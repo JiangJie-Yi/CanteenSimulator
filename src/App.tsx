@@ -12,6 +12,7 @@ import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
 import { Roasting } from './components/Roasting'
 import { Steam } from './components/Steam'
+import { StoveControls } from './components/StoveControls'
 import { DISHES, type Dish as DishInfo } from './menu'
 
 // distance between dishes on the carousel
@@ -207,6 +208,7 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
                 <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={orders[dish.id]}
                   active={i === active} instant={reducedMotion} />
               )}
+              {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
               {dish.heat === 'gas' && (
                 <GasFlame position-y={BURNER_Y} heat={dish.heatControl ? heat / 100 : 1}
                   baseIntensity={theme === 'dark' ? 1.5 : 0.8} />

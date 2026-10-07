@@ -38,7 +38,7 @@ FLARE = 1.06
 WALL = 0.03
 FOOT_H = 0.09         # rubber feet under the stove
 BODY_H = 0.3          # stove body thickness
-Z0 = 0.52 + FOOT_H    # pot bottom, on tall pot supports so the burner flames show underneath
+Z0 = 0.417 + FOOT_H   # pot bottom, on short pot supports with a gap for the burner flames
 BZ = Z0 + 0.30        # broth surface
 INNER_R = POT_R * (1 + (FLARE - 1) * 0.30 / POT_H) - WALL
 
@@ -274,7 +274,10 @@ M = {
     "enamel_dark": pbr("StoveEnamelDark", (0.36, 0.6, 0.52), rough=0.35, coat=0.5),
     "plate": pbr("StovePlate", (0.12, 0.12, 0.13), rough=0.45, metal=0.3),
     "burner": pbr("Burner", (0.25, 0.25, 0.27), rough=0.5, metal=0.7),
-    "knob_mark": pbr("KnobMark", (0.85, 0.2, 0.15), rough=0.4),    "broth": pbr("SpicyBroth", tex=TEX["broth"], nrm=TEX["broth_n"], nrm_strength=0.8, rough=0.16, coat=0.2,
+    "knob_mark": pbr("KnobMark", (0.85, 0.2, 0.15), rough=0.4),
+    "print": pbr("PanelPrint", (0.95, 0.95, 0.92), rough=0.5),
+    "lcd": pbr("Display", (0.16, 0.2, 0.15), rough=0.2, coat=0.6),
+    "broth": pbr("SpicyBroth", tex=TEX["broth"], nrm=TEX["broth_n"], nrm_strength=0.8, rough=0.16, coat=0.2,
                  coat_rough=0.1),
     "beef": pbr("Beef", tex=TEX["beef"], nrm=TEX["beef_n"], rough=0.45),
     "cabbage": pbr("NapaCabbage", tex=TEX["cabbage"], nrm=TEX["cabbage_n"], rough=0.4),
@@ -413,16 +416,54 @@ for fx in (-0.92, 0.92, BODY_X0 - BAY_W + 0.1):
         bevel(o, 0.01, 2)
         finish(o, "StoveFoot", M["bakelite"])
 
-# canister bay on the left end (the gas can is inside, out of sight): low floor, side walls, lid closed over it
-bay_x = BODY_X0 - BAY_W / 2 + 0.02
-box("CanisterBay", (BAY_W, 1.5, 0.07), (bay_x, BODY_Y, FOOT_H + 0.035), M["enamel_dark"], 0.03, 3)
-for wy in (BODY_Y - 0.73, BODY_Y + 0.73):
-    box("CanisterBayWall", (BAY_W, 0.05, BODY_H), (bay_x, wy, body_mid), M["enamel"], 0.02, 3)
-box("CanisterBayWall", (0.05, 1.5, BODY_H), (BODY_X0 - BAY_W + 0.045, BODY_Y, body_mid), M["enamel"], 0.02, 3)
-# the lid, shut flush with the top of the bay, with a finger notch to lift it
-box("CanisterLid", (BAY_W - 0.02, 1.5, 0.03), (bay_x, BODY_Y, FOOT_H + BODY_H - 0.005), M["enamel"], 0.012, 3)
-box("LidNotch", (0.1, 0.16, 0.012), (bay_x - BAY_W / 2 + 0.09, BODY_Y, FOOT_H + BODY_H + 0.012), M["enamel_dark"],
-    0.005, 2)
+# canister housing on the left end (the gas can lies inside, along Y): a profile with a big rounded outer
+# shoulder, extruded front to back, so the cover curves over the can the way real cassette stoves do
+def canister_housing(x_in, x_out, z0, z1, depth, radius, name, mat):
+    pts = [(x_in, z0), (x_out, z0)]
+    # outer side rises, then a quarter arc over to the top
+    for i in range(13):
+        t = i / 12 * math.pi / 2
+        pts.append((x_out + radius - radius * math.cos(t), z1 - radius + radius * math.sin(t)))
+    pts.append((x_in, z1))
+    bm = bmesh.new()
+    y0, y1 = BODY_Y - depth / 2, BODY_Y + depth / 2
+    front = [bm.verts.new((x, y0, z)) for x, z in pts]
+    back = [bm.verts.new((x, y1, z)) for x, z in pts]
+    n = len(pts)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((front[i], front[j], back[j], back[i]))
+    bm.faces.new(front[::-1])
+    bm.faces.new(back)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    bevel(o, 0.02, 3)
+    finish(o, name, mat)
+    # smooth the arc, keep the flat faces crisp
+    o.data.polygons.foreach_set("use_smooth", [True] * len(o.data.polygons))
+    return o
+
+
+HOUSING_OUT = BODY_X0 - BAY_W
+canister_housing(BODY_X0 + 0.02, HOUSING_OUT, FOOT_H, FOOT_H + BODY_H, 1.62, 0.2, "CanisterHousing", M["enamel"])
+# seam where the cover lifts off, running along the top of the curve
+bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.006, depth=1.62,
+                                    location=(HOUSING_OUT + 0.2 - 0.2 * math.cos(math.radians(55)),
+                                              BODY_Y, FOOT_H + BODY_H - 0.2 + 0.2 * math.sin(math.radians(55))),
+                                    rotation=(math.radians(90), 0, 0))
+finish(active(), "HousingSeam", M["enamel_dark"])
+# canister lock lever on the front face of the housing
+lever_x = HOUSING_OUT + 0.24
+box("LockLeverBase", (0.12, 0.02, 0.12), (lever_x, BODY_Y - 0.81 - 0.01, body_mid), M["steel"], 0.01, 2)
+box("LockLever", (0.03, 0.03, 0.15), (lever_x, BODY_Y - 0.81 - 0.035, body_mid + 0.02), M["bakelite"], 0.01, 2)
+# vent slots along the housing's front
+for i in range(5):
+    box("Vent", (0.012, 0.012, 0.09), (HOUSING_OUT + 0.08 + i * 0.03, BODY_Y - 0.81 - 0.004, body_mid - 0.04),
+        M["enamel_dark"], smooth_shade=False)
 
 
 # ignition knob on the front-right
@@ -432,6 +473,22 @@ o = active()
 bevel(o, 0.012, 3)
 finish(o, "Knob", M["bakelite"])
 box("KnobMark", (0.018, 0.008, 0.07), (0.62, FRONT_Y - 0.062, body_mid + 0.02), M["knob_mark"], smooth_shade=False)
+
+# heat scale printed around the knob: ticks over a 270° arc that grow from 小 (left) to 大 (right),
+# matching the web app's knob rotation (src/components/StoveControls.tsx)
+KNOB_X, KNOB_Z = 0.62, body_mid
+for i in range(11):
+    t = i / 10
+    ang = math.radians(225 - 270 * t)          # 225° (lower left) clockwise to -45° (lower right)
+    length = 0.014 + 0.022 * t
+    r = 0.112 + length / 2
+    box("KnobTick", (0.007, 0.004, length),
+        (KNOB_X + r * math.cos(ang), FRONT_Y - 0.002, KNOB_Z + r * math.sin(ang)), M["print"], smooth_shade=False)
+    active().rotation_euler = (0, -(ang - math.pi / 2), 0)
+
+# LCD display panel left of the knob; the web app draws the live heat reading onto it
+box("DisplayBezel", (0.3, 0.012, 0.13), (0.18, FRONT_Y - 0.006, body_mid), M["bakelite"], 0.01, 2)
+box("Display", (0.26, 0.006, 0.09), (0.18, FRONT_Y - 0.014, body_mid), M["lcd"], smooth_shade=False)
 
 # burner and its cap
 plate_top = FOOT_H + BODY_H + 0.013

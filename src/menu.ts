@@ -94,15 +94,18 @@ export const ROAST_STAGES = [
 
 const CHILIES = ['DriedChili', 'SichuanPepper']
 
+/** Files in public/, resolved against the site's base path (\/\ in dev, \/CanteenSimulator/\ on GitHub Pages). */
+const asset = (path: string) => import.meta.env.BASE_URL + path
+
 export const DISHES: Dish[] = [
   {
     id: 'hotpot',
     name: '小火鍋',
-    model: '/models/hotpot.glb',
+    model: asset('models/hotpot.glb'),
     bases: [
-      { id: 'mala', name: '麻辣湯底', price: 120, broth: '/textures/broth-mala.png' },
-      { id: 'tomato', name: '番茄湯底', price: 110, broth: '/textures/broth-tomato.png', hide: CHILIES },
-      { id: 'kombu', name: '昆布湯底', price: 100, broth: '/textures/broth-kombu.png', hide: CHILIES },
+      { id: 'mala', name: '麻辣湯底', price: 120, broth: asset('textures/broth-mala.png') },
+      { id: 'tomato', name: '番茄湯底', price: 110, broth: asset('textures/broth-tomato.png'), hide: CHILIES },
+      { id: 'kombu', name: '昆布湯底', price: 100, broth: asset('textures/broth-kombu.png'), hide: CHILIES },
     ],
     items: [
       { id: 'NapaCabbage', name: '白菜', price: 20 },
@@ -121,14 +124,14 @@ export const DISHES: Dish[] = [
     defaults: ['NapaCabbage', 'BeefSlice', 'Meatball', 'Tofu', 'Corn'],
     heat: 'gas',
     heatControl: true,
-    brothY: 0.91,
+    brothY: 0.81,
     steam: { width: 1.1, height: 1.3 },
-    focusY: 0.58,
+    focusY: 0.5,
   },
   {
     id: 'beefnoodle',
     name: '牛肉麵',
-    model: '/models/beefnoodle.glb',
+    model: asset('models/beefnoodle.glb'),
     bases: [{ id: 'braised', name: '紅燒湯麵', price: 120 }],
     items: [
       { id: 'BeefShank', name: '牛腱肉', price: 80 },
@@ -149,7 +152,7 @@ export const DISHES: Dish[] = [
   {
     id: 'grilledfish',
     name: '烤魚',
-    model: '/models/grilledfish.glb',
+    model: asset('models/grilledfish.glb'),
     bases: [{ id: 'ayu', name: '鹽烤香魚', price: 180 }],
     items: [
       { id: 'ExtraFish', name: '加一尾', price: 80 },

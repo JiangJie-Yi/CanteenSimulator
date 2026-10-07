@@ -38,10 +38,12 @@ function blenderBridge(): Plugin {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command, isPreview }) => ({
+  // GitHub Pages serves the site from https://<user>.github.io/CanteenSimulator/ (and `vite preview` mirrors it)
+  base: command === 'build' || isPreview ? '/CanteenSimulator/' : '/',
   plugins: [react(), blenderBridge()],
   server: {
     // the bridge rewrites this file constantly; don't reload the page for it
     watch: { ignored: ['**/blender/**'] },
   },
-})
+}))
