@@ -3,6 +3,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { playChew } from '../chew'
+import { Steam } from './Steam'
 import { ROAST_STAGES, type Roast } from '../menu'
 
 /** GLTFLoader strips the dot from Blender's "Fish.001", so drop trailing digits to get the type. */
@@ -110,13 +111,15 @@ function Basket({ position }: { position: [number, number, number] }) {
  * Burn patches for over-roasted food: a value-noise mask over the texture that grows as uChar goes 0 → 1, so the
  * food blackens in spots first and ends up fully charred.
  */
-function addCharring(mat: THREE.MeshToonMaterial, uChar: { value: number }) {
+function addCharring(mat: THREE.MeshToonMaterial, uChar: { value: number }, uSalt: { value: number }) {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uChar = uChar
+    shader.uniforms.uSalt = uSalt
     shader.uniforms.uCharColor = { value: CHAR_COLOR }
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', /* glsl */ `#include <common>
         uniform float uChar;
+        uniform float uSalt;
         uniform vec3 uCharColor;
         float charHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float charNoise(vec2 p) {
@@ -132,7 +135,12 @@ function addCharring(mat: THREE.MeshToonMaterial, uChar: { value: number }) {
           float charN = 0.5;
         #endif
         float charMask = smoothstep(1.0 - uChar * 1.15, 1.0 - uChar * 1.15 + 0.2, charN);
-        diffuseColor.rgb = mix(diffuseColor.rgb, uCharColor, charMask);`)
+        diffuseColor.rgb = mix(diffuseColor.rgb, uCharColor, charMask);
+        // coarse salt stuck to the surface: scattered white grains, more of them with every pinch
+        #ifdef USE_MAP
+          float saltN = charHash(floor(vMapUv * vec2(150.0, 90.0)));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 1.0, 0.98), step(1.0 - uSalt * 0.3, saltN));
+        #endif`)
   }
   mat.customProgramCacheKey = () => 'charring'
 }
@@ -157,6 +165,10 @@ type Piece = {
   mats: { mat: THREE.MeshToonMaterial; base: THREE.Color; emissive: THREE.Color; foil: boolean }[]
   /** 0 → 1 how charred the texture is, shared by all of this piece's materials */
   uChar: { value: number }
+  /** 0 → 1 how much salt has been sprinkled on it */
+  uSalt: { value: number }
+  /** seconds since it landed on the plate or in the basket (it steams a little at first) */
+  landed: number
   /** where it sits once collected: index into its plate run (or its pile); null while on the fire */
   slot: number | null
   /** 0 → 1 while being eaten off the plate; eaten pieces are gone until re-ordered */
@@ -191,6 +203,27 @@ function Plate({ position }: { position: [number, number, number] }) {
       </mesh>
     </group>
   )
+}
+
+/** pieces that steam for a moment when they're served (hot fish, potatoes out of the foil) */
+const STEAMS = /^(Fish|ExtraFish|Saury|Mackerel|Potato|SweetPotato)$/
+const WISP_SECONDS = 4.5
+
+/** A little steam rising off food that's just been served, fading out after a few seconds. */
+function Wisp({ at, onDone }: { at: [number, number, number]; onDone: () => void }) {
+  const level = useRef(1)
+  const t = useRef(0)
+  const done = useRef(false)
+  useFrame((_, delta) => {
+    t.current += delta
+    level.current = Math.max(0, 1 - t.current / WISP_SECONDS) ** 1.5
+    if (!done.current && t.current > WISP_SECONDS) {
+      done.current = true
+      onDone()
+    }
+  })
+  return <Steam position={[at[0], at[1] + 0.04, at[2]]} layers={2} width={0.3} height={0.7} opacity={0.6} speed={0.1}
+    level={level} />
 }
 
 type RoastingProps = {
@@ -232,11 +265,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (!(id in roast.times) || known.has(obj)) continue
       const mats: Piece['mats'] = []
       const uChar = { value: 0 }
+      const uSalt = { value: 0 }
       pieces.current.push({
         key: obj.uuid, id, copy: (obj.userData.copy as number | undefined) ?? 0, loose: roast.loose.includes(id),
         node: obj, homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), progress: 0, collected: false,
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
-        toQ: new THREE.Quaternion(), mats, uChar, slot: null, eat: 0, eaten: false,
+        toQ: new THREE.Quaternion(), mats, uChar, uSalt, landed: -1, slot: null, eat: 0, eaten: false,
       })
     }
     scannedCount.current = root.children.length
@@ -257,7 +291,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const mat = (m.material as THREE.MeshToonMaterial).clone()
       // the foil wrapped round potatoes in the ash doesn't brown or char; it comes off when they're served
       const foil = mat.name.startsWith('Foil')
-      if (!foil) addCharring(mat, p.uChar)
+      if (!foil) addCharring(mat, p.uChar, p.uSalt)
       m.material = mat
       p.mats.push({ mat, base: mat.color.clone(), emissive: mat.emissive.clone(), foil })
     }
@@ -286,6 +320,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return new THREE.Vector3(x, y, z).addScaledVector(LAY_DIR, -n * BASKET_STEP)
   }
   const [basketCount, setBasketCount] = useState(1)
+  const [wisps, setWisps] = useState<{ key: string; at: [number, number, number] }[]>([])
   const inBasket = (p: Piece) => !!roast.basket && p.loose
 
   const collect = (p: Piece) => {
@@ -375,6 +410,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const sprinkle = () => {
     shake.current = 1
     salt.left = SALT_SECONDS
+    // everything on the fire gets a little more salt on it as the grains land
+    window.setTimeout(() => {
+      for (const p of pieces.current) if (present(p) && !p.collected) p.uSalt.value = Math.min(1, p.uSalt.value + 0.35)
+    }, 450)
     const { pos, vel } = salt
     for (let i = 0; i < SALT_GRAINS; i++) {
       // a pinch thrown from up high, spreading as it falls over the skewers
@@ -477,14 +516,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const f = fire?.current ?? 0.55
     const ash = THREE.MathUtils.smoothstep(0.5 - f, 0, 0.45)
-    // the heap burns down as the fire dies: the coals shrink and settle (fresh charcoal builds it back up)
-    const heap = 0.4 + 0.6 * THREE.MathUtils.smoothstep(f, 0, 0.55)
-    for (const name of ['BinchotanHeap', 'Charcoal']) {
-      const o = root.getObjectByName(name)
-      if (!o) continue
-      const s0 = (o.userData.baseScale ??= o.scale.clone()) as THREE.Vector3
-      o.scale.set(s0.x * heap, s0.y * heap ** 1.5, s0.z * heap)
-    }
+
     for (const e of embers.current) {
       // no fire, no glow
       e.mat.emissiveIntensity = e.base * 1.23 * f ** 1.6
@@ -526,6 +558,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (!present(p)) {
         // taken off the order: next time it comes back raw, on its skewer
         p.progress = 0
+        p.uSalt.value = 0
+        p.landed = -1
         p.collected = false
         p.flight = 0
         p.slot = null
@@ -544,6 +578,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.node.position.z = p.homeP.z
         if (!menuIds.has(p.id)) p.node.position.y = p.homeP.y   // the base fish has no pop-in driving y
       } else {
+        if (p.flight >= 1) p.landed += dt
+        else p.landed = -1
+        if (p.flight < 1 && p.flight + dt / FLIGHT_SECONDS >= 1 && STEAMS.test(p.id) && !p.eaten) {
+          p.landed = 0
+          setWisps((all) => [...all.filter((w) => w.key !== p.key), { key: p.key, at: p.toP.toArray() as [number, number, number] }])
+        }
         p.flight = Math.min(1, p.flight + dt / FLIGHT_SECONDS)
         const e = p.flight < 0.5 ? 2 * p.flight * p.flight : 1 - (-2 * p.flight + 2) ** 2 / 2
         p.node.position.lerpVectors(p.fromP, p.toP, e)
@@ -634,6 +674,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <Basket key={n} position={basketAt(n).toArray() as [number, number, number]} />
       ))}
       <points geometry={salt.geometry} material={saltMaterial} frustumCulled={false} renderOrder={3} />
+      {wisps.map((w) => (
+        <Wisp key={w.key} at={w.at} onDone={() => setWisps((all) => all.filter((x) => x.key !== w.key))} />
+      ))}
       {active && tags.map(({ key, id, state }) => (
         <group key={key} ref={(g) => { anchors.current[key] = g }}>
           <Html center zIndexRange={[30, 10]}>

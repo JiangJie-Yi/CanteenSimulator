@@ -56,6 +56,16 @@ char = smooth(0.45, 0.7, fbm(N, 4, 4))
 TEX["bark"] = image("T_Bark", mix(bark, (0.035, 0.03, 0.028), char * 0.9))
 TEX["bark_n"] = image("T_Bark_N", to_normal(ridges, 4.0), data=True)
 
+# split bamboo for the skewers (u: around, v: along): fine lengthwise fibres, darker streaks, a couple of nodes
+N = 256
+u, v = grid01(N)
+fibres = vnoise(N, 90, 3) * 0.6 + vnoise(N, 40, 2) * 0.4
+bamboo = mix((0.66, 0.5, 0.28), (0.88, 0.75, 0.5), fibres)
+bamboo = mix(bamboo, (0.5, 0.36, 0.18), smooth(0.72, 0.9, vnoise(N, 24, 6)) * 0.6)
+for node in (0.33, 0.71):
+    bamboo = mix(bamboo, (0.48, 0.34, 0.17), smooth(0.012, 0.0, np.abs(v - node)) * 0.8)
+TEX["bamboo"] = image("T_Bamboo", bamboo)
+
 # glowing charcoal: dark lumps with hot cracks (emission map)
 N = 256
 cracks = 1 - smooth(0.0, 0.05, np.abs(fbm(N, 6, 6) - 0.5))
@@ -193,7 +203,7 @@ M = {
     "ember": pbr("Ember", tex=TEX["ember"], nrm=TEX["ember_n"], rough=0.9, emit_tex=TEX["ember_e"], emit_strength=6.0),
     "stone": pbr("Stone", tex=TEX["stone"], nrm=TEX["stone_n"], rough=0.8),
     "pit": pbr("FirePit", tex=TEX["pit"], nrm=TEX["pit_n"], rough=0.95, blend=True),
-    "stick": pbr("BambooSkewer", (0.82, 0.68, 0.42), rough=0.6),
+    "stick": pbr("BambooSkewer", tex=TEX["bamboo"], rough=0.6),
     "fish": pbr("Ayu", tex=TEX["fish"], nrm=TEX["fish_n"], rough=0.4, coat=0.3),
     "salt": pbr("SaltCrust", (0.97, 0.97, 0.95), rough=0.8),
     "saury": pbr("Saury", tex=TEX["saury"], nrm=TEX["fish_n"], rough=0.3, coat=0.4),
@@ -379,25 +389,46 @@ def stick_frame(angle_deg, along, var=(0.0, 0.0, 0.0)):
 
 
 def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
-    """The bamboo stick; `extra` lengthens it past the tip (sticks come long and short)."""
+    """The bamboo stick, hand-split rather than machined: thin, a little uneven in thickness and section, with
+    a slight bow, whittled to a point at the top. `extra` lengthens it past the tip (sticks come long and short)."""
     _, foot, tip = stick_frame(angle_deg, 0, var)
     d = tip - foot
     length = d.length + 0.08 + extra
-    centre = foot + d.normalized() * (length / 2 - 0.08)
-    rot = d.to_track_quat("Z", "Y").to_euler()
-    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.012, depth=length, location=centre)
-    shaft = active()
-    shaft.rotation_euler = rot
-    finish(shaft, name, M["stick"])
-    # sharpened point continuing past the top of the shaft
-    point_len = 0.07
-    bpy.ops.mesh.primitive_cone_add(vertices=10, radius1=0.012, radius2=0.0, depth=point_len,
-                                    location=centre + d.normalized() * (length / 2 + point_len / 2))
-    point = active()
-    point.rotation_euler = rot
-    finish(point, name + "Point", M["stick"])
-    return join([shaft, point], name)
-
+    point_len = 0.06
+    total = length + point_len
+    rings, seg = 40, 8
+    r0 = random.uniform(0.0065, 0.0085)
+    bow = random.uniform(-0.008, 0.008)
+    flat = random.uniform(0.8, 1.0)                      # split bamboo is never quite round
+    wob = [random.uniform(0.88, 1.12) for _ in range(7)]
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    grid = []
+    for i in range(rings + 1):
+        t = i / rings
+        z = t * total
+        # thickness drifts along the stick, then tapers to the point over the last few centimetres
+        k = wob[int(t * 5)] * (1 - (t * 5 % 1)) + wob[int(t * 5) + 1] * (t * 5 % 1)
+        if z > length:
+            k *= max(0.0, 1 - (z - length) / point_len) ** 0.8
+        off = bow * math.sin(t * math.pi)
+        grid.append([bm.verts.new((r0 * k * math.cos(2 * math.pi * j / seg) + off,
+                                   r0 * k * flat * math.sin(2 * math.pi * j / seg), z - 0.08)) for j in range(seg)])
+    for i in range(rings):
+        for j in range(seg):
+            jn = (j + 1) % seg
+            f = bm.faces.new((grid[i][j], grid[i][jn], grid[i + 1][jn], grid[i + 1][j]))
+            for l, (uu, vv) in zip(f.loops, ((j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1))):
+                l[uvl].uv = (uu / seg, vv / rings)
+    bm.faces.new(grid[0][::-1])
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    shaft = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(shaft)
+    # local Z runs up the stick from just below its foot
+    shaft.matrix_world = Matrix.Translation(foot) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4()
+    return finish(shaft, name, M["stick"])
 
 def place(objs, angle_deg, along, name, stick=True):
     """Join the parts, move them onto the skewer and (optionally) add the stick into the same object."""
@@ -859,21 +890,17 @@ def roast_in_ash(name, mat, angle_deg, r, size, bend=0.0):
     bm.free()
     o.scale = size
     finish(o, name, mat)
-    # the foil: a crumpled, slightly larger copy of the same shape, open at the top
+    # the foil: a crumpled, slightly larger copy of the same shape, wrapping it right round
     foil = o.copy()
     foil.data = o.data.copy()
     foil.data.materials.clear()
     bpy.context.collection.objects.link(foil)
     bm = bmesh.new()
     bm.from_mesh(foil.data)
-    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z > 0.62], context="VERTS")
     for vtx in bm.verts:
-        vtx.co *= 1.09 * random.uniform(0.97, 1.06)
-    for vtx in bm.verts:
-        if vtx.is_boundary:
-            vtx.co.z += random.uniform(0.0, 0.18)          # the crimped edge, folded up unevenly
-            vtx.co.x *= 0.9
-            vtx.co.y *= 0.9
+        vtx.co *= 1.1 * random.uniform(0.97, 1.07)
+        if vtx.co.z > 0.8:
+            vtx.co.z += random.uniform(0.05, 0.2)          # the twist where the foil is gathered on top
     bm.to_mesh(foil.data)
     bm.free()
     finish(foil, name + "Foil", M["foil"], smooth_shade=False)

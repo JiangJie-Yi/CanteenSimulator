@@ -97,12 +97,31 @@ function toToon(src: THREE.MeshStandardMaterial): THREE.MeshToonMaterial {
   return toon
 }
 
+const worldScale = new THREE.Vector3()
+
+/**
+ * Keep an outline's line the same width on screen as its piece grows. The width is in the mesh's own units, so it
+ * is divided by the largest world scale the piece has reached: a piece popping in from nothing (or being eaten
+ * away) gets a line that shrinks with it, instead of one sized for scale 0.0001 that would swallow the whole view.
+ */
+function scaleOutline(outline: THREE.Mesh) {
+  // each outline needs its own uniform (clones would otherwise share the original's)
+  outline.material = (outline.material as THREE.ShaderMaterial).clone()
+  outline.userData.maxScale = 0
+  outline.onBeforeRender = () => {
+    outline.parent?.getWorldScale(worldScale)
+    const avg = (worldScale.x + worldScale.y + worldScale.z) / 3
+    if (avg > outline.userData.maxScale) {
+      outline.userData.maxScale = avg
+      ;(outline.material as THREE.ShaderMaterial).uniforms.uWidth.value = OUTLINE_WIDTH / avg
+    }
+  }
+}
+
 /** Inverted-hull ink outline: back faces pushed out along the normals. */
 function makeOutline(mesh: THREE.Mesh): THREE.Mesh {
-  const scale = mesh.getWorldScale(new THREE.Vector3())
-  const avg = (scale.x + scale.y + scale.z) / 3
   const material = new THREE.ShaderMaterial({
-    uniforms: { uWidth: { value: OUTLINE_WIDTH / avg }, uColor: { value: INK } },
+    uniforms: { uWidth: { value: 0 }, uColor: { value: INK } },
     vertexShader: /* glsl */ `
       uniform float uWidth;
       void main() {
@@ -116,6 +135,7 @@ function makeOutline(mesh: THREE.Mesh): THREE.Mesh {
   const outline = new THREE.Mesh(mesh.geometry, material)
   outline.name = `${mesh.name}_outline`
   outline.raycast = () => {}
+  scaleOutline(outline)
   return outline
 }
 
@@ -243,6 +263,7 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout
     for (const src of originals) {
       // start from where the piece was authored, not where it is now (it may be on the plate)
       const node = src.node.clone(true)
+      node.traverse((o) => { if (o instanceof THREE.Mesh && o.name.endsWith('_outline')) scaleOutline(o) })
       node.userData = { itemId: id, copy }
       node.position.copy(src.homeP).applyAxisAngle(UP, angle)
       node.quaternion.copy(src.homeQ).premultiply(swing)

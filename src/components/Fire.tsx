@@ -64,10 +64,14 @@ const emberFragment = /* glsl */ `
 uniform float uLevel;
 varying float vLife;
 void main() {
+  // a crisp, bright spark: a hard-edged dot with a hot yellow-white core, so it reads on a pale background too
   float d = length(gl_PointCoord - 0.5);
-  float a = smoothstep(0.5, 0.0, d) * smoothstep(0.0, 0.15, vLife) * vLife * uLevel;
-  vec3 col = mix(vec3(1.0, 0.3, 0.05), vec3(1.0, 0.8, 0.4), vLife);
-  gl_FragColor = vec4(col * a * 2.0, a);
+  float spark = 1.0 - smoothstep(0.38, 0.5, d);
+  float core = 1.0 - smoothstep(0.1, 0.28, d);
+  float a = spark * smoothstep(0.0, 0.12, vLife) * min(1.0, vLife * 1.6) * uLevel;
+  vec3 col = mix(vec3(0.95, 0.28, 0.04), vec3(1.0, 0.62, 0.15), vLife);
+  col = mix(col, vec3(1.0, 0.95, 0.7), core);
+  gl_FragColor = vec4(col, a);
 }
 `
 
@@ -83,7 +87,7 @@ type FireProps = ThreeElements['group'] & {
 }
 
 /** Campfire flames (crossed noise planes), rising embers and a flickering firelight. */
-export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, baseIntensity = 7, level, ...props }: FireProps) {
+export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 90, baseIntensity = 7, level, ...props }: FireProps) {
   const flameGeometry = useMemo(() => {
     const g = new THREE.PlaneGeometry(width, height, 16, 48)
     g.translate(0, height / 2, 0)
@@ -118,7 +122,7 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, base
     for (let i = 0; i < embers; i++) {
       maxLife[i] = 1.5 + Math.random() * 2
       life[i] = Math.random()
-      size[i] = 0.02 + Math.random() * 0.03
+      size[i] = 0.035 + Math.random() * 0.035
     }
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -135,7 +139,6 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, base
         uniforms: { uLevel: { value: 1 } },
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
         toneMapped: false,
       }),
     [],
