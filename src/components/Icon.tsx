@@ -142,6 +142,18 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M7 11h.01M20 4v4M18 6h4" />
     </>
   ),
+  Saury: (
+    <>
+      <path d="M2 12c4-2.5 12-2.5 16 0-4 2.5-12 2.5-16 0zM18 12l4-3-1.5 3 1.5 3z" />
+      <path d="M5 11.5h.01M8 12h8" />
+    </>
+  ),
+  Mackerel: (
+    <>
+      <path d="M3 12c3-4 10-4 14 0-4 4-11 4-14 0zM17 12l4-3.5-1.5 3.5 1.5 3.5z" />
+      <path d="M8 9.5l1.5 2M11 9.5l1.5 2M14 10l1 1.5M6 11.5h.01" />
+    </>
+  ),
   GrilledCorn: (
     <>
       <ellipse cx="12" cy="10" rx="3.5" ry="6.5" />

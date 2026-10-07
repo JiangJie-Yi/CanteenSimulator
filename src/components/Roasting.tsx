@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { playChew } from '../chew'
 import { ROAST_STAGES, type Roast } from '../menu'
 
 /** GLTFLoader strips the dot from Blender's "Fish.001", so drop trailing digits to get the type. */
@@ -24,6 +25,11 @@ const STACK_DIR = new THREE.Vector3(0.81, 0, -0.59).normalize()
 const PLATE_R = 0.62
 const SLOT_GAP = 0.2       // wider than the broadest piece (a fish lying flat)
 const PER_LAYER = 5
+/** a plate takes 20 (four layers of five); the next one is set down behind it */
+const PER_PLATE = 20
+const PLATE_STEP = 1.45
+/** seconds to eat one piece: a few bites, each taking a chunk out */
+const EAT_SECONDS = 1.3
 const UP = new THREE.Vector3(0, 1, 0)
 /**
  * Fill order for a pyramid pile, as [layer, position across in piece-widths]. It grows from the middle out and
@@ -91,6 +97,11 @@ type Piece = {
   mats: { mat: THREE.MeshToonMaterial; base: THREE.Color; emissive: THREE.Color }[]
   /** 0 → 1 how charred the texture is, shared by all of this piece's materials */
   uChar: { value: number }
+  /** where it sits once collected: index into its plate run (or its pile); null while on the fire */
+  slot: number | null
+  /** 0 → 1 while being eaten off the plate; eaten pieces are gone until re-ordered */
+  eat: number
+  eaten: boolean
 }
 
 type TagState = { stage: (typeof ROAST_STAGES)[number]['key']; label: string; pct: number }
@@ -158,7 +169,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         key: obj.uuid, id, copy: (obj.userData.copy as number | undefined) ?? 0, loose: roast.loose.includes(id),
         node: obj, homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), progress: 0, collected: false,
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
-        toQ: new THREE.Quaternion(), mats, uChar,
+        toQ: new THREE.Quaternion(), mats, uChar, slot: null, eat: 0, eaten: false,
       })
     }
     scannedCount.current = root.children.length
@@ -187,12 +198,32 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
   const present = (p: Piece) => !menuIds.has(p.id) || p.copy < (quantities[p.id] ?? 0)
 
+  /**
+   * Plate n of the run. They go around the fire at the first plate's distance: the 2nd to its front-right, the
+   * rest round the back (so none sits between the camera and the fire); a full lap moves out a ring.
+   */
+  const plateAt = (n: number) => {
+    const [x, y, z] = roast.plate
+    const r0 = Math.hypot(x, z)
+    const a0 = Math.atan2(z, x)
+    const step = 2 * Math.asin(Math.min(1, (PLATE_STEP / 2) / r0))     // angle between neighbouring plates
+    const order = [0, 1, -1, -2, -3, -4, -5]                             // in steps, from the first plate
+    const lap = Math.floor(n / order.length)
+    const a = a0 + order[n % order.length] * step + lap * step / 2
+    const r = r0 + lap * PLATE_STEP
+    return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r)
+  }
+  const [plateCount, setPlateCount] = useState(1)
+
   const collect = (p: Piece) => {
     if (p.collected || !present(p)) return
     const pile = roast.piles?.[p.id]
-    // count what's already gone to the same place: this item's pile, or the plate
-    const slot = pieces.current.filter((q) => q.collected && present(q) &&
-      (pile ? q.id === p.id : !roast.piles?.[q.id])).length
+    // take the first free spot where it's going (this item's pile, or the plates); eaten food frees its spot
+    const taken = new Set(pieces.current.filter((q) => q.slot !== null && !q.eaten && present(q) &&
+      (pile ? q.id === p.id : !roast.piles?.[q.id])).map((q) => q.slot))
+    let slot = 0
+    while (taken.has(slot)) slot++
+    p.slot = slot
     p.collected = true
     // tells Dish to stop driving this node's position (its pop-in would pull it back up to skewer height)
     p.node.userData.onPlate = true
@@ -208,11 +239,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         .addScaledVector(LAY_DIR, -heap * pile.spacing * 2.6)
       p.toP.y += pile.spacing * (0.42 + layer * 0.8)
     } else {
-      // side by side across the plate, centred; a full row starts a new layer on top
-      const col = slot % PER_LAYER
-      const layer = Math.floor(slot / PER_LAYER)
+      // side by side across the plate, centred; a full row starts a new layer on top; a full plate, a new plate
+      const plate = Math.floor(slot / PER_PLATE)
+      const within = slot % PER_PLATE
+      const col = within % PER_LAYER
+      const layer = Math.floor(within / PER_LAYER)
       const across = (col - (PER_LAYER - 1) / 2) * SLOT_GAP + (layer % 2) * (SLOT_GAP / 2)
-      p.toP.set(...roast.plate).addScaledVector(STACK_DIR, across)
+      p.toP.copy(plateAt(plate)).addScaledVector(STACK_DIR, across)
+      if (plate + 1 > plateCount) setPlateCount(plate + 1)
       // skewers are longer than the plate is wide, so the stick rests across the rim (top ≈ 0.08) instead of
       // cutting through it
       p.toP.y += (p.loose ? 0.075 : 0.105) + layer * LAYER_HEIGHT
@@ -238,8 +272,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
   }
 
-  // pointer: hovering food on the fire makes it glow and turns the cursor into a hand; a click (not a drag that
-  // orbits the camera) takes it off the fire
+  /** Eat a piece that's sitting on the plate (or a pile): a few chewing bites and it's gone. */
+  const eat = (p: Piece) => {
+    if (!p.collected || p.flight < 1 || p.eat > 0 || p.eaten || !present(p)) return
+    p.eat = 0.0001
+    playChew(4, EAT_SECONDS)
+  }
+
+  // pointer: hovering food on the fire or the plate makes it glow and turns the cursor into a hand; a click (not
+  // a drag that orbits the camera) takes it off the fire, or eats it once it's on the plate
   const { gl, camera, raycaster } = useThree()
   const hovered = useRef<Piece | null>(null)
   // the hovered food's tag brightens too (tags sit at low opacity until pointed at)
@@ -260,7 +301,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1,
         -((e.clientY - rect.top) / rect.height) * 2 + 1)
       raycaster.setFromCamera(ndc, camera)
-      const candidates = pieces.current.filter((p) => !p.collected && present(p))
+      const candidates = pieces.current.filter((p) => present(p) &&
+        (!p.collected || (p.flight >= 1 && p.eat === 0 && !p.eaten)))
       const hits = raycaster.intersectObjects(candidates.map((p) => p.node), true)
       if (!hits.length) return null
       let o: THREE.Object3D | null = hits[0].object
@@ -278,7 +320,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const onUp = (e: PointerEvent) => {
       if (e.button !== 0 || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
       const p = pick(e)
-      if (p) collect(p)
+      if (!p) return
+      if (p.collected) eat(p)
+      else collect(p)
     }
     const onLeave = () => {
       setHover(null)
@@ -312,6 +356,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.progress = 0
         p.collected = false
         p.flight = 0
+        p.slot = null
+        p.eat = 0
+        p.eaten = false
         p.node.userData.onPlate = false
         p.node.quaternion.copy(p.homeQ)
         p.node.position.copy(p.homeP)
@@ -347,7 +394,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       // burnt food shrivels a little. Menu items get their scale from Dish's pop-in, which applies this factor;
       // the base fish has no pop-in, so set it directly.
-      const shrink = 1 - 0.08 * THREE.MathUtils.smoothstep(r, 1.8, CHAR_FULL)
+      let shrink = 1 - 0.08 * THREE.MathUtils.smoothstep(r, 1.8, CHAR_FULL)
+      // being eaten: shrinks a bite at a time, with a little squash on each chew
+      if (p.eat > 0 && !p.eaten) {
+        p.eat = Math.min(1, p.eat + dt / EAT_SECONDS)
+        const bites = Math.floor(p.eat * 4)
+        shrink *= (1 - bites * 0.22) * (1 - 0.06 * Math.abs(Math.sin(p.eat * Math.PI * 4)))
+        if (p.eat >= 1) {
+          p.eaten = true
+          p.slot = null
+        }
+      }
+      if (p.eaten) shrink = 0.0001
       if (menuIds.has(p.id)) p.node.userData.shrink = shrink
       else p.node.scale.setScalar(shrink)
 
@@ -362,6 +420,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     since.current += delta
     if (since.current < 0.25) return
     since.current = 0
+    // keep as many plates out as the food on them needs (always at least one)
+    let need = 1
+    for (const p of pieces.current) {
+      if (p.slot !== null && !p.eaten && present(p) && !roast.piles?.[p.id]) {
+        need = Math.max(need, Math.floor(p.slot / PER_PLATE) + 1)
+      }
+    }
+    if (need !== plateCount) setPlateCount(need)
     const next: { key: string; id: string; state: TagState }[] = []
     for (const p of pieces.current) {
       if (!present(p) || p.collected) continue
@@ -380,7 +446,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
   return (
     <>
-      <Plate position={roast.plate} />
+      {Array.from({ length: plateCount }, (_, n) => (
+        <Plate key={n} position={plateAt(n).toArray() as [number, number, number]} />
+      ))}
       {active && tags.map(({ key, id, state }) => (
         <group key={key} ref={(g) => { anchors.current[key] = g }}>
           <Html center zIndexRange={[30, 10]}>

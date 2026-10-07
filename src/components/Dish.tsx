@@ -47,6 +47,19 @@ const UP = new THREE.Vector3(0, 1, 0)
 const FLOAT_DEPTH = 0.12
 const FLOAT_EASE = 2.6
 
+/**
+ * Natural variation for one piece: ±15% in size and a random turn — about its own skewer (local X, the stick
+ * axis in blender/grilledfish.py) for skewers, about the vertical for food lying in a pot or bowl.
+ */
+function jitter(node: THREE.Object3D, skewer: boolean) {
+  node.scale.multiplyScalar(0.85 + Math.random() * 0.3)
+  const q = skewer
+    ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (Math.random() - 0.5) * 1.1)
+    : new THREE.Quaternion().setFromAxisAngle(UP, Math.random() * Math.PI * 2)
+  if (skewer) node.quaternion.multiply(q)
+  else node.quaternion.premultiply(q)
+}
+
 /** GLTFLoader strips the dot from Blender's "Meatball.001", so drop trailing digits to get the type. */
 const baseName = (name: string) => name.replace(/\d+$/, '')
 
@@ -159,11 +172,22 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout
       const list = groups.get(id)!
       obj.userData.itemId = id
       obj.userData.copy = 0
+      // once per node (the scene is cached across remounts): remember the authored scale, then vary it
+      if (!obj.userData.authoredScale) {
+        obj.userData.authoredScale = obj.scale.clone()
+        jitter(obj, isSkewer(id))
+      }
       list.push({ node: obj, copy: 0, index: list.length, baseScale: obj.scale.clone(), baseY: obj.position.y,
         homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), on: true, s: 1, v: 0, y: 0, vy: 0 })
     })
     return groups
   }, [scene, ids])
+
+  /** Skewers around a fire get spun about their own stick; everything else turns about the vertical. */
+  // (a hoisted declaration: the items memo above calls it during the first render)
+  function isSkewer(id: string) {
+    return layout?.mode === 'ring' && layout.spread?.[id] === undefined
+  }
 
   /** Every portion's pieces currently placed in the dish (for finding free spots on the fire ring). */
   const occupiedAzimuths = () => {
@@ -220,10 +244,14 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout
       node.userData = { itemId: id, copy }
       node.position.copy(src.homeP).applyAxisAngle(UP, angle)
       node.quaternion.copy(src.homeQ).premultiply(swing)
+      // every portion is a little different: its own size and turn
+      node.scale.copy(src.node.userData.authoredScale ?? src.baseScale)
+      jitter(node, isSkewer(id))
+      const baseScale = node.scale.clone()
       node.scale.setScalar(0.0001)
       node.visible = false
       src.node.parent!.add(node)
-      pieces.push({ node, copy, index: src.index, baseScale: src.baseScale.clone(), baseY: node.position.y,
+      pieces.push({ node, copy, index: src.index, baseScale, baseY: node.position.y,
         homeP: node.position.clone(), homeQ: node.quaternion.clone(), on: false, s: 0, v: 0, y: 0, vy: 0 })
     }
   }

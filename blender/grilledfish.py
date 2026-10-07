@@ -99,6 +99,36 @@ body = mix(body, (0.2, 0.12, 0.06), scorch * 0.75)
 TEX["fish"] = image("T_Ayu", body)
 TEX["fish_n"] = image("T_Ayu_N", to_normal(vnoise(N, 120, 60) * 0.3 + scorch * 0.5, 1.5), data=True)
 
+# Pacific saury (秋刀魚): steel-blue back, a crisp line onto a bright silver belly, blistered from the grill
+back = smooth(0.52, 0.6, v + (fbm(N, 10, 4) - 0.5) * 0.04)
+saury = mix((0.86, 0.87, 0.86), (0.2, 0.27, 0.38), back)
+saury = mix(saury, (0.55, 0.6, 0.62), smooth(0.04, 0.0, np.abs(v - 0.56)) * 0.6)      # lateral line sheen
+saury = mix(saury, (0.22, 0.13, 0.07), scorch * 0.7)
+TEX["saury"] = image("T_Saury", saury)
+
+# mackerel (鯖魚): blue-green back with dark wavy bars, silver-cream belly, grill-browned
+back = smooth(0.48, 0.62, v)
+waves = smooth(0.7, 0.85, 0.5 + 0.5 * np.sin((u * 26 + np.sin(v * 22) * 0.35) * 2 * np.pi)) * back
+mackerel = mix((0.88, 0.86, 0.78), (0.24, 0.42, 0.44), back)
+mackerel = mix(mackerel, (0.07, 0.1, 0.12), waves * 0.85)
+mackerel = mix(mackerel, (0.3, 0.18, 0.08), scorch * 0.6)
+TEX["mackerel"] = image("T_Mackerel", mackerel)
+
+# coarse salt rubbed over every fish (塩焼き): white grains speckled all over the skin
+salt_grains = (vnoise(N, 150, 75) > 0.8).astype(np.float32) * smooth(0.0, 0.3, fbm(N, 6, 6) + 0.2)
+for key in ("fish", "saury", "mackerel"):
+    img = TEX[key]
+    px = np.array(img.pixels[:], np.float32).reshape(N, N, 4)[..., :3]
+    TEX[key] = image(img.name + "_Salted", mix(px, (0.97, 0.97, 0.95), salt_grains * 0.85))
+
+# binchotan: grey-white crust with fine lengthwise ridges and dark cracks
+N = 256
+u, v = grid01(N)
+ridges = vnoise(N, 40, 4)
+binchotan = mix((0.32, 0.31, 0.3), (0.62, 0.6, 0.57), ridges)
+binchotan = mix(binchotan, (0.08, 0.07, 0.07), smooth(0.03, 0.0, np.abs(fbm(N, 3, 8) - 0.5)))
+TEX["binchotan"] = image("T_Binchotan", binchotan)
+
 # grilled corn: kernels with charred patches
 N = 256
 u, v = grid01(N)
@@ -161,6 +191,11 @@ M = {
     "stick": pbr("BambooSkewer", (0.82, 0.68, 0.42), rough=0.6),
     "fish": pbr("Ayu", tex=TEX["fish"], nrm=TEX["fish_n"], rough=0.4, coat=0.3),
     "salt": pbr("SaltCrust", (0.97, 0.97, 0.95), rough=0.8),
+    "saury": pbr("Saury", tex=TEX["saury"], nrm=TEX["fish_n"], rough=0.3, coat=0.4),
+    "binchotan": pbr("Binchotan", tex=TEX["binchotan"], rough=0.9),
+    "saury_fin": pbr("SauryFin", (0.32, 0.36, 0.42), rough=0.5),
+    "mackerel": pbr("Mackerel", tex=TEX["mackerel"], nrm=TEX["fish_n"], rough=0.35, coat=0.4),
+    "mackerel_fin": pbr("MackerelFin", (0.36, 0.42, 0.4), rough=0.5),
     "eye": pbr("FishEye", (0.95, 0.95, 0.9), rough=0.2),
     "pupil": pbr("FishPupil", (0.05, 0.05, 0.06), rough=0.2),
     "corn": pbr("GrilledCorn", tex=TEX["corn"], nrm=TEX["corn_n"], rough=0.4),
@@ -196,34 +231,52 @@ bm.to_mesh(o.data)
 bm.free()
 finish(o, "FirePit", M["pit"], smooth_shade=False)
 
-# logs leaning into a teepee, so the flames sit in the middle of the skewers: long and short, thick and thin
-N_LOGS = 9
-for i in range(N_LOGS):
-    a = i * 2 * math.pi / N_LOGS + random.uniform(-0.18, 0.18)
-    r = random.uniform(0.035, 0.068)
-    reach = random.uniform(0.26, 0.46)          # how far out the foot rests: short logs stand closer in
-    top = random.uniform(0.26, 0.48)
-    foot = Vector((reach * math.cos(a), reach * math.sin(a), 0.02))
-    tip = Vector((0.05 * math.cos(a + 2.5), 0.05 * math.sin(a + 2.5), top))
-    d = tip - foot
-    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=r, depth=d.length, location=(foot + tip) / 2)
-    o = active()
-    o.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
-    cyl_uv(o)
-    bevel(o, 0.01, 2)
-    finish(o, "Log", M["bark"])
-
-# a few short split logs lying across the base of the fire
-for _ in range(3):
+# binchotan (備長炭) charcoal fire, the Japanese way: long thin sticks of white charcoal heaped into a low mound,
+# ash-grey on the outside and glowing through the cracks. Sizes and angles vary stick to stick.
+sticks = []
+for i in range(34):
     a = random.uniform(0, 2 * math.pi)
-    r = random.uniform(0.04, 0.055)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=r, depth=random.uniform(0.28, 0.42),
-                                        location=(random.uniform(-0.12, 0.12), random.uniform(-0.12, 0.12), r + 0.01),
-                                        rotation=(0, math.radians(90), a))
+    r = math.sqrt(random.uniform(0, 1)) * 0.36
+    length = random.uniform(0.14, 0.34)
+    radius = random.uniform(0.018, 0.034)
+    lift = max(0.0, 0.12 * (1 - r / 0.4)) * random.uniform(0.4, 1.0)     # mounded in the middle
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=radius, depth=length,
+                                        location=(r * math.cos(a), r * math.sin(a), radius + lift),
+                                        rotation=(math.radians(90) + random.uniform(-0.35, 0.35), 0,
+                                                  random.uniform(0, math.pi)))
     o = active()
     cyl_uv(o)
-    bevel(o, 0.01, 2)
-    finish(o, "Log", M["bark"])
+    bevel(o, 0.006, 1)
+    # the ones down in the middle of the heap glow; the outer ones are grey white charcoal
+    sticks.append(finish(o, "Binchotan", M["ember"] if r < 0.22 or random.random() < 0.3 else M["binchotan"],
+                         smooth_shade=False))
+join(sticks, "BinchotanHeap")
+
+# coarse salt: grains strewn over the ash around the skewer feet, and a few little heaps of it
+grains = []
+for _ in range(260):
+    a = random.uniform(0, 2 * math.pi)
+    r = random.uniform(0.45, 0.92)
+    s = random.uniform(0.006, 0.014)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(r * math.cos(a), r * math.sin(a), 0.008 + s * 0.3),
+                                    rotation=(random.uniform(0, 3), random.uniform(0, 3), random.uniform(0, 3)))
+    o = active()
+    o.scale = (s, s * random.uniform(0.7, 1.2), s * random.uniform(0.6, 1.0))
+    grains.append(finish(o, "Grain", M["salt"], smooth_shade=False))
+join(grains, "SaltGrains")
+for a_deg, r, size in ((-20, 0.66, 0.09), (150, 0.7, 0.07), (-150, 0.62, 0.06)):
+    a = math.radians(a_deg)
+    bpy.ops.mesh.primitive_cone_add(vertices=20, radius1=size, radius2=size * 0.15, depth=size * 0.7,
+                                    location=(r * math.cos(a), r * math.sin(a), size * 0.35 + 0.004))
+    o = active()
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    for vtx in bm.verts:
+        vtx.co *= random.uniform(0.88, 1.08)
+    bm.to_mesh(o.data)
+    bm.free()
+    bevel(o, size * 0.2, 2)
+    finish(o, "SaltHeap", M["salt"])
 
 # a thick bed of glowing charcoal, heaped higher in the middle; joined into one mesh to keep draw calls low
 coals = []
@@ -325,51 +378,99 @@ def place(objs, angle_deg, along, name, stick=True):
     return o
 
 
-def fish():
-    """A salt-grilled ayu along local X (head at +X), curved like it's swimming up the skewer."""
+def flat_fin(name, outline, thickness, mat, at=(0, 0, 0)):
+    """A thin fin from a 2D outline in the fish's X/Z plane (X along the body, Z up), lightly thickened in Y,
+    with ray grooves suggested by the edge being slightly scalloped."""
+    bm = bmesh.new()
+    verts = [bm.verts.new((at[0] + x, at[1], at[2] + z)) for x, z in outline]
+    face = bm.faces.new(verts)
+    bmesh.ops.triangulate(bm, faces=[face], quad_method="BEAUTY", ngon_method="EAR_CLIP")
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    s = o.modifiers.new("Solidify", "SOLIDIFY")
+    s.thickness = thickness
+    s.offset = 0
+    return finish(o, name, mat, smooth_shade=False)
+
+
+def forked_tail(length, height, peduncle):
+    """Outline of a forked (swallow) tail, starting at the body at x=0 and spreading back to -length:
+    narrow at the root, two pointed lobes, and a V notch between them — the arrow-like tail of real fish."""
+    pts = [(0.0, peduncle)]
+    # upper edge sweeping out to the upper lobe tip
+    for t in (0.35, 0.7):
+        pts.append((-length * t, peduncle + (height - peduncle) * t ** 1.4))
+    pts.append((-length, height))                      # upper tip
+    pts.append((-length * 0.86, height * 0.55))        # trailing edge curving in…
+    pts.append((-length * 0.62, height * 0.12))
+    pts.append((-length * 0.58, 0.0))                  # …to the notch
+    pts.append((-length * 0.62, -height * 0.12))
+    pts.append((-length * 0.86, -height * 0.55))
+    pts.append((-length, -height))                     # lower tip
+    for t in (0.7, 0.35):
+        pts.append((-length * t, -peduncle - (height - peduncle) * t ** 1.4))
+    pts.append((0.0, -peduncle))
+    return pts
+
+
+# body proportions per species: half-length, half-width, half-depth, how pointed the snout is, tail size
+SPECIES = {
+    "ayu": dict(length=0.3, width=0.055, depth=0.085, snout=0.6, tail=(0.12, 0.085), body="fish", fin="salt"),
+    "saury": dict(length=0.42, width=0.032, depth=0.05, snout=1.2, tail=(0.09, 0.06), body="saury", fin="salt"),
+    "mackerel": dict(length=0.34, width=0.06, depth=0.08, snout=0.8, tail=(0.12, 0.09), body="mackerel", fin="salt"),
+}
+
+
+def fish(species="ayu"):
+    """A grilled fish along local X (head at +X), curved like it's swimming up the skewer."""
+    sp = SPECIES[species]
+    L, W, D = sp["length"], sp["width"], sp["depth"]
+    bend = lambda x: 0.035 * math.sin(x * 9 * 0.3 / L)   # noqa: E731  same S-curve whatever the length
     bm = bmesh.new()
     bm.loops.layers.uv.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=40, v_segments=20, radius=1, calc_uvs=True)
+    bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=24, radius=1, calc_uvs=True)
     for vtx in bm.verts:
         x = vtx.co.x
-        taper = 1 + min(0, x) * 0.78          # thinner toward the tail (-X)
-        head = 1 - max(0, x - 0.6) * 0.6      # rounder snout
-        vtx.co.y *= 0.055 * taper * head
-        vtx.co.z *= 0.085 * taper * head
-        vtx.co.x *= 0.3
-        vtx.co.y += 0.035 * math.sin(vtx.co.x * 9)
+        taper = 1 + min(0, x) * 0.82                       # narrowing into the tail root (-X)
+        head = 1 - max(0, x - 0.55) * sp["snout"]          # snout: pointed for saury, blunter for ayu
+        vtx.co.y *= W * taper * head
+        vtx.co.z *= D * taper * head
+        vtx.co.x *= L
+        vtx.co.y += bend(vtx.co.x)
     me = bpy.data.meshes.new("FishBody")
     bm.to_mesh(me)
     bm.free()
     body = bpy.data.objects.new("FishBody", me)
     bpy.context.collection.objects.link(body)
-    finish(body, "FishBody", M["fish"])
+    finish(body, "FishBody", M[sp["body"]])
     parts = [body]
 
-    # tail fin: a flattened cone, pinched where it meets the body and fanning out wide at the end,
-    # crusted with salt. The cone's wide base (radius1) is at its local -Z; rotating +90° about Y puts that
-    # end at -X, i.e. away from the body.
-    tail_y = 0.035 * math.sin(-0.3 * 9)
-    bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.07, radius2=0.004, depth=0.11,
-                                    location=(-0.34, tail_y, 0), rotation=(0, math.radians(90), 0))
-    t = active()
-    t.scale = (1, 0.12, 1)
-    parts.append(finish(t, "TailFin", M["salt"]))
+    # forked tail, rooted just inside the narrow end of the body
+    tail_len, tail_h = sp["tail"]
+    root_x = -L * 0.93
+    parts.append(flat_fin("TailFin", forked_tail(tail_len, tail_h, D * 0.16), 0.006, M[sp["fin"]],
+                          at=(root_x, bend(root_x), 0)))
 
-    # dorsal fin
-    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.05, radius2=0.002, depth=0.06,
-                                    location=(0.02, 0.035 * math.sin(0.02 * 9), 0.085), rotation=(0, 0, 0))
-    d = active()
-    d.scale = (1, 0.1, 1)
-    parts.append(finish(d, "DorsalFin", M["salt"]))
+    # dorsal fin: a low swept-back sail; a small anal fin underneath
+    dx = L * 0.05
+    parts.append(flat_fin("DorsalFin", [(dx + L * 0.12, 0), (dx + L * 0.02, D * 0.75), (dx - L * 0.12, D * 0.55),
+                                        (dx - L * 0.2, 0)], 0.005, M[sp["fin"]], at=(0, bend(dx), D * 0.82)))
+    ax = -L * 0.45
+    parts.append(flat_fin("AnalFin", [(ax + L * 0.1, 0), (ax - L * 0.08, -D * 0.45), (ax - L * 0.16, 0)], 0.005,
+                          M[sp["fin"]], at=(0, bend(ax), -D * 0.55)))
 
     # eyes on both sides of the head
+    ex = L * 0.73
+    er = 0.014 + D * 0.03
     for side in (-1, 1):
-        ey = 0.035 * math.sin(0.22 * 9) + side * 0.03
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.016, segments=12, ring_count=8, location=(0.22, ey, 0.025))
+        ey = bend(ex) + side * W * 0.5
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=12, ring_count=8, location=(ex, ey, D * 0.25))
         parts.append(finish(active(), "Eye", M["eye"]))
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.009, segments=10, ring_count=6,
-                                             location=(0.224, ey + side * 0.009, 0.026))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.56, segments=10, ring_count=6,
+                                             location=(ex + 0.004, ey + side * er * 0.55, D * 0.26))
         parts.append(finish(active(), "Pupil", M["pupil"]))
     return parts
 
@@ -557,6 +658,8 @@ def sausage():
 place(fish(), 20, 0.62, "Fish")
 place(fish(), 160, 0.62, "Fish")
 place(fish(), 95, 0.64, "ExtraFish")
+place(fish("saury"), -97, 0.6, "Saury")
+place(fish("mackerel"), -122, 0.62, "Mackerel")
 place(corn_cob(), 55, 0.6, "GrilledCorn")
 place(shiitake_trio(), 128, 0.6, "GrilledShiitake")
 place(onigiri(), -20, 0.58, "Onigiri")

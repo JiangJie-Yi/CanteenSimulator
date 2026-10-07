@@ -231,7 +231,7 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
                   baseIntensity={theme === 'dark' ? 1.5 : 0.8} />
               )}
               {/* toon ramps blow out easily, so the firelight stays modest */}
-              {dish.heat === 'fire' && <Fire width={0.7} height={0.95} baseIntensity={look.fire} />}
+              {dish.heat === 'fire' && <Fire width={0.6} height={0.42} baseIntensity={look.fire} />}
               {dish.brothY !== undefined && dish.steam && (
                 <Steam position={[0, dish.brothY + 0.02, 0]} width={dish.steam.width} height={dish.steam.height}
                   opacity={theme === 'dark' ? 0.5 : 0.7} level={dish.heatControl ? steamLevel : undefined} />
@@ -308,7 +308,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const MAX_PORTIONS = 9
+  const MAX_PORTIONS = 99
   const changeQty = (id: string, delta: number) =>
     setOrders((all) => {
       const qty = Math.min(MAX_PORTIONS, Math.max(0, (all[dish.id][id] ?? 0) + delta))

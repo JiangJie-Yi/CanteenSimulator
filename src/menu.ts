@@ -156,6 +156,8 @@ export const DISHES: Dish[] = [
     bases: [{ id: 'ayu', name: '鹽烤香魚', price: 180 }],
     items: [
       { id: 'ExtraFish', name: '加一尾', price: 80 },
+      { id: 'Saury', name: '秋刀魚', price: 90 },
+      { id: 'Mackerel', name: '鯖魚', price: 100 },
       { id: 'GrilledCorn', name: '烤玉米', price: 40 },
       { id: 'GrilledShiitake', name: '烤香菇', price: 30 },
       { id: 'Onigiri', name: '烤飯糰', price: 35 },
@@ -167,9 +169,9 @@ export const DISHES: Dish[] = [
     defaults: ['GrilledCorn', 'Onigiri'],
     heat: 'fire',
     roast: {
-      times: { Fish: 40, ExtraFish: 40, GrilledCorn: 30, GrilledShiitake: 20, Onigiri: 25, ShrimpSkewer: 20,
+      times: { Fish: 40, ExtraFish: 40, Saury: 35, Mackerel: 45, GrilledCorn: 30, GrilledShiitake: 20, Onigiri: 25, ShrimpSkewer: 20,
         Sausage: 25, Potato: 55, SweetPotato: 55 },
-      names: { Fish: '香魚', ExtraFish: '香魚', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '飯糰',
+      names: { Fish: '香魚', ExtraFish: '香魚', Saury: '秋刀魚', Mackerel: '鯖魚', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '飯糰',
         ShrimpSkewer: '蝦串', Sausage: '香腸', Potato: '馬鈴薯', SweetPotato: '地瓜' },
       loose: ['Potato', 'SweetPotato'],
       // just outside the stones, to the upper right of the fire as the camera sees it
