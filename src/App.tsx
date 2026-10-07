@@ -17,7 +17,7 @@ import { DISHES, type Dish as DishInfo } from './menu'
 // distance between dishes on the carousel
 const SPACING = 6
 // burner top on the cassette stove (blender/hotpot.py)
-const BURNER_Y = 0.34
+const BURNER_Y = 0.44
 // the one camera pose every dish is framed from (blender/open_live.py matches Blender's camera to it)
 // low enough (~19° above the dish) that the burner flames show under the hot pot's rim
 const CAMERA_POSITION: [number, number, number] = [2.9, 2.2, 4.0]

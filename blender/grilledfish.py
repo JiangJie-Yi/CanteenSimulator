@@ -297,11 +297,21 @@ def stick_frame(angle_deg, along):
 def skewer_stick(angle_deg, name):
     _, foot, tip = stick_frame(angle_deg, 0)
     d = tip - foot
-    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.012, depth=d.length + 0.08,
-                                        location=foot + d * 0.5 - Vector((0, 0, 0.04)))
-    o = active()
-    o.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
-    return finish(o, name, M["stick"])
+    length = d.length + 0.08
+    centre = foot + d * 0.5 - Vector((0, 0, 0.04))
+    rot = d.to_track_quat("Z", "Y").to_euler()
+    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.012, depth=length, location=centre)
+    shaft = active()
+    shaft.rotation_euler = rot
+    finish(shaft, name, M["stick"])
+    # sharpened point continuing past the top of the shaft
+    point_len = 0.07
+    bpy.ops.mesh.primitive_cone_add(vertices=10, radius1=0.012, radius2=0.0, depth=point_len,
+                                    location=centre + d.normalized() * (length / 2 + point_len / 2))
+    point = active()
+    point.rotation_euler = rot
+    finish(point, name + "Point", M["stick"])
+    return join([shaft, point], name)
 
 
 def place(objs, angle_deg, along, name, stick=True):

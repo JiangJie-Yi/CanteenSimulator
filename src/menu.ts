@@ -77,6 +77,11 @@ export type Roast = {
   loose: string[]
   /** where the serving plate sits, in the dish's own coordinates */
   plate: [number, number, number]
+  /**
+   * Loose pieces that are piled up on the ground instead of going on the plate, one pyramid per item:
+   * where the pile's centre sits and how far apart neighbouring pieces are.
+   */
+  piles?: Record<string, { at: [number, number, number]; spacing: number }>
 }
 
 /** Doneness stages for roasting, by fraction of the cook time. */
@@ -116,9 +121,9 @@ export const DISHES: Dish[] = [
     defaults: ['NapaCabbage', 'BeefSlice', 'Meatball', 'Tofu', 'Corn'],
     heat: 'gas',
     heatControl: true,
-    brothY: 0.81,
+    brothY: 0.91,
     steam: { width: 1.1, height: 1.3 },
-    focusY: 0.5,
+    focusY: 0.58,
   },
   {
     id: 'beefnoodle',
@@ -167,6 +172,11 @@ export const DISHES: Dish[] = [
       // just outside the stones, to the upper right of the fire as the camera sees it
       // (kept clear of the corn skewer at -55°, which used to stand right in front of it)
       plate: [1.26, 0.02, -1.06],
+      // just outside the stones on the left as the camera sees it
+      piles: {
+        Potato: { at: [-1.38, 0, 0.62], spacing: 0.17 },
+        SweetPotato: { at: [-0.86, 0, 1.22], spacing: 0.13 },
+      },
     },
     layout: {
       mode: 'ring',

@@ -37,7 +37,8 @@ POT_H = 0.42
 FLARE = 1.06
 WALL = 0.03
 FOOT_H = 0.09         # rubber feet under the stove
-Z0 = 0.42 + FOOT_H    # pot bottom, on tall pot supports so the burner flames show underneath
+BODY_H = 0.3          # stove body thickness
+Z0 = 0.52 + FOOT_H    # pot bottom, on tall pot supports so the burner flames show underneath
 BZ = Z0 + 0.30        # broth surface
 INNER_R = POT_R * (1 + (FLARE - 1) * 0.30 / POT_H) - WALL
 
@@ -382,7 +383,6 @@ def scatter(rmax=INNER_R - 0.04):
 # Retro cassette gas stove (the pot is centred on the burner, the knob faces -Y)
 # =====================================================================
 
-BODY_H = 0.2
 BODY_Y = -0.12     # body extends further toward the front for the knob
 FRONT_Y = BODY_Y - 0.85
 BODY_X0 = -1.05    # left end of the main body; the canister bay is bolted on beyond it

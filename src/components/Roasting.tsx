@@ -25,6 +25,14 @@ const PLATE_R = 0.62
 const SLOT_GAP = 0.2       // wider than the broadest piece (a fish lying flat)
 const PER_LAYER = 5
 const UP = new THREE.Vector3(0, 1, 0)
+/**
+ * Fill order for a pyramid pile, as [layer, position across in piece-widths]. It grows from the middle out and
+ * only puts a piece on a layer once both pieces under it are down, so it's a pyramid at every count:
+ * 2 side by side, 3 is 2 + 1 on top, then the base widens to 4, then up to 10.
+ */
+const PYRAMID: [number, number][] = [
+  [0, -0.5], [0, 0.5], [1, 0], [0, -1.5], [0, 1.5], [1, -1], [1, 1], [2, -0.5], [2, 0.5], [3, 0],
+]
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
 const STICK_FOOT_R = 0.86
 const STICK_TOP_R = 0.32
@@ -181,19 +189,32 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
   const collect = (p: Piece) => {
     if (p.collected || !present(p)) return
-    const slot = pieces.current.filter((q) => q.collected && present(q)).length
+    const pile = roast.piles?.[p.id]
+    // count what's already gone to the same place: this item's pile, or the plate
+    const slot = pieces.current.filter((q) => q.collected && present(q) &&
+      (pile ? q.id === p.id : !roast.piles?.[q.id])).length
     p.collected = true
     // tells Dish to stop driving this node's position (its pop-in would pull it back up to skewer height)
     p.node.userData.onPlate = true
     p.flight = instant ? 1 : 0
     p.fromP.copy(p.node.position)
     p.fromQ.copy(p.node.quaternion)
-    // side by side across the plate, centred; a full row starts a new layer on top
-    const col = slot % PER_LAYER
-    const layer = Math.floor(slot / PER_LAYER)
-    const across = (col - (PER_LAYER - 1) / 2) * SLOT_GAP + (layer % 2) * (SLOT_GAP / 2)
-    p.toP.set(...roast.plate).addScaledVector(STACK_DIR, across)
-    p.toP.y += (p.loose ? 0.075 : 0.065) + layer * LAYER_HEIGHT
+    if (pile) {
+      // stacked into a pyramid on the ground; a full pyramid starts another one behind it
+      const [layer, offset] = PYRAMID[slot % PYRAMID.length]
+      const heap = Math.floor(slot / PYRAMID.length)
+      p.toP.set(...pile.at)
+        .addScaledVector(STACK_DIR, offset * pile.spacing)
+        .addScaledVector(LAY_DIR, -heap * pile.spacing * 2.6)
+      p.toP.y += pile.spacing * (0.42 + layer * 0.8)
+    } else {
+      // side by side across the plate, centred; a full row starts a new layer on top
+      const col = slot % PER_LAYER
+      const layer = Math.floor(slot / PER_LAYER)
+      const across = (col - (PER_LAYER - 1) / 2) * SLOT_GAP + (layer % 2) * (SLOT_GAP / 2)
+      p.toP.set(...roast.plate).addScaledVector(STACK_DIR, across)
+      p.toP.y += (p.loose ? 0.075 : 0.065) + layer * LAYER_HEIGHT
+    }
     // everything points the same way along LAY_DIR
     if (p.loose) {
       // loose pieces lie on their bottom (local +Y up), long axis (local X) along the row

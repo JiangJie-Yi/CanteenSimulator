@@ -237,14 +237,14 @@ button {
 .brand-late {
   position: absolute;
   z-index: 1;
-  top: -0.42em;
-  left: -0.42em;
-  writing-mode: vertical-rl;
+  top: -0.3em;
+  left: -0.5em;
+  white-space: nowrap;
   font-family: 'Zen Antique', var(--brush);
-  font-size: 0.5em;
+  font-size: 0.36em;
   line-height: 1;
   letter-spacing: 0.08em;
-  padding: 0.28em 0.18em;
+  padding: 0.22em 0.32em 0.22em 0.4em;
   border-radius: 0.12em;
   color: var(--washi);
   background: var(--hanko);
