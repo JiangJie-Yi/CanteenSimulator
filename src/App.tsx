@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import { equilibriumTemp, stepTemp, steamAmount } from './boil'
 import { Brand } from './components/Brand'
 import { Dish } from './components/Dish'
 import { DishSwitcher } from './components/DishSwitcher'
@@ -110,6 +111,14 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
   const scene = useThree((s) => s.scene)
   const aspect = useThree((s) => s.size.width / s.size.height)
   const look = LIGHTING[theme]
+
+  // hot pot broth temperature -> steam, so steam lags the flame both ways (see boil.ts). Starts already at a
+  // simmer for the opening heat setting.
+  const brothTemp = useRef(equilibriumTemp(heat))
+  const steamLevel = useRef(steamAmount(brothTemp.current, heat))
+  useFrame((_, delta) => {
+    brothTemp.current = stepTemp(brothTemp.current, heat, Math.min(delta, 0.1))
+    steamLevel.current = steamAmount(brothTemp.current, heat)  })
   const dishLight = DISHES[active].light ?? {}
 
   // warm spot: per-dish position, strength and shadow softness, eased so switching dishes doesn't pop
@@ -217,7 +226,7 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
               {dish.heat === 'fire' && <Fire width={0.7} height={0.95} baseIntensity={look.fire} />}
               {dish.brothY !== undefined && dish.steam && (
                 <Steam position={[0, dish.brothY + 0.02, 0]} width={dish.steam.width} height={dish.steam.height}
-                  opacity={(theme === 'dark' ? 0.5 : 0.7) * (dish.heatControl ? Math.min(1, heat / 40) : 1)} />
+                  opacity={theme === 'dark' ? 0.5 : 0.7} level={dish.heatControl ? steamLevel : undefined} />
               )}
               {dish.smoke && (
                 // same white puffs as the soup steam, just taller and slower

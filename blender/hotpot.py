@@ -466,14 +466,21 @@ for fx in (-0.92, 0.92, BAY_X1 - 0.1):
 
 # canister section on the right end (the gas can lies inside, along Y): a profile with a big rounded outer
 # shoulder, extruded front to back, so the cover curves over the can the way real cassette stoves do
-def canister_housing(x_in, x_out, z0, z1, depth, radius, name, mat):
+def canister_housing(x_in, x_out, z0, z1, depth, radius, name, mat, inner_radius=0.0):
     s = 1 if x_out > x_in else -1
     pts = [(x_in, z0), (x_out, z0)]
     # outer side rises, then a quarter arc over to the top
     for i in range(13):
         t = i / 12 * math.pi / 2
         pts.append((x_out - s * radius + s * radius * math.cos(t), z1 - radius + radius * math.sin(t)))
-    pts.append((x_in, z1))
+    if inner_radius:
+        # a smaller arc rolling down the inner side, so the housing reads as a hump rising out of the deck
+        for i in range(8, -1, -1):
+            t = i / 8 * math.pi / 2
+            pts.append((x_in + s * inner_radius - s * inner_radius * math.cos(t),
+                        z1 - inner_radius + inner_radius * math.sin(t)))
+    else:
+        pts.append((x_in, z1))
     bm = bmesh.new()
     y0, y1 = BODY_Y - depth / 2, BODY_Y + depth / 2
     front = [bm.verts.new((x, y0, z)) for x, z in pts]
@@ -495,13 +502,16 @@ def canister_housing(x_in, x_out, z0, z1, depth, radius, name, mat):
     return o
 
 
-HOUSING_R = 0.22
-canister_housing(BODY_X1 - 0.03, BAY_X1, FOOT_H, DECK_Z, 1.7, HOUSING_R, "CanisterHousing", M["enamel"])
+# the housing rises well above the deck so a gas can fits inside, rounded over on both sides
+HOUSING_R = 0.3
+HOUSING_TOP = DECK_Z + 0.14
+canister_housing(BODY_X1 - 0.03, BAY_X1, FOOT_H, HOUSING_TOP, 1.7, HOUSING_R, "CanisterHousing", M["enamel"],
+                 inner_radius=0.12)
 # seam where the cover lifts off, running along the top of the curve
 seam_a = math.radians(55)
 bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.006, depth=1.7,
                                     location=(BAY_X1 - HOUSING_R + HOUSING_R * math.cos(seam_a), BODY_Y,
-                                              DECK_Z - HOUSING_R + HOUSING_R * math.sin(seam_a)),
+                                              HOUSING_TOP - HOUSING_R + HOUSING_R * math.sin(seam_a)),
                                     rotation=(math.radians(90), 0, 0))
 finish(active(), "HousingSeam", M["enamel_dark"])
 # canister lock lever on the front of the canister section, on a dark escutcheon

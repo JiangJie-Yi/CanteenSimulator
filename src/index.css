@@ -472,7 +472,7 @@ button {
   white-space: nowrap;
   cursor: pointer;
   /* faint until pointed at (the tag itself, or the food it belongs to), so tags don't crowd the fire */
-  opacity: 0.25;
+  opacity: 0.4;
   transition: transform 140ms ease, opacity 160ms ease;
 }
 

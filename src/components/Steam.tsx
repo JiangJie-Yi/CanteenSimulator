@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, type RefObject } from 'react'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
 import { snoise as noise } from '../shaders/noise'
@@ -58,11 +58,13 @@ type SteamProps = ThreeElements['group'] & {
   shade?: string
   /** how fast the puffs rise */
   speed?: number
+  /** 0..1, read every frame and multiplied into the opacity (e.g. how hard the soup is boiling) */
+  level?: RefObject<number>
 }
 
 /** Rising steam (or smoke) built from a few crossed, noise-animated planes. */
 export function Steam({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, color = '#ffffff', shade = '#e6f0fc',
-  speed = 0.07, ...props }: SteamProps) {
+  speed = 0.07, level, ...props }: SteamProps) {
   const geometry = useMemo(() => {
     const g = new THREE.PlaneGeometry(width, height, 16, 64)
     g.translate(0, height / 2, 0)
@@ -94,11 +96,14 @@ export function Steam({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, c
   )
 
   const time = useRef(0)
+  const group = useRef<THREE.Group>(null)
   useFrame((_, delta) => {
     time.current += delta
+    // gentle steam is also lower: wisps hug the surface, a full boil rises its whole height
+    if (group.current && level) group.current.scale.y = 0.35 + 0.65 * level.current
     for (const m of materials) {
       m.uniforms.uTime.value = time.current
-      m.uniforms.uOpacity.value = opacity
+      m.uniforms.uOpacity.value = opacity * (level ? level.current : 1)
       m.uniforms.uColor.value.set(color)
       m.uniforms.uShade.value.set(shade)
       m.uniforms.uSpeed.value = speed
@@ -106,7 +111,7 @@ export function Steam({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, c
   })
 
   return (
-    <group {...props}>
+    <group ref={group} {...props}>
       {materials.map((m, i) => (
         <mesh key={i} geometry={geometry} material={m} rotation-y={(i * Math.PI) / layers} renderOrder={1} />
       ))}
