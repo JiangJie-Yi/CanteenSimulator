@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, type RefObject } from 'react'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
 import { snoise } from '../shaders/noise'
@@ -77,10 +77,12 @@ type FireProps = ThreeElements['group'] & {
   embers?: number
   /** average firelight intensity before flicker */
   baseIntensity?: number
+  /** 0..1 how fierce the fire is, read every frame: scales the flames, embers and light */
+  level?: RefObject<number>
 }
 
 /** Campfire flames (crossed noise planes), rising embers and a flickering firelight. */
-export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, baseIntensity = 7, ...props }: FireProps) {
+export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, baseIntensity = 7, level, ...props }: FireProps) {
   const flameGeometry = useMemo(() => {
     const g = new THREE.PlaneGeometry(width, height, 16, 48)
     g.translate(0, height / 2, 0)
@@ -138,6 +140,7 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, base
   )
 
   const light = useRef<THREE.PointLight>(null)
+  const flames = useRef<THREE.Group>(null)
   const time = useRef(0)
 
   useFrame((_, delta) => {
@@ -146,9 +149,14 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, base
     const t = time.current
     for (const m of flameMaterials) m.uniforms.uTime.value = t
 
+    // fire strength: low embers barely flicker, a fierce fire stands tall and bright
+    const lv = level ? level.current : 1
+    if (flames.current) flames.current.scale.set(0.6 + 0.6 * lv, 0.25 + 1.5 * lv, 0.6 + 0.6 * lv)
+
     // flicker: a few incommensurate sines read as random
     if (light.current) {
-      light.current.intensity = baseIntensity * (1 + Math.sin(t * 11) * 0.13 + Math.sin(t * 17.3) * 0.1 + Math.sin(t * 5.1) * 0.16)
+      light.current.intensity = baseIntensity * (0.35 + 1.1 * lv) *
+        (1 + Math.sin(t * 11) * 0.13 + Math.sin(t * 17.3) * 0.1 + Math.sin(t * 5.1) * 0.16)
     }
 
     const { pos, vel, life, maxLife, geometry } = emberState
@@ -180,9 +188,11 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, base
 
   return (
     <group {...props}>
-      {flameMaterials.map((m, i) => (
-        <mesh key={i} geometry={flameGeometry} material={m} rotation-y={(i * Math.PI) / layers} renderOrder={2} />
-      ))}
+      <group ref={flames}>
+        {flameMaterials.map((m, i) => (
+          <mesh key={i} geometry={flameGeometry} material={m} rotation-y={(i * Math.PI) / layers} renderOrder={2} />
+        ))}
+      </group>
       <points geometry={emberState.geometry} material={emberMaterial} renderOrder={3} frustumCulled={false} />
       {/* no shadows: from inside the ring it threw a giant star of stone shadows across the floor */}
       <pointLight ref={light} position={[0, 0.3, 0]} color="#ff8a3d" intensity={baseIntensity} distance={5}

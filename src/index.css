@@ -61,18 +61,88 @@ button {
 }
 
 .app {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr auto;
   height: 100%;
 }
 
-.stage {
+/* the 3D view sits under everything and spans the whole window (no hard edge where the menu starts) */
+.canvas-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.canvas-layer canvas {
+  touch-action: none;
+}
+
+/* stage and menu are see-through layers over the 3D view: only their controls take the pointer, so dragging
+   anywhere else still orbits the camera */
+.stage,
+.menu {
   position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.stage {
   min-width: 0;
 }
 
-.stage canvas {
-  touch-action: none;
+.stage > *,
+.menu > * {
+  pointer-events: auto;
+}
+
+/* text stays on one line; narrow screens shrink it instead (see the responsive section) */
+.strip-name,
+.strip-price,
+.dish-name,
+.tally p,
+.heat-value,
+.heat-label,
+.menu-title,
+.roast-tag,
+.brand {
+  white-space: nowrap;
+}
+
+.tally p {
+  font-size: clamp(12px, 1.25vw, 17px);
+}
+
+/* frosted, feathered backing behind text that sits over the 3D view, so it never melts into the scene */
+.switcher-center,
+.heat,
+.menu-title,
+.tally {
+  position: relative;
+  isolation: isolate;
+}
+
+.switcher-center::before,
+.heat::before,
+.menu-title::before,
+.tally::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -16px -26px;
+  background: color-mix(in srgb, var(--page) 62%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  /* fade every edge out, like torn rice paper */
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent),
+    linear-gradient(transparent, #000 14px, #000 calc(100% - 14px), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent),
+    linear-gradient(transparent, #000 14px, #000 calc(100% - 14px), transparent);
+  mask-composite: intersect;
+  pointer-events: none;
 }
 
 /* ---------- stage overlays ---------- */
@@ -503,6 +573,50 @@ button {
   pointer-events: none;
 }
 
+/* 火力 gauge for the charcoal grill (shares the .heat layout) */
+.fire-meter {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #8a2b12, #ff7a2e var(--heat), var(--washi-shade) var(--heat));
+}
+
+.fire-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.fire-add {
+  white-space: nowrap;
+  padding: 3px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--hanko);
+  color: var(--washi);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 10px -6px rgb(59 42 32 / 0.7);
+  transition: transform 140ms ease;
+}
+
+.fire-add:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+
+.fire-add:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.fire-add:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 2px;
+}
+
 /* ---------- roasting tags (floating over each skewer on the grilled-fish stage) ---------- */
 
 .roast-tag {
@@ -615,7 +729,7 @@ button {
 
 .strips {
   display: grid;
-  grid-template-columns: repeat(8, 48px);
+  grid-template-columns: repeat(9, 48px);
   grid-auto-rows: 236px;
   gap: 14px 10px;
   direction: rtl; /* strips read right to left, like the wall menu */
@@ -861,7 +975,7 @@ button {
   }
 
   .strips {
-    grid-template-columns: repeat(8, 42px);
+    grid-template-columns: repeat(9, 42px);
     grid-auto-rows: 220px;
     gap: 12px 8px;
   }

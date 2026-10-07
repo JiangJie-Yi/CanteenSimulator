@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { toChineseNumber, type Dish } from '../menu'
 import { Icon } from './Icon'
 
@@ -12,6 +12,10 @@ type MenuProps = {
   onRemove: (id: string) => void
   onClear: () => void
 }
+
+/** Long names (鹽烤香魚套餐) get a smaller size so they fit the tag in one line instead of wrapping. */
+const nameFit = (name: string): CSSProperties | undefined =>
+  name.length > 4 ? { fontSize: `calc(1em * ${4.6 / name.length})` } : undefined
 
 /**
  * Izakaya-style wall menu: vertical wooden tags, a red stamp marks what's been ordered.
@@ -31,9 +35,11 @@ export function Menu({ dish, baseId, quantities, onBase, onAdd, onRemove, onClea
     const el = row.current
     if (!el) return
     const update = () => {
+      // only rows that actually scroll sideways (the narrow layouts) get paging buttons
+      const scrolls = getComputedStyle(el).overflowX !== 'visible'
       const max = el.scrollWidth - el.clientWidth
       const pos = Math.abs(el.scrollLeft)
-      setEnds({ overflow: max > 2, atRight: pos < 2, atLeft: pos > max - 2 })
+      setEnds({ overflow: scrolls && max > 2, atRight: pos < 2, atLeft: pos > max - 2 })
     }
     update()
     el.addEventListener('scroll', update, { passive: true })
@@ -80,7 +86,7 @@ export function Menu({ dish, baseId, quantities, onBase, onAdd, onRemove, onClea
                   aria-label={`${b.name}，${b.price} 元`} className="strip strip-base" onClick={() => onBase(b.id)}>
                   {/* the chosen base swaps its icon for a 選 stamp of the same size, so nothing shifts or overhangs */}
                   {on ? <span className="stamp stamp-base" aria-hidden="true">選</span> : <Icon name={dish.id} />}
-                  <span className="strip-name">{b.name}</span>
+                  <span className="strip-name"><span style={nameFit(b.name)}>{b.name}</span></span>
                   <span className="strip-price">{toChineseNumber(b.price)}</span>
                 </button>
               )
@@ -89,7 +95,7 @@ export function Menu({ dish, baseId, quantities, onBase, onAdd, onRemove, onClea
         ) : (
           <div className="strip strip-base strip-fixed">
             <Icon name={dish.id} />
-            <span className="strip-name">{base.name}</span>
+            <span className="strip-name"><span style={nameFit(base.name)}>{base.name}</span></span>
             <span className="strip-price">{toChineseNumber(base.price)}</span>
           </div>
         )}
@@ -102,7 +108,7 @@ export function Menu({ dish, baseId, quantities, onBase, onAdd, onRemove, onClea
               onContextMenu={(e) => { e.preventDefault(); onRemove(item.id) }}
               onKeyDown={onKey(item.id)}>
               <Icon name={item.id} />
-              <span className="strip-name">{item.name}</span>
+              <span className="strip-name"><span style={nameFit(item.name)}>{item.name}</span></span>
               <span className="strip-price">{toChineseNumber(item.price)}</span>
               {n > 0 && (
                 <span key={n} className="stamp" aria-hidden="true">

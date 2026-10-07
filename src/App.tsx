@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
@@ -10,6 +10,7 @@ import { Dish } from './components/Dish'
 import { DishSwitcher } from './components/DishSwitcher'
 import { Fire } from './components/Fire'
 import { GasFlame } from './components/GasFlame'
+import { FireControl } from './components/FireControl'
 import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
 import { Roasting } from './components/Roasting'
@@ -51,7 +52,8 @@ const SPOT_SOFTNESS = 6
  * How far to pull the camera back for this viewport. The dishes are framed for a landscape stage;
  * on portrait or narrow stages the horizontal field of view shrinks, so back off until they fit again.
  */
-const cameraDistanceScale = (aspect: number) => (aspect >= 1.3 ? 1 : Math.min(3.2, 1.3 / aspect))
+const cameraDistanceScale = (aspect: number) =>
+  aspect >= 1.3 ? 1 : Math.min(3.4, (1.3 / aspect) * (aspect < 1 ? 1.15 : 1))
 
 function usePrefersReducedMotion() {
   const query = '(prefers-reduced-motion: reduce)'
@@ -94,7 +96,10 @@ function slot(i: number, active: number, n: number) {
   return d
 }
 
-const baseOf = (dish: DishInfo, baseId: string) => dish.bases.find((b) => b.id === baseId) ?? dish.bases[0]
+/** The stage's centre and size in canvas pixels (the canvas fills the whole app). */
+type Frame = { cx: number; cy: number; w: number; h: number }
+
+const baseOf =(dish: DishInfo, baseId: string) => dish.bases.find((b) => b.id === baseId) ?? dish.bases[0]
 
 type SceneProps = {
   active: number
@@ -103,14 +108,28 @@ type SceneProps = {
   theme: Theme
   reducedMotion: boolean
   heat: number
+  /** 0..1 charcoal fire strength for the grill */
+  fire: RefObject<number>
+  /** the stage's box inside the full-window canvas: the dish is framed in it */
+  frame: Frame
 }
 
-function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps) {
+function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
   const camera = useThree((s) => s.camera)
   const scene = useThree((s) => s.scene)
-  const aspect = useThree((s) => s.size.width / s.size.height)
+  const size = useThree((s) => s.size)
+  // frame the dish on the stage rather than the whole canvas: shift the projection so the stage's centre is
+  // the view's centre, and size the shot to the stage's shape
+  const aspect = frame.w > 0 && frame.h > 0 ? frame.w / frame.h : size.width / size.height
+  useEffect(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera) || frame.w <= 0) return
+    const offX = size.width / 2 - frame.cx
+    const offY = size.height / 2 - frame.cy
+    camera.setViewOffset(size.width, size.height, offX, offY, size.width, size.height)
+    camera.updateProjectionMatrix()
+  }, [camera, size, frame])
   const look = LIGHTING[theme]
 
   // hot pot broth temperature -> steam, so steam lags the flame both ways (see boil.ts). Starts already at a
@@ -219,7 +238,7 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
               {dish.roast && (
                 <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={orders[dish.id]}
-                  active={i === active} instant={reducedMotion} />
+                  active={i === active} instant={reducedMotion} fire={fire} />
               )}
               {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
               {dish.heatControl && dish.brothY !== undefined && (
@@ -231,7 +250,7 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
                   baseIntensity={theme === 'dark' ? 1.5 : 0.8} />
               )}
               {/* toon ramps blow out easily, so the firelight stays modest */}
-              {dish.heat === 'fire' && <Fire width={0.6} height={0.42} baseIntensity={look.fire} />}
+              {dish.heat === 'fire' && <Fire width={0.6} height={0.42} baseIntensity={look.fire} level={fire} />}
               {dish.brothY !== undefined && dish.steam && (
                 <Steam position={[0, dish.brothY + 0.02, 0]} width={dish.steam.width} height={dish.steam.height}
                   opacity={theme === 'dark' ? 0.5 : 0.7} level={dish.heatControl ? steamLevel : undefined} />
@@ -274,6 +293,40 @@ export default function App() {
   const [theme, toggleTheme] = useTheme()
   const reducedMotion = usePrefersReducedMotion()
   const [heat, setHeat] = useState(40)
+
+  // where the stage sits inside the full-window canvas
+  const appRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const [frame, setFrame] = useState<Frame>({ cx: 0, cy: 0, w: 0, h: 0 })
+  useEffect(() => {
+    const app = appRef.current
+    const stage = stageRef.current
+    if (!app || !stage) return
+    const measure = () => {
+      const a = app.getBoundingClientRect()
+      const s = stage.getBoundingClientRect()
+      setFrame({ cx: s.left - a.left + s.width / 2, cy: s.top - a.top + s.height / 2, w: s.width, h: s.height })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(app)
+    ro.observe(stage)
+    return () => ro.disconnect()
+  }, [])
+  // charcoal grill: burns down slowly by itself (full to out in about 3 minutes); 添炭 builds it up
+  const fire = useRef(0.6)
+  const [fireLevel, setFireLevel] = useState(60)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      fire.current = Math.max(0, fire.current - 0.0012)
+      setFireLevel(Math.round(fire.current * 1000) / 10)
+    }, 200)
+    return () => window.clearInterval(id)
+  }, [])
+  const addCharcoal = () => {
+    fire.current = Math.min(1, fire.current + 0.18)
+    setFireLevel(Math.round(fire.current * 1000) / 10)
+  }
   const dish = DISHES[active]
   const base = baseOf(dish, bases[dish.id])
 
@@ -316,8 +369,10 @@ export default function App() {
     })
 
   return (
-    <div className="app">
-      <div className="stage">
+    <div className="app" ref={appRef}>
+      {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
+          edge; the camera is offset so the dish still sits in the middle of the stage */}
+      <div className="canvas-layer">
         <Canvas
           shadows="percentage"
           dpr={[1, 2]}
@@ -325,10 +380,13 @@ export default function App() {
           gl={{ alpha: true, toneMapping: THREE.NoToneMapping }}
         >
           <Scene active={active} orders={orders} bases={bases} theme={theme} reducedMotion={reducedMotion}
-            heat={heat} />
+            heat={heat} fire={fire} frame={frame} />
         </Canvas>
+      </div>
+      <div className="stage" ref={stageRef}>
         <Brand night={theme === 'dark'} />
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} />}
+        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} />}
         <DishSwitcher dishes={DISHES} index={active} onChange={setActive} />
       </div>
       <Menu key={dish.id} dish={dish} baseId={base.id} quantities={orders[dish.id]}

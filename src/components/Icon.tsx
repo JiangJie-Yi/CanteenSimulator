@@ -154,6 +154,47 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M8 9.5l1.5 2M11 9.5l1.5 2M14 10l1 1.5M6 11.5h.01" />
     </>
   ),
+  Yakitori: (
+    <>
+      <path d="M12 2v20" />
+      <rect x="9" y="4" width="6" height="4" rx="1.5" />
+      <rect x="9.5" y="9" width="5" height="2.5" rx="1" />
+      <rect x="9" y="12.5" width="6" height="4" rx="1.5" />
+    </>
+  ),
+  PorkBelly: (
+    <>
+      <path d="M12 2v20" />
+      <path d="M8 5h8v3H8zM8 10h8v3H8zM8 15h8v3H8zM8 6.5h8M8 11.5h8M8 16.5h8" />
+    </>
+  ),
+  Squid: (
+    <>
+      <path d="M12 2l4 4v8a4 4 0 0 1-8 0V6z" />
+      <path d="M9 18l-1 4M11 18.5v3.5M13 18.5v3.5M15 18l1 4M10 9h.01M14 9h.01" />
+    </>
+  ),
+  Shishito: (
+    <>
+      <path d="M7 6c1 5 3 11 10 14-1-6-3-11-7-14z" />
+      <path d="M8 6l-2-3" />
+    </>
+  ),
+  Mochi: (
+    <>
+      <path d="M12 2v20" />
+      <rect x="7" y="4" width="10" height="6" rx="2" />
+      <rect x="7" y="12" width="10" height="6" rx="2" />
+    </>
+  ),
+  KingOyster: (
+    <>
+      <path d="M12 2v20" />
+      <ellipse cx="12" cy="7" rx="5" ry="2.5" />
+      <ellipse cx="12" cy="13" rx="5" ry="2.5" />
+      <path d="M9 6l6 2M9 12l6 2" />
+    </>
+  ),
   GrilledCorn: (
     <>
       <ellipse cx="12" cy="10" rx="3.5" ry="6.5" />

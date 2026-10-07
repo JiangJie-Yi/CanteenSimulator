@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -40,8 +40,8 @@ const PYRAMID: [number, number][] = [
   [0, -0.5], [0, 0.5], [1, 0], [0, -1.5], [0, 1.5], [1, -1], [1, 1], [2, -0.5], [2, 0.5], [3, 0],
 ]
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
-const STICK_FOOT_R = 0.86
-const STICK_TOP_R = 0.32
+const STICK_FOOT_R = 0.7
+const STICK_TOP_R = 0.26
 const STICK_TOP_Y = 1.15
 const LAYER_HEIGHT = 0.1
 const CHAR_COLOR = new THREE.Color(0.045, 0.035, 0.03)
@@ -142,7 +142,12 @@ type RoastingProps = {
   /** only the dish on stage roasts and shows its tags */
   active: boolean
   instant?: boolean
+  /** 0..1 how fierce the charcoal is, read every frame: food roasts faster on a hotter fire */
+  fire?: RefObject<number>
 }
+
+/** Roasting speed for a fire level: barely cooking on dying embers, about twice as fast at full blaze. */
+const roastRate = (fire: number) => 0.25 + 1.75 * fire
 
 /**
  * Roasting over the fire: each skewer browns as it cooks (raw → half → done → slowly charring), shows a tag above
@@ -150,7 +155,7 @@ type RoastingProps = {
  * Rendered as a sibling after <Dish>, so its per-frame transforms land after Dish's pop-in animation, and it picks
  * up the extra portions Dish clones in as they appear.
  */
-export function Roasting({ url, roast, itemIds, quantities, active, instant = false }: RoastingProps) {
+export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire }: RoastingProps) {
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -366,7 +371,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       const time = roast.times[p.id]
       if (!p.collected) {
-        if (active) p.progress += dt
+        if (active) p.progress += dt * roastRate(fire?.current ?? 0.55)
         p.node.quaternion.copy(p.homeQ)
         p.node.position.x = p.homeP.x
         p.node.position.z = p.homeP.z

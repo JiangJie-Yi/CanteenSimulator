@@ -35,9 +35,9 @@ PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 seed(44)
 
-STONE_R = 0.98
-STICK_FOOT_R = 0.86
-STICK_TOP_R = 0.32
+STONE_R = 0.9
+STICK_FOOT_R = 0.7
+STICK_TOP_R = 0.26
 STICK_TOP_Z = 1.15
 
 
@@ -79,6 +79,9 @@ dirt = mix((0.32, 0.23, 0.15), (0.45, 0.34, 0.23), fbm(N, 10, 10))
 dirt = mix(dirt, (0.25, 0.18, 0.12), (vnoise(N, 90, 90) > 0.8).astype(np.float32) * 0.5)   # pebbles and grit
 ash = mix((0.42, 0.40, 0.37), (0.12, 0.11, 0.10), np.clip(fbm(N, 8, 8) * 0.6 + (1 - rad / 0.5) * 0.6, 0, 1))
 ground = mix(ash, dirt, smooth(0.36, 0.56, rad + wobble))
+# a bed of coarse salt laid over the ash, thinning out toward the stones
+salt_bed = (vnoise(N, 220, 220) > 0.55).astype(np.float32) * smooth(0.6, 0.45, rad + wobble * 0.5)
+ground = mix(ground, (0.93, 0.92, 0.9), salt_bed * 0.85)
 alpha = 1 - smooth(0.72, 0.98, rad + wobble)
 TEX["pit"] = image("T_FirePit", ground, alpha=alpha)
 TEX["pit_n"] = image("T_FirePit_N", to_normal(fbm(N, 24, 24), 1.5), data=True)
@@ -254,9 +257,9 @@ join(sticks, "BinchotanHeap")
 
 # coarse salt: grains strewn over the ash around the skewer feet, and a few little heaps of it
 grains = []
-for _ in range(260):
+for _ in range(900):
     a = random.uniform(0, 2 * math.pi)
-    r = random.uniform(0.45, 0.92)
+    r = math.sqrt(random.uniform(0.1, 1.0)) * 0.86   # salt laid right across the ash bed
     s = random.uniform(0.006, 0.014)
     bpy.ops.mesh.primitive_cube_add(size=1, location=(r * math.cos(a), r * math.sin(a), 0.008 + s * 0.3),
                                     rotation=(random.uniform(0, 3), random.uniform(0, 3), random.uniform(0, 3)))
@@ -264,7 +267,7 @@ for _ in range(260):
     o.scale = (s, s * random.uniform(0.7, 1.2), s * random.uniform(0.6, 1.0))
     grains.append(finish(o, "Grain", M["salt"], smooth_shade=False))
 join(grains, "SaltGrains")
-for a_deg, r, size in ((-20, 0.66, 0.09), (150, 0.7, 0.07), (-150, 0.62, 0.06)):
+for a_deg, r, size in ((-20, 0.62, 0.1), (150, 0.6, 0.08), (-150, 0.58, 0.07), (70, 0.6, 0.09), (230, 0.55, 0.08), (-60, 0.5, 0.06)):
     a = math.radians(a_deg)
     bpy.ops.mesh.primitive_cone_add(vertices=20, radius1=size, radius2=size * 0.15, depth=size * 0.7,
                                     location=(r * math.cos(a), r * math.sin(a), size * 0.35 + 0.004))
@@ -298,7 +301,7 @@ join(coals, "Charcoal")
 sizes = []
 while sum(sizes) * 2 < 2 * math.pi * STONE_R:
     big = len(sizes) % 3 != 1 and random.random() < 0.7      # mostly big, with smaller ones tucked between
-    sizes.append(random.uniform(0.12, 0.16) if big else random.uniform(0.065, 0.09))
+    sizes.append(random.uniform(0.16, 0.21) if big else random.uniform(0.09, 0.12))
 fit = 2 * math.pi * STONE_R / (sum(sizes) * 2) * 1.04          # scale to close the ring, with slight overlap
 a = 0.0
 for i, half in enumerate(sizes):
@@ -655,6 +658,140 @@ def sausage():
 
 
 # base fish (always there) and the toggleable skewers. Angles avoid the camera side (-90°).
+# ---------------------------------------------------------------------------------------------------------
+# more yakitori-shop skewers: textures and materials
+N = 256
+u, v = grid01(N)
+glaze_char = smooth(0.62, 0.8, fbm(N, 6, 6))
+TEX["chicken"] = image("T_Chicken", mix(mix((0.72, 0.45, 0.22), (0.86, 0.6, 0.32), fbm(N, 8, 8)), (0.3, 0.14, 0.05),
+                                        glaze_char * 0.8))
+fat = smooth(0.08, 0.02, np.abs(((v * 5) % 1) - 0.5) - 0.2)
+TEX["pork"] = image("T_PorkBelly", mix(mix((0.8, 0.5, 0.4), (0.97, 0.88, 0.78), fat), (0.45, 0.22, 0.1),
+                                       glaze_char * 0.7))
+TEX["squid"] = image("T_Squid", mix(mix((0.95, 0.86, 0.72), (0.92, 0.6, 0.35), fbm(N, 5, 5)), (0.55, 0.25, 0.1),
+                                    glaze_char * 0.6))
+blister = (vnoise(N, 40, 40) > 0.78).astype(np.float32)
+TEX["shishito"] = image("T_Shishito", mix(mix((0.22, 0.48, 0.14), (0.38, 0.62, 0.2), fbm(N, 6, 6)), (0.12, 0.1, 0.05),
+                                          blister * 0.85))
+toast = smooth(0.55, 0.75, fbm(N, 5, 5))
+TEX["mochi"] = image("T_Mochi", mix((0.97, 0.95, 0.9), (0.68, 0.45, 0.2), toast * 0.85))
+score = smooth(0.06, 0.0, np.minimum(np.abs(((u + v) * 8) % 1 - 0.5), np.abs(((u - v) * 8) % 1 - 0.5)))
+TEX["eryngii"] = image("T_Eryngii", mix(mix((0.93, 0.87, 0.74), (0.82, 0.7, 0.5), fbm(N, 6, 6)), (0.45, 0.3, 0.15),
+                                        score * 0.75))
+M.update({
+    "chicken": pbr("Chicken", tex=TEX["chicken"], rough=0.35, coat=0.5),
+    "leek": pbr("Leek", (0.9, 0.93, 0.82), rough=0.45),
+    "leek_green": pbr("LeekGreen", (0.42, 0.62, 0.25), rough=0.45),
+    "pork": pbr("PorkBelly", tex=TEX["pork"], rough=0.35, coat=0.4),
+    "squid": pbr("Squid", tex=TEX["squid"], rough=0.3, coat=0.5),
+    "shishito": pbr("Shishito", tex=TEX["shishito"], rough=0.3, coat=0.4),
+    "mochi": pbr("Mochi", tex=TEX["mochi"], rough=0.6),
+    "eryngii": pbr("Eryngii", tex=TEX["eryngii"], rough=0.55),
+})
+
+
+def rounded_box(name, size, mat, at, bev=0.012):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=at,
+                                    rotation=(random.uniform(-0.2, 0.2), random.uniform(-0.2, 0.2), random.uniform(-0.2, 0.2)))
+    o = active()
+    o.scale = size
+    apply_scale(o)
+    bevel(o, bev, 3, angle=False)
+    return finish(o, name, mat)
+
+
+def yakitori():
+    """Negima: chicken thigh chunks with leek between, along local X."""
+    parts = []
+    for i, x in enumerate((-0.14, -0.07, 0.0, 0.07, 0.14)):
+        if i % 2 == 0:
+            parts.append(rounded_box("Chicken", (0.06, 0.055, 0.05), M["chicken"], (x, 0, 0), 0.018))
+        else:
+            bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.02, depth=0.04, location=(x, 0, 0),
+                                                rotation=(math.radians(90), 0, 0))
+            parts.append(finish(active(), "Leek", M["leek"]))
+    return parts
+
+
+def pork_belly():
+    """Three folded slices of pork belly, fat and meat in layers."""
+    parts = []
+    for x in (-0.11, 0.0, 0.11):
+        parts.append(rounded_box("Pork", (0.07, 0.09, 0.025), M["pork"], (x, 0, 0), 0.01))
+    return parts
+
+
+def squid():
+    """A whole grilled squid: tapered mantle with fins at the top, tentacles hanging below."""
+    bm = bmesh.new()
+    bm.loops.layers.uv.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=14, radius=1, calc_uvs=True)
+    for vtx in bm.verts:
+        t = (vtx.co.x + 1) / 2                      # 0 bottom .. 1 tip
+        k = 1 - 0.55 * t ** 1.5
+        vtx.co.y *= 0.035 * k
+        vtx.co.z *= 0.05 * k
+        vtx.co.x = vtx.co.x * 0.15 + 0.03
+    me = bpy.data.meshes.new("SquidBody")
+    bm.to_mesh(me)
+    bm.free()
+    body = bpy.data.objects.new("SquidBody", me)
+    bpy.context.collection.objects.link(body)
+    parts = [finish(body, "SquidBody", M["squid"])]
+    parts.append(flat_fin("SquidFin", [(0.0, 0.0), (-0.05, 0.06), (-0.09, 0.0), (-0.05, -0.06)], 0.006, M["squid"],
+                          at=(0.17, 0, 0)))
+    for i in range(6):
+        a = (i - 2.5) * 0.12
+        bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.008, radius2=0.002, depth=0.12,
+                                        location=(-0.17, a * 0.15, a * 0.25), rotation=(0, math.radians(-90) + a, 0))
+        parts.append(finish(active(), "Tentacle", M["squid"]))
+    return parts
+
+
+def shishito():
+    """Four blistered shishito peppers, slightly curved, stems out to one side."""
+    parts = []
+    for i, x in enumerate((-0.11, -0.04, 0.03, 0.1)):
+        bpy.ops.mesh.primitive_cone_add(vertices=14, radius1=0.018, radius2=0.004, depth=0.11,
+                                        location=(x, 0, -0.01), rotation=(random.uniform(-0.25, 0.25), 0, 0))
+        o = active()
+        bevel(o, 0.006, 2)
+        parts.append(finish(o, "Shishito", M["shishito"]))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.004, depth=0.02, location=(x, 0, 0.055))
+        parts.append(finish(active(), "Stem", M["leek_green"]))
+    return parts
+
+
+def mochi():
+    """Two toasted rice cakes, puffing up."""
+    parts = []
+    for x in (-0.065, 0.065):
+        o = rounded_box("Mochi", (0.11, 0.035, 0.075), M["mochi"], (x, 0, 0), 0.016)
+        o.scale.y *= 1.2
+        parts.append(o)
+    return parts
+
+
+def eryngii():
+    """Three thick slices of king oyster mushroom stem, scored on the face."""
+    parts = []
+    for x in (-0.09, 0.0, 0.09):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.04, depth=0.028, location=(x, 0, 0),
+                                            rotation=(math.radians(90), 0, 0))
+        o = active()
+        bevel(o, 0.006, 2)
+        parts.append(finish(o, "Eryngii", M["eryngii"]))
+    return parts
+
+
+place(yakitori(), 75, 0.6, "Yakitori")
+place(pork_belly(), 112, 0.6, "PorkBelly")
+place(squid(), 178, 0.58, "Squid")
+place(shishito(), 144, 0.6, "Shishito")
+place(mochi(), 224, 0.6, "Mochi")
+place(eryngii(), 357, 0.6, "KingOyster")
+# ---------------------------------------------------------------------------------------------------------
+
 place(fish(), 20, 0.62, "Fish")
 place(fish(), 160, 0.62, "Fish")
 place(fish(), 95, 0.64, "ExtraFish")
