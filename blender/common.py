@@ -275,7 +275,7 @@ def export_dish(root, parts, glb_path, blend_path, preview=None):
         o.select_set(True)
     try:
         bpy.ops.export_scene.gltf(filepath=glb_path, export_format="GLB", use_selection=True, export_apply=True,
-                                  export_image_format="WEBP")
+                                  export_image_format="WEBP", export_vertex_color="ACTIVE")
     except TypeError:
         bpy.ops.export_scene.gltf(filepath=glb_path, export_format="GLB", use_selection=True, export_apply=True)
     bpy.ops.wm.save_as_mainfile(filepath=blend_path)

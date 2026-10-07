@@ -82,6 +82,8 @@ function toToon(src: THREE.MeshStandardMaterial): THREE.MeshToonMaterial {
     emissive: src.emissive,
     emissiveMap: src.emissiveMap,
     emissiveIntensity: src.emissiveIntensity,
+    // per-vertex tint from Blender (the soot on the fire side of the stones)
+    vertexColors: src.vertexColors,
     // keep alpha-blended materials (the fire pit's faded edge) transparent
     transparent: src.transparent,
     opacity: src.opacity,

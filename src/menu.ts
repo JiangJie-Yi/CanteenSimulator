@@ -87,10 +87,12 @@ export type Roast = {
   /** where the serving plate sits, in the dish's own coordinates */
   plate: [number, number, number]
   /**
-   * Loose pieces that are piled up on the ground instead of going on the plate, one pyramid per item:
-   * where the pile's centre sits and how far apart neighbouring pieces are.
+   * Loose pieces (roasted in foil in the ash) are served into a woven bamboo basket instead of onto the plate:
+   * where the first basket sits; it holds `capacity`, and a full one gets another set down beside it.
    */
-  piles?: Record<string, { at: [number, number, number]; spacing: number }>
+  basket?: { at: [number, number, number]; capacity: number }
+  /** a pot of coarse salt beside the fire (object name in the model); clicking it sprinkles salt over the food */
+  salt?: string
 }
 
 /** Doneness stages for roasting, by fraction of the cook time. */
@@ -165,14 +167,14 @@ export const DISHES: Dish[] = [
     name: '日式烤魚',
     ja: '炭火焼き',
     model: asset('models/grilledfish.glb'),
-    // every set comes with one fish, a rice ball, shishito and a potato; extras on top are ordered separately
+    // every set comes with one fish, a rice ball, shishito, king oyster mushroom and a potato; extras on top are ordered separately
     bases: [
       { id: 'ayu', name: '香魚套餐', ja: '鮎定食', en: 'Ayu Set', price: 180,
-        includes: { ExtraFish: 1, Onigiri: 1, Shishito: 1, Potato: 1 } },
+        includes: { ExtraFish: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1 } },
       { id: 'saury', name: '秋刀魚套餐', ja: '秋刀魚定食', en: 'Saury Set', price: 190,
-        includes: { Saury: 1, Onigiri: 1, Shishito: 1, Potato: 1 } },
+        includes: { Saury: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1 } },
       { id: 'mackerel', name: '鯖魚套餐', ja: '鯖定食', en: 'Mackerel Set', price: 200,
-        includes: { Mackerel: 1, Onigiri: 1, Shishito: 1, Potato: 1 } },
+        includes: { Mackerel: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1 } },
     ],
     items: [
       { id: 'ExtraFish', name: '香魚', ja: '鮎', en: 'Ayu', price: 80 },
@@ -191,25 +193,24 @@ export const DISHES: Dish[] = [
       { id: 'Shishito', name: '烤青椒', ja: 'ししとう', en: 'Shishito', price: 30 },
       { id: 'Mochi', name: '烤年糕', ja: '焼き餅', en: 'Mochi', price: 35 },
       { id: 'KingOyster', name: '杏鮑菇', ja: 'エリンギ', en: 'King Oyster', price: 35 },
+      { id: 'Asparagus', name: '烤蘆筍', ja: 'アスパラ', en: 'Asparagus', price: 40 },
     ],
     defaults: [],
     heat: 'fire',
     roast: {
       times: { Fish: 40, ExtraFish: 40, Saury: 35, Mackerel: 45, GrilledCorn: 30, GrilledShiitake: 20, Onigiri: 25, ShrimpSkewer: 20,
         Sausage: 25, Potato: 55, SweetPotato: 55,
-        Yakitori: 30, PorkBelly: 30, Squid: 25, Shishito: 15, Mochi: 20, KingOyster: 20 },
+        Yakitori: 30, PorkBelly: 30, Squid: 25, Shishito: 15, Mochi: 20, KingOyster: 20, Asparagus: 15 },
       names: { Fish: '香魚', ExtraFish: '香魚', Saury: '秋刀魚', Mackerel: '鯖魚', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '飯糰',
         ShrimpSkewer: '蝦串', Sausage: '香腸', Potato: '馬鈴薯', SweetPotato: '地瓜',
-        Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '青椒', Mochi: '年糕', KingOyster: '杏鮑菇' },
+        Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '青椒', Mochi: '年糕', KingOyster: '杏鮑菇', Asparagus: '蘆筍' },
       loose: ['Potato', 'SweetPotato'],
       // just outside the stones, to the upper right of the fire as the camera sees it
       // (kept clear of the corn skewer at -55°, which used to stand right in front of it)
       plate: [1.38, 0.02, -1.16],
       // just outside the stones on the left as the camera sees it
-      piles: {
-        Potato: { at: [-1.38, 0, 0.62], spacing: 0.17 },
-        SweetPotato: { at: [-0.86, 0, 1.22], spacing: 0.13 },
-      },
+      basket: { at: [-1.3, 0, 0.75], capacity: 10 },
+      salt: 'SaltPot',
     },
     layout: {
       mode: 'ring',

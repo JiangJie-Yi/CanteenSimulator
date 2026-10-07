@@ -9,7 +9,8 @@ Outputs:
 
 Flames, embers and the flicker light are animated in the web app (src/components/Fire.tsx).
 Items that the web menu toggles are named by their menu id (src/menu.ts):
-ExtraFish, GrilledCorn, GrilledShiitake, Onigiri, ShrimpSkewer, Sausage (skewers), Potato, SweetPotato (in the ash).
+ExtraFish, Saury, Mackerel, GrilledCorn, GrilledShiitake, Onigiri, ShrimpSkewer, Sausage, Yakitori, PorkBelly,
+Squid, Shishito, Mochi, KingOyster, Asparagus (skewers), Potato, SweetPotato (in the ash).
 """
 import math
 import os
@@ -77,14 +78,15 @@ rad = np.sqrt((u - 0.5) ** 2 + (v - 0.5) ** 2) * 2       # 0 centre .. 1 disc ed
 wobble = (fbm(N, 6, 6) - 0.5) * 0.18
 dirt = mix((0.32, 0.23, 0.15), (0.45, 0.34, 0.23), fbm(N, 10, 10))
 dirt = mix(dirt, (0.25, 0.18, 0.12), (vnoise(N, 90, 90) > 0.8).astype(np.float32) * 0.5)   # pebbles and grit
-ash = mix((0.42, 0.40, 0.37), (0.12, 0.11, 0.10), np.clip(fbm(N, 8, 8) * 0.6 + (1 - rad / 0.5) * 0.6, 0, 1))
-ground = mix(ash, dirt, smooth(0.36, 0.56, rad + wobble))
-# a bed of coarse salt laid over the ash, thinning out toward the stones
-salt_bed = (vnoise(N, 220, 220) > 0.55).astype(np.float32) * smooth(0.6, 0.45, rad + wobble * 0.5)
-ground = mix(ground, (0.93, 0.92, 0.9), salt_bed * 0.85)
+# inside the stones the whole floor is a thick bed of coarse white salt: faint grain and drifts in it,
+# and only a light grey dusting of ash right under the coals
+grit = vnoise(N, 260, 260)
+salt = mix((0.86, 0.86, 0.84), (0.98, 0.98, 0.96), np.clip(grit * 0.6 + fbm(N, 12, 12) * 0.5, 0, 1))
+salt = mix(salt, (0.72, 0.71, 0.69), smooth(0.2, 0.05, rad) * 0.35)
+ground = mix(salt, dirt, smooth(0.56, 0.62, rad + wobble * 0.3))
 alpha = 1 - smooth(0.72, 0.98, rad + wobble)
 TEX["pit"] = image("T_FirePit", ground, alpha=alpha)
-TEX["pit_n"] = image("T_FirePit_N", to_normal(fbm(N, 24, 24), 1.5), data=True)
+TEX["pit_n"] = image("T_FirePit_N", to_normal(fbm(N, 24, 24) * 0.5 + grit * 0.5, 1.5), data=True)
 
 # ayu (sweetfish), salt-grilled. u: around the vertical axis (0 = head), v: belly (0) -> back (1)
 N = 512
@@ -215,6 +217,29 @@ M = {
     "dirt": pbr("Dirt", (0.3, 0.22, 0.15), rough=0.95),
 }
 
+# crinkled aluminium foil for the potatoes roasting in the ash
+N = 256
+crinkle = np.abs(fbm(N, 18, 18) - 0.5) * 2 + vnoise(N, 60, 60) * 0.3
+TEX["foil_n"] = image("T_Foil_N", to_normal(crinkle, 6.0), data=True)
+M["foil"] = pbr("Foil", (0.82, 0.83, 0.86), nrm=TEX["foil_n"], rough=0.3, metal=1.0)
+M["foil"].use_backface_culling = False
+# the salt pot: a little glazed stoneware pot of coarse salt
+M["pot"] = pbr("SaltPotGlaze", (0.035, 0.06, 0.15), rough=0.25, coat=0.4)
+M["pot_clay"] = pbr("SaltPotClay", (0.62, 0.5, 0.38), rough=0.8)
+
+
+def centre_origin(o, at=(0.0, 0.0, 0.0)):
+    """Put a joined object's origin at `at` (the web app scales the charcoal heap about the fire's centre)."""
+    bpy.context.scene.cursor.location = at
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    # bake rotation and scale in too (a join keeps its first piece's, so the web app can scale it from 1)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    bpy.context.scene.cursor.location = (0, 0, 0)
+    return o
+
 
 # =====================================================================
 # Fire pit: ash, logs, charcoal, stone ring
@@ -253,7 +278,7 @@ for i in range(34):
     # the ones down in the middle of the heap glow; the outer ones are grey white charcoal
     sticks.append(finish(o, "Binchotan", M["ember"] if r < 0.12 or random.random() < 0.15 else M["binchotan"],
                          smooth_shade=False))
-join(sticks, "BinchotanHeap")
+centre_origin(join(sticks, "BinchotanHeap"))
 
 # coarse salt: grains strewn over the ash around the skewer feet, and a few little heaps of it
 grains = []
@@ -283,7 +308,7 @@ for _ in range(44):
     o = active()
     o.scale = (s * random.uniform(0.8, 1.3), s * random.uniform(0.8, 1.3), s * random.uniform(0.6, 0.9))
     coals.append(finish(o, "Coal", M["ember"], smooth_shade=False))
-join(coals, "Charcoal")
+centre_origin(join(coals, "Charcoal"))
 
 # a tight ring of mixed big and small stones: pick a half-width for each (along the ring, local Y),
 # then space them by those widths so neighbours touch whatever their size
@@ -313,8 +338,20 @@ for i, half in enumerate(sizes):
         vtx.co *= random.uniform(0.97, 1.03)   # just enough to break the perfect ellipse
         if vtx.co.z < 0:
             vtx.co.z *= 0.6                    # flatter underneath, so it sits on the ground
+    # blackened by the fire on the side facing it (local -X points at the fire), thickest low down, in patches
+    col = bm.loops.layers.float_color.new("Col")
+    for vtx in bm.verts:
+        inward = smooth(0.05, 0.85, np.float32(-vtx.co.x))
+        low = smooth(0.9, -0.2, np.float32(vtx.co.z))
+        patch = 0.65 + 0.35 * math.sin(vtx.co.y * 9 + i * 1.7) * math.sin(vtx.co.z * 7 + i)
+        k = float(1 - 0.82 * inward * (0.45 + 0.55 * low) * patch)
+        for l in vtx.link_loops:
+            l[col] = (k, k * 0.97, k * 0.95, 1.0)
     bm.to_mesh(o.data)
     bm.free()
+    attr = o.data.color_attributes["Col"]
+    o.data.color_attributes.active_color = attr
+    o.data.color_attributes.render_color_index = o.data.color_attributes.find("Col")
     o.scale = (sx, sy, sz)
     finish(o, "Stone", M["stone"])
 
@@ -421,11 +458,20 @@ SPECIES = {
 }
 
 
+def tilted(outline, angle):
+    """Rotate a fin outline (x, z) about its root by `angle` (radians), to follow the curve of the body."""
+    c, s = math.cos(angle), math.sin(angle)
+    return [(x * c - z * s, x * s + z * c) for x, z in outline]
+
+
 def fish(species="ayu"):
-    """A grilled fish along local X (head at +X), curved like it's swimming up the skewer."""
+    """A grilled fish along local X (head at +X), threaded the 踊り串 way: the body waves in a big S up the
+    skewer, as if it were still swimming, so the stick weaves in and out of it."""
     sp = SPECIES[species]
     L, W, D = sp["length"], sp["width"], sp["depth"]
-    bend = lambda x: 0.035 * math.sin(x * 9 * 0.3 / L)   # noqa: E731  same S-curve whatever the length
+    bend = lambda x: 0.012 * math.sin(x * math.pi / L)        # noqa: E731  a little sideways sway
+    wave = lambda x: 0.95 * D * math.sin(x * math.pi / L)      # noqa: E731  the S, seen from the side
+    slope = lambda x: math.atan(0.95 * D * math.pi / L * math.cos(x * math.pi / L))   # noqa: E731
     bm = bmesh.new()
     bm.loops.layers.uv.new()
     bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=24, radius=1, calc_uvs=True)
@@ -437,6 +483,7 @@ def fish(species="ayu"):
         vtx.co.z *= D * taper * head
         vtx.co.x *= L
         vtx.co.y += bend(vtx.co.x)
+        vtx.co.z += wave(vtx.co.x)
     me = bpy.data.meshes.new("FishBody")
     bm.to_mesh(me)
     bm.free()
@@ -445,34 +492,36 @@ def fish(species="ayu"):
     finish(body, "FishBody", M[sp["body"]])
     parts = [body]
 
-    # forked tail, rooted just inside the narrow end of the body
+    # forked tail, rooted just inside the narrow end of the body and flicked along the line of the S
     tail_len, tail_h = sp["tail"]
     root_x = -L * 0.93
-    parts.append(flat_fin("TailFin", forked_tail(tail_len, tail_h, D * 0.16), 0.006, M[sp["fin"]],
-                          at=(root_x, bend(root_x), 0)))
+    parts.append(flat_fin("TailFin", tilted(forked_tail(tail_len, tail_h, D * 0.16), slope(root_x)), 0.006,
+                          M[sp["fin"]], at=(root_x, bend(root_x), wave(root_x))))
 
-    # dorsal fin: a low swept-back sail; a small anal fin underneath
+    # dorsal fin: a low swept-back sail; a small anal fin underneath; both ride the curve of the back
     dx = L * 0.05
-    parts.append(flat_fin("DorsalFin", [(dx + L * 0.12, 0), (dx + L * 0.02, D * 0.75), (dx - L * 0.12, D * 0.55),
-                                        (dx - L * 0.2, 0)], 0.005, M[sp["fin"]], at=(0, bend(dx), D * 0.82)))
+    parts.append(flat_fin("DorsalFin", tilted([(L * 0.12, 0), (L * 0.02, D * 0.75), (-L * 0.12, D * 0.55),
+                                               (-L * 0.2, 0)], slope(dx)), 0.005, M[sp["fin"]],
+                          at=(dx, bend(dx), D * 0.82 + wave(dx))))
     ax = -L * 0.45
-    parts.append(flat_fin("AnalFin", [(ax + L * 0.1, 0), (ax - L * 0.08, -D * 0.45), (ax - L * 0.16, 0)], 0.005,
-                          M[sp["fin"]], at=(0, bend(ax), -D * 0.55)))
+    parts.append(flat_fin("AnalFin", tilted([(L * 0.1, 0), (-L * 0.08, -D * 0.45), (-L * 0.16, 0)], slope(ax)),
+                          0.005, M[sp["fin"]], at=(ax, bend(ax), -D * 0.55 + wave(ax))))
 
     # eyes on both sides of the head
     ex = L * 0.73
     er = 0.014 + D * 0.03
+    ez = wave(ex)
     for side in (-1, 1):
         ey = bend(ex) + side * W * 0.5
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=12, ring_count=8, location=(ex, ey, D * 0.25))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=12, ring_count=8, location=(ex, ey, D * 0.25 + ez))
         parts.append(finish(active(), "Eye", M["eye"]))
         bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.56, segments=10, ring_count=6,
-                                             location=(ex + 0.004, ey + side * er * 0.55, D * 0.26))
+                                             location=(ex + 0.004, ey + side * er * 0.55, D * 0.26 + ez))
         parts.append(finish(active(), "Pupil", M["pupil"]))
     return parts
 
 
-CORN_L = 0.3
+CORN_L = 0.42
 KERNELS_AROUND, KERNELS_ALONG = 16, 12   # must match the T_GrilledCorn texture grid
 
 
@@ -514,68 +563,54 @@ def corn_cob():
     cyl_uv(cob)
     finish(cob, "Cob", M["corn"])
     cob.rotation_euler = (0, math.radians(90), 0)
-    parts = [cob]
+    # just the cob: no stalk stub or husk leaves trailing off the bottom
+    return [cob]
 
-    # stalk stub at the base
-    base_x = -CORN_L / 2
-    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.024, depth=0.06, location=(base_x - 0.025, 0, 0),
-                                        rotation=(0, math.radians(90), 0))
-    parts.append(finish(active(), "Stalk", M["husk"]))
 
-    # three husk leaves folded back from the base, fanning out around the cob
-    for k in range(3):
-        phi = 2 * math.pi * k / 3 + random.uniform(-0.2, 0.2)
-        radial = Vector((0, math.cos(phi), math.sin(phi)))
-        direction = (Vector((-1, 0, 0)) * math.cos(0.35) + radial * math.sin(0.35)).normalized()
-        length = random.uniform(0.2, 0.26)
-        o = leaf(0, 0, 0, 0, length, 0.07, M["husk"], "Husk", cup=0.06, thickness=0.004)
-        # leaf grid runs along local X; aim X down the stick and flare its face outward
-        z_axis = (radial - direction * radial.dot(direction)).normalized()
-        y_axis = z_axis.cross(direction)
-        basis = Matrix((direction, y_axis, z_axis)).transposed().to_4x4()
-        basis.translation = Vector((base_x + 0.02, 0, 0)) + radial * 0.05 + direction * length / 2
-        o.matrix_world = basis
-        parts.append(o)
+def shiitake_slices():
+    """Big shiitake cut through the middle into thick slices, so each shows the mushroom's silhouette:
+    a brown domed rim of cap over the pale flesh, with the stem below. Sizes differ slice to slice;
+    the flat cut faces the viewer (local Y) and the skewer runs through the caps."""
+    parts = []
+    sizes = [random.uniform(0.075, 0.105) for _ in range(3)]
+    x = -(sum(sizes) * 2 + 0.03) / 2
+    for rx in sizes:
+        x += rx
+        hc = rx * random.uniform(0.62, 0.75)          # cap height
+        zc = -hc * 0.35                                # the stick crosses through the lower cap
+        sw = rx * random.uniform(0.3, 0.38)            # stem half-width
+        sl = rx * random.uniform(0.8, 1.0)             # stem length below the cap
+        dome = [(rx * math.cos(t), zc + hc * math.sin(t)) for t in (math.pi * k / 16 for k in range(17))]
+        # cap underside curls in to the stem, the stem narrows a touch to its foot
+        flesh = dome + [(-rx * 0.92, zc - hc * 0.12), (-sw, zc - hc * 0.2), (-sw * 0.85, zc - sl),
+                        (sw * 0.85, zc - sl), (sw, zc - hc * 0.2), (rx * 0.92, zc - hc * 0.12)]
+        tilt = random.uniform(-0.15, 0.15)
+        parts.append(flat_fin("ShiitakeFlesh", tilted(flesh, tilt), 0.028, M["gills"], at=(x, 0, 0)))
+        # the brown skin of the cap: a band along the dome, a little proud of the cut face
+        inner = [(rx * 0.84 * math.cos(t), zc + hc * 0.74 * math.sin(t)) for t in (math.pi * k / 16 for k in range(16, -1, -1))]
+        parts.append(flat_fin("ShiitakeCap", tilted(dome + inner, tilt), 0.036, M["shiitake_skin"], at=(x, 0, 0)))
+        x += rx + 0.015
     return parts
 
 
-def shiitake_trio():
-    """Three shiitake on a skewer: domed caps facing outward (toward the viewer), pale gills underneath,
-    stems pointing back toward the fire."""
+def asparagus():
+    """Five spears laid side by side across the skewer like a raft (out from the fire, so they show side-on)."""
     parts = []
-    for i in range(3):
-        x = (i - 1) * 0.12
-        bm = bmesh.new()
-        bm.loops.layers.uv.new()
-        bmesh.ops.create_uvsphere(bm, u_segments=28, v_segments=14, radius=1, calc_uvs=True)
-        bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, 0),
-                               plane_no=(0, 0, -1), clear_outer=True)
-        gills = bmesh.ops.edgeloop_fill(bm, edges=[e for e in bm.edges if e.is_boundary])["faces"]
-        for vtx in bm.verts:
-            vtx.co.x *= 0.062
-            vtx.co.y *= 0.062
-            vtx.co.z *= 0.036
-        bm.normal_update()
-        for f in gills:
-            if f.normal.z > 0:
-                f.normal_flip()
-            f.material_index = 1
-        me = bpy.data.meshes.new("Cap")
-        bm.to_mesh(me)
-        bm.free()
-        cap = bpy.data.objects.new("Cap", me)
-        bpy.context.collection.objects.link(cap)
-        cap.data.materials.append(M["shiitake"])
-        cap.data.materials.append(M["gills"])
-        for p in cap.data.polygons:
-            p.use_smooth = p.material_index == 0
-        # dome (+Z) -> outward (+Y)
-        cap.location = (x, 0.012, 0)
-        cap.rotation_euler = (math.radians(-90), 0, 0)
-        parts.append(cap)
-        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.016, depth=0.045, location=(x, -0.012, 0),
+    for i in range(5):
+        x = (i - 2) * 0.036
+        r = random.uniform(0.01, 0.013)
+        length = random.uniform(0.22, 0.27)
+        z0 = -0.11 + random.uniform(-0.015, 0.015)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=r, depth=length, location=(x, z0 + length / 2, 0),
                                             rotation=(math.radians(90), 0, 0))
-        parts.append(finish(active(), "Stem", M["stem"]))
+        o = active()
+        cyl_uv(o)
+        parts.append(finish(o, "Asparagus", M["asparagus"]))
+        # the bud: a slim pointed tip a shade darker
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=8, location=(x, z0 + length, 0))
+        tip = active()
+        tip.scale = (r * 1.15, r * 3.2, r * 1.15)
+        parts.append(finish(tip, "AsparagusTip", M["asparagus_tip"]))
     return parts
 
 
@@ -672,7 +707,12 @@ TEX["mochi"] = image("T_Mochi", mix((0.97, 0.95, 0.9), (0.68, 0.45, 0.2), toast 
 score = smooth(0.06, 0.0, np.minimum(np.abs(((u + v) * 8) % 1 - 0.5), np.abs(((u - v) * 8) % 1 - 0.5)))
 TEX["eryngii"] = image("T_Eryngii", mix(mix((0.93, 0.87, 0.74), (0.82, 0.7, 0.5), fbm(N, 6, 6)), (0.45, 0.3, 0.15),
                                         score * 0.75))
+TEX["asparagus"] = image("T_Asparagus", mix(mix((0.3, 0.5, 0.16), (0.52, 0.66, 0.28), v), (0.16, 0.14, 0.06),
+                                            smooth(0.8, 0.92, 0.5 + 0.5 * np.sin(v * 2 * np.pi * 5)) * 0.8))
 M.update({
+    "shiitake_skin": pbr("ShiitakeSkin", (0.33, 0.19, 0.09), rough=0.6),
+    "asparagus": pbr("Asparagus", tex=TEX["asparagus"], rough=0.35, coat=0.3),
+    "asparagus_tip": pbr("AsparagusTip", (0.3, 0.38, 0.16), rough=0.5),
     "chicken": pbr("Chicken", tex=TEX["chicken"], rough=0.35, coat=0.5),
     "leek": pbr("Leek", (0.9, 0.93, 0.82), rough=0.45),
     "leek_green": pbr("LeekGreen", (0.42, 0.62, 0.25), rough=0.45),
@@ -745,13 +785,13 @@ def squid():
 def shishito():
     """Four blistered shishito peppers, slightly curved, stems out to one side."""
     parts = []
-    for i, x in enumerate((-0.11, -0.04, 0.03, 0.1)):
-        bpy.ops.mesh.primitive_cone_add(vertices=14, radius1=0.018, radius2=0.004, depth=0.11,
-                                        location=(x, 0, -0.01), rotation=(random.uniform(-0.25, 0.25), 0, 0))
+    for i, x in enumerate((-0.15, -0.05, 0.05, 0.15)):
+        bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.03, radius2=0.006, depth=0.17,
+                                        location=(x, 0, -0.015), rotation=(random.uniform(-0.25, 0.25), 0, 0))
         o = active()
-        bevel(o, 0.006, 2)
+        bevel(o, 0.009, 2)
         parts.append(finish(o, "Shishito", M["shishito"]))
-        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.004, depth=0.02, location=(x, 0, 0.055))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.006, depth=0.03, location=(x, 0, -0.112))
         parts.append(finish(active(), "Stem", M["leek_green"]))
     return parts
 
@@ -784,13 +824,14 @@ place(squid(), 178, 0.58, "Squid")
 place(shishito(), 144, 0.6, "Shishito")
 place(mochi(), 224, 0.6, "Mochi")
 place(eryngii(), 357, 0.6, "KingOyster")
+place(asparagus(), 25, 0.6, "Asparagus")
 # ---------------------------------------------------------------------------------------------------------
 
 place(fish(), 95, 0.64, "ExtraFish")
 place(fish("saury"), -97, 0.6, "Saury")
 place(fish("mackerel"), -122, 0.62, "Mackerel")
 place(corn_cob(), 55, 0.6, "GrilledCorn")
-place(shiitake_trio(), 128, 0.6, "GrilledShiitake")
+place(shiitake_slices(), 128, 0.6, "GrilledShiitake")
 place(onigiri(), -20, 0.58, "Onigiri")
 place(shrimp_pair(), 200, 0.6, "ShrimpSkewer")
 place(sausage(), -150, 0.6, "Sausage")
@@ -817,13 +858,75 @@ def roast_in_ash(name, mat, angle_deg, r, size, bend=0.0):
     bm.to_mesh(o.data)
     bm.free()
     o.scale = size
-    return finish(o, name, mat)
+    finish(o, name, mat)
+    # the foil: a crumpled, slightly larger copy of the same shape, open at the top
+    foil = o.copy()
+    foil.data = o.data.copy()
+    foil.data.materials.clear()
+    bpy.context.collection.objects.link(foil)
+    bm = bmesh.new()
+    bm.from_mesh(foil.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z > 0.62], context="VERTS")
+    for vtx in bm.verts:
+        vtx.co *= 1.09 * random.uniform(0.97, 1.06)
+    for vtx in bm.verts:
+        if vtx.is_boundary:
+            vtx.co.z += random.uniform(0.0, 0.18)          # the crimped edge, folded up unevenly
+            vtx.co.x *= 0.9
+            vtx.co.y *= 0.9
+    bm.to_mesh(foil.data)
+    bm.free()
+    finish(foil, name + "Foil", M["foil"], smooth_shade=False)
+    return join([o, foil], name)
 
 
 roast_in_ash("Potato", M["potato"], -62, 0.56, (0.1, 0.085, 0.075))
 roast_in_ash("Potato", M["potato"], -78, 0.62, (0.085, 0.075, 0.065))
 roast_in_ash("SweetPotato", M["sweetpotato"], -112, 0.56, (0.17, 0.06, 0.06), bend=0.25)
 roast_in_ash("SweetPotato", M["sweetpotato"], -128, 0.63, (0.15, 0.055, 0.055), bend=-0.2)
+
+
+def salt_pot(angle_deg, r):
+    """A little glazed pot of coarse salt standing just outside the stones; the web app makes it clickable."""
+    a = math.radians(angle_deg)
+    x, y = r * math.cos(a), r * math.sin(a)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.1, depth=0.13, location=(x, y, 0.065))
+    pot = active()
+    bm = bmesh.new()
+    bm.from_mesh(pot.data)
+    for vtx in bm.verts:
+        t = (vtx.co.z + 0.065) / 0.13                   # 0 foot .. 1 lip
+        k = 0.82 + 0.3 * math.sin(t * math.pi * 0.85)    # bellied, narrowing to the foot and the lip
+        vtx.co.x *= k
+        vtx.co.y *= k
+    # open the top: the salt shows inside
+    bm.normal_update()
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.9], context="FACES")
+    bm.to_mesh(pot.data)
+    bm.free()
+    s = pot.modifiers.new("Solidify", "SOLIDIFY")
+    s.thickness = 0.012
+    bevel(pot, 0.004, 2)
+    finish(pot, "SaltPot", M["pot"])
+    # unglazed foot ring
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.075, depth=0.014, location=(x, y, 0.007))
+    foot = finish(active(), "SaltPotFoot", M["pot_clay"])
+    # a heap of coarse salt filling it, rough with grains
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(x, y, 0.118))
+    heap = active()
+    heap.scale = (0.088, 0.088, 0.035)
+    bm = bmesh.new()
+    bm.from_mesh(heap.data)
+    for vtx in bm.verts:
+        vtx.co *= random.uniform(0.94, 1.06)
+    bm.to_mesh(heap.data)
+    bm.free()
+    finish(heap, "SaltHeap", M["salt"], smooth_shade=False)
+    return centre_origin(join([pot, foot, heap], "SaltPot"), (x, y, 0.0))
+
+
+# front right of the fire as the camera sees it, clear of the plate and the basket
+salt_pot(-15, 1.25)
 
 
 # =====================================================================

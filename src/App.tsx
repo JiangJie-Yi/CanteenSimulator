@@ -295,7 +295,8 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame,
               {dish.smoke && (
                 // same white puffs as the soup steam, just taller and slower
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height}
-                  opacity={theme === 'dark' ? 0.5 : 0.7} speed={0.05} />
+                  opacity={theme === 'dark' ? 0.5 : 0.7} speed={0.05}
+                  level={dish.heat === 'fire' ? fire : undefined} />
               )}
             </Suspense>
           </group>
@@ -463,7 +464,7 @@ export default function App() {
         </Canvas>
       </div>
       <div className="stage" ref={stageRef}>
-        <Brand night={theme === 'dark'} />
+        <Brand night={theme === 'dark'} lang={lang} />
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <DishSwitcher dishes={DISHES} index={active} onChange={setActive} lang={lang} />

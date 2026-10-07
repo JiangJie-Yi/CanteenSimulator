@@ -27,24 +27,84 @@ const SLOT_GAP = 0.2       // wider than the broadest piece (a fish lying flat)
 const PER_LAYER = 5
 /** a plate takes 20 (four layers of five); the next one is set down behind it */
 const PER_PLATE = 20
+/**
+ * How far to brighten each charcoal material once it has burnt to ash. Its colour multiplies a very dark
+ * texture, so scaling the colour up turns the black into a mottled pale grey while keeping the ridges and cracks.
+ */
+const ASH_GAIN: Record<string, number> = { Ember: 45, Binchotan: 18 }
+const ASH_TINT = new THREE.Color('#d8d2c8')
 const PLATE_STEP = 1.45
 /** seconds to eat one piece: a few bites, each taking a chunk out */
 const EAT_SECONDS = 1.3
 const UP = new THREE.Vector3(0, 1, 0)
+/** the bamboo basket the foil-roasted potatoes are served in */
+const BASKET_R = 0.36
+const BASKET_STEP = 0.85
 /**
- * Fill order for a pyramid pile, as [layer, position across in piece-widths]. It grows from the middle out and
- * only puts a piece on a layer once both pieces under it are down, so it's a pyramid at every count:
- * 2 side by side, 3 is 2 + 1 on top, then the base widens to 4, then up to 10.
+ * Where each piece settles in a basket, as [ring radius, angle in turns, layer]: five round the bottom, four
+ * nestled on top of them, one crowning the heap.
  */
-const PYRAMID: [number, number][] = [
-  [0, -0.5], [0, 0.5], [1, 0], [0, -1.5], [0, 1.5], [1, -1], [1, 1], [2, -0.5], [2, 0.5], [3, 0],
+const BASKET_SLOTS: [number, number, number][] = [
+  [0.17, 0, 0], [0.17, 0.2, 0], [0.17, 0.4, 0], [0.17, 0.6, 0], [0.17, 0.8, 0],
+  [0.09, 0.1, 1], [0.09, 0.35, 1], [0.09, 0.6, 1], [0.09, 0.85, 1], [0, 0, 2],
 ]
+/** salt sprinkled from the pot: grains fall over the fire for a moment */
+const SALT_GRAINS = 220
+const SALT_SECONDS = 1.1
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
 const STICK_FOOT_R = 0.7
 const STICK_TOP_R = 0.26
 const STICK_TOP_Y = 1.15
 const LAYER_HEIGHT = 0.1
 const CHAR_COLOR = new THREE.Color(0.045, 0.035, 0.03)
+
+/** A woven bamboo (ざる) texture: strips over and under in a twill, pale and honey-coloured. */
+const weaveTexture = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const g = c.getContext('2d')!
+  const cell = 8
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const over = (i + j) % 4 < 2
+      g.fillStyle = over ? '#d9b779' : '#b88f52'
+      g.fillRect(i * cell, j * cell, cell, cell)
+      // a dark seam between strips, and a light streak along the one on top
+      g.fillStyle = 'rgba(80, 52, 22, 0.55)'
+      if (over) g.fillRect(i * cell, j * cell, cell, 1)
+      else g.fillRect(i * cell, j * cell, 1, cell)
+      g.fillStyle = 'rgba(255, 240, 200, 0.35)'
+      if (over) g.fillRect(i * cell, j * cell + 3, cell, 1)
+      else g.fillRect(i * cell + 3, j * cell, 1, cell)
+    }
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(14, 3)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+
+/** Shallow woven bamboo basket with a rolled rim, inked like everything else. */
+function Basket({ position }: { position: [number, number, number] }) {
+  const geometry = useMemo(() => {
+    const R = BASKET_R
+    const profile = [[0, 0.01], [R * 0.55, 0.012], [R * 0.82, 0.04], [R * 0.97, 0.1], [R * 1.02, 0.13], [R * 0.99, 0.145],
+      [R * 0.93, 0.12], [R * 0.78, 0.055], [R * 0.5, 0.028], [0, 0.026]].map(([x, y]) => new THREE.Vector2(x, y))
+    return new THREE.LatheGeometry(profile, 48)
+  }, [])
+  return (
+    <group position={position}>
+      <mesh geometry={geometry} castShadow receiveShadow>
+        <meshToonMaterial color="#ffffff" map={weaveTexture} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh geometry={geometry} scale={[1.03, 1.08, 1.03]}>
+        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+      </mesh>
+    </group>
+  )
+}
 
 /**
  * Burn patches for over-roasted food: a value-noise mask over the texture that grows as uChar goes 0 → 1, so the
@@ -94,7 +154,7 @@ type Piece = {
   fromQ: THREE.Quaternion
   toP: THREE.Vector3
   toQ: THREE.Quaternion
-  mats: { mat: THREE.MeshToonMaterial; base: THREE.Color; emissive: THREE.Color }[]
+  mats: { mat: THREE.MeshToonMaterial; base: THREE.Color; emissive: THREE.Color; foil: boolean }[]
   /** 0 → 1 how charred the texture is, shared by all of this piece's materials */
   uChar: { value: number }
   /** where it sits once collected: index into its plate run (or its pile); null while on the fire */
@@ -195,9 +255,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (!meshes.length || !meshes.every((m) => m.material instanceof THREE.MeshToonMaterial)) return
     for (const m of meshes) {
       const mat = (m.material as THREE.MeshToonMaterial).clone()
-      addCharring(mat, p.uChar)
+      // the foil wrapped round potatoes in the ash doesn't brown or char; it comes off when they're served
+      const foil = mat.name.startsWith('Foil')
+      if (!foil) addCharring(mat, p.uChar)
       m.material = mat
-      p.mats.push({ mat, base: mat.color.clone(), emissive: mat.emissive.clone() })
+      p.mats.push({ mat, base: mat.color.clone(), emissive: mat.emissive.clone(), foil })
     }
   }
 
@@ -219,13 +281,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r)
   }
   const [plateCount, setPlateCount] = useState(1)
+  const basketAt = (n: number) => {
+    const [x, y, z] = roast.basket!.at
+    return new THREE.Vector3(x, y, z).addScaledVector(LAY_DIR, -n * BASKET_STEP)
+  }
+  const [basketCount, setBasketCount] = useState(1)
+  const inBasket = (p: Piece) => !!roast.basket && p.loose
 
   const collect = (p: Piece) => {
     if (p.collected || !present(p)) return
-    const pile = roast.piles?.[p.id]
-    // take the first free spot where it's going (this item's pile, or the plates); eaten food frees its spot
+    const basket = inBasket(p)
+    // take the first free spot where it's going (the baskets, or the plates); eaten food frees its spot
     const taken = new Set(pieces.current.filter((q) => q.slot !== null && !q.eaten && present(q) &&
-      (pile ? q.id === p.id : !roast.piles?.[q.id])).map((q) => q.slot))
+      inBasket(q) === basket).map((q) => q.slot))
     let slot = 0
     while (taken.has(slot)) slot++
     p.slot = slot
@@ -235,14 +303,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.flight = instant ? 1 : 0
     p.fromP.copy(p.node.position)
     p.fromQ.copy(p.node.quaternion)
-    if (pile) {
-      // stacked into a pyramid on the ground; a full pyramid starts another one behind it
-      const [layer, offset] = PYRAMID[slot % PYRAMID.length]
-      const heap = Math.floor(slot / PYRAMID.length)
-      p.toP.set(...pile.at)
-        .addScaledVector(STACK_DIR, offset * pile.spacing)
-        .addScaledVector(LAY_DIR, -heap * pile.spacing * 2.6)
-      p.toP.y += pile.spacing * (0.42 + layer * 0.8)
+    if (basket) {
+      // heaped into the bamboo basket; a full basket (roast.basket.capacity) gets another set down behind it
+      const cap = Math.min(roast.basket!.capacity, BASKET_SLOTS.length)
+      const n = Math.floor(slot / cap)
+      const [r, turn, layer] = BASKET_SLOTS[slot % cap]
+      const a = turn * Math.PI * 2
+      p.toP.copy(basketAt(n)).add(new THREE.Vector3(Math.cos(a) * r, 0.085 + layer * 0.075, Math.sin(a) * r))
+      if (n + 1 > basketCount) setBasketCount(n + 1)
+      // lying on its side round the basket, long way along the ring
+      const along = new THREE.Vector3(-Math.sin(a + 0.4), 0, Math.cos(a + 0.4))
+      p.toQ.setFromRotationMatrix(new THREE.Matrix4().makeBasis(along, UP, new THREE.Vector3().crossVectors(along, UP)))
     } else {
       // side by side across the plate, centred; a full row starts a new layer on top; a full plate, a new plate
       const plate = Math.floor(slot / PER_PLATE)
@@ -257,7 +328,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.toP.y += (p.loose ? 0.075 : 0.105) + layer * LAYER_HEIGHT
     }
     // everything points the same way along LAY_DIR
-    if (p.loose) {
+    if (basket) {
+      // already turned above
+    } else if (p.loose) {
       // loose pieces lie on their bottom (local +Y up), long axis (local X) along the row
       const z = new THREE.Vector3().crossVectors(LAY_DIR, UP)
       p.toQ.setFromRotationMatrix(new THREE.Matrix4().makeBasis(LAY_DIR, UP, z))
@@ -287,6 +360,34 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // pointer: hovering food on the fire or the plate makes it glow and turns the cursor into a hand; a click (not
   // a drag that orbits the camera) takes it off the fire, or eats it once it's on the plate
   const { gl, camera, raycaster } = useThree()
+  const saltPot = useMemo(() => (roast.salt ? root.getObjectByName(roast.salt) ?? null : null), [root, roast.salt])
+  const saltHome = useMemo(() => saltPot?.position.clone() ?? null, [saltPot])
+  const potHovered = useRef(false)
+  const shake = useRef(0)
+  const salt = useMemo(() => {
+    const pos = new Float32Array(SALT_GRAINS * 3).fill(-10)
+    const vel = new Float32Array(SALT_GRAINS * 3)
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    return { pos, vel, geometry, left: 0 }
+  }, [])
+  const saltMaterial = useMemo(() => new THREE.PointsMaterial({ color: '#ffffff', size: 0.022, sizeAttenuation: true }), [])
+  const sprinkle = () => {
+    shake.current = 1
+    salt.left = SALT_SECONDS
+    const { pos, vel } = salt
+    for (let i = 0; i < SALT_GRAINS; i++) {
+      // a pinch thrown from up high, spreading as it falls over the skewers
+      const a = Math.random() * Math.PI * 2
+      const r = Math.sqrt(Math.random()) * 0.25
+      pos[i * 3] = Math.cos(a) * r
+      pos[i * 3 + 1] = 1.45 + Math.random() * 0.35
+      pos[i * 3 + 2] = Math.sin(a) * r
+      vel[i * 3] = Math.cos(a) * (0.1 + Math.random() * 0.35)
+      vel[i * 3 + 1] = -Math.random() * 0.6
+      vel[i * 3 + 2] = Math.sin(a) * (0.1 + Math.random() * 0.35)
+    }
+  }
   const hovered = useRef<Piece | null>(null)
   // the hovered food's tag brightens too (tags sit at low opacity until pointed at)
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
@@ -308,28 +409,35 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       raycaster.setFromCamera(ndc, camera)
       const candidates = pieces.current.filter((p) => present(p) &&
         (!p.collected || (p.flight >= 1 && p.eat === 0 && !p.eaten)))
-      const hits = raycaster.intersectObjects(candidates.map((p) => p.node), true)
+      const targets = candidates.map((p) => p.node)
+      if (saltPot) targets.push(saltPot)
+      const hits = raycaster.intersectObjects(targets, true)
       if (!hits.length) return null
       let o: THREE.Object3D | null = hits[0].object
-      while (o && !candidates.some((p) => p.node === o)) o = o.parent
+      while (o && o !== saltPot && !candidates.some((p) => p.node === o)) o = o.parent
+      if (o && o === saltPot) return 'salt' as const
       return candidates.find((p) => p.node === o) ?? null
     }
     let down: { x: number; y: number } | null = null
     const onMove = (e: PointerEvent) => {
       if (e.buttons) return
-      const p = pick(e)
+      const hit = pick(e)
+      potHovered.current = hit === 'salt'
+      const p = hit === 'salt' ? null : hit
       if (p !== hovered.current) setHover(p)
-      el.style.cursor = p ? 'pointer' : ''
+      el.style.cursor = hit ? 'pointer' : ''
     }
     const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY } }
     const onUp = (e: PointerEvent) => {
       if (e.button !== 0 || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
       const p = pick(e)
       if (!p) return
-      if (p.collected) eat(p)
+      if (p === 'salt') sprinkle()
+      else if (p.collected) eat(p)
       else collect(p)
     }
     const onLeave = () => {
+      potHovered.current = false
       setHover(null)
       el.style.cursor = ''
     }
@@ -352,23 +460,67 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const since = useRef(0)
   const tint = useMemo(() => new THREE.Color(), [])
 
-  // glowing charcoal: mostly black at a low fire, more and more of it red-hot as the fire builds
-  const embers = useRef<{ mat: THREE.MeshToonMaterial; base: number }[] | null>(null)
+  // glowing charcoal: mostly black at a low fire, more and more of it red-hot as the fire builds; as the fire
+  // burns down the coals are used up and slowly turn to pale grey ash (fresh charcoal brings the black back)
+  const embers = useRef<{ mat: THREE.MeshToonMaterial; base: number; color: THREE.Color }[] | null>(null)
 
   useFrame((_, delta) => {
     if (!embers.current || !embers.current.length) {
       const found = new Map<THREE.MeshToonMaterial, number>()
       root.traverse((o) => {
-        if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial && o.material.name === 'Ember') {
+        if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial &&
+          (o.material.name === 'Ember' || o.material.name === 'Binchotan')) {
           found.set(o.material, o.material.emissiveIntensity)
         }
       })
-      embers.current = [...found].map(([mat, base]) => ({ mat, base }))
+      embers.current = [...found].map(([mat, base]) => ({ mat, base, color: mat.color.clone() }))
     }
     const f = fire?.current ?? 0.55
-    for (const e of embers.current) e.mat.emissiveIntensity = e.base * (0.08 + 1.15 * f ** 1.6)
+    const ash = THREE.MathUtils.smoothstep(0.5 - f, 0, 0.45)
+    // the heap burns down as the fire dies: the coals shrink and settle (fresh charcoal builds it back up)
+    const heap = 0.4 + 0.6 * THREE.MathUtils.smoothstep(f, 0, 0.55)
+    for (const name of ['BinchotanHeap', 'Charcoal']) {
+      const o = root.getObjectByName(name)
+      if (!o) continue
+      const s0 = (o.userData.baseScale ??= o.scale.clone()) as THREE.Vector3
+      o.scale.set(s0.x * heap, s0.y * heap ** 1.5, s0.z * heap)
+    }
+    for (const e of embers.current) {
+      // no fire, no glow
+      e.mat.emissiveIntensity = e.base * 1.23 * f ** 1.6
+      const gain = 1 + ((ASH_GAIN[e.mat.name] ?? 1) - 1) * ash ** 1.5
+      e.mat.color.copy(e.color).lerp(ASH_TINT, ash).multiplyScalar(gain)
+    }
     if (scannedCount.current !== root.children.length) scan()
     const dt = Math.min(delta, 0.1)
+
+    // the salt pot glows under the pointer and gives a little hop and tip when you take a pinch
+    if (saltPot && saltHome) {
+      shake.current = Math.max(0, shake.current - dt * 2.2)
+      const s = shake.current
+      saltPot.position.copy(saltHome)
+      saltPot.position.y += Math.sin(s * Math.PI) * 0.08
+      saltPot.rotation.z = Math.sin(s * Math.PI * 3) * 0.18 * s
+      saltPot.traverse((o) => {
+        if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial) {
+          o.material.emissive.set(potHovered.current && active ? HOVER_GLOW : 0x000000)
+        }
+      })
+    }
+    if (salt.left > 0) {
+      salt.left -= dt
+      const { pos, vel } = salt
+      for (let i = 0; i < SALT_GRAINS; i++) {
+        if (pos[i * 3 + 1] <= 0.01) continue
+        vel[i * 3 + 1] -= 4.5 * dt
+        pos[i * 3] += vel[i * 3] * dt
+        pos[i * 3 + 1] = Math.max(0.01, pos[i * 3 + 1] + vel[i * 3 + 1] * dt)
+        pos[i * 3 + 2] += vel[i * 3 + 2] * dt
+      }
+      // grains that have landed vanish into the salt bed
+      if (salt.left <= 0) pos.fill(-10)
+      salt.geometry.attributes.position.needsUpdate = true
+    }
     pieces.current.forEach((p, n) => {
       bindMaterials(p)
       if (!present(p)) {
@@ -407,8 +559,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (r < 1) tint.copy(RAW_TINT).lerp(DONE_TINT, r)
       else tint.copy(DONE_TINT).lerp(BURNT_TINT, charred * 0.6)
       const glow = hovered.current === p
-      for (const { mat, base, emissive } of p.mats) {
-        mat.color.copy(base).multiply(tint)
+      for (const { mat, base, emissive, foil } of p.mats) {
+        if (foil) mat.visible = !(p.collected && p.flight > 0.35)
+        else mat.color.copy(base).multiply(tint)
         mat.emissive.copy(emissive)
         if (glow) mat.emissive.add(HOVER_GLOW)
       }
@@ -442,12 +595,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     since.current = 0
     // keep as many plates out as the food on them needs (always at least one)
     let need = 1
+    let needBaskets = 1
+    const cap = Math.min(roast.basket?.capacity ?? BASKET_SLOTS.length, BASKET_SLOTS.length)
     for (const p of pieces.current) {
-      if (p.slot !== null && !p.eaten && present(p) && !roast.piles?.[p.id]) {
-        need = Math.max(need, Math.floor(p.slot / PER_PLATE) + 1)
-      }
+      if (p.slot === null || p.eaten || !present(p)) continue
+      if (inBasket(p)) needBaskets = Math.max(needBaskets, Math.floor(p.slot / cap) + 1)
+      else need = Math.max(need, Math.floor(p.slot / PER_PLATE) + 1)
     }
     if (need !== plateCount) setPlateCount(need)
+    if (needBaskets !== basketCount) setBasketCount(needBaskets)
     const off = pieces.current.filter((p) => p.collected && present(p)).length
     if (off !== lastOff.current) {
       lastOff.current = off
@@ -474,6 +630,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {Array.from({ length: plateCount }, (_, n) => (
         <Plate key={n} position={plateAt(n).toArray() as [number, number, number]} />
       ))}
+      {roast.basket && Array.from({ length: basketCount }, (_, n) => (
+        <Basket key={n} position={basketAt(n).toArray() as [number, number, number]} />
+      ))}
+      <points geometry={salt.geometry} material={saltMaterial} frustumCulled={false} renderOrder={3} />
       {active && tags.map(({ key, id, state }) => (
         <group key={key} ref={(g) => { anchors.current[key] = g }}>
           <Html center zIndexRange={[30, 10]}>

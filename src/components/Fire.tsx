@@ -61,10 +61,11 @@ void main() {
 `
 
 const emberFragment = /* glsl */ `
+uniform float uLevel;
 varying float vLife;
 void main() {
   float d = length(gl_PointCoord - 0.5);
-  float a = smoothstep(0.5, 0.0, d) * smoothstep(0.0, 0.15, vLife) * vLife;
+  float a = smoothstep(0.5, 0.0, d) * smoothstep(0.0, 0.15, vLife) * vLife * uLevel;
   vec3 col = mix(vec3(1.0, 0.3, 0.05), vec3(1.0, 0.8, 0.4), vLife);
   gl_FragColor = vec4(col * a * 2.0, a);
 }
@@ -131,6 +132,7 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, base
       new THREE.ShaderMaterial({
         vertexShader: emberVertex,
         fragmentShader: emberFragment,
+        uniforms: { uLevel: { value: 1 } },
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
@@ -151,11 +153,18 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 70, base
 
     // fire strength: low embers barely flicker, a fierce fire stands tall and bright
     const lv = level ? level.current : 1
-    if (flames.current) flames.current.scale.set(0.6 + 0.6 * lv, 0.25 + 1.5 * lv, 0.6 + 0.6 * lv)
+    // once the charcoal is spent the flames die right down and go out
+    const alive = THREE.MathUtils.smoothstep(lv, 0, 0.1)
+    if (flames.current) {
+      flames.current.visible = alive > 0.01
+      flames.current.scale.set((0.6 + 0.6 * lv) * alive, (0.25 + 1.5 * lv) * alive, (0.6 + 0.6 * lv) * alive)
+    }
+    emberMaterial.uniforms.uLevel.value = alive
 
     // flicker: a few incommensurate sines read as random
     if (light.current) {
-      light.current.intensity = baseIntensity * (0.35 + 1.1 * lv) *
+      // no fire, no firelight
+      light.current.intensity = baseIntensity * 1.45 * lv * alive *
         (1 + Math.sin(t * 11) * 0.13 + Math.sin(t * 17.3) * 0.1 + Math.sin(t * 5.1) * 0.16)
     }
 

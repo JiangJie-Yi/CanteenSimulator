@@ -195,10 +195,16 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M9 6l6 2M9 12l6 2" />
     </>
   ),
+  Asparagus: (
+    <>
+      <path d="M3 9h18M3 15h18" />
+      <path d="M7 21V6l1-3 1 3v15M12 21V5l1-3 1 3v16M17 21V6l1-3 1 3v15" />
+    </>
+  ),
   GrilledCorn: (
     <>
-      <ellipse cx="12" cy="10" rx="3.5" ry="6.5" />
-      <path d="M8.5 8h7M8.5 11h7M12 16.5V22M10 6l1 1M13 12l1 1" />
+      <ellipse cx="12" cy="10" rx="3.5" ry="7.5" />
+      <path d="M8.5 7h7M8.5 10h7M8.5 13h7M10 5l1 1M13 11l1 1" />
     </>
   ),
   GrilledShiitake: (
