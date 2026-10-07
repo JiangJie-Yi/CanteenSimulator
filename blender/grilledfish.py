@@ -428,14 +428,14 @@ sizes = []
 while sum(sizes) * 2 < 2 * math.pi * STONE_R:
     big = len(sizes) % 3 != 1 and random.random() < 0.7      # mostly big, with smaller ones tucked between
     sizes.append(random.uniform(0.2, 0.25) if big else random.uniform(0.11, 0.14))
-fit = 2 * math.pi * STONE_R / (sum(sizes) * 2) * 1.04          # scale to close the ring, with slight overlap
+fit = 2 * math.pi * STONE_R / (sum(sizes) * 2) * 1.14          # scale to close the ring, packed tight
 a = 0.0
 for i, half in enumerate(sizes):
     half *= fit
     a += half / STONE_R
     k = half / 0.18                                             # overall size relative to a typical stone
     # stagger in and out of the ring a little so it doesn't look laid with a compass
-    r = STONE_R + (0.045 if i % 2 else -0.03) + random.uniform(-0.025, 0.025) + (1 - k) * 0.03
+    r = STONE_R + (0.02 if i % 2 else -0.015) + random.uniform(-0.012, 0.012) + (1 - k) * 0.015
     # river-stone ovals: long along the ring, narrower across it, and fairly flat
     # stone slabs stood on end and driven into the ground round the fire: thin across the ring, wide along it,
     # taller than they're thick, each leaning a little in or out, all broken rock with hard edges
@@ -752,7 +752,7 @@ def shiitake_halves():
     a brown domed cap and pale stem behind, and the flat cut face (cap flesh, gills, stem) turned out of the
     fire (local +Y) or in toward it, alternately. Sizes differ; the skewer runs through the caps."""
     parts = []
-    sizes = [random.uniform(0.07, 0.1) for _ in range(3)]
+    sizes = [random.uniform(0.09, 0.12) for _ in range(3)]
     x = -(sum(sizes) * 2 + 0.03) / 2
     eps = 0.002                                          # keep the axis open a hair (no zero-area faces)
     for n, rx in enumerate(sizes):
@@ -772,14 +772,24 @@ def shiitake_halves():
         rings = []
         for k in range(steps + 1):
             phi = math.pi * k / steps                  # 0 → π round the back, away from the cut face
-            rings.append([bm.verts.new((x + r * math.cos(phi), face * r * math.sin(phi), z)) for r, z, _ in prof])
+            # (shifted so the skewer runs through the middle of the half's flesh, not along its cut face)
+            rings.append([bm.verts.new((x + r * math.cos(phi), face * (r * math.sin(phi) - rx * 0.4), z))
+                          for r, z, _ in prof])
+        uvl = bm.loops.layers.uv.new()
         for k in range(steps):
             for j in range(len(prof) - 1):
                 f = bm.faces.new((rings[k][j], rings[k][j + 1], rings[k + 1][j + 1], rings[k + 1][j]))
-                f.material_index = 0 if prof[j][2] and prof[j + 1][2] else 1
-        # the cut face: the profile down one side and back up the other
+                skin = prof[j][2] and prof[j + 1][2]
+                f.material_index = 0 if skin else 1
+                for l, (kk, jj) in zip(f.loops, ((k, j), (k, j + 1), (k + 1, j + 1), (k + 1, j))):
+                    l[uvl].uv = (kk / steps, 1 - jj / len(prof))
+        # the cut face: the profile down one side and back up the other, mapped flat so it shows the cap's
+        # flesh, the band of gills under it and the fibrous stem
         cut = bm.faces.new(rings[0] + rings[steps][::-1])
-        cut.material_index = 1
+        cut.material_index = 2
+        z_lo, z_hi = zc - sl, zc + hc
+        for l in cut.loops:
+            l[uvl].uv = ((l.vert.co.x - x) / (2 * rx) + 0.5, (l.vert.co.z - z_lo) / (z_hi - z_lo))
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         me = bpy.data.meshes.new("Shiitake")
         bm.to_mesh(me)
@@ -788,8 +798,9 @@ def shiitake_halves():
         bpy.context.collection.objects.link(o)
         o.data.materials.append(M["shiitake_skin"])
         o.data.materials.append(M["gills"])
+        o.data.materials.append(M["shiitake_cut"])
         for p in o.data.polygons:
-            p.use_smooth = p.material_index == 0
+            p.use_smooth = p.material_index != 2
         parts.append(o)
         x += rx + 0.015
     return parts
@@ -893,23 +904,45 @@ def scallops():
 
 
 def asparagus():
-    """Five spears laid side by side across the skewer like a raft (out from the fire, so they show side-on)."""
+    """Five spears laid side by side across the skewer like a raft (out from the fire, so they show side-on),
+    each like the real thing: a slightly bowed stalk, thicker and paler toward its cut end, small pointed bracts
+    up its length, and a tight bud of overlapping scales at the tip."""
     parts = []
     for i in range(5):
-        x = (i - 2) * 0.036
-        r = random.uniform(0.01, 0.013)
-        length = random.uniform(0.22, 0.27)
-        z0 = -0.11 + random.uniform(-0.015, 0.015)
-        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=r, depth=length, location=(x, z0 + length / 2, 0),
+        x = (i - 2) * 0.038
+        r = random.uniform(0.011, 0.014)
+        length = random.uniform(0.23, 0.28)
+        y0 = -0.11 + random.uniform(-0.015, 0.015)
+        bow = random.uniform(-0.01, 0.01)
+        pts = [(x + bow * math.sin(math.pi * s), y0 + s * length, 0.0) for s in (k / 12 for k in range(13))]
+        parts.append(tube(pts, r * 1.15, r * 0.82, M["asparagus"], "Asparagus", seg=12))
+        # the cut end, pale and woody
+        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=r * 1.16, depth=0.004, location=(x, y0, 0),
                                             rotation=(math.radians(90), 0, 0))
-        o = active()
-        cyl_uv(o)
-        parts.append(finish(o, "Asparagus", M["asparagus"]))
-        # the bud: a slim pointed tip a shade darker
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=8, location=(x, z0 + length, 0))
-        tip = active()
-        tip.scale = (r * 1.15, r * 3.2, r * 1.15)
-        parts.append(finish(tip, "AsparagusTip", M["asparagus_tip"]))
+        parts.append(finish(active(), "AsparagusCut", M["asparagus_cut"]))
+        # little triangular bracts climbing the stalk, alternating sides, pointing up toward the tip
+        for k, s in enumerate((0.3, 0.45, 0.58, 0.7, 0.8)):
+            side = 1 if k % 2 else -1
+            px = x + bow * math.sin(math.pi * s) + side * r * 0.75
+            bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=r * 0.45, radius2=0.0, depth=r * 1.8,
+                                            location=(px, y0 + s * length, 0),
+                                            rotation=(math.radians(-90), side * 0.35, random.uniform(0, 3)))
+            o = active()
+            o.scale = (1, 0.35, 1)
+            parts.append(finish(o, "AsparagusBract", M["asparagus_tip"], smooth_shade=False))
+        # the bud: scales packed tight round a point, a shade darker and touched with purple
+        tip_y = y0 + length
+        for k in range(7):
+            a = 2 * math.pi * k / 7
+            lift = (k % 2) * 0.004
+            bpy.ops.mesh.primitive_cone_add(vertices=6, radius1=r * 0.55, radius2=0.0, depth=r * 2.6,
+                                            location=(x + math.cos(a) * r * 0.35, tip_y + lift, math.sin(a) * r * 0.35),
+                                            rotation=(math.radians(-90) + math.sin(a) * 0.3, 0, math.cos(a) * 0.3))
+            parts.append(finish(active(), "AsparagusScale", M["asparagus_tip"]))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=10, ring_count=8, location=(x, tip_y + r * 0.9, 0))
+        bud = active()
+        bud.scale = (r * 0.7, r * 2.0, r * 0.7)
+        parts.append(finish(bud, "AsparagusTip", M["asparagus_tip"]))
     return parts
 
 
@@ -1020,12 +1053,39 @@ TEX["mochi"] = image("T_Mochi", mix((0.97, 0.95, 0.9), (0.68, 0.45, 0.2), toast 
 score = smooth(0.06, 0.0, np.minimum(np.abs(((u + v) * 8) % 1 - 0.5), np.abs(((u - v) * 8) % 1 - 0.5)))
 TEX["eryngii"] = image("T_Eryngii", mix(mix((0.93, 0.87, 0.74), (0.82, 0.7, 0.5), fbm(N, 6, 6)), (0.45, 0.3, 0.15),
                                         score * 0.75))
-TEX["asparagus"] = image("T_Asparagus", mix(mix((0.3, 0.5, 0.16), (0.52, 0.66, 0.28), v), (0.16, 0.14, 0.06),
-                                            smooth(0.8, 0.92, 0.5 + 0.5 * np.sin(v * 2 * np.pi * 5)) * 0.8))
+# shiitake cap skin (u round, v from the rim up to the crown): dark chestnut brown, deeper at the crown, with a
+# web of fine pale cracks and white flecks of the veil near the rim, toasted darker in places
+crack = 1 - smooth(0.0, 0.03, np.abs(fbm(N, 9, 6) - 0.5))
+cap = mix((0.42, 0.27, 0.14), (0.24, 0.13, 0.06), smooth(0.2, 0.9, v))
+cap = mix(cap, (0.82, 0.7, 0.54), crack * 0.6)
+cap = mix(cap, (0.9, 0.85, 0.76), (vnoise(N, 60, 60) > 0.86).astype(np.float32) * smooth(0.3, 0.0, v) * 0.7)
+cap = mix(cap, (0.14, 0.08, 0.04), smooth(0.7, 0.9, fbm(N, 5, 5)) * 0.4)
+TEX["shiitake_cap"] = image("T_ShiitakeCap", cap)
+TEX["shiitake_cap_n"] = image("T_ShiitakeCap_N", to_normal(-crack * 0.6, 2.0), data=True)
+# its cut face (flat, v from the stem's foot to the crown): fibrous stem, a band of packed gills under the cap,
+# firm white cap flesh above, browning along the top where the skin is
+cut = mix((0.9, 0.85, 0.74), (0.8, 0.72, 0.58), vnoise(N, 80, 3) * smooth(0.55, 0.3, v))
+gill_band = smooth(0.48, 0.52, v) * smooth(0.62, 0.58, v)
+cut = mix(cut, (0.66, 0.54, 0.38), gill_band * (0.6 + 0.4 * (0.5 + 0.5 * np.sin(u * 2 * np.pi * 40))))
+cut = mix(cut, (0.5, 0.33, 0.18), smooth(0.9, 1.0, v) * 0.8)
+TEX["shiitake_cut"] = image("T_ShiitakeCut", cut)
+
+# asparagus (u round the stalk, v from the cut end to the tip): pale and fibrous low down, deepening to a rich
+# green, fine lengthwise fibres, a blush of purple near the top, and grill bars seared across it
+fibres = vnoise(N, 70, 3)
+asp = mix((0.72, 0.76, 0.5), (0.3, 0.52, 0.16), smooth(0.0, 0.45, v))
+asp = mix(asp, (0.22, 0.4, 0.12), fibres * 0.35)
+asp = mix(asp, (0.36, 0.26, 0.3), smooth(0.8, 1.0, v) * 0.35)
+asp = mix(asp, (0.14, 0.12, 0.05), smooth(0.84, 0.94, 0.5 + 0.5 * np.sin(v * 2 * np.pi * 5)) *
+          smooth(0.3, 0.6, fbm(N, 5, 5)) * 0.85)
+TEX["asparagus"] = image("T_Asparagus", asp)
+TEX["asparagus_n"] = image("T_Asparagus_N", to_normal(fibres * 0.6, 2.0), data=True)
 M.update({
-    "shiitake_skin": pbr("ShiitakeSkin", (0.33, 0.19, 0.09), rough=0.6),
-    "asparagus": pbr("Asparagus", tex=TEX["asparagus"], rough=0.35, coat=0.3),
-    "asparagus_tip": pbr("AsparagusTip", (0.3, 0.38, 0.16), rough=0.5),
+    "shiitake_skin": pbr("ShiitakeSkin", tex=TEX["shiitake_cap"], nrm=TEX["shiitake_cap_n"], rough=0.6),
+    "shiitake_cut": pbr("ShiitakeCut", tex=TEX["shiitake_cut"], rough=0.75),
+    "asparagus": pbr("Asparagus", tex=TEX["asparagus"], nrm=TEX["asparagus_n"], rough=0.35, coat=0.3),
+    "asparagus_tip": pbr("AsparagusTip", (0.26, 0.34, 0.15), rough=0.5),
+    "asparagus_cut": pbr("AsparagusCut", (0.85, 0.86, 0.66), rough=0.7),
     "chicken": pbr("Chicken", tex=TEX["chicken"], rough=0.35, coat=0.5),
     "leek": pbr("Leek", (0.9, 0.93, 0.82), rough=0.45),
     "leek_green": pbr("LeekGreen", (0.42, 0.62, 0.25), rough=0.45),
@@ -1034,6 +1094,7 @@ M.update({
     "shishito": pbr("Shishito", tex=TEX["shishito"], rough=0.3, coat=0.4),
     "mochi": pbr("Mochi", tex=TEX["mochi"], rough=0.6),
     "eryngii": pbr("Eryngii", tex=TEX["eryngii"], rough=0.55),
+    "eryngii_cap": pbr("EryngiiCap", (0.42, 0.3, 0.18), rough=0.6),
 })
 
 
@@ -1227,14 +1288,47 @@ def mochi():
 
 
 def eryngii():
-    """Three thick slices of king oyster mushroom stem, scored on the face."""
+    """King oyster mushroom cut lengthwise into thick slabs, the way it's grilled: each slab the mushroom's
+    silhouette — a long fat stem swelling a little toward the base, a small flattish cap — its cut face scored in a
+    crosshatch and browned, the brown cap skin along the top edge. Skewered across the stems."""
     parts = []
-    for x in (-0.09, 0.0, 0.09):
-        bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.04, depth=0.028, location=(x, 0, 0),
-                                            rotation=(math.radians(90), 0, 0))
-        o = active()
-        bevel(o, 0.006, 2)
-        parts.append(finish(o, "Eryngii", M["eryngii"]))
+    for n, x in enumerate((-0.13, 0.0, 0.13)):
+        w = random.uniform(0.045, 0.055)            # stem half-width
+        h = random.uniform(0.2, 0.24)                # stem length
+        cw = w * random.uniform(1.3, 1.55)           # cap half-width
+        ch = random.uniform(0.022, 0.03)             # cap height
+        z0 = -h * 0.55
+        outline = [(-w * 0.9, z0), (w * 0.9, z0)]
+        outline += [(w * (1.05 - 0.1 * t), z0 + t * h) for t in (0.3, 0.7, 1.0)]
+        outline += [(cw * math.cos(a), z0 + h + ch * math.sin(a)) for a in (math.pi * k / 10 for k in range(11))]
+        outline += [(-w * (1.05 - 0.1 * t), z0 + t * h) for t in (1.0, 0.7, 0.3)]
+        bm = bmesh.new()
+        th = 0.032
+        front = [bm.verts.new((px, -th / 2, pz)) for px, pz in outline]
+        back = [bm.verts.new((px, th / 2, pz)) for px, pz in outline]
+        ff = bm.faces.new(front[::-1])
+        fb = bm.faces.new(back)
+        m = len(outline)
+        sides = [bm.faces.new((front[i], front[(i + 1) % m], back[(i + 1) % m], back[i])) for i in range(m)]
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        uvl = bm.loops.layers.uv.new()
+        for f in bm.faces:
+            for l in f.loops:
+                l[uvl].uv = (l.vert.co.x * 4 + 0.5, l.vert.co.z * 4 + 0.5)
+        # the cap's skin shows on the rim along the top
+        for f in sides:
+            f.material_index = 1 if f.calc_center_median().z > z0 + h * 0.98 else 0
+        me = bpy.data.meshes.new("Eryngii")
+        bm.to_mesh(me)
+        bm.free()
+        o = bpy.data.objects.new("Eryngii", me)
+        bpy.context.collection.objects.link(o)
+        o.data.materials.append(M["eryngii"])
+        o.data.materials.append(M["eryngii_cap"])
+        o.location = (x, 0, 0)
+        o.rotation_euler = (0, random.uniform(-0.12, 0.12), 0)
+        bevel(o, 0.005, 2)
+        parts.append(o)
     return parts
 
 

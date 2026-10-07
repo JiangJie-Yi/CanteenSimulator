@@ -561,9 +561,11 @@ type RoastingProps = {
   /** a piece has been eaten up (for 飽足) */
   onEat?: (id: string) => void
   /** something to tell the diner (it isn't cooked yet, it's burnt) */
-  onNotice?: (what: 'notCooked' | 'burnt') => void
+  onNotice?: (what: 'notCooked' | 'burnt' | 'waste') => void
   /** written every frame: how much smoke is coming off the fire (0..1), from food that's cooked and still on it */
   smoke?: RefObject<number>
+  /** likewise for black smoke, from food left on until it burns */
+  blackSmoke?: RefObject<number>
 }
 
 /** Roasting speed for a fire level: barely cooking on dying embers, about twice as fast at full blaze. */
@@ -576,7 +578,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  * up the extra portions Dish clones in as they appear.
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
-  onNotice, smoke }: RoastingProps) {
+  onNotice, smoke, blackSmoke }: RoastingProps) {
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -1031,10 +1033,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       aim(e)
       const tool = pickTool()
       if (!tool) {
-        // a bare stick or something burnt can be picked up and carried to the bin (a plain click still eats or
+        // any skewer or piece of food can be picked up and carried to the bin (a plain click still eats or
         // complains as usual: carrying only starts once the pointer moves)
         const food = pickFood()
-        if (food && (food.stickOnly || stageOf(food.progress / roast.times[food.id]).key === 'burnt')) {
+        if (food) {
           scrap.current = { p: food, x: e.clientX, y: e.clientY, started: false }
           window.addEventListener('pointermove', haul)
           window.addEventListener('pointerup', dropScrap, { once: true })
@@ -1157,7 +1159,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const bin = containerAt('bin')
       const pos = q.p.node.position
       if (roast.bin && Math.hypot(pos.x - bin.x, pos.z - bin.z) < BIN_R + 0.16) {
-        // let go over the bin: it drops in
+        // let go over the bin: it drops in — and throwing away good food draws a word
+        const stage = stageOf(q.p.progress / roast.times[q.p.id]).key
+        if (!q.p.stickOnly && stage === 'done') onNotice?.('waste')
         q.p.trash = 0
         q.p.trashFrom.copy(pos)
       } else if (!q.p.collected) {
@@ -1531,13 +1535,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // none from a bare fire, more with every done piece, most when it's charring
     if (smoke) {
       let s = 0
+      let b = 0
       for (const p of pieces.current) {
         if (!present(p) || p.collected || waiting(p)) continue
         const r = p.progress / roast.times[p.id]
         s += THREE.MathUtils.smoothstep(r, 0.7, 1.1) * 0.3 + THREE.MathUtils.smoothstep(r, 1.5, 2.5) * 0.3
+        // food left to burn sends up thick black smoke
+        b += THREE.MathUtils.smoothstep(r, 2.0, 2.8) * 0.45
       }
-      const want = Math.min(1, s) * Math.min(1, (fire?.current ?? 0.55) * 1.5)
-      smoke.current += (want - smoke.current) * Math.min(1, dt * 0.8)
+      const heat = Math.min(1, (fire?.current ?? 0.55) * 1.5)
+      smoke.current += (Math.min(1, s) * heat - smoke.current) * Math.min(1, dt * 0.8)
+      if (blackSmoke) blackSmoke.current += (Math.min(1, b) * heat - blackSmoke.current) * Math.min(1, dt * 0.6)
     }
 
     since.current += delta

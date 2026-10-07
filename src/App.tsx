@@ -142,7 +142,7 @@ type SceneProps = {
   onEat: (id: string) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
-  onNotice: (what: 'notCooked' | 'burnt') => void
+  onNotice: (what: 'notCooked' | 'burnt' | 'waste') => void
 }
 
 function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView }: SceneProps) {
@@ -171,6 +171,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
   const brothTemp = useRef(ROOM_TEMP)
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
   const grillSmoke = useRef(0)
+  const grillBlackSmoke = useRef(0)
   const steamLevel = useRef(0)
   const boilLevel = useRef(0)
   useFrame((_, delta) => {
@@ -307,7 +308,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
               {dish.roast && (
                 <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
-                  onNotice={onNotice} smoke={grillSmoke} />
+                  onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke} />
               )}
               {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
               {soup && dish.heatControl && dish.brothY !== undefined && (
@@ -329,6 +330,11 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height}
                   opacity={theme === 'dark' ? 0.5 : 0.7} speed={0.05}
                   level={dish.heat === 'fire' ? grillSmoke : undefined} />
+              )}
+              {dish.smoke && dish.heat === 'fire' && (
+                // burning food: thick dark smoke that boils up faster and rolls about more than the pale smoke
+                <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width * 1.25} height={dish.smoke.height * 1.2}
+                  layers={5} opacity={0.75} speed={0.11} color="#3a3430" shade="#1c1916" level={grillBlackSmoke} />
               )}
             </Suspense>
           </group>
