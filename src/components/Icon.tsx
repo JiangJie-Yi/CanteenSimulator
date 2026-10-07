@@ -187,12 +187,31 @@ const ICONS: Record<string, ReactNode> = {
       <rect x="7" y="12" width="10" height="6" rx="2" />
     </>
   ),
+  NetMochi: (
+    <>
+      <path d="M3 17h18M3 20h18M6 15v7M10 15v7M14 15v7M18 15v7" />
+      <path d="M6 14c0-4 2-5 3-5 1-3 5-3 6 0 2 0 3 2 3 5z" />
+    </>
+  ),
   KingOyster: (
     <>
       <path d="M12 2v20" />
       <ellipse cx="12" cy="7" rx="5" ry="2.5" />
       <ellipse cx="12" cy="13" rx="5" ry="2.5" />
       <path d="M9 6l6 2M9 12l6 2" />
+    </>
+  ),
+  Okra: (
+    <>
+      <path d="M12 2v20" />
+      <path d="M8 5l8 0M9 5c0 4 2 7 3 9 1-2 3-5 3-9M8 13h8M9 13c0 3 2 5 3 7 1-2 3-4 3-7" />
+    </>
+  ),
+  Scallop: (
+    <>
+      <path d="M12 2v20" />
+      <rect x="7" y="4" width="10" height="5" rx="2.5" />
+      <rect x="7" y="11" width="10" height="5" rx="2.5" />
     </>
   ),
   Asparagus: (

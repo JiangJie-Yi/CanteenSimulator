@@ -358,25 +358,20 @@ button {
 }
 
 /* night: the board becomes a warm yellow lightbox, red lettering, glowing into the dark */
+/* night: the wooden board stays dark, only the lettering lights up, like neon tubes bent into the characters */
 .brand-night .brand-plate {
-  --plate: #ffd879;
-  --plate-cream: #b3291f;
-  color: #8f2016;
-  background:
-    var(--plate-grain) center / 100% 100%,
-    radial-gradient(ellipse at 50% 40%, #fff1b8, #ffd36a 60%, #f3ae3e);
-  box-shadow:
-    inset 0 0 0 0.09em #ffd879,
-    inset 0 0 0 0.14em #b3291f,
-    inset 0 0 0 0.2em #ffd879,
-    inset 0 0 0 0.23em #b3291f,
-    0 0 0.5em 0.12em rgb(255 205 100 / 0.55),
-    0 0 1.6em 0.2em rgb(255 180 70 / 0.3);
-  animation: sign-on 700ms steps(1, end);
+  --plate: #6e1d16;
+  --plate-cream: #b98f63;
+  color: #ffe6a0;
 }
 
-.brand-night .brand-main {
-  text-shadow: 0 0 0.25em rgb(255 240 190 / 0.9);
+.brand-night .brand-main,
+.brand-night .brand-sub {
+  text-shadow:
+    0 0 0.06em #fff6d0,
+    0 0 0.2em rgb(255 214 120 / 0.95),
+    0 0 0.5em rgb(255 170 60 / 0.6);
+  animation: sign-on 700ms steps(1, end);
 }
 
 /* a fluorescent tube catching: flicker, then hold */
@@ -705,6 +700,37 @@ button {
 }
 
 /* ---------- roasting tags (floating over each skewer on the grilled-fish stage) ---------- */
+
+/* while a seasoning is carried, the food tags let the pointer pass through to the food under them */
+.is-carrying,
+.is-carrying * {
+  cursor: grabbing !important;
+}
+
+.is-carrying .roast-tag {
+  pointer-events: none;
+}
+
+/* name over a seasoning pot when it's pointed at */
+.tool-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  background: linear-gradient(90deg, #d9b97f, #e8cfa0 20%, #e8cfa0 80%, #d9b97f);
+  box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.2), 0 4px 10px -5px rgb(59 42 32 / 0.6);
+  font: 700 14px/1.1 var(--brush);
+  white-space: nowrap;
+}
+
+.tool-tag small {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
 
 .roast-tag {
   --state: var(--ink-soft);

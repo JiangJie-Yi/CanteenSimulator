@@ -9,6 +9,8 @@ export type MenuItem = {
   price: number
   /** how it appears when ordered: dropped in with a bounce (default) or rising gently out of the soup */
   entrance?: 'drop' | 'float'
+  /** most portions that can be ordered at once (default 99) */
+  max?: number
 }
 
 /** The part of a dish that's always included (soup base, noodles, the fish). Dark strip on the menu. */
@@ -39,6 +41,8 @@ export type CopyLayout = {
   fixed?: string[]
   /** per-item swing per extra portion, in radians: shuffles it along beside the original instead */
   spread?: Record<string, number>
+  /** per-item spots (x, z in the dish) for the 2nd, 3rd… portion, e.g. side by side on the grill net */
+  slots?: Record<string, [number, number][]>
 }
 
 /** Lighting tweaks for one dish; anything left out uses the scene defaults in App.tsx. */
@@ -91,9 +95,17 @@ export type Roast = {
    * where the first basket sits; it holds `capacity`, and a full one gets another set down beside it.
    */
   basket?: { at: [number, number, number]; capacity: number }
-  /** a pot of coarse salt beside the fire (object name in the model); clicking it sprinkles salt over the food */
-  salt?: string
+  basketItems?: string[]
+  /**
+   * Seasonings beside the fire, by object name in the model: drag one onto a piece of food to season it
+   * (salt and peanut powder sprinkled on, soy brushed on, condensed milk drizzled over).
+   */
+  tools?: Record<string, Seasoning>
+  /** items toasted on the little grill net over the coals rather than on a skewer (they puff up as they cook) */
+  net?: string[]
 }
+
+export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut'
 
 /** Doneness stages for roasting, by fraction of the cook time. */
 export const ROAST_STAGES = [
@@ -182,7 +194,7 @@ export const DISHES: Dish[] = [
       { id: 'Mackerel', name: '鯖魚', ja: '鯖', en: 'Mackerel', price: 100 },
       { id: 'GrilledCorn', name: '烤玉米', ja: '焼きもろこし', en: 'Grilled Corn', price: 40 },
       { id: 'GrilledShiitake', name: '烤香菇', ja: '焼き椎茸', en: 'Shiitake', price: 30 },
-      { id: 'Onigiri', name: '烤飯糰', ja: '焼きおにぎり', en: 'Yaki Onigiri', price: 35 },
+      { id: 'Onigiri', name: '醬油飯糰', ja: '醤油焼きおにぎり', en: 'Soy Onigiri', price: 35 },
       { id: 'ShrimpSkewer', name: '烤蝦串', ja: '海老串', en: 'Shrimp', price: 60 },
       { id: 'Sausage', name: '香腸', ja: 'ソーセージ', en: 'Sausage', price: 45 },
       { id: 'Potato', name: '烤馬鈴薯', ja: 'じゃがいも', en: 'Potato', price: 40 },
@@ -194,32 +206,41 @@ export const DISHES: Dish[] = [
       { id: 'Mochi', name: '烤年糕', ja: '焼き餅', en: 'Mochi', price: 35 },
       { id: 'KingOyster', name: '杏鮑菇', ja: 'エリンギ', en: 'King Oyster', price: 35 },
       { id: 'Asparagus', name: '烤蘆筍', ja: 'アスパラ', en: 'Asparagus', price: 40 },
+      { id: 'Okra', name: '烤秋葵', ja: 'オクラ', en: 'Okra', price: 35 },
+      { id: 'Scallop', name: '烤干貝', ja: 'ホタテ串', en: 'Scallop', price: 90 },
+      // toasted on the grill net, which takes three at a time
+      { id: 'NetMochi', name: '網烤年糕', ja: '焼き切り餅', en: 'Toasted Mochi', price: 30, max: 3 },
     ],
     defaults: [],
     heat: 'fire',
     roast: {
       times: { Fish: 40, ExtraFish: 40, Saury: 35, Mackerel: 45, GrilledCorn: 30, GrilledShiitake: 20, Onigiri: 25, ShrimpSkewer: 20,
         Sausage: 25, Potato: 55, SweetPotato: 55,
-        Yakitori: 30, PorkBelly: 30, Squid: 25, Shishito: 15, Mochi: 20, KingOyster: 20, Asparagus: 15 },
-      names: { Fish: '香魚', ExtraFish: '香魚', Saury: '秋刀魚', Mackerel: '鯖魚', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '飯糰',
+        Yakitori: 30, PorkBelly: 30, Squid: 25, Shishito: 15, Mochi: 20, KingOyster: 20, Asparagus: 15, Okra: 15, Scallop: 20,
+        NetMochi: 25 },
+      names: { Fish: '香魚', ExtraFish: '香魚', Saury: '秋刀魚', Mackerel: '鯖魚', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '醬油飯糰',
         ShrimpSkewer: '蝦串', Sausage: '香腸', Potato: '馬鈴薯', SweetPotato: '地瓜',
-        Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '青椒', Mochi: '年糕', KingOyster: '杏鮑菇', Asparagus: '蘆筍' },
-      loose: ['Potato', 'SweetPotato'],
+        Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '青椒', Mochi: '年糕', KingOyster: '杏鮑菇', Asparagus: '蘆筍', Okra: '秋葵', Scallop: '干貝',
+        NetMochi: '年糕' },
+      loose: ['Potato', 'SweetPotato', 'NetMochi'],
+      net: ['NetMochi'],
       // just outside the stones, to the upper right of the fire as the camera sees it
       // (kept clear of the corn skewer at -55°, which used to stand right in front of it)
       plate: [1.38, 0.02, -1.16],
       // just outside the stones on the left as the camera sees it
       basket: { at: [-1.3, 0, 0.75], capacity: 10 },
-      salt: 'SaltPot',
+      basketItems: ['Potato', 'SweetPotato'],
+      tools: { SaltPot: 'salt', SoyPot: 'soy', MilkJar: 'milk', PeanutBowl: 'peanut' },
     },
     layout: {
       mode: 'ring',
       // camera direction (54°) and the plate (-40°)
       avoid: [54, -40],
+      // the 2nd and 3rd mochi go on the grill net beside the first (blender/grilledfish.py NET_Z)
+      slots: { NetMochi: [[0.01, 0.05], [0.12, -0.04]] },
       // potatoes and sweet potatoes sit in the ash at the front: extra ones line up beside the first,
       // potatoes toward the right, sweet potatoes toward the left
-      // (each portion is two pieces about 16° apart, so step a little more than both)
-      spread: { Potato: 0.55, SweetPotato: -0.55 },
+      spread: { Potato: 0.3, SweetPotato: -0.3 },
     },
     smoke: { y: 0.85, width: 1.0, height: 2.0 },
     focusY: 0.5,

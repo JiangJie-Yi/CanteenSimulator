@@ -119,16 +119,18 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 90, base
     const life = new Float32Array(embers)
     const maxLife = new Float32Array(embers)
     const size = new Float32Array(embers)
+    const baseSize = new Float32Array(embers)
     for (let i = 0; i < embers; i++) {
       maxLife[i] = 1.5 + Math.random() * 2
       life[i] = Math.random()
-      size[i] = 0.035 + Math.random() * 0.035
+      baseSize[i] = 0.03 + Math.random() * 0.04
+      size[i] = baseSize[i]
     }
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     geometry.setAttribute('aLife', new THREE.BufferAttribute(life, 1))
     geometry.setAttribute('aSize', new THREE.BufferAttribute(size, 1))
-    return { pos, vel, life, maxLife, geometry }
+    return { pos, vel, life, maxLife, size, baseSize, geometry }
   }, [embers])
 
   const emberMaterial = useMemo(
@@ -171,31 +173,48 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 90, base
         (1 + Math.sin(t * 11) * 0.13 + Math.sin(t * 17.3) * 0.1 + Math.sin(t * 5.1) * 0.16)
     }
 
-    const { pos, vel, life, maxLife, geometry } = emberState
+    // sparks follow the fire: a fierce fire throws lots of them, fast and high, in bursts as it crackles;
+    // dying embers let off only the odd lazy one
+    const { pos, vel, life, maxLife, size, baseSize, geometry } = emberState
+    const crackle = 0.6 + 0.4 * Math.max(0, Math.sin(t * 2.3) * Math.sin(t * 5.7 + 1.3))
+    const spawn = alive * (0.15 + 0.85 * lv) * crackle
     for (let i = 0; i < life.length; i++) {
-      life[i] -= dt / maxLife[i]
+      if (life[i] > 0) life[i] -= dt / maxLife[i]
       if (life[i] <= 0) {
+        // dead sparks wait to be thrown again, more often the hotter the fire
+        if (Math.random() > spawn * dt * 2.5) {
+          life[i] = 0
+          size[i] = 0
+          continue
+        }
         const a = Math.random() * Math.PI * 2
-        const r = Math.random() * 0.3
+        const r = Math.random() * (0.12 + 0.2 * lv)
         pos[i * 3] = Math.cos(a) * r
-        pos[i * 3 + 1] = 0.1
+        pos[i * 3 + 1] = 0.08 + Math.random() * 0.1
         pos[i * 3 + 2] = Math.sin(a) * r
-        vel[i * 3] = (Math.random() - 0.5) * 0.15
-        vel[i * 3 + 1] = 0.35 + Math.random() * 0.5
-        vel[i * 3 + 2] = (Math.random() - 0.5) * 0.15
+        const kick = 0.4 + 0.9 * lv
+        vel[i * 3] = (Math.random() - 0.5) * 0.3 * kick
+        vel[i * 3 + 1] = (0.35 + Math.random() * 0.6) * kick
+        vel[i * 3 + 2] = (Math.random() - 0.5) * 0.3 * kick
+        maxLife[i] = (0.8 + Math.random() * 1.6) * (0.6 + 0.6 * lv)
         life[i] = 1
       }
-      // drift outward a little so embers escape around the pot instead of through it
-      const x = pos[i * 3]
-      const z = pos[i * 3 + 2]
-      const rr = Math.hypot(x, z) + 1e-4
-      const push = pos[i * 3 + 1] > 0.4 ? 0.5 : 0.05
-      pos[i * 3] += (vel[i * 3] + (x / rr) * push + Math.sin(t * 3 + i) * 0.05) * dt
+      const y = pos[i * 3 + 1]
+      // swirled about by the hot air (a cheap curl of sines), slowing as they cool, a touch of draught
+      const swirl = 0.25 + 0.35 * lv
+      const sx = Math.sin(y * 7 + t * 2.1 + i * 1.3) * swirl
+      const sz = Math.cos(y * 6 + t * 1.7 + i * 0.7) * swirl
+      vel[i * 3 + 1] *= 1 - 0.35 * dt
+      pos[i * 3] += (vel[i * 3] + sx + 0.06) * dt
       pos[i * 3 + 1] += vel[i * 3 + 1] * dt
-      pos[i * 3 + 2] += (vel[i * 3 + 2] + (z / rr) * push + Math.cos(t * 3 + i) * 0.05) * dt
+      pos[i * 3 + 2] += (vel[i * 3 + 2] + sz) * dt
+      // twinkle as they tumble, and shrink as they burn out
+      const twinkle = 0.65 + 0.35 * Math.sin(t * (14 + (i % 7) * 3) + i)
+      size[i] = baseSize[i] * twinkle * (0.4 + 0.6 * life[i]) * (0.7 + 0.5 * lv)
     }
     geometry.attributes.position.needsUpdate = true
     geometry.attributes.aLife.needsUpdate = true
+    geometry.attributes.aSize.needsUpdate = true
   })
 
   return (

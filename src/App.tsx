@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { UI, type Lang } from './i18n'
+import { nameIn, UI, type Lang } from './i18n'
 import { boilAmount, equilibriumTemp, stepTemp, steamAmount } from './boil'
 import { Bubbles } from './components/Bubbles'
 import { Brand } from './components/Brand'
@@ -22,7 +22,7 @@ import { DISHES, type Dish as DishInfo } from './menu'
 // distance between dishes on the carousel
 const SPACING = 6
 /** most items that fit around the charcoal at once */
-const FIRE_CAPACITY = 32
+const FIRE_CAPACITY = 16
 // burner top on the cassette stove (blender/hotpot.py)
 const BURNER_Y = 0.38
 // the one camera pose every dish is framed from (blender/open_live.py matches Blender's camera to it)
@@ -123,7 +123,7 @@ type SceneProps = {
   fire: RefObject<number>
   /** the stage's box inside the full-window canvas: the dish is framed in it */
   frame: Frame
-  onOffFire: (count: number) => void
+  onOffFire: (count: number, loose: number) => void
 }
 
 function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame, onOffFire }: SceneProps) {
@@ -308,6 +308,8 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame,
 
       <OrbitControls
         ref={controls}
+        // shared as the scene's controls so dragging a seasoning onto food can hold the camera still
+        makeDefault
         target={[0, DISHES[0].focusY, 0]}
         enablePan={false}
         minDistance={1.8}
@@ -423,6 +425,8 @@ export default function App() {
   const MAX_PORTIONS = 99
   // the fire only holds so many skewers; past that, take something off before ordering more
   const [offFire, setOffFire] = useState(0)
+  // potatoes and sweet potatoes still around (in the ash or the basket, not yet eaten)
+  const [loose, setLoose] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const noticeTimer = useRef(0)
   const say = (text: string) => {
@@ -430,20 +434,35 @@ export default function App() {
     window.clearTimeout(noticeTimer.current)
     noticeTimer.current = window.setTimeout(() => setNotice(null), 2600)
   }
+  // skewers count toward the fire's limit; potatoes in the ash and mochi on the net have their own
+  const isSkewer = (id: string) => !!dish.roast && id in dish.roast.times && !dish.roast.loose.includes(id)
   const onTheFire = () => {
     if (!dish.roast) return 0
     const served = servings(base, orders[dish.id])
-    const total = Object.entries(served).reduce((n, [id, q]) => n + (id in dish.roast!.times ? q : 0), 0)
+    const total = Object.entries(served).reduce((n, [id, q]) => n + (isSkewer(id) ? q : 0), 0)
     return total - offFire
   }
 
   const changeQty = (id: string, delta: number) => {
-    if (delta > 0 && dish.roast && onTheFire() >= FIRE_CAPACITY) {
+    if (delta > 0 && isSkewer(id) && onTheFire() >= FIRE_CAPACITY) {
       say(UI[lang].fireFull(FIRE_CAPACITY))
       return
     }
+    // the bamboo basket only holds so many potatoes and sweet potatoes
+    const basket = dish.roast?.basket
+    if (delta > 0 && basket && dish.roast!.basketItems?.includes(id) && loose >= basket.capacity) {
+      say(UI[lang].basketFull(basket.capacity))
+      return
+    }
+    // some things only fit so many at once (three mochi on the grill net)
+    const item = dish.items.find((i) => i.id === id)
+    const max = item?.max ?? MAX_PORTIONS
+    if (delta > 0 && servings(base, orders[dish.id])[id] >= max) {
+      say(UI[lang].itemFull(item ? nameIn(lang, item) : id, max))
+      return
+    }
     setOrders((all) => {
-      const qty = Math.min(MAX_PORTIONS, Math.max(0, (all[dish.id][id] ?? 0) + delta))
+      const qty = Math.min(max, Math.max(0, (all[dish.id][id] ?? 0) + delta))
       return { ...all, [dish.id]: { ...all[dish.id], [id]: qty } }
     })
   }
@@ -460,7 +479,7 @@ export default function App() {
           gl={{ alpha: true, toneMapping: THREE.NoToneMapping }}
         >
           <Scene active={active} orders={orders} bases={bases} theme={theme} reducedMotion={reducedMotion}
-            heat={heat} fire={fire} frame={frame} onOffFire={setOffFire} />
+            heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }} />
         </Canvas>
       </div>
       <div className="stage" ref={stageRef}>

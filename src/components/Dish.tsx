@@ -8,7 +8,7 @@ const INK = new THREE.Color('#3b2a20')
 const OUTLINE_WIDTH = 0.007
 // too small, thin or flat to look good with an ink line
 const NO_OUTLINE = new Set(['Broth', 'FirePit', 'DriedChili', 'SichuanPepper', 'Scallion', 'Charcoal', 'PickledGreens',
-  'Noodles', 'ExtraNoodles'])
+  'Noodles', 'ExtraNoodles', 'GrillNet'])
 // flat ground pieces: they catch shadows but shouldn't throw any
 const NO_CAST = new Set(['Broth', 'FirePit'])
 
@@ -109,6 +109,9 @@ function scaleOutline(outline: THREE.Mesh) {
   outline.material = (outline.material as THREE.ShaderMaterial).clone()
   outline.userData.maxScale = 0
   outline.onBeforeRender = () => {
+    // follow the piece's shape keys too (the mochi puffing up on the grill)
+    const src = (outline.parent as THREE.Mesh | null)?.morphTargetInfluences
+    if (src && outline.morphTargetInfluences) for (let i = 0; i < src.length; i++) outline.morphTargetInfluences[i] = src[i]
     outline.parent?.getWorldScale(worldScale)
     const avg = (worldScale.x + worldScale.y + worldScale.z) / 3
     if (avg > outline.userData.maxScale) {
@@ -123,9 +126,15 @@ function makeOutline(mesh: THREE.Mesh): THREE.Mesh {
   const material = new THREE.ShaderMaterial({
     uniforms: { uWidth: { value: 0 }, uColor: { value: INK } },
     vertexShader: /* glsl */ `
+      #include <common>
+      #include <morphtarget_pars_vertex>
       uniform float uWidth;
       void main() {
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * uWidth, 1.0);
+        #include <beginnormal_vertex>
+        #include <morphnormal_vertex>
+        #include <begin_vertex>
+        #include <morphtarget_vertex>
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed + objectNormal * uWidth, 1.0);
       }`,
     fragmentShader: /* glsl */ `
       uniform vec3 uColor;
@@ -208,7 +217,7 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout
   /** Skewers around a fire get spun about their own stick; everything else turns about the vertical. */
   // (a hoisted declaration: the items memo above calls it during the first render)
   function isSkewer(id: string) {
-    return layout?.mode === 'ring' && layout.spread?.[id] === undefined
+    return layout?.mode === 'ring' && layout.spread?.[id] === undefined && !layout.slots?.[id]
   }
 
   /** Every portion's pieces currently placed in the dish (for finding free spots on the fire ring). */
@@ -217,7 +226,7 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout
     // along in the ash (layout.spread) aren't on the ring
     const out: number[] = []
     for (const [id, pieces] of items) {
-      if (layout?.spread?.[id] !== undefined) continue
+      if (layout?.spread?.[id] !== undefined || layout?.slots?.[id]) continue
       for (const p of pieces) out.push(Math.atan2(p.homeP.z, p.homeP.x))
     }
     // the base fish isn't a menu item, but it takes up a spot too
@@ -258,7 +267,8 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout
   /** Clone one more portion of an item from its authored pieces, swung around the dish's centre. */
   const addCopy = (id: string, pieces: Piece[], copy: number) => {
     const originals = pieces.filter((p) => p.copy === 0)
-    const angle = swingFor(id, originals[0], copy)
+    const slot = layout?.slots?.[id]?.[copy - 1]
+    const angle = slot ? 0 : swingFor(id, originals[0], copy)
     const swing = new THREE.Quaternion().setFromAxisAngle(UP, angle)
     for (const src of originals) {
       // start from where the piece was authored, not where it is now (it may be on the plate)
@@ -267,6 +277,11 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout
       node.userData = { itemId: id, copy }
       node.position.copy(src.homeP).applyAxisAngle(UP, angle)
       node.quaternion.copy(src.homeQ).premultiply(swing)
+      // or set down at its own spot (the grill net), level, just turned a little
+      if (slot) {
+        node.position.set(slot[0], src.homeP.y, slot[1])
+        node.quaternion.copy(src.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(UP, (Math.random() - 0.5) * 0.6))
+      }
       // every portion is a little different: its own size and turn
       node.scale.copy(src.node.userData.authoredScale ?? src.baseScale)
       jitter(node, isSkewer(id))
