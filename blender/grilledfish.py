@@ -38,7 +38,7 @@ seed(44)
 
 STONE_R = 0.9
 STICK_FOOT_R = 0.7
-STICK_TOP_R = 0.26
+STICK_TOP_R = 0.4         # tips well apart, so the food on neighbouring skewers doesn't run together
 STICK_TOP_Z = 1.15
 
 
@@ -98,51 +98,65 @@ alpha = 1 - smooth(0.72, 0.98, rad + wobble)
 TEX["pit"] = image("T_FirePit", ground, alpha=alpha)
 TEX["pit_n"] = image("T_FirePit_N", to_normal(fbm(N, 24, 24) * 0.5 + grit * 0.5, 1.5), data=True)
 
-# ayu (sweetfish), salt-grilled. u: around the vertical axis (0 = head), v: belly (0) -> back (1)
-N = 512
+# fish skins. The body's UVs run along the fish (see fish()): u goes round the body (0.5 = the belly line,
+# 0 and 1 = the top of the back), v runs from the tail (0) to the head (1). t: 0 on the belly .. 1 along the back.
+N = 1024
 u, v = grid01(N)
-back = smooth(0.45, 0.75, v + (fbm(N, 8, 4) - 0.5) * 0.1)
-body = mix((0.93, 0.9, 0.82), (0.42, 0.44, 0.38), back)
-# golden blush behind the gills, typical of ayu
-gill = np.minimum(np.abs(u - 0.08), np.abs(u - 0.92))
-body = mix(body, (0.92, 0.72, 0.3), smooth(0.08, 0.02, gill) * smooth(0.25, 0.5, v) * smooth(0.75, 0.55, v) * 0.8)
-spots = (vnoise(N, 60, 30) > 0.82).astype(np.float32) * back
-body = mix(body, (0.25, 0.25, 0.22), spots * 0.6)
-# grill char: diagonal scorch bands and blistered skin
-scorch = smooth(0.82, 0.95, 0.5 + 0.5 * np.sin((u * 14 + v * 3) * 2 * np.pi)) * smooth(0.6, 0.8, fbm(N, 6, 6) + 0.3)
-body = mix(body, (0.2, 0.12, 0.06), scorch * 0.75)
-TEX["fish"] = image("T_Ayu", body)
-TEX["fish_n"] = image("T_Ayu_N", to_normal(vnoise(N, 120, 60) * 0.3 + scorch * 0.5, 1.5), data=True)
+t = 1 - np.minimum(u, 1 - u) * 2
+# fine overlapping scales: rows of little arcs, offset row to row, a shade darker at each scale's edge
+su, sv = u * 140, v * 90
+sv = sv + 0.5 * (np.floor(su) % 2)
+cell = np.sqrt(((su % 1) - 0.5) ** 2 + ((sv % 1) - 0.15) ** 2)
+scales = smooth(0.42, 0.52, cell)
+# grill marks: a few scorched bars across the body, blistered and broken up
+scorch = smooth(0.84, 0.95, 0.5 + 0.5 * np.sin((v * 11 + u * 1.5) * 2 * np.pi)) * smooth(0.55, 0.8, fbm(N, 8, 8) + 0.3)
+blister = smooth(0.8, 0.9, vnoise(N, 70, 40)) * 0.5
+lateral = smooth(0.012, 0.0, np.abs(t - 0.52 - 0.01 * np.sin(v * 40)))            # the lateral line
 
-# Pacific saury (秋刀魚): steel-blue back, a crisp line onto a bright silver belly, blistered from the grill
-back = smooth(0.52, 0.6, v + (fbm(N, 10, 4) - 0.5) * 0.04)
-saury = mix((0.86, 0.87, 0.86), (0.2, 0.27, 0.38), back)
-saury = mix(saury, (0.55, 0.6, 0.62), smooth(0.04, 0.0, np.abs(v - 0.56)) * 0.6)      # lateral line sheen
-saury = mix(saury, (0.22, 0.13, 0.07), scorch * 0.7)
+
+def skin(belly, back_col, back):
+    s = mix(belly, back_col, back)
+    s = mix(s, np.array(back_col) * 0.6, scales * (0.08 + 0.14 * back))
+    s = mix(s, (0.3, 0.3, 0.3), lateral * 0.35)
+    return s
+
+
+# ayu (sweetfish): olive back fading to cream, a golden blush behind the gills, tiny dark spots
+back = smooth(0.42, 0.78, t + (fbm(N, 10, 4) - 0.5) * 0.12)
+body = skin((0.94, 0.91, 0.83), (0.4, 0.43, 0.36), back)
+body = mix(body, (0.94, 0.74, 0.3), smooth(0.05, 0.0, np.abs(v - 0.75)) * smooth(0.25, 0.45, t) * smooth(0.85, 0.6, t) * 0.85)
+body = mix(body, (0.22, 0.22, 0.2), (vnoise(N, 220, 110) > 0.86).astype(np.float32) * back * 0.6)
+body = mix(body, (0.2, 0.12, 0.06), np.clip(scorch * 0.75 + blister * scorch, 0, 1))
+TEX["fish"] = image("T_Ayu", body)
+
+# Pacific saury (秋刀魚): steel-blue back, a crisp line onto a bright silver belly
+back = smooth(0.53, 0.58, t + (fbm(N, 12, 4) - 0.5) * 0.03)
+saury = skin((0.88, 0.89, 0.88), (0.18, 0.25, 0.37), back)
+saury = mix(saury, (0.62, 0.66, 0.7), smooth(0.03, 0.0, np.abs(t - 0.5)) * 0.6)
+saury = mix(saury, (0.22, 0.13, 0.07), np.clip(scorch * 0.7 + blister * scorch, 0, 1))
 TEX["saury"] = image("T_Saury", saury)
 
-# mackerel (鯖魚): blue-green back with dark wavy bars, silver-cream belly, grill-browned
-back = smooth(0.48, 0.62, v)
-waves = smooth(0.7, 0.85, 0.5 + 0.5 * np.sin((u * 26 + np.sin(v * 22) * 0.35) * 2 * np.pi)) * back
-mackerel = mix((0.88, 0.86, 0.78), (0.24, 0.42, 0.44), back)
-mackerel = mix(mackerel, (0.07, 0.1, 0.12), waves * 0.85)
-mackerel = mix(mackerel, (0.3, 0.18, 0.08), scorch * 0.6)
+# mackerel (鯖魚): blue-green back with dark wavy bars, silver-cream belly
+back = smooth(0.5, 0.62, t)
+waves = smooth(0.72, 0.86, 0.5 + 0.5 * np.sin((v * 26 + np.sin(t * 30) * 0.3) * 2 * np.pi)) * back
+mackerel = skin((0.9, 0.88, 0.8), (0.22, 0.4, 0.42), back)
+mackerel = mix(mackerel, (0.06, 0.09, 0.11), waves * 0.85)
+mackerel = mix(mackerel, (0.3, 0.18, 0.08), np.clip(scorch * 0.6 + blister * scorch, 0, 1))
 TEX["mackerel"] = image("T_Mackerel", mackerel)
 
-# the belly is slit open (gutted before grilling): a dark cut along the lower flank from behind the gills to
-# the vent, its lips pale where the flesh shows. ud: 0 at the head .. 0.5 at the tail, on both flanks
-u, v = grid01(N)
-ud = np.minimum(u, 1 - u)
-along = smooth(0.1, 0.14, ud) * smooth(0.36, 0.31, ud)
-line = np.abs(v - 0.17 - 0.012 * np.sin(ud * 60))
-slit = smooth(0.012, 0.003, line) * along
-lips = smooth(0.03, 0.012, line) * along * (1 - slit)
+# the belly is cut open from the vent to behind the gills and spread: dark red inside the cut, the pale flesh of
+# its lips either side (the groove itself is shaped in fish())
+du = np.abs(u - 0.5)
+open_along = smooth(0.36, 0.42, v) * smooth(0.74, 0.68, v)
+inside = smooth(0.026, 0.014, du) * open_along
+lips = smooth(0.06, 0.03, du) * open_along * (1 - inside)
 for key in ("fish", "saury", "mackerel"):
     img = TEX[key]
     px = np.array(img.pixels[:], np.float32).reshape(N, N, 4)[..., :3]
-    px = mix(px, (0.95, 0.84, 0.74), lips * 0.85)
-    TEX[key] = image(img.name + "_Slit", mix(px, (0.22, 0.07, 0.05), slit))
-TEX["fish_n"] = image("T_Fish_N", to_normal(vnoise(N, 120, 60) * 0.3 + scorch * 0.5 - slit * 1.2, 1.5), data=True)
+    px = mix(px, (0.96, 0.82, 0.72), lips * 0.9)
+    TEX[key] = image(img.name + "_Open", mix(px, (0.42, 0.1, 0.07), inside))
+TEX["fish_n"] = image("T_Fish_N", to_normal(scales * 0.35 + scorch * 0.5 + blister * 0.3 - inside * 1.2, 1.5),
+                      data=True)
 
 # coarse salt rubbed over every fish (塩焼き): white grains speckled all over the skin
 salt_grains = (vnoise(N, 150, 75) > 0.8).astype(np.float32) * smooth(0.0, 0.3, fbm(N, 6, 6) + 0.2)
@@ -280,17 +294,44 @@ def centre_origin(o, at=(0.0, 0.0, 0.0)):
 
 # ground disc reaching well past the stone ring; its texture fades the edge out (see T_FirePit)
 PIT_R = 1.55
-bpy.ops.mesh.primitive_circle_add(vertices=96, radius=PIT_R, fill_type="TRIFAN", location=(0, 0, 0.004))
-o = active()
+SALT_R = 0.86
+SALT_H = 0.045
+
+
+def salt_height(x, y):
+    """The salt is piled thick inside the stones, rising gently toward the middle like a low hill."""
+    r = math.hypot(x, y) / SALT_R
+    if r >= 1:
+        return 0.0
+    return SALT_H * (1 - r * r) ** 1.5 + 0.004 * math.sin(x * 23 + y * 7) * math.sin(y * 19 - x * 5) * (1 - r)
+
+
+# a polar grid (not a single fan) so the salt can mound up in the middle
 bm = bmesh.new()
-bm.from_mesh(o.data)
 uv = bm.loops.layers.uv.verify()
-for f in bm.faces:
+rings, segs = 30, 96
+centre = bm.verts.new((0, 0, 0.004 + salt_height(0, 0)))
+grid = []
+for i in range(1, rings + 1):
+    rr = PIT_R * (i / rings) ** 1.3                      # rings closer together in the middle
+    grid.append([bm.verts.new((rr * math.cos(2 * math.pi * j / segs), rr * math.sin(2 * math.pi * j / segs),
+                               0.004 + salt_height(rr * math.cos(2 * math.pi * j / segs),
+                                                   rr * math.sin(2 * math.pi * j / segs)))) for j in range(segs)])
+faces = [bm.faces.new((centre, grid[0][j], grid[0][(j + 1) % segs])) for j in range(segs)]
+for i in range(rings - 1):
+    for j in range(segs):
+        jn = (j + 1) % segs
+        faces.append(bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][jn], grid[i][jn])))
+for f in faces:
     for l in f.loops:
         l[uv].uv = (l.vert.co.x / (2 * PIT_R) + 0.5, l.vert.co.y / (2 * PIT_R) + 0.5)
-bm.to_mesh(o.data)
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+me = bpy.data.meshes.new("FirePit")
+bm.to_mesh(me)
 bm.free()
-finish(o, "FirePit", M["pit"], smooth_shade=False)
+o = bpy.data.objects.new("FirePit", me)
+bpy.context.collection.objects.link(o)
+finish(o, "FirePit", M["pit"])
 
 # binchotan (備長炭) charcoal fire, the Japanese way: long thin sticks of white charcoal heaped into a low mound,
 # ash-grey on the outside and glowing through the cracks. Sizes and angles vary stick to stick.
@@ -342,7 +383,7 @@ for i in range(24):
     lift = max(0.0, 0.12 * (1 - r / 0.4)) * random.uniform(0.4, 1.0)     # mounded in the middle
     # big chunky lengths, some of them hollow down the middle
     o = charcoal_tube(radius, radius * random.uniform(0.35, 0.5) if random.random() < 0.4 else 0.0, length)
-    o.location = (r * math.cos(a), r * math.sin(a), radius + lift)
+    o.location = (r * math.cos(a), r * math.sin(a), radius + lift + salt_height(r * math.cos(a), r * math.sin(a)))
     o.rotation_euler = (math.radians(90) + random.uniform(-0.35, 0.35), 0, random.uniform(0, math.pi))
     # the ones down in the middle of the heap glow; the outer ones are grey white charcoal
     sticks.append(finish(o, "Binchotan", M["ember"] if r < 0.12 or random.random() < 0.15 else M["binchotan"],
@@ -356,7 +397,8 @@ for _ in range(1800):
     r = math.sqrt(random.uniform(0.1, 1.0)) * 0.86   # salt laid right across the ash bed
     s = random.uniform(0.006, 0.012)
     # lying flat on the ash (only spun about the vertical), a hair above it: a level, even crust of salt
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(r * math.cos(a), r * math.sin(a), 0.0065),
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(r * math.cos(a), r * math.sin(a),
+                                                      0.0065 + salt_height(r * math.cos(a), r * math.sin(a))),
                                     rotation=(0, 0, random.uniform(0, math.pi)))
     o = active()
     o.scale = (s, s * random.uniform(0.7, 1.2), 0.003)
@@ -372,7 +414,8 @@ for _ in range(30):
     s = random.uniform(0.05, 0.1)
     heap = max(0.0, 0.08 * (1 - r / 0.44)) * random.uniform(0.3, 1.0)
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=1,
-                                          location=(r * math.cos(a), r * math.sin(a), s * 0.45 + heap),
+                                          location=(r * math.cos(a), r * math.sin(a),
+                                                    s * 0.45 + heap + salt_height(r * math.cos(a), r * math.sin(a))),
                                           rotation=(random.uniform(0, 3), random.uniform(0, 3), random.uniform(0, 3)))
     o = active()
     o.scale = (s * random.uniform(0.8, 1.3), s * random.uniform(0.8, 1.3), s * random.uniform(0.6, 0.9))
@@ -384,7 +427,7 @@ centre_origin(join(coals, "Charcoal"))
 sizes = []
 while sum(sizes) * 2 < 2 * math.pi * STONE_R:
     big = len(sizes) % 3 != 1 and random.random() < 0.7      # mostly big, with smaller ones tucked between
-    sizes.append(random.uniform(0.21, 0.27) if big else random.uniform(0.12, 0.15))
+    sizes.append(random.uniform(0.18, 0.23) if big else random.uniform(0.1, 0.13))
 fit = 2 * math.pi * STONE_R / (sum(sizes) * 2) * 1.04          # scale to close the ring, with slight overlap
 a = 0.0
 for i, half in enumerate(sizes):
@@ -395,8 +438,8 @@ for i, half in enumerate(sizes):
     r = STONE_R + (0.045 if i % 2 else -0.03) + random.uniform(-0.025, 0.025) + (1 - k) * 0.03
     # river-stone ovals: long along the ring, narrower across it, and fairly flat
     sx, sy, sz = half * random.uniform(0.5, 0.9), half, half * random.uniform(0.45, 0.7)
-    # a mix of broken rock and smooth river ovals
-    oval = random.random() < 0.4
+    # mostly smooth river ovals, with some broken rock among them
+    oval = random.random() < 0.7
     loc = (r * math.cos(a), r * math.sin(a), sz * 0.55)
     rot = (random.uniform(-0.08, 0.08), random.uniform(-0.08, 0.08), a + random.uniform(-0.18, 0.18))
     if oval:
@@ -523,6 +566,8 @@ def place(objs, angle_deg, along, name, stick=True):
     o = join(objs, name)
     # each skewer is pushed into the ash a little differently: leaning, higher or lower, longer or shorter
     var = (random.uniform(-0.05, 0.05), random.uniform(-0.12, 0.08), random.uniform(-0.12, 0.12))
+    # and the food sits higher or lower on its stick than its neighbours'
+    along += random.uniform(-0.07, 0.07)
     m, _, _ = stick_frame(angle_deg, along, var)
     o.matrix_world = m @ o.matrix_world
     if stick:
@@ -593,7 +638,19 @@ def fish(species="ayu"):
     slope = lambda x: math.atan(0.95 * D * math.pi / L * math.cos(x * math.pi / L))   # noqa: E731
     bm = bmesh.new()
     bm.loops.layers.uv.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=24, radius=1, calc_uvs=True)
+    bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=32, radius=1, calc_uvs=True)
+    for vtx in bm.verts:
+        # turn the sphere so its poles are the tail (-X) and the head (+X): its UVs then run along the fish
+        # (v tail → head) and round it (u), which is how the skin textures are painted
+        ox, oy, oz = vtx.co
+        vtx.co = Vector((oz, oy, -ox))
+        # the belly cut open from the vent to behind the gills: a groove pressed up along the underside, with
+        # its lips pushed apart
+        x, y, z = vtx.co
+        open_along = smooth(-0.32, -0.22, np.float32(x)) * smooth(0.5, 0.4, np.float32(x)) * (z < -0.4)
+        if open_along > 0:
+            vtx.co.z += 0.38 * math.exp(-(y / 0.22) ** 2) * open_along
+            vtx.co.y *= 1 + 0.3 * math.exp(-((abs(y) - 0.32) / 0.14) ** 2) * open_along
     for vtx in bm.verts:
         x = vtx.co.x
         taper = 1 + min(0, x) * 0.82                       # narrowing into the tail root (-X)
@@ -737,32 +794,48 @@ def shiitake_halves():
 N = 256
 u, v = grid01(N)
 ridge = 0.5 + 0.5 * np.cos(u * 2 * np.pi * 5)                  # five ridges round the pod
-TEX["okra"] = image("T_Okra", mix(mix((0.2, 0.42, 0.12), (0.42, 0.62, 0.22), ridge * 0.7 + fbm(N, 6, 6) * 0.3),
-                                  (0.16, 0.13, 0.05), smooth(0.78, 0.92, vnoise(N, 30, 30)) * 0.85))
+# okra: deep green in the hollows, paler along the ridge crests, a fine downy fuzz, lighter toward the tip,
+# and a few spots seared on the grill
+crest = ridge ** 4
+okra = mix((0.17, 0.38, 0.1), (0.36, 0.58, 0.2), fbm(N, 8, 30) * 0.5 + v * 0.3)
+okra = mix(okra, (0.62, 0.78, 0.38), crest * 0.7)
+okra = mix(okra, (0.75, 0.86, 0.6), (vnoise(N, 180, 180) > 0.8).astype(np.float32) * 0.25)      # fuzz
+okra = mix(okra, (0.14, 0.12, 0.05), smooth(0.8, 0.93, vnoise(N, 26, 26)) * 0.8)                 # sear marks
+TEX["okra"] = image("T_Okra", okra)
+TEX["okra_n"] = image("T_Okra_N", to_normal(crest * 0.6 + vnoise(N, 180, 180) * 0.15, 2.0), data=True)
+M["okra_calyx"] = pbr("OkraCalyx", (0.55, 0.62, 0.3), rough=0.6)
 fib = vnoise(N, 4, 90)
 sear = smooth(0.3, 0.05, v) + smooth(0.7, 0.95, v)
 TEX["scallop"] = image("T_Scallop", mix(mix((0.95, 0.9, 0.8), (0.99, 0.96, 0.9), fib), (0.78, 0.5, 0.2),
                                         np.clip(sear, 0, 1) * 0.85))
-M["okra"] = pbr("Okra", tex=TEX["okra"], rough=0.35, coat=0.3)
+M["okra"] = pbr("Okra", tex=TEX["okra"], nrm=TEX["okra_n"], rough=0.45, coat=0.2)
 M["scallop"] = pbr("Scallop", tex=TEX["scallop"], rough=0.3, coat=0.4)
 
 
 def okra():
-    """Four okra pods across the stick: five-ridged, tapering to a point, with a cap at the stalk end."""
+    """Four okra pods across the stick, like the real thing: five sharp ridges with the faces between them slightly
+    hollowed, a little twist along the pod, fullest just below the shoulder then tapering to a pointed tip that
+    curls to one side; a calyx collar and a short stalk at the top."""
     parts = []
-    for i, x in enumerate((-0.15, -0.05, 0.05, 0.15)):
-        length = random.uniform(0.2, 0.25)
+    for i, x in enumerate((-0.18, -0.06, 0.06, 0.18)):
+        length = random.uniform(0.25, 0.3)
+        curl = random.choice((-1, 1)) * random.uniform(0.015, 0.035)
+        twist = random.uniform(0.2, 0.5)
         bm = bmesh.new()
         uvl = bm.loops.layers.uv.new()
-        rings, seg = 14, 20
+        rings, seg = 22, 30
         grid = []
         for k in range(rings + 1):
             t = k / rings
-            r = 0.03 * (1 - t ** 1.6) * (0.8 + 0.2 * math.sin(math.pi * min(1, t * 3))) + 0.0015
-            grid.append([bm.verts.new((
-                r * (1 + 0.16 * math.cos(5 * 2 * math.pi * j / seg)) * math.cos(2 * math.pi * j / seg),
-                r * (1 + 0.16 * math.cos(5 * 2 * math.pi * j / seg)) * math.sin(2 * math.pi * j / seg),
-                -length / 2 + t * length)) for j in range(seg)])
+            # rounded shoulder at the stalk end, fullest near a fifth of the way down, then a long taper
+            r = 0.04 * math.sin(math.pi / 2 * min(1, t / 0.18)) ** 0.6 * max(0.0, 1 - max(0.0, t - 0.18) / 0.82) ** 1.15 + 0.0012
+            ring = []
+            for j in range(seg):
+                a = 2 * math.pi * j / seg + twist * t
+                ridge = abs(math.cos(5 * (a - twist * t) / 2)) ** 3          # sharp crests, hollow faces
+                rr = r * (0.84 + 0.22 * ridge)
+                ring.append(bm.verts.new((rr * math.cos(a) + curl * t ** 3, rr * math.sin(a), -length / 2 + t * length)))
+            grid.append(ring)
         for k in range(rings):
             for j in range(seg):
                 jn = (j + 1) % seg
@@ -781,9 +854,16 @@ def okra():
         o.location = (x, 0, 0)
         o.rotation_euler = ((math.pi if down else 0) + random.uniform(-0.2, 0.2), random.uniform(-0.15, 0.15), 0)
         parts.append(finish(o, "Okra", M["okra"]))
-        cap_z = length / 2 if down else -length / 2
-        bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.024, depth=0.028, location=(x, 0, cap_z))
-        parts.append(finish(active(), "OkraCap", M["leek_green"]))
+        # the calyx: a pale ridged collar where the pod meets its stalk, and the stalk cut off short
+        s = 1 if down else -1                      # the stalk end (built at -z) is on top once flipped down
+        cap_z = s * length / 2
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.028, minor_radius=0.008, major_segments=15, minor_segments=6,
+                                         location=(x, 0, cap_z))
+        parts.append(finish(active(), "OkraCalyx", M["okra_calyx"]))
+        bpy.ops.mesh.primitive_cone_add(vertices=10, radius1=0.014, radius2=0.008, depth=0.03,
+                                        location=(x, 0, cap_z + s * 0.018),
+                                        rotation=(0 if s > 0 else math.pi, 0, 0))
+        parts.append(finish(active(), "OkraStalk", M["leek_green"]))
     return parts
 
 
@@ -1004,17 +1084,66 @@ def squid():
     return parts
 
 
+M["pepper_in"] = pbr("PepperInside", (0.74, 0.86, 0.52), rough=0.5)
+
+
+def pepper_chunk(x, w, h, R, turn, tilt):
+    """A cut square of green pepper wall: curved like the pepper it came from, glossy green outside and pale
+    inside, with the cut edges showing its thickness. The skewer goes straight through the wall (local X)."""
+    th = 0.007
+    span = w / R / 2
+    nu, nv = 8, 5
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+
+    def surf(rad):
+        return [[bm.verts.new((rad * math.cos(-span + 2 * span * i / nu) - R,
+                               rad * math.sin(-span + 2 * span * i / nu),
+                               -h / 2 + h * j / nv + random.uniform(-0.002, 0.002) * (0 < j < nv)))
+                 for j in range(nv + 1)] for i in range(nu + 1)]
+    out, inn = surf(R), surf(R - th)
+    for g, flip, mat in ((out, False, 0), (inn, True, 1)):
+        for i in range(nu):
+            for j in range(nv):
+                q = (g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1])
+                f = bm.faces.new(q[::-1] if flip else q)
+                f.material_index = mat
+                for l, (uu, vv) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
+                    l[uvl].uv = (uu / nu, vv / nv)
+    # the four cut edges
+    rim = [(out[i][0], out[i + 1][0], inn[i + 1][0], inn[i][0]) for i in range(nu)]
+    rim += [(out[i + 1][nv], out[i][nv], inn[i][nv], inn[i + 1][nv]) for i in range(nu)]
+    rim += [(out[0][j + 1], out[0][j], inn[0][j], inn[0][j + 1]) for j in range(nv)]
+    rim += [(out[nu][j], out[nu][j + 1], inn[nu][j + 1], inn[nu][j]) for j in range(nv)]
+    for q in rim:
+        bm.faces.new(q).material_index = 1
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new("Pepper")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new("Pepper", me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(M["shishito"])
+    o.data.materials.append(M["pepper_in"])
+    for p in o.data.polygons:
+        p.use_smooth = p.material_index == 0
+    # pierced through the wall, then turned well round on the stick and tipped, so its face shows to the side
+    # at its own angle (a chunk square-on to the stick would be seen edge-on)
+    o.location = (x, 0, 0)
+    o.rotation_euler = (tilt, 0, turn)
+    return o
+
+
 def shishito():
-    """Four blistered shishito peppers, slightly curved, stems out to one side."""
+    """Green pepper cut into chunks, threaded on one after another, each a different size and set at its own
+    angle on the stick."""
     parts = []
-    for i, x in enumerate((-0.15, -0.05, 0.05, 0.15)):
-        bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.03, radius2=0.006, depth=0.17,
-                                        location=(x, 0, -0.015), rotation=(random.uniform(-0.25, 0.25), 0, 0))
-        o = active()
-        bevel(o, 0.009, 2)
-        parts.append(finish(o, "Shishito", M["shishito"]))
-        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.006, depth=0.03, location=(x, 0, -0.112))
-        parts.append(finish(active(), "Stem", M["leek_green"]))
+    x = -0.16
+    while x < 0.16:
+        w = random.uniform(0.07, 0.1)
+        parts.append(pepper_chunk(x, w, random.uniform(0.065, 0.09), random.uniform(0.05, 0.075),
+                                  random.choice((-1, 1)) * random.uniform(1.0, 1.3), random.uniform(-0.5, 0.5)))
+        x += random.uniform(0.06, 0.08)
     return parts
 
 
@@ -1056,7 +1185,7 @@ place(fish("saury"), -97, 0.6, "Saury")
 place(fish("mackerel"), -122, 0.62, "Mackerel")
 place(corn_cob(), 55, 0.6, "GrilledCorn")
 place(shiitake_halves(), 128, 0.6, "GrilledShiitake")
-place(onigiri(), -20, 0.58, "Onigiri")
+# (the yaki onigiri isn't skewered: it's toasted on the grill net with the mochi, see below)
 place(shrimp_pair(), 200, 0.6, "ShrimpSkewer")
 place(sausage(), -150, 0.6, "Sausage")
 
@@ -1113,7 +1242,8 @@ def piece(src, name, mat, keep, cut=CUT):
 def roast_in_ash(name, mat, top_mat, flesh_mat, angle_deg, r, size, bend=0.0):
     a = math.radians(angle_deg)
     bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=32, ring_count=16,
-                                         location=(r * math.cos(a), r * math.sin(a), size[2] * 0.7),
+                                         location=(r * math.cos(a), r * math.sin(a),
+                                                   size[2] * 0.7 + salt_height(r * math.cos(a), r * math.sin(a))),
                                          rotation=(0, 0, a + math.pi / 2 + random.uniform(-0.4, 0.4)))
     whole = active()
     bm = bmesh.new()
@@ -1240,8 +1370,7 @@ def salt_pot(angle_deg, r):
     return centre_origin(join([pot, foot, heap], "SaltPot"), (x, y, 0.0))
 
 
-# front right of the fire as the camera sees it, clear of the plate and the basket
-salt_pot(-15, 1.25)
+# (the salt pot now stands in the seasoning box with the others, below)
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -1311,59 +1440,104 @@ def at_angle(angle_deg, r):
     return r * math.cos(a), r * math.sin(a)
 
 
-# soy sauce: a dark glazed pot of soy with a basting brush standing in it
-x, y = at_angle(-2, 1.3)
-parts = [open_pot(x, y, 0.085, 0.12, M["soy_pot"], name="SoyPot"), filling(x, y, 0.1, 0.075, 0.01, M["soy"], rough=0.0)]
-out = Vector((math.cos(math.radians(-2)), math.sin(math.radians(-2)), 0))
-foot = Vector((x, y, 0.06)) - out * 0.02
-parts.append(stick_between(foot, foot + out * 0.1 + Vector((0, 0, 0.26)), 0.008, M["spoon_wood"], "BrushHandle"))
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=8, location=foot - Vector((0, 0, 0.02)))
-tuft = active()
-tuft.scale = (0.022, 0.016, 0.04)
-parts.append(finish(tuft, "BrushBristles", M["bristle"]))
-centre_origin(join(parts, "SoyPot"), (x, y, 0.0))
+# all four live in a wooden seasoning box beside the fire; only their spoons and the brush are picked up
+BOX_ANGLE, BOX_R, BOX_Z = 5.0, 1.36, 0.016
+a = math.radians(BOX_ANGLE)
+box_c = Vector((BOX_R * math.cos(a), BOX_R * math.sin(a), 0))
+tang = Vector((-math.sin(a), math.cos(a), 0))
+out = Vector((math.cos(a), math.sin(a), 0))
+M["box_wood"] = pbr("SeasoningBoxWood", tex=TEX["bamboo"], rough=0.6)
 
-# condensed milk: a pale glazed jar of it, thick and glossy, with a little spoon
-x, y = at_angle(11, 1.3)
-parts = [open_pot(x, y, 0.075, 0.11, M["milk_jar"], belly=0.2, name="MilkJar"),
-         filling(x, y, 0.095, 0.068, 0.018, M["milk"], rough=0.0)]
-out = Vector((math.cos(math.radians(11)), math.sin(math.radians(11)), 0))
-parts.append(stick_between(Vector((x, y, 0.09)), Vector((x, y, 0.09)) + out * 0.13 + Vector((0, 0, 0.16)), 0.006,
-                           M["spoon_wood"], "SpoonHandle"))
-centre_origin(join(parts, "MilkJar"), (x, y, 0.0))
+# the box: an open wooden tray, long side along the stones
+bpy.ops.mesh.primitive_cube_add(size=1, location=(box_c.x, box_c.y, 0.04), rotation=(0, 0, a + math.pi / 2))
+box = active()
+box.scale = (0.86, 0.27, 0.08)
+apply_scale(box)
+bm = bmesh.new()
+bm.from_mesh(box.data)
+bm.normal_update()
+bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.9], context="FACES")
+bm.to_mesh(box.data)
+bm.free()
+sol = box.modifiers.new("Solidify", "SOLIDIFY")
+sol.thickness = 0.014
+bpy.ops.object.select_all(action="DESELECT")
+box.select_set(True)
+bpy.context.view_layer.objects.active = box
+bpy.ops.object.modifier_apply(modifier="Solidify")
+cyl_uv(box)
+finish(box, "SeasoningBox", M["box_wood"], smooth_shade=False)
 
-# peanut powder: a shallow wooden bowl heaped with ground peanuts and sugar, a scoop resting in it
-x, y = at_angle(23, 1.22)
-parts = [open_pot(x, y, 0.1, 0.07, M["bowl_wood"], belly=0.45, name="PeanutBowl"),
-         filling(x, y, 0.065, 0.095, 0.035, M["peanut"], rough=0.08)]
-out = Vector((math.cos(math.radians(23)), math.sin(math.radians(23)), 0))
-parts.append(stick_between(Vector((x, y, 0.08)), Vector((x, y, 0.08)) - out * 0.15 + Vector((0, 0, 0.1)), 0.006,
-                           M["spoon_wood"], "ScoopHandle"))
-centre_origin(join(parts, "PeanutBowl"), (x, y, 0.0))
+
+def in_box(offset):
+    return box_c + tang * offset
+
+
+def utensil(name, head, handle_end, head_obj, radius=0.006):
+    """A spoon or brush standing in its pot: the head down in it, the handle leaning out over the rim.
+    Its origin is the head, which is what's carried over the food."""
+    parts_ = [head_obj, stick_between(head, handle_end, radius, M["spoon_wood"], name + "Handle")]
+    return centre_origin(join(parts_, name), tuple(head))
+
+
+def spoon_bowl(at, r):
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=at)
+    o = active()
+    o.scale = (r, r * 0.8, r * 0.35)
+    return finish(o, "SpoonBowl", M["spoon_wood"])
+
+
+lean = out * 0.09 + Vector((0, 0, 0.21))
+pots = (("SaltPot", -0.3, 0.085, 0.1, M["pot"], 0.3, M["salt"], 0.03, 0.06),
+        ("SoyPot", -0.1, 0.08, 0.11, M["soy_pot"], 0.3, M["soy"], 0.008, 0.0),
+        ("MilkJar", 0.1, 0.075, 0.1, M["milk_jar"], 0.2, M["milk"], 0.016, 0.0),
+        ("PeanutBowl", 0.3, 0.095, 0.07, M["bowl_wood"], 0.45, M["peanut"], 0.03, 0.08))
+for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
+    c = in_box(off)
+    pot = open_pot(c.x, c.y, rad, depth, glaze, belly=belly, name=name)
+    fl = filling(c.x, c.y, depth * 0.85, rad * 0.9, fill_h, fill, rough=rough)
+    for o in (pot, fl):
+        o.location.z += BOX_Z
+    centre_origin(join([pot, fl], name), (c.x, c.y, 0.0))
+    head = Vector((c.x, c.y, BOX_Z + depth * 0.7))
+    if name == "SoyPot":
+        # the basting brush: a tuft of dark bristles on a wooden handle
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=8, location=head)
+        tuft = active()
+        tuft.scale = (0.022, 0.016, 0.04)
+        utensil("SoyBrush", head, head + lean + out * 0.02, finish(tuft, "BrushBristles", M["bristle"]), 0.008)
+    else:
+        utensil({"SaltPot": "SaltSpoon", "MilkJar": "MilkSpoon", "PeanutBowl": "PeanutSpoon"}[name], head,
+                head + lean, spoon_bowl(head, 0.024 if name != "PeanutBowl" else 0.03))
 
 
 # ---------------------------------------------------------------------------------------------------------
 # a little wire grill net laid over the coals, just for toasting mochi (切り餅) on
-NET_Z = 0.27
-NET_H = 0.24
+NET_Z = 0.48
+NET_R = 0.25
 wires = []
+# a round net: a wire hoop, with straight wires across it both ways, standing on three legs splayed out
 for k in range(-6, 7):
-    t = k * NET_H / 6.5
-    wires.append(stick_between((-NET_H, t, NET_Z), (NET_H, t, NET_Z), 0.0028, M["net"], "Wire"))
-    wires.append(stick_between((t, -NET_H, NET_Z - 0.004), (t, NET_H, NET_Z - 0.004), 0.0028, M["net"], "Wire"))
-for a_, b_ in (((-1, -1), (1, -1)), ((1, -1), (1, 1)), ((1, 1), (-1, 1)), ((-1, 1), (-1, -1))):
-    wires.append(stick_between((a_[0] * NET_H, a_[1] * NET_H, NET_Z), (b_[0] * NET_H, b_[1] * NET_H, NET_Z), 0.006,
-                               M["net"], "Frame"))
-for cx, cy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
-    wires.append(stick_between((cx * NET_H, cy * NET_H, NET_Z), (cx * NET_H * 1.1, cy * NET_H * 1.1, 0.0), 0.005,
-                               M["net"], "Leg"))
+    t = k * NET_R / 6.5
+    half = math.sqrt(max(0.0, NET_R * NET_R - t * t))
+    wires.append(stick_between((-half, t, NET_Z), (half, t, NET_Z), 0.0028, M["net"], "Wire"))
+    wires.append(stick_between((t, -half, NET_Z - 0.004), (t, half, NET_Z - 0.004), 0.0028, M["net"], "Wire"))
+hoop = 48
+for k in range(hoop):
+    a0, a1 = 2 * math.pi * k / hoop, 2 * math.pi * (k + 1) / hoop
+    wires.append(stick_between((NET_R * math.cos(a0), NET_R * math.sin(a0), NET_Z),
+                               (NET_R * math.cos(a1), NET_R * math.sin(a1), NET_Z), 0.006, M["net"], "Hoop"))
+for k in range(3):
+    a = math.radians(90 + 120 * k)
+    top = (NET_R * math.cos(a), NET_R * math.sin(a), NET_Z)
+    wires.append(stick_between(top, (NET_R * 1.3 * math.cos(a), NET_R * 1.3 * math.sin(a), 0.0), 0.006, M["net"], "Leg"))
 join(wires, "GrillNet")
 
 # the mochi: a flat block of pounded rice, with a "Puffed" shape key the web app turns up as it toasts —
 # the top swells into a dome and bursts out to one side, the way kirimochi balloons on the grill
 M["netmochi"] = pbr("NetMochi", tex=TEX["mochi"], rough=0.6)
 HX, HY, HZ = 0.062, 0.045, 0.022
-bpy.ops.mesh.primitive_cube_add(size=2, location=(-0.11, 0.05, NET_Z + HZ + 0.004),
+bpy.ops.mesh.primitive_cube_add(size=2, location=(-0.11, 0.0, NET_Z + HZ + 0.004),
                                 rotation=(0, 0, random.uniform(-0.2, 0.2)))
 mochi_o = active()
 bm = bmesh.new()
@@ -1379,19 +1553,28 @@ for vtx in bm.verts:
 bm.to_mesh(mochi_o.data)
 bm.free()
 finish(mochi_o, "NetMochi", M["netmochi"])
+
+# the yaki onigiri lies flat on the net beside it, a nori band round its base
+oni = join(onigiri(), "Onigiri")
+oni.rotation_euler = (math.radians(90), 0, random.uniform(0, math.pi))
+oni.location = (0.1, -0.07, NET_Z + 0.04)
+
 mochi_o.shape_key_add(name="Basis")
 puffed = mochi_o.shape_key_add(name="Puffed")
-side = random.choice((-1, 1))
 for i, kv in enumerate(puffed.data):
     c = mochi_o.data.vertices[i].co
-    nx, ny = c.x / HX, c.y / HY
-    # the whole block swells a little; the top domes up, with a blister bursting out toward one end
-    k = Vector((c.x * 1.08, c.y * 1.08, c.z))
-    if c.z > -HZ * 0.3:
-        dome = max(0.0, 1 - nx * nx) * max(0.0, 1 - ny * ny)
-        blister = math.exp(-((nx - 0.45 * side) ** 2 + ny ** 2) / 0.12)
-        k.z += (0.035 * dome + 0.03 * blister) * (c.z / HZ + 0.3) / 1.3
-        k.x += 0.012 * blister * side
+    nx, ny, nz = c.x / HX, c.y / HY, c.z / HZ
+    # toasted, the block balloons into a round, soft dome: the sides bow out and round off, and the top
+    # rises into a smooth ball-like puff over the whole block
+    k = Vector((c.x * 1.12, c.y * 1.12, c.z))
+    if nz > -0.3:
+        r2 = min(1.0, (nx * nx + ny * ny) / 1.6)
+        lift = (nz + 0.3) / 1.3
+        k.z += 0.07 * math.sqrt(1 - r2) * lift
+        # pull the upper corners in, so it reads as round rather than a swollen box
+        round_in = 1 - 0.18 * lift * r2
+        k.x *= round_in
+        k.y *= round_in
     kv.co = k
 
 

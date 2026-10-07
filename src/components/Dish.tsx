@@ -52,12 +52,18 @@ const FLOAT_EASE = 2.6
  * axis in blender/grilledfish.py) for skewers, about the vertical for food lying in a pot or bowl.
  */
 function jitter(node: THREE.Object3D, skewer: boolean) {
-  node.scale.multiplyScalar(0.85 + Math.random() * 0.3)
+  // size varies a lot, and not evenly: some pieces come out plumper, some longer
+  node.scale.multiplyScalar(0.78 + Math.random() * 0.44)
+  node.scale.y *= 0.88 + Math.random() * 0.24
+  node.scale.z *= 0.88 + Math.random() * 0.24
   const q = skewer
-    ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (Math.random() - 0.5) * 1.1)
+    ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (Math.random() - 0.5) * 0.5)
     : new THREE.Quaternion().setFromAxisAngle(UP, Math.random() * Math.PI * 2)
-  if (skewer) node.quaternion.multiply(q)
-  else node.quaternion.premultiply(q)
+  if (skewer) {
+    node.quaternion.multiply(q)
+    // pushed into the ash deeper or shallower, so the food on neighbouring sticks sits at different heights
+    node.translateX(-Math.random() * 0.14)
+  } else node.quaternion.premultiply(q)
 }
 
 /** GLTFLoader strips the dot from Blender's "Meatball.001", so drop trailing digits to get the type. */
@@ -178,6 +184,9 @@ type DishProps = ThreeElements['group'] & {
   broth?: string
   /** object name prefixes to keep hidden (they don't go with the chosen base) */
   hidden?: string[]
+  /** objects recoloured flat (texture dropped), and tinted over their texture, for the chosen base */
+  fill?: Record<string, string>
+  tint?: Record<string, string>
   /** item ids that rise gently into place instead of dropping in */
   floatIds?: string[]
   /** where extra portions go (see menu.ts CopyLayout); default spreads them evenly around the centre */
@@ -187,7 +196,8 @@ type DishProps = ThreeElements['group'] & {
 }
 
 /** A dish exported from blender/*.py, drawn in a hand-painted toon style, with menu items that pop in and out. */
-export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout, instant = false, ...props }: DishProps) {
+export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floatIds, layout, instant = false,
+  ...props }: DishProps) {
   const { scene } = useGLTF(url)
   const ids = useMemo(() => new Set(itemIds), [itemIds])
   const floats = useMemo(() => new Set(floatIds), [floatIds])
@@ -267,7 +277,9 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout
   /** Clone one more portion of an item from its authored pieces, swung around the dish's centre. */
   const addCopy = (id: string, pieces: Piece[], copy: number) => {
     const originals = pieces.filter((p) => p.copy === 0)
-    const slot = layout?.slots?.[id]?.[copy - 1]
+    const spots = layout?.slots?.[id]
+    // (more portions than spots reuse them; Roasting moves waiting ones into whichever spot frees up)
+    const slot = spots?.length ? spots[(copy - 1) % spots.length] : undefined
     const angle = slot ? 0 : swingFor(id, originals[0], copy)
     const swing = new THREE.Quaternion().setFromAxisAngle(UP, angle)
     for (const src of originals) {
@@ -327,6 +339,31 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout
       if (!ids.has(type)) obj.visible = !hide.has(type)
     })
   }, [scene, hidden, ids])
+
+  // colours that change with the base: a different soup, sauce-coated noodles. Checked each frame because the toon
+  // materials are swapped in by an effect; each material remembers its own colour and texture to go back to.
+  const fillKey = JSON.stringify([fill, tint])
+  useFrame(() => {
+    scene.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh) || obj.name.endsWith('_outline')) return
+      const mat = obj.material
+      if (!(mat instanceof THREE.MeshToonMaterial)) return
+      const owner = obj.parent && obj.parent !== scene && !obj.name ? obj.parent : obj
+      const type = baseName(owner.name.replace(/_\d+$/, ''))
+      if (mat.userData.fillKey === fillKey) return
+      if (!mat.userData.original) mat.userData.original = { color: mat.color.clone(), map: mat.map }
+      const orig = mat.userData.original as { color: THREE.Color; map: THREE.Texture | null }
+      const flat = fill?.[type]
+      const over = tint?.[type]
+      const map = flat ? null : orig.map
+      if (mat.map !== map) {
+        mat.map = map
+        mat.needsUpdate = true
+      }
+      mat.color.copy(flat ? new THREE.Color(flat) : over ? orig.color.clone().multiply(new THREE.Color(over)) : orig.color)
+      mat.userData.fillKey = fillKey
+    })
+  })
 
   // items drop in from above, bounce on landing and spring up to size; taking one out shrinks it away
   const first = useRef(true)

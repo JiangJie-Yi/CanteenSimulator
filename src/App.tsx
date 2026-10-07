@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState, type RefObject } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
@@ -12,6 +12,7 @@ import { DishSwitcher } from './components/DishSwitcher'
 import { Fire } from './components/Fire'
 import { GasFlame } from './components/GasFlame'
 import { FireControl } from './components/FireControl'
+import { Fullness } from './components/Fullness'
 import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
 import { Roasting } from './components/Roasting'
@@ -23,6 +24,8 @@ import { DISHES, type Dish as DishInfo } from './menu'
 const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
+/** the charcoal burns down from full to out in 90 minutes (the fire level is stepped every 200ms) */
+const FIRE_BURN_PER_TICK = 1 / (90 * 60 * 5)
 // burner top on the cassette stove (blender/hotpot.py)
 const BURNER_Y = 0.38
 // the one camera pose every dish is framed from (blender/open_live.py matches Blender's camera to it)
@@ -31,6 +34,11 @@ const CAMERA_POSITION: [number, number, number] = [2.9, 2.2, 4.0]
 const CAMERA_FOV = 40
 
 const ITEM_IDS = Object.fromEntries(DISHES.map((d) => [d.id, d.items.map((it) => it.id)]))
+/** every menu item by id (for its calories when it's eaten) */
+const ALL_ITEMS = new Map(DISHES.flatMap((d) => d.items.map((it) => [it.id, it] as const)))
+/** a comfortably full adult meal, and how fast it settles */
+const FULL_KCAL = 1500
+const DIGEST_KCAL_PER_SEC = 1.2
 const FLOAT_IDS = Object.fromEntries(
   DISHES.map((d) => [d.id, d.items.filter((it) => it.entrance === 'float').map((it) => it.id)]),
 )
@@ -99,23 +107,29 @@ function slot(i: number, active: number, n: number) {
   return d
 }
 
-/** What's on the table: the ordered portions plus whatever the chosen set includes. */
-const servings = (base: { includes?: Record<string, number> }, order: Record<string, number>) => {
-  if (!base.includes) return order
+/**
+ * What's on the table: the ordered portions plus whatever the ordered sets include. Bases (soups, the noodle
+ * bowl, set meals) are ordered like anything else, by their id in the same counts.
+ */
+const servings = (dish: DishInfo, order: Record<string, number>) => {
   const all = { ...order }
-  for (const [id, n] of Object.entries(base.includes)) all[id] = (all[id] ?? 0) + n
+  for (const b of dish.bases) {
+    const n = order[b.id] ?? 0
+    if (!n || !b.includes) continue
+    for (const [id, k] of Object.entries(b.includes)) all[id] = (all[id] ?? 0) + k * n
+  }
   return all
 }
+
+/** The soup or bowl that's been ordered (hot pot and noodles take one at a time), or none: an empty pot. */
+const orderedBase = (dish: DishInfo, order: Record<string, number>) => dish.bases.find((b) => (order[b.id] ?? 0) > 0)
 
 /** The stage's centre and size in canvas pixels (the canvas fills the whole app). */
 type Frame = { cx: number; cy: number; w: number; h: number }
 
-const baseOf =(dish: DishInfo, baseId: string) => dish.bases.find((b) => b.id === baseId) ?? dish.bases[0]
-
 type SceneProps = {
   active: number
   orders: Record<string, Record<string, number>>
-  bases: Record<string, string>
   theme: Theme
   reducedMotion: boolean
   heat: number
@@ -124,9 +138,12 @@ type SceneProps = {
   /** the stage's box inside the full-window canvas: the dish is framed in it */
   frame: Frame
   onOffFire: (count: number, loose: number) => void
+  /** a piece of food has been eaten (for the fullness meter) */
+  onEat: (id: string) => void
+  onNotice: (what: 'notCooked' | 'burnt') => void
 }
 
-function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame, onOffFire }: SceneProps) {
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
   const camera = useThree((s) => s.camera)
@@ -265,20 +282,26 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame,
       </mesh>
 
       {DISHES.map((dish, i) => {
-        const base = baseOf(dish, bases[dish.id])
+        const base = orderedBase(dish, orders[dish.id])
+        // nothing ordered yet: an empty pot or bowl (the soup, noodles and garnish come with the base)
+        const hidden = base ? base.hide : dish.emptyHide
+        const soup = !!base || !dish.emptyHide
         return (
           <group key={dish.id} ref={(g) => { groups.current[i] = g }}
             position-x={slot(i, active, DISHES.length) * SPACING}>
             <Suspense fallback={null}>
-              <Dish url={dish.model} itemIds={ITEM_IDS[dish.id]} quantities={servings(base, orders[dish.id])} broth={base.broth}
-                hidden={base.hide} floatIds={FLOAT_IDS[dish.id]} layout={dish.layout} instant={reducedMotion} />
+              <Dish url={dish.model} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
+                broth={base?.broth} hidden={hidden} fill={base?.fill} tint={base?.tint}
+                floatIds={FLOAT_IDS[dish.id]} layout={dish.layout}
+                instant={reducedMotion} />
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
               {dish.roast && (
-                <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(base, orders[dish.id])}
-                  active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} />
+                <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
+                  active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
+                  onNotice={onNotice} />
               )}
               {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
-              {dish.heatControl && dish.brothY !== undefined && (
+              {soup && dish.heatControl && dish.brothY !== undefined && (
                 // inner radius of the pot at the broth line (blender/hotpot.py INNER_R)
                 <Bubbles position-y={dish.brothY + 0.004} radius={0.74} boil={boilLevel} />
               )}
@@ -288,7 +311,7 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame,
               )}
               {/* toon ramps blow out easily, so the firelight stays modest */}
               {dish.heat === 'fire' && <Fire width={0.6} height={0.42} baseIntensity={look.fire} level={fire} />}
-              {dish.brothY !== undefined && dish.steam && (
+              {soup && dish.brothY !== undefined && dish.steam && (
                 <Steam position={[0, dish.brothY + 0.02, 0]} width={dish.steam.width} height={dish.steam.height}
                   opacity={theme === 'dark' ? 0.5 : 0.7} level={dish.heatControl ? steamLevel : undefined} />
               )}
@@ -327,13 +350,20 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame,
 
 export default function App() {
   const [active, setActive] = useState(0)
-  // portions ordered per item, per dish
+  // portions ordered per item (and per base: soup, bowl, set meal), per dish. Nothing to start with
   const [orders, setOrders] = useState<Record<string, Record<string, number>>>(() =>
-    Object.fromEntries(DISHES.map((d) => [d.id, Object.fromEntries(d.defaults.map((id) => [id, 1]))])),
+    Object.fromEntries(DISHES.map((d) => [d.id, {}])),
   )
-  const [bases, setBases] = useState<Record<string, string>>(() =>
-    Object.fromEntries(DISHES.map((d) => [d.id, d.bases[0].id])),
-  )
+  // how full you are: every bite eaten adds its calories, and they slowly digest away
+  const [kcal, setKcal] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setKcal((k) => Math.max(0, k - DIGEST_KCAL_PER_SEC)), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  const onEat = useCallback((id: string) => {
+    const cal = ALL_ITEMS.get(id)?.kcal ?? 0
+    setKcal((k) => k + cal)
+  }, [])
   const [theme, toggleTheme] = useTheme()
   const reducedMotion = usePrefersReducedMotion()
   const [heat, setHeat] = useState(40)
@@ -374,12 +404,13 @@ export default function App() {
     ro.observe(stage)
     return () => ro.disconnect()
   }, [])
-  // charcoal grill: burns down slowly by itself (full to out in about 3 minutes); 添炭 builds it up
+  // charcoal grill: burns down by itself at about the pace of real binchotan on a grill (a full bed lasts about an
+  // hour and a half; a handful of fresh charcoal, 添炭, about a quarter of an hour more)
   const fire = useRef(0.6)
   const [fireLevel, setFireLevel] = useState(60)
   useEffect(() => {
     const id = window.setInterval(() => {
-      fire.current = Math.max(0, fire.current - 0.0012)
+      fire.current = Math.max(0, fire.current - FIRE_BURN_PER_TICK)
       setFireLevel(Math.round(fire.current * 1000) / 10)
     }, 200)
     return () => window.clearInterval(id)
@@ -389,7 +420,7 @@ export default function App() {
     setFireLevel(Math.round(fire.current * 1000) / 10)
   }
   const dish = DISHES[active]
-  const base = baseOf(dish, bases[dish.id])
+  const base = orderedBase(dish, orders[dish.id])
 
   // dev only: mirror what's on screen into the open Blender (vite.config.ts -> blender/open_live.py)
   useEffect(() => {
@@ -398,9 +429,9 @@ export default function App() {
       dish: dish.id,
       blend: `${dish.id}.blend`,
       items: ITEM_IDS[dish.id],
-      selected: Object.entries(servings(base, orders[dish.id])).filter(([, n]) => n > 0).map(([id]) => id),
-      hide: base.hide ?? [],
-      broth: base.broth ?? null,
+      selected: Object.entries(servings(dish, orders[dish.id])).filter(([, n]) => n > 0).map(([id]) => id),
+      hide: (base ? base.hide : dish.emptyHide) ?? [],
+      broth: base?.broth ?? null,
       focusY: dish.focusY,
       camera: { position: CAMERA_POSITION, fov: CAMERA_FOV },
     }
@@ -438,26 +469,41 @@ export default function App() {
   const isSkewer = (id: string) => !!dish.roast && id in dish.roast.times && !dish.roast.loose.includes(id)
   const onTheFire = () => {
     if (!dish.roast) return 0
-    const served = servings(base, orders[dish.id])
+    const served = servings(dish, orders[dish.id])
     const total = Object.entries(served).reduce((n, [id, q]) => n + (isSkewer(id) ? q : 0), 0)
     return total - offFire
   }
 
   const changeQty = (id: string, delta: number) => {
-    if (delta > 0 && isSkewer(id) && onTheFire() >= FIRE_CAPACITY) {
+    // a pot takes one soup and a bowl one serving of noodles: ordering another swaps it
+    const isBase = dish.bases.some((b) => b.id === id)
+    if (isBase && dish.oneBase) {
+      setOrders((all) => {
+        const next = { ...all[dish.id] }
+        for (const b of dish.bases) next[b.id] = 0
+        next[id] = delta > 0 ? 1 : 0
+        return { ...all, [dish.id]: next }
+      })
+      return
+    }
+    // a set brings its own skewers, so check the fire's room for those too
+    const adds = isBase ? dish.bases.find((b) => b.id === id)!.includes ?? {} : { [id]: 1 }
+    const addsSkewers = Object.entries(adds).reduce((n, [k, q]) => n + (isSkewer(k) ? q : 0), 0)
+    if (delta > 0 && addsSkewers && onTheFire() + addsSkewers > FIRE_CAPACITY) {
       say(UI[lang].fireFull(FIRE_CAPACITY))
       return
     }
     // the bamboo basket only holds so many potatoes and sweet potatoes
     const basket = dish.roast?.basket
-    if (delta > 0 && basket && dish.roast!.basketItems?.includes(id) && loose >= basket.capacity) {
+    const addsLoose = Object.entries(adds).reduce((n, [k, q]) => n + (dish.roast?.basketItems?.includes(k) ? q : 0), 0)
+    if (delta > 0 && basket && addsLoose && loose + addsLoose > basket.capacity) {
       say(UI[lang].basketFull(basket.capacity))
       return
     }
-    // some things only fit so many at once (three mochi on the grill net)
+    // some things only fit so many at once
     const item = dish.items.find((i) => i.id === id)
     const max = item?.max ?? MAX_PORTIONS
-    if (delta > 0 && servings(base, orders[dish.id])[id] >= max) {
+    if (delta > 0 && (orders[dish.id][id] ?? 0) >= max) {
       say(UI[lang].itemFull(item ? nameIn(lang, item) : id, max))
       return
     }
@@ -478,20 +524,21 @@ export default function App() {
           camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
           gl={{ alpha: true, toneMapping: THREE.NoToneMapping }}
         >
-          <Scene active={active} orders={orders} bases={bases} theme={theme} reducedMotion={reducedMotion}
-            heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }} />
+          <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
+            heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }}
+            onEat={onEat} onNotice={(what) => say(UI[lang][what])} />
         </Canvas>
       </div>
       <div className="stage" ref={stageRef}>
         <Brand night={theme === 'dark'} lang={lang} />
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
+        <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} />
         <DishSwitcher dishes={DISHES} index={active} onChange={setActive} lang={lang} />
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
       </div>
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id} dish={dish} baseId={base.id} lang={lang} quantities={orders[dish.id]}
-        onBase={(id) => setBases((all) => ({ ...all, [dish.id]: id }))}
+      <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => setOrders((all) => ({ ...all, [dish.id]: {} }))} />
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>

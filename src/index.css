@@ -662,6 +662,46 @@ button {
   background: linear-gradient(90deg, #8a2b12, #ff7a2e var(--heat), var(--washi-shade) var(--heat));
 }
 
+/* 飽足: a belly meter under the heat/fire controls, filling warm as you eat */
+.fullness {
+  position: absolute;
+  top: 190px;
+  left: 24px;
+  display: grid;
+  grid-template-columns: auto 200px;
+  grid-template-rows: auto auto;
+  column-gap: 14px;
+  row-gap: 4px;
+  align-items: center;
+  color: var(--text);
+}
+
+.fullness .heat-label {
+  font-size: 22px;
+}
+
+.fullness-meter {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #e9b35a, #d9503c var(--full), var(--washi-shade) var(--full));
+  transition: background 400ms ease;
+}
+
+@media (max-width: 900px) {
+  .fullness {
+    top: 150px;
+    left: 16px;
+    grid-template-columns: auto 140px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .fullness {
+    top: 120px;
+    grid-template-columns: auto 120px;
+  }
+}
+
 .fire-row {
   display: flex;
   align-items: center;
@@ -943,8 +983,8 @@ button {
   transform: rotate(var(--tilt, 0deg));
 }
 
-/* soup bases you can switch to are a lighter, unstained walnut until chosen */
-.strip-base[aria-checked='false'] {
+/* soups, bowls and sets are a lighter, unstained walnut until ordered */
+.strip-base[aria-pressed='false'] {
   --wood: #9a7552;
   --wood-dark: #84603f;
 }
@@ -1436,8 +1476,28 @@ button {
   font-size: 0.76em;
 }
 
+/* the ×n count sits on the stamp's upper-right edge, inside the tag so the tag's edge never clips it */
 .menu .stamp-count {
-  font-size: 0.6em;
+  top: -0.5em;
+  right: -0.5em;
+  bottom: auto;
+  font-size: 0.62em;
+  line-height: 1.25;
+  padding: 0 0.25em;
+  z-index: 1;
+}
+
+/* side by side (desktop and tablets): the stage always keeps at least half the width; the menu shrinks its tags
+   to fit the other half (10 tag columns of 2.7em, plus gaps, the title and padding) */
+@media (min-width: 901px) and (min-height: 521px) {
+  .app {
+    grid-template-columns: minmax(50%, 1fr) minmax(0, auto);
+  }
+
+  .menu {
+    max-width: 50vw;
+    --tag-font: clamp(9px, calc((50vw - 210px) / 27), 17px);
+  }
 }
 
 @media (max-width: 1280px) {
@@ -1534,18 +1594,14 @@ button {
 .menu-backing::before {
   content: '';
   position: absolute;
-  inset: 0 0 0 -90px;
-  background: color-mix(in srgb, var(--page) 55%, transparent);
+  /* reaching past the menu on every side, and faded out in a wide soft oval rather than with straight fades,
+     so there's no edge or corner anywhere to read as a cut */
+  inset: -12% -6% -12% -160px;
+  background: color-mix(in srgb, var(--page) 50%, transparent);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
-  -webkit-mask-image:
-    linear-gradient(90deg, transparent, #000 160px, #000 calc(100% - 20px), transparent),
-    linear-gradient(transparent, #000 110px, #000 calc(100% - 110px), transparent);
-  -webkit-mask-composite: source-in;
-  mask-image:
-    linear-gradient(90deg, transparent, #000 160px, #000 calc(100% - 20px), transparent),
-    linear-gradient(transparent, #000 110px, #000 calc(100% - 110px), transparent);
-  mask-composite: intersect;
+  -webkit-mask-image: radial-gradient(farthest-side at 58% 50%, #000 42%, rgb(0 0 0 / 0.55) 68%, transparent 100%);
+  mask-image: radial-gradient(farthest-side at 58% 50%, #000 42%, rgb(0 0 0 / 0.55) 68%, transparent 100%);
 }
 
 @media (max-width: 900px) {

@@ -5,11 +5,9 @@ import { Icon } from './Icon'
 
 type MenuProps = {
   dish: Dish
-  baseId: string
   lang: Lang
-  /** portions ordered per item */
+  /** portions ordered per item, and per base (soup, bowl, set meal) */
   quantities: Record<string, number>
-  onBase: (id: string) => void
   onAdd: (id: string) => void
   onRemove: (id: string) => void
   onClear: () => void
@@ -37,12 +35,13 @@ function tagFit(name: string, en: string | undefined, price: string, stamp: bool
  * Izakaya-style wall menu: vertical wooden tags, a red stamp marks what's been ordered.
  * Click a tag to add a portion, right-click (or press - / Delete on it) to take one away.
  */
-export function Menu({ dish, baseId, lang, quantities, onBase, onAdd, onRemove, onClear }: MenuProps) {
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuProps) {
   const t = UI[lang]
-  const base = dish.bases.find((b) => b.id === baseId) ?? dish.bases[0]
-  const count = dish.items.reduce((n, item) => n + (quantities[item.id] ?? 0), 0)
-  const total = base.price + dish.items.reduce((sum, item) => sum + item.price * (quantities[item.id] ?? 0), 0)
-  const choosable = dish.bases.length > 1
+  const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
+  const count = [...dish.bases, ...dish.items].reduce((n, x) => n + (quantities[x.id] ?? 0), 0)
+  const total = [...dish.bases, ...dish.items].reduce((sum, x) => sum + x.price * (quantities[x.id] ?? 0), 0)
+  // what the ordered sets bring along (stamped 含 on those tags)
+  const included = new Set(ordered.flatMap((b) => Object.keys(b.includes ?? {})))
 
   // when the tags don't fit across (phones, short windows), page through them with ‹ › instead of a scrollbar.
   // The row is right-to-left, so in Chrome/Firefox scrollLeft runs from 0 (rightmost) to negative.
@@ -79,8 +78,35 @@ export function Menu({ dish, baseId, lang, quantities, onBase, onAdd, onRemove, 
     }
   }
 
-  const baseName = nameIn(lang, base)
+  const baseName = ordered.length ? ordered.map((b) => nameIn(lang, b)).join('、') : t.nothingYet
   const [beforeCount, n1, beforeTotal, n2, after] = t.tally(baseName, count, total)
+
+  /** one wooden tag: click to order a portion, right-click (or - / Delete) to take one off */
+  const tag = (x: { id: string; name: string; ja?: string; en?: string; price: number }, icon: string, base: boolean) => {
+    const n = quantities[x.id] ?? 0
+    const incl = !base && n === 0 && included.has(x.id)
+    const name = nameIn(lang, x)
+    const price = toChineseNumber(x.price)
+    return (
+      <button key={x.id} type="button" className={`strip${base ? ' strip-base' : ''}`} aria-pressed={n > 0}
+        aria-label={`${name} ${x.en ?? ''}，${x.price}${n ? `，${t.ordered(n)}` : ''}`}
+        style={tagFit(name, x.en, price, n > 0 || incl)}
+        onClick={() => onAdd(x.id)}
+        onContextMenu={(e) => { e.preventDefault(); onRemove(x.id) }}
+        onKeyDown={onKey(x.id)}>
+        <Icon name={icon} />
+        <span className="strip-name">{name}</span>
+        {x.en && <span className="strip-en" lang="en">{x.en}</span>}
+        <span className="strip-price">{price}</span>
+        {incl && <span className="stamp stamp-incl" aria-hidden="true">{t.included}</span>}
+        {n > 0 && (
+          <span key={n} className="stamp" aria-hidden="true">
+            點{n > 1 && <span className="stamp-count">×{n}</span>}
+          </span>
+        )}
+      </button>
+    )
+  }
 
   return (
     <aside className="menu" aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
@@ -96,60 +122,9 @@ export function Menu({ dish, baseId, lang, quantities, onBase, onAdd, onRemove, 
           </>
         )}
         <div className="strips" ref={row}>
-          {choosable ? (
-            // pick one base (soup or set meal); the dark strips act as a radio group
-            <div className="base-group" role="radiogroup" aria-label={t.menuTitle}>
-              {dish.bases.map((b) => {
-                const on = b.id === base.id
-                const name = nameIn(lang, b)
-                const price = toChineseNumber(b.price)
-                return (
-                  <button key={b.id} type="button" role="radio" aria-checked={on}
-                    aria-label={`${name} ${b.en ?? ''}，${b.price}`} className="strip strip-base"
-                    style={tagFit(name, b.en, price, false)} onClick={() => onBase(b.id)}>
-                    {/* the chosen base swaps its icon for a 選 stamp of the same size, so nothing shifts or overhangs */}
-                    {on ? <span className="stamp stamp-base" aria-hidden="true">選</span> : <Icon name={dish.id} />}
-                    <span className="strip-name">{name}</span>
-                    {b.en && <span className="strip-en" lang="en">{b.en}</span>}
-                    <span className="strip-price">{price}</span>
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="strip strip-base strip-fixed"
-              style={tagFit(baseName, base.en, toChineseNumber(base.price), false)}>
-              <Icon name={dish.id} />
-              <span className="strip-name">{baseName}</span>
-              {base.en && <span className="strip-en" lang="en">{base.en}</span>}
-              <span className="strip-price">{toChineseNumber(base.price)}</span>
-            </div>
-          )}
-          {dish.items.map((item) => {
-            const n = quantities[item.id] ?? 0
-            const included = n === 0 && !!base.includes?.[item.id]
-            const name = nameIn(lang, item)
-            const price = toChineseNumber(item.price)
-            return (
-              <button key={item.id} type="button" className="strip" aria-pressed={n > 0}
-                aria-label={`${name} ${item.en ?? ''}，${item.price}${n ? `，${t.ordered(n)}` : ''}`}
-                style={tagFit(name, item.en, price, n > 0 || included)}
-                onClick={() => onAdd(item.id)}
-                onContextMenu={(e) => { e.preventDefault(); onRemove(item.id) }}
-                onKeyDown={onKey(item.id)}>
-                <Icon name={item.id} />
-                <span className="strip-name">{name}</span>
-                {item.en && <span className="strip-en" lang="en">{item.en}</span>}
-                <span className="strip-price">{price}</span>
-                {included && <span className="stamp stamp-incl" aria-hidden="true">{t.included}</span>}
-                {n > 0 && (
-                  <span key={n} className="stamp" aria-hidden="true">
-                    點{n > 1 && <span className="stamp-count">×{n}</span>}
-                  </span>
-                )}
-              </button>
-            )
-          })}
+          {/* bases (the dark walnut tags) are ordered the same way as everything else */}
+          {dish.bases.map((b) => tag(b, dish.id, true))}
+          {dish.items.map((item) => tag(item, item.id, false))}
         </div>
       </div>
 
