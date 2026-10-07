@@ -276,6 +276,7 @@ M = {
     "burner": pbr("Burner", (0.25, 0.25, 0.27), rough=0.5, metal=0.7),
     "knob_mark": pbr("KnobMark", (0.85, 0.2, 0.15), rough=0.4),
     "print": pbr("PanelPrint", (0.95, 0.95, 0.92), rough=0.5),
+    "iron": pbr("CastIron", (0.05, 0.05, 0.055), rough=0.55, metal=0.6),
     "lcd": pbr("Display", (0.16, 0.2, 0.15), rough=0.2, coat=0.6),
     "broth": pbr("SpicyBroth", tex=TEX["broth"], nrm=TEX["broth_n"], nrm_strength=0.8, rough=0.16, coat=0.2,
                  coat_rough=0.1),
@@ -388,8 +389,10 @@ def scatter(rmax=INNER_R - 0.04):
 
 BODY_Y = -0.12     # body extends further toward the front for the knob
 FRONT_Y = BODY_Y - 0.85
-BODY_X0 = -1.05    # left end of the main body; the canister bay is bolted on beyond it
-BAY_W = 0.5
+BODY_X1 = 1.05     # right end of the main body; the canister section is built on beyond it
+BAY_W = 0.55
+BAY_X1 = BODY_X1 + BAY_W
+DECK_Z = FOOT_H + BODY_H
 
 
 def box(name, size, loc, mat, bev_width=0.0, segments=3, smooth_shade=True):
@@ -402,12 +405,56 @@ def box(name, size, loc, mat, bev_width=0.0, segments=3, smooth_shade=True):
     return finish(o, name, mat, smooth_shade)
 
 
+def lathe(name, profile, mat, steps=72):
+    """Spin an (r, z) profile around Z into a surface of revolution with its normals facing up/out."""
+    bm = bmesh.new()
+    verts = [bm.verts.new((r, 0, z)) for r, z in profile]
+    edges = [bm.edges.new((verts[i], verts[i + 1])) for i in range(len(verts) - 1)]
+    bmesh.ops.spin(bm, geom=verts + edges, axis=(0, 0, 1), cent=(0, 0, 0), angle=2 * math.pi, steps=steps,
+                   use_duplicate=False)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+    bm.normal_update()
+    if sum(f.normal.z for f in bm.faces) < 0:
+        for f in bm.faces:
+            f.normal_flip()
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    return finish(o, name, mat)
+
+
 body_mid = FOOT_H + BODY_H / 2
 box("StoveBody", (2.1, 1.7, BODY_H), (0, BODY_Y, body_mid), M["enamel"], 0.06, 4)
-box("StovePlate", (1.94, 1.5, 0.014), (0, BODY_Y + 0.03, FOOT_H + BODY_H + 0.006), M["plate"], 0.006, 2)
+# dark steel top deck
+box("StovePlate", (1.98, 1.58, 0.016), (0, BODY_Y, DECK_Z + 0.006), M["plate"], 0.008, 2)
 
-# rubber feet at the corners (two more under the canister bay)
-for fx in (-0.92, 0.92, BODY_X0 - BAY_W + 0.1):
+# recessed burner bowl pressed into the deck: a sloped ring down to a flat floor
+BOWL_R, FLOOR_R, BOWL_DEPTH = 0.68, 0.44, 0.05
+plate_top = DECK_Z - BOWL_DEPTH
+bowl = [(0.0, plate_top), (FLOOR_R, plate_top)]
+for i in range(1, 7):
+    t = i / 6
+    bowl.append((FLOOR_R + (BOWL_R - FLOOR_R) * t, plate_top + BOWL_DEPTH * (t * t * (3 - 2 * t)) + 0.015 * t))
+lathe("BurnerBowl", bowl, M["burner"])
+
+# cut the bowl's opening through the deck plate and the top of the body so the recess actually shows
+bpy.ops.mesh.primitive_cylinder_add(vertices=96, radius=BOWL_R - 0.004, depth=0.2,
+                                    location=(0, 0, DECK_Z + 0.04))
+cutter = active()
+for target in (bpy.data.objects["StoveBody"], bpy.data.objects["StovePlate"]):
+    mod = target.modifiers.new("BowlHole", "BOOLEAN")
+    mod.object = cutter
+    mod.operation = "DIFFERENCE"
+    bpy.ops.object.select_all(action="DESELECT")
+    target.select_set(True)
+    bpy.context.view_layer.objects.active = target
+    bpy.ops.object.modifier_apply(modifier="BowlHole")
+bpy.data.objects.remove(cutter, do_unlink=True)
+
+# rubber feet: four under the body, two under the canister section
+for fx in (-0.92, 0.92, BAY_X1 - 0.1):
     for fy in (BODY_Y - 0.7, BODY_Y + 0.7):
         # slightly tapered rubber foot, wider where it meets the body
         bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=0.05, radius2=0.07, depth=FOOT_H + 0.01,
@@ -416,14 +463,16 @@ for fx in (-0.92, 0.92, BODY_X0 - BAY_W + 0.1):
         bevel(o, 0.01, 2)
         finish(o, "StoveFoot", M["bakelite"])
 
-# canister housing on the left end (the gas can lies inside, along Y): a profile with a big rounded outer
+
+# canister section on the right end (the gas can lies inside, along Y): a profile with a big rounded outer
 # shoulder, extruded front to back, so the cover curves over the can the way real cassette stoves do
 def canister_housing(x_in, x_out, z0, z1, depth, radius, name, mat):
+    s = 1 if x_out > x_in else -1
     pts = [(x_in, z0), (x_out, z0)]
     # outer side rises, then a quarter arc over to the top
     for i in range(13):
         t = i / 12 * math.pi / 2
-        pts.append((x_out + radius - radius * math.cos(t), z1 - radius + radius * math.sin(t)))
+        pts.append((x_out - s * radius + s * radius * math.cos(t), z1 - radius + radius * math.sin(t)))
     pts.append((x_in, z1))
     bm = bmesh.new()
     y0, y1 = BODY_Y - depth / 2, BODY_Y + depth / 2
@@ -443,55 +492,58 @@ def canister_housing(x_in, x_out, z0, z1, depth, radius, name, mat):
     bpy.context.collection.objects.link(o)
     bevel(o, 0.02, 3)
     finish(o, name, mat)
-    # smooth the arc, keep the flat faces crisp
-    o.data.polygons.foreach_set("use_smooth", [True] * len(o.data.polygons))
     return o
 
 
-HOUSING_OUT = BODY_X0 - BAY_W
-canister_housing(BODY_X0 + 0.02, HOUSING_OUT, FOOT_H, FOOT_H + BODY_H, 1.62, 0.2, "CanisterHousing", M["enamel"])
+HOUSING_R = 0.22
+canister_housing(BODY_X1 - 0.03, BAY_X1, FOOT_H, DECK_Z, 1.7, HOUSING_R, "CanisterHousing", M["enamel"])
 # seam where the cover lifts off, running along the top of the curve
-bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.006, depth=1.62,
-                                    location=(HOUSING_OUT + 0.2 - 0.2 * math.cos(math.radians(55)),
-                                              BODY_Y, FOOT_H + BODY_H - 0.2 + 0.2 * math.sin(math.radians(55))),
+seam_a = math.radians(55)
+bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.006, depth=1.7,
+                                    location=(BAY_X1 - HOUSING_R + HOUSING_R * math.cos(seam_a), BODY_Y,
+                                              DECK_Z - HOUSING_R + HOUSING_R * math.sin(seam_a)),
                                     rotation=(math.radians(90), 0, 0))
 finish(active(), "HousingSeam", M["enamel_dark"])
-# canister lock lever on the front face of the housing
-lever_x = HOUSING_OUT + 0.24
-box("LockLeverBase", (0.12, 0.02, 0.12), (lever_x, BODY_Y - 0.81 - 0.01, body_mid), M["steel"], 0.01, 2)
-box("LockLever", (0.03, 0.03, 0.15), (lever_x, BODY_Y - 0.81 - 0.035, body_mid + 0.02), M["bakelite"], 0.01, 2)
-# vent slots along the housing's front
+# canister lock lever on the front of the canister section, on a dark escutcheon
+lever_x = BODY_X1 + BAY_W / 2 - 0.02
+box("LockLeverBase", (0.16, 0.014, 0.17), (lever_x, FRONT_Y - 0.007, body_mid), M["bakelite"], 0.012, 2)
+box("LockLever", (0.035, 0.035, 0.13), (lever_x, FRONT_Y - 0.03, body_mid + 0.015), M["steel"], 0.012, 2)
+# vent slots low on the canister front
 for i in range(5):
-    box("Vent", (0.012, 0.012, 0.09), (HOUSING_OUT + 0.08 + i * 0.03, BODY_Y - 0.81 - 0.004, body_mid - 0.04),
+    box("Vent", (0.012, 0.012, 0.07), (lever_x - 0.06 + i * 0.03, FRONT_Y - 0.004, FOOT_H + 0.05),
         M["enamel_dark"], smooth_shade=False)
 
+# chrome name badge on the front-left
+box("Badge", (0.36, 0.012, 0.075), (-0.62, FRONT_Y - 0.006, body_mid), M["steel"], 0.01, 2)
+box("BadgeStripe", (0.3, 0.004, 0.016), (-0.62, FRONT_Y - 0.013, body_mid), M["knob_mark"], smooth_shade=False)
 
-# ignition knob on the front-right
-bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.085, depth=0.06, location=(0.62, FRONT_Y - 0.03, body_mid),
+# control area on the front-right of the main body: dark panel, ignition knob, printed heat scale, LCD
+KNOB_X, KNOB_Z = 0.74, body_mid
+box("ControlPanel", (0.78, 0.012, 0.22), (0.5, FRONT_Y - 0.006, body_mid), M["enamel_dark"], 0.02, 3)
+panel_front = FRONT_Y - 0.012
+bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.085, depth=0.06, location=(KNOB_X, panel_front - 0.03, KNOB_Z),
                                     rotation=(math.radians(90), 0, 0))
 o = active()
 bevel(o, 0.012, 3)
 finish(o, "Knob", M["bakelite"])
-box("KnobMark", (0.018, 0.008, 0.07), (0.62, FRONT_Y - 0.062, body_mid + 0.02), M["knob_mark"], smooth_shade=False)
+box("KnobMark", (0.018, 0.008, 0.07), (KNOB_X, panel_front - 0.062, KNOB_Z + 0.02), M["knob_mark"], smooth_shade=False)
 
-# heat scale printed around the knob: ticks over a 270° arc that grow from 小 (left) to 大 (right),
+# heat scale around the knob: ticks over a 270° arc that grow from 小 (left) to 大 (right),
 # matching the web app's knob rotation (src/components/StoveControls.tsx)
-KNOB_X, KNOB_Z = 0.62, body_mid
 for i in range(11):
     t = i / 10
     ang = math.radians(225 - 270 * t)          # 225° (lower left) clockwise to -45° (lower right)
-    length = 0.014 + 0.022 * t
-    r = 0.112 + length / 2
-    box("KnobTick", (0.007, 0.004, length),
-        (KNOB_X + r * math.cos(ang), FRONT_Y - 0.002, KNOB_Z + r * math.sin(ang)), M["print"], smooth_shade=False)
+    length = 0.012 + 0.016 * t
+    r = 0.1 + length / 2
+    box("KnobTick", (0.006, 0.004, length),
+        (KNOB_X + r * math.cos(ang), panel_front - 0.002, KNOB_Z + r * math.sin(ang)), M["print"], smooth_shade=False)
     active().rotation_euler = (0, -(ang - math.pi / 2), 0)
 
-# LCD display panel left of the knob; the web app draws the live heat reading onto it
-box("DisplayBezel", (0.3, 0.012, 0.13), (0.18, FRONT_Y - 0.006, body_mid), M["bakelite"], 0.01, 2)
-box("Display", (0.26, 0.006, 0.09), (0.18, FRONT_Y - 0.014, body_mid), M["lcd"], smooth_shade=False)
+# LCD left of the knob; the web app draws the live heat reading onto it
+box("DisplayBezel", (0.27, 0.01, 0.12), (0.36, panel_front - 0.005, body_mid), M["bakelite"], 0.01, 2)
+box("Display", (0.23, 0.006, 0.08), (0.36, panel_front - 0.012, body_mid), M["lcd"], smooth_shade=False)
 
-# burner and its cap
-plate_top = FOOT_H + BODY_H + 0.013
+# burner and its cap, sitting on the bowl floor
 bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.36, depth=0.035, location=(0, 0, plate_top + 0.0175))
 o = active()
 bevel(o, 0.008, 2)
@@ -501,18 +553,26 @@ o = active()
 bevel(o, 0.006, 2)
 finish(o, "BurnerCap", M["plate"])
 
-# four pot supports: short radial prongs tucked under the pot, just outside the burner flames
-prong_h = Z0 - plate_top
+# four black pot supports standing in the bowl: a low inner step the pot sits on, and a taller outer lip
+# that keeps it centred
 for i in range(4):
     a = math.radians(45 + i * 90)
-    r = 0.5
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(r * math.cos(a), r * math.sin(a), plate_top + prong_h / 2),
-                                    rotation=(0, 0, a))
+    ca, sa = math.cos(a), math.sin(a)
+    for r0, r1, top, part in ((0.45, 0.6, Z0, "PotSupport"), (0.68, 0.74, Z0 + 0.035, "PotSupportLip")):
+        h = top - plate_top
+        bpy.ops.mesh.primitive_cube_add(size=1, location=((r0 + r1) / 2 * ca, (r0 + r1) / 2 * sa, plate_top + h / 2),
+                                        rotation=(0, 0, a))
+        o = active()
+        o.scale = (r1 - r0, 0.032, h)
+        apply_scale(o)
+        bevel(o, 0.006, 2)
+        finish(o, part, M["iron"], smooth_shade=False)
+    # bar along the bowl floor joining the two
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0.59 * ca, 0.59 * sa, plate_top + 0.012), rotation=(0, 0, a))
     o = active()
-    o.scale = (0.14, 0.035, prong_h)
+    o.scale = (0.3, 0.032, 0.024)
     apply_scale(o)
-    bevel(o, 0.008, 2)
-    finish(o, "PotSupport", M["steel"], smooth_shade=False)
+    finish(o, "PotSupportBar", M["iron"], smooth_shade=False)
 
 
 # =====================================================================

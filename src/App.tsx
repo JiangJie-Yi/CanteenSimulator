@@ -18,7 +18,7 @@ import { DISHES, type Dish as DishInfo } from './menu'
 // distance between dishes on the carousel
 const SPACING = 6
 // burner top on the cassette stove (blender/hotpot.py)
-const BURNER_Y = 0.44
+const BURNER_Y = 0.38
 // the one camera pose every dish is framed from (blender/open_live.py matches Blender's camera to it)
 // low enough (~19° above the dish) that the burner flames show under the hot pot's rim
 const CAMERA_POSITION: [number, number, number] = [2.9, 2.2, 4.0]
@@ -49,7 +49,7 @@ const SPOT_SOFTNESS = 6
  * How far to pull the camera back for this viewport. The dishes are framed for a landscape stage;
  * on portrait or narrow stages the horizontal field of view shrinks, so back off until they fit again.
  */
-const cameraDistanceScale = (aspect: number) => (aspect >= 1.3 ? 1 : Math.min(2.4, 1.3 / aspect))
+const cameraDistanceScale = (aspect: number) => (aspect >= 1.3 ? 1 : Math.min(3.2, 1.3 / aspect))
 
 function usePrefersReducedMotion() {
   const query = '(prefers-reduced-motion: reduce)'
@@ -237,7 +237,7 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
         target={[0, DISHES[0].focusY, 0]}
         enablePan={false}
         minDistance={1.8}
-        maxDistance={12}
+        maxDistance={20}
         maxPolarAngle={Math.PI * 0.45}
         onStart={() => { homing.current = false }}
       />
