@@ -24,6 +24,17 @@ export function stepTemp(temp: number, heat: number, dt: number) {
 }
 
 /**
+ * How hard the soup is boiling (0..1), for the surface bubbles: nothing until it reaches the boil, then it
+ * follows the flame (a simmer on low, a rolling boil at 100%). Once the flame is off it settles within a
+ * moment, as the temperature drops below boiling.
+ */
+export function boilAmount(temp: number, heat: number) {
+  if (temp < BOIL - 1) return 0
+  const nearBoil = Math.min(1, (temp - (BOIL - 1)) / 1)
+  return nearBoil * Math.max(0.12, heat / 100)
+}
+
+/**
  * How much steam (0..1): wisps from STEAM_FROM, rising to a full head at the boil. A rolling boil on a big
  * flame makes more steam than a bare simmer, but a pot that has just been turned off still steams on its heat.
  */

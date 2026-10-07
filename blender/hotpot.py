@@ -466,21 +466,19 @@ for fx in (-0.92, 0.92, BAY_X1 - 0.1):
 
 # canister section on the right end (the gas can lies inside, along Y): a profile with a big rounded outer
 # shoulder, extruded front to back, so the cover curves over the can the way real cassette stoves do
-def canister_housing(x_in, x_out, z0, z1, depth, radius, name, mat, inner_radius=0.0):
+def canister_housing(x_in, x_out, z0, z1, deck_z, depth, radius, name, mat):
+    """Profile: straight outer wall, one big quarter circle over the shoulder, flat top, then a small quarter
+    circle rolling down onto the deck (radius = the hump's height above the deck), extruded along Y."""
     s = 1 if x_out > x_in else -1
+    inner_r = z1 - deck_z
     pts = [(x_in, z0), (x_out, z0)]
-    # outer side rises, then a quarter arc over to the top
-    for i in range(13):
-        t = i / 12 * math.pi / 2
+    for i in range(25):                       # outer shoulder: side wall (0°) round to the top (90°)
+        t = i / 24 * math.pi / 2
         pts.append((x_out - s * radius + s * radius * math.cos(t), z1 - radius + radius * math.sin(t)))
-    if inner_radius:
-        # a smaller arc rolling down the inner side, so the housing reads as a hump rising out of the deck
-        for i in range(8, -1, -1):
-            t = i / 8 * math.pi / 2
-            pts.append((x_in + s * inner_radius - s * inner_radius * math.cos(t),
-                        z1 - inner_radius + inner_radius * math.sin(t)))
-    else:
-        pts.append((x_in, z1))
+    for i in range(1, 17):                    # inner edge: top (90°) round and down to the deck (180°)
+        t = math.pi / 2 + i / 16 * math.pi / 2
+        pts.append((x_in + s * inner_r + s * inner_r * math.cos(t), deck_z + inner_r * math.sin(t)))
+    pts.append((x_in, z0 + 0.001))
     bm = bmesh.new()
     y0, y1 = BODY_Y - depth / 2, BODY_Y + depth / 2
     front = [bm.verts.new((x, y0, z)) for x, z in pts]
@@ -489,24 +487,29 @@ def canister_housing(x_in, x_out, z0, z1, depth, radius, name, mat, inner_radius
     for i in range(n):
         j = (i + 1) % n
         bm.faces.new((front[i], front[j], back[j], back[i]))
-    bm.faces.new(front[::-1])
-    bm.faces.new(back)
+    caps = [bm.faces.new(front[::-1]), bm.faces.new(back)]
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
-    bevel(o, 0.02, 3)
+    # round off the front/back edges only (the profile is already curved)
+    b = bevel(o, 0.025, 4)
+    b.angle_limit = math.radians(60)
     finish(o, name, mat)
+    # curved surface smooth, the flat end caps crisp
+    n_side = len(o.data.polygons) - 2
+    for p in o.data.polygons:
+        p.use_smooth = p.index < n_side
     return o
 
 
 # the housing rises well above the deck so a gas can fits inside, rounded over on both sides
 HOUSING_R = 0.3
-HOUSING_TOP = DECK_Z + 0.14
-canister_housing(BODY_X1 - 0.03, BAY_X1, FOOT_H, HOUSING_TOP, 1.7, HOUSING_R, "CanisterHousing", M["enamel"],
-                 inner_radius=0.12)
+HOUSING_TOP = DECK_Z + 0.12
+canister_housing(BODY_X1 - 0.03, BAY_X1, FOOT_H, HOUSING_TOP, DECK_Z, 1.7, HOUSING_R, "CanisterHousing",
+                 M["enamel"])
 # seam where the cover lifts off, running along the top of the curve
 seam_a = math.radians(55)
 bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.006, depth=1.7,

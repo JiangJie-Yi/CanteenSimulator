@@ -3,7 +3,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { equilibriumTemp, stepTemp, steamAmount } from './boil'
+import { boilAmount, equilibriumTemp, stepTemp, steamAmount } from './boil'
+import { Bubbles } from './components/Bubbles'
 import { Brand } from './components/Brand'
 import { Dish } from './components/Dish'
 import { DishSwitcher } from './components/DishSwitcher'
@@ -116,9 +117,12 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
   // simmer for the opening heat setting.
   const brothTemp = useRef(equilibriumTemp(heat))
   const steamLevel = useRef(steamAmount(brothTemp.current, heat))
+  const boilLevel = useRef(boilAmount(brothTemp.current, heat))
   useFrame((_, delta) => {
     brothTemp.current = stepTemp(brothTemp.current, heat, Math.min(delta, 0.1))
-    steamLevel.current = steamAmount(brothTemp.current, heat)  })
+    steamLevel.current = steamAmount(brothTemp.current, heat)
+    boilLevel.current = boilAmount(brothTemp.current, heat)
+  })
   const dishLight = DISHES[active].light ?? {}
 
   // warm spot: per-dish position, strength and shadow softness, eased so switching dishes doesn't pop
@@ -218,6 +222,10 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
                   active={i === active} instant={reducedMotion} />
               )}
               {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
+              {dish.heatControl && dish.brothY !== undefined && (
+                // inner radius of the pot at the broth line (blender/hotpot.py INNER_R)
+                <Bubbles position-y={dish.brothY + 0.004} radius={0.74} boil={boilLevel} />
+              )}
               {dish.heat === 'gas' && (
                 <GasFlame position-y={BURNER_Y} heat={dish.heatControl ? heat / 100 : 1}
                   baseIntensity={theme === 'dark' ? 1.5 : 0.8} />

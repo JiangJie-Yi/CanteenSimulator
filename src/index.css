@@ -455,6 +455,54 @@ button {
   color: var(--text);
 }
 
+/* ---------- menu paging (narrow layouts, where the tags don't all fit across) ---------- */
+
+.strips::-webkit-scrollbar {
+  display: none;
+}
+
+.strips-page {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  margin-top: -18px;
+  border: none;
+  border-radius: 50%;
+  background: var(--washi);
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+  padding-bottom: 3px;
+  box-shadow: 0 4px 12px -6px rgb(59 42 32 / 0.6);
+  cursor: pointer;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.strips-page-left {
+  left: 0;
+}
+
+.strips-page-right {
+  right: 0;
+}
+
+.strips-page:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+
+.strips-page:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 2px;
+}
+
+/* at the end of the row there's nothing more that way */
+.strips-page:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ---------- roasting tags (floating over each skewer on the grilled-fish stage) ---------- */
 
 .roast-tag {
@@ -558,9 +606,14 @@ button {
   letter-spacing: 0.3em;
 }
 
-.strips {
+.strips-frame {
   grid-column: 1;
   grid-row: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.strips {
   display: grid;
   grid-template-columns: repeat(8, 48px);
   grid-auto-rows: 236px;
@@ -848,8 +901,8 @@ button {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x proximity;
-    scrollbar-width: thin;
-    scrollbar-color: var(--text-soft) transparent;
+    /* paged with the ‹ › buttons instead of a scrollbar */
+    scrollbar-width: none;
     /* side padding is a little wider than the fade, so tags only fade once they're scrolled into it */
     padding: 12px 44px 10px;
     /* tags fade out at both ends of the scrolling row instead of being sliced off at the edge */
@@ -1012,8 +1065,7 @@ button {
     grid-auto-rows: min(196px, calc(100vh - 110px));
     overflow-x: auto;
     padding: 12px 44px 4px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--text-soft) transparent;
+    scrollbar-width: none;
     /* the row fades out at both ends instead of slicing tags off */
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
     mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);

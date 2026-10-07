@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { toChineseNumber, type Dish } from '../menu'
 import { Icon } from './Icon'
 
@@ -23,6 +23,32 @@ export function Menu({ dish, baseId, quantities, onBase, onAdd, onRemove, onClea
   const total = base.price + dish.items.reduce((sum, item) => sum + item.price * (quantities[item.id] ?? 0), 0)
   const choosable = dish.bases.length > 1
 
+  // when the tags don't fit across (phones, short windows), page through them with ‹ › instead of a scrollbar.
+  // The row is right-to-left, so in Chrome/Firefox scrollLeft runs from 0 (rightmost) to negative.
+  const row = useRef<HTMLDivElement>(null)
+  const [ends, setEnds] = useState({ overflow: false, atLeft: true, atRight: true })
+  useEffect(() => {
+    const el = row.current
+    if (!el) return
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth
+      const pos = Math.abs(el.scrollLeft)
+      setEnds({ overflow: max > 2, atRight: pos < 2, atLeft: pos > max - 2 })
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', update)
+      ro.disconnect()
+    }
+  }, [])
+  const page = (dir: -1 | 1) => {
+    const el = row.current
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
+  }
+
   const onKey = (id: string) => (e: KeyboardEvent) => {
     if (e.key === '-' || e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
@@ -34,7 +60,16 @@ export function Menu({ dish, baseId, quantities, onBase, onAdd, onRemove, onClea
     <aside className="menu" aria-label={`${dish.name}菜單`}>
       <h2 className="menu-title">點菜</h2>
 
-      <div className="strips">
+      <div className={`strips-frame${ends.overflow ? ' is-paged' : ''}`}>
+      {ends.overflow && (
+        <>
+          <button type="button" className="strips-page strips-page-left" aria-label="往左看更多菜色"
+            disabled={ends.atLeft} onClick={() => page(-1)}>‹</button>
+          <button type="button" className="strips-page strips-page-right" aria-label="往右看更多菜色"
+            disabled={ends.atRight} onClick={() => page(1)}>›</button>
+        </>
+      )}
+      <div className="strips" ref={row}>
         {choosable ? (
           // pick one soup base; the dark strips act as a radio group
           <div className="base-group" role="radiogroup" aria-label="湯底">
@@ -77,6 +112,7 @@ export function Menu({ dish, baseId, quantities, onBase, onAdd, onRemove, onClea
             </button>
           )
         })}
+      </div>
       </div>
 
       <footer className="tally">

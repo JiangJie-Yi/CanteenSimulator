@@ -213,7 +213,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const layer = Math.floor(slot / PER_LAYER)
       const across = (col - (PER_LAYER - 1) / 2) * SLOT_GAP + (layer % 2) * (SLOT_GAP / 2)
       p.toP.set(...roast.plate).addScaledVector(STACK_DIR, across)
-      p.toP.y += (p.loose ? 0.075 : 0.065) + layer * LAYER_HEIGHT
+      // skewers are longer than the plate is wide, so the stick rests across the rim (top ≈ 0.08) instead of
+      // cutting through it
+      p.toP.y += (p.loose ? 0.075 : 0.105) + layer * LAYER_HEIGHT
     }
     // everything points the same way along LAY_DIR
     if (p.loose) {
