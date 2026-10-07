@@ -471,7 +471,15 @@ button {
   font: 600 13px/1 var(--brush);
   white-space: nowrap;
   cursor: pointer;
-  transition: transform 140ms ease;
+  /* faint until pointed at (the tag itself, or the food it belongs to), so tags don't crowd the fire */
+  opacity: 0.25;
+  transition: transform 140ms ease, opacity 160ms ease;
+}
+
+.roast-tag:hover,
+.roast-tag:focus-visible,
+.roast-tag-lit {
+  opacity: 1;
 }
 
 .roast-tag:hover {

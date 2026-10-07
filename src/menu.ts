@@ -174,7 +174,7 @@ export const DISHES: Dish[] = [
       loose: ['Potato', 'SweetPotato'],
       // just outside the stones, to the upper right of the fire as the camera sees it
       // (kept clear of the corn skewer at -55°, which used to stand right in front of it)
-      plate: [1.26, 0.02, -1.06],
+      plate: [1.38, 0.02, -1.16],
       // just outside the stones on the left as the camera sees it
       piles: {
         Potato: { at: [-1.38, 0, 0.62], spacing: 0.17 },

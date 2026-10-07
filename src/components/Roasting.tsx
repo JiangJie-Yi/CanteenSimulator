@@ -240,6 +240,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // orbits the camera) takes it off the fire
   const { gl, camera, raycaster } = useThree()
   const hovered = useRef<Piece | null>(null)
+  // the hovered food's tag brightens too (tags sit at low opacity until pointed at)
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null)
+  const setHover = (p: Piece | null) => {
+    hovered.current = p
+    setHoveredKey(p?.key ?? null)
+  }
   useEffect(() => {
     const el = gl.domElement
     if (!active) {
@@ -262,8 +268,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     let down: { x: number; y: number } | null = null
     const onMove = (e: PointerEvent) => {
       if (e.buttons) return
-      hovered.current = pick(e)
-      el.style.cursor = hovered.current ? 'pointer' : ''
+      const p = pick(e)
+      if (p !== hovered.current) setHover(p)
+      el.style.cursor = p ? 'pointer' : ''
     }
     const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY } }
     const onUp = (e: PointerEvent) => {
@@ -272,7 +279,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (p) collect(p)
     }
     const onLeave = () => {
-      hovered.current = null
+      setHover(null)
       el.style.cursor = ''
     }
     el.addEventListener('pointermove', onMove)
@@ -375,7 +382,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {active && tags.map(({ key, id, state }) => (
         <group key={key} ref={(g) => { anchors.current[key] = g }}>
           <Html center zIndexRange={[30, 10]}>
-            <button type="button" className={`roast-tag roast-${state.stage}`}
+            <button type="button"
+              className={`roast-tag roast-${state.stage}${hoveredKey === key ? ' roast-tag-lit' : ''}`}
               aria-label={`${roast.names[id]}，${state.label}，點一下放到盤子上`}
               onClick={() => { const p = byKey(key); if (p) collect(p) }}>
               <svg className="roast-ring" viewBox="0 0 20 20" aria-hidden="true">
