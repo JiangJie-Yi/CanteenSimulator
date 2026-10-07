@@ -3,13 +3,14 @@
 // fading as it cools.
 
 const ROOM = 25
+export const ROOM_TEMP = ROOM
 const BOIL = 100
-/** °C per second the burner adds at full flame (a full pot of broth, so it's not instant). */
-const HEAT_RATE = 3.5
+/** °C per second the burner adds at full flame: a cassette stove brings a small pot up in a couple of minutes. */
+const HEAT_RATE = 0.8
 /** Newton cooling: fraction of the gap to room temperature lost per second (losing heat is slower). */
-const COOL_RATE = 0.012
-/** Steam starts to show at this temperature and is fully going at the boil. */
-const STEAM_FROM = 72
+const COOL_RATE = 0.004
+/** Steam only shows close to the boil (faint wisps first), and is fully going once it boils. */
+const STEAM_FROM = 88
 
 /** Temperature the pot settles at for a given flame, capped at boiling. Used to start the scene warm. */
 export function equilibriumTemp(heat: number) {

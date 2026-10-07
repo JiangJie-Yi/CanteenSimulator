@@ -464,20 +464,24 @@ button {
 .switcher-arrow {
   width: 48px;
   height: 48px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
   border-radius: 50%;
-  background: var(--washi);
-  color: var(--ink);
+  /* see-through, frosted: the dish shows behind the arrows */
+  background: color-mix(in srgb, var(--washi) 45%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--text);
   font-size: 30px;
   line-height: 1;
   padding-bottom: 4px;
-  box-shadow: 0 6px 14px -8px rgb(59 42 32 / 0.5);
+  box-shadow: 0 6px 14px -8px rgb(59 42 32 / 0.35);
   cursor: pointer;
-  transition: transform 160ms ease;
+  transition: transform 160ms ease, background-color 160ms ease;
 }
 
 .switcher-arrow:hover {
   transform: scale(1.08);
+  background: color-mix(in srgb, var(--washi) 70%, transparent);
 }
 
 .switcher-center {
@@ -665,40 +669,40 @@ button {
 /* 飽足: a belly meter under the heat/fire controls, filling warm as you eat */
 .fullness {
   position: absolute;
-  top: 190px;
-  left: 24px;
-  display: grid;
-  grid-template-columns: auto 200px;
-  grid-template-rows: auto auto;
-  column-gap: 14px;
-  row-gap: 4px;
+  top: 186px;
+  left: 22px;
+  display: flex;
   align-items: center;
+  gap: 10px;
   color: var(--text);
 }
 
-.fullness .heat-label {
-  font-size: 22px;
-}
-
-.fullness-meter {
-  height: 8px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, #e9b35a, #d9503c var(--full), var(--washi-shade) var(--full));
-  transition: background 400ms ease;
+.fullness-icon {
+  width: 46px;
+  height: 46px;
+  flex: none;
 }
 
 @media (max-width: 900px) {
   .fullness {
-    top: 150px;
-    left: 16px;
-    grid-template-columns: auto 140px;
+    top: 146px;
+    left: 14px;
+  }
+
+  .fullness-icon {
+    width: 36px;
+    height: 36px;
   }
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
   .fullness {
-    top: 120px;
-    grid-template-columns: auto 120px;
+    top: 116px;
+  }
+
+  .fullness-icon {
+    width: 30px;
+    height: 30px;
   }
 }
 
@@ -1490,13 +1494,111 @@ button {
 /* side by side (desktop and tablets): the stage always keeps at least half the width; the menu shrinks its tags
    to fit the other half (10 tag columns of 2.7em, plus gaps, the title and padding) */
 @media (min-width: 901px) and (min-height: 521px) {
+  /* side by side: the food gets 60% of the width, the menu 40% (tags shrink to fit it); folded away, the food
+     gets it all */
   .app {
-    grid-template-columns: minmax(50%, 1fr) minmax(0, auto);
+    grid-template-columns: 60% 40%;
+    transition: grid-template-columns 360ms ease;
   }
 
+  .app.menu-folded {
+    grid-template-columns: 100% 0%;
+  }
+
+  /* the menu fills its 40% column top to bottom: the title, then the tags in two rows that scroll sideways
+     (drag them, or use the ‹ › buttons), and the bill pinned along the bottom. Only the tags move. */
   .menu {
-    max-width: 50vw;
-    --tag-font: clamp(9px, calc((50vw - 210px) / 27), 17px);
+    max-width: 40vw;
+    min-width: 0;
+    height: 100vh;
+    max-height: none;
+    overflow: hidden;
+    align-content: stretch;
+    grid-template-rows: minmax(0, 1fr) auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+    /* two rows of 15.5em tags have to fit the height left over by the title, bill and padding */
+    --tag-font: clamp(10px, calc((100vh - 290px) / 32), 16px);
+    transition: opacity 260ms ease, transform 360ms ease;
+  }
+
+  .menu .strips-frame {
+    align-self: center;
+    overflow: hidden;
+  }
+
+  .menu .strips {
+    grid-template-columns: none;
+    grid-template-rows: repeat(2, calc(var(--tag-font) * 15.5));
+    grid-auto-rows: unset;
+    grid-auto-flow: column;
+    grid-auto-columns: calc(var(--tag-font) * 2.7);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    padding: 6px 4px 10px;
+    cursor: grab;
+    /* the far end fades off instead of being cut */
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 12px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 12px), transparent);
+  }
+
+  .menu .strips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .menu .strips.is-dragging {
+    cursor: grabbing;
+    scroll-behavior: auto;
+  }
+
+  .menu .tally {
+    grid-column: 1 / -1;
+  }
+
+  .app.menu-folded .menu,
+  .app.menu-folded .menu-backing {
+    opacity: 0;
+    transform: translateX(30%);
+    pointer-events: none;
+  }
+
+  .menu-backing {
+    transition: opacity 260ms ease;
+  }
+
+  /* the tab on the menu's edge that folds it away and brings it back */
+  .menu-fold {
+    position: fixed;
+    z-index: 11;
+    top: 50%;
+    right: calc(40% - 6px);
+    width: 28px;
+    height: 72px;
+    margin-top: -36px;
+    border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+    border-radius: 14px 0 0 14px;
+    background: color-mix(in srgb, var(--washi) 55%, transparent);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    color: var(--text);
+    font-size: 18px;
+    cursor: pointer;
+    transition: right 360ms ease, background-color 160ms ease;
+  }
+
+  .menu-fold:hover {
+    background: color-mix(in srgb, var(--washi) 80%, transparent);
+  }
+
+  .app.menu-folded .menu-fold {
+    right: 0;
+  }
+}
+
+@media (max-width: 900px), (max-height: 520px) {
+  .menu-fold {
+    display: none;
   }
 }
 

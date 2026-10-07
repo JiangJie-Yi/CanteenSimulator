@@ -427,7 +427,7 @@ centre_origin(join(coals, "Charcoal"))
 sizes = []
 while sum(sizes) * 2 < 2 * math.pi * STONE_R:
     big = len(sizes) % 3 != 1 and random.random() < 0.7      # mostly big, with smaller ones tucked between
-    sizes.append(random.uniform(0.18, 0.23) if big else random.uniform(0.1, 0.13))
+    sizes.append(random.uniform(0.2, 0.25) if big else random.uniform(0.11, 0.14))
 fit = 2 * math.pi * STONE_R / (sum(sizes) * 2) * 1.04          # scale to close the ring, with slight overlap
 a = 0.0
 for i, half in enumerate(sizes):
@@ -439,7 +439,7 @@ for i, half in enumerate(sizes):
     # river-stone ovals: long along the ring, narrower across it, and fairly flat
     sx, sy, sz = half * random.uniform(0.5, 0.9), half, half * random.uniform(0.45, 0.7)
     # mostly smooth river ovals, with some broken rock among them
-    oval = random.random() < 0.7
+    oval = random.random() < 0.55
     loc = (r * math.cos(a), r * math.sin(a), sz * 0.55)
     rot = (random.uniform(-0.08, 0.08), random.uniform(-0.08, 0.08), a + random.uniform(-0.18, 0.18))
     if oval:
@@ -508,7 +508,9 @@ def stick_frame(angle_deg, along, var=(0.0, 0.0, 0.0)):
     `var` = (tip radius offset, tip height offset, sideways lean in radians) so no two sticks are planted alike."""
     a = math.radians(angle_deg)
     dr, dz, lean = var
-    foot = Vector((STICK_FOOT_R * math.cos(a), STICK_FOOT_R * math.sin(a), 0.0))
+    # planted in the salt bed: the foot sits on its surface (it mounds up toward the middle)
+    fx, fy = STICK_FOOT_R * math.cos(a), STICK_FOOT_R * math.sin(a)
+    foot = Vector((fx, fy, salt_height(fx, fy) - 0.003))
     tip = Vector(((STICK_TOP_R + dr) * math.cos(a + lean), (STICK_TOP_R + dr) * math.sin(a + lean), STICK_TOP_Z + dz))
     x = (tip - foot).normalized()
     out = Vector((math.cos(a), math.sin(a), 0))
@@ -524,7 +526,8 @@ def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
     a slight bow, whittled to a point at the top. `extra` lengthens it past the tip (sticks come long and short)."""
     _, foot, tip = stick_frame(angle_deg, 0, var)
     d = tip - foot
-    length = d.length + 0.08 + extra
+    # the stick stands on the salt: it starts right at the foot (nothing poking out under the floor)
+    length = d.length + extra
     point_len = 0.06
     total = length + point_len
     rings, seg = 40, 8
@@ -544,7 +547,7 @@ def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
             k *= max(0.0, 1 - (z - length) / point_len) ** 0.8
         off = bow * math.sin(t * math.pi)
         grid.append([bm.verts.new((r0 * k * math.cos(2 * math.pi * j / seg) + off,
-                                   r0 * k * flat * math.sin(2 * math.pi * j / seg), z - 0.08)) for j in range(seg)])
+                                   r0 * k * flat * math.sin(2 * math.pi * j / seg), z)) for j in range(seg)])
     for i in range(rings):
         for j in range(seg):
             jn = (j + 1) % seg
@@ -557,7 +560,7 @@ def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
     bm.free()
     shaft = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(shaft)
-    # local Z runs up the stick from just below its foot
+    # local Z runs up the stick from its foot
     shaft.matrix_world = Matrix.Translation(foot) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4()
     return finish(shaft, name, M["stick"])
 
@@ -999,8 +1002,15 @@ TEX["chicken"] = image("T_Chicken", mix(mix((0.72, 0.45, 0.22), (0.86, 0.6, 0.32
 fat = smooth(0.08, 0.02, np.abs(((v * 5) % 1) - 0.5) - 0.2)
 TEX["pork"] = image("T_PorkBelly", mix(mix((0.8, 0.5, 0.4), (0.97, 0.88, 0.78), fat), (0.45, 0.22, 0.1),
                                        glaze_char * 0.7))
-TEX["squid"] = image("T_Squid", mix(mix((0.95, 0.86, 0.72), (0.92, 0.6, 0.35), fbm(N, 5, 5)), (0.55, 0.25, 0.1),
-                                    glaze_char * 0.6))
+# grilled squid: cream flesh going amber under a soy-sugar glaze, scored in a fine crosshatch whose cuts open and
+# darken on the grill, reddish-purple skin speckles left here and there, and charred patches
+score = smooth(0.08, 0.0, np.minimum(np.abs(((u * 9 + v * 6) % 1) - 0.5), np.abs(((u * 9 - v * 6) % 1) - 0.5)))
+squid = mix((0.96, 0.88, 0.74), (0.88, 0.56, 0.28), np.clip(fbm(N, 5, 5) * 0.7 + v * 0.3, 0, 1))
+squid = mix(squid, (0.5, 0.22, 0.08), score * 0.75)
+squid = mix(squid, (0.55, 0.2, 0.25), (vnoise(N, 90, 90) > 0.82).astype(np.float32) * 0.45)
+squid = mix(squid, (0.2, 0.09, 0.04), glaze_char * 0.55)
+TEX["squid"] = image("T_Squid", squid)
+TEX["squid_n"] = image("T_Squid_N", to_normal(-score * 0.8 + fbm(N, 20, 20) * 0.2, 2.5), data=True)
 blister = (vnoise(N, 40, 40) > 0.78).astype(np.float32)
 TEX["shishito"] = image("T_Shishito", mix(mix((0.22, 0.48, 0.14), (0.38, 0.62, 0.2), fbm(N, 6, 6)), (0.12, 0.1, 0.05),
                                           blister * 0.85))
@@ -1019,7 +1029,7 @@ M.update({
     "leek": pbr("Leek", (0.9, 0.93, 0.82), rough=0.45),
     "leek_green": pbr("LeekGreen", (0.42, 0.62, 0.25), rough=0.45),
     "pork": pbr("PorkBelly", tex=TEX["pork"], rough=0.35, coat=0.4),
-    "squid": pbr("Squid", tex=TEX["squid"], rough=0.3, coat=0.5),
+    "squid": pbr("Squid", tex=TEX["squid"], nrm=TEX["squid_n"], rough=0.25, coat=0.6),
     "shishito": pbr("Shishito", tex=TEX["shishito"], rough=0.3, coat=0.4),
     "mochi": pbr("Mochi", tex=TEX["mochi"], rough=0.6),
     "eryngii": pbr("Eryngii", tex=TEX["eryngii"], rough=0.55),
@@ -1057,30 +1067,88 @@ def pork_belly():
     return parts
 
 
+def tube(points, r0, r1, mat, name, seg=8):
+    """A tapered round tube through a list of points (squid arms): radius r0 at the start to r1 at the end."""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    rings = []
+    n = len(points)
+    for i, p in enumerate(points):
+        p = Vector(p)
+        d = (Vector(points[min(i + 1, n - 1)]) - Vector(points[max(i - 1, 0)])).normalized()
+        side = d.cross(Vector((0, 1, 0)))
+        if side.length < 1e-4:
+            side = d.cross(Vector((1, 0, 0)))
+        side.normalize()
+        up = side.cross(d)
+        r = r0 + (r1 - r0) * i / (n - 1)
+        rings.append([bm.verts.new(p + (side * math.cos(2 * math.pi * j / seg) + up * math.sin(2 * math.pi * j / seg)) * r)
+                      for j in range(seg)])
+    for i in range(n - 1):
+        for j in range(seg):
+            jn = (j + 1) % seg
+            f = bm.faces.new((rings[i][j], rings[i][jn], rings[i + 1][jn], rings[i + 1][j]))
+            for l, (uu, vv) in zip(f.loops, ((j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1))):
+                l[uvl].uv = (uu / seg, vv / (n - 1))
+    bm.faces.new(rings[0][::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    return finish(o, name, mat)
+
+
 def squid():
-    """A whole grilled squid: tapered mantle with fins at the top, tentacles hanging below."""
+    """A whole grilled squid (イカ焼き) on the stick: a long tapering mantle scored in a crosshatch and lacquered
+    with sauce, a broad diamond of fins at its tip, the head with its eyes below, and eight short arms plus two
+    long tentacles curling down and out."""
     bm = bmesh.new()
     bm.loops.layers.uv.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=14, radius=1, calc_uvs=True)
+    bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=24, radius=1, calc_uvs=True)
     for vtx in bm.verts:
-        t = (vtx.co.x + 1) / 2                      # 0 bottom .. 1 tip
-        k = 1 - 0.55 * t ** 1.5
-        vtx.co.y *= 0.035 * k
-        vtx.co.z *= 0.05 * k
-        vtx.co.x = vtx.co.x * 0.15 + 0.03
+        ox, oy, oz = vtx.co
+        vtx.co = Vector((oz, oy, -ox))                    # poles along the stick, like the fish
+        t = (vtx.co.x + 1) / 2                            # 0 head end .. 1 tip
+        k = math.sin(math.pi * min(1.0, t * 1.6 + 0.12) / 2) ** 0.4 * (1 - 0.82 * t ** 2.2)
+        vtx.co.y *= 0.032 * k                             # a flattened tube
+        vtx.co.z *= 0.046 * k
+        vtx.co.x = vtx.co.x * 0.16 + 0.06
     me = bpy.data.meshes.new("SquidBody")
     bm.to_mesh(me)
     bm.free()
     body = bpy.data.objects.new("SquidBody", me)
     bpy.context.collection.objects.link(body)
     parts = [finish(body, "SquidBody", M["squid"])]
-    parts.append(flat_fin("SquidFin", [(0.0, 0.0), (-0.05, 0.06), (-0.09, 0.0), (-0.05, -0.06)], 0.006, M["squid"],
-                          at=(0.17, 0, 0)))
-    for i in range(6):
-        a = (i - 2.5) * 0.12
-        bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.008, radius2=0.002, depth=0.12,
-                                        location=(-0.17, a * 0.15, a * 0.25), rotation=(0, math.radians(-90) + a, 0))
-        parts.append(finish(active(), "Tentacle", M["squid"]))
+    # the fins: a wide diamond across the tip of the mantle
+    parts.append(flat_fin("SquidFin", [(0.04, 0.0), (-0.035, 0.085), (-0.1, 0.0), (-0.035, -0.085)], 0.007,
+                          M["squid"], at=(0.2, 0, 0)))
+    # the head, a little narrower than the mantle's open end, with an eye on each side
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=10, location=(-0.115, 0, 0))
+    head = active()
+    head.scale = (0.03, 0.026, 0.032)
+    parts.append(finish(head, "SquidHead", M["squid"]))
+    for side in (-1, 1):
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=10, ring_count=6, location=(-0.11, side * 0.024, 0.008))
+        parts.append(finish(active(), "SquidEye", M["pupil"]))
+    # arms fanning down from the head, curling at the ends; the two long feeding tentacles reach further
+    for i in range(10):
+        long_ = i in (3, 6)
+        spread = (i - 4.5) / 4.5                          # -1 .. 1 across the fan
+        length = random.uniform(0.18, 0.22) if long_ else random.uniform(0.09, 0.12)
+        curl = random.uniform(0.5, 1.4) * (1 if spread >= 0 else -1)
+        pts = []
+        for k in range(10):
+            s = k / 9
+            pts.append((-0.13 - s * length,
+                        spread * 0.02 + random.uniform(-0.002, 0.002),
+                        spread * (0.02 + s * length * 0.45) + math.sin(s * math.pi * curl) * 0.02 * s))
+        parts.append(tube(pts, 0.0075 if not long_ else 0.006, 0.0015, M["squid"], "SquidArm"))
+    # a good-sized squid, half as big again as it's drawn above
+    for o in parts:
+        o.location *= 1.5
+        o.scale *= 1.5
     return parts
 
 
@@ -1173,7 +1241,6 @@ place(yakitori(), 75, 0.6, "Yakitori")
 place(pork_belly(), 112, 0.6, "PorkBelly")
 place(squid(), 178, 0.58, "Squid")
 place(shishito(), 144, 0.6, "Shishito")
-place(mochi(), 224, 0.6, "Mochi")
 place(eryngii(), 357, 0.6, "KingOyster")
 place(asparagus(), 25, 0.6, "Asparagus")
 place(okra(), 161, 0.6, "Okra")
@@ -1513,7 +1580,7 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
 
 # ---------------------------------------------------------------------------------------------------------
 # a little wire grill net laid over the coals, just for toasting mochi (切り餅) on
-NET_Z = 0.48
+NET_Z = 0.62
 NET_R = 0.25
 wires = []
 # a round net: a wire hoop, with straight wires across it both ways, standing on three legs splayed out

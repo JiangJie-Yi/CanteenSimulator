@@ -39,6 +39,7 @@ const PLATE_STEP = 1.45
 const EAT_SECONDS = 3
 const BITES_PER_PIECE = 4
 const UP = new THREE.Vector3(0, 1, 0)
+const ZERO = new THREE.Vector3()
 /** the little side dishes for onigiri and mochi from the grill net */
 const DISH_R = 0.3
 const DISH_STEP = 0.7
@@ -101,32 +102,131 @@ const weaveTexture = (() => {
   return t
 })()
 
-/** A small round side dish (小皿) for onigiri and mochi: pale glaze, an indigo brushed rim, inked. */
-function SideDish({ position }: { position: [number, number, number] }) {
+/**
+ * Painted ware: a top-down picture for a plate or dish, in indigo on cream — a rim band, and a motif in the
+ * well: a stand of bamboo with its leaves (竹), or sprays of plum blossom (梅).
+ */
+function wareTexture(motif: 'bamboo' | 'plum') {
+  if (typeof document === 'undefined') return null
+  const S = 512
+  const c = document.createElement('canvas')
+  c.width = c.height = S
+  const g = c.getContext('2d')!
+  const ink = '#2c4c8c'
+  g.fillStyle = '#f2ece0'
+  g.fillRect(0, 0, S, S)
+  // rim bands
+  g.strokeStyle = ink
+  g.lineWidth = 10
+  g.beginPath()
+  g.arc(S / 2, S / 2, S * 0.455, 0, Math.PI * 2)
+  g.stroke()
+  g.lineWidth = 3
+  g.beginPath()
+  g.arc(S / 2, S / 2, S * 0.42, 0, Math.PI * 2)
+  g.stroke()
+  g.fillStyle = ink
+  g.strokeStyle = ink
+  g.lineCap = 'round'
+  if (motif === 'bamboo') {
+    // two leaning stalks with their joints, and leaves in pointed strokes
+    for (const [x0, lean, h] of [[0.42, 0.06, 0.5], [0.56, -0.04, 0.42]]) {
+      const bx = S * x0
+      const by = S * 0.78
+      const tx = bx + S * lean
+      const ty = by - S * h
+      g.lineWidth = 9
+      g.beginPath()
+      g.moveTo(bx, by)
+      g.lineTo(tx, ty)
+      g.stroke()
+      for (let k = 1; k < 4; k++) {
+        const t = k / 4
+        const jx = bx + (tx - bx) * t
+        const jy = by + (ty - by) * t
+        g.lineWidth = 3
+        g.beginPath()
+        g.moveTo(jx - 9, jy)
+        g.lineTo(jx + 9, jy)
+        g.stroke()
+        for (const dir of [-1, 1]) {
+          g.save()
+          g.translate(jx, jy)
+          g.rotate(dir * (0.7 + k * 0.15))
+          g.beginPath()
+          g.ellipse(dir * 30, 0, 32, 7, 0, 0, Math.PI * 2)
+          g.fill()
+          g.restore()
+        }
+      }
+    }
+  } else {
+    // a branch with five-petalled plum blossoms, buds, and dotted centres
+    g.lineWidth = 7
+    g.beginPath()
+    g.moveTo(S * 0.25, S * 0.72)
+    g.quadraticCurveTo(S * 0.45, S * 0.5, S * 0.74, S * 0.36)
+    g.stroke()
+    const blossom = (x: number, y: number, r: number) => {
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2
+        g.beginPath()
+        g.arc(x + Math.cos(a) * r * 0.62, y + Math.sin(a) * r * 0.62, r * 0.48, 0, Math.PI * 2)
+        g.fill()
+      }
+      g.fillStyle = '#f2ece0'
+      g.beginPath()
+      g.arc(x, y, r * 0.25, 0, Math.PI * 2)
+      g.fill()
+      g.fillStyle = ink
+    }
+    blossom(S * 0.42, S * 0.56, 34)
+    blossom(S * 0.62, S * 0.42, 28)
+    blossom(S * 0.33, S * 0.38, 24)
+    for (const [x, y] of [[0.52, 0.5], [0.72, 0.34], [0.28, 0.66]]) {
+      g.beginPath()
+      g.arc(S * x, S * y, 8, 0, Math.PI * 2)
+      g.fill()
+    }
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+const BAMBOO_WARE = wareTexture('bamboo')
+const PLUM_WARE = wareTexture('plum')
+
+/** Lathe geometry for ware, with UVs projected straight down so a painted picture lies flat in the well. */
+function wareGeometry(profile: [number, number][], R: number) {
+  const g = new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 64)
+  const pos = g.attributes.position
+  const uv = g.attributes.uv
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / (2 * R) + 0.5, 0.5 - pos.getZ(i) / (2 * R))
+  uv.needsUpdate = true
+  return g
+}
+
+/** A small round side dish (小皿) for onigiri and mochi, painted with plum blossom, inked. */
+function SideDish({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = useMemo(() => {
     const R = DISH_R
-    const profile = [[0, 0], [R * 0.55, 0], [R * 0.62, 0.012], [R * 0.85, 0.03], [R, 0.05], [R * 0.97, 0.056],
-      [R * 0.82, 0.038], [R * 0.55, 0.018], [0, 0.018]].map(([x, y]) => new THREE.Vector2(x, y))
-    return new THREE.LatheGeometry(profile, 48)
+    return wareGeometry([[0, 0], [R * 0.55, 0], [R * 0.62, 0.012], [R * 0.85, 0.03], [R, 0.05], [R * 0.97, 0.056],
+      [R * 0.82, 0.038], [R * 0.55, 0.018], [0, 0.018]], R)
   }, [])
   return (
-    <group position={position}>
+    <group position={position} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#efe8da" />
+        <meshToonMaterial color="#ffffff" map={PLUM_WARE} />
       </mesh>
       <mesh geometry={geometry} scale={[1.03, 1.08, 1.03]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-      </mesh>
-      <mesh rotation-x={-Math.PI / 2} position-y={0.052}>
-        <ringGeometry args={[DISH_R * 0.86, DISH_R * 0.93, 48]} />
-        <meshBasicMaterial color="#2f4f8a" />
       </mesh>
     </group>
   )
 }
 
 /** Shallow woven bamboo basket with a rolled rim, inked like everything else. */
-function Basket({ position }: { position: [number, number, number] }) {
+function Basket({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = useMemo(() => {
     const R = BASKET_R
     const profile = [[0, 0.01], [R * 0.55, 0.012], [R * 0.82, 0.04], [R * 0.97, 0.1], [R * 1.02, 0.13], [R * 0.99, 0.145],
@@ -137,12 +237,22 @@ function Basket({ position }: { position: [number, number, number] }) {
     const uv = g.attributes.uv
     for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / (2 * R) + 0.5, pos.getZ(i) / (2 * R) + 0.5)
     uv.needsUpdate = true
+    // shade the inside: the rim throws a soft shadow down into the bowl, deepest low against the wall
+    const col = new Float32Array(pos.count * 3)
+    for (let i = 0; i < pos.count; i++) {
+      const j = i % profile.length
+      const inner = j >= 6
+      const r = Math.hypot(pos.getX(i), pos.getZ(i)) / R
+      const k = inner ? 0.55 + 0.25 * (1 - r) + 0.25 * THREE.MathUtils.smoothstep(pos.getY(i), 0.03, 0.12) : 1
+      col.set([k, k * 0.97, k * 0.92], i * 3)
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3))
     return g
   }, [])
   return (
-    <group position={position}>
+    <group position={position} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={weaveTexture} side={THREE.DoubleSide} />
+        <meshToonMaterial color="#ffffff" map={weaveTexture} side={THREE.DoubleSide} vertexColors />
       </mesh>
       <mesh geometry={geometry} scale={[1.03, 1.08, 1.03]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
@@ -304,6 +414,9 @@ type Piece = {
   stickOnly: boolean
   /** grill-net items: which spot on the net it has (null: waiting its turn, hidden and not cooking) */
   netSpot: number | null
+  /** once served: the plate, dish or basket it's on (plate-n, dish-n, basket-n), and where on it */
+  container: string | null
+  local: THREE.Vector3
   /** seconds since it landed on the plate or in the basket (it steams a little at first) */
   landed: number
   /** where it sits once collected: index into its plate run (or its pile); null while on the fire */
@@ -318,25 +431,20 @@ type TagState = { stage: (typeof ROAST_STAGES)[number]['key']; label: string; pc
 const stageOf = (r: number) => ROAST_STAGES.find((s) => r < s.until)!
 
 /** Plate the roasted pieces are served onto: a shallow cream dish with a blue rim line and an ink outline. */
-function Plate({ position }: { position: [number, number, number] }) {
+function Plate({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = useMemo(() => {
     // profile drawn for a 0.5 radius plate, scaled up to PLATE_R
     const k = PLATE_R / 0.5
-    const profile = [[0, 0], [0.32, 0], [0.4, 0.025], [0.47, 0.06], [0.5, 0.075], [0.49, 0.082], [0.44, 0.052],
-      [0.3, 0.02], [0, 0.02]].map(([x, y]) => new THREE.Vector2(x * k, y))
-    return new THREE.LatheGeometry(profile, 64)
+    return wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.025], [0.47, 0.06], [0.5, 0.075], [0.49, 0.082], [0.44, 0.052],
+      [0.3, 0.02], [0, 0.02]] as [number, number][]).map(([x, y]) => [x * k, y] as [number, number]), PLATE_R)
   }, [])
   return (
-    <group position={position}>
+    <group position={position} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#f4efe4" />
+        <meshToonMaterial color="#ffffff" map={BAMBOO_WARE} />
       </mesh>
       <mesh geometry={geometry} scale={[1.025, 1.06, 1.025]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-      </mesh>
-      <mesh rotation-x={-Math.PI / 2} position-y={0.07}>
-        <ringGeometry args={[PLATE_R * 0.91, PLATE_R * 0.94, 64]} />
-        <meshBasicMaterial color="#3d5f9e" />
       </mesh>
     </group>
   )
@@ -380,6 +488,8 @@ type RoastingProps = {
   onEat?: (id: string) => void
   /** something to tell the diner (it isn't cooked yet, it's burnt) */
   onNotice?: (what: 'notCooked' | 'burnt') => void
+  /** written every frame: how much smoke is coming off the fire (0..1), from food that's cooked and still on it */
+  smoke?: RefObject<number>
 }
 
 /** Roasting speed for a fire level: barely cooking on dying embers, about twice as fast at full blaze. */
@@ -392,7 +502,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  * up the extra portions Dish clones in as they appear.
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
-  onNotice }: RoastingProps) {
+  onNotice, smoke }: RoastingProps) {
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -413,7 +523,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         node: obj, homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), progress: 0, collected: false,
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
         toQ: new THREE.Quaternion(), mats, looks, bites: newBites(), sticks: [], food: [], puffs: [], stickOnly: false,
-        netSpot: null,
+        netSpot: null, container: null, local: new THREE.Vector3(),
         landed: -1,
         body: null, slot: null, eat: 0, eaten: false,
       })
@@ -465,6 +575,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * Plate n of the run. They go around the fire at the first plate's distance: the 2nd to its front-right, the
    * rest round the back (so none sits between the camera and the fire); a full lap moves out a ring.
    */
+  // plates, side dishes and the basket can be dragged about the table: how far each has been moved
+  const moved = useRef(new Map<string, THREE.Vector3>())
+  const [, setMoveTick] = useState(0)
+  const nudge = (key: string) => moved.current.get(key) ?? ZERO
+
   const plateAt = (n: number) => {
     const [x, y, z] = roast.plate
     const r0 = Math.hypot(x, z)
@@ -474,12 +589,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const lap = Math.floor(n / order.length)
     const a = a0 + order[n % order.length] * step + lap * step / 2
     const r = r0 + lap * PLATE_STEP
-    return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r)
+    return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r).add(nudge(`plate-${n}`))
   }
   const [plateCount, setPlateCount] = useState(1)
   const basketAt = (n: number) => {
     const [x, y, z] = roast.basket!.at
-    return new THREE.Vector3(x, y, z).addScaledVector(LAY_DIR, -n * BASKET_STEP)
+    return new THREE.Vector3(x, y, z).addScaledVector(LAY_DIR, -n * BASKET_STEP).add(nudge(`basket-${n}`))
+  }
+  /** where a container (plate-n, dish-n, basket-n) is now */
+  const containerAt = (key: string) => {
+    const [kind, n] = key.split('-')
+    return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   const [basketCount, setBasketCount] = useState(1)
   const [wisps, setWisps] = useState<{ key: string; at: [number, number, number] }[]>([])
@@ -488,7 +608,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const onDish = (p: Piece) => !!roast.dish && !!roast.net?.includes(p.id)
   const dishAt = (n: number) => {
     const [x, y, z] = roast.dish!.at
-    return new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -n * DISH_STEP)
+    return new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -n * DISH_STEP).add(nudge(`dish-${n}`))
   }
   const [dishCount, setDishCount] = useState(1)
   const destination = (p: Piece) => (inBasket(p) ? 'basket' : onDish(p) ? 'dish' : 'plate')
@@ -528,6 +648,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const r = cap > 1 ? DISH_R * 0.48 : 0
       p.toP.copy(dishAt(n)).add(new THREE.Vector3(Math.cos(a) * r, 0.05, Math.sin(a) * r))
       if (n + 1 > dishCount) setDishCount(n + 1)
+      p.container = `dish-${n}`
+      // lying flat, just as it sat on the net, turned any which way
+      p.toQ.copy(p.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(UP, Math.random() * Math.PI * 2))
     } else {
       // side by side across the plate, centred; a full row starts a new layer on top; a full plate, a new plate
       const plate = Math.floor(slot / PER_PLATE)
@@ -537,12 +660,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const across = (col - (PER_LAYER - 1) / 2) * SLOT_GAP + (layer % 2) * (SLOT_GAP / 2)
       p.toP.copy(plateAt(plate)).addScaledVector(STACK_DIR, across)
       if (plate + 1 > plateCount) setPlateCount(plate + 1)
+      p.container = `plate-${plate}`
       // skewers are longer than the plate is wide, so the stick rests across the rim (top ≈ 0.08) instead of
       // cutting through it
       p.toP.y += (p.loose ? 0.075 : 0.105) + layer * LAYER_HEIGHT
     }
+    if (basket) p.container = 'basket-0'
+    // where it sits relative to its plate, dish or basket, so it goes along when that's dragged somewhere else
+    p.local.copy(p.toP).sub(containerAt(p.container!))
     // everything points the same way along LAY_DIR
-    if (basket) {
+    if (basket || dish) {
       // already turned above
     } else if (p.loose) {
       // loose pieces lie on their bottom (local +Y up), long axis (local X) along the row
@@ -625,7 +752,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
   // pointer: hovering food on the fire or the plate makes it glow and turns the cursor into a hand; a click (not
   // a drag that orbits the camera) takes it off the fire, or eats it once it's on the plate
-  const { gl, camera, raycaster } = useThree()
+  const { gl, camera, raycaster, scene: world } = useThree()
+  const shift = useRef<{ key: string; start: THREE.Vector3; from: THREE.Vector3 } | null>(null)
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean } | null
 
   // seasonings beside the fire (salt, soy and brush, condensed milk, peanut powder): pick one up, carry it over a
@@ -762,14 +890,26 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         setToolLabel(tool ? { kind: tool.kind, at: [tool.home.x, tool.home.y + 0.32, tool.home.z] } : null)
       }
       if (p !== hovered.current) setHover(p)
-      el.style.cursor = tool ? 'grab' : p ? 'pointer' : ''
+      el.style.cursor = tool ? 'grab' : p ? 'pointer' : pickContainer() ? 'grab' : ''
     }
     const onDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY }
       if (e.button !== 0) return
       aim(e)
       const tool = pickTool()
-      if (!tool) return
+      if (!tool) {
+        // no seasoning: grab a plate, side dish or the basket (where there's no food under the pointer)
+        const key = pickFood() ? null : pickContainer()
+        if (!key) return
+        const start = groundHit()
+        if (!start) return
+        shift.current = { key, start, from: nudge(key).clone() }
+        if (controls) controls.enabled = false
+        document.body.classList.add('is-carrying')
+        window.addEventListener('pointermove', slide)
+        window.addEventListener('pointerup', release, { once: true })
+        return
+      }
       // pick it up: the camera holds still while it's carried, and the pointer is followed over the whole window
       // (it passes over the food tags, which sit above the canvas)
       drag.current = { tool, target: null, at: tool.node.position.clone(), pour: 0 }
@@ -797,8 +937,46 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       el.style.cursor = ''
       setHover(null)
     }
+    /** the plate / dish / basket under the pointer, by the container key its group carries */
+    const pickContainer = () => {
+      const groups: THREE.Object3D[] = []
+      world.traverse((o) => { if (typeof o.userData.container === 'string') groups.push(o) })
+      for (const hit of raycaster.intersectObjects(groups, true)) {
+        for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) {
+          if (typeof o.userData.container === 'string') return o.userData.container as string
+        }
+      }
+      return null
+    }
+    /** where the pointer meets the table, in the dish's own coordinates */
+    const groundHit = () => {
+      const plane = new THREE.Plane(UP, -root.localToWorld(new THREE.Vector3()).y)
+      const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
+      return hit ? root.worldToLocal(hit) : null
+    }
+    const slide = (e: PointerEvent) => {
+      const s = shift.current
+      if (!s) return
+      aim(e)
+      const hit = groundHit()
+      if (!hit) return
+      const before = nudge(s.key).clone()
+      const next = s.from.clone().add(hit.sub(s.start))
+      next.y = 0
+      moved.current.set(s.key, next)
+      // potatoes rolling about in the basket go along with it
+      const delta = next.clone().sub(before)
+      for (const p of pieces.current) if (p.body?.live && p.container === s.key) p.node.position.add(delta)
+      setMoveTick((t) => t + 1)
+    }
+    const release = () => {
+      shift.current = null
+      window.removeEventListener('pointermove', slide)
+      document.body.classList.remove('is-carrying')
+      if (controls) controls.enabled = true
+    }
     const onUp = (e: PointerEvent) => {
-      if (drag.current) return
+      if (drag.current || shift.current) return
       if (e.button !== 0 || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
       aim(e)
       const p = pickFood()
@@ -1001,6 +1179,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // taken off the order: next time it comes back raw, on its skewer
         p.progress = 0
         p.netSpot = null
+        p.container = null
         p.body = null
         for (const u of Object.values(p.looks)) u.value = 0
         p.stickOnly = false
@@ -1045,6 +1224,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.flight = Math.min(1, p.flight + dt / FLIGHT_SECONDS)
         if (!p.body?.live) {
           const e = p.flight < 0.5 ? 2 * p.flight * p.flight : 1 - (-2 * p.flight + 2) ** 2 / 2
+          // (its spot follows the plate or dish if that's been dragged somewhere)
+          if (p.container) p.toP.copy(containerAt(p.container)).add(p.local)
           p.node.position.lerpVectors(p.fromP, p.toP, e)
           p.node.position.y += Math.sin(p.flight * Math.PI) * 0.45   // a little arc through the air
           p.node.quaternion.slerpQuaternions(p.fromQ, p.toQ, e)
@@ -1137,6 +1318,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
     if (roast.basket) settleBasket(dt)
 
+    // smoke rises once food over the coals starts to cook through (fat and juices dripping onto the charcoal):
+    // none from a bare fire, more with every done piece, most when it's charring
+    if (smoke) {
+      let s = 0
+      for (const p of pieces.current) {
+        if (!present(p) || p.collected || waiting(p)) continue
+        const r = p.progress / roast.times[p.id]
+        s += THREE.MathUtils.smoothstep(r, 0.7, 1.1) * 0.3 + THREE.MathUtils.smoothstep(r, 1.5, 2.5) * 0.3
+      }
+      const want = Math.min(1, s) * Math.min(1, (fire?.current ?? 0.55) * 1.5)
+      smoke.current += (want - smoke.current) * Math.min(1, dt * 0.8)
+    }
+
     since.current += delta
     if (since.current < 0.25) return
     since.current = 0
@@ -1180,13 +1374,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   return (
     <>
       {Array.from({ length: plateCount }, (_, n) => (
-        <Plate key={n} position={plateAt(n).toArray() as [number, number, number]} />
+        <Plate key={n} container={`plate-${n}`} position={plateAt(n).toArray() as [number, number, number]} />
       ))}
       {roast.basket && Array.from({ length: basketCount }, (_, n) => (
-        <Basket key={n} position={basketAt(n).toArray() as [number, number, number]} />
+        <Basket key={n} container={`basket-${n}`} position={basketAt(n).toArray() as [number, number, number]} />
       ))}
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
-        <SideDish key={n} position={dishAt(n).toArray() as [number, number, number]} />
+        <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
       <points geometry={grains.geometry} material={grainMaterial} frustumCulled={false} renderOrder={3} />
       {active && toolLabel && (

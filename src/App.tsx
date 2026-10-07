@@ -4,7 +4,7 @@ import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@rea
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { nameIn, UI, type Lang } from './i18n'
-import { boilAmount, equilibriumTemp, stepTemp, steamAmount } from './boil'
+import { boilAmount, ROOM_TEMP, stepTemp, steamAmount } from './boil'
 import { Bubbles } from './components/Bubbles'
 import { Brand } from './components/Brand'
 import { Dish } from './components/Dish'
@@ -161,13 +161,18 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
   }, [camera, size, frame])
   const look = LIGHTING[theme]
 
-  // hot pot broth temperature -> steam, so steam lags the flame both ways (see boil.ts). Starts already at a
-  // simmer for the opening heat setting.
-  const brothTemp = useRef(equilibriumTemp(heat))
-  const steamLevel = useRef(steamAmount(brothTemp.current, heat))
-  const boilLevel = useRef(boilAmount(brothTemp.current, heat))
+  // hot pot broth temperature -> steam and bubbles, so they lag the flame both ways (see boil.ts). The broth is
+  // poured in cold: nothing until it heats up, wisps of steam close to the boil, bubbles only once it boils.
+  // An empty pot has nothing to heat; a fresh soup starts from room temperature again.
+  const potDish = DISHES.find((d) => d.heatControl)
+  const hasSoup = !!potDish && !!orderedBase(potDish, orders[potDish.id])
+  const brothTemp = useRef(ROOM_TEMP)
+  // smoke off the grill: only once food on it is cooking through (Roasting sets it)
+  const grillSmoke = useRef(0)
+  const steamLevel = useRef(0)
+  const boilLevel = useRef(0)
   useFrame((_, delta) => {
-    brothTemp.current = stepTemp(brothTemp.current, heat, Math.min(delta, 0.1))
+    brothTemp.current = hasSoup ? stepTemp(brothTemp.current, heat, Math.min(delta, 0.1)) : ROOM_TEMP
     steamLevel.current = steamAmount(brothTemp.current, heat)
     boilLevel.current = boilAmount(brothTemp.current, heat)
   })
@@ -298,7 +303,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
               {dish.roast && (
                 <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
-                  onNotice={onNotice} />
+                  onNotice={onNotice} smoke={grillSmoke} />
               )}
               {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
               {soup && dish.heatControl && dish.brothY !== undefined && (
@@ -319,7 +324,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 // same white puffs as the soup steam, just taller and slower
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height}
                   opacity={theme === 'dark' ? 0.5 : 0.7} speed={0.05}
-                  level={dish.heat === 'fire' ? fire : undefined} />
+                  level={dish.heat === 'fire' ? grillSmoke : undefined} />
               )}
             </Suspense>
           </group>
@@ -365,6 +370,8 @@ export default function App() {
     setKcal((k) => k + cal)
   }, [])
   const [theme, toggleTheme] = useTheme()
+  // the menu can be folded away to give the food the whole screen
+  const [menuFolded, setMenuFolded] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
   const [heat, setHeat] = useState(40)
   const [lang, setLang] = useState<Lang>(() => {
@@ -514,7 +521,7 @@ export default function App() {
   }
 
   return (
-    <div className="app" ref={appRef}>
+    <div className={`app${menuFolded ? ' menu-folded' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       <div className="canvas-layer">
@@ -541,6 +548,10 @@ export default function App() {
       <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => setOrders((all) => ({ ...all, [dish.id]: {} }))} />
+      <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)}
+        aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
+        {menuFolded ? '‹' : '›'}
+      </button>
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}
       </button>

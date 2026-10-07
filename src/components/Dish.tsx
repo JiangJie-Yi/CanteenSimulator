@@ -51,7 +51,13 @@ const FLOAT_EASE = 2.6
  * Natural variation for one piece: ±15% in size and a random turn — about its own skewer (local X, the stick
  * axis in blender/grilledfish.py) for skewers, about the vertical for food lying in a pot or bowl.
  */
-function jitter(node: THREE.Object3D, skewer: boolean) {
+function jitter(node: THREE.Object3D, skewer: boolean, gentle = false) {
+  if (gentle) {
+    // shaped food (onigiri, mochi): the same proportions every time, just a touch bigger or smaller
+    node.scale.multiplyScalar(0.95 + Math.random() * 0.1)
+    node.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(UP, Math.random() * Math.PI * 2))
+    return
+  }
   // size varies a lot, and not evenly: some pieces come out plumper, some longer
   node.scale.multiplyScalar(0.78 + Math.random() * 0.44)
   node.scale.y *= 0.88 + Math.random() * 0.24
@@ -59,11 +65,9 @@ function jitter(node: THREE.Object3D, skewer: boolean) {
   const q = skewer
     ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (Math.random() - 0.5) * 0.5)
     : new THREE.Quaternion().setFromAxisAngle(UP, Math.random() * Math.PI * 2)
-  if (skewer) {
-    node.quaternion.multiply(q)
-    // pushed into the ash deeper or shallower, so the food on neighbouring sticks sits at different heights
-    node.translateX(-Math.random() * 0.14)
-  } else node.quaternion.premultiply(q)
+  // (skewers stay standing on the salt: their height varies in the model, blender/grilledfish.py place())
+  if (skewer) node.quaternion.multiply(q)
+  else node.quaternion.premultiply(q)
 }
 
 /** GLTFLoader strips the dot from Blender's "Meatball.001", so drop trailing digits to get the type. */
@@ -216,7 +220,7 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
       // once per node (the scene is cached across remounts): remember the authored scale, then vary it
       if (!obj.userData.authoredScale) {
         obj.userData.authoredScale = obj.scale.clone()
-        jitter(obj, isSkewer(id))
+        jitter(obj, isSkewer(id), !!layout?.slots?.[id])
       }
       list.push({ node: obj, copy: 0, index: list.length, baseScale: obj.scale.clone(), baseY: obj.position.y,
         homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), on: true, s: 1, v: 0, y: 0, vy: 0 })
@@ -296,7 +300,7 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
       }
       // every portion is a little different: its own size and turn
       node.scale.copy(src.node.userData.authoredScale ?? src.baseScale)
-      jitter(node, isSkewer(id))
+      jitter(node, isSkewer(id), !!layout?.slots?.[id])
       const baseScale = node.scale.clone()
       node.scale.setScalar(0.0001)
       node.visible = false

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent } from 'react'
 import { nameIn, UI, type Lang } from '../i18n'
 import { toChineseNumber, type Dish } from '../menu'
 import { Icon } from './Icon'
@@ -71,6 +72,31 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
     if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
   }
 
+  // hold the left button and drag to slide the tags sideways; a drag isn't a click, so it doesn't order anything
+  const grab = useRef<{ x: number; left: number; moved: boolean } | null>(null)
+  const dragged = useRef(false)
+  const onGrab = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || e.pointerType === 'touch' || !row.current) return
+    grab.current = { x: e.clientX, left: row.current.scrollLeft, moved: false }
+    dragged.current = false
+  }
+  const onDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const g = grab.current
+    const el = row.current
+    if (!g || !el || !(e.buttons & 1)) return
+    const dx = e.clientX - g.x
+    if (!g.moved && Math.abs(dx) > 5) {
+      g.moved = true
+      el.classList.add('is-dragging')
+    }
+    if (g.moved) el.scrollLeft = g.left - dx
+  }
+  const onLetGo = () => {
+    if (grab.current?.moved) dragged.current = true
+    grab.current = null
+    row.current?.classList.remove('is-dragging')
+  }
+
   const onKey = (id: string) => (e: KeyboardEvent) => {
     if (e.key === '-' || e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
@@ -121,7 +147,16 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
               disabled={ends.atRight} onClick={() => page(1)}>›</button>
           </>
         )}
-        <div className="strips" ref={row}>
+        <div className="strips" ref={row} onPointerDown={onGrab} onPointerMove={onDrag} onPointerUp={onLetGo}
+          onPointerLeave={onLetGo}
+          onClickCapture={(e) => {
+            // the click that ends a drag doesn't order the tag it was released on
+            if (dragged.current) {
+              e.stopPropagation()
+              e.preventDefault()
+              dragged.current = false
+            }
+          }}>
           {/* bases (the dark walnut tags) are ordered the same way as everything else */}
           {dish.bases.map((b) => tag(b, dish.id, true))}
           {dish.items.map((item) => tag(item, item.id, false))}

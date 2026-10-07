@@ -9,6 +9,8 @@ export const UI = {
   zh: {
     menuTitle: '點菜',
     nothingYet: '尚未點餐',
+    hideMenu: '收起菜單',
+    showMenu: '打開菜單',
     tally: (base: string, count: number, total: number) => [`${base}，加點 `, count, ` 份，合計 `, total, ' 元'] as const,
     clear: '全部取消',
     hint: '點一下加一份，右鍵減一份',
@@ -32,6 +34,8 @@ export const UI = {
   ja: {
     menuTitle: '品書',
     nothingYet: 'ご注文なし',
+    hideMenu: '品書を閉じる',
+    showMenu: '品書を開く',
     tally: (base: string, count: number, total: number) => [`${base}・追加 `, count, ` 品・合計 `, total, ' 円'] as const,
     clear: '全て取消',
     hint: 'クリックで追加、右クリックで減らす',
