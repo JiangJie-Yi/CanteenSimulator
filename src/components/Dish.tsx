@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useGLTF, useTexture } from '@react-three/drei'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
+import type { CopyLayout } from '../menu'
 
 const INK = new THREE.Color('#3b2a20')
 const OUTLINE_WIDTH = 0.007
@@ -17,6 +18,9 @@ type Piece = {
   copy: number
   /** position among the pieces of one portion, for staggering the drop */
   index: number
+  /** where this piece sits in the dish when it isn't animating or on the plate */
+  homeP: THREE.Vector3
+  homeQ: THREE.Quaternion
   baseScale: THREE.Vector3
   baseY: number
   /** currently ordered */
@@ -132,12 +136,14 @@ type DishProps = ThreeElements['group'] & {
   hidden?: string[]
   /** item ids that rise gently into place instead of dropping in */
   floatIds?: string[]
+  /** where extra portions go (see menu.ts CopyLayout); default spreads them evenly around the centre */
+  layout?: CopyLayout
   /** skip the pop-in animation (prefers-reduced-motion) */
   instant?: boolean
 }
 
 /** A dish exported from blender/*.py, drawn in a hand-painted toon style, with menu items that pop in and out. */
-export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, instant = false, ...props }: DishProps) {
+export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, layout, instant = false, ...props }: DishProps) {
   const { scene } = useGLTF(url)
   const ids = useMemo(() => new Set(itemIds), [itemIds])
   const floats = useMemo(() => new Set(floatIds), [floatIds])
@@ -154,24 +160,71 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, instan
       obj.userData.itemId = id
       obj.userData.copy = 0
       list.push({ node: obj, copy: 0, index: list.length, baseScale: obj.scale.clone(), baseY: obj.position.y,
-        on: true, s: 1, v: 0, y: 0, vy: 0 })
+        homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), on: true, s: 1, v: 0, y: 0, vy: 0 })
     })
     return groups
   }, [scene, ids])
 
-  /** Clone one more portion of an item: every authored piece, swung around the dish's centre. */
+  /** Every portion's pieces currently placed in the dish (for finding free spots on the fire ring). */
+  const occupiedAzimuths = () => {
+    // every skewer spot that exists, ordered or not, including clones made a moment ago; pieces that shuffle
+    // along in the ash (layout.spread) aren't on the ring
+    const out: number[] = []
+    for (const [id, pieces] of items) {
+      if (layout?.spread?.[id] !== undefined) continue
+      for (const p of pieces) out.push(Math.atan2(p.homeP.z, p.homeP.x))
+    }
+    // the base fish isn't a menu item, but it takes up a spot too
+    for (const name of layout?.fixed ?? []) {
+      scene.traverse((o) => {
+        if (baseName(o.name) === name && o.parent?.parent === scene) out.push(Math.atan2(o.position.z, o.position.x))
+      })
+    }
+    return out
+  }
+
+  /** How far to swing a new portion of `id` around the dish's centre, by the dish's layout rule. */
+  const swingFor = (id: string, src: Piece, copy: number) => {
+    const spread = layout?.spread?.[id]
+    if (spread !== undefined) return spread * copy                  // shuffle along beside the original
+    if (layout?.mode !== 'ring') return copy * GOLDEN_ANGLE           // pots and bowls: spread evenly around
+    // skewers around a fire: the free spot on the ring farthest from every other skewer, keeping clear of
+    // the camera's line of sight and the plate
+    const from = Math.atan2(src.homeP.z, src.homeP.x)
+    const taken = occupiedAzimuths()
+    const avoid = (layout.avoid ?? []).map((d) => (d * Math.PI) / 180)
+    const gap = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))
+    let best = 0
+    let bestScore = -1
+    for (let deg = 10; deg < 360; deg += 5) {
+      const swing = (deg * Math.PI) / 180
+      const at = from - swing                     // rotating about +Y by θ moves the azimuth by -θ
+      if (avoid.some((a) => gap(at, a) < (28 * Math.PI) / 180)) continue
+      const score = Math.min(...taken.map((t) => gap(at, t)))
+      if (score > bestScore) {
+        bestScore = score
+        best = swing
+      }
+    }
+    return best
+  }
+
+  /** Clone one more portion of an item from its authored pieces, swung around the dish's centre. */
   const addCopy = (id: string, pieces: Piece[], copy: number) => {
-    const angle = copy * GOLDEN_ANGLE
-    for (const src of pieces.filter((p) => p.copy === 0)) {
+    const originals = pieces.filter((p) => p.copy === 0)
+    const angle = swingFor(id, originals[0], copy)
+    const swing = new THREE.Quaternion().setFromAxisAngle(UP, angle)
+    for (const src of originals) {
+      // start from where the piece was authored, not where it is now (it may be on the plate)
       const node = src.node.clone(true)
       node.userData = { itemId: id, copy }
-      node.position.set(src.node.position.x, src.baseY, src.node.position.z).applyAxisAngle(UP, angle)
-      node.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(UP, angle))
+      node.position.copy(src.homeP).applyAxisAngle(UP, angle)
+      node.quaternion.copy(src.homeQ).premultiply(swing)
       node.scale.setScalar(0.0001)
       node.visible = false
       src.node.parent!.add(node)
       pieces.push({ node, copy, index: src.index, baseScale: src.baseScale.clone(), baseY: node.position.y,
-        on: false, s: 0, v: 0, y: 0, vy: 0 })
+        homeP: node.position.clone(), homeQ: node.quaternion.clone(), on: false, s: 0, v: 0, y: 0, vy: 0 })
     }
   }
 
@@ -263,9 +316,11 @@ export function Dish({ url, itemIds, quantities, broth, hidden, floatIds, instan
           }
         }
 
-        const s = Math.max(p.s, 0.0001)
+        // (userData.shrink: Roasting shrivels burnt food a little)
+        const s = Math.max(p.s, 0.0001) * ((p.node.userData.shrink as number | undefined) ?? 1)
         p.node.scale.copy(p.baseScale).multiplyScalar(s)
-        p.node.position.y = p.baseY + p.y
+        // once Roasting has moved a piece to the plate it owns the position
+        if (!p.node.userData.onPlate) p.node.position.y = p.baseY + p.y
         p.node.visible = p.s > 0.01
       })
     }

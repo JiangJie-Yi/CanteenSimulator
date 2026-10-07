@@ -18,6 +18,21 @@ export type Base = {
   hide?: string[]
 }
 
+/**
+ * Where extra portions of an item are placed (the model has one of each; more are cloned and swung around the
+ * dish's centre). Default: spread evenly around, which suits round pots and bowls.
+ */
+export type CopyLayout = {
+  /** 'ring': skewers around a fire, each new one goes to the emptiest free spot on the ring */
+  mode?: 'ring'
+  /** azimuths to keep clear on the ring, in degrees in the dish's x/z plane (camera line of sight, the plate) */
+  avoid?: number[]
+  /** non-menu objects that also occupy ring spots (the base fish) */
+  fixed?: string[]
+  /** per-item swing per extra portion, in radians: shuffles it along beside the original instead */
+  spread?: Record<string, number>
+}
+
 /** Lighting tweaks for one dish; anything left out uses the scene defaults in App.tsx. */
 export type DishLight = {
   spotPosition?: [number, number, number]
@@ -48,6 +63,7 @@ export type Dish = {
   light?: DishLight
   /** things roast over the fire, show their doneness, and can be clicked off onto a plate */
   roast?: Roast
+  layout?: CopyLayout
   /** where the camera looks */
   focusY: number
 }
@@ -149,7 +165,18 @@ export const DISHES: Dish[] = [
         ShrimpSkewer: '蝦串', Sausage: '香腸', Potato: '馬鈴薯', SweetPotato: '地瓜' },
       loose: ['Potato', 'SweetPotato'],
       // just outside the stones, to the upper right of the fire as the camera sees it
-      plate: [0.7, 0.02, -1.75],
+      // (kept clear of the corn skewer at -55°, which used to stand right in front of it)
+      plate: [1.26, 0.02, -1.06],
+    },
+    layout: {
+      mode: 'ring',
+      // camera direction (54°) and the plate (-40°)
+      avoid: [54, -40],
+      fixed: ['Fish'],
+      // potatoes and sweet potatoes sit in the ash at the front: extra ones line up beside the first,
+      // potatoes toward the right, sweet potatoes toward the left
+      // (each portion is two pieces about 16° apart, so step a little more than both)
+      spread: { Potato: 0.55, SweetPotato: -0.55 },
     },
     smoke: { y: 0.85, width: 1.0, height: 2.0 },
     focusY: 0.5,

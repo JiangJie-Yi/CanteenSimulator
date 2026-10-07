@@ -16,10 +16,52 @@ const CHAR_START = 1.15
 const CHAR_FULL = 3
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
-// the plate: skewers are laid side by side along LAY_DIR, stacked across it, then in layers
-const LAY_DIR = new THREE.Vector3(0.81, 0, -0.59).normalize()
-const STACK_DIR = new THREE.Vector3(0.59, 0, 0.81).normalize()
-const PER_LAYER = 8
+// the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
+// enough room that neighbours don't overlap, then in a second layer on top
+// LAY_DIR points at the camera and STACK_DIR runs across the screen, so the row reads left to right
+const LAY_DIR = new THREE.Vector3(0.59, 0, 0.81).normalize()
+const STACK_DIR = new THREE.Vector3(0.81, 0, -0.59).normalize()
+const PLATE_R = 0.62
+const SLOT_GAP = 0.2       // wider than the broadest piece (a fish lying flat)
+const PER_LAYER = 5
+const UP = new THREE.Vector3(0, 1, 0)
+// skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
+const STICK_FOOT_R = 0.86
+const STICK_TOP_R = 0.32
+const STICK_TOP_Y = 1.15
+const LAYER_HEIGHT = 0.1
+const CHAR_COLOR = new THREE.Color(0.045, 0.035, 0.03)
+
+/**
+ * Burn patches for over-roasted food: a value-noise mask over the texture that grows as uChar goes 0 → 1, so the
+ * food blackens in spots first and ends up fully charred.
+ */
+function addCharring(mat: THREE.MeshToonMaterial, uChar: { value: number }) {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uChar = uChar
+    shader.uniforms.uCharColor = { value: CHAR_COLOR }
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', /* glsl */ `#include <common>
+        uniform float uChar;
+        uniform vec3 uCharColor;
+        float charHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float charNoise(vec2 p) {
+          vec2 i = floor(p), f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(charHash(i), charHash(i + vec2(1, 0)), f.x),
+                     mix(charHash(i + vec2(0, 1)), charHash(i + vec2(1, 1)), f.x), f.y);
+        }`)
+      .replace('#include <map_fragment>', /* glsl */ `#include <map_fragment>
+        #ifdef USE_MAP
+          float charN = charNoise(vMapUv * 9.0) * 0.65 + charNoise(vMapUv * 23.0) * 0.35;
+        #else
+          float charN = 0.5;
+        #endif
+        float charMask = smoothstep(1.0 - uChar * 1.15, 1.0 - uChar * 1.15 + 0.2, charN);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uCharColor, charMask);`)
+  }
+  mat.customProgramCacheKey = () => 'charring'
+}
 
 type Piece = {
   key: string
@@ -39,6 +81,8 @@ type Piece = {
   toP: THREE.Vector3
   toQ: THREE.Quaternion
   mats: { mat: THREE.MeshToonMaterial; base: THREE.Color; emissive: THREE.Color }[]
+  /** 0 → 1 how charred the texture is, shared by all of this piece's materials */
+  uChar: { value: number }
 }
 
 type TagState = { stage: (typeof ROAST_STAGES)[number]['key']; label: string; pct: number }
@@ -48,8 +92,10 @@ const stageOf = (r: number) => ROAST_STAGES.find((s) => r < s.until)!
 /** Plate the roasted pieces are served onto: a shallow cream dish with a blue rim line and an ink outline. */
 function Plate({ position }: { position: [number, number, number] }) {
   const geometry = useMemo(() => {
+    // profile drawn for a 0.5 radius plate, scaled up to PLATE_R
+    const k = PLATE_R / 0.5
     const profile = [[0, 0], [0.32, 0], [0.4, 0.025], [0.47, 0.06], [0.5, 0.075], [0.49, 0.082], [0.44, 0.052],
-      [0.3, 0.02], [0, 0.02]].map(([x, y]) => new THREE.Vector2(x, y))
+      [0.3, 0.02], [0, 0.02]].map(([x, y]) => new THREE.Vector2(x * k, y))
     return new THREE.LatheGeometry(profile, 64)
   }, [])
   return (
@@ -61,7 +107,7 @@ function Plate({ position }: { position: [number, number, number] }) {
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
       <mesh rotation-x={-Math.PI / 2} position-y={0.07}>
-        <ringGeometry args={[0.455, 0.47, 64]} />
+        <ringGeometry args={[PLATE_R * 0.91, PLATE_R * 0.94, 64]} />
         <meshBasicMaterial color="#3d5f9e" />
       </mesh>
     </group>
@@ -99,22 +145,36 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const id = (obj.userData.itemId as string | undefined) ?? baseName(obj.name)
       if (!(id in roast.times) || known.has(obj)) continue
       const mats: Piece['mats'] = []
-      // each piece browns on its own, so it gets its own copies of its (already toon) materials
-      obj.traverse((o) => {
-        if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial && !o.name.endsWith('_outline')) {
-          const mat = o.material.clone()
-          o.material = mat
-          mats.push({ mat, base: mat.color.clone(), emissive: mat.emissive.clone() })
-        }
-      })
+      const uChar = { value: 0 }
       pieces.current.push({
         key: obj.uuid, id, copy: (obj.userData.copy as number | undefined) ?? 0, loose: roast.loose.includes(id),
         node: obj, homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), progress: 0, collected: false,
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
-        toQ: new THREE.Quaternion(), mats,
+        toQ: new THREE.Quaternion(), mats, uChar,
       })
     }
     scannedCount.current = root.children.length
+  }
+
+  /**
+   * Each piece browns and chars on its own, so it gets its own copies of its materials. Dish swaps in the toon
+   * materials in an effect that can land after our first frame, so keep trying until they're there.
+   */
+  const bindMaterials = (p: Piece) => {
+    if (p.mats.length) return
+    const meshes: THREE.Mesh[] = []
+    p.node.traverse((o) => {
+      if (o instanceof THREE.Mesh && !o.name.endsWith('_outline')) meshes.push(o)
+    })
+    if (!meshes.length || !meshes.every((m) => m.material instanceof THREE.MeshToonMaterial)) return
+    for (const m of meshes) {
+      // the bamboo skewer itself doesn't roast
+      if ((m.material as THREE.Material).name === 'BambooSkewer') continue
+      const mat = (m.material as THREE.MeshToonMaterial).clone()
+      addCharring(mat, p.uChar)
+      m.material = mat
+      p.mats.push({ mat, base: mat.color.clone(), emissive: mat.emissive.clone() })
+    }
   }
 
   const present = (p: Piece) => !menuIds.has(p.id) || p.copy < (quantities[p.id] ?? 0)
@@ -123,20 +183,35 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (p.collected || !present(p)) return
     const slot = pieces.current.filter((q) => q.collected && present(q)).length
     p.collected = true
+    // tells Dish to stop driving this node's position (its pop-in would pull it back up to skewer height)
+    p.node.userData.onPlate = true
     p.flight = instant ? 1 : 0
     p.fromP.copy(p.node.position)
     p.fromQ.copy(p.node.quaternion)
-    const across = ((slot % PER_LAYER) - (PER_LAYER - 1) / 2) * 0.085
+    // side by side across the plate, centred; a full row starts a new layer on top
+    const col = slot % PER_LAYER
+    const layer = Math.floor(slot / PER_LAYER)
+    const across = (col - (PER_LAYER - 1) / 2) * SLOT_GAP + (layer % 2) * (SLOT_GAP / 2)
     p.toP.set(...roast.plate).addScaledVector(STACK_DIR, across)
-    p.toP.y += (p.loose ? 0.07 : 0.06) + Math.floor(slot / PER_LAYER) * 0.05 + (slot % PER_LAYER) * 0.004
+    p.toP.y += (p.loose ? 0.075 : 0.065) + layer * LAYER_HEIGHT
+    // everything points the same way along LAY_DIR
     if (p.loose) {
-      p.toQ.copy(p.node.quaternion)
+      // loose pieces lie on their bottom (local +Y up), long axis (local X) along the row
+      const z = new THREE.Vector3().crossVectors(LAY_DIR, UP)
+      p.toQ.setFromRotationMatrix(new THREE.Matrix4().makeBasis(LAY_DIR, UP, z))
     } else {
-      // stick along LAY_DIR, the food's broad side (the skewer frame's -Z) facing up
-      const x = LAY_DIR
-      const z = new THREE.Vector3(0, -1, 0)
-      const y = new THREE.Vector3().crossVectors(z, x)
-      p.toQ.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z))
+      // A skewer's local axes depend on how its parts were joined in Blender, so work from the stick itself: it
+      // runs from its foot on the outer ring up and in to its tip (blender/grilledfish.py STICK_*), and the
+      // food's broad side faces outward. Turn that frame so the stick lies along LAY_DIR, broad side up.
+      const phi = Math.atan2(p.homeP.z, p.homeP.x)
+      const outward = new THREE.Vector3(Math.cos(phi), 0, Math.sin(phi))
+      const stick = new THREE.Vector3(-(STICK_FOOT_R - STICK_TOP_R) * Math.cos(phi), STICK_TOP_Y,
+        -(STICK_FOOT_R - STICK_TOP_R) * Math.sin(phi)).normalize()
+      const face = outward.addScaledVector(stick, -outward.dot(stick)).normalize()
+      const from = new THREE.Matrix4().makeBasis(stick, face, new THREE.Vector3().crossVectors(stick, face))
+      const to = new THREE.Matrix4().makeBasis(LAY_DIR, UP, new THREE.Vector3().crossVectors(LAY_DIR, UP))
+      const turn = new THREE.Quaternion().setFromRotationMatrix(to.multiply(from.transpose()))
+      p.toQ.copy(p.homeQ).premultiply(turn)
     }
   }
 
@@ -201,12 +276,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (scannedCount.current !== root.children.length) scan()
     const dt = Math.min(delta, 0.1)
     pieces.current.forEach((p, n) => {
+      bindMaterials(p)
       if (!present(p)) {
         // taken off the order: next time it comes back raw, on its skewer
         p.progress = 0
         p.collected = false
         p.flight = 0
+        p.node.userData.onPlate = false
         p.node.quaternion.copy(p.homeQ)
+        p.node.position.copy(p.homeP)
         return
       }
       const time = roast.times[p.id]
@@ -224,24 +302,30 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.node.quaternion.slerpQuaternions(p.fromQ, p.toQ, e)
       }
 
-      // browning, then a slow char that keeps deepening the longer it's left on
+      // browning, then a slow char: black patches spread across the texture and the whole piece darkens,
+      // deepening the longer it's left on
       const r = p.progress / time
+      const charred = THREE.MathUtils.smootherstep(r, CHAR_START, CHAR_FULL)
+      p.uChar.value = charred
       if (r < 1) tint.copy(RAW_TINT).lerp(DONE_TINT, r)
-      else tint.copy(DONE_TINT).lerp(BURNT_TINT, THREE.MathUtils.smootherstep(r, CHAR_START, CHAR_FULL))
+      else tint.copy(DONE_TINT).lerp(BURNT_TINT, charred * 0.6)
       const glow = hovered.current === p
       for (const { mat, base, emissive } of p.mats) {
         mat.color.copy(base).multiply(tint)
         mat.emissive.copy(emissive)
         if (glow) mat.emissive.add(HOVER_GLOW)
       }
-      // burnt food shrivels a little
-      p.node.scale.multiplyScalar(1 - 0.08 * THREE.MathUtils.smoothstep(r, 1.8, CHAR_FULL))
+      // burnt food shrivels a little. Menu items get their scale from Dish's pop-in, which applies this factor;
+      // the base fish has no pop-in, so set it directly.
+      const shrink = 1 - 0.08 * THREE.MathUtils.smoothstep(r, 1.8, CHAR_FULL)
+      if (menuIds.has(p.id)) p.node.userData.shrink = shrink
+      else p.node.scale.setScalar(shrink)
 
-      // tags sit above the food; alternate pieces sit a little higher so neighbouring tags don't overlap
+      // tags sit above the food, staggered over three heights so neighbouring tags don't overlap
       const a = anchors.current[p.key]
       if (a) {
         a.position.copy(p.node.position)
-        a.position.y += (p.loose ? 0.2 : 0.32) + (n % 2) * 0.16
+        a.position.y += (p.loose ? 0.2 : 0.32) + (n % 3) * 0.15
       }
     })
 

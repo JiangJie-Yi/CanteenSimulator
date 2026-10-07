@@ -201,7 +201,7 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat }: SceneProps
             position-x={slot(i, active, DISHES.length) * SPACING}>
             <Suspense fallback={null}>
               <Dish url={dish.model} itemIds={ITEM_IDS[dish.id]} quantities={orders[dish.id]} broth={base.broth}
-                hidden={base.hide} floatIds={FLOAT_IDS[dish.id]} instant={reducedMotion} />
+                hidden={base.hide} floatIds={FLOAT_IDS[dish.id]} layout={dish.layout} instant={reducedMotion} />
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
               {dish.roast && (
                 <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={orders[dish.id]}

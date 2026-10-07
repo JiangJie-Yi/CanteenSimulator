@@ -761,6 +761,27 @@ button {
   outline-offset: 2px;
 }
 
+/* side-by-side layouts: if the window is too short for the whole menu it scrolls, and its top and bottom
+   fade out rather than slicing tags off at the window edge (the fade sits in the menu's padding, so nothing
+   is dimmed when everything fits) */
+@media (min-width: 901px) {
+  .menu {
+    max-height: 100vh;
+    box-sizing: border-box;
+    /* 'safe' keeps an overflowing menu scrollable from its top instead of centring it off-screen */
+    align-content: safe center;
+    /* clear the day/night button in the corner, and leave room for the fades */
+    padding-top: 72px !important;
+    padding-bottom: 40px !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-soft) transparent;
+    -webkit-mask-image: linear-gradient(transparent, #000 40px, #000 calc(100% - 40px), transparent);
+    mask-image: linear-gradient(transparent, #000 40px, #000 calc(100% - 40px), transparent);
+  }
+}
+
 /* ---------- responsive ----------
    > 1280      desktop: stage left, two-row wall menu right
    ≤ 1280      small laptops / tablets landscape: slimmer strips
@@ -822,10 +843,10 @@ button {
     scrollbar-width: thin;
     scrollbar-color: var(--text-soft) transparent;
     /* side padding is a little wider than the fade, so tags only fade once they're scrolled into it */
-    padding: 12px 26px 10px;
+    padding: 12px 44px 10px;
     /* tags fade out at both ends of the scrolling row instead of being sliced off at the edge */
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
   }
 
   .strip {
@@ -982,7 +1003,20 @@ button {
     grid-auto-columns: 40px;
     grid-auto-rows: min(196px, calc(100vh - 110px));
     overflow-x: auto;
-    padding: 12px 26px 4px;
+    padding: 12px 44px 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-soft) transparent;
+    /* the row fades out at both ends instead of slicing tags off */
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+  }
+
+  /* the row already fades sideways; don't also fade the whole menu top and bottom */
+  .menu {
+    max-height: none;
+    overflow-y: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
   .stamp.stamp-base {
