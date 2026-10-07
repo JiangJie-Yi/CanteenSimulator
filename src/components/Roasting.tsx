@@ -42,55 +42,49 @@ const UP = new THREE.Vector3(0, 1, 0)
 const ZERO = new THREE.Vector3()
 /** the pinching hand is drawn a little above the pinch of salt it holds */
 const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
-/** the bin for bare sticks and burnt food */
-const BIN_R = 0.24
-const BIN_H = 0.36
+/** the water bucket (bare sticks and burnt food go in it too) */
+const BIN_R = 0.27
+/** the tray for raw food waiting to go on the fire: a grid of spots */
+const TRAY_ROWS = 5
+const TRAY_W = 1.6
+const TRAY_D = 1.0
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15
 
-/** A small wooden bucket for the scraps, open at the top, with a dark inside. */
-function Bin({ position, container }: { position: [number, number, number]; container: string }) {
+/** A shallow wooden tray (盛り板) where ordered food waits raw, to be carried onto the fire. */
+function Tray({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = useMemo(() => {
-    const R = BIN_R
-    // outside wall flaring a little toward the rim, a rolled lip, then the inside back down to a raised floor
-    return new THREE.LatheGeometry([[0, 0.01], [R * 0.84, 0.01], [R * 0.86, 0.02], [R, BIN_H], [R * 1.04, BIN_H + 0.012],
-      [R * 0.94, BIN_H + 0.004], [R * 0.82, 0.05], [0, 0.05]].map(([x, y]) => new THREE.Vector2(x, y)), 40)
+    // a low board with a lip all round, its long side across the view
+    const shape = new THREE.Shape()
+    const w = TRAY_W / 2
+    const d = TRAY_D / 2
+    const r = 0.06
+    shape.moveTo(-w + r, -d)
+    shape.lineTo(w - r, -d)
+    shape.quadraticCurveTo(w, -d, w, -d + r)
+    shape.lineTo(w, d - r)
+    shape.quadraticCurveTo(w, d, w - r, d)
+    shape.lineTo(-w + r, d)
+    shape.quadraticCurveTo(-w, d, -w, d - r)
+    shape.lineTo(-w, -d + r)
+    shape.quadraticCurveTo(-w, -d, -w + r, -d)
+    const g = new THREE.ExtrudeGeometry(shape, { depth: 0.035, bevelEnabled: true, bevelSize: 0.012, bevelThickness: 0.01,
+      bevelSegments: 2 })
+    g.rotateX(-Math.PI / 2)
+    return g
   }, [])
-  const staves = useMemo(() => {
-    if (typeof document === 'undefined') return null
-    const c = document.createElement('canvas')
-    c.width = 128
-    c.height = 16
-    const g = c.getContext('2d')!
-    for (let i = 0; i < 8; i++) {
-      g.fillStyle = i % 2 ? '#8a6038' : '#9a6c40'
-      g.fillRect(i * 16, 0, 16, 16)
-      g.fillStyle = 'rgba(40, 24, 10, 0.6)'
-      g.fillRect(i * 16, 0, 1.5, 16)
-    }
-    const t = new THREE.CanvasTexture(c)
-    t.colorSpace = THREE.SRGBColorSpace
-    t.wrapS = THREE.RepeatWrapping
-    t.repeat.set(2, 1)
-    return t
-  }, [])
+  // turned so its long side runs across the screen
+  const yaw = Math.atan2(-STACK_DIR.z, STACK_DIR.x)
   return (
-    <group position={position} userData={{ container }}>
+    <group position={position} rotation-y={yaw} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={staves} side={THREE.DoubleSide} />
+        <meshToonMaterial color="#b98a55" />
       </mesh>
-      <mesh geometry={geometry} scale={[1.03, 1.02, 1.03]}>
+      <mesh geometry={geometry} scale={[1.02, 1.1, 1.02]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
-      {/* two iron hoops round the staves */}
-      {[0.08, 0.27].map((y) => (
-        <mesh key={y} position-y={y} rotation-x={Math.PI / 2}>
-          <torusGeometry args={[BIN_R * (0.86 + 0.14 * (y / BIN_H)) + 0.004, 0.008, 6, 40]} />
-          <meshToonMaterial color="#3c3c40" />
-        </mesh>
-      ))}
     </group>
   )
 }
@@ -124,13 +118,35 @@ const GRAIN_COLORS: Record<Seasoning, THREE.Color> = {
   soy: new THREE.Color('#3a1a08'),
   milk: new THREE.Color('#fbf3dc'),
   peanut: new THREE.Color('#c99a5c'),
+  water: new THREE.Color('#bfe2f2'),
 }
 /** how much one dab of each seasoning adds (0 → 1 fully coated) */
 const DAB = 0.35
 /** label over a seasoning when pointed at */
-const TOOL_NAMES: Record<Seasoning, string> = { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉' }
+const TOOL_NAMES: Record<Seasoning, string> = { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉', water: '水' }
+/** most skewers over the coals at once */
+const FIRE_SKEWERS = 16
+
+/**
+ * 美味: how well each seasoning goes with each food, from the way they're eaten in Japan and Taiwan — salt on
+ * fish, meat and plain vegetables; sweet soy on rice, mochi, mushrooms, corn and squid; condensed milk and
+ * peanut powder on mochi and sweet potato (Taiwanese style); none of them suit everything. The first dab counts
+ * in full, a second adds a little more, and from the third it's overdone.
+ */
+const PAIRING: Record<Exclude<Seasoning, 'water'>, Record<string, number>> = {
+  salt: { Fish: 18, ExtraFish: 18, Saury: 18, Mackerel: 16, ShrimpSkewer: 10, Yakitori: 12, PorkBelly: 10, Shishito: 8,
+    Asparagus: 10, Okra: 8, KingOyster: 8, GrilledShiitake: 8, GrilledCorn: 6, Potato: 14, Scallop: 8, Onigiri: 4,
+    Sausage: -4, NetMochi: -10, SweetPotato: -6, Squid: 4, BloodCake: -6 },
+  soy: { Onigiri: 18, NetMochi: 15, GrilledCorn: 15, GrilledShiitake: 15, KingOyster: 12, Scallop: 14, Squid: 15,
+    Yakitori: 10, PorkBelly: 8, Fish: 4, ExtraFish: 4, Saury: 6, Mackerel: 6, Asparagus: 6, Okra: 8, Shishito: 8,
+    Potato: 5, SweetPotato: -5, Sausage: -2, ShrimpSkewer: 5, BloodCake: 12 },
+  milk: { NetMochi: 18, SweetPotato: 15, GrilledCorn: 6, Potato: -8, BloodCake: -10 },
+  peanut: { NetMochi: 18, BloodCake: 18, SweetPotato: 8, GrilledCorn: 4, Sausage: 6 },
+}
+/** what a seasoning does to a food the table doesn't list (condensed milk on a fish…) */
+const PAIRING_DEFAULT: Record<Exclude<Seasoning, 'water'>, number> = { salt: 4, soy: 3, milk: -18, peanut: -12 }
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
-const STICK_FOOT_R = 0.8
+const STICK_FOOT_R = 0.74
 const STICK_TOP_R = 0.3
 const STICK_TOP_Y = 1.15
 const LAYER_HEIGHT = 0.1
@@ -486,6 +502,20 @@ type Piece = {
   /** once served: the plate, dish or basket it's on (plate-n, dish-n, basket-n), and where on it */
   container: string | null
   local: THREE.Vector3
+  /** dabs of each seasoning (and splashes of water) it's had, for its 美味 */
+  dabs: Record<Seasoning, number>
+  /** ordered and waiting raw on the tray (carried or clicked onto the fire from there), and when it arrived */
+  staged: boolean
+  stagedAt: number
+  /** was it on order last frame (a fresh order goes to the tray) */
+  wasPresent: boolean
+  /** 0 → 1 while moving from the tray onto the fire (1 once it's there) */
+  homeFlight: number
+  /** foil-roasted potatoes: unwrapped in the basket with a click, and 0 → 1 while the foil comes off */
+  unwrapped: boolean
+  unwrapT: number
+  /** the AI chef has seen to its seasoning */
+  chefSeasoned: boolean
   /** being carried by the pointer (a bare stick or something burnt, on its way to the bin) */
   carried: boolean
   /** 0 → 1 while dropping into the bin (−1 otherwise), and where it fell from */
@@ -559,13 +589,20 @@ type RoastingProps = {
   /** told how many pieces are off the fire (on a plate, in a pile or eaten), for the fire's capacity limit */
   onOffFire?: (count: number, loose: number) => void
   /** a piece has been eaten up (for 飽足) */
-  onEat?: (id: string) => void
+  onEat?: (id: string, taste: number) => void
   /** something to tell the diner (it isn't cooked yet, it's burnt) */
-  onNotice?: (what: 'notCooked' | 'burnt' | 'waste') => void
+  onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
   /** written every frame: how much smoke is coming off the fire (0..1), from food that's cooked and still on it */
   smoke?: RefObject<number>
   /** likewise for black smoke, from food left on until it burns */
   blackSmoke?: RefObject<number>
+  /** AI simulation: a chef who works the grill and customers who order and eat */
+  ai?: boolean
+  /** the AI customers order from the menu, and the chef adds charcoal, through the app */
+  onOrder?: (id: string) => void
+  onAddCharcoal?: () => void
+  /** something the chef or a customer says */
+  onSay?: (who: 'chef' | 'guest', text: string) => void
 }
 
 /** Roasting speed for a fire level: barely cooking on dying embers, about twice as fast at full blaze. */
@@ -578,7 +615,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  * up the extra portions Dish clones in as they appear.
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
-  onNotice, smoke, blackSmoke }: RoastingProps) {
+  onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay }: RoastingProps) {
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -600,6 +637,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
         toQ: new THREE.Quaternion(), mats, looks, bites: newBites(), sticks: [], food: [], puffs: [], stickOnly: false,
         netSpot: null, container: null, local: new THREE.Vector3(), carried: false, trash: -1,
+        dabs: { salt: 0, soy: 0, milk: 0, peanut: 0, water: 0 }, staged: false, stagedAt: 0, wasPresent: false, homeFlight: 1,
+        unwrapped: false, unwrapT: 0, chefSeasoned: false,
         trashFrom: new THREE.Vector3(),
         landed: -1,
         body: null, slot: null, eat: 0, eaten: false,
@@ -652,6 +691,64 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const present = (p: Piece) => !menuIds.has(p.id) || p.copy < (quantities[p.id] ?? 0)
 
   /**
+   * 美味 (0..100): how good it is to eat right now. Doneness first — raw is poor, done is best (a touch past done
+   * is better still), past that it dries out and burnt is bad — then each seasoning by how well it suits the
+   * food, and a splash of water makes it soggy.
+   */
+  const tasteOf = (p: Piece) => {
+    const r = p.progress / roast.times[p.id]
+    let t = r < 0.5 ? 10 + r * 20
+      : r < 1 ? 20 + (r - 0.5) * 70
+      : r < 1.3 ? 55 + (r - 1) * 30
+      : r < 2.2 ? 64 - (r - 1.3) * 26
+      : 12
+    for (const k of ['salt', 'soy', 'milk', 'peanut'] as const) {
+      const n = p.dabs[k]
+      if (!n) continue
+      const w = PAIRING[k][p.id] ?? PAIRING_DEFAULT[k]
+      // one dab in full, a second a little more, then it's too much
+      const amount = n === 1 ? 1 : n === 2 ? 1.4 : 1.4 - (n - 2) * 0.9
+      t += w > 0 ? w * amount : w * n
+    }
+    t -= p.dabs.water * 6
+    return Math.round(THREE.MathUtils.clamp(t, 0, 100))
+  }
+
+  /** how a piece lies on a plate or the tray: loose ones on their bottom, skewers flat with the food face up */
+  const flatQ = (p: Piece, out: THREE.Quaternion, dir = LAY_DIR) => {
+    if (p.loose) {
+      const z = new THREE.Vector3().crossVectors(dir, UP)
+      return out.setFromRotationMatrix(new THREE.Matrix4().makeBasis(dir, UP, z))
+    }
+    const phi = Math.atan2(p.homeP.z, p.homeP.x)
+    const outward = new THREE.Vector3(Math.cos(phi), 0, Math.sin(phi))
+    const stick = new THREE.Vector3(-(STICK_FOOT_R - STICK_TOP_R) * Math.cos(phi), STICK_TOP_Y,
+      -(STICK_FOOT_R - STICK_TOP_R) * Math.sin(phi)).normalize()
+    const face = outward.addScaledVector(stick, -outward.dot(stick)).normalize()
+    const from = new THREE.Matrix4().makeBasis(stick, face, new THREE.Vector3().crossVectors(stick, face))
+    const to = new THREE.Matrix4().makeBasis(dir, UP, new THREE.Vector3().crossVectors(dir, UP))
+    const turn = new THREE.Quaternion().setFromRotationMatrix(to.multiply(from.transpose()))
+    return out.copy(p.homeQ).premultiply(turn)
+  }
+
+  /** the tray where ordered food waits raw: where it is, and the n-th spot on it */
+  const trayAt = () => new THREE.Vector3(...(roast.tray ?? [0, 0, 0])).add(nudge('tray'))
+  // skewers lie along the tray's long side, in rows from back to front, a second layer across the first when full
+  /** loose food (potatoes, rice balls, mochi) waits in a row along the back of the tray, clear of the sticks */
+  const trayLooseSpot = (n: number) => trayAt()
+    .addScaledVector(STACK_DIR, ((n % 7) - 3) * 0.2)
+    .addScaledVector(LAY_DIR, -TRAY_D / 2 + 0.13)
+    .add(new THREE.Vector3(0, 0.07 + Math.floor(n / 7) * 0.12, 0))
+  const traySpot = (n: number) => {
+    const row = n % TRAY_ROWS
+    const layer = Math.floor(n / TRAY_ROWS)
+    return trayAt()
+      .addScaledVector(LAY_DIR, 0.13 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.46) / (TRAY_ROWS - 1))
+      .addScaledVector(STACK_DIR, 0.05 + ((layer % 2) - 0.5) * 0.06)
+      .add(new THREE.Vector3(0, 0.07 + layer * 0.06, 0))
+  }
+
+  /**
    * Plate n of the run. They go around the fire at the first plate's distance: the 2nd to its front-right, the
    * rest round the back (so none sits between the camera and the fire); a full lap moves out a ring.
    */
@@ -679,21 +776,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** where a container (plate-n, dish-n, basket-n, the seasoning box, the bin) is now */
   const containerAt = (key: string): THREE.Vector3 => {
     const [kind, n] = key.split('-')
-    if (kind === 'box') return (boxNodes[0]?.home.clone() ?? new THREE.Vector3()).add(nudge('box'))
-    if (kind === 'bin') return new THREE.Vector3(...(roast.bin ?? [0, 0, 0])).add(nudge('bin'))
+    if (kind === 'box' || kind === 'bin') return (carriers[kind]?.[0]?.home.clone() ?? new THREE.Vector3()).add(nudge(kind))
+    if (kind === 'tray') return trayAt()
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   const footprint = (key: string) => {
     const kind = key.split('-')[0]
-    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R }[kind] ?? 0.3
+    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6 }[kind] ?? 0.3
   }
   /** everything standing on the table that can be moved, for bumping into */
   const containerKeys = () => [
     ...Array.from({ length: plateCount }, (_, n) => `plate-${n}`),
     ...(roast.dish ? Array.from({ length: dishCount }, (_, n) => `dish-${n}`) : []),
     ...(roast.basket ? Array.from({ length: basketCount }, (_, n) => `basket-${n}`) : []),
-    ...(boxNodes.length ? ['box'] : []),
-    ...(roast.bin ? ['bin'] : []),
+    ...Object.keys(carriers),
+    ...(roast.tray ? ['tray'] : []),
   ]
   /**
    * Keep a moved container from passing through things: out of the stone ring, and clear of every other
@@ -789,34 +886,41 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // where it sits relative to its plate, dish or basket, so it goes along when that's dragged somewhere else
     p.local.copy(p.toP).sub(containerAt(p.container!))
     // everything points the same way along LAY_DIR
-    if (basket || dish) {
-      // already turned above
-    } else if (p.loose) {
-      // loose pieces lie on their bottom (local +Y up), long axis (local X) along the row
-      const z = new THREE.Vector3().crossVectors(LAY_DIR, UP)
-      p.toQ.setFromRotationMatrix(new THREE.Matrix4().makeBasis(LAY_DIR, UP, z))
-    } else {
-      // A skewer's local axes depend on how its parts were joined in Blender, so work from the stick itself: it
-      // runs from its foot on the outer ring up and in to its tip (blender/grilledfish.py STICK_*), and the
-      // food's broad side faces outward. Turn that frame so the stick lies along LAY_DIR, broad side up.
-      const phi = Math.atan2(p.homeP.z, p.homeP.x)
-      const outward = new THREE.Vector3(Math.cos(phi), 0, Math.sin(phi))
-      const stick = new THREE.Vector3(-(STICK_FOOT_R - STICK_TOP_R) * Math.cos(phi), STICK_TOP_Y,
-        -(STICK_FOOT_R - STICK_TOP_R) * Math.sin(phi)).normalize()
-      const face = outward.addScaledVector(stick, -outward.dot(stick)).normalize()
-      const from = new THREE.Matrix4().makeBasis(stick, face, new THREE.Vector3().crossVectors(stick, face))
-      const to = new THREE.Matrix4().makeBasis(LAY_DIR, UP, new THREE.Vector3().crossVectors(LAY_DIR, UP))
-      const turn = new THREE.Quaternion().setFromRotationMatrix(to.multiply(from.transpose()))
-      p.toQ.copy(p.homeQ).premultiply(turn)
-    }
+    // A skewer's local axes depend on how its parts were joined in Blender, so flatQ works from the stick itself
+    // (it runs from its foot on the outer ring up and in to its tip, the food's broad side facing out) and turns
+    // it to lie along LAY_DIR, broad side up; loose pieces just lie on their bottom
+    if (!basket && !dish) flatQ(p, p.toQ)
   }
 
   /**
    * Eat a piece that's sitting on the plate (or in the basket): a few chewing bites and the food is gone. A skewer
    * leaves its bare stick behind; clicking that clears it away.
    */
+  /** carry a piece from the tray onto the fire (skewers only while there's room among the coals) */
+  const putOnFire = (p: Piece) => {
+    if (!p.staged) return false
+    const skewer = !p.loose
+    const onFire = pieces.current.filter((q) => present(q) && !q.loose && !q.collected && !q.staged && !q.eaten).length
+    if (skewer && onFire >= FIRE_SKEWERS) {
+      onNotice?.('fireFull')
+      p.node.userData.onPlate = true
+      return false
+    }
+    p.staged = false
+    p.homeFlight = instant ? 1 : 0
+    p.fromP.copy(p.node.position)
+    p.fromQ.copy(p.node.quaternion)
+    p.node.userData.onPlate = true
+    return true
+  }
+
   const eat = (p: Piece) => {
     if (!p.collected || p.flight < 1 || p.eaten || !present(p)) return
+    // potatoes in the basket are unwrapped first, with a click of their own
+    if (inBasket(p) && !p.unwrapped) {
+      p.unwrapped = true
+      return
+    }
     if (p.stickOnly) {
       p.eaten = true
       p.slot = null
@@ -875,6 +979,107 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const { gl, camera, raycaster, scene: world } = useThree()
   const shift = useRef<{ key: string; start: THREE.Vector3; from: THREE.Vector3 } | null>(null)
   const scrap = useRef<{ p: Piece; x: number; y: number; started: boolean } | null>(null)
+  const stageSeq = useRef(0)
+  const aiClock = useRef(0)
+  const guestClock = useRef(0)
+  const chefSaid = useRef(0)
+
+  /** the best seasoning for a food by the PAIRING table (null if nothing suits it) */
+  const bestSeasoning = (id: string) => {
+    let best: Exclude<Seasoning, 'water'> | null = null
+    let score = 5
+    for (const k of ['salt', 'soy', 'milk', 'peanut'] as const) {
+      const w = PAIRING[k][id] ?? PAIRING_DEFAULT[k]
+      if (w > score) {
+        score = w
+        best = k
+      }
+    }
+    return best
+  }
+
+  /**
+   * The AI chef, a step at a time: keeps the fire up, puts what's waiting on the tray onto the fire, seasons each
+   * piece as it comes good (once, with what suits it best), takes it off when it's done, unwraps the potatoes,
+   * and clears burnt food and bare sticks into the bucket.
+   */
+  const runChef = () => {
+    const say = (text: string) => {
+      if (performance.now() - chefSaid.current > 2500) {
+        chefSaid.current = performance.now()
+        onSay?.('chef', text)
+      }
+    }
+    if (fire && fire.current < 0.35) {
+      onAddCharcoal?.()
+      say('火小了，添點炭')
+      return
+    }
+    const live = pieces.current.filter((p) => present(p) && !p.eaten && p.trash < 0 && !p.carried)
+    const stageOfP = (p: Piece) => stageOf(p.progress / roast.times[p.id]).key
+    const scrapIt = live.find((p) => p.stickOnly || (!p.collected && !p.staged && stageOfP(p) === 'burnt'))
+    if (scrapIt && carriers.bin) {
+      scrapIt.trashFrom.copy(scrapIt.node.position)
+      scrapIt.trash = 0
+      scrapIt.node.userData.onPlate = true
+      say(scrapIt.stickOnly ? '竹籤收一下' : '這個烤焦了，丟掉吧')
+      return
+    }
+    const ready = live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 &&
+      p.progress / roast.times[p.id] >= 1.05)
+    if (ready) {
+      collect(ready)
+      say(`${roast.names[ready.id]}烤好了！`)
+      return
+    }
+    const toSeason = live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 && !p.chefSeasoned &&
+      p.progress / roast.times[p.id] >= 0.85)
+    if (toSeason) {
+      toSeason.chefSeasoned = true
+      const k = bestSeasoning(toSeason.id)
+      if (k && !toSeason.dabs[k]) {
+        season(toSeason, k)
+        emit(k, toSeason.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
+        say(`${roast.names[toSeason.id]}${{ salt: '撒點鹽', soy: '刷上醬油', milk: '淋上煉乳', peanut: '撒花生粉' }[k]}`)
+      }
+      return
+    }
+    const wrapped = live.find((p) => p.collected && inBasket(p) && !p.unwrapped && p.flight >= 1)
+    if (wrapped) {
+      wrapped.unwrapped = true
+      return
+    }
+    const next = live.filter((p) => p.staged).sort((a, b) => a.stagedAt - b.stagedAt)[0]
+    if (next && putOnFire(next)) say(`${roast.names[next.id]}上火了`)
+  }
+
+  /**
+   * AI customers: now and then one orders something off the menu, and whatever's ready on the plates gets eaten
+   * (one piece at a time), followed by a word on how it tasted.
+   */
+  const runGuests = () => {
+    guestClock.current += 0.8
+    if (guestClock.current > 9 && onOrder) {
+      guestClock.current = 0
+      const pick = itemIds[Math.floor(Math.random() * itemIds.length)]
+      onOrder(pick)
+      onSay?.('guest', `我要一份${roast.names[pick] ?? pick}！`)
+    }
+    if (pieces.current.some((p) => p.eat > 0 && !p.eaten && !p.stickOnly)) return
+    const dish = pieces.current.find((p) => present(p) && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly &&
+      p.trash < 0 && stageOf(p.progress / roast.times[p.id]).key === 'done')
+    if (!dish) return
+    if (inBasket(dish) && !dish.unwrapped) {
+      dish.unwrapped = true
+      return
+    }
+    const taste = tasteOf(dish)
+    eat(dish)
+    const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
+    const words = ['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]
+    window.setTimeout(() => onSay?.('guest', `${roast.names[dish.id]}${words} ${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`),
+      EAT_SECONDS * 1000)
+  }
   const [saltInHand, setSaltInHand] = useState(false)
   const hand = useRef<THREE.Group>(null)
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean } | null
@@ -887,16 +1092,28 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       homeQ: node.quaternion.clone(), back: 1 }] : []
   }), [root, roast.tools])
   // the seasoning box and what stands in it (but not the utensils, which have their own homes), for dragging
-  const boxNodes = useMemo(() => (roast.toolBox ?? []).flatMap((name) => {
-    const node = root.getObjectByName(name)
-    if (!node || Object.prototype.hasOwnProperty.call(roast.tools ?? {}, name)) return []
-    return [{ node, home: node.position.clone() }]
-  }), [root, roast.toolBox, roast.tools])
+  // the seasoning box and the water bucket: each moves as one with whatever stands in it (the utensils have their
+  // own homes, which move along)
+  const carriers = useMemo(() => {
+    const group = (names: string[] | undefined) => (names ?? []).flatMap((name) => {
+      const node = root.getObjectByName(name)
+      if (!node || Object.prototype.hasOwnProperty.call(roast.tools ?? {}, name)) return []
+      return [{ node, home: node.position.clone() }]
+    })
+    const out: Record<string, { node: THREE.Object3D; home: THREE.Vector3 }[]> = {}
+    const box = group(roast.toolBox)
+    const bucket = group(roast.bucket)
+    if (box.length) out.box = box
+    if (bucket.length) out.bin = bucket
+    return out
+  }, [root, roast.toolBox, roast.bucket, roast.tools])
   useEffect(() => {
-    // grabbing the box (not a pot or a utensil) drags the whole thing
-    const box = boxNodes[0]?.node
-    if (box) box.userData.container = 'box'
-  }, [boxNodes])
+    // grabbing the box or the bucket itself (not a pot or a utensil) drags the whole thing
+    for (const [key, nodes] of Object.entries(carriers)) if (nodes[0]) nodes[0].node.userData.container = key
+  }, [carriers])
+  /** which group a utensil belongs to (it moves when that group is dragged) */
+  const carrierOf = (name: string) =>
+    (roast.toolBox ?? []).includes(name) ? 'box' : (roast.bucket ?? []).includes(name) ? 'bin' : null
   type Tool = (typeof tools)[number]
   // the pots they stand in: pointing at or grabbing a pot means its utensil
   const pots = useMemo(() => Object.entries(roast.toolPots ?? {}).flatMap(([potName, toolName]) => {
@@ -936,9 +1153,31 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   /** a seasoning lands on a piece: its look changes (more of it with every dab) */
   const season = (p: Piece, kind: Seasoning) => {
-    const u = { salt: p.looks.uSalt, soy: p.looks.uSoy, milk: p.looks.uMilk, peanut: p.looks.uPeanut }[kind]
-    u.value = Math.min(1, u.value + DAB)
+    const before = tasteOf(p)
+    p.dabs[kind]++
+    if (kind === 'water') {
+      // a splash of water cools it (it stops short of charring for a while) — and leaves it soggy
+      p.progress = Math.max(0, p.progress - roast.times[p.id] * 0.15)
+    } else {
+      const u = { salt: p.looks.uSalt, soy: p.looks.uSoy, milk: p.looks.uMilk, peanut: p.looks.uPeanut }[kind]
+      u.value = Math.min(1, u.value + DAB)
+    }
+    const delta = tasteOf(p) - before
+    pop(p.node.position.clone().add(new THREE.Vector3(0, 0.3, 0)), delta)
   }
+
+  // little floating words: how a seasoning changed a piece's 美味
+  const [pops, setPops] = useState<{ id: number; at: [number, number, number]; text: string; good: boolean }[]>([])
+  const popId = useRef(0)
+  const pop = (at: THREE.Vector3, delta: number) => {
+    if (!delta) return
+    const id = ++popId.current
+    const text = delta > 0 ? `美味 +${delta}` : `美味 ${delta}`
+    setPops((all) => [...all, { id, at: at.toArray() as [number, number, number], text, good: delta > 0 }])
+    window.setTimeout(() => setPops((all) => all.filter((x) => x.id !== id)), 1500)
+  }
+  // the 美味 of whatever's pointed at
+  const [tasteTip, setTasteTip] = useState<{ at: [number, number, number]; taste: number } | null>(null)
 
   const hovered = useRef<Piece | null>(null)
   // the hovered food's tag brightens too (tags sit at low opacity until pointed at)
@@ -1024,7 +1263,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         hoveredTool.current = tool
         setToolLabel(tool ? { kind: tool.kind, at: [tool.home.x, tool.home.y + 0.32, tool.home.z] } : null)
       }
-      if (p !== hovered.current) setHover(p)
+      if (p !== hovered.current) {
+        setHover(p)
+        // pointing at a piece shows how good it'd be to eat right now
+        setTasteTip(p ? { at: p.node.position.clone().add(new THREE.Vector3(0, 0.42, 0)).toArray() as [number, number, number],
+          taste: tasteOf(p) } : null)
+      }
       el.style.cursor = tool ? 'grab' : p ? 'pointer' : pickContainer() ? 'grab' : ''
     }
     const onDown = (e: PointerEvent) => {
@@ -1048,6 +1292,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const start = groundHit()
         if (!start) return
         shift.current = { key, start, from: nudge(key).clone() }
+        lightContainer(key)
         if (controls) controls.enabled = false
         document.body.classList.add('is-carrying')
         window.addEventListener('pointermove', slide)
@@ -1075,6 +1320,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (d.target) {
         season(d.target, d.tool.kind)
         emit(d.tool.kind, d.at.clone().add(new THREE.Vector3(0, -0.1, 0)), 40)
+      } else if (d.tool.kind === 'water' && Math.hypot(d.at.x, d.at.z) < RING_CLEAR * 0.7) {
+        // water thrown on the coals: they hiss and steam, and the fire drops right down
+        emit('water', d.at.clone().add(new THREE.Vector3(0, -0.1, 0)), 60)
+        if (fire) fire.current = Math.max(0, fire.current - 0.3)
+        setWisps((all) => [...all.filter((w) => w.key !== 'douse'), { key: 'douse', at: [0, 0.15, 0] }])
       }
       d.tool.back = 0
       drag.current = null
@@ -1100,6 +1350,26 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
       return hit ? root.worldToLocal(hit) : null
     }
+    /** while a plate, the basket, the box or the bucket is being dragged, it (and whatever it carries) glows */
+    const lit: { mat: THREE.MeshToonMaterial; was: THREE.Color }[] = []
+    const lightContainer = (key: string | null) => {
+      for (const { mat, was } of lit) mat.emissive.copy(was)
+      lit.length = 0
+      if (!key) return
+      const roots: THREE.Object3D[] = []
+      world.traverse((o) => { if (o.userData.container === key) roots.push(o) })
+      for (const b of carriers[key] ?? []) roots.push(b.node)
+      const seen = new Set<THREE.Material>()
+      for (const r of roots) r.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return
+        for (const mat of Array.isArray(o.material) ? o.material : [o.material]) {
+          if (!(mat instanceof THREE.MeshToonMaterial) || seen.has(mat)) continue
+          seen.add(mat)
+          lit.push({ mat, was: mat.emissive.clone() })
+          mat.emissive.add(HOVER_GLOW)
+        }
+      })
+    }
     const slide = (e: PointerEvent) => {
       const s = shift.current
       if (!s) return
@@ -1114,11 +1384,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const next = settle(s.key, want).sub(base)
       next.y = 0
       moved.current.set(s.key, next)
-      if (s.key === 'box') {
-        // the box carries its pots and utensils with it
-        for (const b of boxNodes) b.node.position.copy(b.home).add(next)
-        for (const t of tools) if (t.back >= 1 && drag.current?.tool !== t) t.node.position.copy(t.home0).add(next)
-        for (const t of tools) t.home.copy(t.home0).add(next)
+      if (carriers[s.key]) {
+        // the box carries its pots and utensils with it, the bucket its dipper
+        for (const b of carriers[s.key]) b.node.position.copy(b.home).add(next)
+        for (const t of tools) {
+          if (carrierOf(t.node.name) !== s.key) continue
+          t.home.copy(t.home0).add(next)
+          if (t.back >= 1 && drag.current?.tool !== t) t.node.position.copy(t.home)
+        }
       }
       // potatoes rolling about in the basket go along with it
       const delta = next.clone().sub(before)
@@ -1127,6 +1400,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const release = () => {
       shift.current = null
+      lightContainer(null)
       window.removeEventListener('pointermove', slide)
       document.body.classList.remove('is-carrying')
       if (controls) controls.enabled = true
@@ -1138,10 +1412,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (!q.started) {
         if (Math.hypot(e.clientX - q.x, e.clientY - q.y) < 6) return
         q.started = true
+        setTasteTip(null)
         q.p.carried = true
         q.p.node.userData.onPlate = true
         if (controls) controls.enabled = false
         document.body.classList.add('is-carrying')
+        setHover(q.p)                  // what's being carried glows
       }
       aim(e)
       const plane = new THREE.Plane(UP, -root.localToWorld(new THREE.Vector3(0, 0.55, 0)).y)
@@ -1156,15 +1432,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       document.body.classList.remove('is-carrying')
       if (controls) controls.enabled = true
       q.p.carried = false
+      setHover(null)
+      setTasteTip(null)
       const bin = containerAt('bin')
       const pos = q.p.node.position
-      if (roast.bin && Math.hypot(pos.x - bin.x, pos.z - bin.z) < BIN_R + 0.16) {
-        // let go over the bin: it drops in — and throwing away good food draws a word
+      if (carriers.bin && Math.hypot(pos.x - bin.x, pos.z - bin.z) < BIN_R + 0.16) {
+        // let go over the bucket: it drops in — and throwing away good food draws a word
         const stage = stageOf(q.p.progress / roast.times[q.p.id]).key
         if (!q.p.stickOnly && stage === 'done') onNotice?.('waste')
         q.p.trash = 0
         q.p.trashFrom.copy(pos)
-      } else if (!q.p.collected) {
+        q.p.staged = false
+      } else if (q.p.staged && Math.hypot(pos.x, pos.z) < RING_CLEAR) {
+        // raw food from the tray, let go over the fire: onto its skewer spot (or the net, or the ash)
+        putOnFire(q.p)
+      } else if (!q.p.collected && !q.p.staged) {
         q.p.node.userData.onPlate = false            // back onto its skewer spot
       }
     }
@@ -1174,7 +1456,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       aim(e)
       const p = pickFood()
       if (!p) return
-      if (p.collected) eat(p)
+      if (p.staged) putOnFire(p)
+      else if (p.collected && inBasket(p) && !p.unwrapped) p.unwrapped = true      // unwrap the foil first
+      else if (p.collected) eat(p)
       else collect(p)
     }
     const onLeave = () => {
@@ -1330,7 +1614,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           t.node.quaternion.copy(t.homeQ)
         }
       }
-      const lit = active && (held || hoveredTool.current === t)
+      const lit = active && (held || hoveredTool.current === t ||
+        (!!shift.current && carrierOf(t.node.name) === shift.current.key))
       t.node.traverse((o) => {
         if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial) {
           o.material.emissive.set(lit ? HOVER_GLOW : 0x000000)
@@ -1356,7 +1641,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // the grill net holds a few at a time: hand free spots to waiting pieces, first ordered first
     const spots = roast.netSpots ?? []
     if (spots.length) {
-      const onNet = (p: Piece) => roast.net?.includes(p.id) && present(p) && !p.collected
+      const onNet = (p: Piece) => roast.net?.includes(p.id) && present(p) && !p.collected && !p.staged
       const taken = new Set(pieces.current.filter((p) => onNet(p) && p.netSpot !== null).map((p) => p.netSpot))
       for (const p of pieces.current.filter((q) => onNet(q) && q.netSpot === null).sort((a, b) => a.copy - b.copy)) {
         const free = spots.findIndex((_, i) => !taken.has(i))
@@ -1365,12 +1650,31 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         taken.add(free)
       }
     }
-    const waiting = (p: Piece) => !!roast.net?.includes(p.id) && !p.collected && p.netSpot === null
+    const waiting = (p: Piece) => !!roast.net?.includes(p.id) && !p.collected && !p.staged && p.netSpot === null
+    // what's waiting on the tray, in the order it arrived
+    const onTray = pieces.current.filter((p) => p.staged && present(p) && !p.carried && p.trash < 0)
+      .sort((a, b) => a.stagedAt - b.stagedAt)
 
     pieces.current.forEach((p, n) => {
       bindMaterials(p)
+      if (present(p) && !p.wasPresent) {
+        // just ordered: it's brought out raw on the tray (the base fish, not on the menu, starts on the fire)
+        p.wasPresent = true
+        if (menuIds.has(p.id) && roast.tray) {
+          p.staged = true
+          p.stagedAt = ++stageSeq.current
+          p.node.userData.onPlate = true
+        }
+      }
       if (!present(p)) {
-        // taken off the order: next time it comes back raw, on its skewer
+        // taken off the order: next time it comes back raw, on the tray
+        p.wasPresent = false
+        p.staged = false
+        p.homeFlight = 1
+        p.unwrapped = false
+        p.unwrapT = 0
+        p.chefSeasoned = false
+        for (const k of Object.keys(p.dabs) as Seasoning[]) p.dabs[k] = 0
         p.progress = 0
         p.netSpot = null
         p.container = null
@@ -1416,14 +1720,30 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
       } else if (p.carried) {
         // (held by the pointer, see haul)
+      } else if (p.staged) {
+        // waiting raw on the tray, laid flat in its spot
+        const at = p.loose ? trayLooseSpot(Math.max(0, onTray.filter((q) => q.loose).indexOf(p)))
+          : traySpot(Math.max(0, onTray.filter((q) => !q.loose).indexOf(p)))
+        p.node.position.lerp(at, Math.min(1, dt * 10))
+        flatQ(p, p.node.quaternion, STACK_DIR)
       } else if (!p.collected) {
-        if (active && !waiting(p)) p.progress += dt * roastRate(fire?.current ?? 0.55)
+        if (active && !waiting(p) && p.homeFlight >= 1) p.progress += dt * roastRate(fire?.current ?? 0.55)
         p.node.quaternion.copy(p.homeQ)
         p.node.position.x = p.homeP.x
         p.node.position.z = p.homeP.z
         if (p.netSpot !== null) {
           p.node.position.x = spots[p.netSpot][0]
           p.node.position.z = spots[p.netSpot][1]
+        }
+        if (p.homeFlight < 1) {
+          // carried from the tray onto the fire: a little arc to its spot, turning upright onto the stick
+          p.homeFlight = Math.min(1, p.homeFlight + dt / 0.6)
+          const e = p.homeFlight < 0.5 ? 2 * p.homeFlight ** 2 : 1 - (-2 * p.homeFlight + 2) ** 2 / 2
+          const to = new THREE.Vector3(p.node.position.x, p.homeP.y, p.node.position.z)
+          p.node.position.lerpVectors(p.fromP, to, e)
+          p.node.position.y += Math.sin(p.homeFlight * Math.PI) * 0.35
+          p.node.quaternion.slerpQuaternions(p.fromQ, p.homeQ, e)
+          if (p.homeFlight >= 1) p.node.userData.onPlate = false
         }
         if (!menuIds.has(p.id)) p.node.position.y = p.homeP.y   // the base fish has no pop-in driving y
       } else {
@@ -1467,10 +1787,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const glow = hovered.current === p
       // potatoes: wrapped and whole in the ash. Picked up, the foil is unwrapped on the way over — the sheet opens
       // out, swells and falls away — and the potato lands in the basket bare, broken open to show the flesh
-      const peel = p.collected ? THREE.MathUtils.clamp((p.flight - 0.1) / 0.7, 0, 1) : -1
+      // potatoes in the basket keep their foil until clicked; then it opens out, swells and falls away
+      if (p.unwrapped) p.unwrapT = Math.min(1, p.unwrapT + dt / 0.7)
+      const peel = p.unwrapped ? p.unwrapT : -1
       for (const { mat, mesh, base, emissive, foil, show } of p.mats) {
         // (hide the mesh rather than the material, so its ink outline goes with it)
-        if (show === 'closed') mesh.visible = !(p.collected && p.flight > (foil ? 0.1 : 0.35))
+        if (show === 'closed') mesh.visible = !(p.unwrapped && p.unwrapT > (foil ? 0.05 : 0.35))
         if (show === 'open') {
           mesh.visible = peel > 0 && peel < 1
           if (mesh.visible) {
@@ -1507,7 +1829,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.node.rotateOnWorldAxis(STACK_DIR, -0.12 * lift)
         }
         if (p.eat >= 1) {
-          onEat?.(p.id)
+          onEat?.(p.id, tasteOf(p))
           if (p.sticks.length) {
             p.stickOnly = true
             for (const m of p.food) m.visible = false
@@ -1531,6 +1853,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
     if (roast.basket) settleBasket(dt)
 
+    // AI simulation: the chef works the grill, customers order and eat
+    if (ai && active) {
+      aiClock.current += dt
+      if (aiClock.current > 0.8) {
+        aiClock.current = 0
+        runChef()
+        runGuests()
+      }
+    }
+
     // smoke rises once food over the coals starts to cook through (fat and juices dripping onto the charcoal):
     // none from a bare fire, more with every done piece, most when it's charring
     if (smoke) {
@@ -1539,7 +1871,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       for (const p of pieces.current) {
         if (!present(p) || p.collected || waiting(p)) continue
         const r = p.progress / roast.times[p.id]
-        s += THREE.MathUtils.smoothstep(r, 0.7, 1.1) * 0.3 + THREE.MathUtils.smoothstep(r, 1.5, 2.5) * 0.3
+        // (pale smoke while it cooks; once it's burning there's only the black)
+        s += THREE.MathUtils.smoothstep(r, 0.7, 1.1) * 0.35 * (1 - THREE.MathUtils.smoothstep(r, 1.8, 2.2))
         // food left to burn sends up thick black smoke
         b += THREE.MathUtils.smoothstep(r, 2.0, 2.8) * 0.45
       }
@@ -1566,7 +1899,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (needBaskets !== basketCount) setBasketCount(needBaskets)
     if (needDishes !== dishCount) setDishCount(needDishes)
     // skewers off the fire (for the fire's limit), and potatoes still around (for the basket's)
-    const off = pieces.current.filter((p) => p.collected && present(p) && !p.loose).length
+    const off = pieces.current.filter((p) => (p.collected || p.staged) && present(p) && !p.loose).length
     const loose = pieces.current.filter((p) => inBasket(p) && present(p) && !p.eaten).length
     if (off * 1000 + loose !== lastOff.current) {
       lastOff.current = off * 1000 + loose
@@ -1574,7 +1907,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const next: { key: string; id: string; state: TagState }[] = []
     for (const p of pieces.current) {
-      if (!present(p) || p.collected || (roast.net?.includes(p.id) && p.netSpot === null)) continue
+      if (!present(p) || p.collected || p.staged || (roast.net?.includes(p.id) && p.netSpot === null)) continue
       const r = p.progress / roast.times[p.id]
       const s = stageOf(r)
       next.push({ key: p.key, id: p.id, state: { stage: s.key, label: s.label, pct: Math.round(Math.min(1, r) * 20) / 20 } })
@@ -1599,7 +1932,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
-      {roast.bin && <Bin container="bin" position={containerAt('bin').toArray() as [number, number, number]} />}
+      {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       {/* salt is taken with the fingers: a pinching hand follows the pinch while it's carried */}
       {saltInHand && (
         <group ref={hand}>
@@ -1607,6 +1940,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </group>
       )}
       <points geometry={grains.geometry} material={grainMaterial} frustumCulled={false} renderOrder={3} />
+      {active && tasteTip && (
+        <Html position={tasteTip.at} center zIndexRange={[35, 25]} style={{ pointerEvents: 'none' }}>
+          <span className="taste-tip">美味 <b>{tasteTip.taste}</b></span>
+        </Html>
+      )}
+      {pops.map((x) => (
+        <Html key={x.id} position={x.at} center zIndexRange={[36, 26]} style={{ pointerEvents: 'none' }}>
+          <span className={`taste-pop${x.good ? '' : ' is-bad'}`}>{x.text}</span>
+        </Html>
+      ))}
       {active && toolLabel && (
         <Html position={toolLabel.at} center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
           <span className="tool-tag">{TOOL_NAMES[toolLabel.kind]}<small>拖到食物上</small></span>

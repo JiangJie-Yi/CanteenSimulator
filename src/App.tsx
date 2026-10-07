@@ -15,6 +15,7 @@ import { FireControl } from './components/FireControl'
 import { Fullness } from './components/Fullness'
 import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
+import { PotCooking } from './components/PotCooking'
 import { Roasting } from './components/Roasting'
 import { Steam } from './components/Steam'
 import { StoveControls } from './components/StoveControls'
@@ -139,13 +140,19 @@ type SceneProps = {
   frame: Frame
   onOffFire: (count: number, loose: number) => void
   /** a piece of food has been eaten (for the fullness meter) */
-  onEat: (id: string) => void
+  onEat: (id: string, taste: number) => void
+  /** AI simulation on, and what it does through the app */
+  ai: boolean
+  onOrder: (id: string) => void
+  onAddCharcoal: () => void
+  onSay: (who: 'chef' | 'guest', text: string) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
-  onNotice: (what: 'notCooked' | 'burnt' | 'waste') => void
+  onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView }: SceneProps) {
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai,
+  onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
   const camera = useThree((s) => s.camera)
@@ -308,9 +315,14 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
               {dish.roast && (
                 <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
-                  onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke} />
+                  onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
+                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} />
               )}
               {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
+              {dish.heatControl && (
+                <PotCooking url={dish.model} itemIds={ITEM_IDS[dish.id]} temp={brothTemp} active={i === active}
+                  onEat={onEat} onNotice={onNotice} />
+              )}
               {soup && dish.heatControl && dish.brothY !== undefined && (
                 // inner radius of the pot at the broth line (blender/hotpot.py INNER_R)
                 <Bubbles position-y={dish.brothY + 0.004} radius={0.74} boil={boilLevel} />
@@ -378,9 +390,21 @@ export default function App() {
     const id = window.setInterval(() => setKcal((k) => Math.max(0, k - DIGEST_KCAL_PER_SEC)), 1000)
     return () => window.clearInterval(id)
   }, [])
-  const onEat = useCallback((id: string) => {
+  // 評價: the average 美味 of everything eaten
+  const [rating, setRating] = useState({ sum: 0, n: 0 })
+  const onEat = useCallback((id: string, taste: number) => {
     const cal = ALL_ITEMS.get(id)?.kcal ?? 0
     setKcal((k) => k + cal)
+    setRating((r) => ({ sum: r.sum + taste, n: r.n + 1 }))
+  }, [])
+  // AI simulation: a chef and customers, and what they've said lately
+  const [ai, setAi] = useState(false)
+  const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
+  const chatId = useRef(0)
+  const talk = useCallback((who: 'chef' | 'guest', text: string) => {
+    const id = ++chatId.current
+    setChat((all) => [...all.slice(-3), { id, who, text }])
+    window.setTimeout(() => setChat((all) => all.filter((m) => m.id !== id)), 6000)
   }, [])
   const [theme, toggleTheme] = useTheme()
   // the menu can be folded away to give the food the whole screen
@@ -548,18 +572,28 @@ export default function App() {
         >
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }}
-            onEat={onEat} onNotice={(what) => say(UI[lang][what])} resetView={resetView} />
+            onEat={onEat} onNotice={(what) => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])}
+            resetView={resetView} ai={ai} onOrder={(id) => changeQty(id, 1)} onAddCharcoal={addCharcoal} onSay={talk} />
         </Canvas>
       </div>
       <div className="stage" ref={stageRef}>
         <Brand night={theme === 'dark'} lang={lang} />
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
-        <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} />
+        <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} />
+        {ai && chat.length > 0 && (
+          <ul className="ai-chat" aria-live="polite">
+            {chat.map((m) => (
+              <li key={m.id} className={`ai-line ai-${m.who}`}>
+                <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : UI[lang].guest}</span>{m.text}
+              </li>
+            ))}
+          </ul>
+        )}
         <DishSwitcher dishes={DISHES} index={active} onChange={setActive} lang={lang} />
         <button type="button" className="view-reset" onClick={() => setResetView((n) => n + 1)}
           aria-label={UI[lang].resetView} title={UI[lang].resetView}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4h4" /><circle cx="12" cy="12" r="2.2" /></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
         </button>
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
       </div>
@@ -571,6 +605,8 @@ export default function App() {
         aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
         {menuFolded ? '‹' : '›'}
       </button>
+      <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => setAi((v) => !v)}
+        aria-pressed={ai} title={UI[lang].aiLabel}>{UI[lang].ai}</button>
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}
       </button>

@@ -116,15 +116,17 @@ export type Roast = {
   toolPots?: Record<string, string>
   /** the seasoning box's objects: the first is the box itself, which can be dragged with everything in it */
   toolBox?: string[]
-  /** where the bin for bare sticks and burnt food stands */
-  bin?: [number, number, number]
+  /** the water bucket's objects (bucket first): dragged as one; bare sticks and burnt food are dropped in it */
+  bucket?: string[]
+  /** where the ordered food waits, raw, on a tray, until it's carried to the fire */
+  tray?: [number, number, number]
   /** items toasted on the little grill net over the coals rather than on a skewer (they puff up as they cook) */
   net?: string[]
   /** where the net holds them (x, z in the dish): one per spot, the rest wait until a spot frees up */
   netSpots?: [number, number][]
 }
 
-export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut'
+export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut' | 'water'
 
 /** Doneness stages for roasting, by fraction of the cook time. */
 export const ROAST_STAGES = [
@@ -151,18 +153,18 @@ export const DISHES: Dish[] = [
       { id: 'kombu', name: '昆布湯底', ja: '昆布だし', en: 'Kombu Broth', price: 100, broth: asset('textures/broth-kombu.png'), hide: CHILIES },
     ],
     items: [
-      { id: 'NapaCabbage', name: '白菜', ja: '白菜', en: 'Napa Cabbage', price: 20 },
-      { id: 'BeefSlice', name: '牛肉片', ja: '牛肉スライス', en: 'Beef Slices', price: 60 },
-      { id: 'Meatball', name: '貢丸', ja: '肉団子', en: 'Pork Ball', price: 30 },
-      { id: 'Fishball', name: '魚丸', ja: '魚団子', en: 'Fish Ball', price: 30 },
-      { id: 'Tofu', name: '豆腐', ja: '豆腐', en: 'Tofu', price: 20 },
-      { id: 'FriedTofu', name: '油豆腐', ja: '厚揚げ', en: 'Fried Tofu', price: 25 },
-      { id: 'Taro', name: '芋頭', ja: '里芋', en: 'Taro', price: 25 },
-      { id: 'Corn', name: '玉米', ja: 'とうもろこし', en: 'Corn', price: 20 },
-      { id: 'CrabStick', name: '蟹肉棒', ja: 'カニカマ', en: 'Crab Stick', price: 35 },
-      { id: 'Shrimp', name: '鮮蝦', ja: '海老', en: 'Shrimp', price: 50 },
-      { id: 'ShiitakeCap', name: '香菇', ja: '椎茸', en: 'Shiitake', price: 20 },
-      { id: 'Enoki', name: '金針菇', ja: 'えのき', en: 'Enoki', price: 20 },
+      { id: 'NapaCabbage', name: '白菜', ja: '白菜', en: 'Napa Cabbage', price: 20, kcal: 15 },
+      { id: 'BeefSlice', name: '牛肉片', ja: '牛肉スライス', en: 'Beef Slices', price: 60, kcal: 150 },
+      { id: 'Meatball', name: '貢丸', ja: '肉団子', en: 'Pork Ball', price: 30, kcal: 120 },
+      { id: 'Fishball', name: '魚丸', ja: '魚団子', en: 'Fish Ball', price: 30, kcal: 90 },
+      { id: 'Tofu', name: '豆腐', ja: '豆腐', en: 'Tofu', price: 20, kcal: 80 },
+      { id: 'FriedTofu', name: '油豆腐', ja: '厚揚げ', en: 'Fried Tofu', price: 25, kcal: 130 },
+      { id: 'Taro', name: '芋頭', ja: '里芋', en: 'Taro', price: 25, kcal: 110 },
+      { id: 'Corn', name: '玉米', ja: 'とうもろこし', en: 'Corn', price: 20, kcal: 90 },
+      { id: 'CrabStick', name: '蟹肉棒', ja: 'カニカマ', en: 'Crab Stick', price: 35, kcal: 70 },
+      { id: 'Shrimp', name: '鮮蝦', ja: '海老', en: 'Shrimp', price: 50, kcal: 60 },
+      { id: 'ShiitakeCap', name: '香菇', ja: '椎茸', en: 'Shiitake', price: 20, kcal: 15 },
+      { id: 'Enoki', name: '金針菇', ja: 'えのき', en: 'Enoki', price: 20, kcal: 20 },
     ],
     oneBase: true,
     emptyHide: ['Broth', 'Scallion', ...CHILIES],
@@ -239,6 +241,7 @@ export const DISHES: Dish[] = [
       { id: 'Asparagus', name: '烤蘆筍', ja: 'アスパラ', en: 'Asparagus', price: 40, kcal: 20 },
       { id: 'Okra', name: '烤秋葵', ja: 'オクラ', en: 'Okra', price: 35, kcal: 25 },
       { id: 'Scallop', name: '烤干貝', ja: 'ホタテ串', en: 'Scallop', price: 90, kcal: 90 },
+      { id: 'BloodCake', name: '烤米血', ja: '米血糕', en: 'Rice Blood Cake', price: 35, kcal: 160 },
       // toasted on the grill net, three at a time; more wait their turn
       { id: 'NetMochi', name: '網烤年糕', ja: '焼き餅', en: 'Grilled Mochi', price: 30, kcal: 120 },
     ],
@@ -246,11 +249,11 @@ export const DISHES: Dish[] = [
     roast: {
       times: { Fish: 40, ExtraFish: 40, Saury: 35, Mackerel: 45, GrilledCorn: 30, GrilledShiitake: 20, Onigiri: 25, ShrimpSkewer: 20,
         Sausage: 25, Potato: 55, SweetPotato: 55,
-        Yakitori: 30, PorkBelly: 30, Squid: 25, Shishito: 15,  KingOyster: 20, Asparagus: 15, Okra: 15, Scallop: 20,
+        Yakitori: 30, PorkBelly: 30, Squid: 25, Shishito: 15,  KingOyster: 20, Asparagus: 15, Okra: 15, Scallop: 20, BloodCake: 20,
         NetMochi: 25 },
       names: { Fish: '香魚', ExtraFish: '香魚', Saury: '秋刀魚', Mackerel: '鯖魚', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '醬油飯糰',
         ShrimpSkewer: '蝦串', Sausage: '香腸', Potato: '馬鈴薯', SweetPotato: '地瓜',
-        Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '青椒',  KingOyster: '杏鮑菇', Asparagus: '蘆筍', Okra: '秋葵', Scallop: '干貝',
+        Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '青椒',  KingOyster: '杏鮑菇', Asparagus: '蘆筍', Okra: '秋葵', Scallop: '干貝', BloodCake: '米血',
         NetMochi: '年糕' },
       loose: ['Potato', 'SweetPotato', 'NetMochi', 'Onigiri'],
       // toasted on the grill net, which holds three at a time between them (the rest wait their turn)
@@ -259,21 +262,23 @@ export const DISHES: Dish[] = [
       netSpots: [[-0.11, 0.0], [0.1, 0.07], [0.06, -0.11]],
       // just outside the stones, to the upper right of the fire as the camera sees it
       // (kept clear of the corn skewer at -55°, which used to stand right in front of it)
+      // plates and dishes on the right of the fire as the camera sees it, the box and the bucket on the left
       plate: [1.38, 0.02, -1.16],
       // just outside the stones on the left as the camera sees it
-      basket: { at: [-1.45, 0, 0.85], capacity: 20 },
+      basket: { at: [1.89, 0, -0.13], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
       // behind the fire to the left of the plate, as the camera sees it
-      dish: { at: [0.35, 0.0, -1.62], capacity: 3 },
+      dish: { at: [0.42, 0.0, -1.8], capacity: 3 },
       // the spoons and brush in the seasoning box are what's carried; grabbing a pot picks up its utensil
       // (salt is taken by hand: SaltPinch only marks where the pinch is taken from)
-      tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut' },
+      tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut', WaterDipper: 'water' },
       toolPots: { SaltPot: 'SaltPinch', SoyPot: 'SoyBrush', MilkJar: 'MilkBrush', PeanutBowl: 'PeanutSpoon' },
       // the seasoning box (dragged as a whole) and everything standing in it
       toolBox: ['SeasoningBox', 'SaltPot', 'SoyPot', 'MilkJar', 'PeanutBowl', 'SaltPinch', 'SoyBrush', 'MilkBrush',
         'PeanutSpoon'],
-      // a bin for bare sticks and burnt food, back on the left
-      bin: [-1.05, 0, -1.35],
+      // a bucket of water, for splashing and for the scraps; the tray where ordered food waits to go on the fire
+      bucket: ['WaterBucket', 'WaterDipper'],
+      tray: [1.22, 0.0, 1.36],
     },
     layout: {
       mode: 'ring',

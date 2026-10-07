@@ -263,8 +263,31 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M9 8l6 2M9 11l6 2M9 14l6 2" />
     </>
   ),
+  // ---- grilled-fish sets: each its own fish over the same bowl of rice, so the three tell apart at a glance
+  'set-ayu': (
+    <>
+      <path d="M3 8c2-3.5 5-3.5 7.5 0s5.5 3.5 7.5 0M3 8c2 2 5 2.5 7.5 0M10.5 8c2.5-2.5 5.5-2 7.5 0" />
+      <path d="M18 8l3-2.5v5zM5 7.2h.01" />
+      <path d="M5 15h14a7 7 0 0 1-14 0zM7.5 15c1-2 8-2 9 0" />
+    </>
+  ),
+  'set-saury': (
+    <>
+      <path d="M2 8c5-2.2 13-2.2 17 0-4 2.2-12 2.2-17 0zM19 8l3-2.2-1 2.2 1 2.2z" />
+      <path d="M4.5 7.6h.01M7 8h9" />
+      <path d="M5 15h14a7 7 0 0 1-14 0zM7.5 15c1-2 8-2 9 0" />
+    </>
+  ),
+  'set-mackerel': (
+    <>
+      <path d="M3 4.5h13c3.5 0 4.5 3.5 2 5.5H3z" />
+      <path d="M6 5l1.5 4.5M9.5 5l1.5 4.5M13 5l1.5 4.5" />
+      <path d="M5 15h14a7 7 0 0 1-14 0zM7.5 15c1-2 8-2 9 0" />
+    </>
+  ),
 }
 
+export const hasIcon = (name: string) => name in ICONS
 export function Icon({ name, size = 24 }: { name: string; size?: number }) {
   const shape = ICONS[name]
   if (!shape) return null

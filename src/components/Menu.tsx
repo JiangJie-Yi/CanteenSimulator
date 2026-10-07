@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent,
   type PointerEvent as ReactPointerEvent } from 'react'
 import { nameIn, UI, type Lang } from '../i18n'
 import { toChineseNumber, type Dish } from '../menu'
-import { Icon } from './Icon'
+import { hasIcon, Icon } from './Icon'
 
 type MenuProps = {
   dish: Dish
@@ -151,11 +151,11 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
           <>
             <button type="button" className="strips-page strips-page-left" aria-label="‹"
               disabled={ends.atLeft} onClick={() => page(-1)}>
-              <svg viewBox="0 0 16 26" aria-hidden="true"><path d="M12 3 4 13l8 10" /></svg>
+              <svg viewBox="0 0 22 44" aria-hidden="true"><path d="M17 3C12 11 7 17 3 22c4 5 9 11 14 19-3-8-6-14-8-19 2-5 5-11 8-19z" fill="currentColor" /><circle cx="19" cy="22" r="2.2" fill="#d9503c" /></svg>
             </button>
             <button type="button" className="strips-page strips-page-right" aria-label="›"
               disabled={ends.atRight} onClick={() => page(1)}>
-              <svg viewBox="0 0 16 26" aria-hidden="true"><path d="m4 3 8 10-8 10" /></svg>
+              <svg viewBox="0 0 22 44" aria-hidden="true"><path d="M5 3c5 8 10 14 14 19-4 5-9 11-14 19 3-8 6-14 8-19-2-5-5-11-8-19z" fill="currentColor" /><circle cx="3" cy="22" r="2.2" fill="#d9503c" /></svg>
             </button>
           </>
         )}
@@ -170,7 +170,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
             }
           }}>
           {/* bases (the dark walnut tags) are ordered the same way as everything else */}
-          {dish.bases.map((b) => tag(b, dish.id, true))}
+          {dish.bases.map((b) => tag(b, hasIcon(`set-${b.id}`) ? `set-${b.id}` : dish.id, true))}
           {dish.items.map((item) => tag(item, item.id, false))}
         </div>
       </div>

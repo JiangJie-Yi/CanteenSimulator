@@ -344,6 +344,48 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
     })
   }, [scene, hidden, ids])
 
+  // with no noodles in the bowl there's nothing for the chopsticks to rest in: they're laid down on the table beside
+  // the bowl, side by side with their tips to the left, and picked back up into the noodles when a bowl is ordered
+  const sticks = useMemo(() => {
+    const found: { node: THREE.Object3D; homeP: THREE.Vector3; homeQ: THREE.Quaternion;
+      restP: THREE.Vector3; restQ: THREE.Quaternion }[] = []
+    scene.updateMatrixWorld(true)
+    scene.traverse((o) => { if (baseName(o.name) === 'Chopstick' && !(o.parent && baseName(o.parent.name) === 'Chopstick')) {
+      found.push({ node: o, homeP: o.position.clone(), homeQ: o.quaternion.clone(),
+        restP: new THREE.Vector3(), restQ: new THREE.Quaternion() })
+    } })
+    const along = new THREE.Vector3(-0.81, 0, 0.59)          // tips toward the left of the screen
+    const across = new THREE.Vector3(0.59, 0, 0.81)
+    found.forEach((s, i) => {
+      // the stick's length runs along its longest local axis; which way it points now decides how to lay it down
+      const mesh = s.node instanceof THREE.Mesh ? s.node : s.node.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh
+      if (!mesh) return
+      mesh.geometry.computeBoundingBox()
+      const size = mesh.geometry.boundingBox!.getSize(new THREE.Vector3())
+      const axis = size.x > size.y && size.x > size.z ? new THREE.Vector3(1, 0, 0)
+        : size.y > size.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1)
+      const tipNow = axis.clone().applyQuaternion(s.node.getWorldQuaternion(new THREE.Quaternion())).normalize()
+      // which end is the tip: the end that's lower now (the tips are down in the noodles)
+      if (tipNow.y > 0) tipNow.negate()
+      const turn = new THREE.Quaternion().setFromUnitVectors(tipNow, along)
+      const worldQ = turn.multiply(s.node.getWorldQuaternion(new THREE.Quaternion()))
+      const parentQ = s.node.parent!.getWorldQuaternion(new THREE.Quaternion())
+      s.restQ.copy(parentQ.invert().multiply(worldQ))
+      // lying on the table (its thick end is 0.017 across) just clear of the bowl's rim, toward the camera
+      const at = new THREE.Vector3(0.62, 0.017, 0.86).addScaledVector(across, (i - (found.length - 1) / 2) * 0.07)
+      s.restP.copy(s.node.parent!.worldToLocal(scene.localToWorld(at)))
+    })
+    return found
+  }, [scene])
+  const sticksDown = (hidden ?? []).includes('Noodles')
+  useFrame((_, delta) => {
+    const k = instant ? 1 : Math.min(1, delta * 6)
+    for (const s of sticks) {
+      s.node.position.lerp(sticksDown ? s.restP : s.homeP, k)
+      s.node.quaternion.slerp(sticksDown ? s.restQ : s.homeQ, k)
+    }
+  })
+
   // colours that change with the base: a different soup, sauce-coated noodles. Checked each frame because the toon
   // materials are swapped in by an effect; each material remembers its own colour and texture to go back to.
   const fillKey = JSON.stringify([fill, tint])
@@ -427,7 +469,8 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
         const s = Math.max(p.s, 0.0001) * ((p.node.userData.shrink as number | undefined) ?? 1)
         p.node.scale.copy(p.baseScale).multiplyScalar(s)
         // once Roasting has moved a piece to the plate it owns the position
-        if (!p.node.userData.onPlate) p.node.position.y = p.baseY + p.y
+        // (userData.bob: PotCooking bobs food on a rolling boil)
+        if (!p.node.userData.onPlate) p.node.position.y = p.baseY + p.y + ((p.node.userData.bob as number | undefined) ?? 0)
         p.node.visible = p.s > 0.01
       })
     }

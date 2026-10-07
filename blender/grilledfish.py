@@ -37,7 +37,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 seed(44)
 
 STONE_R = 0.9
-STICK_FOOT_R = 0.8         # planted just inside the stones…
+STICK_FOOT_R = 0.74        # planted inside the stones (clear of them, so no stick runs through a stone)…
 STICK_TOP_R = 0.3         # …and every one leaning in over the coals
 STICK_TOP_Z = 1.15
 
@@ -428,7 +428,7 @@ sizes = []
 while sum(sizes) * 2 < 2 * math.pi * STONE_R:
     big = len(sizes) % 3 != 1 and random.random() < 0.7      # mostly big, with smaller ones tucked between
     sizes.append(random.uniform(0.2, 0.25) if big else random.uniform(0.11, 0.14))
-fit = 2 * math.pi * STONE_R / (sum(sizes) * 2) * 1.14          # scale to close the ring, packed tight
+fit = 2 * math.pi * STONE_R / (sum(sizes) * 2) * 1.22          # scale to close the ring, packed shoulder to shoulder
 a = 0.0
 for i, half in enumerate(sizes):
     half *= fit
@@ -441,7 +441,7 @@ for i, half in enumerate(sizes):
     # taller than they're thick, each leaning a little in or out, all broken rock with hard edges
     sx, sy, sz = half * random.uniform(0.3, 0.42), half, half * random.uniform(0.95, 1.35)
     oval = False
-    loc = (r * math.cos(a), r * math.sin(a), sz * 0.42)
+    loc = (r * math.cos(a), r * math.sin(a), sz * 0.3)          # driven well into the ground, so they stand firm
     rot = (random.uniform(-0.06, 0.06), random.uniform(-0.14, 0.14), a + random.uniform(-0.12, 0.12))
     if oval:
         bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=loc, rotation=rot)
@@ -1340,6 +1340,25 @@ place(eryngii(), 357, 0.6, "KingOyster")
 place(asparagus(), 25, 0.6, "Asparagus")
 place(okra(), 161, 0.6, "Okra")
 place(scallops(), 40, 0.6, "Scallop")
+
+
+def blood_cake():
+    """米血糕 on a stick: a thick slab of glutinous rice set with pig's blood, dark purple-grey with every grain
+    showing, brushed with sweet soy and rolled in peanut powder with a few leaves of coriander."""
+    N2 = 256
+    uu, vv = grid01(N2)
+    grain = smooth(0.45, 0.75, vnoise(N2, 70, 70))
+    cake = mix((0.16, 0.1, 0.12), (0.3, 0.22, 0.25), grain)
+    cake = mix(cake, (0.36, 0.18, 0.08), smooth(0.6, 0.8, fbm(N2, 4, 4)) * 0.5)              # glaze
+    cake = mix(cake, (0.84, 0.66, 0.4), (vnoise(N2, 120, 120) > 0.72).astype(np.float32) * 0.85)   # peanut powder
+    cake = mix(cake, (0.3, 0.55, 0.2), (vnoise(N2, 30, 30) > 0.93).astype(np.float32))           # coriander
+    TEX["blood_cake"] = image("T_BloodCake", cake)
+    TEX["blood_cake_n"] = image("T_BloodCake_N", to_normal(grain, 3.0), data=True)
+    M["blood_cake"] = pbr("BloodCake", tex=TEX["blood_cake"], nrm=TEX["blood_cake_n"], rough=0.55, coat=0.2)
+    return [rounded_box("BloodCake", (0.16, 0.035, 0.07), M["blood_cake"], (0.0, 0, 0), 0.012)]
+
+
+place(blood_cake(), 224, 0.6, "BloodCake")
 # ---------------------------------------------------------------------------------------------------------
 
 place(fish(), 95, 0.64, "ExtraFish")
@@ -1603,7 +1622,7 @@ def at_angle(angle_deg, r):
 
 
 # all four live in a wooden seasoning box beside the fire; only their spoons and the brush are picked up
-BOX_ANGLE, BOX_R, BOX_Z = 5.0, 1.36, 0.016
+BOX_ANGLE, BOX_R, BOX_Z = -134.0, 1.75, 0.016      # on the left of the fire as the camera sees it
 a = math.radians(BOX_ANGLE)
 box_c = Vector((BOX_R * math.cos(a), BOX_R * math.sin(a), 0))
 tang = Vector((-math.sin(a), math.cos(a), 0))
@@ -1678,6 +1697,31 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
         bpy.ops.mesh.primitive_uv_sphere_add(radius=0.012, segments=8, ring_count=4, location=head)
         utensil("SaltPinch", head, head + Vector((0, 0, 0.02)), finish(active(), "SaltPinchMark", M["salt"]), 0.002)
 
+
+# ---------------------------------------------------------------------------------------------------------
+# a wooden bucket of water on the left, with a dipper (柄杓) in it: splash food or the coals, and drop the bare
+# sticks and burnt scraps in it, as you do at a real fire
+M["bucket_wood"] = pbr("BucketWood", tex=TEX["bamboo"], rough=0.65)
+M["hoop"] = pbr("BucketHoop", (0.16, 0.16, 0.17), rough=0.4, metal=0.8)
+M["water"] = pbr("Water", (0.3, 0.5, 0.62), rough=0.05, coat=1.0)
+bx, by = -1.75, -0.16
+BUCKET_R, BUCKET_H = 0.24, 0.34
+bucket = open_pot(bx, by, BUCKET_R, BUCKET_H, M["bucket_wood"], belly=0.08, name="WaterBucket")
+hoops = []
+for hz in (0.07, 0.26):
+    bpy.ops.mesh.primitive_torus_add(major_radius=BUCKET_R * 0.86 + 0.012, minor_radius=0.008, major_segments=40,
+                                     minor_segments=6, location=(bx, by, hz))
+    hoops.append(finish(active(), "Hoop", M["hoop"]))
+bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=BUCKET_R * 0.84, depth=0.006, location=(bx, by, BUCKET_H * 0.78))
+surface = finish(active(), "WaterSurface", M["water"])
+centre_origin(join([bucket, *hoops, surface], "WaterBucket"), (bx, by, 0.0))
+# the dipper: a little round cup on a long handle, leaning out of the bucket
+cup_at = Vector((bx + 0.05, by, BUCKET_H * 0.82))
+bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.045, depth=0.05, location=cup_at)
+cup = finish(active(), "DipperCup", M["bucket_wood"])
+handle = stick_between(cup_at + Vector((-0.04, 0, 0.0)), cup_at + Vector((-0.2, 0.02, 0.28)), 0.007, M["spoon_wood"],
+                       "DipperHandle")
+centre_origin(join([cup, handle], "WaterDipper"), tuple(cup_at))
 
 # ---------------------------------------------------------------------------------------------------------
 # a little wire grill net laid over the coals, just for toasting mochi (切り餅) on
