@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import { UI, type Lang } from './i18n'
 import { boilAmount, equilibriumTemp, stepTemp, steamAmount } from './boil'
 import { Bubbles } from './components/Bubbles'
 import { Brand } from './components/Brand'
@@ -20,6 +21,8 @@ import { DISHES, type Dish as DishInfo } from './menu'
 
 // distance between dishes on the carousel
 const SPACING = 6
+/** most items that fit around the charcoal at once */
+const FIRE_CAPACITY = 32
 // burner top on the cassette stove (blender/hotpot.py)
 const BURNER_Y = 0.38
 // the one camera pose every dish is framed from (blender/open_live.py matches Blender's camera to it)
@@ -96,6 +99,14 @@ function slot(i: number, active: number, n: number) {
   return d
 }
 
+/** What's on the table: the ordered portions plus whatever the chosen set includes. */
+const servings = (base: { includes?: Record<string, number> }, order: Record<string, number>) => {
+  if (!base.includes) return order
+  const all = { ...order }
+  for (const [id, n] of Object.entries(base.includes)) all[id] = (all[id] ?? 0) + n
+  return all
+}
+
 /** The stage's centre and size in canvas pixels (the canvas fills the whole app). */
 type Frame = { cx: number; cy: number; w: number; h: number }
 
@@ -112,9 +123,10 @@ type SceneProps = {
   fire: RefObject<number>
   /** the stage's box inside the full-window canvas: the dish is framed in it */
   frame: Frame
+  onOffFire: (count: number) => void
 }
 
-function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame }: SceneProps) {
+function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame, onOffFire }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
   const camera = useThree((s) => s.camera)
@@ -165,7 +177,26 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame 
     const focus = new THREE.Vector3(0, DISHES[active].focusY, 0)
     home.current.set(...CAMERA_POSITION).sub(focus).multiplyScalar(cameraDistanceScale(aspect)).add(focus)
     homing.current = true
+    zoomGoal.current = null
   }, [active, aspect])
+
+  // smooth wheel zoom: each notch nudges a target distance and the camera eases toward it
+  const gl = useThree((s) => s.gl)
+  const zoomGoal = useRef<number | null>(null)
+  useEffect(() => {
+    const el = gl.domElement
+    const onWheel = (e: WheelEvent) => {
+      const c = controls.current
+      if (!c) return
+      e.preventDefault()
+      homing.current = false
+      const now = zoomGoal.current ?? camera.position.distanceTo(c.target)
+      zoomGoal.current = THREE.MathUtils.clamp(now * Math.exp(e.deltaY * 0.0011), 1.8, 20)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [gl, camera])
+  const zoomDir = useRef(new THREE.Vector3())
 
   useFrame((_, delta) => {
     const k = reducedMotion ? 1 : Math.min(1, delta * 6)
@@ -199,6 +230,12 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame 
       if (camera.position.distanceTo(home.current) < 0.002 && Math.abs(c.target.y - focusY) < 0.002) {
         homing.current = false
       }
+    } else if (c && zoomGoal.current !== null) {
+      const dir = zoomDir.current.copy(camera.position).sub(c.target)
+      const dist = dir.length()
+      const next = dist + (zoomGoal.current - dist) * (reducedMotion ? 1 : Math.min(1, delta * 7))
+      camera.position.copy(c.target).addScaledVector(dir.normalize(), next)
+      if (Math.abs(next - zoomGoal.current) < 0.002) zoomGoal.current = null
     }
   })
 
@@ -233,12 +270,12 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame 
           <group key={dish.id} ref={(g) => { groups.current[i] = g }}
             position-x={slot(i, active, DISHES.length) * SPACING}>
             <Suspense fallback={null}>
-              <Dish url={dish.model} itemIds={ITEM_IDS[dish.id]} quantities={orders[dish.id]} broth={base.broth}
+              <Dish url={dish.model} itemIds={ITEM_IDS[dish.id]} quantities={servings(base, orders[dish.id])} broth={base.broth}
                 hidden={base.hide} floatIds={FLOAT_IDS[dish.id]} layout={dish.layout} instant={reducedMotion} />
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
               {dish.roast && (
-                <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={orders[dish.id]}
-                  active={i === active} instant={reducedMotion} fire={fire} />
+                <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(base, orders[dish.id])}
+                  active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} />
               )}
               {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
               {dish.heatControl && dish.brothY !== undefined && (
@@ -275,6 +312,10 @@ function Scene({ active, orders, bases, theme, reducedMotion, heat, fire, frame 
         minDistance={1.8}
         maxDistance={20}
         maxPolarAngle={Math.PI * 0.45}
+        // the wheel is handled below for a smooth glide; rotation drifts to a stop instead of halting
+        enableZoom={false}
+        enableDamping
+        dampingFactor={0.08}
         onStart={() => { homing.current = false }}
       />
     </>
@@ -293,6 +334,23 @@ export default function App() {
   const [theme, toggleTheme] = useTheme()
   const reducedMotion = usePrefersReducedMotion()
   const [heat, setHeat] = useState(40)
+  const [lang, setLang] = useState<Lang>(() => {
+    try {
+      return localStorage.getItem('canteen-lang') === 'ja' ? 'ja' : 'zh'
+    } catch {
+      return 'zh'
+    }
+  })
+  const toggleLang = () =>
+    setLang((l) => {
+      const next: Lang = l === 'zh' ? 'ja' : 'zh'
+      try {
+        localStorage.setItem('canteen-lang', next)
+      } catch {
+        // not remembered; the switch still works for this visit
+      }
+      return next
+    })
 
   // where the stage sits inside the full-window canvas
   const appRef = useRef<HTMLDivElement>(null)
@@ -337,7 +395,7 @@ export default function App() {
       dish: dish.id,
       blend: `${dish.id}.blend`,
       items: ITEM_IDS[dish.id],
-      selected: Object.keys(orders[dish.id]).filter((id) => orders[dish.id][id] > 0),
+      selected: Object.entries(servings(base, orders[dish.id])).filter(([, n]) => n > 0).map(([id]) => id),
       hide: base.hide ?? [],
       broth: base.broth ?? null,
       focusY: dish.focusY,
@@ -362,11 +420,32 @@ export default function App() {
   }, [])
 
   const MAX_PORTIONS = 99
-  const changeQty = (id: string, delta: number) =>
+  // the fire only holds so many skewers; past that, take something off before ordering more
+  const [offFire, setOffFire] = useState(0)
+  const [notice, setNotice] = useState<string | null>(null)
+  const noticeTimer = useRef(0)
+  const say = (text: string) => {
+    setNotice(text)
+    window.clearTimeout(noticeTimer.current)
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 2600)
+  }
+  const onTheFire = () => {
+    if (!dish.roast) return 0
+    const served = servings(base, orders[dish.id])
+    const total = Object.entries(served).reduce((n, [id, q]) => n + (id in dish.roast!.times ? q : 0), 0)
+    return total - offFire
+  }
+
+  const changeQty = (id: string, delta: number) => {
+    if (delta > 0 && dish.roast && onTheFire() >= FIRE_CAPACITY) {
+      say(UI[lang].fireFull(FIRE_CAPACITY))
+      return
+    }
     setOrders((all) => {
       const qty = Math.min(MAX_PORTIONS, Math.max(0, (all[dish.id][id] ?? 0) + delta))
       return { ...all, [dish.id]: { ...all[dish.id], [id]: qty } }
     })
+  }
 
   return (
     <div className="app" ref={appRef}>
@@ -380,19 +459,24 @@ export default function App() {
           gl={{ alpha: true, toneMapping: THREE.NoToneMapping }}
         >
           <Scene active={active} orders={orders} bases={bases} theme={theme} reducedMotion={reducedMotion}
-            heat={heat} fire={fire} frame={frame} />
+            heat={heat} fire={fire} frame={frame} onOffFire={setOffFire} />
         </Canvas>
       </div>
       <div className="stage" ref={stageRef}>
         <Brand night={theme === 'dark'} />
-        {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} />}
-        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} />}
-        <DishSwitcher dishes={DISHES} index={active} onChange={setActive} />
+        {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
+        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
+        <DishSwitcher dishes={DISHES} index={active} onChange={setActive} lang={lang} />
+        <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
       </div>
-      <Menu key={dish.id} dish={dish} baseId={base.id} quantities={orders[dish.id]}
+      <div className="menu-backing" aria-hidden="true" />
+      <Menu key={dish.id} dish={dish} baseId={base.id} lang={lang} quantities={orders[dish.id]}
         onBase={(id) => setBases((all) => ({ ...all, [dish.id]: id }))}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => setOrders((all) => ({ ...all, [dish.id]: {} }))} />
+      <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
+        {UI[lang].lang}
+      </button>
       <button type="button" className="theme-toggle" onClick={toggleTheme}
         aria-label={theme === 'light' ? '切換成深色模式' : '切換成淺色模式'}>
         {theme === 'light' ? '夜' : '晝'}

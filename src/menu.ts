@@ -2,6 +2,10 @@
 export type MenuItem = {
   id: string
   name: string
+  /** Japanese name, shown instead of the Chinese when the menu is in Japanese */
+  ja?: string
+  /** English name, shown small under the Chinese */
+  en?: string
   price: number
   /** how it appears when ordered: dropped in with a bounce (default) or rising gently out of the soup */
   entrance?: 'drop' | 'float'
@@ -14,6 +18,10 @@ export type Base = {
   price: number
   /** broth surface texture to swap in (blender/hotpot.py writes these to public/textures) */
   broth?: string
+  ja?: string
+  en?: string
+  /** items that come with this base (a set meal), on top of whatever is ordered, by menu id */
+  includes?: Record<string, number>
   /** model objects (name prefixes) that don't belong with this base, e.g. chilies in a mild soup */
   hide?: string[]
 }
@@ -46,6 +54,7 @@ export type DishLight = {
 export type Dish = {
   id: string
   name: string
+  ja?: string
   model: string
   /** one is always included; when there are several the menu lets you pick */
   bases: Base[]
@@ -101,25 +110,26 @@ export const DISHES: Dish[] = [
   {
     id: 'hotpot',
     name: '小火鍋',
+    ja: '小鍋',
     model: asset('models/hotpot.glb'),
     bases: [
-      { id: 'mala', name: '麻辣湯底', price: 120, broth: asset('textures/broth-mala.png') },
-      { id: 'tomato', name: '番茄湯底', price: 110, broth: asset('textures/broth-tomato.png'), hide: CHILIES },
-      { id: 'kombu', name: '昆布湯底', price: 100, broth: asset('textures/broth-kombu.png'), hide: CHILIES },
+      { id: 'mala', name: '麻辣湯底', ja: '麻辣スープ', en: 'Mala Broth', price: 120, broth: asset('textures/broth-mala.png') },
+      { id: 'tomato', name: '番茄湯底', ja: 'トマトスープ', en: 'Tomato Broth', price: 110, broth: asset('textures/broth-tomato.png'), hide: CHILIES },
+      { id: 'kombu', name: '昆布湯底', ja: '昆布だし', en: 'Kombu Broth', price: 100, broth: asset('textures/broth-kombu.png'), hide: CHILIES },
     ],
     items: [
-      { id: 'NapaCabbage', name: '白菜', price: 20 },
-      { id: 'BeefSlice', name: '牛肉片', price: 60 },
-      { id: 'Meatball', name: '貢丸', price: 30 },
-      { id: 'Fishball', name: '魚丸', price: 30 },
-      { id: 'Tofu', name: '豆腐', price: 20 },
-      { id: 'FriedTofu', name: '油豆腐', price: 25 },
-      { id: 'Taro', name: '芋頭', price: 25 },
-      { id: 'Corn', name: '玉米', price: 20 },
-      { id: 'CrabStick', name: '蟹肉棒', price: 35 },
-      { id: 'Shrimp', name: '鮮蝦', price: 50 },
-      { id: 'ShiitakeCap', name: '香菇', price: 20 },
-      { id: 'Enoki', name: '金針菇', price: 20 },
+      { id: 'NapaCabbage', name: '白菜', ja: '白菜', en: 'Napa Cabbage', price: 20 },
+      { id: 'BeefSlice', name: '牛肉片', ja: '牛肉スライス', en: 'Beef Slices', price: 60 },
+      { id: 'Meatball', name: '貢丸', ja: '肉団子', en: 'Pork Ball', price: 30 },
+      { id: 'Fishball', name: '魚丸', ja: '魚団子', en: 'Fish Ball', price: 30 },
+      { id: 'Tofu', name: '豆腐', ja: '豆腐', en: 'Tofu', price: 20 },
+      { id: 'FriedTofu', name: '油豆腐', ja: '厚揚げ', en: 'Fried Tofu', price: 25 },
+      { id: 'Taro', name: '芋頭', ja: '里芋', en: 'Taro', price: 25 },
+      { id: 'Corn', name: '玉米', ja: 'とうもろこし', en: 'Corn', price: 20 },
+      { id: 'CrabStick', name: '蟹肉棒', ja: 'カニカマ', en: 'Crab Stick', price: 35 },
+      { id: 'Shrimp', name: '鮮蝦', ja: '海老', en: 'Shrimp', price: 50 },
+      { id: 'ShiitakeCap', name: '香菇', ja: '椎茸', en: 'Shiitake', price: 20 },
+      { id: 'Enoki', name: '金針菇', ja: 'えのき', en: 'Enoki', price: 20 },
     ],
     defaults: ['NapaCabbage', 'BeefSlice', 'Meatball', 'Tofu', 'Corn'],
     heat: 'gas',
@@ -131,16 +141,17 @@ export const DISHES: Dish[] = [
   {
     id: 'beefnoodle',
     name: '牛肉麵',
+    ja: '牛肉麺',
     model: asset('models/beefnoodle.glb'),
-    bases: [{ id: 'braised', name: '紅燒湯麵', price: 120 }],
+    bases: [{ id: 'braised', name: '紅燒湯麵', ja: '紅焼牛肉麺', en: 'Braised Noodles', price: 120 }],
     items: [
-      { id: 'BeefShank', name: '牛腱肉', price: 80 },
-      { id: 'Tendon', name: '牛筋', price: 50 },
-      { id: 'Tripe', name: '牛肚', price: 50 },
-      { id: 'BraisedEgg', name: '滷蛋', price: 15 },
-      { id: 'BokChoy', name: '青江菜', price: 15 },
-      { id: 'PickledGreens', name: '酸菜', price: 10 },
-      { id: 'ExtraNoodles', name: '加麵', price: 20, entrance: 'float' },
+      { id: 'BeefShank', name: '牛腱肉', ja: '牛すね', en: 'Beef Shank', price: 80 },
+      { id: 'Tendon', name: '牛筋', ja: '牛すじ', en: 'Tendon', price: 50 },
+      { id: 'Tripe', name: '牛肚', ja: 'ハチノス', en: 'Tripe', price: 50 },
+      { id: 'BraisedEgg', name: '滷蛋', ja: '煮玉子', en: 'Braised Egg', price: 15 },
+      { id: 'BokChoy', name: '青江菜', ja: '青梗菜', en: 'Bok Choy', price: 15 },
+      { id: 'PickledGreens', name: '酸菜', ja: '高菜', en: 'Pickled Greens', price: 10 },
+      { id: 'ExtraNoodles', name: '加麵', ja: '替え玉', en: 'Extra Noodles', price: 20, entrance: 'float' },
     ],
     defaults: ['BeefShank', 'BokChoy', 'PickledGreens'],
     brothY: 0.42,
@@ -152,27 +163,36 @@ export const DISHES: Dish[] = [
   {
     id: 'grilledfish',
     name: '日式烤魚',
+    ja: '炭火焼き',
     model: asset('models/grilledfish.glb'),
-    bases: [{ id: 'ayu', name: '鹽烤香魚套餐', price: 180 }],
-    items: [
-      { id: 'ExtraFish', name: '香魚', price: 80 },
-      { id: 'Saury', name: '秋刀魚', price: 90 },
-      { id: 'Mackerel', name: '鯖魚', price: 100 },
-      { id: 'GrilledCorn', name: '烤玉米', price: 40 },
-      { id: 'GrilledShiitake', name: '烤香菇', price: 30 },
-      { id: 'Onigiri', name: '烤飯糰', price: 35 },
-      { id: 'ShrimpSkewer', name: '烤蝦串', price: 60 },
-      { id: 'Sausage', name: '香腸', price: 45 },
-      { id: 'Potato', name: '烤馬鈴薯', price: 40 },
-      { id: 'SweetPotato', name: '烤地瓜', price: 35 },
-      { id: 'Yakitori', name: '雞肉蔥串', price: 50 },
-      { id: 'PorkBelly', name: '豬五花串', price: 55 },
-      { id: 'Squid', name: '烤魷魚', price: 80 },
-      { id: 'Shishito', name: '烤青椒', price: 30 },
-      { id: 'Mochi', name: '烤年糕', price: 35 },
-      { id: 'KingOyster', name: '杏鮑菇', price: 35 },
+    // every set comes with one fish, a rice ball, shishito and a potato; extras on top are ordered separately
+    bases: [
+      { id: 'ayu', name: '香魚套餐', ja: '鮎定食', en: 'Ayu Set', price: 180,
+        includes: { ExtraFish: 1, Onigiri: 1, Shishito: 1, Potato: 1 } },
+      { id: 'saury', name: '秋刀魚套餐', ja: '秋刀魚定食', en: 'Saury Set', price: 190,
+        includes: { Saury: 1, Onigiri: 1, Shishito: 1, Potato: 1 } },
+      { id: 'mackerel', name: '鯖魚套餐', ja: '鯖定食', en: 'Mackerel Set', price: 200,
+        includes: { Mackerel: 1, Onigiri: 1, Shishito: 1, Potato: 1 } },
     ],
-    defaults: ['GrilledCorn', 'Onigiri'],
+    items: [
+      { id: 'ExtraFish', name: '香魚', ja: '鮎', en: 'Ayu', price: 80 },
+      { id: 'Saury', name: '秋刀魚', ja: '秋刀魚', en: 'Saury', price: 90 },
+      { id: 'Mackerel', name: '鯖魚', ja: '鯖', en: 'Mackerel', price: 100 },
+      { id: 'GrilledCorn', name: '烤玉米', ja: '焼きもろこし', en: 'Grilled Corn', price: 40 },
+      { id: 'GrilledShiitake', name: '烤香菇', ja: '焼き椎茸', en: 'Shiitake', price: 30 },
+      { id: 'Onigiri', name: '烤飯糰', ja: '焼きおにぎり', en: 'Yaki Onigiri', price: 35 },
+      { id: 'ShrimpSkewer', name: '烤蝦串', ja: '海老串', en: 'Shrimp', price: 60 },
+      { id: 'Sausage', name: '香腸', ja: 'ソーセージ', en: 'Sausage', price: 45 },
+      { id: 'Potato', name: '烤馬鈴薯', ja: 'じゃがいも', en: 'Potato', price: 40 },
+      { id: 'SweetPotato', name: '烤地瓜', ja: '焼き芋', en: 'Sweet Potato', price: 35 },
+      { id: 'Yakitori', name: '雞肉蔥串', ja: 'ねぎま', en: 'Negima', price: 50 },
+      { id: 'PorkBelly', name: '豬五花串', ja: '豚バラ', en: 'Pork Belly', price: 55 },
+      { id: 'Squid', name: '烤魷魚', ja: 'イカ焼き', en: 'Squid', price: 80 },
+      { id: 'Shishito', name: '烤青椒', ja: 'ししとう', en: 'Shishito', price: 30 },
+      { id: 'Mochi', name: '烤年糕', ja: '焼き餅', en: 'Mochi', price: 35 },
+      { id: 'KingOyster', name: '杏鮑菇', ja: 'エリンギ', en: 'King Oyster', price: 35 },
+    ],
+    defaults: [],
     heat: 'fire',
     roast: {
       times: { Fish: 40, ExtraFish: 40, Saury: 35, Mackerel: 45, GrilledCorn: 30, GrilledShiitake: 20, Onigiri: 25, ShrimpSkewer: 20,
@@ -195,7 +215,6 @@ export const DISHES: Dish[] = [
       mode: 'ring',
       // camera direction (54°) and the plate (-40°)
       avoid: [54, -40],
-      fixed: ['Fish'],
       // potatoes and sweet potatoes sit in the ash at the front: extra ones line up beside the first,
       // potatoes toward the right, sweet potatoes toward the left
       // (each portion is two pieces about 16° apart, so step a little more than both)

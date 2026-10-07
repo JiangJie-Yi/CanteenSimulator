@@ -96,6 +96,79 @@ button {
   pointer-events: auto;
 }
 
+/* an app, not a document: no text selection highlight when clicking around */
+.app {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* English name under the Chinese on each tag, small and set sideways to run down the tag */
+.strip-en {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  font-family: var(--sans, system-ui), sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  opacity: 0.62;
+  margin-bottom: auto;
+}
+
+/* the name no longer pushes the price down by itself: the English line sits between them */
+.strip-name {
+  margin-bottom: 0 !important;
+}
+
+.menu-title-en {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--sans, system-ui), sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  opacity: 0.6;
+}
+
+/* items that come with the chosen set */
+.stamp.stamp-incl {
+  border-style: dashed;
+  border-color: var(--ink-soft);
+  color: var(--ink-soft);
+  background: transparent;
+  animation: none;
+}
+
+/* short message over the stage (e.g. the fire is full) */
+.notice {
+  position: absolute;
+  left: 50%;
+  bottom: 120px;
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgb(59 42 32 / 0.88);
+  color: var(--washi);
+  font-size: 15px;
+  white-space: nowrap;
+  transform: translate(-50%, 8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.notice.is-shown {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 480px) {
+  .notice {
+    font-size: 12px;
+    bottom: 96px;
+  }
+}
+
 /* text stays on one line; narrow screens shrink it instead (see the responsive section) */
 .strip-name,
 .strip-price,
@@ -114,33 +187,27 @@ button {
 }
 
 /* frosted, feathered backing behind text that sits over the 3D view, so it never melts into the scene */
-.switcher-center,
-.heat,
-.menu-title,
-.tally {
+.switcher-center {
   position: relative;
   isolation: isolate;
 }
 
-.switcher-center::before,
-.heat::before,
-.menu-title::before,
-.tally::before {
+.switcher-center::before {
   content: '';
   position: absolute;
   z-index: -1;
-  inset: -16px -26px;
-  background: color-mix(in srgb, var(--page) 62%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  /* fade every edge out, like torn rice paper */
+  inset: -22px -40px;
+  background: color-mix(in srgb, var(--page) 58%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  /* fade every edge out softly, like torn rice paper (the menu's own panel is .menu-backing) */
   -webkit-mask-image:
-    linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent),
-    linear-gradient(transparent, #000 14px, #000 calc(100% - 14px), transparent);
+    linear-gradient(90deg, transparent, #000 35%, #000 65%, transparent),
+    linear-gradient(transparent, #000 32%, #000 68%, transparent);
   -webkit-mask-composite: source-in;
   mask-image:
-    linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent),
-    linear-gradient(transparent, #000 14px, #000 calc(100% - 14px), transparent);
+    linear-gradient(90deg, transparent, #000 35%, #000 65%, transparent),
+    linear-gradient(transparent, #000 32%, #000 68%, transparent);
   mask-composite: intersect;
   pointer-events: none;
 }
@@ -729,8 +796,8 @@ button {
 
 .strips {
   display: grid;
-  grid-template-columns: repeat(9, 48px);
-  grid-auto-rows: 236px;
+  grid-template-columns: repeat(10, 46px);
+  grid-auto-rows: 264px;
   gap: 14px 10px;
   direction: rtl; /* strips read right to left, like the wall menu */
 }
@@ -949,6 +1016,7 @@ button {
     padding-top: 72px !important;
     padding-bottom: 40px !important;
     overflow-y: auto;
+    scroll-behavior: smooth;
     overscroll-behavior: contain;
     scrollbar-width: thin;
     scrollbar-color: var(--text-soft) transparent;
@@ -975,8 +1043,8 @@ button {
   }
 
   .strips {
-    grid-template-columns: repeat(9, 42px);
-    grid-auto-rows: 220px;
+    grid-template-columns: repeat(10, 40px);
+    grid-auto-rows: 248px;
     gap: 12px 8px;
   }
 
@@ -1011,7 +1079,7 @@ button {
     grid-auto-flow: column;
     grid-template-columns: none;
     grid-auto-columns: 44px;
-    grid-auto-rows: 218px;   /* fits a four-character name (麻辣湯底) in one column */
+    grid-auto-rows: 244px;   /* fits a four-character name (麻辣湯底) in one column */
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x proximity;
@@ -1097,7 +1165,7 @@ button {
 
   .strips {
     grid-auto-columns: 40px;
-    grid-auto-rows: 200px;
+    grid-auto-rows: 226px;
     gap: 8px;
   }
 
@@ -1264,5 +1332,190 @@ button {
   .stamp {
     transition: none;
     animation: none;
+  }
+}
+
+/* ---------- menu tags sized in em ----------
+   Everything on a tag is measured from one font size, so a tag can be scaled as a whole: --tag-font sets the
+   size per screen size, and --fit (set by Menu.tsx when a tag's contents would run long) shrinks just that tag
+   so nothing ever spills out of it. These rules come last so they win over the per-breakpoint px sizes above. */
+.menu {
+  --tag-font: 17px;
+}
+
+.menu .strips {
+  grid-template-columns: repeat(10, calc(var(--tag-font) * 2.7));
+  grid-auto-rows: calc(var(--tag-font) * 15.5);
+}
+
+.menu .strip {
+  font-size: calc(var(--tag-font) * var(--fit, 1));
+  gap: 0.35em;
+  padding: 0.7em 0;
+  overflow: hidden;
+}
+
+.menu .strip .icon {
+  width: 1.4em;
+  height: 1.4em;
+}
+
+.menu .strip-name {
+  font-size: 1.3em;
+}
+
+.menu .strip-en {
+  font-size: 0.56em;
+}
+
+.menu .strip-price {
+  font-size: 0.82em;
+}
+
+.menu .stamp {
+  width: 1.9em;
+  height: 1.9em;
+  font-size: 1.05em;
+}
+
+.menu .stamp.stamp-base {
+  width: 1.85em;
+  height: 1.85em;
+  font-size: 0.76em;
+}
+
+.menu .stamp-count {
+  font-size: 0.6em;
+}
+
+@media (max-width: 1280px) {
+  .menu {
+    --tag-font: 15.5px;
+  }
+}
+
+@media (max-width: 900px) {
+  .menu {
+    --tag-font: 15px;
+  }
+
+  .menu .strips {
+    grid-template-columns: none;
+    grid-auto-columns: calc(var(--tag-font) * 2.7);
+  }
+}
+
+@media (max-width: 480px) {
+  .menu {
+    --tag-font: 13.5px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .menu {
+    --tag-font: 11.5px;
+  }
+
+  .menu .strips {
+    grid-template-columns: none;
+    grid-auto-columns: calc(var(--tag-font) * 2.7);
+  }
+}
+
+/* language toggle, beside the day/night button */
+.lang-toggle {
+  position: fixed;
+  z-index: 10;
+  top: 20px;
+  right: 72px;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 50%;
+  background: var(--page);
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lang-toggle:hover {
+  border-color: var(--text);
+}
+
+.lang-toggle:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  .lang-toggle {
+    top: 14px;
+    right: 62px;
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .lang-toggle {
+    top: 10px;
+    right: 54px;
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+}
+
+/* frosted rice-paper panel behind the menu: its own layer in the menu's grid cell, so it stays put while the
+   menu scrolls, with a broad, gentle feather on every side */
+.stage { grid-area: 1 / 1; }
+.menu, .menu-backing { grid-area: 1 / 2; }
+
+.menu-backing {
+  position: relative;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.menu-backing::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 -90px;
+  background: color-mix(in srgb, var(--page) 55%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent, #000 160px, #000 calc(100% - 20px), transparent),
+    linear-gradient(transparent, #000 110px, #000 calc(100% - 110px), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(90deg, transparent, #000 160px, #000 calc(100% - 20px), transparent),
+    linear-gradient(transparent, #000 110px, #000 calc(100% - 110px), transparent);
+  mask-composite: intersect;
+}
+
+@media (max-width: 900px) {
+  .menu, .menu-backing { grid-area: 2 / 1; }
+
+  .menu-backing::before {
+    inset: -50px 0 0;
+    -webkit-mask-image: linear-gradient(transparent, #000 80px);
+    mask-image: linear-gradient(transparent, #000 80px);
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .menu, .menu-backing { grid-area: 1 / 2; }
+
+  .menu-backing::before {
+    inset: 0 0 0 -60px;
+    -webkit-mask-image:
+      linear-gradient(90deg, transparent, #000 110px, #000 calc(100% - 10px), transparent),
+      linear-gradient(transparent, #000 50px, #000 calc(100% - 50px), transparent);
+    mask-image:
+      linear-gradient(90deg, transparent, #000 110px, #000 calc(100% - 10px), transparent),
+      linear-gradient(transparent, #000 50px, #000 calc(100% - 50px), transparent);
   }
 }

@@ -128,7 +128,7 @@ for key in ("fish", "saury", "mackerel"):
 N = 256
 u, v = grid01(N)
 ridges = vnoise(N, 40, 4)
-binchotan = mix((0.32, 0.31, 0.3), (0.62, 0.6, 0.57), ridges)
+binchotan = mix((0.08, 0.075, 0.07), (0.22, 0.21, 0.2), ridges)    # mostly black, a little grey ash
 binchotan = mix(binchotan, (0.08, 0.07, 0.07), smooth(0.03, 0.0, np.abs(fbm(N, 3, 8) - 0.5)))
 TEX["binchotan"] = image("T_Binchotan", binchotan)
 
@@ -251,35 +251,24 @@ for i in range(34):
     cyl_uv(o)
     bevel(o, 0.006, 1)
     # the ones down in the middle of the heap glow; the outer ones are grey white charcoal
-    sticks.append(finish(o, "Binchotan", M["ember"] if r < 0.22 or random.random() < 0.3 else M["binchotan"],
+    sticks.append(finish(o, "Binchotan", M["ember"] if r < 0.12 or random.random() < 0.15 else M["binchotan"],
                          smooth_shade=False))
 join(sticks, "BinchotanHeap")
 
 # coarse salt: grains strewn over the ash around the skewer feet, and a few little heaps of it
 grains = []
-for _ in range(900):
+for _ in range(1800):
     a = random.uniform(0, 2 * math.pi)
     r = math.sqrt(random.uniform(0.1, 1.0)) * 0.86   # salt laid right across the ash bed
-    s = random.uniform(0.006, 0.014)
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(r * math.cos(a), r * math.sin(a), 0.008 + s * 0.3),
-                                    rotation=(random.uniform(0, 3), random.uniform(0, 3), random.uniform(0, 3)))
+    s = random.uniform(0.006, 0.012)
+    # lying flat on the ash (only spun about the vertical), a hair above it: a level, even crust of salt
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(r * math.cos(a), r * math.sin(a), 0.0065),
+                                    rotation=(0, 0, random.uniform(0, math.pi)))
     o = active()
-    o.scale = (s, s * random.uniform(0.7, 1.2), s * random.uniform(0.6, 1.0))
+    o.scale = (s, s * random.uniform(0.7, 1.2), 0.003)
     grains.append(finish(o, "Grain", M["salt"], smooth_shade=False))
 join(grains, "SaltGrains")
-for a_deg, r, size in ((-20, 0.62, 0.1), (150, 0.6, 0.08), (-150, 0.58, 0.07), (70, 0.6, 0.09), (230, 0.55, 0.08), (-60, 0.5, 0.06)):
-    a = math.radians(a_deg)
-    bpy.ops.mesh.primitive_cone_add(vertices=20, radius1=size, radius2=size * 0.15, depth=size * 0.7,
-                                    location=(r * math.cos(a), r * math.sin(a), size * 0.35 + 0.004))
-    o = active()
-    bm = bmesh.new()
-    bm.from_mesh(o.data)
-    for vtx in bm.verts:
-        vtx.co *= random.uniform(0.88, 1.08)
-    bm.to_mesh(o.data)
-    bm.free()
-    bevel(o, size * 0.2, 2)
-    finish(o, "SaltHeap", M["salt"])
+
 
 # a thick bed of glowing charcoal, heaped higher in the middle; joined into one mesh to keep draw calls low
 coals = []
@@ -335,12 +324,14 @@ for i, half in enumerate(sizes):
 # Items are modelled along local +X (the skewer axis), then placed on the stick.
 # =====================================================================
 
-def stick_frame(angle_deg, along):
+def stick_frame(angle_deg, along, var=(0.0, 0.0, 0.0)):
     """Matrix for a point `along` (0 = foot, 1 = tip) on the skewer at this angle.
-    Local X runs up the stick, local Y points out of the fire circle, local Z completes the frame."""
+    Local X runs up the stick, local Y points out of the fire circle, local Z completes the frame.
+    `var` = (tip radius offset, tip height offset, sideways lean in radians) so no two sticks are planted alike."""
     a = math.radians(angle_deg)
+    dr, dz, lean = var
     foot = Vector((STICK_FOOT_R * math.cos(a), STICK_FOOT_R * math.sin(a), 0.0))
-    tip = Vector((STICK_TOP_R * math.cos(a), STICK_TOP_R * math.sin(a), STICK_TOP_Z))
+    tip = Vector(((STICK_TOP_R + dr) * math.cos(a + lean), (STICK_TOP_R + dr) * math.sin(a + lean), STICK_TOP_Z + dz))
     x = (tip - foot).normalized()
     out = Vector((math.cos(a), math.sin(a), 0))
     y = (out - x * out.dot(x)).normalized()
@@ -350,11 +341,12 @@ def stick_frame(angle_deg, along):
     return m, foot, tip
 
 
-def skewer_stick(angle_deg, name):
-    _, foot, tip = stick_frame(angle_deg, 0)
+def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
+    """The bamboo stick; `extra` lengthens it past the tip (sticks come long and short)."""
+    _, foot, tip = stick_frame(angle_deg, 0, var)
     d = tip - foot
-    length = d.length + 0.08
-    centre = foot + d * 0.5 - Vector((0, 0, 0.04))
+    length = d.length + 0.08 + extra
+    centre = foot + d.normalized() * (length / 2 - 0.08)
     rot = d.to_track_quat("Z", "Y").to_euler()
     bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.012, depth=length, location=centre)
     shaft = active()
@@ -373,11 +365,13 @@ def skewer_stick(angle_deg, name):
 def place(objs, angle_deg, along, name, stick=True):
     """Join the parts, move them onto the skewer and (optionally) add the stick into the same object."""
     o = join(objs, name)
-    m, _, _ = stick_frame(angle_deg, along)
+    # each skewer is pushed into the ash a little differently: leaning, higher or lower, longer or shorter
+    var = (random.uniform(-0.05, 0.05), random.uniform(-0.12, 0.08), random.uniform(-0.12, 0.12))
+    m, _, _ = stick_frame(angle_deg, along, var)
     o.matrix_world = m @ o.matrix_world
     if stick:
         # joined into the item, which keeps its origin on the stick so the web pop-in scales from there
-        o = join([o, skewer_stick(angle_deg, name + "Stick")], name)
+        o = join([o, skewer_stick(angle_deg, name + "Stick", var, random.uniform(-0.05, 0.3))], name)
     return o
 
 
@@ -792,8 +786,6 @@ place(mochi(), 224, 0.6, "Mochi")
 place(eryngii(), 357, 0.6, "KingOyster")
 # ---------------------------------------------------------------------------------------------------------
 
-place(fish(), 20, 0.62, "Fish")
-place(fish(), 160, 0.62, "Fish")
 place(fish(), 95, 0.64, "ExtraFish")
 place(fish("saury"), -97, 0.6, "Saury")
 place(fish("mackerel"), -122, 0.62, "Mackerel")

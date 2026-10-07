@@ -40,9 +40,9 @@ void main() {
   float steam = smoothstep(0.45, 1.0, n);
   steam *= smoothstep(0.0, 0.25, vUv.x) * smoothstep(1.0, 0.75, vUv.x);
   steam *= smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.4, vUv.y);
-  // cel look: crisp-edged puffs with a soft shadow band inside
-  float puff = smoothstep(0.3, 0.33, steam);
-  float core = smoothstep(0.46, 0.49, steam);
+  // soft-edged puffs: a wide ramp at the rim so they melt into the air
+  float puff = smoothstep(0.12, 0.42, steam);
+  float core = smoothstep(0.4, 0.62, steam);
   vec3 col = mix(uShade, uColor, core);
   gl_FragColor = vec4(col, puff * uOpacity);
 }

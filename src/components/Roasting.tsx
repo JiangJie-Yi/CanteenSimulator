@@ -144,6 +144,8 @@ type RoastingProps = {
   instant?: boolean
   /** 0..1 how fierce the charcoal is, read every frame: food roasts faster on a hotter fire */
   fire?: RefObject<number>
+  /** told how many pieces are off the fire (on a plate, in a pile or eaten), for the fire's capacity limit */
+  onOffFire?: (count: number) => void
 }
 
 /** Roasting speed for a fire level: barely cooking on dying embers, about twice as fast at full blaze. */
@@ -155,7 +157,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  * Rendered as a sibling after <Dish>, so its per-frame transforms land after Dish's pop-in animation, and it picks
  * up the extra portions Dish clones in as they appear.
  */
-export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire }: RoastingProps) {
+export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire }: RoastingProps) {
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -192,8 +194,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     })
     if (!meshes.length || !meshes.every((m) => m.material instanceof THREE.MeshToonMaterial)) return
     for (const m of meshes) {
-      // the bamboo skewer itself doesn't roast
-      if ((m.material as THREE.Material).name === 'BambooSkewer') continue
       const mat = (m.material as THREE.MeshToonMaterial).clone()
       addCharring(mat, p.uChar)
       m.material = mat
@@ -348,10 +348,25 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const anchors = useRef<Record<string, THREE.Group | null>>({})
   const [tags, setTags] = useState<{ key: string; id: string; state: TagState }[]>([])
   const lastTags = useRef('')
+  const lastOff = useRef(-1)
   const since = useRef(0)
   const tint = useMemo(() => new THREE.Color(), [])
 
+  // glowing charcoal: mostly black at a low fire, more and more of it red-hot as the fire builds
+  const embers = useRef<{ mat: THREE.MeshToonMaterial; base: number }[] | null>(null)
+
   useFrame((_, delta) => {
+    if (!embers.current || !embers.current.length) {
+      const found = new Map<THREE.MeshToonMaterial, number>()
+      root.traverse((o) => {
+        if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial && o.material.name === 'Ember') {
+          found.set(o.material, o.material.emissiveIntensity)
+        }
+      })
+      embers.current = [...found].map(([mat, base]) => ({ mat, base }))
+    }
+    const f = fire?.current ?? 0.55
+    for (const e of embers.current) e.mat.emissiveIntensity = e.base * (0.08 + 1.15 * f ** 1.6)
     if (scannedCount.current !== root.children.length) scan()
     const dt = Math.min(delta, 0.1)
     pieces.current.forEach((p, n) => {
@@ -433,6 +448,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
     }
     if (need !== plateCount) setPlateCount(need)
+    const off = pieces.current.filter((p) => p.collected && present(p)).length
+    if (off !== lastOff.current) {
+      lastOff.current = off
+      onOffFire?.(off)
+    }
     const next: { key: string; id: string; state: TagState }[] = []
     for (const p of pieces.current) {
       if (!present(p) || p.collected) continue
