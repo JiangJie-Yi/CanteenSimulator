@@ -37,8 +37,8 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 seed(44)
 
 STONE_R = 0.9
-STICK_FOOT_R = 0.7
-STICK_TOP_R = 0.4         # tips well apart, so the food on neighbouring skewers doesn't run together
+STICK_FOOT_R = 0.8         # planted just inside the stones…
+STICK_TOP_R = 0.3         # …and every one leaning in over the coals
 STICK_TOP_Z = 1.15
 
 
@@ -437,11 +437,12 @@ for i, half in enumerate(sizes):
     # stagger in and out of the ring a little so it doesn't look laid with a compass
     r = STONE_R + (0.045 if i % 2 else -0.03) + random.uniform(-0.025, 0.025) + (1 - k) * 0.03
     # river-stone ovals: long along the ring, narrower across it, and fairly flat
-    sx, sy, sz = half * random.uniform(0.5, 0.9), half, half * random.uniform(0.45, 0.7)
-    # mostly smooth river ovals, with some broken rock among them
-    oval = random.random() < 0.55
-    loc = (r * math.cos(a), r * math.sin(a), sz * 0.55)
-    rot = (random.uniform(-0.08, 0.08), random.uniform(-0.08, 0.08), a + random.uniform(-0.18, 0.18))
+    # stone slabs stood on end and driven into the ground round the fire: thin across the ring, wide along it,
+    # taller than they're thick, each leaning a little in or out, all broken rock with hard edges
+    sx, sy, sz = half * random.uniform(0.3, 0.42), half, half * random.uniform(0.95, 1.35)
+    oval = False
+    loc = (r * math.cos(a), r * math.sin(a), sz * 0.42)
+    rot = (random.uniform(-0.06, 0.06), random.uniform(-0.14, 0.14), a + random.uniform(-0.12, 0.12))
     if oval:
         bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=loc, rotation=rot)
     else:
@@ -1567,15 +1568,21 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
         o.location.z += BOX_Z
     centre_origin(join([pot, fl], name), (c.x, c.y, 0.0))
     head = Vector((c.x, c.y, BOX_Z + depth * 0.7))
-    if name == "SoyPot":
-        # the basting brush: a tuft of dark bristles on a wooden handle
+    if name in ("SoyPot", "MilkJar"):
+        # a basting brush for each sauce: a tuft of bristles on a wooden handle (pale ones for the milk)
         bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=8, location=head)
         tuft = active()
         tuft.scale = (0.022, 0.016, 0.04)
-        utensil("SoyBrush", head, head + lean + out * 0.02, finish(tuft, "BrushBristles", M["bristle"]), 0.008)
+        bristle = M["bristle"] if name == "SoyPot" else M.setdefault(
+            "bristle_pale", pbr("BrushBristlePale", (0.86, 0.8, 0.66), rough=0.7))
+        utensil("SoyBrush" if name == "SoyPot" else "MilkBrush", head, head + lean + out * 0.02,
+                finish(tuft, "BrushBristles", bristle), 0.008)
+    elif name == "PeanutBowl":
+        utensil("PeanutSpoon", head, head + lean, spoon_bowl(head, 0.03))
     else:
-        utensil({"SaltPot": "SaltSpoon", "MilkJar": "MilkSpoon", "PeanutBowl": "PeanutSpoon"}[name], head,
-                head + lean, spoon_bowl(head, 0.024 if name != "PeanutBowl" else 0.03))
+        # salt is taken by the pinch, by hand: just a marker where the fingers dip in (the web app draws the hand)
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.012, segments=8, ring_count=4, location=head)
+        utensil("SaltPinch", head, head + Vector((0, 0, 0.02)), finish(active(), "SaltPinchMark", M["salt"]), 0.002)
 
 
 # ---------------------------------------------------------------------------------------------------------

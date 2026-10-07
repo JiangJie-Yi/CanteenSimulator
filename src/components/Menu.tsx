@@ -41,8 +41,10 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
   const count = [...dish.bases, ...dish.items].reduce((n, x) => n + (quantities[x.id] ?? 0), 0)
   const total = [...dish.bases, ...dish.items].reduce((sum, x) => sum + x.price * (quantities[x.id] ?? 0), 0)
-  // what the ordered sets bring along (stamped 含 on those tags)
-  const included = new Set(ordered.flatMap((b) => Object.keys(b.includes ?? {})))
+  // what a set brings along shows only while you point at that set: its foods' tags darken and get a 含 stamp
+  const [peek, setPeek] = useState<string | null>(null)
+  const peeked = dish.bases.find((b) => b.id === peek)
+  const included = new Set(Object.keys(peeked?.includes ?? {}))
 
   // when the tags don't fit across (phones, short windows), page through them with ‹ › instead of a scrollbar.
   // The row is right-to-left, so in Chrome/Firefox scrollLeft runs from 0 (rightmost) to negative.
@@ -110,16 +112,22 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
   /** one wooden tag: click to order a portion, right-click (or - / Delete) to take one off */
   const tag = (x: { id: string; name: string; ja?: string; en?: string; price: number }, icon: string, base: boolean) => {
     const n = quantities[x.id] ?? 0
-    const incl = !base && n === 0 && included.has(x.id)
+    const incl = !base && included.has(x.id)
     const name = nameIn(lang, x)
     const price = toChineseNumber(x.price)
+    const hasSet = base && !!(x as { includes?: object }).includes
     return (
-      <button key={x.id} type="button" className={`strip${base ? ' strip-base' : ''}`} aria-pressed={n > 0}
+      <button key={x.id} type="button" aria-pressed={n > 0}
+        className={`strip${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${x.price}${n ? `，${t.ordered(n)}` : ''}`}
-        style={tagFit(name, x.en, price, n > 0 || incl)}
+        style={tagFit(name, x.en, price, n > 0)}
         onClick={() => onAdd(x.id)}
         onContextMenu={(e) => { e.preventDefault(); onRemove(x.id) }}
-        onKeyDown={onKey(x.id)}>
+        onKeyDown={onKey(x.id)}
+        onPointerEnter={hasSet ? () => setPeek(x.id) : undefined}
+        onPointerLeave={hasSet ? () => setPeek(null) : undefined}
+        onFocus={hasSet ? () => setPeek(x.id) : undefined}
+        onBlur={hasSet ? () => setPeek(null) : undefined}>
         <Icon name={icon} />
         <span className="strip-name">{name}</span>
         {x.en && <span className="strip-en" lang="en">{x.en}</span>}
@@ -142,9 +150,13 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
         {ends.overflow && (
           <>
             <button type="button" className="strips-page strips-page-left" aria-label="‹"
-              disabled={ends.atLeft} onClick={() => page(-1)}>‹</button>
+              disabled={ends.atLeft} onClick={() => page(-1)}>
+              <svg viewBox="0 0 16 26" aria-hidden="true"><path d="M12 3 4 13l8 10" /></svg>
+            </button>
             <button type="button" className="strips-page strips-page-right" aria-label="›"
-              disabled={ends.atRight} onClick={() => page(1)}>›</button>
+              disabled={ends.atRight} onClick={() => page(1)}>
+              <svg viewBox="0 0 16 26" aria-hidden="true"><path d="m4 3 8 10-8 10" /></svg>
+            </button>
           </>
         )}
         <div className="strips" ref={row} onPointerDown={onGrab} onPointerMove={onDrag} onPointerUp={onLetGo}

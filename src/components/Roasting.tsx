@@ -40,6 +40,75 @@ const EAT_SECONDS = 3
 const BITES_PER_PIECE = 4
 const UP = new THREE.Vector3(0, 1, 0)
 const ZERO = new THREE.Vector3()
+/** the pinching hand is drawn a little above the pinch of salt it holds */
+const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
+/** the bin for bare sticks and burnt food */
+const BIN_R = 0.24
+const BIN_H = 0.36
+/** the seasoning box, as a round footprint for bumping into things */
+const BOX_R = 0.46
+/** the stone ring's outer edge: nothing can be pushed into the fire */
+const RING_CLEAR = 1.15
+
+/** A small wooden bucket for the scraps, open at the top, with a dark inside. */
+function Bin({ position, container }: { position: [number, number, number]; container: string }) {
+  const geometry = useMemo(() => {
+    const R = BIN_R
+    // outside wall flaring a little toward the rim, a rolled lip, then the inside back down to a raised floor
+    return new THREE.LatheGeometry([[0, 0.01], [R * 0.84, 0.01], [R * 0.86, 0.02], [R, BIN_H], [R * 1.04, BIN_H + 0.012],
+      [R * 0.94, BIN_H + 0.004], [R * 0.82, 0.05], [0, 0.05]].map(([x, y]) => new THREE.Vector2(x, y)), 40)
+  }, [])
+  const staves = useMemo(() => {
+    if (typeof document === 'undefined') return null
+    const c = document.createElement('canvas')
+    c.width = 128
+    c.height = 16
+    const g = c.getContext('2d')!
+    for (let i = 0; i < 8; i++) {
+      g.fillStyle = i % 2 ? '#8a6038' : '#9a6c40'
+      g.fillRect(i * 16, 0, 16, 16)
+      g.fillStyle = 'rgba(40, 24, 10, 0.6)'
+      g.fillRect(i * 16, 0, 1.5, 16)
+    }
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.wrapS = THREE.RepeatWrapping
+    t.repeat.set(2, 1)
+    return t
+  }, [])
+  return (
+    <group position={position} userData={{ container }}>
+      <mesh geometry={geometry} castShadow receiveShadow>
+        <meshToonMaterial color="#ffffff" map={staves} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh geometry={geometry} scale={[1.03, 1.02, 1.03]}>
+        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+      </mesh>
+      {/* two iron hoops round the staves */}
+      {[0.08, 0.27].map((y) => (
+        <mesh key={y} position-y={y} rotation-x={Math.PI / 2}>
+          <torusGeometry args={[BIN_R * (0.86 + 0.14 * (y / BIN_H)) + 0.004, 0.008, 6, 40]} />
+          <meshToonMaterial color="#3c3c40" />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** A pinching hand (for taking salt), drawn over the 3D view while salt is carried. */
+function PinchHand() {
+  return (
+    <svg className="pinch-hand" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M22 60c-6-6-10-14-9-22 1-5 3-8 6-9l1-14c0-3 5-3 5 0v12l1-16c0-3 5-3 5 0v15l1-12c0-3 5-3 5 0v13l1-8c0-3 5-3 5 0v14c0 8-3 14-7 19-3 4-4 6-4 8z"
+        fill="#f3d2b0" stroke="#3b2a20" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M19 29c-4 1-8 4-8 8 0 3 3 4 6 2l5-4" fill="#f3d2b0" stroke="#3b2a20" strokeWidth="2"
+        strokeLinejoin="round" />
+      <circle cx="24" cy="46" r="1.2" fill="#fff" />
+      <circle cx="27" cy="50" r="1" fill="#fff" />
+    </svg>
+  )
+}
+
 /** the little side dishes for onigiri and mochi from the grill net */
 const DISH_R = 0.3
 const DISH_STEP = 0.7
@@ -61,8 +130,8 @@ const DAB = 0.35
 /** label over a seasoning when pointed at */
 const TOOL_NAMES: Record<Seasoning, string> = { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉' }
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
-const STICK_FOOT_R = 0.7
-const STICK_TOP_R = 0.4
+const STICK_FOOT_R = 0.8
+const STICK_TOP_R = 0.3
 const STICK_TOP_Y = 1.15
 const LAYER_HEIGHT = 0.1
 const CHAR_COLOR = new THREE.Color(0.045, 0.035, 0.03)
@@ -417,6 +486,11 @@ type Piece = {
   /** once served: the plate, dish or basket it's on (plate-n, dish-n, basket-n), and where on it */
   container: string | null
   local: THREE.Vector3
+  /** being carried by the pointer (a bare stick or something burnt, on its way to the bin) */
+  carried: boolean
+  /** 0 → 1 while dropping into the bin (−1 otherwise), and where it fell from */
+  trash: number
+  trashFrom: THREE.Vector3
   /** seconds since it landed on the plate or in the basket (it steams a little at first) */
   landed: number
   /** where it sits once collected: index into its plate run (or its pile); null while on the fire */
@@ -523,7 +597,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         node: obj, homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), progress: 0, collected: false,
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
         toQ: new THREE.Quaternion(), mats, looks, bites: newBites(), sticks: [], food: [], puffs: [], stickOnly: false,
-        netSpot: null, container: null, local: new THREE.Vector3(),
+        netSpot: null, container: null, local: new THREE.Vector3(), carried: false, trash: -1,
+        trashFrom: new THREE.Vector3(),
         landed: -1,
         body: null, slot: null, eat: 0, eaten: false,
       })
@@ -552,8 +627,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const foil = mat.name.startsWith('Foil') || mat.name.startsWith('Wrapper')
       const show = mat.name.startsWith('Wrapper') ? 'open' : foil || mat.name.endsWith('Top') ? 'closed' : undefined
       if (!foil) {
-        addCharring(mat, p.looks, p.bites)
-        for (const c of m.children) if (c instanceof THREE.Mesh && c.name.endsWith('_outline')) biteOutline(c, p.bites)
+        // bites come out of the food only: the bamboo stick is never eaten (it gets bites that stay empty)
+        const stick = mat.name.startsWith('BambooSkewer')
+        const bites = stick ? newBites() : p.bites
+        addCharring(mat, p.looks, bites)
+        for (const c of m.children) if (c instanceof THREE.Mesh && c.name.endsWith('_outline')) biteOutline(c, bites)
         mat.color.offsetHSL(shade.h, shade.s, shade.l)
       } else {
         // no two sheets of foil crumple alike: give this one its own folds, sheen and grey
@@ -596,10 +674,50 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const [x, y, z] = roast.basket!.at
     return new THREE.Vector3(x, y, z).addScaledVector(LAY_DIR, -n * BASKET_STEP).add(nudge(`basket-${n}`))
   }
-  /** where a container (plate-n, dish-n, basket-n) is now */
-  const containerAt = (key: string) => {
+  /** where a container (plate-n, dish-n, basket-n, the seasoning box, the bin) is now */
+  const containerAt = (key: string): THREE.Vector3 => {
     const [kind, n] = key.split('-')
+    if (kind === 'box') return (boxNodes[0]?.home.clone() ?? new THREE.Vector3()).add(nudge('box'))
+    if (kind === 'bin') return new THREE.Vector3(...(roast.bin ?? [0, 0, 0])).add(nudge('bin'))
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
+  }
+  const footprint = (key: string) => {
+    const kind = key.split('-')[0]
+    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R }[kind] ?? 0.3
+  }
+  /** everything standing on the table that can be moved, for bumping into */
+  const containerKeys = () => [
+    ...Array.from({ length: plateCount }, (_, n) => `plate-${n}`),
+    ...(roast.dish ? Array.from({ length: dishCount }, (_, n) => `dish-${n}`) : []),
+    ...(roast.basket ? Array.from({ length: basketCount }, (_, n) => `basket-${n}`) : []),
+    ...(boxNodes.length ? ['box'] : []),
+    ...(roast.bin ? ['bin'] : []),
+  ]
+  /**
+   * Keep a moved container from passing through things: out of the stone ring, and clear of every other
+   * plate, dish, basket, the box and the bin (round footprints, pushed apart until they just touch).
+   */
+  const settle = (key: string, at: THREE.Vector3) => {
+    const r = footprint(key)
+    const others = containerKeys().filter((k) => k !== key).map((k) => ({ p: containerAt(k), r: footprint(k) }))
+    for (let i = 0; i < 6; i++) {
+      const d = Math.hypot(at.x, at.z) || 1e-6
+      if (d < RING_CLEAR + r) {
+        at.x *= (RING_CLEAR + r) / d
+        at.z *= (RING_CLEAR + r) / d
+      }
+      for (const o of others) {
+        const dx = at.x - o.p.x
+        const dz = at.z - o.p.z
+        const dd = Math.hypot(dx, dz) || 1e-6
+        const min = r + o.r + 0.01
+        if (dd < min) {
+          at.x = o.p.x + (dx / dd) * min
+          at.z = o.p.z + (dz / dd) * min
+        }
+      }
+    }
+    return at
   }
   const [basketCount, setBasketCount] = useState(1)
   const [wisps, setWisps] = useState<{ key: string; at: [number, number, number] }[]>([])
@@ -754,14 +872,29 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // a drag that orbits the camera) takes it off the fire, or eats it once it's on the plate
   const { gl, camera, raycaster, scene: world } = useThree()
   const shift = useRef<{ key: string; start: THREE.Vector3; from: THREE.Vector3 } | null>(null)
+  const scrap = useRef<{ p: Piece; x: number; y: number; started: boolean } | null>(null)
+  const [saltInHand, setSaltInHand] = useState(false)
+  const hand = useRef<THREE.Group>(null)
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean } | null
 
   // seasonings beside the fire (salt, soy and brush, condensed milk, peanut powder): pick one up, carry it over a
   // piece of food and let go to season that piece
   const tools = useMemo(() => Object.entries(roast.tools ?? {}).flatMap(([name, kind]) => {
     const node = root.getObjectByName(name)
-    return node ? [{ node, kind, home: node.position.clone(), homeQ: node.quaternion.clone(), back: 1 }] : []
+    return node ? [{ node, kind, home: node.position.clone(), home0: node.position.clone(),
+      homeQ: node.quaternion.clone(), back: 1 }] : []
   }), [root, roast.tools])
+  // the seasoning box and what stands in it (but not the utensils, which have their own homes), for dragging
+  const boxNodes = useMemo(() => (roast.toolBox ?? []).flatMap((name) => {
+    const node = root.getObjectByName(name)
+    if (!node || Object.prototype.hasOwnProperty.call(roast.tools ?? {}, name)) return []
+    return [{ node, home: node.position.clone() }]
+  }), [root, roast.toolBox, roast.tools])
+  useEffect(() => {
+    // grabbing the box (not a pot or a utensil) drags the whole thing
+    const box = boxNodes[0]?.node
+    if (box) box.userData.container = 'box'
+  }, [boxNodes])
   type Tool = (typeof tools)[number]
   // the pots they stand in: pointing at or grabbing a pot means its utensil
   const pots = useMemo(() => Object.entries(roast.toolPots ?? {}).flatMap(([potName, toolName]) => {
@@ -898,8 +1031,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       aim(e)
       const tool = pickTool()
       if (!tool) {
-        // no seasoning: grab a plate, side dish or the basket (where there's no food under the pointer)
-        const key = pickFood() ? null : pickContainer()
+        // a bare stick or something burnt can be picked up and carried to the bin (a plain click still eats or
+        // complains as usual: carrying only starts once the pointer moves)
+        const food = pickFood()
+        if (food && (food.stickOnly || stageOf(food.progress / roast.times[food.id]).key === 'burnt')) {
+          scrap.current = { p: food, x: e.clientX, y: e.clientY, started: false }
+          window.addEventListener('pointermove', haul)
+          window.addEventListener('pointerup', dropScrap, { once: true })
+          return
+        }
+        // otherwise grab a plate, side dish, the basket, the seasoning box or the bin (not the food on them)
+        const key = food ? null : pickContainer()
         if (!key) return
         const start = groundHit()
         if (!start) return
@@ -913,6 +1055,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // pick it up: the camera holds still while it's carried, and the pointer is followed over the whole window
       // (it passes over the food tags, which sit above the canvas)
       drag.current = { tool, target: null, at: tool.node.position.clone(), pour: 0 }
+      if (tool.kind === 'salt') setSaltInHand(true)
       if (controls) controls.enabled = false
       el.style.cursor = 'grabbing'
       document.body.classList.add('is-carrying')
@@ -933,6 +1076,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       d.tool.back = 0
       drag.current = null
+      setSaltInHand(false)
       if (controls) controls.enabled = true
       el.style.cursor = ''
       setHover(null)
@@ -961,9 +1105,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const hit = groundHit()
       if (!hit) return
       const before = nudge(s.key).clone()
-      const next = s.from.clone().add(hit.sub(s.start))
+      // where it would go, kept clear of the fire and of everything else on the table
+      const base = containerAt(s.key).sub(before)
+      const want = base.clone().add(s.from).add(hit.sub(s.start))
+      want.y = base.y
+      const next = settle(s.key, want).sub(base)
       next.y = 0
       moved.current.set(s.key, next)
+      if (s.key === 'box') {
+        // the box carries its pots and utensils with it
+        for (const b of boxNodes) b.node.position.copy(b.home).add(next)
+        for (const t of tools) if (t.back >= 1 && drag.current?.tool !== t) t.node.position.copy(t.home0).add(next)
+        for (const t of tools) t.home.copy(t.home0).add(next)
+      }
       // potatoes rolling about in the basket go along with it
       const delta = next.clone().sub(before)
       for (const p of pieces.current) if (p.body?.live && p.container === s.key) p.node.position.add(delta)
@@ -975,8 +1129,43 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       document.body.classList.remove('is-carrying')
       if (controls) controls.enabled = true
     }
+    // carrying scraps to the bin
+    const haul = (e: PointerEvent) => {
+      const q = scrap.current
+      if (!q) return
+      if (!q.started) {
+        if (Math.hypot(e.clientX - q.x, e.clientY - q.y) < 6) return
+        q.started = true
+        q.p.carried = true
+        q.p.node.userData.onPlate = true
+        if (controls) controls.enabled = false
+        document.body.classList.add('is-carrying')
+      }
+      aim(e)
+      const plane = new THREE.Plane(UP, -root.localToWorld(new THREE.Vector3(0, 0.55, 0)).y)
+      const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
+      if (hit) q.p.node.position.copy(root.worldToLocal(hit))
+    }
+    const dropScrap = () => {
+      const q = scrap.current
+      window.removeEventListener('pointermove', haul)
+      scrap.current = null
+      if (!q?.started) return
+      document.body.classList.remove('is-carrying')
+      if (controls) controls.enabled = true
+      q.p.carried = false
+      const bin = containerAt('bin')
+      const pos = q.p.node.position
+      if (roast.bin && Math.hypot(pos.x - bin.x, pos.z - bin.z) < BIN_R + 0.16) {
+        // let go over the bin: it drops in
+        q.p.trash = 0
+        q.p.trashFrom.copy(pos)
+      } else if (!q.p.collected) {
+        q.p.node.userData.onPlate = false            // back onto its skewer spot
+      }
+    }
     const onUp = (e: PointerEvent) => {
-      if (drag.current || shift.current) return
+      if (drag.current || shift.current || scrap.current?.started) return
       if (e.button !== 0 || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
       aim(e)
       const p = pickFood()
@@ -1120,6 +1309,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const d = drag.current
     for (const t of tools) {
       const held = d?.tool === t
+      if (held && t.kind === 'salt' && hand.current) hand.current.position.copy(t.node.position).add(HAND_OFFSET)
       if (held) {
         t.node.position.lerp(d!.at, Math.min(1, dt * 14))
         d!.pour += ((d!.target ? 1 : 0) - d!.pour) * Math.min(1, dt * 8)
@@ -1180,6 +1370,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.progress = 0
         p.netSpot = null
         p.container = null
+        p.carried = false
+        p.trash = -1
         p.body = null
         for (const u of Object.values(p.looks)) u.value = 0
         p.stickOnly = false
@@ -1203,7 +1395,24 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         return
       }
       const time = roast.times[p.id]
-      if (!p.collected) {
+      if (p.trash >= 0) {
+        // tossed into the bin: a short arc down into it, and gone
+        p.trash = Math.min(1, p.trash + dt / 0.45)
+        const k = p.trash
+        const into = containerAt('bin')
+        into.y += 0.12
+        p.node.position.lerpVectors(p.trashFrom, into, k)
+        p.node.position.y += Math.sin(k * Math.PI) * 0.12
+        if (k >= 1) {
+          p.trash = -1
+          p.eaten = true
+          p.slot = null
+          p.collected = true
+          p.stickOnly = false
+        }
+      } else if (p.carried) {
+        // (held by the pointer, see haul)
+      } else if (!p.collected) {
         if (active && !waiting(p)) p.progress += dt * roastRate(fire?.current ?? 0.55)
         p.node.quaternion.copy(p.homeQ)
         p.node.position.x = p.homeP.x
@@ -1382,6 +1591,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
+      {roast.bin && <Bin container="bin" position={containerAt('bin').toArray() as [number, number, number]} />}
+      {/* salt is taken with the fingers: a pinching hand follows the pinch while it's carried */}
+      {saltInHand && (
+        <group ref={hand}>
+          <Html center zIndexRange={[40, 30]} style={{ pointerEvents: 'none' }}><PinchHand /></Html>
+        </group>
+      )}
       <points geometry={grains.geometry} material={grainMaterial} frustumCulled={false} renderOrder={3} />
       {active && toolLabel && (
         <Html position={toolLabel.at} center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>

@@ -114,6 +114,10 @@ export type Roast = {
   tools?: Record<string, Seasoning>
   /** the pot each utensil stands in (pot object name → utensil object name) */
   toolPots?: Record<string, string>
+  /** the seasoning box's objects: the first is the box itself, which can be dragged with everything in it */
+  toolBox?: string[]
+  /** where the bin for bare sticks and burnt food stands */
+  bin?: [number, number, number]
   /** items toasted on the little grill net over the coals rather than on a skewer (they puff up as they cook) */
   net?: string[]
   /** where the net holds them (x, z in the dish): one per spot, the rest wait until a spot frees up */
@@ -262,8 +266,14 @@ export const DISHES: Dish[] = [
       // behind the fire to the left of the plate, as the camera sees it
       dish: { at: [0.35, 0.0, -1.62], capacity: 3 },
       // the spoons and brush in the seasoning box are what's carried; grabbing a pot picks up its utensil
-      tools: { SaltSpoon: 'salt', SoyBrush: 'soy', MilkSpoon: 'milk', PeanutSpoon: 'peanut' },
-      toolPots: { SaltPot: 'SaltSpoon', SoyPot: 'SoyBrush', MilkJar: 'MilkSpoon', PeanutBowl: 'PeanutSpoon' },
+      // (salt is taken by hand: SaltPinch only marks where the pinch is taken from)
+      tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut' },
+      toolPots: { SaltPot: 'SaltPinch', SoyPot: 'SoyBrush', MilkJar: 'MilkBrush', PeanutBowl: 'PeanutSpoon' },
+      // the seasoning box (dragged as a whole) and everything standing in it
+      toolBox: ['SeasoningBox', 'SaltPot', 'SoyPot', 'MilkJar', 'PeanutBowl', 'SaltPinch', 'SoyBrush', 'MilkBrush',
+        'PeanutSpoon'],
+      // a bin for bare sticks and burnt food, back on the left
+      bin: [-1.05, 0, -1.35],
     },
     layout: {
       mode: 'ring',

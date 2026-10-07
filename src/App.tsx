@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
@@ -140,10 +140,12 @@ type SceneProps = {
   onOffFire: (count: number, loose: number) => void
   /** a piece of food has been eaten (for the fullness meter) */
   onEat: (id: string) => void
+  /** bumped by the 視角 button: glide back to the home view */
+  resetView: number
   onNotice: (what: 'notCooked' | 'burnt') => void
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice }: SceneProps) {
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
   const camera = useThree((s) => s.camera)
@@ -195,12 +197,13 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
   // so framing never drifts
   const homing = useRef(true)
   const home = useRef(new THREE.Vector3())
+  const homeTarget = useMemo(() => new THREE.Vector3(), [])
   useEffect(() => {
     const focus = new THREE.Vector3(0, DISHES[active].focusY, 0)
     home.current.set(...CAMERA_POSITION).sub(focus).multiplyScalar(cameraDistanceScale(aspect)).add(focus)
     homing.current = true
     zoomGoal.current = null
-  }, [active, aspect])
+  }, [active, aspect, resetView])
 
   // smooth wheel zoom: each notch nudges a target distance and the camera eases toward it
   const gl = useThree((s) => s.gl)
@@ -247,9 +250,10 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
     const c = controls.current
     if (c && homing.current) {
       camera.position.lerp(home.current, k)
-      c.target.set(0, c.target.y + (focusY - c.target.y) * k, 0)
+      // (any panning is undone too: the target slides back to the middle of the dish)
+      c.target.lerp(homeTarget.set(0, focusY, 0), k)
       c.update()
-      if (camera.position.distanceTo(home.current) < 0.002 && Math.abs(c.target.y - focusY) < 0.002) {
+      if (camera.position.distanceTo(home.current) < 0.002 && c.target.distanceTo(homeTarget) < 0.002) {
         homing.current = false
       }
     } else if (c && zoomGoal.current !== null) {
@@ -339,7 +343,10 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
         // shared as the scene's controls so dragging a seasoning onto food can hold the camera still
         makeDefault
         target={[0, DISHES[0].focusY, 0]}
-        enablePan={false}
+        // the middle button (or the right) drags the view sideways; the left one turns it
+        enablePan
+        screenSpacePanning
+        mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }}
         minDistance={1.8}
         maxDistance={20}
         maxPolarAngle={Math.PI * 0.45}
@@ -372,6 +379,8 @@ export default function App() {
   const [theme, toggleTheme] = useTheme()
   // the menu can be folded away to give the food the whole screen
   const [menuFolded, setMenuFolded] = useState(false)
+  // bumped to send the camera back to its home view
+  const [resetView, setResetView] = useState(0)
   const reducedMotion = usePrefersReducedMotion()
   const [heat, setHeat] = useState(40)
   const [lang, setLang] = useState<Lang>(() => {
@@ -533,7 +542,7 @@ export default function App() {
         >
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }}
-            onEat={onEat} onNotice={(what) => say(UI[lang][what])} />
+            onEat={onEat} onNotice={(what) => say(UI[lang][what])} resetView={resetView} />
         </Canvas>
       </div>
       <div className="stage" ref={stageRef}>
@@ -542,6 +551,10 @@ export default function App() {
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} />
         <DishSwitcher dishes={DISHES} index={active} onChange={setActive} lang={lang} />
+        <button type="button" className="view-reset" onClick={() => setResetView((n) => n + 1)}
+          aria-label={UI[lang].resetView} title={UI[lang].resetView}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4h4" /><circle cx="12" cy="12" r="2.2" /></svg>
+        </button>
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
       </div>
       <div className="menu-backing" aria-hidden="true" />
