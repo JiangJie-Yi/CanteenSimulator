@@ -1,0 +1,1060 @@
+:root {
+  /* 野營夕暮 Campfire Dusk */
+  --page: #dde5ee;        /* dusk wash behind everything */
+  --text: #3b2a20;        /* text on the page */
+  --text-soft: #7a6450;
+  --washi: #fbf3e4;       /* menu strips (always paper, in both themes) */
+  --washi-shade: #efe2c9;
+  --ink: #3b2a20;         /* text on paper */
+  --ink-soft: #7a6450;
+  --moss: #33503f;        /* base strip, focus rings */
+  --hanko: #c23b2a;       /* the stamp */
+
+  --brush: 'LXGW WenKai TC', 'Noto Serif TC', serif;
+
+  color-scheme: light;
+  font: 17px/1.6 var(--brush);
+  color: var(--text);
+  background: var(--page);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* night camp: the page goes dark, the paper strips stay lit like lanterns */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --page: #171c27;
+    --text: #efe6d6;
+    --text-soft: #a99f90;
+    --washi: #ece0c8;
+    --washi-shade: #cdbd9f;
+    --moss: #5d8a70;
+    --hanko: #d9503c;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --page: #171c27;
+  --text: #efe6d6;
+  --text-soft: #a99f90;
+  --washi: #ece0c8;
+  --washi-shade: #cdbd9f;
+  --moss: #5d8a70;
+  --hanko: #d9503c;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--page);
+  transition: background-color 300ms ease;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  height: 100%;
+}
+
+.stage {
+  position: relative;
+  min-width: 0;
+}
+
+.stage canvas {
+  touch-action: none;
+}
+
+/* ---------- stage overlays ---------- */
+
+/* shop sign, top-left of the stage: an old lacquered signboard hanging from two cords */
+.brand {
+  --plate: #a3302a;
+  --plate-cream: #f2e3c2;
+  --hang: 24px;      /* cord length from the top of the stage down to the board */
+  position: absolute;
+  top: var(--hang);
+  left: 22px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 32px;   /* everything in the sign scales off this */
+  pointer-events: none;
+  /* swing from where the cords are tied, as if a breeze is moving it */
+  transform-origin: 2.6em calc(-1 * var(--hang));
+  animation: brand-sway 5.5s ease-in-out infinite;
+}
+
+@keyframes brand-sway {
+  0%, 100% { transform: rotate(-1.2deg); }
+  30% { transform: rotate(1.5deg); }
+  55% { transform: rotate(-0.4deg); }
+  80% { transform: rotate(0.9deg); }
+}
+
+/* twisted hemp rope: diagonal light/dark strands, tied off with a small knot where it meets the board */
+.brand-cord {
+  position: absolute;
+  top: calc(-1 * var(--hang));
+  width: 3px;
+  height: calc(var(--hang) + 0.1em);
+  border-radius: 2px;
+  background: repeating-linear-gradient(-58deg, #7b5a37 0 1.6px, #c8a26a 1.6px 3.4px);
+  box-shadow: 0 0 0 0.5px rgb(59 42 32 / 0.35);
+}
+
+.brand-cord::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  width: 7px;
+  height: 5px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: #a8834f;
+  box-shadow: inset 0 -1px 0 #6e5030;
+}
+
+.brand-cord-left {
+  left: 0.85em;
+}
+
+.brand-cord-right {
+  right: 0.85em;
+}
+
+.brand-plate {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.28em;
+  padding: 0.26em 0.62em 0.3em 0.7em;
+  border-radius: 0.12em;
+  color: var(--plate-cream);
+  /* worn lacquer: mottled darker patches over the vermilion */
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='80'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035 0.09' numOctaves='3' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.04 0 0 0 0 0.02 0 0 0 1.1 -0.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E")
+      center / cover,
+    var(--plate);
+  /* cream double rule painted just inside the edge */
+  box-shadow:
+    inset 0 0 0 0.09em var(--plate),
+    inset 0 0 0 0.14em var(--plate-cream),
+    inset 0 0 0 0.2em var(--plate),
+    inset 0 0 0 0.23em var(--plate-cream),
+    0 0.2em 0.4em -0.22em rgb(40 20 10 / 0.6);
+}
+
+/* nail heads holding the board up */
+.brand-plate::before,
+.brand-plate::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 0.16em;
+  height: 0.16em;
+  margin-top: -0.08em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #d8cfc0, #6d6458);
+}
+
+.brand-plate::before {
+  left: 0.3em;
+}
+
+.brand-plate::after {
+  right: 0.3em;
+}
+
+.brand-main,
+.brand-sub {
+  font-family: 'Zen Antique', var(--brush);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.brand-main {
+  letter-spacing: 0.1em;
+  text-shadow: 0 0.03em 0 rgb(60 15 10 / 0.5);
+}
+
+/* 食堂 stacked small to the right, the way old signs set the trailing word */
+.brand-sub {
+  writing-mode: vertical-rl;
+  font-size: 0.42em;
+  letter-spacing: 0.1em;
+  padding-right: 0.35em;
+}
+
+.brand-plate {
+  transition: background-color 300ms ease, color 300ms ease, box-shadow 300ms ease;
+}
+
+/* night: the board becomes a warm yellow lightbox, red lettering, glowing into the dark */
+.brand-night .brand-plate {
+  --plate: #ffd879;
+  --plate-cream: #b3291f;
+  color: #8f2016;
+  background: radial-gradient(ellipse at 50% 40%, #fff1b8, #ffd36a 60%, #f3ae3e);
+  box-shadow:
+    inset 0 0 0 0.09em #ffd879,
+    inset 0 0 0 0.14em #b3291f,
+    inset 0 0 0 0.2em #ffd879,
+    inset 0 0 0 0.23em #b3291f,
+    0 0 0.5em 0.12em rgb(255 205 100 / 0.55),
+    0 0 1.6em 0.2em rgb(255 180 70 / 0.3);
+  animation: sign-on 700ms steps(1, end);
+}
+
+.brand-night .brand-main {
+  text-shadow: 0 0 0.25em rgb(255 240 190 / 0.9);
+}
+
+/* a fluorescent tube catching: flicker, then hold */
+@keyframes sign-on {
+  0% { filter: brightness(0.55); }
+  12% { filter: brightness(1.15); }
+  20% { filter: brightness(0.6); }
+  32% { filter: brightness(1.1); }
+  40% { filter: brightness(0.8); }
+  55%, 100% { filter: none; }
+}
+
+/* 深夜 tag hung over the board's top-left corner, pressed on like the menu's 選 stamp:
+   snaps down from big to size */
+.brand-late {
+  position: absolute;
+  z-index: 1;
+  top: -0.42em;
+  left: -0.42em;
+  writing-mode: vertical-rl;
+  font-family: 'Zen Antique', var(--brush);
+  font-size: 0.5em;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  padding: 0.28em 0.18em;
+  border-radius: 0.12em;
+  color: var(--washi);
+  background: var(--hanko);
+  box-shadow:
+    inset 0 0 0 0.08em var(--hanko),
+    inset 0 0 0 0.13em rgb(251 243 228 / 0.7),
+    0 0.12em 0.3em -0.1em rgb(0 0 0 / 0.6);
+  transform: rotate(-12deg);
+  animation: brand-stamp 260ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes brand-stamp {
+  from {
+    transform: rotate(-12deg) scale(1.8);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand,
+  .brand-night .brand-plate,
+  .brand-late {
+    animation: none;
+  }
+}
+
+/* pinned to the top-right corner of the whole page */
+.theme-toggle {
+  position: fixed;
+  z-index: 10;
+  top: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 50%;
+  background: var(--page);
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: var(--text);
+}
+
+.theme-toggle:focus-visible,
+.switcher button:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 3px;
+}
+
+/* carousel controls: arrows either side of the brushed dish name */
+.switcher {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.switcher-arrow {
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: var(--washi);
+  color: var(--ink);
+  font-size: 30px;
+  line-height: 1;
+  padding-bottom: 4px;
+  box-shadow: 0 6px 14px -8px rgb(59 42 32 / 0.5);
+  cursor: pointer;
+  transition: transform 160ms ease;
+}
+
+.switcher-arrow:hover {
+  transform: scale(1.08);
+}
+
+.switcher-center {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.dish-name {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.2em;
+  padding-left: 0.2em; /* balance the trailing letter-spacing */
+  color: var(--text);
+}
+
+.dots {
+  display: flex;
+  gap: 4px;
+}
+
+/* the visible dot is small; the button around it is a comfortable tap target */
+.dot {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.dot::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-soft);
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.dot[aria-current='true']::after {
+  background: var(--hanko);
+  border-color: var(--hanko);
+  transform: scale(1.2);
+}
+
+/* 火候 slider: the track warms from blue to orange up to the current heat */
+/* sits under the shop sign */
+.heat {
+  position: absolute;
+  top: 96px;
+  left: 24px;
+  display: grid;
+  grid-template-columns: auto 200px;
+  grid-template-rows: auto auto;
+  column-gap: 14px;
+  align-items: center;
+  color: var(--text);
+}
+
+.heat-label {
+  grid-row: 1 / 3;
+  font-size: 26px;
+  font-weight: 700;
+  writing-mode: vertical-rl;
+  letter-spacing: 0.15em;
+}
+
+.heat input[type='range'] {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+.heat input[type='range']::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #4f9dff, #ff9b3d var(--heat), var(--washi-shade) var(--heat));
+}
+
+.heat input[type='range']::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #4f9dff, #ff9b3d var(--heat), var(--washi-shade) var(--heat));
+}
+
+.heat input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -7px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--washi);
+}
+
+.heat input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--washi);
+}
+
+.heat input[type='range']:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.heat-value {
+  font-size: 15px;
+  color: var(--text-soft);
+}
+
+.heat-word {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ---------- roasting tags (floating over each skewer on the grilled-fish stage) ---------- */
+
+.roast-tag {
+  --state: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 4px;
+  border: none;
+  border-radius: 999px;
+  color: var(--ink);
+  background: linear-gradient(90deg, #d9b97f, #e8cfa0 20%, #e8cfa0 80%, #d9b97f);
+  box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.2), 0 4px 10px -5px rgb(59 42 32 / 0.6);
+  font: 600 13px/1 var(--brush);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.roast-tag:hover {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.roast-tag:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 2px;
+}
+
+.roast-ring {
+  width: 18px;
+  height: 18px;
+  transform: rotate(-90deg);
+}
+
+.roast-ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+
+.roast-ring-track {
+  stroke: rgb(59 42 32 / 0.15);
+}
+
+.roast-ring-fill {
+  stroke: var(--state);
+  stroke-linecap: round;
+  transition: stroke-dasharray 250ms linear;
+}
+
+.roast-state {
+  color: var(--state);
+}
+
+.roast-half { --state: #c98a1e; }
+.roast-done { --state: var(--hanko); }
+.roast-burnt { --state: #3d2a22; }
+
+/* ready to serve: a little pulse to say "take me off" */
+.roast-done {
+  animation: roast-ready 1.2s ease-in-out infinite;
+}
+
+@keyframes roast-ready {
+  50% { box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.2), 0 0 0 4px rgb(194 59 42 / 0.25); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roast-done {
+    animation: none;
+  }
+}
+
+/* ---------- menu ---------- */
+
+.menu {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 20px;
+  align-content: center;
+  padding: 40px 40px 32px 8px;
+}
+
+.menu-title {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  color: var(--text);
+  writing-mode: vertical-rl;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.3em;
+}
+
+.strips {
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(8, 48px);
+  grid-auto-rows: 236px;
+  gap: 14px 10px;
+  direction: rtl; /* strips read right to left, like the wall menu */
+}
+
+/* the soup-base radio group lays its strips straight into the menu grid */
+.base-group {
+  display: contents;
+}
+
+/* wooden menu tags: hinoki for dishes, walnut for the base. The grain is SVG turbulence stretched
+   along the tag, so lines run lengthwise like a real plank */
+.strip {
+  --wood: #e8cfa0;
+  --wood-dark: #d9b97f;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='320'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.14 0.006' numOctaves='3' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.26 0 0 0 0 0.12 0.9 0 0 0 -0.32'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  position: relative;
+  direction: ltr;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 12px 0;
+  border: none;
+  border-radius: 3px 4px 3px 5px;
+  color: var(--ink);
+  background:
+    var(--grain) center / 100% 100%,
+    linear-gradient(90deg, var(--wood-dark), var(--wood) 18%, var(--wood) 82%, var(--wood-dark));
+  box-shadow:
+    inset 0 0 0 1px rgb(59 42 32 / 0.18),
+    0 6px 14px -8px rgb(59 42 32 / 0.5);
+  cursor: pointer;
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 160ms ease;
+}
+
+.strip:nth-child(3n) { --tilt: -0.8deg; }
+.strip:nth-child(3n + 1) { --tilt: 0.6deg; }
+
+.strip:hover {
+  transform: rotate(var(--tilt, 0deg)) translateY(-3px);
+}
+
+.strip:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 3px;
+}
+
+.strip-name,
+.strip-price {
+  writing-mode: vertical-rl;
+  letter-spacing: 0.12em;
+}
+
+.strip .icon {
+  flex: none;
+  color: var(--ink-soft);
+}
+
+.strip-name {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: auto;
+}
+
+.strip-price {
+  order: 2;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+/* the base strip (soup, noodles, fish): dark walnut */
+.strip-base {
+  --wood: #6e4b30;
+  --wood-dark: #553823;
+  color: var(--washi);
+}
+
+.strip-base .icon,
+.strip-base .strip-price {
+  color: var(--washi-shade);
+}
+
+/* only one base: nothing to choose, so it doesn't lift on hover */
+.strip-fixed {
+  cursor: default;
+}
+
+.strip-fixed:hover {
+  transform: rotate(var(--tilt, 0deg));
+}
+
+/* soup bases you can switch to are a lighter, unstained walnut until chosen */
+.strip-base[aria-checked='false'] {
+  --wood: #9a7552;
+  --wood-dark: #84603f;
+}
+
+/* takes the icon's slot at the top of the chosen base tag, same footprint as the icon
+   (two classes so it wins over the general .stamp rule further down) */
+.stamp.stamp-base {
+  order: 0;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-width: 1.5px;
+  border-color: var(--hanko);
+  color: var(--washi);
+  background: var(--hanko);
+  font-size: 13px;
+}
+
+/* sits in the flex column between name and price, so it never covers either */
+.stamp {
+  position: relative;
+  order: 1;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--hanko);
+  border-radius: 50%;
+  color: var(--hanko);
+  font-size: 18px;
+  font-weight: 700;
+  background: rgb(251 243 228 / 0.85);
+  transform: rotate(-14deg);
+  animation: stamp 220ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes stamp {
+  from {
+    transform: rotate(-14deg) scale(1.6);
+    opacity: 0;
+  }
+}
+
+.tally {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--ink-soft);
+}
+
+.tally {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.tally p {
+  margin: 0;
+  color: var(--text);
+}
+
+.tally-hint {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--text-soft) !important;
+}
+
+/* portion count tucked under the 點 stamp */
+.stamp-count {
+  position: absolute;
+  bottom: -9px;
+  right: -10px;
+  padding: 0 3px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--washi);
+  background: var(--hanko);
+  transform: rotate(14deg);
+}
+
+.tally strong {
+  font-size: 22px;
+}
+
+.clear {
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  color: var(--hanko);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.clear:disabled {
+  color: var(--ink-soft);
+  text-decoration: none;
+  cursor: default;
+}
+
+.clear:focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: 2px;
+}
+
+/* ---------- responsive ----------
+   > 1280      desktop: stage left, two-row wall menu right
+   ≤ 1280      small laptops / tablets landscape: slimmer strips
+   ≤ 900       tablets portrait and phones: stage on top, one sideways-scrolling row of strips below
+   ≤ 480       small phones: tighter type and controls
+   short landscape (phones on their side): stage left, one sideways row of strips right            */
+
+@media (max-width: 1280px) {
+  .menu {
+    padding: 32px 24px 24px 4px;
+    column-gap: 14px;
+  }
+
+  .menu-title {
+    font-size: 38px;
+  }
+
+  .strips {
+    grid-template-columns: repeat(8, 42px);
+    grid-auto-rows: 220px;
+    gap: 12px 8px;
+  }
+
+  .strip-name {
+    font-size: 20px;
+  }
+
+  .strip .icon {
+    width: 21px;
+    height: 21px;
+  }
+}
+
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .menu {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 10px 16px 14px;
+    column-gap: 12px;
+    border-top: 1px dashed var(--text-soft);
+  }
+
+  .menu-title {
+    font-size: 28px;
+  }
+
+  .strips {
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: 44px;
+    grid-auto-rows: 218px;   /* fits a four-character name (麻辣湯底) in one column */
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-soft) transparent;
+    /* side padding is a little wider than the fade, so tags only fade once they're scrolled into it */
+    padding: 12px 26px 10px;
+    /* tags fade out at both ends of the scrolling row instead of being sliced off at the edge */
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  }
+
+  .strip {
+    scroll-snap-align: start;
+  }
+
+  .strip-name {
+    font-size: 19px;
+  }
+
+  .tally {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .theme-toggle {
+    top: 14px;
+    right: 14px;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .brand {
+    --hang: 18px;
+    left: 14px;
+    font-size: 25px;
+  }
+
+  .heat {
+    top: 76px;
+    left: 16px;
+    grid-template-columns: auto 160px;
+    column-gap: 10px;
+  }
+
+  .heat-label {
+    font-size: 22px;
+  }
+
+  .switcher {
+    bottom: 12px;
+    gap: 16px;
+  }
+
+  .switcher-arrow {
+    width: 42px;
+    height: 42px;
+    font-size: 26px;
+  }
+
+  .switcher-center {
+    min-width: 110px;
+  }
+
+  .dish-name {
+    font-size: 26px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    font-size: 15px;
+  }
+
+  .menu {
+    padding: 8px 12px 12px;
+  }
+
+  .menu-title {
+    font-size: 24px;
+  }
+
+  .strips {
+    grid-auto-columns: 40px;
+    grid-auto-rows: 200px;
+    gap: 8px;
+  }
+
+  .strip-name {
+    font-size: 17px;
+  }
+
+  .strip .icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .stamp {
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+  }
+
+  /* same footprint as the icon it replaces */
+  .stamp.stamp-base {
+    width: 19px;
+    height: 19px;
+    font-size: 11px;
+  }
+
+  .tally strong {
+    font-size: 19px;
+  }
+
+  .heat {
+    grid-template-columns: auto 120px;
+  }
+
+  .heat-word {
+    font-size: 16px;
+  }
+
+  .switcher {
+    gap: 10px;
+  }
+
+  .dish-name {
+    font-size: 22px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .app {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 46vw);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .tally {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+
+  .tally strong {
+    font-size: 17px;
+  }
+
+  .menu {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-content: center;
+    padding: 10px 14px 10px 0;
+    border-top: none;
+  }
+
+  .menu-title {
+    font-size: 24px;
+  }
+
+  .strips {
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: 40px;
+    grid-auto-rows: min(196px, calc(100vh - 110px));
+    overflow-x: auto;
+    padding: 12px 26px 4px;
+  }
+
+  .stamp.stamp-base {
+    width: 17px;
+    height: 17px;
+    font-size: 10px;
+  }
+
+  .strip {
+    gap: 3px;
+    padding: 8px 0;
+  }
+
+  .strip .icon {
+    width: 17px;
+    height: 17px;
+  }
+
+  .strip-name {
+    font-size: 15px;
+  }
+
+  .strip-price {
+    font-size: 12px;
+  }
+
+  .stamp {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+  }
+
+  .brand {
+    --hang: 12px;
+    left: 12px;
+    font-size: 19px;
+  }
+
+  .heat {
+    top: 56px;
+    left: 12px;
+    grid-template-columns: auto 120px;
+  }
+
+  .theme-toggle {
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .switcher {
+    bottom: 8px;
+    gap: 12px;
+  }
+
+  .switcher-arrow {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+  }
+
+  .dish-name {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strip,
+  .stamp {
+    transition: none;
+    animation: none;
+  }
+}
