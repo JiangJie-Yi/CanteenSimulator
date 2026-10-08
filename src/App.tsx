@@ -150,9 +150,10 @@ type SceneProps = {
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
   onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
+  lang: Lang
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -180,6 +181,8 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
   const grillSmoke = useRef(0)
   const grillBlackSmoke = useRef(0)
+  // black smoke off a hot pot left on the flame with nothing in it
+  const potSmoke = useRef(0)
   const steamLevel = useRef(0)
   const boilLevel = useRef(0)
   useFrame((_, delta) => {
@@ -322,7 +325,8 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
               {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
               {dish.heatControl && (
                 <PotCooking url={dish.model} itemIds={ITEM_IDS[dish.id]} temp={brothTemp} active={i === active}
-                  onEat={onEat} onNotice={onNotice} />
+                  onEat={onEat} onNotice={onNotice} soup={soup} heat={heat} floorY={(dish.brothY ?? 0.81) - 0.27}
+                  smoke={potSmoke} rice={servings(dish, orders[dish.id]).Rice ?? 0} lang={lang} />
               )}
               {soup && dish.heatControl && dish.brothY !== undefined && (
                 // inner radius of the pot at the broth line (blender/hotpot.py INNER_R)
@@ -343,6 +347,10 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height}
                   opacity={theme === 'dark' ? 0.5 : 0.7} speed={0.05}
                   level={dish.heat === 'fire' ? grillSmoke : undefined} />
+              )}
+              {dish.heatControl && dish.brothY !== undefined && (
+                <Steam position={[0, dish.brothY - 0.2, 0]} width={0.8} height={1.4} layers={4} opacity={0.7} speed={0.1}
+                  color="#3a3430" shade="#1c1916" level={potSmoke} />
               )}
               {dish.smoke && dish.heat === 'fire' && (
                 // burning food: thick dark smoke that boils up faster and rolls about more than the pale smoke
@@ -575,7 +583,8 @@ export default function App() {
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }}
             onEat={onEat} onNotice={(what) => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])}
-            resetView={resetView} ai={ai} onOrder={(id) => changeQty(id, 1)} onAddCharcoal={addCharcoal} onSay={talk} />
+            resetView={resetView} ai={ai} onOrder={(id) => changeQty(id, 1)} onAddCharcoal={addCharcoal} onSay={talk}
+            lang={lang} />
         </Canvas>
       </div>
       <div className="stage" ref={stageRef}>

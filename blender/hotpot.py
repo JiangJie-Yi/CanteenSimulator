@@ -505,18 +505,26 @@ def canister_housing(x_in, x_out, z0, z1, deck_z, depth, radius, name, mat):
     return o
 
 
-# the housing rises well above the deck so a gas can fits inside, rounded over on both sides
-HOUSING_R = 0.3
-HOUSING_TOP = DECK_Z + 0.12
-canister_housing(BODY_X1 - 0.03, BAY_X1, FOOT_H, HOUSING_TOP, DECK_Z, 1.7, HOUSING_R, "CanisterHousing",
-                 M["enamel"])
-# seam where the cover lifts off, running along the top of the curve
-seam_a = math.radians(55)
-bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.006, depth=1.7,
-                                    location=(BAY_X1 - HOUSING_R + HOUSING_R * math.cos(seam_a), BODY_Y,
-                                              HOUSING_TOP - HOUSING_R + HOUSING_R * math.sin(seam_a)),
-                                    rotation=(math.radians(90), 0, 0))
-finish(active(), "HousingSeam", M["enamel_dark"])
+# the canister compartment as real cassette stoves have it: a squarish box at the right end, its edges only
+# softly rounded, standing a little proud of the cooktop, closed by a flat lid (the gas can lies in it along Y).
+# The lid sits in a dark seam all round, with a finger notch at its front edge for lifting it.
+HOUSING_TOP = DECK_Z + 0.045
+house_x0 = BODY_X1 - 0.03
+house_w = BAY_X1 - house_x0
+house_cx = house_x0 + house_w / 2
+box("CanisterHousing", (house_w, 1.7, HOUSING_TOP - FOOT_H), (house_cx, BODY_Y, (FOOT_H + HOUSING_TOP) / 2),
+    M["enamel"], 0.045, 4)
+box("CanisterLidSeam", (house_w - 0.05, 1.6, 0.008), (house_cx, BODY_Y, HOUSING_TOP + 0.001), M["enamel_dark"],
+    0.01, 2)
+box("CanisterLid", (house_w - 0.075, 1.575, 0.016), (house_cx, BODY_Y, HOUSING_TOP + 0.006), M["enamel"], 0.012, 3)
+box("CanisterLidNotch", (0.14, 0.035, 0.006), (house_cx, BODY_Y - 0.775, HOUSING_TOP + 0.013), M["enamel_dark"],
+    0.008, 2)
+# a pressed rib along the lid, and the hinge knuckles at the back
+box("CanisterLidRib", (0.016, 1.3, 0.006), (house_cx, BODY_Y, HOUSING_TOP + 0.016), M["enamel"], 0.004, 2)
+for hy in (BODY_Y + 0.55, BODY_Y + 0.7):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.012, depth=0.08,
+                                        location=(house_cx, hy + 0.08, HOUSING_TOP + 0.004), rotation=(0, math.radians(90), 0))
+    finish(active(), "CanisterHinge", M["steel"])
 # canister lock lever on the front of the canister section, on a dark escutcheon
 lever_x = BODY_X1 + BAY_W / 2 - 0.02
 box("LockLeverBase", (0.16, 0.014, 0.17), (lever_x, FRONT_Y - 0.007, body_mid), M["bakelite"], 0.012, 2)

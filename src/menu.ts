@@ -173,6 +173,8 @@ export const DISHES: Dish[] = [
       { id: 'Shrimp', name: '鮮蝦', ja: '海老', en: 'Shrimp', price: 50, kcal: 60 },
       { id: 'ShiitakeCap', name: '香菇', ja: '椎茸', en: 'Shiitake', price: 20, kcal: 15 },
       { id: 'Enoki', name: '金針菇', ja: 'えのき', en: 'Enoki', price: 20, kcal: 20 },
+      // a bowl of rice set in front of the stove (the sauce station beside the stove is free)
+      { id: 'Rice', name: '白飯', ja: 'ご飯', en: 'Rice', price: 15, kcal: 280, max: 2 },
     ],
     oneBase: true,
     emptyHide: ['Broth', 'Scallion', ...CHILIES],
