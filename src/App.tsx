@@ -904,7 +904,7 @@ export default function App() {
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
         {pull > 0 && (
           <div className={`pull-refresh${pull >= 1 ? ' is-ready' : ''}`} style={{ '--pull': pull } as React.CSSProperties}>
-            <span>↻</span>{pull >= 1 ? '放開重新整理' : '往下拉重新整理'}
+            <span>↻</span>{pull >= 1 ? UI[lang].pullGo : UI[lang].pullMore}
           </div>
         )}
       </div>

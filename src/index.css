@@ -2713,7 +2713,7 @@ button {
 }
 
 .ledger-toggle {
-  right: 200px;
+  right: 222px;
 }
 
 .shop-lamp {
@@ -2743,7 +2743,7 @@ button {
   }
 
   .ledger-toggle {
-    right: 176px;
+    right: 190px;
   }
 }
 
@@ -2865,4 +2865,37 @@ button {
 .pull-refresh.is-ready {
   background: #e8742a;
   color: #fff;
+}
+/* narrow phones: the four round switches shrink and close up so they clear the shop sign */
+@media (max-width: 400px) {
+  .theme-toggle,
+  .lang-toggle,
+  .ledger-toggle {
+    top: 10px;
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .theme-toggle {
+    right: 10px;
+  }
+
+  .lang-toggle {
+    right: 48px;
+  }
+
+  .ai-toggle {
+    top: 10px;
+    height: 34px;
+    min-width: 0;
+    padding: 0 8px;
+    right: 86px;
+    font-size: 12px;
+    gap: 4px;
+  }
+
+  .ledger-toggle {
+    right: 156px;
+  }
 }
