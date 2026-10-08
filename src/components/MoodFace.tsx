@@ -5,6 +5,9 @@ import type { GuestView } from './Roasting'
  * face for food that let them down; still waiting, a plain face with its eyes glancing aside; walked out, red
  * and cross. The face is coloured from warm yellow (happy) to grey-blue (unhappy).
  */
+/** which face a rating gets (the number itself isn't shown) */
+export const moodOf = (r: number | null) => r === null ? 'wait' : r >= 80 ? 'love' : r >= 65 ? 'happy' : r >= 45 ? 'ok' : r >= 25 ? 'meh' : 'sad'
+
 export function MoodFace({ guest }: { guest: GuestView }) {
   const r = guest.rating
   const mood = guest.state === 'angry' ? 'angry'
@@ -24,7 +27,7 @@ export function MoodFace({ guest }: { guest: GuestView }) {
   const label = { love: '超滿意', happy: '滿意', ok: '普通', meh: '不太滿意', sad: '失望', wait: '等餐中', angry: '生氣離開' }[mood]
   return (
     <svg className={`mood-face is-${mood}`} viewBox="0 0 36 36" role="img" aria-label={label}>
-      <title>{label}{r !== null ? ` ${Math.round(r)}` : ''}</title>
+      <title>{label}</title>
       <circle cx="18" cy="18" r="15" fill={fill} stroke="#3b2a20" strokeWidth="1.6" />
       {mood === 'love' ? (
         // eyes squeezed shut with joy, and rosy cheeks

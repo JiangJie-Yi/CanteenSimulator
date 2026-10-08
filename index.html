@@ -9,9 +9,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&display=swap" rel="stylesheet" />
-    <!-- retro Mincho for the shop sign, subset to just its characters (甲粗飽食堂深夜) -->
-    <link href="https://fonts.googleapis.com/css2?family=Zen+Antique&text=%E7%94%B2%E7%B2%97%E9%A3%BD%E9%A3%9F%E5%A0%82%E6%B7%B1%E5%A4%9C%E3%81%9F%E3%82%89%E3%81%B5%E3%81%8F&display=swap" rel="stylesheet" />
-    <title>甲粗飽食堂</title>
+    <!-- retro Mincho for the shop signs, subset to just their characters -->
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Antique&text=%E7%94%B2%E7%B2%97%E9%A3%BD%E9%A3%9F%E5%A0%82%E6%B7%B1%E5%A4%9C%E3%81%9F%E3%82%89%E3%81%B5%E3%81%8F%E8%81%9E%E9%87%8E%E7%87%92%E7%83%A4%E9%BC%8E%E6%B2%B8%E7%81%AB%E9%8D%8B%E7%84%BC%E7%82%AD%E9%BA%B5%E8%99%95&display=swap" rel="stylesheet" />
+    <title>食堂模擬器</title>
     <style>
       /* shown until the app takes over #root, so a slow first load is never a blank screen */
       #boot { position: fixed; inset: 0; display: grid; place-content: center; gap: 14px; text-align: center;
@@ -45,7 +45,7 @@
     </script>
   </head>
   <body>
-    <div id="root"><div id="boot"><b>甲粗飽食堂</b><i>準備中…</i>
+    <div id="root"><div id="boot"><b>食堂模擬器</b><i>準備中…</i>
       <button type="button" onclick="location.replace(location.pathname + '?v=' + Date.now())">重新載入</button></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

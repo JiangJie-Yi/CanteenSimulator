@@ -22,6 +22,8 @@ import { PotCooking } from './components/PotCooking'
 import type { GuestView } from './components/Roasting'
 import { CHEFS, type Chef } from './chefs'
 import { liteUrl, QUALITY, stepDown, webglReport } from './quality'
+import { isMuted, onMuteChange, setMuted } from './bgm'
+import { moodOf } from './components/MoodFace'
 import { Roasting } from './components/Roasting'
 import { Steam } from './components/Steam'
 import { StoveControls } from './components/StoveControls'
@@ -510,6 +512,10 @@ export default function App() {
   const feedSeq = useRef(0)
   // (phone) the guest board and the books folded into a chip until tapped
   const [boardsOpen, setBoardsOpen] = useState(false)
+  // (phone) the round switches at the top right folded into one button
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const [musicOn, setMusicOn] = useState(() => !isMuted())
+  useEffect(() => onMuteChange((m) => setMusicOn(!m)), [])
   const [ledger, setLedger] = useState({ revenue: 0, food: 0, fuel: 0, wage: 0 })
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
@@ -780,7 +786,8 @@ export default function App() {
   const starsLine = (id: number, what: string, taste: number) => {
     const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
     const words = ['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]
-    talk('guest', `#${id} ${what}${words} ${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`)
+    // (the stars are kept, but customers show how they liked it in their faces and words, not a score)
+    talk('guest', `#${id} ${what}${words}`)
   }
   const potGuestEat = (id: string, taste: number) => {
     const s = shopOf('hotpot')
@@ -922,7 +929,7 @@ export default function App() {
 
 
   return (
-    <div className={`app${menuFolded ? ' menu-folded' : ''}`} ref={appRef}>
+    <div className={`app${menuFolded ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -978,7 +985,7 @@ export default function App() {
         </Crash>
       </div>
       <div className="stage" ref={stageRef}>
-        <Brand night={theme === 'dark'} lang={lang} />
+        <Brand night={theme === 'dark'} lang={lang} shop={dish.id} />
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} />
@@ -1022,15 +1029,13 @@ export default function App() {
               <GuestCounter guests={guests} shop={DISHES[active].id} />
               <ul className="guest-list">
                 {guests.slice(-4).reverse().map((g) => {
-                  const stars = g.rating === null ? 0 : Math.max(1, Math.round(g.rating / 20))
                   return (
                     <li key={g.id} className={`guest-row is-${g.state}`}>
                       <span className="guest-id">#{g.id}</span>
                       <MoodFace guest={g} />
                       {g.state === 'angry' ? <span className="guest-note">{UI[lang].leftAngry}</span>
                         : g.rating === null ? <span className="guest-note">{UI[lang].waiting}</span>
-                          : <span className="guest-stars">{'★'.repeat(stars)}{'☆'.repeat(5 - stars)}
-                            <small>{Math.round(g.rating)}</small>{g.state === 'eating' && <em>{UI[lang].eating}</em>}</span>}
+                          : <span className="guest-note">{UI[lang].moods[moodOf(g.rating)]}{g.state === 'eating' && <em>{UI[lang].eating}</em>}</span>}
                     </li>
                   )
                 })}
@@ -1079,7 +1084,7 @@ export default function App() {
         )}
       </div>
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]} feed={feed}
+      <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]} feed={feed} locked={ai}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {
           // cancelling everything refunds it (nothing was made)
@@ -1094,6 +1099,12 @@ export default function App() {
       <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)}
         aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
         <span>{menuFolded ? '‹' : '›'}</span>
+      </button>
+      <button type="button" className="tools-toggle" onClick={() => setToolsOpen((o) => !o)} aria-expanded={toolsOpen}
+        aria-label={UI[lang].tools}>{toolsOpen ? '×' : '☰'}</button>
+      <button type="button" className={`bgm-toggle${musicOn ? ' is-on' : ''}`} onClick={() => setMuted(musicOn)}
+        aria-pressed={musicOn} title={UI[lang].music} aria-label={UI[lang].music}>
+        {musicOn ? '♪' : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17V6l10-2v11M9 17a3 3 0 1 1-3-3 3 3 0 0 1 3 3zM19 15a3 3 0 1 1-3-3 3 3 0 0 1 3 3zM3 3l18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>}
       </button>
       <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
         aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>

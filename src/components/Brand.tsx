@@ -1,28 +1,37 @@
 import type { Lang } from '../i18n'
 
-// the shop name per language: 甲粗飽 is Taiwanese for "eat your fill", which Japanese says as たらふく
-const NAME = {
-  zh: { main: '甲粗飽', sub: '食堂' },
-  ja: { main: 'たらふく', sub: '食堂' },
+// each shop has its own name and its own kind of sign
+//   noodles  甲粗飽 食堂 — Taiwanese for "eat your fill": a vermilion lacquered board on two cords
+//   grill    聞野 燒烤  — "smelt from out in the fields": a board of charred cedar (焼杉), white brush lettering
+//            and a red seal
+//   hot pot  鼎沸 火鍋  — "bubbling like a cauldron": a round-cornered red-and-gold plaque with a flame crest
+const NAMES: Record<string, Record<Lang, { main: string; sub: string }>> = {
+  beefnoodle: { zh: { main: '甲粗飽', sub: '食堂' }, ja: { main: 'たらふく', sub: '食堂' } },
+  grilledfish: { zh: { main: '聞野', sub: '燒烤' }, ja: { main: '聞野', sub: '炭火焼' } },
+  hotpot: { zh: { main: '鼎沸', sub: '火鍋' }, ja: { main: '鼎沸', sub: '鍋' } },
 }
 
 /**
- * Shop sign in the style of an old Shōwa / Taiwanese eatery board: a vermilion lacquered plate with a cream
- * double rule, the name in retro Mincho and 食堂 stacked small beside it. It hangs from two cords and sways a
- * little in the breeze. At night the board lights up like a lightbox and a 深夜 stamp is pressed on beside it.
+ * The shop's sign, top-left: it hangs from two cords and sways a little in the breeze, and at night its lettering
+ * lights up (and a 深夜 stamp is pressed on beside it). Which sign depends on which shop is on screen.
  */
-export function Brand({ night, lang }: { night: boolean; lang: Lang }) {
-  const { main, sub } = NAME[lang]
+export function Brand({ night, lang, shop = 'beefnoodle' }: { night: boolean; lang: Lang; shop?: string }) {
+  const { main, sub } = (NAMES[shop] ?? NAMES.beefnoodle)[lang]
   return (
-    <h1 className={`brand${night ? ' brand-night' : ''} brand-${lang}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}
-      aria-label={`${main}${sub}${night ? ' 深夜' : ''}`}>
+    <h1 key={shop} className={`brand brand-${shop}${night ? ' brand-night' : ''} brand-${lang}`}
+      lang={lang === 'ja' ? 'ja' : 'zh-Hant'} aria-label={`${main}${sub}${night ? ' 深夜' : ''}`}>
       <span className="brand-plate" aria-hidden="true">
         <span className="brand-cord brand-cord-left" />
         <span className="brand-cord brand-cord-right" />
+        {shop === 'hotpot' && (
+          <svg className="brand-flame" viewBox="0 0 20 24">
+            <path d="M10 1c2 5 7 7 7 13a7 7 0 0 1-14 0c0-3 2-5 3-7 0 3 1 4 2 4 0-4 1-7 2-10z" />
+          </svg>
+        )}
         <span className="brand-main">{main}</span>
         <span className="brand-sub">{sub}</span>
+        {shop === 'grilledfish' && <span className="brand-seal">炭</span>}
       </span>
-      {/* keyed so the stamp animation replays each time night falls */}
       {night && <span key="night" className="brand-late" aria-hidden="true">深夜</span>}
     </h1>
   )

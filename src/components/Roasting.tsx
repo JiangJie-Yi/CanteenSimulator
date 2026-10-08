@@ -1710,7 +1710,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
       const words = ['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]
       window.setTimeout(() => {
-        onSay?.('guest', `#${g.id} ${roast.names[dish.id]}${words} ${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`)
+        onSay?.('guest', `#${g.id} ${roast.names[dish.id]}${words}`)
         report()
       }, EAT_SECONDS * 1000)
       return

@@ -1,40 +1,48 @@
-# CanteenSimulator — 甲粗飽食堂
+# 食堂模擬器 CanteenSimulator
 
-A hand-painted, Ghibli-style 3D canteen in the browser: pick a dish, order from the wooden menu tags,
-and watch it fill up.
+一個在瀏覽器裡玩的手繪風 3D 食堂經營遊戲。開三家店——**鼎沸火鍋**、**甲粗飽食堂**（麵食）、**聞野燒烤**——自己試菜、研究怎麼烤最好吃，再開店請師傅、店員，看客人上門點餐、吃飯、露出（或不露出）滿意的表情。
 
-- **小火鍋** — hot pot on a cassette gas stove, three soup bases, adjustable heat (火候)
-- **牛肉麵** — braised beef noodle soup in a blue-and-white bowl
-- **烤魚** — salt-grilled fish and skewers around a campfire; they roast over time, and a click takes them off
-  the fire onto the plate
+**線上遊玩：** https://jiangjie-yi.github.io/CanteenSimulator/ （電腦、手機都可以）
 
-Click a menu tag to add a portion, right-click to take one away. Day / night toggle in the top-right corner.
+## 玩法
 
-## Run
+### 閉店：試菜
+- 在右邊（手機在下方）的菜單點餐，食材會送上桌。
+- **燒烤**：把托盤上的生串燒拖到火堆、把飯糰和年糕放上網架；用鹽、醬油刷、煉乳、花生粉調味，用水瓢澆水降火、添炭加火。烤熟了點一下收到盤子裡，再點一下開吃。
+- **火鍋**：選湯底、開火（湯要真的煮滾，食材才會熟），熟了夾進碗裡吃；旁邊的醬料台可以自己調沾醬。空鍋乾燒會燒焦。
+- **麵食**：選麵、加料。
+- 每樣食物都有**美味值**（看熟度和調味），吃下去會增加飽足感，並記在試吃筆記裡。
 
-```
+### 營業
+- 右上角「閉／營」切換。營業中由師傅掌廚、客人點餐，你不能自己點、也不能動火爐，只能經營。
+- 客人從暖簾走進來、點餐（菜單會跟著寫單）、用餐，用表情告訴你滿不滿意；等太久會生氣離開。
+- 「帳」打開營收模式：營收、食材成本、燃料、薪資、利潤。
+
+## 操作
+
+| | 電腦 | 手機 |
+|---|---|---|
+| 轉動視角 | 左鍵拖曳 | 兩指拖曳 |
+| 平移 | 中鍵／右鍵拖曳 | — |
+| 縮放 | 滾輪 | 兩指捏合 |
+| 換店 | 下方 ‹ › 或鍵盤 ← → | 左右滑動 |
+| 點一份／減一份 | 左鍵／右鍵 | 點一下／長按 |
+| 重新整理 | — | 從上往下拉 |
+
+右上角還有背景音樂開關、中日文切換、日夜切換；左下角的眼睛按鈕會回到原本的視角。
+
+## 技術
+
+- React 19 + TypeScript + Vite
+- three.js（@react-three/fiber、@react-three/drei），卡通著色與手繪描邊
+- 所有 3D 模型都由 `blender/*.py` 腳本程序化產生（Blender 5.2），`blender/make_lite.py` 另外輸出手機用的輕量版
+- 依裝置等級自動調整畫質（`src/quality.ts`），手機只載入當前店家的模型
+- 背景音樂由 Web Audio 即時合成，沒有音檔
+
+```bash
 npm install
-npm run dev
+npm run dev      # 開發
+npm run build    # 產生 dist/
 ```
 
-Open http://localhost:5173/.
-
-## Models
-
-The dishes are generated with Blender 5.2 scripts in `blender/` and exported to `public/models/*.glb`:
-
-```
-blender -b --factory-startup --python blender/hotpot.py -- .
-blender -b --factory-startup --python blender/beefnoodle.py -- .
-blender -b --factory-startup --python blender/grilledfish.py -- .
-```
-
-To have a Blender window follow the page (dish, ordered items, camera) while `npm run dev` is running:
-
-```
-blender blender/hotpot.blend --python blender/open_live.py
-```
-
-## Stack
-
-React + TypeScript + Vite, three.js via @react-three/fiber and drei.
+推到 `main` 會由 GitHub Actions 自動部署到 GitHub Pages。

@@ -14,6 +14,8 @@ type MenuProps = {
   onClear: () => void
   /** customers' orders just in: their tags light up with the guest's number, and the order is written out */
   feed?: { key: number; id: string; guest: number }[]
+  /** shop open: the customers order, not you (the tags only show what's been ordered) */
+  locked?: boolean
 }
 
 /**
@@ -38,7 +40,7 @@ function tagFit(name: string, en: string | undefined, price: string, stamp: bool
  * Izakaya-style wall menu: vertical wooden tags, a red stamp marks what's been ordered.
  * Click a tag to add a portion, right-click (or press - / Delete on it) to take one away.
  */
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [] }: MenuProps) {
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
   const count = [...dish.bases, ...dish.items].reduce((n, x) => n + (quantities[x.id] ?? 0), 0)
@@ -109,6 +111,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     const p = { timer: 0, fired: false, x: e.clientX, y: e.clientY }
     p.timer = window.setTimeout(() => {
       p.fired = true
+      if (locked) return
       onRemove(id)
       navigator.vibrate?.(15)
     }, 480)
@@ -134,6 +137,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
   const all = [...dish.bases, ...dish.items]
 
   const onKey = (id: string) => (e: KeyboardEvent) => {
+    if (locked) return
     if (e.key === '-' || e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
       onRemove(id)
@@ -159,7 +163,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         onClick={() => {
           const fired = press.current?.fired
           press.current = null
-          if (!fired) onAdd(x.id)
+          if (!fired && !locked) onAdd(x.id)
         }}
         onPointerDown={pressStart(x.id)}
         onPointerMove={pressMove}
@@ -168,7 +172,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         onContextMenu={(e) => {
           e.preventDefault()
           // (a long press on a phone already took one off)
-          if (!press.current) onRemove(x.id)
+          if (!press.current && !locked) onRemove(x.id)
         }}
         onKeyDown={onKey(x.id)}
         onPointerEnter={hasSet ? () => setPeek(x.id) : undefined}
@@ -191,7 +195,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
   }
 
   return (
-    <aside className="menu" aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
+    <aside className={`menu${locked ? ' is-locked' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
       <h2 className="menu-title">{t.menuTitle}<span className="menu-title-en" lang="en">MENU</span></h2>
 
       <div className={`strips-frame${ends.overflow ? ' is-paged' : ''}`}>
@@ -236,10 +240,10 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         <p>
           {beforeCount}<strong>{n1}</strong>{beforeTotal}<strong>{n2}</strong>{after}
         </p>
-        <button type="button" className="clear" onClick={onClear} disabled={count === 0}>
+        <button type="button" className="clear" onClick={onClear} disabled={count === 0 || locked}>
           {t.clear}
         </button>
-        <p className="tally-hint">{touchOnly ? t.hintTouch : t.hint}</p>
+        <p className="tally-hint">{locked ? t.lockedHint : touchOnly ? t.hintTouch : t.hint}</p>
       </footer>
     </aside>
   )
