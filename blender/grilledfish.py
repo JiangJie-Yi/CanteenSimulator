@@ -515,7 +515,8 @@ for i, half in enumerate(sizes):
     if oval:
         bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=loc, rotation=rot)
     else:
-        bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=2, location=loc, rotation=rot)
+        # (enough vertices for the scorch painted on below to have a ragged edge)
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=4, location=loc, rotation=rot)
     a += half / STONE_R
     o = active()
     bm = bmesh.new()
@@ -553,15 +554,27 @@ for i, half in enumerate(sizes):
                 c = l.vert.co
                 pu, pv = ((c.y, c.z), (c.x, c.z), (c.x, c.y))[ax]
                 l[uvl].uv = ((pu * ct - pv * st) * 0.24 + off[0], (pu * st + pv * ct) * 0.24 + off[1])
-    # blackened by the fire on the side facing it (local -X points at the fire), thickest low down, in patches
+    # scorched by the fire on the side facing it (local -X points at the fire): sooted black, heaviest low down
+    # where the flames lick and along the top edge where the smoke rolls over, in ragged patches; round the soot a
+    # band of rock baked a rusty brown; the side away from the fire left its own grey
     col = bm.loops.layers.float_color.new("Col")
+    ph = i * 1.7
     for vtx in bm.verts:
-        inward = smooth(0.05, 0.85, np.float32(-vtx.co.x))
-        low = smooth(0.9, -0.2, np.float32(vtx.co.z))
-        patch = 0.65 + 0.35 * math.sin(vtx.co.y * 9 + i * 1.7) * math.sin(vtx.co.z * 7 + i)
-        k = float(1 - 0.82 * inward * (0.45 + 0.55 * low) * patch)
+        x, y, z = vtx.co
+        inward = float(smooth(-0.15, 0.75, np.float32(-x)))
+        low = float(smooth(0.8, -0.3, np.float32(z)))
+        crest = float(smooth(0.45, 0.85, np.float32(z))) * float(smooth(-0.3, 0.4, np.float32(-x)))
+        ragged = (0.5 + 0.25 * math.sin(y * 11 + ph) * math.sin(z * 9 + ph * 0.7)
+                  + 0.25 * math.sin(y * 23 - z * 17 + ph * 2.3))
+        soot = min(1.0, max(0.0, inward * (0.35 + 0.75 * low) * (0.55 + 0.6 * ragged) + crest * 0.55 * ragged))
+        soot = soot ** 0.8
+        baked = max(0.0, min(1.0, inward * 1.3 - soot)) * 0.8   # the rusty fringe the soot didn't cover
+        k = 1 - 0.9 * soot
+        r, g, b = k, k * 0.96, k * 0.93
+        r, g, b = r * (1 - baked * 0.25) + 0.62 * baked * 0.25, g * (1 - baked * 0.35) + 0.38 * baked * 0.35, \
+            b * (1 - baked * 0.45) + 0.24 * baked * 0.45
         for l in vtx.link_loops:
-            l[col] = (k, k * 0.97, k * 0.95, 1.0)
+            l[col] = (r, g, b, 1.0)
     bm.to_mesh(o.data)
     bm.free()
     attr = o.data.color_attributes["Col"]
@@ -888,8 +901,8 @@ def shiitake_halves():
         rings = []
         for k in range(steps + 1):
             phi = math.pi * k / steps                  # 0 → π round the back, away from the cut face
-            # (shifted so the skewer runs through the middle of the half's flesh, not along its cut face)
-            rings.append([bm.verts.new((x + r * math.cos(phi), face * (r * math.sin(phi) - rx * 0.4), z))
+            # (shifted by half its depth, so the skewer runs right through the middle of the half's flesh)
+            rings.append([bm.verts.new((x + r * math.cos(phi), face * (r * math.sin(phi) - rx * 0.5), z))
                           for r, z, _ in prof])
         uvl = bm.loops.layers.uv.new()
         for k in range(steps):
@@ -2034,6 +2047,112 @@ for i, kv in enumerate(puffed.data):
     kv.co = k
 
 
+# ---------------------------------------------------------------------------------------------------------
+# miso soup (味噌汁) in a lacquered soup bowl, on the table in front of the fire: the bowl black lacquer
+# outside with a red rim line, vermilion inside, on a low foot; the soup cloudy with miso settling in soft
+# swirls, a few cubes of tofu, torn wakame and rings of scallion floating in it. The soup is its own object
+# (MisoLiquid, a child of the bowl) so the web app can let it go down as it's drunk.
+N = 512
+u, v = grid01(N)
+cx_, cy_ = u - 0.5, v - 0.5
+rr_ = np.sqrt(cx_ ** 2 + cy_ ** 2) * 2
+ang_ = np.arctan2(cy_, cx_)
+swirl = fbm(N, 5, 5) * 0.6 + 0.4 * (0.5 + 0.5 * np.sin(ang_ * 3 + rr_ * 9 + fbm(N, 3, 3) * 4))
+miso = mix((0.62, 0.42, 0.2), (0.82, 0.64, 0.38), smooth(0.3, 0.75, swirl))
+miso = mix(miso, (0.5, 0.32, 0.15), smooth(0.85, 1.0, rr_) * 0.6)            # darker where it meets the bowl
+miso = mix(miso, (0.9, 0.78, 0.55), (vnoise(N, 90, 90) > 0.92).astype(np.float32) * 0.4)   # flecks of miso
+TEX["miso"] = image("T_Miso", miso)
+M["lacquer"] = pbr("BlackLacquer", (0.05, 0.035, 0.03), rough=0.18, coat=0.9)
+M["lacquer_red"] = pbr("RedLacquer", (0.6, 0.08, 0.04), rough=0.2, coat=0.9)
+M["miso"] = pbr("MisoSoup", tex=TEX["miso"], rough=0.15, coat=0.6)
+M["tofu"] = pbr("Tofu", (0.96, 0.94, 0.86), rough=0.5)
+M["wakame"] = pbr("Wakame", (0.12, 0.24, 0.1), rough=0.3, coat=0.4)
+M["negi"] = pbr("Scallion", (0.45, 0.68, 0.25), rough=0.4)
+
+
+def miso_soup(x0, y0):
+    outer = [(0.068, 0.0), (0.076, 0.004), (0.078, 0.016), (0.072, 0.02), (0.085, 0.024), (0.125, 0.05),
+             (0.152, 0.088), (0.166, 0.128), (0.17, 0.142)]
+    inner = [(0.161, 0.142), (0.156, 0.124), (0.142, 0.088), (0.11, 0.055), (0.06, 0.036), (0.001, 0.032)]
+    prof = outer + inner
+    seg = 56
+    bm = bmesh.new()
+    rings = [[bm.verts.new((x0 + r * math.cos(2 * math.pi * k / seg), y0 + r * math.sin(2 * math.pi * k / seg), z))
+              for r, z in prof] for k in range(seg)]
+    for k in range(seg):
+        kn = (k + 1) % seg
+        for j in range(len(prof) - 1):
+            fc = bm.faces.new((rings[k][j], rings[kn][j], rings[kn][j + 1], rings[k][j + 1]))
+            # outside black, a red line round the rim, inside vermilion
+            fc.material_index = 0 if j < len(outer) - 2 else (2 if j == len(outer) - 2 else 1)
+    bm.faces.new([rings[k][0] for k in range(seg)][::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new("MisoSoup")
+    bm.to_mesh(me)
+    bm.free()
+    bowl = bpy.data.objects.new("MisoSoup", me)
+    bpy.context.collection.objects.link(bowl)
+    for m_ in (M["lacquer"], M["lacquer_red"], M["lacquer_red"]):
+        bowl.data.materials.append(m_)
+    for p in bowl.data.polygons:
+        p.use_smooth = True
+    # its origin at its own foot, so the web app turns it where it stands (not round the fire)
+    centre_origin(bowl, at=(x0, y0, 0.0))
+    # the soup: a disc just under the rim, mapped flat for its swirl of miso
+    level = 0.112
+    rs = 0.148
+    bpy.ops.mesh.primitive_circle_add(vertices=48, radius=rs, fill_type="NGON", location=(x0, y0, level))
+    soup = active()
+    bm = bmesh.new()
+    bm.from_mesh(soup.data)
+    uvl = bm.loops.layers.uv.verify()
+    for fc in bm.faces:
+        for l in fc.loops:
+            c = l.vert.co
+            l[uvl].uv = (c.x / (2 * rs) + 0.5, c.y / (2 * rs) + 0.5)
+    bm.to_mesh(soup.data)
+    bm.free()
+    finish(soup, "MisoLiquid", M["miso"], smooth_shade=False)
+    floats = [soup]
+    for k in range(5):
+        a = random.uniform(0, math.pi * 2)
+        d = random.uniform(0.02, 0.09)
+        s_ = random.uniform(0.018, 0.024)
+        bpy.ops.mesh.primitive_cube_add(size=s_, location=(x0 + d * math.cos(a), y0 + d * math.sin(a), level + s_ * 0.15),
+                                        rotation=(random.uniform(-0.2, 0.2), random.uniform(-0.2, 0.2), random.uniform(0, 3)))
+        o = active()
+        bevel(o, s_ * 0.12, 2)
+        floats.append(finish(o, "MisoTofu", M["tofu"]))
+    for k in range(4):
+        a = random.uniform(0, math.pi * 2)
+        d = random.uniform(0.03, 0.1)
+        bm = bmesh.new()
+        n_ = 9
+        cxw, cyw = x0 + d * math.cos(a), y0 + d * math.sin(a)
+        pts = [bm.verts.new((cxw + math.cos(2 * math.pi * q / n_) * random.uniform(0.012, 0.03),
+                             cyw + math.sin(2 * math.pi * q / n_) * random.uniform(0.01, 0.022), level + 0.002))
+               for q in range(n_)]
+        bm.faces.new(pts)
+        me2 = bpy.data.meshes.new("MisoWakame")
+        bm.to_mesh(me2)
+        bm.free()
+        o = bpy.data.objects.new("MisoWakame", me2)
+        bpy.context.collection.objects.link(o)
+        floats.append(finish(o, "MisoWakame", M["wakame"], smooth_shade=False))
+    for k in range(7):
+        a = random.uniform(0, math.pi * 2)
+        d = random.uniform(0.01, 0.11)
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.008, minor_radius=0.0028, major_segments=12, minor_segments=6,
+                                         location=(x0 + d * math.cos(a), y0 + d * math.sin(a), level + 0.002))
+        floats.append(finish(active(), "MisoNegi", M["negi"]))
+    liquid = join(floats, "MisoLiquid")
+    liquid.parent = bowl
+    liquid.matrix_parent_inverse = bowl.matrix_world.inverted()
+    return bowl
+
+
+miso_bowl = miso_soup(0.19, -1.84)
+
 # =====================================================================
 # Group, preview scene, outputs
 # =====================================================================
@@ -2042,7 +2161,8 @@ root = bpy.data.objects.new("GrilledFish", None)
 bpy.context.collection.objects.link(root)
 parts = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 for o in parts:
-    o.parent = root
+    if o.name != "MisoLiquid":                 # (the soup stays inside its bowl)
+        o.parent = root
 
 bpy.ops.mesh.primitive_plane_add(size=12, location=(0, 0, 0))
 finish(active(), "Ground", M["dirt"], smooth_shade=False)

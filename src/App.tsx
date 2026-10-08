@@ -413,7 +413,8 @@ export default function App() {
   // bumped to send the camera back to its home view
   const [resetView, setResetView] = useState(0)
   const reducedMotion = usePrefersReducedMotion()
-  const [heat, setHeat] = useState(40)
+  // the stove starts switched off: the cook turns it up
+  const [heat, setHeat] = useState(0)
   const [lang, setLang] = useState<Lang>(() => {
     try {
       return localStorage.getItem('canteen-lang') === 'ja' ? 'ja' : 'zh'

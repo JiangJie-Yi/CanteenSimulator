@@ -18,6 +18,9 @@ const CHAR_START = 1.15
 const CHAR_FULL = 3
 /** where the camera looks from (App CAMERA_POSITION), for food that turns its broad side toward it */
 const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
+/** how many sips a bowl of soup takes, and how good it is (miso soup doesn't take seasoning) */
+const SIPS = 3
+const SOUP_TASTE = 78
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
 // the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
@@ -50,54 +53,152 @@ const BIN_R = 0.27
 const TRASH_R = 0.24
 const TRASH_H = 0.36
 
-/** A small dark-stained wooden bin for the scraps, open at the top, lined with straw paper, two iron hoops. */
+/**
+ * The trash bin: a classic galvanized steel bin (ゴミ箱), open at the top. Its sides are corrugated in vertical
+ * ribs, dull zinc with a mottled spangle and a darker band where hands knock it, a rolled rim, two side handles,
+ * and a paper label for burnable rubbish. Inside, crumpled paper and an old skewer show it's in use.
+ */
+const TRASH_METAL = (() => {
+  if (typeof document === 'undefined') return null
+  const W = 512
+  const H = 256
+  const c = document.createElement('canvas')
+  c.width = W
+  c.height = H
+  const g = c.getContext('2d')!
+  let seed = 5
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  // ribs: light crest, dark trough, all the way round
+  const ribs = 28
+  for (let x = 0; x < W; x++) {
+    const t = (x / W) * ribs
+    const f = 0.5 + 0.5 * Math.cos(t * Math.PI * 2)
+    const v = Math.round(120 + f * 70)
+    g.fillStyle = `rgb(${v}, ${v + 4}, ${v + 8})`
+    g.fillRect(x, 0, 1, H)
+  }
+  // zinc spangle: soft blotches lighter and darker
+  for (let i = 0; i < 160; i++) {
+    g.fillStyle = rnd() < 0.5 ? `rgba(230, 235, 240, ${0.08 + rnd() * 0.1})` : `rgba(60, 64, 70, ${0.06 + rnd() * 0.1})`
+    g.beginPath()
+    g.ellipse(rnd() * W, rnd() * H, 6 + rnd() * 18, 4 + rnd() * 12, rnd() * 3, 0, Math.PI * 2)
+    g.fill()
+  }
+  // scuffs and a darker band of grime low down
+  const grime = g.createLinearGradient(0, H, 0, H * 0.55)
+  grime.addColorStop(0, 'rgba(50, 45, 40, 0.35)')
+  grime.addColorStop(1, 'rgba(50, 45, 40, 0)')
+  g.fillStyle = grime
+  g.fillRect(0, 0, W, H)
+  g.strokeStyle = 'rgba(40, 40, 45, 0.25)'
+  for (let i = 0; i < 40; i++) {
+    const x = rnd() * W
+    const y = rnd() * H
+    g.lineWidth = 0.6 + rnd()
+    g.beginPath()
+    g.moveTo(x, y)
+    g.lineTo(x + (rnd() - 0.5) * 30, y + (rnd() - 0.5) * 6)
+    g.stroke()
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = THREE.RepeatWrapping
+  return t
+})()
+const TRASH_LABEL = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 256
+  c.height = 160
+  const g = c.getContext('2d')!
+  g.fillStyle = '#efe6cf'
+  g.fillRect(0, 0, 256, 160)
+  g.strokeStyle = '#b4302a'
+  g.lineWidth = 8
+  g.strokeRect(8, 8, 240, 144)
+  g.fillStyle = '#b4302a'
+  g.font = 'bold 64px "Zen Antique", serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText('可燃', 128, 66)
+  g.font = 'bold 30px "Zen Antique", serif'
+  g.fillText('ごみ・竹串', 128, 122)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+
 function TrashBin({ position, container }: { position: [number, number, number]; container: string }) {
+  const R = TRASH_R
   const geometry = useMemo(() => {
-    const R = TRASH_R
-    // outside wall flaring a little toward the rim, a rolled lip, then the inside back down to a raised floor
-    return new THREE.LatheGeometry([[0, 0.01], [R * 0.84, 0.01], [R * 0.86, 0.02], [R, TRASH_H], [R * 1.04, TRASH_H + 0.012],
-      [R * 0.94, TRASH_H + 0.004], [R * 0.82, 0.05], [0, 0.05]].map(([x, y]) => new THREE.Vector2(x, y)), 40)
-  }, [])
-  const staves = useMemo(() => {
-    if (typeof document === 'undefined') return null
-    const c = document.createElement('canvas')
-    c.width = 128
-    c.height = 16
-    const g = c.getContext('2d')!
-    for (let i = 0; i < 8; i++) {
-      g.fillStyle = i % 2 ? '#5a3c24' : '#664630'
-      g.fillRect(i * 16, 0, 16, 16)
-      g.fillStyle = 'rgba(20, 12, 6, 0.6)'
-      g.fillRect(i * 16, 0, 1.5, 16)
-    }
-    const t = new THREE.CanvasTexture(c)
-    t.colorSpace = THREE.SRGBColorSpace
-    t.wrapS = THREE.RepeatWrapping
-    t.repeat.set(2, 1)
-    return t
-  }, [])
+    // a straight-sided steel bin, a little wider at the top; the inside back down to a floor just above the ground
+    return new THREE.LatheGeometry([[0, 0.01], [R * 0.88, 0.01], [R * 0.9, 0.025], [R, TRASH_H], [R * 0.97, TRASH_H],
+      [R * 0.88, 0.03], [0, 0.03]].map(([x, y]) => new THREE.Vector2(x, y)), 56)
+  }, [R])
+  const paper = useMemo(() => {
+    // crumpled paper: lumpy balls, every one squashed differently
+    let seed = 9
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    return Array.from({ length: 5 }, (_, i) => {
+      const geo = new THREE.IcosahedronGeometry(0.055 + rnd() * 0.03, 1)
+      const p = geo.attributes.position
+      for (let k = 0; k < p.count; k++) {
+        const s = 0.75 + rnd() * 0.45
+        p.setXYZ(k, p.getX(k) * s, p.getY(k) * s * 0.85, p.getZ(k) * s)
+      }
+      geo.computeVertexNormals()
+      const a = (i / 5) * Math.PI * 2 + rnd()
+      const d = i === 0 ? 0 : R * (0.35 + rnd() * 0.3)
+      return { geo, at: [Math.cos(a) * d, TRASH_H - 0.07 + rnd() * 0.05, Math.sin(a) * d] as [number, number, number],
+        shade: ['#f4efe2', '#e9e1cc', '#f7f3ea', '#ddd3bb', '#efe8d6'][i] }
+    })
+  }, [R])
+  // the label faces the camera
+  const face = Math.atan2(LAY_DIR.x, LAY_DIR.z)
   return (
     <group position={position} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={staves} side={THREE.DoubleSide} />
+        <meshToonMaterial color="#ffffff" map={TRASH_METAL} side={THREE.DoubleSide} />
       </mesh>
       <mesh geometry={geometry} scale={[1.03, 1.02, 1.03]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
-      {/* the straw-paper lining at the bottom, so it doesn't look like the water bucket */}
-      <mesh position-y={0.055} rotation-x={-Math.PI / 2}>
-        <circleGeometry args={[TRASH_R * 0.8, 24]} />
-        <meshToonMaterial color="#b8a27a" />
+      {/* the rolled rim and a reinforcing band near the foot */}
+      <mesh position-y={TRASH_H} rotation-x={Math.PI / 2}>
+        <torusGeometry args={[R * 0.99, 0.012, 8, 56]} />
+        <meshToonMaterial color="#c9ced3" />
       </mesh>
-      {[0.08, 0.27].map((y) => (
-        <mesh key={y} position-y={y} rotation-x={Math.PI / 2}>
-          <torusGeometry args={[TRASH_R * (0.86 + 0.14 * (y / TRASH_H)) + 0.004, 0.008, 6, 40]} />
-          <meshToonMaterial color="#3c3c40" />
+      <mesh position-y={0.04} rotation-x={Math.PI / 2}>
+        <torusGeometry args={[R * 0.9, 0.009, 6, 56]} />
+        <meshToonMaterial color="#9aa0a6" />
+      </mesh>
+      {/* two handles on the sides */}
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[STACK_DIR.x * sd * (R + 0.012), TRASH_H * 0.78, STACK_DIR.z * sd * (R + 0.012)]}
+          rotation-y={face}>
+          <torusGeometry args={[0.045, 0.008, 6, 16, Math.PI]} />
+          <meshToonMaterial color="#8d939a" />
         </mesh>
       ))}
+      <mesh position={[LAY_DIR.x * (R * 0.96 + 0.004), TRASH_H * 0.5, LAY_DIR.z * (R * 0.96 + 0.004)]} rotation-y={face}>
+        <planeGeometry args={[0.16, 0.1]} />
+        <meshToonMaterial map={TRASH_LABEL} />
+      </mesh>
+      {/* what's been thrown in: crumpled paper, and an old skewer sticking out */}
+      {paper.map((p, i) => (
+        <mesh key={i} geometry={p.geo} position={p.at} rotation={[i, i * 1.7, i * 0.4]}>
+          <meshToonMaterial color={p.shade} />
+        </mesh>
+      ))}
+      <mesh position={[R * 0.25, TRASH_H + 0.02, -R * 0.2]} rotation={[0.5, 0, 0.35]}>
+        <cylinderGeometry args={[0.005, 0.004, 0.32, 5]} />
+        <meshToonMaterial color="#c9a46a" />
+      </mesh>
     </group>
   )
-}/** the tray for raw food waiting to go on the fire: a grid of spots */
+}
+
+/** the tray for raw food waiting to go on the fire: a grid of spots */
 const TRAY_ROWS = 4
 const TRAY_W = 1.6
 const TRAY_D = 1.0
@@ -106,10 +207,93 @@ const BOX_R = 0.46
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15
 
+/**
+ * The tray's planed cedar: three boards with the grain running along them, drawn as wavering growth lines that
+ * bunch round a knot or two, a dark seam between boards, and a few darker stains where wet food has sat. Mapped
+ * in the tray's own units (one texture across 1.6 x 1.6).
+ */
+const TRAY_WOOD = (() => {
+  if (typeof document === 'undefined') return null
+  const S = 1024
+  const c = document.createElement('canvas')
+  c.width = c.height = S
+  const g = c.getContext('2d')!
+  let seed = 3
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  g.fillStyle = '#c4935a'
+  g.fillRect(0, 0, S, S)
+  const boards = 3
+  const bh = S / boards
+  for (let b = 0; b < boards; b++) {
+    const y0 = b * bh
+    // each board its own shade
+    g.fillStyle = `rgba(${150 + rnd() * 40}, ${100 + rnd() * 25}, ${55 + rnd() * 20}, 0.35)`
+    g.fillRect(0, y0, S, bh)
+    // a knot or two that the grain flows round
+    const knots = Array.from({ length: 1 + Math.floor(rnd() * 2) }, () => ({ x: rnd() * S, y: y0 + bh * (0.25 + rnd() * 0.5),
+      r: 10 + rnd() * 14 }))
+    for (let k = 0; k < 46; k++) {
+      const base = y0 + (k / 46) * bh
+      g.strokeStyle = `rgba(${90 + rnd() * 30}, ${55 + rnd() * 15}, 25, ${0.18 + rnd() * 0.32})`
+      g.lineWidth = 0.8 + rnd() * 2.2
+      g.beginPath()
+      for (let x = 0; x <= S; x += 8) {
+        let y = base + Math.sin(x * 0.006 + k * 0.7 + b) * 5 + Math.sin(x * 0.021 + k) * 1.5
+        for (const kn of knots) {
+          const dx = x - kn.x
+          const dy = y - kn.y
+          const d2 = dx * dx + dy * dy
+          y += (dy / (Math.sqrt(d2) + 1)) * kn.r * 2.2 * Math.exp(-d2 / (kn.r * kn.r * 9))
+        }
+        if (x === 0) g.moveTo(x, y)
+        else g.lineTo(x, y)
+      }
+      g.stroke()
+    }
+    for (const kn of knots) {
+      const grad = g.createRadialGradient(kn.x, kn.y, 1, kn.x, kn.y, kn.r)
+      grad.addColorStop(0, 'rgba(70, 38, 15, 0.95)')
+      grad.addColorStop(0.6, 'rgba(110, 62, 28, 0.7)')
+      grad.addColorStop(1, 'rgba(110, 62, 28, 0)')
+      g.fillStyle = grad
+      g.beginPath()
+      g.ellipse(kn.x, kn.y, kn.r * 1.5, kn.r, 0, 0, Math.PI * 2)
+      g.fill()
+    }
+    // the seam to the next board
+    g.fillStyle = 'rgba(55, 32, 14, 0.75)'
+    g.fillRect(0, y0 + bh - 2, S, 3)
+    g.fillStyle = 'rgba(255, 230, 190, 0.25)'
+    g.fillRect(0, y0 + bh + 1, S, 2)
+  }
+  // fine pores along the grain
+  for (let i = 0; i < 2600; i++) {
+    g.fillStyle = `rgba(80, 45, 20, ${0.15 + rnd() * 0.25})`
+    g.fillRect(rnd() * S, rnd() * S, 2 + rnd() * 6, 1)
+  }
+  // stains where wet food has rested
+  for (let i = 0; i < 5; i++) {
+    const x = rnd() * S
+    const y = rnd() * S
+    const r = 30 + rnd() * 60
+    const grad = g.createRadialGradient(x, y, r * 0.2, x, y, r)
+    grad.addColorStop(0, 'rgba(90, 55, 25, 0.22)')
+    grad.addColorStop(1, 'rgba(90, 55, 25, 0)')
+    g.fillStyle = grad
+    g.fillRect(x - r, y - r, r * 2, r * 2)
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(1 / 1.6, 1 / 1.6)
+  t.anisotropy = 8
+  return t
+})()
+
 /** A shallow wooden tray (盛り板) where ordered food waits raw, to be carried onto the fire. */
 function Tray({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = useMemo(() => {
-    // a low board with a lip all round, its long side across the view
+    // a low board with a lip all round
     const shape = new THREE.Shape()
     const w = TRAY_W / 2
     const d = TRAY_D / 2
@@ -128,12 +312,12 @@ function Tray({ position, container }: { position: [number, number, number]; con
     g.rotateX(-Math.PI / 2)
     return g
   }, [])
-  // turned so its long side runs across the screen
-  const yaw = Math.atan2(-STACK_DIR.z, STACK_DIR.x)
+  // standing to the right of the fire, its long side runs toward the camera (so it isn't cut off at the edge)
+  const yaw = Math.atan2(-LAY_DIR.z, LAY_DIR.x)
   return (
     <group position={position} rotation-y={yaw} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#b98a55" />
+        <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
       </mesh>
       <mesh geometry={geometry} scale={[1.02, 1.1, 1.02]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
@@ -141,7 +325,6 @@ function Tray({ position, container }: { position: [number, number, number]; con
     </group>
   )
 }
-
 /** A pinching hand (for taking salt), drawn over the 3D view while salt is carried. */
 function PinchHand() {
   return (
@@ -205,41 +388,108 @@ const STICK_TOP_Y = 1.15
 const LAYER_HEIGHT = 0.1
 const CHAR_COLOR = new THREE.Color(0.045, 0.035, 0.03)
 
-/** A woven bamboo (ざる) texture: strips over and under in a twill, pale and honey-coloured. */
+/**
+ * A woven bamboo (ざる) texture: strips over and under in a twill, pale and honey-coloured — and well used. One
+ * picture across the whole basket (not tiled), so the wear can be where it would be: the middle darkened by
+ * oil and ash from the potatoes, brown stains and a smudge or two of charcoal, strips bleached and worn toward
+ * the rim, a few frayed or split, and the bamboo greyed unevenly with age.
+ */
 const weaveTexture = (() => {
   if (typeof document === 'undefined') return null
+  const S = 1024
   const c = document.createElement('canvas')
-  c.width = c.height = 128
+  c.width = c.height = S
   const g = c.getContext('2d')!
-  const cell = 16
+  let seed = 11
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const n = 26                       // strips across (the old tile was 8 strips, repeated 3.2 times)
+  const cell = S / n
+  const k = cell / 16
   // gaps between the strips show dark
   g.fillStyle = '#5a3d1c'
-  g.fillRect(0, 0, 128, 128)
-  for (let i = 0; i < 8; i++) {
-    for (let j = 0; j < 8; j++) {
+  g.fillRect(0, 0, S, S)
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
       const over = (i + j) % 4 < 2
-      // broad, slightly uneven strips with a gap either side; the one on top is lighter, with a sheen and grain
-      g.fillStyle = over ? '#d9b779' : '#b38a4d'
-      if (over) g.fillRect(i * cell, j * cell + 2, cell, cell - 4)
-      else g.fillRect(i * cell + 2, j * cell, cell - 4, cell)
+      const x = i * cell
+      const y = j * cell
+      // each strip piece a touch different in shade: older bamboo greys and darkens unevenly
+      const age = rnd()
+      const top = over ? [217, 183, 121] : [179, 138, 77]
+      const grey = age * 0.18
+      const col = top.map((v, q) => Math.round(v * (1 - grey) + [150, 140, 120][q] * grey))
+      g.fillStyle = `rgb(${col[0]}, ${col[1]}, ${col[2]})`
+      if (over) g.fillRect(x, y + 2 * k, cell, cell - 4 * k)
+      else g.fillRect(x + 2 * k, y, cell - 4 * k, cell)
       g.fillStyle = 'rgba(255, 240, 200, 0.3)'
-      if (over) g.fillRect(i * cell, j * cell + 5, cell, 2)
-      else g.fillRect(i * cell + 5, j * cell, 2, cell)
+      if (over) g.fillRect(x, y + 5 * k, cell, 2 * k)
+      else g.fillRect(x + 5 * k, y, 2 * k, cell)
       g.fillStyle = 'rgba(90, 60, 25, 0.35)'
-      if (over) g.fillRect(i * cell, j * cell + 10, cell, 1)
-      else g.fillRect(i * cell + 10, j * cell, 1, cell)
+      if (over) g.fillRect(x, y + 10 * k, cell, k)
+      else g.fillRect(x + 10 * k, y, k, cell)
+      // now and then a split along the strip, or a frayed end lifting
+      if (rnd() < 0.05) {
+        g.strokeStyle = 'rgba(60, 38, 16, 0.7)'
+        g.lineWidth = 1.2
+        g.beginPath()
+        if (over) {
+          g.moveTo(x + cell * 0.1, y + cell * (0.35 + rnd() * 0.3))
+          g.lineTo(x + cell * 0.9, y + cell * (0.35 + rnd() * 0.3))
+        } else {
+          g.moveTo(x + cell * (0.35 + rnd() * 0.3), y + cell * 0.1)
+          g.lineTo(x + cell * (0.35 + rnd() * 0.3), y + cell * 0.9)
+        }
+        g.stroke()
+      }
+      if (rnd() < 0.025) {
+        g.fillStyle = 'rgba(240, 220, 175, 0.75)'
+        for (let q = 0; q < 4; q++) g.fillRect(x + rnd() * cell, y + rnd() * cell, 1.5, 4 + rnd() * 6)
+      }
     }
   }
+  const blot = (x: number, y: number, r: number, rgba: string, rgba0: string) => {
+    const grad = g.createRadialGradient(x, y, r * 0.1, x, y, r)
+    grad.addColorStop(0, rgba)
+    grad.addColorStop(1, rgba0)
+    g.fillStyle = grad
+    g.beginPath()
+    // a ragged edge: a wobbly ring rather than a circle
+    for (let q = 0; q <= 24; q++) {
+      const a = (q / 24) * Math.PI * 2
+      const rr = r * (0.75 + 0.25 * Math.sin(a * 3 + x) + rnd() * 0.15)
+      if (q === 0) g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr)
+      else g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr)
+    }
+    g.fill()
+  }
+  // the middle, where hot potatoes have sat for years: oil and ash worked into it
+  blot(S / 2, S / 2, S * 0.3, 'rgba(70, 42, 18, 0.38)', 'rgba(70, 42, 18, 0)')
+  // stains here and there
+  for (let q = 0; q < 9; q++) {
+    const a = rnd() * Math.PI * 2
+    const d = rnd() * S * 0.32
+    blot(S / 2 + Math.cos(a) * d, S / 2 + Math.sin(a) * d, 25 + rnd() * 55, 'rgba(95, 55, 20, 0.3)', 'rgba(95, 55, 20, 0)')
+  }
+  // a couple of charcoal smudges from sooty foil
+  for (let q = 0; q < 3; q++) {
+    const a = rnd() * Math.PI * 2
+    const d = rnd() * S * 0.22
+    blot(S / 2 + Math.cos(a) * d, S / 2 + Math.sin(a) * d, 18 + rnd() * 26, 'rgba(25, 20, 18, 0.35)', 'rgba(25, 20, 18, 0)')
+  }
+  // toward the rim the bamboo is rubbed paler by hands
+  const rim = g.createRadialGradient(S / 2, S / 2, S * 0.33, S / 2, S / 2, S * 0.5)
+  rim.addColorStop(0, 'rgba(255, 240, 210, 0)')
+  rim.addColorStop(1, 'rgba(255, 240, 210, 0.22)')
+  g.fillStyle = rim
+  g.fillRect(0, 0, S, S)
   const t = new THREE.CanvasTexture(c)
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   // mapped straight down onto the bowl (see Basket), so the strips run in two straight crossing directions
-  // right across it, the way a woven zaru is made, instead of pinching into the centre. Few, broad strips:
-  // a coarse, rustic weave
-  t.repeat.set(3.2, 3.2)
+  // right across it, the way a woven zaru is made, instead of pinching into the centre
   t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = 8
   return t
 })()
-
 /**
  * Painted ware in the 染付 manner, as a top-down picture for a plate or dish: indigo on a warm cream glaze. A
  * patterned rim band between fine double lines (青海波 waves on the plate, 雷紋 key-fret on the dish), and in the
@@ -1026,15 +1276,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // skewers lie along the tray's long side, in rows from back to front, a second layer across the first when full
   /** loose food (potatoes, rice balls, mochi) waits in a row along the back of the tray, clear of the sticks */
   const trayLooseSpot = (n: number) => trayAt()
-    .addScaledVector(STACK_DIR, ((n % 7) - 3) * 0.2)
-    .addScaledVector(LAY_DIR, -TRAY_D / 2 + 0.13)
+    .addScaledVector(LAY_DIR, ((n % 7) - 3) * 0.2)
+    .addScaledVector(STACK_DIR, TRAY_D / 2 - 0.13)
     .add(new THREE.Vector3(0, 0.07 + Math.floor(n / 7) * 0.12, 0))
   const traySpot = (n: number) => {
     const row = n % TRAY_ROWS
     const layer = Math.floor(n / TRAY_ROWS)
     return trayAt()
-      .addScaledVector(LAY_DIR, 0.1 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.34) / (TRAY_ROWS - 1))
-      .addScaledVector(STACK_DIR, 0.05 + ((layer % 2) - 0.5) * 0.06)
+      .addScaledVector(STACK_DIR, -0.1 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.34) / (TRAY_ROWS - 1))
+      .addScaledVector(LAY_DIR, 0.05 + ((layer % 2) - 0.5) * 0.06)
       .add(new THREE.Vector3(0, 0.07 + layer * 0.06, 0))
   }
 
@@ -1069,11 +1319,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (kind === 'box' || kind === 'bin') return (carriers[kind]?.[0]?.home.clone() ?? new THREE.Vector3()).add(nudge(kind))
     if (kind === 'tray') return trayAt()
     if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
+    if (kind === 'rawdish') return new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])).add(nudge('rawdish'))
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   const footprint = (key: string) => {
     const kind = key.split('-')[0]
-    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R }[kind] ?? 0.3
+    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R }[kind] ?? 0.3
   }
   /** everything standing on the table that can be moved, for bumping into */
   const containerKeys = () => [
@@ -1083,6 +1334,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     ...Object.keys(carriers),
     ...(roast.tray ? ['tray'] : []),
     ...(roast.trash ? ['trash'] : []),
+    ...(roast.rawDish ? ['rawdish'] : []),
   ]
   /**
    * Keep a moved container from passing through things: out of the stone ring, and clear of every other
@@ -1270,6 +1522,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // a drag that orbits the camera) takes it off the fire, or eats it once it's on the plate
   const { gl, camera, raycaster, scene: world } = useThree()
   const shift = useRef<{ key: string; start: THREE.Vector3; from: THREE.Vector3 } | null>(null)
+  /** soup bowls: sips left, and how full it looks (eased toward what's left) */
+  const sips = useRef(new Map<string, { left: number; level: number }>())
   const scrap = useRef<{ p: Piece; x: number; y: number; started: boolean } | null>(null)
   const stageSeq = useRef(0)
   const aiClock = useRef(0)
@@ -1544,6 +1798,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (target !== hovered.current) setHover(target)
     }
 
+    /** soup on the table (miso soup): the bowl under the pointer, if it still has any in it */
+    const pickDrink = () => {
+      const bowls: THREE.Object3D[] = []
+      root.traverse((o) => {
+        const id = o.userData.itemId as string | undefined
+        if (id && roast.drinks?.includes(id) && o.visible && o.scale.x > 0.01) bowls.push(o)
+      })
+      for (const hit of raycaster.intersectObjects(bowls, true)) {
+        for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) {
+          if (bowls.includes(o) && (sips.current.get(o.uuid)?.left ?? SIPS) > 0) return o
+        }
+      }
+      return null
+    }
+
     let down: { x: number; y: number } | null = null
     const onMove = (e: PointerEvent) => {
       if (drag.current) return
@@ -1561,7 +1830,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         setTasteTip(p ? { at: p.node.position.clone().add(new THREE.Vector3(0, 0.42, 0)).toArray() as [number, number, number],
           taste: tasteOf(p) } : null)
       }
-      el.style.cursor = tool ? 'grab' : p ? 'pointer' : pickContainer() ? 'grab' : ''
+      const soup = tool || p ? null : pickDrink()
+      if (!soup && !p && !hovered.current) setTasteTip(null)
+      if (soup && !p) setTasteTip({ at: soup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.32, 0)).toArray() as [number, number, number], taste: SOUP_TASTE })
+      el.style.cursor = tool ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : ''
     }
     const onDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY }
@@ -1755,7 +2027,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (e.button !== 0 || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
       aim(e)
       const p = pickFood()
-      if (!p) return
+      if (!p) {
+        // a sip of soup: it goes down a little each time, and the last sip counts as having had it
+        const bowl = pickDrink()
+        if (!bowl) return
+        const s = sips.current.get(bowl.uuid) ?? { left: SIPS, level: 1 }
+        s.left -= 1
+        sips.current.set(bowl.uuid, s)
+        if (s.left === 0) onEat?.(bowl.userData.itemId as string, SOUP_TASTE)
+        return
+      }
       if (p.staged) putOnFire(p)
       else if (p.collected && inBasket(p) && !p.unwrapped) p.unwrapped = true      // unwrap the foil first
       else if (p.collected) eat(p)
@@ -1891,7 +2172,31 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     if (scannedCount.current !== root.children.length) scan()
     const dt = Math.min(delta, 0.1)
-
+    // soup going down as it's drunk: the surface sinks into the bowl and narrows with it; a bowl taken off the
+    // order comes back full next time
+    root.traverse((o) => {
+      const id = o.userData.itemId as string | undefined
+      if (!id || !roast.drinks?.includes(id)) return
+      const liquid = o.children.find((c) => c.name.startsWith('MisoLiquid'))
+      if (!liquid) return
+      if (!liquid.userData.full) liquid.userData.full = { y: liquid.position.y }
+      if (!o.visible || o.scale.x < 0.01) {
+        sips.current.delete(o.uuid)
+        return
+      }
+      const s = sips.current.get(o.uuid)
+      if (!s) {
+        liquid.position.y = liquid.userData.full.y
+        liquid.scale.set(1, 1, 1)
+        liquid.visible = true
+        return
+      }
+      s.level += (s.left / SIPS - s.level) * Math.min(1, dt * 4)
+      const gone = 1 - s.level
+      liquid.position.y = liquid.userData.full.y - gone * 0.07
+      liquid.scale.set(1 - gone * 0.42, 1, 1 - gone * 0.42)
+      liquid.visible = s.level > 0.03
+    })
     // seasonings: the one being carried follows the pointer, tipped to pour over the food beneath it (a little
     // sprinkle or drip falls while it's over something); the rest sit in their places, glowing when pointed at
     const d = drag.current
@@ -1954,6 +2259,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // what's waiting on the tray, in the order it arrived
     const onTray = pieces.current.filter((p) => p.staged && present(p) && !p.carried && p.trash < 0)
       .sort((a, b) => a.stagedAt - b.stagedAt)
+    // (those on the raw dish don't take a place on the tray)
+    const onBoard = onTray.filter((p) => !roast.rawDish?.items.includes(p.id))
 
     pieces.current.forEach((p, n) => {
       bindMaterials(p)
@@ -2020,12 +2327,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
       } else if (p.carried) {
         // (held by the pointer, see haul)
+      } else if (p.staged && roast.rawDish?.items.includes(p.id)) {
+        // rice balls wait raw on their own little dish, sitting the way they'll go on the net
+        const mine = onTray.filter((q) => roast.rawDish!.items.includes(q.id))
+        const k = Math.max(0, mine.indexOf(p))
+        const a = (k / 3) * Math.PI * 2 + 0.4
+        const at = containerAt('rawdish').add(new THREE.Vector3(Math.cos(a) * (k < 3 ? 0.1 : 0), 0.05 + Math.floor(k / 3) * 0.08,
+          Math.sin(a) * (k < 3 ? 0.1 : 0)))
+        p.node.position.lerp(at, Math.min(1, dt * 10))
+        p.node.quaternion.copy(p.homeQ)
       } else if (p.staged) {
         // waiting raw on the tray, laid flat in its spot
-        const at = p.loose ? trayLooseSpot(Math.max(0, onTray.filter((q) => q.loose).indexOf(p)))
-          : traySpot(Math.max(0, onTray.filter((q) => !q.loose).indexOf(p)))
+        const at = p.loose ? trayLooseSpot(Math.max(0, onBoard.filter((q) => q.loose).indexOf(p)))
+          : traySpot(Math.max(0, onBoard.filter((q) => !q.loose).indexOf(p)))
         p.node.position.lerp(at, Math.min(1, dt * 10))
-        flatQ(p, p.node.quaternion, STACK_DIR)
+        flatQ(p, p.node.quaternion, LAY_DIR)
       } else if (!p.collected) {
         if (active && !waiting(p) && p.homeFlight >= 1) p.progress += dt * roastRate(fire?.current ?? 0.55)
         p.node.quaternion.copy(p.homeQ)
@@ -2233,6 +2549,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
+      {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
       {roast.trash && <TrashBin container="trash" position={containerAt('trash').toArray() as [number, number, number]} />}
       {/* salt is taken with the fingers: a pinching hand follows the pinch while it's carried */}
       {saltInHand && (

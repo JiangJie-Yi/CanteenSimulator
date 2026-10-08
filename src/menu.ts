@@ -128,6 +128,10 @@ export type Roast = {
   netSpots?: [number, number][]
   /** skewers that turn on their stick to face the camera (flat food, seen side-on otherwise) */
   faceCamera?: string[]
+  /** soups set on the table (not roasted): clicked a few times to drink */
+  drinks?: string[]
+  /** a small dish beside the tray where some raw food (rice balls) waits instead of on the tray */
+  rawDish?: { at: [number, number, number]; items: string[] }
 }
 
 export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut' | 'water'
@@ -220,11 +224,11 @@ export const DISHES: Dish[] = [
     // every set comes with one fish, a rice ball, shishito, king oyster mushroom and a potato; extras on top are ordered separately
     bases: [
       { id: 'ayu', name: '鹽烤香魚套餐', ja: '鮎定食', en: 'Ayu Set', price: 180,
-        includes: { ExtraFish: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1 } },
+        includes: { ExtraFish: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1, MisoSoup: 1 } },
       { id: 'saury', name: '鹽烤秋刀魚套餐', ja: '秋刀魚定食', en: 'Saury Set', price: 190,
-        includes: { Saury: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1 } },
+        includes: { Saury: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1, MisoSoup: 1 } },
       { id: 'mackerel', name: '鹽烤鯖魚套餐', ja: '鯖定食', en: 'Mackerel Set', price: 200,
-        includes: { Mackerel: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1 } },
+        includes: { Mackerel: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1, MisoSoup: 1 } },
     ],
     items: [
       { id: 'ExtraFish', name: '鹽烤香魚', ja: '鮎', en: 'Ayu', price: 80, kcal: 110 },
@@ -248,6 +252,8 @@ export const DISHES: Dish[] = [
       { id: 'BloodCake', name: '烤米血', ja: '米血糕', en: 'Rice Blood Cake', price: 35, kcal: 160 },
       // toasted on the grill net, three at a time; more wait their turn
       { id: 'NetMochi', name: '網烤年糕', ja: '焼き餅', en: 'Grilled Mochi', price: 30, kcal: 120 },
+      // in a lacquered bowl on the table in front, beside the plates; comes with every set too
+      { id: 'MisoSoup', name: '味噌湯', ja: '味噌汁', en: 'Miso Soup', price: 30, kcal: 40, max: 2 },
     ],
     heat: 'fire',
     roast: {
@@ -263,17 +269,20 @@ export const DISHES: Dish[] = [
       // toasted on the grill net, which holds three at a time between them (the rest wait their turn)
       net: ['NetMochi', 'Onigiri'],
       faceCamera: ['ShrimpSkewer'],
+      drinks: ['MisoSoup'],
       // the net's three spots (x, z); the model's mochi sits on the first, its onigiri on the second
       netSpots: [[-0.11, 0.0], [0.1, 0.07], [0.06, -0.11]],
       // just outside the stones, to the upper right of the fire as the camera sees it
       // (kept clear of the corn skewer at -55°, which used to stand right in front of it)
       // plates and dishes on the right of the fire as the camera sees it, the box and the bucket on the left
-      plate: [1.38, 0.02, -1.16],
+      // everything you eat from in a row along the front (toward the camera): the side dish, the miso soup, the
+      // plate and the basket, left to right; the tray of raw skewers on the right; box, bucket and bin on the left
+      plate: [0.98, 0.02, 1.57],
       // just outside the stones on the left as the camera sees it
-      basket: { at: [1.89, 0, -0.13], capacity: 20 },
+      basket: { at: [1.6, 0, 0.93], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
       // behind the fire to the left of the plate, as the camera sees it
-      dish: { at: [0.42, 0.0, -1.8], capacity: 3 },
+      dish: { at: [-0.39, 0.0, 1.81], capacity: 3 },
       // the spoons and brush in the seasoning box are what's carried; grabbing a pot picks up its utensil
       // (salt is taken by hand: SaltPinch only marks where the pinch is taken from)
       tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut', WaterDipper: 'water' },
@@ -285,7 +294,9 @@ export const DISHES: Dish[] = [
       // waits to go on the fire
       bucket: ['WaterBucket', 'WaterDipper'],
       trash: [-2.2, 0.0, -0.45],
-      tray: [1.22, 0.0, 1.36],
+      tray: [1.6, 0.0, -0.75],
+      // the rice balls come out on their own little dish, just past the front end of the tray
+      rawDish: { at: [2.3, 0.0, 0.22], items: ['Onigiri'] },
     },
     layout: {
       mode: 'ring',
@@ -294,7 +305,9 @@ export const DISHES: Dish[] = [
       // the 2nd and 3rd mochi go on the grill net beside the first (blender/grilledfish.py NET_Z)
       // (Roasting moves net items between the net's spots; listing them here keeps Dish from treating them as
       // skewers on the fire ring)
-      slots: { NetMochi: [[0.1, 0.07], [0.06, -0.11]], Onigiri: [[0.06, -0.11], [-0.11, 0.0]] },
+      slots: { NetMochi: [[0.1, 0.07], [0.06, -0.11]], Onigiri: [[0.06, -0.11], [-0.11, 0.0]],
+        // a second bowl of soup beside the first
+        MisoSoup: [[-0.1, 2.25]] },
       // potatoes and sweet potatoes sit in the ash at the front: extra ones line up beside the first,
       // potatoes toward the right, sweet potatoes toward the left
       spread: { Potato: 0.3, SweetPotato: -0.3 },
