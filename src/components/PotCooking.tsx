@@ -216,7 +216,7 @@ type Props = {
   itemIds: string[]
   temp: MutableRefObject<number>
   active: boolean
-  onEat?: (id: string, taste: number) => void
+  onEat?: (id: string, taste: number, how?: { doneness?: number; dip?: string[] }) => void
   onNotice?: (what: 'notCooked') => void
   /** whether there's a soup in the pot, the burner (0..100), and the pot's inner floor height */
   soup: boolean
@@ -395,7 +395,7 @@ export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, 
         // (a customer's piece is theirs)
         if (f.flight < 1 || f.ai) return
         f.eat = 0.0001
-        onEat?.(f.id, withDip(f))
+        onEat?.(f.id, withDip(f), { doneness: f.cook, dip: [...dipRef.current] })
       } else if (f.cook < 1) {
         onNotice?.('notCooked')
       } else {

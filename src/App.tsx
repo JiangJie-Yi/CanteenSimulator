@@ -13,6 +13,7 @@ import { Fire } from './components/Fire'
 import { GasFlame } from './components/GasFlame'
 import { FireControl } from './components/FireControl'
 import { Fullness } from './components/Fullness'
+import { bestOf, Notebook, type Notes } from './components/Notebook'
 import { MoodFace } from './components/MoodFace'
 import { GuestCounter } from './components/GuestCounter'
 import { HeatControl } from './components/HeatControl'
@@ -193,7 +194,8 @@ type SceneProps = {
   frame: Frame
   onOffFire: (count: number, loose: number) => void
   /** a piece of food has been eaten (for the fullness meter) */
-  onEat: (id: string, taste: number) => void
+  onEat: (id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; dip?: string[] }) => void
+  notes: Notes
   /** AI simulation on, and what it does through the app */
   ai: boolean
   onOrder: (id: string, guest?: number) => boolean
@@ -210,7 +212,7 @@ type SceneProps = {
   onPotGuestEat: (id: string, taste: number) => void
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, onGuests, potAi, onPotGuestEat,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, onGuests, potAi, onPotGuestEat, notes,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -401,7 +403,8 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)}
-                  space={ai ? 'open' : 'closed'} locked={ai} />
+                  space={ai ? 'open' : 'closed'} locked={ai}
+                  notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))} />
               )}
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
               {dish.heatControl && (
@@ -502,10 +505,18 @@ export default function App() {
   }, [])
   // 評價: the average 美味 of everything eaten
   const [rating, setRating] = useState({ sum: 0, n: 0 })
-  const onEat = useCallback((id: string, taste: number) => {
-    const cal = ALL_ITEMS.get(id)?.kcal ?? 0
+  // 試吃筆記: every food tried, how it tasted and how it was cooked; the last one is shown under the stomach
+  const [notes, setNotes] = useState<Notes>({})
+  const [lastTry, setLastTry] = useState<{ name: string; taste: number; key: number } | null>(null)
+  const langRef = useRef<Lang>('zh')
+  const onEat = useCallback((id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; dip?: string[] }) => {
+    const item = ALL_ITEMS.get(id)
+    const cal = item?.kcal ?? 0
     setKcal((k) => k + cal)
     setRating((r) => ({ sum: r.sum + taste, n: r.n + 1 }))
+    const name = item ? nameIn(langRef.current, item) : id
+    setNotes((all) => ({ ...all, [id]: { name, tries: [...(all[id]?.tries ?? []), { taste, ...how, at: Date.now() }] } }))
+    setLastTry({ name, taste, key: Date.now() })
   }, [])
   // AI simulation: a chef and customers, and what they've said lately
   // (the running costs are ticked in a second-by-second effect further down)
@@ -562,6 +573,7 @@ export default function App() {
       return 'zh'
     }
   })
+  langRef.current = lang
   const toggleLang = () =>
     setLang((l) => {
       const next: Lang = l === 'zh' ? 'ja' : 'zh'
@@ -1010,7 +1022,7 @@ export default function App() {
               }
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
-            lang={lang} chefOf={chefOf} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
+            lang={lang} notes={notes} chefOf={chefOf} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
         </Canvas>}
         </Crash>
       </div>
@@ -1018,7 +1030,8 @@ export default function App() {
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} />
         {dish.heatControl && <HeatControl heat={heat} onChange={ai ? () => {} : setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={ai ? () => {} : addCharcoal} lang={lang} />}
-        <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} />
+        <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
+        <Notebook notes={notes} lang={lang} />
         <div className={`side-boards${boardsOpen ? ' is-open' : ''}`}>
           {/* on a phone the boards fold into one line at the top: tap it to open them */}
           {(ai || ledgerOn) && (

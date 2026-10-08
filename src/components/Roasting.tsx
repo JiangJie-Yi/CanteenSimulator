@@ -1191,7 +1191,9 @@ type RoastingProps = {
   /** told how many pieces are off the fire (on a plate, in a pile or eaten), for the fire's capacity limit */
   onOffFire?: (count: number, loose: number) => void
   /** a piece has been eaten up (for 飽足) */
-  onEat?: (id: string, taste: number) => void
+  onEat?: (id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number> }) => void
+  /** the player's best way with each food, from the tasting notes: the chef may cook to it */
+  notes?: Record<string, { doneness?: number; dabs?: Record<string, number> }>
   /** something to tell the diner (it isn't cooked yet, it's burnt) */
   onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
   /** written every frame: how much smoke is coming off the fire (0..1), from food that's cooked and still on it */
@@ -1227,7 +1229,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false }: RoastingProps) {
+  locked = false, notes = {} }: RoastingProps) {
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -1701,6 +1703,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.node.userData.onPlate = false
     p.node.userData.shrink = 1
     p.node.userData.byGuest = false
+    p.node.userData.follow = undefined
     p.node.quaternion.copy(p.homeQ)
     p.node.position.copy(p.homeP)
   }
@@ -1804,8 +1807,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       say(scrapIt.stickOnly ? '竹籤收一下' : '這個烤焦了，丟掉吧')
       return
     }
+    // the chef cooks to the notes when they choose to (a better hand follows them more often), else by eye
+    const follows = (p: Piece) => {
+      const n = notes[p.id]
+      if (!n) return null
+      if (p.node.userData.follow === undefined) p.node.userData.follow = Math.random() < chef.seasonChance * 0.85
+      return p.node.userData.follow ? n : null
+    }
+    const pullOf = (p: Piece) => {
+      const n = follows(p)
+      return n?.doneness !== undefined ? Math.min(1.45, Math.max(0.95, n.doneness)) : chef.pullAt
+    }
     const ready = live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 &&
-      p.progress / roast.times[p.id] >= chef.pullAt)
+      p.progress / roast.times[p.id] >= pullOf(p))
     if (ready) {
       collect(ready)
       say(`${roast.names[ready.id]}烤好了！`)
@@ -1815,7 +1829,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.progress / roast.times[p.id] >= 0.85)
     if (toSeason) {
       toSeason.chefSeasoned = true
-      const k = bestSeasoning(toSeason.id)
+      const noted = follows(toSeason)?.dabs
+      const fromNotes = noted ? (Object.entries(noted).filter(([k, n]) => n > 0 && k !== 'water').sort((a, b) => b[1] - a[1])[0]?.[0] as
+        Exclude<Seasoning, 'water'> | undefined) : undefined
+      const k = noted ? fromNotes ?? null : bestSeasoning(toSeason.id)
       // (a less practised hand forgets now and then)
       if (k && !toSeason.dabs[k] && Math.random() < chef.seasonChance) {
         season(toSeason, k)
@@ -2580,6 +2597,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.eat = 0
         p.eaten = false
         p.node.userData.onPlate = false
+        p.node.userData.follow = undefined
         p.node.quaternion.copy(p.homeQ)
         p.node.position.copy(p.homeP)
         return
@@ -2724,7 +2742,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         if (p.eat >= 1) {
           // (what an AI customer eats fills their stomach, not yours)
-          if (!p.node.userData.byGuest) onEat?.(p.id, tasteOf(p))
+          if (!p.node.userData.byGuest) onEat?.(p.id, tasteOf(p), { doneness: p.progress / roast.times[p.id], dabs: { ...p.dabs } })
           if (p.sticks.length) {
             p.stickOnly = true
             for (const m of p.food) m.visible = false

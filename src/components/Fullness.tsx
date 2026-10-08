@@ -1,4 +1,5 @@
 import { UI, type Lang } from '../i18n'
+import { starText } from './Notebook'
 
 type FullnessProps = {
   /** calories eaten and not yet digested */
@@ -8,6 +9,8 @@ type FullnessProps = {
   lang: Lang
   /** average 美味 (0..100) of what's been eaten, or null before anything has */
   rating: number | null
+  /** the last thing tried, with its stars (tasting while the shop is closed) */
+  lastTry?: { name: string; taste: number; key: number } | null
 }
 
 function fullWord(pct: number, lang: Lang) {
@@ -32,7 +35,7 @@ const DUODENUM = 'M42 29 C46 30 47 35 45 40 C44 43 41 45 38 46'
  * 飽足: a stomach that fills up from the bottom as you eat (by each food's real-world calories) and empties as it
  * digests — grey when empty, turning green as it fills — with the average 評價 of what's been eaten.
  */
-export function Fullness({ kcal, full, lang, rating }: FullnessProps) {
+export function Fullness({ kcal, full, lang, rating, lastTry }: FullnessProps) {
   const pct = Math.min(100, (kcal / full) * 100)
   // grey → green as it fills
   const fill = `hsl(122 ${Math.round(8 + pct * 0.5)}% ${Math.round(64 - pct * 0.2)}%)`
@@ -60,7 +63,12 @@ export function Fullness({ kcal, full, lang, rating }: FullnessProps) {
       </svg>
       <span className="heat-value">
         <span className="heat-word">{fullWord(pct, lang)}</span> {Math.round(kcal)} kcal
-        {rating !== null && (
+        {lastTry ? (
+          <span key={lastTry.key} className="fullness-rating fullness-try" title={`美味 ${Math.round(lastTry.taste)}`}>
+            {lang === 'ja' ? '試食' : '試吃'} {lastTry.name} {starText(lastTry.taste)}
+            <small> 美味 {Math.round(lastTry.taste)}</small>
+          </span>
+        ) : rating !== null && (
           <span className="fullness-rating" title={`${UI[lang].rating} ${Math.round(rating)}`}>
             {UI[lang].rating} {'★'.repeat(stars)}{'☆'.repeat(5 - stars)}
           </span>

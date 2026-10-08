@@ -3227,3 +3227,141 @@ button {
   opacity: 0.55;
   filter: grayscale(0.4);
 }
+
+/* ---- tasting notes ---- */
+.fullness-try {
+  animation: stamp 260ms ease-out;
+  white-space: nowrap;
+}
+
+.fullness-try small {
+  color: var(--text-soft);
+}
+
+.notebook-toggle {
+  position: absolute;
+  top: 248px;
+  left: 26px;
+  z-index: 4;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 10px;
+  background: var(--page);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.notebook-toggle svg {
+  width: 22px;
+  height: 22px;
+}
+
+.notebook-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: #e8742a;
+  color: #fff;
+  font: 700 10px/16px system-ui, sans-serif;
+}
+
+.notebook {
+  position: absolute;
+  top: 294px;
+  left: 22px;
+  z-index: 9;
+  width: min(340px, 86vw);
+  max-height: 52vh;
+  overflow: auto;
+  padding: 12px 14px 12px 22px;
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 25px, rgb(90 120 170 / 0.18) 25px 26px),
+    #f8f1e0;
+  box-shadow: 0 10px 28px -12px rgb(0 0 0 / 0.55), inset 12px 0 0 -10px #c4442f;
+  color: #3b2a20;
+  font: 14px/1.6 var(--brush);
+}
+
+.notebook header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  margin-bottom: 6px;
+}
+
+.notebook header b {
+  font-size: 17px;
+}
+
+.notebook header small {
+  grid-column: 1;
+  color: #7a6656;
+  font-size: 12px;
+}
+
+.notebook header button {
+  grid-row: 1;
+  grid-column: 2;
+  border: none;
+  background: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.notebook ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.notebook li {
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgb(59 42 32 / 0.25);
+}
+
+.notebook p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.nb-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.nb-stars {
+  color: #e8742a;
+}
+
+.nb-head small,
+.nb-last,
+.notebook-empty {
+  color: #7a6656;
+}
+
+@media (max-width: 900px) {
+  .notebook-toggle {
+    top: 196px;
+    left: 16px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .notebook {
+    top: 238px;
+    left: 12px;
+  }
+}
