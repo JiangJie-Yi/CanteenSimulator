@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Lang } from '../i18n'
 
 /** how one try at a food went: how good, how far cooked, what went on it */
@@ -51,7 +52,7 @@ export function Notebook({ notes, lang }: { notes: Notes; lang: Lang }) {
         </svg>
         {rows.length > 0 && <span className="notebook-count">{rows.length}</span>}
       </button>
-      {open && (
+      {open && createPortal(
         <section className="notebook" aria-label={lang === 'ja' ? '試食ノート' : '試吃筆記'}>
           <header>
             <b>{lang === 'ja' ? '試食ノート' : '試吃筆記'}</b>
@@ -83,7 +84,8 @@ export function Notebook({ notes, lang }: { notes: Notes; lang: Lang }) {
               })}
             </ul>
           )}
-        </section>
+        </section>,
+        document.body,
       )}
     </>
   )

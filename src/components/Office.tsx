@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { nameIn, type Lang } from '../i18n'
 import type { Dish } from '../menu'
 import { CANDIDATES, ROLES, type Worker } from '../staff'
@@ -39,7 +40,8 @@ export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
-  return (
+  // (put on the page itself, over the menu and everything else)
+  return createPortal(
     <section className="office" aria-label={ja ? '事務所' : '經營'}>
       <header>
         <div className="ofc-tabs" role="tablist">
@@ -100,6 +102,7 @@ export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire
           })}
         </div>
       )}
-    </section>
+    </section>,
+    document.body,
   )
 }

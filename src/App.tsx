@@ -1162,7 +1162,8 @@ export default function App() {
               <p className="guest-count">
                 {UI[lang].guests(guests.length, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
               </p>
-              <GuestCounter guests={guests} shop={DISHES[active].id} />
+              <GuestCounter guests={guests} shop={DISHES[active].id} staff={{ chef: staffOf(DISHES[active].id, 'chef').length,
+                cashier: staffOf(DISHES[active].id, 'cashier').length, server: staffOf(DISHES[active].id, 'server').length }} />
               <ul className="guest-list">
                 {guests.slice(-4).reverse().map((g) => {
                   return (

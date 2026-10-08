@@ -3618,3 +3618,167 @@ button {
   transform: rotate(8deg);
   z-index: 2;
 }
+
+/* ---- the shop interiors (drawn backdrops), with the staff ---- */
+.gc-scene {
+  height: 140px;
+  background: #3a2a1e;
+}
+
+.gc-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.gc-scene .gc-noren {
+  height: 54%;
+  z-index: 4;
+}
+
+.gc-stand {
+  position: absolute;
+  bottom: 37%;
+  width: 30px;
+  margin-left: -15px;
+  z-index: 1;
+}
+
+.gc-stand svg {
+  display: block;
+  width: 30px;
+  height: 45px;
+}
+
+.gc-stand-chef.gc-at-grilledfish { left: 53%; }
+.gc-stand-chef.gc-at-hotpot { left: 21%; bottom: 47%; }
+.gc-stand-chef.gc-at-beefnoodle { left: 27%; }
+.gc-stand-chef2 { left: 29%; bottom: 47%; }
+
+.gc-stand-cashier {
+  left: 94%;
+}
+
+.gc-till {
+  position: absolute;
+  bottom: -2px;
+  left: -14px;
+  width: 16px;
+  height: 10px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #5a5550, #3a3632);
+  box-shadow: inset 0 2px 0 #8a8580;
+}
+
+/* the chef at work: the grill fan flaps, the strainer bobs, the knife chops */
+.gc-staff.is-working .gc-tool {
+  animation: gc-tool 0.6s ease-in-out infinite;
+  transform-origin: 31px 46px;
+}
+
+@keyframes gc-tool {
+  50% { transform: rotate(-16deg); }
+}
+
+.gc-staff-noodle.is-working .gc-tool {
+  animation-duration: 1.4s;
+}
+
+/* floor staff walk to and fro in front of the counter with a tray */
+.gc-walker {
+  position: absolute;
+  bottom: 2%;
+  width: 28px;
+  margin-left: -14px;
+  z-index: 2;
+  animation: gc-patrol 9s ease-in-out infinite;
+}
+
+.gc-walker svg {
+  display: block;
+  width: 28px;
+  height: 42px;
+  animation: gc-step 0.42s ease-in-out infinite;
+}
+
+@keyframes gc-patrol {
+  0%, 100% { left: 24%; transform: scaleX(1); }
+  45% { left: 88%; transform: scaleX(1); }
+  50% { left: 88%; transform: scaleX(-1); }
+  95% { left: 24%; transform: scaleX(-1); }
+}
+
+/* steam and smoke rising, lanterns and the fan moving */
+.gc-backdrop .gc-steam path {
+  animation: gc-rise 3s ease-in-out infinite;
+}
+
+.gc-backdrop .gc-steam path:nth-child(2) {
+  animation-delay: -1.5s;
+}
+
+@keyframes gc-rise {
+  0% { opacity: 0; transform: translateY(6px); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
+.gc-backdrop .gc-sway {
+  animation: lantern-sway 4.5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: top center;
+}
+
+.gc-backdrop .gc-fan ellipse {
+  animation: gc-fan 0.5s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes gc-fan {
+  50% { transform: scaleX(0.2); }
+}
+
+.gc-scene .gc-ware {
+  top: calc(63% - 8px);
+}
+
+.gc-stars .mood-face {
+  width: 18px;
+  height: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gc-walker,
+  .gc-backdrop *,
+  .gc-staff * {
+    animation: none !important;
+  }
+}
+
+/* the office and the notebook float over everything, menu included */
+.office {
+  position: fixed;
+  z-index: 40;
+}
+
+.notebook {
+  position: fixed;
+  z-index: 40;
+}
+
+@media (max-width: 900px) {
+  .office {
+    top: 64px;
+    max-height: 56vh;
+  }
+
+  .ofc-list li {
+    grid-template-columns: 1fr auto auto auto;
+  }
+
+  .ofc-list .ofc-cost {
+    display: none;
+  }
+}
