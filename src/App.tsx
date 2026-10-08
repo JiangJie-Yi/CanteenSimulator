@@ -12,7 +12,8 @@ import { DishSwitcher } from './components/DishSwitcher'
 import { Fire } from './components/Fire'
 import { GasFlame } from './components/GasFlame'
 import { FireControl } from './components/FireControl'
-import { Fullness, MiniStomach } from './components/Fullness'
+import { Fullness } from './components/Fullness'
+import { MoodFace } from './components/MoodFace'
 import { GuestCounter } from './components/GuestCounter'
 import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
@@ -28,8 +29,6 @@ import { DISHES, type Dish as DishInfo } from './menu'
 const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
-/** what fills one customer up (a light meal at a grill counter) */
-const GUEST_FULL_KCAL = 700
 /** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
 const CHARCOAL_COST = 18
 const GAS_PER_HOUR = 30
@@ -641,8 +640,7 @@ export default function App() {
         <Brand night={theme === 'dark'} lang={lang} />
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
-        {/* (in the AI simulation the customers are the ones eating: each has a stomach of their own on the board) */}
-        {!ai && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} />}
+        <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} />
         <div className="side-boards">
           {ai && (
             <section className="guest-board" aria-label={UI[lang].guests(0, 0)}>
@@ -659,15 +657,14 @@ export default function App() {
               <p className="guest-count">
                 {UI[lang].guests(guests.length, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
               </p>
-              <GuestCounter guests={guests}
-                fullness={(g) => (g.ate.reduce((n, id) => n + (ALL_ITEMS.get(id)?.kcal ?? 0), 0) / GUEST_FULL_KCAL) * 100} />
+              <GuestCounter guests={guests} />
               <ul className="guest-list">
                 {guests.slice(-4).reverse().map((g) => {
                   const stars = g.rating === null ? 0 : Math.max(1, Math.round(g.rating / 20))
                   return (
                     <li key={g.id} className={`guest-row is-${g.state}`}>
                       <span className="guest-id">#{g.id}</span>
-                      <MiniStomach pct={(g.ate.reduce((n, id) => n + (ALL_ITEMS.get(id)?.kcal ?? 0), 0) / GUEST_FULL_KCAL) * 100} />
+                      <MoodFace guest={g} />
                       {g.state === 'angry' ? <span className="guest-note">{UI[lang].leftAngry}</span>
                         : g.rating === null ? <span className="guest-note">{UI[lang].waiting}</span>
                           : <span className="guest-stars">{'★'.repeat(stars)}{'☆'.repeat(5 - stars)}

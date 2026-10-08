@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { GuestView } from './Roasting'
-import { MiniStomach } from './Fullness'
+import { MoodFace } from './MoodFace'
 
 /*
  * The shop as the AI customers see it, drawn small above the guest list: a wooden counter with four stools and
@@ -62,7 +62,7 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
 
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave'; at: number }
 
-export function GuestCounter({ guests, fullness }: { guests: GuestView[]; fullness: (g: GuestView) => number }) {
+export function GuestCounter({ guests }: { guests: GuestView[] }) {
   const [shown, setShown] = useState<Shown[]>([])
   const [sway, setSway] = useState(0)
   const timers = useRef<number[]>([])
@@ -121,7 +121,7 @@ export function GuestCounter({ guests, fullness }: { guests: GuestView[]; fullne
                 fill="none" stroke="#d23a28" strokeWidth="2.4" strokeLinecap="round" /></svg>
             )}
             <span className="gc-tag">#{s.id}</span>
-            {g && s.phase === 'sit' && <span className="gc-belly"><MiniStomach pct={fullness(g)} /></span>}
+            {g && s.phase === 'sit' && g.rating !== null && <span className="gc-belly"><MoodFace guest={g} /></span>}
             <Person id={s.id} walking={s.phase !== 'sit'} eating={eating} />
           </div>
         )

@@ -2395,7 +2395,15 @@ button {
   left: -6px;
 }
 
-.gc-belly .mini-stomach {
+.gc-belly .mood-face {
   width: 16px;
   height: 16px;
+  animation: gc-dots 1.6s ease-in-out infinite;
+}
+
+.mood-face {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-self: center;
 }
