@@ -50,6 +50,8 @@ type Food = {
   homeQ: THREE.Quaternion
   mats: { mat: THREE.MeshToonMaterial; base: THREE.Color }[]
   phase: number
+  /** taken out by an AI customer (theirs to eat, not the player's) */
+  ai?: boolean
   drop: number                 // how far it has sunk from where it floats (to the floor of an empty pot)
   vy: number
   char: number                 // 0..1 burnt on a dry, hot pot
@@ -225,9 +227,13 @@ type Props = {
   /** bowls of rice ordered */
   rice: number
   lang: 'zh' | 'ja'
+  /** (shop open) what the customers are waiting for: they take it out of the pot once it's cooked, and eat it */
+  aiWanted?: string[]
+  aiPace?: number
+  onGuestEat?: (id: string, taste: number) => void
 }
 
-export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, heat, floorY, smoke, rice, lang }: Props) {
+export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, heat, floorY, smoke, rice, lang, aiWanted = [], aiPace = 0.8, onGuestEat }: Props) {
   const { scene } = useGLTF(url)
   const { camera, gl } = useThree()
   const group = useRef<THREE.Group>(null)
@@ -337,7 +343,8 @@ export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, 
         ? inBowl().filter((x) => x.flight >= 1).sort((a, b) => b.slot - a.slot)[0] ?? null : null)
       if (!f) return
       if (f.inBowl) {
-        if (f.flight < 1) return
+        // (a customer's piece is theirs)
+        if (f.flight < 1 || f.ai) return
         f.eat = 0.0001
         onEat?.(f.id, withDip(f))
       } else if (f.cook < 1) {
@@ -410,6 +417,7 @@ export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, 
   const raw = useMemo(() => new THREE.Color(), [])
   const done = useMemo(() => new THREE.Color(), [])
   const lastTip = useRef('')
+  const aiClock = useRef(0)
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.1)
     sync()
@@ -467,6 +475,7 @@ export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, 
         f.eat = 0
         f.cook = 0
         f.char = 0
+        f.ai = false
         f.node.userData.onPlate = false
         f.node.userData.shrink = 1
         f.node.position.copy(f.homeP)
@@ -528,6 +537,34 @@ export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, 
       const mul = raw.lerp(done, c)
       for (const { mat, base } of f.mats) mat.color.copy(base).multiply(mul).lerp(CHAR_COLOR, f.char * 0.85)
     }
+    // customers fish out what they ordered once it's cooked, one piece at a time, and eat it from the bowl
+    aiClock.current += dt
+    if (aiWanted.length && aiClock.current > aiPace * 1.8) {
+      aiClock.current = 0
+      const busy = [...foods.current.values()].some((f) => f.ai && f.eat === 0)
+      const pick = busy ? null : [...foods.current.values()].find((f) => !f.inBowl && f.eat === 0 && f.node.visible &&
+        f.node.scale.x > 0.01 && aiWanted.includes(f.id) && f.cook >= 1 && f.cook < 2.3 && f.char < 0.35)
+      if (pick && g) {
+        pick.inBowl = true
+        pick.ai = true
+        pick.flight = 0
+        pick.from.copy(pick.node.position)
+        const taken = new Set(inBowl().map((x) => x.slot))
+        let n = 0
+        while (taken.has(n)) n++
+        pick.slot = n
+        pick.node.userData.onPlate = true
+        const size = new THREE.Box3().setFromObject(pick.node).getSize(new THREE.Vector3())
+        pick.fit = Math.min(1, 0.26 / Math.max(size.x, size.z))
+      }
+    }
+    for (const f of foods.current.values()) {
+      if (f.ai && f.inBowl && f.flight >= 1 && f.eat === 0) {
+        f.eat = 0.0001
+        onGuestEat?.(f.id, taste(f))
+      }
+    }
+
     const h = hovered.current
     if (h) {
       const text = doneness(h)

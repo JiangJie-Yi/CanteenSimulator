@@ -2899,3 +2899,117 @@ button {
     right: 156px;
   }
 }
+/* ---- the three shop fronts ---- */
+/* hot pot: a red noren, a warm red-brown wall, a little pot on its burner in front of every stool */
+.gc-scene.shop-hotpot {
+  background: linear-gradient(180deg, #e9c9a8 0%, #dcb08a 62%, #9a5a3a 62%, #7e4528 100%);
+}
+
+.gc-scene.shop-hotpot .gc-wall {
+  background:
+    radial-gradient(ellipse 40% 70% at 62% 0%, rgb(255 190 120 / 0.6), transparent 70%),
+    repeating-linear-gradient(0deg, transparent 0 13px, rgb(140 60 30 / 0.16) 13px 14px);
+}
+
+.gc-scene.shop-hotpot .gc-noren span {
+  background: #b4302a;
+}
+
+/* noodles: a white noren with black writing, a pale tiled wall, a red paper lantern */
+.gc-scene.shop-beefnoodle {
+  background: linear-gradient(180deg, #eef0ea 0%, #dde3dc 62%, #8a7a5a 62%, #6e5f44 100%);
+}
+
+.gc-scene.shop-beefnoodle .gc-wall {
+  background:
+    radial-gradient(ellipse 40% 70% at 62% 0%, rgb(255 220 160 / 0.5), transparent 70%),
+    repeating-linear-gradient(90deg, transparent 0 11px, rgb(90 110 100 / 0.18) 11px 12px),
+    repeating-linear-gradient(0deg, transparent 0 11px, rgb(90 110 100 / 0.18) 11px 12px);
+}
+
+.gc-scene.shop-beefnoodle .gc-noren span {
+  background: #f6f3ea;
+  color: #22201c;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+}
+
+.gc-ware {
+  position: absolute;
+  top: calc(50% - 8px);
+  width: 16px;
+  height: 8px;
+  z-index: 1;
+}
+
+.gc-ware-hotpot {
+  border-radius: 2px 2px 8px 8px;
+  background: #c9c3ba;
+  box-shadow: inset 0 2px 0 #a8432f, 0 3px 0 -1px #444;
+}
+
+.gc-ware-beefnoodle {
+  border-radius: 0 0 8px 8px;
+  background: #f1ece0;
+  box-shadow: inset 0 2px 0 #3a5a8c, inset 0 -1px 0 rgb(0 0 0 / 0.15);
+}
+
+.gc-lantern {
+  position: absolute;
+  top: 4px;
+  right: 8%;
+  width: 18px;
+  height: 24px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 40%, #ff8a5a, #c4302a 70%);
+  color: #fff3dc;
+  font: 700 9px/1 var(--brush);
+  box-shadow: 0 0 10px 2px rgb(255 120 70 / 0.5);
+  animation: lantern-sway 4s ease-in-out infinite;
+  transform-origin: top center;
+  z-index: 1;
+}
+
+@keyframes lantern-sway {
+  50% { transform: rotate(4deg); }
+}
+
+/* the shop switch is a single round sign again: 營 / 閉 */
+.ai-toggle {
+  min-width: 0;
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+.ledger-toggle {
+  right: 176px;
+}
+
+@media (max-width: 900px) {
+  .ai-toggle {
+    width: 40px;
+    font-size: 16px;
+    right: 108px;
+  }
+
+  .ledger-toggle {
+    right: 156px;
+  }
+}
+
+@media (max-width: 400px) {
+  .ai-toggle {
+    width: 34px;
+    height: 34px;
+    right: 86px;
+    font-size: 14px;
+  }
+
+  .ledger-toggle {
+    right: 124px;
+  }
+}

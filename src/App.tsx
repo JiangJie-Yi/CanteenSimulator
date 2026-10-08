@@ -201,11 +201,14 @@ type SceneProps = {
   resetView: number
   onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
   lang: Lang
-  chef: Chef
-  onGuests: (g: GuestView[]) => void
+  chefOf: (dishId: string) => Chef
+  onGuests: (dishId: string, g: GuestView[]) => void
+  /** what the hot pot's AI customers are waiting for (they take it out of the pot themselves once it's cooked) */
+  potAi: string[]
+  onPotGuestEat: (id: string, taste: number) => void
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chef, onGuests,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, onGuests, potAi, onPotGuestEat,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -386,13 +389,14 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 <Roasting url={url} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
-                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chef} onGuests={onGuests} />
+                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} />
               )}
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
               {dish.heatControl && (
                 <PotCooking url={url} itemIds={ITEM_IDS[dish.id]} temp={brothTemp} active={i === active}
                   onEat={onEat} onNotice={onNotice} soup={soup} heat={heat} floorY={(dish.brothY ?? 0.81) - 0.27}
-                  smoke={potSmoke} rice={servings(dish, orders[dish.id]).Rice ?? 0} lang={lang} />
+                  smoke={potSmoke} rice={servings(dish, orders[dish.id]).Rice ?? 0} lang={lang}
+                  aiWanted={ai && i === active ? potAi : []} aiPace={chefOf(dish.id).pace} onGuestEat={onPotGuestEat} />
               )}
           </>
         )
@@ -490,9 +494,15 @@ export default function App() {
   // AI simulation: a chef and customers, and what they've said lately
   // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
-  const [chefId, setChefId] = useState(CHEFS[1].id)
-  const chef = CHEFS.find((c) => c.id === chefId) ?? CHEFS[1]
-  const [guests, setGuests] = useState<GuestView[]>([])
+  // three shops (the hot pot, the noodle bar, the grill): each its own chef and its own customers
+  const [chefBy, setChefBy] = useState<Record<string, string>>({})
+  const chefOf = (dishId: string) => CHEFS.find((c) => c.id === (chefBy[dishId] ?? CHEFS[1].id)) ?? CHEFS[1]
+  const chef = chefOf(DISHES[active].id)
+  const chefId = chef.id
+  const setChefId = (id: string) => setChefBy((b) => ({ ...b, [DISHES[active].id]: id }))
+  const [guestsBy, setGuestsBy] = useState<Record<string, GuestView[]>>({})
+  const guests = guestsBy[DISHES[active].id] ?? []
+  const setShopGuests = useCallback((dishId: string, g: GuestView[]) => setGuestsBy((b) => ({ ...b, [dishId]: g })), [])
   // revenue mode: what's been sold, and what it cost to make (ingredients, fuel, the chef's wages)
   const [ledgerOn, setLedgerOn] = useState(false)
   // customers' orders as they come in, for the menu to write them down
@@ -751,6 +761,166 @@ export default function App() {
     return true
   }
 
+  // ---- the hot pot shop and the noodle bar, while open (the grill runs its own, in Roasting) ----
+  // A customer comes in while there's a stool free, orders, and waits. At the hot pot the chef lights the stove
+  // and the customers fish their food out of the pot once it's cooked (PotCooking), each eating only what they
+  // ordered; at the noodle bar the chef cooks one bowl at a time, sets it down in front of its customer, who
+  // eats it and leaves. Kept waiting too long, a customer walks out.
+  type ShopGuest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state'];
+    base?: string }
+  const shop = useRef<Record<string, { guests: ShopGuest[]; seq: number; clock: number;
+    kitchen: { guest: number; t: number; phase: 'cook' | 'eat' } | null }>>({})
+  const shopOf = (id: string) => (shop.current[id] ??= { guests: [], seq: 0, clock: 0, kitchen: null })
+  const [potAi, setPotAi] = useState<string[]>([])
+  const report = (dishId: string) => {
+    const s = shopOf(dishId)
+    setShopGuests(dishId, s.guests.map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
+      rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null })))
+  }
+  const starsLine = (id: number, what: string, taste: number) => {
+    const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
+    const words = ['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]
+    talk('guest', `#${id} ${what}${words} ${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`)
+  }
+  const potGuestEat = (id: string, taste: number) => {
+    const s = shopOf('hotpot')
+    const g = s.guests.find((x) => (x.state === 'waiting' || x.state === 'eating') &&
+      x.orders.filter((o) => o === id).length > x.ate.filter((o) => o === id).length)
+    if (!g) return
+    g.ate.push(id)
+    g.eaten.push(taste)
+    g.state = g.ate.length >= g.orders.length ? 'done' : 'eating'
+    const item = ALL_ITEMS.get(id)
+    starsLine(g.id, item ? nameIn(lang, item) : id, taste)
+    report('hotpot')
+  }
+  const potEatRef = useRef(potGuestEat)
+  potEatRef.current = potGuestEat
+  const onPotGuestEat = useCallback((id: string, taste: number) => potEatRef.current(id, taste), [])
+  const simRef = useRef<() => void>(() => {})
+  simRef.current = () => {
+    if (!ai) return
+    const d = DISHES[active]
+    if (d.id !== 'hotpot' && d.id !== 'beefnoodle') return
+    const s = shopOf(d.id)
+    const cook = chefOf(d.id)
+    const now = performance.now() / 1000
+    const seated = s.guests.filter((g) => g.state === 'waiting' || g.state === 'eating')
+    s.clock += 0.8
+    // someone comes in
+    if (seated.length < 4 && s.clock > (d.id === 'beefnoodle' ? 14 : 8) + Math.random() * 6) {
+      s.clock = 0
+      const id = ++s.seq
+      const g: ShopGuest = { id, orders: [], ate: [], eaten: [], since: now, state: 'waiting' }
+      const note = (what: string) => {
+        const key = ++feedSeq.current
+        setFeed((f) => [...f.slice(-2), { key, id: what, guest: id }])
+        window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
+      }
+      if (d.id === 'hotpot') {
+        // the first one in picks the soup; everyone orders a few things to cook in it
+        if (!orderedBase(d, orders[d.id])) {
+          const b = d.bases[Math.floor(Math.random() * d.bases.length)]
+          if (changeQty(b.id, 1)) note(b.id)
+        }
+        const pool = d.items.filter((x) => x.id !== 'Rice')
+        const want = 1 + Math.floor(Math.random() * 3)
+        for (let k = 0; k < want; k++) {
+          const it = pool[Math.floor(Math.random() * pool.length)]
+          if (changeQty(it.id, 1)) {
+            g.orders.push(it.id)
+            note(it.id)
+          }
+        }
+      } else {
+        // a bowl of noodles each, paid for now and cooked in turn
+        const b = d.bases[Math.floor(Math.random() * d.bases.length)]
+        g.base = b.id
+        g.orders.push(b.id)
+        book('revenue', b.price)
+        book('food', costOf(b))
+        note(b.id)
+      }
+      if (g.orders.length) {
+        s.guests.push(g)
+        talk('guest', `#${id} 我要${g.orders.map((o) => {
+          const it = ALL_ITEMS.get(o) ?? d.bases.find((b) => b.id === o)
+          return it ? nameIn(lang, it) : o
+        }).join('、')}！`)
+      }
+      report(d.id)
+    }
+    // kept waiting too long with nothing to eat
+    for (const g of seated) {
+      if (g.eaten.length === 0 && now - g.since > 150 && !(s.kitchen && s.kitchen.guest === g.id)) {
+        g.state = 'angry'
+        talk('guest', `#${g.id} 等太久了，不吃了！`)
+        report(d.id)
+      }
+    }
+    if (d.id === 'hotpot') {
+      // the chef keeps the soup on the boil while anyone's eating, and turns the gas off when the shop's quiet
+      const busy = s.guests.some((g) => g.state === 'waiting' || g.state === 'eating')
+      if (busy && heatRef.current < 70) {
+        setHeat(80)
+        talk('chef', '開火，湯滾了就可以下料')
+      } else if (!busy && heatRef.current > 0) {
+        setHeat(0)
+      }
+      const owed: string[] = []
+      for (const g of s.guests) {
+        if (g.state !== 'waiting' && g.state !== 'eating') continue
+        const left = [...g.orders]
+        for (const a of g.ate) left.splice(left.indexOf(a), 1)
+        owed.push(...left)
+      }
+      setPotAi((p) => (p.join() === owed.join() ? p : owed))
+    } else {
+      // the noodle bar: one bowl at a time, cooked, served, eaten
+      const k = s.kitchen
+      if (!k) {
+        const next = s.guests.find((g) => g.state === 'waiting')
+        if (next) {
+          s.kitchen = { guest: next.id, t: 0, phase: 'cook' }
+          setOrders((all) => ({ ...all, [d.id]: {} }))
+          talk('chef', `#${next.id} 的麵下鍋了`)
+        }
+      } else {
+        k.t += 0.8
+        const g = s.guests.find((x) => x.id === k.guest)!
+        if (k.phase === 'cook' && k.t > 12 * cook.pace) {
+          // the bowl goes in front of its customer
+          k.phase = 'eat'
+          k.t = 0
+          setOrders((all) => ({ ...all, [d.id]: { [g.base!]: 1 } }))
+          g.state = 'eating'
+          talk('chef', `#${g.id} 的${nameIn(lang, d.bases.find((b) => b.id === g.base)!)}來了`)
+          report(d.id)
+        } else if (k.phase === 'eat' && k.t > 12) {
+          // a better chef makes a better bowl
+          const bonus = { rookie: -12, veteran: 4, master: 13 }[cook.id] ?? 0
+          const taste = Math.max(10, Math.min(98, 70 + bonus + (Math.random() - 0.5) * 16))
+          g.eaten.push(taste)
+          g.ate.push(g.base!)
+          g.state = 'done'
+          starsLine(g.id, nameIn(lang, d.bases.find((b) => b.id === g.base)!), taste)
+          s.kitchen = null
+          setOrders((all) => ({ ...all, [d.id]: {} }))
+          report(d.id)
+        }
+      }
+    }
+  }
+  useEffect(() => {
+    const id = window.setInterval(() => simRef.current(), 800)
+    return () => window.clearInterval(id)
+  }, [])
+  // the shop shutting: the hot pot's stove goes off
+  useEffect(() => {
+    if (!ai) setPotAi([])
+  }, [ai])
+
+
   return (
     <div className={`app${menuFolded ? ' menu-folded' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
@@ -803,7 +973,7 @@ export default function App() {
               }
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
-            lang={lang} chef={chef} onGuests={setGuests} />
+            lang={lang} chefOf={chefOf} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
         </Canvas>}
         </Crash>
       </div>
@@ -849,7 +1019,7 @@ export default function App() {
               <p className="guest-count">
                 {UI[lang].guests(guests.length, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
               </p>
-              <GuestCounter guests={guests} />
+              <GuestCounter guests={guests} shop={DISHES[active].id} />
               <ul className="guest-list">
                 {guests.slice(-4).reverse().map((g) => {
                   const stars = g.rating === null ? 0 : Math.max(1, Math.round(g.rating / 20))
@@ -929,7 +1099,7 @@ export default function App() {
         aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => setAi((v) => !v)}
         aria-pressed={ai} title={UI[lang].aiLabel}>
-        <span className="shop-lamp" aria-hidden="true" />{ai ? UI[lang].shopOpen : UI[lang].shopClosed}
+        {ai ? UI[lang].shopOpen : UI[lang].shopClosed}
       </button>
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}

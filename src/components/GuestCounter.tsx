@@ -62,7 +62,15 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
 
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave'; at: number }
 
-export function GuestCounter({ guests }: { guests: GuestView[] }) {
+/** each of the three shops has its own front: the noren's colour and words, the wall, and what's on the counter */
+const SHOPS: Record<string, { noren: [string, string]; name: string }> = {
+  grilledfish: { noren: ['炭', '火'], name: '炭火燒' },
+  hotpot: { noren: ['火', '鍋'], name: '小火鍋' },
+  beefnoodle: { noren: ['麵', '處'], name: '麵食' },
+}
+
+export function GuestCounter({ guests, shop = 'grilledfish' }: { guests: GuestView[]; shop?: string }) {
+  const look = SHOPS[shop] ?? SHOPS.grilledfish
   const [shown, setShown] = useState<Shown[]>([])
   const [sway, setSway] = useState(0)
   const timers = useRef<number[]>([])
@@ -97,14 +105,19 @@ export function GuestCounter({ guests }: { guests: GuestView[] }) {
   }, [guests])
 
   return (
-    <div className="gc-scene" aria-hidden="true">
+    <div className={`gc-scene shop-${shop}`} aria-hidden="true">
       <div className="gc-wall" />
       {/* the noren over the doorway: two indigo panels with the shop's crest, swaying when someone passes */}
       <div key={sway} className={`gc-noren${sway ? ' is-swaying' : ''}`}>
-        <span>甲</span>
-        <span>粗</span>
+        <span>{look.noren[0]}</span>
+        <span>{look.noren[1]}</span>
       </div>
       <div className="gc-counter" />
+      {/* what's set on the counter in front of each stool: a little pot on its burner, or a noodle bowl */}
+      {shop !== 'grilledfish' && SEATS.map((x, i) => (
+        <span key={i} className={`gc-ware gc-ware-${shop}`} style={{ left: `calc(${x}% - 8px)` }} />
+      ))}
+      {shop === 'beefnoodle' && <span className="gc-lantern">麵</span>}
       {shown.map((s) => {
         const g = guests.find((x) => x.id === s.id)
         const eating = g?.state === 'eating' && s.phase === 'sit'
