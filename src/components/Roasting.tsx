@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -149,72 +149,131 @@ const TRASH_LABEL = (() => {
   return t
 })()
 
-function TrashBin({ position, container }: { position: [number, number, number]; container: string }) {
+function TrashBin({ position, container, contents = 0 }: { position: [number, number, number]; container: string; contents?: number }) {
   const R = TRASH_R
-  const geometry = useMemo(() => {
-    // a straight-sided steel bin, a little wider at the top; the inside back down to a floor just above the ground
-    return new THREE.LatheGeometry([[0, 0.01], [R * 0.88, 0.01], [R * 0.9, 0.025], [R, TRASH_H], [R * 0.97, TRASH_H],
-      [R * 0.88, 0.03], [0, 0.03]].map(([x, y]) => new THREE.Vector2(x, y)), 56)
+  // the body: a galvanized steel bin whose wall is really corrugated (the ribs push in and out), slightly tapered,
+  // with a rolled rim and a beaded band near the foot; open-ended, so the inside shows
+  const body = useMemo(() => {
+    const g = new THREE.CylinderGeometry(R, R * 0.9, TRASH_H, 84, 8, true)
+    const p = g.attributes.position
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i)
+      const z = p.getZ(i)
+      const y = p.getY(i)
+      const a = Math.atan2(z, x)
+      // ribs, flattening out near the rim and the foot where the steel is rolled
+      const t = (y + TRASH_H / 2) / TRASH_H
+      const rib = 1 + 0.035 * Math.cos(a * 28) * Math.max(0, Math.sin(Math.min(1, t * 1.15) * Math.PI)) ** 0.6
+      p.setX(i, x * rib)
+      p.setZ(i, z * rib)
+    }
+    g.translate(0, TRASH_H / 2, 0)
+    g.computeVertexNormals()
+    return g
   }, [R])
-  const paper = useMemo(() => {
-    // crumpled paper: lumpy balls, every one squashed differently
-    let seed = 9
+  const floor = useMemo(() => new THREE.CircleGeometry(R * 0.9, 40), [R])
+  // the black bin liner, its top folded out over the rim and hanging down in soft folds
+  const liner = useMemo(() => {
+    const g = new THREE.CylinderGeometry(R * 1.05, R * 1.06, 0.07, 64, 2, true)
+    const p = g.attributes.position
+    for (let i = 0; i < p.count; i++) {
+      const a = Math.atan2(p.getZ(i), p.getX(i))
+      const k = 1 + 0.025 * Math.sin(a * 9) + 0.015 * Math.sin(a * 23)
+      p.setX(i, p.getX(i) * k)
+      p.setZ(i, p.getZ(i) * k)
+      if (p.getY(i) < 0) p.setY(i, p.getY(i) - 0.015 * (1 + Math.sin(a * 9)))
+    }
+    g.computeVertexNormals()
+    return g
+  }, [R])
+  // what's been thrown in: bare skewers, crumpled paper napkins, burnt scraps — heaped up as more goes in
+  const heap = useMemo(() => {
+    let seed = 21
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    return Array.from({ length: 5 }, (_, i) => {
-      const geo = new THREE.IcosahedronGeometry(0.055 + rnd() * 0.03, 1)
-      const p = geo.attributes.position
-      for (let k = 0; k < p.count; k++) {
-        const s = 0.75 + rnd() * 0.45
-        p.setXYZ(k, p.getX(k) * s, p.getY(k) * s * 0.85, p.getZ(k) * s)
+    return Array.from({ length: 24 }, (_, i) => {
+      const kind = i % 3 === 0 ? 'stick' : i % 3 === 1 ? 'paper' : 'scrap'
+      const a = rnd() * Math.PI * 2
+      const d = R * 0.62 * Math.sqrt(rnd())
+      const geo = kind === 'paper' ? new THREE.IcosahedronGeometry(0.045 + rnd() * 0.02, 1)
+        : kind === 'scrap' ? new THREE.DodecahedronGeometry(0.03 + rnd() * 0.015, 0) : null
+      if (geo) {
+        const pp = geo.attributes.position
+        for (let k = 0; k < pp.count; k++) pp.setXYZ(k, pp.getX(k) * (0.7 + rnd() * 0.5), pp.getY(k) * (0.6 + rnd() * 0.4), pp.getZ(k) * (0.7 + rnd() * 0.5))
+        geo.computeVertexNormals()
       }
-      geo.computeVertexNormals()
-      const a = (i / 5) * Math.PI * 2 + rnd()
-      const d = i === 0 ? 0 : R * (0.35 + rnd() * 0.3)
-      return { geo, at: [Math.cos(a) * d, TRASH_H - 0.07 + rnd() * 0.05, Math.sin(a) * d] as [number, number, number],
-        shade: ['#f4efe2', '#e9e1cc', '#f7f3ea', '#ddd3bb', '#efe8d6'][i] }
+      return { kind, geo, x: Math.cos(a) * d, z: Math.sin(a) * d, rot: [rnd() * 3, rnd() * 3, rnd() * 3] as [number, number, number],
+        tilt: (rnd() - 0.5) * 1.6, shade: ['#f4efe2', '#e6dcc4', '#efe8d6'][i % 3] }
     })
   }, [R])
-  // the label faces the camera
+  const shown = Math.min(contents, heap.length)
+  // the heap's height rises with what's in it (but never over the rim)
+  // (the first bits land on the liner sagging into the bin, high enough to be seen over the rim)
+  const level = (n: number) => Math.min(TRASH_H - 0.03, 0.17 + n * 0.008)
   const face = Math.atan2(LAY_DIR.x, LAY_DIR.z)
   return (
     <group position={position} userData={{ container }}>
-      <mesh geometry={geometry} castShadow receiveShadow>
+      <mesh geometry={body} castShadow receiveShadow>
         <meshToonMaterial color="#ffffff" map={TRASH_METAL} side={THREE.DoubleSide} />
       </mesh>
-      <mesh geometry={geometry} scale={[1.03, 1.02, 1.03]}>
+      <mesh geometry={body} scale={[1.035, 1.01, 1.035]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
-      {/* the rolled rim and a reinforcing band near the foot */}
-      <mesh position-y={TRASH_H} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 0.99, 0.012, 8, 56]} />
-        <meshToonMaterial color="#c9ced3" />
+      <mesh geometry={floor} rotation-x={-Math.PI / 2} position-y={0.02}>
+        <meshToonMaterial color="#2a2a2e" />
       </mesh>
-      <mesh position-y={0.04} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 0.9, 0.009, 6, 56]} />
+      {/* rolled rim, the bead near the foot, and a dented bottom ring */}
+      <mesh position-y={TRASH_H} rotation-x={Math.PI / 2}>
+        <torusGeometry args={[R * 1.02, 0.013, 8, 72]} />
+        <meshToonMaterial color="#d3d7db" />
+      </mesh>
+      <mesh position-y={0.05} rotation-x={Math.PI / 2}>
+        <torusGeometry args={[R * 0.915, 0.009, 6, 72]} />
         <meshToonMaterial color="#9aa0a6" />
       </mesh>
-      {/* two handles on the sides */}
+      <mesh position-y={0.012} rotation-x={Math.PI / 2}>
+        <torusGeometry args={[R * 0.9, 0.012, 6, 72]} />
+        <meshToonMaterial color="#7f858b" />
+      </mesh>
+      {/* the liner folded over the rim */}
+      <mesh geometry={liner} position-y={TRASH_H - 0.02}>
+        <meshToonMaterial color="#26272b" side={THREE.DoubleSide} />
+      </mesh>
+      {/* two riveted side handles */}
       {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[STACK_DIR.x * sd * (R + 0.012), TRASH_H * 0.78, STACK_DIR.z * sd * (R + 0.012)]}
-          rotation-y={face}>
-          <torusGeometry args={[0.045, 0.008, 6, 16, Math.PI]} />
-          <meshToonMaterial color="#8d939a" />
-        </mesh>
+        <group key={sd} position={[STACK_DIR.x * sd * (R + 0.02), TRASH_H * 0.8, STACK_DIR.z * sd * (R + 0.02)]} rotation-y={face}>
+          <mesh>
+            <torusGeometry args={[0.05, 0.009, 6, 18, Math.PI]} />
+            <meshToonMaterial color="#8d939a" />
+          </mesh>
+          {[-1, 1].map((r) => (
+            <mesh key={r} position={[r * 0.05, 0, 0]}>
+              <sphereGeometry args={[0.012, 8, 6]} />
+              <meshToonMaterial color="#b0b5ba" />
+            </mesh>
+          ))}
+        </group>
       ))}
-      <mesh position={[LAY_DIR.x * (R * 0.96 + 0.004), TRASH_H * 0.5, LAY_DIR.z * (R * 0.96 + 0.004)]} rotation-y={face}>
+      <mesh position={[LAY_DIR.x * (R * 0.99 + 0.006), TRASH_H * 0.48, LAY_DIR.z * (R * 0.99 + 0.006)]} rotation-y={face}>
         <planeGeometry args={[0.16, 0.1]} />
         <meshToonMaterial map={TRASH_LABEL} />
       </mesh>
-      {/* what's been thrown in: crumpled paper, and an old skewer sticking out */}
-      {paper.map((p, i) => (
-        <mesh key={i} geometry={p.geo} position={p.at} rotation={[i, i * 1.7, i * 0.4]}>
-          <meshToonMaterial color={p.shade} />
-        </mesh>
-      ))}
-      <mesh position={[R * 0.25, TRASH_H + 0.02, -R * 0.2]} rotation={[0.5, 0, 0.35]}>
-        <cylinderGeometry args={[0.005, 0.004, 0.32, 5]} />
-        <meshToonMaterial color="#c9a46a" />
-      </mesh>
+      {/* empty at first; each thing thrown in lands on the heap */}
+      {heap.slice(0, shown).map((h, i) => {
+        const y = level(i + 1) - 0.02
+        if (h.kind === 'stick') {
+          return (
+            <mesh key={i} position={[h.x, y + 0.08, h.z]} rotation={[h.tilt, h.rot[1], h.tilt * 0.6]}>
+              <cylinderGeometry args={[0.005, 0.004, 0.32, 5]} />
+              <meshToonMaterial color="#c9a46a" />
+            </mesh>
+          )
+        }
+        return (
+          <mesh key={i} geometry={h.geo!} position={[h.x, y, h.z]} rotation={h.rot}>
+            <meshToonMaterial color={h.kind === 'paper' ? h.shade : '#2a1d14'} />
+          </mesh>
+        )
+      })}
     </group>
   )
 }
@@ -1147,6 +1206,10 @@ type RoastingProps = {
   onAddCharcoal?: () => void
   /** something the chef or a customer says */
   onSay?: (who: 'chef' | 'guest', text: string) => void
+  /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
+  space?: 'closed' | 'open'
+  /** the shop is open: the chef works the grill, the player only watches */
+  locked?: boolean
   /** who's at the grill in the AI simulation */
   chef?: Chef
   /** every AI customer so far: what they ordered, what they've eaten, how they rated it */
@@ -1163,7 +1226,8 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  * up the extra portions Dish clones in as they appear.
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
-  onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests }: RoastingProps) {
+  onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
+  locked = false }: RoastingProps) {
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -1502,6 +1566,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.fromP.copy(p.node.position)
     p.fromQ.copy(p.node.quaternion)
     p.node.userData.onPlate = true
+    // it lights up as it goes on, so you see it took
+    flashUntil.current.set(p.key, performance.now() + 900)
     return true
   }
 
@@ -1571,6 +1637,121 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const shift = useRef<{ key: string; start: THREE.Vector3; from: THREE.Vector3 } | null>(null)
   /** soup bowls: sips left, and how full it looks (eased toward what's left) */
   const sips = useRef(new Map<string, { left: number; level: number }>())
+  // how many things have gone in the bin (it starts empty), and the fire glowing as raw food is carried over it
+  const trashedRef = useRef(0)
+  const flashUntil = useRef(new Map<string, number>())
+  const [trashed, setTrashed] = useState(0)
+  const [fireHint, setFireHint] = useState(0)
+  const lockedRef = useRef(locked)
+  lockedRef.current = locked
+
+  // ---- two tables: the player's tasting (shop closed) and the shop's own (open). Switching puts one table's
+  // food away exactly as it was and brings the other's back, each piece where it was and as cooked as it was.
+  type Snap = { pieces: Map<string, Record<string, unknown>>; counts: [number, number, number];
+    moved: Map<string, THREE.Vector3>; sips: Map<string, { left: number; level: number }>; trashed: number }
+  const snaps = useRef(new Map<string, Snap>())
+  const lastSpace = useRef(space)
+  const SCALARS = ['progress', 'collected', 'flight', 'stickOnly', 'netSpot', 'container', 'staged', 'stagedAt', 'wasPresent',
+    'homeFlight', 'unwrapped', 'unwrapT', 'chefSeasoned', 'trash', 'landed', 'slot', 'eat', 'eaten'] as const
+  const VECS = ['fromP', 'fromQ', 'toP', 'toQ', 'local', 'trashFrom'] as const
+  const save = (): Snap => {
+    const out = new Map<string, Record<string, unknown>>()
+    for (const p of pieces.current) {
+      const r: Record<string, unknown> = {}
+      for (const k of SCALARS) r[k] = p[k]
+      for (const k of VECS) r[k] = p[k].clone()
+      r.body = p.body ? { v: p.body.v.clone(), r: p.body.r, live: p.body.live } : null
+      r.dabs = { ...p.dabs }
+      r.looks = Object.fromEntries(Object.entries(p.looks).map(([k, u]) => [k, u.value]))
+      r.bites = { n: p.bites.uBiteCount.value, v: p.bites.uBites.value.map((b) => b.clone()) }
+      r.pos = p.node.position.clone()
+      r.quat = p.node.quaternion.clone()
+      r.ud = { onPlate: p.node.userData.onPlate, shrink: p.node.userData.shrink, byGuest: p.node.userData.byGuest }
+      r.food = p.food.map((m) => m.visible)
+      r.puffs = p.puffs.map((m) => [...(m.morphTargetInfluences ?? [])])
+      out.set(p.key, r)
+    }
+    return { pieces: out, counts: [plateCount, dishCount, basketCount], moved: new Map([...moved.current].map(([k, v]) => [k, v.clone()])),
+      sips: new Map([...sips.current].map(([k, v]) => [k, { ...v }])), trashed: trashedRef.current }
+  }
+  const fresh = (p: Piece) => {
+    p.wasPresent = false
+    p.staged = false
+    p.homeFlight = 1
+    p.unwrapped = false
+    p.unwrapT = 0
+    p.chefSeasoned = false
+    for (const k of Object.keys(p.dabs) as Seasoning[]) p.dabs[k] = 0
+    p.progress = 0
+    p.netSpot = null
+    p.container = null
+    p.carried = false
+    p.trash = -1
+    p.body = null
+    for (const u of Object.values(p.looks)) u.value = 0
+    p.stickOnly = false
+    for (const m of p.food) m.visible = true
+    p.bites.uBiteCount.value = 0
+    p.landed = -1
+    p.collected = false
+    p.flight = 0
+    p.slot = null
+    p.eat = 0
+    p.eaten = false
+    p.node.userData.onPlate = false
+    p.node.userData.shrink = 1
+    p.node.userData.byGuest = false
+    p.node.quaternion.copy(p.homeQ)
+    p.node.position.copy(p.homeP)
+  }
+  const load = (snap: Snap | undefined) => {
+    for (const p of pieces.current) {
+      const r = snap?.pieces.get(p.key)
+      if (!r) {
+        fresh(p)
+      } else {
+        const w = p as unknown as Record<string, unknown>
+        for (const k of SCALARS) w[k] = r[k]
+        for (const k of VECS) (p[k] as THREE.Vector3 & THREE.Quaternion).copy(r[k] as THREE.Vector3 & THREE.Quaternion)
+        const b = r.body as { v: THREE.Vector3; r: number; live: boolean } | null
+        p.body = b ? { v: b.v.clone(), r: b.r, live: b.live } : null
+        Object.assign(p.dabs, r.dabs)
+        for (const [k, v] of Object.entries(r.looks as Record<string, number>)) (p.looks as Record<string, { value: number }>)[k].value = v
+        const bites = r.bites as { n: number; v: THREE.Vector4[] }
+        p.bites.uBiteCount.value = bites.n
+        bites.v.forEach((v, i) => p.bites.uBites.value[i].copy(v))
+        p.node.position.copy(r.pos as THREE.Vector3)
+        p.node.quaternion.copy(r.quat as THREE.Quaternion)
+        Object.assign(p.node.userData, r.ud)
+        ;(r.food as boolean[]).forEach((v, i) => { if (p.food[i]) p.food[i].visible = v })
+        ;(r.puffs as number[][]).forEach((v, i) => { const m = p.puffs[i]?.morphTargetInfluences; if (m) v.forEach((x, j) => (m[j] = x)) })
+        p.carried = false
+      }
+      // a bitten piece shows its inside
+      for (const { mat, foil } of p.mats) {
+        const side = !foil && p.bites.uBiteCount.value ? THREE.DoubleSide : THREE.FrontSide
+        if (mat.side !== side) {
+          mat.side = side
+          mat.needsUpdate = true
+        }
+      }
+    }
+    setPlateCount(snap?.counts[0] ?? 1)
+    setDishCount(snap?.counts[1] ?? 1)
+    setBasketCount(snap?.counts[2] ?? 1)
+    moved.current = new Map(snap?.moved ?? [])
+    sips.current = new Map(snap?.sips ?? [])
+    trashedRef.current = snap?.trashed ?? 0
+    setTrashed(trashedRef.current)
+    setMoveTick((t) => t + 1)
+  }
+  useLayoutEffect(() => {
+    if (lastSpace.current === space) return
+    snaps.current.set(lastSpace.current, save())
+    load(snaps.current.get(space))
+    lastSpace.current = space
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [space])
   const scrap = useRef<{ p: Piece; x: number; y: number; started: boolean } | null>(null)
   const stageSeq = useRef(0)
   const aiClock = useRef(0)
@@ -1927,7 +2108,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const onDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY }
-      if (e.button !== 0) return
+      if (e.button !== 0 || lockedRef.current) return
       aim(e)
       const tool = pickTool()
       if (!tool) {
@@ -2080,11 +2261,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const plane = new THREE.Plane(UP, -root.localToWorld(new THREE.Vector3(0, 0.55, 0)).y)
       const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
       if (hit) q.p.node.position.copy(root.worldToLocal(hit))
+      // raw food being carried: the fire lights up to say it can go there, brighter right over it
+      if (q.p.staged) setFireHint(Math.hypot(q.p.node.position.x, q.p.node.position.z) < RING_CLEAR ? 2 : 1)
     }
     const dropScrap = () => {
       const q = scrap.current
       window.removeEventListener('pointermove', haul)
       scrap.current = null
+      setFireHint(0)
       if (controls) controls.enabled = true
       if (!q?.started) return
       document.body.classList.remove('is-carrying')
@@ -2113,6 +2297,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
     }
     const onUp = (e: PointerEvent) => {
+      if (lockedRef.current) return
       if (drag.current || shift.current || scrap.current?.started) return
       if (e.button !== 0 || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
       aim(e)
@@ -2411,6 +2596,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (k >= 1) {
           p.trash = -1
           p.eaten = true
+          // it's in the bin now: one more thing lying in it
+          trashedRef.current += 1
+          setTrashed(trashedRef.current)
           p.slot = null
           p.collected = true
           p.stickOnly = false
@@ -2490,7 +2678,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       if (r < 1) tint.copy(RAW_TINT).lerp(DONE_TINT, r)
       else tint.copy(DONE_TINT).lerp(BURNT_TINT, charred * 0.6)
-      const glow = hovered.current === p
+      const glow = hovered.current === p || (flashUntil.current.get(p.key) ?? 0) > performance.now()
       // potatoes: wrapped and whole in the ash. Picked up, the foil is unwrapped on the way over — the sheet opens
       // out, swells and falls away — and the potato lands in the basket bare, broken open to show the flesh
       // potatoes in the basket keep their foil until clicked; then it opens out, swells and falls away
@@ -2645,7 +2833,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       ))}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
-      {roast.trash && <TrashBin container="trash" position={containerAt('trash').toArray() as [number, number, number]} />}
+      {roast.trash && <TrashBin container="trash" contents={trashed}
+        position={containerAt('trash').toArray() as [number, number, number]} />}
+      {fireHint > 0 && (
+        // where carried food can be set down: the fire bed glows
+        <mesh rotation-x={-Math.PI / 2} position-y={0.07}>
+          <ringGeometry args={[0.18, RING_CLEAR - 0.18, 64]} />
+          <meshBasicMaterial color="#ff8a1e" transparent opacity={fireHint === 2 ? 0.5 : 0.22} depthWrite={false} />
+        </mesh>
+      )}
       {/* salt is taken with the fingers: a pinching hand follows the pinch while it's carried */}
       {saltInHand && (
         <group ref={hand}>

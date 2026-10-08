@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -231,9 +231,12 @@ type Props = {
   aiWanted?: string[]
   aiPace?: number
   onGuestEat?: (id: string, taste: number) => void
+  /** which table: the player's (closed) or the shop's (open), each with its own pot; open, the player only watches */
+  space?: 'closed' | 'open'
+  locked?: boolean
 }
 
-export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, heat, floorY, smoke, rice, lang, aiWanted = [], aiPace = 0.8, onGuestEat }: Props) {
+export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, heat, floorY, smoke, rice, lang, aiWanted = [], aiPace = 0.8, onGuestEat, space = 'closed', locked = false }: Props) {
   const { scene } = useGLTF(url)
   const { camera, gl } = useThree()
   const group = useRef<THREE.Group>(null)
@@ -275,6 +278,51 @@ export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, 
     })
   }
 
+  const lockedRef = useRef(locked)
+  lockedRef.current = locked
+  // switching table: put this one's pot (each piece's cooking, what's in the bowl, the scorch, the dip, the rice)
+  // away as it is and bring the other one's back
+  type PotSnap = { foods: Map<string, Partial<Food> & { pos: THREE.Vector3; quat: THREE.Quaternion; onPlate: unknown; shrink: unknown }>;
+    scorch: number; dry: number; dip: string[]; rice: number[] }
+  const potSnaps = useRef(new Map<string, PotSnap>())
+  const lastSpace = useRef(space)
+  useLayoutEffect(() => {
+    if (lastSpace.current === space) return
+    const foodsSnap = new Map<string, Partial<Food> & { pos: THREE.Vector3; quat: THREE.Quaternion; onPlate: unknown; shrink: unknown }>()
+    for (const [k, f] of foods.current) {
+      foodsSnap.set(k, { cook: f.cook, inBowl: f.inBowl, flight: f.flight, from: f.from.clone(), slot: f.slot, eat: f.eat, fit: f.fit,
+        drop: f.drop, vy: f.vy, char: f.char, ai: f.ai, pos: f.node.position.clone(), quat: f.node.quaternion.clone(),
+        onPlate: f.node.userData.onPlate, shrink: f.node.userData.shrink })
+    }
+    potSnaps.current.set(lastSpace.current, { foods: foodsSnap, scorch: scorch.current, dry: dry.current, dip: dipRef.current,
+      rice: riceRef.current })
+    const next = potSnaps.current.get(space)
+    for (const [k, f] of foods.current) {
+      const r = next?.foods.get(k)
+      if (r) {
+        Object.assign(f, { cook: r.cook, inBowl: r.inBowl, flight: r.flight, slot: r.slot, eat: r.eat, fit: r.fit, drop: r.drop, vy: r.vy,
+          char: r.char, ai: r.ai })
+        f.from.copy(r.from!)
+        f.node.position.copy(r.pos)
+        f.node.quaternion.copy(r.quat)
+        f.node.userData.onPlate = r.onPlate
+        f.node.userData.shrink = r.shrink
+      } else {
+        Object.assign(f, { cook: 0, inBowl: false, flight: 0, slot: 0, eat: 0, fit: 1, drop: 0, vy: 0, char: 0, ai: false })
+        f.node.position.copy(f.homeP)
+        f.node.quaternion.copy(f.homeQ)
+        f.node.userData.onPlate = false
+        f.node.userData.shrink = 1
+      }
+    }
+    scorch.current = next?.scorch ?? 0
+    dry.current = next?.dry ?? 0
+    setDip(next?.dip ?? [])
+    setRiceLeft(next?.rice ?? [])
+    lastSpace.current = space
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [space])
+
   const inBowl = () => [...foods.current.values()].filter((f) => f.inBowl && f.eat === 0)
   /** how good it is dipped in what's in your bowl: each sauce that suits it adds, three or more muddle it */
   const withDip = (f: Food) => {
@@ -312,6 +360,7 @@ export function PotCooking({ url, itemIds, temp, active, onEat, onNotice, soup, 
     let down: { x: number; y: number } | null = null
     const onDown = (e: PointerEvent) => { if (e.button === 0) down = { x: e.clientX, y: e.clientY } }
     const onUp = (e: PointerEvent) => {
+      if (lockedRef.current) return
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return
       down = null
       aim(e)

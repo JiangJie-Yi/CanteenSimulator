@@ -3220,3 +3220,10 @@ button {
     display: none;
   }
 }
+/* the shop is open: the stove and the fire are the chef's, not the player's */
+.app.is-open-shop .heat input,
+.app.is-open-shop .heat button {
+  pointer-events: none;
+  opacity: 0.55;
+  filter: grayscale(0.4);
+}

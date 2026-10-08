@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
@@ -235,6 +235,15 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
   const potDish = DISHES.find((d) => d.heatControl)
   const hasSoup = !!potDish && !!orderedBase(potDish, orders[potDish.id])
   const brothTemp = useRef(ROOM_TEMP)
+  // (each table's pot has its own temperature)
+  const tempBy = useRef<Record<string, number>>({})
+  const tempSpace = useRef(ai)
+  useLayoutEffect(() => {
+    if (tempSpace.current === ai) return
+    tempBy.current[String(tempSpace.current)] = brothTemp.current
+    brothTemp.current = tempBy.current[String(ai)] ?? ROOM_TEMP
+    tempSpace.current = ai
+  }, [ai])
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
   const grillSmoke = useRef(0)
   const grillBlackSmoke = useRef(0)
@@ -391,14 +400,16 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 <Roasting url={url} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
-                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} />
+                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)}
+                  space={ai ? 'open' : 'closed'} locked={ai} />
               )}
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
               {dish.heatControl && (
                 <PotCooking url={url} itemIds={ITEM_IDS[dish.id]} temp={brothTemp} active={i === active}
                   onEat={onEat} onNotice={onNotice} soup={soup} heat={heat} floorY={(dish.brothY ?? 0.81) - 0.27}
                   smoke={potSmoke} rice={servings(dish, orders[dish.id]).Rice ?? 0} lang={lang}
-                  aiWanted={ai && i === active ? potAi : []} aiPace={chefOf(dish.id).pace} onGuestEat={onPotGuestEat} />
+                  aiWanted={ai && i === active ? potAi : []} aiPace={chefOf(dish.id).pace} onGuestEat={onPotGuestEat}
+                  space={ai ? 'open' : 'closed'} locked={ai} />
               )}
           </>
         )
@@ -477,9 +488,12 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
 export default function App() {
   const [active, setActive] = useState(0)
   // portions ordered per item (and per base: soup, bowl, set meal), per dish. Nothing to start with
-  const [orders, setOrders] = useState<Record<string, Record<string, number>>>(() =>
-    Object.fromEntries(DISHES.map((d) => [d.id, {}])),
-  )
+  // two tables: what the player has out to try (shop closed) and what the shop has out for its customers (open);
+  // switching keeps each as it was
+  const [ordersBy, setOrdersBy] = useState<Record<'closed' | 'open', Record<string, Record<string, number>>>>(() => ({
+    closed: Object.fromEntries(DISHES.map((d) => [d.id, {}])),
+    open: Object.fromEntries(DISHES.map((d) => [d.id, {}])),
+  }))
   // how full you are: every bite eaten adds its calories, and they slowly digest away
   const [kcal, setKcal] = useState(0)
   useEffect(() => {
@@ -496,6 +510,10 @@ export default function App() {
   // AI simulation: a chef and customers, and what they've said lately
   // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
+  const space: 'closed' | 'open' = ai ? 'open' : 'closed'
+  const orders = ordersBy[space]
+  const setOrders = (fn: (all: Record<string, Record<string, number>>) => Record<string, Record<string, number>>) =>
+    setOrdersBy((b) => ({ ...b, [space]: fn(b[space]) }))
   // three shops (the hot pot, the noodle bar, the grill): each its own chef and its own customers
   const [chefBy, setChefBy] = useState<Record<string, string>>({})
   const chefOf = (dishId: string) => CHEFS.find((c) => c.id === (chefBy[dishId] ?? CHEFS[1].id)) ?? CHEFS[1]
@@ -534,7 +552,9 @@ export default function App() {
   const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
   // the stove starts switched off: the cook turns it up
-  const [heat, setHeat] = useState(0)
+  const [heatBy, setHeatBy] = useState({ closed: 0, open: 0 })
+  const heat = heatBy[space]
+  const setHeat = (h: number) => setHeatBy((b) => ({ ...b, [space]: h }))
   const [lang, setLang] = useState<Lang>(() => {
     try {
       return localStorage.getItem('canteen-lang') === 'ja' ? 'ja' : 'zh'
@@ -576,6 +596,16 @@ export default function App() {
   // hour and a half; a handful of fresh charcoal, 添炭, about a quarter of an hour more)
   const fire = useRef(0.6)
   const [fireLevel, setFireLevel] = useState(60)
+  // each table has its own fire: the player's test fire and the shop's
+  const fireBy = useRef<Record<string, number>>({})
+  const lastSpace = useRef(space)
+  useLayoutEffect(() => {
+    if (lastSpace.current === space) return
+    fireBy.current[lastSpace.current] = fire.current
+    fire.current = fireBy.current[space] ?? 0.6
+    setFireLevel(Math.round(fire.current * 1000) / 10)
+    lastSpace.current = space
+  }, [space])
   useEffect(() => {
     const id = window.setInterval(() => {
       fire.current = Math.max(0, fire.current - FIRE_BURN_PER_TICK)
@@ -929,7 +959,7 @@ export default function App() {
 
 
   return (
-    <div className={`app${menuFolded ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}`} ref={appRef}>
+    <div className={`app${menuFolded ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -986,8 +1016,8 @@ export default function App() {
       </div>
       <div className="stage" ref={stageRef}>
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} />
-        {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
-        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
+        {dish.heatControl && <HeatControl heat={heat} onChange={ai ? () => {} : setHeat} lang={lang} />}
+        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={ai ? () => {} : addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} />
         <div className={`side-boards${boardsOpen ? ' is-open' : ''}`}>
           {/* on a phone the boards fold into one line at the top: tap it to open them */}
