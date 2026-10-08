@@ -148,15 +148,29 @@ TEX["mackerel"] = image("T_Mackerel", mackerel)
 # its lips either side (the groove itself is shaped in fish())
 du = np.abs(u - 0.5)
 open_along = smooth(0.36, 0.42, v) * smooth(0.74, 0.68, v)
-inside = smooth(0.026, 0.014, du) * open_along
-lips = smooth(0.06, 0.03, du) * open_along * (1 - inside)
+inside = smooth(0.07, 0.045, du) * open_along                 # the opened cavity, wide between the flaps
+lips = smooth(0.1, 0.07, du) * open_along * (1 - inside)
 for key in ("fish", "saury", "mackerel"):
     img = TEX[key]
     px = np.array(img.pixels[:], np.float32).reshape(N, N, 4)[..., :3]
     px = mix(px, (0.96, 0.82, 0.72), lips * 0.9)
-    TEX[key] = image(img.name + "_Open", mix(px, (0.42, 0.1, 0.07), inside))
+    cavity = mix((0.55, 0.2, 0.14), (0.85, 0.62, 0.52), smooth(0.4, 0.9, du / 0.07))
+    cavity = mix(cavity, (0.3, 0.07, 0.05), smooth(0.012, 0.004, du))                    # the blood line by the spine
+    cavity = mix(cavity, (0.9, 0.82, 0.74), smooth(0.85, 0.97, 0.5 + 0.5 * np.cos(2 * np.pi * v * 40)) * 0.6)  # ribs
+    TEX[key] = image(img.name + "_Open", mix(px, cavity, inside))
 TEX["fish_n"] = image("T_Fish_N", to_normal(scales * 0.35 + scorch * 0.5 + blister * 0.3 - inside * 1.2, 1.5),
                       data=True)
+
+# the inside of the belly flaps, turned out: pale cooked flesh with the fine rib bones showing through as thin
+# darker bars across it, a silvery lining strip at the hinge, and the cut edge browned by the coals
+fu, fv = grid01(N)
+ribs = smooth(0.82, 0.97, 0.5 + 0.5 * np.cos(2 * np.pi * (fu * 16 + fv * 0.6))) * smooth(0.05, 0.25, fv) * smooth(0.95, 0.7, fv)
+flesh = mix((0.97, 0.86, 0.76), (0.93, 0.74, 0.64), fbm(N, 5, 5) * 0.8)
+flesh = mix(flesh, (0.78, 0.56, 0.48), ribs * 0.75)
+flesh = mix(flesh, (0.82, 0.8, 0.78), smooth(0.12, 0.0, fv) * 0.7)          # the lining by the hinge
+flesh = mix(flesh, (0.55, 0.32, 0.16), smooth(0.8, 1.0, fv) * (0.6 + 0.4 * fbm(N, 9, 3)))   # browned edge
+flesh = mix(flesh, (0.6, 0.18, 0.12), (vnoise(N, 40, 40) > 0.94).astype(np.float32) * 0.5)  # blood spots
+TEX["fish_flesh"] = image("T_FishFlesh", flesh)
 
 # coarse salt rubbed over every fish (塩焼き): white grains speckled all over the skin
 salt_grains = (vnoise(N, 150, 75) > 0.8).astype(np.float32) * smooth(0.0, 0.3, fbm(N, 6, 6) + 0.2)
@@ -268,6 +282,7 @@ M = {
     "mackerel": pbr("Mackerel", tex=TEX["mackerel"], nrm=TEX["fish_n"], rough=0.35, coat=0.4),
     "mackerel_fin": pbr("MackerelFin", (0.36, 0.42, 0.4), rough=0.5),
     "eye": pbr("FishEye", (0.95, 0.95, 0.9), rough=0.2),
+    "fish_flesh": pbr("FishFlesh", tex=TEX["fish_flesh"], rough=0.55),
     "pupil": pbr("FishPupil", (0.05, 0.05, 0.06), rough=0.2),
     "corn": pbr("GrilledCorn", tex=TEX["corn"], nrm=TEX["corn_n"], rough=0.4),
     "shiitake": pbr("GrilledShiitake", tex=TEX["shiitake"], rough=0.55),
@@ -674,7 +689,7 @@ def fish(species="ayu"):
         x, y, z = vtx.co
         open_along = smooth(-0.32, -0.22, np.float32(x)) * smooth(0.5, 0.4, np.float32(x)) * (z < -0.4)
         if open_along > 0:
-            vtx.co.z += 0.38 * math.exp(-(y / 0.22) ** 2) * open_along
+            vtx.co.z += 0.55 * math.exp(-(y / 0.3) ** 2) * open_along      # the emptied cavity, deep
             vtx.co.y *= 1 + 0.3 * math.exp(-((abs(y) - 0.32) / 0.14) ** 2) * open_along
     for vtx in bm.verts:
         x = vtx.co.x
@@ -719,6 +734,48 @@ def fish(species="ayu"):
         bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.56, segments=10, ring_count=6,
                                              location=(ex + 0.004, ey + side * er * 0.55, D * 0.26 + ez))
         parts.append(finish(active(), "Pupil", M["pupil"]))
+
+    # the belly walls either side of the cut, turned out like the covers of a book: each hinged along its lip of
+    # the cut, folded outward and curling back as it goes, so the cooked flesh and rib bones inside face out
+    x0, x1 = -0.27, 0.45                                   # (the same stretch as the cut, in the sphere's -1..1)
+    nu, nv = 28, 7
+    for sd in (-1, 1):
+        bm = bmesh.new()
+        uvl = bm.loops.layers.uv.new()
+        grid = []
+        for i in range(nu + 1):
+            xn = x0 + (x1 - x0) * i / nu
+            X = xn * L
+            taper = 1 + min(0, X) * 0.82
+            head = 1 - max(0, X - 0.55) * sp["snout"]
+            rho = math.sqrt(max(0.0, 1 - xn * xn))
+            # the lip of the cut, a little up into the belly's curve
+            hinge = Vector((X, sd * 0.4 * rho * W * taper * head + bend(X), -0.9 * rho * D * taper * head + wave(X)))
+            span = math.sin(math.pi * i / nu) ** 0.7        # widest in the middle, closing to nothing at each end
+            width = 0.62 * D * taper * head * rho * span
+            p = hinge.copy()
+            col = [bm.verts.new(p)]
+            for j in range(nv):
+                a = (j + 0.5) / nv
+                th = math.radians(92 + 42 * a + 6 * math.sin(i * 0.9))   # folded right out, curling back at the edge
+                p = p + Vector((0, sd * math.sin(th), -math.cos(th))) * (width / nv)
+                col.append(bm.verts.new(p))
+            grid.append(col)
+        for i in range(nu):
+            for j in range(nv):
+                fc = bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
+                for l, (uu, vv) in zip(fc.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
+                    l[uvl].uv = (uu / nu, vv / nv)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
+        me = bpy.data.meshes.new("BellyFlap")
+        bm.to_mesh(me)
+        bm.free()
+        flap = bpy.data.objects.new("BellyFlap", me)
+        bpy.context.collection.objects.link(flap)
+        sm = flap.modifiers.new("Solidify", "SOLIDIFY")
+        sm.thickness = 0.0045
+        sm.offset = 0
+        parts.append(finish(flap, "BellyFlap", M["fish_flesh"]))
     return parts
 
 
