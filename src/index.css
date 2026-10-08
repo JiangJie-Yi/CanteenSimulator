@@ -3365,3 +3365,256 @@ button {
     left: 12px;
   }
 }
+
+/* ---- the back office: cash, buying stock, hiring ---- */
+.office-toggle {
+  position: absolute;
+  top: 248px;
+  left: 72px;
+  z-index: 4;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 0 8px;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 10px;
+  background: var(--page);
+  color: var(--text);
+  font: 600 13px/1 var(--brush);
+  cursor: pointer;
+}
+
+.office-toggle span {
+  font-size: 18px;
+}
+
+.office {
+  position: absolute;
+  z-index: 20;
+  top: 96px;
+  left: 50%;
+  width: min(560px, 94vw);
+  max-height: min(70vh, 640px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: #fbf3e4;
+  color: #3b2a20;
+  box-shadow: 0 16px 40px -14px rgb(0 0 0 / 0.6);
+  font: 14px/1.4 var(--brush);
+  overflow: hidden;
+}
+
+.office header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgb(59 42 32 / 0.15);
+  background: #f1e3c8;
+}
+
+.ofc-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.ofc-tabs button {
+  padding: 4px 14px;
+  border: 1px solid rgb(59 42 32 / 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ofc-tabs button[aria-selected='true'] {
+  background: #3b2a20;
+  color: #fbf3e4;
+}
+
+.ofc-cash {
+  margin-left: auto;
+  font-weight: 700;
+  color: #2f7a2d;
+}
+
+.ofc-cash.is-low {
+  color: #c4442f;
+}
+
+.ofc-close {
+  border: none;
+  background: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.ofc-list {
+  margin: 0;
+  padding: 6px 12px 12px;
+  list-style: none;
+  overflow: auto;
+}
+
+.ofc-list li {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px dashed rgb(59 42 32 / 0.15);
+}
+
+.ofc-stock {
+  font-variant-numeric: tabular-nums;
+  color: #5a7a3a;
+}
+
+.ofc-list li.is-low .ofc-stock {
+  color: #c07a1a;
+}
+
+.ofc-list li.is-out .ofc-stock {
+  color: #c4442f;
+  font-weight: 700;
+}
+
+.ofc-cost {
+  color: #7a6656;
+  font-size: 12px;
+}
+
+.ofc-list button,
+.ofc-person button,
+.chef-pick button {
+  padding: 2px 10px;
+  border: 1px solid rgb(59 42 32 / 0.3);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ofc-list button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ofc-staff {
+  padding: 6px 12px 12px;
+  overflow: auto;
+}
+
+.ofc-role h4 {
+  margin: 10px 0 4px;
+  font-size: 15px;
+}
+
+.ofc-role h4 small {
+  color: #7a6656;
+}
+
+.ofc-person {
+  display: grid;
+  grid-template-columns: 5.5em 1fr 1fr 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px dashed rgb(59 42 32 / 0.12);
+}
+
+.ofc-person.is-hired {
+  grid-template-columns: 5.5em 1fr 1fr auto auto;
+  background: rgb(232 116 42 / 0.08);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.ofc-note {
+  grid-column: 2 / -1;
+  color: #7a6656;
+  font-size: 12px;
+}
+
+.ofc-wage {
+  font-variant-numeric: tabular-nums;
+  color: #7a6656;
+  font-size: 12px;
+}
+
+.ofc-bar {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: rgb(59 42 32 / 0.1);
+  overflow: hidden;
+}
+
+.ofc-bar b {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #e8a04a, #e8742a);
+}
+
+.ofc-bar i {
+  position: relative;
+  z-index: 1;
+  padding-left: 5px;
+  font: 600 10px/14px system-ui, sans-serif;
+  font-style: normal;
+  color: #3b2a20;
+}
+
+.chef-pick b {
+  font-weight: 600;
+}
+
+.ledger-cash {
+  font-weight: 700;
+  color: #2f7a2d;
+}
+
+@media (max-width: 900px) {
+  .office-toggle {
+    top: 196px;
+    left: 58px;
+    height: 34px;
+  }
+
+  .office {
+    top: 70px;
+  }
+
+  .ofc-person,
+  .ofc-person.is-hired {
+    grid-template-columns: 4.5em 1fr 1fr auto;
+  }
+
+  .ofc-person .ofc-bar:nth-of-type(3) {
+    display: none;
+  }
+}
+
+/* out of stock: the tag greys and gets a 缺 slip */
+.strip.is-out {
+  filter: grayscale(0.7) brightness(0.92);
+}
+
+.out-tag {
+  position: absolute;
+  top: 6px;
+  right: -4px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #5a5550;
+  color: #fff;
+  font: 700 11px/1.2 var(--brush);
+  transform: rotate(8deg);
+  z-index: 2;
+}

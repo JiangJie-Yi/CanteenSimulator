@@ -14,10 +14,13 @@ export type Chef = {
   seasonChance: number
   /** NT$ an hour */
   wagePerHour: number
+  /** (from the hired staff) how well they work now, 0..1, and how many cooks there are */
+  skill?: number
+  cooks?: number
 }
 
 export const CHEFS: Chef[] = [
-  { id: 'rookie', zh: '阿明・學徒', ja: 'アキラ・見習い', pace: 1.6, pullAt: 1.2, seasonChance: 0.45, wagePerHour: 183 },
+  { id: 'rookie', zh: '阿明・學徒', ja: 'アキラ・見習い', pace: 1.6, pullAt: 1.2, seasonChance: 0.45, wagePerHour: 183, skill: 0.5 },
   { id: 'veteran', zh: '老陳・師傅', ja: '陳さん・板前', pace: 0.8, pullAt: 1.05, seasonChance: 1, wagePerHour: 260 },
   { id: 'master', zh: '山田・大將', ja: '山田・大将', pace: 0.45, pullAt: 1.0, seasonChance: 1, wagePerHour: 420 },
 ]

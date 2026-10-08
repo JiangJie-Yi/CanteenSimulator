@@ -16,6 +16,8 @@ type MenuProps = {
   feed?: { key: number; id: string; guest: number }[]
   /** shop open: the customers order, not you (the tags only show what's been ordered) */
   locked?: boolean
+  /** portions in stock (a tag with none left is marked 缺) */
+  stock?: Record<string, number>
 }
 
 /**
@@ -40,7 +42,7 @@ function tagFit(name: string, en: string | undefined, price: string, stamp: bool
  * Izakaya-style wall menu: vertical wooden tags, a red stamp marks what's been ordered.
  * Click a tag to add a portion, right-click (or press - / Delete on it) to take one away.
  */
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false }: MenuProps) {
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
   const count = [...dish.bases, ...dish.items].reduce((n, x) => n + (quantities[x.id] ?? 0), 0)
@@ -155,9 +157,11 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     const price = toChineseNumber(x.price)
     const hasSet = base && !!(x as { includes?: object }).includes
     const filling = feed.filter((f) => f.id === x.id)
+    const parts = (x as { includes?: Record<string, number> }).includes ?? { [x.id]: 1 }
+    const out = !!stock && Object.entries(parts).some(([k, q]) => (stock[k] ?? 0) < q)
     return (
       <button key={x.id} type="button" aria-pressed={n > 0} data-id={x.id}
-        className={`strip${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}${filling.length ? ' is-filling' : ''}`}
+        className={`strip${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}${filling.length ? ' is-filling' : ''}${out ? ' is-out' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${x.price}${n ? `，${t.ordered(n)}` : ''}`}
         style={tagFit(name, x.en, price, n > 0)}
         onClick={() => {
@@ -184,6 +188,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         {x.en && <span className="strip-en" lang="en">{x.en}</span>}
         <span className="strip-price">{price}</span>
         {incl && <span className="stamp stamp-incl" aria-hidden="true">{t.included}</span>}
+        {out && <span className="out-tag" aria-hidden="true">{lang === 'ja' ? '切' : '缺'}</span>}
         {filling.map((f) => <span key={f.key} className="fill-guest" aria-hidden="true">#{f.guest}</span>)}
         {n > 0 && (
           <span key={n} className="stamp" aria-hidden="true">

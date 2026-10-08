@@ -1210,6 +1210,8 @@ type RoastingProps = {
   onSay?: (who: 'chef' | 'guest', text: string) => void
   /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
   space?: 'closed' | 'open'
+  /** how slowly customers come in (no cashier: fewer) */
+  crowd?: number
   /** the shop is open: the chef works the grill, the player only watches */
   locked?: boolean
   /** who's at the grill in the AI simulation */
@@ -1229,7 +1231,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {} }: RoastingProps) {
+  locked = false, notes = {}, crowd = 1 }: RoastingProps) {
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -1860,7 +1862,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const now = performance.now() / 1000
     guestClock.current += 0.8
     const seated = guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating')
-    if (onOrder && seated.length < MAX_SEATED && guestClock.current > 7 + Math.random() * 6) {
+    if (onOrder && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd) {
       guestClock.current = 0
       const want = 1 + Math.floor(Math.random() * 3)
       const orders: string[] = []

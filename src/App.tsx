@@ -22,6 +22,8 @@ import { Crash } from './components/Crash'
 import { PotCooking } from './components/PotCooking'
 import type { GuestView } from './components/Roasting'
 import { CHEFS, type Chef } from './chefs'
+import { CANDIDATES, effective, restPerMin, tirePerMin, type Role } from './staff'
+import { Office } from './components/Office'
 import { liteUrl, QUALITY, stepDown, webglReport } from './quality'
 import { isMuted, onMuteChange, setMuted } from './bgm'
 import { moodOf } from './components/MoodFace'
@@ -34,6 +36,8 @@ import { DISHES, type Dish as DishInfo } from './menu'
 const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
+/** the money the business starts with */
+const CAPITAL = 300000
 
 /**
  * The renderer, asking for less each time if the browser won't give a WebGL context: first the usual, then
@@ -206,13 +210,14 @@ type SceneProps = {
   onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
   lang: Lang
   chefOf: (dishId: string) => Chef
+  crowdOf: (dishId: string) => number
   onGuests: (dishId: string, g: GuestView[]) => void
   /** what the hot pot's AI customers are waiting for (they take it out of the pot themselves once it's cooked) */
   potAi: string[]
   onPotGuestEat: (id: string, taste: number) => void
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, onGuests, potAi, onPotGuestEat, notes,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, crowdOf, onGuests, potAi, onPotGuestEat, notes,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -402,7 +407,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 <Roasting url={url} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
-                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)}
+                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)}
                   space={ai ? 'open' : 'closed'} locked={ai}
                   notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))} />
               )}
@@ -526,11 +531,21 @@ export default function App() {
   const setOrders = (fn: (all: Record<string, Record<string, number>>) => Record<string, Record<string, number>>) =>
     setOrdersBy((b) => ({ ...b, [space]: fn(b[space]) }))
   // three shops (the hot pot, the noodle bar, the grill): each its own chef and its own customers
-  const [chefBy, setChefBy] = useState<Record<string, string>>({})
-  const chefOf = (dishId: string) => CHEFS.find((c) => c.id === (chefBy[dishId] ?? CHEFS[1].id)) ?? CHEFS[1]
+  // the staff hired at each shop (by worker id) and how tired each is
+  const [hired, setHired] = useState<Record<string, Record<string, { fatigue: number }>>>({})
+  const staffOf = (dishId: string, role?: Role) =>
+    (CANDIDATES[dishId] ?? []).filter((w) => hired[dishId]?.[w.id] && (!role || w.role === role))
+  /** the shop's chef as the cooking needs him: the best-working of the hired chefs (or a stand-in if none) */
+  const chefOf = (dishId: string): Chef => {
+    const cooks = staffOf(dishId, 'chef')
+    if (!cooks.length) return CHEFS[0]
+    const best = cooks.map((w) => ({ w, e: effective(w, hired[dishId][w.id].fatigue) })).sort((a, b) => b.e - a.e)[0]
+    const sp = best.w.speed / 100
+    return { id: best.w.id, zh: best.w.zh, ja: best.w.ja, pace: Math.max(0.35, 1.7 - best.e * 0.7 - sp * 0.6),
+      pullAt: 1.25 - best.e * 0.25, seasonChance: Math.min(1, 0.25 + best.e * 0.8),
+      wagePerHour: staffOf(dishId).reduce((n, w) => n + w.wage, 0), skill: best.e, cooks: cooks.length }
+  }
   const chef = chefOf(DISHES[active].id)
-  const chefId = chef.id
-  const setChefId = (id: string) => setChefBy((b) => ({ ...b, [DISHES[active].id]: id }))
   const [guestsBy, setGuestsBy] = useState<Record<string, GuestView[]>>({})
   const guests = guestsBy[DISHES[active].id] ?? []
   const setShopGuests = useCallback((dishId: string, g: GuestView[]) => setGuestsBy((b) => ({ ...b, [dishId]: g })), [])
@@ -545,7 +560,12 @@ export default function App() {
   const [toolsOpen, setToolsOpen] = useState(false)
   const [musicOn, setMusicOn] = useState(() => !isMuted())
   useEffect(() => onMuteChange((m) => setMusicOn(!m)), [])
-  const [ledger, setLedger] = useState({ revenue: 0, food: 0, fuel: 0, wage: 0 })
+  const [ledger, setLedger] = useState({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0 })
+  // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
+  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage
+  // ingredients in stock, by portion; nothing until it's bought
+  const [stock, setStock] = useState<Record<string, number>>({})
+  const [office, setOffice] = useState<null | 'stock' | 'staff'>(null)
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
   const chatId = useRef(0)
@@ -667,8 +687,28 @@ export default function App() {
   // running costs: the gas while the burner's on, the chef's wages while the AI chef is working
   const heatRef = useRef(heat)
   heatRef.current = heat
-  const aiRef = useRef({ ai, wage: chef.wagePerHour })
-  aiRef.current = { ai, wage: chef.wagePerHour }
+  const aiRef = useRef({ ai, wage: chef.wagePerHour, shop: DISHES[active].id })
+  aiRef.current = { ai, wage: chef.wagePerHour, shop: DISHES[active].id }
+  const stockRef = useRef(stock)
+  stockRef.current = stock
+  // tiredness: the open shop's staff tire as they work (the less stamina, the faster), everyone else rests
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setHired((h) => {
+        const next: typeof h = {}
+        for (const [shop, ws] of Object.entries(h)) {
+          next[shop] = {}
+          for (const [wid, st] of Object.entries(ws)) {
+            const w = CANDIDATES[shop].find((x) => x.id === wid)!
+            const working = aiRef.current.ai && aiRef.current.shop === shop
+            next[shop][wid] = { fatigue: Math.max(0, Math.min(100, st.fatigue + (working ? tirePerMin(w) : -restPerMin) / 60)) }
+          }
+        }
+        return next
+      })
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [])
   useEffect(() => {
     const id = window.setInterval(() => {
       if (heatRef.current > 0) book('fuel', (GAS_PER_HOUR * heatRef.current) / 100 / 3600)
@@ -759,17 +799,43 @@ export default function App() {
     const isBase = dish.bases.some((b) => b.id === id)
     // what it sells for and what its ingredients cost (a set is priced as a whole)
     const priced = isBase ? dish.bases.find((b) => b.id === id)! : dish.items.find((i) => i.id === id)
+    // (only paying customers bring money in; tasting with the shop closed only costs the ingredients)
     const sell = (n: number) => {
       if (!priced || !n) return
-      book('revenue', priced.price * n)
+      if (ai) book('revenue', priced.price * n)
       book('food', costOf(priced) * n)
+    }
+    // what it uses up from stock: a set takes its parts, anything else one portion of itself
+    const uses = (x: string): [string, number][] => {
+      const b = dish.bases.find((bb) => bb.id === x)
+      return b?.includes ? Object.entries(b.includes) : [[x, 1]]
+    }
+    const take = (x: string, n: number) => {
+      const need = uses(x)
+      if (n > 0) {
+        const short = need.find(([k, q]) => (stock[k] ?? 0) < q * n)
+        if (short) {
+          const it = ALL_ITEMS.get(short[0]) ?? dish.bases.find((bb) => bb.id === short[0])
+          if (!ai) say(UI[lang].outOfStock(it ? nameIn(lang, it) : short[0]))
+          return false
+        }
+      }
+      setStock((st) => {
+        const next = { ...st }
+        for (const [k, q] of need) next[k] = (next[k] ?? 0) - q * n
+        return next
+      })
+      return true
     }
     if (isBase && dish.oneBase) {
       const had = dish.bases.find((b) => (orders[dish.id][b.id] ?? 0) > 0)
+      if (delta > 0 && had?.id !== id && !take(id, 1)) return false
       if (had && had.id !== id && delta > 0) {
-        book('revenue', -had.price)
+        if (ai) book('revenue', -had.price)
         book('food', -costOf(had))
+        take(had.id, -1)
       }
+      if (delta < 0 && had?.id === id) take(id, -1)
       if (delta > 0 ? had?.id !== id : had?.id === id) sell(delta > 0 ? 1 : -1)
       setOrders((all) => {
         const next = { ...all[dish.id] }
@@ -801,6 +867,7 @@ export default function App() {
       return false
     }
     if (delta < 0 && !(orders[dish.id][id] ?? 0)) return false
+    if (!take(id, delta)) return false
     sell(delta)
     setOrders((all) => {
       const qty = Math.min(max, Math.max(0, (all[dish.id][id] ?? 0) + delta))
@@ -831,7 +898,9 @@ export default function App() {
     // (the stars are kept, but customers show how they liked it in their faces and words, not a score)
     talk('guest', `#${id} ${what}${words}`)
   }
-  const potGuestEat = (id: string, taste: number) => {
+  const potGuestEat = (id: string, raw: number) => {
+    // the back kitchen's prep and the floor staff's service count for something at the hot pot
+    const taste = Math.max(5, Math.min(99, raw + ((chefOf('hotpot').skill ?? 0.6) - 0.7) * 20 + (staffOf('hotpot', 'server').length ? 2 : -8)))
     const s = shopOf('hotpot')
     const g = s.guests.find((x) => (x.state === 'waiting' || x.state === 'eating') &&
       x.orders.filter((o) => o === id).length > x.ate.filter((o) => o === id).length)
@@ -857,7 +926,10 @@ export default function App() {
     const seated = s.guests.filter((g) => g.state === 'waiting' || g.state === 'eating')
     s.clock += 0.8
     // someone comes in
-    if (seated.length < 4 && s.clock > (d.id === 'beefnoodle' ? 14 : 8) + Math.random() * 6) {
+    // no cashier: nobody greets or takes the money, and fewer come in; floor staff bring them in faster
+    const servers = staffOf(d.id, 'server').length
+    const crowd = (staffOf(d.id, 'cashier').length ? 1 : 1.8) / (1 + servers * 0.15)
+    if (seated.length < 4 && s.clock > ((d.id === 'beefnoodle' ? 14 : 8) + Math.random() * 6) * crowd) {
       s.clock = 0
       const id = ++s.seq
       const g: ShopGuest = { id, orders: [], ate: [], eaten: [], since: now, state: 'waiting' }
@@ -883,12 +955,16 @@ export default function App() {
         }
       } else {
         // a bowl of noodles each, paid for now and cooked in turn
-        const b = d.bases[Math.floor(Math.random() * d.bases.length)]
-        g.base = b.id
-        g.orders.push(b.id)
-        book('revenue', b.price)
-        book('food', costOf(b))
-        note(b.id)
+        const inStock = d.bases.filter((bb) => (stockRef.current[bb.id] ?? 0) > 0)
+        const b = inStock[Math.floor(Math.random() * inStock.length)]
+        if (b) {
+          g.base = b.id
+          g.orders.push(b.id)
+          book('revenue', b.price)
+          book('food', costOf(b))
+          setStock((st) => ({ ...st, [b.id]: (st[b.id] ?? 0) - 1 }))
+          note(b.id)
+        }
       }
       if (g.orders.length) {
         s.guests.push(g)
@@ -901,7 +977,7 @@ export default function App() {
     }
     // kept waiting too long with nothing to eat
     for (const g of seated) {
-      if (g.eaten.length === 0 && now - g.since > 150 && !(s.kitchen && s.kitchen.guest === g.id)) {
+      if (g.eaten.length === 0 && now - g.since > 150 * (0.8 + servers * 0.2) && !(s.kitchen && s.kitchen.guest === g.id)) {
         g.state = 'angry'
         talk('guest', `#${g.id} 等太久了，不吃了！`)
         report(d.id)
@@ -937,7 +1013,7 @@ export default function App() {
       } else {
         k.t += 0.8
         const g = s.guests.find((x) => x.id === k.guest)!
-        if (k.phase === 'cook' && k.t > 12 * cook.pace) {
+        if (k.phase === 'cook' && k.t > (12 * cook.pace) / Math.max(1, cook.cooks ?? 1) ** 0.6) {
           // the bowl goes in front of its customer
           k.phase = 'eat'
           k.t = 0
@@ -946,8 +1022,8 @@ export default function App() {
           talk('chef', `#${g.id} 的${nameIn(lang, d.bases.find((b) => b.id === g.base)!)}來了`)
           report(d.id)
         } else if (k.phase === 'eat' && k.t > 12) {
-          // a better chef makes a better bowl
-          const bonus = { rookie: -12, veteran: 4, master: 13 }[cook.id] ?? 0
+          // a better (and less tired) cook makes a better bowl; a server bringing it hot helps too
+          const bonus = ((cook.skill ?? 0.6) - 0.7) * 45 + (staffOf(d.id, 'server').length ? 3 : -3)
           const taste = Math.max(10, Math.min(98, 70 + bonus + (Math.random() - 0.5) * 16))
           g.eaten.push(taste)
           g.ate.push(g.base!)
@@ -1022,7 +1098,7 @@ export default function App() {
               }
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
-            lang={lang} notes={notes} chefOf={chefOf} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
+            lang={lang} notes={notes} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
         </Canvas>}
         </Crash>
       </div>
@@ -1032,6 +1108,28 @@ export default function App() {
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={ai ? () => {} : addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
         <Notebook notes={notes} lang={lang} />
+        <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'stock'))} aria-expanded={!!office}
+          title={lang === 'ja' ? '事務所（仕入れ・人事）' : '經營（採買・人事）'}>
+          <span aria-hidden="true">🏪</span><b>NT${Math.round(cash).toLocaleString()}</b>
+        </button>
+        {office && (
+          <Office dish={dish} lang={lang} cash={cash} stock={stock} tab={office} onTab={setOffice} onClose={() => setOffice(null)}
+            unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
+            onBuy={(id, n) => {
+              const it = ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id)
+              const cost = costOf(it ?? { price: 0 }) * n
+              if (cost > cash) return
+              book('bought', cost)
+              setStock((st) => ({ ...st, [id]: (st[id] ?? 0) + n }))
+            }}
+            hired={hired[dish.id] ?? {}}
+            onHire={(w) => setHired((h) => ({ ...h, [dish.id]: { ...(h[dish.id] ?? {}), [w.id]: { fatigue: 0 } } }))}
+            onFire={(w) => setHired((h) => {
+              const mine = { ...(h[dish.id] ?? {}) }
+              delete mine[w.id]
+              return { ...h, [dish.id]: mine }
+            })} />
+        )}
         <div className={`side-boards${boardsOpen ? ' is-open' : ''}`}>
           {/* on a phone the boards fold into one line at the top: tap it to open them */}
           {(ai || ledgerOn) && (
@@ -1056,15 +1154,10 @@ export default function App() {
           )}
           {ai && (
             <section className="guest-board" aria-label={UI[lang].guests(0, 0)}>
-              <div className="chef-pick" role="radiogroup" aria-label={UI[lang].chefPick}>
+              <div className="chef-pick">
                 <span>{UI[lang].chefPick}</span>
-                {CHEFS.map((c) => (
-                  <button key={c.id} type="button" role="radio" aria-checked={c.id === chefId}
-                    className={c.id === chefId ? 'is-on' : ''} onClick={() => setChefId(c.id)}
-                    title={`${c[lang]} NT$${c.wagePerHour}/h`}>
-                    {c[lang].split('・')[0]}
-                  </button>
-                ))}
+                <b>{staffOf(DISHES[active].id, 'chef').map((w) => (lang === 'ja' ? w.ja : w.zh)).join('、') || '—'}</b>
+                <button type="button" onClick={() => setOffice('staff')}>{lang === 'ja' ? '人事' : '人事'}</button>
               </div>
               <p className="guest-count">
                 {UI[lang].guests(guests.length, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
@@ -1087,6 +1180,8 @@ export default function App() {
           )}
           {ledgerOn && (
             <section className="ledger" aria-label={UI[lang].ledgerLabel}>
+              <p className="ledger-cash"><span>{lang === 'ja' ? '現金' : '現金'}</span><b>NT${Math.round(cash).toLocaleString()}</b></p>
+              <p><span>{lang === 'ja' ? '仕入れ' : '採買支出'}</span><b>−{Math.round(ledger.bought).toLocaleString()}</b></p>
               {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
                 .map(([k, v]) => (
                   <p key={k}><span>{UI[lang][k]}</span><b>{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : 1)}</b></p>
@@ -1127,15 +1222,21 @@ export default function App() {
         )}
       </div>
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]} feed={feed} locked={ai}
+      <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]} feed={feed} locked={ai} stock={stock}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {
           // cancelling everything refunds it (nothing was made)
           for (const x of [...dish.bases, ...dish.items]) {
             const n = orders[dish.id][x.id] ?? 0
             if (!n) continue
-            book('revenue', -x.price * n)
+            if (ai) book('revenue', -x.price * n)
             book('food', -costOf(x) * n)
+            const parts = (x as { includes?: Record<string, number> }).includes ?? { [x.id]: 1 }
+            setStock((st) => {
+              const next = { ...st }
+              for (const [k, q] of Object.entries(parts)) next[k] = (next[k] ?? 0) + q * n
+              return next
+            })
           }
           setOrders((all) => ({ ...all, [dish.id]: {} }))
         }} />
@@ -1151,7 +1252,14 @@ export default function App() {
       </button>
       <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
         aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
-      <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => setAi((v) => !v)}
+      <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => {
+        if (!ai && !staffOf(DISHES[active].id, 'chef').length) {
+          say(UI[lang].needChef)
+          setOffice('staff')
+          return
+        }
+        setAi((v) => !v)
+      }}
         aria-pressed={ai} title={UI[lang].aiLabel}>
         {ai ? UI[lang].shopOpen : UI[lang].shopClosed}
       </button>
