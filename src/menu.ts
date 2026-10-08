@@ -124,6 +124,8 @@ export type Roast = {
   net?: string[]
   /** where the net holds them (x, z in the dish): one per spot, the rest wait until a spot frees up */
   netSpots?: [number, number][]
+  /** skewers that turn on their stick to face the camera (flat food, seen side-on otherwise) */
+  faceCamera?: string[]
 }
 
 export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut' | 'water'
@@ -258,6 +260,7 @@ export const DISHES: Dish[] = [
       loose: ['Potato', 'SweetPotato', 'NetMochi', 'Onigiri'],
       // toasted on the grill net, which holds three at a time between them (the rest wait their turn)
       net: ['NetMochi', 'Onigiri'],
+      faceCamera: ['ShrimpSkewer'],
       // the net's three spots (x, z); the model's mochi sits on the first, its onigiri on the second
       netSpots: [[-0.11, 0.0], [0.1, 0.07], [0.06, -0.11]],
       // just outside the stones, to the upper right of the fire as the camera sees it

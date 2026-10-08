@@ -50,7 +50,10 @@ body,
   margin: 0;
   width: 100%;
   height: 100%;
+  /* clip, not hidden: a hidden box can still be scrolled (a drag held past the edge auto-scrolls it, shifting
+     the whole page out of place); a clipped one never scrolls */
   overflow: hidden;
+  overflow: clip;
   background: var(--page);
   transition: background-color 300ms ease;
 }

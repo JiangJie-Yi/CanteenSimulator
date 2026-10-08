@@ -9,6 +9,8 @@ const OUTLINE_WIDTH = 0.007
 // too small, thin or flat to look good with an ink line
 const NO_OUTLINE = new Set(['Broth', 'FirePit', 'DriedChili', 'SichuanPepper', 'Scallion', 'Charcoal', 'PickledGreens',
   'Noodles', 'ExtraNoodles', 'GrillNet'])
+/** parts too fine for an ink line (a shrimp's legs and feelers would come out as heavy black wire) */
+const NO_OUTLINE_MATERIALS = new Set(['ShrimpLeg'])
 // flat ground pieces: they catch shadows but shouldn't throw any
 const NO_CAST = new Set(['Broth', 'FirePit'])
 
@@ -328,7 +330,8 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
       // multi-material objects load as a group of meshes; use the group's name for the type
       const owner = mesh.parent && mesh.parent !== scene && !mesh.name ? mesh.parent : mesh
       const type = baseName(owner.name.replace(/_\d+$/, ''))
-      if (!NO_OUTLINE.has(type) && !mesh.children.some((c) => c.name.endsWith('_outline'))) {
+      if (!NO_OUTLINE.has(type) && !NO_OUTLINE_MATERIALS.has((mesh.material as THREE.Material).name) &&
+        !mesh.children.some((c) => c.name.endsWith('_outline'))) {
         mesh.add(makeOutline(mesh))
       }
     }

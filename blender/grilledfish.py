@@ -223,12 +223,31 @@ sweet = mix((0.46, 0.14, 0.18), (0.62, 0.24, 0.26), streaks)
 TEX["sweetpotato"] = image("T_SweetPotato", mix(sweet, (0.1, 0.05, 0.05), char * 0.85))
 TEX["sweetpotato_n"] = image("T_SweetPotato_N", to_normal(streaks * 0.6, 2.0), data=True)
 
-# shrimp shell (u: along body, v: around)
-N = 256
+# salt-grilled shrimp shell (u: head 0 .. tail 1 along the body, v: around, the back at v = 0/1, the belly at 0.5).
+# Cooked shell: deep orange-red over the back fading to pale coral and cream underneath, the six tail segments each
+# with a darker overlapping rim, the head shell a little darker and glassier with its cervical groove, white salt
+# crust caught on the back, and a few scorched spots along the ridge.
+N = 512
 u, v = grid01(N)
-stripes = 0.5 + 0.5 * np.cos(2 * np.pi * u * 9)
-top = smooth(0.25, 0.75, 0.5 + 0.5 * np.sin(2 * np.pi * v))
-TEX["shrimp"] = image("T_Shrimp", mix((0.98, 0.78, 0.62), (0.95, 0.36, 0.14), 0.35 + 0.65 * top * (0.7 + 0.3 * stripes)))
+back = 0.5 + 0.5 * np.cos(2 * np.pi * v)                       # 1 on the back, 0 on the belly
+SEG0, SEGW = 0.36, 0.095
+seg_t = np.clip((u - SEG0) / SEGW, 0, 6)
+seg_f = seg_t - np.floor(seg_t)
+rim = smooth(0.78, 0.97, seg_f) * (u > SEG0) * (u < SEG0 + 6 * SEGW)  # each segment darkens toward its rear rim
+groove = smooth(0.012, 0.0, np.abs(u - 0.17)) * smooth(0.2, 0.6, back)
+shell = mix((0.98, 0.86, 0.72), (0.96, 0.52, 0.3), smooth(0.05, 0.45, back))
+shell = mix(shell, (0.86, 0.22, 0.08), smooth(0.4, 0.95, back) * (0.75 + 0.25 * fbm(N, 6, 3)))
+shell = mix(shell, (0.62, 0.12, 0.05), rim * (0.35 + 0.5 * back))
+shell = mix(shell, (0.74, 0.16, 0.07), (u < SEG0) * 0.3 * back)
+shell = mix(shell, (0.5, 0.1, 0.04), groove * 0.7)
+# the dark vein line seen through the back, and the white leg joints underneath
+shell = mix(shell, (0.45, 0.12, 0.06), smooth(0.02, 0.0, np.minimum(v, 1 - v)) * (u > SEG0) * 0.45)
+salt_spk = (vnoise(N, 160, 80) > 0.9).astype(np.float32) * smooth(0.3, 0.8, back)
+shell = mix(shell, (0.98, 0.97, 0.94), salt_spk * 0.9)
+scorch = smooth(0.62, 0.75, fbm(N, 7, 2)) * smooth(0.6, 0.95, back)
+shell = mix(shell, (0.22, 0.07, 0.03), scorch * 0.75)
+TEX["shrimp"] = image("T_Shrimp", shell)
+TEX["shrimp_n"] = image("T_Shrimp_N", to_normal(-rim * 0.8 - groove * 0.6 + vnoise(N, 120, 60) * 0.15, 2.0), data=True)
 
 
 # =====================================================================
@@ -260,7 +279,9 @@ M = {
     "sausage": pbr("Sausage", tex=TEX["sausage"], rough=0.3, coat=0.5),
     "potato": pbr("Potato", tex=TEX["potato"], nrm=TEX["potato_n"], rough=0.8),
     "sweetpotato": pbr("SweetPotato", tex=TEX["sweetpotato"], nrm=TEX["sweetpotato_n"], rough=0.7),
-    "shrimp": pbr("Shrimp", tex=TEX["shrimp"], rough=0.3, coat=0.3),
+    "shrimp": pbr("Shrimp", tex=TEX["shrimp"], nrm=TEX["shrimp_n"], rough=0.28, coat=0.45),
+    "shrimp_tail": pbr("ShrimpTail", (0.62, 0.08, 0.02), rough=0.6),
+    "shrimp_leg": pbr("ShrimpLeg", (0.86, 0.3, 0.12), rough=0.45),
     "dirt": pbr("Dirt", (0.3, 0.22, 0.15), rough=0.95),
 }
 
@@ -988,22 +1009,150 @@ def onigiri():
     return [rice, finish(n, "Nori", M["nori"], smooth_shade=False)]
 
 
-def shrimp_pair():
+def shrimp_body(cx, R, size, name, flip=1):
+    """One whole salt-grilled shrimp curled the way it cooks, skewered through the head and the tail so the body
+    hangs in a U below the stick (in the stick's X/Z plane, so it's seen in profile from outside the fire).
+    Returns its parts: the segmented shell, tail fan, rostrum, eyes, antennae, walking legs and swimmerets."""
     parts = []
-    for i, x in enumerate((-0.07, 0.07)):
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.06, minor_radius=0.022, major_segments=32, minor_segments=12,
-                                         location=(x, 0, 0), rotation=(math.radians(90), 0, 0))
-        b = active()
-        bm = bmesh.new()
-        bm.from_mesh(b.data)
-        bmesh.ops.delete(bm, geom=[v for v in bm.verts if abs(math.atan2(v.co.y, v.co.x)) < math.pi / 4],
-                         context="VERTS")
-        bmesh.ops.holes_fill(bm, edges=bm.edges[:], sides=0)
-        bm.to_mesh(b.data)
-        bm.free()
-        parts.append(finish(b, "Shrimp", M["shrimp"]))
+    th0, th1 = math.pi, 2 * math.pi + 0.18                     # head end .. tail end, round the bottom of the U
+    rings, seg = 64, 16
+    centre = Vector((cx, 0, 0))
+
+    def frame(s):
+        """spine point, direction of travel (head -> tail), outward normal (the back) at s in 0..1"""
+        th = th0 + (th1 - th0) * s
+        p = centre + Vector((R * math.cos(th), 0, flip * R * math.sin(th)))
+        t = Vector((-math.sin(th), 0, flip * math.cos(th)))
+        n = (p - centre).normalized()
+        return p, t, n
+
+    def radius(s):
+        if s < 0.36:                                            # head shell: the bulkiest part, rounded in front,
+            front = math.sin(min(1.0, s / 0.07) * math.pi / 2) ** 0.6     # swelling over the gills, then
+            r = 0.031 * (0.35 + 0.65 * front) * (1 + 0.06 * math.sin(s / 0.36 * math.pi))   # a slight waist
+            r *= 1 - 0.1 * min(1.0, max(0.0, (s - 0.3) / 0.06))
+        elif s < 0.93:                                          # six tail segments, each rim overlapping the next
+            k = (s - 0.36) / 0.57
+            f = ((s - 0.36) / 0.095) % 1
+            r = (0.025 - 0.014 * k ** 1.3) * (0.94 + 0.1 * f ** 2)
+        else:
+            r = 0.0105 - 0.03 * (s - 0.93)
+        return r * size
+
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    vs = []
+    for i in range(rings + 1):
+        s = i / rings
+        p, t, n = frame(s)
+        side = Vector((0, 1, 0))
+        r = radius(s)
+        ring = []
+        for j in range(seg):
+            a = 2 * math.pi * j / seg
+            # deeper back-to-belly than side to side, the belly flatter than the back
+            dn = math.cos(a) * r * (1.15 if math.cos(a) > 0 else 0.85)
+            ring.append(bm.verts.new(p + n * dn + side * math.sin(a) * r * 0.82))
+        vs.append(ring)
+    for i in range(rings):
+        for j in range(seg):
+            jn = (j + 1) % seg
+            fc = bm.faces.new((vs[i][j], vs[i][jn], vs[i + 1][jn], vs[i + 1][j]))
+            for l, (uu, vv) in zip(fc.loops, ((i, j), (i, j + 1), (i + 1, j + 1), (i + 1, j))):
+                l[uvl].uv = (uu / rings, vv / seg)
+    bm.faces.new(vs[0][::-1])
+    bm.faces.new(vs[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    body = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(body)
+    parts.append(finish(body, "Shrimp", M["shrimp"]))
+
+    def flat(name_, pts, thick, mat):
+        """a thin plate through 3D points (tail fan blades, the rostrum)"""
+        bm2 = bmesh.new()
+        f2 = bm2.faces.new([bm2.verts.new(p) for p in pts])
+        bmesh.ops.triangulate(bm2, faces=[f2], quad_method="BEAUTY", ngon_method="EAR_CLIP")
+        me2 = bpy.data.meshes.new(name_)
+        bm2.to_mesh(me2)
+        bm2.free()
+        o = bpy.data.objects.new(name_, me2)
+        bpy.context.collection.objects.link(o)
+        sm = o.modifiers.new("Solidify", "SOLIDIFY")
+        sm.thickness = thick
+        sm.offset = 0
+        return finish(o, name_, mat, smooth_shade=False)
+
+    # tail fan: the pointed telson in the middle and two uropods each side, spread like a fan past the tail end
+    p, t, n = frame(1.0)
+    y = Vector((0, 1, 0))
+    for k, (ang, ln, wd, off) in enumerate(((0, 0.06, 0.01, 0), (-0.32, 0.058, 0.017, -1), (0.32, 0.058, 0.017, 1),
+                                            (-0.65, 0.052, 0.015, -1), (0.65, 0.052, 0.015, 1))):
+        d = (t * math.cos(ang) + n * math.sin(ang) * 0.6).normalized() * size
+        w = n.cross(d).normalized() if ang == 0 else (n * math.cos(ang) * 0.3 - t * math.sin(ang)).normalized()
+        base = p + y * off * 0.004 * size
+        tip = base + d * ln
+        parts.append(flat(f"ShrimpFan{k}", [base - w * wd * 0.3 * size, base + d * ln * 0.55 - w * wd * size,
+                                            tip, base + d * ln * 0.55 + w * wd * size,
+                                            base + w * wd * 0.3 * size], 0.003, M["shrimp_tail"]))
+
+    # the head: a saw-edged rostrum pointing forward and a little up, the eyes on short stalks either side
+    h, th, hn = frame(0.0)
+    fwd = -th
+    h = h - fwd * 0.01 * size + hn * 0.012 * size                # it grows from the top of the head shell
+    rost = [h - fwd * 0.012 * size + hn * 0.012 * size]
+    for k in range(7):
+        a = (k + 1) / 7
+        rost.append(h + (fwd * 0.07 * a + hn * (0.012 + 0.008 * a + (0.006 if k % 2 == 0 else 0))) * size)
+    rost.append(h + (fwd * 0.085 + hn * 0.02) * size)
+    rost += [h + (fwd * 0.045 + hn * 0.006) * size, h - fwd * 0.004 * size]
+    parts.append(flat("ShrimpRostrum", rost, 0.0025, M["shrimp_tail"]))
+    for sd in (-1, 1):
+        e = h + (fwd * 0.004 - hn * 0.008 + y * sd * 0.017) * size
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0075 * size, segments=10, ring_count=6, location=e)
+        parts.append(finish(active(), "ShrimpEye", M["pupil"]))
+        # long antennae sweeping back over the curl, and the short antennules
+        pts = []
+        for k in range(14):
+            a = k / 13
+            ang = math.pi - a * 2.3
+            rr = R * (1.25 + 0.5 * a)
+            pts.append(Vector((cx + rr * math.cos(ang) - (1 - a) * 0.02, sd * (0.012 + 0.07 * a ** 1.5),
+                               flip * (rr * math.sin(ang) * 0.9 + 0.012 * (1 - a)) - flip * sd * 0.02 * a)))
+        pts[0] = h + (fwd * 0.012 - hn * 0.006 + y * sd * 0.008) * size
+        parts.append(tube([tuple(q) for q in pts], 0.0016 * size, 0.0005, M["shrimp_leg"], "ShrimpAntenna", seg=5))
+        a0 = h + (fwd * 0.01 + y * sd * 0.005) * size
+        parts.append(tube([tuple(a0), tuple(a0 + (fwd * 0.03 + hn * 0.01) * size),
+                           tuple(a0 + (fwd * 0.05 + hn * 0.005 + y * sd * 0.008) * size)],
+                          0.0016 * size, 0.0007, M["shrimp_leg"], "ShrimpAntennule", seg=5))
+        # five pairs of walking legs under the head, bent forward; five pairs of little swimmerets under the tail
+        for k in range(5):
+            s = 0.1 + k * 0.05
+            q, tq, nq = frame(s)
+            root = q - nq * radius(s) * 0.8 + y * sd * radius(s) * 0.5
+            ln = (0.03 - k * 0.002) * size * random.uniform(0.85, 1.1)
+            knee = root - nq * ln * 0.5 + tq * ln * 0.12 + y * sd * 0.007
+            foot = knee - nq * ln * 0.2 - tq * ln * (0.5 + random.uniform(-0.1, 0.15)) + y * sd * 0.003
+            parts.append(tube([tuple(root), tuple(knee), tuple(foot)], 0.0019 * size, 0.0007, M["shrimp_leg"],
+                              "ShrimpLeg", seg=5))
+        for k in range(5):
+            s = 0.42 + k * 0.095
+            q, tq, nq = frame(s)
+            root = q - nq * radius(s) * 0.85 + y * sd * radius(s) * 0.35
+            ln = 0.013 * size * (1 - k * 0.1)
+            parts.append(tube([tuple(root), tuple(root - nq * ln * 0.45 + tq * ln * 0.9)], 0.0024 * size, 0.0012,
+                              M["shrimp_leg"], "ShrimpSwimmeret", seg=5))
     return parts
 
+
+def shrimp_pair():
+    """Two shrimp on one stick, each curled and skewered through head and tail; one a little bigger, and turned
+    the other way up, as they come off a real grill."""
+    k = 1.5                    # big tiger prawns: each about a third of the stick, like the real thing
+    return (shrimp_body(-0.072 * k, 0.06 * k, k * random.uniform(0.95, 1.08), "ShrimpA", flip=1) +
+            shrimp_body(0.072 * k, 0.058 * k, k * random.uniform(0.9, 1.02), "ShrimpB", flip=-1))
 
 def sausage():
     """A plump link with rounded ends, curved like a real sausage. Built along local Z, then laid along X."""

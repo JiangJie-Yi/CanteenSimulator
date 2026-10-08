@@ -16,6 +16,8 @@ const BURNT_TINT = new THREE.Color(0.22, 0.17, 0.14)
 // past done, food keeps darkening slowly, reaching full char at this many cook-times
 const CHAR_START = 1.15
 const CHAR_FULL = 3
+/** where the camera looks from (App CAMERA_POSITION), for food that turns its broad side toward it */
+const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
 // the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
@@ -45,7 +47,7 @@ const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
 /** the water bucket (bare sticks and burnt food go in it too) */
 const BIN_R = 0.27
 /** the tray for raw food waiting to go on the fire: a grid of spots */
-const TRAY_ROWS = 5
+const TRAY_ROWS = 4
 const TRAY_W = 1.6
 const TRAY_D = 1.0
 /** the seasoning box, as a round footprint for bumping into things */
@@ -473,6 +475,8 @@ type Piece = {
   node: THREE.Object3D
   homeP: THREE.Vector3
   homeQ: THREE.Quaternion
+  /** as authored, before any turn to face the camera (how it's laid flat on a plate) */
+  homeQ0: THREE.Quaternion
   /** seconds spent over the fire */
   progress: number
   collected: boolean
@@ -633,7 +637,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         uPeanut: { value: 0 } }
       pieces.current.push({
         key: obj.uuid, id, copy: (obj.userData.copy as number | undefined) ?? 0, loose: roast.loose.includes(id),
-        node: obj, homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), progress: 0, collected: false,
+        node: obj, homeP: obj.position.clone(), homeQ: faceCamera(id, obj), homeQ0: obj.quaternion.clone(),
+        progress: 0, collected: false,
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
         toQ: new THREE.Quaternion(), mats, looks, bites: newBites(), sticks: [], food: [], puffs: [], stickOnly: false,
         netSpot: null, container: null, local: new THREE.Vector3(), carried: false, trash: -1,
@@ -645,6 +650,23 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       })
     }
     scannedCount.current = root.children.length
+  }
+
+  /**
+   * A skewer whose food is flat (a pair of curled shrimp) turns on its stick to show its broad side to the
+   * camera wherever it stands on the ring, the way a cook sets it facing the diners; others keep their turn.
+   */
+  function faceCamera(id: string, obj: THREE.Object3D) {
+    const q = obj.quaternion.clone()
+    if (!roast.faceCamera?.includes(id)) return q
+    const stick = new THREE.Vector3(1, 0, 0).applyQuaternion(q)
+    // (the food's broad face: Blender's local Y, which the glTF export turns into local Z)
+    const side = new THREE.Vector3(0, 0, 1).applyQuaternion(q)
+    const toCam = FACE_CAMERA.clone().sub(obj.position)
+    toCam.addScaledVector(stick, -toCam.dot(stick)).normalize()
+    side.addScaledVector(stick, -side.dot(stick)).normalize()
+    const angle = Math.atan2(new THREE.Vector3().crossVectors(side, toCam).dot(stick), side.dot(toCam))
+    return q.premultiply(new THREE.Quaternion().setFromAxisAngle(stick, angle))
   }
 
   /**
@@ -728,7 +750,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const from = new THREE.Matrix4().makeBasis(stick, face, new THREE.Vector3().crossVectors(stick, face))
     const to = new THREE.Matrix4().makeBasis(dir, UP, new THREE.Vector3().crossVectors(dir, UP))
     const turn = new THREE.Quaternion().setFromRotationMatrix(to.multiply(from.transpose()))
-    return out.copy(p.homeQ).premultiply(turn)
+    return out.copy(p.homeQ0).premultiply(turn)
   }
 
   /** the tray where ordered food waits raw: where it is, and the n-th spot on it */
@@ -743,7 +765,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const row = n % TRAY_ROWS
     const layer = Math.floor(n / TRAY_ROWS)
     return trayAt()
-      .addScaledVector(LAY_DIR, 0.13 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.46) / (TRAY_ROWS - 1))
+      .addScaledVector(LAY_DIR, 0.1 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.34) / (TRAY_ROWS - 1))
       .addScaledVector(STACK_DIR, 0.05 + ((layer % 2) - 0.5) * 0.06)
       .add(new THREE.Vector3(0, 0.07 + layer * 0.06, 0))
   }
