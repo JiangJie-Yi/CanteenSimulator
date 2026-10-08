@@ -4,6 +4,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { CHEFS, type Chef } from '../chefs'
 import { QUALITY } from '../quality'
+import { LINES } from '../lines'
+import type { Lang } from '../i18n'
 import { playChew } from '../chew'
 import { Steam } from './Steam'
 import { ROAST_STAGES, type Roast, type Seasoning } from '../menu'
@@ -1210,6 +1212,11 @@ type RoastingProps = {
   onSay?: (who: 'chef' | 'guest', text: string) => void
   /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
   space?: 'closed' | 'open'
+  /** what's said is in this language, with these names for the food */
+  lang?: Lang
+  names?: Record<string, string>
+  /** a customer walked out: what they'd ordered and not eaten (to be refunded) */
+  onWalkOut?: (ids: string[]) => void
   /** how slowly customers come in (no cashier: fewer) */
   crowd?: number
   /** the shop is open: the chef works the grill, the player only watches */
@@ -1231,7 +1238,9 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {}, crowd = 1 }: RoastingProps) {
+  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {} }: RoastingProps) {
+  const L = () => LINES[lang]
+  const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -1796,7 +1805,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     if (fire && fire.current < 0.35) {
       onAddCharcoal?.()
-      say('火小了，添點炭')
+      say(L().addCharcoal)
       return
     }
     const live = pieces.current.filter((p) => present(p) && !p.eaten && p.trash < 0 && !p.carried)
@@ -1806,7 +1815,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       scrapIt.trashFrom.copy(scrapIt.node.position)
       scrapIt.trash = 0
       scrapIt.node.userData.onPlate = true
-      say(scrapIt.stickOnly ? '竹籤收一下' : '這個烤焦了，丟掉吧')
+      say(scrapIt.stickOnly ? L().stickAway : L().burntAway)
       return
     }
     // the chef cooks to the notes when they choose to (a better hand follows them more often), else by eye
@@ -1824,7 +1833,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.progress / roast.times[p.id] >= pullOf(p))
     if (ready) {
       collect(ready)
-      say(`${roast.names[ready.id]}烤好了！`)
+      say(L().done(nameOf(ready.id)))
       return
     }
     const toSeason = live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 && !p.chefSeasoned &&
@@ -1839,7 +1848,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (k && !toSeason.dabs[k] && Math.random() < chef.seasonChance) {
         season(toSeason, k)
         emit(k, toSeason.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
-        say(`${roast.names[toSeason.id]}${{ salt: '撒點鹽', soy: '刷上醬油', milk: '淋上煉乳', peanut: '撒花生粉' }[k]}`)
+        say(L().seasoned(nameOf(toSeason.id), k))
       }
       return
     }
@@ -1849,7 +1858,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return
     }
     const next = live.filter((p) => p.staged).sort((a, b) => a.stagedAt - b.stagedAt)[0]
-    if (next && putOnFire(next)) say(`${roast.names[next.id]}上火了`)
+    if (next && putOnFire(next)) say(L().onFire(nameOf(next.id)))
   }
 
   /**
@@ -1874,9 +1883,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       guestSeq.current = id
       if (orders.length) {
         guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting' })
-        onSay?.('guest', `#${id} 我要${orders.map((o) => roast.names[o] ?? o).join('、')}！`)
+        onSay?.('guest', L().order(id, orders.map(nameOf)))
       } else {
-        onSay?.('guest', `#${id} 位子滿了，下次再來`)
+        onSay?.('guest', L().nothing(id))
       }
       report()
     }
@@ -1884,7 +1893,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (const g of seated) {
       if (g.eaten.length === 0 && now - g.since > PATIENCE) {
         g.state = 'angry'
-        onSay?.('guest', `#${g.id} 等太久了，不吃了！`)
+        const owed = [...g.orders]
+        for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
+        onWalkOut?.(owed)
+        onSay?.('guest', L().angry(g.id))
         report()
       }
     }
@@ -1908,9 +1920,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       g.ate.push(dish.id)
       g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
       const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
-      const words = ['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]
       window.setTimeout(() => {
-        onSay?.('guest', `#${g.id} ${roast.names[dish.id]}${words}`)
+        onSay?.('guest', L().verdict(g.id, nameOf(dish.id), stars))
         report()
       }, EAT_SECONDS * 1000)
       return

@@ -20,8 +20,10 @@ import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
 import { Crash } from './components/Crash'
 import { PotCooking } from './components/PotCooking'
+import { NoodleEating } from './components/NoodleEating'
 import type { GuestView } from './components/Roasting'
 import { CHEFS, type Chef } from './chefs'
+import { LINES } from './lines'
 import { CANDIDATES, effective, restPerMin, tirePerMin, type Role } from './staff'
 import { Office } from './components/Office'
 import { liteUrl, QUALITY, stepDown, webglReport } from './quality'
@@ -38,6 +40,20 @@ const SPACING = 6
 const FIRE_CAPACITY = 16
 /** the money the business starts with */
 const CAPITAL = 300000
+const SAVE_KEY = 'canteen-save'
+/** a whole bowl of noodles, by the bowl (the set meals' parts count on their own) */
+const BASE_KCAL: Record<string, number> = { braised: 650, clear: 560, plain: 380, dry: 520, sesame: 610 }
+type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number }
+  stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes }
+const SAVED: Saved | null = (() => {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY)
+    const v = raw ? (JSON.parse(raw) as Saved) : null
+    return v?.v === 1 ? v : null
+  } catch {
+    return null
+  }
+})()
 
 /**
  * The renderer, asking for less each time if the browser won't give a WebGL context: first the usual, then
@@ -80,8 +96,22 @@ const NO_WEBGL = (() => {
 /** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
 const CHARCOAL_COST = 18
 const GAS_PER_HOUR = 30
-/** what the ingredients of something on the menu cost: about 38% of its price, as in a typical small eatery */
-const costOf = (x: { price: number; cost?: number }) => x.cost ?? Math.round(x.price * 0.38)
+/**
+ * What the ingredients of something on the menu cost, as a share of its price, roughly as in small eateries in
+ * Taiwan: fish and seafood dear (around half), meat a little less, vegetables, tofu and mushrooms cheap, rice and
+ * miso soup cheapest; a soup base or a bowl of noodles in between.
+ */
+const COST_SHARE: Record<string, number> = {
+  ExtraFish: 0.48, Saury: 0.46, Mackerel: 0.48, ShrimpSkewer: 0.52, Scallop: 0.55, Squid: 0.5, Shrimp: 0.5, CrabStick: 0.42,
+  BeefSlice: 0.45, Meatball: 0.36, Fishball: 0.34, Yakitori: 0.4, PorkBelly: 0.42, Sausage: 0.38, BloodCake: 0.3,
+  BeefShank: 0.48, Tendon: 0.45, Tripe: 0.4, BraisedEgg: 0.25,
+  NapaCabbage: 0.22, Tofu: 0.24, FriedTofu: 0.26, Taro: 0.28, Corn: 0.28, GrilledCorn: 0.28, ShiitakeCap: 0.3,
+  GrilledShiitake: 0.3, Enoki: 0.25, Shishito: 0.25, KingOyster: 0.3, Asparagus: 0.32, Okra: 0.28, BokChoy: 0.2,
+  PickledGreens: 0.18, Potato: 0.22, SweetPotato: 0.22, Onigiri: 0.22, NetMochi: 0.24, Rice: 0.18, MisoSoup: 0.2,
+  ExtraNoodles: 0.25, mala: 0.32, tomato: 0.3, kombu: 0.26, braised: 0.4, clear: 0.42, plain: 0.3, dry: 0.3, sesame: 0.32,
+}
+const costOf = (x: { id?: string; price: number; cost?: number }) =>
+  x.cost ?? Math.round(x.price * (COST_SHARE[x.id ?? ''] ?? 0.38))
 /** the charcoal burns down from full to out in 90 minutes (the fire level is stepped every 200ms) */
 const FIRE_BURN_PER_TICK = 1 / (90 * 60 * 5)
 // burner top on the cassette stove (blender/hotpot.py)
@@ -211,13 +241,14 @@ type SceneProps = {
   lang: Lang
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
+  onWalkOut: (ids: string[], dish: DishInfo) => void
   onGuests: (dishId: string, g: GuestView[]) => void
   /** what the hot pot's AI customers are waiting for (they take it out of the pot themselves once it's cooked) */
   potAi: string[]
   onPotGuestEat: (id: string, taste: number) => void
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, crowdOf, onGuests, potAi, onPotGuestEat, notes,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, crowdOf, onWalkOut, onGuests, potAi, onPotGuestEat, notes,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -408,10 +439,16 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)}
+                  onWalkOut={(ids) => onWalkOut(ids, dish)} lang={lang}
+                  names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))}
                   space={ai ? 'open' : 'closed'} locked={ai}
                   notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))} />
               )}
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
+              {dish.id === 'beefnoodle' && (
+                <NoodleEating url={url} base={base?.id ?? null} taste={base ? 70 + (base.broth || base.fill ? 4 : 0) : 0}
+                  active={i === active} locked={ai} toppings={dish.items.map((x) => x.id)} onEat={onEat} />
+              )}
               {dish.heatControl && (
                 <PotCooking url={url} itemIds={ITEM_IDS[dish.id]} temp={brothTemp} active={i === active}
                   onEat={onEat} onNotice={onNotice} soup={soup} heat={heat} floorY={(dish.brothY ?? 0.81) - 0.27}
@@ -511,12 +548,12 @@ export default function App() {
   // 評價: the average 美味 of everything eaten
   const [rating, setRating] = useState({ sum: 0, n: 0 })
   // 試吃筆記: every food tried, how it tasted and how it was cooked; the last one is shown under the stomach
-  const [notes, setNotes] = useState<Notes>({})
+  const [notes, setNotes] = useState<Notes>(() => SAVED?.notes ?? {})
   const [lastTry, setLastTry] = useState<{ name: string; taste: number; key: number } | null>(null)
   const langRef = useRef<Lang>('zh')
   const onEat = useCallback((id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; dip?: string[] }) => {
-    const item = ALL_ITEMS.get(id)
-    const cal = item?.kcal ?? 0
+    const item = ALL_ITEMS.get(id) ?? DISHES.flatMap((d) => d.bases).find((b) => b.id === id)
+    const cal = (item as { kcal?: number } | undefined)?.kcal ?? BASE_KCAL[id] ?? 0
     setKcal((k) => k + cal)
     setRating((r) => ({ sum: r.sum + taste, n: r.n + 1 }))
     const name = item ? nameIn(langRef.current, item) : id
@@ -532,7 +569,7 @@ export default function App() {
     setOrdersBy((b) => ({ ...b, [space]: fn(b[space]) }))
   // three shops (the hot pot, the noodle bar, the grill): each its own chef and its own customers
   // the staff hired at each shop (by worker id) and how tired each is
-  const [hired, setHired] = useState<Record<string, Record<string, { fatigue: number }>>>({})
+  const [hired, setHired] = useState<Record<string, Record<string, { fatigue: number }>>>(() => SAVED?.hired ?? {})
   const staffOf = (dishId: string, role?: Role) =>
     (CANDIDATES[dishId] ?? []).filter((w) => hired[dishId]?.[w.id] && (!role || w.role === role))
   /** the shop's chef as the cooking needs him: the best-working of the hired chefs (or a stand-in if none) */
@@ -560,11 +597,29 @@ export default function App() {
   const [toolsOpen, setToolsOpen] = useState(false)
   const [musicOn, setMusicOn] = useState(() => !isMuted())
   useEffect(() => onMuteChange((m) => setMusicOn(!m)), [])
-  const [ledger, setLedger] = useState({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0 })
+  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, ...SAVED?.ledger }))
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
   const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage
   // ingredients in stock, by portion; nothing until it's bought
-  const [stock, setStock] = useState<Record<string, number>>({})
+  const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
+  // the business is saved as it goes (every few seconds and when the page is left), and picked up next time
+  const saveRef = useRef({ ledger, stock, hired, notes })
+  saveRef.current = { ledger, stock, hired, notes }
+  useEffect(() => {
+    const write = () => {
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, ...saveRef.current }))
+      } catch {
+        // storage full or blocked: carry on unsaved
+      }
+    }
+    const id = window.setInterval(write, 4000)
+    window.addEventListener('pagehide', write)
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('pagehide', write)
+    }
+  }, [])
   const [office, setOffice] = useState<null | 'stock' | 'staff'>(null)
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
@@ -894,9 +949,8 @@ export default function App() {
   }
   const starsLine = (id: number, what: string, taste: number) => {
     const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
-    const words = ['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]
     // (the stars are kept, but customers show how they liked it in their faces and words, not a score)
-    talk('guest', `#${id} ${what}${words}`)
+    talk('guest', LINES[lang].verdict(id, what, stars))
   }
   const potGuestEat = (id: string, raw: number) => {
     // the back kitchen's prep and the floor staff's service count for something at the hot pot
@@ -911,6 +965,11 @@ export default function App() {
     const item = ALL_ITEMS.get(id)
     starsLine(g.id, item ? nameIn(lang, item) : id, taste)
     report('hotpot')
+  }
+  /** a customer walked out: take back the price of what they didn't eat */
+  const refund = (ids: string[], d: DishInfo) => {
+    const total = ids.reduce((n, id) => n + ((ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id))?.price ?? 0), 0)
+    if (total) book('revenue', -total)
   }
   const potEatRef = useRef(potGuestEat)
   potEatRef.current = potGuestEat
@@ -968,10 +1027,10 @@ export default function App() {
       }
       if (g.orders.length) {
         s.guests.push(g)
-        talk('guest', `#${id} 我要${g.orders.map((o) => {
+        talk('guest', LINES[lang].order(id, g.orders.map((o) => {
           const it = ALL_ITEMS.get(o) ?? d.bases.find((b) => b.id === o)
           return it ? nameIn(lang, it) : o
-        }).join('、')}！`)
+        })))
       }
       report(d.id)
     }
@@ -979,7 +1038,11 @@ export default function App() {
     for (const g of seated) {
       if (g.eaten.length === 0 && now - g.since > 150 * (0.8 + servers * 0.2) && !(s.kitchen && s.kitchen.guest === g.id)) {
         g.state = 'angry'
-        talk('guest', `#${g.id} 等太久了，不吃了！`)
+        // they don't pay for what they didn't get (the ingredients are wasted)
+        const owed = [...g.orders]
+        for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
+        refund(owed, d)
+        talk('guest', LINES[lang].angry(g.id))
         report(d.id)
       }
     }
@@ -988,7 +1051,7 @@ export default function App() {
       const busy = s.guests.some((g) => g.state === 'waiting' || g.state === 'eating')
       if (busy && heatRef.current < 70) {
         setHeat(80)
-        talk('chef', '開火，湯滾了就可以下料')
+        talk('chef', LINES[lang].lightPot)
       } else if (!busy && heatRef.current > 0) {
         setHeat(0)
       }
@@ -1008,7 +1071,7 @@ export default function App() {
         if (next) {
           s.kitchen = { guest: next.id, t: 0, phase: 'cook' }
           setOrders((all) => ({ ...all, [d.id]: {} }))
-          talk('chef', `#${next.id} 的麵下鍋了`)
+          talk('chef', LINES[lang].noodlesIn(next.id))
         }
       } else {
         k.t += 0.8
@@ -1019,7 +1082,7 @@ export default function App() {
           k.t = 0
           setOrders((all) => ({ ...all, [d.id]: { [g.base!]: 1 } }))
           g.state = 'eating'
-          talk('chef', `#${g.id} 的${nameIn(lang, d.bases.find((b) => b.id === g.base)!)}來了`)
+          talk('chef', LINES[lang].noodlesUp(g.id, nameIn(lang, d.bases.find((b) => b.id === g.base)!)))
           report(d.id)
         } else if (k.phase === 'eat' && k.t > 12) {
           // a better (and less tired) cook makes a better bowl; a server bringing it hot helps too
@@ -1098,7 +1161,7 @@ export default function App() {
               }
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
-            lang={lang} notes={notes} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
+            lang={lang} notes={notes} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
         </Canvas>}
         </Crash>
       </div>
@@ -1121,6 +1184,16 @@ export default function App() {
               if (cost > cash) return
               book('bought', cost)
               setStock((st) => ({ ...st, [id]: (st[id] ?? 0) + n }))
+            }}
+            onReset={() => {
+              if (!window.confirm(lang === 'ja' ? '資金・在庫・スタッフ・ノートを全部リセットしますか？' : '確定要重新開始？資金、庫存、員工和試吃筆記都會清空。')) return
+              try {
+                localStorage.removeItem(SAVE_KEY)
+              } catch {
+                // storage blocked
+              }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0 }, stock: {}, hired: {}, notes: {} }
+              window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}
             onHire={(w) => setHired((h) => ({ ...h, [dish.id]: { ...(h[dish.id] ?? {}), [w.id]: { fatigue: 0 } } }))}

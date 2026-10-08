@@ -17,6 +17,8 @@ type Props = {
   onClose: () => void
   tab: 'stock' | 'staff'
   onTab: (t: 'stock' | 'staff') => void
+  /** start the business over (wipes the save) */
+  onReset: () => void
 }
 
 const money = (n: number) => `NT$${Math.round(n).toLocaleString()}`
@@ -34,7 +36,7 @@ function Bar({ v, label }: { v: number; label: string }) {
  * The back office of the shop on screen: 採買 (buy ingredients into stock, paid from the cash in hand) and 人事
  * (hire and let go of the staff that kind of shop needs, see who's tired).
  */
-export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire, onFire, onClose, tab, onTab }: Props) {
+export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire, onFire, onClose, tab, onTab, onReset }: Props) {
   const [packs] = useState([10, 50])
   const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items]
   const roles = ROLES[dish.id] ?? []
@@ -49,6 +51,7 @@ export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire
           <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{ja ? '人事' : '人事'}</button>
         </div>
         <span className={`ofc-cash${cash < 0 ? ' is-low' : ''}`}>{ja ? '現金' : '現金'} {money(cash)}</span>
+        <button type="button" className="ofc-reset" onClick={onReset}>{ja ? '最初から' : '重新開始'}</button>
         <button type="button" className="ofc-close" onClick={onClose} aria-label="close">×</button>
       </header>
       {tab === 'stock' ? (
