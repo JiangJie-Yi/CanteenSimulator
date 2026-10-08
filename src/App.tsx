@@ -1147,7 +1147,7 @@ export default function App() {
 
 
   return (
-    <div className={`app${menuFolded ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner && !opened[dish.id] ? ' is-unopened' : ''}`} ref={appRef}>
+    <div className={`app${menuFolded || (owner && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner && !opened[dish.id] ? ' is-unopened' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -1204,7 +1204,7 @@ export default function App() {
       </div>
       <div className="stage" ref={stageRef}>
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
-          onClick={owner && !opened[dish.id] ? () => setAsking(true) : undefined} />
+ />
         {dish.heatControl && <HeatControl heat={heat} onChange={ai ? () => {} : setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={ai ? () => {} : addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
@@ -1332,7 +1332,11 @@ export default function App() {
         </button>
         {owner && !opened[dish.id] && (
           // not open yet: the whole shop is greyed out (see .is-unopened) until its sign is clicked and paid for
-          <p className="unopened-hint">{lang === 'ja' ? '未開業：左上の看板をタップして開業' : '尚未開業：點左上角招牌開業'}</p>
+          <button type="button" className="unopened-hint" onClick={() => setAsking(true)}>
+            <span className="spot" aria-hidden="true" />
+            <b>{lang === 'ja' ? '開業する' : '開業'}</b>
+            <small>{lang === 'ja' ? `「${nameIn(lang, dish)}」・NT$${SHOP_COST.toLocaleString()}` : `「${nameIn(lang, dish)}」・NT$${SHOP_COST.toLocaleString()}`}</small>
+          </button>
         )}
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
         {pull > 0 && (
@@ -1389,7 +1393,7 @@ export default function App() {
           }
           setOrders((all) => ({ ...all, [dish.id]: {} }))
         }} />
-      <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)}
+      <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner && !opened[dish.id])}
         aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
         <span>{menuFolded ? '‹' : '›'}</span>
       </button>
