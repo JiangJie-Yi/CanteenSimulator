@@ -241,97 +241,314 @@ const weaveTexture = (() => {
 })()
 
 /**
- * Painted ware: a top-down picture for a plate or dish, in indigo on cream — a rim band, and a motif in the
- * well: a stand of bamboo with its leaves (竹), or sprays of plum blossom (梅).
+ * Painted ware in the 染付 manner, as a top-down picture for a plate or dish: indigo on a warm cream glaze. A
+ * patterned rim band between fine double lines (青海波 waves on the plate, 雷紋 key-fret on the dish), and in the
+ * well a motif drawn the way a painter does it, a dark outline (骨描き) filled with a paler indigo wash (濃み):
+ * a stand of bamboo with node rings, tapering brush leaves, ground grass and a cloud (竹), or a gnarled plum
+ * branch with outlined blossoms, stamens, buds and a few falling petals (梅). The glaze has faint iron specks and
+ * a fine crackle.
  */
 function wareTexture(motif: 'bamboo' | 'plum') {
   if (typeof document === 'undefined') return null
-  const S = 512
+  const S = 1024
   const c = document.createElement('canvas')
   c.width = c.height = S
   const g = c.getContext('2d')!
-  const ink = '#2c4c8c'
-  g.fillStyle = '#f2ece0'
+  const ink = '#24427f'
+  const wash = 'rgba(58, 96, 170, 0.42)'
+  const cx = S / 2
+  const cy = S / 2
+  let seed = motif === 'bamboo' ? 7 : 13
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+
+  // glaze: warm cream, a little uneven, with iron specks and a faint crackle
+  const glaze = g.createRadialGradient(cx, cy, S * 0.05, cx, cy, S * 0.5)
+  glaze.addColorStop(0, '#f6f1e6')
+  glaze.addColorStop(1, '#ece4d3')
+  g.fillStyle = glaze
   g.fillRect(0, 0, S, S)
-  // rim bands
-  g.strokeStyle = ink
-  g.lineWidth = 10
+  for (let i = 0; i < 260; i++) {
+    g.fillStyle = `rgba(${90 + rnd() * 40}, ${70 + rnd() * 20}, 50, ${0.15 + rnd() * 0.35})`
+    g.beginPath()
+    g.arc(rnd() * S, rnd() * S, 0.6 + rnd() * 1.6, 0, Math.PI * 2)
+    g.fill()
+  }
+  g.strokeStyle = 'rgba(120, 104, 80, 0.12)'
+  g.lineWidth = 0.8
+  for (let i = 0; i < 70; i++) {
+    let x = rnd() * S
+    let y = rnd() * S
+    g.beginPath()
+    g.moveTo(x, y)
+    for (let k = 0; k < 4; k++) {
+      x += (rnd() - 0.5) * 60
+      y += (rnd() - 0.5) * 60
+      g.lineTo(x, y)
+    }
+    g.stroke()
+  }
+
+  const ring = (r: number, w: number) => {
+    g.strokeStyle = ink
+    g.lineWidth = w
+    g.beginPath()
+    g.arc(cx, cy, r * S, 0, Math.PI * 2)
+    g.stroke()
+  }
+  /** a brush stroke along a path, thick at the start and tapering to the end */
+  const stroke = (pts: [number, number][], w0: number, w1: number, color = ink) => {
+    const left: [number, number][] = []
+    const right: [number, number][] = []
+    pts.forEach(([x, y], i) => {
+      const [ax, ay] = pts[Math.max(0, i - 1)]
+      const [bx, by] = pts[Math.min(pts.length - 1, i + 1)]
+      const len = Math.hypot(bx - ax, by - ay) || 1
+      const nx = -(by - ay) / len
+      const ny = (bx - ax) / len
+      const w = (w0 + (w1 - w0) * (i / (pts.length - 1))) / 2
+      left.push([x + nx * w, y + ny * w])
+      right.push([x - nx * w, y - ny * w])
+    })
+    g.fillStyle = color
+    g.beginPath()
+    g.moveTo(...left[0])
+    for (const p of left.slice(1)) g.lineTo(...p)
+    for (const p of right.reverse()) g.lineTo(...p)
+    g.closePath()
+    g.fill()
+  }
+  /** a leaf: a pointed brush shape from its base toward `ang`, washed, then its outline and midrib inked */
+  const leaf = (x: number, y: number, ang: number, len: number, wid: number) => {
+    g.save()
+    g.translate(x, y)
+    g.rotate(ang)
+    g.beginPath()
+    g.moveTo(0, 0)
+    g.quadraticCurveTo(len * 0.35, -wid, len, 0)
+    g.quadraticCurveTo(len * 0.35, wid * 0.9, 0, 0)
+    g.fillStyle = wash
+    g.fill()
+    g.strokeStyle = ink
+    g.lineWidth = 3.2
+    g.stroke()
+    g.lineWidth = 1.8
+    g.beginPath()
+    g.moveTo(len * 0.05, 0)
+    g.quadraticCurveTo(len * 0.5, -wid * 0.12, len * 0.92, 0)
+    g.stroke()
+    g.restore()
+  }
+
+  // rim: a broad band between fine double lines, filled with the border pattern
+  const R0 = 0.4
+  const R1 = 0.47
+  ring(0.478, 3)
+  ring(R1, 6)
+  ring(R0, 4)
+  ring(R0 - 0.012, 1.6)
+  g.save()
   g.beginPath()
-  g.arc(S / 2, S / 2, S * 0.455, 0, Math.PI * 2)
-  g.stroke()
-  g.lineWidth = 3
-  g.beginPath()
-  g.arc(S / 2, S / 2, S * 0.42, 0, Math.PI * 2)
-  g.stroke()
-  g.fillStyle = ink
+  g.arc(cx, cy, R1 * S - 3, 0, Math.PI * 2)
+  g.arc(cx, cy, R0 * S + 2, 0, Math.PI * 2, true)
+  g.clip()
+  g.fillStyle = 'rgba(58, 96, 170, 0.16)'
+  g.fillRect(0, 0, S, S)
   g.strokeStyle = ink
-  g.lineCap = 'round'
   if (motif === 'bamboo') {
-    // two leaning stalks with their joints, and leaves in pointed strokes
-    for (const [x0, lean, h] of [[0.42, 0.06, 0.5], [0.56, -0.04, 0.42]]) {
-      const bx = S * x0
-      const by = S * 0.78
-      const tx = bx + S * lean
-      const ty = by - S * h
-      g.lineWidth = 9
-      g.beginPath()
-      g.moveTo(bx, by)
-      g.lineTo(tx, ty)
-      g.stroke()
-      for (let k = 1; k < 4; k++) {
-        const t = k / 4
-        const jx = bx + (tx - bx) * t
-        const jy = by + (ty - by) * t
-        g.lineWidth = 3
-        g.beginPath()
-        g.moveTo(jx - 9, jy)
-        g.lineTo(jx + 9, jy)
-        g.stroke()
-        for (const dir of [-1, 1]) {
-          g.save()
-          g.translate(jx, jy)
-          g.rotate(dir * (0.7 + k * 0.15))
+    // 青海波: rows of nested fan-shaped arcs, the waves overlapping all round the rim
+    const n = 44
+    for (let row = 0; row < 2; row++) {
+      for (let k = 0; k < n; k++) {
+        const a = ((k + row * 0.5) / n) * Math.PI * 2
+        const rr = (R0 + 0.012 + row * 0.03) * S
+        const x = cx + Math.cos(a) * rr
+        const y = cy + Math.sin(a) * rr
+        for (let q = 3; q >= 1; q--) {
+          g.lineWidth = q === 3 ? 2.2 : 1.4
           g.beginPath()
-          g.ellipse(dir * 30, 0, 32, 7, 0, 0, Math.PI * 2)
-          g.fill()
-          g.restore()
+          g.arc(x, y, q * 9, a + Math.PI * 1.0, a + Math.PI * 2.0)
+          g.stroke()
         }
       }
     }
   } else {
-    // a branch with five-petalled plum blossoms, buds, and dotted centres
-    g.lineWidth = 7
+    // 雷紋: a running key-fret, each square spiralling in, all the way round
+    const n = 40
+    const mid = ((R0 + R1) / 2) * S
+    const h = (R1 - R0) * S * 0.62
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2
+      g.save()
+      g.translate(cx + Math.cos(a) * mid, cy + Math.sin(a) * mid)
+      g.rotate(a + Math.PI / 2)
+      const s = h / 2
+      g.lineWidth = 2.6
+      g.beginPath()
+      g.moveTo(-s, s)
+      g.lineTo(-s, -s)
+      g.lineTo(s, -s)
+      g.lineTo(s, s * 0.5)
+      g.lineTo(-s * 0.5, s * 0.5)
+      g.lineTo(-s * 0.5, -s * 0.4)
+      g.lineTo(s * 0.4, -s * 0.4)
+      g.lineTo(s * 0.4, s * 0.05)
+      g.stroke()
+      g.restore()
+    }
+  }
+  g.restore()
+  // a fine dotted line just inside the band
+  g.fillStyle = ink
+  for (let k = 0; k < 120; k++) {
+    const a = (k / 120) * Math.PI * 2
     g.beginPath()
-    g.moveTo(S * 0.25, S * 0.72)
-    g.quadraticCurveTo(S * 0.45, S * 0.5, S * 0.74, S * 0.36)
-    g.stroke()
-    const blossom = (x: number, y: number, r: number) => {
+    g.arc(cx + Math.cos(a) * (R0 - 0.026) * S, cy + Math.sin(a) * (R0 - 0.026) * S, 1.8, 0, Math.PI * 2)
+    g.fill()
+  }
+
+  if (motif === 'bamboo') {
+    // a cloud drifting top right, in the wash with an inked edge
+    g.save()
+    g.translate(S * 0.64, S * 0.26)
+    g.scale(1.7, 1.7)
+    g.fillStyle = wash
+    g.strokeStyle = ink
+    g.lineWidth = 2
+    for (const [x, y, r] of [[0, 0, 26], [30, -8, 22], [56, 2, 18], [24, 14, 20]] as [number, number, number][]) {
+      g.beginPath()
+      g.arc(x, y, r, 0, Math.PI * 2)
+      g.fill()
+      g.stroke()
+    }
+    g.restore()
+    // ground: a low bank with grass tufts
+    stroke([[S * 0.24, S * 0.765], [S * 0.4, S * 0.745], [S * 0.56, S * 0.755], [S * 0.74, S * 0.775]], 10, 2.5)
+    for (let k = 0; k < 20; k++) {
+      const x = S * (0.26 + k * 0.024)
+      const y = S * (0.758 - Math.sin(k) * 0.006)
+      stroke([[x, y], [x + (rnd() - 0.5) * 26, y - 26 - rnd() * 24]], 5, 0.8)
+    }
+    // three stalks, each its own thickness and lean, with node rings and short side twigs
+    for (const [x0, lean, h, w] of [[0.44, 0.06, 0.52, 32], [0.57, -0.06, 0.46, 25], [0.33, 0.11, 0.36, 18]]) {
+      const bx = S * x0
+      const by = S * 0.755
+      const tx = bx + S * lean
+      const ty = by - S * h
+      // the stalk washed pale, inked down both edges
+      g.save()
+      g.lineCap = 'butt'
+      g.strokeStyle = wash
+      g.lineWidth = w
+      g.beginPath()
+      g.moveTo(bx, by)
+      g.lineTo(tx, ty)
+      g.stroke()
+      g.restore()
+      const len = Math.hypot(tx - bx, ty - by)
+      const nx = -(ty - by) / len
+      const ny = (tx - bx) / len
+      for (const sd of [-1, 1]) {
+        stroke([[bx + nx * sd * w / 2, by + ny * sd * w / 2], [tx + nx * sd * w * 0.35, ty + ny * sd * w * 0.35]], 4.5, 2.2)
+      }
+      const nodes = 4 + Math.round(h * 4)
+      for (let k = 1; k < nodes; k++) {
+        const t = k / nodes
+        const jx = bx + (tx - bx) * t
+        const jy = by + (ty - by) * t
+        const ww = w * (1 - t * 0.5) * 0.75
+        stroke([[jx - nx * ww, jy - ny * ww - 3], [jx, jy + 3], [jx + nx * ww, jy + ny * ww - 3]], 6, 3.5)
+        if (k > 1 && k % 2 === 0) {
+          // a twig off the node, and a fan of leaves at its end
+          const sd = k % 4 === 0 ? 1 : -1
+          const ex = jx + sd * S * 0.09
+          const ey = jy - S * 0.045
+          stroke([[jx, jy], [jx + sd * S * 0.045, jy - S * 0.026], [ex, ey]], 5, 2)
+          for (let q = 0; q < 5; q++) {
+            const ang = (sd > 0 ? -0.25 : Math.PI + 0.25) + sd * (q - 1.8) * 0.4 + (rnd() - 0.5) * 0.2
+            leaf(ex, ey, ang, 80 + rnd() * 40, 15 + rnd() * 4)
+          }
+        }
+      }
+      // leaves at the top of the stalk
+      for (let q = 0; q < 4; q++) leaf(tx, ty, -Math.PI / 2 + (q - 1.5) * 0.5 + lean, 84 + rnd() * 30, 15)
+    }
+  } else {
+    // the branch: a thick gnarled bough from lower left, one twig forking up, one out to the right
+    stroke([[S * 0.2, S * 0.74], [S * 0.3, S * 0.66], [S * 0.36, S * 0.6], [S * 0.47, S * 0.55], [S * 0.6, S * 0.46],
+      [S * 0.76, S * 0.38]], 36, 7)
+    stroke([[S * 0.36, S * 0.6], [S * 0.37, S * 0.5], [S * 0.33, S * 0.4], [S * 0.36, S * 0.3]], 18, 4)
+    stroke([[S * 0.52, S * 0.52], [S * 0.6, S * 0.56], [S * 0.7, S * 0.57]], 13, 3.5)
+    // knots and short spurs along it
+    for (const [x, y] of [[0.29, 0.67], [0.44, 0.565], [0.62, 0.45]]) {
+      stroke([[S * x, S * y], [S * (x + 0.02), S * (y - 0.035)]], 6, 1.5)
+    }
+    const blossom = (x: number, y: number, r: number, turn: number) => {
       for (let k = 0; k < 5; k++) {
-        const a = (k / 5) * Math.PI * 2
+        const a = turn + (k / 5) * Math.PI * 2
+        const px = x + Math.cos(a) * r * 0.58
+        const py = y + Math.sin(a) * r * 0.58
         g.beginPath()
-        g.arc(x + Math.cos(a) * r * 0.62, y + Math.sin(a) * r * 0.62, r * 0.48, 0, Math.PI * 2)
+        g.arc(px, py, r * 0.5, 0, Math.PI * 2)
+        g.fillStyle = wash
+        g.fill()
+        g.strokeStyle = ink
+        g.lineWidth = 3.4
+        g.stroke()
+      }
+      // the stamens: fine lines out from the heart, each tipped with a dot
+      g.lineWidth = 1.2
+      for (let k = 0; k < 9; k++) {
+        const a = turn + (k / 9) * Math.PI * 2
+        const ex = x + Math.cos(a) * r * 0.42
+        const ey = y + Math.sin(a) * r * 0.42
+        g.beginPath()
+        g.moveTo(x, y)
+        g.lineTo(ex, ey)
+        g.stroke()
+        g.fillStyle = ink
+        g.beginPath()
+        g.arc(ex, ey, 2, 0, Math.PI * 2)
         g.fill()
       }
-      g.fillStyle = '#f2ece0'
-      g.beginPath()
-      g.arc(x, y, r * 0.25, 0, Math.PI * 2)
-      g.fill()
       g.fillStyle = ink
-    }
-    blossom(S * 0.42, S * 0.56, 34)
-    blossom(S * 0.62, S * 0.42, 28)
-    blossom(S * 0.33, S * 0.38, 24)
-    for (const [x, y] of [[0.52, 0.5], [0.72, 0.34], [0.28, 0.66]]) {
       g.beginPath()
-      g.arc(S * x, S * y, 8, 0, Math.PI * 2)
+      g.arc(x, y, r * 0.12, 0, Math.PI * 2)
       g.fill()
+    }
+    const blooms: [number, number, number][] = [[0.44, 0.52, 64], [0.63, 0.4, 56], [0.33, 0.35, 50], [0.7, 0.57, 42],
+      [0.27, 0.63, 38], [0.53, 0.63, 32]]
+    blooms.forEach(([x, y, r], i) => blossom(S * x, S * y, r, i * 0.7))
+    // buds: small closed rounds on short stalks
+    for (const [x, y] of [[0.78, 0.36], [0.37, 0.29], [0.57, 0.47], [0.24, 0.7]]) {
+      stroke([[S * x - 10, S * y + 10], [S * x, S * y]], 3, 1.5)
+      g.beginPath()
+      g.arc(S * x, S * y, 9, 0, Math.PI * 2)
+      g.fillStyle = wash
+      g.fill()
+      g.strokeStyle = ink
+      g.lineWidth = 2
+      g.stroke()
+    }
+    // a few petals drifting down
+    for (const [x, y, a] of [[0.6, 0.7, 0.3], [0.68, 0.66, 1.4], [0.48, 0.74, 2.2]]) {
+      g.save()
+      g.translate(S * x, S * y)
+      g.rotate(a)
+      g.beginPath()
+      g.ellipse(0, 0, 12, 8, 0, 0, Math.PI * 2)
+      g.fillStyle = wash
+      g.fill()
+      g.strokeStyle = ink
+      g.lineWidth = 1.8
+      g.stroke()
+      g.restore()
     }
   }
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = 8
   return t
-}
-const BAMBOO_WARE = wareTexture('bamboo')
+}const BAMBOO_WARE = wareTexture('bamboo')
 const PLUM_WARE = wareTexture('plum')
 
 /** Lathe geometry for ware, with UVs projected straight down so a painted picture lies flat in the well. */
