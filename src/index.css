@@ -2624,3 +2624,78 @@ button {
     max-height: 200px;
   }
 }
+/* ---- upright phones: the menu below takes at most 40% of the screen, and folds away with the tab on its top
+   edge (the 3D view then gets the whole screen) ---- */
+@media (max-width: 900px) and (orientation: portrait) {
+  .menu {
+    height: 40vh;
+    height: 40dvh;
+    box-sizing: border-box;
+    overflow: hidden;
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-content: stretch;
+  }
+
+  .menu .strips-frame {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* the tags scroll inside the space left (the frame only clips) */
+  .menu .strips {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    height: auto;
+    box-sizing: border-box;
+  }
+
+  .app.menu-folded .menu,
+  .app.menu-folded .menu-backing {
+    display: none;
+  }
+
+  .menu-fold {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    z-index: 11;
+    left: 50%;
+    bottom: calc(40vh - 1px);
+    bottom: calc(40dvh - 1px);
+    width: 64px;
+    height: 20px;
+    margin-left: -32px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    background: color-mix(in srgb, var(--page) 88%, transparent);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  /* the chevron points down to fold, up to bring it back */
+  .menu-fold {
+    transform: none;
+  }
+
+  .menu-fold::first-letter {
+    display: inline-block;
+  }
+
+  .app.menu-folded .menu-fold {
+    bottom: 0;
+  }
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .menu-fold span {
+    display: inline-block;
+    transform: rotate(90deg);
+  }
+}

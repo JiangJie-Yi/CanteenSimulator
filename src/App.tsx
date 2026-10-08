@@ -273,10 +273,14 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
   const homeTarget = useMemo(() => new THREE.Vector3(), [])
   useEffect(() => {
     const focus = new THREE.Vector3(0, DISHES[active].focusY, 0)
-    home.current.set(...CAMERA_POSITION).sub(focus).multiplyScalar(cameraDistanceScale(aspect)).add(focus)
+    // (a phone's stage sits above the menu inside a full-height canvas: what fits it is the stage's width against
+    // the canvas height, and it mustn't back off just because the menu was folded away)
+    const phoneStage = frame.h > 0 && frame.h < size.height * 0.95 || (frame.w < 700 && size.height > size.width)
+    const scale = phoneStage ? Math.min(3.4, (1.3 / (frame.w / size.height)) * 0.92) : cameraDistanceScale(aspect)
+    home.current.set(...CAMERA_POSITION).sub(focus).multiplyScalar(scale).add(focus)
     homing.current = true
     zoomGoal.current = null
-  }, [active, aspect, resetView])
+  }, [active, aspect, resetView, frame.w, frame.h, size.width, size.height])
 
   // smooth wheel zoom: each notch nudges a target distance and the camera eases toward it
   const gl = useThree((s) => s.gl)
@@ -840,7 +844,7 @@ export default function App() {
         }} />
       <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)}
         aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
-        {menuFolded ? '‹' : '›'}
+        <span>{menuFolded ? '‹' : '›'}</span>
       </button>
       <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
         aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
