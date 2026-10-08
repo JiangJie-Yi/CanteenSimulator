@@ -12,6 +12,8 @@ type MenuProps = {
   onAdd: (id: string) => void
   onRemove: (id: string) => void
   onClear: () => void
+  /** customers' orders just in: their tags light up with the guest's number, and the order is written out */
+  feed?: { key: number; id: string; guest: number }[]
 }
 
 /**
@@ -36,7 +38,7 @@ function tagFit(name: string, en: string | undefined, price: string, stamp: bool
  * Izakaya-style wall menu: vertical wooden tags, a red stamp marks what's been ordered.
  * Click a tag to add a portion, right-click (or press - / Delete on it) to take one away.
  */
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuProps) {
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [] }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
   const count = [...dish.bases, ...dish.items].reduce((n, x) => n + (quantities[x.id] ?? 0), 0)
@@ -122,6 +124,15 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
   }
   const touchOnly = useMemo(() => window.matchMedia('(hover: none)').matches, [])
 
+  // a new order in: bring its tag into view (unless the row is being dragged)
+  const lastFeed = feed[feed.length - 1]
+  useEffect(() => {
+    if (!lastFeed || grab.current) return
+    const el = row.current?.querySelector<HTMLElement>(`[data-id="${lastFeed.id}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+  }, [lastFeed])
+  const all = [...dish.bases, ...dish.items]
+
   const onKey = (id: string) => (e: KeyboardEvent) => {
     if (e.key === '-' || e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
@@ -139,9 +150,10 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
     const name = nameIn(lang, x)
     const price = toChineseNumber(x.price)
     const hasSet = base && !!(x as { includes?: object }).includes
+    const filling = feed.filter((f) => f.id === x.id)
     return (
-      <button key={x.id} type="button" aria-pressed={n > 0}
-        className={`strip${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}`}
+      <button key={x.id} type="button" aria-pressed={n > 0} data-id={x.id}
+        className={`strip${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}${filling.length ? ' is-filling' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${x.price}${n ? `，${t.ordered(n)}` : ''}`}
         style={tagFit(name, x.en, price, n > 0)}
         onClick={() => {
@@ -168,6 +180,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
         {x.en && <span className="strip-en" lang="en">{x.en}</span>}
         <span className="strip-price">{price}</span>
         {incl && <span className="stamp stamp-incl" aria-hidden="true">{t.included}</span>}
+        {filling.map((f) => <span key={f.key} className="fill-guest" aria-hidden="true">#{f.guest}</span>)}
         {n > 0 && (
           <span key={n} className="stamp" aria-hidden="true">
             點{n > 1 && <span className="stamp-count">×{n}</span>}
@@ -211,6 +224,15 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
       </div>
 
       <footer className="tally">
+        {/* the order slip: what came in, written out stroke by stroke */}
+        {feed.length > 0 && (
+          <ul className="order-slip" aria-live="polite">
+            {feed.map((f) => {
+              const it = all.find((x) => x.id === f.id)
+              return <li key={f.key}><span>✎</span><em>{t.wrote(f.guest, it ? nameIn(lang, it) : f.id)}</em></li>
+            })}
+          </ul>
+        )}
         <p>
           {beforeCount}<strong>{n1}</strong>{beforeTotal}<strong>{n2}</strong>{after}
         </p>

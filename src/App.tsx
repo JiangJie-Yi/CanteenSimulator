@@ -38,6 +38,8 @@ const FIRE_CAPACITY = 16
  * crashed its GPU on this site may refuse them all until it's restarted: see NO_WEBGL.)
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const IS_TOUCH = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
+
 const makeRenderer = ({ canvas }: { canvas: any }) => {
   const tries: THREE.WebGLRendererParameters[] = [
     { antialias: QUALITY.antialias, powerPreference: 'high-performance' },
@@ -192,7 +194,7 @@ type SceneProps = {
   onEat: (id: string, taste: number) => void
   /** AI simulation on, and what it does through the app */
   ai: boolean
-  onOrder: (id: string) => boolean
+  onOrder: (id: string, guest?: number) => boolean
   onAddCharcoal: () => void
   onSay: (who: 'chef' | 'guest', text: string) => void
   /** bumped by the 視角 button: glide back to the home view */
@@ -450,11 +452,14 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
         enablePan
         screenSpacePanning
         mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }}
+        // on a touch screen one finger swipes between dishes (App), so turning the view takes two fingers,
+        // which also pinch to zoom
+        touches={IS_TOUCH ? { ONE: -1 as unknown as THREE.TOUCH, TWO: THREE.TOUCH.DOLLY_ROTATE } : undefined}
         minDistance={1.8}
         maxDistance={20}
         maxPolarAngle={Math.PI * 0.45}
         // the wheel is handled below for a smooth glide; rotation drifts to a stop instead of halting
-        enableZoom={false}
+        enableZoom={IS_TOUCH}
         enableDamping
         dampingFactor={0.08}
         onStart={() => { homing.current = false }}
@@ -490,6 +495,9 @@ export default function App() {
   const [guests, setGuests] = useState<GuestView[]>([])
   // revenue mode: what's been sold, and what it cost to make (ingredients, fuel, the chef's wages)
   const [ledgerOn, setLedgerOn] = useState(false)
+  // customers' orders as they come in, for the menu to write them down
+  const [feed, setFeed] = useState<{ key: number; id: string; guest: number }[]>([])
+  const feedSeq = useRef(0)
   // (phone) the guest board and the books folded into a chip until tapped
   const [boardsOpen, setBoardsOpen] = useState(false)
   const [ledger, setLedger] = useState({ revenue: 0, food: 0, fuel: 0, wage: 0 })
@@ -611,6 +619,62 @@ export default function App() {
     return () => window.clearInterval(id)
   }, [])
 
+  // touch gestures over the 3D view (not on the menu or a button):
+  //  - one finger flicked left or right switches dishes
+  //  - pulled down from the top half of the screen and let go, reloads the page, like other sites
+  // A drag that picked up food or a tool (the page gets is-carrying) is neither.
+  const [pull, setPull] = useState(0)
+  useEffect(() => {
+    if (!IS_TOUCH) return
+    let s: { x: number; y: number; t: number; carrying: boolean } | null = null
+    const skip = (t: EventTarget | null) => t instanceof Element && !!t.closest('.menu, button, input, .side-boards, .menu-fold')
+    const start = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || skip(e.target)) {
+        s = null
+        return
+      }
+      const p = e.touches[0]
+      s = { x: p.clientX, y: p.clientY, t: performance.now(), carrying: false }
+    }
+    const move = (e: TouchEvent) => {
+      if (!s) return
+      if (e.touches.length !== 1) {
+        s = null
+        setPull(0)
+        return
+      }
+      if (document.body.classList.contains('is-carrying')) s.carrying = true
+      const p = e.touches[0]
+      const dx = p.clientX - s.x
+      const dy = p.clientY - s.y
+      const pulling = !s.carrying && s.y < window.innerHeight * 0.5 && dy > 0 && dy > Math.abs(dx) * 1.6
+      setPull(pulling ? Math.min(1, dy / 140) : 0)
+    }
+    const end = (e: TouchEvent) => {
+      const g = s
+      s = null
+      setPull((v) => {
+        if (v >= 1 && g && !g.carrying) window.setTimeout(() => window.location.reload(), 120)
+        return v >= 1 ? 1 : 0
+      })
+      if (!g || g.carrying || e.changedTouches.length !== 1 || document.body.classList.contains('is-carrying')) return
+      const p = e.changedTouches[0]
+      const dx = p.clientX - g.x
+      const dy = p.clientY - g.y
+      if (performance.now() - g.t > 1200 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.6) return
+      const n = DISHES.length
+      setActive((i) => (dx < 0 ? (i + 1) % n : (i - 1 + n) % n))
+    }
+    window.addEventListener('touchstart', start, { passive: true })
+    window.addEventListener('touchmove', move, { passive: true })
+    window.addEventListener('touchend', end)
+    window.addEventListener('touchcancel', () => { s = null; setPull(0) })
+    return () => {
+      window.removeEventListener('touchstart', start)
+      window.removeEventListener('touchmove', move)
+      window.removeEventListener('touchend', end)
+    }
+  }, [])
   const MAX_PORTIONS = 99
   // the fire only holds so many skewers; past that, take something off before ordering more
   const [offFire, setOffFire] = useState(0)
@@ -706,7 +770,8 @@ export default function App() {
           <button type="button" onClick={() => window.location.replace(window.location.pathname + '?v=' + Date.now())}>重新載入</button>
         </div>
       )}
-      <div className="canvas-layer" style={glLost || NO_WEBGL ? { visibility: 'hidden' } : undefined}>
+      <div className="canvas-layer" style={glLost || NO_WEBGL ? { visibility: 'hidden' } : undefined}
+>
         <Crash inline>
         {!NO_WEBGL && <Canvas
           shadows={QUALITY.shadows ? 'percentage' : false}
@@ -728,7 +793,16 @@ export default function App() {
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }}
             onEat={onEat} onNotice={(what) => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])}
-            resetView={resetView} ai={ai} onOrder={(id) => changeQty(id, 1)} onAddCharcoal={addCharcoal} onSay={talk}
+            resetView={resetView} ai={ai} onOrder={(id, guest) => {
+              const ok = changeQty(id, 1)
+              // a customer's order is written onto the menu below, so you see it come in
+              if (ok && guest) {
+                const key = ++feedSeq.current
+                setFeed((f) => [...f.slice(-2), { key, id, guest }])
+                window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
+              }
+              return ok
+            }} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} chef={chef} onGuests={setGuests} />
         </Canvas>}
         </Crash>
@@ -828,9 +902,14 @@ export default function App() {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
         </button>
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
+        {pull > 0 && (
+          <div className={`pull-refresh${pull >= 1 ? ' is-ready' : ''}`} style={{ '--pull': pull } as React.CSSProperties}>
+            <span>↻</span>{pull >= 1 ? '放開重新整理' : '往下拉重新整理'}
+          </div>
+        )}
       </div>
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]}
+      <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]} feed={feed}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {
           // cancelling everything refunds it (nothing was made)
@@ -849,7 +928,9 @@ export default function App() {
       <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
         aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => setAi((v) => !v)}
-        aria-pressed={ai} title={UI[lang].aiLabel}>{UI[lang].ai}</button>
+        aria-pressed={ai} title={UI[lang].aiLabel}>
+        <span className="shop-lamp" aria-hidden="true" />{ai ? UI[lang].shopOpen : UI[lang].shopClosed}
+      </button>
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}
       </button>

@@ -1143,7 +1143,7 @@ type RoastingProps = {
   ai?: boolean
   /** the AI customers order from the menu, and the chef adds charcoal, through the app */
   /** order something; false if it couldn't be (the fire or the basket is full) */
-  onOrder?: (id: string) => boolean
+  onOrder?: (id: string, guest?: number) => boolean
   onAddCharcoal?: () => void
   /** something the chef or a customer says */
   onSay?: (who: 'chef' | 'guest', text: string) => void
@@ -1369,6 +1369,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const settle = (key: string, at: THREE.Vector3) => {
     const r = footprint(key)
     const others = containerKeys().filter((k) => k !== key).map((k) => ({ p: containerAt(k), r: footprint(k) }))
+    // the soup bowls on the table are in the way too
+    root.traverse((o) => {
+      const id = o.userData.itemId as string | undefined
+      if (id && roast.drinks?.includes(id) && o.visible && o.scale.x > 0.01) others.push({ p: o.position.clone(), r: 0.19 })
+    })
     for (let i = 0; i < 6; i++) {
       const d = Math.hypot(at.x, at.z) || 1e-6
       if (d < RING_CLEAR + r) {
@@ -1398,6 +1403,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -n * DISH_STEP).add(nudge(`dish-${n}`))
   }
   const [dishCount, setDishCount] = useState(1)
+  // nothing on the table overlaps: every plate, dish, basket, box, bucket, bin and tray is pushed clear of the
+  // fire and of each other where it stands — at the start, and whenever another plate or basket is put out
+  useEffect(() => {
+    for (let pass = 0; pass < 3; pass++) {
+      for (const key of containerKeys()) {
+        const at = containerAt(key)
+        const ok = settle(key, at.clone())
+        const shift = ok.sub(at)
+        shift.y = 0
+        if (shift.lengthSq() > 1e-6) moved.current.set(key, nudge(key).clone().add(shift))
+      }
+    }
+    setMoveTick((t) => t + 1)
+    // (settle and friends read the current counts and nudges)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plateCount, dishCount, basketCount, root])
   const destination = (p: Piece) => (inBasket(p) ? 'basket' : onDish(p) ? 'dish' : 'plate')
 
   const collect = (p: Piece) => {
@@ -1645,11 +1666,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       guestClock.current = 0
       const want = 1 + Math.floor(Math.random() * 3)
       const orders: string[] = []
+      const id = guestSeq.current + 1
       for (let k = 0; k < want; k++) {
         const pick = itemIds.filter((id) => id in roast.times)[Math.floor(Math.random() * itemIds.filter((id) => id in roast.times).length)]
-        if (pick && onOrder(pick)) orders.push(pick)
+        if (pick && onOrder(pick, id)) orders.push(pick)
       }
-      const id = ++guestSeq.current
+      guestSeq.current = id
       if (orders.length) {
         guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting' })
         onSay?.('guest', `#${id} 我要${orders.map((o) => roast.names[o] ?? o).join('、')}！`)

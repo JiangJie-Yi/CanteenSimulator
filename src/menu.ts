@@ -281,7 +281,7 @@ export const DISHES: Dish[] = [
       // plate and the basket, left to right; the tray of raw skewers on the right; box, bucket and bin on the left
       plate: [0.98, 0.02, 1.57],
       // just outside the stones on the left as the camera sees it
-      basket: { at: [1.6, 0, 0.93], capacity: 20 },
+      basket: { at: [1.75, 0, 0.75], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
       // behind the fire to the left of the plate, as the camera sees it
       dish: { at: [-0.39, 0.0, 1.81], capacity: 3 },
@@ -298,7 +298,7 @@ export const DISHES: Dish[] = [
       trash: [-2.2, 0.0, -0.45],
       tray: [1.6, 0.0, -0.75],
       // the rice balls come out on their own little dish, just past the front end of the tray
-      rawDish: { at: [2.3, 0.0, 0.22], items: ['Onigiri'] },
+      rawDish: { at: [2.42, 0.0, 0.08], items: ['Onigiri'] },
     },
     layout: {
       mode: 'ring',
