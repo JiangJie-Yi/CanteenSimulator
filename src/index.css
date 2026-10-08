@@ -2154,3 +2154,248 @@ button {
     padding: 6px 10px;
   }
 }
+/* ---- the little shop above the guest list: noren door, counter, stools, customers walking in and out ---- */
+.side-boards > section.guest-board {
+  width: 280px;
+}
+
+.side-boards > section.ledger {
+  width: 190px;
+}
+
+.gc-scene {
+  position: relative;
+  height: 92px;
+  margin: 4px 0 6px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #efe2c6 0%, #e6d4b0 62%, #c9a77a 62%, #b8925f 100%);
+  box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.25);
+}
+
+/* plank wall with a lamp's warm glow */
+.gc-wall {
+  position: absolute;
+  inset: 0 0 38% 0;
+  background:
+    radial-gradient(ellipse 40% 70% at 62% 0%, rgb(255 214 140 / 0.55), transparent 70%),
+    repeating-linear-gradient(90deg, transparent 0 23px, rgb(120 84 50 / 0.18) 23px 24px);
+}
+
+/* the counter top the stools stand in front of */
+.gc-counter {
+  position: absolute;
+  left: 22%;
+  right: 0;
+  top: 50%;
+  height: 9px;
+  background: linear-gradient(180deg, #a0703f, #7a4e2a);
+  border-top: 1px solid #3b2a20;
+  border-bottom: 1px solid #3b2a20;
+  z-index: 1;
+}
+
+/* noren: two indigo panels over the door, hung from a rod, split in the middle */
+.gc-noren {
+  position: absolute;
+  left: 2%;
+  top: 0;
+  width: 17%;
+  height: 46%;
+  display: flex;
+  gap: 2px;
+  padding-top: 3px;
+  border-top: 3px solid #5a3a20;
+  transform-origin: top center;
+  z-index: 3;
+}
+
+.gc-noren span {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  background: #24427f;
+  color: #f4ecd8;
+  font: 700 11px/1 var(--brush);
+  border-radius: 0 0 2px 2px;
+  transform-origin: top center;
+}
+
+.gc-noren.is-swaying span:first-child {
+  animation: noren-sway 1.1s ease-out;
+}
+
+.gc-noren.is-swaying span:last-child {
+  animation: noren-sway 1.1s ease-out 0.08s;
+}
+
+@keyframes noren-sway {
+  0% { transform: skewX(0) scaleY(1); }
+  20% { transform: skewX(-16deg) scaleY(0.92); }
+  45% { transform: skewX(9deg); }
+  70% { transform: skewX(-4deg); }
+  100% { transform: skewX(0); }
+}
+
+.gc-guest {
+  position: absolute;
+  bottom: 0;
+  width: 34px;
+  margin-left: -17px;
+  left: var(--seat);
+  z-index: 2;
+}
+
+.gc-guest.is-enter {
+  animation: gc-walk-in 1.7s ease-out both;
+}
+
+.gc-guest.is-leave {
+  animation: gc-walk-out 2.6s ease-in both;
+}
+
+/* in through the noren, along to the stool */
+@keyframes gc-walk-in {
+  0% { left: var(--door); opacity: 0; transform: scale(0.92); }
+  15% { opacity: 1; }
+  100% { left: var(--seat); opacity: 1; transform: none; }
+}
+
+/* a moment to get up (and let the stars float), then back out the door */
+@keyframes gc-walk-out {
+  0%, 30% { left: var(--seat); opacity: 1; }
+  90% { left: var(--door); opacity: 1; }
+  100% { left: var(--door); opacity: 0; }
+}
+
+.gc-person {
+  display: block;
+  width: 34px;
+  height: 51px;
+  overflow: visible;
+}
+
+.gc-person.is-walking .gc-body {
+  animation: gc-step 0.42s ease-in-out infinite;
+}
+
+.gc-person.is-walking .gc-legs {
+  animation: gc-legs 0.42s ease-in-out infinite;
+  transform-origin: 20px 44px;
+}
+
+@keyframes gc-step {
+  50% { transform: translateY(-1.5px); }
+}
+
+@keyframes gc-legs {
+  50% { transform: scaleX(-1); }
+}
+
+.gc-person.is-eating .gc-head {
+  animation: gc-nod 0.7s ease-in-out infinite;
+  transform-origin: 20px 28px;
+}
+
+@keyframes gc-nod {
+  50% { transform: translateY(2px) rotate(6deg); }
+}
+
+.gc-tag {
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgb(43 33 25 / 0.7);
+  color: #fff3dc;
+  font: 9px/1.3 var(--sans, system-ui), sans-serif;
+  z-index: 3;
+}
+
+.gc-bubble {
+  position: absolute;
+  top: -6px;
+  left: 60%;
+  padding: 0 5px;
+  border-radius: 8px 8px 8px 2px;
+  background: #fff;
+  border: 1px solid #3b2a20;
+  font: 700 11px/1.2 var(--brush);
+  color: #3b2a20;
+  animation: gc-dots 1.4s ease-in-out infinite;
+}
+
+@keyframes gc-dots {
+  50% { transform: translateY(-2px); }
+}
+
+.gc-stars {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: #e8742a;
+  font-size: 11px;
+  text-shadow: 0 1px 0 #fff, 0 0 4px #fff;
+  animation: gc-float 2.6s ease-out forwards;
+}
+
+.gc-stars i {
+  font-style: normal;
+  color: rgb(59 42 32 / 0.25);
+}
+
+@keyframes gc-float {
+  0% { opacity: 0; transform: translate(-50%, 6px); }
+  15% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -18px); }
+}
+
+.gc-anger {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  animation: gc-pulse 0.5s ease-in-out infinite;
+}
+
+.gc-guest.is-angry.is-leave {
+  animation-duration: 1.6s;
+}
+
+@keyframes gc-pulse {
+  50% { transform: scale(1.25); }
+}
+
+.mini-stomach {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: #3b2a20;
+  align-self: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gc-guest.is-enter,
+  .gc-guest.is-leave,
+  .gc-person *,
+  .gc-noren span {
+    animation-duration: 0.01s !important;
+  }
+}
+/* each seated customer's stomach, over their head */
+.gc-belly {
+  position: absolute;
+  top: -14px;
+  left: -6px;
+}
+
+.gc-belly .mini-stomach {
+  width: 16px;
+  height: 16px;
+}

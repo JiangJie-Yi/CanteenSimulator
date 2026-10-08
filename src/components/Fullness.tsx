@@ -69,3 +69,22 @@ export function Fullness({ kcal, full, lang, rating }: FullnessProps) {
     </div>
   )
 }
+
+/** a small stomach that fills grey → green, for each AI customer */
+export function MiniStomach({ pct }: { pct: number }) {
+  const p = Math.max(0, Math.min(100, pct))
+  const fill = `hsl(122 ${Math.round(8 + p * 0.5)}% ${Math.round(64 - p * 0.2)}%)`
+  const level = 43 - (p / 100) * 38
+  const id = `ms-${Math.random().toString(36).slice(2, 8)}`
+  return (
+    <svg className="mini-stomach" viewBox="0 0 48 48" aria-hidden="true">
+      <defs>
+        <clipPath id={id}><path d={STOMACH} /></clipPath>
+      </defs>
+      <path d={STOMACH} fill="#c9c3ba" opacity="0.45" />
+      <rect x="0" y={level} width="48" height={48 - level} fill={fill} clipPath={`url(#${id})`} />
+      <path d={STOMACH} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
+      <path d={DUODENUM} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  )
+}

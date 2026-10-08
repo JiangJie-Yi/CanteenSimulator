@@ -23,7 +23,9 @@ const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
 const SIPS = 3
 const SOUP_TASTE = 78
 /** an AI customer as App shows them: seated and waiting, eating, or gone (with their rating) */
-export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'angry'; rating: number | null; items: number }
+export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'angry'; rating: number | null; items: number;
+  /** what they've eaten so far (for their stomach) */
+  ate: string[] }
 type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state'] }
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
 const MAX_SEATED = 4
@@ -1543,7 +1545,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const chefClock = useRef(0)
   const guests = useRef<Guest[]>([])
   const guestSeq = useRef(0)
-  const report = () => onGuests?.(guests.current.map((g) => ({ id: g.id, state: g.state, items: g.orders.length,
+  const report = () => onGuests?.(guests.current.map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
     rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null })))
   const chefSaid = useRef(0)
 
@@ -1666,6 +1668,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         return
       }
       const taste = tasteOf(dish)
+      dish.node.userData.byGuest = true
       eat(dish)
       g.eaten.push(taste)
       g.ate.push(dish.id)
@@ -2498,7 +2501,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.node.rotateOnWorldAxis(STACK_DIR, -0.12 * lift)
         }
         if (p.eat >= 1) {
-          onEat?.(p.id, tasteOf(p))
+          // (what an AI customer eats fills their stomach, not yours)
+          if (!p.node.userData.byGuest) onEat?.(p.id, tasteOf(p))
           if (p.sticks.length) {
             p.stickOnly = true
             for (const m of p.food) m.visible = false
