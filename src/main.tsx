@@ -8,3 +8,10 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// started fine: a later failed load (after another deploy) may retry again
+try {
+  sessionStorage.removeItem('canteen-boot-retry')
+} catch {
+  // storage blocked
+}
