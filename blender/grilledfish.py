@@ -471,6 +471,13 @@ for _ in range(1800):
                                     rotation=(0, 0, random.uniform(0, math.pi)))
     o = active()
     o.scale = (s, s * random.uniform(0.7, 1.2), 0.003)
+    # only its top shows (it lies on the ash): keep that face and drop the rest, a sixth of the vertices
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    bm.normal_update()
+    bmesh.ops.delete(bm, geom=[fc for fc in bm.faces if fc.normal.z < 0.9], context="FACES")
+    bm.to_mesh(o.data)
+    bm.free()
     grains.append(finish(o, "Grain", M["salt"], smooth_shade=False))
 join(grains, "SaltGrains")
 
@@ -516,7 +523,7 @@ for i, half in enumerate(sizes):
         bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=loc, rotation=rot)
     else:
         # (enough vertices for the scorch painted on below to have a ragged edge)
-        bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=4, location=loc, rotation=rot)
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=3, location=loc, rotation=rot)
     a += half / STONE_R
     o = active()
     bm = bmesh.new()

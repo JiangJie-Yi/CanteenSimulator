@@ -29,6 +29,7 @@ import { DISHES, type Dish as DishInfo } from './menu'
 const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
+const TOUCH = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
 /** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
 const CHARCOAL_COST = 18
 const GAS_PER_HOUR = 30
@@ -302,7 +303,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
         distance={14}
         decay={1.6}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={TOUCH ? [1024, 1024] : [2048, 2048]}
         shadow-bias={-0.0005}
         shadow-normalBias={0.02}
       />
@@ -625,7 +626,20 @@ export default function App() {
       <div className="canvas-layer">
         <Canvas
           shadows="percentage"
-          dpr={[1, 2]}
+          // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
+          dpr={[1, TOUCH ? 1.5 : 2]}
+          onCreated={({ gl }) => {
+            // if the phone runs out of GPU memory the browser drops the 3D view and it would stay blank:
+            // reload once to bring it back
+            gl.domElement.addEventListener('webglcontextlost', (e) => {
+              e.preventDefault()
+              try {
+                if (sessionStorage.getItem('canteen-gl-reload')) return
+                sessionStorage.setItem('canteen-gl-reload', '1')
+              } catch { /* storage blocked: still try once */ }
+              window.setTimeout(() => window.location.reload(), 400)
+            })
+          }}
           camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
           gl={{ alpha: true, toneMapping: THREE.NoToneMapping }}
         >
