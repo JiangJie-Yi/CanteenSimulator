@@ -42,11 +42,13 @@ const SPACING = 6
 const FIRE_CAPACITY = 16
 /** the money the business starts with */
 const CAPITAL = 300000
+/** what it costs to open one shop */
+const SHOP_COST = 150000
 const SAVE_KEY = 'canteen-save'
 /** a whole bowl of noodles, by the bowl (the set meals' parts count on their own) */
 const BASE_KCAL: Record<string, number> = { braised: 650, clear: 560, plain: 380, dry: 520, sesame: 610 }
-type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number }
-  stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null }
+type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number }
+  stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean> }
 const SAVED: Saved | null = (() => {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
@@ -601,17 +603,21 @@ export default function App() {
   const dragChat = useDrag('chat')
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
-  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, ...SAVED?.ledger }))
+  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, setup: 0, ...SAVED?.ledger }))
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
-  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage
+  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0)
   // ingredients in stock, by portion; nothing until it's bought
   const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
   // the owner's name; until they've given it and founded the business, the welcome is up and the sign is dark
   const [owner, setOwner] = useState<string | null>(() => SAVED?.owner ?? null)
   const [ignite, setIgnite] = useState(0)
+  // which shops have been opened (each costs SHOP_COST to set up); an unopened shop is greyed out until its sign is
+  // clicked and the opening paid for
+  const [opened, setOpened] = useState<Record<string, boolean>>(() => SAVED?.opened ?? {})
+  const [asking, setAsking] = useState(false)
   // the business is saved as it goes (every few seconds and when the page is left), and picked up next time
-  const saveRef = useRef<Omit<Saved, 'v'>>({ ledger, stock, hired, notes, owner })
-  saveRef.current = { ledger, stock, hired, notes, owner }
+  const saveRef = useRef<Omit<Saved, 'v'>>({ ledger, stock, hired, notes, owner, opened })
+  saveRef.current = { ledger, stock, hired, notes, owner, opened }
   useEffect(() => {
     const write = () => {
       try {
@@ -1141,7 +1147,7 @@ export default function App() {
 
 
   return (
-    <div className={`app${menuFolded ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}`} ref={appRef}>
+    <div className={`app${menuFolded ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner && !opened[dish.id] ? ' is-unopened' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -1197,7 +1203,8 @@ export default function App() {
         </Crash>
       </div>
       <div className="stage" ref={stageRef}>
-        <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!owner} ignite={ignite} />
+        <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
+          onClick={owner && !opened[dish.id] ? () => setAsking(true) : undefined} />
         {dish.heatControl && <HeatControl heat={heat} onChange={ai ? () => {} : setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={ai ? () => {} : addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
@@ -1223,7 +1230,7 @@ export default function App() {
               } catch {
                 // storage blocked
               }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0 }, stock: {}, hired: {}, notes: {}, owner: null }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0 }, stock: {}, hired: {}, notes: {}, owner: null, opened: {} }
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}
@@ -1288,6 +1295,7 @@ export default function App() {
             <section className="ledger is-draggable" aria-label={UI[lang].ledgerLabel} style={dragLedger.style}
               onPointerDown={dragLedger.onPointerDown} onDoubleClick={dragLedger.onDoubleClick}>
               <p className="ledger-cash"><span>{lang === 'ja' ? '現金' : '現金'}</span><b>NT${Math.round(cash).toLocaleString()}</b></p>
+              <p><span>{lang === 'ja' ? '開業費' : '開業費用'}</span><b>−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
               <p><span>{lang === 'ja' ? '仕入れ' : '採買支出'}</span><b>−{Math.round(ledger.bought).toLocaleString()}</b></p>
               {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
                 .map(([k, v]) => (
@@ -1322,6 +1330,10 @@ export default function App() {
           aria-label={UI[lang].resetView} title={UI[lang].resetView}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
         </button>
+        {owner && !opened[dish.id] && (
+          // not open yet: the whole shop is greyed out (see .is-unopened) until its sign is clicked and paid for
+          <p className="unopened-hint">{lang === 'ja' ? '未開業：左上の看板をタップして開業' : '尚未開業：點左上角招牌開業'}</p>
+        )}
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
         {pull > 0 && (
           <div className={`pull-refresh${pull >= 1 ? ' is-ready' : ''}`} style={{ '--pull': pull } as React.CSSProperties}>
@@ -1332,8 +1344,6 @@ export default function App() {
       {!owner && (
         <Welcome lang={lang} onStart={(name) => {
           setOwner(name)
-          setIgnite((n) => n + 1)
-          window.setTimeout(() => setIgnite(0), 3200)
           saveRef.current = { ...saveRef.current, owner: name }
           try {
             localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, ...saveRef.current }))
@@ -1341,6 +1351,24 @@ export default function App() {
             // storage blocked
           }
         }} />
+      )}
+      {asking && (
+        <div className="welcome" role="dialog" aria-modal="true">
+          <div className="welcome-card">
+            <h2>{lang === 'ja' ? '開業しますか？' : '要開業嗎？'}</h2>
+            <p>{lang === 'ja' ? `「${nameIn(lang, dish)}」の開業費は NT$${SHOP_COST.toLocaleString()}` : `開一間「${nameIn(lang, dish)}」需要 NT$${SHOP_COST.toLocaleString()}`}</p>
+            <p className="welcome-sub">{lang === 'ja' ? `手持ち NT$${Math.round(cash).toLocaleString()}` : `手上現金 NT$${Math.round(cash).toLocaleString()}`}</p>
+            {cash < SHOP_COST && <p className="welcome-warn">{lang === 'ja' ? '資金が足りません' : '資金不足，還開不了'}</p>}
+            <button type="button" className="welcome-go" disabled={cash < SHOP_COST} onClick={() => {
+              book('setup', SHOP_COST)
+              setOpened((o) => ({ ...o, [dish.id]: true }))
+              setAsking(false)
+              setIgnite((n) => n + 1)
+              window.setTimeout(() => setIgnite(0), 3200)
+            }}>{lang === 'ja' ? '開業' : '開業'}</button>
+            <button type="button" className="welcome-back" onClick={() => setAsking(false)}>{lang === 'ja' ? 'やめる' : '先不要'}</button>
+          </div>
+        </div>
       )}
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]} feed={feed} locked={ai} stock={stock}

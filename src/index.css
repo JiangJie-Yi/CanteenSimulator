@@ -149,11 +149,11 @@ button {
 
 /* every tag glows faintly under the pointer */
 .menu .strip:hover {
-  filter: brightness(1.07);
+  filter: brightness(1.06);
+  /* the glow stays inside the tag (it doesn't spill onto its neighbours) */
   box-shadow:
     inset 0 0 0 1px rgb(59 42 32 / 0.18),
-    0 0 14px 2px rgb(255 214 140 / 0.55),
-    0 6px 14px -8px rgb(59 42 32 / 0.5);
+    inset 0 0 14px 3px rgb(255 214 140 / 0.85);
 }
 
 /* 美味 over the food under the pointer, and the little rising word when a seasoning changes it */
@@ -3921,5 +3921,50 @@ button {
 }
 
 .ofc-owner {
+  font-weight: 700;
+}
+/* not open yet: everything of the shop greyed and dimmed, and not to be touched, except its sign (click to open)
+   and the dish switcher */
+.app.is-unopened .canvas-layer,
+.app.is-unopened .menu,
+.app.is-unopened .menu-backing,
+.app.is-unopened .stage > :not(.brand):not(.switcher):not(.unopened-hint):not(.notice) {
+  filter: grayscale(0.95) brightness(0.62);
+  pointer-events: none;
+  transition: filter 600ms ease;
+}
+
+.unopened-hint {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  margin: 0;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgb(30 26 22 / 0.78);
+  color: #f4ecd8;
+  font: 600 16px/1.3 var(--brush);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: gc-dots 2s ease-in-out infinite;
+}
+
+.brand[role='button'] {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.brand[role='button'] .brand-plate {
+  animation: brand-beckon 1.6s ease-in-out infinite;
+}
+
+@keyframes brand-beckon {
+  50% { box-shadow: 0 0 0 3px rgb(255 214 140 / 0.7), 0 0 18px 4px rgb(255 214 140 / 0.6); }
+}
+
+.welcome-warn {
+  color: #c4442f;
   font-weight: 700;
 }

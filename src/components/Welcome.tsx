@@ -26,7 +26,7 @@ export function Welcome({ lang, onStart }: { lang: Lang; onStart: (name: string)
         ) : (
           <div className="welcome-found">
             <p>{ja ? `${name.trim()} さん、資金は NT$300,000。` : `${name.trim()} 老闆，你手上有 NT$300,000 的資本。`}</p>
-            <p className="welcome-sub">{ja ? '鍋・麺・炭火焼き、三つの店をここから。' : '火鍋、麵食、燒烤三家店，從這裡開始。'}</p>
+            <p className="welcome-sub">{ja ? '店は一軒 NT$150,000 で開業。看板をタップして始めよう。' : '開一間店要 NT$150,000，點店門口的招牌就能開業。'}</p>
             <button type="button" className="welcome-go" onClick={() => onStart(name.trim())}>{ja ? '創業する' : '創業'}</button>
             <button type="button" className="welcome-back" onClick={() => setStep('name')}>{ja ? '戻る' : '返回'}</button>
           </div>
