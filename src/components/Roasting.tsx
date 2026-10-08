@@ -46,7 +46,58 @@ const ZERO = new THREE.Vector3()
 const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
 /** the water bucket (bare sticks and burnt food go in it too) */
 const BIN_R = 0.27
-/** the tray for raw food waiting to go on the fire: a grid of spots */
+/** the trash bin for bare sticks and burnt food (the water bucket is only for water) */
+const TRASH_R = 0.24
+const TRASH_H = 0.36
+
+/** A small dark-stained wooden bin for the scraps, open at the top, lined with straw paper, two iron hoops. */
+function TrashBin({ position, container }: { position: [number, number, number]; container: string }) {
+  const geometry = useMemo(() => {
+    const R = TRASH_R
+    // outside wall flaring a little toward the rim, a rolled lip, then the inside back down to a raised floor
+    return new THREE.LatheGeometry([[0, 0.01], [R * 0.84, 0.01], [R * 0.86, 0.02], [R, TRASH_H], [R * 1.04, TRASH_H + 0.012],
+      [R * 0.94, TRASH_H + 0.004], [R * 0.82, 0.05], [0, 0.05]].map(([x, y]) => new THREE.Vector2(x, y)), 40)
+  }, [])
+  const staves = useMemo(() => {
+    if (typeof document === 'undefined') return null
+    const c = document.createElement('canvas')
+    c.width = 128
+    c.height = 16
+    const g = c.getContext('2d')!
+    for (let i = 0; i < 8; i++) {
+      g.fillStyle = i % 2 ? '#5a3c24' : '#664630'
+      g.fillRect(i * 16, 0, 16, 16)
+      g.fillStyle = 'rgba(20, 12, 6, 0.6)'
+      g.fillRect(i * 16, 0, 1.5, 16)
+    }
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.wrapS = THREE.RepeatWrapping
+    t.repeat.set(2, 1)
+    return t
+  }, [])
+  return (
+    <group position={position} userData={{ container }}>
+      <mesh geometry={geometry} castShadow receiveShadow>
+        <meshToonMaterial color="#ffffff" map={staves} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh geometry={geometry} scale={[1.03, 1.02, 1.03]}>
+        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+      </mesh>
+      {/* the straw-paper lining at the bottom, so it doesn't look like the water bucket */}
+      <mesh position-y={0.055} rotation-x={-Math.PI / 2}>
+        <circleGeometry args={[TRASH_R * 0.8, 24]} />
+        <meshToonMaterial color="#b8a27a" />
+      </mesh>
+      {[0.08, 0.27].map((y) => (
+        <mesh key={y} position-y={y} rotation-x={Math.PI / 2}>
+          <torusGeometry args={[TRASH_R * (0.86 + 0.14 * (y / TRASH_H)) + 0.004, 0.008, 6, 40]} />
+          <meshToonMaterial color="#3c3c40" />
+        </mesh>
+      ))}
+    </group>
+  )
+}/** the tray for raw food waiting to go on the fire: a grid of spots */
 const TRAY_ROWS = 4
 const TRAY_W = 1.6
 const TRAY_D = 1.0
@@ -800,11 +851,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const [kind, n] = key.split('-')
     if (kind === 'box' || kind === 'bin') return (carriers[kind]?.[0]?.home.clone() ?? new THREE.Vector3()).add(nudge(kind))
     if (kind === 'tray') return trayAt()
+    if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   const footprint = (key: string) => {
     const kind = key.split('-')[0]
-    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6 }[kind] ?? 0.3
+    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R }[kind] ?? 0.3
   }
   /** everything standing on the table that can be moved, for bumping into */
   const containerKeys = () => [
@@ -813,6 +865,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     ...(roast.basket ? Array.from({ length: basketCount }, (_, n) => `basket-${n}`) : []),
     ...Object.keys(carriers),
     ...(roast.tray ? ['tray'] : []),
+    ...(roast.trash ? ['trash'] : []),
   ]
   /**
    * Keep a moved container from passing through things: out of the stone ring, and clear of every other
@@ -1040,7 +1093,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const live = pieces.current.filter((p) => present(p) && !p.eaten && p.trash < 0 && !p.carried)
     const stageOfP = (p: Piece) => stageOf(p.progress / roast.times[p.id]).key
     const scrapIt = live.find((p) => p.stickOnly || (!p.collected && !p.staged && stageOfP(p) === 'burnt'))
-    if (scrapIt && carriers.bin) {
+    if (scrapIt && roast.trash) {
       scrapIt.trashFrom.copy(scrapIt.node.position)
       scrapIt.trash = 0
       scrapIt.node.userData.onPlate = true
@@ -1303,6 +1356,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // complains as usual: carrying only starts once the pointer moves)
         const food = pickFood()
         if (food) {
+          // the camera holds still from the press on (otherwise the first few pixels, before the carry starts,
+          // turn the view a little and it keeps drifting after)
+          if (controls) controls.enabled = false
           scrap.current = { p: food, x: e.clientX, y: e.clientY, started: false }
           window.addEventListener('pointermove', haul)
           window.addEventListener('pointerup', dropScrap, { once: true })
@@ -1450,16 +1506,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const q = scrap.current
       window.removeEventListener('pointermove', haul)
       scrap.current = null
+      if (controls) controls.enabled = true
       if (!q?.started) return
       document.body.classList.remove('is-carrying')
       if (controls) controls.enabled = true
       q.p.carried = false
       setHover(null)
       setTasteTip(null)
-      const bin = containerAt('bin')
+      const bin = containerAt('trash')
       const pos = q.p.node.position
-      if (carriers.bin && Math.hypot(pos.x - bin.x, pos.z - bin.z) < BIN_R + 0.16) {
-        // let go over the bucket: it drops in — and throwing away good food draws a word
+      // over the bin is judged where the pointer meets the height of its rim, not where the carried food floats
+      const rim = raycaster.ray.intersectPlane(new THREE.Plane(UP, -root.localToWorld(new THREE.Vector3(0, TRASH_H, 0)).y),
+        new THREE.Vector3())
+      const atRim = rim ? root.worldToLocal(rim) : pos
+      if (roast.trash && Math.hypot(atRim.x - bin.x, atRim.z - bin.z) < TRASH_R + 0.12) {
+        // let go over the trash bin: it drops in — and throwing away good food draws a word
         const stage = stageOf(q.p.progress / roast.times[q.p.id]).key
         if (!q.p.stickOnly && stage === 'done') onNotice?.('waste')
         q.p.trash = 0
@@ -1729,7 +1790,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // tossed into the bin: a short arc down into it, and gone
         p.trash = Math.min(1, p.trash + dt / 0.45)
         const k = p.trash
-        const into = containerAt('bin')
+        const into = containerAt('trash')
         into.y += 0.12
         p.node.position.lerpVectors(p.trashFrom, into, k)
         p.node.position.y += Math.sin(k * Math.PI) * 0.12
@@ -1955,6 +2016,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
+      {roast.trash && <TrashBin container="trash" position={containerAt('trash').toArray() as [number, number, number]} />}
       {/* salt is taken with the fingers: a pinching hand follows the pinch while it's carried */}
       {saltInHand && (
         <group ref={hand}>

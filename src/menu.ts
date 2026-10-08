@@ -116,8 +116,10 @@ export type Roast = {
   toolPots?: Record<string, string>
   /** the seasoning box's objects: the first is the box itself, which can be dragged with everything in it */
   toolBox?: string[]
-  /** the water bucket's objects (bucket first): dragged as one; bare sticks and burnt food are dropped in it */
+  /** the water bucket's objects (bucket first): dragged as one; its dipper splashes food or the coals */
   bucket?: string[]
+  /** where the trash bin stands: bare sticks and burnt (or unwanted) food are dropped in it */
+  trash?: [number, number, number]
   /** where the ordered food waits, raw, on a tray, until it's carried to the fire */
   tray?: [number, number, number]
   /** items toasted on the little grill net over the coals rather than on a skewer (they puff up as they cook) */
@@ -279,8 +281,10 @@ export const DISHES: Dish[] = [
       // the seasoning box (dragged as a whole) and everything standing in it
       toolBox: ['SeasoningBox', 'SaltPot', 'SoyPot', 'MilkJar', 'PeanutBowl', 'SaltPinch', 'SoyBrush', 'MilkBrush',
         'PeanutSpoon'],
-      // a bucket of water, for splashing and for the scraps; the tray where ordered food waits to go on the fire
+      // a bucket of water for splashing, the trash bin beside it (both on the left); the tray where ordered food
+      // waits to go on the fire
       bucket: ['WaterBucket', 'WaterDipper'],
+      trash: [-2.2, 0.0, -0.45],
       tray: [1.22, 0.0, 1.36],
     },
     layout: {
