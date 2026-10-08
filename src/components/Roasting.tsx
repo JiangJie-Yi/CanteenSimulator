@@ -3,6 +3,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { CHEFS, type Chef } from '../chefs'
+import { QUALITY } from '../quality'
 import { playChew } from '../chew'
 import { Steam } from './Steam'
 import { ROAST_STAGES, type Roast, type Seasoning } from '../menu'
@@ -31,10 +32,10 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
 const MAX_SEATED = 4
 const PATIENCE = 150
 /** phones have little GPU memory: the big painted textures are drawn at full size, then handed over at half */
-const PHONE = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
 function forPhone(c: HTMLCanvasElement) {
-  if (!PHONE || c.width <= 512) return c
-  const k = 512 / Math.max(c.width, c.height)
+  const max = QUALITY.canvasMax
+  if (c.width <= max && c.height <= max) return c
+  const k = max / Math.max(c.width, c.height)
   const out = document.createElement('canvas')
   out.width = Math.round(c.width * k)
   out.height = Math.round(c.height * k)

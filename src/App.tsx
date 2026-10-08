@@ -21,6 +21,7 @@ import { Crash } from './components/Crash'
 import { PotCooking } from './components/PotCooking'
 import type { GuestView } from './components/Roasting'
 import { CHEFS, type Chef } from './chefs'
+import { liteUrl, QUALITY, stepDown } from './quality'
 import { Roasting } from './components/Roasting'
 import { Steam } from './components/Steam'
 import { StoveControls } from './components/StoveControls'
@@ -30,7 +31,6 @@ import { DISHES, type Dish as DishInfo } from './menu'
 const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
-const TOUCH = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
 
 /**
  * The renderer, asking for less each time if the browser won't give a WebGL context: first the usual, then
@@ -40,7 +40,7 @@ const TOUCH = typeof window !== 'undefined' && window.matchMedia('(hover: none)'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const makeRenderer = ({ canvas }: { canvas: any }) => {
   const tries: THREE.WebGLRendererParameters[] = [
-    { antialias: !TOUCH, powerPreference: 'high-performance' },
+    { antialias: QUALITY.antialias, powerPreference: 'high-performance' },
     { antialias: false, powerPreference: 'default' },
     { antialias: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false, precision: 'mediump' },
   ]
@@ -242,6 +242,17 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
   })
   const dishLight = DISHES[active].light ?? {}
 
+  // staged loading: once the light model of the dish on screen has been up a moment, and nothing's been ordered
+  // from it yet, the full model is loaded behind it and takes over
+  const [upgraded, setUpgraded] = useState<Set<string>>(() => new Set())
+  const activeId = DISHES[active].id
+  const idle = !Object.values(orders[activeId] ?? {}).some((n) => n > 0)
+  useEffect(() => {
+    if (!QUALITY.upgrade || !idle || upgraded.has(activeId)) return
+    const t = window.setTimeout(() => setUpgraded((u) => new Set(u).add(activeId)), 1500)
+    return () => window.clearTimeout(t)
+  }, [activeId, idle, upgraded])
+
   // warm spot: per-dish position, strength and shadow softness, eased so switching dishes doesn't pop
   const spot = useRef<THREE.SpotLight>(null)
   const floor = useRef<THREE.ShadowMaterial>(null)
@@ -341,7 +352,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
         distance={14}
         decay={1.6}
         castShadow
-        shadow-mapSize={TOUCH ? [512, 512] : [2048, 2048]}
+        shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]}
         shadow-bias={-0.0005}
         shadow-normalBias={0.02}
       />
@@ -357,28 +368,38 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
         // nothing ordered yet: an empty pot or bowl (the soup, noodles and garnish come with the base)
         const hidden = base ? base.hide : dish.emptyHide
         const soup = !!base || !dish.emptyHide
-        return (
-          <group key={dish.id} ref={(g) => { groups.current[i] = g }}
-            position-x={slot(i, active, DISHES.length) * SPACING}>
-            {/* (a phone only keeps the dish in front of it loaded: three at once is more than its GPU holds) */}
-            {(!TOUCH || i === active) && <Suspense fallback={null}>
-              <Dish url={dish.model} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
+        // everything drawn from the dish's model (the full one, or its light version)
+        const models = (url: string) => (
+          <>
+              <Dish url={url} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                 broth={base?.broth} hidden={hidden} fill={base?.fill} tint={base?.tint}
                 floatIds={FLOAT_IDS[dish.id]} layout={dish.layout}
                 instant={reducedMotion} />
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
               {dish.roast && (
-                <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
+                <Roasting url={url} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chef} onGuests={onGuests} />
               )}
-              {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
+              {dish.heatControl && <StoveControls url={url} heat={heat} />}
               {dish.heatControl && (
-                <PotCooking url={dish.model} itemIds={ITEM_IDS[dish.id]} temp={brothTemp} active={i === active}
+                <PotCooking url={url} itemIds={ITEM_IDS[dish.id]} temp={brothTemp} active={i === active}
                   onEat={onEat} onNotice={onNotice} soup={soup} heat={heat} floorY={(dish.brothY ?? 0.81) - 0.27}
                   smoke={potSmoke} rice={servings(dish, orders[dish.id]).Rice ?? 0} lang={lang} />
               )}
+          </>
+        )
+        return (
+          <group key={dish.id} ref={(g) => { groups.current[i] = g }}
+            position-x={slot(i, active, DISHES.length) * SPACING}>
+            {/* (only the dish on screen is loaded, unless the device can hold all three) */}
+            {(QUALITY.allDishes || i === active) && <Suspense fallback={null}>
+              {/* loaded in two steps where the device can take it: the light model shows at once, the full one
+                  replaces it when it has loaded (only while nothing's ordered, so nothing being cooked is lost) */}
+              {QUALITY.lite && !(QUALITY.upgrade && upgraded.has(dish.id)) ? models(liteUrl(dish.model))
+                : QUALITY.lite ? <Suspense fallback={models(liteUrl(dish.model))}>{models(dish.model)}</Suspense>
+                  : models(dish.model)}
               {soup && dish.heatControl && dish.brothY !== undefined && (
                 // inner radius of the pot at the broth line (blender/hotpot.py INNER_R)
                 <Bubbles position-y={dish.brothY + 0.004} radius={0.74} boil={boilLevel} />
@@ -681,14 +702,15 @@ export default function App() {
       <div className="canvas-layer" style={glLost || NO_WEBGL ? { visibility: 'hidden' } : undefined}>
         <Crash inline>
         {!NO_WEBGL && <Canvas
-          shadows="percentage"
+          shadows={QUALITY.shadows ? 'percentage' : false}
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
-          dpr={[1, TOUCH ? 1.25 : 2]}
+          dpr={[1, QUALITY.dpr]}
           onCreated={({ gl }) => {
             // if the phone runs out of GPU memory the browser drops the 3D view and it would stay blank:
             // reload once to bring it back
             gl.domElement.addEventListener('webglcontextlost', (e) => {
               e.preventDefault()
+              stepDown()                 // (and start lighter next time)
               setGlLost(true)
             })
             gl.domElement.addEventListener('webglcontextrestored', () => setGlLost(false))
@@ -813,7 +835,7 @@ export default function App() {
 }
 
 // (a phone loads each dish when it's switched to, to keep memory down)
-for (const d of TOUCH ? [] : DISHES) {
-  useGLTF.preload(d.model)
+for (const d of QUALITY.allDishes ? DISHES : []) {
+  useGLTF.preload(QUALITY.lite ? liteUrl(d.model) : d.model)
   for (const b of d.bases) if (b.broth) useTexture.preload(b.broth)
 }
