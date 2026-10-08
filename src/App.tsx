@@ -65,7 +65,8 @@ const SPOT_SOFTNESS = 6
  * on portrait or narrow stages the horizontal field of view shrinks, so back off until they fit again.
  */
 const cameraDistanceScale = (aspect: number) =>
-  aspect >= 1.3 ? 1 : Math.min(3.4, (1.3 / aspect) * (aspect < 1 ? 1.15 : 1))
+  // (a portrait phone stage needs to stand well back, so the things laid out either side of the fire fit too)
+  aspect >= 1.3 ? 1 : Math.min(3.4, (1.3 / aspect) * (aspect < 1 ? 1.4 : 1))
 
 function usePrefersReducedMotion() {
   const query = '(prefers-reduced-motion: reduce)'

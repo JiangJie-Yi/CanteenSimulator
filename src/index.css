@@ -854,6 +854,18 @@ button {
   text-overflow: ellipsis;
 }
 
+/* when paging, the row steps in from the edges so the arrows sit beside the tags, not on them */
+.strips-frame.is-paged .strips {
+  margin-inline: 24px;
+}
+
+/* a long press on a tag (to take one off) mustn't pop up the phone's callout or select the text */
+.strip {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .strips-page-left {
   left: 0;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent,
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent,
   type PointerEvent as ReactPointerEvent } from 'react'
 import { nameIn, UI, type Lang } from '../i18n'
 import { toChineseNumber, type Dish } from '../menu'
@@ -99,6 +99,29 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
     row.current?.classList.remove('is-dragging')
   }
 
+  // on a phone there's no right button: a long press on a tag takes a portion off instead (and the tap that ends
+  // it doesn't add one back)
+  const press = useRef<{ timer: number; fired: boolean; x: number; y: number } | null>(null)
+  const pressStart = (id: string) => (e: ReactPointerEvent) => {
+    if (e.pointerType !== 'touch') return
+    const p = { timer: 0, fired: false, x: e.clientX, y: e.clientY }
+    p.timer = window.setTimeout(() => {
+      p.fired = true
+      onRemove(id)
+      navigator.vibrate?.(15)
+    }, 480)
+    press.current = p
+  }
+  const pressMove = (e: ReactPointerEvent) => {
+    const p = press.current
+    if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) window.clearTimeout(p.timer)
+  }
+  const pressEnd = () => {
+    const p = press.current
+    if (p) window.clearTimeout(p.timer)
+  }
+  const touchOnly = useMemo(() => window.matchMedia('(hover: none)').matches, [])
+
   const onKey = (id: string) => (e: KeyboardEvent) => {
     if (e.key === '-' || e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
@@ -121,8 +144,20 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
         className={`strip${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${x.price}${n ? `，${t.ordered(n)}` : ''}`}
         style={tagFit(name, x.en, price, n > 0)}
-        onClick={() => onAdd(x.id)}
-        onContextMenu={(e) => { e.preventDefault(); onRemove(x.id) }}
+        onClick={() => {
+          const fired = press.current?.fired
+          press.current = null
+          if (!fired) onAdd(x.id)
+        }}
+        onPointerDown={pressStart(x.id)}
+        onPointerMove={pressMove}
+        onPointerUp={pressEnd}
+        onPointerCancel={pressEnd}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          // (a long press on a phone already took one off)
+          if (!press.current) onRemove(x.id)
+        }}
         onKeyDown={onKey(x.id)}
         onPointerEnter={hasSet ? () => setPeek(x.id) : undefined}
         onPointerLeave={hasSet ? () => setPeek(null) : undefined}
@@ -182,7 +217,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear }: MenuP
         <button type="button" className="clear" onClick={onClear} disabled={count === 0}>
           {t.clear}
         </button>
-        <p className="tally-hint">{t.hint}</p>
+        <p className="tally-hint">{touchOnly ? t.hintTouch : t.hint}</p>
       </footer>
     </aside>
   )
