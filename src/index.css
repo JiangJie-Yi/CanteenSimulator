@@ -2407,3 +2407,57 @@ button {
   flex: none;
   align-self: center;
 }
+
+/* an error caught on some device: what went wrong, to screenshot and send, and a reload */
+.crash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  padding: 24px;
+  background: var(--page);
+  color: var(--text);
+  font: 15px/1.5 system-ui, sans-serif;
+  overflow: auto;
+}
+
+.crash.is-inline {
+  position: absolute;
+  z-index: 1;
+  inset: 20% 4% auto 4%;
+  border-radius: 12px;
+  background: rgb(251 243 228 / 0.95);
+  color: #3b2a20;
+  box-shadow: 0 8px 24px -10px rgb(0 0 0 / 0.5);
+}
+
+.crash b {
+  font-size: 18px;
+}
+
+.crash code {
+  display: block;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.08);
+  font: 12px/1.4 ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.crash small {
+  opacity: 0.6;
+  word-break: break-all;
+}
+
+.crash button {
+  justify-self: start;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #e8742a;
+  color: #fff;
+  font: inherit;
+}

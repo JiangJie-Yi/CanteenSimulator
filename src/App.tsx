@@ -17,6 +17,7 @@ import { MoodFace } from './components/MoodFace'
 import { GuestCounter } from './components/GuestCounter'
 import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
+import { Crash } from './components/Crash'
 import { PotCooking } from './components/PotCooking'
 import type { GuestView } from './components/Roasting'
 import { CHEFS, type Chef } from './chefs'
@@ -303,7 +304,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
         distance={14}
         decay={1.6}
         castShadow
-        shadow-mapSize={TOUCH ? [1024, 1024] : [2048, 2048]}
+        shadow-mapSize={TOUCH ? [512, 512] : [2048, 2048]}
         shadow-bias={-0.0005}
         shadow-normalBias={0.02}
       />
@@ -322,7 +323,8 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
         return (
           <group key={dish.id} ref={(g) => { groups.current[i] = g }}
             position-x={slot(i, active, DISHES.length) * SPACING}>
-            <Suspense fallback={null}>
+            {/* (a phone only keeps the dish in front of it loaded: three at once is more than its GPU holds) */}
+            {(!TOUCH || i === active) && <Suspense fallback={null}>
               <Dish url={dish.model} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                 broth={base?.broth} hidden={hidden} fill={base?.fill} tint={base?.tint}
                 floatIds={FLOAT_IDS[dish.id]} layout={dish.layout}
@@ -369,7 +371,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width * 1.25} height={dish.smoke.height * 1.2}
                   layers={5} opacity={0.75} speed={0.11} color="#3a3430" shade="#1c1916" level={grillBlackSmoke} />
               )}
-            </Suspense>
+            </Suspense>}
           </group>
         )
       })}
@@ -440,6 +442,8 @@ export default function App() {
   const [menuFolded, setMenuFolded] = useState(false)
   // bumped to send the camera back to its home view
   const [resetView, setResetView] = useState(0)
+  // the browser dropped the WebGL context (a phone out of GPU memory)
+  const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
   // the stove starts switched off: the cook turns it up
   const [heat, setHeat] = useState(0)
@@ -623,22 +627,27 @@ export default function App() {
     <div className={`app${menuFolded ? ' menu-folded' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
-      <div className="canvas-layer">
+      {glLost && (
+        <div className="crash is-inline" role="alert">
+          <b>3D 畫面中斷了</b>
+          <p>手機的顯示記憶體不足，瀏覽器把 3D 畫面關掉了。可以先關掉其他分頁或 App 再重新載入。</p>
+          <button type="button" onClick={() => window.location.replace(window.location.pathname + '?v=' + Date.now())}>重新載入</button>
+        </div>
+      )}
+      <div className="canvas-layer" style={glLost ? { visibility: 'hidden' } : undefined}>
+        <Crash inline>
         <Canvas
           shadows="percentage"
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
-          dpr={[1, TOUCH ? 1.5 : 2]}
+          dpr={[1, TOUCH ? 1.25 : 2]}
           onCreated={({ gl }) => {
             // if the phone runs out of GPU memory the browser drops the 3D view and it would stay blank:
             // reload once to bring it back
             gl.domElement.addEventListener('webglcontextlost', (e) => {
               e.preventDefault()
-              try {
-                if (sessionStorage.getItem('canteen-gl-reload')) return
-                sessionStorage.setItem('canteen-gl-reload', '1')
-              } catch { /* storage blocked: still try once */ }
-              window.setTimeout(() => window.location.reload(), 400)
+              setGlLost(true)
             })
+            gl.domElement.addEventListener('webglcontextrestored', () => setGlLost(false))
           }}
           camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
           gl={{ alpha: true, toneMapping: THREE.NoToneMapping }}
@@ -649,6 +658,7 @@ export default function App() {
             resetView={resetView} ai={ai} onOrder={(id) => changeQty(id, 1)} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} chef={chef} onGuests={setGuests} />
         </Canvas>
+        </Crash>
       </div>
       <div className="stage" ref={stageRef}>
         <Brand night={theme === 'dark'} lang={lang} />
@@ -758,7 +768,8 @@ export default function App() {
   )
 }
 
-for (const d of DISHES) {
+// (a phone loads each dish when it's switched to, to keep memory down)
+for (const d of TOUCH ? [] : DISHES) {
   useGLTF.preload(d.model)
   for (const b of d.bases) if (b.broth) useTexture.preload(b.broth)
 }

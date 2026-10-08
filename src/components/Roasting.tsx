@@ -30,6 +30,17 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
 const MAX_SEATED = 4
 const PATIENCE = 150
+/** phones have little GPU memory: the big painted textures are drawn at full size, then handed over at half */
+const PHONE = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
+function forPhone(c: HTMLCanvasElement) {
+  if (!PHONE || c.width <= 512) return c
+  const k = 512 / Math.max(c.width, c.height)
+  const out = document.createElement('canvas')
+  out.width = Math.round(c.width * k)
+  out.height = Math.round(c.height * k)
+  out.getContext('2d')!.drawImage(c, 0, 0, out.width, out.height)
+  return out
+}
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
 // the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
@@ -109,7 +120,7 @@ const TRASH_METAL = (() => {
     g.lineTo(x + (rnd() - 0.5) * 30, y + (rnd() - 0.5) * 6)
     g.stroke()
   }
-  const t = new THREE.CanvasTexture(c)
+  const t = new THREE.CanvasTexture(forPhone(c))
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = THREE.RepeatWrapping
   return t
@@ -132,7 +143,7 @@ const TRASH_LABEL = (() => {
   g.fillText('可燃', 128, 66)
   g.font = 'bold 30px "Zen Antique", serif'
   g.fillText('ごみ・竹串', 128, 122)
-  const t = new THREE.CanvasTexture(c)
+  const t = new THREE.CanvasTexture(forPhone(c))
   t.colorSpace = THREE.SRGBColorSpace
   return t
 })()
@@ -291,7 +302,7 @@ const TRAY_WOOD = (() => {
     g.fillStyle = grad
     g.fillRect(x - r, y - r, r * 2, r * 2)
   }
-  const t = new THREE.CanvasTexture(c)
+  const t = new THREE.CanvasTexture(forPhone(c))
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   t.repeat.set(1 / 1.6, 1 / 1.6)
@@ -491,7 +502,7 @@ const weaveTexture = (() => {
   rim.addColorStop(1, 'rgba(255, 240, 210, 0.22)')
   g.fillStyle = rim
   g.fillRect(0, 0, S, S)
-  const t = new THREE.CanvasTexture(c)
+  const t = new THREE.CanvasTexture(forPhone(c))
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   // mapped straight down onto the bowl (see Basket), so the strips run in two straight crossing directions
   // right across it, the way a woven zaru is made, instead of pinching into the centre
@@ -803,7 +814,7 @@ function wareTexture(motif: 'bamboo' | 'plum') {
       g.restore()
     }
   }
-  const t = new THREE.CanvasTexture(c)
+  const t = new THREE.CanvasTexture(forPhone(c))
   t.colorSpace = THREE.SRGBColorSpace
   t.anisotropy = 8
   return t
