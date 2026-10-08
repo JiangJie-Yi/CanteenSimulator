@@ -31,6 +31,43 @@ const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
 const TOUCH = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
+
+/**
+ * The renderer, asking for less each time if the browser won't give a WebGL context: first the usual, then
+ * without antialiasing on the default GPU, then the low-power GPU even if it's slow. (A phone's browser that has
+ * crashed its GPU on this site may refuse them all until it's restarted: see NO_WEBGL.)
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const makeRenderer = ({ canvas }: { canvas: any }) => {
+  const tries: THREE.WebGLRendererParameters[] = [
+    { antialias: !TOUCH, powerPreference: 'high-performance' },
+    { antialias: false, powerPreference: 'default' },
+    { antialias: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false, precision: 'mediump' },
+  ]
+  let last: unknown
+  for (const t of tries) {
+    try {
+      const r = new THREE.WebGLRenderer({ canvas, alpha: true, ...t })
+      r.toneMapping = THREE.NoToneMapping
+      return r
+    } catch (e) {
+      last = e
+    }
+  }
+  throw last
+}
+/** whether this browser will give a WebGL2 context at all, checked once before the 3D view is put up */
+const NO_WEBGL = (() => {
+  if (typeof document === 'undefined') return false
+  try {
+    const c = document.createElement('canvas')
+    const gl = c.getContext('webgl2') ?? c.getContext('webgl2', { powerPreference: 'low-power' })
+    gl?.getExtension('WEBGL_lose_context')?.loseContext()
+    return !gl
+  } catch {
+    return true
+  }
+})()
 /** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
 const CHARCOAL_COST = 18
 const GAS_PER_HOUR = 30
@@ -634,9 +671,16 @@ export default function App() {
           <button type="button" onClick={() => window.location.replace(window.location.pathname + '?v=' + Date.now())}>重新載入</button>
         </div>
       )}
-      <div className="canvas-layer" style={glLost ? { visibility: 'hidden' } : undefined}>
+      {NO_WEBGL && (
+        <div className="crash is-inline" role="alert">
+          <b>這個瀏覽器現在打不開 3D 畫面</b>
+          <p>多半是先前手機記憶體不足、3D 當掉過幾次，瀏覽器就暫時停用了這個網站的 3D。請把 Chrome（或這個 App）完全關掉再打開；不行的話重開手機，或改用右上角「在 Chrome 中開啟」。菜單一樣可以點。</p>
+          <button type="button" onClick={() => window.location.replace(window.location.pathname + '?v=' + Date.now())}>重新載入</button>
+        </div>
+      )}
+      <div className="canvas-layer" style={glLost || NO_WEBGL ? { visibility: 'hidden' } : undefined}>
         <Crash inline>
-        <Canvas
+        {!NO_WEBGL && <Canvas
           shadows="percentage"
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
           dpr={[1, TOUCH ? 1.25 : 2]}
@@ -650,14 +694,14 @@ export default function App() {
             gl.domElement.addEventListener('webglcontextrestored', () => setGlLost(false))
           }}
           camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
-          gl={{ alpha: true, toneMapping: THREE.NoToneMapping }}
+          gl={makeRenderer}
         >
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }}
             onEat={onEat} onNotice={(what) => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])}
             resetView={resetView} ai={ai} onOrder={(id) => changeQty(id, 1)} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} chef={chef} onGuests={setGuests} />
-        </Canvas>
+        </Canvas>}
         </Crash>
       </div>
       <div className="stage" ref={stageRef}>

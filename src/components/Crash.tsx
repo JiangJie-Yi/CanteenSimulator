@@ -20,6 +20,16 @@ export class Crash extends Component<{ children: ReactNode; inline?: boolean }, 
   render() {
     const { error, where } = this.state
     if (!error) return this.props.children
+    // the browser wouldn't give a 3D context: say what to do, not a stack trace
+    if (/WebGL/i.test(String(error.message))) {
+      return (
+        <div className={`crash${this.props.inline ? ' is-inline' : ''}`} role="alert">
+          <b>這個瀏覽器現在打不開 3D 畫面</b>
+          <p>多半是先前手機記憶體不足、3D 當掉過幾次，瀏覽器就暫時停用了這個網站的 3D。請把 Chrome（或這個 App）完全關掉再打開；不行的話重開手機，或改用「在 Chrome 中開啟」。菜單一樣可以點。</p>
+          <button type="button" onClick={() => window.location.replace(window.location.pathname + '?v=' + Date.now())}>重新載入</button>
+        </div>
+      )
+    }
     return (
       <div className={`crash${this.props.inline ? ' is-inline' : ''}`} role="alert">
         <b>{this.props.inline ? '3D 畫面出錯了' : '畫面出錯了'}</b>
