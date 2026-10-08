@@ -2500,3 +2500,127 @@ button {
     max-height: 270px;
   }
 }
+/* ---- phones: keep the 3D view clear ---- */
+.boards-chip {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  /* the guest board and the books fold into one chip at the top; tapped, they open over the scene */
+  .boards-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 12px;
+    border: 1px solid rgb(59 42 32 / 0.25);
+    border-radius: 999px;
+    background: rgb(251 243 228 / 0.92);
+    color: #3b2a20;
+    font: 600 13px/1.3 var(--brush);
+    box-shadow: 0 4px 12px -6px rgb(0 0 0 / 0.45);
+  }
+
+  .chip-part {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .chip-part .mood-face {
+    width: 18px;
+    height: 18px;
+  }
+
+  .chip-profit {
+    color: #2f7a2d;
+  }
+
+  .chip-profit.is-loss {
+    color: #c4442f;
+  }
+
+  .chip-caret {
+    font-size: 9px;
+    opacity: 0.6;
+  }
+
+  .side-boards {
+    top: 62px;
+    right: 10px;
+    left: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  .side-boards:not(.is-open) > section {
+    display: none;
+  }
+
+  .side-boards.is-open {
+    left: 10px;
+    z-index: 9;
+  }
+
+  .side-boards.is-open > section,
+  .side-boards.is-open > section.guest-board,
+  .side-boards.is-open > section.ledger {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* only the latest thing said, small, just above the dish switcher */
+  .ai-chat {
+    left: 12px;
+    right: 12px;
+    bottom: 70px;
+    max-width: none;
+  }
+
+  .ai-line:not(:last-child) {
+    display: none;
+  }
+
+  .ai-line {
+    padding: 3px 10px;
+    font-size: 12px;
+    justify-self: start;
+  }
+
+  .ai-who {
+    font-size: 10px;
+    padding: 0 4px;
+  }
+}
+
+/* upright phones: shorter tags, one row in view and the rest a swipe down, so the 3D view gets the space */
+@media (max-width: 900px) and (orientation: portrait) {
+  .menu .strips {
+    grid-auto-rows: 176px;
+    max-height: 206px;
+    padding-bottom: 22px;
+  }
+
+  .menu .strip-en {
+    display: none;
+  }
+
+  .menu-title {
+    font-size: 22px;
+  }
+
+  .tally {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+
+  .tally-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .menu .strips {
+    max-height: 200px;
+  }
+}

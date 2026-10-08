@@ -486,6 +486,8 @@ export default function App() {
   const [guests, setGuests] = useState<GuestView[]>([])
   // revenue mode: what's been sold, and what it cost to make (ingredients, fuel, the chef's wages)
   const [ledgerOn, setLedgerOn] = useState(false)
+  // (phone) the guest board and the books folded into a chip until tapped
+  const [boardsOpen, setBoardsOpen] = useState(false)
   const [ledger, setLedger] = useState({ revenue: 0, food: 0, fuel: 0, wage: 0 })
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
@@ -732,7 +734,28 @@ export default function App() {
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} />
-        <div className="side-boards">
+        <div className={`side-boards${boardsOpen ? ' is-open' : ''}`}>
+          {/* on a phone the boards fold into one line at the top: tap it to open them */}
+          {(ai || ledgerOn) && (
+            <button type="button" className="boards-chip" onClick={() => setBoardsOpen((o) => !o)} aria-expanded={boardsOpen}>
+              {ai && (() => {
+                const here = guests.filter((g) => g.state === 'waiting' || g.state === 'eating')
+                const rated = guests.filter((g) => g.rating !== null)
+                const avg = rated.length ? rated.reduce((n, g) => n + (g.rating ?? 0), 0) / rated.length : null
+                return (
+                  <span className="chip-part">
+                    {avg !== null && <MoodFace guest={{ id: 0, state: 'done', rating: avg, items: 0, ate: [] }} />}
+                    {lang === 'ja' ? '客' : '客'} {here.length}/{guests.length}
+                  </span>
+                )
+              })()}
+              {ledgerOn && (() => {
+                const profit = ledger.revenue - ledger.food - ledger.fuel - ledger.wage
+                return <span className={`chip-part chip-profit${profit < 0 ? ' is-loss' : ''}`}>{UI[lang].profit} {profit < 0 ? '−' : ''}{Math.abs(profit).toFixed(0)}</span>
+              })()}
+              <span className="chip-caret">{boardsOpen ? '▲' : '▼'}</span>
+            </button>
+          )}
           {ai && (
             <section className="guest-board" aria-label={UI[lang].guests(0, 0)}>
               <div className="chef-pick" role="radiogroup" aria-label={UI[lang].chefPick}>
