@@ -97,3 +97,25 @@ export function stepDown() {
 }
 
 export const liteUrl = (url: string) => url.replace(/\.glb$/, '-lite.glb')
+
+/** what this browser offers, for the "can't open 3D" notice: so a screenshot of it says what's wrong */
+export function webglReport() {
+  const probe = (type: string, opts?: WebGLContextAttributes) => {
+    try {
+      const c = document.createElement('canvas')
+      const gl = c.getContext(type, opts) as WebGLRenderingContext | null
+      if (!gl) return { ok: false, gpu: '' }
+      const ext = gl.getExtension('WEBGL_debug_renderer_info')
+      const gpu = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER))
+      gl.getExtension('WEBGL_lose_context')?.loseContext()
+      return { ok: true, gpu }
+    } catch {
+      return { ok: false, gpu: '' }
+    }
+  }
+  const w2 = probe('webgl2')
+  const w2low = probe('webgl2', { powerPreference: 'low-power', failIfMajorPerformanceCaveat: false })
+  const w1 = probe('webgl')
+  return `WebGL2: ${w2.ok ? 'OK' : '✗'} · WebGL2 省電: ${w2low.ok ? 'OK' : '✗'} · WebGL1: ${w1.ok ? 'OK' : '✗'}` +
+    ` · GPU: ${w2.gpu || w2low.gpu || w1.gpu || '—'} · 等級: ${QUALITY.tier}`
+}
