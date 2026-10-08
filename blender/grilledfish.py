@@ -74,11 +74,44 @@ TEX["ember"] = image("T_Ember", mix((0.05, 0.04, 0.035), (0.12, 0.08, 0.06), fbm
 TEX["ember_e"] = image("T_Ember_E", mix((0, 0, 0), (1.0, 0.36, 0.06), hot))
 TEX["ember_n"] = image("T_Ember_N", to_normal(-cracks + fbm(N, 16, 16) * 0.4, 2.5), data=True)
 
-# stones
-N = 256
-stone = mix((0.33, 0.32, 0.30), (0.56, 0.54, 0.50), fbm(N, 6, 6))
-TEX["stone"] = image("T_Stone", mix(stone, (0.2, 0.19, 0.18), (vnoise(N, 80, 80) > 0.85).astype(np.float32) * 0.7))
-TEX["stone_n"] = image("T_Stone_N", to_normal(fbm(N, 12, 12), 2.5), data=True)
+# stones: weathered field rock (granite / andesite) as it looks close up. A warm-grey ground mottled browner in
+# places; the speckle of its mineral grains (dark biotite and hornblende, pale feldspar, a few larger dark
+# clusters); thin pale quartz veins wandering across; fine dark hairline cracks; small weathering pits; rusty
+# iron stains; and pale ash dust settled into the hollows. The height for the normal map follows the same
+# features: broad lumps, raised veins and grains, sunken cracks and pits.
+N = 1024
+warp = fbm(N, 4, 4)
+lumps = fbm(N, 6, 6)
+stone = mix((0.33, 0.33, 0.32), (0.55, 0.54, 0.51), lumps)
+stone = mix(stone, (0.5, 0.44, 0.37), smooth(0.6, 0.85, fbm(N, 3, 3)) * 0.25)          # browner patches
+stone = mix(stone, (0.3, 0.31, 0.31), smooth(0.6, 0.85, fbm(N, 2, 5)) * 0.3)           # cooler bands
+# (the toon shading flattens the normal map into a few bands, so the detail has to be in the colour)
+fine = vnoise(N, 170, 170) * 0.7 + vnoise(N, 340, 340) * 0.3
+grain_dark = smooth(0.66, 0.76, fine)
+grain_light = smooth(0.3, 0.22, fine)
+mottle = fbm(N, 20, 20)
+stone = mix(stone, stone * 0.78, smooth(0.45, 0.7, mottle) * 0.8)                   # blotchy weathering
+cluster = smooth(0.86, 0.92, vnoise(N, 150, 150)) * smooth(0.4, 0.6, fbm(N, 8, 8))
+stone = mix(stone, (0.16, 0.15, 0.14), grain_dark * 0.75)
+stone = mix(stone, (0.74, 0.72, 0.67), grain_light * 0.55)
+stone = mix(stone, (0.09, 0.085, 0.08), cluster * 0.85)
+vein = (smooth(0.006, 0.001, np.abs(fbm(N, 3, 2) + (warp - 0.5) * 0.25 - 0.5)) * smooth(0.35, 0.6, fbm(N, 2, 3)) +
+        smooth(0.004, 0.0, np.abs(fbm(N, 2, 4) + (warp - 0.5) * 0.3 - 0.5)) * 0.5 * smooth(0.5, 0.7, fbm(N, 3, 2)))
+vein = np.clip(vein, 0, 1)
+stone = mix(stone, (0.7, 0.69, 0.65), vein * 0.45)
+crack = np.clip(smooth(0.007, 0.001, np.abs(fbm(N, 6, 6) - 0.5)) * smooth(0.4, 0.55, fbm(N, 2, 2)) +
+                smooth(0.005, 0.0, np.abs(fbm(N, 11, 11) - 0.5)) * smooth(0.55, 0.7, fbm(N, 3, 3)) * 0.8, 0, 1)
+stone = mix(stone, (0.08, 0.07, 0.06), crack * 0.9)
+pits = smooth(0.91, 0.95, vnoise(N, 110, 110))
+stone = mix(stone, (0.17, 0.15, 0.13), pits * 0.8)
+rust = smooth(0.66, 0.82, fbm(N, 4, 3)) * (0.6 + 0.4 * fbm(N, 16, 16))
+stone = mix(stone, (0.5, 0.36, 0.24), rust * 0.22)
+ash = smooth(0.62, 0.8, fbm(N, 12, 12)) * (1 - lumps) * 0.6 + pits * 0.3
+stone = mix(stone, (0.72, 0.7, 0.67), np.clip(ash, 0, 1) * 0.4)
+TEX["stone"] = image("T_Stone", stone)
+height = (lumps * 0.7 + fbm(N, 24, 24) * 0.25 + fine * 0.1 + vein * 0.1 + cluster * 0.05
+          - crack * 0.9 - pits * 0.5)
+TEX["stone_n"] = image("T_Stone_N", to_normal(height, 9.0), data=True)
 
 # fire-pit ground: sooty ash in the middle, packed dirt out past the stones, and an alpha edge that's
 # wobbled by noise and fades out smoothly instead of ending in a hard circle
@@ -508,13 +541,18 @@ for i, half in enumerate(sizes):
             vtx.co.z *= 0.6                    # flatter underneath, so it sits on the ground
     if not oval:
         # box-projected UVs, so the stone texture lies flat on every facet
+        # (each stone its own patch of the rock, turned its own way, so no two show the same veins)
         uvl = bm.loops.layers.uv.verify()
         bm.normal_update()
+        off = (random.random(), random.random())
+        turn = random.uniform(0, math.pi)
+        ct, st = math.cos(turn), math.sin(turn)
         for f in bm.faces:
             ax = max(range(3), key=lambda q: abs(f.normal[q]))
             for l in f.loops:
                 c = l.vert.co
-                l[uvl].uv = ((c.y, c.z), (c.x, c.z), (c.x, c.y))[ax]
+                pu, pv = ((c.y, c.z), (c.x, c.z), (c.x, c.y))[ax]
+                l[uvl].uv = ((pu * ct - pv * st) * 0.24 + off[0], (pu * st + pv * ct) * 0.24 + off[1])
     # blackened by the fire on the side facing it (local -X points at the fire), thickest low down, in patches
     col = bm.loops.layers.float_color.new("Col")
     for vtx in bm.verts:
