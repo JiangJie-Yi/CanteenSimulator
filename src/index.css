@@ -3172,16 +3172,14 @@ button {
   .app .theme-toggle,
   .app .lang-toggle,
   .app .ai-toggle,
-  .app .ledger-toggle,
-  .app .bgm-toggle {
+  .app .ledger-toggle {
     display: none;
   }
 
   .app.tools-open .theme-toggle,
   .app.tools-open .lang-toggle,
   .app.tools-open .ai-toggle,
-  .app.tools-open .ledger-toggle,
-  .app.tools-open .bgm-toggle {
+  .app.tools-open .ledger-toggle {
     display: grid;
     place-items: center;
     right: 14px;
@@ -3194,9 +3192,8 @@ button {
 
   .app.tools-open .ai-toggle { top: 62px; }
   .app.tools-open .ledger-toggle { top: 108px; }
-  .app.tools-open .bgm-toggle { top: 154px; }
-  .app.tools-open .lang-toggle { top: 200px; }
-  .app.tools-open .theme-toggle { top: 246px; }
+  .app.tools-open .lang-toggle { top: 154px; }
+  .app.tools-open .theme-toggle { top: 200px; }
 
   /* the chip with the guests and the books sits left of the ☰ */
   .side-boards {
@@ -3781,4 +3778,148 @@ button {
   .ofc-list .ofc-cost {
     display: none;
   }
+}
+
+.guest-id {
+  min-width: 5.2em;
+  white-space: nowrap;
+}
+
+.gc-tag {
+  white-space: nowrap;
+  font-size: 8px;
+}
+
+/* the guest board and the books are dragged by any bare part of them */
+.is-draggable {
+  cursor: grab;
+  user-select: none;
+}
+
+.is-draggable.is-dragging {
+  cursor: grabbing;
+  box-shadow: 0 16px 34px -12px rgb(0 0 0 / 0.6);
+}
+
+/* ---- first visit: the owner's name, then 創業; the sign stays dark until then ---- */
+.welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(20 16 12 / 0.55);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.welcome-card {
+  width: min(380px, 100%);
+  padding: 22px 22px 18px;
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 27px, rgb(90 120 170 / 0.12) 27px 28px),
+    #fbf3e4;
+  color: #3b2a20;
+  box-shadow: 0 20px 50px -18px rgb(0 0 0 / 0.7);
+  font: 16px/1.5 var(--brush);
+  text-align: center;
+  animation: stamp 320ms ease-out;
+}
+
+.welcome-card h2 {
+  margin: 0 0 14px;
+  font: 400 30px/1.2 'Zen Antique', var(--brush);
+  letter-spacing: 0.12em;
+  color: #8f2a20;
+}
+
+.welcome-card label {
+  display: grid;
+  gap: 8px;
+}
+
+.welcome-card input {
+  padding: 10px 12px;
+  border: 1.5px solid rgb(59 42 32 / 0.35);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font: 18px/1.2 var(--brush);
+  text-align: center;
+}
+
+.welcome-card button {
+  margin-top: 14px;
+  padding: 9px 26px;
+  border: none;
+  border-radius: 999px;
+  background: #3b2a20;
+  color: #fbf3e4;
+  font: 600 16px/1 var(--brush);
+  cursor: pointer;
+}
+
+.welcome-card button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.welcome-found p {
+  margin: 0 0 4px;
+}
+
+.welcome-sub {
+  color: #7a6656;
+  font-size: 14px;
+}
+
+.welcome-card .welcome-go {
+  display: block;
+  margin: 18px auto 6px;
+  padding: 12px 40px;
+  background: #b4302a;
+  font: 400 24px/1 'Zen Antique', var(--brush);
+  letter-spacing: 0.3em;
+  box-shadow: 0 6px 16px -6px rgb(180 48 42 / 0.7);
+}
+
+.welcome-card .welcome-back {
+  margin-top: 4px;
+  padding: 4px 12px;
+  background: none;
+  color: #7a6656;
+  font-size: 13px;
+}
+
+/* unlit: grey and dull, no glow */
+.brand-dark .brand-plate {
+  filter: grayscale(0.85) brightness(0.55);
+}
+
+.brand-dark .brand-main,
+.brand-dark .brand-sub,
+.brand-dark .brand-flame {
+  text-shadow: none;
+  animation: none;
+}
+
+/* founded: the sign flickers on and flares up, then settles */
+.brand-ignite .brand-plate {
+  animation: brand-ignite 1.8s ease-out;
+}
+
+@keyframes brand-ignite {
+  0% { filter: grayscale(0.85) brightness(0.55); }
+  12% { filter: brightness(1.4) drop-shadow(0 0 12px rgb(255 210 120 / 0.9)); }
+  20% { filter: grayscale(0.6) brightness(0.7); }
+  32% { filter: brightness(1.5) drop-shadow(0 0 18px rgb(255 200 100 / 1)); }
+  42% { filter: brightness(0.85); }
+  60% { filter: brightness(1.35) drop-shadow(0 0 22px rgb(255 190 90 / 0.9)); }
+  100% { filter: none; }
+}
+
+.ofc-owner {
+  font-weight: 700;
 }

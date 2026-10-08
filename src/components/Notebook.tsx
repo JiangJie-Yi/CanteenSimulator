@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useDrag } from '../useDrag'
 import type { Lang } from '../i18n'
 
 /** how one try at a food went: how good, how far cooked, what went on it */
@@ -41,6 +42,7 @@ const describe = (t: Try, lang: Lang) => {
  */
 export function Notebook({ notes, lang }: { notes: Notes; lang: Lang }) {
   const [open, setOpen] = useState(false)
+  const drag = useDrag('notebook')
   const rows = Object.entries(notes).sort((a, b) => bestOf(b[1]).taste - bestOf(a[1]).taste)
   return (
     <>
@@ -53,8 +55,8 @@ export function Notebook({ notes, lang }: { notes: Notes; lang: Lang }) {
         {rows.length > 0 && <span className="notebook-count">{rows.length}</span>}
       </button>
       {open && createPortal(
-        <section className="notebook" aria-label={lang === 'ja' ? '試食ノート' : '試吃筆記'}>
-          <header>
+        <section className="notebook" aria-label={lang === 'ja' ? '試食ノート' : '試吃筆記'} style={drag.move}>
+          <header {...drag.handle}>
             <b>{lang === 'ja' ? '試食ノート' : '試吃筆記'}</b>
             <small>{lang === 'ja' ? '一番おいしかった焼き方を料理人に渡します（従うかは人次第）'
               : '最好吃的做法會交給師傅參考（照不照做看人）'}</small>

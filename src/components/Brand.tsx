@@ -15,10 +15,12 @@ const NAMES: Record<string, Record<Lang, { main: string; sub: string }>> = {
  * The shop's sign, top-left: it hangs from two cords and sways a little in the breeze, and at night its lettering
  * lights up (and a 深夜 stamp is pressed on beside it). Which sign depends on which shop is on screen.
  */
-export function Brand({ night, lang, shop = 'beefnoodle' }: { night: boolean; lang: Lang; shop?: string }) {
+export function Brand({ night, lang, shop = 'beefnoodle', dark = false, ignite = 0 }:
+  { night: boolean; lang: Lang; shop?: string; dark?: boolean; ignite?: number }) {
   const { main, sub } = (NAMES[shop] ?? NAMES.beefnoodle)[lang]
   return (
-    <h1 key={shop} className={`brand brand-${shop}${night ? ' brand-night' : ''} brand-${lang}`}
+    // dark: the business hasn't been founded yet (the sign is unlit); ignite: it's just been founded (it comes to life)
+    <h1 key={`${shop}-${ignite}`} className={`brand brand-${shop}${night ? ' brand-night' : ''} brand-${lang}${dark ? ' brand-dark' : ''}${ignite ? ' brand-ignite' : ''}`}
       lang={lang === 'ja' ? 'ja' : 'zh-Hant'} aria-label={`${main}${sub}${night ? ' 深夜' : ''}`}>
       <span className="brand-plate" aria-hidden="true">
         <span className="brand-cord brand-cord-left" />

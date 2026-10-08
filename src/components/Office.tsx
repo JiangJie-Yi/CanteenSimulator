@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useDrag } from '../useDrag'
 import { nameIn, type Lang } from '../i18n'
 import type { Dish } from '../menu'
 import { CANDIDATES, ROLES, type Worker } from '../staff'
@@ -19,6 +20,7 @@ type Props = {
   onTab: (t: 'stock' | 'staff') => void
   /** start the business over (wipes the save) */
   onReset: () => void
+  owner: string
 }
 
 const money = (n: number) => `NT$${Math.round(n).toLocaleString()}`
@@ -36,20 +38,22 @@ function Bar({ v, label }: { v: number; label: string }) {
  * The back office of the shop on screen: 採買 (buy ingredients into stock, paid from the cash in hand) and 人事
  * (hire and let go of the staff that kind of shop needs, see who's tired).
  */
-export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire, onFire, onClose, tab, onTab, onReset }: Props) {
+export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire, onFire, onClose, tab, onTab, onReset, owner }: Props) {
   const [packs] = useState([10, 50])
   const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items]
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
+  const drag = useDrag('office')
   // (put on the page itself, over the menu and everything else)
   return createPortal(
-    <section className="office" aria-label={ja ? '事務所' : '經營'}>
-      <header>
+    <section className="office" aria-label={ja ? '事務所' : '經營'} style={drag.move}>
+      <header {...drag.handle}>
         <div className="ofc-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'stock'} onClick={() => onTab('stock')}>{ja ? '仕入れ' : '採買'}</button>
           <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{ja ? '人事' : '人事'}</button>
         </div>
+        {owner && <span className="ofc-owner">{ja ? 'オーナー' : '老闆'} {owner}</span>}
         <span className={`ofc-cash${cash < 0 ? ' is-low' : ''}`}>{ja ? '現金' : '現金'} {money(cash)}</span>
         <button type="button" className="ofc-reset" onClick={onReset}>{ja ? '最初から' : '重新開始'}</button>
         <button type="button" className="ofc-close" onClick={onClose} aria-label="close">×</button>

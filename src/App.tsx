@@ -24,10 +24,12 @@ import { NoodleEating } from './components/NoodleEating'
 import type { GuestView } from './components/Roasting'
 import { CHEFS, type Chef } from './chefs'
 import { LINES } from './lines'
+import { guestLabel } from './guests'
+import { useDrag } from './useDrag'
 import { CANDIDATES, effective, restPerMin, tirePerMin, type Role } from './staff'
 import { Office } from './components/Office'
+import { Welcome } from './components/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from './quality'
-import { isMuted, onMuteChange, setMuted } from './bgm'
 import { moodOf } from './components/MoodFace'
 import { Roasting } from './components/Roasting'
 import { Steam } from './components/Steam'
@@ -44,7 +46,7 @@ const SAVE_KEY = 'canteen-save'
 /** a whole bowl of noodles, by the bowl (the set meals' parts count on their own) */
 const BASE_KCAL: Record<string, number> = { braised: 650, clear: 560, plain: 380, dry: 520, sesame: 610 }
 type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number }
-  stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes }
+  stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null }
 const SAVED: Saved | null = (() => {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
@@ -593,18 +595,23 @@ export default function App() {
   const feedSeq = useRef(0)
   // (phone) the guest board and the books folded into a chip until tapped
   const [boardsOpen, setBoardsOpen] = useState(false)
+  // the guest board and the books can be dragged anywhere on the screen
+  const dragBoard = useDrag('guests')
+  const dragLedger = useDrag('ledger')
+  const dragChat = useDrag('chat')
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
-  const [musicOn, setMusicOn] = useState(() => !isMuted())
-  useEffect(() => onMuteChange((m) => setMusicOn(!m)), [])
   const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, ...SAVED?.ledger }))
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
   const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage
   // ingredients in stock, by portion; nothing until it's bought
   const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
+  // the owner's name; until they've given it and founded the business, the welcome is up and the sign is dark
+  const [owner, setOwner] = useState<string | null>(() => SAVED?.owner ?? null)
+  const [ignite, setIgnite] = useState(0)
   // the business is saved as it goes (every few seconds and when the page is left), and picked up next time
-  const saveRef = useRef({ ledger, stock, hired, notes })
-  saveRef.current = { ledger, stock, hired, notes }
+  const saveRef = useRef<Omit<Saved, 'v'>>({ ledger, stock, hired, notes, owner })
+  saveRef.current = { ledger, stock, hired, notes, owner }
   useEffect(() => {
     const write = () => {
       try {
@@ -624,7 +631,11 @@ export default function App() {
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
   const chatId = useRef(0)
-  const talk = useCallback((who: 'chef' | 'guest', text: string) => {
+  const talk = useCallback((who: 'chef' | 'guest', raw: string) => {
+    // customers are named by how they look (上班族, 老奶奶…), not by number
+    const lg = langRef.current
+    const text = raw.replace(/^#(\d+) /, (_, n) => `${guestLabel(+n, lg)}${lg === 'ja' ? '「' : '：'}`)
+      .replace(/#(\d+) ?/g, (_, n) => guestLabel(+n, lg)) + (lg === 'ja' && /^#\d+ /.test(raw) ? '」' : '')
     const id = ++chatId.current
     setChat((all) => [...all.slice(-3), { id, who, text }])
     window.setTimeout(() => setChat((all) => all.filter((m) => m.id !== id)), 6000)
@@ -681,15 +692,16 @@ export default function App() {
   }, [])
   // charcoal grill: burns down by itself at about the pace of real binchotan on a grill (a full bed lasts about an
   // hour and a half; a handful of fresh charcoal, 添炭, about a quarter of an hour more)
-  const fire = useRef(0.6)
-  const [fireLevel, setFireLevel] = useState(60)
+  // the charcoal isn't lit to begin with: add charcoal to start the fire
+  const fire = useRef(0)
+  const [fireLevel, setFireLevel] = useState(0)
   // each table has its own fire: the player's test fire and the shop's
   const fireBy = useRef<Record<string, number>>({})
   const lastSpace = useRef(space)
   useLayoutEffect(() => {
     if (lastSpace.current === space) return
     fireBy.current[lastSpace.current] = fire.current
-    fire.current = fireBy.current[space] ?? 0.6
+    fire.current = fireBy.current[space] ?? 0
     setFireLevel(Math.round(fire.current * 1000) / 10)
     lastSpace.current = space
   }, [space])
@@ -828,6 +840,25 @@ export default function App() {
       window.removeEventListener('touchend', end)
     }
   }, [])
+  // sold out: once there's nothing left to sell, no new customers can order; when the last one has finished, the
+  // shop closes by itself
+  useEffect(() => {
+    if (!ai) return
+    const d = DISHES[active]
+    const has = (id: string) => (stock[id] ?? 0) > 0
+    const anyItem = d.items.some((x) => has(x.id))
+    const anyBase = d.bases.some((b) => (b.includes ? Object.entries(b.includes).every(([k, q]) => (stock[k] ?? 0) >= q) : has(b.id)))
+    const sellable = d.id === 'grilledfish' ? anyItem || anyBase
+      : d.id === 'hotpot' ? (anyBase || !!orderedBase(d, orders[d.id])) && anyItem
+        : anyBase
+    if (sellable) return
+    const seated = (guestsBy[d.id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')
+    if (seated) return
+    setAi(false)
+    say(UI[lang].soldOut)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ai, stock, guestsBy, active])
+
   const MAX_PORTIONS = 99
   // the fire only holds so many skewers; past that, take something off before ordering more
   const [offFire, setOffFire] = useState(0)
@@ -1166,7 +1197,7 @@ export default function App() {
         </Crash>
       </div>
       <div className="stage" ref={stageRef}>
-        <Brand night={theme === 'dark'} lang={lang} shop={dish.id} />
+        <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!owner} ignite={ignite} />
         {dish.heatControl && <HeatControl heat={heat} onChange={ai ? () => {} : setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={ai ? () => {} : addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
@@ -1176,7 +1207,7 @@ export default function App() {
           <span aria-hidden="true">🏪</span><b>NT${Math.round(cash).toLocaleString()}</b>
         </button>
         {office && (
-          <Office dish={dish} lang={lang} cash={cash} stock={stock} tab={office} onTab={setOffice} onClose={() => setOffice(null)}
+          <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} stock={stock} tab={office} onTab={setOffice} onClose={() => setOffice(null)}
             unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
             onBuy={(id, n) => {
               const it = ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id)
@@ -1192,7 +1223,7 @@ export default function App() {
               } catch {
                 // storage blocked
               }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0 }, stock: {}, hired: {}, notes: {} }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0 }, stock: {}, hired: {}, notes: {}, owner: null }
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}
@@ -1226,7 +1257,8 @@ export default function App() {
             </button>
           )}
           {ai && (
-            <section className="guest-board" aria-label={UI[lang].guests(0, 0)}>
+            <section className="guest-board is-draggable" aria-label={UI[lang].guests(0, 0)} style={dragBoard.style}
+              onPointerDown={dragBoard.onPointerDown} onDoubleClick={dragBoard.onDoubleClick}>
               <div className="chef-pick">
                 <span>{UI[lang].chefPick}</span>
                 <b>{staffOf(DISHES[active].id, 'chef').map((w) => (lang === 'ja' ? w.ja : w.zh)).join('、') || '—'}</b>
@@ -1235,13 +1267,13 @@ export default function App() {
               <p className="guest-count">
                 {UI[lang].guests(guests.length, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
               </p>
-              <GuestCounter guests={guests} shop={DISHES[active].id} staff={{ chef: staffOf(DISHES[active].id, 'chef').length,
+              <GuestCounter guests={guests} shop={DISHES[active].id} lang={lang} staff={{ chef: staffOf(DISHES[active].id, 'chef').length,
                 cashier: staffOf(DISHES[active].id, 'cashier').length, server: staffOf(DISHES[active].id, 'server').length }} />
               <ul className="guest-list">
                 {guests.slice(-4).reverse().map((g) => {
                   return (
                     <li key={g.id} className={`guest-row is-${g.state}`}>
-                      <span className="guest-id">#{g.id}</span>
+                      <span className="guest-id">{guestLabel(g.id, lang)}</span>
                       <MoodFace guest={g} />
                       {g.state === 'angry' ? <span className="guest-note">{UI[lang].leftAngry}</span>
                         : g.rating === null ? <span className="guest-note">{UI[lang].waiting}</span>
@@ -1253,7 +1285,8 @@ export default function App() {
             </section>
           )}
           {ledgerOn && (
-            <section className="ledger" aria-label={UI[lang].ledgerLabel}>
+            <section className="ledger is-draggable" aria-label={UI[lang].ledgerLabel} style={dragLedger.style}
+              onPointerDown={dragLedger.onPointerDown} onDoubleClick={dragLedger.onDoubleClick}>
               <p className="ledger-cash"><span>{lang === 'ja' ? '現金' : '現金'}</span><b>NT${Math.round(cash).toLocaleString()}</b></p>
               <p><span>{lang === 'ja' ? '仕入れ' : '採買支出'}</span><b>−{Math.round(ledger.bought).toLocaleString()}</b></p>
               {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
@@ -1275,7 +1308,8 @@ export default function App() {
           )}
         </div>
         {ai && chat.length > 0 && (
-          <ul className="ai-chat" aria-live="polite">
+          <ul className="ai-chat is-draggable" aria-live="polite" style={{ ...dragChat.style, pointerEvents: 'auto' }}
+            onPointerDown={dragChat.onPointerDown} onDoubleClick={dragChat.onDoubleClick}>
             {chat.map((m) => (
               <li key={m.id} className={`ai-line ai-${m.who}`}>
                 <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : UI[lang].guest}</span>{m.text}
@@ -1295,6 +1329,19 @@ export default function App() {
           </div>
         )}
       </div>
+      {!owner && (
+        <Welcome lang={lang} onStart={(name) => {
+          setOwner(name)
+          setIgnite((n) => n + 1)
+          window.setTimeout(() => setIgnite(0), 3200)
+          saveRef.current = { ...saveRef.current, owner: name }
+          try {
+            localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, ...saveRef.current }))
+          } catch {
+            // storage blocked
+          }
+        }} />
+      )}
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]} feed={feed} locked={ai} stock={stock}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
@@ -1320,10 +1367,6 @@ export default function App() {
       </button>
       <button type="button" className="tools-toggle" onClick={() => setToolsOpen((o) => !o)} aria-expanded={toolsOpen}
         aria-label={UI[lang].tools}>{toolsOpen ? '×' : '☰'}</button>
-      <button type="button" className={`bgm-toggle${musicOn ? ' is-on' : ''}`} onClick={() => setMuted(musicOn)}
-        aria-pressed={musicOn} title={UI[lang].music} aria-label={UI[lang].music}>
-        {musicOn ? '♪' : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17V6l10-2v11M9 17a3 3 0 1 1-3-3 3 3 0 0 1 3 3zM19 15a3 3 0 1 1-3-3 3 3 0 0 1 3 3zM3 3l18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>}
-      </button>
       <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
         aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => {

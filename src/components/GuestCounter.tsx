@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { GuestView } from './Roasting'
 import { MoodFace } from './MoodFace'
+import { guestLabel, kindOf } from '../guests'
+import type { Lang } from '../i18n'
 
 /*
  * The inside of the shop on screen, drawn small above the guest list, each of the three in its own style:
@@ -25,18 +27,22 @@ const HAIR = ['#2b1d14', '#4a3020', '#1c1c22', '#7a5a3a', '#a8a8a8', '#5a3a2a']
 const pick = <T,>(list: T[], n: number) => list[n % list.length]
 const INK = '#3b2a20'
 
-/** customers come in all sorts: office workers in a suit, students, an old man in a cardigan, a woman in a
- * yukata, someone in a hoodie… with glasses or a cap now and then */
+/** a customer, drawn as what they are (see guests.ts): the suit and tie of an office worker, a sailor uniform, the
+ * old lady's bun and cardigan, a schoolkid's yellow cap and satchel, the plump middle-aged man with a moustache… */
 function Person({ id, walking, eating }: { id: number; walking: boolean; eating: boolean }) {
+  const kind = kindOf(id).kind
   const skin = pick(SKIN, id * 7 + 1)
-  const kind = id % 6                  // 0 suit, 1 hoodie, 2 yukata, 3 student, 4 elder, 5 t-shirt
-  const hair = kind === 4 ? '#c8c8c8' : pick(HAIR, id * 3)
-  const wide = id % 3 === 0 ? 1.12 : id % 3 === 1 ? 0.94 : 1
-  const glasses = id % 4 === 1 || kind === 4
-  const cap = kind === 1 && id % 2 === 0
-  const longHair = kind === 2 || (kind === 3 && id % 2) || (kind === 5 && id % 4 === 3)
-  const top = { 0: '#2f3a4a', 1: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), 2: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
-    3: '#23324a', 4: '#8a7a5a', 5: pick(['#e8e0d0', '#c0892e', '#7b5aa0', '#3d8a8a'], id) }[kind] as string
+  const old = kind === 'grandma' || kind === 'grandpa'
+  const hair = old ? '#cfcfcf' : pick(HAIR, id * 3)
+  const scale = kind === 'kid' ? 0.78 : kind === 'grandma' ? 0.92 : 1
+  const wide = kind === 'uncle' ? 1.22 : kind === 'grandpa' ? 1.05 : kind === 'highSchoolGirl' || kind === 'officeLady' ? 0.92 : 1
+  const glasses = old || kind === 'officeLady' && id % 2 === 0 || kind === 'student' && id % 3 === 0
+  const top: Record<string, string> = {
+    salaryman: '#2b3444', officeLady: '#6a6f78', highSchoolGirl: '#f4f1ea', highSchoolBoy: '#1c1e26', grandma: '#c9b48a',
+    grandpa: '#7a5a3a', kid: pick(['#e85a4a', '#4a8ad8', '#f0c040'], id), uncle: pick(['#4a7a5a', '#a8432f', '#3d6a9a'], id),
+    student: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukata: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
+  }
+  const legs = kind === 'highSchoolGirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a' : '#2f2f36'
   return (
     <svg viewBox="0 0 40 60" className={`gc-person${walking ? ' is-walking' : ''}${eating ? ' is-eating' : ''}`}
       aria-hidden="true">
@@ -46,29 +52,50 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
           <path d="M13 50l-2 9M27 50l2 9M20 50v9" stroke="#5a3a20" strokeWidth="1.6" />
         </g>
       )}
-      <g className="gc-body" transform={`translate(20 0) scale(${wide} 1) translate(-20 0)`}>
+      <g className="gc-body" transform={`translate(20 60) scale(${wide * scale} ${scale}) translate(-20 -60)`}>
         {walking && (
           <g className="gc-legs">
-            <path d="M16 44l-2 12M24 44l2 12" stroke={kind === 0 ? '#2a2f3a' : kind === 3 ? '#23324a' : '#3a3a40'} strokeWidth="3.4"
+            <path d="M16 44l-2 12M24 44l2 12" stroke={legs} strokeWidth="3.4" strokeLinecap="round" />
+            <path d="M12 56h4M24 56h4" stroke={kind === 'highSchoolGirl' || kind === 'kid' ? '#3a2a1e' : '#1c1c1c'} strokeWidth="2.4"
               strokeLinecap="round" />
-            <path d="M12 56h4M24 56h4" stroke="#1c1c1c" strokeWidth="2.4" strokeLinecap="round" />
           </g>
         )}
-        {/* the body: shoulders and arms in the clothes, with the details of each kind */}
-        <path d="M9 47c0-11 4-19 11-19s11 8 11 19z" fill={top} stroke={INK} strokeWidth="1.1" />
-        {kind === 0 && <><path d="M17 29l3 9 3-9" fill="#f4f1ea" /><path d="M20 30l-1 2 1 7 1-7z" fill="#a8322a" /></>}
-        {kind === 1 && <><path d="M14 30q6 5 12 0" fill="none" stroke="rgb(0 0 0 / 0.25)" strokeWidth="1.4" /><path d="M18 36v5M22 36v5" stroke="#f1ead8" strokeWidth="0.9" /></>}
-        {kind === 2 && <><path d="M15 29l5 9 5-9" fill="none" stroke="#f4f0e6" strokeWidth="1.6" /><path d="M10 40h20" stroke="#e8c45a" strokeWidth="3" /></>}
-        {kind === 3 && <><path d="M14 29l6 6 6-6" fill="#f4f1ea" stroke={INK} strokeWidth="0.6" /><path d="M18 34l2 3 2-3z" fill="#c4302a" /></>}
-        {kind === 4 && <><path d="M20 29v18" stroke="rgb(0 0 0 / 0.3)" strokeWidth="1" /><circle cx="20" cy="34" r="0.8" fill="#3b2a20" /><circle cx="20" cy="39" r="0.8" fill="#3b2a20" /></>}
-        {kind === 5 && <path d="M15 33h10" stroke="rgb(255 255 255 / 0.5)" strokeWidth="2" />}
+        {/* the satchel on a schoolkid's back, the office worker's briefcase */}
+        {kind === 'kid' && <rect x="27" y="30" width="7" height="10" rx="2" fill="#c4302a" stroke={INK} strokeWidth="0.8" />}
+        {kind === 'salaryman' && walking && <rect x="28" y="40" width="8" height="6" rx="1" fill="#3a2a1e" stroke={INK} strokeWidth="0.6" />}
+        <path d="M9 47c0-11 4-19 11-19s11 8 11 19z" fill={top[kind]} stroke={INK} strokeWidth="1.1" />
+        {kind === 'salaryman' && <><path d="M16 29l4 9 4-9" fill="#f4f1ea" /><path d="M20 30l-1.2 2 1.2 8 1.2-8z" fill="#a8322a" /></>}
+        {kind === 'officeLady' && <><path d="M16 29l4 7 4-7" fill="#f4f1ea" /><circle cx="20" cy="33" r="0.9" fill="#c9b48a" /></>}
+        {kind === 'highSchoolGirl' && (
+          <>
+            {/* the sailor collar with its white stripes, and the red scarf */}
+            <path d="M11 33l9 6 9-6-2-4h-14z" fill="#23324a" />
+            <path d="M12.5 33.5l7.5 5 7.5-5" fill="none" stroke="#f4f1ea" strokeWidth="0.7" />
+            <path d="M18 37l2 4 2-4z" fill="#c4302a" />
+          </>
+        )}
+        {kind === 'highSchoolBoy' && <><path d="M20 29v18" stroke="#3a3a46" strokeWidth="0.8" />{[32, 36, 40, 44].map((y) => <circle key={y} cx="20" cy={y} r="0.8" fill="#e0c060" />)}</>}
+        {kind === 'grandma' && <><path d="M15 29l5 6 5-6" fill="#efe8d6" /><path d="M14 38h12" stroke="rgb(0 0 0 / 0.15)" strokeWidth="1" /></>}
+        {kind === 'grandpa' && <><path d="M16 29l4 6 4-6" fill="#e8e0d0" /><path d="M14 31v16M26 31v16" stroke="#5a3a20" strokeWidth="1" /></>}
+        {kind === 'uncle' && <><path d="M17 29l3 4 3-4" fill="#f4f1ea" /><circle cx="20" cy="35" r="0.7" fill={INK} /></>}
+        {kind === 'student' && <><path d="M14 30q6 5 12 0" fill="none" stroke="rgb(0 0 0 / 0.25)" strokeWidth="1.4" /><path d="M18 36v5M22 36v5" stroke="#f1ead8" strokeWidth="0.9" /></>}
+        {kind === 'yukata' && <><path d="M15 29l5 9 5-9" fill="none" stroke="#f4f0e6" strokeWidth="1.6" /><path d="M10 40h20" stroke="#e8c45a" strokeWidth="3" /><circle cx="14" cy="44" r="1.2" fill="#f4f0e6" opacity="0.6" /><circle cx="25" cy="34" r="1.2" fill="#f4f0e6" opacity="0.6" /></>}
         <g className="gc-head">
-          {longHair && <path d="M11 20c0 9 2 12 9 12s9-3 9-12z" fill={hair} />}
+          {(kind === 'highSchoolGirl' || kind === 'officeLady') && (
+            <path d={kind === 'highSchoolGirl' ? 'M11 20c0 10 2 13 9 13s9-3 9-13z' : 'M11.5 20c0 6 1.5 8 8.5 8s8.5-2 8.5-8z'} fill={hair} />
+          )}
           <circle cx="20" cy="20" r="8.5" fill={skin} stroke={INK} strokeWidth="1.1" />
-          <path d="M11.6 19c0-6 4-9.5 8.4-9.5s8.4 3.5 8.4 9.5c-2-3-5-4.5-8.4-4.5s-6.4 1.5-8.4 4.5z" fill={hair} />
-          {kind === 4 && <path d="M13 13q7-5 14 0" fill="none" stroke={skin} strokeWidth="2.4" />}
-          {kind === 2 && <><circle cx="27" cy="13" r="2.4" fill={hair} /><path d="M26 11l4-3" stroke="#c4302a" strokeWidth="1" /></>}
-          {cap && <path d="M11 15c1-7 17-7 18 0zM27 15h6" fill="#2f4a6a" stroke="#2f4a6a" strokeWidth="1.6" />}
+          {kind === 'grandpa' || kind === 'uncle' ? (
+            // thinning on top, hair at the sides
+            <path d="M11.6 21c0-3 1-5 2.5-6M28.4 21c0-3-1-5-2.5-6" fill="none" stroke={hair} strokeWidth="2.6" strokeLinecap="round" />
+          ) : (
+            <path d="M11.6 19c0-6 4-9.5 8.4-9.5s8.4 3.5 8.4 9.5c-2-3-5-4.5-8.4-4.5s-6.4 1.5-8.4 4.5z" fill={hair} />
+          )}
+          {kind === 'grandma' && <circle cx="20" cy="10" r="3.4" fill={hair} stroke="#a8a8a8" strokeWidth="0.5" />}
+          {kind === 'yukata' && <><circle cx="27" cy="13" r="2.6" fill={hair} /><path d="M26 11l4-3" stroke="#c4302a" strokeWidth="1" /><circle cx="30" cy="8" r="1" fill="#e85a7a" /></>}
+          {kind === 'highSchoolGirl' && <path d="M14 12l3 2" stroke="#c4302a" strokeWidth="1.4" strokeLinecap="round" />}
+          {kind === 'kid' && <path d="M10.5 17c1-8 18-8 19 0zM29 17h3" fill="#f2c62a" stroke="#c49a1a" strokeWidth="0.8" />}
+          {kind === 'student' && id % 2 === 0 && <path d="M11 15c1-7 17-7 18 0zM27 15h6" fill="#2f4a6a" stroke="#2f4a6a" strokeWidth="1.6" />}
           {glasses ? (
             <g fill="none" stroke="#2a1d16" strokeWidth="0.8">
               <circle cx="16.8" cy="21" r="2" /><circle cx="23.2" cy="21" r="2" /><path d="M18.8 21h2.4" />
@@ -76,9 +103,11 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
           ) : (
             <><circle cx="17" cy="21" r="0.9" fill="#2a1d16" /><circle cx="23" cy="21" r="0.9" fill="#2a1d16" /></>
           )}
+          {old && <path d="M14.5 17.5h4M21.5 17.5h4" stroke="#bdbdbd" strokeWidth="0.8" />}
+          {kind === 'uncle' && <path d="M17 24.2q3-1.5 6 0" fill="none" stroke="#3a2a1e" strokeWidth="1.4" strokeLinecap="round" />}
           <circle cx="15" cy="24" r="1.3" fill="#f2907a" opacity="0.35" />
           <circle cx="25" cy="24" r="1.3" fill="#f2907a" opacity="0.35" />
-          <path d={eating ? 'M18 25.5q2 1.5 4 0' : 'M18.5 25.5h3'} fill="none" stroke="#7a3a2a" strokeWidth="0.9" strokeLinecap="round" />
+          <path d={eating ? 'M18 25.5q2 1.5 4 0' : 'M18.5 25.8h3'} fill="none" stroke="#7a3a2a" strokeWidth="0.9" strokeLinecap="round" />
         </g>
       </g>
       {eating && (
@@ -283,8 +312,8 @@ const NOREN: Record<string, [string, string]> = {
 
 export type StaffOnShow = { chef: number; cashier: number; server: number }
 
-export function GuestCounter({ guests, shop = 'grilledfish', staff = { chef: 1, cashier: 0, server: 0 } }:
-  { guests: GuestView[]; shop?: string; staff?: StaffOnShow }) {
+export function GuestCounter({ guests, shop = 'grilledfish', staff = { chef: 1, cashier: 0, server: 0 }, lang = 'zh' }:
+  { guests: GuestView[]; shop?: string; staff?: StaffOnShow; lang?: Lang }) {
   const noren = NOREN[shop] ?? NOREN.grilledfish
   const [shown, setShown] = useState<Shown[]>([])
   const [sway, setSway] = useState(0)
@@ -363,7 +392,7 @@ export function GuestCounter({ guests, shop = 'grilledfish', staff = { chef: 1, 
               <svg className="gc-anger" viewBox="0 0 20 20"><path d="M3 8q5 0 5-5M17 8q-5 0-5-5M3 12q5 0 5 5M17 12q-5 0-5 5"
                 fill="none" stroke="#d23a28" strokeWidth="2.4" strokeLinecap="round" /></svg>
             )}
-            <span className="gc-tag">#{s.id}</span>
+            <span className="gc-tag">{guestLabel(s.id, lang)}</span>
             {g && s.phase === 'sit' && g.rating !== null && <span className="gc-belly"><MoodFace guest={g} /></span>}
             <Person id={s.id} walking={s.phase !== 'sit'} eating={eating} />
           </div>

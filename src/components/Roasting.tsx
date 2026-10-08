@@ -6,7 +6,6 @@ import { CHEFS, type Chef } from '../chefs'
 import { QUALITY } from '../quality'
 import { LINES } from '../lines'
 import type { Lang } from '../i18n'
-import { playChew } from '../chew'
 import { Steam } from './Steam'
 import { ROAST_STAGES, type Roast, type Seasoning } from '../menu'
 
@@ -44,6 +43,12 @@ function forPhone(c: HTMLCanvasElement) {
   out.getContext('2d')!.drawImage(c, 0, 0, out.width, out.height)
   return out
 }
+/** the bar the customers sit at, behind the fire (away from the camera): its middle, length, top, and seats */
+const BAR_AT = new THREE.Vector3(-0.59 * 2.45, 0, -0.81 * 2.45)
+const BAR_LEN = 3.6
+const BAR_TOP = 0.24
+const BAR_SEATS = 4
+const barSeat = (n: number) => BAR_AT.clone().addScaledVector(new THREE.Vector3(0.81, 0, -0.59), (n - (BAR_SEATS - 1) / 2) * (BAR_LEN / BAR_SEATS))
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
 // the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
@@ -76,12 +81,8 @@ const BIN_R = 0.27
 const TRASH_R = 0.24
 const TRASH_H = 0.36
 
-/**
- * The trash bin: a classic galvanized steel bin (ゴミ箱), open at the top. Its sides are corrugated in vertical
- * ribs, dull zinc with a mottled spangle and a darker band where hands knock it, a rolled rim, two side handles,
- * and a paper label for burnable rubbish. Inside, crumpled paper and an old skewer show it's in use.
- */
-const TRASH_METAL = (() => {
+/** split bamboo in a 2-over-2 twill (網代編み), honey-coloured and a little smoked, wrapped round the basket */
+const TRASH_WEAVE = (() => {
   if (typeof document === 'undefined') return null
   const W = 512
   const H = 256
@@ -89,105 +90,112 @@ const TRASH_METAL = (() => {
   c.width = W
   c.height = H
   const g = c.getContext('2d')!
-  let seed = 5
+  let seed = 8
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  // ribs: light crest, dark trough, all the way round
-  const ribs = 28
-  for (let x = 0; x < W; x++) {
-    const t = (x / W) * ribs
-    const f = 0.5 + 0.5 * Math.cos(t * Math.PI * 2)
-    const v = Math.round(120 + f * 70)
-    g.fillStyle = `rgb(${v}, ${v + 4}, ${v + 8})`
-    g.fillRect(x, 0, 1, H)
-  }
-  // zinc spangle: soft blotches lighter and darker
-  for (let i = 0; i < 160; i++) {
-    g.fillStyle = rnd() < 0.5 ? `rgba(230, 235, 240, ${0.08 + rnd() * 0.1})` : `rgba(60, 64, 70, ${0.06 + rnd() * 0.1})`
-    g.beginPath()
-    g.ellipse(rnd() * W, rnd() * H, 6 + rnd() * 18, 4 + rnd() * 12, rnd() * 3, 0, Math.PI * 2)
-    g.fill()
-  }
-  // scuffs and a darker band of grime low down
-  const grime = g.createLinearGradient(0, H, 0, H * 0.55)
-  grime.addColorStop(0, 'rgba(50, 45, 40, 0.35)')
-  grime.addColorStop(1, 'rgba(50, 45, 40, 0)')
-  g.fillStyle = grime
+  g.fillStyle = '#4a3420'
   g.fillRect(0, 0, W, H)
-  g.strokeStyle = 'rgba(40, 40, 45, 0.25)'
-  for (let i = 0; i < 40; i++) {
-    const x = rnd() * W
-    const y = rnd() * H
-    g.lineWidth = 0.6 + rnd()
-    g.beginPath()
-    g.moveTo(x, y)
-    g.lineTo(x + (rnd() - 0.5) * 30, y + (rnd() - 0.5) * 6)
-    g.stroke()
+  const cell = 16
+  for (let i = 0; i < W / cell; i++) {
+    for (let j = 0; j < H / cell; j++) {
+      const over = (i + j) % 4 < 2
+      const tone = 0.85 + rnd() * 0.2
+      const r = Math.round((over ? 214 : 186) * tone)
+      const gg = Math.round((over ? 172 : 140) * tone)
+      const b = Math.round((over ? 104 : 80) * tone)
+      g.fillStyle = `rgb(${r}, ${gg}, ${b})`
+      if (over) g.fillRect(i * cell, j * cell + 1.5, cell, cell - 3)
+      else g.fillRect(i * cell + 1.5, j * cell, cell - 3, cell)
+      // the bamboo's sheen and its fibres
+      g.fillStyle = 'rgba(255, 240, 200, 0.25)'
+      if (over) g.fillRect(i * cell, j * cell + 4, cell, 1.5)
+      else g.fillRect(i * cell + 4, j * cell, 1.5, cell)
+      g.fillStyle = 'rgba(80, 50, 20, 0.3)'
+      if (over) g.fillRect(i * cell, j * cell + 10, cell, 1)
+      else g.fillRect(i * cell + 10, j * cell, 1, cell)
+    }
   }
+  // smoked darker toward the foot
+  const grad = g.createLinearGradient(0, H, 0, 0)
+  grad.addColorStop(0, 'rgba(60, 35, 15, 0.35)')
+  grad.addColorStop(1, 'rgba(60, 35, 15, 0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, W, H)
   const t = new THREE.CanvasTexture(forPhone(c))
   t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(2, 1.4)
+  return t
+})()
+/** rattan wound round and round: diagonal dark-and-light bands */
+const RATTAN = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 128
+  c.height = 16
+  const g = c.getContext('2d')!
+  for (let x = -16; x < 128; x += 6) {
+    g.fillStyle = (x / 6) % 2 ? '#7a4e2a' : '#3e2412'
+    g.beginPath()
+    g.moveTo(x, 16)
+    g.lineTo(x + 6, 16)
+    g.lineTo(x + 12, 0)
+    g.lineTo(x + 6, 0)
+    g.fill()
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = THREE.RepeatWrapping
+  t.repeat.set(8, 1)
   return t
 })()
 const TRASH_LABEL = (() => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')
-  c.width = 256
-  c.height = 160
+  c.width = 96
+  c.height = 180
   const g = c.getContext('2d')!
-  g.fillStyle = '#efe6cf'
-  g.fillRect(0, 0, 256, 160)
-  g.strokeStyle = '#b4302a'
-  g.lineWidth = 8
-  g.strokeRect(8, 8, 240, 144)
-  g.fillStyle = '#b4302a'
-  g.font = 'bold 64px "Zen Antique", serif'
+  // washi: off-white with fibres
+  g.fillStyle = '#f3ecd9'
+  g.fillRect(0, 0, 96, 180)
+  g.strokeStyle = 'rgba(150, 130, 100, 0.25)'
+  for (let i = 0; i < 40; i++) {
+    g.beginPath()
+    g.moveTo(Math.random() * 96, Math.random() * 180)
+    g.lineTo(Math.random() * 96, Math.random() * 180)
+    g.stroke()
+  }
+  g.fillStyle = '#1e1a16'
+  g.font = 'bold 48px "Zen Antique", serif'
   g.textAlign = 'center'
   g.textBaseline = 'middle'
-  g.fillText('可燃', 128, 66)
-  g.font = 'bold 30px "Zen Antique", serif'
-  g.fillText('ごみ・竹串', 128, 122)
-  const t = new THREE.CanvasTexture(forPhone(c))
+  g.fillText('ご', 48, 52)
+  g.fillText('み', 48, 112)
+  g.fillStyle = '#b4302a'
+  g.fillRect(34, 148, 28, 22)
+  g.fillStyle = '#f3ecd9'
+  g.font = 'bold 16px serif'
+  g.fillText('屑', 48, 160)
+  const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   return t
 })()
 
 function TrashBin({ position, container, contents = 0 }: { position: [number, number, number]; container: string; contents?: number }) {
   const R = TRASH_R
-  // the body: a galvanized steel bin whose wall is really corrugated (the ribs push in and out), slightly tapered,
-  // with a rolled rim and a beaded band near the foot; open-ended, so the inside shows
+  // a Japanese waste basket (屑籠): split bamboo woven in a twill (網代編み) round a slightly flaring body, its rim
+  // and foot bound in dark rattan, a strip of washi on the front with ごみ brushed on it; open-topped, so the
+  // woven inside shows
   const body = useMemo(() => {
-    const g = new THREE.CylinderGeometry(R, R * 0.9, TRASH_H, 84, 8, true)
-    const p = g.attributes.position
-    for (let i = 0; i < p.count; i++) {
-      const x = p.getX(i)
-      const z = p.getZ(i)
-      const y = p.getY(i)
-      const a = Math.atan2(z, x)
-      // ribs, flattening out near the rim and the foot where the steel is rolled
-      const t = (y + TRASH_H / 2) / TRASH_H
-      const rib = 1 + 0.035 * Math.cos(a * 28) * Math.max(0, Math.sin(Math.min(1, t * 1.15) * Math.PI)) ** 0.6
-      p.setX(i, x * rib)
-      p.setZ(i, z * rib)
-    }
+    const g = new THREE.CylinderGeometry(R * 1.04, R * 0.86, TRASH_H, 64, 1, true)
     g.translate(0, TRASH_H / 2, 0)
-    g.computeVertexNormals()
     return g
   }, [R])
-  const floor = useMemo(() => new THREE.CircleGeometry(R * 0.9, 40), [R])
-  // the black bin liner, its top folded out over the rim and hanging down in soft folds
-  const liner = useMemo(() => {
-    const g = new THREE.CylinderGeometry(R * 1.05, R * 1.06, 0.07, 64, 2, true)
-    const p = g.attributes.position
-    for (let i = 0; i < p.count; i++) {
-      const a = Math.atan2(p.getZ(i), p.getX(i))
-      const k = 1 + 0.025 * Math.sin(a * 9) + 0.015 * Math.sin(a * 23)
-      p.setX(i, p.getX(i) * k)
-      p.setZ(i, p.getZ(i) * k)
-      if (p.getY(i) < 0) p.setY(i, p.getY(i) - 0.015 * (1 + Math.sin(a * 9)))
-    }
-    g.computeVertexNormals()
+  const inner = useMemo(() => {
+    const g = new THREE.CylinderGeometry(R * 0.99, R * 0.82, TRASH_H - 0.02, 48, 1, true)
+    g.translate(0, TRASH_H / 2 + 0.01, 0)
     return g
   }, [R])
+  const floor = useMemo(() => new THREE.CircleGeometry(R * 0.84, 40), [R])
   // what's been thrown in: bare skewers, crumpled paper napkins, burnt scraps — heaped up as more goes in
   const heap = useMemo(() => {
     let seed = 21
@@ -195,7 +203,7 @@ function TrashBin({ position, container, contents = 0 }: { position: [number, nu
     return Array.from({ length: 24 }, (_, i) => {
       const kind = i % 3 === 0 ? 'stick' : i % 3 === 1 ? 'paper' : 'scrap'
       const a = rnd() * Math.PI * 2
-      const d = R * 0.62 * Math.sqrt(rnd())
+      const d = R * 0.6 * Math.sqrt(rnd())
       const geo = kind === 'paper' ? new THREE.IcosahedronGeometry(0.045 + rnd() * 0.02, 1)
         : kind === 'scrap' ? new THREE.DodecahedronGeometry(0.03 + rnd() * 0.015, 0) : null
       if (geo) {
@@ -208,58 +216,41 @@ function TrashBin({ position, container, contents = 0 }: { position: [number, nu
     })
   }, [R])
   const shown = Math.min(contents, heap.length)
-  // the heap's height rises with what's in it (but never over the rim)
-  // (the first bits land on the liner sagging into the bin, high enough to be seen over the rim)
   const level = (n: number) => Math.min(TRASH_H - 0.03, 0.17 + n * 0.008)
   const face = Math.atan2(LAY_DIR.x, LAY_DIR.z)
+  const fr = R * 1.04 + 0.004
   return (
     <group position={position} userData={{ container }}>
       <mesh geometry={body} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={TRASH_METAL} side={THREE.DoubleSide} />
+        <meshToonMaterial color="#ffffff" map={TRASH_WEAVE} side={THREE.FrontSide} />
       </mesh>
-      <mesh geometry={body} scale={[1.035, 1.01, 1.035]}>
+      <mesh geometry={inner}>
+        <meshToonMaterial color="#9a8058" map={TRASH_WEAVE} side={THREE.BackSide} />
+      </mesh>
+      <mesh geometry={body} scale={[1.03, 1.01, 1.03]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
       <mesh geometry={floor} rotation-x={-Math.PI / 2} position-y={0.02}>
-        <meshToonMaterial color="#2a2a2e" />
+        <meshToonMaterial color="#6e5634" />
       </mesh>
-      {/* rolled rim, the bead near the foot, and a dented bottom ring */}
+      {/* the rattan-bound rim, a second band below it, and the foot */}
       <mesh position-y={TRASH_H} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 1.02, 0.013, 8, 72]} />
-        <meshToonMaterial color="#d3d7db" />
+        <torusGeometry args={[R * 1.04, 0.016, 8, 64]} />
+        <meshToonMaterial color="#4a2e18" map={RATTAN} />
       </mesh>
-      <mesh position-y={0.05} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 0.915, 0.009, 6, 72]} />
-        <meshToonMaterial color="#9aa0a6" />
+      <mesh position-y={TRASH_H * 0.82} rotation-x={Math.PI / 2}>
+        <torusGeometry args={[R * 1.01, 0.007, 6, 64]} />
+        <meshToonMaterial color="#5a3820" />
       </mesh>
-      <mesh position-y={0.012} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 0.9, 0.012, 6, 72]} />
-        <meshToonMaterial color="#7f858b" />
+      <mesh position-y={0.014} rotation-x={Math.PI / 2}>
+        <torusGeometry args={[R * 0.87, 0.014, 8, 64]} />
+        <meshToonMaterial color="#4a2e18" map={RATTAN} />
       </mesh>
-      {/* the liner folded over the rim */}
-      <mesh geometry={liner} position-y={TRASH_H - 0.02}>
-        <meshToonMaterial color="#26272b" side={THREE.DoubleSide} />
-      </mesh>
-      {/* two riveted side handles */}
-      {[-1, 1].map((sd) => (
-        <group key={sd} position={[STACK_DIR.x * sd * (R + 0.02), TRASH_H * 0.8, STACK_DIR.z * sd * (R + 0.02)]} rotation-y={face}>
-          <mesh>
-            <torusGeometry args={[0.05, 0.009, 6, 18, Math.PI]} />
-            <meshToonMaterial color="#8d939a" />
-          </mesh>
-          {[-1, 1].map((r) => (
-            <mesh key={r} position={[r * 0.05, 0, 0]}>
-              <sphereGeometry args={[0.012, 8, 6]} />
-              <meshToonMaterial color="#b0b5ba" />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      <mesh position={[LAY_DIR.x * (R * 0.99 + 0.006), TRASH_H * 0.48, LAY_DIR.z * (R * 0.99 + 0.006)]} rotation-y={face}>
-        <planeGeometry args={[0.16, 0.1]} />
+      {/* the washi strip with ごみ */}
+      <mesh position={[LAY_DIR.x * fr * 0.97, TRASH_H * 0.48, LAY_DIR.z * fr * 0.97]} rotation-y={face}>
+        <planeGeometry args={[0.09, 0.17]} />
         <meshToonMaterial map={TRASH_LABEL} />
       </mesh>
-      {/* empty at first; each thing thrown in lands on the heap */}
       {heap.slice(0, shown).map((h, i) => {
         const y = level(i + 1) - 0.02
         if (h.kind === 'stick') {
@@ -371,6 +362,58 @@ const TRAY_WOOD = (() => {
   t.anisotropy = 8
   return t
 })()
+
+/**
+ * The bar (カウンター) the customers sit at while the shop is open, behind the fire: a long plank of pale hinoki on
+ * a dark base, a raised lip on the customers' side, and a little plate with chopsticks on a rest at every seat —
+ * the chef serves each piece onto it straight off the grill.
+ */
+function Bar() {
+  const yaw = Math.atan2(-STACK_DIR.z, STACK_DIR.x)
+  return (
+    <group position={BAR_AT} rotation-y={yaw}>
+      <mesh position-y={BAR_TOP - 0.03} castShadow receiveShadow>
+        <boxGeometry args={[BAR_LEN + 0.3, 0.06, 0.62]} />
+        <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
+      </mesh>
+      <mesh position-y={BAR_TOP - 0.03} scale={[1.01, 1.2, 1.04]}>
+        <boxGeometry args={[BAR_LEN + 0.3, 0.06, 0.62]} />
+        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+      </mesh>
+      <mesh position-y={(BAR_TOP - 0.06) / 2} castShadow>
+        <boxGeometry args={[BAR_LEN + 0.2, BAR_TOP - 0.06, 0.5]} />
+        <meshToonMaterial color="#3a2a1e" />
+      </mesh>
+      {/* the raised lip on the far (customers') side */}
+      <mesh position={[0, BAR_TOP + 0.03, -0.27]}>
+        <boxGeometry args={[BAR_LEN + 0.3, 0.06, 0.08]} />
+        <meshToonMaterial color="#c49a64" />
+      </mesh>
+      {Array.from({ length: BAR_SEATS }, (_, n) => {
+        const x = (n - (BAR_SEATS - 1) / 2) * (BAR_LEN / BAR_SEATS)
+        return (
+          <group key={n} position={[x, BAR_TOP, 0]}>
+            <mesh position-y={0.01} receiveShadow>
+              <cylinderGeometry args={[0.24, 0.2, 0.02, 32]} />
+              <meshToonMaterial color="#ffffff" map={PLUM_WARE} />
+            </mesh>
+            {/* chopsticks on their rest */}
+            <mesh position={[0.3, 0.025, 0.12]}>
+              <boxGeometry args={[0.04, 0.02, 0.03]} />
+              <meshToonMaterial color="#8a5a30" />
+            </mesh>
+            {[-0.012, 0.012].map((dz) => (
+              <mesh key={dz} position={[0.3, 0.04, 0.12 + dz - 0.02]} rotation-z={Math.PI / 2} rotation-x={Math.PI / 2}>
+                <cylinderGeometry args={[0.006, 0.004, 0.32, 5]} />
+                <meshToonMaterial color="#5a3a20" />
+              </mesh>
+            ))}
+          </group>
+        )
+      })}
+    </group>
+  )
+}
 
 /** A shallow wooden tray (盛り板) where ordered food waits raw, to be carried onto the fire. */
 function Tray({ position, container }: { position: [number, number, number]; container: string }) {
@@ -1421,6 +1464,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const [kind, n] = key.split('-')
     if (kind === 'box' || kind === 'bin') return (carriers[kind]?.[0]?.home.clone() ?? new THREE.Vector3()).add(nudge(kind))
     if (kind === 'tray') return trayAt()
+    if (kind === 'bar') return BAR_AT.clone()
     if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
     if (kind === 'rawdish') return new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])).add(nudge('rawdish'))
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
@@ -1446,6 +1490,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const settle = (key: string, at: THREE.Vector3) => {
     const r = footprint(key)
     const others = containerKeys().filter((k) => k !== key).map((k) => ({ p: containerAt(k), r: footprint(k) }))
+    // the bar behind the fire (shop open) is in the way too
+    if (space === 'open') for (let k = -2; k <= 2; k++) others.push({ p: BAR_AT.clone().addScaledVector(STACK_DIR, k * 0.8), r: 0.42 })
     // the soup bowls on the table are in the way too
     root.traverse((o) => {
       const id = o.userData.itemId as string | undefined
@@ -1472,9 +1518,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   const [basketCount, setBasketCount] = useState(1)
   const [wisps, setWisps] = useState<{ key: string; at: [number, number, number] }[]>([])
-  const inBasket = (p: Piece) => !!roast.basket && !!roast.basketItems?.includes(p.id)
+  // (with the shop open nothing goes in the basket or on the side dishes: it's all served at the bar, unwrapped)
+  const inBasket = (p: Piece) => space !== 'open' && !!roast.basket && !!roast.basketItems?.includes(p.id)
   // onigiri and mochi off the grill net go on little side dishes of their own
-  const onDish = (p: Piece) => !!roast.dish && !!roast.net?.includes(p.id)
+  const onDish = (p: Piece) => space !== 'open' && !!roast.dish && !!roast.net?.includes(p.id)
   const dishAt = (n: number) => {
     const [x, y, z] = roast.dish!.at
     return new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -n * DISH_STEP).add(nudge(`dish-${n}`))
@@ -1495,8 +1542,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     setMoveTick((t) => t + 1)
     // (settle and friends read the current counts and nudges)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plateCount, dishCount, basketCount, root])
-  const destination = (p: Piece) => (inBasket(p) ? 'basket' : onDish(p) ? 'dish' : 'plate')
+  }, [plateCount, dishCount, basketCount, root, space])
+  // (with the shop open, everything cooked is served to the customers along the bar behind the fire)
+  const destination = (p: Piece) => (space === 'open' ? 'bar' : inBasket(p) ? 'basket' : onDish(p) ? 'dish' : 'plate')
 
   const collect = (p: Piece) => {
     if (p.collected || !present(p)) return
@@ -1515,6 +1563,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.flight = instant ? 1 : 0
     p.fromP.copy(p.node.position)
     p.fromQ.copy(p.node.quaternion)
+    if (space === 'open') {
+      // served at the bar: each seat has its own little plate, and pieces go round the seats in turn
+      const seat = slot % BAR_SEATS
+      const row = Math.floor(slot / BAR_SEATS)
+      p.toP.copy(barSeat(seat)).addScaledVector(STACK_DIR, ((row % 3) - 1) * 0.07).add(new THREE.Vector3(0, BAR_TOP + 0.04 + Math.floor(row / 3) * 0.06, 0))
+      p.container = 'bar'
+      p.body = null
+      if (p.loose) flatQ(p, p.toQ, LAY_DIR)
+      else flatQ(p, p.toQ, STACK_DIR)
+      p.local.copy(p.toP).sub(containerAt('bar'))
+      return
+    }
     if (basket) {
       // tossed in from just above the basket; from there the physics drops it in and lets it settle
       const a = Math.random() * Math.PI * 2
@@ -1608,7 +1668,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return
     }
     p.eat = 0.0001
-    playChew(BITES_PER_PIECE + 2, EAT_SECONDS)
   }
 
   /**
@@ -2863,6 +2922,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
+      {space === 'open' && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
       {roast.trash && <TrashBin container="trash" contents={trashed}
         position={containerAt('trash').toArray() as [number, number, number]} />}
