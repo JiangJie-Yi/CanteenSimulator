@@ -1975,3 +1975,182 @@ button {
       linear-gradient(transparent, #000 50px, #000 calc(100% - 50px), transparent);
   }
 }
+/* revenue mode toggle, beside the AI one */
+.ledger-toggle {
+  position: fixed;
+  z-index: 10;
+  top: 20px;
+  right: 176px;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 50%;
+  background: var(--page);
+  color: var(--text);
+  font: 700 16px/1 var(--brush);
+  cursor: pointer;
+}
+
+.ledger-toggle.is-on {
+  border-color: #3d8a3a;
+  background: #3d8a3a;
+  color: #fff;
+  box-shadow: 0 0 12px rgb(61 138 58 / 0.5);
+}
+
+@media (max-width: 900px) {
+  .ledger-toggle {
+    top: 14px;
+    right: 154px;
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* the AI customers (and who's cooking) and the books: side by side in the empty sky at the top right of the
+   stage, clear of the things on the table the cook reaches for */
+.side-boards {
+  position: absolute;
+  top: 84px;
+  right: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  z-index: 3;
+}
+
+.side-boards > section {
+  width: 220px;
+}
+
+.guest-board,
+.ledger {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgb(251 243 228 / 0.86);
+  box-shadow: 0 6px 16px -10px rgb(59 42 32 / 0.6);
+  color: var(--ink);
+  font: 13px/1.4 var(--brush);
+}
+
+.chef-pick {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.chef-pick span {
+  margin-right: 4px;
+  color: var(--text-soft);
+}
+
+.chef-pick button {
+  padding: 2px 8px;
+  border: 1px solid rgb(59 42 32 / 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.chef-pick button.is-on {
+  border-color: var(--hanko);
+  background: var(--hanko);
+  color: #fff;
+}
+
+.guest-count {
+  margin: 2px 0 4px;
+  font-weight: 700;
+}
+
+.guest-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 1px;
+}
+
+.guest-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.guest-id {
+  min-width: 2.4em;
+  color: var(--text-soft);
+}
+
+.guest-stars {
+  color: #e8742a;
+  letter-spacing: 0.04em;
+}
+
+.guest-stars small {
+  margin-left: 4px;
+  color: var(--text-soft);
+}
+
+.guest-stars em {
+  margin-left: 6px;
+  font-style: normal;
+  color: #3d6a9a;
+  font-size: 12px;
+}
+
+.guest-row.is-angry .guest-note {
+  color: #c4442f;
+}
+
+.guest-note {
+  color: var(--text-soft);
+}
+
+.ledger p {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+}
+
+.ledger b {
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-profit {
+  margin-top: 4px !important;
+  padding-top: 4px;
+  border-top: 1px dashed rgb(59 42 32 / 0.35);
+  color: #2f7a2d;
+  font-size: 15px;
+}
+
+.ledger-profit.is-loss {
+  color: #c4442f;
+}
+
+.ledger-margin {
+  color: var(--text-soft);
+}
+
+@media (max-width: 900px) {
+  .side-boards {
+    top: 64px;
+    right: 10px;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .side-boards > section {
+    width: min(200px, 48vw);
+  }
+
+  .guest-board,
+  .ledger {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}

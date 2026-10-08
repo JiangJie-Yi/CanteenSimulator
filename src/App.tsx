@@ -16,6 +16,8 @@ import { Fullness } from './components/Fullness'
 import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
 import { PotCooking } from './components/PotCooking'
+import type { GuestView } from './components/Roasting'
+import { CHEFS, type Chef } from './chefs'
 import { Roasting } from './components/Roasting'
 import { Steam } from './components/Steam'
 import { StoveControls } from './components/StoveControls'
@@ -25,6 +27,11 @@ import { DISHES, type Dish as DishInfo } from './menu'
 const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
+/** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
+const CHARCOAL_COST = 18
+const GAS_PER_HOUR = 30
+/** what the ingredients of something on the menu cost: about 38% of its price, as in a typical small eatery */
+const costOf = (x: { price: number; cost?: number }) => x.cost ?? Math.round(x.price * 0.38)
 /** the charcoal burns down from full to out in 90 minutes (the fire level is stepped every 200ms) */
 const FIRE_BURN_PER_TICK = 1 / (90 * 60 * 5)
 // burner top on the cassette stove (blender/hotpot.py)
@@ -144,16 +151,18 @@ type SceneProps = {
   onEat: (id: string, taste: number) => void
   /** AI simulation on, and what it does through the app */
   ai: boolean
-  onOrder: (id: string) => void
+  onOrder: (id: string) => boolean
   onAddCharcoal: () => void
   onSay: (who: 'chef' | 'guest', text: string) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
   onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
   lang: Lang
+  chef: Chef
+  onGuests: (g: GuestView[]) => void
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chef, onGuests,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -320,7 +329,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 <Roasting url={dish.model} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
-                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} />
+                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chef} onGuests={onGuests} />
               )}
               {dish.heatControl && <StoveControls url={dish.model} heat={heat} />}
               {dish.heatControl && (
@@ -407,7 +416,15 @@ export default function App() {
     setRating((r) => ({ sum: r.sum + taste, n: r.n + 1 }))
   }, [])
   // AI simulation: a chef and customers, and what they've said lately
+  // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
+  const [chefId, setChefId] = useState(CHEFS[1].id)
+  const chef = CHEFS.find((c) => c.id === chefId) ?? CHEFS[1]
+  const [guests, setGuests] = useState<GuestView[]>([])
+  // revenue mode: what's been sold, and what it cost to make (ingredients, fuel, the chef's wages)
+  const [ledgerOn, setLedgerOn] = useState(false)
+  const [ledger, setLedger] = useState({ revenue: 0, food: 0, fuel: 0, wage: 0 })
+  const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
   const chatId = useRef(0)
   const talk = useCallback((who: 'chef' | 'guest', text: string) => {
@@ -472,6 +489,7 @@ export default function App() {
     return () => window.clearInterval(id)
   }, [])
   const addCharcoal = () => {
+    book('fuel', CHARCOAL_COST)
     fire.current = Math.min(1, fire.current + 0.18)
     setFireLevel(Math.round(fire.current * 1000) / 10)
   }
@@ -509,6 +527,19 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // running costs: the gas while the burner's on, the chef's wages while the AI chef is working
+  const heatRef = useRef(heat)
+  heatRef.current = heat
+  const aiRef = useRef({ ai, wage: chef.wagePerHour })
+  aiRef.current = { ai, wage: chef.wagePerHour }
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (heatRef.current > 0) book('fuel', (GAS_PER_HOUR * heatRef.current) / 100 / 3600)
+      if (aiRef.current.ai) book('wage', aiRef.current.wage / 3600)
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
   const MAX_PORTIONS = 99
   // the fire only holds so many skewers; past that, take something off before ordering more
   const [offFire, setOffFire] = useState(0)
@@ -530,43 +561,59 @@ export default function App() {
     return total - offFire
   }
 
-  const changeQty = (id: string, delta: number) => {
+  const changeQty = (id: string, delta: number): boolean => {
     // a pot takes one soup and a bowl one serving of noodles: ordering another swaps it
     const isBase = dish.bases.some((b) => b.id === id)
+    // what it sells for and what its ingredients cost (a set is priced as a whole)
+    const priced = isBase ? dish.bases.find((b) => b.id === id)! : dish.items.find((i) => i.id === id)
+    const sell = (n: number) => {
+      if (!priced || !n) return
+      book('revenue', priced.price * n)
+      book('food', costOf(priced) * n)
+    }
     if (isBase && dish.oneBase) {
+      const had = dish.bases.find((b) => (orders[dish.id][b.id] ?? 0) > 0)
+      if (had && had.id !== id && delta > 0) {
+        book('revenue', -had.price)
+        book('food', -costOf(had))
+      }
+      if (delta > 0 ? had?.id !== id : had?.id === id) sell(delta > 0 ? 1 : -1)
       setOrders((all) => {
         const next = { ...all[dish.id] }
         for (const b of dish.bases) next[b.id] = 0
         next[id] = delta > 0 ? 1 : 0
         return { ...all, [dish.id]: next }
       })
-      return
+      return true
     }
     // a set brings its own skewers, so check the fire's room for those too
     const adds = isBase ? dish.bases.find((b) => b.id === id)!.includes ?? {} : { [id]: 1 }
     const addsSkewers = Object.entries(adds).reduce((n, [k, q]) => n + (isSkewer(k) ? q : 0), 0)
     if (delta > 0 && addsSkewers && onTheFire() + addsSkewers > FIRE_CAPACITY) {
       say(UI[lang].fireFull(FIRE_CAPACITY))
-      return
+      return false
     }
     // the bamboo basket only holds so many potatoes and sweet potatoes
     const basket = dish.roast?.basket
     const addsLoose = Object.entries(adds).reduce((n, [k, q]) => n + (dish.roast?.basketItems?.includes(k) ? q : 0), 0)
     if (delta > 0 && basket && addsLoose && loose + addsLoose > basket.capacity) {
       say(UI[lang].basketFull(basket.capacity))
-      return
+      return false
     }
     // some things only fit so many at once
     const item = dish.items.find((i) => i.id === id)
     const max = item?.max ?? MAX_PORTIONS
     if (delta > 0 && (orders[dish.id][id] ?? 0) >= max) {
       say(UI[lang].itemFull(item ? nameIn(lang, item) : id, max))
-      return
+      return false
     }
+    if (delta < 0 && !(orders[dish.id][id] ?? 0)) return false
+    sell(delta)
     setOrders((all) => {
       const qty = Math.min(max, Math.max(0, (all[dish.id][id] ?? 0) + delta))
       return { ...all, [dish.id]: { ...all[dish.id], [id]: qty } }
     })
+    return true
   }
 
   return (
@@ -584,7 +631,7 @@ export default function App() {
             heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }}
             onEat={onEat} onNotice={(what) => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])}
             resetView={resetView} ai={ai} onOrder={(id) => changeQty(id, 1)} onAddCharcoal={addCharcoal} onSay={talk}
-            lang={lang} />
+            lang={lang} chef={chef} onGuests={setGuests} />
         </Canvas>
       </div>
       <div className="stage" ref={stageRef}>
@@ -592,6 +639,58 @@ export default function App() {
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} />
+        <div className="side-boards">
+          {ai && (
+            <section className="guest-board" aria-label={UI[lang].guests(0, 0)}>
+              <div className="chef-pick" role="radiogroup" aria-label={UI[lang].chefPick}>
+                <span>{UI[lang].chefPick}</span>
+                {CHEFS.map((c) => (
+                  <button key={c.id} type="button" role="radio" aria-checked={c.id === chefId}
+                    className={c.id === chefId ? 'is-on' : ''} onClick={() => setChefId(c.id)}
+                    title={`${c[lang]} NT$${c.wagePerHour}/h`}>
+                    {c[lang].split('・')[0]}
+                  </button>
+                ))}
+              </div>
+              <p className="guest-count">
+                {UI[lang].guests(guests.length, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
+              </p>
+              <ul className="guest-list">
+                {guests.slice(-5).reverse().map((g) => {
+                  const stars = g.rating === null ? 0 : Math.max(1, Math.round(g.rating / 20))
+                  return (
+                    <li key={g.id} className={`guest-row is-${g.state}`}>
+                      <span className="guest-id">#{g.id}</span>
+                      {g.state === 'angry' ? <span className="guest-note">{UI[lang].leftAngry}</span>
+                        : g.rating === null ? <span className="guest-note">{UI[lang].waiting}</span>
+                          : <span className="guest-stars">{'★'.repeat(stars)}{'☆'.repeat(5 - stars)}
+                            <small>{Math.round(g.rating)}</small>{g.state === 'eating' && <em>{UI[lang].eating}</em>}</span>}
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )}
+          {ledgerOn && (
+            <section className="ledger" aria-label={UI[lang].ledgerLabel}>
+              {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
+                .map(([k, v]) => (
+                  <p key={k}><span>{UI[lang][k]}</span><b>{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : 1)}</b></p>
+                ))}
+              {(() => {
+                const profit = ledger.revenue - ledger.food - ledger.fuel - ledger.wage
+                return (
+                  <>
+                    <p className={`ledger-profit${profit < 0 ? ' is-loss' : ''}`}><span>{UI[lang].profit}</span>
+                      <b>{profit < 0 ? '−' : ''}NT${Math.abs(profit).toFixed(0)}</b></p>
+                    <p className="ledger-margin"><span>{UI[lang].margin}</span>
+                      <b>{ledger.revenue > 0 ? `${((profit / ledger.revenue) * 100).toFixed(1)}%` : '—'}</b></p>
+                  </>
+                )
+              })()}
+            </section>
+          )}
+        </div>
         {ai && chat.length > 0 && (
           <ul className="ai-chat" aria-live="polite">
             {chat.map((m) => (
@@ -611,11 +710,22 @@ export default function App() {
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
-        onClear={() => setOrders((all) => ({ ...all, [dish.id]: {} }))} />
+        onClear={() => {
+          // cancelling everything refunds it (nothing was made)
+          for (const x of [...dish.bases, ...dish.items]) {
+            const n = orders[dish.id][x.id] ?? 0
+            if (!n) continue
+            book('revenue', -x.price * n)
+            book('food', -costOf(x) * n)
+          }
+          setOrders((all) => ({ ...all, [dish.id]: {} }))
+        }} />
       <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)}
         aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
         {menuFolded ? '‹' : '›'}
       </button>
+      <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
+        aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => setAi((v) => !v)}
         aria-pressed={ai} title={UI[lang].aiLabel}>{UI[lang].ai}</button>
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>

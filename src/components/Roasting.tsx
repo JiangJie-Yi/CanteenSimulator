@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { CHEFS, type Chef } from '../chefs'
 import { playChew } from '../chew'
 import { Steam } from './Steam'
 import { ROAST_STAGES, type Roast, type Seasoning } from '../menu'
@@ -21,6 +22,12 @@ const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
 /** how many sips a bowl of soup takes, and how good it is (miso soup doesn't take seasoning) */
 const SIPS = 3
 const SOUP_TASTE = 78
+/** an AI customer as App shows them: seated and waiting, eating, or gone (with their rating) */
+export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'angry'; rating: number | null; items: number }
+type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state'] }
+/** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
+const MAX_SEATED = 4
+const PATIENCE = 150
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
 // the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
@@ -1121,10 +1128,15 @@ type RoastingProps = {
   /** AI simulation: a chef who works the grill and customers who order and eat */
   ai?: boolean
   /** the AI customers order from the menu, and the chef adds charcoal, through the app */
-  onOrder?: (id: string) => void
+  /** order something; false if it couldn't be (the fire or the basket is full) */
+  onOrder?: (id: string) => boolean
   onAddCharcoal?: () => void
   /** something the chef or a customer says */
   onSay?: (who: 'chef' | 'guest', text: string) => void
+  /** who's at the grill in the AI simulation */
+  chef?: Chef
+  /** every AI customer so far: what they ordered, what they've eaten, how they rated it */
+  onGuests?: (guests: GuestView[]) => void
 }
 
 /** Roasting speed for a fire level: barely cooking on dying embers, about twice as fast at full blaze. */
@@ -1137,7 +1149,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  * up the extra portions Dish clones in as they appear.
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
-  onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay }: RoastingProps) {
+  onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests }: RoastingProps) {
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
@@ -1528,6 +1540,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const stageSeq = useRef(0)
   const aiClock = useRef(0)
   const guestClock = useRef(0)
+  const chefClock = useRef(0)
+  const guests = useRef<Guest[]>([])
+  const guestSeq = useRef(0)
+  const report = () => onGuests?.(guests.current.map((g) => ({ id: g.id, state: g.state, items: g.orders.length,
+    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null })))
   const chefSaid = useRef(0)
 
   /** the best seasoning for a food by the PAIRING table (null if nothing suits it) */
@@ -1572,7 +1589,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return
     }
     const ready = live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 &&
-      p.progress / roast.times[p.id] >= 1.05)
+      p.progress / roast.times[p.id] >= chef.pullAt)
     if (ready) {
       collect(ready)
       say(`${roast.names[ready.id]}烤好了！`)
@@ -1583,7 +1600,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (toSeason) {
       toSeason.chefSeasoned = true
       const k = bestSeasoning(toSeason.id)
-      if (k && !toSeason.dabs[k]) {
+      // (a less practised hand forgets now and then)
+      if (k && !toSeason.dabs[k] && Math.random() < chef.seasonChance) {
         season(toSeason, k)
         emit(k, toSeason.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
         say(`${roast.names[toSeason.id]}${{ salt: '撒點鹽', soy: '刷上醬油', milk: '淋上煉乳', peanut: '撒花生粉' }[k]}`)
@@ -1600,31 +1618,66 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
 
   /**
-   * AI customers: now and then one orders something off the menu, and whatever's ready on the plates gets eaten
-   * (one piece at a time), followed by a word on how it tasted.
+   * AI customers, each one followed from the door to the bill: now and then one comes in (while there's a seat),
+   * orders one to three things off the menu, eats only what they ordered as it comes off the grill (one piece at
+   * a time), and when they've had it all leaves with their rating, the average of how good each was. Kept
+   * waiting too long with nothing to eat, they walk out.
    */
   const runGuests = () => {
+    const now = performance.now() / 1000
     guestClock.current += 0.8
-    if (guestClock.current > 9 && onOrder) {
+    const seated = guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating')
+    if (onOrder && seated.length < MAX_SEATED && guestClock.current > 7 + Math.random() * 6) {
       guestClock.current = 0
-      const pick = itemIds[Math.floor(Math.random() * itemIds.length)]
-      onOrder(pick)
-      onSay?.('guest', `我要一份${roast.names[pick] ?? pick}！`)
+      const want = 1 + Math.floor(Math.random() * 3)
+      const orders: string[] = []
+      for (let k = 0; k < want; k++) {
+        const pick = itemIds.filter((id) => id in roast.times)[Math.floor(Math.random() * itemIds.filter((id) => id in roast.times).length)]
+        if (pick && onOrder(pick)) orders.push(pick)
+      }
+      const id = ++guestSeq.current
+      if (orders.length) {
+        guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting' })
+        onSay?.('guest', `#${id} 我要${orders.map((o) => roast.names[o] ?? o).join('、')}！`)
+      } else {
+        onSay?.('guest', `#${id} 位子滿了，下次再來`)
+      }
+      report()
+    }
+    // someone kept waiting too long goes
+    for (const g of seated) {
+      if (g.eaten.length === 0 && now - g.since > PATIENCE) {
+        g.state = 'angry'
+        onSay?.('guest', `#${g.id} 等太久了，不吃了！`)
+        report()
+      }
     }
     if (pieces.current.some((p) => p.eat > 0 && !p.eaten && !p.stickOnly)) return
-    const dish = pieces.current.find((p) => present(p) && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly &&
-      p.trash < 0 && stageOf(p.progress / roast.times[p.id]).key === 'done')
-    if (!dish) return
-    if (inBasket(dish) && !dish.unwrapped) {
-      dish.unwrapped = true
+    // a guest eats a piece of what they ordered, if it's ready
+    for (const g of guests.current) {
+      if (g.state !== 'waiting' && g.state !== 'eating') continue
+      const owed = [...g.orders]
+      for (const id of g.ate) owed.splice(owed.indexOf(id), 1)
+      const dish = pieces.current.find((p) => present(p) && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly &&
+        p.trash < 0 && owed.includes(p.id) && stageOf(p.progress / roast.times[p.id]).key === 'done')
+      if (!dish) continue
+      if (inBasket(dish) && !dish.unwrapped) {
+        dish.unwrapped = true
+        return
+      }
+      const taste = tasteOf(dish)
+      eat(dish)
+      g.eaten.push(taste)
+      g.ate.push(dish.id)
+      g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
+      const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
+      const words = ['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]
+      window.setTimeout(() => {
+        onSay?.('guest', `#${g.id} ${roast.names[dish.id]}${words} ${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`)
+        report()
+      }, EAT_SECONDS * 1000)
       return
     }
-    const taste = tasteOf(dish)
-    eat(dish)
-    const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
-    const words = ['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]
-    window.setTimeout(() => onSay?.('guest', `${roast.names[dish.id]}${words} ${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`),
-      EAT_SECONDS * 1000)
   }
   const [saltInHand, setSaltInHand] = useState(false)
   const hand = useRef<THREE.Group>(null)
@@ -2472,9 +2525,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // AI simulation: the chef works the grill, customers order and eat
     if (ai && active) {
       aiClock.current += dt
+      chefClock.current += dt
+      if (chefClock.current > chef.pace) {
+        chefClock.current = 0
+        runChef()
+      }
       if (aiClock.current > 0.8) {
         aiClock.current = 0
-        runChef()
         runGuests()
       }
     }
