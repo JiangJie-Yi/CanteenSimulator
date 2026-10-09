@@ -3217,13 +3217,7 @@ button {
     display: none;
   }
 }
-/* the shop is open: the stove and the fire are the chef's, not the player's */
-.app.is-open-shop .heat input,
-.app.is-open-shop .heat button {
-  pointer-events: none;
-  opacity: 0.55;
-  filter: grayscale(0.4);
-}
+/* (open or closed, the owner is the head chef: the stove and the fire stay theirs) */
 
 /* ---- tasting notes ---- */
 .fullness-try {
@@ -4037,4 +4031,36 @@ button {
 .welcome-warn {
   color: #c4442f;
   font-weight: 700;
+}
+
+/* over each 3D customer's head: their face (once they've eaten), a … while they wait, and what they are */
+.g3-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.g3-label > span:last-child {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgb(43 33 25 / 0.72);
+  color: #fff3dc;
+  font: 600 11px/1.5 var(--brush);
+}
+
+.g3-label .mood-face {
+  width: 22px;
+  height: 22px;
+}
+
+.g3-bubble {
+  padding: 0 7px;
+  border: 1px solid #3b2a20;
+  border-radius: 9px 9px 9px 2px;
+  background: #fff;
+  color: #3b2a20;
+  font: 700 12px/1.3 var(--brush);
+  animation: gc-dots 1.4s ease-in-out infinite;
 }

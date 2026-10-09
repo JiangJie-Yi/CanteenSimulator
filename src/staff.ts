@@ -12,7 +12,7 @@
 // the shop is open they tire (faster with less stamina), and a tired worker works worse; with the shop closed they
 // rest.
 
-export type Role = 'chef' | 'cashier' | 'server'
+export type Role = 'chef' | 'sous' | 'cashier' | 'server'
 export type Worker = {
   id: string
   zh: string
@@ -28,17 +28,21 @@ export type Worker = {
 }
 
 export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: string }[]> = {
+  // the owner is the head chef of every shop: what's hired is a second chef and a sous chef to help
   grilledfish: [
-    { role: 'chef', max: 1, zh: '板前（燒烤師傅）', ja: '板前' },
+    { role: 'chef', max: 1, zh: '主廚（第二位板前）', ja: '板前（二番手）' },
+    { role: 'sous', max: 1, zh: '副廚（備料・上火・收拾）', ja: '追い回し' },
     { role: 'cashier', max: 1, zh: '收銀', ja: 'レジ' },
   ],
   hotpot: [
-    { role: 'chef', max: 2, zh: '後場廚師（備料）', ja: '厨房（仕込み）' },
+    { role: 'chef', max: 1, zh: '主廚（顧湯）', ja: '料理長' },
+    { role: 'sous', max: 1, zh: '副廚（備料）', ja: '副料理長（仕込み）' },
     { role: 'cashier', max: 1, zh: '收銀', ja: 'レジ' },
     { role: 'server', max: 3, zh: '外場服務生', ja: 'ホール' },
   ],
   beefnoodle: [
-    { role: 'chef', max: 2, zh: '煮麵師傅', ja: '麺担当' },
+    { role: 'chef', max: 1, zh: '主廚（煮麵）', ja: '麺の料理長' },
+    { role: 'sous', max: 1, zh: '副廚（顧湯・配料）', ja: '副料理長' },
     { role: 'cashier', max: 1, zh: '收銀', ja: 'レジ' },
     { role: 'server', max: 1, zh: '外場服務生', ja: 'ホール' },
   ],
@@ -46,7 +50,7 @@ export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: st
 
 // a fair wage for someone this good at this job (NT$/h): from about minimum wage (NT$196) up
 const fair = (role: Role, skill: number) =>
-  Math.round((role === 'chef' ? 200 + skill * 4.2 : role === 'server' ? 196 + skill * 1.4 : 196 + skill * 1.1) / 5) * 5
+  Math.round((role === 'chef' ? 200 + skill * 4.2 : role === 'sous' ? 196 + skill * 2.4 : role === 'server' ? 196 + skill * 1.4 : 196 + skill * 1.1) / 5) * 5
 
 type Seed = [string, string, Role, number, number, number, number, string]
 // [中文名, 日本語名, role, skill, speed, stamina, wage adjustment (1 = fair), note]
@@ -57,15 +61,19 @@ const POOL: Record<string, Seed[]> = {
     ['高橋 浩二', '高橋 浩二', 'chef', 81, 62, 70, 0.72, '剛從京都回來，要價不高（撿到寶）'],
     ['渡辺 誠', '渡辺 誠', 'chef', 55, 70, 90, 1.0, '學徒出身，耐操'],
     ['中村 剛', '中村 剛', 'chef', 63, 58, 55, 1.35, '名店出身，但開價偏高'],
+    ['山口 翔太', '山口 翔太', 'sous', 70, 86, 88, 1.0, '手腳麻利，備料上火一把罩'],
+    ['井上 健', '井上 健', 'sous', 58, 74, 92, 0.8, '剛入行，便宜又耐操'],
+    ['木村 大輔', '木村 大輔', 'sous', 82, 70, 62, 0.75, '居酒屋出身，撿到寶'],
     ['小林 美咲', '小林 美咲', 'cashier', 80, 82, 75, 1.0, '算帳又快又準'],
     ['加藤 由美', '加藤 由美', 'cashier', 58, 60, 88, 0.95, '親切，偶爾找錯錢'],
     ['松本 花', '松本 花', 'cashier', 88, 90, 64, 0.85, '前銀行行員，便宜又可靠'],
   ],
   hotpot: [
     ['陳志明', '陳 志明', 'chef', 84, 75, 70, 1.0, '刀工好，盤子擺得漂亮'],
-    ['黃建宏', '黄 建宏', 'chef', 66, 88, 85, 1.0, '備料最快'],
+    ['黃建宏', '黄 建宏', 'sous', 66, 88, 85, 0.85, '備料最快，價錢公道'],
     ['吳宗翰', '呉 宗翰', 'chef', 78, 70, 60, 0.7, '剛退伍，手藝不錯又便宜'],
-    ['蔡明哲', '蔡 明哲', 'chef', 52, 55, 92, 1.0, '學徒，體力好'],
+    ['蔡明哲', '蔡 明哲', 'sous', 52, 55, 92, 1.0, '學徒，體力好'],
+    ['何俊傑', '何 俊傑', 'sous', 74, 82, 80, 1.0, '備料又快又乾淨'],
     ['林雅婷', '林 雅婷', 'cashier', 82, 80, 70, 1.0, '記性好，熟客都記得'],
     ['王怡君', '王 怡君', 'cashier', 60, 64, 85, 1.0, '細心'],
     ['張淑芬', '張 淑芬', 'server', 86, 84, 78, 1.0, '外場十年，眼觀四面'],
@@ -75,9 +83,10 @@ const POOL: Record<string, Seed[]> = {
   ],
   beefnoodle: [
     ['楊德福', '楊 徳福', 'chef', 90, 70, 64, 1.0, '老師傅，湯頭一絕'],
-    ['周文彬', '周 文彬', 'chef', 70, 86, 84, 1.0, '煮麵速度快'],
+    ['周文彬', '周 文彬', 'sous', 70, 86, 84, 1.0, '煮麵速度快'],
     ['鄭大偉', '鄭 大偉', 'chef', 79, 74, 72, 0.7, '家傳手藝，價錢實在'],
-    ['洪國華', '洪 国華', 'chef', 56, 62, 90, 1.0, '學徒'],
+    ['洪國華', '洪 国華', 'sous', 56, 62, 90, 1.0, '學徒'],
+    ['孫立偉', '孫 立偉', 'sous', 76, 80, 74, 0.8, '顧湯一流，要價實在'],
     ['許美玲', '許 美玲', 'cashier', 76, 78, 80, 1.0, '收銀兼包外帶'],
     ['謝秀蘭', '謝 秀蘭', 'cashier', 62, 58, 86, 0.9, '老闆娘的表姊'],
     ['邱雅雯', '邱 雅雯', 'server', 72, 80, 76, 1.0, '端麵很穩'],

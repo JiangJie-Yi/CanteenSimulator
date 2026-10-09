@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type Keyboard
 import { nameIn, UI, type Lang } from '../i18n'
 import { toChineseNumber, type Dish } from '../menu'
 import { hasIcon, Icon } from './Icon'
+import { guestLabel } from '../guests'
 
 type MenuProps = {
   dish: Dish
@@ -238,7 +239,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           <ul className="order-slip" aria-live="polite">
             {feed.map((f) => {
               const it = all.find((x) => x.id === f.id)
-              return <li key={f.key}><span>✎</span><em>{t.wrote(f.guest, it ? nameIn(lang, it) : f.id)}</em></li>
+              return <li key={f.key}><span>✎</span><em>{t.wrote(guestLabel(f.guest, lang), it ? nameIn(lang, it) : f.id)}</em></li>
             })}
           </ul>
         )}

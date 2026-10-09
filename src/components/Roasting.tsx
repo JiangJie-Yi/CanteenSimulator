@@ -25,6 +25,7 @@ const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
 const SIPS = 3
 const SOUP_TASTE = 78
 /** an AI customer as App shows them: seated and waiting, eating, or gone (with their rating) */
+export { BAR_AT }
 export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'angry'; rating: number | null; items: number;
   /** what they've eaten so far (for their stomach) */
   ate: string[] }
@@ -44,9 +45,9 @@ function forPhone(c: HTMLCanvasElement) {
   return out
 }
 /** the bar the customers sit at, behind the fire (away from the camera): its middle, length, top, and seats */
-const BAR_AT = new THREE.Vector3(-0.59 * 2.45, 0, -0.81 * 2.45)
+const BAR_AT = new THREE.Vector3(-0.59 * 2.45 + 0.81 * 0.45, 0, -0.81 * 2.45 - 0.59 * 0.45)
 const BAR_LEN = 3.6
-const BAR_TOP = 0.24
+const BAR_TOP = 0.44
 const BAR_SEATS = 4
 const barSeat = (n: number) => BAR_AT.clone().addScaledVector(new THREE.Vector3(0.81, 0, -0.59), (n - (BAR_SEATS - 1) / 2) * (BAR_LEN / BAR_SEATS))
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
@@ -1255,6 +1256,8 @@ type RoastingProps = {
   onSay?: (who: 'chef' | 'guest', text: string) => void
   /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
   space?: 'closed' | 'open'
+  /** who's hired to help the owner (the head chef): a second chef, a sous chef */
+  helpers?: { chef: boolean; sous: boolean }
   /** what's said is in this language, with these names for the food */
   lang?: Lang
   names?: Record<string, string>
@@ -1281,7 +1284,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {} }: RoastingProps) {
+  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false } }: RoastingProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
   const { scene } = useGLTF(url)
@@ -1862,6 +1865,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         onSay?.('chef', text)
       }
     }
+    // the owner is the head chef and works the grill by hand; a hired chef cooks alongside (takes things off when
+    // done, seasons them), the sous chef does the rest (keeps the fire up, puts what's waiting on, clears away)
+    const { chef: hasChef, sous: hasSous } = helpers
+    if (!hasChef && !hasSous) return
     if (fire && fire.current < 0.35) {
       onAddCharcoal?.()
       say(L().addCharcoal)
@@ -1870,7 +1877,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const live = pieces.current.filter((p) => present(p) && !p.eaten && p.trash < 0 && !p.carried)
     const stageOfP = (p: Piece) => stageOf(p.progress / roast.times[p.id]).key
     const scrapIt = live.find((p) => p.stickOnly || (!p.collected && !p.staged && stageOfP(p) === 'burnt'))
-    if (scrapIt && roast.trash) {
+    if (scrapIt && roast.trash && (hasSous || !hasChef)) {
       scrapIt.trashFrom.copy(scrapIt.node.position)
       scrapIt.trash = 0
       scrapIt.node.userData.onPlate = true
@@ -1888,14 +1895,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const n = follows(p)
       return n?.doneness !== undefined ? Math.min(1.45, Math.max(0.95, n.doneness)) : chef.pullAt
     }
-    const ready = live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 &&
-      p.progress / roast.times[p.id] >= pullOf(p))
+    const ready = hasChef ? live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 &&
+      p.progress / roast.times[p.id] >= pullOf(p)) : undefined
     if (ready) {
       collect(ready)
       say(L().done(nameOf(ready.id)))
       return
     }
-    const toSeason = live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 && !p.chefSeasoned &&
+    const toSeason = hasChef && live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 && !p.chefSeasoned &&
       p.progress / roast.times[p.id] >= 0.85)
     if (toSeason) {
       toSeason.chefSeasoned = true
@@ -1916,7 +1923,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       wrapped.unwrapped = true
       return
     }
-    const next = live.filter((p) => p.staged).sort((a, b) => a.stagedAt - b.stagedAt)[0]
+    const next = hasSous ? live.filter((p) => p.staged).sort((a, b) => a.stagedAt - b.stagedAt)[0] : undefined
     if (next && putOnFire(next)) say(L().onFire(nameOf(next.id)))
   }
 
@@ -2402,6 +2409,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         return
       }
       if (p.staged) putOnFire(p)
+      else if (p.collected && space === 'open') return      // (served at the bar: it's the customers')
       else if (p.collected && inBasket(p) && !p.unwrapped) p.unwrapped = true      // unwrap the foil first
       else if (p.collected) eat(p)
       else collect(p)

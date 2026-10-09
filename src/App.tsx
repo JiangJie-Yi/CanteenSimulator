@@ -15,13 +15,13 @@ import { FireControl } from './components/FireControl'
 import { Fullness } from './components/Fullness'
 import { bestOf, Notebook, type Notes } from './components/Notebook'
 import { MoodFace } from './components/MoodFace'
-import { GuestCounter } from './components/GuestCounter'
 import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
 import { Crash } from './components/Crash'
 import { PotCooking } from './components/PotCooking'
 import { NoodleEating } from './components/NoodleEating'
-import type { GuestView } from './components/Roasting'
+import { BAR_AT, type GuestView } from './components/Roasting'
+import { GuestBar3D } from './components/GuestBar3D'
 import { CHEFS, type Chef } from './chefs'
 import { LINES } from './lines'
 import { guestLabel } from './guests'
@@ -49,14 +49,16 @@ const SAVE_KEY = 'canteen-save'
 const BASE_KCAL: Record<string, number> = { braised: 650, clear: 560, plain: 380, dry: 520, sesame: 610 }
 type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean> }
+// Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff).
+// (Any save left by an older version is cleared.)
 const SAVED: Saved | null = (() => {
   try {
-    const raw = localStorage.getItem(SAVE_KEY)
-    const v = raw ? (JSON.parse(raw) as Saved) : null
-    return v?.v === 1 ? v : null
+    for (const k of [SAVE_KEY, 'canteen-theme', 'canteen-lang', 'canteen-pos-guests', 'canteen-pos-ledger', 'canteen-pos-chat',
+      'canteen-pos-office', 'canteen-pos-notebook']) localStorage.removeItem(k)
   } catch {
-    return null
+    // storage blocked
   }
+  return null
 })()
 
 /**
@@ -174,20 +176,14 @@ function usePrefersReducedMotion() {
 function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      const saved = localStorage.getItem('canteen-theme')
-      if (saved === 'light' || saved === 'dark') return saved
+      // (not remembered: every visit starts from the system preference)
     } catch {
-      // storage unavailable: fall back to the system preference
+      // nothing
     }
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   })
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    try {
-      localStorage.setItem('canteen-theme', theme)
-    } catch {
-      // not persisted; the toggle still works for this visit
-    }
   }, [theme])
   return [theme, () => setTheme((t) => (t === 'light' ? 'dark' : 'light'))]
 }
@@ -245,14 +241,16 @@ type SceneProps = {
   lang: Lang
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
+  helpersOf: (dishId: string) => { chef: boolean; sous: boolean }
   onWalkOut: (ids: string[], dish: DishInfo) => void
   onGuests: (dishId: string, g: GuestView[]) => void
   /** what the hot pot's AI customers are waiting for (they take it out of the pot themselves once it's cooked) */
   potAi: string[]
+  guestsBy: Record<string, GuestView[]>
   onPotGuestEat: (id: string, taste: number) => void
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, crowdOf, onWalkOut, onGuests, potAi, onPotGuestEat, notes,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -443,12 +441,18 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)}
+                  helpers={helpersOf(dish.id)}
                   onWalkOut={(ids) => onWalkOut(ids, dish)} lang={lang}
                   names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))}
-                  space={ai ? 'open' : 'closed'} locked={ai}
+                  space={ai ? 'open' : 'closed'} locked={false}
                   notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))} />
               )}
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
+              {ai && i === active && (
+                // the customers, in 3D, at the bar behind (the grill's bar is drawn by Roasting, which serves onto it)
+                <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast}
+                  at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)} />
+              )}
               {dish.id === 'beefnoodle' && (
                 <NoodleEating url={url} base={base?.id ?? null} taste={base ? 70 + (base.broth || base.fill ? 4 : 0) : 0}
                   active={i === active} locked={ai} toppings={dish.items.map((x) => x.id)} onEat={onEat} />
@@ -576,15 +580,17 @@ export default function App() {
   const [hired, setHired] = useState<Record<string, Record<string, { fatigue: number }>>>(() => SAVED?.hired ?? {})
   const staffOf = (dishId: string, role?: Role) =>
     (CANDIDATES[dishId] ?? []).filter((w) => hired[dishId]?.[w.id] && (!role || w.role === role))
-  /** the shop's chef as the cooking needs him: the best-working of the hired chefs (or a stand-in if none) */
+  /** the kitchen's cooking as the simulation needs it: the owner is the head chef; a hired chef (or, failing that,
+   * the sous chef) is the hand that works alongside, and every cook in the kitchen speeds things up */
   const chefOf = (dishId: string): Chef => {
-    const cooks = staffOf(dishId, 'chef')
-    if (!cooks.length) return CHEFS[0]
+    const all = [...staffOf(dishId, 'chef'), ...staffOf(dishId, 'sous')]
+    const cooks = staffOf(dishId, 'chef').length ? staffOf(dishId, 'chef') : staffOf(dishId, 'sous')
+    if (!cooks.length) return { ...CHEFS[1], id: 'owner', skill: 0.7, cooks: 1, wagePerHour: staffOf(dishId).reduce((n, w) => n + w.wage, 0) }
     const best = cooks.map((w) => ({ w, e: effective(w, hired[dishId][w.id].fatigue) })).sort((a, b) => b.e - a.e)[0]
     const sp = best.w.speed / 100
     return { id: best.w.id, zh: best.w.zh, ja: best.w.ja, pace: Math.max(0.35, 1.7 - best.e * 0.7 - sp * 0.6),
       pullAt: 1.25 - best.e * 0.25, seasonChance: Math.min(1, 0.25 + best.e * 0.8),
-      wagePerHour: staffOf(dishId).reduce((n, w) => n + w.wage, 0), skill: best.e, cooks: cooks.length }
+      wagePerHour: staffOf(dishId).reduce((n, w) => n + w.wage, 0), skill: best.e, cooks: all.length + 1 }
   }
   const chef = chefOf(DISHES[active].id)
   const [guestsBy, setGuestsBy] = useState<Record<string, GuestView[]>>({})
@@ -621,9 +627,9 @@ export default function App() {
   useEffect(() => {
     const write = () => {
       try {
-        localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, ...saveRef.current }))
+        void saveRef.current      // (nothing is saved: a reload starts over)
       } catch {
-        // storage full or blocked: carry on unsaved
+        // nothing
       }
     }
     const id = window.setInterval(write, 4000)
@@ -660,7 +666,7 @@ export default function App() {
   const setHeat = (h: number) => setHeatBy((b) => ({ ...b, [space]: h }))
   const [lang, setLang] = useState<Lang>(() => {
     try {
-      return localStorage.getItem('canteen-lang') === 'ja' ? 'ja' : 'zh'
+      return 'zh'
     } catch {
       return 'zh'
     }
@@ -670,7 +676,7 @@ export default function App() {
     setLang((l) => {
       const next: Lang = l === 'zh' ? 'ja' : 'zh'
       try {
-        localStorage.setItem('canteen-lang', next)
+        void next
       } catch {
         // not remembered; the switch still works for this visit
       }
@@ -1086,10 +1092,14 @@ export default function App() {
     if (d.id === 'hotpot') {
       // the chef keeps the soup on the boil while anyone's eating, and turns the gas off when the shop's quiet
       const busy = s.guests.some((g) => g.state === 'waiting' || g.state === 'eating')
-      if (busy && heatRef.current < 70) {
+      // (only a hired hand minds the stove for you; on your own, the stove is yours to work)
+      const minded = staffOf('hotpot', 'chef').length + staffOf('hotpot', 'sous').length > 0
+      if (!minded) {
+        // nothing
+      } else if (busy && heatRef.current < 70) {
         setHeat(80)
         talk('chef', LINES[lang].lightPot)
-      } else if (!busy && heatRef.current > 0) {
+      } else if (minded && !busy && heatRef.current > 0) {
         setHeat(0)
       }
       const owed: string[] = []
@@ -1198,15 +1208,16 @@ export default function App() {
               }
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
-            lang={lang} notes={notes} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
+            lang={lang} notes={notes} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund}
+            guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
         </Canvas>}
         </Crash>
       </div>
       <div className="stage" ref={stageRef}>
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
  />
-        {dish.heatControl && <HeatControl heat={heat} onChange={ai ? () => {} : setHeat} lang={lang} />}
-        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={ai ? () => {} : addCharcoal} lang={lang} />}
+        {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
+        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
         <Notebook notes={notes} lang={lang} />
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'stock'))} aria-expanded={!!office}
@@ -1268,14 +1279,13 @@ export default function App() {
               onPointerDown={dragBoard.onPointerDown} onDoubleClick={dragBoard.onDoubleClick}>
               <div className="chef-pick">
                 <span>{UI[lang].chefPick}</span>
-                <b>{staffOf(DISHES[active].id, 'chef').map((w) => (lang === 'ja' ? w.ja : w.zh)).join('、') || '—'}</b>
+                <b>{[owner ?? '', ...staffOf(DISHES[active].id, 'chef'), ...staffOf(DISHES[active].id, 'sous')].map((w) => (typeof w === 'string' ? w : lang === 'ja' ? w.ja : w.zh)).filter(Boolean).join('、')}</b>
                 <button type="button" onClick={() => setOffice('staff')}>{lang === 'ja' ? '人事' : '人事'}</button>
               </div>
               <p className="guest-count">
                 {UI[lang].guests(guests.length, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
               </p>
-              <GuestCounter guests={guests} shop={DISHES[active].id} lang={lang} staff={{ chef: staffOf(DISHES[active].id, 'chef').length,
-                cashier: staffOf(DISHES[active].id, 'cashier').length, server: staffOf(DISHES[active].id, 'server').length }} />
+              {/* (the customers themselves are at the bar in 3D now) */}
               <ul className="guest-list">
                 {guests.slice(-4).reverse().map((g) => {
                   return (
@@ -1350,7 +1360,7 @@ export default function App() {
           setOwner(name)
           saveRef.current = { ...saveRef.current, owner: name }
           try {
-            localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, ...saveRef.current }))
+            void saveRef.current
           } catch {
             // storage blocked
           }
@@ -1402,11 +1412,6 @@ export default function App() {
       <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
         aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => {
-        if (!ai && !staffOf(DISHES[active].id, 'chef').length) {
-          say(UI[lang].needChef)
-          setOffice('staff')
-          return
-        }
         setAi((v) => !v)
       }}
         aria-pressed={ai} title={UI[lang].aiLabel}>

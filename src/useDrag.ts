@@ -8,7 +8,8 @@ export function useDrag(key: string) {
   const store = `canteen-pos-${key}`
   const [at, setAt] = useState<{ x: number; y: number }>(() => {
     try {
-      return JSON.parse(localStorage.getItem(store) ?? '') ?? { x: 0, y: 0 }
+      void store
+      return { x: 0, y: 0 }       // (not remembered between visits)
     } catch {
       return { x: 0, y: 0 }
     }
@@ -16,7 +17,7 @@ export function useDrag(key: string) {
   const start = useRef<{ px: number; py: number; x: number; y: number } | null>(null)
   const save = (p: { x: number; y: number }) => {
     try {
-      localStorage.setItem(store, JSON.stringify(p))
+      void p
     } catch {
       // storage blocked
     }
