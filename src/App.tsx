@@ -15,6 +15,7 @@ import { FireControl } from './components/FireControl'
 import { Fullness } from './components/Fullness'
 import { bestOf, Notebook, type Notes } from './components/Notebook'
 import { MoodFace } from './components/MoodFace'
+import { GuestCounter } from './components/GuestCounter'
 import { HeatControl } from './components/HeatControl'
 import { Menu } from './components/Menu'
 import { Crash } from './components/Crash'
@@ -183,6 +184,19 @@ function usePrefersReducedMotion() {
   return reduced
 }
 
+/** a phone (a touch screen, or a narrow one): the customers are shown in the 2D bar on the guest board instead of in 3D */
+const PHONE_QUERY = '(hover: none) and (pointer: coarse), (max-width: 760px)'
+function usePhone() {
+  const [phone, setPhone] = useState(() => window.matchMedia(PHONE_QUERY).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(PHONE_QUERY)
+    const onChange = () => setPhone(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return phone
+}
+
 function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
@@ -261,9 +275,11 @@ type SceneProps = {
   onPotGuestEat: (id: string, taste: number) => void
   /** shops with food out on either table (tasting or open): they stay loaded, so nothing on them is lost */
   inUse: string[]
+  /** on a phone the customers are drawn in 2D on the guest board, not at the bar in 3D */
+  phone: boolean
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -464,7 +480,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                   notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))} />
               )}
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
-              {ai && i === active && (
+              {ai && i === active && !phone && (
                 // the customers, in 3D, at the bar behind (the grill's bar is drawn by Roasting, which serves onto it)
                 <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)} />
@@ -683,6 +699,7 @@ export default function App() {
   // the browser dropped the WebGL context (a phone out of GPU memory)
   const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
+  const phone = usePhone()
   // the stove starts switched off: the cook turns it up
   const [heatBy, setHeatBy] = useState({ closed: 0, open: 0 })
   const heat = heatBy[space]
@@ -1250,7 +1267,7 @@ export default function App() {
             }} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund}
             guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
-            inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />
+            phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />
         </Canvas>}
         </Crash>
       </div>
@@ -1326,7 +1343,12 @@ export default function App() {
               <p className="guest-count">
                 {UI[lang].guests(guests.length, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
               </p>
-              {/* (the customers themselves are at the bar in 3D now) */}
+              {/* (on a computer the customers sit at the bar in 3D; a phone shows them here, in the 2D bar, which
+                  stays sharp and clear of the rest on a small screen) */}
+              {phone && (
+                <GuestCounter guests={guests} shop={DISHES[active].id} lang={lang} staff={{ chef: staffOf(DISHES[active].id, 'chef').length,
+                  cashier: staffOf(DISHES[active].id, 'cashier').length, server: staffOf(DISHES[active].id, 'server').length }} />
+              )}
               <ul className="guest-list">
                 {guests.slice(-4).reverse().map((g) => {
                   return (
