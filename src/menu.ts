@@ -331,7 +331,8 @@ export const DISHES: Dish[] = [
       basket: { at: [1.75, 0, 0.75], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
       // behind the fire to the left of the plate, as the camera sees it
-      dish: { at: [-0.39, 0.0, 1.81], capacity: 3 },
+      // (in the front row, just left of the plate)
+      dish: { at: [0.39, 0.0, 2.32], capacity: 3 },
       // the spoons and brush in the seasoning box are what's carried; grabbing a pot picks up its utensil
       // (salt is taken by hand: SaltPinch only marks where the pinch is taken from)
       tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut', WaterDipper: 'water' },
@@ -342,10 +343,12 @@ export const DISHES: Dish[] = [
       // a bucket of water for splashing, the trash bin beside it (both on the left); the tray where ordered food
       // waits to go on the fire
       bucket: ['WaterBucket', 'WaterDipper'],
-      trash: [-2.2, 0.0, -0.45],
-      tray: [1.6, 0.0, -0.75],
+      // (the bin to the left of the bucket, where it can be seen, not hidden behind it)
+      trash: [-1.97, 0.0, 0.69],
+      tray: [1.31, 0.0, -0.83],
       // the rice balls come out on their own little dish, just past the front end of the tray
-      rawDish: { at: [2.42, 0.0, 0.08], items: ['Onigiri'] },
+      // (beside the front end of the tray, between it and the basket: the prep side, all on the right)
+      rawDish: { at: [1.41, 0.0, 0.15], items: ['Onigiri'] },
     },
     layout: {
       mode: 'ring',

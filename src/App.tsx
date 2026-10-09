@@ -480,9 +480,10 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                   notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))} />
               )}
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
-              {ai && i === active && !phone && (
+              {ai && i === active && (
                 // the customers, in 3D, at the bar behind (the grill's bar is drawn by Roasting, which serves onto it)
-                <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast}
+                <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast} people={!phone}
+                  top={dish.roast ? 0.44 : 0.465}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)} />
               )}
               {dish.id === 'beefnoodle' && (

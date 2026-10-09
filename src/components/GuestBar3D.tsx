@@ -12,6 +12,10 @@ import type { Lang } from '../i18n'
  * on a dark panelled front, stools along the far side; a customer walks in from the end of the bar, sits on a free
  * stool facing the cook, waits ("…"), eats (leaning in, chopsticks going), and when they're done gets up and walks
  * off — their face says how it was. They're dressed as what they are (guests.ts).
+ *
+ * The plates are handled for real: a stack of clean ones at the left end of the bar; as a customer sits down one is
+ * lifted off the top and set in front of them; when they get up it's cleared onto the dirty stack at the right
+ * end, which, once it's grown, is taken back to be washed and comes back to the clean stack plate by plate.
  */
 
 const LAY = new THREE.Vector3(0.59, 0, 0.81)       // toward the camera (the cook's side)
@@ -192,14 +196,84 @@ function Counter({ length }: { length: number }) {
 
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave'; t: number }
 
-export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang }:
-  { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang }) {
+/** a plate on its way to a seat ('serve'), set at it ('set'), or being cleared away ('clear', after a pause) */
+type PlateRun = { key: number; seat: number; phase: 'serve' | 'set' | 'clear'; t: number; from: THREE.Vector3 }
+const STACK_GAP = 0.026
+const CLEAN_START = 8
+/** the dirty stack goes to be washed once it's this high (and nothing's on its way to it) */
+const WASH_AT = 5
+const SERVE_S = 0.55
+const CLEAR_S = 0.6
+const CLEAR_DELAY = 1.0
+const WASH_S = 0.9
+const PLATE_GEO = new THREE.CylinderGeometry(0.19, 0.15, 0.024, 28)
+const RIM_GEO = new THREE.TorusGeometry(0.172, 0.007, 6, 36)
+const SMEAR_GEO = new THREE.CircleGeometry(0.085, 18)
+const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.26, 5)
+
+/** a small white plate with an indigo line round its rim (dirty: a smear of sauce and a used stick) */
+function Plate({ dirty = false }: { dirty?: boolean }) {
+  return (
+    <group>
+      <Part geo={PLATE_GEO} color="#f4efe4" outline={1.05} position-y={0.012} />
+      <mesh geometry={RIM_GEO} position-y={0.0245} rotation-x={Math.PI / 2}>
+        <meshToonMaterial color="#3d5a8c" />
+      </mesh>
+      {dirty && (
+        <>
+          <mesh geometry={SMEAR_GEO} position={[0.03, 0.0255, -0.02]} rotation-x={-Math.PI / 2} scale={[1.2, 0.8, 1]}>
+            <meshBasicMaterial color="#8a5a32" transparent opacity={0.55} depthWrite={false} />
+          </mesh>
+          <mesh geometry={USED_STICK_GEO} position={[-0.02, 0.03, 0.03]} rotation={[0, 0.6, Math.PI / 2]}>
+            <meshToonMaterial color="#c9a46a" />
+          </mesh>
+        </>
+      )}
+    </group>
+  )
+}
+
+export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true }:
+  { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
+    /** the height of the bar top, where the plates go */
+    top?: number
+    /** draw the customers themselves (a phone shows them in 2D instead; the plates still come and go) */
+    people?: boolean }) {
   const [shown, setShown] = useState<Shown[]>([])
   const guestsRef = useRef(guests)
   guestsRef.current = guests
   const groups = useRef(new Map<number, THREE.Group>())
   const clock = useRef(0)
   const seatAt = (n: number) => at.clone().addScaledVector(ALONG, (n - (SEATS - 1) / 2) * (length / SEATS)).addScaledVector(LAY, -0.5)
+  const plateAt = (n: number) => at.clone().addScaledVector(ALONG, (n - (SEATS - 1) / 2) * (length / SEATS)).setY(top)
+  const cleanAt = (k: number) => at.clone().addScaledVector(ALONG, -length / 2 + 0.02).addScaledVector(LAY, 0.06).setY(top + k * STACK_GAP)
+  const dirtyAt = (k: number) => at.clone().addScaledVector(ALONG, length / 2 - 0.02).addScaledVector(LAY, 0.06).setY(top + k * STACK_GAP)
+
+  // the plates: those out at the seats (or on their way), and the two stacks
+  const [, setTick] = useState(0)
+  const redraw = () => setTick((n) => n + 1)
+  const runs = useRef<PlateRun[]>([])
+  const runSeq = useRef(0)
+  const runObjs = useRef(new Map<number, THREE.Group>())
+  /** when each clean plate (bottom up) came back to the stack: it drops onto it */
+  const clean = useRef<number[]>(Array.from({ length: CLEAN_START }, () => -9))
+  const cleanObjs = useRef<(THREE.Group | null)[]>([])
+  const dirty = useRef(0)
+  const dirtyStack = useRef<THREE.Group>(null)
+  const wash = useRef<number | null>(null)
+  const serve = (seat: number) => {
+    const from = cleanAt(Math.max(0, clean.current.length - 1))
+    clean.current = clean.current.slice(0, -1)
+    runs.current.push({ key: ++runSeq.current, seat, phase: 'serve', t: 0, from })
+    redraw()
+  }
+  const clear = (seat: number) => {
+    const r = runs.current.find((x) => x.seat === seat && x.phase !== 'clear')
+    if (r) {
+      r.phase = 'clear'
+      r.t = -CLEAR_DELAY
+    }
+  }
   const doorAt = (n: number) => at.clone().addScaledVector(ALONG, length / 2 + 0.8).addScaledVector(LAY, -0.5 - n * 0.05)
 
   useEffect(() => {
@@ -210,9 +284,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang 
         const seated = g.state === 'waiting' || g.state === 'eating'
         if (!s && seated) {
           const taken = new Set(next.map((x) => x.seat))
-          const seat = Array.from({ length: SEATS }, (_, i) => i).find((i) => !taken.has(i))
+          // (the shop may have given them a stool already)
+          const seat = g.seat !== undefined && !taken.has(g.seat) ? g.seat : Array.from({ length: SEATS }, (_, i) => i).find((i) => !taken.has(i))
           if (seat !== undefined) next.push({ id: g.id, seat, phase: 'enter', t: 0 })
         } else if (s && !seated && s.phase !== 'leave') {
+          clear(s.seat)
           next = next.map((x) => (x.id === g.id ? { ...x, phase: 'leave', t: 0 } : x))
         }
       }
@@ -234,7 +310,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang 
       if (s.phase === 'enter') {
         g.position.lerpVectors(door, seat, e)
         g.rotation.y = k < 1 ? Math.atan2(-ALONG.x, -ALONG.z) : FACE_YAW
-        if (k >= 1) s.phase = 'sit'
+        if (k >= 1) {
+          s.phase = 'sit'
+          // a plate is set in front of them
+          serve(s.seat)
+        }
       } else if (s.phase === 'sit') {
         g.position.copy(seat)
         g.rotation.y = FACE_YAW
@@ -248,6 +328,65 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang 
     }
     if (done.length) setShown((cur) => cur.filter((x) => !done.includes(x.id)))
     done = []
+
+    // the plates on the move: lifted off the stack in an arc to the seat, and cleared away to the dirty stack
+    const step = Math.min(dt, 0.1)
+    let finished = 0
+    for (const r of runs.current) {
+      r.t += step
+      const o = runObjs.current.get(r.key)
+      const to = r.phase === 'clear' ? dirtyAt(dirty.current + finished) : plateAt(r.seat)
+      if (r.phase === 'set' || r.phase === 'clear' && r.t < 0) {
+        o?.position.copy(r.phase === 'set' ? to : o.position)
+        continue
+      }
+      if (r.phase === 'clear' && r.t >= 0 && r.t - step < 0 && o) r.from = o.position.clone()
+      const k = Math.min(1, r.t / (r.phase === 'serve' ? SERVE_S : CLEAR_S))
+      const e = k * k * (3 - 2 * k)
+      if (o) {
+        o.position.lerpVectors(r.from, to, e)
+        o.position.y += Math.sin(Math.PI * k) * 0.22
+        o.rotation.z = Math.sin(Math.PI * k) * 0.12
+      }
+      if (k >= 1) {
+        if (r.phase === 'serve') r.phase = 'set'
+        else {
+          r.t = Infinity
+          finished++
+        }
+      }
+    }
+    if (finished) {
+      runs.current = runs.current.filter((r) => r.t !== Infinity)
+      dirty.current += finished
+      redraw()
+    }
+    // the dirty stack, once it's grown, goes back to be washed (toward the kitchen and down out of sight); it comes
+    // back clean, one plate at a time, onto the clean stack
+    if (wash.current === null && dirty.current >= WASH_AT && !runs.current.some((r) => r.phase === 'clear' && r.t >= 0)) wash.current = 0
+    if (wash.current !== null) {
+      wash.current += step
+      const k = Math.min(1, wash.current / WASH_S)
+      const e = k * k * (3 - 2 * k)
+      dirtyStack.current?.position.set(0, -0.5 * e, 0).addScaledVector(LAY, 0.7 * e)
+      if (k >= 1) {
+        const n = dirty.current
+        dirty.current = 0
+        wash.current = null
+        dirtyStack.current?.position.set(0, 0, 0)
+        const now = clock.current
+        clean.current = [...clean.current, ...Array.from({ length: n }, (_, i) => now + 1.2 + i * 0.35)]
+        redraw()
+      }
+    }
+    // clean plates coming back drop onto the stack
+    clean.current.forEach((born, i) => {
+      const o = cleanObjs.current[i]
+      if (!o) return
+      const k = Math.max(0, Math.min(1, (clock.current - born) / 0.25))
+      o.visible = clock.current >= born
+      o.position.copy(cleanAt(i)).y += (1 - k * k) * 0.3
+    })
   })
 
   return (
@@ -256,7 +395,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang 
       {Array.from({ length: SEATS }, (_, n) => (
         <group key={n} position={seatAt(n)}><Stool /></group>
       ))}
-      {shown.map((s) => {
+      {/* the clean stack, the dirty one, and the plates out at the seats */}
+      {clean.current.map((_, i) => (
+        <group key={`c${i}`} ref={(o) => { cleanObjs.current[i] = o }} position={cleanAt(i)}><Plate /></group>
+      ))}
+      <group ref={dirtyStack}>
+        {Array.from({ length: dirty.current }, (_, i) => (
+          <group key={`d${i}`} position={dirtyAt(i)} rotation-y={i * 0.9}><Plate dirty /></group>
+        ))}
+      </group>
+      {runs.current.map((r) => (
+        <group key={r.key} ref={(o) => { if (o) runObjs.current.set(r.key, o); else runObjs.current.delete(r.key) }} position={r.from}>
+          <Plate dirty={r.phase === 'clear'} />
+        </group>
+      ))}
+      {people && shown.map((s) => {
         const g = guests.find((x) => x.id === s.id)
         const walking = s.phase !== 'sit'
         return (

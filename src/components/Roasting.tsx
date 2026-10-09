@@ -28,8 +28,12 @@ const SOUP_TASTE = 78
 export { BAR_AT }
 export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'angry'; rating: number | null; items: number;
   /** what they've eaten so far (for their stomach) */
-  ate: string[] }
-type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state'] }
+  ate: string[]
+  /** their stool at the bar, where their plate is set */
+  seat?: number }
+type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state']; seat: number
+  /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
+  leftAt?: number; cleared?: boolean }
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
 const MAX_SEATED = 4
 const PATIENCE = 150
@@ -394,11 +398,7 @@ function Bar() {
         const x = (n - (BAR_SEATS - 1) / 2) * (BAR_LEN / BAR_SEATS)
         return (
           <group key={n} position={[x, BAR_TOP, 0]}>
-            <mesh position-y={0.01} receiveShadow>
-              <cylinderGeometry args={[0.24, 0.2, 0.02, 32]} />
-              <meshToonMaterial color="#ffffff" map={PLUM_WARE} />
-            </mesh>
-            {/* chopsticks on their rest */}
+            {/* (each customer's plate is set down and cleared away by GuestBar3D) chopsticks on their rest */}
             <mesh position={[0.3, 0.025, 0.12]}>
               <boxGeometry args={[0.04, 0.02, 0.03]} />
               <meshToonMaterial color="#8a5a30" />
@@ -1176,6 +1176,9 @@ type Piece = {
   /** 0 → 1 while being eaten off the plate; eaten pieces are gone until re-ordered */
   eat: number
   eaten: boolean
+  /** (shop open) the customer it was served to, and their seat at the bar; -1 for none */
+  guest: number
+  seat: number
 }
 
 type TagState = { stage: (typeof ROAST_STAGES)[number]['key']; label: string; pct: number }
@@ -1313,7 +1316,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         unwrapped: false, unwrapT: 0, chefSeasoned: false,
         trashFrom: new THREE.Vector3(),
         landed: -1,
-        body: null, slot: null, eat: 0, eaten: false,
+        body: null, slot: null, eat: 0, eaten: false, guest: -1, seat: -1,
       })
     }
     scannedCount.current = root.children.length
@@ -1567,9 +1570,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.fromP.copy(p.node.position)
     p.fromQ.copy(p.node.quaternion)
     if (space === 'open') {
-      // served at the bar: each seat has its own little plate, and pieces go round the seats in turn
-      const seat = slot % BAR_SEATS
-      const row = Math.floor(slot / BAR_SEATS)
+      // served at the bar, onto the plate of the customer who ordered it (one still owed one of these); pieces
+      // already on that plate push the new one along
+      const owner = guests.current.find((g) => (g.state === 'waiting' || g.state === 'eating') &&
+        g.orders.filter((o) => o === p.id).length > pieces.current.filter((q) => q !== p && q.guest === g.id && q.id === p.id).length)
+      const seat = owner ? owner.seat : slot % BAR_SEATS
+      p.guest = owner?.id ?? -1
+      p.seat = seat
+      const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === seat && present(q) && !q.eaten).length
       p.toP.copy(barSeat(seat)).addScaledVector(STACK_DIR, ((row % 3) - 1) * 0.07).add(new THREE.Vector3(0, BAR_TOP + 0.04 + Math.floor(row / 3) * 0.06, 0))
       p.container = 'bar'
       p.body = null
@@ -1727,7 +1735,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const snaps = useRef(new Map<string, Snap>())
   const lastSpace = useRef(space)
   const SCALARS = ['progress', 'collected', 'flight', 'stickOnly', 'netSpot', 'container', 'staged', 'stagedAt', 'wasPresent',
-    'homeFlight', 'unwrapped', 'unwrapT', 'chefSeasoned', 'trash', 'landed', 'slot', 'eat', 'eaten'] as const
+    'homeFlight', 'unwrapped', 'unwrapT', 'chefSeasoned', 'trash', 'landed', 'slot', 'eat', 'eaten', 'guest', 'seat'] as const
   const VECS = ['fromP', 'fromQ', 'toP', 'toQ', 'local', 'trashFrom'] as const
   const save = (): Snap => {
     const out = new Map<string, Record<string, unknown>>()
@@ -1773,6 +1781,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.slot = null
     p.eat = 0
     p.eaten = false
+    p.guest = -1
+    p.seat = -1
     p.node.userData.onPlate = false
     p.node.userData.shrink = 1
     p.node.userData.byGuest = false
@@ -1837,7 +1847,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const guests = useRef<Guest[]>([])
   const guestSeq = useRef(0)
   const report = () => onGuests?.(guests.current.map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
-    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null })))
+    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat })))
   const chefSaid = useRef(0)
 
   /** the best seasoning for a food by the PAIRING table (null if nothing suits it) */
@@ -1951,7 +1961,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       guestSeq.current = id
       if (orders.length) {
-        guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting' })
+        // the first free stool
+        const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating').map((g) => g.seat))
+        const seat = Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n)) ?? 0
+        guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat })
         onSay?.('guest', L().order(id, orders.map(nameOf)))
       } else {
         onSay?.('guest', L().nothing(id))
@@ -1969,14 +1982,25 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         report()
       }
     }
-    if (pieces.current.some((p) => p.eat > 0 && !p.eaten && !p.stickOnly)) return
-    // a guest eats a piece of what they ordered, if it's ready
+    // someone who's got up: their plate is taken away (GuestBar3D), and the bare sticks on it go with it
+    for (const g of guests.current) {
+      if (g.state === 'waiting' || g.state === 'eating' || g.cleared) continue
+      g.leftAt ??= now
+      if (now - g.leftAt < 0.8) continue
+      g.cleared = true
+      for (const p of pieces.current) {
+        if (p.guest !== g.id || p.container !== 'bar' || p.eat > 0 && !p.stickOnly) continue
+        p.eaten = true
+        p.slot = null
+      }
+    }
+    if (pieces.current.some((p) => p.eat > 0 && !p.eaten && !p.stickOnly)) return    // a guest eats a piece of what they ordered, if it's ready
     for (const g of guests.current) {
       if (g.state !== 'waiting' && g.state !== 'eating') continue
       const owed = [...g.orders]
       for (const id of g.ate) owed.splice(owed.indexOf(id), 1)
       const dish = pieces.current.find((p) => present(p) && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly &&
-        p.trash < 0 && owed.includes(p.id) && stageOf(p.progress / roast.times[p.id]).key === 'done')
+        p.trash < 0 && owed.includes(p.id) && (p.guest === g.id || p.guest < 0) && stageOf(p.progress / roast.times[p.id]).key === 'done')
       if (!dish) continue
       if (inBasket(dish) && !dish.unwrapped) {
         dish.unwrapped = true
