@@ -13,7 +13,17 @@ export type MenuItem = {
   max?: number
   /** calories in one portion (roughly, real-world), counted toward 飽足 when it's eaten */
   kcal?: number
+  /** (台式小吃) served on the table beside the bowl, as this kind of dish; wok dishes are stir-fried first */
+  table?: TableKind
+  /** the colour of what's on it (rice, sauce, soup…) */
+  hue?: string
+  /** how many pieces (dumplings) */
+  pieces?: number
 }
+
+export type TableKind = 'friedRice' | 'quick' | 'saucyRice' | 'friedNoodles' | 'vermicelli' | 'dumplings' | 'xiaolongbao'
+  | 'soup' | 'soupDumplings'
+export const WOK_KINDS: TableKind[] = ['friedRice', 'quick', 'saucyRice', 'friedNoodles', 'vermicelli']
 
 /** The part of a dish that's always included (soup base, noodles, the fish). Dark strip on the menu. */
 export type Base = {
@@ -186,8 +196,8 @@ export const DISHES: Dish[] = [
   },
   {
     id: 'beefnoodle',
-    name: '麵食',
-    ja: '麺類',
+    name: '台式小吃',
+    ja: '台湾小吃',
     model: asset('models/beefnoodle.glb'),
     // one bowl at a time; the soups differ in colour, the dry ones have no soup and sauce-coloured noodles
     bases: [
@@ -200,6 +210,11 @@ export const DISHES: Dish[] = [
         tint: { Noodles: '#d9a868' } },
       { id: 'sesame', name: '麻醬麵', ja: '胡麻だれ麺', en: 'Sesame Noodles', price: 75, hide: ['Broth'],
         tint: { Noodles: '#c08b4e' } },
+      // 湯麵類, as on a Taiwanese dumpling-house menu
+      { id: 'sanxianMian', name: '三鮮麵', ja: '三鮮麺', en: 'Seafood Noodle Soup', price: 125, fill: { Broth: '#e6d8b8' } },
+      { id: 'rousiMian', name: '肉絲麵', ja: '肉絲麺', en: 'Pork Shred Noodles', price: 100, fill: { Broth: '#d8c08c' } },
+      { id: 'daluMian', name: '大滷麵', ja: '大鹵麺', en: 'Thick Gravy Noodles', price: 100, fill: { Broth: '#8a5a2e' } },
+      { id: 'suanlaMian', name: '酸辣麵', ja: '酸辣麺', en: 'Hot & Sour Noodles', price: 100, fill: { Broth: '#9a4a24' } },
     ],
     items: [
       { id: 'BeefShank', name: '牛腱肉', ja: '牛すね', en: 'Beef Shank', price: 80 },
@@ -209,6 +224,38 @@ export const DISHES: Dish[] = [
       { id: 'BokChoy', name: '青江菜', ja: '青梗菜', en: 'Bok Choy', price: 15 },
       { id: 'PickledGreens', name: '酸菜', ja: '高菜', en: 'Pickled Greens', price: 10 },
       { id: 'ExtraNoodles', name: '加麵', ja: '替え玉', en: 'Extra Noodles', price: 20, entrance: 'float' },
+      // on the table beside the bowl: 快餐, 炒飯, 炒麵, 炒米粉, 燴飯 (stir-fried in the wok first), 水餃, 湯餃, 小籠包, 湯類
+      { id: 'zhaopaiFan', name: '招牌飯', ja: '看板ご飯', en: 'House Rice Plate', price: 125, kcal: 780, table: 'quick', hue: '#b0602a' },
+      { id: 'xiangchangFan', name: '香腸飯', ja: '腸詰めご飯', en: 'Sausage Rice', price: 105, kcal: 720, table: 'quick', hue: '#b8323a' },
+      { id: 'gongbaoFan', name: '宮保雞肉飯', ja: '宮保鶏飯', en: 'Kung Pao Chicken Rice', price: 105, kcal: 760, table: 'quick', hue: '#c25a2a' },
+      { id: 'weicengFan', name: '味噌豬肉飯', ja: '味噌豚飯', en: 'Miso Pork Rice', price: 105, kcal: 740, table: 'quick', hue: '#a87840' },
+      { id: 'rousiChaofan', name: '肉絲蛋炒飯', ja: '肉絲卵炒飯', en: 'Pork & Egg Fried Rice', price: 105, kcal: 680, table: 'friedRice', hue: '#e8c870' },
+      { id: 'niurouChaofan', name: '牛肉蛋炒飯', ja: '牛肉卵炒飯', en: 'Beef & Egg Fried Rice', price: 125, kcal: 720, table: 'friedRice', hue: '#d8b060' },
+      { id: 'rousiChaomian', name: '肉絲蛋炒麵', ja: '肉絲卵焼きそば', en: 'Pork Fried Noodles', price: 105, kcal: 650, table: 'friedNoodles', hue: '#c8904a' },
+      { id: 'niurouChaomian', name: '牛肉炒麵', ja: '牛肉焼きそば', en: 'Beef Fried Noodles', price: 125, kcal: 690, table: 'friedNoodles', hue: '#a87038' },
+      { id: 'rousiMifen', name: '肉絲炒米粉', ja: '肉絲焼きビーフン', en: 'Pork Fried Vermicelli', price: 105, kcal: 560, table: 'vermicelli', hue: '#e8d8b0' },
+      { id: 'sanxianMifen', name: '三鮮炒米粉', ja: '三鮮焼きビーフン', en: 'Seafood Fried Vermicelli', price: 125, kcal: 540, table: 'vermicelli', hue: '#efe2c4' },
+      { id: 'niurouMifen', name: '牛肉炒米粉', ja: '牛肉焼きビーフン', en: 'Beef Fried Vermicelli', price: 125, kcal: 590, table: 'vermicelli', hue: '#d8c098' },
+      { id: 'rousiHuifan', name: '肉絲燴飯', ja: '肉絲あんかけご飯', en: 'Pork Gravy Rice', price: 105, kcal: 640, table: 'saucyRice', hue: '#a8743a' },
+      { id: 'niurouHuifan', name: '牛肉燴飯', ja: '牛肉あんかけご飯', en: 'Beef Gravy Rice', price: 125, kcal: 680, table: 'saucyRice', hue: '#7a4a22' },
+      { id: 'sanxianHuifan', name: '三鮮燴飯', ja: '三鮮あんかけご飯', en: 'Seafood Gravy Rice', price: 125, kcal: 620, table: 'saucyRice', hue: '#d8c49a' },
+      { id: 'xiarenHuifan', name: '蝦仁滑蛋燴飯', ja: '海老卵あんかけご飯', en: 'Shrimp & Egg Gravy Rice', price: 110, kcal: 650, table: 'saucyRice', hue: '#f0d070' },
+      { id: 'niunanHuifan', name: '牛腩燴飯', ja: '牛バラあんかけご飯', en: 'Beef Brisket Gravy Rice', price: 150, kcal: 760, table: 'saucyRice', hue: '#6a3a1a' },
+      { id: 'shuijiao10', name: '水餃10顆', ja: '水餃子10個', en: 'Dumplings ×10', price: 80, kcal: 450, table: 'dumplings', pieces: 10 },
+      { id: 'shuijiao15', name: '水餃15顆', ja: '水餃子15個', en: 'Dumplings ×15', price: 120, kcal: 675, table: 'dumplings', pieces: 15 },
+      { id: 'shuijiao20', name: '水餃20顆', ja: '水餃子20個', en: 'Dumplings ×20', price: 160, kcal: 900, table: 'dumplings', pieces: 20 },
+      { id: 'niurouTangjiao', name: '牛肉湯餃', ja: '牛肉スープ餃子', en: 'Beef Soup Dumplings', price: 115, kcal: 520, table: 'soupDumplings', hue: '#b0703a', pieces: 10 },
+      { id: 'suanlaTangjiao', name: '酸辣湯餃', ja: '酸辣スープ餃子', en: 'Hot & Sour Soup Dumplings', price: 115, kcal: 510, table: 'soupDumplings', hue: '#9a5028', pieces: 10 },
+      { id: 'xiaolongbao', name: '小籠包', ja: '小籠包', en: 'Xiaolongbao', price: 120, kcal: 420, table: 'xiaolongbao', pieces: 8 },
+      { id: 'suanlaTang', name: '酸辣湯', ja: '酸辣湯', en: 'Hot & Sour Soup', price: 50, kcal: 120, table: 'soup', hue: '#8a4a26' },
+      { id: 'danhuaTang', name: '蛋花湯', ja: 'かき玉スープ', en: 'Egg Drop Soup', price: 40, kcal: 80, table: 'soup', hue: '#e8d890' },
+      { id: 'doufuTang', name: '豆腐湯', ja: '豆腐スープ', en: 'Tofu Soup', price: 40, kcal: 90, table: 'soup', hue: '#efe6d0' },
+      { id: 'doufuDanhuaTang', name: '豆腐蛋花湯', ja: '豆腐かき玉スープ', en: 'Tofu Egg Drop Soup', price: 50, kcal: 110, table: 'soup', hue: '#ead88a' },
+      { id: 'gongwanTang', name: '貢丸湯', ja: '肉団子スープ', en: 'Pork Ball Soup', price: 55, kcal: 160, table: 'soup', hue: '#e0d4b4' },
+      { id: 'sanxianTang', name: '三鮮湯', ja: '三鮮スープ', en: 'Seafood Soup', price: 80, kcal: 140, table: 'soup', hue: '#e6dcc0' },
+      { id: 'zhuganTang', name: '豬肝湯', ja: '豚レバースープ', en: 'Pork Liver Soup', price: 70, kcal: 150, table: 'soup', hue: '#d8c8a0' },
+      { id: 'yumiTang', name: '玉米濃湯', ja: 'コーンスープ', en: 'Corn Chowder', price: 70, kcal: 180, table: 'soup', hue: '#f0cc50' },
+      { id: 'niurouTang', name: '牛肉湯', ja: '牛肉スープ', en: 'Beef Soup', price: 80, kcal: 170, table: 'soup', hue: '#c08848' },
     ],
     oneBase: true,
     emptyHide: ['Broth', 'Noodles', 'Scallion'],

@@ -20,6 +20,8 @@ import { Menu } from './components/Menu'
 import { Crash } from './components/Crash'
 import { PotCooking } from './components/PotCooking'
 import { NoodleEating } from './components/NoodleEating'
+import { TaiwanTable } from './components/TaiwanTable'
+import { OpeningSpot } from './components/OpeningSpot'
 import { BAR_AT, type GuestView } from './components/Roasting'
 import { GuestBar3D } from './components/GuestBar3D'
 import { CHEFS, type Chef } from './chefs'
@@ -46,7 +48,8 @@ const CAPITAL = 300000
 const SHOP_COST = 150000
 const SAVE_KEY = 'canteen-save'
 /** a whole bowl of noodles, by the bowl (the set meals' parts count on their own) */
-const BASE_KCAL: Record<string, number> = { braised: 650, clear: 560, plain: 380, dry: 520, sesame: 610 }
+const BASE_KCAL: Record<string, number> = { braised: 650, clear: 560, plain: 380, dry: 520, sesame: 610, sanxianMian: 520,
+  rousiMian: 480, daluMian: 560, suanlaMian: 500 }
 type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean> }
 // Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff).
@@ -246,11 +249,12 @@ type SceneProps = {
   onGuests: (dishId: string, g: GuestView[]) => void
   /** what the hot pot's AI customers are waiting for (they take it out of the pot themselves once it's cooked) */
   potAi: string[]
+  spotOn: boolean
   guestsBy: Record<string, GuestView[]>
   onPotGuestEat: (id: string, taste: number) => void
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -417,6 +421,8 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
         shadow-normalBias={0.02}
       />
 
+      <OpeningSpot on={spotOn} focusY={DISHES[active].focusY} />
+
       {/* invisible floor that only shows the spot's shadow, so there's still no background */}
       <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
         <planeGeometry args={[30, 30]} />
@@ -452,6 +458,10 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 // the customers, in 3D, at the bar behind (the grill's bar is drawn by Roasting, which serves onto it)
                 <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)} />
+              )}
+              {dish.id === 'beefnoodle' && (
+                <TaiwanTable items={dish.items} quantities={servings(dish, orders[dish.id])} active={i === active} locked={ai}
+                  onEat={onEat} />
               )}
               {dish.id === 'beefnoodle' && (
                 <NoodleEating url={url} base={base?.id ?? null} taste={base ? 70 + (base.broth || base.fill ? 4 : 0) : 0}
@@ -621,6 +631,8 @@ export default function App() {
   // clicked and the opening paid for
   const [opened, setOpened] = useState<Record<string, boolean>>(() => SAVED?.opened ?? {})
   const [asking, setAsking] = useState(false)
+  // the 開業 button is hovered: a spotlight swings onto the shop
+  const [spotOn, setSpotOn] = useState(false)
   // the business is saved as it goes (every few seconds and when the page is left), and picked up next time
   const saveRef = useRef<Omit<Saved, 'v'>>({ ledger, stock, hired, notes, owner, opened })
   saveRef.current = { ledger, stock, hired, notes, owner, opened }
@@ -1057,7 +1069,8 @@ export default function App() {
         }
       } else {
         // a bowl of noodles each, paid for now and cooked in turn
-        const inStock = d.bases.filter((bb) => (stockRef.current[bb.id] ?? 0) > 0)
+        // a bowl of noodles, or one of the other dishes (fried rice, dumplings, soup…) off the table
+        const inStock = [...d.bases, ...d.items.filter((x) => x.table)].filter((bb) => (stockRef.current[bb.id] ?? 0) > 0)
         const b = inStock[Math.floor(Math.random() * inStock.length)]
         if (b) {
           g.base = b.id
@@ -1129,7 +1142,7 @@ export default function App() {
           k.t = 0
           setOrders((all) => ({ ...all, [d.id]: { [g.base!]: 1 } }))
           g.state = 'eating'
-          talk('chef', LINES[lang].noodlesUp(g.id, nameIn(lang, d.bases.find((b) => b.id === g.base)!)))
+          talk('chef', LINES[lang].noodlesUp(g.id, nameIn(lang, ([...d.bases, ...d.items] as { id: string; name: string }[]).find((b) => b.id === g.base)!)))
           report(d.id)
         } else if (k.phase === 'eat' && k.t > 12) {
           // a better (and less tired) cook makes a better bowl; a server bringing it hot helps too
@@ -1138,7 +1151,7 @@ export default function App() {
           g.eaten.push(taste)
           g.ate.push(g.base!)
           g.state = 'done'
-          starsLine(g.id, nameIn(lang, d.bases.find((b) => b.id === g.base)!), taste)
+          starsLine(g.id, nameIn(lang, ([...d.bases, ...d.items] as { id: string; name: string }[]).find((b) => b.id === g.base)!), taste)
           s.kitchen = null
           setOrders((all) => ({ ...all, [d.id]: {} }))
           report(d.id)
@@ -1157,7 +1170,7 @@ export default function App() {
 
 
   return (
-    <div className={`app${menuFolded || (owner && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner && !opened[dish.id] ? ' is-unopened' : ''}`} ref={appRef}>
+    <div className={`app${menuFolded || (owner && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -1208,7 +1221,7 @@ export default function App() {
               }
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
-            lang={lang} notes={notes} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund}
+            lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund}
             guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
         </Canvas>}
         </Crash>
@@ -1342,8 +1355,9 @@ export default function App() {
         </button>
         {owner && !opened[dish.id] && (
           // not open yet: the whole shop is greyed out (see .is-unopened) until its sign is clicked and paid for
-          <button type="button" className="unopened-hint" onClick={() => setAsking(true)}>
-            <span className="spot" aria-hidden="true" />
+          <button type="button" className="unopened-hint" onClick={() => setAsking(true)}
+            onPointerEnter={() => setSpotOn(true)} onPointerLeave={() => setSpotOn(false)}
+            onFocus={() => setSpotOn(true)} onBlur={() => setSpotOn(false)}>
             <b>{lang === 'ja' ? '開業する' : '開業'}</b>
             <small>{lang === 'ja' ? `「${nameIn(lang, dish)}」・NT$${SHOP_COST.toLocaleString()}` : `「${nameIn(lang, dish)}」・NT$${SHOP_COST.toLocaleString()}`}</small>
           </button>

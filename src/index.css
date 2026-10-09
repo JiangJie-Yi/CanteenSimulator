@@ -3959,53 +3959,12 @@ button {
   opacity: 0.75;
 }
 
-/* the spotlight: a cone of warm light slanting down from the upper left onto the button, off until hovered */
-.unopened-hint .spot {
-  position: absolute;
-  z-index: -1;
-  left: 50%;
-  bottom: 28%;
-  margin-left: -130px;
-  width: 260px;
-  height: 640px;
-  background: linear-gradient(0deg, rgb(255 236 180 / 0.5), rgb(255 236 180 / 0.08) 85%, transparent);
-  clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
-  transform-origin: 50% 100%;
-  transform: rotate(-32deg) scaleY(0.6);
-  opacity: 0;
-  pointer-events: none;
-  filter: blur(6px);
-  transition: opacity 420ms ease, transform 620ms cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-/* and the pool of light it throws on the button */
-.unopened-hint::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  inset: -20px -30px;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 55%, rgb(255 236 180 / 0.55), transparent 65%);
-  opacity: 0;
-  transition: opacity 420ms ease;
-  pointer-events: none;
-}
-
-.unopened-hint:hover::after,
-.unopened-hint:focus-visible::after {
-  opacity: 1;
-}
 .unopened-hint:hover,
 .unopened-hint:focus-visible {
   background: rgb(60 44 30 / 0.5);
   border-color: rgb(255 226 160 / 0.9);
 }
 
-.unopened-hint:hover .spot,
-.unopened-hint:focus-visible .spot {
-  opacity: 1;
-  transform: rotate(-32deg) scaleY(1);
-}
 
 .unopened-hint:hover b {
   text-shadow: 0 0 12px rgb(255 220 150 / 0.9);
@@ -4063,4 +4022,134 @@ button {
   color: #3b2a20;
   font: 700 12px/1.3 var(--brush);
   animation: gc-dots 1.4s ease-in-out infinite;
+}
+
+/* ---- before a shop is opened its controls are put away (only the view reset stays); opening it, they pop out,
+   one after another ---- */
+.app.is-hushed .ai-toggle,
+.app.is-hushed .ledger-toggle,
+.app.is-hushed .lang-toggle,
+.app.is-hushed .theme-toggle,
+.app.is-hushed .tools-toggle,
+.app.is-hushed .heat,
+.app.is-hushed .fullness,
+.app.is-hushed .notebook-toggle,
+.app.is-hushed .office-toggle,
+.app.is-hushed .side-boards {
+  display: none !important;
+}
+
+.app:not(.is-hushed) .heat,
+.app:not(.is-hushed) .fullness,
+.app:not(.is-hushed) .notebook-toggle,
+.app:not(.is-hushed) .office-toggle {
+  animation: ui-pop-left 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+.app:not(.is-hushed) .ai-toggle,
+.app:not(.is-hushed) .ledger-toggle,
+.app:not(.is-hushed) .lang-toggle,
+.app:not(.is-hushed) .theme-toggle,
+.app:not(.is-hushed) .tools-toggle {
+  animation: ui-pop-top 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+.app:not(.is-hushed) .heat { animation-delay: 120ms; }
+.app:not(.is-hushed) .fullness { animation-delay: 220ms; }
+.app:not(.is-hushed) .notebook-toggle { animation-delay: 320ms; }
+.app:not(.is-hushed) .office-toggle { animation-delay: 380ms; }
+.app:not(.is-hushed) .ledger-toggle { animation-delay: 160ms; }
+.app:not(.is-hushed) .ai-toggle { animation-delay: 240ms; }
+.app:not(.is-hushed) .lang-toggle { animation-delay: 320ms; }
+.app:not(.is-hushed) .theme-toggle { animation-delay: 400ms; }
+
+@keyframes ui-pop-left {
+  from { opacity: 0; translate: -40px 0; scale: 0.8; }
+}
+
+@keyframes ui-pop-top {
+  from { opacity: 0; translate: 0 -30px; scale: 0.6; }
+}
+/* the spotlight is in the scene itself (OpeningSpot); under it, the shop gets back some of its colour */
+.app.is-unopened.is-spotlit .canvas-layer {
+  filter: grayscale(0.5) brightness(0.75);
+}
+
+/* ---- 台式小吃: the menu as a Taiwanese dumpling-house board — an orange board, magenta headers for each group,
+   white cards with the name in heavy black and the price in red figures ---- */
+.menu.menu-taiwan .strips {
+  grid-auto-flow: column;
+}
+
+.menu.menu-taiwan .strip-base {
+  grid-row: auto !important;
+}
+
+.menu.menu-taiwan .strip,
+.menu.menu-taiwan .strip-base {
+  border-radius: 2px;
+  background: #ffffff;
+  color: #1c1a18;
+  box-shadow: inset 0 0 0 1.5px #d97a2a, 0 3px 8px -5px rgb(0 0 0 / 0.4);
+}
+
+.menu.menu-taiwan .strip .strip-name {
+  font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+  font-weight: 800;
+  color: #1c1a18;
+}
+
+.menu.menu-taiwan .strip .strip-price {
+  font-family: 'Arial Black', 'Microsoft JhengHei', sans-serif;
+  font-weight: 900;
+  color: #b8141e;
+  writing-mode: horizontal-tb;
+  letter-spacing: 0;
+}
+
+.menu.menu-taiwan .strip .strip-en {
+  color: #8a7a6a;
+}
+
+.menu.menu-taiwan .strip .icon {
+  color: #d8247a;
+}
+
+.menu.menu-taiwan .strip:hover {
+  box-shadow: inset 0 0 0 1.5px #d97a2a, inset 0 0 14px 3px rgb(255 200 120 / 0.9);
+}
+
+.strip-cat {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border-radius: 2px;
+  background: #d8247a;
+  color: #fff;
+  box-shadow: inset 0 0 0 2px #b8105e, 0 3px 8px -5px rgb(0 0 0 / 0.4);
+  font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+  writing-mode: vertical-rl;
+  user-select: none;
+}
+
+.strip-cat b {
+  font-size: calc(var(--tag-font, 15px) * 1.25);
+  font-weight: 900;
+  letter-spacing: 0.15em;
+}
+
+.strip-cat small {
+  font-size: calc(var(--tag-font, 15px) * 0.7);
+  opacity: 0.85;
+}
+
+/* the board behind: Taiwanese menu orange */
+.app:has(.menu-taiwan) .menu-backing {
+  background: radial-gradient(ellipse at 50% 40%, #f08a3a, #e2702a 70%);
+  opacity: 0.32;
+}
+
+.menu.menu-taiwan .menu-title {
+  color: #d8247a;
 }
