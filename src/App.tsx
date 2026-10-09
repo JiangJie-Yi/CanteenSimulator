@@ -140,6 +140,13 @@ const FLOAT_IDS = Object.fromEntries(
   DISHES.map((d) => [d.id, d.items.filter((it) => it.entrance === 'float').map((it) => it.id)]),
 )
 
+/** a set can be sold while all its parts are in stock, anything else while there's a portion of it */
+const canSell = (x: { id: string; includes?: Record<string, number> }, stock: Record<string, number>) =>
+  x.includes ? Object.entries(x.includes).every(([k, q]) => (stock[k] ?? 0) >= q) : (stock[x.id] ?? 0) > 0
+/** what a noodle-bar customer can order now: a bowl (or set), or one of the dishes off the table */
+const noodlePool = (d: DishInfo, stock: Record<string, number>) =>
+  [...d.bases, ...d.items.filter((x) => x.table)].filter((x) => canSell(x as { id: string; includes?: Record<string, number> }, stock))
+
 type Theme = 'light' | 'dark'
 
 const LIGHTING: Record<Theme, { sun: string; sunIntensity: number; sky: string; ground: string; hemi: number;
@@ -767,6 +774,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.altKey || e.ctrlKey || e.metaKey) return
       if (e.target instanceof HTMLInputElement) return
+      if (document.querySelector('.welcome')) return
       const n = DISHES.length
       if (e.key === 'ArrowLeft') setActive((i) => (i - 1 + n) % n)
       if (e.key === 'ArrowRight') setActive((i) => (i + 1) % n)
@@ -869,19 +877,25 @@ export default function App() {
   useEffect(() => {
     if (!ai) return
     const d = DISHES[active]
+    if (!opened[d.id]) {
+      // (switched over to a shop that hasn't opened yet: business stops)
+      setAi(false)
+      return
+    }
+    // (only what customers actually order counts: skewers at the grill, things to cook at the hot pot, a bowl or a
+    // dish off the table at the noodle bar)
     const has = (id: string) => (stock[id] ?? 0) > 0
-    const anyItem = d.items.some((x) => has(x.id))
-    const anyBase = d.bases.some((b) => (b.includes ? Object.entries(b.includes).every(([k, q]) => (stock[k] ?? 0) >= q) : has(b.id)))
-    const sellable = d.id === 'grilledfish' ? anyItem || anyBase
-      : d.id === 'hotpot' ? (anyBase || !!orderedBase(d, orders[d.id])) && anyItem
-        : anyBase
+    const anyBase = d.bases.some((b) => canSell(b, stock))
+    const sellable = d.id === 'grilledfish' ? d.items.some((x) => !!d.roast && x.id in d.roast.times && has(x.id))
+      : d.id === 'hotpot' ? (anyBase || !!orderedBase(d, orders[d.id])) && d.items.some((x) => x.id !== 'Rice' && has(x.id))
+        : noodlePool(d, stock).length > 0
     if (sellable) return
     const seated = (guestsBy[d.id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')
     if (seated) return
     setAi(false)
     say(UI[lang].soldOut)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ai, stock, guestsBy, active])
+  }, [ai, stock, guestsBy, active, opened])
 
   const MAX_PORTIONS = 99
   // the fire only holds so many skewers; past that, take something off before ordering more
@@ -993,9 +1007,11 @@ export default function App() {
   // eats it and leaves. Kept waiting too long, a customer walks out.
   type ShopGuest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state'];
     base?: string }
-  const shop = useRef<Record<string, { guests: ShopGuest[]; seq: number; clock: number;
+  // (each shop's own clock, in seconds of business: it only runs while the shop is open and on screen, so a customer
+  // isn't kept waiting by the shop being closed or looked away from)
+  const shop = useRef<Record<string, { guests: ShopGuest[]; seq: number; clock: number; time: number;
     kitchen: { guest: number; t: number; phase: 'cook' | 'eat' } | null }>>({})
-  const shopOf = (id: string) => (shop.current[id] ??= { guests: [], seq: 0, clock: 0, kitchen: null })
+  const shopOf = (id: string) => (shop.current[id] ??= { guests: [], seq: 0, clock: 0, time: 0, kitchen: null })
   const [potAi, setPotAi] = useState<string[]>([])
   const report = (dishId: string) => {
     const s = shopOf(dishId)
@@ -1031,12 +1047,13 @@ export default function App() {
   const onPotGuestEat = useCallback((id: string, taste: number) => potEatRef.current(id, taste), [])
   const simRef = useRef<() => void>(() => {})
   simRef.current = () => {
-    if (!ai) return
+    if (!ai || !opened[DISHES[active].id]) return
     const d = DISHES[active]
     if (d.id !== 'hotpot' && d.id !== 'beefnoodle') return
     const s = shopOf(d.id)
     const cook = chefOf(d.id)
-    const now = performance.now() / 1000
+    s.time += 0.8
+    const now = s.time
     const seated = s.guests.filter((g) => g.state === 'waiting' || g.state === 'eating')
     s.clock += 0.8
     // someone comes in
@@ -1070,14 +1087,20 @@ export default function App() {
       } else {
         // a bowl of noodles each, paid for now and cooked in turn
         // a bowl of noodles, or one of the other dishes (fried rice, dumplings, soup…) off the table
-        const inStock = [...d.bases, ...d.items.filter((x) => x.table)].filter((bb) => (stockRef.current[bb.id] ?? 0) > 0)
+        const inStock = noodlePool(d, stockRef.current)
         const b = inStock[Math.floor(Math.random() * inStock.length)]
         if (b) {
           g.base = b.id
           g.orders.push(b.id)
           book('revenue', b.price)
           book('food', costOf(b))
-          setStock((st) => ({ ...st, [b.id]: (st[b.id] ?? 0) - 1 }))
+          // (a set takes its parts)
+          const parts = (b as { includes?: Record<string, number> }).includes ?? { [b.id]: 1 }
+          setStock((st) => {
+            const next = { ...st }
+            for (const [k, q] of Object.entries(parts)) next[k] = (next[k] ?? 0) - q
+            return next
+          })
           note(b.id)
         }
       }

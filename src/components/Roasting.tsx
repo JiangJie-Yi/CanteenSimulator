@@ -1832,6 +1832,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const stageSeq = useRef(0)
   const aiClock = useRef(0)
   const guestClock = useRef(0)
+  const guestTime = useRef(0)
   const chefClock = useRef(0)
   const guests = useRef<Guest[]>([])
   const guestSeq = useRef(0)
@@ -1934,7 +1935,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * waiting too long with nothing to eat, they walk out.
    */
   const runGuests = () => {
-    const now = performance.now() / 1000
+    // (patience is counted on the shop's own clock: it stops while the shop's closed or not on screen)
+    guestTime.current += 0.8
+    const now = guestTime.current
     guestClock.current += 0.8
     const seated = guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating')
     if (onOrder && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd) {
