@@ -25,7 +25,7 @@ const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
 const SIPS = 3
 const SOUP_TASTE = 78
 /** an AI customer as App shows them: seated and waiting, eating, or gone (with their rating) */
-export { BAR_AT }
+export { BAR_AT, BAR_TOP }
 export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'angry'; rating: number | null; items: number;
   /** what they've eaten so far (for their stomach) */
   ate: string[]
@@ -1259,6 +1259,8 @@ type RoastingProps = {
   onSay?: (who: 'chef' | 'guest', text: string) => void
   /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
   space?: 'closed' | 'open'
+  /** draw the bar (with the shop open) the food is served onto; a phone shows its customers in 2D, without it */
+  bar?: boolean
   /** who's hired to help the owner (the head chef): a second chef, a sous chef */
   helpers?: { chef: boolean; sous: boolean }
   /** what's said is in this language, with these names for the food */
@@ -1287,7 +1289,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false } }: RoastingProps) {
+  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, bar = true }: RoastingProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
   const { scene } = useGLTF(url)
@@ -1962,7 +1964,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       guestSeq.current = id
       if (orders.length) {
         // the first free stool
-        const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating').map((g) => g.seat))
+        // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
+        const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
         const seat = Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n)) ?? 0
         guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat })
         onSay?.('guest', L().order(id, orders.map(nameOf)))
@@ -1982,19 +1985,23 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         report()
       }
     }
-    // someone who's got up: their plate is taken away (GuestBar3D), and the bare sticks on it go with it
+    // someone who's finished (or walked out): once the last piece is eaten they get up and their plate is taken away
+    // (GuestBar3D: it's told when they're done, after that last piece, and clears the plate a moment later), and
+    // the bare sticks on it go with it
     for (const g of guests.current) {
       if (g.state === 'waiting' || g.state === 'eating' || g.cleared) continue
+      if (pieces.current.some((p) => p.guest === g.id && p.eat > 0 && !p.stickOnly && !p.eaten)) continue
       g.leftAt ??= now
-      if (now - g.leftAt < 0.8) continue
+      if (now - g.leftAt < 1.6) continue
       g.cleared = true
       for (const p of pieces.current) {
-        if (p.guest !== g.id || p.container !== 'bar' || p.eat > 0 && !p.stickOnly) continue
+        if (p.guest !== g.id || p.container !== 'bar') continue
         p.eaten = true
         p.slot = null
       }
     }
-    if (pieces.current.some((p) => p.eat > 0 && !p.eaten && !p.stickOnly)) return    // a guest eats a piece of what they ordered, if it's ready
+    if (pieces.current.some((p) => p.eat > 0 && !p.eaten && !p.stickOnly)) return
+    // a guest eats a piece of what they ordered, if it's ready
     for (const g of guests.current) {
       if (g.state !== 'waiting' && g.state !== 'eating') continue
       const owed = [...g.orders]
@@ -2788,6 +2795,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
               r: (s[0] + s[1]) / 2 * 1.05, live: true }
           }
         }
+        // (no bar drawn, on a phone: what's served is carried off to the customers, who are on the 2D board)
+        if (!bar && p.container === 'bar') p.node.visible = p.flight < 1
       }
 
       // browning, then a slow char: black patches spread across the texture and the whole piece darkens,
@@ -2957,7 +2966,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
-      {space === 'open' && <Bar />}
+      {space === 'open' && bar && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
       {roast.trash && <TrashBin container="trash" contents={trashed}
         position={containerAt('trash').toArray() as [number, number, number]} />}

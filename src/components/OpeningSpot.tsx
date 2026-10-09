@@ -39,19 +39,10 @@ export function OpeningSpot({ on, focusY }: { on: boolean; focusY: number }) {
     t.colorSpace = THREE.SRGBColorSpace
     return t
   }, [])
-  // the shaft: a long open cone from the lamp to the floor, brightest near the floor, fading upward
+  // the shaft: a long open cone from the lamp to the floor (how bright each part is, is up to its shader)
   const shaftGeo = useMemo(() => {
     const len = FROM.length()
     const g = new THREE.CylinderGeometry(0.12, 1.7, len, 64, 16, true)
-    const pos = g.attributes.position
-    const col = new Float32Array(pos.count * 3)
-    for (let i = 0; i < pos.count; i++) {
-      const t = 1 - (pos.getY(i) + len / 2) / len         // 0 at the lamp .. 1 at the floor
-      // dimmest at the lamp, a little stronger toward the floor; the edges of the cone fade out (see below)
-      const a = 0.02 + t * t * 0.32
-      col.set([a, a * 0.92, a * 0.75], i * 3)
-    }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3))
     // point it from the lamp down to the floor
     g.translate(0, -len / 2, 0)
     return g
@@ -68,7 +59,6 @@ export function OpeningSpot({ on, focusY }: { on: boolean; focusY: number }) {
     uniforms: { uStrength: { value: 0 }, uColor: { value: new THREE.Color('#ffe2b4') } },
     vertexShader: `
       varying vec3 vN; varying vec3 vV; varying float vT;
-      uniform float uLen;
       void main() {
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         vN = normalize(normalMatrix * normal);

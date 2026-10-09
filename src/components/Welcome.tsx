@@ -13,7 +13,7 @@ export function Welcome({ lang, onStart }: { lang: Lang; onStart: (name: string)
         <div className="welcome-found">
           <p>{ja ? 'オーナー、資金は NT$300,000。' : '老闆，你手上有 NT$300,000 的資本。'}</p>
           <p className="welcome-sub">{ja ? '店は一軒 NT$150,000 で開業。画面中央の「開業」から始めよう。' : '開一間店要 NT$150,000，點畫面中間的「開業」就能開店。'}</p>
-          <button type="button" className="welcome-go" autoFocus onClick={() => onStart(ja ? '店主' : '老闆')}>{ja ? '創業する' : '創業'}</button>
+          <button type="button" className="welcome-go" autoFocus onClick={() => onStart('')}>{ja ? '創業する' : '創業'}</button>
         </div>
       </div>
     </div>

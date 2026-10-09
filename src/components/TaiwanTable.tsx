@@ -282,11 +282,13 @@ type Props = {
   onEat?: (id: string, taste: number) => void
   /** the kitchen (the shop's chef) is at the wok right now */
   wokBusy?: boolean
+  /** (shop open) what's ordered has been cooked by the kitchen already (at the wok, see wokBusy): it comes straight out */
+  cooked?: boolean
 }
 
 type Dish = { key: string; id: string; left: number; ready: number }
 
-export function TaiwanTable({ items, quantities, active, locked, onEat, wokBusy = false }: Props) {
+export function TaiwanTable({ items, quantities, active, locked, onEat, wokBusy = false, cooked = false }: Props) {
   const tableItems = useMemo(() => items.filter((x) => x.table), [items])
   const [dishes, setDishes] = useState<Dish[]>([])
   const seq = useRef(0)
@@ -301,7 +303,7 @@ export function TaiwanTable({ items, quantities, active, locked, onEat, wokBusy 
         const have = next.filter((d) => d.id === it.id)
         for (let k = have.length; k < want; k++) {
           const wok = WOK_KINDS.includes(it.table as TableKind)
-          const ready = wok ? (wokFree += COOK_S) : now + 0.4
+          const ready = wok && !cooked ? (wokFree += COOK_S) : now + 0.4
           next.push({ key: `${it.id}-${++seq.current}`, id: it.id, left: BITES, ready })
         }
         if (have.length > want) {
@@ -311,10 +313,14 @@ export function TaiwanTable({ items, quantities, active, locked, onEat, wokBusy 
       }
       return next
     })
-  }, [quantities, tableItems])
+  }, [quantities, tableItems, cooked])
 
-  const [now, setNow] = useState(0)
-  useFrame(() => setNow(performance.now() / 1000))
+  // (the clock only ticks while something's still at the wok or on its way to the table, not every frame for nothing)
+  const [now, setNow] = useState(() => performance.now() / 1000)
+  useFrame(() => {
+    const t = performance.now() / 1000
+    if (dishes.some((d) => d.ready > now)) setNow(t)
+  })
   const cooking = wokBusy || dishes.some((d) => d.ready > now && d.ready - now < COOK_S && WOK_KINDS.includes(tableItems.find((x) => x.id === d.id)?.table as TableKind))
   const served = dishes.filter((d) => d.ready <= now && d.left > 0)
 

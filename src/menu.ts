@@ -330,7 +330,6 @@ export const DISHES: Dish[] = [
       // just outside the stones on the left as the camera sees it
       basket: { at: [1.75, 0, 0.75], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
-      // behind the fire to the left of the plate, as the camera sees it
       // (in the front row, just left of the plate)
       dish: { at: [0.39, 0.0, 2.32], capacity: 3 },
       // the spoons and brush in the seasoning box are what's carried; grabbing a pot picks up its utensil

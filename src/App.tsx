@@ -23,7 +23,7 @@ import { PotCooking } from './components/PotCooking'
 import { NoodleEating } from './components/NoodleEating'
 import { TaiwanTable } from './components/TaiwanTable'
 import { OpeningSpot } from './components/OpeningSpot'
-import { BAR_AT, type GuestView } from './components/Roasting'
+import { BAR_AT, BAR_TOP, type GuestView } from './components/Roasting'
 import { GuestBar3D } from './components/GuestBar3D'
 import { CHEFS, type Chef } from './chefs'
 import { LINES } from './lines'
@@ -37,7 +37,7 @@ import { moodOf } from './components/MoodFace'
 import { Roasting } from './components/Roasting'
 import { Steam } from './components/Steam'
 import { StoveControls } from './components/StoveControls'
-import { DISHES, type Dish as DishInfo } from './menu'
+import { DISHES, WOK_KINDS, type Dish as DishInfo, type TableKind } from './menu'
 
 // distance between dishes on the carousel
 const SPACING = 6
@@ -277,9 +277,11 @@ type SceneProps = {
   inUse: string[]
   /** on a phone the customers are drawn in 2D on the guest board, not at the bar in 3D */
   phone: boolean
+  /** (noodle bar open) the kitchen is stir-frying an order at the wok */
+  noodleWok: boolean
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -473,22 +475,22 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)}
-                  helpers={helpersOf(dish.id)}
+                  helpers={helpersOf(dish.id)} bar={!phone}
                   onWalkOut={(ids) => onWalkOut(ids, dish)} lang={lang}
                   names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))}
                   space={ai ? 'open' : 'closed'} locked={false}
                   notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))} />
               )}
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
-              {ai && i === active && (
-                // the customers, in 3D, at the bar behind (the grill's bar is drawn by Roasting, which serves onto it)
-                <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast} people={!phone}
-                  top={dish.roast ? 0.44 : 0.465}
+              {ai && i === active && !phone && (
+                // the customers, in 3D (a phone has them in 2D on the guest board, and no 3D bar at all), at the bar behind (the grill's bar is drawn by Roasting, which serves onto it)
+                <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast}
+                  top={dish.roast ? BAR_TOP : 0.465}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)} />
               )}
               {dish.id === 'beefnoodle' && (
                 <TaiwanTable items={dish.items} quantities={servings(dish, orders[dish.id])} active={i === active} locked={ai}
-                  onEat={onEat} />
+                  onEat={onEat} wokBusy={noodleWok} cooked={ai} />
               )}
               {dish.id === 'beefnoodle' && (
                 <NoodleEating url={url} base={base?.id ?? null} taste={base ? 70 + (base.broth || base.fill ? 4 : 0) : 0}
@@ -652,7 +654,8 @@ export default function App() {
   const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0)
   // ingredients in stock, by portion; nothing until it's bought
   const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
-  // the owner's name; until they've given it and founded the business, the welcome is up and the sign is dark
+  // the owner's name ('' while they aren't asked it: they're 老闆); null until they've founded the business, while the
+  // welcome is up and the sign is dark
   const [owner, setOwner] = useState<string | null>(() => SAVED?.owner ?? null)
   const [ignite, setIgnite] = useState(0)
   // which shops have been opened (each costs SHOP_COST to set up); an unopened shop is greyed out until its sign is
@@ -1215,7 +1218,7 @@ export default function App() {
 
 
   return (
-    <div className={`app${menuFolded || (owner && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}`} ref={appRef}>
+    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -1268,7 +1271,11 @@ export default function App() {
             }} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund}
             guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
-            phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />
+            phone={phone} noodleWok={(() => {
+              const k = ai ? shop.current.beefnoodle?.kitchen : null
+              const g = k && k.phase === 'cook' ? shop.current.beefnoodle.guests.find((x) => x.id === k.guest) : undefined
+              return !!g?.base && WOK_KINDS.includes(ALL_ITEMS.get(g.base)?.table as TableKind)
+            })()} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />
         </Canvas>}
         </Crash>
       </div>
@@ -1338,7 +1345,7 @@ export default function App() {
               onPointerDown={dragBoard.onPointerDown} onDoubleClick={dragBoard.onDoubleClick}>
               <div className="chef-pick">
                 <span>{UI[lang].chefPick}</span>
-                <b>{[owner ?? '', ...staffOf(DISHES[active].id, 'chef'), ...staffOf(DISHES[active].id, 'sous')].map((w) => (typeof w === 'string' ? w : lang === 'ja' ? w.ja : w.zh)).filter(Boolean).join('、')}</b>
+                <b>{[owner || (lang === 'ja' ? '店主' : '老闆'), ...staffOf(DISHES[active].id, 'chef'), ...staffOf(DISHES[active].id, 'sous')].map((w) => (typeof w === 'string' ? w : lang === 'ja' ? w.ja : w.zh)).filter(Boolean).join('、')}</b>
                 <button type="button" onClick={() => setOffice('staff')}>{lang === 'ja' ? '人事' : '人事'}</button>
               </div>
               <p className="guest-count">
@@ -1404,7 +1411,7 @@ export default function App() {
           aria-label={UI[lang].resetView} title={UI[lang].resetView}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
         </button>
-        {owner && !opened[dish.id] && (
+        {owner !== null && !opened[dish.id] && (
           // not open yet: the whole shop is greyed out (see .is-unopened) until its sign is clicked and paid for
           <button type="button" className="unopened-hint" onClick={() => setAsking(true)}
             onPointerEnter={() => setSpotOn(true)} onPointerLeave={() => setSpotOn(false)}
@@ -1420,7 +1427,7 @@ export default function App() {
           </div>
         )}
       </div>
-      {!owner && (
+      {owner === null && (
         <Welcome lang={lang} onStart={(name) => {
           setOwner(name)
           saveRef.current = { ...saveRef.current, owner: name }
@@ -1468,7 +1475,7 @@ export default function App() {
           }
           setOrders((all) => ({ ...all, [dish.id]: {} }))
         }} />
-      <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner && !opened[dish.id])}
+      <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner !== null && !opened[dish.id])}
         aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
         <span>{menuFolded ? '‹' : '›'}</span>
       </button>
