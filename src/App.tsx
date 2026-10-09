@@ -259,9 +259,11 @@ type SceneProps = {
   spotOn: boolean
   guestsBy: Record<string, GuestView[]>
   onPotGuestEat: (id: string, taste: number) => void
+  /** shops with food out on either table (tasting or open): they stay loaded, so nothing on them is lost */
+  inUse: string[]
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -313,7 +315,8 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
   // from it yet, the full model is loaded behind it and takes over
   const [upgraded, setUpgraded] = useState<Set<string>>(() => new Set())
   const activeId = DISHES[active].id
-  const idle = !Object.values(orders[activeId] ?? {}).some((n) => n > 0)
+  // (on neither table: swapping the model starts the dish over)
+  const idle = !inUse.includes(activeId)
   useEffect(() => {
     if (!QUALITY.upgrade || !idle || upgraded.has(activeId)) return
     const t = window.setTimeout(() => setUpgraded((u) => new Set(u).add(activeId)), 1500)
@@ -486,8 +489,9 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
         return (
           <group key={dish.id} ref={(g) => { groups.current[i] = g }}
             position-x={slot(i, active, DISHES.length) * SPACING}>
-            {/* (only the dish on screen is loaded, unless the device can hold all three) */}
-            {(QUALITY.allDishes || i === active) && <Suspense fallback={null}>
+            {/* (only the dish on screen is loaded, unless the device can hold all three; a shop with food out stays
+                loaded though, or switching away and back would throw away everything on it and start it over) */}
+            {(QUALITY.allDishes || i === active || inUse.includes(dish.id)) && <Suspense fallback={null}>
               {/* loaded in two steps where the device can take it: the light model shows at once, the full one
                   replaces it when it has loaded (only while nothing's ordered, so nothing being cooked is lost) */}
               {QUALITY.lite && !(QUALITY.upgrade && upgraded.has(dish.id)) ? models(liteUrl(dish.model))
@@ -1245,7 +1249,8 @@ export default function App() {
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund}
-            guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat} />
+            guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
+            inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />
         </Canvas>}
         </Crash>
       </div>
