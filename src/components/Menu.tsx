@@ -43,6 +43,9 @@ function tagFit(name: string, en: string | undefined, price: string, stamp: bool
  * Izakaya-style wall menu: vertical wooden tags, a red stamp marks what's been ordered.
  * Click a tag to add a portion, right-click (or press - / Delete on it) to take one away.
  */
+/** (a dish on the menu is drawn with the icon of the food it's made from) */
+const iconOf = (x: object) => (x as { icon?: string }).icon
+
 const CAT_NAMES: Record<string, Record<Lang, string>> = {
   noodleSoup: { zh: '湯麵類', ja: '汁そば' }, extra: { zh: '加點', ja: 'トッピング' }, quick: { zh: '快餐', ja: '定食' },
   friedRice: { zh: '炒飯類', ja: '炒飯' }, friedNoodles: { zh: '炒麵類', ja: '焼きそば' }, vermicelli: { zh: '炒米粉類', ja: '焼きビーフン' },
@@ -254,12 +257,12 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
             // grouped the way a Taiwanese 小吃 menu board is, each group under its magenta header
             groups.map((grp) => [
               <div key={`cat-${grp.cat}`} className="strip-cat" aria-hidden="true"><b>{CAT_NAMES[grp.cat][lang]}</b></div>,
-              ...grp.list.map(({ x, base }) => tag(x, base ? dish.id : x.id, base)),
+              ...grp.list.map(({ x, base }) => tag(x, iconOf(x) ?? (base ? dish.id : x.id), base)),
             ])
           ) : (
             <>
-              {dish.bases.map((b) => tag(b, hasIcon(`set-${b.id}`) ? `set-${b.id}` : dish.id, true))}
-              {dish.items.map((item) => tag(item, item.id, false))}
+              {dish.bases.map((b) => tag(b, iconOf(b) ?? (hasIcon(`set-${b.id}`) ? `set-${b.id}` : dish.id), true))}
+              {dish.items.map((item) => tag(item, iconOf(item) ?? item.id, false))}
             </>
           )}
         </div>

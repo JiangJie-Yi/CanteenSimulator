@@ -280,9 +280,9 @@ export const DISHES: Dish[] = [
         includes: { Mackerel: 1, Onigiri: 1, Shishito: 1, KingOyster: 1, Potato: 1, MisoSoup: 1 } },
     ],
     items: [
-      { id: 'ExtraFish', name: '鹽烤香魚', ja: '鮎', en: 'Ayu', price: 80, kcal: 110 },
-      { id: 'Saury', name: '鹽烤秋刀魚', ja: '秋刀魚', en: 'Saury', price: 90, kcal: 300 },
-      { id: 'Mackerel', name: '鹽烤鯖魚', ja: '鯖', en: 'Mackerel', price: 100, kcal: 290 },
+      { id: 'ExtraFish', name: '烤香魚', ja: '鮎', en: 'Ayu', price: 80, kcal: 110 },
+      { id: 'Saury', name: '烤秋刀魚', ja: '秋刀魚', en: 'Saury', price: 90, kcal: 300 },
+      { id: 'Mackerel', name: '烤鯖魚', ja: '鯖', en: 'Mackerel', price: 100, kcal: 290 },
       { id: 'GrilledCorn', name: '烤玉米', ja: '焼きもろこし', en: 'Grilled Corn', price: 40, kcal: 120 },
       { id: 'GrilledShiitake', name: '烤香菇', ja: '焼き椎茸', en: 'Shiitake', price: 30, kcal: 15 },
       { id: 'Onigiri', name: '醬油烤飯糰', ja: '醤油焼きおにぎり', en: 'Soy Onigiri', price: 35, kcal: 220 },

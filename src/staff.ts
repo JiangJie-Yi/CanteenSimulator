@@ -13,8 +13,11 @@
 // rest.
 
 export type Role = 'chef' | 'sous' | 'cashier' | 'server'
+/** how someone looks, for their picture: a woman or a man, young, middle-aged or older */
+export type Look = { female: boolean; age: 'young' | 'middle' | 'old' }
 export type Worker = {
   id: string
+  look: Look
   zh: string
   ja: string
   role: Role
@@ -27,25 +30,18 @@ export type Worker = {
   note: string
 }
 
+// The owner is the head chef (大廚) of every shop. Each can take on two more cooks — a second chef (二廚) and a
+// third (三廚) to prep, put on and clear — one person on the floor (外場) and one at the till (收銀).
+const STAFFING = (chef: string, sous: string, chefJa: string, sousJa: string) => [
+  { role: 'chef' as Role, max: 1, zh: chef, ja: chefJa },
+  { role: 'sous' as Role, max: 1, zh: sous, ja: sousJa },
+  { role: 'server' as Role, max: 1, zh: '外場', ja: 'ホール' },
+  { role: 'cashier' as Role, max: 1, zh: '收銀', ja: 'レジ' },
+]
 export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: string }[]> = {
-  // the owner is the head chef of every shop: what's hired is a second chef and a sous chef to help
-  grilledfish: [
-    { role: 'chef', max: 1, zh: '主廚（第二位板前）', ja: '板前（二番手）' },
-    { role: 'sous', max: 1, zh: '副廚（備料・上火・收拾）', ja: '追い回し' },
-    { role: 'cashier', max: 1, zh: '收銀', ja: 'レジ' },
-  ],
-  hotpot: [
-    { role: 'chef', max: 1, zh: '主廚（顧湯）', ja: '料理長' },
-    { role: 'sous', max: 1, zh: '副廚（備料）', ja: '副料理長（仕込み）' },
-    { role: 'cashier', max: 1, zh: '收銀', ja: 'レジ' },
-    { role: 'server', max: 3, zh: '外場服務生', ja: 'ホール' },
-  ],
-  beefnoodle: [
-    { role: 'chef', max: 1, zh: '主廚（煮麵）', ja: '麺の料理長' },
-    { role: 'sous', max: 1, zh: '副廚（顧湯・配料）', ja: '副料理長' },
-    { role: 'cashier', max: 1, zh: '收銀', ja: 'レジ' },
-    { role: 'server', max: 1, zh: '外場服務生', ja: 'ホール' },
-  ],
+  grilledfish: STAFFING('二廚（板前）', '三廚（備料・上火・收拾）', '二番手', '追い回し'),
+  hotpot: STAFFING('二廚（顧湯）', '三廚（備料）', '二番手', '仕込み'),
+  beefnoodle: STAFFING('二廚（煮麵・快炒）', '三廚（顧湯・配料）', '二番手', '仕込み'),
 }
 
 // a fair wage for someone this good at this job (NT$/h): from about minimum wage (NT$196) up
@@ -67,6 +63,8 @@ const POOL: Record<string, Seed[]> = {
     ['小林 美咲', '小林 美咲', 'cashier', 80, 82, 75, 1.0, '算帳又快又準'],
     ['加藤 由美', '加藤 由美', 'cashier', 58, 60, 88, 0.95, '親切，偶爾找錯錢'],
     ['松本 花', '松本 花', 'cashier', 88, 90, 64, 0.85, '前銀行行員，便宜又可靠'],
+    ['森 さくら', '森 さくら', 'server', 78, 84, 80, 1.0, '居酒屋外場五年，招呼客人有一套'],
+    ['清水 翼', '清水 翼', 'server', 60, 92, 90, 0.8, '大學生打工，跑得快又便宜'],
   ],
   hotpot: [
     ['陳志明', '陳 志明', 'chef', 84, 75, 70, 1.0, '刀工好，盤子擺得漂亮'],
@@ -94,9 +92,15 @@ const POOL: Record<string, Seed[]> = {
   ],
 }
 
+const WOMEN = ['美咲', '由美', '花', '雅婷', '怡君', '淑芬', '佳穎', '雅琪', '美玲', '秀蘭', '雅雯', 'さくら']
+const lookOf = (name: string, note: string): Look => ({
+  female: WOMEN.some((w) => name.includes(w)),
+  age: /三十年|老師傅|表姊|十年|名店/.test(note) ? 'old' : /學徒|大學生|剛入行|新人|剛退伍|打工/.test(note) ? 'young' : 'middle',
+})
+
 export const CANDIDATES: Record<string, Worker[]> = Object.fromEntries(Object.entries(POOL).map(([shop, list]) => [shop,
   list.map(([zh, ja, role, skill, speed, stamina, adj, note], i) => ({
-    id: `${shop}-${i}`, zh, ja, role, skill, speed, stamina, wage: Math.round((fair(role, skill) * adj) / 5) * 5, note,
+    id: `${shop}-${i}`, look: lookOf(zh, note), zh, ja, role, skill, speed, stamina, wage: Math.round((fair(role, skill) * adj) / 5) * 5, note,
   }))]))
 
 /** how well they work right now: tired people work worse (at 100 fatigue, down to 55%) */

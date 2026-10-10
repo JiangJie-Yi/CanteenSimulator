@@ -496,7 +496,7 @@ const FIRE_SKEWERS = 16
  * peanut powder on mochi and sweet potato (Taiwanese style); none of them suit everything. The first dab counts
  * in full, a second adds a little more, and from the third it's overdone.
  */
-const PAIRING: Record<Exclude<Seasoning, 'water'>, Record<string, number>> = {
+export const PAIRING: Record<Exclude<Seasoning, 'water'>, Record<string, number>> = {
   salt: { Fish: 18, ExtraFish: 18, Saury: 18, Mackerel: 16, ShrimpSkewer: 10, Yakitori: 12, PorkBelly: 10, Shishito: 8,
     Asparagus: 10, Okra: 8, KingOyster: 8, GrilledShiitake: 8, GrilledCorn: 6, Potato: 14, Scallop: 8, Onigiri: 4,
     Sausage: -4, NetMochi: -10, SweetPotato: -6, Squid: 4, BloodCake: -6 },
@@ -507,7 +507,7 @@ const PAIRING: Record<Exclude<Seasoning, 'water'>, Record<string, number>> = {
   peanut: { NetMochi: 18, BloodCake: 18, SweetPotato: 8, GrilledCorn: 4, Sausage: 6 },
 }
 /** what a seasoning does to a food the table doesn't list (condensed milk on a fish…) */
-const PAIRING_DEFAULT: Record<Exclude<Seasoning, 'water'>, number> = { salt: 4, soy: 3, milk: -18, peanut: -12 }
+export const PAIRING_DEFAULT: Record<Exclude<Seasoning, 'water'>, number> = { salt: 4, soy: 3, milk: -18, peanut: -12 }
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
 const STICK_FOOT_R = 0.74
 const STICK_TOP_R = 0.3
@@ -1180,6 +1180,8 @@ type Piece = {
   /** (shop open) the customer it was served to, and their seat at the bar; -1 for none */
   guest: number
   seat: number
+  /** (shop open) the dish on the menu it was ordered as: what goes on it, and its name */
+  want: { dabs: string[]; name: string } | null
 }
 
 type TagState = { stage: (typeof ROAST_STAGES)[number]['key']; label: string; pct: number }
@@ -1268,7 +1270,11 @@ type RoastingProps = {
   lang?: Lang
   names?: Record<string, string>
   /** a customer walked out: what they'd ordered and not eaten (to be refunded) */
-  onWalkOut?: (ids: string[]) => void
+  onWalkOut?: (ids: string[], guest: number) => void
+  /** (shop open) what's on the menu, each dish's parts (a food and what goes on it); customers order from this */
+  entries?: { key: string; name: string; parts: { id: string; dabs: string[]; name: string }[] }[]
+  /** a customer orders this dish off the menu: false if it can't be had (out of stock, the fire's full) */
+  onOrderEntry?: (key: string, guest: number) => boolean
   /** how slowly customers come in (no cashier: fewer) */
   crowd?: number
   /** the shop is open: the chef works the grill, the player only watches */
@@ -1290,7 +1296,8 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, bar = true }: RoastingProps) {
+  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, bar = true,
+  entries, onOrderEntry }: RoastingProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
   const { scene } = useGLTF(url)
@@ -1319,7 +1326,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         unwrapped: false, unwrapT: 0, chefSeasoned: false,
         trashFrom: new THREE.Vector3(),
         landed: -1,
-        body: null, slot: null, eat: 0, eaten: false, guest: -1, seat: -1,
+        body: null, slot: null, eat: 0, eaten: false, guest: -1, seat: -1, want: null,
       })
     }
     scannedCount.current = root.children.length
@@ -1799,6 +1806,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       r.body = p.body ? { v: p.body.v.clone(), r: p.body.r, live: p.body.live } : null
       r.dabs = { ...p.dabs }
       r.looks = Object.fromEntries(Object.entries(p.looks).map(([k, u]) => [k, u.value]))
+      r.want = p.want
       r.bites = { n: p.bites.uBiteCount.value, v: p.bites.uBites.value.map((b) => b.clone()) }
       r.pos = p.node.position.clone()
       r.quat = p.node.quaternion.clone()
@@ -1837,6 +1845,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.eaten = false
     p.guest = -1
     p.seat = -1
+    p.want = null
     p.node.userData.onPlate = false
     p.node.userData.shrink = 1
     p.node.userData.byGuest = false
@@ -1856,6 +1865,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const b = r.body as { v: THREE.Vector3; r: number; live: boolean } | null
         p.body = b ? { v: b.v.clone(), r: b.r, live: b.live } : null
         Object.assign(p.dabs, r.dabs)
+        p.want = (r.want as Piece['want']) ?? null
         for (const [k, v] of Object.entries(r.looks as Record<string, number>)) (p.looks as Record<string, { value: number }>)[k].value = v
         const bites = r.bites as { n: number; v: THREE.Vector4[] }
         p.bites.uBiteCount.value = bites.n
@@ -1900,6 +1910,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const guestTime = useRef(0)
   const chefClock = useRef(0)
   const guests = useRef<Guest[]>([])
+  /** what's been ordered off the menu and not yet brought out: each food, as which dish */
+  const wants = useRef<{ id: string; dabs: string[]; name: string }[]>([])
+  const nameOfP = (p: Piece) => p.want?.name ?? nameOf(p.id)
   const guestSeq = useRef(0)
   const report = () => onGuests?.(guests.current.map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
     rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat })))
@@ -1965,7 +1978,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.progress / roast.times[p.id] >= pullOf(p)) : undefined
     if (ready) {
       collect(ready)
-      say(L().done(nameOf(ready.id)))
+      say(L().done(nameOfP(ready)))
       return
     }
     const toSeason = hasChef && live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 && !p.chefSeasoned &&
@@ -1975,6 +1988,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const noted = follows(toSeason)?.dabs
       const fromNotes = noted ? (Object.entries(noted).filter(([k, n]) => n > 0 && k !== 'water').sort((a, b) => b[1] - a[1])[0]?.[0] as
         Exclude<Seasoning, 'water'> | undefined) : undefined
+      // (what's ordered off the menu is made the way it's listed)
+      if (toSeason.want) {
+        for (const w of toSeason.want.dabs as Exclude<Seasoning, 'water'>[]) {
+          if (toSeason.dabs[w]) continue
+          season(toSeason, w)
+          emit(w, toSeason.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
+        }
+        if (toSeason.want.dabs.length) say(L().seasoned(nameOfP(toSeason), toSeason.want.dabs[0] as Exclude<Seasoning, 'water'>))
+        return
+      }
       const k = noted ? fromNotes ?? null : bestSeasoning(toSeason.id)
       // (a less practised hand forgets now and then)
       if (k && !toSeason.dabs[k] && Math.random() < chef.seasonChance) {
@@ -1989,8 +2012,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       wrapped.unwrapped = true
       return
     }
-    const next = hasSous ? live.filter((p) => p.staged).sort((a, b) => a.stagedAt - b.stagedAt)[0] : undefined
-    if (next && putOnFire(next)) say(L().onFire(nameOf(next.id)))
+    // (the sous chef puts things on; with no sous chef, the second chef does it too)
+    const next = hasSous || hasChef ? live.filter((p) => p.staged).sort((a, b) => a.stagedAt - b.stagedAt)[0] : undefined
+    if (next && putOnFire(next)) say(L().onFire(nameOfP(next)))
   }
 
   /**
@@ -2010,9 +2034,26 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const want = 1 + Math.floor(Math.random() * 3)
       const orders: string[] = []
       const id = guestSeq.current + 1
-      for (let k = 0; k < want; k++) {
+      const said: string[] = []
+      for (let k = 0; k < (entries ? Math.min(want, 2) : want); k++) {
+        if (entries) {
+          // a dish (or a set) off the menu, made the way it's listed
+          const e = entries[Math.floor(Math.random() * entries.length)]
+          if (!e || !e.parts.every((pt) => pt.id in roast.times)) continue
+          wants.current.push(...e.parts)
+          if (onOrderEntry?.(e.key, id)) {
+            orders.push(...e.parts.map((pt) => pt.id))
+            said.push(e.name)
+          } else {
+            wants.current.splice(wants.current.length - e.parts.length, e.parts.length)
+          }
+          continue
+        }
         const pick = itemIds.filter((id) => id in roast.times)[Math.floor(Math.random() * itemIds.filter((id) => id in roast.times).length)]
-        if (pick && onOrder(pick, id)) orders.push(pick)
+        if (pick && onOrder(pick, id)) {
+          orders.push(pick)
+          said.push(nameOf(pick))
+        }
       }
       guestSeq.current = id
       if (orders.length) {
@@ -2024,7 +2065,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (only those still here and the last few gone are kept: the list doesn't grow all day)
         guests.current = guests.current.filter((g, i, all) => g.state === 'waiting' || g.state === 'eating' || !g.cleared ||
           i >= all.length - 12)
-        onSay?.('guest', L().order(id, orders.map(nameOf)))
+        onSay?.('guest', L().order(id, said))
       } else {
         onSay?.('guest', L().nothing(id))
       }
@@ -2036,7 +2077,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         g.state = 'angry'
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
-        onWalkOut?.(owed)
+        onWalkOut?.(owed, g.id)
         onSay?.('guest', L().angry(g.id))
         report()
       }
@@ -2069,7 +2110,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         dish.unwrapped = true
         return
       }
-      const taste = tasteOf(dish)
+      // (not made the way it's on the menu: not what they ordered)
+      const asOrdered = !dish.want || dish.want.dabs.slice().sort().join() ===
+        Object.entries(dish.dabs).filter(([k, n]) => n > 0 && k !== 'water').map(([k]) => k).sort().join()
+      const taste = Math.max(0, tasteOf(dish) - (asOrdered ? 0 : 15))
       dish.node.userData.byGuest = true
       eat(dish)
       g.eaten.push(taste)
@@ -2077,7 +2121,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
       const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
       window.setTimeout(() => {
-        onSay?.('guest', L().verdict(g.id, nameOf(dish.id), stars))
+        onSay?.('guest', L().verdict(g.id, nameOfP(dish), stars))
         report()
       }, EAT_SECONDS * 1000)
       return
@@ -2635,7 +2679,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
 
   const anchors = useRef<Record<string, THREE.Group | null>>({})
-  const [tags, setTags] = useState<{ key: string; id: string; state: TagState }[]>([])
+  const [tags, setTags] = useState<{ key: string; id: string; name?: string; state: TagState }[]>([])
   const lastTags = useRef('')
   const lastOff = useRef(-1)
   const since = useRef(0)
@@ -2762,6 +2806,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (present(p) && !p.wasPresent) {
         // just ordered: it's brought out raw on the tray (the base fish, not on the menu, starts on the fire)
         p.wasPresent = true
+        // (in the open shop: the next one of these ordered, as what dish)
+        if (space === 'open') {
+          const i = wants.current.findIndex((w) => w.id === p.id)
+          p.want = i >= 0 ? wants.current.splice(i, 1)[0] : null
+        }
         if (menuIds.has(p.id) && roast.tray) {
           p.staged = true
           p.stagedAt = ++stageSeq.current
@@ -2799,6 +2848,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.slot = null
         p.eat = 0
         p.eaten = false
+        p.want = null
         p.node.userData.onPlate = false
         p.node.userData.follow = undefined
         p.node.quaternion.copy(p.homeQ)
@@ -3033,12 +3083,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       lastOff.current = off * 1000 + loose
       onOffFire?.(off, loose)
     }
-    const next: { key: string; id: string; state: TagState }[] = []
+    const next: { key: string; id: string; name?: string; state: TagState }[] = []
     for (const p of pieces.current) {
       if (!present(p) || p.collected || p.staged || (roast.net?.includes(p.id) && p.netSpot === null)) continue
       const r = p.progress / roast.times[p.id]
       const s = stageOf(r)
-      next.push({ key: p.key, id: p.id, state: { stage: s.key, label: s.label, pct: Math.round(Math.min(1, r) * 20) / 20 } })
+      next.push({ key: p.key, id: p.id, name: p.want?.name, state: { stage: s.key, label: s.label, pct: Math.round(Math.min(1, r) * 20) / 20 } })
     }
     const k = JSON.stringify(next)
     if (k !== lastTags.current) {
@@ -3097,7 +3147,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {wisps.map((w) => (
         <Wisp key={w.key} at={w.at} onDone={() => setWisps((all) => all.filter((x) => x.key !== w.key))} />
       ))}
-      {active && tags.map(({ key, id, state }) => (
+      {active && tags.map(({ key, id, name, state }) => (
         <group key={key} ref={(g) => { anchors.current[key] = g }}>
           <Html center zIndexRange={[30, 10]}>
             <button type="button"
@@ -3109,7 +3159,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
                 <circle cx="10" cy="10" r="8" className="roast-ring-fill" pathLength={100}
                   strokeDasharray={`${state.pct * 100} 100`} />
               </svg>
-              <span className="roast-name">{roast.names[id]}</span>
+              <span className="roast-name">{name ?? roast.names[id]}</span>
               <span className="roast-state">{state.label}</span>
             </button>
           </Html>

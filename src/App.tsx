@@ -14,6 +14,7 @@ import { GasFlame } from './components/GasFlame'
 import { FireControl } from './components/FireControl'
 import { Fullness } from './components/Fullness'
 import { bestOf, Notebook, type Notes } from './components/Notebook'
+import { findItem, MENU_MAX, MENU_MIN, SEASON_COST, type Entry, type Part, type Seasoning } from './recipes'
 import { MoodFace } from './components/MoodFace'
 import { GuestCounter } from './components/GuestCounter'
 import { HeatControl } from './components/HeatControl'
@@ -138,16 +139,11 @@ const ALL_ITEMS = new Map(DISHES.flatMap((d) => d.items.map((it) => [it.id, it] 
 /** a comfortably full adult meal, and how fast it settles */
 const FULL_KCAL = 1500
 const DIGEST_KCAL_PER_SEC = 1.2
+/** what's cooked in the hot pot (eating any of it is trying the soup too) */
+const potItems = new Set(DISHES.find((d) => d.heatControl)?.items.map((x) => x.id) ?? [])
 const FLOAT_IDS = Object.fromEntries(
   DISHES.map((d) => [d.id, d.items.filter((it) => it.entrance === 'float').map((it) => it.id)]),
 )
-
-/** a set can be sold while all its parts are in stock, anything else while there's a portion of it */
-const canSell = (x: { id: string; includes?: Record<string, number> }, stock: Record<string, number>) =>
-  x.includes ? Object.entries(x.includes).every(([k, q]) => (stock[k] ?? 0) >= q) : (stock[x.id] ?? 0) > 0
-/** what a noodle-bar customer can order now: a bowl (or set), or one of the dishes off the table */
-const noodlePool = (d: DishInfo, stock: Record<string, number>) =>
-  [...d.bases, ...d.items.filter((x) => x.table)].filter((x) => canSell(x as { id: string; includes?: Record<string, number> }, stock))
 
 type Theme = 'light' | 'dark'
 
@@ -267,7 +263,10 @@ type SceneProps = {
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
   helpersOf: (dishId: string) => { chef: boolean; sous: boolean }
-  onWalkOut: (ids: string[], dish: DishInfo) => void
+  onWalkOut: (ids: string[], dish: DishInfo, guest?: number) => void
+  /** (shop open) what's on each shop's menu, and a customer ordering one of them */
+  entriesOf: (dishId: string) => Entry[]
+  onOrderEntry: (key: string, guest: number) => boolean
   onGuests: (dishId: string, g: GuestView[]) => void
   /** what the hot pot's AI customers are waiting for (they take it out of the pot themselves once it's cooked) */
   potAi: string[]
@@ -282,7 +281,7 @@ type SceneProps = {
   noodleWok: boolean
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -316,6 +315,12 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
     brothTemp.current = tempBy.current[String(ai)] ?? ROOM_TEMP
     tempSpace.current = ai
   }, [ai])
+  // (the open shop's soup comes from the kitchen's stock pot, already near the boil: customers aren't kept waiting
+  // while a cold pot heats up)
+  const openSoup = ai && potDish ? orderedBase(potDish, orders[potDish.id])?.id ?? null : null
+  useEffect(() => {
+    if (openSoup) brothTemp.current = Math.max(brothTemp.current, 88)
+  }, [openSoup])
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
   const grillSmoke = useRef(0)
   const grillBlackSmoke = useRef(0)
@@ -477,7 +482,8 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)}
                   helpers={helpersOf(dish.id)} bar={!phone}
-                  onWalkOut={(ids) => onWalkOut(ids, dish)} lang={lang}
+                  onWalkOut={(ids, g) => onWalkOut(ids, dish, g)} lang={lang}
+                  entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
                   names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))}
                   space={ai ? 'open' : 'closed'} locked={false}
                   notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))} />
@@ -600,19 +606,38 @@ export default function App() {
   const [notes, setNotes] = useState<Notes>(() => SAVED?.notes ?? {})
   const [lastTry, setLastTry] = useState<{ name: string; taste: number; key: number } | null>(null)
   const langRef = useRef<Lang>('zh')
+  const potSoupRef = useRef<string | null>(null)
   const onEat = useCallback((id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; dip?: string[] }) => {
     const item = ALL_ITEMS.get(id) ?? DISHES.flatMap((d) => d.bases).find((b) => b.id === id)
     const cal = (item as { kcal?: number } | undefined)?.kcal ?? BASE_KCAL[id] ?? 0
     setKcal((k) => k + cal)
     setRating((r) => ({ sum: r.sum + taste, n: r.n + 1 }))
     const name = item ? nameIn(langRef.current, item) : id
-    setNotes((all) => ({ ...all, [id]: { name, tries: [...(all[id]?.tries ?? []), { taste, ...how, at: Date.now() }] } }))
+    setNotes((all) => {
+      const next = { ...all, [id]: { name, tries: [...(all[id]?.tries ?? []), { taste, ...how, at: Date.now() }] } }
+      // (food out of the hot pot is the soup tried too: that's how a soup base gets worked out)
+      const soup = potSoupRef.current
+      if (soup && potItems.has(id)) {
+        const b = DISHES.flatMap((d) => d.bases).find((x) => x.id === soup)
+        if (b) next[soup] = { name: nameIn(langRef.current, b), tries: [...(all[soup]?.tries ?? []), { taste, at: Date.now() }] }
+      }
+      return next
+    })
     setLastTry({ name, taste, key: Date.now() })
   }, [])
+  // (dev only: the browser tests try dishes without cooking them in 3D)
+  // the soup in the hot pot being tried, if any
+  useEffect(() => {
+    if (import.meta.env.DEV) (window as unknown as { __eat?: typeof onEat }).__eat = onEat
+  }, [onEat])
   // AI simulation: a chef and customers, and what they've said lately
   // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
   const space: 'closed' | 'open' = ai ? 'open' : 'closed'
+  {
+    const pot = DISHES.find((d) => d.heatControl)
+    potSoupRef.current = pot && !ai ? orderedBase(pot, ordersBy.closed[pot.id])?.id ?? null : null
+  }
   const orders = ordersBy[space]
   const setOrders = (fn: (all: Record<string, Record<string, number>>) => Record<string, Record<string, number>>) =>
     setOrdersBy((b) => ({ ...b, [space]: fn(b[space]) }))
@@ -686,6 +711,40 @@ export default function App() {
     }
   }, [])
   const [office, setOffice] = useState<null | 'stock' | 'staff'>(null)
+  // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
+  const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>({})
+  const menuByRef = useRef(menuBy)
+  menuByRef.current = menuBy
+  const entriesOf = (id: string) => menuBy[id] ?? []
+  // how many of each dish on the menu have been ordered (for the menu board while open)
+  const [entryCount, setEntryCount] = useState<Record<string, number>>({})
+  // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
+  const bills = useRef<Record<string, Record<number, { paid: number; parts: number }>>>({})
+  const [bookAt, setBookAt] = useState<{ tab: 'lab' | 'menu' | 'chef'; n: number } | undefined>(undefined)
+  /** a part's cost: the food, and what's put on it */
+  const partCost = (d: DishInfo, p: Part) => costOf(findItem(d, p.id) ?? { price: 0 }) +
+    p.dabs.reduce((n, k) => n + SEASON_COST[k as Seasoning], 0)
+  const entryCost = (e: Entry) => {
+    const d = DISHES.find((x) => x.id === e.shop)!
+    return e.parts.reduce((n, p) => n + partCost(d, p), 0)
+  }
+  /** what a dish takes out of stock (a bowl that comes with its beef: the beef; it isn't bought as a bowl) */
+  const needOf = (e: Entry) => {
+    const d = DISHES.find((x) => x.id === e.shop)!
+    const need: Record<string, number> = {}
+    for (const p of e.parts) {
+      const inc = (findItem(d, p.id) as { includes?: Record<string, number> } | undefined)?.includes
+      for (const [k, q] of Object.entries(inc ?? { [p.id]: 1 })) need[k] = (need[k] ?? 0) + q
+    }
+    return need
+  }
+  /** how many of each thing a dish puts out to be cooked */
+  const partsOf = (e: Entry) => {
+    const n: Record<string, number> = {}
+    for (const p of e.parts) n[p.id] = (n[p.id] ?? 0) + 1
+    return n
+  }
+  const canServe = (e: Entry, st: Record<string, number> = stock) => Object.entries(needOf(e)).every(([k, q]) => (st[k] ?? 0) >= q)
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
   const chatId = useRef(0)
@@ -778,6 +837,17 @@ export default function App() {
   }
   const dish = DISHES[active]
   const base = orderedBase(dish, orders[dish.id])
+  /** the menu board while open: the dishes on the menu (soups and bowls among the dark tags), at their prices */
+  const menuDish = (d: DishInfo): DishInfo => {
+    const asItem = (e: Entry) => ({ ...(findItem(d, e.parts[0].id) as object), id: e.key, name: e.name, ja: e.ja, en: undefined,
+      price: e.price, icon: e.parts[0].id, includes: undefined, max: undefined })
+    const isBase = (e: Entry) => d.bases.some((b) => b.id === e.parts[0].id)
+    return { ...d, bases: entriesOf(d.id).filter(isBase).map(asItem) as DishInfo['bases'],
+      items: entriesOf(d.id).filter((e) => !isBase(e)).map(asItem) as DishInfo['items'] }
+  }
+  /** how many of each dish on the menu could be made from what's in stock */
+  const entryStock = (d: DishInfo) => Object.fromEntries(entriesOf(d.id).map((e) =>
+    [e.key, Math.min(...Object.entries(needOf(e)).map(([k, q]) => Math.floor((stock[k] ?? 0) / q)))]))
 
   // dev only: mirror what's on screen into the open Blender (vite.config.ts -> blender/open_live.py)
   useEffect(() => {
@@ -921,11 +991,11 @@ export default function App() {
   /** whether a customer could order anything at this shop now: skewers at the grill, things to cook (and a soup,
    * or one already in the pot) at the hot pot, a bowl or a dish off the table at the noodle bar */
   function sellable(d: DishInfo) {
-    const has = (id: string) => (stock[id] ?? 0) > 0
-    const anyBase = d.bases.some((b) => canSell(b, stock))
-    return d.id === 'grilledfish' ? d.items.some((x) => !!d.roast && x.id in d.roast.times && has(x.id))
-      : d.id === 'hotpot' ? (anyBase || !!orderedBase(d, ordersBy.open[d.id])) && d.items.some((x) => x.id !== 'Rice' && has(x.id))
-        : noodlePool(d, stock).length > 0
+    // (only what's on the menu, and in stock)
+    const es = entriesOf(d.id).filter((e) => canServe(e))
+    const isSoup = (e: Entry) => e.parts.every((p) => d.bases.some((b) => b.id === p.id))
+    return d.id === 'hotpot' ? (es.some(isSoup) || !!orderedBase(d, ordersBy.open[d.id])) && es.some((e) => !isSoup(e))
+      : es.length > 0
   }
   const MAX_PORTIONS = 99
   // the fire only holds so many skewers; past that, take something off before ordering more
@@ -1036,7 +1106,9 @@ export default function App() {
   // ordered; at the noodle bar the chef cooks one bowl at a time, sets it down in front of its customer, who
   // eats it and leaves. Kept waiting too long, a customer walks out.
   type ShopGuest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state'];
-    base?: string }
+    base?: string
+    /** (noodle bar) everything in what they ordered, and what it's called on the menu */
+    parts?: string[]; label?: string }
   // (each shop's own clock, in seconds of business: it only runs while the shop is open and on screen, so a customer
   // isn't kept waiting by the shop being closed or looked away from)
   const shop = useRef<Record<string, { guests: ShopGuest[]; seq: number; clock: number; time: number;
@@ -1068,10 +1140,62 @@ export default function App() {
     report('hotpot')
   }
   /** a customer walked out: take back the price of what they didn't eat */
-  const refund = (ids: string[], d: DishInfo) => {
-    const total = ids.reduce((n, id) => n + ((ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id))?.price ?? 0), 0)
+  const refund = (ids: string[], d: DishInfo, guest?: number) => {
+    // (what they paid for the menu's dishes, in proportion to what of it they didn't get)
+    const bill = guest !== undefined ? bills.current[d.id]?.[guest] : undefined
+    const total = bill ? Math.round((bill.paid * ids.length) / Math.max(1, bill.parts))
+      : ids.reduce((n, id) => n + ((ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id))?.price ?? 0), 0)
     if (total) book('revenue', -total)
   }
+  /**
+   * A customer orders a dish off the menu: its parts come out of stock, it's paid at the menu's price, its cost is
+   * the food and the seasonings, and (except at the noodle bar, where the kitchen sets each bowl down) its food is
+   * put out to be cooked. False if it can't be had now.
+   */
+  const orderEntry = (e: Entry, guest: number): boolean => {
+    const d = DISHES.find((x) => x.id === e.shop)!
+    const need = needOf(e)
+    if (!canServe(e, stockRef.current)) return false
+    if (d.roast) {
+      const skewers = Object.entries(partsOf(e)).reduce((n, [k, q]) => n + (isSkewer(k) ? q : 0), 0)
+      if (skewers && onTheFire() + skewers > FIRE_CAPACITY) return false
+    }
+    stockRef.current = { ...stockRef.current }
+    for (const [k, q] of Object.entries(need)) stockRef.current[k] = (stockRef.current[k] ?? 0) - q
+    setStock((st) => {
+      const next = { ...st }
+      for (const [k, q] of Object.entries(need)) next[k] = (next[k] ?? 0) - q
+      return next
+    })
+    book('revenue', e.price)
+    book('food', entryCost(e))
+    if (d.id !== 'beefnoodle') {
+      setOrdersBy((b) => {
+        const cur = { ...b.open[d.id] }
+        for (const [k, q] of Object.entries(partsOf(e))) {
+          if (d.oneBase && d.bases.some((bb) => bb.id === k)) {
+            for (const bb of d.bases) cur[bb.id] = 0
+            cur[k] = 1
+          } else cur[k] = (cur[k] ?? 0) + q
+        }
+        return { ...b, open: { ...b.open, [d.id]: cur } }
+      })
+    }
+    const bill = ((bills.current[d.id] ??= {})[guest] ??= { paid: 0, parts: 0 })
+    bill.paid += e.price
+    bill.parts += e.parts.length
+    setEntryCount((c) => ({ ...c, [e.key]: (c[e.key] ?? 0) + 1 }))
+    const key = ++feedSeq.current
+    setFeed((fd) => [...fd.slice(-2), { key, id: e.key, guest }])
+    window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
+    return true
+  }
+  const orderEntryRef = useRef(orderEntry)
+  orderEntryRef.current = orderEntry
+  const onOrderEntry = useCallback((key: string, guest: number) => {
+    const e = Object.values(menuByRef.current).flat().find((x) => x.key === key)
+    return !!e && orderEntryRef.current(e, guest)
+  }, [])
   const potEatRef = useRef(potGuestEat)
   potEatRef.current = potGuestEat
   const onPotGuestEat = useCallback((id: string, taste: number) => potEatRef.current(id, taste), [])
@@ -1094,65 +1218,56 @@ export default function App() {
       s.clock = 0
       const id = ++s.seq
       const g: ShopGuest = { id, orders: [], ate: [], eaten: [], since: now, state: 'waiting' }
-      const note = (what: string) => {
-        const key = ++feedSeq.current
-        setFeed((f) => [...f.slice(-2), { key, id: what, guest: id }])
-        window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
-      }
+      const said: string[] = []
       if (d.id === 'hotpot') {
         // the first one in picks the soup; everyone orders a few things to cook in it
+        // (off the menu: a soup on it, and the things to cook on it)
+        const es = entriesOf(d.id)
+        const isBase = (x: string) => d.bases.some((b) => b.id === x)
+        const soups = es.filter((e) => e.parts.every((p) => isBase(p.id)) && canServe(e, stockRef.current))
+        const foods = es.filter((e) => e.parts.some((p) => !isBase(p.id)))
         if (!orderedBase(d, orders[d.id])) {
-          const b = d.bases[Math.floor(Math.random() * d.bases.length)]
-          if (changeQty(b.id, 1)) note(b.id)
+          const e = soups[Math.floor(Math.random() * soups.length)]
+          if (e && orderEntry(e, id)) said.push(nameIn(lang, e))
         }
-        const pool = d.items.filter((x) => x.id !== 'Rice')
-        const want = 1 + Math.floor(Math.random() * 3)
+        const want = 1 + Math.floor(Math.random() * 2)
         for (let k = 0; k < want; k++) {
-          const it = pool[Math.floor(Math.random() * pool.length)]
-          if (changeQty(it.id, 1)) {
-            g.orders.push(it.id)
-            note(it.id)
+          const e = foods[Math.floor(Math.random() * foods.length)]
+          if (e && orderEntry(e, id)) {
+            g.orders.push(...e.parts.filter((p) => !isBase(p.id)).map((p) => p.id))
+            said.push(nameIn(lang, e))
           }
         }
       } else {
         // a bowl of noodles each, paid for now and cooked in turn
         // a bowl of noodles, or one of the other dishes (fried rice, dumplings, soup…) off the table
-        const inStock = noodlePool(d, stockRef.current)
-        const b = inStock[Math.floor(Math.random() * inStock.length)]
-        if (b) {
-          g.base = b.id
-          g.orders.push(b.id)
-          book('revenue', b.price)
-          book('food', costOf(b))
-          // (a set takes its parts)
-          const parts = (b as { includes?: Record<string, number> }).includes ?? { [b.id]: 1 }
-          setStock((st) => {
-            const next = { ...st }
-            for (const [k, q] of Object.entries(parts)) next[k] = (next[k] ?? 0) - q
-            return next
-          })
-          note(b.id)
+        // (a dish off the menu: a bowl, a plate off the table, or a set of them)
+        const inStock = entriesOf(d.id).filter((e) => canServe(e, stockRef.current))
+        const e = inStock[Math.floor(Math.random() * inStock.length)]
+        if (e && orderEntry(e, id)) {
+          g.parts = e.parts.map((p) => p.id)
+          g.base = g.parts[0]
+          g.label = nameIn(lang, e)
+          g.orders.push(...g.parts)
+          said.push(g.label)
         }
       }
       if (g.orders.length) {
         s.guests.push(g)
         // (only those still here and the last few gone are kept: the list doesn't grow all day)
         s.guests = s.guests.filter((x, i, all) => x.state === 'waiting' || x.state === 'eating' || i >= all.length - 12)
-        talk('guest', LINES[lang].order(id, g.orders.map((o) => {
-          const it = ALL_ITEMS.get(o) ?? d.bases.find((b) => b.id === o)
-          return it ? nameIn(lang, it) : o
-        })))
+        talk('guest', LINES[lang].order(id, said))
       }
       report(d.id)
     }
     // kept waiting too long with nothing to eat
     for (const g of seated) {
-      if (g.eaten.length === 0 && now - g.since > 150 * (0.8 + servers * 0.2) && !(s.kitchen && s.kitchen.guest === g.id)) {
+      if (g.eaten.length === 0 && now - g.since > (d.id === 'hotpot' ? 300 : 150) * (0.8 + servers * 0.2) && !(s.kitchen && s.kitchen.guest === g.id)) {
         g.state = 'angry'
         // they don't pay for what they didn't get (the ingredients are wasted)
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
-        refund(owed, d)
+        refund(owed, d, g.id)
         talk('guest', LINES[lang].angry(g.id))
         report(d.id)
       }
@@ -1195,18 +1310,20 @@ export default function App() {
           // the bowl goes in front of its customer
           k.phase = 'eat'
           k.t = 0
-          setOrders((all) => ({ ...all, [d.id]: { [g.base!]: 1 } }))
+          // (all of what they ordered goes in front of them)
+          const all = g.parts ?? [g.base!]
+          setOrders((o) => ({ ...o, [d.id]: Object.fromEntries(all.map((p) => [p, all.filter((x) => x === p).length])) }))
           g.state = 'eating'
-          talk('chef', LINES[lang].noodlesUp(g.id, nameIn(lang, ([...d.bases, ...d.items] as { id: string; name: string }[]).find((b) => b.id === g.base)!)))
+          talk('chef', LINES[lang].noodlesUp(g.id, g.label ?? nameIn(lang, ([...d.bases, ...d.items] as { id: string; name: string }[]).find((b) => b.id === g.base)!)))
           report(d.id)
         } else if (k.phase === 'eat' && k.t > 12) {
           // a better (and less tired) cook makes a better bowl; a server bringing it hot helps too
           const bonus = ((cook.skill ?? 0.6) - 0.7) * 45 + (staffOf(d.id, 'server').length ? 3 : -3)
           const taste = Math.max(10, Math.min(98, 70 + bonus + (Math.random() - 0.5) * 16))
           g.eaten.push(taste)
-          g.ate.push(g.base!)
+          g.ate.push(...(g.parts ?? [g.base!]))
           g.state = 'done'
-          starsLine(g.id, nameIn(lang, ([...d.bases, ...d.items] as { id: string; name: string }[]).find((b) => b.id === g.base)!), taste)
+          starsLine(g.id, g.label ?? nameIn(lang, ([...d.bases, ...d.items] as { id: string; name: string }[]).find((b) => b.id === g.base)!), taste)
           s.kitchen = null
           setOrders((all) => ({ ...all, [d.id]: {} }))
           report(d.id)
@@ -1276,7 +1393,7 @@ export default function App() {
               }
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
-            lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund}
+            lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
             phone={phone} noodleWok={(() => {
               const k = ai ? shop.current.beefnoodle?.kitchen : null
@@ -1292,7 +1409,17 @@ export default function App() {
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
-        <Notebook notes={notes} lang={lang} />
+        <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)} openAt={bookAt}
+          partCost={(p) => partCost(dish, p)}
+          chef={(() => { const c = staffOf(dish.id, 'chef')[0]; return c ? (lang === 'ja' ? c.ja : c.zh) : null })()}
+          chefSkill={(staffOf(dish.id, 'chef')[0]?.skill ?? 60) / 100}
+          onPublish={(e) => setMenuBy((m) => {
+            const cur = m[e.shop] ?? []
+            if (cur.length >= MENU_MAX || cur.some((x) => x.key === e.key)) return m
+            return { ...m, [e.shop]: [...cur, e] }
+          })}
+          onUnpublish={(key) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).filter((x) => x.key !== key) }))}
+          onReprice={(key, price) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).map((x) => (x.key === key ? { ...x, price } : x)) }))} />
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'stock'))} aria-expanded={!!office}
           title={lang === 'ja' ? '事務所（仕入れ・人事）' : '經營（採買・人事）'}>
           <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em><b>NT${Math.round(cash).toLocaleString()}</b>
@@ -1300,8 +1427,9 @@ export default function App() {
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} stock={stock} tab={office} onTab={setOffice} onClose={() => setOffice(null)}
             unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
-            onBuyAll={(n) => {
-              const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items]
+            menuUses={new Set(entriesOf(dish.id).flatMap((e) => e.parts.map((p) => p.id)))}
+            onBuyAll={(n, ids) => {
+              const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items].filter((g) => !ids || ids.includes(g.id))
               const cost = goods.reduce((t, g) => t + costOf(g) * n, 0)
               if (cost > cash) return
               book('bought', cost)
@@ -1477,7 +1605,8 @@ export default function App() {
         </div>
       )}
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id} dish={dish} lang={lang} quantities={orders[dish.id]} feed={feed} locked={ai} stock={stock}
+      <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : dish} lang={lang} quantities={ai ? entryCount : orders[dish.id]}
+        feed={feed} locked={ai} stock={ai ? entryStock(dish) : stock}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {
           // cancelling everything refunds it (nothing was made)
@@ -1505,11 +1634,18 @@ export default function App() {
         aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => {
         // (opening with nothing a customer could order would only shut again at once: say what's missing instead)
+        if (!ai && entriesOf(dish.id).length < (MENU_MIN[dish.id] ?? 1)) {
+          say(UI[lang].menuShort(entriesOf(dish.id).length, MENU_MIN[dish.id] ?? 1))
+          setBookAt((b) => ({ tab: 'lab', n: (b?.n ?? 0) + 1 }))
+          return
+        }
         if (!ai && !sellable(dish)) {
           say(UI[lang].cantOpen)
           setOffice('stock')
           return
         }
+        // (at the grill the owner is the head chef: with no cooks hired, it's all theirs to do)
+        if (!ai && dish.roast && !staffOf(dish.id, 'chef').length && !staffOf(dish.id, 'sous').length) say(UI[lang].ownerCooks)
         setAi((v) => !v)
       }}
         aria-pressed={ai} title={UI[lang].aiLabel}>
