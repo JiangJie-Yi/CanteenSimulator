@@ -1450,6 +1450,29 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const moved = useRef(new Map<string, THREE.Vector3>())
   const [, setMoveTick] = useState(0)
   const nudge = (key: string) => moved.current.get(key) ?? ZERO
+  // empty plates and dishes can be stacked, any on any: what each one sits on (its nudge then carries the lift too)
+  const stackOn = useRef(new Map<string, string>())
+  const STACKABLE = (k: string) => /^(plate|dish)-\d+$|^rawdish$/.test(k)
+  const stackRoot = (k: string) => {
+    let r = k
+    for (let i = 0; i < 20 && stackOn.current.has(r); i++) r = stackOn.current.get(r)!
+    return r
+  }
+  const sameStack = (a: string, b: string) => stackRoot(a) === stackRoot(b)
+  /** the one on top of whatever stack this is in */
+  const stackTop = (k: string) => {
+    let t = k
+    for (let i = 0; i < 20; i++) {
+      const up = [...stackOn.current].find(([, under]) => under === t)?.[0]
+      if (!up) break
+      t = up
+    }
+    return t
+  }
+  /** how far above its own foot the next one stacked on this container rests */
+  const stackStep = (k: string) => (k.startsWith('plate') ? 0.075 : 0.05)
+  /** whether anything is lying on (or in) this container */
+  const holds = (k: string) => pieces.current.some((q) => q.container === k && present(q) && !q.eaten)
 
   const plateAt = (n: number) => {
     const [x, y, z] = roast.plate
@@ -1495,9 +1518,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * Keep a moved container from passing through things: out of the stone ring, and clear of every other
    * plate, dish, basket, the box and the bin (round footprints, pushed apart until they just touch).
    */
-  const settle = (key: string, at: THREE.Vector3) => {
+  const settle = (key: string, at: THREE.Vector3, stacking = false) => {
     const r = footprint(key)
-    const others = containerKeys().filter((k) => k !== key).map((k) => ({ p: containerAt(k), r: footprint(k) }))
+    // (what it's stacked with doesn't push it away; nor, while an empty one is carried, other empty ones it could go on)
+    const others = containerKeys().filter((k) => k !== key && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
+      .map((k) => ({ p: containerAt(k), r: footprint(k) }))
     // the bar behind the fire (shop open) is in the way too
     if (space === 'open') for (let k = -2; k <= 2; k++) others.push({ p: BAR_AT.clone().addScaledVector(STACK_DIR, k * 0.8), r: 0.42 })
     // the soup bowls on the table are in the way too
@@ -1540,6 +1565,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   useEffect(() => {
     for (let pass = 0; pass < 3; pass++) {
       for (const key of containerKeys()) {
+        // (a stack stays where it was put)
+        if (stackOn.current.has(key)) continue
         const at = containerAt(key)
         const ok = settle(key, at.clone())
         const shift = ok.sub(at)
@@ -1554,6 +1581,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // (with the shop open, everything cooked is served to the customers along the bar behind the fire)
   const destination = (p: Piece) => (space === 'open' ? 'bar' : inBasket(p) ? 'basket' : onDish(p) ? 'dish' : 'plate')
 
+  /** take this container out of its stack (or what's on it off it), set down clear of the rest */
+  const unstack = (key: string) => {
+    for (const k of [stackTop(key), key]) {
+      if (!stackOn.current.has(k)) continue
+      stackOn.current.delete(k)
+      const n = nudge(k).clone()
+      n.y = 0
+      moved.current.set(k, n)
+      const base = containerAt(k).sub(n)
+      const ok = settle(k, containerAt(k)).sub(base)
+      ok.y = 0
+      moved.current.set(k, ok)
+    }
+    setMoveTick((t) => t + 1)
+  }
   const collect = (p: Piece) => {
     if (p.collected || !present(p)) return
     const basket = inBasket(p)
@@ -1624,6 +1666,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.toP.y += (p.loose ? 0.075 : 0.105) + layer * LAYER_HEIGHT
     }
     if (basket) p.container = 'basket-0'
+    // (onto a plate that's under another, or one stacked up: it's set down on its own first)
+    if (p.container && STACKABLE(p.container) && (stackOn.current.has(p.container) || stackTop(p.container) !== p.container)) {
+      const offset = p.toP.clone().sub(containerAt(p.container))
+      unstack(p.container)
+      p.toP.copy(containerAt(p.container)).add(offset)
+    }
     // where it sits relative to its plate, dish or basket, so it goes along when that's dragged somewhere else
     p.local.copy(p.toP).sub(containerAt(p.container!))
     // everything points the same way along LAY_DIR
@@ -1733,7 +1781,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // ---- two tables: the player's tasting (shop closed) and the shop's own (open). Switching puts one table's
   // food away exactly as it was and brings the other's back, each piece where it was and as cooked as it was.
   type Snap = { pieces: Map<string, Record<string, unknown>>; counts: [number, number, number];
-    moved: Map<string, THREE.Vector3>; sips: Map<string, { left: number; level: number }>; trashed: number }
+    moved: Map<string, THREE.Vector3>; sips: Map<string, { left: number; level: number }>; trashed: number
+    stacks: Map<string, string> }
   const snaps = useRef(new Map<string, Snap>())
   const lastSpace = useRef(space)
   const SCALARS = ['progress', 'collected', 'flight', 'stickOnly', 'netSpot', 'container', 'staged', 'stagedAt', 'wasPresent',
@@ -1757,7 +1806,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       out.set(p.key, r)
     }
     return { pieces: out, counts: [plateCount, dishCount, basketCount], moved: new Map([...moved.current].map(([k, v]) => [k, v.clone()])),
-      sips: new Map([...sips.current].map(([k, v]) => [k, { ...v }])), trashed: trashedRef.current }
+      sips: new Map([...sips.current].map(([k, v]) => [k, { ...v }])), trashed: trashedRef.current,
+      stacks: new Map(stackOn.current) }
   }
   const fresh = (p: Piece) => {
     p.wasPresent = false
@@ -1828,6 +1878,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     setDishCount(snap?.counts[1] ?? 1)
     setBasketCount(snap?.counts[2] ?? 1)
     moved.current = new Map(snap?.moved ?? [])
+    stackOn.current = new Map(snap?.stacks ?? [])
     sips.current = new Map(snap?.sips ?? [])
     trashedRef.current = snap?.trashed ?? 0
     setTrashed(trashedRef.current)
@@ -2255,8 +2306,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           return
         }
         // otherwise grab a plate, side dish, the basket, the seasoning box or the bin (not the food on them)
-        const key = food ? null : pickContainer()
-        if (!key) return
+        const picked = food ? null : pickContainer()
+        if (!picked) return
+        // (from a stack, the one on top comes off)
+        const key = STACKABLE(picked) ? stackTop(picked) : picked
+        if (stackOn.current.has(key)) {
+          stackOn.current.delete(key)
+          const n = nudge(key).clone()
+          n.y = 0
+          moved.current.set(key, n)
+        }
         const start = groundHit()
         if (!start) return
         shift.current = { key, start, from: nudge(key).clone() }
@@ -2349,7 +2408,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const base = containerAt(s.key).sub(before)
       const want = base.clone().add(s.from).add(hit.sub(s.start))
       want.y = base.y
-      const next = settle(s.key, want).sub(base)
+      const next = settle(s.key, want, STACKABLE(s.key) && !holds(s.key)).sub(base)
       next.y = 0
       moved.current.set(s.key, next)
       if (carriers[s.key]) {
@@ -2367,6 +2426,31 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       setMoveTick((t) => t + 1)
     }
     const release = () => {
+      const s = shift.current
+      if (s && STACKABLE(s.key)) {
+        const at = containerAt(s.key)
+        // the nearest other empty one it's been let go over (the top of its stack), if any
+        const target = containerKeys()
+          .filter((k) => k !== s.key && STACKABLE(k) && !holds(k) && stackTop(k) === k && !sameStack(k, s.key))
+          .map((k) => ({ k, d: Math.hypot(containerAt(k).x - at.x, containerAt(k).z - at.z) }))
+          .filter((o) => o.d < footprint(o.k) * 0.75)
+          .sort((a, b) => a.d - b.d)[0]
+        const base = at.clone().sub(nudge(s.key))
+        if (!holds(s.key) && target) {
+          // set square on top of it
+          const there = containerAt(target.k)
+          stackOn.current.set(s.key, target.k)
+          const n = there.clone().sub(base)
+          n.y = there.y + stackStep(target.k) - base.y
+          moved.current.set(s.key, n)
+        } else {
+          // not over one: it's pushed clear of whatever it was carried across
+          const n = settle(s.key, at.clone()).sub(base)
+          n.y = 0
+          moved.current.set(s.key, n)
+        }
+        setMoveTick((t) => t + 1)
+      }
       shift.current = null
       lightContainer(null)
       window.removeEventListener('pointermove', slide)

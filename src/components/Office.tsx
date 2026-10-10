@@ -12,6 +12,8 @@ type Props = {
   stock: Record<string, number>
   unitCost: (id: string) => number
   onBuy: (id: string, n: number) => void
+  /** buy n of everything this shop sells */
+  onBuyAll: (n: number) => void
   hired: Record<string, { fatigue: number }>
   onHire: (w: Worker) => void
   onFire: (w: Worker) => void
@@ -38,7 +40,7 @@ function Bar({ v, label }: { v: number; label: string }) {
  * The back office of the shop on screen: 採買 (buy ingredients into stock, paid from the cash in hand) and 人事
  * (hire and let go of the staff that kind of shop needs, see who's tired).
  */
-export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire, onFire, onClose, tab, onTab, onReset, owner }: Props) {
+export function Office({ dish, lang, cash, stock, unitCost, onBuy, onBuyAll, hired, onHire, onFire, onClose, tab, onTab, onReset, owner }: Props) {
   const [packs] = useState([10, 50])
   const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items]
   const roles = ROLES[dish.id] ?? []
@@ -59,6 +61,20 @@ export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire
         <button type="button" className="ofc-close" onClick={onClose} aria-label="close">×</button>
       </header>
       {tab === 'stock' ? (
+        <>
+        {/* a new shop has nothing in: say so, and offer to stock everything in one go */}
+        {(() => {
+          const all = goods.reduce((t, g) => t + unitCost(g.id) * 10, 0)
+          const empty = goods.every((g) => !(stock[g.id] ?? 0))
+          return (
+            <div className={`ofc-all${empty ? ' is-empty' : ''}`}>
+              {empty && <p>{ja ? 'まずは仕入れ：在庫があるものだけ注文でき、営業できます。' : '先進貨：有庫存的東西，菜單才點得到、才能營業。'}</p>}
+              <button type="button" onClick={() => onBuyAll(10)} disabled={cash < all}>
+                {ja ? '全部 +10' : '全部各 +10'} <small>{money(all)}</small>
+              </button>
+            </div>
+          )
+        })()}
         <ul className="ofc-list">
           {goods.map((g) => {
             const n = stock[g.id] ?? 0
@@ -76,6 +92,7 @@ export function Office({ dish, lang, cash, stock, unitCost, onBuy, hired, onHire
             )
           })}
         </ul>
+        </>
       ) : (
         <div className="ofc-staff">
           {roles.map((r) => {

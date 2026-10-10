@@ -46,7 +46,8 @@ const FIRE_CAPACITY = 16
 /** the money the business starts with */
 const CAPITAL = 300000
 /** what it costs to open one shop */
-const SHOP_COST = 150000
+// (the first takes less than half the capital: what's left buys stock, and a little earned opens the second)
+const SHOP_COST = 120000
 const SAVE_KEY = 'canteen-save'
 /** a whole bowl of noodles, by the bowl (the set meals' parts count on their own) */
 const BASE_KCAL: Record<string, number> = { braised: 650, clear: 560, plain: 380, dry: 520, sesame: 610, sanxianMian: 520,
@@ -907,14 +908,7 @@ export default function App() {
       setAi(false)
       return
     }
-    // (only what customers actually order counts: skewers at the grill, things to cook at the hot pot, a bowl or a
-    // dish off the table at the noodle bar)
-    const has = (id: string) => (stock[id] ?? 0) > 0
-    const anyBase = d.bases.some((b) => canSell(b, stock))
-    const sellable = d.id === 'grilledfish' ? d.items.some((x) => !!d.roast && x.id in d.roast.times && has(x.id))
-      : d.id === 'hotpot' ? (anyBase || !!orderedBase(d, orders[d.id])) && d.items.some((x) => x.id !== 'Rice' && has(x.id))
-        : noodlePool(d, stock).length > 0
-    if (sellable) return
+    if (sellable(d)) return
     const seated = (guestsBy[d.id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')
     if (seated) return
     setAi(false)
@@ -922,6 +916,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ai, stock, guestsBy, active, opened])
 
+  /** whether a customer could order anything at this shop now: skewers at the grill, things to cook (and a soup,
+   * or one already in the pot) at the hot pot, a bowl or a dish off the table at the noodle bar */
+  function sellable(d: DishInfo) {
+    const has = (id: string) => (stock[id] ?? 0) > 0
+    const anyBase = d.bases.some((b) => canSell(b, stock))
+    return d.id === 'grilledfish' ? d.items.some((x) => !!d.roast && x.id in d.roast.times && has(x.id))
+      : d.id === 'hotpot' ? (anyBase || !!orderedBase(d, ordersBy.open[d.id])) && d.items.some((x) => x.id !== 'Rice' && has(x.id))
+        : noodlePool(d, stock).length > 0
+  }
   const MAX_PORTIONS = 99
   // the fire only holds so many skewers; past that, take something off before ordering more
   const [offFire, setOffFire] = useState(0)
@@ -1288,11 +1291,22 @@ export default function App() {
         <Notebook notes={notes} lang={lang} />
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'stock'))} aria-expanded={!!office}
           title={lang === 'ja' ? '事務所（仕入れ・人事）' : '經營（採買・人事）'}>
-          <span aria-hidden="true">🏪</span><b>NT${Math.round(cash).toLocaleString()}</b>
+          <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em><b>NT${Math.round(cash).toLocaleString()}</b>
         </button>
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} stock={stock} tab={office} onTab={setOffice} onClose={() => setOffice(null)}
             unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
+            onBuyAll={(n) => {
+              const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items]
+              const cost = goods.reduce((t, g) => t + costOf(g) * n, 0)
+              if (cost > cash) return
+              book('bought', cost)
+              setStock((st) => {
+                const next = { ...st }
+                for (const g of goods) next[g.id] = (next[g.id] ?? 0) + n
+                return next
+              })
+            }}
             onBuy={(id, n) => {
               const it = ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id)
               const cost = costOf(it ?? { price: 0 }) * n
@@ -1428,7 +1442,7 @@ export default function App() {
         )}
       </div>
       {owner === null && (
-        <Welcome lang={lang} onStart={(name) => {
+        <Welcome lang={lang} capital={CAPITAL} shopCost={SHOP_COST} onStart={(name) => {
           setOwner(name)
           saveRef.current = { ...saveRef.current, owner: name }
           try {
@@ -1451,6 +1465,8 @@ export default function App() {
               setAsking(false)
               setIgnite((n) => n + 1)
               window.setTimeout(() => setIgnite(0), 3200)
+              // first thing a new shop needs: stock (nothing on the menu can be ordered without it)
+              window.setTimeout(() => setOffice('stock'), 900)
             }}>{lang === 'ja' ? '開業' : '開業'}</button>
             <button type="button" className="welcome-back" onClick={() => setAsking(false)}>{lang === 'ja' ? 'やめる' : '先不要'}</button>
           </div>
@@ -1484,6 +1500,12 @@ export default function App() {
       <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
         aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => {
+        // (opening with nothing a customer could order would only shut again at once: say what's missing instead)
+        if (!ai && !sellable(dish)) {
+          say(UI[lang].cantOpen)
+          setOffice('stock')
+          return
+        }
         setAi((v) => !v)
       }}
         aria-pressed={ai} title={UI[lang].aiLabel}>
