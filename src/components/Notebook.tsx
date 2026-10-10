@@ -85,7 +85,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
     }
     for (const [k, tries] of by) {
       const dabs = roast ? signature(tries[0].dabs) : []
-      const part: Part = { id, dabs, name: partName(item, short(id), id, dabs, 'zh'), ja: partName(item, short(id), id, dabs, 'ja') }
+      const part: Part = { id, dabs, name: partName(item, short(id), id, dabs, 'zh', !!roast), ja: partName(item, short(id), id, dabs, 'ja', !!roast) }
       recipes.push({ key: k, part, best: tries.reduce((a, b) => (b.taste > a.taste ? b : a)), tries: tries.length, cost: partCost(part) })
     }
   }

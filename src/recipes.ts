@@ -38,7 +38,7 @@ export const recipeKey = (id: string, dabs: Seasoning[]) => (dabs.length ? `${id
 const SPECIAL: Record<string, Partial<Record<string, string>>> = {
   GrilledCorn: { soy: '醬刷玉米', salt: '鹽烤玉米', milk: '奶香烤玉米', 'soy+peanut': '醬刷花生玉米' },
   Onigiri: { soy: '醬油烤飯糰', salt: '鹽烤飯糰' },
-  NetMochi: { soy: '醬油烤年糕', milk: '煉乳烤年糕', peanut: '花生年糕', 'milk+peanut': '花生煉乳年糕' },
+  NetMochi: { '': '網烤年糕', soy: '醬油烤年糕', milk: '煉乳烤年糕', peanut: '花生年糕', 'milk+peanut': '花生煉乳年糕' },
   BloodCake: { peanut: '花生米血', soy: '醬烤米血', 'soy+peanut': '醬烤花生米血' },
   SweetPotato: { milk: '煉乳烤地瓜', peanut: '花生烤地瓜' },
   Squid: { soy: '醬烤魷魚', salt: '鹽烤魷魚' },
@@ -49,17 +49,18 @@ const SPECIAL: Record<string, Partial<Record<string, string>>> = {
 
 /**
  * The name of a food cooked this way: 鹽烤 / 醬烤 before it (salt, soy), and 佐花生粉 / 淋煉乳 after it for what's
- * put on to finish, unless the dish has a name of its own. Elsewhere than the grill it's just the dish.
+ * put on to finish, unless the dish has a name of its own; with nothing on it, 烤 and the food. Elsewhere than the
+ * grill it's just the dish. (What's bought in is the bare food: 玉米, not 烤玉米.)
  */
-export function partName(item: { name: string; ja?: string }, short: string, id: string, dabs: Seasoning[], lang: Lang) {
-  if (lang === 'ja') {
-    if (!dabs.length) return item.ja ?? item.name
-    return dabs.map((k) => SEASON_NAME.ja[k]).join('・') + (item.ja ?? item.name)
-  }
+export function partName(item: { name: string; ja?: string }, short: string, id: string, dabs: Seasoning[], lang: Lang,
+  grill = true) {
+  const ja = item.ja ?? item.name
+  if (!grill) return lang === 'ja' ? ja : item.name
+  if (lang === 'ja') return (dabs.length ? dabs.map((k) => SEASON_NAME.ja[k]).join('・') : '') + '焼き' + ja
   const sig = dabs.join('+')
   const special = SPECIAL[id]?.[sig]
   if (special) return special
-  if (!dabs.length) return item.name
+  if (!dabs.length) return '烤' + short
   const head = dabs.includes('soy') && dabs.includes('salt') ? '鹽醬烤' : dabs.includes('soy') ? '醬烤' : dabs.includes('salt') ? '鹽烤' : '烤'
   let name = head + short
   if (dabs.includes('peanut')) name += '佐花生粉'

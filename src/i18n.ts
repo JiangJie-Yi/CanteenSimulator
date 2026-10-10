@@ -8,6 +8,7 @@ export const nameIn = (lang: Lang, x: Named) => (lang === 'ja' ? x.ja ?? x.name 
 export const UI = {
   zh: {
     menuTitle: '點菜',
+    researchTitle: '試做',
     nothingYet: '尚未點餐',
     hideMenu: '收起菜單',
     resetView: '恢復原視角',
@@ -47,7 +48,7 @@ export const UI = {
     showMenu: '打開菜單',
     tally: (base: string, count: number, total: number) => [`${base}，加點 `, count, ` 份，合計 `, total, ' 元'] as const,
     clear: '全部取消',
-    hint: '點一下加一份，右鍵減一份',
+    hint: '點一下拿一份來試做，右鍵減一份；吃過的到研發筆記上架',
     hintTouch: '點一下加一份，長按減一份',
     included: '含',
     ordered: (n: number) => `已點 ${n} 份`,
@@ -69,6 +70,7 @@ export const UI = {
   },
   ja: {
     menuTitle: '品書',
+    researchTitle: '試作',
     nothingYet: 'ご注文なし',
     hideMenu: '品書を閉じる',
     resetView: '視点を戻す',

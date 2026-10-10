@@ -19,6 +19,8 @@ type MenuProps = {
   locked?: boolean
   /** portions in stock (a tag with none left is marked 缺) */
   stock?: Record<string, number>
+  /** (shop closed) the board is the shop's foods to try out, not a menu: there's no menu until dishes are worked out */
+  research?: boolean
 }
 
 /**
@@ -53,7 +55,7 @@ const CAT_NAMES: Record<string, Record<Lang, string>> = {
   xiaolongbao: { zh: '點心', ja: '点心' }, soup: { zh: '湯類', ja: 'スープ' },
 }
 
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock }: MenuProps) {
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
   const count = [...dish.bases, ...dish.items].reduce((n, x) => n + (quantities[x.id] ?? 0), 0)
@@ -227,7 +229,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
 
   return (
     <aside className={`menu${locked ? ' is-locked' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
-      <h2 className="menu-title">{t.menuTitle}<span className="menu-title-en" lang="en">MENU</span></h2>
+      <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'TEST KITCHEN' : 'MENU'}</span></h2>
 
       <div className={`strips-frame${ends.overflow ? ' is-paged' : ''}`}>
         {ends.overflow && (

@@ -820,20 +820,20 @@ export default function App() {
     if (lastSpace.current === space) return
     fireBy.current[lastSpace.current] = fire.current
     fire.current = fireBy.current[space] ?? 0
-    setFireLevel(Math.round(fire.current * 1000) / 10)
+    setFireLevel(Math.round(fire.current * 100))
     lastSpace.current = space
   }, [space])
   useEffect(() => {
     const id = window.setInterval(() => {
       fire.current = Math.max(0, fire.current - FIRE_BURN_PER_TICK)
-      setFireLevel(Math.round(fire.current * 1000) / 10)
+      setFireLevel(Math.round(fire.current * 100))
     }, 200)
     return () => window.clearInterval(id)
   }, [])
   const addCharcoal = () => {
     book('fuel', CHARCOAL_COST)
     fire.current = Math.min(1, fire.current + 0.18)
-    setFireLevel(Math.round(fire.current * 1000) / 10)
+    setFireLevel(Math.round(fire.current * 100))
   }
   const dish = DISHES[active]
   const base = orderedBase(dish, orders[dish.id])
@@ -845,6 +845,9 @@ export default function App() {
     return { ...d, bases: entriesOf(d.id).filter(isBase).map(asItem) as DishInfo['bases'],
       items: entriesOf(d.id).filter((e) => !isBase(e)).map(asItem) as DishInfo['items'] }
   }
+  /** (shop closed) what can be tried out: the shop's own foods (at the grill not ready-made sets: sets are made up
+   * from what's been worked out) */
+  const researchDish = (d: DishInfo): DishInfo => (d.roast ? { ...d, bases: d.bases.filter((b) => !b.includes) } : d)
   /** how many of each dish on the menu could be made from what's in stock */
   const entryStock = (d: DishInfo) => Object.fromEntries(entriesOf(d.id).map((e) =>
     [e.key, Math.min(...Object.entries(needOf(e)).map(([k, q]) => Math.floor((stock[k] ?? 0) / q)))]))
@@ -892,16 +895,20 @@ export default function App() {
   useEffect(() => {
     const id = window.setInterval(() => {
       setHired((h) => {
+        // (nothing changes for someone fully rested and resting: then nothing re-renders)
+        let changed = false
         const next: typeof h = {}
         for (const [shop, ws] of Object.entries(h)) {
           next[shop] = {}
           for (const [wid, st] of Object.entries(ws)) {
             const w = CANDIDATES[shop].find((x) => x.id === wid)!
             const working = aiRef.current.ai && aiRef.current.shop === shop
-            next[shop][wid] = { fatigue: Math.max(0, Math.min(100, st.fatigue + (working ? tirePerMin(w) : -restPerMin) / 60)) }
+            const fatigue = Math.max(0, Math.min(100, st.fatigue + (working ? tirePerMin(w) : -restPerMin) / 60))
+            if (fatigue !== st.fatigue) changed = true
+            next[shop][wid] = { fatigue }
           }
         }
-        return next
+        return changed ? next : h
       })
     }, 1000)
     return () => window.clearInterval(id)
@@ -1605,7 +1612,7 @@ export default function App() {
         </div>
       )}
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : dish} lang={lang} quantities={ai ? entryCount : orders[dish.id]}
+      <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : researchDish(dish)} research={!ai} lang={lang} quantities={ai ? entryCount : orders[dish.id]}
         feed={feed} locked={ai} stock={ai ? entryStock(dish) : stock}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {
