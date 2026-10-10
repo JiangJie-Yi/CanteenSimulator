@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { BASE_MATERIAL } from '../baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -1374,6 +1375,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         mat.normalScale.multiplyScalar(0.6 + rand() * 1.0)
         mat.color.multiplyScalar(0.9 + rand() * 0.14)
       }
+      if (!BASE_MATERIAL.has(m)) BASE_MATERIAL.set(m, m.material)
       m.material = mat
       p.mats.push({ mat, mesh: m, base: mat.color.clone(), emissive: mat.emissive.clone(), foil, show })
       if (mat.name.startsWith('BambooSkewer')) p.sticks.push(m)
@@ -2019,6 +2021,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
         const seat = Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n)) ?? 0
         guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat })
+        // (only those still here and the last few gone are kept: the list doesn't grow all day)
+        guests.current = guests.current.filter((g, i, all) => g.state === 'waiting' || g.state === 'eating' || !g.cleared ||
+          i >= all.length - 12)
         onSay?.('guest', L().order(id, orders.map(nameOf)))
       } else {
         onSay?.('guest', L().nothing(id))
@@ -2798,6 +2803,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.node.userData.follow = undefined
         p.node.quaternion.copy(p.homeQ)
         p.node.position.copy(p.homeP)
+        return
+      }
+      // eaten and gone (or in the bin): nothing more to work out for it, every frame, however many there have been
+      if (p.eaten && p.trash < 0) {
+        if (menuIds.has(p.id)) p.node.userData.shrink = 0.0001
+        else p.node.scale.setScalar(0.0001)
         return
       }
       const time = roast.times[p.id]

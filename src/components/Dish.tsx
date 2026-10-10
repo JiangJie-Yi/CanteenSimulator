@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { BASE_MATERIAL } from '../baseMaterial'
 import { useGLTF, useTexture } from '@react-three/drei'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -291,6 +292,17 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
     for (const src of originals) {
       // start from where the piece was authored, not where it is now (it may be on the plate)
       const node = src.node.clone(true)
+      // a fresh portion: every part shown and on its untouched material, whatever has happened to the first one
+      // (eaten down to its stick, charred, bitten into, lit up under the pointer)
+      const srcMeshes: THREE.Mesh[] = []
+      src.node.traverse((o) => { if (o instanceof THREE.Mesh) srcMeshes.push(o) })
+      let mi = 0
+      node.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return
+        const base = BASE_MATERIAL.get(srcMeshes[mi++])
+        if (base) o.material = base
+        o.visible = true
+      })
       node.traverse((o) => { if (o instanceof THREE.Mesh && o.name.endsWith('_outline')) scaleOutline(o) })
       node.userData = { itemId: id, copy }
       node.position.copy(src.homeP).applyAxisAngle(UP, angle)
@@ -474,7 +486,8 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
         // once Roasting has moved a piece to the plate it owns the position
         // (userData.bob: PotCooking bobs food on a rolling boil)
         if (!p.node.userData.onPlate) p.node.position.y = p.baseY + p.y + ((p.node.userData.bob as number | undefined) ?? 0)
-        p.node.visible = p.s > 0.01
+        // (nor is food that's been eaten, or a portion still to pop in: nothing invisible is drawn)
+        p.node.visible = p.s > 0.01 && s > 0.002
       })
     }
   })

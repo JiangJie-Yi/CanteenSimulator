@@ -636,6 +636,8 @@ export default function App() {
   const chef = chefOf(DISHES[active].id)
   const [guestsBy, setGuestsBy] = useState<Record<string, GuestView[]>>({})
   const guests = guestsBy[DISHES[active].id] ?? []
+  // how many have come in all (customers are numbered as they come; the list itself only keeps the latest)
+  const visits = guests.reduce((n, g) => Math.max(n, g.id), 0)
   const setShopGuests = useCallback((dishId: string, g: GuestView[]) => setGuestsBy((b) => ({ ...b, [dishId]: g })), [])
   // revenue mode: what's been sold, and what it cost to make (ingredients, fuel, the chef's wages)
   const [ledgerOn, setLedgerOn] = useState(false)
@@ -1134,6 +1136,8 @@ export default function App() {
       }
       if (g.orders.length) {
         s.guests.push(g)
+        // (only those still here and the last few gone are kept: the list doesn't grow all day)
+        s.guests = s.guests.filter((x, i, all) => x.state === 'waiting' || x.state === 'eating' || i >= all.length - 12)
         talk('guest', LINES[lang].order(id, g.orders.map((o) => {
           const it = ALL_ITEMS.get(o) ?? d.bases.find((b) => b.id === o)
           return it ? nameIn(lang, it) : o
@@ -1343,7 +1347,7 @@ export default function App() {
                 return (
                   <span className="chip-part">
                     {avg !== null && <MoodFace guest={{ id: 0, state: 'done', rating: avg, items: 0, ate: [] }} />}
-                    {lang === 'ja' ? '客' : '客'} {here.length}/{guests.length}
+                    {lang === 'ja' ? '客' : '客'} {here.length}/{visits}
                   </span>
                 )
               })()}
@@ -1363,7 +1367,7 @@ export default function App() {
                 <button type="button" onClick={() => setOffice('staff')}>{lang === 'ja' ? '人事' : '人事'}</button>
               </div>
               <p className="guest-count">
-                {UI[lang].guests(guests.length, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
+                {UI[lang].guests(visits, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
               </p>
               {/* (on a computer the customers sit at the bar in 3D; a phone shows them here, in the 2D bar, which
                   stays sharp and clear of the rest on a small screen) */}
