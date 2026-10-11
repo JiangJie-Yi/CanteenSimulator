@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent,
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent,
   type PointerEvent as ReactPointerEvent } from 'react'
 import { nameIn, UI, type Lang } from '@/data/i18n'
 import { toChineseNumber, type Dish } from '@/data/menu'
@@ -245,8 +245,55 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     )
   }
 
+  // side by side (desktop, tablets), the tags are sized and stacked to fill the space they have: as many rows as
+  // gives the biggest tags (a short menu of 9 dishes in 3 rows of 3, not 2 rows with a hole and room to spare). Too
+  // many to fit even small, they go back to two rows that slide sideways.
+  const aside = useRef<HTMLElement>(null)
+  const [fit, setFit] = useState<{ font: number; rows: number } | null>(null)
+  const tagCount = dish.bases.length + dish.items.length
+  const baseCount = dish.bases.length
+  useLayoutEffect(() => {
+    const menu = aside.current, strips = row.current
+    if (!menu || !strips || taiwan) return
+    const wide = window.matchMedia('(min-width: 901px) and (min-height: 521px)')
+    const px = (v: string) => parseFloat(v) || 0
+    const measure = () => {
+      if (!wide.matches) {
+        setFit(null)
+        return
+      }
+      const cs = getComputedStyle(menu), ss = getComputedStyle(strips)
+      const title = menu.querySelector<HTMLElement>('.menu-title'), tally = menu.querySelector<HTMLElement>('.tally')
+      const w = menu.clientWidth - px(cs.paddingLeft) - px(cs.paddingRight) - (title?.offsetWidth ?? 0) - px(cs.columnGap)
+        - px(ss.paddingLeft) - px(ss.paddingRight)
+      const h = menu.clientHeight - px(cs.paddingTop) - px(cs.paddingBottom) - (tally?.offsetHeight ?? 0) - px(cs.rowGap)
+        - px(ss.paddingTop) - px(ss.paddingBottom)
+      const gx = px(ss.columnGap), gy = px(ss.rowGap)
+      let best = { font: 0, rows: 2, empty: Infinity }
+      for (let r = 1; r <= 4; r++) {
+        // (the sets all go along the top row)
+        const cols = Math.max(Math.ceil(tagCount / r), r > 1 ? baseCount : 0)
+        const font = Math.min(22, (h - (r - 1) * gy) / (r * 15.5), (w - (cols - 1) * gx) / (cols * 2.7))
+        const empty = cols * r - tagCount
+        if (font > best.font + 0.5 || (Math.abs(font - best.font) <= 0.5 && empty < best.empty)) best = { font, rows: r, empty }
+      }
+      const next = best.font >= 10 ? { font: Math.floor(best.font * 10) / 10, rows: best.rows }
+        : { font: Math.max(10, Math.min(16, (h - gy) / 31)), rows: 2 }
+      setFit((cur) => (cur && cur.font === next.font && cur.rows === next.rows ? cur : next))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(menu)
+    wide.addEventListener('change', measure)
+    return () => {
+      ro.disconnect()
+      wide.removeEventListener('change', measure)
+    }
+  }, [tagCount, baseCount, taiwan])
+
   return (
-    <aside className={`menu${locked ? ' is-locked' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
+    <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
+      className={`menu${locked ? ' is-locked' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
       <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'TEST KITCHEN' : 'MENU'}</span></h2>
 
       <div className={`strips-frame${ends.overflow ? ' is-paged' : ''}`}>
