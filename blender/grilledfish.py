@@ -384,7 +384,7 @@ M = {
     "saury_fin": pbr("SauryFin", (0.32, 0.36, 0.42), rough=0.5),
     "mackerel": pbr("Mackerel", tex=TEX["mackerel"], nrm=TEX["fish_n"], rough=0.35, coat=0.4),
     "mackerel_fin": pbr("MackerelFin", (0.36, 0.42, 0.4), rough=0.5),
-    "eye": pbr("FishEye", (0.95, 0.95, 0.9), rough=0.2),
+    "eye": pbr("FishEye", (0.98, 0.98, 0.95), rough=0.2),
     "fish_flesh": pbr("FishFlesh", tex=TEX["fish_flesh"], rough=0.55),
     "pupil": pbr("FishPupil", (0.05, 0.05, 0.06), rough=0.2),
     "corn": pbr("GrilledCorn", tex=TEX["corn"], nrm=TEX["corn_n"], rough=0.4),
@@ -890,8 +890,9 @@ def fish(species="ayu"):
         ey = bend(ex) + side * W * 0.5
         bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=12, ring_count=8, location=(ex, ey, D * 0.25 + ez))
         parts.append(finish(active(), "Eye", M["eye"]))
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.56, segments=10, ring_count=6,
-                                             location=(ex + 0.004, ey + side * er * 0.55, D * 0.26 + ez))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.42, segments=12, ring_count=8,
+                                             location=(ex + 0.002, ey + side * er * 0.7, D * 0.255 + ez))
+        active().scale = (1, 0.5, 1)
         parts.append(finish(active(), "Pupil", M["pupil"]))
 
     # the horse mackerel's scutes: a row of small hard plates along the rear half of the lateral line, both sides

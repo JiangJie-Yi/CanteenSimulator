@@ -678,6 +678,10 @@ type Looks = { uChar: Uniform; uSalt: Uniform; uSoy: Uniform; uMilk: Uniform; uP
  * food blackens in spots first and ends up fully charred. Seasonings show on top: salt and peanut powder as
  * specks, soy as a dark lacquer over everything, condensed milk in wavy drizzled ribbons.
  */
+/** a fish's eyes neither brown, char nor take the seasoning: they stay a clear white with a dark pupil */
+const EYE_LOOKS: Looks = { uChar: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
+  uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 } }
+
 function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, looks, bites)
@@ -822,7 +826,7 @@ type Piece = {
   toP: THREE.Vector3
   toQ: THREE.Quaternion
   mats: { mat: THREE.MeshToonMaterial; mesh: THREE.Mesh; base: THREE.Color; emissive: THREE.Color; foil: boolean;
-    show?: 'closed' | 'open' }[]
+    show?: 'closed' | 'open'; eye?: boolean }[]
   /** in the basket: a simple rigid ball that falls in, rolls and settles against the others */
   body: { v: THREE.Vector3; r: number; live: boolean } | null
   /** how charred and how seasoned it is, shared by all of this piece's materials */
@@ -1060,14 +1064,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // Potatoes roast inside foil ("Foil…") with their skin whole ("…Top" is the cap); served, the foil is shown
       // opened out ("Wrapper…") and the cap broken off to show the flesh. Foil doesn't brown or char.
       const foil = mat.name.startsWith('Foil') || mat.name.startsWith('Wrapper')
+      const eye = /^Fish(Eye|Pupil)/.test(mat.name)
       const show = mat.name.startsWith('Wrapper') ? 'open' : foil || mat.name.endsWith('Top') ? 'closed' : undefined
       if (!foil) {
         // bites come out of the food only: the bamboo stick is never eaten (it gets bites that stay empty)
         const stick = mat.name.startsWith('BambooSkewer')
         const bites = stick ? newBites() : p.bites
-        addCharring(mat, p.looks, bites)
+        addCharring(mat, eye ? EYE_LOOKS : p.looks, bites)
         for (const c of m.children) if (c instanceof THREE.Mesh && c.name.endsWith('_outline')) biteOutline(c, bites)
-        mat.color.offsetHSL(shade.h, shade.s, shade.l)
+        if (!eye) mat.color.offsetHSL(shade.h, shade.s, shade.l)
       } else {
         // no two sheets of foil crumple alike: give this one its own folds, sheen and grey
         crumpleFoil(m, rand)
@@ -1076,7 +1081,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       if (!BASE_MATERIAL.has(m)) BASE_MATERIAL.set(m, m.material)
       m.material = mat
-      p.mats.push({ mat, mesh: m, base: mat.color.clone(), emissive: mat.emissive.clone(), foil, show })
+      p.mats.push({ mat, mesh: m, base: mat.color.clone(), emissive: mat.emissive.clone(), foil, show, eye })
       if (mat.name.startsWith('BambooSkewer')) p.sticks.push(m)
       else p.food.push(m)
       if (m.morphTargetInfluences?.length) p.puffs.push(m)
@@ -2799,7 +2804,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // potatoes in the basket keep their foil until clicked; then it opens out, swells and falls away
       if (p.unwrapped) p.unwrapT = Math.min(1, p.unwrapT + dt / 0.7)
       const peel = p.unwrapped ? p.unwrapT : -1
-      for (const { mat, mesh, base, emissive, foil, show } of p.mats) {
+      for (const { mat, mesh, base, emissive, foil, show, eye } of p.mats) {
         // (hide the mesh rather than the material, so its ink outline goes with it)
         if (show === 'closed') mesh.visible = !(p.unwrapped && p.unwrapT > (foil ? 0.05 : 0.35))
         if (show === 'open') {
@@ -2817,7 +2822,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             mesh.position.y = 0
           }
         }
-        if (!foil) mat.color.copy(base).multiply(tint)
+        if (!foil && !eye) mat.color.copy(base).multiply(tint)
         mat.emissive.copy(emissive)
         if (glow) mat.emissive.add(HOVER_GLOW)
       }
