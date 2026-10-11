@@ -170,7 +170,8 @@ const CHILIES = ['DriedChili', 'SichuanPepper']
 /** Files in public/, resolved against the site's base path (\/\ in dev, \/CanteenSimulator/\ on GitHub Pages). */
 const asset = (path: string) => import.meta.env.BASE_URL + path
 
-export const DISHES: Dish[] = [
+/** every shop the game has */
+export const ALL_DISHES: Dish[] = [
   {
     id: 'hotpot',
     name: '小火鍋',
@@ -429,6 +430,10 @@ export const DISHES: Dish[] = [
     focusY: 0.45,
   },
 ]
+
+/** the shops open in this build: for now only the grill (the others are kept, switched off) */
+export const ENABLED_SHOPS = ['grilledfish']
+export const DISHES: Dish[] = ALL_DISHES.filter((d) => ENABLED_SHOPS.includes(d.id))
 
 const DIGITS = '〇一二三四五六七八九'
 

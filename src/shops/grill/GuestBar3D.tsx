@@ -134,8 +134,7 @@ const PLANKS = (() => {
 })()
 
 /**
- * The way in: a noren hanging at the end of the bar (three panels that sway a little), and a passage of
- * floorboards from it along behind the seats.
+ * The way in: a noren hanging just past the end of the bar, three panels that sway a little.
  */
 function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const tex = useMemo(() => norenTexture(mark), [mark])
@@ -150,11 +149,6 @@ function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   })
   return (
     <group position={at} rotation-y={yaw}>
-      {/* the floorboards: from just outside the door back along the bar */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.006, -1.1]} receiveShadow>
-        <planeGeometry args={[W + 0.2, 3.2]} />
-        <meshToonMaterial color="#ffffff" map={PLANKS} />
-      </mesh>
       {/* the noren: three panels side by side, hung from a bamboo rod (no frame: it hangs in the way in by itself) */}
       <mesh position={[0, H - 0.05, 0.03]} rotation-z={Math.PI / 2}>
         <cylinderGeometry args={[0.012, 0.012, W, 8]} />
@@ -167,6 +161,50 @@ function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
             <meshToonMaterial map={panelTex(tex, k + 1)} side={THREE.DoubleSide} />
           </mesh>
         </group>
+      ))}
+    </group>
+  )
+}
+
+/**
+ * The customers' side of the shop floored in wide old boards: one even rectangle under the whole bar, the row of
+ * stools and the way along behind them to the noren, its boards running the length of the bar.
+ */
+function DiningFloor({ at, length }: { at: THREE.Vector3; length: number }) {
+  const yaw = Math.atan2(ALONG.x, ALONG.z)
+  // (in the floor's own frame: z along the bar toward the door, x away from the cook, so LAY is -x)
+  const from = -length / 2 - 0.35
+  const to = length / 2 + 1.25
+  const near = 0.42
+  const far = -1.0
+  const w = near - far
+  const l = to - from
+  const map = useMemo(() => {
+    if (!PLANKS) return null
+    const t = PLANKS.clone()
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(w / 0.5, l / 2)
+    t.needsUpdate = true
+    return t
+  }, [w, l])
+  return (
+    <group position={at} rotation-y={yaw}>
+      <mesh rotation-x={-Math.PI / 2} position={[-(near + far) / 2, 0.004, (from + to) / 2]} receiveShadow>
+        <planeGeometry args={[w, l]} />
+        <meshToonMaterial color="#ffffff" map={map} />
+      </mesh>
+      {/* a dark edging board round it, so it reads as a floor laid down, not a mat */}
+      {[from, to].map((z) => (
+        <mesh key={z} position={[-(near + far) / 2, 0.01, z]}>
+          <boxGeometry args={[w + 0.04, 0.02, 0.04]} />
+          <meshToonMaterial color="#3a2416" />
+        </mesh>
+      ))}
+      {[-near, -far].map((x) => (
+        <mesh key={x} position={[x, 0.01, (from + to) / 2]}>
+          <boxGeometry args={[0.04, 0.02, l + 0.04]} />
+          <meshToonMaterial color="#3a2416" />
+        </mesh>
       ))}
     </group>
   )
@@ -438,6 +476,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   return (
     <group>
       {drawCounter && <group position={at}><Counter length={length} /></group>}
+      <DiningFloor at={at} length={length} />
       {/* the way in, just past the end of the bar where the customers come and go */}
       <Entrance at={at.clone().addScaledVector(ALONG, length / 2 + 0.95).addScaledVector(LAY, -0.5)} mark={mark} />
       {Array.from({ length: SEATS }, (_, n) => (

@@ -1,5 +1,5 @@
 // What stands about the grill besides the dishes: a crate of binchotan (a stick dragged from it onto the fire adds
-// charcoal), a paper fan by the raw tray (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
+// charcoal), a paper fan by the seasonings (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
 // glowing behind the stones, which can be moved about like the dishes. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
 // them like anything else (DECOR is their footprint, for its settle()).
 import { useMemo, useRef, type ReactNode, type RefObject } from 'react'
@@ -11,8 +11,8 @@ type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
 export const DECOR = {
   crate: { at: [0.62, -2.0], r: 0.38 },
-  // (lying on the table to the left of the raw tray)
-  fan: { at: [0.61, 1.85], r: 0.2 },
+  // (lying on the table by the seasoning boxes, at their front end)
+  fan: { at: [-0.95, 1.9], r: 0.3 },
   lantern: { at: [-1.61, -0.68], r: 0.2 },
 } satisfies Record<string, Spot>
 
@@ -156,7 +156,7 @@ function Crate() {
   )
 }
 
-/** A round paper fan (団扇) lying by the raw tray; picked up, it's held upright and swings as it's waved. */
+/** A round paper fan (団扇) lying by the seasoning boxes; picked up, it's held upright and swings as it's waved. */
 function Fan({ held }: { held: RefObject<Held> }) {
   const g = useRef<THREE.Group>(null)
   const swing = useRef(0)
@@ -185,7 +185,8 @@ function Fan({ held }: { held: RefObject<Held> }) {
     }
   }, [])
   return (
-    <group ref={g} userData={{ decor: 'fan' }}>
+    // (a proper size for fanning a charcoal fire: about a hand and a half across)
+    <group ref={g} userData={{ decor: 'fan' }} scale={1.6}>
       <Inked geometry={geo.face} map={FAN_PAPER} grow={1.05} position={[0, 0.004, 0]} />
       <mesh geometry={geo.rim} position={[0, 0.006, 0]}>
         <meshToonMaterial color="#9a7444" />

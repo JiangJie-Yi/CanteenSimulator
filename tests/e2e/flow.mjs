@@ -10,7 +10,8 @@
 import { chromium } from 'playwright-core'
 
 const URL = process.argv[2] ?? 'http://localhost:5173/CanteenSimulator/'
-const SHOPS = ['hotpot', 'beefnoodle', 'grilledfish', 'bakery'] // (the order of the dots)
+// (only the grill is open in this build; a new game starts in it, already set up)
+const SHOPS = ['grilledfish']
 const ONLY = process.argv.slice(3)
 const OPEN_FOR = Number(process.env.OPEN_FOR ?? 40000)
 
@@ -33,9 +34,9 @@ for (const [i, shop] of SHOPS.entries()) {
   try {
     await page.goto(URL)
     await page.waitForTimeout(5000)
-    await page.locator('.welcome-go').click()
+    if (await page.locator('.welcome-go').count()) await page.locator('.welcome-go').click()
     await page.waitForTimeout(800)
-    await page.locator('button.dot').nth(i).click()
+    if (await page.locator('button.dot').count()) await page.locator('button.dot').nth(i).click()
     await page.waitForTimeout(2500)
     if (await page.locator('.unopened-hint').count()) {
       await page.locator('.unopened-hint').click()

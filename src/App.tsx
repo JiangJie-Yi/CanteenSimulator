@@ -668,18 +668,19 @@ export default function App() {
   const dragChat = useDrag('chat')
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
-  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, setup: 0, ...SAVED?.ledger }))
+  // (a new game starts with the grill already set up: its opening cost is already paid)
+  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
   const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0)
   // ingredients in stock, by portion; nothing until it's bought
   const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
   // the owner's name ('' while they aren't asked it: they're 老闆); null until they've founded the business, while the
   // welcome is up and the sign is dark
-  const [owner, setOwner] = useState<string | null>(() => SAVED?.owner ?? null)
+  const [owner, setOwner] = useState<string | null>(() => SAVED?.owner ?? '老闆')
   const [ignite, setIgnite] = useState(0)
   // which shops have been opened (each costs SHOP_COST to set up); an unopened shop is greyed out until its sign is
   // clicked and the opening paid for
-  const [opened, setOpened] = useState<Record<string, boolean>>(() => SAVED?.opened ?? {})
+  const [opened, setOpened] = useState<Record<string, boolean>>(() => SAVED?.opened ?? Object.fromEntries(DISHES.map((d) => [d.id, true])))
   const [asking, setAsking] = useState(false)
   // the 開業 button is hovered: a spotlight swings onto the shop
   const [spotOn, setSpotOn] = useState(false)

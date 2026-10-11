@@ -1,6 +1,6 @@
 // Money and stock: what things cost, what a dish on the menu takes out of stock, and whether it can be served.
 // Pure functions over the data in src/data, so App (and the tests) all reckon the same way.
-import { DISHES, type Dish } from '@/data/menu'
+import { ALL_DISHES, type Dish } from '@/data/menu'
 import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Seasoning } from '@/data/recipes'
 
 export type Stock = Record<string, number>
@@ -36,7 +36,7 @@ export const COST_SHARE: Record<string, number> = {
 export const costOf = (x: { id?: string; price: number; cost?: number }) =>
   x.cost ?? Math.round(x.price * (COST_SHARE[x.id ?? ''] ?? 0.38))
 
-const shopOf = (e: Entry) => DISHES.find((x) => x.id === e.shop)!
+const shopOf = (e: Entry) => ALL_DISHES.find((x) => x.id === e.shop)!
 
 /** what a thing takes out of stock (a bowl that comes with its beef: the beef; it isn't bought as a bowl) */
 export const takesOf = (d: Dish, id: string): Stock =>

@@ -1,6 +1,7 @@
 // The rules of the game, checked on their own (npm test). Each block guards one module in src/game or src/data.
 import { describe, expect, it } from 'vitest'
-import { DISHES } from '@/data/menu'
+// (every shop is checked, whether or not this build has it open)
+import { ALL_DISHES as DISHES } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPrice, type Entry } from '@/data/recipes'
 import { ROLES } from '@/data/staff'
 import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder } from '@/game/economy'

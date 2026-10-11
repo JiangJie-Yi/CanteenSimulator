@@ -2,6 +2,8 @@
 
 React 19 + TypeScript + Vite + three.js（@react-three/fiber / drei）。推到 `main` 就會由 GitHub Actions 測試、建置，並部署到 GitHub Pages。
 
+目前只開放日式烤魚（`data/menu.ts` 的 `ENABLED_SHOPS`），新遊戲直接進到已開業的烤魚店；其他三間店的資料都還在（`ALL_DISHES`），單元測試仍會檢查全部四間。
+
 ## 資料夾分類（依賴只能往左）
 
 ```
