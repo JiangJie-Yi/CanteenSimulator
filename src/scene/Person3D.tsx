@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { kindOf, type GuestKind } from '@/data/guests'
+import { cloth, type Pattern } from './patterns'
 
 /*
  * A customer in 3D, toon-shaded with an ink outline, built in code: a torso turned on a lathe (shoulders, chest,
@@ -7,6 +8,12 @@ import { kindOf, type GuestKind } from '@/data/guests'
  * eyes (and their catch-lights), brows, nose, mouth and ears, a fringe over the forehead. What they're dressed in
  * says what they are (data/guests.ts): the office worker's white shirt and tie, the schoolgirl's sailor collar and
  * pleated skirt, the old man's glasses, the yukata's crossed collar and sash, the student's hood…
+ *
+ * Their clothes have their cloth's pattern (scene/patterns.ts): the suit's pinstripe, the student's flannel, the
+ * yukata's hemp-leaf, the uncle's aloha shirt…
+ *
+ * Proportions are those of a stylised game character, about five and a half heads tall: a head a little large, legs
+ * a little short, but a grown-up's build (a child is smaller all over).
  *
  * The figure stands (or sits) at its group's origin, facing +Z: sitting, the hips are on a stool top at 0.34.
  */
@@ -16,7 +23,9 @@ const SKIN = ['#f3d2b0', '#eac39c', '#d9a77e', '#f6dcc0', '#c99470']
 const HAIR = ['#2b1d14', '#4a3020', '#1c1c22', '#7a5a3a', '#5a3a2a']
 const pick = <T,>(l: T[], n: number) => l[n % l.length]
 
-type Look = { top: string; legs: string; hair: string; skin: string; shoes: string; size: number; wide: number }
+type Look = { top: string; legs: string; hair: string; skin: string; shoes: string; size: number; wide: number
+  /** the cloth of what they wear on top, and on their legs (or skirt) */
+  topCloth?: Pattern; legCloth?: Pattern }
 function lookOf(id: number, kind: GuestKind): Look {
   const old = kind === 'grandma' || kind === 'grandpa'
   const top: Record<GuestKind, string> = {
@@ -33,15 +42,20 @@ function lookOf(id: number, kind: GuestKind): Look {
     shoes: kind === 'student' || kind === 'kid' ? '#f2f0ea' : kind === 'yukata' ? '#b08a5a' : '#2a2220',
     size: kind === 'kid' ? 0.72 : kind === 'grandma' ? 0.9 : 1,
     wide: kind === 'uncle' ? 1.2 : kind === 'grandpa' ? 1.04 : kind === 'highSchoolGirl' || kind === 'officeLady' || kind === 'yukata' ? 0.9 : 1,
+    topCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', grandma: 'floret', grandpa: 'knit', kid: 'border', uncle: 'hibiscus',
+      student: 'plaid', yukata: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
+    legCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', highSchoolGirl: 'pleats', yukata: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
   }
 }
 
 /** toon material, and its ink outline (a slightly bigger back-faced shell) */
-function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeometry; color: string; outline?: number } & Record<string, unknown>) {
+function Part({ geo, color, outline = 1.06, map, ...rest }: { geo: THREE.BufferGeometry; color: string; outline?: number
+  /** a cloth drawn in the colour already (the material then stays white) */
+  map?: THREE.Texture | null } & Record<string, unknown>) {
   return (
     <group {...rest}>
       <mesh geometry={geo} castShadow>
-        <meshToonMaterial color={color} />
+        <meshToonMaterial color={map ? '#ffffff' : color} map={map ?? null} />
       </mesh>
       {outline > 0 && (
         <mesh geometry={geo} scale={outline}>
@@ -72,12 +86,18 @@ const GEO = {
   hand: new THREE.SphereGeometry(0.03, 16, 12),
   thumb: new THREE.CapsuleGeometry(0.009, 0.022, 4, 8),
   cuff: new THREE.TorusGeometry(0.03, 0.006, 6, 18),
-  thigh: new THREE.CapsuleGeometry(0.048, 0.14, 8, 16),
-  shin: new THREE.CapsuleGeometry(0.04, 0.15, 8, 16),
+  thigh: new THREE.CapsuleGeometry(0.05, 0.17, 8, 16),
+  shin: new THREE.CapsuleGeometry(0.04, 0.18, 8, 16),
+  // the waistband (a belt, for those in trousers), and the hem of a jacket
+  belt: new THREE.TorusGeometry(0.1, 0.012, 6, 32),
+  buckle: new THREE.BoxGeometry(0.03, 0.022, 0.008),
+  // long hair's locks either side of the face
+  lock: new THREE.CapsuleGeometry(0.022, 0.12, 4, 10),
+  pocket: new THREE.BoxGeometry(0.045, 0.035, 0.004),
   shoe: new THREE.SphereGeometry(0.045, 16, 10),
   collar: new THREE.TorusGeometry(0.045, 0.01, 8, 24),
   skirt: new THREE.CylinderGeometry(0.115, 0.16, 0.13, 18, 1, true),
-  head: new THREE.SphereGeometry(0.105, 28, 20),
+  head: new THREE.SphereGeometry(0.1, 28, 20),
   ear: new THREE.SphereGeometry(0.022, 10, 8),
   hair: new THREE.SphereGeometry(0.112, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.52),
   fringe: new THREE.SphereGeometry(0.113, 24, 8, -Math.PI * 0.32, Math.PI * 0.64, Math.PI * 0.22, Math.PI * 0.16),
@@ -136,7 +156,7 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
   const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
   const blush = kind === 'kid' || kind === 'highSchoolGirl' || kind === 'yukata'
   // sitting: hips on the stool top (0.34); walking: standing, the legs straight under them
-  const hipY = walking ? 0.42 : 0.36
+  const hipY = walking ? 0.5 : 0.36
   const pose = eating ? eatingPose(t, id) : null
   const bob = walking ? Math.abs(Math.sin(t * 9)) * 0.02 : Math.sin(t * 1.6) * 0.004
   const lean = pose ? pose.lean : 0.05 + Math.sin(t * 0.8 + id) * 0.015
@@ -146,6 +166,12 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
   // a blink now and then
   const blink = (t * 0.9 + id * 0.37) % 4 < 0.12 ? 0.15 : 1
   const shinColor = skirt ? l.skin : l.legs
+  // the cloth on top (round the torso four times, up it twice; the sleeves get theirs too) and on the legs
+  const topMap = l.topCloth ? cloth(l.topCloth, l.top, [4, 2]) : null
+  const sleeveMap = l.topCloth ? cloth(l.topCloth, l.top, [2, 1]) : null
+  const legMap = l.legCloth && !skirt ? cloth(l.legCloth, l.legs, [2, 1]) : null
+  const skirtMap = l.legCloth && skirt ? cloth(l.legCloth, l.legs, [8, 1]) : null
+  const belted = kind === 'salaryman' || kind === 'grandpa' || kind === 'uncle' || kind === 'highSchoolBoy' || kind === 'student'
   return (
     <group scale={l.size}>
       {/* legs: thigh and shin, bent at the knee over the stool, or swinging as they walk; shoes at the end */}
@@ -154,19 +180,32 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
         const knee = walking ? Math.max(0, -sd * step) * 0.9 : 1.5
         return (
           <group key={sd} position={[sd * 0.055 * l.wide, hipY, 0]} rotation-x={swing}>
-            <Part geo={GEO.thigh} color={skirt ? l.skin : l.legs} position={[0, -0.1, 0]} />
-            <group position-y={-0.2} rotation-x={knee}>
-              <Part geo={GEO.shin} color={shinColor} position={[0, -0.1, 0]} />
-              {kind === 'highSchoolGirl' && <Part geo={GEO.shin} color="#f4f1ea" outline={0} position={[0, -0.16, 0]} scale={[1.08, 0.35, 1.08]} />}
-              <Part geo={GEO.shoe} color={l.shoes} position={[0, -0.215, 0.025]} scale={[0.9, 0.55, 1.5]} />
+            <Part geo={GEO.thigh} color={skirt ? l.skin : l.legs} map={legMap} position={[0, -0.115, 0]} />
+            <group position-y={-0.23} rotation-x={knee}>
+              <Part geo={GEO.shin} color={shinColor} map={legMap} position={[0, -0.115, 0]} />
+              {kind === 'highSchoolGirl' && <Part geo={GEO.shin} color="#f4f1ea" outline={0} position={[0, -0.18, 0]} scale={[1.08, 0.35, 1.08]} />}
+              <Part geo={GEO.shoe} color={l.shoes} position={[0, -0.245, 0.025]} scale={[0.9, 0.55, 1.5]} />
             </group>
           </group>
         )
       })}
       <group position-y={hipY + bob} rotation-x={lean}>
-        {skirt && <Part geo={GEO.skirt} color={l.legs} outline={1.03} position={[0, 0.0, 0.02]} scale={[1, 1, 1.05]} rotation-x={walking ? 0 : -0.25} />}
-        <Part geo={GEO.torso} color={l.top} outline={1.04} scale={[l.wide, 1, 0.78]} />
-        {kind === 'uncle' && <Part geo={GEO.belly} color={l.top} outline={1.04} position={[0, 0.1, 0.03]} scale={[1.08, 0.95, 0.85]} />}
+        {skirt && <Part geo={GEO.skirt} color={l.legs} map={skirtMap} outline={1.03} position={[0, 0.0, 0.02]} scale={[1, 1, 1.05]} rotation-x={walking ? 0 : -0.25} />}
+        <Part geo={GEO.torso} color={l.top} map={topMap} outline={1.04} scale={[l.wide, 1, 0.78]} />
+        {kind === 'uncle' && <Part geo={GEO.belly} color={l.top} map={topMap} outline={1.04} position={[0, 0.1, 0.03]} scale={[1.08, 0.95, 0.85]} />}
+        {/* a belt at the waistband, its buckle in front */}
+        {belted && (
+          <>
+            <mesh geometry={GEO.belt} position-y={0.03} rotation-x={Math.PI / 2} scale={[l.wide * (kind === 'uncle' ? 1.12 : 1.01), 0.8, 1]}>
+              <meshToonMaterial color="#2a1e16" />
+            </mesh>
+            <Flat geo={GEO.buckle} color="#c8b070" position={[0, 0.03, 0.08 * (kind === 'uncle' ? 1.15 : 1)]} />
+          </>
+        )}
+        {/* a breast pocket on a jacket or a shirt */}
+        {(kind === 'salaryman' || kind === 'student' || kind === 'grandpa') && (
+          <Flat geo={GEO.pocket} color={kind === 'salaryman' ? '#1e2532' : kind === 'grandpa' ? '#5a4028' : '#3a3434'} position={[-0.055 * l.wide, 0.24, 0.083]} rotation-x={-0.18} />
+        )}
         {/* what marks each kind of customer */}
         {kind === 'salaryman' && (
           <>
@@ -212,10 +251,10 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
           const elbow = walking ? 0.25 : pose && sd > 0 ? pose.elbow : 0.92
           return (
             <group key={sd} position={[sd * 0.128 * l.wide, 0.3, 0]} rotation={[-shoulder, 0, sd * 0.12]}>
-              <Part geo={GEO.shoulder} color={l.top} outline={1.04} position={[0, -0.01, 0]} scale={[1, 0.9, 1]} />
-              <Part geo={GEO.upperArm} color={l.top} position={[0, -0.07, 0]} />
+              <Part geo={GEO.shoulder} color={l.top} map={sleeveMap} outline={1.04} position={[0, -0.01, 0]} scale={[1, 0.9, 1]} />
+              <Part geo={GEO.upperArm} color={l.top} map={sleeveMap} position={[0, -0.07, 0]} />
               <group position-y={-0.15} rotation-x={-elbow}>
-                <Part geo={GEO.foreArm} color={l.top} position={[0, -0.065, 0]} />
+                <Part geo={GEO.foreArm} color={l.top} map={sleeveMap} position={[0, -0.065, 0]} />
                 {/* the cuff of the sleeve, then a hand with its thumb */}
                 <mesh geometry={GEO.cuff} position={[0, -0.112, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color={l.top} /></mesh>
                 <Part geo={GEO.hand} color={l.skin} position={[0, -0.14, 0]} scale={[0.9, 1.1, 0.75]} />
@@ -242,7 +281,7 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
           </mesh>
         )}
         {/* the head */}
-        <group position-y={0.48} rotation={[pose ? pose.head : Math.sin(t * 0.7 + id) * 0.04, look, 0]}>
+        <group position-y={0.475} rotation={[pose ? pose.head : Math.sin(t * 0.7 + id) * 0.04, look, 0]}>
           <Part geo={GEO.head} color={l.skin} scale={[1, 1.05, 0.97]} />
           {[-1, 1].map((sd) => <Part key={sd} geo={GEO.ear} color={l.skin} outline={1.1} position={[sd * 0.103, -0.005, 0]} scale={[0.5, 1, 0.8]} />)}
           {!bald && (
@@ -258,6 +297,9 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
               scale={[1.08, kind === 'highSchoolGirl' ? 1.45 : 1.2, 0.62]} />
           )}
           {(kind === 'grandma' || kind === 'yukata') && <Part geo={GEO.bun} color={l.hair} position={[0, 0.1, -0.06]} />}
+          {longHair && kind !== 'yukata' && [-1, 1].map((sd) => (
+            <Part key={sd} geo={GEO.lock} color={l.hair} outline={1.08} position={[sd * 0.088, -0.07, 0.035]} rotation-z={sd * 0.08} />
+          ))}
           {kind === 'kid' && (
             <>
               <Part geo={GEO.cap} color="#f2c62a" position={[0, 0.01, 0]} />

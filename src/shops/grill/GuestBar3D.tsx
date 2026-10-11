@@ -642,7 +642,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <group scale={PEOPLE_SCALE}>
               <PersonClock s={s} eating={() => s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'} clock={clock} />
             </group>
-            <Html position={[0, 0.98 * PEOPLE_SCALE, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+            <Html position={[0, 1.05 * PEOPLE_SCALE, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
               <div className="g3-label">
                 {g && !walking && g.state === 'waiting' && g.rating === null && <span className="g3-bubble">…</span>}
                 {g && g.rating !== null && <MoodFace guest={g} />}
