@@ -41,10 +41,7 @@ type Props = {
   chefSkill: number
   /** ask the second chef to try out a few dishes not yet tried (using up their food) */
   onTrial?: () => void
-  /** the tab it opens at */
-  openAt?: Tab
 }
-type Tab = 'lab' | 'menu' | 'chef'
 
 const t = (lang: Lang, zh: string, ja: string) => (lang === 'ja' ? ja : zh)
 
@@ -53,8 +50,7 @@ const t = (lang: Lang, zh: string, ja: string) => (lang === 'ja' ? ja : zh)
  * its own (鹽烤玉米, 醬刷玉米…) — each with its best try; any of them can be put on the menu at a price. The menu
  * tab lists what's on it (re-price, take off, make up sets), and a hired chef can be asked what's worth trying.
  */
-export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, onReprice, partCost, chef, chefSkill, openAt, onTrial }: Props) {
-  const [tab, setTab] = useState<Tab>(openAt ?? 'lab')
+export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, onReprice, partCost, chef, chefSkill, onTrial }: Props) {
   const [prices, setPrices] = useState<Record<string, string>>({})
   const [picked, setPicked] = useState<string[]>([])
   const [setName, setSetName] = useState('')
@@ -155,15 +151,9 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
     // (a tab of the office window: 研發筆記 beside 人事)
     <div className="nb-embedded" aria-label={t(lang, '研發筆記', '開発ノート')}>
           <p className="nb-summary">{t(lang, `菜單 ${entries.length}/${MENU_MAX}・至少 ${min} 樣才能營業`, `メニュー ${entries.length}/${MENU_MAX}・${min}品から営業可`)}</p>
-          <div className="nb-tabs" role="tablist">
-            {(['lab', 'menu', 'chef'] as Tab[]).map((k) => (
-              <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
-                {k === 'lab' ? t(lang, '研發', '開発') : k === 'menu' ? t(lang, `菜單 ${entries.length}`, `メニュー ${entries.length}`) : t(lang, '問二廚', '二番手に聞く')}
-              </button>
-            ))}
-          </div>
-
-          {tab === 'lab' && (recipes.length === 0 ? (
+          {/* all on one page: what's been worked out, what's on the menu, and the second chef */}
+          <h4 className="nb-sec">{t(lang, '研發（試做過的菜）', '開発（試作した料理）')}</h4>
+          {(recipes.length === 0 ? (
             <p className="notebook-empty">{t(lang, '閉店時點菜試做、調味、吃一口，做過的菜就會記在這裡，再把好吃的上架。',
               '閉店中に試作して食べると、ここに記録されます。おいしいものをメニューに。')}</p>
           ) : (
@@ -196,7 +186,8 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
             </ul>
           ))}
 
-          {tab === 'menu' && (
+          <h4 className="nb-sec">{t(lang, `菜單 ${entries.length}`, `メニュー ${entries.length}`)}</h4>
+          {(
             <>
               {entries.length === 0 ? (
                 <p className="notebook-empty">{t(lang, '菜單還是空的：在「研發」把做過的菜上架。', 'メニューはまだ空です。')}</p>
@@ -256,7 +247,8 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
             </>
           )}
 
-          {tab === 'chef' && (
+          <h4 className="nb-sec">{t(lang, '問二廚', '二番手に聞く')}</h4>
+          {(
             <div className="nb-chef">
               {chef ? (
                 <>

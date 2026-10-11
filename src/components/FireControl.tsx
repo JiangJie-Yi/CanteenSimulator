@@ -4,7 +4,8 @@ import { UI, type Lang } from '../i18n'
 type FireControlProps = {
   /** 0..100 */
   level: number
-  onAdd: () => void
+  /** (the coals are clicked to add charcoal: see Roasting) */
+  onAdd?: () => void
   lang: Lang
 }
 
@@ -16,8 +17,8 @@ function fireWord(level: number, lang: Lang) {
   return w[3]
 }
 
-/** 火力 gauge for the charcoal grill: the fire burns down on its own, 添炭 builds it back up. */
-export function FireControl({ level, onAdd, lang }: FireControlProps) {
+/** 火力 gauge for the charcoal grill: the fire burns down on its own; a click on the coals builds it back up. */
+export function FireControl({ level, lang }: FireControlProps) {
   return (
     <div className="heat fire-control">
       <span className="heat-label" aria-hidden="true">{UI[lang].fire}</span>
@@ -26,7 +27,7 @@ export function FireControl({ level, onAdd, lang }: FireControlProps) {
         style={{ '--heat': `${level}%` } as CSSProperties} />
       <div className="fire-row">
         <span className="heat-value"><span className="heat-word">{fireWord(level, lang)}</span> {Math.round(level)}%</span>
-        <button type="button" className="fire-add" onClick={onAdd} disabled={level >= 100}>{UI[lang].addCharcoal}</button>
+        <span className="fire-tip">{UI[lang].tapCoals}</span>
       </div>
     </div>
   )

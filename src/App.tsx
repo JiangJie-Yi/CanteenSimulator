@@ -147,8 +147,6 @@ const FULL_KCAL = 1500
 const DIGEST_KCAL_PER_SEC = 1.2
 /** what's cooked in the hot pot (eating any of it is trying the soup too) */
 const potItems = new Set(DISHES.find((d) => d.heatControl)?.items.map((x) => x.id) ?? [])
-/** items drawn as copies of others (the grill's extra fish) */
-const LOOKS = Object.fromEntries(DISHES.map((d) => [d.id, Object.fromEntries(d.items.filter((x) => x.look).map((x) => [x.id, x.look!]))]))
 const FLOAT_IDS = Object.fromEntries(
   DISHES.map((d) => [d.id, d.items.filter((it) => it.entrance === 'float').map((it) => it.id)]),
 )
@@ -483,7 +481,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
           <>
               <Dish url={url} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                 broth={base?.broth} hidden={hidden} fill={base?.fill} tint={base?.tint}
-                floatIds={FLOAT_IDS[dish.id]} layout={dish.layout} looks={LOOKS[dish.id]}
+                floatIds={FLOAT_IDS[dish.id]} layout={dish.layout}
                 instant={reducedMotion} />
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
               {dish.roast && (
@@ -733,8 +731,6 @@ export default function App() {
   const [entryCount, setEntryCount] = useState<Record<string, number>>({})
   // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
   const bills = useRef<Record<string, Record<number, { paid: number; parts: number }>>>({})
-  // (the research notebook opens at this tab)
-  const [bookTab, setBookTab] = useState<'lab' | 'menu' | 'chef'>('lab')
   /** a part's cost: the food, and what's put on it */
   const partCost = (d: DishInfo, p: Part) => costOf(findItem(d, p.id) ?? { price: 0 }) +
     p.dabs.reduce((n, k) => n + SEASON_COST[k as Seasoning], 0)
@@ -1532,15 +1528,13 @@ export default function App() {
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
           title={lang === 'ja' ? '開発ノート・人事' : '經營（研發筆記・人事）'}>
-          <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em>
-          <i className={`office-menu${entriesOf(dish.id).length < (MENU_MIN[dish.id] ?? 1) ? ' is-short' : ''}`}
-            title={lang === 'ja' ? 'メニュー数' : '菜單數'}>{entriesOf(dish.id).length}/{MENU_MIN[dish.id] ?? 1}</i><b>NT${Math.round(cash).toLocaleString()}</b>
+          <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em><b>NT${Math.round(cash).toLocaleString()}</b>
         </button>
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
-            tab={office} onTab={(t) => { setBookTab('lab'); setOffice(t) }}
+            tab={office} onTab={setOffice}
             book={(
-              <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)} openAt={bookTab}
+              <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)}
                 partCost={(p) => partCost(dish, p)}
                 chef={(() => { const c = staffOf(dish.id, 'chef')[0]; return c ? (lang === 'ja' ? c.ja : c.zh) : null })()}
                 chefSkill={(staffOf(dish.id, 'chef')[0]?.skill ?? 60) / 100} onTrial={() => chefTrial(dish)}
@@ -1744,7 +1738,6 @@ export default function App() {
         // (opening with nothing a customer could order would only shut again at once: say what's missing instead)
         if (!ai && entriesOf(dish.id).length < (MENU_MIN[dish.id] ?? 1)) {
           say(UI[lang].menuShort(entriesOf(dish.id).length, MENU_MIN[dish.id] ?? 1))
-          setBookTab('lab')
           setOffice('book')
           return
         }

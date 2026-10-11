@@ -9,7 +9,8 @@ Outputs:
 
 Flames, embers and the flicker light are animated in the web app (src/components/Fire.tsx).
 Items that the web menu toggles are named by their menu id (src/menu.ts):
-ExtraFish, Saury, Mackerel, GrilledCorn, GrilledShiitake, Onigiri, ShrimpSkewer, Sausage, Yakitori, PorkBelly,
+ExtraFish, Saury, Mackerel, Aji, Iwashi, Shishamo, Nodoguro (whole fish), Salmon, Buri, Gindara (fillets), Hokke
+(opened), GrilledCorn, GrilledShiitake, Onigiri, ShrimpSkewer, Sausage, Yakitori, PorkBelly,
 Squid, Shishito, Mochi, KingOyster, Asparagus (skewers), Potato, SweetPotato (in the ash).
 """
 import math
@@ -177,13 +178,46 @@ mackerel = mix(mackerel, (0.06, 0.09, 0.11), waves * 0.85)
 mackerel = mix(mackerel, (0.3, 0.18, 0.08), np.clip(scorch * 0.6 + blister * scorch, 0, 1))
 TEX["mackerel"] = image("T_Mackerel", mackerel)
 
+# horse mackerel (竹筴魚): olive-grey back, bright silver flanks with a faint yellow band along the lateral line,
+# and the black spot on the gill cover
+back = smooth(0.5, 0.6, t + (fbm(N, 12, 4) - 0.5) * 0.04)
+aji = skin((0.9, 0.9, 0.86), (0.34, 0.4, 0.36), back)
+aji = mix(aji, (0.86, 0.76, 0.36), smooth(0.04, 0.0, np.abs(t - 0.54)) * 0.55)
+aji = mix(aji, (0.08, 0.08, 0.09), smooth(0.035, 0.015, np.sqrt((v - 0.8) ** 2 + (t - 0.62) ** 2 * 0.6)))
+aji = mix(aji, (0.22, 0.13, 0.07), np.clip(scorch * 0.6 + blister * scorch, 0, 1))
+TEX["aji"] = image("T_Aji", aji)
+
+# sardine (沙丁魚): deep blue back, silver below, a row of black spots along the side
+back = smooth(0.52, 0.58, t)
+iwashi = skin((0.9, 0.91, 0.92), (0.12, 0.2, 0.38), back)
+spots = np.zeros_like(t)
+for k in range(7):
+    spots = np.maximum(spots, smooth(0.025, 0.012, np.sqrt(((v - (0.72 - k * 0.07)) * 1.6) ** 2 + (t - 0.56) ** 2)))
+iwashi = mix(iwashi, (0.06, 0.07, 0.1), spots * 0.9)
+iwashi = mix(iwashi, (0.22, 0.13, 0.07), np.clip(scorch * 0.7 + blister * scorch, 0, 1))
+TEX["iwashi"] = image("T_Iwashi", iwashi)
+
+# shishamo (柳葉魚): grey-brown back, a pale belly showing the yellow of the roe through it
+back = smooth(0.45, 0.62, t)
+shishamo = skin((0.95, 0.88, 0.66), (0.42, 0.38, 0.32), back)
+shishamo = mix(shishamo, (0.95, 0.72, 0.3), smooth(0.35, 0.05, t) * smooth(0.25, 0.4, v) * smooth(0.75, 0.6, v) * 0.6)
+shishamo = mix(shishamo, (0.3, 0.18, 0.08), np.clip(scorch * 0.5 + blister * scorch, 0, 1))
+TEX["shishamo"] = image("T_Shishamo", shishamo)
+
+# blackthroat seaperch (紅喉 / のどぐろ): scarlet back, rose flanks, a pearly pink belly
+back = smooth(0.35, 0.75, t)
+nodoguro = skin((0.98, 0.82, 0.78), (0.82, 0.18, 0.12), back)
+nodoguro = mix(nodoguro, (0.95, 0.42, 0.32), smooth(0.25, 0.5, t) * smooth(0.8, 0.55, t) * 0.5)
+nodoguro = mix(nodoguro, (0.3, 0.1, 0.05), np.clip(scorch * 0.5 + blister * scorch, 0, 1))
+TEX["nodoguro"] = image("T_Nodoguro", nodoguro)
+
 # the belly is cut open from the vent to behind the gills and spread: dark red inside the cut, the pale flesh of
 # its lips either side (the groove itself is shaped in fish())
 du = np.abs(u - 0.5)
 open_along = smooth(0.36, 0.42, v) * smooth(0.74, 0.68, v)
 inside = smooth(0.07, 0.045, du) * open_along                 # the opened cavity, wide between the flaps
 lips = smooth(0.1, 0.07, du) * open_along * (1 - inside)
-for key in ("fish", "saury", "mackerel"):
+for key in ("fish", "saury", "mackerel", "aji", "nodoguro"):
     img = TEX[key]
     px = np.array(img.pixels[:], np.float32).reshape(N, N, 4)[..., :3]
     px = mix(px, (0.96, 0.82, 0.72), lips * 0.9)
@@ -205,9 +239,45 @@ flesh = mix(flesh, (0.55, 0.32, 0.16), smooth(0.8, 1.0, fv) * (0.6 + 0.4 * fbm(N
 flesh = mix(flesh, (0.6, 0.18, 0.12), (vnoise(N, 40, 40) > 0.94).astype(np.float32) * 0.5)  # blood spots
 TEX["fish_flesh"] = image("T_FishFlesh", flesh)
 
+# fillets (切り身) and the opened, half-dried atka mackerel. Planar UVs: u along the piece, v across it (0 the belly
+# edge, 1 the back edge where the skin is)
+NF = 512
+pu, pv = grid01(NF)
+grill_bars = smooth(0.86, 0.96, 0.5 + 0.5 * np.sin((pu * 7 + pv * 1.2) * 2 * np.pi)) * smooth(0.5, 0.75, fbm(NF, 8, 8) + 0.3)
+# salmon: deep orange flesh with the white fat lines curving across it in bands, browned at the edges
+fat = smooth(0.82, 0.95, 0.5 + 0.5 * np.sin((pu * 9 + np.sin(pv * 3.0) * 0.6) * 2 * np.pi))
+salmon = mix((0.96, 0.46, 0.24), (0.9, 0.38, 0.2), fbm(NF, 6, 6))
+salmon = mix(salmon, (0.98, 0.86, 0.74), fat * 0.8)
+salmon = mix(salmon, (0.62, 0.3, 0.14), smooth(0.85, 1.0, np.maximum(np.abs(pu - 0.5) * 2, pv)) * 0.5)
+salmon = mix(salmon, (0.36, 0.16, 0.07), grill_bars * 0.75)
+TEX["salmon"] = image("T_SalmonFillet", salmon)
+# yellowtail: pale pink-beige flesh, the dark red blood line (血合い) near the skin, glazed with teriyaki
+buri = mix((0.9, 0.7, 0.6), (0.84, 0.62, 0.52), fbm(NF, 5, 5))
+buri = mix(buri, (0.5, 0.12, 0.1), smooth(0.08, 0.02, np.abs(pv - 0.72 - 0.04 * np.sin(pu * 8))) * 0.85)
+buri = mix(buri, (0.55, 0.3, 0.14), smooth(0.4, 1.0, fbm(NF, 7, 7)) * 0.5)
+buri = mix(buri, (0.3, 0.14, 0.06), grill_bars * 0.7)
+TEX["buri"] = image("T_BuriFillet", buri)
+# black cod: snow-white flesh in big flakes, golden where it's caught
+flakes = smooth(0.7, 0.95, 0.5 + 0.5 * np.sin((pu * 6 + fbm(NF, 4, 4) * 0.8) * 2 * np.pi))
+gindara = mix((0.98, 0.96, 0.92), (0.92, 0.88, 0.8), flakes * 0.7)
+gindara = mix(gindara, (0.85, 0.62, 0.3), smooth(0.45, 0.9, fbm(NF, 6, 6)) * 0.45)
+gindara = mix(gindara, (0.45, 0.28, 0.12), grill_bars * 0.55)
+TEX["gindara"] = image("T_GindaraFillet", gindara)
+# atka mackerel, opened (開き): golden flesh with the backbone down the middle and the ribs fanning off it,
+# browned in patches; its skin side grey with darker bars
+spine = smooth(0.025, 0.005, np.abs(pv - 0.5))
+ribs2 = smooth(0.85, 0.97, 0.5 + 0.5 * np.cos(2 * np.pi * (pu * 18 + np.abs(pv - 0.5) * 4))) * smooth(0.45, 0.2, np.abs(pv - 0.5))
+hokke = mix((0.94, 0.8, 0.56), (0.86, 0.66, 0.4), fbm(NF, 6, 6))
+hokke = mix(hokke, (0.7, 0.5, 0.32), ribs2 * 0.6)
+hokke = mix(hokke, (0.88, 0.84, 0.76), spine)
+hokke = mix(hokke, (0.5, 0.28, 0.12), smooth(0.55, 0.9, fbm(NF, 9, 5)) * 0.55)
+TEX["hokke"] = image("T_HokkeOpen", hokke)
+hokke_skin = mix((0.62, 0.62, 0.58), (0.4, 0.4, 0.38), smooth(0.4, 0.6, 0.5 + 0.5 * np.sin(pu * 2 * np.pi * 8)))
+TEX["hokke_skin"] = image("T_HokkeSkin", hokke_skin)
+
 # coarse salt rubbed over every fish (塩焼き): white grains speckled all over the skin
 salt_grains = (vnoise(N, 150, 75) > 0.8).astype(np.float32) * smooth(0.0, 0.3, fbm(N, 6, 6) + 0.2)
-for key in ("fish", "saury", "mackerel"):
+for key in ("fish", "saury", "mackerel", "aji", "iwashi", "shishamo", "nodoguro"):
     img = TEX[key]
     px = np.array(img.pixels[:], np.float32).reshape(N, N, 4)[..., :3]
     TEX[key] = image(img.name + "_Salted", mix(px, (0.97, 0.97, 0.95), salt_grains * 0.85))
@@ -331,6 +401,20 @@ M = {
     "shrimp_tail": pbr("ShrimpTail", (0.62, 0.08, 0.02), rough=0.6),
     "shrimp_leg": pbr("ShrimpLeg", (0.86, 0.3, 0.12), rough=0.45),
     "dirt": pbr("Dirt", (0.3, 0.22, 0.15), rough=0.95),
+    # the other fish of a grilled-fish shop
+    "aji": pbr("Aji", tex=TEX["aji"], nrm=TEX["fish_n"], rough=0.3, coat=0.4),
+    "iwashi": pbr("Iwashi", tex=TEX["iwashi"], nrm=TEX["fish_n"], rough=0.3, coat=0.4),
+    "shishamo": pbr("Shishamo", tex=TEX["shishamo"], nrm=TEX["fish_n"], rough=0.4, coat=0.3),
+    "nodoguro": pbr("Nodoguro", tex=TEX["nodoguro"], nrm=TEX["fish_n"], rough=0.3, coat=0.5),
+    "scute": pbr("AjiScute", (0.8, 0.82, 0.84), rough=0.3, metal=0.3),
+    "salmon": pbr("SalmonFillet", tex=TEX["salmon"], rough=0.45, coat=0.2),
+    "salmon_skin": pbr("SalmonSkin", (0.55, 0.58, 0.62), rough=0.35, metal=0.2),
+    "buri": pbr("BuriFillet", tex=TEX["buri"], rough=0.3, coat=0.6),
+    "buri_skin": pbr("BuriSkin", (0.34, 0.38, 0.42), rough=0.35, metal=0.15),
+    "gindara": pbr("GindaraFillet", tex=TEX["gindara"], rough=0.5, coat=0.2),
+    "gindara_skin": pbr("GindaraSkin", (0.11, 0.11, 0.13), rough=0.4),
+    "hokke": pbr("HokkeOpen", tex=TEX["hokke"], rough=0.5, coat=0.2),
+    "hokke_skin": pbr("HokkeSkin", tex=TEX["hokke_skin"], rough=0.5),
 }
 
 # crinkled aluminium foil for the potatoes roasting in the ash
@@ -717,6 +801,18 @@ SPECIES = {
     "ayu": dict(length=0.3, width=0.055, depth=0.085, snout=0.6, tail=(0.12, 0.085), body="fish", fin="salt"),
     "saury": dict(length=0.42, width=0.032, depth=0.05, snout=1.2, tail=(0.09, 0.06), body="saury", fin="salt"),
     "mackerel": dict(length=0.34, width=0.06, depth=0.08, snout=0.8, tail=(0.12, 0.09), body="mackerel", fin="salt"),
+    # horse mackerel: a torpedo with big eyes and the bony scutes (ぜいご) along the rear of its lateral line
+    "aji": dict(length=0.27, width=0.045, depth=0.07, snout=0.75, tail=(0.11, 0.085), body="aji", fin="salt", eye=1.35,
+                scutes=True),
+    # sardine: small and slim, grilled whole without being opened
+    "iwashi": dict(length=0.2, width=0.032, depth=0.048, snout=0.75, tail=(0.075, 0.055), body="iwashi", fin="salt",
+                   eye=1.2, opened=False),
+    # shishamo: little, straight, its belly round with roe
+    "shishamo": dict(length=0.085, width=0.018, depth=0.026, snout=0.6, tail=(0.03, 0.024), body="shishamo", fin="salt",
+                     eye=0.9, opened=False, belly=0.4, wave=0.25),
+    # blackthroat seaperch: deep-bodied, blunt-headed, its eyes very large
+    "nodoguro": dict(length=0.25, width=0.06, depth=0.11, snout=0.35, tail=(0.1, 0.095), body="nodoguro", fin="salt",
+                     eye=1.7),
 }
 
 
@@ -732,8 +828,10 @@ def fish(species="ayu"):
     sp = SPECIES[species]
     L, W, D = sp["length"], sp["width"], sp["depth"]
     bend = lambda x: 0.012 * math.sin(x * math.pi / L)        # noqa: E731  a little sideways sway
-    wave = lambda x: 0.95 * D * math.sin(x * math.pi / L)      # noqa: E731  the S, seen from the side
-    slope = lambda x: math.atan(0.95 * D * math.pi / L * math.cos(x * math.pi / L))   # noqa: E731
+    sway = sp.get("wave", 1.0)
+    wave = lambda x: 0.95 * D * sway * math.sin(x * math.pi / L)      # noqa: E731  the S, seen from the side
+    slope = lambda x: math.atan(0.95 * D * sway * math.pi / L * math.cos(x * math.pi / L))   # noqa: E731
+    opened = sp.get("opened", True)
     bm = bmesh.new()
     bm.loops.layers.uv.new()
     bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=32, radius=1, calc_uvs=True)
@@ -746,11 +844,14 @@ def fish(species="ayu"):
         # its lips pushed apart
         x, y, z = vtx.co
         open_along = smooth(-0.32, -0.22, np.float32(x)) * smooth(0.5, 0.4, np.float32(x)) * (z < -0.4)
-        if open_along > 0:
+        if opened and open_along > 0:
             vtx.co.z += 0.55 * math.exp(-(y / 0.3) ** 2) * open_along      # the emptied cavity, deep
             vtx.co.y *= 1 + 0.3 * math.exp(-((abs(y) - 0.32) / 0.14) ** 2) * open_along
     for vtx in bm.verts:
         x = vtx.co.x
+        # (a roe-filled belly bulges below, through the middle of the body)
+        if sp.get("belly") and vtx.co.z < 0:
+            vtx.co.z *= 1 + sp["belly"] * math.exp(-((x + 0.05) / 0.4) ** 2)
         taper = 1 + min(0, x) * 0.82                       # narrowing into the tail root (-X)
         head = 1 - max(0, x - 0.55) * sp["snout"]          # snout: pointed for saury, blunter for ayu
         vtx.co.y *= W * taper * head
@@ -783,7 +884,7 @@ def fish(species="ayu"):
 
     # eyes on both sides of the head
     ex = L * 0.73
-    er = 0.014 + D * 0.03
+    er = (0.014 + D * 0.03) * sp.get("eye", 1.0)
     ez = wave(ex)
     for side in (-1, 1):
         ey = bend(ex) + side * W * 0.5
@@ -793,6 +894,20 @@ def fish(species="ayu"):
                                              location=(ex + 0.004, ey + side * er * 0.55, D * 0.26 + ez))
         parts.append(finish(active(), "Pupil", M["pupil"]))
 
+    # the horse mackerel's scutes: a row of small hard plates along the rear half of the lateral line, both sides
+    if sp.get("scutes"):
+        for k in range(13):
+            sx = -L * 0.82 + k * L * 0.055
+            taper = 1 + min(0.0, sx / L) * 0.82
+            for side in (-1, 1):
+                bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0065, segments=8, ring_count=6,
+                                                     location=(sx, bend(sx) + side * W * taper * 0.97, wave(sx) + D * 0.05 * taper))
+                sc = active()
+                sc.scale = (1.3, 0.35, 0.8)
+                parts.append(finish(sc, "Scute", M["scute"]))
+
+    if not opened:
+        return parts
     # the belly walls either side of the cut, turned out like the covers of a book: each hinged along its lip of
     # the cut, folded outward and curling back as it goes, so the cooked flesh and rib bones inside face out
     x0, x1 = -0.27, 0.45                                   # (the same stretch as the cut, in the sphere's -1..1)
@@ -835,6 +950,95 @@ def fish(species="ayu"):
         sm.offset = 0
         parts.append(finish(flap, "BellyFlap", M["fish_flesh"]))
     return parts
+
+
+def shishamo_trio():
+    """Shishamo come three to a skewer, roe-filled and grilled whole, one after another up the stick."""
+    out = []
+    for i, dx in enumerate((-0.13, 0.0, 0.13)):
+        o = join(fish("shishamo"), "Shishamo%d" % i)
+        o.location.x += dx
+        o.rotation_euler.x = random.uniform(-0.15, 0.15)
+        out.append(o)
+    return out
+
+
+def planar_uv(obj, x0, x1, z0, z1):
+    """UVs straight off the piece's side: u along X, v up Z."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    uv = bm.loops.layers.uv.verify()
+    for f in bm.faces:
+        for l in f.loops:
+            l[uv].uv = ((l.vert.co.x - x0) / (x1 - x0), (l.vert.co.z - z0) / (z1 - z0))
+    bm.to_mesh(obj.data)
+    bm.free()
+
+
+def fillet(name, length, height, thick, flesh, skin, skin_w=0.012):
+    """A fillet (切り身) threaded on the stick: a thick slab, broad face out, a little narrower and thinner at the
+    belly edge than at the back, rounded at its corners, with a strip of its skin along the back."""
+    bpy.ops.mesh.primitive_cube_add(size=2)
+    o = active()
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=6, use_grid_fill=True)
+    for v in bm.verts:
+        x, y, z = v.co
+        zn = (z + 1) / 2                               # 0 belly .. 1 back
+        v.co.x = x * length * (0.86 + 0.14 * zn) + 0.02 * length * math.sin(z * 1.4)
+        v.co.y = y * thick * (0.6 + 0.4 * zn) * (1 - 0.18 * x * x)
+        v.co.z = z * height + 0.04 * height * math.cos(x * 1.6)
+    bm.to_mesh(o.data)
+    bm.free()
+    bevel(o, min(thick, height) * 0.35, segments=3, angle=False)
+    planar_uv(o, -length, length, -height, height)
+    finish(o, name + "Flesh", M[flesh])
+    # the skin, a strip along the back edge
+    bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, height * 1.02))
+    s = active()
+    s.scale = (length * 0.95, thick * 1.02, skin_w)
+    apply_scale(s)
+    bevel(s, skin_w * 0.6, segments=2, angle=False)
+    finish(s, name + "Skin", M[skin])
+    return [o, s]
+
+
+def hokke_open():
+    """Atka mackerel opened flat and half-dried (ほっけの開き): one broad piece, the flesh side out with the backbone
+    down its middle, the head split too; the skin on the far side; a little tail."""
+    L, H = 0.2, 0.11
+    pts = []
+    for i in range(41):
+        a = -math.pi + 2 * math.pi * i / 40
+        x = L * math.cos(a)
+        # wide at the split head (+X), tapering to the tail root
+        h = H * (0.32 + 0.68 * (0.5 + 0.5 * math.cos(math.pi * (1 - (x / L + 1) / 2)))) ** 0.8
+        pts.append((x, h * math.sin(a)))
+    bm = bmesh.new()
+    verts = [bm.verts.new((x, 0.0, z)) for x, z in pts]
+    face = bm.faces.new(verts)
+    bmesh.ops.triangulate(bm, faces=[face], quad_method="BEAUTY", ngon_method="EAR_CLIP")
+    # (the outline runs round so the face points into the fire: turn it to face out, the flesh side to the diners)
+    bmesh.ops.reverse_faces(bm, faces=bm.faces)
+    me = bpy.data.meshes.new("HokkeOpen")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new("HokkeOpen", me)
+    bpy.context.collection.objects.link(o)
+    planar_uv(o, -L, L, -H, H)
+    finish(o, "HokkeOpen", M["hokke"])
+    o.data.materials.append(M["hokke_skin"])
+    sm = o.modifiers.new("Solidify", "SOLIDIFY")
+    sm.thickness = 0.022
+    sm.offset = -1                       # (the flesh face stays outermost; the thickness goes in)
+    sm.material_offset = 1
+    sm.material_offset_rim = 1
+    # the backbone standing a little proud down the middle
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.006, depth=L * 1.6, location=(-L * 0.05, 0.004, 0), rotation=(0, math.pi / 2, 0))
+    bone = finish(active(), "HokkeSpine", M["eye"])
+    tail = flat_fin("HokkeTail", forked_tail(0.07, 0.06, 0.02), 0.005, M["salt"], at=(-L * 0.98, -0.01, 0))
+    return [o, bone, tail]
 
 
 CORN_L = 0.42
@@ -1628,6 +1832,15 @@ place(blood_cake(), 224, 0.6, "BloodCake")
 place(fish(), 95, 0.64, "ExtraFish")
 place(fish("saury"), -97, 0.6, "Saury")
 place(fish("mackerel"), -122, 0.62, "Mackerel")
+# the rest of a grilled-fish shop's fish, in the gaps round the ring (clear of the camera's line, at about -54°)
+place(fish("aji"), 8, 0.62, "Aji")
+place(fish("iwashi"), 17, 0.62, "Iwashi")
+place(shishamo_trio(), 189, 0.6, "Shishamo")
+place(fish("nodoguro"), 217, 0.62, "Nodoguro")
+place(fillet("Salmon", 0.1, 0.055, 0.03, "salmon", "salmon_skin"), 250, 0.6, "Salmon")
+place(hokke_open(), 275, 0.62, "Hokke")
+place(fillet("Buri", 0.1, 0.06, 0.032, "buri", "buri_skin"), 336, 0.6, "Buri")
+place(fillet("Gindara", 0.09, 0.055, 0.038, "gindara", "gindara_skin", skin_w=0.01), 346, 0.6, "Gindara")
 place(corn_cob(), 55, 0.6, "GrilledCorn")
 place(shiitake_halves(), 128, 0.6, "GrilledShiitake")
 # (the yaki onigiri isn't skewered: it's toasted on the grill net with the mochi, see below)

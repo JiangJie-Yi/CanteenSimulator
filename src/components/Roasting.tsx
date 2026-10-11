@@ -2335,7 +2335,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const soup = tool || p ? null : pickDrink()
       if (!soup && !p && !hovered.current) setTasteTip(null)
       if (soup && !p) setTasteTip({ at: soup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.32, 0)).toArray() as [number, number, number], taste: SOUP_TASTE })
-      el.style.cursor = tool ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : ''
+      el.style.cursor = tool ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : pickCoal() ? 'pointer' : ''
     }
     const onDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY }
@@ -2357,7 +2357,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         // otherwise grab a plate, side dish, the basket, the seasoning box or the bin (not the food on them)
         const picked = food ? null : pickContainer()
-        if (!picked) return
+        if (!picked) {
+          // (a click on the coals themselves puts more charcoal on)
+          if (pickCoal()) {
+            onAddCharcoal?.()
+          }
+          return
+        }
         // (from a stack, the one on top comes off)
         const key = STACKABLE(picked) ? stackTop(picked) : picked
         if (stackOn.current.has(key)) {
@@ -2411,6 +2417,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       setHover(null)
     }
     /** the plate / dish / basket under the pointer, by the container key its group carries */
+    /** the charcoal (and the logs) in the fire, under the pointer, with nothing nearer in the way */
+    const pickCoal = () => {
+      const hit = raycaster.intersectObject(root, true)[0]
+      if (!hit || !(hit.object instanceof THREE.Mesh)) return false
+      const mats = ([] as THREE.Material[]).concat(hit.object.material)
+      return mats.some((m) => /^(Ember|Binchotan|Bark)/.test(m.name))
+    }
     const pickContainer = () => {
       const groups: THREE.Object3D[] = []
       world.traverse((o) => { if (typeof o.userData.container === 'string') groups.push(o) })

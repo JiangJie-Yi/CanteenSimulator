@@ -4734,3 +4734,16 @@ button {
 .office-menu.is-short {
   background: #c4442f;
 }
+
+.fire-tip {
+  color: #c4442f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nb-sec {
+  margin: 12px 14px 2px;
+  padding-bottom: 3px;
+  border-bottom: 1.5px solid rgb(59 42 32 / 0.3);
+  font-size: 14px;
+}
