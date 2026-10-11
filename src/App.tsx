@@ -34,6 +34,7 @@ import { OpeningSpot } from '@/scene/OpeningSpot'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
+import { GRILL_COUNTERS } from '@/shops/grill/bar'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
 import { guestLabel } from '@/data/guests'
@@ -480,7 +481,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 // the customers, in 3D (a phone has them in 2D on the guest board, and no 3D bar at all), at the bar behind (the grill's bar is drawn by Roasting, which serves onto it)
                 <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast}
                   mark={dish.roast ? '聞野' : dish.heatControl ? '鼎沸' : dish.bake ? '麵包' : '食堂'}
-                  top={dish.roast ? BAR_TOP : 0.465}
+                  top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)} />
               )}
               {dish.id === 'beefnoodle' && (

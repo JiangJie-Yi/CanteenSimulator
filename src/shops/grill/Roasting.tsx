@@ -12,7 +12,8 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
-import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
+import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
+import { GRILL_COUNTERS, GRILL_SEATS, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -41,17 +42,16 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
   /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
   leftAt?: number; cleared?: boolean }
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
-const MAX_SEATED = 4
+const MAX_SEATED = GRILL_SEATS.length
 const PATIENCE = 150
 /** the bar the customers sit at, behind the fire (away from the camera): its middle, length, top, and seats */
-const BAR_AT = new THREE.Vector3(-0.59 * 2.45 + 0.81 * 0.45, 0, -0.81 * 2.45 - 0.59 * 0.45)
-const BAR_LEN = 3.6
+const BAR_AT = GRILL_COUNTERS[0].at.clone()
 // (high enough for the customers sat at it: about a third of their height above the seat, as a real counter)
 const BAR_TOP = 0.64
-const BAR_SEATS = 4
+const BAR_SEATS = GRILL_SEATS.length
 /** how big food is on the bar, next to the fire's: a skewer about as long as a customer's plate is wide */
 const BAR_FOOD_SCALE = 0.5
-const barSeat = (n: number) => BAR_AT.clone().addScaledVector(new THREE.Vector3(0.81, 0, -0.59), (n - (BAR_SEATS - 1) / 2) * (BAR_LEN / BAR_SEATS))
+const barSeat = (n: number) => GRILL_SEATS[n].plate.clone()
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
 // the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
@@ -379,41 +379,66 @@ const TRAY_WOOD = (() => {
  * the chef serves each piece onto it straight off the grill.
  */
 function Bar() {
-  const yaw = Math.atan2(-STACK_DIR.z, STACK_DIR.x)
+  return <>{GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} />)}</>
+}
+const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042, 0.016], [0.045, 0.02], [0.043, 0.021],
+  [0.036, 0.012], [0.026, 0.006], [0, 0.006]], 0.045)
+function BarCounter({ c }: { c: Counter }) {
+  const yaw = Math.atan2(-c.along.z, c.along.x)
+  const L = c.length
   return (
-    <group position={BAR_AT} rotation-y={yaw}>
+    <group position={c.at} rotation-y={yaw}>
       <mesh position-y={BAR_TOP - 0.03} castShadow receiveShadow>
-        <boxGeometry args={[BAR_LEN + 0.3, 0.06, 0.62]} />
+        <boxGeometry args={[L + 0.3, 0.06, 0.62]} />
         <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
       </mesh>
       <mesh position-y={BAR_TOP - 0.03} scale={[1.01, 1.2, 1.04]}>
-        <boxGeometry args={[BAR_LEN + 0.3, 0.06, 0.62]} />
+        <boxGeometry args={[L + 0.3, 0.06, 0.62]} />
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
-      <mesh position-y={(BAR_TOP - 0.06) / 2} castShadow>
-        <boxGeometry args={[BAR_LEN + 0.2, BAR_TOP - 0.06, 0.5]} />
+      {/* the base stands back on the cook's side, so the customers' knees go under the top */}
+      <mesh position={[0, (BAR_TOP - 0.06) / 2, 0.08]} castShadow>
+        <boxGeometry args={[L + 0.2, BAR_TOP - 0.06, 0.4]} />
         <meshToonMaterial color="#3a2a1e" />
       </mesh>
-      {/* the raised lip on the far (customers') side */}
-      <mesh position={[0, BAR_TOP + 0.03, -0.27]}>
-        <boxGeometry args={[BAR_LEN + 0.3, 0.06, 0.08]} />
+      {/* the raised lip on the cook's side, the step the food is handed over */}
+      <mesh position={[0, BAR_TOP + 0.03, 0.27]}>
+        <boxGeometry args={[L + 0.3, 0.06, 0.08]} />
         <meshToonMaterial color="#c49a64" />
       </mesh>
-      {Array.from({ length: BAR_SEATS }, (_, n) => {
-        const x = (n - (BAR_SEATS - 1) / 2) * (BAR_LEN / BAR_SEATS)
+      {Array.from({ length: c.seats }, (_, n) => {
+        const x = (n - (c.seats - 1) / 2) * (L / c.seats)
         return (
           <group key={n} position={[x, BAR_TOP, 0]}>
-            {/* (each customer's plate is set down and cleared away by GuestBar3D) chopsticks on their rest */}
-            <mesh position={[0.3, 0.025, 0.12]}>
-              <boxGeometry args={[0.04, 0.02, 0.03]} />
+            {/* (each customer's plate is set down and cleared away by GuestBar3D) in front of it, on the customer's
+                side, chopsticks across on their rest, tips to the left; to the right a little dish of sauce */}
+            <mesh position={[0.11, 0.012, -0.25]}>
+              <boxGeometry args={[0.03, 0.02, 0.04]} />
               <meshToonMaterial color="#8a5a30" />
             </mesh>
             {[-0.012, 0.012].map((dz) => (
-              <mesh key={dz} position={[0.3, 0.04, 0.12 + dz - 0.02]} rotation-z={Math.PI / 2} rotation-x={Math.PI / 2}>
-                <cylinderGeometry args={[0.006, 0.004, 0.32, 5]} />
+              <mesh key={dz} position={[0.0, 0.027, -0.25 + dz]} rotation-z={Math.PI / 2}>
+                <cylinderGeometry args={[0.004, 0.006, 0.3, 5]} />
                 <meshToonMaterial color="#5a3a20" />
               </mesh>
             ))}
+            <group position={[-0.25, 0.002, -0.14]}>
+              <mesh geometry={SAUCE_DISH_GEO} castShadow>
+                <meshToonMaterial color="#ffffff" map={CLOUD_WARE} />
+              </mesh>
+              <mesh geometry={SAUCE_DISH_GEO} scale={[1.06, 1.15, 1.06]}>
+                <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+              </mesh>
+              {/* soy with a dab of grated daikon */}
+              <mesh position-y={0.011} rotation-x={-Math.PI / 2}>
+                <circleGeometry args={[0.03, 16]} />
+                <meshToonMaterial color="#3a1c0c" />
+              </mesh>
+              <mesh position={[0.008, 0.015, 0.004]} scale={[1, 0.5, 1]}>
+                <sphereGeometry args={[0.011, 8, 6]} />
+                <meshToonMaterial color="#f2efe4" />
+              </mesh>
+            </group>
           </group>
         )
       })}
@@ -1263,7 +1288,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // the crate and the fan
     for (const d of [DECOR.crate, DECOR.fan]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
-    if (space === 'open') for (let k = -2; k <= 2; k++) others.push({ p: BAR_AT.clone().addScaledVector(STACK_DIR, k * 0.8), r: 0.42 })
+    if (space === 'open') for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: c.at.clone().addScaledVector(c.along, k * c.length / 4.5), r: 0.42 })
     // the soup bowls on the table are in the way too
     root.traverse((o) => {
       const id = o.userData.itemId as string | undefined
@@ -1366,7 +1391,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.guest = owner?.id ?? -1
       p.seat = seat
       const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === seat && present(q) && !q.eaten).length
-      p.toP.copy(barSeat(seat)).addScaledVector(STACK_DIR, ((row % 3) - 1) * 0.07).add(new THREE.Vector3(0, BAR_TOP + 0.04 + Math.floor(row / 3) * 0.06, 0))
+      p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, ((row % 3) - 1) * 0.07).add(new THREE.Vector3(0, BAR_TOP + 0.04 + Math.floor(row / 3) * 0.06, 0))
       p.container = 'bar'
       p.body = null
       if (p.loose) flatQ(p, p.toQ, LAY_DIR)

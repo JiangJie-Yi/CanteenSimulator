@@ -8,6 +8,7 @@ import { guestLabel } from '@/data/guests'
 import { Person } from '@/scene/Person3D'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
+import { AISLE, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -21,11 +22,9 @@ import { CLOUD_WARE, wareGeometry } from './ware'
  */
 
 const LAY = new THREE.Vector3(0.59, 0, 0.81)       // toward the camera (the cook's side)
-const ALONG = new THREE.Vector3(0.81, 0, -0.59)    // along the bar
-const SEATS = 4
-const WALK = 1.8                                    // seconds to walk to or from a seat
+const ALONG = new THREE.Vector3(0.81, 0, -0.59)    // along the first counter
+const SPEED = 1.5                                   // how fast they walk in and out (per second)
 const INK = '#3b2a20'
-const FACE_YAW = Math.atan2(LAY.x, LAY.z)
 
 /** toon material, and its ink outline (a slightly bigger back-faced shell) */
 function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeometry; color: string; outline?: number } & Record<string, unknown>) {
@@ -170,13 +169,12 @@ function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
  * The customers' side of the shop floored in wide old boards: one even rectangle under the whole bar, the row of
  * stools and the way along behind them to the noren, its boards running the length of the bar.
  */
-function DiningFloor({ at, length }: { at: THREE.Vector3; length: number }) {
-  const yaw = Math.atan2(ALONG.x, ALONG.z)
-  // (in the floor's own frame: z along the bar toward the door, x away from the cook, so LAY is -x)
-  const from = -length / 2 - 0.35
-  const to = length / 2 + 1.25
-  const near = 0.42
-  const far = -1.0
+function DiningFloor({ c, from, to }: { c: Counter; from: number; to: number }) {
+  const yaw = Math.atan2(c.along.x, c.along.z)
+  const at = c.at
+  // (in the floor's own frame: z along the bar, x away from the cook, so lay is -x)
+  const near = FLOOR_NEAR
+  const far = FLOOR_FAR
   const w = near - far
   const l = to - from
   const map = useMemo(() => {
@@ -209,6 +207,10 @@ function DiningFloor({ at, length }: { at: THREE.Vector3; length: number }) {
     </group>
   )
 }
+
+/** the floor reaches this far under the counter, and back past the aisle */
+const FLOOR_NEAR = 0.42
+const FLOOR_FAR = -(AISLE + 0.5)
 
 function Stool() {
   return (
@@ -285,8 +287,10 @@ function Plate({ dirty = false }: { dirty?: boolean }) {
   )
 }
 
-export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂' }:
+export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
+    /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
+    counters?: Counter[]
     /** what's dyed on the noren at the door (its first character in the middle) */
     mark?: string
     /** the height of the bar top, where the plates go */
@@ -298,8 +302,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   guestsRef.current = guests
   const groups = useRef(new Map<number, THREE.Group>())
   const clock = useRef(0)
-  const seatAt = (n: number) => at.clone().addScaledVector(ALONG, (n - (SEATS - 1) / 2) * (length / SEATS)).addScaledVector(LAY, -0.5)
-  const plateAt = (n: number) => at.clone().addScaledVector(ALONG, (n - (SEATS - 1) / 2) * (length / SEATS)).setY(top)
+  const counters = useMemo(() => given ?? singleCounter(at, length), [given, at, length])
+  const seats = useMemo(() => seatsOf(counters), [counters])
+  const paths = useMemo(() => seats.map((st) => {
+    const path = pathTo(counters, st)
+    return { path, len: pathLength(path) }
+  }), [counters, seats])
+  const plateAt = (n: number) => seats[n].plate.clone().setY(top)
   const cleanAt = (k: number) => at.clone().addScaledVector(ALONG, -length / 2 + 0.02).addScaledVector(LAY, 0.06).setY(top + k * STACK_GAP)
   const dirtyAt = (k: number) => at.clone().addScaledVector(ALONG, length / 2 - 0.02).addScaledVector(LAY, 0.06).setY(top + k * STACK_GAP)
 
@@ -339,7 +348,6 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
   }
   const shownRef = useRef<Shown[]>([])
-  const doorAt = (n: number) => at.clone().addScaledVector(ALONG, length / 2 + 0.8).addScaledVector(LAY, -0.5 - n * 0.05)
 
   shownRef.current = shown
   useEffect(() => {
@@ -356,7 +364,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (!s && seated) {
           const taken = new Set(next.map((x) => x.seat))
           // (the shop may have given them a stool already: it only does once the last one there has gone)
-          const seat = g.seat !== undefined ? g.seat : Array.from({ length: SEATS }, (_, i) => i).find((i) => !taken.has(i))
+          const seat = g.seat !== undefined ? g.seat : Array.from({ length: seats.length }, (_, i) => i).find((i) => !taken.has(i))
           if (seat !== undefined) next.push({ id: g.id, seat, phase: 'enter', t: 0 })
         } else if (s && !seated && s.phase !== 'leave') {
           next = next.map((x) => (x.id === g.id ? { ...x, phase: 'leave', t: 0 } : x))
@@ -373,27 +381,31 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       s.t += Math.min(dt, 0.1)
       // (they come and go whether or not they're drawn: on a phone they aren't, but their plates still follow them)
       const g = groups.current.get(s.id)
-      const seat = seatAt(s.seat)
-      const door = doorAt(s.seat)
-      const k = Math.min(1, s.t / WALK)
-      const e = k * k * (3 - 2 * k)
+      const st = seats[s.seat]
+      if (!st) continue
+      const { path, len } = paths[s.seat]
       if (s.phase === 'enter') {
-        g?.position.lerpVectors(door, seat, e)
-        if (g) g.rotation.y = k < 1 ? Math.atan2(-ALONG.x, -ALONG.z) : FACE_YAW
-        if (k >= 1) {
+        // in through the noren, along the aisle behind the stools (round the corner, for the other counter), and
+        // in to their own stool
+        const d = Math.min(len, s.t * SPEED)
+        const { p, dir } = alongPath(path, d)
+        g?.position.copy(p)
+        if (g) g.rotation.y = d < len ? Math.atan2(dir.x, dir.z) : st.yaw
+        if (d >= len) {
           s.phase = 'sit'
           // a plate is set in front of them
           serve(s.seat, s.id)
         }
       } else if (s.phase === 'sit') {
-        g?.position.copy(seat)
-        if (g) g.rotation.y = FACE_YAW
+        g?.position.copy(st.stool)
+        if (g) g.rotation.y = st.yaw
       } else {
         // a moment to get up, then off the way they came
-        const k2 = Math.max(0, Math.min(1, (s.t - 0.8) / WALK))
-        g?.position.lerpVectors(seat, door, k2 * k2 * (3 - 2 * k2))
-        if (g) g.rotation.y = s.t < 0.8 ? FACE_YAW : Math.atan2(ALONG.x, ALONG.z)
-        if (k2 >= 1) done.push(s.id)
+        const d = Math.max(0, Math.min(len, (s.t - 0.8) * SPEED))
+        const { p, dir } = alongPath(path, len - d)
+        g?.position.copy(p)
+        if (g) g.rotation.y = s.t < 0.8 ? st.yaw : Math.atan2(-dir.x, -dir.z)
+        if (d >= len) done.push(s.id)
       }
     }
     if (done.length) setShown((cur) => cur.filter((x) => !done.includes(x.id)))
@@ -476,11 +488,22 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   return (
     <group>
       {drawCounter && <group position={at}><Counter length={length} /></group>}
-      <DiningFloor at={at} length={length} />
+      {counters.map((c, i) => {
+        // the first counter's floor runs on past its end to the door, and back to meet the others' aisles; each other
+        // one's runs up to the first one's
+        const c0 = counters[0]
+        if (i === 0) {
+          const back = Math.min(-c.length / 2 - 0.35, ...counters.slice(1).map((o) =>
+            o.at.clone().addScaledVector(o.lay, FLOOR_FAR).sub(c.at).dot(c.along)))
+          return <DiningFloor key={i} c={c} from={back} to={c.length / 2 + 1.45} />
+        }
+        const meet = c0.at.clone().addScaledVector(c0.lay, FLOOR_NEAR).sub(c.at).dot(c.along)
+        return <DiningFloor key={i} c={c} from={-c.length / 2 - 0.35} to={meet} />
+      })}
       {/* the way in, just past the end of the bar where the customers come and go */}
-      <Entrance at={at.clone().addScaledVector(ALONG, length / 2 + 0.95).addScaledVector(LAY, -0.5)} mark={mark} />
-      {Array.from({ length: SEATS }, (_, n) => (
-        <group key={n} position={seatAt(n)} scale={PEOPLE_SCALE}><Stool /></group>
+      <Entrance at={doorOf(counters)} mark={mark} />
+      {seats.map((st, n) => (
+        <group key={n} position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>
       ))}
       {/* the clean stack, the dirty one, and the plates out at the seats */}
       {clean.current.map((_, i) => (
