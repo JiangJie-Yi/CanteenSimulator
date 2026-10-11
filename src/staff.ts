@@ -42,6 +42,7 @@ export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: st
   grilledfish: STAFFING('二廚（板前）', '三廚（備料・上火・收拾）', '二番手', '追い回し'),
   hotpot: STAFFING('二廚（顧湯）', '三廚（備料）', '二番手', '仕込み'),
   beefnoodle: STAFFING('二廚（煮麵・快炒）', '三廚（顧湯・配料）', '二番手', '仕込み'),
+  bakery: STAFFING('二廚（麵包師傅）', '三廚（備料・整形）', 'パン職人', '仕込み'),
 }
 
 // a fair wage for someone this good at this job (NT$/h): from about minimum wage (NT$196) up
@@ -79,6 +80,17 @@ const POOL: Record<string, Seed[]> = {
     ['劉佳穎', '劉 佳穎', 'server', 75, 72, 66, 0.75, '笑容滿分，時薪不高'],
     ['楊雅琪', '楊 雅琪', 'server', 50, 60, 70, 1.3, '新人卻開高價'],
   ],
+  bakery: [
+    ['陳俊宏', '陳 俊宏', 'chef', 88, 72, 66, 1.05, '烘焙二十年，可頌層次一絕'],
+    ['林佩君', '林 佩君', 'chef', 76, 84, 80, 1.0, '法國藍帶出身，手腳快'],
+    ['黃志偉', '黃 志偉', 'chef', 70, 66, 78, 0.72, '剛出師，要價實在（撿到寶）'],
+    ['吳家豪', '吳 家豪', 'sous', 64, 88, 90, 0.85, '整形又快又漂亮'],
+    ['鄭雅慧', '鄭 雅慧', 'sous', 58, 70, 86, 0.9, '學徒，肯學'],
+    ['蘇美惠', '蘇 美惠', 'server', 74, 80, 78, 1.0, '會招呼也會推新品'],
+    ['張凱翔', '張 凱翔', 'server', 56, 90, 92, 0.8, '大學生打工，便宜'],
+    ['王淑華', '王 淑華', 'cashier', 82, 78, 76, 1.0, '收銀兼包裝，又快又整齊'],
+    ['李欣怡', '李 欣怡', 'cashier', 62, 66, 88, 0.9, '親切細心'],
+  ],
   beefnoodle: [
     ['楊德福', '楊 徳福', 'chef', 90, 70, 64, 1.0, '老師傅，湯頭一絕'],
     ['周文彬', '周 文彬', 'sous', 70, 86, 84, 1.0, '煮麵速度快'],
@@ -92,10 +104,10 @@ const POOL: Record<string, Seed[]> = {
   ],
 }
 
-const WOMEN = ['美咲', '由美', '花', '雅婷', '怡君', '淑芬', '佳穎', '雅琪', '美玲', '秀蘭', '雅雯', 'さくら']
+const WOMEN = ['美咲', '由美', '花', '雅婷', '怡君', '淑芬', '佳穎', '雅琪', '美玲', '秀蘭', '雅雯', 'さくら', '佩君', '雅慧', '美惠', '淑華', '欣怡']
 const lookOf = (name: string, note: string): Look => ({
   female: WOMEN.some((w) => name.includes(w)),
-  age: /三十年|老師傅|表姊|十年|名店/.test(note) ? 'old' : /學徒|大學生|剛入行|新人|剛退伍|打工/.test(note) ? 'young' : 'middle',
+  age: /三十年|二十年|老師傅|表姊|十年|名店/.test(note) ? 'old' : /學徒|大學生|剛入行|新人|剛退伍|打工|剛出師/.test(note) ? 'young' : 'middle',
 })
 
 export const CANDIDATES: Record<string, Worker[]> = Object.fromEntries(Object.entries(POOL).map(([shop, list]) => [shop,

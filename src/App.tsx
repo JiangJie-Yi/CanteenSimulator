@@ -14,7 +14,9 @@ import { GasFlame } from './components/GasFlame'
 import { FireControl } from './components/FireControl'
 import { Fullness } from './components/Fullness'
 import { bestOf, Notebook, type Notes } from './components/Notebook'
-import { findItem, MENU_MAX, MENU_MIN, SEASON_COST, type Entry, type Part, type Seasoning } from './recipes'
+import { findItem, MENU_MAX, MENU_MIN, partName, SEASON_COST, signature, type Entry, type Part, type Seasoning, type Topping } from './recipes'
+import { PAIRING, PAIRING_DEFAULT } from './components/Roasting'
+import { breadTaste } from './components/Bakery'
 import { MoodFace } from './components/MoodFace'
 import { GuestCounter } from './components/GuestCounter'
 import { HeatControl } from './components/HeatControl'
@@ -23,6 +25,7 @@ import { Crash } from './components/Crash'
 import { PotCooking } from './components/PotCooking'
 import { NoodleEating } from './components/NoodleEating'
 import { TaiwanTable } from './components/TaiwanTable'
+import { Bakery } from './components/Bakery'
 import { OpeningSpot } from './components/OpeningSpot'
 import { BAR_AT, BAR_TOP, type GuestView } from './components/Roasting'
 import { GuestBar3D } from './components/GuestBar3D'
@@ -114,6 +117,8 @@ const GAS_PER_HOUR = 30
  * miso soup cheapest; a soup base or a bowl of noodles in between.
  */
 const COST_SHARE: Record<string, number> = {
+  // dough: flour, butter, eggs, sugar (what goes on it is costed on its own)
+  CroissantDough: 0.38, BaguetteDough: 0.26, BriocheDough: 0.34, SourdoughDough: 0.3,
   ExtraFish: 0.48, Saury: 0.46, Mackerel: 0.48, ShrimpSkewer: 0.52, Scallop: 0.55, Squid: 0.5, Shrimp: 0.5, CrabStick: 0.42,
   BeefSlice: 0.45, Meatball: 0.36, Fishball: 0.34, Yakitori: 0.4, PorkBelly: 0.42, Sausage: 0.38, BloodCake: 0.3,
   BeefShank: 0.48, Tendon: 0.45, Tripe: 0.4, BraisedEgg: 0.25,
@@ -279,9 +284,11 @@ type SceneProps = {
   phone: boolean
   /** (noodle bar open) the kitchen is stir-frying an order at the wok */
   noodleWok: boolean
+  /** (bakery open) what the kitchen is baking, or has set out */
+  bakeKitchen: { phase: 'cook' | 'eat'; parts: Part[] } | null
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -520,7 +527,10 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
             {(QUALITY.allDishes || i === active || inUse.includes(dish.id)) && <Suspense fallback={null}>
               {/* loaded in two steps where the device can take it: the light model shows at once, the full one
                   replaces it when it has loaded (only while nothing's ordered, so nothing being cooked is lost) */}
-              {QUALITY.lite && !(QUALITY.upgrade && upgraded.has(dish.id)) ? models(liteUrl(dish.model))
+              {dish.procedural ? (
+                dish.bake && <Bakery items={dish.items} bake={dish.bake} quantities={servings(dish, orders[dish.id])} active={i === active}
+                  locked={ai} lang={lang} onEat={onEat} kitchen={ai && i === active ? bakeKitchen : null} />
+              ) : QUALITY.lite && !(QUALITY.upgrade && upgraded.has(dish.id)) ? models(liteUrl(dish.model))
                 : QUALITY.lite ? <Suspense fallback={models(liteUrl(dish.model))}>{models(dish.model)}</Suspense>
                   : models(dish.model)}
               {soup && dish.heatControl && dish.brothY !== undefined && (
@@ -710,7 +720,7 @@ export default function App() {
       window.removeEventListener('pagehide', write)
     }
   }, [])
-  const [office, setOffice] = useState<null | 'stock' | 'staff'>(null)
+  const [office, setOffice] = useState<null | 'staff'>(null)
   // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
   const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>({})
   const menuByRef = useRef(menuBy)
@@ -743,6 +753,99 @@ export default function App() {
     const n: Record<string, number> = {}
     for (const p of e.parts) n[p.id] = (n[p.id] ?? 0) + 1
     return n
+  }
+  /**
+   * The second chef tries out a few dishes not yet tried, the way he'd make them (a better one picks what suits a
+   * food better and makes it better): each uses up its food from stock, costs its ingredients, and goes in the
+   * notebook as a try, like the owner's own.
+   */
+  const chefTrial = (d: DishInfo) => {
+    const c = staffOf(d.id, 'chef')[0]
+    if (!c) return
+    const who = lang === 'ja' ? c.ja : c.zh
+    const skill = effective(c, hired[d.id]?.[c.id]?.fatigue ?? 0)
+    const left = { ...stock }
+    const takes = (id: string) => {
+      const inc = (findItem(d, id) as { includes?: Record<string, number> } | undefined)?.includes ?? { [id]: 1 }
+      return inc
+    }
+    const can = (id: string) => Object.entries(takes(id)).every(([k, q]) => (left[k] ?? 0) >= q)
+    const tried = (id: string, dabs: Seasoning[]) => !!notes[id]?.tries.some((tr) => signature(tr.dabs).join('+') === dabs.join('+'))
+    // what could be tried, with how good it ought to come out
+    const ideas: { id: string; dabs: Seasoning[]; taste: number }[] = []
+    if (d.roast) {
+      for (const it of d.items) {
+        if (!(it.id in d.roast.times)) continue
+        ideas.push({ id: it.id, dabs: [], taste: 62 })
+        for (const k of ['salt', 'soy', 'milk', 'peanut'] as const) {
+          const w = PAIRING[k][it.id] ?? PAIRING_DEFAULT[k]
+          if (w > 5) ideas.push({ id: it.id, dabs: [k], taste: 62 + w })
+        }
+      }
+    } else if (d.bake) {
+      for (const it of d.items) {
+        ideas.push({ id: it.id, dabs: [], taste: breadTaste(d.bake, it.id, [], 1.1) })
+        for (const [k, w] of Object.entries(d.bake.pairing[it.id] ?? {})) {
+          if ((w ?? 0) > 5) ideas.push({ id: it.id, dabs: [k as Topping], taste: breadTaste(d.bake, it.id, [k as Topping], 1.1) })
+        }
+      }
+    } else {
+      for (const it of [...d.bases.filter((b) => !b.includes || d.id === 'beefnoodle'), ...d.items]) ideas.push({ id: it.id, dabs: [], taste: 72 })
+    }
+    // the best ideas first (a less able chef is less sure which those are)
+    const ranked = ideas.filter((x) => !tried(x.id, x.dabs))
+      .map((x) => ({ ...x, guess: x.taste + (Math.random() - 0.5) * (1 - skill) * 40 }))
+      .sort((a, b) => b.guess - a.guess)
+    const done: string[] = []
+    let spent = 0
+    const tries: { id: string; taste: number; dabs: Seasoning[] }[] = []
+    for (const x of ranked) {
+      if (tries.length >= 3) break
+      if (!can(x.id)) continue
+      for (const [k, q] of Object.entries(takes(x.id))) left[k] = (left[k] ?? 0) - q
+      const part: Part = { id: x.id, dabs: x.dabs, name: '', ja: '' }
+      spent += partCost(d, part)
+      const taste = Math.round(Math.max(5, Math.min(98, x.taste + (skill - 0.7) * 15 + (Math.random() - 0.5) * (1 - skill) * 30)))
+      tries.push({ id: x.id, taste, dabs: x.dabs })
+      const item = findItem(d, x.id)!
+      done.push(partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, lang, d.roast ? 'grill' : d.bake ? 'bake' : 'plain'))
+    }
+    if (!tries.length) {
+      say(LINES[lang].trialNone(who))
+      return
+    }
+    setStock(left)
+    book('food', spent)
+    setNotes((all) => {
+      const next = { ...all }
+      for (const tr of tries) {
+        const item = findItem(d, tr.id)!
+        next[tr.id] = { name: nameIn(lang, item), tries: [...(next[tr.id]?.tries ?? []), { taste: tr.taste, doneness: 1.1,
+          dabs: Object.fromEntries(tr.dabs.map((k) => [k, 1])), at: Date.now() }] }
+      }
+      return next
+    })
+    say(LINES[lang].trial(who, done))
+  }
+  /** buy in n of something (paid from the cash in hand) */
+  const buyIn = (d: DishInfo, id: string, n: number) => {
+    const it = ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id)
+    const cost = costOf(it ?? { price: 0 }) * n
+    if (cost > cash) return
+    book('bought', cost)
+    setStock((st) => ({ ...st, [id]: (st[id] ?? 0) + n }))
+  }
+  /** buy in n of everything this shop sells */
+  const buyAll = (d: DishInfo, n: number) => {
+    const goods = [...d.bases.filter((b) => !b.includes), ...d.items]
+    const cost = goods.reduce((t, g) => t + costOf(g) * n, 0)
+    if (cost > cash) return
+    book('bought', cost)
+    setStock((st) => {
+      const next = { ...st }
+      for (const g of goods) next[g.id] = (next[g.id] ?? 0) + n
+      return next
+    })
   }
   const canServe = (e: Entry, st: Record<string, number> = stock) => Object.entries(needOf(e)).every(([k, q]) => (st[k] ?? 0) >= q)
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
@@ -1115,7 +1218,7 @@ export default function App() {
   type ShopGuest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state'];
     base?: string
     /** (noodle bar) everything in what they ordered, and what it's called on the menu */
-    parts?: string[]; label?: string }
+    parts?: string[]; label?: string; dishParts?: Part[] }
   // (each shop's own clock, in seconds of business: it only runs while the shop is open and on screen, so a customer
   // isn't kept waiting by the shop being closed or looked away from)
   const shop = useRef<Record<string, { guests: ShopGuest[]; seq: number; clock: number; time: number;
@@ -1176,7 +1279,8 @@ export default function App() {
     })
     book('revenue', e.price)
     book('food', entryCost(e))
-    if (d.id !== 'beefnoodle') {
+    // (the noodle bar's and the bakery's kitchens set each order out themselves)
+    if (d.id !== 'beefnoodle' && d.id !== 'bakery') {
       setOrdersBy((b) => {
         const cur = { ...b.open[d.id] }
         for (const [k, q] of Object.entries(partsOf(e))) {
@@ -1210,7 +1314,7 @@ export default function App() {
   simRef.current = () => {
     if (!ai || !opened[DISHES[active].id]) return
     const d = DISHES[active]
-    if (d.id !== 'hotpot' && d.id !== 'beefnoodle') return
+    if (d.id !== 'hotpot' && d.id !== 'beefnoodle' && d.id !== 'bakery') return
     const s = shopOf(d.id)
     const cook = chefOf(d.id)
     s.time += 0.8
@@ -1253,6 +1357,7 @@ export default function App() {
         const e = inStock[Math.floor(Math.random() * inStock.length)]
         if (e && orderEntry(e, id)) {
           g.parts = e.parts.map((p) => p.id)
+          g.dishParts = e.parts
           g.base = g.parts[0]
           g.label = nameIn(lang, e)
           g.orders.push(...g.parts)
@@ -1308,7 +1413,7 @@ export default function App() {
         if (next) {
           s.kitchen = { guest: next.id, t: 0, phase: 'cook' }
           setOrders((all) => ({ ...all, [d.id]: {} }))
-          talk('chef', LINES[lang].noodlesIn(next.id))
+          talk('chef', d.bake ? LINES[lang].bakeIn(next.id) : LINES[lang].noodlesIn(next.id))
         }
       } else {
         k.t += 0.8
@@ -1321,7 +1426,7 @@ export default function App() {
           const all = g.parts ?? [g.base!]
           setOrders((o) => ({ ...o, [d.id]: Object.fromEntries(all.map((p) => [p, all.filter((x) => x === p).length])) }))
           g.state = 'eating'
-          talk('chef', LINES[lang].noodlesUp(g.id, g.label ?? nameIn(lang, ([...d.bases, ...d.items] as { id: string; name: string }[]).find((b) => b.id === g.base)!)))
+          talk('chef', (d.bake ? LINES[lang].bakeUp : LINES[lang].noodlesUp)(g.id, g.label ?? nameIn(lang, ([...d.bases, ...d.items] as { id: string; name: string }[]).find((b) => b.id === g.base)!)))
           report(d.id)
         } else if (k.phase === 'eat' && k.t > 12) {
           // a better (and less tired) cook makes a better bowl; a server bringing it hot helps too
@@ -1402,6 +1507,11 @@ export default function App() {
             }} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
+            bakeKitchen={(() => {
+              const k = ai ? shop.current.bakery?.kitchen : null
+              const g = k ? shop.current.bakery.guests.find((x) => x.id === k.guest) : undefined
+              return k && g?.dishParts ? { phase: k.phase, parts: g.dishParts } : null
+            })()}
             phone={phone} noodleWok={(() => {
               const k = ai ? shop.current.beefnoodle?.kitchen : null
               const g = k && k.phase === 'cook' ? shop.current.beefnoodle.guests.find((x) => x.id === k.guest) : undefined
@@ -1419,7 +1529,7 @@ export default function App() {
         <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)} openAt={bookAt}
           partCost={(p) => partCost(dish, p)}
           chef={(() => { const c = staffOf(dish.id, 'chef')[0]; return c ? (lang === 'ja' ? c.ja : c.zh) : null })()}
-          chefSkill={(staffOf(dish.id, 'chef')[0]?.skill ?? 60) / 100}
+          chefSkill={(staffOf(dish.id, 'chef')[0]?.skill ?? 60) / 100} onTrial={() => chefTrial(dish)}
           onPublish={(e) => setMenuBy((m) => {
             const cur = m[e.shop] ?? []
             if (cur.length >= MENU_MAX || cur.some((x) => x.key === e.key)) return m
@@ -1427,32 +1537,12 @@ export default function App() {
           })}
           onUnpublish={(key) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).filter((x) => x.key !== key) }))}
           onReprice={(key, price) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).map((x) => (x.key === key ? { ...x, price } : x)) }))} />
-        <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'stock'))} aria-expanded={!!office}
-          title={lang === 'ja' ? '事務所（仕入れ・人事）' : '經營（採買・人事）'}>
+        <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'staff'))} aria-expanded={!!office}
+          title={lang === 'ja' ? '人事' : '經營（人事）'}>
           <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em><b>NT${Math.round(cash).toLocaleString()}</b>
         </button>
         {office && (
-          <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} stock={stock} tab={office} onTab={setOffice} onClose={() => setOffice(null)}
-            unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
-            menuUses={new Set(entriesOf(dish.id).flatMap((e) => e.parts.map((p) => p.id)))}
-            onBuyAll={(n, ids) => {
-              const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items].filter((g) => !ids || ids.includes(g.id))
-              const cost = goods.reduce((t, g) => t + costOf(g) * n, 0)
-              if (cost > cash) return
-              book('bought', cost)
-              setStock((st) => {
-                const next = { ...st }
-                for (const g of goods) next[g.id] = (next[g.id] ?? 0) + n
-                return next
-              })
-            }}
-            onBuy={(id, n) => {
-              const it = ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id)
-              const cost = costOf(it ?? { price: 0 }) * n
-              if (cost > cash) return
-              book('bought', cost)
-              setStock((st) => ({ ...st, [id]: (st[id] ?? 0) + n }))
-            }}
+          <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
             onReset={() => {
               if (!window.confirm(lang === 'ja' ? '資金・在庫・スタッフ・ノートを全部リセットしますか？' : '確定要重新開始？資金、庫存、員工和試吃筆記都會清空。')) return
               try {
@@ -1604,15 +1694,17 @@ export default function App() {
               setAsking(false)
               setIgnite((n) => n + 1)
               window.setTimeout(() => setIgnite(0), 3200)
-              // first thing a new shop needs: stock (nothing on the menu can be ordered without it)
-              window.setTimeout(() => setOffice('stock'), 900)
+              // first thing a new shop needs: stock, bought in right on the board
+              window.setTimeout(() => say(UI[lang].buyOnBoard), 900)
             }}>{lang === 'ja' ? '開業' : '開業'}</button>
             <button type="button" className="welcome-back" onClick={() => setAsking(false)}>{lang === 'ja' ? 'やめる' : '先不要'}</button>
           </div>
         </div>
       )}
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : researchDish(dish)} research={!ai} lang={lang} quantities={ai ? entryCount : orders[dish.id]}
+      <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : researchDish(dish)} research={!ai}
+        cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
+        onBuy={(id, n) => buyIn(dish, id, n)} onBuyAll={(n) => buyAll(dish, n)} lang={lang} quantities={ai ? entryCount : orders[dish.id]}
         feed={feed} locked={ai} stock={ai ? entryStock(dish) : stock}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {
@@ -1648,7 +1740,6 @@ export default function App() {
         }
         if (!ai && !sellable(dish)) {
           say(UI[lang].cantOpen)
-          setOffice('stock')
           return
         }
         // (at the grill the owner is the head chef: with no cooks hired, it's all theirs to do)
@@ -1671,7 +1762,7 @@ export default function App() {
 }
 
 // (a phone loads each dish when it's switched to, to keep memory down)
-for (const d of QUALITY.allDishes ? DISHES : []) {
+for (const d of QUALITY.allDishes ? DISHES.filter((x) => !x.procedural) : []) {
   useGLTF.preload(QUALITY.lite ? liteUrl(d.model) : d.model)
   for (const b of d.bases) if (b.broth) useTexture.preload(b.broth)
 }

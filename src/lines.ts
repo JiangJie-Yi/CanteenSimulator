@@ -15,6 +15,10 @@ const ZH = {
   lightPot: '開火，湯滾了就可以下料',
   noodlesIn: (id: number) => `#${id} 的麵下鍋了`,
   noodlesUp: (id: number, n: string) => `#${id} 的${n}來了`,
+  bakeIn: (id: number) => `#${id} 的麵包進爐了`,
+  bakeUp: (id: number, n: string) => `#${id} 的${n}出爐了，剛烤好的！`,
+  trial: (who: string, names: string[]) => `${who}試做了：${names.join('、')}，記進研發筆記了`,
+  trialNone: (who: string) => `${who}：沒有材料可以試，先進貨吧`,
 }
 const JA: typeof ZH = {
   addCharcoal: '火が弱いな、炭を足そう',
@@ -30,6 +34,10 @@ const JA: typeof ZH = {
   lightPot: '火を点けます、煮立ったら具をどうぞ',
   noodlesIn: (id) => `#${id} さんの麺、茹でてます`,
   noodlesUp: (id, n) => `#${id} さん、${n}お待ち！`,
+  bakeIn: (id) => `#${id} さんのパン、窯に入れました`,
+  bakeUp: (id, n) => `#${id} さん、焼きたての${n}です！`,
+  trial: (who, names) => `${who}が試作：${names.join('、')}（ノートに記録）`,
+  trialNone: (who) => `${who}：材料がありません。先に仕入れを`,
 }
 export const LINES: Record<Lang, typeof ZH> = { zh: ZH, ja: JA }
 export const starsFor = (taste: number) => (taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1)

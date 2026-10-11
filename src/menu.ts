@@ -1,3 +1,4 @@
+import type { Topping } from './recipes'
 // Dishes and their menus. Each item `id` is the object-name prefix in that dish's .glb (see blender/*.py).
 export type MenuItem = {
   id: string
@@ -71,11 +72,21 @@ export type DishLight = {
   shadowSoftness?: number
 }
 
+/**
+ * The bakery: doughs are given their fillings or toppings and baked in the oven. How long each takes (seconds) and
+ * how well each topping suits each dough (美味 added or taken away), from Taiwanese bakeries.
+ */
+export type Bake = { times: Record<string, number>; pairing: Record<string, Partial<Record<Topping, number>>> }
+
 export type Dish = {
   id: string
   name: string
   ja?: string
+  /** the glb it's drawn from ('' for a shop drawn in code: see procedural) */
   model: string
+  /** drawn in code rather than from a model (the bakery) */
+  procedural?: boolean
+  bake?: Bake
   /** soups, bowls or set meals, ordered on the menu like anything else */
   bases: Base[]
   /** only one base at a time (one soup in the pot, one bowl of noodles): ordering another swaps it */
@@ -365,6 +376,36 @@ export const DISHES: Dish[] = [
     },
     smoke: { y: 0.85, width: 1.0, height: 2.0 },
     focusY: 0.5,
+  },
+  {
+    id: 'bakery',
+    name: '西式麵包',
+    ja: 'ベーカリー',
+    model: '',
+    procedural: true,
+    bases: [],
+    // a French/Viennese bakery: what's bought in is the dough; what it becomes depends on what goes on it (recipes.ts)
+    items: [
+      { id: 'CroissantDough', name: '可頌麵團', ja: 'クロワッサン生地', en: 'Croissant Dough', price: 45, kcal: 260 },
+      { id: 'BaguetteDough', name: '法國麵團', ja: 'バゲット生地', en: 'Baguette Dough', price: 35, kcal: 270 },
+      { id: 'BriocheDough', name: '布里歐麵團', ja: 'ブリオッシュ生地', en: 'Brioche Dough', price: 40, kcal: 300 },
+      { id: 'SourdoughDough', name: '酸種麵團', ja: 'サワードウ生地', en: 'Sourdough', price: 50, kcal: 280 },
+    ],
+    bake: {
+      times: { CroissantDough: 22, BaguetteDough: 26, BriocheDough: 18, SourdoughDough: 32 },
+      pairing: {
+        // butter pastry: chocolate and almond (pain au chocolat, croissant aux amandes), ham and cheese; not garlic
+        CroissantDough: { chocolate: 16, almond: 14, custard: 10, cheese: 10, ham: 8, garlic: -12 },
+        // a crusty stick: garlic butter, cheese, ham (jambon-beurre); nothing sweet
+        BaguetteDough: { garlic: 16, cheese: 12, ham: 12, almond: -6, chocolate: -8, custard: -12 },
+        // rich and soft: chocolate and custard
+        BriocheDough: { custard: 16, chocolate: 14, almond: 10, cheese: 4, ham: 2, garlic: -12 },
+        // a sour country loaf: cheese and garlic
+        SourdoughDough: { cheese: 12, garlic: 12, ham: 8, almond: 2, chocolate: -6, custard: -10 },
+      },
+    },
+    light: { spotIntensity: 1.2, shadowOpacity: 0.5 },
+    focusY: 0.45,
   },
 ]
 

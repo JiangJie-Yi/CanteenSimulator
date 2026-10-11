@@ -41,6 +41,8 @@ type Props = {
   chef: string | null
   /** how good that chef is (0..1): a better one gives better advice */
   chefSkill: number
+  /** ask the second chef to try out a few dishes not yet tried (using up their food) */
+  onTrial?: () => void
   /** open it at this tab (bumped from outside: the 營 button sends you to the menu when it's short) */
   openAt?: { tab: Tab; n: number }
 }
@@ -53,7 +55,7 @@ const t = (lang: Lang, zh: string, ja: string) => (lang === 'ja' ? ja : zh)
  * its own (鹽烤玉米, 醬刷玉米…) — each with its best try; any of them can be put on the menu at a price. The menu
  * tab lists what's on it (re-price, take off, make up sets), and a hired chef can be asked what's worth trying.
  */
-export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, onReprice, partCost, chef, chefSkill, openAt }: Props) {
+export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, onReprice, partCost, chef, chefSkill, openAt, onTrial }: Props) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('lab')
   const [seenOpen, setSeenOpen] = useState(0)
@@ -68,6 +70,9 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   const [setName, setSetName] = useState('')
   const [advice, setAdvice] = useState<string | null>(null)
   const roast = dish.roast
+  // (at the grill and the bakery what goes on a food makes it a dish of its own)
+  const kind = roast ? 'grill' : dish.bake ? 'bake' : 'plain'
+  const seasoned = kind !== 'plain'
   const short = (id: string) => roast?.names[id] ?? findItem(dish, id)?.name ?? id
 
   // every way each food of this shop has been tried, by recipe
@@ -79,13 +84,13 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
     if (!item || (roast && (item as { includes?: object }).includes)) continue
     const by = new Map<string, Try[]>()
     for (const tr of n.tries) {
-      const dabs = roast ? signature(tr.dabs) : []
+      const dabs = seasoned ? signature(tr.dabs) : []
       const k = recipeKey(id, dabs)
       by.set(k, [...(by.get(k) ?? []), tr])
     }
     for (const [k, tries] of by) {
-      const dabs = roast ? signature(tries[0].dabs) : []
-      const part: Part = { id, dabs, name: partName(item, short(id), id, dabs, 'zh', !!roast), ja: partName(item, short(id), id, dabs, 'ja', !!roast) }
+      const dabs = seasoned ? signature(tries[0].dabs) : []
+      const part: Part = { id, dabs, name: partName(item, short(id), id, dabs, 'zh', kind), ja: partName(item, short(id), id, dabs, 'ja', kind) }
       recipes.push({ key: k, part, best: tries.reduce((a, b) => (b.taste > a.taste ? b : a)), tries: tries.length, cost: partCost(part) })
     }
   }
@@ -101,7 +106,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   const describe = (r: Recipe) => {
     const bits: string[] = []
     if (r.best.doneness !== undefined) bits.push(donenessWord(r.best.doneness, lang))
-    if (roast) bits.push(r.part.dabs.length ? r.part.dabs.map((k) => SEASON_NAME[lang][k]).join('＋') : t(lang, '原味', '味付けなし'))
+    if (seasoned) bits.push(r.part.dabs.length ? r.part.dabs.map((k) => SEASON_NAME[lang][k]).join('＋') : t(lang, '原味', '味付けなし'))
     return bits.join('・')
   }
 
@@ -110,8 +115,8 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
     if (!chef) return
     if (roast) {
       const foods = dish.items.filter((x) => x.id in roast.times)
-      const ranked = (id: string) => (['salt', 'soy', 'milk', 'peanut'] as Seasoning[])
-        .map((k) => ({ k, w: PAIRING[k][id] ?? PAIRING_DEFAULT[k] })).sort((a, b) => b.w - a.w)
+      const ranked = (id: string) => (['salt', 'soy', 'milk', 'peanut'] as const)
+        .map((k) => ({ k: k as Seasoning, w: PAIRING[k][id] ?? PAIRING_DEFAULT[k] })).sort((a, b) => b.w - a.w)
       const ideas = foods.map((f) => {
         const r = ranked(f.id)
         // (a less able chef sometimes names the second best)
@@ -131,6 +136,19 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
         ? t(lang, `${chef}：「${name}的話，刷點${SEASON_NAME.zh[idea.k]}最對味，烤到剛好熟就起火，可以做成${partName(idea.f, name, idea.f.id, [idea.k], 'zh')}。」`,
           `${chef}：「${idea.f.ja ?? name}なら${SEASON_NAME.ja[idea.k]}が一番合います。」`)
         : t(lang, `${chef}：「${name}原味烤就好，什麼都別加。」`, `${chef}：「${idea.f.ja ?? name}は何もつけずに焼くのが一番。」`))
+    } else if (dish.bake) {
+      // the baker: a dough with the filling that suits it best, not yet tried
+      const bake = dish.bake
+      const ideas = dish.items.map((f) => {
+        const r = Object.entries(bake.pairing[f.id] ?? {}).sort((a, b) => b[1] - a[1])
+        const pick = (Math.random() < chefSkill ? r[0] : r[1]) ?? r[0]
+        return { f, k: pick?.[0] as Seasoning | undefined }
+      }).filter((x) => x.k && !notes[x.f.id]?.tries.some((tr) => signature(tr.dabs).join() === x.k))
+      const idea = ideas[Math.floor(Math.random() * ideas.length)]
+      setAdvice(idea?.k
+        ? t(lang, `${chef}：「${idea.f.name}配${SEASON_NAME.zh[idea.k]}最對味，烤到表皮金黃就出爐，就是${partName(idea.f, idea.f.name, idea.f.id, [idea.k], 'zh', 'bake')}。」`,
+          `${chef}：「${idea.f.ja ?? idea.f.name}には${SEASON_NAME.ja[idea.k]}が合います。」`)
+        : t(lang, `${chef}：「招牌麵包都試過了，可以組個套餐。」`, `${chef}：「定番は全部試しましたね。」`))
     } else {
       const untried = [...dish.bases.filter((b) => !b.includes), ...dish.items].filter((x) => !notes[x.id])
       const idea = untried[Math.floor(Math.random() * untried.length)]
@@ -266,7 +284,10 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
               {chef ? (
                 <>
                   <p>{t(lang, `可以問二廚 ${chef} 做菜的意見。`, `二番手の${chef}に相談できます。`)}</p>
-                  <button type="button" onClick={ask}>{t(lang, '問一下', '聞いてみる')}</button>
+                  <div className="nb-chef-acts">
+                    <button type="button" onClick={ask}>{t(lang, '問一下', '聞いてみる')}</button>
+                    <button type="button" onClick={onTrial}>{t(lang, '請他試做 3 道（用掉食材）', '3品試作してもらう')}</button>
+                  </div>
                   {advice && <blockquote>{advice}</blockquote>}
                 </>
               ) : (

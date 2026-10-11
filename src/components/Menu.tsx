@@ -19,8 +19,14 @@ type MenuProps = {
   locked?: boolean
   /** portions in stock (a tag with none left is marked 缺) */
   stock?: Record<string, number>
-  /** (shop closed) the board is the shop's foods to try out, not a menu: there's no menu until dishes are worked out */
+  /** (shop closed) the board is the shop's foods to try out, not a menu: there's no menu until dishes are worked out.
+   * Each tag shows what the food costs and how much is in, and it's bought in right there */
   research?: boolean
+  unitCost?: (id: string) => number
+  onBuy?: (id: string, n: number) => void
+  /** buy n of everything on the board */
+  onBuyAll?: (n: number) => void
+  cash?: number
 }
 
 /**
@@ -55,7 +61,8 @@ const CAT_NAMES: Record<string, Record<Lang, string>> = {
   xiaolongbao: { zh: '點心', ja: '点心' }, soup: { zh: '湯類', ja: 'スープ' },
 }
 
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false }: MenuProps) {
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false, unitCost, onBuy, onBuyAll,
+  cash = Infinity }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
   const count = [...dish.bases, ...dish.items].reduce((n, x) => n + (quantities[x.id] ?? 0), 0)
@@ -181,15 +188,16 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     const n = quantities[x.id] ?? 0
     const incl = !base && included.has(x.id)
     const name = nameIn(lang, x)
-    // (a Taiwanese menu prints its prices in plain figures, in red)
-    const price = taiwan ? String(x.price) : toChineseNumber(x.price)
+    // (a Taiwanese menu prints its prices in plain figures, in red; the test kitchen's board shows what it costs)
+    const cost = research && unitCost ? unitCost(x.id) : 0
+    const price = research ? `${cost}` : taiwan ? String(x.price) : toChineseNumber(x.price)
     const hasSet = base && !!(x as { includes?: object }).includes
     const filling = feed.filter((f) => f.id === x.id)
     const parts = (x as { includes?: Record<string, number> }).includes ?? { [x.id]: 1 }
     const out = !!stock && Object.entries(parts).some(([k, q]) => (stock[k] ?? 0) < q)
     return (
       <button key={x.id} type="button" aria-pressed={n > 0} data-id={x.id}
-        className={`strip${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}${filling.length ? ' is-filling' : ''}${out ? ' is-out' : ''}`}
+        className={`strip${research ? ' is-research' : ''}${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}${filling.length ? ' is-filling' : ''}${out ? ' is-out' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${x.price}${n ? `，${t.ordered(n)}` : ''}`}
         style={tagFit(name, x.en, price, n > 0)}
         onClick={() => {
@@ -214,7 +222,17 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         <Icon name={icon} />
         <span className="strip-name">{name}</span>
         {x.en && <span className="strip-en" lang="en">{x.en}</span>}
-        <span className="strip-price">{price}</span>
+        {!research && <span className="strip-price">{price}</span>}
+        {research && onBuy && (
+          // (stocked right here: it isn't the tag itself, which takes one to try)
+          <span className="strip-stock" aria-hidden="true">
+            <small>{lang === 'ja' ? '原価' : '成本'} {cost}</small>
+            <b>{lang === 'ja' ? '在庫' : '庫存'} {stock?.[x.id] ?? 0}</b>
+            <span role="button" tabIndex={-1} className={`strip-buy${cash < cost * 10 ? ' is-off' : ''}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (cash >= cost * 10) onBuy(x.id, 10) }}>+10</span>
+          </span>
+        )}
         {incl && <span className="stamp stamp-incl" aria-hidden="true">{t.included}</span>}
         {out && <span className="out-tag" aria-hidden="true">{lang === 'ja' ? '切' : '缺'}</span>}
         {filling.map((f) => <span key={f.key} className="fill-guest" aria-hidden="true">#{f.guest}</span>)}
@@ -286,7 +304,16 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         <button type="button" className="clear" onClick={onClear} disabled={count === 0 || locked}>
           {t.clear}
         </button>
-        <p className="tally-hint">{locked ? t.lockedHint : touchOnly ? t.hintTouch : t.hint}</p>
+        <p className="tally-hint">{locked ? t.lockedHint : touchOnly ? t.hintTouch : t.hint}
+          {research && onBuyAll && unitCost && (() => {
+            // (stock everything on the board at once)
+            const all = [...dish.bases.filter((b) => !b.includes), ...dish.items].reduce((n, x) => n + unitCost(x.id) * 10, 0)
+            return (
+              <button type="button" className="tally-buyall" disabled={cash < all} onClick={() => onBuyAll(10)}>
+                {lang === 'ja' ? '全部 +10' : '全部各 +10'} <small>NT${all.toLocaleString()}</small>
+              </button>
+            )
+          })()}</p>
       </footer>
     </aside>
   )

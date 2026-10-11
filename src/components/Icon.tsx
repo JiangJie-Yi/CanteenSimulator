@@ -2,6 +2,37 @@ import type { ReactNode } from 'react'
 
 // Hand-drawn line icons for the menu strips. 24x24, stroked in currentColor so they ink like the text.
 const ICONS: Record<string, ReactNode> = {
+  // ---- the bakery and its doughs
+  bakery: (
+    <>
+      <path d="M4 13a8 5 0 0 1 16 0v5H4z" />
+      <path d="M8 10l1 3M12 9v4M16 10l-1 3" />
+    </>
+  ),
+  BriocheDough: (
+    <>
+      <path d="M4 15a8 6 0 0 1 16 0z" />
+      <path d="M7 11l3 3M11 9l4 4M15 9l2 2M9 9l-2 2" />
+    </>
+  ),
+  SourdoughDough: (
+    <>
+      <path d="M3 16a9 7 0 0 1 18 0z" />
+      <path d="M8 11l8 0M9 13.5l6 0M12 9v6" />
+    </>
+  ),
+  CroissantDough: (
+    <>
+      <path d="M3 15c2-6 6-9 9-9s7 3 9 9c-2 1-4 0-5-2-1 2-2 3-4 3s-3-1-4-3c-1 2-3 3-5 2z" />
+      <path d="M9 9l1 5M15 9l-1 5" />
+    </>
+  ),
+  BaguetteDough: (
+    <>
+      <path d="M4 18c-2-2 10-14 14-14 2 2-10 14-14 14z" />
+      <path d="M9 11l2 2M12 8l2 2M6 14l2 2" />
+    </>
+  ),
   // ---- bases
   hotpot: (
     <>

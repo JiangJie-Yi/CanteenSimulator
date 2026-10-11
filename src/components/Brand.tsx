@@ -5,10 +5,12 @@ import type { Lang } from '../i18n'
 //   grill    聞野 燒烤  — "smelt from out in the fields": a board of charred cedar (焼杉), white brush lettering
 //            and a red seal
 //   hot pot  鼎沸 火鍋  — "bubbling like a cauldron": a round-cornered red-and-gold plaque with a flame crest
+//   bakery   麥田 烘焙  — "wheat field", a French-style bakery: a cream-painted board edged in brown, with a wheat ear
 const NAMES: Record<string, Record<Lang, { main: string; sub: string }>> = {
   beefnoodle: { zh: { main: '甲粗飽', sub: '食堂' }, ja: { main: 'たらふく', sub: '食堂' } },
   grilledfish: { zh: { main: '聞野', sub: '燒烤' }, ja: { main: '聞野', sub: '炭火焼' } },
   hotpot: { zh: { main: '鼎沸', sub: '火鍋' }, ja: { main: '鼎沸', sub: '鍋' } },
+  bakery: { zh: { main: '麥田', sub: '烘焙' }, ja: { main: '麦田', sub: 'ベーカリー' } },
 }
 
 /**
@@ -30,6 +32,11 @@ export function Brand({ night, lang, shop = 'beefnoodle', dark = false, ignite =
         {shop === 'hotpot' && (
           <svg className="brand-flame" viewBox="0 0 20 24">
             <path d="M10 1c2 5 7 7 7 13a7 7 0 0 1-14 0c0-3 2-5 3-7 0 3 1 4 2 4 0-4 1-7 2-10z" />
+          </svg>
+        )}
+        {shop === 'bakery' && (
+          <svg className="brand-wheat" viewBox="0 0 16 28">
+            <path d="M8 27V6M8 9c-3-1-4-4-3-6 2 1 3 3 3 6zm0 0c3-1 4-4 3-6-2 1-3 3-3 6zM8 15c-3-1-4-4-3-6 2 1 3 3 3 6zm0 0c3-1 4-4 3-6-2 1-3 3-3 6zM8 21c-3-1-4-4-3-6 2 1 3 3 3 6zm0 0c3-1 4-4 3-6-2 1-3 3-3 6z" />
           </svg>
         )}
         <span className="brand-main">{main}</span>

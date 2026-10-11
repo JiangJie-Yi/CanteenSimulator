@@ -4541,3 +4541,156 @@ button {
     width: 62px;
   }
 }
+
+/* ---- the bakery's sign: a cream-painted board edged in brown, with a wheat ear ---- */
+.brand-bakery .brand-plate {
+  --plate: #f4e6c8;
+  --plate-cream: #6a4426;
+  color: #6a4426;
+  border-radius: 0.3em;
+  background: linear-gradient(180deg, #fbf0d8, #ecd8b0);
+  box-shadow: inset 0 0 0 0.06em #8a5a32, inset 0 0 0 0.11em #f4e6c8, inset 0 0 0 0.14em rgb(138 90 50 / 0.5),
+    0 0.2em 0.4em -0.22em rgb(0 0 0 / 0.5);
+}
+
+.brand-bakery .brand-main {
+  letter-spacing: 0.14em;
+}
+
+.brand-wheat {
+  width: 0.5em;
+  height: 0.9em;
+  margin-right: 0.12em;
+  fill: none;
+  stroke: #c08a3a;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.brand-bakery.brand-night .brand-plate {
+  color: #ffe2b0;
+  background: linear-gradient(180deg, #4a3422, #2e2016);
+}
+
+.brand-bakery.brand-night .brand-main,
+.brand-bakery.brand-night .brand-sub {
+  text-shadow: 0 0 0.06em #fff0d0, 0 0 0.22em rgb(255 190 90 / 0.9);
+}
+
+/* the bakery's labels: the fillings' bowls, the oven, what to do on the tray */
+.bake-bowl,
+.bake-oven,
+.bake-hint {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(251 243 228 / 0.92);
+  color: #3b2a20;
+  font: 600 12px/1.4 var(--brush);
+  white-space: nowrap;
+  box-shadow: 0 2px 6px -3px rgb(0 0 0 / 0.5);
+}
+
+.bake-bowl.is-picked {
+  background: #c4442f;
+  color: #fff;
+}
+
+.bake-oven.is-on {
+  background: #e8862a;
+  color: #fff;
+}
+
+.bake-hint {
+  background: rgb(59 42 32 / 0.85);
+  color: #fbf3e4;
+}
+
+/* 試做 board: each tag shows what it costs and what's in, and buys ten more */
+/* (room at the foot of the tag for what it costs, what's in, and +10) */
+.strip.is-research {
+  padding-bottom: 50px;
+}
+
+.strip-stock small {
+  font-size: 9px;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.strip-stock b {
+  white-space: nowrap;
+}
+
+.strip-stock {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.strip-stock b {
+  font-variant-numeric: tabular-nums;
+  color: #5a7a3a;
+}
+
+.strip.is-out .strip-stock b {
+  color: #c4442f;
+}
+
+.strip-buy {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: #3b2a20;
+  color: #fbf3e4;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.strip-buy:hover {
+  background: #c4442f;
+}
+
+.strip-buy.is-off {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.tally-buyall {
+  margin-left: 10px;
+  padding: 2px 10px;
+  border: 1.5px solid #c4442f;
+  border-radius: 8px;
+  background: #c4442f;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tally-buyall small {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.tally-buyall:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.nb-chef-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nb-chef-acts button {
+  margin-left: 0;
+}
