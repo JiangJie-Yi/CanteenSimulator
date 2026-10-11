@@ -41,7 +41,7 @@ export const CHEF_TALK = {
     noStock: (dish: string) => pick([`${dish}的材料沒了，先進貨吧。`, `冰箱裡沒有做${dish}的料了，老闆要先叫貨。`, `欸，${dish}的料剛好用完了，要先補貨。`]),
     unknownFood: () => pick(['這個我們店裡沒有耶，換一樣吧。', '這個沒進貨喔，要不要看看別的？']),
     made: (dish: string, taste: number, chose: boolean) =>
-      `${aside('zh', 0.25)}${chose ? pick([`我照我的方式做成${dish}了。`, `那我做成${dish}。`, `交給我就對了，${dish}，`]) : pick([`${dish}好了，`, `來，${dish}。`, `${dish}做好了，`, `${dish}出爐，小心燙。`])}${verdict.zh(taste)}已經記進料理研製。`,
+      `${aside('zh', 0.25)}${chose ? pick([`我照我的方式做成${dish}了。`, `那我做成${dish}。`, `交給我就對了，${dish}，`]) : pick([`${dish}好了，`, `來，${dish}。`, `${dish}做好了，`, `${dish}出爐，小心燙。`])}${verdict.zh(taste)}已經記在試菜紀錄。`,
     warn: (dish: string) => pick([`${dish}？……這個搭配有點冒險，`, `老闆確定？${dish}我是沒做過，`, `${dish}啊……好吧，你是老闆，`]),
     batch: (dishes: string[]) => pick([`我試了${dishes.join('、')}，都記進筆記了，你看看哪些能上菜單。`,
       `好，一口氣做了${dishes.join('、')}，你挑挑看。`, `${dishes.join('、')}都做好了，筆記上有評語。`]),
@@ -71,7 +71,12 @@ export const CHEF_TALK = {
     },
     placeholder: '跟二廚說…（例：幫我做鹽烤玉米、想吃魚、你決定）',
     send: '說',
-    chips: ['有什麼推薦？', '隨便試 3 道', '庫存還夠嗎？'],
+    chips: ['一鍵生成菜單 10 道', '有什麼推薦？', '隨便試 3 道', '庫存還夠嗎？'],
+    /** a whole menu worked out and put up (by the second chef, and the third if there is one) */
+    menuMade: (dishes: string[], who: string) => pick([`${who}一口氣排了 ${dishes.length} 道：${dishes.join('、')}。都上架了，價錢你再看看。`,
+      `好，菜單弄好了！${who}做了${dishes.join('、')}，共 ${dishes.length} 道，已經上架。`]),
+    menuNone: () => pick(['沒得排了：要嘛都上架了，要嘛材料不夠，先補貨吧。', '材料不夠排菜單，先叫點貨。']),
+    together: (a: string, b: string) => `${a}跟${b}`,
   },
   ja: {
     hello: () => pick(['お疲れさまです。何を作りましょう？', 'はい、何でしょう？', '炭は見てますよ。何にします？']),
@@ -106,6 +111,9 @@ export const CHEF_TALK = {
     },
     placeholder: '二番手に話しかける…（例：塩焼きとうもろこしを作って、魚が食べたい、おまかせ）',
     send: '送る',
-    chips: ['おすすめは？', '3品おまかせ', '在庫は？'],
+    chips: ['メニュー10品おまかせ', 'おすすめは？', '3品おまかせ', '在庫は？'],
+    menuMade: (dishes: string[], who: string) => `${who}で${dishes.length}品作って、メニューに載せました：${dishes.join('、')}`,
+    menuNone: () => 'もう載せられるものがないか、材料が足りません。',
+    together: (a: string, b: string) => `${a}と${b}`,
   },
 } satisfies Record<Lang, unknown>

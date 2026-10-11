@@ -9,7 +9,8 @@ import { LINES } from '@/data/lines'
 import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
-import { PAIRING, PAIRING_DEFAULT } from '@/game/taste'
+import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
+import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 
@@ -485,12 +486,20 @@ const GRAIN_COLORS: Record<Seasoning, THREE.Color> = {
   soy: new THREE.Color('#3a1a08'),
   milk: new THREE.Color('#fbf3dc'),
   peanut: new THREE.Color('#c99a5c'),
+  miso: new THREE.Color('#a8662a'),
+  wasabi: new THREE.Color('#9fc25a'),
+  shichimi: new THREE.Color('#c8401f'),
+  yuzu: new THREE.Color('#b7c43a'),
+  lemon: new THREE.Color('#fff29a'),
   water: new THREE.Color('#bfe2f2'),
 }
+/** the seasonings that go on food (all but water), in the order they're tasted */
+const DABS = ['salt', 'soy', 'milk', 'peanut', 'miso', 'wasabi', 'shichimi', 'yuzu', 'lemon'] as const
 /** how much one dab of each seasoning adds (0 → 1 fully coated) */
 const DAB = 0.35
 /** label over a seasoning when pointed at */
-const TOOL_NAMES: Record<Seasoning, string> = { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉', water: '水' }
+const TOOL_NAMES: Record<Seasoning, string> = { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉', miso: '味噌', wasabi: '山葵',
+  shichimi: '七味粉', yuzu: '柚子胡椒', lemon: '檸檬', water: '水' }
 /** most skewers over the coals at once */
 const FIRE_SKEWERS = 16
 
@@ -981,7 +990,9 @@ function Basket({ position, container }: { position: [number, number, number]; c
 
 type Uniform = { value: number }
 /** per-piece look: how charred it is, and how much of each seasoning is on it (all 0 → 1) */
-type Looks = { uChar: Uniform; uSalt: Uniform; uSoy: Uniform; uMilk: Uniform; uPeanut: Uniform }
+type Looks = { uChar: Uniform; uSalt: Uniform; uSoy: Uniform; uMilk: Uniform; uPeanut: Uniform
+  /** miso glaze; green dabs (wasabi, yuzu kosho); red flakes (shichimi); a glisten of lemon juice */
+  uMiso: Uniform; uGreen: Uniform; uRed: Uniform; uLemon: Uniform }
 
 /**
  * Burn patches for over-roasted food: a value-noise mask over the texture that grows as uChar goes 0 → 1, so the
@@ -1000,6 +1011,10 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
         uniform float uSoy;
         uniform float uMilk;
         uniform float uPeanut;
+        uniform float uMiso;
+        uniform float uGreen;
+        uniform float uRed;
+        uniform float uLemon;
         uniform vec3 uCharColor;
         float charHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float charNoise(vec2 p) {
@@ -1018,6 +1033,10 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
         diffuseColor.rgb = mix(diffuseColor.rgb, uCharColor, charMask);
         // soy brushed on: a dark, rich lacquer over the whole surface
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.5, 0.3, 0.15) + vec3(0.05, 0.02, 0.0), uSoy * 0.85);
+        // miso spread on: a thick golden-brown paste, caught darker where it's bubbled
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.66, 0.42, 0.18) * (0.8 + 0.3 * charNoise(vMapUv * 14.0)), uMiso * 0.8);
+        // lemon squeezed over: a pale, bright sheen
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.08 + vec3(0.05, 0.05, 0.0), uLemon * 0.6);
         #ifdef USE_MAP
           // coarse salt stuck to the surface: scattered white grains, more of them with every pinch
           float saltN = charHash(floor(vMapUv * vec2(150.0, 90.0)));
@@ -1025,6 +1044,12 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
           // peanut powder: fine tan dust settled in specks
           float nutN = charHash(floor(vMapUv * vec2(110.0, 70.0)) + 17.0);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.67, 0.4), step(1.0 - uPeanut * 0.55, nutN));
+          // wasabi or yuzu kosho: a few soft green dabs
+          float dabN = charNoise(vMapUv * 7.0 + 11.0);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.76, 0.3), smoothstep(1.0 - uGreen * 0.28, 1.02 - uGreen * 0.28, dabN));
+          // shichimi: red and dark flakes
+          float redN = charHash(floor(vMapUv * vec2(120.0, 80.0)) + 41.0);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.22, 0.1), step(1.0 - uRed * 0.35, redN));
           // condensed milk drizzled across in thin wavy ribbons, more of them the more is poured
           float ribbon = abs(fract(vMapUv.x * (4.0 + 4.0 * step(0.5, uMilk)) + sin(vMapUv.y * 9.0) * 0.25) - 0.5);
           float milk = (1.0 - smoothstep(0.04, 0.08, ribbon)) * step(0.3, charNoise(vMapUv * 5.0 + 3.0));
@@ -1139,6 +1164,8 @@ type Piece = {
   local: THREE.Vector3
   /** dabs of each seasoning (and splashes of water) it's had, for its 美味 */
   dabs: Record<Seasoning, number>
+  /** each seasoning as it went on, and when (for its timing, and the recipe) */
+  steps: Step[]
   /** ordered and waiting raw on the tray (carried or clicked onto the fire from there), and when it arrived */
   staged: boolean
   stagedAt: number
@@ -1229,7 +1256,7 @@ type RoastingProps = {
   /** told how many pieces are off the fire (on a plate, in a pile or eaten), for the fire's capacity limit */
   onOffFire?: (count: number, loose: number) => void
   /** a piece has been eaten up (for 飽足) */
-  onEat?: (id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number> }) => void
+  onEat?: (id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; steps?: Step[] }) => void
   /** the player's best way with each food, from the tasting notes: the chef may cook to it */
   notes?: Record<string, { doneness?: number; dabs?: Record<string, number> }>
   /** something to tell the diner (it isn't cooked yet, it's burnt) */
@@ -1300,7 +1327,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (!(id in roast.times) || known.has(obj)) continue
       const mats: Piece['mats'] = []
       const looks: Looks = { uChar: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
-        uPeanut: { value: 0 } }
+        uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 } }
       pieces.current.push({
         key: obj.uuid, id, copy: (obj.userData.copy as number | undefined) ?? 0, loose: roast.loose.includes(id),
         node: obj, homeP: obj.position.clone(), homeQ: faceCamera(id, obj), homeQ0: obj.quaternion.clone(),
@@ -1308,7 +1335,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
         toQ: new THREE.Quaternion(), mats, looks, bites: newBites(), sticks: [], food: [], puffs: [], stickOnly: false,
         netSpot: null, container: null, local: new THREE.Vector3(), carried: false, trash: -1,
-        dabs: { salt: 0, soy: 0, milk: 0, peanut: 0, water: 0 }, staged: false, stagedAt: 0, wasPresent: false, homeFlight: 1,
+        dabs: { salt: 0, soy: 0, milk: 0, peanut: 0, miso: 0, wasabi: 0, shichimi: 0, yuzu: 0, lemon: 0, water: 0 }, steps: [], staged: false, stagedAt: 0, wasPresent: false, homeFlight: 1,
         unwrapped: false, unwrapT: 0, chefSeasoned: false,
         trashFrom: new THREE.Vector3(),
         landed: -1,
@@ -1391,13 +1418,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       : r < 1.3 ? 55 + (r - 1) * 30
       : r < 2.2 ? 64 - (r - 1.3) * 26
       : 12
-    for (const k of ['salt', 'soy', 'milk', 'peanut'] as const) {
+    for (const k of DABS) {
       const n = p.dabs[k]
       if (!n) continue
       const w = PAIRING[k][p.id] ?? PAIRING_DEFAULT[k]
       // one dab in full, a second a little more, then it's too much
       const amount = n === 1 ? 1 : n === 2 ? 1.4 : 1.4 - (n - 2) * 0.9
       t += w > 0 ? w * amount : w * n
+      // and put on at the wrong time (soy early, so it burns; lemon cooked; salt sprinkled at the end) it loses some
+      const first = p.steps.find((x) => x.k === k)
+      if (first) t -= timingLoss(k, first.at)
     }
     t -= p.dabs.water * 6
     return Math.round(THREE.MathUtils.clamp(t, 0, 100))
@@ -1808,6 +1838,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       for (const k of VECS) r[k] = p[k].clone()
       r.body = p.body ? { v: p.body.v.clone(), r: p.body.r, live: p.body.live } : null
       r.dabs = { ...p.dabs }
+      r.steps = [...p.steps]
       r.looks = Object.fromEntries(Object.entries(p.looks).map(([k, u]) => [k, u.value]))
       r.want = p.want
       r.bites = { n: p.bites.uBiteCount.value, v: p.bites.uBites.value.map((b) => b.clone()) }
@@ -1830,6 +1861,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.unwrapT = 0
     p.chefSeasoned = false
     for (const k of Object.keys(p.dabs) as Seasoning[]) p.dabs[k] = 0
+    p.steps = []
     p.progress = 0
     p.netSpot = null
     p.container = null
@@ -1868,6 +1900,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const b = r.body as { v: THREE.Vector3; r: number; live: boolean } | null
         p.body = b ? { v: b.v.clone(), r: b.r, live: b.live } : null
         Object.assign(p.dabs, r.dabs)
+        p.steps = [...((r.steps as Step[] | undefined) ?? [])]
         p.want = (r.want as Piece['want']) ?? null
         for (const [k, v] of Object.entries(r.looks as Record<string, number>)) (p.looks as Record<string, { value: number }>)[k].value = v
         const bites = r.bites as { n: number; v: THREE.Vector4[] }
@@ -1925,7 +1958,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const bestSeasoning = (id: string) => {
     let best: Exclude<Seasoning, 'water'> | null = null
     let score = 5
-    for (const k of ['salt', 'soy', 'milk', 'peanut'] as const) {
+    for (const k of DABS) {
       const w = PAIRING[k][id] ?? PAIRING_DEFAULT[k]
       if (w > score) {
         score = w
@@ -1979,35 +2012,39 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const ready = hasChef ? live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 &&
       p.progress / roast.times[p.id] >= pullOf(p)) : undefined
+    // what the chef means to put on a piece: what it was ordered with, else what the notes say worked best, else
+    // what suits it (a less practised hand now and then forgets: decided once per piece)
+    const planOf = (p: Piece): Exclude<Seasoning, 'water'>[] => {
+      if (p.want) return p.want.dabs as Exclude<Seasoning, 'water'>[]
+      if (p.node.userData.seasonOk === undefined) p.node.userData.seasonOk = Math.random() < chef.seasonChance
+      if (!p.node.userData.seasonOk) return []
+      const noted = follows(p)?.dabs
+      const k = noted ? (Object.entries(noted).filter(([x, n]) => n > 0 && x !== 'water').sort((m, n) => n[1] - m[1])[0]?.[0] as
+        Exclude<Seasoning, 'water'> | undefined) ?? null : bestSeasoning(p.id)
+      return k ? [k] : []
+    }
+    // each seasoning at its own time, as a cook does: salt as it goes on, glazes just before it's done, wasabi,
+    // shichimi, yuzu kosho and lemon once it's off
+    const dueOnFire = (k: string, r: number) => {
+      const at = bestStage(k)
+      return at === 'before' || at === 'early' ? r < 0.6 : at === 'late' ? r >= 0.85 : false
+    }
+    const dab = (p: Piece, k: Exclude<Seasoning, 'water'>) => {
+      season(p, k)
+      emit(k, p.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
+      say(L().seasoned(nameOfP(p), k))
+    }
     if (ready) {
       collect(ready)
       say(L().done(nameOfP(ready)))
+      for (const k of planOf(ready)) if (!ready.dabs[k] && bestStage(k) === 'after') dab(ready, k)
       return
     }
-    const toSeason = hasChef && live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 && !p.chefSeasoned &&
-      p.progress / roast.times[p.id] >= 0.85)
+    const toSeason = hasChef && live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 &&
+      planOf(p).some((k) => !p.dabs[k] && dueOnFire(k, p.progress / roast.times[p.id])))
     if (toSeason) {
-      toSeason.chefSeasoned = true
-      const noted = follows(toSeason)?.dabs
-      const fromNotes = noted ? (Object.entries(noted).filter(([k, n]) => n > 0 && k !== 'water').sort((a, b) => b[1] - a[1])[0]?.[0] as
-        Exclude<Seasoning, 'water'> | undefined) : undefined
-      // (what's ordered off the menu is made the way it's listed)
-      if (toSeason.want) {
-        for (const w of toSeason.want.dabs as Exclude<Seasoning, 'water'>[]) {
-          if (toSeason.dabs[w]) continue
-          season(toSeason, w)
-          emit(w, toSeason.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
-        }
-        if (toSeason.want.dabs.length) say(L().seasoned(nameOfP(toSeason), toSeason.want.dabs[0] as Exclude<Seasoning, 'water'>))
-        return
-      }
-      const k = noted ? fromNotes ?? null : bestSeasoning(toSeason.id)
-      // (a less practised hand forgets now and then)
-      if (k && !toSeason.dabs[k] && Math.random() < chef.seasonChance) {
-        season(toSeason, k)
-        emit(k, toSeason.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
-        say(L().seasoned(nameOf(toSeason.id), k))
-      }
+      const r = toSeason.progress / roast.times[toSeason.id]
+      for (const k of planOf(toSeason)) if (!toSeason.dabs[k] && dueOnFire(k, r)) dab(toSeason, k)
       return
     }
     const wrapped = live.find((p) => p.collected && inBasket(p) && !p.unwrapped && p.flight >= 1)
@@ -2209,8 +2246,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // a splash of water cools it (it stops short of charring for a while) — and leaves it soggy
       p.progress = Math.max(0, p.progress - roast.times[p.id] * 0.15)
     } else {
-      const u = { salt: p.looks.uSalt, soy: p.looks.uSoy, milk: p.looks.uMilk, peanut: p.looks.uPeanut }[kind]
+      const u = { salt: p.looks.uSalt, soy: p.looks.uSoy, milk: p.looks.uMilk, peanut: p.looks.uPeanut, miso: p.looks.uMiso,
+        wasabi: p.looks.uGreen, yuzu: p.looks.uGreen, shichimi: p.looks.uRed, lemon: p.looks.uLemon }[kind]
       u.value = Math.min(1, u.value + DAB)
+      // (when it went on: before the fire, while cooking, just before it's done, or once it's off)
+      p.steps.push({ k: kind, at: seasonStage(p.collected ? null : p.progress / roast.times[p.id]) })
     }
     const delta = tasteOf(p) - before
     pop(p.node.position.clone().add(new THREE.Vector3(0, 0.3, 0)), delta)
@@ -2919,6 +2959,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.unwrapT = 0
         p.chefSeasoned = false
         for (const k of Object.keys(p.dabs) as Seasoning[]) p.dabs[k] = 0
+        p.steps = []
         p.progress = 0
         p.netSpot = null
         p.container = null
@@ -3096,7 +3137,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         if (p.eat >= 1) {
           // (what an AI customer eats fills their stomach, not yours)
-          if (!p.node.userData.byGuest) onEat?.(p.id, tasteOf(p), { doneness: p.progress / roast.times[p.id], dabs: { ...p.dabs } })
+          if (!p.node.userData.byGuest) onEat?.(p.id, tasteOf(p), { doneness: p.progress / roast.times[p.id], dabs: { ...p.dabs }, steps: [...p.steps] })
           if (p.sticks.length) {
             p.stickOnly = true
             for (const m of p.food) m.visible = false

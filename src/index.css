@@ -5393,3 +5393,343 @@ button {
 .menu .strip.is-research .strip-en {
   margin-bottom: 0;
 }
+/* applicants: sex and age by the name, their own words under the note; starting over at the foot */
+.ofc-tag-who {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgb(90 122 154 / 0.14);
+  color: #3d5f80;
+  font-size: 11px;
+  font-weight: 500;
+  vertical-align: 1px;
+}
+.ofc-tag-who.is-f {
+  background: rgb(196 68 47 / 0.12);
+  color: #a8352a;
+}
+.ofc-intro {
+  display: block;
+  margin-top: 2px;
+  color: #8a7360;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.ofc-foot {
+  margin: 14px 14px 12px;
+  text-align: right;
+}
+.ofc-restart {
+  border: 0;
+  background: none;
+  color: #9a8470;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.office > header .ofc-autohire:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* a tried dish written out as a recipe: numbered steps in a soft card, and a tip when the timing was off */
+.nb-recipe {
+  margin: 6px 0 4px;
+  padding: 8px 10px 8px 30px;
+  border-radius: 10px;
+  background: rgb(232 176 74 / 0.1);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.nb-recipe li::marker {
+  color: #c4442f;
+  font-weight: 700;
+}
+.nb-tip {
+  margin: 2px 0 6px;
+  color: #a8352a;
+  font-size: 12px;
+}
+/* the office and the boards: half see-through frosted glass over the scene */
+.office {
+  background: rgb(251 246 234 / 0.5) !important;
+  -webkit-backdrop-filter: blur(3px) saturate(1.2);
+  backdrop-filter: blur(3px) saturate(1.2);
+}
+.guest-board,
+.ledger {
+  background: rgb(251 243 228 / 0.5);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.office > header {
+  background: linear-gradient(rgb(74 52 38 / 0.82), rgb(54 37 26 / 0.82));
+}
+.ofc-person,
+.ofc-person.is-hired,
+.ofc-slot {
+  background: rgb(255 255 255 / 0.55);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .office { background: rgb(30 26 22 / 0.5) !important; }
+  :root:not([data-theme='light']) .guest-board,
+  :root:not([data-theme='light']) .ledger { background: rgb(30 36 50 / 0.5); }
+}
+:root[data-theme='dark'] .office { background: rgb(30 26 22 / 0.5) !important; }
+:root[data-theme='dark'] .guest-board,
+:root[data-theme='dark'] .ledger { background: rgb(30 36 50 / 0.5); }
+/* ---------------------------------------------------------------------------------------------------------
+   冷藏櫃: a summary strip (what's in stock, what's out, the two buying buttons), then the shelves, each food a row:
+   its icon, name, cost a portion, a stock bar against PAR with the count, and +10 */
+.fridge {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 10px 14px 14px;
+}
+.fr-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.55);
+  border: 1px solid rgb(59 42 32 / 0.12);
+}
+.fr-stats {
+  display: flex;
+  gap: 16px;
+}
+.fr-stats span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.fr-stats small {
+  color: #7a6656;
+  font-size: 11px;
+}
+.fr-stats b {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.fr-stats .is-out b { color: #c4442f; }
+.fr-stats .is-low b { color: #c98a1e; }
+.fr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fr-topup,
+.fr-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgb(59 42 32 / 0.18);
+}
+.fr-topup { background: linear-gradient(#6fb04e, #4f8a34); }
+.fr-all { background: linear-gradient(#d4553f, #a8352a); }
+.fr-topup:disabled,
+.fr-all:disabled {
+  background: #b6ad9f;
+  box-shadow: none;
+  cursor: default;
+}
+.fr-topup .money,
+.fr-all .money { color: #f0fff3 !important; }
+.fr-shelf h4 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 12px 0 4px;
+  padding-left: 8px;
+  border-left: 4px solid #6fa0c8;
+  font-size: 13px;
+}
+.fr-shelf h4 small {
+  color: #7a6656;
+  font-weight: 400;
+}
+.fr-shelf ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fr-shelf li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto minmax(110px, 0.9fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+.fr-shelf li:nth-child(odd) {
+  background: rgb(255 255 255 / 0.35);
+}
+.fr-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgb(111 160 200 / 0.14);
+  color: #3b2a20;
+}
+.fr-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.fr-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8a7360;
+  font-size: 10px;
+}
+.fr-cost {
+  font-size: 11px;
+  color: #7a6656;
+  white-space: nowrap;
+}
+.fr-cost b {
+  margin-left: 4px;
+  font-size: 12px;
+}
+.fr-level {
+  display: grid;
+  grid-template-columns: minmax(40px, 1fr) 2.2em auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.fr-level i {
+  height: 7px;
+  border-radius: 4px;
+  background: rgb(59 42 32 / 0.12);
+  overflow: hidden;
+}
+.fr-level i b {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: #6fb04e;
+}
+.fr-shelf li.is-low .fr-level i b { background: #e0a030; }
+.fr-level em {
+  font-style: normal;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.fr-level small { color: #5f8a42; white-space: nowrap; }
+.fr-shelf li.is-low .fr-level small { color: #c98a1e; }
+.fr-shelf li.is-out .fr-level small,
+.fr-shelf li.is-out .fr-level em { color: #c4442f; }
+.fr-buy {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #3b2a20;
+  color: #fbf3e4;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.fr-buy:hover { background: #c4442f; }
+.fr-buy:disabled { background: #b6ad9f; cursor: default; }
+@media (max-width: 560px) {
+  .fr-shelf li { grid-template-columns: 30px minmax(0, 1fr) minmax(80px, 1fr) auto; }
+  .fr-cost { display: none; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .fr-summary, :root:not([data-theme='light']) .fr-shelf li:nth-child(odd) { background: rgb(255 255 255 / 0.06); border-color: rgb(246 236 216 / 0.12); }
+  :root:not([data-theme='light']) .fr-icon { background: rgb(111 160 200 / 0.2); color: #f6ecd8; }
+  :root:not([data-theme='light']) .fr-stats small, :root:not([data-theme='light']) .fr-cost, :root:not([data-theme='light']) .fr-name small, :root:not([data-theme='light']) .fr-shelf h4 small { color: #c9bfae !important; }
+  :root:not([data-theme='light']) .fr-level i { background: rgb(255 255 255 / 0.14); }
+  :root:not([data-theme='light']) .fr-shelf li.is-out .fr-level small, :root:not([data-theme='light']) .fr-shelf li.is-out .fr-level em, :root:not([data-theme='light']) .fr-stats .is-out b { color: #ff8f78 !important; }
+  :root:not([data-theme='light']) .fr-shelf li.is-low .fr-level small, :root:not([data-theme='light']) .fr-stats .is-low b { color: #f2b84b !important; }
+  :root:not([data-theme='light']) .fr-level small { color: #9fe3ae !important; }
+}
+:root[data-theme='dark'] .fr-summary, :root[data-theme='dark'] .fr-shelf li:nth-child(odd) { background: rgb(255 255 255 / 0.06); border-color: rgb(246 236 216 / 0.12); }
+:root[data-theme='dark'] .fr-icon { background: rgb(111 160 200 / 0.2); color: #f6ecd8; }
+:root[data-theme='dark'] .fr-stats small, :root[data-theme='dark'] .fr-cost, :root[data-theme='dark'] .fr-name small, :root[data-theme='dark'] .fr-shelf h4 small { color: #c9bfae !important; }
+:root[data-theme='dark'] .fr-level i { background: rgb(255 255 255 / 0.14); }
+:root[data-theme='dark'] .fr-shelf li.is-out .fr-level small, :root[data-theme='dark'] .fr-shelf li.is-out .fr-level em, :root[data-theme='dark'] .fr-stats .is-out b { color: #ff8f78 !important; }
+:root[data-theme='dark'] .fr-shelf li.is-low .fr-level small, :root[data-theme='dark'] .fr-stats .is-low b { color: #f2b84b !important; }
+:root[data-theme='dark'] .fr-level small { color: #9fe3ae !important; }
+/* the 經營 button: a little shop front for its icon, frosted like the office it opens */
+.office-toggle {
+  background: rgb(251 246 234 / 0.55);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  border-color: rgb(59 42 32 / 0.35);
+  box-shadow: 0 4px 12px -6px rgb(59 42 32 / 0.5);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.office-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px -8px rgb(59 42 32 / 0.6);
+}
+.office-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .office-toggle { background: rgb(30 36 50 / 0.55); border-color: rgb(246 236 216 / 0.3); }
+}
+:root[data-theme='dark'] .office-toggle { background: rgb(30 36 50 / 0.55); border-color: rgb(246 236 216 / 0.3); }
+.ofc-slot-btn {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.ofc-slot.is-open .ofc-slot-btn:hover .ofc-slot-empty {
+  border-color: #c4442f;
+  color: #c4442f;
+  background: rgb(196 68 47 / 0.08);
+}
+.ofc-slot-btn:disabled {
+  cursor: default;
+}
+
+.ofc-slot-btn {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.ofc-slot.is-open .ofc-slot-btn:hover .ofc-slot-empty {
+  border-color: #c4442f;
+  color: #c4442f;
+  background: rgb(196 68 47 / 0.08);
+}
+.ofc-slot-btn:disabled {
+  cursor: default;
+}
+.nb-embedded .nb-recipe li {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: list-item;
+}

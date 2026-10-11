@@ -1,7 +1,7 @@
 // Money and stock: what things cost, what a dish on the menu takes out of stock, and whether it can be served.
 // Pure functions over the data in src/data, so App (and the tests) all reckon the same way.
 import { DISHES, type Dish } from '@/data/menu'
-import { findItem, SEASON_COST, type Entry, type Part, type Seasoning } from '@/data/recipes'
+import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Seasoning } from '@/data/recipes'
 
 export type Stock = Record<string, number>
 
@@ -129,4 +129,12 @@ export function topUpOrder(d: Dish, stock: Stock, par = PAR) {
     cost += costOf(g) * n
   }
   return { buy, cost }
+}
+
+/** what to ask for a dish on the menu: the food's own price plus a little for what goes on it (at the grill: the
+ * price list is a mid-range Taipei robata's), or, for something without a price of its own, three times its cost */
+export const menuPrice = (d: Dish, p: Part) => {
+  const it = findItem(d, p.id)
+  if (!it?.price) return suggestPrice(partCost(d, p))
+  return Math.round((it.price + p.dabs.reduce((n, k) => n + SEASON_COST[k as Seasoning], 0) * 3) / 5) * 5
 }

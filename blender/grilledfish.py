@@ -2175,6 +2175,102 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
         utensil("SaltPinch", head, head + Vector((0, 0, 0.02)), finish(active(), "SaltPinchMark", M["salt"]), 0.002)
 
 
+
+# ---------------------------------------------------------------------------------------------------------
+# a second seasoning box, just outside the first: what a yakitori counter keeps besides — miso, grated wasabi,
+# shichimi, yuzu kosho, and lemon wedges to squeeze. Each has its little spoon (the lemon is picked up itself).
+M["miso_paste"] = pbr("MisoPaste", (0.6, 0.38, 0.16), rough=0.55)
+M["wasabi"] = pbr("Wasabi", (0.55, 0.72, 0.3), rough=0.6)
+M["shichimi"] = pbr("Shichimi", (0.72, 0.2, 0.08), rough=0.8)
+M["yuzu_kosho"] = pbr("YuzuKosho", (0.66, 0.7, 0.25), rough=0.5)
+M["lemon"] = pbr("Lemon", (0.98, 0.86, 0.25), rough=0.35, coat=0.4)
+M["lemon_flesh"] = pbr("LemonFlesh", (1.0, 0.94, 0.55), rough=0.2, coat=0.6)
+M["white_dish"] = pbr("SmallWhiteDish", (0.93, 0.91, 0.86), rough=0.25, coat=0.6)
+
+BOX2_R = BOX_R + 0.3
+box2_c = Vector((BOX2_R * math.cos(a), BOX2_R * math.sin(a), 0))
+bpy.ops.mesh.primitive_cube_add(size=1, location=(box2_c.x, box2_c.y, 0.04), rotation=(0, 0, a + math.pi / 2))
+box2 = active()
+box2.scale = (0.86, 0.27, 0.08)
+apply_scale(box2)
+bm = bmesh.new()
+bm.from_mesh(box2.data)
+bm.normal_update()
+bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.9], context="FACES")
+bm.to_mesh(box2.data)
+bm.free()
+sol = box2.modifiers.new("Solidify", "SOLIDIFY")
+sol.thickness = 0.014
+bpy.ops.object.select_all(action="DESELECT")
+box2.select_set(True)
+bpy.context.view_layer.objects.active = box2
+bpy.ops.object.modifier_apply(modifier="Solidify")
+cyl_uv(box2)
+finish(box2, "SeasoningBox2", M["box_wood"], smooth_shade=False)
+
+pots2 = (("MisoPot", -0.32, 0.07, 0.08, M["pot"], 0.3, M["miso_paste"], 0.03, 0.08, "MisoSpoon"),
+         ("WasabiDish", -0.16, 0.065, 0.035, M["white_dish"], 0.5, M["wasabi"], 0.025, 0.12, "WasabiSpoon"),
+         ("ShichimiBowl", 0.0, 0.06, 0.06, M["bowl_wood"], 0.45, M["shichimi"], 0.02, 0.1, "ShichimiSpoon"),
+         ("YuzuJar", 0.16, 0.06, 0.08, M["soy_pot"], 0.25, M["yuzu_kosho"], 0.02, 0.06, "YuzuSpoon"))
+for name, off, rad, depth, glaze, belly, fill, fill_h, rough, tool in pots2:
+    c = box2_c + tang * off
+    pot = open_pot(c.x, c.y, rad, depth, glaze, belly=belly, name=name)
+    fl = filling(c.x, c.y, depth * 0.8, rad * 0.88, fill_h, fill, rough=rough)
+    for o in (pot, fl):
+        o.location.z += BOX_Z
+    centre_origin(join([pot, fl], name), (c.x, c.y, 0.0))
+    head = Vector((c.x, c.y, BOX_Z + depth * 0.7))
+    utensil(tool, head, head + out * 0.08 + Vector((0, 0, 0.18)), spoon_bowl(head, 0.022))
+
+# the lemon: a little dish of wedges; the one on top is what's picked up and squeezed
+c = box2_c + tang * 0.33
+bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.07, depth=0.014, location=(c.x, c.y, BOX_Z + 0.007))
+dish_l = finish(active(), "LemonDish", M["white_dish"])
+centre_origin(dish_l, (c.x, c.y, 0.0))
+
+
+def wedge(at, turn, name):
+    """A lemon wedge: an eighth of a lemon, peel round the back, the flesh on its two cut faces."""
+    bm = bmesh.new()
+    R, L = 0.032, 0.07
+    seg = 6
+    a0, a1 = -math.pi / 8, math.pi / 8
+    rim = [Vector((0, R * math.cos(a0 + (a1 - a0) * k / seg), R * math.sin(a0 + (a1 - a0) * k / seg))) for k in range(seg + 1)]
+    rows = []
+    for j in range(5):
+        x = (j / 4 - 0.5) * L
+        s_ = math.sqrt(max(0.0, 1 - (2 * x / L) ** 2)) * 0.9 + 0.1
+        rows.append([bm.verts.new((x, v.y * s_, v.z * s_)) for v in rim] + [bm.verts.new((x, 0, 0))])
+    for j in range(4):
+        r0, r1 = rows[j], rows[j + 1]
+        n = len(rim)
+        for k in range(n - 1):
+            f = bm.faces.new((r0[k], r0[k + 1], r1[k + 1], r1[k]))
+            f.material_index = 0
+        for k in (0, n - 1):
+            f = bm.faces.new((r0[k], r1[k], r1[n], r0[n]) if k == 0 else (r0[n], r1[n], r1[k], r0[k]))
+            f.material_index = 1
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(M["lemon"])
+    o.data.materials.append(M["lemon_flesh"])
+    for p in o.data.polygons:
+        p.use_smooth = True
+    o.rotation_euler = (math.pi / 2 + 0.3, 0, turn)
+    o.location = at
+    return o
+
+
+wedges = [wedge(Vector((c.x + 0.02 * math.cos(t), c.y + 0.02 * math.sin(t), BOX_Z + 0.03)), t, "LemonWedgeRest")
+          for t in (0.4, 2.5)]
+join(wedges, "LemonWedges")
+top = wedge(Vector((c.x, c.y, BOX_Z + 0.055)), 1.3, "LemonWedge")
+centre_origin(top, (c.x, c.y, BOX_Z + 0.055))
+
 # ---------------------------------------------------------------------------------------------------------
 # a wooden bucket of water on the left, with a dipper (柄杓) in it: splash food or the coals, and drop the bare
 # sticks and burnt scraps in it, as you do at a real fire

@@ -5,7 +5,7 @@ import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPr
 import { ROLES } from '@/data/staff'
 import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder } from '@/game/economy'
 import { trialIdeas } from '@/game/research'
-import { makeCandidates, seeded } from '@/game/hiring'
+import { makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
 import { bestDabs, expectedTaste, understand } from '@/game/chefChat'
 import { breadTaste, moodOf, PAIRING, PAIRING_DEFAULT, starText } from '@/game/taste'
 
@@ -41,7 +41,7 @@ describe('data: every shop', () => {
   it('staffs two cooks, a server and a cashier at each shop', () => {
     for (const d of DISHES) {
       const roles = ROLES[d.id]
-      expect(roles.map((r) => `${r.role}x${r.max}`).sort(), d.id).toEqual(['cashierx1', 'chefx1', 'serverx1', 'sousx1', 'stockx1'])
+      expect(roles.map((r) => `${r.role}x${r.max}`).sort(), d.id).toEqual(['cashierx1', 'chefx1', 'serverx2', 'sousx1', 'stockx1'])
     }
   })
   it('has the grill pairing for every grill food (or the default)', () => {
@@ -249,5 +249,29 @@ describe('game/economy: 一鍵補貨', () => {
     expect(buy.GrilledCorn).toBe(PAR)
     expect(cost).toBe(Object.entries(buy).reduce((n, [id, q]) => n + costOf(goodsOf(grill).find((g) => g.id === id)!) * q, 0))
     expect(topUpOrder(grill, Object.fromEntries(goodsOf(grill).map((g) => [g.id, PAR]))).cost).toBe(0)
+  })
+})
+
+describe('hiring: who they are, and 一鍵徵人', () => {
+  const people = makeCandidates('grilledfish', seeded(7))
+  it('gives everyone an age that fits their age group, and a few words of their own', () => {
+    for (const w of people) {
+      const [lo, hi] = { young: [19, 29], middle: [30, 49], old: [50, 68] }[w.look.age]
+      expect(w.years).toBeGreaterThanOrEqual(lo)
+      expect(w.years).toBeLessThanOrEqual(hi)
+      expect(w.intro.length).toBeGreaterThan(8)
+    }
+  })
+  it('fills every open job with its best-value applicant, and nothing already filled', () => {
+    const roles = ROLES.grilledfish
+    const all = pickHires(people, roles, {})
+    expect(all.length).toBe(roles.reduce((n, r) => n + r.max, 0))
+    for (const r of roles) {
+      const picks = all.filter((w) => w.role === r.role)
+      expect(picks.length).toBe(r.max)
+      for (const w of people.filter((x) => x.role === r.role && !picks.includes(x))) for (const p of picks) expect(valueOf(p)).toBeGreaterThanOrEqual(valueOf(w))
+    }
+    const chef = all.find((w) => w.role === 'chef')!
+    expect(pickHires(people, roles, { [chef.id]: true }).some((w) => w.role === 'chef')).toBe(false)
   })
 })

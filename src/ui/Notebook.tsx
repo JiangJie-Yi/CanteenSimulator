@@ -5,6 +5,8 @@ import type { Dish } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, suggestPrice,
   type Entry, type Part } from '@/data/recipes'
 import { starText } from '@/game/taste'
+import { idealSteps, recipeSteps, timingTips } from '@/game/research'
+import { menuPrice } from '@/game/economy'
 import type { Notes, Talk, Try } from '@/game/types'
 
 
@@ -42,7 +44,7 @@ type Props = {
 const t = (lang: Lang, zh: string, ja: string) => (lang === 'ja' ? ja : zh)
 
 /**
- * 料理研製 (a tab of the office window, beside 人事): what's been tried with the shop closed, as dishes — at the grill a food with its seasonings is a dish of
+ * 廚房 (a tab of the office window, beside 人事): what's been tried with the shop closed, as dishes — at the grill a food with its seasonings is a dish of
  * its own (鹽烤玉米, 醬刷玉米…) — each with its best try; any of them can be put on the menu at a price. The menu
  * tab lists what's on it (re-price, take off, make up sets), and a hired chef can be asked what's worth trying.
  */
@@ -112,31 +114,31 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   const setSum = setParts.reduce((n, e) => n + e.price, 0)
 
   return (
-    // (a tab of the office window: 料理研製 beside 人事)
-    <div className="nb-embedded" aria-label={t(lang, '料理研製', '開発ノート')}>
+    // (a tab of the office window: 廚房 beside 人事)
+    <div className="nb-embedded" aria-label={t(lang, '廚房', '厨房')}>
           {/* how far the menu is from opening: a bar to the minimum, and what's left to do */}
           <div className={`nb-progress${entries.length >= min ? ' is-ready' : ''}`}>
             <span>{t(lang, `菜單 ${entries.length}/${MENU_MAX}`, `メニュー ${entries.length}/${MENU_MAX}`)}</span>
             <i><b style={{ width: `${Math.min(100, (entries.length / min) * 100)}%` }} /></i>
             <small>{entries.length >= min ? t(lang, '可以營業了', '営業できます')
-              : t(lang, `再上架 ${min - entries.length} 樣就能營業`, `あと${min - entries.length}品で営業可`)}</small>
+              : t(lang, `至少 ${min} 樣才能開業`, `${min}品から開業できます`)}</small>
           </div>
           <nav className="nb-views" role="tablist">
-            {([['tried', t(lang, '試做紀錄', '試作'), recipes.length], ['menu', t(lang, '菜單', 'メニュー'), entries.length],
-              ['chef', t(lang, '問二廚', '二番手'), null]] as const).map(([k, label, n]) => (
+            {([['tried', t(lang, '試菜', '試作'), recipes.length], ['menu', t(lang, '菜單', 'メニュー'), entries.length],
+              ['chef', t(lang, '料理研製', '料理研究'), null]] as const).map(([k, label, n]) => (
               <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => setView(k)}>
                 {label}{n !== null && <em>{n}</em>}
               </button>
             ))}
           </nav>
           {view === 'tried' && (recipes.length === 0 ? (
-            <p className="notebook-empty">{t(lang, '還沒試做過。關店時在右邊的牌子點菜試做、調味、吃一口，做過的菜就會記在這裡，好吃的按「上架」放上菜單。也可以到「問二廚」請二廚幫忙試做。',
+            <p className="notebook-empty">{t(lang, '還沒試做過。關店時在右邊的牌子點菜試做、調味、吃一口，做過的菜就會記在這裡，好吃的按「上架」放上菜單。也可以到「料理研製」請二廚幫忙試做。',
               '閉店中に試作して食べると、ここに記録されます。おいしいものをメニューに。')}</p>
           ) : (
             <ul>
               {recipes.map((r) => {
                 const listed = onMenu.has(r.key)
-                const fallback = suggestPrice(r.cost)
+                const fallback = roast ? menuPrice(dish, r.part) : suggestPrice(r.cost)
                 return (
                   <li key={r.key}>
                     <div className="nb-head">
@@ -145,6 +147,18 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                       <small>{t(lang, '美味', '美味')} {Math.round(r.best.taste)}</small>
                     </div>
                     <p>{t(lang, '最好：', 'ベスト：')}{describe(r)}・{t(lang, `試了 ${r.tries} 次`, `${r.tries}回`)}・{t(lang, '成本', '原価')} NT${r.cost}</p>
+                    {roast && (() => {
+                      // written out as a recipe: what goes on when, and how long over the fire
+                      const steps = r.best.steps ?? idealSteps(r.part.dabs)
+                      const secs = Math.round((roast.times[r.part.id] ?? 30) * (r.best.doneness ?? 1.1))
+                      const tips = timingTips(steps, lang)
+                      return (
+                        <>
+                          <ol className="nb-recipe">{recipeSteps(steps, secs, donenessWord(r.best.doneness ?? 1.1, lang), lang).map((x, i) => <li key={i}>{x}</li>)}</ol>
+                          {tips.length > 0 && <p className="nb-tip">{t(lang, '小提醒：', 'ひとこと：')}{tips.join('；')}</p>}
+                        </>
+                      )
+                    })()}
                     <div className="nb-publish">
                       {listed ? <span className="nb-listed">{t(lang, '已上架', '掲載中')}</span> : (
                         <>
@@ -165,7 +179,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
           {view === 'menu' && (
             <>
               {entries.length === 0 ? (
-                <p className="notebook-empty">{t(lang, '菜單還是空的：到「試做紀錄」把做過的菜上架。上架兩樣以上，就能在這裡組套餐。', 'メニューはまだ空です。')}</p>
+                <p className="notebook-empty">{t(lang, '菜單還是空的：到「試菜」把做過的菜上架。上架兩樣以上，就能在這裡組套餐。', 'メニューはまだ空です。')}</p>
               ) : (
                 <ul>
                   {entries.map((e) => {

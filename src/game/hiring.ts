@@ -2,7 +2,7 @@
 // data/people.ts, so the hiring list is never the same twice. Older hands are more skilled and tire sooner; young
 // ones are quicker and tireless but still learning. Most ask a fair wage; now and then one is a bargain, now and
 // then one asks too much.
-import { BACKGROUNDS, JP_GIVEN, JP_SURNAMES, PAY, TO_JA, TRAITS, TW_GIVEN, TW_SURNAMES } from '@/data/people'
+import { BACKGROUNDS, INTRO, JP_GIVEN, JP_SURNAMES, PAY, TO_JA, TRAITS, TW_GIVEN, TW_SURNAMES } from '@/data/people'
 import { DISHES } from '@/data/menu'
 import { fair, type Look, type Role, type Worker } from '@/data/staff'
 
@@ -19,6 +19,9 @@ const STATS: Record<Look['age'], { skill: [number, number]; speed: [number, numb
   middle: { skill: [60, 88], speed: [62, 90], stamina: [64, 90] },
   old: { skill: [72, 96], speed: [52, 78], stamina: [48, 74] },
 }
+
+/** how old someone of each age group is: 19-29, 30-49, 50-68 */
+const YEARS: Record<Look['age'], [number, number]> = { young: [19, 29], middle: [30, 49], old: [50, 68] }
 
 /** a repeatable random sequence (for tests) */
 export const seeded = (seed: number): Rand => () => {
@@ -85,6 +88,8 @@ export function makeCandidates(shop: string, rand: Rand = Math.random, taken = n
       out.push({
         id: `${shop}-${out.length}`, look: { female, age }, ...name, role, ...stats,
         wage: Math.round((fair(role, stats.skill) * adj) / 5) * 5, note: noteOf(rand, shop, role, age, stats, adj),
+        years: between(rand, YEARS[age]),
+        intro: `${pick(rand, INTRO.why[age])}，${pick(rand, INTRO.likes)}，${pick(rand, INTRO.when)}。`,
       })
     }
   }
@@ -96,3 +101,17 @@ export const CANDIDATES: Record<string, Worker[]> = (() => {
   const taken = new Set<string>()
   return Object.fromEntries(DISHES.map((d) => d.id).map((shop) => [shop, makeCandidates(shop, Math.random, taken)]))
 })()
+
+/** how much someone is worth for what they cost: skill counts most, then speed, then stamina, per NT$ an hour */
+export const valueOf = (w: Worker) => (w.skill * 0.5 + w.speed * 0.3 + w.stamina * 0.2) / w.wage
+
+/** 一鍵徵人: for every job still open, the applicant who's the best value */
+export function pickHires(people: Worker[], roles: { role: Role; max: number }[], hired: Record<string, unknown>) {
+  const out: Worker[] = []
+  for (const r of roles) {
+    const have = people.filter((w) => w.role === r.role && hired[w.id]).length
+    const open = people.filter((w) => w.role === r.role && !hired[w.id]).sort((a, b) => valueOf(b) - valueOf(a))
+    out.push(...open.slice(0, Math.max(0, r.max - have)))
+  }
+  return out
+}

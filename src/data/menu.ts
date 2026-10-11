@@ -155,7 +155,7 @@ export type Roast = {
   rawDish?: { at: [number, number, number]; items: string[] }
 }
 
-export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut' | 'water'
+export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut' | 'miso' | 'wasabi' | 'shichimi' | 'yuzu' | 'lemon' | 'water'
 
 /** Doneness stages for roasting, by fraction of the cook time. */
 export const ROAST_STAGES = [
@@ -361,11 +361,15 @@ export const DISHES: Dish[] = [
       dish: { at: [-0.74, 0.0, 2.21], capacity: 3 },
       // the spoons and brush in the seasoning box are what's carried; grabbing a pot picks up its utensil
       // (salt is taken by hand: SaltPinch only marks where the pinch is taken from)
-      tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut', WaterDipper: 'water' },
-      toolPots: { SaltPot: 'SaltPinch', SoyPot: 'SoyBrush', MilkJar: 'MilkBrush', PeanutBowl: 'PeanutSpoon' },
+      tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut', WaterDipper: 'water',
+        // (the second box: miso, wasabi, shichimi, yuzu kosho, and a lemon wedge picked up itself)
+        MisoSpoon: 'miso', WasabiSpoon: 'wasabi', ShichimiSpoon: 'shichimi', YuzuSpoon: 'yuzu', LemonWedge: 'lemon' },
+      toolPots: { SaltPot: 'SaltPinch', SoyPot: 'SoyBrush', MilkJar: 'MilkBrush', PeanutBowl: 'PeanutSpoon',
+        MisoPot: 'MisoSpoon', WasabiDish: 'WasabiSpoon', ShichimiBowl: 'ShichimiSpoon', YuzuJar: 'YuzuSpoon', LemonDish: 'LemonWedge', LemonWedges: 'LemonWedge' },
       // the seasoning box (dragged as a whole) and everything standing in it
       toolBox: ['SeasoningBox', 'SaltPot', 'SoyPot', 'MilkJar', 'PeanutBowl', 'SaltPinch', 'SoyBrush', 'MilkBrush',
-        'PeanutSpoon'],
+        'PeanutSpoon', 'SeasoningBox2', 'MisoPot', 'WasabiDish', 'ShichimiBowl', 'YuzuJar', 'LemonDish', 'LemonWedges',
+        'MisoSpoon', 'WasabiSpoon', 'ShichimiSpoon', 'YuzuSpoon', 'LemonWedge'],
       // a bucket of water for splashing, the trash bin beside it (both on the left); the tray where ordered food
       // waits to go on the fire
       bucket: ['WaterBucket', 'WaterDipper'],

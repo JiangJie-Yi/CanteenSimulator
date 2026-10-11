@@ -29,15 +29,18 @@ export type Worker = {
   wage: number
   /** a line about them, for the hiring list */
   note: string
+  /** how old they are, and a few words of their own (why they want the job, what they like, when they can work) */
+  years: number
+  intro: string
 }
 
 // The owner is the head chef (大廚) of every shop. Each can take on two more cooks — a second chef (二廚) and a
-// third (三廚) to prep, put on and clear — one person on the floor (外場), one at the till (收銀), and a stock keeper
+// third (三廚) to prep, put on and clear — two people on the floor (外場), one at the till (收銀), and a stock keeper
 // (倉儲) who watches what's running low and orders it in before it runs out.
 const STAFFING = (chef: string, sous: string, chefJa: string, sousJa: string) => [
   { role: 'chef' as Role, max: 1, zh: chef, ja: chefJa },
   { role: 'sous' as Role, max: 1, zh: sous, ja: sousJa },
-  { role: 'server' as Role, max: 1, zh: '外場', ja: 'ホール' },
+  { role: 'server' as Role, max: 2, zh: '外場', ja: 'ホール' },
   { role: 'cashier' as Role, max: 1, zh: '收銀', ja: 'レジ' },
   { role: 'stock' as Role, max: 1, zh: '倉儲（叫貨・補貨）', ja: '仕入れ' },
 ]

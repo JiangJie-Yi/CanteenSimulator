@@ -14,12 +14,12 @@ import { GasFlame } from '@/shops/hotpot/GasFlame'
 import { FireControl } from '@/shops/grill/FireControl'
 import { Fullness } from '@/ui/Fullness'
 import { bestOf, Notebook } from '@/ui/Notebook'
-import { findItem, MENU_MAX, MENU_MIN, SEASON_NAME, signature, type Entry, type Part, type Seasoning } from '@/data/recipes'
+import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, type Entry, type Part, type Seasoning } from '@/data/recipes'
 import { moodOf } from '@/game/taste'
-import { trialIdeas } from '@/game/research'
+import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
-import { restockOrder, topUpOrder, buyAllCost, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
+import { menuPrice, restockOrder, topUpOrder, buyAllCost, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
   portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
 import { GuestCounter } from '@/ui/GuestCounter'
@@ -32,7 +32,7 @@ import { TaiwanTable } from '@/shops/noodle/TaiwanTable'
 import { Bakery } from '@/shops/bakery/Bakery'
 import { OpeningSpot } from '@/scene/OpeningSpot'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
-import type { GuestView, Notes, Talk } from '@/game/types'
+import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
@@ -41,6 +41,7 @@ import { useDrag } from '@/ui/useDrag'
 import { effective, restPerMin, tirePerMin, type Role } from '@/data/staff'
 import { CANDIDATES } from '@/game/hiring'
 import { Office } from '@/ui/Office'
+import { Fridge } from '@/ui/Fridge'
 import { Welcome } from '@/ui/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
 import { Roasting } from '@/shops/grill/Roasting'
@@ -233,7 +234,7 @@ type SceneProps = {
   frame: Frame
   onOffFire: (count: number, loose: number) => void
   /** a piece of food has been eaten (for the fullness meter) */
-  onEat: (id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; dip?: string[] }) => void
+  onEat: (id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; steps?: Step[]; dip?: string[] }) => void
   notes: Notes
   /** AI simulation on, and what it does through the app */
   ai: boolean
@@ -596,7 +597,7 @@ export default function App() {
   const [lastTry, setLastTry] = useState<{ name: string; taste: number; key: number } | null>(null)
   const langRef = useRef<Lang>('zh')
   const potSoupRef = useRef<string | null>(null)
-  const onEat = useCallback((id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; dip?: string[] }) => {
+  const onEat = useCallback((id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; steps?: Step[]; dip?: string[] }) => {
     const item = ALL_ITEMS.get(id) ?? DISHES.flatMap((d) => d.bases).find((b) => b.id === id)
     const cal = (item as { kcal?: number } | undefined)?.kcal ?? BASE_KCAL[id] ?? 0
     setKcal((k) => k + cal)
@@ -699,7 +700,7 @@ export default function App() {
       window.removeEventListener('pagehide', write)
     }
   }, [])
-  const [office, setOffice] = useState<null | 'book' | 'staff'>(null)
+  const [office, setOffice] = useState<null | 'book' | 'staff' | 'fridge'>(null)
   // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
   const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>({})
   const menuByRef = useRef(menuBy)
@@ -714,7 +715,7 @@ export default function App() {
    * costs its ingredients, and goes in the notebook as a try, like the owner's own. How it comes out is what it
    * ought to (plan.taste), better or worse by how good he is. Returns what he made.
    */
-  const chefCook = (d: DishInfo, plans: { id: string; dabs: Seasoning[]; taste: number }[], max: number, skill: number) => {
+  const chefCook = (d: DishInfo, plans: { id: string; dabs: Seasoning[]; taste: number }[], max: number, skills: number | number[]) => {
     const left = { ...stock }
     const can = (id: string) => Object.entries(takesOf(d, id)).every(([k, q]) => (left[k] ?? 0) >= q)
     let spent = 0
@@ -724,6 +725,8 @@ export default function App() {
       if (!can(x.id)) continue
       for (const [k, q] of Object.entries(takesOf(d, x.id))) left[k] = (left[k] ?? 0) - q
       spent += partCost(d, { id: x.id, dabs: x.dabs, name: '', ja: '' })
+      // (several cooks take turns, dish by dish, each as able as they are)
+      const skill = Array.isArray(skills) ? skills[made.length % skills.length] : skills
       const taste = Math.round(Math.max(5, Math.min(98, x.taste + (skill - 0.7) * 15 + (Math.random() - 0.5) * (1 - skill) * 30)))
       made.push({ id: x.id, dabs: x.dabs, taste, name: dishName(d, x.id, x.dabs, lang) })
     }
@@ -735,7 +738,7 @@ export default function App() {
       for (const tr of made) {
         const item = findItem(d, tr.id)!
         next[tr.id] = { name: nameIn(lang, item), tries: [...(next[tr.id]?.tries ?? []), { taste: tr.taste, doneness: 1.1,
-          dabs: Object.fromEntries(tr.dabs.map((k) => [k, 1])), at: Date.now() }] }
+          dabs: Object.fromEntries(tr.dabs.map((k) => [k, 1])), ...(d.roast ? { steps: idealSteps(tr.dabs) } : {}), at: Date.now() }] }
       }
       return next
     })
@@ -749,9 +752,12 @@ export default function App() {
       .sort((a, b) => b.guess - a.guess)
   }
   const chefNow = (d: DishInfo) => {
-    const c = staffOf(d.id, 'chef')[0]
+    const c = staffOf(d.id, 'chef')[0] ?? staffOf(d.id, 'sous')[0]
     return c ? { c, skill: effective(c, hired[d.id]?.[c.id]?.fatigue ?? 0) } : null
   }
+  /** everyone in the kitchen who can try dishes out: the second chef and the third, each with how able they are now */
+  const cooksNow = (d: DishInfo) => [...staffOf(d.id, 'chef'), ...staffOf(d.id, 'sous')]
+    .map((c) => ({ c, skill: effective(c, hired[d.id]?.[c.id]?.fatigue ?? 0) }))
   // talking with the second chef, at each shop: what was said both ways, and the dish he last offered to make
   const [talkBy, setTalkBy] = useState<Record<string, Talk[]>>({})
   const talkSeq = useRef(0)
@@ -777,7 +783,8 @@ export default function App() {
     const foodOf = (id: string) => (d.roast?.names[id] && lang !== 'ja' ? d.roast.names[id] : nameIn(lang, findItem(d, id)!))
     // how he'd say what goes on (撒點鹽, 刷醬油…)
     const how = (k: Seasoning) => lang === 'ja' ? SEASON_NAME.ja[k]
-      : d.bake ? `包${SEASON_NAME.zh[k]}` : ({ salt: '撒點鹽', soy: '刷醬油', milk: '淋煉乳', peanut: '撒花生粉' } as Record<string, string>)[k] ?? SEASON_NAME.zh[k]
+      : d.bake ? `包${SEASON_NAME.zh[k]}` : ({ salt: '撒點鹽', soy: '刷醬油', milk: '淋煉乳', peanut: '撒花生粉', miso: '抹味噌', wasabi: '配山葵', shichimi: '撒七味粉',
+        yuzu: '點柚子胡椒', lemon: '擠檸檬' } as Record<string, string>)[k] ?? SEASON_NAME.zh[k]
     let reply: string
     switch (intent.kind) {
       case 'make': {
@@ -794,6 +801,40 @@ export default function App() {
       case 'batch': {
         const made = chefCook(d, untriedIdeas(d, skill), intent.n, skill)
         reply = made.length ? T.batch(made.map((m) => m.name)) : T.batchNone()
+        break
+      }
+      case 'menu': {
+        // a whole menu at once: the kitchen (second and third chef taking turns) works out n dishes it hasn't put up
+        // yet — not only the surest, a few of their own fancy among them, each food at most twice — and they go up
+        // at a sensible price
+        const cooks = cooksNow(d)
+        const listed = new Set(entriesOf(d.id).map((e) => e.key))
+        const pool = trialIdeas(d).filter((x) => !listed.has(recipeKey(x.id, x.dabs)) && (stock[x.id] ?? 0) > 0)
+          .map((x) => ({ ...x, pick: x.taste + Math.random() * 18 })).sort((a, b) => b.pick - a.pick)
+        const per = new Map<string, number>()
+        const chosen = pool.filter((x) => {
+          const n = per.get(x.id) ?? 0
+          if (n >= 2) return false
+          per.set(x.id, n + 1)
+          return true
+        })
+        const made: { id: string; dabs: Seasoning[]; taste: number; name: string }[] = []
+        // (they take turns, dish by dish)
+        made.push(...chefCook(d, chosen, intent.n, cooks.map((ck) => ck.skill)))
+        const room = MENU_MAX - entriesOf(d.id).length
+        const up = made.slice(0, Math.max(0, room))
+        if (up.length) setMenuBy((m) => {
+          const cur = m[d.id] ?? []
+          const add = up.map((x) => {
+            const item = findItem(d, x.id)!
+            const part = { id: x.id, dabs: x.dabs, name: partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, 'zh', d.roast ? 'grill' : d.bake ? 'bake' : 'plain'),
+              ja: partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, 'ja', d.roast ? 'grill' : d.bake ? 'bake' : 'plain') }
+            return { key: recipeKey(x.id, x.dabs), shop: d.id, name: part.name, ja: part.ja, price: menuPrice(d, part), parts: [part] }
+          }).filter((e) => !cur.some((c) => c.key === e.key))
+          return { ...m, [d.id]: [...cur, ...add].slice(0, MENU_MAX) }
+        })
+        const who = cooks.length > 1 ? T.together(lang === 'ja' ? cooks[0].c.ja : cooks[0].c.zh, lang === 'ja' ? cooks[1].c.ja : cooks[1].c.zh) : lang === 'ja' ? cooks[0].c.ja : cooks[0].c.zh
+        reply = up.length ? T.menuMade(up.map((m) => m.name), who) : T.menuNone()
         break
       }
       case 'advise': {
@@ -1613,12 +1654,28 @@ export default function App() {
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
-          title={lang === 'ja' ? '開発ノート・人事' : '經營（料理研製・人事）'}>
-          <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em><b className="money">NT${Math.round(cash).toLocaleString()}</b>
+          title={lang === 'ja' ? '開発ノート・人事' : '經營（廚房・人事）'}>
+          <svg className="office-icon" viewBox="0 0 28 28" aria-hidden="true">
+            {/* the shop front: a tiled eave, a noren split in three with the shop's mark, a lantern at the side */}
+            <path d="M3 10.5 14 4l11 6.5z" fill="#3b2a20" />
+            <path d="M4.5 10.5h19" stroke="#c79a5a" strokeWidth="1.2" />
+            <rect x="5.5" y="11" width="17" height="13" rx="1" fill="#efe2c8" stroke="#3b2a20" strokeWidth="1.1" />
+            <path d="M6.5 11.6h15v6.4c-1.3.6-2.6.6-3.75 0-1.3.6-2.6.6-3.75 0-1.3.6-2.6.6-3.75 0-1.3.6-2.6.6-3.75 0z" fill="#c4442f" />
+            <path d="M10.25 11.6v6.6M14 11.6v6.6M17.75 11.6v6.6" stroke="#8f2a20" strokeWidth=".7" />
+            <circle cx="14" cy="14.4" r="1.6" fill="none" stroke="#fbf3e4" strokeWidth=".9" />
+            <rect x="11.5" y="19.5" width="5" height="4.5" fill="#5a3a26" />
+            <ellipse cx="24.6" cy="15" rx="1.6" ry="2.2" fill="#f2b84b" stroke="#3b2a20" strokeWidth=".7" />
+          </svg><em>{lang === 'ja' ? '経営' : '經營'}</em><b className="money">NT${Math.round(cash).toLocaleString()}</b>
         </button>
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
             tab={office} onTab={setOffice}
+            fridge={(
+              <Fridge dish={dish} lang={lang} cash={cash} stock={stock}
+                unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
+                onBuy={(id, n) => buyIn(dish, id, n)} onBuyAll={(n) => buyAll(dish, n)} onTopUp={() => topUp(dish)}
+                topUpCost={topUpOrder(dish, stock).cost} />
+            )}
             book={(
               <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)}
                 partCost={(p) => partCost(dish, p)}
@@ -1793,7 +1850,7 @@ export default function App() {
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : researchDish(dish)} research={!ai}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
-        onBuy={(id, n) => buyIn(dish, id, n)} onBuyAll={(n) => buyAll(dish, n)} onTopUp={() => topUp(dish)} topUpCost={topUpOrder(dish, stock).cost} lang={lang} quantities={ai ? entryCount : orders[dish.id]}
+         lang={lang} quantities={ai ? entryCount : orders[dish.id]}
         feed={feed} locked={ai} stock={ai ? entryStock(dish) : stock}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {

@@ -45,7 +45,13 @@ for (const [i, shop] of SHOPS.entries()) {
     check(shop, 'shop set up', (await page.locator('.unopened-hint').count()) === 0)
     // buy in stock on the board
     const before = await cash()
-    await page.locator('.tally-buyall').click()
+    // (buying in is done in the office's 冷藏櫃)
+    await page.locator('.office-toggle').click()
+    await page.waitForTimeout(200)
+    await page.locator('.ofc-tabs button').nth(2).click()
+    await page.locator('.fr-all').click()
+    await page.locator('.ofc-close').click()
+    await page.waitForTimeout(200)
     await page.waitForTimeout(200)
     check(shop, 'buying stock costs money', (await cash()) < before, `${before} -> ${await cash()}`)
     // hire the second chef, and have him try dishes out until there are enough for the menu
@@ -57,10 +63,13 @@ for (const [i, shop] of SHOPS.entries()) {
     if (await hire.count()) await hire.click()
     await page.locator('.ofc-tabs button').nth(0).click()
     await page.waitForTimeout(200)
-    // (料理研製 shows one view at a time: 問二廚, then 試做紀錄 to put the dishes on the menu)
+    // (廚房 shows one view at a time: 料理研製 to talk to the chef, then 試菜 to put the dishes on the menu)
     await page.locator('.nb-views button').nth(2).click()
-    for (let k = 0; k < 4; k++) {
-      await page.locator('.nb-chef-acts button').nth(1).click()
+    // 一鍵生成菜單 (ten dishes worked out and put up at once), then a few more tries to be sure
+    await page.locator('.nb-chef-acts button').nth(0).click()
+    await page.waitForTimeout(900)
+    for (let k = 0; k < 2; k++) {
+      await page.locator('.nb-chef-acts button').nth(2).click()
       await page.waitForTimeout(300)
     }
     await page.locator('.nb-views button').nth(0).click()

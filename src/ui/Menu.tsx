@@ -242,7 +242,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         )}
         {incl && <span className="stamp stamp-incl" aria-hidden="true">{t.included}</span>}
         {/* (on the test board the stock line already shows it, in red) */}
-        {out && !research && <span className="out-tag" aria-hidden="true">{lang === 'ja' ? '切' : '缺'}</span>}
+        {out && <span className="out-tag" aria-hidden="true">{lang === 'ja' ? '切' : '缺'}</span>}
         {filling.map((f) => <span key={f.key} className="fill-guest" aria-hidden="true">#{f.guest}</span>)}
         {n > 0 && (
           <span key={n} className="stamp" aria-hidden="true">
@@ -302,7 +302,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
   return (
     <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
       className={`menu${locked ? ' is-locked' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
-      <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'TEST KITCHEN' : 'MENU'}</span></h2>
+      <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>
 
       <div className={`strips-frame${ends.overflow ? ' is-paged' : ''}`}>
         {ends.overflow && (

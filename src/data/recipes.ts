@@ -6,8 +6,10 @@
 import type { Lang } from './i18n'
 import type { Dish, MenuItem } from './menu'
 
-export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut' | Topping
-export const SEASONINGS: Seasoning[] = ['salt', 'soy', 'milk', 'peanut']
+export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut' | 'miso' | 'wasabi' | 'shichimi' | 'yuzu' | 'lemon' | Topping
+/** at the grill: salt and soy, the Taiwanese condensed milk and peanut powder, and what a Japanese yakitori counter
+ * keeps besides — miso, wasabi, shichimi, yuzu kosho, and lemon to squeeze */
+export const SEASONINGS: Seasoning[] = ['salt', 'soy', 'milk', 'peanut', 'miso', 'wasabi', 'shichimi', 'yuzu', 'lemon']
 /** what goes on (or in) a bread before it's baked, at the bakery */
 export type Topping = 'chocolate' | 'almond' | 'cheese' | 'ham' | 'custard' | 'garlic'
 export const TOPPINGS: Topping[] = ['chocolate', 'almond', 'cheese', 'ham', 'custard', 'garlic']
@@ -21,19 +23,19 @@ export type Entry = { key: string; shop: string; name: string; ja: string; price
 /** most dishes (and sets) a menu holds */
 export const MENU_MAX = 40
 /** fewest on the menu before the shop can open */
-export const MENU_MIN: Record<string, number> = { grilledfish: 8, hotpot: 8, beefnoodle: 8, bakery: 8 }
+export const MENU_MIN: Record<string, number> = { grilledfish: 10, hotpot: 10, beefnoodle: 10, bakery: 10 }
 
 /**
  * What a portion's seasoning costs, NT$, as in a Taiwanese stall: a pinch of salt next to nothing, a brush of soy
  * glaze a little more, peanut powder (with sugar) more, condensed milk most. At the bakery, what goes in or on a
  * bread: garlic butter is cheap, custard a little more, chocolate and almonds more, cheese and ham dearest.
  */
-export const SEASON_COST: Record<Seasoning, number> = { salt: 1, soy: 2, peanut: 3, milk: 4,
+export const SEASON_COST: Record<Seasoning, number> = { salt: 1, soy: 2, peanut: 3, milk: 4, miso: 3, wasabi: 5, shichimi: 2, yuzu: 4, lemon: 3,
   chocolate: 6, almond: 6, cheese: 7, ham: 8, custard: 5, garlic: 3 }
 export const SEASON_NAME: Record<Lang, Record<Seasoning, string>> = {
-  zh: { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉',
+  zh: { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉', miso: '味噌', wasabi: '山葵', shichimi: '七味粉', yuzu: '柚子胡椒', lemon: '檸檬',
     chocolate: '巧克力', almond: '杏仁片', cheese: '起司', ham: '火腿', custard: '卡士達', garlic: '蒜香奶油' },
-  ja: { salt: '塩', soy: '醤油', milk: '練乳', peanut: 'きな粉',
+  ja: { salt: '塩', soy: '醤油', milk: '練乳', peanut: 'きな粉', miso: '味噌', wasabi: 'わさび', shichimi: '七味', yuzu: '柚子胡椒', lemon: 'レモン',
     chocolate: 'チョコ', almond: 'アーモンド', cheese: 'チーズ', ham: 'ハム', custard: 'カスタード', garlic: 'ガーリック' },
 }
 
@@ -45,10 +47,11 @@ export const recipeKey = (id: string, dabs: Seasoning[]) => (dabs.length ? `${id
 // what such a dish is called in Taiwan, where it has a name of its own
 const SPECIAL: Record<string, Partial<Record<string, string>>> = {
   GrilledCorn: { soy: '醬刷玉米', salt: '鹽烤玉米', milk: '奶香烤玉米', 'soy+peanut': '醬刷花生玉米' },
-  Onigiri: { soy: '醬油烤飯糰', salt: '鹽烤飯糰' },
-  Buri: { soy: '照燒鰤魚' },
-  Salmon: { soy: '照燒鮭魚' },
-  Gindara: { soy: '照燒銀鱈' },
+  Onigiri: { soy: '醬油烤飯糰', salt: '鹽烤飯糰', miso: '味噌烤飯糰' },
+  Buri: { soy: '照燒鰤魚', miso: '味噌燒鰤魚' },
+  Salmon: { soy: '照燒鮭魚', miso: '味噌燒鮭魚' },
+  Gindara: { soy: '照燒銀鱈', miso: '西京味噌燒銀鱈' },
+  Saury: { 'salt+lemon': '鹽烤秋刀魚佐檸檬' },
   Hokke: { salt: '鹽烤花魚一夜干' },
   NetMochi: { '': '網烤年糕', soy: '醬油烤年糕', milk: '煉乳烤年糕', peanut: '花生年糕', 'milk+peanut': '花生煉乳年糕' },
   BloodCake: { peanut: '花生米血', soy: '醬烤米血', 'soy+peanut': '醬烤花生米血' },
@@ -91,10 +94,14 @@ export function partName(item: { name: string; ja?: string }, short: string, id:
   const special = SPECIAL[id]?.[sig]
   if (special) return special
   if (!dabs.length) return '烤' + short
-  const head = dabs.includes('soy') && dabs.includes('salt') ? '鹽醬烤' : dabs.includes('soy') ? '醬烤' : dabs.includes('salt') ? '鹽烤' : '烤'
+  const head = dabs.includes('soy') && dabs.includes('salt') ? '鹽醬烤' : dabs.includes('miso') ? '味噌烤' : dabs.includes('soy') ? '醬烤'
+    : dabs.includes('salt') ? '鹽烤' : '烤'
   let name = head + short
   if (dabs.includes('peanut')) name += '佐花生粉'
   if (dabs.includes('milk')) name += '淋煉乳'
+  // (what's added at the table, after: 佐山葵, 佐七味, 佐柚子胡椒, 佐檸檬)
+  const after = ([['wasabi', '山葵'], ['shichimi', '七味'], ['yuzu', '柚子胡椒'], ['lemon', '檸檬']] as const).filter(([k]) => dabs.includes(k)).map(([, w]) => w)
+  if (after.length) name += '佐' + after.join('・')
   return name
 }
 

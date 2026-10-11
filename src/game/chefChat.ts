@@ -14,6 +14,8 @@ export type Intent =
   | { kind: 'makeWhat' }
   /** try n dishes of the chef's choosing */
   | { kind: 'batch'; n: number }
+  /** work out a whole menu at once (n dishes) and put it up */
+  | { kind: 'menu'; n: number }
   /** what to do with a food (or with anything, id undefined) */
   | { kind: 'advise'; id?: string }
   /** a kind of food (魚, 肉, 蔬菜…), the shop's foods of that kind; asking about it (ask) or wanting one made */
@@ -47,6 +49,11 @@ const SEASON_WORDS: Record<Seasoning, string[]> = {
   soy: ['醬油', '醬', '照燒', '醤油', '照り焼き', 'タレ', 'soy'],
   milk: ['煉乳', '練乳', '奶', 'milk'],
   peanut: ['花生', 'きな粉', 'ピーナッツ', 'peanut'],
+  miso: ['味噌', 'みそ', 'miso'],
+  wasabi: ['山葵', '芥末', '哇沙米', '挖撒米', 'わさび', 'wasabi'],
+  shichimi: ['七味', '辣椒粉', '一味', 'とうがらし', 'shichimi'],
+  yuzu: ['柚子胡椒', '柚子', 'ゆず', 'yuzu'],
+  lemon: ['檸檬', '酢橘', 'すだち', 'レモン', 'lemon'],
   chocolate: ['巧克力', 'チョコ', 'chocolate'],
   almond: ['杏仁', 'アーモンド', 'almond'],
   cheese: ['起司', '乳酪', '起士', 'チーズ', 'cheese'],
@@ -107,6 +114,11 @@ export function understand(text: string, d: Dish): Intent {
     return { kind: 'make', id: hit.id, dabs: dabs?.slice(0, 3) ?? null }
   }
   if (/庫存|材料|食材|還有多少|夠不夠|在庫|仕入れ/.test(s)) return { kind: 'stock' }
+  // 「一鍵生成菜單」「幫我排個菜單」「メニューを作って」
+  if (/(生成|排|開|做|擬|定|弄|設計|組).{0,3}菜單|菜單.{0,3}(生成|排|做|定)|一鍵|メニュー(を|作)/.test(s)) {
+    const m = s.match(/(\d+|[一兩二三四五六七八九十])\s*(道|樣|個|品|種)/)
+    return { kind: 'menu', n: Math.max(1, Math.min(20, (m && (Number(m[1]) || NUMBERS[m[1]])) || 10)) }
+  }
   if (count && (wants || /隨便|你看|你決定|任せ/.test(s))) {
     const n = Number(count[1]) || NUMBERS[count[1]] || 3
     return { kind: 'batch', n: Math.max(1, Math.min(5, n)) }
