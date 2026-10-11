@@ -25,7 +25,7 @@ export const CHEF_TALK = {
     noStock: (dish: string) => pick([`${dish}的材料沒了，先進貨吧。`, `冰箱裡沒有做${dish}的料了，老闆要先叫貨。`]),
     unknownFood: () => '這個我們店裡沒有耶，換一樣吧。',
     made: (dish: string, taste: number, chose: boolean) =>
-      `${chose ? pick([`我照我的方式做成${dish}了。`, `那我做成${dish}。`]) : pick([`${dish}好了，`, `來，${dish}。`, `${dish}做好了，`])}${verdict.zh(taste)}已經記進研發筆記。`,
+      `${chose ? pick([`我照我的方式做成${dish}了。`, `那我做成${dish}。`]) : pick([`${dish}好了，`, `來，${dish}。`, `${dish}做好了，`])}${verdict.zh(taste)}已經記進料理研製。`,
     warn: (dish: string) => pick([`${dish}？……這個搭配有點冒險，`, `老闆確定？${dish}我是沒做過，`]),
     batch: (dishes: string[]) => `我試了${dishes.join('、')}，都記進筆記了，你看看哪些能上菜單。`,
     batchNone: () => '能試的都試過了，或是材料不夠了。',

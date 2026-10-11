@@ -17,7 +17,7 @@ const ZH = {
   noodlesUp: (id: number, n: string) => `#${id} 的${n}來了`,
   bakeIn: (id: number) => `#${id} 的麵包進爐了`,
   bakeUp: (id: number, n: string) => `#${id} 的${n}出爐了，剛烤好的！`,
-  trial: (who: string, names: string[]) => `${who}試做了：${names.join('、')}，記進研發筆記了`,
+  trial: (who: string, names: string[]) => `${who}試做了：${names.join('、')}，記進料理研製了`,
   trialNone: (who: string) => `${who}：沒有材料可以試，先進貨吧`,
 }
 const JA: typeof ZH = {

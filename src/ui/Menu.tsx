@@ -102,11 +102,12 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
 
   // hold the left button and drag to slide the tags sideways; a drag isn't a click, so it doesn't order anything
   const grab = useRef<{ x: number; left: number; moved: boolean } | null>(null)
-  const dragged = useRef(false)
+  /** when a drag of the row last ended (the click that ends it isn't an order; one long after it is) */
+  const dragged = useRef(0)
   const onGrab = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || e.pointerType === 'touch' || !row.current) return
     grab.current = { x: e.clientX, left: row.current.scrollLeft, moved: false }
-    dragged.current = false
+    dragged.current = 0
   }
   const onDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
     const g = grab.current
@@ -120,7 +121,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     if (g.moved) el.scrollLeft = g.left - dx
   }
   const onLetGo = () => {
-    if (grab.current?.moved) dragged.current = true
+    if (grab.current?.moved) dragged.current = performance.now()
     grab.current = null
     row.current?.classList.remove('is-dragging')
   }
@@ -215,7 +216,8 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           if (!press.current && !locked) onRemove(x.id)
         }}
         onKeyDown={onKey(x.id)}
-        onPointerEnter={hasSet ? () => setPeek(x.id) : undefined}
+        // (not from a finger: a tap that changes the page on hover would need a second tap to order, on iOS)
+        onPointerEnter={hasSet ? (e) => { if (e.pointerType !== 'touch') setPeek(x.id) } : undefined}
         onPointerLeave={hasSet ? () => setPeek(null) : undefined}
         onFocus={hasSet ? () => setPeek(x.id) : undefined}
         onBlur={hasSet ? () => setPeek(null) : undefined}>
@@ -313,11 +315,12 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           onPointerLeave={onLetGo}
           onClickCapture={(e) => {
             // the click that ends a drag doesn't order the tag it was released on
-            if (dragged.current) {
+            // (a drag that ended by the pointer leaving the row, then a click later on, is a real click)
+            if (dragged.current && performance.now() - dragged.current < 250) {
               e.stopPropagation()
               e.preventDefault()
-              dragged.current = false
             }
+            dragged.current = 0
           }}>
           {/* bases (the dark walnut tags) are ordered the same way as everything else */}
           {taiwan ? (

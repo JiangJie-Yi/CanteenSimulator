@@ -1564,7 +1564,7 @@ export default function App() {
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
-          title={lang === 'ja' ? '開発ノート・人事' : '經營（研發筆記・人事）'}>
+          title={lang === 'ja' ? '開発ノート・人事' : '經營（料理研製・人事）'}>
           <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em><b>NT${Math.round(cash).toLocaleString()}</b>
         </button>
         {office && (

@@ -28,7 +28,7 @@ export const COST_SHARE: Record<string, number> = {
   BeefShank: 0.48, Tendon: 0.45, Tripe: 0.4, BraisedEgg: 0.25,
   NapaCabbage: 0.22, Tofu: 0.24, FriedTofu: 0.26, Taro: 0.28, Corn: 0.28, GrilledCorn: 0.28, ShiitakeCap: 0.3,
   GrilledShiitake: 0.3, Enoki: 0.25, Shishito: 0.25, KingOyster: 0.3, Asparagus: 0.32, Okra: 0.28, BokChoy: 0.2,
-  PickledGreens: 0.18, Potato: 0.22, SweetPotato: 0.22, Onigiri: 0.22, NetMochi: 0.24, Rice: 0.18, MisoSoup: 0.2, Sake: 0.35,
+  PickledGreens: 0.18, Potato: 0.22, SweetPotato: 0.22, Onigiri: 0.22, NetMochi: 0.24, Rice: 0.18, MisoSoup: 0.2, Sake: 0.4,
   ExtraNoodles: 0.25, mala: 0.32, tomato: 0.3, kombu: 0.26, braised: 0.4, clear: 0.42, plain: 0.3, dry: 0.3, sesame: 0.32,
 }
 

@@ -4529,9 +4529,9 @@ button {
   font-size: 10px;
 }
 
-.ofc-hire button {
-  background: #3b2a20 !important;
-  color: #fbf3e4 !important;
+.ofc-person .ofc-hire button {
+  background: #c4442f !important;
+  color: #fff !important;
 }
 
 .avatar {
@@ -4840,4 +4840,208 @@ button {
   background: transparent;
   color: #c4442f;
   font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   the office (經營): a sheet of washi in a dark wood frame; each job a section under a coloured rule, each
+   applicant a card, their skill, speed and stamina as little bars */
+.office {
+  --ofc-ink: #3b2a20;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.55), transparent 70%),
+    linear-gradient(#fbf6ea, #f4ecda);
+  border: 1px solid rgba(59, 42, 32, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(40, 24, 12, 0.28), 0 2px 0 rgba(255, 255, 255, 0.6) inset;
+  overflow: hidden;
+}
+.office > header {
+  background: linear-gradient(#4a3426, #36251a);
+  color: #f6ecd8;
+  border-bottom: 2px solid #c79a5a;
+  padding: 10px 14px;
+}
+.office > header .ofc-tabs button {
+  color: #f6ecd8;
+  border-color: rgba(246, 236, 216, 0.4);
+  background: transparent;
+}
+.office > header .ofc-tabs button[aria-selected='true'] {
+  background: #f6ecd8;
+  color: var(--ofc-ink);
+  border-color: #f6ecd8;
+}
+.office > header .ofc-cash {
+  color: #f2cf7a;
+  font-variant-numeric: tabular-nums;
+}
+.office > header .ofc-reset {
+  color: #f6ecd8;
+  background: transparent;
+  border-color: rgba(246, 236, 216, 0.45);
+}
+.office > header .ofc-close {
+  color: #f6ecd8;
+}
+.ofc-team {
+  gap: 10px;
+  padding: 12px 14px 4px;
+}
+.ofc-slot {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(59, 42, 32, 0.15);
+  border-radius: 12px;
+  padding: 8px 6px 6px;
+  box-shadow: 0 2px 6px rgba(59, 42, 32, 0.08);
+}
+.ofc-slot.is-open {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+.ofc-wages {
+  margin: 6px 14px 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(196, 68, 47, 0.07);
+}
+.ofc-role {
+  margin: 10px 14px 0;
+}
+.ofc-role h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 6px 10px;
+  border-left: 4px solid var(--role, #a08a5c);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+.ofc-role h4 small {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(59, 42, 32, 0.08);
+  font-variant-numeric: tabular-nums;
+}
+.ofc-role.is-chef { --role: #e8b04a; }
+.ofc-role.is-sous { --role: #d9c27a; }
+.ofc-role.is-server { --role: #5a7a9a; }
+.ofc-role.is-cashier { --role: #7aa070; }
+.ofc-role.is-stock { --role: #a08a5c; }
+.ofc-person,
+.ofc-person.is-hired {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(59, 42, 32, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0 0 8px;
+  box-shadow: 0 1px 3px rgba(59, 42, 32, 0.06);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.ofc-person:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(59, 42, 32, 0.12);
+}
+.ofc-person.is-hired {
+  background: linear-gradient(90deg, rgba(255, 244, 222, 0.95), rgba(255, 255, 255, 0.8));
+  border-color: color-mix(in srgb, var(--role, #a08a5c) 55%, transparent);
+}
+.ofc-person .avatar {
+  filter: drop-shadow(0 2px 3px rgba(59, 42, 32, 0.18));
+}
+.ofc-stars {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 12px;
+  margin: 3px 0 2px;
+}
+.ofc-stat {
+  display: grid;
+  grid-template-columns: auto minmax(28px, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #6b5442;
+}
+.ofc-stat i {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(59, 42, 32, 0.12);
+  overflow: hidden;
+}
+.ofc-stat b {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: #d8a245;
+}
+.ofc-stat b.is-high { background: #c4442f; }
+.ofc-stat b.is-low { background: #a9a093; }
+.ofc-stat em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--ofc-ink);
+  min-width: 2ch;
+  text-align: right;
+}
+.ofc-note {
+  color: #7a6250;
+}
+.ofc-hire b {
+  font-size: 15px;
+  color: var(--ofc-ink);
+  font-variant-numeric: tabular-nums;
+}
+.ofc-person .ofc-hire button {
+  background: #c4442f;
+  border-color: #a8352a;
+  color: #fff;
+  border-radius: 8px;
+}
+.ofc-person .ofc-hire button:hover {
+  background: #a8352a;
+}
+.ofc-fire {
+  border-radius: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .office {
+    background: linear-gradient(#2b2520, #231d18);
+    border-color: rgba(246, 236, 216, 0.15);
+  }
+  :root:not([data-theme='light']) .ofc-person,
+  :root:not([data-theme='light']) .ofc-slot { background: rgba(255, 255, 255, 0.05); border-color: rgba(246, 236, 216, 0.12); }
+  :root:not([data-theme='light']) .ofc-person.is-hired { background: rgba(232, 176, 74, 0.1); }
+  :root:not([data-theme='light']) .ofc-stat,
+  :root:not([data-theme='light']) .ofc-note { color: #c8b8a4; }
+  :root:not([data-theme='light']) .ofc-stat em,
+  :root:not([data-theme='light']) .ofc-hire b { color: #f6ecd8; }
+}
+:root[data-theme='dark'] .office {
+  background: linear-gradient(#2b2520, #231d18);
+  border-color: rgba(246, 236, 216, 0.15);
+}
+:root[data-theme='dark'] .ofc-person,
+:root[data-theme='dark'] .ofc-slot { background: rgba(255, 255, 255, 0.05); border-color: rgba(246, 236, 216, 0.12); }
+:root[data-theme='dark'] .ofc-person.is-hired { background: rgba(232, 176, 74, 0.1); }
+:root[data-theme='dark'] .ofc-stat,
+:root[data-theme='dark'] .ofc-note { color: #c8b8a4; }
+:root[data-theme='dark'] .ofc-stat em,
+:root[data-theme='dark'] .ofc-hire b { color: #f6ecd8; }
+/* (the team in one row: the owner and the five jobs) */
+.office .ofc-team {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+  gap: 6px;
+}
+.office .ofc-slot {
+  width: auto;
+  min-width: 0;
+}
+.office .ofc-slot figcaption small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }

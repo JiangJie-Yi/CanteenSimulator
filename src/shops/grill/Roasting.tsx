@@ -1491,13 +1491,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (kind === 'box' || kind === 'bin') return (carriers[kind]?.[0]?.home.clone() ?? new THREE.Vector3()).add(nudge(kind))
     if (kind === 'tray') return trayAt()
     if (kind === 'bar') return BAR_AT.clone()
+    if (kind === 'lantern') return new THREE.Vector3(DECOR.lantern.at[0], 0, DECOR.lantern.at[1]).add(nudge('lantern'))
     if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
     if (kind === 'rawdish') return new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])).add(nudge('rawdish'))
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   const footprint = (key: string) => {
     const kind = key.split('-')[0]
-    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R }[kind] ?? 0.3
+    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R, lantern: DECOR.lantern.r }[kind] ?? 0.3
   }
   /** a container's footprint as circles: one for most, three in a row along the long tray */
   const circlesOf = (key: string, at: THREE.Vector3) => key === 'tray'
@@ -1512,6 +1513,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     ...(roast.tray ? ['tray'] : []),
     ...(roast.trash ? ['trash'] : []),
     ...(roast.rawDish ? ['rawdish'] : []),
+    'lantern',
   ]
   /**
    * Keep a moved container from passing through things: out of the stone ring, and clear of every other
@@ -1522,8 +1524,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (what it's stacked with doesn't push it away; nor, while an empty one is carried, other empty ones it could go on)
     const others = containerKeys().filter((k) => k !== key && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
       .flatMap((k) => circlesOf(k, containerAt(k)))
-    // the crate, the fan and the sake set
-    for (const d of Object.values(DECOR)) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
+    // the crate and the fan
+    for (const d of [DECOR.crate, DECOR.fan]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
     if (space === 'open') for (let k = -2; k <= 2; k++) others.push({ p: BAR_AT.clone().addScaledVector(STACK_DIR, k * 0.8), r: 0.42 })
     // the soup bowls on the table are in the way too
@@ -2848,6 +2850,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         (!!shift.current && carrierOf(t.node.name) === shift.current.key))
       t.node.traverse((o) => {
         if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial) {
+          // (the spoons' and brushes' handles share one wood material: each gets its own, so only this one glows)
+          if (!o.userData.ownMaterial) {
+            o.material = o.material.clone()
+            o.userData.ownMaterial = true
+          }
           o.material.emissive.set(lit ? HOVER_GLOW : 0x000000)
         }
       })
@@ -3196,7 +3203,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
-      <Decor held={held} />
+      <Decor held={held} lanternAt={containerAt('lantern').toArray() as [number, number, number]} />
       {active && decorTip && (
         <Html position={decorTip === 'fan' ? [DECOR.fan.at[0], 0.62, DECOR.fan.at[1]] : [DECOR.crate.at[0], 0.5, DECOR.crate.at[1]]}
           center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>

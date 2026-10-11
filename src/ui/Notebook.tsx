@@ -42,7 +42,7 @@ type Props = {
 const t = (lang: Lang, zh: string, ja: string) => (lang === 'ja' ? ja : zh)
 
 /**
- * 研發筆記 (a tab of the office window, beside 人事): what's been tried with the shop closed, as dishes — at the grill a food with its seasonings is a dish of
+ * 料理研製 (a tab of the office window, beside 人事): what's been tried with the shop closed, as dishes — at the grill a food with its seasonings is a dish of
  * its own (鹽烤玉米, 醬刷玉米…) — each with its best try; any of them can be put on the menu at a price. The menu
  * tab lists what's on it (re-price, take off, make up sets), and a hired chef can be asked what's worth trying.
  */
@@ -110,11 +110,11 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   const setSum = setParts.reduce((n, e) => n + e.price, 0)
 
   return (
-    // (a tab of the office window: 研發筆記 beside 人事)
-    <div className="nb-embedded" aria-label={t(lang, '研發筆記', '開発ノート')}>
+    // (a tab of the office window: 料理研製 beside 人事)
+    <div className="nb-embedded" aria-label={t(lang, '料理研製', '開発ノート')}>
           <p className="nb-summary">{t(lang, `菜單 ${entries.length}/${MENU_MAX}・至少 ${min} 樣才能營業`, `メニュー ${entries.length}/${MENU_MAX}・${min}品から営業可`)}</p>
           {/* all on one page: what's been worked out, what's on the menu, and the second chef */}
-          <h4 className="nb-sec">{t(lang, '研發（試做過的菜）', '開発（試作した料理）')}</h4>
+          <h4 className="nb-sec">{t(lang, '料理研製（試做過的菜）', '開発（試作した料理）')}</h4>
           {(recipes.length === 0 ? (
             <p className="notebook-empty">{t(lang, '閉店時點菜試做、調味、吃一口，做過的菜就會記在這裡，再把好吃的上架。',
               '閉店中に試作して食べると、ここに記録されます。おいしいものをメニューに。')}</p>
@@ -152,7 +152,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
           {(
             <>
               {entries.length === 0 ? (
-                <p className="notebook-empty">{t(lang, '菜單還是空的：在「研發」把做過的菜上架。', 'メニューはまだ空です。')}</p>
+                <p className="notebook-empty">{t(lang, '菜單還是空的：在「料理研製」把做過的菜上架。', 'メニューはまだ空です。')}</p>
               ) : (
                 <ul>
                   {entries.map((e) => {

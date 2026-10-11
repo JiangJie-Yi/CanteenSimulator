@@ -25,11 +25,14 @@ type Props = {
 }
 
 const money = (n: number) => `NT$${Math.round(n).toLocaleString()}`
-/** a 1..100 rating as five stars */
-const stars = (v: number) => {
-  const n = Math.max(1, Math.min(5, Math.round(v / 20)))
-  return '★'.repeat(n) + '☆'.repeat(5 - n)
-}
+/** a 1..100 rating as a short bar, with its number */
+const Stat = ({ label, v }: { label: string; v: number }) => (
+  <span className="ofc-stat" title={`${label} ${v}`}>
+    <span>{label}</span>
+    <i><b style={{ width: `${v}%` }} className={v >= 80 ? 'is-high' : v < 60 ? 'is-low' : ''} /></i>
+    <em>{v}</em>
+  </span>
+)
 
 /**
  * The back office of the shop on screen: 人事, the kitchen and the floor as places to fill — the owner as head chef,
@@ -48,7 +51,7 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
     <section className="office" aria-label={t('經營', '事務所')} style={drag.move}>
       <header {...drag.handle}>
         <div className="ofc-tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('研發筆記', '開発ノート')}</button>
+          <button type="button" role="tab" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('料理研製', '開発ノート')}</button>
           <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{t('人事', '人事')}</button>
         </div>
         <span className={`ofc-cash${cash < 0 ? ' is-low' : ''}`}>{t('現金', '現金')} {money(cash)}</span>
@@ -68,7 +71,7 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
               return (
                 <figure key={r.role} className={`ofc-slot${w ? '' : ' is-open'}`}>
                   {w ? <Avatar id={w.id} look={w.look} role={w.role} size={48} /> : <span className="ofc-slot-empty">？</span>}
-                  <figcaption><b>{w ? (ja ? w.ja : w.zh) : t('徵人中', '募集中')}</b><small>{ja ? r.ja : r.zh}</small></figcaption>
+                  <figcaption><b>{w ? (ja ? w.ja : w.zh) : t('徵人中', '募集中')}</b><small>{ja ? r.ja : r.zh.split('（')[0]}</small></figcaption>
                 </figure>
               )
             })}
@@ -78,7 +81,7 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
             const mine = people.filter((w) => w.role === r.role && hired[w.id])
             const open = people.filter((w) => w.role === r.role && !hired[w.id])
             return (
-              <div key={r.role} className="ofc-role">
+              <div key={r.role} className={`ofc-role is-${r.role}`}>
                 <h4>{ja ? r.ja : r.zh} <small>{mine.length}/{r.max}</small></h4>
                 {mine.map((w) => (
                   <div key={w.id} className="ofc-person is-hired">
@@ -99,9 +102,9 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
                     <div className="ofc-who">
                       <b>{ja ? w.ja : w.zh}</b>
                       <span className="ofc-stars">
-                        <span>{t('手藝', '腕')} <em>{stars(w.skill)}</em></span>
-                        <span>{t('速度', '速さ')} <em>{stars(w.speed)}</em></span>
-                        <span>{t('體力', '体力')} <em>{stars(w.stamina)}</em></span>
+                        <Stat label={t('手藝', '腕')} v={w.skill} />
+                        <Stat label={t('速度', '速さ')} v={w.speed} />
+                        <Stat label={t('體力', '体力')} v={w.stamina} />
                       </span>
                       <small className="ofc-note">{w.note}</small>
                     </div>

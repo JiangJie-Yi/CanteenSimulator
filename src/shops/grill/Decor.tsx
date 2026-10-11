@@ -1,6 +1,6 @@
 // What stands about the grill besides the dishes: a crate of binchotan (a stick dragged from it onto the fire adds
 // charcoal), a paper fan leaning on it (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
-// glowing behind the stones. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
+// glowing behind the stones, which can be moved about like the dishes. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
 // them like anything else (DECOR is their footprint, for its settle()).
 import { useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -214,7 +214,7 @@ const LANTERN_PAPER = canvas(128, 256, (g) => {
 })
 
 /** A floor lantern (行燈): a square wooden frame on four legs, washi panels lit from inside. */
-function Lantern() {
+function Lantern({ at }: { at: [number, number, number] }) {
   const S = 0.2, H = 0.36, LEG = 0.16
   const geo = useMemo(() => ({
     post: new THREE.BoxGeometry(0.022, H + LEG + 0.04, 0.022),
@@ -226,7 +226,7 @@ function Lantern() {
   const posts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [a * S / 2, b * S / 2] as const)
   const top = LEG + H
   return (
-    <group position={[DECOR.lantern.at[0], 0, DECOR.lantern.at[1]]} rotation-y={0.4}>
+    <group position={at} rotation-y={0.4} userData={{ container: 'lantern' }}>
       {posts.map(([x, z], i) => (
         <Inked key={i} geometry={geo.post} color="#3a2416" grow={1.12} position={[x, (H + LEG + 0.04) / 2, z]} />
       ))}
@@ -268,13 +268,14 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
   )
 }
 
-export function Decor({ held }: { held: RefObject<Held> }) {
+/** (the lantern can be moved about the table like a dish: Roasting says where it is) */
+export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
     <>
       <Crate />
       <Fan held={held} />
       <HeldStick held={held} />
-      <Lantern />
+      <Lantern at={lanternAt} />
     </>
   )
 }
