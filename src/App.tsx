@@ -38,8 +38,8 @@ import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
-import { effective, restPerMin, tirePerMin, type Role } from '@/data/staff'
-import { CANDIDATES } from '@/game/hiring'
+import { effective, restPerMin, ROLES, tirePerMin, type Role } from '@/data/staff'
+import { CANDIDATES, pickHires } from '@/game/hiring'
 import { Office } from '@/ui/Office'
 import { Fridge } from '@/ui/Fridge'
 import { Welcome } from '@/ui/Welcome'
@@ -760,6 +760,41 @@ export default function App() {
   /** everyone in the kitchen who can try dishes out: the second chef and the third, each with how able they are now */
   const cooksNow = (d: DishInfo) => [...staffOf(d.id, 'chef'), ...staffOf(d.id, 'sous')]
     .map((c) => ({ c, skill: effective(c, hired[d.id]?.[c.id]?.fatigue ?? 0) }))
+  /**
+   * A whole menu at once: the kitchen (second and third chef taking turns) works out n dishes it hasn't put up yet —
+   * not only the surest, a few of their own fancy among them, each food at most twice — and they go up at a sensible
+   * price. Returns what went up, and who made it.
+   */
+  const makeMenu = (d: DishInfo, n: number) => {
+    const cooks = cooksNow(d)
+    const listed = new Set(entriesOf(d.id).map((e) => e.key))
+    const pool = trialIdeas(d).filter((x) => !listed.has(recipeKey(x.id, x.dabs)) && (stock[x.id] ?? 0) > 0)
+      .map((x) => ({ ...x, pick: x.taste + Math.random() * 18 })).sort((a, b) => b.pick - a.pick)
+    const per = new Map<string, number>()
+    const chosen = pool.filter((x) => {
+      const n = per.get(x.id) ?? 0
+      if (n >= 2) return false
+      per.set(x.id, n + 1)
+      return true
+    })
+    const made: { id: string; dabs: Seasoning[]; taste: number; name: string }[] = []
+    // (they take turns, dish by dish)
+    made.push(...chefCook(d, chosen, n, cooks.map((ck) => ck.skill)))
+    const room = MENU_MAX - entriesOf(d.id).length
+    const up = made.slice(0, Math.max(0, room))
+    if (up.length) setMenuBy((m) => {
+      const cur = m[d.id] ?? []
+      const add = up.map((x) => {
+        const item = findItem(d, x.id)!
+        const part = { id: x.id, dabs: x.dabs, name: partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, 'zh', d.roast ? 'grill' : d.bake ? 'bake' : 'plain'),
+          ja: partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, 'ja', d.roast ? 'grill' : d.bake ? 'bake' : 'plain') }
+        return { key: recipeKey(x.id, x.dabs), shop: d.id, name: part.name, ja: part.ja, price: menuPrice(d, part), parts: [part] }
+      }).filter((e) => !cur.some((c) => c.key === e.key))
+      return { ...m, [d.id]: [...cur, ...add].slice(0, MENU_MAX) }
+    })
+    const who = cooks.length > 1 ? CHEF_TALK[lang].together(lang === 'ja' ? cooks[0].c.ja : cooks[0].c.zh, lang === 'ja' ? cooks[1].c.ja : cooks[1].c.zh) : lang === 'ja' ? cooks[0].c.ja : cooks[0].c.zh
+    return { up, who }
+  }
   // talking with the second chef, at each shop: what was said both ways, and the dish he last offered to make
   const [talkBy, setTalkBy] = useState<Record<string, Talk[]>>({})
   const talkSeq = useRef(0)
@@ -806,36 +841,8 @@ export default function App() {
         break
       }
       case 'menu': {
-        // a whole menu at once: the kitchen (second and third chef taking turns) works out n dishes it hasn't put up
-        // yet — not only the surest, a few of their own fancy among them, each food at most twice — and they go up
-        // at a sensible price
-        const cooks = cooksNow(d)
-        const listed = new Set(entriesOf(d.id).map((e) => e.key))
-        const pool = trialIdeas(d).filter((x) => !listed.has(recipeKey(x.id, x.dabs)) && (stock[x.id] ?? 0) > 0)
-          .map((x) => ({ ...x, pick: x.taste + Math.random() * 18 })).sort((a, b) => b.pick - a.pick)
-        const per = new Map<string, number>()
-        const chosen = pool.filter((x) => {
-          const n = per.get(x.id) ?? 0
-          if (n >= 2) return false
-          per.set(x.id, n + 1)
-          return true
-        })
-        const made: { id: string; dabs: Seasoning[]; taste: number; name: string }[] = []
-        // (they take turns, dish by dish)
-        made.push(...chefCook(d, chosen, intent.n, cooks.map((ck) => ck.skill)))
-        const room = MENU_MAX - entriesOf(d.id).length
-        const up = made.slice(0, Math.max(0, room))
-        if (up.length) setMenuBy((m) => {
-          const cur = m[d.id] ?? []
-          const add = up.map((x) => {
-            const item = findItem(d, x.id)!
-            const part = { id: x.id, dabs: x.dabs, name: partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, 'zh', d.roast ? 'grill' : d.bake ? 'bake' : 'plain'),
-              ja: partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, 'ja', d.roast ? 'grill' : d.bake ? 'bake' : 'plain') }
-            return { key: recipeKey(x.id, x.dabs), shop: d.id, name: part.name, ja: part.ja, price: menuPrice(d, part), parts: [part] }
-          }).filter((e) => !cur.some((c) => c.key === e.key))
-          return { ...m, [d.id]: [...cur, ...add].slice(0, MENU_MAX) }
-        })
-        const who = cooks.length > 1 ? T.together(lang === 'ja' ? cooks[0].c.ja : cooks[0].c.zh, lang === 'ja' ? cooks[1].c.ja : cooks[1].c.zh) : lang === 'ja' ? cooks[0].c.ja : cooks[0].c.zh
+        // a whole menu at once (see makeMenu)
+        const { up, who } = makeMenu(d, intent.n)
         reply = up.length ? T.menuMade(up.map((m) => m.name), who) : T.menuNone()
         break
       }
@@ -1226,6 +1233,71 @@ export default function App() {
     say(UI[lang].soldOut)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ai, stock, guestsBy, active, opened])
+
+  // AI 全自動: the whole shop runs itself — hiring whoever's missing, buying in, having the kitchen work out a menu,
+  // opening, ordering more as it sells, and shutting for a rest when the staff are worn out — one step every few
+  // seconds (each step acts on the state as it is then, so it does one thing at a time)
+  const [auto, setAuto] = useState(false)
+  const resting = useRef(false)
+  const autoStep = useRef<() => void>(() => {})
+  autoStep.current = () => {
+    const d = DISHES[active]
+    const T = UI[lang]
+    const mine = hired[d.id] ?? {}
+    const tired = Math.max(0, ...Object.values(mine).map((w) => w.fatigue))
+    const seated = (guestsBy[d.id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')
+    if (ai) {
+      // worn out: no more customers in; shut once the last has eaten
+      if (tired > 85 && !seated) {
+        resting.current = true
+        setAi(false)
+        say(T.autoRest)
+        return
+      }
+      // no stock keeper: order in what the menu's running low on, as one would
+      const keeper = (CANDIDATES[d.id] ?? []).some((w) => w.role === 'stock' && mine[w.id])
+      if (!keeper) {
+        const { buy, cost } = restockOrder(d, entriesOf(d.id), stock, cash, 60)
+        if (cost) {
+          book('bought', cost)
+          setStock((st) => {
+            const next = { ...st }
+            for (const [k, q] of Object.entries(buy)) next[k] = (next[k] ?? 0) + q
+            return next
+          })
+        }
+      }
+      return
+    }
+    if (resting.current && tired > 25) return
+    resting.current = false
+    const hires = pickHires(CANDIDATES[d.id] ?? [], ROLES[d.id] ?? [], mine)
+    if (hires.length) {
+      setHired((h) => ({ ...h, [d.id]: { ...(h[d.id] ?? {}), ...Object.fromEntries(hires.map((w) => [w.id, { fatigue: 0 }])) } }))
+      say(T.autoHired(hires.length))
+      return
+    }
+    const order = topUpOrder(d, stock)
+    if (order.cost && order.cost <= cash) {
+      topUp(d)
+      return
+    }
+    if (entriesOf(d.id).length < (MENU_MIN[d.id] ?? 1) && cooksNow(d).length) {
+      const { up, who } = makeMenu(d, 10)
+      if (up.length) addTalk(d.id, 'chef', CHEF_TALK[lang].menuMade(up.map((m) => m.name), who))
+      return
+    }
+    if (entriesOf(d.id).length >= (MENU_MIN[d.id] ?? 1) && sellable(d)) {
+      setAi(true)
+      say(T.autoOpen)
+    }
+  }
+  useEffect(() => {
+    if (!auto) return
+    autoStep.current()
+    const id = window.setInterval(() => autoStep.current(), 2500)
+    return () => window.clearInterval(id)
+  }, [auto])
 
   /** whether a customer could order anything at this shop now: skewers at the grill, things to cook (and a soup,
    * or one already in the pot) at the hot pot, a bowl or a dish off the table at the noodle bar */
@@ -1669,6 +1741,13 @@ export default function App() {
             <rect x="11.5" y="19.5" width="5" height="4.5" fill="#5a3a26" />
             <ellipse cx="24.6" cy="15" rx="1.6" ry="2.2" fill="#f2b84b" stroke="#3b2a20" strokeWidth=".7" />
           </svg><em>{lang === 'ja' ? '経営' : '經營'}</em><b className="money">NT${Math.round(cash).toLocaleString()}</b>
+        </button>
+        <button type="button" className={`auto-toggle${auto ? ' is-on' : ''}`} aria-pressed={auto} title={UI[lang].autoLabel}
+          onClick={() => {
+            setAuto((v) => !v)
+            say(auto ? UI[lang].autoOff : UI[lang].autoOn)
+          }}>
+          <span className="auto-lamp" aria-hidden="true" />{UI[lang].auto}
         </button>
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}

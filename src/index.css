@@ -5755,3 +5755,54 @@ button {
 @media (max-width: 900px) {
   .grill-sign { width: 4.8em; }
 }
+
+/* AI 全自動: under 經營, a lamp that glows while the shop runs itself */
+.auto-toggle {
+  position: absolute;
+  top: 294px;
+  left: 72px;
+  z-index: 4;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px 0 10px;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 10px;
+  background: var(--page);
+  color: var(--text);
+  font: 600 13px/1 var(--brush);
+  cursor: pointer;
+}
+
+.auto-lamp {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8a8580;
+}
+
+.auto-toggle.is-on {
+  border-color: #3d8a3a;
+  background: #3d8a3a;
+  color: #fff;
+  box-shadow: 0 0 12px rgb(61 138 58 / 0.45);
+}
+
+.auto-toggle.is-on .auto-lamp {
+  background: #d8ffb0;
+  box-shadow: 0 0 6px 2px rgb(200 255 150 / 0.8);
+  animation: auto-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes auto-blink {
+  50% { opacity: 0.4; }
+}
+
+@media (max-width: 900px) {
+  .auto-toggle {
+    top: 238px;
+    left: 58px;
+    height: 30px;
+  }
+}
