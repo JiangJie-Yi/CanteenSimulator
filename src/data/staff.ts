@@ -42,7 +42,7 @@ const STAFFING = (chef: string, sous: string, chefJa: string, sousJa: string) =>
   { role: 'stock' as Role, max: 1, zh: '倉儲（叫貨・補貨）', ja: '仕入れ' },
 ]
 export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: string }[]> = {
-  grilledfish: STAFFING('二廚（板前）', '三廚（備料・上火・收拾）', '二番手', '追い回し'),
+  grilledfish: STAFFING('二廚（顧爐・烤魚）', '三廚（備料・上火・收拾）', '二番手', '追い回し'),
   hotpot: STAFFING('二廚（顧湯）', '三廚（備料）', '二番手', '仕込み'),
   beefnoodle: STAFFING('二廚（煮麵・快炒）', '三廚（顧湯・配料）', '二番手', '仕込み'),
   bakery: STAFFING('二廚（麵包師傅）', '三廚（備料・整形）', 'パン職人', '仕込み'),

@@ -53,7 +53,7 @@ export const JP_GIVEN: Record<'male' | 'female', ByAge> = {
 export const BACKGROUNDS: Record<string, Partial<Record<Role, Partial<ByAge>>>> = {
   grilledfish: {
     chef: {
-      old: ['炭火三十年', '老字號燒鳥店出身', '在築地魚市場待過二十年', '在京都割烹當過板前'],
+      old: ['炭火三十年', '老字號燒鳥店出身', '在築地魚市場待過二十年', '在京都割烹掌過廚'],
       middle: ['居酒屋掌爐十年', '剛從東京回來', '飯店日料部出身', '跑過幾家燒肉店'],
       young: ['學徒出身', '剛出師', '料理學校畢業', '在居酒屋打過工'],
     },

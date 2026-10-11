@@ -51,6 +51,8 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   const [picked, setPicked] = useState<string[]>([])
   const [setName, setSetName] = useState('')
   const [draft, setDraft] = useState('')
+  // one thing at a time: what's been tried, the menu, or the second chef (to begin with, him, once there's one)
+  const [view, setView] = useState<'tried' | 'menu' | 'chef'>(() => (chef && !Object.keys(notes).length ? 'chef' : 'tried'))
   const T = CHEF_TALK[lang]
   const [hello] = useState(() => T.hello())
   const log = useRef<HTMLOListElement>(null)
@@ -112,11 +114,23 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   return (
     // (a tab of the office window: 料理研製 beside 人事)
     <div className="nb-embedded" aria-label={t(lang, '料理研製', '開発ノート')}>
-          <p className="nb-summary">{t(lang, `菜單 ${entries.length}/${MENU_MAX}・至少 ${min} 樣才能營業`, `メニュー ${entries.length}/${MENU_MAX}・${min}品から営業可`)}</p>
-          {/* all on one page: what's been worked out, what's on the menu, and the second chef */}
-          <h4 className="nb-sec">{t(lang, '料理研製（試做過的菜）', '開発（試作した料理）')}</h4>
-          {(recipes.length === 0 ? (
-            <p className="notebook-empty">{t(lang, '閉店時點菜試做、調味、吃一口，做過的菜就會記在這裡，再把好吃的上架。',
+          {/* how far the menu is from opening: a bar to the minimum, and what's left to do */}
+          <div className={`nb-progress${entries.length >= min ? ' is-ready' : ''}`}>
+            <span>{t(lang, `菜單 ${entries.length}/${MENU_MAX}`, `メニュー ${entries.length}/${MENU_MAX}`)}</span>
+            <i><b style={{ width: `${Math.min(100, (entries.length / min) * 100)}%` }} /></i>
+            <small>{entries.length >= min ? t(lang, '可以營業了', '営業できます')
+              : t(lang, `再上架 ${min - entries.length} 樣就能營業`, `あと${min - entries.length}品で営業可`)}</small>
+          </div>
+          <nav className="nb-views" role="tablist">
+            {([['tried', t(lang, '試做紀錄', '試作'), recipes.length], ['menu', t(lang, '菜單', 'メニュー'), entries.length],
+              ['chef', t(lang, '問二廚', '二番手'), null]] as const).map(([k, label, n]) => (
+              <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => setView(k)}>
+                {label}{n !== null && <em>{n}</em>}
+              </button>
+            ))}
+          </nav>
+          {view === 'tried' && (recipes.length === 0 ? (
+            <p className="notebook-empty">{t(lang, '還沒試做過。關店時在右邊的牌子點菜試做、調味、吃一口，做過的菜就會記在這裡，好吃的按「上架」放上菜單。也可以到「問二廚」請二廚幫忙試做。',
               '閉店中に試作して食べると、ここに記録されます。おいしいものをメニューに。')}</p>
           ) : (
             <ul>
@@ -148,11 +162,10 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
             </ul>
           ))}
 
-          <h4 className="nb-sec">{t(lang, `菜單 ${entries.length}`, `メニュー ${entries.length}`)}</h4>
-          {(
+          {view === 'menu' && (
             <>
               {entries.length === 0 ? (
-                <p className="notebook-empty">{t(lang, '菜單還是空的：在「料理研製」把做過的菜上架。', 'メニューはまだ空です。')}</p>
+                <p className="notebook-empty">{t(lang, '菜單還是空的：到「試做紀錄」把做過的菜上架。上架兩樣以上，就能在這裡組套餐。', 'メニューはまだ空です。')}</p>
               ) : (
                 <ul>
                   {entries.map((e) => {
@@ -209,8 +222,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
             </>
           )}
 
-          <h4 className="nb-sec">{t(lang, '問二廚', '二番手に聞く')}</h4>
-          {(
+          {view === 'chef' && (
             <div className="nb-chef">
               {chef ? (
                 <>

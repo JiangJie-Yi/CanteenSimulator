@@ -22,6 +22,7 @@
 /* night camp: the page goes dark, the paper strips stay lit like lanterns */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
+    --money: #9fe3ae;
     --page: #171c27;
     --text: #efe6d6;
     --text-soft: #a99f90;
@@ -34,6 +35,7 @@
 }
 
 :root[data-theme='dark'] {
+  --money: #9fe3ae;
   --page: #171c27;
   --text: #efe6d6;
   --text-soft: #a99f90;
@@ -5044,4 +5046,350 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+/* night: the boards and the office go dark, and everything written on them light */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .guest-board,
+  :root:not([data-theme='light']) .ledger {
+    background: rgb(30 36 50 / 0.88);
+    color: var(--text);
+    box-shadow: 0 6px 16px -10px rgb(0 0 0 / 0.8);
+  }
+  :root:not([data-theme='light']) .guest-board *:not(button):not(.fill-guest),
+  :root:not([data-theme='light']) .ledger *:not(button) {
+    color: inherit;
+  }
+  :root:not([data-theme='light']) .guest-board .guest-note,
+  :root:not([data-theme='light']) .guest-board .chef-pick span,
+  :root:not([data-theme='light']) .guest-board small {
+    color: #c9bfae;
+  }
+  :root:not([data-theme='light']) .office {
+    color: var(--text);
+  }
+  :root:not([data-theme='light']) .office *:not(button):not(input):not(.ofc-cash):not(.money) {
+    color: inherit;
+  }
+  :root:not([data-theme='light']) .office small,
+  :root:not([data-theme='light']) .office .ofc-note,
+  :root:not([data-theme='light']) .office .ofc-stat,
+  :root:not([data-theme='light']) .office .nb-head small,
+  :root:not([data-theme='light']) .office .notebook-empty,
+  :root:not([data-theme='light']) .office .ofc-wages {
+    color: #c9bfae;
+  }
+  :root:not([data-theme='light']) .office .ofc-slot.is-open figcaption b {
+    color: #ff8f78;
+  }
+  :root:not([data-theme='light']) .office .nb-sec,
+  :root:not([data-theme='light']) .office h4 {
+    color: #f6ecd8;
+    border-color: rgb(246 236 216 / 0.25);
+  }
+  :root:not([data-theme='light']) .office .nb-chat .from-chef {
+    background: rgb(255 255 255 / 0.07);
+    border-color: rgb(246 236 216 / 0.18);
+  }
+  :root:not([data-theme='light']) .office .nb-chat .from-chef b {
+    color: #ff9a80;
+  }
+  :root:not([data-theme='light']) .office .nb-chat .from-me {
+    color: #fff;
+  }
+  :root:not([data-theme='light']) .office .nb-chat-form input,
+  :root:not([data-theme='light']) .office .nb-publish input {
+    background: #1d1915;
+    color: var(--text);
+    border-color: rgb(246 236 216 / 0.3);
+  }
+  :root:not([data-theme='light']) .office .nb-embedded > ul > li,
+  :root:not([data-theme='light']) .office .nb-set {
+    background: rgb(255 255 255 / 0.04);
+    border-color: rgb(246 236 216 / 0.14);
+  }
+  :root:not([data-theme='light']) .office button:not(.ofc-fire):not([aria-selected='true']):not(.nb-chat-form button) {
+    color: var(--text);
+  }
+  :root:not([data-theme='light']) .office .nb-chef-acts button {
+    color: #ff9a80;
+    border-color: rgb(255 154 128 / 0.6);
+  }
+  
+}
+
+:root[data-theme='dark'] .guest-board,
+:root[data-theme='dark'] .ledger {
+  background: rgb(30 36 50 / 0.88);
+  color: var(--text);
+  box-shadow: 0 6px 16px -10px rgb(0 0 0 / 0.8);
+}
+:root[data-theme='dark'] .guest-board *:not(button):not(.fill-guest),
+:root[data-theme='dark'] .ledger *:not(button) {
+  color: inherit;
+}
+:root[data-theme='dark'] .guest-board .guest-note,
+:root[data-theme='dark'] .guest-board .chef-pick span,
+:root[data-theme='dark'] .guest-board small {
+  color: #c9bfae;
+}
+:root[data-theme='dark'] .office {
+  color: var(--text);
+}
+:root[data-theme='dark'] .office *:not(button):not(input):not(.ofc-cash):not(.money) {
+  color: inherit;
+}
+:root[data-theme='dark'] .office small,
+:root[data-theme='dark'] .office .ofc-note,
+:root[data-theme='dark'] .office .ofc-stat,
+:root[data-theme='dark'] .office .nb-head small,
+:root[data-theme='dark'] .office .notebook-empty,
+:root[data-theme='dark'] .office .ofc-wages {
+  color: #c9bfae;
+}
+:root[data-theme='dark'] .office .ofc-slot.is-open figcaption b {
+  color: #ff8f78;
+}
+:root[data-theme='dark'] .office .nb-sec,
+:root[data-theme='dark'] .office h4 {
+  color: #f6ecd8;
+  border-color: rgb(246 236 216 / 0.25);
+}
+:root[data-theme='dark'] .office .nb-chat .from-chef {
+  background: rgb(255 255 255 / 0.07);
+  border-color: rgb(246 236 216 / 0.18);
+}
+:root[data-theme='dark'] .office .nb-chat .from-chef b {
+  color: #ff9a80;
+}
+:root[data-theme='dark'] .office .nb-chat .from-me {
+  color: #fff;
+}
+:root[data-theme='dark'] .office .nb-chat-form input,
+:root[data-theme='dark'] .office .nb-publish input {
+  background: #1d1915;
+  color: var(--text);
+  border-color: rgb(246 236 216 / 0.3);
+}
+:root[data-theme='dark'] .office .nb-embedded > ul > li,
+:root[data-theme='dark'] .office .nb-set {
+  background: rgb(255 255 255 / 0.04);
+  border-color: rgb(246 236 216 / 0.14);
+}
+:root[data-theme='dark'] .office button:not(.ofc-fire):not([aria-selected='true']):not(.nb-chat-form button) {
+  color: var(--text);
+}
+:root[data-theme='dark'] .office .nb-chef-acts button {
+  color: #ff9a80;
+  border-color: rgb(255 154 128 / 0.6);
+}
+
+/* money, wherever it's shown, in a pale green (a shade deeper on the light pages, to stay readable) */
+.money,
+.office .money,
+.office > header .ofc-cash .money {
+  color: var(--money, #3f9e5c) !important;
+  font-variant-numeric: tabular-nums;
+}
+.office > header .ofc-cash .money,
+.tally-buyall .money {
+  color: #a6ecb4 !important;
+}
+/* (a little coin before every sum of money) */
+.money::before {
+  content: '';
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 0.22em;
+  vertical-align: -0.14em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='9' fill='%23e8c45a' stroke='%236b4a1a' stroke-width='1.4'/%3E%3Ccircle cx='10' cy='10' r='6.2' fill='none' stroke='%23b8892e' stroke-width='1'/%3E%3Cpath d='M7 6.5l3 3.6 3-3.6M10 10.1v4.4M7.4 11.2h5.2M7.4 13h5.2' fill='none' stroke='%236b4a1a' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* 料理研製: a bar to opening day, then one view at a time (試做紀錄 / 菜單 / 問二廚) under segmented tabs; the chat
+   fills its view, its log scrolling above the box you type in, so there's only ever one scrollbar */
+.nb-embedded {
+  display: flex;
+  flex-direction: column;
+}
+.nb-progress {
+  display: grid;
+  grid-template-columns: auto minmax(60px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 14px 8px;
+  font-size: 13px;
+}
+.nb-progress i {
+  height: 8px;
+  border-radius: 4px;
+  background: rgb(59 42 32 / 0.12);
+  overflow: hidden;
+}
+.nb-progress b {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: #d8a245;
+  transition: width 0.3s;
+}
+.nb-progress.is-ready b { background: #5fa040; }
+.nb-progress small { color: #7a6656; }
+.nb-views {
+  display: flex;
+  gap: 4px;
+  margin: 0 14px 8px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgb(59 42 32 / 0.08);
+}
+.nb-views button {
+  flex: 1;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.nb-views button[aria-selected='true'] {
+  background: #fffaf0;
+  box-shadow: 0 1px 3px rgb(59 42 32 / 0.2);
+  font-weight: 700;
+}
+.nb-views em {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgb(59 42 32 / 0.12);
+  font-style: normal;
+  font-size: 11px;
+}
+.nb-embedded .notebook-empty {
+  margin: 8px 14px 14px;
+  padding: 14px 16px;
+  border: 1.5px dashed rgb(59 42 32 / 0.25);
+  border-radius: 12px;
+  line-height: 1.7;
+}
+.nb-embedded .nb-chef {
+  display: flex;
+  flex-direction: column;
+  height: min(46vh, 400px);
+  padding: 0 14px 12px;
+}
+.nb-embedded .nb-chat {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgb(59 42 32 / 0.04);
+}
+.nb-embedded .nb-chef-acts {
+  flex-wrap: wrap;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .nb-views { background: rgb(255 255 255 / 0.06); }
+  :root:not([data-theme='light']) .nb-views button[aria-selected='true'] { background: rgb(255 255 255 / 0.14); color: #fff; }
+  :root:not([data-theme='light']) .nb-views em, :root:not([data-theme='light']) .nb-progress i { background: rgb(255 255 255 / 0.12); }
+  :root:not([data-theme='light']) .nb-progress small { color: #c9bfae; }
+  :root:not([data-theme='light']) .nb-embedded .notebook-empty { border-color: rgb(246 236 216 / 0.2); }
+  :root:not([data-theme='light']) .nb-embedded .nb-chat { background: rgb(255 255 255 / 0.03); }
+}
+:root[data-theme='dark'] .nb-views { background: rgb(255 255 255 / 0.06); }
+:root[data-theme='dark'] .nb-views button[aria-selected='true'] { background: rgb(255 255 255 / 0.14); color: #fff; }
+:root[data-theme='dark'] .nb-views em, :root[data-theme='dark'] .nb-progress i { background: rgb(255 255 255 / 0.12); }
+:root[data-theme='dark'] .nb-progress small { color: #c9bfae; }
+:root[data-theme='dark'] .nb-embedded .notebook-empty { border-color: rgb(246 236 216 / 0.2); }
+:root[data-theme='dark'] .nb-embedded .nb-chat { background: rgb(255 255 255 / 0.03); }
+
+/* the two buying buttons side by side: 一鍵補貨 (top up to 10) and 全部各 +10 */
+.tally-buy {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 6px;
+}
+.tally-topup {
+  padding: 2px 10px;
+  border: 1.5px solid #4f8a34;
+  border-radius: 8px;
+  background: #5fa040;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tally-topup small {
+  margin-left: 4px;
+}
+.tally-topup:disabled {
+  background: #a9b8a0;
+  border-color: #a9b8a0;
+  cursor: default;
+}
+.tally-buy .tally-buyall {
+  margin-left: 0;
+}
+
+.tally-topup .money {
+  color: #f0fff3 !important;
+}
+.tally-topup:disabled {
+  color: #4a5a44;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .office .ofc-fire, :root:not([data-theme='light']) .guest-board button:not(.is-on) { color: #3b2a20; }
+}
+:root[data-theme='dark'] .office .ofc-fire, :root[data-theme='dark'] .guest-board button:not(.is-on) { color: #3b2a20; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .office .nb-chat .from-chef b { color: #ff9a80 !important; }
+  :root:not([data-theme='light']) .office .nb-chat .from-me { background: #c4442f; color: #fff !important; border: 0; }
+  :root:not([data-theme='light']) .office .ofc-slot.is-open figcaption b { color: #ff8f78 !important; }
+  :root:not([data-theme='light']) .office .nb-stars { color: #f2b84b !important; }
+}
+:root[data-theme='dark'] .office .nb-chat .from-chef b { color: #ff9a80 !important; }
+:root[data-theme='dark'] .office .nb-chat .from-me { background: #c4442f; color: #fff !important; border: 0; }
+:root[data-theme='dark'] .office .ofc-slot.is-open figcaption b { color: #ff8f78 !important; }
+:root[data-theme='dark'] .office .nb-stars { color: #f2b84b !important; }
+/* nothing on a tag runs past its edges: the cost and stock as label-over-number, the 缺 tab inside the corner */
+.menu .strip-stock {
+  max-width: calc(100% - 4px);
+  gap: 3px;
+}
+.menu .strip-stock small,
+.menu .strip-stock b {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-size: 0.82em;
+  line-height: 1.05;
+}
+.menu .strip-stock em {
+  font-style: normal;
+  font-size: 1.15em;
+  font-variant-numeric: tabular-nums;
+}
+.menu .out-tag {
+  top: 3px;
+  right: 3px;
+  transform: none;
+  font-size: 10px;
+}
+/* (on the test board the cost and stock stand at the foot of the tag in its flow, so the name makes room for them) */
+.menu .strip.is-research .strip-stock {
+  position: static;
+  transform: none;
+  margin-top: auto !important;
+  flex: none;
+}
+.menu .strip.is-research .strip-en {
+  margin-bottom: 0;
 }

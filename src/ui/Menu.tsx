@@ -26,6 +26,9 @@ type MenuProps = {
   onBuy?: (id: string, n: number) => void
   /** buy n of everything on the board */
   onBuyAll?: (n: number) => void
+  /** 一鍵補貨: top everything up to 10, and what that costs (0: nothing's short) */
+  onTopUp?: () => void
+  topUpCost?: number
   cash?: number
 }
 
@@ -34,13 +37,14 @@ type MenuProps = {
  * the tag is 15.5em tall with 0.7em padding top and bottom), and shrink the whole tag's type if it would
  * overflow. Long Japanese names (焼きおにぎり) and set names (秋刀魚定食) come out smaller instead of spilling.
  */
-function tagFit(name: string, en: string | undefined, price: string, stamp: boolean): CSSProperties | undefined {
+function tagFit(name: string, en: string | undefined, price: string, stamp: boolean, stocked = false): CSSProperties | undefined {
   const parts = [
     1.4,                                  // icon (or the 選 stamp in its place)
     name.length * 1.3 * 1.12,             // name: 1.3em glyphs + 0.12em letter-spacing
     en ? en.length * 0.56 * 0.6 : 0,      // English, set sideways: ~0.6em per Latin letter at 0.56em
     price.length * 0.82 * 1.12,           // price in kanji numerals
     stamp ? 2 : 0,                        // the 點 / 含 stamp
+    stocked ? 5.4 : 0,                    // the test board's cost, stock and +10, in a column at the foot
   ].filter((h) => h > 0)
   const total = parts.reduce((a, b) => a + b, 0) + (parts.length - 1) * 0.35
   const room = 15.5 - 1.4
@@ -61,7 +65,7 @@ const CAT_NAMES: Record<string, Record<Lang, string>> = {
   xiaolongbao: { zh: '點心', ja: '点心' }, soup: { zh: '湯類', ja: 'スープ' },
 }
 
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false, unitCost, onBuy, onBuyAll,
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0,
   cash = Infinity }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
@@ -200,7 +204,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       <button key={x.id} type="button" aria-pressed={n > 0} data-id={x.id}
         className={`strip${research ? ' is-research' : ''}${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}${filling.length ? ' is-filling' : ''}${out ? ' is-out' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${x.price}${n ? `，${t.ordered(n)}` : ''}`}
-        style={tagFit(name, x.en, price, n > 0)}
+        style={tagFit(name, x.en, research ? '' : price, n > 0, research && !!onBuy)}
         onClick={() => {
           const fired = press.current?.fired
           press.current = null
@@ -228,15 +232,17 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         {research && onBuy && (
           // (stocked right here: it isn't the tag itself, which takes one to try)
           <span className="strip-stock" aria-hidden="true">
-            <small>{lang === 'ja' ? '原価' : '成本'} {cost}</small>
-            <b>{lang === 'ja' ? '在庫' : '庫存'} {stock?.[x.id] ?? 0}</b>
+            {/* (label over number, so a four-figure cost still fits a narrow tag) */}
+            <small>{lang === 'ja' ? '原価' : '成本'}<em>{cost}</em></small>
+            <b>{lang === 'ja' ? '在庫' : '庫存'}<em>{stock?.[x.id] ?? 0}</em></b>
             <span role="button" tabIndex={-1} className={`strip-buy${cash < cost * 10 ? ' is-off' : ''}`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (cash >= cost * 10) onBuy(x.id, 10) }}>+10</span>
           </span>
         )}
         {incl && <span className="stamp stamp-incl" aria-hidden="true">{t.included}</span>}
-        {out && <span className="out-tag" aria-hidden="true">{lang === 'ja' ? '切' : '缺'}</span>}
+        {/* (on the test board the stock line already shows it, in red) */}
+        {out && !research && <span className="out-tag" aria-hidden="true">{lang === 'ja' ? '切' : '缺'}</span>}
         {filling.map((f) => <span key={f.key} className="fill-guest" aria-hidden="true">#{f.guest}</span>)}
         {n > 0 && (
           <span key={n} className="stamp" aria-hidden="true">
@@ -349,7 +355,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           </ul>
         )}
         <p>
-          {beforeCount}<strong>{n1}</strong>{beforeTotal}<strong>{n2}</strong>{after}
+          {beforeCount}<strong>{n1}</strong>{beforeTotal}<strong className="money">{n2}</strong>{after}
         </p>
         <button type="button" className="clear" onClick={onClear} disabled={count === 0 || locked}>
           {t.clear}
@@ -359,9 +365,18 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
             // (stock everything on the board at once)
             const all = [...dish.bases.filter((b) => !b.includes), ...dish.items].reduce((n, x) => n + unitCost(x.id) * 10, 0)
             return (
-              <button type="button" className="tally-buyall" disabled={cash < all} onClick={() => onBuyAll(10)}>
-                {lang === 'ja' ? '全部 +10' : '全部各 +10'} <small>NT${all.toLocaleString()}</small>
-              </button>
+              <span className="tally-buy">
+                {onTopUp && (
+                  <button type="button" className="tally-topup" disabled={!topUpCost || cash < topUpCost} onClick={onTopUp}
+                    title={lang === 'ja' ? '足りない分を各10まで補充' : '不足的食材全部補到各 10 份'}>
+                    {topUpCost ? (lang === 'ja' ? '一括補充' : '一鍵補貨') : (lang === 'ja' ? '在庫十分' : '庫存都滿了')}
+                    {topUpCost > 0 && <small className="money">NT${topUpCost.toLocaleString()}</small>}
+                  </button>
+                )}
+                <button type="button" className="tally-buyall" disabled={cash < all} onClick={() => onBuyAll(10)}>
+                  {lang === 'ja' ? '全部 +10' : '全部各 +10'} <small className="money">NT${all.toLocaleString()}</small>
+                </button>
+              </span>
             )
           })()}</p>
       </footer>

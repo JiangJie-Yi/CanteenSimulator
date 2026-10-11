@@ -117,3 +117,16 @@ export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number,
   }
   return { buy, cost }
 }
+
+/** 一鍵補貨: everything the shop sells topped up to PAR portions (what's already over it is left as it is) */
+export function topUpOrder(d: Dish, stock: Stock, par = PAR) {
+  const buy: Stock = {}
+  let cost = 0
+  for (const g of goodsOf(d)) {
+    const n = par - (stock[g.id] ?? 0)
+    if (n <= 0) continue
+    buy[g.id] = n
+    cost += costOf(g) * n
+  }
+  return { buy, cost }
+}

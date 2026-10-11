@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { DISHES } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPrice, type Entry } from '@/data/recipes'
 import { ROLES } from '@/data/staff'
-import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock } from '@/game/economy'
+import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder } from '@/game/economy'
 import { trialIdeas } from '@/game/research'
 import { makeCandidates, seeded } from '@/game/hiring'
 import { bestDabs, expectedTaste, understand } from '@/game/chefChat'
@@ -183,7 +183,8 @@ describe('chef chat: understanding what the owner asks', () => {
     expect(understand('好啊', g)).toEqual({ kind: 'yes' })
     expect(understand('辛苦了', g)).toEqual({ kind: 'thanks' })
     expect(understand('幫我做個東西', g)).toEqual({ kind: 'makeWhat' })
-    expect(understand('今天天氣真好', g)).toEqual({ kind: 'unknown' })
+    expect(understand('今天天氣真好', g)).toEqual({ kind: 'chat', topic: 'weather' })
+    expect(understand('嗚啦啦', g)).toEqual({ kind: 'unknown' })
   })
   it('knows what suits a food', () => {
     expect(bestDabs(g, 'GrilledCorn')[0]).toBe('soy')
@@ -209,5 +210,44 @@ describe('game/economy: the stock keeper', () => {
     expect(supplierDiscount(100)).toBe(0.05)
     const cheap = restockOrder(grill, menu, {}, 1e6, 100).cost
     expect(cheap).toBeLessThan(restockOrder(grill, menu, {}, 1e6, 60).cost)
+  })
+})
+
+describe('game/chefChat: by kind, left to him, small talk', () => {
+  const grill = shop('grilledfish')
+  it('understands a kind of food, asked about or wanted', () => {
+    const fish = understand('魚類', grill)
+    expect(fish.kind).toBe('byKind')
+    if (fish.kind === 'byKind') {
+      expect(fish.ids).toContain('Saury')
+      expect(fish.ask).toBe(false)
+    }
+    const veg = understand('有什麼蔬菜推薦？', grill)
+    expect(veg.kind === 'byKind' && veg.ask).toBe(true)
+    // (a food named outright still wins over its kind)
+    expect(understand('鮭魚配什麼好？', grill)).toEqual({ kind: 'advise', id: 'Salmon' })
+  })
+  it('leaves it to him', () => {
+    expect(understand('你幫我客製化就好', grill)).toEqual({ kind: 'batch', n: 1 })
+    expect(understand('你決定', grill)).toEqual({ kind: 'batch', n: 1 })
+    expect(understand('都來一點', grill).kind).not.toBe('unknown')
+  })
+  it('makes small talk', () => {
+    expect(understand('今天天氣好熱', grill)).toEqual({ kind: 'chat', topic: 'weather' })
+    expect(understand('@@?', grill)).toEqual({ kind: 'chat', topic: 'confused' })
+    expect(understand('你是誰', grill)).toEqual({ kind: 'chat', topic: 'who' })
+    expect(understand('講個笑話', grill)).toEqual({ kind: 'chat', topic: 'joke' })
+  })
+})
+
+describe('game/economy: 一鍵補貨', () => {
+  const grill = shop('grilledfish')
+  it('tops everything up to PAR, leaving what has more alone', () => {
+    const { buy, cost } = topUpOrder(grill, { Saury: 4, Salmon: 15 })
+    expect(buy.Saury).toBe(PAR - 4)
+    expect(buy.Salmon).toBeUndefined()
+    expect(buy.GrilledCorn).toBe(PAR)
+    expect(cost).toBe(Object.entries(buy).reduce((n, [id, q]) => n + costOf(goodsOf(grill).find((g) => g.id === id)!) * q, 0))
+    expect(topUpOrder(grill, Object.fromEntries(goodsOf(grill).map((g) => [g.id, PAR]))).cost).toBe(0)
   })
 })

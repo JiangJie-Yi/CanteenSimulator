@@ -17,9 +17,9 @@ import { bestOf, Notebook } from '@/ui/Notebook'
 import { findItem, MENU_MAX, MENU_MIN, SEASON_NAME, signature, type Entry, type Part, type Seasoning } from '@/data/recipes'
 import { moodOf } from '@/game/taste'
 import { trialIdeas } from '@/game/research'
-import { bestDabs, dishName, expectedTaste, understand } from '@/game/chefChat'
+import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
-import { restockOrder, buyAllCost, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
+import { restockOrder, topUpOrder, buyAllCost, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
   portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
 import { GuestCounter } from '@/ui/GuestCounter'
@@ -816,11 +816,49 @@ export default function App() {
         reply = goods.every((g) => !(stock[g.id] ?? 0)) ? T.stockEmpty() : T.stock(low.slice(0, 6))
         break
       }
+      case 'byKind': {
+        // a kind of food: the best of it there's food for (one not tried yet, if any); asked about, he offers it,
+        // otherwise he just makes it
+        const label = lang === 'ja' ? intent.food.ja : intent.food.zh
+        const have = intent.ids.filter((id) => (stock[id] ?? 0) > 0)
+        const idea = untriedIdeas(d, skill).find((x) => have.includes(x.id))
+          ?? have.map((id) => ({ id, dabs: bestDabs(d, id).slice(0, 1) }))
+            .sort((a, b) => expectedTaste(d, b.id, b.dabs) - expectedTaste(d, a.id, a.dabs))[0]
+        if (!idea) {
+          reply = T.byKindNone(label)
+        } else if (intent.ask) {
+          offered.current[d.id] = { id: idea.id, dabs: idea.dabs }
+          reply = T.byKind(label, nameOf(idea.id, idea.dabs))
+        } else {
+          const exp = expectedTaste(d, idea.id, idea.dabs)
+          const made = chefCook(d, [{ id: idea.id, dabs: idea.dabs, taste: exp }], 1, skill)
+          reply = made.length ? T.made(nameOf(idea.id, idea.dabs), made[0].taste, true) : T.noStock(nameOf(idea.id, idea.dabs))
+        }
+        break
+      }
+      case 'chat': {
+        const c = now.c
+        const C = T.chat
+        const fatigue = hired[d.id]?.[c.id]?.fatigue ?? 0
+        const open = ai && DISHES[active].id === d.id
+        const guests = (guestsBy[d.id] ?? []).filter((g) => g.state === 'waiting' || g.state === 'eating').length
+        reply = intent.topic === 'confused' ? T.confused()
+          : intent.topic === 'tired' ? C.tired(fatigue)
+          : intent.topic === 'who' ? C.who(lang === 'ja' ? c.ja : c.zh, c.note ? `${c.note}。` : '')
+          : intent.topic === 'business' ? C.business(open, guests)
+          : C[intent.topic]()
+        break
+      }
       case 'makeWhat': reply = T.makeWhat(); break
       case 'no': reply = T.no(); break
       case 'thanks': reply = T.thanks(); break
       case 'hello': reply = T.hello(); break
-      default: reply = T.unknown()
+      default: {
+        // he didn't follow: he says so, and suggests something there's food for
+        const idea = untriedIdeas(d, skill).find((x) => (stock[x.id] ?? 0) > 0) ?? untriedIdeas(d, skill)[0]
+        if (idea) offered.current[d.id] = { id: idea.id, dabs: idea.dabs }
+        reply = T.unknown(idea ? nameOf(idea.id, idea.dabs) : foodOf(cookable(d)[0]?.id ?? ''))
+      }
     }
     // (a moment to answer, as a person would)
     window.setTimeout(() => addTalk(d.id, 'chef', reply), 350 + Math.random() * 300)
@@ -842,6 +880,17 @@ export default function App() {
     setStock((st) => {
       const next = { ...st }
       for (const g of goods) next[g.id] = (next[g.id] ?? 0) + n
+      return next
+    })
+  }
+  /** 一鍵補貨: top everything this shop sells up to 10 portions */
+  const topUp = (d: DishInfo) => {
+    const { buy, cost } = topUpOrder(d, stock)
+    if (!cost || cost > cash) return
+    book('bought', cost)
+    setStock((st) => {
+      const next = { ...st }
+      for (const [k, n] of Object.entries(buy)) next[k] = (next[k] ?? 0) + n
       return next
     })
   }
@@ -1565,7 +1614,7 @@ export default function App() {
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
           title={lang === 'ja' ? '開発ノート・人事' : '經營（料理研製・人事）'}>
-          <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em><b>NT${Math.round(cash).toLocaleString()}</b>
+          <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em><b className="money">NT${Math.round(cash).toLocaleString()}</b>
         </button>
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
@@ -1658,19 +1707,19 @@ export default function App() {
           {ledgerOn && (
             <section className="ledger is-draggable" aria-label={UI[lang].ledgerLabel} style={dragLedger.style}
               onPointerDown={dragLedger.onPointerDown} onDoubleClick={dragLedger.onDoubleClick}>
-              <p className="ledger-cash"><span>{lang === 'ja' ? '現金' : '現金'}</span><b>NT${Math.round(cash).toLocaleString()}</b></p>
-              <p><span>{lang === 'ja' ? '開業費' : '開業費用'}</span><b>−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
-              <p><span>{lang === 'ja' ? '仕入れ' : '採買支出'}</span><b>−{Math.round(ledger.bought).toLocaleString()}</b></p>
+              <p className="ledger-cash"><span>{lang === 'ja' ? '現金' : '現金'}</span><b className="money">NT${Math.round(cash).toLocaleString()}</b></p>
+              <p><span>{lang === 'ja' ? '開業費' : '開業費用'}</span><b className="money">−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
+              <p><span>{lang === 'ja' ? '仕入れ' : '採買支出'}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
               {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
                 .map(([k, v]) => (
-                  <p key={k}><span>{UI[lang][k]}</span><b>{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : 1)}</b></p>
+                  <p key={k}><span>{UI[lang][k]}</span><b className="money">{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : 1)}</b></p>
                 ))}
               {(() => {
                 const profit = ledger.revenue - ledger.food - ledger.fuel - ledger.wage
                 return (
                   <>
                     <p className={`ledger-profit${profit < 0 ? ' is-loss' : ''}`}><span>{UI[lang].profit}</span>
-                      <b>{profit < 0 ? '−' : ''}NT${Math.abs(profit).toFixed(0)}</b></p>
+                      <b className={profit < 0 ? '' : 'money'}>{profit < 0 ? '−' : ''}NT${Math.abs(profit).toFixed(0)}</b></p>
                     <p className="ledger-margin"><span>{UI[lang].margin}</span>
                       <b>{ledger.revenue > 0 ? `${((profit / ledger.revenue) * 100).toFixed(1)}%` : '—'}</b></p>
                   </>
@@ -1744,7 +1793,7 @@ export default function App() {
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : researchDish(dish)} research={!ai}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
-        onBuy={(id, n) => buyIn(dish, id, n)} onBuyAll={(n) => buyAll(dish, n)} lang={lang} quantities={ai ? entryCount : orders[dish.id]}
+        onBuy={(id, n) => buyIn(dish, id, n)} onBuyAll={(n) => buyAll(dish, n)} onTopUp={() => topUp(dish)} topUpCost={topUpOrder(dish, stock).cost} lang={lang} quantities={ai ? entryCount : orders[dish.id]}
         feed={feed} locked={ai} stock={ai ? entryStock(dish) : stock}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {

@@ -57,10 +57,13 @@ for (const [i, shop] of SHOPS.entries()) {
     if (await hire.count()) await hire.click()
     await page.locator('.ofc-tabs button').nth(0).click()
     await page.waitForTimeout(200)
+    // (料理研製 shows one view at a time: 問二廚, then 試做紀錄 to put the dishes on the menu)
+    await page.locator('.nb-views button').nth(2).click()
     for (let k = 0; k < 4; k++) {
       await page.locator('.nb-chef-acts button').nth(1).click()
       await page.waitForTimeout(300)
     }
+    await page.locator('.nb-views button').nth(0).click()
     const publish = page.locator('.nb-embedded .nb-publish button:not(.nb-off)')
     for (let guard = 0; guard < 60 && (await publish.count()); guard++) {
       await publish.first().click()

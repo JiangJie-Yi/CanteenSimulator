@@ -54,7 +54,7 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
           <button type="button" role="tab" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('料理研製', '開発ノート')}</button>
           <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{t('人事', '人事')}</button>
         </div>
-        <span className={`ofc-cash${cash < 0 ? ' is-low' : ''}`}>{t('現金', '現金')} {money(cash)}</span>
+        <span className={`ofc-cash${cash < 0 ? ' is-low' : ''}`}>{t('現金', '現金')} <b className="money">{money(cash)}</b></span>
         <button type="button" className="ofc-reset" onClick={onReset}>{t('重新開始', '最初から')}</button>
         <button type="button" className="ofc-close" onClick={onClose} aria-label="close">×</button>
       </header>
@@ -109,7 +109,7 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
                       <small className="ofc-note">{w.note}</small>
                     </div>
                     <div className="ofc-hire">
-                      <b>{money(w.wage)}<small>/h</small></b>
+                      <b className="money">{money(w.wage)}<small>/h</small></b>
                       <button type="button" onClick={() => onHire(w)}>{t('雇用', '雇う')}</button>
                     </div>
                   </div>

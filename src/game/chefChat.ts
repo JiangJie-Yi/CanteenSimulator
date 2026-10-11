@@ -1,6 +1,8 @@
 // Talking with the second chef: what the owner typed, understood as a request (make this dish, try a few, what
 // goes with that, how's the stock…), with the food and the seasonings picked out of it however it was put —
-// 「幫我做鹽烤玉米」, 「鮭魚刷醬油烤一下」, 「玉米配什麼好？」, 「隨便試三道」, 「サーモンを塩で」.
+// 「幫我做鹽烤玉米」, 「鮭魚刷醬油烤一下」, 「玉米配什麼好？」, 「隨便試三道」, 「サーモンを塩で」 — or by kind
+// (「想吃魚」, 「有什麼蔬菜？」), left to him (「你決定」, 「幫我客製化」), or just talk (天氣, 累不累, 你是誰…).
+import { FOOD_KINDS, type FoodKind } from '@/data/foodKinds'
 import type { Dish } from '@/data/menu'
 import { findItem, partName, SEASONINGS, TOPPINGS, type Seasoning } from '@/data/recipes'
 import { breadTaste, PAIRING, PAIRING_DEFAULT } from '@/game/taste'
@@ -14,12 +16,30 @@ export type Intent =
   | { kind: 'batch'; n: number }
   /** what to do with a food (or with anything, id undefined) */
   | { kind: 'advise'; id?: string }
+  /** a kind of food (魚, 肉, 蔬菜…), the shop's foods of that kind; asking about it (ask) or wanting one made */
+  | { kind: 'byKind'; food: FoodKind; ids: string[]; ask: boolean }
   | { kind: 'stock' }
+  /** small talk */
+  | { kind: 'chat'; topic: Topic }
   | { kind: 'yes' }
   | { kind: 'no' }
   | { kind: 'hello' }
   | { kind: 'thanks' }
   | { kind: 'unknown' }
+
+export type Topic = 'weather' | 'tired' | 'praise' | 'complain' | 'who' | 'joke' | 'business' | 'bye' | 'confused'
+/** what each bit of small talk sounds like (checked in this order) */
+const TOPICS: [Topic, RegExp][] = [
+  ['confused', /^([?？!！.。…~～@s]+|@@.*|蛤+[?？]*|啥[?？]*|什麼[?？]+|嗯+|呃+|欸+|え[?？]*)$/],
+  ['complain', /難吃|不好吃|太鹹|太淡|太焦|燒焦|烤焦|很爛|まずい|しょっぱい|焦げ/],
+  ['praise', /好吃|好棒|讚|厲害|很棒|不錯|太強|美味|天才|帥|うまい|美味しい|すごい|最高/],
+  ['weather', /天氣|下雨|好熱|好冷|颱風|天気|暑い|寒い|雨/],
+  ['tired', /累|休息|還好嗎|撐得住|疲れ|大丈夫/],
+  ['who', /你是誰|你叫|名字|幾歲|哪裡人|自我介紹|來自|経歴|名前|誰/],
+  ['joke', /笑話|講個|好笑|無聊|冗談|ジョーク|面白い/],
+  ['business', /生意|客人|營業|賺|業績|人多|売上|お客|繁盛/],
+  ['bye', /掰|再見|先這樣|下次|bye|またね|じゃあね/],
+]
 
 /** the words for each seasoning, in Chinese, Japanese and English */
 const SEASON_WORDS: Record<Seasoning, string[]> = {
@@ -91,7 +111,18 @@ export function understand(text: string, d: Dish): Intent {
     const n = Number(count[1]) || NUMBERS[count[1]] || 3
     return { kind: 'batch', n: Math.max(1, Math.min(5, n)) }
   }
-  if (/隨便|你看著辦|你決定|你挑|任せ/.test(s)) return { kind: 'batch', n: 3 }
+  if (/隨便|都來|各來|每樣|全部來|什麼都好/.test(s)) return { kind: 'batch', n: 3 }
+  // left to him, one dish: 「你決定」「交給你」「幫我客製化」「你的拿手菜」
+  if (/客製|你決定|你看著辦|交給你|你來配|你配|你安排|你挑|你拿手|拿手菜|招牌|都可以|隨意|自由發揮|任せ|おまかせ/.test(s)) return { kind: 'batch', n: 1 }
+  // a kind of food
+  const shop = new Set(cookable(d).map((x) => x.id))
+  for (const food of FOOD_KINDS) {
+    if (!food.words.some((w) => s.includes(w))) continue
+    const ids = food.ids.filter((id) => shop.has(id))
+    return { kind: 'byKind', food, ids, ask: asks && !wants }
+  }
+  if (/謝|辛苦了|感恩|ありがと|お疲れ|thank/.test(s)) return { kind: 'thanks' }
+  for (const [topic, re] of TOPICS) if (re.test(s)) return { kind: 'chat', topic }
   if (asks || /推薦|建議|おすすめ/.test(s)) return { kind: 'advise' }
   if (/^(好|好啊|好喔|好的|可以|做吧|來吧|拜託|麻煩了?|ok|okay|yes|うん|はい|お願い|頼む)[!！。~～]*$/.test(s)) return { kind: 'yes' }
   if (/^(不用|不要|算了|先不要|不了|no|いや|いいえ|やめ)/.test(s)) return { kind: 'no' }
