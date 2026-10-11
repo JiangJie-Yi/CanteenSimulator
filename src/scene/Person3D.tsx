@@ -57,19 +57,25 @@ const Flat = ({ geo, color, ...rest }: { geo: THREE.BufferGeometry; color: strin
 )
 
 // the torso's outline, hips (y 0) to the base of the neck: hips, a waist, the chest, square shoulders
-const TORSO_PROFILE = [[0, -0.005], [0.1, 0], [0.112, 0.03], [0.1, 0.12], [0.112, 0.22], [0.126, 0.29], [0.122, 0.325],
-  [0.085, 0.355], [0.04, 0.37], [0, 0.372]].map(([x, y]) => new THREE.Vector2(x, y))
+const TORSO_PROFILE = [[0, -0.005], [0.096, 0], [0.11, 0.015], [0.113, 0.04], [0.106, 0.08], [0.099, 0.12], [0.103, 0.17],
+  [0.113, 0.22], [0.122, 0.26], [0.127, 0.29], [0.124, 0.315], [0.11, 0.337], [0.085, 0.355], [0.055, 0.366], [0.03, 0.371],
+  [0, 0.373]].map(([x, y]) => new THREE.Vector2(x, y))
 
 const GEO = {
-  torso: new THREE.LatheGeometry(TORSO_PROFILE, 22),
+  torso: new THREE.LatheGeometry(TORSO_PROFILE, 40),
   belly: new THREE.SphereGeometry(0.1, 16, 12),
   neck: new THREE.CylinderGeometry(0.034, 0.038, 0.07, 12),
-  upperArm: new THREE.CapsuleGeometry(0.034, 0.1, 4, 10),
-  foreArm: new THREE.CapsuleGeometry(0.03, 0.09, 4, 10),
-  hand: new THREE.SphereGeometry(0.03, 12, 8),
-  thigh: new THREE.CapsuleGeometry(0.048, 0.14, 4, 10),
-  shin: new THREE.CapsuleGeometry(0.04, 0.15, 4, 10),
-  shoe: new THREE.SphereGeometry(0.045, 12, 8),
+  upperArm: new THREE.CapsuleGeometry(0.034, 0.1, 8, 16),
+  foreArm: new THREE.CapsuleGeometry(0.03, 0.09, 8, 16),
+  // the shoulder's round, where the sleeve turns down from the torso
+  shoulder: new THREE.SphereGeometry(0.042, 16, 12),
+  hand: new THREE.SphereGeometry(0.03, 16, 12),
+  thumb: new THREE.CapsuleGeometry(0.009, 0.022, 4, 8),
+  cuff: new THREE.TorusGeometry(0.03, 0.006, 6, 18),
+  thigh: new THREE.CapsuleGeometry(0.048, 0.14, 8, 16),
+  shin: new THREE.CapsuleGeometry(0.04, 0.15, 8, 16),
+  shoe: new THREE.SphereGeometry(0.045, 16, 10),
+  collar: new THREE.TorusGeometry(0.045, 0.01, 8, 24),
   skirt: new THREE.CylinderGeometry(0.115, 0.16, 0.13, 18, 1, true),
   head: new THREE.SphereGeometry(0.105, 28, 20),
   ear: new THREE.SphereGeometry(0.022, 10, 8),
@@ -99,6 +105,27 @@ const GEO = {
   stick: new THREE.CylinderGeometry(0.004, 0.003, 0.2, 5),
 }
 
+const smooth = (a: number, b: number, x: number) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k) }
+
+/**
+ * How a customer moves while eating, over one bite (about three seconds): the skewer comes up to the mouth, the
+ * head dips to meet it and bites, the arm goes down again while they chew, and a moment's rest looking at the
+ * plate before the next. While waiting they look about now and then, and sway a little.
+ */
+function eatingPose(t: number, id: number) {
+  const p = ((t + id * 0.73) % 3.2) / 3.2
+  const lift = smooth(0, 0.28, p) * (1 - smooth(0.45, 0.68, p))
+  const bite = smooth(0.26, 0.34, p) * (1 - smooth(0.36, 0.46, p))
+  const chewing = p > 0.4 && p < 0.9
+  return {
+    shoulder: 0.7 + lift * 0.6,
+    elbow: 0.92 + lift * 1.3,
+    head: 0.08 + bite * 0.22 + (chewing ? Math.sin(t * 13) * 0.025 : 0),
+    mouth: bite > 0.2 ? 1.6 : chewing ? 0.7 + 0.5 * Math.abs(Math.sin(t * 13)) : 0.8,
+    lean: 0.18 + bite * 0.1,
+  }
+}
+
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
 export function Person({ id, eating, walking, t }: { id: number; eating: boolean; walking: boolean; t: number }) {
   const kind = kindOf(id).kind
@@ -110,8 +137,11 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
   const blush = kind === 'kid' || kind === 'highSchoolGirl' || kind === 'yukata'
   // sitting: hips on the stool top (0.34); walking: standing, the legs straight under them
   const hipY = walking ? 0.42 : 0.36
-  const bob = walking ? Math.abs(Math.sin(t * 9)) * 0.02 : eating ? Math.max(0, Math.sin(t * 6)) * 0.03 : Math.sin(t * 1.6) * 0.004
-  const lean = eating ? 0.25 + Math.sin(t * 6) * 0.06 : 0.05
+  const pose = eating ? eatingPose(t, id) : null
+  const bob = walking ? Math.abs(Math.sin(t * 9)) * 0.02 : Math.sin(t * 1.6) * 0.004
+  const lean = pose ? pose.lean : 0.05 + Math.sin(t * 0.8 + id) * 0.015
+  // waiting, they glance about every so often (to the door, along the bar, at the fire)
+  const look = !eating && !walking ? Math.sin(t * 0.45 + id * 1.7) * 0.5 * smooth(0.55, 0.85, Math.abs(Math.sin(t * 0.21 + id))) : 0
   const step = walking ? Math.sin(t * 9) * 0.5 : 0
   // a blink now and then
   const blink = (t * 0.9 + id * 0.37) % 4 < 0.12 ? 0.15 : 1
@@ -177,26 +207,42 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
         {kind === 'kid' && <Part geo={GEO.bag} color="#c4302a" position={[0, 0.2, -0.11]} />}
         {/* arms: upper arm and forearm, reaching onto the bar; the right one working the chopsticks while eating */}
         {[-1, 1].map((sd) => {
-          const shoulder = walking ? -sd * step * 0.6 : 0.55
-          const elbow = walking ? 0.25 : 0.9 + (eating && sd > 0 ? Math.sin(t * 6) * 0.35 : 0)
+          // (the right hand holds the skewer and brings it up to bite; the left rests on the bar)
+          const shoulder = walking ? -sd * step * 0.6 : pose && sd > 0 ? pose.shoulder : 0.7
+          const elbow = walking ? 0.25 : pose && sd > 0 ? pose.elbow : 0.92
           return (
             <group key={sd} position={[sd * 0.128 * l.wide, 0.3, 0]} rotation={[-shoulder, 0, sd * 0.12]}>
+              <Part geo={GEO.shoulder} color={l.top} outline={1.04} position={[0, -0.01, 0]} scale={[1, 0.9, 1]} />
               <Part geo={GEO.upperArm} color={l.top} position={[0, -0.07, 0]} />
               <group position-y={-0.15} rotation-x={-elbow}>
                 <Part geo={GEO.foreArm} color={l.top} position={[0, -0.065, 0]} />
+                {/* the cuff of the sleeve, then a hand with its thumb */}
+                <mesh geometry={GEO.cuff} position={[0, -0.112, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color={l.top} /></mesh>
                 <Part geo={GEO.hand} color={l.skin} position={[0, -0.14, 0]} scale={[0.9, 1.1, 0.75]} />
+                <Part geo={GEO.thumb} color={l.skin} outline={0} position={[-sd * 0.022, -0.132, 0.012]} rotation={[0.3, 0, sd * 0.6]} />
+                {pose && sd > 0 && (
+                  // the skewer in the hand, pointing up out of the fist, a bit of food on the end
+                  <group position={[0, -0.15, 0.02]} rotation-x={-1.1}>
+                    <mesh geometry={GEO.stick} position-y={0.08}><meshToonMaterial color="#c9a46a" /></mesh>
+                    <mesh position-y={0.15}>
+                      <boxGeometry args={[0.03, 0.05, 0.025]} />
+                      <meshToonMaterial color="#c8743a" />
+                    </mesh>
+                  </group>
+                )}
               </group>
             </group>
           )
         })}
-        {eating && (
-          <group position={[0.1, 0.3, 0.26]} rotation-x={-0.6 + Math.sin(t * 6) * 0.3}>
-            <mesh geometry={GEO.stick}><meshToonMaterial color="#8a5a30" /></mesh>
-          </group>
-        )}
         <Part geo={GEO.neck} color={l.skin} outline={0} position={[0, 0.39, 0]} />
+        {/* a collar round the base of the neck, in the colour of what they wear */}
+        {kind !== 'yukata' && kind !== 'highSchoolGirl' && (
+          <mesh geometry={GEO.collar} position={[0, 0.367, 0.004]} rotation-x={Math.PI / 2 - 0.15} scale={[l.wide, 1, 0.9]}>
+            <meshToonMaterial color={kind === 'salaryman' || kind === 'officeLady' || kind === 'grandpa' ? '#f4f2ec' : l.top} />
+          </mesh>
+        )}
         {/* the head */}
-        <group position-y={0.48} rotation-x={eating ? 0.15 : Math.sin(t * 0.7 + id) * 0.04}>
+        <group position-y={0.48} rotation={[pose ? pose.head : Math.sin(t * 0.7 + id) * 0.04, look, 0]}>
           <Part geo={GEO.head} color={l.skin} scale={[1, 1.05, 0.97]} />
           {[-1, 1].map((sd) => <Part key={sd} geo={GEO.ear} color={l.skin} outline={1.1} position={[sd * 0.103, -0.005, 0]} scale={[0.5, 1, 0.8]} />)}
           {!bald && (
@@ -207,8 +253,9 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
           )}
           {bald && <Part geo={GEO.hair} color={l.hair} outline={0} position={[0, -0.02, -0.03]} rotation-x={-1.2} scale={[1.02, 0.6, 1]} />}
           {longHair && (
-            <Part geo={GEO.hair} color={l.hair} outline={0} position={[0, -0.06, -0.03]} rotation-x={Math.PI * 0.75}
-              scale={[1, kind === 'highSchoolGirl' ? 1.4 : 1, 1]} />
+            // long hair falling down the back of the head to the shoulders (behind it: from the front only its sides show)
+            <Part geo={GEO.head} color={l.hair} outline={1.03} position={[0, -0.07, -0.05]}
+              scale={[1.08, kind === 'highSchoolGirl' ? 1.45 : 1.2, 0.62]} />
           )}
           {(kind === 'grandma' || kind === 'yukata') && <Part geo={GEO.bun} color={l.hair} position={[0, 0.1, -0.06]} />}
           {kind === 'kid' && (
@@ -231,7 +278,7 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
             </group>
           ))}
           <Part geo={GEO.nose} color={l.skin} outline={0} position={[0, -0.014, 0.1]} scale={[0.9, 1, 0.8]} />
-          <Flat geo={GEO.mouth} color="#8a3a2a" position={[0, -0.04, 0.091]} rotation-z={eating ? 0 : Math.PI} scale={eating ? [0.8, 0.8, 1] : 1} />
+          <Flat geo={GEO.mouth} color="#8a3a2a" position={[0, -0.04, 0.091]} rotation-z={pose ? 0 : Math.PI} scale={pose ? [0.8, pose.mouth, 1] : 1} />
           {kind === 'uncle' && (
             <mesh position={[0, -0.028, 0.096]}>
               <boxGeometry args={[0.05, 0.01, 0.008]} />

@@ -4,7 +4,6 @@ import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { CHEFS, type Chef } from '@/data/chefs'
-import { QUALITY } from '@/scene/quality'
 import { LINES } from '@/data/lines'
 import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
@@ -13,6 +12,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
+import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 
 export { BAR_AT, BAR_TOP }
 
@@ -43,22 +43,14 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
 const MAX_SEATED = 4
 const PATIENCE = 150
-/** phones have little GPU memory: the big painted textures are drawn at full size, then handed over at half */
-function forPhone(c: HTMLCanvasElement) {
-  const max = QUALITY.canvasMax
-  if (c.width <= max && c.height <= max) return c
-  const k = max / Math.max(c.width, c.height)
-  const out = document.createElement('canvas')
-  out.width = Math.round(c.width * k)
-  out.height = Math.round(c.height * k)
-  out.getContext('2d')!.drawImage(c, 0, 0, out.width, out.height)
-  return out
-}
 /** the bar the customers sit at, behind the fire (away from the camera): its middle, length, top, and seats */
 const BAR_AT = new THREE.Vector3(-0.59 * 2.45 + 0.81 * 0.45, 0, -0.81 * 2.45 - 0.59 * 0.45)
 const BAR_LEN = 3.6
-const BAR_TOP = 0.44
+// (high enough for the customers sat at it: about a third of their height above the seat, as a real counter)
+const BAR_TOP = 0.64
 const BAR_SEATS = 4
+/** how big food is on the bar, next to the fire's: a skewer about as long as a customer's plate is wide */
+const BAR_FOOD_SCALE = 0.5
 const barSeat = (n: number) => BAR_AT.clone().addScaledVector(new THREE.Vector3(0.81, 0, -0.59), (n - (BAR_SEATS - 1) / 2) * (BAR_LEN / BAR_SEATS))
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
@@ -79,6 +71,13 @@ const PER_PLATE = 20
 const ASH_GAIN: Record<string, number> = { Ember: 45, Binchotan: 18 }
 const ASH_TINT = new THREE.Color('#d8d2c8')
 const PLATE_STEP = 1.45
+/**
+ * Spare plates and dishes stacked where the first of each stands, as they are in a shop: the one in use sits on top
+ * of the stack, and taken off it (dragged away), it leaves the rest standing. How many under each, and how high each
+ * one stacks.
+ */
+const SPARES: Record<string, { n: number; step: number }> = { 'plate-0': { n: 3, step: 0.075 }, 'dish-0': { n: 3, step: 0.05 },
+  rawdish: { n: 2, step: 0.05 } }
 /** seconds to eat one piece: a few bites, each taking a chunk out and chewed before the next */
 const EAT_SECONDS = 3
 const BITES_PER_PIECE = 4
@@ -444,8 +443,8 @@ function Tray({ position, container }: { position: [number, number, number]; con
     g.rotateX(-Math.PI / 2)
     return g
   }, [])
-  // standing to the right of the fire, its long side runs toward the camera (so it isn't cut off at the edge)
-  const yaw = Math.atan2(-LAY_DIR.z, LAY_DIR.x)
+  // in front of the fire, its long side running across the screen
+  const yaw = Math.atan2(-STACK_DIR.z, STACK_DIR.x)
   return (
     <group position={position} rotation-y={yaw} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
@@ -612,328 +611,8 @@ const weaveTexture = (() => {
   t.anisotropy = 8
   return t
 })()
-/**
- * Painted ware in the 染付 manner, as a top-down picture for a plate or dish: indigo on a warm cream glaze. A
- * patterned rim band between fine double lines (青海波 waves on the plate, 雷紋 key-fret on the dish), and in the
- * well a motif drawn the way a painter does it, a dark outline (骨描き) filled with a paler indigo wash (濃み):
- * a stand of bamboo with node rings, tapering brush leaves, ground grass and a cloud (竹), or a gnarled plum
- * branch with outlined blossoms, stamens, buds and a few falling petals (梅). The glaze has faint iron specks and
- * a fine crackle.
- */
-function wareTexture(motif: 'bamboo' | 'plum') {
-  if (typeof document === 'undefined') return null
-  const S = 1024
-  const c = document.createElement('canvas')
-  c.width = c.height = S
-  const g = c.getContext('2d')!
-  const ink = '#24427f'
-  const wash = 'rgba(58, 96, 170, 0.42)'
-  const cx = S / 2
-  const cy = S / 2
-  let seed = motif === 'bamboo' ? 7 : 13
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 
-  // glaze: warm cream, a little uneven, with iron specks and a faint crackle
-  const glaze = g.createRadialGradient(cx, cy, S * 0.05, cx, cy, S * 0.5)
-  glaze.addColorStop(0, '#f6f1e6')
-  glaze.addColorStop(1, '#ece4d3')
-  g.fillStyle = glaze
-  g.fillRect(0, 0, S, S)
-  for (let i = 0; i < 260; i++) {
-    g.fillStyle = `rgba(${90 + rnd() * 40}, ${70 + rnd() * 20}, 50, ${0.15 + rnd() * 0.35})`
-    g.beginPath()
-    g.arc(rnd() * S, rnd() * S, 0.6 + rnd() * 1.6, 0, Math.PI * 2)
-    g.fill()
-  }
-  g.strokeStyle = 'rgba(120, 104, 80, 0.12)'
-  g.lineWidth = 0.8
-  for (let i = 0; i < 70; i++) {
-    let x = rnd() * S
-    let y = rnd() * S
-    g.beginPath()
-    g.moveTo(x, y)
-    for (let k = 0; k < 4; k++) {
-      x += (rnd() - 0.5) * 60
-      y += (rnd() - 0.5) * 60
-      g.lineTo(x, y)
-    }
-    g.stroke()
-  }
-
-  const ring = (r: number, w: number) => {
-    g.strokeStyle = ink
-    g.lineWidth = w
-    g.beginPath()
-    g.arc(cx, cy, r * S, 0, Math.PI * 2)
-    g.stroke()
-  }
-  /** a brush stroke along a path, thick at the start and tapering to the end */
-  const stroke = (pts: [number, number][], w0: number, w1: number, color = ink) => {
-    const left: [number, number][] = []
-    const right: [number, number][] = []
-    pts.forEach(([x, y], i) => {
-      const [ax, ay] = pts[Math.max(0, i - 1)]
-      const [bx, by] = pts[Math.min(pts.length - 1, i + 1)]
-      const len = Math.hypot(bx - ax, by - ay) || 1
-      const nx = -(by - ay) / len
-      const ny = (bx - ax) / len
-      const w = (w0 + (w1 - w0) * (i / (pts.length - 1))) / 2
-      left.push([x + nx * w, y + ny * w])
-      right.push([x - nx * w, y - ny * w])
-    })
-    g.fillStyle = color
-    g.beginPath()
-    g.moveTo(...left[0])
-    for (const p of left.slice(1)) g.lineTo(...p)
-    for (const p of right.reverse()) g.lineTo(...p)
-    g.closePath()
-    g.fill()
-  }
-  /** a leaf: a pointed brush shape from its base toward `ang`, washed, then its outline and midrib inked */
-  const leaf = (x: number, y: number, ang: number, len: number, wid: number) => {
-    g.save()
-    g.translate(x, y)
-    g.rotate(ang)
-    g.beginPath()
-    g.moveTo(0, 0)
-    g.quadraticCurveTo(len * 0.35, -wid, len, 0)
-    g.quadraticCurveTo(len * 0.35, wid * 0.9, 0, 0)
-    g.fillStyle = wash
-    g.fill()
-    g.strokeStyle = ink
-    g.lineWidth = 3.2
-    g.stroke()
-    g.lineWidth = 1.8
-    g.beginPath()
-    g.moveTo(len * 0.05, 0)
-    g.quadraticCurveTo(len * 0.5, -wid * 0.12, len * 0.92, 0)
-    g.stroke()
-    g.restore()
-  }
-
-  // rim: a broad band between fine double lines, filled with the border pattern
-  const R0 = 0.4
-  const R1 = 0.47
-  ring(0.478, 3)
-  ring(R1, 6)
-  ring(R0, 4)
-  ring(R0 - 0.012, 1.6)
-  g.save()
-  g.beginPath()
-  g.arc(cx, cy, R1 * S - 3, 0, Math.PI * 2)
-  g.arc(cx, cy, R0 * S + 2, 0, Math.PI * 2, true)
-  g.clip()
-  g.fillStyle = 'rgba(58, 96, 170, 0.16)'
-  g.fillRect(0, 0, S, S)
-  g.strokeStyle = ink
-  if (motif === 'bamboo') {
-    // 青海波: rows of nested fan-shaped arcs, the waves overlapping all round the rim
-    const n = 44
-    for (let row = 0; row < 2; row++) {
-      for (let k = 0; k < n; k++) {
-        const a = ((k + row * 0.5) / n) * Math.PI * 2
-        const rr = (R0 + 0.012 + row * 0.03) * S
-        const x = cx + Math.cos(a) * rr
-        const y = cy + Math.sin(a) * rr
-        for (let q = 3; q >= 1; q--) {
-          g.lineWidth = q === 3 ? 2.2 : 1.4
-          g.beginPath()
-          g.arc(x, y, q * 9, a + Math.PI * 1.0, a + Math.PI * 2.0)
-          g.stroke()
-        }
-      }
-    }
-  } else {
-    // 雷紋: a running key-fret, each square spiralling in, all the way round
-    const n = 40
-    const mid = ((R0 + R1) / 2) * S
-    const h = (R1 - R0) * S * 0.62
-    for (let k = 0; k < n; k++) {
-      const a = (k / n) * Math.PI * 2
-      g.save()
-      g.translate(cx + Math.cos(a) * mid, cy + Math.sin(a) * mid)
-      g.rotate(a + Math.PI / 2)
-      const s = h / 2
-      g.lineWidth = 2.6
-      g.beginPath()
-      g.moveTo(-s, s)
-      g.lineTo(-s, -s)
-      g.lineTo(s, -s)
-      g.lineTo(s, s * 0.5)
-      g.lineTo(-s * 0.5, s * 0.5)
-      g.lineTo(-s * 0.5, -s * 0.4)
-      g.lineTo(s * 0.4, -s * 0.4)
-      g.lineTo(s * 0.4, s * 0.05)
-      g.stroke()
-      g.restore()
-    }
-  }
-  g.restore()
-  // a fine dotted line just inside the band
-  g.fillStyle = ink
-  for (let k = 0; k < 120; k++) {
-    const a = (k / 120) * Math.PI * 2
-    g.beginPath()
-    g.arc(cx + Math.cos(a) * (R0 - 0.026) * S, cy + Math.sin(a) * (R0 - 0.026) * S, 1.8, 0, Math.PI * 2)
-    g.fill()
-  }
-
-  if (motif === 'bamboo') {
-    // a cloud drifting top right, in the wash with an inked edge
-    g.save()
-    g.translate(S * 0.64, S * 0.26)
-    g.scale(1.7, 1.7)
-    g.fillStyle = wash
-    g.strokeStyle = ink
-    g.lineWidth = 2
-    for (const [x, y, r] of [[0, 0, 26], [30, -8, 22], [56, 2, 18], [24, 14, 20]] as [number, number, number][]) {
-      g.beginPath()
-      g.arc(x, y, r, 0, Math.PI * 2)
-      g.fill()
-      g.stroke()
-    }
-    g.restore()
-    // ground: a low bank with grass tufts
-    stroke([[S * 0.24, S * 0.765], [S * 0.4, S * 0.745], [S * 0.56, S * 0.755], [S * 0.74, S * 0.775]], 10, 2.5)
-    for (let k = 0; k < 20; k++) {
-      const x = S * (0.26 + k * 0.024)
-      const y = S * (0.758 - Math.sin(k) * 0.006)
-      stroke([[x, y], [x + (rnd() - 0.5) * 26, y - 26 - rnd() * 24]], 5, 0.8)
-    }
-    // three stalks, each its own thickness and lean, with node rings and short side twigs
-    for (const [x0, lean, h, w] of [[0.44, 0.06, 0.52, 32], [0.57, -0.06, 0.46, 25], [0.33, 0.11, 0.36, 18]]) {
-      const bx = S * x0
-      const by = S * 0.755
-      const tx = bx + S * lean
-      const ty = by - S * h
-      // the stalk washed pale, inked down both edges
-      g.save()
-      g.lineCap = 'butt'
-      g.strokeStyle = wash
-      g.lineWidth = w
-      g.beginPath()
-      g.moveTo(bx, by)
-      g.lineTo(tx, ty)
-      g.stroke()
-      g.restore()
-      const len = Math.hypot(tx - bx, ty - by)
-      const nx = -(ty - by) / len
-      const ny = (tx - bx) / len
-      for (const sd of [-1, 1]) {
-        stroke([[bx + nx * sd * w / 2, by + ny * sd * w / 2], [tx + nx * sd * w * 0.35, ty + ny * sd * w * 0.35]], 4.5, 2.2)
-      }
-      const nodes = 4 + Math.round(h * 4)
-      for (let k = 1; k < nodes; k++) {
-        const t = k / nodes
-        const jx = bx + (tx - bx) * t
-        const jy = by + (ty - by) * t
-        const ww = w * (1 - t * 0.5) * 0.75
-        stroke([[jx - nx * ww, jy - ny * ww - 3], [jx, jy + 3], [jx + nx * ww, jy + ny * ww - 3]], 6, 3.5)
-        if (k > 1 && k % 2 === 0) {
-          // a twig off the node, and a fan of leaves at its end
-          const sd = k % 4 === 0 ? 1 : -1
-          const ex = jx + sd * S * 0.09
-          const ey = jy - S * 0.045
-          stroke([[jx, jy], [jx + sd * S * 0.045, jy - S * 0.026], [ex, ey]], 5, 2)
-          for (let q = 0; q < 5; q++) {
-            const ang = (sd > 0 ? -0.25 : Math.PI + 0.25) + sd * (q - 1.8) * 0.4 + (rnd() - 0.5) * 0.2
-            leaf(ex, ey, ang, 80 + rnd() * 40, 15 + rnd() * 4)
-          }
-        }
-      }
-      // leaves at the top of the stalk
-      for (let q = 0; q < 4; q++) leaf(tx, ty, -Math.PI / 2 + (q - 1.5) * 0.5 + lean, 84 + rnd() * 30, 15)
-    }
-  } else {
-    // the branch: a thick gnarled bough from lower left, one twig forking up, one out to the right
-    stroke([[S * 0.2, S * 0.74], [S * 0.3, S * 0.66], [S * 0.36, S * 0.6], [S * 0.47, S * 0.55], [S * 0.6, S * 0.46],
-      [S * 0.76, S * 0.38]], 36, 7)
-    stroke([[S * 0.36, S * 0.6], [S * 0.37, S * 0.5], [S * 0.33, S * 0.4], [S * 0.36, S * 0.3]], 18, 4)
-    stroke([[S * 0.52, S * 0.52], [S * 0.6, S * 0.56], [S * 0.7, S * 0.57]], 13, 3.5)
-    // knots and short spurs along it
-    for (const [x, y] of [[0.29, 0.67], [0.44, 0.565], [0.62, 0.45]]) {
-      stroke([[S * x, S * y], [S * (x + 0.02), S * (y - 0.035)]], 6, 1.5)
-    }
-    const blossom = (x: number, y: number, r: number, turn: number) => {
-      for (let k = 0; k < 5; k++) {
-        const a = turn + (k / 5) * Math.PI * 2
-        const px = x + Math.cos(a) * r * 0.58
-        const py = y + Math.sin(a) * r * 0.58
-        g.beginPath()
-        g.arc(px, py, r * 0.5, 0, Math.PI * 2)
-        g.fillStyle = wash
-        g.fill()
-        g.strokeStyle = ink
-        g.lineWidth = 3.4
-        g.stroke()
-      }
-      // the stamens: fine lines out from the heart, each tipped with a dot
-      g.lineWidth = 1.2
-      for (let k = 0; k < 9; k++) {
-        const a = turn + (k / 9) * Math.PI * 2
-        const ex = x + Math.cos(a) * r * 0.42
-        const ey = y + Math.sin(a) * r * 0.42
-        g.beginPath()
-        g.moveTo(x, y)
-        g.lineTo(ex, ey)
-        g.stroke()
-        g.fillStyle = ink
-        g.beginPath()
-        g.arc(ex, ey, 2, 0, Math.PI * 2)
-        g.fill()
-      }
-      g.fillStyle = ink
-      g.beginPath()
-      g.arc(x, y, r * 0.12, 0, Math.PI * 2)
-      g.fill()
-    }
-    const blooms: [number, number, number][] = [[0.44, 0.52, 64], [0.63, 0.4, 56], [0.33, 0.35, 50], [0.7, 0.57, 42],
-      [0.27, 0.63, 38], [0.53, 0.63, 32]]
-    blooms.forEach(([x, y, r], i) => blossom(S * x, S * y, r, i * 0.7))
-    // buds: small closed rounds on short stalks
-    for (const [x, y] of [[0.78, 0.36], [0.37, 0.29], [0.57, 0.47], [0.24, 0.7]]) {
-      stroke([[S * x - 10, S * y + 10], [S * x, S * y]], 3, 1.5)
-      g.beginPath()
-      g.arc(S * x, S * y, 9, 0, Math.PI * 2)
-      g.fillStyle = wash
-      g.fill()
-      g.strokeStyle = ink
-      g.lineWidth = 2
-      g.stroke()
-    }
-    // a few petals drifting down
-    for (const [x, y, a] of [[0.6, 0.7, 0.3], [0.68, 0.66, 1.4], [0.48, 0.74, 2.2]]) {
-      g.save()
-      g.translate(S * x, S * y)
-      g.rotate(a)
-      g.beginPath()
-      g.ellipse(0, 0, 12, 8, 0, 0, Math.PI * 2)
-      g.fillStyle = wash
-      g.fill()
-      g.strokeStyle = ink
-      g.lineWidth = 1.8
-      g.stroke()
-      g.restore()
-    }
-  }
-  const t = new THREE.CanvasTexture(forPhone(c))
-  t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 8
-  return t
-}const BAMBOO_WARE = wareTexture('bamboo')
-const PLUM_WARE = wareTexture('plum')
-
-/** Lathe geometry for ware, with UVs projected straight down so a painted picture lies flat in the well. */
-function wareGeometry(profile: [number, number][], R: number) {
-  const g = new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 64)
-  const pos = g.attributes.position
-  const uv = g.attributes.uv
-  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / (2 * R) + 0.5, 0.5 - pos.getZ(i) / (2 * R))
-  uv.needsUpdate = true
-  return g
-}
-
-/** A small round side dish (小皿) for onigiri and mochi, painted with plum blossom, inked. */
+/** A small round side dish (小皿) for onigiri and mochi, of the same set as the plates (plum blossom), inked. */
 function SideDish({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = useMemo(() => {
     const R = DISH_R
@@ -1455,15 +1134,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // skewers lie along the tray's long side, in rows from back to front, a second layer across the first when full
   /** loose food (potatoes, rice balls, mochi) waits in a row along the back of the tray, clear of the sticks */
   const trayLooseSpot = (n: number) => trayAt()
-    .addScaledVector(LAY_DIR, ((n % 7) - 3) * 0.2)
-    .addScaledVector(STACK_DIR, TRAY_D / 2 - 0.13)
+    .addScaledVector(STACK_DIR, ((n % 7) - 3) * 0.2)
+    .addScaledVector(LAY_DIR, -(TRAY_D / 2 - 0.13))
     .add(new THREE.Vector3(0, 0.07 + Math.floor(n / 7) * 0.12, 0))
   const traySpot = (n: number) => {
     const row = n % TRAY_ROWS
     const layer = Math.floor(n / TRAY_ROWS)
     return trayAt()
-      .addScaledVector(STACK_DIR, -0.1 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.34) / (TRAY_ROWS - 1))
-      .addScaledVector(LAY_DIR, 0.05 + ((layer % 2) - 0.5) * 0.06)
+      .addScaledVector(LAY_DIR, 0.1 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.34) / (TRAY_ROWS - 1))
+      .addScaledVector(STACK_DIR, 0.05 + ((layer % 2) - 0.5) * 0.06)
       .add(new THREE.Vector3(0, 0.07 + layer * 0.06, 0))
   }
 
@@ -1508,9 +1187,27 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const lap = Math.floor(n / order.length)
     const a = a0 + order[n % order.length] * step + lap * step / 2
     const r = r0 + lap * PLATE_STEP
-    return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r).add(nudge(`plate-${n}`))
+    return onSpares(`plate-${n}`, new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r))
   }
   const [plateCount, setPlateCount] = useState(1)
+  /** a container at home, moved by its nudge — lifted onto its stack of spares while it's still standing over it */
+  function onSpares(key: string, home: THREE.Vector3) {
+    const at = home.clone().add(nudge(key))
+    const sp = SPARES[key]
+    if (sp && !stackOn.current.has(key) && Math.hypot(at.x - home.x, at.z - home.z) < 0.12) at.y += sp.n * sp.step
+    return at
+  }
+  /** where each stack of spares stands (the container's home), for drawing them and for bumping into */
+  const spareHome = (key: string) => {
+    if (key === 'plate-0') return onSparesHome(plateAt, 0, 'plate-0')
+    if (key === 'dish-0') return roast.dish ? onSparesHome(dishAt, 0, 'dish-0') : null
+    return roast.rawDish ? new THREE.Vector3(...roast.rawDish.at) : null
+  }
+  const onSparesHome = (at: (n: number) => THREE.Vector3, n: number, key: string) => {
+    const p = at(n).sub(nudge(key))
+    p.y = 0
+    return p
+  }
   const basketAt = (n: number) => {
     const [x, y, z] = roast.basket!.at
     return new THREE.Vector3(x, y, z).addScaledVector(LAY_DIR, -n * BASKET_STEP).add(nudge(`basket-${n}`))
@@ -1523,7 +1220,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (kind === 'bar') return BAR_AT.clone()
     if (kind === 'lantern') return new THREE.Vector3(DECOR.lantern.at[0], 0, DECOR.lantern.at[1]).add(nudge('lantern'))
     if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
-    if (kind === 'rawdish') return new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])).add(nudge('rawdish'))
+    if (kind === 'rawdish') return onSpares('rawdish', new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])))
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   const footprint = (key: string) => {
@@ -1532,7 +1229,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   /** a container's footprint as circles: one for most, three in a row along the long tray */
   const circlesOf = (key: string, at: THREE.Vector3) => key === 'tray'
-    ? [-1, 0, 1].map((k) => ({ p: at.clone().addScaledVector(LAY_DIR, k * (TRAY_W - TRAY_D) / 2), r: TRAY_D / 2 + 0.02 }))
+    ? [-1, 0, 1].map((k) => ({ p: at.clone().addScaledVector(STACK_DIR, k * (TRAY_W - TRAY_D) / 2), r: TRAY_D / 2 + 0.02 }))
     : [{ p: at.clone(), r: footprint(key) }]
   /** everything standing on the table that can be moved, for bumping into */
   const containerKeys = () => [
@@ -1554,6 +1251,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (what it's stacked with doesn't push it away; nor, while an empty one is carried, other empty ones it could go on)
     const others = containerKeys().filter((k) => k !== key && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
       .flatMap((k) => circlesOf(k, containerAt(k)))
+    for (const k of Object.keys(SPARES)) {
+      const h = k !== key && spareHome(k)
+      if (h) others.push({ p: h, r: footprint(k) })
+    }
     // the crate and the fan
     for (const d of [DECOR.crate, DECOR.fan]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
@@ -1595,7 +1296,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const onDish = (p: Piece) => space !== 'open' && !!roast.dish && !!roast.net?.includes(p.id)
   const dishAt = (n: number) => {
     const [x, y, z] = roast.dish!.at
-    return new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -n * DISH_STEP).add(nudge(`dish-${n}`))
+    return onSpares(`dish-${n}`, new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -n * DISH_STEP))
   }
   const [dishCount, setDishCount] = useState(1)
   // nothing on the table overlaps: every plate, dish, basket, box, bucket, bin and tray is pushed clear of the
@@ -3030,7 +2731,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const at = p.loose ? trayLooseSpot(Math.max(0, onBoard.filter((q) => q.loose).indexOf(p)))
           : traySpot(Math.max(0, onBoard.filter((q) => !q.loose).indexOf(p)))
         p.node.position.lerp(at, Math.min(1, dt * 10))
-        flatQ(p, p.node.quaternion, LAY_DIR)
+        // (lying along the tray's long side, which runs across the front)
+        flatQ(p, p.node.quaternion, STACK_DIR)
       } else if (!p.collected) {
         if (active && !waiting(p) && p.homeFlight >= 1) p.progress += dt * roastRate(fire?.current ?? 0.55)
         p.node.quaternion.copy(p.homeQ)
@@ -3147,6 +2849,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           }
         }
       }
+      // served at the bar it comes down to the size of the customers and their plates (the fire is drawn big, to
+      // cook on; the bar is in the people's own scale), shrinking as it's carried over
+      if (p.container === 'bar' && p.collected) shrink *= THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1))
       if (p.eaten || waiting(p)) shrink = 0.0001
       if (menuIds.has(p.id)) p.node.userData.shrink = shrink
       else p.node.scale.setScalar(shrink)
@@ -3244,9 +2949,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
+      {Object.entries(SPARES).map(([k, sp]) => {
+        const h = spareHome(k)
+        if (!h) return null
+        const base = roast.plate[1] ?? 0
+        return Array.from({ length: sp.n }, (_, i) => {
+          // (stacked by hand: each a little off true)
+          const j = Math.sin(i * 7.3 + k.length) * 0.012
+          const at: [number, number, number] = [h.x + j, (k === 'plate-0' ? base : 0) + i * sp.step, h.z - j * 0.7]
+          return k === 'plate-0' ? <Plate key={`${k}-${i}`} container="" position={at} />
+            : <SideDish key={`${k}-${i}`} container="" position={at} />
+        })
+      })}
       <Decor held={held} lanternAt={containerAt('lantern').toArray() as [number, number, number]} />
       {active && decorTip && (
-        <Html position={decorTip === 'fan' ? [DECOR.fan.at[0], 0.62, DECOR.fan.at[1]] : [DECOR.crate.at[0], 0.5, DECOR.crate.at[1]]}
+        <Html position={decorTip === 'fan' ? [DECOR.fan.at[0], 0.35, DECOR.fan.at[1]] : [DECOR.crate.at[0], 0.5, DECOR.crate.at[1]]}
           center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
           <span className="tool-tag">{decorTip === 'fan' ? '團扇' : '備長炭'}<small>{decorTip === 'fan' ? '拿到火上來回搧' : '拖到火上添炭'}</small></span>
         </Html>

@@ -7,6 +7,7 @@ import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel } from '@/data/guests'
 import { Person } from '@/scene/Person3D'
 import type { Lang } from '@/data/i18n'
+import { CLOUD_WARE, wareGeometry } from './ware'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -45,6 +46,130 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
 const GEO = {
   seat: new THREE.CylinderGeometry(0.11, 0.1, 0.03, 20),
   stoolLeg: new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6),
+}
+
+/** the customers (and their stools) at life size beside the bar, which is drawn to match them */
+const PEOPLE_SCALE = 1.3
+
+/** the noren's cloth: deep indigo, a white band of the shop's mark across its three panels, faded at the hem */
+const norenTexture = (mark: string) => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 384
+  c.height = 256
+  const g = c.getContext('2d')!
+  const grad = g.createLinearGradient(0, 0, 0, 256)
+  grad.addColorStop(0, '#1f2f55')
+  grad.addColorStop(1, '#2b3f6e')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 384, 256)
+  // a fine weave
+  g.strokeStyle = 'rgba(255,255,255,0.04)'
+  for (let y = 0; y < 256; y += 3) {
+    g.beginPath()
+    g.moveTo(0, y)
+    g.lineTo(384, y)
+    g.stroke()
+  }
+  // the shop's name, one character on each outer panel, and a crest of waves in a ring on the middle one
+  g.fillStyle = '#f4efe2'
+  g.font = 'bold 76px serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  const [a, b] = [...mark]
+  g.fillText(a ?? '', 64, 110)
+  g.fillText(b ?? '', 320, 110)
+  g.strokeStyle = '#f4efe2'
+  g.lineWidth = 6
+  g.beginPath()
+  g.arc(192, 104, 40, 0, Math.PI * 2)
+  g.stroke()
+  g.lineWidth = 3
+  for (let q = 0; q < 3; q++) {
+    g.beginPath()
+    g.arc(192, 122, 10 + q * 9, Math.PI, Math.PI * 2)
+    g.stroke()
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+/** one panel's third of the noren cloth (a clone of the texture, offset) */
+const panelTex = (tex: THREE.Texture | null, i: number) => {
+  if (!tex) return null
+  const key = `p${i}`
+  const cache = (tex.userData.panels ??= {}) as Record<string, THREE.Texture>
+  if (!cache[key]) {
+    const t = tex.clone()
+    t.repeat.set(1 / 3, 1)
+    t.offset.set(i / 3, 0)
+    t.needsUpdate = true
+    cache[key] = t
+  }
+  return cache[key]
+}
+/** wide old floorboards for the passage in */
+const PLANKS = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 128
+  c.height = 512
+  const g = c.getContext('2d')!
+  for (let b = 0; b < 4; b++) {
+    g.fillStyle = ['#8a6440', '#7d5a3a', '#94704a', '#836040'][b]
+    g.fillRect(b * 32, 0, 32, 512)
+    g.strokeStyle = 'rgba(40,25,15,0.25)'
+    for (let k = 0; k < 6; k++) {
+      g.beginPath()
+      g.moveTo(b * 32 + 4 + k * 5, 0)
+      g.bezierCurveTo(b * 32 + 2 + k * 5, 170, b * 32 + 8 + k * 5, 340, b * 32 + 4 + k * 5, 512)
+      g.stroke()
+    }
+    g.fillStyle = 'rgba(30,18,10,0.6)'
+    g.fillRect(b * 32, 0, 1.5, 512)
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+
+/**
+ * The way in: a noren hanging at the end of the bar (three panels that sway a little), and a passage of
+ * floorboards from it along behind the seats.
+ */
+function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
+  const tex = useMemo(() => norenTexture(mark), [mark])
+  const panels = useRef<(THREE.Mesh | null)[]>([])
+  const yaw = Math.atan2(ALONG.x, ALONG.z)
+  const W = 0.78, H = 1.5, NOREN = 0.62
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    panels.current.forEach((m, i) => {
+      if (m) m.rotation.x = Math.sin(t * 1.3 + i * 0.9) * 0.05
+    })
+  })
+  return (
+    <group position={at} rotation-y={yaw}>
+      {/* the floorboards: from just outside the door back along the bar */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.006, -1.1]} receiveShadow>
+        <planeGeometry args={[W + 0.2, 3.2]} />
+        <meshToonMaterial color="#ffffff" map={PLANKS} />
+      </mesh>
+      {/* the noren: three panels side by side, hung from a bamboo rod (no frame: it hangs in the way in by itself) */}
+      <mesh position={[0, H - 0.05, 0.03]} rotation-z={Math.PI / 2}>
+        <cylinderGeometry args={[0.012, 0.012, W, 8]} />
+        <meshToonMaterial color="#c9a46a" />
+      </mesh>
+      {[-1, 0, 1].map((k) => (
+        <group key={k} position={[k * (W / 3), H - 0.05, 0.035]}>
+          <mesh ref={(m) => { panels.current[k + 1] = m }} position-y={-NOREN / 2}>
+            <planeGeometry args={[W / 3 - 0.012, NOREN]} />
+            <meshToonMaterial map={panelTex(tex, k + 1)} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
 }
 
 function Stool() {
@@ -91,25 +216,29 @@ const SERVE_S = 0.55
 const CLEAR_S = 0.6
 const CLEAR_DELAY = 1.0
 const WASH_S = 0.9
-const PLATE_GEO = new THREE.CylinderGeometry(0.19, 0.15, 0.024, 28)
-const RIM_GEO = new THREE.TorusGeometry(0.172, 0.007, 6, 36)
+// (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
+const PLATE_R = 0.19
+const PLATE_GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 0.038], [0.49, 0.042], [0.44, 0.026],
+  [0.3, 0.01], [0, 0.01]] as [number, number][]).map(([x, y]) => [x * PLATE_R * 2, y] as [number, number]), PLATE_R)
 const SMEAR_GEO = new THREE.CircleGeometry(0.085, 18)
 const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.26, 5)
 
-/** a small white plate with an indigo line round its rim (dirty: a smear of sauce and a used stick) */
+/** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and a used stick) */
 function Plate({ dirty = false }: { dirty?: boolean }) {
   return (
     <group>
-      <Part geo={PLATE_GEO} color="#f4efe4" outline={1.05} position-y={0.012} />
-      <mesh geometry={RIM_GEO} position-y={0.0245} rotation-x={Math.PI / 2}>
-        <meshToonMaterial color="#3d5a8c" />
+      <mesh geometry={PLATE_GEO} castShadow receiveShadow>
+        <meshToonMaterial color="#ffffff" map={CLOUD_WARE} />
+      </mesh>
+      <mesh geometry={PLATE_GEO} scale={[1.03, 1.08, 1.03]}>
+        <meshBasicMaterial color={INK} side={THREE.BackSide} />
       </mesh>
       {dirty && (
         <>
-          <mesh geometry={SMEAR_GEO} position={[0.03, 0.0255, -0.02]} rotation-x={-Math.PI / 2} scale={[1.2, 0.8, 1]}>
+          <mesh geometry={SMEAR_GEO} position={[0.03, 0.013, -0.02]} rotation-x={-Math.PI / 2} scale={[1.2, 0.8, 1]}>
             <meshBasicMaterial color="#8a5a32" transparent opacity={0.55} depthWrite={false} />
           </mesh>
-          <mesh geometry={USED_STICK_GEO} position={[-0.02, 0.03, 0.03]} rotation={[0, 0.6, Math.PI / 2]}>
+          <mesh geometry={USED_STICK_GEO} position={[-0.02, 0.018, 0.03]} rotation={[0, 0.6, Math.PI / 2]}>
             <meshToonMaterial color="#c9a46a" />
           </mesh>
         </>
@@ -118,8 +247,10 @@ function Plate({ dirty = false }: { dirty?: boolean }) {
   )
 }
 
-export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true }:
+export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂' }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
+    /** what's dyed on the noren at the door (its first character in the middle) */
+    mark?: string
     /** the height of the bar top, where the plates go */
     top?: number
     /** draw the customers themselves (a phone shows them in 2D instead; the plates still come and go) */
@@ -307,8 +438,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   return (
     <group>
       {drawCounter && <group position={at}><Counter length={length} /></group>}
+      {/* the way in, just past the end of the bar where the customers come and go */}
+      <Entrance at={at.clone().addScaledVector(ALONG, length / 2 + 0.95).addScaledVector(LAY, -0.5)} mark={mark} />
       {Array.from({ length: SEATS }, (_, n) => (
-        <group key={n} position={seatAt(n)}><Stool /></group>
+        <group key={n} position={seatAt(n)} scale={PEOPLE_SCALE}><Stool /></group>
       ))}
       {/* the clean stack, the dirty one, and the plates out at the seats */}
       {clean.current.map((_, i) => (
@@ -338,8 +471,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const walking = s.phase !== 'sit'
         return (
           <group key={s.id} ref={(o) => { if (o) groups.current.set(s.id, o); else groups.current.delete(s.id) }}>
-            <PersonClock s={s} eating={() => s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'} clock={clock} />
-            <Html position={[0, 0.98, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+            <group scale={PEOPLE_SCALE}>
+              <PersonClock s={s} eating={() => s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'} clock={clock} />
+            </group>
+            <Html position={[0, 0.98 * PEOPLE_SCALE, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
               <div className="g3-label">
                 {g && !walking && g.state === 'waiting' && g.rating === null && <span className="g3-bubble">…</span>}
                 {g && g.rating !== null && <MoodFace guest={g} />}

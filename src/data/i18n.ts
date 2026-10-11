@@ -49,7 +49,10 @@ export const UI = {
     leftAngry: '等太久走了',
     chefPick: '掌廚',
     showMenu: '打開菜單',
-    tally: (base: string, count: number, total: number) => [`${base}，加點 `, count, ` 份，合計 `, total, ' 元'] as const,
+    // what's been ordered: the sets by name and how many portions in all, or, open for business, what the customers
+    // have ordered so far and what it comes to
+    tally: (base: string | null, count: number, total: number, open: boolean) => (open ? ['客人已點 ', count, ' 份・營收 ', total, ' 元']
+      : !count ? ['尚未點餐', null, '', null, ''] : base ? [`${base}，共 `, count, ' 份・合計 ', total, ' 元'] : ['已點 ', count, ' 份・合計 ', total, ' 元']) as readonly [string, number | null, string, number | null, string],
     clear: '全部取消',
     hint: '點一下拿一份來試做，右鍵減一份；吃過的到「廚房 › 試菜」上架',
     hintTouch: '點一下加一份，長按減一份',
@@ -114,7 +117,8 @@ export const UI = {
     leftAngry: '待ちきれず帰った',
     chefPick: '担当',
     showMenu: '品書を開く',
-    tally: (base: string, count: number, total: number) => [`${base}・追加 `, count, ` 品・合計 `, total, ' 円'] as const,
+    tally: (base: string | null, count: number, total: number, open: boolean) => (open ? ['お客の注文 ', count, ' 品・売上 ', total, ' 円']
+      : !count ? ['ご注文なし', null, '', null, ''] : base ? [`${base}・計 `, count, ' 品・合計 ', total, ' 円'] : ['注文 ', count, ' 品・合計 ', total, ' 円']) as readonly [string, number | null, string, number | null, string],
     clear: '全て取消',
     hint: 'クリックで追加、右クリックで減らす',
     hintTouch: 'タップで追加、長押しで減らす',

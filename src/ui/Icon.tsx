@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 // Hand-drawn line icons for the menu strips. 24x24, stroked in currentColor so they ink like the text.
 const ICONS: Record<string, ReactNode> = {
@@ -316,16 +316,205 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M5 15h14a7 7 0 0 1-14 0zM7.5 15c1-2 8-2 9 0" />
     </>
   ),
+  // ---- more of the grill: the other fish, whole or as fillets, the sets, and the table's soup and sake
+  Aji: (
+    <>
+      <path d="M3 12c3-3.5 10-3.5 14 0-4 3.5-11 3.5-14 0zM17 12l4-3.5-1.5 3.5 1.5 3.5z" />
+      <path d="M6 11.5h.01M8 12.5c3 .6 6 .6 9-.5M9 10l1 1 1-1 1 1 1-1 1 1" />
+    </>
+  ),
+  Iwashi: (
+    <>
+      <path d="M3 12c3-3 9-3 13 0-4 3-10 3-13 0zM16 12l4-3-1.2 3 1.2 3z" />
+      <path d="M5.5 11.5h.01M8 12.4h.01M10 12.6h.01M12 12.5h.01M14 12.3h.01" />
+    </>
+  ),
+  Shishamo: (
+    <>
+      <path d="M3 9c2.5-2 7-2 10 0-3 2-7.5 2-10 0zM13 9l3-2v4z" />
+      <path d="M6 15c2.5-2 7-2 10 0-3 2-7.5 2-10 0zM16 15l3-2v4z" />
+      <path d="M5 9h.01M8 15h.01M8 10.2c1.5.6 3 .6 4 0M11 16.2c1.5.6 3 .6 4 0" />
+    </>
+  ),
+  Salmon: (
+    <>
+      <path d="M4 15c2-6 9-9 16-8-1 6-7 10-16 8z" />
+      <path d="M7 14c2-1 3-3 4-5M10 14c2-1 4-3 5-6M14 13c1.5-1 3-3 3.5-5" />
+    </>
+  ),
+  Hokke: (
+    <>
+      <path d="M12 4c4 0 7 4 7 8s-3 8-7 8-7-4-7-8 3-8 7-8z" />
+      <path d="M12 4v16M12 8l-3 1.5M12 11l-3.5 1.5M12 14l-3 1.5M12 8l3 1.5M12 11l3.5 1.5M12 14l3 1.5" />
+    </>
+  ),
+  Buri: (
+    <>
+      <path d="M3 14c1-5 7-8 18-7-1 6-8 10-18 7z" />
+      <path d="M17 7.6c-1 3-3 5.5-6 7.2" strokeWidth="2.4" />
+      <path d="M6 13.5c3 0 6-1 8-3" />
+    </>
+  ),
+  Gindara: (
+    <>
+      <rect x="4" y="7" width="16" height="10" rx="3" />
+      <path d="M8 7c1 3 1 7 0 10M12 7c1 3 1 7 0 10M16 7c1 3 1 7 0 10" />
+    </>
+  ),
+  Nodoguro: (
+    <>
+      <path d="M3 12c3-5 11-5 14 0-3 5-11 5-14 0zM17 12l4-4-1 4 1 4z" />
+      <path d="M6 11h.01M5 13.5c1 1.5 2.5 2 3.5 1.5M9 8.5l2-2 2 2" />
+    </>
+  ),
+  BloodCake: (
+    <>
+      <path d="M12 2v20" />
+      <rect x="8" y="6" width="8" height="10" rx="1.5" />
+      <path d="M9.5 9h.01M12 8.5h.01M14.5 9.5h.01M10 12h.01M13 12.5h.01M11 14.5h.01M14.5 14h.01" />
+    </>
+  ),
+  MisoSoup: (
+    <>
+      <path d="M3 12h18a9 7 0 0 1-18 0z" />
+      <path d="M8 18.5h8v2H8zM7 14.5h2v2H7zM12 15h.01M15 14h2v2h-2zM9 9c0-1.5 1-1.5 1-3M14 9c0-1.5 1-1.5 1-3" />
+    </>
+  ),
+  Sake: (
+    <>
+      <path d="M9 3h4v2c0 1.5 3 3 3 7v6a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3v-6c0-4 3-5.5 3-7z" transform="translate(-2 0)" />
+      <path d="M6 12h8" />
+      <path d="M16 16h5l-.7 3.5a1 1 0 0 1-1 .8h-1.6a1 1 0 0 1-1-.8z" />
+    </>
+  ),
+  setMeal: (
+    <>
+      <rect x="2.5" y="6" width="19" height="13" rx="2" />
+      <path d="M5 12c1.5-2 4.5-2 6 0-1.5 2-4.5 2-6 0zM11 12l1.5-1.2v2.4z" />
+      <path d="M14 15.5h6a3 3 0 0 1-6 0zM15.5 9.5h3a1.5 1.5 0 0 1-3 0z" />
+    </>
+  ),
+  Rice: (
+    <>
+      <path d="M4 12h16a8 7 0 0 1-16 0z" />
+      <path d="M5 12c0-3 3-5 7-5s7 2 7 5M8 10h.01M11 9h.01M14 9.5h.01M16 10.5h.01M9.5 19h5" />
+    </>
+  ),
+  // ---- the noodle shop, by the kind of dish (each listed one without its own drawing takes its kind's)
+  noodleSoup: (
+    <>
+      <path d="M3 11h18a9 8 0 0 1-18 0z" />
+      <path d="M6 11c1-2 2 0 3-2s2 0 3-2 2 0 3-2M15 3l5 7M17.5 2.5l4 6.5" />
+    </>
+  ),
+  quick: (
+    <>
+      <path d="M2.5 14h19a2 2 0 0 1-2 3h-15a2 2 0 0 1-2-3z" />
+      <path d="M5 14c0-3 3-5 7-5s7 2 7 5M8 12h.01M11 11h.01M14 11.5h.01M10 9c1-1.5 3-1.5 4 0" />
+    </>
+  ),
+  friedRice: (
+    <>
+      <path d="M2 11h17a8 6 0 0 1-17 0z" />
+      <path d="M19 12l3-1.5M5 9h.01M8 8h.01M11 8.5h.01M14 8h.01M7 6l1 1M12 5.5l-1 1M16 9.5h.01" />
+    </>
+  ),
+  friedNoodles: (
+    <>
+      <path d="M3 15h18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" />
+      <path d="M5 14c2-3 3 0 5-3s3 0 5-3 3 0 4 1M6 12c1-1 2 1 4-1" />
+    </>
+  ),
+  vermicelli: (
+    <>
+      <path d="M3 15h18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" />
+      <path d="M5 14c1.5-2 3 1 4.5-1s3 1 4.5-1 3 1 4.5-1M6 12c1.5-2 3 1 4.5-1s3 1 4.5-1M8 10c1.5-2 3 1 4.5-1" />
+    </>
+  ),
+  saucyRice: (
+    <>
+      <path d="M2.5 14h19a2 2 0 0 1-2 3h-15a2 2 0 0 1-2-3z" />
+      <path d="M5 14c0-3 3-5 7-5s7 2 7 5" />
+      <path d="M7 13c1-2 3-2 4-1s3 1 4-1 2 0 2 1" strokeWidth="2.2" />
+    </>
+  ),
+  dumplings: (
+    <>
+      <path d="M3 15c0-4 4-7 9-7s9 3 9 7z" />
+      <path d="M6 9.5l1 2M9 8.3l.6 2.2M12 8v2.3M15 8.3l-.6 2.2M18 9.5l-1 2M3 15h18" />
+    </>
+  ),
+  soupDumplings: (
+    <>
+      <path d="M3 12h18a9 7 0 0 1-18 0z" />
+      <path d="M7 12c0-2 2-3.5 3.5-3.5S14 10 14 12M13 12c0-2 1.5-3 3-3s3 1 3 3M9 9.5l.5 1M16 9.5l.3 1" />
+    </>
+  ),
+  xiaolongbao: (
+    <>
+      <path d="M4 18h16M5 18c0-6 3-11 7-11s7 5 7 11" />
+      <path d="M12 7c-.5-1.5.5-3 0-4M9 9l1.5 2M15 9l-1.5 2M7.5 13l2 1M16.5 13l-2 1" />
+    </>
+  ),
+  soup: (
+    <>
+      <path d="M3 12h18a9 7 0 0 1-18 0z" />
+      <path d="M8 19h8M8 9c0-1.5 1-1.5 1-3M12 9c0-1.5 1-1.5 1-3M16 9c0-1.5 1-1.5 1-3" />
+    </>
+  ),
 }
 
 export const hasIcon = (name: string) => name in ICONS
+/** each drawing's own square around what's drawn (measured once), so every icon fills its box the same */
+const FRAMES = new Map<string, { view: string; side: number }>()
+
 export function Icon({ name, size = 24 }: { name: string; size?: number }) {
   const shape = ICONS[name]
+  const g = useRef<SVGGElement>(null)
+  const [frame, setFrame] = useState(() => FRAMES.get(name) ?? { view: '0 0 24 24', side: 24 })
+  useLayoutEffect(() => {
+    const known = FRAMES.get(name)
+    if (known) {
+      setFrame(known)
+      return
+    }
+    const b = g.current?.getBBox()
+    if (!b || !b.width || !b.height) return
+    // (a margin for the stroke: small drawings are scaled up and large ones down, to the same size)
+    const side = Math.max(b.width, b.height) * 1.12 + 2
+    const f = { view: `${b.x + b.width / 2 - side / 2} ${b.y + b.height / 2 - side / 2} ${side} ${side}`, side }
+    FRAMES.set(name, f)
+    setFrame(f)
+  }, [name])
   if (!shape) return null
   return (
-    <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {shape}
+    // (the line stays as thick on screen however much the drawing was scaled)
+    <svg className="icon" width={size} height={size} viewBox={frame.view} fill="none" stroke="currentColor"
+      strokeWidth={1.6 * (frame.side / 24)} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <g ref={g}>{shape}</g>
     </svg>
   )
+}
+
+/**
+ * The drawing for something on a menu: its own if it has one; a set's (set-<id>), or at the grill a set meal; at the
+ * noodle shop the drawing for its kind of dish (湯麵, 炒飯, 水餃…); failing all that, by what its name says (…麵,
+ * …飯, …湯), and last the shop's own.
+ */
+export function iconFor(shop: string, x: { id: string; name?: string; icon?: string; table?: string }, base: boolean) {
+  const own = x.icon ?? x.id
+  if (hasIcon(own)) return own
+  if (base) return hasIcon(`set-${x.id}`) ? `set-${x.id}` : shop === 'grilledfish' ? 'setMeal' : shop === 'beefnoodle' ? 'noodleSoup' : shop
+  if (x.table && hasIcon(x.table)) return x.table
+  const n = x.name ?? ''
+  if (/米粉/.test(n)) return 'vermicelli'
+  if (/炒麵/.test(n)) return 'friedNoodles'
+  if (/炒飯/.test(n)) return 'friedRice'
+  if (/燴飯/.test(n)) return 'saucyRice'
+  if (/湯餃/.test(n)) return 'soupDumplings'
+  if (/餃/.test(n)) return 'dumplings'
+  if (/麵/.test(n)) return 'noodleSoup'
+  if (/飯/.test(n)) return 'quick'
+  if (/湯/.test(n)) return 'soup'
+  return hasIcon(shop) ? shop : 'grilledfish'
 }

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
   type PointerEvent as ReactPointerEvent } from 'react'
 import { nameIn, UI, type Lang } from '@/data/i18n'
 import { toChineseNumber, type Dish } from '@/data/menu'
-import { hasIcon, Icon } from './Icon'
+import { Icon, iconFor } from './Icon'
 import { guestLabel } from '@/data/guests'
 
 type MenuProps = {
@@ -37,7 +37,7 @@ type MenuProps = {
  * the tag is 15.5em tall with 0.7em padding top and bottom), and shrink the whole tag's type if it would
  * overflow. Long Japanese names (焼きおにぎり) and set names (秋刀魚定食) come out smaller instead of spilling.
  */
-function tagFit(name: string, en: string | undefined, price: string, stamp: boolean, stocked = false): CSSProperties | undefined {
+function tagFit(name: string, en: string | undefined, price: string, stamp: boolean, stocked = false): number {
   const parts = [
     1.4,                                  // icon (or the 選 stamp in its place)
     name.length * 1.3 * 1.12,             // name: 1.3em glyphs + 0.12em letter-spacing
@@ -48,7 +48,7 @@ function tagFit(name: string, en: string | undefined, price: string, stamp: bool
   ].filter((h) => h > 0)
   const total = parts.reduce((a, b) => a + b, 0) + (parts.length - 1) * 0.35
   const room = 15.5 - 1.4
-  return total > room ? ({ '--fit': (room / total).toFixed(3) } as CSSProperties) : undefined
+  return total > room ? room / total : 1
 }
 
 /**
@@ -185,8 +185,13 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     }
   }
 
-  const baseName = ordered.length ? ordered.map((b) => nameIn(lang, b)).join('、') : t.nothingYet
-  const [beforeCount, n1, beforeTotal, n2, after] = t.tally(baseName, count, total)
+  // every tag on the board is lettered the same size: the size the longest one needs (with room for its stamp)
+  const priceText = (x: { price: number }) => (research ? '' : taiwan ? String(x.price) : toChineseNumber(x.price))
+  const boardFit = Math.min(1, ...all.map((x) => tagFit(nameIn(lang, x), x.en, priceText(x), true, research && !!onBuy)))
+  const fitStyle = { '--fit': boardFit.toFixed(3) } as CSSProperties
+
+  const baseName = ordered.length ? ordered.map((b) => nameIn(lang, b)).join('、') : null
+  const [beforeCount, n1, beforeTotal, n2, after] = t.tally(baseName, count, total, locked)
 
   /** one wooden tag: click to order a portion, right-click (or - / Delete) to take one off */
   const tag = (x: { id: string; name: string; ja?: string; en?: string; price: number }, icon: string, base: boolean) => {
@@ -204,7 +209,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       <button key={x.id} type="button" aria-pressed={n > 0} data-id={x.id}
         className={`strip${research ? ' is-research' : ''}${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}${filling.length ? ' is-filling' : ''}${out ? ' is-out' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${x.price}${n ? `，${t.ordered(n)}` : ''}`}
-        style={tagFit(name, x.en, research ? '' : price, n > 0, research && !!onBuy)}
+        style={fitStyle}
         onClick={() => {
           const fired = press.current?.fired
           press.current = null
@@ -333,33 +338,37 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
             // grouped the way a Taiwanese 小吃 menu board is, each group under its magenta header
             groups.map((grp) => [
               <div key={`cat-${grp.cat}`} className="strip-cat" aria-hidden="true"><b>{CAT_NAMES[grp.cat][lang]}</b></div>,
-              ...grp.list.map(({ x, base }) => tag(x, iconOf(x) ?? (base ? dish.id : x.id), base)),
+              ...grp.list.map(({ x, base }) => tag(x, iconFor(dish.id, { ...x, icon: iconOf(x) }, base), base)),
             ])
           ) : (
             <>
-              {dish.bases.map((b) => tag(b, iconOf(b) ?? (hasIcon(`set-${b.id}`) ? `set-${b.id}` : dish.id), true))}
-              {dish.items.map((item) => tag(item, iconOf(item) ?? item.id, false))}
+              {dish.bases.map((b) => tag(b, iconFor(dish.id, { ...b, icon: iconOf(b) }, true), true))}
+              {dish.items.map((item) => tag(item, iconFor(dish.id, { ...item, icon: iconOf(item) }, false), false))}
             </>
           )}
         </div>
       </div>
 
       <footer className="tally">
-        {/* the order slip: what came in, written out stroke by stroke */}
-        {feed.length > 0 && (
+        {/* the order slip: what came in, written out stroke by stroke (its room kept while open, so nothing moves
+            when a line comes in, and it never sits over the tags) */}
+        {(feed.length > 0 || locked) && (
           <ul className="order-slip" aria-live="polite">
-            {feed.map((f) => {
+            {feed.slice(-2).map((f) => {
               const it = all.find((x) => x.id === f.id)
               return <li key={f.key}><span>✎</span><em>{t.wrote(guestLabel(f.guest, lang), it ? nameIn(lang, it) : f.id)}</em></li>
             })}
           </ul>
         )}
         <p>
-          {beforeCount}<strong>{n1}</strong>{beforeTotal}<strong className="money">{n2}</strong>{after}
+          {beforeCount}{n1 !== null && <strong>{n1}</strong>}{beforeTotal}{n2 !== null && <strong className="money">{n2}</strong>}{after}
         </p>
-        <button type="button" className="clear" onClick={onClear} disabled={count === 0 || locked}>
-          {t.clear}
-        </button>
+        {/* (open, the customers order: there's nothing of yours to take back) */}
+        {!locked && (
+          <button type="button" className="clear" onClick={onClear} disabled={count === 0}>
+            {t.clear}
+          </button>
+        )}
         <p className="tally-hint">{locked ? t.lockedHint : touchOnly ? t.hintTouch : t.hint}
           {research && onBuyAll && unitCost && (() => {
             // (stock everything on the board at once)

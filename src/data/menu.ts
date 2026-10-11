@@ -353,12 +353,13 @@ export const DISHES: Dish[] = [
       // plates and dishes on the right of the fire as the camera sees it, the box and the bucket on the left
       // everything you eat from in a row along the front (toward the camera): the side dish, the miso soup, the
       // plate and the basket, left to right; the tray of raw skewers on the right; box, bucket and bin on the left
-      plate: [1.19, 0.02, 1.55],
+      // (the plates and dishes all on the right of the fire as the camera sees it; the raw tray front and centre)
+      plate: [1.45, 0.02, -1.24],
       // just outside the stones on the left as the camera sees it
-      basket: { at: [2.16, 0, 0.84], capacity: 20 },
+      basket: { at: [2.53, 0, 0.33], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
       // (in the front row, left of the miso soup bowls)
-      dish: { at: [-0.74, 0.0, 2.21], capacity: 3 },
+      dish: { at: [1.8, 0.0, -0.26], capacity: 3 },
       // the spoons and brush in the seasoning box are what's carried; grabbing a pot picks up its utensil
       // (salt is taken by hand: SaltPinch only marks where the pinch is taken from)
       tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut', WaterDipper: 'water',
@@ -375,10 +376,10 @@ export const DISHES: Dish[] = [
       bucket: ['WaterBucket', 'WaterDipper'],
       // (the bin to the left of the bucket, where it can be seen, not hidden behind it)
       trash: [-1.97, 0.0, 0.69],
-      tray: [1.47, 0.0, -1.13],
+      tray: [1.467, 0.0, 1.163],
       // the rice balls come out on their own little dish, just past the front end of the tray
       // (beside the front end of the tray, between it and the basket: the prep side, all on the right)
-      rawDish: { at: [2.3, 0.0, -0.25], items: ['Onigiri'] },
+      rawDish: { at: [2.32, 0.0, -0.64], items: ['Onigiri'] },
     },
     layout: {
       mode: 'ring',

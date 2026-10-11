@@ -1,5 +1,5 @@
 // What stands about the grill besides the dishes: a crate of binchotan (a stick dragged from it onto the fire adds
-// charcoal), a paper fan leaning on it (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
+// charcoal), a paper fan by the raw tray (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
 // glowing behind the stones, which can be moved about like the dishes. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
 // them like anything else (DECOR is their footprint, for its settle()).
 import { useMemo, useRef, type ReactNode, type RefObject } from 'react'
@@ -11,8 +11,8 @@ type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
 export const DECOR = {
   crate: { at: [0.62, -2.0], r: 0.38 },
-  // (leaning on the crate's end)
-  fan: { at: [0.0, -1.86], r: 0.16 },
+  // (lying on the table to the left of the raw tray)
+  fan: { at: [0.61, 1.85], r: 0.2 },
   lantern: { at: [-1.61, -0.68], r: 0.2 },
 } satisfies Record<string, Spot>
 
@@ -156,7 +156,7 @@ function Crate() {
   )
 }
 
-/** A round paper fan (団扇) leaning on the crate; picked up, it's held upright and swings as it's waved. */
+/** A round paper fan (団扇) lying by the raw tray; picked up, it's held upright and swings as it's waved. */
 function Fan({ held }: { held: RefObject<Held> }) {
   const g = useRef<THREE.Group>(null)
   const swing = useRef(0)
@@ -170,8 +170,8 @@ function Fan({ held }: { held: RefObject<Held> }) {
       // face to the camera's side, handle down, rocking side to side as it fans
       o.rotation.set(1.45, -0.6, swing.current)
     } else {
-      o.position.set(DECOR.fan.at[0], 0.2, DECOR.fan.at[1])
-      o.rotation.set(1.2, 0.25, 0)
+      o.position.set(DECOR.fan.at[0], 0.01, DECOR.fan.at[1])
+      o.rotation.set(0, 2.1, 0)
     }
   })
   const geo = useMemo(() => {
@@ -213,8 +213,39 @@ const LANTERN_PAPER = canvas(128, 256, (g) => {
   g.fillRect(62, 0, 3, 256)
 })
 
-/** A floor lantern (行燈): a square wooden frame on four legs, washi panels lit from inside. */
+/** a soft round glow, bright in the middle and fading to nothing, for the light round the lantern */
+const GLOW = canvas(128, 128, (g) => {
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+  grad.addColorStop(0, 'rgba(255,200,120,0.9)')
+  grad.addColorStop(0.25, 'rgba(255,170,80,0.45)')
+  grad.addColorStop(0.6, 'rgba(255,140,50,0.12)')
+  grad.addColorStop(1, 'rgba(255,120,40,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 128, 128)
+})
+
+/**
+ * A floor lantern (行燈): a square wooden frame on four legs, washi panels lit from inside by a flame — the paper
+ * brightens and dims a little as it flickers, a warm halo hangs round it, and (on a strong GPU) it throws a little
+ * flickering light on what's near.
+ */
 function Lantern({ at }: { at: [number, number, number] }) {
+  const paper = useRef<THREE.MeshBasicMaterial>(null)
+  const halo = useRef<THREE.Sprite>(null)
+  const flame = useRef<THREE.Mesh>(null)
+  const lamp = useRef<THREE.PointLight>(null)
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    // a flame's flicker: a slow breath and a quicker shiver, never quite repeating
+    const f = 0.88 + 0.07 * Math.sin(t * 2.3) + 0.05 * Math.sin(t * 7.9 + 1.3) + 0.03 * Math.sin(t * 17.1)
+    if (paper.current) paper.current.color.setScalar(f)
+    if (halo.current) {
+      halo.current.material.opacity = 0.55 + (f - 0.88) * 2.2
+      halo.current.scale.setScalar(0.95 + (f - 0.88) * 0.6)
+    }
+    if (flame.current) flame.current.scale.set(1, 0.85 + (f - 0.88) * 2.5, 1)
+    if (lamp.current) lamp.current.intensity = 0.7 * f
+  })
   const S = 0.2, H = 0.36, LEG = 0.16
   const geo = useMemo(() => ({
     post: new THREE.BoxGeometry(0.022, H + LEG + 0.04, 0.022),
@@ -237,7 +268,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
       ))))}
       {/* the lit paper: unshaded, it glows the same by day or night */}
       <mesh geometry={geo.shade} position={[0, LEG + H / 2, 0]}>
-        <meshBasicMaterial map={LANTERN_PAPER} toneMapped={false} />
+        <meshBasicMaterial ref={paper} map={LANTERN_PAPER} toneMapped={false} transparent opacity={0.94} />
       </mesh>
       <mesh geometry={geo.shelf} position={[0, LEG * 0.45, 0]}>
         <meshToonMaterial color="#4a2e1c" />
@@ -245,7 +276,16 @@ function Lantern({ at }: { at: [number, number, number] }) {
       <mesh geometry={geo.handle} position={[0, top + 0.02, 0]}>
         <meshToonMaterial color="#2a1a10" />
       </mesh>
-      {QUALITY.tier === 'high' && <pointLight position={[0, LEG + H / 2, 0]} color="#ffb060" intensity={0.6} distance={1.6} decay={2} />}
+      {/* the flame inside, seen through the paper */}
+      <mesh ref={flame} position={[0, LEG + H * 0.38, 0]}>
+        <coneGeometry args={[0.028, 0.09, 10]} />
+        <meshBasicMaterial color="#ffb347" toneMapped={false} transparent opacity={0.85} />
+      </mesh>
+      {/* the glow round it, always facing the camera, laid on additively */}
+      <sprite ref={halo} position={[0, LEG + H / 2, 0]} scale={0.95}>
+        <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
+      </sprite>
+      {QUALITY.tier === 'high' && <pointLight ref={lamp} position={[0, LEG + H / 2, 0]} color="#ffb060" intensity={0.7} distance={1.8} decay={2} />}
     </group>
   )
 }

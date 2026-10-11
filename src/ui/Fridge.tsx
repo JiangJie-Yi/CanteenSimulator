@@ -2,7 +2,7 @@ import { FOOD_KINDS } from '@/data/foodKinds'
 import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { PAR } from '@/game/economy'
-import { hasIcon, Icon } from './Icon'
+import { Icon, iconFor } from './Icon'
 
 type Props = {
   dish: Dish
@@ -33,14 +33,6 @@ const SHELVES: { zh: string; ja: string; ids: Set<string> }[] = [
  * a bar against the PAR level, whether it's out or running low — with +10 on each, and at the top what's in stock
  * altogether, how much is short, 一鍵補貨 (top everything up to PAR) and 全部各 +10.
  */
-/** its own drawing, or one of its kind (a fish for a fish), or the shop's */
-const iconFor = (g: { id: string; icon?: string }) => {
-  const own = g.icon ?? g.id
-  if (hasIcon(own)) return own
-  const shelf = SHELVES.findIndex((sh) => sh.ids.has(g.id))
-  return (['ExtraFish', 'ShrimpSkewer', 'Yakitori', 'GrilledShiitake'][shelf] ?? 'grilledfish')
-}
-
 export function Fridge({ dish, lang, cash, stock, unitCost, onBuy, onBuyAll, onTopUp, topUpCost }: Props) {
   const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items]
   const shelves: { name: string; list: typeof goods }[] = []
@@ -85,7 +77,7 @@ export function Fridge({ dish, lang, cash, stock, unitCost, onBuy, onBuyAll, onT
               const state = n === 0 ? 'is-out' : n < 3 ? 'is-low' : ''
               return (
                 <li key={g.id} className={state}>
-                  <span className="fr-icon"><Icon name={iconFor(g)} size={22} /></span>
+                  <span className="fr-icon"><Icon name={iconFor(dish.id, g, false)} size={22} /></span>
                   <span className="fr-name"><b>{name(g)}</b>{(g as { en?: string }).en && <small lang="en">{(g as { en?: string }).en}</small>}</span>
                   <span className="fr-cost">{t(lang, '每份', '1人前')}<b className="money">NT${cost}</b></span>
                   <span className="fr-level" title={`${n}/${PAR}`}>
