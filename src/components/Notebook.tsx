@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { useDrag } from '../useDrag'
 import type { Lang } from '../i18n'
 import type { Dish } from '../menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, suggestPrice, type Entry, type Part,
@@ -43,28 +41,20 @@ type Props = {
   chefSkill: number
   /** ask the second chef to try out a few dishes not yet tried (using up their food) */
   onTrial?: () => void
-  /** open it at this tab (bumped from outside: the 營 button sends you to the menu when it's short) */
-  openAt?: { tab: Tab; n: number }
+  /** the tab it opens at */
+  openAt?: Tab
 }
 type Tab = 'lab' | 'menu' | 'chef'
 
 const t = (lang: Lang, zh: string, ja: string) => (lang === 'ja' ? ja : zh)
 
 /**
- * 研發筆記: what's been tried with the shop closed, as dishes — at the grill a food with its seasonings is a dish of
+ * 研發筆記 (a tab of the office window, beside 人事): what's been tried with the shop closed, as dishes — at the grill a food with its seasonings is a dish of
  * its own (鹽烤玉米, 醬刷玉米…) — each with its best try; any of them can be put on the menu at a price. The menu
  * tab lists what's on it (re-price, take off, make up sets), and a hired chef can be asked what's worth trying.
  */
 export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, onReprice, partCost, chef, chefSkill, openAt, onTrial }: Props) {
-  const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState<Tab>('lab')
-  const [seenOpen, setSeenOpen] = useState(0)
-  if (openAt && openAt.n !== seenOpen) {
-    setSeenOpen(openAt.n)
-    setOpen(true)
-    setTab(openAt.tab)
-  }
-  const drag = useDrag('notebook')
+  const [tab, setTab] = useState<Tab>(openAt ?? 'lab')
   const [prices, setPrices] = useState<Record<string, string>>({})
   const [picked, setPicked] = useState<string[]>([])
   const [setName, setSetName] = useState('')
@@ -162,22 +152,9 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   const setSum = setParts.reduce((n, e) => n + e.price, 0)
 
   return (
-    <>
-      <button type="button" className="notebook-toggle" onClick={() => setOpen((o) => !o)} aria-expanded={open}
-        title={t(lang, '研發筆記', '開発ノート')}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6z" fill="#e9d9b6" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M6 3v18M4 7h4M4 12h4M4 17h4M10 8h6M10 11h6M10 14h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-        </svg>
-        <span className={`notebook-count${entries.length < min ? ' is-short' : ''}`}>{entries.length}/{min}</span>
-      </button>
-      {open && createPortal(
-        <section className="notebook" aria-label={t(lang, '研發筆記', '開発ノート')} style={drag.move}>
-          <header {...drag.handle}>
-            <b>{t(lang, '研發筆記', '開発ノート')}</b>
-            <small>{t(lang, `菜單 ${entries.length}/${MENU_MAX}・至少 ${min} 樣才能營業`, `メニュー ${entries.length}/${MENU_MAX}・${min}品から営業可`)}</small>
-            <button type="button" onClick={() => setOpen(false)} aria-label="close">×</button>
-          </header>
+    // (a tab of the office window: 研發筆記 beside 人事)
+    <div className="nb-embedded" aria-label={t(lang, '研發筆記', '開発ノート')}>
+          <p className="nb-summary">{t(lang, `菜單 ${entries.length}/${MENU_MAX}・至少 ${min} 樣才能營業`, `メニュー ${entries.length}/${MENU_MAX}・${min}品から営業可`)}</p>
           <div className="nb-tabs" role="tablist">
             {(['lab', 'menu', 'chef'] as Tab[]).map((k) => (
               <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
@@ -296,9 +273,6 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
               )}
             </div>
           )}
-        </section>,
-        document.body,
-      )}
-    </>
+    </div>
   )
 }

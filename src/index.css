@@ -4694,3 +4694,43 @@ button {
 .nb-chef-acts button {
   margin-left: 0;
 }
+
+/* the research notebook as a tab of the office window */
+.nb-embedded {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.nb-embedded ul {
+  margin: 0;
+  padding: 0 14px 10px;
+  list-style: none;
+}
+
+.nb-embedded li {
+  padding: 8px 0;
+  border-bottom: 1px dashed rgb(59 42 32 / 0.15);
+}
+
+.nb-embedded p {
+  margin: 2px 0;
+  font-size: 13px;
+}
+
+.nb-summary {
+  padding: 6px 14px 0;
+  color: #7a6656;
+}
+
+.office-menu {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #5fa040;
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.office-menu.is-short {
+  background: #c4442f;
+}

@@ -46,6 +46,10 @@ export const recipeKey = (id: string, dabs: Seasoning[]) => (dabs.length ? `${id
 const SPECIAL: Record<string, Partial<Record<string, string>>> = {
   GrilledCorn: { soy: '醬刷玉米', salt: '鹽烤玉米', milk: '奶香烤玉米', 'soy+peanut': '醬刷花生玉米' },
   Onigiri: { soy: '醬油烤飯糰', salt: '鹽烤飯糰' },
+  Buri: { soy: '照燒鰤魚' },
+  Salmon: { soy: '照燒鮭魚' },
+  Gindara: { soy: '照燒銀鱈' },
+  Hokke: { salt: '鹽烤花魚一夜干' },
   NetMochi: { '': '網烤年糕', soy: '醬油烤年糕', milk: '煉乳烤年糕', peanut: '花生年糕', 'milk+peanut': '花生煉乳年糕' },
   BloodCake: { peanut: '花生米血', soy: '醬烤米血', 'soy+peanut': '醬烤花生米血' },
   SweetPotato: { milk: '煉乳烤地瓜', peanut: '花生烤地瓜' },

@@ -119,7 +119,8 @@ const GAS_PER_HOUR = 30
 const COST_SHARE: Record<string, number> = {
   // dough: flour, butter, eggs, sugar (what goes on it is costed on its own)
   CroissantDough: 0.38, BaguetteDough: 0.26, BriocheDough: 0.34, SourdoughDough: 0.3,
-  ExtraFish: 0.48, Saury: 0.46, Mackerel: 0.48, ShrimpSkewer: 0.52, Scallop: 0.55, Squid: 0.5, Shrimp: 0.5, CrabStick: 0.42,
+  ExtraFish: 0.48, Saury: 0.46, Mackerel: 0.48, Aji: 0.45, Iwashi: 0.4, Shishamo: 0.42, Salmon: 0.5, Hokke: 0.48,
+  Buri: 0.5, Gindara: 0.52, Nodoguro: 0.56, ShrimpSkewer: 0.52, Scallop: 0.55, Squid: 0.5, Shrimp: 0.5, CrabStick: 0.42,
   BeefSlice: 0.45, Meatball: 0.36, Fishball: 0.34, Yakitori: 0.4, PorkBelly: 0.42, Sausage: 0.38, BloodCake: 0.3,
   BeefShank: 0.48, Tendon: 0.45, Tripe: 0.4, BraisedEgg: 0.25,
   NapaCabbage: 0.22, Tofu: 0.24, FriedTofu: 0.26, Taro: 0.28, Corn: 0.28, GrilledCorn: 0.28, ShiitakeCap: 0.3,
@@ -146,6 +147,8 @@ const FULL_KCAL = 1500
 const DIGEST_KCAL_PER_SEC = 1.2
 /** what's cooked in the hot pot (eating any of it is trying the soup too) */
 const potItems = new Set(DISHES.find((d) => d.heatControl)?.items.map((x) => x.id) ?? [])
+/** items drawn as copies of others (the grill's extra fish) */
+const LOOKS = Object.fromEntries(DISHES.map((d) => [d.id, Object.fromEntries(d.items.filter((x) => x.look).map((x) => [x.id, x.look!]))]))
 const FLOAT_IDS = Object.fromEntries(
   DISHES.map((d) => [d.id, d.items.filter((it) => it.entrance === 'float').map((it) => it.id)]),
 )
@@ -480,7 +483,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
           <>
               <Dish url={url} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                 broth={base?.broth} hidden={hidden} fill={base?.fill} tint={base?.tint}
-                floatIds={FLOAT_IDS[dish.id]} layout={dish.layout}
+                floatIds={FLOAT_IDS[dish.id]} layout={dish.layout} looks={LOOKS[dish.id]}
                 instant={reducedMotion} />
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
               {dish.roast && (
@@ -720,7 +723,7 @@ export default function App() {
       window.removeEventListener('pagehide', write)
     }
   }, [])
-  const [office, setOffice] = useState<null | 'staff'>(null)
+  const [office, setOffice] = useState<null | 'book' | 'staff'>(null)
   // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
   const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>({})
   const menuByRef = useRef(menuBy)
@@ -730,7 +733,8 @@ export default function App() {
   const [entryCount, setEntryCount] = useState<Record<string, number>>({})
   // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
   const bills = useRef<Record<string, Record<number, { paid: number; parts: number }>>>({})
-  const [bookAt, setBookAt] = useState<{ tab: 'lab' | 'menu' | 'chef'; n: number } | undefined>(undefined)
+  // (the research notebook opens at this tab)
+  const [bookTab, setBookTab] = useState<'lab' | 'menu' | 'chef'>('lab')
   /** a part's cost: the food, and what's put on it */
   const partCost = (d: DishInfo, p: Part) => costOf(findItem(d, p.id) ?? { price: 0 }) +
     p.dabs.reduce((n, k) => n + SEASON_COST[k as Seasoning], 0)
@@ -1526,23 +1530,28 @@ export default function App() {
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
         {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
         <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />
-        <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)} openAt={bookAt}
-          partCost={(p) => partCost(dish, p)}
-          chef={(() => { const c = staffOf(dish.id, 'chef')[0]; return c ? (lang === 'ja' ? c.ja : c.zh) : null })()}
-          chefSkill={(staffOf(dish.id, 'chef')[0]?.skill ?? 60) / 100} onTrial={() => chefTrial(dish)}
-          onPublish={(e) => setMenuBy((m) => {
-            const cur = m[e.shop] ?? []
-            if (cur.length >= MENU_MAX || cur.some((x) => x.key === e.key)) return m
-            return { ...m, [e.shop]: [...cur, e] }
-          })}
-          onUnpublish={(key) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).filter((x) => x.key !== key) }))}
-          onReprice={(key, price) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).map((x) => (x.key === key ? { ...x, price } : x)) }))} />
-        <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'staff'))} aria-expanded={!!office}
-          title={lang === 'ja' ? '人事' : '經營（人事）'}>
-          <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em><b>NT${Math.round(cash).toLocaleString()}</b>
+        <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
+          title={lang === 'ja' ? '開発ノート・人事' : '經營（研發筆記・人事）'}>
+          <span aria-hidden="true">🏪</span><em>{lang === 'ja' ? '経営' : '經營'}</em>
+          <i className={`office-menu${entriesOf(dish.id).length < (MENU_MIN[dish.id] ?? 1) ? ' is-short' : ''}`}
+            title={lang === 'ja' ? 'メニュー数' : '菜單數'}>{entriesOf(dish.id).length}/{MENU_MIN[dish.id] ?? 1}</i><b>NT${Math.round(cash).toLocaleString()}</b>
         </button>
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
+            tab={office} onTab={(t) => { setBookTab('lab'); setOffice(t) }}
+            book={(
+              <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)} openAt={bookTab}
+                partCost={(p) => partCost(dish, p)}
+                chef={(() => { const c = staffOf(dish.id, 'chef')[0]; return c ? (lang === 'ja' ? c.ja : c.zh) : null })()}
+                chefSkill={(staffOf(dish.id, 'chef')[0]?.skill ?? 60) / 100} onTrial={() => chefTrial(dish)}
+                onPublish={(e) => setMenuBy((m) => {
+                  const cur = m[e.shop] ?? []
+                  if (cur.length >= MENU_MAX || cur.some((x) => x.key === e.key)) return m
+                  return { ...m, [e.shop]: [...cur, e] }
+                })}
+                onUnpublish={(key) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).filter((x) => x.key !== key) }))}
+                onReprice={(key, price) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).map((x) => (x.key === key ? { ...x, price } : x)) }))} />
+            )}
             onReset={() => {
               if (!window.confirm(lang === 'ja' ? '資金・在庫・スタッフ・ノートを全部リセットしますか？' : '確定要重新開始？資金、庫存、員工和試吃筆記都會清空。')) return
               try {
@@ -1735,7 +1744,8 @@ export default function App() {
         // (opening with nothing a customer could order would only shut again at once: say what's missing instead)
         if (!ai && entriesOf(dish.id).length < (MENU_MIN[dish.id] ?? 1)) {
           say(UI[lang].menuShort(entriesOf(dish.id).length, MENU_MIN[dish.id] ?? 1))
-          setBookAt((b) => ({ tab: 'lab', n: (b?.n ?? 0) + 1 }))
+          setBookTab('lab')
+          setOffice('book')
           return
         }
         if (!ai && !sellable(dish)) {

@@ -3,7 +3,7 @@ import { BASE_MATERIAL } from '../baseMaterial'
 import { useGLTF, useTexture } from '@react-three/drei'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { CopyLayout } from '../menu'
+import type { CopyLayout, MenuItem } from '../menu'
 
 const INK = new THREE.Color('#3b2a20')
 const OUTLINE_WIDTH = 0.007
@@ -198,12 +198,14 @@ type DishProps = ThreeElements['group'] & {
   floatIds?: string[]
   /** where extra portions go (see menu.ts CopyLayout); default spreads them evenly around the centre */
   layout?: CopyLayout
+  /** items drawn as copies of others the model has (tinted, resized, stood elsewhere on the ring) */
+  looks?: Record<string, NonNullable<MenuItem['look']>>
   /** skip the pop-in animation (prefers-reduced-motion) */
   instant?: boolean
 }
 
 /** A dish exported from blender/*.py, drawn in a hand-painted toon style, with menu items that pop in and out. */
-export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floatIds, layout, instant = false,
+export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floatIds, layout, looks, instant = false,
   ...props }: DishProps) {
   const { scene } = useGLTF(url)
   const ids = useMemo(() => new Set(itemIds), [itemIds])
@@ -228,7 +230,36 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
       list.push({ node: obj, copy: 0, index: list.length, baseScale: obj.scale.clone(), baseY: obj.position.y,
         homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), on: true, s: 1, v: 0, y: 0, vy: 0 })
     })
+    // items the model hasn't got are made from one it has: a deep copy with its own tinted materials, resized, and
+    // stood on the fire ring at its own azimuth, turned to match (made once: the scene is cached across remounts)
+    for (const [id, look] of Object.entries(looks ?? {})) {
+      if (groups.has(id) || !ids.has(id)) continue
+      const src = groups.get(look.from)?.[0]
+      if (!src) continue
+      const node = src.node.clone(true)
+      const tintColor = new THREE.Color(look.tint)
+      node.traverse((o) => {
+        if (!(o instanceof THREE.Mesh) || o.name.endsWith('_outline')) return
+        const mat = (o.material as THREE.MeshStandardMaterial).clone()
+        mat.userData = {}
+        mat.color.multiply(tintColor)
+        o.material = mat
+      })
+      node.name = id
+      node.userData = { itemId: id, copy: 0 }
+      const r = Math.hypot(src.homeP.x, src.homeP.z)
+      const from = Math.atan2(src.homeP.z, src.homeP.x)
+      const to = (look.at * Math.PI) / 180
+      node.position.set(Math.cos(to) * r, src.homeP.y, Math.sin(to) * r)
+      node.quaternion.copy(src.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), from - to))
+      node.scale.copy(src.node.userData.authoredScale ?? src.baseScale).multiplyScalar(look.scale ?? 1)
+      node.userData.authoredScale = node.scale.clone()
+      src.node.parent!.add(node)
+      groups.set(id, [{ node, copy: 0, index: 0, baseScale: node.scale.clone(), baseY: node.position.y,
+        homeP: node.position.clone(), homeQ: node.quaternion.clone(), on: true, s: 1, v: 0, y: 0, vy: 0 }])
+    }
     return groups
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene, ids])
 
   /** Skewers around a fire get spun about their own stick; everything else turns about the vertical. */

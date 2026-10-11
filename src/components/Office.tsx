@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom'
+import type { ReactNode } from 'react'
 import { useDrag } from '../useDrag'
 import type { Lang } from '../i18n'
 import type { Dish } from '../menu'
@@ -13,6 +14,10 @@ type Props = {
   onHire: (w: Worker) => void
   onFire: (w: Worker) => void
   onClose: () => void
+  /** which tab is showing, and the research notebook to show in its own */
+  tab: 'book' | 'staff'
+  onTab: (t: 'book' | 'staff') => void
+  book: ReactNode
   /** start the business over (wipes the save) */
   onReset: () => void
   owner: string
@@ -30,7 +35,7 @@ const stars = (v: number) => {
  * two cooks, someone on the floor and at the till — each filled with a face, or open, with the people who could
  * fill it. (Buying in is done on the 試做 board itself, tag by tag.)
  */
-export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onReset, owner }: Props) {
+export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -42,12 +47,14 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
     <section className="office" aria-label={t('經營', '事務所')} style={drag.move}>
       <header {...drag.handle}>
         <div className="ofc-tabs" role="tablist">
-          <button type="button" role="tab" aria-selected>{t('人事', '人事')}</button>
+          <button type="button" role="tab" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('研發筆記', '開発ノート')}</button>
+          <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{t('人事', '人事')}</button>
         </div>
         <span className={`ofc-cash${cash < 0 ? ' is-low' : ''}`}>{t('現金', '現金')} {money(cash)}</span>
         <button type="button" className="ofc-reset" onClick={onReset}>{t('重新開始', '最初から')}</button>
         <button type="button" className="ofc-close" onClick={onClose} aria-label="close">×</button>
       </header>
+      {tab === 'book' ? book : (
         <div className="ofc-staff">
           {/* the team as it stands: the owner, then each place to fill */}
           <div className="ofc-team">
@@ -107,6 +114,7 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
             )
           })}
         </div>
+      )}
     </section>,
     document.body,
   )

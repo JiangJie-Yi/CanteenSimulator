@@ -497,13 +497,14 @@ const FIRE_SKEWERS = 16
  * in full, a second adds a little more, and from the third it's overdone.
  */
 export const PAIRING: Record<Exclude<Seasoning, 'water'>, Record<string, number>> = {
-  salt: { Fish: 18, ExtraFish: 18, Saury: 18, Mackerel: 16, ShrimpSkewer: 10, Yakitori: 12, PorkBelly: 10, Shishito: 8,
+  salt: { Fish: 18, ExtraFish: 18, Saury: 18, Mackerel: 16, Aji: 18, Iwashi: 16, Shishamo: 14, Salmon: 18, Hokke: 16, Buri: 10,
+    Gindara: 8, Nodoguro: 20,  ShrimpSkewer: 10, Yakitori: 12, PorkBelly: 10, Shishito: 8,
     Asparagus: 10, Okra: 8, KingOyster: 8, GrilledShiitake: 8, GrilledCorn: 6, Potato: 14, Scallop: 8, Onigiri: 4,
     Sausage: -4, NetMochi: -10, SweetPotato: -6, Squid: 4, BloodCake: -6 },
-  soy: { Onigiri: 18, NetMochi: 15, GrilledCorn: 15, GrilledShiitake: 15, KingOyster: 12, Scallop: 14, Squid: 15,
+  soy: { Buri: 18, Salmon: 12, Gindara: 16, Hokke: 6, Aji: 4, Iwashi: 8, Shishamo: 4, Nodoguro: 4, Onigiri: 18, NetMochi: 15, GrilledCorn: 15, GrilledShiitake: 15, KingOyster: 12, Scallop: 14, Squid: 15,
     Yakitori: 10, PorkBelly: 8, Fish: 4, ExtraFish: 4, Saury: 6, Mackerel: 6, Asparagus: 6, Okra: 8, Shishito: 8,
     Potato: 5, SweetPotato: -5, Sausage: -2, ShrimpSkewer: 5, BloodCake: 12 },
-  milk: { NetMochi: 18, SweetPotato: 15, GrilledCorn: 6, Potato: -8, BloodCake: -10 },
+  milk: { Salmon: -12, Buri: -14, Gindara: -12, Hokke: -14, Aji: -16, Iwashi: -16, Shishamo: -14, Nodoguro: -16, NetMochi: 18, SweetPotato: 15, GrilledCorn: 6, Potato: -8, BloodCake: -10 },
   peanut: { NetMochi: 18, BloodCake: 18, SweetPotato: 8, GrilledCorn: 4, Sausage: 6 },
 }
 /** what a seasoning does to a food the table doesn't list (condensed milk on a fish…) */

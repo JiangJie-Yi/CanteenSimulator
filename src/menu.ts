@@ -20,6 +20,9 @@ export type MenuItem = {
   hue?: string
   /** how many pieces (dumplings) */
   pieces?: number
+  /** (not in the model) drawn as a copy of another item's model: tinted, resized, and stood elsewhere on the fire
+   * ring (at this azimuth, degrees) */
+  look?: { from: string; tint: string; scale?: number; at: number }
 }
 
 export type TableKind = 'friedRice' | 'quick' | 'saucyRice' | 'friedNoodles' | 'vermicelli' | 'dumplings' | 'xiaolongbao'
@@ -294,6 +297,24 @@ export const DISHES: Dish[] = [
       { id: 'ExtraFish', name: '香魚', ja: '鮎', en: 'Ayu', price: 80, kcal: 110 },
       { id: 'Saury', name: '秋刀魚', ja: '秋刀魚', en: 'Saury', price: 90, kcal: 300 },
       { id: 'Mackerel', name: '鯖魚', ja: '鯖', en: 'Mackerel', price: 100, kcal: 290 },
+      // more of what a Japanese grilled-fish shop (焼き魚定食屋) has, priced as there: horse mackerel, sardines and
+      // shishamo cheap; salmon, atka mackerel and yellowtail in between; black cod dear; blackthroat seaperch dearest
+      { id: 'Aji', name: '竹筴魚', ja: '鯵', en: 'Horse Mackerel', price: 90, kcal: 150,
+        look: { from: 'Saury', tint: '#c9d6e0', scale: 0.85, at: 150 } },
+      { id: 'Iwashi', name: '沙丁魚', ja: '鰯', en: 'Sardine', price: 60, kcal: 160,
+        look: { from: 'Saury', tint: '#b4c4d8', scale: 0.72, at: 172 } },
+      { id: 'Shishamo', name: '柳葉魚', ja: 'ししゃも', en: 'Shishamo', price: 70, kcal: 120,
+        look: { from: 'Saury', tint: '#e8d6b0', scale: 0.55, at: 194 } },
+      { id: 'Salmon', name: '鮭魚', ja: '鮭', en: 'Salmon', price: 120, kcal: 230,
+        look: { from: 'Mackerel', tint: '#f2a27a', scale: 1, at: 216 } },
+      { id: 'Hokke', name: '花魚', ja: 'ほっけ', en: 'Atka Mackerel', price: 150, kcal: 280,
+        look: { from: 'Mackerel', tint: '#d8c49a', scale: 1.15, at: 238 } },
+      { id: 'Buri', name: '鰤魚', ja: '鰤', en: 'Yellowtail', price: 160, kcal: 260,
+        look: { from: 'Mackerel', tint: '#a8b4bc', scale: 1.1, at: 128 } },
+      { id: 'Gindara', name: '銀鱈', ja: '銀鱈', en: 'Black Cod', price: 220, kcal: 250,
+        look: { from: 'Mackerel', tint: '#9aa0a8', scale: 1.05, at: 106 } },
+      { id: 'Nodoguro', name: '紅喉', ja: 'のどぐろ', en: 'Blackthroat Seaperch', price: 380, kcal: 200,
+        look: { from: 'Mackerel', tint: '#ff8a7a', scale: 0.9, at: 260 } },
       { id: 'GrilledCorn', name: '玉米', ja: 'とうもろこし', en: 'Grilled Corn', price: 40, kcal: 120 },
       { id: 'GrilledShiitake', name: '香菇', ja: '椎茸', en: 'Shiitake', price: 30, kcal: 15 },
       { id: 'Onigiri', name: '飯糰', ja: 'おにぎり', en: 'Soy Onigiri', price: 35, kcal: 220 },
@@ -317,11 +338,13 @@ export const DISHES: Dish[] = [
     ],
     heat: 'fire',
     roast: {
-      times: { Fish: 40, ExtraFish: 40, Saury: 35, Mackerel: 45, GrilledCorn: 30, GrilledShiitake: 20, Onigiri: 25, ShrimpSkewer: 20,
+      times: { Fish: 40, ExtraFish: 40, Saury: 35, Mackerel: 45, Aji: 35, Iwashi: 25, Shishamo: 20, Salmon: 40, Hokke: 45,
+        Buri: 40, Gindara: 45, Nodoguro: 40, GrilledCorn: 30, GrilledShiitake: 20, Onigiri: 25, ShrimpSkewer: 20,
         Sausage: 25, Potato: 55, SweetPotato: 55,
         Yakitori: 30, PorkBelly: 30, Squid: 25, Shishito: 15,  KingOyster: 20, Asparagus: 15, Okra: 15, Scallop: 20, BloodCake: 20,
         NetMochi: 25 },
-      names: { Fish: '香魚', ExtraFish: '香魚', Saury: '秋刀魚', Mackerel: '鯖魚', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '飯糰',
+      names: { Fish: '香魚', ExtraFish: '香魚', Saury: '秋刀魚', Mackerel: '鯖魚', Aji: '竹筴魚', Iwashi: '沙丁魚', Shishamo: '柳葉魚',
+        Salmon: '鮭魚', Hokke: '花魚', Buri: '鰤魚', Gindara: '銀鱈', Nodoguro: '紅喉', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '飯糰',
         ShrimpSkewer: '蝦串', Sausage: '香腸', Potato: '馬鈴薯', SweetPotato: '地瓜',
         Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '青椒',  KingOyster: '杏鮑菇', Asparagus: '蘆筍', Okra: '秋葵', Scallop: '干貝', BloodCake: '米血',
         NetMochi: '年糕' },
