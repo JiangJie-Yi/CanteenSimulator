@@ -105,6 +105,23 @@ export function partName(item: { name: string; ja?: string }, short: string, id:
   return name
 }
 
+/**
+ * A dish's English name, for the small line down its menu tag: how it's grilled, the food, and what it's served
+ * with (Salt & Soy Grilled Saury with Wasabi & Lemon).
+ */
+export function partEn(en: string | undefined, dabs: Seasoning[], kind: 'grill' | 'bake' | 'plain' = 'grill') {
+  if (!en) return undefined
+  if (kind === 'plain') return en
+  const W: Record<string, string> = { salt: 'Salt', soy: 'Soy', miso: 'Miso', milk: 'Condensed Milk', peanut: 'Peanut',
+    wasabi: 'Wasabi', shichimi: 'Shichimi', yuzu: 'Yuzu Kosho', lemon: 'Lemon' }
+  if (kind === 'bake') return [...dabs.map((k) => W[k] ?? k), en].join(' ')
+  const head = (['salt', 'soy', 'miso'] as const).filter((k) => dabs.includes(k)).map((k) => W[k])
+  const glaze = (['milk', 'peanut'] as const).filter((k) => dabs.includes(k)).map((k) => W[k])
+  const after = (['wasabi', 'shichimi', 'yuzu', 'lemon'] as const).filter((k) => dabs.includes(k)).map((k) => W[k])
+  const withs = [...glaze, ...after]
+  return `${head.length ? head.join(' & ') + ' ' : ''}Grilled ${en}${withs.length ? ' with ' + withs.join(' & ') : ''}`
+}
+
 /** the food or bowl a part is cooked from, wherever it's listed */
 export const findItem = (d: Dish, id: string): (MenuItem | Dish['bases'][number]) | undefined =>
   d.items.find((x) => x.id === id) ?? d.bases.find((b) => b.id === id)

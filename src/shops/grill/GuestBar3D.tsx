@@ -272,6 +272,53 @@ const CHOCHIN_POST = new THREE.BoxGeometry(0.05, 1.3, 0.05)
 const CHOCHIN_ARM = new THREE.BoxGeometry(0.3, 0.035, 0.035)
 
 /**
+ * The till by the door (帳場): a small counter of the same dark wood as the bar's base under a pale top, an old
+ * cash register on it, a tray for the change, and a beckoning cat (招き猫) for luck. Its top is the bar's height.
+ */
+function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
+  const W = 0.62, D = 0.42
+  return (
+    <group position={at} rotation-y={yaw}>
+      <Part geo={REG_GEO.body} color="#3a2a1e" outline={1.02} position={[0, (top - 0.05) / 2, 0]} scale={[W, top - 0.05, D]} />
+      <Part geo={REG_GEO.body} color="#d9b884" outline={1.02} position={[0, top - 0.025, 0]} scale={[W + 0.06, 0.05, D + 0.06]} />
+      {/* panels on its front */}
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * W / 4, (top - 0.05) / 2, -D / 2 - 0.002]} rotation-y={Math.PI}>
+          <planeGeometry args={[W / 2 - 0.06, top - 0.18]} />
+          <meshToonMaterial color="#4a3626" />
+        </mesh>
+      ))}
+      {/* the register: a sloped keyboard, a little drum of figures on top */}
+      <group position={[0, top, 0.06]}>
+        <Part geo={REG_GEO.body} color="#5a6a66" position={[0, 0.06, 0]} scale={[0.2, 0.12, 0.22]} />
+        <Part geo={REG_GEO.body} color="#2f3634" outline={0} position={[-0.06, 0.125, 0]} rotation-z={0.5} scale={[0.1, 0.02, 0.2]} />
+        <Part geo={REG_GEO.body} color="#e8e2cf" position={[0.05, 0.15, 0]} scale={[0.07, 0.05, 0.12]} />
+      </group>
+      {/* the change tray */}
+      <Part geo={REG_GEO.body} color="#8a2a1e" outline={1.04} position={[-0.18, top + 0.008, -0.1]} scale={[0.12, 0.012, 0.09]} />
+      {/* the beckoning cat, its paw up */}
+      <group position={[0.2, top, -0.1]} rotation-y={Math.PI}>
+        <Part geo={REG_GEO.ball} color="#f6f3ea" position={[0, 0.05, 0]} scale={[1, 1.15, 0.9]} />
+        <Part geo={REG_GEO.ball} color="#f6f3ea" position={[0, 0.115, 0]} scale={[0.85, 0.75, 0.8]} />
+        {[-1, 1].map((sd) => <Part key={sd} geo={REG_GEO.ear} color="#f6f3ea" position={[sd * 0.022, 0.15, 0]} rotation-z={-sd * 0.3} />)}
+        <Part geo={REG_GEO.paw} color="#f6f3ea" position={[0.04, 0.12, 0.012]} />
+        <mesh position={[0, 0.085, 0.034]}><torusGeometry args={[0.03, 0.005, 6, 16, Math.PI]} /><meshToonMaterial color="#c4302a" /></mesh>
+        <mesh position={[0, 0.072, 0.04]}><sphereGeometry args={[0.008, 8, 6]} /><meshToonMaterial color="#e8c45a" /></mesh>
+        {[-1, 1].map((sd) => (
+          <mesh key={sd} position={[sd * 0.014, 0.12, 0.033]}><sphereGeometry args={[0.004, 6, 4]} /><meshBasicMaterial color="#2a1d16" /></mesh>
+        ))}
+      </group>
+    </group>
+  )
+}
+const REG_GEO = {
+  body: new THREE.BoxGeometry(1, 1, 1),
+  ball: new THREE.SphereGeometry(0.04, 14, 10),
+  ear: new THREE.ConeGeometry(0.012, 0.026, 6),
+  paw: new THREE.CapsuleGeometry(0.01, 0.03, 4, 8),
+}
+
+/**
  * The customers' side of the shop floored in wide old boards: one even rectangle under the whole bar, the row of
  * stools and the way along behind them to the noren, its boards running the length of the bar.
  */
@@ -363,11 +410,11 @@ const CLEAR_S = 0.6
 const CLEAR_DELAY = 1.0
 const WASH_S = 0.9
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
-const PLATE_R = 0.19
+const PLATE_R = 0.13
 const PLATE_GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 0.038], [0.49, 0.042], [0.44, 0.026],
   [0.3, 0.01], [0, 0.01]] as [number, number][]).map(([x, y]) => [x * PLATE_R * 2, y] as [number, number]), PLATE_R)
-const SMEAR_GEO = new THREE.CircleGeometry(0.085, 18)
-const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.26, 5)
+const SMEAR_GEO = new THREE.CircleGeometry(0.058, 18)
+const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.18, 5)
 
 /** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and a used stick) */
 function Plate({ dirty = false }: { dirty?: boolean }) {
@@ -415,8 +462,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return { path, len: pathLength(path) }
   }), [counters, seats])
   const plateAt = (n: number) => seats[n].plate.clone().setY(top)
-  const cleanAt = (k: number) => at.clone().addScaledVector(ALONG, -length / 2 + 0.02).addScaledVector(LAY, 0.06).setY(top + k * STACK_GAP)
-  const dirtyAt = (k: number) => at.clone().addScaledVector(ALONG, length / 2 - 0.02).addScaledVector(LAY, 0.06).setY(top + k * STACK_GAP)
+  const cleanAt = (k: number) => counters[0].at.clone().addScaledVector(ALONG, -counters[0].length / 2 + 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP)
+  const dirtyAt = (k: number) => counters[0].at.clone().addScaledVector(ALONG, counters[0].length / 2 - 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP)
 
   // the plates: those out at the seats (or on their way), and the two stacks
   const [, setTick] = useState(0)
@@ -608,6 +655,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       })}
       {/* the way in, just past the end of the bar where the customers come and go */}
       <Entrance at={doorOf(counters)} mark={mark} />
+      {/* the till, just inside the door on the bar's side of the way in (the shops that lay out their own counters) */}
+      {given && (
+        <Register top={top} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
+          at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + 0.95).addScaledVector(counters[0].lay, -0.3)} />
+      )}
       {seats.map((st, n) => (
         <group key={n} position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>
       ))}

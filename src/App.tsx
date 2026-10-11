@@ -14,7 +14,7 @@ import { GasFlame } from '@/shops/hotpot/GasFlame'
 import { FireControl } from '@/shops/grill/FireControl'
 import { Fullness } from '@/ui/Fullness'
 import { bestOf, Notebook } from '@/ui/Notebook'
-import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, type Entry, type Part, type Seasoning } from '@/data/recipes'
+import { findItem, MENU_MAX, MENU_MIN, partEn, partName, recipeKey, SEASON_NAME, signature, type Entry, type Part, type Seasoning } from '@/data/recipes'
 import { moodOf } from '@/game/taste'
 import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
@@ -1056,7 +1056,8 @@ export default function App() {
   const base = orderedBase(dish, orders[dish.id])
   /** the menu board while open: the dishes on the menu (soups and bowls among the dark tags), at their prices */
   const menuDish = (d: DishInfo): DishInfo => {
-    const asItem = (e: Entry) => ({ ...(findItem(d, e.parts[0].id) as object), id: e.key, name: e.name, ja: e.ja, en: undefined,
+    const asItem = (e: Entry) => ({ ...(findItem(d, e.parts[0].id) as object), id: e.key, name: e.name, ja: e.ja,
+      en: e.parts.length === 1 ? partEn(findItem(d, e.parts[0].id)?.en, e.parts[0].dabs, d.roast ? 'grill' : d.bake ? 'bake' : 'plain') : undefined,
       price: e.price, icon: e.parts[0].id, includes: undefined, max: undefined })
     const isBase = (e: Entry) => d.bases.some((b) => b.id === e.parts[0].id)
     return { ...d, bases: entriesOf(d.id).filter(isBase).map(asItem) as DishInfo['bases'],
@@ -1949,6 +1950,7 @@ export default function App() {
       )}
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : researchDish(dish)} research={!ai}
+        layoutLike={ai ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })} days={days}
          lang={lang} quantities={ai ? entryCount : orders[dish.id]}
         feed={feed} locked={ai} stock={ai ? entryStock(dish) : stock}

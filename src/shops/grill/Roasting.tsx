@@ -379,11 +379,12 @@ const TRAY_WOOD = (() => {
  * the chef serves each piece onto it straight off the grill.
  */
 function Bar() {
-  return <>{GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} />)}</>
+  // (where the second counter butts against the first, the first's lip stops short of it, so nothing runs through)
+  return <>{GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} />)}</>
 }
 const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042, 0.016], [0.045, 0.02], [0.043, 0.021],
   [0.036, 0.012], [0.026, 0.006], [0, 0.006]], 0.045)
-function BarCounter({ c }: { c: Counter }) {
+function BarCounter({ c, trim = 0 }: { c: Counter; trim?: number }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
   const L = c.length
   return (
@@ -402,8 +403,8 @@ function BarCounter({ c }: { c: Counter }) {
         <meshToonMaterial color="#3a2a1e" />
       </mesh>
       {/* the raised lip on the cook's side, the step the food is handed over */}
-      <mesh position={[0, BAR_TOP + 0.03, 0.27]}>
-        <boxGeometry args={[L + 0.3, 0.06, 0.08]} />
+      <mesh position={[trim / 2, BAR_TOP + 0.03, 0.285]}>
+        <boxGeometry args={[L + 0.3 - trim, 0.06, 0.05]} />
         <meshToonMaterial color="#c49a64" />
       </mesh>
       {Array.from({ length: c.seats }, (_, n) => {
@@ -412,17 +413,17 @@ function BarCounter({ c }: { c: Counter }) {
           <group key={n} position={[x, BAR_TOP, 0]}>
             {/* (each customer's plate is set down and cleared away by GuestBar3D) in front of it, on the customer's
                 side, chopsticks across on their rest, tips to the left; to the right a little dish of sauce */}
-            <mesh position={[0.11, 0.012, -0.25]}>
+            <mesh position={[0.08, 0.012, -0.18]}>
               <boxGeometry args={[0.03, 0.02, 0.04]} />
               <meshToonMaterial color="#8a5a30" />
             </mesh>
             {[-0.012, 0.012].map((dz) => (
-              <mesh key={dz} position={[0.0, 0.027, -0.25 + dz]} rotation-z={Math.PI / 2}>
-                <cylinderGeometry args={[0.004, 0.006, 0.3, 5]} />
+              <mesh key={dz} position={[0.0, 0.027, -0.18 + dz * 0.7]} rotation-z={Math.PI / 2}>
+                <cylinderGeometry args={[0.003, 0.0045, 0.2, 5]} />
                 <meshToonMaterial color="#5a3a20" />
               </mesh>
             ))}
-            <group position={[-0.25, 0.002, -0.14]}>
+            <group position={[-0.2, 0.002, -0.1]}>
               <mesh geometry={SAUCE_DISH_GEO} castShadow>
                 <meshToonMaterial color="#ffffff" map={CLOUD_WARE} />
               </mesh>

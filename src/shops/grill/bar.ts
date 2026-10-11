@@ -85,7 +85,7 @@ export const singleCounter = (at: THREE.Vector3, length: number): Counter[] => [
  * looking in across the fire from the left. The door is past the right end of the first.
  */
 export const GRILL_COUNTERS: Counter[] = [
-  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, 0.45), along: ALONG, lay: LAY, length: 3.6, seats: 4 },
-  { at: new THREE.Vector3().addScaledVector(LAY, -0.5).addScaledVector(ALONG, -2.75), along: LAY.clone().negate(), lay: ALONG, length: 3.0, seats: 4 },
+  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35), along: ALONG, lay: LAY, length: 5.2, seats: 6 },
+  { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4 },
 ]
 export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)

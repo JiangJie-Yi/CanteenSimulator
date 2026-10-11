@@ -31,6 +31,8 @@ type MenuProps = {
   topUpCost?: number
   /** the shop's diary: which day of business, and how many customers today and all told */
   days?: { day: number; today: number; total: number }
+  /** (the menu, open) size its tags as the board of the shop's foods is sized: this many tags, this many sets */
+  layoutLike?: { tags: number; bases: number }
   cash?: number
 }
 
@@ -39,11 +41,14 @@ type MenuProps = {
  * the tag is 15.5em tall with 0.7em padding top and bottom), and shrink the whole tag's type if it would
  * overflow. Long Japanese names (焼きおにぎり) and set names (秋刀魚定食) come out smaller instead of spilling.
  */
-function tagFit(name: string, en: string | undefined, price: string, stamp: boolean, stocked = false): number {
+function tagFit(name: string, en: string | undefined, price: string, stamp: boolean, stocked = false, twoCol = false): number {
+  // (a dish's long name may go down the tag in two columns, its English in two as well)
+  const rows = twoCol && name.length > TWO_COL_FROM ? Math.ceil(name.length / 2) : name.length
+  const enLen = en ? (twoCol && en.length > 18 ? Math.ceil(en.length / 2) + 2 : en.length) : 0
   const parts = [
     1.4,                                  // icon (or the 選 stamp in its place)
-    name.length * 1.3 * 1.12,             // name: 1.3em glyphs + 0.12em letter-spacing
-    en ? en.length * 0.56 * 0.6 : 0,      // English, set sideways: ~0.6em per Latin letter at 0.56em
+    rows * 1.3 * 1.12,                    // name: 1.3em glyphs + 0.12em letter-spacing
+    enLen * 0.56 * 0.6,                   // English, set sideways: ~0.6em per Latin letter at 0.56em
     price.length * 0.82 * 1.12,           // price in kanji numerals
     stamp ? 2 : 0,                        // the 點 / 含 stamp
     stocked ? 5.4 : 0,                    // the test board's cost, stock and +10, in a column at the foot
@@ -52,6 +57,11 @@ function tagFit(name: string, en: string | undefined, price: string, stamp: bool
   const room = 15.5 - 1.4
   return total > room ? room / total : 1
 }
+
+/** a dish name longer than this goes on in a second column */
+const TWO_COL_FROM = 5
+/** the size the foods' board last came out at, so the open menu's tags can be the very same size */
+let foodsFont: { font: number; rows: number } | null = null
 
 /**
  * Izakaya-style wall menu: vertical wooden tags, a red stamp marks what's been ordered.
@@ -67,7 +77,7 @@ const CAT_NAMES: Record<string, Record<Lang, string>> = {
   xiaolongbao: { zh: '點心', ja: '点心' }, soup: { zh: '湯類', ja: 'スープ' },
 }
 
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0, days,
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0, days, layoutLike,
   cash = Infinity }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
@@ -189,7 +199,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
 
   // every tag on the board is lettered the same size: the size the longest one needs (with room for its stamp)
   const priceText = (x: { price: number }) => (research ? '' : taiwan ? String(x.price) : toChineseNumber(x.price))
-  const boardFit = Math.min(1, ...all.map((x) => tagFit(nameIn(lang, x), x.en, priceText(x), true, research && !!onBuy)))
+  const boardFit = Math.min(1, ...all.map((x) => tagFit(nameIn(lang, x), x.en, priceText(x), true, research && !!onBuy, !!layoutLike)))
   const fitStyle = { '--fit': boardFit.toFixed(3) } as CSSProperties
 
   const baseName = ordered.length ? ordered.map((b) => nameIn(lang, b)).join('、') : null
@@ -211,7 +221,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       <button key={x.id} type="button" aria-pressed={n > 0} data-id={x.id}
         className={`strip${research ? ' is-research' : ''}${base ? ' strip-base' : ''}${incl ? ' is-included' : ''}${filling.length ? ' is-filling' : ''}${out ? ' is-out' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${x.price}${n ? `，${t.ordered(n)}` : ''}`}
-        style={fitStyle}
+        style={layoutLike ? { ...fitStyle, '--two-col-rows': name.length > TWO_COL_FROM ? Math.ceil(name.length / 2) : name.length } as CSSProperties : fitStyle}
         onClick={() => {
           const fired = press.current?.fired
           press.current = null
@@ -267,6 +277,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
   const [fit, setFit] = useState<{ font: number; rows: number } | null>(null)
   const tagCount = dish.bases.length + dish.items.length
   const baseCount = dish.bases.length
+  const likeTags = layoutLike?.tags ?? 0, likeBases = layoutLike?.bases ?? 0
   useLayoutEffect(() => {
     const menu = aside.current, strips = row.current
     if (!menu || !strips || taiwan) return
@@ -284,16 +295,32 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       const h = menu.clientHeight - px(cs.paddingTop) - px(cs.paddingBottom) - (tally?.offsetHeight ?? 0) - px(cs.rowGap)
         - px(ss.paddingTop) - px(ss.paddingBottom)
       const gx = px(ss.columnGap), gy = px(ss.rowGap)
+      // (the open menu is sized as the foods' board would be, so its tags are the same size as theirs)
+      const sizeTags = likeTags || tagCount, sizeBases = likeTags ? likeBases : baseCount
       let best = { font: 0, rows: 2, empty: Infinity }
       for (let r = 1; r <= 4; r++) {
         // (the sets all go along the top row)
-        const cols = Math.max(Math.ceil(tagCount / r), r > 1 ? baseCount : 0)
+        const cols = Math.max(Math.ceil(sizeTags / r), r > 1 ? sizeBases : 0)
         const font = Math.min(22, (h - (r - 1) * gy) / (r * 15.5), (w - (cols - 1) * gx) / (cols * 2.7))
-        const empty = cols * r - tagCount
+        const empty = cols * r - sizeTags
         if (font > best.font + 0.5 || (Math.abs(font - best.font) <= 0.5 && empty < best.empty)) best = { font, rows: r, empty }
+      }
+      if (likeTags) {
+        // at that size (the foods' board's own, as it last came out, if it has been up), as few rows of the menu's
+        // own tags as fit across
+        if (foodsFont) best = { ...best, font: foodsFont.font }
+        const font = best.font
+        for (let r = 1; r <= 4; r++) {
+          const cols = Math.max(Math.ceil(tagCount / r), r > 1 ? baseCount : 0)
+          if ((w - (cols - 1) * gx) / (cols * 2.7) >= font - 0.01 && (h - (r - 1) * gy) / (r * 15.5) >= font - 0.01) {
+            best = { ...best, rows: r }
+            break
+          }
+        }
       }
       const next = best.font >= 10 ? { font: Math.floor(best.font * 10) / 10, rows: best.rows }
         : { font: Math.max(10, Math.min(16, (h - gy) / 31)), rows: 2 }
+      if (research) foodsFont = next
       setFit((cur) => (cur && cur.font === next.font && cur.rows === next.rows ? cur : next))
     }
     measure()
@@ -304,11 +331,11 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       ro.disconnect()
       wide.removeEventListener('change', measure)
     }
-  }, [tagCount, baseCount, taiwan])
+  }, [tagCount, baseCount, likeTags, likeBases, taiwan, research])
 
   return (
     <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
-      className={`menu${locked ? ' is-locked' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
+      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
       <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>
 
       <div className={`strips-frame${ends.overflow ? ' is-paged' : ''}`}>

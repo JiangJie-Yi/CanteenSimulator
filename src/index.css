@@ -5821,3 +5821,17 @@ button {
   font-size: 15px;
   margin: 0 2px;
 }
+
+/* the open menu: tags the size of the foods' board's, a long dish name (and its English) going on in a second
+   column so its letters needn't come out tiny */
+.menu.menu-two-col .strip-name {
+  white-space: normal;
+  line-height: 1.02;
+  max-height: calc(var(--two-col-rows, 6) * 1.12em + 0.05em);
+}
+
+.menu.menu-two-col .strip-en {
+  white-space: normal;
+  line-height: 1.05;
+  max-height: 12em;
+}
