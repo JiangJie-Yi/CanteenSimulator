@@ -5,6 +5,7 @@ import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPr
 import { ROLES } from '@/data/staff'
 import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, partCost, partsOf, portionsLeft, takeStock } from '@/game/economy'
 import { trialIdeas } from '@/game/research'
+import { makeCandidates, seeded } from '@/game/hiring'
 import { breadTaste, moodOf, PAIRING, PAIRING_DEFAULT, starText } from '@/game/taste'
 
 const shop = (id: string) => DISHES.find((d) => d.id === id)!
@@ -134,5 +135,30 @@ describe('taste', () => {
     expect(moodOf(null)).toBe('wait')
     expect(moodOf(90)).toBe('love')
     expect(moodOf(10)).toBe('sad')
+  })
+})
+
+describe('hiring: a new lot of people each game', () => {
+  it('gives every shop applicants for every job, with unique names', () => {
+    const taken = new Set<string>()
+    for (const d of DISHES) {
+      const people = makeCandidates(d.id, seeded(7), taken)
+      for (const r of ROLES[d.id]) expect(people.filter((w) => w.role === r.role).length, `${d.id} ${r.role}`).toBeGreaterThanOrEqual(3)
+      for (const w of people) {
+        expect(w.note.length, w.zh).toBeGreaterThan(1)
+        expect(w.wage).toBeGreaterThanOrEqual(130)
+        for (const k of [w.skill, w.speed, w.stamina]) expect(k).toBeGreaterThan(0)
+      }
+    }
+    expect(taken.size).toBe(DISHES.length * 13)
+  })
+  it('is different from one game to the next', () => {
+    const a = makeCandidates('hotpot', seeded(1)).map((w) => w.zh).join()
+    const b = makeCandidates('hotpot', seeded(2)).map((w) => w.zh).join()
+    expect(a).not.toBe(b)
+  })
+  it('makes Japanese names readable in Japanese', () => {
+    const w = makeCandidates('hotpot', seeded(3))
+    for (const x of w) expect(x.ja).toMatch(/^\S+ \S+$/)
   })
 })
