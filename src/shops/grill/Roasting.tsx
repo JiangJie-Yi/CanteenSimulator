@@ -11,6 +11,7 @@ import { Steam } from '@/scene/Steam'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { PAIRING, PAIRING_DEFAULT } from '@/game/taste'
 import type { GuestView } from '@/game/types'
+import { DECOR, Decor } from './Decor'
 
 export { BAR_AT, BAR_TOP }
 
@@ -1492,6 +1493,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const kind = key.split('-')[0]
     return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R }[kind] ?? 0.3
   }
+  /** a container's footprint as circles: one for most, three in a row along the long tray */
+  const circlesOf = (key: string, at: THREE.Vector3) => key === 'tray'
+    ? [-1, 0, 1].map((k) => ({ p: at.clone().addScaledVector(LAY_DIR, k * (TRAY_W - TRAY_D) / 2), r: TRAY_D / 2 + 0.02 }))
+    : [{ p: at.clone(), r: footprint(key) }]
   /** everything standing on the table that can be moved, for bumping into */
   const containerKeys = () => [
     ...Array.from({ length: plateCount }, (_, n) => `plate-${n}`),
@@ -1510,7 +1515,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const r = footprint(key)
     // (what it's stacked with doesn't push it away; nor, while an empty one is carried, other empty ones it could go on)
     const others = containerKeys().filter((k) => k !== key && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
-      .map((k) => ({ p: containerAt(k), r: footprint(k) }))
+      .flatMap((k) => circlesOf(k, containerAt(k)))
+    // the crate, the fan and the sake set
+    for (const d of Object.values(DECOR)) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
     if (space === 'open') for (let k = -2; k <= 2; k++) others.push({ p: BAR_AT.clone().addScaledVector(STACK_DIR, k * 0.8), r: 0.42 })
     // the soup bowls on the table are in the way too
@@ -1518,20 +1525,25 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const id = o.userData.itemId as string | undefined
       if (id && roast.drinks?.includes(id) && o.visible && o.scale.x > 0.01) others.push({ p: o.position.clone(), r: 0.19 })
     })
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 8; i++) {
       const d = Math.hypot(at.x, at.z) || 1e-6
       if (d < RING_CLEAR + r) {
         at.x *= (RING_CLEAR + r) / d
         at.z *= (RING_CLEAR + r) / d
       }
-      for (const o of others) {
-        const dx = at.x - o.p.x
-        const dz = at.z - o.p.z
-        const dd = Math.hypot(dx, dz) || 1e-6
-        const min = r + o.r + 0.01
-        if (dd < min) {
-          at.x = o.p.x + (dx / dd) * min
-          at.z = o.p.z + (dz / dd) * min
+      // (the tray is long: each of its circles is pushed clear, carrying the whole tray)
+      for (const own of circlesOf(key, at)) {
+        for (const o of others) {
+          const dx = own.p.x - o.p.x
+          const dz = own.p.z - o.p.z
+          const dd = Math.hypot(dx, dz) || 1e-6
+          const min = own.r + o.r + 0.02
+          if (dd < min) {
+            at.x += (dx / dd) * (min - dd)
+            at.z += (dz / dd) * (min - dd)
+            own.p.x += (dx / dd) * (min - dd)
+            own.p.z += (dz / dd) * (min - dd)
+          }
         }
       }
     }
@@ -3102,6 +3114,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
+      <Decor />
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       {space === 'open' && bar && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
