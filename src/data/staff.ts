@@ -13,7 +13,7 @@
 // the shop is open they tire (faster with less stamina), and a tired worker works worse; with the shop closed they
 // rest.
 
-export type Role = 'chef' | 'sous' | 'cashier' | 'server'
+export type Role = 'chef' | 'sous' | 'cashier' | 'server' | 'stock'
 /** how someone looks, for their picture: a woman or a man, young, middle-aged or older */
 export type Look = { female: boolean; age: 'young' | 'middle' | 'old' }
 export type Worker = {
@@ -32,12 +32,14 @@ export type Worker = {
 }
 
 // The owner is the head chef (大廚) of every shop. Each can take on two more cooks — a second chef (二廚) and a
-// third (三廚) to prep, put on and clear — one person on the floor (外場) and one at the till (收銀).
+// third (三廚) to prep, put on and clear — one person on the floor (外場), one at the till (收銀), and a stock keeper
+// (倉儲) who watches what's running low and orders it in before it runs out.
 const STAFFING = (chef: string, sous: string, chefJa: string, sousJa: string) => [
   { role: 'chef' as Role, max: 1, zh: chef, ja: chefJa },
   { role: 'sous' as Role, max: 1, zh: sous, ja: sousJa },
   { role: 'server' as Role, max: 1, zh: '外場', ja: 'ホール' },
   { role: 'cashier' as Role, max: 1, zh: '收銀', ja: 'レジ' },
+  { role: 'stock' as Role, max: 1, zh: '倉儲（叫貨・補貨）', ja: '仕入れ' },
 ]
 export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: string }[]> = {
   grilledfish: STAFFING('二廚（板前）', '三廚（備料・上火・收拾）', '二番手', '追い回し'),
@@ -48,7 +50,7 @@ export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: st
 
 // a fair wage for someone this good at this job (NT$/h): from about minimum wage (NT$196) up
 export const fair = (role: Role, skill: number) =>
-  Math.round((role === 'chef' ? 200 + skill * 4.2 : role === 'sous' ? 196 + skill * 2.4 : role === 'server' ? 196 + skill * 1.4 : 196 + skill * 1.1) / 5) * 5
+  Math.round((role === 'chef' ? 200 + skill * 4.2 : role === 'sous' ? 196 + skill * 2.4 : role === 'server' ? 196 + skill * 1.4 : role === 'stock' ? 196 + skill * 1.2 : 196 + skill * 1.1) / 5) * 5
 
 /** how well they work right now: tired people work worse (at 100 fatigue, down to 55%) */
 export const effective = (w: Worker, fatigue: number) => (w.skill * (1 - fatigue * 0.0045)) / 100

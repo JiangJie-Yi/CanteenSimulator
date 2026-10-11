@@ -87,3 +87,33 @@ export const goodsOf = (d: Dish) => [...d.bases.filter((b) => !b.includes), ...d
 
 /** what buying n of every good of a shop costs */
 export const buyAllCost = (d: Dish, n: number) => goodsOf(d).reduce((t, g) => t + costOf(g) * n, 0)
+
+/** a stock keeper (倉儲) tops up whatever the menu uses once it's down to this many portions, back up to PAR */
+export const PAR = 10
+export const REORDER_AT = 3
+/** how much off the suppliers' price a stock keeper gets: nothing for a beginner, up to 5% for a skilled one */
+export const supplierDiscount = (skill: number) => Math.max(0, Math.min(0.05, (skill - 60) / 800))
+
+/**
+ * What a stock keeper orders in for a shop: everything its menu uses that's running low, topped back up to PAR (more
+ * for what a dish takes several of). Only what there's cash for is ordered, cheapest first left out last.
+ */
+export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number, skill: number) {
+  const per: Stock = {}
+  for (const e of menu) for (const [k, q] of Object.entries(needOf(e))) per[k] = Math.max(per[k] ?? 0, q)
+  const goods = new Map(goodsOf(d).map((g) => [g.id, g]))
+  const off = 1 - supplierDiscount(skill)
+  const buy: Stock = {}
+  let cost = 0
+  for (const [id, q] of Object.entries(per)) {
+    const g = goods.get(id)
+    const have = stock[id] ?? 0
+    if (!g || have > REORDER_AT * q) continue
+    const n = PAR * q - have
+    const c = Math.round(costOf(g) * n * off)
+    if (cost + c > cash) continue
+    buy[id] = n
+    cost += c
+  }
+  return { buy, cost }
+}

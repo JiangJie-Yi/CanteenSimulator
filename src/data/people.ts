@@ -59,6 +59,7 @@ export const BACKGROUNDS: Record<string, Partial<Record<Role, Partial<ByAge>>>> 
     },
     sous: { middle: ['居酒屋出身', '燒肉店內場出身'] },
     server: { middle: ['居酒屋外場五年'] },
+    stock: { middle: ['魚市場送貨出身'], old: ['在漁港批發做了一輩子'] },
   },
   hotpot: {
     chef: {
@@ -84,6 +85,11 @@ export const BACKGROUNDS: Record<string, Partial<Record<Role, Partial<ByAge>>>> 
     server: { middle: ['做過咖啡廳'] },
   },
   '*': {
+    stock: {
+      old: ['市場批發做了二十年', '雜貨店顧了二十年', '倉庫管理退休'],
+      middle: ['物流倉管出身', '做過超市理貨', '跑過市場叫貨', '餐廳採購五年'],
+      young: ['大學生打工', '剛退伍', '做過超商理貨', '物流打工過'],
+    },
     chef: { old: ['廚房做了大半輩子'], middle: ['做過幾家餐廳'], young: ['料理學校畢業'] },
     sous: {
       old: ['廚房做了大半輩子', '退休後想找點事做'],
@@ -110,12 +116,14 @@ export const TRAITS: Record<'skillHigh' | 'skillLow' | 'speedHigh' | 'speedLow' 
     sous: ['做事細', '刀工乾淨', '備料一把罩'],
     cashier: ['算帳又快又準', '記性好，熟客都記得', '從沒找錯過錢'],
     server: ['眼觀四面', '招呼客人有一套', '笑容滿分'],
+    stock: ['盤點一絲不苟', '跟菜商很熟，拿得到好價錢', '叫貨從不出錯'],
   },
   skillLow: {
     chef: ['手藝還在磨', '調味中規中矩', '偶爾失手'],
     sous: ['還在學', '有時丟三落四'],
     cashier: ['偶爾找錯錢', '算帳要多看兩眼'],
     server: ['還不太熟', '偶爾送錯桌'],
+    stock: ['偶爾叫錯貨', '還不太會殺價'],
   },
   speedHigh: { '*': ['手腳快', '動作麻利', '做事很快'], server: ['跑得快'] },
   speedLow: { '*': ['慢工出細活', '動作慢了點'] },

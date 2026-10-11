@@ -19,7 +19,7 @@ import { moodOf } from '@/game/taste'
 import { trialIdeas } from '@/game/research'
 import { bestDabs, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
-import { buyAllCost, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
+import { restockOrder, buyAllCost, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
   portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
 import { GuestCounter } from '@/ui/GuestCounter'
@@ -846,9 +846,9 @@ export default function App() {
     })
   }
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
-  const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
+  const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest' | 'stock'; text: string }[]>([])
   const chatId = useRef(0)
-  const talk = useCallback((who: 'chef' | 'guest', raw: string) => {
+  const talk = useCallback((who: 'chef' | 'guest' | 'stock', raw: string) => {
     // customers are named by how they look (上班族, 老奶奶…), not by number
     const lg = langRef.current
     const text = raw.replace(/^#(\d+) /, (_, n) => `${guestLabel(+n, lg)}${lg === 'ja' ? '「' : '：'}`)
@@ -991,6 +991,46 @@ export default function App() {
   aiRef.current = { ai, wage: chef.wagePerHour, shop: DISHES[active].id }
   const stockRef = useRef(stock)
   stockRef.current = stock
+  // the stock keeper (倉儲) at each shop goes round now and then and orders in whatever its menu is running low on:
+  // a quicker one checks more often, a tired one less often, a skilled one gets a better price
+  const restockRef = useRef({ cash, menuBy, hired, active, lang })
+  restockRef.current = { cash, menuBy, hired, active, lang }
+  const lastRound = useRef<Record<string, number>>({})
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const { cash, menuBy, hired, active, lang } = restockRef.current
+      let money = cash
+      for (const d of DISHES) {
+        const keeper = (CANDIDATES[d.id] ?? []).find((w) => w.role === 'stock' && hired[d.id]?.[w.id])
+        if (!keeper) continue
+        const fatigue = hired[d.id][keeper.id].fatigue
+        const now = Date.now()
+        if (now - (lastRound.current[d.id] ?? 0) < (45 - keeper.speed * 0.3) * (1 + fatigue / 100) * 1000) continue
+        lastRound.current[d.id] = now
+        const { buy, cost } = restockOrder(d, menuBy[d.id] ?? [], stockRef.current, money, effective(keeper, fatigue) * 100)
+        if (!cost) continue
+        money -= cost
+        book('bought', cost)
+        stockRef.current = { ...stockRef.current }
+        for (const [k, n] of Object.entries(buy)) stockRef.current[k] = (stockRef.current[k] ?? 0) + n
+        setStock((st) => {
+          const next = { ...st }
+          for (const [k, n] of Object.entries(buy)) next[k] = (next[k] ?? 0) + n
+          return next
+        })
+        if (DISHES[active].id === d.id) {
+          const names = Object.entries(buy).map(([k, n]) => {
+            const it = ALL_ITEMS.get(k) ?? d.bases.find((b) => b.id === k)
+            return `${(lang === 'ja' ? it?.ja : it?.name) ?? k} ${n}`
+          })
+          talk('stock', UI[lang].restocked(lang === 'ja' ? keeper.ja : keeper.zh, names.join('、')))
+        }
+      }
+    }, 1000)
+    return () => window.clearInterval(id)
+    // (everything it reads is in restockRef; book and talk only set state)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // tiredness: the open shop's staff tire as they work (the less stamina, the faster), everyone else rests
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -1644,7 +1684,7 @@ export default function App() {
             onPointerDown={dragChat.onPointerDown} onDoubleClick={dragChat.onDoubleClick}>
             {chat.map((m) => (
               <li key={m.id} className={`ai-line ai-${m.who}`}>
-                <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : UI[lang].guest}</span>{m.text}
+                <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : m.who === 'stock' ? UI[lang].stock : UI[lang].guest}</span>{m.text}
               </li>
             ))}
           </ul>

@@ -3,12 +3,12 @@ import type { Look, Role } from '@/data/staff'
 /*
  * A worker's picture (大頭貼), drawn rather than photographed, in the same hand-inked style as the rest: their face
  * and hair (a woman's longer, an older person's grey and lined), and what they wear for the job — a cook's white
- * hat and jacket, a server's dark vest, a cashier's apron — on a ground of their role's colour.
+ * hat and jacket, a server's dark vest, a cashier's apron, a stock keeper's work jacket and clipboard — on a ground of their role's colour.
  */
 
 const SKIN = ['#f3d2b0', '#eac39c', '#e2b48a', '#f6dcc0', '#d9a77e']
 const HAIR = ['#2b1d14', '#3a2a20', '#1c1c22', '#5a3a2a', '#4a3020']
-const GROUND: Record<Role | 'owner', string> = { owner: '#c4442f', chef: '#e8b04a', sous: '#d9c27a', server: '#5a7a9a', cashier: '#7aa070' }
+const GROUND: Record<Role | 'owner', string> = { owner: '#c4442f', chef: '#e8b04a', sous: '#d9c27a', server: '#5a7a9a', cashier: '#7aa070', stock: '#a08a5c' }
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
 
 export function Avatar({ id, look, role, size = 44 }: { id: string; look: Look; role: Role | 'owner'; size?: number }) {
@@ -23,9 +23,11 @@ export function Avatar({ id, look, role, size = 44 }: { id: string; look: Look; 
       <clipPath id={`av-${id}`}><circle cx="24" cy="24" r="22" /></clipPath>
       <g clipPath={`url(#av-${id})`}>
         {/* shoulders, in what they wear for the job */}
-        <path d="M6 48c1-9 8-13 18-13s17 4 18 13z" fill={cook ? '#f7f3ea' : role === 'server' ? '#2b2b33' : '#e9e2d2'} stroke={ink} strokeWidth="1.2" />
+        <path d="M6 48c1-9 8-13 18-13s17 4 18 13z" fill={cook ? '#f7f3ea' : role === 'server' ? '#2b2b33' : role === 'stock' ? '#5f6b45' : '#e9e2d2'} stroke={ink} strokeWidth="1.2" />
         {role === 'server' && <path d="M19 36l5 6 5-6" fill="#f7f3ea" stroke={ink} strokeWidth="1" />}
         {role === 'cashier' && <path d="M15 40h18v8H15z" fill="#a8432f" stroke={ink} strokeWidth="1" />}
+        {role === 'stock' && <path d="M27 39h9v9h-9z" fill="#efe6d2" stroke={ink} strokeWidth="1" />}
+        {role === 'stock' && <path d="M29 42h5M29 44.5h4" stroke={ink} strokeWidth="0.8" />}
         {cook && <path d="M24 36v12M20 40h.1M20 44h.1" stroke={ink} strokeWidth="1.2" strokeLinecap="round" />}
         {/* long hair behind the head */}
         {look.female && <path d="M12 22c0-9 5-14 12-14s12 5 12 14v14H12z" fill={hair} stroke={ink} strokeWidth="1.2" />}

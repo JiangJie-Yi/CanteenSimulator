@@ -9,9 +9,9 @@ import { fair, type Look, type Role, type Worker } from '@/data/staff'
 export type Rand = () => number
 
 /** how many come for each job at each shop */
-const COUNTS: Record<Role, number> = { chef: 4, sous: 3, cashier: 3, server: 3 }
+const COUNTS: Record<Role, number> = { chef: 4, sous: 3, cashier: 3, server: 3, stock: 3 }
 /** how likely each job's applicants are women */
-const WOMEN: Record<Role, number> = { chef: 0.3, sous: 0.4, cashier: 0.7, server: 0.55 }
+const WOMEN: Record<Role, number> = { chef: 0.3, sous: 0.4, cashier: 0.7, server: 0.55, stock: 0.35 }
 const AGES: Look['age'][] = ['young', 'middle', 'old']
 /** skill, speed and stamina ranges by age */
 const STATS: Record<Look['age'], { skill: [number, number]; speed: [number, number]; stamina: [number, number] }> = {

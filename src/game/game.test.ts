@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { DISHES } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPrice, type Entry } from '@/data/recipes'
 import { ROLES } from '@/data/staff'
-import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, partCost, partsOf, portionsLeft, takeStock } from '@/game/economy'
+import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock } from '@/game/economy'
 import { trialIdeas } from '@/game/research'
 import { makeCandidates, seeded } from '@/game/hiring'
 import { bestDabs, expectedTaste, understand } from '@/game/chefChat'
@@ -41,7 +41,7 @@ describe('data: every shop', () => {
   it('staffs two cooks, a server and a cashier at each shop', () => {
     for (const d of DISHES) {
       const roles = ROLES[d.id]
-      expect(roles.map((r) => `${r.role}x${r.max}`).sort(), d.id).toEqual(['cashierx1', 'chefx1', 'serverx1', 'sousx1'])
+      expect(roles.map((r) => `${r.role}x${r.max}`).sort(), d.id).toEqual(['cashierx1', 'chefx1', 'serverx1', 'sousx1', 'stockx1'])
     }
   })
   it('has the grill pairing for every grill food (or the default)', () => {
@@ -151,7 +151,7 @@ describe('hiring: a new lot of people each game', () => {
         for (const k of [w.skill, w.speed, w.stamina]) expect(k).toBeGreaterThan(0)
       }
     }
-    expect(taken.size).toBe(DISHES.length * 13)
+    expect(taken.size).toBe(DISHES.length * 16)
   })
   it('is different from one game to the next', () => {
     const a = makeCandidates('hotpot', seeded(1)).map((w) => w.zh).join()
@@ -189,5 +189,25 @@ describe('chef chat: understanding what the owner asks', () => {
     expect(bestDabs(g, 'GrilledCorn')[0]).toBe('soy')
     expect(bestDabs(g, 'Aji')).not.toContain('milk')
     expect(expectedTaste(g, 'Aji', ['milk'])).toBeLessThan(expectedTaste(g, 'Aji', ['salt']))
+  })
+})
+
+describe('game/economy: the stock keeper', () => {
+  const grill = shop('grilledfish')
+  const menu = [entry('grilledfish', ['Saury']), entry('grilledfish', ['GrilledCorn'])]
+  it('tops up only what the menu uses and is running low, back to PAR', () => {
+    const { buy, cost } = restockOrder(grill, menu, { Saury: 2, GrilledCorn: REORDER_AT + 1, Salmon: 0 }, 1e6, 60)
+    expect(buy).toEqual({ Saury: PAR - 2 })
+    expect(cost).toBe(costOf(grill.items.find((x) => x.id === 'Saury')!) * (PAR - 2))
+  })
+  it('orders nothing it can’t pay for, and nothing without a menu', () => {
+    expect(restockOrder(grill, menu, {}, 0, 60).cost).toBe(0)
+    expect(restockOrder(grill, [], {}, 1e6, 60).cost).toBe(0)
+  })
+  it('gets a better price the more skilled, at most 5% off', () => {
+    expect(supplierDiscount(50)).toBe(0)
+    expect(supplierDiscount(100)).toBe(0.05)
+    const cheap = restockOrder(grill, menu, {}, 1e6, 100).cost
+    expect(cheap).toBeLessThan(restockOrder(grill, menu, {}, 1e6, 60).cost)
   })
 })
