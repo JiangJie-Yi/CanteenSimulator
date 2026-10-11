@@ -626,6 +626,10 @@ export default function App() {
   // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
   const space: 'closed' | 'open' = ai ? 'open' : 'closed'
+  // (opening is the start of a new day)
+  useEffect(() => {
+    if (ai) setDays((d) => ({ ...d, day: d.day + 1, today: 0 }))
+  }, [ai])
   {
     const pot = DISHES.find((d) => d.heatControl)
     potSoupRef.current = pot && !ai ? orderedBase(pot, ordersBy.closed[pot.id])?.id ?? null : null
@@ -655,7 +659,20 @@ export default function App() {
   const guests = guestsBy[DISHES[active].id] ?? []
   // how many have come in all (customers are numbered as they come; the list itself only keeps the latest)
   const visits = guests.reduce((n, g) => Math.max(n, g.id), 0)
-  const setShopGuests = useCallback((dishId: string, g: GuestView[]) => setGuestsBy((b) => ({ ...b, [dishId]: g })), [])
+  // the shop's days: each time it opens is a new one; and how many customers came in, today and all told
+  const [days, setDays] = useState({ day: 0, today: 0, total: 0 })
+  const seen = useRef(new Set<string>())
+  const setShopGuests = useCallback((dishId: string, g: GuestView[]) => {
+    setGuestsBy((b) => ({ ...b, [dishId]: g }))
+    let fresh = 0
+    for (const x of g) {
+      const k = `${dishId}-${x.id}`
+      if (seen.current.has(k)) continue
+      seen.current.add(k)
+      fresh++
+    }
+    if (fresh) setDays((d) => ({ ...d, today: d.today + fresh, total: d.total + fresh }))
+  }, [])
   // revenue mode: what's been sold, and what it cost to make (ingredients, fuel, the chef's wages)
   const [ledgerOn, setLedgerOn] = useState(false)
   // customers' orders as they come in, for the menu to write them down
@@ -1932,7 +1949,7 @@ export default function App() {
       )}
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : researchDish(dish)} research={!ai}
-        cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
+        cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })} days={days}
          lang={lang} quantities={ai ? entryCount : orders[dish.id]}
         feed={feed} locked={ai} stock={ai ? entryStock(dish) : stock}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}

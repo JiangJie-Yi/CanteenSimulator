@@ -5806,3 +5806,18 @@ button {
     height: 30px;
   }
 }
+
+/* the shop's diary at the foot of the menu: which day, and how many customers */
+.tally .tally-day {
+  flex-basis: 100%;
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--text-soft);
+  letter-spacing: 0.04em;
+}
+
+.tally .tally-day strong {
+  color: var(--text);
+  font-size: 15px;
+  margin: 0 2px;
+}

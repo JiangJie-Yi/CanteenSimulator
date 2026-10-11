@@ -29,6 +29,8 @@ type MenuProps = {
   /** 一鍵補貨: top everything up to 10, and what that costs (0: nothing's short) */
   onTopUp?: () => void
   topUpCost?: number
+  /** the shop's diary: which day of business, and how many customers today and all told */
+  days?: { day: number; today: number; total: number }
   cash?: number
 }
 
@@ -65,7 +67,7 @@ const CAT_NAMES: Record<string, Record<Lang, string>> = {
   xiaolongbao: { zh: '點心', ja: '点心' }, soup: { zh: '湯類', ja: 'スープ' },
 }
 
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0,
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0, days,
   cash = Infinity }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
@@ -359,6 +361,13 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
               return <li key={f.key}><span>✎</span><em>{t.wrote(guestLabel(f.guest, lang), it ? nameIn(lang, it) : f.id)}</em></li>
             })}
           </ul>
+        )}
+        {/* the shop's diary: which day it is, and how many have come in */}
+        {days && days.day > 0 && (
+          <p className="tally-day">
+            {lang === 'ja' ? <>営業 <strong>{days.day}</strong> 日目・本日の来客 <strong>{days.today}</strong> 名・累計 <strong>{days.total}</strong> 名</>
+              : <>第 <strong>{days.day}</strong> 天・今日來客 <strong>{days.today}</strong> 位・累計 <strong>{days.total}</strong> 位</>}
+          </p>
         )}
         <p>
           {beforeCount}{n1 !== null && <strong>{n1}</strong>}{beforeTotal}{n2 !== null && <strong className="money">{n2}</strong>}{after}

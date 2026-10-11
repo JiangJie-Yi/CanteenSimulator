@@ -136,6 +136,7 @@ const PLANKS = (() => {
  * The way in: a noren hanging just past the end of the bar, three panels that sway a little.
  */
 function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
+  const lantern = mark === '聞野' ? '炭火' : mark
   const tex = useMemo(() => norenTexture(mark), [mark])
   const panels = useRef<(THREE.Mesh | null)[]>([])
   const yaw = Math.atan2(ALONG.x, ALONG.z)
@@ -148,6 +149,8 @@ function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   })
   return (
     <group position={at} rotation-y={yaw}>
+      {/* a red lantern beside the way in */}
+      <group position={[W / 2 + 0.45, 0, 0.05]}><Chochin mark={lantern} /></group>
       {/* the noren: three panels side by side, hung from a bamboo rod (no frame: it hangs in the way in by itself) */}
       <mesh position={[0, H - 0.05, 0.03]} rotation-z={Math.PI / 2}>
         <cylinderGeometry args={[0.012, 0.012, W, 8]} />
@@ -164,6 +167,109 @@ function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
     </group>
   )
 }
+
+/** the red paper lantern's skin: red washi with its ribs, and the shop's name brushed down it in black */
+const chochinTexture = (mark: string) => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 512
+  c.height = 256
+  const g = c.getContext('2d')!
+  const grad = g.createLinearGradient(0, 0, 0, 256)
+  grad.addColorStop(0, '#9e1d14')
+  grad.addColorStop(0.5, '#d8362a')
+  grad.addColorStop(1, '#9e1d14')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 512, 256)
+  // the bamboo ribs it's wound on
+  g.strokeStyle = 'rgba(70,10,5,0.35)'
+  g.lineWidth = 2
+  for (let y = 8; y < 256; y += 14) {
+    g.beginPath()
+    g.moveTo(0, y)
+    g.lineTo(512, y)
+    g.stroke()
+  }
+  // the name, down the side facing out (and again round the back)
+  g.fillStyle = '#1a0d08'
+  g.font = 'bold 84px serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  const chars = [...mark]
+  for (const u of [128, 384]) chars.forEach((ch, i) => g.fillText(ch, u, 128 + (i - (chars.length - 1) / 2) * 92))
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+const CHOCHIN_GLOW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+  grad.addColorStop(0, 'rgba(255,120,70,0.8)')
+  grad.addColorStop(0.35, 'rgba(255,80,40,0.3)')
+  grad.addColorStop(1, 'rgba(255,60,30,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 128, 128)
+  return new THREE.CanvasTexture(c)
+})()
+const CHOCHIN_GEO = (() => {
+  // a barrel of paper, round in the middle and drawn in at top and bottom
+  const pts = Array.from({ length: 13 }, (_, i) => {
+    const y = i / 12
+    return new THREE.Vector2(0.07 + 0.09 * Math.sin(Math.PI * y), y * 0.42 - 0.21)
+  })
+  return new THREE.LatheGeometry(pts, 24)
+})()
+
+/**
+ * A red paper lantern (赤提灯) hung at the door on a little arm off a post, the shop's name on it, lit from inside:
+ * it sways a touch and its glow breathes like the flame in it.
+ */
+function Chochin({ mark }: { mark: string }) {
+  const tex = useMemo(() => chochinTexture(mark), [mark])
+  const hang = useRef<THREE.Group>(null)
+  const skin = useRef<THREE.MeshBasicMaterial>(null)
+  const halo = useRef<THREE.Sprite>(null)
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    const f = 0.9 + 0.06 * Math.sin(t * 2.1) + 0.04 * Math.sin(t * 7.3 + 1.1)
+    if (hang.current) hang.current.rotation.z = Math.sin(t * 0.9) * 0.04
+    if (skin.current) skin.current.color.setScalar(f)
+    if (halo.current) halo.current.material.opacity = 0.5 + (f - 0.9) * 2
+  })
+  return (
+    <group>
+      {/* the post and its arm */}
+      <Part geo={CHOCHIN_POST} color="#3a2416" position={[0, 0.65, 0]} />
+      <Part geo={CHOCHIN_ARM} color="#3a2416" position={[-0.14, 1.26, 0]} />
+      <group ref={hang} position={[-0.26, 1.24, 0]}>
+        <mesh position-y={-0.08}>
+          <cylinderGeometry args={[0.003, 0.003, 0.12, 4]} />
+          <meshBasicMaterial color="#1a0d08" />
+        </mesh>
+        <group position-y={-0.38}>
+          <mesh geometry={CHOCHIN_GEO}>
+            <meshBasicMaterial ref={skin} map={tex} toneMapped={false} />
+          </mesh>
+          {/* the black lacquered rings top and bottom */}
+          {[0.215, -0.215].map((y) => (
+            <mesh key={y} position-y={y}>
+              <cylinderGeometry args={[0.075, 0.075, 0.035, 18]} />
+              <meshToonMaterial color="#1a0d08" />
+            </mesh>
+          ))}
+          <sprite ref={halo} scale={0.9}>
+            <spriteMaterial map={CHOCHIN_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.5} />
+          </sprite>
+        </group>
+      </group>
+    </group>
+  )
+}
+const CHOCHIN_POST = new THREE.BoxGeometry(0.05, 1.3, 0.05)
+const CHOCHIN_ARM = new THREE.BoxGeometry(0.3, 0.035, 0.035)
 
 /**
  * The customers' side of the shop floored in wide old boards: one even rectangle under the whole bar, the row of

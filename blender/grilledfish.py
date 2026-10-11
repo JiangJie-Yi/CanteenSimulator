@@ -2132,10 +2132,10 @@ def in_box(offset):
     return box_c + tang * offset
 
 
-def utensil(name, head, handle_end, head_obj, radius=0.006):
+def utensil(name, head, handle_end, head_obj, radius=0.006, handle=None):
     """A spoon or brush standing in its pot: the head down in it, the handle leaning out over the rim.
     Its origin is the head, which is what's carried over the food."""
-    parts_ = [head_obj, stick_between(head, handle_end, radius, M["spoon_wood"], name + "Handle")]
+    parts_ = [head_obj, stick_between(head, handle_end, radius, handle or M["spoon_wood"], name + "Handle")]
     return centre_origin(join(parts_, name), tuple(head))
 
 
@@ -2144,6 +2144,34 @@ def spoon_bowl(at, r):
     o = active()
     o.scale = (r, r * 0.8, r * 0.35)
     return finish(o, "SpoonBowl", M["spoon_wood"])
+
+
+# each seasoning has its own kind of spoon, as a counter would: a flat wooden paddle for the miso, a little white
+# porcelain spoon for the wasabi, a slip of a bamboo scoop for the shichimi, a small steel spoon for the yuzu kosho
+M["spoon_bamboo"] = pbr("SpoonBamboo", (0.8, 0.68, 0.4), rough=0.45)
+M["spoon_steel"] = pbr("SpoonSteel", (0.78, 0.79, 0.8), rough=0.25, metal=1.0)
+M["spoon_china"] = pbr("SpoonChina", (0.95, 0.94, 0.9), rough=0.2, coat=0.6)
+
+
+def spoon_head(kind, at):
+    """The head of a seasoning's own spoon, and what its handle is made of and how thick."""
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=10, location=at)
+    o = active()
+    if kind == "miso":
+        # a flat paddle (へら), broad and thin, squared off a little at the end
+        o.scale = (0.03, 0.022, 0.005)
+        return finish(o, "SpoonPaddle", M["spoon_wood"]), M["spoon_wood"], 0.007
+    if kind == "wasabi":
+        # a small white porcelain spoon: an oval bowl drawn to a point
+        o.scale = (0.026, 0.016, 0.009)
+        return finish(o, "SpoonChinaBowl", M["spoon_china"]), M["spoon_china"], 0.005
+    if kind == "shichimi":
+        # a slender bamboo scoop, long and narrow and barely dished
+        o.scale = (0.012, 0.03, 0.004)
+        return finish(o, "SpoonBambooScoop", M["spoon_bamboo"]), M["spoon_bamboo"], 0.004
+    # yuzu kosho: a small steel spoon, a neat oval bowl on a thin stem
+    o.scale = (0.016, 0.02, 0.006)
+    return finish(o, "SpoonSteelBowl", M["spoon_steel"]), M["spoon_steel"], 0.0032
 
 
 lean = out * 0.09 + Vector((0, 0, 0.21))
@@ -2221,7 +2249,9 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough, tool in pots2:
         o.location.z += BOX_Z
     centre_origin(join([pot, fl], name), (c.x, c.y, 0.0))
     head = Vector((c.x, c.y, BOX_Z + depth * 0.7))
-    utensil(tool, head, head + out * 0.08 + Vector((0, 0, 0.18)), spoon_bowl(head, 0.022))
+    kind = {"MisoSpoon": "miso", "WasabiSpoon": "wasabi", "ShichimiSpoon": "shichimi"}.get(tool, "yuzu")
+    obj, mat, thick = spoon_head(kind, head)
+    utensil(tool, head, head + out * 0.08 + Vector((0, 0, 0.18 if kind != "shichimi" else 0.15)), obj, thick, mat)
 
 # the lemon: a little dish of wedges; the one on top is what's picked up and squeezed
 c = box2_c + tang * 0.33
