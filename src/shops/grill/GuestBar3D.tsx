@@ -4,7 +4,8 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
-import { guestLabel, kindOf, type GuestKind } from '@/data/guests'
+import { guestLabel } from '@/data/guests'
+import { Person } from '@/scene/Person3D'
 import type { Lang } from '@/data/i18n'
 
 /*
@@ -25,28 +26,6 @@ const WALK = 1.8                                    // seconds to walk to or fro
 const INK = '#3b2a20'
 const FACE_YAW = Math.atan2(LAY.x, LAY.z)
 
-const SKIN = ['#f3d2b0', '#eac39c', '#d9a77e', '#f6dcc0', '#c99470']
-const HAIR = ['#2b1d14', '#4a3020', '#1c1c22', '#7a5a3a', '#5a3a2a']
-const pick = <T,>(l: T[], n: number) => l[n % l.length]
-
-type Look = { top: string; legs: string; hair: string; skin: string; size: number; wide: number }
-function lookOf(id: number, kind: GuestKind): Look {
-  const old = kind === 'grandma' || kind === 'grandpa'
-  const top: Record<GuestKind, string> = {
-    salaryman: '#2b3444', officeLady: '#6a6f78', highSchoolGirl: '#f4f1ea', highSchoolBoy: '#1c1e26', grandma: '#c9b48a',
-    grandpa: '#7a5a3a', kid: pick(['#e85a4a', '#4a8ad8', '#f0c040'], id), uncle: pick(['#4a7a5a', '#a8432f', '#3d6a9a'], id),
-    student: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukata: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
-  }
-  return {
-    top: top[kind],
-    legs: kind === 'highSchoolGirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a' : '#2f2f36',
-    hair: old ? '#d4d4d4' : pick(HAIR, id * 3),
-    skin: pick(SKIN, id * 7 + 1),
-    size: kind === 'kid' ? 0.72 : kind === 'grandma' ? 0.9 : 1,
-    wide: kind === 'uncle' ? 1.25 : kind === 'grandpa' ? 1.06 : kind === 'highSchoolGirl' || kind === 'officeLady' ? 0.9 : 1,
-  }
-}
-
 /** toon material, and its ink outline (a slightly bigger back-faced shell) */
 function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeometry; color: string; outline?: number } & Record<string, unknown>) {
   return (
@@ -64,104 +43,8 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
 }
 
 const GEO = {
-  torso: new THREE.CapsuleGeometry(0.11, 0.16, 6, 16),
-  arm: new THREE.CapsuleGeometry(0.035, 0.16, 4, 10),
-  leg: new THREE.CapsuleGeometry(0.045, 0.2, 4, 10),
-  head: new THREE.SphereGeometry(0.105, 24, 16),
-  hair: new THREE.SphereGeometry(0.112, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52),
-  bun: new THREE.SphereGeometry(0.045, 12, 8),
-  cap: new THREE.SphereGeometry(0.118, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5),
-  brim: new THREE.CylinderGeometry(0.07, 0.07, 0.01, 16, 1, false, -Math.PI / 2, Math.PI),
-  tie: new THREE.BoxGeometry(0.03, 0.12, 0.012),
-  collar: new THREE.CylinderGeometry(0.13, 0.12, 0.05, 16, 1, true),
-  sash: new THREE.CylinderGeometry(0.118, 0.118, 0.05, 16, 1, true),
-  bag: new THREE.BoxGeometry(0.12, 0.14, 0.06),
-  eye: new THREE.SphereGeometry(0.012, 8, 6),
   seat: new THREE.CylinderGeometry(0.11, 0.1, 0.03, 20),
   stoolLeg: new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6),
-  bowl: new THREE.SphereGeometry(0.07, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
-  stick: new THREE.CylinderGeometry(0.004, 0.003, 0.2, 5),
-}
-
-/** one customer, sitting on their stool (or walking), built from simple rounded shapes */
-function Person({ id, eating, walking, t }: { id: number; eating: boolean; walking: boolean; t: number }) {
-  const kind = kindOf(id).kind
-  const l = lookOf(id, kind)
-  const bald = kind === 'grandpa' || kind === 'uncle'
-  // sitting: hips on the stool top (0.34), the torso above; walking: standing on the ground
-  const hipY = walking ? 0.32 : 0.36
-  const bob = walking ? Math.abs(Math.sin(t * 9)) * 0.02 : eating ? Math.max(0, Math.sin(t * 6)) * 0.03 : 0
-  const lean = eating ? 0.25 + Math.sin(t * 6) * 0.06 : 0.05
-  const step = walking ? Math.sin(t * 9) * 0.5 : 0
-  return (
-    <group scale={l.size}>
-      {/* legs: bent over the stool when sitting, swinging when walking */}
-      {[-1, 1].map((sd) => (
-        <group key={sd} position={[sd * 0.055 * l.wide, hipY, 0]} rotation-x={walking ? sd * step : -1.35}>
-          <Part geo={GEO.leg} color={l.legs} position={[0, -0.14, 0]} />
-        </group>
-      ))}
-      <group position-y={hipY + bob} rotation-x={lean}>
-        <Part geo={GEO.torso} color={l.top} position={[0, 0.2, 0]} scale={[l.wide, 1, 0.85]} />
-        {/* what marks each kind of customer */}
-        {kind === 'salaryman' && <Part geo={GEO.tie} color="#a8322a" outline={0} position={[0, 0.27, 0.1]} />}
-        {kind === 'highSchoolGirl' && (
-          <>
-            <Part geo={GEO.collar} color="#23324a" outline={0} position={[0, 0.34, 0]} />
-            <Part geo={GEO.tie} color="#c4302a" outline={0} position={[0, 0.3, 0.11]} scale={[1.6, 0.5, 1]} />
-          </>
-        )}
-        {kind === 'highSchoolBoy' && <Part geo={GEO.collar} color="#0e0f14" outline={0} position={[0, 0.35, 0]} scale={[1, 0.6, 1]} />}
-        {kind === 'yukata' && <Part geo={GEO.sash} color="#e8c45a" outline={0} position={[0, 0.14, 0]} scale={[l.wide, 1, 0.85]} />}
-        {kind === 'kid' && <Part geo={GEO.bag} color="#c4302a" position={[0, 0.22, -0.11]} />}
-        {/* arms: reaching onto the bar, the right one working the chopsticks while eating */}
-        {[-1, 1].map((sd) => (
-          <group key={sd} position={[sd * 0.13 * l.wide, 0.3, 0]}
-            rotation={[-(walking ? -sd * step * 0.6 : 1.1 + (eating && sd > 0 ? Math.sin(t * 6) * 0.35 : 0)), 0, sd * 0.15]}>
-            <Part geo={GEO.arm} color={l.top} position={[0, -0.1, 0]} />
-          </group>
-        ))}
-        {eating && (
-          <group position={[0.06, 0.33, 0.24]} rotation-x={-0.6 + Math.sin(t * 6) * 0.3}>
-            <mesh geometry={GEO.stick}><meshToonMaterial color="#8a5a30" /></mesh>
-          </group>
-        )}
-        {/* the head */}
-        <group position-y={0.47} rotation-x={eating ? 0.15 : 0}>
-          <Part geo={GEO.head} color={l.skin} />
-          {!bald && <Part geo={GEO.hair} color={l.hair} outline={0} position={[0, 0.012, -0.008]} rotation-x={-0.25} />}
-          {bald && <Part geo={GEO.hair} color={l.hair} outline={0} position={[0, -0.02, -0.03]} rotation-x={-1.2} scale={[1.02, 0.6, 1]} />}
-          {(kind === 'highSchoolGirl' || kind === 'officeLady' || kind === 'yukata') && (
-            <Part geo={GEO.hair} color={l.hair} outline={0} position={[0, -0.06, -0.03]} rotation-x={Math.PI * 0.75}
-              scale={[1, kind === 'highSchoolGirl' ? 1.4 : 1, 1]} />
-          )}
-          {(kind === 'grandma' || kind === 'yukata') && <Part geo={GEO.bun} color={l.hair} position={[0, 0.1, -0.06]} />}
-          {kind === 'kid' && (
-            <>
-              <Part geo={GEO.cap} color="#f2c62a" position={[0, 0.01, 0]} />
-              <Part geo={GEO.brim} color="#f2c62a" outline={0} position={[0, 0.02, 0.09]} />
-            </>
-          )}
-          {[-1, 1].map((sd) => (
-            <mesh key={sd} geometry={GEO.eye} position={[sd * 0.035, 0.01, 0.095]}>
-              <meshBasicMaterial color="#2a1d16" />
-            </mesh>
-          ))}
-          {kind === 'uncle' && (
-            <mesh position={[0, -0.035, 0.1]}>
-              <boxGeometry args={[0.06, 0.014, 0.01]} />
-              <meshBasicMaterial color="#3a2a1e" />
-            </mesh>
-          )}
-        </group>
-      </group>
-      {eating && (
-        <mesh geometry={GEO.bowl} position={[0, 0.5, 0.3]} rotation-x={Math.PI}>
-          <meshToonMaterial color="#e9e1cf" side={THREE.DoubleSide} />
-        </mesh>
-      )}
-    </group>
-  )
 }
 
 function Stool() {
