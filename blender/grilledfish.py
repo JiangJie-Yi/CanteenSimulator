@@ -2371,7 +2371,81 @@ def miso_soup(x0, y0):
     return bowl
 
 
-miso_bowl = miso_soup(0.19, -1.84)
+miso_bowl = miso_soup(-0.33, -1.85)
+
+
+# ---------------------------------------------------------------------------------------------------------
+# sake (日本酒): a white porcelain tokkuri with an indigo band and a cup (お猪口) beside it, on a little lacquered
+# tray. The sake in the cup is its own object (SakeLiquid, a child of the set) so the web app can let it go down.
+M["porcelain"] = pbr("SakePorcelain", (0.93, 0.91, 0.86), rough=0.25, coat=0.6)
+M["indigo"] = pbr("SakeIndigo", (0.12, 0.22, 0.45), rough=0.25, coat=0.6)
+M["sake"] = pbr("Sake", (0.86, 0.82, 0.62), rough=0.05, coat=1.0)
+
+
+def revolve(prof, x0, y0, name, mat_of, seg=40):
+    """A lathe of (radius, height) points round (x0, y0); mat_of(j) picks the material slot of band j."""
+    bm = bmesh.new()
+    rings = [[bm.verts.new((x0 + r * math.cos(2 * math.pi * k / seg), y0 + r * math.sin(2 * math.pi * k / seg), z))
+              for r, z in prof] for k in range(seg)]
+    for k in range(seg):
+        kn = (k + 1) % seg
+        for j in range(len(prof) - 1):
+            fc = bm.faces.new((rings[k][j], rings[kn][j], rings[kn][j + 1], rings[k][j + 1]))
+            fc.material_index = mat_of(j)
+    bm.faces.new([rings[k][0] for k in range(seg)][::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    for p in o.data.polygons:
+        p.use_smooth = True
+    return o
+
+
+def sake_set(x0, y0):
+    # the tray: a low lacquered board
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x0, y0, 0.012))
+    tray = active()
+    tray.scale = (0.34, 0.24, 0.024)
+    apply_scale(tray)
+    bev = tray.modifiers.new("Bevel", "BEVEL")
+    bev.width = 0.006
+    bev.segments = 2
+    bpy.ops.object.select_all(action="DESELECT")
+    tray.select_set(True)
+    bpy.context.view_layer.objects.active = tray
+    bpy.ops.object.modifier_apply(modifier="Bevel")
+    finish(tray, "SakeTray", M["lacquer"], smooth_shade=False)
+    base = 0.024
+    # the tokkuri: a round belly narrowing to a slim neck with a flared lip; the band round its belly in indigo
+    tx, ty = x0 - 0.075, y0 + 0.02
+    prof = [(0.04, 0.0), (0.05, 0.004), (0.062, 0.03), (0.068, 0.06), (0.066, 0.09), (0.056, 0.12), (0.036, 0.15),
+            (0.022, 0.175), (0.02, 0.2), (0.028, 0.212), (0.024, 0.216), (0.016, 0.205), (0.001, 0.2)]
+    prof = [(r, z + base) for r, z in prof]
+    tok = revolve(prof, tx, ty, "Tokkuri", lambda j: 1 if j in (2, 3) else 0)
+    for m_ in (M["porcelain"], M["indigo"]):
+        tok.data.materials.append(m_)
+    # the cup: small and shallow, on a foot ring, white inside
+    cx, cy = x0 + 0.08, y0 - 0.03
+    cup_prof = [(0.022, 0.0), (0.026, 0.002), (0.026, 0.008), (0.034, 0.014), (0.044, 0.03), (0.048, 0.042),
+                (0.044, 0.042), (0.04, 0.03), (0.028, 0.018), (0.001, 0.014)]
+    cup_prof = [(r, z + base) for r, z in cup_prof]
+    cup = revolve(cup_prof, cx, cy, "Choko", lambda j: 0)
+    cup.data.materials.append(M["porcelain"])
+    sake = join([tray, tok, cup], "Sake")
+    centre_origin(sake, at=(x0, y0, 0.0))
+    # the sake in the cup, just under its rim
+    level = base + 0.036
+    bpy.ops.mesh.primitive_circle_add(vertices=32, radius=0.04, fill_type="NGON", location=(cx, cy, level))
+    liquid = finish(active(), "SakeLiquid", M["sake"], smooth_shade=False)
+    liquid.parent = sake
+    liquid.matrix_parent_inverse = sake.matrix_world.inverted()
+    return sake
+
+
+sake_obj = sake_set(0.35, -1.42)
 
 # =====================================================================
 # Group, preview scene, outputs
@@ -2381,7 +2455,7 @@ root = bpy.data.objects.new("GrilledFish", None)
 bpy.context.collection.objects.link(root)
 parts = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 for o in parts:
-    if o.name != "MisoLiquid":                 # (the soup stays inside its bowl)
+    if o.name not in ("MisoLiquid", "SakeLiquid"):     # (the soup stays inside its bowl, the sake in its cup)
         o.parent = root
 
 bpy.ops.mesh.primitive_plane_add(size=12, location=(0, 0, 0))

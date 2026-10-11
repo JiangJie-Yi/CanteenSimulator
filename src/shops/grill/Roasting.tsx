@@ -11,7 +11,7 @@ import { Steam } from '@/scene/Steam'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { PAIRING, PAIRING_DEFAULT } from '@/game/taste'
 import type { GuestView } from '@/game/types'
-import { DECOR, Decor } from './Decor'
+import { DECOR, Decor, type Held } from './Decor'
 
 export { BAR_AT, BAR_TOP }
 
@@ -30,6 +30,12 @@ const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
 /** how many sips a bowl of soup takes, and how good it is (miso soup doesn't take seasoning) */
 const SIPS = 3
 const SOUP_TASTE = 78
+// the fan (団扇): waved over the fire, how much hotter it gets per unit the fan travels, and at most; once the
+// fanning stops that extra dies back (per second), taking a little more charcoal with it than it gave
+const FAN_GAIN = 0.08
+const FAN_MAX = 0.25
+const FAN_FADE = 0.02
+const FAN_COST = 1.4
 type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state']; seat: number
   /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
   leftAt?: number; cleared?: boolean }
@@ -1523,7 +1529,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // the soup bowls on the table are in the way too
     root.traverse((o) => {
       const id = o.userData.itemId as string | undefined
-      if (id && roast.drinks?.includes(id) && o.visible && o.scale.x > 0.01) others.push({ p: o.position.clone(), r: 0.19 })
+      if (id && roast.drinks?.includes(id) && o.visible && o.scale.x > 0.01) others.push({ p: o.position.clone(), r: id === 'Sake' ? 0.22 : 0.19 })
     })
     for (let i = 0; i < 8; i++) {
       const d = Math.hypot(at.x, at.z) || 1e-6
@@ -1770,6 +1776,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const shift = useRef<{ key: string; start: THREE.Vector3; from: THREE.Vector3 } | null>(null)
   /** soup bowls: sips left, and how full it looks (eased toward what's left) */
   const sips = useRef(new Map<string, { left: number; level: number }>())
+  /** a stick of charcoal or the fan in hand (see Decor), and the heat the fanning has added */
+  const held = useRef<Held>(null)
+  const fanned = useRef({ extra: 0, last: 0 })
+  const [decorTip, setDecorTip] = useState<'charcoal' | 'fan' | null>(null)
   // how many things have gone in the bin (it starts empty), and the fire glowing as raw food is carried over it
   const trashedRef = useRef(0)
   const flashUntil = useRef(new Map<string, number>())
@@ -2307,7 +2317,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
     let down: { x: number; y: number } | null = null
     const onMove = (e: PointerEvent) => {
-      if (drag.current) return
+      if (drag.current || held.current) return
       if (e.buttons) return
       aim(e)
       const tool = pickTool()
@@ -2325,7 +2335,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const soup = tool || p ? null : pickDrink()
       if (!soup && !p && !hovered.current) setTasteTip(null)
       if (soup && !p) setTasteTip({ at: soup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.32, 0)).toArray() as [number, number, number], taste: SOUP_TASTE })
-      el.style.cursor = tool ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : pickCoal() ? 'pointer' : ''
+      const dec = tool || p || soup ? null : pickDecor()
+      setDecorTip(dec)
+      el.style.cursor = tool || dec ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : pickCoal() ? 'pointer' : ''
     }
     const onDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY }
@@ -2343,6 +2355,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           scrap.current = { p: food, x: e.clientX, y: e.clientY, started: false }
           window.addEventListener('pointermove', haul)
           window.addEventListener('pointerup', dropScrap, { once: true })
+          return
+        }
+        // a stick of binchotan from the crate, or the fan
+        const dec = pickDecor()
+        if (dec) {
+          held.current = { kind: dec, at: new THREE.Vector3(), wave: -1 }
+          setDecorTip(null)
+          if (controls) controls.enabled = false
+          document.body.classList.add('is-carrying')
+          el.style.cursor = 'grabbing'
+          holdDecor(e)
+          window.addEventListener('pointermove', holdDecor)
+          window.addEventListener('pointerup', dropDecor, { once: true })
           return
         }
         // otherwise grab a plate, side dish, the basket, the seasoning box or the bin (not the food on them)
@@ -2405,6 +2430,54 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (controls) controls.enabled = true
       el.style.cursor = ''
       setHover(null)
+    }
+    /** the crate of charcoal or the fan under the pointer */
+    const pickDecor = () => {
+      const groups: THREE.Object3D[] = []
+      world.traverse((o) => { if (typeof o.userData.decor === 'string') groups.push(o) })
+      const hit = raycaster.intersectObjects(groups, true)[0]
+      for (let o: THREE.Object3D | null = hit?.object ?? null; o; o = o.parent) {
+        if (typeof o.userData.decor === 'string') return o.userData.decor as 'charcoal' | 'fan'
+      }
+      return null
+    }
+    // carried a little above the fire; the fan, waved over a lit fire, fans the coals up
+    const holdDecor = (e: PointerEvent) => {
+      const h = held.current
+      if (!h) return
+      aim(e)
+      const y = root.localToWorld(new THREE.Vector3(0, h.kind === 'fan' ? 0.62 : 0.5, 0)).y
+      holdPlane.set(UP, -y)
+      const hit = raycaster.ray.intersectPlane(holdPlane, new THREE.Vector3())
+      if (!hit) return
+      const at = root.worldToLocal(hit)
+      if (h.wave < 0) {
+        h.at.copy(at)
+        h.wave = 0
+        return
+      }
+      const moved = at.distanceTo(h.at)
+      h.at.copy(at)
+      if (h.kind !== 'fan') return
+      h.wave += moved
+      if (fire && fire.current > 0.02 && Math.hypot(at.x, at.z) < RING_CLEAR + 0.1) {
+        const gain = Math.min(moved * FAN_GAIN, FAN_MAX - fanned.current.extra, 1 - fire.current)
+        if (gain > 0) {
+          fire.current += gain
+          fanned.current.extra += gain
+        }
+        fanned.current.last = performance.now()
+      }
+    }
+    const dropDecor = () => {
+      const h = held.current
+      window.removeEventListener('pointermove', holdDecor)
+      document.body.classList.remove('is-carrying')
+      // the charcoal let go over the fire goes on it
+      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) onAddCharcoal?.()
+      held.current = null
+      if (controls) controls.enabled = true
+      el.style.cursor = ''
     }
     /** the plate / dish / basket under the pointer, by the container key its group carries */
     /** the charcoal (and the logs) in the fire, under the pointer, with nothing nearer in the way */
@@ -2715,12 +2788,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     if (scannedCount.current !== root.children.length) scan()
     const dt = Math.min(delta, 0.1)
+    // fanned-up heat dies back once the fanning stops, and it burnt the coals faster
+    const fan = fanned.current
+    if (fan.extra > 0 && fire && performance.now() - fan.last > 600) {
+      const back = Math.min(fan.extra, dt * FAN_FADE)
+      fan.extra -= back
+      fire.current = Math.max(0, fire.current - back * FAN_COST)
+    }
     // soup going down as it's drunk: the surface sinks into the bowl and narrows with it; a bowl taken off the
     // order comes back full next time
     root.traverse((o) => {
       const id = o.userData.itemId as string | undefined
       if (!id || !roast.drinks?.includes(id)) return
-      const liquid = o.children.find((c) => c.name.startsWith('MisoLiquid'))
+      const liquid = o.children.find((c) => /^(Miso|Sake)Liquid/.test(c.name))
       if (!liquid) return
       if (!liquid.userData.full) liquid.userData.full = { y: liquid.position.y }
       if (!o.visible || o.scale.x < 0.01) {
@@ -2736,8 +2816,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       s.level += (s.left / SIPS - s.level) * Math.min(1, dt * 4)
       const gone = 1 - s.level
-      liquid.position.y = liquid.userData.full.y - gone * 0.07
-      liquid.scale.set(1 - gone * 0.42, 1, 1 - gone * 0.42)
+      // (the sake cup is much shallower than the soup bowl)
+      const cup = liquid.name.startsWith('Sake')
+      liquid.position.y = liquid.userData.full.y - gone * (cup ? 0.022 : 0.07)
+      liquid.scale.set(1 - gone * (cup ? 0.5 : 0.42), 1, 1 - gone * (cup ? 0.5 : 0.42))
       liquid.visible = s.level > 0.03
     })
     // seasonings: the one being carried follows the pointer, tipped to pour over the food beneath it (a little
@@ -3114,7 +3196,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
         <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
       ))}
-      <Decor />
+      <Decor held={held} />
+      {active && decorTip && (
+        <Html position={decorTip === 'fan' ? [DECOR.fan.at[0], 0.62, DECOR.fan.at[1]] : [DECOR.crate.at[0], 0.5, DECOR.crate.at[1]]}
+          center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
+          <span className="tool-tag">{decorTip === 'fan' ? '團扇' : '備長炭'}<small>{decorTip === 'fan' ? '拿到火上來回搧' : '拖到火上添炭'}</small></span>
+        </Html>
+      )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       {space === 'open' && bar && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}

@@ -1,7 +1,9 @@
-// Things that just stand about the grill to make it look lived in: a crate of binchotan at the back, a paper fan
-// lying by the fire, a sake set on its own little tray, and a paper floor lantern (行燈) glowing behind the stones. They can't be picked up, but what's dragged across the
-// table is pushed clear of them like anything else (DECOR is their footprint, for Roasting's settle()).
-import { useMemo, type ReactNode } from 'react'
+// What stands about the grill besides the dishes: a crate of binchotan (a stick dragged from it onto the fire adds
+// charcoal), a paper fan leaning on it (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
+// glowing behind the stones. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
+// them like anything else (DECOR is their footprint, for its settle()).
+import { useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
 
@@ -9,10 +11,14 @@ type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
 export const DECOR = {
   crate: { at: [0.62, -2.0], r: 0.38 },
-  fan: { at: [-0.41, 1.48], r: 0.22 },
-  sake: { at: [-0.07, -2.06], r: 0.27 },
+  // (leaning on the crate's end)
+  fan: { at: [0.0, -1.86], r: 0.16 },
   lantern: { at: [-1.61, -0.68], r: 0.2 },
 } satisfies Record<string, Spot>
+
+/** what's being carried from here: a stick of charcoal or the fan, where it is (Roasting sets it), and how far the
+ * fan has been waved (it swings with it) */
+export type Held = { kind: 'charcoal' | 'fan'; at: THREE.Vector3; wave: number } | null
 
 const INK = '#3b2a20'
 
@@ -101,9 +107,6 @@ const FAN_PAPER = canvas(256, 256, (g) => {
   }
 })
 
-/** a lathe from (radius, height) pairs */
-const lathe = (pts: [number, number][], seg = 32) => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), seg)
-
 /** A wooden crate of white binchotan, its label on the front, a few sticks leaning out. */
 function Crate() {
   const W = 0.62, D = 0.36, H = 0.2, T = 0.02
@@ -133,7 +136,7 @@ function Crate() {
   }, [])
   const wood = CRATE_WOOD
   return (
-    <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35}>
+    <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35} userData={{ decor: 'charcoal' }}>
       <Inked geometry={geo.side} map={wood} position={[0, H / 2, D / 2 - T / 2]}>
         {/* the label faces out of the front */}
         <mesh geometry={geo.label} position={[0.17, 0, T / 2 + 0.002]}>
@@ -153,8 +156,24 @@ function Crate() {
   )
 }
 
-/** A round paper fan (団扇) lying by the fire, for fanning the coals. */
-function Fan() {
+/** A round paper fan (団扇) leaning on the crate; picked up, it's held upright and swings as it's waved. */
+function Fan({ held }: { held: RefObject<Held> }) {
+  const g = useRef<THREE.Group>(null)
+  const swing = useRef(0)
+  useFrame((_, dt) => {
+    const o = g.current
+    if (!o) return
+    const h = held.current
+    if (h?.kind === 'fan') {
+      o.position.copy(h.at)
+      swing.current += (Math.sin(h.wave * 6) * 0.55 - swing.current) * Math.min(1, dt * 14)
+      // face to the camera's side, handle down, rocking side to side as it fans
+      o.rotation.set(1.45, -0.6, swing.current)
+    } else {
+      o.position.set(DECOR.fan.at[0], 0.2, DECOR.fan.at[1])
+      o.rotation.set(1.2, 0.25, 0)
+    }
+  })
   const geo = useMemo(() => {
     const face = new THREE.CircleGeometry(0.15, 40)
     face.rotateX(-Math.PI / 2)
@@ -166,36 +185,12 @@ function Fan() {
     }
   }, [])
   return (
-    <group position={[DECOR.fan.at[0], 0.008, DECOR.fan.at[1]]} rotation-y={2.1}>
+    <group ref={g} userData={{ decor: 'fan' }}>
       <Inked geometry={geo.face} map={FAN_PAPER} grow={1.05} position={[0, 0.004, 0]} />
       <mesh geometry={geo.rim} position={[0, 0.006, 0]}>
         <meshToonMaterial color="#9a7444" />
       </mesh>
       <Inked geometry={geo.handle} color="#b08a55" grow={1.12} position={[0, 0.012, 0.21]} />
-    </group>
-  )
-}
-
-/** A sake set on a little lacquered tray: a tokkuri and two cups. */
-function Sake() {
-  const geo = useMemo(() => ({
-    tray: new THREE.BoxGeometry(0.42, 0.025, 0.3),
-    tokkuri: lathe([[0, 0], [0.05, 0], [0.065, 0.03], [0.072, 0.08], [0.06, 0.13], [0.03, 0.17], [0.022, 0.2], [0.03, 0.215],
-      [0.022, 0.215]]),
-    choko: lathe([[0, 0], [0.025, 0], [0.026, 0.008], [0.04, 0.02], [0.046, 0.042], [0.04, 0.042], [0.03, 0.02], [0, 0.016]]),
-    band: new THREE.CylinderGeometry(0.0725, 0.0725, 0.018, 32, 1, true),
-  }), [])
-  return (
-    <group position={[DECOR.sake.at[0], 0, DECOR.sake.at[1]]} rotation-y={-0.5}>
-      <Inked geometry={geo.tray} color="#5a1e1a" position={[0, 0.0125, 0]} />
-      <Inked geometry={geo.tokkuri} color="#ece6da" position={[-0.09, 0.025, 0]}>
-        {/* an indigo band round its belly */}
-        <mesh geometry={geo.band} position={[0, 0.075, 0]}>
-          <meshToonMaterial color="#2c4f86" side={THREE.DoubleSide} />
-        </mesh>
-      </Inked>
-      <Inked geometry={geo.choko} color="#ece6da" position={[0.07, 0.025, -0.06]} />
-      <Inked geometry={geo.choko} color="#ece6da" position={[0.11, 0.025, 0.07]} />
     </group>
   )
 }
@@ -255,12 +250,30 @@ function Lantern() {
   )
 }
 
-export function Decor() {
+/** the stick of binchotan being carried from the crate to the fire */
+function HeldStick({ held }: { held: RefObject<Held> }) {
+  const g = useRef<THREE.Group>(null)
+  const geo = useMemo(() => new THREE.CylinderGeometry(0.024, 0.026, 0.5, 7), [])
+  useFrame(() => {
+    const o = g.current
+    if (!o) return
+    const h = held.current
+    o.visible = h?.kind === 'charcoal'
+    if (o.visible) o.position.copy(h!.at)
+  })
+  return (
+    <group ref={g} visible={false} rotation={[0.3, 0.4, Math.PI / 2]}>
+      <Inked geometry={geo} color="#8d8a86" grow={1.08} />
+    </group>
+  )
+}
+
+export function Decor({ held }: { held: RefObject<Held> }) {
   return (
     <>
       <Crate />
-      <Fan />
-      <Sake />
+      <Fan held={held} />
+      <HeldStick held={held} />
       <Lantern />
     </>
   )

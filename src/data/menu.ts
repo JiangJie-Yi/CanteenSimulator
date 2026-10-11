@@ -324,6 +324,8 @@ export const DISHES: Dish[] = [
       { id: 'NetMochi', name: '年糕', ja: '餅', en: 'Grilled Mochi', price: 30, kcal: 120 },
       // in a lacquered bowl on the table in front, beside the plates; comes with every set too
       { id: 'MisoSoup', name: '味噌湯', ja: '味噌汁', en: 'Miso Soup', price: 30, kcal: 40, max: 2 },
+      // a tokkuri of warm sake with its cup, on a little tray in the row beside the soup
+      { id: 'Sake', name: '清酒', ja: '日本酒', en: 'Sake', price: 120, kcal: 110, max: 1 },
     ],
     heat: 'fire',
     roast: {
@@ -341,7 +343,7 @@ export const DISHES: Dish[] = [
       // toasted on the grill net, which holds three at a time between them (the rest wait their turn)
       net: ['NetMochi', 'Onigiri'],
       faceCamera: ['ShrimpSkewer'],
-      drinks: ['MisoSoup'],
+      drinks: ['MisoSoup', 'Sake'],
       // the net's three spots (x, z); the model's mochi sits on the first, its onigiri on the second
       netSpots: [[-0.11, 0.0], [0.1, 0.07], [0.06, -0.11]],
       // just outside the stones, to the upper right of the fire as the camera sees it
@@ -349,12 +351,12 @@ export const DISHES: Dish[] = [
       // plates and dishes on the right of the fire as the camera sees it, the box and the bucket on the left
       // everything you eat from in a row along the front (toward the camera): the side dish, the miso soup, the
       // plate and the basket, left to right; the tray of raw skewers on the right; box, bucket and bin on the left
-      plate: [1.12, 0.02, 1.54],
+      plate: [1.19, 0.02, 1.55],
       // just outside the stones on the left as the camera sees it
-      basket: { at: [1.88, 0, 0.62], capacity: 20 },
+      basket: { at: [2.16, 0, 0.84], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
       // (in the front row, left of the miso soup bowls)
-      dish: { at: [-0.75, 0.0, 1.95], capacity: 3 },
+      dish: { at: [-0.74, 0.0, 2.21], capacity: 3 },
       // the spoons and brush in the seasoning box are what's carried; grabbing a pot picks up its utensil
       // (salt is taken by hand: SaltPinch only marks where the pinch is taken from)
       tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut', WaterDipper: 'water' },
@@ -381,7 +383,7 @@ export const DISHES: Dish[] = [
       // skewers on the fire ring)
       slots: { NetMochi: [[0.1, 0.07], [0.06, -0.11]], Onigiri: [[0.06, -0.11], [-0.11, 0.0]],
         // a second bowl of soup beside the first
-        MisoSoup: [[-0.1, 2.25]] },
+        MisoSoup: [[0.0, 1.61]] },
       // potatoes and sweet potatoes sit in the ash at the front: extra ones line up beside the first,
       // potatoes toward the right, sweet potatoes toward the left
       spread: { Potato: 0.3, SweetPotato: -0.3 },
