@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { CHEF_TALK } from '@/data/chefTalk'
 import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
-import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, suggestPrice, type Entry, type Part,
-  type Seasoning } from '@/data/recipes'
-import { PAIRING, PAIRING_DEFAULT, starText } from '@/game/taste'
-import type { Notes, Try } from '@/game/types'
+import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, suggestPrice,
+  type Entry, type Part } from '@/data/recipes'
+import { starText } from '@/game/taste'
+import type { Notes, Talk, Try } from '@/game/types'
 
 
 
@@ -33,10 +34,9 @@ type Props = {
   partCost: (p: Part) => number
   /** the hired chef who can be asked (null: nobody to ask yet) */
   chef: string | null
-  /** how good that chef is (0..1): a better one gives better advice */
-  chefSkill: number
-  /** ask the second chef to try out a few dishes not yet tried (using up their food) */
-  onTrial?: () => void
+  /** what's been said with him, and saying something to him (he answers, and cooks what he's asked) */
+  talk: Talk[]
+  onTalk: (text: string) => void
 }
 
 const t = (lang: Lang, zh: string, ja: string) => (lang === 'ja' ? ja : zh)
@@ -46,11 +46,23 @@ const t = (lang: Lang, zh: string, ja: string) => (lang === 'ja' ? ja : zh)
  * its own (鹽烤玉米, 醬刷玉米…) — each with its best try; any of them can be put on the menu at a price. The menu
  * tab lists what's on it (re-price, take off, make up sets), and a hired chef can be asked what's worth trying.
  */
-export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, onReprice, partCost, chef, chefSkill, onTrial }: Props) {
+export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, onReprice, partCost, chef, talk, onTalk }: Props) {
   const [prices, setPrices] = useState<Record<string, string>>({})
   const [picked, setPicked] = useState<string[]>([])
   const [setName, setSetName] = useState('')
-  const [advice, setAdvice] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
+  const T = CHEF_TALK[lang]
+  const [hello] = useState(() => T.hello())
+  const log = useRef<HTMLOListElement>(null)
+  // (the latest line in view)
+  useEffect(() => {
+    log.current?.scrollTo({ top: log.current.scrollHeight, behavior: 'smooth' })
+  }, [talk.length])
+  const send = (text: string) => {
+    if (!text.trim()) return
+    onTalk(text)
+    setDraft('')
+  }
   const roast = dish.roast
   // (at the grill and the bakery what goes on a food makes it a dish of its own)
   const kind = roast ? 'grill' : dish.bake ? 'bake' : 'plain'
@@ -92,52 +104,6 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
     return bits.join('・')
   }
 
-  /** the hired chef's advice: a food not yet tried the way that suits it best (a less able one is less sure) */
-  const ask = () => {
-    if (!chef) return
-    if (roast) {
-      const foods = dish.items.filter((x) => x.id in roast.times)
-      const ranked = (id: string) => (['salt', 'soy', 'milk', 'peanut'] as const)
-        .map((k) => ({ k: k as Seasoning, w: PAIRING[k][id] ?? PAIRING_DEFAULT[k] })).sort((a, b) => b.w - a.w)
-      const ideas = foods.map((f) => {
-        const r = ranked(f.id)
-        // (a less able chef sometimes names the second best)
-        const pick = Math.random() < chefSkill ? r[0] : r[1]
-        return { f, k: pick.w > 5 ? pick.k : null, tried: !!notes[f.id]?.tries.some((tr) => {
-          const s = signature(tr.dabs)
-          return pick.w > 5 ? s.length === 1 && s[0] === pick.k : !s.length
-        }) }
-      }).filter((x) => !x.tried)
-      const idea = ideas[Math.floor(Math.random() * ideas.length)]
-      if (!idea) {
-        setAdvice(t(lang, `${chef}：「該試的都試過了，老闆你比我還懂。」`, `${chef}：「もう全部試しましたね。」`))
-        return
-      }
-      const name = short(idea.f.id)
-      setAdvice(idea.k
-        ? t(lang, `${chef}：「${name}的話，刷點${SEASON_NAME.zh[idea.k]}最對味，烤到剛好熟就起火，可以做成${partName(idea.f, name, idea.f.id, [idea.k], 'zh')}。」`,
-          `${chef}：「${idea.f.ja ?? name}なら${SEASON_NAME.ja[idea.k]}が一番合います。」`)
-        : t(lang, `${chef}：「${name}原味烤就好，什麼都別加。」`, `${chef}：「${idea.f.ja ?? name}は何もつけずに焼くのが一番。」`))
-    } else if (dish.bake) {
-      // the baker: a dough with the filling that suits it best, not yet tried
-      const bake = dish.bake
-      const ideas = dish.items.map((f) => {
-        const r = Object.entries(bake.pairing[f.id] ?? {}).sort((a, b) => b[1] - a[1])
-        const pick = (Math.random() < chefSkill ? r[0] : r[1]) ?? r[0]
-        return { f, k: pick?.[0] as Seasoning | undefined }
-      }).filter((x) => x.k && !notes[x.f.id]?.tries.some((tr) => signature(tr.dabs).join() === x.k))
-      const idea = ideas[Math.floor(Math.random() * ideas.length)]
-      setAdvice(idea?.k
-        ? t(lang, `${chef}：「${idea.f.name}配${SEASON_NAME.zh[idea.k]}最對味，烤到表皮金黃就出爐，就是${partName(idea.f, idea.f.name, idea.f.id, [idea.k], 'zh', 'bake')}。」`,
-          `${chef}：「${idea.f.ja ?? idea.f.name}には${SEASON_NAME.ja[idea.k]}が合います。」`)
-        : t(lang, `${chef}：「招牌麵包都試過了，可以組個套餐。」`, `${chef}：「定番は全部試しましたね。」`))
-    } else {
-      const untried = [...dish.bases.filter((b) => !b.includes), ...dish.items].filter((x) => !notes[x.id])
-      const idea = untried[Math.floor(Math.random() * untried.length)]
-      setAdvice(idea ? t(lang, `${chef}：「試試${idea.name}吧，客人很常點。」`, `${chef}：「${idea.ja ?? idea.name}を試してみては。」`)
-        : t(lang, `${chef}：「菜單上能做的都試過了。」`, `${chef}：「全部試しましたね。」`))
-    }
-  }
 
   const singles = entries.filter((e) => e.parts.length === 1)
   const setParts = picked.map((k) => entries.find((e) => e.key === k)).filter((e): e is Entry => !!e)
@@ -248,12 +214,23 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
             <div className="nb-chef">
               {chef ? (
                 <>
-                  <p>{t(lang, `可以問二廚 ${chef} 做菜的意見。`, `二番手の${chef}に相談できます。`)}</p>
+                  <ol className="nb-chat" ref={log} aria-live="polite">
+                    <li className="from-chef"><b>{chef}</b>{hello}</li>
+                    {talk.map((m) => (
+                      <li key={m.id} className={`from-${m.from}`}>{m.from === 'chef' && <b>{chef}</b>}{m.text}</li>
+                    ))}
+                  </ol>
+                  <form className="nb-chat-form" onSubmit={(e) => {
+                    e.preventDefault()
+                    send(draft)
+                  }}>
+                    <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={T.placeholder} aria-label={T.placeholder} />
+                    <button type="submit" disabled={!draft.trim()}>{T.send}</button>
+                  </form>
+                  {/* (things often said, one tap away; the cooking uses up the food) */}
                   <div className="nb-chef-acts">
-                    <button type="button" onClick={ask}>{t(lang, '問一下', '聞いてみる')}</button>
-                    <button type="button" onClick={onTrial}>{t(lang, '請他試做 3 道（用掉食材）', '3品試作してもらう')}</button>
+                    {T.chips.map((c) => <button key={c} type="button" onClick={() => send(c)}>{c}</button>)}
                   </div>
-                  {advice && <blockquote>{advice}</blockquote>}
                 </>
               ) : (
                 <p className="notebook-empty">{t(lang, '還沒有二廚。到「經營 › 人事」雇用廚師後，就能問他做菜的意見。',

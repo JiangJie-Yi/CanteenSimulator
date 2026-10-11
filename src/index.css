@@ -4763,3 +4763,77 @@ button {
   border-bottom: 1.5px solid rgb(59 42 32 / 0.3);
   font-size: 14px;
 }
+
+/* 問二廚: a chat with the second chef — his lines on the left with his name, the owner's on the right */
+.nb-chat {
+  max-height: 260px;
+  margin: 0 0 8px;
+  padding: 6px 2px;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nb-chat li {
+  max-width: 82%;
+  padding: 6px 10px;
+  border-radius: 12px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.nb-chat .from-chef {
+  align-self: flex-start;
+  background: #fff7ea;
+  border: 1px solid rgb(196 68 47 / 0.25);
+  border-bottom-left-radius: 3px;
+}
+
+.nb-chat .from-chef b {
+  display: block;
+  font-size: 11px;
+  color: #c4442f;
+}
+
+.nb-chat .from-me {
+  align-self: flex-end;
+  background: #c4442f;
+  color: #fff;
+  border-bottom-right-radius: 3px;
+}
+
+.nb-chat-form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.nb-chat-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1.5px solid rgb(59 42 32 / 0.3);
+  border-radius: 8px;
+  background: #fff;
+  color: #3b2a20;
+  font: inherit;
+  font-size: 14px;
+}
+
+.nb-chat-form input:focus {
+  outline: 2px solid #c4442f;
+  outline-offset: -1px;
+}
+
+.nb-chat-form button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.nb-chef .nb-chef-acts button {
+  background: transparent;
+  color: #c4442f;
+  font-weight: 600;
+}

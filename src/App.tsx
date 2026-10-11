@@ -14,9 +14,11 @@ import { GasFlame } from '@/shops/hotpot/GasFlame'
 import { FireControl } from '@/shops/grill/FireControl'
 import { Fullness } from '@/ui/Fullness'
 import { bestOf, Notebook } from '@/ui/Notebook'
-import { findItem, MENU_MAX, MENU_MIN, partName, signature, type Entry, type Part, type Seasoning } from '@/data/recipes'
+import { findItem, MENU_MAX, MENU_MIN, SEASON_NAME, signature, type Entry, type Part, type Seasoning } from '@/data/recipes'
 import { moodOf } from '@/game/taste'
 import { trialIdeas } from '@/game/research'
+import { bestDabs, dishName, expectedTaste, understand } from '@/game/chefChat'
+import { CHEF_TALK } from '@/data/chefTalk'
 import { buyAllCost, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
   portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
@@ -30,7 +32,7 @@ import { TaiwanTable } from '@/shops/noodle/TaiwanTable'
 import { Bakery } from '@/shops/bakery/Bakery'
 import { OpeningSpot } from '@/scene/OpeningSpot'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
-import type { GuestView, Notes } from '@/game/types'
+import type { GuestView, Notes, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
@@ -708,55 +710,120 @@ export default function App() {
   // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
   const bills = useRef<Record<string, Record<number, { paid: number; parts: number }>>>({})
   /**
-   * The second chef tries out a few dishes not yet tried, the way he'd make them (a better one picks what suits a
-   * food better and makes it better): each uses up its food from stock, costs its ingredients, and goes in the
-   * notebook as a try, like the owner's own.
+   * The second chef cooks these, in turn, as many as there's food for (up to max): each uses up its food from stock,
+   * costs its ingredients, and goes in the notebook as a try, like the owner's own. How it comes out is what it
+   * ought to (plan.taste), better or worse by how good he is. Returns what he made.
    */
-  const chefTrial = (d: DishInfo) => {
-    const c = staffOf(d.id, 'chef')[0]
-    if (!c) return
-    const who = lang === 'ja' ? c.ja : c.zh
-    const skill = effective(c, hired[d.id]?.[c.id]?.fatigue ?? 0)
+  const chefCook = (d: DishInfo, plans: { id: string; dabs: Seasoning[]; taste: number }[], max: number, skill: number) => {
     const left = { ...stock }
-    const takes = (id: string) => takesOf(d, id)
-    const can = (id: string) => Object.entries(takes(id)).every(([k, q]) => (left[k] ?? 0) >= q)
-    const tried = (id: string, dabs: Seasoning[]) => !!notes[id]?.tries.some((tr) => signature(tr.dabs).join('+') === dabs.join('+'))
-    // what could be tried, with how good it ought to come out
-    const ideas = trialIdeas(d)
-    // the best ideas first (a less able chef is less sure which those are)
-    const ranked = ideas.filter((x) => !tried(x.id, x.dabs))
-      .map((x) => ({ ...x, guess: x.taste + (Math.random() - 0.5) * (1 - skill) * 40 }))
-      .sort((a, b) => b.guess - a.guess)
-    const done: string[] = []
+    const can = (id: string) => Object.entries(takesOf(d, id)).every(([k, q]) => (left[k] ?? 0) >= q)
     let spent = 0
-    const tries: { id: string; taste: number; dabs: Seasoning[] }[] = []
-    for (const x of ranked) {
-      if (tries.length >= 3) break
+    const made: { id: string; dabs: Seasoning[]; taste: number; name: string }[] = []
+    for (const x of plans) {
+      if (made.length >= max) break
       if (!can(x.id)) continue
-      for (const [k, q] of Object.entries(takes(x.id))) left[k] = (left[k] ?? 0) - q
-      const part: Part = { id: x.id, dabs: x.dabs, name: '', ja: '' }
-      spent += partCost(d, part)
+      for (const [k, q] of Object.entries(takesOf(d, x.id))) left[k] = (left[k] ?? 0) - q
+      spent += partCost(d, { id: x.id, dabs: x.dabs, name: '', ja: '' })
       const taste = Math.round(Math.max(5, Math.min(98, x.taste + (skill - 0.7) * 15 + (Math.random() - 0.5) * (1 - skill) * 30)))
-      tries.push({ id: x.id, taste, dabs: x.dabs })
-      const item = findItem(d, x.id)!
-      done.push(partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, lang, d.roast ? 'grill' : d.bake ? 'bake' : 'plain'))
+      made.push({ id: x.id, dabs: x.dabs, taste, name: dishName(d, x.id, x.dabs, lang) })
     }
-    if (!tries.length) {
-      say(LINES[lang].trialNone(who))
-      return
-    }
+    if (!made.length) return made
     setStock(left)
     book('food', spent)
     setNotes((all) => {
       const next = { ...all }
-      for (const tr of tries) {
+      for (const tr of made) {
         const item = findItem(d, tr.id)!
         next[tr.id] = { name: nameIn(lang, item), tries: [...(next[tr.id]?.tries ?? []), { taste: tr.taste, doneness: 1.1,
           dabs: Object.fromEntries(tr.dabs.map((k) => [k, 1])), at: Date.now() }] }
       }
       return next
     })
-    say(LINES[lang].trial(who, done))
+    return made
+  }
+  /** the dishes not yet tried, the best first (a less able chef is less sure which those are) */
+  const untriedIdeas = (d: DishInfo, skill: number) => {
+    const tried = (id: string, dabs: Seasoning[]) => !!notes[id]?.tries.some((tr) => signature(tr.dabs).join('+') === dabs.join('+'))
+    return trialIdeas(d).filter((x) => !tried(x.id, x.dabs))
+      .map((x) => ({ ...x, guess: x.taste + (Math.random() - 0.5) * (1 - skill) * 40 }))
+      .sort((a, b) => b.guess - a.guess)
+  }
+  const chefNow = (d: DishInfo) => {
+    const c = staffOf(d.id, 'chef')[0]
+    return c ? { c, skill: effective(c, hired[d.id]?.[c.id]?.fatigue ?? 0) } : null
+  }
+  // talking with the second chef, at each shop: what was said both ways, and the dish he last offered to make
+  const [talkBy, setTalkBy] = useState<Record<string, Talk[]>>({})
+  const talkSeq = useRef(0)
+  const offered = useRef<Record<string, { id: string; dabs: Seasoning[] } | null>>({})
+  const addTalk = (shop: string, from: Talk['from'], text: string) =>
+    setTalkBy((b) => ({ ...b, [shop]: [...(b[shop] ?? []).slice(-40), { id: ++talkSeq.current, from, text }] }))
+  /**
+   * The owner says something to the second chef: he works out what's wanted (game/chefChat) and answers — cooks the
+   * dish asked for (choosing the seasoning himself if none was said), tries a few of his own choosing, says what
+   * suits a food (and offers to make it: a 「好」 next has him do it), or how the stock is.
+   */
+  const chefChat = (d: DishInfo, text: string) => {
+    const now = chefNow(d)
+    if (!now || !text.trim()) return
+    addTalk(d.id, 'me', text.trim())
+    const T = CHEF_TALK[lang]
+    const { skill } = now
+    let intent = understand(text, d)
+    const offer = offered.current[d.id]
+    offered.current[d.id] = null
+    if (intent.kind === 'yes') intent = offer ? { kind: 'make', ...offer } : { kind: 'makeWhat' }
+    const nameOf = (id: string, dabs: Seasoning[]) => dishName(d, id, dabs, lang)
+    const foodOf = (id: string) => (d.roast?.names[id] && lang !== 'ja' ? d.roast.names[id] : nameIn(lang, findItem(d, id)!))
+    // how he'd say what goes on (撒點鹽, 刷醬油…)
+    const how = (k: Seasoning) => lang === 'ja' ? SEASON_NAME.ja[k]
+      : d.bake ? `包${SEASON_NAME.zh[k]}` : ({ salt: '撒點鹽', soy: '刷醬油', milk: '淋煉乳', peanut: '撒花生粉' } as Record<string, string>)[k] ?? SEASON_NAME.zh[k]
+    let reply: string
+    switch (intent.kind) {
+      case 'make': {
+        const chose = intent.dabs === null
+        const best = bestDabs(d, intent.id)
+        // (left to him, a less able chef sometimes reaches for the second best)
+        const dabs = intent.dabs ?? (best.length ? [Math.random() < skill || best.length < 2 ? best[0] : best[1]] : [])
+        const exp = expectedTaste(d, intent.id, dabs)
+        const made = chefCook(d, [{ id: intent.id, dabs, taste: exp }], 1, skill)
+        const name = nameOf(intent.id, dabs)
+        reply = made.length ? (exp < 50 ? T.warn(name) : '') + T.made(name, made[0].taste, chose) : T.noStock(name)
+        break
+      }
+      case 'batch': {
+        const made = chefCook(d, untriedIdeas(d, skill), intent.n, skill)
+        reply = made.length ? T.batch(made.map((m) => m.name)) : T.batchNone()
+        break
+      }
+      case 'advise': {
+        if (intent.id) {
+          const best = bestDabs(d, intent.id)
+          const dabs = best.length ? [best[0]] : []
+          offered.current[d.id] = { id: intent.id, dabs }
+          reply = best.length ? T.advise(foodOf(intent.id), how(best[0]), nameOf(intent.id, dabs))
+            : d.roast ? T.advisePlain(foodOf(intent.id)) : T.adviseAny(nameOf(intent.id, []))
+        } else {
+          const idea = untriedIdeas(d, skill)[0]
+          if (idea) offered.current[d.id] = { id: idea.id, dabs: idea.dabs }
+          reply = idea ? T.adviseAny(nameOf(idea.id, idea.dabs)) : T.adviseNone()
+        }
+        break
+      }
+      case 'stock': {
+        const goods = goodsOf(d)
+        const low = goods.filter((g) => (stock[g.id] ?? 0) < 3).map((g) => `${foodOf(g.id)}${lang === 'ja' ? '残り' : '剩'} ${stock[g.id] ?? 0}`)
+        reply = goods.every((g) => !(stock[g.id] ?? 0)) ? T.stockEmpty() : T.stock(low.slice(0, 6))
+        break
+      }
+      case 'makeWhat': reply = T.makeWhat(); break
+      case 'no': reply = T.no(); break
+      case 'thanks': reply = T.thanks(); break
+      case 'hello': reply = T.hello(); break
+      default: reply = T.unknown()
+    }
+    // (a moment to answer, as a person would)
+    window.setTimeout(() => addTalk(d.id, 'chef', reply), 350 + Math.random() * 300)
   }
   /** buy in n of something (paid from the cash in hand) */
   const buyIn = (d: DishInfo, id: string, n: number) => {
@@ -1467,7 +1534,7 @@ export default function App() {
               <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)}
                 partCost={(p) => partCost(dish, p)}
                 chef={(() => { const c = staffOf(dish.id, 'chef')[0]; return c ? (lang === 'ja' ? c.ja : c.zh) : null })()}
-                chefSkill={(staffOf(dish.id, 'chef')[0]?.skill ?? 60) / 100} onTrial={() => chefTrial(dish)}
+                talk={talkBy[dish.id] ?? []} onTalk={(text) => chefChat(dish, text)}
                 onPublish={(e) => setMenuBy((m) => {
                   const cur = m[e.shop] ?? []
                   if (cur.length >= MENU_MAX || cur.some((x) => x.key === e.key)) return m

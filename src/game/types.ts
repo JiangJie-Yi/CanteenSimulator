@@ -10,3 +10,6 @@ export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'an
 /** how one try at a food went: how good, how far cooked, what went on it */
 export type Try = { taste: number; doneness?: number; dabs?: Record<string, number>; dip?: string[]; at: number }
 export type Notes = Record<string, { name: string; tries: Try[] }>
+
+/** one thing said in the talk with the second chef: by the owner or by him */
+export type Talk = { id: number; from: 'me' | 'chef'; text: string }

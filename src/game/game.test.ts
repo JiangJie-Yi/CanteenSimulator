@@ -6,6 +6,7 @@ import { ROLES } from '@/data/staff'
 import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, partCost, partsOf, portionsLeft, takeStock } from '@/game/economy'
 import { trialIdeas } from '@/game/research'
 import { makeCandidates, seeded } from '@/game/hiring'
+import { bestDabs, expectedTaste, understand } from '@/game/chefChat'
 import { breadTaste, moodOf, PAIRING, PAIRING_DEFAULT, starText } from '@/game/taste'
 
 const shop = (id: string) => DISHES.find((d) => d.id === id)!
@@ -160,5 +161,33 @@ describe('hiring: a new lot of people each game', () => {
   it('makes Japanese names readable in Japanese', () => {
     const w = makeCandidates('hotpot', seeded(3))
     for (const x of w) expect(x.ja).toMatch(/^\S+ \S+$/)
+  })
+})
+
+describe('chef chat: understanding what the owner asks', () => {
+  const g = shop('grilledfish'), b = shop('bakery'), n = shop('beefnoodle')
+  it('picks out the food and its seasonings, however it is put', () => {
+    expect(understand('幫我做鹽烤玉米', g)).toEqual({ kind: 'make', id: 'GrilledCorn', dabs: ['salt'] })
+    expect(understand('鮭魚刷醬油烤一下', g)).toEqual({ kind: 'make', id: 'Salmon', dabs: ['soy'] })
+    expect(understand('來一串原味的香菇', g)).toMatchObject({ kind: 'make', dabs: [] })
+    expect(understand('烤個年糕，加煉乳和花生', g)).toEqual({ kind: 'make', id: 'NetMochi', dabs: ['milk', 'peanut'] })
+    expect(understand('做紅喉', g)).toEqual({ kind: 'make', id: 'Nodoguro', dabs: null })
+    expect(understand('火腿起司可頌一個', b)).toEqual({ kind: 'make', id: 'CroissantDough', dabs: ['cheese', 'ham'] })
+    expect(understand('煮一碗紅燒牛肉麵', n)).toMatchObject({ kind: 'make', id: 'braised' })
+  })
+  it('tells a question from an order', () => {
+    expect(understand('玉米配什麼好？', g)).toEqual({ kind: 'advise', id: 'GrilledCorn' })
+    expect(understand('有什麼推薦的嗎', g)).toEqual({ kind: 'advise' })
+    expect(understand('隨便幫我試三道', g)).toEqual({ kind: 'batch', n: 3 })
+    expect(understand('庫存還夠嗎', g)).toEqual({ kind: 'stock' })
+    expect(understand('好啊', g)).toEqual({ kind: 'yes' })
+    expect(understand('辛苦了', g)).toEqual({ kind: 'thanks' })
+    expect(understand('幫我做個東西', g)).toEqual({ kind: 'makeWhat' })
+    expect(understand('今天天氣真好', g)).toEqual({ kind: 'unknown' })
+  })
+  it('knows what suits a food', () => {
+    expect(bestDabs(g, 'GrilledCorn')[0]).toBe('soy')
+    expect(bestDabs(g, 'Aji')).not.toContain('milk')
+    expect(expectedTaste(g, 'Aji', ['milk'])).toBeLessThan(expectedTaste(g, 'Aji', ['salt']))
   })
 })
