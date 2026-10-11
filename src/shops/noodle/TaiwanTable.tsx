@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { WOK_KINDS, type MenuItem, type TableKind } from '../menu'
+import { WOK_KINDS, type MenuItem, type TableKind } from '@/data/menu'
 
 /*
  * 台式小吃: beside the noodle bowl, a low wooden table the other dishes are set out on — fried rice, rice plates,

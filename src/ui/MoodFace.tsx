@@ -1,12 +1,10 @@
-import type { GuestView } from './Roasting'
+import type { GuestView } from '@/game/types'
 
 /**
  * How pleased a customer is, as a face: a wide grin for food they loved, a smile, a flat mouth, a frown, a sad
  * face for food that let them down; still waiting, a plain face with its eyes glancing aside; walked out, red
  * and cross. The face is coloured from warm yellow (happy) to grey-blue (unhappy).
  */
-/** which face a rating gets (the number itself isn't shown) */
-export const moodOf = (r: number | null) => r === null ? 'wait' : r >= 80 ? 'love' : r >= 65 ? 'happy' : r >= 45 ? 'ok' : r >= 25 ? 'meh' : 'sad'
 
 export function MoodFace({ guest }: { guest: GuestView }) {
   const r = guest.rating

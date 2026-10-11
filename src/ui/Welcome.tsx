@@ -1,4 +1,4 @@
-import type { Lang } from '../i18n'
+import type { Lang } from '@/data/i18n'
 
 /**
  * The first time in: the owner founds the business (創業). Only then does the shop sign light up. Shown again

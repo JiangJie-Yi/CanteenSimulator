@@ -3,55 +3,52 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { nameIn, UI, type Lang } from './i18n'
-import { boilAmount, ROOM_TEMP, stepTemp, steamAmount } from './boil'
-import { Bubbles } from './components/Bubbles'
-import { Brand } from './components/Brand'
-import { Dish } from './components/Dish'
-import { DishSwitcher } from './components/DishSwitcher'
-import { Fire } from './components/Fire'
-import { GasFlame } from './components/GasFlame'
-import { FireControl } from './components/FireControl'
-import { Fullness } from './components/Fullness'
-import { bestOf, Notebook, type Notes } from './components/Notebook'
-import { findItem, MENU_MAX, MENU_MIN, partName, SEASON_COST, signature, type Entry, type Part, type Seasoning, type Topping } from './recipes'
-import { PAIRING, PAIRING_DEFAULT } from './components/Roasting'
-import { breadTaste } from './components/Bakery'
-import { MoodFace } from './components/MoodFace'
-import { GuestCounter } from './components/GuestCounter'
-import { HeatControl } from './components/HeatControl'
-import { Menu } from './components/Menu'
-import { Crash } from './components/Crash'
-import { PotCooking } from './components/PotCooking'
-import { NoodleEating } from './components/NoodleEating'
-import { TaiwanTable } from './components/TaiwanTable'
-import { Bakery } from './components/Bakery'
-import { OpeningSpot } from './components/OpeningSpot'
-import { BAR_AT, BAR_TOP, type GuestView } from './components/Roasting'
-import { GuestBar3D } from './components/GuestBar3D'
-import { CHEFS, type Chef } from './chefs'
-import { LINES } from './lines'
-import { guestLabel } from './guests'
-import { useDrag } from './useDrag'
-import { CANDIDATES, effective, restPerMin, tirePerMin, type Role } from './staff'
-import { Office } from './components/Office'
-import { Welcome } from './components/Welcome'
-import { liteUrl, QUALITY, stepDown, webglReport } from './quality'
-import { moodOf } from './components/MoodFace'
-import { Roasting } from './components/Roasting'
-import { Steam } from './components/Steam'
-import { StoveControls } from './components/StoveControls'
-import { DISHES, WOK_KINDS, type Dish as DishInfo, type TableKind } from './menu'
+import { nameIn, UI, type Lang } from '@/data/i18n'
+import { boilAmount, ROOM_TEMP, stepTemp, steamAmount } from '@/shops/hotpot/boil'
+import { Bubbles } from '@/shops/hotpot/Bubbles'
+import { Brand } from '@/ui/Brand'
+import { Dish } from '@/scene/Dish'
+import { DishSwitcher } from '@/ui/DishSwitcher'
+import { Fire } from '@/shops/grill/Fire'
+import { GasFlame } from '@/shops/hotpot/GasFlame'
+import { FireControl } from '@/shops/grill/FireControl'
+import { Fullness } from '@/ui/Fullness'
+import { bestOf, Notebook } from '@/ui/Notebook'
+import { findItem, MENU_MAX, MENU_MIN, partName, signature, type Entry, type Part, type Seasoning } from '@/data/recipes'
+import { moodOf } from '@/game/taste'
+import { trialIdeas } from '@/game/research'
+import { buyAllCost, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
+  portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
+import { MoodFace } from '@/ui/MoodFace'
+import { GuestCounter } from '@/ui/GuestCounter'
+import { HeatControl } from '@/shops/hotpot/HeatControl'
+import { Menu } from '@/ui/Menu'
+import { Crash } from '@/ui/Crash'
+import { PotCooking } from '@/shops/hotpot/PotCooking'
+import { NoodleEating } from '@/shops/noodle/NoodleEating'
+import { TaiwanTable } from '@/shops/noodle/TaiwanTable'
+import { Bakery } from '@/shops/bakery/Bakery'
+import { OpeningSpot } from '@/scene/OpeningSpot'
+import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
+import type { GuestView, Notes } from '@/game/types'
+import { GuestBar3D } from '@/shops/grill/GuestBar3D'
+import { CHEFS, type Chef } from '@/data/chefs'
+import { LINES } from '@/data/lines'
+import { guestLabel } from '@/data/guests'
+import { useDrag } from '@/ui/useDrag'
+import { CANDIDATES, effective, restPerMin, tirePerMin, type Role } from '@/data/staff'
+import { Office } from '@/ui/Office'
+import { Welcome } from '@/ui/Welcome'
+import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
+import { Roasting } from '@/shops/grill/Roasting'
+import { Steam } from '@/scene/Steam'
+import { StoveControls } from '@/shops/hotpot/StoveControls'
+import { DISHES, WOK_KINDS, type Dish as DishInfo, type TableKind } from '@/data/menu'
 
 // distance between dishes on the carousel
 const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
-/** the money the business starts with */
-const CAPITAL = 300000
-/** what it costs to open one shop */
-// (the first takes less than half the capital: what's left buys stock, and a little earned opens the second)
-const SHOP_COST = 120000
 const SAVE_KEY = 'canteen-save'
 /** a whole bowl of noodles, by the bowl (the set meals' parts count on their own) */
 const BASE_KCAL: Record<string, number> = { braised: 650, clear: 560, plain: 380, dry: 520, sesame: 610, sanxianMian: 520,
@@ -108,28 +105,6 @@ const NO_WEBGL = (() => {
     return true
   }
 })()
-/** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
-const CHARCOAL_COST = 18
-const GAS_PER_HOUR = 30
-/**
- * What the ingredients of something on the menu cost, as a share of its price, roughly as in small eateries in
- * Taiwan: fish and seafood dear (around half), meat a little less, vegetables, tofu and mushrooms cheap, rice and
- * miso soup cheapest; a soup base or a bowl of noodles in between.
- */
-const COST_SHARE: Record<string, number> = {
-  // dough: flour, butter, eggs, sugar (what goes on it is costed on its own)
-  CroissantDough: 0.38, BaguetteDough: 0.26, BriocheDough: 0.34, SourdoughDough: 0.3,
-  ExtraFish: 0.48, Saury: 0.46, Mackerel: 0.48, Aji: 0.45, Iwashi: 0.4, Shishamo: 0.42, Salmon: 0.5, Hokke: 0.48,
-  Buri: 0.5, Gindara: 0.52, Nodoguro: 0.56, ShrimpSkewer: 0.52, Scallop: 0.55, Squid: 0.5, Shrimp: 0.5, CrabStick: 0.42,
-  BeefSlice: 0.45, Meatball: 0.36, Fishball: 0.34, Yakitori: 0.4, PorkBelly: 0.42, Sausage: 0.38, BloodCake: 0.3,
-  BeefShank: 0.48, Tendon: 0.45, Tripe: 0.4, BraisedEgg: 0.25,
-  NapaCabbage: 0.22, Tofu: 0.24, FriedTofu: 0.26, Taro: 0.28, Corn: 0.28, GrilledCorn: 0.28, ShiitakeCap: 0.3,
-  GrilledShiitake: 0.3, Enoki: 0.25, Shishito: 0.25, KingOyster: 0.3, Asparagus: 0.32, Okra: 0.28, BokChoy: 0.2,
-  PickledGreens: 0.18, Potato: 0.22, SweetPotato: 0.22, Onigiri: 0.22, NetMochi: 0.24, Rice: 0.18, MisoSoup: 0.2,
-  ExtraNoodles: 0.25, mala: 0.32, tomato: 0.3, kombu: 0.26, braised: 0.4, clear: 0.42, plain: 0.3, dry: 0.3, sesame: 0.32,
-}
-const costOf = (x: { id?: string; price: number; cost?: number }) =>
-  x.cost ?? Math.round(x.price * (COST_SHARE[x.id ?? ''] ?? 0.38))
 /** the charcoal burns down from full to out in 90 minutes (the fire level is stepped every 200ms) */
 const FIRE_BURN_PER_TICK = 1 / (90 * 60 * 5)
 // burner top on the cassette stove (blender/hotpot.py)
@@ -731,29 +706,6 @@ export default function App() {
   const [entryCount, setEntryCount] = useState<Record<string, number>>({})
   // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
   const bills = useRef<Record<string, Record<number, { paid: number; parts: number }>>>({})
-  /** a part's cost: the food, and what's put on it */
-  const partCost = (d: DishInfo, p: Part) => costOf(findItem(d, p.id) ?? { price: 0 }) +
-    p.dabs.reduce((n, k) => n + SEASON_COST[k as Seasoning], 0)
-  const entryCost = (e: Entry) => {
-    const d = DISHES.find((x) => x.id === e.shop)!
-    return e.parts.reduce((n, p) => n + partCost(d, p), 0)
-  }
-  /** what a dish takes out of stock (a bowl that comes with its beef: the beef; it isn't bought as a bowl) */
-  const needOf = (e: Entry) => {
-    const d = DISHES.find((x) => x.id === e.shop)!
-    const need: Record<string, number> = {}
-    for (const p of e.parts) {
-      const inc = (findItem(d, p.id) as { includes?: Record<string, number> } | undefined)?.includes
-      for (const [k, q] of Object.entries(inc ?? { [p.id]: 1 })) need[k] = (need[k] ?? 0) + q
-    }
-    return need
-  }
-  /** how many of each thing a dish puts out to be cooked */
-  const partsOf = (e: Entry) => {
-    const n: Record<string, number> = {}
-    for (const p of e.parts) n[p.id] = (n[p.id] ?? 0) + 1
-    return n
-  }
   /**
    * The second chef tries out a few dishes not yet tried, the way he'd make them (a better one picks what suits a
    * food better and makes it better): each uses up its food from stock, costs its ingredients, and goes in the
@@ -765,33 +717,11 @@ export default function App() {
     const who = lang === 'ja' ? c.ja : c.zh
     const skill = effective(c, hired[d.id]?.[c.id]?.fatigue ?? 0)
     const left = { ...stock }
-    const takes = (id: string) => {
-      const inc = (findItem(d, id) as { includes?: Record<string, number> } | undefined)?.includes ?? { [id]: 1 }
-      return inc
-    }
+    const takes = (id: string) => takesOf(d, id)
     const can = (id: string) => Object.entries(takes(id)).every(([k, q]) => (left[k] ?? 0) >= q)
     const tried = (id: string, dabs: Seasoning[]) => !!notes[id]?.tries.some((tr) => signature(tr.dabs).join('+') === dabs.join('+'))
     // what could be tried, with how good it ought to come out
-    const ideas: { id: string; dabs: Seasoning[]; taste: number }[] = []
-    if (d.roast) {
-      for (const it of d.items) {
-        if (!(it.id in d.roast.times)) continue
-        ideas.push({ id: it.id, dabs: [], taste: 62 })
-        for (const k of ['salt', 'soy', 'milk', 'peanut'] as const) {
-          const w = PAIRING[k][it.id] ?? PAIRING_DEFAULT[k]
-          if (w > 5) ideas.push({ id: it.id, dabs: [k], taste: 62 + w })
-        }
-      }
-    } else if (d.bake) {
-      for (const it of d.items) {
-        ideas.push({ id: it.id, dabs: [], taste: breadTaste(d.bake, it.id, [], 1.1) })
-        for (const [k, w] of Object.entries(d.bake.pairing[it.id] ?? {})) {
-          if ((w ?? 0) > 5) ideas.push({ id: it.id, dabs: [k as Topping], taste: breadTaste(d.bake, it.id, [k as Topping], 1.1) })
-        }
-      }
-    } else {
-      for (const it of [...d.bases.filter((b) => !b.includes || d.id === 'beefnoodle'), ...d.items]) ideas.push({ id: it.id, dabs: [], taste: 72 })
-    }
+    const ideas = trialIdeas(d)
     // the best ideas first (a less able chef is less sure which those are)
     const ranked = ideas.filter((x) => !tried(x.id, x.dabs))
       .map((x) => ({ ...x, guess: x.taste + (Math.random() - 0.5) * (1 - skill) * 40 }))
@@ -837,8 +767,8 @@ export default function App() {
   }
   /** buy in n of everything this shop sells */
   const buyAll = (d: DishInfo, n: number) => {
-    const goods = [...d.bases.filter((b) => !b.includes), ...d.items]
-    const cost = goods.reduce((t, g) => t + costOf(g) * n, 0)
+    const goods = goodsOf(d)
+    const cost = buyAllCost(d, n)
     if (cost > cash) return
     book('bought', cost)
     setStock((st) => {
@@ -847,7 +777,6 @@ export default function App() {
       return next
     })
   }
-  const canServe = (e: Entry, st: Record<string, number> = stock) => Object.entries(needOf(e)).every(([k, q]) => (st[k] ?? 0) >= q)
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest'; text: string }[]>([])
   const chatId = useRef(0)
@@ -953,7 +882,7 @@ export default function App() {
   const researchDish = (d: DishInfo): DishInfo => (d.roast ? { ...d, bases: d.bases.filter((b) => !b.includes) } : d)
   /** how many of each dish on the menu could be made from what's in stock */
   const entryStock = (d: DishInfo) => Object.fromEntries(entriesOf(d.id).map((e) =>
-    [e.key, Math.min(...Object.entries(needOf(e)).map(([k, q]) => Math.floor((stock[k] ?? 0) / q)))]))
+    [e.key, portionsLeft(e, stock)]))
 
   // dev only: mirror what's on screen into the open Blender (vite.config.ts -> blender/open_live.py)
   useEffect(() => {
@@ -1102,7 +1031,7 @@ export default function App() {
    * or one already in the pot) at the hot pot, a bowl or a dish off the table at the noodle bar */
   function sellable(d: DishInfo) {
     // (only what's on the menu, and in stock)
-    const es = entriesOf(d.id).filter((e) => canServe(e))
+    const es = entriesOf(d.id).filter((e) => canServe(e, stock))
     const isSoup = (e: Entry) => e.parts.every((p) => d.bases.some((b) => b.id === p.id))
     return d.id === 'hotpot' ? (es.some(isSoup) || !!orderedBase(d, ordersBy.open[d.id])) && es.some((e) => !isSoup(e))
       : es.length > 0

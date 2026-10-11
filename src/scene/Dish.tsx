@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { BASE_MATERIAL } from '../baseMaterial'
+import { BASE_MATERIAL } from './baseMaterial'
 import { useGLTF, useTexture } from '@react-three/drei'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { CopyLayout } from '../menu'
+import type { CopyLayout } from '@/data/menu'
 
 const INK = new THREE.Color('#3b2a20')
 const OUTLINE_WIDTH = 0.007

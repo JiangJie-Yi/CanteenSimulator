@@ -1,5 +1,5 @@
-import { UI, type Lang } from '../i18n'
-import { starText } from './Notebook'
+import { UI, type Lang } from '@/data/i18n'
+import { starText } from '@/game/taste'
 
 type FullnessProps = {
   /** calories eaten and not yet digested */

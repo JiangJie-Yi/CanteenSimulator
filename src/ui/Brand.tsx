@@ -1,4 +1,4 @@
-import type { Lang } from '../i18n'
+import type { Lang } from '@/data/i18n'
 
 // each shop has its own name and its own kind of sign
 //   noodles  甲粗飽 食堂 — Taiwanese for "eat your fill": a vermilion lacquered board on two cords

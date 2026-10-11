@@ -1,16 +1,12 @@
 import { useState } from 'react'
-import type { Lang } from '../i18n'
-import type { Dish } from '../menu'
+import type { Lang } from '@/data/i18n'
+import type { Dish } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, suggestPrice, type Entry, type Part,
-  type Seasoning } from '../recipes'
-import { PAIRING, PAIRING_DEFAULT } from './Roasting'
+  type Seasoning } from '@/data/recipes'
+import { PAIRING, PAIRING_DEFAULT, starText } from '@/game/taste'
+import type { Notes, Try } from '@/game/types'
 
-/** how one try at a food went: how good, how far cooked, what went on it */
-export type Try = { taste: number; doneness?: number; dabs?: Record<string, number>; dip?: string[]; at: number }
-export type Notes = Record<string, { name: string; tries: Try[] }>
 
-export const starsOf = (taste: number) => Math.max(1, Math.min(5, Math.round(taste / 20)))
-export const starText = (taste: number) => '★'.repeat(starsOf(taste)) + '☆'.repeat(5 - starsOf(taste))
 
 const DONE: Record<Lang, string[]> = {
   zh: ['生', '半熟', '剛好', '偏老', '焦了'],

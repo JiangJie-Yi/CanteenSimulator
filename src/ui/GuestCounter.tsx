@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import type { GuestView } from './Roasting'
+import type { GuestView } from '@/game/types'
 import { MoodFace } from './MoodFace'
-import { guestLabel, kindOf } from '../guests'
-import type { Lang } from '../i18n'
+import { guestLabel, kindOf } from '@/data/guests'
+import type { Lang } from '@/data/i18n'
 
 /*
  * The inside of the shop on screen, drawn small above the guest list, each of the three in its own style:

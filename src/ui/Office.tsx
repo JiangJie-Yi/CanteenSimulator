@@ -1,9 +1,9 @@
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
-import { useDrag } from '../useDrag'
-import type { Lang } from '../i18n'
-import type { Dish } from '../menu'
-import { CANDIDATES, ROLES, type Worker } from '../staff'
+import { useDrag } from './useDrag'
+import type { Lang } from '@/data/i18n'
+import type { Dish } from '@/data/menu'
+import { CANDIDATES, ROLES, type Worker } from '@/data/staff'
 import { Avatar } from './Avatar'
 
 type Props = {

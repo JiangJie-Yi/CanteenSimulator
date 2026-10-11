@@ -1,14 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { BASE_MATERIAL } from '../baseMaterial'
+import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { CHEFS, type Chef } from '../chefs'
-import { QUALITY } from '../quality'
-import { LINES } from '../lines'
-import type { Lang } from '../i18n'
-import { Steam } from './Steam'
-import { ROAST_STAGES, type Roast, type Seasoning } from '../menu'
+import { CHEFS, type Chef } from '@/data/chefs'
+import { QUALITY } from '@/scene/quality'
+import { LINES } from '@/data/lines'
+import type { Lang } from '@/data/i18n'
+import { Steam } from '@/scene/Steam'
+import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
+import { PAIRING, PAIRING_DEFAULT } from '@/game/taste'
+import type { GuestView } from '@/game/types'
+
+export { BAR_AT, BAR_TOP }
 
 /** GLTFLoader strips the dot from Blender's "Fish.001", so drop trailing digits to get the type. */
 const baseName = (name: string) => name.replace(/\d+$/, '')
@@ -25,13 +29,6 @@ const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
 /** how many sips a bowl of soup takes, and how good it is (miso soup doesn't take seasoning) */
 const SIPS = 3
 const SOUP_TASTE = 78
-/** an AI customer as App shows them: seated and waiting, eating, or gone (with their rating) */
-export { BAR_AT, BAR_TOP }
-export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'angry'; rating: number | null; items: number;
-  /** what they've eaten so far (for their stomach) */
-  ate: string[]
-  /** their stool at the bar, where their plate is set */
-  seat?: number }
 type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state']; seat: number
   /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
   leftAt?: number; cleared?: boolean }
@@ -490,25 +487,6 @@ const TOOL_NAMES: Record<Seasoning, string> = { salt: '鹽', soy: '醬油', milk
 /** most skewers over the coals at once */
 const FIRE_SKEWERS = 16
 
-/**
- * 美味: how well each seasoning goes with each food, from the way they're eaten in Japan and Taiwan — salt on
- * fish, meat and plain vegetables; sweet soy on rice, mochi, mushrooms, corn and squid; condensed milk and
- * peanut powder on mochi and sweet potato (Taiwanese style); none of them suit everything. The first dab counts
- * in full, a second adds a little more, and from the third it's overdone.
- */
-export const PAIRING: Record<Exclude<Seasoning, 'water'>, Record<string, number>> = {
-  salt: { Fish: 18, ExtraFish: 18, Saury: 18, Mackerel: 16, Aji: 18, Iwashi: 16, Shishamo: 14, Salmon: 18, Hokke: 16, Buri: 10,
-    Gindara: 8, Nodoguro: 20,  ShrimpSkewer: 10, Yakitori: 12, PorkBelly: 10, Shishito: 8,
-    Asparagus: 10, Okra: 8, KingOyster: 8, GrilledShiitake: 8, GrilledCorn: 6, Potato: 14, Scallop: 8, Onigiri: 4,
-    Sausage: -4, NetMochi: -10, SweetPotato: -6, Squid: 4, BloodCake: -6 },
-  soy: { Buri: 18, Salmon: 12, Gindara: 16, Hokke: 6, Aji: 4, Iwashi: 8, Shishamo: 4, Nodoguro: 4, Onigiri: 18, NetMochi: 15, GrilledCorn: 15, GrilledShiitake: 15, KingOyster: 12, Scallop: 14, Squid: 15,
-    Yakitori: 10, PorkBelly: 8, Fish: 4, ExtraFish: 4, Saury: 6, Mackerel: 6, Asparagus: 6, Okra: 8, Shishito: 8,
-    Potato: 5, SweetPotato: -5, Sausage: -2, ShrimpSkewer: 5, BloodCake: 12 },
-  milk: { Salmon: -12, Buri: -14, Gindara: -12, Hokke: -14, Aji: -16, Iwashi: -16, Shishamo: -14, Nodoguro: -16, NetMochi: 18, SweetPotato: 15, GrilledCorn: 6, Potato: -8, BloodCake: -10 },
-  peanut: { NetMochi: 18, BloodCake: 18, SweetPotato: 8, GrilledCorn: 4, Sausage: 6 },
-}
-/** what a seasoning does to a food the table doesn't list (condensed milk on a fish…) */
-export const PAIRING_DEFAULT: Record<Exclude<Seasoning, 'water'>, number> = { salt: 4, soy: 3, milk: -18, peanut: -12 }
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
 const STICK_FOOT_R = 0.74
 const STICK_TOP_R = 0.3

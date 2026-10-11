@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import type { GuestView } from './Roasting'
-import { MoodFace } from './MoodFace'
-import { guestLabel, kindOf, type GuestKind } from '../guests'
-import type { Lang } from '../i18n'
+import type { GuestView } from '@/game/types'
+import { MoodFace } from '@/ui/MoodFace'
+import { guestLabel, kindOf, type GuestKind } from '@/data/guests'
+import type { Lang } from '@/data/i18n'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki

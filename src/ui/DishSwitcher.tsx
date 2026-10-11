@@ -1,5 +1,5 @@
-import { nameIn, type Lang } from '../i18n'
-import type { Dish } from '../menu'
+import { nameIn, type Lang } from '@/data/i18n'
+import type { Dish } from '@/data/menu'
 
 type DishSwitcherProps = {
   dishes: Dish[]

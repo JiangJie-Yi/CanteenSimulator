@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Html } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { Bake, MenuItem } from '../menu'
-import { SEASON_NAME, TOPPINGS, type Part, type Topping } from '../recipes'
-import type { Lang } from '../i18n'
+import type { Bake, MenuItem } from '@/data/menu'
+import { SEASON_NAME, TOPPINGS, type Part, type Topping } from '@/data/recipes'
+import type { Lang } from '@/data/i18n'
+import { breadTaste } from '@/game/taste'
 
 /*
  * 麥田烘焙, a French-style bakery (boulangerie), drawn in code. A floured work table with a baking tray on it; along
@@ -60,14 +61,6 @@ const G = {
 const bakeColor = (r: number, out: THREE.Color) =>
   r < 1 ? out.copy(RAW).lerp(BAKED, Math.max(0, r)) : out.copy(BAKED).lerp(BURNT, THREE.MathUtils.smoothstep(r, 1.35, 2.1))
 
-/** 美味: doneness first (doughy, golden best, burnt bad), then how the fillings suit the dough */
-export function breadTaste(bake: Bake, id: string, dabs: Topping[], r: number) {
-  let t = r < 0.6 ? 12 : r < 0.9 ? 25 + (r - 0.6) * 100 : r < 1.3 ? 58 + (1 - Math.abs(r - 1.1) * 4) * 8 : r < 1.8 ? 55 - (r - 1.3) * 60 : 10
-  const pair = bake.pairing[id] ?? {}
-  dabs.forEach((k, i) => { t += (pair[k] ?? -6) * (i === 0 ? 1 : 0.6) })
-  if (dabs.length > 2) t -= (dabs.length - 2) * 12
-  return Math.round(THREE.MathUtils.clamp(t, 0, 100))
-}
 
 function BreadShape({ b, color }: { b: { id: string; dabs: Topping[] }; color: THREE.Color }) {
   const c = `#${color.getHexString()}`

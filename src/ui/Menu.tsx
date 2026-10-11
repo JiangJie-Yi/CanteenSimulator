@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent,
   type PointerEvent as ReactPointerEvent } from 'react'
-import { nameIn, UI, type Lang } from '../i18n'
-import { toChineseNumber, type Dish } from '../menu'
+import { nameIn, UI, type Lang } from '@/data/i18n'
+import { toChineseNumber, type Dish } from '@/data/menu'
 import { hasIcon, Icon } from './Icon'
-import { guestLabel } from '../guests'
+import { guestLabel } from '@/data/guests'
 
 type MenuProps = {
   dish: Dish

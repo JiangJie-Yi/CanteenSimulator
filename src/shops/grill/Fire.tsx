@@ -1,7 +1,7 @@
 import { useMemo, useRef, type RefObject } from 'react'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
-import { snoise } from '../shaders/noise'
+import { snoise } from '@/scene/shaders/noise'
 
 const flameVertex = /* glsl */ `
 uniform float uTime;

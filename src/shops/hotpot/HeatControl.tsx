@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { UI, type Lang } from '../i18n'
+import { UI, type Lang } from '@/data/i18n'
 
 type HeatControlProps = {
   heat: number

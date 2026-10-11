@@ -42,6 +42,8 @@ export default defineConfig(({ command, isPreview }) => ({
   // GitHub Pages serves the site from https://<user>.github.io/CanteenSimulator/ (and `vite preview` mirrors it)
   base: command === 'build' || isPreview ? '/CanteenSimulator/' : '/',
   plugins: [react(), blenderBridge()],
+  // (the same alias as tsconfig.app.json's paths)
+  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     // the bridge rewrites this file constantly; don't reload the page for it
     watch: { ignored: ['**/blender/**'] },

@@ -1,4 +1,4 @@
-import type { Look, Role } from '../staff'
+import type { Look, Role } from '@/data/staff'
 
 /*
  * A worker's picture (大頭貼), drawn rather than photographed, in the same hand-inked style as the rest: their face
