@@ -11,7 +11,7 @@ export function Welcome({ lang, onStart, capital, shopCost }:
   return (
     <div className="welcome" role="dialog" aria-modal="true" aria-label={ja ? 'ようこそ' : '歡迎'}>
       <div className="welcome-card">
-        <h2>{ja ? '食堂シミュレーター' : '食堂模擬器'}</h2>
+        <h2>{ja ? '炭火焼きシミュレーター' : '日式燒烤模擬器'}</h2>
         <div className="welcome-found">
           <p>{ja ? `オーナー、資金は ${nt(capital)}。` : `老闆，你手上有 ${nt(capital)} 的資本。`}</p>
           <p className="welcome-sub">{ja ? `店は一軒 ${nt(shopCost)} で開業。画面中央の「開業」から始めよう。` : `開一間店要 ${nt(shopCost)}，點畫面中間的「開業」就能開店。`}</p>

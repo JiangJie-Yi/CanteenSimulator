@@ -1,4 +1,4 @@
-# CanteenSimulator 食堂模擬器：開發守則
+# JapaneseGrillSimulator 日式燒烤模擬器：開發守則
 
 React 19 + TypeScript + Vite + three.js（@react-three/fiber / drei）。推到 `main` 就會由 GitHub Actions 測試、建置，並部署到 GitHub Pages。
 
@@ -29,7 +29,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 | 指令 | 用途 |
 |---|---|
-| `npm run dev` | 開發伺服器 http://localhost:5173/CanteenSimulator/ |
+| `npm run dev` | 開發伺服器 http://localhost:5173/JapaneseGrillSimulator/ |
 | `npm test` | 單元測試＋架構測試（Vitest，約 1 秒） |
 | `npm run e2e` | 瀏覽器實際玩一遍四間店（需先開 dev server，約 4 分鐘）。`node tests/e2e/flow.mjs <url> grilledfish` 只測一間 |
 | `npm run build` | 型別檢查＋建置 |

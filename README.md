@@ -1,8 +1,8 @@
-# 食堂模擬器 CanteenSimulator
+# 日式燒烤模擬器 JapaneseGrillSimulator
 
 一個在瀏覽器裡玩的手繪風 3D 食堂經營遊戲。開三家店——**鼎沸火鍋**、**甲粗飽食堂**（麵食）、**聞野燒烤**——自己試菜、研究怎麼烤最好吃，再開店請師傅、店員，看客人上門點餐、吃飯、露出（或不露出）滿意的表情。
 
-**線上遊玩：** https://jiangjie-yi.github.io/CanteenSimulator/ （電腦、手機都可以）
+**線上遊玩：** https://jiangjie-yi.github.io/JapaneseGrillSimulator/ （電腦、手機都可以）
 
 ## 玩法
 

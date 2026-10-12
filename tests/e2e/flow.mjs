@@ -9,7 +9,7 @@
 // Uses the installed Chrome (playwright-core), headless, with software WebGL.
 import { chromium } from 'playwright-core'
 
-const URL = process.argv[2] ?? 'http://localhost:5173/CanteenSimulator/'
+const URL = process.argv[2] ?? 'http://localhost:5173/JapaneseGrillSimulator/'
 // (only the grill is open in this build; a new game starts in it, already set up)
 const SHOPS = ['grilledfish']
 const ONLY = process.argv.slice(3)

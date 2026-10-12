@@ -39,8 +39,8 @@ function blenderBridge(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig(({ command, isPreview }) => ({
-  // GitHub Pages serves the site from https://<user>.github.io/CanteenSimulator/ (and `vite preview` mirrors it)
-  base: command === 'build' || isPreview ? '/CanteenSimulator/' : '/',
+  // GitHub Pages serves the site from https://<user>.github.io/JapaneseGrillSimulator/ (and `vite preview` mirrors it)
+  base: command === 'build' || isPreview ? '/JapaneseGrillSimulator/' : '/',
   plugins: [react(), blenderBridge()],
   // (the same alias as tsconfig.app.json's paths)
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },

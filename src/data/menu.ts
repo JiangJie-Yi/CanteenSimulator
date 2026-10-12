@@ -167,7 +167,7 @@ export const ROAST_STAGES = [
 
 const CHILIES = ['DriedChili', 'SichuanPepper']
 
-/** Files in public/, resolved against the site's base path (\/\ in dev, \/CanteenSimulator/\ on GitHub Pages). */
+/** Files in public/, resolved against the site's base path (\/\ in dev, \/JapaneseGrillSimulator/\ on GitHub Pages). */
 const asset = (path: string) => import.meta.env.BASE_URL + path
 
 /** every shop the game has */
