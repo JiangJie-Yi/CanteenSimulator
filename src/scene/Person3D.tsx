@@ -1,29 +1,31 @@
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { useGLTF } from '@react-three/drei'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
 import { cloth, type Pattern } from './patterns'
 
 /*
- * A customer in 3D, toon-shaded with an ink outline, built in code: a torso turned on a lathe (shoulders, chest,
- * waist), a neck, arms and legs in two parts each (bending at the elbow and the knee), hands and shoes; a face with
- * eyes (and their catch-lights), brows, nose, mouth and ears, a fringe over the forehead. What they're dressed in
- * says what they are (data/guests.ts): the office worker's white shirt and tie, the schoolgirl's sailor collar and
- * pleated skirt, the old man's glasses, the yukata's crossed collar and sash, the student's hood…
+ * A customer in 3D, toon-shaded with an ink outline: a chibi figure from blender/guests.py (public/models/guests.glb),
+ * one of ten kinds (data/guests.ts) on a shared rig, sitting, eating or walking by its actions there. What they're
+ * dressed in says what they are: the office worker's suit and tie, the schoolgirl's sailor collar and pleated
+ * skirt, the boy's black gakuran, the old man's knit vest and glasses, the kid's yellow cap and randoseru, the
+ * yukata and its obi, the uncle's aloha shirt and headband, the student's hoodie…
  *
- * Their clothes have their cloth's pattern (scene/patterns.ts): the suit's pinstripe, the student's flannel, the
- * yukata's hemp-leaf, the uncle's aloha shirt…
- *
- * Proportions are those of a stylised game character, about five and a half heads tall: a head a little large, legs
- * a little short, but a grown-up's build (a child is smaller all over).
+ * Each customer gets their own colours (skin, hair, clothes, shoes) and their clothes' cloth (scene/patterns.ts).
+ * They blink, chew, and while waiting look about now and then.
  *
  * The figure stands (or sits) at its group's origin, facing +Z: sitting, the hips are on a stool top at 0.34.
  */
 
-const INK = '#3b2a20'
+const URL = import.meta.env.BASE_URL + 'models/guests.glb'
+const INK = new THREE.Color('#3b2a20')
+const OUTLINE = 0.0035
 const SKIN = ['#f3d2b0', '#eac39c', '#d9a77e', '#f6dcc0', '#c99470']
 const HAIR = ['#2b1d14', '#4a3020', '#1c1c22', '#7a5a3a', '#5a3a2a']
 const pick = <T,>(l: T[], n: number) => l[n % l.length]
 
-type Look = { top: string; legs: string; hair: string; skin: string; shoes: string; size: number; wide: number
+type Look = { top: string; legs: string; hair: string; skin: string; shoes: string; size: number
   /** the cloth of what they wear on top, and on their legs (or skirt) */
   topCloth?: Pattern; legCloth?: Pattern }
 function lookOf(id: number, kind: GuestKind): Look {
@@ -36,310 +38,213 @@ function lookOf(id: number, kind: GuestKind): Look {
   return {
     top: top[kind],
     legs: kind === 'highSchoolGirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a'
-      : kind === 'student' ? '#3a4a6a' : kind === 'yukata' ? top[kind] : '#2f2f36',
+      : kind === 'student' ? '#3a4a6a' : kind === 'grandma' ? '#5a4a3e' : kind === 'yukata' ? top[kind] : '#2f2f36',
     hair: old ? '#d4d4d4' : pick(HAIR, id * 3),
     skin: pick(SKIN, id * 7 + 1),
     shoes: kind === 'student' || kind === 'kid' ? '#f2f0ea' : kind === 'yukata' ? '#b08a5a' : '#2a2220',
-    size: kind === 'kid' ? 0.72 : kind === 'grandma' ? 0.9 : 1,
-    wide: kind === 'uncle' ? 1.2 : kind === 'grandpa' ? 1.04 : kind === 'highSchoolGirl' || kind === 'officeLady' || kind === 'yukata' ? 0.9 : 1,
+    size: kind === 'kid' ? 0.78 : kind === 'grandma' ? 0.93 : 1,
     topCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', grandma: 'floret', grandpa: 'knit', kid: 'border', uncle: 'hibiscus',
       student: 'plaid', yukata: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
-    legCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', highSchoolGirl: 'pleats', yukata: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
+    legCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', yukata: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
   }
 }
 
-/** toon material, and its ink outline (a slightly bigger back-faced shell) */
-function Part({ geo, color, outline = 1.06, map, ...rest }: { geo: THREE.BufferGeometry; color: string; outline?: number
-  /** a cloth drawn in the colour already (the material then stays white) */
-  map?: THREE.Texture | null } & Record<string, unknown>) {
-  return (
-    <group {...rest}>
-      <mesh geometry={geo} castShadow>
-        <meshToonMaterial color={map ? '#ffffff' : color} map={map ?? null} />
-      </mesh>
-      {outline > 0 && (
-        <mesh geometry={geo} scale={outline}>
-          <meshBasicMaterial color={INK} side={THREE.BackSide} />
-        </mesh>
-      )}
-    </group>
-  )
-}
-/** an unshaded detail (eyes, brows, mouth…) */
-const Flat = ({ geo, color, ...rest }: { geo: THREE.BufferGeometry; color: string } & Record<string, unknown>) => (
-  <mesh geometry={geo} {...rest}><meshBasicMaterial color={color} /></mesh>
-)
+const gradientMap = (() => {
+  const t = new THREE.DataTexture(new Uint8Array([110, 185, 255]), 3, 1, THREE.RedFormat)
+  t.minFilter = THREE.NearestFilter
+  t.magFilter = THREE.NearestFilter
+  t.needsUpdate = true
+  return t
+})()
 
-// the torso's outline, hips (y 0) to the base of the neck: hips, a waist, the chest, square shoulders
-const TORSO_PROFILE = [[0, -0.005], [0.096, 0], [0.11, 0.015], [0.113, 0.04], [0.106, 0.08], [0.099, 0.12], [0.103, 0.17],
-  [0.113, 0.22], [0.122, 0.26], [0.127, 0.29], [0.124, 0.315], [0.11, 0.337], [0.085, 0.355], [0.055, 0.366], [0.03, 0.371],
-  [0, 0.373]].map(([x, y]) => new THREE.Vector2(x, y))
+/** an ink outline that bends with the figure: its back faces pushed out along the (skinned) normals */
+const outlineMaterial = new THREE.ShaderMaterial({
+  uniforms: { uWidth: { value: OUTLINE }, uColor: { value: INK } },
+  vertexShader: /* glsl */ `
+    #include <common>
+    #include <skinning_pars_vertex>
+    uniform float uWidth;
+    void main() {
+      #include <beginnormal_vertex>
+      #include <skinbase_vertex>
+      #include <skinnormal_vertex>
+      #include <begin_vertex>
+      #include <skinning_vertex>
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed + normalize(objectNormal) * uWidth, 1.0);
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform vec3 uColor;
+    void main() { gl_FragColor = vec4(uColor, 1.0); }`,
+  side: THREE.BackSide,
+})
 
-const GEO = {
-  torso: new THREE.LatheGeometry(TORSO_PROFILE, 40),
-  belly: new THREE.SphereGeometry(0.1, 16, 12),
-  neck: new THREE.CylinderGeometry(0.034, 0.038, 0.07, 12),
-  upperArm: new THREE.CapsuleGeometry(0.034, 0.1, 8, 16),
-  foreArm: new THREE.CapsuleGeometry(0.03, 0.09, 8, 16),
-  // the shoulder's round, where the sleeve turns down from the torso
-  shoulder: new THREE.SphereGeometry(0.042, 16, 12),
-  hand: new THREE.SphereGeometry(0.03, 16, 12),
-  thumb: new THREE.CapsuleGeometry(0.009, 0.022, 4, 8),
-  cuff: new THREE.TorusGeometry(0.03, 0.006, 6, 18),
-  thigh: new THREE.CapsuleGeometry(0.05, 0.17, 8, 16),
-  shin: new THREE.CapsuleGeometry(0.04, 0.18, 8, 16),
-  // the waistband (a belt, for those in trousers), and the hem of a jacket
-  belt: new THREE.TorusGeometry(0.1, 0.012, 6, 32),
-  buckle: new THREE.BoxGeometry(0.03, 0.022, 0.008),
-  // long hair's locks either side of the face
-  lock: new THREE.CapsuleGeometry(0.022, 0.12, 4, 10),
-  pocket: new THREE.BoxGeometry(0.045, 0.035, 0.004),
-  shoe: new THREE.SphereGeometry(0.045, 16, 10),
-  collar: new THREE.TorusGeometry(0.045, 0.01, 8, 24),
-  skirt: new THREE.CylinderGeometry(0.115, 0.16, 0.13, 18, 1, true),
-  head: new THREE.SphereGeometry(0.1, 28, 20),
-  ear: new THREE.SphereGeometry(0.022, 10, 8),
-  hair: new THREE.SphereGeometry(0.112, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.52),
-  fringe: new THREE.SphereGeometry(0.113, 24, 8, -Math.PI * 0.32, Math.PI * 0.64, Math.PI * 0.22, Math.PI * 0.16),
-  bun: new THREE.SphereGeometry(0.045, 12, 8),
-  cap: new THREE.SphereGeometry(0.118, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5),
-  brim: new THREE.CylinderGeometry(0.07, 0.07, 0.01, 16, 1, false, -Math.PI / 2, Math.PI),
-  eye: new THREE.SphereGeometry(0.014, 10, 8),
-  glint: new THREE.SphereGeometry(0.0045, 6, 4),
-  brow: new THREE.BoxGeometry(0.032, 0.006, 0.006),
-  nose: new THREE.SphereGeometry(0.013, 8, 6),
-  mouth: new THREE.TorusGeometry(0.018, 0.0035, 4, 12, Math.PI),
-  blush: new THREE.CircleGeometry(0.016, 12),
-  lens: new THREE.TorusGeometry(0.022, 0.0032, 6, 18),
-  bridge: new THREE.BoxGeometry(0.022, 0.003, 0.003),
-  tie: new THREE.BoxGeometry(0.026, 0.13, 0.008),
-  shirt: new THREE.BoxGeometry(0.06, 0.1, 0.006),
-  ribbon: new THREE.BoxGeometry(0.05, 0.022, 0.012),
-  sailor: new THREE.BoxGeometry(0.2, 0.012, 0.13),
-  lapel: new THREE.BoxGeometry(0.022, 0.15, 0.008),
-  button: new THREE.SphereGeometry(0.008, 6, 4),
-  sash: new THREE.CylinderGeometry(0.106, 0.106, 0.05, 18, 1, true),
-  hood: new THREE.TorusGeometry(0.075, 0.025, 8, 16, Math.PI),
-  bag: new THREE.BoxGeometry(0.12, 0.14, 0.06),
-  bowl: new THREE.SphereGeometry(0.07, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
-  stick: new THREE.CylinderGeometry(0.004, 0.003, 0.2, 5),
-}
+/** the parts drawn without an outline (things lying on the surface, and fine ones) */
+const FLAT = /^(eyes|eyesShut|face|mouth|mouthOpen|details|cuffs|glasses|pin)/
+
+const UP = new THREE.Vector3(), QA = new THREE.Quaternion(), QB = new THREE.Quaternion()
 
 const smooth = (a: number, b: number, x: number) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k) }
 
-/**
- * How a customer moves while eating, over one bite (about three seconds): the skewer comes up to the mouth, the
- * head dips to meet it and bites, the arm goes down again while they chew, and a moment's rest looking at the
- * plate before the next. While waiting they look about now and then, and sway a little.
- */
-function eatingPose(t: number, id: number) {
-  const p = ((t + id * 0.73) % 3.2) / 3.2
-  const lift = smooth(0, 0.28, p) * (1 - smooth(0.45, 0.68, p))
-  const bite = smooth(0.26, 0.34, p) * (1 - smooth(0.36, 0.46, p))
-  const chewing = p > 0.4 && p < 0.9
-  return {
-    shoulder: 0.7 + lift * 0.6,
-    elbow: 0.92 + lift * 1.3,
-    head: 0.08 + bite * 0.22 + (chewing ? Math.sin(t * 13) * 0.025 : 0),
-    mouth: bite > 0.2 ? 1.6 : chewing ? 0.7 + 0.5 * Math.abs(Math.sin(t * 13)) : 0.8,
-    lean: 0.18 + bite * 0.1,
-  }
+type Rigged = {
+  root: THREE.Object3D
+  mixer: THREE.AnimationMixer
+  actions: Record<string, THREE.AnimationAction>
+  head?: THREE.Bone
+  hand?: THREE.Bone
+  eyes: THREE.Object3D[]
+  shut: THREE.Object3D[]
+  mouth: THREE.Object3D[]
+  open: THREE.Object3D[]
+  /** the head as the action left it, and as it was turned to look about */
+  posed: THREE.Quaternion
+  looked: THREE.Quaternion
+}
+
+/** one customer's copy of the figures: only their kind kept, in their colours, with outlines */
+function useRigged(id: number, kind: GuestKind, glasses: boolean): Rigged {
+  const gltf = useGLTF(URL)
+  return useMemo(() => {
+    const l = lookOf(id, kind)
+    const root = cloneSkinned(gltf.scene)
+    // (three drops the dots from glTF names: "salaryman.body" is "salarymanbody")
+    const partOf = (o: THREE.Object3D): string | null => {
+      for (let p: THREE.Object3D | null = o; p; p = p.parent) {
+        if (p.name.startsWith(kind)) return p.name.slice(kind.length)
+        if (p.name === 'Rig' || p.name === 'Guests') return null
+      }
+      return null
+    }
+    const drop: THREE.Object3D[] = []
+    const eyes: THREE.Object3D[] = [], shut: THREE.Object3D[] = [], mouth: THREE.Object3D[] = [], open: THREE.Object3D[] = []
+    const mats = new Map<string, THREE.MeshToonMaterial>()
+    const toon = (src: THREE.MeshStandardMaterial) => {
+      const name = src.name
+      if (!mats.has(name)) {
+        const m = new THREE.MeshToonMaterial({ name, color: src.color.clone(), gradientMap, transparent: src.transparent, opacity: src.opacity,
+          depthWrite: !src.transparent })
+        const pattern = name === 'Top' ? l.topCloth : name === 'Bottom' ? l.legCloth : undefined
+        const colour = ({ Skin: l.skin, Hair: l.hair, Top: l.top, Bottom: l.legs, Shoes: l.shoes } as Record<string, string>)[name]
+        if (colour) m.color.set(colour)
+        if (pattern) {
+          m.map = cloth(pattern, colour!, [1, 1])
+          m.color.set('#ffffff')
+        }
+        mats.set(name, m)
+      }
+      return mats.get(name)!
+    }
+    const meshes: THREE.Mesh[] = []
+    root.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o) })
+    for (const o of meshes) {
+      const part = partOf(o)
+      if (part === null || (part === 'glasses' && !glasses)) {
+        drop.push(o)
+        continue
+      }
+      o.material = toon(o.material as THREE.MeshStandardMaterial)
+      o.castShadow = true
+      o.frustumCulled = false
+      if (part === 'eyes') eyes.push(o)
+      if (part === 'eyesShut') shut.push(o)
+      if (part === 'mouth') mouth.push(o)
+      if (part === 'mouthOpen') open.push(o)
+      if (!FLAT.test(part) && o instanceof THREE.SkinnedMesh) {
+        const line = new THREE.SkinnedMesh(o.geometry, outlineMaterial)
+        line.bind(o.skeleton, o.bindMatrix)
+        line.frustumCulled = false
+        line.raycast = () => {}
+        o.add(line)
+      }
+    }
+    for (const o of drop) o.removeFromParent()
+    for (const o of [...shut, ...open]) o.visible = false
+    const mixer = new THREE.AnimationMixer(root)
+    const actions: Record<string, THREE.AnimationAction> = {}
+    for (const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip)
+    let head: THREE.Bone | undefined, hand: THREE.Bone | undefined
+    root.traverse((o) => {
+      if (o instanceof THREE.Bone && o.name === 'head') head = o
+      if (o instanceof THREE.Bone && o.name === 'handR') hand = o
+    })
+    return { root, mixer, actions, head, hand, eyes, shut, mouth, open, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0) }
+  }, [gltf, id, kind, glasses])
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
 export function Person({ id, eating, walking, t }: { id: number; eating: boolean; walking: boolean; t: number }) {
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
-  const bald = kind === 'grandpa' || kind === 'uncle'
-  const longHair = kind === 'highSchoolGirl' || kind === 'officeLady' || kind === 'yukata'
-  const skirt = kind === 'highSchoolGirl' || kind === 'officeLady'
   const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
-  const blush = kind === 'kid' || kind === 'highSchoolGirl' || kind === 'yukata'
-  // sitting: hips on the stool top (0.34); walking: standing, the legs straight under them
-  const hipY = walking ? 0.5 : 0.36
-  const pose = eating ? eatingPose(t, id) : null
-  const bob = walking ? Math.abs(Math.sin(t * 9)) * 0.02 : Math.sin(t * 1.6) * 0.004
-  const lean = pose ? pose.lean : 0.05 + Math.sin(t * 0.8 + id) * 0.015
-  // waiting, they glance about every so often (to the door, along the bar, at the fire)
-  const look = !eating && !walking ? Math.sin(t * 0.45 + id * 1.7) * 0.5 * smooth(0.55, 0.85, Math.abs(Math.sin(t * 0.21 + id))) : 0
-  const step = walking ? Math.sin(t * 9) * 0.5 : 0
-  // a blink now and then
-  const blink = (t * 0.9 + id * 0.37) % 4 < 0.12 ? 0.15 : 1
-  const shinColor = skirt ? l.skin : l.legs
-  // the cloth on top (round the torso four times, up it twice; the sleeves get theirs too) and on the legs
-  const topMap = l.topCloth ? cloth(l.topCloth, l.top, [4, 2]) : null
-  const sleeveMap = l.topCloth ? cloth(l.topCloth, l.top, [2, 1]) : null
-  const legMap = l.legCloth && !skirt ? cloth(l.legCloth, l.legs, [2, 1]) : null
-  const skirtMap = l.legCloth && skirt ? cloth(l.legCloth, l.legs, [8, 1]) : null
-  const belted = kind === 'salaryman' || kind === 'grandpa' || kind === 'uncle' || kind === 'highSchoolBoy' || kind === 'student'
+  const r = useRigged(id, kind, glasses)
+  const playing = useRef<string | null>(null)
+  const last = useRef<number | null>(null)
+  const skewer = useRef<THREE.Group>(null)
+
+  // what they're doing: walking in or out, eating, or sat waiting
+  const now = walking ? 'Walk' : eating ? 'Eat' : 'Sit'
+  useEffect(() => {
+    const next = r.actions[now]
+    if (!next) return
+    const prev = playing.current ? r.actions[playing.current] : null
+    next.reset().play()
+    // (each customer a little out of step with the next)
+    if (!prev) next.time = (id * 0.37) % next.getClip().duration
+    if (prev && prev !== next) next.crossFadeFrom(prev, 0.3, false)
+    playing.current = now
+  }, [now, r, id])
+
+  // the skewer they eat from, in the right hand
+  useEffect(() => {
+    const s = skewer.current
+    if (!s || !r.hand) return
+    r.hand.add(s)
+    return () => { s.removeFromParent() }
+  }, [r])
+
+  // their own clock moves the figure: the action, then a look about (waiting), a blink, chewing
+  const dt = last.current === null ? 0 : Math.min(0.1, Math.max(0, t - last.current))
+  last.current = t
+  r.mixer.update(dt)
+  if (r.head && !walking && !eating) {
+    const look = Math.sin(t * 0.45 + id * 1.7) * 0.5 * smooth(0.55, 0.85, Math.abs(Math.sin(t * 0.21 + id)))
+    // (about the figure's own up, in the neck's frame)
+    // (the mixer only writes a bone that changed: start from its own pose, not last frame's look)
+    if (r.head.quaternion.equals(r.looked)) r.head.quaternion.copy(r.posed)
+    else r.posed.copy(r.head.quaternion)
+    const up = UP.set(0, 1, 0).applyQuaternion(r.root.getWorldQuaternion(QA))
+    up.applyQuaternion(r.head.parent!.getWorldQuaternion(QB).invert())
+    r.head.quaternion.premultiply(QA.setFromAxisAngle(up.normalize(), look))
+    r.looked.copy(r.head.quaternion)
+  }
+  const blink = (t * 0.9 + id * 0.37) % 4 < 0.12
+  for (const o of r.eyes) o.visible = !blink
+  for (const o of r.shut) o.visible = blink
+  const chewing = eating && Math.sin(t * 11) > 0.2 && ((t + id * 0.7) % 3) > 1.2
+  for (const o of r.mouth) o.visible = !chewing
+  for (const o of r.open) o.visible = chewing
+
   return (
     <group scale={l.size}>
-      {/* legs: thigh and shin, bent at the knee over the stool, or swinging as they walk; shoes at the end */}
-      {[-1, 1].map((sd) => {
-        const swing = walking ? sd * step : -1.5
-        const knee = walking ? Math.max(0, -sd * step) * 0.9 : 1.5
-        return (
-          <group key={sd} position={[sd * 0.055 * l.wide, hipY, 0]} rotation-x={swing}>
-            <Part geo={GEO.thigh} color={skirt ? l.skin : l.legs} map={legMap} position={[0, -0.115, 0]} />
-            <group position-y={-0.23} rotation-x={knee}>
-              <Part geo={GEO.shin} color={shinColor} map={legMap} position={[0, -0.115, 0]} />
-              {kind === 'highSchoolGirl' && <Part geo={GEO.shin} color="#f4f1ea" outline={0} position={[0, -0.18, 0]} scale={[1.08, 0.35, 1.08]} />}
-              <Part geo={GEO.shoe} color={l.shoes} position={[0, -0.245, 0.025]} scale={[0.9, 0.55, 1.5]} />
-            </group>
-          </group>
-        )
-      })}
-      <group position-y={hipY + bob} rotation-x={lean}>
-        {skirt && <Part geo={GEO.skirt} color={l.legs} map={skirtMap} outline={1.03} position={[0, 0.0, 0.02]} scale={[1, 1, 1.05]} rotation-x={walking ? 0 : -0.25} />}
-        <Part geo={GEO.torso} color={l.top} map={topMap} outline={1.04} scale={[l.wide, 1, 0.78]} />
-        {kind === 'uncle' && <Part geo={GEO.belly} color={l.top} map={topMap} outline={1.04} position={[0, 0.1, 0.03]} scale={[1.08, 0.95, 0.85]} />}
-        {/* a belt at the waistband, its buckle in front */}
-        {belted && (
-          <>
-            <mesh geometry={GEO.belt} position-y={0.03} rotation-x={Math.PI / 2} scale={[l.wide * (kind === 'uncle' ? 1.12 : 1.01), 0.8, 1]}>
-              <meshToonMaterial color="#2a1e16" />
-            </mesh>
-            <Flat geo={GEO.buckle} color="#c8b070" position={[0, 0.03, 0.08 * (kind === 'uncle' ? 1.15 : 1)]} />
-          </>
-        )}
-        {/* a breast pocket on a jacket or a shirt */}
-        {(kind === 'salaryman' || kind === 'student' || kind === 'grandpa') && (
-          <Flat geo={GEO.pocket} color={kind === 'salaryman' ? '#1e2532' : kind === 'grandpa' ? '#5a4028' : '#3a3434'} position={[-0.055 * l.wide, 0.24, 0.083]} rotation-x={-0.18} />
-        )}
-        {/* what marks each kind of customer */}
-        {kind === 'salaryman' && (
-          <>
-            <Flat geo={GEO.shirt} color="#f4f2ec" position={[0, 0.29, 0.088]} rotation-x={-0.25} />
-            <Flat geo={GEO.tie} color="#a8322a" position={[0, 0.24, 0.093]} rotation-x={-0.12} />
-            {[-1, 1].map((sd) => <Flat key={sd} geo={GEO.lapel} color="#1e2532" position={[sd * 0.035, 0.27, 0.09]} rotation={[-0.2, 0, sd * 0.35]} />)}
-            {[0.14, 0.09].map((y) => <Flat key={y} geo={GEO.button} color="#141820" position={[0.012, y, 0.084]} />)}
-          </>
-        )}
-        {kind === 'officeLady' && (
-          <>
-            <Flat geo={GEO.shirt} color="#f4f2ec" position={[0, 0.3, 0.084]} rotation-x={-0.3} scale={[1.2, 0.8, 1]} />
-            {[0.22, 0.16, 0.1].map((y) => <Flat key={y} geo={GEO.button} color="#e8e4da" position={[0, y, 0.082]} />)}
-          </>
-        )}
-        {kind === 'highSchoolGirl' && (
-          <>
-            <Part geo={GEO.sailor} color="#23324a" outline={0} position={[0, 0.35, -0.035]} rotation-x={0.35} />
-            {[-1, 1].map((sd) => <Flat key={sd} geo={GEO.lapel} color="#23324a" position={[sd * 0.04, 0.29, 0.088]} rotation={[-0.25, 0, sd * 0.5]} />)}
-            <Flat geo={GEO.ribbon} color="#c4302a" position={[0, 0.255, 0.096]} />
-          </>
-        )}
-        {kind === 'highSchoolBoy' && (
-          <>
-            <Part geo={GEO.neck} color="#0e0f14" outline={0} position={[0, 0.37, 0]} scale={[1.25, 0.7, 1.25]} />
-            {[0.27, 0.2, 0.13, 0.06].map((y) => <Flat key={y} geo={GEO.button} color="#d4b04a" position={[0, y, 0.088]} />)}
-          </>
-        )}
-        {kind === 'grandma' && [0.25, 0.18, 0.11].map((y) => <Flat key={y} geo={GEO.button} color="#7a5a3a" position={[0, y, 0.084]} />)}
-        {kind === 'grandpa' && <Flat geo={GEO.shirt} color="#e8e0cc" position={[0, 0.3, 0.084]} rotation-x={-0.3} />}
-        {kind === 'yukata' && (
-          <>
-            <Part geo={GEO.sash} color="#e8c45a" outline={0} position={[0, 0.13, 0]} scale={[l.wide * 1.02, 1, 0.8]} />
-            {[-1, 1].map((sd) => <Flat key={sd} geo={GEO.lapel} color="#f4efe2" position={[sd * 0.025, 0.275, 0.088]} rotation={[-0.2, 0, -sd * 0.55]} />)}
-          </>
-        )}
-        {kind === 'student' && <Part geo={GEO.hood} color={l.top} outline={0} position={[0, 0.355, -0.045]} rotation={[-0.4, 0, 0]} />}
-        {kind === 'kid' && <Part geo={GEO.bag} color="#c4302a" position={[0, 0.2, -0.11]} />}
-        {/* arms: upper arm and forearm, reaching onto the bar; the right one working the chopsticks while eating */}
-        {[-1, 1].map((sd) => {
-          // (the right hand holds the skewer and brings it up to bite; the left rests on the bar)
-          const shoulder = walking ? -sd * step * 0.6 : pose && sd > 0 ? pose.shoulder : 0.7
-          const elbow = walking ? 0.25 : pose && sd > 0 ? pose.elbow : 0.92
-          return (
-            <group key={sd} position={[sd * 0.128 * l.wide, 0.3, 0]} rotation={[-shoulder, 0, sd * 0.12]}>
-              <Part geo={GEO.shoulder} color={l.top} map={sleeveMap} outline={1.04} position={[0, -0.01, 0]} scale={[1, 0.9, 1]} />
-              <Part geo={GEO.upperArm} color={l.top} map={sleeveMap} position={[0, -0.07, 0]} />
-              <group position-y={-0.15} rotation-x={-elbow}>
-                <Part geo={GEO.foreArm} color={l.top} map={sleeveMap} position={[0, -0.065, 0]} />
-                {/* the cuff of the sleeve, then a hand with its thumb */}
-                <mesh geometry={GEO.cuff} position={[0, -0.112, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color={l.top} /></mesh>
-                <Part geo={GEO.hand} color={l.skin} position={[0, -0.14, 0]} scale={[0.9, 1.1, 0.75]} />
-                <Part geo={GEO.thumb} color={l.skin} outline={0} position={[-sd * 0.022, -0.132, 0.012]} rotation={[0.3, 0, sd * 0.6]} />
-                {pose && sd > 0 && (
-                  // the skewer in the hand, pointing up out of the fist, a bit of food on the end
-                  <group position={[0, -0.15, 0.02]} rotation-x={-1.1}>
-                    <mesh geometry={GEO.stick} position-y={0.08}><meshToonMaterial color="#c9a46a" /></mesh>
-                    <mesh position-y={0.15}>
-                      <boxGeometry args={[0.03, 0.05, 0.025]} />
-                      <meshToonMaterial color="#c8743a" />
-                    </mesh>
-                  </group>
-                )}
-              </group>
-            </group>
-          )
-        })}
-        <Part geo={GEO.neck} color={l.skin} outline={0} position={[0, 0.39, 0]} />
-        {/* a collar round the base of the neck, in the colour of what they wear */}
-        {kind !== 'yukata' && kind !== 'highSchoolGirl' && (
-          <mesh geometry={GEO.collar} position={[0, 0.367, 0.004]} rotation-x={Math.PI / 2 - 0.15} scale={[l.wide, 1, 0.9]}>
-            <meshToonMaterial color={kind === 'salaryman' || kind === 'officeLady' || kind === 'grandpa' ? '#f4f2ec' : l.top} />
-          </mesh>
-        )}
-        {/* the head */}
-        <group position-y={0.475} rotation={[pose ? pose.head : Math.sin(t * 0.7 + id) * 0.04, look, 0]}>
-          <Part geo={GEO.head} color={l.skin} scale={[1, 1.05, 0.97]} />
-          {[-1, 1].map((sd) => <Part key={sd} geo={GEO.ear} color={l.skin} outline={1.1} position={[sd * 0.103, -0.005, 0]} scale={[0.5, 1, 0.8]} />)}
-          {!bald && (
-            <>
-              <Part geo={GEO.hair} color={l.hair} outline={1.03} position={[0, 0.014, -0.008]} rotation-x={-0.25} />
-              <Part geo={GEO.fringe} color={l.hair} outline={0} position={[0, 0.006, 0.004]} />
-            </>
-          )}
-          {bald && <Part geo={GEO.hair} color={l.hair} outline={0} position={[0, -0.02, -0.03]} rotation-x={-1.2} scale={[1.02, 0.6, 1]} />}
-          {longHair && (
-            // long hair falling down the back of the head to the shoulders (behind it: from the front only its sides show)
-            <Part geo={GEO.head} color={l.hair} outline={1.03} position={[0, -0.07, -0.05]}
-              scale={[1.08, kind === 'highSchoolGirl' ? 1.45 : 1.2, 0.62]} />
-          )}
-          {(kind === 'grandma' || kind === 'yukata') && <Part geo={GEO.bun} color={l.hair} position={[0, 0.1, -0.06]} />}
-          {longHair && kind !== 'yukata' && [-1, 1].map((sd) => (
-            <Part key={sd} geo={GEO.lock} color={l.hair} outline={1.08} position={[sd * 0.088, -0.07, 0.035]} rotation-z={sd * 0.08} />
-          ))}
-          {kind === 'kid' && (
-            <>
-              <Part geo={GEO.cap} color="#f2c62a" position={[0, 0.01, 0]} />
-              <Part geo={GEO.brim} color="#f2c62a" outline={0} position={[0, 0.02, 0.09]} />
-            </>
-          )}
-          {/* the face */}
-          {[-1, 1].map((sd) => (
-            <group key={sd} position={[sd * 0.036, 0.002, 0.093]}>
-              <Flat geo={GEO.eye} color="#2a1d16" scale={[1, blink * 1.15, 0.7]} />
-              {blink === 1 && <Flat geo={GEO.glint} color="#ffffff" position={[0.004, 0.005, 0.009]} />}
-              <Flat geo={GEO.brow} color={bald ? '#bdb6aa' : l.hair} position={[0, 0.034, -0.004]} rotation-z={sd * -0.12} />
-              {blush && (
-                <mesh geometry={GEO.blush} position={[sd * 0.016, -0.028, -0.002]} rotation-y={sd * 0.4}>
-                  <meshBasicMaterial color="#f08a7a" transparent opacity={0.45} depthWrite={false} />
-                </mesh>
-              )}
-            </group>
-          ))}
-          <Part geo={GEO.nose} color={l.skin} outline={0} position={[0, -0.014, 0.1]} scale={[0.9, 1, 0.8]} />
-          <Flat geo={GEO.mouth} color="#8a3a2a" position={[0, -0.04, 0.091]} rotation-z={pose ? 0 : Math.PI} scale={pose ? [0.8, pose.mouth, 1] : 1} />
-          {kind === 'uncle' && (
-            <mesh position={[0, -0.028, 0.096]}>
-              <boxGeometry args={[0.05, 0.01, 0.008]} />
-              <meshBasicMaterial color="#3a2a1e" />
-            </mesh>
-          )}
-          {glasses && (
-            <group position={[0, 0.003, 0.1]}>
-              {[-1, 1].map((sd) => <Flat key={sd} geo={GEO.lens} color="#2a2220" position={[sd * 0.036, 0, 0]} />)}
-              <Flat geo={GEO.bridge} color="#2a2220" />
-            </group>
-          )}
-        </group>
+      <primitive object={r.root} />
+      {/* (along the hand: its tip, with the food, at the mouth when the hand is up) */}
+      <group ref={skewer} visible={eating} position={[0, 0.03, 0.006]}>
+        <mesh position-y={0.03}>
+          <cylinderGeometry args={[0.0025, 0.0025, 0.11, 6]} />
+          <meshToonMaterial color="#c9a46a" gradientMap={gradientMap} />
+        </mesh>
+        <mesh position-y={0.075}>
+          <boxGeometry args={[0.026, 0.045, 0.022]} />
+          <meshToonMaterial color="#c8743a" gradientMap={gradientMap} />
+        </mesh>
       </group>
       {eating && (
-        <mesh geometry={GEO.bowl} position={[0, 0.5, 0.3]} rotation-x={Math.PI}>
-          <meshToonMaterial color="#e9e1cf" side={THREE.DoubleSide} />
+        <mesh position={[0, 0.5, 0.3]} rotation-x={Math.PI}>
+          <sphereGeometry args={[0.07, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshToonMaterial color="#e9e1cf" side={THREE.DoubleSide} gradientMap={gradientMap} />
         </mesh>
       )}
     </group>
   )
 }
+
+useGLTF.preload(URL)
