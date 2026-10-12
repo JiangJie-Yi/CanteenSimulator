@@ -8,6 +8,7 @@ import { guestLabel } from '@/data/guests'
 import { Person } from '@/scene/Person3D'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
+import { DiningWall } from './DiningRoom'
 import { AISLE, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
@@ -648,10 +649,20 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (i === 0) {
           const back = Math.min(-c.length / 2 - 0.35, ...counters.slice(1).map((o) =>
             o.at.clone().addScaledVector(o.lay, FLOOR_FAR).sub(c.at).dot(c.along)))
-          return <DiningFloor key={i} c={c} from={back} to={c.length / 2 + 1.45} />
+          return (
+            <group key={i}>
+              <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} />
+              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} />}
+            </group>
+          )
         }
         const meet = c0.at.clone().addScaledVector(c0.lay, FLOOR_NEAR).sub(c.at).dot(c.along)
-        return <DiningFloor key={i} c={c} from={-c.length / 2 - 0.35} to={meet} />
+        return (
+          <group key={i}>
+            <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} />
+            {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={meet} far={FLOOR_FAR} lamps={2} />}
+          </group>
+        )
       })}
       {/* the way in, just past the end of the bar where the customers come and go */}
       <Entrance at={doorOf(counters)} mark={mark} />
