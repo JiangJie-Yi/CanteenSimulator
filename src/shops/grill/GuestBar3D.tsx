@@ -738,6 +738,32 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const run = () => runs.current.find((x) => x.key === w.run)
       const setMove = (on: boolean) => setMoving((m) => { const n = [...m]; n[wi] = on; return n })
       w.t += step
+      // (the customer gone meanwhile: what was being carried to them is taken away, and the server goes back)
+      if ((w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') && !sitting(w.seat)) {
+        for (const k of w.keys) SERVICE.carried.delete(k)
+        w.keys = []
+        const r = run()
+        if (r && r.phase === 'carry') { r.phase = 'clear'; r.t = 0 }
+        w.run = null
+        if (w.phase === 'pickup') {
+          w.phase = 'idle'
+          w.yaw = home.yaw
+        } else {
+          // (back over the corners already passed, from where they are: none still ahead of them)
+          const walked = w.phase === 'go' ? Math.min(w.len, w.t * SERVER_SPEED) : w.len
+          const passed: THREE.Vector3[] = []
+          for (let i = 1, at = 0; i < w.path.length - 1; i++) {
+            at += w.path[i].distanceTo(w.path[i - 1])
+            if (at < walked) passed.push(w.path[i])
+          }
+          w.path = [home.at.clone(), ...passed, w.pos.clone()]
+          w.len = pathLength(w.path)
+          w.phase = 'back'
+          w.t = 0
+          setMove(true)
+        }
+        w.seat = -1
+      }
       if (w.phase === 'idle') {
         const job = [...SERVICE.waiting.entries()].find(([, n]) => sitting(n))
         const needPlate = job && !runs.current.some((r) => r.seat === job[1] && (r.phase === 'set' || r.phase === 'carry' || r.phase === 'serve'))

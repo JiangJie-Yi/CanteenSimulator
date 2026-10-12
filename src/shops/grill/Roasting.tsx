@@ -3076,7 +3076,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         return
       }
       // eaten and gone (or in the bin): nothing more to work out for it, every frame, however many there have been
-      // (and nothing of it left for a server to carry)
+      // (and nothing of it left for a server to carry; nor anything left told of one that isn't going through the
+      // pass, should the floor have set it down just as it was taken away)
+      if (!p.via && SERVICE.delivered.size) SERVICE.delivered.delete(p.key)
       if (p.eaten && p.via) {
         p.via = undefined
         SERVICE.waiting.delete(p.key)

@@ -274,6 +274,7 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
         m.bind(first.skeleton, first.bindMatrix)
         m.frustumCulled = false
         m.castShadow = mat !== outlineMaterial
+        m.userData.own = true
         if (mat === outlineMaterial) m.raycast = () => {}
         parent.add(m)
         return m
@@ -303,6 +304,8 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
     r.root.traverse((o) => {
       if (o instanceof THREE.SkinnedMesh) o.skeleton.dispose()
       if (o instanceof THREE.Mesh && o.material !== outlineMaterial) (o.material as THREE.Material).dispose()
+      // (the merged meshes are this customer's own: the rest share the model's geometry)
+      if (o instanceof THREE.Mesh && o.userData.own) o.geometry.dispose()
     })
   }, [r])
   return r
