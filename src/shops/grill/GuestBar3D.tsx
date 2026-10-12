@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel } from '@/data/guests'
@@ -314,35 +315,106 @@ function Chochin({ mark }: { mark: string }) {
 }
 
 /**
- * The till by the door (帳場): a small counter of the same dark wood as the bar's base under a pale top, an old
- * cash register on it, a tray for the change, and a beckoning cat (招き猫) for luck. Its top is the bar's height.
+ * The till by the door (帳場): a counter of the bar's dark wood under a pale top with a rounded edge, set back on the
+ * bar's side of the way in with room behind it for the cashier. On it the cash register (its keys, its drawer, the
+ * customer's display), a card reader, a receipt printer with its paper curling out, a tray for the change, a cup of
+ * pens, a little bell to ring, the お会計 sign facing the customers, and a beckoning cat (招き猫) for luck.
  */
+const TILL = { W: 1.0, D: 0.5 }
 function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
-  const W = 0.62, D = 0.42
+  const { W, D } = TILL
   return (
     <group position={at} rotation-y={yaw}>
-      <Part geo={REG_GEO.body} color="#3a2a1e" outline={1.02} position={[0, (top - 0.05) / 2, 0]} scale={[W, top - 0.05, D]} />
-      <Part geo={REG_GEO.body} color="#d9b884" outline={1.02} position={[0, top - 0.025, 0]} scale={[W + 0.06, 0.05, D + 0.06]} />
-      {/* panels on its front */}
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[sd * W / 4, (top - 0.05) / 2, -D / 2 - 0.002]} rotation-y={Math.PI}>
-          <planeGeometry args={[W / 2 - 0.06, top - 0.18]} />
+      {/* (local x along the bar, +z toward the cashier, behind it) */}
+      <Part geo={REG_GEO.body} color="#3a2a1e" outline={1.015} position={[0, (top - 0.05) / 2, 0.02]} scale={[W - 0.04, top - 0.05, D - 0.06]} />
+      <Part geo={REG_GEO.round} color="#d9b884" outline={1.02} position={[0, top - 0.025, 0]} scale={[W + 0.06, 0.05, D + 0.04]} />
+      {/* panels on its front, a kick board at its foot */}
+      {[-1, 0, 1].map((k) => (
+        <mesh key={k} position={[k * (W / 3), (top - 0.05) / 2 + 0.02, -D / 2 + 0.028]} rotation-y={Math.PI}>
+          <planeGeometry args={[W / 3 - 0.06, top - 0.2]} />
           <meshToonMaterial color="#4a3626" />
         </mesh>
       ))}
-      {/* the register: a sloped keyboard, a little drum of figures on top */}
-      <group position={[0, top, 0.06]}>
-        <Part geo={REG_GEO.body} color="#5a6a66" position={[0, 0.06, 0]} scale={[0.2, 0.12, 0.22]} />
-        <Part geo={REG_GEO.body} color="#2f3634" outline={0} position={[-0.06, 0.125, 0]} rotation-z={0.5} scale={[0.1, 0.02, 0.2]} />
-        <Part geo={REG_GEO.body} color="#e8e2cf" position={[0.05, 0.15, 0]} scale={[0.07, 0.05, 0.12]} />
+      <Part geo={REG_GEO.body} color="#22180f" outline={0} position={[0, 0.03, -D / 2 + 0.035]} scale={[W - 0.06, 0.06, 0.02]} />
+      {/* the register: a sloped keyboard of keys, the drawer under it, the display turned to the customer */}
+      <group position={[0.05, top, 0.06]} rotation-y={Math.PI}>
+        <Part geo={REG_GEO.body} color="#5a6a66" position={[0, 0.035, 0]} scale={[0.26, 0.07, 0.24]} />
+        <Part geo={REG_GEO.body} color="#3e4a46" outline={0} position={[0, 0.036, 0.121]} scale={[0.2, 0.03, 0.004]} />
+        <Part geo={REG_GEO.body} color="#2f3634" outline={1.04} position={[0, 0.085, -0.03]} rotation-x={-0.35} scale={[0.22, 0.03, 0.15]} />
+        {Array.from({ length: 12 }, (_, i) => (
+          <Part key={i} geo={REG_GEO.body} color={i % 4 === 3 ? '#c8a050' : '#e8e2cf'} outline={0}
+            position={[-0.07 + (i % 4) * 0.045, 0.103 + Math.floor(i / 4) * 0.016, -0.06 + Math.floor(i / 4) * 0.04]} rotation-x={-0.35}
+            scale={[0.032, 0.008, 0.028]} />
+        ))}
+        <Part geo={REG_GEO.body} color="#2f3634" position={[0.06, 0.16, 0.08]} scale={[0.012, 0.09, 0.012]} />
+        <group position={[0.06, 0.215, 0.08]} rotation-y={Math.PI}>
+          <Part geo={REG_GEO.body} color="#2f3634" position={[0, 0, 0]} scale={[0.11, 0.05, 0.02]} />
+          <mesh position-z={0.0105}><planeGeometry args={[0.09, 0.032]} /><meshBasicMaterial color="#7ad0a0" /></mesh>
+        </group>
       </group>
-      {/* the change tray */}
-      <Part geo={REG_GEO.body} color="#8a2a1e" outline={1.04} position={[-0.18, top + 0.008, -0.1]} scale={[0.12, 0.012, 0.09]} />
+      {/* the card reader, its screen and keys, by the register on the customers' side */}
+      <group position={[-0.25, top, -0.1]} rotation-x={-0.25}>
+        <Part geo={REG_GEO.round} color="#2a2c30" position-y={0.02} scale={[0.075, 0.04, 0.14]} />
+        <mesh position={[0, 0.041, -0.03]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.055, 0.045]} /><meshBasicMaterial color="#9ad0f0" /></mesh>
+        {Array.from({ length: 9 }, (_, i) => (
+          <mesh key={i} position={[-0.016 + (i % 3) * 0.016, 0.041, 0.018 + Math.floor(i / 3) * 0.014]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[0.011, 0.009]} /><meshBasicMaterial color="#bfc4c8" />
+          </mesh>
+        ))}
+      </group>
+      {/* the receipt printer, a curl of paper out of its top */}
+      <group position={[-0.25, top, 0.12]}>
+        <Part geo={REG_GEO.round} color="#e8e6e0" position-y={0.04} scale={[0.12, 0.08, 0.13]} />
+        <Part geo={REG_GEO.body} color="#2a2c30" outline={0} position={[0, 0.081, 0]} scale={[0.08, 0.002, 0.012]} />
+        <mesh position={[0, 0.1, -0.012]} rotation-x={0.4}><planeGeometry args={[0.07, 0.05]} /><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
+      </group>
+      {/* the change tray, the cup of pens, the bell */}
+      <Part geo={REG_GEO.round} color="#8a2a1e" outline={1.04} position={[0.05, top + 0.008, -0.17]} scale={[0.14, 0.012, 0.1]} />
+      <group position={[-0.42, top, 0.12]}>
+        <Part geo={REG_GEO.cup} color="#3a4a5a" position-y={0.03} />
+        {[[-0.006, '#2a2a6a'], [0.007, '#a82a1e'], [0, '#2a2a2a']].map(([x, c], i) => (
+          <mesh key={i} position={[x as number, 0.075, (i - 1) * 0.006]} rotation-z={(x as number) * 20}>
+            <cylinderGeometry args={[0.003, 0.003, 0.09, 5]} /><meshToonMaterial color={c as string} />
+          </mesh>
+        ))}
+      </group>
+      <group position={[-0.42, top, -0.1]}>
+        <Part geo={REG_GEO.ball} color="#d4b04a" position-y={0.012} scale={[0.6, 0.45, 0.6]} />
+        <Part geo={REG_GEO.body} color="#2a2420" outline={0} position-y={0.004} scale={[0.06, 0.008, 0.06]} />
+      </group>
+      {/* the お会計 sign, in its little wooden stand, to the customers */}
+      <group position={[0.3, top, -0.19]} rotation-y={Math.PI}>
+        <Part geo={REG_GEO.body} color="#6a4428" position-y={0.006} scale={[0.14, 0.012, 0.05]} />
+        <mesh position={[0, 0.05, 0]}><planeGeometry args={[0.12, 0.075]} /><meshToonMaterial color="#ffffff" map={PAY_SIGN} /></mesh>
+      </group>
       {/* the beckoning cat, its paw up */}
-      <group position={[0.2, top, -0.1]} rotation-y={Math.PI}><LuckyCat /></group>
+      <group position={[0.4, top, 0.04]} rotation-y={Math.PI}><LuckyCat /></group>
     </group>
   )
 }
+/** the sign on the till: お会計 brushed on cream, with its Chinese under it */
+const PAY_SIGN = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 160
+  c.height = 100
+  const g = c.getContext('2d')!
+  g.fillStyle = '#f2e8d0'
+  g.fillRect(0, 0, 160, 100)
+  g.strokeStyle = '#6a4428'
+  g.lineWidth = 6
+  g.strokeRect(3, 3, 154, 94)
+  g.fillStyle = '#1d140c'
+  g.font = 'bold 40px "Zen Antique", "Noto Serif TC", serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText('お会計', 80, 42)
+  g.font = '20px "Noto Serif TC", serif'
+  g.fillText('結帳', 80, 78)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
 
 /**
  * The cats at the door (in the entrance's frame: x across the way in, +x toward the back wall, which stands at x 0.5; +z out of the shop.
@@ -357,6 +429,8 @@ const DOOR_CATS = [
 ]
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
+  round: new RoundedBoxGeometry(1, 1, 1, 3, 0.12),
+  cup: new THREE.CylinderGeometry(0.025, 0.022, 0.06, 14),
   ball: new THREE.SphereGeometry(0.04, 14, 10),
   ear: new THREE.ConeGeometry(0.012, 0.026, 6),
   paw: new THREE.CapsuleGeometry(0.01, 0.03, 4, 8),
@@ -366,12 +440,10 @@ const REG_GEO = {
  * The customers' side of the shop floored in wide old boards: one even rectangle under the whole bar, the row of
  * stools and the way along behind them to the noren, its boards running the length of the bar.
  */
-function DiningFloor({ c, from, to }: { c: Counter; from: number; to: number }) {
+function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR }: { c: Counter; from: number; to: number; near?: number; far?: number }) {
   const yaw = Math.atan2(c.along.x, c.along.z)
   const at = c.at
   // (in the floor's own frame: z along the bar, x away from the cook, so lay is -x)
-  const near = FLOOR_NEAR
-  const far = FLOOR_FAR
   const w = near - far
   const l = to - from
   const map = useMemo(() => {
@@ -699,6 +771,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           return (
             <group key={i}>
               <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} />
+              {/* (and past the bar's end, a strip more behind the till for the cashier to stand on) */}
+              {given && <DiningFloor c={c} from={c.length / 2 + 0.15} to={c.length / 2 + 1.45} near={1.1} far={FLOOR_NEAR} />}
               {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} />}
             </group>
           )
@@ -716,7 +790,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* the till, just inside the door on the bar's side of the way in (the shops that lay out their own counters) */}
       {given && (
         <Register top={top} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
-          at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + 0.95).addScaledVector(counters[0].lay, -0.3)} />
+          at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + 0.95).addScaledVector(counters[0].lay, 0.1)} />
       )}
       {seats.map((st, n) => (
         <group key={n} position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>

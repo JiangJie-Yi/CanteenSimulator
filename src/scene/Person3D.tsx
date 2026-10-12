@@ -4,15 +4,17 @@ import * as THREE from 'three'
 import { useGLTF } from '@react-three/drei'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
+import type { Look as StaffLook, Role } from '@/data/staff'
 import { cloth, type Pattern } from './patterns'
 
 /*
  * A customer in 3D, toon-shaded with an ink outline: a chibi figure from blender/guests.py (public/models/guests.glb),
- * one of twelve kinds (data/guests.ts) on a shared rig, sitting, eating or walking by its actions there. What they're
+ * one of fifteen kinds (data/guests.ts) on a shared rig, sitting, eating or walking by its actions there. What they're
  * dressed in says what they are: the office worker's suit and tie, the schoolgirl's sailor collar and pleated
  * skirt, the boy's black gakuran, the old man's knit vest and glasses, the kid's yellow cap and randoseru, the
  * yukata and its obi, the uncle's aloha shirt and headband, the student's hoodie, the delinquent's
- * long gakuran and pompadour, the biker's tokkō coat and hachimaki…
+ * long gakuran and pompadour, the biker's tokkō coat and hachimaki,
+ * the tourist's backpack, the civil servant's staff pass, the maid's apron and headdress…
  *
  * Each customer gets their own colours (skin, hair, clothes, shoes) and their clothes' cloth (scene/patterns.ts).
  * They blink, chew, and while waiting look about now and then.
@@ -31,26 +33,29 @@ type Look = { top: string; legs: string; hair: string; skin: string; shoes: stri
   /** the cloth of what they wear on top, and on their legs (or skirt) */
   topCloth?: Pattern; legCloth?: Pattern }
 /** the cook at the fire (the same rig as the customers, in his own clothes and his own action) */
-type Kind = GuestKind | 'chef'
+type Kind = GuestKind | 'chef' | 'staffM' | 'staffF'
 const CHEF_LOOK: Look = { top: '#2c3a58', legs: '#263049', hair: '#2b1d14', skin: '#e2b48c', shoes: '#2a2220', size: 1 }
 function lookOf(id: number, kind: Kind): Look {
-  if (kind === 'chef') return CHEF_LOOK
+  if (kind === 'chef' || kind === 'staffM' || kind === 'staffF') return CHEF_LOOK
   const old = kind === 'grandma' || kind === 'grandpa'
   const top: Record<GuestKind, string> = {
     salaryman: '#2b3444', officeLady: '#6a6f78', highSchoolGirl: '#f4f1ea', highSchoolBoy: '#1c1e26', grandma: '#c9b48a',
     grandpa: '#7a5a3a', kid: pick(['#e85a4a', '#4a8ad8', '#f0c040'], id), uncle: pick(['#4a7a5a', '#a8432f', '#3d6a9a'], id),
     student: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukata: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
     yankee: pick(['#15161c', '#1c2440'], id), bosozoku: pick(['#f2efe8', '#4a2a5e', '#1a1a20'], id),
+    tourist: pick(['#e8d24a', '#4aa8d8', '#e86a4a', '#f2f0ea'], id), civilServant: pick(['#4a4e56', '#3a4250'], id), maid: '#1c1c24',
   }
   return {
     top: top[kind],
     legs: kind === 'highSchoolGirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a'
       : kind === 'student' ? '#3a4a6a' : kind === 'grandma' ? '#5a4a3e' : kind === 'yukata' || kind === 'bosozoku' ? top[kind]
-        : kind === 'yankee' ? '#15161c' : '#2f2f36',
+        : kind === 'yankee' ? '#15161c' : kind === 'tourist' ? '#a8946a' : kind === 'civilServant' ? top[kind] : kind === 'maid' ? '#1c1c24' : '#2f2f36',
     // (the rough lot bleach it, or dye it red-brown, as often as not)
-    hair: old ? '#d4d4d4' : kind === 'yankee' || kind === 'bosozoku' ? pick(['#e2b85a', '#1c1c22', '#a8542a'], id) : pick(HAIR, id * 3),
-    skin: pick(SKIN, id * 7 + 1),
-    shoes: kind === 'student' || kind === 'kid' ? '#f2f0ea' : kind === 'yukata' ? '#b08a5a' : '#2a2220',
+    hair: kind === 'tourist' ? pick(['#e8cc80', '#b07a40', '#c0602a', '#2b1d14'], id) : kind === 'maid' ? pick(['#e88ab0', '#1c1c22', '#8a5a3a', '#e8cc80', '#a8c8e8'], id)
+      : old ? '#d4d4d4' : kind === 'yankee' || kind === 'bosozoku' ? pick(['#e2b85a', '#1c1c22', '#a8542a'], id) : pick(HAIR, id * 3),
+    // (a visitor from abroad as like as not fairer, or darker, than anyone local)
+    skin: kind === 'tourist' ? pick(['#f8e2d0', '#f6d8c4', '#8a5a3a', '#c99470'], id) : pick(SKIN, id * 7 + 1),
+    shoes: kind === 'maid' ? '#1a1a1a' : kind === 'student' || kind === 'kid' || kind === 'tourist' ? '#f2f0ea' : kind === 'yukata' ? '#b08a5a' : '#2a2220',
     size: kind === 'kid' ? 0.78 : kind === 'grandma' ? 0.93 : 1,
     topCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', grandma: 'floret', grandpa: 'knit', kid: 'border', uncle: 'hibiscus',
       student: 'plaid', yukata: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
@@ -110,11 +115,48 @@ type Rigged = {
   looked: THREE.Quaternion
 }
 
-/** one customer's copy of the figures: only their kind kept, in their colours, with outlines */
-function useRigged(id: number, kind: Kind, glasses: boolean): Rigged {
+/** a black leather briefcase hanging from its handle (the handle at the origin, the case below along +y) */
+function Briefcase() {
+  return (
+    <group>
+      <mesh position-y={0.012} rotation-z={Math.PI / 2}>
+        <torusGeometry args={[0.012, 0.003, 6, 12, Math.PI]} />
+        <meshToonMaterial color="#1a1410" gradientMap={gradientMap} />
+      </mesh>
+      <mesh position-y={0.065}>
+        <boxGeometry args={[0.028, 0.1, 0.14]} />
+        <meshToonMaterial color="#2a1e16" gradientMap={gradientMap} />
+      </mesh>
+      <mesh position-y={0.065} scale={[1.15, 1.05, 1.04]}>
+        <boxGeometry args={[0.028, 0.1, 0.14]} />
+        <meshBasicMaterial color={INK} side={THREE.BackSide} />
+      </mesh>
+      {[-0.035, 0.035].map((z) => (
+        <mesh key={z} position={[0, 0.024, z]}>
+          <boxGeometry args={[0.031, 0.012, 0.014]} />
+          <meshToonMaterial color="#c8b070" gradientMap={gradientMap} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** a number from 0 to 1 that's always the same for this id (and this salt), spread so neighbours differ */
+const hash = (id: number, salt: number) => ((Math.imul(id * 7 + salt + 1, 2654435761) >>> 0) % 1000) / 1000
+
+/**
+ * One customer's copy of the figures: only their kind kept, in their colours, with outlines; one of the kind's ways
+ * of wearing its hair (the parts named "<part>_<style>": the style picked by id, or given), and their head a touch
+ * wider or narrower, longer or shorter than the next one's.
+ */
+function useRigged(id: number, kind: Kind, glasses: boolean,
+  given?: { look?: Look; style?: (styles: string[]) => string; show?: (part: string) => boolean }): Rigged {
   const gltf = useGLTF(URL)
+  const lookGiven = given?.look
+  const styleGiven = given?.style
+  const showGiven = given?.show
   return useMemo(() => {
-    const l = lookOf(id, kind)
+    const l = lookGiven ?? lookOf(id, kind)
     const root = cloneSkinned(gltf.scene)
     // (three drops the dots from glTF names: "salaryman.body" is "salarymanbody")
     const partOf = (o: THREE.Object3D): string | null => {
@@ -145,9 +187,15 @@ function useRigged(id: number, kind: Kind, glasses: boolean): Rigged {
     }
     const meshes: THREE.Mesh[] = []
     root.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o) })
+    // (a part's name is "<part>", or "<part>_<style>" for one of the hair styles; three adds "_<n>" to each piece of a
+    // mesh of several materials)
+    const nameOf = (o: THREE.Object3D) => partOf(o)?.replace(/_\d+$/, '') ?? null
+    const styles = [...new Set(meshes.map(nameOf).filter((p): p is string => !!p && p.includes('_')).map((p) => p.split('_')[1]))].sort()
+    const style = styles.length ? (styleGiven ? styleGiven(styles) : styles[Math.floor(hash(id, 11) * styles.length)]) : null
     for (const o of meshes) {
-      const part = partOf(o)
-      if (part === null || (part === 'glasses' && !glasses)) {
+      const part = nameOf(o)
+      if (part === null || (part === 'glasses' && !glasses) || (part.includes('_') && part.split('_')[1] !== style)
+        || (showGiven && !showGiven(part.split('_')[0]))) {
         drop.push(o)
         continue
       }
@@ -177,8 +225,10 @@ function useRigged(id: number, kind: Kind, glasses: boolean): Rigged {
       if (o instanceof THREE.Bone && o.name === 'handR') hand = o
       if (o instanceof THREE.Bone && o.name === 'handL') handL = o
     })
+    // (no two heads quite the same: a few percent wider or narrower, longer or shorter; the actions never scale it)
+    head?.scale.set(0.95 + 0.1 * hash(id, 3), 0.97 + 0.06 * hash(id, 5), 0.97 + 0.06 * hash(id, 3))
     return { root, mixer, actions, head, hand, handL, eyes, shut, mouth, open, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0) }
-  }, [gltf, id, kind, glasses])
+  }, [gltf, id, kind, glasses, lookGiven, styleGiven, showGiven])
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
@@ -186,10 +236,14 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
   const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
+    || (kind === 'civilServant' && id % 2 === 1)
   const r = useRigged(id, kind, glasses)
   const playing = useRef<string | null>(null)
   const last = useRef<number | null>(null)
   const skewer = useRef<THREE.Group>(null)
+  const carried = useRef<THREE.Group>(null)
+  // (half the office workers, and every civil servant, come with a briefcase: carried in, set down by the stool)
+  const briefcase = (kind === 'salaryman' && id % 2 === 0) || kind === 'civilServant'
 
   // what they're doing: walking in or out, eating, or sat waiting
   const now = walking ? 'Walk' : eating ? 'Eat' : 'Sit'
@@ -209,7 +263,9 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
     const s = skewer.current
     if (!s || !r.hand) return
     r.hand.add(s)
-    return () => { s.removeFromParent() }
+    const b = carried.current
+    if (b) r.hand.add(b)
+    return () => { s.removeFromParent(); b?.removeFromParent() }
   }, [r])
 
   // their own clock moves the figure: the action, then a look about (waiting), a blink, chewing
@@ -251,6 +307,13 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
           <meshToonMaterial color="#c8743a" gradientMap={gradientMap} />
         </mesh>
       </group>
+      {/* the briefcase: in the hand, hanging from its handle, walking; on the floor by the stool, sitting */}
+      {briefcase && (
+        <>
+          <group ref={carried} visible={walking} position={[0, 0.035, 0]}><Briefcase /></group>
+          {!walking && <group position={[-0.17, 0, 0.1]} rotation-y={0.3}><group position-y={0.105} rotation-z={Math.PI}><Briefcase /></group></group>}
+        </>
+      )}
       {/* the rice bowl held up in the left hand (where guests.py's BOWL is) */}
       {eating && (
         <group position={[0.025, 0.6, 0.21]}>
@@ -272,21 +335,59 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
  * The cook, standing at the fire while the shop is open and busy at it: fanning the coals with an uchiwa in his left
  * hand, turning a skewer low over them with his right, then holding it up high to shake salt down. Faces +Z.
  */
-export function CookFigure() {
-  const r = useRigged(0, 'chef', false)
+/*
+ * The staff dressed and coloured just as their pictures in the office have them (ui/Avatar.tsx): the same skin and
+ * hair (picked by the same hash of their id), glasses on the same ones, a woman's hair long, in a bob or tied up as
+ * there; the second chef in his white jacket and toque, the third in the low white cap, the floor in a dark waistcoat
+ * and red bow tie, the till in a red apron with a name badge, the stock keeper in an olive work jacket and cap.
+ */
+const AV_SKIN = ['#f3d2b0', '#eac39c', '#e2b48a', '#f6dcc0', '#d9a77e']
+const AV_HAIR = ['#2b1d14', '#3a2a20', '#1c1c22', '#5a3a2a', '#4a3020', '#6b4a32']
+const avHash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
+const TOPS: Record<Role, string> = { chef: '#f7f3ea', sous: '#f7f3ea', server: '#2b2b33', cashier: '#e9e2d2', stock: '#5f6b45' }
+/** which of the job's things each wears (the parts of the staff figures in guests.glb) */
+const WEARS: Record<Role, string[]> = { chef: ['toque', 'buttons'], sous: ['wacap', 'buttons'], server: ['bowtie'],
+  cashier: ['apron', 'bib', 'badge'], stock: ['workcap'] }
+const JOB_PARTS = new Set(['toque', 'wacap', 'workcap', 'buttons', 'bowtie', 'apron', 'bib', 'badge'])
+
+/**
+ * Someone working in the shop, standing at their place: a cook at the fire (fanning the coals, turning skewers,
+ * salting), a server holding a tray, the cashier at the till with their hands together, the stock keeper with his
+ * clipboard.
+ */
+export function StaffFigure({ id, role, look: who }: { id: string; role: Role; look: StaffLook }) {
+  const h = avHash(id)
+  const seed = h % 997
+  const kind: Kind = who.female ? 'staffF' : 'staffM'
+  const old = who.age === 'old'
+  const cook = role === 'chef' || role === 'sous'
+  const glasses = (h >> 7) % 5 === 0 || (old && (h >> 7) % 2 === 0)
+  const cut = (h >> 13) % 3
+  const look = useMemo<Look>(() => ({ top: TOPS[role], legs: '#2a2a30',
+    hair: old ? ((h >> 4) & 1 ? '#d6d1c8' : '#a9a49c') : AV_HAIR[(h >> 3) % AV_HAIR.length],
+    skin: AV_SKIN[h % AV_SKIN.length], shoes: '#2a2220', size: 1 }), [role, old, h])
+  const style = useMemo(() => () => (who.female ? ['long', 'bob', 'bun'][cut] : cook ? 'short' : cut === 1 ? 'messy' : 'side'),
+    [who.female, cut, cook])
+  const show = useMemo(() => (part: string) => !JOB_PARTS.has(part) || WEARS[role].includes(part), [role])
+  const r = useRigged(1000 + seed, kind, glasses, { look, style, show })
   const fan = useRef<THREE.Group>(null)
   const clock = useRef(0)
+  const action = cook ? 'Cook' : role === 'cashier' ? 'Stand' : 'Hold'
   useEffect(() => {
-    r.actions.Cook?.reset().play()
+    const a = r.actions[action]
+    if (!a) return
+    a.reset().play()
+    // (each a little out of step with the others)
+    a.time = (seed * 0.61) % a.getClip().duration
     const f = fan.current
     if (f && r.handL) r.handL.add(f)
-    return () => { f?.removeFromParent() }
-  }, [r])
+    return () => { f?.removeFromParent(); a.stop() }
+  }, [r, action, seed])
   useFrame((_, delta) => {
     const dt = Math.min(0.1, delta)
     clock.current += dt
     r.mixer.update(dt)
-    const blink = clock.current % 3.6 < 0.12
+    const blink = (clock.current + seed * 0.9) % 3.6 < 0.12
     for (const o of r.eyes) o.visible = !blink
     for (const o of r.shut) o.visible = blink
   })
@@ -294,7 +395,7 @@ export function CookFigure() {
     <group>
       <primitive object={r.root} />
       {/* the uchiwa: a round paper fan on a bamboo handle, along the hand from the fist */}
-      <group ref={fan} position={[0, 0.03, 0]}>
+      <group ref={fan} position={[0, 0.03, 0]} visible={cook}>
         <mesh position-y={0.03}>
           <cylinderGeometry args={[0.003, 0.003, 0.07, 5]} />
           <meshToonMaterial color="#c9a46a" gradientMap={gradientMap} />
@@ -312,8 +413,53 @@ export function CookFigure() {
           <meshToonMaterial color="#c8281e" gradientMap={gradientMap} />
         </mesh>
       </group>
+      {/* a server's round lacquered tray, a cup of tea on it, held level on the hands */}
+      {role === 'server' && (
+        <group position={[0, 0.548, 0.18]}>
+          <mesh>
+            <cylinderGeometry args={[0.085, 0.08, 0.012, 24]} />
+            <meshToonMaterial color="#3a1a14" gradientMap={gradientMap} />
+          </mesh>
+          <mesh scale={[1.04, 1.4, 1.04]}>
+            <cylinderGeometry args={[0.085, 0.08, 0.012, 24]} />
+            <meshBasicMaterial color={INK} side={THREE.BackSide} />
+          </mesh>
+          <mesh position={[0.02, 0.028, 0]}>
+            <cylinderGeometry args={[0.022, 0.018, 0.045, 14]} />
+            <meshToonMaterial color="#e8dcc0" gradientMap={gradientMap} />
+          </mesh>
+        </group>
+      )}
+      {/* the stock keeper's clipboard, held up at the waist, the stock list on it */}
+      {role === 'stock' && (
+        <group position={[0, 0.56, 0.17]} rotation-x={-0.9}>
+          <mesh>
+            <boxGeometry args={[0.1, 0.006, 0.13]} />
+            <meshToonMaterial color="#c9a66b" gradientMap={gradientMap} />
+          </mesh>
+          <mesh scale={[1.06, 1.6, 1.05]}>
+            <boxGeometry args={[0.1, 0.006, 0.13]} />
+            <meshBasicMaterial color={INK} side={THREE.BackSide} />
+          </mesh>
+          <mesh position={[0, 0.0035, 0.008]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[0.08, 0.1]} />
+            <meshToonMaterial color="#f7f3ea" gradientMap={gradientMap} />
+          </mesh>
+          {[0.03, 0.01, -0.01, -0.03].map((z) => (
+            <mesh key={z} position={[0, 0.004, z]} rotation-x={-Math.PI / 2}>
+              <planeGeometry args={[0.06, 0.004]} />
+              <meshBasicMaterial color={INK} />
+            </mesh>
+          ))}
+          <mesh position={[0, 0.006, -0.062]}>
+            <boxGeometry args={[0.03, 0.008, 0.012]} />
+            <meshToonMaterial color="#8a8a8a" gradientMap={gradientMap} />
+          </mesh>
+        </group>
+      )}
     </group>
   )
 }
+
 
 useGLTF.preload(URL)

@@ -7,7 +7,8 @@ import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
 import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
-import { CookFigure } from '@/scene/Person3D'
+import { StaffFigure } from '@/scene/Person3D'
+import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
@@ -405,6 +406,40 @@ const COOK_TABLE_PARTS: [number, number, number, number][] = [
   [COOK_NOTCH.lay, COOK_TABLE.lay[1], COOK_TABLE.along[0], COOK_NOTCH.along[0]],
   [COOK_NOTCH.lay, COOK_TABLE.lay[1], COOK_NOTCH.along[1], COOK_TABLE.along[1]],
 ]
+export type CrewMember = { id: string; role: Role; look: Look }
+/**
+ * Where each of the staff stands while the shop's open (the owner is the player, so isn't drawn): the second cook at
+ * the fire in the bay cut into the cook's table, the third cook and the stock keeper at its right-hand end, facing in
+ * along it; the cashier behind the till by the door; one server at
+ * the near end of the bar by the till, the other at the dead end of the side counter's aisle (both out of the way the
+ * customers walk). The first two of each job are shown.
+ */
+const KITCHEN_YAW = Math.atan2(-ALONG.x, -ALONG.z)
+const kitchenAt = (lay: number) => new THREE.Vector3().addScaledVector(LAY, lay).addScaledVector(ALONG, 3.55).setY(GRILL_OFFSET.y)
+function crewPlaces(crew: CrewMember[]) {
+  const c0 = GRILL_COUNTERS[0], c1 = GRILL_COUNTERS[1]
+  const onFloor = (v: THREE.Vector3) => toGrillScene(v).setY(GRILL_OFFSET.y)
+  const spots: Record<Role, { at: THREE.Vector3; yaw: number }[]> = {
+    chef: [{ at: CHEF_AT, yaw: CHEF_YAW }],
+    sous: [{ at: kitchenAt(1.3), yaw: KITCHEN_YAW }],
+    stock: [{ at: kitchenAt(-0.6), yaw: KITCHEN_YAW }],
+    cashier: [{ at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + 0.95).addScaledVector(c0.lay, 0.68)),
+      yaw: Math.atan2(-c0.lay.x, -c0.lay.z) }],
+    server: [
+      { at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + 0.3).addScaledVector(c0.lay, -0.62)),
+        yaw: Math.atan2(-c0.along.x, -c0.along.z) },
+      { at: onFloor(c1.at.clone().addScaledVector(c1.along, -c1.length / 2 - 0.15).addScaledVector(c1.lay, -0.95)),
+        yaw: Math.atan2(c1.along.x, c1.along.z) },
+    ],
+  }
+  const used: Partial<Record<Role, number>> = {}
+  return crew.flatMap((m) => {
+    const k = used[m.role] ?? 0
+    used[m.role] = k + 1
+    const spot = spots[m.role][k]
+    return spot ? [{ m, ...spot }] : []
+  })
+}
 /** where the cook stands (on the floor, in the notch), and the way he faces: in at the fire */
 const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(ALONG, -1.08).setY(GRILL_OFFSET.y)
 const CHEF_YAW = Math.atan2(-CHEF_AT.x, -CHEF_AT.z)
@@ -418,8 +453,10 @@ const COOK_TABLE_WOOD = (() => {
 })()
 function CookTable() {
   // (and the cook's floor, at the customers' floor's height, out a step in front of the table where he stands)
-  const W = COOK_TABLE.along[1] - COOK_TABLE.along[0], D = COOK_TABLE.lay[1] + 0.9 - COOK_TABLE.lay[0]
-  const mid = new THREE.Vector3().addScaledVector(ALONG, (COOK_TABLE.along[0] + COOK_TABLE.along[1]) / 2)
+  // (and on past the table's right-hand end, where the other cooks stand)
+  const right = COOK_TABLE.along[1] + 1.0
+  const W = right - COOK_TABLE.along[0], D = COOK_TABLE.lay[1] + 0.9 - COOK_TABLE.lay[0]
+  const mid = new THREE.Vector3().addScaledVector(ALONG, (COOK_TABLE.along[0] + right) / 2)
     .addScaledVector(LAY, (COOK_TABLE.lay[0] + COOK_TABLE.lay[1] + 0.9) / 2).setY(GRILL_OFFSET.y + 0.006)
   return (
     <>
@@ -1099,6 +1136,8 @@ type RoastingProps = {
   bar?: boolean
   /** who's hired to help the owner (the head chef): a second chef, a sous chef */
   helpers?: { chef: boolean; sous: boolean }
+  /** who's on the staff here (each drawn at their place while the shop is open) */
+  crew?: CrewMember[]
   /** what's said is in this language, with these names for the food */
   lang?: Lang
   names?: Record<string, string>
@@ -1129,7 +1168,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, bar = true,
+  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, crew = [], bar = true,
   entries, onOrderEntry }: RoastingProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
@@ -3123,9 +3162,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       <CookTable />
-      {space === 'open' && bar && (
-        <group position={CHEF_AT} rotation-y={CHEF_YAW} scale={CHEF_SCALE}><CookFigure /></group>
-      )}
+      {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
+        <group key={m.id} position={at} rotation-y={yaw} scale={CHEF_SCALE}><StaffFigure id={m.id} role={m.role} look={m.look} /></group>
+      ))}
       {space === 'open' && bar && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
       {roast.trash && <TrashBin container="trash" contents={trashed}

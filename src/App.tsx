@@ -45,7 +45,7 @@ import { Office } from '@/ui/Office'
 import { Fridge } from '@/ui/Fridge'
 import { Welcome } from '@/ui/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
-import { Roasting } from '@/shops/grill/Roasting'
+import { Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { Steam } from '@/scene/Steam'
 import { StoveControls } from '@/shops/hotpot/StoveControls'
 import { DISHES, WOK_KINDS, type Dish as DishInfo, type TableKind } from '@/data/menu'
@@ -249,6 +249,7 @@ type SceneProps = {
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
   helpersOf: (dishId: string) => { chef: boolean; sous: boolean }
+  crewOf: (dishId: string) => CrewMember[]
   onWalkOut: (ids: string[], dish: DishInfo, guest?: number) => void
   /** (shop open) what's on each shop's menu, and a customer ordering one of them */
   entriesOf: (dishId: string) => Entry[]
@@ -269,7 +270,7 @@ type SceneProps = {
   bakeKitchen: { phase: 'cook' | 'eat'; parts: Part[] } | null
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -469,7 +470,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)}
-                  helpers={helpersOf(dish.id)} bar={!phone}
+                  helpers={helpersOf(dish.id)} crew={crewOf(dish.id)} bar={!phone}
                   onWalkOut={(ids, g) => onWalkOut(ids, dish, g)} lang={lang}
                   entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
                   names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))}
@@ -1726,7 +1727,8 @@ export default function App() {
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
-            guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
+            guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })}
+            crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
             bakeKitchen={(() => {
               const k = ai ? shop.current.bakery?.kitchen : null
               const g = k ? shop.current.bakery.guests.find((x) => x.id === k.guest) : undefined

@@ -308,12 +308,18 @@ export function DiningWall({ c, from, to, far, lamps }: { c: Counter; from: numb
   // (pictures along the wall, a print then a scroll in turn, about a metre apart, leaving the shelf's stretch clear)
   const shelfZ = mid + l * 0.3
   const art = useMemo(() => {
-    const n = Math.max(1, Math.floor((l - 0.6) / 1.0))
+    // (in the bays between the posts, spaced evenly in each, never over a post or the shelf)
+    const posts = [from, mid - l / 6, mid + l / 6, to]
     const start = Math.round(c.length * 3)
-    return Array.from({ length: n }, (_, i) => ({ z: from + (l / n) * (i + 0.5), i: start + i }))
-      .filter((a) => Math.abs(a.z - shelfZ) > 0.75)
-      .map((a, k) => ({ z: a.z, scroll: k % 2 ? SCROLLS[a.i % SCROLLS.length] : undefined, print: PRINTS[a.i % PRINTS.length] }))
-  }, [l, from, shelfZ, c.length])
+    const spots: number[] = []
+    for (let b = 0; b < 3; b++) {
+      const w = posts[b + 1] - posts[b]
+      const n = Math.max(0, Math.floor(w / 0.95))
+      for (let i = 0; i < n; i++) spots.push(posts[b] + (w / n) * (i + 0.5))
+    }
+    return spots.filter((z) => Math.abs(z - shelfZ) > 0.85)
+      .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length] }))
+  }, [l, from, to, mid, shelfZ, c.length])
   const frieze = useMemo(() => {
     if (!SEIGAIHA) return null
     const t = SEIGAIHA.clone()

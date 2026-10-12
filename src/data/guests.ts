@@ -3,7 +3,7 @@
 import type { Lang } from './i18n'
 
 export type GuestKind = 'salaryman' | 'officeLady' | 'highSchoolGirl' | 'highSchoolBoy' | 'grandma' | 'grandpa' | 'kid'
-  | 'uncle' | 'student' | 'yukata' | 'yankee' | 'bosozoku'
+  | 'uncle' | 'student' | 'yukata' | 'yankee' | 'bosozoku' | 'tourist' | 'civilServant' | 'maid'
 
 /** who they are, and how often they come in (the weights against each other: the rough lot only now and then) */
 export const KINDS: { kind: GuestKind; zh: string; ja: string; weight: number }[] = [
@@ -19,12 +19,17 @@ export const KINDS: { kind: GuestKind; zh: string; ja: string; weight: number }[
   { kind: 'highSchoolBoy', zh: '男高中生', ja: '男子高生', weight: 10 },
   { kind: 'yankee', zh: '不良少年', ja: 'ヤンキー', weight: 5 },
   { kind: 'bosozoku', zh: '暴走族', ja: '暴走族', weight: 3 },
+  { kind: 'tourist', zh: '外國觀光客', ja: '外国人観光客', weight: 6 },
+  { kind: 'civilServant', zh: '公務員', ja: '公務員', weight: 7 },
+  { kind: 'maid', zh: '女僕 Coser', ja: 'メイドさん', weight: 3 },
 ]
 
 const TOTAL = KINDS.reduce((n, k) => n + k.weight, 0)
 /** each guest's kind, fixed by their id: drawn by weight, the ids scattered so neighbours seldom match */
 export const kindOf = (id: number) => {
-  let n = (Math.imul(id + 1, 2654435761) >>> 0) % TOTAL
+  let h = Math.imul(id ^ (id >>> 16) ^ 0x2c1b3c6d, 0x45d9f3b)
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b)
+  let n = ((h ^ (h >>> 16)) >>> 0) % TOTAL
   for (const k of KINDS) {
     if (n < k.weight) return k
     n -= k.weight

@@ -1,4 +1,4 @@
-"""Generate the customers: twelve kinds of chibi figures on one shared rig, with sitting, eating and walking actions.
+"""Generate the customers: fifteen kinds of chibi figures on one shared rig, with sitting, eating and walking actions.
 
 Usage:
   blender -b --factory-startup --python blender/guests.py -- <project_dir> [preview.png]
@@ -39,7 +39,7 @@ PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 KINDS = ["salaryman", "officeLady", "highSchoolGirl", "highSchoolBoy", "grandma", "grandpa", "kid", "uncle",
-         "student", "yukata", "yankee", "bosozoku", "chef"]
+         "student", "yukata", "yankee", "bosozoku", "tourist", "civilServant", "maid", "chef", "staffM", "staffF"]
 
 # =====================================================================
 # Materials
@@ -116,6 +116,10 @@ mat("Pin", srgb("#e85a7a"))
 mat("Cord", srgb("#e8e4da"))
 mat("Iris", srgb("#6a4632"))
 mat("Sole", srgb("#4a403a"))
+mat("Toque", srgb("#fbfaf6"))
+mat("Wrinkle", srgb("#b0806a"))
+mat("Work", srgb("#7a6a3e"))
+mat("WorkDark", srgb("#5f5230"))
 
 # =====================================================================
 # Skeleton (standing, arms a little out)
@@ -351,11 +355,53 @@ STYLE = {
                    collar="gakuran", jacket=True, coat=0.3, baggy=1.3, tough=True),
     # the biker gang (暴走族): a tokkō coat (特攻服) to the ankles, its standing collar and gold embroidery, a punch
     # perm under a hachimaki with the rising sun
-    "bosozoku": dict(sh=1.06, waist=1.0, hip=1.02, belly=0.0, chest=0.0, sleeves="long", legs="long", hair="punch",
+    "bosozoku": dict(sh=1.06, waist=1.0, hip=1.02, belly=0.0, chest=0.0, sleeves="long", legs="long", hair="oni",
                      collar="tokko", jacket=True, coat=0.14, baggy=1.2, tough=True),
+    # a tourist from abroad: a T-shirt, cargo shorts, a big backpack
+    "tourist": dict(sh=1.06, waist=1.02, hip=1.0, belly=0.006, chest=0.0, sleeves="short", legs="shorts", hair="side",
+                    collar="tee", socks=0.2, backpack=True),
+    # a civil servant (公務員): a plain grey suit, his staff pass on a lanyard
+    "civilServant": dict(sh=0.98, waist=1.02, hip=1.0, belly=0.008, chest=0.0, sleeves="long", legs="long", hair="side",
+                         jacket=True, collar="shirt", lanyard=True),
+    # a maid café cosplayer: the black dress with its puffed sleeves, a frilled white apron and bib, a headdress,
+    # knee socks
+    "maid": dict(sh=0.88, waist=0.85, hip=0.98, belly=0.0, chest=0.008, sleeves="short", legs="skirt", hair="twin",
+                 skirt=(0.3, 0.05, 1.0), collar="tee", socks=0.62, apron=True),
+    # the hired staff, a man and a woman, dressed by the app for their job (as in their pictures, ui/Avatar.tsx): a
+    # shirt under what's coloured Top (all white for the cooks, a dark waistcoat for the floor, an olive work jacket
+    # for the stock keeper), and the job's things shown or not: the cooks' toque or cap and buttons, the floor's bow
+    # tie, the till's apron and name badge, the stock keeper's work cap
+    "staffM": dict(sh=1.02, waist=1.0, hip=1.0, belly=0.006, chest=0.0, sleeves="long", legs="long", hair="short",
+                  collar="shirt", vest=True, staff=True),
+    "staffF": dict(sh=0.9, waist=0.88, hip=1.0, belly=0.0, chest=0.008, sleeves="long", legs="long", hair="bob",
+                   collar="shirt", vest=True, staff=True),
     # (the cook, not a customer: a samue's crossed collar, a twisted headband)
     "chef": dict(sh=1.04, waist=1.06, hip=1.02, belly=0.015, chest=0.0, sleeves="long", legs="long", hair="crop",
                  collar="yukata"),
+}
+
+
+# the ways each kind can wear its hair (a customer is given one of them, at random by their id: the app finds the
+# choices from the parts' names, "<kind>.<part>_<style>"); the first is the kind's own
+HAIRS = {
+    "salaryman": ["side", "short", "messy"],
+    "officeLady": ["bob", "long", "updo"],
+    "highSchoolGirl": ["long", "bob"],
+    "highSchoolBoy": ["spiky", "short", "messy"],
+    "grandma": ["bun", "short"],
+    "grandpa": ["bald", "short"],
+    "kid": ["cap", "spiky", "short"],
+    "uncle": ["crop", "punch", "bald"],
+    "student": ["messy", "side", "spiky"],
+    "yukata": ["updo", "bob", "long"],
+    "yankee": ["regent", "punch"],
+    "bosozoku": ["oni"],
+    "tourist": ["side", "messy", "short"],
+    "civilServant": ["side", "short"],
+    "maid": ["twin", "long", "bob"],
+    "chef": ["crop", "short", "side"],
+    "staffM": ["short", "side", "messy"],
+    "staffF": ["bob", "long", "bun"],
 }
 
 
@@ -537,26 +583,52 @@ def ang_dir(yaw, pitch):
     return Vector((math.sin(yaw) * math.cos(pitch), -math.cos(yaw) * math.cos(pitch), math.sin(pitch)))
 
 
+# each kind's face: how wide and how long, how much the jaw narrows to the chin (less is squarer), how far the chin
+# drops, and how full the cheeks are
+FACE = {
+    "salaryman": dict(wide=1.02, long=1.0, jaw=0.13, chin=0.012, cheek=0.004),
+    "officeLady": dict(wide=0.98, long=1.0, jaw=0.16, chin=0.014, cheek=0.005),
+    "highSchoolGirl": dict(wide=1.03, long=0.97, jaw=0.12, chin=0.01, cheek=0.008),
+    "highSchoolBoy": dict(wide=1.01, long=0.99, jaw=0.14, chin=0.012, cheek=0.005),
+    "grandma": dict(wide=1.08, long=0.95, jaw=0.04, chin=0.006, cheek=0.011),
+    "grandpa": dict(wide=0.99, long=1.04, jaw=0.1, chin=0.004, cheek=0.003),
+    "kid": dict(wide=1.07, long=0.94, jaw=0.02, chin=0.004, cheek=0.013),
+    "uncle": dict(wide=1.12, long=0.97, jaw=-0.03, chin=0.006, cheek=0.011),
+    "student": dict(wide=0.98, long=1.03, jaw=0.15, chin=0.012, cheek=0.003),
+    "yukata": dict(wide=0.99, long=1.0, jaw=0.15, chin=0.013, cheek=0.006),
+    "yankee": dict(wide=0.98, long=1.04, jaw=0.2, chin=0.018, cheek=0.002),
+    "bosozoku": dict(wide=1.06, long=1.02, jaw=0.0, chin=0.012, cheek=0.003),
+    "tourist": dict(wide=0.97, long=1.06, jaw=0.17, chin=0.02, cheek=0.002),
+    "civilServant": dict(wide=1.04, long=1.0, jaw=0.08, chin=0.01, cheek=0.006),
+    "maid": dict(wide=1.02, long=0.96, jaw=0.13, chin=0.008, cheek=0.009),
+    "staffM": dict(wide=1.03, long=1.0, jaw=0.1, chin=0.01, cheek=0.005),
+    "staffF": dict(wide=1.0, long=0.98, jaw=0.14, chin=0.01, cheek=0.007),
+    "chef": dict(wide=1.06, long=0.99, jaw=0.05, chin=0.008, cheek=0.006),
+}
+
+
 def head(kind):
     st = STYLE[kind]
+    fc = FACE[kind]
     k = st.get("head", 1.0)
     bm = bmesh.new()
     bmesh.ops.create_uvsphere(bm, u_segments=40, v_segments=28, radius=HEAD_R * k)
     for vt in bm.verts:
         p = vt.co
         # a chibi face: round, a little wider than tall at the cheeks, the jaw tucked in, the back of the head full
+        # (each kind's own: wider or narrower, longer, squarer or more pointed at the chin)
         z = p.z / (HEAD_R * k)
-        p.x *= 1.04 - 0.08 * smoothstep(-0.2, -1.0, z)
+        p.x *= fc["wide"] - fc["jaw"] * smoothstep(-0.2, -1.0, z)
         p.y *= 0.96
         if p.y < 0:
             p.y *= 1 - 0.1 * smoothstep(-0.1, -0.9, z)
             # soft cheeks
-            p.y -= 0.006 * k * math.exp(-((z + 0.35) / 0.25) ** 2) * math.exp(-((abs(p.x) / (HEAD_R * k) - 0.55) / 0.3) ** 2)
+            p.y -= fc["cheek"] * k * math.exp(-((z + 0.35) / 0.25) ** 2) * math.exp(-((abs(p.x) / (HEAD_R * k) - 0.55) / 0.3) ** 2)
         else:
             p.y *= 1.04
-        p.z *= 0.97
+        p.z *= 0.97 * (fc["long"] if z < 0 else 1 + (fc["long"] - 1) * 0.3)
         if z < -0.6:
-            p.z -= 0.01 * k * smoothstep(-0.6, -1.0, z) * (1 if p.y < 0 else 0.3)
+            p.z -= fc["chin"] * k * smoothstep(-0.6, -1.0, z) * (1 if p.y < 0 else 0.3)
         vt.co = p + HC + Vector((0, 0, (k - 1) * HEAD_R * 0.6))
     for f in bm.faces:
         f.smooth = True
@@ -643,11 +715,11 @@ def face(kind, hd):
     st = STYLE[kind]
     k = st.get("head", 1.0)
     surf = Surface(hd, HC + Vector((0, 0, (k - 1) * HEAD_R * 0.6)))
-    girl = kind in ("officeLady", "highSchoolGirl", "yukata", "grandma")
+    girl = kind in ("officeLady", "highSchoolGirl", "yukata", "grandma", "maid", "staffF")
     old = kind in ("grandma", "grandpa")
     ex, ez = 0.36, -0.06          # eye yaw and pitch
     tough = st.get("tough", False)
-    names = ["Eye", "EyeWhite", "Lash", "Hair", "Mouth", "MouthIn", "Blush", "Skin", "Iris"]
+    names = ["Eye", "EyeWhite", "Lash", "Hair", "Mouth", "MouthIn", "Blush", "Skin", "Iris", "Wrinkle"]
     mi = {n: i for i, n in enumerate(names)}
     mats = [MATS[n] for n in names]
 
@@ -696,8 +768,20 @@ def face(kind, hd):
             brow = [(y + sd * a * 0.085, ez + lift - 0.035 + 0.045 * (a + 1) / 2) for a in (-1, -0.4, 0.3, 1)]
         decal_strip(bm, surf, brow, [0.0, 0.012 if girl else 0.016, 0.012 if girl else 0.016, 0.0],
                     mi["Hair"] if kind not in ("grandpa",) else mi["Hair"], off=0.0024)
-        if kind in ("kid", "highSchoolGirl", "yukata", "grandma", "officeLady"):
+        if kind in ("kid", "highSchoolGirl", "yukata", "grandma", "officeLady", "maid"):
             decal_ellipse(bm, surf, sd * 0.56, -0.3, 0.12, 0.06, mi["Blush"], off=0.0012)
+    if old:
+        # the lines of age: across the brow, crow's feet at the eyes' corners, down from the nose to the mouth's corners
+        for k in range(3):
+            pz = 0.42 + k * 0.07
+            decal_strip(bm, surf, [(a * 0.26, pz + 0.02 * (1 - a * a)) for a in (-1, -0.5, 0, 0.5, 1)],
+                        [0.0, 0.007, 0.008, 0.007, 0.0], mi["Wrinkle"], off=0.0022)
+        for sd in (1, -1):
+            for k in (-1, 0, 1):
+                y0 = sd * (ex + 0.13)
+                decal_strip(bm, surf, [(y0, ez + k * 0.02), (y0 + sd * 0.05, ez + k * 0.045)], [0.006, 0.0], mi["Wrinkle"], off=0.0022)
+            decal_strip(bm, surf, [(sd * 0.1, -0.24), (sd * 0.14, -0.32), (sd * 0.15, -0.4)], [0.007, 0.008, 0.0], mi["Wrinkle"],
+                        off=0.0022)
     if kind == "uncle":
         # a moustache: two tapered locks either side
         for sd in (1, -1):
@@ -799,9 +883,9 @@ def cap(hd, surf, keep, off=0.006, thick=0.008):
     return bm
 
 
-def hair(kind, hd, surf):
+def hair(kind, hd, surf, style=None):
     st = STYLE[kind]
-    style = st["hair"]
+    style = style or st["hair"]
     mats = [MATS["Hair"]]
     if style == "bald":
         # a horseshoe of hair round the back and over the ears
@@ -815,10 +899,12 @@ def hair(kind, hd, surf):
                          0.035, 0.009, [0.006, 0.01, 0.006], ring=6)
         return from_bm(f"{kind}.hair", bm, mats, HREF)
 
-    if style == "crop":
-        # a close crop with a receding front, and a twisted headband (hachimaki) on top
+    if style in ("crop", "short"):
+        # a close crop with a receding front (and for "crop", a twisted headband, a hachimaki, on top)
         bm = cap(hd, surf, lambda y, p: (p > 0.55 - 0.15 * min(1, abs(y))) if abs(y) < 1.3 else p > -0.35, off=0.004, thick=0.007)
         o = from_bm(f"{kind}.hair", bm, mats, HREF)
+        if style == "short":
+            return o
         bm = bmesh.new()
         tube_ring(bm, surf.c + Vector((0, 0.005, 0.045)), Vector((0, -0.18, 1)), HEAD_R * 1.03, (0.012, 0.016), mi=0, seg=32)
         for sd in (1, -1):
@@ -828,28 +914,84 @@ def hair(kind, hd, surf):
         return o
 
     if style == "punch":
-        # a punch perm: cropped close and set in tight curls all over, a hachimaki round it with the rising sun
-        bm = cap(hd, surf, lambda y, p: p > (0.42 if abs(y) < 0.9 else -0.3 - 0.15 * smoothstep(1.4, 2.6, abs(y))), off=0.005)
-        for i in range(13):
-            pitch = 1.45 - i * 0.14
-            n = max(1, int(26 * math.cos(pitch) + 0.5))
+        # a punch perm: cropped close and set in small tight curls all over, squared off at the brow
+        bm = cap(hd, surf, lambda y, p: p > (0.48 if abs(y) < 0.9 else -0.25 - 0.15 * smoothstep(1.4, 2.6, abs(y))), off=0.004)
+        for i in range(19):
+            pitch = 1.5 - i * 0.1
+            n = max(1, int(40 * math.cos(pitch) + 0.5))
             for j in range(n):
                 yaw = -math.pi + (j + 0.5 * (i % 2)) * 2 * math.pi / n
-                if pitch < (0.5 if abs(yaw) < 0.9 else -0.25 - 0.15 * smoothstep(1.4, 2.6, abs(yaw))):
+                if pitch < (0.5 if abs(yaw) < 0.9 else -0.22 - 0.15 * smoothstep(1.4, 2.6, abs(yaw))):
                     continue
-                # (none where the headband goes round)
-                if abs(pitch - (0.27 + 0.1 * math.cos(yaw))) < 0.17:
-                    continue
-                ellipsoid(bm, surf.ang(yaw, pitch, 0.012)[0], (0.013, 0.013, 0.011), seg=8, rings=6)
+                ellipsoid(bm, surf.ang(yaw, pitch, 0.007)[0], (0.009, 0.009, 0.008), seg=8, rings=5)
+        return from_bm(f"{kind}.hair", bm, mats, HREF)
+
+    if style == "oni":
+        # the biker's 鬼リーゼント: the sides shaved up high and an M of 剃り込み cut into the brow either side, and
+        # the front combed into one enormous roll jutting far out over the face; a hachimaki round it under the roll
+        def keep(y, p):
+            a = abs(y)
+            if a < 0.32:
+                edge = 0.45
+            elif a < 0.72:
+                edge = 0.98
+            elif a < 2.3:
+                edge = 0.72
+            else:
+                edge = 0.72 - 1.05 * smoothstep(2.3, 2.9, a)
+            return p > edge
+        bm = cap(hd, surf, keep, off=0.004, thick=0.008)
+        roll_c = HC + Vector((0, -HEAD_R * 0.92, HEAD_R * 0.68))
+        rot = Matrix.Rotation(-0.08, 3, "X")
+        ellipsoid(bm, roll_c, (0.07, 0.15, 0.052), seg=24, rings=16, rot=rot)
+        for i in range(5):
+            x = -0.04 + i * 0.02
+            pts = [roll_c + rot @ Vector((x * 0.9, 0.12, 0.03)), roll_c + rot @ Vector((x, 0.0, 0.052)),
+                   roll_c + rot @ Vector((x * 0.95, -0.11, 0.035)), roll_c + rot @ Vector((x * 0.8, -0.148, 0.0))]
+            loft(bm, pts, [0.004, 0.006, 0.006, 0.003], [0.003] * 4, [rot @ Vector((0, 0, 1))] * 4, ring=6, tip=False)
         o = from_bm(f"{kind}.hair", bm, mats, HREF)
         bm = bmesh.new()
-        tube_ring(bm, surf.c + Vector((0, 0.005, 0.03)), Vector((0, -0.12, 1)), HEAD_R * 1.08, (0.014, 0.024), mi=0, seg=32)
+        tube_ring(bm, surf.c + Vector((0, 0.005, 0.052)), Vector((0, -0.06, 1)), HEAD_R * 1.0, (0.012, 0.02), mi=0, seg=32)
         for sd in (1, -1):
-            lock(bm, surf, [(math.pi - sd * 0.12, 0.2), (math.pi - sd * 0.28, -0.1), (math.pi - sd * 0.36, -0.5)],
-                 0.024, 0.005, [0.022, 0.026, 0.028])
-        # (the red sun on its front)
-        ellipsoid(bm, surf.ang(0, 0.34, 0.03)[0], (0.022, 0.005, 0.022), mi=1, seg=16, rings=6)
+            lock(bm, surf, [(math.pi - sd * 0.12, 0.4), (math.pi - sd * 0.28, 0.1), (math.pi - sd * 0.36, -0.3)],
+                 0.024, 0.005, [0.016, 0.02, 0.022])
+        # (the red sun on its front, just under the roll)
+        ellipsoid(bm, surf.ang(0, 0.42, 0.02)[0], (0.018, 0.005, 0.014), mi=1, seg=16, rings=6)
         from_bm(f"{kind}.band", bm, [MATS["Band"], MATS["BandRed"]], HREF)
+        return o
+
+    if style == "twin":
+        # twin tails: a full fringe, the rest drawn up into a tail high either side, tied with a ribbon
+        bm = cap(hd, surf, lambda y, p: p > (0.42 if abs(y) < 0.85 else -0.45), off=0.007, thick=0.01)
+        for i in range(9):
+            y0 = -0.72 + i * 0.18
+            lock(bm, surf, [(y0 * 0.6, 1.1), (y0 * 0.9, 0.75), (y0, 0.38), (y0, 0.2)], 0.05, 0.016,
+                 [0.006, 0.02, 0.02, 0.016], ring=6)
+        for sd in (1, -1):
+            for j in range(3):
+                hang(bm, surf, (sd * (0.95 + j * 0.12), 0.25), 0.1, 0.03, 0.012, 0.01, n=6)
+            root = surf.ang(sd * 1.9, 0.72, 0.01)[0]
+            out = Vector((sd, 0.25, 0)).normalized()
+            path = [root, root + out * 0.04 + Vector((0, 0, 0.005)), root + out * 0.075 + Vector((0, 0.01, -0.07)),
+                    root + out * 0.085 + Vector((0, 0.015, -0.18)), root + out * 0.065 + Vector((0, 0.01, -0.3))]
+            # (a round bunch of hair: a string of soft lumps, thickest a little way down, tapering to its tip)
+            for k in range(26):
+                t = k / 25
+                seg_i = min(3, int(t * 4))
+                u = t * 4 - seg_i
+                q = path[seg_i].lerp(path[seg_i + 1], u)
+                r = 0.026 + 0.026 * math.sin(math.pi * min(1, t * 1.6)) * (1 - 0.7 * t) - 0.016 * t
+                ellipsoid(bm, q, (r, r, r * 1.3), seg=12, rings=8)
+        o = from_bm(f"{kind}.hair", bm, mats, HREF)
+        rb = bmesh.new()
+        for sd in (1, -1):
+            root = surf.ang(sd * 1.9, 0.72, 0.03)[0]
+            for k in (1, -1):
+                ellipsoid(rb, root + Vector((0, k * 0.022, 0.012)), (0.008, 0.022, 0.014), mi=0, seg=12, rings=8)
+            ellipsoid(rb, root, (0.012, 0.012, 0.012), mi=0, seg=10, rings=6)
+        for f in rb.faces:
+            f.smooth = True
+        from_bm(f"{kind}.pin", rb, [MATS["Ribbon"]], HREF)
         return o
 
     bm = None
@@ -943,9 +1085,10 @@ def hair(kind, hd, surf):
             y0 = -0.7 + i * 0.24
             lock(bm, surf, [(0.3, 1.15), (y0 * 0.7 + 0.15, 0.75), (y0, 0.35), (y0 - 0.15, 0.18)], 0.055, 0.016,
                  [0.006, 0.02, 0.02, 0.012])
-        for j in range(11):
-            y0 = 0.85 + j * (2 * math.pi - 1.7) / 10
-            hang(bm, surf, (y0, 0.25), 0.15 + 0.03 * abs(math.cos(y0)), 0.042, 0.016, 0.01, splay=-0.02)
+        # (close enough that no scalp shows between them)
+        for j in range(17):
+            y0 = 0.85 + j * (2 * math.pi - 1.7) / 16
+            hang(bm, surf, (y0, 0.25), 0.15 + 0.03 * abs(math.cos(y0)), 0.05, 0.018, 0.01, splay=-0.02)
     elif style == "long":
         # long straight hair with a blunt fringe, a lock either side of the face, falling past the shoulders
         bm = cap(hd, surf, lambda y, p: p > (0.42 if abs(y) < 0.85 else -0.6), off=0.007, thick=0.01)
@@ -989,6 +1132,49 @@ def hair(kind, hd, surf):
     return from_bm(f"{kind}.hair", bm, mats, HREF)
 
 
+def headwear(kind, hd, surf):
+    """the staff's hats: the second chef's toque, the third's low white cap (和帽子), the stock keeper's work cap"""
+    # the toque: a band round the head, a pleated tube up from it, a puffed top
+    bm = bmesh.new()
+    tube_ring(bm, surf.c + Vector((0, 0, HEAD_R * 0.42)), Vector((0, 0, 1)), HEAD_R * 1.02, (0.012, 0.035), mi=0, seg=32)
+    ret = bmesh.ops.create_cone(bm, cap_ends=False, segments=24, radius1=HEAD_R * 0.95, radius2=HEAD_R * 1.1,
+                                depth=HEAD_R * 0.75, matrix=Matrix.Translation(surf.c + Vector((0, 0, HEAD_R * 0.95))))
+    for v in ret["verts"]:
+        a = math.atan2(v.co.y - surf.c.y, v.co.x - surf.c.x)
+        d = Vector((v.co.x - surf.c.x, v.co.y - surf.c.y, 0))
+        v.co += d.normalized() * 0.004 * math.cos(a * 12)
+    ellipsoid(bm, surf.c + Vector((0, 0, HEAD_R * 1.36)), (HEAD_R * 1.18, HEAD_R * 1.18, HEAD_R * 0.38), mi=0, seg=24, rings=12)
+    for f in bm.faces:
+        f.smooth = True
+    from_bm(f"{kind}.toque", bm, [MATS["Toque"]], HREF)
+    # the low white cap: a soft dome down to the brow, a seam round it
+    bm = cap(hd, surf, lambda y, p: p > 0.36 - 0.08 * math.cos(y), off=0.022, thick=0.01)
+    tube_ring(bm, surf.c + Vector((0, 0, HEAD_R * 0.36)), Vector((0, -0.05, 1)), HEAD_R * 1.1, (0.004, 0.006), mi=0, seg=32)
+    from_bm(f"{kind}.wacap", bm, [MATS["Toque"]], HREF)
+    # the work cap: a crown, a peak to the front, a button on top
+    cb = bmesh.new()
+    cb2 = cap(hd, surf, lambda y, p: p > 0.32 - 0.06 * math.cos(y), off=0.02, thick=0.01)
+    cbm = bpy.data.meshes.new("tmp")
+    cb2.to_mesh(cbm)
+    cb2.free()
+    cb.from_mesh(cbm)
+    bpy.data.meshes.remove(cbm)
+    brim = [surf.ang(-1.1 + i * 2.2 / 12, 0.34, 0.02)[0] for i in range(13)]
+    rows = [[cb.verts.new(p) for p in brim],
+            [cb.verts.new(p + (ang_dir(-1.1 + i * 2.2 / 12, 0) * 0.055 + Vector((0, 0, -0.012))) * (math.cos((-1.1 + i * 2.2 / 12) * 1.25) ** 0.6))
+             for i, p in enumerate(brim)]]
+    top_ = [cb.verts.new(v.co + Vector((0, 0, 0.006))) for v in rows[0]] + [cb.verts.new(v.co + Vector((0, 0, 0.006))) for v in rows[1]]
+    for i in range(12):
+        f = cb.faces.new((rows[0][i], rows[0][i + 1], rows[1][i + 1], rows[1][i]))
+        f.material_index = 1
+        f = cb.faces.new((top_[i], top_[13 + i], top_[13 + i + 1], top_[i + 1]))
+        f.material_index = 1
+    ellipsoid(cb, surf.c + Vector((0, 0, HEAD_R * 1.1 + 0.035)), (0.012, 0.012, 0.008), mi=1)
+    for f in cb.faces:
+        f.smooth = True
+    from_bm(f"{kind}.workcap", cb, [MATS["Work"], MATS["WorkDark"]], HREF)
+
+
 # =====================================================================
 # Clothes that stand off the body
 # =====================================================================
@@ -1004,8 +1190,9 @@ def body_radius(bd, z, x0=None):
     return max(xs), max(ys)
 
 
-def skirt(kind, bd, top, hem, flare, pleats, mi_name="Bottom"):
-    """a skirt (or the yukata's robe): a flared tube from top to hem, pleated if asked"""
+def skirt(kind, bd, top, hem, flare, pleats, mi_name="Bottom", front=None, grow=0.0):
+    """a skirt (or the yukata's robe): a flared tube from top to hem, pleated if asked; with front (an angle), only
+    the part of it that far round either side of the front (an apron), grown out a little to lie over the skirt"""
     bm = bmesh.new()
     rows = 8
     segs = 48
@@ -1015,8 +1202,8 @@ def skirt(kind, bd, top, hem, flare, pleats, mi_name="Bottom"):
         t = i / rows
         z = top + (hem - top) * t
         rx, ry = body_radius(bd, max(z, 0.4))
-        rx = max(rx, rx0 * 0.98) + 0.006 + flare * t ** 0.8 + (0.006 if kind == "officeLady" else 0)
-        ry = max(ry, ry0 * 0.98) + 0.006 + flare * 0.9 * t ** 0.8
+        rx = max(rx, rx0 * 0.98) + 0.006 + flare * t ** 0.8 + (0.006 if kind == "officeLady" else 0) + grow
+        ry = max(ry, ry0 * 0.98) + 0.006 + flare * 0.9 * t ** 0.8 + grow
         row = []
         for j in range(segs):
             a = 2 * math.pi * j / segs
@@ -1029,7 +1216,13 @@ def skirt(kind, bd, top, hem, flare, pleats, mi_name="Bottom"):
     for i in range(rows):
         for j in range(segs):
             j1 = (j + 1) % segs
+            if front is not None:
+                a = 2 * math.pi * (j + 0.5) / segs
+                if min(a, 2 * math.pi - a) > front:
+                    continue
             bm.faces.new((rows_v[i][j], rows_v[i][j1], rows_v[i + 1][j1], rows_v[i + 1][j]))
+    if front is not None:
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
     bm.normal_update()
     bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=0.004)
     for f in bm.faces:
@@ -1140,7 +1333,7 @@ def clothes(kind, bd, hd, surf):
             parts.append(fr([(-0.03, 0.69), (0.0, 0.565 if c == "shirt" else 0.6), (0.03, 0.69)], "Shirt", 0.0022))
         for sd in (1, -1):
             parts.append(fr([(sd * 0.002, 0.672), (sd * 0.034, 0.692), (sd * 0.028, 0.655)], "Shirt", 0.004, cuts=2))
-        if kind == "salaryman":
+        if kind in ("salaryman", "civilServant"):
             parts.append(fr([(-0.006, 0.672), (0.006, 0.672), (0.012, 0.59), (0.0, 0.575), (-0.012, 0.59)], "Tie", 0.003))
             parts.append(fr([(-0.009, 0.684), (0.009, 0.684), (0.006, 0.669), (-0.006, 0.669)], "Tie", 0.0042, cuts=1))
         if st.get("jacket"):
@@ -1254,6 +1447,65 @@ def clothes(kind, bd, hd, surf):
         hem = st.get("coat", 0.405)
         out.append(skirt(kind, bd, 0.475, hem, 0.012 + 0.13 * (0.405 - hem), 0, mi_name="Top"))
         out[-1].name = f"{kind}.hem"
+    if st.get("staff"):
+        def own(name, bms, mat_names):
+            b = bmesh.new()
+            for x in bms:
+                me_ = bpy.data.meshes.new("tmp")
+                x.to_mesh(me_)
+                x.free()
+                b.from_mesh(me_)
+                bpy.data.meshes.remove(me_)
+            o_ = from_bm(f"{kind}.{name}", b, [MATS[n] for n in mat_names], BREF)
+            out.append(o_)
+        # a cook's jacket: crossed over, two rows of buttons
+        bb = [fr([(-0.04, 0.665), (-0.03, 0.672), (0.035, 0.56), (0.026, 0.55)], "Button", 0.0032, cuts=3)]
+        for z in (0.6, 0.555, 0.51):
+            for x in (-0.026, 0.026):
+                b = bmesh.new()
+                ellipsoid(b, at(Vector((x, -0.3, z)), F, 0.003)[0], (0.006, 0.004, 0.006), mi=mi["Button"], seg=10, rings=6)
+                bb.append(b)
+        own("buttons", bb, names)
+        # the floor's red bow tie
+        b = bmesh.new()
+        p0 = at(Vector((0, -0.3, 0.676)), F, 0.006)[0]
+        for sd in (1, -1):
+            ellipsoid(b, p0 + Vector((sd * 0.014, 0, 0)), (0.014, 0.005, 0.009), mi=mi["Ribbon"], seg=10, rings=6,
+                      rot=Matrix.Rotation(sd * 0.2, 3, "Y"))
+        ellipsoid(b, p0, (0.006, 0.006, 0.007), mi=mi["Ribbon"], seg=8, rings=6)
+        own("bowtie", [b], names)
+        # the till's name badge
+        own("badge", [fr([(0.03, 0.62), (0.058, 0.62), (0.058, 0.6), (0.03, 0.6)], "Shirt", 0.0055, cuts=1)], names)
+        # and the till's red apron, its bib and its skirt
+        out.append(skirt(kind, bd, 0.5, 0.3, 0.02, 0, mi_name="Ribbon", front=1.0, grow=0.01))
+        out[-1].name = f"{kind}.apron"
+        own("bib", [fr([(-0.05, 0.6), (0.05, 0.6), (0.055, 0.49), (-0.055, 0.49)], "Ribbon", 0.0045)], names)
+    if st.get("lanyard"):
+        # the staff pass on its lanyard: the cord round the neck and down, the card at the chest
+        for sd in (1, -1):
+            parts.append(fr([(sd * 0.026, 0.69), (sd * 0.034, 0.688), (sd * 0.006, 0.56), (sd * 0.0, 0.562)], "Navy", 0.006, cuts=4))
+        parts.append(fr([(-0.022, 0.565), (0.022, 0.565), (0.022, 0.505), (-0.022, 0.505)], "Shirt", 0.0075, cuts=2))
+        parts.append(fr([(-0.016, 0.556), (0.0, 0.556), (0.0, 0.528), (-0.016, 0.528)], "Navy", 0.0085, cuts=1))
+    if st.get("backpack"):
+        # a big trekking pack on the back, its lid and side pockets, the straps over the shoulders
+        b = bmesh.new()
+        bc = Vector((0, 0.12, 0.6))
+        bmesh.ops.create_cube(b, size=1, matrix=Matrix.Translation(bc) @ Matrix.Diagonal((0.15, 0.085, 0.19, 1)))
+        for f in b.faces:
+            f.material_index = mi["Navy"]
+        bmesh.ops.bevel(b, geom=b.edges[:], offset=0.025, segments=3, affect="EDGES")
+        lid = bmesh.ops.create_cube(b, size=1, matrix=Matrix.Translation(bc + Vector((0, 0.005, 0.09))) @ Matrix.Diagonal((0.155, 0.09, 0.04, 1)))
+        for v in lid["verts"]:
+            for f in v.link_faces:
+                f.material_index = mi["Strap"]
+        for sd in (1, -1):
+            pk = bmesh.ops.create_cube(b, size=1, matrix=Matrix.Translation(bc + Vector((sd * 0.08, 0.01, -0.04))) @ Matrix.Diagonal((0.025, 0.06, 0.08, 1)))
+            for v in pk["verts"]:
+                for f in v.link_faces:
+                    f.material_index = mi["Strap"]
+        parts.append(b)
+        for sd in (1, -1):
+            parts.append(fr([(sd * 0.03, 0.665), (sd * 0.055, 0.665), (sd * 0.06, 0.52), (sd * 0.04, 0.52)], "Strap", 0.003))
     if kind == "kid":
         # a red randoseru on his back, its straps over his shoulders
         b = bmesh.new()
@@ -1286,6 +1538,18 @@ def clothes(kind, bd, hd, surf):
     if st["legs"] == "skirt":
         hem, flare, pl = st["skirt"]
         out.append(skirt(kind, bd, 0.475, hem, flare, pl))
+    if st.get("apron"):
+        out.append(skirt(kind, bd, 0.48, 0.33, 0.05, 0, mi_name="Collar", front=1.05, grow=0.012))
+        out[-1].name = f"{kind}.apron"
+        # its bib over the chest, and the ribbon bow at the collar
+        parts.append(fr([(-0.042, 0.62), (0.042, 0.62), (0.05, 0.48), (-0.05, 0.48)], "Collar", 0.004))
+        rib = bmesh.new()
+        p0 = at(Vector((0, -0.3, 0.675)), F, 0.006)[0]
+        for sd in (1, -1):
+            ellipsoid(rib, p0 + Vector((sd * 0.016, 0, 0.002)), (0.018, 0.006, 0.011), mi=mi["Ribbon"], seg=12, rings=8,
+                      rot=Matrix.Rotation(sd * 0.3, 3, "Y"))
+        ellipsoid(rib, p0, (0.007, 0.006, 0.008), mi=mi["Ribbon"], seg=10, rings=6)
+        parts.append(rib)
     if st["legs"] == "robe":
         out.append(skirt(kind, bd, 0.48, 0.1, 0.012, 0, mi_name="Top"))
         out[-1].name = f"{kind}.robe"
@@ -1507,12 +1771,35 @@ for kind in KINDS:
     bd = body(kind)
     hd = head(kind)
     surf, feats = face(kind, hd)
-    hr = hair(kind, hd, surf)
+    st_ = STYLE[kind]
+    styles = HAIRS[kind]
+    hrs = []
+    for style in styles:
+        before = set(COL.objects)
+        hrs.append(hair(kind, hd, surf, style))
+        if len(styles) > 1:
+            for o in set(COL.objects) - before:
+                o.name = f"{o.name}_{style}"
     extra = clothes(kind, bd, hd, surf)
     gl = glasses(kind, surf)
+    if st_.get("staff"):
+        headwear(kind, hd, surf)
+    if kind == "maid":
+        # the headdress: a band of white frills over the crown, ear to ear
+        hb = bmesh.new()
+        for i in range(9):
+            yy = -1.45 + i * 0.3625
+            pc = surf.ang(yy, 0.95 - 0.25 * (yy / 1.45) ** 2, 0.03)[0]
+            ellipsoid(hb, pc, (0.02, 0.012, 0.016), mi=0, seg=10, rings=6)
+        lock(hb, surf, [(-1.5, 0.62), (-0.75, 0.9), (0, 1.0), (0.75, 0.9), (1.5, 0.62)], 0.03, 0.008,
+             [0.024, 0.026, 0.026, 0.026, 0.024], mi=1, ring=6)
+        for f in hb.faces:
+            f.smooth = True
+        from_bm(f"{kind}.band", hb, [MATS["Collar"], MATS["Button"]], HREF)
     # skin them all to the rig: the body by heat, the head and all on it rigidly, garments by their own rules
     auto_weights(bd, rig)
-    for o in [hd, hr, gl, *feats] + [x for x in COL.objects if x.name.startswith(f"{kind}.") and x.name.split(".")[1] in ("hat", "band", "pin")]:
+    for o in [hd, *hrs, gl, *feats] + [x for x in COL.objects if x.name.startswith(f"{kind}.")
+                                         and x.name.split(".")[1].split("_")[0] in ("hat", "band", "pin", "toque", "wacap", "workcap")]:
         if o.parent is None:
             weights_rigid(o, "head")
             bind(o, rig)
@@ -1520,7 +1807,7 @@ for kind in KINDS:
         part = o.name.split(".")[1]
         if part == "skirt" and kind == "officeLady":
             copy_weights(bd, o)
-        elif part in ("skirt", "robe", "hem"):
+        elif part in ("skirt", "robe", "hem", "apron"):
             top = 0.48 if part == "robe" else 0.475
             weights_skirt(o, top, 0.1)
         elif part == "cuffs":
@@ -1725,6 +2012,31 @@ def cook(phase):
 
 
 action("Cook", [(i * 4, cook(i / 24)) for i in range(25)])
+
+
+def stand(breathe, hold=False):
+    """standing by, for the staff on the floor: hands together in front (the till), or held out at the waist bearing
+    something (a tray, a crate)"""
+    def pose():
+        move_hips(0.458, 0)
+        aim("spine", (0, -0.02, 1))
+        aim("chest", (0, -0.03, 1 + breathe))
+        aim("head", (0, 0.02 - breathe, 1))
+        for s, sd in (("L", 1), ("R", -1)):
+            aim(f"thigh.{s}", (sd * 0.03, 0, -1))
+            aim(f"shin.{s}", (0, 0.02, -1))
+            aim(f"foot.{s}", (sd * 0.1, -1, -0.3))
+            if hold:
+                aim(f"clavicle.{s}", (sd, -0.1, 0.03))
+                reach(s, (sd * 0.085, -0.17, 0.52), (sd, 0.3, -1), (-sd * 0.25, -0.9, 0.15))
+            else:
+                aim(f"clavicle.{s}", (sd, -0.05, 0))
+                reach(s, (sd * 0.02, -0.1, 0.47), (sd, 0.5, -0.5), (-sd * 0.8, -0.3, -0.5))
+    return pose
+
+
+action("Stand", [(0, stand(0)), (40, stand(0.03)), (80, stand(0))])
+action("Hold", [(0, stand(0, True)), (40, stand(0.03, True)), (80, stand(0, True))])
 reset_pose()
 
 # =====================================================================

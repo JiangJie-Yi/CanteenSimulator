@@ -42,6 +42,7 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
     grandpa: '#7a5a3a', kid: pick(['#e85a4a', '#4a8ad8', '#f0c040'], id), uncle: pick(['#4a7a5a', '#a8432f', '#3d6a9a'], id),
     student: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukata: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
     yankee: '#15161c', bosozoku: pick(['#f2efe8', '#4a2a5e', '#1a1a20'], id),
+    tourist: pick(['#e8d24a', '#4aa8d8', '#e86a4a'], id), civilServant: '#4a4e56', maid: '#1c1c24',
   }
   const legs = kind === 'highSchoolGirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a' : '#2f2f36'
   return (
