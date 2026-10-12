@@ -290,39 +290,33 @@ const SHOJI = canvasTex(64, 64, (g) => {
 })
 
 /**
- * The way through to the toilet: a sliding door (引き戸) in a dark wooden frame, two shoji panels of paper on a
- * lattice, one slid a little across the other, a short indigo noren over it, and the plaque.
+ * The way through to the toilet: one sliding door (引き戸) in a dark wooden frame, shut, wood below and shoji paper on
+ * a lattice above, a short indigo noren over it, and the plaque.
  */
 function ToiletDoor() {
   const W = 0.9, H = 1.85
   return (
     <group>
-      {/* the opening's dark beyond, the frame round it */}
-      <mesh position={[-0.004, H / 2, 0]} rotation-y={-Math.PI / 2}>
-        <planeGeometry args={[W, H]} />
-        <meshBasicMaterial color="#1a120c" />
-      </mesh>
+      {/* the frame round the opening */}
       {[-1, 1].map((sd) => <Box key={sd} size={[0.06, H + 0.06, 0.06]} color="#3a2416" position={[-0.03, H / 2, sd * (W / 2 + 0.03)]} />)}
       <Box size={[0.07, 0.07, W + 0.12]} color="#3a2416" position={[-0.035, H + 0.035, 0]} />
       <Box size={[0.05, 0.025, W + 0.12]} color="#3a2416" position={[-0.03, 0.012, 0]} />
-      {/* the two panels: one shut, one slid half over it (the gap is the way in) */}
-      {[{ z: -W / 4, x: -0.03 }, { z: W / 4 - 0.12, x: -0.055 }].map((pnl, i) => (
-        <group key={i} position={[pnl.x, H / 2, pnl.z]}>
-          <mesh rotation-y={-Math.PI / 2}>
-            <planeGeometry args={[W / 2, H - 0.04]} />
-            <meshToonMaterial color="#ffffff" map={SHOJI} />
-          </mesh>
-          {/* its frame and lattice */}
-          {[-1, 1].map((sd) => <Box key={sd} size={[0.02, H - 0.04, 0.025]} color="#5a3a22" position={[-0.004, 0, sd * (W / 4 - 0.012)]} />)}
-          {[-1, -0.5, 0, 0.5, 1].map((k) => <Box key={k} size={[0.016, 0.018, W / 2]} color="#5a3a22" position={[-0.006, k * (H / 2 - 0.03), 0]} />)}
-          <Box size={[0.016, H - 0.06, 0.012]} color="#5a3a22" position={[-0.006, 0, 0]} />
-          {/* the hand-hold */}
-          <mesh position={[-0.012, 0, (i ? -1 : 1) * (W / 4 - 0.06)]} rotation-z={Math.PI / 2}>
-            <cylinderGeometry args={[0.018, 0.018, 0.006, 12]} />
-            <meshToonMaterial color="#2a1a10" />
-          </mesh>
-        </group>
-      ))}
+      {/* the door: one whole sliding panel, shut, filling the opening: wood below, shoji paper on a lattice above */}
+      <group position={[-0.03, H / 2, 0]}>
+        <mesh position-y={0.2} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[W - 0.02, H - 0.44]} />
+          <meshToonMaterial color="#ffffff" map={SHOJI} />
+        </mesh>
+        <Box size={[0.02, 0.4, W - 0.02]} color="#6a4428" position={[-0.002, -H / 2 + 0.2, 0]} />
+        {[-1, 1].map((sd) => <Box key={sd} size={[0.024, H - 0.02, 0.03]} color="#5a3a22" position={[-0.006, 0, sd * (W / 2 - 0.025)]} />)}
+        {[-0.5, -0.17, 0.17, 0.5].map((k) => <Box key={k} size={[0.016, H - 0.46, 0.014]} color="#5a3a22" position={[-0.008, 0.2, k * (W - 0.06) / 1.1]} />)}
+        {[0, 1, 2, 3, 4].map((k) => <Box key={k} size={[0.016, 0.018, W - 0.04]} color="#5a3a22" position={[-0.008, -H / 2 + 0.41 + k * (H - 0.46) / 4, 0]} />)}
+        {/* the hand-hold, sunk in the wood */}
+        <mesh position={[-0.014, -0.1, W / 2 - 0.09]} rotation-z={Math.PI / 2}>
+          <cylinderGeometry args={[0.02, 0.02, 0.006, 12]} />
+          <meshToonMaterial color="#2a1a10" />
+        </mesh>
+      </group>
       {/* the short noren, and the plaque over it */}
       {[-1, 1].map((sd) => (
         <mesh key={sd} position={[-0.075, H - 0.2, sd * W / 4.2]} rotation-y={-Math.PI / 2}>

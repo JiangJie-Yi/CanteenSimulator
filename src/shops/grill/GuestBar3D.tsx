@@ -13,7 +13,7 @@ import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { AISLE, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { FLOOR_FAR, FLOOR_NEAR, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -482,8 +482,6 @@ function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR }: { c: C
 }
 
 /** the floor reaches this far under the counter, and back past the aisle */
-const FLOOR_NEAR = 0.42
-const FLOOR_FAR = -(AISLE + 0.5)
 
 function Stool() {
   return (

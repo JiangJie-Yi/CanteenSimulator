@@ -2046,11 +2046,14 @@ def phone(phase):
     def pose():
         sit_base(lean=0.16)
         aim("neck", (0, -0.12, 1))
-        aim("head", (0.03 * math.sin(2 * math.pi * phase), -0.55, 1))
+        aim("head", (-0.08 + 0.03 * math.sin(2 * math.pi * phase), -0.5, 1))
         aim("clavicle.L", (1, -0.18, 0.04))
         aim("clavicle.R", (-1, -0.18, 0.04))
-        reach("L", (0.035, -0.25, 0.535), (1, 0.2, -1), (-0.55, -0.75, 0.35))
-        reach("R", (-0.05, -0.24, 0.54 + 0.005 * th), (-1, 0.2, -1), (0.5 + 0.08 * th, -0.75, 0.35))
+        # (held up at the chest, clear of the bar, its screen turned up to the face)
+        # (held at the chest, clear of the bar, a little to the right so it shows past the head from behind, its
+        # screen turned up to the face)
+        reach("L", (-0.005, -0.23, 0.56), (1, 0.3, -1), (-0.5, -0.6, 0.6))
+        reach("R", (-0.075, -0.22, 0.565 + 0.005 * th), (-1, 0.3, -1), (0.4 + 0.08 * th, -0.6, 0.6))
     return pose
 
 

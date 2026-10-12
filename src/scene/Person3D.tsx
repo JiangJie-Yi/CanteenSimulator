@@ -135,6 +135,21 @@ type Rigged = {
   looked: THREE.Quaternion
 }
 
+/** a soft round glow, for a phone's screen */
+const SCREEN_GLOW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)')
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.3)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 64, 64)
+  return new THREE.CanvasTexture(c)
+})()
+
 /** a black leather briefcase hanging from its handle (the handle at the origin, the case below along +y) */
 function Briefcase() {
   return (
@@ -294,12 +309,14 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
-export function Person({ id, eating, walking, t: tGiven, clock, talk = 0 }: { id: number; eating: boolean; walking: boolean
+export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven }: { id: number; eating: boolean; walking: boolean
   /** their own clock (seconds): given as a number (re-rendered each frame), or read each frame from a ref, which
    * moves the figure without re-rendering it (only a change of what they're doing re-renders) */
   t?: number; clock?: { current: number }
   /** sat beside the one they came with: +1 if they're on this one's left, -1 on the right (they talk, turned to them) */
-  talk?: number }) {
+  talk?: number
+  /** (to look at one) what they do while they wait, instead of passing the time by turns */
+  idle?: 'Sit' | 'Phone' | 'Chin' }) {
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
   const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
@@ -320,7 +337,7 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0 }: { id
   const spellOf = (t: number) => Math.floor((t + id * 9) / 24)
   const [spell, setSpell] = useState(() => spellOf(timeNow()))
   const idle = (['Sit', 'Phone', 'Chin', 'Phone', 'Sit', 'Chin'] as const)[Math.floor(hash(id, spell) * 6)]
-  const now = walking ? 'Walk' : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idle
+  const now = walking ? 'Walk' : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idleGiven ?? idle
   useEffect(() => {
     const next = r.actions[now]
     if (!next) return
@@ -390,15 +407,26 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0 }: { id
         </mesh>
       </group>
       {/* a phone in the left hand while they look at it, its screen lit */}
-      <group ref={phone} visible={now === 'Phone'} position={[0.0, 0.045, 0.012]} rotation-x={-0.3}>
+      <group ref={phone} visible={now === 'Phone'} position={[-0.012, 0.05, 0.016]} rotation-x={-0.3}>
         <mesh>
-          <boxGeometry args={[0.032, 0.058, 0.005]} />
+          <boxGeometry args={[0.042, 0.076, 0.006]} />
           <meshToonMaterial color="#22252a" gradientMap={gradientMap} />
         </mesh>
-        <mesh position-z={-0.0027} rotation-y={Math.PI}>
-          <planeGeometry args={[0.027, 0.05]} />
-          <meshBasicMaterial color="#9fd0f4" />
+        <mesh scale={[1.12, 1.07, 1.6]}>
+          <boxGeometry args={[0.042, 0.076, 0.006]} />
+          <meshBasicMaterial color={INK} side={THREE.BackSide} />
         </mesh>
+        {[1, -1].map((sd) => (
+          <mesh key={sd} position-z={sd * 0.0032} rotation-y={sd > 0 ? 0 : Math.PI}>
+            <planeGeometry args={[0.036, 0.066]} />
+            <meshBasicMaterial color="#b8e2ff" toneMapped={false} />
+          </mesh>
+        ))}
+        {/* (the screen's cold light round it, so it shows from behind them too) */}
+        <sprite scale={0.12}>
+          <spriteMaterial map={SCREEN_GLOW} color="#9fd8ff" transparent opacity={0.55} depthWrite={false}
+            blending={THREE.AdditiveBlending} toneMapped={false} />
+        </sprite>
       </group>
       {/* the briefcase: in the hand, hanging from its handle, walking; on the floor by the stool, sitting */}
       {briefcase && (

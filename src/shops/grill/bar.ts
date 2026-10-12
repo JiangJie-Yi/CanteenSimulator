@@ -24,6 +24,10 @@ export type Seat = {
 /** how far behind the counter's middle line the stools stand, and the aisle behind them */
 export const SIT_BACK = 0.5
 export const AISLE = 1.15
+/** the customers' floor runs from this far toward the cook from a counter's middle line (under the bar, up to its
+ * cook's edge's reach) back to the wall behind the aisle; the kitchen's floor starts where it stops */
+export const FLOOR_NEAR = 0.42
+export const FLOOR_FAR = -(AISLE + 0.5)
 
 export const LAY = new THREE.Vector3(0.59, 0, 0.81)
 export const ALONG = new THREE.Vector3(0.81, 0, -0.59)

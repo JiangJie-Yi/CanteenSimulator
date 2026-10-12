@@ -18,7 +18,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
-import { ALONG, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -398,11 +398,13 @@ function Bar() {
   // (where the second counter butts against the first, the first's lip stops short of it, so nothing runs through)
   // (and a way through for the staff at the outer end of each: the first counter's far end by the till, the side
   // counter's near end)
+  // (and one top over both, in one piece round the corner, its edges rounded and flush where they meet)
   return (
     <group position={GRILL_OFFSET} scale={GRILL_SCALE}>
       <StaticBatch>
         {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0}
-          gate={i === 0 ? { end: 1, w: 0.55 } : { end: -1, w: 0.42 }} />)}
+          gate={i === 0 ? { end: 1, w: 0.55 } : { end: -1, w: 0.42 }} noTop={GRILL_COUNTERS.length > 1} />)}
+        {GRILL_COUNTERS.length > 1 && <BarTop />}
       </StaticBatch>
     </group>
   )
@@ -468,28 +470,41 @@ const COOK_TABLE_WOOD = (() => {
   t.needsUpdate = true
   return t
 })()
-const KITCHEN_FLOOR = { lay: [-2.3, 4.9], along: [-2.7, 7.4] }
-/** the kitchen's floor (土間): grey stone tiles, set in rows with their joints staggered, a little uneven in tone */
-const STONE_TILES = (() => {
+/**
+ * The kitchen's floor, inside the counters: from the first counter's floor's edge (lay) and the side counter's (along)
+ * to the side counter's near end and the first counter's far end, so it meets the customers' floors without a gap or
+ * an overlap (worked out from the counters, in the scene's frame).
+ */
+const KITCHEN_FLOOR = (() => {
+  const [c0, c1] = GRILL_COUNTERS
+  const lay0 = toGrillScene(c0.at.clone().addScaledVector(c0.lay, FLOOR_NEAR)).dot(LAY)
+  const along0 = c1 ? toGrillScene(c1.at.clone().addScaledVector(c1.lay, FLOOR_NEAR)).dot(ALONG) : COOK_TABLE.along[0] - 0.4
+  const along1 = toGrillScene(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + 0.15)).dot(ALONG)
+  const lay1 = c1 ? toGrillScene(c1.at.clone().addScaledVector(c1.along, -c1.length / 2 - 0.35)).dot(LAY) : COOK_TABLE.lay[1] + 0.9
+  return { lay: [lay0, lay1], along: [along0, along1] }
+})()
+/** its boards: dark walnut, narrower than the customers', so the two read as two rooms */
+const KITCHEN_PLANKS = (() => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')
-  c.width = c.height = 256
+  c.width = 128
+  c.height = 512
   const g = c.getContext('2d')!
-  g.fillStyle = '#3e3a34'
-  g.fillRect(0, 0, 256, 256)
-  let seed = 11
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  for (let row = 0; row < 4; row++) {
-    for (let col = -1; col < 4; col++) {
-      const x = col * 64 + (row % 2 ? 32 : 0), y = row * 64
-      const v = 100 + Math.floor(rnd() * 22)
-      g.fillStyle = `rgb(${v + 6},${v + 2},${v - 6})`
-      g.fillRect(x + 3, y + 3, 58, 58)
-      for (let k = 0; k < 14; k++) {
-        g.fillStyle = `rgba(${rnd() < 0.5 ? '40,36,30' : '200,194,180'},0.08)`
-        g.fillRect(x + 3 + rnd() * 50, y + 3 + rnd() * 50, 3 + rnd() * 8, 2 + rnd() * 5)
-      }
+  for (let b = 0; b < 6; b++) {
+    const w = 128 / 6
+    g.fillStyle = ['#4e3a2a', '#563f2e', '#4a3627', '#5a4331', '#503b2b', '#47342a'][b]
+    g.fillRect(b * w, 0, w, 512)
+    g.strokeStyle = 'rgba(20,12,6,0.3)'
+    for (let k = 0; k < 4; k++) {
+      g.beginPath()
+      g.moveTo(b * w + 3 + k * 5, 0)
+      g.bezierCurveTo(b * w + 1 + k * 5, 170, b * w + 6 + k * 5, 340, b * w + 3 + k * 5, 512)
+      g.stroke()
     }
+    g.fillStyle = 'rgba(15,8,4,0.7)'
+    g.fillRect(b * w, 0, 1.5, 512)
+    // (the boards' butt joints, staggered)
+    g.fillRect(b * w, ((b * 197) % 512), w, 1.5)
   }
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
@@ -497,15 +512,17 @@ const STONE_TILES = (() => {
   return t
 })()
 function CookTable() {
-  // (and under it all the kitchen's own floor, a step's worth of colour away from the customers' boards: tiled stone
-  // from the bar's cook's edges to the front, and on past the table's right-hand end where the other cooks stand)
+  // (and under it all the kitchen's own floor of darker boards, from the bar's cook's edges to the front, and on past
+  // the table's right-hand end where the other cooks stand)
   const W = KITCHEN_FLOOR.along[1] - KITCHEN_FLOOR.along[0], D = KITCHEN_FLOOR.lay[1] - KITCHEN_FLOOR.lay[0]
   const mid = new THREE.Vector3().addScaledVector(ALONG, (KITCHEN_FLOOR.along[0] + KITCHEN_FLOOR.along[1]) / 2)
     .addScaledVector(LAY, (KITCHEN_FLOOR.lay[0] + KITCHEN_FLOOR.lay[1]) / 2).setY(GRILL_OFFSET.y + 0.003)
   const map = useMemo(() => {
-    if (!STONE_TILES) return null
-    const t = STONE_TILES.clone()
-    t.repeat.set(W / 3.2, D / 3.2)
+    if (!KITCHEN_PLANKS) return null
+    const t = KITCHEN_PLANKS.clone()
+    // (the boards run along the counter, each about 0.3 wide)
+    t.repeat.set(D / 1.8, W / 6)
+    t.rotation = Math.PI / 2
     t.needsUpdate = true
     return t
   }, [W, D])
@@ -567,6 +584,51 @@ function CookTableBox({ lay, along }: { lay: [number, number]; along: [number, n
     </group>
   )
 }
+/**
+ * The bar's top as one plank round the corner: each counter's top as a rectangle (along the first counter, across
+ * it), the side counter's outer edge squared up with the first's end, joined into an L and given rounded edges.
+ */
+const BAR_DEPTH = 0.62
+function barTopShape(grow: number) {
+  const box = (c: Counter) => {
+    const hl = (c.length + 0.3) / 2, hd = BAR_DEPTH / 2
+    const pts = [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => c.at.clone().addScaledVector(c.along, a * hl).addScaledVector(c.lay, b * hd))
+    const xs = pts.map((p) => p.dot(ALONG)), ys = pts.map((p) => p.dot(LAY))
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }
+  }
+  const a = box(GRILL_COUNTERS[0]), b = box(GRILL_COUNTERS[1])
+  // (the side counter stands off the first's cook's side, at its start: its outer edge flush with the first's end)
+  const i = 0.025 - grow
+  const x0 = Math.min(a.x0, b.x0) + i
+  const pts: [number, number][] = [[x0, a.y0 + i], [a.x1 - i, a.y0 + i], [a.x1 - i, a.y1 - i], [b.x1 - i, a.y1 - i], [b.x1 - i, b.y1 - i],
+    [x0, b.y1 - i]]
+  const sh = new THREE.Shape()
+  pts.forEach(([x, y], k) => (k ? sh.lineTo(x, y) : sh.moveTo(x, y)))
+  const thick = 0.012 + grow * 0.6
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.06 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: 0.025 + grow * 0.6,
+    bevelSegments: 3, curveSegments: 4 })
+  g.rotateX(Math.PI / 2)
+  g.translate(0, BAR_TOP - thick, 0)
+  return g
+}
+const BAR_WOOD = (() => {
+  if (!TRAY_WOOD) return null
+  const t = TRAY_WOOD.clone()
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(1 / 2.6, 1 / 0.62)
+  t.needsUpdate = true
+  return t
+})()
+function BarTop() {
+  const geo = useMemo(() => barTopShape(0), [])
+  const ink = useMemo(() => barTopShape(0.01), [])
+  return (
+    <group rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+      <mesh geometry={geo} castShadow receiveShadow><meshToonMaterial color="#ffffff" map={BAR_WOOD} /></mesh>
+      <mesh geometry={ink}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+    </group>
+  )
+}
 /** a unit slab with rounded edges (scaled to each top), its grain still running the long way */
 const ROUNDED_SLAB = new RoundedBoxGeometry(1, 1, 1, 3, 0.08)
 const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042, 0.016], [0.045, 0.02], [0.043, 0.021],
@@ -577,7 +639,9 @@ const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042,
  * and that end of the top is a flap on brass hinges, a pair of low swing doors under it: the staff's way between the
  * kitchen and the floor.
  */
-function BarCounter({ c, trim = 0, gate }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number } }) {
+function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number }
+  /** its top drawn with the others' as one piece (BarTop), not its own */
+  noTop?: boolean }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
   const L = c.length
   const G = gate?.w ?? 0
@@ -588,12 +652,16 @@ function BarCounter({ c, trim = 0, gate }: { c: Counter; trim?: number; gate?: {
   const gateX = end * ((L + 0.2) / 2 - G / 2)
   return (
     <group position={c.at} rotation-y={yaw}>
-      <mesh position-y={BAR_TOP - 0.03} scale={[L + 0.3, 0.06, 0.62]} castShadow receiveShadow geometry={ROUNDED_SLAB}>
-        <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
-      </mesh>
-      <mesh position-y={BAR_TOP - 0.03} scale={[(L + 0.3) * 1.008, 0.06 * 1.25, 0.62 * 1.035]} geometry={ROUNDED_SLAB}>
-        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-      </mesh>
+      {!noTop && (
+        <>
+          <mesh position-y={BAR_TOP - 0.03} scale={[L + 0.3, 0.06, 0.62]} castShadow receiveShadow geometry={ROUNDED_SLAB}>
+            <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
+          </mesh>
+          <mesh position-y={BAR_TOP - 0.03} scale={[(L + 0.3) * 1.008, 0.06 * 1.25, 0.62 * 1.035]} geometry={ROUNDED_SLAB}>
+            <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+          </mesh>
+        </>
+      )}
       {/* the base stands back on the cook's side, so the customers' knees go under the top */}
       <mesh position={[baseX, (BAR_TOP - 0.06) / 2, 0.08]} castShadow>
         <boxGeometry args={[baseL, BAR_TOP - 0.06, 0.4]} />
