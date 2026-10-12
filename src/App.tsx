@@ -34,6 +34,7 @@ import { OpeningSpot } from '@/scene/OpeningSpot'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
+import { SAY_EACH, sayChunks } from '@/game/say'
 import { GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE } from '@/shops/grill/bar'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
@@ -259,6 +260,7 @@ type SceneProps = {
   potAi: string[]
   spotOn: boolean
   guestsBy: Record<string, GuestView[]>
+  speech: Record<number, { key: number; text: string }>
   onPotGuestEat: (id: string, taste: number) => void
   /** shops with food out on either table (tasting or open): they stay loaded, so nothing on them is lost */
   inUse: string[]
@@ -270,7 +272,7 @@ type SceneProps = {
   bakeKitchen: { phase: 'cook' | 'eat'; parts: Part[] } | null
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
+function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -480,7 +482,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
               {ai && i === active && !phone && (
                 // the customers, in 3D (a phone has them in 2D on the guest board, and no 3D bar at all), at the bar behind (the grill's bar is drawn by Roasting, which serves onto it)
-                <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast}
+                <GuestBar3D guests={guestsBy[dish.id] ?? []} lang={lang} drawCounter={!dish.roast} speech={speech}
                   mark={dish.roast ? '聞野' : dish.heatControl ? '鼎沸' : dish.bake ? '麵包' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)} />
@@ -599,6 +601,7 @@ export default function App() {
   const [notes, setNotes] = useState<Notes>(() => SAVED?.notes ?? {})
   const [lastTry, setLastTry] = useState<{ name: string; taste: number; key: number } | null>(null)
   const langRef = useRef<Lang>('zh')
+  const phoneRef = useRef(false)
   const potSoupRef = useRef<string | null>(null)
   const onEat = useCallback((id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; steps?: Step[]; dip?: string[] }) => {
     const item = ALL_ITEMS.get(id) ?? DISHES.flatMap((d) => d.bases).find((b) => b.id === id)
@@ -964,15 +967,28 @@ export default function App() {
     })
   }
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
-  const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest' | 'stock'; text: string }[]>([])
+  const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest' | 'stock' | 'order'; text: string }[]>([])
+  /** what each customer's saying just now (over their head) */
+  const [speech, setSpeech] = useState<Record<number, { key: number; text: string }>>({})
   const chatId = useRef(0)
-  const talk = useCallback((who: 'chef' | 'guest' | 'stock', raw: string) => {
+  const talk = useCallback((who: 'chef' | 'guest' | 'stock' | 'order', raw: string) => {
+    // what a customer says is shown in a bubble over their head, where there's a 3D bar to show it on
+    const said = /^#(\d+) (.*)$/.exec(raw)
+    if (who === 'guest' && said && !phoneRef.current) {
+      const gid = +said[1]
+      const key = ++chatId.current
+      setSpeech((sp) => ({ ...sp, [gid]: { key, text: said[2] } }))
+      // (long enough for a long line to be said a piece at a time)
+      const ms = Math.max(4500, sayChunks(said[2]).length * SAY_EACH * 1000 + 1500)
+      window.setTimeout(() => setSpeech((sp) => (sp[gid]?.key === key ? Object.fromEntries(Object.entries(sp).filter(([k]) => +k !== gid)) : sp)), ms)
+      return
+    }
     // customers are named by how they look (上班族, 老奶奶…), not by number
     const lg = langRef.current
     const text = raw.replace(/^#(\d+) /, (_, n) => `${guestLabel(+n, lg)}${lg === 'ja' ? '「' : '：'}`)
       .replace(/#(\d+) ?/g, (_, n) => guestLabel(+n, lg)) + (lg === 'ja' && /^#\d+ /.test(raw) ? '」' : '')
     const id = ++chatId.current
-    setChat((all) => [...all.slice(-3), { id, who, text }])
+    setChat((all) => [...all.slice(-4), { id, who, text }])
     window.setTimeout(() => setChat((all) => all.filter((m) => m.id !== id)), 6000)
   }, [])
   const [theme, toggleTheme] = useTheme()
@@ -984,6 +1000,7 @@ export default function App() {
   const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
   const phone = usePhone()
+  phoneRef.current = phone
   // the stove starts switched off: the cook turns it up
   const [heatBy, setHeatBy] = useState({ closed: 0, open: 0 })
   const heat = heatBy[space]
@@ -1519,6 +1536,7 @@ export default function App() {
     setEntryCount((c) => ({ ...c, [e.key]: (c[e.key] ?? 0) + 1 }))
     const key = ++feedSeq.current
     setFeed((fd) => [...fd.slice(-2), { key, id: e.key, guest }])
+    talk('order', `#${guest} ${lang === 'ja' ? 'から' : '點了'} ${nameIn(lang, e)}`)
     window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
     return true
   }
@@ -1722,12 +1740,14 @@ export default function App() {
               if (ok && guest) {
                 const key = ++feedSeq.current
                 setFeed((f) => [...f.slice(-2), { key, id, guest }])
+                const it = findItem(dish, id)
+                talk('order', `#${guest} ${lang === 'ja' ? 'から' : '點了'} ${it ? nameIn(lang, it) : id}`)
                 window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
               }
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
-            guestsBy={guestsBy} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })}
+            guestsBy={guestsBy} speech={speech} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
             bakeKitchen={(() => {
               const k = ai ? shop.current.bakery?.kitchen : null
@@ -1893,7 +1913,8 @@ export default function App() {
             onPointerDown={dragChat.onPointerDown} onDoubleClick={dragChat.onDoubleClick}>
             {chat.map((m) => (
               <li key={m.id} className={`ai-line ai-${m.who}`}>
-                <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : m.who === 'stock' ? UI[lang].stock : UI[lang].guest}</span>{m.text}
+                <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : m.who === 'stock' ? UI[lang].stock : m.who === 'order' ? (lang === 'ja' ? '注文' : '點單')
+                  : UI[lang].guest}</span>{m.text}
               </li>
             ))}
           </ul>

@@ -11,6 +11,7 @@ import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
+import { SAY_EACH, sayChunks } from '@/game/say'
 import { AISLE, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
@@ -556,7 +557,8 @@ function Plate({ dirty = false }: { dirty?: boolean }) {
   )
 }
 
-export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset }:
+export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
+  speech = {} }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
@@ -566,6 +568,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     top?: number
     /** draw the customers themselves (a phone shows them in 2D instead; the plates still come and go) */
     people?: boolean
+    /** what each customer's saying just now, shown over their head */
+    speech?: Record<number, { key: number; text: string }>
     /** drawn this much bigger, all of it */
     scale?: number
     /** and moved by this (after scaling) */
@@ -577,6 +581,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const clock = useRef(0)
   const counters = useMemo(() => given ?? singleCounter(at, length), [given, at, length])
   const seats = useMemo(() => seatsOf(counters), [counters])
+  /** a couple sat side by side turn to talk: the one at the next stool along is on the left (+1), the one before on
+   * the right (-1); 0 while the other isn't sat there yet (or has gone) */
+  const talkSide = (s: Shown) => {
+    const g = guests.find((x) => x.id === s.id)
+    const o = g?.partner !== undefined ? shown.find((x) => x.id === g.partner && x.phase === 'sit') : undefined
+    return s.phase === 'sit' && o ? Math.sign(o.seat - s.seat) : 0
+  }
   const paths = useMemo(() => seats.map((st) => {
     const path = pathTo(counters, st)
     return { path, len: pathLength(path) }
@@ -773,15 +784,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} />
               {/* (and past the bar's end, a strip more behind the till for the cashier to stand on) */}
               {given && <DiningFloor c={c} from={c.length / 2 + 0.15} to={c.length / 2 + 1.45} near={1.1} far={FLOOR_NEAR} />}
-              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} />}
+              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} shrine={back + 1.0} />}
             </group>
           )
         }
         const meet = c0.at.clone().addScaledVector(c0.lay, FLOOR_NEAR).sub(c.at).dot(c.along)
+        // (where its wall's line reaches the first counter's wall)
+        const corner = (FLOOR_FAR - c.at.clone().sub(c0.at).dot(c0.lay)) / c.along.dot(c0.lay)
         return (
           <group key={i}>
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} />
-            {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={meet} far={FLOOR_FAR} lamps={2} />}
+            {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
+            {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={FLOOR_FAR} lamps={2} top={top} door={(meet + corner) / 2} />}
           </group>
         )
       })}
@@ -824,13 +838,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         return (
           <group key={s.id} ref={(o) => { if (o) groups.current.set(s.id, o); else groups.current.delete(s.id) }}>
             <group scale={PEOPLE_SCALE}>
-              <PersonClock s={s} eating={() => s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'} clock={clock} />
+              <PersonClock s={s} eating={() => s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'} clock={clock}
+                talk={talkSide(s)} />
             </group>
             <Html position={[0, 1.05 * PEOPLE_SCALE, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
               <div className="g3-label">
-                {g && !walking && g.state === 'waiting' && g.rating === null && <span className="g3-bubble">…</span>}
+                {speech[s.id] ? <Say key={speech[s.id].key} text={speech[s.id].text} />
+                  : g && !walking && g.state === 'waiting' && g.rating === null && <span className="g3-bubble">…</span>}
                 {g && g.rating !== null && <MoodFace guest={g} />}
-                <span>{guestLabel(s.id, lang)}</span>
+                <span>{g?.partner !== undefined && <i className="g3-heart">♥</i>}{guestLabel(s.id, lang)}</span>
               </div>
             </Html>
           </group>
@@ -840,9 +856,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   )
 }
 
+/** a short line at a time, so a long one says itself in turn over their head rather than in a tall thin column */
+function Say({ text }: { text: string }) {
+  const chunks = useMemo(() => sayChunks(text), [text])
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    if (i >= chunks.length - 1) return
+    const h = window.setTimeout(() => setI(i + 1), SAY_EACH * 1000)
+    return () => window.clearTimeout(h)
+  }, [i, chunks.length])
+  return <span key={i} className="g3-bubble g3-say">{chunks[i]}{i < chunks.length - 1 ? '…' : ''}</span>
+}
+
 /** re-renders the figure each frame (its little movements), without re-rendering the whole bar */
-function PersonClock({ s, eating, clock }: { s: Shown; eating: () => boolean; clock: { current: number } }) {
+function PersonClock({ s, eating, clock, talk }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number }) {
   const [t, setT] = useState(0)
   useFrame(() => setT(clock.current))
-  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} t={t} />
+  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} t={t} talk={talk} />
 }

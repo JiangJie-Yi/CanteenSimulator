@@ -5820,3 +5820,24 @@ button {
   --plate: #4a3a2c;
   --plate-cream: #a88c6c;
 }
+
+.g3-heart {
+  margin-right: 3px;
+  color: #ff7a9a;
+  font-style: normal;
+}
+
+/* what a customer says, over their head */
+.g3-say {
+  white-space: nowrap;
+  text-align: center;
+  animation: g3-say-in 0.25s ease-out;
+}
+
+@keyframes g3-say-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.9); }
+}
+
+.ai-order .ai-who {
+  background: #7a6a3e;
+}

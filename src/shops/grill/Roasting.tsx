@@ -3,11 +3,13 @@ import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
 import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
 import { StaffFigure } from '@/scene/Person3D'
+import { kindOf, type GuestKind } from '@/data/guests'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
@@ -41,10 +43,15 @@ const FAN_MAX = 0.25
 const FAN_FADE = 0.02
 const FAN_COST = 1.4
 type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state']; seat: number
+  /** the one they came in with (a couple, sat side by side) */
+  partner?: number
   /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
   leftAt?: number; cleared?: boolean }
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
 const MAX_SEATED = GRILL_SEATS.length
+/** who can come in as a couple: him, and her */
+const COUPLE_HIM = new Set<GuestKind>(['salaryman', 'student', 'highSchoolBoy', 'yankee', 'tourist'])
+const COUPLE_HER = new Set<GuestKind>(['officeLady', 'highSchoolGirl', 'yukata', 'maid', 'student'])
 const PATIENCE = 150
 /** the bar the customers sit at, behind the fire (away from the camera): its middle, length, top, and seats */
 const BAR_AT = GRILL_COUNTERS[0].at.clone()
@@ -388,7 +395,14 @@ const TRAY_WOOD = (() => {
  */
 function Bar() {
   // (where the second counter butts against the first, the first's lip stops short of it, so nothing runs through)
-  return <group position={GRILL_OFFSET} scale={GRILL_SCALE}>{GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} />)}</group>
+  // (and a way through for the staff at the outer end of each: the first counter's far end by the till, the side
+  // counter's near end)
+  return (
+    <group position={GRILL_OFFSET} scale={GRILL_SCALE}>
+      {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0}
+        gate={i === 0 ? { end: 1, w: 0.55 } : { end: -1, w: 0.42 }} />)}
+    </group>
+  )
 }
 /**
  * The cook's table everything stands on (the fire pit, the tray, the plates): a thick top of pale planks, its front
@@ -451,45 +465,97 @@ const COOK_TABLE_WOOD = (() => {
   t.needsUpdate = true
   return t
 })()
+const KITCHEN_FLOOR = { lay: [-2.3, 4.9], along: [-2.7, 7.4] }
+/** the kitchen's floor (土間): grey stone tiles, set in rows with their joints staggered, a little uneven in tone */
+const STONE_TILES = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')!
+  g.fillStyle = '#3e3a34'
+  g.fillRect(0, 0, 256, 256)
+  let seed = 11
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  for (let row = 0; row < 4; row++) {
+    for (let col = -1; col < 4; col++) {
+      const x = col * 64 + (row % 2 ? 32 : 0), y = row * 64
+      const v = 100 + Math.floor(rnd() * 22)
+      g.fillStyle = `rgb(${v + 6},${v + 2},${v - 6})`
+      g.fillRect(x + 3, y + 3, 58, 58)
+      for (let k = 0; k < 14; k++) {
+        g.fillStyle = `rgba(${rnd() < 0.5 ? '40,36,30' : '200,194,180'},0.08)`
+        g.fillRect(x + 3 + rnd() * 50, y + 3 + rnd() * 50, 3 + rnd() * 8, 2 + rnd() * 5)
+      }
+    }
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  return t
+})()
 function CookTable() {
-  // (and the cook's floor, at the customers' floor's height, out a step in front of the table where he stands)
-  // (and on past the table's right-hand end, where the other cooks stand)
-  const right = COOK_TABLE.along[1] + 1.0
-  const W = right - COOK_TABLE.along[0], D = COOK_TABLE.lay[1] + 0.9 - COOK_TABLE.lay[0]
-  const mid = new THREE.Vector3().addScaledVector(ALONG, (COOK_TABLE.along[0] + right) / 2)
-    .addScaledVector(LAY, (COOK_TABLE.lay[0] + COOK_TABLE.lay[1] + 0.9) / 2).setY(GRILL_OFFSET.y + 0.006)
+  // (and under it all the kitchen's own floor, a step's worth of colour away from the customers' boards: tiled stone
+  // from the bar's cook's edges to the front, and on past the table's right-hand end where the other cooks stand)
+  const W = KITCHEN_FLOOR.along[1] - KITCHEN_FLOOR.along[0], D = KITCHEN_FLOOR.lay[1] - KITCHEN_FLOOR.lay[0]
+  const mid = new THREE.Vector3().addScaledVector(ALONG, (KITCHEN_FLOOR.along[0] + KITCHEN_FLOOR.along[1]) / 2)
+    .addScaledVector(LAY, (KITCHEN_FLOOR.lay[0] + KITCHEN_FLOOR.lay[1]) / 2).setY(GRILL_OFFSET.y + 0.003)
+  const map = useMemo(() => {
+    if (!STONE_TILES) return null
+    const t = STONE_TILES.clone()
+    t.repeat.set(W / 3.2, D / 3.2)
+    t.needsUpdate = true
+    return t
+  }, [W, D])
   return (
     <>
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]} />)}
-      <mesh position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} receiveShadow>
-        <boxGeometry args={[W, 0.012, D]} />
-        <meshToonMaterial color="#5a4030" />
+      <CookTableTop />
+      <mesh position={mid} rotation={[-Math.PI / 2, 0, Math.atan2(-ALONG.z, ALONG.x)]} receiveShadow>
+        <planeGeometry args={[W, D]} />
+        <meshToonMaterial color="#ffffff" map={map} />
       </mesh>
     </>
+  )
+}
+/**
+ * The cook's table's top, in one piece round its bay: a thick plank top with its edges rounded over (面取り), the
+ * grain running on unbroken, its ink outline round the whole shape (no seams where the parts under it meet).
+ */
+function tableTopGeometry(grow: number, thick: number) {
+  const { along: [a0, a1], lay: [l0, l1] } = COOK_TABLE
+  const n = COOK_NOTCH
+  const i = 0.025 - grow
+  const sh = new THREE.Shape()
+  const pts: [number, number][] = [[a0 + i, l0 + i], [a1 - i, l0 + i], [a1 - i, l1 - i], [n.along[1] + i, l1 - i],
+    [n.along[1] + i, n.lay - i], [n.along[0] - i, n.lay - i], [n.along[0] - i, l1 - i], [a0 + i, l1 - i]]
+  pts.forEach(([x, y], k) => (k ? sh.lineTo(x, y) : sh.moveTo(x, y)))
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.08 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: 0.025 + grow * 0.6,
+    bevelSegments: 3, curveSegments: 4 })
+  g.rotateX(Math.PI / 2)
+  g.translate(0, -thick, 0)
+  return g
+}
+const TABLE_TOP = tableTopGeometry(0, 0.015)
+const TABLE_TOP_INK = tableTopGeometry(0.012, 0.022)
+function CookTableTop() {
+  return (
+    <group rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+      <mesh geometry={TABLE_TOP} receiveShadow>
+        <meshToonMaterial color="#d8c4a6" map={COOK_TABLE_WOOD} />
+      </mesh>
+      <mesh geometry={TABLE_TOP_INK}>
+        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+      </mesh>
+    </group>
   )
 }
 function CookTableBox({ lay, along }: { lay: [number, number]; along: [number, number] }) {
   const W = along[1] - along[0], D = lay[1] - lay[0]
   const mid = new THREE.Vector3().addScaledVector(ALONG, (along[0] + along[1]) / 2).addScaledVector(LAY, (lay[0] + lay[1]) / 2)
   const floor = GRILL_OFFSET.y
-  // (the planks' texture tiled by the box's own size, so the grain runs on across both)
-  const map = useMemo(() => {
-    if (!COOK_TABLE_WOOD) return null
-    const t = COOK_TABLE_WOOD.clone()
-    t.repeat.set(W / 1.6, D / 1.6)
-    t.needsUpdate = true
-    return t
-  }, [W, D])
+  // (the top is one piece over all of them: CookTableTop)
   return (
     <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
-      <mesh position-y={-0.04} receiveShadow>
-        <boxGeometry args={[W, 0.08, D]} />
-        <meshToonMaterial color="#d8c4a6" map={map} />
-      </mesh>
-      <mesh position-y={-0.04} scale={[1 + 0.02 / W, 1.25, 1 + 0.02 / D]}>
-        <boxGeometry args={[W, 0.08, D]} />
-        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-      </mesh>
       {/* the body, set back a little under the top */}
       <mesh position-y={(floor - 0.08) / 2}>
         <boxGeometry args={[W - 0.12, -floor - 0.08, D - 0.12]} />
@@ -498,26 +564,70 @@ function CookTableBox({ lay, along }: { lay: [number, number]; along: [number, n
     </group>
   )
 }
+/** a unit slab with rounded edges (scaled to each top), its grain still running the long way */
+const ROUNDED_SLAB = new RoundedBoxGeometry(1, 1, 1, 3, 0.08)
 const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042, 0.016], [0.045, 0.02], [0.043, 0.021],
   [0.036, 0.012], [0.026, 0.006], [0, 0.006]], 0.045)
-function BarCounter({ c, trim = 0 }: { c: Counter; trim?: number }) {
+/**
+ * One counter of the bar: a long plank of pale hinoki with rounded edges on a dark base, a raised lip on the cook's
+ * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
+ * and that end of the top is a flap on brass hinges, a pair of low swing doors under it: the staff's way between the
+ * kitchen and the floor.
+ */
+function BarCounter({ c, trim = 0, gate }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number } }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
   const L = c.length
+  const G = gate?.w ?? 0
+  const end = gate?.end ?? 1
+  // (the base, short of the gate)
+  const baseL = L + 0.2 - G
+  const baseX = -end * G / 2
+  const gateX = end * ((L + 0.2) / 2 - G / 2)
   return (
     <group position={c.at} rotation-y={yaw}>
-      <mesh position-y={BAR_TOP - 0.03} castShadow receiveShadow>
-        <boxGeometry args={[L + 0.3, 0.06, 0.62]} />
+      <mesh position-y={BAR_TOP - 0.03} scale={[L + 0.3, 0.06, 0.62]} castShadow receiveShadow geometry={ROUNDED_SLAB}>
         <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
       </mesh>
-      <mesh position-y={BAR_TOP - 0.03} scale={[1.01, 1.2, 1.04]}>
-        <boxGeometry args={[L + 0.3, 0.06, 0.62]} />
+      <mesh position-y={BAR_TOP - 0.03} scale={[(L + 0.3) * 1.008, 0.06 * 1.25, 0.62 * 1.035]} geometry={ROUNDED_SLAB}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
       {/* the base stands back on the cook's side, so the customers' knees go under the top */}
-      <mesh position={[0, (BAR_TOP - 0.06) / 2, 0.08]} castShadow>
-        <boxGeometry args={[L + 0.2, BAR_TOP - 0.06, 0.4]} />
+      <mesh position={[baseX, (BAR_TOP - 0.06) / 2, 0.08]} castShadow>
+        <boxGeometry args={[baseL, BAR_TOP - 0.06, 0.4]} />
         <meshToonMaterial color="#3a2a1e" />
       </mesh>
+      {gate && (
+        <group position-x={gateX}>
+          {/* the flap's seam across the top, and its two brass hinges on the cook's side */}
+          <mesh position={[-end * G / 2, BAR_TOP + 0.001, 0]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[0.008, 0.6]} />
+            <meshBasicMaterial color="#3b2a20" />
+          </mesh>
+          {[-0.18, 0.18].map((z) => (
+            <mesh key={z} position={[-end * G / 2, BAR_TOP + 0.003, z]}>
+              <boxGeometry args={[0.05, 0.006, 0.03]} />
+              <meshToonMaterial color="#c8a050" />
+            </mesh>
+          ))}
+          {/* the swing doors, standing a touch ajar, slatted, at the base's middle */}
+          {[-1, 1].map((sd) => (
+            <group key={sd} position={[sd * G / 2, 0.06, 0.08]} rotation-y={sd * 0.12}>
+              <group position-x={-sd * G / 4}>
+                <mesh position-y={0.2}>
+                  <boxGeometry args={[G / 2 - 0.02, 0.4, 0.025]} />
+                  <meshToonMaterial color="#5a3e28" />
+                </mesh>
+                {[0.08, 0.16, 0.24, 0.32].map((y) => (
+                  <mesh key={y} position={[0, y, -0.014]}>
+                    <boxGeometry args={[G / 2 - 0.05, 0.012, 0.004]} />
+                    <meshToonMaterial color="#3a2a1e" />
+                  </mesh>
+                ))}
+              </group>
+            </group>
+          ))}
+        </group>
+      )}
       {/* the raised lip on the cook's side, the step the food is handed over */}
       <mesh position={[trim / 2, BAR_TOP + 0.03, 0.285]}>
         <boxGeometry args={[L + 0.3 - trim, 0.06, 0.05]} />
@@ -1448,7 +1558,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (h) others.push({ p: h, r: footprint(k) })
     }
     // the crate and the fan
-    for (const d of [DECOR.crate, DECOR.fan]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
+    for (const d of [DECOR.crate, DECOR.fan, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
     if (space === 'open') for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)), r: 0.42 * GRILL_SCALE })
     // the soup bowls on the table are in the way too
@@ -1844,7 +1954,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const nameOfP = (p: Piece) => p.want?.name ?? nameOf(p.id)
   const guestSeq = useRef(0)
   const report = () => onGuests?.(guests.current.map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
-    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat })))
+    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner })))
   const chefSaid = useRef(0)
 
   /** the best seasoning for a food by the PAIRING table (null if nothing suits it) */
@@ -1964,44 +2074,58 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const seated = guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating')
     if (onOrder && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd) {
       guestClock.current = 0
-      const want = 1 + Math.floor(Math.random() * 3)
-      const orders: string[] = []
-      const id = guestSeq.current + 1
-      const said: string[] = []
-      for (let k = 0; k < (entries ? Math.min(want, 2) : want); k++) {
-        if (entries) {
-          // a dish (or a set) off the menu, made the way it's listed
-          const e = entries[Math.floor(Math.random() * entries.length)]
-          if (!e || !e.parts.every((pt) => pt.id in roast.times)) continue
-          wants.current.push(...e.parts)
-          if (onOrderEntry?.(e.key, id)) {
-            orders.push(...e.parts.map((pt) => pt.id))
-            said.push(e.name)
-          } else {
-            wants.current.splice(wants.current.length - e.parts.length, e.parts.length)
+      // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
+      const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
+      const free = (n: number) => n < BAR_SEATS && !used.has(n)
+      // now and then a couple comes in together, if two stools side by side on one counter are free: a young man and
+      // a young woman (the next ids that are), sat next to each other
+      const pairAt = Math.random() < 0.2
+        ? Array.from({ length: BAR_SEATS - 1 }, (_, n) => n).find((n) => free(n) && free(n + 1) && GRILL_SEATS[n].counter === GRILL_SEATS[n + 1].counter)
+        : undefined
+      let ids = [guestSeq.current + 1]
+      if (pairAt !== undefined) {
+        let i = guestSeq.current + 1
+        while (!(COUPLE_HIM.has(kindOf(i).kind) && COUPLE_HER.has(kindOf(i + 1).kind)) && i < guestSeq.current + 400) i++
+        if (i < guestSeq.current + 400) ids = [i, i + 1]
+      }
+      const couple = ids.length === 2
+      for (const [k, id] of ids.entries()) {
+        const want = 1 + Math.floor(Math.random() * 3)
+        const orders: string[] = []
+        const said: string[] = []
+        for (let j = 0; j < (entries ? Math.min(want, 2) : want); j++) {
+          if (entries) {
+            // a dish (or a set) off the menu, made the way it's listed
+            const e = entries[Math.floor(Math.random() * entries.length)]
+            if (!e || !e.parts.every((pt) => pt.id in roast.times)) continue
+            wants.current.push(...e.parts)
+            if (onOrderEntry?.(e.key, id)) {
+              orders.push(...e.parts.map((pt) => pt.id))
+              said.push(e.name)
+            } else {
+              wants.current.splice(wants.current.length - e.parts.length, e.parts.length)
+            }
+            continue
           }
-          continue
+          const pick = itemIds.filter((x) => x in roast.times)[Math.floor(Math.random() * itemIds.filter((x) => x in roast.times).length)]
+          if (pick && onOrder(pick, id)) {
+            orders.push(pick)
+            said.push(nameOf(pick))
+          }
         }
-        const pick = itemIds.filter((id) => id in roast.times)[Math.floor(Math.random() * itemIds.filter((id) => id in roast.times).length)]
-        if (pick && onOrder(pick, id)) {
-          orders.push(pick)
-          said.push(nameOf(pick))
+        guestSeq.current = Math.max(guestSeq.current, id)
+        if (orders.length) {
+          const seat = couple ? pairAt! + k : Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n)) ?? 0
+          used.add(seat)
+          guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat, partner: couple ? ids[1 - k] : undefined })
+          onSay?.('guest', L().order(id, said))
+        } else {
+          onSay?.('guest', L().nothing(id))
         }
       }
-      guestSeq.current = id
-      if (orders.length) {
-        // the first free stool
-        // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
-        const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
-        const seat = Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n)) ?? 0
-        guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat })
-        // (only those still here and the last few gone are kept: the list doesn't grow all day)
-        guests.current = guests.current.filter((g, i, all) => g.state === 'waiting' || g.state === 'eating' || !g.cleared ||
-          i >= all.length - 12)
-        onSay?.('guest', L().order(id, said))
-      } else {
-        onSay?.('guest', L().nothing(id))
-      }
+      // (only those still here and the last few gone are kept: the list doesn't grow all day)
+      guests.current = guests.current.filter((g, i, all) => g.state === 'waiting' || g.state === 'eating' || !g.cleared ||
+        i >= all.length - 12)
       report()
     }
     // someone kept waiting too long goes
@@ -2968,8 +3092,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
               r: (s[0] + s[1]) / 2 * 1.05, live: true }
           }
         }
-        // (no bar drawn, on a phone: what's served is carried off to the customers, who are on the 2D board)
+        // (no bar drawn, on a phone: what's served is carried off to the customers, who are on the 2D board; and with
+        // the shop shut there's no bar at all, so nothing left served on it hangs in the air where it was)
         if (!bar && p.container === 'bar') p.node.visible = p.flight < 1
+        if (space !== 'open' && p.container === 'bar') p.node.visible = false
       }
 
       // browning, then a slow char: black patches spread across the texture and the whole piece darkens,
@@ -3024,7 +3150,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const phase = p.eat * BITES_PER_PIECE
         const wanted = Math.min(BITES_PER_PIECE, Math.floor(phase + 0.35))
         while (p.bites.uBiteCount.value < wanted) takeBite(p)
-        if (!p.body?.live) {
+        // (only what's eaten off your own plate hops up to be bitten: at the bar it's the customer you see eating, so
+        // the piece just lies there getting smaller)
+        if (!p.body?.live && p.container !== 'bar') {
           const lift = Math.max(0, Math.sin(Math.min(1, (phase % 1) * 1.6) * Math.PI))
           p.node.position.y += 0.06 * lift
           p.node.rotateOnWorldAxis(STACK_DIR, -0.12 * lift)

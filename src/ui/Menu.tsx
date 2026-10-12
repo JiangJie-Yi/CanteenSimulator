@@ -3,7 +3,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { nameIn, UI, type Lang } from '@/data/i18n'
 import { toChineseNumber, type Dish } from '@/data/menu'
 import { Icon, iconFor } from './Icon'
-import { guestLabel } from '@/data/guests'
 
 type MenuProps = {
   dish: Dish
@@ -396,16 +395,6 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       </div>
 
       <footer className="tally">
-        {/* the order slip: what came in, written out stroke by stroke (its room kept while open, so nothing moves
-            when a line comes in, and it never sits over the tags) */}
-        {(feed.length > 0 || locked) && (
-          <ul className="order-slip" aria-live="polite">
-            {feed.slice(-2).map((f) => {
-              const it = all.find((x) => x.id === f.id)
-              return <li key={f.key}><span>✎</span><em>{t.wrote(guestLabel(f.guest, lang), it ? nameIn(lang, it) : f.id)}</em></li>
-            })}
-          </ul>
-        )}
         {/* the shop's diary: which day it is, and how many have come in */}
         {days && days.day > 0 && (
           <p className="tally-day">

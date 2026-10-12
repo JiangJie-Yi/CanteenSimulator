@@ -5,7 +5,9 @@ export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'an
   /** what they've eaten so far (for their stomach) */
   ate: string[]
   /** their stool at the bar, where their plate is set */
-  seat?: number }
+  seat?: number
+  /** the one they came in with, if they're a couple */
+  partner?: number }
 
 /** how one try at a food went: how good, how far cooked, what went on it */
 /** one try at a dish: how good it was, how done, what went on it — and, at the grill, when each went on — and when */

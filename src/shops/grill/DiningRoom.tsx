@@ -1,14 +1,13 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { QUALITY } from '@/scene/quality'
 import type { Counter } from './bar'
 import { LuckyCat } from './LuckyCat'
 
 /**
  * The customers' side of the room, behind the aisle: a wall of cream plaster over a dark wooden wainscot, a frieze of
  * seigaiha waves under the beam, prints and hanging scrolls along the plaster, a shelf of sake bottles, crocks and a beckoning cat, and paper
- * pendant lamps hung low over the bar that light the customers warmly. Seen from behind (the camera swung round),
+ * pendant lamps hung low over the bar, their warm light painted on it. Seen from behind (the camera swung round),
  * the wall isn't drawn, so it never hides the bar.
  */
 
@@ -261,8 +260,176 @@ function Bottle({ x, color, label }: { x: number; color: string; label: string }
   )
 }
 
-/** a paper pendant lamp over the bar, lit (and lighting the customers below it when it carries a light) */
-function Pendant({ z, drop, light }: { z: number; drop: number; light: boolean }) {
+/** the plaque over the toilet door: お手洗い, and 廁所 under it */
+const WC_SIGN = canvasTex(160, 64, (g) => {
+  g.fillStyle = '#3a2416'
+  g.fillRect(0, 0, 160, 64)
+  g.fillStyle = '#efe2c4'
+  g.fillRect(4, 4, 152, 56)
+  g.fillStyle = '#1d140c'
+  g.font = 'bold 30px "Zen Antique", "Noto Serif TC", serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText('お手洗い', 80, 25)
+  g.font = '16px "Noto Serif TC", serif'
+  g.fillText('廁所 · WC', 80, 50)
+})
+/** shoji paper, faintly fibred */
+const SHOJI = canvasTex(64, 64, (g) => {
+  g.fillStyle = '#f4ecd8'
+  g.fillRect(0, 0, 64, 64)
+  g.strokeStyle = 'rgba(150,120,80,0.12)'
+  for (let k = 0; k < 30; k++) {
+    g.beginPath()
+    const x = (k * 37) % 64, y = (k * 23) % 64
+    g.moveTo(x, y)
+    g.lineTo(x + 6, y + 3)
+    g.stroke()
+  }
+})
+
+/**
+ * The way through to the toilet: a sliding door (引き戸) in a dark wooden frame, two shoji panels of paper on a
+ * lattice, one slid a little across the other, a short indigo noren over it, and the plaque.
+ */
+function ToiletDoor() {
+  const W = 0.9, H = 1.85
+  return (
+    <group>
+      {/* the opening's dark beyond, the frame round it */}
+      <mesh position={[-0.004, H / 2, 0]} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[W, H]} />
+        <meshBasicMaterial color="#1a120c" />
+      </mesh>
+      {[-1, 1].map((sd) => <Box key={sd} size={[0.06, H + 0.06, 0.06]} color="#3a2416" position={[-0.03, H / 2, sd * (W / 2 + 0.03)]} />)}
+      <Box size={[0.07, 0.07, W + 0.12]} color="#3a2416" position={[-0.035, H + 0.035, 0]} />
+      <Box size={[0.05, 0.025, W + 0.12]} color="#3a2416" position={[-0.03, 0.012, 0]} />
+      {/* the two panels: one shut, one slid half over it (the gap is the way in) */}
+      {[{ z: -W / 4, x: -0.03 }, { z: W / 4 - 0.12, x: -0.055 }].map((pnl, i) => (
+        <group key={i} position={[pnl.x, H / 2, pnl.z]}>
+          <mesh rotation-y={-Math.PI / 2}>
+            <planeGeometry args={[W / 2, H - 0.04]} />
+            <meshToonMaterial color="#ffffff" map={SHOJI} />
+          </mesh>
+          {/* its frame and lattice */}
+          {[-1, 1].map((sd) => <Box key={sd} size={[0.02, H - 0.04, 0.025]} color="#5a3a22" position={[-0.004, 0, sd * (W / 4 - 0.012)]} />)}
+          {[-1, -0.5, 0, 0.5, 1].map((k) => <Box key={k} size={[0.016, 0.018, W / 2]} color="#5a3a22" position={[-0.006, k * (H / 2 - 0.03), 0]} />)}
+          <Box size={[0.016, H - 0.06, 0.012]} color="#5a3a22" position={[-0.006, 0, 0]} />
+          {/* the hand-hold */}
+          <mesh position={[-0.012, 0, (i ? -1 : 1) * (W / 4 - 0.06)]} rotation-z={Math.PI / 2}>
+            <cylinderGeometry args={[0.018, 0.018, 0.006, 12]} />
+            <meshToonMaterial color="#2a1a10" />
+          </mesh>
+        </group>
+      ))}
+      {/* the short noren, and the plaque over it */}
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[-0.075, H - 0.2, sd * W / 4.2]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[W / 2.2, 0.36]} />
+          <meshToonMaterial color="#2c3e66" side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+      <mesh position={[-0.075, H + 0.16, 0]} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[0.44, 0.18]} />
+        <meshToonMaterial color="#ffffff" map={WC_SIGN} />
+      </mesh>
+    </group>
+  )
+}
+
+/**
+ * The household shrine (神棚) up on the wall: a shelf on two brackets, a little shrine of pale hinoki under its
+ * roof, a vase of sakaki either side, the cups of rice, salt and water before it, and the sacred rope (注連縄) with its
+ * paper streamers hung across the front.
+ */
+function Kamidana() {
+  const HIN = '#e2c89a'
+  return (
+    <group>
+      <Box size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />
+      {[-0.3, 0.3].map((z) => <Box key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
+      {/* the shrine: its base, body, doors and roof */}
+      <group position={[-0.14, 0.015, 0]}>
+        <Box size={[0.16, 0.03, 0.34]} color={HIN} position-y={0.015} />
+        <Box size={[0.12, 0.16, 0.24]} color={HIN} position-y={0.11} />
+        <mesh position={[-0.061, 0.11, 0]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[0.1, 0.12]} />
+          <meshToonMaterial color="#c8a868" />
+        </mesh>
+        <mesh position={[-0.0615, 0.11, 0]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[0.004, 0.12]} />
+          <meshBasicMaterial color={INK} />
+        </mesh>
+        {[-1, 1].map((sd) => (
+          <mesh key={sd} position={[sd * 0.05, 0.215, 0]} rotation-z={sd * 0.55}>
+            <boxGeometry args={[0.13, 0.014, 0.3]} />
+            <meshToonMaterial color="#6a5038" />
+          </mesh>
+        ))}
+        <Box size={[0.02, 0.02, 0.32]} color="#d4b04a" position-y={0.245} />
+      </group>
+      {/* the sakaki in their vases, and the cups */}
+      {[-0.3, 0.3].map((z) => (
+        <group key={z} position={[-0.15, 0.015, z]}>
+          <mesh position-y={0.04}>
+            <cylinderGeometry args={[0.02, 0.016, 0.08, 10]} />
+            <meshToonMaterial color="#f4f1ea" />
+          </mesh>
+          {[-1, 0, 1].map((k) => (
+            <mesh key={k} position={[0, 0.11 + Math.abs(k) * -0.01, k * 0.02]} rotation-x={k * 0.4} scale={[0.6, 1, 1]}>
+              <sphereGeometry args={[0.035, 8, 6]} />
+              <meshToonMaterial color="#3a6a3a" />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      {[-0.13, 0, 0.13].map((z) => (
+        <mesh key={z} position={[-0.23, 0.03, z * 0.6]}>
+          <cylinderGeometry args={[0.012, 0.01, 0.025, 10]} />
+          <meshToonMaterial color="#f4f1ea" />
+        </mesh>
+      ))}
+      {/* the rope across the front, sagging, and its zigzag paper shide */}
+      {Array.from({ length: 9 }, (_, i) => {
+        const z = -0.36 + i * 0.09
+        return (
+          <mesh key={i} position={[-0.27, -0.02 - 0.03 * (1 - (z / 0.36) ** 2), z]} rotation-x={Math.PI / 2}>
+            <cylinderGeometry args={[0.014, 0.014, 0.095, 8]} />
+            <meshToonMaterial color="#d8c08a" />
+          </mesh>
+        )
+      })}
+      {[-0.2, 0, 0.2].map((z) => (
+        <mesh key={z} position={[-0.275, -0.1, z]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[0.035, 0.11]} />
+          <meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** the glow round a lit lamp, and the pool of its light on what's under it: a soft warm disc, bright in the middle */
+const GLOW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+  grad.addColorStop(0, 'rgba(255,200,130,0.9)')
+  grad.addColorStop(0.4, 'rgba(255,170,90,0.35)')
+  grad.addColorStop(1, 'rgba(255,150,70,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 128, 128)
+  return new THREE.CanvasTexture(c)
+})()
+
+/**
+ * A paper pendant lamp over the bar, lit. Its light is painted, not cast: a halo round the shade and a warm pool on
+ * the bar top under it (added on, so it brightens what it falls on). Six real lights would cost every lit surface in
+ * the room on every frame; these cost two quads each.
+ */
+function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
   return (
     <group position={[0, WALL_H, z]}>
       <mesh position-y={-drop / 2}>
@@ -284,8 +451,15 @@ function Pendant({ z, drop, light }: { z: number; drop: number; light: boolean }
             <meshToonMaterial color={INK} />
           </mesh>
         ))}
-        {light && QUALITY.tier !== 'low' && <pointLight color="#ffc37a" intensity={5} distance={5} decay={1} position-y={-0.1} />}
+        <sprite scale={0.75}>
+          <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
+        </sprite>
       </group>
+      {/* (the pool of light on the bar top below, down from the lamp's height) */}
+      <mesh position-y={pool - WALL_H + 0.004} rotation-x={-Math.PI / 2} renderOrder={1}>
+        <planeGeometry args={[1.3, 1.3]} />
+        <meshBasicMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.32} />
+      </mesh>
     </group>
   )
 }
@@ -294,7 +468,14 @@ function Pendant({ z, drop, light }: { z: number; drop: number; light: boolean }
  * One counter's stretch of the room: the wall behind its aisle (from/to along it, in the counter's own frame), and
  * pendant lamps over it.
  */
-export function DiningWall({ c, from, to, far, lamps }: { c: Counter; from: number; to: number; far: number; lamps: number }) {
+export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: Counter; from: number; to: number; far: number
+  lamps: number
+  /** the bar top's height, where the lamps' light falls */
+  top: number
+  /** where along it the sliding door to the toilet is, if it has one */
+  door?: number
+  /** where along it the little household shrine (神棚) is put up, if it has one */
+  shrine?: number }) {
   const yaw = Math.atan2(c.along.x, c.along.z)
   const l = to - from
   const mid = (from + to) / 2
@@ -306,7 +487,8 @@ export function DiningWall({ c, from, to, far, lamps }: { c: Counter; from: numb
     return t
   }, [l])
   // (pictures along the wall, a print then a scroll in turn, about a metre apart, leaving the shelf's stretch clear)
-  const shelfZ = mid + l * 0.3
+  // (the shelf in the far third of the wall, or the near one if the door's in the far one)
+  const shelfZ = door !== undefined && Math.abs(door - (mid + l * 0.3)) < 1.3 ? mid - l * 0.3 : mid + l * 0.3
   const art = useMemo(() => {
     // (in the bays between the posts, spaced evenly in each, never over a post or the shelf)
     const posts = [from, mid - l / 6, mid + l / 6, to]
@@ -317,9 +499,10 @@ export function DiningWall({ c, from, to, far, lamps }: { c: Counter; from: numb
       const n = Math.max(0, Math.floor(w / 0.95))
       for (let i = 0; i < n; i++) spots.push(posts[b] + (w / n) * (i + 0.5))
     }
-    return spots.filter((z) => Math.abs(z - shelfZ) > 0.85)
+    return spots.filter((z) => Math.abs(z - shelfZ) > 0.85 && (door === undefined || Math.abs(z - door) > 0.95)
+      && (shrine === undefined || Math.abs(z - shrine) > 0.75))
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length] }))
-  }, [l, from, to, mid, shelfZ, c.length])
+  }, [l, from, to, mid, shelfZ, c.length, door, shrine])
   const frieze = useMemo(() => {
     if (!SEIGAIHA) return null
     const t = SEIGAIHA.clone()
@@ -365,6 +548,8 @@ export function DiningWall({ c, from, to, far, lamps }: { c: Counter; from: numb
             {a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
           </group>
         ))}
+        {door !== undefined && <group position-z={door}><ToiletDoor /></group>}
+        {shrine !== undefined && <group position={[0, 1.78, shrine]}><Kamidana /></group>}
         {/* the shelf: sake bottles, two crocks and the cat */}
         <group position={[-0.1, 1.08, shelfZ]}>
           <Box size={[0.2, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
@@ -386,7 +571,7 @@ export function DiningWall({ c, from, to, far, lamps }: { c: Counter; from: numb
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {
         const z = (i - (lamps - 1) / 2) * (c.length / lamps)
-        return <group key={i} position-x={0.05}><Pendant z={z} drop={0.5} light /></group>
+        return <group key={i} position-x={0.05}><Pendant z={z} drop={0.5} pool={top} /></group>
       })}
     </group>
   )

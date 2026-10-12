@@ -6,6 +6,7 @@ import { useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
+import { Steam } from '@/scene/Steam'
 
 type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
@@ -13,7 +14,10 @@ export const DECOR = {
   crate: { at: [0.62, -2.0], r: 0.38 },
   // (lying on the table by the seasoning boxes, at their front end)
   fan: { at: [-0.95, 1.9], r: 0.3 },
-  lantern: { at: [-1.61, -0.68], r: 0.2 },
+  // (drawn 1.8 times its own size, standing back from the fire's stones)
+  lantern: { at: [-2.05, -0.3], r: 0.36 },
+  // (the cooked rice the rice balls are made from, at the table's front right corner)
+  rice: { at: [3.56, 0.2], r: 0.34 },
 } satisfies Record<string, Spot>
 
 /** what's being carried from here: a stick of charcoal or the fan, where it is (Roasting sets it), and how far the
@@ -230,6 +234,7 @@ const GLOW = canvas(128, 128, (g) => {
  * brightens and dims a little as it flickers, a warm halo hangs round it, and (on a strong GPU) it throws a little
  * flickering light on what's near.
  */
+const LANTERN_SCALE = 1.8
 function Lantern({ at }: { at: [number, number, number] }) {
   const paper = useRef<THREE.MeshBasicMaterial>(null)
   const halo = useRef<THREE.Sprite>(null)
@@ -258,7 +263,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
   const posts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [a * S / 2, b * S / 2] as const)
   const top = LEG + H
   return (
-    <group position={at} rotation-y={0.4} userData={{ container: 'lantern' }}>
+    <group position={at} rotation-y={0.4} scale={LANTERN_SCALE} userData={{ container: 'lantern' }}>
       {posts.map(([x, z], i) => (
         <Inked key={i} geometry={geo.post} color="#3a2416" grow={1.12} position={[x, (H + LEG + 0.04) / 2, z]} />
       ))}
@@ -310,6 +315,50 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
 }
 
 /** (the lantern can be moved about the table like a dish: Roasting says where it is) */
+/**
+ * The rice the rice balls are shaped from (おひつ): a round tub of pale sawara bound with copper hoops, heaped with
+ * steaming white rice, the wooden paddle (しゃもじ) stood in it, its lid leant against its side.
+ */
+function RiceTub() {
+  const [x, z] = DECOR.rice.at
+  const geo = useMemo(() => ({
+    tub: new THREE.CylinderGeometry(0.27, 0.25, 0.2, 28, 1, true),
+    floor: new THREE.CircleGeometry(0.25, 28),
+    hoop: new THREE.TorusGeometry(0.272, 0.012, 6, 32),
+    rice: new THREE.SphereGeometry(0.255, 24, 10, 0, Math.PI * 2, 0, Math.PI * 0.32),
+    lid: new THREE.CylinderGeometry(0.29, 0.29, 0.03, 28),
+    paddle: new THREE.CylinderGeometry(0.012, 0.012, 0.26, 6),
+    blade: new THREE.SphereGeometry(0.06, 12, 8),
+  }), [])
+  return (
+    <group position={[x, 0, z]}>
+      <Inked geometry={geo.tub} color="#d9b47a" position={[0, 0.1, 0]} grow={1.03} />
+      <mesh geometry={geo.tub} position-y={0.1} scale={0.98}>
+        <meshToonMaterial color="#c49a5e" side={THREE.BackSide} />
+      </mesh>
+      <mesh geometry={geo.floor} position-y={0.01} rotation-x={-Math.PI / 2}>
+        <meshToonMaterial color="#c49a5e" />
+      </mesh>
+      {[0.04, 0.16].map((y) => (
+        <mesh key={y} geometry={geo.hoop} position-y={y} rotation-x={Math.PI / 2}>
+          <meshToonMaterial color="#b0683a" />
+        </mesh>
+      ))}
+      {/* the rice, heaped a little over the rim */}
+      <mesh geometry={geo.rice} position-y={0.1} scale={[1, 0.55, 1]}>
+        <meshToonMaterial color="#fbf8f0" />
+      </mesh>
+      {/* the paddle stood in it, and the lid leant against the tub */}
+      <group position={[0.08, 0.27, -0.04]} rotation={[0.25, 0, -0.35]}>
+        <mesh geometry={geo.paddle} position-y={0.06}><meshToonMaterial color="#e2c89a" /></mesh>
+        <mesh geometry={geo.blade} position-y={-0.1} scale={[1, 1.3, 0.25]}><meshToonMaterial color="#e2c89a" /></mesh>
+      </group>
+      <Inked geometry={geo.lid} color="#d9b47a" position={[0.34, 0.27, 0.05]} rotation={[0, 0, 1.25]} grow={1.04} />
+      <Steam position={[0, 0.16, 0]} width={0.4} height={0.55} opacity={0.32} layers={2} />
+    </group>
+  )
+}
+
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
     <>
@@ -317,6 +366,7 @@ export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [
       <Fan held={held} />
       <HeldStick held={held} />
       <Lantern at={lanternAt} />
+      <RiceTub />
     </>
   )
 }

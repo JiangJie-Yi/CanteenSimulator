@@ -5,6 +5,7 @@ import { ALL_DISHES as DISHES } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPrice, type Entry } from '@/data/recipes'
 import { ROLES } from '@/data/staff'
 import { KINDS, kindOf } from '@/data/guests'
+import { SAY_CHUNK, sayChunks } from '@/game/say'
 import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder } from '@/game/economy'
 import { trialIdeas } from '@/game/research'
 import { makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
@@ -286,5 +287,15 @@ describe('guests: who comes in, and how often', () => {
     const total = KINDS.reduce((s, k) => s + k.weight, 0)
     for (const k of KINDS) expect(Math.abs((seen.get(k.kind) ?? 0) / n - k.weight / total)).toBeLessThan(0.01)
     expect(seen.get('bosozoku')!).toBeLessThan(seen.get('salaryman')! / 2)
+  })
+})
+
+describe('say: a long line over a customer\'s head, a piece at a time', () => {
+  it('cuts at the punctuation, never more than SAY_CHUNK to a piece, and loses nothing', () => {
+    const line = '我要味噌烤五串花生柚子胡椒、味噌烤銀鱈！'
+    const parts = sayChunks(line)
+    expect(parts.join('')).toBe(line)
+    for (const p of parts) expect([...p].length).toBeLessThanOrEqual(SAY_CHUNK)
+    expect(sayChunks('好吃')).toEqual(['好吃'])
   })
 })

@@ -612,7 +612,7 @@ def head(kind):
     fc = FACE[kind]
     k = st.get("head", 1.0)
     bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=40, v_segments=28, radius=HEAD_R * k)
+    bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=22, radius=HEAD_R * k)
     for vt in bm.verts:
         p = vt.co
         # a chibi face: round, a little wider than tall at the cheeks, the jaw tucked in, the back of the head full
@@ -621,7 +621,9 @@ def head(kind):
         p.x *= fc["wide"] - fc["jaw"] * smoothstep(-0.2, -1.0, z)
         p.y *= 0.96
         if p.y < 0:
-            p.y *= 1 - 0.1 * smoothstep(-0.1, -0.9, z)
+            p.y *= 1 - 0.03 * smoothstep(-0.1, -0.9, z)
+            # (a chin that comes forward a little, not tucked back under the face)
+            p.y -= 0.012 * k * math.exp(-((z + 0.82) / 0.16) ** 2) * math.exp(-(p.x / (HEAD_R * k * 0.45)) ** 2)
             # soft cheeks
             p.y -= fc["cheek"] * k * math.exp(-((z + 0.35) / 0.25) ** 2) * math.exp(-((abs(p.x) / (HEAD_R * k) - 0.55) / 0.3) ** 2)
         else:
@@ -2036,6 +2038,63 @@ def stand(breathe, hold=False):
 
 
 action("Stand", [(0, stand(0)), (40, stand(0.03)), (80, stand(0))])
+
+
+def phone(phase):
+    """sat looking down at a phone held in both hands over the bar, the right thumb scrolling"""
+    th = math.sin(2 * math.pi * phase * 3)
+    def pose():
+        sit_base(lean=0.16)
+        aim("neck", (0, -0.12, 1))
+        aim("head", (0.03 * math.sin(2 * math.pi * phase), -0.55, 1))
+        aim("clavicle.L", (1, -0.18, 0.04))
+        aim("clavicle.R", (-1, -0.18, 0.04))
+        reach("L", (0.035, -0.25, 0.535), (1, 0.2, -1), (-0.55, -0.75, 0.35))
+        reach("R", (-0.05, -0.24, 0.54 + 0.005 * th), (-1, 0.2, -1), (0.5 + 0.08 * th, -0.75, 0.35))
+    return pose
+
+
+def chin(phase):
+    """sat leaning on the bar, the chin propped on the right hand, the left arm lying along the bar, gazing about"""
+    b = math.sin(2 * math.pi * phase)
+    def pose():
+        sit_base(lean=0.2)
+        aim("head", (0.06 * b, -0.02, 1), twist=0.12 * b)
+        aim("clavicle.L", (1, -0.15, 0.04))
+        reach("L", (0.06, -0.21, BAR_HAND), (1, 0.2, -1), (-0.8, -0.5, -0.1))
+        aim("clavicle.R", (-1, -0.2, 0.1))
+        reach("R", MOUTH + Vector((-0.02, -0.03, -0.105)), (-0.6, 0.0, -1), (0.2, -0.2, 1))
+    return pose
+
+
+def talk(side, phase):
+    """sat turned toward the one beside them (side +1: on their left), talking: the head and shoulders round to them,
+    nodding, a hand lifted now and then as they say something"""
+    a = math.sin(2 * math.pi * phase * 2)
+    g = smoothstep(0.3, 0.45, phase) * (1 - smoothstep(0.65, 0.8, phase))
+    def pose():
+        sit_base(lean=0.1)
+        aim("spine", (0, -0.06, 1), twist=side * 0.18)
+        aim("chest", (0, -0.08, 1), twist=side * 0.25)
+        # (the head turned round to them about its own up, nodding a little; not tipped over sideways)
+        aim("head", (0, -0.05 + 0.06 * a, 1), twist=side * 0.85)
+        arms_on_bar("L", 1)
+        if side > 0:
+            aim("clavicle.R", (-1, -0.15, 0.04 + 0.08 * g))
+            reach("R", Vector((-0.085, -0.2, BAR_HAND)).lerp(Vector((-0.03, -0.24, 0.6)), g), (-1, 0.2, -1),
+                  Vector((0.6, -0.8, -0.15)).lerp(Vector((0.4, -0.5, 0.8)), g))
+        else:
+            arms_on_bar("R", -1)
+            aim("clavicle.L", (1, -0.15, 0.04 + 0.08 * g))
+            reach("L", Vector((0.085, -0.2, BAR_HAND)).lerp(Vector((0.03, -0.24, 0.6)), g), (1, 0.2, -1),
+                  Vector((-0.6, -0.8, -0.15)).lerp(Vector((-0.4, -0.5, 0.8)), g))
+    return pose
+
+
+action("Phone", [(i * 6, phone(i / 12)) for i in range(13)])
+action("Chin", [(i * 12, chin(i / 8)) for i in range(9)])
+action("TalkL", [(i * 6, talk(1, i / 16)) for i in range(17)])
+action("TalkR", [(i * 6, talk(-1, i / 16)) for i in range(17)])
 action("Hold", [(0, stand(0, True)), (40, stand(0.03, True)), (80, stand(0, True))])
 reset_pose()
 
@@ -2047,6 +2106,21 @@ root = bpy.data.objects.new("Guests", None)
 COL.objects.link(root)
 rig.parent = root
 
+# (light enough for a dozen at a time: the hair and the things on it, built up of many locks and lumps, are cut down
+# to about BUDGET triangles each; seen this small, toon-shaded, nobody can tell)
+BUDGET = {"hair": 2400, "pin": 500, "band": 700, "hat": 700, "toque": 700, "wacap": 600, "workcap": 600}
+for o in list(COL.objects):
+    if o.type != "MESH":
+        continue
+    part = o.name.split(".")[1].split("_")[0] if "." in o.name else ""
+    tris = sum(len(p.vertices) - 2 for p in o.data.polygons)
+    if part in BUDGET and tris > BUDGET[part]:
+        bpy.context.view_layer.objects.active = o
+        m = o.modifiers.new("Lighter", "DECIMATE")
+        m.ratio = BUDGET[part] / tris
+        bpy.ops.object.modifier_move_to_index(modifier="Lighter", index=0)
+        bpy.ops.object.modifier_apply(modifier="Lighter")
+
 os.makedirs(os.path.join(PROJECT, "public", "models"), exist_ok=True)
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(PROJECT, "blender", "guests.blend"))
 bpy.ops.object.select_all(action="DESELECT")
@@ -2055,7 +2129,7 @@ for o in COL.objects:
 out = os.path.join(PROJECT, "public", "models", "guests.glb")
 bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", use_selection=True, export_apply=False,
                           export_animations=True, export_animation_mode="ACTIONS", export_skins=True,
-                          export_def_bones=False, export_optimize_animation_size=False, export_force_sampling=True)
+                          export_def_bones=False, export_optimize_animation_size=True, export_force_sampling=True)
 print("GUESTS_DONE", out)
 
 if PREVIEW:

@@ -142,7 +142,11 @@ function Briefcase() {
 }
 
 /** a number from 0 to 1 that's always the same for this id (and this salt), spread so neighbours differ */
-const hash = (id: number, salt: number) => ((Math.imul(id * 7 + salt + 1, 2654435761) >>> 0) % 1000) / 1000
+const hash = (id: number, salt: number) => {
+  let h = Math.imul(id ^ Math.imul(salt + 1, 0x9e3779b1), 0x45d9f3b)
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b)
+  return (((h ^ (h >>> 16)) >>> 0) % 1000) / 1000
+}
 
 /**
  * One customer's copy of the figures: only their kind kept, in their colours, with outlines; one of the kind's ways
@@ -155,9 +159,19 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
   const lookGiven = given?.look
   const styleGiven = given?.style
   const showGiven = given?.show
-  return useMemo(() => {
+  const r = useMemo(() => {
     const l = lookGiven ?? lookOf(id, kind)
+    // (clone only this kind's figure: the others' parts are lifted off the source for the moment of the copy, and
+    // put back. A copy of all eighteen kinds would be thrown mostly away at once, at every customer that came in)
+    const others: [THREE.Object3D, THREE.Object3D][] = []
+    gltf.scene.traverse((o) => {
+      const p = o.parent
+      if (p && (p.name === 'Rig' || p.name === 'Guests') && !(o instanceof THREE.Bone) && o.name !== 'Rig' && !o.name.startsWith(kind)
+        && (o instanceof THREE.Mesh || o.children.some((c) => c instanceof THREE.Mesh))) others.push([o, p])
+    })
+    for (const [o] of others) o.removeFromParent()
     const root = cloneSkinned(gltf.scene)
+    for (const [o, p] of others) p.add(o)
     // (three drops the dots from glTF names: "salaryman.body" is "salarymanbody")
     const partOf = (o: THREE.Object3D): string | null => {
       for (let p: THREE.Object3D | null = o; p; p = p.parent) {
@@ -229,10 +243,22 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
     head?.scale.set(0.95 + 0.1 * hash(id, 3), 0.97 + 0.06 * hash(id, 5), 0.97 + 0.06 * hash(id, 3))
     return { root, mixer, actions, head, hand, handL, eyes, shut, mouth, open, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0) }
   }, [gltf, id, kind, glasses, lookGiven, styleGiven, showGiven])
+  // (when they've gone, let go of what the GPU holds for them: each skeleton's bone texture, their own materials;
+  // left alone these pile up over a day of customers until the browser drops the 3D)
+  useEffect(() => () => {
+    r.mixer.stopAllAction()
+    r.root.traverse((o) => {
+      if (o instanceof THREE.SkinnedMesh) o.skeleton.dispose()
+      if (o instanceof THREE.Mesh && o.material !== outlineMaterial) (o.material as THREE.Material).dispose()
+    })
+  }, [r])
+  return r
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
-export function Person({ id, eating, walking, t }: { id: number; eating: boolean; walking: boolean; t: number }) {
+export function Person({ id, eating, walking, t, talk = 0 }: { id: number; eating: boolean; walking: boolean; t: number
+  /** sat beside the one they came with: +1 if they're on this one's left, -1 on the right (they talk, turned to them) */
+  talk?: number }) {
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
   const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
@@ -245,8 +271,13 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
   // (half the office workers, and every civil servant, come with a briefcase: carried in, set down by the stool)
   const briefcase = (kind === 'salaryman' && id % 2 === 0) || kind === 'civilServant'
 
-  // what they're doing: walking in or out, eating, or sat waiting
-  const now = walking ? 'Walk' : eating ? 'Eat' : 'Sit'
+  const phone = useRef<THREE.Group>(null)
+  // what they're doing: walking in or out, eating, or sat waiting; waiting, they talk to the one they came with, or
+  // (alone) pass the time one way and then another every half a minute or so: look about, look at their phone, sit
+  // with their chin in their hand
+  const spell = Math.floor((t + id * 9) / 24)
+  const idle = (['Sit', 'Phone', 'Chin', 'Phone', 'Sit', 'Chin'] as const)[Math.floor(hash(id, spell) * 6)]
+  const now = walking ? 'Walk' : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idle
   useEffect(() => {
     const next = r.actions[now]
     if (!next) return
@@ -265,15 +296,18 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
     r.hand.add(s)
     const b = carried.current
     if (b) r.hand.add(b)
-    return () => { s.removeFromParent(); b?.removeFromParent() }
+    const ph = phone.current
+    if (ph && r.handL) r.handL.add(ph)
+    return () => { s.removeFromParent(); b?.removeFromParent(); ph?.removeFromParent() }
   }, [r])
 
   // their own clock moves the figure: the action, then a look about (waiting), a blink, chewing
   const dt = last.current === null ? 0 : Math.min(0.1, Math.max(0, t - last.current))
   last.current = t
   r.mixer.update(dt)
-  if (r.head && !walking && !eating) {
-    const look = Math.sin(t * 0.45 + id * 1.7) * 0.5 * smooth(0.55, 0.85, Math.abs(Math.sin(t * 0.21 + id)))
+  if (r.head && !walking && !eating && now === 'Sit') {
+    // (now and then a slow look round the room, not a shake of the head)
+    const look = Math.sin(t * 0.3 + id * 1.7) * 0.35 * smooth(0.7, 0.95, Math.abs(Math.sin(t * 0.13 + id)))
     // (about the figure's own up, in the neck's frame)
     // (the mixer only writes a bone that changed: start from its own pose, not last frame's look)
     if (r.head.quaternion.equals(r.looked)) r.head.quaternion.copy(r.posed)
@@ -307,6 +341,17 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
           <meshToonMaterial color="#c8743a" gradientMap={gradientMap} />
         </mesh>
       </group>
+      {/* a phone in the left hand while they look at it, its screen lit */}
+      <group ref={phone} visible={now === 'Phone'} position={[0.0, 0.045, 0.012]} rotation-x={-0.3}>
+        <mesh>
+          <boxGeometry args={[0.032, 0.058, 0.005]} />
+          <meshToonMaterial color="#22252a" gradientMap={gradientMap} />
+        </mesh>
+        <mesh position-z={-0.0027} rotation-y={Math.PI}>
+          <planeGeometry args={[0.027, 0.05]} />
+          <meshBasicMaterial color="#9fd0f4" />
+        </mesh>
+      </group>
       {/* the briefcase: in the hand, hanging from its handle, walking; on the floor by the stool, sitting */}
       {briefcase && (
         <>
@@ -338,15 +383,15 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
 /*
  * The staff dressed and coloured just as their pictures in the office have them (ui/Avatar.tsx): the same skin and
  * hair (picked by the same hash of their id), glasses on the same ones, a woman's hair long, in a bob or tied up as
- * there; the second chef in his white jacket and toque, the third in the low white cap, the floor in a dark waistcoat
+ * there; the cooks Japanese, in white or navy samue under a hachimaki (a woman in the low white cap), the floor in a dark waistcoat
  * and red bow tie, the till in a red apron with a name badge, the stock keeper in an olive work jacket and cap.
  */
 const AV_SKIN = ['#f3d2b0', '#eac39c', '#e2b48a', '#f6dcc0', '#d9a77e']
 const AV_HAIR = ['#2b1d14', '#3a2a20', '#1c1c22', '#5a3a2a', '#4a3020', '#6b4a32']
 const avHash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
-const TOPS: Record<Role, string> = { chef: '#f7f3ea', sous: '#f7f3ea', server: '#2b2b33', cashier: '#e9e2d2', stock: '#5f6b45' }
+const TOPS: Record<Role, string> = { chef: '#f4f1ea', sous: '#2c3a58', server: '#2b2b33', cashier: '#e9e2d2', stock: '#5f6b45' }
 /** which of the job's things each wears (the parts of the staff figures in guests.glb) */
-const WEARS: Record<Role, string[]> = { chef: ['toque', 'buttons'], sous: ['wacap', 'buttons'], server: ['bowtie'],
+const WEARS: Record<Role, string[]> = { chef: ['wacap'], sous: ['wacap'], server: ['bowtie'],
   cashier: ['apron', 'bib', 'badge'], stock: ['workcap'] }
 const JOB_PARTS = new Set(['toque', 'wacap', 'workcap', 'buttons', 'bowtie', 'apron', 'bib', 'badge'])
 
@@ -358,15 +403,18 @@ const JOB_PARTS = new Set(['toque', 'wacap', 'workcap', 'buttons', 'bowtie', 'ap
 export function StaffFigure({ id, role, look: who }: { id: string; role: Role; look: StaffLook }) {
   const h = avHash(id)
   const seed = h % 997
-  const kind: Kind = who.female ? 'staffF' : 'staffM'
-  const old = who.age === 'old'
   const cook = role === 'chef' || role === 'sous'
+  // (a Japanese shop's cooks dress Japanese: the men in the samue's crossed collar under a twisted hachimaki, the
+  // women in the white cap)
+  const kind: Kind = cook && !who.female ? 'chef' : who.female ? 'staffF' : 'staffM'
+  const old = who.age === 'old'
   const glasses = (h >> 7) % 5 === 0 || (old && (h >> 7) % 2 === 0)
   const cut = (h >> 13) % 3
-  const look = useMemo<Look>(() => ({ top: TOPS[role], legs: '#2a2a30',
+  // (a woman at the fire in the white kappōgi, whatever the job's colour)
+  const look = useMemo<Look>(() => ({ top: cook && who.female ? '#f4f1ea' : TOPS[role], legs: cook ? '#263049' : '#2a2a30',
     hair: old ? ((h >> 4) & 1 ? '#d6d1c8' : '#a9a49c') : AV_HAIR[(h >> 3) % AV_HAIR.length],
-    skin: AV_SKIN[h % AV_SKIN.length], shoes: '#2a2220', size: 1 }), [role, old, h])
-  const style = useMemo(() => () => (who.female ? ['long', 'bob', 'bun'][cut] : cook ? 'short' : cut === 1 ? 'messy' : 'side'),
+    skin: AV_SKIN[h % AV_SKIN.length], shoes: '#2a2220', size: 1 }), [role, old, h, cook])
+  const style = useMemo(() => () => (who.female ? (cook ? 'bun' : ['long', 'bob', 'bun'][cut]) : cook ? 'crop' : cut === 1 ? 'messy' : 'side'),
     [who.female, cut, cook])
   const show = useMemo(() => (part: string) => !JOB_PARTS.has(part) || WEARS[role].includes(part), [role])
   const r = useRigged(1000 + seed, kind, glasses, { look, style, show })
