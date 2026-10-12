@@ -461,7 +461,7 @@ export function StaffFigure({ id, role, look: who }: { id: string; role: Role; l
   // (a woman at the fire in the white kappōgi, whatever the job's colour)
   const look = useMemo<Look>(() => ({ top: cook && who.female ? '#f4f1ea' : TOPS[role], legs: cook ? '#263049' : '#2a2a30',
     hair: old ? ((h >> 4) & 1 ? '#d6d1c8' : '#a9a49c') : AV_HAIR[(h >> 3) % AV_HAIR.length],
-    skin: AV_SKIN[h % AV_SKIN.length], shoes: '#2a2220', size: 1 }), [role, old, h, cook])
+    skin: AV_SKIN[h % AV_SKIN.length], shoes: '#2a2220', size: 1 }), [role, old, h, cook, who.female])
   const style = useMemo(() => () => (who.female ? (cook ? 'bun' : ['long', 'bob', 'bun'][cut]) : cook ? 'crop' : cut === 1 ? 'messy' : 'side'),
     [who.female, cut, cook])
   const show = useMemo(() => (part: string) => !JOB_PARTS.has(part) || WEARS[role].includes(part), [role])
