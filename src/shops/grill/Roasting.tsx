@@ -7,6 +7,7 @@ import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
 import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
+import { CookFigure } from '@/scene/Person3D'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
@@ -390,29 +391,65 @@ function Bar() {
 }
 /**
  * The cook's table everything stands on (the fire pit, the tray, the plates): a thick top of pale planks, its front
- * and sides boarded dark, down to the floor the customers walk on. Its back butts against the bar's cook's edges.
+ * and sides boarded dark, down to the floor the customers walk on. Its back butts against the bar's cook's edges;
+ * a bay is cut into its front, left of the tray, and the cook stands in there, close by the fire and the seasonings,
+ * in full view (no table in front of him).
  */
 const COOK_TABLE = { lay: [-2.1, 2.7], along: [-2.4, 3.1] }
+const COOK_NOTCH = { lay: 1.85, along: [-1.75, -0.4] }
+/** the cook, as big as the customers at the bar */
+const CHEF_SCALE = 1.3 * GRILL_SCALE
+/** the table as boxes (lay from–to, along from–to): all of it behind the notch, and the front either side of it */
+const COOK_TABLE_PARTS: [number, number, number, number][] = [
+  [COOK_TABLE.lay[0], COOK_NOTCH.lay, COOK_TABLE.along[0], COOK_TABLE.along[1]],
+  [COOK_NOTCH.lay, COOK_TABLE.lay[1], COOK_TABLE.along[0], COOK_NOTCH.along[0]],
+  [COOK_NOTCH.lay, COOK_TABLE.lay[1], COOK_NOTCH.along[1], COOK_TABLE.along[1]],
+]
+/** where the cook stands (on the floor, in the notch), and the way he faces: in at the fire */
+const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(ALONG, -1.08).setY(GRILL_OFFSET.y)
+const CHEF_YAW = Math.atan2(-CHEF_AT.x, -CHEF_AT.z)
 const COOK_TABLE_WOOD = (() => {
   if (!TRAY_WOOD) return null
   const t = TRAY_WOOD.clone()
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set((COOK_TABLE.along[1] - COOK_TABLE.along[0]) / 1.6, (COOK_TABLE.lay[1] - COOK_TABLE.lay[0]) / 1.6)
+  t.repeat.set(1 / 1.6, 1 / 1.6)
   t.needsUpdate = true
   return t
 })()
 function CookTable() {
-  const W = COOK_TABLE.along[1] - COOK_TABLE.along[0], D = COOK_TABLE.lay[1] - COOK_TABLE.lay[0]
+  // (and the cook's floor, at the customers' floor's height, out a step in front of the table where he stands)
+  const W = COOK_TABLE.along[1] - COOK_TABLE.along[0], D = COOK_TABLE.lay[1] + 0.9 - COOK_TABLE.lay[0]
   const mid = new THREE.Vector3().addScaledVector(ALONG, (COOK_TABLE.along[0] + COOK_TABLE.along[1]) / 2)
-    .addScaledVector(LAY, (COOK_TABLE.lay[0] + COOK_TABLE.lay[1]) / 2)
+    .addScaledVector(LAY, (COOK_TABLE.lay[0] + COOK_TABLE.lay[1] + 0.9) / 2).setY(GRILL_OFFSET.y + 0.006)
+  return (
+    <>
+      {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]} />)}
+      <mesh position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} receiveShadow>
+        <boxGeometry args={[W, 0.012, D]} />
+        <meshToonMaterial color="#5a4030" />
+      </mesh>
+    </>
+  )
+}
+function CookTableBox({ lay, along }: { lay: [number, number]; along: [number, number] }) {
+  const W = along[1] - along[0], D = lay[1] - lay[0]
+  const mid = new THREE.Vector3().addScaledVector(ALONG, (along[0] + along[1]) / 2).addScaledVector(LAY, (lay[0] + lay[1]) / 2)
   const floor = GRILL_OFFSET.y
+  // (the planks' texture tiled by the box's own size, so the grain runs on across both)
+  const map = useMemo(() => {
+    if (!COOK_TABLE_WOOD) return null
+    const t = COOK_TABLE_WOOD.clone()
+    t.repeat.set(W / 1.6, D / 1.6)
+    t.needsUpdate = true
+    return t
+  }, [W, D])
   return (
     <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
       <mesh position-y={-0.04} receiveShadow>
         <boxGeometry args={[W, 0.08, D]} />
-        <meshToonMaterial color="#d8c4a6" map={COOK_TABLE_WOOD} />
+        <meshToonMaterial color="#d8c4a6" map={map} />
       </mesh>
-      <mesh position-y={-0.04} scale={[1.004, 1.25, 1.006]}>
+      <mesh position-y={-0.04} scale={[1 + 0.02 / W, 1.25, 1 + 0.02 / D]}>
         <boxGeometry args={[W, 0.08, D]} />
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
@@ -3055,6 +3092,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       <CookTable />
+      {space === 'open' && bar && (
+        <group position={CHEF_AT} rotation-y={CHEF_YAW} scale={CHEF_SCALE}><CookFigure /></group>
+      )}
       {space === 'open' && bar && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
       {roast.trash && <TrashBin container="trash" contents={trashed}

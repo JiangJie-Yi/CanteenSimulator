@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGLTF } from '@react-three/drei'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
@@ -28,7 +29,11 @@ const pick = <T,>(l: T[], n: number) => l[n % l.length]
 type Look = { top: string; legs: string; hair: string; skin: string; shoes: string; size: number
   /** the cloth of what they wear on top, and on their legs (or skirt) */
   topCloth?: Pattern; legCloth?: Pattern }
-function lookOf(id: number, kind: GuestKind): Look {
+/** the cook at the fire (the same rig as the customers, in his own clothes and his own action) */
+type Kind = GuestKind | 'chef'
+const CHEF_LOOK: Look = { top: '#2c3a58', legs: '#263049', hair: '#2b1d14', skin: '#e2b48c', shoes: '#2a2220', size: 1 }
+function lookOf(id: number, kind: Kind): Look {
+  if (kind === 'chef') return CHEF_LOOK
   const old = kind === 'grandma' || kind === 'grandpa'
   const top: Record<GuestKind, string> = {
     salaryman: '#2b3444', officeLady: '#6a6f78', highSchoolGirl: '#f4f1ea', highSchoolBoy: '#1c1e26', grandma: '#c9b48a',
@@ -90,6 +95,7 @@ type Rigged = {
   mixer: THREE.AnimationMixer
   actions: Record<string, THREE.AnimationAction>
   head?: THREE.Bone
+  handL?: THREE.Bone
   hand?: THREE.Bone
   eyes: THREE.Object3D[]
   shut: THREE.Object3D[]
@@ -101,7 +107,7 @@ type Rigged = {
 }
 
 /** one customer's copy of the figures: only their kind kept, in their colours, with outlines */
-function useRigged(id: number, kind: GuestKind, glasses: boolean): Rigged {
+function useRigged(id: number, kind: Kind, glasses: boolean): Rigged {
   const gltf = useGLTF(URL)
   return useMemo(() => {
     const l = lookOf(id, kind)
@@ -161,12 +167,13 @@ function useRigged(id: number, kind: GuestKind, glasses: boolean): Rigged {
     const mixer = new THREE.AnimationMixer(root)
     const actions: Record<string, THREE.AnimationAction> = {}
     for (const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip)
-    let head: THREE.Bone | undefined, hand: THREE.Bone | undefined
+    let head: THREE.Bone | undefined, hand: THREE.Bone | undefined, handL: THREE.Bone | undefined
     root.traverse((o) => {
       if (o instanceof THREE.Bone && o.name === 'head') head = o
       if (o instanceof THREE.Bone && o.name === 'handR') hand = o
+      if (o instanceof THREE.Bone && o.name === 'handL') handL = o
     })
-    return { root, mixer, actions, head, hand, eyes, shut, mouth, open, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0) }
+    return { root, mixer, actions, head, hand, handL, eyes, shut, mouth, open, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0) }
   }, [gltf, id, kind, glasses])
 }
 
@@ -253,6 +260,54 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
           </mesh>
         </group>
       )}
+    </group>
+  )
+}
+
+/**
+ * The cook, standing at the fire while the shop is open and busy at it: fanning the coals with an uchiwa in his left
+ * hand, turning a skewer low over them with his right, then holding it up high to shake salt down. Faces +Z.
+ */
+export function CookFigure() {
+  const r = useRigged(0, 'chef', false)
+  const fan = useRef<THREE.Group>(null)
+  const clock = useRef(0)
+  useEffect(() => {
+    r.actions.Cook?.reset().play()
+    const f = fan.current
+    if (f && r.handL) r.handL.add(f)
+    return () => { f?.removeFromParent() }
+  }, [r])
+  useFrame((_, delta) => {
+    const dt = Math.min(0.1, delta)
+    clock.current += dt
+    r.mixer.update(dt)
+    const blink = clock.current % 3.6 < 0.12
+    for (const o of r.eyes) o.visible = !blink
+    for (const o of r.shut) o.visible = blink
+  })
+  return (
+    <group>
+      <primitive object={r.root} />
+      {/* the uchiwa: a round paper fan on a bamboo handle, along the hand from the fist */}
+      <group ref={fan} position={[0, 0.03, 0]}>
+        <mesh position-y={0.03}>
+          <cylinderGeometry args={[0.003, 0.003, 0.07, 5]} />
+          <meshToonMaterial color="#c9a46a" gradientMap={gradientMap} />
+        </mesh>
+        <mesh position-y={0.105} rotation-x={Math.PI / 2}>
+          <cylinderGeometry args={[0.05, 0.05, 0.003, 20]} />
+          <meshToonMaterial color="#f2ead8" gradientMap={gradientMap} />
+        </mesh>
+        <mesh position-y={0.105} rotation-x={Math.PI / 2} scale={[1.08, 1.6, 1.08]}>
+          <cylinderGeometry args={[0.05, 0.05, 0.003, 20]} />
+          <meshBasicMaterial color={INK} side={THREE.BackSide} />
+        </mesh>
+        <mesh position={[0, 0.11, 0.002]} rotation-x={Math.PI / 2}>
+          <cylinderGeometry args={[0.022, 0.022, 0.0035, 16]} />
+          <meshToonMaterial color="#c8281e" gradientMap={gradientMap} />
+        </mesh>
+      </group>
     </group>
   )
 }

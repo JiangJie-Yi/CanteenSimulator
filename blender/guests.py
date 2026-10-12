@@ -39,7 +39,7 @@ PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 KINDS = ["salaryman", "officeLady", "highSchoolGirl", "highSchoolBoy", "grandma", "grandpa", "kid", "uncle",
-         "student", "yukata"]
+         "student", "yukata", "chef"]
 
 # =====================================================================
 # Materials
@@ -344,6 +344,9 @@ STYLE = {
                     collar="hood"),
     "yukata": dict(sh=0.88, waist=0.9, hip=0.98, belly=0.0, chest=0.006, sleeves="elbow", legs="robe", hair="updo",
                    collar="yukata", socks=0.12),
+    # (the cook, not a customer: a samue's crossed collar, a twisted headband)
+    "chef": dict(sh=1.04, waist=1.06, hip=1.02, belly=0.015, chest=0.0, sleeves="long", legs="long", hair="crop",
+                 collar="yukata"),
 }
 
 
@@ -1596,6 +1599,35 @@ def walk(phase):
 action("Sit", [(0, sit(0)), (36, sit(0.025)), (72, sit(0))])
 action("Eat", [(0, eat(0)), (14, eat(0.6)), (22, eat(1)), (32, eat(1)), (44, eat(0.4)), (56, eat(0)), (72, eat(0))])
 action("Walk", [(i * 3, walk(i / 8)) for i in range(9)])
+
+
+def cook(phase):
+    """the cook at the fire, standing: the left hand fanning the coals with an uchiwa all along, the right turning a
+    skewer low over them (the first half), then held up high shaking salt down (the second)"""
+    a = math.sin(2 * math.pi * phase * 6)
+    salt = smoothstep(0.42, 0.55, phase) * (1 - smoothstep(0.88, 0.98, phase))
+
+    def pose():
+        move_hips(0.455, 0)
+        aim("spine", (0, -0.06, 1), twist=0.08 * math.sin(2 * math.pi * phase))
+        aim("chest", (0, -0.1, 1))
+        aim("neck", (0, -0.05, 1))
+        aim("head", (0.06 * math.sin(2 * math.pi * phase * 2), -0.22 + 0.1 * salt, 1))
+        for s, sd in (("L", 1), ("R", -1)):
+            aim(f"thigh.{s}", (sd * 0.05, -0.02, -1))
+            aim(f"shin.{s}", (0, 0.04, -1))
+            aim(f"foot.{s}", (sd * 0.12, -1, -0.3))
+        aim("clavicle.L", (1, -0.12, 0.03))
+        reach("L", (0.17, -0.2, 0.55 + 0.012 * a), (1, 0.3, -1), (0.75 * a, -0.6, 0.35))
+        aim("clavicle.R", (-1, -0.12, 0.03 + 0.12 * salt))
+        low = Vector((-0.07, -0.27, 0.5 + 0.01 * math.sin(2 * math.pi * phase * 4)))
+        high = Vector((-0.1, -0.2, 0.86 + 0.012 * math.sin(2 * math.pi * phase * 14)))
+        turn = (0.35 * math.sin(2 * math.pi * phase * 3), -1, -0.35)
+        reach("R", low.lerp(high, salt), (-1, 0.2, -0.6), Vector(turn).lerp(Vector((0.1, -0.35, -1)), salt))
+    return pose
+
+
+action("Cook", [(i * 4, cook(i / 24)) for i in range(25)])
 reset_pose()
 
 # =====================================================================
