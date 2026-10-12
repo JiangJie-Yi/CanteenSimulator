@@ -89,3 +89,19 @@ export const GRILL_COUNTERS: Counter[] = [
   { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4 },
 ]
 export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)
+/**
+ * The grill's bar, stools and customers are all drawn this much bigger than their sizes here, to stand beside the
+ * fire pit and its big skewers: scaled about the inside corner of the two counters' cook's edges, so those edges stay
+ * where they are by the fire and the rest grows away from it. Roasting moves its own uses of them to match.
+ */
+export const GRILL_SCALE = 2
+/** the grill's bar top, in its own sizes */
+export const GRILL_BAR_TOP = 0.64
+/** the cook's own table (the fire pit and all on it) has its top at the scene's floor, y = 0; the customers' floor is
+ * further down, so their bar top comes up just this much higher than it */
+export const GRILL_BAR_RISE = 0.12
+const GRILL_PIVOT = new THREE.Vector3().addScaledVector(LAY, -2.14).addScaledVector(ALONG, -2.44)
+/** where the scaled bar's group goes (with scale GRILL_SCALE) */
+export const GRILL_OFFSET = GRILL_PIVOT.clone().multiplyScalar(1 - GRILL_SCALE).setY(GRILL_BAR_RISE - GRILL_BAR_TOP * GRILL_SCALE)
+/** a point given in the bar's own sizes, where it is in the scene as drawn */
+export const toGrillScene = (v: THREE.Vector3) => v.clone().multiplyScalar(GRILL_SCALE).add(GRILL_OFFSET)

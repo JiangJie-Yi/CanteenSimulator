@@ -224,7 +224,8 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
   for (const o of r.open) o.visible = chewing
 
   return (
-    <group scale={l.size}>
+    // (a smaller figure sits up on the stool, its legs dangling, rather than sinking into it)
+    <group scale={l.size} position-y={walking ? 0 : 0.35 * (1 - l.size)}>
       <primitive object={r.root} />
       {/* (along the hand: its tip, with the food, at the mouth when the hand is up) */}
       <group ref={skewer} visible={eating} position={[0, 0.03, 0.006]}>

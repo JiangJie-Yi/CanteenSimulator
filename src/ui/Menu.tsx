@@ -60,6 +60,8 @@ function tagFit(name: string, en: string | undefined, price: string, stamp: bool
 
 /** a dish name longer than this goes on in a second column */
 const TWO_COL_FROM = 5
+/** the smallest the menu tags are drawn (px of their font): smaller and the names are hard to read */
+const MIN_TAG_FONT = 18
 /** the size the foods' board last came out at, so the open menu's tags can be the very same size */
 let foodsFont: { font: number; rows: number } | null = null
 
@@ -318,6 +320,21 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           }
         }
       }
+      // (never so small they're hard to read: past that, as many rows as fit at a readable size, and the rest scroll
+      // sideways)
+      if (best.font < MIN_TAG_FONT) {
+        for (let r = 4; r >= 1; r--) {
+          const font = Math.min(22, (h - (r - 1) * gy) / (r * 15.5))
+          if (font >= MIN_TAG_FONT || r === 1) {
+            best = { ...best, font: Math.max(best.font, font), rows: r }
+            break
+          }
+        }
+      }
+      // (and never more rows than go down the space: fewer, scrolling sideways, or smaller ones if even one won't)
+      const tall = (r: number) => (h - (r - 1) * gy) / (r * 15.5)
+      while (best.rows > 1 && tall(best.rows) < best.font - 0.01) best = { ...best, rows: best.rows - 1 }
+      if (tall(best.rows) < best.font) best = { ...best, font: tall(best.rows) }
       const next = best.font >= 10 ? { font: Math.floor(best.font * 10) / 10, rows: best.rows }
         : { font: Math.max(10, Math.min(16, (h - gy) / 31)), rows: 2 }
       if (research) foodsFont = next

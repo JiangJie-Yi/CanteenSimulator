@@ -887,12 +887,14 @@ def fish(species="ayu"):
     er = (0.014 + D * 0.03) * sp.get("eye", 1.0)
     ez = wave(ex)
     for side in (-1, 1):
-        ey = bend(ex) + side * W * 0.5
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=12, ring_count=8, location=(ex, ey, D * 0.25 + ez))
+        # (the white stands out of the head a little, so a ring of it shows round the black)
+        ey = bend(ex) + side * (W * 0.5 + er * 0.35)
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=16, ring_count=10, location=(ex, ey, D * 0.25 + ez))
+        active().scale = (1, 0.6, 1)
         parts.append(finish(active(), "Eye", M["eye"]))
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.42, segments=12, ring_count=8,
-                                             location=(ex + 0.002, ey + side * er * 0.7, D * 0.255 + ez))
-        active().scale = (1, 0.5, 1)
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.5, segments=12, ring_count=8,
+                                             location=(ex + 0.002, ey + side * er * 0.42, D * 0.255 + ez))
+        active().scale = (1, 0.4, 1)
         parts.append(finish(active(), "Pupil", M["pupil"]))
 
     # the horse mackerel's scutes: a row of small hard plates along the rear half of the lateral line, both sides

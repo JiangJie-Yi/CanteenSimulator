@@ -11,7 +11,8 @@ const OUTLINE_WIDTH = 0.007
 const NO_OUTLINE = new Set(['Broth', 'FirePit', 'DriedChili', 'SichuanPepper', 'Scallion', 'Charcoal', 'PickledGreens',
   'Noodles', 'ExtraNoodles', 'GrillNet'])
 /** parts too fine for an ink line (a shrimp's legs and feelers would come out as heavy black wire) */
-const NO_OUTLINE_MATERIALS = new Set(['ShrimpLeg'])
+// (and the fish's eyes: an outline as thick as on the body would be a black ring as wide as the eye itself)
+const NO_OUTLINE_MATERIALS = new Set(['ShrimpLeg', 'FishEye', 'FishPupil'])
 // flat ground pieces: they catch shadows but shouldn't throw any
 const NO_CAST = new Set(['Broth', 'FirePit'])
 

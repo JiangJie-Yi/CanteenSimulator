@@ -1,9 +1,8 @@
 import type { Lang } from '@/data/i18n'
-import { GrillSign } from './GrillSign'
 
 // each shop has its own name and its own kind of sign
 //   noodles  甲粗飽 食堂 — Taiwanese for "eat your fill": a vermilion lacquered board on two cords
-//   grill    聞野 日式烤魚 — "smelt from out in the fields": a carved board of old wood (see GrillSign)
+//   grill    聞野 日式烤魚 — "smelt from out in the fields": the same vermilion lacquered board as the first sign
 //   hot pot  鼎沸 火鍋  — "bubbling like a cauldron": a round-cornered red-and-gold plaque with a flame crest
 //   bakery   麥田 烘焙  — "wheat field", a French-style bakery: a cream-painted board edged in brown, with a wheat ear
 const NAMES: Record<string, Record<Lang, { main: string; sub: string }>> = {
@@ -39,12 +38,8 @@ export function Brand({ night, lang, shop = 'beefnoodle', dark = false, ignite =
             <path d="M8 27V6M8 9c-3-1-4-4-3-6 2 1 3 3 3 6zm0 0c3-1 4-4 3-6-2 1-3 3-3 6zM8 15c-3-1-4-4-3-6 2 1 3 3 3 6zm0 0c3-1 4-4 3-6-2 1-3 3-3 6zM8 21c-3-1-4-4-3-6 2 1 3 3 3 6zm0 0c3-1 4-4 3-6-2 1-3 3-3 6z" />
           </svg>
         )}
-        {shop === 'grilledfish' ? <GrillSign night={night} /> : (
-          <>
-            <span className="brand-main">{main}</span>
-            <span className="brand-sub">{sub}</span>
-          </>
-        )}
+        <span className="brand-main">{main}</span>
+        <span className="brand-sub">{sub}</span>
       </span>
       {night && <span key="night" className="brand-late" aria-hidden="true">深夜</span>}
     </h1>

@@ -13,7 +13,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
-import { GRILL_COUNTERS, GRILL_SEATS, type Counter } from './bar'
+import { ALONG, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -47,11 +47,14 @@ const PATIENCE = 150
 /** the bar the customers sit at, behind the fire (away from the camera): its middle, length, top, and seats */
 const BAR_AT = GRILL_COUNTERS[0].at.clone()
 // (high enough for the customers sat at it: about a third of their height above the seat, as a real counter)
-const BAR_TOP = 0.64
+const BAR_TOP = GRILL_BAR_TOP
 const BAR_SEATS = GRILL_SEATS.length
+/** the same, in the scene as drawn (GRILL_SCALE bigger) */
+const BAR_AT_SCENE = toGrillScene(BAR_AT)
+const BAR_TOP_SCENE = BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y
 /** how big food is on the bar, next to the fire's: a skewer about as long as a customer's plate is wide */
-const BAR_FOOD_SCALE = 0.5
-const barSeat = (n: number) => GRILL_SEATS[n].plate.clone()
+const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
+const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
 // the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
@@ -59,7 +62,7 @@ const FLIGHT_SECONDS = 0.7
 // LAY_DIR points at the camera and STACK_DIR runs across the screen, so the row reads left to right
 const LAY_DIR = new THREE.Vector3(0.59, 0, 0.81).normalize()
 const STACK_DIR = new THREE.Vector3(0.81, 0, -0.59).normalize()
-const PLATE_R = 0.62
+const PLATE_R = 0.5
 const SLOT_GAP = 0.2       // wider than the broadest piece (a fish lying flat)
 const PER_LAYER = 5
 /** a plate takes 20 (four layers of five); the next one is set down behind it */
@@ -70,7 +73,7 @@ const PER_PLATE = 20
  */
 const ASH_GAIN: Record<string, number> = { Ember: 45, Binchotan: 18 }
 const ASH_TINT = new THREE.Color('#d8d2c8')
-const PLATE_STEP = 1.45
+const PLATE_STEP = 1.2
 /**
  * Spare plates and dishes stacked where the first of each stands, as they are in a shop: the one in use sits on top
  * of the stack, and taken off it (dragged away), it leaves the rest standing. How many under each, and how high each
@@ -287,8 +290,11 @@ const TRAY_W = 1.6
 const TRAY_D = 1.0
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
+/** how much bigger the fire pit (its ground, stones and coals) is drawn than modelled */
+const PIT_SCALE = 1.3
+const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
 /** the stone ring's outer edge: nothing can be pushed into the fire */
-const RING_CLEAR = 1.15
+const RING_CLEAR = 1.15 * PIT_SCALE
 
 /**
  * The tray's planed cedar: three boards with the grain running along them, drawn as wavering growth lines that
@@ -380,7 +386,43 @@ const TRAY_WOOD = (() => {
  */
 function Bar() {
   // (where the second counter butts against the first, the first's lip stops short of it, so nothing runs through)
-  return <>{GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} />)}</>
+  return <group position={GRILL_OFFSET} scale={GRILL_SCALE}>{GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} />)}</group>
+}
+/**
+ * The cook's table everything stands on (the fire pit, the tray, the plates): a thick top of pale planks, its front
+ * and sides boarded dark, down to the floor the customers walk on. Its back butts against the bar's cook's edges.
+ */
+const COOK_TABLE = { lay: [-2.1, 2.7], along: [-2.4, 3.1] }
+const COOK_TABLE_WOOD = (() => {
+  if (!TRAY_WOOD) return null
+  const t = TRAY_WOOD.clone()
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set((COOK_TABLE.along[1] - COOK_TABLE.along[0]) / 1.6, (COOK_TABLE.lay[1] - COOK_TABLE.lay[0]) / 1.6)
+  t.needsUpdate = true
+  return t
+})()
+function CookTable() {
+  const W = COOK_TABLE.along[1] - COOK_TABLE.along[0], D = COOK_TABLE.lay[1] - COOK_TABLE.lay[0]
+  const mid = new THREE.Vector3().addScaledVector(ALONG, (COOK_TABLE.along[0] + COOK_TABLE.along[1]) / 2)
+    .addScaledVector(LAY, (COOK_TABLE.lay[0] + COOK_TABLE.lay[1]) / 2)
+  const floor = GRILL_OFFSET.y
+  return (
+    <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+      <mesh position-y={-0.04} receiveShadow>
+        <boxGeometry args={[W, 0.08, D]} />
+        <meshToonMaterial color="#d8c4a6" map={COOK_TABLE_WOOD} />
+      </mesh>
+      <mesh position-y={-0.04} scale={[1.004, 1.25, 1.006]}>
+        <boxGeometry args={[W, 0.08, D]} />
+        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+      </mesh>
+      {/* the body, set back a little under the top */}
+      <mesh position-y={(floor - 0.08) / 2}>
+        <boxGeometry args={[W - 0.12, -floor - 0.08, D - 0.12]} />
+        <meshToonMaterial color="#3a2a1e" />
+      </mesh>
+    </group>
+  )
 }
 const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042, 0.016], [0.045, 0.02], [0.043, 0.021],
   [0.036, 0.012], [0.026, 0.006], [0, 0.006]], 0.045)
@@ -497,8 +539,8 @@ function PinchHand() {
 }
 
 /** the little side dishes for onigiri and mochi from the grill net */
-const DISH_R = 0.3
-const DISH_STEP = 0.7
+const DISH_R = 0.25
+const DISH_STEP = 0.6
 /** the bamboo basket the foil-roasted potatoes are served in */
 const BASKET_R = 0.48
 /** the basket's inner floor as y = BOWL_CURVE * r², fitted to its lathe profile */
@@ -1025,6 +1067,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
+  // the fire pit drawn bigger than it was modelled (its stones further out, the coals heaped wider), the skewers
+  // still planted where they were, now well inside the ring
+  useMemo(() => {
+    for (const o of root.children) {
+      if (!PIT_PARTS.test(o.name) || o.userData.pitScaled) continue
+      o.userData.pitScaled = true
+      o.position.x *= PIT_SCALE
+      o.position.z *= PIT_SCALE
+      o.scale.multiplyScalar(PIT_SCALE)
+    }
+  }, [root])
 
   // pieces by node, found by scanning the model root; rescanned whenever Dish adds a cloned portion
   const pieces = useRef<Piece[]>([])
@@ -1248,7 +1301,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const [kind, n] = key.split('-')
     if (kind === 'box' || kind === 'bin') return (carriers[kind]?.[0]?.home.clone() ?? new THREE.Vector3()).add(nudge(kind))
     if (kind === 'tray') return trayAt()
-    if (kind === 'bar') return BAR_AT.clone()
+    if (kind === 'bar') return BAR_AT_SCENE.clone()
     if (kind === 'lantern') return new THREE.Vector3(DECOR.lantern.at[0], 0, DECOR.lantern.at[1]).add(nudge('lantern'))
     if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
     if (kind === 'rawdish') return onSpares('rawdish', new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])))
@@ -1289,7 +1342,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // the crate and the fan
     for (const d of [DECOR.crate, DECOR.fan]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
-    if (space === 'open') for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: c.at.clone().addScaledVector(c.along, k * c.length / 4.5), r: 0.42 })
+    if (space === 'open') for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)), r: 0.42 * GRILL_SCALE })
     // the soup bowls on the table are in the way too
     root.traverse((o) => {
       const id = o.userData.itemId as string | undefined
@@ -1392,7 +1445,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.guest = owner?.id ?? -1
       p.seat = seat
       const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === seat && present(q) && !q.eaten).length
-      p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, ((row % 3) - 1) * 0.07).add(new THREE.Vector3(0, BAR_TOP + 0.04 + Math.floor(row / 3) * 0.06, 0))
+      p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE).add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
       p.container = 'bar'
       p.body = null
       if (p.loose) flatQ(p, p.toQ, LAY_DIR)
@@ -3000,6 +3053,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </Html>
       )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
+      <CookTable />
       {space === 'open' && bar && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
       {roast.trash && <TrashBin container="trash" contents={trashed}

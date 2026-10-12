@@ -453,6 +453,8 @@ def body_mat(name, t, p, st, kind):
         legs = st["legs"]
         if name.startswith("shin") and t > 0.93:
             return "Shoes"
+        if legs in ("skirt", "robe") and name.startswith("thigh") and p.z > (st["skirt"][0] if legs == "skirt" else 0.1) + 0.02:
+            return "Bottom"  # (under the skirt: in its colour, in case the hip shows at its waist as they move)
         socks = st.get("socks")
         if socks and name.startswith("shin") and t > 1 - socks:
             return "Socks"
@@ -463,7 +465,7 @@ def body_mat(name, t, p, st, kind):
         return "Skin"
     # the torso: the top down to the waist, then the trousers (or the robe, or the skirt)
     if st["legs"] in ("skirt", "robe"):
-        return "Top" if p.z > 0.47 or st["legs"] == "robe" else "Bottom"
+        return "Top" if p.z > (0.44 if st.get("jacket") else 0.47) or st["legs"] == "robe" else "Bottom"
     if st.get("jacket") and p.z > 0.43:
         return "Top"
     return "Top" if p.z > 0.47 else "Bottom"
@@ -1335,6 +1337,24 @@ def weights_skirt(o, top, hem):
                 gs[n].add([vt.index], x, "REPLACE")
 
 
+def cut_under(bd, lo, hi, bones):
+    """drop the body where a skirt or robe hides it (by its bones), so no leg pokes through the cloth as it moves"""
+    bm = bmesh.new()
+    bm.from_mesh(bd.data)
+    dl = bm.verts.layers.deform.active
+    names = {g.index: g.name for g in bd.vertex_groups}
+    drop = []
+    for v in bm.verts:
+        if lo < v.co.z < hi:
+            w = v[dl]
+            tot = sum(w.values())
+            if tot > 0 and sum(x for i, x in w.items() if names[i] in bones) / tot > 0.9:
+                drop.append(v)
+    bmesh.ops.delete(bm, geom=drop, context="VERTS")
+    bm.to_mesh(bd.data)
+    bm.free()
+
+
 def copy_weights(src, o):
     """each vertex takes the weights of the nearest vertex of src"""
     kd = KDTree(len(src.data.vertices))
@@ -1410,6 +1430,11 @@ for kind in KINDS:
         else:
             copy_weights(bd, o)
         bind(o, rig)
+    st = STYLE[kind]
+    if st["legs"] == "skirt":
+        cut_under(bd, st["skirt"][0] + 0.035, 0.42, ("hips", "thigh.L", "thigh.R"))
+    elif st["legs"] == "robe":
+        cut_under(bd, 0.17, 0.42, ("hips", "thigh.L", "thigh.R", "shin.L", "shin.R"))
     print("built", kind)
 
 

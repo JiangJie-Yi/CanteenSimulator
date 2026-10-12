@@ -241,15 +241,13 @@ function Chochin({ mark }: { mark: string }) {
   })
   return (
     <group>
-      {/* the post and its arm */}
-      <Part geo={CHOCHIN_POST} color="#3a2416" position={[0, 0.65, 0]} />
-      <Part geo={CHOCHIN_ARM} color="#3a2416" position={[-0.14, 1.26, 0]} />
-      <group ref={hang} position={[-0.26, 1.24, 0]}>
-        <mesh position-y={-0.08}>
-          <cylinderGeometry args={[0.003, 0.003, 0.12, 4]} />
+      {/* hung straight from above on a long cord (no post) */}
+      <group ref={hang} position={[-0.26, 1.9, 0]}>
+        <mesh position-y={-0.37}>
+          <cylinderGeometry args={[0.003, 0.003, 0.74, 4]} />
           <meshBasicMaterial color="#1a0d08" />
         </mesh>
-        <group position-y={-0.38}>
+        <group position-y={-1.04}>
           <mesh geometry={CHOCHIN_GEO}>
             <meshBasicMaterial ref={skin} map={tex} toneMapped={false} />
           </mesh>
@@ -268,8 +266,6 @@ function Chochin({ mark }: { mark: string }) {
     </group>
   )
 }
-const CHOCHIN_POST = new THREE.BoxGeometry(0.05, 1.3, 0.05)
-const CHOCHIN_ARM = new THREE.BoxGeometry(0.3, 0.035, 0.035)
 
 /**
  * The till by the door (帳場): a small counter of the same dark wood as the bar's base under a pale top, an old
@@ -440,7 +436,7 @@ function Plate({ dirty = false }: { dirty?: boolean }) {
   )
 }
 
-export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given }:
+export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
@@ -449,7 +445,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** the height of the bar top, where the plates go */
     top?: number
     /** draw the customers themselves (a phone shows them in 2D instead; the plates still come and go) */
-    people?: boolean }) {
+    people?: boolean
+    /** drawn this much bigger, all of it */
+    scale?: number
+    /** and moved by this (after scaling) */
+    offset?: THREE.Vector3 }) {
   const [shown, setShown] = useState<Shown[]>([])
   const guestsRef = useRef(guests)
   guestsRef.current = guests
@@ -639,7 +639,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   })
 
   return (
-    <group>
+    <group scale={scale} position={offset}>
       {drawCounter && <group position={at}><Counter length={length} /></group>}
       {counters.map((c, i) => {
         // the first counter's floor runs on past its end to the door, and back to meet the others' aisles; each other
