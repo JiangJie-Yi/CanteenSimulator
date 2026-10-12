@@ -523,6 +523,37 @@ function BarCounter({ c, trim = 0 }: { c: Counter; trim?: number }) {
           </group>
         )
       })}
+      {/* a box of tissues between each pair of seats, back by the lip clear of their plates */}
+      {Array.from({ length: Math.floor(c.seats / 2) }, (_, k) => (
+        <group key={k} position={[(2 * k + 1 - c.seats / 2) * (L / c.seats), BAR_TOP, 0.2]}><TissueBox /></group>
+      ))}
+    </group>
+  )
+}
+
+/** a box of tissues in a wooden case, one pulled up out of the slot on top */
+function TissueBox() {
+  return (
+    <group>
+      <mesh position-y={0.028} castShadow>
+        <boxGeometry args={[0.13, 0.056, 0.07]} />
+        <meshToonMaterial color="#6a4428" />
+      </mesh>
+      <mesh position-y={0.028} scale={[1.05, 1.1, 1.08]}>
+        <boxGeometry args={[0.13, 0.056, 0.07]} />
+        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+      </mesh>
+      {/* the slot, and the tissue puffed up out of it */}
+      <mesh position-y={0.0565} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[0.08, 0.016]} />
+        <meshBasicMaterial color="#2a1a10" />
+      </mesh>
+      {[-0.012, 0.01].map((x, i) => (
+        <mesh key={x} position={[x, 0.082, 0]} rotation={[0, i ? 0.3 : -0.2, i ? -0.25 : 0.2]} scale={[1, 1, 0.25]}>
+          <coneGeometry args={[0.03, 0.056, 6, 1, true]} />
+          <meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} />
+        </mesh>
+      ))}
     </group>
   )
 }

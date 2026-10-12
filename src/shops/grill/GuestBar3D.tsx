@@ -9,6 +9,7 @@ import { Person } from '@/scene/Person3D'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall } from './DiningRoom'
+import { LuckyCat } from './LuckyCat'
 import { AISLE, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
@@ -136,7 +137,7 @@ const PLANKS = (() => {
 /**
  * The way in: a noren hanging just past the end of the bar, three panels that sway a little.
  */
-function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
+export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const lantern = mark === '聞野' ? '炭火' : mark
   const tex = useMemo(() => norenTexture(mark), [mark])
   const panels = useRef<(THREE.Mesh | null)[]>([])
@@ -150,8 +151,27 @@ function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   })
   return (
     <group position={at} rotation-y={yaw}>
-      {/* a red lantern beside the way in */}
-      <group position={[W / 2 + 0.45, 0, 0.05]}><Chochin mark={lantern} /></group>
+      {/* beckoning cats either side of the way in, on little stands: a big white one and smaller gold and black ones */}
+      {DOOR_CATS.map((k, i) => (
+        <group key={i} position={[k.x, 0, k.z]} rotation-y={k.yaw}>
+          <Part geo={REG_GEO.body} color="#5a3a24" outline={1.03} position={[0, k.stand / 2, 0]} scale={[0.16 * k.s, k.stand, 0.14 * k.s]} />
+          <group position-y={k.stand} scale={k.s * 2.2}><LuckyCat body={k.body} paw={k.paw} /></group>
+        </group>
+      ))}
+      {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
+      <Part geo={REG_GEO.body} color="#2b2620" outline={0} position={[0, 0.007, -0.22]} scale={[0.78, 0.006, 0.46]} />
+      {[-1, 1].map((sd) => (
+        <group key={sd}>
+          <Part geo={REG_GEO.body} color="#3a2416" outline={0} position={[sd * 0.38, 0.012, -0.22]} scale={[0.03, 0.012, 0.46]} />
+          <Part geo={REG_GEO.body} color="#3a2416" outline={0} position={[0, 0.012, -0.22 + sd * 0.215]} scale={[0.79, 0.012, 0.03]} />
+        </group>
+      ))}
+      <mesh position={[0, 0.0115, -0.22]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[0.66, 0.36]} />
+        <meshToonMaterial color="#ffffff" map={DOORMAT} />
+      </mesh>
+      {/* a red lantern hung just outside, on the bar's side (the back wall is too close on the other, the till inside) */}
+      <group position={[-0.3, 0, 0.47]}><Chochin mark={lantern} /></group>
       {/* the noren: three panels side by side, hung from a bamboo rod (no frame: it hangs in the way in by itself) */}
       <mesh position={[0, H - 0.05, 0.03]} rotation-z={Math.PI / 2}>
         <cylinderGeometry args={[0.012, 0.012, W, 8]} />
@@ -168,6 +188,31 @@ function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
     </group>
   )
 }
+
+/** the coir doormat: tan bristle in ribs, a dark border, the shop's welcome (いらっしゃいませ) woven across it */
+const DOORMAT = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 256
+  c.height = 140
+  const g = c.getContext('2d')!
+  g.fillStyle = '#4a3020'
+  g.fillRect(0, 0, 256, 140)
+  g.fillStyle = '#a77d4c'
+  g.fillRect(12, 12, 232, 116)
+  for (let x = 14; x < 244; x += 6) {
+    g.fillStyle = x % 12 ? 'rgba(90,60,30,0.28)' : 'rgba(255,230,180,0.14)'
+    g.fillRect(x, 12, 3, 116)
+  }
+  g.fillStyle = '#4a3020'
+  g.font = 'bold 22px "Noto Serif TC", serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText('いらっしゃいませ', 128, 70)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
 
 /** the red paper lantern's skin: red washi with its ribs, and the shop's name brushed down it in black */
 const chochinTexture = (mark: string) => {
@@ -294,20 +339,22 @@ function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: numbe
       {/* the change tray */}
       <Part geo={REG_GEO.body} color="#8a2a1e" outline={1.04} position={[-0.18, top + 0.008, -0.1]} scale={[0.12, 0.012, 0.09]} />
       {/* the beckoning cat, its paw up */}
-      <group position={[0.2, top, -0.1]} rotation-y={Math.PI}>
-        <Part geo={REG_GEO.ball} color="#f6f3ea" position={[0, 0.05, 0]} scale={[1, 1.15, 0.9]} />
-        <Part geo={REG_GEO.ball} color="#f6f3ea" position={[0, 0.115, 0]} scale={[0.85, 0.75, 0.8]} />
-        {[-1, 1].map((sd) => <Part key={sd} geo={REG_GEO.ear} color="#f6f3ea" position={[sd * 0.022, 0.15, 0]} rotation-z={-sd * 0.3} />)}
-        <Part geo={REG_GEO.paw} color="#f6f3ea" position={[0.04, 0.12, 0.012]} />
-        <mesh position={[0, 0.085, 0.034]}><torusGeometry args={[0.03, 0.005, 6, 16, Math.PI]} /><meshToonMaterial color="#c4302a" /></mesh>
-        <mesh position={[0, 0.072, 0.04]}><sphereGeometry args={[0.008, 8, 6]} /><meshToonMaterial color="#e8c45a" /></mesh>
-        {[-1, 1].map((sd) => (
-          <mesh key={sd} position={[sd * 0.014, 0.12, 0.033]}><sphereGeometry args={[0.004, 6, 4]} /><meshBasicMaterial color="#2a1d16" /></mesh>
-        ))}
-      </group>
+      <group position={[0.2, top, -0.1]} rotation-y={Math.PI}><LuckyCat /></group>
     </group>
   )
 }
+
+/**
+ * The cats at the door (in the entrance's frame: x across the way in, +x toward the back wall, which stands at x 0.5; +z out of the shop.
+   The customers come in at x 0 and walk off down -z, so all of these sit just outside the noren, clear of them, the
+ * wall and the till, which reaches out to z 0.26 between x -0.64 and -1.06)
+ */
+const DOOR_CATS = [
+  { x: -0.36, z: 0.14, yaw: -0.3, s: 1.2, stand: 0.14, body: '#f6f3ea', paw: 'right' as const },
+  { x: 0.34, z: 0.14, yaw: 0.3, s: 1.1, stand: 0.14, body: '#f6f3ea', paw: 'left' as const },
+  { x: -0.46, z: 0.38, yaw: -0.2, s: 0.8, stand: 0.06, body: '#d9b04a', paw: 'left' as const },
+  { x: 0.3, z: 0.38, yaw: 0.25, s: 0.75, stand: 0.06, body: '#2a2420', paw: 'right' as const },
+]
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
   ball: new THREE.SphereGeometry(0.04, 14, 10),

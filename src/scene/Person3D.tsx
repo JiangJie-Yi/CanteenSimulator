@@ -8,10 +8,11 @@ import { cloth, type Pattern } from './patterns'
 
 /*
  * A customer in 3D, toon-shaded with an ink outline: a chibi figure from blender/guests.py (public/models/guests.glb),
- * one of ten kinds (data/guests.ts) on a shared rig, sitting, eating or walking by its actions there. What they're
+ * one of twelve kinds (data/guests.ts) on a shared rig, sitting, eating or walking by its actions there. What they're
  * dressed in says what they are: the office worker's suit and tie, the schoolgirl's sailor collar and pleated
  * skirt, the boy's black gakuran, the old man's knit vest and glasses, the kid's yellow cap and randoseru, the
- * yukata and its obi, the uncle's aloha shirt and headband, the student's hoodie…
+ * yukata and its obi, the uncle's aloha shirt and headband, the student's hoodie, the delinquent's
+ * long gakuran and pompadour, the biker's tokkō coat and hachimaki…
  *
  * Each customer gets their own colours (skin, hair, clothes, shoes) and their clothes' cloth (scene/patterns.ts).
  * They blink, chew, and while waiting look about now and then.
@@ -39,12 +40,15 @@ function lookOf(id: number, kind: Kind): Look {
     salaryman: '#2b3444', officeLady: '#6a6f78', highSchoolGirl: '#f4f1ea', highSchoolBoy: '#1c1e26', grandma: '#c9b48a',
     grandpa: '#7a5a3a', kid: pick(['#e85a4a', '#4a8ad8', '#f0c040'], id), uncle: pick(['#4a7a5a', '#a8432f', '#3d6a9a'], id),
     student: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukata: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
+    yankee: pick(['#15161c', '#1c2440'], id), bosozoku: pick(['#f2efe8', '#4a2a5e', '#1a1a20'], id),
   }
   return {
     top: top[kind],
     legs: kind === 'highSchoolGirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a'
-      : kind === 'student' ? '#3a4a6a' : kind === 'grandma' ? '#5a4a3e' : kind === 'yukata' ? top[kind] : '#2f2f36',
-    hair: old ? '#d4d4d4' : pick(HAIR, id * 3),
+      : kind === 'student' ? '#3a4a6a' : kind === 'grandma' ? '#5a4a3e' : kind === 'yukata' || kind === 'bosozoku' ? top[kind]
+        : kind === 'yankee' ? '#15161c' : '#2f2f36',
+    // (the rough lot bleach it, or dye it red-brown, as often as not)
+    hair: old ? '#d4d4d4' : kind === 'yankee' || kind === 'bosozoku' ? pick(['#e2b85a', '#1c1c22', '#a8542a'], id) : pick(HAIR, id * 3),
     skin: pick(SKIN, id * 7 + 1),
     shoes: kind === 'student' || kind === 'kid' ? '#f2f0ea' : kind === 'yukata' ? '#b08a5a' : '#2a2220',
     size: kind === 'kid' ? 0.78 : kind === 'grandma' ? 0.93 : 1,

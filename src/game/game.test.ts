@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { ALL_DISHES as DISHES } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPrice, type Entry } from '@/data/recipes'
 import { ROLES } from '@/data/staff'
+import { KINDS, kindOf } from '@/data/guests'
 import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder } from '@/game/economy'
 import { trialIdeas } from '@/game/research'
 import { makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
@@ -274,5 +275,16 @@ describe('hiring: who they are, and 一鍵徵人', () => {
     }
     const chef = all.find((w) => w.role === 'chef')!
     expect(pickHires(people, roles, { [chef.id]: true }).some((w) => w.role === 'chef')).toBe(false)
+  })
+})
+
+describe('guests: who comes in, and how often', () => {
+  it('every kind turns up, each about as often as its weight, the rough lot less', () => {
+    const n = 20000
+    const seen = new Map<string, number>()
+    for (let id = 0; id < n; id++) seen.set(kindOf(id).kind, (seen.get(kindOf(id).kind) ?? 0) + 1)
+    const total = KINDS.reduce((s, k) => s + k.weight, 0)
+    for (const k of KINDS) expect(Math.abs((seen.get(k.kind) ?? 0) / n - k.weight / total)).toBeLessThan(0.01)
+    expect(seen.get('bosozoku')!).toBeLessThan(seen.get('salaryman')! / 2)
   })
 })
