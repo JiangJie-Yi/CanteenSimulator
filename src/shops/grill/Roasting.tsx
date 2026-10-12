@@ -18,7 +18,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
-import { ALONG, FLOOR_NEAR, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, PLATES_SET, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -3157,7 +3157,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           const at = inBasket(p) ? basketAt(0).add(new THREE.Vector3(0, 0.06, 0)) : p.toP
           setWisps((all) => [...all.filter((w) => w.key !== p.key), { key: p.key, at: at.toArray() as [number, number, number] }])
         }
-        p.flight = Math.min(1, p.flight + dt / FLIGHT_SECONDS)
+        // (served at the bar, it waits in the cook's hand by the fire till the customer's plate is set down for it)
+        const plateless = p.container === 'bar' && bar && p.flight === 0 && !PLATES_SET.has(p.seat)
+        if (!plateless) p.flight = Math.min(1, p.flight + dt / FLIGHT_SECONDS)
         if (!p.body?.live) {
           const e = p.flight < 0.5 ? 2 * p.flight * p.flight : 1 - (-2 * p.flight + 2) ** 2 / 2
           // (its spot follows the plate or dish if that's been dragged somewhere)

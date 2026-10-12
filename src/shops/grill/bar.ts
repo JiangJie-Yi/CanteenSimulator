@@ -29,6 +29,12 @@ export const AISLE = 1.15
 export const FLOOR_NEAR = 0.42
 export const FLOOR_FAR = -(AISLE + 0.5)
 
+/**
+ * The seats with a customer's plate set down at them just now (GuestBar3D keeps it, every frame): what's grilled for
+ * someone is only carried over once their plate's there, so it never lands on the bare bar before it.
+ */
+export const PLATES_SET = new Set<number>()
+
 export const LAY = new THREE.Vector3(0.59, 0, 0.81)
 export const ALONG = new THREE.Vector3(0.81, 0, -0.59)
 

@@ -13,7 +13,7 @@ import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { FLOOR_FAR, FLOOR_NEAR, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { FLOOR_FAR, FLOOR_NEAR, PLATES_SET, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -735,6 +735,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       }
     }
+    // (which seats have their plate down, for what's being served to them)
+    PLATES_SET.clear()
+    for (const r of runs.current) if (r.phase === 'set' || r.phase === 'clear' && r.t < 0) PLATES_SET.add(r.seat)
     if (finished) {
       runs.current = runs.current.filter((r) => r.t !== Infinity)
       dirty.current += finished
