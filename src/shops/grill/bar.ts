@@ -35,6 +35,28 @@ export const FLOOR_FAR = -(AISLE + 0.5)
  */
 export const PLATES_SET = new Set<number>()
 
+/**
+ * Serving through the pass, when there's a server on the floor: what's grilled is put out at the pass (the end of the
+ * first counter by the clean plates); a server picks it up there with a plate and carries it to the customer, and
+ * sets it down in front of them. Roasting moves the food, GuestBar3D the server and the plates; this is what they tell
+ * each other, by the food's key.
+ */
+export const SERVICE = {
+  /** how many servers there are to carry (GuestBar3D says): none, and the cook hands it over the bar himself */
+  servers: 0,
+  /** what's out at the pass waiting to go, and for which seat (Roasting) */
+  waiting: new Map<string, number>(),
+  /** what's being carried, and where it is just now, in the shop's frame (GuestBar3D) */
+  carried: new Map<string, THREE.Vector3>(),
+  /** what's been set down at its seat (GuestBar3D; Roasting lays it on the plate and takes it out of here) */
+  delivered: new Set<string>(),
+}
+// (in development, to be watched from the console)
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __service?: typeof SERVICE }).__service = SERVICE
+/** the pass, in the bar's own frame (on the first counter's top, at its start, the customers' side of it) */
+export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + 0.2)
+  .addScaledVector(cs[0].lay, -0.16)
+
 export const LAY = new THREE.Vector3(0.59, 0, 0.81)
 export const ALONG = new THREE.Vector3(0.81, 0, -0.59)
 

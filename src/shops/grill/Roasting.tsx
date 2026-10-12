@@ -4,6 +4,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
+import { FloorPiece } from '@/scene/FloorPiece'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
@@ -18,7 +19,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
-import { ALONG, FLOOR_NEAR, PLATES_SET, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, PLATES_SET, SERVICE, passOf, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -64,6 +65,8 @@ const BAR_AT_SCENE = toGrillScene(BAR_AT)
 const BAR_TOP_SCENE = BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y
 /** how big food is on the bar, next to the fire's: a skewer about as long as a customer's plate is wide */
 const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
+/** the pass, where what's grilled is put out for a server to carry */
+const PASS_SCENE = toGrillScene(passOf(GRILL_COUNTERS)).setY(GRILL_BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y + 0.04)
 const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 const FLIGHT_SECONDS = 0.7
@@ -403,7 +406,7 @@ function Bar() {
     <group position={GRILL_OFFSET} scale={GRILL_SCALE}>
       <StaticBatch>
         {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0}
-          gate={i === 0 ? { end: 1, w: 0.55 } : { end: -1, w: 0.42 }} noTop={GRILL_COUNTERS.length > 1} />)}
+          gate={BAR_GATES[i]} noTop={GRILL_COUNTERS.length > 1} />)}
         {GRILL_COUNTERS.length > 1 && <BarTop />}
       </StaticBatch>
     </group>
@@ -436,7 +439,7 @@ export type CrewMember = { id: string; role: Role; look: Look }
 const KITCHEN_YAW = Math.atan2(-ALONG.x, -ALONG.z)
 const kitchenAt = (lay: number) => new THREE.Vector3().addScaledVector(LAY, lay).addScaledVector(ALONG, 3.55).setY(GRILL_OFFSET.y)
 function crewPlaces(crew: CrewMember[]) {
-  const c0 = GRILL_COUNTERS[0], c1 = GRILL_COUNTERS[1]
+  const c0 = GRILL_COUNTERS[0]
   const onFloor = (v: THREE.Vector3) => toGrillScene(v).setY(GRILL_OFFSET.y)
   const spots: Record<Role, { at: THREE.Vector3; yaw: number }[]> = {
     chef: [{ at: CHEF_AT, yaw: CHEF_YAW }],
@@ -444,12 +447,8 @@ function crewPlaces(crew: CrewMember[]) {
     stock: [{ at: kitchenAt(-0.6), yaw: KITCHEN_YAW }],
     cashier: [{ at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + 0.95).addScaledVector(c0.lay, 0.68)),
       yaw: Math.atan2(-c0.lay.x, -c0.lay.z) }],
-    server: [
-      { at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + 0.3).addScaledVector(c0.lay, -0.62)),
-        yaw: Math.atan2(-c0.along.x, -c0.along.z) },
-      { at: onFloor(c1.at.clone().addScaledVector(c1.along, -c1.length / 2 - 0.15).addScaledVector(c1.lay, -0.95)),
-        yaw: Math.atan2(c1.along.x, c1.along.z) },
-    ],
+    // (the servers are on the floor with the customers, and walk: GuestBar3D draws them)
+    server: [],
   }
   const used: Partial<Record<Role, number>> = {}
   return crew.flatMap((m) => {
@@ -483,57 +482,20 @@ const KITCHEN_FLOOR = (() => {
   const lay1 = c1 ? toGrillScene(c1.at.clone().addScaledVector(c1.along, -c1.length / 2 - 0.35)).dot(LAY) : COOK_TABLE.lay[1] + 0.9
   return { lay: [lay0, lay1], along: [along0, along1] }
 })()
-/** its boards: dark walnut, narrower than the customers', so the two read as two rooms */
-const KITCHEN_PLANKS = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 128
-  c.height = 512
-  const g = c.getContext('2d')!
-  for (let b = 0; b < 6; b++) {
-    const w = 128 / 6
-    g.fillStyle = ['#4e3a2a', '#563f2e', '#4a3627', '#5a4331', '#503b2b', '#47342a'][b]
-    g.fillRect(b * w, 0, w, 512)
-    g.strokeStyle = 'rgba(20,12,6,0.3)'
-    for (let k = 0; k < 4; k++) {
-      g.beginPath()
-      g.moveTo(b * w + 3 + k * 5, 0)
-      g.bezierCurveTo(b * w + 1 + k * 5, 170, b * w + 6 + k * 5, 340, b * w + 3 + k * 5, 512)
-      g.stroke()
-    }
-    g.fillStyle = 'rgba(15,8,4,0.7)'
-    g.fillRect(b * w, 0, 1.5, 512)
-    // (the boards' butt joints, staggered)
-    g.fillRect(b * w, ((b * 197) % 512), w, 1.5)
-  }
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  return t
-})()
 function CookTable() {
-  // (and under it all the kitchen's own floor of darker boards, from the bar's cook's edges to the front, and on past
-  // the table's right-hand end where the other cooks stand)
+  // (and under it all the kitchen's floor, from the bar's cook's edges to the front, and on past the table's
+  // right-hand end where the other cooks stand)
   const W = KITCHEN_FLOOR.along[1] - KITCHEN_FLOOR.along[0], D = KITCHEN_FLOOR.lay[1] - KITCHEN_FLOOR.lay[0]
   const mid = new THREE.Vector3().addScaledVector(ALONG, (KITCHEN_FLOOR.along[0] + KITCHEN_FLOOR.along[1]) / 2)
-    .addScaledVector(LAY, (KITCHEN_FLOOR.lay[0] + KITCHEN_FLOOR.lay[1]) / 2).setY(GRILL_OFFSET.y + 0.003)
-  const map = useMemo(() => {
-    if (!KITCHEN_PLANKS) return null
-    const t = KITCHEN_PLANKS.clone()
-    // (the boards run along the counter, each about 0.3 wide)
-    t.repeat.set(D / 1.8, W / 6)
-    t.rotation = Math.PI / 2
-    t.needsUpdate = true
-    return t
-  }, [W, D])
+    .addScaledVector(LAY, (KITCHEN_FLOOR.lay[0] + KITCHEN_FLOOR.lay[1]) / 2).setY(GRILL_OFFSET.y + 0.004 * GRILL_SCALE)
   return (
     <>
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]} />)}
       <CookTableTop />
-      <mesh position={mid} rotation={[-Math.PI / 2, 0, Math.atan2(-ALONG.z, ALONG.x)]} receiveShadow>
-        <planeGeometry args={[W, D]} />
-        <meshToonMaterial color="#ffffff" map={map} />
-      </mesh>
+      {/* (the same boards as the customers', running on from theirs, a shade darker: the kitchen's side) */}
+      <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+        <FloorPiece w={W} l={D} tint="#b49a84" />
+      </group>
     </>
   )
 }
@@ -589,6 +551,10 @@ function CookTableBox({ lay, along }: { lay: [number, number]; along: [number, n
  * it), the side counter's outer edge squared up with the first's end, joined into an L and given rounded edges.
  */
 const BAR_DEPTH = 0.62
+/** the staff's way through, at the outer end of each counter: which end, and how wide */
+const BAR_GATES: { end: 1 | -1; w: number }[] = [{ end: 1, w: 0.55 }, { end: -1, w: 0.42 }]
+/** how far the gates' flaps stand lifted open */
+const FLAP_OPEN = 1.25
 function barTopShape(grow: number) {
   const box = (c: Counter) => {
     const hl = (c.length + 0.3) / 2, hd = BAR_DEPTH / 2
@@ -600,8 +566,11 @@ function barTopShape(grow: number) {
   // (the side counter stands off the first's cook's side, at its start: its outer edge flush with the first's end)
   const i = 0.025 - grow
   const x0 = Math.min(a.x0, b.x0) + i
-  const pts: [number, number][] = [[x0, a.y0 + i], [a.x1 - i, a.y0 + i], [a.x1 - i, a.y1 - i], [b.x1 - i, a.y1 - i], [b.x1 - i, b.y1 - i],
-    [x0, b.y1 - i]]
+  // (short of each gate's flap, which is a piece of its own: at the first counter's far end, the side counter's near
+  // one, which is its high-lay end here)
+  const ax1 = a.x1 - BAR_GATES[0].w, by1 = b.y1 - BAR_GATES[1].w
+  const pts: [number, number][] = [[x0, a.y0 + i], [ax1 - i, a.y0 + i], [ax1 - i, a.y1 - i], [b.x1 - i, a.y1 - i], [b.x1 - i, by1 - i],
+    [x0, by1 - i]]
   const sh = new THREE.Shape()
   pts.forEach(([x, y], k) => (k ? sh.lineTo(x, y) : sh.moveTo(x, y)))
   const thick = 0.012 + grow * 0.6
@@ -669,29 +638,37 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
       </mesh>
       {gate && (
         <group position-x={gateX}>
-          {/* the flap's seam across the top, and its two brass hinges on the cook's side */}
-          <mesh position={[-end * G / 2, BAR_TOP + 0.001, 0]} rotation-x={-Math.PI / 2}>
-            <planeGeometry args={[0.008, 0.6]} />
-            <meshBasicMaterial color="#3b2a20" />
-          </mesh>
-          {[-0.18, 0.18].map((z) => (
-            <mesh key={z} position={[-end * G / 2, BAR_TOP + 0.003, z]}>
-              <boxGeometry args={[0.05, 0.006, 0.03]} />
-              <meshToonMaterial color="#c8a050" />
+          {/* the flap: that end of the top, hinged at its inner edge on two brass hinges, lifted up and standing open */}
+          <group position={[-end * G / 2, BAR_TOP, 0]} rotation-z={end * FLAP_OPEN}>
+            <mesh position={[end * G / 2, -0.03, 0]} scale={[G - 0.01, 0.06, BAR_DEPTH]} geometry={ROUNDED_SLAB} castShadow>
+              <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
             </mesh>
-          ))}
-          {/* the swing doors, standing a touch ajar, slatted, at the base's middle */}
+            <mesh position={[end * G / 2, -0.03, 0]} scale={[(G - 0.01) * 1.02, 0.075, BAR_DEPTH * 1.03]} geometry={ROUNDED_SLAB}>
+              <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+            </mesh>
+            {[-0.2, 0.2].map((z) => (
+              <mesh key={z} position={[0, 0.002, z]}>
+                <boxGeometry args={[0.05, 0.012, 0.04]} />
+                <meshToonMaterial color="#c8a050" />
+              </mesh>
+            ))}
+          </group>
+          {/* the half doors below it, pale wood, slatted, swung a little open */}
           {[-1, 1].map((sd) => (
-            <group key={sd} position={[sd * G / 2, 0.06, 0.08]} rotation-y={sd * 0.12}>
+            <group key={sd} position={[sd * G / 2, 0.05, 0.08]} rotation-y={sd * 0.38}>
               <group position-x={-sd * G / 4}>
                 <mesh position-y={0.2}>
                   <boxGeometry args={[G / 2 - 0.02, 0.4, 0.025]} />
-                  <meshToonMaterial color="#5a3e28" />
+                  <meshToonMaterial color="#b08454" />
                 </mesh>
-                {[0.08, 0.16, 0.24, 0.32].map((y) => (
-                  <mesh key={y} position={[0, y, -0.014]}>
-                    <boxGeometry args={[G / 2 - 0.05, 0.012, 0.004]} />
-                    <meshToonMaterial color="#3a2a1e" />
+                <mesh position-y={0.2} scale={[1.05, 1.04, 1.4]}>
+                  <boxGeometry args={[G / 2 - 0.02, 0.4, 0.025]} />
+                  <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+                </mesh>
+                {[-0.08, -0.03, 0.02, 0.07].map((x) => (
+                  <mesh key={x} position={[x * (G / 0.55), 0.2, -0.014]}>
+                    <boxGeometry args={[0.012, 0.34, 0.004]} />
+                    <meshToonMaterial color="#7a5432" />
                   </mesh>
                 ))}
               </group>
@@ -1176,6 +1153,10 @@ type Piece = {
   collected: boolean
   /** 0..1 along the flight to the plate */
   flight: number
+  /** (served by a server) out at the pass, or on its way: it goes on to the customer's plate when it's set down */
+  via?: 'pass'
+  /** drawn at the bar's size: it's been out on it (at the pass), so it doesn't grow back on the last hop */
+  small?: boolean
   fromP: THREE.Vector3
   fromQ: THREE.Quaternion
   toP: THREE.Vector3
@@ -1735,6 +1716,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.seat = seat
       const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === seat && present(q) && !q.eaten).length
       p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE).add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
+      // (with a server on the floor it's put out at the pass instead, to be carried over with a plate)
+      if (SERVICE.servers && bar) {
+        const n = pieces.current.filter((q) => q !== p && q.via === 'pass' && !q.eaten).length
+        p.via = 'pass'
+        p.toP.copy(PASS_SCENE).addScaledVector(ALONG, ((n % 4) - 1.5) * 0.08 * GRILL_SCALE).addScaledVector(LAY, -Math.floor(n / 4) * 0.09 * GRILL_SCALE)
+      }
       p.container = 'bar'
       p.body = null
       if (p.loose) flatQ(p, p.toQ, LAY_DIR)
@@ -1818,7 +1805,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
 
   const eat = (p: Piece) => {
-    if (!p.collected || p.flight < 1 || p.eaten || !present(p)) return
+    if (!p.collected || p.flight < 1 || p.eaten || !present(p) || p.via) return
     // potatoes in the basket are unwrapped first, with a click of their own
     if (inBasket(p) && !p.unwrapped) {
       p.unwrapped = true
@@ -3074,6 +3061,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           }
         }
         p.landed = -1
+        p.via = undefined
+        p.small = false
         p.collected = false
         p.flight = 0
         p.slot = null
@@ -3087,6 +3076,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         return
       }
       // eaten and gone (or in the bin): nothing more to work out for it, every frame, however many there have been
+      // (and nothing of it left for a server to carry)
+      if (p.eaten && p.via) {
+        p.via = undefined
+        SERVICE.waiting.delete(p.key)
+        SERVICE.carried.delete(p.key)
+        SERVICE.delivered.delete(p.key)
+      }
       if (p.eaten && p.trash < 0) {
         if (menuIds.has(p.id)) p.node.userData.shrink = 0.0001
         else p.node.scale.setScalar(0.0001)
@@ -3158,7 +3154,27 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           setWisps((all) => [...all.filter((w) => w.key !== p.key), { key: p.key, at: at.toArray() as [number, number, number] }])
         }
         // (served at the bar, it waits in the cook's hand by the fire till the customer's plate is set down for it)
-        const plateless = p.container === 'bar' && bar && p.flight === 0 && !PLATES_SET.has(p.seat)
+        const plateless = p.container === 'bar' && bar && !SERVICE.servers && !p.via && p.flight === 0 && !PLATES_SET.has(p.seat)
+        // (served through the pass: out there till a server takes it, then on the tray with them, then onto the plate)
+        if (p.via === 'pass') {
+          if (SERVICE.delivered.has(p.key)) {
+            SERVICE.delivered.delete(p.key)
+            const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === p.seat && !q.via && present(q) && !q.eaten).length
+            p.fromP.copy(p.node.position)
+            p.fromQ.copy(p.node.quaternion)
+            p.toP.copy(barSeat(p.seat)).addScaledVector(GRILL_SEATS[p.seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE)
+              .add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
+            p.via = undefined
+            p.flight = 0.6
+          } else if (SERVICE.carried.has(p.key)) {
+            p.fromP.copy(SERVICE.carried.get(p.key)!)
+            p.toP.copy(p.fromP)
+            p.flight = 1
+          } else if (p.flight >= 1) {
+            p.small = true
+            if (!SERVICE.waiting.has(p.key)) SERVICE.waiting.set(p.key, p.seat)
+          }
+        }
         if (!plateless) p.flight = Math.min(1, p.flight + dt / FLIGHT_SECONDS)
         if (!p.body?.live) {
           const e = p.flight < 0.5 ? 2 * p.flight * p.flight : 1 - (-2 * p.flight + 2) ** 2 / 2
@@ -3253,7 +3269,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       // served at the bar it comes down to the size of the customers and their plates (the fire is drawn big, to
       // cook on; the bar is in the people's own scale), shrinking as it's carried over
-      if (p.container === 'bar' && p.collected) shrink *= THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1))
+      if (p.container === 'bar' && p.collected) shrink *= p.small ? BAR_FOOD_SCALE : THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1))
       if (p.eaten || waiting(p)) shrink = 0.0001
       if (menuIds.has(p.id)) p.node.userData.shrink = shrink
       else p.node.scale.setScalar(shrink)

@@ -2094,6 +2094,29 @@ def talk(side, phase):
     return pose
 
 
+def carry(phase):
+    """walking with something held level in both hands at the waist (a server bringing a plate): the legs stride as in
+    walk, the body upright and steady, the arms held out still"""
+    a = math.sin(2 * math.pi * phase)
+    c = math.cos(2 * math.pi * phase)
+
+    def pose():
+        move_hips(0.46 - 0.008 + 0.012 * abs(c), 0)
+        aim("spine", (0, -0.02, 1), twist=0.03 * a)
+        aim("chest", (0, -0.03, 1), twist=-0.03 * a)
+        aim("head", (0, 0.02, 1))
+        for s_, sd in (("L", 1), ("R", -1)):
+            sw = a * sd
+            aim(f"thigh.{s_}", (sd * 0.02, -0.4 * sw, -1))
+            knee = max(0.0, -math.sin(2 * math.pi * phase + 0.6) * sd) * 0.8 + 0.08
+            aim(f"shin.{s_}", (0, -0.4 * sw + knee, -1))
+            aim(f"foot.{s_}", (sd * 0.04, -1, -0.3 + max(0, sw) * 0.3))
+            aim(f"clavicle.{s_}", (sd, -0.1, 0.03))
+            reach(s_, (sd * 0.085, -0.17, 0.52 + 0.004 * c), (sd, 0.3, -1), (-sd * 0.25, -0.9, 0.15))
+    return pose
+
+
+action("Carry", [(i * 3, carry(i / 8)) for i in range(9)])
 action("Phone", [(i * 6, phone(i / 12)) for i in range(13)])
 action("Chin", [(i * 12, chin(i / 8)) for i in range(9)])
 action("TalkL", [(i * 6, talk(1, i / 16)) for i in range(17)])

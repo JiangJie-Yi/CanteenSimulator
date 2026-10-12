@@ -3,17 +3,19 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
+import { FloorPiece } from '@/scene/FloorPiece'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel } from '@/data/guests'
-import { Person } from '@/scene/Person3D'
+import { Person, StaffFigure } from '@/scene/Person3D'
+import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { FLOOR_FAR, FLOOR_NEAR, PLATES_SET, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SERVICE, passOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -29,6 +31,7 @@ import { FLOOR_FAR, FLOOR_NEAR, PLATES_SET, alongPath, doorOf, pathLength, pathT
 const LAY = new THREE.Vector3(0.59, 0, 0.81)       // toward the camera (the cook's side)
 const ALONG = new THREE.Vector3(0.81, 0, -0.59)    // along the first counter
 const SPEED = 1.5                                   // how fast they walk in and out (per second)
+const SERVER_SPEED = 2.1                            // and the servers, carrying (brisk)
 const INK = '#3b2a20'
 
 /** toon material, and its ink outline (a slightly bigger back-faced shell) */
@@ -112,30 +115,6 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
   }
   return cache[key]
 }
-/** wide old floorboards for the passage in */
-const PLANKS = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 128
-  c.height = 512
-  const g = c.getContext('2d')!
-  for (let b = 0; b < 4; b++) {
-    g.fillStyle = ['#8a6440', '#7d5a3a', '#94704a', '#836040'][b]
-    g.fillRect(b * 32, 0, 32, 512)
-    g.strokeStyle = 'rgba(40,25,15,0.25)'
-    for (let k = 0; k < 6; k++) {
-      g.beginPath()
-      g.moveTo(b * 32 + 4 + k * 5, 0)
-      g.bezierCurveTo(b * 32 + 2 + k * 5, 170, b * 32 + 8 + k * 5, 340, b * 32 + 4 + k * 5, 512)
-      g.stroke()
-    }
-    g.fillStyle = 'rgba(30,18,10,0.6)'
-    g.fillRect(b * 32, 0, 1.5, 512)
-  }
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-})()
 
 /**
  * The way in: a noren hanging just past the end of the bar, three panels that sway a little.
@@ -444,39 +423,24 @@ const REG_GEO = {
  * The customers' side of the shop floored in wide old boards: one even rectangle under the whole bar, the row of
  * stools and the way along behind them to the noren, its boards running the length of the bar.
  */
-function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR }: { c: Counter; from: number; to: number; near?: number; far?: number }) {
+function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR, wall = true }: { c: Counter; from: number; to: number; near?: number
+  far?: number
+  /** a dark edging board along its far side, where it meets the wall */
+  wall?: boolean }) {
   const yaw = Math.atan2(c.along.x, c.along.z)
-  const at = c.at
-  // (in the floor's own frame: z along the bar, x away from the cook, so lay is -x)
+  // (in the floor's own frame: z along the bar, x away from the cook, so lay is -x; its boards are laid from the
+  // world, so they run straight on into the next piece's and the kitchen's, no seam between)
   const w = near - far
   const l = to - from
-  const map = useMemo(() => {
-    if (!PLANKS) return null
-    const t = PLANKS.clone()
-    t.wrapS = t.wrapT = THREE.RepeatWrapping
-    t.repeat.set(w / 0.5, l / 2)
-    t.needsUpdate = true
-    return t
-  }, [w, l])
   return (
-    <group position={at} rotation-y={yaw}>
-      <mesh rotation-x={-Math.PI / 2} position={[-(near + far) / 2, 0.004, (from + to) / 2]} receiveShadow>
-        <planeGeometry args={[w, l]} />
-        <meshToonMaterial color="#ffffff" map={map} />
-      </mesh>
-      {/* a dark edging board round it, so it reads as a floor laid down, not a mat */}
-      {[from, to].map((z) => (
-        <mesh key={z} position={[-(near + far) / 2, 0.01, z]}>
-          <boxGeometry args={[w + 0.04, 0.02, 0.04]} />
+    <group position={c.at} rotation-y={yaw}>
+      <FloorPiece w={w} l={l} position={[-(near + far) / 2, 0.004, (from + to) / 2]} />
+      {wall && (
+        <mesh position={[-far, 0.01, (from + to) / 2]}>
+          <boxGeometry args={[0.04, 0.02, l]} />
           <meshToonMaterial color="#3a2416" />
         </mesh>
-      ))}
-      {[-near, -far].map((x) => (
-        <mesh key={x} position={[x, 0.01, (from + to) / 2]}>
-          <boxGeometry args={[0.04, 0.02, l + 0.04]} />
-          <meshToonMaterial color="#3a2416" />
-        </mesh>
-      ))}
+      )}
     </group>
   )
 }
@@ -516,7 +480,7 @@ function Counter({ length }: { length: number }) {
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave'; t: number }
 
 /** a plate on its way to a seat ('serve'), set at it ('set'), or being cleared away ('clear', after a pause) */
-type PlateRun = { key: number; seat: number; guest: number; phase: 'serve' | 'set' | 'clear'; t: number; from: THREE.Vector3
+type PlateRun = { key: number; seat: number; guest: number; phase: 'serve' | 'carry' | 'set' | 'clear'; t: number; from: THREE.Vector3
   /** (clearing) its place on the dirty stack, taken when it sets off, so two cleared at once don't aim for the same one */
   to?: THREE.Vector3 }
 const STACK_GAP = 0.026
@@ -559,7 +523,7 @@ function Plate({ dirty = false }: { dirty?: boolean }) {
 }
 
 export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
-  speech = {} }:
+  speech = {}, servers = [] }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
@@ -571,6 +535,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     people?: boolean
     /** what each customer's saying just now, shown over their head */
     speech?: Record<number, { key: number; text: string }>
+    /** the servers on the floor: they carry what's put out at the pass to the customers, a plate with it */
+    servers?: { id: string; look: StaffLook }[]
     /** drawn this much bigger, all of it */
     scale?: number
     /** and moved by this (after scaling) */
@@ -594,6 +560,33 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return { path, len: pathLength(path) }
   }), [counters, seats])
   const plateAt = (n: number) => seats[n].plate.clone().setY(top)
+  // the servers wait by the pass, side by side, ready to carry
+  const pass = useMemo(() => passOf(counters), [counters])
+  const homes = useMemo(() => {
+    const c0 = counters[0]
+    const at = (k: number) => c0.at.clone().addScaledVector(c0.along, -c0.length / 2 - 0.25 - k * 0.42).addScaledVector(c0.lay, -0.75 - k * 0.12)
+    return [0, 1].map((k) => ({ at: at(k), yaw: Math.atan2(c0.lay.x, c0.lay.z) }))
+  }, [counters])
+  /** from the pass to a seat: out into the aisle, along it (round the corner for the side counter) and in beside them */
+  const routeTo = (n: number) => {
+    const c0 = counters[0], st = seats[n]
+    const out = homes[0].at.clone().addScaledVector(c0.lay, -(AISLE - 0.75))
+    const side = st.aisle.clone().lerp(st.stool, 0.45).addScaledVector(st.along, 0.24)
+    const path = [homes[0].at.clone(), out, ...pathTo(counters, st).slice(1, -1), side]
+    return { path, len: pathLength(path) }
+  }
+  const waiters = useRef<{ phase: 'idle' | 'pickup' | 'go' | 'set' | 'back'; t: number; seat: number; keys: string[]; run: number | null
+    path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number }[]>([])
+  const waiterObjs = useRef<(THREE.Group | null)[]>([])
+  const [moving, setMoving] = useState<boolean[]>([])
+  useEffect(() => {
+    waiters.current = servers.slice(0, homes.length).map((_, i) => ({ phase: 'idle', t: 0, seat: -1, keys: [], run: null, path: [], len: 0,
+      pos: homes[i].at.clone(), yaw: homes[i].yaw }))
+    SERVICE.servers = Math.min(homes.length, servers.length)
+    return () => { SERVICE.servers = 0 }
+  }, [servers.length, homes])
+  /** a point in the bar's frame, in the shop's (where Roasting has the food) */
+  const toShop = (v: THREE.Vector3) => v.clone().multiplyScalar(scale).add(offset ?? new THREE.Vector3())
   const cleanAt = (k: number) => counters[0].at.clone().addScaledVector(ALONG, -counters[0].length / 2 + 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP)
   const dirtyAt = (k: number) => counters[0].at.clone().addScaledVector(ALONG, counters[0].length / 2 - 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP)
 
@@ -678,8 +671,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (g) g.rotation.y = d < len ? Math.atan2(dir.x, dir.z) : st.yaw
         if (d >= len) {
           s.phase = 'sit'
-          // a plate is set in front of them
-          serve(s.seat, s.id)
+          // a plate is set in front of them (or, with a server, brought with the first thing they ordered)
+          if (!SERVICE.servers) serve(s.seat, s.id)
         }
       } else if (s.phase === 'sit') {
         g?.position.copy(st.stool)
@@ -709,7 +702,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     for (const r of runs.current) {
       r.t += step
       const o = runObjs.current.get(r.key)
-      if (r.phase === 'set' || r.phase === 'clear' && r.t < 0) {
+      if (r.phase === 'set' || r.phase === 'clear' && r.t < 0 || r.phase === 'carry') {
         if (r.phase === 'set') o?.position.copy(plateAt(r.seat))
         continue
       }
@@ -735,6 +728,98 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       }
     }
+    // the servers, by the pass: one that's free takes what's put out there for one seat (and a clean plate, if the
+    // customer hasn't one yet), carries it along the aisle on the tray, sets it down beside them, and goes back
+    const sitting = (n: number) => shownRef.current.some((x) => x.seat === n && x.phase === 'sit')
+    waiters.current.forEach((w, wi) => {
+      const home = homes[wi]
+      const trayAt = () => w.pos.clone().add(new THREE.Vector3(0, 0.548, 0.18).multiplyScalar(PEOPLE_SCALE)
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), w.yaw))
+      const run = () => runs.current.find((x) => x.key === w.run)
+      const setMove = (on: boolean) => setMoving((m) => { const n = [...m]; n[wi] = on; return n })
+      w.t += step
+      if (w.phase === 'idle') {
+        const job = [...SERVICE.waiting.entries()].find(([, n]) => sitting(n))
+        const needPlate = job && !runs.current.some((r) => r.seat === job[1] && (r.phase === 'set' || r.phase === 'carry' || r.phase === 'serve'))
+        if (job && (!needPlate || clean.current.length > 0)) {
+          w.seat = job[1]
+          w.keys = [...SERVICE.waiting.entries()].filter(([, n]) => n === job[1]).map(([k]) => k)
+          for (const k of w.keys) SERVICE.waiting.delete(k)
+          w.run = null
+          if (needPlate) {
+            const from = cleanAt(clean.current.length - 1)
+            clean.current = clean.current.slice(0, -1)
+            const key = ++runSeq.current
+            const g = shownRef.current.find((x) => x.seat === w.seat && x.phase === 'sit')
+            runs.current.push({ key, seat: w.seat, guest: g?.id ?? -1, phase: 'carry', t: 0, from })
+            w.run = key
+            redraw()
+          }
+          w.phase = 'pickup'
+          w.t = 0
+          w.yaw = Math.atan2(pass.x - w.pos.x, pass.z - w.pos.z)
+        }
+      } else if (w.phase === 'pickup' && w.t > 0.4) {
+        const r = routeTo(w.seat)
+        // (from wherever this one stands by the pass)
+        r.path[0] = w.pos.clone()
+        Object.assign(w, { path: r.path, len: pathLength(r.path), phase: 'go', t: 0 })
+        setMove(true)
+      } else if (w.phase === 'go' || w.phase === 'back') {
+        const d = Math.min(w.len, w.t * SERVER_SPEED)
+        const { p, dir } = alongPath(w.path, w.phase === 'go' ? d : w.len - d)
+        w.pos.copy(p)
+        w.yaw = w.phase === 'go' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z)
+        if (d >= w.len) {
+          if (w.phase === 'go') {
+            w.phase = 'set'
+            const pl = plateAt(w.seat)
+            w.yaw = Math.atan2(pl.x - w.pos.x, pl.z - w.pos.z)
+          } else {
+            w.phase = 'idle'
+            w.pos.copy(home.at)
+            w.yaw = home.yaw
+            setMove(false)
+          }
+          w.t = 0
+          if (w.phase === 'set') setMove(false)
+        }
+      } else if (w.phase === 'set' && w.t > 0.4) {
+        // (down at their place: the plate, and what's on it with it; unless they've gone meanwhile, and it's cleared)
+        const r = run()
+        if (r && r.phase === 'carry') r.phase = 'set'
+        for (const k of w.keys) {
+          SERVICE.carried.delete(k)
+          SERVICE.delivered.add(k)
+        }
+        w.keys = []
+        w.run = null
+        // (back the way they came, to their place by the pass)
+        w.path = [...w.path.slice(0, -1), w.pos.clone()]
+        w.path[0] = home.at.clone()
+        w.len = pathLength(w.path)
+        w.phase = 'back'
+        w.t = 0
+        setMove(true)
+      }
+      // what's on the tray goes where the tray goes (and, being set down, from the tray to the bar)
+      const tray = trayAt()
+      const k = w.phase === 'set' ? Math.min(1, w.t / 0.4) : 0
+      const plateTo = w.seat >= 0 ? plateAt(w.seat) : tray
+      const hold = tray.clone().lerp(plateTo, k * k * (3 - 2 * k))
+      hold.y += Math.sin(Math.PI * k) * 0.04
+      if (w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') {
+        const r = run()
+        const pr = runObjs.current.get(w.run ?? -1)
+        if (pr && r?.phase === 'carry') pr.position.copy(w.phase === 'pickup' ? cleanAt(clean.current.length).lerp(tray, Math.min(1, w.t / 0.4)) : hold.clone().setY(hold.y + 0.006))
+        w.keys.forEach((key, i) => SERVICE.carried.set(key, toShop(hold.clone().add(new THREE.Vector3((i % 3 - 1) * 0.05, 0.035 + Math.floor(i / 3) * 0.03, 0)))))
+      }
+      const o = waiterObjs.current[wi]
+      if (o) {
+        o.position.copy(w.pos)
+        o.rotation.y = w.yaw
+      }
+    })
     // (which seats have their plate down, for what's being served to them)
     PLATES_SET.clear()
     for (const r of runs.current) if (r.phase === 'set' || r.phase === 'clear' && r.t < 0) PLATES_SET.add(r.seat)
@@ -787,7 +872,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <group key={i}>
               <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} />
               {/* (and past the bar's end, a strip more behind the till for the cashier to stand on) */}
-              {given && <DiningFloor c={c} from={c.length / 2 + 0.15} to={c.length / 2 + 1.45} near={1.1} far={FLOOR_NEAR} />}
+              {given && <DiningFloor c={c} from={c.length / 2 + 0.15} to={c.length / 2 + 1.45} near={1.1} far={FLOOR_NEAR} wall={false} />}
               {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} shrine={back + 1.0} />}
             </group>
           )
@@ -838,6 +923,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
         }}>
           <Plate dirty={r.phase === 'clear'} />
+        </group>
+      ))}
+      {servers.slice(0, homes.length).map((w, i) => (
+        <group key={w.id} ref={(o) => { waiterObjs.current[i] = o }} position={homes[i].at} rotation-y={homes[i].yaw} scale={PEOPLE_SCALE}>
+          <StaffFigure id={w.id} role="server" look={w.look} moving={!!moving[i]} />
         </group>
       ))}
       {people && shown.map((s) => {

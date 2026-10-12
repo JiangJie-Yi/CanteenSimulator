@@ -476,7 +476,9 @@ const JOB_PARTS = new Set(['toque', 'wacap', 'workcap', 'buttons', 'bowtie', 'ap
  * salting), a server holding a tray, the cashier at the till with their hands together, the stock keeper with his
  * clipboard.
  */
-export function StaffFigure({ id, role, look: who }: { id: string; role: Role; look: StaffLook }) {
+export function StaffFigure({ id, role, look: who, moving = false }: { id: string; role: Role; look: StaffLook
+  /** walking somewhere with the tray held out (a server carrying a plate) */
+  moving?: boolean }) {
   const h = avHash(id)
   const seed = h % 997
   const cook = role === 'chef' || role === 'sous'
@@ -496,7 +498,7 @@ export function StaffFigure({ id, role, look: who }: { id: string; role: Role; l
   const r = useRigged(1000 + seed, kind, glasses, { look, style, show })
   const fan = useRef<THREE.Group>(null)
   const clock = useRef(0)
-  const action = cook ? 'Cook' : role === 'cashier' ? 'Stand' : 'Hold'
+  const action = moving ? 'Carry' : cook ? 'Cook' : role === 'cashier' ? 'Stand' : 'Hold'
   useEffect(() => {
     const a = r.actions[action]
     if (!a) return
