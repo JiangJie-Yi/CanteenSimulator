@@ -453,19 +453,20 @@ function BarCounter({ c, trim = 0 }: { c: Counter; trim?: number }) {
         const x = (n - (c.seats - 1) / 2) * (L / c.seats)
         return (
           <group key={n} position={[x, BAR_TOP, 0]}>
-            {/* (each customer's plate is set down and cleared away by GuestBar3D) in front of it, on the customer's
-                side, chopsticks across on their rest, tips to the left; to the right a little dish of sauce */}
-            <mesh position={[0.08, 0.012, -0.18]}>
+            {/* (each customer's plate is set down and cleared away by GuestBar3D) beyond it, toward the cook (clear of
+                the customer's hands, resting in front of it), chopsticks across on their rest, tips to the left; to the
+                left a little dish of sauce */}
+            <mesh position={[0.08, 0.012, 0.19]}>
               <boxGeometry args={[0.03, 0.02, 0.04]} />
               <meshToonMaterial color="#8a5a30" />
             </mesh>
             {[-0.012, 0.012].map((dz) => (
-              <mesh key={dz} position={[0.0, 0.027, -0.18 + dz * 0.7]} rotation-z={Math.PI / 2}>
+              <mesh key={dz} position={[0.0, 0.027, 0.19 + dz * 0.7]} rotation-z={Math.PI / 2}>
                 <cylinderGeometry args={[0.003, 0.0045, 0.2, 5]} />
                 <meshToonMaterial color="#5a3a20" />
               </mesh>
             ))}
-            <group position={[-0.2, 0.002, -0.1]}>
+            <group position={[-0.2, 0.002, 0.13]}>
               <mesh geometry={SAUCE_DISH_GEO} castShadow>
                 <meshToonMaterial color="#ffffff" map={CLOUD_WARE} />
               </mesh>

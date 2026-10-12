@@ -193,7 +193,7 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
     playing.current = now
   }, [now, r, id])
 
-  // the skewer they eat from, in the right hand
+  // the chopsticks they eat with, in the right hand
   useEffect(() => {
     const s = skewer.current
     if (!s || !r.hand) return
@@ -227,22 +227,31 @@ export function Person({ id, eating, walking, t }: { id: number; eating: boolean
     // (a smaller figure sits up on the stool, its legs dangling, rather than sinking into it)
     <group scale={l.size} position-y={walking ? 0 : 0.35 * (1 - l.size)}>
       <primitive object={r.root} />
-      {/* (along the hand: its tip, with the food, at the mouth when the hand is up) */}
-      <group ref={skewer} visible={eating} position={[0, 0.03, 0.006]}>
-        <mesh position-y={0.03}>
-          <cylinderGeometry args={[0.0025, 0.0025, 0.11, 6]} />
-          <meshToonMaterial color="#c9a46a" gradientMap={gradientMap} />
-        </mesh>
-        <mesh position-y={0.075}>
-          <boxGeometry args={[0.026, 0.045, 0.022]} />
+      {/* the chopsticks, along the hand from the fist: their tips (with a bite) in the bowl, then at the mouth */}
+      <group ref={skewer} visible={eating} position={[0, 0.02, 0.004]}>
+        {[-0.004, 0.004].map((x) => (
+          <mesh key={x} position={[x, 0.06, 0]} rotation-z={x * 4}>
+            <cylinderGeometry args={[0.0018, 0.0026, 0.13, 5]} />
+            <meshToonMaterial color="#6a4226" gradientMap={gradientMap} />
+          </mesh>
+        ))}
+        <mesh position-y={0.124} scale={[1, 0.7, 0.8]}>
+          <sphereGeometry args={[0.009, 8, 6]} />
           <meshToonMaterial color="#c8743a" gradientMap={gradientMap} />
         </mesh>
       </group>
+      {/* the rice bowl held up in the left hand (where guests.py's BOWL is) */}
       {eating && (
-        <mesh position={[0, 0.5, 0.3]} rotation-x={Math.PI}>
-          <sphereGeometry args={[0.07, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshToonMaterial color="#e9e1cf" side={THREE.DoubleSide} gradientMap={gradientMap} />
-        </mesh>
+        <group position={[0.025, 0.6, 0.21]}>
+          <mesh rotation-x={Math.PI}>
+            <sphereGeometry args={[0.05, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.42]} />
+            <meshToonMaterial color="#e9e1cf" side={THREE.DoubleSide} gradientMap={gradientMap} />
+          </mesh>
+          <mesh position-y={-0.012} rotation-x={-Math.PI / 2}>
+            <circleGeometry args={[0.046, 20]} />
+            <meshToonMaterial color="#fbf8f0" gradientMap={gradientMap} />
+          </mesh>
+        </group>
       )}
     </group>
   )

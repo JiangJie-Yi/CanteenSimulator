@@ -372,11 +372,11 @@ def body(kind):
         shoulder = v((sd * 0.088 * sh, 0, 0.66), 0.038)
         elbow = v((sd * 0.152, 0, 0.552), 0.028)
         wrist = v((sd * 0.198, 0, 0.448), 0.022)
-        palm = v((sd * 0.208, -0.002, 0.415), 0.03)
-        knuckle = v((sd * 0.216, -0.004, 0.388), 0.027)
-        tip = v((sd * 0.222, -0.006, 0.368), 0.018)
-        thumb0 = v((sd * 0.2, -0.018, 0.425), 0.012)
-        thumb1 = v((sd * 0.207, -0.032, 0.403), 0.01)
+        palm = v((sd * 0.206, -0.002, 0.42), 0.031)
+        knuckle = v((sd * 0.212, -0.004, 0.4), 0.029)
+        tip = v((sd * 0.216, -0.006, 0.386), 0.021)
+        thumb0 = v((sd * 0.2, -0.02, 0.428), 0.013)
+        thumb1 = v((sd * 0.205, -0.033, 0.41), 0.011)
         edges += [(top, shoulder), (shoulder, elbow), (elbow, wrist), (wrist, palm), (palm, knuckle), (knuckle, tip),
                   (palm, thumb0), (thumb0, thumb1)]
         hip = v((sd * 0.052 * hi, 0, 0.425), 0.054 * hi)
@@ -416,7 +416,7 @@ def body(kind):
             n = ax.cross(Vector((0, 1, 0))).normalized()
             off = p - a
             d = off.dot(n)
-            p -= n * d * 0.42
+            p -= n * d * 0.25
         if name.startswith("foot") or (name.startswith("shin") and t > 0.9):
             if p.z < 0.012:
                 p.z = 0.012 + (p.z - 0.012) * 0.3
@@ -1511,7 +1511,8 @@ MOUTH = Vector((0, -0.15, 0.7))
 def arms_on_bar(s, sd, forward=0.0):
     """forearms on the bar, hands in front of them"""
     aim(f"clavicle.{s}", (sd, -0.15, 0.04))
-    reach(s, (sd * 0.075, -0.2 - forward, BAR_HAND), (sd, 0.2, -1), (-sd * 0.3, -1, -0.1))
+    # (the hands a little turned in toward each other, the way hands rest on a table)
+    reach(s, (sd * 0.085, -0.2 - forward, BAR_HAND), (sd, 0.2, -1), (-sd * 0.6, -0.8, -0.15))
 
 
 def key_all(frame):
@@ -1547,18 +1548,24 @@ def sit(breathe):
     return pose
 
 
+# the rice bowl held up in the left hand while eating (Person3D draws it here)
+BOWL = Vector((0.025, -0.21, 0.6))
+
+
 def eat(phase):
-    """the right hand brings the food up to the mouth (phase 0: down on the bar, 1: at the mouth)"""
+    """the bowl held up in the left hand, the chopsticks in the right going from it (phase 0) up to the mouth (1)"""
     def pose():
-        sit_base(lean=0.12 + 0.05 * phase)
-        aim("head", (0, -0.12 * phase, 1))
-        arms_on_bar("L", 1, forward=0.03)
-        aim("clavicle.R", (-1, -0.15, 0.04 + 0.12 * phase))
-        rest = Vector((-0.075, -0.21, BAR_HAND))
-        # (lifted to just in front of the mouth, the skewer in the fist pointing at it)
-        lifted = MOUTH + Vector((-0.035, -0.11, -0.06))
-        w = rest.lerp(lifted, phase)
-        hand = Vector((-0.3, -1, -0.1)).lerp(MOUTH - lifted, phase)
+        sit_base(lean=0.1 + 0.04 * phase)
+        aim("head", (0, -0.06 - 0.08 * phase, 1))
+        # (the left hand under the bowl, palm up, fingers round toward the middle)
+        aim("clavicle.L", (1, -0.15, 0.06))
+        reach("L", BOWL + Vector((0.045, 0.01, -0.045)), (1, 0.2, -1), (-1, -0.25, 0.2))
+        aim("clavicle.R", (-1, -0.15, 0.06 + 0.1 * phase))
+        # (over the bowl, the chopsticks' tips down in it; then lifted to the mouth, the tips at the lips)
+        dip = BOWL + Vector((-0.07, 0.02, 0.085))
+        lifted = MOUTH + Vector((-0.06, -0.1, -0.055))
+        w = dip.lerp(lifted, phase)
+        hand = (BOWL - dip).lerp(MOUTH - lifted, phase)
         reach("R", w, (-1, 0.3, -0.8), hand)
     return pose
 
