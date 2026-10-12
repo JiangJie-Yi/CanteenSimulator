@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGLTF } from '@react-three/drei'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
 import type { Look as StaffLook, Role } from '@/data/staff'
 import { cloth, type Pattern } from './patterns'
@@ -92,6 +93,25 @@ const outlineMaterial = new THREE.ShaderMaterial({
   side: THREE.BackSide,
 })
 
+/** a skinned part's geometry, ready to merge with the others: the same attributes, of the same types, all indexed */
+function skinnable(o: THREE.SkinnedMesh, into: THREE.SkinnedMesh) {
+  const src = o.geometry
+  const g = new THREE.BufferGeometry()
+  const n = src.attributes.position.count
+  g.setAttribute('position', src.attributes.position.clone())
+  g.setAttribute('normal', src.attributes.normal ? src.attributes.normal.clone() : new THREE.BufferAttribute(new Float32Array(n * 3), 3))
+  const uv = src.attributes.uv
+  g.setAttribute('uv', uv ? uv.clone() : new THREE.BufferAttribute(new Float32Array(n * 2), 2))
+  const si = src.attributes.skinIndex, sw = src.attributes.skinWeight
+  g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(Uint16Array.from({ length: n * 4 }, (_, i) => si.getComponent(Math.floor(i / 4), i % 4)), 4))
+  g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(Float32Array.from({ length: n * 4 }, (_, i) => sw.getComponent(Math.floor(i / 4), i % 4)), 4))
+  g.setIndex(src.index ? Array.from(src.index.array) : Array.from({ length: n }, (_, i) => i))
+  // (into the bind space of the one it's merged with, should theirs differ)
+  if (!o.bindMatrix.equals(into.bindMatrix)) g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(into.bindMatrixInverse, o.bindMatrix))
+  return g
+}
+/** the parts swapped in and out as they blink and chew (kept apart, not merged) */
+const SWAPPED = new Set(['eyes', 'eyesShut', 'mouth', 'mouthOpen'])
 /** the parts drawn without an outline (things lying on the surface, and fine ones) */
 const FLAT = /^(eyes|eyesShut|face|mouth|mouthOpen|details|cuffs|glasses|pin)/
 
@@ -181,6 +201,7 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
       return null
     }
     const drop: THREE.Object3D[] = []
+    const keep: { o: THREE.SkinnedMesh; inked: boolean }[] = []
     const eyes: THREE.Object3D[] = [], shut: THREE.Object3D[] = [], mouth: THREE.Object3D[] = [], open: THREE.Object3D[] = []
     const mats = new Map<string, THREE.MeshToonMaterial>()
     const toon = (src: THREE.MeshStandardMaterial) => {
@@ -220,15 +241,32 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
       if (part === 'eyesShut') shut.push(o)
       if (part === 'mouth') mouth.push(o)
       if (part === 'mouthOpen') open.push(o)
-      if (!FLAT.test(part) && o instanceof THREE.SkinnedMesh) {
-        const line = new THREE.SkinnedMesh(o.geometry, outlineMaterial)
-        line.bind(o.skeleton, o.bindMatrix)
-        line.frustumCulled = false
-        line.raycast = () => {}
-        o.add(line)
-      }
+      if (o instanceof THREE.SkinnedMesh && !SWAPPED.has(part)) keep.push({ o, inked: !FLAT.test(part) })
     }
     for (const o of drop) o.removeFromParent()
+    // (drawn as few meshes as can be: every part in one material merged into one mesh, and one ink outline round all
+    // the parts that have one; the eyes and mouth, swapped as they blink and chew, stay as they are)
+    const skinned = keep.map((k) => k.o)
+    if (skinned.length) {
+      const first = skinned[0]
+      const parent = first.parent!
+      const byMat = new Map<THREE.Material, THREE.SkinnedMesh[]>()
+      for (const o of skinned) byMat.set(o.material as THREE.Material, [...(byMat.get(o.material as THREE.Material) ?? []), o])
+      const bake = (list: THREE.SkinnedMesh[], mat: THREE.Material) => {
+        const g = mergeGeometries(list.map((o) => skinnable(o, first)))
+        if (!g) return null
+        const m = new THREE.SkinnedMesh(g, mat)
+        m.bind(first.skeleton, first.bindMatrix)
+        m.frustumCulled = false
+        m.castShadow = mat !== outlineMaterial
+        if (mat === outlineMaterial) m.raycast = () => {}
+        parent.add(m)
+        return m
+      }
+      for (const [mat, list] of byMat) bake(list, mat)
+      bake(keep.filter((k) => k.inked).map((k) => k.o), outlineMaterial)
+      for (const o of skinned) o.removeFromParent()
+    }
     for (const o of [...shut, ...open]) o.visible = false
     const mixer = new THREE.AnimationMixer(root)
     const actions: Record<string, THREE.AnimationAction> = {}
@@ -256,7 +294,10 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
-export function Person({ id, eating, walking, t, talk = 0 }: { id: number; eating: boolean; walking: boolean; t: number
+export function Person({ id, eating, walking, t: tGiven, clock, talk = 0 }: { id: number; eating: boolean; walking: boolean
+  /** their own clock (seconds): given as a number (re-rendered each frame), or read each frame from a ref, which
+   * moves the figure without re-rendering it (only a change of what they're doing re-renders) */
+  t?: number; clock?: { current: number }
   /** sat beside the one they came with: +1 if they're on this one's left, -1 on the right (they talk, turned to them) */
   talk?: number }) {
   const kind = kindOf(id).kind
@@ -275,7 +316,9 @@ export function Person({ id, eating, walking, t, talk = 0 }: { id: number; eatin
   // what they're doing: walking in or out, eating, or sat waiting; waiting, they talk to the one they came with, or
   // (alone) pass the time one way and then another every half a minute or so: look about, look at their phone, sit
   // with their chin in their hand
-  const spell = Math.floor((t + id * 9) / 24)
+  const timeNow = () => tGiven ?? clock?.current ?? 0
+  const spellOf = (t: number) => Math.floor((t + id * 9) / 24)
+  const [spell, setSpell] = useState(() => spellOf(timeNow()))
   const idle = (['Sit', 'Phone', 'Chin', 'Phone', 'Sit', 'Chin'] as const)[Math.floor(hash(id, spell) * 6)]
   const now = walking ? 'Walk' : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idle
   useEffect(() => {
@@ -302,27 +345,32 @@ export function Person({ id, eating, walking, t, talk = 0 }: { id: number; eatin
   }, [r])
 
   // their own clock moves the figure: the action, then a look about (waiting), a blink, chewing
-  const dt = last.current === null ? 0 : Math.min(0.1, Math.max(0, t - last.current))
-  last.current = t
-  r.mixer.update(dt)
-  if (r.head && !walking && !eating && now === 'Sit') {
-    // (now and then a slow look round the room, not a shake of the head)
-    const look = Math.sin(t * 0.3 + id * 1.7) * 0.35 * smooth(0.7, 0.95, Math.abs(Math.sin(t * 0.13 + id)))
-    // (about the figure's own up, in the neck's frame)
-    // (the mixer only writes a bone that changed: start from its own pose, not last frame's look)
-    if (r.head.quaternion.equals(r.looked)) r.head.quaternion.copy(r.posed)
-    else r.posed.copy(r.head.quaternion)
-    const up = UP.set(0, 1, 0).applyQuaternion(r.root.getWorldQuaternion(QA))
-    up.applyQuaternion(r.head.parent!.getWorldQuaternion(QB).invert())
-    r.head.quaternion.premultiply(QA.setFromAxisAngle(up.normalize(), look))
-    r.looked.copy(r.head.quaternion)
+  const step = () => {
+    const t = timeNow()
+    if (spellOf(t) !== spell) setSpell(spellOf(t))
+    const dt = last.current === null ? 0 : Math.min(0.1, Math.max(0, t - last.current))
+    last.current = t
+    r.mixer.update(dt)
+    if (r.head && !walking && !eating && now === 'Sit') {
+      // (now and then a slow look round the room, not a shake of the head)
+      const look = Math.sin(t * 0.3 + id * 1.7) * 0.35 * smooth(0.7, 0.95, Math.abs(Math.sin(t * 0.13 + id)))
+      // (about the figure's own up, in the neck's frame)
+      // (the mixer only writes a bone that changed: start from its own pose, not last frame's look)
+      if (r.head.quaternion.equals(r.looked)) r.head.quaternion.copy(r.posed)
+      else r.posed.copy(r.head.quaternion)
+      const up = UP.set(0, 1, 0).applyQuaternion(r.root.getWorldQuaternion(QA))
+      up.applyQuaternion(r.head.parent!.getWorldQuaternion(QB).invert())
+      r.head.quaternion.premultiply(QA.setFromAxisAngle(up.normalize(), look))
+      r.looked.copy(r.head.quaternion)
+    }
+    const blink = (t * 0.9 + id * 0.37) % 4 < 0.12
+    for (const o of r.eyes) o.visible = !blink
+    for (const o of r.shut) o.visible = blink
+    const chewing = eating && Math.sin(t * 11) > 0.2 && ((t + id * 0.7) % 3) > 1.2
+    for (const o of r.mouth) o.visible = !chewing
+    for (const o of r.open) o.visible = chewing
   }
-  const blink = (t * 0.9 + id * 0.37) % 4 < 0.12
-  for (const o of r.eyes) o.visible = !blink
-  for (const o of r.shut) o.visible = blink
-  const chewing = eating && Math.sin(t * 11) > 0.2 && ((t + id * 0.7) % 3) > 1.2
-  for (const o of r.mouth) o.visible = !chewing
-  for (const o of r.open) o.visible = chewing
+  useFrame(step)
 
   return (
     // (a smaller figure sits up on the stool, its legs dangling, rather than sinking into it)

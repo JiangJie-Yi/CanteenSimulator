@@ -943,9 +943,9 @@ def hair(kind, hd, surf, style=None):
                 edge = 0.72 - 1.05 * smoothstep(2.3, 2.9, a)
             return p > edge
         bm = cap(hd, surf, keep, off=0.004, thick=0.008)
-        roll_c = HC + Vector((0, -HEAD_R * 0.92, HEAD_R * 0.68))
-        rot = Matrix.Rotation(-0.08, 3, "X")
-        ellipsoid(bm, roll_c, (0.07, 0.15, 0.052), seg=24, rings=16, rot=rot)
+        roll_c = HC + Vector((0, -HEAD_R * 1.02, HEAD_R * 0.5))
+        rot = Matrix.Rotation(0.04, 3, "X")
+        ellipsoid(bm, roll_c, (0.078, 0.165, 0.058), seg=24, rings=16, rot=rot)
         for i in range(5):
             x = -0.04 + i * 0.02
             pts = [roll_c + rot @ Vector((x * 0.9, 0.12, 0.03)), roll_c + rot @ Vector((x, 0.0, 0.052)),

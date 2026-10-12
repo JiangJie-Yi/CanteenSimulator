@@ -1719,6 +1719,8 @@ export default function App() {
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
           dpr={[1, QUALITY.dpr]}
           onCreated={({ gl }) => {
+            // (in development, the renderer's counts are to hand for checking how heavy a view is)
+            if (import.meta.env.DEV) (window as unknown as { __gl?: THREE.WebGLRenderer }).__gl = gl
             // if the phone runs out of GPU memory the browser drops the 3D view and it would stay blank:
             // reload once to bring it back
             gl.domElement.addEventListener('webglcontextlost', (e) => {

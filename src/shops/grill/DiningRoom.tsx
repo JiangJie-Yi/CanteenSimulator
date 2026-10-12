@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { StaticBatch } from '@/scene/StaticBatch'
 import type { Counter } from './bar'
 import { LuckyCat } from './LuckyCat'
 
@@ -523,6 +524,8 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: 
     <group position={c.at} rotation-y={yaw}>
       {/* (local x is away from the cook: the wall stands at the floor's far edge, facing back toward the bar) */}
       <group ref={wall} position-x={-far}>
+        {/* (all of it standing still: drawn merged, a few meshes for the whole wall) */}
+        <StaticBatch key={`${from}|${to}|${door}|${shrine}`}>
         <mesh position={[0, WAINSCOT + (WALL_H - WAINSCOT) / 2, mid]} rotation-y={-Math.PI / 2} receiveShadow>
           <planeGeometry args={[l, WALL_H - WAINSCOT]} />
           <meshToonMaterial color="#ffffff" map={plaster} />
@@ -567,6 +570,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: 
           </mesh>
           <group position={[0, 0, 0.3]} rotation-y={-Math.PI / 2}><LuckyCat /></group>
         </group>
+        </StaticBatch>
       </group>
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {

@@ -3,6 +3,7 @@ import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { StaticBatch } from '@/scene/StaticBatch'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
@@ -399,8 +400,10 @@ function Bar() {
   // counter's near end)
   return (
     <group position={GRILL_OFFSET} scale={GRILL_SCALE}>
-      {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0}
-        gate={i === 0 ? { end: 1, w: 0.55 } : { end: -1, w: 0.42 }} />)}
+      <StaticBatch>
+        {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0}
+          gate={i === 0 ? { end: 1, w: 0.55 } : { end: -1, w: 0.42 }} />)}
+      </StaticBatch>
     </group>
   )
 }
@@ -2123,6 +2126,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           onSay?.('guest', L().nothing(id))
         }
       }
+      // (a couple only if both of them stayed: one who found nothing to order went, and the other sits alone)
+      if (couple) {
+        const both = ids.every((x) => guests.current.some((g) => g.id === x))
+        if (!both) for (const g of guests.current) if (ids.includes(g.id)) g.partner = undefined
+      }
       // (only those still here and the last few gone are kept: the list doesn't grow all day)
       guests.current = guests.current.filter((g, i, all) => g.state === 'waiting' || g.state === 'eating' || !g.cleared ||
         i >= all.length - 12)
@@ -2231,7 +2239,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
   // the grains and drops that fall while a seasoning is held over food
   const grains = useMemo(() => {
-    const pos = new Float32Array(GRAINS * 3).fill(-10)
+    const pos = new Float32Array(GRAINS * 3)
+    for (let i = 0; i < GRAINS; i++) pos[i * 3 + 1] = -1e4
     const col = new Float32Array(GRAINS * 3)
     const vel = new Float32Array(GRAINS * 3)
     const life = new Float32Array(GRAINS)
@@ -2927,7 +2936,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         pos[i * 3] += vel[i * 3] * dt
         pos[i * 3 + 1] += vel[i * 3 + 1] * dt
         pos[i * 3 + 2] += vel[i * 3 + 2] * dt
-        if (life[i] <= 0) pos[i * 3 + 1] = -10
+        // (a grain that reaches the table top is gone into it; one that's done is put far out of sight: parked just
+        // under the table it would show on the floors, which lie below it)
+        if (pos[i * 3 + 1] < 0.004) life[i] = 0
+        if (life[i] <= 0) pos.set([0, -1e4, 0], i * 3)
       }
       if (any) grains.geometry.attributes.position.needsUpdate = true
       grains.geometry.attributes.color.needsUpdate = true

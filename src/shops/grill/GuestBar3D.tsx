@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
+import { StaticBatch } from '@/scene/StaticBatch'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
@@ -153,6 +154,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   })
   return (
     <group position={at} rotation-y={yaw}>
+      <StaticBatch>
       {/* beckoning cats either side of the way in, on little stands: a big white one and smaller gold and black ones */}
       {DOOR_CATS.map((k, i) => (
         <group key={i} position={[k.x, 0, k.z]} rotation-y={k.yaw}>
@@ -172,6 +174,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
         <planeGeometry args={[0.66, 0.36]} />
         <meshToonMaterial color="#ffffff" map={DOORMAT} />
       </mesh>
+      </StaticBatch>
       {/* a red lantern hung just outside, on the bar's side (the back wall is too close on the other, the till inside) */}
       <group position={[-0.3, 0, 0.47]}><Chochin mark={lantern} /></group>
       {/* the noren: three panels side by side, hung from a bamboo rod (no frame: it hangs in the way in by itself) */}
@@ -803,12 +806,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       <Entrance at={doorOf(counters)} mark={mark} />
       {/* the till, just inside the door on the bar's side of the way in (the shops that lay out their own counters) */}
       {given && (
-        <Register top={top} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
-          at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + 0.95).addScaledVector(counters[0].lay, 0.1)} />
+        <StaticBatch>
+          <Register top={top} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
+            at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + 0.95).addScaledVector(counters[0].lay, 0.1)} />
+        </StaticBatch>
       )}
-      {seats.map((st, n) => (
-        <group key={n} position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>
-      ))}
+      <StaticBatch key={seats.length}>
+        {seats.map((st, n) => (
+          <group key={n} position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>
+        ))}
+      </StaticBatch>
       {/* the clean stack, the dirty one, and the plates out at the seats */}
       {clean.current.map((_, i) => (
         <group key={`c${i}`} ref={(o) => { cleanObjs.current[i] = o; if (o && !o.userData.placed) { o.userData.placed = true; o.position.copy(cleanAt(i)) } }}>
@@ -868,9 +875,7 @@ function Say({ text }: { text: string }) {
   return <span key={i} className="g3-bubble g3-say">{chunks[i]}{i < chunks.length - 1 ? '…' : ''}</span>
 }
 
-/** re-renders the figure each frame (its little movements), without re-rendering the whole bar */
+/** one customer's figure, moved by the bar's clock each frame (read from the ref: nothing re-renders for it) */
 function PersonClock({ s, eating, clock, talk }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number }) {
-  const [t, setT] = useState(0)
-  useFrame(() => setT(clock.current))
-  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} t={t} talk={talk} />
+  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} clock={clock} talk={talk} />
 }
