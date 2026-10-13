@@ -325,6 +325,8 @@ function useRigged(id: number, kind: Kind, glasses: boolean, phones: boolean,
 export const walkOf = (kind: string) => kind === 'grandma' || kind === 'grandpa' ? 'WalkO' : kind === 'uncle' ? 'WalkU'
   : ['officeLady', 'highSchoolGirl', 'yukata', 'maid', 'gyaru', 'staffF'].includes(kind) ? 'WalkF' : 'Walk'
 export const walkSpeedOf = (kind: string) => ({ WalkO: 0.55, WalkU: 0.82, WalkF: 0.92, Walk: kind === 'kid' ? 1.12 : 1 })[walkOf(kind)]
+/** the shop's slippers */
+const SLIPPER = new THREE.Color('#4a6a52')
 /** the shapes a face can have */
 const FACES = ['round', 'long', 'square', 'oval'] as const
 /**
@@ -382,7 +384,7 @@ function shapeFace(root: THREE.Object3D, head: THREE.Bone, shape: (typeof FACES)
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
-export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven, mood = null, fade }: { id: number; eating: boolean; walking: boolean
+export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven, mood = null, fade, slippers }: { id: number; eating: boolean; walking: boolean
   /** their own clock (seconds): given as a number (re-rendered each frame), or read each frame from a ref, which
    * moves the figure without re-rendering it (only a change of what they're doing re-renders) */
   t?: number; clock?: { current: number }
@@ -393,7 +395,9 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
   /** how they're taking it (on their face) */
   mood?: Mood | null
   /** how much of them shows, read each frame (1: all; less as they fade away going out) */
-  fade?: () => number }) {
+  fade?: () => number
+  /** in the house's slippers just now (read each frame), not their own shoes */
+  slippers?: () => boolean }) {
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
   const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
@@ -464,9 +468,21 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
       m.opacity = base.opacity * f
     })
   }
+  // their shoes, or the shop's slippers (soft green), once they've stepped up out of the genkan
+  const shoes = useMemo(() => {
+    const out: THREE.MeshToonMaterial[] = []
+    r.root.traverse((o) => { if (o instanceof THREE.Mesh && (o.material as THREE.Material).name === 'Shoes' && !out.includes(o.material)) out.push(o.material) })
+    return { mats: out, own: out[0]?.color.clone() }
+  }, [r])
+  const inSlippers = useRef<boolean | null>(null)
   // their own clock moves the figure: the action, then a look about (waiting), a blink, chewing
   const step = () => {
     applyFade(fade?.() ?? 1)
+    const sl = slippers?.() ?? false
+    if (sl !== inSlippers.current && shoes.own) {
+      inSlippers.current = sl
+      for (const m of shoes.mats) m.color.copy(sl ? SLIPPER : shoes.own)
+    }
     const t = timeNow()
     if (spellOf(t) !== spell) setSpell(spellOf(t))
     const dt = last.current === null ? 0 : Math.min(0.1, Math.max(0, t - last.current))

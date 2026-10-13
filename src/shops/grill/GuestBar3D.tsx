@@ -15,7 +15,7 @@ import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, DrinkFridge, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -129,7 +129,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
     })
   })
   return (
-    <group position={at} rotation-y={yaw}>
+    <group name="look-door" position={at} rotation-y={yaw}>
       <StaticBatch>
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
       <group position={[0.4, 0, -0.75]}>
@@ -142,23 +142,38 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
         ))}
       </group>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
-      <Part geo={REG_GEO.body} color="#2b2620" outline={0} position={[0, 0.007, -0.22]} scale={[0.78, 0.006, 0.46]} />
-      {[-1, 1].map((sd) => (
-        <group key={sd}>
-          <Part geo={REG_GEO.body} color="#3a2416" outline={0} position={[sd * 0.38, 0.012, -0.22]} scale={[0.03, 0.012, 0.46]} />
-          <Part geo={REG_GEO.body} color="#3a2416" outline={0} position={[0, 0.012, -0.22 + sd * 0.215]} scale={[0.79, 0.012, 0.03]} />
-        </group>
-      ))}
-      <mesh position={[0, 0.0115, -0.22]} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[0.66, 0.36]} />
+      {/* the coir mat lying on the genkan's stone, just inside */}
+      <mesh position={[0, -GENKAN.depth + 0.009, -0.18]} rotation-x={-Math.PI / 2} scale={[-1, 1, 1]}>
+        <planeGeometry args={[0.34, 0.34]} />
         <meshToonMaterial color="#ffffff" map={DOORMAT} />
       </mesh>
+      {/* the shoe cupboard (下駄箱) against the wall in the genkan: dark wood, its doors in a grid of small panels, a
+          vase of a sprig on top */}
+      <group position={[0.34, -GENKAN.depth, -0.24]}>
+        <Part geo={REG_GEO.round} color="#4a2e1c" outline={1.02} position={[0, 0.42, 0]} scale={[0.3, 0.84, 0.42]} />
+        {[0, 1, 2].map((r) => [-1, 1].map((sd) => (
+          <group key={`${r}${sd}`} position={[-0.152, 0.16 + r * 0.25, sd * 0.1]}>
+            <mesh rotation-y={-Math.PI / 2}><planeGeometry args={[0.17, 0.21]} /><meshToonMaterial color="#6a4428" /></mesh>
+            <mesh position={[-0.004, 0, -sd * 0.06]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.008, 0.008, 0.008, 8]} /><meshToonMaterial color="#c8a050" /></mesh>
+          </group>
+        )))}
+        <Part geo={REG_GEO.round} color="#3a2416" outline={1.02} position={[0, 0.855, 0]} scale={[0.32, 0.03, 0.44]} />
+        <mesh position={[0, 0.93, 0.05]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
+        {[0, 1, 2].map((k) => (
+          <mesh key={k} position={[Math.cos(k * 2) * 0.02, 1.04 + k * 0.02, 0.05 + Math.sin(k * 2) * 0.02]} rotation={[Math.sin(k * 2) * 0.4, 0, Math.cos(k * 2) * 0.4]}>
+            <cylinderGeometry args={[0.003, 0.004, 0.16, 4]} /><meshToonMaterial color="#5a3a1e" />
+          </mesh>
+        ))}
+        {[0, 1, 2, 3].map((k) => (
+          <mesh key={`b${k}`} position={[Math.cos(k * 1.7) * 0.05, 1.1 + (k % 2) * 0.03, 0.05 + Math.sin(k * 1.7) * 0.05]}><sphereGeometry args={[0.014, 6, 5]} /><meshToonMaterial color="#f2b0c0" /></mesh>
+        ))}
+      </group>
       </StaticBatch>
       {/* the doorway's frame: a post either side and the lintel over them, the noren's rod hung under it; off the post on
           the bar's side an arm (腕木) reaches out over the way in, and the red lantern hangs from its end */}
       <StaticBatch>
         {[-1, 1].map((sd) => (
-          <Part key={sd} geo={REG_GEO.body} color="#3a2416" outline={1.03} position={[sd * (W / 2 + 0.05), (H + 0.12) / 2, 0.03]} scale={[0.07, H + 0.12, 0.07]} />
+          <Part key={sd} geo={REG_GEO.body} color="#3a2416" outline={1.03} position={[sd * (W / 2 + 0.05), (H + 0.12 - GENKAN.depth) / 2, 0.03]} scale={[0.07, H + 0.12 + GENKAN.depth, 0.07]} />
         ))}
         <Part geo={REG_GEO.body} color="#3a2416" outline={1.03} position={[0, H + 0.08, 0.03]} scale={[W + 0.3, 0.08, 0.09]} />
         <Part geo={REG_GEO.body} color="#4a2e1c" outline={1.03} position={[-(W / 2 + 0.05), H - 0.05, 0.27]} scale={[0.05, 0.06, 0.5]} />
@@ -515,12 +530,49 @@ function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR, wall = t
 function RoomFloor({ counters }: { counters: Counter[] }) {
   const c = counters[0]
   const { along: [a0, a1], lay: [l0, l1] } = useMemo(() => roomOf(counters), [counters])
+  // (the genkan's corner, by the door, is left out of the boards: it's a step down, in stone)
+  const g0 = c.length / 2 + GENKAN.along[0], gl = GENKAN.lay[1], D = GENKAN.depth
+  const piece = (al: [number, number], ly: [number, number], k: string) => (
+    <FloorPiece key={k} w={ly[1] - ly[0]} l={al[1] - al[0]} position={[-(ly[0] + ly[1]) / 2, 0.004, (al[0] + al[1]) / 2]} />
+  )
   return (
     <group position={c.at} rotation-y={Math.atan2(c.along.x, c.along.z)}>
-      <FloorPiece w={l1 - l0} l={a1 - a0} position={[-(l0 + l1) / 2, 0.004, (a0 + a1) / 2]} />
+      {piece([a0, g0], [l0, l1], 'a')}
+      {piece([g0, a1], [gl, l1], 'b')}
+      {/* the genkan: its stone, the step's riser round its two inner sides, and the polished kamachi on the edge */}
+      <mesh position={[-(l0 + gl) / 2, -D + 0.004, (g0 + a1) / 2]} rotation-x={-Math.PI / 2} receiveShadow>
+        <planeGeometry args={[gl - l0, a1 - g0]} />
+        <meshToonMaterial color="#ffffff" map={GENKAN_STONE} />
+      </mesh>
+      <mesh position={[-(l0 + gl) / 2, -D / 2, g0]}><boxGeometry args={[gl - l0, D, 0.012]} /><meshToonMaterial color="#3a2416" /></mesh>
+      <mesh position={[-gl, -D / 2, (g0 + a1) / 2]}><boxGeometry args={[0.012, D, a1 - g0]} /><meshToonMaterial color="#3a2416" /></mesh>
+      <mesh position={[-(l0 + gl) / 2 - 0.0, 0.007, g0 + 0.03]}><boxGeometry args={[gl - l0 + 0.06, 0.008, 0.06]} /><meshToonMaterial color="#4a2a18" /></mesh>
+      <mesh position={[-gl + 0.03, 0.007, (g0 + a1) / 2]}><boxGeometry args={[0.06, 0.008, a1 - g0]} /><meshToonMaterial color="#4a2a18" /></mesh>
+      {/* (the wall's foot, and the room's open end, down to the stone) */}
+      <mesh position={[-l0, -D / 2, (g0 + a1) / 2]}><boxGeometry args={[0.02, D, a1 - g0]} /><meshToonMaterial color="#2a1a10" /></mesh>
+      <mesh position={[-(l0 + gl) / 2, -D / 2, a1]}><boxGeometry args={[gl - l0, D, 0.012]} /><meshToonMaterial color="#2a1a10" /></mesh>
     </group>
   )
 }
+/** the genkan's stone: dark grey slate laid in rough rectangles */
+const GENKAN_STONE = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  g.fillStyle = '#2e2c2a'
+  g.fillRect(0, 0, 128, 128)
+  for (let j = 0; j < 4; j++) for (let i = 0; i < 3; i++) {
+    const v = 52 + ((i * 7 + j * 13) % 5) * 6
+    g.fillStyle = `rgb(${v},${v - 2},${v - 5})`
+    g.fillRect(i * 43 + (j % 2) * 20 - 20 + 2, j * 32 + 2, 39, 28)
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(1.5, 1.5)
+  return t
+})()
 
 /**
  * A Japanese bar stool (丸椅子): a thick round seat of pale wood with a rounded edge and a flat indigo cushion tied on,
@@ -586,7 +638,13 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   drink?: DrinkId
   leaving?: boolean
   /** how much of them shows (fading out as they go out of the door) */
-  fade?: number }
+  fade?: number
+  /** in the house's slippers (inside, past the genkan's step), or their own shoes */
+  slippers?: boolean }
+/** how long they stand at the genkan's step changing their shoes */
+const SHOES_S = 1.2
+/** a walk that stops a while at a point along it: how far along, at a time when it would have been `d` */
+const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at + hold ? at : d - hold)
 /** the women's kinds, who use the women's toilet */
 const HER = new Set(['officeLady', 'highSchoolGirl', 'yukata', 'grandma', 'maid', 'gyaru'])
 /** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
@@ -686,6 +744,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return { path, len: pathLength(path) }
   }), [counters, seats])
   const plateAt = (n: number) => seats[n].plate.clone().setY(top)
+  /** how far along a way in (from the door) the genkan's step up into the room is */
+  const stepAt = (path: THREE.Vector3[]) => {
+    if (!given) return 0
+    for (let d = 0; d < 2; d += 0.02) if (!inGenkan(counters, alongPath(path, d).p)) return d
+    return 0
+  }
   // where a server stands at the pass to take what's put out there (on the floor, by the first counter's start)
   const pass = useMemo(() => passOf(counters), [counters])
   const passSpot = useMemo(() => {
@@ -844,10 +908,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (s.phase === 'enter') {
         // in through the noren, along the aisle behind the stools (round the corner, for the other counter), and
         // in to their own stool
-        const d = Math.min(len, s.t * SPEED * walkSpeedOf(kindOf(s.id).kind))
+        // (stopping at the genkan's step a moment, to step out of their shoes and up into slippers)
+        const d = Math.min(len, withPause(s.t * SPEED * walkSpeedOf(kindOf(s.id).kind), stepAt(path), SHOES_S * SPEED * walkSpeedOf(kindOf(s.id).kind)))
         const { p, dir } = alongPath(path, d)
         g?.position.copy(p)
         if (g) g.rotation.y = d < len ? Math.atan2(dir.x, dir.z) : st.yaw
+        s.slippers = d > stepAt(path)
         if (d >= len) {
           s.phase = 'sit'
           // a plate is set in front of them (or, with a server, brought with the first thing they ordered)
@@ -898,8 +964,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       } else {
         // a moment to get up, then off the way they came
-        const d = Math.max(0, Math.min(len, (s.t - 0.8) * SPEED * walkSpeedOf(kindOf(s.id).kind)))
+        const v = SPEED * walkSpeedOf(kindOf(s.id).kind)
+        const d = Math.max(0, Math.min(len, withPause((s.t - 0.8) * v, len - stepAt(path), SHOES_S * v)))
         const { p, dir } = alongPath(path, len - d)
+        s.slippers = len - d > stepAt(path)
         g?.position.copy(p)
         if (g) g.rotation.y = s.t < 0.8 ? st.yaw : Math.atan2(-dir.x, -dir.z)
         if (d >= len) done.push(s.id)
@@ -907,6 +975,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         s.fade = Math.min(1, (len - d) / 0.9)
       }
       if (g) g.visible = !(s.phase === 'wcIn' && s.wc?.who !== 'drink')
+      // (down a step, standing in the genkan)
+      if (g && given) g.position.y = inGenkan(counters, g.position) ? -GENKAN.depth : 0
     }
     SEATS_TAKEN.clear()
     for (const x of shown) SEATS_TAKEN.add(x.seat)
@@ -1178,6 +1248,24 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <group key={n} position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>
         ))}
       </StaticBatch>
+      {/* their shoes, left in pairs on the genkan's stone by the step, a pair for each of them inside */}
+      {given && (() => {
+        const c0 = counters[0]
+        const inside = shown.filter((s) => s.slippers)
+        return inside.slice(0, 9).map((s, k) => {
+          // (three pairs abreast, on the till's side of the way in, out of everyone's feet and clear of the doorpost)
+          const at = c0.at.clone().addScaledVector(c0.along, c0.length / 2 + GENKAN.along[0] + 0.08 + Math.floor(k / 3) * 0.12)
+            .addScaledVector(c0.lay, -0.7 - (k % 3) * 0.12).setY(-GENKAN.depth)
+          const col = ['#2a2220', '#5a3a22', '#f2f0ea', '#1c1c22', '#7a2a22'][s.id % 5]
+          return (
+            <group key={`shoe${s.id}`} position={at} rotation-y={Math.atan2(c0.along.x, c0.along.z) + Math.PI + (s.id % 3 - 1) * 0.15}>
+              {[-1, 1].map((sd) => (
+                <mesh key={sd} position={[sd * 0.028, 0.018, 0]} scale={[0.025, 0.018, 0.06]}><sphereGeometry args={[1, 8, 6]} /><meshToonMaterial color={col} /></mesh>
+              ))}
+            </group>
+          )
+        })
+      })()}
       {fridge && <group name="look-fridge" position={fridge.at} rotation-y={fridge.yaw}><DrinkFridge /></group>}
       {/* what each has fetched from the fridge, stood beside their plate, toward the cook */}
       {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => {
@@ -1274,5 +1362,5 @@ function Say({ text }: { text: string }) {
 function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number
   guest?: GuestView }) {
   return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
-    fade={() => s.fade ?? 1} />
+    fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} />
 }

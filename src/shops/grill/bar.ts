@@ -190,6 +190,18 @@ export function seatsOf(cs: Counter[]): Seat[] {
   }))
 }
 
+/**
+ * The genkan (玄関) just inside the door: a floor of dark stone a step down from the room's boards, from the wall out
+ * past the doorway and from the room's end back to the step up into the room (the first counter's frame: along it,
+ * and lay, from its middle). Customers step up out of their shoes there, and into slippers.
+ */
+export const GENKAN = { depth: 0.05, along: [0.5, 1.45] as [number, number], lay: [FLOOR_FAR, -0.62] as [number, number] }
+/** whether a point (the bar's frame) is down in the genkan */
+export function inGenkan(cs: Counter[], p: THREE.Vector3) {
+  const c0 = cs[0], d = p.clone().sub(c0.at)
+  const a = d.dot(c0.along) - c0.length / 2, l = d.dot(c0.lay)
+  return a > GENKAN.along[0] && a < GENKAN.along[1] + 0.01 && l > GENKAN.lay[0] - 0.01 && l < GENKAN.lay[1]
+}
 /** the way in: on the first counter's aisle, just past its far end */
 export const doorOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, cs[0].length / 2 + 1.0)
   .addScaledVector(cs[0].lay, -AISLE)
