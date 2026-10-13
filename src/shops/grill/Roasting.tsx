@@ -600,25 +600,16 @@ function BarGate({ c, gate }: { c: Counter; gate: (typeof BAR_GATES)[number] }) 
       <group position={[hinge, 0, 0.08]}>
         <group ref={leaf} name="gate-leaf">
           <group position-x={end * (G / 2 - 0.005)}>
-            <mesh position-y={H / 2 + 0.02} castShadow>
-              <boxGeometry args={[G - 0.02, H - 0.06, 0.035]} />
-              <meshToonMaterial color="#b08454" />
-            </mesh>
-            <mesh position-y={H / 2 + 0.02} scale={[1.02, 1.01, 1.3]}>
-              <boxGeometry args={[G - 0.02, H - 0.06, 0.035]} />
-              <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-            </mesh>
-            {[-0.3, -0.1, 0.1, 0.3].map((k) => (
-              <mesh key={k} position={[k * (G - 0.06), H / 2, -0.019]}>
-                <boxGeometry args={[0.012, H - 0.16, 0.004]} />
-                <meshToonMaterial color="#7a5432" />
-              </mesh>
-            ))}
+            {/* a framed door of planed wood: two stiles and three rails with rounded edges, the grain running up the
+                stiles and across the rails, and a recessed board panel of upright planks between them */}
+            <GateLeaf w={G - 0.02} h={H - 0.06} y={0.05} />
             {/* its cap, level with the bar top */}
-            <mesh position-y={BAR_TOP - 0.025} geometry={ROUNDED_SLAB} scale={[G - 0.015, 0.05, 0.12]} castShadow>
-              <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
+            <mesh position-y={BAR_TOP - 0.025} castShadow>
+              <primitive object={gateGeo(G - 0.015, 0.05, 0.12, 0.018)} attach="geometry" />
+              <meshToonMaterial color="#ffffff" map={GATE_WOOD.across} />
             </mesh>
-            <mesh position-y={BAR_TOP - 0.025} geometry={ROUNDED_SLAB} scale={[G, 0.065, 0.135]}>
+            <mesh position-y={BAR_TOP - 0.025} scale={[1.02, 1.25, 1.1]}>
+              <primitive object={gateGeo(G - 0.015, 0.05, 0.12, 0.018)} attach="geometry" />
               <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
             </mesh>
           </group>
@@ -628,6 +619,67 @@ function BarGate({ c, gate }: { c: Counter; gate: (typeof BAR_GATES)[number] }) 
           <mesh key={y} position={[0, y, 0]}><boxGeometry args={[0.02, 0.05, 0.05]} /><meshToonMaterial color="#c8a050" /></mesh>
         ))}
       </group>
+    </group>
+  )
+}
+/** rounded boxes for the gate's parts, made once per size */
+const GATE_GEO = new Map<string, THREE.BufferGeometry>()
+function gateGeo(w: number, h: number, d: number, r: number) {
+  const k = [w, h, d, r].map((v) => v.toFixed(3)).join()
+  if (!GATE_GEO.has(k)) GATE_GEO.set(k, new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2.2, h / 2.2, d / 2.2)))
+  return GATE_GEO.get(k)!
+}
+/** the bar's wood for the gate, its grain turned to run up (the stiles, the panel) or across (the rails, the cap) */
+const GATE_WOOD = (() => {
+  const turn = (up: boolean) => {
+    if (!TRAY_WOOD) return null
+    const t = TRAY_WOOD.clone()
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.center.set(0.5, 0.5)
+    t.rotation = up ? Math.PI / 2 : 0
+    t.repeat.set(0.35, 0.35)
+    t.needsUpdate = true
+    return t
+  }
+  return { up: turn(true), across: turn(false) }
+})()
+/** the gate's door: a frame of stiles and rails, rounded, and a panel of planks set back in it, both sides alike */
+function GateLeaf({ w, h, y }: { w: number; h: number; y: number }) {
+  const S = 0.06, T = 0.04
+  const parts: { at: [number, number, number]; size: [number, number, number]; up: boolean }[] = [
+    { at: [-(w - S) / 2, h / 2, 0], size: [S, h, T], up: true },
+    { at: [(w - S) / 2, h / 2, 0], size: [S, h, T], up: true },
+    ...[S / 2, h * 0.52, h - S / 2].map((ry) => ({ at: [0, ry, 0] as [number, number, number], size: [w - 2 * S + 0.004, S, T * 0.9] as [number, number, number], up: false })),
+  ]
+  return (
+    <group position-y={y}>
+      {parts.map((pt, i) => (
+        <group key={i} position={pt.at}>
+          <mesh castShadow>
+            <primitive object={gateGeo(...pt.size, 0.012)} attach="geometry" />
+            <meshToonMaterial color="#e8cfa6" map={pt.up ? GATE_WOOD.up : GATE_WOOD.across} />
+          </mesh>
+          <mesh scale={[1 + 0.008 / pt.size[0], 1 + 0.008 / pt.size[1], 1.15]}>
+            <primitive object={gateGeo(...pt.size, 0.012)} attach="geometry" />
+            <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+          </mesh>
+        </group>
+      ))}
+      {/* the panels, upper and lower, of upright boards with dark joints between, set back in the frame */}
+      {[[S, h * 0.52 - S / 2], [h * 0.52 + S / 2, h - S]].map(([a, b], i) => (
+        <group key={i} position-y={(a + b) / 2}>
+          <mesh>
+            <boxGeometry args={[w - 2 * S, b - a, T * 0.4]} />
+            <meshToonMaterial color="#d2b48a" map={GATE_WOOD.up} />
+          </mesh>
+          {[-1, 0, 1].map((k) => [1, -1].map((sd) => (
+            <mesh key={`${k}${sd}`} position={[k * (w - 2 * S) / 4, 0, sd * T * 0.21]} rotation-y={sd > 0 ? 0 : Math.PI}>
+              <planeGeometry args={[0.006, b - a]} />
+              <meshBasicMaterial color="#5a3a22" />
+            </mesh>
+          )))}
+        </group>
+      ))}
     </group>
   )
 }
@@ -1665,7 +1717,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // the crate and the fan
     for (const d of [DECOR.crate, DECOR.fan, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
-    if (space === 'open') for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)), r: 0.42 * GRILL_SCALE })
+    if (bar) for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)), r: 0.42 * GRILL_SCALE })
     // the soup bowls on the table are in the way too
     root.traverse((o) => {
       const id = o.userData.itemId as string | undefined
@@ -3444,11 +3496,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </Html>
       )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
-      <CookTable floor={!(space === 'open' && bar)} />
+      <CookTable floor={!bar} />
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
         <group key={m.id} position={at} rotation-y={yaw} scale={CHEF_SCALE}><StaffFigure id={m.id} role={m.role} look={m.look} /></group>
       ))}
-      {space === 'open' && bar && <Bar />}
+      {bar && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
       {roast.trash && <TrashBin container="trash" contents={trashed}
         position={containerAt('trash').toArray() as [number, number, number]} />}
