@@ -31,6 +31,7 @@ import { NoodleEating } from '@/shops/noodle/NoodleEating'
 import { TaiwanTable } from '@/shops/noodle/TaiwanTable'
 import { Bakery } from '@/shops/bakery/Bakery'
 import { OpeningSpot } from '@/scene/OpeningSpot'
+import { FramePacer } from '@/scene/FramePacer'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
@@ -1734,6 +1735,7 @@ export default function App() {
           camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
           gl={makeRenderer}
         >
+          <FramePacer />
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }}
             onEat={onEat} onNotice={(what) => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])}

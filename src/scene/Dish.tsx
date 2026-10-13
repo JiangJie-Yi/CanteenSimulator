@@ -215,19 +215,25 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
   const items = useMemo(() => {
     const groups = new Map<string, Piece[]>()
     scene.traverse((obj) => {
-      const id = baseName(obj.name)
-      if (!ids.has(id) || obj.userData.copy) return
+      const id = (obj.userData.itemId as string | undefined) ?? baseName(obj.name)
+      if (!ids.has(id)) return
       if (!groups.has(id)) groups.set(id, [])
       const list = groups.get(id)!
       obj.userData.itemId = id
-      obj.userData.copy = 0
-      // once per node (the scene is cached across remounts): remember the authored scale, then vary it
-      if (!obj.userData.authoredScale) {
+      const copy = (obj.userData.copy as number | undefined) ?? 0
+      obj.userData.copy = copy
+      // once per node (the scene is cached across remounts): remember where it was authored, and its size, then vary
+      // it. Seen again (the menu changed), it's taken from there, not from wherever it is now (on a plate, on the
+      // tray, shrunk away): its extra portions, cloned from it, stand where they should
+      if (!obj.userData.home) {
         obj.userData.authoredScale = obj.scale.clone()
         jitter(obj, isSkewer(id), !!layout?.slots?.[id])
+        obj.userData.home = { p: obj.position.clone(), q: obj.quaternion.clone(), s: obj.scale.clone() }
       }
-      list.push({ node: obj, copy: 0, index: list.length, baseScale: obj.scale.clone(), baseY: obj.position.y,
-        homeP: obj.position.clone(), homeQ: obj.quaternion.clone(), on: true, s: 1, v: 0, y: 0, vy: 0 })
+      const home = obj.userData.home as { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }
+      const on = copy === 0 || obj.visible
+      list.push({ node: obj, copy, index: list.filter((q) => q.copy === copy).length, baseScale: home.s.clone(), baseY: home.p.y,
+        homeP: home.p.clone(), homeQ: home.q.clone(), on, s: on ? 1 : 0, v: 0, y: 0, vy: 0 })
     })
     return groups
   }, [scene, ids])
@@ -314,9 +320,10 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
         node.quaternion.copy(src.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(UP, (Math.random() - 0.5) * 0.6))
       }
       // every portion is a little different: its own size and turn
-      node.scale.copy(src.node.userData.authoredScale ?? src.baseScale)
+      node.scale.copy(src.node.userData.authoredScale as THREE.Vector3 ?? src.baseScale)
       jitter(node, isSkewer(id), !!layout?.slots?.[id])
       const baseScale = node.scale.clone()
+      node.userData.home = { p: node.position.clone(), q: node.quaternion.clone(), s: baseScale.clone() }
       node.scale.setScalar(0.0001)
       node.visible = false
       src.node.parent!.add(node)

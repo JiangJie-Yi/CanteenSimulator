@@ -552,7 +552,7 @@ function CookTableBox({ lay, along }: { lay: [number, number]; along: [number, n
  */
 const BAR_DEPTH = 0.62
 /** the staff's way through, at the outer end of each counter: which end, and how wide */
-const BAR_GATES: { end: 1 | -1; w: number }[] = [{ end: 1, w: 0.55 }, { end: -1, w: 0.42 }]
+const BAR_GATES: { end: 1 | -1; w: number }[] = [{ end: 1, w: 0.4 }, { end: -1, w: 0.42 }]
 /** how far the gates' flaps stand lifted open */
 const FLAP_OPEN = 1.5
 function barTopShape(grow: number) {
@@ -605,8 +605,7 @@ const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042,
 /**
  * One counter of the bar: a long plank of pale hinoki with rounded edges on a dark base, a raised lip on the cook's
  * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
- * and that end of the top is a flap on brass hinges, a pair of low swing doors under it: the staff's way between the
- * kitchen and the floor.
+ * and that end of the top is a flap on brass hinges, lifted: the staff's way between the kitchen and the floor.
  */
 function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number }
   /** its top drawn with the others' as one piece (BarTop), not its own */
@@ -619,6 +618,8 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
   const baseL = L + 0.2 - G
   const baseX = -end * G / 2
   const gateX = end * ((L + 0.2) / 2 - G / 2)
+  // (where the top starts, on the near end: short of a gate there)
+  const topX0 = -(L + 0.3) / 2 + (gate && end < 0 ? G : 0)
   return (
     <group position={c.at} rotation-y={yaw}>
       {!noTop && (
@@ -651,29 +652,6 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
                 <boxGeometry args={[0.05, 0.012, 0.04]} />
                 <meshToonMaterial color="#c8a050" />
               </mesh>
-            ))}
-          </group>
-          {/* the half door below it: one leaf of pale slatted wood, hung on the base's end, swung a little open */}
-          <group position={[-end * G / 2, 0.05, 0.08]} rotation-y={-end * 0.08}>
-            <group position-x={end * (G / 2 - 0.01)}>
-              <mesh position-y={0.22}>
-                <boxGeometry args={[G - 0.04, 0.44, 0.025]} />
-                <meshToonMaterial color="#b08454" />
-              </mesh>
-              <mesh position-y={0.22} scale={[1.03, 1.03, 1.4]}>
-                <boxGeometry args={[G - 0.04, 0.44, 0.025]} />
-                <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-              </mesh>
-              {[-0.36, -0.12, 0.12, 0.36].map((k) => (
-                <mesh key={k} position={[k * (G - 0.08), 0.22, -0.014]}>
-                  <boxGeometry args={[0.012, 0.38, 0.004]} />
-                  <meshToonMaterial color="#7a5432" />
-                </mesh>
-              ))}
-            </group>
-            {/* its two hinges on the base's end */}
-            {[0.08, 0.36].map((y) => (
-              <mesh key={y} position={[0, y, 0]}><boxGeometry args={[0.016, 0.04, 0.03]} /><meshToonMaterial color="#c8a050" /></mesh>
             ))}
           </group>
         </group>
@@ -710,7 +688,8 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
                 <meshToonMaterial color="#5a3a20" />
               </mesh>
             ))}
-            <group position={[-0.2, 0.002, 0.13]}>
+            {/* (on the right instead at a seat where the left would be off the top, by the gate) */}
+            <group position={[x - 0.2 - 0.06 < topX0 ? 0.2 : -0.2, 0.002, 0.13]}>
               <mesh geometry={SAUCE_DISH_GEO} castShadow>
                 <meshToonMaterial color="#ffffff" map={CLOUD_WARE} />
               </mesh>
@@ -1370,6 +1349,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const id = (obj.userData.itemId as string | undefined) ?? baseName(obj.name)
       if (!(id in roast.times) || known.has(obj)) continue
       const mats: Piece['mats'] = []
+      // (where Dish has it standing at home: the scene's cached, so after a remount it may be anywhere, on a plate)
+      const home = obj.userData.home as { p: THREE.Vector3; q: THREE.Quaternion } | undefined
+      if (home) {
+        obj.position.copy(home.p)
+        obj.quaternion.copy(home.q)
+      }
       const looks: Looks = { uChar: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
         uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 } }
       pieces.current.push({

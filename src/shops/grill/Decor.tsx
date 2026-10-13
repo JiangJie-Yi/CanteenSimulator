@@ -16,8 +16,9 @@ export const DECOR = {
   fan: { at: [-0.95, 1.9], r: 0.3 },
   // (drawn 1.8 times its own size, standing back from the fire's stones)
   lantern: { at: [-2.05, -0.3], r: 0.36 },
-  // (the cooked rice the rice balls are made from, at the table's front right corner)
-  rice: { at: [3.56, 0.2], r: 0.34 },
+  // (the cooked rice the rice balls are made from, at the table's front right corner; a shop's tub, half again as wide as
+  // a plate, its lid leant on the side away from the corner)
+  rice: { at: [3.19, 0.21], r: 0.7 },
 } satisfies Record<string, Spot>
 
 /** what's being carried from here: a stick of charcoal or the fan, where it is (Roasting sets it), and how far the
@@ -319,6 +320,8 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
  * The rice the rice balls are shaped from (おひつ): a round tub of pale sawara bound with copper hoops, heaped with
  * steaming white rice, the wooden paddle (しゃもじ) stood in it, its lid leant against its side.
  */
+/** the tub as drawn below, made this much bigger (a shop's おひつ, about 40 cm across beside the 25 cm plates) */
+const RICE_SCALE = 2.0
 function RiceTub() {
   const [x, z] = DECOR.rice.at
   const geo = useMemo(() => ({
@@ -331,7 +334,8 @@ function RiceTub() {
     blade: new THREE.SphereGeometry(0.06, 12, 8),
   }), [])
   return (
-    <group position={[x, 0, z]}>
+    // (turned so the lid leans away from the table's edges, back along the table)
+    <group position={[x, 0, z]} scale={RICE_SCALE} rotation-y={Math.atan2(-0.59, -0.81)}>
       <Inked geometry={geo.tub} color="#d9b47a" position={[0, 0.1, 0]} grow={1.03} />
       <mesh geometry={geo.tub} position-y={0.1} scale={0.98}>
         <meshToonMaterial color="#c49a5e" side={THREE.BackSide} />
