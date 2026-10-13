@@ -3339,7 +3339,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     let needDishes = 1
     const cap = roast.basket?.capacity ?? 10
     for (const p of pieces.current) {
-      if (p.slot === null || p.eaten || !present(p)) continue
+      // (what's served at the bar has a slot too, but it's the customers' and needs no plate out by the fire)
+      if (p.slot === null || p.eaten || !present(p) || p.container === 'bar') continue
       if (inBasket(p)) needBaskets = Math.max(needBaskets, Math.floor(p.slot / cap) + 1)
       else if (onDish(p)) needDishes = Math.max(needDishes, Math.floor(p.slot / roast.dish!.capacity) + 1)
       else need = Math.max(need, Math.floor(p.slot / PER_PLATE) + 1)
