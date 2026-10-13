@@ -32,6 +32,7 @@ import { TaiwanTable } from '@/shops/noodle/TaiwanTable'
 import { Bakery } from '@/shops/bakery/Bakery'
 import { OpeningSpot } from '@/scene/OpeningSpot'
 import { FramePacer } from '@/scene/FramePacer'
+import { DRINKS, type DrinkId } from '@/shops/grill/bar'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
@@ -228,6 +229,8 @@ type Frame = { cx: number; cy: number; w: number; h: number }
 /** a stick of incense on the altar burns this long (ms) */
 const INCENSE_MS = 60000
 type SceneProps = {
+  /** a customer took a drink from the grill's fridge */
+  onDrink?: (guest: number, drink: DrinkId) => void
   /** the incense on the grill's altar: when it was lit (performance.now), and lighting a new one */
   incense: { litAt: number | null; onLight: () => void }
   /** the incense is burning: customers order more */
@@ -280,7 +283,7 @@ type SceneProps = {
 }
 
 function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
-  onOrder, onAddCharcoal, onSay, blessed = false }: SceneProps) {
+  onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
   // (in development, the view can be set from the console: __ctl.target, __cam.position)
@@ -497,7 +500,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
                   mark={dish.roast ? '聞野' : dish.heatControl ? '鼎沸' : dish.bake ? '麵包' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)}
-                  incense={dish.roast ? incense : undefined} />
+                  incense={dish.roast ? incense : undefined} onDrink={onDrink} />
               )}
               {dish.id === 'beefnoodle' && (
                 <TaiwanTable items={dish.items} quantities={servings(dish, orders[dish.id])} active={i === active} locked={ai}
@@ -1562,6 +1565,17 @@ export default function App() {
     window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
     return true
   }
+  /** a customer helped themselves to a drink from the fridge: paid for at its price, a third of that its cost */
+  const sellDrink = (guest: number, id: DrinkId) => {
+    const d = DRINKS.find((x) => x.id === id)
+    if (!d) return
+    book('revenue', d.price)
+    book('food', Math.round(d.price * 0.35))
+    talk('order', `#${guest} ${lang === 'ja' ? 'が冷蔵庫から' : '從冰箱拿了'} ${lang === 'ja' ? d.ja : d.zh}`)
+  }
+  const sellDrinkRef = useRef(sellDrink)
+  sellDrinkRef.current = sellDrink
+  const onDrink = useCallback((guest: number, id: DrinkId) => sellDrinkRef.current(guest, id), [])
   const orderEntryRef = useRef(orderEntry)
   orderEntryRef.current = orderEntry
   const onOrderEntry = useCallback((key: string, guest: number) => {
@@ -1772,7 +1786,7 @@ export default function App() {
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
-            incense={{ litAt: incenseAt, onLight: lightIncense }} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
+            incense={{ litAt: incenseAt, onLight: lightIncense }} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
             bakeKitchen={(() => {

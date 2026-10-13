@@ -19,7 +19,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
-import { ALONG, FLOOR_NEAR, PLATES_SET, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -608,6 +608,16 @@ function BarGate({ c, gate }: { c: Counter; gate: (typeof BAR_GATES)[number] }) 
             {/* a framed door of planed wood: two stiles and three rails with rounded edges, the grain running up the
                 stiles and across the rails, and a recessed board panel of upright planks between them */}
             <GateLeaf w={G - 0.02} h={H - 0.06} y={0.05} />
+            {[0.16, BAR_TOP - 0.16].map((y) => [1, -1].map((sd) => (
+              <group key={`${y}${sd}`} position={[-end * (G / 2 - 0.005) + end * 0.022, y, sd * 0.024]}>
+                <mesh geometry={HINGE_GEO.plate}><meshToonMaterial color="#b89040" /></mesh>
+                {[-1, 1].map((k) => (
+                  <mesh key={k} geometry={HINGE_GEO.screw} position={[0, k * 0.02, sd * 0.0025]} rotation-x={Math.PI / 2}>
+                    <meshToonMaterial color="#5a4220" />
+                  </mesh>
+                ))}
+              </group>
+            )))}
             {/* its cap, level with the bar top */}
             <mesh position-y={BAR_TOP - 0.025} castShadow>
               <primitive object={gateGeo(G - 0.015, 0.05, 0.12, 0.018)} attach="geometry" />
@@ -619,13 +629,33 @@ function BarGate({ c, gate }: { c: Counter; gate: (typeof BAR_GATES)[number] }) 
             </mesh>
           </group>
         </group>
-        {/* the hinges, on the base's end */}
-        {[0.12, BAR_TOP - 0.14].map((y) => (
-          <mesh key={y} position={[0, y, 0]}><boxGeometry args={[0.02, 0.05, 0.05]} /><meshToonMaterial color="#c8a050" /></mesh>
+        {/* the hinges, top and bottom: a brass knuckle on the hinge's line, a leaf screwed to the base's end and one to
+            the door's stile (that one turns with it: GateHingeLeaf) */}
+        {[0.16, BAR_TOP - 0.16].map((y) => (
+          <group key={y} position-y={y}>
+            <mesh geometry={HINGE_GEO.knuckle}><meshToonMaterial color="#c8a050" /></mesh>
+            <mesh geometry={HINGE_GEO.knuckle} scale={[1.25, 1.03, 1.25]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+            {[1, -1].map((sd) => (
+              <group key={sd}>
+                <mesh geometry={HINGE_GEO.plate} position={[-end * 0.022, 0, sd * 0.024]}><meshToonMaterial color="#b89040" /></mesh>
+                {[-1, 1].map((k) => (
+                  <mesh key={k} geometry={HINGE_GEO.screw} position={[-end * 0.022, k * 0.02, sd * 0.0265]} rotation-x={Math.PI / 2}>
+                    <meshToonMaterial color="#5a4220" />
+                  </mesh>
+                ))}
+              </group>
+            ))}
+          </group>
         ))}
       </group>
     </group>
   )
+}
+/** a gate's hinge: its knuckle (a brass barrel on the hinge's line), its leaves, their screw heads */
+const HINGE_GEO = {
+  knuckle: new THREE.CylinderGeometry(0.009, 0.009, 0.075, 10),
+  plate: new THREE.BoxGeometry(0.036, 0.07, 0.004),
+  screw: new THREE.CylinderGeometry(0.004, 0.004, 0.003, 8),
 }
 /** rounded boxes for the gate's parts, made once per size */
 const GATE_GEO = new Map<string, THREE.BufferGeometry>()
@@ -751,7 +781,6 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
   const baseL = L + 0.2 - G
   const baseX = -end * G / 2
   // (where the top starts, on the near end: short of a gate there)
-  const topX0 = -(L + 0.3) / 2 + (gate && end < 0 ? G : 0)
   return (
     <group position={c.at} rotation-y={yaw}>
       {!noTop && (
@@ -802,22 +831,14 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
               </mesh>
             ))}
             {/* (on the right instead at a seat where the left would be off the top, by the gate) */}
-            <group position={[x - 0.2 - 0.06 < topX0 ? 0.2 : -0.2, 0.002, 0.13]}>
+            <group position={[sauceSide(c, gate, x), 0.002, 0.13]}>
               <mesh geometry={SAUCE_DISH_GEO} castShadow>
                 <meshToonMaterial color="#ffffff" map={CLOUD_WARE} />
               </mesh>
               <mesh geometry={SAUCE_DISH_GEO} scale={[1.06, 1.15, 1.06]}>
                 <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
               </mesh>
-              {/* soy with a dab of grated daikon */}
-              <mesh position-y={0.011} rotation-x={-Math.PI / 2}>
-                <circleGeometry args={[0.03, 16]} />
-                <meshToonMaterial color="#3a1c0c" />
-              </mesh>
-              <mesh position={[0.008, 0.015, 0.004]} scale={[1, 0.5, 1]}>
-                <sphereGeometry args={[0.011, 8, 6]} />
-                <meshToonMaterial color="#f2efe4" />
-              </mesh>
+              {/* (empty till someone sits down there: GuestBar3D pours them their soy) */}
             </group>
           </group>
         )
@@ -1723,6 +1744,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     // the crate and the fan
     for (const d of [DECOR.crate, DECOR.fan, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
+    // the customers' plates, stacked on the table by the pass
+    if (bar) for (const v of [PLATE_STACKS.clean, PLATE_STACKS.dirty]) others.push({ p: toGrillScene(v).setY(0), r: 0.32 })
     // the bar behind the fire (shop open) is in the way too
     if (bar) for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)), r: 0.42 * GRILL_SCALE })
     // the soup bowls on the table are in the way too
@@ -2246,6 +2269,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       guestClock.current = 0
       // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
       const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
+      // (nor one the room still has somebody at: getting up and going, or away at the toilet)
+      for (const n of SEATS_TAKEN) used.add(n)
       const free = (n: number) => n < BAR_SEATS && !used.has(n)
       // now and then a couple comes in together, if two stools side by side on one counter are free: a young man and
       // a young woman (the next ids that are), sat next to each other
@@ -2572,7 +2597,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (soup && !p) setTasteTip({ at: soup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.32, 0)).toArray() as [number, number, number], taste: SOUP_TASTE })
       const dec = tool || p || soup ? null : pickDecor()
       setDecorTip(dec)
-      el.style.cursor = tool || dec ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : pickCoal() ? 'pointer' : ''
+      el.style.cursor = tool || dec ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : pickCoal() ? 'pointer' : POINTER_HINT.hand ? 'pointer' : ''
     }
     const onDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY }

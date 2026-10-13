@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
-import { TOILETS, WC_W, type Counter } from './bar'
+import { DRINKS, FRIDGE, TOILETS, WC_W, handOver, type Counter } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Steam } from '@/scene/Steam'
 
@@ -263,6 +263,26 @@ function Bottle({ x, color, label }: { x: number; color: string; label: string }
 }
 
 /** the plaque over the toilet door: お手洗い, and 廁所 under it */
+/** a toilet's door's height */
+const WC_H = 1.85
+/** a stretch of the wall (the wall's own frame: z along it, y up), plaster or the dark wainscot, the plaster's
+ * pattern laid from the wall's own z so stretches side by side run on into each other */
+function WallPiece({ z0, z1, y0, y1, plaster = false }: { z0: number; z1: number; y0: number; y1: number; plaster?: boolean }) {
+  const map = useMemo(() => {
+    if (!plaster || !PLASTER) return null
+    const t = PLASTER.clone()
+    t.repeat.set((z1 - z0) / 1.2, (y1 - y0) / 1.2)
+    t.offset.set(-z1 / 1.2, y0 / 1.2)
+    t.needsUpdate = true
+    return t
+  }, [z0, z1, y0, y1, plaster])
+  return (
+    <mesh position={[0, (y0 + y1) / 2, (z0 + z1) / 2]} rotation-y={-Math.PI / 2} receiveShadow>
+      <planeGeometry args={[z1 - z0, y1 - y0]} />
+      <meshToonMaterial color={plaster ? '#ffffff' : '#5e4029'} map={map} />
+    </mesh>
+  )
+}
 /** the plaque over each toilet's door: 男 in indigo with a man's figure, 女 in red with a woman's, and the word under */
 const wcSign = (who: 'm' | 'f') => canvasTex(160, 96, (g) => {
   const ink = who === 'm' ? '#24407a' : '#b8262a'
@@ -316,12 +336,104 @@ const SHOJI = canvasTex(64, 64, (g) => {
  * The way through to the toilet: one sliding door (引き戸) in a dark wooden frame, shut, wood below and shoji paper on
  * a lattice above, a short indigo noren over it, and the plaque.
  */
+/** small square tiles, pale with grey grout */
+const TILES = canvasTex(64, 64, (g) => {
+  g.fillStyle = '#b8b4aa'
+  g.fillRect(0, 0, 64, 64)
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    g.fillStyle = (i + j) % 2 ? '#eeeae0' : '#e6e2d6'
+    g.fillRect(i * 16 + 1, j * 16 + 1, 14, 14)
+  }
+}, true)
+const WC_GEO = {
+  bowl: new THREE.SphereGeometry(0.12, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+  foot: new THREE.CylinderGeometry(0.07, 0.09, 0.28, 16),
+  seat: new THREE.TorusGeometry(0.1, 0.022, 8, 20),
+  tank: new THREE.BoxGeometry(0.12, 0.3, 0.32),
+  basin: new THREE.CylinderGeometry(0.1, 0.07, 0.07, 16),
+  roll: new THREE.CylinderGeometry(0.04, 0.04, 0.09, 12),
+  pot: new THREE.CylinderGeometry(0.035, 0.028, 0.06, 10),
+  leaf: new THREE.ConeGeometry(0.02, 0.12, 4),
+  lamp: new THREE.SphereGeometry(0.06, 12, 8),
+}
+/**
+ * The little room behind a toilet's door: tiled floor and walls up to the waist, plaster above, a ceiling of dark
+ * boards over it (so it's not looked down into); a white toilet against the back wall with its cistern, a small
+ * basin on a bracket to one side with a round mirror over it and a towel, the paper on the other wall, a pot of
+ * greenery on the cistern, and a paper lamp lit overhead.
+ */
+function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
+  const D = 0.9
+  const floor = useMemo(() => {
+    if (!TILES) return null
+    const t = TILES.clone()
+    t.repeat.set(D / 0.32, w / 0.32)
+    t.needsUpdate = true
+    return t
+  }, [w])
+  const wall = useMemo(() => {
+    if (!TILES) return null
+    const t = TILES.clone()
+    t.repeat.set(w / 0.24, 0.9 / 0.24)
+    t.needsUpdate = true
+    return t
+  }, [w])
+  const accent = who === 'm' ? '#2c3e66' : '#9a2a2a'
+  return (
+    <group>
+      <mesh position={[D / 2, 0.004, 0]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[D, w]} />
+        <meshToonMaterial color="#ffffff" map={floor} />
+      </mesh>
+      {/* back wall and the two side walls: tiles to the waist, plaster over */}
+      <group position={[D, 0, 0]}>
+        <mesh position-y={0.45} rotation-y={-Math.PI / 2}><planeGeometry args={[w, 0.9]} /><meshToonMaterial color="#ffffff" map={wall} /></mesh>
+        <mesh position-y={0.9 + (h + 0.3 - 0.9) / 2} rotation-y={-Math.PI / 2}><planeGeometry args={[w, h + 0.3 - 0.9]} /><meshToonMaterial color="#e8dcc4" /></mesh>
+      </group>
+      {[-1, 1].map((sd) => (
+        <group key={sd} position={[D / 2, 0, sd * w / 2]} rotation-y={sd > 0 ? Math.PI : 0}>
+          <mesh position-y={0.45}><planeGeometry args={[D, 0.9]} /><meshToonMaterial color="#ffffff" map={wall} /></mesh>
+          <mesh position-y={0.9 + (h + 0.3 - 0.9) / 2}><planeGeometry args={[D, h + 0.3 - 0.9]} /><meshToonMaterial color="#e8dcc4" /></mesh>
+        </group>
+      ))}
+      <mesh position={[D / 2, h + 0.3, 0]} rotation-x={Math.PI / 2}><planeGeometry args={[D, w]} /><meshToonMaterial color="#3a2416" /></mesh>
+      {/* the toilet, facing the door */}
+      <group position={[D - 0.22, 0, 0]}>
+        <mesh geometry={WC_GEO.foot} position-y={0.14}><meshToonMaterial color="#f6f6f2" /></mesh>
+        <mesh geometry={WC_GEO.bowl} position-y={0.36} rotation-x={Math.PI} scale={[1.15, 0.7, 1]}><meshToonMaterial color="#f6f6f2" side={THREE.DoubleSide} /></mesh>
+        <mesh geometry={WC_GEO.seat} position={[-0.02, 0.37, 0]} rotation-x={-Math.PI / 2} scale={[1.15, 1, 1]}><meshToonMaterial color={accent} /></mesh>
+        <mesh geometry={WC_GEO.tank} position={[0.13, 0.55, 0]}><meshToonMaterial color="#f6f6f2" /></mesh>
+        {/* a little pot of greenery on the cistern */}
+        <group position={[0.13, 0.7, 0.08]}>
+          <mesh geometry={WC_GEO.pot} position-y={0.03}><meshToonMaterial color="#5a4a3a" /></mesh>
+          {[0, 1.6, 3.2, 4.7].map((a) => (
+            <mesh key={a} geometry={WC_GEO.leaf} position={[Math.cos(a) * 0.015, 0.11, Math.sin(a) * 0.015]} rotation={[Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4]}>
+              <meshToonMaterial color="#5f8c3a" />
+            </mesh>
+          ))}
+        </group>
+      </group>
+      {/* the basin on its bracket, the mirror over it, a towel on a ring */}
+      <group position={[D * 0.45, 0, -w / 2 + 0.12]}>
+        <mesh geometry={WC_GEO.basin} position-y={0.8}><meshToonMaterial color="#f6f6f2" /></mesh>
+        <mesh position={[0, 0.72, -0.08]}><boxGeometry args={[0.04, 0.12, 0.03]} /><meshToonMaterial color="#3a2416" /></mesh>
+        <mesh position={[0, 1.3, -0.115]}><circleGeometry args={[0.13, 24]} /><meshBasicMaterial color="#c8d8e0" /></mesh>
+        <mesh position={[0, 1.3, -0.117]}><circleGeometry args={[0.15, 24]} /><meshToonMaterial color="#6a4428" /></mesh>
+        <mesh position={[0.22, 0.95, -0.11]}><planeGeometry args={[0.12, 0.26]} /><meshToonMaterial color={accent} side={THREE.DoubleSide} /></mesh>
+      </group>
+      {/* the paper, on the other wall */}
+      <mesh geometry={WC_GEO.roll} position={[D - 0.3, 0.55, w / 2 - 0.05]} rotation-x={Math.PI / 2}><meshToonMaterial color="#fafaf6" /></mesh>
+      {/* a paper lamp, lit, overhead */}
+      <mesh geometry={WC_GEO.lamp} position={[D / 2, h + 0.1, 0]}><meshBasicMaterial color="#fff1cc" toneMapped={false} /></mesh>
+    </group>
+  )
+}
 /**
  * A toilet's door itself: one whole sliding panel, wood below, shoji paper on a lattice above. It slides aside into
  * the wall when someone goes in or comes out, or when it's clicked (and back again with another click).
  */
 function ToiletPanel({ who }: { who: 'm' | 'f' }) {
-  const W = WC_W, H = 1.85
+  const W = WC_W, H = WC_H
   const g = useRef<THREE.Group>(null)
   const k = useRef(0)
   // (the men's slides off one way, the women's the other, away from each other)
@@ -335,7 +447,7 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
   })
   return (
     <group ref={g} onClick={(ev) => { ev.stopPropagation(); TOILETS[who].open = !TOILETS[who].open }}
-      onPointerOver={() => { document.body.style.cursor = 'pointer' }} onPointerOut={() => { document.body.style.cursor = '' }}>
+      {...handOver}>
       <group position={[-0.03, H / 2, 0]}>
         <mesh position-y={0.2} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[W - 0.02, H - 0.44]} />
@@ -355,24 +467,15 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
   )
 }
 function ToiletDoor({ who }: { who: 'm' | 'f' }) {
-  const W = WC_W, H = 1.85
+  const W = WC_W, H = WC_H
   return (
     <group>
       {/* the frame round the opening */}
       {[-1, 1].map((sd) => <Box key={sd} size={[0.06, H + 0.06, 0.06]} color="#3a2416" position={[-0.03, H / 2, sd * (W / 2 + 0.03)]} />)}
       <Box size={[0.07, 0.07, W + 0.12]} color="#3a2416" position={[-0.035, H + 0.035, 0]} />
       <Box size={[0.05, 0.025, W + 0.12]} color="#3a2416" position={[-0.03, 0.012, 0]} />
-      {/* (the sliding panel: ToiletPanel, not merged) and the dark little room behind it */}
-      <mesh position={[0.45, H / 2, 0]} rotation-y={-Math.PI / 2}>
-        <planeGeometry args={[W, H]} />
-        <meshBasicMaterial color="#1e1a18" />
-      </mesh>
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[0.22, H / 2, sd * W / 2]} rotation-y={sd > 0 ? Math.PI : 0}>
-          <planeGeometry args={[0.45, H]} />
-          <meshBasicMaterial color="#2a2420" />
-        </mesh>
-      ))}
+      {/* (the sliding panel: ToiletPanel, not merged) and the little room behind it */}
+      <WcRoom w={W} h={H} who={who} />
       {/* the short noren, and the plaque over it */}
       {[-1, 1].map((sd) => (
         <mesh key={sd} position={[-0.075, H - 0.2, sd * W / 4.2]} rotation-y={-Math.PI / 2}>
@@ -532,13 +635,12 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
   const yaw = Math.atan2(c.along.x, c.along.z)
   const l = to - from
   const mid = (from + to) / 2
-  const plaster = useMemo(() => {
-    if (!PLASTER) return null
-    const t = PLASTER.clone()
-    t.repeat.set(l / 1.2, (WALL_H - WAINSCOT) / 1.2)
-    t.needsUpdate = true
-    return t
-  }, [l])
+  // the wall's stretches: whole, or with the toilets' doorways left open (as high as their frames' lintel)
+  const spans = useMemo(() => {
+    if (door === undefined) return [[from, to, 0]]
+    const g0 = door - WC_W - 0.12, g1 = door + WC_W + 0.12
+    return [[from, g0, 0], [door - 0.06, door + 0.06, 0], [g1, to, 0], [g0, g1, WC_H + 0.07]]
+  }, [from, to, door])
   // (pictures along the wall, a print then a scroll in turn, about a metre apart, leaving the shelf's stretch clear)
   // (the shelf in the far third of the wall, or the near one if the door's in the far one)
   const shelfZ = door !== undefined && Math.abs(door - (mid + l * 0.3)) < 1.3 ? mid - l * 0.3 : mid + l * 0.3
@@ -578,16 +680,16 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
       <group ref={wall} position-x={-far}>
         {/* (all of it standing still: drawn merged, a few meshes for the whole wall) */}
         <StaticBatch key={`${from}|${to}|${door}|${shrine}|${!!altar}`}>
-        <mesh position={[0, WAINSCOT + (WALL_H - WAINSCOT) / 2, mid]} rotation-y={-Math.PI / 2} receiveShadow>
-          <planeGeometry args={[l, WALL_H - WAINSCOT]} />
-          <meshToonMaterial color="#ffffff" map={plaster} />
-        </mesh>
-        <mesh position={[0, WAINSCOT / 2, mid]} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[l, WAINSCOT]} />
-          <meshToonMaterial color="#5e4029" />
-        </mesh>
+        {/* the plaster over the wainscot, open where the toilets' doors are (a strip between them, and over them) */}
+        {spans.map(([z0, z1, y0]) => (
+          <group key={`${z0}|${y0}`}>
+            <WallPiece z0={z0} z1={z1} y0={Math.max(WAINSCOT, y0)} y1={WALL_H} plaster />
+            {y0 < WAINSCOT && <WallPiece z0={z0} z1={z1} y0={0} y1={WAINSCOT} />}
+          </group>
+        ))}
         {/* posts, the rail over the wainscot and the beam along the top */}
-        <Box size={[0.05, 0.05, l]} color="#3a2416" position={[-0.02, WAINSCOT, mid]} />
+        {/* (the rail broken where the toilets' doorways are) */}
+        {spans.filter(([, , y0]) => y0 < WAINSCOT).map(([z0, z1]) => <Box key={z0} size={[0.05, 0.05, z1 - z0]} color="#3a2416" position={[-0.02, WAINSCOT, (z0 + z1) / 2]} />)}
         <Box size={[0.08, 0.1, l]} color="#3a2416" position={[-0.03, WALL_H - 0.05, mid]} />
         {[from, mid - l / 6, mid + l / 6, to].filter((z) => z === from || z === to || door === undefined || Math.abs(z - door) > WC_W + 0.1).map((z) => (
           <Box key={z} size={[0.07, WALL_H, 0.08]} color="#3a2416" position={[-0.03, WALL_H / 2, z]} />
@@ -609,8 +711,8 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         ))}
         {shrine !== undefined && <group position={[0, 1.78, shrine]}><Kamidana /></group>}
         {/* the shelf: sake bottles, two crocks and the cat; or, by the door, the altar */}
-        {altar ? <group position={[-0.1, 1.08, shelfZ]}><Box size={[0.2, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
-          {[-0.35, 0.35].map((z) => <Box key={z} size={[0.18, 0.08, 0.025]} color="#3a2416" position={[0.04, -0.06, z]} />)}</group>
+        {altar ? <group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Box size={[ALTAR_D, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
+          {[-0.35, 0.35].map((z) => <Box key={z} size={[ALTAR_D - 0.04, 0.1, 0.03]} color="#3a2416" position={[0.02, -0.07, z]} />)}</group>
           : <>
         <group position={[-0.1, 1.08, shelfZ]}>
           <Box size={[0.2, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
@@ -635,7 +737,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
           <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group>
         ))}
         {/* (the altar's flag stirs, its incense smokes: not merged) */}
-        {altar && <group name="look-altar" position={[-0.1, 1.08, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group>}
+        {altar && <group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group>}
       </group>
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {
@@ -788,6 +890,7 @@ const ALTAR_GEO = {
   knob: new THREE.SphereGeometry(0.008, 10, 8),
   tassel: new THREE.CylinderGeometry(0.004, 0.0015, 0.03, 6),
   fruit: new THREE.SphereGeometry(0.03, 12, 8),
+  banana: new THREE.TorusGeometry(0.07, 0.013, 6, 12, 1.4),
   dish: new THREE.CylinderGeometry(0.08, 0.06, 0.015, 18),
 }
 /**
@@ -795,6 +898,109 @@ const ALTAR_GEO = {
  * stood in it on a black pole with a gold tip, rippling a little, and one stick of incense burning, its tip glowing and
  * a thread of smoke going up; a dish of oranges set out as an offering.
  */
+/** a tiger's coat: gold-orange, its black stripes running round it, pale underneath */
+const TIGER_COAT = canvasTex(128, 64, (g) => {
+  g.fillStyle = '#e8902a'
+  g.fillRect(0, 0, 128, 64)
+  g.fillStyle = '#f6e2b0'
+  g.fillRect(0, 50, 128, 14)
+  g.fillStyle = '#1c120a'
+  for (let k = 0; k < 9; k++) {
+    const x = 7 + k * 14
+    g.beginPath()
+    g.moveTo(x, 2)
+    g.quadraticCurveTo(x + 6, 20, x + 1, 40)
+    g.lineTo(x - 3, 40)
+    g.quadraticCurveTo(x + 1, 20, x - 4, 2)
+    g.closePath()
+    g.fill()
+  }
+})
+const TIGER_GEO = {
+  ball: new THREE.SphereGeometry(1, 18, 12),
+  leg: new THREE.CylinderGeometry(0.011, 0.014, 0.06, 10),
+  ear: new THREE.ConeGeometry(0.012, 0.02, 10),
+  fang: new THREE.ConeGeometry(0.0035, 0.012, 6),
+  coin: new THREE.CylinderGeometry(0.009, 0.009, 0.003, 16),
+  tail: new THREE.TorusGeometry(0.04, 0.007, 8, 16, Math.PI * 1.2),
+  cape: new THREE.CylinderGeometry(0.03, 0.045, 0.03, 18, 1, true),
+  dais: new THREE.BoxGeometry(0.14, 0.05, 0.12),
+  trim: new THREE.BoxGeometry(0.146, 0.008, 0.126),
+}
+/**
+ * 虎爺, the tiger lord, as his figure sits in a temple: on a red lacquered dais with gold bands, sat up on his
+ * haunches with his forelegs straight, his chest out, his big head up and turned to the room; gold-orange with black
+ * stripes, a white ruff at his cheeks and a white chest, his round eyes fierce under gold brows, his mouth open on
+ * two fangs with a gold coin in it, a red cape with a gold hem at his neck, his tail curled up beside him.
+ * Faces -x (the room).
+ */
+function TigerIdol() {
+  const B = (props: { at: [number, number, number]; r: [number, number, number]; color?: string; map?: THREE.Texture | null; ink?: boolean }) => (
+    <group position={props.at} scale={props.r}>
+      <mesh geometry={TIGER_GEO.ball}><meshToonMaterial color={props.color ?? '#ffffff'} map={props.map ?? null} /></mesh>
+      {props.ink !== false && <mesh geometry={TIGER_GEO.ball} scale={1.07}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>}
+    </group>
+  )
+  return (
+    <group>
+      {/* the dais: red lacquer, a gold band round its top and its foot */}
+      <Inked geometry={TIGER_GEO.dais} color="#a8261e" position-y={0.025} grow={1.02} />
+      <mesh geometry={TIGER_GEO.trim} position-y={0.047}><meshToonMaterial color="#d4b04a" /></mesh>
+      <mesh geometry={TIGER_GEO.trim} position-y={0.004}><meshToonMaterial color="#d4b04a" /></mesh>
+      <group position-y={0.05}>
+        {/* haunches, sat on, and the body rising to the chest */}
+        <B at={[0.02, 0.03, 0]} r={[0.042, 0.034, 0.04]} map={TIGER_COAT} />
+        <B at={[-0.01, 0.065, 0]} r={[0.03, 0.042, 0.03]} map={TIGER_COAT} />
+        <B at={[-0.03, 0.06, 0]} r={[0.012, 0.03, 0.022]} color="#f6e8c8" ink={false} />
+        {/* forelegs, straight down to the paws */}
+        {[-1, 1].map((sd) => (
+          <group key={sd}>
+            <mesh geometry={TIGER_GEO.leg} position={[-0.03, 0.03, sd * 0.016]}><meshToonMaterial color="#e8902a" /></mesh>
+            <B at={[-0.038, 0.006, sd * 0.017]} r={[0.016, 0.008, 0.012]} color="#f6e8c8" />
+            {/* the hind paws, out in front of the haunches */}
+            <B at={[0.0, 0.006, sd * 0.034]} r={[0.018, 0.008, 0.012]} color="#f6e8c8" />
+          </group>
+        ))}
+        {/* the tail, curled up along his side */}
+        <mesh geometry={TIGER_GEO.tail} position={[0.04, 0.05, 0.04]} rotation={[0, 0.2, Math.PI / 2 + 0.3]}><meshToonMaterial color="#e8902a" /></mesh>
+        {/* the red cape at his neck, its gold hem */}
+        <mesh geometry={TIGER_GEO.cape} position={[-0.012, 0.1, 0]} rotation-z={0.25}><meshToonMaterial color="#c4302a" side={THREE.DoubleSide} /></mesh>
+        <mesh position={[-0.009, 0.086, 0]} rotation={[Math.PI / 2, 0, 0.25]}><torusGeometry args={[0.045, 0.003, 6, 24]} /><meshToonMaterial color="#d4b04a" /></mesh>
+        {/* the head: big and round, the ruff white at his cheeks, the muzzle */}
+        <group position={[-0.03, 0.135, 0]}>
+          <B at={[0, 0, 0]} r={[0.038, 0.036, 0.04]} map={TIGER_COAT} />
+          {[-1, 1].map((sd) => (
+            <group key={sd}>
+              <B at={[-0.012, -0.012, sd * 0.03]} r={[0.018, 0.02, 0.014]} color="#f6e8c8" />
+              <mesh geometry={TIGER_GEO.ear} position={[0.006, 0.034, sd * 0.024]} rotation-x={sd * 0.35}><meshToonMaterial color="#e8902a" /></mesh>
+              <mesh position={[-0.0035, 0.033, sd * 0.024]} rotation={[sd * 0.35, -Math.PI / 2, 0]} scale={[0.6, 0.7, 1]}>
+                <circleGeometry args={[0.009, 10]} /><meshToonMaterial color="#e8a0a0" />
+              </mesh>
+              {/* eyes: white, a black pupil, under a gold brow */}
+              <B at={[-0.032, 0.008, sd * 0.014]} r={[0.006, 0.008, 0.008]} color="#fbf6e8" ink={false} />
+              <B at={[-0.0375, 0.008, sd * 0.014]} r={[0.003, 0.005, 0.005]} color="#140c08" ink={false} />
+              <mesh position={[-0.034, 0.019, sd * 0.015]} rotation={[sd * 0.3, -Math.PI / 2, 0]}>
+                <boxGeometry args={[0.016, 0.004, 0.003]} /><meshToonMaterial color="#d4b04a" />
+              </mesh>
+            </group>
+          ))}
+          <B at={[-0.034, -0.012, 0]} r={[0.016, 0.014, 0.022]} color="#f6e8c8" />
+          <B at={[-0.049, -0.004, 0]} r={[0.005, 0.004, 0.007]} color="#3a1a10" ink={false} />
+          {/* the mouth open: dark inside, two fangs down, the gold coin held in it */}
+          <B at={[-0.044, -0.022, 0]} r={[0.008, 0.007, 0.014]} color="#5a1a16" ink={false} />
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} geometry={TIGER_GEO.fang} position={[-0.049, -0.016, sd * 0.008]} rotation-z={Math.PI}><meshToonMaterial color="#fbf6e8" /></mesh>
+          ))}
+          <mesh geometry={TIGER_GEO.coin} position={[-0.052, -0.024, 0]} rotation-z={Math.PI / 2}><meshToonMaterial color="#e2b84a" /></mesh>
+        </group>
+      </group>
+    </group>
+  )
+}
+/** the altar shelf's depth, out from the wall: the god at the back, raised, the censer before him */
+const ALTAR_D = 0.38
+/** and its height: up over the beckoning cats' stand below it, by the door */
+const ALTAR_Y = 1.34
 /** how long a stick of incense burns (ms) */
 const INCENSE_MS = 60000
 function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
@@ -835,6 +1041,9 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   })
   return (
     <group>
+      {/* 虎爺 at the back, raised on his dais, looking out over the censer */}
+      <group position={[0.1, 0, 0]}><StaticBatch><TigerIdol /></StaticBatch></group>
+      <group position-x={-0.09}>
       <Inked geometry={ALTAR_GEO.censer} color="#8a6a3a" position-y={0.05} />
       {[0, 1, 2].map((k) => (
         <mesh key={k} geometry={ALTAR_GEO.foot} position={[Math.cos(k * 2.1) * 0.05, 0.008, Math.sin(k * 2.1) * 0.05]}>
@@ -842,23 +1051,22 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         </mesh>
       ))}
       <mesh geometry={ALTAR_GEO.ash} position-y={0.091} rotation-x={-Math.PI / 2}><meshToonMaterial color="#d8d0c0" /></mesh>
-      {/* the packet of incense beside the censer: click it (or the censer) to stand a stick in the ash and light it */}
-      <group position={[-0.01, 0, -0.14]} rotation-y={0.3} onClick={(e) => { e.stopPropagation(); incense?.onLight() }}
-        onPointerOver={() => { if (incense) document.body.style.cursor = 'pointer' }} onPointerOut={() => { document.body.style.cursor = '' }}>
-        <mesh position-y={0.035}><boxGeometry args={[0.035, 0.07, 0.06]} /><meshToonMaterial color="#c4302a" /></mesh>
-        <mesh position={[-0.0181, 0.04, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.04, 0.03]} /><meshToonMaterial color="#f2c62a" /></mesh>
-        {[-0.012, -0.004, 0.006, 0.014].map((z, k) => (
-          <mesh key={z} position={[0, 0.07 + 0.03, z]} rotation-x={(k - 1.5) * 0.06}>
-            <cylinderGeometry args={[0.0022, 0.0022, 0.06 + k * 0.006, 4]} /><meshToonMaterial color="#8a2a1a" />
+      {/* the bundle of incense lying beside the censer, a long paper sleeve with the sticks' ends showing: click it (or
+          the censer) to stand a stick in the ash and light it */}
+      <group position={[-0.03, 0, -0.27]} onClick={(e) => { e.stopPropagation(); incense?.onLight() }} {...(incense ? handOver : {})}>
+        <mesh position-y={0.014}><boxGeometry args={[0.04, 0.026, 0.2]} /><meshToonMaterial color="#c4302a" /></mesh>
+        <mesh position={[-0.0201, 0.014, 0.02]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.07, 0.02]} /><meshToonMaterial color="#f2c62a" /></mesh>
+        {[-0.012, -0.004, 0.004, 0.012].map((x, k) => (
+          <mesh key={x} position={[x, 0.008 + (k % 2) * 0.008, -0.12]} rotation-x={Math.PI / 2}>
+            <cylinderGeometry args={[0.0022, 0.0022, 0.05, 4]} /><meshToonMaterial color="#8a2a1a" />
           </mesh>
         ))}
-        <mesh position-y={0.06} visible={false}><boxGeometry args={[0.12, 0.16, 0.14]} /></mesh>
+        <mesh position-y={0.02} visible={false}><boxGeometry args={[0.1, 0.1, 0.28]} /></mesh>
       </group>
       {/* the stick in the censer, in front, burning down; none there till one's lit, and gone again once it's out */}
       <group position={[-0.03, 0.09, 0]} rotation-z={0.06}
         onClick={(e) => { e.stopPropagation(); incense?.onLight() }}
-        onPointerOver={() => { if (incense) document.body.style.cursor = 'pointer' }}
-        onPointerOut={() => { document.body.style.cursor = '' }}>
+        {...(incense ? handOver : {})}>
         <group ref={stick}>
           <mesh geometry={ALTAR_GEO.stick} position-y={0.1}><meshToonMaterial color="#8a2a1a" /></mesh>
         </group>
@@ -871,7 +1079,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       </group>
       {/* the command flag, stood at the back of the censer: its pole, a gold tip on it, the silk on the pole's upper
           part, a red tassel hanging from its point */}
-      <group position={[0.035, 0.09, 0.03]}>
+      <group position={[0.03, 0.09, -0.05]}>
         <mesh geometry={ALTAR_GEO.pole} position-y={0.17}><meshToonMaterial color="#1a120c" /></mesh>
         <mesh geometry={ALTAR_GEO.knob} position-y={0.342}><meshToonMaterial color="#d4b04a" /></mesh>
         <mesh geometry={ALTAR_GEO.finial} position-y={0.36}><meshToonMaterial color="#d4b04a" /></mesh>
@@ -882,16 +1090,81 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         </group>
         <mesh geometry={ALTAR_GEO.tassel} position={[0, 0.235, -0.17]}><meshToonMaterial color="#c4302a" /></mesh>
       </group>
+      </group>
       {/* the oranges on their dish */}
-      <group position={[0, 0, 0.3]}>
+      <group position={[-0.05, 0, 0.28]}>
         <mesh geometry={ALTAR_GEO.dish} position-y={0.008}><meshToonMaterial color="#e8e2d2" /></mesh>
         {[[0, 0.035, -0.02], [-0.02, 0.035, 0.025], [0.025, 0.035, 0.02], [0, 0.085, 0.008]].map((pt, k) => (
           <mesh key={k} geometry={ALTAR_GEO.fruit} position={pt as [number, number, number]}><meshToonMaterial color="#f08a1a" /></mesh>
         ))}
+        {/* and a hand of bananas leant against them */}
+        <group position={[-0.045, 0.03, 0]} rotation={[0, 0.2, 0.5]}>
+          {[-1, 0, 1].map((k) => (
+            <group key={k} rotation-y={k * 0.28}>
+              <mesh geometry={ALTAR_GEO.banana} rotation-x={Math.PI / 2}><meshToonMaterial color="#f2d23a" /></mesh>
+            </group>
+          ))}
+          <mesh position={[0.07, 0, 0]}><boxGeometry args={[0.014, 0.016, 0.03]} /><meshToonMaterial color="#6a5a2a" /></mesh>
+        </group>
       </group>
     </group>
   )
 }
+
+/**
+ * The drinks fridge customers help themselves from: a dark cabinet with a glass door, lit inside, four shelves of
+ * bottles (beer, sake, oolong tea, ramune), a lit sign over it, the door's long handle. Faces +z (out of the wall).
+ */
+export function DrinkFridge() {
+  const { W, H, D } = FRIDGE
+  const rows = [0.2, 0.5, 0.8, 1.1]
+  return (
+    <StaticBatch>
+      {/* the cabinet: its back part solid, open at the front between its sides, top and foot, lit inside */}
+      <Inked geometry={FRIDGE_GEO.body} color="#2a2c30" position={[0, H / 2, -0.09]} scale={[W, H, D - 0.18]} grow={1.01} />
+      {[-1, 1].map((sd) => <Box key={sd} size={[0.04, H, 0.19]} color="#2a2c30" position={[sd * (W / 2 - 0.02), H / 2, D / 2 - 0.095]} />)}
+      <Box size={[W, 0.16, 0.19]} color="#2a2c30" position={[0, 0.08, D / 2 - 0.095]} />
+      <Box size={[W, 0.1, 0.19]} color="#2a2c30" position={[0, H - 0.05, D / 2 - 0.095]} />
+      <mesh position={[0, H / 2 + 0.03, D / 2 - 0.178]}><planeGeometry args={[W - 0.08, H - 0.26]} /><meshBasicMaterial color="#dfe9ee" /></mesh>
+      {rows.map((y, r) => (
+        <group key={y} position-y={y}>
+          <mesh position={[0, -0.01, D / 2 - 0.08]}><boxGeometry args={[W - 0.08, 0.012, 0.14]} /><meshToonMaterial color="#9aa2a8" /></mesh>
+          {Array.from({ length: 6 }, (_, k) => {
+            const d = DRINKS[(r + Math.floor(k / 3)) % DRINKS.length]
+            return (
+              <group key={k} position={[(k - 2.5) * 0.085, 0, D / 2 - 0.08]}>
+                <mesh position-y={0.07}><cylinderGeometry args={[0.024, 0.026, 0.14, 10]} />
+                  <meshToonMaterial color={d.color} transparent={d.glass} opacity={d.glass ? 0.8 : 1} /></mesh>
+                <mesh position-y={0.16}><cylinderGeometry args={[0.012, 0.022, 0.04, 8]} /><meshToonMaterial color={d.color} /></mesh>
+                <mesh position-y={0.183}><cylinderGeometry args={[0.012, 0.012, 0.008, 8]} /><meshToonMaterial color={d.cap} /></mesh>
+              </group>
+            )
+          })}
+        </group>
+      ))}
+      {/* the glass door, its frame, its handle */}
+      <mesh position={[0, H / 2 + 0.03, D / 2 + 0.004]}><planeGeometry args={[W - 0.06, H - 0.26]} />
+        <meshBasicMaterial color="#cfe4f0" transparent opacity={0.18} depthWrite={false} /></mesh>
+      {[-1, 1].map((sd) => <Box key={sd} size={[0.03, H - 0.24, 0.02]} color="#3a3c42" position={[sd * (W / 2 - 0.03), H / 2 + 0.03, D / 2 + 0.008]} />)}
+      {[0.16, H - 0.1].map((y) => <Box key={y} size={[W - 0.03, 0.03, 0.02]} color="#3a3c42" position={[0, y, D / 2 + 0.008]} />)}
+      <Box size={[0.02, 0.5, 0.03]} color="#b8bcc0" position={[W / 2 - 0.07, H / 2 + 0.05, D / 2 + 0.03]} />
+      {/* the lit sign on top */}
+      <mesh position={[0, H + 0.09, D / 2 - 0.02]}><planeGeometry args={[W, 0.16]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGN} toneMapped={false} /></mesh>
+      <Box size={[W, 0.17, 0.05]} color="#1c1d20" position={[0, H + 0.09, D / 2 - 0.05]} />
+    </StaticBatch>
+  )
+}
+const FRIDGE_GEO = { body: new THREE.BoxGeometry(1, 1, 1) }
+/** the fridge's sign: 飲料 · ドリンク, white on red */
+const FRIDGE_SIGN = canvasTex(192, 48, (g) => {
+  g.fillStyle = '#b8261c'
+  g.fillRect(0, 0, 192, 48)
+  g.fillStyle = '#fff6e0'
+  g.font = 'bold 26px "Zen Antique", "Noto Serif TC", serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText('飲料 · ドリンク', 96, 25)
+})
 
 /** straw wrapping round a sake barrel (菰), the brewer's mark in red and black on its front (the middle, -z) */
 const KOMO = canvasTex(256, 96, (g) => {
@@ -1011,7 +1284,7 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
         <group position-x={0.21} rotation-y={0.4}><SakeBarrel /></group>
         <group position-y={0.43} rotation-y={-0.2}><SakeBarrel /></group>
       </group>
-      <group position={at(-3.6, 3.6)}><PottedBamboo /></group>
+      <group position={at(-4.25, 3.7)}><PottedBamboo /></group>
       <group position={at(1.45, 0.62)} rotation-y={face}><BottleCrates /></group>
     </StaticBatch>
   )

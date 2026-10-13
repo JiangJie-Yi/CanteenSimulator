@@ -40,7 +40,8 @@ PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 KINDS = ["salaryman", "officeLady", "highSchoolGirl", "highSchoolBoy", "grandma", "grandpa", "kid", "uncle",
-         "student", "yukata", "yankee", "bosozoku", "tourist", "civilServant", "maid", "chef", "staffM", "staffF"]
+         "student", "yukata", "yankee", "bosozoku", "tourist", "civilServant", "maid", "gyaru", "chef", "staffM",
+         "staffF"]
 
 # =====================================================================
 # Materials
@@ -371,6 +372,10 @@ STYLE = {
     # knee socks
     "maid": dict(sh=0.88, waist=0.85, hip=0.98, belly=0.0, chest=0.008, sleeves="short", legs="skirt", hair="twin",
                  skirt=(0.3, 0.05, 1.0), collar="tee", socks=0.62, apron=True),
+    # a gyaru (ギャル): bleached hair, a tan, a cropped top and a short skirt, slouched loose socks, platform shoes, and
+    # heavy lashes with flicked liner
+    "gyaru": dict(sh=0.88, waist=0.84, hip=0.98, belly=0.0, chest=0.01, sleeves="short", legs="skirt", hair="long",
+                  skirt=(0.3, 0.035, 1.0), collar="tee", socks=0.48, heels=True),
     # the hired staff, a man and a woman, dressed by the app for their job (as in their pictures, ui/Avatar.tsx): a
     # shirt under what's coloured Top (all white for the cooks, a dark waistcoat for the floor, an olive work jacket
     # for the stock keeper), and the job's things shown or not: the cooks' toque or cap and buttons, the floor's bow
@@ -403,6 +408,7 @@ HAIRS = {
     "tourist": ["side", "messy", "short"],
     "civilServant": ["side", "short"],
     "maid": ["twin", "long", "bob"],
+    "gyaru": ["long", "twin", "updo"],
     "chef": ["crop", "short", "side"],
     "staffM": ["short", "side", "messy"],
     "staffF": ["bob", "long", "bun"],
@@ -605,6 +611,7 @@ FACE = {
     "tourist": dict(wide=0.97, long=1.06, jaw=0.17, chin=0.02, cheek=0.002),
     "civilServant": dict(wide=1.04, long=1.0, jaw=0.08, chin=0.01, cheek=0.006),
     "maid": dict(wide=1.02, long=0.96, jaw=0.13, chin=0.008, cheek=0.009),
+    "gyaru": dict(wide=1.0, long=0.98, jaw=0.12, chin=0.01, cheek=0.008),
     "staffM": dict(wide=1.03, long=1.0, jaw=0.1, chin=0.01, cheek=0.005),
     "staffF": dict(wide=1.0, long=0.98, jaw=0.14, chin=0.01, cheek=0.007),
     "chef": dict(wide=1.06, long=0.99, jaw=0.05, chin=0.008, cheek=0.006),
@@ -721,7 +728,7 @@ def face(kind, hd):
     st = STYLE[kind]
     k = st.get("head", 1.0)
     surf = Surface(hd, HC + Vector((0, 0, (k - 1) * HEAD_R * 0.6)))
-    girl = kind in ("officeLady", "highSchoolGirl", "yukata", "grandma", "maid", "staffF")
+    girl = kind in ("officeLady", "highSchoolGirl", "yukata", "grandma", "maid", "gyaru", "staffF")
     old = kind in ("grandma", "grandpa")
     ex, ez = 0.36, -0.06          # eye yaw and pitch
     tough = st.get("tough", False)
@@ -741,7 +748,7 @@ def face(kind, hd):
         rw, rh = (0.105, 0.16) if girl or kind == "kid" else (0.092, 0.14)
         # (each kind its own eyes, and boldly: big and bright for the kid, the girls and the tourist, small and beady
         # for the uncle, heavy-lidded for the tired office worker and the student)
-        rw, rh = {"kid": (0.125, 0.19), "maid": (0.125, 0.19), "highSchoolGirl": (0.118, 0.18), "tourist": (0.112, 0.16),
+        rw, rh = {"kid": (0.125, 0.19), "maid": (0.125, 0.19), "highSchoolGirl": (0.118, 0.18), "gyaru": (0.12, 0.17), "tourist": (0.112, 0.16),
                   "uncle": (0.06, 0.075), "civilServant": (0.07, 0.095)}.get(kind, (rw, rh))
         sleepy = kind in ("salaryman", "student")
         if tough:
@@ -764,7 +771,11 @@ def face(kind, hd):
         if not sleepy:
             decal_ellipse(bm, surf, y + sd * 0.012, ez + rh * 0.4, rw * 0.36, rh * 0.28, mi["EyeWhite"], off=0.0026)
         decal_ellipse(bm, surf, y - sd * 0.025, ez - rh * 0.43, rw * 0.18, rh * 0.13, mi["EyeWhite"], off=0.0026)
-        if kind in ("kid", "maid", "highSchoolGirl"):
+        if kind == "gyaru":
+            # (her liner, thick along the top lid and flicked out past the corner)
+            decal_strip(bm, surf, [(y - sd * rw * 0.9, ez + rh * 0.85), (y, ez + rh * 1.02), (y + sd * rw * 1.15, ez + rh * 0.8),
+                                   (y + sd * rw * 1.6, ez + rh * 1.0)], [0.0, 0.02, 0.022, 0.0], mi["Lash"], off=0.0025)
+        if kind in ("kid", "maid", "highSchoolGirl", "gyaru"):
             # (a third sparkle, for the starry-eyed)
             decal_ellipse(bm, surf, y + sd * rw * 0.45, ez - rh * 0.05, rw * 0.12, rh * 0.09, mi["EyeWhite"], off=0.0026)
         if girl:
@@ -838,7 +849,7 @@ def face(kind, hd):
     # blush, the lines of age, the uncle's moustache (on the face mesh: they never change)
     bm = bmesh.new()
     for sd in (1, -1):
-        if kind in ("kid", "highSchoolGirl", "yukata", "grandma", "officeLady", "maid"):
+        if kind in ("kid", "highSchoolGirl", "yukata", "grandma", "officeLady", "maid", "gyaru"):
             decal_ellipse(bm, surf, sd * 0.56, -0.3, 0.12, 0.06, mi["Blush"], off=0.0012)
     if old:
         # the lines of age: across the brow, crow's feet at the eyes' corners, down from the nose to the mouth's corners
@@ -896,6 +907,7 @@ def face(kind, hd):
         "tourist": lambda bm: open_d(bm, 0.16, 0.08, tongue=False),
         "kid": lambda bm: open_d(bm, 0.11, 0.1, teeth=False),
         "highSchoolGirl": cat, "maid": cat,
+        "gyaru": lambda bm: open_d(bm, 0.11, 0.055, tongue=False),
         "student": lambda bm: smile(bm, 0.12, 0.03, 0.019, tilt=0.045),
         "yankee": lambda bm: smile(bm, 0.13, 0.0, 0.021, tilt=0.05),
         "bosozoku": lambda bm: smile(bm, 0.15, -0.03, 0.024, tilt=0.045),
@@ -2096,32 +2108,50 @@ def eat(phase):
     return pose
 
 
-def walk(phase):
-    """one step: phase 0..1 over a stride of both feet"""
+def walk(phase, style="man"):
+    """one step: phase 0..1 over a stride of both feet. Each walks their own way: a man's easy stride; a woman's
+    shorter steps, the feet set in toward one line, the hips turning, the arms kept closer in; the middle-aged
+    uncle's heavier gait, leaning back a touch, the feet wide, the arms out; the old folk stooped forward, short
+    shuffling steps on bent knees, the hands held behind the back"""
     a = math.sin(2 * math.pi * phase)
     c = math.cos(2 * math.pi * phase)
+    st = {"man": dict(step=0.45, lean=-0.04, twist=0.06, wide=0.02, arm=0.5, out=0.3, knee=0.08, bob=0.012),
+          "woman": dict(step=0.32, lean=-0.02, twist=0.11, wide=-0.02, arm=0.32, out=0.16, knee=0.06, bob=0.008),
+          "uncle": dict(step=0.36, lean=0.05, twist=0.04, wide=0.07, arm=0.32, out=0.45, knee=0.06, bob=0.016),
+          "old": dict(step=0.22, lean=-0.32, twist=0.03, wide=0.04, arm=0.0, out=0.2, knee=0.3, bob=0.006)}[style]
 
     def pose():
-        move_hips(0.46 - 0.008 + 0.012 * abs(c), 0)
-        aim("spine", (0, -0.04, 1), twist=0.06 * a)
-        aim("chest", (0, -0.05, 1), twist=-0.1 * a)
-        aim("head", (0, 0.0, 1), twist=0.04 * a)
+        move_hips(0.46 - 0.008 - (0.03 if style == "old" else 0) + st["bob"] * abs(c), 0)
+        aim("spine", (0, st["lean"], 1), twist=st["twist"] * a)
+        aim("chest", (0, st["lean"] * 0.8 - 0.01, 1), twist=-st["twist"] * 1.4 * a)
+        # (the old look up ahead from their stoop)
+        aim("head", (0, 0.25 if style == "old" else 0.0, 1), twist=0.04 * a)
         for s, sd in (("L", 1), ("R", -1)):
             sw = a * sd
-            aim(f"thigh.{s}", (sd * 0.02, -0.45 * sw, -1))
-            knee = max(0.0, -math.sin(2 * math.pi * phase + 0.6) * sd) * 0.9 + 0.08
-            aim(f"shin.{s}", (0, -0.45 * sw + knee, -1))
+            aim(f"thigh.{s}", (sd * st["wide"], -st["step"] * sw - (0.12 if style == "old" else 0), -1))
+            knee = max(0.0, -math.sin(2 * math.pi * phase + 0.6) * sd) * 0.9 * st["step"] / 0.45 + st["knee"]
+            aim(f"shin.{s}", (0, -st["step"] * sw + knee, -1))
             aim(f"foot.{s}", (sd * 0.04, -1, -0.3 + max(0, sw) * 0.3))
             aim(f"clavicle.{s}", (sd, 0, 0.02))
-            aim(f"upperarm.{s}", (sd * 0.3, 0.5 * sw, -1))
-            aim(f"forearm.{s}", (sd * 0.25, 0.5 * sw - 0.35 - max(0, -sw) * 0.4, -1))
-            aim(f"hand.{s}", (sd * 0.12, 0.5 * sw - 0.3, -1))
+            if style == "old":
+                # (hands clasped behind, at the small of the back)
+                aim(f"upperarm.{s}", (sd * 0.25, 0.55, -1))
+                aim(f"forearm.{s}", (-sd * 0.6, 0.55, -0.15))
+                aim(f"hand.{s}", (-sd * 0.8, 0.3, -0.2))
+                continue
+            aim(f"upperarm.{s}", (sd * st["out"], st["arm"] * sw, -1))
+            aim(f"forearm.{s}", (sd * st["out"] * 0.8, st["arm"] * sw - 0.35 - max(0, -sw) * 0.4, -1))
+            aim(f"hand.{s}", (sd * 0.12, st["arm"] * sw - 0.3, -1))
     return pose
 
 
 action("Sit", [(0, sit(0)), (36, sit(0.025)), (72, sit(0))])
 action("Eat", [(0, eat(0)), (14, eat(0.6)), (22, eat(1)), (32, eat(1)), (44, eat(0.4)), (56, eat(0)), (72, eat(0))])
 action("Walk", [(i * 3, walk(i / 8)) for i in range(9)])
+# (the others' strides take their own time: quick little steps, a heavier tread, a slow shuffle)
+action("WalkF", [(i * 3, walk(i / 8, "woman")) for i in range(9)])
+action("WalkU", [(i * 4, walk(i / 8, "uncle")) for i in range(9)])
+action("WalkO", [(i * 5, walk(i / 8, "old")) for i in range(9)])
 
 
 def cook(phase):

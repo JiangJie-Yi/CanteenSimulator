@@ -45,18 +45,19 @@ function lookOf(id: number, kind: Kind): Look {
     student: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukata: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
     yankee: pick(['#15161c', '#1c2440'], id), bosozoku: pick(['#f2efe8', '#4a2a5e', '#1a1a20'], id),
     tourist: pick(['#e8d24a', '#4aa8d8', '#e86a4a', '#f2f0ea'], id), civilServant: pick(['#4a4e56', '#3a4250'], id), maid: '#1c1c24',
+    gyaru: pick(['#f06aa0', '#f2f0ea', '#1c1c22', '#f2c62a'], id),
   }
   return {
     top: top[kind],
     legs: kind === 'highSchoolGirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a'
       : kind === 'student' ? '#3a4a6a' : kind === 'grandma' ? '#5a4a3e' : kind === 'yukata' || kind === 'bosozoku' ? top[kind]
-        : kind === 'yankee' ? '#15161c' : kind === 'tourist' ? '#a8946a' : kind === 'civilServant' ? top[kind] : kind === 'maid' ? '#1c1c24' : '#2f2f36',
+        : kind === 'yankee' ? '#15161c' : kind === 'tourist' ? '#a8946a' : kind === 'civilServant' ? top[kind] : kind === 'maid' ? '#1c1c24' : kind === 'gyaru' ? pick(['#2a2a32', '#3a5a8a', '#c43a6a'], id + 1) : '#2f2f36',
     // (the rough lot bleach it, or dye it red-brown, as often as not)
-    hair: kind === 'tourist' ? pick(['#e8cc80', '#b07a40', '#c0602a', '#2b1d14'], id) : kind === 'maid' ? pick(['#e88ab0', '#1c1c22', '#8a5a3a', '#e8cc80', '#a8c8e8'], id)
+    hair: kind === 'gyaru' ? pick(['#f0d090', '#e8b860', '#c8884a', '#f2e2b8'], id) : kind === 'tourist' ? pick(['#e8cc80', '#b07a40', '#c0602a', '#2b1d14'], id) : kind === 'maid' ? pick(['#e88ab0', '#1c1c22', '#8a5a3a', '#e8cc80', '#a8c8e8'], id)
       : old ? '#d4d4d4' : kind === 'yankee' || kind === 'bosozoku' ? pick(['#e2b85a', '#1c1c22', '#a8542a'], id) : pick(HAIR, id * 3),
     // (a visitor from abroad as like as not fairer, or darker, than anyone local)
-    skin: kind === 'tourist' ? pick(['#f8e2d0', '#f6d8c4', '#8a5a3a', '#c99470'], id) : pick(SKIN, id * 7 + 1),
-    shoes: kind === 'maid' ? '#1a1a1a' : kind === 'student' || kind === 'kid' || kind === 'tourist' ? '#f2f0ea' : kind === 'yukata' ? '#b08a5a' : '#2a2220',
+    skin: kind === 'gyaru' ? pick(['#c99470', '#b8805a', '#d8a880'], id) : kind === 'tourist' ? pick(['#f8e2d0', '#f6d8c4', '#8a5a3a', '#c99470'], id) : pick(SKIN, id * 7 + 1),
+    shoes: kind === 'maid' ? '#1a1a1a' : kind === 'gyaru' ? '#f2f0ea' : kind === 'student' || kind === 'kid' || kind === 'tourist' ? '#f2f0ea' : kind === 'yukata' ? '#b08a5a' : '#2a2220',
     size: kind === 'kid' ? 0.78 : kind === 'grandma' ? 0.93 : 1,
     topCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', grandma: 'floret', grandpa: 'knit', kid: 'border', uncle: 'hibiscus',
       student: 'plaid', yukata: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
@@ -299,6 +300,8 @@ function useRigged(id: number, kind: Kind, glasses: boolean, phones: boolean,
     })
     // (no two heads quite the same: a few percent wider or narrower, longer or shorter; the actions never scale it)
     head?.scale.set(0.95 + 0.1 * hash(id, 3), 0.97 + 0.06 * hash(id, 5), 0.97 + 0.06 * hash(id, 3))
+    // and the face's shape, one of four: round, long, square-jawed, or a narrow pointed one (瓜子臉)
+    if (head) shapeFace(root, head, FACES[Math.floor(hash(id, 31) * FACES.length)])
     return { root, mixer, actions, head, hand, handL, eyes, shut, mouth, open, face, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0) }
   }, [gltf, id, kind, glasses, phones, lookGiven, styleGiven, showGiven])
   // (when they've gone, let go of what the GPU holds for them: each skeleton's bone texture, their own materials;
@@ -313,6 +316,69 @@ function useRigged(id: number, kind: Kind, glasses: boolean, phones: boolean,
     })
   }, [r])
   return r
+}
+
+/**
+ * How each kind walks (the model's own actions): the women their own way, quick light steps; the middle-aged uncle a
+ * heavier tread; the old folk a slow stooped shuffle; the rest a man's easy stride. And how fast, for the same.
+ */
+export const walkOf = (kind: string) => kind === 'grandma' || kind === 'grandpa' ? 'WalkO' : kind === 'uncle' ? 'WalkU'
+  : ['officeLady', 'highSchoolGirl', 'yukata', 'maid', 'gyaru', 'staffF'].includes(kind) ? 'WalkF' : 'Walk'
+export const walkSpeedOf = (kind: string) => ({ WalkO: 0.55, WalkU: 0.82, WalkF: 0.92, Walk: kind === 'kid' ? 1.12 : 1 })[walkOf(kind)]
+/** the shapes a face can have */
+const FACES = ['round', 'long', 'square', 'oval'] as const
+/**
+ * Reshape this copy's head (and all that sits on it: its face, its hair, its hat) to one of the face shapes, moving
+ * the vertices that ride on the head bone about the head's middle: rounder and broader, longer and narrower, a wide
+ * square jaw, or narrowing to a pointed chin. Shared geometry is copied first, so only this one changes.
+ */
+function shapeFace(root: THREE.Object3D, head: THREE.Bone, shape: (typeof FACES)[number]) {
+  const meshes: THREE.SkinnedMesh[] = []
+  root.traverse((o) => { if (o instanceof THREE.SkinnedMesh && o.material !== outlineMaterial) meshes.push(o) })
+  root.traverse((o) => { if (o instanceof THREE.SkinnedMesh && o.material === outlineMaterial) meshes.push(o) })
+  if (!meshes.length) return
+  const hi = meshes[0].skeleton.bones.indexOf(head)
+  if (hi < 0) return
+  const onHead = (g: THREE.BufferGeometry, i: number) => {
+    const si = g.attributes.skinIndex, sw = g.attributes.skinWeight
+    for (let k = 0; k < 4; k++) if (si.getComponent(i, k) === hi && sw.getComponent(i, k) >= 0.5) return true
+    return false
+  }
+  // the head's middle and size, from the skin on it
+  const skin = meshes.find((m) => (m.material as THREE.Material).name === 'Skin')
+  if (!skin) return
+  const box = new THREE.Box3(), v = new THREE.Vector3()
+  const sp = skin.geometry.attributes.position
+  for (let i = 0; i < sp.count; i++) if (onHead(skin.geometry, i)) box.expandByPoint(v.fromBufferAttribute(sp, i).applyMatrix4(skin.bindMatrix))
+  if (box.isEmpty()) return
+  const c = box.getCenter(new THREE.Vector3()), R = (box.max.y - box.min.y) / 2
+  const inv = new THREE.Matrix4()
+  for (const m of meshes) {
+    if (!m.userData.own) {
+      m.geometry = m.geometry.clone()
+      m.userData.own = true
+    }
+    const g = m.geometry, p = g.attributes.position
+    inv.copy(m.bindMatrix).invert()
+    for (let i = 0; i < p.count; i++) {
+      if (!onHead(g, i)) continue
+      v.fromBufferAttribute(p, i).applyMatrix4(m.bindMatrix).sub(c)
+      const low = Math.min(1, Math.max(0, -v.y / R))
+      const lo = low * Math.sqrt(low)
+      let sx = 1, sy = 1
+      if (shape === 'round') { sx = 1.07; sy = 0.95 }
+      else if (shape === 'long') { sx = 0.93; sy = 1.06 + 0.06 * low }
+      else if (shape === 'square') { sx = 1 + 0.2 * lo; sy = 1 - 0.06 * low }
+      else { sx = 1 - 0.24 * lo; sy = 1 + 0.1 * low }
+      v.x *= sx
+      v.z *= shape === 'round' ? 1.03 : shape === 'oval' ? 1 - 0.08 * lo : 1
+      v.y *= sy
+      v.add(c).applyMatrix4(inv)
+      p.setXYZ(i, v.x, v.y, v.z)
+    }
+    p.needsUpdate = true
+    g.computeBoundingSphere()
+  }
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
@@ -350,7 +416,7 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
   const spellOf = (t: number) => Math.floor((t + id * 9) / 24)
   const [spell, setSpell] = useState(() => spellOf(timeNow()))
   const idle = (['Sit', 'Phone', 'Chin', 'Phone', 'Sit', 'Chin'] as const)[Math.floor(hash(id, spell) * 6)]
-  const now = walking ? 'Walk' : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idleGiven ?? idle
+  const now = walking ? walkOf(kind) : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idleGiven ?? idle
   useEffect(() => {
     const next = r.actions[now]
     if (!next) return

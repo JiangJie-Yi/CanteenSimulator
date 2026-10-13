@@ -8,14 +8,14 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
-import { Person, StaffFigure, moodOf } from '@/scene/Person3D'
+import { Person, StaffFigure, moodOf, walkSpeedOf } from '@/scene/Person3D'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
-import { DiningWall, ShopProps } from './DiningRoom'
+import { DiningWall, DrinkFridge, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SERVICE, BAR_GATES, TILL, TOILETS, gateOf, toiletsOf, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -579,8 +579,11 @@ function Counter({ length }: { length: number }) {
 }
 
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcBack'; t: number
-  /** (at the toilet) which, and the way there from their stool; told to go home meanwhile, they do once they're back */
-  wc?: { who: 'm' | 'f'; path: THREE.Vector3[]; len: number }
+  /** (off to the toilet, or to the fridge for a drink) where, and the way there from their stool; told to go home
+   * meanwhile, they do once they're back */
+  wc?: { who: 'm' | 'f' | 'drink'; path: THREE.Vector3[]; len: number }
+  /** what they've fetched from the fridge, stood by their plate */
+  drink?: DrinkId
   leaving?: boolean
   /** how much of them shows (fading out as they go out of the door) */
   fade?: number }
@@ -589,6 +592,12 @@ const HER = new Set(['officeLady', 'highSchoolGirl', 'yukata', 'grandma', 'maid'
 /** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
 const WC_RATE = 1 / 240
 const WC_STAY = 6
+/** and to go and get themselves a drink from the fridge (once), and how long they stand choosing */
+const DRINK_RATE = 1 / 70
+const DRINK_STAY = 1.6
+/** what each kind of customer takes from the fridge: the children a ramune, the old folk tea, the rest any */
+const drinkFor = (kind: string, id: number): DrinkId => kind === 'kid' ? 'ramune' : kind === 'grandma' || kind === 'grandpa' ? 'oolong'
+  : kind === 'highSchoolGirl' || kind === 'highSchoolBoy' ? (id % 2 ? 'ramune' : 'oolong') : (['beer', 'sake', 'oolong', 'beer', 'ramune'] as const)[id % 5]
 
 /** a plate on its way to a seat ('serve'), set at it ('set'), or being cleared away ('clear', after a pause) */
 type PlateRun = { key: number; seat: number; guest: number; phase: 'serve' | 'carry' | 'set' | 'clear'; t: number; from: THREE.Vector3
@@ -634,7 +643,7 @@ function Plate({ dirty = false }: { dirty?: boolean }) {
 }
 
 export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
-  speech = {}, servers = [], incense }:
+  speech = {}, servers = [], incense, onDrink }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
@@ -646,6 +655,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     people?: boolean
     /** what each customer's saying just now, shown over their head */
     speech?: Record<number, { key: number; text: string }>
+    /** a customer's taken a drink from the fridge (it's paid for) */
+    onDrink?: (guest: number, drink: DrinkId) => void
     /** the incense on the altar by the door (lit when, and lighting another) */
     incense?: { litAt: number | null; onLight: () => void }
     /** the servers on the floor: they carry what's put out at the pass to the customers, a plate with it */
@@ -662,6 +673,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const counters = useMemo(() => given ?? singleCounter(at, length), [given, at, length])
   const seats = useMemo(() => seatsOf(counters), [counters])
   const wcs = useMemo(() => (given ? toiletsOf(counters) : null), [counters, given])
+  const fridge = useMemo(() => (given ? fridgeOf(counters) : null), [counters, given])
   /** a couple sat side by side turn to talk: the one at the next stool along is on the left (+1), the one before on
    * the right (-1); 0 while the other isn't sat there yet (or has gone) */
   const talkSide = (s: Shown) => {
@@ -742,13 +754,19 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     waiters.current = servers.slice(0, homes.length).map((_, i) => ({ phase: 'idle', t: 0, seat: -1, keys: [], run: null, path: [], len: 0,
       pos: homes[i].at.clone(), yaw: homes[i].yaw }))
     SERVICE.servers = Math.min(homes.length, servers.length)
-    return () => { SERVICE.servers = 0 }
+    return () => {
+      SERVICE.servers = 0
+      SEATS_TAKEN.clear()
+    }
   }, [servers.length, homes])
   /** a point in the bar's frame, in the shop's (where Roasting has the food) */
   const toShop = (v: THREE.Vector3) => v.clone().multiplyScalar(scale).add(offset ?? new THREE.Vector3())
-  const cleanAt = (k: number) => counters[0].at.clone().addScaledVector(ALONG, -counters[0].length / 2 + 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP)
+  // (the shop laid out in full keeps its plates inside, on the cook's table by the pass: they're handed over the bar)
+  const cleanAt = (k: number) => (given ? PLATE_STACKS.clean.clone().setY(KITCHEN_TOP + k * STACK_GAP)
+    : counters[0].at.clone().addScaledVector(ALONG, -counters[0].length / 2 + 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP))
   // (in from the first counter's far end, clear of the staff's gate there)
-  const dirtyAt = (k: number) => counters[0].at.clone().addScaledVector(ALONG, counters[0].length / 2 - (given ? 0.75 : 0.25)).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP)
+  const dirtyAt = (k: number) => (given ? PLATE_STACKS.dirty.clone().setY(KITCHEN_TOP + k * STACK_GAP)
+    : counters[0].at.clone().addScaledVector(ALONG, counters[0].length / 2 - 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP))
 
   // the plates: those out at the seats (or on their way), and the two stacks
   const [, setTick] = useState(0)
@@ -826,7 +844,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (s.phase === 'enter') {
         // in through the noren, along the aisle behind the stools (round the corner, for the other counter), and
         // in to their own stool
-        const d = Math.min(len, s.t * SPEED)
+        const d = Math.min(len, s.t * SPEED * walkSpeedOf(kindOf(s.id).kind))
         const { p, dir } = alongPath(path, d)
         g?.position.copy(p)
         if (g) g.rotation.y = d < len ? Math.atan2(dir.x, dir.z) : st.yaw
@@ -840,7 +858,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (g) g.rotation.y = st.yaw
         // (now and then, while they wait, off to the toilet: their kind's own)
         const guest = guestsRef.current.find((x) => x.id === s.id)
-        if (wcs && guest?.state === 'waiting' && Math.random() < WC_RATE * Math.min(dt, 0.1)) {
+        if (fridge && guest?.state === 'waiting' && !s.drink && Math.random() < DRINK_RATE * Math.min(dt, 0.1)) {
+          const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
+          const path = [st.stool.clone(), st.aisle.clone(), ...turn, fridge.aisle.clone(), fridge.front.clone()]
+          s.wc = { who: 'drink', path, len: pathLength(path) }
+          s.phase = 'wcGo'
+          s.t = 0
+        } else if (wcs && guest?.state === 'waiting' && Math.random() < WC_RATE * Math.min(dt, 0.1)) {
           const who = HER.has(kindOf(s.id).kind) ? 'f' : 'm'
           const w = wcs[who]
           const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
@@ -852,7 +876,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       } else if (s.phase === 'wcGo' || s.phase === 'wcBack') {
         // to the door, which slides open as they come up to it, in, and later back out to their stool
         const w = s.wc!
-        const d = Math.min(w.len, s.t * SPEED)
+        const d = Math.min(w.len, s.t * SPEED * walkSpeedOf(kindOf(s.id).kind))
         const { p, dir } = alongPath(w.path, s.phase === 'wcGo' ? d : w.len - d)
         g?.position.copy(p)
         if (g) g.rotation.y = s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z)
@@ -861,13 +885,20 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.t = 0
         }
       } else if (s.phase === 'wcIn') {
-        if (s.t > WC_STAY) {
+        // (at the fridge: facing it, choosing; then their drink in hand, back to their stool)
+        if (s.wc?.who === 'drink' && g && fridge) g.rotation.y = fridge.yaw + Math.PI
+        if (s.t > (s.wc?.who === 'drink' ? DRINK_STAY : WC_STAY)) {
+          if (s.wc?.who === 'drink' && !s.drink) {
+            s.drink = drinkFor(kindOf(s.id).kind, s.id)
+            onDrink?.(s.id, s.drink)
+            redraw()
+          }
           s.phase = 'wcBack'
           s.t = 0
         }
       } else {
         // a moment to get up, then off the way they came
-        const d = Math.max(0, Math.min(len, (s.t - 0.8) * SPEED))
+        const d = Math.max(0, Math.min(len, (s.t - 0.8) * SPEED * walkSpeedOf(kindOf(s.id).kind)))
         const { p, dir } = alongPath(path, len - d)
         g?.position.copy(p)
         if (g) g.rotation.y = s.t < 0.8 ? st.yaw : Math.atan2(-dir.x, -dir.z)
@@ -875,8 +906,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (out of the door they fade away, the last stretch)
         s.fade = Math.min(1, (len - d) / 0.9)
       }
-      if (g) g.visible = s.phase !== 'wcIn'
+      if (g) g.visible = !(s.phase === 'wcIn' && s.wc?.who !== 'drink')
     }
+    SEATS_TAKEN.clear()
+    for (const x of shown) SEATS_TAKEN.add(x.seat)
     // the toilets' doors open for whoever's going through them just now
     if (wcs) for (const who of ['m', 'f'] as const) {
       TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack' || x.phase === 'wcIn')
@@ -1108,7 +1141,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const c0 = counters[0]
         if (i === 0) {
           const back = Math.min(-c.length / 2 - 0.35, ...counters.slice(1).map((o) =>
-            o.at.clone().addScaledVector(o.lay, FLOOR_FAR).sub(c.at).dot(c.along)))
+            o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c.at).dot(c.along)))
           return (
             <group key={i}>
               <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} bare={!!given} />
@@ -1125,9 +1158,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const corner = (FLOOR_FAR - c.at.clone().sub(c0.at).dot(c0.lay)) / c.along.dot(c0.lay)
         return (
           <group key={i}>
-            <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} bare={!!given} />
+            <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
-            {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={FLOOR_FAR} lamps={2} top={top} door={(meet + corner) / 2} />}
+            {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lamps={2} top={top} door={(meet + corner) / 2} />}
           </group>
         )
       })}
@@ -1145,6 +1178,34 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <group key={n} position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>
         ))}
       </StaticBatch>
+      {fridge && <group name="look-fridge" position={fridge.at} rotation-y={fridge.yaw}><DrinkFridge /></group>}
+      {/* what each has fetched from the fridge, stood beside their plate, toward the cook */}
+      {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => {
+        const st = seats[s.seat], c = counters[st.counter]
+        const d = DRINKS.find((x) => x.id === s.drink)!
+        const at = st.plate.clone().addScaledVector(c.along, 0.17).addScaledVector(c.lay, 0.1).setY(top)
+        return (
+          <group key={`drink${s.id}`} position={at}>
+            <mesh position-y={0.06}><cylinderGeometry args={[0.022, 0.024, 0.12, 12]} />
+              <meshToonMaterial color={d.color} transparent={d.glass} opacity={d.glass ? 0.75 : 1} /></mesh>
+            <mesh position-y={0.13}><cylinderGeometry args={[0.012, 0.02, 0.025, 10]} /><meshToonMaterial color={d.color} /></mesh>
+            <mesh position-y={0.145}><cylinderGeometry args={[0.012, 0.012, 0.008, 10]} /><meshToonMaterial color={d.cap} /></mesh>
+          </group>
+        )
+      })}
+      {/* each seated customer's soy, poured into the little dish at their place (empty till they sit), a dab of
+          grated daikon in it */}
+      {given && shown.filter((s) => s.phase !== 'enter' && s.phase !== 'leave').map((s) => {
+        const st = seats[s.seat], c = counters[st.counter]
+        const x = st.plate.clone().sub(c.at).dot(c.along)
+        const at = st.plate.clone().addScaledVector(c.along, sauceSide(c, BAR_GATES[st.counter], x)).addScaledVector(c.lay, 0.13).setY(top + 0.013)
+        return (
+          <group key={`soy${s.id}`} position={at}>
+            <mesh rotation-x={-Math.PI / 2}><circleGeometry args={[0.03, 16]} /><meshToonMaterial color="#3a1c0c" /></mesh>
+            <mesh position={[0.008, 0.004, 0.004]} scale={[1, 0.5, 1]}><sphereGeometry args={[0.011, 8, 6]} /><meshToonMaterial color="#f2efe4" /></mesh>
+          </group>
+        )
+      })}
       {/* the clean stack, the dirty one, and the plates out at the seats */}
       {clean.current.map((_, i) => (
         <group key={`c${i}`} ref={(o) => { cleanObjs.current[i] = o; if (o && !o.userData.placed) { o.userData.placed = true; o.position.copy(cleanAt(i)) } }}>

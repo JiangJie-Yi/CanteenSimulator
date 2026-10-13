@@ -3,7 +3,7 @@
 import type { Lang } from './i18n'
 
 export type GuestKind = 'salaryman' | 'officeLady' | 'highSchoolGirl' | 'highSchoolBoy' | 'grandma' | 'grandpa' | 'kid'
-  | 'uncle' | 'student' | 'yukata' | 'yankee' | 'bosozoku' | 'tourist' | 'civilServant' | 'maid'
+  | 'uncle' | 'student' | 'yukata' | 'yankee' | 'bosozoku' | 'tourist' | 'civilServant' | 'maid' | 'gyaru'
 
 /** who they are, and how often they come in (the weights against each other: the rough lot only now and then) */
 export const KINDS: { kind: GuestKind; zh: string; ja: string; weight: number }[] = [
@@ -22,6 +22,7 @@ export const KINDS: { kind: GuestKind; zh: string; ja: string; weight: number }[
   { kind: 'tourist', zh: '外國觀光客', ja: '外国人観光客', weight: 6 },
   { kind: 'civilServant', zh: '公務員', ja: '公務員', weight: 7 },
   { kind: 'maid', zh: '女僕 Coser', ja: 'メイドさん', weight: 3 },
+  { kind: 'gyaru', zh: '辣妹', ja: 'ギャル', weight: 7 },
 ]
 
 const TOTAL = KINDS.reduce((n, k) => n + k.weight, 0)

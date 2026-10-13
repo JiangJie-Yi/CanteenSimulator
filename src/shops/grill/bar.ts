@@ -8,7 +8,9 @@ import * as THREE from 'three'
  */
 export type Counter = { at: THREE.Vector3; along: THREE.Vector3; lay: THREE.Vector3; length: number; seats: number
   /** its stools moved along it this far from evenly spaced about its middle (clear of a gate at one end) */
-  shift?: number }
+  shift?: number
+  /** how far behind its middle line its wall stands (FLOOR_FAR unless it's further back, to make room by it) */
+  far?: number }
 export type Seat = {
   /** on the counter top (y 0: set the top's height yourself): where the plate goes */
   plate: THREE.Vector3
@@ -30,12 +32,19 @@ export const AISLE = 1.15
  * cook's edge's reach) back to the wall behind the aisle; the kitchen's floor starts where it stops */
 export const FLOOR_NEAR = 0.42
 export const FLOOR_FAR = -(AISLE + 0.5)
+/** where a counter's wall stands, behind its middle line */
+export const farOf = (c: Counter) => c.far ?? FLOOR_FAR
 
 /**
  * The seats with a customer's plate set down at them just now (GuestBar3D keeps it, every frame): what's grilled for
  * someone is only carried over once their plate's there, so it never lands on the bare bar before it.
  */
 export const PLATES_SET = new Set<number>()
+/**
+ * The stools someone's at in the 3D room just now (GuestBar3D): sat there, on their way to it, away at the toilet, or
+ * still getting up and going. Nobody new is given one of these, though the shop's done with whoever had it.
+ */
+export const SEATS_TAKEN = new Set<number>()
 
 /**
  * Serving through the pass, when there's a server on the floor: what's grilled is put out at the pass (the end of the
@@ -70,6 +79,30 @@ export function gateOf(c: Counter, g: { end: 1 | -1; w: number; leaf: number }) 
   const hinge = g.end * ((c.length + 0.2) / 2 - g.w)
   return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, 0.08) }
 }
+/**
+ * The little dish of sauce at a seat (the bar's frame, on its top): to the customer's left of their place, or their
+ * right at a seat where the left would be off the top, by a gate. Its offset along the counter, given its seat's.
+ */
+export function sauceSide(c: Counter, gate: { end: 1 | -1; w: number } | undefined, x: number) {
+  const topX0 = -(c.length + 0.3) / 2 + (gate && gate.end < 0 ? gate.w : 0)
+  return x - 0.2 - 0.06 < topX0 ? 0.2 : -0.2
+}
+/** things in the room that can be clicked (the toilets' doors, the altar's incense): how many are under the pointer */
+export const POINTER_HINT = { hand: 0 }
+/** handlers for one of those: a hand over it */
+export const handOver = {
+  onPointerOver: (e: { stopPropagation: () => void; nativeEvent: Event }) => {
+    e.stopPropagation()
+    POINTER_HINT.hand++
+    const el = e.nativeEvent.target as HTMLElement | null
+    if (el?.style) el.style.cursor = 'pointer'
+  },
+  onPointerOut: (e: { nativeEvent: Event }) => {
+    POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand - 1)
+    const el = e.nativeEvent.target as HTMLElement | null
+    if (el?.style && !POINTER_HINT.hand) el.style.cursor = ''
+  },
+}
 /** each toilet's door's width */
 export const WC_W = 0.82
 /**
@@ -86,10 +119,30 @@ export function toiletsOf(cs: Counter[]) {
   const one = (k: number) => {
     const z = door + k * (WC_W / 2 + 0.06)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
-    return { z, front: at(FLOOR_FAR + 0.45), aisle: at(-AISLE), inside: at(FLOOR_FAR - 0.45) }
+    return { z, front: at(farOf(c) + 0.45), aisle: at(-AISLE), inside: at(farOf(c) - 0.45) }
   }
   return { door, m: one(-1), f: one(1) }
 }
+/** the drinks fridge against the side counter's wall, just along from the toilets: where it stands (along that
+ * counter, and out from its middle line), the way it faces, and the spot before it where a customer helps themselves */
+export function fridgeOf(cs: Counter[]) {
+  const t = toiletsOf(cs)
+  if (!t) return null
+  const c = cs[1]
+  const z = t.m.z - WC_W / 2 - 0.12 - FRIDGE.W / 2 - 0.05
+  const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
+  return { at: at(farOf(c) + FRIDGE.D / 2 + 0.01), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE.D + 0.32), aisle: at(-AISLE) }
+}
+/** the fridge's size: across, up, deep */
+export const FRIDGE = { W: 0.62, H: 1.55, D: 0.36 }
+/** what's in it, and what each costs (NT$) */
+export const DRINKS = [
+  { id: 'beer', zh: '啤酒', ja: 'ビール', price: 120, color: '#c88a2a', cap: '#d4b04a', glass: false },
+  { id: 'sake', zh: '清酒', ja: '日本酒', price: 150, color: '#e8eef0', cap: '#c4302a', glass: true },
+  { id: 'oolong', zh: '烏龍茶', ja: 'ウーロン茶', price: 50, color: '#9a5a1a', cap: '#2a6a3a', glass: false },
+  { id: 'ramune', zh: '彈珠汽水', ja: 'ラムネ', price: 60, color: '#8ad0e8', cap: '#2a6ab0', glass: true },
+] as const
+export type DrinkId = (typeof DRINKS)[number]['id']
 /** the toilets' doors: how many are going through each just now (GuestBar3D), and whether the player's opened it */
 export const TOILETS = { m: { passing: 0, open: false }, f: { passing: 0, open: false } }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __toilets?: typeof TOILETS }).__toilets = TOILETS
@@ -114,7 +167,7 @@ export function roomOf(cs: Counter[]) {
   }
   // (the first counter's floor runs on past its end to the door, with the till's strip behind it)
   add(c0, [-c0.length / 2 - 0.35, c0.length / 2 + 1.45], [FLOOR_FAR, 1.1])
-  for (const c of cs.slice(1)) add(c, [-c.length / 2 - 0.35, c.length / 2], [FLOOR_FAR, FLOOR_NEAR])
+  for (const c of cs.slice(1)) add(c, [-c.length / 2 - 0.35, c.length / 2], [farOf(c), FLOOR_NEAR])
   const al = pts.map((p) => p.clone().sub(c0.at).dot(c0.along)), ly = pts.map((p) => p.clone().sub(c0.at).dot(c0.lay))
   return { along: [Math.min(...al), Math.max(...al)] as [number, number], lay: [Math.min(...ly), Math.max(...ly)] as [number, number] }
 }
@@ -180,7 +233,9 @@ export const singleCounter = (at: THREE.Vector3, length: number): Counter[] => [
  */
 export const GRILL_COUNTERS: Counter[] = [
   { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35), along: ALONG, lay: LAY, length: 5.2, seats: 6 },
-  { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4, shift: 0.25 },
+  { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4, shift: 0.25,
+    // (its wall set further back, for the drinks fridge by the toilets)
+    far: FLOOR_FAR - 0.45 },
 ]
 export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)
 /**
@@ -197,5 +252,16 @@ export const GRILL_BAR_RISE = 0.12
 const GRILL_PIVOT = new THREE.Vector3().addScaledVector(LAY, -2.14).addScaledVector(ALONG, -2.44)
 /** where the scaled bar's group goes (with scale GRILL_SCALE) */
 export const GRILL_OFFSET = GRILL_PIVOT.clone().multiplyScalar(1 - GRILL_SCALE).setY(GRILL_BAR_RISE - GRILL_BAR_TOP * GRILL_SCALE)
+/**
+ * Where the customers' plates are kept (the bar's frame, on the cook's table, inside, by the pass): the clean stack
+ * and the dirty one beside it, back from the bar where the customers can't reach; and the height of that table's top.
+ */
+export const PLATE_STACKS = (() => {
+  const c0 = { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35) }
+  const at = (along: number, lay: number) => c0.at.clone().addScaledVector(ALONG, along).addScaledVector(LAY, lay)
+  return { clean: at(-1.78, 0.62), dirty: at(-1.4, 0.62) }
+})()
 /** a point given in the bar's own sizes, where it is in the scene as drawn */
 export const toGrillScene = (v: THREE.Vector3) => v.clone().multiplyScalar(GRILL_SCALE).add(GRILL_OFFSET)
+/** the cook's table's top (the scene's y = 0), in the bar's own frame */
+export const KITCHEN_TOP = -GRILL_OFFSET.y / GRILL_SCALE
