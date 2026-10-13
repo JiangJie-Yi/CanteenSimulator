@@ -6,7 +6,9 @@ import * as THREE from 'three'
  * the far side, facing the cook. (along × up = lay, so every counter's frame turns the same way.) Behind each row of
  * stools runs an aisle, and the customers walk in along the aisles, never through the stools.
  */
-export type Counter = { at: THREE.Vector3; along: THREE.Vector3; lay: THREE.Vector3; length: number; seats: number }
+export type Counter = { at: THREE.Vector3; along: THREE.Vector3; lay: THREE.Vector3; length: number; seats: number
+  /** its stools moved along it this far from evenly spaced about its middle (clear of a gate at one end) */
+  shift?: number }
 export type Seat = {
   /** on the counter top (y 0: set the top's height yourself): where the plate goes */
   plate: THREE.Vector3
@@ -62,12 +64,36 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * base and top is, and how wide the swing door across it (the first counter's reaches on to the till, which stands
  * against its end)
  */
-export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.4, leaf: 0.44 }, { end: -1, w: 0.42, leaf: 0.41 }]
+export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.32, leaf: 0.36 }, { end: -1, w: 0.56, leaf: 0.55 }]
 /** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
 export function gateOf(c: Counter, g: { end: 1 | -1; w: number; leaf: number }) {
   const hinge = g.end * ((c.length + 0.2) / 2 - g.w)
   return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, 0.08) }
 }
+/** each toilet's door's width */
+export const WC_W = 0.82
+/**
+ * The two toilets, the men's and the women's, side by side in the side counter's wall where it runs into the corner:
+ * each one's door along that counter (from its middle), the spot on the floor before it, and one inside. With only the
+ * one counter there are none.
+ */
+export function toiletsOf(cs: Counter[]) {
+  if (cs.length < 2) return null
+  const c0 = cs[0], c = cs[1]
+  const meet = c0.at.clone().addScaledVector(c0.lay, FLOOR_NEAR).sub(c.at).dot(c.along)
+  const corner = (FLOOR_FAR - c.at.clone().sub(c0.at).dot(c0.lay)) / c.along.dot(c0.lay)
+  const door = (meet + corner) / 2
+  const one = (k: number) => {
+    const z = door + k * (WC_W / 2 + 0.06)
+    const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
+    return { z, front: at(FLOOR_FAR + 0.45), aisle: at(-AISLE), inside: at(FLOOR_FAR - 0.45) }
+  }
+  return { door, m: one(-1), f: one(1) }
+}
+/** the toilets' doors: how many are going through each just now (GuestBar3D), and whether the player's opened it */
+export const TOILETS = { m: { passing: 0, open: false }, f: { passing: 0, open: false } }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __toilets?: typeof TOILETS }).__toilets = TOILETS
+
 /** the till: how far past the first counter's middle it stands (it butts on to the counter's end), and its size */
 export const TILL = { along: 0.75, W: 1.2, D: 0.6, rise: 0.1 }
 
@@ -98,7 +124,7 @@ export const ALONG = new THREE.Vector3(0.81, 0, -0.59)
 
 export function seatsOf(cs: Counter[]): Seat[] {
   return cs.flatMap((c, ci) => Array.from({ length: c.seats }, (_, n) => {
-    const plate = c.at.clone().addScaledVector(c.along, (n - (c.seats - 1) / 2) * (c.length / c.seats))
+    const plate = c.at.clone().addScaledVector(c.along, (n - (c.seats - 1) / 2) * (c.length / c.seats) + (c.shift ?? 0))
     return {
       plate,
       stool: plate.clone().addScaledVector(c.lay, -SIT_BACK),
@@ -154,7 +180,7 @@ export const singleCounter = (at: THREE.Vector3, length: number): Counter[] => [
  */
 export const GRILL_COUNTERS: Counter[] = [
   { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35), along: ALONG, lay: LAY, length: 5.2, seats: 6 },
-  { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4 },
+  { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4, shift: 0.25 },
 ]
 export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)
 /**

@@ -322,10 +322,10 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
  * steaming white rice, the wooden paddle (しゃもじ) stood in it, its lid leant against its side.
  */
 /** the tub as drawn below, made this much bigger (a shop's おひつ, wider than two plates, and deep) */
-const RICE_SCALE = 2.6
+const RICE_SCALE = 2.0
 /** the side table it stands on: its top's height (the cook's table's top is the scene's y = 0), and its size */
 const SIDE_TOP = -0.3
-const SIDE_W = 1.6
+const SIDE_W = 1.35
 const RICE_GEO = {
   tub: new THREE.CylinderGeometry(0.27, 0.25, 0.3, 28, 1, true),
   floor: new THREE.CircleGeometry(0.25, 28),

@@ -7,7 +7,7 @@ import { FloorPiece } from '@/scene/FloorPiece'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
-import { guestLabel } from '@/data/guests'
+import { guestLabel, kindOf } from '@/data/guests'
 import { Person, StaffFigure, moodOf } from '@/scene/Person3D'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
@@ -15,7 +15,7 @@ import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SERVICE, BAR_GATES, TILL, gateOf, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SERVICE, BAR_GATES, TILL, TOILETS, gateOf, toiletsOf, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -50,10 +50,6 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
   )
 }
 
-const GEO = {
-  seat: new THREE.CylinderGeometry(0.11, 0.1, 0.03, 20),
-  stoolLeg: new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6),
-}
 
 /** the customers (and their stools) at life size beside the bar, which is drawn to match them */
 const PEOPLE_SCALE = 1.3
@@ -158,9 +154,17 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
         <meshToonMaterial color="#ffffff" map={DOORMAT} />
       </mesh>
       </StaticBatch>
-      {/* a red lantern hung just outside, on the bar's side (the back wall is too close on the other, the till inside) */}
-      <group position={[-0.3, 0, 0.47]}><Chochin mark={lantern} /></group>
-      {/* the noren: three panels side by side, hung from a bamboo rod (no frame: it hangs in the way in by itself) */}
+      {/* the doorway's frame: a post either side and the lintel over them, the noren's rod hung under it; off the post on
+          the bar's side an arm (腕木) reaches out over the way in, and the red lantern hangs from its end */}
+      <StaticBatch>
+        {[-1, 1].map((sd) => (
+          <Part key={sd} geo={REG_GEO.body} color="#3a2416" outline={1.03} position={[sd * (W / 2 + 0.05), (H + 0.12) / 2, 0.03]} scale={[0.07, H + 0.12, 0.07]} />
+        ))}
+        <Part geo={REG_GEO.body} color="#3a2416" outline={1.03} position={[0, H + 0.08, 0.03]} scale={[W + 0.3, 0.08, 0.09]} />
+        <Part geo={REG_GEO.body} color="#4a2e1c" outline={1.03} position={[-(W / 2 + 0.05), H - 0.05, 0.27]} scale={[0.05, 0.06, 0.5]} />
+      </StaticBatch>
+      <group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group>
+      {/* the noren: three panels side by side, hung from a bamboo rod under the lintel */}
       <mesh position={[0, H - 0.05, 0.03]} rotation-z={Math.PI / 2}>
         <cylinderGeometry args={[0.012, 0.012, W, 8]} />
         <meshToonMaterial color="#c9a46a" />
@@ -276,12 +280,12 @@ function Chochin({ mark }: { mark: string }) {
   return (
     <group>
       {/* hung straight from above on a long cord (no post) */}
-      <group ref={hang} position={[-0.26, 1.9, 0]}>
-        <mesh position-y={-0.37}>
-          <cylinderGeometry args={[0.003, 0.003, 0.74, 4]} />
+      <group ref={hang} name="look-chochin" position={[-0.26, 2.25, 0]}>
+        <mesh position-y={-0.075}>
+          <cylinderGeometry args={[0.003, 0.003, 0.15, 4]} />
           <meshBasicMaterial color="#1a0d08" />
         </mesh>
-        <group position-y={-1.04}>
+        <group position-y={-0.36}>
           <mesh geometry={CHOCHIN_GEO}>
             <meshBasicMaterial ref={skin} map={tex} toneMapped={false} />
           </mesh>
@@ -518,13 +522,39 @@ function RoomFloor({ counters }: { counters: Counter[] }) {
   )
 }
 
+/**
+ * A Japanese bar stool (丸椅子): a thick round seat of pale wood with a rounded edge and a flat indigo cushion tied on,
+ * four square legs splayed out a little, and a ring of rails low between them to rest the feet on.
+ */
+const STOOL_GEO = {
+  seat: new THREE.CylinderGeometry(0.115, 0.105, 0.035, 24),
+  cushion: new THREE.CylinderGeometry(0.1, 0.1, 0.018, 24),
+  leg: new THREE.BoxGeometry(0.022, 0.32, 0.022),
+  rail: new THREE.BoxGeometry(0.012, 0.012, 1),
+}
 function Stool() {
+  const legs = [0, 1, 2, 3].map((k) => (k / 4) * Math.PI * 2 + Math.PI / 4)
   return (
     <group>
-      <Part geo={GEO.seat} color="#8a5a30" position={[0, 0.33, 0]} />
-      {[0, 1, 2].map((k) => {
-        const a = (k / 3) * Math.PI * 2
-        return <mesh key={k} geometry={GEO.stoolLeg} position={[Math.cos(a) * 0.07, 0.16, Math.sin(a) * 0.07]}><meshToonMaterial color="#5a3a20" /></mesh>
+      <Part geo={STOOL_GEO.seat} color="#c49a64" position={[0, 0.322, 0]} outline={1.05} />
+      <Part geo={STOOL_GEO.cushion} color="#2c3e66" position={[0, 0.347, 0]} outline={1.04} />
+      {legs.map((a) => (
+        // (each leg leans out, its foot further out than its top)
+        <mesh key={a} geometry={STOOL_GEO.leg} position={[Math.cos(a) * 0.082, 0.155, Math.sin(a) * 0.082]}
+          rotation={[Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12]}>
+          <meshToonMaterial color="#8a5a30" />
+        </mesh>
+      ))}
+      {/* the foot rails, a square of them between the legs */}
+      {legs.map((a, k) => {
+        const b = legs[(k + 1) % 4], r = 0.093
+        const p = [(Math.cos(a) + Math.cos(b)) / 2 * r, (Math.sin(a) + Math.sin(b)) / 2 * r]
+        const len = Math.hypot(Math.cos(a) - Math.cos(b), Math.sin(a) - Math.sin(b)) * r
+        return (
+          <mesh key={k} geometry={STOOL_GEO.rail} position={[p[0], 0.1, p[1]]} rotation-y={Math.atan2(Math.cos(b) - Math.cos(a), Math.sin(b) - Math.sin(a))} scale={[1, 1, len]}>
+            <meshToonMaterial color="#7a4e2a" />
+          </mesh>
+        )
       })}
     </group>
   )
@@ -548,7 +578,17 @@ function Counter({ length }: { length: number }) {
   )
 }
 
-type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave'; t: number }
+type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcBack'; t: number
+  /** (at the toilet) which, and the way there from their stool; told to go home meanwhile, they do once they're back */
+  wc?: { who: 'm' | 'f'; path: THREE.Vector3[]; len: number }
+  leaving?: boolean
+  /** how much of them shows (fading out as they go out of the door) */
+  fade?: number }
+/** the women's kinds, who use the women's toilet */
+const HER = new Set(['officeLady', 'highSchoolGirl', 'yukata', 'grandma', 'maid', 'gyaru'])
+/** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
+const WC_RATE = 1 / 240
+const WC_STAY = 6
 
 /** a plate on its way to a seat ('serve'), set at it ('set'), or being cleared away ('clear', after a pause) */
 type PlateRun = { key: number; seat: number; guest: number; phase: 'serve' | 'carry' | 'set' | 'clear'; t: number; from: THREE.Vector3
@@ -594,7 +634,7 @@ function Plate({ dirty = false }: { dirty?: boolean }) {
 }
 
 export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
-  speech = {}, servers = [] }:
+  speech = {}, servers = [], incense }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
@@ -606,6 +646,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     people?: boolean
     /** what each customer's saying just now, shown over their head */
     speech?: Record<number, { key: number; text: string }>
+    /** the incense on the altar by the door (lit when, and lighting another) */
+    incense?: { litAt: number | null; onLight: () => void }
     /** the servers on the floor: they carry what's put out at the pass to the customers, a plate with it */
     servers?: { id: string; look: StaffLook }[]
     /** drawn this much bigger, all of it */
@@ -619,6 +661,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const clock = useRef(0)
   const counters = useMemo(() => given ?? singleCounter(at, length), [given, at, length])
   const seats = useMemo(() => seatsOf(counters), [counters])
+  const wcs = useMemo(() => (given ? toiletsOf(counters) : null), [counters, given])
   /** a couple sat side by side turn to talk: the one at the next stool along is on the left (+1), the one before on
    * the right (-1); 0 while the other isn't sat there yet (or has gone) */
   const talkSide = (s: Shown) => {
@@ -761,8 +804,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // (the shop may have given them a stool already: it only does once the last one there has gone)
           const seat = g.seat !== undefined ? g.seat : Array.from({ length: seats.length }, (_, i) => i).find((i) => !taken.has(i))
           if (seat !== undefined) next.push({ id: g.id, seat, phase: 'enter', t: 0 })
-        } else if (s && !seated && s.phase !== 'leave') {
-          next = next.map((x) => (x.id === g.id ? { ...x, phase: 'leave', t: 0 } : x))
+        } else if (s && !seated && s.phase !== 'leave' && !s.leaving) {
+          // (away at the toilet: they go once they're back at their stool)
+          next = next.map((x) => (x.id === g.id ? (x.phase.startsWith('wc') ? { ...x, leaving: true } : { ...x, phase: 'leave', t: 0 }) : x))
         }
       }
       return next
@@ -794,6 +838,33 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       } else if (s.phase === 'sit') {
         g?.position.copy(st.stool)
         if (g) g.rotation.y = st.yaw
+        // (now and then, while they wait, off to the toilet: their kind's own)
+        const guest = guestsRef.current.find((x) => x.id === s.id)
+        if (wcs && guest?.state === 'waiting' && Math.random() < WC_RATE * Math.min(dt, 0.1)) {
+          const who = HER.has(kindOf(s.id).kind) ? 'f' : 'm'
+          const w = wcs[who]
+          const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
+          const path = [st.stool.clone(), st.aisle.clone(), ...turn, w.aisle.clone(), w.front.clone(), w.inside.clone()]
+          s.wc = { who, path, len: pathLength(path) }
+          s.phase = 'wcGo'
+          s.t = 0
+        }
+      } else if (s.phase === 'wcGo' || s.phase === 'wcBack') {
+        // to the door, which slides open as they come up to it, in, and later back out to their stool
+        const w = s.wc!
+        const d = Math.min(w.len, s.t * SPEED)
+        const { p, dir } = alongPath(w.path, s.phase === 'wcGo' ? d : w.len - d)
+        g?.position.copy(p)
+        if (g) g.rotation.y = s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z)
+        if (d >= w.len) {
+          s.phase = s.phase === 'wcGo' ? 'wcIn' : s.leaving ? 'leave' : 'sit'
+          s.t = 0
+        }
+      } else if (s.phase === 'wcIn') {
+        if (s.t > WC_STAY) {
+          s.phase = 'wcBack'
+          s.t = 0
+        }
       } else {
         // a moment to get up, then off the way they came
         const d = Math.max(0, Math.min(len, (s.t - 0.8) * SPEED))
@@ -801,7 +872,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         g?.position.copy(p)
         if (g) g.rotation.y = s.t < 0.8 ? st.yaw : Math.atan2(-dir.x, -dir.z)
         if (d >= len) done.push(s.id)
+        // (out of the door they fade away, the last stretch)
+        s.fade = Math.min(1, (len - d) / 0.9)
       }
+      if (g) g.visible = s.phase !== 'wcIn'
+    }
+    // the toilets' doors open for whoever's going through them just now
+    if (wcs) for (const who of ['m', 'f'] as const) {
+      TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack' || x.phase === 'wcIn')
+        && (groups.current.get(x.id)?.position.distanceTo(wcs[who].front) ?? 9) < 0.9).length
     }
     if (done.length) setShown((cur) => cur.filter((x) => !done.includes(x.id)))
     done = []
@@ -847,7 +926,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     // the servers: one that's free goes out to the pass for what's put out there for one seat (and a clean plate, if
     // the customer hasn't one yet), carries it along the aisle on the tray, sets it down beside them, and goes back
-    const sitting = (n: number) => shownRef.current.some((x) => x.seat === n && x.phase === 'sit')
+    const sitting = (n: number) => shownRef.current.some((x) => x.seat === n && (x.phase === 'sit' || x.phase.startsWith('wc')))
     waiters.current.forEach((w, wi) => {
       const home = homes[wi]
       const trayAt = () => w.pos.clone().add(new THREE.Vector3(0, 0.548, 0.18).multiplyScalar(PEOPLE_SCALE)
@@ -1037,7 +1116,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} />}
               {given && <ShopProps counters={counters} />}
-              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} shrine={back + 1.0} />}
+              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} shrine={back + 1.0} altar={incense ?? true} />}
             </group>
           )
         }
@@ -1133,5 +1212,6 @@ function Say({ text }: { text: string }) {
 /** one customer's figure, moved by the bar's clock each frame (read from the ref: nothing re-renders for it) */
 function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number
   guest?: GuestView }) {
-  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null} />
+  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
+    fade={() => s.fade ?? 1} />
 }

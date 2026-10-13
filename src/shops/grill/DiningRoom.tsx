@@ -1,9 +1,10 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
-import type { Counter } from './bar'
+import { TOILETS, WC_W, type Counter } from './bar'
 import { LuckyCat } from './LuckyCat'
+import { Steam } from '@/scene/Steam'
 
 /**
  * The customers' side of the room, behind the aisle: a wall of cream plaster over a dark wooden wainscot, a frieze of
@@ -262,19 +263,41 @@ function Bottle({ x, color, label }: { x: number; color: string; label: string }
 }
 
 /** the plaque over the toilet door: お手洗い, and 廁所 under it */
-const WC_SIGN = canvasTex(160, 64, (g) => {
+/** the plaque over each toilet's door: 男 in indigo with a man's figure, 女 in red with a woman's, and the word under */
+const wcSign = (who: 'm' | 'f') => canvasTex(160, 96, (g) => {
+  const ink = who === 'm' ? '#24407a' : '#b8262a'
   g.fillStyle = '#3a2416'
-  g.fillRect(0, 0, 160, 64)
+  g.fillRect(0, 0, 160, 96)
   g.fillStyle = '#efe2c4'
-  g.fillRect(4, 4, 152, 56)
-  g.fillStyle = '#1d140c'
-  g.font = 'bold 30px "Zen Antique", "Noto Serif TC", serif'
+  g.fillRect(4, 4, 152, 88)
+  // the figure: a head, and a body (a woman's in a skirt)
+  g.fillStyle = ink
+  g.beginPath()
+  g.arc(36, 24, 9, 0, Math.PI * 2)
+  g.fill()
+  g.beginPath()
+  if (who === 'm') {
+    g.rect(26, 36, 20, 26)
+    g.rect(28, 62, 6, 22)
+    g.rect(38, 62, 6, 22)
+  } else {
+    g.moveTo(36, 34)
+    g.lineTo(52, 66)
+    g.lineTo(20, 66)
+    g.closePath()
+    g.rect(29, 66, 5, 18)
+    g.rect(38, 66, 5, 18)
+  }
+  g.fill()
+  g.font = 'bold 50px "Zen Antique", "Noto Serif TC", serif'
   g.textAlign = 'center'
   g.textBaseline = 'middle'
-  g.fillText('お手洗い', 80, 25)
-  g.font = '16px "Noto Serif TC", serif'
-  g.fillText('廁所 · WC', 80, 50)
+  g.fillText(who === 'm' ? '男' : '女', 104, 44)
+  g.fillStyle = '#1d140c'
+  g.font = '15px "Noto Serif TC", serif'
+  g.fillText(who === 'm' ? '男廁 · MEN' : '女廁 · WOMEN', 104, 80)
 })
+const WC_SIGNS = { m: wcSign('m'), f: wcSign('f') }
 /** shoji paper, faintly fibred */
 const SHOJI = canvasTex(64, 64, (g) => {
   g.fillStyle = '#f4ecd8'
@@ -293,15 +316,26 @@ const SHOJI = canvasTex(64, 64, (g) => {
  * The way through to the toilet: one sliding door (引き戸) in a dark wooden frame, shut, wood below and shoji paper on
  * a lattice above, a short indigo noren over it, and the plaque.
  */
-function ToiletDoor() {
-  const W = 0.9, H = 1.85
+/**
+ * A toilet's door itself: one whole sliding panel, wood below, shoji paper on a lattice above. It slides aside into
+ * the wall when someone goes in or comes out, or when it's clicked (and back again with another click).
+ */
+function ToiletPanel({ who }: { who: 'm' | 'f' }) {
+  const W = WC_W, H = 1.85
+  const g = useRef<THREE.Group>(null)
+  const k = useRef(0)
+  // (the men's slides off one way, the women's the other, away from each other)
+  const away = who === 'm' ? -1 : 1
+  useFrame((_, dt) => {
+    const d = TOILETS[who]
+    const want = d.passing > 0 || d.open ? 1 : 0
+    k.current += Math.sign(want - k.current) * Math.min(Math.abs(want - k.current), Math.min(dt, 0.1) * 1.8)
+    const e = k.current * k.current * (3 - 2 * k.current)
+    if (g.current) g.current.position.z = away * e * (W - 0.1)
+  })
   return (
-    <group>
-      {/* the frame round the opening */}
-      {[-1, 1].map((sd) => <Box key={sd} size={[0.06, H + 0.06, 0.06]} color="#3a2416" position={[-0.03, H / 2, sd * (W / 2 + 0.03)]} />)}
-      <Box size={[0.07, 0.07, W + 0.12]} color="#3a2416" position={[-0.035, H + 0.035, 0]} />
-      <Box size={[0.05, 0.025, W + 0.12]} color="#3a2416" position={[-0.03, 0.012, 0]} />
-      {/* the door: one whole sliding panel, shut, filling the opening: wood below, shoji paper on a lattice above */}
+    <group ref={g} onClick={(ev) => { ev.stopPropagation(); TOILETS[who].open = !TOILETS[who].open }}
+      onPointerOver={() => { document.body.style.cursor = 'pointer' }} onPointerOut={() => { document.body.style.cursor = '' }}>
       <group position={[-0.03, H / 2, 0]}>
         <mesh position-y={0.2} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[W - 0.02, H - 0.44]} />
@@ -317,16 +351,38 @@ function ToiletDoor() {
           <meshToonMaterial color="#2a1a10" />
         </mesh>
       </group>
+    </group>
+  )
+}
+function ToiletDoor({ who }: { who: 'm' | 'f' }) {
+  const W = WC_W, H = 1.85
+  return (
+    <group>
+      {/* the frame round the opening */}
+      {[-1, 1].map((sd) => <Box key={sd} size={[0.06, H + 0.06, 0.06]} color="#3a2416" position={[-0.03, H / 2, sd * (W / 2 + 0.03)]} />)}
+      <Box size={[0.07, 0.07, W + 0.12]} color="#3a2416" position={[-0.035, H + 0.035, 0]} />
+      <Box size={[0.05, 0.025, W + 0.12]} color="#3a2416" position={[-0.03, 0.012, 0]} />
+      {/* (the sliding panel: ToiletPanel, not merged) and the dark little room behind it */}
+      <mesh position={[0.45, H / 2, 0]} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[W, H]} />
+        <meshBasicMaterial color="#1e1a18" />
+      </mesh>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[0.22, H / 2, sd * W / 2]} rotation-y={sd > 0 ? Math.PI : 0}>
+          <planeGeometry args={[0.45, H]} />
+          <meshBasicMaterial color="#2a2420" />
+        </mesh>
+      ))}
       {/* the short noren, and the plaque over it */}
       {[-1, 1].map((sd) => (
         <mesh key={sd} position={[-0.075, H - 0.2, sd * W / 4.2]} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[W / 2.2, 0.36]} />
-          <meshToonMaterial color="#2c3e66" side={THREE.DoubleSide} />
+          <meshToonMaterial color={who === 'm' ? '#2c3e66' : '#9a2a2a'} side={THREE.DoubleSide} />
         </mesh>
       ))}
       <mesh position={[-0.075, H + 0.16, 0]} rotation-y={-Math.PI / 2}>
-        <planeGeometry args={[0.44, 0.18]} />
-        <meshToonMaterial color="#ffffff" map={WC_SIGN} />
+        <planeGeometry args={[0.4, 0.24]} />
+        <meshToonMaterial color="#ffffff" map={WC_SIGNS[who]} />
       </mesh>
     </group>
   )
@@ -463,7 +519,9 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
  * One counter's stretch of the room: the wall behind its aisle (from/to along it, in the counter's own frame), and
  * pendant lamps over it.
  */
-export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: Counter; from: number; to: number; far: number
+export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar = false }: { c: Counter; from: number; to: number; far: number
+  /** its shelf an altar instead (by the door): a command flag in the censer, and incense (lit when, and lighting more) */
+  altar?: boolean | { litAt: number | null; onLight: () => void }
   lamps: number
   /** the bar top's height, where the lamps' light falls */
   top: number
@@ -495,7 +553,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: 
       for (let i = 0; i < n; i++) spots.push(posts[b] + (w / n) * (i + 0.5))
     }
     return spots.filter((z) => Math.abs(z - shelfZ) > 0.85 && (door === undefined || Math.abs(z - door) > 0.95)
-      && (shrine === undefined || Math.abs(z - shrine) > 0.75))
+      && (shrine === undefined || Math.abs(z - shrine) > 0.75) && (door === undefined || Math.abs(z - door) > WC_W + 0.55))
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length] }))
   }, [l, from, to, mid, shelfZ, c.length, door, shrine])
   const frieze = useMemo(() => {
@@ -519,7 +577,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: 
       {/* (local x is away from the cook: the wall stands at the floor's far edge, facing back toward the bar) */}
       <group ref={wall} position-x={-far}>
         {/* (all of it standing still: drawn merged, a few meshes for the whole wall) */}
-        <StaticBatch key={`${from}|${to}|${door}|${shrine}`}>
+        <StaticBatch key={`${from}|${to}|${door}|${shrine}|${!!altar}`}>
         <mesh position={[0, WAINSCOT + (WALL_H - WAINSCOT) / 2, mid]} rotation-y={-Math.PI / 2} receiveShadow>
           <planeGeometry args={[l, WALL_H - WAINSCOT]} />
           <meshToonMaterial color="#ffffff" map={plaster} />
@@ -531,7 +589,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: 
         {/* posts, the rail over the wainscot and the beam along the top */}
         <Box size={[0.05, 0.05, l]} color="#3a2416" position={[-0.02, WAINSCOT, mid]} />
         <Box size={[0.08, 0.1, l]} color="#3a2416" position={[-0.03, WALL_H - 0.05, mid]} />
-        {[from, mid - l / 6, mid + l / 6, to].map((z) => (
+        {[from, mid - l / 6, mid + l / 6, to].filter((z) => z === from || z === to || door === undefined || Math.abs(z - door) > WC_W + 0.1).map((z) => (
           <Box key={z} size={[0.07, WALL_H, 0.08]} color="#3a2416" position={[-0.03, WALL_H / 2, z]} />
         ))}
         {/* a frieze of seigaiha waves under the beam, and the pictures hung along the plaster */}
@@ -545,9 +603,15 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: 
             {a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
           </group>
         ))}
-        {door !== undefined && <group position-z={door}><ToiletDoor /></group>}
+        {/* the toilets, the men's and the women's, side by side */}
+        {door !== undefined && (['m', 'f'] as const).map((who, k) => (
+          <group key={who} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletDoor who={who} /></group>
+        ))}
         {shrine !== undefined && <group position={[0, 1.78, shrine]}><Kamidana /></group>}
-        {/* the shelf: sake bottles, two crocks and the cat */}
+        {/* the shelf: sake bottles, two crocks and the cat; or, by the door, the altar */}
+        {altar ? <group position={[-0.1, 1.08, shelfZ]}><Box size={[0.2, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
+          {[-0.35, 0.35].map((z) => <Box key={z} size={[0.18, 0.08, 0.025]} color="#3a2416" position={[0.04, -0.06, z]} />)}</group>
+          : <>
         <group position={[-0.1, 1.08, shelfZ]}>
           <Box size={[0.2, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
           {[-0.35, 0.35].map((z) => <Box key={z} size={[0.18, 0.08, 0.025]} color="#3a2416" position={[0.04, -0.06, z]} />)}
@@ -564,13 +628,267 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: 
           </mesh>
           <group position={[0, 0, 0.3]} rotation-y={-Math.PI / 2}><LuckyCat /></group>
         </group>
+          </>}
         </StaticBatch>
+        {/* (the toilets' doors slide: not merged) */}
+        {door !== undefined && (['m', 'f'] as const).map((who, k) => (
+          <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group>
+        ))}
+        {/* (the altar's flag stirs, its incense smokes: not merged) */}
+        {altar && <group name="look-altar" position={[-0.1, 1.08, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group>}
       </group>
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {
         const z = (i - (lamps - 1) / 2) * (c.length / lamps)
         return <group key={i} position-x={0.05}><Pendant z={z} drop={0.5} pool={top} /></group>
       })}
+    </group>
+  )
+}
+
+/**
+ * A command flag (令旗), as a temple's is made: a pennant of yellow silk, woven (the threads show), edged with a
+ * border of red flames cut in points, a thin gold line inside it, and a tiger (虎爺) embroidered on it.
+ * Its long side is against the pole (u = 0), its point at u = 1.
+ */
+const LINGQI = canvasTex(256, 256, (g) => {
+  const tri = (inset: number) => {
+    g.beginPath()
+    g.moveTo(inset * 0.5, inset)
+    g.lineTo(256 - inset * 1.9, 128)
+    g.lineTo(inset * 0.5, 256 - inset)
+    g.closePath()
+  }
+  // the red border cloth under it all
+  g.fillStyle = '#b8201c'
+  tri(0)
+  g.fill()
+  // the silk
+  g.fillStyle = '#f0c232'
+  tri(26)
+  g.fill()
+  // its weave: fine threads both ways, lighter and darker
+  g.save()
+  tri(26)
+  g.clip()
+  for (let i = 0; i < 256; i += 3) {
+    g.fillStyle = i % 6 ? 'rgba(255,240,170,0.18)' : 'rgba(150,100,10,0.16)'
+    g.fillRect(i, 0, 1, 256)
+    g.fillStyle = i % 6 ? 'rgba(120,80,0,0.12)' : 'rgba(255,245,200,0.14)'
+    g.fillRect(0, i, 256, 1)
+  }
+  // a soft sheen down its middle, as silk catches the light
+  const sheen = g.createLinearGradient(0, 40, 0, 216)
+  sheen.addColorStop(0, 'rgba(255,255,255,0)')
+  sheen.addColorStop(0.5, 'rgba(255,250,220,0.22)')
+  sheen.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = sheen
+  g.fillRect(0, 0, 256, 256)
+  g.restore()
+  // the flames between the red and the silk: points cut into the yellow
+  g.fillStyle = '#b8201c'
+  for (let k = 0; k < 10; k++) {
+    const t = (k + 0.5) / 10
+    for (const sd of [1, -1]) {
+      const x = 13 + (230 - 13) * t, y = 128 - sd * (115 - 102 * t)
+      g.beginPath()
+      g.moveTo(x - 9, y - sd * 2)
+      g.lineTo(x + 9, y - sd * 2)
+      g.lineTo(x, y + sd * 16)
+      g.closePath()
+      g.fill()
+    }
+  }
+  // a gold line just inside the border
+  g.strokeStyle = '#e8b830'
+  g.lineWidth = 3
+  tri(40)
+  g.stroke()
+  // a tiger (虎爺) embroidered on it, prowling toward the pole: orange, striped in black, outlined in gold thread
+  g.save()
+  g.translate(80, 132)
+  g.lineJoin = 'round'
+  const tiger = () => {
+    g.beginPath()
+    // body, haunch to shoulder
+    g.ellipse(4, 4, 40, 19, -0.08, 0, Math.PI * 2)
+    g.moveTo(-34, 0)
+    // tail, curling up behind
+    g.bezierCurveTo(-56, -6, -58, -34, -40, -40)
+    g.lineTo(-37, -34)
+    g.bezierCurveTo(-50, -28, -48, -10, -32, -6)
+    // legs, one pair striding
+    g.rect(-30, 14, 10, 24)
+    g.rect(-14, 16, 10, 22)
+    g.rect(16, 16, 10, 22)
+    g.rect(30, 12, 10, 26)
+    // the head, its ears
+    g.moveTo(66, -10)
+    g.arc(50, -10, 17, 0, Math.PI * 2)
+    g.moveTo(38, -24)
+    g.arc(40, -24, 6, 0, Math.PI * 2)
+    g.moveTo(62, -24)
+    g.arc(60, -24, 6, 0, Math.PI * 2)
+  }
+  tiger()
+  g.lineWidth = 6
+  g.strokeStyle = '#e8b830'
+  g.stroke()
+  g.fillStyle = '#e2701c'
+  tiger()
+  g.fill()
+  // stripes over the back, on the haunch and tail, on the brow
+  g.strokeStyle = '#1c120a'
+  g.lineWidth = 3.5
+  g.lineCap = 'round'
+  for (const [x, top, len] of [[-22, -14, 14], [-10, -18, 16], [2, -19, 17], [14, -18, 16], [26, -15, 13], [-30, 8, 8], [-44, -30, 7]]) {
+    g.beginPath()
+    g.moveTo(x, top)
+    g.quadraticCurveTo(x + 4, top + len / 2, x - 1, top + len)
+    g.stroke()
+  }
+  for (const k of [-6, 0, 6]) {
+    g.beginPath()
+    g.moveTo(50 + k, -24)
+    g.lineTo(50 + k * 0.6, -17)
+    g.stroke()
+  }
+  // its eye and nose, a pale muzzle
+  g.fillStyle = '#f6ecd0'
+  g.beginPath()
+  g.ellipse(58, -4, 9, 6, 0, 0, Math.PI * 2)
+  g.fill()
+  g.fillStyle = '#1c120a'
+  g.beginPath()
+  g.arc(54, -13, 2.6, 0, Math.PI * 2)
+  g.arc(64, -6, 2.4, 0, Math.PI * 2)
+  g.fill()
+  g.restore()
+})
+/** the pennant: a triangle of cloth in strips from the pole out to its point, to ripple */
+const FLAG_GEO = (() => {
+  const g = new THREE.PlaneGeometry(1, 1, 12, 6)
+  const p = g.attributes.position, uv = g.attributes.uv
+  for (let i = 0; i < p.count; i++) {
+    const u = uv.getX(i), v = uv.getY(i)
+    // (narrowing to the point: the long side at the pole, x = 0)
+    p.setXYZ(i, u, (v - 0.5) * (1 - u), 0)
+  }
+  g.userData.rest = Float32Array.from(p.array as Float32Array)
+  return g
+})()
+const ALTAR_GEO = {
+  censer: new THREE.CylinderGeometry(0.075, 0.06, 0.08, 20),
+  foot: new THREE.SphereGeometry(0.014, 8, 6),
+  ash: new THREE.CircleGeometry(0.068, 20),
+  stick: new THREE.CylinderGeometry(0.0025, 0.0025, 0.2, 5),
+  tip: new THREE.SphereGeometry(0.005, 6, 4),
+  pole: new THREE.CylinderGeometry(0.004, 0.0045, 0.34, 8),
+  finial: new THREE.ConeGeometry(0.008, 0.026, 8),
+  knob: new THREE.SphereGeometry(0.008, 10, 8),
+  tassel: new THREE.CylinderGeometry(0.004, 0.0015, 0.03, 6),
+  fruit: new THREE.SphereGeometry(0.03, 12, 8),
+  dish: new THREE.CylinderGeometry(0.08, 0.06, 0.015, 18),
+}
+/**
+ * The altar on the shelf by the door: a bronze censer on three feet full of ash, a command flag (令旗) of yellow silk
+ * stood in it on a black pole with a gold tip, rippling a little, and one stick of incense burning, its tip glowing and
+ * a thread of smoke going up; a dish of oranges set out as an offering.
+ */
+/** how long a stick of incense burns (ms) */
+const INCENSE_MS = 60000
+function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
+  const tip = useRef<THREE.MeshBasicMaterial>(null)
+  const stick = useRef<THREE.Group>(null)
+  const smoke = useRef<THREE.Group>(null)
+  const ember = useRef<THREE.Mesh>(null)
+  const flag = useMemo(() => FLAG_GEO.clone(), [])
+  useEffect(() => () => flag.dispose(), [flag])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    // (the stick burns down over its minute, from its tip; burnt out, it's gone, and another can be lit)
+    const lit = incense?.litAt ?? null
+    const left = lit === null ? 1 : Math.max(0, 1 - (performance.now() - lit) / INCENSE_MS)
+    const burning = lit !== null && left > 0
+    const len = 0.06 + 0.94 * left
+    if (stick.current) {
+      stick.current.scale.y = len
+      stick.current.visible = burning
+    }
+    if (ember.current) {
+      ember.current.visible = burning
+      ember.current.position.y = 0.2 * len
+    }
+    if (smoke.current) {
+      smoke.current.visible = burning
+      smoke.current.position.y = 0.2 * len + 0.12
+    }
+    if (tip.current) tip.current.color.setRGB(1, 0.35 + 0.15 * Math.sin(t * 3.1), 0.1)
+    // the silk stirring in the air: a slow ripple from the pole out to the point, more the further out
+    const p = flag.attributes.position, rest = FLAG_GEO.userData.rest as Float32Array
+    for (let i = 0; i < p.count; i++) {
+      const x = rest[i * 3], y = rest[i * 3 + 1]
+      p.setXYZ(i, x, y - x * x * 0.03, Math.sin(x * 5 - t * 1.6) * 0.035 * x + Math.sin(y * 7 + t) * 0.006 * x)
+    }
+    p.needsUpdate = true
+    flag.computeVertexNormals()
+  })
+  return (
+    <group>
+      <Inked geometry={ALTAR_GEO.censer} color="#8a6a3a" position-y={0.05} />
+      {[0, 1, 2].map((k) => (
+        <mesh key={k} geometry={ALTAR_GEO.foot} position={[Math.cos(k * 2.1) * 0.05, 0.008, Math.sin(k * 2.1) * 0.05]}>
+          <meshToonMaterial color="#6a4e2a" />
+        </mesh>
+      ))}
+      <mesh geometry={ALTAR_GEO.ash} position-y={0.091} rotation-x={-Math.PI / 2}><meshToonMaterial color="#d8d0c0" /></mesh>
+      {/* the packet of incense beside the censer: click it (or the censer) to stand a stick in the ash and light it */}
+      <group position={[-0.01, 0, -0.14]} rotation-y={0.3} onClick={(e) => { e.stopPropagation(); incense?.onLight() }}
+        onPointerOver={() => { if (incense) document.body.style.cursor = 'pointer' }} onPointerOut={() => { document.body.style.cursor = '' }}>
+        <mesh position-y={0.035}><boxGeometry args={[0.035, 0.07, 0.06]} /><meshToonMaterial color="#c4302a" /></mesh>
+        <mesh position={[-0.0181, 0.04, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.04, 0.03]} /><meshToonMaterial color="#f2c62a" /></mesh>
+        {[-0.012, -0.004, 0.006, 0.014].map((z, k) => (
+          <mesh key={z} position={[0, 0.07 + 0.03, z]} rotation-x={(k - 1.5) * 0.06}>
+            <cylinderGeometry args={[0.0022, 0.0022, 0.06 + k * 0.006, 4]} /><meshToonMaterial color="#8a2a1a" />
+          </mesh>
+        ))}
+        <mesh position-y={0.06} visible={false}><boxGeometry args={[0.12, 0.16, 0.14]} /></mesh>
+      </group>
+      {/* the stick in the censer, in front, burning down; none there till one's lit, and gone again once it's out */}
+      <group position={[-0.03, 0.09, 0]} rotation-z={0.06}
+        onClick={(e) => { e.stopPropagation(); incense?.onLight() }}
+        onPointerOver={() => { if (incense) document.body.style.cursor = 'pointer' }}
+        onPointerOut={() => { document.body.style.cursor = '' }}>
+        <group ref={stick}>
+          <mesh geometry={ALTAR_GEO.stick} position-y={0.1}><meshToonMaterial color="#8a2a1a" /></mesh>
+        </group>
+        <mesh ref={ember} geometry={ALTAR_GEO.tip} position-y={0.2}><meshBasicMaterial ref={tip} color="#ff6a1a" toneMapped={false} /></mesh>
+        {/* (a bigger, unseen target round it all, so it's easy to click) */}
+        <mesh position-y={0.1} visible={false}><boxGeometry args={[0.16, 0.3, 0.3]} /></mesh>
+        <group ref={smoke}>
+          <Steam width={0.06} height={0.4} opacity={0.32} layers={1} color="#e8e4dc" shade="#c8c4bc" speed={0.04} />
+        </group>
+      </group>
+      {/* the command flag, stood at the back of the censer: its pole, a gold tip on it, the silk on the pole's upper
+          part, a red tassel hanging from its point */}
+      <group position={[0.035, 0.09, 0.03]}>
+        <mesh geometry={ALTAR_GEO.pole} position-y={0.17}><meshToonMaterial color="#1a120c" /></mesh>
+        <mesh geometry={ALTAR_GEO.knob} position-y={0.342}><meshToonMaterial color="#d4b04a" /></mesh>
+        <mesh geometry={ALTAR_GEO.finial} position-y={0.36}><meshToonMaterial color="#d4b04a" /></mesh>
+        <group position={[0, 0.25, -0.004]} rotation-y={Math.PI / 2} scale={[0.17, 0.15, 1]}>
+          <mesh geometry={flag}>
+            <meshToonMaterial color="#ffffff" map={LINGQI} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+        <mesh geometry={ALTAR_GEO.tassel} position={[0, 0.235, -0.17]}><meshToonMaterial color="#c4302a" /></mesh>
+      </group>
+      {/* the oranges on their dish */}
+      <group position={[0, 0, 0.3]}>
+        <mesh geometry={ALTAR_GEO.dish} position-y={0.008}><meshToonMaterial color="#e8e2d2" /></mesh>
+        {[[0, 0.035, -0.02], [-0.02, 0.035, 0.025], [0.025, 0.035, 0.02], [0, 0.085, 0.008]].map((pt, k) => (
+          <mesh key={k} geometry={ALTAR_GEO.fruit} position={pt as [number, number, number]}><meshToonMaterial color="#f08a1a" /></mesh>
+        ))}
+      </group>
     </group>
   )
 }

@@ -316,7 +316,7 @@ function useRigged(id: number, kind: Kind, glasses: boolean, phones: boolean,
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
-export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven, mood = null }: { id: number; eating: boolean; walking: boolean
+export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven, mood = null, fade }: { id: number; eating: boolean; walking: boolean
   /** their own clock (seconds): given as a number (re-rendered each frame), or read each frame from a ref, which
    * moves the figure without re-rendering it (only a change of what they're doing re-renders) */
   t?: number; clock?: { current: number }
@@ -325,7 +325,9 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
   /** (to look at one) what they do while they wait, instead of passing the time by turns */
   idle?: 'Sit' | 'Phone' | 'Chin'
   /** how they're taking it (on their face) */
-  mood?: Mood | null }) {
+  mood?: Mood | null
+  /** how much of them shows, read each frame (1: all; less as they fade away going out) */
+  fade?: () => number }) {
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
   const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
@@ -372,8 +374,33 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
     return () => { s.removeFromParent(); b?.removeFromParent(); ph?.removeFromParent() }
   }, [r])
 
+  // fading out: their own materials see-through, the ink outline (shared by all) left off
+  const faded = useRef(1)
+  const applyFade = (f: number) => {
+    if (Math.abs(f - faded.current) < 0.01 && (f < 1) === (faded.current < 1)) return
+    const was = faded.current < 1
+    faded.current = f
+    r.root.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return
+      if (o.material === outlineMaterial) {
+        o.visible = f >= 1
+        return
+      }
+      const m = o.material as THREE.Material
+      // (as it was made: some parts, the blush, are see-through already)
+      if (m.userData.base === undefined) m.userData.base = { opacity: m.opacity, transparent: m.transparent, depthWrite: m.depthWrite }
+      const base = m.userData.base as { opacity: number; transparent: boolean; depthWrite: boolean }
+      if (was !== f < 1) {
+        m.transparent = f < 1 || base.transparent
+        m.depthWrite = f < 1 ? false : base.depthWrite
+        m.needsUpdate = true
+      }
+      m.opacity = base.opacity * f
+    })
+  }
   // their own clock moves the figure: the action, then a look about (waiting), a blink, chewing
   const step = () => {
+    applyFade(fade?.() ?? 1)
     const t = timeNow()
     if (spellOf(t) !== spell) setSpell(spellOf(t))
     const dt = last.current === null ? 0 : Math.min(0.1, Math.max(0, t - last.current))

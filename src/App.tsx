@@ -225,7 +225,13 @@ const orderedBase = (dish: DishInfo, order: Record<string, number>) => dish.base
 /** The stage's centre and size in canvas pixels (the canvas fills the whole app). */
 type Frame = { cx: number; cy: number; w: number; h: number }
 
+/** a stick of incense on the altar burns this long (ms) */
+const INCENSE_MS = 60000
 type SceneProps = {
+  /** the incense on the grill's altar: when it was lit (performance.now), and lighting a new one */
+  incense: { litAt: number | null; onLight: () => void }
+  /** the incense is burning: customers order more */
+  blessed?: boolean
   active: number
   orders: Record<string, Record<string, number>>
   theme: Theme
@@ -273,8 +279,8 @@ type SceneProps = {
   bakeKitchen: { phase: 'cook' | 'eat'; parts: Part[] } | null
 }
 
-function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
-  onOrder, onAddCharcoal, onSay }: SceneProps) {
+function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
+  onOrder, onAddCharcoal, onSay, blessed = false }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
   // (in development, the view can be set from the console: __ctl.target, __cam.position)
@@ -474,7 +480,7 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                 <Roasting url={url} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
-                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)}
+                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)} blessed={blessed}
                   helpers={helpersOf(dish.id)} crew={crewOf(dish.id)} bar={!phone}
                   onWalkOut={(ids, g) => onWalkOut(ids, dish, g)} lang={lang}
                   entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
@@ -490,7 +496,8 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
                   servers={dish.roast && ai ? crewOf(dish.id).filter((w) => w.role === 'server') : []}
                   mark={dish.roast ? '聞野' : dish.heatControl ? '鼎沸' : dish.bake ? '麵包' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}
-                  at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)} />
+                  at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)}
+                  incense={dish.roast ? incense : undefined} />
               )}
               {dish.id === 'beefnoodle' && (
                 <TaiwanTable items={dish.items} quantities={servings(dish, orders[dish.id])} active={i === active} locked={ai}
@@ -634,6 +641,16 @@ export default function App() {
   // AI simulation: a chef and customers, and what they've said lately
   // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
+  // the incense on the altar by the door: lit, for a minute more come in and they order more
+  const [incenseAt, setIncenseAt] = useState<number | null>(null)
+  const [blessed, setBlessed] = useState(false)
+  const lightIncense = () => {
+    if (incenseAt !== null && performance.now() - incenseAt < INCENSE_MS) return
+    setIncenseAt(performance.now())
+    setBlessed(true)
+    window.setTimeout(() => setBlessed(false), INCENSE_MS)
+    say(lang === 'ja' ? 'お線香を上げました：一分間、お客さんが増えて、よく注文してくれます' : '點了一支香：這一分鐘客人會變多，也點得比較多')
+  }
   const space: 'closed' | 'open' = ai ? 'open' : 'closed'
   // (opening is the start of a new day)
   useEffect(() => {
@@ -1754,7 +1771,8 @@ export default function App() {
               }
               return ok
             }} onAddCharcoal={addCharcoal} onSay={talk}
-            lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8)} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
+            lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
+            incense={{ litAt: incenseAt, onLight: lightIncense }} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
             bakeKitchen={(() => {

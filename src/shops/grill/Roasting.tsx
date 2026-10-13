@@ -491,7 +491,9 @@ function CookTable({ floor = true }: { floor?: boolean }) {
     .addScaledVector(LAY, (KITCHEN_FLOOR.lay[0] + KITCHEN_FLOOR.lay[1]) / 2).setY(GRILL_OFFSET.y + 0.004 * GRILL_SCALE)
   return (
     <>
-      {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]} />)}
+      {/* (set back under the top on their outer faces only: where they meet, they run into each other, no gap) */}
+      {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]}
+        inset={i === 0 ? [0.06, -0.01, 0.06, 0.06] : i === 1 ? [-0.01, 0.06, 0.06, 0.06] : [-0.01, 0.06, 0.06, 0.06]} />)}
       <CookTableTop />
       {/* (the same boards as the customers', laid the same way; with the shop open and the room drawn, its one floor
           runs under the kitchen too) */}
@@ -552,8 +554,11 @@ function CookTableTop() {
     </group>
   )
 }
-function CookTableBox({ lay, along }: { lay: [number, number]; along: [number, number] }) {
-  const W = along[1] - along[0], D = lay[1] - lay[0]
+function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [number, number]; along: [number, number]
+  /** how far each face is set back under the top: lay's low and high ends, along's low and high (less than 0: run on) */
+  inset: [number, number, number, number] }) {
+  const lay = [l[0] + i0, l[1] - i1], along = [a[0] + j0, a[1] - j1]
+  const W = along[1] - along[0] + 0.12, D = lay[1] - lay[0] + 0.12
   const mid = new THREE.Vector3().addScaledVector(ALONG, (along[0] + along[1]) / 2).addScaledVector(LAY, (lay[0] + lay[1]) / 2)
   const floor = GRILL_OFFSET.y
   // (the top is one piece over all of them: CookTableTop)
@@ -780,7 +785,7 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
         )
       })()}
       {Array.from({ length: c.seats }, (_, n) => {
-        const x = (n - (c.seats - 1) / 2) * (L / c.seats)
+        const x = (n - (c.seats - 1) / 2) * (L / c.seats) + (c.shift ?? 0)
         return (
           <group key={n} position={[x, BAR_TOP, 0]}>
             {/* (each customer's plate is set down and cleared away by GuestBar3D) beyond it, toward the cook (clear of
@@ -819,7 +824,7 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
       })}
       {/* a box of tissues between each pair of seats, back by the lip clear of their plates */}
       {Array.from({ length: Math.floor(c.seats / 2) }, (_, k) => (
-        <group key={k} position={[(2 * k + 1 - c.seats / 2) * (L / c.seats), BAR_TOP, 0.2]}><TissueBox /></group>
+        <group key={k} position={[(2 * k + 1 - c.seats / 2) * (L / c.seats) + (c.shift ?? 0), BAR_TOP, 0.2]}><TissueBox /></group>
       ))}
     </group>
   )
@@ -1410,6 +1415,8 @@ type RoastingProps = {
   onOrderEntry?: (key: string, guest: number) => boolean
   /** how slowly customers come in (no cashier: fewer) */
   crowd?: number
+  /** the incense is burning: each customer orders a little more */
+  blessed?: boolean
   /** the shop is open: the chef works the grill, the player only watches */
   locked?: boolean
   /** who's at the grill in the AI simulation */
@@ -1429,7 +1436,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {}, crowd = 1, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, crew = [], bar = true,
+  locked = false, notes = {}, crowd = 1, blessed = false, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, crew = [], bar = true,
   entries, onOrderEntry }: RoastingProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
@@ -2253,10 +2260,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       const couple = ids.length === 2
       for (const [k, id] of ids.entries()) {
-        const want = 1 + Math.floor(Math.random() * 3)
+        const want = 1 + Math.floor(Math.random() * 3) + (blessed && Math.random() < 0.6 ? 1 : 0)
         const orders: string[] = []
         const said: string[] = []
-        for (let j = 0; j < (entries ? Math.min(want, 2) : want); j++) {
+        for (let j = 0; j < (entries ? Math.min(want, blessed ? 3 : 2) : want); j++) {
           if (entries) {
             // a dish (or a set) off the menu, made the way it's listed
             const e = entries[Math.floor(Math.random() * entries.length)]
