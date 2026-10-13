@@ -5786,7 +5786,9 @@ button {
   flex-direction: column;
   gap: 0.12em;
   padding: 0.3em 0.75em 0.26em;
-  background:
+  /* (its wood, laid on the fish-cut board under it: .brand-fishboard) */
+  background: transparent;
+  --fish-wood:
     /* fine growth rings, closer and further apart down the board */
     repeating-linear-gradient(178deg, rgb(48 30 18 / 0.22) 0 0.02em, transparent 0.02em 0.09em, rgb(48 30 18 / 0.12) 0.09em 0.11em, transparent 0.11em 0.23em),
     /* long grain lines, wavering along the board */
@@ -5799,6 +5801,66 @@ button {
 
 .brand-grilledfish .brand-main {
   text-shadow: 0 0.03em 0 rgb(40 25 15 / 0.55);
+}
+
+/* (cut in the shape of a fish, nose to the left, tail to the right: the name in its body; the board's wood is laid
+   on a layer of its own, cut to the fish, so the cords it hangs by aren't cut off with it) */
+.brand-grilledfish .brand-plate {
+  padding: 0.34em 1.55em 0.3em 0.95em;
+  box-shadow: none;
+  border-radius: 0;
+  filter: drop-shadow(0 0.12em 0.14em rgb(40 20 10 / 0.55));
+}
+.brand-grilledfish .brand-plate > .brand-fishboard {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--fish-wood);
+  clip-path: polygon(0% 50%, 3% 30%, 9% 16%, 19% 7%, 40% 2%, 63% 6%, 76% 15%, 83% 36%, 100% 6%, 96% 50%, 100% 94%, 83% 64%,
+    76% 85%, 63% 94%, 40% 98%, 19% 93%, 9% 84%, 3% 70%);
+}
+.brand-grilledfish .brand-plate {
+  isolation: isolate;
+}
+.brand-fish {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.brand-fish path,
+.brand-fish ellipse {
+  vector-effect: non-scaling-stroke;
+  fill: none;
+  stroke: var(--plate-cream);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.brand-fish-rule {
+  stroke-width: 1.6;
+  opacity: 0.85;
+}
+.brand-fish-line {
+  stroke-width: 1.3;
+  opacity: 0.75;
+}
+.brand-fish-scale {
+  stroke-width: 1;
+  opacity: 0.45;
+}
+.brand-fish .brand-fish-eye {
+  fill: var(--plate-cream);
+  stroke: rgb(40 25 15 / 0.6);
+  stroke-width: 1;
+}
+/* (the nails holding it up: one through its head, one by its tail) */
+.brand-grilledfish .brand-plate::before {
+  left: 1.25em;
+}
+.brand-grilledfish .brand-plate::after {
+  right: 1.75em;
 }
 
 /* (under the name, across, small and spaced out, between two short rules) */

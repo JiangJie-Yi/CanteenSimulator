@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { MOODS, MOOD_PARTS, cap, walkOf, type Mood } from './people'
 import { useGLTF } from '@react-three/drei'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -115,17 +116,6 @@ function skinnable(o: THREE.SkinnedMesh, into: THREE.SkinnedMesh) {
 const SWAPPED = new Set(['eyes', 'eyesShut', 'mouth', 'mouthOpen'])
 /** the parts drawn without an outline (things lying on the surface, and fine ones) */
 const FLAT = /^(eyes|eyesShut|face|mouth|mouthOpen|brows|details|cuffs|glasses|pin)/
-/** how a customer's taking it, on their face: pleased (eyes squeezed shut, brows up, a big grin), cross, let down */
-export type Mood = 'joy' | 'mad' | 'sad'
-const MOODS: Mood[] = ['joy', 'mad', 'sad']
-/** the face's parts for each mood (the plain brows too: they're swapped out for a mood's) */
-function MOOD_PARTS() {
-  return ['brows', 'eyesJoy', ...MOODS.flatMap((m) => [`brows${cap(m)}`, `mouth${cap(m)}`])]
-}
-const cap = (m: string) => m[0].toUpperCase() + m.slice(1)
-/** a customer's mood from how they rated it (or that they walked out): none while they've not said */
-export const moodOf = (g: { rating: number | null; state: string }): Mood | null =>
-  g.state === 'angry' ? 'mad' : g.rating === null ? null : g.rating >= 65 ? 'joy' : g.rating < 45 ? 'sad' : null
 
 const UP = new THREE.Vector3(), QA = new THREE.Quaternion(), QB = new THREE.Quaternion()
 
@@ -318,13 +308,6 @@ function useRigged(id: number, kind: Kind, glasses: boolean, phones: boolean,
   return r
 }
 
-/**
- * How each kind walks (the model's own actions): the women their own way, quick light steps; the middle-aged uncle a
- * heavier tread; the old folk a slow stooped shuffle; the rest a man's easy stride. And how fast, for the same.
- */
-export const walkOf = (kind: string) => kind === 'grandma' || kind === 'grandpa' ? 'WalkO' : kind === 'uncle' ? 'WalkU'
-  : ['officeLady', 'highSchoolGirl', 'yukata', 'maid', 'gyaru', 'staffF'].includes(kind) ? 'WalkF' : 'Walk'
-export const walkSpeedOf = (kind: string) => ({ WalkO: 0.55, WalkU: 0.82, WalkF: 0.92, Walk: kind === 'kid' ? 1.12 : 1 })[walkOf(kind)]
 /** the shop's slippers */
 const SLIPPER = new THREE.Color('#4a6a52')
 /** the shapes a face can have */

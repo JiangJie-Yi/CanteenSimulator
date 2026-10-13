@@ -148,7 +148,7 @@ export const TOILETS = { m: { passing: 0, open: false }, f: { passing: 0, open: 
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __toilets?: typeof TOILETS }).__toilets = TOILETS
 
 /** the till: how far past the first counter's middle it stands (it butts on to the counter's end), and its size */
-export const TILL = { along: 0.75, W: 1.2, D: 0.6, rise: 0.1 }
+export const TILL = { along: 0.75, W: 1.2, D: 0.6, rise: 0.22 }
 
 /** the pass, in the bar's own frame (on the first counter's top, at its start, the customers' side of it) */
 export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + 0.2)

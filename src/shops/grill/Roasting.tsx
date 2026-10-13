@@ -4,6 +4,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
+import { BlobShadow } from '@/scene/BlobShadow'
 import { FloorPiece } from '@/scene/FloorPiece'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { CHEFS, type Chef } from '@/data/chefs'
@@ -761,6 +762,23 @@ function BarTop() {
     </group>
   )
 }
+/** the cove light's glow down the bar's base: warm at the top, gone by the floor */
+const COVE_GLOW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 8
+  c.height = 64
+  const g = c.getContext('2d')!
+  const grad = g.createLinearGradient(0, 0, 0, 64)
+  grad.addColorStop(0, 'rgba(255,200,120,0.6)')
+  grad.addColorStop(0.5, 'rgba(255,190,110,0.22)')
+  grad.addColorStop(1, 'rgba(255,190,110,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 8, 64)
+  return new THREE.CanvasTexture(c)
+})()
+/** how high the raised lip along the bar's cook's side stands over its top */
+const LIP_H = 0.15
 /** a unit slab with rounded edges (scaled to each top), its grain still running the long way */
 const ROUNDED_SLAB = new RoundedBoxGeometry(1, 1, 1, 3, 0.08)
 const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042, 0.016], [0.045, 0.02], [0.043, 0.021],
@@ -793,6 +811,14 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
           </mesh>
         </>
       )}
+      {/* the cove light: a warm strip hidden under the top's front edge, its glow washing down the base toward the floor */}
+      <mesh position={[baseX, BAR_TOP - 0.068, -0.27]} rotation-x={Math.PI / 2}>
+        <planeGeometry args={[baseL, 0.03]} /><meshBasicMaterial color="#ffcf88" toneMapped={false} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[baseX, (BAR_TOP - 0.06) * 0.62, -0.1215]} rotation-y={Math.PI}>
+        <planeGeometry args={[baseL, (BAR_TOP - 0.06) * 0.76]} />
+        <meshBasicMaterial map={COVE_GLOW} transparent depthWrite={false} toneMapped={false} />
+      </mesh>
       {/* the base stands back on the cook's side, so the customers' knees go under the top */}
       <mesh position={[baseX, (BAR_TOP - 0.06) / 2, 0.08]} castShadow>
         <boxGeometry args={[baseL, BAR_TOP - 0.06, 0.4]} />
@@ -807,10 +833,11 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
           else x0 += G
         }
         return (
-          <mesh position={[(x0 + x1) / 2, BAR_TOP + 0.03, 0.285]}>
-            <boxGeometry args={[x1 - x0, 0.06, 0.05]} />
-            <meshToonMaterial color="#c49a64" />
-          </mesh>
+          // (a tall one, a screen of wood between the customers and the kitchen, its top rounded)
+          <group position={[(x0 + x1) / 2, BAR_TOP + LIP_H / 2, 0.28]}>
+            <mesh geometry={ROUNDED_SLAB} scale={[x1 - x0, LIP_H, 0.06]} castShadow><meshToonMaterial color="#ffffff" map={TRAY_WOOD} /></mesh>
+            <mesh geometry={ROUNDED_SLAB} scale={[(x1 - x0) * 1.003, LIP_H * 1.06, 0.07]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+          </group>
         )
       })()}
       {Array.from({ length: c.seats }, (_, n) => {
@@ -3530,7 +3557,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       <CookTable floor={!bar} />
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
-        <group key={m.id} position={at} rotation-y={yaw} scale={CHEF_SCALE}><StaffFigure id={m.id} role={m.role} look={m.look} /></group>
+        <group key={m.id} position={at} rotation-y={yaw} scale={CHEF_SCALE}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></group>
       ))}
       {bar && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}

@@ -8,7 +8,9 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
-import { Person, StaffFigure, moodOf, walkSpeedOf } from '@/scene/Person3D'
+import { Person, StaffFigure } from '@/scene/Person3D'
+import { moodOf, walkSpeedOf } from '@/scene/people'
+import { BlobShadow } from '@/scene/BlobShadow'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
@@ -326,21 +328,47 @@ function Chochin({ mark }: { mark: string }) {
  * customer's display), a card reader, a receipt printer with its paper curling out, a tray for the change, a cup of
  * pens, a little bell to ring, the お会計 sign facing the customers, and a beckoning cat (招き猫) for luck.
  */
+/** the warm light washing down the till's front from under its top: bright at the top, fading out */
+const TILL_GLOW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 8
+  c.height = 64
+  const g = c.getContext('2d')!
+  const grad = g.createLinearGradient(0, 0, 0, 64)
+  grad.addColorStop(0, 'rgba(255,214,150,0.55)')
+  grad.addColorStop(1, 'rgba(255,214,150,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 8, 64)
+  return new THREE.CanvasTexture(c)
+})()
 export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
   const { W, D } = TILL
   return (
     <group position={at} rotation-y={yaw}>
       {/* (local x along the bar, +z toward the cashier, behind it) */}
       <Part geo={REG_GEO.body} color="#3a2a1e" outline={1.015} position={[0, (top - 0.05) / 2, 0.02]} scale={[W - 0.04, top - 0.05, D - 0.06]} />
-      <Part geo={REG_GEO.round} color="#d9b884" outline={1.02} position={[0, top - 0.025, 0]} scale={[W + 0.06, 0.05, D + 0.04]} />
-      {/* panels on its front, a kick board at its foot */}
-      {[-1, 0, 1].map((k) => (
-        <mesh key={k} position={[k * (W / 3), (top - 0.05) / 2 + 0.02, -D / 2 + 0.028]} rotation-y={Math.PI}>
-          <planeGeometry args={[W / 3 - 0.06, top - 0.2]} />
-          <meshToonMaterial color="#4a3626" />
-        </mesh>
+      {/* a thick top of pale hinoki, overhanging its front, a warm light hidden under the overhang washing down the front */}
+      <Part geo={REG_GEO.round} color="#d9b884" outline={1.02} position={[0, top - 0.03, -0.03]} scale={[W + 0.1, 0.06, D + 0.1]} />
+      <mesh position={[0, top - 0.075, -D / 2 - 0.0]} rotation-y={Math.PI}><planeGeometry args={[W - 0.1, 0.025]} /><meshBasicMaterial color="#ffd89a" toneMapped={false} /></mesh>
+      <mesh position={[0, top - 0.22, -D / 2 + 0.018]} rotation-y={Math.PI}><planeGeometry args={[W - 0.06, 0.3]} /><meshBasicMaterial map={TILL_GLOW} transparent depthWrite={false} toneMapped={false} /></mesh>
+      {/* its front: upright battens of hinoki over the dark body, close set, a dark kick board at the foot */}
+      {Array.from({ length: 15 }, (_, k) => (
+        <Part key={k} geo={REG_GEO.body} color={k % 2 ? '#c49a64' : '#b88c58'} outline={0} position={[(k - 7) * (W - 0.08) / 15, (top - 0.06) / 2 + 0.04, -D / 2 + 0.014]}
+          scale={[0.036, top - 0.14, 0.024]} />
       ))}
       <Part geo={REG_GEO.body} color="#22180f" outline={0} position={[0, 0.03, -D / 2 + 0.035]} scale={[W - 0.06, 0.06, 0.02]} />
+      {/* and at its end, toward the door, a round window (丸窓) in its side with a lattice in it, lit from within */}
+      <group position={[W / 2 - 0.018, (top - 0.05) / 2 + 0.03, 0.02]} rotation-y={Math.PI / 2}>
+        <mesh><circleGeometry args={[0.2, 28]} /><meshBasicMaterial color="#f2dcb0" toneMapped={false} /></mesh>
+        <mesh position-z={0.002}><ringGeometry args={[0.2, 0.235, 28]} /><meshToonMaterial color="#5a3a22" /></mesh>
+        {[-1, 0, 1].map((k) => (
+          <group key={k}>
+            <mesh position={[k * 0.1, 0, 0.003]}><planeGeometry args={[0.012, 0.4 * Math.sqrt(1 - (k * 0.1 / 0.2) ** 2)]} /><meshToonMaterial color="#5a3a22" /></mesh>
+            <mesh position={[0, k * 0.1, 0.003]}><planeGeometry args={[0.4 * Math.sqrt(1 - (k * 0.1 / 0.2) ** 2), 0.012]} /><meshToonMaterial color="#5a3a22" /></mesh>
+          </group>
+        ))}
+      </group>
       {/* the register, an old brass-trimmed one: the cash drawer (handle and lock) under a stepped body, its keys in rows
           down the sloped front to the cashier, the crank at its side, and on top the arched sign where the amount's
           figures pop up, to both sides */}
@@ -645,6 +673,15 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
 const SHOES_S = 1.2
 /** a walk that stops a while at a point along it: how far along, at a time when it would have been `d` */
 const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at + hold ? at : d - hold)
+/** what's set at a customer's place (their soy, their drink) and their shoes left in the genkan: shared shapes */
+const AT_SEAT = {
+  soy: new THREE.CircleGeometry(0.03, 16),
+  daikon: new THREE.SphereGeometry(0.011, 8, 6),
+  bottle: new THREE.CylinderGeometry(0.022, 0.024, 0.12, 12),
+  neck: new THREE.CylinderGeometry(0.012, 0.02, 0.025, 10),
+  cap: new THREE.CylinderGeometry(0.012, 0.012, 0.008, 10),
+  shoe: new THREE.SphereGeometry(1, 8, 6),
+}
 /** the women's kinds, who use the women's toilet */
 const HER = new Set(['officeLady', 'highSchoolGirl', 'yukata', 'grandma', 'maid', 'gyaru'])
 /** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
@@ -980,6 +1017,31 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     SEATS_TAKEN.clear()
     for (const x of shown) SEATS_TAKEN.add(x.seat)
+    // nobody walks through anybody: those walking (in, out, to the toilet or the fridge) keep a body's width apart,
+    // stepping aside for each other and for the servers (who keep to their way, their trays held level)
+    {
+      const walkers: { p: THREE.Vector3; give: boolean }[] = []
+      for (const x of shown) {
+        if (x.phase === 'sit' || x.phase === 'wcIn' && x.wc?.who !== 'drink') continue
+        const gp = groups.current.get(x.id)?.position
+        if (gp) walkers.push({ p: gp, give: true })
+      }
+      for (const w of waiters.current) walkers.push({ p: waiterObjs.current[waiters.current.indexOf(w)]?.position ?? w.pos, give: false })
+      const R = 0.3
+      for (let i = 0; i < walkers.length; i++) for (let j = i + 1; j < walkers.length; j++) {
+        const a = walkers[i], b = walkers[j]
+        const dx = a.p.x - b.p.x, dz = a.p.z - b.p.z, d = Math.hypot(dx, dz)
+        if (d >= R || (!a.give && !b.give)) continue
+        // (straight on into each other: aside to the left)
+        const nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0
+        const push = R - d
+        const ka = a.give ? (b.give ? 0.5 : 1) : 0, kb = b.give ? (a.give ? 0.5 : 1) : 0
+        a.p.x += nx * push * ka
+        a.p.z += nz * push * ka
+        b.p.x -= nx * push * kb
+        b.p.z -= nz * push * kb
+      }
+    }
     // the toilets' doors open for whoever's going through them just now
     if (wcs) for (const who of ['m', 'f'] as const) {
       TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack' || x.phase === 'wcIn')
@@ -1260,7 +1322,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           return (
             <group key={`shoe${s.id}`} position={at} rotation-y={Math.atan2(c0.along.x, c0.along.z) + Math.PI + (s.id % 3 - 1) * 0.15}>
               {[-1, 1].map((sd) => (
-                <mesh key={sd} position={[sd * 0.028, 0.018, 0]} scale={[0.025, 0.018, 0.06]}><sphereGeometry args={[1, 8, 6]} /><meshToonMaterial color={col} /></mesh>
+                <mesh key={sd} geometry={AT_SEAT.shoe} position={[sd * 0.028, 0.018, 0]} scale={[0.025, 0.018, 0.06]}><meshToonMaterial color={col} /></mesh>
               ))}
             </group>
           )
@@ -1274,10 +1336,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const at = st.plate.clone().addScaledVector(c.along, 0.17).addScaledVector(c.lay, 0.1).setY(top)
         return (
           <group key={`drink${s.id}`} position={at}>
-            <mesh position-y={0.06}><cylinderGeometry args={[0.022, 0.024, 0.12, 12]} />
-              <meshToonMaterial color={d.color} transparent={d.glass} opacity={d.glass ? 0.75 : 1} /></mesh>
-            <mesh position-y={0.13}><cylinderGeometry args={[0.012, 0.02, 0.025, 10]} /><meshToonMaterial color={d.color} /></mesh>
-            <mesh position-y={0.145}><cylinderGeometry args={[0.012, 0.012, 0.008, 10]} /><meshToonMaterial color={d.cap} /></mesh>
+            <mesh geometry={AT_SEAT.bottle} position-y={0.06}><meshToonMaterial color={d.color} transparent={d.glass} opacity={d.glass ? 0.75 : 1} /></mesh>
+            <mesh geometry={AT_SEAT.neck} position-y={0.13}><meshToonMaterial color={d.color} /></mesh>
+            <mesh geometry={AT_SEAT.cap} position-y={0.145}><meshToonMaterial color={d.cap} /></mesh>
           </group>
         )
       })}
@@ -1289,8 +1350,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const at = st.plate.clone().addScaledVector(c.along, sauceSide(c, BAR_GATES[st.counter], x)).addScaledVector(c.lay, 0.13).setY(top + 0.013)
         return (
           <group key={`soy${s.id}`} position={at}>
-            <mesh rotation-x={-Math.PI / 2}><circleGeometry args={[0.03, 16]} /><meshToonMaterial color="#3a1c0c" /></mesh>
-            <mesh position={[0.008, 0.004, 0.004]} scale={[1, 0.5, 1]}><sphereGeometry args={[0.011, 8, 6]} /><meshToonMaterial color="#f2efe4" /></mesh>
+            <mesh geometry={AT_SEAT.soy} rotation-x={-Math.PI / 2}><meshToonMaterial color="#3a1c0c" /></mesh>
+            <mesh geometry={AT_SEAT.daikon} position={[0.008, 0.004, 0.004]} scale={[1, 0.5, 1]}><meshToonMaterial color="#f2efe4" /></mesh>
           </group>
         )
       })}
@@ -1319,6 +1380,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       ))}
       {servers.slice(0, homes.length).map((w, i) => (
         <group key={w.id} ref={(o) => { waiterObjs.current[i] = o }} position={homes[i].at} rotation-y={homes[i].yaw} scale={PEOPLE_SCALE}>
+          <BlobShadow r={0.17} />
           <StaffFigure id={w.id} role="server" look={w.look} moving={!!moving[i]} />
         </group>
       ))}
@@ -1327,6 +1389,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const walking = s.phase !== 'sit'
         return (
           <group key={s.id} ref={(o) => { if (o) groups.current.set(s.id, o); else groups.current.delete(s.id) }}>
+            {/* (a soft shadow under them, sat or walking) */}
+            <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>
               <PersonClock s={s} eating={() => s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'} clock={clock}
                 talk={talkSide(s)} guest={g} />

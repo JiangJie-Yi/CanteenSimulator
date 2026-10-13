@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { DRINKS, FRIDGE, TOILETS, WC_W, handOver, type Counter } from './bar'
 import { LuckyCat } from './LuckyCat'
@@ -934,13 +935,16 @@ const TIGER_GEO = {
  * two fangs with a gold coin in it, a red cape with a gold hem at his neck, his tail curled up beside him.
  * Faces -x (the room).
  */
-function TigerIdol() {
-  const B = (props: { at: [number, number, number]; r: [number, number, number]; color?: string; map?: THREE.Texture | null; ink?: boolean }) => (
+/** one rounded part of the figure: a ball stretched to its size, inked round unless it's a small painted detail */
+function B(props: { at: [number, number, number]; r: [number, number, number]; color?: string; map?: THREE.Texture | null; ink?: boolean }) {
+  return (
     <group position={props.at} scale={props.r}>
       <mesh geometry={TIGER_GEO.ball}><meshToonMaterial color={props.color ?? '#ffffff'} map={props.map ?? null} /></mesh>
       {props.ink !== false && <mesh geometry={TIGER_GEO.ball} scale={1.07}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>}
     </group>
   )
+}
+function TigerIdol() {
   return (
     <group>
       {/* the dais: red lacquer, a gold band round its top and its foot */}
@@ -1200,6 +1204,7 @@ const PROP_GEO = {
   stalk: new THREE.CylinderGeometry(0.014, 0.017, 1, 6),
   leaf: new THREE.ConeGeometry(0.035, 0.2, 4),
   crate: new THREE.BoxGeometry(0.3, 0.2, 0.24),
+  tallPot: new THREE.CylinderGeometry(0.13, 0.1, 0.34, 16),
   bottle: new THREE.CylinderGeometry(0.03, 0.03, 0.14, 8),
 }
 function Inked({ geometry, color, map, grow = 1.04, side, ...rest }: { geometry: THREE.BufferGeometry; color: string; map?: THREE.Texture | null
@@ -1252,6 +1257,40 @@ function PottedBamboo() {
     </group>
   )
 }
+/** the willow's weeping branches: each a thin tube arching out from the top of its trunk and falling away */
+const WILLOW = (() => {
+  const branches: THREE.BufferGeometry[] = []
+  const leaves: THREE.Vector3[] = []
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2 + (k % 3) * 0.3
+    const reach = 0.16 + (k % 4) * 0.04, fall = 0.55 + (k % 5) * 0.09
+    const dir = new THREE.Vector3(Math.cos(a), 0, Math.sin(a))
+    const top = new THREE.Vector3(0, 1.05 + (k % 3) * 0.04, 0)
+    const pts = [top, top.clone().addScaledVector(dir, reach * 0.5).add(new THREE.Vector3(0, 0.08, 0)), top.clone().addScaledVector(dir, reach),
+      top.clone().addScaledVector(dir, reach * 1.15).add(new THREE.Vector3(0, -fall * 0.5, 0)), top.clone().addScaledVector(dir, reach * 1.2).add(new THREE.Vector3(0, -fall, 0))]
+    const curve = new THREE.CatmullRomCurve3(pts)
+    branches.push(new THREE.TubeGeometry(curve, 10, 0.0035, 3, false))
+    for (let i = 3; i <= 12; i++) leaves.push(curve.getPoint(i / 12))
+  }
+  return { branches: mergeGeometries(branches)!, leaves }
+})()
+const WILLOW_LEAF = new THREE.ConeGeometry(0.012, 0.06, 4)
+/** a weeping willow (柳) in a tall glazed pot: a slender trunk, its long thin branches falling all round it in green */
+function PottedWillow() {
+  return (
+    <group>
+      <Inked geometry={PROP_GEO.tallPot} color="#3a4a3e" position-y={0.17} />
+      <mesh position-y={0.34} rotation-x={-Math.PI / 2}><circleGeometry args={[0.12, 16]} /><meshToonMaterial color="#4a3020" /></mesh>
+      <mesh position={[0.01, 0.7, 0]} rotation-z={0.05}><cylinderGeometry args={[0.012, 0.022, 0.75, 6]} /><meshToonMaterial color="#5a4a32" /></mesh>
+      <mesh geometry={WILLOW.branches}><meshToonMaterial color="#6a7a3a" /></mesh>
+      {WILLOW.leaves.map((p, i) => (
+        <mesh key={i} geometry={WILLOW_LEAF} position={p} rotation={[Math.PI + (i % 3 - 1) * 0.4, i * 1.3, (i % 2 - 0.5) * 0.6]}>
+          <meshToonMaterial color={i % 3 ? '#7a9a3e' : '#8aac4a'} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
 /** plastic crates of empty bottles (P箱), stacked by the kitchen's end, where the stock's seen to */
 function BottleCrates() {
   return (
@@ -1284,7 +1323,13 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
         <group position-x={0.21} rotation-y={0.4}><SakeBarrel /></group>
         <group position-y={0.43} rotation-y={-0.2}><SakeBarrel /></group>
       </group>
+      {/* plants about the room: bamboo and a willow along the side counter's back wall, by the fridge; a willow by
+          the sake barrels in the front corner; bamboo either side of the till's end, by the door */}
       <group position={at(-4.25, 3.7)}><PottedBamboo /></group>
+      <group position={at(-4.17, 2.85)} rotation-y={0.8} scale={0.85}><PottedWillow /></group>
+      <group position={at(-4.25, 1.75)} rotation-y={2.1}><PottedBamboo /></group>
+      <group position={at(3.62, 2.25)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
+      <group position={at(2.3, 3.72)} rotation-y={0.4}><PottedBamboo /></group>
       <group position={at(1.45, 0.62)} rotation-y={face}><BottleCrates /></group>
     </StaticBatch>
   )
