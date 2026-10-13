@@ -1116,16 +1116,22 @@ def hair(kind, hd, surf, style=None):
         # a regent: the sides slicked flat back to a duck's tail, the front swept up and out in a great pompadour
         bm = cap(hd, surf, lambda y, p: p > (0.5 if abs(y) < 0.9 else 0.02 - 0.4 * smoothstep(1.8, 2.8, abs(y))),
                  off=0.004, thick=0.008)
-        # (the pompadour: a great roll of hair pushed up and out over the brow, tilted up at its front, and the
-        # combed ridges running forward over it)
-        roll_c = HC + Vector((0, -HEAD_R * 0.74, HEAD_R * 0.66))
-        rot = Matrix.Rotation(-0.75, 3, "X")
-        ellipsoid(bm, roll_c, (0.09, 0.085, 0.05), seg=24, rings=14, rot=rot)
+        # (the pompadour, the 飛機頭: a thick sweep of hair rising from the crown and thrust straight out forward over
+        # the brow like a bill, rounded off at its front, the comb's ridges running the length of it)
+        def pomp(x, y, z):
+            return HC + Vector((x, y, z))
+        path = [pomp(0, 0.05, 0.11), pomp(0, -0.03, 0.14), pomp(0, -0.1, 0.143), pomp(0, -0.15, 0.125), pomp(0, -0.178, 0.098),
+                pomp(0, -0.188, 0.075)]
+        wide = [0.072, 0.084, 0.086, 0.08, 0.066, 0.04]
+        thick = [0.028, 0.04, 0.044, 0.04, 0.032, 0.018]
+        ups = [Vector((0, 0.2, 1)).normalized(), Vector((0, 0, 1)), Vector((0, -0.1, 1)).normalized(), Vector((0, -0.4, 1)).normalized(),
+               Vector((0, -0.8, 1)).normalized(), Vector((0, -1, 0.6)).normalized()]
+        loft(bm, path, wide, thick, ups, ring=12, tip=False)
         for i in range(5):
-            x = -0.05 + i * 0.025
-            pts = [roll_c + rot @ Vector((x * 0.9, 0.06, 0.03)), roll_c + rot @ Vector((x, 0.0, 0.05)),
-                   roll_c + rot @ Vector((x * 0.95, -0.06, 0.035)), roll_c + rot @ Vector((x * 0.85, -0.084, 0.0))]
-            loft(bm, pts, [0.004, 0.006, 0.006, 0.003], [0.003] * 4, [rot @ Vector((0, 0, 1))] * 4, ring=6, tip=False)
+            x = (i - 2) * 0.026
+            ridge = [pomp(x * 0.8, 0.03, 0.135), pomp(x, -0.03, 0.178), pomp(x, -0.1, 0.185), pomp(x * 0.95, -0.15, 0.163),
+                     pomp(x * 0.8, -0.18, 0.128)]
+            loft(bm, ridge, [0.005, 0.008, 0.008, 0.007, 0.004], [0.004] * 5, ups[:5], ring=6, tip=False)
         for sd in (1, -1):
             # (combed straight back over the ears, above them)
             for i in range(4):

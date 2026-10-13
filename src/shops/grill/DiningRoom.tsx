@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
-import { DRINKS, FRIDGE, TOILETS, WC_W, handOver, type Counter } from './bar'
+import { DRINKS, FRIDGE, TOILETS, WC_SLIDE, WC_W, handOver, type Counter } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Steam } from '@/scene/Steam'
 
@@ -444,7 +444,7 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     const want = d.passing > 0 || d.open ? 1 : 0
     k.current += Math.sign(want - k.current) * Math.min(Math.abs(want - k.current), Math.min(dt, 0.1) * 1.8)
     const e = k.current * k.current * (3 - 2 * k.current)
-    if (g.current) g.current.position.z = away * e * (W - 0.1)
+    if (g.current) g.current.position.z = away * e * WC_SLIDE
   })
   return (
     <group ref={g} onClick={(ev) => { ev.stopPropagation(); TOILETS[who].open = !TOILETS[who].open }}
@@ -623,7 +623,9 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
  * One counter's stretch of the room: the wall behind its aisle (from/to along it, in the counter's own frame), and
  * pendant lamps over it.
  */
-export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar = false }: { c: Counter; from: number; to: number; far: number
+export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar = false, clear = [] }: { c: Counter; from: number; to: number; far: number
+  /** stretches of it (along it) where something stands against it: nothing hung there, no post */
+  clear?: [number, number][]
   /** its shelf an altar instead (by the door): a command flag in the censer, and incense (lit when, and lighting more) */
   altar?: boolean | { litAt: number | null; onLight: () => void }
   lamps: number
@@ -645,6 +647,9 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
   // (pictures along the wall, a print then a scroll in turn, about a metre apart, leaving the shelf's stretch clear)
   // (the shelf in the far third of the wall, or the near one if the door's in the far one)
   const shelfZ = door !== undefined && Math.abs(door - (mid + l * 0.3)) < 1.3 ? mid - l * 0.3 : mid + l * 0.3
+  // (the wall with the toilets has the fridge and the doors' sliding along it: no shelf there)
+  const shelf = door === undefined
+  const isClear = (z: number, pad: number) => clear.every(([a, b]) => z < a - pad || z > b + pad)
   const art = useMemo(() => {
     // (in the bays between the posts, spaced evenly in each, never over a post or the shelf)
     const posts = [from, mid - l / 6, mid + l / 6, to]
@@ -655,10 +660,10 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
       const n = Math.max(0, Math.floor(w / 0.95))
       for (let i = 0; i < n; i++) spots.push(posts[b] + (w / n) * (i + 0.5))
     }
-    return spots.filter((z) => Math.abs(z - shelfZ) > 0.85 && (door === undefined || Math.abs(z - door) > 0.95)
-      && (shrine === undefined || Math.abs(z - shrine) > 0.75) && (door === undefined || Math.abs(z - door) > WC_W + 0.55))
+    return spots.filter((z) => (!shelf || Math.abs(z - shelfZ) > 0.85) && isClear(z, 0.3) && (door === undefined || Math.abs(z - door) > 0.95)
+      && (shrine === undefined || Math.abs(z - shrine) > 0.75) && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length] }))
-  }, [l, from, to, mid, shelfZ, c.length, door, shrine])
+  }, [l, from, to, mid, shelfZ, c.length, door, shrine, shelf, clear])
   const frieze = useMemo(() => {
     if (!SEIGAIHA) return null
     const t = SEIGAIHA.clone()
@@ -692,7 +697,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         {/* (the rail broken where the toilets' doorways are) */}
         {spans.filter(([, , y0]) => y0 < WAINSCOT).map(([z0, z1]) => <Box key={z0} size={[0.05, 0.05, z1 - z0]} color="#3a2416" position={[-0.02, WAINSCOT, (z0 + z1) / 2]} />)}
         <Box size={[0.08, 0.1, l]} color="#3a2416" position={[-0.03, WALL_H - 0.05, mid]} />
-        {[from, mid - l / 6, mid + l / 6, to].filter((z) => z === from || z === to || door === undefined || Math.abs(z - door) > WC_W + 0.1).map((z) => (
+        {[from, mid - l / 6, mid + l / 6, to].filter((z) => z === from || z === to || (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.2) && isClear(z, 0.05)).map((z) => (
           <Box key={z} size={[0.07, WALL_H, 0.08]} color="#3a2416" position={[-0.03, WALL_H / 2, z]} />
         ))}
         {/* a frieze of seigaiha waves under the beam, and the pictures hung along the plaster */}
@@ -713,8 +718,11 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         {shrine !== undefined && <group position={[0, 1.78, shrine]}><Kamidana /></group>}
         {/* the shelf: sake bottles, two crocks and the cat; or, by the door, the altar */}
         {altar ? <group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Box size={[ALTAR_D, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
-          {[-0.35, 0.35].map((z) => <Box key={z} size={[ALTAR_D - 0.04, 0.1, 0.03]} color="#3a2416" position={[0.02, -0.07, z]} />)}</group>
-          : <>
+          {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
+          {[-0.35, 0.35].map((z) => (
+            <mesh key={z} geometry={SHELF_BRACKET} position={[ALTAR_D / 2, -0.03, z - 0.015]}><meshToonMaterial color="#3a2416" /></mesh>
+          ))}</group>
+          : shelf && <>
         <group position={[-0.1, 1.08, shelfZ]}>
           <Box size={[0.2, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
           {[-0.35, 0.35].map((z) => <Box key={z} size={[0.18, 0.08, 0.025]} color="#3a2416" position={[0.04, -0.06, z]} />)}
@@ -1043,6 +1051,22 @@ function TigerIdol() {
     </group>
   )
 }
+/**
+ * A carved shelf bracket (持ち送り), in the wall's frame (x out from the wall, which is at x = 0, so it reaches to -x):
+ * a post against the wall, an arm under the shelf, and between them a deep curve, its end rounded off.
+ */
+const SHELF_BRACKET = (() => {
+  const sh = new THREE.Shape()
+  const D = 0.34, H = 0.24, w = 0.035
+  sh.moveTo(0, 0)
+  sh.lineTo(-D, 0)
+  sh.quadraticCurveTo(-D - 0.01, -0.03, -D + 0.02, -0.045)
+  sh.quadraticCurveTo(-w - 0.02, -0.06, -w, -H + 0.02)
+  sh.quadraticCurveTo(-w * 0.4, -H - 0.02, 0, -H)
+  sh.lineTo(0, 0)
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 10 })
+  return g
+})()
 /** the altar shelf's depth, out from the wall: the god at the back, raised, the censer before him */
 const ALTAR_D = 0.45
 /** and its height: up over the beckoning cats' stand below it, by the door */
@@ -1164,43 +1188,84 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
  */
 export function DrinkFridge() {
   const { W, H, D } = FRIDGE
-  const rows = [0.2, 0.5, 0.8, 1.1]
+  const rows = [0.2, 0.47, 0.74, 1.01, 1.28]
   return (
     <StaticBatch>
       {/* the cabinet: its back part solid, open at the front between its sides, top and foot, lit inside */}
-      <Inked geometry={FRIDGE_GEO.body} color="#2a2c30" position={[0, H / 2, -0.09]} scale={[W, H, D - 0.18]} grow={1.01} />
-      {[-1, 1].map((sd) => <Box key={sd} size={[0.04, H, 0.19]} color="#2a2c30" position={[sd * (W / 2 - 0.02), H / 2, D / 2 - 0.095]} />)}
-      <Box size={[W, 0.16, 0.19]} color="#2a2c30" position={[0, 0.08, D / 2 - 0.095]} />
-      <Box size={[W, 0.1, 0.19]} color="#2a2c30" position={[0, H - 0.05, D / 2 - 0.095]} />
-      <mesh position={[0, H / 2 + 0.03, D / 2 - 0.178]}><planeGeometry args={[W - 0.08, H - 0.26]} /><meshBasicMaterial color="#dfe9ee" /></mesh>
+      <Inked geometry={FRIDGE_GEO.body} color="#2a2c30" position={[0, H / 2, -D / 2 + 0.06]} scale={[W, H, 0.12]} grow={1.01} />
+      {[-1, 1].map((sd) => <Box key={sd} size={[0.045, H, D]} color="#2a2c30" position={[sd * (W / 2 - 0.022), H / 2, 0]} />)}
+      <Box size={[W, 0.16, D]} color="#2a2c30" position={[0, 0.08, 0]} />
+      <Box size={[W, 0.12, D]} color="#2a2c30" position={[0, H - 0.06, 0]} />
+      <mesh position={[0, H / 2 + 0.02, -D / 2 + 0.121]}><planeGeometry args={[W - 0.09, H - 0.28]} /><meshBasicMaterial color="#e4edf2" /></mesh>
+      {/* (the light strip down each side inside) */}
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * (W / 2 - 0.046), H / 2 + 0.02, 0]} rotation-y={-sd * Math.PI / 2}><planeGeometry args={[D - 0.05, H - 0.3]} /><meshBasicMaterial color="#f4f8fb" /></mesh>
+      ))}
       {rows.map((y, r) => (
         <group key={y} position-y={y}>
-          <mesh position={[0, -0.01, D / 2 - 0.08]}><boxGeometry args={[W - 0.08, 0.012, 0.14]} /><meshToonMaterial color="#9aa2a8" /></mesh>
-          {Array.from({ length: 6 }, (_, k) => {
-            const d = DRINKS[(r + Math.floor(k / 3)) % DRINKS.length]
-            return (
-              <group key={k} position={[(k - 2.5) * 0.085, 0, D / 2 - 0.08]}>
-                <mesh position-y={0.07}><cylinderGeometry args={[0.024, 0.026, 0.14, 10]} />
-                  <meshToonMaterial color={d.color} transparent={d.glass} opacity={d.glass ? 0.8 : 1} /></mesh>
-                <mesh position-y={0.16}><cylinderGeometry args={[0.012, 0.022, 0.04, 8]} /><meshToonMaterial color={d.color} /></mesh>
-                <mesh position-y={0.183}><cylinderGeometry args={[0.012, 0.012, 0.008, 8]} /><meshToonMaterial color={d.cap} /></mesh>
-              </group>
-            )
-          })}
+          <mesh position={[0, -0.01, 0]}><boxGeometry args={[W - 0.09, 0.012, D - 0.12]} /><meshToonMaterial color="#9aa2a8" /></mesh>
+          {/* two deep: a row in front, one behind */}
+          {[0.06, -0.09].map((z, depth) => Array.from({ length: 7 }, (_, k) => (
+            <group key={`${depth}${k}`} position={[(k - 3) * 0.1, 0, z]}>
+              <DrinkBottle id={DRINKS[(r + Math.floor(k / 2) + depth) % DRINKS.length].id} />
+            </group>
+          )))}
         </group>
       ))}
       {/* the glass door, its frame, its handle */}
-      <mesh position={[0, H / 2 + 0.03, D / 2 + 0.004]}><planeGeometry args={[W - 0.06, H - 0.26]} />
-        <meshBasicMaterial color="#cfe4f0" transparent opacity={0.18} depthWrite={false} /></mesh>
-      {[-1, 1].map((sd) => <Box key={sd} size={[0.03, H - 0.24, 0.02]} color="#3a3c42" position={[sd * (W / 2 - 0.03), H / 2 + 0.03, D / 2 + 0.008]} />)}
-      {[0.16, H - 0.1].map((y) => <Box key={y} size={[W - 0.03, 0.03, 0.02]} color="#3a3c42" position={[0, y, D / 2 + 0.008]} />)}
-      <Box size={[0.02, 0.5, 0.03]} color="#b8bcc0" position={[W / 2 - 0.07, H / 2 + 0.05, D / 2 + 0.03]} />
-      {/* the lit sign on top */}
-      <mesh position={[0, H + 0.09, D / 2 - 0.02]}><planeGeometry args={[W, 0.16]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGN} toneMapped={false} /></mesh>
-      <Box size={[W, 0.17, 0.05]} color="#1c1d20" position={[0, H + 0.09, D / 2 - 0.05]} />
+      <mesh position={[0, H / 2 + 0.02, D / 2 + 0.004]}><planeGeometry args={[W - 0.06, H - 0.26]} />
+        <meshBasicMaterial color="#cfe4f0" transparent opacity={0.16} depthWrite={false} /></mesh>
+      {[-1, 1].map((sd) => <Box key={sd} size={[0.035, H - 0.24, 0.025]} color="#3a3c42" position={[sd * (W / 2 - 0.03), H / 2 + 0.02, D / 2 + 0.01]} />)}
+      {[0.16, H - 0.12].map((y) => <Box key={y} size={[W - 0.03, 0.035, 0.025]} color="#3a3c42" position={[0, y, D / 2 + 0.01]} />)}
+      <Box size={[0.025, 0.6, 0.035]} color="#b8bcc0" position={[W / 2 - 0.08, H / 2 + 0.05, D / 2 + 0.04]} />
+      {/* the lit sign on top, and the vents at its foot */}
+      <mesh position={[0, H + 0.1, D / 2 - 0.01]}><planeGeometry args={[W, 0.18]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGN} toneMapped={false} /></mesh>
+      <Box size={[W, 0.19, 0.06]} color="#1c1d20" position={[0, H + 0.1, D / 2 - 0.045]} />
+      {[0, 1, 2, 3].map((k) => <Box key={k} size={[W - 0.2, 0.012, 0.004]} color="#16171a" position={[0, 0.04 + k * 0.025, D / 2 + 0.002]} />)}
     </StaticBatch>
   )
 }
+/** a bottle of one of the drinks, standing (its foot at the origin): its glass or can, its label printed round it,
+ * its neck and cap */
+export function DrinkBottle({ id }: { id: (typeof DRINKS)[number]['id'] }) {
+  const d = DRINKS.find((x) => x.id === id)!
+  const look = BOTTLE_LOOK[id]
+  return (
+    <group>
+      <mesh geometry={BOTTLE_GEO.body} position-y={0.065} material={look.glass} />
+      <mesh geometry={BOTTLE_GEO.label} position-y={0.06} material={look.label} />
+      <mesh geometry={BOTTLE_GEO.neck} position-y={0.145} material={look.glass} />
+      <mesh geometry={BOTTLE_GEO.cap} position-y={0.169}><meshToonMaterial color={d.cap} /></mesh>
+    </group>
+  )
+}
+const BOTTLE_GEO = {
+  body: new THREE.CylinderGeometry(0.026, 0.028, 0.13, 14),
+  label: new THREE.CylinderGeometry(0.0285, 0.0295, 0.06, 14, 1, true),
+  neck: new THREE.CylinderGeometry(0.012, 0.026, 0.04, 12),
+  cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 12),
+}
+/** each drink's label: its colours and its name round it, the shop's own small print */
+const BOTTLE_LOOK = Object.fromEntries(DRINKS.map((d) => {
+  const lbl = { beer: ['#c8a040', '#7a1a12', '生ビール'], sake: ['#f4efe2', '#b8261c', '清酒'], oolong: ['#3a6a3a', '#f2e6c8', '烏龍茶'], ramune: ['#2a6ab0', '#ffffff', 'ラムネ'] }[d.id]!
+  const tex = canvasTex(128, 48, (g) => {
+    g.fillStyle = lbl[0]
+    g.fillRect(0, 0, 128, 48)
+    g.fillStyle = lbl[1]
+    g.fillRect(0, 4, 128, 3)
+    g.fillRect(0, 41, 128, 3)
+    g.font = 'bold 20px "Zen Antique", "Noto Serif TC", serif'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    // (twice round, so it reads from either side)
+    g.fillText(lbl[2], 32, 25)
+    g.fillText(lbl[2], 96, 25)
+  })
+  return [d.id, {
+    glass: new THREE.MeshToonMaterial({ color: d.color, transparent: d.glass, opacity: d.glass ? 0.82 : 1 }),
+    label: new THREE.MeshToonMaterial({ color: '#ffffff', map: tex }),
+  }]
+})) as unknown as Record<(typeof DRINKS)[number]["id"], { glass: THREE.Material; label: THREE.Material }>
 const FRIDGE_GEO = { body: new THREE.BoxGeometry(1, 1, 1) }
 /** the fridge's sign: 飲料 · ドリンク, white on red */
 const FRIDGE_SIGN = canvasTex(192, 48, (g) => {
@@ -1366,11 +1431,9 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
         <group position-x={0.21} rotation-y={0.4}><SakeBarrel /></group>
         <group position-y={0.43} rotation-y={-0.2}><SakeBarrel /></group>
       </group>
-      {/* plants about the room: bamboo and a willow along the side counter's back wall, by the fridge; a willow by
+      {/* plants about the room: bamboo at the end of the side counter's back wall; a willow by
           the sake barrels in the front corner; bamboo either side of the till's end, by the door */}
       <group position={at(-4.25, 3.7)}><PottedBamboo /></group>
-      <group position={at(-4.17, 2.85)} rotation-y={0.8} scale={0.85}><PottedWillow /></group>
-      <group position={at(-4.25, 1.75)} rotation-y={2.1}><PottedBamboo /></group>
       <group position={at(3.62, 2.25)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       <group position={at(2.3, 3.72)} rotation-y={0.4}><PottedBamboo /></group>
       <group position={at(1.45, 0.62)} rotation-y={face}><BottleCrates /></group>

@@ -14,10 +14,10 @@ import { BlobShadow } from '@/scene/BlobShadow'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
-import { DiningWall, DrinkFridge, ShopProps } from './DiningRoom'
+import { DiningWall, DrinkBottle, DrinkFridge, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -123,7 +123,8 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const panels = useRef<(THREE.Mesh | null)[]>([])
   const yaw = Math.atan2(ALONG.x, ALONG.z)
   // (hung high, its rod well over a customer's head: they duck through only its hem)
-  const W = 0.78, H = 1.95, NOREN = 0.68
+  // (the doorway wide, its middle a little off the way in toward the till: the wall's close on the other side)
+  const W = 1.05, H = 1.95, NOREN = 0.68, DX = -0.12
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     panels.current.forEach((m, i) => {
@@ -171,6 +172,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
         ))}
       </group>
       </StaticBatch>
+      <group position-x={DX}>
       {/* the doorway's frame: a post either side and the lintel over them, the noren's rod hung under it; off the post on
           the bar's side an arm (腕木) reaches out over the way in, and the red lantern hangs from its end */}
       <StaticBatch>
@@ -194,6 +196,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           </mesh>
         </group>
       ))}
+      </group>
     </group>
   )
 }
@@ -347,7 +350,18 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
   return (
     <group position={at} rotation-y={yaw}>
       {/* (local x along the bar, +z toward the cashier, behind it) */}
-      <Part geo={REG_GEO.body} color="#3a2a1e" outline={1.015} position={[0, (top - 0.05) / 2, 0.02]} scale={[W - 0.04, top - 0.05, D - 0.06]} />
+      {/* its body hollow, open on the cashier's side: the front, the two ends, a shelf low inside and one under the top,
+          for the till roll, the bags and the cash box */}
+      <Part geo={REG_GEO.body} color="#3a2a1e" outline={1.015} position={[0, (top - 0.05) / 2, -D / 2 + 0.06]} scale={[W - 0.04, top - 0.05, 0.08]} />
+      {[-1, 1].map((sd) => (
+        <Part key={sd} geo={REG_GEO.body} color="#3a2a1e" outline={1.015} position={[sd * (W / 2 - 0.05), (top - 0.05) / 2, 0.02]} scale={[0.06, top - 0.05, D - 0.06]} />
+      ))}
+      <Part geo={REG_GEO.body} color="#4a3626" outline={0} position={[0, 0.1, 0.03]} scale={[W - 0.14, 0.03, D - 0.14]} />
+      <Part geo={REG_GEO.body} color="#4a3626" outline={0} position={[0, top - 0.2, 0.04]} scale={[W - 0.14, 0.025, D - 0.2]} />
+      {/* on the shelves: a stack of paper bags, a box of till rolls, the cash box */}
+      <Part geo={REG_GEO.body} color="#c8a878" outline={1.02} position={[-0.3, 0.17, 0.12]} scale={[0.22, 0.11, 0.16]} />
+      <Part geo={REG_GEO.body} color="#e8e2d2" outline={1.02} position={[0.05, 0.16, 0.1]} scale={[0.14, 0.09, 0.12]} />
+      <Part geo={REG_GEO.body} color="#2a3442" outline={1.02} position={[0.3, top - 0.155, 0.08]} scale={[0.2, 0.065, 0.16]} />
       {/* a thick top of pale hinoki, overhanging its front, a warm light hidden under the overhang washing down the front */}
       <Part geo={REG_GEO.round} color="#d9b884" outline={1.02} position={[0, top - 0.03, -0.03]} scale={[W + 0.1, 0.06, D + 0.1]} />
       <mesh position={[0, top - 0.075, -D / 2 - 0.0]} rotation-y={Math.PI}><planeGeometry args={[W - 0.1, 0.025]} /><meshBasicMaterial color="#ffd89a" toneMapped={false} /></mesh>
@@ -677,9 +691,6 @@ const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at 
 const AT_SEAT = {
   soy: new THREE.CircleGeometry(0.03, 16),
   daikon: new THREE.SphereGeometry(0.011, 8, 6),
-  bottle: new THREE.CylinderGeometry(0.022, 0.024, 0.12, 12),
-  neck: new THREE.CylinderGeometry(0.012, 0.02, 0.025, 10),
-  cap: new THREE.CylinderGeometry(0.012, 0.012, 0.008, 10),
   shoe: new THREE.SphereGeometry(1, 8, 6),
 }
 /** the women's kinds, who use the women's toilet */
@@ -1292,7 +1303,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <group key={i}>
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
-            {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lamps={2} top={top} door={(meet + corner) / 2} />}
+            {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lamps={2} top={top} door={wcs?.door ?? (meet + corner) / 2}
+              clear={fridge ? [[fridge.z - FRIDGE.W / 2 - 0.1, fridge.z + FRIDGE.W / 2 + 0.1]] : undefined} />}
           </group>
         )
       })}
@@ -1302,7 +1314,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && (
         <StaticBatch>
           <Register top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
-            at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + TILL.along).addScaledVector(counters[0].lay, 0.1)} />
+            at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + TILL.along).addScaledVector(counters[0].lay, TILL.lay)} />
         </StaticBatch>
       )}
       <StaticBatch key={seats.length}>
@@ -1336,9 +1348,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const at = st.plate.clone().addScaledVector(c.along, 0.17).addScaledVector(c.lay, 0.1).setY(top)
         return (
           <group key={`drink${s.id}`} position={at}>
-            <mesh geometry={AT_SEAT.bottle} position-y={0.06}><meshToonMaterial color={d.color} transparent={d.glass} opacity={d.glass ? 0.75 : 1} /></mesh>
-            <mesh geometry={AT_SEAT.neck} position-y={0.13}><meshToonMaterial color={d.color} /></mesh>
-            <mesh geometry={AT_SEAT.cap} position-y={0.145}><meshToonMaterial color={d.cap} /></mesh>
+            <DrinkBottle id={d.id} />
           </group>
         )
       })}

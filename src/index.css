@@ -1903,6 +1903,53 @@ button {
   }
 }
 
+/* the game's speed, ▶▶ / ×2, at the left end of the round buttons top right */
+.speed-toggle {
+  position: fixed;
+  z-index: 10;
+  top: 20px;
+  right: 228px;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 50%;
+  background: var(--page);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  cursor: pointer;
+}
+.speed-toggle:hover {
+  border-color: var(--text);
+}
+.speed-toggle.is-on {
+  background: #e8862a;
+  border-color: #e8862a;
+  color: #fff;
+}
+.speed-toggle:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .speed-toggle {
+    top: 14px;
+    right: 204px;
+    width: 40px;
+    height: 40px;
+    font-size: 13px;
+  }
+}
+@media (max-width: 400px) {
+  .speed-toggle {
+    width: 34px;
+    height: 34px;
+    right: 162px;
+    font-size: 12px;
+  }
+}
+
 /* language toggle, beside the day/night button */
 .lang-toggle {
   position: fixed;

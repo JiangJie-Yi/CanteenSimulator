@@ -406,7 +406,7 @@ function Bar() {
   return (
     <group position={GRILL_OFFSET} scale={GRILL_SCALE}>
       <StaticBatch>
-        {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0}
+        {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} butt={i > 0}
           gate={BAR_GATES[i]} noTop={GRILL_COUNTERS.length > 1} />)}
         {GRILL_COUNTERS.length > 1 && <BarTop />}
       </StaticBatch>
@@ -447,7 +447,7 @@ function crewPlaces(crew: CrewMember[]) {
     chef: [{ at: CHEF_AT, yaw: CHEF_YAW }],
     sous: [{ at: kitchenAt(1.3), yaw: KITCHEN_YAW }],
     stock: [{ at: kitchenAt(-0.6), yaw: KITCHEN_YAW }],
-    cashier: [{ at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + TILL.along).addScaledVector(c0.lay, TILL.D / 2 + 0.38)),
+    cashier: [{ at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + TILL.along).addScaledVector(c0.lay, TILL.lay + TILL.D / 2 + 0.3)),
       yaw: Math.atan2(-c0.lay.x, -c0.lay.z) }],
     // (the servers are on the floor with the customers, and walk: GuestBar3D draws them)
     server: [],
@@ -788,7 +788,9 @@ const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042,
  * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
  * and that end of the top too: the staff's way between the kitchen and the floor, shut by a little swing door (BarGate).
  */
-function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number; leaf: number }
+function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number; leaf: number }
+  /** its far end runs into the first counter's side (its lip runs on into the first one's, so they meet with no gap) */
+  butt?: boolean
   /** its top drawn with the others' as one piece (BarTop), not its own */
   noTop?: boolean }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
@@ -827,7 +829,9 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
       {/* the raised lip on the cook's side, the step the food is handed over */}
       {/* (stopping short of where the other counter butts on, and of the gate's flap) */}
       {(() => {
-        let x0 = -(L + 0.3) / 2 + trim, x1 = (L + 0.3) / 2
+        // (where the two counters' lips meet at the corner, each runs a little into the other: no notch between their
+        // rounded ends)
+        let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.05 : 0), x1 = (L + 0.3) / 2 + (butt ? 0.06 : 0)
         if (gate) {
           if (end > 0) x1 -= G
           else x0 += G
@@ -2312,6 +2316,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       const couple = ids.length === 2
       for (const [k, id] of ids.entries()) {
+        // (a stool for them, before they order: with every one taken, or someone still at it, they don't come in)
+        const seatFor = couple ? pairAt! + k : Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n))
+        if (seatFor === undefined || used.has(seatFor)) continue
         const want = 1 + Math.floor(Math.random() * 3) + (blessed && Math.random() < 0.6 ? 1 : 0)
         const orders: string[] = []
         const said: string[] = []
@@ -2337,7 +2344,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         guestSeq.current = Math.max(guestSeq.current, id)
         if (orders.length) {
-          const seat = couple ? pairAt! + k : Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n)) ?? 0
+          const seat = seatFor
           used.add(seat)
           guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat, partner: couple ? ids[1 - k] : undefined })
           onSay?.('guest', L().order(id, said))

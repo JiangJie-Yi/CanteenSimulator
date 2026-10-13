@@ -73,7 +73,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * base and top is, and how wide the swing door across it (the first counter's reaches on to the till, which stands
  * against its end)
  */
-export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.32, leaf: 0.36 }, { end: -1, w: 0.56, leaf: 0.55 }]
+export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.56, leaf: 0.55 }]
 /** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
 export function gateOf(c: Counter, g: { end: 1 | -1; w: number; leaf: number }) {
   const hinge = g.end * ((c.length + 0.2) / 2 - g.w)
@@ -103,8 +103,9 @@ export const handOver = {
     if (el?.style && !POINTER_HINT.hand) el.style.cursor = ''
   },
 }
-/** each toilet's door's width */
+/** each toilet's door's width, and how far it slides open along the wall */
 export const WC_W = 0.82
+export const WC_SLIDE = WC_W - 0.1
 /**
  * The two toilets, the men's and the women's, side by side in the side counter's wall where it runs into the corner:
  * each one's door along that counter (from its middle), the spot on the floor before it, and one inside. With only the
@@ -115,7 +116,8 @@ export function toiletsOf(cs: Counter[]) {
   const c0 = cs[0], c = cs[1]
   const meet = c0.at.clone().addScaledVector(c0.lay, FLOOR_NEAR).sub(c.at).dot(c.along)
   const corner = (FLOOR_FAR - c.at.clone().sub(c0.at).dot(c0.lay)) / c.along.dot(c0.lay)
-  const door = (meet + corner) / 2
+  // (set back from the corner far enough that the women's door, sliding open toward it, stays on the wall)
+  const door = Math.min((meet + corner) / 2, corner - (WC_W + 0.12 + WC_SLIDE + 0.08))
   const one = (k: number) => {
     const z = door + k * (WC_W / 2 + 0.06)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
@@ -129,12 +131,13 @@ export function fridgeOf(cs: Counter[]) {
   const t = toiletsOf(cs)
   if (!t) return null
   const c = cs[1]
-  const z = t.m.z - WC_W / 2 - 0.12 - FRIDGE.W / 2 - 0.05
+  // (clear of where the men's door slides open)
+  const z = t.m.z - WC_W / 2 - 0.06 - WC_SLIDE - FRIDGE.W / 2 - 0.1
   const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
-  return { at: at(farOf(c) + FRIDGE.D / 2 + 0.01), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE.D + 0.32), aisle: at(-AISLE) }
+  return { z, at: at(farOf(c) + FRIDGE.D / 2 + 0.01), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE.D + 0.3), aisle: at(-AISLE) }
 }
 /** the fridge's size: across, up, deep */
-export const FRIDGE = { W: 0.62, H: 1.55, D: 0.36 }
+export const FRIDGE = { W: 0.84, H: 1.72, D: 0.52 }
 /** what's in it, and what each costs (NT$) */
 export const DRINKS = [
   { id: 'beer', zh: '啤酒', ja: 'ビール', price: 120, color: '#c88a2a', cap: '#d4b04a', glass: false },
@@ -148,7 +151,9 @@ export const TOILETS = { m: { passing: 0, open: false }, f: { passing: 0, open: 
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __toilets?: typeof TOILETS }).__toilets = TOILETS
 
 /** the till: how far past the first counter's middle it stands (it butts on to the counter's end), and its size */
-export const TILL = { along: 0.75, W: 1.2, D: 0.6, rise: 0.22 }
+export const TILL = { along: 0.75, W: 1.2, D: 0.82, rise: 0.22,
+  /** how far back from the first counter's line (toward the kitchen) its middle stands */
+  lay: 0.3 }
 
 /** the pass, in the bar's own frame (on the first counter's top, at its start, the customers' side of it) */
 export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + 0.2)
@@ -195,7 +200,7 @@ export function seatsOf(cs: Counter[]): Seat[] {
  * past the doorway and from the room's end back to the step up into the room (the first counter's frame: along it,
  * and lay, from its middle). Customers step up out of their shoes there, and into slippers.
  */
-export const GENKAN = { depth: 0.05, along: [0.5, 1.45] as [number, number], lay: [FLOOR_FAR, -0.62] as [number, number] }
+export const GENKAN = { depth: 0.1, along: [0.5, 1.45] as [number, number], lay: [FLOOR_FAR, -0.42] as [number, number] }
 /** whether a point (the bar's frame) is down in the genkan */
 export function inGenkan(cs: Counter[], p: THREE.Vector3) {
   const c0 = cs[0], d = p.clone().sub(c0.at)

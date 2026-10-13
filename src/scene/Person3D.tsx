@@ -427,7 +427,7 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
     return () => { s.removeFromParent(); b?.removeFromParent(); ph?.removeFromParent() }
   }, [r])
 
-  // fading out: their own materials see-through, the ink outline (shared by all) left off
+  // fading out: their own materials dissolving, the ink outline (shared by all) left off
   const faded = useRef(1)
   const applyFade = (f: number) => {
     if (Math.abs(f - faded.current) < 0.01 && (f < 1) === (faded.current < 1)) return
@@ -443,9 +443,10 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
       // (as it was made: some parts, the blush, are see-through already)
       if (m.userData.base === undefined) m.userData.base = { opacity: m.opacity, transparent: m.transparent, depthWrite: m.depthWrite }
       const base = m.userData.base as { opacity: number; transparent: boolean; depthWrite: boolean }
+      // (a dithered dissolve, not see-through layers: each part stays solid where it's drawn, so the hair doesn't show
+      // through the head nor the arm through the body; parts already see-through, the blush, just fade)
       if (was !== f < 1) {
-        m.transparent = f < 1 || base.transparent
-        m.depthWrite = f < 1 ? false : base.depthWrite
+        if (!base.transparent) m.alphaHash = f < 1
         m.needsUpdate = true
       }
       m.opacity = base.opacity * f

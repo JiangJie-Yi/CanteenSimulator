@@ -32,6 +32,7 @@ import { TaiwanTable } from '@/shops/noodle/TaiwanTable'
 import { Bakery } from '@/shops/bakery/Bakery'
 import { OpeningSpot } from '@/scene/OpeningSpot'
 import { FramePacer } from '@/scene/FramePacer'
+import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
@@ -644,6 +645,9 @@ export default function App() {
   // AI simulation: a chef and customers, and what they've said lately
   // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
+  // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
+  const [speed, setSpeed] = useState(1)
+  useEffect(() => { GAME_SPEED.value = speed }, [speed])
   // the incense on the altar by the door: lit, for a minute more come in and they order more
   const [incenseAt, setIncenseAt] = useState<number | null>(null)
   const [blessed, setBlessed] = useState(false)
@@ -1085,7 +1089,7 @@ export default function App() {
   }, [space])
   useEffect(() => {
     const id = window.setInterval(() => {
-      fire.current = Math.max(0, fire.current - FIRE_BURN_PER_TICK)
+      fire.current = Math.max(0, fire.current - FIRE_BURN_PER_TICK * GAME_SPEED.value)
       setFireLevel(Math.round(fire.current * 100))
     }, 200)
     return () => window.clearInterval(id)
@@ -1204,7 +1208,7 @@ export default function App() {
           for (const [wid, st] of Object.entries(ws)) {
             const w = CANDIDATES[shop].find((x) => x.id === wid)!
             const working = aiRef.current.ai && aiRef.current.shop === shop
-            const fatigue = Math.max(0, Math.min(100, st.fatigue + (working ? tirePerMin(w) : -restPerMin) / 60))
+            const fatigue = Math.max(0, Math.min(100, st.fatigue + (working ? tirePerMin(w) : -restPerMin) / 60 * GAME_SPEED.value))
             if (fatigue !== st.fatigue) changed = true
             next[shop][wid] = { fatigue }
           }
@@ -1216,8 +1220,8 @@ export default function App() {
   }, [])
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (heatRef.current > 0) book('fuel', (GAS_PER_HOUR * heatRef.current) / 100 / 3600)
-      if (aiRef.current.ai) book('wage', aiRef.current.wage / 3600)
+      if (heatRef.current > 0) book('fuel', (GAS_PER_HOUR * heatRef.current) / 100 / 3600 * GAME_SPEED.value)
+      if (aiRef.current.ai) book('wage', aiRef.current.wage / 3600 * GAME_SPEED.value)
     }, 1000)
     return () => window.clearInterval(id)
   }, [])
@@ -1719,7 +1723,8 @@ export default function App() {
     }
   }
   useEffect(() => {
-    const id = window.setInterval(() => simRef.current(), 800)
+    // (at ×2, twice each tick)
+    const id = window.setInterval(() => { for (let i = 0; i < GAME_SPEED.value; i++) simRef.current() }, 800)
     return () => window.clearInterval(id)
   }, [])
   // the shop shutting: the hot pot's stove goes off
@@ -2062,6 +2067,10 @@ export default function App() {
       </button>
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}
+      </button>
+      <button type="button" className={`speed-toggle${speed > 1 ? ' is-on' : ''}`} onClick={() => setSpeed((v) => (v > 1 ? 1 : 2))}
+        aria-pressed={speed > 1} title={lang === 'ja' ? '早送り ×2' : '快速 ×2'}>
+        {speed > 1 ? '×2' : '▶▶'}
       </button>
       <button type="button" className="theme-toggle" onClick={toggleTheme}
         aria-label={theme === 'light' ? '切換成深色模式' : '切換成淺色模式'}>
