@@ -52,9 +52,25 @@ export const SERVICE = {
   delivered: new Set<string>(),
   /** where the staff walking about are just now, in the bar's own frame (the gates in the bar open for them) */
   walkers: [] as THREE.Vector3[],
+  /** what a server has gone to fetch from the pass (no longer waiting there for another to take) */
+  claimed: new Set<string>(),
 }
 // (in development, to be watched from the console)
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __service?: typeof SERVICE }).__service = SERVICE
+/**
+ * The staff's way through each counter, at its outer end (GRILL_COUNTERS order): which end, how wide the gap in the
+ * base and top is, and how wide the swing door across it (the first counter's reaches on to the till, which stands
+ * against its end)
+ */
+export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.4, leaf: 0.44 }, { end: -1, w: 0.42, leaf: 0.41 }]
+/** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
+export function gateOf(c: Counter, g: { end: 1 | -1; w: number; leaf: number }) {
+  const hinge = g.end * ((c.length + 0.2) / 2 - g.w)
+  return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, 0.08) }
+}
+/** the till: how far past the first counter's middle it stands (it butts on to the counter's end), and its size */
+export const TILL = { along: 0.75, W: 1.2, D: 0.6, rise: 0.1 }
+
 /** the pass, in the bar's own frame (on the first counter's top, at its start, the customers' side of it) */
 export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + 0.2)
   .addScaledVector(cs[0].lay, -0.16)

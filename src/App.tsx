@@ -277,6 +277,8 @@ function Scene({ active, orders, theme, reducedMotion, heat, fire, frame, onOffF
   onOrder, onAddCharcoal, onSay }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
+  // (in development, the view can be set from the console: __ctl.target, __cam.position)
+  useEffect(() => { if (import.meta.env.DEV) Object.assign(window, { __ctl: controls.current }) })
   const camera = useThree((s) => s.camera)
   const scene = useThree((s) => s.scene)
   const size = useThree((s) => s.size)
@@ -1720,9 +1722,9 @@ export default function App() {
           shadows={QUALITY.shadows ? 'percentage' : false}
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
           dpr={[1, QUALITY.dpr]}
-          onCreated={({ gl }) => {
+          onCreated={({ gl, camera, scene }) => {
             // (in development, the renderer's counts are to hand for checking how heavy a view is)
-            if (import.meta.env.DEV) (window as unknown as { __gl?: THREE.WebGLRenderer }).__gl = gl
+            if (import.meta.env.DEV) Object.assign(window, { __gl: gl, __cam: camera, __scene: scene })
             // if the phone runs out of GPU memory the browser drops the 3D view and it would stay blank:
             // reload once to bring it back
             gl.domElement.addEventListener('webglcontextlost', (e) => {

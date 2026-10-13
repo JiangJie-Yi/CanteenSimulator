@@ -19,7 +19,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
-import { ALONG, FLOOR_NEAR, PLATES_SET, SERVICE, passOf, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, PLATES_SET, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -446,7 +446,7 @@ function crewPlaces(crew: CrewMember[]) {
     chef: [{ at: CHEF_AT, yaw: CHEF_YAW }],
     sous: [{ at: kitchenAt(1.3), yaw: KITCHEN_YAW }],
     stock: [{ at: kitchenAt(-0.6), yaw: KITCHEN_YAW }],
-    cashier: [{ at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + 0.95).addScaledVector(c0.lay, 0.68)),
+    cashier: [{ at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + TILL.along).addScaledVector(c0.lay, TILL.D / 2 + 0.38)),
       yaw: Math.atan2(-c0.lay.x, -c0.lay.z) }],
     // (the servers are on the floor with the customers, and walk: GuestBar3D draws them)
     server: [],
@@ -572,8 +572,6 @@ function CookTableBox({ lay, along }: { lay: [number, number]; along: [number, n
  * it), the side counter's outer edge squared up with the first's end, joined into an L and given rounded edges.
  */
 const BAR_DEPTH = 0.62
-/** the staff's way through, at the outer end of each counter: which end, and how wide */
-const BAR_GATES: { end: 1 | -1; w: number }[] = [{ end: 1, w: 0.4 }, { end: -1, w: 0.42 }]
 /** how near someone has to come for a gate to swing open for them (the bar's sizes), and how quickly it swings */
 const GATE_NEAR = 0.75
 const GATE_SWING = 4
@@ -582,14 +580,14 @@ const GATE_SWING = 4
  * wood so it reads as the bar run on, hung on brass hinges on the base's end. It stands shut, flush with the bar, and
  * swings in toward the kitchen when one of the staff comes up to it (SERVICE.walkers), shutting again behind them.
  */
-function BarGate({ c, gate }: { c: Counter; gate: { end: 1 | -1; w: number } }) {
+function BarGate({ c, gate }: { c: Counter; gate: (typeof BAR_GATES)[number] }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
-  const L = c.length, G = gate.w, end = gate.end
-  // (the hinge: the inner edge of the gap, on the base's line; the leaf reaches from it across the gap)
-  const hinge = end * ((L + 0.2) / 2 - G)
+  const end = gate.end
+  // (the hinge: the inner edge of the gap, on the base's line; the leaf reaches from it across the doorway)
+  const { hinge, mid: middle } = useMemo(() => gateOf(c, gate), [c, gate])
+  const G = gate.leaf
   const leaf = useRef<THREE.Group>(null)
   const open = useRef(0)
-  const middle = useMemo(() => c.at.clone().addScaledVector(c.along, hinge + end * G / 2), [c, hinge, end, G])
   useFrame((_, dt) => {
     const near = SERVICE.walkers.some((w) => Math.hypot(w.x - middle.x, w.z - middle.z) < GATE_NEAR)
     open.current = THREE.MathUtils.clamp(open.current + (near ? 1 : -1) * Math.min(dt, 0.1) * GATE_SWING, 0, 1)
@@ -600,7 +598,7 @@ function BarGate({ c, gate }: { c: Counter; gate: { end: 1 | -1; w: number } }) 
   return (
     <group position={c.at} rotation-y={yaw}>
       <group position={[hinge, 0, 0.08]}>
-        <group ref={leaf}>
+        <group ref={leaf} name="gate-leaf">
           <group position-x={end * (G / 2 - 0.005)}>
             <mesh position-y={H / 2 + 0.02} castShadow>
               <boxGeometry args={[G - 0.02, H - 0.06, 0.035]} />
@@ -685,7 +683,7 @@ const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042,
  * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
  * and that end of the top too: the staff's way between the kitchen and the floor, shut by a little swing door (BarGate).
  */
-function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number }
+function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number; leaf: number }
   /** its top drawn with the others' as one piece (BarTop), not its own */
   noTop?: boolean }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
@@ -3138,6 +3136,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.via = undefined
         SERVICE.waiting.delete(p.key)
         SERVICE.carried.delete(p.key)
+        SERVICE.claimed.delete(p.key)
         SERVICE.delivered.delete(p.key)
       }
       if (p.eaten && p.trash < 0) {
@@ -3229,7 +3228,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             p.flight = 1
           } else if (p.flight >= 1) {
             p.small = true
-            if (!SERVICE.waiting.has(p.key)) SERVICE.waiting.set(p.key, p.seat)
+            if (!SERVICE.waiting.has(p.key) && !SERVICE.claimed.has(p.key)) SERVICE.waiting.set(p.key, p.seat)
           }
         }
         if (!plateless) p.flight = Math.min(1, p.flight + dt / FLIGHT_SECONDS)

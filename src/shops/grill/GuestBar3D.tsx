@@ -15,7 +15,7 @@ import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SERVICE, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SERVICE, BAR_GATES, TILL, gateOf, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -307,7 +307,6 @@ function Chochin({ mark }: { mark: string }) {
  * customer's display), a card reader, a receipt printer with its paper curling out, a tray for the change, a cup of
  * pens, a little bell to ring, the お会計 sign facing the customers, and a beckoning cat (招き猫) for luck.
  */
-const TILL = { W: 1.0, D: 0.5 }
 export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
   const { W, D } = TILL
   return (
@@ -632,22 +631,67 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return { path, len: pathLength(path) }
   }), [counters, seats])
   const plateAt = (n: number) => seats[n].plate.clone().setY(top)
-  // the servers wait by the pass, side by side, ready to carry
+  // where a server stands at the pass to take what's put out there (on the floor, by the first counter's start)
   const pass = useMemo(() => passOf(counters), [counters])
-  const homes = useMemo(() => {
+  const passSpot = useMemo(() => {
     const c0 = counters[0]
-    const at = (k: number) => c0.at.clone().addScaledVector(c0.along, -c0.length / 2 - 0.25 - k * 0.42).addScaledVector(c0.lay, -0.75 - k * 0.12)
-    return [0, 1].map((k) => ({ at: at(k), yaw: Math.atan2(c0.lay.x, c0.lay.z) }))
+    return c0.at.clone().addScaledVector(c0.along, -c0.length / 2 - 0.25).addScaledVector(c0.lay, -0.75)
   }, [counters])
+  /** where the first counter's aisle meets another's */
+  const aisleCorner = (c: Counter) => {
+    const c0 = counters[0]
+    const p0 = c0.at.clone().addScaledVector(c0.lay, -AISLE)
+    return p0.clone().addScaledVector(c0.along, c.at.clone().addScaledVector(c.lay, -AISLE).sub(p0).dot(c0.along))
+  }
+  // the servers wait in the kitchen, each just inside a gate in the bar (the first counter's, by the till, and the side
+  // counter's), so they go out through it on every trip and come back in by it, the door swinging for them; a shop
+  // without gates has them waiting by the pass
+  const homes = useMemo(() => {
+    if (!given) {
+      const c0 = counters[0]
+      return [0, 1].map((k) => {
+        const at = c0.at.clone().addScaledVector(c0.along, -c0.length / 2 - 0.25 - k * 0.42).addScaledVector(c0.lay, -0.75 - k * 0.12)
+        return { at, yaw: Math.atan2(c0.lay.x, c0.lay.z), counter: 0, way: [at] }
+      })
+    }
+    return counters.slice(0, BAR_GATES.length).map((c, i) => {
+      const g = BAR_GATES[i]
+      const { mid } = gateOf(c, g)
+      const at = mid.clone().addScaledVector(c.lay, 0.85).addScaledVector(c.along, -g.end * 0.3)
+      // (in to the doorway square on, through it, and out to the aisle)
+      const way = [at, mid.clone().addScaledVector(c.lay, 0.42), mid.clone().addScaledVector(c.lay, -0.5), mid.clone().addScaledVector(c.lay, -AISLE - 0.08)]
+      return { at, yaw: Math.atan2(-c.lay.x, -c.lay.z), counter: i, way }
+    })
+  }, [counters, given])
+  /** from a server's place to the pass: out through their gate, along the aisle(s) */
+  const fetchPath = (wi: number) => {
+    const h = homes[wi]
+    if (h.way.length < 2) return [h.at.clone(), passSpot.clone()]
+    const c0 = counters[0]
+    const via = h.counter === 0 ? c0.at.clone().addScaledVector(c0.along, -c0.length / 2 - 0.25).addScaledVector(c0.lay, -AISLE)
+      : aisleCorner(counters[h.counter])
+    return [...h.way.map((v) => v.clone()), via, passSpot.clone()]
+  }
+  /** beside a customer, where a server stands to set their plate down */
+  const besideSeat = (n: number) => {
+    const st = seats[n]
+    return st.aisle.clone().lerp(st.stool, 0.45).addScaledVector(st.along, 0.24)
+  }
   /** from the pass to a seat: out into the aisle, along it (round the corner for the side counter) and in beside them */
   const routeTo = (n: number) => {
     const c0 = counters[0], st = seats[n]
-    const out = homes[0].at.clone().addScaledVector(c0.lay, -(AISLE - 0.75))
-    const side = st.aisle.clone().lerp(st.stool, 0.45).addScaledVector(st.along, 0.24)
-    const path = [homes[0].at.clone(), out, ...pathTo(counters, st).slice(1, -1), side]
+    const out = passSpot.clone().addScaledVector(c0.lay, -(AISLE - 0.75))
+    const path = [passSpot.clone(), out, ...pathTo(counters, st).slice(1, -1), besideSeat(n)]
     return { path, len: pathLength(path) }
   }
-  const waiters = useRef<{ phase: 'idle' | 'pickup' | 'go' | 'set' | 'back'; t: number; seat: number; keys: string[]; run: number | null
+  /** from a server's place to a seat the shortest way (out through their gate): walked backwards, it's their way back */
+  const backPath = (wi: number, n: number) => {
+    const h = homes[wi], st = seats[n]
+    if (h.way.length < 2) return routeTo(n).path
+    const turn = st.counter === h.counter ? [] : [aisleCorner(counters[st.counter === 0 ? h.counter : st.counter])]
+    return [...h.way.map((v) => v.clone()), ...turn, st.aisle.clone(), besideSeat(n)]
+  }
+  const waiters = useRef<{ phase: 'idle' | 'fetch' | 'pickup' | 'go' | 'set' | 'back'; t: number; seat: number; keys: string[]; run: number | null
     path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number }[]>([])
   const waiterObjs = useRef<(THREE.Group | null)[]>([])
   const [moving, setMoving] = useState<boolean[]>([])
@@ -801,8 +845,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       }
     }
-    // the servers, by the pass: one that's free takes what's put out there for one seat (and a clean plate, if the
-    // customer hasn't one yet), carries it along the aisle on the tray, sets it down beside them, and goes back
+    // the servers: one that's free goes out to the pass for what's put out there for one seat (and a clean plate, if
+    // the customer hasn't one yet), carries it along the aisle on the tray, sets it down beside them, and goes back
     const sitting = (n: number) => shownRef.current.some((x) => x.seat === n && x.phase === 'sit')
     waiters.current.forEach((w, wi) => {
       const home = homes[wi]
@@ -812,29 +856,30 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const setMove = (on: boolean) => setMoving((m) => { const n = [...m]; n[wi] = on; return n })
       w.t += step
       // (the customer gone meanwhile: what was being carried to them is taken away, and the server goes back)
-      if ((w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') && !sitting(w.seat)) {
-        for (const k of w.keys) SERVICE.carried.delete(k)
+      if ((w.phase === 'fetch' || w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') && !sitting(w.seat)) {
+        for (const k of w.keys) {
+          SERVICE.carried.delete(k)
+          SERVICE.claimed.delete(k)
+        }
         w.keys = []
         const r = run()
         if (r && r.phase === 'carry') { r.phase = 'clear'; r.t = 0 }
         w.run = null
-        if (w.phase === 'pickup') {
-          w.phase = 'idle'
-          w.yaw = home.yaw
-        } else {
-          // (back over the corners already passed, from where they are: none still ahead of them)
-          const walked = w.phase === 'go' ? Math.min(w.len, w.t * SERVER_SPEED) : w.len
-          const passed: THREE.Vector3[] = []
-          for (let i = 1, at = 0; i < w.path.length - 1; i++) {
-            at += w.path[i].distanceTo(w.path[i - 1])
-            if (at < walked) passed.push(w.path[i])
-          }
-          w.path = [home.at.clone(), ...passed, w.pos.clone()]
-          w.len = pathLength(w.path)
-          w.phase = 'back'
-          w.t = 0
-          setMove(true)
+        // (back over the corners already passed, from where they are: none still ahead of them; from the pass or
+        // beyond, the way they came out to it first)
+        const walked = w.phase === 'go' || w.phase === 'fetch' ? Math.min(w.len, w.t * SERVER_SPEED) : w.len
+        const passed: THREE.Vector3[] = []
+        for (let i = 1, at = 0; i < w.path.length - 1; i++) {
+          at += w.path[i].distanceTo(w.path[i - 1])
+          if (at < walked) passed.push(w.path[i])
         }
+        w.path = w.phase === 'set' ? backPath(wi, w.seat).slice(0, -1).concat(w.pos.clone())
+          : w.phase === 'fetch' ? [home.at.clone(), ...passed, w.pos.clone()]
+            : [...fetchPath(wi), ...(w.phase === 'go' ? passed : []), w.pos.clone()]
+        w.len = pathLength(w.path)
+        w.phase = 'back'
+        w.t = 0
+        setMove(true)
         w.seat = -1
       }
       if (w.phase === 'idle') {
@@ -843,7 +888,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (job && (!needPlate || clean.current.length > 0)) {
           w.seat = job[1]
           w.keys = [...SERVICE.waiting.entries()].filter(([, n]) => n === job[1]).map(([k]) => k)
-          for (const k of w.keys) SERVICE.waiting.delete(k)
+          for (const k of w.keys) {
+            SERVICE.waiting.delete(k)
+            SERVICE.claimed.add(k)
+          }
           w.run = null
           if (needPlate) {
             const from = cleanAt(clean.current.length - 1)
@@ -854,9 +902,23 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             w.run = key
             redraw()
           }
+          // (out to the pass for it)
+          w.path = fetchPath(wi)
+          w.len = pathLength(w.path)
+          w.phase = 'fetch'
+          w.t = 0
+          setMove(true)
+        }
+      } else if (w.phase === 'fetch') {
+        const d = Math.min(w.len, w.t * SERVER_SPEED)
+        const { p, dir } = alongPath(w.path, d)
+        w.pos.copy(p)
+        w.yaw = Math.atan2(dir.x, dir.z)
+        if (d >= w.len) {
           w.phase = 'pickup'
           w.t = 0
           w.yaw = Math.atan2(pass.x - w.pos.x, pass.z - w.pos.z)
+          setMove(false)
         }
       } else if (w.phase === 'pickup' && w.t > 0.4) {
         const r = routeTo(w.seat)
@@ -889,13 +951,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (r && r.phase === 'carry') r.phase = 'set'
         for (const k of w.keys) {
           SERVICE.carried.delete(k)
+          SERVICE.claimed.delete(k)
           SERVICE.delivered.add(k)
         }
         w.keys = []
         w.run = null
-        // (back the way they came, to their place by the pass)
-        w.path = [...w.path.slice(0, -1), w.pos.clone()]
-        w.path[0] = home.at.clone()
+        // (back the shortest way to their place, in through their gate)
+        w.path = backPath(wi, w.seat).slice(0, -1).concat(w.pos.clone())
         w.len = pathLength(w.path)
         w.phase = 'back'
         w.t = 0
@@ -995,8 +1057,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* the till, just inside the door on the bar's side of the way in (the shops that lay out their own counters) */}
       {given && (
         <StaticBatch>
-          <Register top={top} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
-            at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + 0.95).addScaledVector(counters[0].lay, 0.1)} />
+          <Register top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
+            at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + TILL.along).addScaledVector(counters[0].lay, 0.1)} />
         </StaticBatch>
       )}
       <StaticBatch key={seats.length}>

@@ -148,20 +148,8 @@ type Rigged = {
   looked: THREE.Quaternion
 }
 
-/** a soft round glow, for a phone's screen */
-const SCREEN_GLOW = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = c.height = 64
-  const g = c.getContext('2d')!
-  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32)
-  grad.addColorStop(0, 'rgba(255,255,255,0.9)')
-  grad.addColorStop(0.4, 'rgba(255,255,255,0.3)')
-  grad.addColorStop(1, 'rgba(255,255,255,0)')
-  g.fillStyle = grad
-  g.fillRect(0, 0, 64, 64)
-  return new THREE.CanvasTexture(c)
-})()
+/** which side of the phone (in the hand's frame) its screen is on: the one facing whoever holds it */
+const PHONE_FACE = -1
 
 /** a black leather briefcase hanging from its handle (the handle at the origin, the case below along +y) */
 function Briefcase() {
@@ -446,17 +434,11 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
           <boxGeometry args={[0.042, 0.076, 0.006]} />
           <meshBasicMaterial color={INK} side={THREE.BackSide} />
         </mesh>
-        {[1, -1].map((sd) => (
-          <mesh key={sd} position-z={sd * 0.0032} rotation-y={sd > 0 ? 0 : Math.PI}>
-            <planeGeometry args={[0.036, 0.066]} />
-            <meshBasicMaterial color="#b8e2ff" toneMapped={false} />
-          </mesh>
-        ))}
-        {/* (the screen's cold light round it, so it shows from behind them too) */}
-        <sprite scale={0.12}>
-          <spriteMaterial map={SCREEN_GLOW} color="#9fd8ff" transparent opacity={0.55} depthWrite={false}
-            blending={THREE.AdditiveBlending} toneMapped={false} />
-        </sprite>
+        {/* the screen, on its face only: toward the eyes looking down at it */}
+        <mesh position-z={PHONE_FACE * 0.0032} rotation-y={PHONE_FACE > 0 ? 0 : Math.PI}>
+          <planeGeometry args={[0.036, 0.066]} />
+          <meshBasicMaterial color="#b8e2ff" toneMapped={false} />
+        </mesh>
       </group>
       {/* the briefcase: in the hand, hanging from its handle, walking; on the floor by the stool, sitting */}
       {briefcase && (
