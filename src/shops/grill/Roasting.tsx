@@ -554,7 +554,7 @@ const BAR_DEPTH = 0.62
 /** the staff's way through, at the outer end of each counter: which end, and how wide */
 const BAR_GATES: { end: 1 | -1; w: number }[] = [{ end: 1, w: 0.55 }, { end: -1, w: 0.42 }]
 /** how far the gates' flaps stand lifted open */
-const FLAP_OPEN = 1.25
+const FLAP_OPEN = 1.5
 function barTopShape(grow: number) {
   const box = (c: Counter) => {
     const hl = (c.length + 0.3) / 2, hd = BAR_DEPTH / 2
@@ -653,34 +653,46 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
               </mesh>
             ))}
           </group>
-          {/* the half doors below it, pale wood, slatted, swung a little open */}
-          {[-1, 1].map((sd) => (
-            <group key={sd} position={[sd * G / 2, 0.05, 0.08]} rotation-y={sd * 0.38}>
-              <group position-x={-sd * G / 4}>
-                <mesh position-y={0.2}>
-                  <boxGeometry args={[G / 2 - 0.02, 0.4, 0.025]} />
-                  <meshToonMaterial color="#b08454" />
+          {/* the half door below it: one leaf of pale slatted wood, hung on the base's end, swung a little open */}
+          <group position={[-end * G / 2, 0.05, 0.08]} rotation-y={-end * 0.08}>
+            <group position-x={end * (G / 2 - 0.01)}>
+              <mesh position-y={0.22}>
+                <boxGeometry args={[G - 0.04, 0.44, 0.025]} />
+                <meshToonMaterial color="#b08454" />
+              </mesh>
+              <mesh position-y={0.22} scale={[1.03, 1.03, 1.4]}>
+                <boxGeometry args={[G - 0.04, 0.44, 0.025]} />
+                <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+              </mesh>
+              {[-0.36, -0.12, 0.12, 0.36].map((k) => (
+                <mesh key={k} position={[k * (G - 0.08), 0.22, -0.014]}>
+                  <boxGeometry args={[0.012, 0.38, 0.004]} />
+                  <meshToonMaterial color="#7a5432" />
                 </mesh>
-                <mesh position-y={0.2} scale={[1.05, 1.04, 1.4]}>
-                  <boxGeometry args={[G / 2 - 0.02, 0.4, 0.025]} />
-                  <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-                </mesh>
-                {[-0.08, -0.03, 0.02, 0.07].map((x) => (
-                  <mesh key={x} position={[x * (G / 0.55), 0.2, -0.014]}>
-                    <boxGeometry args={[0.012, 0.34, 0.004]} />
-                    <meshToonMaterial color="#7a5432" />
-                  </mesh>
-                ))}
-              </group>
+              ))}
             </group>
-          ))}
+            {/* its two hinges on the base's end */}
+            {[0.08, 0.36].map((y) => (
+              <mesh key={y} position={[0, y, 0]}><boxGeometry args={[0.016, 0.04, 0.03]} /><meshToonMaterial color="#c8a050" /></mesh>
+            ))}
+          </group>
         </group>
       )}
       {/* the raised lip on the cook's side, the step the food is handed over */}
-      <mesh position={[trim / 2, BAR_TOP + 0.03, 0.285]}>
-        <boxGeometry args={[L + 0.3 - trim, 0.06, 0.05]} />
-        <meshToonMaterial color="#c49a64" />
-      </mesh>
+      {/* (stopping short of where the other counter butts on, and of the gate's flap) */}
+      {(() => {
+        let x0 = -(L + 0.3) / 2 + trim, x1 = (L + 0.3) / 2
+        if (gate) {
+          if (end > 0) x1 -= G
+          else x0 += G
+        }
+        return (
+          <mesh position={[(x0 + x1) / 2, BAR_TOP + 0.03, 0.285]}>
+            <boxGeometry args={[x1 - x0, 0.06, 0.05]} />
+            <meshToonMaterial color="#c49a64" />
+          </mesh>
+        )
+      })()}
       {Array.from({ length: c.seats }, (_, n) => {
         const x = (n - (c.seats - 1) / 2) * (L / c.seats)
         return (

@@ -124,7 +124,8 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const tex = useMemo(() => norenTexture(mark), [mark])
   const panels = useRef<(THREE.Mesh | null)[]>([])
   const yaw = Math.atan2(ALONG.x, ALONG.z)
-  const W = 0.78, H = 1.5, NOREN = 0.62
+  // (hung high, its rod well over a customer's head: they duck through only its hem)
+  const W = 0.78, H = 1.95, NOREN = 0.68
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     panels.current.forEach((m, i) => {
@@ -134,13 +135,16 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   return (
     <group position={at} rotation-y={yaw}>
       <StaticBatch>
-      {/* beckoning cats either side of the way in, on little stands: a big white one and smaller gold and black ones */}
-      {DOOR_CATS.map((k, i) => (
-        <group key={i} position={[k.x, 0, k.z]} rotation-y={k.yaw}>
-          <Part geo={REG_GEO.body} color="#5a3a24" outline={1.03} position={[0, k.stand / 2, 0]} scale={[0.16 * k.s, k.stand, 0.14 * k.s]} />
-          <group position-y={k.stand} scale={k.s * 2.2}><LuckyCat body={k.body} paw={k.paw} /></group>
-        </group>
-      ))}
+      {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
+      <group position={[0.4, 0, -0.75]}>
+        {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower) */}
+        {[[-0.01, 0.22, 0.32, 0.62], [0.04, 0.12, 0.6, 0.5]].map(([x, d, h, l], i) => (
+          <Part key={i} geo={REG_GEO.round} color={i ? '#4a2e1c' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
+        ))}
+        {DOOR_CATS.map((k, i) => (
+          <group key={i} position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw} scale={k.s * 2.2}><LuckyCat body={k.body} paw={k.paw} /></group>
+        ))}
+      </group>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       <Part geo={REG_GEO.body} color="#2b2620" outline={0} position={[0, 0.007, -0.22]} scale={[0.78, 0.006, 0.46]} />
       {[-1, 1].map((sd) => (
@@ -304,7 +308,7 @@ function Chochin({ mark }: { mark: string }) {
  * pens, a little bell to ring, the お会計 sign facing the customers, and a beckoning cat (招き猫) for luck.
  */
 const TILL = { W: 1.0, D: 0.5 }
-function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
+export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
   const { W, D } = TILL
   return (
     <group position={at} rotation-y={yaw}>
@@ -319,20 +323,57 @@ function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: numbe
         </mesh>
       ))}
       <Part geo={REG_GEO.body} color="#22180f" outline={0} position={[0, 0.03, -D / 2 + 0.035]} scale={[W - 0.06, 0.06, 0.02]} />
-      {/* the register: a sloped keyboard of keys, the drawer under it, the display turned to the customer */}
+      {/* the register, an old brass-trimmed one: the cash drawer (handle and lock) under a stepped body, its keys in rows
+          down the sloped front to the cashier, the crank at its side, and on top the arched sign where the amount's
+          figures pop up, to both sides */}
       <group position={[0.05, top, 0.06]} rotation-y={Math.PI}>
-        <Part geo={REG_GEO.body} color="#5a6a66" position={[0, 0.035, 0]} scale={[0.26, 0.07, 0.24]} />
-        <Part geo={REG_GEO.body} color="#3e4a46" outline={0} position={[0, 0.036, 0.121]} scale={[0.2, 0.03, 0.004]} />
-        <Part geo={REG_GEO.body} color="#2f3634" outline={1.04} position={[0, 0.085, -0.03]} rotation-x={-0.35} scale={[0.22, 0.03, 0.15]} />
-        {Array.from({ length: 12 }, (_, i) => (
-          <Part key={i} geo={REG_GEO.body} color={i % 4 === 3 ? '#c8a050' : '#e8e2cf'} outline={0}
-            position={[-0.07 + (i % 4) * 0.045, 0.103 + Math.floor(i / 4) * 0.016, -0.06 + Math.floor(i / 4) * 0.04]} rotation-x={-0.35}
-            scale={[0.032, 0.008, 0.028]} />
-        ))}
-        <Part geo={REG_GEO.body} color="#2f3634" position={[0.06, 0.16, 0.08]} scale={[0.012, 0.09, 0.012]} />
-        <group position={[0.06, 0.215, 0.08]} rotation-y={Math.PI}>
-          <Part geo={REG_GEO.body} color="#2f3634" position={[0, 0, 0]} scale={[0.11, 0.05, 0.02]} />
-          <mesh position-z={0.0105}><planeGeometry args={[0.09, 0.032]} /><meshBasicMaterial color="#7ad0a0" /></mesh>
+        {/* drawer */}
+        <Part geo={REG_GEO.round} color="#3a2416" outline={1.03} position={[0, 0.035, 0]} scale={[0.32, 0.07, 0.27]} />
+        <Part geo={REG_GEO.body} color="#5a3a24" outline={0} position={[0, 0.035, -0.136]} scale={[0.28, 0.05, 0.004]} />
+        <Part geo={REG_GEO.round} color="#d4b04a" outline={0} position={[0, 0.035, -0.142]} scale={[0.09, 0.012, 0.012]} />
+        <mesh position={[0.1, 0.035, -0.139]}><circleGeometry args={[0.006, 10]} /><meshBasicMaterial color="#1a120c" /></mesh>
+        {/* body: a deep base and the sloped key bank */}
+        <Part geo={REG_GEO.round} color="#7c8a86" outline={1.03} position={[0, 0.115, 0.03]} scale={[0.3, 0.09, 0.2]} />
+        <group position={[0, 0.13, -0.075]} rotation-x={-0.5}>
+          <Part geo={REG_GEO.round} color="#6c7a76" outline={1.04} scale={[0.29, 0.03, 0.13]} />
+          {/* the keys: five columns of four, round caps, the top row amber (the departments), the right-hand column red (total) */}
+          {Array.from({ length: 20 }, (_, i) => {
+            const col = i % 5, row = Math.floor(i / 5)
+            const cap = col === 4 ? '#c4302a' : row === 0 ? '#e0a83a' : '#f2ede0'
+            return (
+              <group key={i} position={[-0.1 + col * 0.05, 0.02, -0.045 + row * 0.03]}>
+                <mesh geometry={REG_GEO.key}><meshToonMaterial color="#2a2c2e" /></mesh>
+                <mesh geometry={REG_GEO.cap} position-y={0.008}><meshToonMaterial color={cap} /></mesh>
+                <mesh position-y={0.0115} rotation-x={-Math.PI / 2}><planeGeometry args={[0.006, 0.006]} /><meshBasicMaterial color="#2a1d16" /></mesh>
+              </group>
+            )
+          })}
+        </group>
+        {/* brass trim along the edges */}
+        {[-1, 1].map((sd) => <Part key={sd} geo={REG_GEO.body} color="#d4b04a" outline={0} position={[sd * 0.152, 0.115, 0.03]} scale={[0.006, 0.092, 0.202]} />)}
+        <Part geo={REG_GEO.body} color="#d4b04a" outline={0} position={[0, 0.162, 0.03]} scale={[0.304, 0.006, 0.204]} />
+        {/* the crank at its right side */}
+        <group position={[0.165, 0.1, 0.05]}>
+          <mesh rotation-z={Math.PI / 2}><cylinderGeometry args={[0.018, 0.018, 0.02, 14]} /><meshToonMaterial color="#d4b04a" /></mesh>
+          <mesh position={[0.012, -0.025, -0.02]} rotation-x={0.7}><boxGeometry args={[0.008, 0.06, 0.012]} /><meshToonMaterial color="#9aa0a4" /></mesh>
+          <mesh position={[0.02, -0.045, -0.045]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.008, 0.008, 0.03, 10]} /><meshToonMaterial color="#1a120c" /></mesh>
+        </group>
+        {/* the sign on top: an arched brass frame, the amount's figures on white tabs, both sides */}
+        <group position={[0, 0.165, 0.08]}>
+          <Part geo={REG_GEO.round} color="#d4b04a" outline={1.04} position-y={0.04} scale={[0.22, 0.08, 0.05]} />
+          <mesh position={[0, 0.095, 0]} rotation-x={Math.PI / 2}>
+            <cylinderGeometry args={[0.11, 0.11, 0.05, 24, 1, false, -Math.PI / 2, Math.PI]} />
+            <meshToonMaterial color="#d4b04a" />
+          </mesh>
+          {[1, -1].map((sd) => (
+            <group key={sd} position-z={sd * 0.026} rotation-y={sd > 0 ? 0 : Math.PI}>
+              <mesh position-y={0.04}><planeGeometry args={[0.18, 0.05]} /><meshBasicMaterial color="#1f2326" /></mesh>
+              {[0, 1, 2, 3].map((k) => (
+                <mesh key={k} position={[-0.063 + k * 0.042, 0.04, 0.001]}><planeGeometry args={[0.034, 0.04]} /><meshToonMaterial color="#ffffff" map={REG_DIGITS[k]} /></mesh>
+              ))}
+              <mesh position={[0, 0.098, 0.001]}><planeGeometry args={[0.12, 0.035]} /><meshToonMaterial color="#ffffff" map={REG_DIGITS[4]} /></mesh>
+            </group>
+          ))}
         </group>
       </group>
       {/* the card reader, its screen and keys, by the register on the customers' side */}
@@ -400,18 +441,38 @@ const PAY_SIGN = (() => {
 })()
 
 /**
- * The cats at the door (in the entrance's frame: x across the way in, +x toward the back wall, which stands at x 0.5; +z out of the shop.
-   The customers come in at x 0 and walk off down -z, so all of these sit just outside the noren, clear of them, the
- * wall and the till, which reaches out to z 0.26 between x -0.64 and -1.06)
+ * The cats at the door, on their stand just inside it against the wall (the entrance's +x side; the till is on the
+ * other), facing across the way in at those coming through
  */
 const DOOR_CATS = [
-  { x: -0.36, z: 0.14, yaw: -0.3, s: 1.2, stand: 0.14, body: '#f6f3ea', paw: 'right' as const },
-  { x: 0.34, z: 0.14, yaw: 0.3, s: 1.1, stand: 0.14, body: '#f6f3ea', paw: 'left' as const },
-  { x: -0.46, z: 0.38, yaw: -0.2, s: 0.8, stand: 0.06, body: '#d9b04a', paw: 'left' as const },
-  { x: 0.3, z: 0.38, yaw: 0.25, s: 0.75, stand: 0.06, body: '#2a2420', paw: 'right' as const },
+  // (on the stand: x out from the wall, y the tier's top, z along it; the big white pair on the upper tier)
+  { x: 0.04, y: 0.6, z: -0.13, yaw: 0.2, s: 0.95, body: '#f6f3ea', paw: 'right' as const },
+  { x: 0.04, y: 0.6, z: 0.13, yaw: -0.2, s: 0.95, body: '#f6f3ea', paw: 'left' as const },
+  { x: -0.07, y: 0.32, z: -0.2, yaw: 0.25, s: 0.75, body: '#d9b04a', paw: 'left' as const },
+  { x: -0.07, y: 0.32, z: 0.2, yaw: -0.25, s: 0.75, body: '#2a2420', paw: 'right' as const },
 ]
+/** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
+const REG_DIGITS = ['¥', '1', '2', '8', 'お会計'].map((t) => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = t.length > 1 ? 128 : 48
+  c.height = t.length > 1 ? 40 : 56
+  const g = c.getContext('2d')!
+  g.fillStyle = t.length > 1 ? '#d4b04a' : '#f4f1ea'
+  g.fillRect(0, 0, c.width, c.height)
+  g.fillStyle = t.length > 1 ? '#3a2416' : '#1a120c'
+  g.font = `bold ${t.length > 1 ? 26 : 40}px "Zen Antique", "Noto Serif TC", serif`
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText(t, c.width / 2, c.height / 2 + 2)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+})
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
+  key: new THREE.CylinderGeometry(0.004, 0.004, 0.016, 6),
+  cap: new THREE.CylinderGeometry(0.012, 0.012, 0.006, 12),
   round: new RoundedBoxGeometry(1, 1, 1, 3, 0.12),
   cup: new THREE.CylinderGeometry(0.025, 0.022, 0.06, 14),
   ball: new THREE.SphereGeometry(0.04, 14, 10),
@@ -588,7 +649,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** a point in the bar's frame, in the shop's (where Roasting has the food) */
   const toShop = (v: THREE.Vector3) => v.clone().multiplyScalar(scale).add(offset ?? new THREE.Vector3())
   const cleanAt = (k: number) => counters[0].at.clone().addScaledVector(ALONG, -counters[0].length / 2 + 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP)
-  const dirtyAt = (k: number) => counters[0].at.clone().addScaledVector(ALONG, counters[0].length / 2 - 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP)
+  // (in from the first counter's far end, clear of the staff's gate there)
+  const dirtyAt = (k: number) => counters[0].at.clone().addScaledVector(ALONG, counters[0].length / 2 - (given ? 0.75 : 0.25)).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP)
 
   // the plates: those out at the seats (or on their way), and the two stacks
   const [, setTick] = useState(0)
