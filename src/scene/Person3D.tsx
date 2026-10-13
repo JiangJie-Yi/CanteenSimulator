@@ -464,15 +464,15 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
  * hair (picked by the same hash of their id), glasses on the same ones, a woman's hair long, in a bob or tied up as
  * there. It's a Japanese shop, so everyone the customers see dresses Japanese: the cooks in white or navy samue under a
  * hachimaki (a woman in the low white cap); on the floor and at the till the men in samue (deep red for the floor,
- * indigo at the till), the women in kimono of the same colours, their hair put up; only the stock keeper, out of
- * sight in the back, works in his olive jacket and cap.
+ * indigo at the till, brown for the stock keeper in the kitchen, with his clipboard), the women in kimono of the
+ * same colours, their hair put up.
  */
 const AV_SKIN = ['#f3d2b0', '#eac39c', '#e2b48a', '#f6dcc0', '#d9a77e']
 const AV_HAIR = ['#2b1d14', '#3a2a20', '#1c1c22', '#5a3a2a', '#4a3020', '#6b4a32']
 const avHash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
-const TOPS: Record<Role, string> = { chef: '#f4f1ea', sous: '#2c3a58', server: '#7a2a22', cashier: '#2c3e66', stock: '#5f6b45' }
+const TOPS: Record<Role, string> = { chef: '#f4f1ea', sous: '#2c3a58', server: '#7a2a22', cashier: '#2c3e66', stock: '#6a5236' }
 /** which of the job's things each wears (the parts of the staff figures in guests.glb) */
-const WEARS: Record<Role, string[]> = { chef: ['wacap'], sous: ['wacap'], server: [], cashier: [], stock: ['workcap'] }
+const WEARS: Record<Role, string[]> = { chef: ['wacap'], sous: ['wacap'], server: [], cashier: [], stock: [] }
 const JOB_PARTS = new Set(['toque', 'wacap', 'workcap', 'buttons', 'bowtie', 'apron', 'bib', 'badge'])
 
 /**
@@ -488,8 +488,8 @@ export function StaffFigure({ id, role, look: who, moving = false }: { id: strin
   const cook = role === 'chef' || role === 'sous'
   // (the samue's crossed collar for the men in the kitchen and out front; a kimono for the women out front; the women
   // cooks in their white kappōgi and cap; the stock keeper in his work clothes)
-  const front = role === 'server' || role === 'cashier'
-  const kind: Kind = who.female ? (front ? 'yukata' : 'staffF') : role === 'stock' ? 'staffM' : 'chef'
+  const front = role === 'server' || role === 'cashier' || role === 'stock'
+  const kind: Kind = who.female ? (front ? 'yukata' : 'staffF') : 'chef'
   const old = who.age === 'old'
   const glasses = (h >> 7) % 5 === 0 || (old && (h >> 7) % 2 === 0)
   const cut = (h >> 13) % 3
@@ -501,7 +501,7 @@ export function StaffFigure({ id, role, look: who, moving = false }: { id: strin
     skin: AV_SKIN[h % AV_SKIN.length], shoes: front && who.female ? '#b08a5a' : '#2a2220', size: 1 }), [role, old, h, cook, who.female, front])
   // (hair put up for work: a woman out front in an updo, the men cropped, the floor's under a hachimaki too)
   const style = useMemo(() => () => (who.female ? (cook ? 'bun' : front ? 'updo' : ['long', 'bob', 'bun'][cut])
-    : cook || role === 'server' ? 'crop' : role === 'cashier' ? 'short' : cut === 1 ? 'messy' : 'side'), [who.female, cut, cook, front, role])
+    : cook || role === 'server' || role === 'stock' ? 'crop' : 'short'), [who.female, cut, cook, front, role])
   const show = useMemo(() => (part: string) => !JOB_PARTS.has(part) || WEARS[role].includes(part), [role])
   const r = useRigged(1000 + seed, kind, glasses, { look, style, show })
   const fan = useRef<THREE.Group>(null)
