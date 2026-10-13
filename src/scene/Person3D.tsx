@@ -113,7 +113,18 @@ function skinnable(o: THREE.SkinnedMesh, into: THREE.SkinnedMesh) {
 /** the parts swapped in and out as they blink and chew (kept apart, not merged) */
 const SWAPPED = new Set(['eyes', 'eyesShut', 'mouth', 'mouthOpen'])
 /** the parts drawn without an outline (things lying on the surface, and fine ones) */
-const FLAT = /^(eyes|eyesShut|face|mouth|mouthOpen|details|cuffs|glasses|pin)/
+const FLAT = /^(eyes|eyesShut|face|mouth|mouthOpen|brows|details|cuffs|glasses|pin)/
+/** how a customer's taking it, on their face: pleased (eyes squeezed shut, brows up, a big grin), cross, let down */
+export type Mood = 'joy' | 'mad' | 'sad'
+const MOODS: Mood[] = ['joy', 'mad', 'sad']
+/** the face's parts for each mood (the plain brows too: they're swapped out for a mood's) */
+function MOOD_PARTS() {
+  return ['brows', 'eyesJoy', ...MOODS.flatMap((m) => [`brows${cap(m)}`, `mouth${cap(m)}`])]
+}
+const cap = (m: string) => m[0].toUpperCase() + m.slice(1)
+/** a customer's mood from how they rated it (or that they walked out): none while they've not said */
+export const moodOf = (g: { rating: number | null; state: string }): Mood | null =>
+  g.state === 'angry' ? 'mad' : g.rating === null ? null : g.rating >= 65 ? 'joy' : g.rating < 45 ? 'sad' : null
 
 const UP = new THREE.Vector3(), QA = new THREE.Quaternion(), QB = new THREE.Quaternion()
 
@@ -130,6 +141,8 @@ type Rigged = {
   shut: THREE.Object3D[]
   mouth: THREE.Object3D[]
   open: THREE.Object3D[]
+  /** the face's mood parts, by name (eyesJoy, brows, browsJoy, mouthMad…) */
+  face: Record<string, THREE.Object3D[]>
   /** the head as the action left it, and as it was turned to look about */
   posed: THREE.Quaternion
   looked: THREE.Quaternion
@@ -188,7 +201,7 @@ const hash = (id: number, salt: number) => {
  * of wearing its hair (the parts named "<part>_<style>": the style picked by id, or given), and their head a touch
  * wider or narrower, longer or shorter than the next one's.
  */
-function useRigged(id: number, kind: Kind, glasses: boolean,
+function useRigged(id: number, kind: Kind, glasses: boolean, phones: boolean,
   given?: { look?: Look; style?: (styles: string[]) => string; show?: (part: string) => boolean }): Rigged {
   const gltf = useGLTF(URL)
   const lookGiven = given?.look
@@ -218,6 +231,7 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
     const drop: THREE.Object3D[] = []
     const keep: { o: THREE.SkinnedMesh; inked: boolean }[] = []
     const eyes: THREE.Object3D[] = [], shut: THREE.Object3D[] = [], mouth: THREE.Object3D[] = [], open: THREE.Object3D[] = []
+    const face: Record<string, THREE.Object3D[]> = {}
     const mats = new Map<string, THREE.MeshToonMaterial>()
     const toon = (src: THREE.MeshStandardMaterial) => {
       const name = src.name
@@ -244,7 +258,7 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
     const style = styles.length ? (styleGiven ? styleGiven(styles) : styles[Math.floor(hash(id, 11) * styles.length)]) : null
     for (const o of meshes) {
       const part = nameOf(o)
-      if (part === null || (part === 'glasses' && !glasses) || (part.includes('_') && part.split('_')[1] !== style)
+      if (part === null || (part === 'glasses' && !glasses) || (part === 'phones' && !phones) || (part.includes('_') && part.split('_')[1] !== style)
         || (showGiven && !showGiven(part.split('_')[0]))) {
         drop.push(o)
         continue
@@ -256,7 +270,8 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
       if (part === 'eyesShut') shut.push(o)
       if (part === 'mouth') mouth.push(o)
       if (part === 'mouthOpen') open.push(o)
-      if (o instanceof THREE.SkinnedMesh && !SWAPPED.has(part)) keep.push({ o, inked: !FLAT.test(part) })
+      if (MOOD_PARTS().includes(part)) (face[part] ??= []).push(o)
+      if (o instanceof THREE.SkinnedMesh && !SWAPPED.has(part) && !MOOD_PARTS().includes(part)) keep.push({ o, inked: !FLAT.test(part) })
     }
     for (const o of drop) o.removeFromParent()
     // (drawn as few meshes as can be: every part in one material merged into one mesh, and one ink outline round all
@@ -284,6 +299,7 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
       for (const o of skinned) o.removeFromParent()
     }
     for (const o of [...shut, ...open]) o.visible = false
+    for (const [k, list] of Object.entries(face)) if (k !== 'brows') for (const o of list) o.visible = false
     const mixer = new THREE.AnimationMixer(root)
     const actions: Record<string, THREE.AnimationAction> = {}
     for (const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip)
@@ -295,8 +311,8 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
     })
     // (no two heads quite the same: a few percent wider or narrower, longer or shorter; the actions never scale it)
     head?.scale.set(0.95 + 0.1 * hash(id, 3), 0.97 + 0.06 * hash(id, 5), 0.97 + 0.06 * hash(id, 3))
-    return { root, mixer, actions, head, hand, handL, eyes, shut, mouth, open, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0) }
-  }, [gltf, id, kind, glasses, lookGiven, styleGiven, showGiven])
+    return { root, mixer, actions, head, hand, handL, eyes, shut, mouth, open, face, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0) }
+  }, [gltf, id, kind, glasses, phones, lookGiven, styleGiven, showGiven])
   // (when they've gone, let go of what the GPU holds for them: each skeleton's bone texture, their own materials;
   // left alone these pile up over a day of customers until the browser drops the 3D)
   useEffect(() => () => {
@@ -312,19 +328,23 @@ function useRigged(id: number, kind: Kind, glasses: boolean,
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
-export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven }: { id: number; eating: boolean; walking: boolean
+export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven, mood = null }: { id: number; eating: boolean; walking: boolean
   /** their own clock (seconds): given as a number (re-rendered each frame), or read each frame from a ref, which
    * moves the figure without re-rendering it (only a change of what they're doing re-renders) */
   t?: number; clock?: { current: number }
   /** sat beside the one they came with: +1 if they're on this one's left, -1 on the right (they talk, turned to them) */
   talk?: number
   /** (to look at one) what they do while they wait, instead of passing the time by turns */
-  idle?: 'Sit' | 'Phone' | 'Chin' }) {
+  idle?: 'Sit' | 'Phone' | 'Chin'
+  /** how they're taking it (on their face) */
+  mood?: Mood | null }) {
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
   const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
     || (kind === 'civilServant' && id % 2 === 1)
-  const r = useRigged(id, kind, glasses)
+  // (a third of the students come in with their big headphones on)
+  const phones = kind === 'student' && hash(id, 23) < 0.34
+  const r = useRigged(id, kind, glasses, phones)
   const playing = useRef<string | null>(null)
   const last = useRef<number | null>(null)
   const skewer = useRef<THREE.Group>(null)
@@ -383,12 +403,19 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
       r.head.quaternion.premultiply(QA.setFromAxisAngle(up.normalize(), look))
       r.looked.copy(r.head.quaternion)
     }
-    const blink = (t * 0.9 + id * 0.37) % 4 < 0.12
-    for (const o of r.eyes) o.visible = !blink
+    // (pleased, their eyes are squeezed shut in happy arcs: no blinking)
+    const joy = mood === 'joy' && !!r.face.eyesJoy
+    const blink = !joy && (t * 0.9 + id * 0.37) % 4 < 0.12
+    for (const o of r.eyes) o.visible = !blink && !joy
     for (const o of r.shut) o.visible = blink
+    for (const o of r.face.eyesJoy ?? []) o.visible = joy
+    const browsNow = mood && r.face[`brows${cap(mood)}`] ? `brows${cap(mood)}` : 'brows'
+    for (const k of ['brows', ...MOODS.map((m) => `brows${cap(m)}`)]) for (const o of r.face[k] ?? []) o.visible = k === browsNow
     const chewing = eating && Math.sin(t * 11) > 0.2 && ((t + id * 0.7) % 3) > 1.2
-    for (const o of r.mouth) o.visible = !chewing
-    for (const o of r.open) o.visible = chewing
+    const mouthNow = chewing ? 'open' : mood && r.face[`mouth${cap(mood)}`] ? `mouth${cap(mood)}` : 'mouth'
+    for (const o of r.mouth) o.visible = mouthNow === 'mouth'
+    for (const o of r.open) o.visible = mouthNow === 'open'
+    for (const m of MOODS) for (const o of r.face[`mouth${cap(m)}`] ?? []) o.visible = mouthNow === `mouth${cap(m)}`
   }
   useFrame(step)
 
@@ -503,7 +530,7 @@ export function StaffFigure({ id, role, look: who, moving = false }: { id: strin
   const style = useMemo(() => () => (who.female ? (cook ? 'bun' : front ? 'updo' : ['long', 'bob', 'bun'][cut])
     : cook || role === 'server' || role === 'stock' ? 'crop' : 'short'), [who.female, cut, cook, front, role])
   const show = useMemo(() => (part: string) => !JOB_PARTS.has(part) || WEARS[role].includes(part), [role])
-  const r = useRigged(1000 + seed, kind, glasses, { look, style, show })
+  const r = useRigged(1000 + seed, kind, glasses, false, { look, style, show })
   const fan = useRef<THREE.Group>(null)
   const clock = useRef(0)
   const action = moving ? 'Carry' : cook ? 'Cook' : role === 'cashier' ? 'Stand' : 'Hold'

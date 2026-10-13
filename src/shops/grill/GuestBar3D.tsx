@@ -8,14 +8,14 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel } from '@/data/guests'
-import { Person, StaffFigure } from '@/scene/Person3D'
+import { Person, StaffFigure, moodOf } from '@/scene/Person3D'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
-import { DiningWall } from './DiningRoom'
+import { DiningWall, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SERVICE, passOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SERVICE, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -484,10 +484,12 @@ const REG_GEO = {
  * The customers' side of the shop floored in wide old boards: one even rectangle under the whole bar, the row of
  * stools and the way along behind them to the noren, its boards running the length of the bar.
  */
-function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR, wall = true }: { c: Counter; from: number; to: number; near?: number
+function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR, wall = true, bare = false }: { c: Counter; from: number; to: number; near?: number
   far?: number
   /** a dark edging board along its far side, where it meets the wall */
-  wall?: boolean }) {
+  wall?: boolean
+  /** only the edging board (the floor itself laid as one, under the whole room) */
+  bare?: boolean }) {
   const yaw = Math.atan2(c.along.x, c.along.z)
   // (in the floor's own frame: z along the bar, x away from the cook, so lay is -x; its boards are laid from the
   // world, so they run straight on into the next piece's and the kitchen's, no seam between)
@@ -495,7 +497,7 @@ function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR, wall = t
   const l = to - from
   return (
     <group position={c.at} rotation-y={yaw}>
-      <FloorPiece w={w} l={l} position={[-(near + far) / 2, 0.004, (from + to) / 2]} />
+      {!bare && <FloorPiece w={w} l={l} position={[-(near + far) / 2, 0.004, (from + to) / 2]} />}
       {wall && (
         <mesh position={[-far, 0.01, (from + to) / 2]}>
           <boxGeometry args={[0.04, 0.02, l]} />
@@ -506,7 +508,16 @@ function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR, wall = t
   )
 }
 
-/** the floor reaches this far under the counter, and back past the aisle */
+/** the whole room's floor in one piece, a rectangle under the counters, the kitchen and the way in (roomOf) */
+function RoomFloor({ counters }: { counters: Counter[] }) {
+  const c = counters[0]
+  const { along: [a0, a1], lay: [l0, l1] } = useMemo(() => roomOf(counters), [counters])
+  return (
+    <group position={c.at} rotation-y={Math.atan2(c.along.x, c.along.z)}>
+      <FloorPiece w={l1 - l0} l={a1 - a0} position={[-(l0 + l1) / 2, 0.004, (a0 + a1) / 2]} />
+    </group>
+  )
+}
 
 function Stool() {
   return (
@@ -908,6 +919,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.rotation.y = w.yaw
       }
     })
+    SERVICE.walkers = waiters.current.map((w) => w.pos)
     // (which seats have their plate down, for what's being served to them)
     PLATES_SET.clear()
     for (const r of runs.current) if (r.phase === 'set' || r.phase === 'clear' && r.t < 0) PLATES_SET.add(r.seat)
@@ -958,9 +970,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             o.at.clone().addScaledVector(o.lay, FLOOR_FAR).sub(c.at).dot(c.along)))
           return (
             <group key={i}>
-              <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} />
-              {/* (and past the bar's end, a strip more behind the till for the cashier to stand on) */}
-              {given && <DiningFloor c={c} from={c.length / 2 + 0.15} to={c.length / 2 + 1.45} near={1.1} far={FLOOR_NEAR} wall={false} />}
+              <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} bare={!!given} />
+              {/* (and past the bar's end, a strip more behind the till for the cashier to stand on; a shop laid out
+                  in full has one floor under all of it instead) */}
+              {given && <RoomFloor counters={counters} />}
+              {given && <ShopProps counters={counters} />}
               {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} shrine={back + 1.0} />}
             </group>
           )
@@ -970,7 +984,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const corner = (FLOOR_FAR - c.at.clone().sub(c0.at).dot(c0.lay)) / c.along.dot(c0.lay)
         return (
           <group key={i}>
-            <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} />
+            <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} bare={!!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
             {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={FLOOR_FAR} lamps={2} top={top} door={(meet + corner) / 2} />}
           </group>
@@ -1025,7 +1039,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <group key={s.id} ref={(o) => { if (o) groups.current.set(s.id, o); else groups.current.delete(s.id) }}>
             <group scale={PEOPLE_SCALE}>
               <PersonClock s={s} eating={() => s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'} clock={clock}
-                talk={talkSide(s)} />
+                talk={talkSide(s)} guest={g} />
             </group>
             <Html position={[0, 1.05 * PEOPLE_SCALE, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
               <div className="g3-label">
@@ -1055,6 +1069,7 @@ function Say({ text }: { text: string }) {
 }
 
 /** one customer's figure, moved by the bar's clock each frame (read from the ref: nothing re-renders for it) */
-function PersonClock({ s, eating, clock, talk }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number }) {
-  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} clock={clock} talk={talk} />
+function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number
+  guest?: GuestView }) {
+  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null} />
 }

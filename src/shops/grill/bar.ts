@@ -50,12 +50,32 @@ export const SERVICE = {
   carried: new Map<string, THREE.Vector3>(),
   /** what's been set down at its seat (GuestBar3D; Roasting lays it on the plate and takes it out of here) */
   delivered: new Set<string>(),
+  /** where the staff walking about are just now, in the bar's own frame (the gates in the bar open for them) */
+  walkers: [] as THREE.Vector3[],
 }
 // (in development, to be watched from the console)
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __service?: typeof SERVICE }).__service = SERVICE
 /** the pass, in the bar's own frame (on the first counter's top, at its start, the customers' side of it) */
 export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + 0.2)
   .addScaledVector(cs[0].lay, -0.16)
+
+/**
+ * The whole shop's floor as one rectangle, in the first counter's frame (along it and across it, lay, from its middle):
+ * every counter's floor from its far end and wall to where it meets the others, the strip behind the till, and the
+ * kitchen inside them, squared off, so there's no corner left open.
+ */
+export function roomOf(cs: Counter[]) {
+  const c0 = cs[0]
+  const pts: THREE.Vector3[] = []
+  const add = (c: Counter, along: [number, number], lay: [number, number]) => {
+    for (const a of along) for (const l of lay) pts.push(c.at.clone().addScaledVector(c.along, a).addScaledVector(c.lay, l))
+  }
+  // (the first counter's floor runs on past its end to the door, with the till's strip behind it)
+  add(c0, [-c0.length / 2 - 0.35, c0.length / 2 + 1.45], [FLOOR_FAR, 1.1])
+  for (const c of cs.slice(1)) add(c, [-c.length / 2 - 0.35, c.length / 2], [FLOOR_FAR, FLOOR_NEAR])
+  const al = pts.map((p) => p.clone().sub(c0.at).dot(c0.along)), ly = pts.map((p) => p.clone().sub(c0.at).dot(c0.lay))
+  return { along: [Math.min(...al), Math.max(...al)] as [number, number], lay: [Math.min(...ly), Math.max(...ly)] as [number, number] }
+}
 
 export const LAY = new THREE.Vector3(0.59, 0, 0.81)
 export const ALONG = new THREE.Vector3(0.81, 0, -0.59)

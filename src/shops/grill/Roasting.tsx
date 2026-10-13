@@ -409,6 +409,7 @@ function Bar() {
           gate={BAR_GATES[i]} noTop={GRILL_COUNTERS.length > 1} />)}
         {GRILL_COUNTERS.length > 1 && <BarTop />}
       </StaticBatch>
+      {GRILL_COUNTERS.map((c, i) => BAR_GATES[i] && <BarGate key={i} c={c} gate={BAR_GATES[i]} />)}
     </group>
   )
 }
@@ -482,7 +483,7 @@ const KITCHEN_FLOOR = (() => {
   const lay1 = c1 ? toGrillScene(c1.at.clone().addScaledVector(c1.along, -c1.length / 2 - 0.35)).dot(LAY) : COOK_TABLE.lay[1] + 0.9
   return { lay: [lay0, lay1], along: [along0, along1] }
 })()
-function CookTable() {
+function CookTable({ floor = true }: { floor?: boolean }) {
   // (and under it all the kitchen's floor, from the bar's cook's edges to the front, and on past the table's
   // right-hand end where the other cooks stand)
   const W = KITCHEN_FLOOR.along[1] - KITCHEN_FLOOR.along[0], D = KITCHEN_FLOOR.lay[1] - KITCHEN_FLOOR.lay[0]
@@ -492,10 +493,13 @@ function CookTable() {
     <>
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]} />)}
       <CookTableTop />
-      {/* (the same boards as the customers', running on from theirs, a shade darker: the kitchen's side) */}
-      <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
-        <FloorPiece w={W} l={D} tint="#b49a84" />
-      </group>
+      {/* (the same boards as the customers', laid the same way; with the shop open and the room drawn, its one floor
+          runs under the kitchen too) */}
+      {floor && (
+        <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+          <FloorPiece w={W} l={D} />
+        </group>
+      )}
     </>
   )
 }
@@ -503,16 +507,33 @@ function CookTable() {
  * The cook's table's top, in one piece round its bay: a thick plank top with its edges rounded over (面取り), the
  * grain running on unbroken, its ink outline round the whole shape (no seams where the parts under it meet).
  */
+/** a closed outline through these corners, each rounded off to its radius (a curve cut in from both its sides) */
+function roundedShape(pts: [number, number][], radii: number[]) {
+  const sh = new THREE.Shape()
+  pts.forEach(([x, y], k) => {
+    const [px, py] = pts[(k + pts.length - 1) % pts.length], [nx, ny] = pts[(k + 1) % pts.length]
+    const dp = Math.hypot(px - x, py - y), dn = Math.hypot(nx - x, ny - y)
+    const r = Math.min(radii[k], dp / 2, dn / 2)
+    const a: [number, number] = [x + (px - x) / dp * r, y + (py - y) / dp * r]
+    const b: [number, number] = [x + (nx - x) / dn * r, y + (ny - y) / dn * r]
+    if (k) sh.lineTo(a[0], a[1])
+    else sh.moveTo(a[0], a[1])
+    sh.quadraticCurveTo(x, y, b[0], b[1])
+  })
+  sh.closePath()
+  return sh
+}
 function tableTopGeometry(grow: number, thick: number) {
   const { along: [a0, a1], lay: [l0, l1] } = COOK_TABLE
   const n = COOK_NOTCH
   const i = 0.025 - grow
-  const sh = new THREE.Shape()
   const pts: [number, number][] = [[a0 + i, l0 + i], [a1 - i, l0 + i], [a1 - i, l1 - i], [n.along[1] + i, l1 - i],
     [n.along[1] + i, n.lay - i], [n.along[0] - i, n.lay - i], [n.along[0] - i, l1 - i], [a0 + i, l1 - i]]
-  pts.forEach(([x, y], k) => (k ? sh.lineTo(x, y) : sh.moveTo(x, y)))
+  // (its corners rounded off, the outer ones well, the bay's inside ones a little, as a planed top would be)
+  // (the outline, grown out, keeps to the same curves: wider round the outside corners, tighter in the bay's)
+  const sh = roundedShape(pts, [0.16, 0.16, 0.16, 0.12, -0.06, -0.06, 0.12, 0.16].map((r) => Math.max(0.01, Math.abs(r) + Math.sign(r) * grow)))
   const g = new THREE.ExtrudeGeometry(sh, { depth: 0.08 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: 0.025 + grow * 0.6,
-    bevelSegments: 3, curveSegments: 4 })
+    bevelSegments: 3, curveSegments: 6 })
   g.rotateX(Math.PI / 2)
   g.translate(0, -thick, 0)
   return g
@@ -553,8 +574,65 @@ function CookTableBox({ lay, along }: { lay: [number, number]; along: [number, n
 const BAR_DEPTH = 0.62
 /** the staff's way through, at the outer end of each counter: which end, and how wide */
 const BAR_GATES: { end: 1 | -1; w: number }[] = [{ end: 1, w: 0.4 }, { end: -1, w: 0.42 }]
-/** how far the gates' flaps stand lifted open */
-const FLAP_OPEN = 1.5
+/** how near someone has to come for a gate to swing open for them (the bar's sizes), and how quickly it swings */
+const GATE_NEAR = 0.75
+const GATE_SWING = 4
+/**
+ * The swing door across a counter's gate: a leaf of slatted wood as high as the bar, its top capped in the bar's own
+ * wood so it reads as the bar run on, hung on brass hinges on the base's end. It stands shut, flush with the bar, and
+ * swings in toward the kitchen when one of the staff comes up to it (SERVICE.walkers), shutting again behind them.
+ */
+function BarGate({ c, gate }: { c: Counter; gate: { end: 1 | -1; w: number } }) {
+  const yaw = Math.atan2(-c.along.z, c.along.x)
+  const L = c.length, G = gate.w, end = gate.end
+  // (the hinge: the inner edge of the gap, on the base's line; the leaf reaches from it across the gap)
+  const hinge = end * ((L + 0.2) / 2 - G)
+  const leaf = useRef<THREE.Group>(null)
+  const open = useRef(0)
+  const middle = useMemo(() => c.at.clone().addScaledVector(c.along, hinge + end * G / 2), [c, hinge, end, G])
+  useFrame((_, dt) => {
+    const near = SERVICE.walkers.some((w) => Math.hypot(w.x - middle.x, w.z - middle.z) < GATE_NEAR)
+    open.current = THREE.MathUtils.clamp(open.current + (near ? 1 : -1) * Math.min(dt, 0.1) * GATE_SWING, 0, 1)
+    const k = open.current
+    if (leaf.current) leaf.current.rotation.y = -end * (Math.PI / 2) * k * k * (3 - 2 * k)
+  })
+  const H = BAR_TOP - 0.02
+  return (
+    <group position={c.at} rotation-y={yaw}>
+      <group position={[hinge, 0, 0.08]}>
+        <group ref={leaf}>
+          <group position-x={end * (G / 2 - 0.005)}>
+            <mesh position-y={H / 2 + 0.02} castShadow>
+              <boxGeometry args={[G - 0.02, H - 0.06, 0.035]} />
+              <meshToonMaterial color="#b08454" />
+            </mesh>
+            <mesh position-y={H / 2 + 0.02} scale={[1.02, 1.01, 1.3]}>
+              <boxGeometry args={[G - 0.02, H - 0.06, 0.035]} />
+              <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+            </mesh>
+            {[-0.3, -0.1, 0.1, 0.3].map((k) => (
+              <mesh key={k} position={[k * (G - 0.06), H / 2, -0.019]}>
+                <boxGeometry args={[0.012, H - 0.16, 0.004]} />
+                <meshToonMaterial color="#7a5432" />
+              </mesh>
+            ))}
+            {/* its cap, level with the bar top */}
+            <mesh position-y={BAR_TOP - 0.025} geometry={ROUNDED_SLAB} scale={[G - 0.015, 0.05, 0.12]} castShadow>
+              <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
+            </mesh>
+            <mesh position-y={BAR_TOP - 0.025} geometry={ROUNDED_SLAB} scale={[G, 0.065, 0.135]}>
+              <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+            </mesh>
+          </group>
+        </group>
+        {/* the hinges, on the base's end */}
+        {[0.12, BAR_TOP - 0.14].map((y) => (
+          <mesh key={y} position={[0, y, 0]}><boxGeometry args={[0.02, 0.05, 0.05]} /><meshToonMaterial color="#c8a050" /></mesh>
+        ))}
+      </group>
+    </group>
+  )
+}
 function barTopShape(grow: number) {
   const box = (c: Counter) => {
     const hl = (c.length + 0.3) / 2, hd = BAR_DEPTH / 2
@@ -605,7 +683,7 @@ const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042,
 /**
  * One counter of the bar: a long plank of pale hinoki with rounded edges on a dark base, a raised lip on the cook's
  * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
- * and that end of the top is a flap on brass hinges, lifted: the staff's way between the kitchen and the floor.
+ * and that end of the top too: the staff's way between the kitchen and the floor, shut by a little swing door (BarGate).
  */
 function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number }
   /** its top drawn with the others' as one piece (BarTop), not its own */
@@ -617,7 +695,6 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
   // (the base, short of the gate)
   const baseL = L + 0.2 - G
   const baseX = -end * G / 2
-  const gateX = end * ((L + 0.2) / 2 - G / 2)
   // (where the top starts, on the near end: short of a gate there)
   const topX0 = -(L + 0.3) / 2 + (gate && end < 0 ? G : 0)
   return (
@@ -637,25 +714,6 @@ function BarCounter({ c, trim = 0, gate, noTop = false }: { c: Counter; trim?: n
         <boxGeometry args={[baseL, BAR_TOP - 0.06, 0.4]} />
         <meshToonMaterial color="#3a2a1e" />
       </mesh>
-      {gate && (
-        <group position-x={gateX}>
-          {/* the flap: that end of the top, hinged at its inner edge on two brass hinges, lifted up and standing open */}
-          <group position={[-end * G / 2, BAR_TOP, 0]} rotation-z={end * FLAP_OPEN}>
-            <mesh position={[end * G / 2, -0.03, 0]} scale={[G - 0.01, 0.06, BAR_DEPTH]} geometry={ROUNDED_SLAB} castShadow>
-              <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
-            </mesh>
-            <mesh position={[end * G / 2, -0.03, 0]} scale={[(G - 0.01) * 1.02, 0.075, BAR_DEPTH * 1.03]} geometry={ROUNDED_SLAB}>
-              <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-            </mesh>
-            {[-0.2, 0.2].map((z) => (
-              <mesh key={z} position={[0, 0.002, z]}>
-                <boxGeometry args={[0.05, 0.012, 0.04]} />
-                <meshToonMaterial color="#c8a050" />
-              </mesh>
-            ))}
-          </group>
-        </group>
-      )}
       {/* the raised lip on the cook's side, the step the food is handed over */}
       {/* (stopping short of where the other counter butts on, and of the gate's flap) */}
       {(() => {
@@ -3387,7 +3445,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </Html>
       )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
-      <CookTable />
+      <CookTable floor={!(space === 'open' && bar)} />
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
         <group key={m.id} position={at} rotation-y={yaw} scale={CHEF_SCALE}><StaffFigure id={m.id} role={m.role} look={m.look} /></group>
       ))}

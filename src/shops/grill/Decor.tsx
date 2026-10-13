@@ -7,6 +7,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
+import { ALONG, GRILL_OFFSET } from './bar'
 
 type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
@@ -16,9 +17,9 @@ export const DECOR = {
   fan: { at: [-0.95, 1.9], r: 0.3 },
   // (drawn 1.8 times its own size, standing back from the fire's stones)
   lantern: { at: [-2.05, -0.3], r: 0.36 },
-  // (the cooked rice the rice balls are made from, at the table's front right corner; a shop's tub, half again as wide as
-  // a plate, its lid leant on the side away from the corner)
-  rice: { at: [3.19, 0.21], r: 0.7 },
+  // (the cooked rice the rice balls are made from: a shop's big tub, on a side table of its own just past the cook's
+  // table's right-hand end, by the other cooks)
+  rice: { at: [4.93, -0.12], r: 1.1 },
 } satisfies Record<string, Spot>
 
 /** what's being carried from here: a stick of charcoal or the fan, where it is (Roasting sets it), and how far the
@@ -320,45 +321,82 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
  * The rice the rice balls are shaped from (おひつ): a round tub of pale sawara bound with copper hoops, heaped with
  * steaming white rice, the wooden paddle (しゃもじ) stood in it, its lid leant against its side.
  */
-/** the tub as drawn below, made this much bigger (a shop's おひつ, about 40 cm across beside the 25 cm plates) */
-const RICE_SCALE = 2.0
+/** the tub as drawn below, made this much bigger (a shop's おひつ, wider than two plates, and deep) */
+const RICE_SCALE = 2.6
+/** the side table it stands on: its top's height (the cook's table's top is the scene's y = 0), and its size */
+const SIDE_TOP = -0.3
+const SIDE_W = 1.6
+const RICE_GEO = {
+  tub: new THREE.CylinderGeometry(0.27, 0.25, 0.3, 28, 1, true),
+  floor: new THREE.CircleGeometry(0.25, 28),
+  hoop: new THREE.TorusGeometry(0.272, 0.012, 6, 32),
+  rice: new THREE.SphereGeometry(0.255, 24, 10, 0, Math.PI * 2, 0, Math.PI * 0.32),
+  lid: new THREE.CylinderGeometry(0.29, 0.29, 0.03, 28),
+  paddle: new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6),
+  blade: new THREE.SphereGeometry(0.06, 12, 8),
+  slab: new THREE.BoxGeometry(1, 1, 1),
+  bowl: new THREE.SphereGeometry(0.11, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
+}
+/**
+ * The rice the rice balls are shaped from (おひつ): a big round tub of pale sawara bound with copper hoops, heaped with
+ * steaming white rice, the wooden paddle (しゃもじ) stood in it, on a plain side table of its own (作業台); its lid and
+ * a stack of rice bowls on the shelf under it.
+ */
 function RiceTub() {
   const [x, z] = DECOR.rice.at
-  const geo = useMemo(() => ({
-    tub: new THREE.CylinderGeometry(0.27, 0.25, 0.2, 28, 1, true),
-    floor: new THREE.CircleGeometry(0.25, 28),
-    hoop: new THREE.TorusGeometry(0.272, 0.012, 6, 32),
-    rice: new THREE.SphereGeometry(0.255, 24, 10, 0, Math.PI * 2, 0, Math.PI * 0.32),
-    lid: new THREE.CylinderGeometry(0.29, 0.29, 0.03, 28),
-    paddle: new THREE.CylinderGeometry(0.012, 0.012, 0.26, 6),
-    blade: new THREE.SphereGeometry(0.06, 12, 8),
-  }), [])
+  const g = RICE_GEO
+  const floor = GRILL_OFFSET.y
+  const legH = SIDE_TOP - 0.05 - floor
   return (
-    // (turned so the lid leans away from the table's edges, back along the table)
-    <group position={[x, 0, z]} scale={RICE_SCALE} rotation-y={Math.atan2(-0.59, -0.81)}>
-      <Inked geometry={geo.tub} color="#d9b47a" position={[0, 0.1, 0]} grow={1.03} />
-      <mesh geometry={geo.tub} position-y={0.1} scale={0.98}>
-        <meshToonMaterial color="#c49a5e" side={THREE.BackSide} />
+    <group position={[x, 0, z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+      {/* the table: a thick top, four square legs, a shelf low between them */}
+      <mesh geometry={g.slab} position-y={SIDE_TOP - 0.025} scale={[SIDE_W, 0.05, SIDE_W]} castShadow receiveShadow>
+        <meshToonMaterial color="#b98a58" />
       </mesh>
-      <mesh geometry={geo.floor} position-y={0.01} rotation-x={-Math.PI / 2}>
-        <meshToonMaterial color="#c49a5e" />
+      <mesh geometry={g.slab} position-y={SIDE_TOP - 0.025} scale={[SIDE_W * 1.015, 0.065, SIDE_W * 1.015]}>
+        <meshBasicMaterial color={INK} side={THREE.BackSide} />
       </mesh>
-      {[0.04, 0.16].map((y) => (
-        <mesh key={y} geometry={geo.hoop} position-y={y} rotation-x={Math.PI / 2}>
-          <meshToonMaterial color="#b0683a" />
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([i, k]) => (
+        <mesh key={`${i}${k}`} geometry={g.slab} position={[i * (SIDE_W / 2 - 0.08), floor + legH / 2, k * (SIDE_W / 2 - 0.08)]} scale={[0.09, legH, 0.09]}>
+          <meshToonMaterial color="#7a5434" />
         </mesh>
       ))}
-      {/* the rice, heaped a little over the rim */}
-      <mesh geometry={geo.rice} position-y={0.1} scale={[1, 0.55, 1]}>
-        <meshToonMaterial color="#fbf8f0" />
+      <mesh geometry={g.slab} position-y={floor + 0.28} scale={[SIDE_W - 0.12, 0.035, SIDE_W - 0.12]} receiveShadow>
+        <meshToonMaterial color="#9a7046" />
       </mesh>
-      {/* the paddle stood in it, and the lid leant against the tub */}
-      <group position={[0.08, 0.27, -0.04]} rotation={[0.25, 0, -0.35]}>
-        <mesh geometry={geo.paddle} position-y={0.06}><meshToonMaterial color="#e2c89a" /></mesh>
-        <mesh geometry={geo.blade} position-y={-0.1} scale={[1, 1.3, 0.25]}><meshToonMaterial color="#e2c89a" /></mesh>
+      {/* on the shelf: the tub's lid laid flat, and the rice bowls stacked upside down beside it */}
+      <mesh geometry={g.lid} position={[-0.25, floor + 0.28 + 0.018 + 0.04, 0]} scale={RICE_SCALE * 0.95}>
+        <meshToonMaterial color="#d9b47a" />
+      </mesh>
+      {[0, 1, 2].map((k) => (
+        <mesh key={k} geometry={g.bowl} position={[0.5, floor + 0.3 + k * 0.07, 0.35]} rotation-x={Math.PI} scale={[1.6, 1.4, 1.6]}>
+          <meshToonMaterial color="#e8e2d2" />
+        </mesh>
+      ))}
+      <group position-y={SIDE_TOP} scale={RICE_SCALE}>
+        <Inked geometry={g.tub} color="#d9b47a" position={[0, 0.15, 0]} grow={1.03} />
+        <mesh geometry={g.tub} position-y={0.15} scale={0.98}>
+          <meshToonMaterial color="#c49a5e" side={THREE.BackSide} />
+        </mesh>
+        <mesh geometry={g.floor} position-y={0.01} rotation-x={-Math.PI / 2}>
+          <meshToonMaterial color="#c49a5e" />
+        </mesh>
+        {[0.05, 0.25].map((y) => (
+          <mesh key={y} geometry={g.hoop} position-y={y} rotation-x={Math.PI / 2}>
+            <meshToonMaterial color="#b0683a" />
+          </mesh>
+        ))}
+        {/* the rice, heaped a little over the rim */}
+        <mesh geometry={g.rice} position-y={0.15} scale={[1, 0.55, 1]}>
+          <meshToonMaterial color="#fbf8f0" />
+        </mesh>
+        {/* the paddle stood in it */}
+        <group position={[0.08, 0.36, -0.04]} rotation={[0.25, 0, -0.35]}>
+          <mesh geometry={g.paddle} position-y={0.06}><meshToonMaterial color="#e2c89a" /></mesh>
+          <mesh geometry={g.blade} position-y={-0.12} scale={[1, 1.3, 0.25]}><meshToonMaterial color="#e2c89a" /></mesh>
+        </group>
+        <Steam position={[0, 0.22, 0]} width={0.4} height={0.55} opacity={0.32} layers={2} />
       </group>
-      <Inked geometry={geo.lid} color="#d9b47a" position={[0.34, 0.27, 0.05]} rotation={[0, 0, 1.25]} grow={1.04} />
-      <Steam position={[0, 0.16, 0]} width={0.4} height={0.55} opacity={0.32} layers={2} />
     </group>
   )
 }

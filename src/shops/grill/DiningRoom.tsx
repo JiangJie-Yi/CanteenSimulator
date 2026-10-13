@@ -574,3 +574,127 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine }: { c: 
     </group>
   )
 }
+
+/** straw wrapping round a sake barrel (菰), the brewer's mark in red and black on its front (the middle, -z) */
+const KOMO = canvasTex(256, 96, (g) => {
+  g.fillStyle = '#d8c48e'
+  g.fillRect(0, 0, 256, 96)
+  for (let x = 0; x < 256; x += 3) {
+    g.strokeStyle = x % 6 ? 'rgba(120,90,40,0.35)' : 'rgba(250,240,200,0.4)'
+    g.beginPath()
+    g.moveTo(x, 0)
+    g.lineTo(x + 1, 96)
+    g.stroke()
+  }
+  // the mark: a red disc, the name brushed in black over it, and a band of black either side
+  g.fillStyle = '#f4ead2'
+  g.fillRect(96, 10, 64, 76)
+  g.fillStyle = '#b8261c'
+  g.beginPath()
+  g.arc(128, 40, 22, 0, Math.PI * 2)
+  g.fill()
+  g.fillStyle = '#1c1410'
+  g.font = 'bold 30px serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText('聞', 128, 41)
+  g.font = 'bold 15px serif'
+  g.fillText('銘酒', 128, 74)
+})
+const PROP_GEO = {
+  barrel: new THREE.CylinderGeometry(0.2, 0.2, 0.42, 24, 1, true),
+  barrelTop: new THREE.CircleGeometry(0.2, 24),
+  rope: new THREE.TorusGeometry(0.203, 0.012, 5, 28),
+  pot: new THREE.CylinderGeometry(0.15, 0.12, 0.26, 16),
+  stalk: new THREE.CylinderGeometry(0.014, 0.017, 1, 6),
+  leaf: new THREE.ConeGeometry(0.035, 0.2, 4),
+  crate: new THREE.BoxGeometry(0.3, 0.2, 0.24),
+  bottle: new THREE.CylinderGeometry(0.03, 0.03, 0.14, 8),
+}
+function Inked({ geometry, color, map, grow = 1.04, side, ...rest }: { geometry: THREE.BufferGeometry; color: string; map?: THREE.Texture | null
+  grow?: number; side?: THREE.Side } & Record<string, unknown>) {
+  return (
+    <group {...rest}>
+      <mesh geometry={geometry} castShadow receiveShadow>
+        <meshToonMaterial color={color} map={map ?? null} side={side ?? THREE.FrontSide} />
+      </mesh>
+      <mesh geometry={geometry} scale={grow}>
+        <meshBasicMaterial color={INK} side={THREE.BackSide} />
+      </mesh>
+    </group>
+  )
+}
+/** a straw-wrapped sake barrel (菰樽), its lid and its two ropes, standing on its end; its mark faces `-z` */
+function SakeBarrel() {
+  return (
+    <group>
+      <Inked geometry={PROP_GEO.barrel} color="#ffffff" map={KOMO} position-y={0.21} grow={1.03} side={THREE.DoubleSide} />
+      <mesh geometry={PROP_GEO.barrelTop} position-y={0.42} rotation-x={-Math.PI / 2}><meshToonMaterial color="#c9a46a" /></mesh>
+      {[0.07, 0.35].map((y) => (
+        <mesh key={y} geometry={PROP_GEO.rope} position-y={y} rotation-x={Math.PI / 2}><meshToonMaterial color="#5a3a1e" /></mesh>
+      ))}
+    </group>
+  )
+}
+/** a clump of bamboo in a glazed pot: a few stalks, leaves in tufts at their joints */
+function PottedBamboo() {
+  const stalks = [[0.04, 0.02, 1.25, 0.05], [-0.05, 0.03, 1.05, -0.08], [0.0, -0.06, 0.9, 0.1]]
+  return (
+    <group>
+      <Inked geometry={PROP_GEO.pot} color="#2c4a5c" position-y={0.13} />
+      <mesh position-y={0.255} rotation-x={-Math.PI / 2}><circleGeometry args={[0.14, 16]} /><meshToonMaterial color="#4a3020" /></mesh>
+      {stalks.map(([x, z, h, lean], i) => (
+        <group key={i} position={[x, 0.25, z]} rotation-z={lean}>
+          <mesh geometry={PROP_GEO.stalk} position-y={h / 2} scale={[1, h, 1]}><meshToonMaterial color="#6f8a3a" /></mesh>
+          {[0.55, 0.75, 0.95].filter((k) => k * h < h).map((k) => (
+            <group key={k} position-y={k * h}>
+              {[0, 2.1, 4.2].map((a) => (
+                <mesh key={a} geometry={PROP_GEO.leaf} position={[Math.cos(a + i) * 0.09, 0.02, Math.sin(a + i) * 0.09]}
+                  rotation={[Math.sin(a + i) * 1.1, 0, -Math.cos(a + i) * 1.1]}>
+                  <meshToonMaterial color={i % 2 ? '#4f7a32' : '#5f8c3a'} />
+                </mesh>
+              ))}
+            </group>
+          ))}
+        </group>
+      ))}
+    </group>
+  )
+}
+/** plastic crates of empty bottles (P箱), stacked by the kitchen's end, where the stock's seen to */
+function BottleCrates() {
+  return (
+    <group>
+      {[0, 1].map((k) => (
+        <group key={k} position={[k * 0.04 - 0.02, k * 0.2, 0]} rotation-y={k * 0.12}>
+          <Inked geometry={PROP_GEO.crate} color={k ? '#b8322a' : '#c0442e'} position-y={0.1} />
+          {[-0.1, 0, 0.1].flatMap((x) => [-0.06, 0.06].map((z) => (
+            <mesh key={`${x}${z}`} geometry={PROP_GEO.bottle} position={[x, 0.17, z]}><meshToonMaterial color="#3a2a1a" /></mesh>
+          )))}
+        </group>
+      ))}
+    </group>
+  )
+}
+/**
+ * What stands about the room besides the counters (the shop's own frame): sake barrels stacked in the open corner past
+ * the kitchen, a pot of bamboo at the dead end of the side counter's aisle, and the empty-bottle crates at the
+ * kitchen's end — all of it on the floor out of everyone's way, and facing the room.
+ */
+export function ShopProps({ counters }: { counters: Counter[] }) {
+  const c0 = counters[0]
+  const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, along).addScaledVector(c0.lay, lay)
+  // (their fronts toward the room's open side, where the camera is)
+  const face = Math.atan2(-c0.lay.x, -c0.lay.z)
+  return (
+    <StaticBatch>
+      <group position={at(3.3, 3.2)} rotation-y={face + 0.3}>
+        <group position-x={-0.21}><SakeBarrel /></group>
+        <group position-x={0.21} rotation-y={0.4}><SakeBarrel /></group>
+        <group position-y={0.43} rotation-y={-0.2}><SakeBarrel /></group>
+      </group>
+      <group position={at(-3.6, 3.6)}><PottedBamboo /></group>
+      <group position={at(1.45, 0.62)} rotation-y={face}><BottleCrates /></group>
+    </StaticBatch>
+  )
+}

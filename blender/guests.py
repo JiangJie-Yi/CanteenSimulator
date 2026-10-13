@@ -16,8 +16,9 @@ its surface, ears and a nose, and hair built up from a cap and tapered locks.
 Materials the app recolours per customer: Skin, Hair, Top, Bottom, Shoes (others keep their colour). Top and
 Bottom carry UVs in metres around each limb, for the cloth patterns (scene/patterns.ts).
 
-Options any kind can show: "<kind>.glasses". Swapped in by the app: "<kind>.eyes" / "<kind>.eyesShut" (a blink)
-and "<kind>.mouth" / "<kind>.mouthOpen" (chewing).
+Options any kind can show: "<kind>.glasses" (and the student's "student.phones"). Swapped in by the app:
+"<kind>.eyes" / "<kind>.eyesShut" (a blink) / "<kind>.eyesJoy", "<kind>.brows" / "browsJoy" / "browsMad" / "browsSad",
+and "<kind>.mouth" / "<kind>.mouthOpen" (chewing) / "mouthJoy" / "mouthMad" / "mouthSad" (as they're pleased or not).
 
 The figure faces -Y in Blender (+Z in the glTF), feet on the ground at its origin, about 0.97 tall; sitting, its
 hips rest on a seat 0.34 up.
@@ -102,6 +103,9 @@ mat("Button", srgb("#2a2420"))
 mat("Belt", srgb("#2a1e16"))
 mat("Buckle", srgb("#c8b070"))
 mat("Lens", srgb("#2a2220"))
+mat("PhoneRed", srgb("#d0342c"))
+mat("Vein", srgb("#d8262a"))
+mat("Tear", srgb("#8fd0f4"))
 mat("CapYellow", srgb("#f2c62a"))
 mat("Bag", srgb("#c4302a"))
 mat("BagDark", srgb("#8a1e1a"))
@@ -721,7 +725,7 @@ def face(kind, hd):
     old = kind in ("grandma", "grandpa")
     ex, ez = 0.36, -0.06          # eye yaw and pitch
     tough = st.get("tough", False)
-    names = ["Eye", "EyeWhite", "Lash", "Hair", "Mouth", "MouthIn", "Blush", "Skin", "Iris", "Wrinkle"]
+    names = ["Eye", "EyeWhite", "Lash", "Hair", "Mouth", "MouthIn", "Blush", "Skin", "Iris", "Wrinkle", "Vein", "Tear"]
     mi = {n: i for i, n in enumerate(names)}
     mats = [MATS[n] for n in names]
 
@@ -734,17 +738,35 @@ def face(kind, hd):
             arc = [(y + sd * a * 0.11, ez + 0.012 - 0.05 * (a * a) + 0.03) for a in (-1, -0.6, -0.2, 0.2, 0.6, 1)]
             decal_strip(bm, surf, arc, [0.0, 0.013, 0.016, 0.016, 0.013, 0.0], mi["Eye"])
             continue
-        rw, rh = (0.085, 0.13) if girl or kind == "kid" else (0.075, 0.115)
+        rw, rh = (0.105, 0.16) if girl or kind == "kid" else (0.092, 0.14)
+        # (each kind its own eyes, and boldly: big and bright for the kid, the girls and the tourist, small and beady
+        # for the uncle, heavy-lidded for the tired office worker and the student)
+        rw, rh = {"kid": (0.125, 0.19), "maid": (0.125, 0.19), "highSchoolGirl": (0.118, 0.18), "tourist": (0.112, 0.16),
+                  "uncle": (0.06, 0.075), "civilServant": (0.07, 0.095)}.get(kind, (rw, rh))
+        sleepy = kind in ("salaryman", "student")
         if tough:
             # (a narrowed glare: shorter eyes, flat along the top)
             rh *= 0.72
+        lid = 0.6 if tough else 0.3 if sleepy else None
         decal_ellipse(bm, surf, y, ez, rw, rh, mi["Eye"],
-                      squash=(lambda x, yy: (x, min(yy, 0.6 * rh))) if tough else None)
+                      squash=(lambda x, yy, lid=lid, rh=rh: (x, min(yy, lid * rh))) if lid else None)
+        if sleepy:
+            # (the heavy lid's line across the top of the eye, drooping at its outer end)
+            decal_strip(bm, surf, [(y - sd * rw * 1.15, ez + rh * 0.36), (y, ez + rh * 0.42), (y + sd * rw * 1.2, ez + rh * 0.22)],
+                        [0.0, 0.014, 0.0], mi["Lash"], off=0.0024)
+        if kind == "salaryman":
+            # (and bags under them, from the late nights)
+            decal_strip(bm, surf, [(y + sd * a * rw, ez - rh * 1.05 - 0.012 * (1 - a * a)) for a in (-1, 0, 1)],
+                        [0.0, 0.007, 0.0], mi["Wrinkle"], off=0.0022)
         # a warm brown iris in its lower part, a dark pupil left over it
         decal_ellipse(bm, surf, y, ez - rh * 0.22, rw * 0.72, rh * 0.5, mi["Iris"], off=0.0021)
         decal_ellipse(bm, surf, y, ez - rh * 0.1, rw * 0.38, rh * 0.36, mi["Eye"], off=0.0023)
-        decal_ellipse(bm, surf, y + sd * 0.012, ez + 0.045, rw * 0.36, rh * 0.28, mi["EyeWhite"], off=0.0026)
-        decal_ellipse(bm, surf, y - sd * 0.025, ez - 0.05, rw * 0.18, rh * 0.13, mi["EyeWhite"], off=0.0026)
+        if not sleepy:
+            decal_ellipse(bm, surf, y + sd * 0.012, ez + rh * 0.4, rw * 0.36, rh * 0.28, mi["EyeWhite"], off=0.0026)
+        decal_ellipse(bm, surf, y - sd * 0.025, ez - rh * 0.43, rw * 0.18, rh * 0.13, mi["EyeWhite"], off=0.0026)
+        if kind in ("kid", "maid", "highSchoolGirl"):
+            # (a third sparkle, for the starry-eyed)
+            decal_ellipse(bm, surf, y + sd * rw * 0.45, ez - rh * 0.05, rw * 0.12, rh * 0.09, mi["EyeWhite"], off=0.0026)
         if girl:
             lash = [(y + sd * a * rw * 1.25, ez + rh * (0.95 - 0.25 * a * a) + 0.01) for a in (-1, -0.5, 0, 0.5, 1, 1.25)]
             decal_strip(bm, surf, lash, [0.0, 0.014, 0.016, 0.016, 0.012, 0.0], mi["Lash"], off=0.0024)
@@ -759,17 +781,63 @@ def face(kind, hd):
         decal_strip(bm, surf, arc, [0.0] + [0.012] * (len(arc) - 2) + [0.0], mi["Eye"])
     shut = from_bm(f"{kind}.eyesShut", bm, mats, HREF)
 
-    # brows, mouth, blush (on the face mesh with the eyes: they never change)
+    # the moods, swapped in by the app as a customer's pleased or not: "joy" (eyes squeezed shut in happy arcs, brows
+    # up, a wide open grin), "mad" (brows down hard in a V, a scowl), "sad" (brows up at the middle, a wobbly frown);
+    # the plain face between. Eyes shut with joy:
     bm = bmesh.new()
     for sd in (1, -1):
         y = sd * ex
-        lift = 0.2 if not old else 0.17
-        brow = [(y + sd * a * 0.085, ez + lift + 0.02 * (1 - a * a) - sd * 0.0) for a in (-1, -0.4, 0.3, 1)]
-        if tough:
-            # (thin, plucked brows, drawn down hard toward the nose in a scowl)
-            brow = [(y + sd * a * 0.085, ez + lift - 0.035 + 0.045 * (a + 1) / 2) for a in (-1, -0.4, 0.3, 1)]
-        decal_strip(bm, surf, brow, [0.0, 0.012 if girl else 0.016, 0.012 if girl else 0.016, 0.0],
-                    mi["Hair"] if kind not in ("grandpa",) else mi["Hair"], off=0.0024)
+        arc = [(y + sd * a * 0.12, ez - 0.04 + 0.085 * (1 - a * a)) for a in (-1, -0.6, -0.2, 0.2, 0.6, 1)]
+        decal_strip(bm, surf, arc, [0.0, 0.024, 0.028, 0.028, 0.024, 0.0], mi["Eye"])
+        # (and cheeks gone pink with it)
+        decal_ellipse(bm, surf, sd * 0.56, -0.28, 0.15, 0.08, mi["Blush"], off=0.0014)
+    eyes_joy = from_bm(f"{kind}.eyesJoy", bm, mats, HREF)
+
+    def brows(name, shape, thick, extra=None):
+        bm = bmesh.new()
+        for sd in (1, -1):
+            y = sd * ex
+            # (a: -1 at the brow's inner end, by the nose, 1 at its outer)
+            pts = [(y + sd * a * 0.11, ez + shape(a)) for a in (-1, -0.4, 0.3, 1)]
+            decal_strip(bm, surf, pts, [0.0, thick, thick, 0.0], mi["Hair"], off=0.0024 if kind != "grandpa" else 0.003)
+        if extra:
+            extra(bm)
+        return from_bm(f"{kind}.{name}", bm, mats, HREF)
+
+    def vein(bm):
+        # (cross: the red "anger mark" standing out on the temple, four bent strokes in a cross)
+        cy, cp = -0.62, 0.42
+        for k in range(4):
+            a = k * math.pi / 2 + math.pi / 4
+            dy, dp = math.cos(a), math.sin(a)
+            pts = [(cy + dy * 0.03, cp + dp * 0.03), (cy + dy * 0.08 + dp * 0.02, cp + dp * 0.08 - dy * 0.02), (cy + dy * 0.1, cp + dp * 0.1)]
+            decal_strip(bm, surf, pts, [0.016, 0.014, 0.0], mi["Vein"], off=0.0026)
+
+    def tear(bm):
+        # (let down: a tear welling at one eye's corner and running down the cheek)
+        decal_ellipse(bm, surf, -(ex + 0.06), ez - 0.2, 0.03, 0.05, mi["Tear"], off=0.0028,
+                      squash=lambda x, y: (x * (0.4 if y > 0 else 1.0), y))
+        decal_strip(bm, surf, [(-(ex + 0.05), ez - 0.1), (-(ex + 0.06), ez - 0.17)], [0.008, 0.012], mi["Tear"], off=0.0027)
+    lift = 0.2 if not old else 0.17
+    if kind == "grandpa":
+        # (his bushy white brows)
+        lift, plain_t = 0.21, 0.03
+    else:
+        plain_t = 0.017 if girl else 0.024
+    lift += 0.03
+    if tough:
+        # (thin, plucked brows, drawn down hard toward the nose in a scowl)
+        plain = lambda a: lift - 0.035 + 0.045 * (a + 1) / 2
+    else:
+        plain = lambda a: lift + (0.025 if kind == "grandpa" else 0.02) * (1 - a * a)
+    b_plain = brows("brows", plain, plain_t)
+    b_joy = brows("browsJoy", lambda a: lift + 0.06 + 0.045 * (1 - a * a), plain_t)
+    b_mad = brows("browsMad", lambda a: lift - 0.1 + 0.13 * (a + 1) / 2, plain_t * 1.5, vein)
+    b_sad = brows("browsSad", lambda a: lift + 0.07 - 0.11 * (a + 1) / 2, plain_t * 1.2, tear)
+
+    # blush, the lines of age, the uncle's moustache (on the face mesh: they never change)
+    bm = bmesh.new()
+    for sd in (1, -1):
         if kind in ("kid", "highSchoolGirl", "yukata", "grandma", "officeLady", "maid"):
             decal_ellipse(bm, surf, sd * 0.56, -0.3, 0.12, 0.06, mi["Blush"], off=0.0012)
     if old:
@@ -789,21 +857,56 @@ def face(kind, hd):
         for sd in (1, -1):
             pts = [(sd * 0.01, -0.36), (sd * 0.12, -0.38), (sd * 0.22, -0.44)]
             decal_strip(bm, surf, pts, [0.03, 0.026, 0.0], mi["Hair"], off=0.003)
-    if kind == "grandpa":
-        for sd in (1, -1):
-            # bushy white brows
-            brow = [(sd * (ex + a * 0.1), ez + 0.19 + 0.025 * (1 - a * a)) for a in (-1, -0.4, 0.3, 1)]
-            decal_strip(bm, surf, brow, [0.0, 0.022, 0.022, 0.0], mi["Hair"], off=0.003)
+    if kind == "tourist":
+        # freckles across the nose
+        for fy, fp in [(-0.2, -0.22), (-0.13, -0.27), (-0.26, -0.28), (0.2, -0.22), (0.13, -0.27), (0.26, -0.28)]:
+            decal_ellipse(bm, surf, fy, fp, 0.012, 0.01, mi["Wrinkle"], off=0.0016)
     feat = from_bm(f"{kind}.face", bm, mats, HREF)
 
-    # the mouth: a small smile; open, a little D of a mouth (chewing)
-    bm = bmesh.new()
-    smile = [(a * 0.1, -0.4 - 0.035 * (1 - a * a)) for a in (-1, -0.5, 0, 0.5, 1)]
-    decal_strip(bm, surf, smile, [0.0, 0.01, 0.012, 0.01, 0.0], mi["Mouth"])
-    mouth = from_bm(f"{kind}.mouth", bm, mats, HREF)
-    bm = bmesh.new()
-    decal_ellipse(bm, surf, 0, -0.43, 0.07, 0.055, mi["MouthIn"], squash=lambda x, y: (x, y if y < 0 else y * 0.25))
-    mouth_open = from_bm(f"{kind}.mouthOpen", bm, mats, HREF)
+    # the mouth, each kind's own: a small smile; the uncle's broad, the tourist's a toothy grin, the kid's an open D,
+    # the girls' a cat's ω, the student's and the rough lot's a crooked smirk, the civil servant's a straight line
+    def mouth_mesh(name, build):
+        bm = bmesh.new()
+        build(bm)
+        return from_bm(f"{kind}.{name}", bm, mats, HREF)
+
+    def smile(bm, w=0.13, sag=0.045, t=0.019, z=-0.4, tilt=0.0):
+        decal_strip(bm, surf, [(a * w, z - sag * (1 - a * a) + tilt * a) for a in (-1, -0.5, 0, 0.5, 1)],
+                    [0.0, t * 0.85, t, t * 0.85, 0.0], mi["Mouth"])
+
+    def open_d(bm, w, h, z=-0.42, teeth=True, tongue=True):
+        decal_ellipse(bm, surf, 0, z, w, h, mi["MouthIn"], squash=lambda x, y: (x, y if y < 0 else y * 0.15))
+        if teeth:
+            decal_ellipse(bm, surf, 0, z - h * 0.05, w * 0.78, h * 0.2, mi["EyeWhite"], off=0.0021)
+        if tongue:
+            decal_ellipse(bm, surf, 0, z - h * 0.62, w * 0.5, h * 0.3, mi["Mouth"], off=0.0021)
+
+    def cat(bm):
+        for sd in (1, -1):
+            decal_strip(bm, surf, [(sd * (0.06 + a * 0.06), -0.41 - 0.04 * (1 - a * a)) for a in (-1, -0.5, 0, 0.5, 1)],
+                        [0.0, 0.015, 0.017, 0.015, 0.0], mi["Mouth"])
+
+    def sad(bm):
+        # (a wobbly frown: down at the corners, a little kink in the middle)
+        decal_strip(bm, surf, [(-0.13, -0.49), (-0.07, -0.43), (0.0, -0.45), (0.07, -0.43), (0.13, -0.49)],
+                    [0.0, 0.019, 0.019, 0.019, 0.0], mi["Mouth"])
+
+    plain_mouth = {
+        "uncle": lambda bm: smile(bm, 0.2, 0.07, 0.024, z=-0.46),
+        "tourist": lambda bm: open_d(bm, 0.16, 0.08, tongue=False),
+        "kid": lambda bm: open_d(bm, 0.11, 0.1, teeth=False),
+        "highSchoolGirl": cat, "maid": cat,
+        "student": lambda bm: smile(bm, 0.12, 0.03, 0.019, tilt=0.045),
+        "yankee": lambda bm: smile(bm, 0.13, 0.0, 0.021, tilt=0.05),
+        "bosozoku": lambda bm: smile(bm, 0.15, -0.03, 0.024, tilt=0.045),
+        "civilServant": lambda bm: smile(bm, 0.09, 0.0, 0.017),
+    }.get(kind, lambda bm: smile(bm))
+    mouth = mouth_mesh("mouth", plain_mouth)
+    mouth_open = mouth_mesh("mouthOpen", lambda bm: decal_ellipse(bm, surf, 0, -0.43, 0.07, 0.055, mi["MouthIn"],
+                                                                   squash=lambda x, y: (x, y if y < 0 else y * 0.25)))
+    m_joy = mouth_mesh("mouthJoy", lambda bm: open_d(bm, 0.2, 0.15, z=-0.41))
+    m_mad = mouth_mesh("mouthMad", lambda bm: smile(bm, 0.15, -0.07, 0.028, z=-0.46))
+    m_sad = mouth_mesh("mouthSad", sad)
 
     # nose and ears, on the head mesh itself
     bm = bmesh.new()
@@ -818,7 +921,7 @@ def face(kind, hd):
     bm.free()
     for p in hd.data.polygons:
         p.use_smooth = True
-    return surf, [eyes, shut, feat, mouth, mouth_open]
+    return surf, [eyes, shut, eyes_joy, b_plain, b_joy, b_mad, b_sad, feat, mouth, mouth_open, m_joy, m_mad, m_sad]
 
 
 # =====================================================================
@@ -1642,6 +1745,27 @@ def glasses(kind, surf):
     return from_bm(f"{kind}.glasses", bm, [MATS["Lens"]], HREF)
 
 
+def headphones(kind, surf):
+    """big over-ear headphones (the student's, some of them): a band up over the crown clear of the hair, a padded
+    red cup over each ear"""
+    bm = bmesh.new()
+    path, norms = [], []
+    for yaw, pitch, off in [(1.5, -0.02, 0.036), (1.5, 0.35, 0.048), (1.5, 0.75, 0.056), (1.5, 1.15, 0.06), (0.0, 1.5707, 0.062),
+                            (-1.5, 1.15, 0.06), (-1.5, 0.75, 0.056), (-1.5, 0.35, 0.048), (-1.5, -0.02, 0.036)]:
+        pt = surf.ang(yaw, pitch, off)[0]
+        path.append(pt)
+        norms.append((pt - surf.c).normalized())
+    loft(bm, path, [0.016] * len(path), [0.006] * len(path), norms, ring=8, mi=0, tip=False)
+    for sd in (1, -1):
+        c, n = surf.ang(sd * 1.5, -0.13, 0.032)
+        rot = Vector((0, 0, 1)).rotation_difference(n).to_matrix()
+        ellipsoid(bm, c, (0.05, 0.05, 0.022), mi=1, seg=16, rings=8, rot=rot)
+        tube_ring(bm, c - n * 0.012, n, 0.044, (0.009, 0.009), mi=0, seg=20)
+    for f in bm.faces:
+        f.smooth = True
+    return from_bm(f"{kind}.phones", bm, [MATS["Lens"], MATS["PhoneRed"]], HREF)
+
+
 # =====================================================================
 # Rig, weights
 # =====================================================================
@@ -1793,6 +1917,10 @@ for kind in KINDS:
                 o.name = f"{o.name}_{style}"
     extra = clothes(kind, bd, hd, surf)
     gl = glasses(kind, surf)
+    if kind == "student":
+        gl = [gl, headphones(kind, surf)]
+    else:
+        gl = [gl]
     if st_.get("staff"):
         headwear(kind, hd, surf)
     if kind == "maid":
@@ -1809,7 +1937,7 @@ for kind in KINDS:
         from_bm(f"{kind}.band", hb, [MATS["Collar"], MATS["Button"]], HREF)
     # skin them all to the rig: the body by heat, the head and all on it rigidly, garments by their own rules
     auto_weights(bd, rig)
-    for o in [hd, *hrs, gl, *feats] + [x for x in COL.objects if x.name.startswith(f"{kind}.")
+    for o in [hd, *hrs, *gl, *feats] + [x for x in COL.objects if x.name.startswith(f"{kind}.")
                                          and x.name.split(".")[1].split("_")[0] in ("hat", "band", "pin", "toque", "wacap", "workcap")]:
         if o.parent is None:
             weights_rigid(o, "head")
