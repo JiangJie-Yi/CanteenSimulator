@@ -1439,10 +1439,19 @@ def clothes(kind, bd, hd, surf):
         parts.append(fr([(0.032, 0.697), (0.052, 0.69), (0.012, 0.6), (0.0, 0.615)], "Collar", 0.0026))
 
     # a belt where there are trousers (not under a jacket)
-    if st["legs"] in ("long", "shorts") and not st.get("jacket"):
+    if st["legs"] in ("long", "shorts") and not st.get("jacket") and kind != "chef":
         out.append(band(kind, bd, 0.47, 0.022, "Belt", "belt", extra=0.003))
         b = bmesh.new()
         ellipsoid(b, at(Vector((0, -0.3, 0.47)), F, 0.006)[0], (0.012, 0.004, 0.009), mi=mi["Buckle"], seg=10, rings=6)
+        parts.append(b)
+    if kind == "chef":
+        # the samue's cloth tie at the waist, knotted at the side, its ends hanging (no belt, no buckle)
+        out.append(band(kind, bd, 0.47, 0.014, "Top", "tie", extra=0.004))
+        b = bmesh.new()
+        kp = at(Vector((0.05, -0.3, 0.47)), F, 0.007)[0]
+        ellipsoid(b, kp, (0.01, 0.006, 0.008), mi=mi["Top"], seg=10, rings=6)
+        for dx in (-0.006, 0.006):
+            loft(b, [kp, kp + Vector((dx, -0.004, -0.04))], [0.007, 0.005], [0.003, 0.003], [B, B], mi=mi["Top"], tip=False)
         parts.append(b)
     if st.get("jacket") and st["legs"] != "skirt":
         # the jacket's skirts over the hips: a little flare, open at the front (a long coat's down to the knee or more)

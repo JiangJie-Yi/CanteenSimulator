@@ -7,7 +7,7 @@ import type { Look, Role } from '@/data/staff'
  * moustache or earrings; lines round the eyes with age. What they wear is the job's (and the cooks dress Japanese,
  * as in the 3D shop: scene/Person3D.tsx): the head chef's and second chef's twisted hachimaki over a white kappōgi
  * crossed at the collar, the third cook's low white cap over a navy samue (a woman at the fire in the white cap and
- * kappōgi), a server's waistcoat and bow tie, a cashier's apron and name badge, a stock keeper's
+ * kappōgi), the floor in deep red and the till in indigo, the men in samue and the women in kimono, hair put up, a server's waistcoat and bow tie, a cashier's apron and name badge, a stock keeper's
  * work cap, jacket and clipboard. The ground is the role's colour, lit from the top.
  */
 
@@ -51,13 +51,13 @@ export function Avatar({ id, look, role, size = 44 }: { id: string; look: Look; 
         <circle cx="24" cy="24" r="19" fill="none" stroke="#fff" strokeOpacity=".14" strokeWidth="1" strokeDasharray="2 3" />
 
         {/* long hair falls behind the shoulders */}
-        {look.female && cut !== 2 && (
+        {look.female && cut !== 2 && role !== 'server' && role !== 'cashier' && (
           <path d={cut === 0 ? 'M12.5 22c0-9 5-14 11.5-14S35.5 13 35.5 22v17h-23z' : 'M13 22c0-9 5-14 11-14s11 5 11 14l1 10c-3 1-7 1-8-1H20c-1 2-5 2-8 1z'}
             fill={hair} stroke={INK} strokeWidth="1.1" />
         )}
 
         {/* shoulders, in what they wear for the job */}
-        <path d="M5 48c1-9 8-13.5 19-13.5S42 39 43 48z" fill={role === 'sous' && !look.female ? '#2c3a58' : cook ? '#f7f3ea' : role === 'server' ? '#f7f3ea' : role === 'stock' ? '#5f6b45' : role === 'cashier' ? '#e9e2d2' : '#e9e2d2'}
+        <path d="M5 48c1-9 8-13.5 19-13.5S42 39 43 48z" fill={role === 'sous' && !look.female ? '#2c3a58' : role === 'server' ? '#7a2a22' : role === 'cashier' ? '#2c3e66' : cook ? '#f7f3ea' : role === 'stock' ? '#5f6b45' : role === 'cashier' ? '#e9e2d2' : '#e9e2d2'}
           stroke={INK} strokeWidth="1.2" />
         {cook && <>
           {/* the collar crossed left over right, kimono-wise, an under-collar showing at the neck */}
@@ -65,17 +65,11 @@ export function Avatar({ id, look, role, size = 44 }: { id: string; look: Look; 
           <path d="M20 35.2l4 4.6 4-4.6" fill="none" stroke={role === 'sous' && !look.female ? '#f7f3ea' : '#d8cfbd'} strokeWidth="1.4" />
           {role === 'owner' && <path d="M19 36.2l5 3.2 5-3.2" fill="none" stroke="#c4442f" strokeWidth="1.6" />}
         </>}
-        {role === 'server' && <>
-          {/* a dark waistcoat over a white shirt, and a bow tie */}
-          <path d="M5 48c1-8 6-12 13-13l6 13zM43 48c-1-8-6-12-13-13l-6 13z" fill="#2b2b33" stroke={INK} strokeWidth="1" />
-          <path d="M20.5 36.5l3.5 1.6-3.5 1.6zM27.5 36.5L24 38.1l3.5 1.6z" fill="#a8432f" stroke={INK} strokeWidth=".7" />
-          <circle cx="24" cy="44" r=".7" fill="#d8d0c0" />
-        </>}
-        {role === 'cashier' && <>
-          {/* an apron over the shirt, and a name badge */}
-          <path d="M15 40h18v8H15z" fill="#a8432f" stroke={INK} strokeWidth="1" />
-          <path d="M15 40l-2-5M33 40l2-5" stroke={INK} strokeWidth="1" />
-          <rect x="27" y="41.5" width="5" height="2.6" rx=".5" fill="#f7f3ea" stroke={INK} strokeWidth=".6" />
+        {(role === 'server' || role === 'cashier') && <>
+          {/* out front, Japanese: the collar crossed left over right, a pale under-collar at the neck; a kimono's obi */}
+          <path d="M18.5 35l9 13M29.5 35L24 43" fill="none" stroke={INK} strokeWidth="1" />
+          <path d="M20 35.2l4 4.6 4-4.6" fill="none" stroke="#efe6d4" strokeWidth="1.4" />
+          {look.female && <path d="M8 45.5h32v3H8z" fill="#e8c45a" stroke={INK} strokeWidth=".8" />}
         </>}
         {role === 'stock' && <>
           {/* a work jacket with its collar and zip, and a clipboard held up */}
@@ -102,7 +96,7 @@ export function Avatar({ id, look, role, size = 44 }: { id: string; look: Look; 
         <path d="M29.5 15.5c3 3 3.6 10 .4 14.5-1.5 2-3.6 3.4-5.9 3.9 4.5-3 6.5-10 5.5-18.4z" fill={INK} opacity=".07" />
 
         {/* hair (or a cap over it) */}
-        {(role === 'chef' || role === 'owner') && !look.female ? (
+        {(role === 'chef' || role === 'owner' || role === 'server') && !look.female ? (
           // the hachimaki: a twisted white band round the brow over cropped hair, its knot to one side
           <g>
             <path d="M14.8 21c0-7 4-10.2 9.2-10.2s9.2 3.2 9.2 10.2c-2-3-5-4.1-9.2-4.1s-7.2 1.1-9.2 4.1z" fill={hair} stroke={INK} strokeWidth="1.1" />
@@ -128,11 +122,11 @@ export function Avatar({ id, look, role, size = 44 }: { id: string; look: Look; 
           </g>
         ) : look.female ? (
           <g>
-            {cut === 2 && (
+            {(cut === 2 || role === 'server' || role === 'cashier') && (
               // hair tied up in a bun
               <circle cx="24" cy="10" r="4" fill={hair} stroke={INK} strokeWidth="1.1" />
             )}
-            <path d={cut === 1 ? 'M14.8 23c-.5-8.5 4-12.6 9.2-12.6s9.7 4.1 9.2 12.6c-1.6-4.6-4.2-7-6.6-7.6-1 2-4.6 3.6-8 3.6-1.6 0-3 1.6-3.8 4z'
+            <path d={cut === 1 && role !== 'server' && role !== 'cashier' ? 'M14.8 23c-.5-8.5 4-12.6 9.2-12.6s9.7 4.1 9.2 12.6c-1.6-4.6-4.2-7-6.6-7.6-1 2-4.6 3.6-8 3.6-1.6 0-3 1.6-3.8 4z'
               : 'M14.8 22.5c0-8 4-12 9.2-12s9.2 4 9.2 12c-3-4.2-6.2-6.2-9.2-6.2s-6.2 2-9.2 6.2z'}
               fill={hair} stroke={INK} strokeWidth="1.1" />
             <path d="M19 13.2c1.6-.9 3.4-1.2 5-1.2" stroke="#fff" strokeOpacity=".35" strokeWidth="1" strokeLinecap="round" fill="none" />
