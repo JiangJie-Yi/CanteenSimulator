@@ -50,6 +50,7 @@ import { Fridge } from '@/ui/Fridge'
 import { Welcome } from '@/ui/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
 import { Roasting, type CrewMember } from '@/shops/grill/Roasting'
+import { Grill2D } from '@/shops/grill/Grill2D'
 import { Steam } from '@/scene/Steam'
 import { StoveControls } from '@/shops/hotpot/StoveControls'
 import { DISHES, WOK_KINDS, type Dish as DishInfo, type TableKind } from '@/data/menu'
@@ -1100,6 +1101,22 @@ export default function App() {
     setFireLevel(Math.round(fire.current * 100))
   }
   const dish = DISHES[active]
+  // a phone at the grill has no 3D view: the fire pit and the customers' bar are drawn flat (Grill2D)
+  const flatGrill = phone && !!dish.roast
+  const sceneOffFire = (n: number, loose: number) => { setOffFire(n); setLoose(loose) }
+  const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
+  const sceneOrder = (id: string, guest?: number) => {
+    const ok = changeQty(id, 1)
+    // a customer's order is written onto the menu below, so you see it come in
+    if (ok && guest) {
+      const key = ++feedSeq.current
+      setFeed((f) => [...f.slice(-2), { key, id, guest }])
+      const it = findItem(dish, id)
+      talk('order', `#${guest} ${lang === 'ja' ? 'から' : '點了'} ${it ? nameIn(lang, it) : id}`)
+      window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
+    }
+    return ok
+  }
   const base = orderedBase(dish, orders[dish.id])
   /** the menu board while open: the dishes on the menu (soups and bowls among the dark tags), at their prices */
   const menuDish = (d: DishInfo): DishInfo => {
@@ -1734,7 +1751,7 @@ export default function App() {
 
 
   return (
-    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}`} ref={appRef}>
+    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -1755,7 +1772,8 @@ export default function App() {
       <div className="canvas-layer" style={glLost || NO_WEBGL ? { visibility: 'hidden' } : undefined}
 >
         <Crash inline>
-        {!NO_WEBGL && <Canvas
+        {/* (a phone at the grill draws it all flat, in 2D: no 3D view at all) */}
+        {!NO_WEBGL && !flatGrill && <Canvas
           shadows={QUALITY.shadows ? 'percentage' : false}
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
           dpr={[1, QUALITY.dpr]}
@@ -1776,20 +1794,9 @@ export default function App() {
         >
           <FramePacer />
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
-            heat={heat} fire={fire} frame={frame} onOffFire={(n, loose) => { setOffFire(n); setLoose(loose) }}
-            onEat={onEat} onNotice={(what) => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])}
-            resetView={resetView} ai={ai} onOrder={(id, guest) => {
-              const ok = changeQty(id, 1)
-              // a customer's order is written onto the menu below, so you see it come in
-              if (ok && guest) {
-                const key = ++feedSeq.current
-                setFeed((f) => [...f.slice(-2), { key, id, guest }])
-                const it = findItem(dish, id)
-                talk('order', `#${guest} ${lang === 'ja' ? 'から' : '點了'} ${it ? nameIn(lang, it) : id}`)
-                window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
-              }
-              return ok
-            }} onAddCharcoal={addCharcoal} onSay={talk}
+            heat={heat} fire={fire} frame={frame} onOffFire={sceneOffFire}
+            onEat={onEat} onNotice={sceneNotice}
+            resetView={resetView} ai={ai} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
             incense={{ litAt: incenseAt, onLight: lightIncense }} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })}
@@ -1808,6 +1815,18 @@ export default function App() {
         </Crash>
       </div>
       <div className="stage" ref={stageRef}>
+        {flatGrill && dish.roast && (
+          <Grill2D roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])} active fire={fire}
+            onOffFire={sceneOffFire} onEat={onEat} onNotice={sceneNotice} ai={ai} onOrder={sceneOrder} onAddCharcoal={addCharcoal}
+            onSay={talk} chef={chefOf(dish.id)} onGuests={(g) => setShopGuests(dish.id, g)}
+            crowd={(staffOf(dish.id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed} onDrink={onDrink}
+            helpers={{ chef: staffOf(dish.id, 'chef').length > 0, sous: staffOf(dish.id, 'sous').length > 0 }}
+            onWalkOut={(ids, g) => refund(ids, dish, g)} lang={lang} entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
+            names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))} space={ai ? 'open' : 'closed'}
+            notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))}
+            top={ai ? <GuestCounter guests={guests} shop={dish.id} lang={lang} staff={{ chef: staffOf(dish.id, 'chef').length,
+              cashier: staffOf(dish.id, 'cashier').length, server: staffOf(dish.id, 'server').length }} /> : undefined} />
+        )}
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
  />
         {dish.heatControl && <HeatControl heat={heat} onChange={setHeat} lang={lang} />}
@@ -1910,7 +1929,7 @@ export default function App() {
               </p>
               {/* (on a computer the customers sit at the bar in 3D; a phone shows them here, in the 2D bar, which
                   stays sharp and clear of the rest on a small screen) */}
-              {phone && (
+              {phone && !flatGrill && (
                 <GuestCounter guests={guests} shop={DISHES[active].id} lang={lang} staff={{ chef: staffOf(DISHES[active].id, 'chef').length,
                   cashier: staffOf(DISHES[active].id, 'cashier').length, server: staffOf(DISHES[active].id, 'server').length }} />
               )}

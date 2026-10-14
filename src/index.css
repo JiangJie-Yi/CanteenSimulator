@@ -2655,6 +2655,11 @@ button {
   .side-boards.is-open > section.ledger {
     width: 100%;
     box-sizing: border-box;
+    /* (sliding in from the right edge, right to left) */
+    animation: board-slide 280ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  }
+  .side-boards.is-open > section + section {
+    animation-delay: 60ms;
   }
 
   /* only the latest thing said, small, just above the dish switcher */
@@ -3255,7 +3260,10 @@ button {
 }
 
 @keyframes tools-drop {
-  from { opacity: 0; transform: translateY(-8px); }
+  from { opacity: 0; transform: translateX(24px); }
+}
+@keyframes board-slide {
+  from { opacity: 0; transform: translateX(105%); }
 }
 
 /* touch screens swipe between dishes: no arrows needed */
@@ -5986,4 +5994,146 @@ button {
 
 .ai-order .ai-who {
   background: #7a6a3e;
+}
+
+/* ---- the grill drawn flat, on a phone (Grill2D): the customers' bar on top, the fire pit in the middle, the
+   seasonings under it, all above the menu ---- */
+.grill2d {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 118px;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 6px;
+  pointer-events: auto;
+}
+.grill2d-top {
+  width: 100%;
+  flex: 0 0 auto;
+}
+.grill2d-pit {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 520px;
+  touch-action: manipulation;
+}
+.g2-piece {
+  cursor: pointer;
+}
+.g2-tag {
+  font: 700 9px/1 var(--brush);
+  paint-order: stroke;
+  stroke: #fff8ec;
+  stroke-width: 2.5px;
+}
+.g2-pop {
+  font: 700 10px/1 var(--brush);
+  fill: #c4302a;
+  paint-order: stroke;
+  stroke: #fff8ec;
+  stroke-width: 3px;
+}
+.g2-pop.is-good {
+  fill: #2a8a3a;
+}
+.g2-label {
+  font: 700 9px/1 var(--brush);
+  fill: #fff6e6;
+}
+.grill2d-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  max-width: 520px;
+}
+.g2-tool {
+  padding: 4px 8px;
+  border: 1.5px solid #5a3a22;
+  border-left: 6px solid var(--dab);
+  border-radius: 12px;
+  background: #fff8ec;
+  color: #3b2a20;
+  font: 700 12px/1 var(--brush);
+}
+.g2-tool.is-on {
+  background: #e8862a;
+  color: #fff;
+}
+/* (with the grill drawn flat on a phone, the stage's controls step aside to the top right, clear of the bar and the
+   fire pit under them) */
+.is-flatgrill .office-toggle {
+  position: fixed;
+  top: 108px;
+  right: 8px;
+  left: auto;
+  bottom: auto;
+  transform: scale(0.82);
+  transform-origin: top right;
+}
+.is-flatgrill .auto-toggle {
+  position: fixed;
+  top: 146px;
+  right: 8px;
+  left: auto;
+  bottom: auto;
+  transform: scale(0.82);
+  transform-origin: top right;
+}
+.is-flatgrill .fullness {
+  position: fixed;
+  top: 146px;
+  left: 8px;
+  right: auto;
+  bottom: auto;
+  transform: scale(0.8);
+  transform-origin: top left;
+}
+.is-flatgrill .incense-toggle {
+  top: 62px;
+}
+.is-flatgrill .grill2d {
+  top: 182px;
+  bottom: 22px;
+}
+.g2-fridge-sign {
+  font: 700 10px/1 var(--brush);
+  fill: #fff6d0;
+  letter-spacing: 0.1em;
+}
+.is-flatgrill .switcher {
+  display: none;
+}
+.grill2d .gc-scene {
+  height: 96px;
+  margin: 0;
+}
+.grill2d-tools {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 52px 2px;
+  scrollbar-width: none;
+}
+.g2-tool {
+  flex: 0 0 auto;
+}
+.g2-label-dark {
+  fill: #3a5a8c;
+}
+.grill2d-tools {
+  box-sizing: border-box;
+  padding-left: 60px;
+}
+.is-flatgrill .incense-toggle {
+  position: fixed;
+  top: 146px;
+  left: 8px;
+  right: auto;
 }
