@@ -11,10 +11,9 @@ import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { GuestView, Step } from '@/game/types'
 import { GAME_SPEED } from '@/scene/speed'
-import { DRINKS, drinkFor, GRILL_SEATS, type DrinkId } from './bar'
+import { drinkFor, GRILL_SEATS, type DrinkId } from './bar'
+import { COAL_GLOW, COAL_STICKS, DEFS, FIRE_LIFE, FoodArt, Fridge, NET, COAL_X, COAL_Y, PIT_ART, PIT_X, PIT_Y, Plate, Soup, TABLE, Tag, ToolIcon, Tray, VIEW_H, VIEW_W } from './Grill2DArt'
 
-const CHAR_START = 1.15
-const CHAR_FULL = 3
 const EAT_SECONDS = 3
 const PATIENCE = 150
 const BAR_SEATS = GRILL_SEATS.length
@@ -28,7 +27,6 @@ const COUPLE_HER = new Set<GuestKind>(['officeLady', 'highSchoolGirl', 'yukata',
 const roastRate = (fire: number) => 0.25 + 1.75 * fire
 const stageOf = (r: number) => ROAST_STAGES.find((s) => r < s.until)!
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x))
-const smooth = (a: number, b: number, x: number) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t) }
 
 type Piece = {
   key: string; id: string; copy: number; loose: boolean; net: boolean
@@ -43,21 +41,13 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
 
 const freshDabs = () => ({ salt: 0, soy: 0, milk: 0, peanut: 0, miso: 0, wasabi: 0, shichimi: 0, yuzu: 0, lemon: 0, water: 0 }) as Record<Seasoning, number>
 
-/** each food's colour on the fire, raw (it browns from there) */
+/** each food's colour raw (it browns from there), for anything without a picture of its own */
 const FOOD_COLOR: [RegExp, string][] = [
   [/Salmon|Nodoguro/, '#f08a5a'], [/Shrimp/, '#f2a0a0'], [/Onigiri|Mochi/, '#f6f0e2'], [/SweetPotato/, '#b0485a'], [/Potato/, '#c8c4bc'],
   [/Corn/, '#f2d04a'], [/Shiitake|KingOyster/, '#b89a78'], [/Shishito|Okra|Asparagus/, '#6aa04a'], [/Sausage|BloodCake/, '#b8584a'],
   [/Yakitori|PorkBelly|Squid|Scallop/, '#f0d8c0'], [/Fish|Saury|Mackerel|Aji|Iwashi|Shishamo|Hokke|Buri|Gindara/, '#a8b4c0'],
 ]
 const colorOf = (id: string) => FOOD_COLOR.find(([r]) => r.test(id))?.[1] ?? '#d8b890'
-/** a colour cooked: browned toward done, then charred toward black */
-function cooked(hex: string, r: number) {
-  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
-  const brown = [150, 90, 40], black = [40, 26, 18]
-  const b = smooth(0.3, 1.1, r) * 0.55, k = smooth(CHAR_START, CHAR_FULL, r) * 0.85
-  const out = c.map((v, i) => (v * (1 - b) + brown[i] * b) * (1 - k) + black[i] * k)
-  return `rgb(${out.map((v) => Math.round(v)).join(',')})`
-}
 const DAB_COLOR: Record<string, string> = { salt: '#ffffff', soy: '#5a2a10', milk: '#fff2d0', peanut: '#d8a860', miso: '#a86a2a', wasabi: '#8ac04a',
   shichimi: '#d8401c', yuzu: '#c8d04a', lemon: '#f2e04a', water: '#8ad0f0' }
 const DAB_NAME: Record<Lang, Record<string, string>> = {
@@ -447,7 +437,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
     else if (live.current.space === 'closed') eat(p)
   }
 
-  // ---- drawing
+  // ---- drawing (the pictures are in Grill2DArt)
   const list = pieces().filter((p) => present(p) && !p.eaten)
   const fireLv = fire?.current ?? 0.55
   const ring = list.filter((p) => p.onFire && !p.collected && !p.net && !p.loose)
@@ -455,191 +445,109 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
   const net = list.filter((p) => p.onFire && !p.collected && p.net)
   const tray = list.filter((p) => p.staged).sort((a, b) => a.stagedAt - b.stagedAt)
   const served = list.filter((p) => p.collected)
-  const soups = (roast.drinks ?? []).flatMap((id) => Array.from({ length: quantities[id] ?? 0 }, (_, c) => ({ key: `${id}#${c}`, id })))
-  const W = 360, CX = 180, CY = 100
+  const soups = (roast.drinks ?? []).flatMap((id) => Array.from({ length: quantities[id] ?? 0 }, (_, c) => ({ key: `${id}#${c}`, id, c })))
+  const CX = PIT_X, CY = PIT_Y
   const tag = (p: Piece) => {
     const s = stageOf(p.progress / roast.times[p.id])
-    return { label: s.label, color: s.key === 'done' ? '#3a8a3a' : s.key === 'burnt' ? '#1a1a1a' : s.key === 'half' ? '#c87a1a' : '#9a8a7a' }
+    return { label: s.label, color: s.key === 'done' ? '#3a8a3a' : s.key === 'burnt' ? '#2a1e1a' : s.key === 'half' ? '#d0801a' : '#9a8a7a' }
   }
   const popOf = (key: string) => pops.find((x) => x.key === key)
-  const Skewer = ({ p, x, y, a }: { p: Piece; x: number; y: number; a: number }) => {
-    const r = p.progress / roast.times[p.id]
+  // (how done, rounded, and the seasonings as one digit each: what a food's picture is memoised on)
+  const doneOf = (p: Piece) => Math.round((p.progress / roast.times[p.id]) * 40) / 40
+  const dkOf = (p: Piece) => DABS.map((k) => Math.min(9, p.dabs[k])).join('')
+  const down = (p: Piece) => (e: React.PointerEvent) => { e.stopPropagation(); tap(p) }
+  const art = (p: Piece) => <FoodArt id={p.id} r={doneOf(p)} dk={dkOf(p)} foil={/Potato/.test(p.id) && !p.collected} fallback={colorOf(p.id)} />
+  /** a skewer stuck in the ash round the fire, its food toward the coals (a fish kept right way up) */
+  const skewer = (p: Piece, x: number, y: number, a: number) => (
+    <g key={p.key} className="g2-piece" onPointerDown={down(p)} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a.toFixed(1)})`}>
+      <rect x={-40} y={-13} width={62} height={26} fill="transparent" />
+      <g transform={Math.cos((a * Math.PI) / 180) < 0 ? 'scale(1 -1)' : undefined}>{art(p)}</g>
+    </g>
+  )
+  /** something lying flat: on the net, in the embers, waiting on the tray, or off the fire on the plate */
+  const flat = (p: Piece, x: number, y: number, s = 0.6) => {
     const t = tag(p)
     const pp = popOf(p.key)
     return (
-      <g className="g2-piece" onPointerDown={(e) => { e.stopPropagation(); tap(p) }} transform={`translate(${x} ${y})`}>
-        <rect x={-22} y={-24} width={44} height={48} fill="transparent" />
-        <g transform={`rotate(${a})`}>
-          <line x1={-20} y1={0} x2={20} y2={0} stroke="#c8a060" strokeWidth={2} strokeLinecap="round" />
-          {[-10, 0, 10].map((dx) => <ellipse key={dx} cx={dx} cy={0} rx={5.5} ry={6.5} fill={cooked(colorOf(p.id), r)} stroke="#3b2a20" strokeWidth={1} />)}
-          {DABS.filter((k) => p.dabs[k]).map((k, i) => <circle key={k} cx={-8 + i * 6} cy={-3} r={1.6} fill={DAB_COLOR[k]} />)}
-        </g>
-        <text y={-14} textAnchor="middle" className="g2-tag" fill={t.color}>{(p.want?.name ?? nameOf(p.id)).slice(0, 4)} {t.label}</text>
-        {pp && <text y={-26} textAnchor="middle" className={`g2-pop${pp.good ? ' is-good' : ''}`}>{pp.text}</text>}
+      <g key={p.key} className="g2-piece" onPointerDown={down(p)} transform={`translate(${x} ${y})`}>
+        <rect x={-16} y={-14} width={32} height={28} fill="transparent" />
+        <g transform={p.loose ? `scale(${s + 0.25})` : `rotate(-28) scale(${s}) translate(10 0)`}>{art(p)}</g>
+        {p.eat > 0 && <circle r={12} fill="none" stroke="#e8862a" strokeWidth={2.4} strokeLinecap="round" strokeDasharray={`${p.eat * 75} 80`} transform="rotate(-90)" />}
+        {!p.staged && <Tag label={t.label} color={t.color} x={0} y={-12} />}
+        {pp && <text y={-20} textAnchor="middle" className={`g2-pop${pp.good ? ' is-good' : ''}`}>{pp.text}</text>}
       </g>
     )
   }
-  const Flat = ({ p, x, y }: { p: Piece; x: number; y: number }) => {
-    const r = p.progress / roast.times[p.id]
-    const t = tag(p)
-    const pp = popOf(p.key)
-    const foil = /Potato/.test(p.id) && !p.collected
-    return (
-      <g className="g2-piece" onPointerDown={(e) => { e.stopPropagation(); tap(p) }} transform={`translate(${x} ${y})`}>
-        <rect x={-16} y={-16} width={32} height={32} fill="transparent" />
-        {p.loose ? <ellipse rx={11} ry={8} fill={foil ? '#d8dce0' : cooked(colorOf(p.id), r)} stroke="#3b2a20" strokeWidth={1} />
-          : <g>
-            <line x1={-15} y1={0} x2={15} y2={0} stroke="#c8a060" strokeWidth={2} strokeLinecap="round" />
-            {[-7, 0, 7].map((dx) => <ellipse key={dx} cx={dx} cy={0} rx={4.2} ry={5} fill={cooked(colorOf(p.id), r)} stroke="#3b2a20" strokeWidth={0.9} />)}
-          </g>}
-        {p.eat > 0 && <circle r={12} fill="none" stroke="#e8862a" strokeWidth={2} strokeDasharray={`${p.eat * 75} 80`} transform="rotate(-90)" />}
-        {!p.staged && <text y={-12} textAnchor="middle" className="g2-tag" fill={t.color}>{t.label}</text>}
-        {pp && <text y={-22} textAnchor="middle" className={`g2-pop${pp.good ? ' is-good' : ''}`}>{pp.text}</text>}
-      </g>
-    )
-  }
+  const slots = Math.max(ring.length, 8)
+  const spots = ring.map((p, i) => {
+    const a = -Math.PI / 2 + (i / slots) * Math.PI * 2
+    return { p, a, x: CX + Math.cos(a) * 104, y: CY + Math.sin(a) * 54 }
+  })
+  // (potatoes in foil pushed into the embers at the front of the coals)
+  const EMBER = [[-52, 12], [52, 12], [-30, 20], [30, 20], [-64, 0], [64, 0], [0, 22], [-14, 24]]
+  const fl = clamp(fireLv, 0, 1)
   return (
     <div className="grill2d">
       {top && <div className="grill2d-top">{top}</div>}
-      <svg className="grill2d-pit" viewBox={`0 0 ${W + 82} 252`} preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <radialGradient id="g2coal">
-            <stop offset="0" stopColor={`rgb(255 ${Math.round(150 + 80 * fireLv)} 60)`} stopOpacity={0.5 + 0.5 * fireLv} />
-            <stop offset="0.6" stopColor="#c8401a" stopOpacity={0.35 + 0.5 * fireLv} />
-            <stop offset="1" stopColor="#3a2014" stopOpacity="0.9" />
-          </radialGradient>
-        </defs>
-        {/* the cook's table, the fire pit's stones round the white ash, the coals glowing as hot as the fire */}
-        <rect x={4} y={4} width={W - 8} height={244} rx={14} fill="#c8a070" stroke="#5a3a22" strokeWidth={2} />
-        {Array.from({ length: 16 }, (_, k) => {
-          const a = (k / 16) * Math.PI * 2
-          return <ellipse key={k} cx={CX + Math.cos(a) * 128} cy={CY + Math.sin(a) * 80} rx={20} ry={14} fill={k % 2 ? '#6a625a' : '#7a7068'} stroke="#3b2a20" strokeWidth={1} />
-        })}
-        <ellipse cx={CX} cy={CY} rx={114} ry={68} fill="#ece8e0" />
-        <ellipse cx={CX} cy={CY} rx={56} ry={34} fill="url(#g2coal)" />
-        {/* the net in the middle, and what's toasting on it */}
-        {roast.net && <rect x={CX - 30} y={CY - 18} width={60} height={36} rx={4} fill="none" stroke="#7a6a5a" strokeWidth={1} strokeDasharray="3 3" />}
-        {net.map((p, i) => <Flat key={p.key} p={p} x={CX - 20 + (i % 3) * 20} y={CY - 6 + Math.floor(i / 3) * 14} />)}
-        {/* the skewers round the coals */}
-        {ring.map((p, i) => {
-          const a = -Math.PI / 2 + (i / Math.max(ring.length, 8)) * Math.PI * 2
-          return <Skewer key={p.key} p={p} x={CX + Math.cos(a) * 84} y={CY + Math.sin(a) * 48} a={(a * 180) / Math.PI} />
-        })}
-        {/* potatoes in the ash at the front */}
-        {ash.map((p, i) => <Flat key={p.key} p={p} x={CX - 40 + i * 26} y={CY + 44} />)}
-        {/* the tray of what's waiting raw, bottom left; what's off the fire, bottom right */}
-        <rect x={12} y={184} width={164} height={60} rx={8} fill="#b8885a" stroke="#5a3a22" strokeWidth={1.5} />
-        <text x={18} y={196} className="g2-label">{lang === 'ja' ? '生（タップで火へ）' : '待烤（點一下上火）'}</text>
-        {tray.slice(0, 10).map((p, i) => <Flat key={p.key} p={p} x={30 + (i % 5) * 32} y={212 + Math.floor(i / 5) * 22} />)}
-        {tray.length > 10 && <text x={168} y={240} textAnchor="end" className="g2-label">+{tray.length - 10}</text>}
-        <ellipse cx={268} cy={216} rx={84} ry={30} fill="#f6f0e2" stroke="#3a5a8c" strokeWidth={2} />
-        <text x={190} y={196} className="g2-label g2-label-dark">{space === 'open' ? (lang === 'ja' ? '出来上がり' : '烤好的') : (lang === 'ja' ? 'お皿（タップで食べる）' : '盤子（點一下吃）')}</text>
-        {served.slice(0, 10).map((p, i) => <Flat key={p.key} p={p} x={222 + (i % 4) * 30} y={212 + Math.floor(i / 4) * 18} />)}
-        {soups.map((s, i) => {
+      <svg className="grill2d-pit" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMid meet">
+        {DEFS}
+        {/* the cook's table; the soup bowls and the sake in its back corners */}
+        {TABLE}
+        {soups.map((s) => {
           const left = sips.current.get(s.key) ?? SIPS
           return (
-            <g key={s.key} className="g2-piece" transform={`translate(${30 + i * 34} 172)`} onPointerDown={(e) => {
+            <g key={s.key} className="g2-piece" transform={s.id === 'Sake' ? `translate(${360 - s.c * 40} 22)` : `translate(${24 + s.c * 30} 24)`} onPointerDown={(e) => {
               e.stopPropagation()
               if (left <= 0) return
               sips.current.set(s.key, left - 1)
               if (left - 1 === 0) onEat?.(s.id, SOUP_TASTE)
               setTick((n) => n + 1)
             }}>
-              <ellipse rx={13} ry={9} fill={s.id === 'Sake' ? '#f2f0ea' : '#3a1a10'} stroke="#3b2a20" strokeWidth={1} />
-              <ellipse rx={10 * left / SIPS} ry={6 * left / SIPS} fill={s.id === 'Sake' ? '#e8eef0' : '#c8904a'} />
+              <rect x={-18} y={-15} width={36} height={30} fill="transparent" />
+              <Soup id={s.id} left={left} of={SIPS} />
             </g>
           )
         })}
-        <Fridge x={W + 4} taken={taken && performance.now() - taken.at < 1500 ? taken.id : null} lang={lang} />
+        {/* the fire pit: stones round the white ash, the binchotan glowing as hot as the fire, sparks and smoke */}
+        {PIT_ART}
+        <ellipse cx={CX} cy={CY} rx={112} ry={50} fill="url(#g2-halo)" opacity={0.2 + 0.8 * fl} />
+        <g opacity={0.45 + 0.55 * fl}><ellipse className="g2-flicker" cx={CX} cy={CY} rx={COAL_X - 2} ry={COAL_Y - 2} fill="url(#g2-glow)" /></g>
+        {COAL_STICKS}
+        <g opacity={0.35 + 0.65 * fl}><g className="g2-flicker">{COAL_GLOW}</g></g>
+        {/* the net in the middle, and what's toasting on it */}
+        {roast.net && NET}
+        {net.map((p, i) => flat(p, CX - 26 + (i % 3) * 26, CY - 2 + Math.floor(i / 3) * 14, 0.75))}
+        {ash.map((p, i) => flat(p, CX + EMBER[i % EMBER.length][0], CY + EMBER[i % EMBER.length][1], 0.6))}
+        {/* the skewers round the coals, back ones first */}
+        {[...spots].sort((m, n) => m.y - n.y).map((s) => skewer(s.p, s.x, s.y, (s.a * 180) / Math.PI))}
+        <g opacity={0.2 + 0.8 * fl}>{FIRE_LIFE}</g>
+        {/* the tray of what's waiting raw, bottom left; the plate of what's off the fire, bottom right */}
+        <Tray x={6} y={172} w={172} h={44} label={lang === 'ja' ? '生（タップで火へ）' : '待烤（點一下上火）'} />
+        {tray.slice(0, 10).map((p, i) => flat(p, 28 + (i % 5) * 32, 188 + Math.floor(i / 5) * 16, 0.64))}
+        {tray.length > 10 && <text x={172} y={212} textAnchor="end" className="g2-label g2-more">+{tray.length - 10}</text>}
+        <Plate cx={296} cy={193} rx={92} ry={23} label={space === 'open' ? (lang === 'ja' ? '出来上がり' : '烤好的') : (lang === 'ja' ? 'お皿（タップで食べる）' : '盤子（點一下吃）')} />
+        {served.slice(0, 10).map((p, i) => flat(p, 296 + ((i % 5) - (Math.min(served.length, 5) - 1) / 2) * 32, 192 + Math.floor(i / 5) * 12, 0.66))}
+        {/* each skewer's paper tag at its end, over everything, and how much a seasoning did */}
+        {spots.map(({ p, a }) => {
+          const t = tag(p)
+          const pp = popOf(p.key)
+          const x = CX + Math.cos(a) * 146, y = CY + Math.sin(a) * 70
+          return (
+            <g key={p.key} className="g2-piece" onPointerDown={down(p)}>
+              <Tag name={(p.want?.name ?? nameOf(p.id)).slice(0, ring.length > 10 ? 4 : 5)} label={t.label} color={t.color} x={x} y={y} />
+              {pp && <text x={x} y={y - 14} textAnchor="middle" className={`g2-pop${pp.good ? ' is-good' : ''}`}>{pp.text}</text>}
+            </g>
+          )
+        })}
+        <Fridge x={406} taken={taken && performance.now() - taken.at < 1500 ? taken.id : null} lang={lang} />
       </svg>
       {/* the seasonings: pick one, then tap the food to put it on (tap it again to put it down) */}
       <div className="grill2d-tools">
         {([...DABS, 'water'] as Seasoning[]).map((k) => (
           <button key={k} type="button" className={`g2-tool${tool === k ? ' is-on' : ''}`} style={{ ['--dab' as string]: DAB_COLOR[k] }}
-            onClick={() => setTool((t) => (t === k ? null : k))}>{DAB_NAME[lang][k]}</button>
+            onClick={() => setTool((t) => (t === k ? null : k))}><ToolIcon k={k} /><span>{DAB_NAME[lang][k]}</span></button>
         ))}
       </div>
     </div>
-  )
-}
-
-/** the fridge's shelves, top down: what's on each (as the 3D fridge has them, bottom up) */
-const FRIDGE_ROWS: DrinkId[][] = [['beer', 'sake'], ['highball', 'beerCan'], ['cola', 'oolong'], ['coffee', 'greenTea'], ['yakult', 'yakult']]
-/** the bright colours of each drink's bottle or can, and its label */
-const DRINK_ART: Record<string, { body: string; label: string; cap: string }> = {
-  beer: { body: '#8a4a12', label: '#f2c430', cap: '#e8c040' }, sake: { body: '#e8f4f8', label: '#e8202a', cap: '#d01818' },
-  highball: { body: '#1c3a8a', label: '#f2c430', cap: '#c8ccd2' }, beerCan: { body: '#f2d02a', label: '#e8202a', cap: '#c8ccd2' },
-  cola: { body: '#e8141c', label: '#ffffff', cap: '#c8ccd2' }, oolong: { body: '#b8601a', label: '#1a7a3a', cap: '#1a7a3a' },
-  coffee: { body: '#5a2a10', label: '#f2a020', cap: '#c8ccd2' }, greenTea: { body: '#2aa040', label: '#ffffff', cap: '#c8ccd2' },
-  yakult: { body: '#fff4e4', label: '#e8202a', cap: '#e8202a' }, ramune: { body: '#5ac8f0', label: '#1a5ab8', cap: '#1a5ab8' },
-}
-/**
- * The drinks fridge, beside the cook's table: a red-lacquered cabinet with a lit glass door, its sign glowing on top,
- * five shelves of bright bottles and cans standing in ranks, a gleam across the glass. The shelf of whatever a customer
- * has just taken lights up.
- */
-function Fridge({ x, taken, lang }: { x: number; taken: DrinkId | null; lang: Lang }) {
-  const w = 74, h = 234
-  const sh = (h - 56) / FRIDGE_ROWS.length
-  return (
-    <g transform={`translate(${x} 10)`}>
-      <defs>
-        <linearGradient id="g2fr-body" x1="0" x2="1">
-          <stop offset="0" stopColor="#8a1a14" /><stop offset="0.5" stopColor="#c8281e" /><stop offset="1" stopColor="#7a140e" />
-        </linearGradient>
-        <linearGradient id="g2fr-in" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ffffff" /><stop offset="1" stopColor="#cfe8f6" />
-        </linearGradient>
-        <linearGradient id="g2fr-gleam" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0" /><stop offset="0.45" stopColor="#ffffff" stopOpacity="0.55" />
-          <stop offset="0.55" stopColor="#ffffff" stopOpacity="0" />
-        </linearGradient>
-        <filter id="g2fr-glow"><feGaussianBlur stdDeviation="2.2" /></filter>
-      </defs>
-      {/* its sign, lit */}
-      <rect x={4} y={0} width={w - 8} height={18} rx={4} fill="#ffd040" filter="url(#g2fr-glow)" opacity={0.8} />
-      <rect x={4} y={0} width={w - 8} height={18} rx={4} fill="#e8202a" stroke="#3b1a10" strokeWidth={1.2} />
-      <text x={w / 2} y={13} textAnchor="middle" className="g2-fridge-sign">{lang === 'ja' ? 'ドリンク' : '飲料'}</text>
-      {/* the cabinet and its lit inside */}
-      <rect x={0} y={20} width={w} height={h - 20} rx={6} fill="url(#g2fr-body)" stroke="#3b1a10" strokeWidth={1.6} />
-      <rect x={6} y={28} width={w - 12} height={h - 52} rx={3} fill="url(#g2fr-in)" stroke="#5a1a10" strokeWidth={1} />
-      {FRIDGE_ROWS.map((row, r) => {
-        const y = 30 + r * sh
-        const lit = !!taken && row.includes(taken)
-        return (
-          <g key={r}>
-            {lit && <rect x={7} y={y} width={w - 14} height={sh - 2} fill="#fff2a0" opacity={0.85} />}
-            {row.flatMap((id, half) => {
-              const n = id === 'yakult' ? 4 : 3
-              const art = DRINK_ART[id]
-              const shape = DRINKS.find((d) => d.id === id)?.shape ?? 'bottle'
-              const bw = shape === 'small' ? 5.4 : shape === 'can' ? 6.6 : 6
-              const bh = shape === 'small' ? sh * 0.5 : shape === 'can' ? sh * 0.62 : sh * 0.7
-              return Array.from({ length: n }, (_, k) => {
-                const cx = 10 + half * ((w - 20) / 2) + (k + 0.5) * ((w - 20) / 2 / n)
-                const by = y + sh - 3
-                return (
-                  <g key={`${half}${k}`}>
-                    {shape === 'bottle' && <rect x={cx - 1.6} y={by - bh - 4} width={3.2} height={5} fill={art.body} stroke="#2a1a10" strokeWidth={0.5} />}
-                    <rect x={cx - bw / 2} y={by - bh} width={bw} height={bh} rx={shape === 'can' ? 1 : 2} fill={art.body} stroke="#2a1a10" strokeWidth={0.6} />
-                    <rect x={cx - bw / 2} y={by - bh * 0.62} width={bw} height={bh * 0.3} fill={art.label} />
-                    <rect x={cx - (shape === 'bottle' ? 1.6 : bw / 2)} y={by - bh - (shape === 'bottle' ? 5.5 : 1.4)} width={shape === 'bottle' ? 3.2 : bw}
-                      height={1.6} fill={art.cap} />
-                    <rect x={cx - bw / 2 + 0.8} y={by - bh + 1} width={1} height={bh - 2} fill="#ffffff" opacity={0.45} />
-                  </g>
-                )
-              })
-            })}
-            <rect x={6} y={y + sh - 3} width={w - 12} height={2.4} fill="#9aa8b0" />
-          </g>
-        )
-      })}
-      {/* the glass: a gleam across it, its frame, the long handle */}
-      <rect x={6} y={28} width={w - 12} height={h - 52} rx={3} fill="url(#g2fr-gleam)" />
-      <rect x={6} y={28} width={w - 12} height={h - 52} rx={3} fill="none" stroke="#2a2c30" strokeWidth={2.4} />
-      <rect x={w - 12} y={70} width={3} height={60} rx={1.5} fill="#e8eaec" stroke="#5a5c60" strokeWidth={0.6} />
-      {/* the vents at its foot */}
-      {[0, 1, 2].map((k) => <rect key={k} x={10} y={h - 18 + k * 4} width={w - 20} height={1.6} fill="#3b1a10" />)}
-    </g>
   )
 }

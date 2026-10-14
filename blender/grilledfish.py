@@ -2257,7 +2257,7 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough, tool in pots2:
 
 # the lemon: a little dish of wedges; the one on top is what's picked up and squeezed
 c = box2_c + tang * 0.33
-bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.07, depth=0.014, location=(c.x, c.y, BOX_Z + 0.007))
+bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.082, depth=0.014, location=(c.x, c.y, BOX_Z + 0.007))
 dish_l = finish(active(), "LemonDish", M["white_dish"])
 centre_origin(dish_l, (c.x, c.y, 0.0))
 
@@ -2265,7 +2265,8 @@ centre_origin(dish_l, (c.x, c.y, 0.0))
 def wedge(at, turn, name):
     """A lemon wedge: an eighth of a lemon, peel round the back, the flesh on its two cut faces."""
     bm = bmesh.new()
-    R, L = 0.032, 0.07
+    # (a good-sized wedge, a quarter of a big lemon's half)
+    R, L = 0.044, 0.094
     seg = 6
     a0, a1 = -math.pi / 8, math.pi / 8
     rim = [Vector((0, R * math.cos(a0 + (a1 - a0) * k / seg), R * math.sin(a0 + (a1 - a0) * k / seg))) for k in range(seg + 1)]
@@ -2298,11 +2299,12 @@ def wedge(at, turn, name):
     return o
 
 
-wedges = [wedge(Vector((c.x + 0.02 * math.cos(t), c.y + 0.02 * math.sin(t), BOX_Z + 0.03)), t, "LemonWedgeRest")
-          for t in (0.4, 2.5)]
+# (a heap of them: four lying round the dish, the one picked up on top)
+wedges = [wedge(Vector((c.x + 0.03 * math.cos(t), c.y + 0.03 * math.sin(t), BOX_Z + 0.036)), t, "LemonWedgeRest")
+          for t in (0.4, 2.0, 3.6, 5.2)]
 join(wedges, "LemonWedges")
-top = wedge(Vector((c.x, c.y, BOX_Z + 0.055)), 1.3, "LemonWedge")
-centre_origin(top, (c.x, c.y, BOX_Z + 0.055))
+top = wedge(Vector((c.x, c.y, BOX_Z + 0.07)), 1.3, "LemonWedge")
+centre_origin(top, (c.x, c.y, BOX_Z + 0.07))
 
 # ---------------------------------------------------------------------------------------------------------
 # a wooden bucket of water on the left, with a dipper (柄杓) in it: splash food or the coals, and drop the bare

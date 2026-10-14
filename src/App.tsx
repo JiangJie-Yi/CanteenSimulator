@@ -174,6 +174,21 @@ function usePrefersReducedMotion() {
 
 /** a phone (a touch screen, or a narrow one): the customers are shown in the 2D bar on the guest board instead of in 3D */
 const PHONE_QUERY = '(hover: none) and (pointer: coarse), (max-width: 760px)'
+/**
+ * a phone by its screen's size (not a tablet, though that's a touch screen too): the short side under 600 css px.
+ * Only a phone gets the grill drawn flat, without any 3D.
+ */
+const SMALL_SCREEN_QUERY = '(max-width: 599px), (max-height: 499px)'
+function useMedia(query: string) {
+  const [on, setOn] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const onChange = () => setOn(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [query])
+  return on
+}
 function usePhone() {
   const [phone, setPhone] = useState(() => window.matchMedia(PHONE_QUERY).matches)
   useEffect(() => {
@@ -1030,6 +1045,7 @@ export default function App() {
   const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
   const phone = usePhone()
+  const smallScreen = useMedia(SMALL_SCREEN_QUERY)
   phoneRef.current = phone
   // the stove starts switched off: the cook turns it up
   const [heatBy, setHeatBy] = useState({ closed: 0, open: 0 })
@@ -1102,7 +1118,8 @@ export default function App() {
   }
   const dish = DISHES[active]
   // a phone at the grill has no 3D view: the fire pit and the customers' bar are drawn flat (Grill2D)
-  const flatGrill = phone && !!dish.roast
+  // (by the screen's size: a tablet, touch screen or not, keeps the 3D grill)
+  const flatGrill = smallScreen && !!dish.roast
   const sceneOffFire = (n: number, loose: number) => { setOffFire(n); setLoose(loose) }
   const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
   const sceneOrder = (id: string, guest?: number) => {
