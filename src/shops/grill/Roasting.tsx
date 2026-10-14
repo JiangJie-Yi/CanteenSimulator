@@ -831,7 +831,7 @@ function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Cou
       {(() => {
         // (where the two counters' lips meet at the corner, each runs a little into the other: no notch between their
         // rounded ends)
-        let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.05 : 0), x1 = (L + 0.3) / 2 + (butt ? 0.06 : 0)
+        let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.02 : 0), x1 = (L + 0.3) / 2 + (butt ? 0.05 : 0)
         if (gate) {
           if (end > 0) x1 -= G
           else x0 += G
