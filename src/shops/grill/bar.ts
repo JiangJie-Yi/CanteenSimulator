@@ -140,12 +140,32 @@ export function fridgeOf(cs: Counter[]) {
 export const FRIDGE = { W: 0.84, H: 1.72, D: 0.52 }
 /** what's in it, and what each costs (NT$) */
 export const DRINKS = [
-  { id: 'beer', zh: '啤酒', ja: 'ビール', price: 120, color: '#c88a2a', cap: '#d4b04a', glass: false },
-  { id: 'sake', zh: '清酒', ja: '日本酒', price: 150, color: '#e8eef0', cap: '#c4302a', glass: true },
-  { id: 'oolong', zh: '烏龍茶', ja: 'ウーロン茶', price: 50, color: '#9a5a1a', cap: '#2a6a3a', glass: false },
-  { id: 'ramune', zh: '彈珠汽水', ja: 'ラムネ', price: 60, color: '#8ad0e8', cap: '#2a6ab0', glass: true },
+  // bottles
+  { id: 'beer', zh: '瓶裝啤酒', ja: '瓶ビール', price: 120, color: '#7a4a1a', cap: '#d4b04a', glass: false, shape: 'bottle', label: ['#c8a040', '#7a1a12', '生ビール'] },
+  { id: 'sake', zh: '清酒', ja: '日本酒', price: 150, color: '#e8eef0', cap: '#c4302a', glass: true, shape: 'bottle', label: ['#f4efe2', '#b8261c', '清酒'] },
+  { id: 'oolong', zh: '烏龍茶', ja: 'ウーロン茶', price: 50, color: '#9a5a1a', cap: '#2a6a3a', glass: false, shape: 'bottle', label: ['#3a6a3a', '#f2e6c8', '烏龍茶'] },
+  { id: 'ramune', zh: '彈珠汽水', ja: 'ラムネ', price: 60, color: '#8ad0e8', cap: '#2a6ab0', glass: true, shape: 'bottle', label: ['#2a6ab0', '#ffffff', 'ラムネ'] },
+  // cans
+  { id: 'beerCan', zh: '罐裝啤酒', ja: '缶ビール', price: 100, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#e8d070', '#b8261c', 'ビール'] },
+  { id: 'highball', zh: '調酒', ja: 'ハイボール', price: 110, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#1c2a4a', '#e8c45a', 'ハイボール'] },
+  { id: 'coffee', zh: '罐裝咖啡', ja: '缶コーヒー', price: 45, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#4a2a18', '#f2e2c0', '珈琲'] },
+  { id: 'greenTea', zh: '綠茶', ja: '緑茶', price: 40, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#4a8a3a', '#ffffff', 'お茶'] },
+  { id: 'cola', zh: '可樂', ja: 'コーラ', price: 40, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#b8201c', '#ffffff', 'コーラ'] },
+  // the little bottles of cultured milk drink
+  { id: 'yakult', zh: '養樂多', ja: '乳酸菌飲料', price: 20, color: '#f2ece0', cap: '#c4302a', glass: false, shape: 'small', label: ['#f2ece0', '#c4302a', '乳酸菌'] },
 ] as const
 export type DrinkId = (typeof DRINKS)[number]['id']
+/** what each kind of customer takes from the fridge: the children a ramune, the old folk tea, the rest any */
+export const drinkFor = (kind: string, id: number): DrinkId => {
+  const of = (l: DrinkId[]) => l[id % l.length]
+  if (kind === 'kid') return of(['ramune', 'yakult', 'cola'])
+  if (kind === 'grandma' || kind === 'grandpa') return of(['oolong', 'greenTea', 'yakult', 'sake'])
+  if (kind === 'highSchoolGirl' || kind === 'highSchoolBoy') return of(['cola', 'ramune', 'greenTea', 'coffee', 'yakult'])
+  if (kind === 'salaryman' || kind === 'civilServant') return of(['beerCan', 'coffee', 'highball', 'beer'])
+  if (kind === 'uncle') return of(['beer', 'sake', 'highball', 'beerCan'])
+  return of(['beer', 'highball', 'sake', 'beerCan', 'oolong', 'coffee', 'cola'])
+}
+
 /** the toilets' doors: how many are going through each just now (GuestBar3D), and whether the player's opened it */
 export const TOILETS = { m: { passing: 0, open: false }, f: { passing: 0, open: false } }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __toilets?: typeof TOILETS }).__toilets = TOILETS

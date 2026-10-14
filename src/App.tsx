@@ -484,7 +484,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
                 <Roasting url={url} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
-                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)} blessed={blessed}
+                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)} blessed={blessed} onDrink={onDrink}
                   helpers={helpersOf(dish.id)} crew={crewOf(dish.id)} bar={!phone}
                   onWalkOut={(ids, g) => onWalkOut(ids, dish, g)} lang={lang}
                   entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
@@ -2068,6 +2068,13 @@ export default function App() {
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}
       </button>
+      {/* (on a phone there's no 3D room and no altar to click: the incense is lit from here) */}
+      {phone && ai && !!dish.roast && (
+        <button type="button" className={`incense-toggle${blessed ? ' is-on' : ''}`} onClick={lightIncense} disabled={blessed}
+          title={lang === 'ja' ? 'お線香を上げる（一分間、客足とご注文が増える）' : '點香（一分鐘內客人變多、點得也多）'}>
+          {blessed ? (lang === 'ja' ? '焚香中' : '燃香中') : (lang === 'ja' ? '線香' : '點香')}
+        </button>
+      )}
       <button type="button" className={`speed-toggle${speed > 1 ? ' is-on' : ''}`} onClick={() => setSpeed((v) => (v > 1 ? 1 : 2))}
         aria-pressed={speed > 1} title={lang === 'ja' ? '早送り ×2' : '快速 ×2'}>
         {speed > 1 ? '×2' : '▶▶'}

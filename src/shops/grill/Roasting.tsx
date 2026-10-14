@@ -20,7 +20,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
-import { ALONG, FLOOR_NEAR, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -1469,6 +1469,8 @@ type RoastingProps = {
   crowd?: number
   /** the incense is burning: each customer orders a little more */
   blessed?: boolean
+  /** (on a phone, with no 3D room) a waiting customer's had a drink from the fridge */
+  onDrink?: (guest: number, drink: DrinkId) => void
   /** the shop is open: the chef works the grill, the player only watches */
   locked?: boolean
   /** who's at the grill in the AI simulation */
@@ -1488,7 +1490,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {}, crowd = 1, blessed = false, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, crew = [], bar = true,
+  locked = false, notes = {}, crowd = 1, blessed = false, onDrink, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, crew = [], bar = true,
   entries, onOrderEntry }: RoastingProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
@@ -1509,6 +1511,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
   // pieces by node, found by scanning the model root; rescanned whenever Dish adds a cloned portion
   const pieces = useRef<Piece[]>([])
+  /** (on a phone) who's had their drink from the fridge */
+  const drank = useRef(new Set<number>())
   const scannedCount = useRef(-1)
   const scan = () => {
     const known = new Set(pieces.current.map((p) => p.node))
@@ -2296,6 +2300,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const now = guestTime.current
     guestClock.current += 0.8
     const seated = guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating')
+    // (no room drawn, on a phone: nobody walks to the fridge, but they still help themselves to a drink, once each)
+    if (!bar && onDrink) for (const g of seated) {
+      if (g.state !== 'waiting' || drank.current.has(g.id) || Math.random() > 0.8 / 70) continue
+      drank.current.add(g.id)
+      onDrink(g.id, drinkFor(kindOf(g.id).kind, g.id))
+    }
     if (onOrder && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd) {
       guestClock.current = 0
       // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)

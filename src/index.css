@@ -1950,6 +1950,26 @@ button {
   }
 }
 
+/* (a phone's) light the incense: under the round buttons, top right */
+.incense-toggle {
+  position: fixed;
+  z-index: 10;
+  top: 62px;
+  right: 10px;
+  padding: 6px 10px;
+  border: 1.5px solid #c4302a;
+  border-radius: 16px;
+  background: var(--page);
+  color: #c4302a;
+  font: 700 13px/1 var(--brush);
+  cursor: pointer;
+}
+.incense-toggle.is-on {
+  background: #c4302a;
+  color: #fff6e0;
+  cursor: default;
+}
+
 /* language toggle, beside the day/night button */
 .lang-toggle {
   position: fixed;

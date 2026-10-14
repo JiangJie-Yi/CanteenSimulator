@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
-import { DRINKS, FRIDGE, TOILETS, WC_SLIDE, WC_W, handOver, type Counter } from './bar'
+import { DRINKS, FRIDGE, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Steam } from '@/scene/Steam'
 
@@ -1204,12 +1204,15 @@ export function DrinkFridge() {
       {rows.map((y, r) => (
         <group key={y} position-y={y}>
           <mesh position={[0, -0.01, 0]}><boxGeometry args={[W - 0.09, 0.012, D - 0.12]} /><meshToonMaterial color="#9aa2a8" /></mesh>
-          {/* two deep: a row in front, one behind */}
-          {[0.06, -0.09].map((z, depth) => Array.from({ length: 7 }, (_, k) => (
-            <group key={`${depth}${k}`} position={[(k - 3) * 0.1, 0, z]}>
-              <DrinkBottle id={DRINKS[(r + Math.floor(k / 2) + depth) % DRINKS.length].id} />
-            </group>
-          )))}
+          {/* two drinks to a shelf, one each side, set out in even ranks two deep, every label turned to the door */}
+          {SHELF_DRINKS[r].map((id, half) => {
+            const [n, gap] = SHELF_RANK[DRINKS.find((x) => x.id === id)!.shape]
+            return [0.07, -0.08].map((z, depth) => Array.from({ length: n }, (_, k) => (
+              <group key={`${half}${depth}${k}`} position={[(half ? 1 : -1) * (W / 4 - 0.01) + (k - (n - 1) / 2) * gap, 0, z]}>
+                <DrinkBottle id={id} />
+              </group>
+            )))
+          })}
         </group>
       ))}
       {/* the glass door, its frame, its handle */}
@@ -1225,13 +1228,33 @@ export function DrinkFridge() {
     </StaticBatch>
   )
 }
+/** what's on each of the fridge's shelves, bottom up */
+const SHELF_DRINKS: [DrinkId, DrinkId][] = [['yakult', 'yakult'], ['coffee', 'greenTea'], ['cola', 'oolong'], ['highball', 'beerCan'],
+  ['beer', 'sake']]
+/** how many of each shape stand along half a shelf, and their spacing */
+const SHELF_RANK = { bottle: [3, 0.12], can: [4, 0.09], small: [5, 0.072] } as const
 /** a bottle of one of the drinks, standing (its foot at the origin): its glass or can, its label printed round it,
  * its neck and cap */
-export function DrinkBottle({ id }: { id: (typeof DRINKS)[number]['id'] }) {
+export function DrinkBottle({ id }: { id: DrinkId }) {
   const d = DRINKS.find((x) => x.id === id)!
   const look = BOTTLE_LOOK[id]
+  // (turned so its label's name faces +z)
+  if (d.shape === 'can') return (
+    // a can: printed all over, its silver top and rim
+    <group rotation-y={-Math.PI / 2}>
+      <mesh geometry={BOTTLE_GEO.can} position-y={0.044} material={look.label} />
+      <mesh geometry={BOTTLE_GEO.canTop} position-y={0.091} material={look.glass} />
+    </group>
+  )
+  if (d.shape === 'small') return (
+    // the little cultured milk bottle: waisted, a red foil top
+    <group rotation-y={-Math.PI / 2}>
+      <mesh geometry={BOTTLE_GEO.small} position-y={0.036} material={look.label} />
+      <mesh geometry={BOTTLE_GEO.smallTop} position-y={0.074}><meshToonMaterial color={d.cap} /></mesh>
+    </group>
+  )
   return (
-    <group>
+    <group rotation-y={-Math.PI / 2}>
       <mesh geometry={BOTTLE_GEO.body} position-y={0.065} material={look.glass} />
       <mesh geometry={BOTTLE_GEO.label} position-y={0.06} material={look.label} />
       <mesh geometry={BOTTLE_GEO.neck} position-y={0.145} material={look.glass} />
@@ -1244,28 +1267,41 @@ const BOTTLE_GEO = {
   label: new THREE.CylinderGeometry(0.0285, 0.0295, 0.06, 14, 1, true),
   neck: new THREE.CylinderGeometry(0.012, 0.026, 0.04, 12),
   cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 12),
+  can: new THREE.CylinderGeometry(0.021, 0.021, 0.088, 16),
+  canTop: new THREE.CylinderGeometry(0.018, 0.021, 0.006, 16),
+  small: new THREE.LatheGeometry([[0, 0], [0.016, 0], [0.017, 0.02], [0.013, 0.036], [0.016, 0.056], [0.015, 0.072], [0, 0.072]]
+    .map(([x, y]) => new THREE.Vector2(x, y - 0.036)), 16),
+  smallTop: new THREE.CylinderGeometry(0.0155, 0.0155, 0.004, 14),
 }
 /** each drink's label: its colours and its name round it, the shop's own small print */
 const BOTTLE_LOOK = Object.fromEntries(DRINKS.map((d) => {
-  const lbl = { beer: ['#c8a040', '#7a1a12', '生ビール'], sake: ['#f4efe2', '#b8261c', '清酒'], oolong: ['#3a6a3a', '#f2e6c8', '烏龍茶'], ramune: ['#2a6ab0', '#ffffff', 'ラムネ'] }[d.id]!
-  const tex = canvasTex(128, 48, (g) => {
+  const lbl = d.label
+  const tall = d.shape !== 'bottle'
+  const tex = canvasTex(128, tall ? 96 : 48, (g) => {
+    const h = tall ? 96 : 48
     g.fillStyle = lbl[0]
-    g.fillRect(0, 0, 128, 48)
+    g.fillRect(0, 0, 128, h)
     g.fillStyle = lbl[1]
     g.fillRect(0, 4, 128, 3)
-    g.fillRect(0, 41, 128, 3)
-    g.font = 'bold 20px "Zen Antique", "Noto Serif TC", serif'
+    g.fillRect(0, h - 7, 128, 3)
+    if (d.shape === 'can') {
+      // (a can's design: a band of colour across it, a few bubbles, its name upright down it)
+      g.globalAlpha = 0.25
+      g.fillRect(0, h * 0.62, 128, h * 0.12)
+      g.globalAlpha = 1
+    }
+    g.font = `bold ${d.shape === 'small' ? 16 : lbl[2].length > 4 ? 15 : 20}px "Zen Antique", "Noto Serif TC", serif`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     // (twice round, so it reads from either side)
-    g.fillText(lbl[2], 32, 25)
-    g.fillText(lbl[2], 96, 25)
+    g.fillText(lbl[2], 32, h / 2)
+    g.fillText(lbl[2], 96, h / 2)
   })
   return [d.id, {
     glass: new THREE.MeshToonMaterial({ color: d.color, transparent: d.glass, opacity: d.glass ? 0.82 : 1 }),
     label: new THREE.MeshToonMaterial({ color: '#ffffff', map: tex }),
   }]
-})) as unknown as Record<(typeof DRINKS)[number]["id"], { glass: THREE.Material; label: THREE.Material }>
+})) as unknown as Record<DrinkId, { glass: THREE.Material; label: THREE.Material }>
 const FRIDGE_GEO = { body: new THREE.BoxGeometry(1, 1, 1) }
 /** the fridge's sign: 飲料 · ドリンク, white on red */
 const FRIDGE_SIGN = canvasTex(192, 48, (g) => {

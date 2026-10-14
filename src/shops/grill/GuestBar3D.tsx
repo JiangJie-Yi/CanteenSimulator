@@ -17,7 +17,7 @@ import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, DrinkBottle, DrinkFridge, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, drinkFor, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -701,9 +701,6 @@ const WC_STAY = 6
 /** and to go and get themselves a drink from the fridge (once), and how long they stand choosing */
 const DRINK_RATE = 1 / 70
 const DRINK_STAY = 1.6
-/** what each kind of customer takes from the fridge: the children a ramune, the old folk tea, the rest any */
-const drinkFor = (kind: string, id: number): DrinkId => kind === 'kid' ? 'ramune' : kind === 'grandma' || kind === 'grandpa' ? 'oolong'
-  : kind === 'highSchoolGirl' || kind === 'highSchoolBoy' ? (id % 2 ? 'ramune' : 'oolong') : (['beer', 'sake', 'oolong', 'beer', 'ramune'] as const)[id % 5]
 
 /** a plate on its way to a seat ('serve'), set at it ('set'), or being cleared away ('clear', after a pause) */
 type PlateRun = { key: number; seat: number; guest: number; phase: 'serve' | 'carry' | 'set' | 'clear'; t: number; from: THREE.Vector3
