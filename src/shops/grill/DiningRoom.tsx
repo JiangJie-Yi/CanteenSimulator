@@ -443,8 +443,13 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     const d = TOILETS[who]
     const want = d.passing > 0 || d.open ? 1 : 0
     k.current += Math.sign(want - k.current) * Math.min(Math.abs(want - k.current), Math.min(dt, 0.1) * 1.8)
-    const e = k.current * k.current * (3 - 2 * k.current)
-    if (g.current) g.current.position.z = away * e * WC_SLIDE
+    // (first out of the doorway onto its track in front of the wall, clear of the frame's posts and the plaster, then
+    // along it; shutting, the other way about)
+    const ss = (a: number, b: number) => { const t = Math.min(1, Math.max(0, (k.current - a) / (b - a))); return t * t * (3 - 2 * t) }
+    if (g.current) {
+      g.current.position.x = -0.065 * ss(0, 0.25)
+      g.current.position.z = away * ss(0.2, 1) * WC_SLIDE
+    }
   })
   return (
     <group ref={g} onClick={(ev) => { ev.stopPropagation(); TOILETS[who].open = !TOILETS[who].open }}
@@ -479,7 +484,7 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
       <WcRoom w={W} h={H} who={who} />
       {/* the short noren, and the plaque over it */}
       {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[-0.075, H - 0.2, sd * W / 4.2]} rotation-y={-Math.PI / 2}>
+        <mesh key={sd} position={[-0.125, H - 0.2, sd * W / 4.2]} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[W / 2.2, 0.36]} />
           <meshToonMaterial color={who === 'm' ? '#2c3e66' : '#9a2a2a'} side={THREE.DoubleSide} />
         </mesh>
