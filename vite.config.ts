@@ -38,9 +38,11 @@ function blenderBridge(): Plugin {
 }
 
 // https://vite.dev/config/
+// GitHub Pages serves the site from https://<user>.github.io/<repo>/: built on GitHub, the repo's own name (so the site
+// works whatever the repo's called); built here, and in `vite preview`, JapaneseGrillSimulator
+const REPO = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'JapaneseGrillSimulator'
 export default defineConfig(({ command, isPreview }) => ({
-  // GitHub Pages serves the site from https://<user>.github.io/JapaneseGrillSimulator/ (and `vite preview` mirrors it)
-  base: command === 'build' || isPreview ? '/JapaneseGrillSimulator/' : '/',
+  base: command === 'build' || isPreview ? `/${REPO}/` : '/',
   plugins: [react(), blenderBridge()],
   // (the same alias as tsconfig.app.json's paths)
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
