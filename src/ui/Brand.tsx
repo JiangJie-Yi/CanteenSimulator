@@ -13,7 +13,7 @@ const NAMES: Record<string, Record<Lang, { main: string; sub: string }>> = {
 }
 
 /** the grill's fish-shaped board's painted rule, just inside its edge (the board's own outline is in the CSS) */
-const FISH_RULE = 'M3 25Q6 11 18 7Q40 3 64 7Q76 10 83 22L94 9Q91 25 94 41L83 28Q76 40 64 43Q40 47 18 43Q6 39 3 25Z'
+const FISH_RULE = 'M3 26Q7 15 16 11Q30 8 50 8Q66 9 76 13Q82 17 86 21L96 9Q92 25 96 41L86 29Q82 33 76 37Q66 41 50 42Q30 42 16 39Q7 36 3 26Z'
 /**
  * The shop's sign, top-left: it hangs from two cords and sways a little in the breeze, and at night its lettering
  * lights up (and a 深夜 stamp is pressed on beside it). Which sign depends on which shop is on screen.
@@ -42,9 +42,11 @@ export function Brand({ night, lang, shop = 'beefnoodle', dark = false, ignite =
           <span className="brand-fishboard" />
           <svg className="brand-fish" viewBox="0 0 100 50" preserveAspectRatio="none">
             <path className="brand-fish-rule" d={FISH_RULE} />
-            <path className="brand-fish-line" d="M17 14q5 11 0 22M84 25l11-15M84 25l11 15M86 25h10" />
-            <path className="brand-fish-scale" d="M66 16q3 4 0 8M72 18q3 4 0 8M66 26q3 4 0 8M72 28q3 4 0 8" />
-            <ellipse className="brand-fish-eye" cx="9.5" cy="21" rx="1.6" ry="3.2" />
+            {/* a saury (秋刀魚): long and slim, its jaw pointed, its back dark, the small finlets toward its forked tail */}
+            <path className="brand-fish-back" d="M14 11.5Q40 7.5 64 9Q74 10.5 82 16" />
+            <path className="brand-fish-line" d="M13 15q4 10 0 20M88 22l9-11M88 28l9 11M89 25h8" />
+            <path className="brand-fish-scale" d="M70 11.5l2-2.5 1 2.6M75 13l2-2.4 1 2.5M79 15.5l1.8-2.2.8 2.4M75 37l2 2.4 1-2.5M79 34.5l1.8 2.2.8-2.4" />
+            <ellipse className="brand-fish-eye" cx="8" cy="23.5" rx="1.5" ry="3" />
           </svg>
           </>
         )}

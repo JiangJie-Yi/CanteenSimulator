@@ -5873,7 +5873,7 @@ button {
 /* (cut in the shape of a fish, nose to the left, tail to the right: the name in its body; the board's wood is laid
    on a layer of its own, cut to the fish, so the cords it hangs by aren't cut off with it) */
 .brand-grilledfish .brand-plate {
-  padding: 0.34em 1.55em 0.3em 0.95em;
+  padding: 0.5em 1.55em 0.46em 0.85em;
   box-shadow: none;
   border-radius: 0;
   filter: drop-shadow(0 0.12em 0.14em rgb(40 20 10 / 0.55));
@@ -5883,8 +5883,9 @@ button {
   inset: 0;
   z-index: -1;
   background: var(--fish-wood);
-  clip-path: polygon(0% 50%, 3% 30%, 9% 16%, 19% 7%, 40% 2%, 63% 6%, 76% 15%, 83% 36%, 100% 6%, 96% 50%, 100% 94%, 83% 64%,
-    76% 85%, 63% 94%, 40% 98%, 19% 93%, 9% 84%, 3% 70%);
+  /* (a saury: long and slim, its lower jaw a point, narrowing to a slim stalk and a deeply forked tail) */
+  clip-path: polygon(0% 53%, 3% 41%, 8% 28%, 16% 19%, 30% 14%, 50% 13%, 66% 15%, 76% 22%, 84% 35%, 88% 41%, 100% 11%,
+    95% 50%, 100% 89%, 88% 59%, 84% 65%, 76% 76%, 66% 84%, 50% 87%, 30% 86%, 16% 81%, 8% 70%, 2% 58%);
 }
 .brand-grilledfish .brand-plate {
   isolation: isolate;
@@ -5922,12 +5923,27 @@ button {
   stroke: rgb(40 25 15 / 0.6);
   stroke-width: 1;
 }
-/* (the nails holding it up: one through its head, one by its tail) */
+/* (the cords come right down to the board's back, where it's nailed: each nail at a cord's end) */
+.brand-grilledfish .brand-cord {
+  height: calc(var(--hang) + 21%);
+}
+.brand-grilledfish .brand-cord-left {
+  left: calc(22% - 1.5px);
+}
+.brand-grilledfish .brand-cord-right {
+  left: calc(64% - 1.5px);
+  right: auto;
+}
 .brand-grilledfish .brand-plate::before {
-  left: 1.25em;
+  left: calc(22% - 0.08em);
 }
 .brand-grilledfish .brand-plate::after {
-  right: 1.75em;
+  left: calc(64% - 0.08em);
+  right: auto;
+}
+.brand-fish-back {
+  stroke-width: 2.4;
+  opacity: 0.35;
 }
 
 /* (under the name, across, small and spaced out, between two short rules) */
@@ -5942,7 +5958,8 @@ button {
 
 .brand-grilledfish .brand-plate::before,
 .brand-grilledfish .brand-plate::after {
-  top: 0.42em;
+  top: 21%;
+  z-index: 1;
 }
 
 .brand-grilledfish.brand-night .brand-plate {
