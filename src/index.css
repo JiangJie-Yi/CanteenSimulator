@@ -5865,13 +5865,13 @@ button {
   background: transparent;
   --fish-wood:
     /* fine growth rings, closer and further apart down the board */
-    repeating-linear-gradient(178deg, rgb(48 30 18 / 0.22) 0 0.02em, transparent 0.02em 0.09em, rgb(48 30 18 / 0.12) 0.09em 0.11em, transparent 0.11em 0.23em),
+    repeating-linear-gradient(178deg, rgb(30 16 8 / 0.42) 0 0.025em, transparent 0.02em 0.09em, rgb(30 16 8 / 0.26) 0.09em 0.12em, transparent 0.11em 0.23em),
     /* long grain lines, wavering along the board */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='90'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006 0.09' numOctaves='2' seed='5' result='w'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.35' numOctaves='3' seed='2' result='n'/%3E%3CfeDisplacementMap in='n' in2='w' scale='26' xChannelSelector='R' yChannelSelector='G'/%3E%3CfeColorMatrix values='0 0 0 0 0.18 0 0 0 0 0.11 0 0 0 0 0.06 2.6 0 0 0 -0.95'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E") center / 100% 100%,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='90'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006 0.09' numOctaves='2' seed='5' result='w'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.35' numOctaves='3' seed='2' result='n'/%3E%3CfeDisplacementMap in='n' in2='w' scale='26' xChannelSelector='R' yChannelSelector='G'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.06 0 0 0 0 0.03 3.6 0 0 0 -1.15'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E") center / 100% 100%,
     /* a knot and the softer patches of the board */
-    radial-gradient(ellipse 0.5em 0.22em at 78% 70%, rgb(60 40 26 / 0.55), rgb(60 40 26 / 0.15) 60%, transparent 75%),
+    radial-gradient(ellipse 0.5em 0.22em at 78% 70%, rgb(28 15 8 / 0.85), rgb(28 15 8 / 0.3) 60%, transparent 75%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='80'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.12' numOctaves='3' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0.25 0 0 0 0 0.17 0 0 0 0 0.1 0 0 0 0.9 -0.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E") center / cover,
-    linear-gradient(180deg, #86694f, #6f5540);
+    linear-gradient(180deg, #6a4a32 0%, #553a27 48%, #3f2a1c 100%);
 }
 
 .brand-grilledfish .brand-main {
@@ -5881,7 +5881,7 @@ button {
 /* (cut in the shape of a fish, nose to the left, tail to the right: the name in its body; the board's wood is laid
    on a layer of its own, cut to the fish, so the cords it hangs by aren't cut off with it) */
 .brand-grilledfish .brand-plate {
-  padding: 0.5em 1.55em 0.46em 0.85em;
+  padding: 0.62em 1.35em 0.56em 1.5em;
   box-shadow: none;
   border-radius: 0;
   filter: drop-shadow(0 0.12em 0.14em rgb(40 20 10 / 0.55));
@@ -5892,8 +5892,7 @@ button {
   z-index: -1;
   background: var(--fish-wood);
   /* (a saury: long and slim, its lower jaw a point, narrowing to a slim stalk and a deeply forked tail) */
-  clip-path: polygon(0% 53%, 3% 41%, 8% 28%, 16% 19%, 30% 14%, 50% 13%, 66% 15%, 76% 22%, 84% 35%, 88% 41%, 100% 11%,
-    95% 50%, 100% 89%, 88% 59%, 84% 65%, 76% 76%, 66% 84%, 50% 87%, 30% 86%, 16% 81%, 8% 70%, 2% 58%);
+  /* (its clip-path is set in Brand.tsx, from the saury's outline) */
 }
 .brand-grilledfish .brand-plate {
   isolation: isolate;
@@ -5915,8 +5914,37 @@ button {
   stroke-linejoin: round;
 }
 .brand-fish-rule {
-  stroke-width: 1.6;
-  opacity: 0.85;
+  stroke-width: 1.5;
+  opacity: 0.8;
+}
+.brand-fish .brand-fish-cut {
+  stroke: rgb(18 9 4 / 0.85);
+  stroke-width: 2.2;
+}
+.brand-fish .brand-fish-scales {
+  stroke: none;
+  opacity: 0.3;
+}
+.brand-fish pattern path {
+  stroke: rgb(255 238 205 / 0.55);
+  stroke-width: 0.45;
+  fill: none;
+  vector-effect: none;
+}
+.brand-fish .brand-fish-silver {
+  stroke: var(--plate-cream);
+  stroke-width: 1.4;
+  opacity: 0.55;
+}
+.brand-fish .brand-fish-ring {
+  fill: none;
+  stroke: var(--plate-cream);
+  stroke-width: 1.3;
+  opacity: 0.95;
+}
+.brand-fish .brand-fish-pupil {
+  fill: #140a06;
+  stroke: none;
 }
 .brand-fish-line {
   stroke-width: 1.3;
@@ -5931,7 +5959,25 @@ button {
   stroke: rgb(40 25 15 / 0.6);
   stroke-width: 1;
 }
-/* (the cords come right down to the board's back, where it's nailed: each nail at a cord's end) */
+/* the cords are short (the board hangs just under the top edge), and come right down to the board where it's nailed */
+.brand.brand-grilledfish {
+  /* (the saury's back is a quarter of the way down its board, so the board's raised to hang just under the top edge: the
+     cords show only a few pixels) */
+  --hang: 14px;
+  top: -10px;
+}
+@media (max-width: 900px) {
+  .brand.brand-grilledfish {
+    --hang: 12px;
+    top: -12px;
+  }
+}
+@media (max-width: 400px) {
+  .brand.brand-grilledfish {
+    --hang: 10px;
+    top: -12px;
+  }
+}
 .brand-grilledfish .brand-cord {
   height: calc(var(--hang) + 21%);
 }

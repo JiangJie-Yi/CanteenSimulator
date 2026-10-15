@@ -134,10 +134,16 @@ export function fridgeOf(cs: Counter[]) {
   // (clear of where the men's door slides open)
   const z = t.m.z - WC_W / 2 - 0.06 - WC_SLIDE - FRIDGE.W / 2 - 0.1
   const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
-  return { z, at: at(farOf(c) + FRIDGE.D / 2 + 0.01), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE.D + 0.3), aisle: at(-AISLE) }
+  // (the door's hinged on the fridge's own left, and swings out that side: whoever's helping themselves stands a little right of
+  // its middle, clear of it; the fridge's own +x is (lay.z, -lay.x) in this frame)
+  const side = new THREE.Vector3(c.lay.z, 0, -c.lay.x).multiplyScalar(0.17)
+  return { z, at: at(farOf(c) + FRIDGE.D / 2 + 0.01), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE.D + 0.34).add(side), aisle: at(-AISLE) }
 }
 /** the fridge's size: across, up, deep */
 export const FRIDGE = { W: 0.84, H: 1.72, D: 0.52 }
+/** the fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
+export const FRIDGE_STATE = { passing: 0, open: false }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridge?: typeof FRIDGE_STATE }).__fridge = FRIDGE_STATE
 /** what's in it, and what each costs (NT$) */
 export const DRINKS = [
   // bottles

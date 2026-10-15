@@ -5,6 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { BlobShadow } from '@/scene/BlobShadow'
+import { brushText } from '@/scene/signFont'
 import { FloorPiece } from '@/scene/FloorPiece'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { CHEFS, type Chef } from '@/data/chefs'
@@ -191,17 +192,11 @@ const TRASH_LABEL = (() => {
     g.lineTo(Math.random() * 96, Math.random() * 180)
     g.stroke()
   }
-  g.fillStyle = '#1e1a16'
-  g.font = 'bold 48px "Zen Antique", serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillText('ご', 48, 52)
-  g.fillText('み', 48, 112)
+  brushText(g, 'ご', 48, 52, 52, { fill: '#1e1a16', shadow: 'rgba(120,90,50,0.25)' })
+  brushText(g, 'み', 48, 112, 52, { fill: '#1e1a16', shadow: 'rgba(120,90,50,0.25)' })
   g.fillStyle = '#b4302a'
   g.fillRect(34, 148, 28, 22)
-  g.fillStyle = '#f3ecd9'
-  g.font = 'bold 16px serif'
-  g.fillText('屑', 48, 160)
+  brushText(g, '屑', 48, 160, 18, { fill: '#f3ecd9' })
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   return t
@@ -788,6 +783,8 @@ const COVE_GLOW = (() => {
   g.fillRect(0, 0, 8, 64)
   return new THREE.CanvasTexture(c)
 })()
+/** the foot rail along a counter's base (the counter's frame: height, how far out toward the customers, its radius) */
+const FOOT_RAIL = { y: 0.2, z: -0.3, r: 0.02 }
 /** how high the raised lip along the bar's cook's side stands over its top */
 const LIP_H = 0.15
 /** a unit slab with rounded edges (scaled to each top), its grain still running the long way */
@@ -832,6 +829,32 @@ function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Cou
         <planeGeometry args={[baseL, (BAR_TOP - 0.06) * 0.76]} />
         <meshBasicMaterial map={COVE_GLOW} transparent depthWrite={false} toneMapped={false} />
       </mesh>
+      {/* the foot rail: a brass bar along the base's front at the height of a sitting customer's soles, held out from the
+          base on brackets, so their feet rest on something */}
+      {(() => {
+        const x0 = -(L + 0.3) / 2 + (trim ? 0.34 : 0.1) + (gate && end < 0 ? G : 0)
+        const x1 = (L + 0.3) / 2 - (butt ? 0.32 : 0.1) - (gate && end > 0 ? G : 0)
+        const len = x1 - x0
+        const n = Math.max(2, Math.round(len / 0.9) + 1)
+        return (
+          <group position-x={(x0 + x1) / 2}>
+            <mesh position={[0, FOOT_RAIL.y, FOOT_RAIL.z]} rotation-z={Math.PI / 2}>
+              <cylinderGeometry args={[FOOT_RAIL.r, FOOT_RAIL.r, len, 14]} />
+              <meshToonMaterial color="#d4b04a" />
+            </mesh>
+            <mesh position={[0, FOOT_RAIL.y, FOOT_RAIL.z]} rotation-z={Math.PI / 2} scale={[1.18, 1, 1.18]}>
+              <cylinderGeometry args={[FOOT_RAIL.r, FOOT_RAIL.r, len + 0.012, 14]} />
+              <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+            </mesh>
+            {Array.from({ length: n }, (_, k) => (
+              <mesh key={k} position={[-len / 2 + (len * k) / (n - 1), FOOT_RAIL.y, (FOOT_RAIL.z - 0.12) / 2]}>
+                <boxGeometry args={[0.03, 0.03, Math.abs(FOOT_RAIL.z + 0.12)]} />
+                <meshToonMaterial color="#b89040" />
+              </mesh>
+            ))}
+          </group>
+        )
+      })()}
       {/* the base stands back on the cook's side, so the customers' knees go under the top */}
       <mesh position={[baseX, (BAR_TOP - 0.06) / 2, 0.08]} castShadow>
         <boxGeometry args={[baseL, BAR_TOP - 0.06, 0.4]} />

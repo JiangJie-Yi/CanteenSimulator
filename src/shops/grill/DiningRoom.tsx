@@ -3,7 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
-import { DRINKS, FRIDGE, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
+import { brushText, signTexture } from '@/scene/signFont'
+import { DRINKS, FRIDGE, FRIDGE_STATE, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Steam } from '@/scene/Steam'
 
@@ -22,15 +23,8 @@ const WAINSCOT = 0.85
 
 /** a canvas texture of the given size, drawn by `draw` */
 function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void, repeat = false) {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = w
-  c.height = h
-  draw(c.getContext('2d')!)
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping
-  return t
+  // (painted again once the sign font has loaded: signFont)
+  return signTexture(w, h, (g) => draw(g), repeat)
 }
 
 /** a red seal stamped in a corner */
@@ -310,13 +304,8 @@ const wcSign = (who: 'm' | 'f') => canvasTex(160, 96, (g) => {
     g.rect(38, 66, 5, 18)
   }
   g.fill()
-  g.font = 'bold 50px "Zen Antique", "Noto Serif TC", serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillText(who === 'm' ? '男' : '女', 104, 44)
-  g.fillStyle = '#1d140c'
-  g.font = '15px "Noto Serif TC", serif'
-  g.fillText(who === 'm' ? '男廁 · MEN' : '女廁 · WOMEN', 104, 80)
+  brushText(g, who === 'm' ? '男' : '女', 104, 42, 58, { fill: ink, edge: '#f4eadb', shadow: 'rgba(60,30,10,0.35)', shine: '#ffffff' })
+  brushText(g, who === 'm' ? '男廁 · MEN' : '女廁 · WOMEN', 104, 80, 14, { fill: '#1d140c', weight: 'normal' })
 })
 const WC_SIGNS = { m: wcSign('m'), f: wcSign('f') }
 /** shoji paper, faintly fibred */
@@ -889,6 +878,8 @@ const FLAG_GEO = (() => {
     const u = uv.getX(i), v = uv.getY(i)
     // (narrowing to the point: the long side at the pole, x = 0)
     p.setXYZ(i, u, (v - 0.5) * (1 - u), 0)
+    // (and the picture sampled from the triangle it's drawn in, not the whole square: no blank corners)
+    uv.setXY(i, u, 0.5 + (v - 0.5) * (1 - u))
   }
   g.userData.rest = Float32Array.from(p.array as Float32Array)
   return g
@@ -963,7 +954,21 @@ const TIGER_GEO = {
   leg: new THREE.CylinderGeometry(0.011, 0.014, 0.06, 10),
   ear: new THREE.ConeGeometry(0.012, 0.02, 10),
   fang: new THREE.ConeGeometry(0.0035, 0.012, 6),
-  coin: new THREE.CylinderGeometry(0.009, 0.009, 0.003, 16),
+  coin: (() => {
+    // an old Chinese coin: a round disc with a square hole, its rim raised
+    const sh = new THREE.Shape()
+    sh.absarc(0, 0, 0.0155, 0, Math.PI * 2, false)
+    const hole = new THREE.Path()
+    const q = 0.0053
+    hole.moveTo(-q, -q)
+    hole.lineTo(-q, q)
+    hole.lineTo(q, q)
+    hole.lineTo(q, -q)
+    hole.closePath()
+    sh.holes.push(hole)
+    return new THREE.ExtrudeGeometry(sh, { depth: 0.003, bevelEnabled: true, bevelThickness: 0.0009, bevelSize: 0.0012, bevelSegments: 1, curveSegments: 20 })
+  })(),
+  cord: new THREE.CylinderGeometry(0.0012, 0.0012, 0.05, 5),
   tail: new THREE.TorusGeometry(0.04, 0.007, 8, 16, Math.PI * 1.2),
   cape: new THREE.CylinderGeometry(0.03, 0.045, 0.03, 18, 1, true),
   dais: new THREE.BoxGeometry(0.14, DAIS_H, 0.12),
@@ -989,7 +994,7 @@ function B(props: { at: [number, number, number]; r: [number, number, number]; c
   )
 }
 /** the figure's gold: leaf over lacquer, bright where the light catches it */
-const IDOL_GOLD = new THREE.MeshStandardMaterial({ color: '#d8ae48', roughness: 0.32, metalness: 0.6 })
+const IDOL_GOLD = new THREE.MeshStandardMaterial({ color: '#e8bc4a', roughness: 0.3, metalness: 0.25, emissive: '#6a4a10', emissiveIntensity: 0.55 })
 const IDOL_RED = new THREE.MeshStandardMaterial({ color: '#a8261e', roughness: 0.35, metalness: 0.02 })
 function TigerIdol() {
   return (
@@ -1050,7 +1055,15 @@ function TigerIdol() {
           {[-1, 1].map((sd) => (
             <mesh key={sd} geometry={TIGER_GEO.fang} position={[-0.049, -0.016, sd * 0.008]} rotation-z={Math.PI}><meshToonMaterial color="#fbf6e8" /></mesh>
           ))}
-          <mesh geometry={TIGER_GEO.coin} material={IDOL_GOLD} position={[-0.052, -0.024, 0]} rotation-z={Math.PI / 2} />
+          {/* the money: a gold coin held across his teeth, his fangs either side of its rim, and a red cord from its hole with
+              two more coins hanging on it */}
+          <group position={[-0.0535, -0.018, 0]} rotation={[0, -Math.PI / 2, 0.12]}>
+            <mesh geometry={TIGER_GEO.coin} material={IDOL_GOLD} position-z={-0.0015} />
+            <mesh geometry={TIGER_GEO.cord} position={[0, -0.03, 0]}><meshToonMaterial color="#c4302a" /></mesh>
+            {[-0.05, -0.075].map((y) => (
+              <mesh key={y} geometry={TIGER_GEO.coin} material={IDOL_GOLD} position={[0, y, -0.0015]} scale={0.78} />
+            ))}
+          </group>
         </group>
       </group>
     </group>
@@ -1220,17 +1233,45 @@ export function DrinkFridge() {
           })}
         </group>
       ))}
-      {/* the glass door, its frame, its handle */}
-      <mesh position={[0, H / 2 + 0.02, D / 2 + 0.004]}><planeGeometry args={[W - 0.06, H - 0.26]} />
-        <meshBasicMaterial color="#cfe4f0" transparent opacity={0.16} depthWrite={false} /></mesh>
-      {[-1, 1].map((sd) => <Box key={sd} size={[0.035, H - 0.24, 0.025]} color="#3a3c42" position={[sd * (W / 2 - 0.03), H / 2 + 0.02, D / 2 + 0.01]} />)}
-      {[0.16, H - 0.12].map((y) => <Box key={y} size={[W - 0.03, 0.035, 0.025]} color="#3a3c42" position={[0, y, D / 2 + 0.01]} />)}
-      <Box size={[0.025, 0.6, 0.035]} color="#b8bcc0" position={[W / 2 - 0.08, H / 2 + 0.05, D / 2 + 0.04]} />
       {/* the lit sign on top, and the vents at its foot */}
       <mesh position={[0, H + 0.1, D / 2 - 0.01]}><planeGeometry args={[W, 0.18]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGN} toneMapped={false} /></mesh>
       <Box size={[W, 0.19, 0.06]} color="#1c1d20" position={[0, H + 0.1, D / 2 - 0.045]} />
       {[0, 1, 2, 3].map((k) => <Box key={k} size={[W - 0.2, 0.012, 0.004]} color="#16171a" position={[0, 0.04 + k * 0.025, D / 2 + 0.002]} />)}
     </StaticBatch>
+  )
+}
+/**
+ * The fridge's door: a glass door in a dark frame, hinged on the fridge's left with a long handle on its right, swinging
+ * open (out into the room) when someone's at the fridge or when it's clicked, and shutting after; while it's open the cold
+ * pours out of it in a low white mist.
+ */
+export function FridgeDoor() {
+  const { W, H, D } = FRIDGE
+  const hinge = useRef<THREE.Group>(null)
+  const open = useRef(0)
+  const mist = useRef(0)
+  useFrame((_, dt) => {
+    const want = FRIDGE_STATE.passing > 0 || FRIDGE_STATE.open ? 1 : 0
+    open.current += Math.sign(want - open.current) * Math.min(Math.abs(want - open.current), Math.min(dt, 0.1) * 2.2)
+    const e = open.current * open.current * (3 - 2 * open.current)
+    if (hinge.current) hinge.current.rotation.y = -e * 1.85
+    mist.current = e
+  })
+  return (
+    <group>
+      <group ref={hinge} position={[-W / 2, 0, D / 2]} onClick={(ev) => { ev.stopPropagation(); FRIDGE_STATE.open = !FRIDGE_STATE.open }} {...handOver}>
+        <mesh position={[W / 2, H / 2 + 0.02, 0.004]}><planeGeometry args={[W - 0.06, H - 0.26]} />
+          <meshBasicMaterial color="#cfe4f0" transparent opacity={0.16} depthWrite={false} side={THREE.DoubleSide} /></mesh>
+        {[-1, 1].map((sd) => <Box key={sd} size={[0.035, H - 0.24, 0.025]} color="#3a3c42" position={[W / 2 + sd * (W / 2 - 0.03), H / 2 + 0.02, 0.01]} />)}
+        {[0.16, H - 0.12].map((y) => <Box key={y} size={[W - 0.03, 0.035, 0.025]} color="#3a3c42" position={[W / 2, y, 0.01]} />)}
+        <Box size={[0.025, 0.6, 0.035]} color="#b8bcc0" position={[W - 0.08, H / 2 + 0.05, 0.04]} />
+        {[-1, 1].map((sd) => <Box key={sd} size={[0.01, H - 0.3, 0.01]} color="#9aa0a6" position={[W / 2 + sd * (W / 2 - 0.05), H / 2 + 0.02, 0.0]} />)}
+      </group>
+      {/* the mist, low at the foot of the open door, rolling out over the floor */}
+      <group position={[0, 0.05, D / 2 + 0.1]}>
+        <Steam width={W * 0.9} height={0.5} opacity={0.5} layers={2} color="#eaf6ff" shade="#bcd8ec" speed={0.06} level={mist} />
+      </group>
+    </group>
   )
 }
 /** what's on each of the fridge's shelves, bottom up */
@@ -1312,11 +1353,10 @@ const FRIDGE_GEO = { body: new THREE.BoxGeometry(1, 1, 1) }
 const FRIDGE_SIGN = canvasTex(192, 48, (g) => {
   g.fillStyle = '#b8261c'
   g.fillRect(0, 0, 192, 48)
-  g.fillStyle = '#fff6e0'
-  g.font = 'bold 26px "Zen Antique", "Noto Serif TC", serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillText('飲料 · ドリンク', 96, 25)
+  g.strokeStyle = 'rgba(255,230,160,0.7)'
+  g.lineWidth = 1.4
+  g.strokeRect(4, 4, 184, 40)
+  brushText(g, '飲料 · ドリンク', 96, 25, 26, { fill: '#fff6e0', edge: '#7a0e0a', shadow: 'rgba(40,0,0,0.5)', shine: '#ffffff', spacing: 1 })
 })
 
 /** straw wrapping round a sake barrel (菰), the brewer's mark in red and black on its front (the middle, -z) */

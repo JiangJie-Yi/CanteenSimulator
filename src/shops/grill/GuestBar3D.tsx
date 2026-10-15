@@ -11,13 +11,14 @@ import { guestLabel, kindOf } from '@/data/guests'
 import { Person, StaffFigure } from '@/scene/Person3D'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
+import { brushText, signTexture } from '@/scene/signFont'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
-import { DiningWall, DrinkBottle, DrinkFridge, ShopProps } from './DiningRoom'
+import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, drinkFor, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -57,48 +58,45 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
 const PEOPLE_SCALE = 1.3
 
 /** the noren's cloth: deep indigo, a white band of the shop's mark across its three panels, faded at the hem */
-const norenTexture = (mark: string) => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 384
-  c.height = 256
-  const g = c.getContext('2d')!
+const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
+  // indigo dyed cloth, darker at the top where it's hung, a fine weave, the dye gone uneven
   const grad = g.createLinearGradient(0, 0, 0, 256)
-  grad.addColorStop(0, '#1f2f55')
-  grad.addColorStop(1, '#2b3f6e')
+  grad.addColorStop(0, '#17244a')
+  grad.addColorStop(0.7, '#25396a')
+  grad.addColorStop(1, '#31487c')
   g.fillStyle = grad
   g.fillRect(0, 0, 384, 256)
-  // a fine weave
-  g.strokeStyle = 'rgba(255,255,255,0.04)'
+  g.strokeStyle = 'rgba(255,255,255,0.05)'
   for (let y = 0; y < 256; y += 3) {
     g.beginPath()
     g.moveTo(0, y)
     g.lineTo(384, y)
     g.stroke()
   }
-  // the shop's name, one character on each outer panel, and a crest of waves in a ring on the middle one
-  g.fillStyle = '#f4efe2'
-  g.font = 'bold 76px serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  const [a, b] = [...mark]
-  g.fillText(a ?? '', 64, 110)
-  g.fillText(b ?? '', 320, 110)
-  g.strokeStyle = '#f4efe2'
-  g.lineWidth = 6
-  g.beginPath()
-  g.arc(192, 104, 40, 0, Math.PI * 2)
-  g.stroke()
-  g.lineWidth = 3
-  for (let q = 0; q < 3; q++) {
+  g.strokeStyle = 'rgba(0,0,10,0.12)'
+  for (let x = 0; x < 384; x += 4) {
     g.beginPath()
-    g.arc(192, 122, 10 + q * 9, Math.PI, Math.PI * 2)
+    g.moveTo(x, 0)
+    g.lineTo(x, 256)
     g.stroke()
   }
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-}
+  // the shop's name, one character on each outer panel, big and bold in the sign font, white dye with a soft
+  // shadow in the cloth; and a crest of waves in a ring on the middle one
+  const [a, b] = [...mark]
+  brushText(g, a ?? '', 64, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
+  brushText(g, b ?? '', 320, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
+  g.strokeStyle = '#f4efe2'
+  g.lineWidth = 7
+  g.beginPath()
+  g.arc(192, 108, 46, 0, Math.PI * 2)
+  g.stroke()
+  g.lineWidth = 3.4
+  for (let q = 0; q < 4; q++) {
+    g.beginPath()
+    g.arc(192, 128, 9 + q * 8, Math.PI, Math.PI * 2)
+    g.stroke()
+  }
+})
 /** one panel's third of the noren cloth (a clone of the texture, offset) */
 const panelTex = (tex: THREE.Texture | null, i: number) => {
   if (!tex) return null
@@ -202,12 +200,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
 }
 
 /** the coir doormat: tan bristle in ribs, a dark border, the shop's welcome (いらっしゃいませ) woven across it */
-const DOORMAT = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 256
-  c.height = 140
-  const g = c.getContext('2d')!
+const DOORMAT = (() => signTexture(256, 140, (g) => {
   g.fillStyle = '#4a3020'
   g.fillRect(0, 0, 256, 140)
   g.fillStyle = '#a77d4c'
@@ -216,31 +209,19 @@ const DOORMAT = (() => {
     g.fillStyle = x % 12 ? 'rgba(90,60,30,0.28)' : 'rgba(255,230,180,0.14)'
     g.fillRect(x, 12, 3, 116)
   }
-  g.fillStyle = '#4a3020'
-  g.font = 'bold 22px "Noto Serif TC", serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillText('いらっしゃいませ', 128, 70)
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-})()
+  brushText(g, 'いらっしゃいませ', 128, 70, 26, { fill: '#3a2414', shadow: 'rgba(255,230,180,0.35)', spacing: 2 })
+}))()
 
 /** the red paper lantern's skin: red washi with its ribs, and the shop's name brushed down it in black */
-const chochinTexture = (mark: string) => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 512
-  c.height = 256
-  const g = c.getContext('2d')!
+const chochinTexture = (mark: string) => signTexture(512, 256, (g) => {
   const grad = g.createLinearGradient(0, 0, 0, 256)
-  grad.addColorStop(0, '#9e1d14')
-  grad.addColorStop(0.5, '#d8362a')
-  grad.addColorStop(1, '#9e1d14')
+  grad.addColorStop(0, '#8a1810')
+  grad.addColorStop(0.5, '#e03a2c')
+  grad.addColorStop(1, '#8a1810')
   g.fillStyle = grad
   g.fillRect(0, 0, 512, 256)
   // the bamboo ribs it's wound on
-  g.strokeStyle = 'rgba(70,10,5,0.35)'
+  g.strokeStyle = 'rgba(70,10,5,0.4)'
   g.lineWidth = 2
   for (let y = 8; y < 256; y += 14) {
     g.beginPath()
@@ -248,17 +229,12 @@ const chochinTexture = (mark: string) => {
     g.lineTo(512, y)
     g.stroke()
   }
-  // the name, down the side facing out (and again round the back)
-  g.fillStyle = '#1a0d08'
-  g.font = 'bold 84px serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
+  // the name, down the side facing out (and again round the back): a signwriter's black, edged in gold leaf, with a
+  // glow of the lamp behind it
   const chars = [...mark]
-  for (const u of [128, 384]) chars.forEach((ch, i) => g.fillText(ch, u, 128 + (i - (chars.length - 1) / 2) * 92))
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-}
+  for (const u of [128, 384]) chars.forEach((ch, i) =>
+    brushText(g, ch, u, 128 + (i - (chars.length - 1) / 2) * 100, 104, { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' }))
+})
 const CHOCHIN_GLOW = (() => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')
@@ -477,28 +453,18 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
   )
 }
 /** the sign on the till: お会計 brushed on cream, with its Chinese under it */
-const PAY_SIGN = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 160
-  c.height = 100
-  const g = c.getContext('2d')!
+const PAY_SIGN = (() => signTexture(160, 100, (g) => {
   g.fillStyle = '#f2e8d0'
   g.fillRect(0, 0, 160, 100)
   g.strokeStyle = '#6a4428'
   g.lineWidth = 6
   g.strokeRect(3, 3, 154, 94)
-  g.fillStyle = '#1d140c'
-  g.font = 'bold 40px "Zen Antique", "Noto Serif TC", serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillText('お会計', 80, 42)
-  g.font = '20px "Noto Serif TC", serif'
-  g.fillText('結帳', 80, 78)
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-})()
+  g.strokeStyle = '#b8261c'
+  g.lineWidth = 1.6
+  g.strokeRect(10, 10, 140, 80)
+  brushText(g, 'お会計', 80, 40, 44, { fill: '#b8261c', edge: '#f8f0dc', shadow: 'rgba(60,30,10,0.4)', spacing: 3 })
+  brushText(g, '結帳', 80, 76, 22, { fill: '#1d140c', weight: 'normal', spacing: 6 })
+}))()
 
 /**
  * The cats at the door, on their stand just inside it against the wall (the entrance's +x side; the till is on the
@@ -513,21 +479,13 @@ const DOOR_CATS = [
 ]
 /** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
 const REG_DIGITS = ['¥', '1', '2', '8', 'お会計'].map((t) => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = t.length > 1 ? 128 : 48
-  c.height = t.length > 1 ? 40 : 56
-  const g = c.getContext('2d')!
-  g.fillStyle = t.length > 1 ? '#d4b04a' : '#f4f1ea'
-  g.fillRect(0, 0, c.width, c.height)
-  g.fillStyle = t.length > 1 ? '#3a2416' : '#1a120c'
-  g.font = `bold ${t.length > 1 ? 26 : 40}px "Zen Antique", "Noto Serif TC", serif`
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillText(t, c.width / 2, c.height / 2 + 2)
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
-  return tex
+  const w = t.length > 1 ? 128 : 48
+  const h = t.length > 1 ? 40 : 56
+  return signTexture(w, h, (g) => {
+    g.fillStyle = t.length > 1 ? '#d4b04a' : '#f4f1ea'
+    g.fillRect(0, 0, w, h)
+    brushText(g, t, w / 2, h / 2 + 2, t.length > 1 ? 26 : 42, { fill: t.length > 1 ? '#3a2416' : '#1a120c', edge: t.length > 1 ? 'rgba(255,240,170,0.5)' : undefined })
+  })
 })
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
@@ -700,7 +658,9 @@ const WC_RATE = 1 / 240
 const WC_STAY = 6
 /** and to go and get themselves a drink from the fridge (once), and how long they stand choosing */
 const DRINK_RATE = 1 / 70
-const DRINK_STAY = 1.6
+/** (in development, `__drinkRate` in the console makes them thirstier, for watching it) */
+const drinkRate = () => (import.meta.env.DEV ? (window as unknown as { __drinkRate?: number }).__drinkRate : undefined) ?? DRINK_RATE
+const DRINK_STAY = 2.25
 
 /** a plate on its way to a seat ('serve'), set at it ('set'), or being cleared away ('clear', after a pause) */
 type PlateRun = { key: number; seat: number; guest: number; phase: 'serve' | 'carry' | 'set' | 'clear'; t: number; from: THREE.Vector3
@@ -969,7 +929,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (g) g.rotation.y = st.yaw
         // (now and then, while they wait, off to the toilet: their kind's own)
         const guest = guestsRef.current.find((x) => x.id === s.id)
-        if (fridge && guest?.state === 'waiting' && !s.drink && Math.random() < DRINK_RATE * Math.min(dt, 0.1)) {
+        if (fridge && guest?.state === 'waiting' && !s.drink && Math.random() < drinkRate() * Math.min(dt, 0.1)) {
           const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
           const path = [st.stool.clone(), st.aisle.clone(), ...turn, fridge.aisle.clone(), fridge.front.clone()]
           s.wc = { who: 'drink', path, len: pathLength(path) }
@@ -1050,6 +1010,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         b.p.z -= nz * push * kb
       }
     }
+    // the fridge's door opens for whoever's at it (as they come up to it, while they take their drink, as they leave it)
+    FRIDGE_STATE.passing = fridge ? shown.filter((x) => x.wc?.who === 'drink' && (x.phase === 'wcIn'
+      || ((x.phase === 'wcGo' || x.phase === 'wcBack') && (groups.current.get(x.id)?.position.distanceTo(fridge.front) ?? 9) < 0.7))).length : 0
     // the toilets' doors open for whoever's going through them just now
     if (wcs) for (const who of ['m', 'f'] as const) {
       TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack' || x.phase === 'wcIn')
@@ -1337,7 +1300,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           )
         })
       })()}
-      {fridge && <group name="look-fridge" position={fridge.at} rotation-y={fridge.yaw}><DrinkFridge /></group>}
+      {fridge && <group name="look-fridge" position={fridge.at} rotation-y={fridge.yaw}><DrinkFridge /><FridgeDoor /></group>}
       {/* what each has fetched from the fridge, stood beside their plate, toward the cook */}
       {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => {
         const st = seats[s.seat], c = counters[st.counter]
@@ -1432,6 +1395,8 @@ function Say({ text }: { text: string }) {
 /** one customer's figure, moved by the bar's clock each frame (read from the ref: nothing re-renders for it) */
 function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number
   guest?: GuestView }) {
+  const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
   return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
-    fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} />
+    fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined}
+    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} /> : undefined} />
 }

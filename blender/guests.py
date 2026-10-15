@@ -2213,6 +2213,32 @@ def stand(breathe, hold=False):
 action("Stand", [(0, stand(0)), (40, stand(0.03)), (80, stand(0))])
 
 
+def fetch(phase):
+    """standing at the drinks fridge (2.25 s): the left hand takes the door's handle and pulls it open (the first part), the
+    right reaches in to a shelf for a drink (the middle), draws it out to the chest while the left lets go (the last)"""
+    L_rest, L_handle, L_pulled = Vector((0.1, -0.06, 0.42)), Vector((0.15, -0.28, 0.56)), Vector((0.13, -0.17, 0.52))
+    R_rest, R_in, R_back = Vector((-0.07, -0.06, 0.42)), Vector((-0.05, -0.31, 0.61)), Vector((-0.04, -0.17, 0.5))
+    wl = L_rest.lerp(L_handle, smoothstep(0.03, 0.2, phase)).lerp(L_pulled, smoothstep(0.22, 0.42, phase)).lerp(L_rest, smoothstep(0.66, 0.9, phase))
+    wr = R_rest.lerp(R_in, smoothstep(0.3, 0.5, phase)).lerp(R_back, smoothstep(0.55, 0.8, phase))
+    lean = 0.08 + 0.08 * smoothstep(0.3, 0.5, phase) * (1 - smoothstep(0.6, 0.85, phase))
+
+    def pose():
+        move_hips(0.452, 0)
+        aim("spine", (0, -lean, 1), twist=0.05)
+        aim("chest", (0, -lean * 1.2, 1), twist=0.08)
+        aim("neck", (0, -0.05, 1))
+        aim("head", (0, -0.14, 1))
+        for s, sd in (("L", 1), ("R", -1)):
+            aim(f"thigh.{s}", (sd * 0.06, -0.03 * (1 if s == "R" else 0), -1))
+            aim(f"shin.{s}", (0, 0.03, -1))
+            aim(f"foot.{s}", (sd * 0.12, -1, -0.3))
+        aim("clavicle.L", (1, -0.14, 0.04))
+        reach("L", wl, (1, 0.3, -1), (-0.1, -0.9, 0.2))
+        aim("clavicle.R", (-1, -0.14, 0.04))
+        reach("R", wr, (-1, 0.3, -1), (0.1, -0.9, 0.25))
+    return pose
+
+
 def phone(phase):
     """sat looking down at a phone held in both hands over the bar, the right thumb scrolling"""
     th = math.sin(2 * math.pi * phase * 3)
@@ -2295,6 +2321,7 @@ action("Chin", [(i * 12, chin(i / 8)) for i in range(9)])
 action("TalkL", [(i * 6, talk(1, i / 16)) for i in range(17)])
 action("TalkR", [(i * 6, talk(-1, i / 16)) for i in range(17)])
 action("Hold", [(0, stand(0, True)), (40, stand(0.03, True)), (80, stand(0, True))])
+action("Fetch", [(i * 3, fetch(i / 18)) for i in range(19)])
 reset_pose()
 
 # =====================================================================

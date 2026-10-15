@@ -367,7 +367,7 @@ function shapeFace(root: THREE.Object3D, head: THREE.Bone, shape: (typeof FACES)
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
-export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven, mood = null, fade, slippers }: { id: number; eating: boolean; walking: boolean
+export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven, mood = null, fade, slippers, pose, held }: { id: number; eating: boolean; walking: boolean
   /** their own clock (seconds): given as a number (re-rendered each frame), or read each frame from a ref, which
    * moves the figure without re-rendering it (only a change of what they're doing re-renders) */
   t?: number; clock?: { current: number }
@@ -380,7 +380,11 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
   /** how much of them shows, read each frame (1: all; less as they fade away going out) */
   fade?: () => number
   /** in the house's slippers just now (read each frame), not their own shoes */
-  slippers?: () => boolean }) {
+  slippers?: () => boolean
+  /** an action of the model's to play in place of what they'd do (walking, eating, waiting): 'Fetch' at the drinks fridge */
+  pose?: string
+  /** something carried in the right hand (a drink), drawn in the hand's own frame */
+  held?: React.ReactNode }) {
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
   const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
@@ -396,6 +400,7 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
   const briefcase = (kind === 'salaryman' && id % 2 === 0) || kind === 'civilServant'
 
   const phone = useRef<THREE.Group>(null)
+  const heldRef = useRef<THREE.Group>(null)
   // what they're doing: walking in or out, eating, or sat waiting; waiting, they talk to the one they came with, or
   // (alone) pass the time one way and then another every half a minute or so: look about, look at their phone, sit
   // with their chin in their hand
@@ -403,7 +408,7 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
   const spellOf = (t: number) => Math.floor((t + id * 9) / 24)
   const [spell, setSpell] = useState(() => spellOf(timeNow()))
   const idle = (['Sit', 'Phone', 'Chin', 'Phone', 'Sit', 'Chin'] as const)[Math.floor(hash(id, spell) * 6)]
-  const now = walking ? walkOf(kind) : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idleGiven ?? idle
+  const now = pose ?? (walking ? walkOf(kind) : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idleGiven ?? idle)
   useEffect(() => {
     const next = r.actions[now]
     if (!next) return
@@ -424,7 +429,9 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
     if (b) r.hand.add(b)
     const ph = phone.current
     if (ph && r.handL) r.handL.add(ph)
-    return () => { s.removeFromParent(); b?.removeFromParent(); ph?.removeFromParent() }
+    const hd = heldRef.current
+    if (hd) r.hand.add(hd)
+    return () => { s.removeFromParent(); b?.removeFromParent(); ph?.removeFromParent(); hd?.removeFromParent() }
   }, [r])
 
   // fading out: their own materials dissolving, the ink outline (shared by all) left off
@@ -517,6 +524,8 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
           <meshToonMaterial color="#c8743a" gradientMap={gradientMap} />
         </mesh>
       </group>
+      {/* what's carried in the right hand (a drink): the fist's end, upright when the arm hangs */}
+      <group ref={heldRef} visible={!!held} position={[0, 0.045, 0.004]} rotation={[Math.PI, 0, 0]} scale={0.72}>{held}</group>
       {/* a phone in the left hand while they look at it, its screen lit */}
       <group ref={phone} visible={now === 'Phone'} position={[-0.012, 0.05, 0.016]} rotation-x={-0.3}>
         <mesh>

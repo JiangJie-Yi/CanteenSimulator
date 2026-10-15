@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { brushText } from '@/scene/signFont'
 
 /**
  * A beckoning cat (招き猫), about 0.2 tall, facing +z: sat up round, one paw raised to call the customers in, the
@@ -34,11 +35,7 @@ const KOBAN = (() => {
     g.lineTo(60, y)
     g.stroke()
   }
-  g.fillStyle = '#5a3a10'
-  g.font = 'bold 22px serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  ;['千', '萬', '兩'].forEach((ch, i) => g.fillText(ch, 32, 22 + i * 26))
+  ;['千', '萬', '兩'].forEach((ch, i) => brushText(g, ch, 32, 22 + i * 26, 24, { fill: '#5a3a10', shadow: 'rgba(255,240,170,0.5)' }))
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   return t

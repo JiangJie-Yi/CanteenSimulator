@@ -7,6 +7,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
+import { brushText } from '@/scene/signFont'
 import { ALONG, GRILL_OFFSET } from './bar'
 
 type Spot = { at: [number, number]; r: number }
@@ -76,10 +77,7 @@ const CRATE_WOOD = canvas(256, 128, (g) => {
 const CRATE_LABEL = canvas(128, 256, (g) => {
   g.fillStyle = '#efe6d2'
   g.fillRect(0, 0, 128, 256)
-  g.fillStyle = '#1d1a18'
-  g.font = 'bold 44px serif'
-  g.textAlign = 'center'
-  ;['紀', '州', '備', '長', '炭'].forEach((ch, i) => g.fillText(ch, 64, 50 + i * 44))
+  ;['紀', '州', '備', '長', '炭'].forEach((ch, i) => brushText(g, ch, 64, 50 + i * 44, 44, { fill: '#1d1a18', shadow: 'rgba(120,90,50,0.25)' }))
   g.fillStyle = '#b8322a'
   g.fillRect(84, 214, 26, 26)
 })
