@@ -1239,7 +1239,11 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
         // soy brushed on: a dark, rich lacquer over the whole surface
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.5, 0.3, 0.15) + vec3(0.05, 0.02, 0.0), uSoy * 0.85);
         // miso spread on: a thick golden-brown paste, caught darker where it's bubbled
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.66, 0.42, 0.18) * (0.8 + 0.3 * charNoise(vMapUv * 14.0)), uMiso * 0.8);
+        #ifdef USE_MAP
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.66, 0.42, 0.18) * (0.8 + 0.3 * charNoise(vMapUv * 14.0)), uMiso * 0.8);
+        #else
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.66, 0.42, 0.18) * 0.95, uMiso * 0.8);
+        #endif
         // lemon squeezed over: a pale, bright sheen
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.08 + vec3(0.05, 0.05, 0.0), uLemon * 0.6);
         #ifdef USE_MAP
