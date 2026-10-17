@@ -1250,11 +1250,13 @@ export function FridgeDoor() {
   const hinge = useRef<THREE.Group>(null)
   const open = useRef(0)
   const mist = useRef(0)
+  // (the door's state lives outside React: leave it shut when the shop's let go, so it doesn't come back open)
+  useEffect(() => () => { FRIDGE_STATE.open = false; FRIDGE_STATE.passing = 0 }, [])
   useFrame((_, dt) => {
     const want = FRIDGE_STATE.passing > 0 || FRIDGE_STATE.open ? 1 : 0
     open.current += Math.sign(want - open.current) * Math.min(Math.abs(want - open.current), Math.min(dt, 0.1) * 2.2)
     const e = open.current * open.current * (3 - 2 * open.current)
-    if (hinge.current) hinge.current.rotation.y = -e * 1.85
+    if (hinge.current) hinge.current.rotation.y = -e * (Math.PI / 2)
     mist.current = e
   })
   return (

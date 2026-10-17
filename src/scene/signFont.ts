@@ -6,7 +6,7 @@ import * as THREE from 'three'
  */
 export const SIGN_FONT = '"Zen Antique", "Noto Serif TC", "Noto Serif JP", serif'
 /** every character the signs set in it (kept in step with the font request in index.html) */
-export const SIGN_CHARS = '聞野炭火銘酒男女廁飲料お手洗い会計結帳生ビール清酒烏龍茶ラムネ缶ハイボール珈琲茶コーラ乳酸菌紀州備長炭千萬兩ごみ屑食堂麵包鼎沸いらっしゃいませ甲粗飽深夜燒烤魚日式令¥0123456789'
+export const SIGN_CHARS = '聞野炭火銘酒男女廁飲料お手洗い会計結帳生ビール清酒烏龍茶ラムネ缶ハイボール珈琲茶コーラ乳酸菌紀州備長炭千萬兩ごみ屑食堂麵包鼎沸いらっしゃいませ甲粗飽深夜燒烤魚日式令¥0123456789ドリンク·MENWO'
 
 type Painted = { c: HTMLCanvasElement; draw: (g: CanvasRenderingContext2D, w: number, h: number) => void; tex: THREE.CanvasTexture }
 const painted: Painted[] = []
@@ -20,16 +20,25 @@ function repaintAll() {
     g.setTransform(1, 0, 0, 1, 0, 0)
     p.draw(g, p.c.width, p.c.height)
     p.tex.needsUpdate = true
+    for (const f of followers.get(p.tex) ?? []) f.needsUpdate = true
   }
 }
+/** clones of a sign texture (cut to a part of it, say): they keep their own version, so are told when it's repainted */
+const followers = new WeakMap<THREE.Texture, THREE.Texture[]>()
+export function followSign(tex: THREE.Texture, clone: THREE.Texture) {
+  followers.set(tex, [...(followers.get(tex) ?? []), clone])
+}
 if (typeof document !== 'undefined' && document.fonts) {
-  const ask = () => document.fonts.load('bold 40px "Zen Antique"', SIGN_CHARS).then(() => {
+  // (load() answers with no faces at all while the font's page hasn't been asked for yet: not loaded, try again later)
+  const ask = () => document.fonts.load('bold 40px "Zen Antique"', SIGN_CHARS).then((faces) => {
+    if (!faces.length) return
     fontsOk = true
     repaintAll()
   }).catch(() => {})
   // (the font's page may not have been asked for yet when this runs: once the page has, and the font's in)
   void ask()
   void document.fonts.ready.then(() => { if (!fontsOk) void ask() })
+  document.fonts.addEventListener('loadingdone', () => { if (!fontsOk) void ask() })
 }
 
 /** a canvas texture painted by `draw`, painted again by it once the sign font has loaded */
@@ -42,8 +51,13 @@ export function signTexture(w: number, h: number, draw: Painted['draw'], repeat 
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
   if (repeat) tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-  painted.push({ c, draw, tex })
-  if (fontsOk) repaintAll()
+  // (drawn above with the font already in if it is; otherwise repainted once it arrives, until the texture is let go)
+  const entry = { c, draw, tex }
+  painted.push(entry)
+  tex.addEventListener('dispose', () => {
+    const i = painted.indexOf(entry)
+    if (i >= 0) painted.splice(i, 1)
+  })
   return tex
 }
 

@@ -7,7 +7,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
-import { brushText } from '@/scene/signFont'
+import { brushText, signTexture } from '@/scene/signFont'
 import { ALONG, GRILL_OFFSET } from './bar'
 
 type Spot = { at: [number, number]; r: number }
@@ -47,16 +47,8 @@ function Inked({ geometry, color, map, grow = 1.04, position, rotation, children
   )
 }
 
-const canvas = (w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = w
-  c.height = h
-  draw(c.getContext('2d')!)
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-}
+// (painted again once the sign font has loaded: signFont)
+const canvas = (w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) => signTexture(w, h, (g) => draw(g))
 
 /** pale cedar planks with a few grain lines */
 const CRATE_WOOD = canvas(256, 128, (g) => {

@@ -11,7 +11,7 @@ import { guestLabel, kindOf } from '@/data/guests'
 import { Person, StaffFigure } from '@/scene/Person3D'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
-import { brushText, signTexture } from '@/scene/signFont'
+import { brushText, followSign, signTexture } from '@/scene/signFont'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { CLOUD_WARE, wareGeometry } from './ware'
@@ -107,6 +107,7 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
     t.repeat.set(1 / 3, 1)
     t.offset.set(i / 3, 0)
     t.needsUpdate = true
+    followSign(tex, t)
     cache[key] = t
   }
   return cache[key]

@@ -5,7 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { BlobShadow } from '@/scene/BlobShadow'
-import { brushText } from '@/scene/signFont'
+import { brushText, signTexture } from '@/scene/signFont'
 import { FloorPiece } from '@/scene/FloorPiece'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { CHEFS, type Chef } from '@/data/chefs'
@@ -176,12 +176,7 @@ const RATTAN = (() => {
   t.repeat.set(8, 1)
   return t
 })()
-const TRASH_LABEL = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 96
-  c.height = 180
-  const g = c.getContext('2d')!
+const TRASH_LABEL = signTexture(96, 180, (g) => {
   // washi: off-white with fibres
   g.fillStyle = '#f3ecd9'
   g.fillRect(0, 0, 96, 180)
@@ -197,10 +192,7 @@ const TRASH_LABEL = (() => {
   g.fillStyle = '#b4302a'
   g.fillRect(34, 148, 28, 22)
   brushText(g, '屑', 48, 160, 18, { fill: '#f3ecd9' })
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-})()
+})
 
 function TrashBin({ position, container, contents = 0 }: { position: [number, number, number]; container: string; contents?: number }) {
   const R = TRASH_R
