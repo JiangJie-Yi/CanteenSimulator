@@ -487,7 +487,8 @@ export const GRILL_OFFSET = GRILL_PIVOT.clone().multiplyScalar(1 - GRILL_SCALE).
 export const PLATE_STACKS = (() => {
   const c0 = { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35) }
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(ALONG, along).addScaledVector(LAY, lay)
-  return { clean: at(-1.78, 0.62), dirty: at(-1.4, 0.62) }
+  // (kept clear of the side counter, drawn in by SIDE_PULL)
+  return { clean: at(-1.78 + SIDE_PULL, 0.62), dirty: at(-1.4 + SIDE_PULL, 0.62) }
 })()
 /** a point given in the bar's own sizes, where it is in the scene as drawn */
 export const toGrillScene = (v: THREE.Vector3) => v.clone().multiplyScalar(GRILL_SCALE).add(GRILL_OFFSET)

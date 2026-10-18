@@ -916,7 +916,8 @@ function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Cou
       {(() => {
         // (where the two counters' lips meet at the corner, each runs a little into the other: no notch between their
         // rounded ends)
-        let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.02 : 0), x1 = (L + 0.3) / 2 + (butt ? 0.05 : 0)
+        // (the first counter's lip starts where the side counter's now stands, drawn in from the wall by SIDE_PULL)
+        let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.02 : 0) + (trim ? SIDE_PULL : 0), x1 = (L + 0.3) / 2 + (butt ? 0.05 : 0)
         if (gate) {
           if (end > 0) x1 -= G
           else x0 += G
@@ -1878,6 +1879,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (id && roast.drinks?.includes(id) && o.visible && o.scale.x > 0.01) others.push({ p: o.position.clone(), r: id === 'Sake' ? 0.22 : 0.19 })
     })
     for (let i = 0; i < 8; i++) {
+      // (nothing on the table's drawn-in end hangs over the side counter's lip: kept a plank in from it)
+      const edge = COOK_TABLE.along[0] + r + 0.38
+      const here = at.dot(ALONG)
+      if (here < edge) at.addScaledVector(ALONG, edge - here)
       const d = Math.hypot(at.x, at.z) || 1e-6
       if (d < RING_CLEAR + r) {
         at.x *= (RING_CLEAR + r) / d

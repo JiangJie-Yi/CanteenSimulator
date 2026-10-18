@@ -625,7 +625,6 @@ function KitchenPit({ counters, drop }: { counters: Counter[]; drop: number }) {
       {wall(ky0 - 0.01, ky0 + 0.01, g1, kx1, 'f2')}
       {/* (down the kitchen's end past the first counter, steps across the whole of it: a way in from the door's side) */}
       {wall(ky0, ky1, kx1 - 0.01, kx1 + 0.01, 'e')}
-      {stepSide(ky0, ky1, kx1 - 0.17 * 3, 'se')}
       {/* (and down by the side counter, the gate's way through) */}
       {gates.side ? (
         <>

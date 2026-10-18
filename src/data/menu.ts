@@ -377,7 +377,7 @@ export const ALL_DISHES: Dish[] = [
       bucket: ['WaterBucket', 'WaterDipper'],
       // (the bin to the left of the bucket, where it can be seen, not hidden behind it)
       // (kept on the table, whose left edge is drawn in by the side counter's pull: SIDE_PULL in shops/grill/bar.ts)
-      trash: [-1.33, 0.0, 0.21],
+      trash: [-1.17, 0.0, 0.09],
       tray: [1.467, 0.0, 1.163],
       // the rice balls come out on their own little dish, just past the front end of the tray
       // (beside the front end of the tray, between it and the basket: the prep side, all on the right)
