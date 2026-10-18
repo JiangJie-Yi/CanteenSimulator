@@ -74,7 +74,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * base and top is, and how wide the swing door across it (the first counter's reaches on to the till, which stands
  * against its end)
  */
-export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.9, leaf: 0.89 }]
+export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.56, leaf: 0.55 }]
 /** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
 export function gateOf(c: Counter, g: { end: 1 | -1; w: number; leaf: number }) {
   const hinge = g.end * ((c.length + 0.2) / 2 - g.w)
@@ -340,6 +340,8 @@ export function kitchenOf(cs: Counter[]) {
 }
 /** where the staff's way through each counter's gate lies on the kitchen's edge: along the first counter's cook's face, and
  * along (in lay) the kitchen's side by the side counter */
+/** how much further than the side gate's doorway its steps reach, inward along the counter */
+const SIDE_STEP_EXTRA = 0.34
 export function kitchenGatesOf(cs: Counter[]) {
   const c0 = cs[0], c1 = cs[1]
   const g0 = gateOf(c0, BAR_GATES[0])
@@ -349,7 +351,8 @@ export function kitchenGatesOf(cs: Counter[]) {
   if (c1 && BAR_GATES[1]) {
     const g1 = gateOf(c1, BAR_GATES[1])
     const at = (s: number) => c1.at.clone().addScaledVector(c1.along, s).sub(c0.at).dot(c0.lay)
-    side = [at(g1.hinge), at(g1.hinge + BAR_GATES[1].end * BAR_GATES[1].w)].sort((p, q) => p - q) as [number, number]
+    // (the steps reach a good way further in than the door, along the counter, to fill the well beside it)
+    side = [at(g1.hinge - BAR_GATES[1].end * SIDE_STEP_EXTRA), at(g1.hinge + BAR_GATES[1].end * BAR_GATES[1].w)].sort((p, q) => p - q) as [number, number]
   }
   return { first: a, side }
 }
