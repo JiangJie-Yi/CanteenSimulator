@@ -2192,86 +2192,55 @@ function BottleCrates() {
  * The mat that marks where the staff go in and out (関係者専用): a woven rug of deep red with a border of indigo and cream, a
  * seigaiha wave band inside it, the words in its middle, and a fringe at both ends.
  */
-/** the mat's picture, in the words of each language: indigo with a lattice of diamonds (菱繋ぎ), a cream band bound in black at its
- * edge as a tatami's is, and a cream plaque in the middle with the words brushed on it, a cherry blossom at each of its corners */
-function staffMatTex(words: string) {
-  return canvasTex(320, 200, (g) => {
-    // (the cloth: deep indigo, its weave in fine lines)
-    g.fillStyle = '#1b3262'
-    g.fillRect(0, 0, 320, 200)
-    g.strokeStyle = 'rgba(0,0,0,0.16)'
-    g.lineWidth = 1
-    for (let x = 0; x < 320; x += 3) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 200); g.stroke() }
-    g.strokeStyle = 'rgba(180,200,240,0.06)'
-    for (let y = 0; y < 200; y += 3) { g.beginPath(); g.moveTo(0, y); g.lineTo(320, y); g.stroke() }
-    // (the lattice of diamonds over the field, light lines on the indigo, a small dot where they cross)
-    g.strokeStyle = 'rgba(150,180,230,0.34)'
-    g.lineWidth = 1.2
-    const S = 22
-    for (let k = -12; k < 24; k++) {
-      g.beginPath(); g.moveTo(k * S, 0); g.lineTo(k * S + 200, 200); g.stroke()
-      g.beginPath(); g.moveTo(k * S, 200); g.lineTo(k * S + 200, 0); g.stroke()
-    }
-    g.fillStyle = 'rgba(244,236,208,0.4)'
-    for (let a = 0; a < 16; a++) for (let b = 0; b < 12; b++) {
-      g.beginPath(); g.arc(a * S, b * S * 2 + ((a % 2) * S), 1.6, 0, Math.PI * 2); g.fill()
-    }
-    // (the edge: a cream band between two black lines, as the binding of a tatami)
-    g.fillStyle = '#e9dcb8'
-    g.fillRect(0, 0, 320, 12)
-    g.fillRect(0, 188, 320, 12)
-    g.fillRect(0, 0, 12, 200)
-    g.fillRect(308, 0, 12, 200)
-    g.strokeStyle = '#161210'
-    g.lineWidth = 2.2
-    g.strokeRect(1.5, 1.5, 317, 197)
-    g.strokeRect(12, 12, 296, 176)
-    g.strokeStyle = '#b8923a'
-    g.lineWidth = 1.2
-    g.strokeRect(17, 17, 286, 166)
-    // (the plaque)
-    const rr = (x: number, y: number, w: number, h: number, r: number) => {
-      g.beginPath()
-      g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r)
-      g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-      g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r)
-      g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y)
-      g.closePath()
-    }
-    g.fillStyle = 'rgba(0,0,0,0.3)'
-    rr(46, 64, 236, 82, 12); g.fill()
-    g.fillStyle = '#f1e6c4'
-    rr(42, 58, 236, 82, 12); g.fill()
-    g.strokeStyle = '#8a2a20'
-    g.lineWidth = 2.4
-    rr(48, 64, 224, 70, 8); g.stroke()
-    brushText(g, words, 160, 100, 44, { fill: '#241810', shadow: 'rgba(120,90,50,0.35)', spacing: 6 })
-    // (a cherry blossom at each corner of the plaque: five petals, a pale pink, the heart a deeper one)
-    for (const [x, y] of [[42, 58], [278, 58], [42, 140], [278, 140]]) {
-      g.fillStyle = '#f2c4cc'
-      for (let k = 0; k < 5; k++) {
-        const a = (k / 5) * Math.PI * 2 - Math.PI / 2
-        g.beginPath(); g.ellipse(x + Math.cos(a) * 6, y + Math.sin(a) * 6, 5, 3.4, a, 0, Math.PI * 2); g.fill()
-      }
-      g.fillStyle = '#c4586c'
-      g.beginPath(); g.arc(x, y, 2.2, 0, Math.PI * 2); g.fill()
-    }
-  })
-}
-const STAFF_MATS = { zh: staffMatTex('員工專用'), ja: staffMatTex('関係者専用') }
+const CARPET_URL = import.meta.env.BASE_URL + 'models/prayer_carpet.glb'
+/** the words alone, brushed in dark ink on a cream plaque with a transparent ground, laid over the middle of the carpet */
+const STAFF_WORDS = (words: string) => canvasTex(256, 96, (g) => {
+  g.clearRect(0, 0, 256, 96)
+  g.fillStyle = 'rgba(243,232,200,0.94)'
+  g.beginPath(); g.roundRect(6, 10, 244, 76, 14); g.fill()
+  g.strokeStyle = '#8a2a20'
+  g.lineWidth = 3
+  g.beginPath(); g.roundRect(12, 16, 232, 64, 9); g.stroke()
+  brushText(g, words, 128, 50, 44, { fill: '#241810', shadow: 'rgba(120,90,50,0.35)', spacing: 6 })
+})
+const STAFF_WORDS_TEX = { zh: STAFF_WORDS('員工專用'), ja: STAFF_WORDS('関係者専用') }
+/** the mat that marks where the staff go in and out: the downloaded prayer carpet, laid flat, the words keyed on its middle */
 function StaffMat({ lang }: { lang: Lang }) {
+  const gltf = useGLTF(CARPET_URL) as unknown as { scene: THREE.Group }
+  const rug = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, side: THREE.DoubleSide })
+    })
+    // (the model stands upright in its own space, its thin side front to back: laid flat, its long side along x, 1.5 long)
+    const wrap = new THREE.Group()
+    wrap.add(root)
+    const b0 = new THREE.Box3().setFromObject(root)
+    const sz = b0.getSize(new THREE.Vector3())
+    const thin = sz.z < sz.x && sz.z < sz.y ? 'z' : sz.y < sz.x ? 'y' : 'x'
+    if (thin === 'z') wrap.rotation.x = -Math.PI / 2
+    wrap.updateMatrixWorld(true)
+    let b = new THREE.Box3().setFromObject(wrap)
+    let d = b.getSize(new THREE.Vector3())
+    if (d.z > d.x) { wrap.rotation.y = Math.PI / 2; wrap.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(wrap); d = b.getSize(new THREE.Vector3()) }
+    const out = new THREE.Group()
+    const k = 1.5 / d.x
+    const c = b.getCenter(new THREE.Vector3())
+    wrap.position.set(-c.x, -b.min.y, -c.z)
+    out.add(wrap)
+    out.scale.setScalar(k)
+    return { group: out, depth: d.z * k, height: d.y * k }
+  }, [gltf])
   return (
     <group>
-      {/* (the rug's body, a little thick and a shade darker, under its face; a soft shadow round it on the boards) */}
-      <mesh position={[0, 0.006, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.56, 1.0]} /><meshBasicMaterial color="#000000" transparent opacity={0.28} depthWrite={false} /></mesh>
-      <mesh position={[0, 0.011, 0]}><boxGeometry args={[1.5, 0.014, 0.94]} /><meshToonMaterial color="#1a2c50" /></mesh>
-      <mesh position={[0, 0.0188, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.5, 0.94]} /><meshToonMaterial color="#ffffff" map={STAFF_MATS[lang]} /></mesh>
-      {/* (the fringe at both ends, tassels of cream cord) */}
-      {[-1, 1].flatMap((sd) => Array.from({ length: 30 }, (_, k) => (
-        <mesh key={`${sd}${k}`} position={[sd * 0.76, 0.012, (k - 14.5) * 0.031]} rotation-z={Math.PI / 2}>
-          <cylinderGeometry args={[0.004, 0.004, 0.06, 4]} /><meshToonMaterial color="#e8d8a8" />
-        </mesh>
-      )))}
+      <primitive object={rug.group} />
+      <mesh position={[0, rug.height + 0.006, 0]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[0.9, 0.34]} />
+        <meshToonMaterial color="#ffffff" map={STAFF_WORDS_TEX[lang]} transparent depthWrite={false} />
+      </mesh>
     </group>
   )
 }
