@@ -629,6 +629,22 @@ const SHRINE_GRAIN = canvasTex(128, 128, (g) => {
   g.fillStyle = 'rgba(100,70,40,0.4)'
   g.beginPath(); g.ellipse(40, 44, 3, 7, 0, 0, Math.PI * 2); g.fill()
 }, true)
+/** the shrine's roof: cypress-bark thatch, courses laid along the slope, each a different tone with a dark seam, the grain fine along it */
+const SHRINE_ROOF = canvasTex(128, 128, (g) => {
+  const tones = ['#8d6a42', '#7c5b36', '#98744a', '#84623c', '#90693f', '#785632', '#9a784c', '#86633a']
+  for (let r = 0; r < 8; r++) {
+    g.fillStyle = tones[r]
+    g.fillRect(0, r * 16, 128, 16)
+    g.strokeStyle = 'rgba(40,24,10,0.3)'
+    g.lineWidth = 1
+    for (let k = 0; k < 6; k++) {
+      const y = r * 16 + 2.5 + k * 2.4
+      g.beginPath(); g.moveTo(0, y); g.lineTo(128, y + ((k + r) % 3 - 1) * 0.8); g.stroke()
+    }
+    g.fillStyle = 'rgba(30,16,6,0.6)'
+    g.fillRect(0, r * 16 + 14.5, 128, 1.8)
+  }
+}, true)
 /** a box with the shop's ink line round it (its back faces, a hair bigger), for the small shrine */
 function InkBox({ size, color, position, ...rest }: { size: [number, number, number]; color: string; position?: [number, number, number]; 'position-y'?: number; 'rotation-x'?: number }) {
   const e = 0.0035
@@ -1125,7 +1141,8 @@ function Kamidana({ shelf = true }: { shelf?: boolean }) {
             board; the ridge capped in gold, the crossed finials (千木) rising at both ends and the short logs (鰹木) laid across it) */}
         {[-1, 1].map((sd) => (
           <group key={sd} position={[sd * 0.066, 0.225, 0]} rotation-z={-sd * 0.5}>
-            <mesh><boxGeometry args={[0.15, 0.012, 0.3]} /><meshToonMaterial color="#8a6a44" /></mesh>
+            <mesh><boxGeometry args={[0.15, 0.012, 0.3]} /><meshToonMaterial color="#ffffff" map={SHRINE_ROOF} /></mesh>
+            <mesh scale={[1.03, 1.5, 1.015]}><boxGeometry args={[0.15, 0.012, 0.3]} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
             <mesh position={[sd * -0.001, -0.0085, 0]}><boxGeometry args={[0.152, 0.005, 0.304]} /><meshToonMaterial color="#4a3622" /></mesh>
             {[-1, 1].map((e) => <mesh key={e} position={[0, 0.0045, e * 0.1485]}><boxGeometry args={[0.15, 0.006, 0.006]} /><meshToonMaterial color="#4a3622" /></mesh>)}
           </group>
