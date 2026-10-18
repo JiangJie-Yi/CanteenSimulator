@@ -555,22 +555,31 @@ const RISER = '#3a2416'
  * floor in a well in it), a pale rim of boards round its top edge, a dark body, a toe board at its foot, standing
  * out past the room all round: so it all sits on something solid, not on nothing.
  */
-function ShopBase({ al, ly, drop }: { al: [number, number]; ly: [number, number]; drop: number }) {
-  const m = 0.34
+function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [number, number]][]; genkan: [[number, number], [number, number]]
+  /** how far down the genkan's stone lies */
+  step: number; drop: number }) {
   const top = -drop - 0.003
-  const cx = -(ly[0] + ly[1]) / 2, cz = (al[0] + al[1]) / 2
-  const W = ly[1] - ly[0], L = al[1] - al[0]
-  const layer = (grow: number, y0: number, h: number, color: string, key: string) => (
-    <mesh key={key} position={[cx, y0 - h / 2, cz]} receiveShadow>
-      <boxGeometry args={[W + 2 * (m - grow), h, L + 2 * (m - grow)]} />
-      <meshToonMaterial color={color} />
-    </mesh>
-  )
+  // (each piece of the base is cut exactly to the room's own outline: the floor's pieces and the genkan's corner, no more)
+  const layers = (al: [number, number], ly: [number, number], key: string) => {
+    const cx = -(ly[0] + ly[1]) / 2, cz = (al[0] + al[1]) / 2
+    const W = ly[1] - ly[0], L = al[1] - al[0]
+    return [[top, 0.06, '#9a7650'], [top - 0.06, 0.22, '#3a2a1e'], [top - 0.28, 0.05, '#22170f']].map(([y0, h, color], i) => (
+      <mesh key={`${key}${i}`} position={[cx, (y0 as number) - (h as number) / 2, cz]} receiveShadow>
+        <boxGeometry args={[W, h as number, L]} />
+        <meshToonMaterial color={color as string} />
+      </mesh>
+    ))
+  }
+  const [gal, gly] = genkan
   return (
     <>
-      {layer(0, top, 0.06, '#9a7650', 'rim')}
-      {layer(0.03, top - 0.06, 0.22, '#3a2a1e', 'body')}
-      {layer(0.015, top - 0.28, 0.05, '#22170f', 'toe')}
+      {rects.flatMap(([al, ly], i) => layers(al, ly, `r${i}`))}
+      {/* (and under the genkan's stone, solid up to it) */}
+      {layers(gal, gly, 'g')}
+      <mesh position={[-(gly[0] + gly[1]) / 2, (top + 0.0 - step) / 2 - 0.0015, (gal[0] + gal[1]) / 2]}>
+        <boxGeometry args={[gly[1] - gly[0], -step - top - 0.003, gal[1] - gal[0]]} />
+        <meshToonMaterial color="#3a2416" />
+      </mesh>
     </>
   )
 }
@@ -645,7 +654,7 @@ function RoomFloor({ counters, drop }: { counters: Counter[]; drop: number }) {
     <group position={c.at} rotation-y={Math.atan2(c.along.x, c.along.z)}>
       {piece([a0, g0], [l0, l1], 'a')}
       {piece([g0, a1], [gl, l1], 'b')}
-      <ShopBase al={[a0, a1]} ly={[l0, l1]} drop={drop} />
+      <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={drop} />
       {/* (and a solid fill under the customers' boards, down to the base, round the kitchen's well) */}
       {[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => minus(al as [number, number], ly as [number, number], kitchen).map(([a, l], i) => (
         <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, -(drop + 0.006) / 2 - 0.004, (a[0] + a[1]) / 2]}>
