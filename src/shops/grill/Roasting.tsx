@@ -661,7 +661,7 @@ function BarGate({ c, gate }: { c: Counter; gate: (typeof BAR_GATES)[number] }) 
                 stiles and across the rails, and a recessed board panel of upright planks between them */}
             <GateLeaf w={G - 0.02} h={H - 0.06} y={0.05} />
             {[0.16, BAR_TOP - 0.16].map((y) => [1, -1].map((sd) => (
-              <group key={`${y}${sd}`} position={[-end * (G / 2 - 0.005) + end * 0.022, y, sd * 0.024]}>
+              <group key={`${y}${sd}`} position={[-end * (G / 2 - 0.005) + end * 0.022, y, sd * 0.042]}>
                 <mesh geometry={HINGE_GEO.plate}><meshToonMaterial color="#b89040" /></mesh>
                 {[-1, 1].map((k) => (
                   <mesh key={k} geometry={HINGE_GEO.screw} position={[0, k * 0.02, sd * 0.0025]} rotation-x={Math.PI / 2}>
@@ -735,7 +735,7 @@ const GATE_WOOD = (() => {
 })()
 /** the gate's door: a frame of stiles and rails, rounded, and a panel of planks set back in it, both sides alike */
 function GateLeaf({ w, h, y }: { w: number; h: number; y: number }) {
-  const S = 0.06, T = 0.04
+  const S = 0.07, T = 0.075
   const parts: { at: [number, number, number]; size: [number, number, number]; up: boolean }[] = [
     { at: [-(w - S) / 2, h / 2, 0], size: [S, h, T], up: true },
     { at: [(w - S) / 2, h / 2, 0], size: [S, h, T], up: true },
