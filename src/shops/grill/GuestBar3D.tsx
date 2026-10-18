@@ -583,7 +583,44 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
     </>
   )
 }
-const STEP_WOOD = '#a8794a'
+/** raw timber for the steps: warm unplaned wood, its long grain wavering, a knot or two, and the dark rough of the cut */
+const STEP_LOG = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 256
+  c.height = 64
+  const g = c.getContext('2d')!
+  g.fillStyle = '#9a6c3c'
+  g.fillRect(0, 0, 256, 64)
+  for (let i = 0; i < 26; i++) {
+    const y = 2 + i * 2.4 + (i % 3)
+    g.strokeStyle = i % 4 ? 'rgba(70,40,18,0.35)' : 'rgba(215,170,110,0.28)'
+    g.lineWidth = 1 + (i % 3) * 0.4
+    g.beginPath()
+    g.moveTo(0, y)
+    g.bezierCurveTo(70, y + 3 * Math.sin(i), 170, y - 3 * Math.cos(i * 1.7), 256, y + 2)
+    g.stroke()
+  }
+  for (const [x, y] of [[60, 20], [190, 44]]) {
+    g.fillStyle = 'rgba(55,30,12,0.7)'
+    g.beginPath(); g.ellipse(x, y, 9, 4.5, 0, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = 'rgba(55,30,12,0.4)'
+    g.beginPath(); g.ellipse(x, y, 16, 8, 0, 0, Math.PI * 2); g.stroke()
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  return t
+})()
+/** the same turned a quarter, for steps whose long side lies the other way */
+const STEP_LOG_TURNED = (() => {
+  if (!STEP_LOG) return null
+  const t = STEP_LOG.clone()
+  t.center.set(0.5, 0.5)
+  t.rotation = Math.PI / 2
+  t.needsUpdate = true
+  return t
+})()
 /**
  * The kitchen, sunk below the customers' floor: its own floor lower down, a riser of the bar's dark wood round its
  * edges (the counters' bases run on down into it), and at each gate two steps to tread on, down from the customers' floor.
@@ -601,19 +638,22 @@ function KitchenPit({ counters, drop }: { counters: Counter[]; drop: number }) {
   )
   // (the steps are blocks stood in the kitchen against its edge, each a third lower than the last)
   const [g0, g1] = gates.first
+  // (each step a raw timber, its grain along it; a little wider than the gate's way and a little into the wall's riser at both
+  // ends, so there's no gap beside it, and the first set right against the customers' floor's edge)
+  const STEP_OVER = 0.03
   const stepAt = (a: number, b: number, edgeLay: number, key: string) => [1, 2].map((n) => {
     const h = drop * (3 - n) / 3
     return (
-      <mesh key={`${key}${n}`} position={[-(edgeLay + 0.17 * n - 0.085), -drop + h / 2, (a + b) / 2]}>
-        <boxGeometry args={[0.17, h, b - a]} /><meshToonMaterial color={STEP_WOOD} />
+      <mesh key={`${key}${n}`} position={[-(edgeLay + 0.17 * n - 0.085), -drop + h / 2, (a + b) / 2]} receiveShadow castShadow>
+        <boxGeometry args={[0.17 + 0.012, h + 0.004, b - a + 2 * STEP_OVER]} /><meshToonMaterial color="#ffffff" map={STEP_LOG_TURNED} />
       </mesh>
     )
   })
   const stepSide = (a: number, b: number, edgeAlong: number, key: string) => [1, 2].map((n) => {
     const h = drop * (3 - n) / 3
     return (
-      <mesh key={`${key}${n}`} position={[-(a + b) / 2, -drop + h / 2, edgeAlong + 0.17 * n - 0.085]}>
-        <boxGeometry args={[b - a, h, 0.17]} /><meshToonMaterial color={STEP_WOOD} />
+      <mesh key={`${key}${n}`} position={[-(a + b) / 2, -drop + h / 2, edgeAlong + 0.17 * n - 0.085]} receiveShadow castShadow>
+        <boxGeometry args={[b - a + 2 * STEP_OVER, h + 0.004, 0.17 + 0.012]} /><meshToonMaterial color="#ffffff" map={STEP_LOG} />
       </mesh>
     )
   })
@@ -1424,7 +1464,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               {/* (and past the bar's end, a strip more behind the till for the cashier to stand on; a shop laid out
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} drop={KITCHEN_DROP / scale} />}
-              {given && <ShopProps counters={counters} />}
+              {given && <ShopProps counters={counters} lang={lang} />}
               {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} altar={incense ?? true} corner />}
             </group>
           )

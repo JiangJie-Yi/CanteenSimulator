@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
+import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
@@ -2184,46 +2185,80 @@ function BottleCrates() {
  * The mat that marks where the staff go in and out (関係者専用): a woven rug of deep red with a border of indigo and cream, a
  * seigaiha wave band inside it, the words in its middle, and a fringe at both ends.
  */
-const STAFF_MAT = canvasTex(256, 160, (g) => {
-  g.fillStyle = '#7a2a22'
-  g.fillRect(0, 0, 256, 160)
-  // (the weave, fine lines across and along)
-  g.strokeStyle = 'rgba(0,0,0,0.16)'
-  for (let x = 0; x < 256; x += 3) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 160); g.stroke() }
-  g.strokeStyle = 'rgba(255,220,170,0.07)'
-  for (let y = 0; y < 160; y += 4) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke() }
-  // (the borders: indigo, then cream, then a thin gold line)
-  g.fillStyle = '#1f3a68'
-  g.fillRect(0, 0, 256, 160)
-  g.fillStyle = '#f0e2bc'
-  g.fillRect(8, 8, 240, 144)
-  g.fillStyle = '#7a2a22'
-  g.fillRect(14, 14, 228, 132)
-  g.strokeStyle = '#d4b04a'
-  g.lineWidth = 2
-  g.strokeRect(20, 20, 216, 120)
-  // (a band of seigaiha waves along each long side)
-  g.strokeStyle = 'rgba(244,239,226,0.55)'
-  g.lineWidth = 1.4
-  for (const y0 of [34, 128]) for (let col = 0; col < 14; col++) for (const r of [8, 5.5, 3]) {
-    g.beginPath()
-    g.arc(30 + col * 14.6, y0, r, Math.PI, 0)
-    g.stroke()
-  }
-  brushText(g, '関係者専用', 128, 81, 38, { fill: '#f4e8c8', shadow: 'rgba(0,0,0,0.4)', spacing: 4 })
-  // (a pair of cranes' worth of small gold diamonds at the corners)
-  g.fillStyle = '#d4b04a'
-  for (const [x, y] of [[32, 54], [224, 54], [32, 108], [224, 108]]) {
-    g.beginPath(); g.moveTo(x, y - 5); g.lineTo(x + 5, y); g.lineTo(x, y + 5); g.lineTo(x - 5, y); g.closePath(); g.fill()
-  }
-})
-function StaffMat() {
+/** the mat's picture, in the words of each language: indigo with a lattice of diamonds (菱繋ぎ), a cream band bound in black at its
+ * edge as a tatami's is, and a cream plaque in the middle with the words brushed on it, a cherry blossom at each of its corners */
+function staffMatTex(words: string) {
+  return canvasTex(320, 200, (g) => {
+    // (the cloth: deep indigo, its weave in fine lines)
+    g.fillStyle = '#1b3262'
+    g.fillRect(0, 0, 320, 200)
+    g.strokeStyle = 'rgba(0,0,0,0.16)'
+    g.lineWidth = 1
+    for (let x = 0; x < 320; x += 3) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 200); g.stroke() }
+    g.strokeStyle = 'rgba(180,200,240,0.06)'
+    for (let y = 0; y < 200; y += 3) { g.beginPath(); g.moveTo(0, y); g.lineTo(320, y); g.stroke() }
+    // (the lattice of diamonds over the field, light lines on the indigo, a small dot where they cross)
+    g.strokeStyle = 'rgba(150,180,230,0.34)'
+    g.lineWidth = 1.2
+    const S = 22
+    for (let k = -12; k < 24; k++) {
+      g.beginPath(); g.moveTo(k * S, 0); g.lineTo(k * S + 200, 200); g.stroke()
+      g.beginPath(); g.moveTo(k * S, 200); g.lineTo(k * S + 200, 0); g.stroke()
+    }
+    g.fillStyle = 'rgba(244,236,208,0.4)'
+    for (let a = 0; a < 16; a++) for (let b = 0; b < 12; b++) {
+      g.beginPath(); g.arc(a * S, b * S * 2 + ((a % 2) * S), 1.6, 0, Math.PI * 2); g.fill()
+    }
+    // (the edge: a cream band between two black lines, as the binding of a tatami)
+    g.fillStyle = '#e9dcb8'
+    g.fillRect(0, 0, 320, 12)
+    g.fillRect(0, 188, 320, 12)
+    g.fillRect(0, 0, 12, 200)
+    g.fillRect(308, 0, 12, 200)
+    g.strokeStyle = '#161210'
+    g.lineWidth = 2.2
+    g.strokeRect(1.5, 1.5, 317, 197)
+    g.strokeRect(12, 12, 296, 176)
+    g.strokeStyle = '#b8923a'
+    g.lineWidth = 1.2
+    g.strokeRect(17, 17, 286, 166)
+    // (the plaque)
+    const rr = (x: number, y: number, w: number, h: number, r: number) => {
+      g.beginPath()
+      g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r)
+      g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+      g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r)
+      g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y)
+      g.closePath()
+    }
+    g.fillStyle = 'rgba(0,0,0,0.3)'
+    rr(46, 64, 236, 82, 12); g.fill()
+    g.fillStyle = '#f1e6c4'
+    rr(42, 58, 236, 82, 12); g.fill()
+    g.strokeStyle = '#8a2a20'
+    g.lineWidth = 2.4
+    rr(48, 64, 224, 70, 8); g.stroke()
+    brushText(g, words, 160, 100, 44, { fill: '#241810', shadow: 'rgba(120,90,50,0.35)', spacing: 6 })
+    // (a cherry blossom at each corner of the plaque: five petals, a pale pink, the heart a deeper one)
+    for (const [x, y] of [[42, 58], [278, 58], [42, 140], [278, 140]]) {
+      g.fillStyle = '#f2c4cc'
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2 - Math.PI / 2
+        g.beginPath(); g.ellipse(x + Math.cos(a) * 6, y + Math.sin(a) * 6, 5, 3.4, a, 0, Math.PI * 2); g.fill()
+      }
+      g.fillStyle = '#c4586c'
+      g.beginPath(); g.arc(x, y, 2.2, 0, Math.PI * 2); g.fill()
+    }
+  })
+}
+const STAFF_MATS = { zh: staffMatTex('員工專用'), ja: staffMatTex('関係者専用') }
+function StaffMat({ lang }: { lang: Lang }) {
   return (
     <group>
       {/* (the rug's body, a little thick and a shade darker, under its face; a soft shadow round it on the boards) */}
       <mesh position={[0, 0.006, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.56, 1.0]} /><meshBasicMaterial color="#000000" transparent opacity={0.28} depthWrite={false} /></mesh>
       <mesh position={[0, 0.011, 0]}><boxGeometry args={[1.5, 0.014, 0.94]} /><meshToonMaterial color="#1a2c50" /></mesh>
-      <mesh position={[0, 0.0188, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.5, 0.94]} /><meshToonMaterial color="#ffffff" map={STAFF_MAT} /></mesh>
+      <mesh position={[0, 0.0188, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.5, 0.94]} /><meshToonMaterial color="#ffffff" map={STAFF_MATS[lang]} /></mesh>
       {/* (the fringe at both ends, tassels of cream cord) */}
       {[-1, 1].flatMap((sd) => Array.from({ length: 30 }, (_, k) => (
         <mesh key={`${sd}${k}`} position={[sd * 0.76, 0.012, (k - 14.5) * 0.031]} rotation-z={Math.PI / 2}>
@@ -2233,7 +2268,7 @@ function StaffMat() {
     </group>
   )
 }
-export function ShopProps({ counters }: { counters: Counter[] }) {
+export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang?: Lang }) {
   const c0 = counters[0]
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, along).addScaledVector(c0.lay, lay)
   // (their fronts toward the room's open side, where the camera is)
@@ -2251,7 +2286,7 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
     return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32)
   }, [fr, c1])
   return (
-    <StaticBatch>
+    <StaticBatch key={lang}>
       <group position={at(3.3, 3.2)} rotation-y={face + 0.3}>
         <group position-x={-0.21}><SakeBarrel /></group>
         <group position-x={0.21} rotation-y={0.4}><SakeBarrel /></group>
@@ -2260,7 +2295,7 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
       <group position={at(3.62, 2.25)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
-      <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat /></group>
+      <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
       <group position={cornerAt} rotation-y={0.4}><PottedBamboo /></group>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
       {fr && <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><BottleCrates /></group>}
