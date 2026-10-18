@@ -1502,13 +1502,16 @@ function useFreezer(n: number) {
   }, [gltf, n])
 }
 export function DrinkFridge({ n = 0 }: { n?: number }) {
-  const { W, H, D } = FRIDGE
+  const { W, H } = FRIDGE
   const { body } = useFreezer(n)
   return (
     <group>
       <primitive object={body} />
-      {/* the lit sign across the header over the glass */}
-      <mesh position={[0, H - 0.17, D / 2 + 0.004]}><planeGeometry args={[W * 0.9, 0.2]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGNS[n]} toneMapped={false} /></mesh>
+      {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
+      <group position={[0, H + 0.03, 0.03]} rotation-x={-0.12}>
+        <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
+        <mesh position={[0, 0.1, 0.0115]}><planeGeometry args={[W * 0.86, 0.17]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGNS[n]} toneMapped={false} /></mesh>
+      </group>
     </group>
   )
 }
