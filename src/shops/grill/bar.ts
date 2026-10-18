@@ -461,7 +461,7 @@ export const GRILL_COUNTERS: Counter[] = [
   // (its start drawn in to meet the side counter, which is drawn in from the wall by SIDE_PULL: the far end stays where it was)
   { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL, seats: 6 },
   // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)
-  { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4, shift: 0.25,
+  { at: new THREE.Vector3().addScaledVector(LAY, -0.42 + 0.25).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14 + 0.5, seats: 4, shift: 0.25 - 0.1,
     // (its wall set further back, for the drinks fridges by the toilets: where it was, the counter having moved off it)
     far: FLOOR_FAR - 0.45 - SIDE_PULL },
 ]
