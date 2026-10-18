@@ -550,6 +550,8 @@ function minus(al: [number, number], ly: [number, number], h: { along: [number, 
   return out
 }
 const RISER = '#3a2416'
+/** the base's whole thickness, one dark colour all the way down (its sides show as a single band) */
+const BASE_COLOR = '#1d0d05'
 /**
  * The shop's base: a thick plinth of wood under the whole room (the customers' floor on a solid fill, the kitchen's lower
  * floor in a well in it), a pale rim of boards round its top edge, a dark body, a toe board at its foot, standing
@@ -563,10 +565,10 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   const layers = (al: [number, number], ly: [number, number], key: string) => {
     const cx = -(ly[0] + ly[1]) / 2, cz = (al[0] + al[1]) / 2
     const W = ly[1] - ly[0], L = al[1] - al[0]
-    return [[top, 0.06, '#9a7650'], [top - 0.06, 0.22, '#3a2a1e'], [top - 0.28, 0.05, '#22170f']].map(([y0, h, color], i) => (
+    return [[top, 0.06], [top - 0.06, 0.22], [top - 0.28, 0.05]].map(([y0, h], i) => (
       <mesh key={`${key}${i}`} position={[cx, (y0 as number) - (h as number) / 2, cz]} receiveShadow>
         <boxGeometry args={[W, h as number, L]} />
-        <meshToonMaterial color={color as string} />
+        <meshToonMaterial color={BASE_COLOR} />
       </mesh>
     ))
   }
@@ -578,7 +580,7 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
       {layers(gal, gly, 'g')}
       <mesh position={[-(gly[0] + gly[1]) / 2, (top + 0.0 - step) / 2 - 0.0015, (gal[0] + gal[1]) / 2]}>
         <boxGeometry args={[gly[1] - gly[0], -step - top - 0.003, gal[1] - gal[0]]} />
-        <meshToonMaterial color="#3a2416" />
+        <meshToonMaterial color={BASE_COLOR} />
       </mesh>
     </>
   )
@@ -658,7 +660,7 @@ function RoomFloor({ counters, drop }: { counters: Counter[]; drop: number }) {
       {/* (and a solid fill under the customers' boards, down to the base, round the kitchen's well) */}
       {[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => minus(al as [number, number], ly as [number, number], kitchen).map(([a, l], i) => (
         <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, -(drop + 0.006) / 2 - 0.004, (a[0] + a[1]) / 2]}>
-          <boxGeometry args={[l[1] - l[0], drop - 0.002, a[1] - a[0]]} /><meshToonMaterial color={RISER} />
+          <boxGeometry args={[l[1] - l[0], drop - 0.002, a[1] - a[0]]} /><meshToonMaterial color={BASE_COLOR} />
         </mesh>
       )))}
       <KitchenPit counters={counters} drop={drop} />
