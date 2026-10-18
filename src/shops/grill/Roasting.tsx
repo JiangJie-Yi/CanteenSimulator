@@ -1880,7 +1880,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     })
     for (let i = 0; i < 8; i++) {
       // (nothing on the table's drawn-in end hangs over the side counter's lip: kept a plank in from it)
-      const edge = COOK_TABLE.along[0] + r + 0.38
+      // (the seasoning box, with its pots, reaches further than its round footprint: held a little further in)
+      const edge = COOK_TABLE.along[0] + r + 0.38 + (key === 'box' ? 0.22 : 0)
       const here = at.dot(ALONG)
       if (here < edge) at.addScaledVector(ALONG, edge - here)
       const d = Math.hypot(at.x, at.z) || 1e-6

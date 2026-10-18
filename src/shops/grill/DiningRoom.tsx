@@ -1507,6 +1507,11 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
   return (
     <group>
       <primitive object={body} />
+      {/* the white light strips inside, one up each side of the glass, and one along the top under the header */}
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * (W / 2 - 0.1), H / 2 - 0.02, D / 2 - 0.09]}><boxGeometry args={[0.022, H - 0.5, 0.012]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
+      ))}
+      <mesh position={[0, H - 0.3, D / 2 - 0.09]}><boxGeometry args={[W - 0.2, 0.02, 0.012]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
       <group position={[0, H + 0.03, D / 2 - 0.1]} rotation-x={-0.12}>
         <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
