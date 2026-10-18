@@ -1495,10 +1495,10 @@ const GABLE_GEO = (() => {
 })()
 function Sutra() {
   return (
-    <group position={[-0.12, 0.007, -0.27]} rotation-y={0}>
-      <mesh><boxGeometry args={[0.075, 0.012, 0.115]} /><meshToonMaterial color="#efe6cf" /></mesh>
-      <mesh position-y={0.0062} rotation-x={-Math.PI / 2}><planeGeometry args={[0.075, 0.115]} /><meshToonMaterial color="#ffffff" map={SUTRA_COVER} /></mesh>
-      <mesh scale={[1.04, 1.25, 1.03]}><boxGeometry args={[0.075, 0.012, 0.115]} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+    <group position={[-0.12, 0.007, -0.27]} rotation-y={Math.PI / 2}>
+      <mesh><boxGeometry args={[0.075, 0.012, 0.17]} /><meshToonMaterial color="#efe6cf" /></mesh>
+      <mesh position-y={0.0062} rotation-x={-Math.PI / 2}><planeGeometry args={[0.075, 0.17]} /><meshToonMaterial color="#ffffff" map={SUTRA_COVER} /></mesh>
+      <mesh scale={[1.04, 1.25, 1.02]}><boxGeometry args={[0.075, 0.012, 0.17]} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
     </group>
   )
 }
@@ -1538,7 +1538,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     const since = at === null ? 99 : (performance.now() - at) / 1000
     const CUP_X = ALTAR_D / 2 - 0.375, CUP_TOP = 0.05
     const cupZ = [-0.1125, 0, 0.1125]
-    const rest = { x: -0.2, y: 0, z: 0.3 }
+    const rest = { x: -0.06, y: 0, z: 0.3 }
     const f = flaskRef.current
     let k = 0, which = -1
     if (on && since < 4.6) {
@@ -1600,7 +1600,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}
       <Sutra />
-      <group ref={flaskRef} position={[-0.2, 0, 0.3]}>{flask(0, 'f')}</group>
+      <group ref={flaskRef} position={[-0.06, 0, 0.3]}>{flask(0, 'f')}</group>
       {/* (the clear sake: a thin stream down into the cup, and the cups, each filling with it) */}
       <mesh ref={streamRef} visible={false}>
         <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} /><meshBasicMaterial color="#e6f4ff" transparent opacity={0.55} depthWrite={false} />
