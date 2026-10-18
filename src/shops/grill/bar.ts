@@ -454,7 +454,8 @@ export const singleCounter = (at: THREE.Vector3, length: number): Counter[] => [
 /** how far the side counter, its stools and its aisle are pulled in from the wall (bar units) */
 export const SIDE_PULL = 0.3
 export const GRILL_COUNTERS: Counter[] = [
-  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35), along: ALONG, lay: LAY, length: 5.2, seats: 6 },
+  // (its start drawn in to meet the side counter, which is drawn in from the wall by SIDE_PULL: the far end stays where it was)
+  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL, seats: 6 },
   // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)
   { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4, shift: 0.25,
     // (its wall set further back, for the drinks fridges by the toilets: where it was, the counter having moved off it)
