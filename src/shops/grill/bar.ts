@@ -176,17 +176,17 @@ export type DrinkId = (typeof DRINKS)[number]['id']
 export const FRIDGE_UNITS: { sign: [string, string]; shelves: { y: number; pitch: number; ids: DrinkId[] }[] }[] = [
   { sign: ['飲料', 'ドリンク'], shelves: [
     { y: 0.2, pitch: 0.082, ids: ['oolong', 'oolong', 'oolong', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
-    { y: 0.47, pitch: 0.078, ids: ['cola', 'cola', 'cola', 'cola', 'ramune', 'ramune', 'ramune', 'ramune'] },
+    { y: 0.47, pitch: 0.08, ids: ['cola', 'cola', 'cola', 'cola', 'cola', 'ramune', 'ramune', 'ramune', 'ramune'] },
     { y: 0.74, pitch: 0.07, ids: ['milk', 'milk', 'milk', 'milk', 'milk', 'coffee', 'coffee', 'coffee', 'coffee', 'coffee'] },
-    { y: 1.01, pitch: 0.07, ids: ['coffee', 'coffee', 'coffee', 'greenTea', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
-    { y: 1.28, pitch: 0.062, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult'] },
+    { y: 1.01, pitch: 0.07, ids: ['coffee', 'coffee', 'coffee', 'coffee', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
+    { y: 1.28, pitch: 0.06, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult'] },
   ] },
   { sign: ['酒類', 'お酒'], shelves: [
-    { y: 0.2, pitch: 0.085, ids: ['sake', 'sake', 'sake', 'sake', 'beer', 'beer', 'beer', 'beer', 'beer'] },
-    { y: 0.47, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
+    { y: 0.2, pitch: 0.082, ids: ['sake', 'sake', 'sake', 'sake', 'beer', 'beer', 'beer', 'beer', 'beer'] },
+    { y: 0.47, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
     { y: 0.74, pitch: 0.07, ids: ['highball', 'highball', 'highball', 'highball', 'highball', 'chuhai', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
-    { y: 1.01, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'highball'] },
-    { y: 1.28, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'highball', 'highball', 'highball'] },
+    { y: 1.01, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'highball', 'highball'] },
+    { y: 1.28, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'highball', 'highball', 'highball'] },
   ] },
 ]
 /** which fridge a drink lives in */

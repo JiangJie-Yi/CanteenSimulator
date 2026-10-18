@@ -1324,7 +1324,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
   const clock = useRef(0)
   const objs = useRef(new Map<string, THREE.Group>())
   const shelves = FRIDGE_UNITS[n].shelves
-  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.04)
+  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.09)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
   useFrame((_, dt) => {
     if (seen.current !== FRIDGE_STOCK.ver) {
@@ -1412,6 +1412,12 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
           <DrinkBottle id={id} />
         </group>
       )))}
+      {/* (and a rank behind each, stood a little further back: a shelf of drinks is never one deep) */}
+      {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
+        <group key={`b${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? 0.012 : -0.012), slotAt(r, k).y, slotAt(r, k).z - 0.1]}>
+          <DrinkBottle id={id} />
+        </group>
+      )))}
       {/* (what's been taken out, stood on the floor before the fridge) */}
       {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
         <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
@@ -1424,7 +1430,13 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
 }
 /** a bottle of one of the drinks, standing (its foot at the origin): its glass or can, its label printed round it,
  * its neck and cap */
+/** how much bigger each drink stands than it's modelled, to be the size it is in a shop (a 350 ml can is 12 cm tall) */
+const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.08, sake: 1.12, oolong: 1.12, ramune: 1.3, beerCan: 1.38, highball: 1.38, coffee: 1.38, greenTea: 1.32,
+  cola: 1.32, yakult: 1.12, sports: 1.32, milk: 1.3, chuhai: 1.38 }
 export function DrinkBottle({ id }: { id: DrinkId }) {
+  return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} /></group>
+}
+function DrinkBottleRaw({ id }: { id: DrinkId }) {
   const d = DRINKS.find((x) => x.id === id)!
   const look = BOTTLE_LOOK[id]
   // (turned so its label's name faces +z)
@@ -1762,9 +1774,8 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
         <group position-x={0.21} rotation-y={0.4}><SakeBarrel /></group>
         <group position-y={0.43} rotation-y={-0.2}><SakeBarrel /></group>
       </group>
-      {/* plants about the room: bamboo at the end of the side counter's back wall; a willow by
-          the sake barrels in the front corner; bamboo either side of the till's end, by the door */}
-      <group position={at(-4.25, 3.7)}><PottedBamboo /></group>
+      {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
+          (none against the side wall: the two drinks fridges stand there) */}
       <group position={at(3.62, 2.25)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       <group position={at(2.3, 3.72)} rotation-y={0.4}><PottedBamboo /></group>
       <group position={at(1.45, 0.62)} rotation-y={face}><BottleCrates /></group>
