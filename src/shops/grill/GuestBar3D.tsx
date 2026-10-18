@@ -15,6 +15,7 @@ import { brushText, followSign, signTexture } from '@/scene/signFont'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel } from '@/scene/inkHull'
+import { Later } from '@/scene/Later'
 import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
@@ -1478,7 +1479,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               {/* (and past the bar's end, a strip more behind the till for the cashier to stand on; a shop laid out
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} drop={KITCHEN_DROP / scale} />}
-              {given && <ShopProps counters={counters} lang={lang} />}
+              {given && <Later stage={2}><ShopProps counters={counters} lang={lang} /></Later>}
               {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} altar={incense ?? true} corner />}
             </group>
           )
@@ -1527,9 +1528,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           )
         })
       })()}
-      {fridges && fridges.map((f) => (
+      {fridges && <Later stage={2}>{fridges.map((f) => (
         <group key={f.n} name={f.n ? 'look-fridge-b' : 'look-fridge'} position={f.at} rotation-y={f.yaw}><DrinkFridge n={f.n} /><FridgeStock n={f.n} /><FridgeDoor n={f.n} /></group>
-      ))}
+      ))}</Later>}
       {/* what each has fetched from the fridge, stood beside their plate, toward the cook */}
       {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => {
         const st = seats[s.seat], c = counters[st.counter]
@@ -1577,6 +1578,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <Plate dirty={r.phase === 'clear'} />
         </group>
       ))}
+      <Later stage={3}>
       {servers.slice(0, homes.length).map((w, i) => (
         <group key={w.id} ref={(o) => { waiterObjs.current[i] = o }} position={homes[i].at} rotation-y={homes[i].yaw} scale={PEOPLE_SCALE}>
           <BlobShadow r={0.17} />
@@ -1605,6 +1607,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           </group>
         )
       })}
+      </Later>
     </group>
   )
 }
