@@ -343,12 +343,13 @@ export function kitchenOf(cs: Counter[]) {
 export function kitchenGatesOf(cs: Counter[]) {
   const c0 = cs[0], c1 = cs[1]
   const g0 = gateOf(c0, BAR_GATES[0])
-  const a = [g0.hinge, g0.hinge + BAR_GATES[0].end * BAR_GATES[0].leaf].sort((p, q) => p - q) as [number, number]
+  // (the way through is the gap in the base, from the hinge's post to the counter's end: its width w, not the door leaf's)
+  const a = [g0.hinge, g0.hinge + BAR_GATES[0].end * BAR_GATES[0].w].sort((p, q) => p - q) as [number, number]
   let side: [number, number] | null = null
   if (c1 && BAR_GATES[1]) {
     const g1 = gateOf(c1, BAR_GATES[1])
     const at = (s: number) => c1.at.clone().addScaledVector(c1.along, s).sub(c0.at).dot(c0.lay)
-    side = [at(g1.hinge), at(g1.hinge + BAR_GATES[1].end * BAR_GATES[1].leaf)].sort((p, q) => p - q) as [number, number]
+    side = [at(g1.hinge), at(g1.hinge + BAR_GATES[1].end * BAR_GATES[1].w)].sort((p, q) => p - q) as [number, number]
   }
   return { first: a, side }
 }

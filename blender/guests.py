@@ -2371,16 +2371,27 @@ rig.parent = root
 
 # (light enough for a dozen at a time: the hair and the things on it, built up of many locks and lumps, are cut down
 # to about BUDGET triangles each; seen this small, toon-shaded, nobody can tell)
-BUDGET = {"hair": 2400, "pin": 500, "band": 700, "hat": 700, "toque": 700, "wacap": 600, "workcap": 600}
+BUDGET = {"hair": 1300, "pin": 300, "band": 400, "hat": 450, "toque": 450, "wacap": 400, "workcap": 400}
+# (and the rest, for a web game: each part cut to a share of its triangles, the body and head to about half; flat-shaded in toon
+# colours at this size, the silhouette is what shows, and it holds. Parts under SMALL triangles are left as they are.)
+SHARE = {"body": 0.5, "head": 0.5, "eyes": 0.45, "eyesJoy": 0.45, "eyesShut": 0.6, "cuffs": 0.4, "glasses": 0.5, "hem": 0.5, "skirt": 0.5,
+         "details": 0.5, "mouth": 0.6, "mouthJoy": 0.5, "mouthOpen": 0.5, "mouthMad": 0.6, "mouthSad": 0.6, "face": 0.6, "browsSad": 0.6,
+         "robe": 0.6, "apron": 0.6, "belt": 0.6}
+SMALL = 260
 for o in list(COL.objects):
     if o.type != "MESH":
         continue
     part = o.name.split(".")[1].split("_")[0] if "." in o.name else ""
     tris = sum(len(p.vertices) - 2 for p in o.data.polygons)
+    ratio = None
     if part in BUDGET and tris > BUDGET[part]:
+        ratio = BUDGET[part] / tris
+    elif part in SHARE and tris > SMALL:
+        ratio = SHARE[part]
+    if ratio is not None:
         bpy.context.view_layer.objects.active = o
         m = o.modifiers.new("Lighter", "DECIMATE")
-        m.ratio = BUDGET[part] / tris
+        m.ratio = ratio
         bpy.ops.object.modifier_move_to_index(modifier="Lighter", index=0)
         bpy.ops.object.modifier_apply(modifier="Lighter")
 
