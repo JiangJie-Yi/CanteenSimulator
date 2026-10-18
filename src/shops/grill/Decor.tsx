@@ -2,10 +2,12 @@
 // charcoal), a paper fan by the seasonings (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
 // glowing behind the stones, which can be moved about like the dishes. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
 // them like anything else (DECOR is their footprint, for its settle()).
-import { useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
+import { Steam } from '@/scene/Steam'
+import { glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { ALONG, GRILL_OFFSET, KITCHEN_DROP } from './bar'
 
@@ -345,7 +347,7 @@ const STAVES = (() => {
   return t
 })()
 const RICE_GEO = {
-  tub: new THREE.CylinderGeometry(0.27, 0.255, 0.3, 32, 1, false),
+  tub: new THREE.CylinderGeometry(0.27, 0.255, 0.42, 32, 1, false),
   lidTop: new THREE.CylinderGeometry(0.255, 0.285, 0.035, 32),
   ear: new THREE.BoxGeometry(0.1, 0.12, 0.05),
   band: new THREE.TorusGeometry(0.268, 0.01, 6, 40),
@@ -365,6 +367,18 @@ const RICE_GEO = {
  */
 function RiceTub() {
   const [x, z] = DECOR.rice.at
+  // (the lid: on the tub, or lifted off and leant against its side; click the tub to lift it or put it back. Open, the rice shows,
+  // steaming, with its paddle in it)
+  const [open, setOpen] = useState(false)
+  const lid = useRef<THREE.Group>(null)
+  const lidT = useRef(0)
+  useFrame((_, dt) => {
+    lidT.current = THREE.MathUtils.clamp(lidT.current + (open ? 1 : -1) * Math.min(dt, 0.1) * 2.2, 0, 1)
+    const k = lidT.current * lidT.current * (3 - 2 * lidT.current)
+    if (!lid.current) return
+    lid.current.position.set(-0.32 * k, 0.4375 - 0.1585 * k + Math.sin(k * Math.PI) * 0.22, 0)
+    lid.current.rotation.z = k * 1.36
+  })
   const g = RICE_GEO
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const legH = SIDE_TOP - 0.05 - floor
@@ -391,23 +405,41 @@ function RiceTub() {
           <meshToonMaterial color="#e8e2d2" />
         </mesh>
       ))}
-      <group position-y={SIDE_TOP} scale={RICE_SCALE}>
-        {/* the tub: pale staves, its lid on (its bar across the top), an ear at each side to lift it by, and a band of woven cane
-            round the lower body */}
-        <Inked geometry={g.tub} color="#ffffff" map={STAVES} position={[0, 0.15, 0]} grow={1.03} />
-        <Inked geometry={g.lidTop} color="#ffffff" map={STAVES} position={[0, 0.3175, 0]} grow={1.05} />
-        <mesh geometry={g.slab} position={[0, 0.355, 0]} scale={[0.22, 0.03, 0.05]} castShadow><meshToonMaterial color="#e0a868" /></mesh>
-        <mesh geometry={g.slab} position={[0, 0.34, 0]} scale={[0.19, 0.03, 0.03]}><meshToonMaterial color="#d09858" /></mesh>
+      <group position-y={SIDE_TOP} scale={RICE_SCALE}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v) }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; glowOnly(e.eventObject) }}
+        onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null) }}>
+        {/* the tub: pale staves, an ear at each side to lift it by, a band of woven cane round the lower body, and its lid (a bar across
+            the top) */}
+        <Inked geometry={g.tub} color="#ffffff" map={STAVES} position={[0, 0.21, 0]} grow={1.03} />
+        <group ref={lid} position={[0, 0.4375, 0]}>
+          <Inked geometry={g.lidTop} color="#ffffff" map={STAVES} grow={1.05} />
+          <mesh geometry={g.slab} position={[0, 0.0375, 0]} scale={[0.22, 0.03, 0.05]} castShadow><meshToonMaterial color="#e0a868" /></mesh>
+          <mesh geometry={g.slab} position={[0, 0.022, 0]} scale={[0.19, 0.03, 0.03]}><meshToonMaterial color="#d09858" /></mesh>
+        </group>
         {[-1, 1].map((sd) => (
-          <group key={sd} position={[sd * 0.285, 0.265, 0]} rotation-z={-sd * 0.22}>
+          <group key={sd} position={[sd * 0.285, 0.365, 0]} rotation-z={-sd * 0.22}>
             <Inked geometry={g.ear} color="#ffffff" map={STAVES} grow={1.06} />
           </group>
         ))}
-        {[0.075, 0.095, 0.115].map((y, k) => (
+        {[0.1, 0.12, 0.14].map((y, k) => (
           <mesh key={y} geometry={g.band} position-y={y} rotation={[Math.PI / 2 + (k - 1) * 0.05, 0, 0]}>
             <meshToonMaterial color={k === 1 ? '#c2a368' : '#a98a52'} />
           </mesh>
         ))}
+        {open && (
+          <>
+            {/* the rice, heaped a little over the rim, the paddle stood in it */}
+            <mesh geometry={g.rice} position-y={0.42} scale={[1, 0.55, 1]}>
+              <meshToonMaterial color="#fbf8f0" />
+            </mesh>
+            <group position={[0.08, 0.57, -0.04]} rotation={[0.25, 0, -0.35]}>
+              <mesh geometry={g.paddle} position-y={0.06}><meshToonMaterial color="#e2c89a" /></mesh>
+              <mesh geometry={g.blade} position-y={-0.12} scale={[1, 1.3, 0.25]}><meshToonMaterial color="#e2c89a" /></mesh>
+            </group>
+            <Steam position={[0, 0.5, 0]} width={0.4} height={0.55} opacity={0.32} layers={2} />
+          </>
+        )}
       </group>
     </group>
   )
