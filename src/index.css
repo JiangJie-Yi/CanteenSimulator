@@ -5930,16 +5930,11 @@ button {
   stroke: rgb(40 25 15 / 0.6);
   stroke-width: 1;
 }
-/* (the eye, in the board's own wood: a dark cut ring round a lighter wooden centre, a dark brown pupil) */
+/* (the eye: a solid disc in the same colour as the painted rule round the board's edge) */
 .brand-fish .brand-fish-ring {
-  fill: #a9814f;
-  stroke: #2a170a;
-  stroke-width: 1.4;
-  opacity: 1;
-}
-.brand-fish .brand-fish-pupil {
-  fill: #3a2210;
+  fill: var(--plate-cream);
   stroke: none;
+  opacity: 0.95;
 }
 
 /* (the nails holding it up: one through its head, one by its tail) */

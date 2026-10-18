@@ -125,24 +125,27 @@ export function toiletsOf(cs: Counter[]) {
   }
   return { door, m: one(-1), f: one(1) }
 }
-/** the drinks fridge against the side counter's wall, just along from the toilets: where it stands (along that
- * counter, and out from its middle line), the way it faces, and the spot before it where a customer helps themselves */
-export function fridgeOf(cs: Counter[]) {
+/** the two drinks fridges against the side counter's wall, just along from the toilets, side by side: where each stands
+ * (along that counter, and out from its middle line), the way it faces, and the spot before it where a customer helps themselves */
+export function fridgesOf(cs: Counter[]) {
   const t = toiletsOf(cs)
   if (!t) return null
   const c = cs[1]
-  // (clear of where the men's door slides open)
-  const z = t.m.z - WC_W / 2 - 0.06 - WC_SLIDE - FRIDGE.W / 2 - 0.1
-  const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
+  // (the first clear of where the men's door slides open, the second on along the wall from it)
+  const z0 = t.m.z - WC_W / 2 - 0.06 - WC_SLIDE - FRIDGE.W / 2 - 0.1
   // (the door's hinged on the fridge's own left, and swings out that side: whoever's helping themselves stands a little right of
   // its middle, clear of it; the fridge's own +x is (lay.z, -lay.x) in this frame)
   const side = new THREE.Vector3(c.lay.z, 0, -c.lay.x).multiplyScalar(0.17)
-  return { z, at: at(farOf(c) + FRIDGE.D / 2 + 0.01), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE.D + 0.34).add(side), aisle: at(-AISLE) }
+  return [0, 1].map((n) => {
+    const z = z0 - n * (FRIDGE.W + 0.14)
+    const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
+    return { n, z, at: at(farOf(c) + FRIDGE.D / 2 + 0.01), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE.D + 0.34).add(side), aisle: at(-AISLE) }
+  })
 }
 /** the fridge's size: across, up, deep */
 export const FRIDGE = { W: 0.84, H: 1.72, D: 0.52 }
-/** the fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
-export const FRIDGE_STATE = { passing: 0, open: false }
+/** each fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
+export const FRIDGE_STATE = [{ passing: 0, open: false }, { passing: 0, open: false }]
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridge?: typeof FRIDGE_STATE }).__fridge = FRIDGE_STATE
 /** what's in it, and what each costs (NT$) */
 export const DRINKS = [
@@ -159,61 +162,103 @@ export const DRINKS = [
   { id: 'cola', zh: '可樂', ja: 'コーラ', price: 40, color: '#4a2414', cap: '#c4302a', glass: false, shape: 'can', label: ['#b8201c', '#ffffff', 'コーラ'] },
   // the little bottles of cultured milk drink
   { id: 'yakult', zh: '養樂多', ja: '乳酸菌飲料', price: 20, color: '#f2ece0', cap: '#c4302a', glass: false, shape: 'small', label: ['#f2ece0', '#c4302a', '乳酸菌'] },
+  // a sports drink in its plastic bottle, the glass milk bottle with its paper cap, a chuhai in a can
+  { id: 'sports', zh: '運動飲料', ja: 'スポーツドリンク', price: 50, color: '#a8d8ee', cap: '#1f6fb8', glass: true, shape: 'bottle', label: ['#f4f9fc', '#1f6fb8', 'スポーツ'] },
+  { id: 'milk', zh: '牛奶', ja: '牛乳', price: 45, color: '#f6f2e6', cap: '#f4efe2', glass: true, shape: 'bottle', label: ['#f4f0e4', '#3a6ab0', '牛乳'] },
+  { id: 'chuhai', zh: '酎沙瓦', ja: 'チューハイ', price: 90, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#f6b8c4', '#ffffff', 'チューハイ'] },
 ] as const
 export type DrinkId = (typeof DRINKS)[number]['id']
 /**
- * What stands in the drinks fridge: each shelf (bottom up) is a row of places, each holding a drink or nothing (taken).
- * A customer who takes a drink empties a place (the last of that kind along its shelf); the shop restocks one place at a
- * time after a while; and the player can drag any drink to another place (an empty one, or swapping with what's there).
- * `ver` goes up with every change, for the drawing to follow.
+ * The two fridges: the ordinary drinks (teas, cola, a sports drink, milk, coffee, cultured milk) in the first, the
+ * alcohol (sake and beer in bottles, beer, highballs and chuhai in cans) in the second. Each shelf, bottom up, is a row
+ * of places, the big bottles low; the unit a drink lives in is where a customer goes for it.
  */
-export const FRIDGE_HOME: { y: number; pitch: number; ids: DrinkId[] }[] = [
-  // the big bottles at the bottom
-  { y: 0.2, pitch: 0.094, ids: ['beer', 'beer', 'beer', 'sake', 'sake', 'sake', 'oolong', 'oolong'] },
-  { y: 0.47, pitch: 0.078, ids: ['ramune', 'ramune', 'ramune', 'cola', 'cola', 'cola', 'cola', 'cola', 'cola'] },
-  { y: 0.74, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'coffee', 'coffee', 'coffee'] },
-  { y: 1.01, pitch: 0.07, ids: ['greenTea', 'greenTea', 'greenTea', 'greenTea', 'coffee', 'coffee', 'coffee', 'coffee'] },
-  { y: 1.28, pitch: 0.062, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult'] },
+export const FRIDGE_UNITS: { sign: [string, string]; shelves: { y: number; pitch: number; ids: DrinkId[] }[] }[] = [
+  { sign: ['飲料', 'ドリンク'], shelves: [
+    { y: 0.2, pitch: 0.082, ids: ['oolong', 'oolong', 'oolong', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
+    { y: 0.47, pitch: 0.078, ids: ['cola', 'cola', 'cola', 'cola', 'ramune', 'ramune', 'ramune', 'ramune'] },
+    { y: 0.74, pitch: 0.07, ids: ['milk', 'milk', 'milk', 'milk', 'milk', 'coffee', 'coffee', 'coffee', 'coffee', 'coffee'] },
+    { y: 1.01, pitch: 0.07, ids: ['coffee', 'coffee', 'coffee', 'greenTea', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
+    { y: 1.28, pitch: 0.062, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult'] },
+  ] },
+  { sign: ['酒類', 'お酒'], shelves: [
+    { y: 0.2, pitch: 0.085, ids: ['sake', 'sake', 'sake', 'sake', 'beer', 'beer', 'beer', 'beer', 'beer'] },
+    { y: 0.47, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
+    { y: 0.74, pitch: 0.07, ids: ['highball', 'highball', 'highball', 'highball', 'highball', 'chuhai', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
+    { y: 1.01, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'highball'] },
+    { y: 1.28, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'highball', 'highball', 'highball'] },
+  ] },
 ]
+/** which fridge a drink lives in */
+export const fridgeUnitOf = (id: DrinkId) => Math.max(0, FRIDGE_UNITS.findIndex((u) => u.shelves.some((sh) => sh.ids.includes(id))))
+/**
+ * What stands in the fridges: each place holds a drink or nothing (taken); drinks the player's taken out stand on the floor
+ * before their fridge. A customer who takes a drink empties a place (the last of that kind in its fridge); the shop puts
+ * one back after a while; and the player can drag any drink to another place in the same fridge (an empty one, or
+ * swapping), or out onto the floor, and back in again. `ver` goes up with every change, for the drawing to follow.
+ */
 export const FRIDGE_STOCK = {
-  slots: FRIDGE_HOME.map((r) => [...r.ids] as (DrinkId | null)[]),
+  units: FRIDGE_UNITS.map((u) => u.shelves.map((sh) => [...sh.ids] as (DrinkId | null)[])),
+  out: [] as { id: DrinkId; unit: number; x: number; z: number }[],
   ver: 0,
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stock?: typeof FRIDGE_STOCK }).__stock = FRIDGE_STOCK
 /** a customer takes a drink: the last place holding one of that kind is emptied (any kind at all if it's run out) */
 export function takeDrink(id: DrinkId) {
-  const rows = FRIDGE_STOCK.slots
-  for (const want of [id, null as DrinkId | null]) {
-    for (let r = rows.length - 1; r >= 0; r--) {
-      for (let k = rows[r].length - 1; k >= 0; k--) {
-        if (want ? rows[r][k] === want : rows[r][k]) {
-          rows[r][k] = null
-          FRIDGE_STOCK.ver++
-          return
+  const home = fridgeUnitOf(id)
+  for (const u of [home, ...FRIDGE_STOCK.units.map((_, i) => i).filter((i) => i !== home)]) {
+    const rows = FRIDGE_STOCK.units[u]
+    for (const want of [id, null as DrinkId | null]) {
+      for (let r = rows.length - 1; r >= 0; r--) {
+        for (let k = rows[r].length - 1; k >= 0; k--) {
+          if (want ? rows[r][k] === want : rows[r][k]) {
+            rows[r][k] = null
+            FRIDGE_STOCK.ver++
+            return
+          }
         }
       }
     }
+    if (u === home) break
   }
 }
-/** the shop puts back one drink where one's been taken (the first empty place, its own kind) */
-export function restockDrink() {
-  for (let r = 0; r < FRIDGE_HOME.length; r++) {
-    const k = FRIDGE_STOCK.slots[r].findIndex((x) => x === null)
+/** the shop puts back one drink in a fridge where one's been taken (the first empty place, its own kind) */
+export function restockDrink(unit: number) {
+  const rows = FRIDGE_STOCK.units[unit]
+  for (let r = 0; r < rows.length; r++) {
+    const k = rows[r].findIndex((x) => x === null)
     if (k >= 0) {
-      FRIDGE_STOCK.slots[r][k] = FRIDGE_HOME[r].ids[k]
+      rows[r][k] = FRIDGE_UNITS[unit].shelves[r].ids[k]
       FRIDGE_STOCK.ver++
       return true
     }
   }
   return false
 }
-/** the player moves a drink from one place to another (swapping with what's there, if anything) */
-export function moveDrink(from: [number, number], to: [number, number]) {
-  const rows = FRIDGE_STOCK.slots
+/** the player moves a drink from one place to another in a fridge (swapping with what's there, if anything) */
+export function moveDrink(unit: number, from: [number, number], to: [number, number]) {
+  const rows = FRIDGE_STOCK.units[unit]
   const a = rows[from[0]][from[1]]
   rows[from[0]][from[1]] = rows[to[0]][to[1]]
   rows[to[0]][to[1]] = a
   FRIDGE_STOCK.ver++
+}
+/** the player takes a drink out of a fridge and stands it on the floor before it (x across, z out from it) */
+export function pullOut(unit: number, from: [number, number], x: number, z: number) {
+  const id = FRIDGE_STOCK.units[unit][from[0]][from[1]]
+  if (!id) return
+  FRIDGE_STOCK.units[unit][from[0]][from[1]] = null
+  FRIDGE_STOCK.out.push({ id, unit, x, z })
+  FRIDGE_STOCK.ver++
+}
+/** and puts one back, into an empty place */
+export function putBack(index: number, unit: number, to: [number, number]) {
+  const o = FRIDGE_STOCK.out[index]
+  if (!o || FRIDGE_STOCK.units[unit][to[0]][to[1]]) return false
+  FRIDGE_STOCK.units[unit][to[0]][to[1]] = o.id
+  FRIDGE_STOCK.out.splice(index, 1)
+  FRIDGE_STOCK.ver++
+  return true
 }
 
 /** what each kind of customer takes from the fridge: the children a ramune, the old folk tea, the rest any */

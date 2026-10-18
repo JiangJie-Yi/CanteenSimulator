@@ -6,7 +6,7 @@ import * as THREE from 'three'
  */
 export const SIGN_FONT = '"Zen Antique", "Noto Serif TC", "Noto Serif JP", serif'
 /** every character the signs set in it (kept in step with the font request in index.html) */
-export const SIGN_CHARS = '聞野炭火銘酒男女廁飲料お手洗い会計結帳生ビール清酒烏龍茶ラムネ缶ハイボール珈琲茶コーラ乳酸菌紀州備長炭千萬兩ごみ屑食堂麵包鼎沸いらっしゃいませ甲粗飽深夜燒烤魚日式令¥0123456789ドリンク·MENWO'
+export const SIGN_CHARS = '聞野炭火銘酒男女廁飲料お手洗い会計結帳生ビール清酒烏龍茶ラムネ缶ハイボール珈琲茶コーラ乳酸菌紀州備長炭千萬兩ごみ屑食堂麵包鼎沸いらっしゃいませ甲粗飽深夜燒烤魚日式令¥0123456789ドリンク·MENWO類牛スポツチュ'
 
 type Painted = { c: HTMLCanvasElement; draw: (g: CanvasRenderingContext2D, w: number, h: number) => void; tex: THREE.CanvasTexture }
 const painted: Painted[] = []

@@ -12,7 +12,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { GuestView, Step } from '@/game/types'
 import { GAME_SPEED } from '@/scene/speed'
 import { drinkFor, GRILL_SEATS, type DrinkId } from './bar'
-import { COAL_GLOW, COAL_STICKS, DEFS, FIRE_LIFE, FoodArt, Fridge, NET, COAL_X, COAL_Y, PIT_ART, PIT_X, PIT_Y, Plate, Soup, TABLE, Tag, ToolIcon, Tray, VIEW_H, VIEW_W } from './Grill2DArt'
+import { COAL_GLOW, COAL_STICKS, DEFS, FIRE_LIFE, FoodArt, NET, COAL_X, COAL_Y, PIT_ART, PIT_X, PIT_Y, Plate, Soup, TABLE, Tag, ToolIcon, Tray, VIEW_H, VIEW_W } from './Grill2DArt'
 
 const EAT_SECONDS = 3
 const PATIENCE = 150
@@ -113,7 +113,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
   const [pops, setPops] = useState<{ id: number; key: string; text: string; good: boolean }[]>([])
   const popId = useRef(0)
   /** the drink just taken from the fridge (its shelf lights up a moment) */
-  const [taken, setTaken] = useState<{ id: DrinkId; at: number } | null>(null)
+  const [, setTaken] = useState<{ id: DrinkId; at: number } | null>(null)
 
   const present = (p: Piece) => !menuIds.has(p.id) || p.copy < (live.current.quantities[p.id] ?? 0)
   const tasteOf = (p: Piece) => {
@@ -539,7 +539,6 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
             </g>
           )
         })}
-        <Fridge x={406} taken={taken && performance.now() - taken.at < 1500 ? taken.id : null} lang={lang} />
       </svg>
       {/* the seasonings: pick one, then tap the food to put it on (tap it again to put it down) */}
       <div className="grill2d-tools">

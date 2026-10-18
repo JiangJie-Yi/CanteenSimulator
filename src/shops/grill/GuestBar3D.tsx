@@ -18,7 +18,7 @@ import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgeOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -747,7 +747,7 @@ function Counter({ length }: { length: number }) {
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcBack'; t: number
   /** (off to the toilet, or to the fridge for a drink) where, and the way there from their stool; told to go home
    * meanwhile, they do once they're back */
-  wc?: { who: 'm' | 'f' | 'drink'; path: THREE.Vector3[]; len: number }
+  wc?: { who: 'm' | 'f' | 'drink'; path: THREE.Vector3[]; len: number; unit?: number; pick?: DrinkId }
   /** what they've fetched from the fridge, stood by their plate */
   drink?: DrinkId
   leaving?: boolean
@@ -852,7 +852,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const counters = useMemo(() => given ?? singleCounter(at, length), [given, at, length])
   const seats = useMemo(() => seatsOf(counters), [counters])
   const wcs = useMemo(() => (given ? toiletsOf(counters) : null), [counters, given])
-  const fridge = useMemo(() => (given ? fridgeOf(counters) : null), [counters, given])
+  const fridges = useMemo(() => (given ? fridgesOf(counters) : null), [counters, given])
   /** a couple sat side by side turn to talk: the one at the next stool along is on the left (+1), the one before on
    * the right (-1); 0 while the other isn't sat there yet (or has gone) */
   const talkSide = (s: Shown) => {
@@ -1007,7 +1007,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SERVICE.carried.clear()
     SEATS_TAKEN.clear()
     PLATES_SET.clear()
-    FRIDGE_STATE.passing = 0
+    for (const f of FRIDGE_STATE) f.passing = 0
     TOILETS.m.passing = 0
     TOILETS.f.passing = 0
     redraw()
@@ -1067,10 +1067,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (g) g.rotation.y = st.yaw
         // (now and then, while they wait, off to the toilet: their kind's own)
         const guest = guestsRef.current.find((x) => x.id === s.id)
-        if (fridge && guest?.state === 'waiting' && !s.drink && Math.random() < drinkRate() * Math.min(dt, 0.1)) {
+        if (fridges && guest?.state === 'waiting' && !s.drink && Math.random() < drinkRate() * Math.min(dt, 0.1)) {
+          // (they choose what they want, and go to the fridge it's in)
+          const pick = drinkFor(kindOf(s.id).kind, s.id)
+          const fr = fridges[fridgeUnitOf(pick)]
           const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
-          const path = [st.stool.clone(), st.aisle.clone(), ...turn, fridge.aisle.clone(), fridge.front.clone()]
-          s.wc = { who: 'drink', path, len: pathLength(path) }
+          const path = [st.stool.clone(), st.aisle.clone(), ...turn, fr.aisle.clone(), fr.front.clone()]
+          s.wc = { who: 'drink', path, len: pathLength(path), unit: fr.n, pick }
           s.phase = 'wcGo'
           s.t = 0
         } else if (wcs && guest?.state === 'waiting' && Math.random() < WC_RATE * Math.min(dt, 0.1)) {
@@ -1095,10 +1098,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       } else if (s.phase === 'wcIn') {
         // (at the fridge: facing it, choosing; then their drink in hand, back to their stool)
-        if (s.wc?.who === 'drink' && g && fridge) g.rotation.y = fridge.yaw + Math.PI
+        if (s.wc?.who === 'drink' && g && fridges) g.rotation.y = fridges[s.wc.unit ?? 0].yaw + Math.PI
         if (s.t > (s.wc?.who === 'drink' ? DRINK_STAY : WC_STAY)) {
           if (s.wc?.who === 'drink' && !s.drink) {
-            s.drink = drinkFor(kindOf(s.id).kind, s.id)
+            s.drink = s.wc.pick ?? drinkFor(kindOf(s.id).kind, s.id)
             takeDrink(s.drink)
             onDrink?.(s.id, s.drink)
             redraw()
@@ -1150,8 +1153,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
     }
     // the fridge's door opens for whoever's at it (as they come up to it, while they take their drink, as they leave it)
-    FRIDGE_STATE.passing = fridge ? shown.filter((x) => x.wc?.who === 'drink' && (x.phase === 'wcIn'
-      || ((x.phase === 'wcGo' || x.phase === 'wcBack') && (groups.current.get(x.id)?.position.distanceTo(fridge.front) ?? 9) < 0.7))).length : 0
+    if (fridges) for (const fr of fridges) {
+      FRIDGE_STATE[fr.n].passing = shown.filter((x) => x.wc?.who === 'drink' && (x.wc.unit ?? 0) === fr.n && (x.phase === 'wcIn'
+        || ((x.phase === 'wcGo' || x.phase === 'wcBack') && (groups.current.get(x.id)?.position.distanceTo(fr.front) ?? 9) < 0.7))).length
+    }
     // the toilets' doors open for whoever's going through them just now
     if (wcs) for (const who of ['m', 'f'] as const) {
       TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack' || x.phase === 'wcIn')
@@ -1403,7 +1408,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
             {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lamps={2} top={top} door={wcs?.door ?? (meet + corner) / 2}
-              clear={fridge ? [[fridge.z - FRIDGE.W / 2 - 0.1, fridge.z + FRIDGE.W / 2 + 0.1]] : undefined} />}
+              clear={fridges ? fridges.map((f) => [f.z - FRIDGE.W / 2 - 0.1, f.z + FRIDGE.W / 2 + 0.1] as [number, number]) : undefined} />}
           </group>
         )
       })}
@@ -1439,7 +1444,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           )
         })
       })()}
-      {fridge && <group name="look-fridge" position={fridge.at} rotation-y={fridge.yaw}><DrinkFridge /><FridgeStock /><FridgeDoor /></group>}
+      {fridges && fridges.map((f) => (
+        <group key={f.n} name={f.n ? 'look-fridge-b' : 'look-fridge'} position={f.at} rotation-y={f.yaw}><DrinkFridge n={f.n} /><FridgeStock n={f.n} /><FridgeDoor n={f.n} /></group>
+      ))}
       {/* what each has fetched from the fridge, stood beside their plate, toward the cook */}
       {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => {
         const st = seats[s.seat], c = counters[st.counter]

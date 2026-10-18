@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { brushText, signTexture } from '@/scene/signFont'
-import { DRINKS, FRIDGE, FRIDGE_HOME, FRIDGE_STATE, FRIDGE_STOCK, moveDrink, restockDrink, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
+import { DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, pullOut, putBack, restockDrink, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Steam } from '@/scene/Steam'
 
@@ -226,6 +226,82 @@ function Nobori({ i }: { i: number }) {
         </mesh>
         <mesh geometry={NOBORI_GEO.weight} position={[-0.006, -NOBORI_H - 0.04, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#2a1a10" /></mesh>
       </group>
+    </group>
+  )
+}
+
+/**
+ * The banners strung overhead as an izakaya hangs them: a rope along the wall's aisle, a close row of narrow banners of every
+ * colour hung from it, each swinging a little on its own.
+ */
+function BannerRow({ zs }: { zs: number[] }) {
+  const refs = useRef<(THREE.Group | null)[]>([])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    refs.current.forEach((g, i) => {
+      if (!g) return
+      g.rotation.x = Math.sin(t * 0.9 + i * 1.3) * 0.05
+      g.rotation.z = Math.sin(t * 0.7 + i) * 0.04
+    })
+  })
+  const z0 = zs[0], z1 = zs[zs.length - 1]
+  return (
+    <group>
+      <mesh position={[0, 0, (z0 + z1) / 2]} rotation-x={Math.PI / 2}>
+        <cylinderGeometry args={[0.004, 0.004, z1 - z0 + 0.3, 5]} /><meshBasicMaterial color="#2a1a10" />
+      </mesh>
+      {zs.map((z, i) => {
+        const len = 0.44 + 0.07 * ((i * 7) % 3)
+        return (
+          <group key={i} position={[0, 0, z]} ref={(g) => { refs.current[i] = g }}>
+            <mesh position={[0, -0.01, 0]}><boxGeometry args={[0.012, 0.02, 0.17]} /><meshToonMaterial color="#e8dcc0" /></mesh>
+            <mesh position={[0, -len / 2 - 0.02, 0]} rotation-y={-Math.PI / 2}>
+              <planeGeometry args={[0.15, len]} />
+              <meshToonMaterial color="#ffffff" map={noboriTex((i * 5 + 3) % NOBORI_LOOKS.length)} side={THREE.DoubleSide} />
+            </mesh>
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
+/** a big signboard (看板) on the wall: a cream board with the word brushed down it in great black strokes, a red seal at its foot */
+const KANBAN_LOOKS = [{ text: '炭火燒烤', seal: '聞野' }, { text: '日式烤魚', seal: '聞野' }, { text: '深夜食堂', seal: '聞野' }, { text: '銘酒', seal: '酒' }]
+const kanbanCache = new Map<number, THREE.Texture | null>()
+const kanbanTex = (i: number) => {
+  if (!kanbanCache.has(i)) {
+    const look = KANBAN_LOOKS[i]
+    kanbanCache.set(i, signTexture(128, 320, (g) => {
+      g.fillStyle = '#ecd9a6'
+      g.fillRect(0, 0, 128, 320)
+      g.strokeStyle = 'rgba(120,80,30,0.16)'
+      for (let y = 0; y < 320; y += 4) {
+        g.beginPath()
+        g.moveTo(0, y + Math.sin(y * 0.3) * 1.5)
+        g.lineTo(128, y)
+        g.stroke()
+      }
+      g.strokeStyle = '#3a2416'
+      g.lineWidth = 5
+      g.strokeRect(5, 5, 118, 310)
+      const chars = [...look.text]
+      const size = chars.length > 2 ? 62 : 78
+      const gap = Math.min(size * 1.05, 230 / chars.length)
+      chars.forEach((ch, k) => brushText(g, ch, 64, 28 + size * 0.5 + k * gap, size, { fill: '#1a0d06', shadow: 'rgba(120,80,30,0.28)' }))
+      g.fillStyle = '#b8261c'
+      g.fillRect(40, 262, 48, 40)
+      brushText(g, look.seal, 64, 283, look.seal.length > 1 ? 18 : 26, { fill: '#fbf3e2' })
+    }))
+  }
+  return kanbanCache.get(i) ?? null
+}
+function Kanban({ i }: { i: number }) {
+  const W = 0.34, H = 0.82
+  return (
+    <group>
+      <mesh position-x={-0.012}><boxGeometry args={[0.024, H + 0.05, W + 0.05]} /><meshToonMaterial color="#2e1d12" /></mesh>
+      <mesh position-x={-0.026} rotation-y={-Math.PI / 2}><planeGeometry args={[W, H]} /><meshToonMaterial color="#ffffff" map={kanbanTex(i)} /></mesh>
     </group>
   )
 }
@@ -799,7 +875,9 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
       && (shrine === undefined || Math.abs(z - shrine) > 0.75) && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length],
         // (a banner every third place along the wall, in turn)
-        nobori: k % 3 === 2 ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined }))
+        nobori: k % 3 === 2 ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined,
+        // (and a big signboard every fifth, between)
+        kanban: k % 5 === 3 && k % 3 !== 2 ? Math.floor(k / 5 + start) % KANBAN_LOOKS.length : undefined }))
   }, [l, from, to, mid, shelfZ, c.length, door, shrine, shelf, clear])
   const frieze = useMemo(() => {
     if (!SEIGAIHA) return null
@@ -845,7 +923,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         <Box size={[0.03, 0.025, l]} color="#3a2416" position={[-0.01, WALL_H - 0.31, mid]} />
         {art.map((a) => (
           <group key={a.z} position={[0, a.scroll ? 1.42 : 1.5, a.z]}>
-            {a.nobori !== undefined ? null : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
+            {a.nobori !== undefined ? null : a.kanban !== undefined ? <Kanban i={a.kanban} /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
           </group>
         ))}
         {/* the toilets, the men's and the women's, side by side */}
@@ -878,6 +956,17 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         </group>
           </>}
         </StaticBatch>
+        {/* (the strings of banners overhead, clear of the altar, the fridges and the toilets' doors) */}
+        {(() => {
+          const zs: number[] = []
+          for (let z = from + 0.25; z < to - 0.25; z += 0.21) {
+            if (altar && Math.abs(z - shelfZ) < 0.62) continue
+            if (!isClear(z, 0.1)) continue
+            if (door !== undefined && Math.abs(z - door) < WC_W + 0.3) continue
+            zs.push(z)
+          }
+          return zs.length > 1 ? <group position={[-0.42, 2.18, 0]}><BannerRow zs={zs} /></group> : null
+        })()}
         {/* (the banners sway: not merged) */}
         {art.filter((a) => a.nobori !== undefined).map((a) => <group key={`n${a.z}`} position={[0, 1.08, a.z]}><Nobori i={a.nobori!} /></group>)}
         {/* (the toilets' doors slide: not merged) */}
@@ -997,7 +1086,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
  * The drinks fridge customers help themselves from: a dark cabinet with a glass door, lit inside, four shelves of
  * bottles (beer, sake, oolong tea, ramune), a lit sign over it, the door's long handle. Faces +z (out of the wall).
  */
-export function DrinkFridge() {
+export function DrinkFridge({ n = 0 }: { n?: number }) {
   const { W, H, D } = FRIDGE
   const rows = [0.2, 0.47, 0.74, 1.01, 1.28]
   return (
@@ -1019,7 +1108,7 @@ export function DrinkFridge() {
         </group>
       ))}
       {/* the lit sign on top, and the vents at its foot */}
-      <mesh position={[0, H + 0.1, D / 2 - 0.01]}><planeGeometry args={[W, 0.18]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGN} toneMapped={false} /></mesh>
+      <mesh position={[0, H + 0.1, D / 2 - 0.01]}><planeGeometry args={[W, 0.18]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGNS[n]} toneMapped={false} /></mesh>
       <Box size={[W, 0.19, 0.06]} color="#1c1d20" position={[0, H + 0.1, D / 2 - 0.045]} />
       {[0, 1, 2, 3].map((k) => <Box key={k} size={[W - 0.2, 0.012, 0.004]} color="#16171a" position={[0, 0.04 + k * 0.025, D / 2 + 0.002]} />)}
     </StaticBatch>
@@ -1030,15 +1119,15 @@ export function DrinkFridge() {
  * open (out into the room) when someone's at the fridge or when it's clicked, and shutting after; while it's open the cold
  * pours out of it in a low white mist.
  */
-export function FridgeDoor() {
+export function FridgeDoor({ n = 0 }: { n?: number }) {
   const { W, H, D } = FRIDGE
   const hinge = useRef<THREE.Group>(null)
   const open = useRef(0)
   const mist = useRef(0)
   // (the door's state lives outside React: leave it shut when the shop's let go, so it doesn't come back open)
-  useEffect(() => () => { FRIDGE_STATE.open = false; FRIDGE_STATE.passing = 0 }, [])
+  useEffect(() => () => { FRIDGE_STATE[n].open = false; FRIDGE_STATE[n].passing = 0 }, [n])
   useFrame((_, dt) => {
-    const want = FRIDGE_STATE.passing > 0 || FRIDGE_STATE.open ? 1 : 0
+    const want = FRIDGE_STATE[n].passing > 0 || FRIDGE_STATE[n].open ? 1 : 0
     open.current += Math.sign(want - open.current) * Math.min(Math.abs(want - open.current), Math.min(dt, 0.1) * 2.2)
     const e = open.current * open.current * (3 - 2 * open.current)
     if (hinge.current) hinge.current.rotation.y = -e * (Math.PI / 2)
@@ -1046,7 +1135,7 @@ export function FridgeDoor() {
   })
   return (
     <group>
-      <group ref={hinge} position={[-W / 2, 0, D / 2]} onClick={(ev) => { ev.stopPropagation(); FRIDGE_STATE.open = !FRIDGE_STATE.open }} {...handOver}>
+      <group ref={hinge} position={[-W / 2, 0, D / 2]} onClick={(ev) => { ev.stopPropagation(); FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...handOver}>
         <mesh position={[W / 2, H / 2 + 0.02, 0.004]}><planeGeometry args={[W - 0.06, H - 0.26]} />
           <meshBasicMaterial color="#cfe4f0" transparent opacity={0.16} depthWrite={false} side={THREE.DoubleSide} /></mesh>
         {[-1, 1].map((sd) => <Box key={sd} size={[0.035, H - 0.24, 0.025]} color="#3a3c42" position={[W / 2 + sd * (W / 2 - 0.03), H / 2 + 0.02, 0.01]} />)}
@@ -1062,11 +1151,12 @@ export function FridgeDoor() {
   )
 }
 /**
- * The fridge's drinks, each in its place on its shelf (FRIDGE_STOCK): one tidy row to a shelf, every label to the door.
- * Customers empty places as they take their drinks, the shop puts one back every so often, and with the door open any
- * drink can be dragged to another place (an empty one, or swapping with the drink there).
+ * A fridge's drinks, each in its place on its shelf (FRIDGE_STOCK): one tidy row to a shelf, every label to the door.
+ * Customers empty places as they take their drinks, the shop puts one back every so often, and any drink can be dragged,
+ * with the door open: to another place (an empty one, or swapping with the drink there), or right out onto the floor
+ * before the fridge, and back in again later.
  */
-export function FridgeStock() {
+export function FridgeStock({ n = 0 }: { n?: number }) {
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((st) => st.controls) as unknown as { enabled: boolean } | null
@@ -1074,75 +1164,102 @@ export function FridgeStock() {
   const seen = useRef(-1)
   const clock = useRef(0)
   const objs = useRef(new Map<string, THREE.Group>())
-  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (FRIDGE_HOME[r].ids.length - 1) / 2) * FRIDGE_HOME[r].pitch, FRIDGE_HOME[r].y, 0.04)
+  const shelves = FRIDGE_UNITS[n].shelves
+  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.04)
+  const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
   useFrame((_, dt) => {
     if (seen.current !== FRIDGE_STOCK.ver) {
       seen.current = FRIDGE_STOCK.ver
-      setVer((n) => n + 1)
+      setVer((v) => v + 1)
     }
     // (the shop puts one back every forty seconds, where one's been taken)
     clock.current += Math.min(dt, 0.1)
     if (clock.current > 40) {
       clock.current = 0
-      restockDrink()
+      restockDrink(n)
     }
   })
-  const begin = (r: number, k: number, ev: { stopPropagation: () => void }) => {
-    // (only with the door open: the glass is in the way otherwise)
-    if (!(FRIDGE_STATE.open || FRIDGE_STATE.passing > 0)) return
+  type From = { kind: 'slot'; r: number; k: number } | { kind: 'out'; i: number }
+  const begin = (from: From, ev: { stopPropagation: () => void }) => {
+    // (a drink in the fridge only with its door open: the glass is in the way otherwise)
+    if (from.kind === 'slot' && !doorOpen()) return
     ev.stopPropagation()
-    const grp = objs.current.get(`${r}-${k}`)
+    const key = from.kind === 'slot' ? `${from.r}-${from.k}` : `o${from.i}`
+    const grp = objs.current.get(key)
     const host = root.current
     if (!grp || !host) return
     if (controls) controls.enabled = false
     document.body.classList.add('is-carrying')
     const plane = new THREE.Plane()
+    const at = new THREE.Vector3()
     const move = (e: PointerEvent) => {
       const rect = gl.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1), camera)
       host.updateWorldMatrix(true, false)
-      const n = new THREE.Vector3(0, 0, 1).transformDirection(host.matrixWorld)
-      plane.setFromNormalAndCoplanarPoint(n, host.localToWorld(new THREE.Vector3(0, 0.7, 0.2)))
+      const nrm = new THREE.Vector3(0, 0, 1).transformDirection(host.matrixWorld)
+      plane.setFromNormalAndCoplanarPoint(nrm, host.localToWorld(new THREE.Vector3(0, 0.7, 0.2)))
       const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
       if (!hit) return
-      const p = host.worldToLocal(hit)
-      grp.position.set(THREE.MathUtils.clamp(p.x, -0.36, 0.36), THREE.MathUtils.clamp(p.y, 0.12, 1.5), 0.2)
+      at.copy(host.worldToLocal(hit))
+      grp.position.set(THREE.MathUtils.clamp(at.x, -1.1, 1.1), THREE.MathUtils.clamp(at.y, 0.02, 1.62), 0.2)
     }
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       document.body.classList.remove('is-carrying')
       if (controls) controls.enabled = true
-      // (dropped on the nearest place within reach: moved or swapped; anywhere else, back where it was)
+      const px = grp.position.x, py = grp.position.y
+      const inside = Math.abs(px) < 0.4 && py > 0.1 && py < 1.62
+      // (dropped on the nearest place within reach: moved or swapped; out past the fridge's sides or down to the floor, stood
+      // on the floor; anywhere else, back where it was)
       let best: [number, number] | null = null
       let bestD = 0.1
-      for (let rr = 0; rr < FRIDGE_HOME.length; rr++) {
-        for (let kk = 0; kk < FRIDGE_HOME[rr].ids.length; kk++) {
+      for (let rr = 0; rr < shelves.length; rr++) {
+        for (let kk = 0; kk < shelves[rr].ids.length; kk++) {
           const sp = slotAt(rr, kk)
-          const d = Math.hypot(sp.x - grp.position.x, sp.y - grp.position.y)
+          const d = Math.hypot(sp.x - px, sp.y - py)
           if (d < bestD) {
             bestD = d
             best = [rr, kk]
           }
         }
       }
-      const home = slotAt(r, k)
+      const home = from.kind === 'slot' ? slotAt(from.r, from.k) : new THREE.Vector3(FRIDGE_STOCK.out[from.i].x, 0, FRIDGE_STOCK.out[from.i].z)
       grp.position.copy(home)
-      if (best && (best[0] !== r || best[1] !== k)) moveDrink([r, k], best)
+      if (inside && best) {
+        if (from.kind === 'slot' && (best[0] !== from.r || best[1] !== from.k)) moveDrink(n, [from.r, from.k], best)
+        else if (from.kind === 'out') putBack(from.i, n, best)
+      } else if (!inside) {
+        const x = THREE.MathUtils.clamp(px, -1.0, 1.0)
+        const z = 0.5 + 0.13 * (FRIDGE_STOCK.out.filter((o) => o.unit === n).length % 3)
+        if (from.kind === 'slot') pullOut(n, [from.r, from.k], x, z)
+        else {
+          FRIDGE_STOCK.out[from.i].x = x
+          FRIDGE_STOCK.ver++
+        }
+      }
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
   }
+  const reg = (key: string) => (g: THREE.Group | null) => { if (g) objs.current.set(key, g); else objs.current.delete(key) }
   return (
     <group ref={root}>
-      {FRIDGE_STOCK.slots.map((row, r) => row.map((id, k) => id && (
-        <group key={`${r}-${k}`} ref={(g) => { if (g) objs.current.set(`${r}-${k}`, g); else objs.current.delete(`${r}-${k}`) }}
-          position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin(r, k, ev)}
-          onPointerOver={() => { if (FRIDGE_STATE.open || FRIDGE_STATE.passing > 0) document.body.style.cursor = 'grab' }}
+      {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
+        <group key={`${r}-${k}`} ref={reg(`${r}-${k}`)}
+          position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin({ kind: 'slot', r, k }, ev)}
+          onPointerOver={() => { if (doorOpen()) document.body.style.cursor = 'grab' }}
           onPointerOut={() => { document.body.style.cursor = '' }}>
           <DrinkBottle id={id} />
         </group>
       )))}
+      {/* (what's been taken out, stood on the floor before the fridge) */}
+      {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
+        <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
+          onPointerOver={() => { document.body.style.cursor = 'grab' }} onPointerOut={() => { document.body.style.cursor = '' }}>
+          <DrinkBottle id={o.id} />
+        </group>
+      ))}
     </group>
   )
 }
@@ -1155,8 +1272,11 @@ export function DrinkBottle({ id }: { id: DrinkId }) {
   if (d.shape === 'can' && id !== 'cola' && id !== 'greenTea') return (
     // a can: printed all over, its silver top and rim
     <group rotation-y={-Math.PI / 2}>
-      <mesh geometry={BOTTLE_GEO.can} position-y={0.044} material={look.label} />
-      <mesh geometry={BOTTLE_GEO.canTop} position-y={0.091} material={look.glass} />
+      <mesh geometry={BOTTLE_GEO.can} material={look.glass} />
+      <mesh geometry={BOTTLE_GEO.canLabel} position-y={0.046} material={look.label} />
+      <mesh geometry={BOTTLE_GEO.canTop} position-y={0.0905} material={look.glass} />
+      <mesh geometry={BOTTLE_GEO.canRim} position-y={0.09} rotation-x={Math.PI / 2}><meshToonMaterial color="#aeb3b9" /></mesh>
+      <mesh geometry={BOTTLE_GEO.canTab} position={[0, 0.0928, 0.002]}><meshToonMaterial color="#d8dce0" /></mesh>
     </group>
   )
   if (d.shape === 'small') return (
@@ -1168,7 +1288,7 @@ export function DrinkBottle({ id }: { id: DrinkId }) {
   )
   // the bottles proper, each shaped as it is in a shop: the beer's long neck, the sake's slim shoulder, the big tea bottle
   const shaped = id === 'beer' ? BOTTLE_SHAPE.beer : id === 'sake' ? BOTTLE_SHAPE.sake : id === 'oolong' ? BOTTLE_SHAPE.pet
-    : id === 'cola' || id === 'greenTea' ? BOTTLE_SHAPE.pet500 : null
+    : id === 'cola' || id === 'greenTea' || id === 'sports' ? BOTTLE_SHAPE.pet500 : id === 'milk' ? BOTTLE_SHAPE.milk : null
   if (shaped) return (
     <group rotation-y={-Math.PI / 2}>
       <mesh geometry={shaped.body} material={look.glass} />
@@ -1194,6 +1314,10 @@ const BOTTLE_SHAPE = {
   beer: { body: bottleBody([[0, 0], [0.024, 0], [0.0275, 0.005], [0.0275, 0.12], [0.0235, 0.145], [0.0145, 0.17], [0.0125, 0.2],
     [0.0135, 0.206], [0.0135, 0.21], [0, 0.21]]), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 18, 1, true), labelY: 0.065,
     cap: new THREE.CylinderGeometry(0.0145, 0.0145, 0.008, 14), capY: 0.213, foil: new THREE.CylinderGeometry(0.0138, 0.0155, 0.04, 14), foilY: 0.18 },
+  // the glass milk bottle: a wide mouth, a paper cap pressed down over it, a paper label round its middle
+  milk: { body: bottleBody([[0, 0], [0.02, 0], [0.0225, 0.005], [0.0225, 0.085], [0.02, 0.098], [0.0175, 0.106], [0.0175, 0.118], [0, 0.118]]),
+    label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 18, 1, true), labelY: 0.05,
+    cap: new THREE.CylinderGeometry(0.0195, 0.0195, 0.006, 16), capY: 0.121, foil: new THREE.CylinderGeometry(0.0182, 0.0188, 0.014, 16) as THREE.BufferGeometry | null, foilY: 0.112 },
   // the 500 ml plastic bottle: a ribbed foot, a label round its middle, a coloured cap
   pet500: { body: bottleBody([[0, 0], [0.019, 0], [0.0235, 0.006], [0.0235, 0.1], [0.021, 0.125], [0.0135, 0.145], [0.0105, 0.152],
     [0.0105, 0.158], [0, 0.158]]), label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 18, 1, true), labelY: 0.07,
@@ -1212,8 +1336,11 @@ const BOTTLE_GEO = {
   label: new THREE.CylinderGeometry(0.0285, 0.0295, 0.06, 14, 1, true),
   neck: new THREE.CylinderGeometry(0.012, 0.026, 0.04, 12),
   cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 12),
-  can: new THREE.CylinderGeometry(0.021, 0.021, 0.088, 16),
-  canTop: new THREE.CylinderGeometry(0.018, 0.021, 0.006, 16),
+  can: bottleBody([[0, 0], [0.0168, 0], [0.0198, 0.004], [0.0212, 0.011], [0.0212, 0.078], [0.0202, 0.084], [0.0184, 0.0885], [0.0178, 0.09], [0, 0.09]]),
+  canLabel: new THREE.CylinderGeometry(0.0215, 0.0215, 0.07, 18, 1, true),
+  canTop: new THREE.CylinderGeometry(0.0172, 0.0178, 0.004, 18),
+  canTab: new THREE.CylinderGeometry(0.0062, 0.0062, 0.0014, 12),
+  canRim: new THREE.TorusGeometry(0.0178, 0.0013, 5, 18),
   small: new THREE.LatheGeometry([[0, 0], [0.016, 0], [0.017, 0.02], [0.013, 0.036], [0.016, 0.056], [0.015, 0.072], [0, 0.072]]
     .map(([x, y]) => new THREE.Vector2(x, y - 0.036)), 16),
   smallTop: new THREE.CylinderGeometry(0.0155, 0.0155, 0.004, 14),
@@ -1221,7 +1348,7 @@ const BOTTLE_GEO = {
 /** each drink's label: its colours and its name round it, the shop's own small print */
 const BOTTLE_LOOK = Object.fromEntries(DRINKS.map((d) => {
   const lbl = d.label
-  const tall = d.shape !== 'bottle' || d.id === 'oolong' || d.id === 'sake'
+  const tall = d.shape !== 'bottle' || d.id === 'oolong' || d.id === 'sake' || d.id === 'sports'
   const tex = canvasTex(128, tall ? 96 : 48, (g) => {
     const h = tall ? 96 : 48
     g.fillStyle = lbl[0]
@@ -1234,6 +1361,71 @@ const BOTTLE_LOOK = Object.fromEntries(DRINKS.map((d) => {
       g.globalAlpha = 0.25
       g.fillRect(0, h * 0.62, 128, h * 0.12)
       g.globalAlpha = 1
+    }
+    // (a small picture on each face: the coffee's bean, the beer's wheat ear, the highball's bubbles, the chuhai's fruit, the milk's cow spot)
+    for (const cx of [32, 96]) {
+      g.save()
+      g.translate(cx, d.shape === 'can' ? h * 0.3 : h * 0.28)
+      if (d.id === 'coffee') {
+        g.fillStyle = '#f2e2c0'
+        g.beginPath()
+        g.ellipse(0, 0, 8, 5.5, -0.5, 0, Math.PI * 2)
+        g.fill()
+        g.strokeStyle = '#4a2a18'
+        g.lineWidth = 1.6
+        g.beginPath()
+        g.moveTo(-6, 3)
+        g.quadraticCurveTo(0, -1, 6, -3)
+        g.stroke()
+      } else if (d.id === 'beerCan' || d.id === 'beer') {
+        g.strokeStyle = '#7a1a12'
+        g.fillStyle = '#7a1a12'
+        g.lineWidth = 1.4
+        g.beginPath()
+        g.moveTo(0, 8)
+        g.lineTo(0, -8)
+        g.stroke()
+        for (let k = -2; k <= 1; k++) for (const sd of [-1, 1]) {
+          g.beginPath()
+          g.ellipse(sd * 3.4, k * 4, 2.6, 1.3, sd * -0.7, 0, Math.PI * 2)
+          g.fill()
+        }
+      } else if (d.id === 'highball') {
+        g.fillStyle = '#e8c45a'
+        for (const [bx, by, br] of [[-5, 4, 2.2], [3, 6, 1.6], [-1, -2, 1.8], [5, -4, 2.4], [-6, -6, 1.5]]) {
+          g.beginPath()
+          g.arc(bx, by, br, 0, Math.PI * 2)
+          g.fill()
+        }
+      } else if (d.id === 'chuhai') {
+        g.fillStyle = '#ffd84a'
+        g.beginPath()
+        g.arc(0, 0, 8, 0, Math.PI * 2)
+        g.fill()
+        g.strokeStyle = '#fff6c8'
+        g.lineWidth = 1.2
+        for (let k = 0; k < 6; k++) {
+          g.beginPath()
+          g.moveTo(0, 0)
+          g.lineTo(Math.cos(k * 1.047) * 7, Math.sin(k * 1.047) * 7)
+          g.stroke()
+        }
+      } else if (d.id === 'milk') {
+        g.fillStyle = '#3a6ab0'
+        g.beginPath()
+        g.ellipse(-4, -1, 3.5, 2.6, 0.3, 0, Math.PI * 2)
+        g.ellipse(4, 2, 3, 2.2, -0.2, 0, Math.PI * 2)
+        g.fill()
+      } else if (d.id === 'sports') {
+        g.strokeStyle = '#1f6fb8'
+        g.lineWidth = 2
+        g.beginPath()
+        g.moveTo(-8, 3)
+        g.quadraticCurveTo(-3, -6, 2, 0)
+        g.quadraticCurveTo(6, 4, 9, -3)
+        g.stroke()
+      }
+      g.restore()
     }
     g.font = `bold ${d.shape === 'small' ? 16 : lbl[2].length > 4 ? 15 : 20}px "Zen Antique", "Noto Serif TC", serif`
     g.textAlign = 'center'
@@ -1248,15 +1440,15 @@ const BOTTLE_LOOK = Object.fromEntries(DRINKS.map((d) => {
   }]
 })) as unknown as Record<DrinkId, { glass: THREE.Material; label: THREE.Material }>
 const FRIDGE_GEO = { body: new THREE.BoxGeometry(1, 1, 1) }
-/** the fridge's sign: 飲料 · ドリンク, white on red */
-const FRIDGE_SIGN = canvasTex(192, 48, (g) => {
-  g.fillStyle = '#b8261c'
+/** each fridge's sign: 飲料 · ドリンク, white on red; 酒類 · お酒, on indigo */
+const FRIDGE_SIGNS = FRIDGE_UNITS.map((u, n) => canvasTex(192, 48, (g) => {
+  g.fillStyle = n ? '#1c2a4a' : '#b8261c'
   g.fillRect(0, 0, 192, 48)
-  g.strokeStyle = 'rgba(255,230,160,0.7)'
+  g.strokeStyle = n ? 'rgba(232,196,90,0.8)' : 'rgba(255,230,160,0.7)'
   g.lineWidth = 1.4
   g.strokeRect(4, 4, 184, 40)
-  brushText(g, '飲料 · ドリンク', 96, 25, 26, { fill: '#fff6e0', edge: '#7a0e0a', shadow: 'rgba(40,0,0,0.5)', shine: '#ffffff', spacing: 1 })
-})
+  brushText(g, `${u.sign[0]} · ${u.sign[1]}`, 96, 25, 26, { fill: '#fff6e0', edge: n ? '#0a1020' : '#7a0e0a', shadow: 'rgba(0,0,0,0.5)', shine: '#ffffff', spacing: 1 })
+}))
 
 /** straw wrapping round a sake barrel (菰), the brewer's mark in red and black on its front (the middle, -z) */
 const KOMO = canvasTex(256, 96, (g) => {
