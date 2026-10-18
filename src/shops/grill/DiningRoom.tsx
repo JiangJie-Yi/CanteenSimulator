@@ -387,7 +387,7 @@ function Nobori({ i }: { i: number }) {
  * The banners strung overhead as an izakaya hangs them: a rope along the wall's aisle, a close row of narrow banners of every
  * colour hung from it, each swinging a little on its own.
  */
-function BannerRow({ zs, seed = 0 }: { zs: number[]; seed?: number }) {
+function BannerRow({ zs, seed = 0, x0 = 0, x1 = 0 }: { zs: number[]; seed?: number; x0?: number; x1?: number }) {
   const refs = useRef<(THREE.Group | null)[]>([])
   // (the same every time: a mix of cloths and lengths, a wide banner every so often taking three places)
   const items = useMemo(() => {
@@ -412,13 +412,18 @@ function BannerRow({ zs, seed = 0 }: { zs: number[]; seed?: number }) {
     })
   })
   const z0 = zs[0], z1 = zs[zs.length - 1]
+  // (the rope runs from x0 at the first place to x1 at the last: a slant gives a string that crosses another)
+  const xAt = (z: number) => (z1 > z0 ? x0 + ((x1 - x0) * (z - z0)) / (z1 - z0) : x0)
+  const yaw = Math.atan2(x1 - x0, z1 - z0)
   return (
     <group>
-      <mesh position={[0, 0, (z0 + z1) / 2]} rotation-x={Math.PI / 2}>
-        <cylinderGeometry args={[0.004, 0.004, z1 - z0 + 0.3, 5]} /><meshBasicMaterial color="#2a1a10" />
-      </mesh>
+      <group position={[(x0 + x1) / 2, 0, (z0 + z1) / 2]} rotation-y={yaw}>
+        <mesh rotation-x={Math.PI / 2}>
+          <cylinderGeometry args={[0.004, 0.004, Math.hypot(x1 - x0, z1 - z0) + 0.3, 5]} /><meshBasicMaterial color="#2a1a10" />
+        </mesh>
+      </group>
       {items.map((it, i) => (
-        <group key={i} position={[0, 0, it.z]} ref={(g) => { refs.current[i] = g }}>
+        <group key={i} position={[xAt(it.z), 0, it.z]} ref={(g) => { refs.current[i] = g }}>
           {it.wide ? (
             <>
               {[-1, 1].map((sd) => (
@@ -1222,13 +1227,11 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
             {y0 < WAINSCOT && <WallPiece z0={z0} z1={z1} y0={0} y1={WAINSCOT} />}
           </group>
         ))}
-        {/* posts, the rail over the wainscot and the beam along the top */}
+        {/* the rail over the wainscot and the beam along the top */}
         {/* (the rail broken where the toilets' doorways are) */}
         {spans.filter(([, , y0]) => y0 < WAINSCOT).map(([z0, z1]) => <Box key={z0} size={[0.05, 0.05, z1 - z0]} color="#3a2416" position={[-0.02, WAINSCOT, (z0 + z1) / 2]} />)}
         <Box size={[0.08, 0.1, l]} color="#3a2416" position={[-0.03, WALL_H - 0.05, mid]} />
-        {[from, mid - l / 6, mid + l / 6, to].filter((z) => z === from || z === to || (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.2) && isClear(z, 0.05)).map((z) => (
-          <Box key={z} size={[0.07, WALL_H, 0.08]} color="#3a2416" position={[-0.03, WALL_H / 2, z]} />
-        ))}
+        {/* (no upright posts: nothing stands in the way of the banners strung along it) */}
         {/* a frieze of seigaiha waves under the beam, and the pictures hung along the plaster */}
         <mesh position={[-0.004, WALL_H - 0.2, mid]} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[l, 0.2]} />
@@ -1273,7 +1276,8 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         {/* (the strings of banners overhead, clear of the altar, the fridges and the toilets' doors) */}
         {(() => {
           const zs: number[] = []
-          for (let z = from + 0.25; z < to - 0.25; z += 0.145) {
+          // (not out to the way in at the end: nothing hung over the doorway)
+          for (let z = from + 0.25; z < to - 1.05; z += 0.145) {
             if (altar && Math.abs(z - shelfZ) < 0.62) continue
             if (!isClear(z, 0.1)) continue
             if (door !== undefined && Math.abs(z - door) < WC_W + 0.3) continue
@@ -1281,11 +1285,13 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
           }
           return zs.length > 1 ? (
             <>
-              <group position={[-0.42, 2.18, 0]}><BannerRow zs={zs} /></group>
-              {/* (a second string, a little further out and shifted, hung lower: a crowd of them, as in a real izakaya) */}
-              <group position={[-0.78, 2.06, 0]}><BannerRow zs={zs.filter((_, k) => k % 2).map((z) => z + 0.07)} seed={5} /></group>
+              <group position={[0, 2.22, 0]}><BannerRow zs={zs} x0={-0.3} x1={-0.3} /></group>
+              {/* (and two more strings slanted across the aisle, crossing each other like an X, one a little lower than the other,
+                  so no banner meets another) */}
+              <group position={[0, 2.04, 0]}><BannerRow zs={zs.filter((_, k) => k % 2 === 0)} seed={5} x0={-0.4} x1={-1.3} /></group>
+              <group position={[0, 1.9, 0]}><BannerRow zs={zs.filter((_, k) => k % 2 === 1)} seed={9} x0={-1.3} x1={-0.4} /></group>
               {/* (and paper umbrellas (和傘), pastel, opened and hung upside-down over the aisle) */}
-              {zs.filter((_, k) => k % 5 === 2).map((z, k) => <group key={k} position={[-1.15, 2.1 - (k % 2) * 0.1, z]} scale={0.5}><Wagasa i={k} /></group>)}
+              {zs.filter((_, k) => k % 5 === 2).map((z, k) => <group key={k} position={[-1.7, 2.1 - (k % 2) * 0.1, z]} scale={0.5}><Wagasa i={k} /></group>)}
             </>
           ) : null
         })()}

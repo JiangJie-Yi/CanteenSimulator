@@ -173,15 +173,11 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       </group>
       </StaticBatch>
       <group position-x={DX}>
-      {/* the doorway's frame: a post either side and the lintel over them, the noren's rod hung under it; off the post on
-          the bar's side an arm (腕木) reaches out over the way in, and the red lantern hangs from its end */}
-      <StaticBatch>
-        {[-1, 1].map((sd) => (
-          <Part key={sd} geo={REG_GEO.body} color="#3a2416" outline={1.03} position={[sd * (W / 2 + 0.05), (H + 0.12 - GENKAN.depth) / 2, 0.03]} scale={[0.07, H + 0.12 + GENKAN.depth, 0.07]} />
-        ))}
-        <Part geo={REG_GEO.body} color="#3a2416" outline={1.03} position={[0, H + 0.08, 0.03]} scale={[W + 0.3, 0.08, 0.09]} />
-        <Part geo={REG_GEO.body} color="#4a2e1c" outline={1.03} position={[-(W / 2 + 0.05), H - 0.05, 0.27]} scale={[0.05, 0.06, 0.5]} />
-      </StaticBatch>
+      {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
+      {/* (no posts: the rod hangs by a cord at each end from the beam above, and the lantern by its own) */}
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * (W / 2), H - 0.05 + 0.18, 0.03]}><cylinderGeometry args={[0.004, 0.004, 0.36, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
+      ))}
       <group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel */}
       <mesh position={[0, H - 0.05, 0.03]} rotation-z={Math.PI / 2}>
