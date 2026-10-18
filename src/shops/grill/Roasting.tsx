@@ -5,6 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { BlobShadow } from '@/scene/BlobShadow'
+import { GAME_SPEED } from '@/scene/speed'
 import { brushText, signTexture } from '@/scene/signFont'
 import { FloorPiece } from '@/scene/FloorPiece'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
@@ -40,12 +41,14 @@ const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
 /** how many sips a bowl of soup takes, and how good it is (miso soup doesn't take seasoning) */
 const SIPS = 3
 const SOUP_TASTE = 78
-// the fan (団扇): waved over the fire, how much hotter it gets per unit the fan travels, and at most; once the
-// fanning stops that extra dies back (per second), taking a little more charcoal with it than it gave
+// the fan (団扇): waved over the fire, how much hotter it gets per unit the fan travels, and at most; the extra heat
+// dies back (per second) once the fanning stops, and while it lasts the coals burn away faster in proportion to it
+// (per second, at the most it can add: the plain burn is about 0.0002 a second, so fanning flat out burns some 65 times
+// as fast)
 const FAN_GAIN = 0.08
 const FAN_MAX = 0.25
 const FAN_FADE = 0.02
-const FAN_COST = 1.4
+const FAN_BURN = 0.012
 type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state']; seat: number
   /** the one they came in with (a couple, sat side by side) */
   partner?: number
@@ -1809,8 +1812,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     // the crate and the fan
     for (const d of [DECOR.crate, DECOR.fan, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
-    // the customers' plates, stacked on the table by the pass
-    if (bar) for (const v of [PLATE_STACKS.clean, PLATE_STACKS.dirty]) others.push({ p: toGrillScene(v).setY(0), r: 0.32 })
+    // the customers' plates, stacked on the table by the pass (they stand there shop open or not)
+    for (const v of [PLATE_STACKS.clean, PLATE_STACKS.dirty]) others.push({ p: toGrillScene(v).setY(0), r: 0.32 })
     // the bar behind the fire (shop open) is in the way too
     if (bar) for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)), r: 0.42 * GRILL_SCALE })
     // the soup bowls on the table are in the way too
@@ -3122,12 +3125,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     if (scannedCount.current !== root.children.length) scan()
     const dt = Math.min(delta, 0.1)
-    // fanned-up heat dies back once the fanning stops, and it burnt the coals faster
+    // fanned-up heat burns the coals faster while it lasts (more the hotter it's been fanned), and dies back once the
+    // fanning stops
     const fan = fanned.current
-    if (fan.extra > 0 && fire && performance.now() - fan.last > 600) {
-      const back = Math.min(fan.extra, dt * FAN_FADE)
-      fan.extra -= back
-      fire.current = Math.max(0, fire.current - back * FAN_COST)
+    if (fan.extra > 0 && fire) {
+      fire.current = Math.max(0, fire.current - dt * GAME_SPEED.value * FAN_BURN * (fan.extra / FAN_MAX))
+      if (performance.now() - fan.last > 600) {
+        const back = Math.min(fan.extra, dt * FAN_FADE)
+        fan.extra -= back
+        fire.current = Math.max(0, fire.current - back)
+      }
+      if (fire.current <= 0.02) fan.extra = 0
     }
     // soup going down as it's drunk: the surface sinks into the bowl and narrows with it; a bowl taken off the
     // order comes back full next time

@@ -15,9 +15,9 @@ type Spot = { at: [number, number]; r: number }
 export const DECOR = {
   crate: { at: [0.62, -2.0], r: 0.38 },
   // (lying on the table by the seasoning boxes, at their front end)
-  fan: { at: [-0.95, 1.9], r: 0.3 },
-  // (drawn 1.8 times its own size, standing back from the fire's stones)
-  lantern: { at: [-2.05, -0.3], r: 0.36 },
+  fan: { at: [-0.62, 1.85], r: 0.3 },
+  // (drawn 1.8 times its own size, behind the fire's stones, clear of the plate stacks and the bucket on the left)
+  lantern: { at: [-0.45, -2.5], r: 0.34 },
   // (the cooked rice the rice balls are made from: a shop's big tub, on a side table of its own just past the cook's
   // table's right-hand end, by the other cooks)
   rice: { at: [4.93, -0.12], r: 1.1 },
