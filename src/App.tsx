@@ -566,11 +566,12 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
                   baseIntensity={theme === 'dark' ? 1.5 : 0.8} />
               )}
               {/* toon ramps blow out easily, so the firelight stays modest */}
-              {dish.heat === 'fire' && <Fire width={0.6} height={0.42} baseIntensity={look.fire} level={fire} />}
+              {dish.heat === 'fire' && <group position={dish.roast ? FIRE_SHIFT : undefined}><Fire width={0.6} height={0.42} baseIntensity={look.fire} level={fire} /></group>}
               {soup && dish.brothY !== undefined && dish.steam && (
                 <Steam position={[0, dish.brothY + 0.02, 0]} width={dish.steam.width} height={dish.steam.height}
                   opacity={theme === 'dark' ? 0.5 : 0.7} level={dish.heatControl ? steamLevel : undefined} />
               )}
+              <group position={dish.roast ? FIRE_SHIFT : undefined}>
               {dish.smoke && (
                 // same white puffs as the soup steam, just taller and slower
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height}
@@ -586,6 +587,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width * 1.25} height={dish.smoke.height * 1.2}
                   layers={5} opacity={0.75} speed={0.11} color="#3a3430" shade="#1c1916" level={grillBlackSmoke} />
               )}
+              </group>
             </Suspense>}
           </group>
         )
