@@ -1341,7 +1341,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ai, stock, guestsBy, active, opened])
 
-  // AI 全自動: the whole shop runs itself — hiring whoever's missing, buying in, having the kitchen work out a menu,
+  // 自動營運: the whole shop runs itself — hiring whoever's missing, buying in, having the kitchen work out a menu,
   // opening, ordering more as it sells, and shutting for a rest when the staff are worn out — one step every few
   // seconds (each step acts on the state as it is then, so it does one thing at a time)
   const [auto, setAuto] = useState(false)
