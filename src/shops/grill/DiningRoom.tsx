@@ -1267,7 +1267,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         {/* the plaster over the wainscot, open where the toilets' doors are (a strip between them, and over them) */}
         {/* (the wall's thickness: a slab behind it, the base's dark wood, full height, over the toilets' doorways only above them) */}
         {spans.map(([z0, z1, y0]) => (
-          <mesh key={`t${z0}|${y0}`} position={[WALL_T / 2, (Math.max(y0, 0) + WALL_H) / 2 - 0.0, (z0 + z1) / 2]}>
+          <mesh key={`t${z0}|${y0}`} position={[WALL_T / 2 + 0.012, (Math.max(y0, 0) + WALL_H) / 2, (z0 + z1) / 2]}>
             <boxGeometry args={[WALL_T, WALL_H - Math.max(y0, 0), z1 - z0]} /><meshToonMaterial color="#3d2414" />
           </mesh>
         ))}
