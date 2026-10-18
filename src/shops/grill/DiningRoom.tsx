@@ -1167,22 +1167,6 @@ function Kamidana({ shelf = true }: { shelf?: boolean }) {
           <meshToonMaterial color="#f4f1ea" />
         </mesh>
       ))}
-      {/* the rope across the front, sagging, and its zigzag paper shide */}
-      {Array.from({ length: 9 }, (_, i) => {
-        const z = -0.36 + i * 0.09
-        return (
-          <mesh key={i} position={[-0.27, 0.04 - 0.03 * (1 - (z / 0.36) ** 2), z]} rotation-x={Math.PI / 2}>
-            <cylinderGeometry args={[0.014, 0.014, 0.095, 8]} />
-            <meshToonMaterial color="#d8c08a" />
-          </mesh>
-        )
-      })}
-      {[-0.2, 0, 0.2].map((z) => (
-        <mesh key={z} position={[-0.275, -0.02, z]} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[0.035, 0.11]} />
-          <meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} />
-        </mesh>
-      ))}
     </group>
   )
 }
