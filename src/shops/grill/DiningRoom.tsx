@@ -2283,7 +2283,7 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   return (
     <StaticBatch key={lang}>
       <group position={at(3.3, 3.2)} rotation-y={face + 0.3}>
-        <SakeStack />
+        <group rotation-y={Math.PI / 2}><SakeStack /></group>
       </group>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
