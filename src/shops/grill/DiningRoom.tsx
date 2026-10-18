@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
+import { inkModel } from '@/scene/inkHull'
 import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
@@ -1543,6 +1544,7 @@ function useFreezer(n: number) {
         m.castShadow = true
       }
     })
+    inkModel(root, (m) => !!(m.material as THREE.Material).transparent)
     root.updateMatrixWorld(true)
     const door = root.getObjectByName('Door_6')
     const body = new THREE.Group()

@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { inkModel } from '@/scene/inkHull'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 
 /**
@@ -92,7 +93,7 @@ export function LuckyCat({ kind = 1, height = HEIGHT, still = false }: { kind?: 
     <group ref={group} name="lucky-cat">
       {frames.map((parts, i) => (
         <group key={i} visible={still || kind !== 1 || i === 0}>
-          {parts.map(({ g, mat }, j) => <mesh key={j} geometry={g} material={mat} castShadow />)}
+          {parts.map(({ g, mat }, j) => <mesh key={j} geometry={g} material={mat} castShadow ref={(m) => { if (m) inkModel(m) }} />)}
         </group>
       ))}
     </group>

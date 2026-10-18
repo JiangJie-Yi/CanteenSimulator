@@ -14,6 +14,7 @@ import { BlobShadow } from '@/scene/BlobShadow'
 import { brushText, followSign, signTexture } from '@/scene/signFont'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
+import { inkModel } from '@/scene/inkHull'
 import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
@@ -658,19 +659,19 @@ function KitchenPit({ counters, drop }: { counters: Counter[]; drop: number }) {
   const [g0, g1] = gates.first
   // (each step a block of raw timber, its grain along it at one scale; run a way on past the gate's way through along the kitchen's
   // edge, to fill the corner of the well beside it, but never past the kitchen's own bounds)
-  const STEP_OVER = 0.45
+  const STEP_OVER = 0.02
   const stepAt = (a: number, b: number, edgeLay: number, key: string) => [1, 2].map((n) => {
     const h = drop * (3 - n) / 3
     const lo = Math.max(kx0, a - STEP_OVER), hi = Math.min(kx1, b + STEP_OVER)
     return (
-      <mesh key={`${key}${n}`} position={[-(edgeLay + 0.17 * n - 0.085), -drop + h / 2, (lo + hi) / 2]} geometry={timberBox(0.17, h, hi - lo)} material={TIMBER} castShadow receiveShadow />
+      <mesh key={`${key}${n}`} position={[-(edgeLay + 0.17 * n - 0.085), -drop + h / 2, (lo + hi) / 2]} geometry={timberBox(0.17, h, hi - lo)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />
     )
   })
   const stepSide = (a: number, b: number, edgeAlong: number, key: string) => [1, 2].map((n) => {
     const h = drop * (3 - n) / 3
     const lo = Math.max(ky0, a - STEP_OVER), hi = Math.min(ky1, b + STEP_OVER)
     return (
-      <mesh key={`${key}${n}`} position={[-(lo + hi) / 2, -drop + h / 2, edgeAlong + 0.17 * n - 0.085]} geometry={timberBox(hi - lo, h, 0.17)} material={TIMBER} castShadow receiveShadow />
+      <mesh key={`${key}${n}`} position={[-(lo + hi) / 2, -drop + h / 2, edgeAlong + 0.17 * n - 0.085]} geometry={timberBox(hi - lo, h, 0.17)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />
     )
   })
   return (

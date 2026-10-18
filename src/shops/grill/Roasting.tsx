@@ -5,6 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
+import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
 import { brushText, signTexture } from '@/scene/signFont'
@@ -586,7 +587,7 @@ function Block({ along: a, lay: l, y: [y0, y1], color }: { along: [number, numbe
   const mid = new THREE.Vector3().addScaledVector(ALONG, (a[0] + a[1]) / 2).addScaledVector(LAY, (l[0] + l[1]) / 2)
   return (
     <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
-      <mesh position-y={(y0 + y1) / 2}>
+      <mesh position-y={(y0 + y1) / 2} ref={(m) => { if (m) inkModel(m) }}>
         <boxGeometry args={[a[1] - a[0], y1 - y0, l[1] - l[0]]} />
         <meshToonMaterial color={color} />
       </mesh>
