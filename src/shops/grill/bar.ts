@@ -199,7 +199,8 @@ export const fridgeUnitOf = (id: DrinkId) => Math.max(0, FRIDGE_UNITS.findIndex(
  */
 export const FRIDGE_STOCK = {
   units: FRIDGE_UNITS.map((u) => u.shelves.map((sh) => [...sh.ids] as (DrinkId | null)[])),
-  out: [] as { id: DrinkId; unit: number; x: number; z: number }[],
+  /** (x, z: out on the floor before the fridge, in its own frame; w: set down on a table, anywhere, in the scene's) */
+  out: [] as { id: DrinkId; unit: number; x: number; z: number; w?: [number, number, number] }[],
   ver: 0,
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stock?: typeof FRIDGE_STOCK }).__stock = FRIDGE_STOCK
@@ -244,12 +245,53 @@ export function moveDrink(unit: number, from: [number, number], to: [number, num
   FRIDGE_STOCK.ver++
 }
 /** the player takes a drink out of a fridge and stands it on the floor before it (x across, z out from it) */
-export function pullOut(unit: number, from: [number, number], x: number, z: number) {
+export function pullOut(unit: number, from: [number, number], x: number, z: number, w?: [number, number, number]) {
   const id = FRIDGE_STOCK.units[unit][from[0]][from[1]]
   if (!id) return
   FRIDGE_STOCK.units[unit][from[0]][from[1]] = null
-  FRIDGE_STOCK.out.push({ id, unit, x, z })
+  FRIDGE_STOCK.out.push({ id, unit, x, z, w })
   FRIDGE_STOCK.ver++
+}
+/** a drink that's out is set down somewhere else on a table */
+export function moveOut(index: number, w: [number, number, number]) {
+  const o = FRIDGE_STOCK.out[index]
+  if (!o) return
+  o.w = w
+  FRIDGE_STOCK.ver++
+}
+/**
+ * Where a ray from the pointer meets a table a drink can be set down on, if it does: the cook's table's top (not on its
+ * stone ring, not in the notch the cook stands in) and the tops of the bar's counters, wherever along them. The point, in the
+ * scene's own frame, or null.
+ */
+export function tableHit(ray: THREE.Ray): THREE.Vector3 | null {
+  const best: { p: THREE.Vector3; t: number }[] = []
+  const at = (y: number, ok: (p: THREE.Vector3) => boolean) => {
+    if (Math.abs(ray.direction.y) < 1e-6) return
+    const t = (y - ray.origin.y) / ray.direction.y
+    if (t <= 0) return
+    const p = ray.origin.clone().addScaledVector(ray.direction, t)
+    if (ok(p)) best.push({ p, t })
+  }
+  // (the cook's table: its top is the scene's y = 0)
+  at(0, (p) => {
+    const lay = p.dot(LAY), along = p.dot(ALONG)
+    if (lay < -2.0 || lay > 2.6 || along < -2.3 || along > 3.0) return false
+    if (Math.hypot(p.x, p.z) < 2.0) return false
+    if (lay > 1.75 && along > -1.85 && along < -0.3) return false
+    return true
+  })
+  // (the bar's tops)
+  const top = GRILL_BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y
+  at(top, (p) => {
+    const q = p.clone().sub(GRILL_OFFSET).divideScalar(GRILL_SCALE)
+    return GRILL_COUNTERS.some((c) => {
+      const d = q.clone().sub(new THREE.Vector3(c.at.x, 0, c.at.z)).setY(0)
+      return Math.abs(d.dot(c.along)) <= c.length / 2 + 0.1 && Math.abs(d.dot(c.lay)) <= 0.27
+    })
+  })
+  best.sort((a, b) => a.t - b.t)
+  return best[0]?.p ?? null
 }
 /** and puts one back, into an empty place */
 export function putBack(index: number, unit: number, to: [number, number]) {

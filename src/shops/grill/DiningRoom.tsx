@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { brushText, signTexture } from '@/scene/signFont'
-import { DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, pullOut, putBack, restockDrink, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
+import { DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Steam } from '@/scene/Steam'
 
@@ -1425,6 +1425,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
   const seen = useRef(-1)
   const clock = useRef(0)
   const objs = useRef(new Map<string, THREE.Group>())
+  const dragKey = useRef<string | null>(null)
   const shelves = FRIDGE_UNITS[n].shelves
   const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.09)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
@@ -1432,6 +1433,22 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
     if (seen.current !== FRIDGE_STOCK.ver) {
       seen.current = FRIDGE_STOCK.ver
       setVer((v) => v + 1)
+    }
+    // (what's out: on the floor before the fridge, or set down on a table, upright, where it was put)
+    const host = root.current
+    if (host) {
+      host.updateWorldMatrix(true, false)
+      FRIDGE_STOCK.out.forEach((o, i) => {
+        const g = objs.current.get(`o${i}`)
+        if (!g || o.unit !== n || dragKey.current === `o${i}`) return
+        if (o.w) {
+          g.position.copy(host.worldToLocal(new THREE.Vector3(o.w[0], o.w[1], o.w[2])))
+          g.quaternion.copy(host.getWorldQuaternion(new THREE.Quaternion()).invert())
+        } else {
+          g.position.set(o.x, 0, o.z)
+          g.quaternion.identity()
+        }
+      })
     }
     // (the shop puts one back every forty seconds, where one's been taken)
     clock.current += Math.min(dt, 0.1)
@@ -1453,6 +1470,8 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
     document.body.classList.add('is-carrying')
     const plane = new THREE.Plane()
     const at = new THREE.Vector3()
+    let onTable: THREE.Vector3 | null = null
+    dragKey.current = key
     const move = (e: PointerEvent) => {
       const rect = gl.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1), camera)
@@ -1460,6 +1479,15 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       const nrm = new THREE.Vector3(0, 0, 1).transformDirection(host.matrixWorld)
       plane.setFromNormalAndCoplanarPoint(nrm, host.localToWorld(new THREE.Vector3(0, 0.7, 0.2)))
       const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
+      // (over a table, nearer than the fridge's own front, it goes down on the table, standing upright, wherever the pointer is)
+      const th = tableHit(raycaster.ray)
+      onTable = th && (!hit || th.distanceTo(raycaster.ray.origin) < hit.distanceTo(raycaster.ray.origin)) ? th : null
+      if (onTable) {
+        grp.position.copy(host.worldToLocal(onTable.clone()))
+        grp.quaternion.copy(host.getWorldQuaternion(new THREE.Quaternion()).invert())
+        return
+      }
+      grp.quaternion.identity()
       if (!hit) return
       at.copy(host.worldToLocal(hit))
       grp.position.set(THREE.MathUtils.clamp(at.x, -1.1, 1.1), THREE.MathUtils.clamp(at.y, 0.02, 1.62), 0.2)
@@ -1469,6 +1497,15 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       window.removeEventListener('pointerup', up)
       document.body.classList.remove('is-carrying')
       if (controls) controls.enabled = true
+      dragKey.current = null
+      grp.quaternion.identity()
+      if (onTable) {
+        const w: [number, number, number] = [onTable.x, onTable.y, onTable.z]
+        grp.position.set(0, 0, 0)
+        if (from.kind === 'slot') pullOut(n, [from.r, from.k], 0, 0.5, w)
+        else moveOut(from.i, w)
+        return
+      }
       const px = grp.position.x, py = grp.position.y
       const inside = Math.abs(px) < 0.4 && py > 0.1 && py < 1.62
       // (dropped on the nearest place within reach: moved or swapped; out past the fridge's sides or down to the floor, stood

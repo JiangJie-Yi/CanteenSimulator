@@ -103,7 +103,7 @@ const FAN_PAPER = canvas(256, 256, (g) => {
   }
 })
 
-/** A wooden crate of white binchotan, its label on the front, a few sticks leaning out. */
+/** A wooden crate of white binchotan, its label on the front, the sticks heaped inside it. */
 function Crate() {
   const W = 0.62, D = 0.36, H = 0.2, T = 0.02
   const geo = useMemo(() => ({
@@ -125,9 +125,10 @@ function Crate() {
         out.push({ p: [(rnd() - 0.5) * 0.04, T + 0.025 + row * 0.04, z], r: [rnd() * 3, (rnd() - 0.5) * 0.12, Math.PI / 2] })
       }
     }
-    // two pulled half out, resting on the rim
-    out.push({ p: [0.1, H + 0.02, 0.04], r: [0, 0.3, Math.PI / 2 - 0.28] })
-    out.push({ p: [-0.06, H + 0.01, -0.06], r: [0, -0.5, Math.PI / 2 + 0.22] })
+    // two more laid along the top of the heap, inside the box (a stick is W - 0.08 long, the box's inside W - 0.04: none goes past
+    // the ends, none stands above the rim)
+    out.push({ p: [0, T + 0.025 + 3 * 0.04 + 0.012, 0.035], r: [0.6, 0.04, Math.PI / 2] })
+    out.push({ p: [0.01, T + 0.025 + 3 * 0.04 + 0.012, -0.045], r: [2.1, -0.03, Math.PI / 2] })
     return out
   }, [])
   const wood = CRATE_WOOD
