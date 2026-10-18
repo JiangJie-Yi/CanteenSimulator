@@ -1172,7 +1172,7 @@ function Kamidana({ shelf = true, part = 'all' }: { shelf?: boolean; part?: 'all
       {part !== 'shrine' && [-1, 1].map((sd) => (
         <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} /></group>
       ))}
-      {part !== 'shrine' && [-0.13, 0, 0.13].map((z) => (
+      {part !== 'shrine' && [-0.16, 0.16].map((z) => (
         <mesh key={z} position={[-0.235, 0.03, z * 0.6]}>
           <cylinderGeometry args={[0.012, 0.01, 0.025, 10]} />
           <meshToonMaterial color="#f4f1ea" />
