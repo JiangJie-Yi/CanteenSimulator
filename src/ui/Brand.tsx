@@ -65,8 +65,9 @@ export function Brand({ night, lang, shop = 'beefnoodle', dark = false, ignite =
             <path className="brand-fish-rule" d={FISH_RULE} />
             <path className="brand-fish-line" d="M17 14q5 11 0 22M84 25l11-15M84 25l11 15M86 25h10" />
             <path className="brand-fish-scale" d="M66 16q3 4 0 8M72 18q3 4 0 8M66 26q3 4 0 8M72 28q3 4 0 8" />
-            <circle className="brand-fish-ring" cx="10" cy="19.6" r="2.4" />
           </svg>
+          {/* (the eye: an HTML dot, so it's a true circle however the board's stretched) */}
+          <span className="brand-fish-eyedot" />
           </>
         )}
         {shop === 'bakery' && (

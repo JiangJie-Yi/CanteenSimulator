@@ -63,7 +63,7 @@ const SAVE_KEY = 'canteen-save'
 /** a whole bowl of noodles, by the bowl (the set meals' parts count on their own) */
 const BASE_KCAL: Record<string, number> = { braised: 650, clear: 560, plain: 380, dry: 520, sesame: 610, sanxianMian: 520,
   rousiMian: 480, daluMian: 560, suanlaMian: 500 }
-type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number }
+type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean> }
 // Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff).
 // (Any save left by an older version is cleared.)
@@ -244,7 +244,9 @@ const orderedBase = (dish: DishInfo, order: Record<string, number>) => dish.base
 type Frame = { cx: number; cy: number; w: number; h: number }
 
 /** the sake offered at the shrine stands (and brings its extra custom) this long (ms) */
-const INCENSE_MS = 60000
+const INCENSE_MS = 180000
+/** what offering the sake costs (NT$) */
+const OFFERING_COST = 1000
 type SceneProps = {
   /** a customer took a drink from the grill's fridge */
   onDrink?: (guest: number, drink: DrinkId) => void
@@ -669,10 +671,15 @@ export default function App() {
   const [blessed, setBlessed] = useState(false)
   const lightIncense = () => {
     if (incenseAt !== null && performance.now() - incenseAt < INCENSE_MS) return
+    if (cash < OFFERING_COST) {
+      say(lang === 'ja' ? 'お金が足りません：お神酒をお供えするには NT$1,000 かかります' : '現金不足：供清酒需要 NT$1,000')
+      return
+    }
+    book('offering', OFFERING_COST)
     setIncenseAt(performance.now())
     setBlessed(true)
     window.setTimeout(() => setBlessed(false), INCENSE_MS)
-    say(lang === 'ja' ? 'お神酒をお供えしました：一分間、お客さんが増えて、よく注文してくれます' : '供了一杯清酒：這一分鐘客人會變多，也點得比較多')
+    say(lang === 'ja' ? 'お神酒をお供えしました（NT$1,000）：三分間、お客さんが増えて、よく注文してくれます' : '供了一杯清酒（花費 NT$1,000）：這三分鐘客人會變多，也點得比較多')
   }
   const space: 'closed' | 'open' = ai ? 'open' : 'closed'
   // (opening is the start of a new day)
@@ -736,9 +743,9 @@ export default function App() {
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
   // (a new game starts with the grill already set up: its opening cost is already paid)
-  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
+  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
-  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0)
+  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0) - (ledger.offering ?? 0)
   // ingredients in stock, by portion; nothing until it's bought
   const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
   // the owner's name ('' while they aren't asked it: they're 老闆); null until they've founded the business, while the
@@ -1900,7 +1907,7 @@ export default function App() {
               } catch {
                 // storage blocked
               }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0 }, stock: {}, hired: {}, notes: {}, owner: null, opened: {} }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0 }, stock: {}, hired: {}, notes: {}, owner: null, opened: {} }
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}
@@ -1971,6 +1978,7 @@ export default function App() {
               <p className="ledger-cash"><span>{lang === 'ja' ? '現金' : '現金'}</span><b className="money">NT${Math.round(cash).toLocaleString()}</b></p>
               <p><span>{lang === 'ja' ? '開業費' : '開業費用'}</span><b className="money">−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
               <p><span>{lang === 'ja' ? '仕入れ' : '採買支出'}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
+              <p><span>{lang === 'ja' ? 'お供え' : '供品費用'}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
               {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
                 .map(([k, v]) => (
                   <p key={k}><span>{UI[lang][k]}</span><b className="money">{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : 1)}</b></p>
@@ -2107,7 +2115,7 @@ export default function App() {
       {/* (on a phone there's no 3D room and no shrine to click: the sake is offered from here) */}
       {phone && ai && !!dish.roast && (
         <button type="button" className={`incense-toggle${blessed ? ' is-on' : ''}`} onClick={lightIncense} disabled={blessed}
-          title={lang === 'ja' ? 'お神酒を供える（一分間、客足とご注文が増える）' : '供清酒（一分鐘內客人變多、點得也多）'}>
+          title={lang === 'ja' ? 'お神酒を供える（NT$1,000、三分間、客足とご注文が増える）' : '供清酒（花 NT$1,000，三分鐘內客人變多、點得也多）'}>
           {blessed ? (lang === 'ja' ? 'お供え中' : '供酒中') : (lang === 'ja' ? 'お神酒' : '供酒')}
         </button>
       )}

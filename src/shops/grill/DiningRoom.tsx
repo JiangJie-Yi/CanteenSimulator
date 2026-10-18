@@ -152,13 +152,27 @@ const SCROLLS: ArtKey[] = ['calligraphy', 'plum']
  * word down it in big letters (a stripe along its edge, stitching), laced by loops to a bamboo rod, the foot weighted;
  * it stirs a little in the air.
  */
-const NOBORI_LOOKS = [
-  { text: '炭火燒烤', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2' },
-  { text: '日式烤魚', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0' },
-  { text: '生ビール', cloth: '#f4efe2', ink: '#b8261c', edge: '#b8261c' },
-  { text: '銘酒', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2' },
-  { text: '深夜食堂', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0' },
-  { text: '飲料', cloth: '#f4efe2', ink: '#1f3a68', edge: '#1f3a68' },
+type NoboriLook = { text: string; cloth: string; ink: string; edge: string; shape: 'rect' | 'swallow' | 'point' | 'wave'
+  pat?: 'seigaiha' | 'fish' | 'sun' | 'flame' | 'stripe' }
+/** the cloths: red, indigo, white, black, orange, yellow, green; cut square, swallow-tailed, to a point or scalloped; some printed
+ * with waves, a fish, the sun, flames or a stripe */
+const NOBORI_LOOKS: NoboriLook[] = [
+  { text: '炭火燒烤', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2', shape: 'rect' },
+  { text: '日式烤魚', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0', shape: 'swallow', pat: 'seigaiha' },
+  { text: '生ビール', cloth: '#f4efe2', ink: '#b8261c', edge: '#b8261c', shape: 'rect' },
+  { text: '銘酒', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2', shape: 'point' },
+  { text: '深夜食堂', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0', shape: 'rect', pat: 'stripe' },
+  { text: '飲料', cloth: '#f4efe2', ink: '#1f3a68', edge: '#1f3a68', shape: 'wave' },
+  { text: '大漁', cloth: '#14120f', ink: '#e8c45a', edge: '#e8c45a', shape: 'swallow', pat: 'flame' },
+  { text: '旬', cloth: '#e8742a', ink: '#fffaf0', edge: '#fffaf0', shape: 'rect', pat: 'sun' },
+  { text: '名物', cloth: '#f2c62a', ink: '#1a0d06', edge: '#1a0d06', shape: 'point' },
+  { text: '本日推薦', cloth: '#f4efe2', ink: '#14120f', edge: '#b8261c', shape: 'rect', pat: 'stripe' },
+  { text: '秋刀魚', cloth: '#1f3a68', ink: '#fffaf0', edge: '#fffaf0', shape: 'swallow', pat: 'fish' },
+  { text: '営業中', cloth: '#b8261c', ink: '#fffaf0', edge: '#fffaf0', shape: 'wave' },
+  { text: '焼', cloth: '#14120f', ink: '#d8341c', edge: '#d8341c', shape: 'rect', pat: 'flame' },
+  { text: '歓迎', cloth: '#2f7a4a', ink: '#fffaf0', edge: '#fffaf0', shape: 'point' },
+  { text: '鮭', cloth: '#e8742a', ink: '#fffaf0', edge: '#fffaf0', shape: 'swallow', pat: 'seigaiha' },
+  { text: '炭火', cloth: '#f4efe2', ink: '#14120f', edge: '#14120f', shape: 'wave', pat: 'sun' },
 ]
 const NOBORI_W = 0.3
 const NOBORI_H = 0.92
@@ -167,15 +181,75 @@ const noboriTex = (i: number) => {
   if (!noboriCache.has(i)) {
     const look = NOBORI_LOOKS[i]
     noboriCache.set(i, signTexture(96, 296, (g) => {
+      // (the cloth's cut: square, a swallow's tail, a point, or scallops along its foot)
+      g.save()
+      g.beginPath()
+      if (look.shape === 'swallow') {
+        g.moveTo(0, 0); g.lineTo(96, 0); g.lineTo(96, 296); g.lineTo(48, 244); g.lineTo(0, 296)
+      } else if (look.shape === 'point') {
+        g.moveTo(0, 0); g.lineTo(96, 0); g.lineTo(96, 236); g.lineTo(48, 296); g.lineTo(0, 236)
+      } else if (look.shape === 'wave') {
+        g.moveTo(0, 0); g.lineTo(96, 0); g.lineTo(96, 270)
+        for (let k = 2; k >= 0; k--) g.arc(16 + k * 32, 270, 16, 0, Math.PI, false)
+      } else {
+        g.rect(0, 0, 96, 296)
+      }
+      g.closePath()
+      g.clip()
       g.fillStyle = look.cloth
       g.fillRect(0, 0, 96, 296)
       // (the weave, and a border stitched down each side)
-      g.strokeStyle = 'rgba(0,0,0,0.06)'
+      g.strokeStyle = 'rgba(0,0,0,0.07)'
       for (let y = 0; y < 296; y += 3) {
         g.beginPath()
         g.moveTo(0, y)
         g.lineTo(96, y)
         g.stroke()
+      }
+      // (what's printed on it)
+      g.fillStyle = look.edge
+      g.strokeStyle = look.edge
+      if (look.pat === 'seigaiha') {
+        g.globalAlpha = 0.45
+        g.lineWidth = 1.6
+        for (let row = 0; row < 3; row++) for (let col = -1; col < 4; col++) for (const r of [14, 9, 4]) {
+          g.beginPath()
+          g.arc(col * 26 + (row % 2) * 13, 262 + row * 13, r, Math.PI, 0)
+          g.stroke()
+        }
+        g.globalAlpha = 1
+      } else if (look.pat === 'fish') {
+        g.globalAlpha = 0.5
+        g.beginPath()
+        g.ellipse(46, 252, 22, 10, 0, 0, Math.PI * 2)
+        g.moveTo(66, 252); g.lineTo(84, 240); g.lineTo(84, 264)
+        g.fill()
+        g.globalAlpha = 1
+      } else if (look.pat === 'sun') {
+        g.fillStyle = '#c8301e'
+        g.beginPath()
+        g.arc(48, 44, 24, 0, Math.PI * 2)
+        g.fill()
+      } else if (look.pat === 'flame') {
+        g.fillStyle = '#d8341c'
+        g.globalAlpha = 0.85
+        for (let k = 0; k < 4; k++) {
+          g.beginPath()
+          g.moveTo(k * 24 - 4, 296)
+          g.quadraticCurveTo(k * 24 + 10, 262 - (k % 2) * 14, k * 24 + 12, 232 - (k % 2) * 22)
+          g.quadraticCurveTo(k * 24 + 22, 262, k * 24 + 30, 296)
+          g.fill()
+        }
+        g.globalAlpha = 1
+      } else if (look.pat === 'stripe') {
+        g.globalAlpha = 0.28
+        g.save()
+        g.translate(48, 148)
+        g.rotate(-0.25)
+        g.fillRect(-70, -120, 22, 240)
+        g.fillRect(48, -120, 22, 240)
+        g.restore()
+        g.globalAlpha = 1
       }
       g.fillStyle = look.edge
       g.fillRect(5, 0, 3, 296)
@@ -183,17 +257,49 @@ const noboriTex = (i: number) => {
       g.setLineDash([6, 5])
       g.strokeStyle = look.edge
       g.lineWidth = 1.4
-      g.strokeRect(12, 4, 72, 288)
+      g.strokeRect(12, 4, 72, look.shape === 'rect' ? 288 : 226)
       g.setLineDash([])
       // (the word, a letter to a line, big and bold, in the sign font)
       const chars = [...look.text]
-      const size = chars.length > 3 ? 46 : 56
-      const gap = Math.min(size * 1.08, 268 / chars.length)
-      chars.forEach((ch, k) => brushText(g, ch, 48, 148 - ((chars.length - 1) * gap) / 2 + k * gap, size,
-        { fill: look.ink, shadow: 'rgba(0,0,0,0.22)' }))
+      const size = chars.length > 3 ? 46 : chars.length === 1 ? 78 : 56
+      const gap = Math.min(size * 1.08, 190 / chars.length)
+      const top = look.pat === 'sun' ? 104 : 30
+      chars.forEach((ch, k) => brushText(g, ch, 48, top + size * 0.55 + k * gap, size, { fill: look.ink, shadow: 'rgba(0,0,0,0.22)' }))
+      g.restore()
     }))
   }
   return noboriCache.get(i) ?? null
+}
+/** a wide banner (横断幕) hung from two cords across a stretch of the rope: a word set along it */
+const HBANNER_LOOKS = [
+  { text: 'いらっしゃいませ', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2' },
+  { text: '炭火燒烤 銘酒', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0' },
+  { text: '本日の推薦', cloth: '#f4efe2', ink: '#b8261c', edge: '#b8261c' },
+  { text: '大漁', cloth: '#14120f', ink: '#e8c45a', edge: '#e8c45a' },
+]
+const hbannerCache = new Map<number, THREE.Texture | null>()
+const hbannerTex = (i: number) => {
+  if (!hbannerCache.has(i)) {
+    const look = HBANNER_LOOKS[i]
+    hbannerCache.set(i, signTexture(320, 96, (g) => {
+      g.fillStyle = look.cloth
+      g.fillRect(0, 0, 320, 96)
+      g.strokeStyle = 'rgba(0,0,0,0.07)'
+      for (let x = 0; x < 320; x += 3) {
+        g.beginPath()
+        g.moveTo(x, 0)
+        g.lineTo(x, 96)
+        g.stroke()
+      }
+      g.fillStyle = look.edge
+      g.fillRect(0, 5, 320, 3)
+      g.fillRect(0, 88, 320, 3)
+      const chars = [...look.text]
+      const size = chars.length > 5 ? 40 : 54
+      brushText(g, look.text, 160, 49, Math.min(size, 290 / chars.length), { fill: look.ink, shadow: 'rgba(0,0,0,0.25)' })
+    }))
+  }
+  return hbannerCache.get(i) ?? null
 }
 const NOBORI_GEO = {
   rod: new THREE.CylinderGeometry(0.007, 0.007, NOBORI_W + 0.08, 8),
@@ -222,7 +328,7 @@ function Nobori({ i }: { i: number }) {
         {[-0.11, 0, 0.11].map((z) => <mesh key={z} geometry={NOBORI_GEO.loop} position={[0, -0.02, z]}><meshToonMaterial color="#e8dcc0" /></mesh>)}
         <mesh position={[-0.004, -NOBORI_H / 2 - 0.04, 0]} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[NOBORI_W, NOBORI_H]} />
-          <meshToonMaterial color="#ffffff" map={noboriTex(i)} side={THREE.DoubleSide} />
+          <meshToonMaterial color="#ffffff" map={noboriTex(i)} side={THREE.DoubleSide} transparent alphaTest={0.4} />
         </mesh>
         <mesh geometry={NOBORI_GEO.weight} position={[-0.006, -NOBORI_H - 0.04, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#2a1a10" /></mesh>
       </group>
@@ -236,6 +342,20 @@ function Nobori({ i }: { i: number }) {
  */
 function BannerRow({ zs }: { zs: number[] }) {
   const refs = useRef<(THREE.Group | null)[]>([])
+  // (the same every time: a mix of cloths and lengths, a wide banner every so often taking three places)
+  const items = useMemo(() => {
+    const out: { z: number; look: number; len: number; w: number; wide: boolean }[] = []
+    for (let k = 0; k < zs.length; k++) {
+      if (k % 7 === 3 && k + 2 < zs.length) {
+        out.push({ z: zs[k + 1], look: (k * 3) % HBANNER_LOOKS.length, len: 0.2, w: 0.62, wide: true })
+        k += 2
+      } else {
+        const look = (k * 5 + 3) % NOBORI_LOOKS.length
+        out.push({ z: zs[k], look, len: 0.36 + 0.09 * ((k * 7) % 4), w: NOBORI_LOOKS[look].shape === 'rect' ? 0.15 : 0.17, wide: false })
+      }
+    }
+    return out
+  }, [zs])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
@@ -250,30 +370,47 @@ function BannerRow({ zs }: { zs: number[] }) {
       <mesh position={[0, 0, (z0 + z1) / 2]} rotation-x={Math.PI / 2}>
         <cylinderGeometry args={[0.004, 0.004, z1 - z0 + 0.3, 5]} /><meshBasicMaterial color="#2a1a10" />
       </mesh>
-      {zs.map((z, i) => {
-        const len = 0.44 + 0.07 * ((i * 7) % 3)
-        return (
-          <group key={i} position={[0, 0, z]} ref={(g) => { refs.current[i] = g }}>
-            <mesh position={[0, -0.01, 0]}><boxGeometry args={[0.012, 0.02, 0.17]} /><meshToonMaterial color="#e8dcc0" /></mesh>
-            <mesh position={[0, -len / 2 - 0.02, 0]} rotation-y={-Math.PI / 2}>
-              <planeGeometry args={[0.15, len]} />
-              <meshToonMaterial color="#ffffff" map={noboriTex((i * 5 + 3) % NOBORI_LOOKS.length)} side={THREE.DoubleSide} />
-            </mesh>
-          </group>
-        )
-      })}
+      {items.map((it, i) => (
+        <group key={i} position={[0, 0, it.z]} ref={(g) => { refs.current[i] = g }}>
+          {it.wide ? (
+            <>
+              {[-1, 1].map((sd) => (
+                <mesh key={sd} position={[0, -0.05, sd * (it.w / 2 - 0.03)]}><cylinderGeometry args={[0.0025, 0.0025, 0.1, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
+              ))}
+              <mesh position={[0, -0.1 - it.len / 2, 0]} rotation-y={-Math.PI / 2}>
+                <planeGeometry args={[it.w, it.len]} /><meshToonMaterial color="#ffffff" map={hbannerTex(it.look)} side={THREE.DoubleSide} />
+              </mesh>
+              <mesh position={[0, -0.1 - it.len, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.004, 0.004, it.w, 5]} /><meshToonMaterial color="#2a1a10" /></mesh>
+            </>
+          ) : (
+            <>
+              <mesh position={[0, -0.01, 0]}><boxGeometry args={[0.012, 0.02, it.w + 0.02]} /><meshToonMaterial color="#e8dcc0" /></mesh>
+              <mesh position={[0, -it.len / 2 - 0.02, 0]} rotation-y={-Math.PI / 2}>
+                <planeGeometry args={[it.w, it.len]} />
+                <meshToonMaterial color="#ffffff" map={noboriTex(it.look)} side={THREE.DoubleSide} transparent alphaTest={0.4} />
+              </mesh>
+            </>
+          )}
+        </group>
+      ))}
     </group>
   )
 }
 
 /** a big signboard (看板) on the wall: a cream board with the word brushed down it in great black strokes, a red seal at its foot */
-const KANBAN_LOOKS = [{ text: '炭火燒烤', seal: '聞野' }, { text: '日式烤魚', seal: '聞野' }, { text: '深夜食堂', seal: '聞野' }, { text: '銘酒', seal: '酒' }]
+const KANBAN_LOOKS = [
+  { text: '炭火燒烤', seal: '聞野', bg: '#ecd9a6', ink: '#1a0d06', frame: '#3a2416' },
+  { text: '日式烤魚', seal: '聞野', bg: '#1c1a18', ink: '#e8c45a', frame: '#6a4a2a' },
+  { text: '大漁', seal: '漁', bg: '#b8261c', ink: '#fbf3e2', frame: '#3a2416' },
+  { text: '銘酒', seal: '酒', bg: '#f4efe2', ink: '#1f3a68', frame: '#3a2416' },
+  { text: '深夜食堂', seal: '聞野', bg: '#1f3a68', ink: '#fbf3e2', frame: '#2a1a10' },
+]
 const kanbanCache = new Map<number, THREE.Texture | null>()
 const kanbanTex = (i: number) => {
   if (!kanbanCache.has(i)) {
     const look = KANBAN_LOOKS[i]
     kanbanCache.set(i, signTexture(128, 320, (g) => {
-      g.fillStyle = '#ecd9a6'
+      g.fillStyle = look.bg
       g.fillRect(0, 0, 128, 320)
       g.strokeStyle = 'rgba(120,80,30,0.16)'
       for (let y = 0; y < 320; y += 4) {
@@ -282,16 +419,16 @@ const kanbanTex = (i: number) => {
         g.lineTo(128, y)
         g.stroke()
       }
-      g.strokeStyle = '#3a2416'
+      g.strokeStyle = look.frame
       g.lineWidth = 5
       g.strokeRect(5, 5, 118, 310)
       const chars = [...look.text]
       const size = chars.length > 2 ? 62 : 78
       const gap = Math.min(size * 1.05, 230 / chars.length)
-      chars.forEach((ch, k) => brushText(g, ch, 64, 28 + size * 0.5 + k * gap, size, { fill: '#1a0d06', shadow: 'rgba(120,80,30,0.28)' }))
-      g.fillStyle = '#b8261c'
+      chars.forEach((ch, k) => brushText(g, ch, 64, 28 + size * 0.5 + k * gap, size, { fill: look.ink, shadow: 'rgba(0,0,0,0.25)' }))
+      g.fillStyle = look.bg === '#b8261c' ? '#fbf3e2' : '#b8261c'
       g.fillRect(40, 262, 48, 40)
-      brushText(g, look.seal, 64, 283, look.seal.length > 1 ? 18 : 26, { fill: '#fbf3e2' })
+      brushText(g, look.seal, 64, 283, look.seal.length > 1 ? 18 : 26, { fill: look.bg === '#b8261c' ? '#b8261c' : '#fbf3e2' })
     }))
   }
   return kanbanCache.get(i) ?? null
@@ -728,20 +865,22 @@ function Kamidana({ shelf = true }: { shelf?: boolean }) {
           <planeGeometry args={[0.004, 0.125]} /><meshBasicMaterial color={INK} />
         </mesh>
         <Box size={[0.014, 0.012, 0.15]} color="#6a5038" position={[-0.064, 0.19, 0]} />
-        {/* (the roof, a thick pair of slopes with its ridge, the crossed finials at both ends, the logs across) */}
+        {/* (the roof: two planks of cypress bark sloping down from the ridge, a modest eave all round, each edged with a thin darker
+            board; the ridge capped in gold, the crossed finials (千木) rising at both ends and the short logs (鰹木) laid across it) */}
         {[-1, 1].map((sd) => (
-          <mesh key={sd} position={[sd * 0.055, 0.235, 0]} rotation-z={sd * 0.55}>
-            <boxGeometry args={[0.14, 0.018, 0.31]} />
-            <meshToonMaterial color="#6a5038" />
-          </mesh>
+          <group key={sd} position={[sd * 0.066, 0.225, 0]} rotation-z={-sd * 0.5}>
+            <mesh><boxGeometry args={[0.15, 0.012, 0.3]} /><meshToonMaterial color="#8a6a44" /></mesh>
+            <mesh position={[sd * -0.001, -0.0085, 0]}><boxGeometry args={[0.152, 0.005, 0.304]} /><meshToonMaterial color="#4a3622" /></mesh>
+            {[-1, 1].map((e) => <mesh key={e} position={[0, 0.0045, e * 0.1485]}><boxGeometry args={[0.15, 0.006, 0.006]} /><meshToonMaterial color="#4a3622" /></mesh>)}
+          </group>
         ))}
-        <Box size={[0.03, 0.016, 0.33]} color="#d4b04a" position-y={0.272} />
+        <Box size={[0.026, 0.014, 0.31]} color="#d4b04a" position-y={0.272} />
         {[-1, 1].flatMap((sz) => [-1, 1].map((lean) => (
-          <Box key={`${sz}${lean}`} size={[0.008, 0.008, 0.07]} color="#c9a46a" position={[0, 0.295, sz * 0.172]} rotation-x={lean * 0.6} />
+          <Box key={`${sz}${lean}`} size={[0.008, 0.012, 0.085]} color="#d8b878" position={[0, 0.3, sz * 0.158]} rotation-x={lean * 0.62} />
         )))}
-        {[-0.07, 0, 0.07].map((z) => (
+        {[-0.065, 0, 0.065].map((z) => (
           <mesh key={z} position={[0, 0.285, z]} rotation-z={Math.PI / 2}>
-            <cylinderGeometry args={[0.009, 0.009, 0.085, 10]} /><meshToonMaterial color="#d4b04a" />
+            <cylinderGeometry args={[0.008, 0.008, 0.075, 10]} /><meshToonMaterial color="#d4b04a" />
           </mesh>
         ))}
       </group>
@@ -986,26 +1125,30 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
 }
 
 const ALTAR_GEO = {
-  bottle: new THREE.CylinderGeometry(0.03, 0.034, 0.09, 16),
-  neck: new THREE.CylinderGeometry(0.011, 0.02, 0.06, 12),
-  mouth: new THREE.CylinderGeometry(0.014, 0.012, 0.012, 12),
+  // a round-bellied sake flask with a long slim neck and a flared lip (徳利), in white glaze
+  tokkuri: new THREE.LatheGeometry([[0, 0], [0.022, 0], [0.034, 0.008], [0.04, 0.026], [0.038, 0.05], [0.028, 0.072], [0.016, 0.088], [0.0115, 0.104],
+    [0.0108, 0.128], [0.0135, 0.14], [0.015, 0.146], [0.0128, 0.15], [0, 0.15]].map(([r, y]) => new THREE.Vector2(r, y)), 20),
+  cord: new THREE.TorusGeometry(0.0128, 0.0022, 6, 18),
+  knot: new THREE.SphereGeometry(0.0045, 6, 5),
+  shide: new THREE.PlaneGeometry(0.02, 0.05),
   cup: new THREE.CylinderGeometry(0.03, 0.017, 0.016, 16),
   sake: new THREE.CircleGeometry(0.026, 16),
   fruit: new THREE.SphereGeometry(0.03, 12, 8),
   leaf: new THREE.ConeGeometry(0.01, 0.026, 6),
   dish: new THREE.CylinderGeometry(0.08, 0.06, 0.015, 18),
 }
-/** the label on the sake bottle: 酒 brushed in black on a red square */
-const SAKE_LABEL = canvasTex(64, 80, (g) => {
-  g.fillStyle = '#f8f2e2'
-  g.fillRect(0, 0, 64, 80)
-  g.fillStyle = '#b8261c'
-  g.fillRect(8, 8, 48, 64)
-  brushText(g, '酒', 32, 42, 40, { fill: '#fff6e0', shadow: 'rgba(40,0,0,0.4)' })
+/** the paper label stuck on each tokkuri: 御神酒 down it in black on white, a red seal */
+const SAKE_LABEL = canvasTex(48, 96, (g) => {
+  g.fillStyle = '#fbf8ef'
+  g.fillRect(0, 0, 48, 96)
+  g.strokeStyle = '#b8261c'
+  g.lineWidth = 2
+  g.strokeRect(3, 3, 42, 90)
+  ;[...'御神酒'].forEach((ch, k) => brushText(g, ch, 24, 20 + k * 25, 22, { fill: '#1a0d06' }))
 })
 /**
- * The altar on the shelf by the door: the household shrine (神棚), a bottle of sake and its cup set out before it, a
- * dish of oranges. Offering the sake (a click) fills the cup and lights the shrine for a minute.
+ * The altar on the shelf by the door: the household shrine (神棚), a pair of sake flasks (御神酒徳利) and a cup set out before it, a
+ * dish of oranges. Offering the sake (a click) fills the cup and makes the shrine itself glow for a minute.
  */
 /**
  * A carved shelf bracket (持ち送り), in the wall's frame (x out from the wall, which is at x = 0, so it reaches to -x):
@@ -1028,47 +1171,63 @@ const ALTAR_D = 0.58
 /** and its height: up over the beckoning cats' stand below it, by the door */
 const ALTAR_Y = 1.42
 /** how long the sake offered stands there, and the extra custom it brings (ms) */
-const INCENSE_MS = 60000
+const INCENSE_MS = 180000
 function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
-  const glow = useRef<THREE.Mesh>(null)
-  const halo = useRef<THREE.MeshBasicMaterial>(null)
+  const doorGlow = useRef<THREE.MeshBasicMaterial>(null)
+  const aura = useRef<THREE.SpriteMaterial>(null)
   const sake = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    // (offered, the sake stands in its cup for a minute, the shrine glowing, and is gone when it's over; then another can be offered)
+    // (offered, the sake stands in its cup for a minute and the shrine glows, then goes quiet; then another can be offered)
     const at = incense?.litAt ?? null
     const left = at === null ? 0 : Math.max(0, 1 - (performance.now() - at) / INCENSE_MS)
     const on = left > 0
+    const k = on ? Math.min(1, left * 8) : 0
+    const pulse = 0.85 + 0.15 * Math.sin(t * 2.4)
     if (sake.current) sake.current.visible = on
-    if (glow.current) glow.current.visible = on
-    if (halo.current) halo.current.opacity = on ? Math.min(1, left * 8) * (0.4 + 0.08 * Math.sin(t * 2.4)) : 0
+    if (doorGlow.current) doorGlow.current.opacity = k * 0.8 * pulse
+    if (aura.current) aura.current.opacity = k * 0.5 * pulse
   })
   const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); incense?.onLight() }
+  // (the shrine's front, in the altar's frame: its doors' plane, and the roof's)
+  const SC = 1.25
+  const doorX = ALTAR_D / 2 - (0.14 + 0.0645) * SC
+  const doorY = (0.015 + 0.12) * SC
+  const flask = (z: number, key: string) => (
+    <group key={key} position={[-0.2, 0, z]} onClick={offer} {...(incense ? handOver : {})}>
+      <mesh geometry={ALTAR_GEO.tokkuri} castShadow><meshToonMaterial color="#f6f4ee" /></mesh>
+      <mesh geometry={ALTAR_GEO.tokkuri} scale={1.03}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
+      {/* (a red cord round the neck with its knot, a paper shide hanging from it, a small label on the belly) */}
+      <mesh geometry={ALTAR_GEO.cord} position-y={0.112} rotation-x={Math.PI / 2}><meshToonMaterial color="#c4302a" /></mesh>
+      <mesh geometry={ALTAR_GEO.knot} position={[-0.0128, 0.112, 0]}><meshToonMaterial color="#c4302a" /></mesh>
+      <mesh geometry={ALTAR_GEO.shide} position={[-0.0165, 0.088, 0]} rotation-y={-Math.PI / 2}><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
+      <mesh position={[-0.0405, 0.04, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.03, 0.06]} /><meshToonMaterial color="#ffffff" map={SAKE_LABEL} /></mesh>
+      <mesh position={[0, 0.07, 0]} visible={false}><boxGeometry args={[0.1, 0.16, 0.1]} /></mesh>
+    </group>
+  )
   return (
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
-      <group position-x={ALTAR_D / 2} scale={1.25}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
-      {/* the glow round the shrine while the offering's there */}
-      <mesh ref={glow} position={[-0.28, 0.2, 0]} rotation-y={-Math.PI / 2} renderOrder={2}>
-        <planeGeometry args={[0.95, 0.7]} />
-        <meshBasicMaterial ref={halo} map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0} />
+      <group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
+      {/* the shrine's own glow while the offering stands: its doors lit, and a warm light behind it all round */}
+      <mesh position={[doorX, doorY, 0]} rotation-y={-Math.PI / 2} renderOrder={3}>
+        <planeGeometry args={[0.112 * SC, 0.128 * SC]} />
+        <meshBasicMaterial ref={doorGlow} color="#ffd48a" transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0} />
       </mesh>
-      {/* the offering of sake (御神酒): a white bottle with its red-labelled 酒, and a shallow cup before it that the sake's
-          poured into: click either (or the shrine) to make the offering */}
-      <group position={[-0.2, 0, -0.32]} onClick={offer} {...(incense ? handOver : {})}>
-        <Inked geometry={ALTAR_GEO.bottle} color="#f4f1ea" position-y={0.045} />
-        <Inked geometry={ALTAR_GEO.neck} color="#f4f1ea" position-y={0.115} />
-        <mesh geometry={ALTAR_GEO.mouth} position-y={0.143}><meshToonMaterial color="#c4302a" /></mesh>
-        <mesh position={[-0.0325, 0.05, 0]} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[0.04, 0.05]} /><meshToonMaterial color="#ffffff" map={SAKE_LABEL} />
+      <sprite position={[ALTAR_D / 2 - 0.02, 0.2, 0]} scale={[0.95, 0.75, 1]}>
+        <spriteMaterial ref={aura} map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0} />
+      </sprite>
+      {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
+          sake's poured into: click any of them (or the shrine) to make the offering */}
+      {flask(-0.22, 'fl')}
+      {flask(0.22, 'fr')}
+      <group position={[-0.24, 0, -0.1]} onClick={offer} {...(incense ? handOver : {})}>
+        <mesh geometry={ALTAR_GEO.cup} position-y={0.008}><meshToonMaterial color="#f6f4ee" /></mesh>
+        <mesh geometry={ALTAR_GEO.cup} position-y={0.008} scale={1.06}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
+        <mesh ref={sake} geometry={ALTAR_GEO.sake} position-y={0.0175} rotation-x={-Math.PI / 2} visible={false}>
+          <meshBasicMaterial color="#f2dc8a" toneMapped={false} />
         </mesh>
-        <group position={[-0.0, 0, 0.09]}>
-          <Inked geometry={ALTAR_GEO.cup} color="#f4f1ea" position-y={0.008} />
-          <mesh ref={sake} geometry={ALTAR_GEO.sake} position-y={0.0175} rotation-x={-Math.PI / 2} visible={false}>
-            <meshBasicMaterial color="#f2dc8a" toneMapped={false} />
-          </mesh>
-        </group>
-        <mesh position={[0, 0.07, 0.05]} visible={false}><boxGeometry args={[0.14, 0.16, 0.2]} /></mesh>
+        <mesh position={[0, 0.02, 0]} visible={false}><boxGeometry args={[0.1, 0.08, 0.1]} /></mesh>
       </group>
       {/* the oranges on their dish, a leaf on the top one */}
       <group position={[-0.17, 0, 0]}>

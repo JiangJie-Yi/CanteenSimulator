@@ -5930,11 +5930,17 @@ button {
   stroke: rgb(40 25 15 / 0.6);
   stroke-width: 1;
 }
-/* (the eye: a solid disc in the same colour as the painted rule round the board's edge) */
-.brand-fish .brand-fish-ring {
-  fill: var(--plate-cream);
-  stroke: none;
+/* (the eye: a solid round dot in the same colour as the painted rule round the board's edge) */
+.brand-grilledfish .brand-fish-eyedot {
+  position: absolute;
+  left: calc(10% - 0.15em);
+  top: calc(39% - 0.15em);
+  width: 0.3em;
+  height: 0.3em;
+  border-radius: 50%;
+  background: var(--plate-cream);
   opacity: 0.95;
+  pointer-events: none;
 }
 
 /* (the nails holding it up: one through its head, one by its tail) */
