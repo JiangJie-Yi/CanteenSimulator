@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
+import { glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
@@ -1546,8 +1547,8 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
         <group key={`${r}-${k}`} ref={reg(`${r}-${k}`)}
           position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin({ kind: 'slot', r, k }, ev)}
-          onPointerOver={() => { if (doorOpen()) document.body.style.cursor = 'grab' }}
-          onPointerOut={() => { document.body.style.cursor = '' }}>
+          onPointerOver={(ev) => { if (doorOpen()) { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject) } }}
+          onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null) }}>
           <DrinkBottle id={id} />
         </group>
       )))}
@@ -1560,7 +1561,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       {/* (what's been taken out, stood on the floor before the fridge) */}
       {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
         <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
-          onPointerOver={() => { document.body.style.cursor = 'grab' }} onPointerOut={() => { document.body.style.cursor = '' }}>
+          onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject) }} onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null) }}>
           <DrinkBottle id={o.id} />
         </group>
       ))}

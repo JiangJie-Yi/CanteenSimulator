@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { glowOff, glowOnly } from '@/scene/hoverGlow'
 
 /*
  * Where the customers sit: one or more counters, each a straight run of stools. A counter is given by its middle
@@ -91,13 +92,17 @@ export function sauceSide(c: Counter, gate: { end: 1 | -1; w: number } | undefin
 export const POINTER_HINT = { hand: 0 }
 /** handlers for one of those: a hand over it */
 export const handOver = {
-  onPointerOver: (e: { stopPropagation: () => void; nativeEvent: Event }) => {
+  onPointerOver: (e: { stopPropagation: () => void; nativeEvent: Event; eventObject?: THREE.Object3D }) => {
     e.stopPropagation()
+    // (and the thing itself lights up, so it's plain which one is under the pointer)
+    glowOnly(e.eventObject)
     POINTER_HINT.hand++
     const el = e.nativeEvent.target as HTMLElement | null
     if (el?.style) el.style.cursor = 'pointer'
   },
-  onPointerOut: (e: { nativeEvent: Event }) => {
+  onPointerOut: (e: { nativeEvent: Event; eventObject?: THREE.Object3D }) => {
+    glowOff(e.eventObject)
+    glowOnly(null)
     POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand - 1)
     const el = e.nativeEvent.target as HTMLElement | null
     if (el?.style && !POINTER_HINT.hand) el.style.cursor = ''

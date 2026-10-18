@@ -4,6 +4,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
+import { glowOnly } from '@/scene/hoverGlow'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
 import { brushText, signTexture } from '@/scene/signFont'
@@ -2709,10 +2710,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (soup && !p) setTasteTip({ at: soup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.32, 0)).toArray() as [number, number, number], taste: SOUP_TASTE })
       const dec = tool || p || soup ? null : pickDecor()
       setDecorTip(dec)
+      // (what's under the pointer, other than the food (which shows its own taste tip), lights up)
+      const cont = tool || p || soup || dec ? null : pickContainer()
+      let lit: THREE.Object3D | null = null
+      if (tool) lit = tool.node
+      else if (soup) lit = soup
+      else if (dec) world.traverse((o) => { if (!lit && o.userData.decor === dec) lit = o })
+      else if (cont) world.traverse((o) => { if (!lit && o.userData.container === cont) lit = o })
+      glowOnly(lit)
       el.style.cursor = tool || dec ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : pickCoal() ? 'pointer' : POINTER_HINT.hand ? 'pointer' : ''
     }
     const onDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY }
+      glowOnly(null)
       if (e.button !== 0 || lockedRef.current) return
       aim(e)
       const tool = pickTool()
