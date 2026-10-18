@@ -3939,6 +3939,16 @@ button {
   animation: stamp 320ms ease-out;
 }
 
+.ofc-credits,
+.welcome-credits {
+  margin: 18px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-soft);
+  opacity: 0.8;
+  text-align: center;
+}
+
 .welcome-card h2 {
   margin: 0 0 14px;
   font: 400 30px/1.2 'Zen Antique', var(--brush);

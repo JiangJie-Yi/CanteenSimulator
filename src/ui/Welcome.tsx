@@ -1,3 +1,4 @@
+import { CREDITS } from '@/data/credits'
 import type { Lang } from '@/data/i18n'
 
 /**
@@ -17,6 +18,9 @@ export function Welcome({ lang, onStart, capital, shopCost }:
           <p className="welcome-sub">{ja ? `店は一軒 ${nt(shopCost)} で開業。画面中央の「開業」から始めよう。` : `開一間店要 ${nt(shopCost)}，點畫面中間的「開業」就能開店。`}</p>
           <button type="button" className="welcome-go" autoFocus onClick={() => onStart('')}>{ja ? '創業する' : '創業'}</button>
         </div>
+        <p className="welcome-credits">
+          {CREDITS.map((c) => `${c.what[ja ? 'ja' : 'zh']}：「${c.title}」 by ${c.author}（${c.licence}、${c.from}）`).join(' ／ ')}
+        </p>
       </div>
     </div>
   )
