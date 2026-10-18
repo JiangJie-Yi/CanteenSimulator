@@ -1501,17 +1501,43 @@ function useFreezer(n: number) {
     return out
   }, [gltf, n])
 }
+/** the soft wash of a cove light: white along the slot, fading to nothing across the wall */
+const COVE_WASH = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 64
+  c.height = 8
+  const g = c.getContext('2d')!
+  const grad = g.createLinearGradient(0, 0, 64, 0)
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)')
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.28)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 64, 8)
+  return new THREE.CanvasTexture(c)
+})()
 export function DrinkFridge({ n = 0 }: { n?: number }) {
   const { W, H, D } = FRIDGE
   const { body } = useFreezer(n)
   return (
     <group>
       <primitive object={body} />
-      {/* the white light strips inside, one up each side of the glass, and one along the top under the header */}
+      {/* the cove lights (槽燈): a narrow slot let into each inner side and the top, a thin line of white light deep in it, and
+          the light washing softly along the wall, shelf and drinks beside it */}
       {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[sd * (W / 2 - 0.1), H / 2 - 0.02, D / 2 - 0.09]}><boxGeometry args={[0.022, H - 0.5, 0.012]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
+        <group key={sd} position={[sd * (W / 2 - 0.075), H / 2 - 0.02, D / 2 - 0.1]}>
+          <mesh><boxGeometry args={[0.03, H - 0.46, 0.03]} /><meshBasicMaterial color="#202226" /></mesh>
+          <mesh position={[-sd * 0.0085, 0, 0.0155]}><boxGeometry args={[0.008, H - 0.5, 0.004]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
+          <mesh position={[-sd * 0.014, 0, -0.17]} rotation-y={sd * Math.PI / 2}><planeGeometry args={[0.32, H - 0.46]} />
+            <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.8} side={THREE.DoubleSide} /></mesh>
+        </group>
       ))}
-      <mesh position={[0, H - 0.3, D / 2 - 0.09]}><boxGeometry args={[W - 0.2, 0.02, 0.012]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
+      <group position={[0, H - 0.3, D / 2 - 0.1]}>
+        <mesh><boxGeometry args={[W - 0.12, 0.03, 0.03]} /><meshBasicMaterial color="#202226" /></mesh>
+        <mesh position={[0, -0.0085, 0.0155]}><boxGeometry args={[W - 0.16, 0.008, 0.004]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
+        <mesh position={[0, -0.014, -0.17]} rotation-x={Math.PI / 2}><planeGeometry args={[W - 0.16, 0.32]} />
+          <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.65} side={THREE.DoubleSide} /></mesh>
+      </group>
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
       <group position={[0, H + 0.03, D / 2 - 0.1]} rotation-x={-0.12}>
         <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
