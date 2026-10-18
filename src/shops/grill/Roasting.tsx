@@ -595,14 +595,16 @@ function Block({ along: a, lay: l, y: [y0, y1], color }: { along: [number, numbe
   )
 }
 /** the cubby cut into the table's front: a header over it under the top, a plinth at its foot, a shelf over its right-hand part */
+/** the cubby's boards, all one colour */
+const CUBBY_WOOD = '#4a3524'
 function CubbyFrame() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const front = COOK_TABLE.lay[1] - 0.06
   return (
     <>
-      <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[-0.3, -0.08]} color="#3a2a1e" />
-      <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color="#4a3524" />
-      <Block along={[CUBBY.shelfAlong, CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[CUBBY_SHELF_Y - CUBBY.shelfThick, CUBBY_SHELF_Y]} color="#8a6a44" />
+      <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[-0.3, -0.08]} color={CUBBY_WOOD} />
+      <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color={CUBBY_WOOD} />
+      <Block along={[CUBBY.shelfAlong, CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[CUBBY_SHELF_Y - CUBBY.shelfThick, CUBBY_SHELF_Y]} color={CUBBY_WOOD} />
     </>
   )
 }
@@ -1891,14 +1893,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * plate, dish, basket, the box and the bin (round footprints, pushed apart until they just touch).
    */
   const settle = (key: string, at: THREE.Vector3, stacking = false) => {
-    // (what's kept in the cubby stays where it is: it's under the top, not among what stands on it)
-    if (CUBBY_KEYS.has(key)) return at
     const r = footprint(key)
     // (what it's stacked with doesn't push it away; nor, while an empty one is carried, other empty ones it could go on)
-    const others = containerKeys().filter((k) => k !== key && !CUBBY_KEYS.has(k) && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
+    const others = containerKeys().filter((k) => k !== key && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
       .flatMap((k) => circlesOf(k, containerAt(k)))
     for (const k of Object.keys(SPARES)) {
-      const h = k !== key && !CUBBY_KEYS.has(k) && spareHome(k)
+      const h = k !== key && spareHome(k)
       if (h) others.push({ p: h, r: footprint(k) })
     }
     // the crate and the fan
@@ -1969,8 +1969,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     for (let pass = 0; pass < 3; pass++) {
       for (const key of containerKeys()) {
-        // (a stack stays where it was put)
-        if (stackOn.current.has(key)) continue
+        // (a stack stays where it was put; what's kept in the cubby under the table stays there till it's taken out)
+        if (stackOn.current.has(key) || CUBBY_KEYS.has(key)) continue
         const at = containerAt(key)
         const ok = settle(key, at.clone())
         const shift = ok.sub(at)
@@ -2844,8 +2844,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         // otherwise grab a plate, side dish, the basket, the seasoning box or the bin (not the food on them)
         const picked = food ? null : pickContainer()
-        // (what's kept in the cubby stays there; the food on it is picked up all the same)
-        if (picked && CUBBY_KEYS.has(picked)) return
         if (!picked) {
           // (a click on the coals themselves puts more charcoal on)
           if (pickCoal()) {
@@ -3010,6 +3008,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       want.y = base.y
       const next = settle(s.key, want, STACKABLE(s.key) && !holds(s.key)).sub(base)
       next.y = 0
+      // (taken out of the cubby, it comes up onto the table's top)
+      if (CUBBY_KEYS.has(s.key)) next.y = (s.key === 'plate-0' ? PLATE_TOP[1] : DISH_TOP[1]) - base.y
       moved.current.set(s.key, next)
       if (carriers[s.key]) {
         // the box carries its pots and utensils with it, the bucket its dipper
