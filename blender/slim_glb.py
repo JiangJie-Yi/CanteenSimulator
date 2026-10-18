@@ -13,6 +13,12 @@ src, dst, target = argv[0], argv[1], int(argv[2])
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src)
+for img in bpy.data.images:
+    w, h = img.size
+    if max(w, h) > 1024:
+        k = 1024 / max(w, h)
+        img.scale(max(1, int(w * k)), max(1, int(h * k)))
+        img.pack()
 meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 total = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in meshes)
 ratio = min(1.0, target / max(1, total))

@@ -2042,32 +2042,6 @@ const FRIDGE_SIGNS = FRIDGE_UNITS.map((u, n) => canvasTex(192, 48, (g) => {
   brushText(g, `${u.sign[0]} · ${u.sign[1]}`, 96, 25, 26, { fill: '#fff6e0', edge: n ? '#0a1020' : '#7a0e0a', shadow: 'rgba(0,0,0,0.5)', shine: '#ffffff', spacing: 1 })
 }))
 
-/** straw wrapping round a sake barrel (菰), the brewer's mark in red and black on its front (the middle, -z) */
-const KOMO = canvasTex(256, 96, (g) => {
-  g.fillStyle = '#d8c48e'
-  g.fillRect(0, 0, 256, 96)
-  for (let x = 0; x < 256; x += 3) {
-    g.strokeStyle = x % 6 ? 'rgba(120,90,40,0.35)' : 'rgba(250,240,200,0.4)'
-    g.beginPath()
-    g.moveTo(x, 0)
-    g.lineTo(x + 1, 96)
-    g.stroke()
-  }
-  // the mark: a red disc, the name brushed in black over it, and a band of black either side
-  g.fillStyle = '#f4ead2'
-  g.fillRect(96, 10, 64, 76)
-  g.fillStyle = '#b8261c'
-  g.beginPath()
-  g.arc(128, 40, 22, 0, Math.PI * 2)
-  g.fill()
-  g.fillStyle = '#1c1410'
-  g.font = 'bold 30px serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillText('聞', 128, 41)
-  g.font = 'bold 15px serif'
-  g.fillText('銘酒', 128, 74)
-})
 const PROP_GEO = {
   barrel: new THREE.CylinderGeometry(0.2, 0.2, 0.42, 24, 1, true),
   barrelTop: new THREE.CircleGeometry(0.2, 24),
@@ -2092,17 +2066,36 @@ function Inked({ geometry, color, map, grow = 1.04, side, ...rest }: { geometry:
     </group>
   )
 }
-/** a straw-wrapped sake barrel (菰樽), its lid and its two ropes, standing on its end; its mark faces `-z` */
-function SakeBarrel() {
-  return (
-    <group>
-      <Inked geometry={PROP_GEO.barrel} color="#ffffff" map={KOMO} position-y={0.21} grow={1.03} side={THREE.DoubleSide} />
-      <mesh geometry={PROP_GEO.barrelTop} position-y={0.42} rotation-x={-Math.PI / 2}><meshToonMaterial color="#c9a46a" /></mesh>
-      {[0.07, 0.35].map((y) => (
-        <mesh key={y} geometry={PROP_GEO.rope} position-y={y} rotation-x={Math.PI / 2}><meshToonMaterial color="#5a3a1e" /></mesh>
-      ))}
-    </group>
-  )
+const BARRELS_URL = import.meta.env.BASE_URL + 'models/kazaridaru_sake_barrels_lowpoly_remesh.glb'
+/** a stack of decorative sake barrels (飾り樽), the downloaded model (its floor left out), toon-shaded and inked, stood on the floor, ~0.9 tall */
+function SakeStack() {
+  const gltf = useGLTF(BARRELS_URL) as unknown as { scene: THREE.Group }
+  const stack = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const geo = m.geometry
+      geo.computeBoundingBox()
+      const sz = geo.boundingBox!.getSize(new THREE.Vector3())
+      // (the model's floor plane is flat: not drawn)
+      if (sz.y < 0.01 && sz.x > 1.5) { m.visible = false; return }
+      const src = m.material as THREE.MeshStandardMaterial
+      m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null })
+      m.castShadow = true
+    })
+    inkModel(root)
+    const box = new THREE.Box3().setFromObject(root.children[0] ? root : root)
+    const size = box.getSize(new THREE.Vector3())
+    const k = 0.9 / (size.y || 1)
+    const c = box.getCenter(new THREE.Vector3())
+    const out = new THREE.Group()
+    root.position.set(-c.x, -box.min.y, -c.z)
+    out.add(root)
+    out.scale.setScalar(k)
+    return out
+  }, [gltf])
+  return <primitive object={stack} />
 }
 /** a clump of bamboo in a glazed pot: a few stalks, leaves in tufts at their joints */
 function PottedBamboo() {
@@ -2290,9 +2283,7 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   return (
     <StaticBatch key={lang}>
       <group position={at(3.3, 3.2)} rotation-y={face + 0.3}>
-        <group position-x={-0.21}><SakeBarrel /></group>
-        <group position-x={0.21} rotation-y={0.4}><SakeBarrel /></group>
-        <group position-y={0.43} rotation-y={-0.2}><SakeBarrel /></group>
+        <SakeStack />
       </group>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}

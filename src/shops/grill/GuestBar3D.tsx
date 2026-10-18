@@ -592,11 +592,11 @@ const STEP_LOG = (() => {
   c.height = 64
   const g = c.getContext('2d')!
   // (planed oak, as the floor's: a warm mid-brown, long straight fine grain with a few darker streaks, no knots)
-  g.fillStyle = '#7a5836'
+  g.fillStyle = '#9a7650'
   g.fillRect(0, 0, 256, 64)
   for (let i = 0; i < 40; i++) {
     const y = (i * 1.6 + (i % 5) * 0.4) % 64
-    g.strokeStyle = i % 3 ? 'rgba(45,26,12,0.22)' : 'rgba(190,140,90,0.16)'
+    g.strokeStyle = i % 3 ? 'rgba(60,36,18,0.16)' : 'rgba(190,140,90,0.16)'
     g.lineWidth = 0.7 + (i % 4) * 0.25
     g.beginPath()
     g.moveTo(0, y)
