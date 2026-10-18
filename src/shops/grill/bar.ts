@@ -341,7 +341,7 @@ export function kitchenOf(cs: Counter[]) {
 /** where the staff's way through each counter's gate lies on the kitchen's edge: along the first counter's cook's face, and
  * along (in lay) the kitchen's side by the side counter */
 /** how much further than the side gate's doorway its steps reach, inward along the counter */
-const SIDE_STEP_EXTRA = 0.34
+const SIDE_STEP_EXTRA = 0.12
 export function kitchenGatesOf(cs: Counter[]) {
   const c0 = cs[0], c1 = cs[1]
   const g0 = gateOf(c0, BAR_GATES[0])

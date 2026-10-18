@@ -631,7 +631,7 @@ const SHRINE_GRAIN = canvasTex(128, 128, (g) => {
 }, true)
 /** the shrine's roof: cypress-bark thatch, courses laid along the slope, each a different tone with a dark seam, the grain fine along it */
 const SHRINE_ROOF = canvasTex(128, 128, (g) => {
-  const tones = ['#8d6a42', '#7c5b36', '#98744a', '#84623c', '#90693f', '#785632', '#9a784c', '#86633a']
+  const tones = ['#c9a06a', '#bd9460', '#d2aa74', '#c19863', '#cba36c', '#b88e5a', '#d4ad78', '#c49b66']
   for (let r = 0; r < 8; r++) {
     g.fillStyle = tones[r]
     g.fillRect(0, r * 16, 128, 16)
@@ -1098,23 +1098,28 @@ function Bouquet({ lean = 0 }: { lean?: number }) {
  * a bouquet in a vase either side, the cups of rice, salt and water before it, and the sacred rope (注連縄) with its
  * paper streamers hung across the front.
  */
-function Kamidana({ shelf = true }: { shelf?: boolean }) {
+/** `part`: the shrine itself, the things set about it (vases, cups), or all of it (on the wall) */
+function Kamidana({ shelf = true, part = 'all' }: { shelf?: boolean; part?: 'all' | 'shrine' | 'extras' }) {
   const HIN = '#e2c89a'
   const GRAIN = '#cfae78'
-  const RED = '#a8541e'
+  const RED = '#d8b884'
+  const GOLD = '#d9b13e'
   return (
     <group>
-      {shelf && <InkBox size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />}
-      {shelf && [-0.3, 0.3].map((z) => <InkBox key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
+      {part !== 'extras' && shelf && <InkBox size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />}
+      {part !== 'extras' && shelf && [-0.3, 0.3].map((z) => <InkBox key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
       {/* the shrine: a stepped base, the railing, body, doors and roof */}
-      <group position={[-0.14, 0.015, 0]}>
+      {part !== 'extras' && <group position={[-0.14, 0.015, 0]}>
         <InkBox size={[0.18, 0.02, 0.36]} color={GRAIN} position-y={0.01} />
         <InkBox size={[0.16, 0.02, 0.33]} color={HIN} position-y={0.03} />
         {/* (three steps down the front) */}
         {[0, 1, 2].map((k) => <InkBox key={k} size={[0.02, 0.008, 0.07 - k * 0.006]} color="#d8bc88" position={[-0.09 - k * 0.018, 0.016 - k * 0.004, 0]} />)}
         {/* (the railing round the platform, a post at each corner) */}
         {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
-          <InkBox key={`${sx}${sz}`} size={[0.012, 0.05, 0.012]} color={RED} position={[sx * 0.073, 0.065, sz * 0.153]} />
+          <group key={`${sx}${sz}`}>
+            <InkBox size={[0.014, 0.05, 0.014]} color={RED} position={[sx * 0.073, 0.065, sz * 0.153]} />
+            <InkBox size={[0.011, 0.012, 0.011]} color={GOLD} position={[sx * 0.073, 0.096, sz * 0.153]} />
+          </group>
         )))}
         <InkBox size={[0.008, 0.01, 0.31]} color={RED} position={[-0.073, 0.082, 0]} />
         {[-1, 1].map((sz) => <InkBox key={sz} size={[0.15, 0.01, 0.008]} color={RED} position={[0, 0.082, sz * 0.153]} />)}
@@ -1136,7 +1141,13 @@ function Kamidana({ shelf = true }: { shelf?: boolean }) {
         <mesh position={[-0.0618, 0.12, 0]} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[0.004, 0.125]} /><meshBasicMaterial color={INK} />
         </mesh>
-        <InkBox size={[0.014, 0.012, 0.15]} color="#6a5038" position={[-0.064, 0.19, 0]} />
+        {/* (the gold crest in the middle of the doors, and a gold fitting in each corner of each leaf) */}
+        <mesh position={[-0.0632, 0.12, 0]} rotation-y={-Math.PI / 2}><circleGeometry args={[0.014, 14]} /><meshBasicMaterial color={GOLD} /></mesh>
+        <mesh position={[-0.0636, 0.12, 0]} rotation-y={-Math.PI / 2}><ringGeometry args={[0.007, 0.01, 12]} /><meshBasicMaterial color="#8a6a1a" /></mesh>
+        {[-1, 1].flatMap((sd) => [-1, 1].map((v) => (
+          <mesh key={`${sd}${v}`} position={[-0.0625, 0.12 + v * 0.05, sd * 0.045]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.014, 0.014]} /><meshBasicMaterial color={GOLD} /></mesh>
+        )))}
+        <InkBox size={[0.014, 0.012, 0.15]} color="#c9a56c" position={[-0.064, 0.19, 0]} />
         {/* (the roof: two planks of cypress bark sloping down from the ridge, a modest eave all round, each edged with a thin darker
             board; the ridge capped in gold, the crossed finials (千木) rising at both ends and the short logs (鰹木) laid across it) */}
         {[-1, 1].map((sd) => (
@@ -1151,17 +1162,17 @@ function Kamidana({ shelf = true }: { shelf?: boolean }) {
         {[-1, 1].flatMap((sz) => [-1, 1].map((lean) => (
           <InkBox key={`${sz}${lean}`} size={[0.008, 0.012, 0.085]} color="#d8b878" position={[0, 0.3, sz * 0.158]} rotation-x={lean * 0.62} />
         )))}
-        {[-0.065, 0, 0.065].map((z) => (
+        {[-0.11, -0.055, 0, 0.055, 0.11].map((z) => (
           <mesh key={z} position={[0, 0.285, z]} rotation-z={Math.PI / 2}>
             <cylinderGeometry args={[0.008, 0.008, 0.075, 10]} /><meshToonMaterial color="#d4b04a" />
           </mesh>
         ))}
-      </group>
+      </group>}
       {/* the bouquets in their vases, leaning in a little, and the cups */}
-      {[-1, 1].map((sd) => (
+      {part !== 'shrine' && [-1, 1].map((sd) => (
         <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} /></group>
       ))}
-      {[-0.13, 0, 0.13].map((z) => (
+      {part !== 'shrine' && [-0.13, 0, 0.13].map((z) => (
         <mesh key={z} position={[-0.235, 0.03, z * 0.6]}>
           <cylinderGeometry args={[0.012, 0.01, 0.025, 10]} />
           <meshToonMaterial color="#f4f1ea" />
@@ -1505,7 +1516,9 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
       <group position-x={ALTAR_D / 2} scale={SC} onClick={offer}
-        {...handOver}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
+        {...handOver}><StaticBatch><Kamidana shelf={false} part="shrine" /></StaticBatch></group>
+      {/* (the vases and cups beside it are not part of what's pointed at: they don't light with it) */}
+      <group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana shelf={false} part="extras" /></StaticBatch></group>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={GLOW} color="#ffe0a0" size={0.07} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </points>
