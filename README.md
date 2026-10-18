@@ -58,3 +58,6 @@ npm run build    # 產生 dist/
 ## Credits
 
 - Lucky cat (招き猫) model: "Lucky cat with animation cute maneki neko" by Noth+ Studio, licensed under Creative Commons Attribution 4.0 (CC BY 4.0), via Sketchfab. Converted for use here (poses baked into plain meshes, re-textured materials).
+- Lucky cat (招き猫) model: "Lucky cat maneki neko" by Rice & Soy Sauce (@rice_soysauce), CC BY 4.0, via Sketchfab.
+- Lucky cat (招き猫) model: "Maneki neko" by Ramujiro (@Ramzus), CC BY 4.0, via Sketchfab.
+- Drinks fridge model: "medium freezer" by ALEXPROXY, CC BY 4.0, via Sketchfab. Scaled, re-materialled and its door given a hinge for use here.
