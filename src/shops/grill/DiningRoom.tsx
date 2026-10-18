@@ -2237,9 +2237,9 @@ function StaffMat({ lang }: { lang: Lang }) {
   return (
     <group>
       <primitive object={rug.group} />
-      <mesh position={[0, rug.height + 0.006, 0]} rotation-x={-Math.PI / 2}>
+      <mesh position={[0, rug.height + 0.025, 0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[0.9, 0.34]} />
-        <meshToonMaterial color="#ffffff" map={STAFF_WORDS_TEX[lang]} transparent depthWrite={false} />
+        <meshBasicMaterial color="#ffffff" map={STAFF_WORDS_TEX[lang]} transparent toneMapped={false} polygonOffset polygonOffsetFactor={-4} />
       </mesh>
     </group>
   )
@@ -2263,12 +2263,12 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   }, [fr, c1])
   return (
     <StaticBatch key={lang}>
-      <group position={at(3.62, 3.08)} rotation-y={face + 0.3}>
+      <group position={at(3.7, 3.55)} rotation-y={face + 0.3}>
         <group rotation-y={Math.PI / 2}><SakeStack /></group>
       </group>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
-      <group position={at(3.68, 2.38)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
+      <group position={at(3.8, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
       <group position={cornerAt} rotation-y={0.4}><PottedBamboo /></group>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
