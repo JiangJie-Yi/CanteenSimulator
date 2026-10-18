@@ -1509,8 +1509,8 @@ const COVE_WASH = (() => {
   c.height = 8
   const g = c.getContext('2d')!
   const grad = g.createLinearGradient(0, 0, 64, 0)
-  grad.addColorStop(0, 'rgba(255,255,255,1)')
-  grad.addColorStop(0.4, 'rgba(255,255,255,0.5)')
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)')
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.28)')
   grad.addColorStop(1, 'rgba(255,255,255,0)')
   g.fillStyle = grad
   g.fillRect(0, 0, 64, 8)
@@ -1527,12 +1527,9 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
       {[-1, 1].map((sd) => (
         <group key={sd} position={[sd * (W / 2 - 0.075), H / 2 - 0.02, D / 2 - 0.1]}>
           <mesh><boxGeometry args={[0.03, H - 0.46, 0.03]} /><meshBasicMaterial color="#202226" /></mesh>
-          <mesh position={[-sd * 0.0085, 0, 0.0155]}><boxGeometry args={[0.016, H - 0.5, 0.006]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
-          <mesh position={[-sd * 0.014, 0, -0.17]} rotation-y={sd * Math.PI / 2}><planeGeometry args={[0.5, H - 0.46]} />
-            <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={1} side={THREE.DoubleSide} /></mesh>
-          {/* (and a second, brighter and narrower wash on the same wall, so it reads as a lit channel) */}
-          <mesh position={[-sd * 0.016, 0, -0.1]} rotation-y={sd * Math.PI / 2}><planeGeometry args={[0.24, H - 0.46]} />
-            <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={1} side={THREE.DoubleSide} /></mesh>
+          <mesh position={[-sd * 0.0085, 0, 0.0155]}><boxGeometry args={[0.008, H - 0.5, 0.004]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
+          <mesh position={[-sd * 0.014, 0, -0.17]} rotation-y={sd * Math.PI / 2}><planeGeometry args={[0.32, H - 0.46]} />
+            <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.8} side={THREE.DoubleSide} /></mesh>
         </group>
       ))}
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
