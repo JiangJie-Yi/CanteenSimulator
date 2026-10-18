@@ -622,95 +622,197 @@ const SHOJI = canvasTex(64, 64, (g) => {
  * The way through to the toilet: one sliding door (引き戸) in a dark wooden frame, shut, wood below and shoji paper on
  * a lattice above, a short indigo noren over it, and the plaque.
  */
-/** small square tiles, pale with grey grout */
-const TILES = canvasTex(64, 64, (g) => {
-  g.fillStyle = '#b8b4aa'
-  g.fillRect(0, 0, 64, 64)
-  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
-    g.fillStyle = (i + j) % 2 ? '#eeeae0' : '#e6e2d6'
-    g.fillRect(i * 16 + 1, j * 16 + 1, 14, 14)
+/** hinoki floorboards, a warm pale wood, the boards running across */
+const WC_FLOOR = canvasTex(128, 64, (g) => {
+  g.fillStyle = '#c9a572'
+  g.fillRect(0, 0, 128, 64)
+  for (let i = 0; i < 4; i++) {
+    g.fillStyle = ['#d2b07c', '#c4a06c', '#cfac78', '#c9a572'][i]
+    g.fillRect(0, i * 16 + 1, 128, 14)
+    g.strokeStyle = 'rgba(110,70,30,0.18)'
+    for (let k = 0; k < 6; k++) {
+      g.beginPath()
+      g.moveTo(0, i * 16 + 3 + k * 2.2)
+      g.bezierCurveTo(40, i * 16 + 2 + k * 2.2, 90, i * 16 + 5 + k * 2.2, 128, i * 16 + 3 + k * 2.2)
+      g.stroke()
+    }
   }
 }, true)
+/** charred cedar boards (焼杉), the dark upright planks of a traditional wall's foot */
+const WC_CEDAR = canvasTex(64, 128, (g) => {
+  g.fillStyle = '#2a1d15'
+  g.fillRect(0, 0, 64, 128)
+  for (let i = 0; i < 4; i++) {
+    g.fillStyle = ['#33241a', '#2c1f16', '#382818', '#2e2018'][i]
+    g.fillRect(i * 16 + 1, 0, 14, 128)
+    g.strokeStyle = 'rgba(0,0,0,0.35)'
+    for (let k = 0; k < 6; k++) {
+      g.beginPath()
+      g.moveTo(i * 16 + 3 + k * 2, 0)
+      g.bezierCurveTo(i * 16 + 2 + k * 2, 40, i * 16 + 5 + k * 2, 90, i * 16 + 3 + k * 2, 128)
+      g.stroke()
+    }
+  }
+}, true)
+/** the plaque by the door: お手洗い in black on a pale board */
+const WC_PLAQUE = canvasTex(160, 64, (g) => {
+  g.fillStyle = '#e6d2a4'
+  g.fillRect(0, 0, 160, 64)
+  g.strokeStyle = '#3a2416'
+  g.lineWidth = 4
+  g.strokeRect(3, 3, 154, 58)
+  brushText(g, 'お手洗い', 80, 33, 34, { fill: '#1a0d06', spacing: 3 })
+})
+/** a hand towel (手拭い) of indigo cotton with a wave pattern, white at both ends */
+const WC_TENUGUI = canvasTex(48, 96, (g) => {
+  g.fillStyle = '#1f3a68'
+  g.fillRect(0, 0, 48, 96)
+  g.strokeStyle = 'rgba(244,239,226,0.7)'
+  g.lineWidth = 1.2
+  for (let row = 0; row < 7; row++) for (let col = -1; col < 3; col++) for (const r of [8, 5, 2]) {
+    g.beginPath()
+    g.arc(col * 16 + (row % 2) * 8, 20 + row * 8, r, Math.PI, 0)
+    g.stroke()
+  }
+  g.fillStyle = '#f4efe2'
+  g.fillRect(0, 0, 48, 6)
+  g.fillRect(0, 90, 48, 6)
+}, false)
 const WC_GEO = {
   bowl: new THREE.SphereGeometry(0.12, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2),
   foot: new THREE.CylinderGeometry(0.07, 0.09, 0.28, 16),
   seat: new THREE.TorusGeometry(0.1, 0.022, 8, 20),
   tank: new THREE.BoxGeometry(0.12, 0.3, 0.32),
-  basin: new THREE.CylinderGeometry(0.1, 0.07, 0.07, 16),
+  basin: new THREE.CylinderGeometry(0.09, 0.065, 0.06, 18),
   roll: new THREE.CylinderGeometry(0.04, 0.04, 0.09, 12),
-  pot: new THREE.CylinderGeometry(0.035, 0.028, 0.06, 10),
+  pot: new THREE.CylinderGeometry(0.03, 0.026, 0.1, 10),
   leaf: new THREE.ConeGeometry(0.02, 0.12, 4),
   lamp: new THREE.SphereGeometry(0.06, 12, 8),
 }
 /**
- * The little room behind a toilet's door: tiled floor and walls up to the waist, plaster above, a ceiling of dark
- * boards over it (so it's not looked down into); a white toilet against the back wall with its cistern, a small
- * basin on a bracket to one side with a round mirror over it and a towel, the paper on the other wall, a pot of
- * greenery on the cistern, and a paper lamp lit overhead.
+ * The little room behind a toilet's door, in the Japanese way: floorboards of pale hinoki, charred-cedar planks to the
+ * waist and cream plaster above, dark beams over a ceiling of boards; a white toilet against the back wall with its
+ * cistern (a small basin on its top to wash the hands in), a shoji window over it, a slatted duckboard (簀の子) before
+ * it and slippers by the door; a stone basin on a wooden shelf by the other wall with a bamboo dipper, a round mirror
+ * in a wooden frame and an indigo hand towel on a rod; the paper in a wooden holder; a bamboo vase of camellia on the
+ * cistern, the お手洗い plaque, and a paper lamp lit overhead.
  */
 function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
   const D = 0.9
   const floor = useMemo(() => {
-    if (!TILES) return null
-    const t = TILES.clone()
-    t.repeat.set(D / 0.32, w / 0.32)
+    if (!WC_FLOOR) return null
+    const t = WC_FLOOR.clone()
+    t.repeat.set(D / 0.4, w / 0.4)
     t.needsUpdate = true
     return t
   }, [w])
-  const wall = useMemo(() => {
-    if (!TILES) return null
-    const t = TILES.clone()
-    t.repeat.set(w / 0.24, 0.9 / 0.24)
+  const cedar = useMemo(() => {
+    if (!WC_CEDAR) return null
+    const t = WC_CEDAR.clone()
+    t.repeat.set(w / 0.3, 0.9 / 0.5)
     t.needsUpdate = true
     return t
   }, [w])
+  const cedarSide = useMemo(() => {
+    if (!WC_CEDAR) return null
+    const t = WC_CEDAR.clone()
+    t.repeat.set(D / 0.3, 0.9 / 0.5)
+    t.needsUpdate = true
+    return t
+  }, [])
   const accent = who === 'm' ? '#2c3e66' : '#9a2a2a'
+  const top = h + 0.3
+  const PLASTER = '#ece0c6'
   return (
     <group>
       <mesh position={[D / 2, 0.004, 0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[D, w]} />
         <meshToonMaterial color="#ffffff" map={floor} />
       </mesh>
-      {/* back wall and the two side walls: tiles to the waist, plaster over */}
+      {/* back wall and the two side walls: charred cedar to the waist with a rail along it, cream plaster over */}
       <group position={[D, 0, 0]}>
-        <mesh position-y={0.45} rotation-y={-Math.PI / 2}><planeGeometry args={[w, 0.9]} /><meshToonMaterial color="#ffffff" map={wall} /></mesh>
-        <mesh position-y={0.9 + (h + 0.3 - 0.9) / 2} rotation-y={-Math.PI / 2}><planeGeometry args={[w, h + 0.3 - 0.9]} /><meshToonMaterial color="#e8dcc4" /></mesh>
+        <mesh position-y={0.45} rotation-y={-Math.PI / 2}><planeGeometry args={[w, 0.9]} /><meshToonMaterial color="#ffffff" map={cedar} /></mesh>
+        <mesh position-y={0.9 + (top - 0.9) / 2} rotation-y={-Math.PI / 2}><planeGeometry args={[w, top - 0.9]} /><meshToonMaterial color={PLASTER} /></mesh>
+        <mesh position={[-0.012, 0.9, 0]}><boxGeometry args={[0.03, 0.035, w]} /><meshToonMaterial color="#6a4428" /></mesh>
+        {/* (the shoji window over the toilet: washi in a dark lattice, lit from outside) */}
+        <group position={[-0.006, 1.38, 0]} rotation-y={-Math.PI / 2}>
+          <mesh position-z={0.0015}><planeGeometry args={[0.46, 0.34]} /><meshBasicMaterial color="#fcebc6" toneMapped={false} /></mesh>
+          {[-1, 0, 1].map((k) => <mesh key={`v${k}`} position={[k * 0.115, 0, 0.003]}><planeGeometry args={[0.012, 0.34]} /><meshToonMaterial color="#3a2416" /></mesh>)}
+          {[-0.5, 0.5].map((k) => <mesh key={`h${k}`} position={[0, k * 0.11, 0.003]}><planeGeometry args={[0.46, 0.012]} /><meshToonMaterial color="#3a2416" /></mesh>)}
+          {[[0, 0.18, 0.5, 0.03], [0, -0.18, 0.5, 0.03], [-0.24, 0, 0.03, 0.4], [0.24, 0, 0.03, 0.4]].map(([x, y, sw, sh]) => (
+            <mesh key={`${x}${y}`} position={[x, y, 0.004]}><planeGeometry args={[sw, sh]} /><meshToonMaterial color="#2e1d12" /></mesh>
+          ))}
+        </group>
       </group>
       {[-1, 1].map((sd) => (
         <group key={sd} position={[D / 2, 0, sd * w / 2]} rotation-y={sd > 0 ? Math.PI : 0}>
-          <mesh position-y={0.45}><planeGeometry args={[D, 0.9]} /><meshToonMaterial color="#ffffff" map={wall} /></mesh>
-          <mesh position-y={0.9 + (h + 0.3 - 0.9) / 2}><planeGeometry args={[D, h + 0.3 - 0.9]} /><meshToonMaterial color="#e8dcc4" /></mesh>
+          <mesh position-y={0.45}><planeGeometry args={[D, 0.9]} /><meshToonMaterial color="#ffffff" map={cedarSide} /></mesh>
+          <mesh position-y={0.9 + (top - 0.9) / 2}><planeGeometry args={[D, top - 0.9]} /><meshToonMaterial color={PLASTER} /></mesh>
+          <mesh position={[0, 0.9, 0.012]}><boxGeometry args={[D, 0.035, 0.03]} /><meshToonMaterial color="#6a4428" /></mesh>
         </group>
       ))}
-      <mesh position={[D / 2, h + 0.3, 0]} rotation-x={Math.PI / 2}><planeGeometry args={[D, w]} /><meshToonMaterial color="#3a2416" /></mesh>
+      {/* the ceiling of dark boards, with two beams across it */}
+      <mesh position={[D / 2, top, 0]} rotation-x={Math.PI / 2}><planeGeometry args={[D, w]} /><meshToonMaterial color="#3a2416" /></mesh>
+      {[0.25, 0.7].map((x) => <mesh key={x} position={[x, top - 0.03, 0]}><boxGeometry args={[0.06, 0.06, w]} /><meshToonMaterial color="#241408" /></mesh>)}
       {/* the toilet, facing the door */}
       <group position={[D - 0.22, 0, 0]}>
         <mesh geometry={WC_GEO.foot} position-y={0.14}><meshToonMaterial color="#f6f6f2" /></mesh>
         <mesh geometry={WC_GEO.bowl} position-y={0.36} rotation-x={Math.PI} scale={[1.15, 0.7, 1]}><meshToonMaterial color="#f6f6f2" side={THREE.DoubleSide} /></mesh>
-        <mesh geometry={WC_GEO.seat} position={[-0.02, 0.37, 0]} rotation-x={-Math.PI / 2} scale={[1.15, 1, 1]}><meshToonMaterial color={accent} /></mesh>
+        <mesh geometry={WC_GEO.seat} position={[-0.02, 0.37, 0]} rotation-x={-Math.PI / 2} scale={[1.15, 1, 1]}><meshToonMaterial color="#e8d4a8" /></mesh>
         <mesh geometry={WC_GEO.tank} position={[0.13, 0.55, 0]}><meshToonMaterial color="#f6f6f2" /></mesh>
-        {/* a little pot of greenery on the cistern */}
-        <group position={[0.13, 0.7, 0.08]}>
-          <mesh geometry={WC_GEO.pot} position-y={0.03}><meshToonMaterial color="#5a4a3a" /></mesh>
+        {/* (a small basin on the cistern's top to wash the hands in as it fills, its tap curving over it) */}
+        <mesh geometry={WC_GEO.basin} position={[0.13, 0.725, -0.06]} scale={[0.8, 1, 0.8]}><meshToonMaterial color="#f6f6f2" /></mesh>
+        <mesh position={[0.17, 0.78, -0.06]}><cylinderGeometry args={[0.006, 0.006, 0.07, 6]} /><meshToonMaterial color="#b8bcc0" /></mesh>
+        <mesh position={[0.15, 0.815, -0.06]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.006, 0.006, 0.045, 6]} /><meshToonMaterial color="#b8bcc0" /></mesh>
+        {/* (a bamboo vase of camellia beside it) */}
+        <group position={[0.13, 0.7, 0.09]}>
+          <mesh geometry={WC_GEO.pot} position-y={0.05}><meshToonMaterial color="#b8a060" /></mesh>
+          {[0.02, 0.05, 0.08].map((y) => <mesh key={y} position-y={y}><torusGeometry args={[0.03, 0.002, 4, 10]} /><meshToonMaterial color="#8a7a3a" /></mesh>)}
+          <mesh position={[0.01, 0.17, 0.005]} rotation-z={0.15}><cylinderGeometry args={[0.0022, 0.0022, 0.14, 5]} /><meshToonMaterial color="#3a2a1a" /></mesh>
+          <mesh position={[0.02, 0.24, 0.005]}><sphereGeometry args={[0.024, 8, 6]} /><meshToonMaterial color="#d8445a" /></mesh>
           {[0, 1.6, 3.2, 4.7].map((a) => (
-            <mesh key={a} geometry={WC_GEO.leaf} position={[Math.cos(a) * 0.015, 0.11, Math.sin(a) * 0.015]} rotation={[Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4]}>
-              <meshToonMaterial color="#5f8c3a" />
+            <mesh key={a} geometry={WC_GEO.leaf} position={[Math.cos(a) * 0.02, 0.15, Math.sin(a) * 0.02]} rotation={[Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5]}>
+              <meshToonMaterial color="#3f7a3a" />
             </mesh>
           ))}
         </group>
       </group>
-      {/* the basin on its bracket, the mirror over it, a towel on a ring */}
-      <group position={[D * 0.45, 0, -w / 2 + 0.12]}>
-        <mesh geometry={WC_GEO.basin} position-y={0.8}><meshToonMaterial color="#f6f6f2" /></mesh>
-        <mesh position={[0, 0.72, -0.08]}><boxGeometry args={[0.04, 0.12, 0.03]} /><meshToonMaterial color="#3a2416" /></mesh>
-        <mesh position={[0, 1.3, -0.115]}><circleGeometry args={[0.13, 24]} /><meshBasicMaterial color="#c8d8e0" /></mesh>
-        <mesh position={[0, 1.3, -0.117]}><circleGeometry args={[0.15, 24]} /><meshToonMaterial color="#6a4428" /></mesh>
-        <mesh position={[0.22, 0.95, -0.11]}><planeGeometry args={[0.12, 0.26]} /><meshToonMaterial color={accent} side={THREE.DoubleSide} /></mesh>
+      {/* the slatted duckboard (簀の子) before the toilet, and the slippers by the door */}
+      <group position={[D - 0.54, 0, 0]}>
+        {Array.from({ length: 9 }, (_, k) => (
+          <mesh key={k} position={[0, 0.02, (k - 4) * 0.052]}><boxGeometry args={[0.4, 0.02, 0.04]} /><meshToonMaterial color="#d8c08a" /></mesh>
+        ))}
+        {[-1, 1].map((sd) => <mesh key={sd} position={[0, 0.008, sd * 0.2]}><boxGeometry args={[0.4, 0.016, 0.03]} /><meshToonMaterial color="#6a4a28" /></mesh>)}
       </group>
-      {/* the paper, on the other wall */}
-      <mesh geometry={WC_GEO.roll} position={[D - 0.3, 0.55, w / 2 - 0.05]} rotation-x={Math.PI / 2}><meshToonMaterial color="#fafaf6" /></mesh>
-      {/* a paper lamp, lit, overhead */}
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[0.07, 0.018, sd * 0.1]} rotation-y={sd * 0.1}>
+          <boxGeometry args={[0.2, 0.03, 0.08]} /><meshToonMaterial color={accent} />
+        </mesh>
+      ))}
+      {/* a stone basin on a wooden shelf by the side wall, a bamboo dipper laid across it, a round mirror in a wooden frame
+          over it, the indigo hand towel on a rod */}
+      <group position={[D * 0.45, 0, -w / 2 + 0.12]}>
+        <mesh position={[0, 0.74, 0]}><boxGeometry args={[0.28, 0.035, 0.2]} /><meshToonMaterial color="#b88a52" /></mesh>
+        {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.11, 0.66, 0]}><boxGeometry args={[0.025, 0.14, 0.16]} /><meshToonMaterial color="#6a4428" /></mesh>)}
+        <mesh geometry={WC_GEO.basin} position-y={0.79}><meshToonMaterial color="#6a6e70" /></mesh>
+        <mesh position={[0, 0.82, 0]}><circleGeometry args={[0.075, 18]} /><meshBasicMaterial color="#9ab8c4" /></mesh>
+        <mesh position={[0.02, 0.835, 0.03]} rotation-z={Math.PI / 2} rotation-y={0.3}><cylinderGeometry args={[0.005, 0.005, 0.26, 5]} /><meshToonMaterial color="#c8b070" /></mesh>
+        <mesh position={[-0.13, 0.84, 0.03]}><cylinderGeometry args={[0.028, 0.024, 0.04, 10]} /><meshToonMaterial color="#c8b070" /></mesh>
+        <mesh position={[0, 1.3, -0.115]}><circleGeometry args={[0.13, 24]} /><meshBasicMaterial color="#c8d8e0" /></mesh>
+        <mesh position={[0, 1.3, -0.117]}><circleGeometry args={[0.16, 24]} /><meshToonMaterial color="#6a4428" /></mesh>
+        <mesh position={[0.24, 1.0, -0.1]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.005, 0.005, 0.12, 5]} /><meshToonMaterial color="#c8b070" /></mesh>
+        <mesh position={[0.24, 0.9, -0.098]}><planeGeometry args={[0.1, 0.2]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI} side={THREE.DoubleSide} /></mesh>
+      </group>
+      {/* the paper, in a wooden holder on the other wall, and the plaque over it */}
+      <group position={[D - 0.3, 0.55, w / 2 - 0.05]}>
+        <mesh position={[0, 0, 0.03]}><boxGeometry args={[0.14, 0.12, 0.012]} /><meshToonMaterial color="#8a5a30" /></mesh>
+        <mesh geometry={WC_GEO.roll} position={[0, 0, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#fafaf6" /></mesh>
+        {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.06, 0, 0]}><boxGeometry args={[0.012, 0.1, 0.07]} /><meshToonMaterial color="#8a5a30" /></mesh>)}
+      </group>
+      <mesh position={[D * 0.45, 1.5, w / 2 - 0.006]} rotation-y={Math.PI}><planeGeometry args={[0.3, 0.12]} /><meshToonMaterial color="#ffffff" map={WC_PLAQUE} /></mesh>
+      {/* a paper lamp, lit, overhead, in a wooden cage */}
       <mesh geometry={WC_GEO.lamp} position={[D / 2, h + 0.1, 0]}><meshBasicMaterial color="#fff1cc" toneMapped={false} /></mesh>
+      <mesh position={[D / 2, h + 0.1, 0]}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
     </group>
   )
 }
