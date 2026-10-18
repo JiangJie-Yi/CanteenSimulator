@@ -657,7 +657,7 @@ function KitchenPit({ counters, drop }: { counters: Counter[]; drop: number }) {
   const [g0, g1] = gates.first
   // (each step a block of raw timber, its grain along it at one scale; run a way on past the gate's way through along the kitchen's
   // edge, to fill the corner of the well beside it, but never past the kitchen's own bounds)
-  const STEP_OVER = 0.02
+  const STEP_OVER = 0.1
   const stepAt = (a: number, b: number, edgeLay: number, key: string) => [1, 2].map((n) => {
     const h = drop * (3 - n) / 3
     const lo = Math.max(kx0, a - STEP_OVER), hi = Math.min(kx1, b + STEP_OVER)

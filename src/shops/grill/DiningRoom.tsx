@@ -1172,11 +1172,12 @@ function Kamidana({ shelf = true, part = 'all' }: { shelf?: boolean; part?: 'all
       {part !== 'shrine' && [-1, 1].map((sd) => (
         <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} /></group>
       ))}
-      {part !== 'shrine' && [-0.16, 0.16].map((z) => (
-        <mesh key={z} position={[-0.235, 0.03, z * 0.6]}>
-          <cylinderGeometry args={[0.012, 0.01, 0.025, 10]} />
-          <meshToonMaterial color="#f4f1ea" />
-        </mesh>
+      {part !== 'shrine' && [-0.09, 0, 0.09].map((z) => (
+        <group key={z} position={[-0.3, 0.03, z]}>
+          {/* (a hollow cup: its wall open at the top, a floor in it, so the sake poured in is seen in it) */}
+          <mesh><cylinderGeometry args={[0.012, 0.01, 0.025, 12, 1, true]} /><meshToonMaterial color="#f4f1ea" side={THREE.DoubleSide} /></mesh>
+          <mesh position-y={-0.0115} rotation-x={-Math.PI / 2}><circleGeometry args={[0.01, 12]} /><meshToonMaterial color="#f4f1ea" /></mesh>
+        </group>
       ))}
     </group>
   )
@@ -1467,7 +1468,10 @@ const ALTAR_Y = 1.42
 /** how long the sake offered stands there, and the extra custom it brings (ms) */
 const INCENSE_MS = 180000
 function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
-  const sake = useRef<THREE.Mesh>(null)
+  // (the offering: one flask pours clear sake into the three cups in turn, the stream and the cups filling; then it's set back)
+  const flaskRef = useRef<THREE.Group>(null)
+  const streamRef = useRef<THREE.Mesh>(null)
+  const liquid = useRef<(THREE.Mesh | null)[]>([null, null, null])
   // (the motes: while the offering stands, faint glowing ones drift up from the shrine)
   const burning = useRef(false)
   const motes = useRef<THREE.Points>(null)
@@ -1495,13 +1499,49 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     const left = at === null ? 0 : Math.max(0, 1 - (performance.now() - at) / INCENSE_MS)
     const on = left > 0
     burning.current = on
-    if (sake.current) sake.current.visible = on
+    // (pouring: a few seconds from the moment it's offered; the cups stay full while the offering stands)
+    const since = at === null ? 99 : (performance.now() - at) / 1000
+    const CUP_X = ALTAR_D / 2 - 0.375, CUP_TOP = 0.05
+    const cupZ = [-0.1125, 0, 0.1125]
+    const rest = { x: -0.2, y: 0, z: 0.3 }
+    const f = flaskRef.current
+    let k = 0, which = -1
+    if (on && since < 4.6) {
+      which = Math.min(2, Math.max(0, Math.floor((since - 0.7) / 1.1)))
+      // (lifts and tips in over the first 0.7 s, back at the end)
+      k = THREE.MathUtils.smoothstep(since, 0, 0.7) * (1 - THREE.MathUtils.smoothstep(since, 4.0, 4.6))
+    }
+    if (f) {
+      const z = which >= 0 ? cupZ[which] - 0.092 : rest.z
+      f.position.set(THREE.MathUtils.lerp(rest.x, CUP_X, k), THREE.MathUtils.lerp(rest.y, 0.1, k), THREE.MathUtils.lerp(rest.z, z, k))
+      f.rotation.x = k * 1.1
+    }
+    const pouring = on && since > 0.7 && since < 4.0
+    if (streamRef.current) {
+      streamRef.current.visible = pouring
+      if (pouring) {
+        const z = cupZ[which]
+        const a = 0.1 + 0.047, b = CUP_TOP
+        streamRef.current.position.set(CUP_X, (a + b) / 2, z)
+        streamRef.current.scale.set(1, a - b, 1)
+      }
+    }
+    for (let i = 0; i < 3; i++) {
+      const m = liquid.current[i]
+      if (!m) continue
+      // (each cup fills as the stream is on it: 1.1 s each from 0.7 s in)
+      const fill = !on ? 0 : THREE.MathUtils.clamp((since - 0.7 - i * 1.1) / 1.1, 0, 1)
+      m.visible = fill > 0
+      m.scale.y = Math.max(0.001, fill)
+      // (it fills from the cup's floor up: its bottom stays on the floor as it grows)
+      m.position.y = 0.0245 + 0.013 * fill
+    }
   })
   const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); incense?.onLight() }
   // (the shrine's front, in the altar's frame: its doors' plane, and the roof's)
   const SC = 1.25
   const flask = (z: number, key: string) => (
-    <group key={key} position={[-0.2, 0, z]}>
+    <group key={key} position={[0, 0, z]}>
       <mesh geometry={ALTAR_GEO.tokkuri} castShadow><meshToonMaterial color="#f6f4ee" /></mesh>
       <mesh geometry={ALTAR_GEO.tokkuri} scale={1.03}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
       {/* (a red cord round the neck with its knot, a paper shide hanging from it, a small label on the belly) */}
@@ -1524,16 +1564,16 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       </points>
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}
-      {flask(-0.22, 'fl')}
-      {flask(0.22, 'fr')}
-      <group position={[-0.24, 0, -0.1]}>
-        <mesh geometry={ALTAR_GEO.cup} position-y={0.008}><meshToonMaterial color="#f6f4ee" /></mesh>
-        <mesh geometry={ALTAR_GEO.cup} position-y={0.008} scale={1.06}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
-        <mesh ref={sake} geometry={ALTAR_GEO.sake} position-y={0.0175} rotation-x={-Math.PI / 2} visible={false}>
-          <meshBasicMaterial color="#f2dc8a" toneMapped={false} />
+      <group ref={flaskRef} position={[-0.2, 0, 0.3]}>{flask(0, 'f')}</group>
+      {/* (the clear sake: a thin stream down into the cup, and the cups, each filling with it) */}
+      <mesh ref={streamRef} visible={false}>
+        <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} /><meshBasicMaterial color="#e6f4ff" transparent opacity={0.55} depthWrite={false} />
+      </mesh>
+      {[0, 1, 2].map((i) => (
+        <mesh key={i} ref={(m) => { liquid.current[i] = m }} position={[ALTAR_D / 2 - 0.375, 0.035, [-0.1125, 0, 0.1125][i]]} visible={false}>
+          <cylinderGeometry args={[0.0136, 0.0112, 0.026, 12]} /><meshBasicMaterial color="#d8ecfa" transparent opacity={0.62} depthWrite={false} />
         </mesh>
-        <mesh position={[0, 0.02, 0]} visible={false}><boxGeometry args={[0.1, 0.08, 0.1]} /></mesh>
-      </group>
+      ))}
       {/* the oranges on their dish, a leaf on the top one */}
       <group position={[-0.17, 0, 0]}>
         <mesh geometry={ALTAR_GEO.dish} position-y={0.008}><meshToonMaterial color="#e8e2d2" /></mesh>
@@ -2259,7 +2299,7 @@ function StaffMat({ lang }: { lang: Lang }) {
     const out = new THREE.Group()
     const k = 1.5 / d.x
     const c = b.getCenter(new THREE.Vector3())
-    wrap.position.set(-c.x, -b.min.y, -c.z)
+    wrap.position.set(-c.x, -b.min.y - 0.004, -c.z)
     out.add(wrap)
     out.scale.setScalar(k)
     return { group: out, depth: d.z * k, height: d.y * k }
@@ -2267,7 +2307,7 @@ function StaffMat({ lang }: { lang: Lang }) {
   return (
     <group>
       <primitive object={rug.group} />
-      <mesh position={[0, rug.height + 0.025, 0]} rotation-x={-Math.PI / 2}>
+      <mesh position={[0, rug.height + 0.008, 0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[0.9, 0.34]} />
         <meshBasicMaterial color="#ffffff" map={STAFF_WORDS_TEX[lang]} transparent toneMapped={false} polygonOffset polygonOffsetFactor={-4} />
       </mesh>
@@ -2293,12 +2333,12 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   }, [fr, c1])
   return (
     <StaticBatch key={lang}>
-      <group position={at(3.85, 3.55)} rotation-y={face + 0.3}>
+      <group position={at(3.3, 3.2)} rotation-y={face + 0.3}>
         <group rotation-y={Math.PI / 2}><SakeStack /></group>
       </group>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
-      <group position={at(3.9, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
+      <group position={at(3.62, 2.25)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
       <group position={cornerAt} rotation-y={0.4}><PottedBamboo /></group>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}

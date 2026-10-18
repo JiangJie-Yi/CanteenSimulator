@@ -341,7 +341,7 @@ export function kitchenOf(cs: Counter[]) {
 /** where the staff's way through each counter's gate lies on the kitchen's edge: along the first counter's cook's face, and
  * along (in lay) the kitchen's side by the side counter */
 /** how much further than the side gate's doorway its steps reach, inward along the counter */
-const SIDE_STEP_EXTRA = 0.12
+const SIDE_STEP_EXTRA = 0.22
 export function kitchenGatesOf(cs: Counter[]) {
   const c0 = cs[0], c1 = cs[1]
   const g0 = gateOf(c0, BAR_GATES[0])
@@ -469,7 +469,7 @@ export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)
 /** the staff door in the room's front edge (the first counter's frame: along it, and lay from its middle) and the spot just
  * inside it, where the staff go in and out */
 // (the mat's outer edge flush with the room's front edge, lay 3.97: its middle half its depth in from it)
-export const STAFF_DOOR = { along: 3.4, lay: 3.2 }
+export const STAFF_DOOR = { along: 1.3, lay: 3.9 }
 export const staffDoorAt = (c: Counter, lay = STAFF_DOOR.lay - 0.25) => c.at.clone().addScaledVector(c.along, STAFF_DOOR.along).addScaledVector(c.lay, lay)
 /**
  * The grill's bar, stools and customers are all drawn this much bigger than their sizes here, to stand beside the
