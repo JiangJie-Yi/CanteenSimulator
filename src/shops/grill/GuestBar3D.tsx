@@ -640,7 +640,7 @@ function KitchenPit({ counters, drop }: { counters: Counter[]; drop: number }) {
   const [g0, g1] = gates.first
   // (each step a raw timber, its grain along it; a little wider than the gate's way and a little into the wall's riser at both
   // ends, so there's no gap beside it, and the first set right against the customers' floor's edge)
-  const STEP_OVER = 0.03
+  const STEP_OVER = 0.34
   const stepAt = (a: number, b: number, edgeLay: number, key: string) => [1, 2].map((n) => {
     const h = drop * (3 - n) / 3
     return (
