@@ -2201,6 +2201,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     snaps.current.set(lastSpace.current, save())
     load(snaps.current.get(space))
     lastSpace.current = space
+    // (shut: the customers are gone, and what they'd ordered with them)
+    if (space === 'closed') {
+      guests.current = []
+      wants.current = []
+      onGuests?.([])
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [space])
   const scrap = useRef<{ p: Piece; x: number; y: number; started: boolean } | null>(null)

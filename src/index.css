@@ -5881,7 +5881,7 @@ button {
 /* (cut in the shape of a fish, nose to the left, tail to the right: the name in its body; the board's wood is laid
    on a layer of its own, cut to the fish, so the cords it hangs by aren't cut off with it) */
 .brand-grilledfish .brand-plate {
-  padding: 0.95em 1.45em 0.9em 1.6em;
+  padding: 0.62em 1.4em 0.56em 1.55em;
   box-shadow: none;
   border-radius: 0;
   filter: drop-shadow(0 0.12em 0.14em rgb(40 20 10 / 0.55));

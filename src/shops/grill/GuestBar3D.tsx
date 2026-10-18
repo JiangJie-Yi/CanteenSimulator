@@ -707,7 +707,7 @@ function Plate({ dirty = false }: { dirty?: boolean }) {
 }
 
 export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
-  speech = {}, servers = [], incense, onDrink }:
+  speech = {}, servers = [], incense, onDrink, open = true }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
@@ -721,6 +721,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     speech?: Record<number, { key: number; text: string }>
     /** a customer's taken a drink from the fridge (it's paid for) */
     onDrink?: (guest: number, drink: DrinkId) => void
+    /** the shop's open: shut, nobody's in the room and the plates are back where they started */
+    open?: boolean
     /** the incense on the altar by the door (lit when, and lighting another) */
     incense?: { litAt: number | null; onLight: () => void }
     /** the servers on the floor: they carry what's put out at the pass to the customers, a plate with it */
@@ -876,6 +878,28 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const shownRef = useRef<Shown[]>([])
 
   shownRef.current = shown
+  // closing the shop empties the room at once: nobody at the stools, no plates out or being carried, the stacks as at the start
+  useEffect(() => {
+    if (open) return
+    setShown([])
+    runs.current = []
+    runObjs.current.clear()
+    waiting.current = []
+    clean.current = Array.from({ length: CLEAN_START }, () => -9)
+    dirty.current = 0
+    wash.current = null
+    waiters.current = waiters.current.map((w, i) => ({ phase: 'idle', t: 0, seat: -1, keys: [], run: null, path: [], len: 0,
+      pos: homes[i]?.at.clone() ?? w.pos, yaw: homes[i]?.yaw ?? w.yaw }))
+    SERVICE.waiting.clear()
+    SERVICE.carried.clear()
+    SEATS_TAKEN.clear()
+    PLATES_SET.clear()
+    FRIDGE_STATE.passing = 0
+    TOILETS.m.passing = 0
+    TOILETS.f.passing = 0
+    redraw()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
   useEffect(() => {
     // (the plates are seen to here, not in the state update below, which must stay free of side effects)
     for (const g of guests) {

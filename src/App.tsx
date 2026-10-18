@@ -142,7 +142,7 @@ const LIGHTING: Record<Theme, { sun: string; sunIntensity: number; sky: string; 
   spot: number; fire: number; shadow: string; shadowOpacity: number }> = {
   // golden-hour sun and a cool sky fill
   light: { sun: '#ffe7c2', sunIntensity: 1.8, sky: '#cfe0ff', ground: '#7a6450', hemi: 1.0, spot: 18, fire: 2,
-    shadow: '#000000', shadowOpacity: 0.42 },
+    shadow: '#000000', shadowOpacity: 0.28 },
   // moonlight; the warm spot, fire and burners carry the scene
   dark: { sun: '#b8c4ff', sunIntensity: 0.9, sky: '#6a6274', ground: '#3a2c20', hemi: 1.35, spot: 30, fire: 4,
     shadow: '#000000', shadowOpacity: 0.45 },
@@ -512,7 +512,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
               {(ai || !!dish.roast) && i === active && !phone && (
                 // the customers, in 3D (a phone has them in 2D on the guest board, and no 3D bar at all), at the bar behind (the grill's bar is drawn by Roasting, which serves onto it);
                 // the grill's room is there before it opens too, empty
-                <GuestBar3D guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
+                <GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
                   servers={dish.roast && ai ? crewOf(dish.id).filter((w) => w.role === 'server') : []}
                   mark={dish.roast ? '聞野' : dish.heatControl ? '鼎沸' : dish.bake ? '麵包' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}

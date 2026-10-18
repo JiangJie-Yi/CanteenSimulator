@@ -486,54 +486,112 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   )
 }
 
+/** a bunch of flowers in a white vase with a blue band: stems up from its mouth, a blossom and a leaf or two on each */
+const BLOOMS = ['#f48fb1', '#fbfaf6', '#ffd54f', '#ef5350', '#ce93d8', '#ff9a62', '#fff0a0']
+const BOUQUET_GEO = {
+  vase: new THREE.CylinderGeometry(0.02, 0.024, 0.07, 14),
+  neck: new THREE.CylinderGeometry(0.014, 0.02, 0.02, 14),
+  band: new THREE.CylinderGeometry(0.0245, 0.0245, 0.012, 14),
+  stem: new THREE.CylinderGeometry(0.0013, 0.0013, 1, 5),
+  bloom: new THREE.SphereGeometry(0.014, 10, 8),
+  heart: new THREE.SphereGeometry(0.005, 8, 6),
+  leaf: new THREE.ConeGeometry(0.01, 0.034, 5),
+}
+function Bouquet({ lean = 0 }: { lean?: number }) {
+  // (seven blooms fanned over the vase's mouth, the tall ones in the middle; the same every time)
+  const stems = [[0, 0.17, 0], [-0.03, 0.14, 0.01], [0.03, 0.145, -0.01], [-0.016, 0.115, -0.03], [0.018, 0.12, 0.03],
+    [-0.04, 0.1, -0.01], [0.04, 0.105, 0.012]]
+  return (
+    <group rotation-z={lean}>
+      <mesh geometry={BOUQUET_GEO.vase} position-y={0.035}><meshToonMaterial color="#f4f1ea" /></mesh>
+      <mesh geometry={BOUQUET_GEO.band} position-y={0.03}><meshToonMaterial color="#3a5a9a" /></mesh>
+      <mesh geometry={BOUQUET_GEO.neck} position-y={0.08}><meshToonMaterial color="#f4f1ea" /></mesh>
+      {stems.map(([x, y, z], k) => {
+        const len = Math.hypot(x, y - 0.09, z)
+        return (
+          <group key={k}>
+            <mesh geometry={BOUQUET_GEO.stem} position={[x / 2, 0.09 + (y - 0.09) / 2, z / 2]} scale={[1, len, 1]}
+              rotation={[Math.atan2(z, y - 0.09), 0, -Math.atan2(x, y - 0.09)]}><meshToonMaterial color="#3a7a2a" /></mesh>
+            <mesh geometry={BOUQUET_GEO.bloom} position={[x, y, z]} scale={[1, 0.8, 1]}><meshToonMaterial color={BLOOMS[k % BLOOMS.length]} /></mesh>
+            <mesh geometry={BOUQUET_GEO.heart} position={[x, y + 0.008, z]}><meshToonMaterial color="#e8a82a" /></mesh>
+            <mesh geometry={BOUQUET_GEO.leaf} position={[x * 0.55 + (k % 2 ? -0.012 : 0.012), 0.115, z * 0.55]} rotation-z={k % 2 ? 0.7 : -0.7}>
+              <meshToonMaterial color="#3a8a2a" />
+            </mesh>
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
 /**
- * The household shrine (神棚) up on the wall: a shelf on two brackets, a little shrine of pale hinoki under its
- * roof, a vase of sakaki either side, the cups of rice, salt and water before it, and the sacred rope (注連縄) with its
+ * The household shrine (神棚) up on the wall: a shelf on two brackets, a little shrine of pale hinoki on a stepped base
+ * with a railing, its two doors and a roof with the crossed finials (千木) and the short logs (鰹木) along its ridge,
+ * a bouquet in a vase either side, the cups of rice, salt and water before it, and the sacred rope (注連縄) with its
  * paper streamers hung across the front.
  */
 function Kamidana({ shelf = true }: { shelf?: boolean }) {
   const HIN = '#e2c89a'
+  const GRAIN = '#cfae78'
+  const RED = '#a8541e'
   return (
     <group>
       {shelf && <Box size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />}
       {shelf && [-0.3, 0.3].map((z) => <Box key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
-      {/* the shrine: its base, body, doors and roof */}
+      {/* the shrine: a stepped base, the railing, body, doors and roof */}
       <group position={[-0.14, 0.015, 0]}>
-        <Box size={[0.16, 0.03, 0.34]} color={HIN} position-y={0.015} />
-        <Box size={[0.12, 0.16, 0.24]} color={HIN} position-y={0.11} />
-        <mesh position={[-0.061, 0.11, 0]} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[0.1, 0.12]} />
-          <meshToonMaterial color="#c8a868" />
-        </mesh>
-        <mesh position={[-0.0615, 0.11, 0]} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[0.004, 0.12]} />
-          <meshBasicMaterial color={INK} />
-        </mesh>
+        <Box size={[0.18, 0.02, 0.36]} color={GRAIN} position-y={0.01} />
+        <Box size={[0.16, 0.02, 0.33]} color={HIN} position-y={0.03} />
+        {/* (three steps down the front) */}
+        {[0, 1, 2].map((k) => <Box key={k} size={[0.02, 0.008, 0.07 - k * 0.006]} color="#d8bc88" position={[-0.09 - k * 0.018, 0.016 - k * 0.004, 0]} />)}
+        {/* (the railing round the platform, a post at each corner) */}
+        {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
+          <Box key={`${sx}${sz}`} size={[0.012, 0.05, 0.012]} color={RED} position={[sx * 0.073, 0.065, sz * 0.153]} />
+        )))}
+        <Box size={[0.008, 0.01, 0.31]} color={RED} position={[-0.073, 0.082, 0]} />
+        {[-1, 1].map((sz) => <Box key={sz} size={[0.15, 0.01, 0.008]} color={RED} position={[0, 0.082, sz * 0.153]} />)}
+        <Box size={[0.12, 0.16, 0.24]} color={HIN} position-y={0.12} />
+        {/* (the doors: two leaves with a dark seam between, a gold fitting on each, a lintel over them) */}
         {[-1, 1].map((sd) => (
-          <mesh key={sd} position={[sd * 0.05, 0.215, 0]} rotation-z={sd * 0.55}>
-            <boxGeometry args={[0.13, 0.014, 0.3]} />
+          <group key={sd}>
+            <mesh position={[-0.0612, 0.12, sd * 0.0275]} rotation-y={-Math.PI / 2}>
+              <planeGeometry args={[0.05, 0.125]} /><meshToonMaterial color="#c8a868" />
+            </mesh>
+            <mesh position={[-0.0616, 0.12, sd * 0.0275]} rotation-y={-Math.PI / 2}>
+              <planeGeometry args={[0.036, 0.11]} /><meshToonMaterial color="#d6b878" />
+            </mesh>
+            <mesh position={[-0.0625, 0.12, sd * 0.008]} rotation-y={-Math.PI / 2}>
+              <circleGeometry args={[0.005, 10]} /><meshBasicMaterial color="#d4b04a" />
+            </mesh>
+          </group>
+        ))}
+        <mesh position={[-0.0618, 0.12, 0]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[0.004, 0.125]} /><meshBasicMaterial color={INK} />
+        </mesh>
+        <Box size={[0.014, 0.012, 0.15]} color="#6a5038" position={[-0.064, 0.19, 0]} />
+        {/* (the roof, a thick pair of slopes with its ridge, the crossed finials at both ends, the logs across) */}
+        {[-1, 1].map((sd) => (
+          <mesh key={sd} position={[sd * 0.055, 0.235, 0]} rotation-z={sd * 0.55}>
+            <boxGeometry args={[0.14, 0.018, 0.31]} />
             <meshToonMaterial color="#6a5038" />
           </mesh>
         ))}
-        <Box size={[0.02, 0.02, 0.32]} color="#d4b04a" position-y={0.245} />
-      </group>
-      {/* the sakaki in their vases, and the cups */}
-      {[-0.3, 0.3].map((z) => (
-        <group key={z} position={[-0.15, 0.015, z]}>
-          <mesh position-y={0.04}>
-            <cylinderGeometry args={[0.02, 0.016, 0.08, 10]} />
-            <meshToonMaterial color="#f4f1ea" />
+        <Box size={[0.03, 0.016, 0.33]} color="#d4b04a" position-y={0.272} />
+        {[-1, 1].flatMap((sz) => [-1, 1].map((lean) => (
+          <Box key={`${sz}${lean}`} size={[0.008, 0.008, 0.07]} color="#c9a46a" position={[0, 0.295, sz * 0.172]} rotation-x={lean * 0.6} />
+        )))}
+        {[-0.07, 0, 0.07].map((z) => (
+          <mesh key={z} position={[0, 0.285, z]} rotation-z={Math.PI / 2}>
+            <cylinderGeometry args={[0.009, 0.009, 0.085, 10]} /><meshToonMaterial color="#d4b04a" />
           </mesh>
-          {[-1, 0, 1].map((k) => (
-            <mesh key={k} position={[0, 0.11 + Math.abs(k) * -0.01, k * 0.02]} rotation-x={k * 0.4} scale={[0.6, 1, 1]}>
-              <sphereGeometry args={[0.035, 8, 6]} />
-              <meshToonMaterial color="#3a6a3a" />
-            </mesh>
-          ))}
-        </group>
+        ))}
+      </group>
+      {/* the bouquets in their vases, leaning in a little, and the cups */}
+      {[-1, 1].map((sd) => (
+        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} /></group>
       ))}
       {[-0.13, 0, 0.13].map((z) => (
-        <mesh key={z} position={[-0.23, 0.03, z * 0.6]}>
+        <mesh key={z} position={[-0.235, 0.03, z * 0.6]}>
           <cylinderGeometry args={[0.012, 0.01, 0.025, 10]} />
           <meshToonMaterial color="#f4f1ea" />
         </mesh>
@@ -542,14 +600,14 @@ function Kamidana({ shelf = true }: { shelf?: boolean }) {
       {Array.from({ length: 9 }, (_, i) => {
         const z = -0.36 + i * 0.09
         return (
-          <mesh key={i} position={[-0.27, -0.02 - 0.03 * (1 - (z / 0.36) ** 2), z]} rotation-x={Math.PI / 2}>
+          <mesh key={i} position={[-0.27, 0.04 - 0.03 * (1 - (z / 0.36) ** 2), z]} rotation-x={Math.PI / 2}>
             <cylinderGeometry args={[0.014, 0.014, 0.095, 8]} />
             <meshToonMaterial color="#d8c08a" />
           </mesh>
         )
       })}
       {[-0.2, 0, 0.2].map((z) => (
-        <mesh key={z} position={[-0.275, -0.1, z]} rotation-y={-Math.PI / 2}>
+        <mesh key={z} position={[-0.275, -0.02, z]} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[0.035, 0.11]} />
           <meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} />
         </mesh>
@@ -790,7 +848,7 @@ const SHELF_BRACKET = (() => {
   return g
 })()
 /** the altar shelf's depth, out from the wall: the god at the back, raised, the censer before him */
-const ALTAR_D = 0.45
+const ALTAR_D = 0.58
 /** and its height: up over the beckoning cats' stand below it, by the door */
 const ALTAR_Y = 1.42
 /** how long the sake offered stands there, and the extra custom it brings (ms) */
@@ -813,15 +871,15 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   return (
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
-      <group position-x={ALTAR_D / 2} scale={1.3}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
+      <group position-x={ALTAR_D / 2} scale={1.25}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
       {/* the glow round the shrine while the offering's there */}
-      <mesh ref={glow} position={[-0.22, 0.2, 0]} rotation-y={-Math.PI / 2} renderOrder={2}>
+      <mesh ref={glow} position={[-0.28, 0.2, 0]} rotation-y={-Math.PI / 2} renderOrder={2}>
         <planeGeometry args={[0.95, 0.7]} />
         <meshBasicMaterial ref={halo} map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0} />
       </mesh>
       {/* the offering of sake (御神酒): a white bottle with its red-labelled 酒, and a shallow cup before it that the sake's
           poured into: click either (or the shrine) to make the offering */}
-      <group position={[-0.145, 0, -0.22]} onClick={offer} {...(incense ? handOver : {})}>
+      <group position={[-0.2, 0, -0.32]} onClick={offer} {...(incense ? handOver : {})}>
         <Inked geometry={ALTAR_GEO.bottle} color="#f4f1ea" position-y={0.045} />
         <Inked geometry={ALTAR_GEO.neck} color="#f4f1ea" position-y={0.115} />
         <mesh geometry={ALTAR_GEO.mouth} position-y={0.143}><meshToonMaterial color="#c4302a" /></mesh>
@@ -837,7 +895,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         <mesh position={[0, 0.07, 0.05]} visible={false}><boxGeometry args={[0.14, 0.16, 0.2]} /></mesh>
       </group>
       {/* the oranges on their dish, a leaf on the top one */}
-      <group position={[-0.14, 0, 0.22]}>
+      <group position={[-0.17, 0, 0]}>
         <mesh geometry={ALTAR_GEO.dish} position-y={0.008}><meshToonMaterial color="#e8e2d2" /></mesh>
         {[[0, 0.035, -0.02], [-0.02, 0.035, 0.025], [0.025, 0.035, 0.02], [0, 0.085, 0.008]].map((pt, k) => (
           <mesh key={k} geometry={ALTAR_GEO.fruit} position={pt as [number, number, number]}><meshToonMaterial color="#f08a1a" /></mesh>
@@ -855,6 +913,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
 export function DrinkFridge() {
   const { W, H, D } = FRIDGE
   const rows = [0.2, 0.47, 0.74, 1.01, 1.28]
+  const across = W - 0.09
   return (
     <StaticBatch>
       {/* the cabinet: its back part solid, open at the front between its sides, top and foot, lit inside */}
@@ -870,15 +929,12 @@ export function DrinkFridge() {
       {rows.map((y, r) => (
         <group key={y} position-y={y}>
           <mesh position={[0, -0.01, 0]}><boxGeometry args={[W - 0.09, 0.012, D - 0.12]} /><meshToonMaterial color="#9aa2a8" /></mesh>
-          {/* two drinks to a shelf, one each side, set out in even ranks two deep, every label turned to the door */}
-          {SHELF_DRINKS[r].map((id, half) => {
-            const [n, gap] = SHELF_RANK[DRINKS.find((x) => x.id === id)!.shape]
-            return [0.07, -0.08].map((z, depth) => Array.from({ length: n }, (_, k) => (
-              <group key={`${half}${depth}${k}`} position={[(half ? 1 : -1) * (W / 4 - 0.01) + (k - (n - 1) / 2) * gap, 0, z]}>
-                <DrinkBottle id={id} />
-              </group>
-            )))
-          })}
+          {/* the shelf packed edge to edge, each kind in its own block three ranks deep, every label turned to the door */}
+          {shelfSlots(SHELVES[r], across).map((sl) => [0.09, 0.03, -0.03].map((z, depth) => (
+            <group key={`${sl.key}${depth}`} position={[sl.x, 0, z]}>
+              <DrinkBottle id={sl.id} />
+            </group>
+          )))}
         </group>
       ))}
       {/* the lit sign on top, and the vents at its foot */}
@@ -924,11 +980,29 @@ export function FridgeDoor() {
     </group>
   )
 }
-/** what's on each of the fridge's shelves, bottom up */
-const SHELF_DRINKS: [DrinkId, DrinkId][] = [['yakult', 'yakult'], ['coffee', 'greenTea'], ['cola', 'oolong'], ['highball', 'beerCan'],
-  ['beer', 'sake']]
-/** how many of each shape stand along half a shelf, and their spacing */
-const SHELF_RANK = { bottle: [3, 0.12], can: [4, 0.09], small: [5, 0.072] } as const
+/** how far apart each kind stands along a shelf (its width and a little air) */
+const PITCH: Record<DrinkId, number> = { beer: 0.062, sake: 0.056, oolong: 0.074, ramune: 0.056, beerCan: 0.047, highball: 0.047,
+  coffee: 0.047, greenTea: 0.047, cola: 0.047, yakult: 0.038 }
+/** what's on each of the fridge's shelves, bottom up: the tall bottles at the bottom, then the cans, the little cultured milk
+ * bottles at the top; each kind and how many stand abreast */
+const SHELVES: [DrinkId, number][][] = [
+  [['beer', 4], ['sake', 4], ['oolong', 3]],
+  [['ramune', 6], ['cola', 7]],
+  [['beerCan', 5], ['highball', 5], ['coffee', 5]],
+  [['greenTea', 8], ['coffee', 4]],
+  [['yakult', 19]],
+]
+/** where each drink along a shelf stands, the whole row centred across it */
+function shelfSlots(blocks: [DrinkId, number][], across: number) {
+  const total = blocks.reduce((t, [id, n]) => t + PITCH[id] * n, 0)
+  let x = -Math.min(total, across) / 2
+  const out: { key: string; id: DrinkId; x: number }[] = []
+  for (const [id, n] of blocks) {
+    for (let k = 0; k < n; k++) out.push({ key: `${id}${k}${out.length}`, id, x: x + PITCH[id] * (k + 0.5) })
+    x += PITCH[id] * n
+  }
+  return out
+}
 /** a bottle of one of the drinks, standing (its foot at the origin): its glass or can, its label printed round it,
  * its neck and cap */
 export function DrinkBottle({ id }: { id: DrinkId }) {
@@ -949,6 +1023,17 @@ export function DrinkBottle({ id }: { id: DrinkId }) {
       <mesh geometry={BOTTLE_GEO.smallTop} position-y={0.074}><meshToonMaterial color={d.cap} /></mesh>
     </group>
   )
+  // the bottles proper, each shaped as it is in a shop: the beer's long neck, the sake's slim shoulder, the big tea bottle
+  const shaped = id === 'beer' ? BOTTLE_SHAPE.beer : id === 'sake' ? BOTTLE_SHAPE.sake : id === 'oolong' ? BOTTLE_SHAPE.pet : null
+  if (shaped) return (
+    <group rotation-y={-Math.PI / 2}>
+      <mesh geometry={shaped.body} material={look.glass} />
+      <mesh geometry={shaped.label} position-y={shaped.labelY} material={look.label} />
+      <mesh geometry={shaped.cap} position-y={shaped.capY}><meshToonMaterial color={d.cap} /></mesh>
+      {/* (the foil round the beer's neck, the sake's paper collar) */}
+      {shaped.foil && <mesh geometry={shaped.foil} position-y={shaped.foilY}><meshToonMaterial color={id === 'beer' ? '#d4b04a' : '#f4efe2'} /></mesh>}
+    </group>
+  )
   return (
     <group rotation-y={-Math.PI / 2}>
       <mesh geometry={BOTTLE_GEO.body} position-y={0.065} material={look.glass} />
@@ -957,6 +1042,22 @@ export function DrinkBottle({ id }: { id: DrinkId }) {
       <mesh geometry={BOTTLE_GEO.cap} position-y={0.169}><meshToonMaterial color={d.cap} /></mesh>
     </group>
   )
+}
+/** a bottle turned from its profile: the points of (radius, height) from its foot up to its mouth */
+const bottleBody = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 18)
+const BOTTLE_SHAPE = {
+  // a brown long-necked beer bottle, a gold foil at its neck
+  beer: { body: bottleBody([[0, 0], [0.024, 0], [0.0275, 0.005], [0.0275, 0.12], [0.0235, 0.145], [0.0145, 0.17], [0.0125, 0.2],
+    [0.0135, 0.206], [0.0135, 0.21], [0, 0.21]]), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 18, 1, true), labelY: 0.065,
+    cap: new THREE.CylinderGeometry(0.0145, 0.0145, 0.008, 14), capY: 0.213, foil: new THREE.CylinderGeometry(0.0138, 0.0155, 0.04, 14), foilY: 0.18 },
+  // a clear slim sake bottle with a round shoulder, a paper collar under the red cap
+  sake: { body: bottleBody([[0, 0], [0.022, 0], [0.0245, 0.004], [0.0245, 0.12], [0.0225, 0.15], [0.014, 0.178], [0.0105, 0.2],
+    [0.0115, 0.206], [0, 0.206]]), label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 18, 1, true), labelY: 0.07,
+    cap: new THREE.CylinderGeometry(0.0125, 0.0125, 0.014, 14), capY: 0.21, foil: new THREE.CylinderGeometry(0.0112, 0.0125, 0.012, 14), foilY: 0.196 },
+  // the big plastic tea bottle: wide, a ribbed foot, a green label round its middle
+  pet: { body: bottleBody([[0, 0], [0.026, 0], [0.032, 0.008], [0.032, 0.012], [0.0305, 0.02], [0.032, 0.028], [0.032, 0.17],
+    [0.028, 0.2], [0.017, 0.225], [0.0135, 0.236], [0.0135, 0.246], [0, 0.246]]), label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 18, 1, true),
+    labelY: 0.1, cap: new THREE.CylinderGeometry(0.0145, 0.0145, 0.014, 14), capY: 0.252, foil: null as THREE.BufferGeometry | null, foilY: 0 },
 }
 const BOTTLE_GEO = {
   body: new THREE.CylinderGeometry(0.026, 0.028, 0.13, 14),
@@ -972,7 +1073,7 @@ const BOTTLE_GEO = {
 /** each drink's label: its colours and its name round it, the shop's own small print */
 const BOTTLE_LOOK = Object.fromEntries(DRINKS.map((d) => {
   const lbl = d.label
-  const tall = d.shape !== 'bottle'
+  const tall = d.shape !== 'bottle' || d.id === 'oolong' || d.id === 'sake'
   const tex = canvasTex(128, tall ? 96 : 48, (g) => {
     const h = tall ? 96 : 48
     g.fillStyle = lbl[0]
