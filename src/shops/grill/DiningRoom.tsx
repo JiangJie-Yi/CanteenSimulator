@@ -1356,11 +1356,9 @@ const ALTAR_Y = 1.42
 /** how long the sake offered stands there, and the extra custom it brings (ms) */
 const INCENSE_MS = 180000
 function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
-  const doorGlow = useRef<THREE.MeshBasicMaterial>(null)
-  const aura = useRef<THREE.SpriteMaterial>(null)
   const sake = useRef<THREE.Mesh>(null)
-  // (the pointer over the shrine: the shrine itself lights up, and faint glowing motes drift up from it)
-  const hovered = useRef(false)
+  // (the motes: while the offering stands, faint glowing ones drift up from the shrine)
+  const burning = useRef(false)
   const motes = useRef<THREE.Points>(null)
   const moteMat = useRef<THREE.PointsMaterial>(null)
   const MOTES = 18
@@ -1372,7 +1370,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime
     // (the motes: each rises from the shrine's base and fades as it goes, over about three seconds, swaying a little)
-    if (moteMat.current) moteMat.current.opacity += ((hovered.current ? 0.95 : 0) - moteMat.current.opacity) * Math.min(1, dt * 6)
+    if (moteMat.current) moteMat.current.opacity += ((burning.current ? 0.95 : 0) - moteMat.current.opacity) * Math.min(1, dt * 6)
     if (motes.current && moteMat.current && moteMat.current.opacity > 0.01) {
       const pos = moteGeo.attributes.position as THREE.BufferAttribute
       for (let i = 0; i < MOTES; i++) {
@@ -1385,17 +1383,12 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     const at = incense?.litAt ?? null
     const left = at === null ? 0 : Math.max(0, 1 - (performance.now() - at) / INCENSE_MS)
     const on = left > 0
-    const k = on ? Math.min(1, left * 8) : 0
-    const pulse = 0.85 + 0.15 * Math.sin(t * 2.4)
+    burning.current = on
     if (sake.current) sake.current.visible = on
-    if (doorGlow.current) doorGlow.current.opacity = k * 0.8 * pulse
-    if (aura.current) aura.current.opacity = k * 0.5 * pulse
   })
   const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); incense?.onLight() }
   // (the shrine's front, in the altar's frame: its doors' plane, and the roof's)
   const SC = 1.25
-  const doorX = ALTAR_D / 2 - (0.14 + 0.0645) * SC
-  const doorY = (0.015 + 0.12) * SC
   const flask = (z: number, key: string) => (
     <group key={key} position={[-0.2, 0, z]} onClick={offer} {...(incense ? handOver : {})}>
       <mesh geometry={ALTAR_GEO.tokkuri} castShadow><meshToonMaterial color="#f6f4ee" /></mesh>
@@ -1412,19 +1405,10 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
       <group position-x={ALTAR_D / 2} scale={SC} onClick={offer}
-        onPointerOver={(e) => { hovered.current = true; handOver.onPointerOver(e) }}
-        onPointerOut={(e) => { hovered.current = false; handOver.onPointerOut(e) }}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
+        {...handOver}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={GLOW} color="#ffe0a0" size={0.07} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </points>
-      {/* the shrine's own glow while the offering stands: its doors lit, and a warm light behind it all round */}
-      <mesh position={[doorX, doorY, 0]} rotation-y={-Math.PI / 2} renderOrder={3}>
-        <planeGeometry args={[0.112 * SC, 0.128 * SC]} />
-        <meshBasicMaterial ref={doorGlow} color="#ffd48a" transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0} />
-      </mesh>
-      <sprite position={[ALTAR_D / 2 - 0.02, 0.2, 0]} scale={[0.95, 0.75, 1]}>
-        <spriteMaterial ref={aura} map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0} />
-      </sprite>
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: click any of them (or the shrine) to make the offering */}
       {flask(-0.22, 'fl')}
