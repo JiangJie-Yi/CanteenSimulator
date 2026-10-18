@@ -1448,7 +1448,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
 const FREEZER_URL = import.meta.env.BASE_URL + 'models/medium_freezer.glb'
 /** its size as modelled (0.866 wide, 2.24 tall, 0.774 deep), its middle and the door's hinge, and how it's scaled to the shop */
 const FREEZER = { scale: 0.97, cx: 0.21, cz: 0.045, base: -0.013 }
-const freezers = new Map<number, { body: THREE.Group; door: THREE.Group }>()
+const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; door: THREE.Group }>()
 function useFreezer(n: number) {
   const gltf = useGLTF(FREEZER_URL) as unknown as { scene: THREE.Group }
   return useMemo(() => {
@@ -1482,8 +1482,8 @@ function useFreezer(n: number) {
       const box = new THREE.Box3().setFromObject(door)
       pivot.position.set(box.min.x, 0, box.max.z)
       body.add(root)
-      body.add(pivot)
       body.updateMatrixWorld(true)
+      pivot.updateMatrixWorld(true)
       pivot.attach(door)
     } else body.add(root)
     // (stood in the shop: scaled, its middle at the origin, its base on the floor)
@@ -1491,7 +1491,12 @@ function useFreezer(n: number) {
     place.scale.setScalar(FREEZER.scale)
     place.position.set(-FREEZER.cx * FREEZER.scale, -FREEZER.base * FREEZER.scale, -FREEZER.cz * FREEZER.scale)
     place.add(body)
-    const out = { body: place, door: pivot }
+    // (the door's pivot stands in its own copy of the same placing, so the door sits on the cabinet when it's shut)
+    const doorRoot = new THREE.Group()
+    doorRoot.scale.copy(place.scale)
+    doorRoot.position.copy(place.position)
+    doorRoot.add(pivot)
+    const out = { body: place, doorRoot, door: pivot }
     freezers.set(n, out)
     return out
   }, [gltf, n])
@@ -1514,7 +1519,7 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
  */
 export function FridgeDoor({ n = 0 }: { n?: number }) {
   const { W, D } = FRIDGE
-  const { door } = useFreezer(n)
+  const { door, doorRoot } = useFreezer(n)
   const open = useRef(0)
   const mist = useRef(0)
   // (the door's state lives outside React: leave it shut when the shop's let go, so it doesn't come back open)
@@ -1529,7 +1534,7 @@ export function FridgeDoor({ n = 0 }: { n?: number }) {
   return (
     <group>
       {/* the model's own door, hung on its pivot (the glass and its frame), swung with the rest of the model's scale */}
-      <group onClick={(ev) => { ev.stopPropagation(); FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...handOver}><primitive object={door} /></group>
+      <group onClick={(ev) => { ev.stopPropagation(); FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...handOver}><primitive object={doorRoot} /></group>
       {/* the mist, low at the foot of the open door, rolling out over the floor */}
       <group position={[0, 0.05, D / 2 + 0.1]}>
         <Steam width={W * 0.9} height={0.5} opacity={0.5} layers={2} color="#eaf6ff" shade="#bcd8ec" speed={0.06} level={mist} />
