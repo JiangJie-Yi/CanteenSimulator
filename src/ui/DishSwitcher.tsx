@@ -15,7 +15,8 @@ export function DishSwitcher({ dishes, index, onChange, lang }: DishSwitcherProp
   const next = (index + 1) % n
 
   // (with one shop there's nothing to switch to: just its name)
-  if (n < 2) return <nav className="switcher" aria-label="料理"><div className="switcher-center"><h2 className="dish-name">{nameIn(lang, dishes[index])}</h2></div></nav>
+  // (one dish only: no name along the bottom)
+  if (n < 2) return null
   return (
     <nav className="switcher" aria-label="切換料理">
       <button type="button" className="switcher-arrow" onClick={() => onChange(prev)}

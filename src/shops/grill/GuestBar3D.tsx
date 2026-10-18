@@ -18,7 +18,8 @@ import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { SHOP } from '@/game/shopState'
+import { staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -1347,7 +1348,20 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         w.keys.forEach((key, i) => SERVICE.carried.set(key, toShop(hold.clone().add(new THREE.Vector3((i % 3 - 1) * 0.05, 0.035 + Math.floor(i / 3) * 0.03, 0)))))
       }
       const o = waiterObjs.current[wi]
-      if (o) {
+      if (o && SHOP.leaving) {
+        // (the shop's shut and empty: out by the staff door, and gone)
+        const gate = staffDoorAt(counters[0])
+        const d = gate.clone().sub(w.pos).setY(0)
+        const len = d.length()
+        if (len > 0.05) {
+          w.pos.addScaledVector(d.normalize(), Math.min(len, Math.min(dt, 0.1) * 1.1))
+          w.yaw = Math.atan2(d.x, d.z)
+        }
+        o.position.copy(w.pos)
+        o.rotation.y = w.yaw
+        o.visible = len > 0.12
+      } else if (o) {
+        o.visible = true
         o.position.copy(w.pos)
         o.rotation.y = w.yaw
       }

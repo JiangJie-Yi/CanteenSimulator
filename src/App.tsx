@@ -32,6 +32,7 @@ import { TaiwanTable } from '@/shops/noodle/TaiwanTable'
 import { Bakery } from '@/shops/bakery/Bakery'
 import { OpeningSpot } from '@/scene/OpeningSpot'
 import { FramePacer } from '@/scene/FramePacer'
+import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
@@ -669,6 +670,10 @@ export default function App() {
   // the sake offered at the shrine by the door: for a minute more come in and they order more
   const [incenseAt, setIncenseAt] = useState<number | null>(null)
   const [blessed, setBlessed] = useState(false)
+  // closing: shut by the owner, the last customers finishing; leaving: they've gone and the staff are walking out
+  const [closing, setClosing] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
   const lightIncense = () => {
     if (incenseAt !== null && performance.now() - incenseAt < INCENSE_MS) return
     if (cash < OFFERING_COST) {
@@ -1346,8 +1351,27 @@ export default function App() {
   // seconds (each step acts on the state as it is then, so it does one thing at a time)
   const [auto, setAuto] = useState(false)
   const resting = useRef(false)
+  // (the last customer's gone: the staff walk out, and then the shop is shut)
+  useEffect(() => {
+    if (!closing || leaving) return
+    if (!ai) {
+      setClosing(false)
+      return
+    }
+    if ((guestsBy[DISHES[active].id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')) return
+    setLeaving(true)
+    // (a timer of its own, not the effect's: the effect runs again the moment `leaving` changes)
+    window.setTimeout(() => {
+      setAi(false)
+      setClosing(false)
+      setLeaving(false)
+    }, 5000)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closing, leaving, ai, guestsBy, active])
   const autoStep = useRef<() => void>(() => {})
   autoStep.current = () => {
+    // (shut for the day by hand: it stays shut)
+    if (closing || leaving) return
     const d = DISHES[active]
     const T = UI[lang]
     const mine = hired[d.id] ?? {}
@@ -2104,10 +2128,17 @@ export default function App() {
         }
         // (at the grill the owner is the head chef: with no cooks hired, it's all theirs to do)
         if (!ai && dish.roast && !staffOf(dish.id, 'chef').length && !staffOf(dish.id, 'sous').length) say(UI[lang].ownerCooks)
-        setAi((v) => !v)
+        if (leaving) return
+        if (!ai) setAi(true)
+        else if (closing) setClosing(false)
+        else {
+          // (shutting up: no more customers come in, those here finish, and then the staff go out the back)
+          setAuto(false)
+          setClosing(true)
+        }
       }}
         aria-pressed={ai} title={UI[lang].aiLabel}>
-        {ai ? UI[lang].shopOpen : UI[lang].shopClosed}
+        {ai ? (closing ? (lang === 'ja' ? '閉店準備中' : '準備閉店') : UI[lang].shopOpen) : UI[lang].shopClosed}
       </button>
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}

@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
+import { STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Steam } from '@/scene/Steam'
 
@@ -252,6 +252,34 @@ const noboriTex = (i: number) => {
         g.restore()
         g.globalAlpha = 1
       }
+      // (the cloth's own life: a soft shade down it, two vertical folds, the dye heavier at the top where it's hung)
+      const shade = g.createLinearGradient(0, 0, 96, 0)
+      shade.addColorStop(0, 'rgba(0,0,0,0.16)')
+      shade.addColorStop(0.2, 'rgba(0,0,0,0)')
+      shade.addColorStop(0.78, 'rgba(255,255,255,0.06)')
+      shade.addColorStop(1, 'rgba(0,0,0,0.2)')
+      g.fillStyle = shade
+      g.fillRect(0, 0, 96, 296)
+      const dye = g.createLinearGradient(0, 0, 0, 60)
+      dye.addColorStop(0, 'rgba(0,0,0,0.28)')
+      dye.addColorStop(1, 'rgba(0,0,0,0)')
+      g.fillStyle = dye
+      g.fillRect(0, 0, 96, 60)
+      g.strokeStyle = 'rgba(0,0,0,0.12)'
+      g.lineWidth = 2
+      for (const fx of [32, 66]) {
+        g.beginPath()
+        g.moveTo(fx, 0)
+        g.lineTo(fx + 3, 296)
+        g.stroke()
+      }
+      // (the sleeve at the top the rod passes through, stitched along its lower edge)
+      g.fillStyle = 'rgba(0,0,0,0.22)'
+      g.fillRect(0, 0, 96, 12)
+      g.fillStyle = look.edge
+      g.globalAlpha = 0.8
+      for (let x = 4; x < 96; x += 8) g.fillRect(x, 12, 4, 1.6)
+      g.globalAlpha = 1
       g.fillStyle = look.edge
       g.fillRect(5, 0, 3, 296)
       g.fillRect(88, 0, 3, 296)
@@ -265,7 +293,7 @@ const noboriTex = (i: number) => {
       const size = chars.length > 3 ? 46 : chars.length === 1 ? 78 : 56
       const gap = Math.min(size * 1.08, 190 / chars.length)
       const top = look.pat === 'sun' ? 104 : 30
-      chars.forEach((ch, k) => brushText(g, ch, 48, top + size * 0.55 + k * gap, size, { fill: look.ink, shadow: 'rgba(0,0,0,0.22)' }))
+      chars.forEach((ch, k) => brushText(g, ch, 48, top + size * 0.55 + k * gap, size, { fill: look.ink, edge: look.cloth, shadow: 'rgba(0,0,0,0.26)', shine: look.ink }))
       g.restore()
     }))
   }
@@ -302,6 +330,17 @@ const hbannerTex = (i: number) => {
   }
   return hbannerCache.get(i) ?? null
 }
+/** a banner's cloth, a unit plane with a slow ripple down it (so it hangs as cloth, not a board) */
+const CLOTH_GEO = (() => {
+  const g = new THREE.PlaneGeometry(1, 1, 4, 10)
+  const p = g.attributes.position
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i)
+    p.setZ(i, Math.sin(y * 7 + x * 3) * 0.018 * (0.4 + (0.5 - y)) + Math.sin(x * 9) * 0.01)
+  }
+  g.computeVertexNormals()
+  return g
+})()
 const NOBORI_GEO = {
   rod: new THREE.CylinderGeometry(0.007, 0.007, NOBORI_W + 0.08, 8),
   cap: new THREE.SphereGeometry(0.011, 8, 6),
@@ -327,8 +366,7 @@ function Nobori({ i }: { i: number }) {
       <group ref={cloth} position={[-0.012, NOBORI_H / 2 + 0.03, 0]}>
         {/* (the loops it hangs by, the cloth below them) */}
         {[-0.11, 0, 0.11].map((z) => <mesh key={z} geometry={NOBORI_GEO.loop} position={[0, -0.02, z]}><meshToonMaterial color="#e8dcc0" /></mesh>)}
-        <mesh position={[-0.004, -NOBORI_H / 2 - 0.04, 0]} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[NOBORI_W, NOBORI_H]} />
+        <mesh position={[-0.004, -NOBORI_H / 2 - 0.04, 0]} rotation-y={-Math.PI / 2} geometry={CLOTH_GEO} scale={[NOBORI_W, NOBORI_H, 1]}>
           <meshToonMaterial color="#ffffff" map={noboriTex(i)} side={THREE.DoubleSide} transparent alphaTest={0.4} />
         </mesh>
         <mesh geometry={NOBORI_GEO.weight} position={[-0.006, -NOBORI_H - 0.04, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#2a1a10" /></mesh>
@@ -386,8 +424,11 @@ function BannerRow({ zs }: { zs: number[] }) {
           ) : (
             <>
               <mesh position={[0, -0.01, 0]}><boxGeometry args={[0.012, 0.02, it.w + 0.02]} /><meshToonMaterial color="#e8dcc0" /></mesh>
-              <mesh position={[0, -it.len / 2 - 0.02, 0]} rotation-y={-Math.PI / 2}>
-                <planeGeometry args={[it.w, it.len]} />
+              {[-1, 1].map((sd) => (
+                <mesh key={sd} position={[0, -0.03, sd * (it.w / 2 + 0.012)]}><cylinderGeometry args={[0.004, 0.004, 0.05, 5]} /><meshToonMaterial color="#c8a050" /></mesh>
+              ))}
+              <mesh position={[0, -it.len - 0.035, 0]}><cylinderGeometry args={[0.003, 0.003, 0.012, 4]} /><meshToonMaterial color="#c8a050" /></mesh>
+              <mesh position={[0, -it.len / 2 - 0.02, 0]} rotation-y={-Math.PI / 2} geometry={CLOTH_GEO} scale={[it.w, it.len, 1]}>
                 <meshToonMaterial color="#ffffff" map={noboriTex(it.look)} side={THREE.DoubleSide} transparent alphaTest={0.4} />
               </mesh>
             </>
@@ -1902,6 +1943,56 @@ function BottleCrates() {
  * the kitchen, a pot of bamboo at the dead end of the side counter's aisle, and the empty-bottle crates at the
  * kitchen's end — all of it on the floor out of everyone's way, and facing the room.
  */
+/**
+ * The mat that marks where the staff go in and out (関係者専用): a woven rug of deep red with a border of indigo and cream, a
+ * seigaiha wave band inside it, the words in its middle, and a fringe at both ends.
+ */
+const STAFF_MAT = canvasTex(256, 160, (g) => {
+  g.fillStyle = '#7a2a22'
+  g.fillRect(0, 0, 256, 160)
+  // (the weave, fine lines across and along)
+  g.strokeStyle = 'rgba(0,0,0,0.16)'
+  for (let x = 0; x < 256; x += 3) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 160); g.stroke() }
+  g.strokeStyle = 'rgba(255,220,170,0.07)'
+  for (let y = 0; y < 160; y += 4) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke() }
+  // (the borders: indigo, then cream, then a thin gold line)
+  g.fillStyle = '#1f3a68'
+  g.fillRect(0, 0, 256, 160)
+  g.fillStyle = '#f0e2bc'
+  g.fillRect(8, 8, 240, 144)
+  g.fillStyle = '#7a2a22'
+  g.fillRect(14, 14, 228, 132)
+  g.strokeStyle = '#d4b04a'
+  g.lineWidth = 2
+  g.strokeRect(20, 20, 216, 120)
+  // (a band of seigaiha waves along each long side)
+  g.strokeStyle = 'rgba(244,239,226,0.55)'
+  g.lineWidth = 1.4
+  for (const y0 of [34, 128]) for (let col = 0; col < 14; col++) for (const r of [8, 5.5, 3]) {
+    g.beginPath()
+    g.arc(30 + col * 14.6, y0, r, Math.PI, 0)
+    g.stroke()
+  }
+  brushText(g, '関係者専用', 128, 81, 38, { fill: '#f4e8c8', shadow: 'rgba(0,0,0,0.4)', spacing: 4 })
+  // (a pair of cranes' worth of small gold diamonds at the corners)
+  g.fillStyle = '#d4b04a'
+  for (const [x, y] of [[32, 54], [224, 54], [32, 108], [224, 108]]) {
+    g.beginPath(); g.moveTo(x, y - 5); g.lineTo(x + 5, y); g.lineTo(x, y + 5); g.lineTo(x - 5, y); g.closePath(); g.fill()
+  }
+})
+function StaffMat() {
+  return (
+    <group>
+      <mesh position={[0, 0.012, 0.15]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.5, 0.94]} /><meshToonMaterial color="#ffffff" map={STAFF_MAT} /></mesh>
+      {/* (the fringe at both ends, tassels of cream cord) */}
+      {[-1, 1].flatMap((sd) => Array.from({ length: 30 }, (_, k) => (
+        <mesh key={`${sd}${k}`} position={[sd * 0.76, 0.012, 0.15 + (k - 14.5) * 0.031]} rotation-z={Math.PI / 2}>
+          <cylinderGeometry args={[0.004, 0.004, 0.06, 4]} /><meshToonMaterial color="#e8d8a8" />
+        </mesh>
+      )))}
+    </group>
+  )
+}
 export function ShopProps({ counters }: { counters: Counter[] }) {
   const c0 = counters[0]
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, along).addScaledVector(c0.lay, lay)
@@ -1917,7 +2008,8 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
       <group position={at(3.62, 2.25)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
-      <group position={at(2.3, 3.72)} rotation-y={0.4}><PottedBamboo /></group>
+      <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat /></group>
+      <group position={at(-2.75, 3.8)} rotation-y={0.4}><PottedBamboo /></group>
       <group position={at(1.45, 0.62)} rotation-y={face}><BottleCrates /></group>
     </StaticBatch>
   )

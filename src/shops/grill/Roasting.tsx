@@ -23,7 +23,8 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
-import { ALONG, FLOOR_NEAR, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, KITCHEN_DROP, LAY, toGrillScene, type Counter } from './bar'
+import { SHOP } from '@/game/shopState'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, KITCHEN_DROP, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -431,6 +432,30 @@ export type CrewMember = { id: string; role: Role; look: Look }
  */
 const KITCHEN_YAW = Math.atan2(-ALONG.x, -ALONG.z)
 const kitchenAt = (lay: number) => new THREE.Vector3().addScaledVector(LAY, lay).addScaledVector(ALONG, 3.55).setY(GRILL_OFFSET.y - KITCHEN_DROP)
+/** one of the staff at their place; once the shop's shut and empty (SHOP.leaving) they walk out by the staff door and are gone */
+function CrewWalk({ at, yaw, children }: { at: THREE.Vector3; yaw: number; children: React.ReactNode }) {
+  const g = useRef<THREE.Group>(null)
+  const exit = useMemo(() => toGrillScene(staffDoorAt(GRILL_COUNTERS[0])).setY(GRILL_OFFSET.y), [])
+  useFrame((_, dt) => {
+    const o = g.current
+    if (!o) return
+    if (!SHOP.leaving) {
+      o.position.copy(at)
+      o.rotation.y = yaw
+      o.visible = true
+      return
+    }
+    const d = exit.clone().sub(o.position).setY(0)
+    const len = d.length()
+    if (len > 0.05) {
+      o.position.addScaledVector(d.normalize(), Math.min(len, Math.min(dt, 0.1) * 1.6))
+      o.rotation.y = Math.atan2(d.x, d.z)
+    }
+    o.position.y = at.y
+    o.visible = len > 0.2
+  })
+  return <group ref={g} position={at} rotation-y={yaw} scale={CHEF_SCALE}>{children}</group>
+}
 function crewPlaces(crew: CrewMember[]) {
   const c0 = GRILL_COUNTERS[0]
   const onFloor = (v: THREE.Vector3) => toGrillScene(v).setY(GRILL_OFFSET.y)
@@ -2375,7 +2400,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       drank.current.add(g.id)
       onDrink(g.id, drinkFor(kindOf(g.id).kind, g.id))
     }
-    if (onOrder && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd) {
+    if (onOrder && !SHOP.closing && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd) {
       guestClock.current = 0
       // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
       const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
@@ -3657,7 +3682,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       <CookTable floor={!bar} />
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
-        <group key={m.id} position={at} rotation-y={yaw} scale={CHEF_SCALE}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></group>
+        <CrewWalk key={m.id} at={at} yaw={yaw}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></CrewWalk>
       ))}
       {bar && <Bar />}
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}

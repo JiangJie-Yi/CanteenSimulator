@@ -500,6 +500,11 @@ button {
   --name-scale: 0.8;
   letter-spacing: 0.02em;
 }
+/* (the grill's name is the same two characters in both languages: set at the same size and spacing in each) */
+.brand-grilledfish.brand-ja .brand-main {
+  --name-scale: 1;
+  letter-spacing: 0.1em;
+}
 
 /* 食堂 stacked small to the right, the way old signs set the trailing word */
 .brand-sub {
@@ -5933,10 +5938,10 @@ button {
 /* (the eye: a solid round dot in the same colour as the painted rule round the board's edge) */
 .brand-grilledfish .brand-fish-eyedot {
   position: absolute;
-  left: calc(10% - 0.15em);
-  top: calc(39% - 0.15em);
-  width: 0.3em;
-  height: 0.3em;
+  left: calc(10% - 0.1em);
+  top: calc(39% - 0.1em);
+  width: 0.2em;
+  height: 0.2em;
   border-radius: 50%;
   background: var(--plate-cream);
   opacity: 0.95;

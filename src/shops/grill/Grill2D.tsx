@@ -10,6 +10,7 @@ import { kindOf, type GuestKind } from '@/data/guests'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { GuestView, Step } from '@/game/types'
+import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { drinkFor, GRILL_SEATS, type DrinkId } from './bar'
 import { COAL_GLOW, COAL_STICKS, DEFS, FIRE_LIFE, FoodArt, NET, COAL_X, COAL_Y, PIT_ART, PIT_X, PIT_Y, Plate, Soup, TABLE, Tag, ToolIcon, Tray, VIEW_H, VIEW_W } from './Grill2DArt'
@@ -265,7 +266,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
       cb.current.onDrink(g.id, d)
       setTaken({ id: d, at: performance.now() })
     }
-    if (cb.current.onOrder && seated.length < BAR_SEATS && c.guest > (7 + Math.random() * 6) * cr) {
+    if (cb.current.onOrder && !SHOP.closing && seated.length < BAR_SEATS && c.guest > (7 + Math.random() * 6) * cr) {
       c.guest = 0
       const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
       const free = (n: number) => n < BAR_SEATS && !used.has(n)
