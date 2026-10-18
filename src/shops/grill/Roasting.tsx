@@ -24,7 +24,7 @@ import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, KITCHEN_DROP, LAY, toGrillScene, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, KITCHEN_DROP, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -412,7 +412,7 @@ function Bar() {
  * a bay is cut into its front, left of the tray, and the cook stands in there, close by the fire and the seasonings,
  * in full view (no table in front of him).
  */
-const COOK_TABLE = { lay: [-2.1, 2.7], along: [-2.4, 3.1] }
+const COOK_TABLE = { lay: [-2.1, 2.7], along: [-2.4 + 2 * SIDE_PULL, 3.1] }
 const COOK_NOTCH = { lay: 1.85, along: [-1.75, -0.4] }
 /** the cook, as big as the customers at the bar */
 const CHEF_SCALE = 1.3 * GRILL_SCALE

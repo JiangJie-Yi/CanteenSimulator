@@ -6,7 +6,7 @@ import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
-import { STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
+import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Steam } from '@/scene/Steam'
 
@@ -1488,8 +1488,9 @@ function useFreezer(n: number) {
     } else body.add(root)
     // (stood in the shop: scaled, its middle at the origin, its base on the floor)
     const place = new THREE.Group()
-    place.scale.setScalar(FREEZER.scale)
-    place.position.set(-FREEZER.cx * FREEZER.scale, -FREEZER.base * FREEZER.scale, -FREEZER.cz * FREEZER.scale)
+    // (a shallower cabinet than modelled, so its doors have room: the depth scaled to 0.8)
+    place.scale.set(FREEZER.scale, FREEZER.scale, FREEZER.scale * 0.8)
+    place.position.set(-FREEZER.cx * FREEZER.scale, -FREEZER.base * FREEZER.scale, -FREEZER.cz * FREEZER.scale * 0.8)
     place.add(body)
     // (the door's pivot stands in its own copy of the same placing, so the door sits on the cabinet when it's shut)
     const doorRoot = new THREE.Group()
@@ -1570,7 +1571,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
   const objs = useRef(new Map<string, THREE.Group>())
   const dragKey = useRef<string | null>(null)
   const shelves = FRIDGE_UNITS[n].shelves
-  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.16)
+  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.1)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
   useFrame((_, dt) => {
     if (seen.current !== FRIDGE_STOCK.ver) {
@@ -1696,12 +1697,12 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       )))}
       {/* (and a rank behind each, stood a little further back: a shelf of drinks is never one deep) */}
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
-        <group key={`b${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? 0.012 : -0.012), slotAt(r, k).y, slotAt(r, k).z - 0.13]}>
+        <group key={`b${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? 0.012 : -0.012), slotAt(r, k).y, slotAt(r, k).z - 0.1]}>
           <DrinkBottle id={id} />
         </group>
       )))}
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
-        <group key={`c${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? -0.01 : 0.01), slotAt(r, k).y, slotAt(r, k).z - 0.26]}>
+        <group key={`c${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? -0.01 : 0.01), slotAt(r, k).y, slotAt(r, k).z - 0.2]}>
           <DrinkBottle id={id} />
         </group>
       )))}
@@ -2106,6 +2107,13 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, along).addScaledVector(c0.lay, lay)
   // (their fronts toward the room's open side, where the camera is)
   const face = Math.atan2(-c0.lay.x, -c0.lay.z)
+  const fr = useMemo(() => fridgesOf(counters), [counters])
+  const c1 = counters[1]
+  const crateAt = useMemo(() => {
+    if (!fr || !c1) return new THREE.Vector3()
+    const last = fr[fr.length - 1]
+    return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32)
+  }, [fr, c1])
   return (
     <StaticBatch>
       <group position={at(3.3, 3.2)} rotation-y={face + 0.3}>
@@ -2117,8 +2125,9 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
           (none against the side wall: the two drinks fridges stand there) */}
       <group position={at(3.62, 2.25)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat /></group>
-      <group position={at(-2.75, 3.8)} rotation-y={0.4}><PottedBamboo /></group>
-      <group position={at(1.45, 0.62)} rotation-y={face}><BottleCrates /></group>
+      <group position={at(-3.35, 3.6)} rotation-y={0.4}><PottedBamboo /></group>
+      {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
+      {fr && <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><BottleCrates /></group>}
     </StaticBatch>
   )
 }

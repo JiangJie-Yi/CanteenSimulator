@@ -137,18 +137,19 @@ export function fridgesOf(cs: Counter[]) {
   if (!t) return null
   const c = cs[1]
   // (the first clear of where the men's door slides open, the second on along the wall from it)
-  const z0 = t.m.z - WC_W / 2 - 0.06 - WC_SLIDE - FRIDGE.W / 2 - 0.1
+  // (as close along to the men's door's slide as it allows)
+  const z0 = t.m.z - WC_W / 2 - 0.06 - WC_SLIDE - FRIDGE.W / 2 - 0.02
   // (the door's hinged on the fridge's own left, and swings out that side: whoever's helping themselves stands a little right of
   // its middle, clear of it; the fridge's own +x is (lay.z, -lay.x) in this frame)
   const side = new THREE.Vector3(c.lay.z, 0, -c.lay.x).multiplyScalar(0.17)
   return [0, 1].map((n) => {
-    const z = z0 - n * (FRIDGE.W + 0.14)
+    const z = z0 - n * (FRIDGE.W + 0.03)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
     return { n, z, at: at(farOf(c) + FRIDGE.D / 2 + 0.01), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE.D + 0.34).add(side), aisle: at(-AISLE) }
   })
 }
 /** the fridge's size: across, up, deep */
-export const FRIDGE = { W: 0.86, H: 2.17, D: 0.75 }
+export const FRIDGE = { W: 0.86, H: 2.17, D: 0.6 }
 /** each fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
 export const FRIDGE_STATE = [{ passing: 0, open: false }, { passing: 0, open: false }]
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridge?: typeof FRIDGE_STATE }).__fridge = FRIDGE_STATE
@@ -450,11 +451,14 @@ export const singleCounter = (at: THREE.Vector3, length: number): Counter[] => [
  * The grill's: the long counter behind the fire, and a second one down the left side of the room, its customers
  * looking in across the fire from the left. The door is past the right end of the first.
  */
+/** how far the side counter, its stools and its aisle are pulled in from the wall (bar units) */
+export const SIDE_PULL = 0.15
 export const GRILL_COUNTERS: Counter[] = [
   { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35), along: ALONG, lay: LAY, length: 5.2, seats: 6 },
-  { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4, shift: 0.25,
-    // (its wall set further back, for the drinks fridge by the toilets)
-    far: FLOOR_FAR - 0.45 },
+  // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)
+  { at: new THREE.Vector3().addScaledVector(LAY, -0.42).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14, seats: 4, shift: 0.25,
+    // (its wall set further back, for the drinks fridges by the toilets: where it was, the counter having moved off it)
+    far: FLOOR_FAR - 0.45 - SIDE_PULL },
 ]
 export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)
 /** the staff door in the room's front edge (the first counter's frame: along it, and lay from its middle) and the spot just
