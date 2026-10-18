@@ -1922,7 +1922,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // the crate and the fan
     for (const d of [DECOR.crate, DECOR.fan, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
-    if (bar) for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)), r: 0.42 * GRILL_SCALE })
+    if (bar) for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)).sub(FIRE_SHIFT), r: 0.42 * GRILL_SCALE })
     // the soup bowls on the table are in the way too
     root.traverse((o) => {
       const id = o.userData.itemId as string | undefined
@@ -1931,7 +1931,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (let i = 0; i < 8; i++) {
       // (nothing on the table's drawn-in end hangs over the side counter's lip: kept a plank in from it)
       // (the seasoning box, with its pots, reaches further than its round footprint: held a little further in)
-      const edge = COOK_TABLE.along[0] - FIRE_SHIFT.dot(ALONG) + r + 0.38 + (key === 'box' ? 0.22 : 0)
+      const edge = COOK_TABLE.along[0] - FIRE_SHIFT.dot(ALONG) + r + 0.06 + (key === 'box' ? 0.1 : 0)
       const here = at.dot(ALONG)
       if (here < edge) at.addScaledVector(ALONG, edge - here)
       // (nor hanging over the table's right-hand end, its back or its front)
@@ -1961,6 +1961,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           }
         }
       }
+    }
+    // (and last of all, never off the table's top, whatever pushed it: the edges are hard)
+    {
+      const edge = COOK_TABLE.along[0] - FIRE_SHIFT.dot(ALONG) + 0.06
+      const a1 = at.dot(ALONG), l1 = at.dot(LAY)
+      const aMax = COOK_TABLE.along[1] - FIRE_SHIFT.dot(ALONG) - 0.06
+      const lMin = COOK_TABLE.lay[0] - FIRE_SHIFT.dot(LAY) + 0.06, lMax = COOK_TABLE.lay[1] - FIRE_SHIFT.dot(LAY) - 0.06
+      if (a1 < edge + r * 0.5) at.addScaledVector(ALONG, edge + r * 0.5 - a1)
+      if (a1 > aMax - r * 0.5) at.addScaledVector(ALONG, aMax - r * 0.5 - a1)
+      if (l1 < lMin + r * 0.5) at.addScaledVector(LAY, lMin + r * 0.5 - l1)
+      if (l1 > lMax - r * 0.5) at.addScaledVector(LAY, lMax - r * 0.5 - l1)
     }
     return at
   }
