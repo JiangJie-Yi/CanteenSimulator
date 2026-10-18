@@ -155,12 +155,67 @@ export const DRINKS = [
   { id: 'beerCan', zh: '罐裝啤酒', ja: '缶ビール', price: 100, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#e8d070', '#b8261c', 'ビール'] },
   { id: 'highball', zh: '調酒', ja: 'ハイボール', price: 110, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#1c2a4a', '#e8c45a', 'ハイボール'] },
   { id: 'coffee', zh: '罐裝咖啡', ja: '缶コーヒー', price: 45, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#4a2a18', '#f2e2c0', '珈琲'] },
-  { id: 'greenTea', zh: '綠茶', ja: '緑茶', price: 40, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#4a8a3a', '#ffffff', 'お茶'] },
-  { id: 'cola', zh: '可樂', ja: 'コーラ', price: 40, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#b8201c', '#ffffff', 'コーラ'] },
+  { id: 'greenTea', zh: '綠茶', ja: '緑茶', price: 40, color: '#9bb85a', cap: '#2f7a3a', glass: false, shape: 'can', label: ['#4a8a3a', '#ffffff', 'お茶'] },
+  { id: 'cola', zh: '可樂', ja: 'コーラ', price: 40, color: '#4a2414', cap: '#c4302a', glass: false, shape: 'can', label: ['#b8201c', '#ffffff', 'コーラ'] },
   // the little bottles of cultured milk drink
   { id: 'yakult', zh: '養樂多', ja: '乳酸菌飲料', price: 20, color: '#f2ece0', cap: '#c4302a', glass: false, shape: 'small', label: ['#f2ece0', '#c4302a', '乳酸菌'] },
 ] as const
 export type DrinkId = (typeof DRINKS)[number]['id']
+/**
+ * What stands in the drinks fridge: each shelf (bottom up) is a row of places, each holding a drink or nothing (taken).
+ * A customer who takes a drink empties a place (the last of that kind along its shelf); the shop restocks one place at a
+ * time after a while; and the player can drag any drink to another place (an empty one, or swapping with what's there).
+ * `ver` goes up with every change, for the drawing to follow.
+ */
+export const FRIDGE_HOME: { y: number; pitch: number; ids: DrinkId[] }[] = [
+  // the big bottles at the bottom
+  { y: 0.2, pitch: 0.094, ids: ['beer', 'beer', 'beer', 'sake', 'sake', 'sake', 'oolong', 'oolong'] },
+  { y: 0.47, pitch: 0.078, ids: ['ramune', 'ramune', 'ramune', 'cola', 'cola', 'cola', 'cola', 'cola', 'cola'] },
+  { y: 0.74, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'coffee', 'coffee', 'coffee'] },
+  { y: 1.01, pitch: 0.07, ids: ['greenTea', 'greenTea', 'greenTea', 'greenTea', 'coffee', 'coffee', 'coffee', 'coffee'] },
+  { y: 1.28, pitch: 0.062, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult'] },
+]
+export const FRIDGE_STOCK = {
+  slots: FRIDGE_HOME.map((r) => [...r.ids] as (DrinkId | null)[]),
+  ver: 0,
+}
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stock?: typeof FRIDGE_STOCK }).__stock = FRIDGE_STOCK
+/** a customer takes a drink: the last place holding one of that kind is emptied (any kind at all if it's run out) */
+export function takeDrink(id: DrinkId) {
+  const rows = FRIDGE_STOCK.slots
+  for (const want of [id, null as DrinkId | null]) {
+    for (let r = rows.length - 1; r >= 0; r--) {
+      for (let k = rows[r].length - 1; k >= 0; k--) {
+        if (want ? rows[r][k] === want : rows[r][k]) {
+          rows[r][k] = null
+          FRIDGE_STOCK.ver++
+          return
+        }
+      }
+    }
+  }
+}
+/** the shop puts back one drink where one's been taken (the first empty place, its own kind) */
+export function restockDrink() {
+  for (let r = 0; r < FRIDGE_HOME.length; r++) {
+    const k = FRIDGE_STOCK.slots[r].findIndex((x) => x === null)
+    if (k >= 0) {
+      FRIDGE_STOCK.slots[r][k] = FRIDGE_HOME[r].ids[k]
+      FRIDGE_STOCK.ver++
+      return true
+    }
+  }
+  return false
+}
+/** the player moves a drink from one place to another (swapping with what's there, if anything) */
+export function moveDrink(from: [number, number], to: [number, number]) {
+  const rows = FRIDGE_STOCK.slots
+  const a = rows[from[0]][from[1]]
+  rows[from[0]][from[1]] = rows[to[0]][to[1]]
+  rows[to[0]][to[1]] = a
+  FRIDGE_STOCK.ver++
+}
+
 /** what each kind of customer takes from the fridge: the children a ramune, the old folk tea, the rest any */
 export const drinkFor = (kind: string, id: number): DrinkId => {
   const of = (l: DrinkId[]) => l[id % l.length]
@@ -175,6 +230,37 @@ export const drinkFor = (kind: string, id: number): DrinkId => {
 /** the toilets' doors: how many are going through each just now (GuestBar3D), and whether the player's opened it */
 export const TOILETS = { m: { passing: 0, open: false }, f: { passing: 0, open: false } }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __toilets?: typeof TOILETS }).__toilets = TOILETS
+
+/**
+ * How far the kitchen's floor lies below the customers' (in the scene's own units): the cooks stand lower, so the bar is
+ * at a seated customer's elbow and the cook looks over it; a step or two at each gate, and risers down the rest.
+ */
+export const KITCHEN_DROP = 0.22
+/**
+ * The sunken kitchen inside the counters, in the first counter's frame (along it, and lay from its middle): from the
+ * side counter's cook's face to a little past the first counter's far end, and from the first counter's cook's face
+ * (the bar's base stands this far over its middle line) out to the room's front edge.
+ */
+export function kitchenOf(cs: Counter[]) {
+  const c0 = cs[0], c1 = cs[1]
+  const room = roomOf(cs)
+  const along0 = c1 ? c1.at.clone().addScaledVector(c1.lay, 0.28).sub(c0.at).dot(c0.along) : -c0.length / 2
+  return { along: [along0, c0.length / 2 + 0.15] as [number, number], lay: [0.28, room.lay[1]] as [number, number] }
+}
+/** where the staff's way through each counter's gate lies on the kitchen's edge: along the first counter's cook's face, and
+ * along (in lay) the kitchen's side by the side counter */
+export function kitchenGatesOf(cs: Counter[]) {
+  const c0 = cs[0], c1 = cs[1]
+  const g0 = gateOf(c0, BAR_GATES[0])
+  const a = [g0.hinge, g0.hinge + BAR_GATES[0].end * BAR_GATES[0].leaf].sort((p, q) => p - q) as [number, number]
+  let side: [number, number] | null = null
+  if (c1 && BAR_GATES[1]) {
+    const g1 = gateOf(c1, BAR_GATES[1])
+    const at = (s: number) => c1.at.clone().addScaledVector(c1.along, s).sub(c0.at).dot(c0.lay)
+    side = [at(g1.hinge), at(g1.hinge + BAR_GATES[1].end * BAR_GATES[1].leaf)].sort((p, q) => p - q) as [number, number]
+  }
+  return { first: a, side }
+}
 
 /** the till: how far past the first counter's middle it stands (it butts on to the counter's end), and its size */
 export const TILL = { along: 0.75, W: 1.2, D: 0.82, rise: 0.22,

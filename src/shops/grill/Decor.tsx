@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ALONG, GRILL_OFFSET } from './bar'
+import { ALONG, GRILL_OFFSET, KITCHEN_DROP } from './bar'
 
 type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
@@ -335,7 +335,7 @@ const RICE_GEO = {
 function RiceTub() {
   const [x, z] = DECOR.rice.at
   const g = RICE_GEO
-  const floor = GRILL_OFFSET.y
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const legH = SIDE_TOP - 0.05 - floor
   return (
     <group position={[x, 0, z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>

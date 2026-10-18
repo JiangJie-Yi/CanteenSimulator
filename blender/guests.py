@@ -731,7 +731,7 @@ def face(kind, hd):
     surf = Surface(hd, HC + Vector((0, 0, (k - 1) * HEAD_R * 0.6)))
     girl = kind in ("officeLady", "highSchoolGirl", "yukata", "grandma", "maid", "gyaru", "staffF")
     old = kind in ("grandma", "grandpa")
-    ex, ez = 0.36, -0.06          # eye yaw and pitch
+    ex, ez = 0.37, -0.075         # eye yaw and pitch
     tough = st.get("tough", False)
     names = ["Eye", "EyeWhite", "Lash", "Hair", "Mouth", "MouthIn", "Blush", "Skin", "Iris", "Wrinkle", "Vein", "Tear", "IrisLight"]
     mi = {n: i for i, n in enumerate(names)}
@@ -754,7 +754,7 @@ def face(kind, hd):
         sleepy = kind in ("salaryman", "student")
         # (rounder, bigger eyes all round: the shape that reads as a face at a distance)
         if kind not in ("uncle", "civilServant"):
-            rw, rh = rw * 1.1, rh * 1.14
+            rw, rh = rw * 1.2, rh * 1.26
         if tough:
             # (a narrowed glare: shorter eyes, flat along the top)
             rh *= 0.72
@@ -776,7 +776,7 @@ def face(kind, hd):
                       squash=lambda x, yy: (x, yy if yy < 0 else yy * 0.5))
         decal_ellipse(bm, surf, y, ez - rh * 0.08, rw * 0.42, rh * 0.46, mi["Eye"], off=0.0023)
         if not sleepy:
-            decal_ellipse(bm, surf, y + sd * rw * 0.2, ez + rh * 0.34, rw * 0.3, rh * 0.26, mi["EyeWhite"], off=0.0026)
+            decal_ellipse(bm, surf, y + sd * rw * 0.22, ez + rh * 0.3, rw * 0.36, rh * 0.3, mi["EyeWhite"], off=0.0026)
         decal_ellipse(bm, surf, y - sd * rw * 0.3, ez - rh * 0.42, rw * 0.16, rh * 0.12, mi["EyeWhite"], off=0.0026)
         if kind == "gyaru":
             # (her liner, thick along the top lid and flicked out past the corner)
@@ -787,7 +787,7 @@ def face(kind, hd):
             decal_ellipse(bm, surf, y + sd * rw * 0.45, ez - rh * 0.05, rw * 0.12, rh * 0.09, mi["EyeWhite"], off=0.0026)
         if girl:
             lash = [(y + sd * a * rw * 1.25, ez + rh * (0.95 - 0.25 * a * a) + 0.01) for a in (-1, -0.5, 0, 0.5, 1, 1.25)]
-            decal_strip(bm, surf, lash, [0.0, 0.019, 0.024, 0.024, 0.018, 0.0], mi["Lash"], off=0.0024)
+            decal_strip(bm, surf, lash, [0.0, 0.026, 0.034, 0.034, 0.025, 0.0], mi["Lash"], off=0.0024)
             # (and a little flick out past the outer corner, and a fold of the lid above)
             decal_strip(bm, surf, [(y + sd * rw * 1.1, ez + rh * 0.78), (y + sd * rw * 1.5, ez + rh * 0.92)],
                         [0.012, 0.0], mi["Lash"], off=0.0025)
@@ -795,7 +795,7 @@ def face(kind, hd):
                         [0.0, 0.006, 0.006, 0.0], mi["Wrinkle"], off=0.0021)
         elif not (sleepy or tough):
             lash = [(y + sd * a * rw * 1.1, ez + rh * (0.96 - 0.22 * a * a)) for a in (-1, -0.5, 0, 0.5, 1)]
-            decal_strip(bm, surf, lash, [0.0, 0.011, 0.013, 0.011, 0.0], mi["Lash"], off=0.0024)
+            decal_strip(bm, surf, lash, [0.0, 0.016, 0.019, 0.016, 0.0], mi["Lash"], off=0.0024)
     eyes = from_bm(f"{kind}.eyes", bm, mats, HREF)
 
     bm = bmesh.new()
@@ -898,7 +898,7 @@ def face(kind, hd):
         build(bm)
         return from_bm(f"{kind}.{name}", bm, mats, HREF)
 
-    def smile(bm, w=0.13, sag=0.045, t=0.019, z=-0.4, tilt=0.0):
+    def smile(bm, w=0.11, sag=0.04, t=0.016, z=-0.4, tilt=0.0):
         decal_strip(bm, surf, [(a * w, z - sag * (1 - a * a) + tilt * a) for a in (-1, -0.5, 0, 0.5, 1)],
                     [0.0, t * 0.85, t, t * 0.85, 0.0], mi["Mouth"])
 
@@ -925,9 +925,9 @@ def face(kind, hd):
         "kid": lambda bm: open_d(bm, 0.11, 0.1, teeth=False),
         "highSchoolGirl": cat, "maid": cat,
         "gyaru": lambda bm: open_d(bm, 0.11, 0.055, tongue=False),
-        "student": lambda bm: smile(bm, 0.12, 0.03, 0.019, tilt=0.045),
-        "yankee": lambda bm: smile(bm, 0.13, 0.0, 0.021, tilt=0.05),
-        "bosozoku": lambda bm: smile(bm, 0.15, -0.03, 0.024, tilt=0.045),
+        "student": lambda bm: smile(bm, 0.1, 0.035, 0.016, tilt=0.015),
+        "yankee": lambda bm: smile(bm, 0.11, 0.015, 0.018, tilt=0.025),
+        "bosozoku": lambda bm: smile(bm, 0.12, 0.0, 0.02, tilt=0.025),
         "civilServant": lambda bm: smile(bm, 0.09, 0.0, 0.017),
     }.get(kind, lambda bm: smile(bm))
     mouth = mouth_mesh("mouth", plain_mouth)
@@ -940,8 +940,8 @@ def face(kind, hd):
     # nose and ears, on the head mesh itself
     bm = bmesh.new()
     bm.from_mesh(hd.data)
-    np_, nn = surf.ang(0, -0.24, -0.004)
-    ellipsoid(bm, np_, (0.009 * k, 0.0075 * k, 0.0075 * k), mi=0)
+    np_, nn = surf.ang(0, -0.235, -0.002)
+    ellipsoid(bm, np_, (0.0075 * k, 0.006 * k, 0.006 * k), mi=0)
     for sd in (1, -1):
         ep, en = surf.ang(sd * 1.5, -0.14, -0.012)
         rot = Vector((0, 0, 1)).rotation_difference(Vector((sd, 0.25, 0))).to_matrix()
@@ -2080,6 +2080,18 @@ def key_all(frame):
     rig.pose.bones["hips"].keyframe_insert("location", frame=frame)
 
 
+# the standing and walking actions: the hips are brought down (or up) until the lower foot stands right on the floor, so no
+# one's feet hover (the sole of a foot sits 0.017 under the lower end of its bone, standing flat)
+GROUNDED = {"Walk", "WalkF", "WalkU", "WalkO", "Cook", "Stand", "Hold", "Carry", "Fetch"}
+
+
+def plant():
+    bpy.context.view_layer.update()
+    low = min(min(rig.pose.bones[f"foot.{s}"].head.z, rig.pose.bones[f"foot.{s}"].tail.z) for s in ("L", "R"))
+    hips = rig.pose.bones["hips"]
+    move_hips(hips.head.z + (0.017 - low), hips.head.y)
+
+
 def action(name, frames):
     """frames: [(frame, pose function)]"""
     ad = rig.animation_data_create()
@@ -2089,6 +2101,8 @@ def action(name, frames):
     for f, pose in frames:
         reset_pose()
         pose()
+        if name in GROUNDED:
+            plant()
         key_all(f)
     # smooth, looping
     tr = ad.nla_tracks.new()
@@ -2170,7 +2184,7 @@ def walk(phase, style="man"):
         # stands on the ground: no one walks an inch above the floor)
         bpy.context.view_layer.update()
         low = min(min(rig.pose.bones[f"foot.{s}"].head.z, rig.pose.bones[f"foot.{s}"].tail.z) for s in ("L", "R"))
-        move_hips(z0 + (0.03 - low), 0)
+        move_hips(z0 + (0.017 - low), 0)
     return pose
 
 

@@ -22,7 +22,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
-import { ALONG, FLOOR_NEAR, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, LAY, toGrillScene, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, KITCHEN_DROP, LAY, toGrillScene, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -429,7 +429,7 @@ export type CrewMember = { id: string; role: Role; look: Look }
  * customers walk). The first two of each job are shown.
  */
 const KITCHEN_YAW = Math.atan2(-ALONG.x, -ALONG.z)
-const kitchenAt = (lay: number) => new THREE.Vector3().addScaledVector(LAY, lay).addScaledVector(ALONG, 3.55).setY(GRILL_OFFSET.y)
+const kitchenAt = (lay: number) => new THREE.Vector3().addScaledVector(LAY, lay).addScaledVector(ALONG, 3.55).setY(GRILL_OFFSET.y - KITCHEN_DROP)
 function crewPlaces(crew: CrewMember[]) {
   const c0 = GRILL_COUNTERS[0]
   const onFloor = (v: THREE.Vector3) => toGrillScene(v).setY(GRILL_OFFSET.y)
@@ -451,7 +451,7 @@ function crewPlaces(crew: CrewMember[]) {
   })
 }
 /** where the cook stands (on the floor, in the notch), and the way he faces: in at the fire */
-const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(ALONG, -1.08).setY(GRILL_OFFSET.y)
+const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(ALONG, -1.08).setY(GRILL_OFFSET.y - KITCHEN_DROP)
 const CHEF_YAW = Math.atan2(-CHEF_AT.x, -CHEF_AT.z)
 const COOK_TABLE_WOOD = (() => {
   if (!TRAY_WOOD) return null
@@ -479,7 +479,7 @@ function CookTable({ floor = true }: { floor?: boolean }) {
   // right-hand end where the other cooks stand)
   const W = KITCHEN_FLOOR.along[1] - KITCHEN_FLOOR.along[0], D = KITCHEN_FLOOR.lay[1] - KITCHEN_FLOOR.lay[0]
   const mid = new THREE.Vector3().addScaledVector(ALONG, (KITCHEN_FLOOR.along[0] + KITCHEN_FLOOR.along[1]) / 2)
-    .addScaledVector(LAY, (KITCHEN_FLOOR.lay[0] + KITCHEN_FLOOR.lay[1]) / 2).setY(GRILL_OFFSET.y + 0.004 * GRILL_SCALE)
+    .addScaledVector(LAY, (KITCHEN_FLOOR.lay[0] + KITCHEN_FLOOR.lay[1]) / 2).setY(GRILL_OFFSET.y - KITCHEN_DROP + 0.004 * GRILL_SCALE)
   return (
     <>
       {/* (set back under the top on their outer faces only: where they meet, they run into each other, no gap) */}
@@ -551,7 +551,7 @@ function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [num
   const lay = [l[0] + i0, l[1] - i1], along = [a[0] + j0, a[1] - j1]
   const W = along[1] - along[0] + 0.12, D = lay[1] - lay[0] + 0.12
   const mid = new THREE.Vector3().addScaledVector(ALONG, (along[0] + along[1]) / 2).addScaledVector(LAY, (lay[0] + lay[1]) / 2)
-  const floor = GRILL_OFFSET.y
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
   // (the top is one piece over all of them: CookTableTop)
   return (
     <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
