@@ -1960,7 +1960,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [dishCount, setDishCount] = useState(1)
   // nothing on the table overlaps: every plate, dish, basket, box, bucket, bin and tray is pushed clear of the
   // fire and of each other where it stands — at the start, and whenever another plate or basket is put out
-  useEffect(() => {
+  useLayoutEffect(() => {
     // (the seasoning box starts beside the cook, in the table's corner by where they stand, not out against the counter's edge)
     if (carriers.box && !boxPlaced.current && !moved.current.has('box')) {
       boxPlaced.current = true
