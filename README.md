@@ -54,3 +54,7 @@ npm run build    # 產生 dist/
 ```
 
 推到 `main` 會由 GitHub Actions 自動部署到 GitHub Pages。
+
+## Credits
+
+- Lucky cat (招き猫) model: "Lucky cat with animation cute maneki neko" by Noth+ Studio, licensed under Creative Commons Attribution 4.0 (CC BY 4.0), via Sketchfab. Converted for use here (poses baked into plain meshes, re-textured materials).

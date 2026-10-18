@@ -1,130 +1,95 @@
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { brushText, signTexture } from '@/scene/signFont'
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 
 /**
- * A beckoning cat (招き猫), about 0.2 tall, facing +z: sat up round, one paw raised to call the customers in, the
- * other holding a gold koban to its chest; big round eyes, pink nose and cheeks, whiskers, pink inside its ears, a red
- * collar with a gold bell, a tail curled round behind, and (on a white one) a tortoiseshell patch or two.
+ * A beckoning cat (招き猫), about 0.2 tall, facing +z, from the model "Lucky cat with animation cute maneki neko" by Noth+
+ * Studio (CC BY 4.0, via Sketchfab; see the credits in README.md): its paw waves, the shop's way.
+ *
+ * The model's skin is baked into a few plain poses along the wave (a skinned mesh can't be merged into a StaticBatch, and
+ * costs more to draw); `still` shows one pose, the default plays the wave by stepping through them there and back.
  */
+const URL = import.meta.env.BASE_URL + 'models/luckycat.glb'
+/** how tall it stands, as this is measured (the cat and its cushion come out twice this tall in the shop: about 0.2) */
+const HEIGHT = 0.1
+/** the poses: the wave's lift, from its start up to the paw's highest, at these moments of the clip (seconds) */
+const POSES = [0, 0.9, 1.8, 2.7, 3.6, 4.5, 5.4, 6.3, 7.2, 8]
+const STILL = 5.4
 
-const INK = '#2a1d16'
-const GEO = {
-  ball: new THREE.SphereGeometry(1, 16, 12),
-  ear: new THREE.ConeGeometry(1, 1, 8),
-  limb: new THREE.CapsuleGeometry(1, 1, 4, 8),
-  stick: new THREE.CylinderGeometry(1, 1, 1, 4),
-  coin: new THREE.CylinderGeometry(1, 1, 1, 20),
-  collar: new THREE.TorusGeometry(0.037, 0.006, 6, 20),
-  tail: new THREE.TorusGeometry(0.03, 0.009, 6, 12, Math.PI * 1.2),
+function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.Color | null) {
+  const root = cloneSkinned(gltf.scene) as THREE.Group
+  const mixer = new THREE.AnimationMixer(root)
+  if (gltf.animations.length) mixer.clipAction(gltf.animations[0]).play()
+  mixer.setTime(at)
+  root.updateMatrixWorld(true)
+  const out: { g: THREE.BufferGeometry; mat: THREE.Material }[] = []
+  const v = new THREE.Vector3()
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh
+    if (!m.isMesh) return
+    const g = m.geometry.clone()
+    const pos = g.attributes.position
+    if (m.isSkinnedMesh) m.skeleton.update()
+    for (let i = 0; i < pos.count; i++) {
+      if (m.isSkinnedMesh) m.getVertexPosition(i, v)
+      else v.fromBufferAttribute(pos, i)
+      v.applyMatrix4(m.matrixWorld)
+      pos.setXYZ(i, v.x, v.y, v.z)
+    }
+    g.deleteAttribute('skinIndex')
+    g.deleteAttribute('skinWeight')
+    g.computeVertexNormals()
+    const src = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial
+    const mat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ?? null, side: THREE.DoubleSide })
+    // (a differently coloured cat: the body's own material takes the tint)
+    if (tint && src.map && !/coin|ring|red/i.test(src.name)) mat.color.lerp(tint, 0.85)
+    out.push({ g, mat })
+  })
+  return out
 }
 
-/** the koban's face: gold with the hammered ribs and 千萬兩 brushed down it */
-const KOBAN = signTexture(64, 96, (g) => {
-  g.fillStyle = '#e6be4e'
-  g.fillRect(0, 0, 64, 96)
-  g.strokeStyle = 'rgba(140,96,20,0.45)'
-  g.lineWidth = 2
-  for (let y = 10; y < 96; y += 7) {
-    g.beginPath()
-    g.moveTo(4, y)
-    g.lineTo(60, y)
-    g.stroke()
-  }
-  ;['千', '萬', '兩'].forEach((ch, i) => brushText(g, ch, 32, 22 + i * 26, 24, { fill: '#5a3a10', shadow: 'rgba(255,240,170,0.5)' }))
-})
-
-function Bit({ geo, color, outline = 0, basic, ...rest }:
-  { geo: THREE.BufferGeometry; color: string; outline?: number; basic?: boolean } & Record<string, unknown>) {
+export function LuckyCat({ body, still = false }: { body?: string; paw?: 'left' | 'right'; still?: boolean }) {
+  const gltf = useGLTF(URL)
+  const frames = useMemo(() => {
+    const tint = body && body !== '#f6f3ea' ? new THREE.Color(body) : null
+    const times = still ? [STILL] : POSES
+    const baked = times.map((t) => bake(gltf, t, tint))
+    // (its size and where it stands: scaled to HEIGHT tall, centred, its feet on the ground, by a middle pose's extent)
+    const box = new THREE.Box3()
+    for (const { g } of baked[Math.min(baked.length - 1, 4)]) {
+      g.computeBoundingBox()
+      box.union(g.boundingBox!)
+    }
+    const size = box.getSize(new THREE.Vector3())
+    const k = HEIGHT / size.y
+    const centre = box.getCenter(new THREE.Vector3())
+    const place = new THREE.Matrix4().makeScale(k, k, k).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -box.min.y, -centre.z))
+    return baked.map((parts) => parts.map(({ g, mat }) => { g.applyMatrix4(place); return { g, mat } }))
+  }, [gltf, body, still])
+  const group = useRef<THREE.Group>(null)
+  const t = useRef(Math.random() * 10)
+  useFrame((_, dt) => {
+    if (still || !group.current) return
+    // (up and down the wave, a few poses a second)
+    t.current += Math.min(dt, 0.1) * 5
+    const n = frames.length
+    const cycle = 2 * (n - 1)
+    const i = Math.floor(t.current) % cycle
+    const shown = i < n ? i : cycle - i
+    group.current.children.forEach((c, k) => { c.visible = k === shown })
+  })
   return (
-    <group {...rest}>
-      <mesh geometry={geo} castShadow={outline > 0}>
-        {basic ? <meshBasicMaterial color={color} /> : <meshToonMaterial color={color} />}
-      </mesh>
-      {outline > 0 && (
-        <mesh geometry={geo} scale={outline}>
-          <meshBasicMaterial color={INK} side={THREE.BackSide} />
-        </mesh>
-      )}
-    </group>
-  )
-}
-
-export function LuckyCat({ body = '#f6f3ea', paw = 'right' }: { body?: string; paw?: 'left' | 'right' }) {
-  const p = paw === 'right' ? 1 : -1
-  const white = body === '#f6f3ea'
-  const dark = body === '#2a2420'
-  const eye = dark ? '#e8c45a' : INK
-  const pink = '#f2a0a0'
-  return (
-    <group>
-      {/* body, sat up, and its feet poking out in front */}
-      <Bit geo={GEO.ball} color={body} outline={1.05} position={[0, 0.05, 0]} scale={[0.052, 0.056, 0.046]} />
-      {[-1, 1].map((sd) => (
-        <Bit key={sd} geo={GEO.ball} color={body} outline={1.1} position={[sd * 0.022, 0.009, 0.034]} scale={[0.014, 0.009, 0.016]} />
+    <group ref={group} name="lucky-cat">
+      {frames.map((parts, i) => (
+        <group key={i} visible={still || i === 0}>
+          {parts.map(({ g, mat }, j) => <mesh key={j} geometry={g} material={mat} castShadow />)}
+        </group>
       ))}
-      {/* the tail curled round its side at the back */}
-      <mesh geometry={GEO.tail} position={[-p * 0.01, 0.02, -0.03]} rotation={[Math.PI / 2, 0, -0.6]}>
-        <meshToonMaterial color={body} />
-      </mesh>
-      {/* tortoiseshell patches on a white one: one on its back, one over an ear */}
-      {white && (
-        <>
-          <Bit geo={GEO.ball} color="#e0913a" position={[-p * 0.02, 0.06, -0.018]} scale={[0.028, 0.026, 0.026]} />
-          <Bit geo={GEO.ball} color="#3a2e28" position={[p * 0.024, 0.032, -0.024]} scale={[0.02, 0.018, 0.02]} />
-        </>
-      )}
-      {/* the red collar and its gold bell */}
-      <mesh geometry={GEO.collar} position={[0, 0.093, 0.002]} rotation-x={Math.PI / 2 - 0.15} scale={[1.05, 1, 0.9]}>
-        <meshToonMaterial color="#c4302a" />
-      </mesh>
-      <Bit geo={GEO.ball} color="#e8c45a" outline={1.12} position={[0, 0.08, 0.04]} scale={0.011} />
-      <Bit geo={GEO.stick} color={INK} basic position={[0, 0.077, 0.0505]} rotation-x={Math.PI / 2} scale={[0.0015, 0.002, 0.004]} />
-      {/* the head: wide, a little flat */}
-      <group position={[0, 0.138, 0]}>
-        <Bit geo={GEO.ball} color={body} outline={1.05} scale={[0.058, 0.048, 0.05]} />
-        {white && <Bit geo={GEO.ball} color="#e0913a" position={[p * 0.028, 0.026, -0.004]} scale={[0.024, 0.02, 0.03]} />}
-        {[-1, 1].map((sd) => (
-          <group key={sd} position={[sd * 0.033, 0.04, 0]} rotation-z={-sd * 0.35}>
-            <Bit geo={GEO.ear} color={white && sd === p ? '#e0913a' : body} outline={1.12} scale={[0.017, 0.03, 0.013]} />
-            <Bit geo={GEO.ear} color={pink} position={[0, -0.002, 0.007]} scale={[0.009, 0.018, 0.004]} />
-          </group>
-        ))}
-        {/* big round eyes with a glint, pink nose, blushed cheeks, a little w of a mouth */}
-        {[-1, 1].map((sd) => (
-          <group key={sd} position={[sd * 0.021, 0.006, 0.045]}>
-            <Bit geo={GEO.ball} color={eye} basic scale={[0.0075, 0.009, 0.004]} />
-            <Bit geo={GEO.ball} color="#ffffff" basic position={[0.002, 0.003, 0.003]} scale={0.0022} />
-            <Bit geo={GEO.ball} color={pink} position={[sd * 0.012, -0.015, -0.005]} scale={[0.009, 0.005, 0.003]} />
-          </group>
-        ))}
-        <Bit geo={GEO.ball} color="#e07a86" basic position={[0, -0.007, 0.05]} scale={[0.005, 0.0035, 0.003]} />
-        {[-1, 1].map((sd) => (
-          <Bit key={sd} geo={GEO.stick} color={INK} basic position={[sd * 0.0045, -0.0135, 0.049]} rotation-z={-sd * 1.0}
-            scale={[0.0012, 0.01, 0.0012]} />
-        ))}
-        {/* whiskers, three a side */}
-        {[-1, 1].flatMap((sd) => [-0.25, 0, 0.25].map((a) => (
-          <Bit key={`${sd}${a}`} geo={GEO.stick} color={dark ? '#d8d0c0' : '#6a5a50'} basic
-            position={[sd * 0.045, -0.01 + a * 0.02, 0.038]} rotation={[0, -sd * 0.5, Math.PI / 2 + sd * a]} scale={[0.0007, 0.03, 0.0007]} />
-        )))}
-      </group>
-      {/* the raised paw, calling them in, its pink pad to the front */}
-      <group position={[p * 0.046, 0.108, 0.01]} rotation-z={-p * 0.15}>
-        <Bit geo={GEO.limb} color={body} outline={1.1} position-y={0.03} scale={[0.012, 0.03, 0.012]} />
-        <Bit geo={GEO.ball} color={body} outline={1.08} position-y={0.065} scale={0.015} />
-        <Bit geo={GEO.ball} color={pink} position={[0, 0.063, 0.013]} scale={[0.008, 0.007, 0.003]} />
-      </group>
-      {/* the other paw holding the koban to its chest */}
-      <group position={[-p * 0.012, 0.042, 0.046]} rotation-y={p * 0.15}>
-        <mesh geometry={GEO.coin} rotation-x={Math.PI / 2} scale={[0.022, 0.004, 0.034]}>
-          <meshToonMaterial color="#d9ab3a" />
-        </mesh>
-        <mesh position-z={0.0025} scale={[0.04, 0.064, 1]}>
-          <circleGeometry args={[0.5, 24]} />
-          <meshToonMaterial color="#ffffff" map={KOBAN} />
-        </mesh>
-        <Bit geo={GEO.ball} color={body} outline={1.1} position={[-p * 0.022, 0.012, 0.004]} scale={0.013} />
-      </group>
     </group>
   )
 }
+
+useGLTF.preload(URL)

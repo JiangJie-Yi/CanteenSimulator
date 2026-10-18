@@ -140,7 +140,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           <Part key={i} geo={REG_GEO.round} color={i ? '#4a2e1c' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
         ))}
         {DOOR_CATS.map((k, i) => (
-          <group key={i} position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw} scale={k.s * 2.2}><LuckyCat body={k.body} paw={k.paw} /></group>
+          <group key={i} position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw} scale={k.s * 2.2}><LuckyCat body={k.body} paw={k.paw} still /></group>
         ))}
       </group>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
