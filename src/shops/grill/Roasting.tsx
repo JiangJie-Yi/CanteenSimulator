@@ -1980,6 +1980,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // fire and of each other where it stands — at the start, and whenever another plate or basket is put out
   useLayoutEffect(() => {
     // (the seasoning box starts beside the cook, in the table's corner by where they stand, not out against the counter's edge)
+    if (carriers.bin && !moved.current.has('bin')) {
+      // (the water bucket stands where the lantern was, along the back)
+      const h = carriers.bin[0].home
+      moved.current.set('bin', new THREE.Vector3(0.2 - h.x, 0, -1.85 - h.z))
+    }
     if (carriers.box && !boxPlaced.current && !moved.current.has('box')) {
       boxPlaced.current = true
       const want = new THREE.Vector3().addScaledVector(ALONG, BOX_SPOT.along).addScaledVector(LAY, BOX_SPOT.lay)
