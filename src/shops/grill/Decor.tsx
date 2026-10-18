@@ -354,7 +354,7 @@ const RICE_GEO = {
   floor: new THREE.CircleGeometry(0.25, 28),
   hoop: new THREE.TorusGeometry(0.272, 0.012, 6, 32),
   rice: new THREE.SphereGeometry(0.255, 24, 10, 0, Math.PI * 2, 0, Math.PI * 0.32),
-  cylRice: new THREE.CylinderGeometry(0.255, 0.245, 0.39, 28, 1, false),
+  cylRice: new THREE.CylinderGeometry(0.258, 0.248, 0.44, 28, 1, false),
   lid: new THREE.CylinderGeometry(0.29, 0.29, 0.03, 28),
   paddle: new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6),
   blade: new THREE.SphereGeometry(0.06, 12, 8),
@@ -434,10 +434,10 @@ function RiceTub() {
         {open && (
           <>
             {/* the rice, heaped a little over the rim, the paddle stood in it */}
-            <mesh geometry={g.cylRice} position-y={0.205} >
+            <mesh geometry={g.cylRice} position-y={0.21}>
               <meshToonMaterial color="#fbf8f0" />
             </mesh>
-            <mesh geometry={g.rice} position-y={0.4} scale={[1.02, 0.5, 1.02]}>
+            <mesh geometry={g.rice} position-y={0.42} scale={[1.02, 0.5, 1.02]}>
               <meshToonMaterial color="#fbf8f0" />
             </mesh>
             <group position={[0.08, 0.57, -0.04]} rotation={[0.25, 0, -0.35]}>

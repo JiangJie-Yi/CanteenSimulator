@@ -1392,13 +1392,13 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
           }
           return zs.length > 1 ? (
             <>
-              <group position={[0, 2.22, 0]}><BannerRow zs={zs} x0={-0.3} x1={-0.3} /></group>
+              <group position={[0, 2.22, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 0)} x0={-0.3} x1={-0.3} /></group>
               {/* (and two more strings slanted across the aisle, crossing each other like an X, one a little lower than the other,
                   so no banner meets another) */}
-              <group position={[0, 2.04, 0]}><BannerRow zs={zs.filter((_, k) => k % 2 === 0)} seed={5} x0={-0.4} x1={-1.3} /></group>
-              <group position={[0, 1.9, 0]}><BannerRow zs={zs.filter((_, k) => k % 2 === 1)} seed={9} x0={-1.3} x1={-0.4} /></group>
+              <group position={[0, 2.04, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 1)} seed={5} x0={-0.4} x1={-1.3} /></group>
+              <group position={[0, 1.9, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 2)} seed={9} x0={-1.3} x1={-0.4} /></group>
               {/* (and paper umbrellas (和傘), pastel, opened and hung upside-down over the aisle) */}
-              {zs.filter((_, k) => k % 5 === 2).map((z, k) => <group key={k} position={[-1.7, 2.1 - (k % 2) * 0.1, z]} scale={0.5}><Wagasa i={k} /></group>)}
+              {zs.filter((_, k) => k % 6 === 4).map((z, k) => <group key={k} position={[-1.9, 2.1 - (k % 2) * 0.1, z]} scale={0.5}><Wagasa i={k} /></group>)}
             </>
           ) : null
         })()}

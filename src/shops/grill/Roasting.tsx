@@ -1931,14 +1931,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (let i = 0; i < 8; i++) {
       // (nothing on the table's drawn-in end hangs over the side counter's lip: kept a plank in from it)
       // (the seasoning box, with its pots, reaches further than its round footprint: held a little further in)
-      const edge = COOK_TABLE.along[0] + r + 0.38 + (key === 'box' ? 0.22 : 0)
+      const edge = COOK_TABLE.along[0] - FIRE_SHIFT.dot(ALONG) + r + 0.38 + (key === 'box' ? 0.22 : 0)
       const here = at.dot(ALONG)
       if (here < edge) at.addScaledVector(ALONG, edge - here)
       // (nor hanging over the table's right-hand end, its back or its front)
-      const farEnd = COOK_TABLE.along[1] - r - 0.06
+      const farEnd = COOK_TABLE.along[1] - FIRE_SHIFT.dot(ALONG) - r - 0.06
       if (here > farEnd) at.addScaledVector(ALONG, farEnd - here)
       const across = at.dot(LAY)
-      const acrossMax = COOK_TABLE.lay[1] - r - 0.06, acrossMin = COOK_TABLE.lay[0] + r + 0.06
+      const acrossMax = COOK_TABLE.lay[1] - FIRE_SHIFT.dot(LAY) - r - 0.06, acrossMin = COOK_TABLE.lay[0] - FIRE_SHIFT.dot(LAY) + r + 0.06
       if (across > acrossMax) at.addScaledVector(LAY, acrossMax - across)
       else if (across < acrossMin) at.addScaledVector(LAY, acrossMin - across)
       const d = Math.hypot(at.x, at.z) || 1e-6
@@ -1983,7 +1983,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (carriers.bin && !moved.current.has('bin')) {
       // (the water bucket stands where the lantern was, along the back)
       const h = carriers.bin[0].home
-      moved.current.set('bin', new THREE.Vector3(0.2 - h.x, 0, -1.85 - h.z))
+      moved.current.set('bin', new THREE.Vector3(1.35 - h.x, 0, -1.45 - h.z))
     }
     if (carriers.box && !boxPlaced.current && !moved.current.has('box')) {
       boxPlaced.current = true
@@ -1993,7 +1993,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (let pass = 0; pass < 3; pass++) {
       for (const key of containerKeys()) {
         // (a stack stays where it was put; what's kept in the cubby under the table stays there till it's taken out)
-        if (stackOn.current.has(key) || CUBBY_KEYS.has(key)) continue
+        if (stackOn.current.has(key) || CUBBY_KEYS.has(key) || key === 'bin') continue
         const at = containerAt(key)
         const ok = settle(key, at.clone())
         const shift = ok.sub(at)
@@ -2647,8 +2647,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         n.scale.multiplyScalar(BUCKET_SCALE)
         n.position.sub(c).multiplyScalar(BUCKET_SCALE).add(c)
       }
-      for (const k of carriers.bin ?? []) k.home.copy(k.node.position)
-      for (const t of tools) if (t.node === d) { t.home.copy(d!.position); t.home0.copy(d!.position) }
+      const nd = nudge('bin')
+      for (const t of tools) if (t.node === d) { t.home.copy(d!.position); t.home0.copy(d!.position).sub(nd) }
     }
   }, [root, carriers, tools])
   useEffect(() => {
