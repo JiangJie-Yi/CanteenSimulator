@@ -303,6 +303,8 @@ type SceneProps = {
   bakeKitchen: { phase: 'cook' | 'eat'; parts: Part[] } | null
 }
 
+/** the shop's own waiter, there when no one's been hired for the floor: the cooked food is always carried to the customers, never tossed over the bar */
+const HOUSE_SERVER: CrewMember = { id: 'house-server', role: 'server', look: { female: false, age: 'middle' } }
 function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
@@ -518,7 +520,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
                 // the customers, in 3D (a phone has them in 2D on the guest board, and no 3D bar at all), at the bar behind (the grill's bar is drawn by Roasting, which serves onto it);
                 // the grill's room is there before it opens too, empty
                 <group position={dish.roast ? FIRE_SHIFT.clone().negate() : undefined}><GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
-                  servers={dish.roast && ai ? crewOf(dish.id).filter((w) => w.role === 'server') : []}
+                  servers={dish.roast && ai ? (() => { const hired = crewOf(dish.id).filter((w) => w.role === 'server'); return hired.length ? hired : [HOUSE_SERVER] })() : []}
                   mark={dish.roast ? '聞野' : dish.heatControl ? '鼎沸' : dish.bake ? '麵包' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)}

@@ -1159,6 +1159,7 @@ function Kamidana({ shelf = true, part = 'all' }: { shelf?: boolean; part?: 'all
           </group>
         ))}
         <InkBox size={[0.026, 0.014, 0.31]} color="#d4b04a" position-y={0.272} />
+        {[-1, 1].map((sz) => <mesh key={sz} geometry={GABLE_GEO} position={[0, 0, sz * 0.148]} rotation-y={Math.PI / 2 * 0}><meshToonMaterial color="#e2c89a" map={SHRINE_GRAIN} /></mesh>)}
         {[-1, 1].flatMap((sz) => [-1, 1].map((lean) => (
           <InkBox key={`${sz}${lean}`} size={[0.008, 0.012, 0.085]} color="#d8b878" position={[0, 0.3, sz * 0.158]} rotation-x={lean * 0.62} />
         )))}
@@ -1467,6 +1468,40 @@ const ALTAR_D = 0.58
 const ALTAR_Y = 1.42
 /** how long the sake offered stands there, and the extra custom it brings (ms) */
 const INCENSE_MS = 180000
+/** the sutra laid by the shrine: a thread-bound book, an indigo cover, a cream label down it with the name brushed in a column */
+const SUTRA_COVER = canvasTex(96, 160, (g) => {
+  g.fillStyle = '#26365e'
+  g.fillRect(0, 0, 96, 160)
+  g.strokeStyle = 'rgba(255,255,255,0.07)'
+  for (let y = 0; y < 160; y += 3) { g.beginPath(); g.moveTo(0, y); g.lineTo(96, y); g.stroke() }
+  g.fillStyle = '#efe3c2'
+  g.fillRect(30, 14, 36, 132)
+  g.strokeStyle = '#8a2a20'
+  g.lineWidth = 1.5
+  g.strokeRect(33, 17, 30, 126)
+  const t = '觀世音菩薩普門品'
+  for (let i = 0; i < t.length; i++) brushText(g, t[i], 48, 29 + i * 15.2, 14, { fill: '#241810' })
+  // (the binding: white thread through four holes at the spine)
+  g.fillStyle = '#f4efe0'
+  for (const y of [22, 58, 102, 138]) { g.beginPath(); g.arc(10, y, 2.2, 0, Math.PI * 2); g.fill() }
+})
+/** the roof's two gable ends, closed with a plank triangle each, so there's no open hollow under the eaves */
+const GABLE_GEO = (() => {
+  const sh = new THREE.Shape()
+  sh.moveTo(-0.135, 0.185); sh.lineTo(0.135, 0.185); sh.lineTo(0, 0.268); sh.closePath()
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.012, bevelEnabled: false })
+  g.translate(0, 0, -0.006)
+  return g
+})()
+function Sutra() {
+  return (
+    <group position={[-0.12, 0.007, -0.27]} rotation-y={0}>
+      <mesh><boxGeometry args={[0.075, 0.012, 0.115]} /><meshToonMaterial color="#efe6cf" /></mesh>
+      <mesh position-y={0.0062} rotation-x={-Math.PI / 2}><planeGeometry args={[0.075, 0.115]} /><meshToonMaterial color="#ffffff" map={SUTRA_COVER} /></mesh>
+      <mesh scale={[1.04, 1.25, 1.03]}><boxGeometry args={[0.075, 0.012, 0.115]} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+    </group>
+  )
+}
 function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
   // (the offering: one flask pours clear sake into the three cups in turn, the stream and the cups filling; then it's set back)
   const flaskRef = useRef<THREE.Group>(null)
@@ -1512,8 +1547,8 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       k = THREE.MathUtils.smoothstep(since, 0, 0.7) * (1 - THREE.MathUtils.smoothstep(since, 4.0, 4.6))
     }
     if (f) {
-      const z = which >= 0 ? cupZ[which] - 0.092 : rest.z
-      f.position.set(THREE.MathUtils.lerp(rest.x, CUP_X, k), THREE.MathUtils.lerp(rest.y, 0.1, k), THREE.MathUtils.lerp(rest.z, z, k))
+      const z = which >= 0 ? cupZ[which] - 0.1337 : rest.z
+      f.position.set(THREE.MathUtils.lerp(rest.x, CUP_X, k), THREE.MathUtils.lerp(rest.y, 0.045, k), THREE.MathUtils.lerp(rest.z, z, k))
       f.rotation.x = k * 1.1
     }
     const pouring = on && since > 0.7 && since < 4.0
@@ -1521,7 +1556,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       streamRef.current.visible = pouring
       if (pouring) {
         const z = cupZ[which]
-        const a = 0.1 + 0.047, b = CUP_TOP
+        const a = 0.045 + 0.068, b = CUP_TOP
         streamRef.current.position.set(CUP_X, (a + b) / 2, z)
         streamRef.current.scale.set(1, a - b, 1)
       }
@@ -1564,6 +1599,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       </points>
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}
+      <Sutra />
       <group ref={flaskRef} position={[-0.2, 0, 0.3]}>{flask(0, 'f')}</group>
       {/* (the clear sake: a thin stream down into the cup, and the cups, each filling with it) */}
       <mesh ref={streamRef} visible={false}>

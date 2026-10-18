@@ -120,7 +120,9 @@ const ZERO = new THREE.Vector3()
 /** the pinching hand is drawn a little above the pinch of salt it holds */
 const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
 /** the water bucket (bare sticks and burnt food go in it too) */
-const BIN_R = 0.27
+const BIN_R = 0.27 * 1.65
+/** the water bucket drawn this much bigger than modelled */
+const BUCKET_SCALE = 1.65
 /** the trash bin for bare sticks and burnt food (the water bucket is only for water) */
 const TRASH_R = 0.24
 const TRASH_H = 0.36
@@ -308,7 +310,7 @@ const TRAY_D = 1.0
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
 /** where the seasoning box's first half starts out: beside the cook, along and across the table */
-const BOX_SPOT = { along: -1.75, lay: 1.1 }
+const BOX_SPOT = { along: 0.0, lay: 1.7 }
 /** how much bigger the fire pit (its ground, stones and coals) is drawn than modelled */
 const PIT_SCALE = 1.3
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
@@ -1842,6 +1844,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   const boxPlaced = useRef(false)
   const [plateCount, setPlateCount] = useState(1)
+  const carriedOut = useRef(false)
+  /** the kitchen's floor, where a dish let go off the table lands (the scene's y) */
+  const FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP
+  const LIFT = 0.25
+  /** whether a place (the scene's x, z) is off the cook's table (past its edges, less the thing's own radius) */
+  const outsideTable = (at: THREE.Vector3, r: number) => {
+    const a = at.dot(ALONG) + FIRE_SHIFT.dot(ALONG), l = at.dot(LAY) + FIRE_SHIFT.dot(LAY)
+    return a < COOK_TABLE.along[0] - 0.05 || a > COOK_TABLE.along[1] + 0.05 || l < COOK_TABLE.lay[0] - 0.05 || l > COOK_TABLE.lay[1] + 0.05 - 0 * r
+  }
   /** a container at home, moved by its nudge — lifted onto its stack of spares while it's still standing over it */
   function onSpares(key: string, home: THREE.Vector3) {
     const at = home.clone().add(nudge(key))
@@ -2621,6 +2632,20 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (bucket.length) out.bin = bucket
     return out
   }, [root, roast.toolBox, roast.bucket, roast.tools])
+  useLayoutEffect(() => {
+    // (the water bucket and its dipper, drawn bigger: scaled about the bucket's own place)
+    const b = root.getObjectByName('WaterBucket'), d = root.getObjectByName('WaterDipper')
+    if (b && !b.userData.scaled) {
+      b.userData.scaled = true
+      const c = b.position.clone()
+      for (const n of [b, d]) if (n) {
+        n.scale.multiplyScalar(BUCKET_SCALE)
+        n.position.sub(c).multiplyScalar(BUCKET_SCALE).add(c)
+      }
+      for (const k of carriers.bin ?? []) k.home.copy(k.node.position)
+      for (const t of tools) if (t.node === d) { t.home.copy(d!.position); t.home0.copy(d!.position) }
+    }
+  }, [root, carriers, tools])
   useEffect(() => {
     // grabbing the box or the bucket itself (not a pot or a utensil) drags the whole thing
     for (const [key, nodes] of Object.entries(carriers)) if (nodes[0]) nodes[0].node.userData.container = key
@@ -3013,10 +3038,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const base = containerAt(s.key).sub(before)
       const want = base.clone().add(s.from).add(hit.sub(s.start))
       want.y = base.y
-      const next = settle(s.key, want, STACKABLE(s.key) && !holds(s.key)).sub(base)
+      // (a plate or dish carried past the table's edge goes where it's taken, off the table; let go there, it falls to the floor below)
+      const out = outsideTable(want, footprint(s.key))
+      const next = out && STACKABLE(s.key) ? want.clone().sub(base) : settle(s.key, want, STACKABLE(s.key) && !holds(s.key)).sub(base)
       next.y = 0
+      carriedOut.current = out && STACKABLE(s.key)
+      if (carriedOut.current) next.y = LIFT - base.y
       // (taken out of the cubby, it comes up onto the table's top)
-      if (CUBBY_KEYS.has(s.key)) next.y = (s.key === 'plate-0' ? PLATE_TOP[1] : s.key === 'trash' || s.key === 'basket-0' ? 0 : DISH_TOP[1]) - base.y
+      if (!carriedOut.current && CUBBY_KEYS.has(s.key)) next.y = (s.key === 'plate-0' ? PLATE_TOP[1] : s.key === 'trash' || s.key === 'basket-0' ? 0 : DISH_TOP[1]) - base.y
       moved.current.set(s.key, next)
       if (carriers[s.key]) {
         // the box carries its pots and utensils with it, the bucket its dipper
@@ -3034,7 +3063,32 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const release = () => {
       const s = shift.current
-      if (s && STACKABLE(s.key)) {
+      if (s && STACKABLE(s.key) && carriedOut.current) {
+        // (let go off the table: it falls under gravity to the floor, a small bounce, and lies there)
+        const key = s.key
+        const n0 = nudge(key).clone()
+        const baseY = containerAt(key).y - n0.y
+        let y = n0.y, vy = 0, last = performance.now()
+        const fall = () => {
+          const now = performance.now()
+          const d = Math.min(0.05, (now - last) / 1000)
+          last = now
+          vy -= 9.8 * d
+          y += vy * d
+          const floorN = FLOOR_Y - baseY + 0.0
+          if (y <= floorN) {
+            y = floorN
+            if (vy < -1) vy = -vy * 0.2
+            else vy = 0
+          }
+          const cur = nudge(key).clone()
+          cur.y = y
+          moved.current.set(key, cur)
+          setMoveTick((t) => t + 1)
+          if (vy !== 0 || y > floorN) requestAnimationFrame(fall)
+        }
+        requestAnimationFrame(fall)
+      } else if (s && STACKABLE(s.key)) {
         const at = containerAt(s.key)
         // the nearest other empty one it's been let go over (the top of its stack), if any
         const target = containerKeys()
