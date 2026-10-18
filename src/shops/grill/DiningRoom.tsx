@@ -613,6 +613,18 @@ function Box({ size, color, ...rest }: { size: [number, number, number]; color: 
     </mesh>
   )
 }
+/** a box with the shop's ink line round it (its back faces, a hair bigger), for the small shrine */
+function InkBox({ size, color, position, ...rest }: { size: [number, number, number]; color: string; position?: [number, number, number]; 'position-y'?: number; 'rotation-x'?: number }) {
+  const e = 0.0035
+  const sc: [number, number, number] = [1 + 2 * e / size[0], 1 + 2 * e / size[1], 1 + 2 * e / size[2]]
+  const at = position ?? [0, rest['position-y'] ?? 0, 0]
+  return (
+    <group position={at} rotation-x={rest['rotation-x'] ?? 0}>
+      <mesh><boxGeometry args={size} /><meshToonMaterial color={color} /></mesh>
+      <mesh scale={sc}><boxGeometry args={size} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+    </group>
+  )
+}
 
 /** an isshōbin of sake: a tall bottle, its label */
 function Bottle({ x, color, label }: { x: number; color: string; label: string }) {
@@ -1060,21 +1072,21 @@ function Kamidana({ shelf = true }: { shelf?: boolean }) {
   const RED = '#a8541e'
   return (
     <group>
-      {shelf && <Box size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />}
-      {shelf && [-0.3, 0.3].map((z) => <Box key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
+      {shelf && <InkBox size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />}
+      {shelf && [-0.3, 0.3].map((z) => <InkBox key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
       {/* the shrine: a stepped base, the railing, body, doors and roof */}
       <group position={[-0.14, 0.015, 0]}>
-        <Box size={[0.18, 0.02, 0.36]} color={GRAIN} position-y={0.01} />
-        <Box size={[0.16, 0.02, 0.33]} color={HIN} position-y={0.03} />
+        <InkBox size={[0.18, 0.02, 0.36]} color={GRAIN} position-y={0.01} />
+        <InkBox size={[0.16, 0.02, 0.33]} color={HIN} position-y={0.03} />
         {/* (three steps down the front) */}
-        {[0, 1, 2].map((k) => <Box key={k} size={[0.02, 0.008, 0.07 - k * 0.006]} color="#d8bc88" position={[-0.09 - k * 0.018, 0.016 - k * 0.004, 0]} />)}
+        {[0, 1, 2].map((k) => <InkBox key={k} size={[0.02, 0.008, 0.07 - k * 0.006]} color="#d8bc88" position={[-0.09 - k * 0.018, 0.016 - k * 0.004, 0]} />)}
         {/* (the railing round the platform, a post at each corner) */}
         {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
-          <Box key={`${sx}${sz}`} size={[0.012, 0.05, 0.012]} color={RED} position={[sx * 0.073, 0.065, sz * 0.153]} />
+          <InkBox key={`${sx}${sz}`} size={[0.012, 0.05, 0.012]} color={RED} position={[sx * 0.073, 0.065, sz * 0.153]} />
         )))}
-        <Box size={[0.008, 0.01, 0.31]} color={RED} position={[-0.073, 0.082, 0]} />
-        {[-1, 1].map((sz) => <Box key={sz} size={[0.15, 0.01, 0.008]} color={RED} position={[0, 0.082, sz * 0.153]} />)}
-        <Box size={[0.12, 0.16, 0.24]} color={HIN} position-y={0.12} />
+        <InkBox size={[0.008, 0.01, 0.31]} color={RED} position={[-0.073, 0.082, 0]} />
+        {[-1, 1].map((sz) => <InkBox key={sz} size={[0.15, 0.01, 0.008]} color={RED} position={[0, 0.082, sz * 0.153]} />)}
+        <InkBox size={[0.12, 0.16, 0.24]} color={HIN} position-y={0.12} />
         {/* (the doors: two leaves with a dark seam between, a gold fitting on each, a lintel over them) */}
         {[-1, 1].map((sd) => (
           <group key={sd}>
@@ -1092,7 +1104,7 @@ function Kamidana({ shelf = true }: { shelf?: boolean }) {
         <mesh position={[-0.0618, 0.12, 0]} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[0.004, 0.125]} /><meshBasicMaterial color={INK} />
         </mesh>
-        <Box size={[0.014, 0.012, 0.15]} color="#6a5038" position={[-0.064, 0.19, 0]} />
+        <InkBox size={[0.014, 0.012, 0.15]} color="#6a5038" position={[-0.064, 0.19, 0]} />
         {/* (the roof: two planks of cypress bark sloping down from the ridge, a modest eave all round, each edged with a thin darker
             board; the ridge capped in gold, the crossed finials (千木) rising at both ends and the short logs (鰹木) laid across it) */}
         {[-1, 1].map((sd) => (
@@ -1102,9 +1114,9 @@ function Kamidana({ shelf = true }: { shelf?: boolean }) {
             {[-1, 1].map((e) => <mesh key={e} position={[0, 0.0045, e * 0.1485]}><boxGeometry args={[0.15, 0.006, 0.006]} /><meshToonMaterial color="#4a3622" /></mesh>)}
           </group>
         ))}
-        <Box size={[0.026, 0.014, 0.31]} color="#d4b04a" position-y={0.272} />
+        <InkBox size={[0.026, 0.014, 0.31]} color="#d4b04a" position-y={0.272} />
         {[-1, 1].flatMap((sz) => [-1, 1].map((lean) => (
-          <Box key={`${sz}${lean}`} size={[0.008, 0.012, 0.085]} color="#d8b878" position={[0, 0.3, sz * 0.158]} rotation-x={lean * 0.62} />
+          <InkBox key={`${sz}${lean}`} size={[0.008, 0.012, 0.085]} color="#d8b878" position={[0, 0.3, sz * 0.158]} rotation-x={lean * 0.62} />
         )))}
         {[-0.065, 0, 0.065].map((z) => (
           <mesh key={z} position={[0, 0.285, z]} rotation-z={Math.PI / 2}>
