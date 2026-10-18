@@ -120,6 +120,7 @@ mat("Strap", srgb("#7a2a1e"))
 mat("Pin", srgb("#e85a7a"))
 mat("Cord", srgb("#e8e4da"))
 mat("Iris", srgb("#6a4632"))
+mat("IrisLight", srgb("#b4835a"))
 mat("Sole", srgb("#4a403a"))
 mat("Toque", srgb("#fbfaf6"))
 mat("Wrinkle", srgb("#b0806a"))
@@ -732,7 +733,7 @@ def face(kind, hd):
     old = kind in ("grandma", "grandpa")
     ex, ez = 0.36, -0.06          # eye yaw and pitch
     tough = st.get("tough", False)
-    names = ["Eye", "EyeWhite", "Lash", "Hair", "Mouth", "MouthIn", "Blush", "Skin", "Iris", "Wrinkle", "Vein", "Tear"]
+    names = ["Eye", "EyeWhite", "Lash", "Hair", "Mouth", "MouthIn", "Blush", "Skin", "Iris", "Wrinkle", "Vein", "Tear", "IrisLight"]
     mi = {n: i for i, n in enumerate(names)}
     mats = [MATS[n] for n in names]
 
@@ -751,6 +752,9 @@ def face(kind, hd):
         rw, rh = {"kid": (0.125, 0.19), "maid": (0.125, 0.19), "highSchoolGirl": (0.118, 0.18), "gyaru": (0.12, 0.17), "tourist": (0.112, 0.16),
                   "uncle": (0.06, 0.075), "civilServant": (0.07, 0.095)}.get(kind, (rw, rh))
         sleepy = kind in ("salaryman", "student")
+        # (rounder, bigger eyes all round: the shape that reads as a face at a distance)
+        if kind not in ("uncle", "civilServant"):
+            rw, rh = rw * 1.1, rh * 1.14
         if tough:
             # (a narrowed glare: shorter eyes, flat along the top)
             rh *= 0.72
@@ -765,12 +769,15 @@ def face(kind, hd):
             # (and bags under them, from the late nights)
             decal_strip(bm, surf, [(y + sd * a * rw, ez - rh * 1.05 - 0.012 * (1 - a * a)) for a in (-1, 0, 1)],
                         [0.0, 0.007, 0.0], mi["Wrinkle"], off=0.0022)
-        # a warm brown iris in its lower part, a dark pupil left over it
-        decal_ellipse(bm, surf, y, ez - rh * 0.22, rw * 0.72, rh * 0.5, mi["Iris"], off=0.0021)
-        decal_ellipse(bm, surf, y, ez - rh * 0.1, rw * 0.38, rh * 0.36, mi["Eye"], off=0.0023)
+        # a big iris filling most of the eye, darker at the top and warmer toward the lower rim, a dark pupil in it, and
+        # a large catchlight up on the one side with a small one low on the other
+        decal_ellipse(bm, surf, y, ez - rh * 0.12, rw * 0.86, rh * 0.8, mi["Iris"], off=0.0021)
+        decal_ellipse(bm, surf, y, ez - rh * 0.46, rw * 0.66, rh * 0.34, mi["IrisLight"], off=0.0022,
+                      squash=lambda x, yy: (x, yy if yy < 0 else yy * 0.5))
+        decal_ellipse(bm, surf, y, ez - rh * 0.08, rw * 0.42, rh * 0.46, mi["Eye"], off=0.0023)
         if not sleepy:
-            decal_ellipse(bm, surf, y + sd * 0.012, ez + rh * 0.4, rw * 0.36, rh * 0.28, mi["EyeWhite"], off=0.0026)
-        decal_ellipse(bm, surf, y - sd * 0.025, ez - rh * 0.43, rw * 0.18, rh * 0.13, mi["EyeWhite"], off=0.0026)
+            decal_ellipse(bm, surf, y + sd * rw * 0.2, ez + rh * 0.34, rw * 0.3, rh * 0.26, mi["EyeWhite"], off=0.0026)
+        decal_ellipse(bm, surf, y - sd * rw * 0.3, ez - rh * 0.42, rw * 0.16, rh * 0.12, mi["EyeWhite"], off=0.0026)
         if kind == "gyaru":
             # (her liner, thick along the top lid and flicked out past the corner)
             decal_strip(bm, surf, [(y - sd * rw * 0.9, ez + rh * 0.85), (y, ez + rh * 1.02), (y + sd * rw * 1.15, ez + rh * 0.8),
@@ -780,7 +787,15 @@ def face(kind, hd):
             decal_ellipse(bm, surf, y + sd * rw * 0.45, ez - rh * 0.05, rw * 0.12, rh * 0.09, mi["EyeWhite"], off=0.0026)
         if girl:
             lash = [(y + sd * a * rw * 1.25, ez + rh * (0.95 - 0.25 * a * a) + 0.01) for a in (-1, -0.5, 0, 0.5, 1, 1.25)]
-            decal_strip(bm, surf, lash, [0.0, 0.014, 0.016, 0.016, 0.012, 0.0], mi["Lash"], off=0.0024)
+            decal_strip(bm, surf, lash, [0.0, 0.019, 0.024, 0.024, 0.018, 0.0], mi["Lash"], off=0.0024)
+            # (and a little flick out past the outer corner, and a fold of the lid above)
+            decal_strip(bm, surf, [(y + sd * rw * 1.1, ez + rh * 0.78), (y + sd * rw * 1.5, ez + rh * 0.92)],
+                        [0.012, 0.0], mi["Lash"], off=0.0025)
+            decal_strip(bm, surf, [(y + sd * a * rw * 0.95, ez + rh * (1.18 - 0.3 * a * a)) for a in (-1, -0.4, 0.4, 1)],
+                        [0.0, 0.006, 0.006, 0.0], mi["Wrinkle"], off=0.0021)
+        elif not (sleepy or tough):
+            lash = [(y + sd * a * rw * 1.1, ez + rh * (0.96 - 0.22 * a * a)) for a in (-1, -0.5, 0, 0.5, 1)]
+            decal_strip(bm, surf, lash, [0.0, 0.011, 0.013, 0.011, 0.0], mi["Lash"], off=0.0024)
     eyes = from_bm(f"{kind}.eyes", bm, mats, HREF)
 
     bm = bmesh.new()
@@ -849,8 +864,10 @@ def face(kind, hd):
     # blush, the lines of age, the uncle's moustache (on the face mesh: they never change)
     bm = bmesh.new()
     for sd in (1, -1):
-        if kind in ("kid", "highSchoolGirl", "yukata", "grandma", "officeLady", "maid", "gyaru"):
-            decal_ellipse(bm, surf, sd * 0.56, -0.3, 0.12, 0.06, mi["Blush"], off=0.0012)
+        if kind in ("kid", "highSchoolGirl", "yukata", "grandma", "officeLady", "maid", "gyaru", "staffF"):
+            decal_ellipse(bm, surf, sd * 0.56, -0.28, 0.15, 0.075, mi["Blush"], off=0.0012)
+        elif kind in ("highSchoolBoy", "student", "staffM"):
+            decal_ellipse(bm, surf, sd * 0.56, -0.28, 0.1, 0.05, mi["Blush"], off=0.0012)
     if old:
         # the lines of age: across the brow, crow's feet at the eyes' corners, down from the nose to the mouth's corners
         for k in range(3):
@@ -924,7 +941,7 @@ def face(kind, hd):
     bm = bmesh.new()
     bm.from_mesh(hd.data)
     np_, nn = surf.ang(0, -0.24, -0.004)
-    ellipsoid(bm, np_, (0.011 * k, 0.009 * k, 0.009 * k), mi=0)
+    ellipsoid(bm, np_, (0.009 * k, 0.0075 * k, 0.0075 * k), mi=0)
     for sd in (1, -1):
         ep, en = surf.ang(sd * 1.5, -0.14, -0.012)
         rot = Vector((0, 0, 1)).rotation_difference(Vector((sd, 0.25, 0))).to_matrix()
@@ -2127,7 +2144,8 @@ def walk(phase, style="man"):
           "old": dict(step=0.22, lean=-0.32, twist=0.03, wide=0.04, arm=0.0, out=0.2, knee=0.3, bob=0.006)}[style]
 
     def pose():
-        move_hips(0.46 - 0.008 - (0.03 if style == "old" else 0) + st["bob"] * abs(c), 0)
+        z0 = 0.46 - 0.008 - (0.03 if style == "old" else 0) + st["bob"] * abs(c)
+        move_hips(z0, 0)
         aim("spine", (0, st["lean"], 1), twist=st["twist"] * a)
         aim("chest", (0, st["lean"] * 0.8 - 0.01, 1), twist=-st["twist"] * 1.4 * a)
         # (the old look up ahead from their stoop)
@@ -2148,6 +2166,11 @@ def walk(phase, style="man"):
             aim(f"upperarm.{s}", (sd * st["out"], st["arm"] * sw, -1))
             aim(f"forearm.{s}", (sd * st["out"] * 0.8, st["arm"] * sw - 0.35 - max(0, -sw) * 0.4, -1))
             aim(f"hand.{s}", (sd * 0.12, st["arm"] * sw - 0.3, -1))
+        # (the legs reach less far down the more they stride or bend, so the hips come down until the lower foot
+        # stands on the ground: no one walks an inch above the floor)
+        bpy.context.view_layer.update()
+        low = min(min(rig.pose.bones[f"foot.{s}"].head.z, rig.pose.bones[f"foot.{s}"].tail.z) for s in ("L", "R"))
+        move_hips(z0 + (0.03 - low), 0)
     return pose
 
 

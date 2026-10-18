@@ -142,7 +142,7 @@ const LIGHTING: Record<Theme, { sun: string; sunIntensity: number; sky: string; 
   spot: number; fire: number; shadow: string; shadowOpacity: number }> = {
   // golden-hour sun and a cool sky fill
   light: { sun: '#ffe7c2', sunIntensity: 1.8, sky: '#cfe0ff', ground: '#7a6450', hemi: 1.0, spot: 18, fire: 2,
-    shadow: '#3a4a5c', shadowOpacity: 0.3 },
+    shadow: '#000000', shadowOpacity: 0.42 },
   // moonlight; the warm spot, fire and burners carry the scene
   dark: { sun: '#b8c4ff', sunIntensity: 0.9, sky: '#6a6274', ground: '#3a2c20', hemi: 1.35, spot: 30, fire: 4,
     shadow: '#000000', shadowOpacity: 0.45 },
