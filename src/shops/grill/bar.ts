@@ -477,6 +477,8 @@ export const staffDoorAt = (c: Counter, lay = STAFF_DOOR.lay - 0.25) => c.at.clo
  * where they are by the fire and the rest grows away from it. Roasting moves its own uses of them to match.
  */
 export const GRILL_SCALE = 2
+/** how far along the table the fire (and all that's laid out round it) stands from where the table was drawn for it, to sit in the table's middle */
+export const FIRE_SHIFT = new THREE.Vector3().addScaledVector(ALONG, 0.65)
 /** the grill's bar top, in its own sizes */
 export const GRILL_BAR_TOP = 0.64
 /** the cook's own table (the fire pit and all on it) has its top at the scene's floor, y = 0; the customers' floor is

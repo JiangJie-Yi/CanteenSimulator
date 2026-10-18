@@ -25,7 +25,7 @@ import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -3749,11 +3749,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </Html>
       )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
+      {/* (the table, the crew and the bar stay where they were drawn: the fire and all round it stand FIRE_SHIFT along from them, to the table's middle) */}
+      <group position={[-FIRE_SHIFT.x, 0, -FIRE_SHIFT.z]}>
       <CookTable floor={!bar} />
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
         <CrewWalk key={m.id} at={at} yaw={yaw}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></CrewWalk>
       ))}
       {bar && <Bar />}
+      </group>
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
       {roast.trash && <TrashBin container="trash" contents={trashed}
         position={containerAt('trash').toArray() as [number, number, number]} />}

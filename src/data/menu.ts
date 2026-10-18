@@ -357,12 +357,12 @@ export const ALL_DISHES: Dish[] = [
       // (the plates and dishes all on the right of the fire as the camera sees it; the raw tray front and centre)
       // (the plates and dishes are kept in the cubby under the cook's table: the big plate on its floor, the side dishes on its
       // shelf over it; Roasting's plateAt and dishAt put the ones past the first back on the table's top, where this was)
-      plate: [2.86, -1.26, -0.16],
+      plate: [2.333, -1.26, 0.224],
       // just outside the stones on the left as the camera sees it
       basket: { at: [2.97, 0, -0.18], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
       // (in the front row, left of the miso soup bowls)
-      dish: { at: [2.66, -0.74, -0.01], capacity: 3 },
+      dish: { at: [2.133, -0.74, 0.374], capacity: 3 },
       // the spoons and brush in the seasoning box are what's carried; grabbing a pot picks up its utensil
       // (salt is taken by hand: SaltPinch only marks where the pinch is taken from)
       tools: { SaltPinch: 'salt', SoyBrush: 'soy', MilkBrush: 'milk', PeanutSpoon: 'peanut', WaterDipper: 'water',
@@ -383,7 +383,7 @@ export const ALL_DISHES: Dish[] = [
       tray: [2.1, 0.0, -1.03],
       // the rice balls come out on their own little dish, just past the front end of the tray
       // (beside the front end of the tray, between it and the basket: the prep side, all on the right)
-      rawDish: { at: [3.1, -0.74, -0.34], items: ['Onigiri'] },
+      rawDish: { at: [2.573, -0.74, 0.044], items: ['Onigiri'] },
     },
     layout: {
       mode: 'ring',

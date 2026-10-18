@@ -40,7 +40,7 @@ import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE } from '@/shops/grill/bar'
+import { FIRE_SHIFT, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE } from '@/shops/grill/bar'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
 import { guestLabel } from '@/data/guests'
@@ -495,7 +495,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
         const soup = !!base || !dish.emptyHide
         // everything drawn from the dish's model (the full one, or its light version)
         const models = (url: string) => (
-          <>
+          <group position={dish.roast ? FIRE_SHIFT : undefined}>
               <Dish url={url} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                 broth={base?.broth} hidden={hidden} fill={base?.fill} tint={base?.tint}
                 floatIds={FLOAT_IDS[dish.id]} layout={dish.layout}
@@ -517,12 +517,12 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
               {(ai || !!dish.roast) && i === active && !phone && (
                 // the customers, in 3D (a phone has them in 2D on the guest board, and no 3D bar at all), at the bar behind (the grill's bar is drawn by Roasting, which serves onto it);
                 // the grill's room is there before it opens too, empty
-                <GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
+                <group position={dish.roast ? FIRE_SHIFT.clone().negate() : undefined}><GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
                   servers={dish.roast && ai ? crewOf(dish.id).filter((w) => w.role === 'server') : []}
                   mark={dish.roast ? '聞野' : dish.heatControl ? '鼎沸' : dish.bake ? '麵包' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(dish.heatControl ? 2.75 : 1.95)}
-                  incense={dish.roast ? incense : undefined} onDrink={onDrink} />
+                  incense={dish.roast ? incense : undefined} onDrink={onDrink} /></group>
               )}
               {dish.id === 'beefnoodle' && (
                 <TaiwanTable items={dish.items} quantities={servings(dish, orders[dish.id])} active={i === active} locked={ai}
@@ -539,7 +539,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
                   aiWanted={ai && i === active ? potAi : []} aiPace={chefOf(dish.id).pace} onGuestEat={onPotGuestEat}
                   space={ai ? 'open' : 'closed'} locked={ai} />
               )}
-          </>
+          </group>
         )
         return (
           <group key={dish.id} ref={(g) => { groups.current[i] = g }}
