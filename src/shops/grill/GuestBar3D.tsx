@@ -140,7 +140,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           <Part key={i} geo={REG_GEO.round} color={i ? '#4a2e1c' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
         ))}
         {DOOR_CATS.map((k, i) => (
-          <group key={i} position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw} scale={k.s * 2.2}><LuckyCat body={k.body} paw={k.paw} still /></group>
+          <group key={i} position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
         ))}
       </group>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
@@ -450,7 +450,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         <mesh position={[0, 0.05, 0]}><planeGeometry args={[0.12, 0.075]} /><meshToonMaterial color="#ffffff" map={PAY_SIGN} /></mesh>
       </group>
       {/* the beckoning cat, its paw up */}
-      <group position={[0.4, top, 0.04]} rotation-y={Math.PI}><LuckyCat /></group>
+      <group position={[0.4, top, 0.04]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.3} /></group>
     </group>
   )
 }
@@ -474,10 +474,11 @@ const PAY_SIGN = (() => signTexture(160, 100, (g) => {
  */
 const DOOR_CATS = [
   // (on the stand: x out from the wall, y the tier's top, z along it; the big white pair on the upper tier)
-  { x: 0.04, y: 0.6, z: -0.13, yaw: 0.2, s: 0.95, body: '#f6f3ea', paw: 'right' as const },
-  { x: 0.04, y: 0.6, z: 0.13, yaw: -0.2, s: 0.95, body: '#f6f3ea', paw: 'left' as const },
-  { x: -0.07, y: 0.32, z: -0.2, yaw: 0.25, s: 0.75, body: '#d9b04a', paw: 'left' as const },
-  { x: -0.07, y: 0.32, z: 0.2, yaw: -0.25, s: 0.75, body: '#2a2420', paw: 'right' as const },
+  // (each its own model and size, in its own colours: two big ones on top, two smaller below)
+  { x: 0.04, y: 0.6, z: -0.15, yaw: 0.2, kind: 1 as const, h: 0.5 },
+  { x: 0.04, y: 0.6, z: 0.15, yaw: -0.2, kind: 3 as const, h: 0.42 },
+  { x: -0.07, y: 0.32, z: -0.2, yaw: 0.25, kind: 2 as const, h: 0.34 },
+  { x: -0.07, y: 0.32, z: 0.2, yaw: -0.25, kind: 1 as const, h: 0.3 },
 ]
 /** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
 /** the customers' display: green figures on black, the amount to pay */

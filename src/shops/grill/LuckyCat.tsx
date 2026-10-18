@@ -12,9 +12,14 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
  * The model's skin is baked into a few plain poses along the wave (a skinned mesh can't be merged into a StaticBatch, and
  * costs more to draw); `still` shows one pose, the default plays the wave by stepping through them there and back.
  */
-const URL = import.meta.env.BASE_URL + 'models/luckycat.glb'
-/** how tall it stands, as this is measured (the cat and its cushion come out twice this tall in the shop: about 0.2) */
-const HEIGHT = 0.1
+/** the three models (the first waves, the others are still ones), how much taller each comes out than asked for, and the turn that brings its face to +z (measured) */
+const MODELS = [
+  { url: import.meta.env.BASE_URL + 'models/luckycat1.glb', fudge: 0.5 },
+  { url: import.meta.env.BASE_URL + 'models/luckycat2.glb', fudge: 0.5 },
+  { url: import.meta.env.BASE_URL + 'models/luckycat3.glb', fudge: 0.5, yaw: -Math.PI / 2 },
+]
+/** how tall each stands in the shop, unless said otherwise */
+const HEIGHT = 0.2
 /** the poses: the wave's lift, from its start up to the paw's highest, at these moments of the clip (seconds) */
 const POSES = [0, 0.9, 1.8, 2.7, 3.6, 4.5, 5.4, 6.3, 7.2, 8]
 const STILL = 5.4
@@ -51,11 +56,13 @@ function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.
   return out
 }
 
-export function LuckyCat({ body, still = false }: { body?: string; paw?: 'left' | 'right'; still?: boolean }) {
-  const gltf = useGLTF(URL)
+export function LuckyCat({ kind = 1, height = HEIGHT, still = false }: { kind?: 1 | 2 | 3; height?: number; still?: boolean }) {
+  const model = MODELS[kind - 1]
+  const gltf = useGLTF(model.url)
   const frames = useMemo(() => {
-    const tint = body && body !== '#f6f3ea' ? new THREE.Color(body) : null
-    const times = still ? [STILL] : POSES
+    const tint = null
+    // (only the first has a wave to play; the others are one pose)
+    const times = still || kind !== 1 ? [STILL] : POSES
     const baked = times.map((t) => bake(gltf, t, tint))
     // (its size and where it stands: scaled to HEIGHT tall, centred, its feet on the ground, by a middle pose's extent)
     const box = new THREE.Box3()
@@ -64,15 +71,15 @@ export function LuckyCat({ body, still = false }: { body?: string; paw?: 'left' 
       box.union(g.boundingBox!)
     }
     const size = box.getSize(new THREE.Vector3())
-    const k = HEIGHT / size.y
+    const k = (height * model.fudge) / size.y
     const centre = box.getCenter(new THREE.Vector3())
-    const place = new THREE.Matrix4().makeScale(k, k, k).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -box.min.y, -centre.z))
+    const place = new THREE.Matrix4().makeRotationY((model as { yaw?: number }).yaw ?? 0).multiply(new THREE.Matrix4().makeScale(k, k, k)).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -box.min.y, -centre.z))
     return baked.map((parts) => parts.map(({ g, mat }) => { g.applyMatrix4(place); return { g, mat } }))
-  }, [gltf, body, still])
+  }, [gltf, kind, height, model, still])
   const group = useRef<THREE.Group>(null)
   const t = useRef(Math.random() * 10)
   useFrame((_, dt) => {
-    if (still || !group.current) return
+    if (still || kind !== 1 || !group.current) return
     // (up and down the wave, a few poses a second)
     t.current += Math.min(dt, 0.1) * 5
     const n = frames.length
@@ -84,7 +91,7 @@ export function LuckyCat({ body, still = false }: { body?: string; paw?: 'left' 
   return (
     <group ref={group} name="lucky-cat">
       {frames.map((parts, i) => (
-        <group key={i} visible={still || i === 0}>
+        <group key={i} visible={still || kind !== 1 || i === 0}>
           {parts.map(({ g, mat }, j) => <mesh key={j} geometry={g} material={mat} castShadow />)}
         </group>
       ))}
@@ -92,4 +99,4 @@ export function LuckyCat({ body, still = false }: { body?: string; paw?: 'left' 
   )
 }
 
-useGLTF.preload(URL)
+for (const m of MODELS) useGLTF.preload(m.url)

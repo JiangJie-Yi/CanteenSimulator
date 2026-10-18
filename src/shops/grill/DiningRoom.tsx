@@ -1194,7 +1194,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
             <cylinderGeometry args={[0.04, 0.05, 0.1, 12]} />
             <meshToonMaterial color="#3e4a5a" />
           </mesh>
-          <group position={[0, 0, 0.3]} rotation-y={-Math.PI / 2}><LuckyCat still /></group>
+          <group position={[0, 0, 0.3]} rotation-y={-Math.PI / 2}><LuckyCat kind={3} height={0.3} still /></group>
         </group>
           </>}
         </StaticBatch>
