@@ -591,23 +591,20 @@ const STEP_LOG = (() => {
   c.width = 256
   c.height = 64
   const g = c.getContext('2d')!
-  g.fillStyle = '#9a6c3c'
+  // (planed oak, as the floor's: a warm mid-brown, long straight fine grain with a few darker streaks, no knots)
+  g.fillStyle = '#7a5836'
   g.fillRect(0, 0, 256, 64)
-  for (let i = 0; i < 26; i++) {
-    const y = 2 + i * 2.4 + (i % 3)
-    g.strokeStyle = i % 4 ? 'rgba(70,40,18,0.35)' : 'rgba(215,170,110,0.28)'
-    g.lineWidth = 1 + (i % 3) * 0.4
+  for (let i = 0; i < 40; i++) {
+    const y = (i * 1.6 + (i % 5) * 0.4) % 64
+    g.strokeStyle = i % 3 ? 'rgba(45,26,12,0.22)' : 'rgba(190,140,90,0.16)'
+    g.lineWidth = 0.7 + (i % 4) * 0.25
     g.beginPath()
     g.moveTo(0, y)
-    g.bezierCurveTo(70, y + 3 * Math.sin(i), 170, y - 3 * Math.cos(i * 1.7), 256, y + 2)
+    g.lineTo(256, y + ((i % 7) - 3) * 0.25)
     g.stroke()
   }
-  for (const [x, y] of [[60, 20], [190, 44]]) {
-    g.fillStyle = 'rgba(55,30,12,0.7)'
-    g.beginPath(); g.ellipse(x, y, 9, 4.5, 0, 0, Math.PI * 2); g.fill()
-    g.strokeStyle = 'rgba(55,30,12,0.4)'
-    g.beginPath(); g.ellipse(x, y, 16, 8, 0, 0, Math.PI * 2); g.stroke()
-  }
+  g.fillStyle = 'rgba(40,22,10,0.18)'
+  for (const y of [9, 31, 52]) g.fillRect(0, y, 256, 2.2)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = t.wrapT = THREE.RepeatWrapping
