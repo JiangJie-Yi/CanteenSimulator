@@ -553,7 +553,7 @@ function minus(al: [number, number], ly: [number, number], h: { along: [number, 
 }
 const RISER = '#3a2416'
 /** the base's whole thickness, one dark colour all the way down (its sides show as a single band) */
-const BASE_COLOR = '#261004'
+const BASE_COLOR = '#3d2414'
 /**
  * The shop's base: a thick plinth of wood under the whole room (the customers' floor on a solid fill, the kitchen's lower
  * floor in a well in it), a pale rim of boards round its top edge, a dark body, a toe board at its foot, standing

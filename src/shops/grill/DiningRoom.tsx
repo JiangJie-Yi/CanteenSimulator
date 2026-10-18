@@ -1983,10 +1983,13 @@ const STAFF_MAT = canvasTex(256, 160, (g) => {
 function StaffMat() {
   return (
     <group>
-      <mesh position={[0, 0.012, 0.15]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.5, 0.94]} /><meshToonMaterial color="#ffffff" map={STAFF_MAT} /></mesh>
+      {/* (the rug's body, a little thick and a shade darker, under its face; a soft shadow round it on the boards) */}
+      <mesh position={[0, 0.006, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.56, 1.0]} /><meshBasicMaterial color="#000000" transparent opacity={0.28} depthWrite={false} /></mesh>
+      <mesh position={[0, 0.011, 0]}><boxGeometry args={[1.5, 0.014, 0.94]} /><meshToonMaterial color="#1a2c50" /></mesh>
+      <mesh position={[0, 0.0188, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.5, 0.94]} /><meshToonMaterial color="#ffffff" map={STAFF_MAT} /></mesh>
       {/* (the fringe at both ends, tassels of cream cord) */}
       {[-1, 1].flatMap((sd) => Array.from({ length: 30 }, (_, k) => (
-        <mesh key={`${sd}${k}`} position={[sd * 0.76, 0.012, 0.15 + (k - 14.5) * 0.031]} rotation-z={Math.PI / 2}>
+        <mesh key={`${sd}${k}`} position={[sd * 0.76, 0.012, (k - 14.5) * 0.031]} rotation-z={Math.PI / 2}>
           <cylinderGeometry args={[0.004, 0.004, 0.06, 4]} /><meshToonMaterial color="#e8d8a8" />
         </mesh>
       )))}
