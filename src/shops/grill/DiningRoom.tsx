@@ -23,6 +23,8 @@ const NORMAL = new THREE.Vector3()
 const WALL_H = 2.3
 /** how thick the room's walls are, behind their face */
 const WALL_T = 0.2
+/** how far down the shop's base goes under the room's floor, for the wall's thickness to stand on it all the way */
+const BASE_DEPTH = 0.46
 const WAINSCOT = 0.85
 
 /** a canvas texture of the given size, drawn by `draw` */
@@ -1197,7 +1199,9 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
  * One counter's stretch of the room: the wall behind its aisle (from/to along it, in the counter's own frame), and
  * pendant lamps over it.
  */
-export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar = false, clear = [] }: { c: Counter; from: number; to: number; far: number
+export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar = false, clear = [], corner = false }: { c: Counter; from: number; to: number; far: number
+  /** the first of the room's two walls, whose start is the corner they meet in: its thickness runs on to close the corner */
+  corner?: boolean
   /** stretches of it (along it) where something stands against it: nothing hung there, no post */
   clear?: [number, number][]
   /** its shelf an altar instead (by the door): a command flag in the censer, and incense (lit when, and lighting more) */
@@ -1266,11 +1270,16 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         <StaticBatch key={`${from}|${to}|${door}|${shrine}|${!!altar}`}>
         {/* the plaster over the wainscot, open where the toilets' doors are (a strip between them, and over them) */}
         {/* (the wall's thickness: a slab behind it, the base's dark wood, full height, over the toilets' doorways only above them) */}
-        {spans.map(([z0, z1, y0]) => (
-          <mesh key={`t${z0}|${y0}`} position={[WALL_T / 2 + 0.012, (Math.max(y0, 0) + WALL_H) / 2, (z0 + z1) / 2]}>
-            <boxGeometry args={[WALL_T, WALL_H - Math.max(y0, 0), z1 - z0]} /><meshToonMaterial color="#3d2414" />
-          </mesh>
-        ))}
+        {/* (down through the base's own thickness too, which stops at the room's outline, short of the wall's) */}
+        {spans.map(([z0, z1, y0]) => {
+          const lo = y0 > 0 ? y0 : -BASE_DEPTH
+          const z0e = corner && z0 === from ? z0 - WALL_T - 0.012 : z0
+          return (
+            <mesh key={`t${z0}|${y0}`} position={[WALL_T / 2 + 0.012, (lo + WALL_H) / 2, (z0e + z1) / 2]}>
+              <boxGeometry args={[WALL_T, WALL_H - lo, z1 - z0e]} /><meshToonMaterial color="#3d2414" />
+            </mesh>
+          )
+        })}
         {spans.map(([z0, z1, y0]) => (
           <group key={`${z0}|${y0}`}>
             <WallPiece z0={z0} z1={z1} y0={Math.max(WAINSCOT, y0)} y1={WALL_H} plaster />
@@ -1279,7 +1288,11 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         ))}
         {/* the rail over the wainscot and the beam along the top */}
         {/* (the rail broken where the toilets' doorways are) */}
-        {spans.filter(([, , y0]) => y0 < WAINSCOT).map(([z0, z1]) => <Box key={z0} size={[0.05, 0.05, z1 - z0]} color="#3a2416" position={[-0.02, WAINSCOT, (z0 + z1) / 2]} />)}
+        {/* (stopping short of the doorways' frames, and not across the little strip between the two doors) */}
+        {spans.filter(([a, b, y0]) => y0 < WAINSCOT && b - a > 0.3).map(([z0, z1]) => {
+          const a = door !== undefined && z0 !== from ? z0 + 0.09 : z0, b = door !== undefined && z1 !== to ? z1 - 0.09 : z1
+          return <Box key={z0} size={[0.05, 0.05, b - a]} color="#3a2416" position={[-0.02, WAINSCOT, (a + b) / 2]} />
+        })}
         <Box size={[0.08, 0.1, l]} color="#3a2416" position={[-0.03, WALL_H - 0.05, mid]} />
         {/* (no upright posts: nothing stands in the way of the banners strung along it) */}
         {/* a frieze of seigaiha waves under the beam, and the pictures hung along the plaster */}
@@ -2227,6 +2240,11 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
   const face = Math.atan2(-c0.lay.x, -c0.lay.z)
   const fr = useMemo(() => fridgesOf(counters), [counters])
   const c1 = counters[1]
+  // (the corner where the room's two walls meet: the plant stands in it, a little in from both)
+  const cornerAt = useMemo(() => {
+    const along = Math.min(-c0.length / 2 - 0.35, ...counters.slice(1).map((o) => o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c0.at).dot(c0.along)))
+    return c0.at.clone().addScaledVector(c0.along, along + 0.42).addScaledVector(c0.lay, farOf(c0) + 0.42)
+  }, [c0, counters])
   const crateAt = useMemo(() => {
     if (!fr || !c1) return new THREE.Vector3()
     const last = fr[fr.length - 1]
@@ -2243,7 +2261,7 @@ export function ShopProps({ counters }: { counters: Counter[] }) {
           (none against the side wall: the two drinks fridges stand there) */}
       <group position={at(3.62, 2.25)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat /></group>
-      <group position={at(-3.35, 3.6)} rotation-y={0.4}><PottedBamboo /></group>
+      <group position={cornerAt} rotation-y={0.4}><PottedBamboo /></group>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
       {fr && <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><BottleCrates /></group>}
     </StaticBatch>
