@@ -296,6 +296,8 @@ const TRAY_W = 1.6
 const TRAY_D = 1.0
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
+/** where the seasoning box's first half starts out: beside the cook, along and across the table */
+const BOX_SPOT = { along: -0.55, lay: 0.85 }
 /** how much bigger the fire pit (its ground, stones and coals) is drawn than modelled */
 const PIT_SCALE = 1.3
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
@@ -827,6 +829,8 @@ const LOG_END = new THREE.CircleGeometry(FOOT_RAIL.r * 1.03, 9)
 const LOG_KNOT = new THREE.SphereGeometry(0.011, 7, 5)
 /** how high the raised lip along the bar's cook's side stands over its top */
 const LIP_H = 0.15
+/** how far the first counter's lip runs on towards the side counter's, so the two meet at the corner with no gap (the bar's own sizes) */
+const LIP_JOIN = 0.29
 /** a unit slab with rounded edges (scaled to each top), its grain still running the long way */
 const ROUNDED_SLAB = new RoundedBoxGeometry(1, 1, 1, 3, 0.08)
 const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042, 0.016], [0.045, 0.02], [0.043, 0.021],
@@ -918,7 +922,7 @@ function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Cou
         // (where the two counters' lips meet at the corner, each runs a little into the other: no notch between their
         // rounded ends)
         // (the first counter's lip starts where the side counter's now stands, drawn in from the wall by SIDE_PULL)
-        let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.02 : 0) + (trim ? SIDE_PULL : 0), x1 = (L + 0.3) / 2 + (butt ? 0.05 : 0)
+        let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.02 : 0) + (trim ? SIDE_PULL - LIP_JOIN : 0), x1 = (L + 0.3) / 2 + (butt ? 0.05 : 0)
         if (gate) {
           if (end > 0) x1 -= G
           else x0 += G
@@ -1802,6 +1806,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const r = r0 + lap * PLATE_STEP
     return onSpares(`plate-${n}`, new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r))
   }
+  const boxPlaced = useRef(false)
   const [plateCount, setPlateCount] = useState(1)
   /** a container at home, moved by its nudge — lifted onto its stack of spares while it's still standing over it */
   function onSpares(key: string, home: THREE.Vector3) {
@@ -1922,6 +1927,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // nothing on the table overlaps: every plate, dish, basket, box, bucket, bin and tray is pushed clear of the
   // fire and of each other where it stands — at the start, and whenever another plate or basket is put out
   useEffect(() => {
+    // (the seasoning box starts beside the cook, in the table's corner by where they stand, not out against the counter's edge)
+    if (carriers.box && !boxPlaced.current && !moved.current.has('box')) {
+      boxPlaced.current = true
+      const want = new THREE.Vector3().addScaledVector(ALONG, BOX_SPOT.along).addScaledVector(LAY, BOX_SPOT.lay)
+      moved.current.set('box', new THREE.Vector3(want.x - carriers.box[0].home.x, 0, want.z - carriers.box[0].home.z))
+    }
     for (let pass = 0; pass < 3; pass++) {
       for (const key of containerKeys()) {
         // (a stack stays where it was put)
@@ -1933,12 +1944,25 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (shift.lengthSq() > 1e-6) moved.current.set(key, nudge(key).clone().add(shift))
       }
     }
+    // (and what settle moved is moved on the table: the box with its pots and utensils, the bucket with its dipper)
+    for (const [key, nodes] of Object.entries(carriers)) {
+      const next = nudge(key)
+      for (const b of nodes) b.node.position.copy(b.home).add(next)
+      for (const t of tools) {
+        if (carrierOf(t.node.name) !== key) continue
+        t.home.copy(t.home0).add(next)
+        if (t.back >= 1) t.node.position.copy(t.home)
+      }
+    }
     setMoveTick((t) => t + 1)
     // (settle and friends read the current counts and nudges)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plateCount, dishCount, basketCount, root, space])
   // (with the shop open, everything cooked is served to the customers along the bar behind the fire)
-  const destination = (p: Piece) => (space === 'open' ? 'bar' : inBasket(p) ? 'basket' : onDish(p) ? 'dish' : 'plate')
+  // (only what a customer ordered: cooked for no one, it stays with the cook, on a plate of their own, not sent off to some seat)
+  const ownerOf = (p: Piece) => guests.current.find((g) => (g.state === 'waiting' || g.state === 'eating') &&
+    g.orders.filter((o) => o === p.id).length > pieces.current.filter((q) => q !== p && q.guest === g.id && q.id === p.id).length)
+  const destination = (p: Piece) => (space === 'open' && (p.container === 'bar' || (!p.collected && ownerOf(p))) ? 'bar' : inBasket(p) ? 'basket' : onDish(p) ? 'dish' : 'plate')
 
   /** take this container out of its stack (or what's on it off it), set down clear of the rest */
   const unstack = (key: string) => {
@@ -1972,13 +1996,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.flight = instant ? 1 : 0
     p.fromP.copy(p.node.position)
     p.fromQ.copy(p.node.quaternion)
-    if (space === 'open') {
+    const owner = space === 'open' ? ownerOf(p) : undefined
+    if (space === 'open' && owner) {
       // served at the bar, onto the plate of the customer who ordered it (one still owed one of these); pieces
       // already on that plate push the new one along
-      const owner = guests.current.find((g) => (g.state === 'waiting' || g.state === 'eating') &&
-        g.orders.filter((o) => o === p.id).length > pieces.current.filter((q) => q !== p && q.guest === g.id && q.id === p.id).length)
-      const seat = owner ? owner.seat : slot % BAR_SEATS
-      p.guest = owner?.id ?? -1
+      const seat = owner.seat
+      p.guest = owner.id
       p.seat = seat
       const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === seat && present(q) && !q.eaten).length
       p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE).add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
