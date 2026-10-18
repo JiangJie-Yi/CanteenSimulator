@@ -148,7 +148,7 @@ export function fridgesOf(cs: Counter[]) {
   })
 }
 /** the fridge's size: across, up, deep */
-export const FRIDGE = { W: 0.84, H: 1.72, D: 0.52 }
+export const FRIDGE = { W: 0.86, H: 2.17, D: 0.75 }
 /** each fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
 export const FRIDGE_STATE = [{ passing: 0, open: false }, { passing: 0, open: false }]
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridge?: typeof FRIDGE_STATE }).__fridge = FRIDGE_STATE
@@ -180,18 +180,16 @@ export type DrinkId = (typeof DRINKS)[number]['id']
  */
 export const FRIDGE_UNITS: { sign: [string, string]; shelves: { y: number; pitch: number; ids: DrinkId[] }[] }[] = [
   { sign: ['飲料', 'ドリンク'], shelves: [
-    { y: 0.2, pitch: 0.082, ids: ['oolong', 'oolong', 'oolong', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
-    { y: 0.47, pitch: 0.08, ids: ['cola', 'cola', 'cola', 'cola', 'cola', 'ramune', 'ramune', 'ramune', 'ramune'] },
-    { y: 0.74, pitch: 0.07, ids: ['milk', 'milk', 'milk', 'milk', 'milk', 'coffee', 'coffee', 'coffee', 'coffee', 'coffee'] },
-    { y: 1.01, pitch: 0.07, ids: ['coffee', 'coffee', 'coffee', 'coffee', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
-    { y: 1.28, pitch: 0.06, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult'] },
+    { y: 0.27, pitch: 0.082, ids: ['oolong', 'oolong', 'oolong', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
+    { y: 0.72, pitch: 0.08, ids: ['cola', 'cola', 'cola', 'cola', 'cola', 'ramune', 'ramune', 'ramune', 'ramune'] },
+    { y: 1.19, pitch: 0.07, ids: ['milk', 'milk', 'milk', 'milk', 'milk', 'coffee', 'coffee', 'coffee', 'coffee', 'coffee'] },
+    { y: 1.63, pitch: 0.06, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult'] },
   ] },
   { sign: ['酒類', 'お酒'], shelves: [
-    { y: 0.2, pitch: 0.082, ids: ['sake', 'sake', 'sake', 'sake', 'beer', 'beer', 'beer', 'beer', 'beer'] },
-    { y: 0.47, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
-    { y: 0.74, pitch: 0.07, ids: ['highball', 'highball', 'highball', 'highball', 'highball', 'chuhai', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
-    { y: 1.01, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'highball', 'highball'] },
-    { y: 1.28, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'highball', 'highball', 'highball'] },
+    { y: 0.27, pitch: 0.082, ids: ['sake', 'sake', 'sake', 'sake', 'beer', 'beer', 'beer', 'beer', 'beer'] },
+    { y: 0.72, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
+    { y: 1.19, pitch: 0.07, ids: ['highball', 'highball', 'highball', 'highball', 'highball', 'chuhai', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
+    { y: 1.63, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'highball'] },
   ] },
 ]
 /** which fridge a drink lives in */

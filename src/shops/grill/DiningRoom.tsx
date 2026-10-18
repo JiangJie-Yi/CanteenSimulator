@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
+import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
@@ -1440,35 +1441,70 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
 }
 
 /**
- * The drinks fridge customers help themselves from: a dark cabinet with a glass door, lit inside, four shelves of
- * bottles (beer, sake, oolong tea, ramune), a lit sign over it, the door's long handle. Faces +z (out of the wall).
+ * A drinks fridge: the downloaded "medium freezer" model (a tall glass-doored cabinet with three wire shelves), scaled to the
+ * fridge's size and stood with its middle at the origin, its front toward +z, with the shop's sign over its glass. The model's
+ * door is its own node: FridgeDoor swings it. Each fridge gets its own copy.
  */
+const FREEZER_URL = import.meta.env.BASE_URL + 'models/medium_freezer.glb'
+/** its size as modelled (0.866 wide, 2.24 tall, 0.774 deep), its middle and the door's hinge, and how it's scaled to the shop */
+const FREEZER = { scale: 0.97, cx: 0.21, cz: 0.045, base: -0.013 }
+const freezers = new Map<number, { body: THREE.Group; door: THREE.Group }>()
+function useFreezer(n: number) {
+  const gltf = useGLTF(FREEZER_URL) as unknown as { scene: THREE.Group }
+  return useMemo(() => {
+    const hit = freezers.get(n)
+    if (hit) return hit
+    const root = gltf.scene.clone(true)
+    const toon = new Map<THREE.Material, THREE.Material>()
+    const conv = (m: THREE.Material) => {
+      let t = toon.get(m)
+      if (!t) {
+        const src = m as THREE.MeshStandardMaterial
+        t = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ?? null, transparent: src.transparent,
+          opacity: src.opacity, side: src.transparent ? THREE.DoubleSide : THREE.FrontSide, depthWrite: !src.transparent })
+        toon.set(m, t)
+      }
+      return t
+    }
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (m.isMesh) {
+        m.material = Array.isArray(m.material) ? m.material.map(conv) : conv(m.material)
+        m.castShadow = true
+      }
+    })
+    root.updateMatrixWorld(true)
+    const door = root.getObjectByName('Door_6')
+    const body = new THREE.Group()
+    const pivot = new THREE.Group()
+    if (door) {
+      // (the door swings on its left edge: a pivot there, the door moved onto it without moving)
+      const box = new THREE.Box3().setFromObject(door)
+      pivot.position.set(box.min.x, 0, box.max.z)
+      body.add(root)
+      body.add(pivot)
+      body.updateMatrixWorld(true)
+      pivot.attach(door)
+    } else body.add(root)
+    // (stood in the shop: scaled, its middle at the origin, its base on the floor)
+    const place = new THREE.Group()
+    place.scale.setScalar(FREEZER.scale)
+    place.position.set(-FREEZER.cx * FREEZER.scale, -FREEZER.base * FREEZER.scale, -FREEZER.cz * FREEZER.scale)
+    place.add(body)
+    const out = { body: place, door: pivot }
+    freezers.set(n, out)
+    return out
+  }, [gltf, n])
+}
 export function DrinkFridge({ n = 0 }: { n?: number }) {
   const { W, H, D } = FRIDGE
-  const rows = [0.2, 0.47, 0.74, 1.01, 1.28]
+  const { body } = useFreezer(n)
   return (
-    <StaticBatch>
-      {/* the cabinet: its back part solid, open at the front between its sides, top and foot, lit inside */}
-      <Inked geometry={FRIDGE_GEO.body} color="#2a2c30" position={[0, H / 2, -D / 2 + 0.06]} scale={[W, H, 0.12]} grow={1.01} />
-      {[-1, 1].map((sd) => <Box key={sd} size={[0.045, H, D]} color="#2a2c30" position={[sd * (W / 2 - 0.022), H / 2, 0]} />)}
-      <Box size={[W, 0.16, D]} color="#2a2c30" position={[0, 0.08, 0]} />
-      <Box size={[W, 0.12, D]} color="#2a2c30" position={[0, H - 0.06, 0]} />
-      <mesh position={[0, H / 2 + 0.02, -D / 2 + 0.121]}><planeGeometry args={[W - 0.09, H - 0.28]} /><meshBasicMaterial color="#e4edf2" /></mesh>
-      {/* (the light strip down each side inside) */}
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[sd * (W / 2 - 0.046), H / 2 + 0.02, 0]} rotation-y={-sd * Math.PI / 2}><planeGeometry args={[D - 0.05, H - 0.3]} /><meshBasicMaterial color="#f4f8fb" /></mesh>
-      ))}
-      {rows.map((y) => (
-        <group key={y} position-y={y}>
-          <mesh position={[0, -0.01, 0]}><boxGeometry args={[W - 0.09, 0.012, D - 0.12]} /><meshToonMaterial color="#9aa2a8" /></mesh>
-          {/* (the drinks themselves are FridgeStock's: they come and go, and can be moved) */}
-        </group>
-      ))}
-      {/* the lit sign on top, and the vents at its foot */}
-      <mesh position={[0, H + 0.1, D / 2 - 0.01]}><planeGeometry args={[W, 0.18]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGNS[n]} toneMapped={false} /></mesh>
-      <Box size={[W, 0.19, 0.06]} color="#1c1d20" position={[0, H + 0.1, D / 2 - 0.045]} />
-      {[0, 1, 2, 3].map((k) => <Box key={k} size={[W - 0.2, 0.012, 0.004]} color="#16171a" position={[0, 0.04 + k * 0.025, D / 2 + 0.002]} />)}
-    </StaticBatch>
+    <group>
+      <primitive object={body} />
+      {/* the lit sign across the header over the glass */}
+      <mesh position={[0, H - 0.17, D / 2 + 0.004]}><planeGeometry args={[W * 0.9, 0.2]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGNS[n]} toneMapped={false} /></mesh>
+    </group>
   )
 }
 /**
@@ -1477,8 +1513,8 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
  * pours out of it in a low white mist.
  */
 export function FridgeDoor({ n = 0 }: { n?: number }) {
-  const { W, H, D } = FRIDGE
-  const hinge = useRef<THREE.Group>(null)
+  const { W, D } = FRIDGE
+  const { door } = useFreezer(n)
   const open = useRef(0)
   const mist = useRef(0)
   // (the door's state lives outside React: leave it shut when the shop's let go, so it doesn't come back open)
@@ -1487,19 +1523,13 @@ export function FridgeDoor({ n = 0 }: { n?: number }) {
     const want = FRIDGE_STATE[n].passing > 0 || FRIDGE_STATE[n].open ? 1 : 0
     open.current += Math.sign(want - open.current) * Math.min(Math.abs(want - open.current), Math.min(dt, 0.1) * 2.2)
     const e = open.current * open.current * (3 - 2 * open.current)
-    if (hinge.current) hinge.current.rotation.y = -e * (Math.PI / 2)
+    door.rotation.y = -e * (Math.PI / 2)
     mist.current = e
   })
   return (
     <group>
-      <group ref={hinge} position={[-W / 2, 0, D / 2]} onClick={(ev) => { ev.stopPropagation(); FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...handOver}>
-        <mesh position={[W / 2, H / 2 + 0.02, 0.004]}><planeGeometry args={[W - 0.06, H - 0.26]} />
-          <meshBasicMaterial color="#cfe4f0" transparent opacity={0.16} depthWrite={false} side={THREE.DoubleSide} /></mesh>
-        {[-1, 1].map((sd) => <Box key={sd} size={[0.035, H - 0.24, 0.025]} color="#3a3c42" position={[W / 2 + sd * (W / 2 - 0.03), H / 2 + 0.02, 0.01]} />)}
-        {[0.16, H - 0.12].map((y) => <Box key={y} size={[W - 0.03, 0.035, 0.025]} color="#3a3c42" position={[W / 2, y, 0.01]} />)}
-        <Box size={[0.025, 0.6, 0.035]} color="#b8bcc0" position={[W - 0.08, H / 2 + 0.05, 0.04]} />
-        {[-1, 1].map((sd) => <Box key={sd} size={[0.01, H - 0.3, 0.01]} color="#9aa0a6" position={[W / 2 + sd * (W / 2 - 0.05), H / 2 + 0.02, 0.0]} />)}
-      </group>
+      {/* the model's own door, hung on its pivot (the glass and its frame), swung with the rest of the model's scale */}
+      <group onClick={(ev) => { ev.stopPropagation(); FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...handOver}><primitive object={door} /></group>
       {/* the mist, low at the foot of the open door, rolling out over the floor */}
       <group position={[0, 0.05, D / 2 + 0.1]}>
         <Steam width={W * 0.9} height={0.5} opacity={0.5} layers={2} color="#eaf6ff" shade="#bcd8ec" speed={0.06} level={mist} />
@@ -1523,7 +1553,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
   const objs = useRef(new Map<string, THREE.Group>())
   const dragKey = useRef<string | null>(null)
   const shelves = FRIDGE_UNITS[n].shelves
-  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.09)
+  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.16)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
   useFrame((_, dt) => {
     if (seen.current !== FRIDGE_STOCK.ver) {
@@ -1649,7 +1679,12 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       )))}
       {/* (and a rank behind each, stood a little further back: a shelf of drinks is never one deep) */}
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
-        <group key={`b${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? 0.012 : -0.012), slotAt(r, k).y, slotAt(r, k).z - 0.1]}>
+        <group key={`b${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? 0.012 : -0.012), slotAt(r, k).y, slotAt(r, k).z - 0.13]}>
+          <DrinkBottle id={id} />
+        </group>
+      )))}
+      {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
+        <group key={`c${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? -0.01 : 0.01), slotAt(r, k).y, slotAt(r, k).z - 0.26]}>
           <DrinkBottle id={id} />
         </group>
       )))}
@@ -1845,7 +1880,6 @@ const BOTTLE_LOOK = Object.fromEntries(DRINKS.map((d) => {
     label: new THREE.MeshToonMaterial({ color: '#ffffff', map: tex }),
   }]
 })) as unknown as Record<DrinkId, { glass: THREE.Material; label: THREE.Material }>
-const FRIDGE_GEO = { body: new THREE.BoxGeometry(1, 1, 1) }
 /** each fridge's sign: 飲料 · ドリンク, white on red; 酒類 · お酒, on indigo */
 const FRIDGE_SIGNS = FRIDGE_UNITS.map((u, n) => canvasTex(192, 48, (g) => {
   g.fillStyle = n ? '#1c2a4a' : '#b8261c'
