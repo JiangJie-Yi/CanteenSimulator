@@ -174,6 +174,14 @@ const NOBORI_LOOKS: NoboriLook[] = [
   { text: '歓迎', cloth: '#2f7a4a', ink: '#fffaf0', edge: '#fffaf0', shape: 'point' },
   { text: '鮭', cloth: '#e8742a', ink: '#fffaf0', edge: '#fffaf0', shape: 'swallow', pat: 'seigaiha' },
   { text: '炭火', cloth: '#f4efe2', ink: '#14120f', edge: '#14120f', shape: 'wave', pat: 'sun' },
+  { text: '焼鳥', cloth: '#e8588a', ink: '#fffaf0', edge: '#fffaf0', shape: 'swallow', pat: 'stripe' },
+  { text: '刺身', cloth: '#7a4aa8', ink: '#fffaf0', edge: '#f2d9ff', shape: 'rect', pat: 'seigaiha' },
+  { text: '定食', cloth: '#f2c62a', ink: '#b8261c', edge: '#b8261c', shape: 'point' },
+  { text: 'おでん', cloth: '#3aa7b8', ink: '#fffaf0', edge: '#fffaf0', shape: 'wave', pat: 'stripe' },
+  { text: '祭', cloth: '#d8341c', ink: '#f2c62a', edge: '#f2c62a', shape: 'swallow', pat: 'sun' },
+  { text: '呑', cloth: '#9ad0e8', ink: '#1f3a68', edge: '#1f3a68', shape: 'rect', pat: 'seigaiha' },
+  { text: '本日限定', cloth: '#f4efe2', ink: '#7a4aa8', edge: '#e8588a', shape: 'swallow', pat: 'stripe' },
+  { text: '生ビール', cloth: '#2f7a4a', ink: '#fffaf0', edge: '#e8c45a', shape: 'point' },
 ]
 const NOBORI_W = 0.3
 const NOBORI_H = 0.92
@@ -379,7 +387,7 @@ function Nobori({ i }: { i: number }) {
  * The banners strung overhead as an izakaya hangs them: a rope along the wall's aisle, a close row of narrow banners of every
  * colour hung from it, each swinging a little on its own.
  */
-function BannerRow({ zs }: { zs: number[] }) {
+function BannerRow({ zs, seed = 0 }: { zs: number[]; seed?: number }) {
   const refs = useRef<(THREE.Group | null)[]>([])
   // (the same every time: a mix of cloths and lengths, a wide banner every so often taking three places)
   const items = useMemo(() => {
@@ -389,7 +397,7 @@ function BannerRow({ zs }: { zs: number[] }) {
         out.push({ z: zs[k + 1], look: (k * 3) % HBANNER_LOOKS.length, len: 0.2, w: 0.62, wide: true })
         k += 2
       } else {
-        const look = (k * 5 + 3) % NOBORI_LOOKS.length
+        const look = (k * 5 + 3 + seed) % NOBORI_LOOKS.length
         out.push({ z: zs[k], look, len: 0.36 + 0.09 * ((k * 7) % 4), w: NOBORI_LOOKS[look].shape === 'rect' ? 0.15 : 0.17, wide: false })
       }
     }
@@ -435,6 +443,29 @@ function BannerRow({ zs }: { zs: number[] }) {
           )}
         </group>
       ))}
+    </group>
+  )
+}
+
+/** a paper umbrella hung open from the ceiling by its handle: a dome of pastel paper ribbed with bamboo, a hanging cord */
+const WAGASA_COLORS = ['#f6b8c8', '#bfe3f0', '#f8e6a8', '#d8c4f0', '#c8ecd0', '#f8c8a8']
+const WAGASA_GEO = {
+  dome: new THREE.SphereGeometry(0.34, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.42),
+  ribs: new THREE.SphereGeometry(0.34, 12, 2, 0, Math.PI * 2, 0, Math.PI * 0.42),
+  rim: new THREE.TorusGeometry(0.31, 0.004, 4, 28),
+}
+function Wagasa({ i }: { i: number }) {
+  const col = WAGASA_COLORS[i % WAGASA_COLORS.length]
+  return (
+    <group rotation={[0.28 * ((i % 3) - 1), 0, 0.22 * (((i + 1) % 3) - 1)]}>
+      {/* (hung with its mouth down, the way they're displayed: the dome upward, wider side down) */}
+      <group rotation-x={Math.PI} position-y={-0.2}>
+        <mesh geometry={WAGASA_GEO.dome} scale={[1, 0.55, 1]}><meshToonMaterial color={col} side={THREE.DoubleSide} /></mesh>
+        <mesh geometry={WAGASA_GEO.rim} position-y={0.0} rotation-x={Math.PI / 2} scale={[1.0, 1, 1]}><meshToonMaterial color="#e8dcc0" /></mesh>
+        {/* (the bamboo ribs: a coarse mesh of the same dome, drawn as lines just over the paper) */}
+        <mesh geometry={WAGASA_GEO.ribs} scale={[1.004, 0.554, 1.004]}><meshBasicMaterial color="#b8935a" wireframe /></mesh>
+      </group>
+      <mesh position-y={0.16}><cylinderGeometry args={[0.002, 0.002, 0.32, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
     </group>
   )
 }
@@ -1242,13 +1273,21 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         {/* (the strings of banners overhead, clear of the altar, the fridges and the toilets' doors) */}
         {(() => {
           const zs: number[] = []
-          for (let z = from + 0.25; z < to - 0.25; z += 0.21) {
+          for (let z = from + 0.25; z < to - 0.25; z += 0.145) {
             if (altar && Math.abs(z - shelfZ) < 0.62) continue
             if (!isClear(z, 0.1)) continue
             if (door !== undefined && Math.abs(z - door) < WC_W + 0.3) continue
             zs.push(z)
           }
-          return zs.length > 1 ? <group position={[-0.42, 2.18, 0]}><BannerRow zs={zs} /></group> : null
+          return zs.length > 1 ? (
+            <>
+              <group position={[-0.42, 2.18, 0]}><BannerRow zs={zs} /></group>
+              {/* (a second string, a little further out and shifted, hung lower: a crowd of them, as in a real izakaya) */}
+              <group position={[-0.78, 2.06, 0]}><BannerRow zs={zs.filter((_, k) => k % 2).map((z) => z + 0.07)} seed={5} /></group>
+              {/* (and paper umbrellas (和傘), pastel, opened and hung upside-down over the aisle) */}
+              {zs.filter((_, k) => k % 5 === 2).map((z, k) => <group key={k} position={[-1.15, 2.1 - (k % 2) * 0.1, z]} scale={0.5}><Wagasa i={k} /></group>)}
+            </>
+          ) : null
         })()}
         {/* (the banners sway: not merged) */}
         {art.filter((a) => a.nobori !== undefined).map((a) => <group key={`n${a.z}`} position={[0, 1.08, a.z]}><Nobori i={a.nobori!} /></group>)}
@@ -1320,8 +1359,28 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   const doorGlow = useRef<THREE.MeshBasicMaterial>(null)
   const aura = useRef<THREE.SpriteMaterial>(null)
   const sake = useRef<THREE.Mesh>(null)
-  useFrame(({ clock }) => {
+  // (the pointer over the shrine: the shrine itself lights up, and faint glowing motes drift up from it)
+  const hovered = useRef(false)
+  const motes = useRef<THREE.Points>(null)
+  const moteMat = useRef<THREE.PointsMaterial>(null)
+  const MOTES = 18
+  const moteGeo = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MOTES * 3), 3))
+    return g
+  }, [])
+  useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime
+    // (the motes: each rises from the shrine's base and fades as it goes, over about three seconds, swaying a little)
+    if (moteMat.current) moteMat.current.opacity += ((hovered.current ? 0.95 : 0) - moteMat.current.opacity) * Math.min(1, dt * 6)
+    if (motes.current && moteMat.current && moteMat.current.opacity > 0.01) {
+      const pos = moteGeo.attributes.position as THREE.BufferAttribute
+      for (let i = 0; i < MOTES; i++) {
+        const life = ((t * 0.32 + i / MOTES) % 1)
+        pos.setXYZ(i, 0.09 + Math.sin(t * 1.3 + i * 2.1) * 0.03 + life * 0.03, 0.04 + life * 0.5, ((i * 0.37) % 1 - 0.5) * 0.42 + Math.sin(t * 0.9 + i) * 0.02)
+      }
+      pos.needsUpdate = true
+    }
     // (offered, the sake stands in its cup for a minute and the shrine glows, then goes quiet; then another can be offered)
     const at = incense?.litAt ?? null
     const left = at === null ? 0 : Math.max(0, 1 - (performance.now() - at) / INCENSE_MS)
@@ -1352,7 +1411,12 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   return (
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
-      <group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
+      <group position-x={ALTAR_D / 2} scale={SC} onClick={offer}
+        onPointerOver={(e) => { hovered.current = true; handOver.onPointerOver(e) }}
+        onPointerOut={(e) => { hovered.current = false; handOver.onPointerOut(e) }}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
+      <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
+        <pointsMaterial ref={moteMat} map={GLOW} color="#ffe0a0" size={0.07} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </points>
       {/* the shrine's own glow while the offering stands: its doors lit, and a warm light behind it all round */}
       <mesh position={[doorX, doorY, 0]} rotation-y={-Math.PI / 2} renderOrder={3}>
         <planeGeometry args={[0.112 * SC, 0.128 * SC]} />
