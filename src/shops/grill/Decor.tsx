@@ -6,7 +6,6 @@ import { useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
-import { Steam } from '@/scene/Steam'
 import { brushText, signTexture } from '@/scene/signFont'
 import { ALONG, GRILL_OFFSET, KITCHEN_DROP } from './bar'
 
@@ -317,8 +316,39 @@ const RICE_SCALE = 2.0
 /** the side table it stands on: its top's height (the cook's table's top is the scene's y = 0), and its size */
 const SIDE_TOP = -0.3
 const SIDE_W = 1.35
+/** pale cypress staves round the tub, each its own tone, fine grain running up, a dark joint between */
+const STAVES = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 128
+  c.height = 64
+  const g = c.getContext('2d')!
+  const tones = ['#ecd2a2', '#e3c593', '#f0d8ab', '#dfbf8c', '#e8cd9b', '#e1c28f', '#efd5a6', '#e5c898']
+  for (let i = 0; i < 8; i++) {
+    g.fillStyle = tones[i]
+    g.fillRect(i * 16, 0, 16, 64)
+    g.strokeStyle = 'rgba(150,100,50,0.28)'
+    g.lineWidth = 1
+    for (let k = 0; k < 5; k++) {
+      g.beginPath()
+      g.moveTo(i * 16 + 2 + k * 3, 0)
+      g.bezierCurveTo(i * 16 + 3 + k * 3, 20, i * 16 + 1 + k * 3, 44, i * 16 + 2 + k * 3, 64)
+      g.stroke()
+    }
+  }
+  g.fillStyle = 'rgba(120,80,40,0.55)'
+  for (let i = 0; i < 8; i++) g.fillRect(i * 16, 0, 1, 64)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = THREE.RepeatWrapping
+  t.repeat.set(2, 1)
+  return t
+})()
 const RICE_GEO = {
-  tub: new THREE.CylinderGeometry(0.27, 0.25, 0.3, 28, 1, true),
+  tub: new THREE.CylinderGeometry(0.27, 0.255, 0.3, 32, 1, false),
+  lidTop: new THREE.CylinderGeometry(0.255, 0.285, 0.035, 32),
+  ear: new THREE.BoxGeometry(0.1, 0.12, 0.05),
+  band: new THREE.TorusGeometry(0.268, 0.01, 6, 40),
   floor: new THREE.CircleGeometry(0.25, 28),
   hoop: new THREE.TorusGeometry(0.272, 0.012, 6, 32),
   rice: new THREE.SphereGeometry(0.255, 24, 10, 0, Math.PI * 2, 0, Math.PI * 0.32),
@@ -355,38 +385,29 @@ function RiceTub() {
       <mesh geometry={g.slab} position-y={floor + 0.28} scale={[SIDE_W - 0.12, 0.035, SIDE_W - 0.12]} receiveShadow>
         <meshToonMaterial color="#9a7046" />
       </mesh>
-      {/* on the shelf: the tub's lid laid flat, and the rice bowls stacked upside down beside it */}
-      <mesh geometry={g.lid} position={[-0.25, floor + 0.28 + 0.018 + 0.04, 0]} scale={RICE_SCALE * 0.95}>
-        <meshToonMaterial color="#d9b47a" />
-      </mesh>
+      {/* on the shelf: the rice bowls, stacked upside down */}
       {[0, 1, 2].map((k) => (
         <mesh key={k} geometry={g.bowl} position={[0.5, floor + 0.3 + k * 0.07, 0.35]} rotation-x={Math.PI} scale={[1.6, 1.4, 1.6]}>
           <meshToonMaterial color="#e8e2d2" />
         </mesh>
       ))}
       <group position-y={SIDE_TOP} scale={RICE_SCALE}>
-        <Inked geometry={g.tub} color="#d9b47a" position={[0, 0.15, 0]} grow={1.03} />
-        <mesh geometry={g.tub} position-y={0.15} scale={0.98}>
-          <meshToonMaterial color="#c49a5e" side={THREE.BackSide} />
-        </mesh>
-        <mesh geometry={g.floor} position-y={0.01} rotation-x={-Math.PI / 2}>
-          <meshToonMaterial color="#c49a5e" />
-        </mesh>
-        {[0.05, 0.25].map((y) => (
-          <mesh key={y} geometry={g.hoop} position-y={y} rotation-x={Math.PI / 2}>
-            <meshToonMaterial color="#b0683a" />
+        {/* the tub: pale staves, its lid on (its bar across the top), an ear at each side to lift it by, and a band of woven cane
+            round the lower body */}
+        <Inked geometry={g.tub} color="#ffffff" map={STAVES} position={[0, 0.15, 0]} grow={1.03} />
+        <Inked geometry={g.lidTop} color="#ffffff" map={STAVES} position={[0, 0.3175, 0]} grow={1.05} />
+        <mesh geometry={g.slab} position={[0, 0.355, 0]} scale={[0.22, 0.03, 0.05]} castShadow><meshToonMaterial color="#e0a868" /></mesh>
+        <mesh geometry={g.slab} position={[0, 0.34, 0]} scale={[0.19, 0.03, 0.03]}><meshToonMaterial color="#d09858" /></mesh>
+        {[-1, 1].map((sd) => (
+          <group key={sd} position={[sd * 0.285, 0.265, 0]} rotation-z={-sd * 0.22}>
+            <Inked geometry={g.ear} color="#ffffff" map={STAVES} grow={1.06} />
+          </group>
+        ))}
+        {[0.075, 0.095, 0.115].map((y, k) => (
+          <mesh key={y} geometry={g.band} position-y={y} rotation={[Math.PI / 2 + (k - 1) * 0.05, 0, 0]}>
+            <meshToonMaterial color={k === 1 ? '#c2a368' : '#a98a52'} />
           </mesh>
         ))}
-        {/* the rice, heaped a little over the rim */}
-        <mesh geometry={g.rice} position-y={0.15} scale={[1, 0.55, 1]}>
-          <meshToonMaterial color="#fbf8f0" />
-        </mesh>
-        {/* the paddle stood in it */}
-        <group position={[0.08, 0.36, -0.04]} rotation={[0.25, 0, -0.35]}>
-          <mesh geometry={g.paddle} position-y={0.06}><meshToonMaterial color="#e2c89a" /></mesh>
-          <mesh geometry={g.blade} position-y={-0.12} scale={[1, 1.3, 0.25]}><meshToonMaterial color="#e2c89a" /></mesh>
-        </group>
-        <Steam position={[0, 0.22, 0]} width={0.4} height={0.55} opacity={0.32} layers={2} />
       </group>
     </group>
   )
