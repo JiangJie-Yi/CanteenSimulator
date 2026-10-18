@@ -1522,8 +1522,8 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
   return (
     <group>
       <primitive object={body} />
-      {/* the cove lights (槽燈): a narrow slot let into each inner side and the top, a thin line of white light deep in it, and
-          the light washing softly along the wall, shelf and drinks beside it */}
+      {/* the cove lights (槽燈): a narrow slot let into each inner side, a thin line of white light deep in it, and
+          the light washing softly along the wall, shelf and drinks beside it (up each side only) */}
       {[-1, 1].map((sd) => (
         <group key={sd} position={[sd * (W / 2 - 0.075), H / 2 - 0.02, D / 2 - 0.1]}>
           <mesh><boxGeometry args={[0.03, H - 0.46, 0.03]} /><meshBasicMaterial color="#202226" /></mesh>
@@ -1532,12 +1532,6 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
             <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.8} side={THREE.DoubleSide} /></mesh>
         </group>
       ))}
-      <group position={[0, H - 0.3, D / 2 - 0.1]}>
-        <mesh><boxGeometry args={[W - 0.12, 0.03, 0.03]} /><meshBasicMaterial color="#202226" /></mesh>
-        <mesh position={[0, -0.0085, 0.0155]}><boxGeometry args={[W - 0.16, 0.008, 0.004]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
-        <mesh position={[0, -0.014, -0.17]} rotation-x={Math.PI / 2}><planeGeometry args={[W - 0.16, 0.32]} />
-          <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.65} side={THREE.DoubleSide} /></mesh>
-      </group>
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
       <group position={[0, H + 0.03, D / 2 - 0.1]} rotation-x={-0.12}>
         <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
@@ -1549,7 +1543,6 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
         {[-1, 1].map((sd) => Array.from({ length: 4 }, (_, k) => (
           <mesh key={`s${sd}${k}`} position={[sd * W * 0.45, 0.04 + k * 0.045, 0.012]}><sphereGeometry args={[0.009, 8, 6]} /><meshBasicMaterial color="#ffe9a8" toneMapped={false} /></mesh>
         )))}
-        <mesh position={[0, -0.012, 0.02]}><boxGeometry args={[W * 0.86, 0.012, 0.012]} /><meshBasicMaterial color={n ? '#9ad0ff' : '#ff9a8a'} toneMapped={false} /></mesh>
         <sprite position={[0, 0.1, 0.1]} scale={[W * 1.1, 0.4, 1]}><spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.22} /></sprite>
       </group>
     </group>
