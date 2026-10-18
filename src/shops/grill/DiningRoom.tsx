@@ -1588,6 +1588,8 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
             <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.8} side={THREE.DoubleSide} /></mesh>
         </group>
       ))}
+      {/* the cabinet's own light: two white lamps up in it, so the shelves and what stands on them are seen clearly */}
+      {[0.72, 0.34].map((k) => <pointLight key={k} position={[0, H * k, D / 2 - 0.15]} color="#ffffff" intensity={0.9} distance={1.5} decay={1.6} />)}
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
       <group position={[0, H + 0.03, D / 2 - 0.1]} rotation-x={-0.12}>
         <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
