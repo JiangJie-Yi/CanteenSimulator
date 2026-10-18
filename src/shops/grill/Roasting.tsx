@@ -25,7 +25,7 @@ import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -100,10 +100,11 @@ const ASH_GAIN: Record<string, number> = { Ember: 45, Binchotan: 18 }
 const ASH_TINT = new THREE.Color('#d8d2c8')
 const PLATE_STEP = 1.2
 const DISH_TOP: [number, number, number] = [1.8, 0, -0.26]
+const BASKET_TOP: [number, number, number] = [2.0, 0, 0.4]
 /** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
 const PLATE_TOP: [number, number, number] = [1.45, 0.02, -1.24]
 /** what lives in the cubby under the table: kept there, not carried about (it's under the top, not on it) */
-const CUBBY_KEYS = new Set(['plate-0', 'dish-0', 'rawdish'])
+const CUBBY_KEYS = new Set(['plate-0', 'dish-0', 'rawdish', 'trash', 'basket-0'])
 /**
  * Spare plates and dishes stacked where the first of each stands, as they are in a shop: the one in use sits on top
  * of the stack, and taken off it (dragged away), it leaves the rest standing. How many under each, and how high each
@@ -307,7 +308,7 @@ const TRAY_D = 1.0
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
 /** where the seasoning box's first half starts out: beside the cook, along and across the table */
-const BOX_SPOT = { along: -1.3, lay: 1.55 }
+const BOX_SPOT = { along: -1.75, lay: 1.1 }
 /** how much bigger the fire pit (its ground, stones and coals) is drawn than modelled */
 const PIT_SCALE = 1.3
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
@@ -432,7 +433,8 @@ const CHEF_SCALE = 1.3 * GRILL_SCALE
 /** the table as boxes (lay from–to, along from–to): all of it behind the cubby, and the front either side of it */
 const COOK_TABLE_PARTS: [number, number, number, number][] = [
   [COOK_TABLE.lay[0], CUBBY.lay[0], COOK_TABLE.along[0], COOK_TABLE.along[1]],
-  [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_TABLE.along[0], CUBBY.along[0]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_TABLE.along[0], CUBBY2.along[0]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY2.along[1], CUBBY.along[0]],
   [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY.along[1], COOK_TABLE.along[1]],
 ]
 export type CrewMember = { id: string; role: Role; look: Look }
@@ -523,7 +525,7 @@ function CookTable({ floor = true }: { floor?: boolean }) {
     <>
       {/* (set back under the top on their outer faces only: where they meet, they run into each other, no gap) */}
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]}
-        inset={i === 0 ? [0.06, -0.01, 0.06, 0.06] : i === 1 ? [-0.01, 0.06, 0.06, -0.01] : [-0.01, 0.06, -0.01, 0.06]} />)}
+        inset={i === 0 ? [0.06, -0.01, 0.06, 0.06] : i === 1 ? [-0.01, 0.06, 0.06, -0.01] : i === 2 ? [-0.01, 0.06, -0.01, -0.01] : [-0.01, 0.06, -0.01, 0.06]} />)}
       <CubbyFrame />
       <CookTableTop />
       {/* (the same boards as the customers', laid the same way; with the shop open and the room drawn, its one floor
@@ -605,6 +607,10 @@ function CubbyFrame() {
       <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[-0.3, -0.08]} color={CUBBY_WOOD} />
       <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color={CUBBY_WOOD} />
       <Block along={[CUBBY.shelfAlong, CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[CUBBY_SHELF_Y - CUBBY.shelfThick, CUBBY_SHELF_Y]} color={CUBBY_WOOD} />
+      {/* (and the second, on the left: the same header, floor and a shelf the whole way across) */}
+      <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[-0.3, -0.08]} color={CUBBY_WOOD} />
+      <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color={CUBBY_WOOD} />
+      <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[CUBBY_SHELF_Y - CUBBY.shelfThick, CUBBY_SHELF_Y]} color={CUBBY_WOOD} />
     </>
   )
 }
@@ -1855,8 +1861,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return p
   }
   const basketAt = (n: number) => {
-    const [x, y, z] = roast.basket!.at
-    return new THREE.Vector3(x, y, z).addScaledVector(LAY_DIR, -n * BASKET_STEP).add(nudge(`basket-${n}`))
+    // (the first lives in the left cubby, on its shelf; more, as they're needed, stand on the table's top in a row)
+    const [x, y, z] = n === 0 ? roast.basket!.at : BASKET_TOP
+    return new THREE.Vector3(x, y, z).addScaledVector(LAY_DIR, -Math.max(0, n - 1) * BASKET_STEP).add(nudge(`basket-${n}`))
   }
   /** where a container (plate-n, dish-n, basket-n, the seasoning box, the bin) is now */
   const containerAt = (key: string): THREE.Vector3 => {
@@ -3009,7 +3016,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const next = settle(s.key, want, STACKABLE(s.key) && !holds(s.key)).sub(base)
       next.y = 0
       // (taken out of the cubby, it comes up onto the table's top)
-      if (CUBBY_KEYS.has(s.key)) next.y = (s.key === 'plate-0' ? PLATE_TOP[1] : DISH_TOP[1]) - base.y
+      if (CUBBY_KEYS.has(s.key)) next.y = (s.key === 'plate-0' ? PLATE_TOP[1] : s.key === 'trash' || s.key === 'basket-0' ? 0 : DISH_TOP[1]) - base.y
       moved.current.set(s.key, next)
       if (carriers[s.key]) {
         // the box carries its pots and utensils with it, the bucket its dipper

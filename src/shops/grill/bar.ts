@@ -497,6 +497,8 @@ export const GRILL_OFFSET = GRILL_PIVOT.clone().multiplyScalar(1 - GRILL_SCALE).
  * stacks on its floor to the left, the cook's big plate on its floor to the right with the side dishes on the shelf over it.
  * (along and lay in the first counter's frame, from the table's own sizes in Roasting; heights in the scene.)
  */
+/** the second cubby, at the table's left: the trash bin on its floor, the basket on its shelf */
+export const CUBBY2 = { along: [-1.5, -0.35], lay: [0.95, 2.1] }
 export const CUBBY = { along: [0.55, 3.0], lay: [0.95, 2.1], plinth: 0.1, shelfAlong: 1.85, shelfThick: 0.04 }
 /** the cubby's floor and shelf surfaces, in the scene: the table's top is y = 0 */
 export const CUBBY_FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP + CUBBY.plinth
