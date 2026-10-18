@@ -1253,7 +1253,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} />}
               {given && <ShopProps counters={counters} />}
-              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} shrine={back + 1.0} altar={incense ?? true} />}
+              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} altar={incense ?? true} />}
             </group>
           )
         }

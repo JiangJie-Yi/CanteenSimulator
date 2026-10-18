@@ -5881,7 +5881,7 @@ button {
 /* (cut in the shape of a fish, nose to the left, tail to the right: the name in its body; the board's wood is laid
    on a layer of its own, cut to the fish, so the cords it hangs by aren't cut off with it) */
 .brand-grilledfish .brand-plate {
-  padding: 0.62em 1.35em 0.56em 1.5em;
+  padding: 0.95em 1.45em 0.9em 1.6em;
   box-shadow: none;
   border-radius: 0;
   filter: drop-shadow(0 0.12em 0.14em rgb(40 20 10 / 0.55));
@@ -5891,8 +5891,8 @@ button {
   inset: 0;
   z-index: -1;
   background: var(--fish-wood);
-  /* (a saury: long and slim, its lower jaw a point, narrowing to a slim stalk and a deeply forked tail) */
-  /* (its clip-path is set in Brand.tsx, from the saury's outline) */
+  /* (a plump fish: a rounded head, a deep body, narrowing to a stalk and a forked tail) */
+  /* (its clip-path is set in Brand.tsx, from the fish's outline) */
 }
 .brand-grilledfish .brand-plate {
   isolation: isolate;
@@ -5961,25 +5961,24 @@ button {
 }
 /* the cords are short (the board hangs just under the top edge), and come right down to the board where it's nailed */
 .brand.brand-grilledfish {
-  /* (the saury's back is a quarter of the way down its board, so the board's raised to hang just under the top edge: the
-     cords show only a few pixels) */
-  --hang: 14px;
-  top: -10px;
+  /* (the cords are short: the board hangs just under the top edge, tied by its back) */
+  --hang: 10px;
+  top: 6px;
 }
 @media (max-width: 900px) {
   .brand.brand-grilledfish {
-    --hang: 12px;
-    top: -12px;
+    --hang: 9px;
+    top: 4px;
   }
 }
 @media (max-width: 400px) {
   .brand.brand-grilledfish {
-    --hang: 10px;
-    top: -12px;
+    --hang: 8px;
+    top: 4px;
   }
 }
 .brand-grilledfish .brand-cord {
-  height: calc(var(--hang) + 21%);
+  height: calc(var(--hang) + 6.4%);
 }
 .brand-grilledfish .brand-cord-left {
   left: calc(22% - 1.5px);
@@ -6012,7 +6011,7 @@ button {
 
 .brand-grilledfish .brand-plate::before,
 .brand-grilledfish .brand-plate::after {
-  top: 21%;
+  top: 6.4%;
   z-index: 1;
 }
 

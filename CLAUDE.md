@@ -58,12 +58,12 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `bar.ts` | 店面的共用資料與純計算（不含 React）：吧台 `GRILL_COUNTERS`（`shift` 座位位移、`far` 牆距）、座位 `seatsOf`、整間地板 `roomOf`、閘門 `BAR_GATES`/`gateOf`、收銀台 `TILL`、廁所 `toiletsOf`、飲料櫃 `fridgeOf`/`DRINKS`、玄關 `GENKAN`/`inGenkan`、盤子堆 `PLATE_STACKS`、醬油碟位置 `sauceSide`；以及兩邊溝通用的狀態 `SERVICE`（出餐口與外場）、`SEATS_TAKEN`、`PLATES_SET`、`TOILETS`、`POINTER_HINT` |
 | `Roasting.tsx` | 爐火、料理台、吧台本體（`Bar`、`BarCounter`、`BarGate` 擺動門）、烤物的流程與點餐 |
 | `GuestBar3D.tsx` | 客人（進出、坐下、上廁所、拿飲料、換拖鞋、淡出）、外場服務生（從閘門進出送餐）、盤子、地板、玄關、收銀台 `Register` |
-| `DiningRoom.tsx` | 牆面與牆上的東西（畫、神棚、虎爺神龕 `Altar`、男女廁所與室內 `WcRoom`）、飲料櫃 `DrinkFridge`、場內擺設 `ShopProps`（酒樽、竹子、柳樹、酒箱） |
+| `DiningRoom.tsx` | 牆面與牆上的東西（畫、門口的神棚與供品 `Altar`、男女廁所與室內 `WcRoom`）、飲料櫃 `DrinkFridge`、場內擺設 `ShopProps`（酒樽、竹子、柳樹、酒箱） |
 | `Decor.tsx` | 料理台上的擺設：炭箱、扇子、行燈、飯桶與作業台 |
 | `Grill2D.tsx`、`Grill2DArt.tsx` | 手機（螢幕短邊 < 600px，平板不算）不用 3D：同樣的烤爐玩法畫成 2D（邏輯在 Grill2D，SVG 插圖在 Grill2DArt） |
 
 - 客人模型由 `blender/guests.py` 產生：表情（`eyesJoy`、`brows*`、`mouth*`，依評分切換，見 `scene/people.ts`）、走路動作（`Walk`／`WalkF` 女性／`WalkU` 大叔／`WalkO` 老人，速度也不同）、大學生的耳機 `student.phones`。臉型（圓、長、方、瓜子）是在 `scene/Person3D.tsx` 的 `shapeFace` 依 id 變形。
-- 點香（神龕的香袋）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`）。
+- 供清酒（點門口神棚前的酒瓶）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`；名稱沿用舊的點香）。
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。
 - 卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps；右上角 ×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
 

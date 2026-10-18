@@ -17,11 +17,13 @@ const NAMES: Record<string, Record<Lang, { main: string; sub: string }>> = {
  * finlets on the back and the belly toward a forked tail. (The CSS clip-path is made from these same points.)
  */
 const FISH: [number, number][] = [
-  [0, 26], [1.5, 24.2], [4, 22.2], [8, 19.2], [13, 16.8], [20, 14.9], [30, 13.5], [44, 12.7], [56, 12.9],
-  [60, 12.9], [62, 11.2], [63.5, 13.1], [66, 11.5], [67.5, 13.4], [70, 11.9], [71.5, 14], [74, 12.6], [75.5, 14.9], [78, 13.9],
-  [82, 17.5], [86, 22], [88.5, 24.5], [93, 16], [100, 6.5], [96.5, 25], [100, 43.5], [93, 34], [88.5, 27], [86, 30], [82, 34.5],
-  [78, 36.4], [75.5, 37.6], [74, 39.8], [71.5, 38.6], [70, 40.4], [67.5, 39.2], [66, 41], [63.5, 39.6], [62, 41.3], [60, 39.6],
-  [56, 39.5], [44, 39.1], [30, 38.2], [20, 36], [13, 32.8], [8, 29.8], [4, 28.2], [1, 27.2],
+  [0, 25], [1.5, 20], [4, 15], [8, 10.5], [13, 7], [19, 4],
+  [27, 2.25], [36, 1.25], [46, 1], [56, 1.5], [65, 3], [72, 5.5],
+  [78, 9.5], [82, 15], [84, 18], [88, 15], [93, 9], [98, 4],
+  [100, 2.5], [96, 25], [100, 47.5], [98, 46], [93, 41], [88, 35],
+  [84, 32], [82, 35], [78, 40.5], [72, 44.5], [65, 47], [56, 48.5],
+  [46, 49], [36, 48.75], [27, 47.75], [19, 46], [13, 43], [8, 39.5],
+  [4, 35], [1.5, 30],
 ]
 const FISH_PATH = `M${FISH.map(([x, y]) => `${x} ${y}`).join('L')}Z`
 const FISH_CLIP = `polygon(${FISH.map(([x, y]) => `${x}% ${y * 2}%`).join(', ')})`
@@ -66,20 +68,20 @@ export function Brand({ night, lang, shop = 'beefnoodle', dark = false, ignite =
             </defs>
             <g clipPath="url(#fish-body)">
               {/* the dark back fading down its flanks, the pale belly, the scales over the middle */}
-              <rect x="0" y="10" width="100" height="16" fill="url(#fish-back)" stroke="none" />
-              <rect x="0" y="26" width="100" height="16" fill="url(#fish-belly)" stroke="none" />
-              <rect className="brand-fish-scales" x="14" y="16" width="74" height="22" fill="url(#fish-scales)" />
+              <rect x="0" y="0" width="100" height="26" fill="url(#fish-back)" stroke="none" />
+              <rect x="0" y="26" width="100" height="24" fill="url(#fish-belly)" stroke="none" />
+              <rect className="brand-fish-scales" x="24" y="9" width="60" height="32" fill="url(#fish-scales)" />
             </g>
             {/* carved round its edge: a dark cut, and the painted rule inside it */}
             <path className="brand-fish-cut" d={FISH_PATH} />
             <g transform="translate(50 26) scale(0.95 0.86) translate(-50 -26)"><path className="brand-fish-rule" d={FISH_PATH} /></g>
             {/* the gill covers, the silver line down its side, the mouth, the pectoral fin, the tail's rays */}
-            <path className="brand-fish-line" d="M17.2 17.6Q22.4 26 17.4 34.2M19.8 18.4Q24.4 26 20 33.6" />
-            <path className="brand-fish-silver" d="M21 25.4Q52 23 87 25.2" />
-            <path className="brand-fish-line" d="M0.8 26.2L7 26.7M22.5 31Q27.4 32.6 31.4 37.4Q25.4 36.4 22.5 31Z" />
-            <path className="brand-fish-line" d="M89 25L98.6 8.6M89.4 25L98 14.6M89.6 25L97.6 20M89 25.6L98.6 41.6M89.4 25.6L98 35.6M89.6 25.6L97.6 30.6M90 25.3H96" />
-            <circle className="brand-fish-ring" cx="9.4" cy="22.8" r="2.3" />
-            <circle className="brand-fish-pupil" cx="9.4" cy="22.8" r="1.15" />
+            <path className="brand-fish-line" d="M20 11Q27 25 20 39M23 11.5Q29.5 25 23 38.5" />
+            <path className="brand-fish-silver" d="M26 25.4Q56 22.5 84 25.2" />
+            <path className="brand-fish-line" d="M0.8 25.6L6.5 26.2M26 33Q31 35 35 42Q28.5 40.4 26 33Z" />
+            <path className="brand-fish-line" d="M88 25L98.6 6.6M88.4 25L98 13.6M88.6 25L97.6 19.6M88 25.6L98.6 43.4M88.4 25.6L98 36.4M88.6 25.6L97.6 30.6M89 25.3H95" />
+            <circle className="brand-fish-ring" cx="10" cy="19.6" r="2.7" />
+            <circle className="brand-fish-pupil" cx="10" cy="19.6" r="1.35" />
           </svg>
           </>
         )}

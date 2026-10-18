@@ -243,7 +243,7 @@ const orderedBase = (dish: DishInfo, order: Record<string, number>) => dish.base
 /** The stage's centre and size in canvas pixels (the canvas fills the whole app). */
 type Frame = { cx: number; cy: number; w: number; h: number }
 
-/** a stick of incense on the altar burns this long (ms) */
+/** the sake offered at the shrine stands (and brings its extra custom) this long (ms) */
 const INCENSE_MS = 60000
 type SceneProps = {
   /** a customer took a drink from the grill's fridge */
@@ -664,7 +664,7 @@ export default function App() {
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
   const [speed, setSpeed] = useState(1)
   useEffect(() => { GAME_SPEED.value = speed }, [speed])
-  // the incense on the altar by the door: lit, for a minute more come in and they order more
+  // the sake offered at the shrine by the door: for a minute more come in and they order more
   const [incenseAt, setIncenseAt] = useState<number | null>(null)
   const [blessed, setBlessed] = useState(false)
   const lightIncense = () => {
@@ -672,7 +672,7 @@ export default function App() {
     setIncenseAt(performance.now())
     setBlessed(true)
     window.setTimeout(() => setBlessed(false), INCENSE_MS)
-    say(lang === 'ja' ? 'お線香を上げました：一分間、お客さんが増えて、よく注文してくれます' : '點了一支香：這一分鐘客人會變多，也點得比較多')
+    say(lang === 'ja' ? 'お神酒をお供えしました：一分間、お客さんが増えて、よく注文してくれます' : '供了一杯清酒：這一分鐘客人會變多，也點得比較多')
   }
   const space: 'closed' | 'open' = ai ? 'open' : 'closed'
   // (opening is the start of a new day)
@@ -2104,11 +2104,11 @@ export default function App() {
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}
       </button>
-      {/* (on a phone there's no 3D room and no altar to click: the incense is lit from here) */}
+      {/* (on a phone there's no 3D room and no shrine to click: the sake is offered from here) */}
       {phone && ai && !!dish.roast && (
         <button type="button" className={`incense-toggle${blessed ? ' is-on' : ''}`} onClick={lightIncense} disabled={blessed}
-          title={lang === 'ja' ? 'お線香を上げる（一分間、客足とご注文が増える）' : '點香（一分鐘內客人變多、點得也多）'}>
-          {blessed ? (lang === 'ja' ? '焚香中' : '燃香中') : (lang === 'ja' ? '線香' : '點香')}
+          title={lang === 'ja' ? 'お神酒を供える（一分間、客足とご注文が増える）' : '供清酒（一分鐘內客人變多、點得也多）'}>
+          {blessed ? (lang === 'ja' ? 'お供え中' : '供酒中') : (lang === 'ja' ? 'お神酒' : '供酒')}
         </button>
       )}
       <button type="button" className={`speed-toggle${speed > 1 ? ' is-on' : ''}`} onClick={() => setSpeed((v) => (v > 1 ? 1 : 2))}

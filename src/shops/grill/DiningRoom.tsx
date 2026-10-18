@@ -491,12 +491,12 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
  * roof, a vase of sakaki either side, the cups of rice, salt and water before it, and the sacred rope (注連縄) with its
  * paper streamers hung across the front.
  */
-function Kamidana() {
+function Kamidana({ shelf = true }: { shelf?: boolean }) {
   const HIN = '#e2c89a'
   return (
     <group>
-      <Box size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />
-      {[-0.3, 0.3].map((z) => <Box key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
+      {shelf && <Box size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />}
+      {shelf && [-0.3, 0.3].map((z) => <Box key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
       {/* the shrine: its base, body, doors and roof */}
       <group position={[-0.14, 0.015, 0]}>
         <Box size={[0.16, 0.03, 0.34]} color={HIN} position-y={0.015} />
@@ -751,324 +751,28 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
   )
 }
 
-/**
- * A command flag (令旗), as a temple's is made: a pennant of yellow silk, woven (the threads show), edged with a
- * border of red flames cut in points, a thin gold line inside it, and a tiger (虎爺) embroidered on it.
- * Its long side is against the pole (u = 0), its point at u = 1.
- */
-const LINGQI = canvasTex(256, 256, (g) => {
-  const tri = (inset: number) => {
-    g.beginPath()
-    g.moveTo(inset * 0.5, inset)
-    g.lineTo(256 - inset * 1.9, 128)
-    g.lineTo(inset * 0.5, 256 - inset)
-    g.closePath()
-  }
-  // the red border cloth under it all
-  g.fillStyle = '#b8201c'
-  tri(0)
-  g.fill()
-  // the silk
-  g.fillStyle = '#f0c232'
-  tri(26)
-  g.fill()
-  // its weave: fine threads both ways, lighter and darker
-  g.save()
-  tri(26)
-  g.clip()
-  for (let i = 0; i < 256; i += 3) {
-    g.fillStyle = i % 6 ? 'rgba(255,240,170,0.18)' : 'rgba(150,100,10,0.16)'
-    g.fillRect(i, 0, 1, 256)
-    g.fillStyle = i % 6 ? 'rgba(120,80,0,0.12)' : 'rgba(255,245,200,0.14)'
-    g.fillRect(0, i, 256, 1)
-  }
-  // a soft sheen down its middle, as silk catches the light
-  const sheen = g.createLinearGradient(0, 40, 0, 216)
-  sheen.addColorStop(0, 'rgba(255,255,255,0)')
-  sheen.addColorStop(0.5, 'rgba(255,250,220,0.22)')
-  sheen.addColorStop(1, 'rgba(255,255,255,0)')
-  g.fillStyle = sheen
-  g.fillRect(0, 0, 256, 256)
-  g.restore()
-  // the flames between the red and the silk: points cut into the yellow
-  g.fillStyle = '#b8201c'
-  for (let k = 0; k < 10; k++) {
-    const t = (k + 0.5) / 10
-    for (const sd of [1, -1]) {
-      const x = 13 + (230 - 13) * t, y = 128 - sd * (115 - 102 * t)
-      g.beginPath()
-      g.moveTo(x - 9, y - sd * 2)
-      g.lineTo(x + 9, y - sd * 2)
-      g.lineTo(x, y + sd * 16)
-      g.closePath()
-      g.fill()
-    }
-  }
-  // a gold line just inside the border
-  g.strokeStyle = '#e8b830'
-  g.lineWidth = 3
-  tri(40)
-  g.stroke()
-  // a tiger (虎爺) embroidered on it, prowling toward the pole: orange, striped in black, outlined in gold thread
-  g.save()
-  g.translate(80, 132)
-  g.lineJoin = 'round'
-  const tiger = () => {
-    g.beginPath()
-    // body, haunch to shoulder
-    g.ellipse(4, 4, 40, 19, -0.08, 0, Math.PI * 2)
-    g.moveTo(-34, 0)
-    // tail, curling up behind
-    g.bezierCurveTo(-56, -6, -58, -34, -40, -40)
-    g.lineTo(-37, -34)
-    g.bezierCurveTo(-50, -28, -48, -10, -32, -6)
-    // legs, one pair striding
-    g.rect(-30, 14, 10, 24)
-    g.rect(-14, 16, 10, 22)
-    g.rect(16, 16, 10, 22)
-    g.rect(30, 12, 10, 26)
-    // the head, its ears
-    g.moveTo(66, -10)
-    g.arc(50, -10, 17, 0, Math.PI * 2)
-    g.moveTo(38, -24)
-    g.arc(40, -24, 6, 0, Math.PI * 2)
-    g.moveTo(62, -24)
-    g.arc(60, -24, 6, 0, Math.PI * 2)
-  }
-  tiger()
-  g.lineWidth = 6
-  g.strokeStyle = '#e8b830'
-  g.stroke()
-  g.fillStyle = '#e2701c'
-  tiger()
-  g.fill()
-  // stripes over the back, on the haunch and tail, on the brow
-  g.strokeStyle = '#1c120a'
-  g.lineWidth = 3.5
-  g.lineCap = 'round'
-  for (const [x, top, len] of [[-22, -14, 14], [-10, -18, 16], [2, -19, 17], [14, -18, 16], [26, -15, 13], [-30, 8, 8], [-44, -30, 7]]) {
-    g.beginPath()
-    g.moveTo(x, top)
-    g.quadraticCurveTo(x + 4, top + len / 2, x - 1, top + len)
-    g.stroke()
-  }
-  for (const k of [-6, 0, 6]) {
-    g.beginPath()
-    g.moveTo(50 + k, -24)
-    g.lineTo(50 + k * 0.6, -17)
-    g.stroke()
-  }
-  // its eye and nose, a pale muzzle
-  g.fillStyle = '#f6ecd0'
-  g.beginPath()
-  g.ellipse(58, -4, 9, 6, 0, 0, Math.PI * 2)
-  g.fill()
-  g.fillStyle = '#1c120a'
-  g.beginPath()
-  g.arc(54, -13, 2.6, 0, Math.PI * 2)
-  g.arc(64, -6, 2.4, 0, Math.PI * 2)
-  g.fill()
-  g.restore()
-})
-/** the pennant: a triangle of cloth in strips from the pole out to its point, to ripple */
-const FLAG_GEO = (() => {
-  const g = new THREE.PlaneGeometry(1, 1, 12, 6)
-  const p = g.attributes.position, uv = g.attributes.uv
-  for (let i = 0; i < p.count; i++) {
-    const u = uv.getX(i), v = uv.getY(i)
-    // (narrowing to the point: the long side at the pole, x = 0)
-    p.setXYZ(i, u, (v - 0.5) * (1 - u), 0)
-    // (and the picture sampled from the triangle it's drawn in, not the whole square: no blank corners)
-    uv.setXY(i, u, 0.5 + (v - 0.5) * (1 - u))
-  }
-  g.userData.rest = Float32Array.from(p.array as Float32Array)
-  return g
-})()
 const ALTAR_GEO = {
-  censer: new THREE.CylinderGeometry(0.075, 0.06, 0.08, 20),
-  foot: new THREE.SphereGeometry(0.014, 8, 6),
-  ash: new THREE.CircleGeometry(0.068, 20),
-  stick: new THREE.CylinderGeometry(0.0025, 0.0025, 0.2, 5),
-  tip: new THREE.SphereGeometry(0.005, 6, 4),
-  pole: new THREE.CylinderGeometry(0.004, 0.0045, 0.34, 8),
-  finial: new THREE.ConeGeometry(0.008, 0.026, 8),
-  flagStand: new THREE.CylinderGeometry(0.016, 0.022, 0.17, 12),
-  knob: new THREE.SphereGeometry(0.008, 10, 8),
-  tassel: new THREE.CylinderGeometry(0.004, 0.0015, 0.03, 6),
+  bottle: new THREE.CylinderGeometry(0.03, 0.034, 0.09, 16),
+  neck: new THREE.CylinderGeometry(0.011, 0.02, 0.06, 12),
+  mouth: new THREE.CylinderGeometry(0.014, 0.012, 0.012, 12),
+  cup: new THREE.CylinderGeometry(0.03, 0.017, 0.016, 16),
+  sake: new THREE.CircleGeometry(0.026, 16),
   fruit: new THREE.SphereGeometry(0.03, 12, 8),
-  banana: new THREE.TorusGeometry(0.07, 0.013, 6, 12, 1.4),
+  leaf: new THREE.ConeGeometry(0.01, 0.026, 6),
   dish: new THREE.CylinderGeometry(0.08, 0.06, 0.015, 18),
 }
-/**
- * The altar on the shelf by the door: a bronze censer on three feet full of ash, a command flag (令旗) of yellow silk
- * stood in it on a black pole with a gold tip, rippling a little, and one stick of incense burning, its tip glowing and
- * a thread of smoke going up; a dish of oranges set out as an offering.
- */
-/** a tiger's coat: gold-orange, its black stripes running round it, pale underneath */
-const TIGER_COAT = canvasTex(512, 256, (g) => {
-  // painted as a temple's carved and lacquered tiger is: a deep gold-orange along the back, lighter down the flanks,
-  // cream underneath, the brush's strokes of fur all over it, and the black stripes in tapering, forking strokes
-  const grad = g.createLinearGradient(0, 0, 0, 256)
-  grad.addColorStop(0, '#b8581a')
-  grad.addColorStop(0.35, '#d97a26')
-  grad.addColorStop(0.62, '#eb9a40')
-  grad.addColorStop(0.78, '#f4d8a0')
-  grad.addColorStop(1, '#fbf0d8')
-  g.fillStyle = grad
-  g.fillRect(0, 0, 512, 256)
-  // (a seeded scatter, so it's the same every time)
-  let seed = 7
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  for (let i = 0; i < 2600; i++) {
-    const x = rnd() * 512, y = rnd() * 256, l = 3 + rnd() * 5
-    g.strokeStyle = rnd() < 0.5 ? 'rgba(255,230,180,0.18)' : 'rgba(110,50,10,0.16)'
-    g.lineWidth = 1
-    g.beginPath()
-    g.moveTo(x, y)
-    g.lineTo(x + (rnd() - 0.5) * 2, y + l)
-    g.stroke()
-  }
-  g.fillStyle = '#1a0f08'
-  for (let k = 0; k < 14; k++) {
-    const x = 18 + k * 36 + (rnd() - 0.5) * 8, len = 110 + rnd() * 50, w = 6 + rnd() * 5
-    const stroke = (x0: number, y0: number, l: number, w0: number, lean: number) => {
-      g.beginPath()
-      g.moveTo(x0 - w0, y0)
-      g.quadraticCurveTo(x0 + lean - w0 * 0.4, y0 + l * 0.5, x0 + lean * 1.4, y0 + l)
-      g.quadraticCurveTo(x0 + lean + w0 * 0.4, y0 + l * 0.5, x0 + w0, y0)
-      g.closePath()
-      g.fill()
-    }
-    stroke(x, 0, len, w, (rnd() - 0.5) * 18)
-    // (a fork off some, a short stroke between others)
-    if (k % 2) stroke(x + 10, 40 + rnd() * 30, len * 0.45, w * 0.6, 10)
-    else stroke(x + 18, 0, len * 0.5, w * 0.55, (rnd() - 0.5) * 10)
-  }
+/** the label on the sake bottle: 酒 brushed in black on a red square */
+const SAKE_LABEL = canvasTex(64, 80, (g) => {
+  g.fillStyle = '#f8f2e2'
+  g.fillRect(0, 0, 64, 80)
+  g.fillStyle = '#b8261c'
+  g.fillRect(8, 8, 48, 64)
+  brushText(g, '酒', 32, 42, 40, { fill: '#fff6e0', shadow: 'rgba(40,0,0,0.4)' })
 })
-/** how high 虎爺's dais raises him over the altar shelf */
-const DAIS_H = 0.12
-const TIGER_GEO = {
-  ball: new THREE.SphereGeometry(1, 32, 20),
-  toe: new THREE.SphereGeometry(0.0045, 10, 8),
-  whisker: new THREE.CylinderGeometry(0.0006, 0.0003, 0.03, 4),
-  leg: new THREE.CylinderGeometry(0.011, 0.014, 0.06, 10),
-  ear: new THREE.ConeGeometry(0.012, 0.02, 10),
-  fang: new THREE.ConeGeometry(0.0035, 0.012, 6),
-  coin: (() => {
-    // an old Chinese coin: a round disc with a square hole, its rim raised
-    const sh = new THREE.Shape()
-    sh.absarc(0, 0, 0.0155, 0, Math.PI * 2, false)
-    const hole = new THREE.Path()
-    const q = 0.0053
-    hole.moveTo(-q, -q)
-    hole.lineTo(-q, q)
-    hole.lineTo(q, q)
-    hole.lineTo(q, -q)
-    hole.closePath()
-    sh.holes.push(hole)
-    return new THREE.ExtrudeGeometry(sh, { depth: 0.003, bevelEnabled: true, bevelThickness: 0.0009, bevelSize: 0.0012, bevelSegments: 1, curveSegments: 20 })
-  })(),
-  cord: new THREE.CylinderGeometry(0.0012, 0.0012, 0.05, 5),
-  tail: new THREE.TorusGeometry(0.04, 0.007, 8, 16, Math.PI * 1.2),
-  cape: new THREE.CylinderGeometry(0.03, 0.045, 0.03, 18, 1, true),
-  dais: new THREE.BoxGeometry(0.14, DAIS_H, 0.12),
-  trim: new THREE.BoxGeometry(0.146, 0.008, 0.126),
-}
 /**
- * 虎爺, the tiger lord, as his figure sits in a temple: on a red lacquered dais with gold bands, sat up on his
- * haunches with his forelegs straight, his chest out, his big head up and turned to the room; gold-orange with black
- * stripes, a white ruff at his cheeks and a white chest, his round eyes fierce under gold brows, his mouth open on
- * two fangs with a gold coin in it, a red cape with a gold hem at his neck, his tail curled up beside him.
- * Faces -x (the room).
+ * The altar on the shelf by the door: the household shrine (神棚), a bottle of sake and its cup set out before it, a
+ * dish of oranges. Offering the sake (a click) fills the cup and lights the shrine for a minute.
  */
-/** one rounded part of the figure: a ball stretched to its size, lacquered (a soft sheen, as a painted carving has),
- * a fine dark line round it unless it's a small painted detail */
-function B(props: { at: [number, number, number]; r: [number, number, number]; color?: string; map?: THREE.Texture | null; ink?: boolean }) {
-  return (
-    <group position={props.at} scale={props.r}>
-      <mesh geometry={TIGER_GEO.ball} castShadow>
-        <meshStandardMaterial color={props.color ?? '#ffffff'} map={props.map ?? null} roughness={0.42} metalness={0.05} />
-      </mesh>
-      {props.ink !== false && <mesh geometry={TIGER_GEO.ball} scale={1.035}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>}
-    </group>
-  )
-}
-/** the figure's gold: leaf over lacquer, bright where the light catches it */
-const IDOL_GOLD = new THREE.MeshStandardMaterial({ color: '#e8bc4a', roughness: 0.3, metalness: 0.25, emissive: '#6a4a10', emissiveIntensity: 0.55 })
-const IDOL_RED = new THREE.MeshStandardMaterial({ color: '#a8261e', roughness: 0.35, metalness: 0.02 })
-function TigerIdol() {
-  return (
-    <group>
-      {/* the dais: red lacquer, a gold band round its top and its foot */}
-      <mesh geometry={TIGER_GEO.dais} material={IDOL_RED} position-y={DAIS_H / 2} castShadow />
-      <mesh geometry={TIGER_GEO.dais} position-y={DAIS_H / 2} scale={1.02}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
-      {[DAIS_H - 0.003, DAIS_H / 2, 0.004].map((y) => <mesh key={y} geometry={TIGER_GEO.trim} material={IDOL_GOLD} position-y={y} />)}
-      <group position-y={DAIS_H}>
-        {/* haunches, sat on, and the body rising to the chest */}
-        <B at={[0.02, 0.03, 0]} r={[0.042, 0.034, 0.04]} map={TIGER_COAT} />
-        <B at={[-0.01, 0.065, 0]} r={[0.03, 0.042, 0.03]} map={TIGER_COAT} />
-        <B at={[-0.03, 0.06, 0]} r={[0.012, 0.03, 0.022]} color="#f6e8c8" ink={false} />
-        {/* forelegs, straight down to the paws */}
-        {[-1, 1].map((sd) => (
-          <group key={sd}>
-            <mesh geometry={TIGER_GEO.leg} position={[-0.03, 0.03, sd * 0.016]}><meshToonMaterial color="#e8902a" /></mesh>
-            <B at={[-0.038, 0.006, sd * 0.017]} r={[0.016, 0.008, 0.012]} color="#f6e8c8" />
-            {/* his toes, three on each forepaw */}
-            {[-1, 0, 1].map((t) => <mesh key={t} geometry={TIGER_GEO.toe} position={[-0.053, 0.006, sd * 0.017 + t * 0.006]}><meshStandardMaterial color="#f2e2c0" roughness={0.45} /></mesh>)}
-            {/* the hind paws, out in front of the haunches */}
-            <B at={[0.0, 0.006, sd * 0.034]} r={[0.018, 0.008, 0.012]} color="#f6e8c8" />
-          </group>
-        ))}
-        {/* the tail, curled up along his side */}
-        <mesh geometry={TIGER_GEO.tail} position={[0.04, 0.05, 0.04]} rotation={[0, 0.2, Math.PI / 2 + 0.3]}><meshToonMaterial color="#e8902a" /></mesh>
-        {/* the red cape at his neck, its gold hem */}
-        <mesh geometry={TIGER_GEO.cape} position={[-0.012, 0.1, 0]} rotation-z={0.25}><meshStandardMaterial color="#b8221c" roughness={0.6} side={THREE.DoubleSide} /></mesh>
-        <mesh position={[-0.009, 0.086, 0]} rotation={[Math.PI / 2, 0, 0.25]} material={IDOL_GOLD}><torusGeometry args={[0.045, 0.003, 6, 24]} /></mesh>
-        {/* the head: big and round, the ruff white at his cheeks, the muzzle */}
-        <group position={[-0.03, 0.135, 0]}>
-          <B at={[0, 0, 0]} r={[0.038, 0.036, 0.04]} map={TIGER_COAT} />
-          {[-1, 1].map((sd) => (
-            <group key={sd}>
-              <B at={[-0.012, -0.012, sd * 0.03]} r={[0.018, 0.02, 0.014]} color="#f6e8c8" />
-              <mesh geometry={TIGER_GEO.ear} position={[0.006, 0.034, sd * 0.024]} rotation-x={sd * 0.35}><meshToonMaterial color="#e8902a" /></mesh>
-              <mesh position={[-0.0035, 0.033, sd * 0.024]} rotation={[sd * 0.35, -Math.PI / 2, 0]} scale={[0.6, 0.7, 1]}>
-                <circleGeometry args={[0.009, 10]} /><meshToonMaterial color="#e8a0a0" />
-              </mesh>
-              {/* eyes: white, a black pupil, under a gold brow */}
-              <B at={[-0.032, 0.008, sd * 0.014]} r={[0.006, 0.008, 0.008]} color="#fbf6e8" ink={false} />
-              <B at={[-0.0375, 0.008, sd * 0.014]} r={[0.003, 0.005, 0.005]} color="#140c08" ink={false} />
-              <mesh position={[-0.034, 0.019, sd * 0.015]} rotation={[sd * 0.3, -Math.PI / 2, 0]}>
-                <boxGeometry args={[0.016, 0.004, 0.003]} /><meshToonMaterial color="#d4b04a" />
-              </mesh>
-            </group>
-          ))}
-          <B at={[-0.034, -0.012, 0]} r={[0.016, 0.014, 0.022]} color="#f6e8c8" />
-          <B at={[-0.049, -0.004, 0]} r={[0.005, 0.004, 0.007]} color="#3a1a10" ink={false} />
-          {/* whiskers, three a side, off the muzzle */}
-          {[-1, 1].flatMap((sd) => [-1, 0, 1].map((t) => (
-            <mesh key={`${sd}${t}`} geometry={TIGER_GEO.whisker} position={[-0.046, -0.01 + t * 0.003, sd * 0.024]} rotation={[sd * (Math.PI / 2 - 0.2 + t * 0.15), 0, 0]}>
-              <meshBasicMaterial color="#f8f2e2" />
-            </mesh>
-          )))}
-          {/* the mouth open: dark inside, two fangs down, the gold coin held in it */}
-          <B at={[-0.044, -0.022, 0]} r={[0.008, 0.007, 0.014]} color="#5a1a16" ink={false} />
-          {[-1, 1].map((sd) => (
-            <mesh key={sd} geometry={TIGER_GEO.fang} position={[-0.049, -0.016, sd * 0.008]} rotation-z={Math.PI}><meshToonMaterial color="#fbf6e8" /></mesh>
-          ))}
-          {/* the money: a gold coin held across his teeth, his fangs either side of its rim, and a red cord from its hole with
-              two more coins hanging on it */}
-          <group position={[-0.0535, -0.018, 0]} rotation={[0, -Math.PI / 2, 0.12]}>
-            <mesh geometry={TIGER_GEO.coin} material={IDOL_GOLD} position-z={-0.0015} />
-            <mesh geometry={TIGER_GEO.cord} position={[0, -0.03, 0]}><meshToonMaterial color="#c4302a" /></mesh>
-            {[-0.05, -0.075].map((y) => (
-              <mesh key={y} geometry={TIGER_GEO.coin} material={IDOL_GOLD} position={[0, y, -0.0015]} scale={0.78} />
-            ))}
-          </group>
-        </group>
-      </group>
-    </group>
-  )
-}
 /**
  * A carved shelf bracket (持ち送り), in the wall's frame (x out from the wall, which is at x = 0, so it reaches to -x):
  * a post against the wall, an arm under the shelf, and between them a deep curve, its end rounded off.
@@ -1089,112 +793,56 @@ const SHELF_BRACKET = (() => {
 const ALTAR_D = 0.45
 /** and its height: up over the beckoning cats' stand below it, by the door */
 const ALTAR_Y = 1.42
-/** how long a stick of incense burns (ms) */
+/** how long the sake offered stands there, and the extra custom it brings (ms) */
 const INCENSE_MS = 60000
 function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
-  const tip = useRef<THREE.MeshBasicMaterial>(null)
-  const stick = useRef<THREE.Group>(null)
-  const smoke = useRef<THREE.Group>(null)
-  const ember = useRef<THREE.Mesh>(null)
-  const flag = useMemo(() => FLAG_GEO.clone(), [])
-  useEffect(() => () => flag.dispose(), [flag])
+  const glow = useRef<THREE.Mesh>(null)
+  const halo = useRef<THREE.MeshBasicMaterial>(null)
+  const sake = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    // (the stick burns down over its minute, from its tip; burnt out, it's gone, and another can be lit)
-    const lit = incense?.litAt ?? null
-    const left = lit === null ? 1 : Math.max(0, 1 - (performance.now() - lit) / INCENSE_MS)
-    const burning = lit !== null && left > 0
-    const len = 0.06 + 0.94 * left
-    if (stick.current) {
-      stick.current.scale.y = len
-      stick.current.visible = burning
-    }
-    if (ember.current) {
-      ember.current.visible = burning
-      ember.current.position.y = 0.2 * len
-    }
-    if (smoke.current) {
-      smoke.current.visible = burning
-      smoke.current.position.y = 0.2 * len + 0.12
-    }
-    if (tip.current) tip.current.color.setRGB(1, 0.35 + 0.15 * Math.sin(t * 3.1), 0.1)
-    // the silk stirring in the air: a slow ripple from the pole out to the point, more the further out
-    const p = flag.attributes.position, rest = FLAG_GEO.userData.rest as Float32Array
-    for (let i = 0; i < p.count; i++) {
-      const x = rest[i * 3], y = rest[i * 3 + 1]
-      p.setXYZ(i, x, y - x * x * 0.03, Math.sin(x * 5 - t * 1.6) * 0.035 * x + Math.sin(y * 7 + t) * 0.006 * x)
-    }
-    p.needsUpdate = true
-    flag.computeVertexNormals()
+    // (offered, the sake stands in its cup for a minute, the shrine glowing, and is gone when it's over; then another can be offered)
+    const at = incense?.litAt ?? null
+    const left = at === null ? 0 : Math.max(0, 1 - (performance.now() - at) / INCENSE_MS)
+    const on = left > 0
+    if (sake.current) sake.current.visible = on
+    if (glow.current) glow.current.visible = on
+    if (halo.current) halo.current.opacity = on ? Math.min(1, left * 8) * (0.4 + 0.08 * Math.sin(t * 2.4)) : 0
   })
+  const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); incense?.onLight() }
   return (
     <group>
-      {/* 虎爺 at the back, raised on his dais, looking out over the censer */}
-      <group position={[0.07, 0, 0]}><StaticBatch><TigerIdol /></StaticBatch></group>
-      <group position-x={-0.105}>
-      <Inked geometry={ALTAR_GEO.censer} color="#8a6a3a" position-y={0.05} />
-      {[0, 1, 2].map((k) => (
-        <mesh key={k} geometry={ALTAR_GEO.foot} position={[Math.cos(k * 2.1) * 0.05, 0.008, Math.sin(k * 2.1) * 0.05]}>
-          <meshToonMaterial color="#6a4e2a" />
+      {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
+      <group position-x={ALTAR_D / 2} scale={1.3}><StaticBatch><Kamidana shelf={false} /></StaticBatch></group>
+      {/* the glow round the shrine while the offering's there */}
+      <mesh ref={glow} position={[-0.22, 0.2, 0]} rotation-y={-Math.PI / 2} renderOrder={2}>
+        <planeGeometry args={[0.95, 0.7]} />
+        <meshBasicMaterial ref={halo} map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0} />
+      </mesh>
+      {/* the offering of sake (御神酒): a white bottle with its red-labelled 酒, and a shallow cup before it that the sake's
+          poured into: click either (or the shrine) to make the offering */}
+      <group position={[-0.145, 0, -0.22]} onClick={offer} {...(incense ? handOver : {})}>
+        <Inked geometry={ALTAR_GEO.bottle} color="#f4f1ea" position-y={0.045} />
+        <Inked geometry={ALTAR_GEO.neck} color="#f4f1ea" position-y={0.115} />
+        <mesh geometry={ALTAR_GEO.mouth} position-y={0.143}><meshToonMaterial color="#c4302a" /></mesh>
+        <mesh position={[-0.0325, 0.05, 0]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[0.04, 0.05]} /><meshToonMaterial color="#ffffff" map={SAKE_LABEL} />
         </mesh>
-      ))}
-      <mesh geometry={ALTAR_GEO.ash} position-y={0.091} rotation-x={-Math.PI / 2}><meshToonMaterial color="#d8d0c0" /></mesh>
-      {/* the bundle of incense lying beside the censer, a long paper sleeve with the sticks' ends showing: click it (or
-          the censer) to stand a stick in the ash and light it */}
-      <group position={[-0.03, 0, -0.27]} onClick={(e) => { e.stopPropagation(); incense?.onLight() }} {...(incense ? handOver : {})}>
-        <mesh position-y={0.014}><boxGeometry args={[0.04, 0.026, 0.2]} /><meshToonMaterial color="#c4302a" /></mesh>
-        <mesh position={[-0.0201, 0.014, 0.02]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.07, 0.02]} /><meshToonMaterial color="#f2c62a" /></mesh>
-        {[-0.012, -0.004, 0.004, 0.012].map((x, k) => (
-          <mesh key={x} position={[x, 0.008 + (k % 2) * 0.008, -0.12]} rotation-x={Math.PI / 2}>
-            <cylinderGeometry args={[0.0022, 0.0022, 0.05, 4]} /><meshToonMaterial color="#8a2a1a" />
-          </mesh>
-        ))}
-        <mesh position-y={0.02} visible={false}><boxGeometry args={[0.1, 0.1, 0.28]} /></mesh>
-      </group>
-      {/* the stick in the censer, in front, burning down; none there till one's lit, and gone again once it's out */}
-      <group position={[-0.03, 0.09, 0]} rotation-z={0.06}
-        onClick={(e) => { e.stopPropagation(); incense?.onLight() }}
-        {...(incense ? handOver : {})}>
-        <group ref={stick}>
-          <mesh geometry={ALTAR_GEO.stick} position-y={0.1}><meshToonMaterial color="#8a2a1a" /></mesh>
-        </group>
-        <mesh ref={ember} geometry={ALTAR_GEO.tip} position-y={0.2}><meshBasicMaterial ref={tip} color="#ff6a1a" toneMapped={false} /></mesh>
-        {/* (a bigger, unseen target round it all, so it's easy to click) */}
-        <mesh position-y={0.1} visible={false}><boxGeometry args={[0.16, 0.3, 0.3]} /></mesh>
-        <group ref={smoke}>
-          <Steam width={0.06} height={0.4} opacity={0.32} layers={1} color="#e8e4dc" shade="#c8c4bc" speed={0.04} />
-        </group>
-      </group>
-      </group>
-      {/* the command flag, on a stand of its own behind 虎爺, at the very back by the wall (not in with the incense):
-          its pole, a gold tip on it, the silk on the pole's upper part, a red tassel hanging from its point */}
-      <mesh geometry={ALTAR_GEO.flagStand} position={[0.165, 0.085, 0]}><meshToonMaterial color="#a8261e" /></mesh>
-      <group position={[0.165, 0.17, 0]}>
-        <mesh geometry={ALTAR_GEO.pole} position-y={0.17}><meshToonMaterial color="#1a120c" /></mesh>
-        <mesh geometry={ALTAR_GEO.knob} position-y={0.342}><meshToonMaterial color="#d4b04a" /></mesh>
-        <mesh geometry={ALTAR_GEO.finial} position-y={0.36}><meshToonMaterial color="#d4b04a" /></mesh>
-        <group position={[0, 0.25, -0.004]} rotation-y={Math.PI / 2} scale={[0.17, 0.15, 1]}>
-          <mesh geometry={flag}>
-            <meshToonMaterial color="#ffffff" map={LINGQI} side={THREE.DoubleSide} />
+        <group position={[-0.0, 0, 0.09]}>
+          <Inked geometry={ALTAR_GEO.cup} color="#f4f1ea" position-y={0.008} />
+          <mesh ref={sake} geometry={ALTAR_GEO.sake} position-y={0.0175} rotation-x={-Math.PI / 2} visible={false}>
+            <meshBasicMaterial color="#f2dc8a" toneMapped={false} />
           </mesh>
         </group>
-        <mesh geometry={ALTAR_GEO.tassel} position={[0, 0.235, -0.17]}><meshToonMaterial color="#c4302a" /></mesh>
+        <mesh position={[0, 0.07, 0.05]} visible={false}><boxGeometry args={[0.14, 0.16, 0.2]} /></mesh>
       </group>
-      {/* the oranges on their dish */}
-      <group position={[-0.05, 0, 0.28]}>
+      {/* the oranges on their dish, a leaf on the top one */}
+      <group position={[-0.14, 0, 0.22]}>
         <mesh geometry={ALTAR_GEO.dish} position-y={0.008}><meshToonMaterial color="#e8e2d2" /></mesh>
         {[[0, 0.035, -0.02], [-0.02, 0.035, 0.025], [0.025, 0.035, 0.02], [0, 0.085, 0.008]].map((pt, k) => (
           <mesh key={k} geometry={ALTAR_GEO.fruit} position={pt as [number, number, number]}><meshToonMaterial color="#f08a1a" /></mesh>
         ))}
-        {/* and a hand of bananas leant against them */}
-        <group position={[-0.045, 0.03, 0]} rotation={[0, 0.2, 0.5]}>
-          {[-1, 0, 1].map((k) => (
-            <group key={k} rotation-y={k * 0.28}>
-              <mesh geometry={ALTAR_GEO.banana} rotation-x={Math.PI / 2}><meshToonMaterial color="#f2d23a" /></mesh>
-            </group>
-          ))}
-          <mesh position={[0.07, 0, 0]}><boxGeometry args={[0.014, 0.016, 0.03]} /><meshToonMaterial color="#6a5a2a" /></mesh>
-        </group>
+        <mesh geometry={ALTAR_GEO.leaf} position={[0, 0.118, 0.008]} rotation-z={0.3}><meshToonMaterial color="#3a7a2a" /></mesh>
       </group>
     </group>
   )
