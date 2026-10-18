@@ -3829,9 +3829,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {/* (the table, the crew and the bar stay where they were drawn: the fire and all round it stand FIRE_SHIFT along from them, to the table's middle) */}
       <group position={[-FIRE_SHIFT.x, 0, -FIRE_SHIFT.z]}>
       <CookTable floor={!bar} />
+      {/* (the crew keep their own places on the kitchen floor: carried back by the shift) */}
+      <group position={[FIRE_SHIFT.x, 0, FIRE_SHIFT.z]}>
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
         <CrewWalk key={m.id} at={at} yaw={yaw}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></CrewWalk>
       ))}
+      </group>
       {bar && <Bar />}
       </group>
       {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
