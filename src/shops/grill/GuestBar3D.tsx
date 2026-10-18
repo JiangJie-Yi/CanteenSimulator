@@ -583,6 +583,62 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
     </>
   )
 }
+/** raw timber for the steps: warm unplaned wood, its long grain wavering, a knot or two, and the dark rough of the cut */
+const STEP_LOG = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 256
+  c.height = 64
+  const g = c.getContext('2d')!
+  g.fillStyle = '#9a6c3c'
+  g.fillRect(0, 0, 256, 64)
+  for (let i = 0; i < 26; i++) {
+    const y = 2 + i * 2.4 + (i % 3)
+    g.strokeStyle = i % 4 ? 'rgba(70,40,18,0.35)' : 'rgba(215,170,110,0.28)'
+    g.lineWidth = 1 + (i % 3) * 0.4
+    g.beginPath()
+    g.moveTo(0, y)
+    g.bezierCurveTo(70, y + 3 * Math.sin(i), 170, y - 3 * Math.cos(i * 1.7), 256, y + 2)
+    g.stroke()
+  }
+  for (const [x, y] of [[60, 20], [190, 44]]) {
+    g.fillStyle = 'rgba(55,30,12,0.7)'
+    g.beginPath(); g.ellipse(x, y, 9, 4.5, 0, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = 'rgba(55,30,12,0.4)'
+    g.beginPath(); g.ellipse(x, y, 16, 8, 0, 0, Math.PI * 2); g.stroke()
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  return t
+})()
+/**
+ * A timber block w × h × d whose grain runs the long way on every face and is laid at one scale all over (a texture one metre
+ * long, a quarter of a metre across), however the block is shaped: nothing stretched.
+ */
+const TIMBER_GEO = new Map<string, THREE.BufferGeometry>()
+const TIMBER = new THREE.MeshToonMaterial({ color: '#ffffff', map: STEP_LOG })
+function timberBox(w: number, h: number, d: number) {
+  const key = [w, h, d].map((v) => v.toFixed(3)).join()
+  const have = TIMBER_GEO.get(key)
+  if (have) return have
+  const g = new THREE.BoxGeometry(w, h, d)
+  TIMBER_GEO.set(key, g)
+  const uv = g.attributes.uv
+  // (BoxGeometry's faces, four vertices each: +x, -x, +y, -y, +z, -z; the two sizes across each face along its u and v)
+  const dims: [number, number][] = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]]
+  for (let f = 0; f < 6; f++) {
+    const [du, dv] = dims[f]
+    for (let k = 0; k < 4; k++) {
+      const i = f * 4 + k
+      const u = uv.getX(i), v = uv.getY(i)
+      // (the longer side takes the grain, the texture's u)
+      if (du >= dv) uv.setXY(i, u * du, v * dv * 4)
+      else uv.setXY(i, v * dv, u * du * 4)
+    }
+  }
+  return g
+}
 /**
  * The kitchen, sunk below the customers' floor: its own floor lower down, a riser of the bar's dark wood round its
  * edges (the counters' bases run on down into it), and at each gate two steps to tread on, down from the customers' floor.
@@ -600,34 +656,21 @@ function KitchenPit({ counters, drop }: { counters: Counter[]; drop: number }) {
   )
   // (the steps are blocks stood in the kitchen against its edge, each a third lower than the last)
   const [g0, g1] = gates.first
-  // (each step a block of the bar's dark wood, its tread laid in the shop's own floorboards, running on from the floor's: no texture
-  // stretched over it; set exactly in the gate's way through, from the post to the counter's end)
-  const STEP_TREAD = '#d9c9b0'
-  const tread = (w: number, l: number, x: number, y: number, z: number, key: string) => (
-    <FloorPiece key={key} w={w} l={l} tint={STEP_TREAD} position={[x, y, z]} />
-  )
+  // (each step a block of raw timber, its grain along it at one scale; run a way on past the gate's way through along the kitchen's
+  // edge, to fill the corner of the well beside it, but never past the kitchen's own bounds)
+  const STEP_OVER = 0.45
   const stepAt = (a: number, b: number, edgeLay: number, key: string) => [1, 2].map((n) => {
     const h = drop * (3 - n) / 3
-    const x = -(edgeLay + 0.17 * n - 0.085)
+    const lo = Math.max(kx0, a - STEP_OVER), hi = Math.min(kx1, b + STEP_OVER)
     return (
-      <group key={`${key}${n}`}>
-        <mesh position={[x, -drop + h / 2, (a + b) / 2]} castShadow receiveShadow>
-          <boxGeometry args={[0.17, h, b - a]} /><meshToonMaterial color={RISER} />
-        </mesh>
-        {tread(0.17, b - a, x, -drop + h + 0.002, (a + b) / 2, `${key}t${n}`)}
-      </group>
+      <mesh key={`${key}${n}`} position={[-(edgeLay + 0.17 * n - 0.085), -drop + h / 2, (lo + hi) / 2]} geometry={timberBox(0.17, h, hi - lo)} material={TIMBER} castShadow receiveShadow />
     )
   })
   const stepSide = (a: number, b: number, edgeAlong: number, key: string) => [1, 2].map((n) => {
     const h = drop * (3 - n) / 3
-    const z = edgeAlong + 0.17 * n - 0.085
+    const lo = Math.max(ky0, a - STEP_OVER), hi = Math.min(ky1, b + STEP_OVER)
     return (
-      <group key={`${key}${n}`}>
-        <mesh position={[-(a + b) / 2, -drop + h / 2, z]} castShadow receiveShadow>
-          <boxGeometry args={[b - a, h, 0.17]} /><meshToonMaterial color={RISER} />
-        </mesh>
-        {tread(b - a, 0.17, -(a + b) / 2, -drop + h + 0.002, z, `${key}t${n}`)}
-      </group>
+      <mesh key={`${key}${n}`} position={[-(lo + hi) / 2, -drop + h / 2, edgeAlong + 0.17 * n - 0.085]} geometry={timberBox(hi - lo, h, 0.17)} material={TIMBER} castShadow receiveShadow />
     )
   })
   return (

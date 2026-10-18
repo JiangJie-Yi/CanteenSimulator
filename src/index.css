@@ -906,6 +906,11 @@ button {
   border-radius: 4px;
   background: linear-gradient(90deg, #8a2b12, #ff7a2e var(--heat), var(--washi-shade) var(--heat));
 }
+/* fanned past full (up to 120%): the whole bar white-hot and glowing */
+.fire-meter.fire-over {
+  background: linear-gradient(90deg, #b8340f, #ffb347 60%, #fff0c2);
+  box-shadow: 0 0 10px 2px rgba(255, 150, 50, 0.75);
+}
 
 /* 飽足: a belly meter under the heat/fire controls, filling warm as you eat */
 .fullness {

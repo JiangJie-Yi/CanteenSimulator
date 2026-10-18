@@ -1866,7 +1866,7 @@ function DrinkBottleRaw({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
       <mesh geometry={BOTTLE_GEO.can} material={look.glass} />
       <mesh geometry={BOTTLE_GEO.canLabel} position-y={0.046} material={look.label} />
       <mesh geometry={BOTTLE_GEO.canTop} position-y={0.0905} material={look.glass} />
-      <mesh geometry={BOTTLE_GEO.canRim} position-y={0.09} rotation-x={Math.PI / 2}><meshToonMaterial color="#aeb3b9" /></mesh>
+      <mesh geometry={BOTTLE_GEO.canRim} position-y={0.09}><meshToonMaterial color="#aeb3b9" /></mesh>
       <mesh geometry={BOTTLE_GEO.canTab} position={[0, 0.0928, 0.002]}><meshToonMaterial color="#d8dce0" /></mesh>
     </group>
   )
@@ -1899,42 +1899,42 @@ function DrinkBottleRaw({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
   )
 }
 /** a bottle turned from its profile: the points of (radius, height) from its foot up to its mouth */
-const bottleBody = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 18)
+const bottleBody = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 10)
 const BOTTLE_SHAPE = {
   // a brown long-necked beer bottle, a gold foil at its neck
   beer: { body: bottleBody([[0, 0], [0.024, 0], [0.0275, 0.005], [0.0275, 0.12], [0.0235, 0.145], [0.0145, 0.17], [0.0125, 0.2],
-    [0.0135, 0.206], [0.0135, 0.21], [0, 0.21]]), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 18, 1, true), labelY: 0.065,
-    cap: new THREE.CylinderGeometry(0.0145, 0.0145, 0.008, 14), capY: 0.213, foil: new THREE.CylinderGeometry(0.0138, 0.0155, 0.04, 14), foilY: 0.18 },
+    [0.0135, 0.206], [0.0135, 0.21], [0, 0.21]]), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 10, 1, true), labelY: 0.065,
+    cap: new THREE.CylinderGeometry(0.0145, 0.0145, 0.008, 9), capY: 0.213, foil: new THREE.CylinderGeometry(0.0138, 0.0155, 0.04, 9), foilY: 0.18 },
   // the glass milk bottle: a wide mouth, a paper cap pressed down over it, a paper label round its middle
   milk: { body: bottleBody([[0, 0], [0.02, 0], [0.0225, 0.005], [0.0225, 0.085], [0.02, 0.098], [0.0175, 0.106], [0.0175, 0.118], [0, 0.118]]),
-    label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 18, 1, true), labelY: 0.05,
-    cap: new THREE.CylinderGeometry(0.0195, 0.0195, 0.006, 16), capY: 0.121, foil: new THREE.CylinderGeometry(0.0182, 0.0188, 0.014, 16) as THREE.BufferGeometry | null, foilY: 0.112 },
+    label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 10, 1, true), labelY: 0.05,
+    cap: new THREE.CylinderGeometry(0.0195, 0.0195, 0.006, 9), capY: 0.121, foil: new THREE.CylinderGeometry(0.0182, 0.0188, 0.014, 9) as THREE.BufferGeometry | null, foilY: 0.112 },
   // the 500 ml plastic bottle: a ribbed foot, a label round its middle, a coloured cap
   pet500: { body: bottleBody([[0, 0], [0.019, 0], [0.0235, 0.006], [0.0235, 0.1], [0.021, 0.125], [0.0135, 0.145], [0.0105, 0.152],
-    [0.0105, 0.158], [0, 0.158]]), label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 18, 1, true), labelY: 0.07,
-    cap: new THREE.CylinderGeometry(0.0118, 0.0118, 0.012, 14), capY: 0.164, foil: null as THREE.BufferGeometry | null, foilY: 0 },
+    [0.0105, 0.158], [0, 0.158]]), label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 10, 1, true), labelY: 0.07,
+    cap: new THREE.CylinderGeometry(0.0118, 0.0118, 0.012, 9), capY: 0.164, foil: null as THREE.BufferGeometry | null, foilY: 0 },
   // a clear slim sake bottle with a round shoulder, a paper collar under the red cap
   sake: { body: bottleBody([[0, 0], [0.022, 0], [0.0245, 0.004], [0.0245, 0.12], [0.0225, 0.15], [0.014, 0.178], [0.0105, 0.2],
-    [0.0115, 0.206], [0, 0.206]]), label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 18, 1, true), labelY: 0.07,
-    cap: new THREE.CylinderGeometry(0.0125, 0.0125, 0.014, 14), capY: 0.21, foil: new THREE.CylinderGeometry(0.0112, 0.0125, 0.012, 14), foilY: 0.196 },
+    [0.0115, 0.206], [0, 0.206]]), label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 10, 1, true), labelY: 0.07,
+    cap: new THREE.CylinderGeometry(0.0125, 0.0125, 0.014, 9), capY: 0.21, foil: new THREE.CylinderGeometry(0.0112, 0.0125, 0.012, 9), foilY: 0.196 },
   // the big plastic tea bottle: wide, a ribbed foot, a green label round its middle
   pet: { body: bottleBody([[0, 0], [0.026, 0], [0.032, 0.008], [0.032, 0.012], [0.0305, 0.02], [0.032, 0.028], [0.032, 0.17],
-    [0.028, 0.2], [0.017, 0.225], [0.0135, 0.236], [0.0135, 0.246], [0, 0.246]]), label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 18, 1, true),
-    labelY: 0.1, cap: new THREE.CylinderGeometry(0.0145, 0.0145, 0.014, 14), capY: 0.252, foil: null as THREE.BufferGeometry | null, foilY: 0 },
+    [0.028, 0.2], [0.017, 0.225], [0.0135, 0.236], [0.0135, 0.246], [0, 0.246]]), label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 10, 1, true),
+    labelY: 0.1, cap: new THREE.CylinderGeometry(0.0145, 0.0145, 0.014, 9), capY: 0.252, foil: null as THREE.BufferGeometry | null, foilY: 0 },
 }
 const BOTTLE_GEO = {
-  body: new THREE.CylinderGeometry(0.026, 0.028, 0.13, 14),
-  label: new THREE.CylinderGeometry(0.0285, 0.0295, 0.06, 14, 1, true),
-  neck: new THREE.CylinderGeometry(0.012, 0.026, 0.04, 12),
-  cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 12),
+  body: new THREE.CylinderGeometry(0.026, 0.028, 0.13, 9),
+  label: new THREE.CylinderGeometry(0.0285, 0.0295, 0.06, 9, 1, true),
+  neck: new THREE.CylinderGeometry(0.012, 0.026, 0.04, 8),
+  cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 8),
   can: bottleBody([[0, 0], [0.0168, 0], [0.0198, 0.004], [0.0212, 0.011], [0.0212, 0.078], [0.0202, 0.084], [0.0184, 0.0885], [0.0178, 0.09], [0, 0.09]]),
-  canLabel: new THREE.CylinderGeometry(0.0215, 0.0215, 0.07, 18, 1, true),
-  canTop: new THREE.CylinderGeometry(0.0172, 0.0178, 0.004, 18),
-  canTab: new THREE.CylinderGeometry(0.0062, 0.0062, 0.0014, 12),
-  canRim: new THREE.TorusGeometry(0.0178, 0.0013, 5, 18),
+  canLabel: new THREE.CylinderGeometry(0.0215, 0.0215, 0.07, 10, 1, true),
+  canTop: new THREE.CylinderGeometry(0.0172, 0.0178, 0.004, 10),
+  canTab: new THREE.CylinderGeometry(0.0062, 0.0062, 0.0014, 8),
+  canRim: new THREE.CylinderGeometry(0.0182, 0.0182, 0.0026, 10, 1, true),
   small: new THREE.LatheGeometry([[0, 0], [0.016, 0], [0.017, 0.02], [0.013, 0.036], [0.016, 0.056], [0.015, 0.072], [0, 0.072]]
-    .map(([x, y]) => new THREE.Vector2(x, y - 0.036)), 16),
-  smallTop: new THREE.CylinderGeometry(0.0155, 0.0155, 0.004, 14),
+    .map(([x, y]) => new THREE.Vector2(x, y - 0.036)), 9),
+  smallTop: new THREE.CylinderGeometry(0.0155, 0.0155, 0.004, 9),
 }
 /** each drink's label: its colours and its name round it, the shop's own small print */
 const BOTTLE_LOOK = Object.fromEntries(DRINKS.map((d) => {

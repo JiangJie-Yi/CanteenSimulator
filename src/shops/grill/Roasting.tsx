@@ -47,10 +47,14 @@ const SOUP_TASTE = 78
 // dies back (per second) once the fanning stops, and while it lasts the coals burn away faster in proportion to it
 // (per second, at the most it can add: the plain burn is about 0.0002 a second, so fanning flat out burns some 65 times
 // as fast)
+// (fanned hard, the fire goes past its full 100%, to FIRE_FANNED_MAX (120%), cooking faster still, and the coals burn away much faster
+// for it: all the faster the further over 100% it is, FAN_OVER_BURN a second at the top)
 const FAN_GAIN = 0.08
-const FAN_MAX = 0.25
+const FAN_MAX = 0.3
 const FAN_FADE = 0.02
-const FAN_BURN = 0.012
+const FAN_BURN = 0.02
+const FIRE_FANNED_MAX = 1.2
+const FAN_OVER_BURN = 0.03
 type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state']; seat: number
   /** the one they came in with (a couple, sat side by side) */
   partner?: number
@@ -665,15 +669,6 @@ function BarGate({ c, gate }: { c: Counter; gate: (typeof BAR_GATES)[number] }) 
                 ))}
               </group>
             )))}
-            {/* its cap, level with the bar top */}
-            <mesh position-y={BAR_TOP - 0.025} castShadow>
-              <primitive object={gateGeo(G - 0.015, 0.05, 0.12, 0.018)} attach="geometry" />
-              <meshToonMaterial color="#ffffff" map={GATE_WOOD.across} />
-            </mesh>
-            <mesh position-y={BAR_TOP - 0.025} scale={[1.02, 1.25, 1.1]}>
-              <primitive object={gateGeo(G - 0.015, 0.05, 0.12, 0.018)} attach="geometry" />
-              <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-            </mesh>
           </group>
         </group>
         {/* the door's post (柱): a jamb of pale planed wood standing up the base's end, its face rounded, the hinges on it,
@@ -2939,7 +2934,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (h.kind !== 'fan') return
       h.wave += moved
       if (fire && fire.current > 0.02 && Math.hypot(at.x, at.z) < RING_CLEAR + 0.1) {
-        const gain = Math.min(moved * FAN_GAIN, FAN_MAX - fanned.current.extra, 1 - fire.current)
+        const gain = Math.min(moved * FAN_GAIN, FAN_MAX - fanned.current.extra, FIRE_FANNED_MAX - fire.current)
         if (gain > 0) {
           fire.current += gain
           fanned.current.extra += gain
@@ -3278,6 +3273,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       if (fire.current <= 0.02) fan.extra = 0
     }
+    // (past 100% the coals are going up fast: the more over, the faster they're used up)
+    if (fire && fire.current > 1) fire.current = Math.max(1, fire.current - dt * GAME_SPEED.value * FAN_OVER_BURN * ((fire.current - 1) / (FIRE_FANNED_MAX - 1)))
     // soup going down as it's drunk: the surface sinks into the bowl and narrows with it; a bowl taken off the
     // order comes back full next time
     root.traverse((o) => {

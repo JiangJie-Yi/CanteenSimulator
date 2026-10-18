@@ -66,7 +66,7 @@ type SteamProps = ThreeElements['group'] & {
 export function Steam({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, color = '#ffffff', shade = '#e6f0fc',
   speed = 0.07, level, ...props }: SteamProps) {
   const geometry = useMemo(() => {
-    const g = new THREE.PlaneGeometry(width, height, 16, 64)
+    const g = new THREE.PlaneGeometry(width, height, 8, 28)
     g.translate(0, height / 2, 0)
     return g
   }, [width, height])
