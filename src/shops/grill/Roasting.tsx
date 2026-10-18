@@ -1931,14 +1931,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (let i = 0; i < 8; i++) {
       // (nothing on the table's drawn-in end hangs over the side counter's lip: kept a plank in from it)
       // (the seasoning box, with its pots, reaches further than its round footprint: held a little further in)
-      const edge = COOK_TABLE.along[0] - FIRE_SHIFT.dot(ALONG) + r + 0.06 + (key === 'box' ? 0.1 : 0)
+      const edge = COOK_TABLE.along[0] - FIRE_SHIFT.dot(ALONG) + r + 0.16 + (key === 'box' ? 0.1 : 0)
       const here = at.dot(ALONG)
       if (here < edge) at.addScaledVector(ALONG, edge - here)
       // (nor hanging over the table's right-hand end, its back or its front)
-      const farEnd = COOK_TABLE.along[1] - FIRE_SHIFT.dot(ALONG) - r - 0.06
+      const farEnd = COOK_TABLE.along[1] - FIRE_SHIFT.dot(ALONG) - r - 0.16
       if (here > farEnd) at.addScaledVector(ALONG, farEnd - here)
       const across = at.dot(LAY)
-      const acrossMax = COOK_TABLE.lay[1] - FIRE_SHIFT.dot(LAY) - r - 0.06, acrossMin = COOK_TABLE.lay[0] - FIRE_SHIFT.dot(LAY) + r + 0.06
+      const acrossMax = COOK_TABLE.lay[1] - FIRE_SHIFT.dot(LAY) - r - 0.16, acrossMin = COOK_TABLE.lay[0] - FIRE_SHIFT.dot(LAY) + r + 0.16
       if (across > acrossMax) at.addScaledVector(LAY, acrossMax - across)
       else if (across < acrossMin) at.addScaledVector(LAY, acrossMin - across)
       const d = Math.hypot(at.x, at.z) || 1e-6
@@ -1964,10 +1964,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     // (and last of all, never off the table's top, whatever pushed it: the edges are hard)
     {
-      const edge = COOK_TABLE.along[0] - FIRE_SHIFT.dot(ALONG) + 0.06
+      const edge = COOK_TABLE.along[0] - FIRE_SHIFT.dot(ALONG) + 0.16
       const a1 = at.dot(ALONG), l1 = at.dot(LAY)
-      const aMax = COOK_TABLE.along[1] - FIRE_SHIFT.dot(ALONG) - 0.06
-      const lMin = COOK_TABLE.lay[0] - FIRE_SHIFT.dot(LAY) + 0.06, lMax = COOK_TABLE.lay[1] - FIRE_SHIFT.dot(LAY) - 0.06
+      const aMax = COOK_TABLE.along[1] - FIRE_SHIFT.dot(ALONG) - 0.16
+      const lMin = COOK_TABLE.lay[0] - FIRE_SHIFT.dot(LAY) + 0.16, lMax = COOK_TABLE.lay[1] - FIRE_SHIFT.dot(LAY) - 0.16
       if (a1 < edge + r * 0.5) at.addScaledVector(ALONG, edge + r * 0.5 - a1)
       if (a1 > aMax - r * 0.5) at.addScaledVector(ALONG, aMax - r * 0.5 - a1)
       if (l1 < lMin + r * 0.5) at.addScaledVector(LAY, lMin + r * 0.5 - l1)
