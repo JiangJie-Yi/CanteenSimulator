@@ -73,3 +73,11 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 - 手機（`PHONE_QUERY`）營業時用 2D 吧台（`ui/GuestCounter`），不跑 3D 吧台。
 - 程式註解用英文，風格跟周圍一致；介面文字中日雙語（`data/i18n.ts`、`data/lines.ts`）。
+
+## 節省 token 的做法
+
+- 驗證優先用數值（`__scene`、`__ctl`、Box3 量測、DOM 查詢），必要才截圖，且只截目標區域，不截整頁。
+- 大檔（`Roasting.tsx` 約 185KB、`DiningRoom.tsx`、`GuestBar3D.tsx`、`index.css`）先用搜尋定位，再讀幾十行，不要整檔展開。
+- 一次改多處用腳本批次處理；`npx tsc -b` 與 `npm test` 只在提交前跑一次。
+- 回報只講結果、已驗證與未驗證的部分，不重貼程式碼。
+- 對話很長時（回覆開始變慢或重複），建議推送後開新 chat，靠本檔接續。
