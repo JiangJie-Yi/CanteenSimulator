@@ -1584,12 +1584,10 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
         <group key={sd} position={[sd * (W / 2 - 0.075), H / 2 - 0.02, D / 2 - 0.1]}>
           <mesh><boxGeometry args={[0.03, H - 0.46, 0.03]} /><meshBasicMaterial color="#202226" /></mesh>
           <mesh position={[-sd * 0.0085, 0, 0.0155]}><boxGeometry args={[0.008, H - 0.5, 0.004]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
-          <mesh position={[-sd * 0.014, 0, -0.17]} rotation-y={sd * Math.PI / 2}><planeGeometry args={[0.32, H - 0.46]} />
-            <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.5} side={THREE.DoubleSide} /></mesh>
+          <mesh position={[-sd * 0.014, 0, -0.17]} rotation-y={sd * Math.PI / 2}><planeGeometry args={[0.45, H - 0.46]} />
+            <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.75} side={THREE.DoubleSide} /></mesh>
         </group>
       ))}
-      {/* the light itself comes from the cove strips: a lamp beside each, level with the middle of the cabinet, just in from the slot */}
-      {[-1, 1].map((sd) => <pointLight key={sd} position={[sd * (W / 2 - 0.16), H * 0.52, D / 2 - 0.2]} color="#f4f8ff" intensity={0.45} distance={2} decay={0.9} />)}
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
       <group position={[0, H + 0.03, D / 2 - 0.1]} rotation-x={-0.12}>
         <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
@@ -1793,18 +1791,18 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
           position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin({ kind: 'slot', r, k }, ev)}
           onPointerOver={(ev) => { if (doorOpen()) { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject) } }}
           onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null) }}>
-          <DrinkBottle id={id} />
+          <DrinkBottle id={id} lit />
         </group>
       )))}
       {/* (and a rank behind each, stood a little further back: a shelf of drinks is never one deep) */}
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
         <group key={`b${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? 0.012 : -0.012), slotAt(r, k).y, slotAt(r, k).z - 0.13]}>
-          <DrinkBottle id={id} />
+          <DrinkBottle id={id} lit />
         </group>
       )))}
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
         <group key={`c${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? -0.01 : 0.01), slotAt(r, k).y, slotAt(r, k).z - 0.26]}>
-          <DrinkBottle id={id} />
+          <DrinkBottle id={id} lit />
         </group>
       )))}
       {/* (what's been taken out, stood on the floor before the fridge) */}
@@ -1822,12 +1820,31 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
 /** how much bigger each drink stands than it's modelled, to be the size it is in a shop (a 350 ml can is 12 cm tall) */
 const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.08, sake: 1.12, oolong: 1.12, ramune: 1.3, beerCan: 1.38, highball: 1.38, coffee: 1.38, greenTea: 1.32,
   cola: 1.32, yakult: 1.12, sports: 1.32, milk: 1.3, chuhai: 1.38 }
-export function DrinkBottle({ id }: { id: DrinkId }) {
-  return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} /></group>
+/** (`lit`: standing in a fridge, in its cove lights' wash: lifted by a soft glow of its own, which can't leak out through the cabinet as a lamp's light would) */
+export function DrinkBottle({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
+  return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} lit={lit} /></group>
 }
-function DrinkBottleRaw({ id }: { id: DrinkId }) {
+/** each drink's look with a gentle glow, for those standing in a fridge */
+const LIT_LOOK = new Map<DrinkId, { glass: THREE.Material; label: THREE.Material }>()
+function litLook(id: DrinkId) {
+  let l = LIT_LOOK.get(id)
+  if (!l) {
+    const base = BOTTLE_LOOK[id]
+    const glass = base.glass.clone() as THREE.MeshToonMaterial
+    glass.emissive = glass.color.clone()
+    glass.emissiveIntensity = 0.32
+    const label = base.label.clone() as THREE.MeshToonMaterial
+    label.emissive = new THREE.Color('#ffffff')
+    label.emissiveMap = label.map
+    label.emissiveIntensity = 0.3
+    l = { glass, label }
+    LIT_LOOK.set(id, l)
+  }
+  return l
+}
+function DrinkBottleRaw({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
   const d = DRINKS.find((x) => x.id === id)!
-  const look = BOTTLE_LOOK[id]
+  const look = lit ? litLook(id) : BOTTLE_LOOK[id]
   // (turned so its label's name faces +z)
   if (d.shape === 'can' && id !== 'cola' && id !== 'greenTea') return (
     // a can: printed all over, its silver top and rim
