@@ -19,7 +19,7 @@ import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProp
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
-import { staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, KITCHEN_TOP, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -955,10 +955,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** a point in the bar's frame, in the shop's (where Roasting has the food) */
   const toShop = (v: THREE.Vector3) => v.clone().multiplyScalar(scale).add(offset ?? new THREE.Vector3())
   // (the shop laid out in full keeps its plates inside, on the cook's table by the pass: they're handed over the bar)
-  const cleanAt = (k: number) => (given ? PLATE_STACKS.clean.clone().setY(KITCHEN_TOP + k * STACK_GAP)
+  const cleanAt = (k: number) => (given ? PLATE_STACKS.clean.clone().setY(PLATE_STACK_Y + k * STACK_GAP)
     : counters[0].at.clone().addScaledVector(ALONG, -counters[0].length / 2 + 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP))
   // (in from the first counter's far end, clear of the staff's gate there)
-  const dirtyAt = (k: number) => (given ? PLATE_STACKS.dirty.clone().setY(KITCHEN_TOP + k * STACK_GAP)
+  const dirtyAt = (k: number) => (given ? PLATE_STACKS.dirty.clone().setY(PLATE_STACK_Y + k * STACK_GAP)
     : counters[0].at.clone().addScaledVector(ALONG, counters[0].length / 2 - 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP))
 
   // the plates: those out at the seats (or on their way), and the two stacks

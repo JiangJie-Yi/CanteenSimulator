@@ -24,7 +24,7 @@ import type { GuestView } from '@/game/types'
 import { DECOR, Decor, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, PLATE_STACKS, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, KITCHEN_DROP, LAY, toGrillScene, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -94,6 +94,11 @@ const PER_PLATE = 20
 const ASH_GAIN: Record<string, number> = { Ember: 45, Binchotan: 18 }
 const ASH_TINT = new THREE.Color('#d8d2c8')
 const PLATE_STEP = 1.2
+const DISH_TOP: [number, number, number] = [1.8, 0, -0.26]
+/** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
+const PLATE_TOP: [number, number, number] = [1.45, 0.02, -1.24]
+/** what lives in the cubby under the table: kept there, not carried about (it's under the top, not on it) */
+const CUBBY_KEYS = new Set(['plate-0', 'dish-0', 'rawdish'])
 /**
  * Spare plates and dishes stacked where the first of each stands, as they are in a shop: the one in use sits on top
  * of the stack, and taken off it (dragged away), it leaves the rest standing. How many under each, and how high each
@@ -297,7 +302,7 @@ const TRAY_D = 1.0
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
 /** where the seasoning box's first half starts out: beside the cook, along and across the table */
-const BOX_SPOT = { along: -0.55, lay: 0.85 }
+const BOX_SPOT = { along: -1.3, lay: 1.55 }
 /** how much bigger the fire pit (its ground, stones and coals) is drawn than modelled */
 const PIT_SCALE = 1.3
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
@@ -414,16 +419,16 @@ function Bar() {
  * a bay is cut into its front, left of the tray, and the cook stands in there, close by the fire and the seasonings,
  * in full view (no table in front of him).
  */
-const COOK_TABLE = { lay: [-2.1, 2.7], along: [-2.4 + 2 * SIDE_PULL, 3.1] }
-// (the bay's left edge kept a plank's width in from the table's drawn-in end)
-const COOK_NOTCH = { lay: 1.85, along: [Math.max(-1.75, COOK_TABLE.along[0] + 0.35), -0.4] }
+// (the fire in the middle across it, the cook's whole side open: the front face is a straight run the cook stands along, the
+// cubby for the plates cut into it under the top)
+const COOK_TABLE = { lay: [-2.1, 2.1], along: [-2.4 + 2 * SIDE_PULL, 3.1] }
 /** the cook, as big as the customers at the bar */
 const CHEF_SCALE = 1.3 * GRILL_SCALE
-/** the table as boxes (lay from–to, along from–to): all of it behind the notch, and the front either side of it */
+/** the table as boxes (lay from–to, along from–to): all of it behind the cubby, and the front either side of it */
 const COOK_TABLE_PARTS: [number, number, number, number][] = [
-  [COOK_TABLE.lay[0], COOK_NOTCH.lay, COOK_TABLE.along[0], COOK_TABLE.along[1]],
-  [COOK_NOTCH.lay, COOK_TABLE.lay[1], COOK_TABLE.along[0], COOK_NOTCH.along[0]],
-  [COOK_NOTCH.lay, COOK_TABLE.lay[1], COOK_NOTCH.along[1], COOK_TABLE.along[1]],
+  [COOK_TABLE.lay[0], CUBBY.lay[0], COOK_TABLE.along[0], COOK_TABLE.along[1]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_TABLE.along[0], CUBBY.along[0]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY.along[1], COOK_TABLE.along[1]],
 ]
 export type CrewMember = { id: string; role: Role; look: Look }
 /**
@@ -480,7 +485,7 @@ function crewPlaces(crew: CrewMember[]) {
   })
 }
 /** where the cook stands (on the floor, in the notch), and the way he faces: in at the fire */
-const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(ALONG, -1.08).setY(GRILL_OFFSET.y - KITCHEN_DROP)
+const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.62).addScaledVector(ALONG, -0.4).setY(GRILL_OFFSET.y - KITCHEN_DROP)
 const CHEF_YAW = Math.atan2(-CHEF_AT.x, -CHEF_AT.z)
 const COOK_TABLE_WOOD = (() => {
   if (!TRAY_WOOD) return null
@@ -513,7 +518,8 @@ function CookTable({ floor = true }: { floor?: boolean }) {
     <>
       {/* (set back under the top on their outer faces only: where they meet, they run into each other, no gap) */}
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]}
-        inset={i === 0 ? [0.06, -0.01, 0.06, 0.06] : i === 1 ? [-0.01, 0.06, 0.06, 0.06] : [-0.01, 0.06, 0.06, 0.06]} />)}
+        inset={i === 0 ? [0.06, -0.01, 0.06, 0.06] : i === 1 ? [-0.01, 0.06, 0.06, -0.01] : [-0.01, 0.06, -0.01, 0.06]} />)}
+      <CubbyFrame />
       <CookTableTop />
       {/* (the same boards as the customers', laid the same way; with the shop open and the room drawn, its one floor
           runs under the kitchen too) */}
@@ -547,13 +553,10 @@ function roundedShape(pts: [number, number][], radii: number[]) {
 }
 function tableTopGeometry(grow: number, thick: number) {
   const { along: [a0, a1], lay: [l0, l1] } = COOK_TABLE
-  const n = COOK_NOTCH
   const i = 0.025 - grow
-  const pts: [number, number][] = [[a0 + i, l0 + i], [a1 - i, l0 + i], [a1 - i, l1 - i], [n.along[1] + i, l1 - i],
-    [n.along[1] + i, n.lay - i], [n.along[0] - i, n.lay - i], [n.along[0] - i, l1 - i], [a0 + i, l1 - i]]
-  // (its corners rounded off, the outer ones well, the bay's inside ones a little, as a planed top would be)
-  // (the outline, grown out, keeps to the same curves: wider round the outside corners, tighter in the bay's)
-  const sh = roundedShape(pts, [0.16, 0.16, 0.16, 0.12, -0.06, -0.06, 0.12, 0.16].map((r) => Math.max(0.01, Math.abs(r) + Math.sign(r) * grow)))
+  const pts: [number, number][] = [[a0 + i, l0 + i], [a1 - i, l0 + i], [a1 - i, l1 - i], [a0 + i, l1 - i]]
+  // (its corners rounded off, as a planed top would be; the outline, grown out, keeps to the same curves)
+  const sh = roundedShape(pts, [0.16, 0.16, 0.16, 0.16].map((r) => r + grow))
   const g = new THREE.ExtrudeGeometry(sh, { depth: 0.08 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: 0.025 + grow * 0.6,
     bevelSegments: 3, curveSegments: 6 })
   g.rotateX(Math.PI / 2)
@@ -572,6 +575,30 @@ function CookTableTop() {
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
     </group>
+  )
+}
+/** a plain block of the table's body, by its extents (along, lay, and height from–to) */
+function Block({ along: a, lay: l, y: [y0, y1], color }: { along: [number, number]; lay: [number, number]; y: [number, number]; color: string }) {
+  const mid = new THREE.Vector3().addScaledVector(ALONG, (a[0] + a[1]) / 2).addScaledVector(LAY, (l[0] + l[1]) / 2)
+  return (
+    <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+      <mesh position-y={(y0 + y1) / 2}>
+        <boxGeometry args={[a[1] - a[0], y1 - y0, l[1] - l[0]]} />
+        <meshToonMaterial color={color} />
+      </mesh>
+    </group>
+  )
+}
+/** the cubby cut into the table's front: a header over it under the top, a plinth at its foot, a shelf over its right-hand part */
+function CubbyFrame() {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const front = COOK_TABLE.lay[1] - 0.06
+  return (
+    <>
+      <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[-0.3, -0.08]} color="#3a2a1e" />
+      <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color="#4a3524" />
+      <Block along={[CUBBY.shelfAlong, CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[CUBBY_SHELF_Y - CUBBY.shelfThick, CUBBY_SHELF_Y]} color="#8a6a44" />
+    </>
   )
 }
 function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [number, number]; along: [number, number]
@@ -1796,13 +1823,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const holds = (k: string) => pieces.current.some((q) => q.container === k && present(q) && !q.eaten)
 
   const plateAt = (n: number) => {
-    const [x, y, z] = roast.plate
+    // (the first plate is the one in the cubby; the rest, as more are needed, go round the fire on the table's top)
+    if (n === 0) return onSpares('plate-0', new THREE.Vector3(...roast.plate))
+    const [x, y, z] = PLATE_TOP
+    const m = n - 1
     const r0 = Math.hypot(x, z)
     const a0 = Math.atan2(z, x)
     const step = 2 * Math.asin(Math.min(1, (PLATE_STEP / 2) / r0))     // angle between neighbouring plates
     const order = [0, 1, -1, -2, -3, -4, -5]                             // in steps, from the first plate
-    const lap = Math.floor(n / order.length)
-    const a = a0 + order[n % order.length] * step + lap * step / 2
+    const lap = Math.floor(m / order.length)
+    const a = a0 + order[m % order.length] * step + lap * step / 2
     const r = r0 + lap * PLATE_STEP
     return onSpares(`plate-${n}`, new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r))
   }
@@ -1865,18 +1895,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * plate, dish, basket, the box and the bin (round footprints, pushed apart until they just touch).
    */
   const settle = (key: string, at: THREE.Vector3, stacking = false) => {
+    // (what's kept in the cubby stays where it is: it's under the top, not among what stands on it)
+    if (CUBBY_KEYS.has(key)) return at
     const r = footprint(key)
     // (what it's stacked with doesn't push it away; nor, while an empty one is carried, other empty ones it could go on)
-    const others = containerKeys().filter((k) => k !== key && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
+    const others = containerKeys().filter((k) => k !== key && !CUBBY_KEYS.has(k) && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
       .flatMap((k) => circlesOf(k, containerAt(k)))
     for (const k of Object.keys(SPARES)) {
-      const h = k !== key && spareHome(k)
+      const h = k !== key && !CUBBY_KEYS.has(k) && spareHome(k)
       if (h) others.push({ p: h, r: footprint(k) })
     }
     // the crate and the fan
     for (const d of [DECOR.crate, DECOR.fan, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
-    // the customers' plates, stacked on the table by the pass (they stand there shop open or not)
-    for (const v of [PLATE_STACKS.clean, PLATE_STACKS.dirty]) others.push({ p: toGrillScene(v).setY(0), r: 0.32 })
     // the bar behind the fire (shop open) is in the way too
     if (bar) for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)), r: 0.42 * GRILL_SCALE })
     // the soup bowls on the table are in the way too
@@ -1890,6 +1920,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const edge = COOK_TABLE.along[0] + r + 0.38 + (key === 'box' ? 0.22 : 0)
       const here = at.dot(ALONG)
       if (here < edge) at.addScaledVector(ALONG, edge - here)
+      // (nor hanging over the table's right-hand end, its back or its front)
+      const farEnd = COOK_TABLE.along[1] - r - 0.06
+      if (here > farEnd) at.addScaledVector(ALONG, farEnd - here)
+      const across = at.dot(LAY)
+      const acrossMax = COOK_TABLE.lay[1] - r - 0.06, acrossMin = COOK_TABLE.lay[0] + r + 0.06
+      if (across > acrossMax) at.addScaledVector(LAY, acrossMax - across)
+      else if (across < acrossMin) at.addScaledVector(LAY, acrossMin - across)
       const d = Math.hypot(at.x, at.z) || 1e-6
       if (d < RING_CLEAR + r) {
         at.x *= (RING_CLEAR + r) / d
@@ -1920,8 +1957,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // onigiri and mochi off the grill net go on little side dishes of their own
   const onDish = (p: Piece) => space !== 'open' && !!roast.dish && !!roast.net?.includes(p.id)
   const dishAt = (n: number) => {
-    const [x, y, z] = roast.dish!.at
-    return onSpares(`dish-${n}`, new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -n * DISH_STEP))
+    // (the first is in the cubby, on its shelf; the rest, as more are needed, in a row on the table's top)
+    const [x, y, z] = n === 0 ? roast.dish!.at : DISH_TOP
+    return onSpares(`dish-${n}`, new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -Math.max(0, n - 1) * DISH_STEP))
   }
   const [dishCount, setDishCount] = useState(1)
   // nothing on the table overlaps: every plate, dish, basket, box, bucket, bin and tray is pushed clear of the
@@ -2810,6 +2848,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         // otherwise grab a plate, side dish, the basket, the seasoning box or the bin (not the food on them)
         const picked = food ? null : pickContainer()
+        // (what's kept in the cubby stays there; the food on it is picked up all the same)
+        if (picked && CUBBY_KEYS.has(picked)) return
         if (!picked) {
           // (a click on the coals themselves puts more charcoal on)
           if (pickCoal()) {
@@ -3694,11 +3734,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {Object.entries(SPARES).map(([k, sp]) => {
         const h = spareHome(k)
         if (!h) return null
-        const base = roast.plate[1] ?? 0
+        const base = k === 'plate-0' ? roast.plate[1] ?? 0 : k === 'dish-0' ? roast.dish!.at[1] : roast.rawDish!.at[1]
         return Array.from({ length: sp.n }, (_, i) => {
           // (stacked by hand: each a little off true)
           const j = Math.sin(i * 7.3 + k.length) * 0.012
-          const at: [number, number, number] = [h.x + j, (k === 'plate-0' ? base : 0) + i * sp.step, h.z - j * 0.7]
+          const at: [number, number, number] = [h.x + j, base + i * sp.step, h.z - j * 0.7]
           return k === 'plate-0' ? <Plate key={`${k}-${i}`} container="" position={at} />
             : <SideDish key={`${k}-${i}`} container="" position={at} />
         })

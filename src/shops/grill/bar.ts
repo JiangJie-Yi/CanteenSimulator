@@ -485,12 +485,26 @@ export const GRILL_OFFSET = GRILL_PIVOT.clone().multiplyScalar(1 - GRILL_SCALE).
  * Where the customers' plates are kept (the bar's frame, on the cook's table, inside, by the pass): the clean stack
  * and the dirty one beside it, back from the bar where the customers can't reach; and the height of that table's top.
  */
+/**
+ * The cubby cut into the cook's table under its top, in its front face (the cook's side): open to the front, a low plinth
+ * at its foot and one shelf over its right-hand part. Where the plates and dishes are kept: the customers' clean and dirty
+ * stacks on its floor to the left, the cook's big plate on its floor to the right with the side dishes on the shelf over it.
+ * (along and lay in the first counter's frame, from the table's own sizes in Roasting; heights in the scene.)
+ */
+export const CUBBY = { along: [0.55, 3.0], lay: [0.95, 2.1], plinth: 0.1, shelfAlong: 1.85, shelfThick: 0.04 }
+/** the cubby's floor and shelf surfaces, in the scene: the table's top is y = 0 */
+export const CUBBY_FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP + CUBBY.plinth
+export const CUBBY_SHELF_Y = -0.76
+/** a place in the cubby (along, lay, and which tier it is on), in the scene */
+export const cubbyAt = (along: number, lay: number, tier: 'floor' | 'shelf') =>
+  new THREE.Vector3().addScaledVector(ALONG, along).addScaledVector(LAY, lay).setY(tier === 'floor' ? CUBBY_FLOOR_Y : CUBBY_SHELF_Y)
 export const PLATE_STACKS = (() => {
-  const c0 = { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35) }
-  const at = (along: number, lay: number) => c0.at.clone().addScaledVector(ALONG, along).addScaledVector(LAY, lay)
-  // (kept clear of the side counter, drawn in by SIDE_PULL)
-  return { clean: at(-1.78 + SIDE_PULL, 0.62), dirty: at(-1.4 + SIDE_PULL, 0.62) }
+  // (in the bar's own frame: where those places are, under the table's top, to the left in the cubby)
+  const at = (along: number) => cubbyAt(along, 1.5, 'floor').sub(GRILL_OFFSET).multiplyScalar(1 / GRILL_SCALE)
+  return { clean: at(0.95), dirty: at(1.4) }
 })()
+/** the height of the cubby's floor, in the bar's own frame, for the stacks of plates standing on it */
+export const PLATE_STACK_Y = (CUBBY_FLOOR_Y - GRILL_OFFSET.y) / GRILL_SCALE
 /** a point given in the bar's own sizes, where it is in the scene as drawn */
 export const toGrillScene = (v: THREE.Vector3) => v.clone().multiplyScalar(GRILL_SCALE).add(GRILL_OFFSET)
 /** the cook's table's top (the scene's y = 0), in the bar's own frame */
