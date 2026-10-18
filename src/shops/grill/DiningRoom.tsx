@@ -21,6 +21,8 @@ const INK = '#2a1a10'
 const WP = new THREE.Vector3()
 const NORMAL = new THREE.Vector3()
 const WALL_H = 2.3
+/** how thick the room's walls are, behind their face */
+const WALL_T = 0.2
 const WAINSCOT = 0.85
 
 /** a canvas texture of the given size, drawn by `draw` */
@@ -637,19 +639,60 @@ function Bottle({ x, color, label }: { x: number; color: string; label: string }
 const WC_H = 1.85
 /** a stretch of the wall (the wall's own frame: z along it, y up), plaster or the dark wainscot, the plaster's
  * pattern laid from the wall's own z so stretches side by side run on into each other */
+/** upright boards of warm brown wood, each with its own tone and grain, for the wall's foot (the wainscot) */
+const WALL_BOARDS = canvasTex(128, 128, (g) => {
+  g.fillStyle = '#6a4a2e'
+  g.fillRect(0, 0, 128, 128)
+  const tones = ['#6e4c30', '#5f4128', '#76553a', '#684830', '#6a4a2c', '#5a3e26', '#74523a', '#644530']
+  for (let i = 0; i < 8; i++) {
+    g.fillStyle = tones[i]
+    g.fillRect(i * 16 + 1, 0, 14, 128)
+    g.strokeStyle = 'rgba(30,14,4,0.35)'
+    g.lineWidth = 1
+    for (let k = 0; k < 7; k++) {
+      g.beginPath()
+      g.moveTo(i * 16 + 2 + k * 2, 0)
+      g.bezierCurveTo(i * 16 + 1 + k * 2, 40, i * 16 + 4 + k * 2, 90, i * 16 + 2 + k * 2, 128)
+      g.stroke()
+    }
+    g.strokeStyle = 'rgba(255,220,170,0.1)'
+    for (let k = 0; k < 3; k++) {
+      g.beginPath()
+      g.moveTo(i * 16 + 4 + k * 4, 0)
+      g.lineTo(i * 16 + 5 + k * 4, 128)
+      g.stroke()
+    }
+    // (a knot now and then)
+    if (i % 3 === 1) {
+      g.fillStyle = 'rgba(40,20,8,0.55)'
+      g.beginPath()
+      g.ellipse(i * 16 + 8, 30 + i * 9, 3, 5, 0, 0, Math.PI * 2)
+      g.fill()
+    }
+  }
+  g.fillStyle = 'rgba(0,0,0,0.5)'
+  for (let i = 0; i < 8; i++) g.fillRect(i * 16, 0, 1.2, 128)
+}, true)
 function WallPiece({ z0, z1, y0, y1, plaster = false }: { z0: number; z1: number; y0: number; y1: number; plaster?: boolean }) {
   const map = useMemo(() => {
-    if (!plaster || !PLASTER) return null
-    const t = PLASTER.clone()
-    t.repeat.set((z1 - z0) / 1.2, (y1 - y0) / 1.2)
-    t.offset.set(-z1 / 1.2, y0 / 1.2)
+    const src = plaster ? PLASTER : WALL_BOARDS
+    if (!src) return null
+    const t = src.clone()
+    if (plaster) {
+      t.repeat.set((z1 - z0) / 1.2, (y1 - y0) / 1.2)
+      t.offset.set(-z1 / 1.2, y0 / 1.2)
+    } else {
+      // (boards a hand's width across, running up)
+      t.repeat.set((z1 - z0) / 0.64, (y1 - y0) / 0.9)
+      t.offset.set(-z1 / 0.64, 0)
+    }
     t.needsUpdate = true
     return t
   }, [z0, z1, y0, y1, plaster])
   return (
     <mesh position={[0, (y0 + y1) / 2, (z0 + z1) / 2]} rotation-y={-Math.PI / 2} receiveShadow>
       <planeGeometry args={[z1 - z0, y1 - y0]} />
-      <meshToonMaterial color={plaster ? '#ffffff' : '#5e4029'} map={map} />
+      <meshToonMaterial color="#ffffff" map={map} />
     </mesh>
   )
 }
@@ -1222,6 +1265,12 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         {/* (all of it standing still: drawn merged, a few meshes for the whole wall) */}
         <StaticBatch key={`${from}|${to}|${door}|${shrine}|${!!altar}`}>
         {/* the plaster over the wainscot, open where the toilets' doors are (a strip between them, and over them) */}
+        {/* (the wall's thickness: a slab behind it, the base's dark wood, full height, over the toilets' doorways only above them) */}
+        {spans.map(([z0, z1, y0]) => (
+          <mesh key={`t${z0}|${y0}`} position={[WALL_T / 2, (Math.max(y0, 0) + WALL_H) / 2 - 0.0, (z0 + z1) / 2]}>
+            <boxGeometry args={[WALL_T, WALL_H - Math.max(y0, 0), z1 - z0]} /><meshToonMaterial color="#3d2414" />
+          </mesh>
+        ))}
         {spans.map(([z0, z1, y0]) => (
           <group key={`${z0}|${y0}`}>
             <WallPiece z0={z0} z1={z1} y0={Math.max(WAINSCOT, y0)} y1={WALL_H} plaster />
@@ -1612,7 +1661,17 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
           g.position.copy(host.worldToLocal(new THREE.Vector3(o.w[0], o.w[1], o.w[2])))
           g.quaternion.copy(host.getWorldQuaternion(new THREE.Quaternion()).invert())
         } else {
-          g.position.set(o.x, 0, o.z)
+          // (let go in mid-air, it falls: gravity, and a small bounce on the floor)
+          if (o.fy !== undefined) {
+            o.vy = (o.vy ?? 0) - 9.8 * Math.min(dt, 0.05)
+            o.fy += o.vy * Math.min(dt, 0.05)
+            if (o.fy <= 0) {
+              o.fy = 0
+              if (o.vy < -0.8) o.vy = -o.vy * 0.25
+              else { o.fy = undefined; o.vy = undefined }
+            }
+          }
+          g.position.set(o.x, o.fy ?? 0, o.z)
           g.quaternion.identity()
         }
       })
@@ -1697,10 +1756,20 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       } else if (!inside) {
         const x = THREE.MathUtils.clamp(px, -1.0, 1.0)
         const z = 0.5 + 0.13 * (FRIDGE_STOCK.out.filter((o) => o.unit === n).length % 3)
-        if (from.kind === 'slot') pullOut(n, [from.r, from.k], x, z)
-        else {
+        let idx = from.kind === 'out' ? from.i : -1
+        if (from.kind === 'slot') {
+          pullOut(n, [from.r, from.k], x, z)
+          idx = FRIDGE_STOCK.out.length - 1
+        } else {
           FRIDGE_STOCK.out[from.i].x = x
           FRIDGE_STOCK.ver++
+        }
+        // (let go above the floor, it drops from there)
+        const o = FRIDGE_STOCK.out[idx]
+        if (o && py > 0.03) {
+          o.fy = py
+          o.vy = 0
+          grp.position.set(o.x, py, o.z)
         }
       }
     }

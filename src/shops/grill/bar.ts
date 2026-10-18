@@ -204,7 +204,7 @@ export const fridgeUnitOf = (id: DrinkId) => Math.max(0, FRIDGE_UNITS.findIndex(
 export const FRIDGE_STOCK = {
   units: FRIDGE_UNITS.map((u) => u.shelves.map((sh) => [...sh.ids] as (DrinkId | null)[])),
   /** (x, z: out on the floor before the fridge, in its own frame; w: set down on a table, anywhere, in the scene's) */
-  out: [] as { id: DrinkId; unit: number; x: number; z: number; w?: [number, number, number] }[],
+  out: [] as { id: DrinkId; unit: number; x: number; z: number; w?: [number, number, number]; fy?: number; vy?: number }[],
   ver: 0,
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stock?: typeof FRIDGE_STOCK }).__stock = FRIDGE_STOCK
