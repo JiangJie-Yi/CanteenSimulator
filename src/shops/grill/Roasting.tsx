@@ -779,7 +779,24 @@ const COVE_GLOW = (() => {
   return new THREE.CanvasTexture(c)
 })()
 /** the foot rail along a counter's base (the counter's frame: height, how far out toward the customers, its radius) */
-const FOOT_RAIL = { y: 0.2, z: -0.3, r: 0.02 }
+const FOOT_RAIL = { y: 0.186, z: -0.3, r: 0.034 }
+/** the foot rail's log, a unit long: a round of timber a little uneven, its trunk a touch fatter at one end, the surface
+ * roughened (the same every time) */
+const LOG_GEO = (() => {
+  const g = new THREE.CylinderGeometry(FOOT_RAIL.r, FOOT_RAIL.r * 1.07, 1, 9, 14, false)
+  const p = g.attributes.position
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i)
+    const a = Math.atan2(z, x)
+    const bump = 1 + 0.07 * Math.sin(a * 3 + y * 9) + 0.05 * Math.sin(a * 5 - y * 23 + 1.3) + 0.03 * Math.sin(y * 41 + a)
+    p.setXYZ(i, x * bump, y, z * bump)
+  }
+  g.computeVertexNormals()
+  return g
+})()
+const LOG_RING = new THREE.CylinderGeometry(FOOT_RAIL.r * 1.1, FOOT_RAIL.r * 1.1, 0.026, 9)
+const LOG_END = new THREE.CircleGeometry(FOOT_RAIL.r * 1.03, 9)
+const LOG_KNOT = new THREE.SphereGeometry(0.011, 7, 5)
 /** how high the raised lip along the bar's cook's side stands over its top */
 const LIP_H = 0.15
 /** a unit slab with rounded edges (scaled to each top), its grain still running the long way */
@@ -824,8 +841,8 @@ function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Cou
         <planeGeometry args={[baseL, (BAR_TOP - 0.06) * 0.76]} />
         <meshBasicMaterial map={COVE_GLOW} transparent depthWrite={false} toneMapped={false} />
       </mesh>
-      {/* the foot rail: a brass bar along the base's front at the height of a sitting customer's soles, held out from the
-          base on brackets, so their feet rest on something */}
+      {/* the foot rail: a log of raw timber along the base's front at the height of a sitting customer's soles, held out from
+          the base on wooden brackets, so their feet rest on something */}
       {(() => {
         const x0 = -(L + 0.3) / 2 + (trim ? 0.34 : 0.1) + (gate && end < 0 ? G : 0)
         const x1 = (L + 0.3) / 2 - (butt ? 0.32 : 0.1) - (gate && end > 0 ? G : 0)
@@ -833,18 +850,30 @@ function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Cou
         const n = Math.max(2, Math.round(len / 0.9) + 1)
         return (
           <group position-x={(x0 + x1) / 2}>
-            <mesh position={[0, FOOT_RAIL.y, FOOT_RAIL.z]} rotation-z={Math.PI / 2}>
-              <cylinderGeometry args={[FOOT_RAIL.r, FOOT_RAIL.r, len, 14]} />
-              <meshToonMaterial color="#d4b04a" />
+            <mesh geometry={LOG_GEO} position={[0, FOOT_RAIL.y, FOOT_RAIL.z]} rotation-z={Math.PI / 2} scale={[1, len, 1]}>
+              <meshToonMaterial color="#7a5434" />
             </mesh>
-            <mesh position={[0, FOOT_RAIL.y, FOOT_RAIL.z]} rotation-z={Math.PI / 2} scale={[1.18, 1, 1.18]}>
-              <cylinderGeometry args={[FOOT_RAIL.r, FOOT_RAIL.r, len + 0.012, 14]} />
-              <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+            <mesh geometry={LOG_GEO} position={[0, FOOT_RAIL.y, FOOT_RAIL.z]} rotation-z={Math.PI / 2} scale={[1.16, len + 0.012, 1.16]}>
+              <meshBasicMaterial color="#2a1a10" side={THREE.BackSide} />
             </mesh>
+            {/* (the bark's rings and a few knots along it, and the cut ends showing the pale wood) */}
+            {Array.from({ length: Math.max(1, Math.round(len / 0.55)) }, (_, k) => (
+              <mesh key={`r${k}`} geometry={LOG_RING} position={[-len / 2 + (len * (k + 0.5)) / Math.max(1, Math.round(len / 0.55)), FOOT_RAIL.y, FOOT_RAIL.z]}
+                rotation-z={Math.PI / 2} rotation-y={k}><meshToonMaterial color="#4a3220" /></mesh>
+            ))}
+            {Array.from({ length: Math.max(1, Math.round(len / 0.9)) }, (_, k) => (
+              <mesh key={`k${k}`} geometry={LOG_KNOT} position={[-len / 2 + (len * (k + 0.3 + (k % 2) * 0.35)) / Math.max(1, Math.round(len / 0.9)),
+                FOOT_RAIL.y + 0.012 + (k % 2) * 0.006, FOOT_RAIL.z - 0.026 - (k % 3) * 0.003]}><meshToonMaterial color="#9a6c44" /></mesh>
+            ))}
+            {[-1, 1].map((sd) => (
+              <mesh key={`e${sd}`} geometry={LOG_END} position={[sd * (len / 2 + 0.002), FOOT_RAIL.y, FOOT_RAIL.z]} rotation-y={sd * Math.PI / 2}>
+                <meshToonMaterial color="#d8b078" />
+              </mesh>
+            ))}
             {Array.from({ length: n }, (_, k) => (
               <mesh key={k} position={[-len / 2 + (len * k) / (n - 1), FOOT_RAIL.y, (FOOT_RAIL.z - 0.12) / 2]}>
-                <boxGeometry args={[0.03, 0.03, Math.abs(FOOT_RAIL.z + 0.12)]} />
-                <meshToonMaterial color="#b89040" />
+                <boxGeometry args={[0.035, 0.035, Math.abs(FOOT_RAIL.z + 0.12)]} />
+                <meshToonMaterial color="#4a3220" />
               </mesh>
             ))}
           </group>

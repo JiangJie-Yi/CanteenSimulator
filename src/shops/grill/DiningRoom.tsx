@@ -147,6 +147,89 @@ type ArtKey = keyof typeof ART
 const PRINTS: ArtKey[] = ['fuji', 'wave', 'koi']
 const SCROLLS: ArtKey[] = ['calligraphy', 'plum']
 
+/**
+ * Nobori (幟), the tall narrow banners a yakitori or grill shop hangs: a cloth of red, indigo or white with the shop's
+ * word down it in big letters (a stripe along its edge, stitching), laced by loops to a bamboo rod, the foot weighted;
+ * it stirs a little in the air.
+ */
+const NOBORI_LOOKS = [
+  { text: '炭火燒烤', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2' },
+  { text: '日式烤魚', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0' },
+  { text: '生ビール', cloth: '#f4efe2', ink: '#b8261c', edge: '#b8261c' },
+  { text: '銘酒', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2' },
+  { text: '深夜食堂', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0' },
+  { text: '飲料', cloth: '#f4efe2', ink: '#1f3a68', edge: '#1f3a68' },
+]
+const NOBORI_W = 0.3
+const NOBORI_H = 0.92
+const noboriCache = new Map<number, THREE.Texture | null>()
+const noboriTex = (i: number) => {
+  if (!noboriCache.has(i)) {
+    const look = NOBORI_LOOKS[i]
+    noboriCache.set(i, signTexture(96, 296, (g) => {
+      g.fillStyle = look.cloth
+      g.fillRect(0, 0, 96, 296)
+      // (the weave, and a border stitched down each side)
+      g.strokeStyle = 'rgba(0,0,0,0.06)'
+      for (let y = 0; y < 296; y += 3) {
+        g.beginPath()
+        g.moveTo(0, y)
+        g.lineTo(96, y)
+        g.stroke()
+      }
+      g.fillStyle = look.edge
+      g.fillRect(5, 0, 3, 296)
+      g.fillRect(88, 0, 3, 296)
+      g.setLineDash([6, 5])
+      g.strokeStyle = look.edge
+      g.lineWidth = 1.4
+      g.strokeRect(12, 4, 72, 288)
+      g.setLineDash([])
+      // (the word, a letter to a line, big and bold, in the sign font)
+      const chars = [...look.text]
+      const size = chars.length > 3 ? 46 : 56
+      const gap = Math.min(size * 1.08, 268 / chars.length)
+      chars.forEach((ch, k) => brushText(g, ch, 48, 148 - ((chars.length - 1) * gap) / 2 + k * gap, size,
+        { fill: look.ink, shadow: 'rgba(0,0,0,0.22)' }))
+    }))
+  }
+  return noboriCache.get(i) ?? null
+}
+const NOBORI_GEO = {
+  rod: new THREE.CylinderGeometry(0.007, 0.007, NOBORI_W + 0.08, 8),
+  cap: new THREE.SphereGeometry(0.011, 8, 6),
+  loop: new THREE.BoxGeometry(0.004, 0.05, 0.02),
+  weight: new THREE.CylinderGeometry(0.006, 0.006, NOBORI_W + 0.03, 6),
+}
+function Nobori({ i }: { i: number }) {
+  const cloth = useRef<THREE.Group>(null)
+  const seed = useMemo(() => i * 1.7 + 0.5, [i])
+  useFrame(({ clock }) => {
+    // (a slow sway from the rod, and a ripple's worth of lean)
+    const t = clock.elapsedTime
+    if (cloth.current) {
+      cloth.current.rotation.z = Math.sin(t * 0.8 + seed) * 0.035
+      cloth.current.rotation.y = Math.sin(t * 0.6 + seed * 2) * 0.03
+    }
+  })
+  return (
+    <group position-y={NOBORI_H / 2 - 0.05}>
+      {/* the rod and its knobs, over the cloth's top */}
+      <mesh geometry={NOBORI_GEO.rod} position={[-0.01, NOBORI_H / 2 + 0.03, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#6a4a2a" /></mesh>
+      {[-1, 1].map((s) => <mesh key={s} geometry={NOBORI_GEO.cap} position={[-0.01, NOBORI_H / 2 + 0.03, s * (NOBORI_W + 0.08) / 2]}><meshToonMaterial color="#3a2a1a" /></mesh>)}
+      <group ref={cloth} position={[-0.012, NOBORI_H / 2 + 0.03, 0]}>
+        {/* (the loops it hangs by, the cloth below them) */}
+        {[-0.11, 0, 0.11].map((z) => <mesh key={z} geometry={NOBORI_GEO.loop} position={[0, -0.02, z]}><meshToonMaterial color="#e8dcc0" /></mesh>)}
+        <mesh position={[-0.004, -NOBORI_H / 2 - 0.04, 0]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[NOBORI_W, NOBORI_H]} />
+          <meshToonMaterial color="#ffffff" map={noboriTex(i)} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh geometry={NOBORI_GEO.weight} position={[-0.006, -NOBORI_H - 0.04, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#2a1a10" /></mesh>
+      </group>
+    </group>
+  )
+}
+
 /** a print behind glass in a thin dark frame */
 function Framed({ art }: { art: ArtKey }) {
   const W = 0.5, H = 0.36
@@ -714,7 +797,9 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
     }
     return spots.filter((z) => (!shelf || Math.abs(z - shelfZ) > 0.85) && isClear(z, 0.3) && (door === undefined || Math.abs(z - door) > 0.95)
       && (shrine === undefined || Math.abs(z - shrine) > 0.75) && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
-      .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length] }))
+      .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length],
+        // (a banner every third place along the wall, in turn)
+        nobori: k % 3 === 2 ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined }))
   }, [l, from, to, mid, shelfZ, c.length, door, shrine, shelf, clear])
   const frieze = useMemo(() => {
     if (!SEIGAIHA) return null
@@ -760,7 +845,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         <Box size={[0.03, 0.025, l]} color="#3a2416" position={[-0.01, WALL_H - 0.31, mid]} />
         {art.map((a) => (
           <group key={a.z} position={[0, a.scroll ? 1.42 : 1.5, a.z]}>
-            {a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
+            {a.nobori !== undefined ? null : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
           </group>
         ))}
         {/* the toilets, the men's and the women's, side by side */}
@@ -793,6 +878,8 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         </group>
           </>}
         </StaticBatch>
+        {/* (the banners sway: not merged) */}
+        {art.filter((a) => a.nobori !== undefined).map((a) => <group key={`n${a.z}`} position={[0, 1.08, a.z]}><Nobori i={a.nobori!} /></group>)}
         {/* (the toilets' doors slide: not merged) */}
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
           <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group>
