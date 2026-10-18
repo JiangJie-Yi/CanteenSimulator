@@ -149,7 +149,7 @@ export function fridgesOf(cs: Counter[]) {
   })
 }
 /** the fridge's size: across, up, deep */
-export const FRIDGE = { W: 0.86, H: 2.17, D: 0.6 }
+export const FRIDGE = { W: 0.86, H: 2.17, D: 0.75 }
 /** each fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
 export const FRIDGE_STATE = [{ passing: 0, open: false }, { passing: 0, open: false }]
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridge?: typeof FRIDGE_STATE }).__fridge = FRIDGE_STATE
@@ -452,7 +452,7 @@ export const singleCounter = (at: THREE.Vector3, length: number): Counter[] => [
  * looking in across the fire from the left. The door is past the right end of the first.
  */
 /** how far the side counter, its stools and its aisle are pulled in from the wall (bar units) */
-export const SIDE_PULL = 0.15
+export const SIDE_PULL = 0.3
 export const GRILL_COUNTERS: Counter[] = [
   { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35), along: ALONG, lay: LAY, length: 5.2, seats: 6 },
   // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)

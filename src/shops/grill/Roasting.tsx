@@ -413,7 +413,8 @@ function Bar() {
  * in full view (no table in front of him).
  */
 const COOK_TABLE = { lay: [-2.1, 2.7], along: [-2.4 + 2 * SIDE_PULL, 3.1] }
-const COOK_NOTCH = { lay: 1.85, along: [-1.75, -0.4] }
+// (the bay's left edge kept a plank's width in from the table's drawn-in end)
+const COOK_NOTCH = { lay: 1.85, along: [Math.max(-1.75, COOK_TABLE.along[0] + 0.35), -0.4] }
 /** the cook, as big as the customers at the bar */
 const CHEF_SCALE = 1.3 * GRILL_SCALE
 /** the table as boxes (lay from–to, along from–to): all of it behind the notch, and the front either side of it */

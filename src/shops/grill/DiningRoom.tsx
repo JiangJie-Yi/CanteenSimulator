@@ -1488,9 +1488,8 @@ function useFreezer(n: number) {
     } else body.add(root)
     // (stood in the shop: scaled, its middle at the origin, its base on the floor)
     const place = new THREE.Group()
-    // (a shallower cabinet than modelled, so its doors have room: the depth scaled to 0.8)
-    place.scale.set(FREEZER.scale, FREEZER.scale, FREEZER.scale * 0.8)
-    place.position.set(-FREEZER.cx * FREEZER.scale, -FREEZER.base * FREEZER.scale, -FREEZER.cz * FREEZER.scale * 0.8)
+    place.scale.setScalar(FREEZER.scale)
+    place.position.set(-FREEZER.cx * FREEZER.scale, -FREEZER.base * FREEZER.scale, -FREEZER.cz * FREEZER.scale)
     place.add(body)
     // (the door's pivot stands in its own copy of the same placing, so the door sits on the cabinet when it's shut)
     const doorRoot = new THREE.Group()
@@ -1571,7 +1570,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
   const objs = useRef(new Map<string, THREE.Group>())
   const dragKey = useRef<string | null>(null)
   const shelves = FRIDGE_UNITS[n].shelves
-  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.1)
+  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.16)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
   useFrame((_, dt) => {
     if (seen.current !== FRIDGE_STOCK.ver) {
@@ -1697,12 +1696,12 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       )))}
       {/* (and a rank behind each, stood a little further back: a shelf of drinks is never one deep) */}
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
-        <group key={`b${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? 0.012 : -0.012), slotAt(r, k).y, slotAt(r, k).z - 0.1]}>
+        <group key={`b${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? 0.012 : -0.012), slotAt(r, k).y, slotAt(r, k).z - 0.13]}>
           <DrinkBottle id={id} />
         </group>
       )))}
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
-        <group key={`c${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? -0.01 : 0.01), slotAt(r, k).y, slotAt(r, k).z - 0.2]}>
+        <group key={`c${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? -0.01 : 0.01), slotAt(r, k).y, slotAt(r, k).z - 0.26]}>
           <DrinkBottle id={id} />
         </group>
       )))}
