@@ -1502,15 +1502,24 @@ function useFreezer(n: number) {
   }, [gltf, n])
 }
 export function DrinkFridge({ n = 0 }: { n?: number }) {
-  const { W, H } = FRIDGE
+  const { W, H, D } = FRIDGE
   const { body } = useFreezer(n)
   return (
     <group>
       <primitive object={body} />
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
-      <group position={[0, H + 0.03, 0.03]} rotation-x={-0.12}>
+      <group position={[0, H + 0.03, D / 2 - 0.1]} rotation-x={-0.12}>
         <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
         <mesh position={[0, 0.1, 0.0115]}><planeGeometry args={[W * 0.86, 0.17]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGNS[n]} toneMapped={false} /></mesh>
+        {/* (a strip of light round the sign's edge: little bulbs in a row, warm white, and a glowing bar along its foot) */}
+        {Array.from({ length: 13 }, (_, k) => (
+          <mesh key={`t${k}`} position={[-W * 0.43 + (k * W * 0.86) / 12, 0.205, 0.012]}><sphereGeometry args={[0.009, 8, 6]} /><meshBasicMaterial color={k % 2 ? '#ffe9a8' : '#fff6d8'} toneMapped={false} /></mesh>
+        ))}
+        {[-1, 1].map((sd) => Array.from({ length: 4 }, (_, k) => (
+          <mesh key={`s${sd}${k}`} position={[sd * W * 0.45, 0.04 + k * 0.045, 0.012]}><sphereGeometry args={[0.009, 8, 6]} /><meshBasicMaterial color="#ffe9a8" toneMapped={false} /></mesh>
+        )))}
+        <mesh position={[0, -0.012, 0.02]}><boxGeometry args={[W * 0.86, 0.012, 0.012]} /><meshBasicMaterial color={n ? '#9ad0ff' : '#ff9a8a'} toneMapped={false} /></mesh>
+        <sprite position={[0, 0.1, 0.1]} scale={[W * 1.1, 0.4, 1]}><spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.22} /></sprite>
       </group>
     </group>
   )
