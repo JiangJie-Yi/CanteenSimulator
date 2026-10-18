@@ -1164,6 +1164,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (fridges) for (const fr of fridges) {
       FRIDGE_STATE[fr.n].passing = shown.filter((x) => x.wc?.who === 'drink' && (x.wc.unit ?? 0) === fr.n && (x.phase === 'wcIn'
         || ((x.phase === 'wcGo' || x.phase === 'wcBack') && (groups.current.get(x.id)?.position.distanceTo(fr.front) ?? 9) < 0.7))).length
+      // (a door left open by hand shuts as soon as anyone else has to go by it: the door swings out over the way, so nobody
+      // walks through it)
+      if (FRIDGE_STATE[fr.n].open && !FRIDGE_STATE[fr.n].passing) {
+        const near = (v: THREE.Vector3 | undefined) => !!v && v.distanceTo(fr.front) < 1.5
+        const byCustomer = shown.some((x) => x.phase !== 'sit' && near(groups.current.get(x.id)?.position))
+        const byServer = waiterObjs.current.some((o) => near(o?.position))
+        if (byCustomer || byServer) FRIDGE_STATE[fr.n].open = false
+      }
     }
     // the toilets' doors open for whoever's going through them just now
     if (wcs) for (const who of ['m', 'f'] as const) {
