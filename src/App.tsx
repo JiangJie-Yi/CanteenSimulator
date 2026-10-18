@@ -1,5 +1,6 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { IndoorHDRI } from '@/scene/IndoorHDRI'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -463,6 +464,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
     <>
       <directionalLight position={[3, 5, 2]} intensity={look.sunIntensity} color={look.sun} />
       <hemisphereLight args={[look.sky, look.ground, look.hemi]} />
+      <IndoorHDRI intensity={0.25 + look.hemi * 0.5} />
       <spotLight
         ref={spot}
         position={SPOT_POSITION}
