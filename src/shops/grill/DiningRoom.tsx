@@ -1589,7 +1589,7 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
         </group>
       ))}
       {/* the light itself comes from the cove strips: a lamp beside each, level with the middle of the cabinet, just in from the slot */}
-      {[-1, 1].map((sd) => <pointLight key={sd} position={[sd * (W / 2 - 0.16), H * 0.52, D / 2 - 0.2]} color="#ffffff" intensity={1.1} distance={1.6} decay={1.5} />)}
+      {[-1, 1].map((sd) => <pointLight key={sd} position={[sd * (W / 2 - 0.16), H * 0.52, D / 2 - 0.2]} color="#f4f8ff" intensity={0.6} distance={2.2} decay={0.8} />)}
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
       <group position={[0, H + 0.03, D / 2 - 0.1]} rotation-x={-0.12}>
         <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
