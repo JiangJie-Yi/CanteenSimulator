@@ -352,7 +352,7 @@ export function kitchenGatesOf(cs: Counter[]) {
     const g1 = gateOf(c1, BAR_GATES[1])
     const at = (s: number) => c1.at.clone().addScaledVector(c1.along, s).sub(c0.at).dot(c0.lay)
     // (the steps reach a good way further in than the door, along the counter, to fill the well beside it)
-    side = [at(g1.hinge - BAR_GATES[1].end * SIDE_STEP_EXTRA), at(g1.hinge + BAR_GATES[1].end * BAR_GATES[1].w)].sort((p, q) => p - q) as [number, number]
+    side = [at(g1.hinge), at(g1.hinge + BAR_GATES[1].end * (BAR_GATES[1].w + SIDE_STEP_EXTRA))].sort((p, q) => p - q) as [number, number]
   }
   return { first: a, side }
 }
