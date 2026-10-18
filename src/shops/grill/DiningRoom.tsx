@@ -1509,8 +1509,15 @@ function useFreezer(n: number) {
       let t = toon.get(m)
       if (!t) {
         const src = m as THREE.MeshStandardMaterial
-        t = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ?? null, transparent: src.transparent,
-          opacity: src.opacity, side: src.transparent ? THREE.DoubleSide : THREE.FrontSide, depthWrite: !src.transparent })
+        // (the glass clearer than the model has it, so the drinks show; the sign's light box keeps the model's own glow, brightened)
+        const toonMat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ?? null, transparent: src.transparent,
+          opacity: src.transparent ? src.opacity * 0.4 : src.opacity, side: src.transparent ? THREE.DoubleSide : THREE.FrontSide, depthWrite: !src.transparent })
+        if (src.emissiveMap) {
+          toonMat.emissive = new THREE.Color('#ffffff')
+          toonMat.emissiveMap = src.emissiveMap
+          toonMat.emissiveIntensity = 1.5
+        }
+        t = toonMat
         toon.set(m, t)
       }
       return t
