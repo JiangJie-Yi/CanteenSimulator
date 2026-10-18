@@ -310,7 +310,7 @@ const TRAY_D = 1.0
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
 /** where the seasoning box's first half starts out: beside the cook, along and across the table */
-const BOX_SPOT = { along: 0.0, lay: 1.7 }
+const BOX_SPOT = { along: 0.7, lay: 1.7 }
 /** how much bigger the fire pit (its ground, stones and coals) is drawn than modelled */
 const PIT_SCALE = 1.3
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
@@ -2004,7 +2004,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (let pass = 0; pass < 3; pass++) {
       for (const key of containerKeys()) {
         // (a stack stays where it was put; what's kept in the cubby under the table stays there till it's taken out)
-        if (stackOn.current.has(key) || CUBBY_KEYS.has(key) || key === 'bin') continue
+        if (stackOn.current.has(key) || CUBBY_KEYS.has(key) || key === 'bin' || key === 'tray' || outsideTable(containerAt(key), footprint(key))) continue
         const at = containerAt(key)
         const ok = settle(key, at.clone())
         const shift = ok.sub(at)
@@ -2649,6 +2649,26 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return out
   }, [root, roast.toolBox, roast.bucket, roast.tools])
   useLayoutEffect(() => {
+    // (the seasoning box turned right round, about its own middle: its pots and spoons swung with it)
+    const bx = root.getObjectByName('SeasoningBox')
+    if (bx && !bx.userData.turned) {
+      bx.userData.turned = true
+      const n = nudge('box')
+      const c = (carriers.box?.[0]?.home ?? bx.position).clone()
+      const flip = (v: THREE.Vector3) => new THREE.Vector3(2 * c.x - v.x, v.y, 2 * c.z - v.z)
+      for (const k of carriers.box ?? []) {
+        k.home.copy(flip(k.home))
+        k.node.position.copy(k.home).add(n)
+        k.node.rotation.y += Math.PI
+      }
+      for (const t of tools) if (carrierOf(t.node.name) === 'box') {
+        t.home0.copy(flip(t.home0))
+        t.home.copy(t.home0).add(n)
+        if (t.back >= 1) t.node.position.copy(t.home)
+      }
+    }
+  }, [root, carriers, tools])
+  useLayoutEffect(() => {
     // (the water bucket and its dipper, drawn bigger: scaled about the bucket's own place)
     const b = root.getObjectByName('WaterBucket'), d = root.getObjectByName('WaterDipper')
     if (b && !b.userData.scaled) {
@@ -3056,9 +3076,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       want.y = base.y
       // (a plate or dish carried past the table's edge goes where it's taken, off the table; let go there, it falls to the floor below)
       const out = outsideTable(want, footprint(s.key))
-      const next = out && STACKABLE(s.key) ? want.clone().sub(base) : settle(s.key, want, STACKABLE(s.key) && !holds(s.key)).sub(base)
+      const next = out ? want.clone().sub(base) : settle(s.key, want, STACKABLE(s.key) && !holds(s.key)).sub(base)
       next.y = 0
-      carriedOut.current = out && STACKABLE(s.key)
+      carriedOut.current = out
       if (carriedOut.current) next.y = LIFT - base.y
       // (taken out of the cubby, it comes up onto the table's top)
       if (!carriedOut.current && CUBBY_KEYS.has(s.key)) next.y = (s.key === 'plate-0' ? PLATE_TOP[1] : s.key === 'trash' || s.key === 'basket-0' ? 0 : DISH_TOP[1]) - base.y
@@ -3079,7 +3099,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const release = () => {
       const s = shift.current
-      if (s && STACKABLE(s.key) && carriedOut.current) {
+      if (s && carriedOut.current) {
         // (let go off the table: it falls under gravity to the floor, a small bounce, and lies there)
         const key = s.key
         const n0 = nudge(key).clone()
@@ -3100,6 +3120,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           const cur = nudge(key).clone()
           cur.y = y
           moved.current.set(key, cur)
+          // (the box carries its pots and utensils down with it, the bucket its dipper)
+          for (const b of carriers[key] ?? []) b.node.position.copy(b.home).add(cur)
+          for (const t of tools) {
+            if (carrierOf(t.node.name) !== key) continue
+            t.home.copy(t.home0).add(cur)
+            if (t.back >= 1) t.node.position.copy(t.home)
+          }
           setMoveTick((t) => t + 1)
           if (vy !== 0 || y > floorN) requestAnimationFrame(fall)
         }
