@@ -1490,7 +1490,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   // (the shrine's front, in the altar's frame: its doors' plane, and the roof's)
   const SC = 1.25
   const flask = (z: number, key: string) => (
-    <group key={key} position={[-0.2, 0, z]} onClick={offer} {...(incense ? handOver : {})}>
+    <group key={key} position={[-0.2, 0, z]}>
       <mesh geometry={ALTAR_GEO.tokkuri} castShadow><meshToonMaterial color="#f6f4ee" /></mesh>
       <mesh geometry={ALTAR_GEO.tokkuri} scale={1.03}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
       {/* (a red cord round the neck with its knot, a paper shide hanging from it, a small label on the belly) */}
@@ -1510,10 +1510,10 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         <pointsMaterial ref={moteMat} map={GLOW} color="#ffe0a0" size={0.07} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </points>
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
-          sake's poured into: click any of them (or the shrine) to make the offering */}
+          sake's poured into: only the shrine itself is clicked, to make the offering */}
       {flask(-0.22, 'fl')}
       {flask(0.22, 'fr')}
-      <group position={[-0.24, 0, -0.1]} onClick={offer} {...(incense ? handOver : {})}>
+      <group position={[-0.24, 0, -0.1]}>
         <mesh geometry={ALTAR_GEO.cup} position-y={0.008}><meshToonMaterial color="#f6f4ee" /></mesh>
         <mesh geometry={ALTAR_GEO.cup} position-y={0.008} scale={1.06}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
         <mesh ref={sake} geometry={ALTAR_GEO.sake} position-y={0.0175} rotation-x={-Math.PI / 2} visible={false}>
