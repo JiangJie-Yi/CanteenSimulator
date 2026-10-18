@@ -613,6 +613,22 @@ function Box({ size, color, ...rest }: { size: [number, number, number]; color: 
     </mesh>
   )
 }
+/** fine cypress grain for the small shrine's boards: pale, streaked, a little warm (tinted by each board's colour) */
+const SHRINE_GRAIN = canvasTex(128, 128, (g) => {
+  g.fillStyle = '#f2eee6'
+  g.fillRect(0, 0, 128, 128)
+  for (let i = 0; i < 46; i++) {
+    const x = (i * 2.9 + (i % 4) * 0.7) % 128
+    g.strokeStyle = i % 3 ? 'rgba(120,90,50,0.22)' : 'rgba(255,255,255,0.35)'
+    g.lineWidth = 0.8 + (i % 3) * 0.4
+    g.beginPath()
+    g.moveTo(x, 0)
+    g.bezierCurveTo(x + 3 * Math.sin(i), 40, x - 3 * Math.cos(i), 90, x + 1, 128)
+    g.stroke()
+  }
+  g.fillStyle = 'rgba(100,70,40,0.4)'
+  g.beginPath(); g.ellipse(40, 44, 3, 7, 0, 0, Math.PI * 2); g.fill()
+}, true)
 /** a box with the shop's ink line round it (its back faces, a hair bigger), for the small shrine */
 function InkBox({ size, color, position, ...rest }: { size: [number, number, number]; color: string; position?: [number, number, number]; 'position-y'?: number; 'rotation-x'?: number }) {
   const e = 0.0035
@@ -620,7 +636,7 @@ function InkBox({ size, color, position, ...rest }: { size: [number, number, num
   const at = position ?? [0, rest['position-y'] ?? 0, 0]
   return (
     <group position={at} rotation-x={rest['rotation-x'] ?? 0}>
-      <mesh><boxGeometry args={size} /><meshToonMaterial color={color} /></mesh>
+      <mesh><boxGeometry args={size} /><meshToonMaterial color={color} map={SHRINE_GRAIN} /></mesh>
       <mesh scale={sc}><boxGeometry args={size} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
     </group>
   )
@@ -2263,12 +2279,12 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   }, [fr, c1])
   return (
     <StaticBatch key={lang}>
-      <group position={at(3.7, 3.55)} rotation-y={face + 0.3}>
+      <group position={at(3.85, 3.55)} rotation-y={face + 0.3}>
         <group rotation-y={Math.PI / 2}><SakeStack /></group>
       </group>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
-      <group position={at(3.8, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
+      <group position={at(3.9, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
       <group position={cornerAt} rotation-y={0.4}><PottedBamboo /></group>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}

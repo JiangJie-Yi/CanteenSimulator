@@ -347,13 +347,14 @@ const STAVES = (() => {
   return t
 })()
 const RICE_GEO = {
-  tub: new THREE.CylinderGeometry(0.27, 0.255, 0.42, 32, 1, false),
+  tub: new THREE.CylinderGeometry(0.27, 0.255, 0.42, 32, 1, true),
   lidTop: new THREE.CylinderGeometry(0.255, 0.285, 0.035, 32),
   ear: new THREE.BoxGeometry(0.1, 0.12, 0.05),
   band: new THREE.TorusGeometry(0.268, 0.01, 6, 40),
   floor: new THREE.CircleGeometry(0.25, 28),
   hoop: new THREE.TorusGeometry(0.272, 0.012, 6, 32),
   rice: new THREE.SphereGeometry(0.255, 24, 10, 0, Math.PI * 2, 0, Math.PI * 0.32),
+  cylRice: new THREE.CylinderGeometry(0.255, 0.245, 0.39, 28, 1, false),
   lid: new THREE.CylinderGeometry(0.29, 0.29, 0.03, 28),
   paddle: new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6),
   blade: new THREE.SphereGeometry(0.06, 12, 8),
@@ -412,6 +413,9 @@ function RiceTub() {
         {/* the tub: pale staves, an ear at each side to lift it by, a band of woven cane round the lower body, and its lid (a bar across
             the top) */}
         <Inked geometry={g.tub} color="#ffffff" map={STAVES} position={[0, 0.21, 0]} grow={1.03} />
+        {/* (hollow: its inside wall and floor, so the rice fills it rather than lying on a lid) */}
+        <mesh geometry={g.tub} position-y={0.21} scale={0.985}><meshToonMaterial color="#b88f58" side={THREE.BackSide} /></mesh>
+        <mesh geometry={g.floor} position-y={0.012} rotation-x={-Math.PI / 2}><meshToonMaterial color="#b88f58" /></mesh>
         <group ref={lid} position={[0, 0.4375, 0]}>
           <Inked geometry={g.lidTop} color="#ffffff" map={STAVES} grow={1.05} />
           <mesh geometry={g.slab} position={[0, 0.0375, 0]} scale={[0.22, 0.03, 0.05]} castShadow><meshToonMaterial color="#e0a868" /></mesh>
@@ -430,7 +434,10 @@ function RiceTub() {
         {open && (
           <>
             {/* the rice, heaped a little over the rim, the paddle stood in it */}
-            <mesh geometry={g.rice} position-y={0.42} scale={[1, 0.55, 1]}>
+            <mesh geometry={g.cylRice} position-y={0.205} >
+              <meshToonMaterial color="#fbf8f0" />
+            </mesh>
+            <mesh geometry={g.rice} position-y={0.4} scale={[1.02, 0.5, 1.02]}>
               <meshToonMaterial color="#fbf8f0" />
             </mesh>
             <group position={[0.08, 0.57, -0.04]} rotation={[0.25, 0, -0.35]}>
