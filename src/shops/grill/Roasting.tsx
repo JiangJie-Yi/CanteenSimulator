@@ -334,9 +334,13 @@ function scorchEarth(mesh: THREE.Mesh) {
       // (past the salt, the earth goes darker and redder-brown toward the rim, the way fired ground does)
       const k = Math.min(1, Math.max(0, (r - 0.5) / 0.35))
       const i = (y * c.width + x) * 4
-      px.data[i] *= 1 - 0.55 * k
-      px.data[i + 1] *= 1 - 0.65 * k
-      px.data[i + 2] *= 1 - 0.7 * k
+      // (multiplied in, as a stain: the earth darkened by its own colour, and only partly opaque, fading out at the rim; the salt inside, r < 0.5, untouched)
+      const mul = 1 - k
+      px.data[i] = px.data[i] * (mul + k * (px.data[i] / 255) * 0.75)
+      px.data[i + 1] = px.data[i + 1] * (mul + k * (px.data[i + 1] / 255) * 0.65)
+      px.data[i + 2] = px.data[i + 2] * (mul + k * (px.data[i + 2] / 255) * 0.6)
+      const edge = Math.min(1, Math.max(0, (r - 0.62) / 0.36))
+      px.data[i + 3] *= r < 0.5 ? 1 : (1 - 0.3 * k) * (1 - edge * edge * (3 - 2 * edge))
     }
   }
   g.putImageData(px, 0, 0)
@@ -345,6 +349,7 @@ function scorchEarth(mesh: THREE.Mesh) {
   t.colorSpace = mat.map!.colorSpace
   t.anisotropy = mat.map!.anisotropy
   mat.map = t
+  mat.transparent = true
   mat.needsUpdate = true
 }
 /** how much higher the pit (its stones, coals and net) stands than it was modelled, with the flames and smoke over it */
@@ -3399,6 +3404,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // glowing charcoal: mostly black at a low fire, more and more of it red-hot as the fire builds; as the fire
   // burns down the coals are used up and slowly turn to pale grey ash (fresh charcoal brings the black back)
   const embers = useRef<{ mat: THREE.MeshToonMaterial; base: number; color: THREE.Color }[] | null>(null)
+  const fuel = useRef(0.55)
 
   useFrame((_, delta) => {
     if (!embers.current || !embers.current.length) {
@@ -3411,8 +3417,20 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       })
       embers.current = [...found].map(([mat, base]) => ({ mat, base, color: mat.color.clone() }))
     }
-    const f = fire?.current ?? 0.55
+    const target = fire?.current ?? 0.55
+    // (the coals' own state eases toward the fire: charcoal added swells up and kindles over a moment, the pile shrinks back slowly as it burns)
+    const ease = target > fuel.current ? 2.2 : 0.35
+    fuel.current += (target - fuel.current) * Math.min(1, delta * ease)
+    const f = fuel.current
     const ash = THREE.MathUtils.smoothstep(0.5 - f, 0, 0.45)
+    // (no fire: only a few lumps of grey ash and slag; charcoal is what swells the heap, kindles and glows)
+    const heap = 0.28 + 0.72 * THREE.MathUtils.smoothstep(f, 0.0, 0.3)
+    for (const nm of ['Charcoal', 'BinchotanHeap']) {
+      const o = root.getObjectByName(nm)
+      if (!o) continue
+      const b = (o.userData.heapBase ??= o.scale.clone()) as THREE.Vector3
+      o.scale.set(b.x * heap, b.y * (0.25 + 0.75 * heap), b.z * heap)
+    }
 
     for (const e of embers.current) {
       // no fire, no glow

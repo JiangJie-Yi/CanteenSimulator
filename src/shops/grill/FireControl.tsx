@@ -11,6 +11,7 @@ type FireControlProps = {
 
 function fireWord(level: number, lang: Lang) {
   const w = UI[lang].fireWords
+  if (level < 1) return w[4] ?? w[0]
   if (level < 8) return w[0]
   if (level < 35) return w[1]
   if (level < 70) return w[2]
