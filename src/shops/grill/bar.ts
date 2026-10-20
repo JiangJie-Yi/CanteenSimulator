@@ -74,7 +74,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * base and top is, and how wide the swing door across it (the first counter's reaches on to the till, which stands
  * against its end)
  */
-export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.56, leaf: 0.55 }]
+export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.37, leaf: 0.4 }]
 /** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
 export function gateOf(c: Counter, g: { end: 1 | -1; w: number; leaf: number }) {
   const hinge = g.end * ((c.length + 0.2) / 2 - g.w)
@@ -362,6 +362,23 @@ export const TILL = { along: 0.75, W: 1.2, D: 0.82, rise: 0.22,
   /** how far back from the first counter's line (toward the kitchen) its middle stands */
   lay: 0.3 }
 
+/** the till's live state: what its displays read and how far its drawer is out (0 shut, 1 open), set by the customer paying there */
+export const TILL_STATE = { text: '0', drawer: 0 }
+/** what a customer's bill comes to: the dishes they ordered and the drink from the fridge, if they took one */
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __till?: typeof TILL_STATE }).__till = TILL_STATE
+export const billOf = (items: number, drink?: DrinkId) => Math.max(1, items) * 380 + (drink ? 320 : 0)
+/** the figures on the register's displays: a number with its thousands comma */
+export const yen = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+/**
+ * Where a customer pays on the way out: they stand before the till (on the floor of the room, just short of the
+ * genkan's step), reached from the aisle by a lane past the bar's end, and go on from there to the door.
+ */
+export function payOf(cs: Counter[]) {
+  const c0 = cs[0]
+  const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, c0.length / 2 + along).addScaledVector(c0.lay, lay)
+  return { spot: at(TILL.along, TILL.lay - TILL.D / 2 - 0.25), lane: at(0.4, TILL.lay - TILL.D / 2 - 0.25), aisle: at(0.4, -AISLE) }
+}
+
 /** the pass, in the bar's own frame (on the first counter's top, at its start, the customers' side of it) */
 export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + 0.2)
   .addScaledVector(cs[0].lay, -0.16)
@@ -509,7 +526,7 @@ export const cubbyAt = (along: number, lay: number, tier: 'floor' | 'shelf') =>
 export const PLATE_STACKS = (() => {
   // (in the bar's own frame: where those places are, under the table's top, to the left in the cubby)
   const at = (along: number) => cubbyAt(along, 1.5, 'floor').sub(GRILL_OFFSET).multiplyScalar(1 / GRILL_SCALE)
-  return { clean: at(0.95), dirty: at(1.4) }
+  return { clean: at(1.07), dirty: at(1.52) }
 })()
 /** the height of the cubby's floor, in the bar's own frame, for the stacks of plates standing on it */
 export const PLATE_STACK_Y = (CUBBY_FLOOR_Y - GRILL_OFFSET.y) / GRILL_SCALE

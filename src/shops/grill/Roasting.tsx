@@ -313,12 +313,11 @@ const BOX_R = 0.46
 const BOX_SPOT = { along: 1.55, lay: 1.3 }
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
 const PIT_SCALE = 1.3
-/** how much bigger the coals alone are drawn: they grow, the stone ring does not */
-const COAL_SCALE = 1.55
+/** the pit's ground disc, as a part of that: the stones stand on its rim */
+const PIT_GROUND = 0.62
 /** how much higher the pit (its stones, coals and net) stands than it was modelled, with the flames and smoke over it */
 export const PIT_LIFT = 0.12
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
-const COAL_PARTS = /^(Charcoal|BinchotanHeap)/
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15 * PIT_SCALE
 
@@ -1651,25 +1650,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       o.position.x *= PIT_SCALE
       o.position.z *= PIT_SCALE
       o.position.y += PIT_LIFT
-      o.scale.multiplyScalar(COAL_PARTS.test(o.name) ? COAL_SCALE : PIT_SCALE)
+      // (the ground disc only reaches the stones' middle: no muddy rim round the ring, over the table)
+      o.scale.multiplyScalar(o.name === 'FirePit' ? PIT_SCALE * PIT_GROUND : PIT_SCALE)
     }
-    // (the net a hand's width higher too, and about twice the coals: a second heap of each, turned and set a little off, sharing the
-    // same materials so they glow and ash with the rest)
+    // (the net a hand's width higher too)
     const net = root.getObjectByName('GrillNet')
     if (net && !net.userData.lifted) {
       net.userData.lifted = true
       net.position.y += PIT_LIFT
-    }
-    for (const o of [...root.children]) {
-      if (!/^(Charcoal|BinchotanHeap)$/.test(o.name) || o.userData.doubled) continue
-      o.userData.doubled = true
-      const c = o.clone()
-      c.name = `${o.name}2`
-      c.userData = { pitScaled: true, doubled: true }
-      c.rotation.y += 2.2
-      c.scale.multiplyScalar(0.9)
-      c.position.y += 0.05
-      root.add(c)
     }
   }, [root])
 

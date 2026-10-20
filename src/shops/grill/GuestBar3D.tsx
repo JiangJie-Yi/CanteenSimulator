@@ -22,7 +22,7 @@ import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProp
 import { LuckyCat } from './LuckyCat'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
-import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -372,13 +372,6 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           big cream keys and the teal total key to the right), the till roll's cover at the back with its paper coming
           out, a small operator's display on a stalk, and over it all the customers' display, its green figures facing both ways */}
       <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.12}>
-        {/* drawer */}
-        <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.04, 0]} scale={[0.36, 0.08, 0.3]} />
-        <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.04, -0.1515]} scale={[0.33, 0.056, 0.004]} />
-        <Part geo={REG_GEO.body} color="#8a8478" outline={0} position={[-0.02, 0.058, -0.154]} scale={[0.12, 0.008, 0.004]} />
-        <mesh position={[0.11, 0.04, -0.155]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.009, 0.009, 0.006, 14]} /><meshToonMaterial color="#c8ccd0" /></mesh>
-        <mesh position={[0.11, 0.04, -0.1585]}><planeGeometry args={[0.012, 0.0025]} /><meshBasicMaterial color="#2a2c30" /></mesh>
-        <Part geo={REG_GEO.body} color="#f2e28a" outline={0} position={[-0.11, 0.024, -0.1535]} scale={[0.045, 0.014, 0.002]} />
         {/* the body: a deep base, set back a little */}
         <Part geo={REG_GEO.round} color="#d6d0c2" outline={1.03} position={[0, 0.125, 0.03]} scale={[0.34, 0.09, 0.25]} />
         {/* the sloped key panel */}
@@ -396,7 +389,6 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         {/* the operator's display on the right segment: dark, tilted back, green seven-segment figures */}
         <group position={[-0.085, 0.226, 0.05]} rotation={[-0.55, 0, 0]}>
           <Part geo={REG_GEO.round} color="#1a1c20" outline={1.05} scale={[0.14, 0.012, 0.05]} />
-          <mesh position-y={0.0072} rotation={[-Math.PI / 2, 0, Math.PI]}><planeGeometry args={[0.125, 0.036]} /><meshBasicMaterial map={REG_LED2} toneMapped={false} /></mesh>
         </group>
         {/* the mode dial at the front right of the body, its scale round it */}
         <group position={[-0.145, 0.15, -0.14]} rotation-x={-0.34}>
@@ -410,7 +402,6 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         <mesh position={[0, 0.3, 0.1]}><cylinderGeometry args={[0.005, 0.006, 0.2, 8]} /><meshToonMaterial color="#8a8e92" /></mesh>
         <group position={[0, 0.41, 0.1]} rotation-x={-0.18}>
           <Part geo={REG_GEO.round} color="#1a1c20" outline={1.04} scale={[0.17, 0.065, 0.02]} />
-          <mesh position-z={0.0108}><planeGeometry args={[0.15, 0.044]} /><meshBasicMaterial map={REG_LED2} toneMapped={false} /></mesh>
         </group>
       </group>
       {/* the card reader, its screen and keys, by the register on the customers' side */}
@@ -429,8 +420,18 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         <Part geo={REG_GEO.body} color="#2a2c30" outline={0} position={[0, 0.081, 0]} scale={[0.08, 0.002, 0.012]} />
         <mesh position={[0, 0.1, -0.012]} rotation-x={0.4}><planeGeometry args={[0.07, 0.05]} /><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
       </group>
-      {/* the change tray, the cup of pens, the bell */}
-      <Part geo={REG_GEO.round} color="#8a2a1e" outline={1.04} position={[0.05, top + 0.008, -0.17]} scale={[0.14, 0.012, 0.1]} />
+      {/* the coin tray (カルトン), a lacquered dish at the register's front for the change, with coins and a folded note in it, the cup of pens, the bell */}
+      <group position={[-0.02, top, -0.2]}>
+        <Part geo={REG_GEO.round} color="#7a1f16" outline={1.04} position-y={0.009} scale={[0.22, 0.02, 0.14]} />
+        <mesh position-y={0.0195} rotation-x={-Math.PI / 2}><planeGeometry args={[0.19, 0.11]} /><meshToonMaterial color="#3e100b" /></mesh>
+        {([[-0.07, -0.03, '#cfd2d6', 3], [-0.04, -0.03, '#d6b04a', 2], [-0.07, 0.02, '#b8683a', 2], [-0.04, 0.02, '#cfd2d6', 4]] as [number, number, string, number][]).map(([x, z, c, n], i) => (
+          <mesh key={i} position={[x, 0.021 + n * 0.0016, z]}><cylinderGeometry args={[0.014, 0.014, n * 0.0032, 14]} /><meshToonMaterial color={c} /></mesh>
+        ))}
+        {([[0.0, -0.03], [0.0, 0.02]] as [number, number][]).map(([x, z], i) => (
+          <mesh key={i} position={[x, 0.0205, z]} rotation-y={0.1 * (i ? -1 : 1)}><boxGeometry args={[0.03, 0.0015, 0.03]} /><meshToonMaterial color="#d6b04a" /></mesh>
+        ))}
+        <mesh position={[0.05, 0.0225, 0]} rotation-y={0.3}><boxGeometry args={[0.06, 0.004, 0.034]} /><meshToonMaterial color="#cfc79c" /></mesh>
+      </group>
       <group position={[-0.42, top, 0.12]}>
         <Part geo={REG_GEO.cup} color="#3a4a5a" position-y={0.03} />
         {[[-0.006, '#2a2a6a'], [0.007, '#a82a1e'], [0, '#2a2a2a']].map(([x, c], i) => (
@@ -444,12 +445,74 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         <Part geo={REG_GEO.body} color="#2a2420" outline={0} position-y={0.004} scale={[0.06, 0.008, 0.06]} />
       </group>
       {/* the お会計 sign, in its little wooden stand, to the customers */}
-      <group position={[0.3, top, -0.19]} rotation-y={Math.PI}>
+      <group position={[0.24, top, -0.19]} rotation-y={Math.PI}>
         <Part geo={REG_GEO.body} color="#6a4428" position-y={0.006} scale={[0.14, 0.012, 0.05]} />
         <mesh position={[0, 0.05, 0]}><planeGeometry args={[0.12, 0.075]} /><meshToonMaterial color="#ffffff" map={PAY_SIGN} /></mesh>
       </group>
-      {/* the beckoning cat, its paw up */}
-      <group position={[0.4, top, 0.04]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.3} /></group>
+      {/* the beckoning cat, its paw up: bigger, at the till's corner by the door, facing the customers */}
+      <group position={[0.5, top, -0.26]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.46} /></group>
+    </group>
+  )
+}
+/** the register's moving parts, apart from the batched till: its drawer, which slides out, and its displays, which read what's being paid */
+function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
+  const drawer = useRef<THREE.Group>(null)
+  const cash = useRef<THREE.Group>(null)
+  const led = useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 160
+    c.height = 40
+    return new THREE.CanvasTexture(c)
+  }, [])
+  const shown = useRef('')
+  useFrame(() => {
+    if (drawer.current) drawer.current.position.z = -TILL_STATE.drawer * 0.2
+    if (cash.current) cash.current.visible = TILL_STATE.drawer > 0.15
+    if (shown.current === TILL_STATE.text) return
+    shown.current = TILL_STATE.text
+    const g = (led.image as HTMLCanvasElement).getContext('2d')!
+    g.fillStyle = '#07100a'
+    g.fillRect(0, 0, 160, 40)
+    g.font = 'bold 30px "Courier New", monospace'
+    g.textAlign = 'right'
+    g.textBaseline = 'middle'
+    g.fillStyle = '#5cff7a'
+    g.shadowColor = '#5cff7a'
+    g.shadowBlur = 7
+    g.fillText(TILL_STATE.text, 152, 21)
+    led.needsUpdate = true
+  })
+  return (
+    <group position={at} rotation-y={yaw}>
+      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.12}>
+        {/* the cash drawer: a lock and a label on its front; out, it shows its compartments, notes behind and coins before */}
+        <group ref={drawer}>
+          <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.04, 0]} scale={[0.36, 0.08, 0.3]} />
+          <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.04, -0.1515]} scale={[0.33, 0.056, 0.004]} />
+          <Part geo={REG_GEO.body} color="#8a8478" outline={0} position={[-0.02, 0.058, -0.154]} scale={[0.12, 0.008, 0.004]} />
+          <mesh position={[0.11, 0.04, -0.155]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.009, 0.009, 0.006, 14]} /><meshToonMaterial color="#c8ccd0" /></mesh>
+          <mesh position={[0.11, 0.04, -0.1585]}><planeGeometry args={[0.012, 0.0025]} /><meshBasicMaterial color="#2a2c30" /></mesh>
+          <Part geo={REG_GEO.body} color="#f2e28a" outline={0} position={[-0.11, 0.024, -0.1535]} scale={[0.045, 0.014, 0.002]} />
+          <group ref={cash} visible={false}>
+            <mesh position={[0, 0.0815, -0.03]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.33, 0.2]} /><meshToonMaterial color="#2a2c30" /></mesh>
+            {[-0.09, 0, 0.09].map((x, i) => (
+              <mesh key={i} position={[x, 0.0835, -0.04]} rotation-y={0.04 * (i - 1)}><boxGeometry args={[0.07, 0.004 + i * 0.002, 0.034]} /><meshToonMaterial color={['#d8cba0', '#c9c79a', '#bcd0a0'][i]} /></mesh>
+            ))}
+            {([[-0.12, '#cfd2d6', 4], [-0.06, '#d6b04a', 3], [0, '#b8683a', 5], [0.06, '#cfd2d6', 3], [0.12, '#d6b04a', 4]] as [number, string, number][]).map(([x, c, n], i) => (
+              <mesh key={i} position={[x, 0.0815 + n * 0.0015, -0.1]}><cylinderGeometry args={[0.017, 0.017, n * 0.003, 14]} /><meshToonMaterial color={c} /></mesh>
+            ))}
+            <mesh position={[0, 0.0835, -0.07]}><boxGeometry args={[0.32, 0.004, 0.003]} /><meshToonMaterial color="#8a8478" /></mesh>
+          </group>
+        </group>
+        {/* the operator's display, tilted back on the right segment */}
+        <group position={[-0.085, 0.226, 0.05]} rotation={[-0.55, 0, 0]}>
+          <mesh position-y={0.0072} rotation={[-Math.PI / 2, 0, Math.PI]}><planeGeometry args={[0.125, 0.036]} /><meshBasicMaterial map={led} toneMapped={false} /></mesh>
+        </group>
+        {/* the customers' display on its stalk */}
+        <group position={[0, 0.41, 0.1]} rotation-x={-0.18}>
+          <mesh position-z={0.0108}><planeGeometry args={[0.15, 0.044]} /><meshBasicMaterial map={led} toneMapped={false} /></mesh>
+        </group>
+      </group>
     </group>
   )
 }
@@ -487,18 +550,6 @@ const TILL_TOP_GEO = (() => {
   return g
 })()
 /** a key of the register's keyboard */
-/** the display's figures: green seven-segment-like digits at the right of a near-black field */
-const REG_LED2 = signTexture(160, 40, (g) => {
-  g.fillStyle = '#07100a'
-  g.fillRect(0, 0, 160, 40)
-  g.font = 'bold 30px "Courier New", monospace'
-  g.textAlign = 'right'
-  g.textBaseline = 'middle'
-  g.fillStyle = '#5cff7a'
-  g.shadowColor = '#5cff7a'
-  g.shadowBlur = 7
-  g.fillText('100,45', 152, 21)
-})
 /** the receipt: CASH RECEIPT, the shop's lines, a list of items with prices, tax and total */
 const REG_RECEIPT = signTexture(170, 200, (g) => {
   g.fillStyle = '#fbfaf6'
@@ -922,12 +973,16 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   /** what they've fetched from the fridge, stood by their plate */
   drink?: DrinkId
   leaving?: boolean
+  /** what they've ordered, for their bill at the till on the way out */
+  items?: number
   /** how much of them shows (fading out as they go out of the door) */
   fade?: number
   /** in the house's slippers (inside, past the genkan's step), or their own shoes */
   slippers?: boolean }
 /** how long they stand at the genkan's step changing their shoes */
 const SHOES_S = 1.2
+/** how long they stand at the till paying: the bill rung up, the drawer out and in, the change given */
+const PAY_S = 3.6
 /** a walk that stops a while at a point along it: how far along, at a time when it would have been `d` */
 const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at + hold ? at : d - hold)
 /** what's set at a customer's place (their soy, their drink) and their shoes left in the genkan: shared shapes */
@@ -1035,6 +1090,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const path = pathTo(counters, st)
     return { path, len: pathLength(path) }
   }), [counters, seats])
+  // the way out: the same way back, but by the till, where they stop to pay (door first, like the way in)
+  const leavePaths = useMemo(() => seats.map((st) => {
+    const base = pathTo(counters, st)
+    if (!given) return { path: base, len: pathLength(base), payD: 0 }
+    const { spot, lane, aisle } = payOf(counters)
+    const path = [base[0], spot, lane, aisle, ...base.slice(1)]
+    return { path, len: pathLength(path), payD: base[0].distanceTo(spot) }
+  }), [counters, seats, given])
   const plateAt = (n: number) => seats[n].plate.clone().setY(top)
   /** how far along a way in (from the door) the genkan's step up into the room is */
   const stepAt = (path: THREE.Vector3[]) => {
@@ -1212,6 +1275,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   useFrame((_, dt) => {
     clock.current += Math.min(dt, 0.1)
     let done: number[] = []
+    let paying: { s: Shown; k: number } | null = null
     for (const s of shown) {
       s.t += Math.min(dt, 0.1)
       // (they come and go whether or not they're drawn: on a phone they aren't, but their plates still follow them)
@@ -1238,6 +1302,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (g) g.rotation.y = st.yaw
         // (now and then, while they wait, off to the toilet: their kind's own)
         const guest = guestsRef.current.find((x) => x.id === s.id)
+        if (guest) s.items = guest.items
         if (fridges && guest?.state === 'waiting' && !s.drink && Math.random() < drinkRate() * Math.min(dt, 0.1)) {
           // (they choose what they want, and go to the fridge it's in)
           const pick = drinkFor(kindOf(s.id).kind, s.id)
@@ -1281,20 +1346,41 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.t = 0
         }
       } else {
-        // a moment to get up, then off the way they came
+        // a moment to get up, then off the way they came, by the till: they stop there to pay, and again at the genkan's step
+        const lp = leavePaths[s.seat]
         const v = SPEED * walkSpeedOf(kindOf(s.id).kind)
-        const d = Math.max(0, Math.min(len, withPause((s.t - 0.8) * v, len - stepAt(path), SHOES_S * v)))
-        const { p, dir } = alongPath(path, len - d)
-        s.slippers = len - d > stepAt(path)
+        const raw = Math.max(0, (s.t - 0.8) * v)
+        const payAt = lp.len - lp.payD
+        const d = Math.max(0, Math.min(lp.len, withPause(withPause(raw, payAt, lp.payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v)))
+        const { p, dir } = alongPath(lp.path, lp.len - d)
+        s.slippers = lp.len - d > stepAt(lp.path)
         g?.position.copy(p)
         if (g) g.rotation.y = s.t < 0.8 ? st.yaw : Math.atan2(-dir.x, -dir.z)
-        if (d >= len) done.push(s.id)
+        // (at the till, facing it: the register's reading follows what they owe)
+        if (lp.payD && raw >= payAt && raw < payAt + PAY_S * v) {
+          if (g) g.rotation.y = Math.atan2(counters[0].lay.x, counters[0].lay.z)
+          paying = { s, k: (raw - payAt) / (PAY_S * v) }
+        }
+        if (d >= lp.len) done.push(s.id)
         // (out of the door they fade away, the last stretch)
-        s.fade = Math.min(1, (len - d) / 0.9)
+        s.fade = Math.min(1, (lp.len - d) / 0.9)
       }
       if (g) g.visible = !(s.phase === 'wcIn' && s.wc?.who !== 'drink')
       // (down a step, standing in the genkan)
       if (g && given) g.position.y = inGenkan(counters, g.position) ? -GENKAN.depth : 0
+    }
+    // (the register reads what's being paid: each dish rung up in turn, the total, the drawer out, then the change)
+    if (paying) {
+      const { s: x, k } = paying
+      const n = Math.max(1, x.items ?? 2)
+      const parts = [...Array.from({ length: n }, () => billOf(1)), ...(x.drink ? [billOf(1, x.drink) - billOf(1)] : [])]
+      const bill = parts.reduce((a, b) => a + b, 0)
+      const rung = Math.min(parts.length, Math.floor(k / 0.4 * parts.length) + 1)
+      TILL_STATE.text = yen(k < 0.4 ? parts.slice(0, rung).reduce((a, b) => a + b, 0) : k < 0.6 ? bill : Math.ceil(bill / 1000) * 1000 - bill)
+      TILL_STATE.drawer = Math.min(1, Math.max(0, Math.min((k - 0.4) / 0.1, (0.92 - k) / 0.08)))
+    } else {
+      TILL_STATE.text = '0'
+      TILL_STATE.drawer = 0
     }
     SEATS_TAKEN.clear()
     for (const x of shown) SEATS_TAKEN.add(x.seat)
@@ -1612,6 +1698,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <Register top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
             at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + TILL.along).addScaledVector(counters[0].lay, TILL.lay)} />
         </StaticBatch>
+      )}
+      {given && (
+        <RegisterLive top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
+          at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + TILL.along).addScaledVector(counters[0].lay, TILL.lay)} />
       )}
       <StaticBatch key={seats.length}>
         {seats.map((st, n) => (
