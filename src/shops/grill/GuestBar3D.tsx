@@ -140,7 +140,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
       <group position={[0.4, 0, -0.75]}>
         {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower) */}
-        {[[-0.01, 0.22, 0.32, 0.62], [0.04, 0.12, 0.6, 0.5]].map(([x, d, h, l], i) => (
+        {[[-0.01, 0.26, 0.32, 0.84], [0.04, 0.14, 0.6, 0.7]].map(([x, d, h, l], i) => (
           <Part key={i} geo={REG_GEO.round} color={i ? '#4a2e1c' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
         ))}
         {DOOR_CATS.map((k, i) => (
@@ -477,10 +477,10 @@ const PAY_SIGN = (() => signTexture(160, 100, (g) => {
 const DOOR_CATS = [
   // (on the stand: x out from the wall, y the tier's top, z along it; the big white pair on the upper tier)
   // (each its own model and size, in its own colours: two big ones on top, two smaller below)
-  { x: 0.04, y: 0.6, z: -0.15, yaw: 0.2, kind: 1 as const, h: 0.5 },
-  { x: 0.04, y: 0.6, z: 0.15, yaw: -0.2, kind: 3 as const, h: 0.42 },
-  { x: -0.07, y: 0.32, z: -0.2, yaw: 0.25, kind: 2 as const, h: 0.34 },
-  { x: -0.07, y: 0.32, z: 0.2, yaw: -0.25, kind: 1 as const, h: 0.3 },
+  { x: 0.04, y: 0.6, z: -0.2, yaw: 0.2, kind: 1 as const, h: 0.66 },
+  { x: 0.04, y: 0.6, z: 0.2, yaw: -0.2, kind: 3 as const, h: 0.56 },
+  { x: -0.07, y: 0.32, z: -0.26, yaw: 0.25, kind: 2 as const, h: 0.46 },
+  { x: -0.07, y: 0.32, z: 0.26, yaw: -0.25, kind: 1 as const, h: 0.56 },
 ]
 /** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
 /** the customers' display: green figures on black, the amount to pay */

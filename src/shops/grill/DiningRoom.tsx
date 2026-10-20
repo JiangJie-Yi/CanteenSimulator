@@ -1495,7 +1495,7 @@ const GABLE_GEO = (() => {
 })()
 function Sutra() {
   return (
-    <group position={[-0.12, 0.007, -0.27]} rotation-y={-Math.PI / 2}>
+    <group position={[-0.12, 0.009, -0.34]} rotation-y={-Math.PI / 2}>
       <mesh><boxGeometry args={[0.105, 0.016, 0.24]} /><meshToonMaterial color="#efe6cf" /></mesh>
       <mesh position-y={0.0082} rotation-x={-Math.PI / 2}><planeGeometry args={[0.105, 0.24]} /><meshToonMaterial color="#ffffff" map={SUTRA_COVER} /></mesh>
       <mesh scale={[1.04, 1.25, 1.02]}><boxGeometry args={[0.105, 0.016, 0.24]} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
