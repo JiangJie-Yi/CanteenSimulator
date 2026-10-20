@@ -345,7 +345,6 @@ function CashRegisterModel() {
     root.position.set(-c.x, -b.min.y, -c.z)
     wrap.scale.setScalar(k)
     wrap.name = 'cash-register'
-    inkModel(wrap)
     return wrap
   }, [gltf])
   return <primitive object={reg} />
@@ -389,7 +388,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         ))}
       </group>
       {/* the register: the downloaded model, stood on the counter, its keys toward the cashier */}
-      <group position={[0.05, top, 0.06]} rotation-y={Math.PI}><CashRegisterModel /></group>
+      <group position={[0.05, top, 0.06]}><CashRegisterModel /></group>
       {/* the card reader, its screen and keys, by the register on the customers' side */}
       <group position={[-0.25, top, -0.1]} rotation-x={-0.25}>
         <Part geo={REG_GEO.round} color="#2a2c30" position-y={0.02} scale={[0.075, 0.04, 0.14]} />

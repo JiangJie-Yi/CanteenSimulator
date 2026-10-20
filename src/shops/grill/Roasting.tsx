@@ -804,6 +804,20 @@ function barTopShape(grow: number) {
   const thick = 0.012 + grow * 0.6
   const g = new THREE.ExtrudeGeometry(sh, { depth: 0.06 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: 0.025 + grow * 0.6,
     bevelSegments: 3, curveSegments: 4 })
+  // (the boards on the top run along each arm of the L: along the first counter, and along the side counter, at one scale
+  // over both: the faces' texture coordinates laid from where they are, not stretched over the shape)
+  const pos = g.attributes.position, uv = g.attributes.uv
+  for (let t = 0; t < pos.count; t += 3) {
+    const cx = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3, cy = (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3
+    const nz = Math.abs((pos.getX(t + 1) - pos.getX(t)) * (pos.getY(t + 2) - pos.getY(t)) - (pos.getY(t + 1) - pos.getY(t)) * (pos.getX(t + 2) - pos.getX(t)))
+    const flat = pos.getZ(t) === pos.getZ(t + 1) && pos.getZ(t) === pos.getZ(t + 2) && nz > 1e-9
+    const armTwo = cy > a.y1 + 0.02 && cx < b.x1
+    for (let k = 0; k < 3; k++) {
+      const x = pos.getX(t + k), y = pos.getY(t + k)
+      if (flat) uv.setXY(t + k, armTwo ? y : x, armTwo ? -x : y)
+      else uv.setXY(t + k, x + y, pos.getZ(t + k) * 4)
+    }
+  }
   g.rotateX(Math.PI / 2)
   g.translate(0, BAR_TOP - thick, 0)
   return g
@@ -812,7 +826,7 @@ const BAR_WOOD = (() => {
   if (!TRAY_WOOD) return null
   const t = TRAY_WOOD.clone()
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set(1 / 2.6, 1 / 0.62)
+  t.repeat.set(1 / 1.6, 1 / 1.6)
   t.needsUpdate = true
   return t
 })()
