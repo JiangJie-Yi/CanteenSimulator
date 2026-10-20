@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { IndoorHDRI } from '@/scene/IndoorHDRI'
+import { FpsMeter } from '@/scene/FpsMeter'
 import { ContactShadows, Loader, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -1847,6 +1848,7 @@ export default function App() {
           gl={makeRenderer}
         >
           <FramePacer />
+          <FpsMeter />
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             heat={heat} fire={fire} frame={frame} onOffFire={sceneOffFire}
             onEat={onEat} onNotice={sceneNotice}
