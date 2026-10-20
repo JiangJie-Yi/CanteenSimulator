@@ -2295,11 +2295,44 @@ function BottleCrates() {
  * kitchen's end — all of it on the floor out of everyone's way, and facing the room.
  */
 /**
- * The mat that marks where the staff go in and out (関係者専用): a woven rug of deep red with a border of indigo and cream, a
- * seigaiha wave band inside it, the words in its middle, and a fringe at both ends.
+ * The mat that marks where the staff go in and out (関係者専用): a tatami mat, woven rush in pale straw green with the dark
+ * cloth border (heri) along its two long sides, the words on a cream plaque in its middle.
  */
-const CARPET_URL = import.meta.env.BASE_URL + 'models/prayer_carpet.glb'
-/** the words alone, brushed in dark ink on a cream plaque with a transparent ground, laid over the middle of the carpet */
+/** the tatami top: fine rush weave along the mat, uneven in tone, with the heri sewn along both long edges */
+const TATAMI_TEX = canvasTex(512, 256, (g) => {
+  g.fillStyle = '#b7b178'
+  g.fillRect(0, 0, 512, 256)
+  // (the rush: thin strands side by side, each a little lighter or darker, with now and then a pale fleck)
+  let seed = 7
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+  for (let y = 0; y < 256; y += 2) {
+    const t = rnd()
+    g.fillStyle = `rgba(${t < 0.5 ? '96,100,52' : '236,228,160'},${0.1 + rnd() * 0.16})`
+    g.fillRect(0, y, 512, 1 + (rnd() < 0.3 ? 1 : 0))
+  }
+  for (let i = 0; i < 900; i++) {
+    g.fillStyle = `rgba(250,244,190,${0.15 + rnd() * 0.2})`
+    g.fillRect(rnd() * 512, rnd() * 256, 6 + rnd() * 18, 1)
+  }
+  // (the weft stitching across the mat, a fine twill)
+  g.strokeStyle = 'rgba(80,80,40,0.10)'
+  g.lineWidth = 1
+  for (let x = 0; x < 512; x += 6) { g.beginPath(); g.moveTo(x, 20); g.lineTo(x, 236); g.stroke() }
+  // (the heri: dark indigo cloth with a thin cream line each side of it and a row of small diamonds)
+  for (const y of [0, 236]) {
+    g.fillStyle = '#1d2540'
+    g.fillRect(0, y, 512, 20)
+    g.fillStyle = '#c9b98a'
+    g.fillRect(0, y === 0 ? 17 : 236, 512, 1.5)
+    g.fillStyle = 'rgba(201,185,138,0.55)'
+    for (let x = 6; x < 512; x += 16) {
+      g.beginPath(); g.moveTo(x, y + 10); g.lineTo(x + 4, y + 6); g.lineTo(x + 8, y + 10); g.lineTo(x + 4, y + 14); g.closePath(); g.fill()
+    }
+  }
+  // (the ends: a sewn edge, a shade darker)
+  g.fillStyle = 'rgba(60,60,30,0.28)'
+  g.fillRect(0, 20, 3, 216); g.fillRect(509, 20, 3, 216)
+})
 const STAFF_WORDS = (words: string) => canvasTex(256, 96, (g) => {
   g.clearRect(0, 0, 256, 96)
   g.fillStyle = 'rgba(243,232,200,0.94)'
@@ -2310,40 +2343,20 @@ const STAFF_WORDS = (words: string) => canvasTex(256, 96, (g) => {
   brushText(g, words, 128, 50, 44, { fill: '#241810', shadow: 'rgba(120,90,50,0.35)', spacing: 6 })
 })
 const STAFF_WORDS_TEX = { zh: STAFF_WORDS('員工專用'), ja: STAFF_WORDS('関係者専用') }
-/** the mat that marks where the staff go in and out: the downloaded prayer carpet, laid flat, the words keyed on its middle */
+/** the mat that marks where the staff go in and out: a flat tatami mat, the words keyed on its middle */
+const MAT = { w: 1.5, d: 0.75, h: 0.03 }
 function StaffMat({ lang }: { lang: Lang }) {
-  const gltf = useGLTF(CARPET_URL) as unknown as { scene: THREE.Group }
-  const rug = useMemo(() => {
-    const root = gltf.scene.clone(true)
-    root.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, side: THREE.DoubleSide })
-    })
-    // (the model stands upright in its own space, its thin side front to back: laid flat, its long side along x, 1.5 long)
-    const wrap = new THREE.Group()
-    wrap.add(root)
-    const b0 = new THREE.Box3().setFromObject(root)
-    const sz = b0.getSize(new THREE.Vector3())
-    const thin = sz.z < sz.x && sz.z < sz.y ? 'z' : sz.y < sz.x ? 'y' : 'x'
-    if (thin === 'z') wrap.rotation.x = -Math.PI / 2
-    wrap.updateMatrixWorld(true)
-    let b = new THREE.Box3().setFromObject(wrap)
-    let d = b.getSize(new THREE.Vector3())
-    if (d.z > d.x) { wrap.rotation.y = Math.PI / 2; wrap.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(wrap); d = b.getSize(new THREE.Vector3()) }
-    const out = new THREE.Group()
-    const k = 1.5 / d.x
-    const c = b.getCenter(new THREE.Vector3())
-    wrap.position.set(-c.x, -b.min.y - 0.004, -c.z)
-    out.add(wrap)
-    out.scale.setScalar(k)
-    return { group: out, depth: d.z * k, height: d.y * k }
-  }, [gltf])
+  const mats = useMemo(() => {
+    const side = new THREE.MeshToonMaterial({ color: '#8e8a5a' })
+    const top = new THREE.MeshToonMaterial({ color: '#ffffff', map: TATAMI_TEX })
+    return [side, side, top, side, side, side]
+  }, [])
   return (
     <group>
-      <primitive object={rug.group} />
-      <mesh position={[0, rug.height + 0.008, 0]} rotation-x={-Math.PI / 2}>
+      <mesh position={[0, MAT.h / 2, 0]} material={mats}>
+        <boxGeometry args={[MAT.w, MAT.h, MAT.d]} />
+      </mesh>
+      <mesh position={[0, MAT.h + 0.004, 0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[0.9, 0.34]} />
         <meshBasicMaterial color="#ffffff" map={STAFF_WORDS_TEX[lang]} transparent toneMapped={false} polygonOffset polygonOffsetFactor={-4} />
       </mesh>
