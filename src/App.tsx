@@ -52,7 +52,7 @@ import { Office } from '@/ui/Office'
 import { Fridge } from '@/ui/Fridge'
 import { Welcome } from '@/ui/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
-import { Roasting, type CrewMember } from '@/shops/grill/Roasting'
+import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { Grill2D } from '@/shops/grill/Grill2D'
 import { Steam } from '@/scene/Steam'
 import { StoveControls } from '@/shops/hotpot/StoveControls'
@@ -579,12 +579,12 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
                   baseIntensity={theme === 'dark' ? 1.5 : 0.8} />
               )}
               {/* toon ramps blow out easily, so the firelight stays modest */}
-              {dish.heat === 'fire' && <group position={dish.roast ? FIRE_SHIFT : undefined}><Fire width={0.6} height={0.42} baseIntensity={look.fire} level={fire} /></group>}
+              {dish.heat === 'fire' && <group position={dish.roast ? [FIRE_SHIFT.x, PIT_LIFT, FIRE_SHIFT.z] : undefined}><Fire width={0.6} height={0.42} baseIntensity={look.fire} level={fire} /></group>}
               {soup && dish.brothY !== undefined && dish.steam && (
                 <Steam position={[0, dish.brothY + 0.02, 0]} width={dish.steam.width} height={dish.steam.height}
                   opacity={theme === 'dark' ? 0.5 : 0.7} level={dish.heatControl ? steamLevel : undefined} />
               )}
-              <group position={dish.roast ? FIRE_SHIFT : undefined}>
+              <group position={dish.roast ? [FIRE_SHIFT.x, PIT_LIFT, FIRE_SHIFT.z] : undefined}>
               {dish.smoke && (
                 // same white puffs as the soup steam, just taller and slower
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height}
