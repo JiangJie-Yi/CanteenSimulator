@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -321,6 +322,34 @@ const TILL_GLOW = (() => {
   g.fillRect(0, 0, 8, 64)
   return new THREE.CanvasTexture(c)
 })()
+const REGISTER_URL = import.meta.env.BASE_URL + 'models/cash_register.glb'
+/** the cash register model, toon-shaded and inked, stood on its base at the origin, about 0.5 wide, its front toward -z */
+function CashRegisterModel() {
+  const gltf = useGLTF(REGISTER_URL) as unknown as { scene: THREE.Group }
+  const reg = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      m.material = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ?? null, side: THREE.DoubleSide })
+      m.castShadow = true
+    })
+    root.updateMatrixWorld(true)
+    const b = new THREE.Box3().setFromObject(root)
+    const d = b.getSize(new THREE.Vector3())
+    const wrap = new THREE.Group()
+    wrap.add(root)
+    const k = 0.5 / Math.max(d.x, d.z)
+    const c = b.getCenter(new THREE.Vector3())
+    root.position.set(-c.x, -b.min.y, -c.z)
+    wrap.scale.setScalar(k)
+    wrap.name = 'cash-register'
+    inkModel(wrap)
+    return wrap
+  }, [gltf])
+  return <primitive object={reg} />
+}
 export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
   const { W, D } = TILL
   return (
@@ -359,60 +388,8 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           </group>
         ))}
       </group>
-      {/* the register, an electronic one of the kind every shop has: a cream cash drawer (a lock and a label on its front)
-          under a body whose sloped panel carries the keys (the coloured function keys to the left, the grey number pad, the
-          big cream keys and the teal total key to the right), the till roll's cover at the back with its paper coming
-          out, a small operator's display on a stalk, and over it all the customers' display, its green figures facing both ways */}
-      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.12}>
-        {/* drawer */}
-        <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.04, 0]} scale={[0.36, 0.08, 0.3]} />
-        <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.04, -0.1515]} scale={[0.33, 0.056, 0.004]} />
-        <Part geo={REG_GEO.body} color="#8a8478" outline={0} position={[-0.02, 0.058, -0.154]} scale={[0.12, 0.008, 0.004]} />
-        <mesh position={[0.11, 0.04, -0.155]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.009, 0.009, 0.006, 14]} /><meshToonMaterial color="#c8ccd0" /></mesh>
-        <mesh position={[0.11, 0.04, -0.1585]}><planeGeometry args={[0.012, 0.0025]} /><meshBasicMaterial color="#2a2c30" /></mesh>
-        <Part geo={REG_GEO.body} color="#f2e28a" outline={0} position={[-0.11, 0.024, -0.1535]} scale={[0.045, 0.014, 0.002]} />
-        {/* the body: a deep base, set back a little */}
-        <Part geo={REG_GEO.round} color="#d6d0c2" outline={1.03} position={[0, 0.125, 0.03]} scale={[0.34, 0.09, 0.25]} />
-        {/* the sloped key panel */}
-        <group position={[0, 0.172, -0.07]} rotation-x={-0.34}>
-          <Part geo={REG_GEO.round} color="#cbc5b7" outline={1.04} scale={[0.335, 0.026, 0.16]} />
-          {Array.from({ length: 16 }, (_, i) => {
-            const col = i % 4, row = Math.floor(i / 4)
-            const cap = ['#5e86c8', '#5e86c8', '#e07a9a', col === 3 ? '#7a5fa8' : '#e07a9a'][row]
-            return <mesh key={`f${i}`} geometry={REG_KEY} position={[-0.138 + col * 0.025, 0.018, -0.052 + row * 0.03]}><meshToonMaterial color={cap} /></mesh>
-          })}
-          {Array.from({ length: 12 }, (_, i) => (
-            <mesh key={`n${i}`} geometry={REG_KEY} position={[-0.03 + (i % 3) * 0.025, 0.018, -0.052 + Math.floor(i / 3) * 0.03]}><meshToonMaterial color="#4a4e54" /></mesh>
-          ))}
-          {Array.from({ length: 8 }, (_, i) => (
-            <mesh key={`c${i}`} geometry={REG_KEY} position={[0.07 + (i % 2) * 0.03, 0.018, -0.052 + Math.floor(i / 2) * 0.03]} scale={[1.25, 1, 1.25]}>
-              <meshToonMaterial color="#f4efe2" />
-            </mesh>
-          ))}
-          {[0, 1].map((j) => (
-            <mesh key={`t${j}`} geometry={REG_KEY} position={[0.14, 0.018, -0.052 + j * 0.03]} scale={[1, 1, 1.15]}><meshToonMaterial color="#3aa79a" /></mesh>
-          ))}
-        </group>
-        {/* the till roll's cover at the back left, a strip of paper coming out of it */}
-        <Part geo={REG_GEO.round} color="#c9c3b5" outline={1.04} position={[-0.1, 0.19, 0.085]} scale={[0.1, 0.03, 0.08]} />
-        <mesh position={[-0.1, 0.225, 0.09]} rotation-x={-0.5}><planeGeometry args={[0.05, 0.07]} /><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
-        {/* the operator's display: a small tilted screen on a stalk, at the back right */}
-        <mesh position={[0.09, 0.225, 0.075]}><cylinderGeometry args={[0.006, 0.007, 0.07, 8]} /><meshToonMaterial color="#8a8e92" /></mesh>
-        <group position={[0.09, 0.27, 0.07]} rotation-x={-0.55}>
-          <Part geo={REG_GEO.round} color="#b8bcc0" outline={1.05} scale={[0.075, 0.04, 0.012]} />
-          <mesh position-z={-0.0072}><planeGeometry args={[0.06, 0.026]} /><meshBasicMaterial color="#b8d090" toneMapped={false} /></mesh>
-        </group>
-        {/* the customers' display: a dark housing on a tall stalk, lit green figures on both faces */}
-        <mesh position={[-0.02, 0.28, 0.1]}><cylinderGeometry args={[0.005, 0.006, 0.19, 8]} /><meshToonMaterial color="#6a6e72" /></mesh>
-        <group position={[-0.02, 0.38, 0.1]}>
-          <Part geo={REG_GEO.round} color="#1c1e22" outline={1.04} scale={[0.15, 0.05, 0.03]} />
-          {[1, -1].map((sd) => (
-            <mesh key={sd} position-z={sd * 0.0155} rotation-y={sd > 0 ? 0 : Math.PI}>
-              <planeGeometry args={[0.13, 0.034]} /><meshBasicMaterial map={REG_LED} toneMapped={false} />
-            </mesh>
-          ))}
-        </group>
-      </group>
+      {/* the register: the downloaded model, stood on the counter, its keys toward the cashier */}
+      <group position={[0.05, top, 0.06]} rotation-y={Math.PI}><CashRegisterModel /></group>
       {/* the card reader, its screen and keys, by the register on the customers' side */}
       <group position={[-0.25, top, -0.1]} rotation-x={-0.25}>
         <Part geo={REG_GEO.round} color="#2a2c30" position-y={0.02} scale={[0.075, 0.04, 0.14]} />
@@ -481,22 +458,6 @@ const DOOR_CATS = [
 ]
 /** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
 /** the customers' display: green figures on black, the amount to pay */
-const REG_LED = signTexture(128, 34, (g) => {
-  g.fillStyle = '#0a120a'
-  g.fillRect(0, 0, 128, 34)
-  g.font = 'bold 26px "Courier New", monospace'
-  g.textAlign = 'right'
-  g.textBaseline = 'middle'
-  g.fillStyle = '#5cff7a'
-  g.shadowColor = '#5cff7a'
-  g.shadowBlur = 6
-  g.fillText('0.85', 118, 18)
-  g.font = 'bold 12px "Courier New", monospace'
-  g.textAlign = 'left'
-  g.fillText('TOTAL', 8, 18)
-})
-/** a key of the register's keyboard */
-const REG_KEY = new RoundedBoxGeometry(0.021, 0.008, 0.021, 2, 0.003)
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
   key: new THREE.CylinderGeometry(0.004, 0.004, 0.016, 6),

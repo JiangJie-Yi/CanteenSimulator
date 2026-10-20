@@ -126,8 +126,8 @@ const BURNER_Y = 0.38
 // low enough (~19° above the dish) that the burner flames show under the hot pot's rim
 const CAMERA_POSITION: [number, number, number] = [2.9, 2.2, 4.0]
 /** the second view the eye button gives (at the grill): from high up at 45 degrees, the whole shop in it */
-const OVERVIEW_TARGET = new THREE.Vector3(1.0, 0, -0.5)
-const OVERVIEW_POSITION = new THREE.Vector3(18.5, 20, 19)
+const OVERVIEW_TARGET = new THREE.Vector3(-0.45, 0.3, -0.9)
+const OVERVIEW_POSITION = new THREE.Vector3(11.6, 16.6, 17.6)
 const CAMERA_FOV = 40
 
 const ITEM_IDS = Object.fromEntries(DISHES.map((d) => [d.id, d.items.map((it) => it.id)]))
