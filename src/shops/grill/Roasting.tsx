@@ -1698,23 +1698,23 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const y0 = box ? box.max.y : 0.02
       const ash = new THREE.Group()
       ash.name = 'AshBed'
-      const bed = new THREE.Mesh(new THREE.CircleGeometry(0.4, 24), new THREE.MeshToonMaterial({ color: '#9a9894' }))
+      const bed = new THREE.Mesh(new THREE.CircleGeometry(0.5, 28), new THREE.MeshToonMaterial({ color: '#b3b1ac' }))
       bed.rotation.x = -Math.PI / 2
       bed.position.y = y0 + 0.004
       ash.add(bed)
-      const tones = ['#8d8a86', '#6f6c68', '#a3a09b', '#7a7773']
+      const tones = ['#b0aeaa', '#9d9b97', '#c4c2bd', '#a8a6a2']
       // (heaped into a mound, like the charcoal's own heap: layers of lumps, each ring narrower and higher, about seventy in all)
       let k = 0
-      for (let layer = 0; layer < 8; layer++) {
-        const ringR = 0.5 * (1 - layer * 0.11)
-        const count = Math.max(5, Math.round(22 - layer * 2.4))
+      for (let layer = 0; layer < 4; layer++) {
+        const ringR = 0.52 * (1 - layer * 0.2)
+        const count = Math.max(6, Math.round(24 - layer * 5))
         for (let n = 0; n < count; n++) {
           const a = (n / count) * Math.PI * 2 + layer * 0.9 + ((k * 7) % 5) * 0.08
           const r = ringR * (0.55 + ((k * 31) % 10) * 0.045)
-          const size = 0.034 + ((k * 13) % 6) * 0.009
+          const size = 0.03 + ((k * 13) % 6) * 0.008
           const m = new THREE.Mesh(new THREE.DodecahedronGeometry(size, 0), new THREE.MeshToonMaterial({ color: tones[k % 4] }))
-          m.position.set(Math.cos(a) * r, y0 + 0.02 + layer * 0.052, Math.sin(a) * r)
-          m.scale.set(1.2 + (k % 3) * 0.25, 0.65 + (k % 2) * 0.2, 1 + (k % 4) * 0.1)
+          m.position.set(Math.cos(a) * r, y0 + 0.015 + layer * 0.03, Math.sin(a) * r)
+          m.scale.set(1.5 + (k % 3) * 0.3, 0.45 + (k % 2) * 0.12, 1.2 + (k % 4) * 0.1)
           m.rotation.set(k, k * 1.7, k * 0.6)
           ash.add(m)
           k++
@@ -1722,7 +1722,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       for (let n = 0; n < 4; n++) {
         const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.05, 0), new THREE.MeshToonMaterial({ color: tones[n % 4] }))
-        m.position.set(Math.cos(n * 1.6) * 0.07, y0 + 0.43, Math.sin(n * 1.6) * 0.07)
+        m.position.set(Math.cos(n * 1.6) * 0.06, y0 + 0.14, Math.sin(n * 1.6) * 0.06)
         m.scale.set(1.3, 0.8, 1.1)
         ash.add(m)
       }
@@ -3449,7 +3449,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // glowing charcoal: mostly black at a low fire, more and more of it red-hot as the fire builds; as the fire
   // burns down the coals are used up and slowly turn to pale grey ash (fresh charcoal brings the black back)
   const embers = useRef<{ mat: THREE.MeshToonMaterial; base: number; color: THREE.Color }[] | null>(null)
-  const fuel = useRef(0.55)
+  // (starts at the fire's own level, so a cold pit is ash from the first frame, not charcoal easing down to it)
+  const fuel = useRef(fire?.current ?? 0.55)
 
   useFrame((_, delta) => {
     if (!embers.current || !embers.current.length) {
