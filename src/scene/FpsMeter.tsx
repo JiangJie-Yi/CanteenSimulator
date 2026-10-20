@@ -15,7 +15,7 @@ export function FpsMeter() {
   const acc = useRef({ frames: 0, time: 0, worst: 0 })
   useEffect(() => {
     const d = document.createElement('div')
-    d.style.cssText = 'position:fixed;left:10px;bottom:76px;z-index:60;pointer-events:none;font:11px/1.35 ui-monospace,Consolas,monospace;'
+    d.style.cssText = 'position:fixed;left:76px;bottom:10px;z-index:60;pointer-events:none;font:11px/1.35 ui-monospace,Consolas,monospace;'
       + 'color:#39ff6a;background:rgba(0,0,0,0.55);padding:5px 8px;border-radius:6px;white-space:pre;text-shadow:0 0 2px #000'
     d.textContent = 'FPS …'
     document.body.appendChild(d)
