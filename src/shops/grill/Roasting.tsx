@@ -314,10 +314,11 @@ const BOX_SPOT = { along: 1.55, lay: 1.3 }
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
 const PIT_SCALE = 1.3
 /**
- * The pit's ground texture is white salt inside and brown earth out to a fading rim: the earth is faded away, so only the salt
- * shows (nothing muddy round the stones, over the table).
+ * The pit's ground texture is white salt inside and brown earth out to a fading rim: the earth is kept, but darkened and
+ * browned further out like ground scorched by heat, and the disc drawn a little smaller (PIT_GROUND).
  */
-function saltOnly(mesh: THREE.Mesh) {
+const PIT_GROUND = 0.9
+function scorchEarth(mesh: THREE.Mesh) {
   const mat = mesh.material as THREE.MeshStandardMaterial
   const img = mat.map?.image as CanvasImageSource & { width: number; height: number } | undefined
   if (!img || typeof document === 'undefined') return
@@ -330,8 +331,12 @@ function saltOnly(mesh: THREE.Mesh) {
   for (let y = 0; y < c.height; y++) {
     for (let x = 0; x < c.width; x++) {
       const r = Math.hypot(x / c.width - 0.5, y / c.height - 0.5) * 2
-      const k = Math.min(1, Math.max(0, (r - 0.5) / 0.08))
-      px.data[(y * c.width + x) * 4 + 3] *= 1 - k * k * (3 - 2 * k)
+      // (past the salt, the earth goes darker and redder-brown toward the rim, the way fired ground does)
+      const k = Math.min(1, Math.max(0, (r - 0.5) / 0.35))
+      const i = (y * c.width + x) * 4
+      px.data[i] *= 1 - 0.55 * k
+      px.data[i + 1] *= 1 - 0.65 * k
+      px.data[i + 2] *= 1 - 0.7 * k
     }
   }
   g.putImageData(px, 0, 0)
@@ -1677,8 +1682,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       o.position.x *= PIT_SCALE
       o.position.z *= PIT_SCALE
       o.position.y += PIT_LIFT
-      o.scale.multiplyScalar(PIT_SCALE)
-      if (o.name === 'FirePit') saltOnly(o as THREE.Mesh)
+      o.scale.multiplyScalar(o.name === 'FirePit' ? PIT_SCALE * PIT_GROUND : PIT_SCALE)
+      if (o.name === 'FirePit') scorchEarth(o as THREE.Mesh)
     }
     // (the net a hand's width higher too)
     const net = root.getObjectByName('GrillNet')

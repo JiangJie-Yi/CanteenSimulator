@@ -371,7 +371,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           under a body whose sloped panel carries the keys (the coloured function keys to the left, the grey number pad, the
           big cream keys and the teal total key to the right), the till roll's cover at the back with its paper coming
           out, a small operator's display on a stalk, and over it all the customers' display, its green figures facing both ways */}
-      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.12}>
+      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.4}>
         {/* the body: a deep base, set back a little */}
         <Part geo={REG_GEO.round} color="#d6d0c2" outline={1.03} position={[0, 0.125, 0.03]} scale={[0.34, 0.09, 0.25]} />
         {/* the sloped key panel */}
@@ -399,7 +399,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         </group>
       </group>
       {/* the card reader, its screen and keys, by the register on the customers' side */}
-      <group position={[-0.25, top, -0.1]} rotation-x={-0.25}>
+      <group position={[-0.38, top, -0.1]} rotation-x={-0.25}>
         <Part geo={REG_GEO.round} color="#2a2c30" position-y={0.02} scale={[0.075, 0.04, 0.14]} />
         <mesh position={[0, 0.041, -0.03]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.055, 0.045]} /><meshBasicMaterial color="#9ad0f0" /></mesh>
         {Array.from({ length: 9 }, (_, i) => (
@@ -409,7 +409,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         ))}
       </group>
       {/* the receipt printer, a curl of paper out of its top */}
-      <group position={[-0.25, top, 0.12]}>
+      <group position={[-0.38, top, 0.12]}>
         <Part geo={REG_GEO.round} color="#e8e6e0" position-y={0.04} scale={[0.12, 0.08, 0.13]} />
         <Part geo={REG_GEO.body} color="#2a2c30" outline={0} position={[0, 0.081, 0]} scale={[0.08, 0.002, 0.012]} />
         <mesh position={[0, 0.1, -0.012]} rotation-x={0.4}><planeGeometry args={[0.07, 0.05]} /><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
@@ -426,7 +426,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         ))}
         <mesh position={[0.05, 0.0225, 0]} rotation-y={0.3}><boxGeometry args={[0.06, 0.004, 0.034]} /><meshToonMaterial color="#cfc79c" /></mesh>
       </group>
-      <group position={[-0.42, top, 0.12]}>
+      <group position={[-0.52, top, 0.12]}>
         <Part geo={REG_GEO.cup} color="#3a4a5a" position-y={0.03} />
         {[[-0.006, '#2a2a6a'], [0.007, '#a82a1e'], [0, '#2a2a2a']].map(([x, c], i) => (
           <mesh key={i} position={[x as number, 0.075, (i - 1) * 0.006]} rotation-z={(x as number) * 20}>
@@ -434,7 +434,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           </mesh>
         ))}
       </group>
-      <group position={[-0.42, top, -0.1]}>
+      <group position={[-0.52, top, -0.1]}>
         <Part geo={REG_GEO.ball} color="#d4b04a" position-y={0.012} scale={[0.6, 0.45, 0.6]} />
         <Part geo={REG_GEO.body} color="#2a2420" outline={0} position-y={0.004} scale={[0.06, 0.008, 0.06]} />
       </group>
@@ -478,7 +478,7 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
   })
   return (
     <group position={at} rotation-y={yaw}>
-      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.12}>
+      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.4}>
         {/* the cash drawer: a lock and a label on its front; out, it shows its compartments, notes behind and coins before */}
         <group ref={drawer}>
           <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.04, 0]} scale={[0.36, 0.08, 0.3]} />
