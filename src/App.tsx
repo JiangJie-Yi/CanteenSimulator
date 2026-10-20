@@ -125,6 +125,9 @@ const BURNER_Y = 0.38
 // the one camera pose every dish is framed from (blender/open_live.py matches Blender's camera to it)
 // low enough (~19° above the dish) that the burner flames show under the hot pot's rim
 const CAMERA_POSITION: [number, number, number] = [2.9, 2.2, 4.0]
+/** the second view the eye button gives (at the grill): from high up at 45 degrees, the whole shop in it */
+const OVERVIEW_TARGET = new THREE.Vector3(1.0, 0, -0.5)
+const OVERVIEW_POSITION = new THREE.Vector3(18.5, 20, 19)
 const CAMERA_FOV = 40
 
 const ITEM_IDS = Object.fromEntries(DISHES.map((d) => [d.id, d.items.map((it) => it.id)]))
@@ -277,6 +280,8 @@ type SceneProps = {
   onSay: (who: 'chef' | 'guest', text: string) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
+  /** the eye button's second view, on: the whole shop from above at 45 degrees */
+  overview: boolean
   onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
   lang: Lang
   chefOf: (dishId: string) => Chef
@@ -306,7 +311,7 @@ type SceneProps = {
 
 /** the shop's own waiter, there when no one's been hired for the floor: the cooked food is always carried to the customers, never tossed over the bar */
 const HOUSE_SERVER: CrewMember = { id: 'house-server', role: 'server', look: { female: false, age: 'middle' } }
-function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
+function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, overview, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -398,10 +403,17 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
     // the canvas height, and it mustn't back off just because the menu was folded away)
     const phoneStage = frame.h > 0 && frame.h < size.height * 0.95 || (frame.w < 700 && size.height > size.width)
     const scale = phoneStage ? Math.min(3.4, (1.3 / (frame.w / size.height)) * 0.92) : cameraDistanceScale(aspect)
-    home.current.set(...CAMERA_POSITION).sub(focus).multiplyScalar(scale).add(focus)
+    const wide = overview && !!DISHES[active].roast && !phoneStage
+    if (wide) {
+      home.current.copy(OVERVIEW_POSITION)
+      homeTarget.copy(OVERVIEW_TARGET)
+    } else {
+      home.current.set(...CAMERA_POSITION).sub(focus).multiplyScalar(scale).add(focus)
+      homeTarget.copy(focus)
+    }
     homing.current = true
     zoomGoal.current = null
-  }, [active, aspect, resetView, frame.w, frame.h, size.width, size.height])
+  }, [active, aspect, resetView, overview, frame.w, frame.h, size.width, size.height])
 
   // smooth wheel zoom: each notch nudges a target distance and the camera eases toward it
   const gl = useThree((s) => s.gl)
@@ -449,7 +461,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
     if (c && homing.current) {
       camera.position.lerp(home.current, k)
       // (any panning is undone too: the target slides back to the middle of the dish)
-      c.target.lerp(homeTarget.set(0, focusY, 0), k)
+      c.target.lerp(homeTarget, k)
       c.update()
       if (camera.position.distanceTo(home.current) < 0.002 && c.target.distanceTo(homeTarget) < 0.002) {
         homing.current = false
@@ -1060,6 +1072,7 @@ export default function App() {
   const [menuFolded, setMenuFolded] = useState(false)
   // bumped to send the camera back to its home view
   const [resetView, setResetView] = useState(0)
+  const [overview, setOverview] = useState(false)
   // the browser dropped the WebGL context (a phone out of GPU memory)
   const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
@@ -1852,7 +1865,7 @@ export default function App() {
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             heat={heat} fire={fire} frame={frame} onOffFire={sceneOffFire}
             onEat={onEat} onNotice={sceneNotice}
-            resetView={resetView} ai={ai} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
+            resetView={resetView} overview={overview} ai={ai} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
             incense={{ litAt: incenseAt, onLight: lightIncense }} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })}
@@ -2041,7 +2054,7 @@ export default function App() {
           </ul>
         )}
         <DishSwitcher dishes={DISHES} index={active} onChange={setActive} lang={lang} />
-        <button type="button" className="view-reset" onClick={() => setResetView((n) => n + 1)}
+        <button type="button" className="view-reset" onClick={() => { setOverview((v) => !v); setResetView((n) => n + 1) }}
           aria-label={UI[lang].resetView} title={UI[lang].resetView}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
         </button>
