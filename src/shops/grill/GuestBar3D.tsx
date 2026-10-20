@@ -398,24 +398,31 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
             </mesh>
           ))}
         </group>
-        {/* the till roll's cover at the back left, a strip of paper coming out of it */}
-        <Part geo={REG_GEO.round} color="#c9c3b5" outline={1.04} position={[-0.1, 0.19, 0.085]} scale={[0.1, 0.03, 0.08]} />
-        <mesh position={[-0.1, 0.225, 0.09]} rotation-x={-0.5}><planeGeometry args={[0.05, 0.07]} /><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
-        {/* the operator's display: a small tilted screen on a stalk, at the back right */}
-        <mesh position={[0.09, 0.225, 0.075]}><cylinderGeometry args={[0.006, 0.007, 0.07, 8]} /><meshToonMaterial color="#8a8e92" /></mesh>
-        <group position={[0.09, 0.27, 0.07]} rotation-x={-0.55}>
-          <Part geo={REG_GEO.round} color="#b8bcc0" outline={1.05} scale={[0.075, 0.04, 0.012]} />
-          <mesh position-z={-0.0072}><planeGeometry args={[0.06, 0.026]} /><meshBasicMaterial color="#b8d090" toneMapped={false} /></mesh>
+        {/* the upper body in two rounded segments behind the keys: the left (the receipt slot) the taller, the right (the operator's display) a little lower, a seam between */}
+        <Part geo={REG_GEO.round} color="#e4e1da" outline={1.04} position={[0.087, 0.2, 0.07]} scale={[0.165, 0.075, 0.13]} />
+        <Part geo={REG_GEO.round} color="#e4e1da" outline={1.04} position={[-0.085, 0.19, 0.07]} scale={[0.165, 0.055, 0.13]} />
+        <mesh position={[0, 0.205, 0.0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.004, 0.0001]} /><meshBasicMaterial color="#8a8780" /></mesh>
+        {/* the receipt slot: a recess in the left segment's front, a receipt leaning in it, printed */}
+        <mesh position={[0.087, 0.226, 0.03]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.13, 0.06]} /><meshBasicMaterial color="#6a6862" /></mesh>
+        <mesh position={[0.087, 0.262, 0.05]} rotation={[0.3, Math.PI, 0]}><planeGeometry args={[0.085, 0.1]} /><meshBasicMaterial map={REG_RECEIPT} toneMapped={false} side={THREE.DoubleSide} /></mesh>
+        {/* the operator's display on the right segment: dark, tilted back, green seven-segment figures */}
+        <group position={[-0.085, 0.226, 0.05]} rotation={[-0.55, 0, 0]}>
+          <Part geo={REG_GEO.round} color="#1a1c20" outline={1.05} scale={[0.14, 0.012, 0.05]} />
+          <mesh position-y={0.0072} rotation={[-Math.PI / 2, 0, Math.PI]}><planeGeometry args={[0.125, 0.036]} /><meshBasicMaterial map={REG_LED2} toneMapped={false} /></mesh>
         </group>
-        {/* the customers' display: a dark housing on a tall stalk, lit green figures on both faces */}
-        <mesh position={[-0.02, 0.28, 0.1]}><cylinderGeometry args={[0.005, 0.006, 0.19, 8]} /><meshToonMaterial color="#6a6e72" /></mesh>
-        <group position={[-0.02, 0.38, 0.1]}>
-          <Part geo={REG_GEO.round} color="#1c1e22" outline={1.04} scale={[0.15, 0.05, 0.03]} />
-          {[1, -1].map((sd) => (
-            <mesh key={sd} position-z={sd * 0.0155} rotation-y={sd > 0 ? 0 : Math.PI}>
-              <planeGeometry args={[0.13, 0.034]} /><meshBasicMaterial map={REG_LED} toneMapped={false} />
-            </mesh>
-          ))}
+        {/* the mode dial at the front right of the body, its scale round it */}
+        <group position={[-0.115, 0.172, -0.12]} rotation-x={-0.34}>
+          <mesh position-y={0.014}><cylinderGeometry args={[0.014, 0.016, 0.016, 18]} /><meshToonMaterial color="#1a1a1c" /></mesh>
+          <mesh position={[0, 0.0225, -0.006]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.003, 0.014]} /><meshBasicMaterial color="#f4efe2" /></mesh>
+          <mesh position-y={0.0045} rotation={[-Math.PI / 2, 0, Math.PI]}><planeGeometry args={[0.07, 0.07]} /><meshBasicMaterial map={REG_DIAL} transparent depthWrite={false} /></mesh>
+        </group>
+        {/* the maker's line printed at the front's lower left */}
+        <mesh position={[-0.09, 0.105, -0.0955]} rotation-y={Math.PI}><planeGeometry args={[0.15, 0.015]} /><meshBasicMaterial map={REG_NAME} transparent depthWrite={false} /></mesh>
+        {/* the customers' display on a thin stalk behind: a dark panel leaning back, green figures at its right */}
+        <mesh position={[0, 0.3, 0.1]}><cylinderGeometry args={[0.005, 0.006, 0.2, 8]} /><meshToonMaterial color="#8a8e92" /></mesh>
+        <group position={[0, 0.41, 0.1]} rotation-x={-0.18}>
+          <Part geo={REG_GEO.round} color="#1a1c20" outline={1.04} scale={[0.17, 0.065, 0.02]} />
+          <mesh position-z={0.0108}><planeGeometry args={[0.15, 0.044]} /><meshBasicMaterial map={REG_LED2} toneMapped={false} /></mesh>
         </group>
       </group>
       {/* the card reader, its screen and keys, by the register on the customers' side */}
@@ -491,22 +498,66 @@ const TILL_TOP_GEO = (() => {
   const g = new RoundedBoxGeometry(1, 1, 1, 3, 0.12)
   return g
 })()
-const REG_LED = signTexture(128, 34, (g) => {
-  g.fillStyle = '#0a120a'
-  g.fillRect(0, 0, 128, 34)
-  g.font = 'bold 26px "Courier New", monospace'
+/** a key of the register's keyboard */
+const REG_KEY = new RoundedBoxGeometry(0.021, 0.008, 0.021, 2, 0.003)
+/** the display's figures: green seven-segment-like digits at the right of a near-black field */
+const REG_LED2 = signTexture(160, 40, (g) => {
+  g.fillStyle = '#07100a'
+  g.fillRect(0, 0, 160, 40)
+  g.font = 'bold 30px "Courier New", monospace'
   g.textAlign = 'right'
   g.textBaseline = 'middle'
   g.fillStyle = '#5cff7a'
   g.shadowColor = '#5cff7a'
-  g.shadowBlur = 6
-  g.fillText('0.85', 118, 18)
-  g.font = 'bold 12px "Courier New", monospace'
-  g.textAlign = 'left'
-  g.fillText('TOTAL', 8, 18)
+  g.shadowBlur = 7
+  g.fillText('100,45', 152, 21)
 })
-/** a key of the register's keyboard */
-const REG_KEY = new RoundedBoxGeometry(0.021, 0.008, 0.021, 2, 0.003)
+/** the receipt: CASH RECEIPT, the shop's lines, a list of items with prices, tax and total */
+const REG_RECEIPT = signTexture(170, 200, (g) => {
+  g.fillStyle = '#fbfaf6'
+  g.fillRect(0, 0, 170, 200)
+  g.fillStyle = '#2a2a2a'
+  g.textAlign = 'center'
+  g.font = 'bold 15px "Courier New", monospace'
+  g.fillText('CASH RECEIPT', 85, 20)
+  g.font = '9px "Courier New", monospace'
+  g.fillText('Shop Name', 85, 34)
+  g.fillText('Address line', 85, 45)
+  g.textAlign = 'left'
+  g.fillText('Description', 12, 64)
+  g.textAlign = 'right'
+  g.fillText('Price', 158, 64)
+  const rows = [['Lorem ipsum', '12.50'], ['Dolor sit amet', '8.00'], ['Consectetur', '21.75'], ['Adipiscing elit', '15.40'], ['Sed do eiusmod', '25.37']]
+  rows.forEach(([d, pr], k) => {
+    g.textAlign = 'left'; g.fillText(d, 12, 80 + k * 13)
+    g.textAlign = 'right'; g.fillText(pr, 158, 80 + k * 13)
+  })
+  g.fillRect(12, 150, 146, 1)
+  g.textAlign = 'left'; g.fillText('Tax', 12, 165); g.textAlign = 'right'; g.fillText('$17.43', 158, 165)
+  g.font = 'bold 11px "Courier New", monospace'
+  g.textAlign = 'left'; g.fillText('Total', 12, 184); g.textAlign = 'right'; g.fillText('$100.45', 158, 184)
+})
+/** the mode dial's scale: VOID OFF REG X Z PGM round the arc */
+const REG_DIAL = signTexture(128, 128, (g) => {
+  g.clearRect(0, 0, 128, 128)
+  g.fillStyle = '#3a3a3a'
+  g.font = 'bold 11px sans-serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  const labels = ['VOID', 'OFF', 'REG', 'X', 'Z', 'PGM']
+  labels.forEach((t, k) => {
+    const a = (-150 + k * 60) * Math.PI / 180
+    g.fillText(t, 64 + Math.sin(a) * 48, 64 - Math.cos(a) * 48)
+  })
+})
+const REG_NAME = signTexture(256, 26, (g) => {
+  g.clearRect(0, 0, 256, 26)
+  g.fillStyle = '#4a4a4a'
+  g.font = 'bold 15px sans-serif'
+  g.textAlign = 'left'
+  g.textBaseline = 'middle'
+  g.fillText('ELECTRONIC CASH REGISTER', 4, 14)
+})
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
   key: new THREE.CylinderGeometry(0.004, 0.004, 0.016, 6),
