@@ -384,19 +384,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         {/* the sloped key panel */}
         <group position={[0, 0.172, -0.07]} rotation-x={-0.34}>
           <Part geo={REG_GEO.round} color="#cbc5b7" outline={1.04} scale={[0.335, 0.026, 0.16]} />
-          {/* the keys as on the model: a block of four columns by three rows at the left, the number pad of three by four, and two
-              columns of three big ones at the right (the last the teal total key) */}
-          {Array.from({ length: 12 }, (_, i) => (
-            <mesh key={`f${i}`} geometry={REG_KEY} position={[-0.138 + (i % 4) * 0.025, 0.018, -0.052 + Math.floor(i / 4) * 0.03]}><meshToonMaterial color="#2a2c30" /></mesh>
-          ))}
-          {Array.from({ length: 12 }, (_, i) => (
-            <mesh key={`n${i}`} geometry={REG_KEY} position={[-0.03 + (i % 3) * 0.025, 0.018, -0.052 + Math.floor(i / 3) * 0.03]}><meshToonMaterial color="#2a2c30" /></mesh>
-          ))}
-          {Array.from({ length: 6 }, (_, i) => (
-            <mesh key={`c${i}`} geometry={REG_KEY} position={[0.075 + (i % 2) * 0.032, 0.018, -0.05 + Math.floor(i / 2) * 0.04]} scale={[1.3, 1, 1.45]}>
-              <meshToonMaterial color={i === 5 ? '#3aa79a' : '#2a2c30'} />
-            </mesh>
-          ))}
+          <RegisterKeys />
         </group>
         {/* the upper body in two rounded segments behind the keys: the left (the receipt slot) the taller, the right (the operator's display) a little lower, a seam between */}
         <Part geo={REG_GEO.round} color="#e4e1da" outline={1.04} position={[0.087, 0.2, 0.07]} scale={[0.165, 0.075, 0.13]} />
@@ -411,7 +399,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           <mesh position-y={0.0072} rotation={[-Math.PI / 2, 0, Math.PI]}><planeGeometry args={[0.125, 0.036]} /><meshBasicMaterial map={REG_LED2} toneMapped={false} /></mesh>
         </group>
         {/* the mode dial at the front right of the body, its scale round it */}
-        <group position={[-0.115, 0.172, -0.12]} rotation-x={-0.34}>
+        <group position={[-0.145, 0.15, -0.14]} rotation-x={-0.34}>
           <mesh position-y={0.014}><cylinderGeometry args={[0.014, 0.016, 0.016, 18]} /><meshToonMaterial color="#1a1a1c" /></mesh>
           <mesh position={[0, 0.0225, -0.006]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.003, 0.014]} /><meshBasicMaterial color="#f4efe2" /></mesh>
           <mesh position-y={0.0045} rotation={[-Math.PI / 2, 0, Math.PI]}><planeGeometry args={[0.07, 0.07]} /><meshBasicMaterial map={REG_DIAL} transparent depthWrite={false} /></mesh>
@@ -499,7 +487,6 @@ const TILL_TOP_GEO = (() => {
   return g
 })()
 /** a key of the register's keyboard */
-const REG_KEY = new RoundedBoxGeometry(0.021, 0.008, 0.021, 2, 0.003)
 /** the display's figures: green seven-segment-like digits at the right of a near-black field */
 const REG_LED2 = signTexture(160, 40, (g) => {
   g.fillStyle = '#07100a'
@@ -558,6 +545,66 @@ const REG_NAME = signTexture(256, 26, (g) => {
   g.textBaseline = 'middle'
   g.fillText('ELECTRONIC CASH REGISTER', 4, 14)
 })
+/** a key's face: its words in small print on a clear ground, kept once each */
+const KEY_FACES = new Map<string, THREE.Texture | null>()
+function keyFace(text: string, ink: string, corner = false) {
+  const k = `${text}|${ink}|${corner}`
+  if (!KEY_FACES.has(k)) {
+    KEY_FACES.set(k, signTexture(96, 64, (g) => {
+      g.clearRect(0, 0, 96, 64)
+      g.fillStyle = ink
+      g.textAlign = 'center'
+      g.textBaseline = 'middle'
+      if (corner) {
+        g.font = 'bold 15px sans-serif'
+        g.textAlign = 'right'
+        g.fillText(text, 88, 52)
+        return
+      }
+      const lines = text.split('/')
+      const size = lines.length > 1 ? 15 : text.length > 6 ? 14 : text.length > 3 ? 19 : 30
+      g.font = `bold ${size}px sans-serif`
+      lines.forEach((t, n) => g.fillText(t, 48, 32 + (n - (lines.length - 1) / 2) * (size + 2)))
+    }))
+  }
+  return KEY_FACES.get(k)!
+}
+const KEY_BLUE = '#a9bbea', KEY_RED = '#d8453a', KEY_GREEN = '#4aa860', KEY_YELLOW = '#e8c63a', KEY_DARK = '#4a4d52', KEY_GREY = '#c9ccd0', KEY_WHITE = '#f4f0ec'
+/** the register's keys as on the reference, col/row from the top left of the panel (cols 0-7): [col, row, cols wide, face, key colour, ink] */
+const KEY_LAYOUT: [number, number, number, string, string, string][] = [
+  [0, 1, 1, 'RETURN', KEY_BLUE, '#1a1a1a'], [0, 2, 1, 'VOID', KEY_BLUE, '#1a1a1a'], [0, 3, 1, 'CANCEL', KEY_BLUE, '#1a1a1a'], [0, 4, 1, 'TAX', KEY_GREEN, '#ffffff'],
+  [1, 1, 1, '', KEY_GREY, '#1a1a1a'], [1, 2, 1, '', KEY_GREY, '#1a1a1a'], [1, 3, 1, '', KEY_GREY, '#1a1a1a'], [1, 4, 1, '', KEY_GREY, '#1a1a1a'],
+  [2, 0, 1, 'CLEAR', KEY_BLUE, '#1a1a1a'], [3, 0, 1, 'PLU', KEY_RED, '#ffffff'], [4, 0, 1, 'X/TIME', KEY_BLUE, '#1a1a1a'], [5, 0, 1, 'RCPT/ON-OFF', KEY_RED, '#ffffff'],
+  ...['7', '8', '9', '4', '5', '6', '1', '2', '3', '0', '00', '.'].map((t, n): [number, number, number, string, string, string] => [2 + (n % 3), 1 + Math.floor(n / 3), 1, t, KEY_DARK, '#f4f0ec']),
+  [5, 1, 1, 'CLERK−', KEY_GREEN, '#ffffff'], [5, 2, 1, '− %', KEY_GREEN, '#ffffff'], [5, 3, 1, '+ %', KEY_GREEN, '#ffffff'], [5, 4, 1, 'FEED', KEY_BLUE, '#1a1a1a'],
+  [6, 0, 1, 'NO SALE', KEY_RED, '#ffffff'], [7, 0, 1, 'CALC', KEY_GREEN, '#ffffff'],
+  [6, 1, 1, 'RA +', KEY_YELLOW, '#1a1a1a'], [7, 1, 1, 'PO −', KEY_YELLOW, '#1a1a1a'],
+  [6, 2, 1, 'CHECK', KEY_BLUE, '#1a1a1a'], [7, 2, 1, 'CHARGE', KEY_BLUE, '#1a1a1a'],
+  [6, 3, 2, 'SUBTOTAL', KEY_WHITE, '#1a1a1a'], [6, 4, 2, 'CASH/TEND =', KEY_WHITE, '#1a1a1a'],
+]
+const KEY_BOX = new RoundedBoxGeometry(1, 1, 1, 3, 0.2)
+/** the register's keyboard: bevelled keys, a little matte, each with its words printed on (the department keys numbered 1 to 4 in the corner) */
+function RegisterKeys() {
+  const PX = 0.038, PZ = 0.029
+  return (
+    <>
+      {KEY_LAYOUT.map(([col, row, w, face, color, ink], n) => {
+        const x = 0.133 - (col + (w - 1) / 2) * PX, z = 0.056 - row * PZ
+        const dept = col === 1 && row >= 1 && row <= 4
+        return (
+          <group key={n} position={[x, 0.0185, z]}>
+            <mesh geometry={KEY_BOX} scale={[0.033 * w + (w - 1) * 0.005, 0.009, 0.025]}><meshToonMaterial color={color} /></mesh>
+            {(face || dept) && (
+              <mesh position-y={0.0049} rotation={[-Math.PI / 2, 0, Math.PI]}>
+                <planeGeometry args={[0.028 * w, 0.019]} /><meshBasicMaterial map={keyFace(dept ? String(row) : face, ink, dept)} transparent depthWrite={false} toneMapped={false} />
+              </mesh>
+            )}
+          </group>
+        )
+      })}
+    </>
+  )
+}
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
   key: new THREE.CylinderGeometry(0.004, 0.004, 0.016, 6),
