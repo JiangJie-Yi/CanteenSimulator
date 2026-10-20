@@ -343,7 +343,7 @@ function saltOnly(mesh: THREE.Mesh) {
   mat.needsUpdate = true
 }
 /** how much higher the pit (its stones, coals and net) stands than it was modelled, with the flames and smoke over it */
-export const PIT_LIFT = 0.12
+export const PIT_LIFT = 0
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15 * PIT_SCALE

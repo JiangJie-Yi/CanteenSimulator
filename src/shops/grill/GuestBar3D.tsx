@@ -390,12 +390,6 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         <group position={[-0.085, 0.226, 0.05]} rotation={[-0.55, 0, 0]}>
           <Part geo={REG_GEO.round} color="#1a1c20" outline={1.05} scale={[0.14, 0.012, 0.05]} />
         </group>
-        {/* the mode dial at the front right of the body, its scale round it */}
-        <group position={[-0.145, 0.15, -0.14]} rotation-x={-0.34}>
-          <mesh position-y={0.014}><cylinderGeometry args={[0.014, 0.016, 0.016, 18]} /><meshToonMaterial color="#1a1a1c" /></mesh>
-          <mesh position={[0, 0.0225, -0.006]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.003, 0.014]} /><meshBasicMaterial color="#f4efe2" /></mesh>
-          <mesh position-y={0.0045} rotation={[-Math.PI / 2, 0, Math.PI]}><planeGeometry args={[0.07, 0.07]} /><meshBasicMaterial map={REG_DIAL} transparent depthWrite={false} /></mesh>
-        </group>
         {/* the maker's line printed at the front's lower left */}
         <mesh position={[-0.09, 0.105, -0.0955]} rotation-y={Math.PI}><planeGeometry args={[0.15, 0.015]} /><meshBasicMaterial map={REG_NAME} transparent depthWrite={false} /></mesh>
         {/* the customers' display on a thin stalk behind: a dark panel leaning back, green figures at its right */}
@@ -653,6 +647,12 @@ function RegisterKeys() {
           </group>
         )
       })}
+      {/* the mode dial in the panel's blank top-left corner, its scale round it */}
+      <group position={[0.114, 0.0185, 0.056]}>
+        <mesh position-y={0.006}><cylinderGeometry args={[0.014, 0.016, 0.016, 18]} /><meshToonMaterial color="#1a1a1c" /></mesh>
+        <mesh position={[0, 0.0145, -0.005]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.003, 0.014]} /><meshBasicMaterial color="#f4efe2" /></mesh>
+        <mesh position-y={0.0005} rotation={[-Math.PI / 2, 0, Math.PI]}><planeGeometry args={[0.08, 0.08]} /><meshBasicMaterial map={REG_DIAL} transparent depthWrite={false} /></mesh>
+      </group>
     </>
   )
 }
