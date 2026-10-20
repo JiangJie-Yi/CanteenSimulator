@@ -129,7 +129,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   // (the doorway wide, its middle a little off the way in toward the till: the wall's close on the other side)
   const W = 1.05, H = 2.14, NOREN = 0.68, DX = -0.12
   // (the rod and cloth hung out toward the doorway's own line, not back in the room)
-  const NZ = 0.36
+  const NZ = 0.27
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     panels.current.forEach((m, i) => {
