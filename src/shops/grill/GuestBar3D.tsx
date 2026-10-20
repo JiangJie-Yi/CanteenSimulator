@@ -127,7 +127,9 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const yaw = Math.atan2(ALONG.x, ALONG.z)
   // (hung high, its rod well over a customer's head: they duck through only its hem)
   // (the doorway wide, its middle a little off the way in toward the till: the wall's close on the other side)
-  const W = 1.05, H = 1.95, NOREN = 0.68, DX = -0.12
+  const W = 1.05, H = 2.14, NOREN = 0.68, DX = -0.12
+  // (the rod and cloth hung out toward the doorway's own line, not back in the room)
+  const NZ = 0.36
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     panels.current.forEach((m, i) => {
@@ -140,7 +142,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
       <group position={[0.4, 0, -0.75]}>
         {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower) */}
-        {[[-0.01, 0.26, 0.32, 0.84], [0.04, 0.14, 0.6, 0.7]].map(([x, d, h, l], i) => (
+        {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7]].map(([x, d, h, l], i) => (
           <Part key={i} geo={REG_GEO.round} color={i ? '#4a2e1c' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
         ))}
         {DOOR_CATS.map((k, i) => (
@@ -179,16 +181,16 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (no posts: the rod hangs by a cord at each end from the beam above, and the lantern by its own) */}
       {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[sd * (W / 2), H - 0.05 + 0.18, 0.03]}><cylinderGeometry args={[0.004, 0.004, 0.36, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
+        <mesh key={sd} position={[sd * (W / 2), H - 0.05 + 0.18, NZ]}><cylinderGeometry args={[0.004, 0.004, 0.36, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
       ))}
       <group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel */}
-      <mesh position={[0, H - 0.05, 0.03]} rotation-z={Math.PI / 2}>
+      <mesh position={[0, H - 0.05, NZ]} rotation-z={Math.PI / 2}>
         <cylinderGeometry args={[0.012, 0.012, W, 8]} />
         <meshToonMaterial color="#c9a46a" />
       </mesh>
       {[-1, 0, 1].map((k) => (
-        <group key={k} position={[k * (W / 3), H - 0.05, 0.035]}>
+        <group key={k} position={[k * (W / 3), H - 0.05, NZ + 0.005]}>
           <mesh ref={(m) => { panels.current[k + 1] = m }} position-y={-NOREN / 2}>
             <planeGeometry args={[W / 3 - 0.012, NOREN]} />
             <meshToonMaterial map={panelTex(tex, k + 1)} side={THREE.DoubleSide} />
@@ -477,10 +479,10 @@ const PAY_SIGN = (() => signTexture(160, 100, (g) => {
 const DOOR_CATS = [
   // (on the stand: x out from the wall, y the tier's top, z along it; the big white pair on the upper tier)
   // (each its own model and size, in its own colours: two big ones on top, two smaller below)
-  { x: 0.04, y: 0.6, z: -0.2, yaw: 0.2, kind: 1 as const, h: 0.66 },
-  { x: 0.04, y: 0.6, z: 0.2, yaw: -0.2, kind: 3 as const, h: 0.56 },
-  { x: -0.07, y: 0.32, z: -0.26, yaw: 0.25, kind: 2 as const, h: 0.46 },
-  { x: -0.07, y: 0.32, z: 0.26, yaw: -0.25, kind: 1 as const, h: 0.56 },
+  { x: -0.05, y: 0.6, z: -0.2, yaw: 0.2, kind: 1 as const, h: 0.66 },
+  { x: -0.05, y: 0.6, z: 0.2, yaw: -0.2, kind: 3 as const, h: 0.56 },
+  { x: -0.26, y: 0.32, z: -0.26, yaw: 0.25, kind: 2 as const, h: 0.46 },
+  { x: -0.26, y: 0.32, z: 0.26, yaw: -0.25, kind: 1 as const, h: 0.56 },
 ]
 /** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
 /** the customers' display: green figures on black, the amount to pay */
