@@ -313,8 +313,35 @@ const BOX_R = 0.46
 const BOX_SPOT = { along: 1.55, lay: 1.3 }
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
 const PIT_SCALE = 1.3
-/** the pit's ground disc, as a part of that: the stones stand on its rim */
-const PIT_GROUND = 0.62
+/**
+ * The pit's ground texture is white salt inside and brown earth out to a fading rim: the earth is faded away, so only the salt
+ * shows (nothing muddy round the stones, over the table).
+ */
+function saltOnly(mesh: THREE.Mesh) {
+  const mat = mesh.material as THREE.MeshStandardMaterial
+  const img = mat.map?.image as CanvasImageSource & { width: number; height: number } | undefined
+  if (!img || typeof document === 'undefined') return
+  const c = document.createElement('canvas')
+  c.width = img.width
+  c.height = img.height
+  const g = c.getContext('2d')!
+  g.drawImage(img, 0, 0)
+  const px = g.getImageData(0, 0, c.width, c.height)
+  for (let y = 0; y < c.height; y++) {
+    for (let x = 0; x < c.width; x++) {
+      const r = Math.hypot(x / c.width - 0.5, y / c.height - 0.5) * 2
+      const k = Math.min(1, Math.max(0, (r - 0.5) / 0.08))
+      px.data[(y * c.width + x) * 4 + 3] *= 1 - k * k * (3 - 2 * k)
+    }
+  }
+  g.putImageData(px, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.flipY = mat.map!.flipY
+  t.colorSpace = mat.map!.colorSpace
+  t.anisotropy = mat.map!.anisotropy
+  mat.map = t
+  mat.needsUpdate = true
+}
 /** how much higher the pit (its stones, coals and net) stands than it was modelled, with the flames and smoke over it */
 export const PIT_LIFT = 0.12
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
@@ -1650,8 +1677,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       o.position.x *= PIT_SCALE
       o.position.z *= PIT_SCALE
       o.position.y += PIT_LIFT
-      // (the ground disc only reaches the stones' middle: no muddy rim round the ring, over the table)
-      o.scale.multiplyScalar(o.name === 'FirePit' ? PIT_SCALE * PIT_GROUND : PIT_SCALE)
+      o.scale.multiplyScalar(PIT_SCALE)
+      if (o.name === 'FirePit') saltOnly(o as THREE.Mesh)
     }
     // (the net a hand's width higher too)
     const net = root.getObjectByName('GrillNet')
