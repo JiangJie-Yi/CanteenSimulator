@@ -306,11 +306,11 @@ function TrashBin({ position, container, contents = 0 }: { position: [number, nu
 /** the tray for raw food waiting to go on the fire: a grid of spots */
 const TRAY_ROWS = 4
 const TRAY_W = 1.6
-const TRAY_D = 1.0
+const TRAY_D = 0.9
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
 /** where the seasoning box's first half starts out: beside the cook, along and across the table */
-const BOX_SPOT = { along: 1.4, lay: 1.3 }
+const BOX_SPOT = { along: 1.55, lay: 1.3 }
 /** how much bigger the fire pit (its ground, stones and coals) is drawn than modelled */
 const PIT_SCALE = 1.3
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/

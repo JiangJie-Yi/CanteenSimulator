@@ -18,7 +18,7 @@ export const DECOR = {
   // (lying on the table by the seasoning boxes, at their front end)
   fan: { at: [0.85, 1.68], r: 0.3 },
   // (drawn 1.8 times its own size, at the table's back right, well in from the bar's edge (a lantern's feet and shade need the table's room), clear of the stones, the crate and the plates)
-  lantern: { at: [-2.0, -0.9], r: 0.34 },
+  lantern: { at: [-2.12, -0.81], r: 0.34 },
   // (the cooked rice the rice balls are made from: a shop's big tub, on a side table of its own just past the cook's
   // table's right-hand end, by the other cooks)
   rice: { at: [3.5, -2.12], r: 1.1 },

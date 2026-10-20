@@ -380,7 +380,7 @@ export const ALL_DISHES: Dish[] = [
       // (the bin to the left of the bucket, where it can be seen, not hidden behind it)
       // (kept on the table, whose left edge is drawn in by the side counter's pull: SIDE_PULL in shops/grill/bar.ts)
       trash: [-0.533, -1.26, 2.248],
-      tray: [-0.3, 0.0, 2.0],
+      tray: [-0.38, 0.0, 2.06],
       // the rice balls come out on their own little dish, just past the front end of the tray
       // (beside the front end of the tray, between it and the basket: the prep side, all on the right)
       rawDish: { at: [2.573, -0.74, 0.044], items: ['Onigiri'] },
