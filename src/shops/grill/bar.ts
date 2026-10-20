@@ -469,7 +469,7 @@ export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)
 /** the staff door in the room's front edge (the first counter's frame: along it, and lay from its middle) and the spot just
  * inside it, where the staff go in and out */
 // (the mat's outer edge flush with the room's front edge, lay 3.97: its middle half its depth in from it)
-export const STAFF_DOOR = { along: 1.3, lay: 3.9 }
+export const STAFF_DOOR = { along: 1.3, lay: 4.1 }
 export const staffDoorAt = (c: Counter, lay = STAFF_DOOR.lay - 0.25) => c.at.clone().addScaledVector(c.along, STAFF_DOOR.along).addScaledVector(c.lay, lay)
 /**
  * The grill's bar, stools and customers are all drawn this much bigger than their sizes here, to stand beside the

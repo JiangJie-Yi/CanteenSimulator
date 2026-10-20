@@ -310,7 +310,7 @@ const TRAY_D = 1.0
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
 /** where the seasoning box's first half starts out: beside the cook, along and across the table */
-const BOX_SPOT = { along: 0.7, lay: 1.7 }
+const BOX_SPOT = { along: 1.4, lay: 1.3 }
 /** how much bigger the fire pit (its ground, stones and coals) is drawn than modelled */
 const PIT_SCALE = 1.3
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/

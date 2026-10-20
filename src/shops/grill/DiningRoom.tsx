@@ -2369,12 +2369,12 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   }, [fr, c1])
   return (
     <StaticBatch key={lang}>
-      <group position={at(3.3, 3.2)} rotation-y={face + 0.3}>
+      <group position={at(3.6, 3.2)} rotation-y={face + 0.3}>
         <group rotation-y={Math.PI / 2}><SakeStack /></group>
       </group>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
-      <group position={at(3.62, 2.25)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
+      <group position={at(3.62, 2.7)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
       <group position={cornerAt} rotation-y={0.4}><PottedBamboo /></group>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
