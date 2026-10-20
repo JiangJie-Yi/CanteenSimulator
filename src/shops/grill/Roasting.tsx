@@ -1690,6 +1690,29 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       o.scale.multiplyScalar(o.name === 'FirePit' ? PIT_SCALE * PIT_GROUND : PIT_SCALE)
       if (o.name === 'FirePit') scorchEarth(o as THREE.Mesh)
     }
+    // (the bed's ash, for when the fire is out: a thin grey layer and a few lumps of slag, nothing like the charcoal's own model)
+    if (!root.getObjectByName('AshBed')) {
+      const ground = root.getObjectByName('FirePit')
+      root.updateWorldMatrix(true, true)
+      const box = ground ? new THREE.Box3().setFromObject(ground).applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert()) : null
+      const y0 = box ? box.max.y : 0.02
+      const ash = new THREE.Group()
+      ash.name = 'AshBed'
+      const bed = new THREE.Mesh(new THREE.CircleGeometry(0.4, 24), new THREE.MeshToonMaterial({ color: '#9a9894' }))
+      bed.rotation.x = -Math.PI / 2
+      bed.position.y = y0 + 0.004
+      ash.add(bed)
+      const tones = ['#8d8a86', '#6f6c68', '#a3a09b', '#7a7773']
+      for (let k = 0; k < 11; k++) {
+        const a = k * 2.4 + 0.6, r = 0.06 + ((k * 37) % 10) * 0.028
+        const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.03 + ((k * 13) % 5) * 0.008, 0), new THREE.MeshToonMaterial({ color: tones[k % 4] }))
+        m.position.set(Math.cos(a) * r, y0 + 0.014, Math.sin(a) * r)
+        m.scale.set(1.2 + (k % 3) * 0.2, 0.5 + (k % 2) * 0.15, 1)
+        m.rotation.set(k, k * 1.7, 0)
+        ash.add(m)
+      }
+      root.add(ash)
+    }
     // (the net a hand's width higher too)
     const net = root.getObjectByName('GrillNet')
     if (net && !net.userData.lifted) {
@@ -3424,12 +3447,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const f = fuel.current
     const ash = THREE.MathUtils.smoothstep(0.5 - f, 0, 0.45)
     // (no fire: only a few lumps of grey ash and slag; charcoal is what swells the heap, kindles and glows)
-    const heap = 0.28 + 0.72 * THREE.MathUtils.smoothstep(f, 0.0, 0.3)
+    const heap = THREE.MathUtils.smoothstep(f, 0.0, 0.3)
     for (const nm of ['Charcoal', 'BinchotanHeap']) {
       const o = root.getObjectByName(nm)
       if (!o) continue
       const b = (o.userData.heapBase ??= o.scale.clone()) as THREE.Vector3
       o.scale.set(b.x * heap, b.y * (0.25 + 0.75 * heap), b.z * heap)
+      o.visible = heap > 0.02
+    }
+    const bedAsh = root.getObjectByName('AshBed')
+    if (bedAsh) {
+      bedAsh.visible = heap < 0.6
+      bedAsh.scale.setScalar(1 - 0.6 * heap)
     }
 
     for (const e of embers.current) {
