@@ -1703,12 +1703,27 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       bed.position.y = y0 + 0.004
       ash.add(bed)
       const tones = ['#8d8a86', '#6f6c68', '#a3a09b', '#7a7773']
-      for (let k = 0; k < 11; k++) {
-        const a = k * 2.4 + 0.6, r = 0.06 + ((k * 37) % 10) * 0.028
-        const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.03 + ((k * 13) % 5) * 0.008, 0), new THREE.MeshToonMaterial({ color: tones[k % 4] }))
-        m.position.set(Math.cos(a) * r, y0 + 0.014, Math.sin(a) * r)
-        m.scale.set(1.2 + (k % 3) * 0.2, 0.5 + (k % 2) * 0.15, 1)
-        m.rotation.set(k, k * 1.7, 0)
+      // (heaped into a mound, like the charcoal's own heap: layers of lumps, each ring narrower and higher, about seventy in all)
+      let k = 0
+      for (let layer = 0; layer < 8; layer++) {
+        const ringR = 0.5 * (1 - layer * 0.11)
+        const count = Math.max(5, Math.round(22 - layer * 2.4))
+        for (let n = 0; n < count; n++) {
+          const a = (n / count) * Math.PI * 2 + layer * 0.9 + ((k * 7) % 5) * 0.08
+          const r = ringR * (0.55 + ((k * 31) % 10) * 0.045)
+          const size = 0.034 + ((k * 13) % 6) * 0.009
+          const m = new THREE.Mesh(new THREE.DodecahedronGeometry(size, 0), new THREE.MeshToonMaterial({ color: tones[k % 4] }))
+          m.position.set(Math.cos(a) * r, y0 + 0.02 + layer * 0.052, Math.sin(a) * r)
+          m.scale.set(1.2 + (k % 3) * 0.25, 0.65 + (k % 2) * 0.2, 1 + (k % 4) * 0.1)
+          m.rotation.set(k, k * 1.7, k * 0.6)
+          ash.add(m)
+          k++
+        }
+      }
+      for (let n = 0; n < 4; n++) {
+        const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.05, 0), new THREE.MeshToonMaterial({ color: tones[n % 4] }))
+        m.position.set(Math.cos(n * 1.6) * 0.07, y0 + 0.43, Math.sin(n * 1.6) * 0.07)
+        m.scale.set(1.3, 0.8, 1.1)
         ash.add(m)
       }
       root.add(ash)
@@ -3447,19 +3462,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const f = fuel.current
     const ash = THREE.MathUtils.smoothstep(0.5 - f, 0, 0.45)
     // (no fire: only a few lumps of grey ash and slag; charcoal is what swells the heap, kindles and glows)
-    const heap = THREE.MathUtils.smoothstep(f, 0.0, 0.3)
+    // (a plain swap: charcoal while there's a fire, the ash mound when there's none; no shrinking between)
+    const burning = f > 0.02
     for (const nm of ['Charcoal', 'BinchotanHeap']) {
       const o = root.getObjectByName(nm)
-      if (!o) continue
-      const b = (o.userData.heapBase ??= o.scale.clone()) as THREE.Vector3
-      o.scale.set(b.x * heap, b.y * (0.25 + 0.75 * heap), b.z * heap)
-      o.visible = heap > 0.02
+      if (o) o.visible = burning
     }
     const bedAsh = root.getObjectByName('AshBed')
-    if (bedAsh) {
-      bedAsh.visible = heap < 0.6
-      bedAsh.scale.setScalar(1 - 0.6 * heap)
-    }
+    if (bedAsh) bedAsh.visible = !burning
 
     for (const e of embers.current) {
       // no fire, no glow
