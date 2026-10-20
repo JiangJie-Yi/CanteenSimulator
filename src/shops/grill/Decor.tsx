@@ -206,7 +206,7 @@ const LANTERN_PAPER = canvas(128, 256, (g) => {
     g.fillStyle = `rgba(180,120,60,${Math.random() * 0.08})`
     g.fillRect(Math.random() * 128, Math.random() * 256, 2 + Math.random() * 6, 1)
   }
-  g.fillStyle = 'rgba(70,40,20,0.35)'
+  g.fillStyle = 'rgba(70,40,20,0.2)'
   g.fillRect(0, 84, 128, 3)
   g.fillRect(0, 170, 128, 3)
   g.fillRect(62, 0, 3, 256)
@@ -232,7 +232,7 @@ const LANTERN_SCALE = 1.8
 function Lantern({ at }: { at: [number, number, number] }) {
   const paper = useRef<THREE.MeshBasicMaterial>(null)
   const halo = useRef<THREE.Sprite>(null)
-  const flame = useRef<THREE.Mesh>(null)
+  const flame = useRef<THREE.Sprite>(null)
   const lamp = useRef<THREE.PointLight>(null)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -243,7 +243,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
       halo.current.material.opacity = 0.55 + (f - 0.88) * 2.2
       halo.current.scale.setScalar(0.95 + (f - 0.88) * 0.6)
     }
-    if (flame.current) flame.current.scale.set(1, 0.85 + (f - 0.88) * 2.5, 1)
+    if (flame.current) flame.current.scale.setScalar(0.22 * (0.9 + (f - 0.88) * 1.8))
     if (lamp.current) lamp.current.intensity = 0.7 * f
   })
   const S = 0.2, H = 0.36, LEG = 0.16
@@ -268,7 +268,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
       ))))}
       {/* the lit paper: unshaded, it glows the same by day or night */}
       <mesh geometry={geo.shade} position={[0, LEG + H / 2, 0]}>
-        <meshBasicMaterial ref={paper} map={LANTERN_PAPER} toneMapped={false} transparent opacity={0.94} />
+        <meshBasicMaterial ref={paper} map={LANTERN_PAPER} toneMapped={false} />
       </mesh>
       <mesh geometry={geo.shelf} position={[0, LEG * 0.45, 0]}>
         <meshToonMaterial color="#4a2e1c" />
@@ -277,10 +277,10 @@ function Lantern({ at }: { at: [number, number, number] }) {
         <meshToonMaterial color="#2a1a10" />
       </mesh>
       {/* the flame inside, seen through the paper */}
-      <mesh ref={flame} position={[0, LEG + H * 0.38, 0]}>
-        <coneGeometry args={[0.028, 0.09, 10]} />
-        <meshBasicMaterial color="#ffb347" toneMapped={false} transparent opacity={0.85} />
-      </mesh>
+      {/* (a soft glow, not a solid shape: a hard cone showing through the paper cut dark wedges across it) */}
+      <sprite ref={flame} position={[0, LEG + H * 0.4, 0]} scale={0.22}>
+        <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.7} color="#ffcf80" />
+      </sprite>
       {/* the glow round it, always facing the camera, laid on additively */}
       <sprite ref={halo} position={[0, LEG + H / 2, 0]} scale={0.95}>
         <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
