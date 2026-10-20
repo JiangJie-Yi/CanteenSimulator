@@ -367,7 +367,12 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
       <Part geo={REG_GEO.body} color="#e8e2d2" outline={1.02} position={[0.05, 0.16, 0.1]} scale={[0.14, 0.09, 0.12]} />
       <Part geo={REG_GEO.body} color="#2a3442" outline={1.02} position={[0.3, top - 0.155, 0.08]} scale={[0.2, 0.065, 0.16]} />
       {/* a thick top of pale hinoki, overhanging its front, a warm light hidden under the overhang washing down the front */}
-      <Part geo={REG_GEO.round} color="#d9b884" outline={1.02} position={[0, top - 0.03, -0.03]} scale={[W + 0.1, 0.06, D + 0.1]} />
+      <group position={[0, top - 0.03, -0.03]}>
+        <mesh geometry={TILL_TOP_GEO} scale={[W + 0.1, 0.06, D + 0.1]} castShadow receiveShadow>
+          <meshToonMaterial color="#ffffff" map={TILL_WOOD} />
+        </mesh>
+        <mesh geometry={REG_GEO.round} scale={[(W + 0.1) * 1.02, 0.06 * 1.02, (D + 0.1) * 1.02]}><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
+      </group>
       <mesh position={[0, top - 0.075, -D / 2 - 0.0]} rotation-y={Math.PI}><planeGeometry args={[W - 0.1, 0.025]} /><meshBasicMaterial color="#ffd89a" toneMapped={false} /></mesh>
       <mesh position={[0, top - 0.22, -D / 2 + 0.018]} rotation-y={Math.PI}><planeGeometry args={[W - 0.06, 0.3]} /><meshBasicMaterial map={TILL_GLOW} transparent depthWrite={false} toneMapped={false} /></mesh>
       {/* its front: upright battens of hinoki over the dark body, close set, a dark kick board at the foot */}
@@ -457,6 +462,29 @@ const DOOR_CATS = [
 ]
 /** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
 /** the customers' display: green figures on black, the amount to pay */
+/** pale hinoki for the till's top: warm cream boards, fine grain running along the counter, a darker seam between them */
+const TILL_WOOD = signTexture(256, 128, (g) => {
+  const tones = ['#e4c796', '#dcbd8a', '#e8cd9e', '#d8b884']
+  for (let r = 0; r < 4; r++) {
+    g.fillStyle = tones[r]
+    g.fillRect(0, r * 32, 256, 32)
+    for (let k = 0; k < 9; k++) {
+      const y = r * 32 + 3 + k * 3.2
+      g.strokeStyle = k % 3 ? 'rgba(150,105,55,0.28)' : 'rgba(255,240,205,0.3)'
+      g.lineWidth = 0.8 + (k % 2) * 0.4
+      g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(80, y + 1.5 * Math.sin(r + k), 170, y - 1.5 * Math.cos(r * 2 + k), 256, y + 0.5); g.stroke()
+    }
+    g.fillStyle = 'rgba(110,75,38,0.55)'
+    g.fillRect(0, r * 32 + 30.5, 256, 1.6)
+  }
+  g.fillStyle = 'rgba(120,80,40,0.35)'
+  g.beginPath(); g.ellipse(170, 48, 6, 2.6, 0, 0, Math.PI * 2); g.fill()
+}, true)
+const TILL_TOP_GEO = (() => {
+  // (a rounded slab whose top and bottom faces take their texture coordinates from their own size: the grain along it, boards a hand wide)
+  const g = new RoundedBoxGeometry(1, 1, 1, 3, 0.12)
+  return g
+})()
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
   key: new THREE.CylinderGeometry(0.004, 0.004, 0.016, 6),
