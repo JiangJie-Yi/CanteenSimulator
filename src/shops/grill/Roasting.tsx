@@ -1728,6 +1728,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       root.add(ash)
     }
+    // (no striped shadow acne on the salt and no lattice shadow of the net laid over the coals: the ground doesn't take shadows, the net casts none)
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      if (/^FirePit/.test(o.name)) m.receiveShadow = false
+      if (/^GrillNet/.test(o.name) || /^GrillNet/.test(o.parent?.name ?? '')) m.castShadow = false
+    })
     // (the net a hand's width higher too)
     const net = root.getObjectByName('GrillNet')
     if (net && !net.userData.lifted) {
@@ -3454,6 +3461,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
       })
       embers.current = [...found].map(([mat, base]) => ({ mat, base, color: mat.color.clone() }))
+    }
+    // (Dish sets every mesh to cast and receive shadows as it loads, so the ground and net are put right here, once it has)
+    if (!root.userData.shadowsFixed) {
+      const g = root.getObjectByName('FirePit') as THREE.Mesh | undefined
+      const n = root.getObjectByName('GrillNet') as THREE.Mesh | undefined
+      if (g && n && g.receiveShadow && n.castShadow) {
+        g.receiveShadow = false
+        n.castShadow = false
+        root.userData.shadowsFixed = true
+      }
     }
     const target = fire?.current ?? 0.55
     // (the coals' own state eases toward the fire: charcoal added swells up and kindles over a moment, the pile shrinks back slowly as it burns)
