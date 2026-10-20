@@ -808,13 +808,11 @@ function barTopShape(grow: number) {
   // over both: the faces' texture coordinates laid from where they are, not stretched over the shape)
   const pos = g.attributes.position, uv = g.attributes.uv
   for (let t = 0; t < pos.count; t += 3) {
-    const cx = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3, cy = (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3
     const nz = Math.abs((pos.getX(t + 1) - pos.getX(t)) * (pos.getY(t + 2) - pos.getY(t)) - (pos.getY(t + 1) - pos.getY(t)) * (pos.getX(t + 2) - pos.getX(t)))
     const flat = pos.getZ(t) === pos.getZ(t + 1) && pos.getZ(t) === pos.getZ(t + 2) && nz > 1e-9
-    const armTwo = cy > a.y1 + 0.02 && cx < b.x1
     for (let k = 0; k < 3; k++) {
       const x = pos.getX(t + k), y = pos.getY(t + k)
-      if (flat) uv.setXY(t + k, armTwo ? y : x, armTwo ? -x : y)
+      if (flat) uv.setXY(t + k, x, y)
       else uv.setXY(t + k, x + y, pos.getZ(t + k) * 4)
     }
   }
