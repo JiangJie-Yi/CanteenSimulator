@@ -90,15 +90,51 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
   const [a, b] = [...mark]
   brushText(g, a ?? '', 64, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
   brushText(g, b ?? '', 320, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
-  g.strokeStyle = '#f4efe2'
-  g.lineWidth = 7
+  // the middle panel: a salt-grilled fish on a bamboo skewer, in the same white dye (the grill's own mark): the body with its tail and fins, the eye,
+  // the gill, the rows of scales and a few grains of salt, little waves of heat rising under it
+  const skewer = (x0: number, y0: number, x1: number, y1: number) => {
+    g.strokeStyle = '#d9c28e'; g.lineWidth = 4; g.lineCap = 'round'
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke()
+    g.lineCap = 'butt'
+  }
+  skewer(112, 134, 270, 82)
+  g.fillStyle = '#f6f0e0'
   g.beginPath()
-  g.arc(192, 108, 46, 0, Math.PI * 2)
-  g.stroke()
+  g.moveTo(130, 108)
+  g.bezierCurveTo(146, 80, 200, 74, 232, 98)
+  g.lineTo(262, 80)
+  g.quadraticCurveTo(250, 108, 262, 138)
+  g.lineTo(232, 118)
+  g.bezierCurveTo(200, 144, 146, 138, 130, 108)
+  g.closePath()
+  g.fill()
+  // (the dorsal fin on top, the pelvic fin under, each a small fan)
+  g.beginPath(); g.moveTo(166, 82); g.lineTo(186, 62); g.lineTo(206, 86); g.closePath(); g.fill()
+  g.beginPath(); g.moveTo(176, 132); g.lineTo(188, 150); g.lineTo(206, 130); g.closePath(); g.fill()
+  // (the details cut away in the cloth's indigo)
+  g.strokeStyle = '#25396a'
+  g.fillStyle = '#25396a'
+  g.lineWidth = 3.2
+  g.beginPath(); g.arc(152, 102, 5.5, 0, Math.PI * 2); g.fill()
+  g.beginPath(); g.arc(171, 108, 17, -0.95, 0.95); g.stroke()
+  g.lineWidth = 2
+  g.beginPath(); g.moveTo(132, 112); g.quadraticCurveTo(140, 118, 150, 116); g.stroke()
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 5; col++) {
+      g.beginPath(); g.arc(188 + col * 9 + (row % 2) * 4.5, 94 + row * 9, 5, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke()
+    }
+  }
+  g.lineWidth = 2.4
+  for (const [x, y0, y1] of [[240, 90, 100], [244, 104, 112], [242, 120, 128]] as [number, number, number][]) { g.beginPath(); g.moveTo(x, y0); g.lineTo(x + 14, y1 - 6); g.stroke() }
+  // (a few grains of salt along its back, and the heat: three short waves rising under it)
+  g.fillStyle = '#f6f0e0'
+  for (const [x, y] of [[176, 90], [196, 86], [214, 90], [186, 128], [206, 126]] as [number, number][]) { g.beginPath(); g.arc(x, y, 2.2, 0, Math.PI * 2); g.fill() }
+  g.strokeStyle = '#f4efe2'
   g.lineWidth = 3.4
-  for (let q = 0; q < 4; q++) {
+  for (let q = 0; q < 3; q++) {
     g.beginPath()
-    g.arc(192, 128, 9 + q * 8, Math.PI, Math.PI * 2)
+    g.moveTo(150 + q * 34, 172)
+    g.bezierCurveTo(144 + q * 34, 164, 158 + q * 34, 156, 150 + q * 34, 148)
     g.stroke()
   }
   // a band of seigaiha waves along the hem (concentric scales in tone-on-tone indigo, rows overlapping, a pale thread at their crests), and
@@ -149,7 +185,8 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
  */
 export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const lantern = mark === '聞野' ? '炭火' : mark
-  const tex = useMemo(() => norenTexture(mark), [mark])
+  // (the grill's noren reads 烤魚, the shop's trade, with a fish on it; the other shops' name their own)
+  const tex = useMemo(() => norenTexture(mark === '聞野' ? '烤魚' : mark), [mark])
   const panels = useRef<(THREE.Mesh | null)[]>([])
   const yaw = Math.atan2(ALONG.x, ALONG.z)
   // (hung high, its rod well over a customer's head: they duck through only its hem)
