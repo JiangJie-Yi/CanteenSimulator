@@ -22,7 +22,7 @@ import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
-import { DECOR, Decor, type Held } from './Decor'
+import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
 import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
@@ -1653,7 +1653,7 @@ type RoastingProps = {
   /** the player's best way with each food, from the tasting notes: the chef may cook to it */
   notes?: Record<string, { doneness?: number; dabs?: Record<string, number> }>
   /** something to tell the diner (it isn't cooked yet, it's burnt) */
-  onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
+  onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable') => void
   /** written every frame: how much smoke is coming off the fire (0..1), from food that's cooked and still on it */
   smoke?: RefObject<number>
   /** likewise for black smoke, from food left on until it burns */
@@ -2211,6 +2211,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       destination(q) === destination(p)).map((q) => q.slot))
     let slot = 0
     while (taken.has(slot)) slot++
+    // (food comes off the fire onto a plate only if that plate is on the cook's table: a plate carried off it, or fallen to the floor, takes nothing)
+    if (space !== 'open' && !basket && !dish) {
+      const pl = plateAt(Math.floor(slot / PER_PLATE))
+      if (outsideTable(pl, PLATE_R)) { onNotice?.('offTable'); return }
+    }
     p.slot = slot
     p.collected = true
     p.netSpot = null           // its place on the grill net goes to the next one waiting
@@ -3695,6 +3700,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (present(p) && !p.wasPresent) {
         // just ordered: it's brought out raw on the tray (the base fish, not on the menu, starts on the fire)
         p.wasPresent = true
+        p.node.userData.shrink = undefined
         // (in the open shop: the next one of these ordered, as what dish)
         if (space === 'open') {
           const i = wants.current.findIndex((w) => w.id === p.id)
@@ -3703,11 +3709,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (menuIds.has(p.id) && roast.tray) {
           p.staged = true
           p.stagedAt = ++stageSeq.current
+          FRIDGE_KICK.at = performance.now()
           p.node.userData.onPlate = true
         }
       }
       if (!present(p)) {
         // taken off the order: next time it comes back raw, on the tray
+        // (sent home to the fire's place but kept at no size, so it isn't seen there for the moment it takes Dish to shrink it away)
+        if (menuIds.has(p.id)) p.node.userData.shrink = 0.0001
         p.wasPresent = false
         p.staged = false
         p.homeFlight = 1

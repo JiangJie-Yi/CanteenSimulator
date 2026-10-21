@@ -4,12 +4,13 @@
 // them like anything else (DECOR is their footprint, for its settle()).
 import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ALONG, GRILL_OFFSET, KITCHEN_DROP } from './bar'
+import { ALONG, GRILL_OFFSET, KITCHEN_DROP, LAY } from './bar'
 
 type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
@@ -452,6 +453,77 @@ function RiceTub() {
   )
 }
 
+/** when something was last taken out of the ingredient fridge (Roasting sets it as an order is brought out raw to the tray) */
+export const FRIDGE_KICK = { at: -1e9 }
+const CUTFISH_URL = import.meta.env.BASE_URL + 'models/cut_fish.glb'
+/**
+ * The ingredient fridge: a tall pale-blue cabinet with a rounded top, a cream handle and a plate that says 食材, standing on the
+ * kitchen floor by the table's right end. Its door swings open for a moment each time something is brought out of it for an order, a
+ * cool light spilling out, and on its top lies the cut fish (the downloaded hand-painted model, kept in its own colours).
+ */
+function IngredientFridge() {
+  const door = useRef<THREE.Group>(null)
+  const light = useRef<THREE.PointLight>(null)
+  const gltf = useGLTF(CUTFISH_URL) as unknown as { scene: THREE.Group }
+  const fish = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      // (its painted colours as they are: the map straight into a toon material, no tint, so its soft airbrushed shading survives)
+      m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null })
+      m.castShadow = true
+    })
+    const b = new THREE.Box3().setFromObject(root)
+    const d = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3())
+    const k = 0.5 / Math.max(d.x, d.z)
+    const wrap = new THREE.Group()
+    root.position.set(-c.x, -b.min.y, -c.z)
+    wrap.add(root)
+    wrap.scale.setScalar(k)
+    return wrap
+  }, [gltf])
+  useFrame(() => {
+    const open = performance.now() - FRIDGE_KICK.at < 1800 ? 1 : 0
+    if (door.current) door.current.rotation.y += ((-open * 1.7) - door.current.rotation.y) * 0.12
+    if (light.current) light.current.intensity += (open * 0.9 - light.current.intensity) * 0.12
+  })
+  const W = 0.8, H = 1.7, D = 0.7
+  const BLUE = '#a9d4ee', DARK = '#6f9fbd'
+  return (
+    <group>
+      <mesh position={[0, H / 2, 0]} castShadow><boxGeometry args={[W, H, D]} /><meshToonMaterial color={BLUE} /></mesh>
+      <mesh position={[0, H + 0.02, 0]}><boxGeometry args={[W + 0.04, 0.05, D + 0.04]} /><meshToonMaterial color={DARK} /></mesh>
+      <mesh position={[0, 0.04, 0]}><boxGeometry args={[W + 0.03, 0.08, D + 0.03]} /><meshToonMaterial color="#4a6a80" /></mesh>
+      {/* (inside, seen when the door is open: shelves and a cool light) */}
+      {[0.5, 0.95, 1.4].map((y) => <mesh key={y} position={[0, y, 0.01]}><boxGeometry args={[W - 0.1, 0.02, D - 0.08]} /><meshToonMaterial color="#dfeef7" /></mesh>)}
+      <pointLight ref={light} position={[0, H * 0.6, D / 2 + 0.2]} color="#cfe9ff" intensity={0} distance={2.2} decay={1.6} />
+      {/* the door, hinged on its left, with the handle and the sign */}
+      <group ref={door} position={[-W / 2 + 0.02, 0, D / 2 + 0.01]}>
+        <mesh position={[W / 2 - 0.02, H / 2, 0.015]} castShadow><boxGeometry args={[W - 0.04, H - 0.1, 0.04]} /><meshToonMaterial color="#bfe0f4" /></mesh>
+        <mesh position={[W - 0.12, H * 0.55, 0.06]}><boxGeometry args={[0.03, 0.5, 0.03]} /><meshToonMaterial color="#f2efe6" /></mesh>
+        <mesh position={[W / 2 - 0.02, H - 0.3, 0.037]}><planeGeometry args={[0.46, 0.17]} /><meshBasicMaterial map={FRIDGE_SIGN} toneMapped={false} /></mesh>
+      </group>
+      <group position={[0, H + 0.05, 0]} rotation-y={0.3}><primitive object={fish} /></group>
+    </group>
+  )
+}
+const FRIDGE_SIGN = canvas(184, 64, (g) => {
+  g.fillStyle = '#f4f8fb'
+  g.fillRect(0, 0, 184, 64)
+  g.strokeStyle = '#3f7ca8'
+  g.lineWidth = 4
+  g.strokeRect(3, 3, 178, 58)
+  brushText(g, '食材', 92, 34, 40, { fill: '#2a5a80', spacing: 8 })
+})
+/** where it stands on the kitchen floor (along the first counter, across it) */
+const FRIDGE_AT = { along: 4.0, lay: 1.7 }
+function FridgeAt() {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const p = new THREE.Vector3().addScaledVector(ALONG, FRIDGE_AT.along).addScaledVector(LAY, FRIDGE_AT.lay)
+  return <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-ALONG.x, -ALONG.z)}><IngredientFridge /></group>
+}
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
     <>
@@ -460,6 +532,7 @@ export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [
       <HeldStick held={held} />
       <Lantern at={lanternAt} />
       <RiceTub />
+      <group position={[0, 0, 0]}><FridgeAt /></group>
     </>
   )
 }

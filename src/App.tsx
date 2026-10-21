@@ -282,7 +282,7 @@ type SceneProps = {
   resetView: number
   /** the eye button's second view, on: the whole shop from above at 45 degrees */
   overview: boolean
-  onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
+  onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable') => void
   lang: Lang
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
@@ -1153,7 +1153,7 @@ export default function App() {
   // (by the screen's size: a tablet, touch screen or not, keeps the 3D grill)
   const flatGrill = smallScreen && !!dish.roast
   const sceneOffFire = (n: number, loose: number) => { setOffFire(n); setLoose(loose) }
-  const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
+  const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
   const sceneOrder = (id: string, guest?: number) => {
     const ok = changeQty(id, 1)
     // a customer's order is written onto the menu below, so you see it come in
