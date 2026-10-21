@@ -455,14 +455,16 @@ function RiceTub() {
 
 /** when something was last taken out of the ingredient fridge (Roasting sets it as an order is brought out raw to the tray) */
 export const FRIDGE_KICK = { at: -1e9 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridgeKick?: typeof FRIDGE_KICK }).__fridgeKick = FRIDGE_KICK
 const CUTFISH_URL = import.meta.env.BASE_URL + 'models/cut_fish.glb'
 /**
- * The ingredient fridge: a tall pale-blue cabinet with a rounded top, a cream handle and a plate that says 食材, standing on the
- * kitchen floor by the table's right end. Its door swings open for a moment each time something is brought out of it for an order, a
- * cool light spilling out, and on its top lies the cut fish (the downloaded hand-painted model, kept in its own colours).
+ * The ingredient freezer: a wide chest freezer lying along the kitchen's back wall by the staff door, pale blue-white on a dark plinth, its
+ * hinged lid on the back edge with a chrome handle, a compressor housing at its right end (vent louvres, a dial and a red lamp), and a plate
+ * on its front that says 食材. Its lid swings up for a moment each time something is brought out of it for an order, a cool light spilling
+ * out over the frozen packs inside, and on the housing's top lies the cut fish (the downloaded hand-painted model, kept in its own colours).
  */
 function IngredientFridge() {
-  const door = useRef<THREE.Group>(null)
+  const lid = useRef<THREE.Group>(null)
   const light = useRef<THREE.PointLight>(null)
   const gltf = useGLTF(CUTFISH_URL) as unknown as { scene: THREE.Group }
   const fish = useMemo(() => {
@@ -486,26 +488,71 @@ function IngredientFridge() {
   }, [gltf])
   useFrame(() => {
     const open = performance.now() - FRIDGE_KICK.at < 1800 ? 1 : 0
-    if (door.current) door.current.rotation.y += ((-open * 1.7) - door.current.rotation.y) * 0.12
-    if (light.current) light.current.intensity += (open * 0.9 - light.current.intensity) * 0.12
+    // (the lid hinged on its back edge, swinging up and over)
+    if (lid.current) lid.current.rotation.x += ((-open * 1.85) - lid.current.rotation.x) * 0.1
+    if (light.current) light.current.intensity += (open * 1.1 - light.current.intensity) * 0.12
   })
-  const W = 0.8, H = 1.7, D = 0.7
-  const BLUE = '#a9d4ee', DARK = '#6f9fbd'
+  // (its size: along the wall, deep, and tall as a worktop; the compressor housing takes the right-hand end)
+  const W = 1.5, D = 0.74, H = 0.86, HOUSE = 0.34, PLINTH = 0.1, WALL = 0.05, LID = 0.09
+  const BODY = '#dce9f1', TRIM = '#b6cad8', DARK = '#46576a', INNER = '#eef6fb'
+  const STEEL = '#cdd5db'
+  const LW = W - HOUSE
+  // (the frozen packs inside: blocks and trays in cool whites and blues, heaped in the cavity)
+  const packs = useMemo(() => {
+    let seed = 5
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    const tones = ['#f2f8fc', '#cfe3f1', '#e4eef6', '#bcd6ea', '#f8fbfd']
+    return Array.from({ length: 16 }, (_, i) => ({
+      p: [(rnd() - 0.5) * (LW - 0.3), PLINTH + 0.1 + Math.floor(i / 8) * 0.07 + 0.03, (rnd() - 0.5) * (D - 0.25)] as [number, number, number],
+      s: [0.14 + rnd() * 0.12, 0.06 + rnd() * 0.03, 0.12 + rnd() * 0.08] as [number, number, number], r: (rnd() - 0.5) * 0.5, c: tones[i % tones.length],
+    }))
+  }, [LW])
   return (
     <group>
-      <mesh position={[0, H / 2, 0]} castShadow><boxGeometry args={[W, H, D]} /><meshToonMaterial color={BLUE} /></mesh>
-      <mesh position={[0, H + 0.02, 0]}><boxGeometry args={[W + 0.04, 0.05, D + 0.04]} /><meshToonMaterial color={DARK} /></mesh>
-      <mesh position={[0, 0.04, 0]}><boxGeometry args={[W + 0.03, 0.08, D + 0.03]} /><meshToonMaterial color="#4a6a80" /></mesh>
-      {/* (inside, seen when the door is open: shelves and a cool light) */}
-      {[0.5, 0.95, 1.4].map((y) => <mesh key={y} position={[0, y, 0.01]}><boxGeometry args={[W - 0.1, 0.02, D - 0.08]} /><meshToonMaterial color="#dfeef7" /></mesh>)}
-      <pointLight ref={light} position={[0, H * 0.6, D / 2 + 0.2]} color="#cfe9ff" intensity={0} distance={2.2} decay={1.6} />
-      {/* the door, hinged on its left, with the handle and the sign */}
-      <group ref={door} position={[-W / 2 + 0.02, 0, D / 2 + 0.01]}>
-        <mesh position={[W / 2 - 0.02, H / 2, 0.015]} castShadow><boxGeometry args={[W - 0.04, H - 0.1, 0.04]} /><meshToonMaterial color="#bfe0f4" /></mesh>
-        <mesh position={[W - 0.12, H * 0.55, 0.06]}><boxGeometry args={[0.03, 0.5, 0.03]} /><meshToonMaterial color="#f2efe6" /></mesh>
-        <mesh position={[W / 2 - 0.02, H - 0.3, 0.037]}><planeGeometry args={[0.46, 0.17]} /><meshBasicMaterial map={FRIDGE_SIGN} toneMapped={false} /></mesh>
+      {/* the plinth, and the cabinet's four walls and floor round the cavity */}
+      <mesh position={[0, PLINTH / 2, 0]}><boxGeometry args={[W - 0.04, PLINTH, D - 0.04]} /><meshToonMaterial color={DARK} /></mesh>
+      <mesh position={[-HOUSE / 2, PLINTH + 0.03, 0]}><boxGeometry args={[LW - 0.02, 0.06, D - 0.02]} /><meshToonMaterial color={INNER} /></mesh>
+      {/* (front and back walls, left end, and the wall between the cavity and the housing) */}
+      <mesh position={[-HOUSE / 2, (H - LID + PLINTH) / 2, D / 2 - WALL / 2]} castShadow><boxGeometry args={[LW, H - LID - PLINTH, WALL]} /><meshToonMaterial color={BODY} /></mesh>
+      <mesh position={[-HOUSE / 2, (H - LID + PLINTH) / 2, -D / 2 + WALL / 2]}><boxGeometry args={[LW, H - LID - PLINTH, WALL]} /><meshToonMaterial color={BODY} /></mesh>
+      <mesh position={[-W / 2 + WALL / 2, (H - LID + PLINTH) / 2, 0]} castShadow><boxGeometry args={[WALL, H - LID - PLINTH, D]} /><meshToonMaterial color={BODY} /></mesh>
+      <mesh position={[W / 2 - HOUSE, (H - LID + PLINTH) / 2, 0]}><boxGeometry args={[WALL, H - LID - PLINTH, D]} /><meshToonMaterial color={INNER} /></mesh>
+      {/* (the inside faces, paler, seen when the lid is up) */}
+      <mesh position={[-HOUSE / 2, (H - LID + PLINTH) / 2, D / 2 - WALL - 0.002]} rotation-y={Math.PI}><planeGeometry args={[LW - 0.1, H - LID - PLINTH]} /><meshToonMaterial color={INNER} /></mesh>
+      <mesh position={[-HOUSE / 2, (H - LID + PLINTH) / 2, -D / 2 + WALL + 0.002]}><planeGeometry args={[LW - 0.1, H - LID - PLINTH]} /><meshToonMaterial color={INNER} /></mesh>
+      {/* (the frozen packs) */}
+      <group position={[-HOUSE / 2, 0, 0]}>
+        {packs.map((k, i) => <mesh key={i} position={k.p} rotation-y={k.r}><boxGeometry args={k.s} /><meshToonMaterial color={k.c} /></mesh>)}
       </group>
-      <group position={[0, H + 0.05, 0]} rotation-y={0.3}><primitive object={fish} /></group>
+      {/* the chrome rim all round the opening, and the gasket's dark line inside it */}
+      <mesh position={[-HOUSE / 2, H - LID - 0.006, 0]}><boxGeometry args={[LW + 0.03, 0.012, D + 0.03]} /><meshToonMaterial color={STEEL} /></mesh>
+      {/* (the front's plate: 食材, a thin trim round the cabinet's foot, and the bottom edge's shadow line) */}
+      <mesh position={[-W / 2 + 0.34, 0.5, D / 2 + 0.003]}><planeGeometry args={[0.46, 0.17]} /><meshBasicMaterial map={FRIDGE_SIGN} toneMapped={false} /></mesh>
+      <mesh position={[-HOUSE / 2, PLINTH + 0.005, 0]}><boxGeometry args={[W + 0.01, 0.012, D + 0.01]} /><meshToonMaterial color={TRIM} /></mesh>
+      {/* the compressor housing at the right end: a solid block, a top of its own, louvres, a dial and a lamp on its front */}
+      <mesh position={[W / 2 - HOUSE / 2, (H + PLINTH) / 2, 0]} castShadow><boxGeometry args={[HOUSE, H - PLINTH, D]} /><meshToonMaterial color={BODY} /></mesh>
+      <mesh position={[W / 2 - HOUSE / 2, H + 0.006, 0]}><boxGeometry args={[HOUSE + 0.02, 0.014, D + 0.02]} /><meshToonMaterial color={STEEL} /></mesh>
+      {[0, 1, 2, 3, 4, 5].map((k) => <mesh key={k} position={[W / 2 - HOUSE / 2, 0.22 + k * 0.034, D / 2 + 0.003]}><boxGeometry args={[0.22, 0.012, 0.006]} /><meshToonMaterial color={DARK} /></mesh>)}
+      <mesh position={[W / 2 - HOUSE / 2 + 0.07, 0.58, D / 2 + 0.012]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.026, 0.028, 0.02, 16]} /><meshToonMaterial color="#2c3640" /></mesh>
+      <mesh position={[W / 2 - HOUSE / 2 + 0.07, 0.58, D / 2 + 0.023]}><boxGeometry args={[0.004, 0.034, 0.002]} /><meshBasicMaterial color="#f4f1e6" /></mesh>
+      <mesh position={[W / 2 - HOUSE / 2 - 0.07, 0.58, D / 2 + 0.008]}><sphereGeometry args={[0.011, 10, 8]} /><meshBasicMaterial color="#ff4a3a" toneMapped={false} /></mesh>
+      {/* the lid, hinged along its back edge: a thick slab with a chrome handle at the front and a lock, its underside's gasket dark */}
+      <group ref={lid} position={[-HOUSE / 2, H - LID, -D / 2]}>
+        <mesh position={[0, LID / 2, D / 2]} castShadow><boxGeometry args={[LW, LID, D]} /><meshToonMaterial color="#eaf3f9" /></mesh>
+        <mesh position={[0, LID / 2 - 0.02, D / 2]}><boxGeometry args={[LW + 0.012, 0.012, D + 0.012]} /><meshToonMaterial color={STEEL} /></mesh>
+        {/* (the underside: a pale liner with the gasket's dark line all round its edge) */}
+        <mesh position={[0, 0.003, D / 2]}><boxGeometry args={[LW - 0.06, 0.006, D - 0.06]} /><meshToonMaterial color="#e4eef5" /></mesh>
+        {[-1, 1].map((sd) => <mesh key={`a${sd}`} position={[0, 0.0045, D / 2 + sd * (D / 2 - 0.045)]}><boxGeometry args={[LW - 0.06, 0.008, 0.016]} /><meshToonMaterial color="#2a3138" /></mesh>)}
+        {[-1, 1].map((sd) => <mesh key={`b${sd}`} position={[sd * (LW / 2 - 0.045), 0.0045, D / 2]}><boxGeometry args={[0.016, 0.008, D - 0.06]} /><meshToonMaterial color="#2a3138" /></mesh>)}
+        <mesh position={[0, LID * 0.62, D - 0.03]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.011, 0.011, 0.5, 10]} /><meshToonMaterial color={STEEL} /></mesh>
+        {[-0.22, 0.22].map((x) => <mesh key={x} position={[x, LID * 0.62, D - 0.014]}><boxGeometry args={[0.02, 0.03, 0.028]} /><meshToonMaterial color={STEEL} /></mesh>)}
+        <mesh position={[LW / 2 - 0.1, LID * 0.5, D + 0.002]}><boxGeometry args={[0.03, 0.03, 0.006]} /><meshToonMaterial color="#8a8e92" /></mesh>
+        {/* (the two hinges at the back) */}
+        {[-LW / 2 + 0.16, LW / 2 - 0.16].map((x) => <mesh key={x} position={[x, LID / 2, -0.004]}><boxGeometry args={[0.1, 0.05, 0.012]} /><meshToonMaterial color="#8a8e92" /></mesh>)}
+      </group>
+      <pointLight ref={light} position={[-HOUSE / 2, H - 0.12, 0.15]} color="#cfe9ff" intensity={0} distance={2.4} decay={1.6} />
+      {/* the cut fish on the housing's top, laid across it */}
+      <group position={[W / 2 - HOUSE / 2, H + 0.014, 0]} rotation-y={Math.PI / 2 + 0.2}><primitive object={fish} /></group>
     </group>
   )
 }
@@ -517,12 +564,13 @@ const FRIDGE_SIGN = canvas(184, 64, (g) => {
   g.strokeRect(3, 3, 178, 58)
   brushText(g, '食材', 92, 34, 40, { fill: '#2a5a80', spacing: 8 })
 })
-/** where it stands on the kitchen floor (along the first counter, across it) */
-const FRIDGE_AT = { along: 4.0, lay: 1.7 }
+/** where it stands on the kitchen floor (along the first counter, across it): lying along the back wall, just to the cooks' side of the staff door, its back to the wall */
+const FRIDGE_AT = { along: 3.4, lay: 5.05 }
 function FridgeAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, FRIDGE_AT.along).addScaledVector(LAY, FRIDGE_AT.lay)
-  return <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-ALONG.x, -ALONG.z)}><IngredientFridge /></group>
+  // (its front, local +z, toward the room, and its length along the wall: local x runs along the first counter)
+  return <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><IngredientFridge /></group>
 }
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
