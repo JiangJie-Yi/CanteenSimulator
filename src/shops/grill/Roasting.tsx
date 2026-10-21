@@ -366,18 +366,21 @@ function scorchEarth(mesh: THREE.Mesh) {
   for (let y = 0; y < c.height; y++) {
     for (let x = 0; x < c.width; x++) {
       const r = Math.hypot(x / c.width - 0.5, y / c.height - 0.5) * 2
-      // (past the salt, the earth goes darker and redder-brown toward the rim, the way fired ground does)
-      const k = Math.min(1, Math.max(0, (r - 0.5) / 0.35))
       const i = (y * c.width + x) * 4
-      // (multiplied in, as a stain: the earth darkened by its own colour, and only partly opaque, fading out at the rim; the salt inside, r < 0.5, untouched)
+      // (the salt fills the ring right out under the stones, pure salt to r = 0.58 whatever tone the model's earth had; past it the earth goes
+      // darker and redder-brown toward the rim, the way fired ground does, multiplied in as a stain, and never over the salt)
+      const k = Math.min(1, Math.max(0, (r - 0.66) / 0.3))
+      const grainS = 0.95 + 0.05 * ((px.data[i] + px.data[i + 1] + px.data[i + 2]) / 765)
+      const saltness = 1 - Math.min(1, Math.max(0, (r - 0.58) / 0.08))
       const mul = 1 - k
-      px.data[i] = px.data[i] * (mul + k * (px.data[i] / 255) * 0.75)
-      px.data[i + 1] = px.data[i + 1] * (mul + k * (px.data[i + 1] / 255) * 0.65)
-      px.data[i + 2] = px.data[i + 2] * (mul + k * (px.data[i + 2] / 255) * 0.6)
-      const edge = Math.min(1, Math.max(0, (r - 0.62) / 0.36))
+      const er = px.data[i] * (mul + k * (px.data[i] / 255) * 0.75), eg = px.data[i + 1] * (mul + k * (px.data[i + 1] / 255) * 0.65), eb = px.data[i + 2] * (mul + k * (px.data[i + 2] / 255) * 0.6)
+      px.data[i] = er + (236 * grainS - er) * saltness
+      px.data[i + 1] = eg + (231 * grainS - eg) * saltness
+      px.data[i + 2] = eb + (220 * grainS - eb) * saltness
+      const edge = Math.min(1, Math.max(0, (r - 0.7) / 0.28))
       // (powdery: the ring's alpha grained with fine noise, thinning to scattered specks at its edge, not a hard disc)
       const grain = 0.55 + 0.9 * Math.random()
-      px.data[i + 3] *= r < 0.5 ? 1 : Math.min(1, (1 - 0.3 * k) * (1 - edge * edge * (3 - 2 * edge)) * (edge > 0.2 ? grain : 1))
+      px.data[i + 3] *= r < 0.66 ? 1 : Math.min(1, (1 - 0.3 * k) * (1 - edge * edge * (3 - 2 * edge)) * (edge > 0.2 ? grain : 1))
     }
   }
   g.putImageData(px, 0, 0)
@@ -389,6 +392,10 @@ function scorchEarth(mesh: THREE.Mesh) {
   mat.transparent = true
   mat.needsUpdate = true
 }
+/** how long a fresh stick of charcoal takes to kindle to red-hot, in game seconds */
+const COAL_KINDLE_S = 22
+/** how much higher the salt is heaped in the pit than it was modelled */
+const PIT_SALT_RISE = 2.4
 /** how much higher the pit (its stones, coals and net) stands than it was modelled, with the flames and smoke over it */
 export const PIT_LIFT = 0
 const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
@@ -1725,7 +1732,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       o.position.z *= PIT_SCALE
       o.position.y += PIT_LIFT
       o.scale.multiplyScalar(o.name === 'FirePit' ? PIT_SCALE * PIT_GROUND : PIT_SCALE)
-      if (o.name === 'FirePit') scorchEarth(o as THREE.Mesh)
+      // (the salt heaped higher, filling the ring)
+      if (o.name === 'FirePit') { o.scale.y *= PIT_SALT_RISE; scorchEarth(o as THREE.Mesh) }
     }
     // (the bed's ash, for when the fire is out: a thin grey layer and a few lumps of slag, nothing like the charcoal's own model)
     if (!root.getObjectByName('AshBed')) {
@@ -1985,20 +1993,45 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [plateCount, setPlateCount] = useState(1)
   const carriedOut = useRef(false)
   const shattered = useRef(new Set<string>())
-  // charcoal added falls in as a few sticks, each thrown at random: they drop under gravity onto the heap, bounce, tip and lie where they land
-  const coals = useRef<{ g: THREE.Mesh | null; x: number; y: number; z: number; vy: number; rx: number; rz: number; ry: number; settled: boolean; top: number }[]>([])
+  // charcoal added is thrown in: a few sticks leave the hand (or the crate), fly in an arc, land on the heap, bounce, tip and lie
+  // where they land, a burst of sparks and ash where each strikes. Each stick starts black and kindles on its own, over some
+  // seconds, to red-hot (its glow reddening, its face going ashy grey), as binchotan does
+  type Coal = { g: THREE.Mesh | null; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
+    sx: number; sz: number; settled: boolean; top: number; delay: number; heat: number; bounced: boolean }
+  const coals = useRef<Coal[]>([])
   const [coalIds, setCoalIds] = useState<number[]>([])
-  const coalMat = useMemo(() => { const m = new THREE.MeshToonMaterial({ color: '#2b1d17', emissive: new THREE.Color('#ff6418'), emissiveIntensity: 0.7 }); m.name = 'Ember'; return m }, [])
   const coalGeo = useMemo(() => new THREE.CylinderGeometry(0.03, 0.03, 0.22, 7), [])
-  const dropCoals = () => {
-    const n = 3 + Math.floor(Math.random() * 2)
-    const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
-    for (let k = 0; k < n; k++) {
-      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.28
-      coals.current[base + k] = { g: null, x: Math.cos(a) * r, y: 0.7 + Math.random() * 0.4, z: Math.sin(a) * r, vy: 0, rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, settled: false, top: 0.07 + Math.random() * 0.09 }
+  // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
+  const SPARKS = 80
+  const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
+  const sparkGeo = useMemo(() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3)); return g }, [])
+  const ashGeo = useMemo(() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3)); return g }, [])
+  const burst = (x: number, y: number, z: number) => {
+    for (let i = 0; i < 9; i++) {
+      const a = Math.random() * Math.PI * 2, v = 0.15 + Math.random() * 0.35
+      sparkPts.current.push({ x, y, z, vx: Math.cos(a) * v, vy: 0.5 + Math.random() * 0.9, vz: Math.sin(a) * v, life: 0.5 + Math.random() * 0.7, ash: i % 3 === 0 })
     }
-    setCoalIds((ids) => [...ids, ...Array.from({ length: n }, (_, k) => base + k)].slice(-14))
+    if (sparkPts.current.length > SPARKS * 2) sparkPts.current.splice(0, sparkPts.current.length - SPARKS * 2)
   }
+  const dropCoals = (from?: { x: number; y: number; z: number }) => {
+    const n = 4 + Math.floor(Math.random() * 2)
+    const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
+    const start = from ?? { x: DECOR.crate.at[0], y: 0.5, z: DECOR.crate.at[1] }
+    for (let k = 0; k < n; k++) {
+      // (each lands at its own place on the heap, in a flight of about two thirds of a second, one after another)
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.3
+      const tx = Math.cos(a) * r, tz = Math.sin(a) * r
+      const top = PIT_LIFT + 0.07 + Math.random() * 0.09
+      const T = 0.5 + Math.random() * 0.25
+      const sx = start.x + (Math.random() - 0.5) * 0.06, sz = start.z + (Math.random() - 0.5) * 0.06
+      const mat = new THREE.MeshToonMaterial({ color: '#17120f', emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
+      coals.current[base + k] = { g: null, mat, x: sx, y: start.y, z: sz, vx: (tx - sx) / T, vz: (tz - sz) / T, vy: (top - start.y + 0.5 * 9.8 * T * T) / T,
+        rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
+        settled: false, top, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false }
+    }
+    setCoalIds((ids) => [...ids, ...Array.from({ length: n }, (_, k) => base + k)].slice(-16))
+  }
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dropCoals: dropCoals, __fire: fire, __coals: coals })
   const [shards, setShards] = useState<{ id: number; x: number; y: number; z: number; s: number; r: number; t: number }[]>([])
   /** the kitchen's floor, where a dish let go off the table lands (the scene's y) */
   const FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP
@@ -3175,7 +3208,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       window.removeEventListener('pointermove', holdDecor)
       document.body.classList.remove('is-carrying')
       // the charcoal let go over the fire goes on it
-      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { onAddCharcoal?.(); dropCoals() }
+      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { onAddCharcoal?.(); dropCoals({ x: h.at.x, y: 0.5, z: h.at.z }) }
       held.current = null
       if (controls) controls.enabled = true
       el.style.cursor = ''
@@ -3524,17 +3557,68 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // (starts at the fire's own level, so a cold pit is ash from the first frame, not charcoal easing down to it)
   const fuel = useRef(fire?.current ?? 0.55)
 
-  useFrame((_, delta) => {
+  useFrame(({ clock: clk }, delta) => {
+    const clock = clk.elapsedTime
+    const cdt = Math.min(delta, 0.05)
     for (const c of coals.current) {
-      if (!c || !c.g || c.settled) continue
-      c.vy -= 9.8 * Math.min(delta, 0.05)
-      c.y += c.vy * Math.min(delta, 0.05)
-      if (c.y <= c.top) {
+      if (!c || !c.g) continue
+      // (the glow: black at first, then a deep red creeping in, orange, and the face going grey under it as it kindles)
+      if (c.delay <= 0) {
+        c.heat = Math.min(1, c.heat + delta * GAME_SPEED.value / COAL_KINDLE_S)
+        const h = c.heat
+        const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
+        c.mat.emissive.setRGB(0.25 + 0.75 * h, 0.03 + 0.4 * h ** 1.6, 0.0 + 0.1 * h ** 3)
+        c.mat.emissiveIntensity = 1.25 * h ** 1.5 * flick
+        c.mat.color.set('#17120f').lerp(ASH_TINT, 0.55 * THREE.MathUtils.smoothstep(h, 0.45, 1))
+      }
+      if (c.settled) continue
+      if (c.delay > 0) {
+        c.delay -= cdt
+        c.g.visible = c.delay <= 0
+        if (c.delay > 0) continue
+      }
+      c.vy -= 9.8 * cdt
+      c.x += c.vx * cdt
+      c.z += c.vz * cdt
+      c.y += c.vy * cdt
+      // (tumbling in the air)
+      if (!c.bounced) { c.rx += c.sx * cdt; c.rz += c.sz * cdt }
+      if (c.y <= c.top && c.vy < 0) {
         c.y = c.top
-        if (c.vy < -0.9) { c.vy = -c.vy * 0.3; c.rx += (Math.random() - 0.5) * 1.2; c.rz += (Math.random() - 0.5) * 1.2 } else { c.vy = 0; c.settled = true; c.rx = Math.PI / 2 + (Math.random() - 0.5) * 0.4 }
+        if (!c.bounced) burst(c.x, c.y, c.z)
+        c.bounced = true
+        if (c.vy < -0.9) { c.vy = -c.vy * 0.3; c.vx *= 0.35; c.vz *= 0.35; c.rx += (Math.random() - 0.5) * 1.2; c.rz += (Math.random() - 0.5) * 1.2 }
+        else { c.vy = 0; c.vx = 0; c.vz = 0; c.settled = true; c.rx = Math.PI / 2 + (Math.random() - 0.5) * 0.4 }
       }
       c.g.position.set(c.x, c.y, c.z)
       c.g.rotation.set(c.rx, c.ry, c.rz)
+    }
+    // (sparks and ash from the landings: thrown up, falling back, fading out)
+    {
+      const sp = sparkPts.current
+      const pa = sparkGeo.attributes.position as THREE.BufferAttribute, ca = sparkGeo.attributes.color as THREE.BufferAttribute
+      const pb = ashGeo.attributes.position as THREE.BufferAttribute, cb = ashGeo.attributes.color as THREE.BufferAttribute
+      let ns = 0, na = 0
+      for (let i = sp.length - 1; i >= 0; i--) {
+        const q = sp[i]
+        q.life -= cdt
+        if (q.life <= 0) { sp.splice(i, 1); continue }
+        q.vy -= (q.ash ? 0.9 : 3.2) * cdt
+        q.x += q.vx * cdt
+        q.y += q.vy * cdt
+        q.z += q.vz * cdt
+        const k = Math.min(1, q.life / 0.5)
+        if (q.ash) {
+          if (na >= SPARKS) continue
+          pb.setXYZ(na, q.x, q.y, q.z); cb.setXYZ(na, 0.8 * k, 0.78 * k, 0.74 * k); na++
+        } else {
+          if (ns >= SPARKS) continue
+          pa.setXYZ(ns, q.x, q.y, q.z); ca.setXYZ(ns, k, 0.45 * k * k, 0.08 * k ** 3); ns++
+        }
+      }
+      for (let i = ns; i < SPARKS; i++) { pa.setXYZ(i, 0, -9, 0); ca.setXYZ(i, 0, 0, 0) }
+      for (let i = na; i < SPARKS; i++) { pb.setXYZ(i, 0, -9, 0); cb.setXYZ(i, 0, 0, 0) }
+      pa.needsUpdate = ca.needsUpdate = pb.needsUpdate = cb.needsUpdate = true
     }
     if (!embers.current || !embers.current.length) {
       const found = new Map<THREE.MeshToonMaterial, number>()
@@ -3558,7 +3642,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const target = fire?.current ?? 0.55
     // (the coals' own state eases toward the fire: charcoal added swells up and kindles over a moment, the pile shrinks back slowly as it burns)
-    const ease = target > fuel.current ? 2.2 : 0.35
+    const ease = target > fuel.current ? 0.16 : 0.35
     fuel.current += (target - fuel.current) * Math.min(1, delta * ease)
     const f = fuel.current
     const ash = THREE.MathUtils.smoothstep(0.5 - f, 0, 0.45)
@@ -3573,12 +3657,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const bedAsh = root.getObjectByName('AshBed')
     if (bedAsh) bedAsh.visible = !burning
 
-    for (const e of embers.current) {
-      // no fire, no glow
-      e.mat.emissiveIntensity = e.base * 1.23 * f ** 1.6
+    embers.current.forEach((e, i) => {
+      // no fire, no glow; as the heap kindles its glow goes from a deep red, through orange, toward a yellower white at the full blaze, and it breathes
+      const flick = 0.93 + 0.07 * Math.sin(clock * 6.1 + i * 2.3) * Math.sin(clock * 2.7 + i)
+      e.mat.emissiveIntensity = e.base * 1.23 * f ** 1.6 * flick
+      e.mat.emissive.setRGB(0.55 + 0.45 * Math.min(1, f * 1.3), 0.1 + 0.5 * Math.min(1, f) ** 1.5, 0.02 + 0.18 * Math.min(1, f) ** 3)
       const gain = 1 + ((ASH_GAIN[e.mat.name] ?? 1) - 1) * ash ** 1.5
       e.mat.color.copy(e.color).lerp(ASH_TINT, ash).multiplyScalar(gain)
-    }
+    })
     if (scannedCount.current !== root.children.length) scan()
     const dt = Math.min(delta, 0.1)
     // fanned-up heat burns the coals faster while it lasts (more the hotter it's been fanned), and dies back once the
@@ -4064,9 +4150,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             : <SideDish key={`${k}-${i}`} container="" position={at} />
         })
       })}
-      {coalIds.map((id) => (
-        <mesh key={id} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }} geometry={coalGeo} material={coalMat} />
+      {coalIds.map((id) => coals.current[id] && (
+        <mesh key={id} visible={false} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }} geometry={coalGeo} material={coals.current[id].mat} castShadow />
       ))}
+      <points geometry={sparkGeo} frustumCulled={false}><pointsMaterial size={0.024} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></points>
+      <points geometry={ashGeo} frustumCulled={false}><pointsMaterial size={0.05} vertexColors transparent opacity={0.6} depthWrite={false} toneMapped={false} /></points>
       {shards.map((sh) => (
         <mesh key={sh.id} position={[sh.x, sh.y, sh.z]} rotation={[-Math.PI / 2, 0, sh.r]}>
           <circleGeometry args={[sh.s, 3]} /><meshToonMaterial color="#efece4" side={THREE.DoubleSide} />
