@@ -5,6 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
+import { crossYaw, restOf, type Lay } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -398,6 +399,7 @@ function scorchEarth(mesh: THREE.Mesh) {
   mat.needsUpdate = true
 }
 /** the most sticks of charcoal the bed holds at once, and how long one lasts once it's burning, in game seconds (it burns down to a third of its length, then it's ash) */
+const UP_AXIS = new THREE.Vector3(0, 1, 0)
 const COAL_MAX = 10
 const COAL_LAST_S = 170
 /** how long a fresh stick of charcoal takes to kindle to red-hot, in game seconds */
@@ -2007,7 +2009,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   type Coal = { g: THREE.Object3D | null; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
     sx: number; sz: number; settled: boolean; top: number; delay: number; heat: number; bounced: boolean
     /** seconds since it landed, whether it's burnt out, and how long it's been going out when it's pushed out by the new */
-    age: number; gone: boolean; dying: boolean; dyT: number }
+    age: number; gone: boolean; dying: boolean; dyT: number
+    /** where it lies in plan (its landing), the way it points, how steeply it tips, and the pose it settles to */
+    tx: number; tz: number; yaw: number; slope: number; qEnd: THREE.Quaternion }
   const coals = useRef<Coal[]>([])
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
@@ -2024,25 +2028,48 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     if (sparkPts.current.length > SPARKS * 2) sparkPts.current.splice(0, sparkPts.current.length - SPARKS * 2)
   }
+  /** works out where every stick on the bed lies, bottom up (the oldest lowest), each on the bed or across those beneath it */
+  const restack = () => {
+    const below: Lay[] = []
+    for (const c of coals.current) {
+      if (!c || c.gone || c.dying) continue
+      const r = restOf(c.tx, c.tz, c.yaw, below, PIT_LIFT)
+      c.top = r.y
+      c.slope = r.slope
+      c.qEnd.setFromUnitVectors(UP_AXIS, new THREE.Vector3(Math.cos(c.yaw), r.slope, Math.sin(c.yaw)).normalize())
+      below.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: r.y, slope: r.slope })
+    }
+  }
   const dropCoals = (from?: { x: number; y: number; z: number }) => {
     const n = 4 + Math.floor(Math.random() * 2)
     const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
-    // (always out of the crate of binchotan, whether it's clicked or a stick let go over the fire: thrown from there across the table)
     // (a bed only holds so many sticks: when the new ones would take it past the most, the oldest burn out at once, shrinking away)
     const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
     for (const c of alive.slice(0, Math.max(0, alive.length + n - COAL_MAX))) c.dying = true
+    // (always out of the crate of binchotan, whether it's clicked or a stick let go over the fire: thrown from there across the table)
     const start = from ?? { x: DECOR.crate.at[0], y: 0.34, z: DECOR.crate.at[1] }
+    const lying: Lay[] = []
+    for (const c of coals.current) if (c && !c.gone && !c.dying) lying.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope })
     for (let k = 0; k < n; k++) {
-      // (each lands at its own place on the heap, in a flight of about two thirds of a second, one after another)
+      // (each lands at its own place on the heap, one after another; one that lands by another lies across it)
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.3
       const tx = Math.cos(a) * r, tz = Math.sin(a) * r
-      const top = PIT_LIFT + 0.07 + Math.random() * 0.09
-      const T = 0.5 + Math.random() * 0.25
-      const sx = start.x + (Math.random() - 0.5) * 0.06, sz = start.z + (Math.random() - 0.5) * 0.06
+      const yaw = crossYaw(tx, tz, lying) ?? Math.random() * Math.PI
+      const rest = restOf(tx, tz, yaw, lying, PIT_LIFT)
+      lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
       const mat = new THREE.MeshToonMaterial({ color: '#8d8a86', emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
-      coals.current[base + k] = { g: null, mat, x: sx, y: start.y, z: sz, vx: (tx - sx) / T, vz: (tz - sz) / T, vy: (top - start.y + 0.5 * 9.8 * T * T) / T,
+      coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
-        settled: false, top, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0 }
+        settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
+        tx, tz, yaw, slope: rest.slope, qEnd: new THREE.Quaternion() }
+    }
+    restack()
+    // (the flight to each one's place: about two thirds of a second)
+    for (let k = 0; k < n; k++) {
+      const c = coals.current[base + k], T = 0.5 + Math.random() * 0.25
+      c.vx = (c.tx - c.x) / T
+      c.vz = (c.tz - c.z) / T
+      c.vy = (c.top - c.y + 0.5 * 9.8 * T * T) / T
     }
     setCoalIds((ids) => [...ids, ...Array.from({ length: n }, (_, k) => base + k)].slice(-16))
   }
@@ -3584,14 +3611,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (burning down: shorter as it goes, a third of it left at the end; pushed out by new ones, it goes out in a second and a half)
         const burnt = c.dying ? (c.dyT += delta) / 1.5 : Math.min(1, c.age / COAL_LAST_S)
         c.g.scale.set(1, c.dying ? Math.max(0.02, 1 - burnt) : 1 - 0.67 * burnt * burnt, 1)
-        if (burnt >= 1) { c.gone = true; c.g.visible = false; continue }
+        if (burnt >= 1) { c.gone = true; c.g.visible = false; restack(); continue }
         c.heat = Math.min(1, c.heat + delta * GAME_SPEED.value / COAL_KINDLE_S)
         const h = c.heat
         const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
         c.mat.emissive.setRGB(0.25 + 0.75 * h, 0.03 + 0.4 * h ** 1.6, 0.0 + 0.1 * h ** 3)
         c.mat.emissiveIntensity = 0.9 * h ** 1.5 * flick
       }
-      if (c.settled) continue
+      if (c.settled) {
+        // (what lay on it comes down as sticks beneath burn away; it eases to its pose)
+        if (Math.abs(c.y - c.top) > 0.0005) { c.y += (c.top - c.y) * Math.min(1, delta * 6); c.g.position.y = c.y }
+        if (c.g.quaternion.angleTo(c.qEnd) > 0.002) c.g.quaternion.slerp(c.qEnd, Math.min(1, delta * 8))
+        continue
+      }
       if (c.delay > 0) {
         c.delay -= cdt
         c.g.visible = c.delay <= 0
@@ -3601,17 +3633,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       c.x += c.vx * cdt
       c.z += c.vz * cdt
       c.y += c.vy * cdt
-      // (tumbling in the air)
-      if (!c.bounced) { c.rx += c.sx * cdt; c.rz += c.sz * cdt }
+      // (tumbling in the air, then turning to the way it lies as it lands)
+      if (!c.bounced) { c.rx += c.sx * cdt; c.rz += c.sz * cdt; c.g.rotation.set(c.rx, c.ry, c.rz) }
+      else c.g.quaternion.slerp(c.qEnd, Math.min(1, delta * 14))
       if (c.y <= c.top && c.vy < 0) {
         c.y = c.top
         if (!c.bounced) burst(c.x, c.y, c.z)
         c.bounced = true
-        if (c.vy < -0.9) { c.vy = -c.vy * 0.3; c.vx *= 0.35; c.vz *= 0.35; c.rx += (Math.random() - 0.5) * 1.2; c.rz += (Math.random() - 0.5) * 1.2 }
-        else { c.vy = 0; c.vx = 0; c.vz = 0; c.settled = true; c.rx = Math.PI / 2 + (Math.random() - 0.5) * 0.4 }
+        if (c.vy < -0.9) { c.vy = -c.vy * 0.3; c.vx *= 0.35; c.vz *= 0.35 }
+        else { c.vy = 0; c.x = c.tx; c.z = c.tz; c.vx = 0; c.vz = 0; c.settled = true }
       }
       c.g.position.set(c.x, c.y, c.z)
-      c.g.rotation.set(c.rx, c.ry, c.rz)
     }
     // (sparks and ash from the landings: thrown up, falling back, fading out)
     {
