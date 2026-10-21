@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
@@ -1356,7 +1357,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         ))}
         {shrine !== undefined && <group position={[0, 1.78, shrine]}><Kamidana /></group>}
         {/* the shelf: sake bottles, two crocks and the cat; or, by the door, the altar */}
-        {altar ? <group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Box size={[ALTAR_D, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
+        {altar ? <group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
           {[-0.35, 0.35].map((z) => (
             <mesh key={z} geometry={SHELF_BRACKET} position={[ALTAR_D / 2, -0.03, z - 0.015]}><meshToonMaterial color="#3a2416" /></mesh>
@@ -1485,6 +1486,90 @@ const SUTRA_COVER = canvasTex(96, 160, (g) => {
   g.fillStyle = '#f4efe0'
   for (const y of [22, 58, 102, 138]) { g.beginPath(); g.arc(10, y, 2.2, 0, Math.PI * 2); g.fill() }
 })
+/** the offering table's top: a dark keyaki-like board, the grain running along its length with a cathedral figure or two, a knot, a warm sheen */
+const ALTAR_WOOD = canvasTex(256, 512, (g) => {
+  g.fillStyle = '#7b4b2b'
+  g.fillRect(0, 0, 256, 512)
+  let seed = 11
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  // (long streaks along the board, some darker, some lighter, each wavering a little)
+  for (let i = 0; i < 150; i++) {
+    const x = rnd() * 256
+    g.strokeStyle = rnd() < 0.55 ? `rgba(48,26,12,${0.12 + rnd() * 0.2})` : `rgba(214,160,100,${0.08 + rnd() * 0.14})`
+    g.lineWidth = 0.6 + rnd() * 1.8
+    g.beginPath()
+    g.moveTo(x, 0)
+    g.bezierCurveTo(x + (rnd() - 0.5) * 14, 170, x + (rnd() - 0.5) * 14, 340, x + (rnd() - 0.5) * 10, 512)
+    g.stroke()
+  }
+  // (a cathedral figure: nested arches of the growth rings, crossing the board)
+  for (let k = 0; k < 9; k++) {
+    g.strokeStyle = `rgba(40,20,8,${0.34 - k * 0.025})`
+    g.lineWidth = 1.2
+    g.beginPath()
+    g.moveTo(78 - k * 6, 512)
+    g.bezierCurveTo(78 - k * 6, 360 - k * 22, 140 + k * 5, 330 - k * 26, 140 + k * 5, 512)
+    g.stroke()
+  }
+  // (a knot, its rings crowding round it)
+  for (let k = 0; k < 6; k++) {
+    g.strokeStyle = `rgba(35,16,6,${0.55 - k * 0.07})`
+    g.lineWidth = 1.2
+    g.beginPath(); g.ellipse(192, 140, 3 + k * 3.5, 8 + k * 9, 0, 0, Math.PI * 2); g.stroke()
+  }
+  g.fillStyle = 'rgba(25,10,4,0.75)'
+  g.beginPath(); g.ellipse(192, 140, 2.5, 6, 0, 0, Math.PI * 2); g.fill()
+}, true)
+const ALTAR_TOP_GEO = new RoundedBoxGeometry(1, 1, 1, 3, 0.2)
+/** the apron under the table's front edge: a board cut with a row of arched openings (花頭窓), its lower corners rounded */
+const ALTAR_APRON = (() => {
+  const W = 0.8, H = 0.07
+  const sh = new THREE.Shape()
+  sh.moveTo(-W / 2, 0)
+  sh.lineTo(-W / 2, -H + 0.012)
+  sh.quadraticCurveTo(-W / 2, -H, -W / 2 + 0.012, -H)
+  sh.lineTo(W / 2 - 0.012, -H)
+  sh.quadraticCurveTo(W / 2, -H, W / 2, -H + 0.012)
+  sh.lineTo(W / 2, 0)
+  sh.lineTo(-W / 2, 0)
+  // (five arched openings, a pointed little ogee at the top of each)
+  for (let k = 0; k < 5; k++) {
+    const cx = (k - 2) * 0.15, w = 0.05
+    const hole = new THREE.Path()
+    hole.moveTo(cx - w / 2, -H + 0.016)
+    hole.lineTo(cx - w / 2, -0.034)
+    hole.quadraticCurveTo(cx - w / 2, -0.02, cx, -0.012)
+    hole.quadraticCurveTo(cx + w / 2, -0.02, cx + w / 2, -0.034)
+    hole.lineTo(cx + w / 2, -H + 0.016)
+    hole.lineTo(cx - w / 2, -H + 0.016)
+    sh.holes.push(hole)
+  }
+  return new THREE.ExtrudeGeometry(sh, { depth: 0.016, bevelEnabled: true, bevelThickness: 0.002, bevelSize: 0.002, bevelSegments: 1 })
+})()
+/** the small shrine's offering table: the grained top with its raised lip along the front and sides, a fine gold line inlaid inside the lip, and the arched apron below */
+function AltarTable() {
+  const L = 0.9, D = ALTAR_D, T = 0.034
+  return (
+    <group>
+      <mesh geometry={ALTAR_TOP_GEO} scale={[D, T, L]} position-y={-T / 2} castShadow receiveShadow>
+        <meshToonMaterial color="#ffffff" map={ALTAR_WOOD} />
+      </mesh>
+      <mesh geometry={ALTAR_TOP_GEO} scale={[D * 1.02, T * 1.04, L * 1.015]} position-y={-T / 2}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
+      {/* the lip: along the front and both sides, in darker wood, rounded */}
+      <mesh geometry={ALTAR_TOP_GEO} scale={[0.014, 0.012, L - 0.02]} position={[-D / 2 + 0.012, 0.004, 0]}><meshToonMaterial color="#3a2414" /></mesh>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} geometry={ALTAR_TOP_GEO} scale={[D - 0.03, 0.012, 0.014]} position={[0.0, 0.004, sd * (L / 2 - 0.012)]}><meshToonMaterial color="#3a2414" /></mesh>
+      ))}
+      {/* the gold line inlaid inside it */}
+      <mesh position={[-D / 2 + 0.03, 0.0008, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.004, L - 0.07]} /><meshBasicMaterial color="#b8924a" /></mesh>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[0.0, 0.0008, sd * (L / 2 - 0.03)]} rotation-x={-Math.PI / 2}><planeGeometry args={[D - 0.07, 0.004]} /><meshBasicMaterial color="#b8924a" /></mesh>
+      ))}
+      {/* the apron under the front edge */}
+      <mesh geometry={ALTAR_APRON} position={[-D / 2 + 0.034, -T + 0.002, 0]} rotation-y={Math.PI / 2}><meshToonMaterial color="#4a2c18" /></mesh>
+    </group>
+  )
+}
 /** the roof's two gable ends, closed with a plank triangle each, so there's no open hollow under the eaves */
 const GABLE_GEO = (() => {
   const sh = new THREE.Shape()

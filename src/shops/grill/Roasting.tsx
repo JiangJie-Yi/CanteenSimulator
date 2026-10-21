@@ -392,6 +392,9 @@ function scorchEarth(mesh: THREE.Mesh) {
   mat.transparent = true
   mat.needsUpdate = true
 }
+/** the most sticks of charcoal the bed holds at once, and how long one lasts once it's burning, in game seconds (it burns down to a third of its length, then it's ash) */
+const COAL_MAX = 10
+const COAL_LAST_S = 170
 /** how long a fresh stick of charcoal takes to kindle to red-hot, in game seconds */
 const COAL_KINDLE_S = 22
 /** how much higher the salt is heaped in the pit than it was modelled */
@@ -1996,11 +1999,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // charcoal added is thrown in: a few sticks leave the hand (or the crate), fly in an arc, land on the heap, bounce, tip and lie
   // where they land, a burst of sparks and ash where each strikes. Each stick starts black and kindles on its own, over some
   // seconds, to red-hot (its glow reddening, its face going ashy grey), as binchotan does
-  type Coal = { g: THREE.Mesh | null; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
-    sx: number; sz: number; settled: boolean; top: number; delay: number; heat: number; bounced: boolean }
+  type Coal = { g: THREE.Object3D | null; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
+    sx: number; sz: number; settled: boolean; top: number; delay: number; heat: number; bounced: boolean
+    /** seconds since it landed, whether it's burnt out, and how long it's been going out when it's pushed out by the new */
+    age: number; gone: boolean; dying: boolean; dyT: number }
   const coals = useRef<Coal[]>([])
   const [coalIds, setCoalIds] = useState<number[]>([])
-  const coalGeo = useMemo(() => new THREE.CylinderGeometry(0.03, 0.03, 0.22, 7), [])
+  // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
+  const coalGeo = useMemo(() => new THREE.CylinderGeometry(0.022, 0.024, 0.54, 7), [])
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -2016,7 +2022,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const dropCoals = (from?: { x: number; y: number; z: number }) => {
     const n = 4 + Math.floor(Math.random() * 2)
     const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
-    const start = from ?? { x: DECOR.crate.at[0], y: 0.5, z: DECOR.crate.at[1] }
+    // (always out of the crate of binchotan, whether it's clicked or a stick let go over the fire: thrown from there across the table)
+    // (a bed only holds so many sticks: when the new ones would take it past the most, the oldest burn out at once, shrinking away)
+    const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
+    for (const c of alive.slice(0, Math.max(0, alive.length + n - COAL_MAX))) c.dying = true
+    const start = from ?? { x: DECOR.crate.at[0], y: 0.34, z: DECOR.crate.at[1] }
     for (let k = 0; k < n; k++) {
       // (each lands at its own place on the heap, in a flight of about two thirds of a second, one after another)
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.3
@@ -2024,10 +2034,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const top = PIT_LIFT + 0.07 + Math.random() * 0.09
       const T = 0.5 + Math.random() * 0.25
       const sx = start.x + (Math.random() - 0.5) * 0.06, sz = start.z + (Math.random() - 0.5) * 0.06
-      const mat = new THREE.MeshToonMaterial({ color: '#17120f', emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
+      const mat = new THREE.MeshToonMaterial({ color: '#8d8a86', emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
       coals.current[base + k] = { g: null, mat, x: sx, y: start.y, z: sz, vx: (tx - sx) / T, vz: (tz - sz) / T, vy: (top - start.y + 0.5 * 9.8 * T * T) / T,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
-        settled: false, top, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false }
+        settled: false, top, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0 }
     }
     setCoalIds((ids) => [...ids, ...Array.from({ length: n }, (_, k) => base + k)].slice(-16))
   }
@@ -3208,7 +3218,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       window.removeEventListener('pointermove', holdDecor)
       document.body.classList.remove('is-carrying')
       // the charcoal let go over the fire goes on it
-      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { onAddCharcoal?.(); dropCoals({ x: h.at.x, y: 0.5, z: h.at.z }) }
+      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { onAddCharcoal?.(); dropCoals() }
       held.current = null
       if (controls) controls.enabled = true
       el.style.cursor = ''
@@ -3563,13 +3573,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (const c of coals.current) {
       if (!c || !c.g) continue
       // (the glow: black at first, then a deep red creeping in, orange, and the face going grey under it as it kindles)
-      if (c.delay <= 0) {
+      if (c.gone) continue
+      if (c.bounced) {
+        c.age += delta * GAME_SPEED.value
+        // (burning down: shorter as it goes, a third of it left at the end; pushed out by new ones, it goes out in a second and a half)
+        const burnt = c.dying ? (c.dyT += delta) / 1.5 : Math.min(1, c.age / COAL_LAST_S)
+        c.g.scale.set(1, c.dying ? Math.max(0.02, 1 - burnt) : 1 - 0.67 * burnt * burnt, 1)
+        if (burnt >= 1) { c.gone = true; c.g.visible = false; continue }
         c.heat = Math.min(1, c.heat + delta * GAME_SPEED.value / COAL_KINDLE_S)
         const h = c.heat
         const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
         c.mat.emissive.setRGB(0.25 + 0.75 * h, 0.03 + 0.4 * h ** 1.6, 0.0 + 0.1 * h ** 3)
-        c.mat.emissiveIntensity = 1.25 * h ** 1.5 * flick
-        c.mat.color.set('#17120f').lerp(ASH_TINT, 0.55 * THREE.MathUtils.smoothstep(h, 0.45, 1))
+        c.mat.emissiveIntensity = 0.9 * h ** 1.5 * flick
       }
       if (c.settled) continue
       if (c.delay > 0) {
@@ -3642,7 +3657,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const target = fire?.current ?? 0.55
     // (the coals' own state eases toward the fire: charcoal added swells up and kindles over a moment, the pile shrinks back slowly as it burns)
-    const ease = target > fuel.current ? 0.16 : 0.35
+    const ease = target > fuel.current ? 0.05 : 0.35
     fuel.current += (target - fuel.current) * Math.min(1, delta * ease)
     const f = fuel.current
     const ash = THREE.MathUtils.smoothstep(0.5 - f, 0, 0.45)
@@ -4151,7 +4166,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         })
       })}
       {coalIds.map((id) => coals.current[id] && (
-        <mesh key={id} visible={false} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }} geometry={coalGeo} material={coals.current[id].mat} castShadow />
+        <group key={id} visible={false} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }}>
+          <mesh geometry={coalGeo} material={coals.current[id].mat} castShadow />
+          <mesh geometry={coalGeo} scale={1.08}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+        </group>
       ))}
       <points geometry={sparkGeo} frustumCulled={false}><pointsMaterial size={0.024} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></points>
       <points geometry={ashGeo} frustumCulled={false}><pointsMaterial size={0.05} vertexColors transparent opacity={0.6} depthWrite={false} toneMapped={false} /></points>
