@@ -1394,7 +1394,10 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         {altar ? <group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
           {[-0.35, 0.35].map((z) => (
-            <mesh key={z} geometry={SHELF_BRACKET} position={[ALTAR_D / 2, -0.03, z - 0.015]}><meshToonMaterial color="#3a2416" /></mesh>
+            <group key={z} position={[ALTAR_D / 2, -0.03, z - 0.015]}>
+              <mesh geometry={SHELF_BRACKET}><meshToonMaterial color="#1c130d" /></mesh>
+              <mesh geometry={SHELF_BRACKET} scale={[1.035, 1.035, 1.4]} position-z={-0.004}><meshBasicMaterial color="#c9a040" side={THREE.BackSide} /></mesh>
+            </group>
           ))}</group>
           : shelf && <>
         <group position={[-0.1, 1.08, shelfZ]}>
@@ -1520,39 +1523,62 @@ const SUTRA_COVER = canvasTex(96, 160, (g) => {
   g.fillStyle = '#f4efe0'
   for (const y of [22, 58, 102, 138]) { g.beginPath(); g.arc(10, y, 2.2, 0, Math.PI * 2); g.fill() }
 })
-/** the offering table's top: a dark keyaki-like board, the grain running along its length with a cathedral figure or two, a knot, a warm sheen */
-const ALTAR_WOOD = canvasTex(256, 512, (g) => {
-  g.fillStyle = '#7b4b2b'
-  g.fillRect(0, 0, 256, 512)
+/**
+ * the offering table's top: three boards of dark keyaki laid side by side (their grain running along the table), each its own tone, with
+ * a thin seam between, long wavering streaks with pores, a cathedral figure or two, a knot, and a soft sheen of oil across it
+ */
+const ALTAR_WOOD = canvasTex(512, 1024, (g) => {
   let seed = 11
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  // (long streaks along the board, some darker, some lighter, each wavering a little)
-  for (let i = 0; i < 150; i++) {
-    const x = rnd() * 256
-    g.strokeStyle = rnd() < 0.55 ? `rgba(48,26,12,${0.12 + rnd() * 0.2})` : `rgba(214,160,100,${0.08 + rnd() * 0.14})`
-    g.lineWidth = 0.6 + rnd() * 1.8
-    g.beginPath()
-    g.moveTo(x, 0)
-    g.bezierCurveTo(x + (rnd() - 0.5) * 14, 170, x + (rnd() - 0.5) * 14, 340, x + (rnd() - 0.5) * 10, 512)
-    g.stroke()
+  const W = 512 / 3
+  const tones = ['#7a4a2a', '#6c4124', '#84532f']
+  for (let b = 0; b < 3; b++) {
+    const x0 = b * W
+    g.fillStyle = tones[b]
+    g.fillRect(x0, 0, W + 1, 1024)
+    // (the grain: streaks along the board, wavering, some dark, some light, with pores as tiny dashes in them)
+    for (let i = 0; i < 110; i++) {
+      const x = x0 + rnd() * W
+      g.strokeStyle = rnd() < 0.55 ? `rgba(44,24,10,${0.1 + rnd() * 0.22})` : `rgba(216,164,104,${0.07 + rnd() * 0.15})`
+      g.lineWidth = 0.5 + rnd() * 1.7
+      g.beginPath()
+      g.moveTo(x, 0)
+      g.bezierCurveTo(x + (rnd() - 0.5) * 18, 340, x + (rnd() - 0.5) * 18, 680, x + (rnd() - 0.5) * 12, 1024)
+      g.stroke()
+    }
+    g.fillStyle = 'rgba(30,14,5,0.28)'
+    for (let i = 0; i < 260; i++) g.fillRect(x0 + rnd() * W, rnd() * 1024, 0.8, 3 + rnd() * 9)
+    // (a cathedral figure per board: nested arches of the growth rings, the board's own)
+    const cx = x0 + W * (0.3 + rnd() * 0.4), top = 180 + rnd() * 520
+    for (let k = 0; k < 10; k++) {
+      g.strokeStyle = `rgba(38,18,7,${0.34 - k * 0.022})`
+      g.lineWidth = 1.1
+      g.beginPath()
+      g.moveTo(cx - 40 + k * 3, 1024)
+      g.bezierCurveTo(cx - 40 + k * 3, top + 120 + k * 36, cx + 40 - k * 3, top + 80 + k * 40, cx + 40 - k * 3, 1024)
+      g.stroke()
+    }
   }
-  // (a cathedral figure: nested arches of the growth rings, crossing the board)
-  for (let k = 0; k < 9; k++) {
-    g.strokeStyle = `rgba(40,20,8,${0.34 - k * 0.025})`
+  // (a knot in the middle board, its rings crowding round it)
+  for (let k = 0; k < 7; k++) {
+    g.strokeStyle = `rgba(35,16,6,${0.58 - k * 0.07})`
     g.lineWidth = 1.2
-    g.beginPath()
-    g.moveTo(78 - k * 6, 512)
-    g.bezierCurveTo(78 - k * 6, 360 - k * 22, 140 + k * 5, 330 - k * 26, 140 + k * 5, 512)
-    g.stroke()
+    g.beginPath(); g.ellipse(256, 300, 4 + k * 4, 12 + k * 11, 0, 0, Math.PI * 2); g.stroke()
   }
-  // (a knot, its rings crowding round it)
-  for (let k = 0; k < 6; k++) {
-    g.strokeStyle = `rgba(35,16,6,${0.55 - k * 0.07})`
-    g.lineWidth = 1.2
-    g.beginPath(); g.ellipse(192, 140, 3 + k * 3.5, 8 + k * 9, 0, 0, Math.PI * 2); g.stroke()
+  g.fillStyle = 'rgba(22,9,3,0.8)'
+  g.beginPath(); g.ellipse(256, 300, 3, 8, 0, 0, Math.PI * 2); g.fill()
+  // (the seams: a dark joint with a pale lip beside it)
+  for (const x of [W, 2 * W]) {
+    g.fillStyle = 'rgba(14,6,2,0.85)'; g.fillRect(x - 1, 0, 2.5, 1024)
+    g.fillStyle = 'rgba(230,180,120,0.18)'; g.fillRect(x + 1.5, 0, 1.5, 1024)
   }
-  g.fillStyle = 'rgba(25,10,4,0.75)'
-  g.beginPath(); g.ellipse(192, 140, 2.5, 6, 0, 0, Math.PI * 2); g.fill()
+  // (a soft sheen of oil: a pale band slanting across it)
+  const sh = g.createLinearGradient(0, 200, 512, 420)
+  sh.addColorStop(0, 'rgba(255,230,190,0)')
+  sh.addColorStop(0.5, 'rgba(255,230,190,0.1)')
+  sh.addColorStop(1, 'rgba(255,230,190,0)')
+  g.fillStyle = sh
+  g.fillRect(0, 0, 512, 1024)
 }, true)
 const ALTAR_TOP_GEO = new RoundedBoxGeometry(1, 1, 1, 3, 0.2)
 /** the apron under the table's front edge: a board cut with a row of arched openings (花頭窓), its lower corners rounded */
@@ -1598,6 +1624,15 @@ function AltarTable() {
       <mesh position={[-D / 2 + 0.03, 0.0008, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.004, L - 0.07]} /><meshBasicMaterial color="#b8924a" /></mesh>
       {[-1, 1].map((sd) => (
         <mesh key={sd} position={[0.0, 0.0008, sd * (L / 2 - 0.03)]} rotation-x={-Math.PI / 2}><planeGeometry args={[D - 0.07, 0.004]} /><meshBasicMaterial color="#b8924a" /></mesh>
+      ))}
+      {/* gold caps on the two front corners (隅金具): a plate over the top corner, wrapped down each of its two faces */}
+      {[-1, 1].map((sd) => (
+        <group key={sd} position={[-D / 2, 0, sd * (L / 2)]}>
+          <mesh position={[0.02, 0.0012, -sd * 0.02]}><boxGeometry args={[0.042, 0.0024, 0.042]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
+          <mesh position={[-0.0008, -0.016, -sd * 0.02]}><boxGeometry args={[0.0024, 0.034, 0.042]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
+          <mesh position={[0.02, -0.016, -sd * 0.0008]}><boxGeometry args={[0.042, 0.034, 0.0024]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
+          <mesh position={[0.012, 0.0032, -sd * 0.012]}><sphereGeometry args={[0.004, 8, 6]} /><meshToonMaterial color="#8a6a1a" /></mesh>
+        </group>
       ))}
       {/* the apron under the front edge */}
       <mesh geometry={ALTAR_APRON} position={[-D / 2 + 0.034, -T + 0.002, 0]} rotation-y={Math.PI / 2}><meshToonMaterial color="#4a2c18" /></mesh>
