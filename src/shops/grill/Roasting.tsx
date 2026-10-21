@@ -390,6 +390,11 @@ function scorchEarth(mesh: THREE.Mesh) {
   t.anisotropy = mat.map!.anisotropy
   mat.map = t
   mat.transparent = true
+  // (the ground is drawn first and writes its depth, so the scene's shadow-only floor, which sits a hair under it, can never be drawn over the
+  // salt from any angle: that was the net's and the coals' shadows laid across it as stripes)
+  mat.depthWrite = true
+  mat.alphaTest = 0.06
+  mesh.renderOrder = -2
   mat.needsUpdate = true
 }
 /** the most sticks of charcoal the bed holds at once, and how long one lasts once it's burning, in game seconds (it burns down to a third of its length, then it's ash) */
