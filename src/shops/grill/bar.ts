@@ -530,7 +530,9 @@ export const cubbyAt = (along: number, lay: number, tier: 'floor' | 'shelf') =>
 export const PLATE_STACKS = (() => {
   // (in the bar's own frame: where those places are, under the table's top, to the left in the cubby)
   const at = (along: number) => cubbyAt(along, 1.5, 'floor').sub(GRILL_OFFSET).multiplyScalar(1 / GRILL_SCALE)
-  return { clean: at(1.07), dirty: at(1.52) }
+  // (a plate is 0.26 across its radius in the scene: the two stacks stand more than a diameter apart, so the plates of one never run into the other's,
+  // the dirty one still clear of the shelf over the cubby's right-hand part, which starts at along 1.85)
+  return { clean: at(0.93), dirty: at(1.5) }
 })()
 /** the height of the cubby's floor, in the bar's own frame, for the stacks of plates standing on it */
 export const PLATE_STACK_Y = (CUBBY_FLOOR_Y - GRILL_OFFSET.y) / GRILL_SCALE
