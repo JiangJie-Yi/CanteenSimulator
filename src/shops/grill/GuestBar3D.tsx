@@ -1316,6 +1316,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
   }
   const shownRef = useRef<Shown[]>([])
+  /** each shown guest's name tag, faded with them as they go out of the door */
+  const labels = useRef(new Map<number, HTMLElement>())
+  if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
 
   shownRef.current = shown
   // closing the shop empties the room at once: nobody at the stools, no plates out or being carried, the stacks as at the start
@@ -1454,10 +1457,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (g) g.rotation.y = Math.atan2(counters[0].lay.x, counters[0].lay.z)
           paying = { s, k: (raw - payAt) / (PAY_S * v) }
         }
-        if (d >= lp.len) done.push(s.id)
+        // (and if they've somehow not got out in all the time it can take, they're gone all the same)
+        if (d >= lp.len || raw > lp.len + (PAY_S + SHOES_S + 8) * v) done.push(s.id)
         // (out of the door they fade away, the last stretch)
         s.fade = Math.min(1, (lp.len - d) / 0.9)
       }
+      // (the name tag goes with the body: gone a little before they are, so none is left hanging in the doorway)
+      const tag = labels.current.get(s.id)
+      if (tag) tag.style.opacity = s.phase === 'leave' ? String(Math.max(0, Math.min(1, (s.fade ?? 1) * 1.6 - 0.5))) : ''
       if (g) g.visible = !(s.phase === 'wcIn' && s.wc?.who !== 'drink')
       // (down a step, standing in the genkan)
       if (g && given) g.position.y = inGenkan(counters, g.position) ? -GENKAN.depth : 0
@@ -1896,7 +1903,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
                 talk={talkSide(s)} guest={g} />
             </group>
             <Html position={[0, 1.05 * PEOPLE_SCALE, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
-              <div className="g3-label">
+              <div className="g3-label" ref={(el) => { if (el) labels.current.set(s.id, el); else labels.current.delete(s.id) }}>
                 {speech[s.id] ? <Say key={speech[s.id].key} text={speech[s.id].text} />
                   : g && !walking && g.state === 'waiting' && g.rating === null && <span className="g3-bubble">…</span>}
                 {g && g.rating !== null && <MoodFace guest={g} />}
