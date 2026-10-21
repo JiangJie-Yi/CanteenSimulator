@@ -363,7 +363,9 @@ export const TILL = { along: 0.75, W: 1.2, D: 0.82, rise: 0.22,
   lay: 0.3 }
 
 /** the till's live state: what its displays read and how far its drawer is out (0 shut, 1 open), set by the customer paying there */
-export const TILL_STATE = { text: '0', drawer: 0 }
+export const TILL_STATE = { text: '0', drawer: 0,
+  /** how far on the customer's payment has got (0..1; -1 when no one's paying), the note they hand over and the change they're due */
+  k: -1, tender: 0, change: 0 }
 /** what a customer's bill comes to: the dishes they ordered and the drink from the fridge, if they took one */
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __till?: typeof TILL_STATE }).__till = TILL_STATE
 export const billOf = (items: number, drink?: DrinkId) => Math.max(1, items) * 380 + (drink ? 320 : 0)
