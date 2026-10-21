@@ -128,13 +128,13 @@ const coinGeo = (kind: CoinKind) => (COIN_GEO[kind] ??= new THREE.CylinderGeomet
 export function NoteStack({ kind, n = 1, ...rest }: { kind: Note; n?: number } & Record<string, unknown>) {
   const mats = useMemo(() => noteMats(kind), [kind])
   const h = 0.0012 * n + 0.001
-  return <mesh geometry={NOTE_GEO} material={mats} scale={[1, h, 1]} position-y={h / 2} castShadow {...rest} />
+  return <group {...rest}><mesh geometry={NOTE_GEO} material={mats} scale={[1, h, 1]} position-y={h / 2} castShadow /></group>
 }
 /** a stack of `n` coins, its base at the group's y = 0 */
 export function CoinStack({ kind, n = 1, ...rest }: { kind: CoinKind; n?: number } & Record<string, unknown>) {
   const mats = useMemo(() => coinMats(kind), [kind])
   const h = 0.0016 * n
-  return <mesh geometry={coinGeo(kind)} material={mats} scale={[1, h, 1]} position-y={h / 2} castShadow {...rest} />
+  return <group {...rest}><mesh geometry={coinGeo(kind)} material={mats} scale={[1, h, 1]} position-y={h / 2} castShadow /></group>
 }
 export const COIN_R = (kind: CoinKind) => COINS[kind].r
 

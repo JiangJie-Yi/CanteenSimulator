@@ -20,9 +20,10 @@ import { mapleTexture } from '@/scene/mapleGrain'
 import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
+import { changeOf, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
-import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, handOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -444,13 +445,13 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
       <group position={[-0.02, top, -0.2]}>
         <Part geo={REG_GEO.round} color="#7a1f16" outline={1.04} position-y={0.009} scale={[0.22, 0.02, 0.14]} />
         <mesh position-y={0.0195} rotation-x={-Math.PI / 2}><planeGeometry args={[0.19, 0.11]} /><meshToonMaterial color="#3e100b" /></mesh>
-        {([[-0.07, -0.03, '#cfd2d6', 3], [-0.04, -0.03, '#d6b04a', 2], [-0.07, 0.02, '#b8683a', 2], [-0.04, 0.02, '#cfd2d6', 4]] as [number, number, string, number][]).map(([x, z, c, n], i) => (
-          <mesh key={i} position={[x, 0.021 + n * 0.0016, z]}><cylinderGeometry args={[0.014, 0.014, n * 0.0032, 14]} /><meshToonMaterial color={c} /></mesh>
+        {([[-0.07, -0.03, 100, 3], [-0.04, -0.03, 500, 2], [-0.07, 0.02, 10, 2], [-0.04, 0.02, 50, 4]] as [number, number, CoinKind, number][]).map(([x, z, kind, n], i) => (
+          <CoinStack key={i} kind={kind} n={n} position={[x, 0.0198, z]} />
         ))}
-        {([[0.0, -0.03], [0.0, 0.02]] as [number, number][]).map(([x, z], i) => (
-          <mesh key={i} position={[x, 0.0205, z]} rotation-y={0.1 * (i ? -1 : 1)}><boxGeometry args={[0.03, 0.0015, 0.03]} /><meshToonMaterial color="#d6b04a" /></mesh>
+        {([[0.0, -0.03, 1], [0.0, 0.02, 5]] as [number, number, CoinKind][]).map(([x, z, kind], i) => (
+          <CoinStack key={i} kind={kind} n={1} position={[x, 0.0198, z]} />
         ))}
-        <mesh position={[0.05, 0.0225, 0]} rotation-y={0.3}><boxGeometry args={[0.06, 0.004, 0.034]} /><meshToonMaterial color="#cfc79c" /></mesh>
+        <NoteStack kind={1000} n={1} position={[0.05, 0.0198, 0.0]} rotation-y={Math.PI + 0.3} />
       </group>
       <group position={[-0.52, top, 0.12]}>
         <Part geo={REG_GEO.cup} color="#3a4a5a" position-y={0.03} />
@@ -474,10 +475,26 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
     </group>
   )
 }
-/** the register's moving parts, apart from the batched till: its drawer, which slides out, and its displays, which read what's being paid */
+/** the register's size in the till (its drawer, keys and displays are drawn in units of 1/1.4 of this) */
+const REG_SC = 1.4
+/** where each kind of note lies in the drawer's insert, along its width (in the till's own units, from the insert's middle) */
+const SLOT_X: Record<Note, number> = { 1000: -0.19, 5000: -0.12, 10000: -0.05 }
+/** where the coin tray's middle is, and how far down the till's top its dish is, in the till's frame */
+const TRAY_AT = { x: -0.02, z: -0.2, y: 0.0215 }
+const smooth = (e0: number, e1: number, x: number) => THREE.MathUtils.smoothstep(x, e0, e1)
+/**
+ * the register's moving parts, apart from the batched till: its drawer, which slides out (by hand, a click on it, or on its own as a
+ * customer pays), its displays, which read what's being paid, and the money going about: the note the customer lays on the coin tray, which
+ * the cashier takes into the drawer, and the change that comes back out onto the tray for the customer to take
+ */
 function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
   const drawer = useRef<THREE.Group>(null)
   const cash = useRef<THREE.Group>(null)
+  const tender = useRef<THREE.Group>(null)
+  const change = useRef<THREE.Group>(null)
+  const open = useRef(0)
+  const [pay, setPay] = useState<{ tender: Note[]; change: (Note | CoinKind)[] }>({ tender: [], change: [] })
+  const paySeen = useRef('')
   const led = useMemo(() => {
     const c = document.createElement('canvas')
     c.width = 160
@@ -485,9 +502,40 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
     return new THREE.CanvasTexture(c)
   }, [])
   const shown = useRef('')
-  useFrame(() => {
-    if (drawer.current) drawer.current.position.z = -TILL_STATE.drawer * 0.2
-    if (cash.current) cash.current.visible = TILL_STATE.drawer > 0.15
+  useFrame((_, delta) => {
+    // (the drawer: out while a customer's paying, or when it's been clicked open, easing out and in)
+    const want = Math.max(TILL_STATE.drawer, TILL_STATE.manual ? 1 : 0)
+    open.current += (want - open.current) * Math.min(1, delta * 9)
+    if (drawer.current) drawer.current.position.z = -open.current * 0.2
+    if (cash.current) cash.current.visible = open.current > 0.15
+    // (what's being paid, as notes and coins to draw: changes only with the customer)
+    const key = `${TILL_STATE.tender}|${TILL_STATE.change}`
+    if (paySeen.current !== key) {
+      paySeen.current = key
+      setPay({ tender: TILL_STATE.tender ? (changeOf(TILL_STATE.tender) as Note[]) : [], change: TILL_STATE.change ? changeOf(TILL_STATE.change) : [] })
+    }
+    const k = TILL_STATE.k
+    // (the note laid on the tray, then taken into its place in the drawer)
+    const tg = tender.current
+    if (tg) {
+      tg.visible = k >= 0.38 && k < 0.64
+      if (tg.visible) {
+        const t = smooth(0.54, 0.64, k)
+        const kind = pay.tender[0] ?? 1000
+        // (its slot in the drawer, in the till's frame: the drawer's own place, less how far out it's drawn)
+        const slot = new THREE.Vector3(0.05 - SLOT_X[kind], top + 0.114 + 0.02, 0.102 + 0.04 + 0.28 * open.current)
+        const tray = new THREE.Vector3(TRAY_AT.x, top + TRAY_AT.y + (1 - smooth(0.38, 0.44, k)) * 0.1, TRAY_AT.z)
+        tg.position.lerpVectors(tray, slot, t)
+        tg.position.y += Math.sin(Math.PI * t) * 0.07
+        tg.rotation.y = THREE.MathUtils.lerp(Math.PI + 0.12, Math.PI / 2, t)
+      }
+    }
+    // (the change, set out on the tray when the drawer's been shut on the note, and taken away by the customer)
+    const cg = change.current
+    if (cg) {
+      cg.visible = k >= 0.66 && k < 0.95
+      if (cg.visible) cg.position.set(TRAY_AT.x, top + TRAY_AT.y + (1 - smooth(0.66, 0.72, k)) * 0.08 + smooth(0.9, 0.95, k) * 0.12, TRAY_AT.z)
+    }
     if (shown.current === TILL_STATE.text) return
     shown.current = TILL_STATE.text
     const g = (led.image as HTMLCanvasElement).getContext('2d')!
@@ -502,26 +550,44 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
     g.fillText(TILL_STATE.text, 152, 21)
     led.needsUpdate = true
   })
+  const coinList = pay.change.filter((v): v is CoinKind => !isNote(v))
+  const noteList = pay.change.filter((v): v is Note => isNote(v))
   return (
     <group position={at} rotation-y={yaw}>
-      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.4}>
-        {/* the cash drawer: a lock and a label on its front; out, it shows its compartments, notes behind and coins before */}
-        <group ref={drawer}>
+      {/* (the note the customer lays down: on the coin tray's dish) */}
+      <group ref={tender} visible={false}>
+        {pay.tender.map((v, i) => <NoteStack key={i} kind={v} n={1} position={[i * 0.006, i * 0.0016, i * 0.008]} rotation-y={0.07 * i} />)}
+      </group>
+      {/* (the change on the tray: the notes first, then the coins in rows) */}
+      <group ref={change} visible={false}>
+        {noteList.map((v, i) => <NoteStack key={`n${i}`} kind={v} n={1} position={[0.04, i * 0.0016, 0.0]} rotation-y={Math.PI + 0.1} />)}
+        {coinList.map((v, j) => <CoinStack key={`c${j}`} kind={v} n={1} position={[-0.08 + (j % 4) * 0.032, 0, (Math.floor(j / 4) - 0.5) * 0.045]} />)}
+      </group>
+      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={REG_SC}>
+        {/* the cash drawer: a lock and a label on its front; clicked, it comes out; out, it shows its insert, notes in slots behind and coins in cups before */}
+        <group ref={drawer} onClick={(e) => { e.stopPropagation(); TILL_STATE.manual = !TILL_STATE.manual }} {...handOver}>
           <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.04, 0]} scale={[0.36, 0.08, 0.3]} />
           <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.04, -0.1515]} scale={[0.33, 0.056, 0.004]} />
           <Part geo={REG_GEO.body} color="#8a8478" outline={0} position={[-0.02, 0.058, -0.154]} scale={[0.12, 0.008, 0.004]} />
           <mesh position={[0.11, 0.04, -0.155]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.009, 0.009, 0.006, 14]} /><meshToonMaterial color="#c8ccd0" /></mesh>
           <mesh position={[0.11, 0.04, -0.1585]}><planeGeometry args={[0.012, 0.0025]} /><meshBasicMaterial color="#2a2c30" /></mesh>
           <Part geo={REG_GEO.body} color="#f2e28a" outline={0} position={[-0.11, 0.024, -0.1535]} scale={[0.045, 0.014, 0.002]} />
-          <group ref={cash} visible={false}>
-            <mesh position={[0, 0.0815, -0.03]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.33, 0.2]} /><meshToonMaterial color="#2a2c30" /></mesh>
-            {[-0.09, 0, 0.09].map((x, i) => (
-              <mesh key={i} position={[x, 0.0835, -0.04]} rotation-y={0.04 * (i - 1)}><boxGeometry args={[0.07, 0.004 + i * 0.002, 0.034]} /><meshToonMaterial color={['#d8cba0', '#c9c79a', '#bcd0a0'][i]} /></mesh>
+          {/* (the insert, laid out in the till's own units: the group is scaled back by the register's size) */}
+          <group ref={cash} visible={false} position={[0, 0.0815, -0.03]} scale={1 / REG_SC}>
+            <mesh rotation-x={-Math.PI / 2}><planeGeometry args={[0.46, 0.28]} /><meshToonMaterial color="#2c2d31" /></mesh>
+            {/* (ribs between the slots) */}
+            {[-0.225, -0.155, -0.085, -0.015].map((x) => <mesh key={x} position={[x, 0.006, 0]}><boxGeometry args={[0.004, 0.012, 0.26]} /><meshToonMaterial color="#5a5c62" /></mesh>)}
+            {/* (the notes standing in their slots, each kind its own stack, the long side along the drawer) */}
+            {([1000, 5000, 10000] as Note[]).map((kind) => <NoteStack key={kind} kind={kind} n={16} position={[SLOT_X[kind], 0, -0.04]} rotation-y={Math.PI / 2} />)}
+            {/* (the coins in their cups: 1, 5, 10 along the front, 50, 100, 500 behind them) */}
+            {([[1, 0.07, -0.08, 9], [5, 0.135, -0.08, 7], [10, 0.2, -0.08, 8], [50, 0.07, 0.03, 6], [100, 0.135, 0.03, 8], [500, 0.2, 0.03, 5]] as [CoinKind, number, number, number][]).map(([kind, x, z, n]) => (
+              <group key={kind} position={[x, 0, z]}>
+                <mesh position-y={0.003}><cylinderGeometry args={[0.027, 0.027, 0.006, 18, 1, true]} /><meshToonMaterial color="#5a5c62" side={THREE.DoubleSide} /></mesh>
+                <CoinStack kind={kind} n={n} />
+              </group>
             ))}
-            {([[-0.12, '#cfd2d6', 4], [-0.06, '#d6b04a', 3], [0, '#b8683a', 5], [0.06, '#cfd2d6', 3], [0.12, '#d6b04a', 4]] as [number, string, number][]).map(([x, c, n], i) => (
-              <mesh key={i} position={[x, 0.0815 + n * 0.0015, -0.1]}><cylinderGeometry args={[0.017, 0.017, n * 0.003, 14]} /><meshToonMaterial color={c} /></mesh>
-            ))}
-            <mesh position={[0, 0.0835, -0.07]}><boxGeometry args={[0.32, 0.004, 0.003]} /><meshToonMaterial color="#8a8478" /></mesh>
+            {/* (a thin bar across the notes, holding them down) */}
+            <mesh position={[-0.12, 0.034, 0.015]}><boxGeometry args={[0.21, 0.003, 0.006]} /><meshToonMaterial color="#9aa0a6" /></mesh>
           </group>
         </group>
         {/* the operator's display, tilted back on the right segment */}
@@ -1008,7 +1074,8 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
 /** how long they stand at the genkan's step changing their shoes */
 const SHOES_S = 1.2
 /** how long they stand at the till paying: the bill rung up, the drawer out and in, the change given */
-const PAY_S = 3.6
+const PAY_S = 5.6
+const smoothstepOf = (e0: number, e1: number, x: number) => THREE.MathUtils.smoothstep(x, e0, e1)
 /** a walk that stops a while at a point along it: how far along, at a time when it would have been `d` */
 const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at + hold ? at : d - hold)
 /** what's set at a customer's place (their soy, their drink) and their shoes left in the genkan: shared shapes */
@@ -1395,18 +1462,26 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (down a step, standing in the genkan)
       if (g && given) g.position.y = inGenkan(counters, g.position) ? -GENKAN.depth : 0
     }
-    // (the register reads what's being paid: each dish rung up in turn, the total, the drawer out, then the change)
+    // (the register and the money follow what's being paid: each dish rung up in turn, the total, the note laid on the tray, the drawer out and
+    // the note put in it, the change worked out and set on the tray, the drawer shut, the change taken)
     if (paying) {
       const { s: x, k } = paying
       const n = Math.max(1, x.items ?? 2)
       const parts = [...Array.from({ length: n }, () => billOf(1)), ...(x.drink ? [billOf(1, x.drink) - billOf(1)] : [])]
       const bill = parts.reduce((a, b) => a + b, 0)
-      const rung = Math.min(parts.length, Math.floor(k / 0.4 * parts.length) + 1)
-      TILL_STATE.text = yen(k < 0.4 ? parts.slice(0, rung).reduce((a, b) => a + b, 0) : k < 0.6 ? bill : Math.ceil(bill / 1000) * 1000 - bill)
-      TILL_STATE.drawer = Math.min(1, Math.max(0, Math.min((k - 0.4) / 0.1, (0.92 - k) / 0.08)))
+      const given = Math.min(10000, Math.ceil(bill / 1000) * 1000)
+      const rung = Math.min(parts.length, Math.floor(k / 0.32 * parts.length) + 1)
+      TILL_STATE.text = yen(k < 0.32 ? parts.slice(0, rung).reduce((a, b) => a + b, 0) : k < 0.62 ? bill : Math.max(0, given - bill))
+      TILL_STATE.drawer = smoothstepOf(0.46, 0.54, k) * (1 - smoothstepOf(0.78, 0.86, k))
+      TILL_STATE.k = k
+      TILL_STATE.tender = given
+      TILL_STATE.change = Math.max(0, given - bill)
     } else {
       TILL_STATE.text = '0'
       TILL_STATE.drawer = 0
+      TILL_STATE.k = -1
+      TILL_STATE.tender = 0
+      TILL_STATE.change = 0
     }
     SEATS_TAKEN.clear()
     for (const x of shown) SEATS_TAKEN.add(x.seat)
