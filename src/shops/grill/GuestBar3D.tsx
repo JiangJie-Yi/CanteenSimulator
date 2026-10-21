@@ -100,6 +100,32 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
     g.arc(192, 128, 9 + q * 8, Math.PI, Math.PI * 2)
     g.stroke()
   }
+  // a band of seigaiha waves along the hem (concentric scales in tone-on-tone indigo, rows overlapping, a pale thread at their crests), and
+  // a thin run of them under the rod: the cloth's own pattern, dyed in
+  const waves = (y0: number, rows: number, R: number) => {
+    for (let row = 0; row < rows; row++) {
+      for (let col = -1; col < 384 / R + 1; col++) {
+        const cx = col * R + (row % 2 ? R / 2 : 0), cy = y0 + row * R * 0.5
+        for (let ring = 0; ring < 4; ring++) {
+          g.beginPath()
+          g.arc(cx, cy, R * 0.5 * (1 - ring * 0.22), Math.PI, 0)
+          g.strokeStyle = ring % 2 ? 'rgba(120,150,210,0.5)' : 'rgba(190,205,235,0.55)'
+          g.lineWidth = 1.6
+          g.stroke()
+        }
+      }
+    }
+  }
+  g.save()
+  g.beginPath(); g.rect(0, 188, 384, 68); g.clip()
+  g.fillStyle = 'rgba(20,34,78,0.55)'; g.fillRect(0, 188, 384, 68)
+  waves(196, 8, 24)
+  g.restore()
+  g.save()
+  g.beginPath(); g.rect(0, 0, 384, 24); g.clip()
+  waves(4, 2, 16)
+  g.restore()
+  g.fillStyle = 'rgba(244,239,226,0.85)'; g.fillRect(0, 186, 384, 2.4)
 })
 /** one panel's third of the noren cloth (a clone of the texture, offset) */
 const panelTex = (tex: THREE.Texture | null, i: number) => {

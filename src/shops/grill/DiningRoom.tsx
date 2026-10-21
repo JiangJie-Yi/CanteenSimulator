@@ -1804,16 +1804,29 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
         } else {
           // (let go in mid-air, it falls: gravity, and a small bounce on the floor)
           if (o.fy !== undefined) {
+            o.fell = Math.max(o.fell ?? 0, o.fy)
             o.vy = (o.vy ?? 0) - 9.8 * Math.min(dt, 0.05)
             o.fy += o.vy * Math.min(dt, 0.05)
             if (o.fy <= 0) {
               o.fy = 0
+              // (landing: a hard fall from high enough can't keep it upright, a tall bottle least of all: it tips over, and rolls)
+              if (!o.tipped && o.vy < -2.2 && Math.random() < Math.min(0.95, (o.fell ?? 0) * 0.9 + 0.15)) { o.tipped = true; o.tip = 0; o.roll = 0 }
               if (o.vy < -0.8) o.vy = -o.vy * 0.25
-              else { o.fy = undefined; o.vy = undefined }
+              else { o.fy = undefined; o.vy = undefined; o.fell = 0 }
             }
           }
-          g.position.set(o.x, o.fy ?? 0, o.z)
-          g.quaternion.identity()
+          if (o.tipped) {
+            // (over on its side in about half a second, rolling a hand's width while it goes, slowing)
+            const tip = Math.min(Math.PI / 2, (o.tip ?? 0) + dt * 4)
+            o.tip = tip
+            const roll = Math.min(0.22, (o.roll ?? 0) + dt * 0.5 * (1 - tip / (Math.PI / 2) + 0.15))
+            o.roll = roll
+            g.position.set(o.x + roll, (o.fy ?? 0) + (0.026 * Math.sin(tip)), o.z)
+            g.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, -1), tip + roll * 2)
+          } else {
+            g.position.set(o.x, o.fy ?? 0, o.z)
+            g.quaternion.identity()
+          }
         }
       })
     }
@@ -1829,6 +1842,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
     // (a drink in the fridge only with its door open: the glass is in the way otherwise)
     if (from.kind === 'slot' && !doorOpen()) return
     ev.stopPropagation()
+    if (from.kind === 'out') { const o = FRIDGE_STOCK.out[from.i]; if (o) { o.tipped = false; o.tip = 0; o.roll = 0 } }
     const key = from.kind === 'slot' ? `${from.r}-${from.k}` : `o${from.i}`
     const grp = objs.current.get(key)
     const host = root.current
@@ -2333,19 +2347,9 @@ const TATAMI_TEX = canvasTex(512, 256, (g) => {
   g.fillStyle = 'rgba(60,60,30,0.28)'
   g.fillRect(0, 20, 3, 216); g.fillRect(509, 20, 3, 216)
 })
-const STAFF_WORDS = (words: string) => canvasTex(256, 96, (g) => {
-  g.clearRect(0, 0, 256, 96)
-  g.fillStyle = 'rgba(243,232,200,0.94)'
-  g.beginPath(); g.roundRect(6, 10, 244, 76, 14); g.fill()
-  g.strokeStyle = '#8a2a20'
-  g.lineWidth = 3
-  g.beginPath(); g.roundRect(12, 16, 232, 64, 9); g.stroke()
-  brushText(g, words, 128, 50, 44, { fill: '#241810', shadow: 'rgba(120,90,50,0.35)', spacing: 6 })
-})
-const STAFF_WORDS_TEX = { zh: STAFF_WORDS('員工專用'), ja: STAFF_WORDS('関係者専用') }
 /** the mat that marks where the staff go in and out: a flat tatami mat, the words keyed on its middle */
 const MAT = { w: 1.5, d: 0.75, h: 0.03 }
-function StaffMat({ lang }: { lang: Lang }) {
+function StaffMat({ lang: _lang }: { lang: Lang }) {
   const mats = useMemo(() => {
     const side = new THREE.MeshToonMaterial({ color: '#8e8a5a' })
     const top = new THREE.MeshToonMaterial({ color: '#ffffff', map: TATAMI_TEX })
@@ -2355,10 +2359,6 @@ function StaffMat({ lang }: { lang: Lang }) {
     <group>
       <mesh position={[0, MAT.h / 2, 0]} material={mats}>
         <boxGeometry args={[MAT.w, MAT.h, MAT.d]} />
-      </mesh>
-      <mesh position={[0, MAT.h + 0.004, 0]} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[0.9, 0.34]} />
-        <meshBasicMaterial color="#ffffff" map={STAFF_WORDS_TEX[lang]} transparent toneMapped={false} polygonOffset polygonOffsetFactor={-4} />
       </mesh>
     </group>
   )

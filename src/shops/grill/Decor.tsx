@@ -437,7 +437,7 @@ function RiceTub() {
             <mesh geometry={g.cylRice} position-y={0.21}>
               <meshToonMaterial color="#fbf8f0" />
             </mesh>
-            <mesh geometry={g.rice} position-y={0.42} scale={[1.02, 0.5, 1.02]}>
+            <mesh geometry={g.rice} position-y={0.338} scale={[1.17, 0.6, 1.17]}>
               <meshToonMaterial color="#fbf8f0" />
             </mesh>
             <group position={[0.08, 0.57, -0.04]} rotation={[0.25, 0, -0.35]}>

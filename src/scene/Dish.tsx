@@ -9,7 +9,7 @@ const INK = new THREE.Color('#3b2a20')
 const OUTLINE_WIDTH = 0.007
 // too small, thin or flat to look good with an ink line
 const NO_OUTLINE = new Set(['Broth', 'FirePit', 'DriedChili', 'SichuanPepper', 'Scallion', 'Charcoal', 'PickledGreens',
-  'Noodles', 'ExtraNoodles', 'GrillNet'])
+  'Noodles', 'ExtraNoodles', 'GrillNet', 'AshLump', 'CoalChunk', 'CoalStick'])
 /** parts too fine for an ink line (a shrimp's legs and feelers would come out as heavy black wire) */
 // (and the fish's eyes: an outline as thick as on the body would be a black ring as wide as the eye itself)
 const NO_OUTLINE_MATERIALS = new Set(['ShrimpLeg', 'FishEye', 'FishPupil'])

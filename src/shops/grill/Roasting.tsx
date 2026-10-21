@@ -311,6 +311,41 @@ const TRAY_D = 0.9
 const BOX_R = 0.46
 /** where the seasoning box's first half starts out: beside the cook, along and across the table */
 const BOX_SPOT = { along: 1.55, lay: 1.3 }
+/**
+ * A handful of lumps dropped from above onto the pit's floor and let settle: each falls under gravity, rests on the ground, pushes
+ * off the others it lands on (as spheres), and is held in by the stones. Run once as the heap's made, so it lies as it would fall.
+ */
+function dropHeap(bodies: { x: number; y: number; z: number; r: number }[], floor: number, wall: number, steps = 90) {
+  const vy = bodies.map(() => 0)
+  for (let step = 0; step < steps; step++) {
+    for (let i = 0; i < bodies.length; i++) {
+      const b = bodies[i]
+      vy[i] -= 0.012
+      b.y += vy[i]
+      if (b.y - b.r < floor) { b.y = floor + b.r; vy[i] = 0 }
+      const d = Math.hypot(b.x, b.z)
+      if (d > wall) { b.x *= wall / d; b.z *= wall / d }
+    }
+    for (let i = 0; i < bodies.length; i++) {
+      for (let j = i + 1; j < bodies.length; j++) {
+        const a = bodies[i], c = bodies[j]
+        const dx = c.x - a.x, dy = c.y - a.y, dz = c.z - a.z
+        const dist = Math.hypot(dx, dy, dz) || 1e-6
+        const min = (a.r + c.r) * 0.9
+        if (dist < min) {
+          const push = (min - dist) / 2
+          const nx = dx / dist, ny = dy / dist, nz = dz / dist
+          // (the upper one is moved the more, so a lump lying on another stays up on it)
+          const wa = a.y > c.y ? 1.3 : 0.7, wc = 2 - wa
+          a.x -= nx * push * wa; a.y -= ny * push * wa; a.z -= nz * push * wa
+          c.x += nx * push * wc; c.y += ny * push * wc; c.z += nz * push * wc
+          if (c.y > a.y) vy[j] = Math.max(vy[j], 0); else vy[i] = Math.max(vy[i], 0)
+        }
+      }
+    }
+  }
+  return bodies
+}
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
 const PIT_SCALE = 1.3
 /**
@@ -340,7 +375,9 @@ function scorchEarth(mesh: THREE.Mesh) {
       px.data[i + 1] = px.data[i + 1] * (mul + k * (px.data[i + 1] / 255) * 0.65)
       px.data[i + 2] = px.data[i + 2] * (mul + k * (px.data[i + 2] / 255) * 0.6)
       const edge = Math.min(1, Math.max(0, (r - 0.62) / 0.36))
-      px.data[i + 3] *= r < 0.5 ? 1 : (1 - 0.3 * k) * (1 - edge * edge * (3 - 2 * edge))
+      // (powdery: the ring's alpha grained with fine noise, thinning to scattered specks at its edge, not a hard disc)
+      const grain = 0.55 + 0.9 * Math.random()
+      px.data[i + 3] *= r < 0.5 ? 1 : Math.min(1, (1 - 0.3 * k) * (1 - edge * edge * (3 - 2 * edge)) * (edge > 0.2 ? grain : 1))
     }
   }
   g.putImageData(px, 0, 0)
@@ -1702,30 +1739,26 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       bed.rotation.x = -Math.PI / 2
       bed.position.y = y0 + 0.004
       ash.add(bed)
-      const tones = ['#b0aeaa', '#9d9b97', '#c4c2bd', '#a8a6a2']
-      // (heaped into a mound, like the charcoal's own heap: layers of lumps, each ring narrower and higher, about seventy in all)
-      let k = 0
-      for (let layer = 0; layer < 4; layer++) {
-        const ringR = 0.52 * (1 - layer * 0.2)
-        const count = Math.max(6, Math.round(24 - layer * 5))
-        for (let n = 0; n < count; n++) {
-          const a = (n / count) * Math.PI * 2 + layer * 0.9 + ((k * 7) % 5) * 0.08
-          const r = ringR * (0.55 + ((k * 31) % 10) * 0.045)
-          const size = 0.03 + ((k * 13) % 6) * 0.008
-          const m = new THREE.Mesh(new THREE.DodecahedronGeometry(size, 0), new THREE.MeshToonMaterial({ color: tones[k % 4] }))
-          m.position.set(Math.cos(a) * r, y0 + 0.015 + layer * 0.03, Math.sin(a) * r)
-          m.scale.set(1.5 + (k % 3) * 0.3, 0.45 + (k % 2) * 0.12, 1.2 + (k % 4) * 0.1)
-          m.rotation.set(k, k * 1.7, k * 0.6)
-          ash.add(m)
-          k++
-        }
-      }
-      for (let n = 0; n < 4; n++) {
-        const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.05, 0), new THREE.MeshToonMaterial({ color: tones[n % 4] }))
-        m.position.set(Math.cos(n * 1.6) * 0.06, y0 + 0.14, Math.sin(n * 1.6) * 0.06)
-        m.scale.set(1.3, 0.8, 1.1)
-        ash.add(m)
-      }
+      // (about ninety lumps as ONE instanced mesh, each placed by chance on a low mound, flat and tilted, in a grey of its own: one draw, one material)
+      const rnd = Math.random
+      const lumps = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshToonMaterial({ color: '#ffffff' }), 90)
+      const d = new THREE.Object3D()
+      const col = new THREE.Color()
+      const ashBodies = Array.from({ length: 90 }, () => {
+        const r = 0.45 * Math.sqrt(rnd()), a = rnd() * Math.PI * 2, size = 0.025 + rnd() * 0.03
+        return { x: Math.cos(a) * r, y: y0 + 0.05 + rnd() * 0.5, z: Math.sin(a) * r, r: size * 1.2 }
+      })
+      dropHeap(ashBodies, y0, 0.5)
+      ashBodies.forEach((b, n) => {
+        d.position.set(b.x, b.y - b.r * 0.35, b.z)
+        d.rotation.set(rnd() * 3, rnd() * 6, rnd() * 3)
+        d.scale.set(b.r * (1.1 + rnd() * 0.5), b.r * (0.45 + rnd() * 0.2), b.r * (0.8 + rnd() * 0.4))
+        d.updateMatrix()
+        lumps.setMatrixAt(n, d.matrix)
+        lumps.setColorAt(n, col.setScalar(0.4 + rnd() * 0.26))
+      })
+      lumps.name = 'AshLump'
+      ash.add(lumps)
       root.add(ash)
     }
     // (no striped shadow acne on the salt and no lattice shadow of the net laid over the coals: the ground doesn't take shadows, the net casts none)
@@ -1951,6 +1984,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const boxPlaced = useRef(false)
   const [plateCount, setPlateCount] = useState(1)
   const carriedOut = useRef(false)
+  const shattered = useRef(new Set<string>())
+  // charcoal added falls in as a few sticks, each thrown at random: they drop under gravity onto the heap, bounce, tip and lie where they land
+  const coals = useRef<{ g: THREE.Mesh | null; x: number; y: number; z: number; vy: number; rx: number; rz: number; ry: number; settled: boolean; top: number }[]>([])
+  const [coalIds, setCoalIds] = useState<number[]>([])
+  const coalMat = useMemo(() => { const m = new THREE.MeshToonMaterial({ color: '#2b1d17', emissive: new THREE.Color('#ff6418'), emissiveIntensity: 0.7 }); m.name = 'Ember'; return m }, [])
+  const coalGeo = useMemo(() => new THREE.CylinderGeometry(0.03, 0.03, 0.22, 7), [])
+  const dropCoals = () => {
+    const n = 3 + Math.floor(Math.random() * 2)
+    const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.28
+      coals.current[base + k] = { g: null, x: Math.cos(a) * r, y: 0.7 + Math.random() * 0.4, z: Math.sin(a) * r, vy: 0, rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, settled: false, top: 0.07 + Math.random() * 0.09 }
+    }
+    setCoalIds((ids) => [...ids, ...Array.from({ length: n }, (_, k) => base + k)].slice(-14))
+  }
+  const [shards, setShards] = useState<{ id: number; x: number; y: number; z: number; s: number; r: number; t: number }[]>([])
   /** the kitchen's floor, where a dish let go off the table lands (the scene's y) */
   const FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP
   const LIFT = 0.25
@@ -3022,6 +3071,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           // (a click on the coals themselves puts more charcoal on)
           if (pickCoal()) {
             onAddCharcoal?.()
+            dropCoals()
           }
           return
         }
@@ -3120,7 +3170,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       window.removeEventListener('pointermove', holdDecor)
       document.body.classList.remove('is-carrying')
       // the charcoal let go over the fire goes on it
-      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) onAddCharcoal?.()
+      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { onAddCharcoal?.(); dropCoals() }
       held.current = null
       if (controls) controls.enabled = true
       el.style.cursor = ''
@@ -3220,6 +3270,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           const floorN = FLOOR_Y - baseY + 0.0
           if (y <= floorN) {
             y = floorN
+            // (a plate or dish that falls this far (the table's top is well over a metre up) is ceramic on a hard floor: it shatters,
+            // shards scattered on the floor, and a fresh one is set out in the cubby a moment later)
+            if (vy < -2.5 && /^(plate|dish|rawdish)/.test(key) && !shattered.current.has(key)) {
+              shattered.current.add(key)
+              const at = containerAt(key)
+              setShards((all) => [...all, ...Array.from({ length: 9 }, (_, n) => ({ id: Math.random(), x: at.x + (Math.random() - 0.5) * 0.5, y: at.y + 0.005, z: at.z + (Math.random() - 0.5) * 0.5, s: 0.03 + Math.random() * 0.05, r: Math.random() * 6, t: performance.now() + n * 0 }))].slice(-40))
+              y = -20   // (the broken plate is gone from the floor at once)
+              vy = 0
+              window.setTimeout(() => {
+                moved.current.delete(key)
+                stackOn.current.delete(key)
+                shattered.current.delete(key)
+                setMoveTick((t) => t + 1)
+              }, 1800)
+              window.setTimeout(() => setShards((all) => all.filter((sh) => performance.now() - sh.t < 6000)), 6200)
+            }
             if (vy < -1) vy = -vy * 0.2
             else vy = 0
           }
@@ -3234,6 +3300,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             if (t.back >= 1) t.node.position.copy(t.home)
           }
           setMoveTick((t) => t + 1)
+          if (y < -10) return
           if (vy !== 0 || y > floorN) requestAnimationFrame(fall)
         }
         requestAnimationFrame(fall)
@@ -3453,6 +3520,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const fuel = useRef(fire?.current ?? 0.55)
 
   useFrame((_, delta) => {
+    for (const c of coals.current) {
+      if (!c || !c.g || c.settled) continue
+      c.vy -= 9.8 * Math.min(delta, 0.05)
+      c.y += c.vy * Math.min(delta, 0.05)
+      if (c.y <= c.top) {
+        c.y = c.top
+        if (c.vy < -0.9) { c.vy = -c.vy * 0.3; c.rx += (Math.random() - 0.5) * 1.2; c.rz += (Math.random() - 0.5) * 1.2 } else { c.vy = 0; c.settled = true; c.rx = Math.PI / 2 + (Math.random() - 0.5) * 0.4 }
+      }
+      c.g.position.set(c.x, c.y, c.z)
+      c.g.rotation.set(c.rx, c.ry, c.rz)
+    }
     if (!embers.current || !embers.current.length) {
       const found = new Map<THREE.MeshToonMaterial, number>()
       root.traverse((o) => {
@@ -3482,6 +3560,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (no fire: only a few lumps of grey ash and slag; charcoal is what swells the heap, kindles and glows)
     // (a plain swap: charcoal while there's a fire, the ash mound when there's none; no shrinking between)
     const burning = f > 0.02
+    // (burning: the model's own charcoal, as it was; out: the ash mound)
     for (const nm of ['Charcoal', 'BinchotanHeap']) {
       const o = root.getObjectByName(nm)
       if (o) o.visible = burning
@@ -3976,6 +4055,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             : <SideDish key={`${k}-${i}`} container="" position={at} />
         })
       })}
+      {coalIds.map((id) => (
+        <mesh key={id} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }} geometry={coalGeo} material={coalMat} />
+      ))}
+      {shards.map((sh) => (
+        <mesh key={sh.id} position={[sh.x, sh.y, sh.z]} rotation={[-Math.PI / 2, 0, sh.r]}>
+          <circleGeometry args={[sh.s, 3]} /><meshToonMaterial color="#efece4" side={THREE.DoubleSide} />
+        </mesh>
+      ))}
       <Decor held={held} lanternAt={containerAt('lantern').toArray() as [number, number, number]} />
       {active && decorTip && (
         <Html position={decorTip === 'fan' ? [DECOR.fan.at[0], 0.35, DECOR.fan.at[1]] : [DECOR.crate.at[0], 0.5, DECOR.crate.at[1]]}
