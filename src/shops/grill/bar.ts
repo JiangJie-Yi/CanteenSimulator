@@ -74,7 +74,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * base and top is, and how wide the swing door across it (the first counter's reaches on to the till, which stands
  * against its end)
  */
-export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.37, leaf: 0.4 }]
+export const BAR_GATES: { end: 1 | -1; w: number; leaf: number }[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.3, leaf: 0.34 }]
 /** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
 export function gateOf(c: Counter, g: { end: 1 | -1; w: number; leaf: number }) {
   const hinge = g.end * ((c.length + 0.2) / 2 - g.w)
