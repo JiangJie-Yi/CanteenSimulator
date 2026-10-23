@@ -38,6 +38,7 @@ import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
 import { toggleEdit, useEdit } from '@/shops/grill/edit'
+import { Bgm } from '@/ui/Bgm'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
@@ -2202,6 +2203,7 @@ export default function App() {
         aria-label={theme === 'light' ? '切換成深色模式' : '切換成淺色模式'}>
         {theme === 'light' ? '夜' : '晝'}
       </button>
+      <Bgm />
       <Loader />
     </div>
   )

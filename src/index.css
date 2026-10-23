@@ -6413,3 +6413,33 @@ button {
 .app.is-editing .stage :is(button, input, select, a, [role='button']):not(.view-reset) {
   pointer-events: none;
 }
+
+/* the music switch, left of the edit button */
+.bgm-toggle {
+  position: fixed;
+  z-index: 10;
+  top: 20px;
+  right: 332px;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 50%;
+  background: var(--page);
+  color: var(--text-soft);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.bgm-toggle.is-on {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .bgm-toggle {
+    top: 14px;
+    right: 306px;
+    width: 40px;
+    height: 40px;
+  }
+}
