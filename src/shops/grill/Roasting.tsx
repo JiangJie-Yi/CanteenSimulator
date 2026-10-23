@@ -751,7 +751,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
   const leaf = useRef<THREE.Group>(null)
   const open = useRef(0)
   const body = useRef<THREE.Group>(null)
-  const label = useRef<HTMLDivElement>(null)
+  const badge = useRef<HTMLDivElement | null>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean } | null
   const [editing, setEditing] = useState(false)
@@ -770,12 +770,25 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [])
-  const showNumbers = () => {
-    const n = nudgeNow(gate)
-    const w = body.current?.getWorldPosition(new THREE.Vector3())
-    if (label.current) label.current.textContent = `gate ${idx}  nudge [${n.map((v) => v.toFixed(3)).join(', ')}]  world (${w ? [w.x, w.y, w.z].map((v) => v.toFixed(2)).join(', ') : '?'})`
-  }
-  useEffect(() => { if (editing) showNumbers() }, [editing])
+  const showNumbers = () => {}
+  // (on screen, not on the gate, which may be out of view: a box at the corner with the numbers, and the camera brought up to the gate)
+  useEffect(() => {
+    if (!editing) return
+    const el = document.createElement('div')
+    el.style.cssText = `position:fixed;left:16px;bottom:${96 + idx * 110}px;z-index:9999;background:rgba(10,20,40,0.92);color:#bfe3ff;font:13px/1.5 monospace;padding:8px 12px;border-radius:8px;border:1px solid #3fa9ff;pointer-events:none;white-space:pre`
+    document.body.appendChild(el)
+    badge.current = el
+    const cam = controls as unknown as { target?: THREE.Vector3; update?: () => void } | null
+    if (idx === 1 && body.current && cam?.target) {
+      const w = body.current.getWorldPosition(new THREE.Vector3())
+      const off = camera.position.clone().sub(cam.target)
+      off.setLength(Math.min(off.length(), 6))
+      cam.target.set(w.x, w.y + 0.6, w.z)
+      camera.position.copy(cam.target.clone().add(off))
+      cam.update?.()
+    }
+    return () => { el.remove(); badge.current = null }
+  }, [editing])
   const hit = (e: PointerEvent, y: number, lift: boolean) => {
     const r = gl.domElement.getBoundingClientRect()
     raycaster.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera)
@@ -829,6 +842,10 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     if (body.current) {
       const n = nudgeOf(gate)
       body.current.position.set(c.at.x + n[0], c.at.y + n[1], c.at.z + n[2])
+      if (badge.current) {
+        const nn = nudgeNow(gate), w = (leaf.current ?? body.current).getWorldPosition(new THREE.Vector3())
+        badge.current.textContent = `調整模式 (G 離開)   閘門 ${idx}${idx === 1 ? '（水槽旁）' : ''}\n拖藍色方塊移動，Shift 抬高\nnudge [${nn.map((v) => v.toFixed(3)).join(', ')}]\nworld (${w.x.toFixed(2)}, ${w.y.toFixed(2)}, ${w.z.toFixed(2)})`
+      }
     }
   })
   const H = BAR_TOP - 0.02
@@ -838,9 +855,6 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
         <>
           {/* (the handle: a pale box round the gate, to be taken hold of; its numbers float over it) */}
           <mesh position={[hinge + end * G / 2, 0.55, 0.08]}><boxGeometry args={[G + 0.2, 1.1, 0.5]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
-          <Html position={[hinge + end * G / 2, 1.3, 0.08]} center zIndexRange={[60, 50]} style={{ pointerEvents: 'none' }}>
-            <div ref={label} style={{ background: 'rgba(10,20,40,0.88)', color: '#bfe3ff', font: '12px monospace', padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap' }} />
-          </Html>
         </>
       )}
       <group position={[hinge, 0, 0.08]}>
