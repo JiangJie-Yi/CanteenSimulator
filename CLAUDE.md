@@ -46,10 +46,10 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 雲端每次動手前：`git fetch origin`，把 `origin/main` 合進 `cloud-work`（本機推的東西先拿到），改完只 `git push origin cloud-work`。
 - 本機收雲端的修改：`npm run dev:sync`（或只要同步：`npm run sync`）。每 20 秒看一次，有新東西且沒有未提交的修改時：
   1. GitHub 的 `main` 有別台機器的新提交 → 快轉拉下來。
-  2. `cloud-work` 有新提交 → 合併進本機 `main` → 跑 `npx tsc -b && npm test` → **通過才** `git push origin main`；合併衝突或檢查失敗就退回原狀並提示，不推。
-  3. 本機自己還沒推的提交 → 同樣檢查通過才推。
-- 不想自動推：`SYNC_PUSH=0 npm run dev:sync`（只合併和檢查，推送自己來）。
-- 本機的 Claude Code 在這個專案開始工作時，若 `git fetch origin` 後 `origin/cloud-work` 有 `main` 沒有的提交，且工作目錄乾淨：合併它、跑 `npx tsc -b && npm test`、通過就 `git push origin main`；有衝突或失敗就停下來告訴使用者。
+  2. `cloud-work` 有新提交 → 合併進本機 `main` → 跑 `npx tsc -b && npm test`；合併衝突或檢查失敗就退回原狀並提示。**預設不推 `main`**（推 `main` 就會部署網站）；要自動推：`SYNC_PUSH=1 npm run dev:sync`。
+  3. （只在 `SYNC_PUSH=1`）本機自己還沒推的提交 → 檢查通過才推。
+- 網站只在推 `main` 時部署，推 `cloud-work` 不會；所以雲端 chat 每做完一次就推 `cloud-work`，使用者的 localhost 看得到，網站不動。
+- 本機的 Claude Code 在這個專案開始工作時，若 `git fetch origin` 後 `origin/cloud-work` 有 `main` 沒有的提交，且工作目錄乾淨：合併它、跑 `npx tsc -b && npm test`、通過後**不要推 `main`**，除非使用者說；有衝突或失敗就停下來告訴使用者。
 - 遊戲裡的編輯模式（按 G，閉店時才能用）調的位置存在瀏覽器裡；確定後把面板上的 offset 數值告訴雲端 chat，由它寫成預設值。
 
 ## 常見改動要碰哪裡

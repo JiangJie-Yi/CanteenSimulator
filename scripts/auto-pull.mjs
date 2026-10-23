@@ -12,7 +12,7 @@
 //   npm run dev:sync      (the dev server and this together)
 //   node scripts/auto-pull.mjs --once       (look once and stop)
 //   SYNC_SECONDS=60       how often, default 20
-//   SYNC_PUSH=0           merge and check here, but leave pushing to you
+//   SYNC_PUSH=1           also push main once checked (that deploys the site); default: off, merge and check here only
 //   SYNC_VERIFY="cmd"     the checks, default `npx tsc -b && npm test`
 
 import { execFileSync, execSync } from 'node:child_process'
@@ -20,7 +20,8 @@ import { execFileSync, execSync } from 'node:child_process'
 const EVERY = Math.max(5, Number(process.env.SYNC_SECONDS ?? 20)) * 1000
 const BRANCH = process.env.SYNC_BRANCH ?? 'main'
 const CLOUD = process.env.SYNC_CLOUD ?? 'cloud-work'
-const PUSH = process.env.SYNC_PUSH !== '0'
+// (pushing main is what deploys the site: off unless asked for with SYNC_PUSH=1, so the cloud chat's work shows on this machine's localhost and stays off the website)
+const PUSH = process.env.SYNC_PUSH === '1'
 const VERIFY = process.env.SYNC_VERIFY ?? 'npx tsc -b && npm test'
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const ok = (...args) => { try { git(...args); return true } catch { return false } }
@@ -44,7 +45,7 @@ function verify() {
   }
 }
 function push() {
-  if (!PUSH) return log('checked and ready: SYNC_PUSH=0, so `git push origin main` is left to you')
+  if (!PUSH) return log('checked and in your main here (not pushed: that is what deploys the site)')
   git('push', 'origin', BRANCH)
   log(`pushed main (${short()}): GitHub deploys it`)
 }
@@ -61,7 +62,7 @@ function check() {
     const hasCloud = ok('rev-parse', '--verify', '--quiet', cloudRef)
     const mainBehind = !isAncestor(remoteMain, 'HEAD')           // GitHub's main has something this one hasn't
     const cloudNews = hasCloud && !isAncestor(cloudRef, 'HEAD')   // the cloud chat's work not in main yet
-    const mainAhead = !isAncestor('HEAD', remoteMain)            // this main has commits GitHub doesn't
+    const mainAhead = PUSH && !isAncestor('HEAD', remoteMain)    // this main has commits GitHub doesn't, and pushing is on
     if (!mainBehind && !cloudNews && !mainAhead) return (told = '')
     if (dirty) return say('dirty', 'there is news (or something of yours to push), but you have uncommitted changes: waiting until they are committed or put away')
     const before = git('rev-parse', 'HEAD')
@@ -110,6 +111,6 @@ function check() {
 
 check()
 if (!process.argv.includes('--once')) {
-  log(`watching origin/${BRANCH} and origin/${CLOUD} every ${EVERY / 1000}s${PUSH ? '' : ' (not pushing)'} (Ctrl+C to stop)`)
+  log(`watching origin/${BRANCH} and origin/${CLOUD} every ${EVERY / 1000}s${PUSH ? ' (pushing main once checked)' : ' (merging and checking here only, never pushing)'} (Ctrl+C to stop)`)
   setInterval(check, EVERY)
 }
