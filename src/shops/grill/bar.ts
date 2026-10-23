@@ -78,11 +78,11 @@ export type Gate = { end: 1 | -1; w: number; leaf: number
   /** the whole gate (post, doorway and door) slid this far along its counter toward the counter's end, its width as it was: the base and top then run on
    * that much further, up to the post */
   shift?: number
-  /** the whole gate (post, door and the way through it that the servers walk) moved in the world, by this much in x, y and z (world units: the bar is drawn twice its own size) */
+  /** the swing door alone (not its post, the doorway or the hinges' fixed leaves) moved by this much along the counter (x), up (y) and across it (z), in world units: the bar is drawn twice its own size */
   nudge?: [number, number, number] }
 export const BAR_GATES: Gate[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.56, leaf: 0.55, nudge: [0, 0, 0] }]
 /** where each gate's been dragged to by hand (kept in the browser, so it stays put), by gate: its nudge, in the same units as `nudge` */
-const GATE_KEY = 'jgs-gate-nudge'
+const GATE_KEY = 'jgs-gate-leaf-nudge'
 export const GATE_EDIT: { on: boolean; nudge: Record<number, [number, number, number]> } = { on: false, nudge: (() => {
   try { return JSON.parse(localStorage.getItem(GATE_KEY) ?? '{}') } catch { return {} }
 })() }
@@ -96,7 +96,7 @@ export const gateCut = (g: { w: number; shift?: number }) => g.w - (g.shift ?? 0
 /** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
 export function gateOf(c: Counter, g: Gate) {
   const hinge = g.end * ((c.length + 0.2) / 2 - gateCut(g))
-  return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, 0.08).add(new THREE.Vector3(...nudgeOf(g))) }
+  return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, 0.08) }
 }
 /**
  * The little dish of sauce at a seat (the bar's frame, on its top): to the customer's left of their place, or their

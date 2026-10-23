@@ -841,23 +841,22 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     // (the whole gate where it's been put, the moment it's moved)
     if (body.current) {
       const n = nudgeOf(gate)
-      body.current.position.set(c.at.x + n[0], c.at.y + n[1], c.at.z + n[2])
+      body.current.position.set(n[0], n[1], n[2])
       if (badge.current) {
         const nn = nudgeNow(gate), w = (leaf.current ?? body.current).getWorldPosition(new THREE.Vector3())
-        badge.current.textContent = `調整模式 (G 離開)   閘門 ${idx}${idx === 1 ? '（水槽旁）' : ''}\n拖藍色方塊移動，Shift 抬高\nnudge [${nn.map((v) => v.toFixed(3)).join(', ')}]\nworld (${w.x.toFixed(2)}, ${w.y.toFixed(2)}, ${w.z.toFixed(2)})`
+        badge.current.textContent = `調整模式 (G 離開)   閘門 ${idx}${idx === 1 ? '（水槽旁）' : ''}\n只移動門板（門柱不動），拖藍色方塊，Shift 抬高\nnudge [${nn.map((v) => v.toFixed(3)).join(', ')}]\nworld (${w.x.toFixed(2)}, ${w.y.toFixed(2)}, ${w.z.toFixed(2)})`
       }
     }
   })
   const H = BAR_TOP - 0.02
   return (
-    <group ref={body} position={c.at.clone().add(new THREE.Vector3(...nudgeOf(gate)))} rotation-y={yaw} onPointerDown={down}>
-      {editing && (
-        <>
-          {/* (the handle: a pale box round the gate, to be taken hold of; its numbers float over it) */}
-          <mesh position={[hinge + end * G / 2, 0.55, 0.08]}><boxGeometry args={[G + 0.2, 1.1, 0.5]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
-        </>
-      )}
+    <group position={c.at} rotation-y={yaw}>
       <group position={[hinge, 0, 0.08]}>
+        {/* the swing door by itself: its own thing, apart from the post and the doorway, which stay where they are; it's this that's moved by hand */}
+        <group ref={body} position={nudgeOf(gate)} onPointerDown={down}>
+        {editing && (
+          <mesh position={[end * G / 2, 0.55, 0]}><boxGeometry args={[G + 0.1, 1.1, 0.3]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
+        )}
         <group ref={leaf} name="gate-leaf">
           <group position-x={end * (G / 2 - 0.005)}>
             {/* a framed door of planed wood: two stiles and three rails with rounded edges, the grain running up the
@@ -874,6 +873,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
               </group>
             )))}
           </group>
+        </group>
         </group>
         {/* the door's post (柱): a jamb of pale planed wood standing up the base's end, its face rounded, the hinges on it,
             set apart from the dark base so the gate reads as a door hung on a post; and a thin dark shadow line down the
