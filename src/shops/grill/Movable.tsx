@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { commitOffsets, moveTo, offsetOf, registerMovable, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, moveTo, offsetOf, registerMovable, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -53,6 +53,7 @@ export function AxisGizmo({ id, at, size = 0.5 }: { id: string; at: V3; size?: n
     }
     let last = along(e.nativeEvent)
     if (last === null) return
+    beginChange()
     moveTo(id, offsetOf(id))
     if (controls) controls.enabled = false
     const move = (ev: PointerEvent) => {
@@ -153,6 +154,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
     }
     let last = at(e.nativeEvent)
     if (!last) return
+    beginChange()
     moveTo(id, offsetOf(id))
     if (controls) controls.enabled = false
     const move = (ev: PointerEvent) => {

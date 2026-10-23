@@ -26,7 +26,7 @@ import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { AxisGizmo, focusCamera } from './Movable'
 import { binchotanGeo, binchotanMap } from './Binchotan'
-import { commitOffsets, getEdit, moveTo, offsetOf, registerMovable, useEdit } from './edit'
+import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, registerMovable, useEdit } from './edit'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
 import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
@@ -779,6 +779,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     // (an axis arrow under the pointer takes it: the box is only for the free move)
     if (e.intersections?.some((i) => i.object.userData.gizmo)) return
     e.stopPropagation()
+    beginChange()
     moveTo(`gate${idx}`, offsetOf(`gate${idx}`))
     const wp = body.current.getWorldPosition(new THREE.Vector3())
     const lift = e.nativeEvent.shiftKey

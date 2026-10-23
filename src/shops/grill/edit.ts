@@ -19,10 +19,39 @@ export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return (
 const DEFAULTS: Record<string, V3> = { gate1: [0, 0, 0.17] }
 export const offsetOf = (id: string): V3 => state.offsets[id] ?? DEFAULTS[id] ?? [0, 0, 0]
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state.offsets)) } catch { /* private window: it just won't be kept */ } }
+// ---- undo: each change (a drag, an arrow, a field edited, reset all) is a step; Ctrl+Z goes back one, Ctrl+Y (or Ctrl+Shift+Z) forward again
+const past: Record<string, V3>[] = []
+let future: Record<string, V3>[] = []
+const snap = () => JSON.stringify(state.offsets)
+/** called as a change begins: the way things are now is kept, to go back to */
+export function beginChange() {
+  const last = past.length ? JSON.stringify(past[past.length - 1]) : null
+  if (last === snap()) return
+  past.push(JSON.parse(snap()))
+  if (past.length > 100) past.shift()
+  future = []
+  panel()
+}
+export function undo() {
+  const prev = past.pop()
+  if (!prev) { toast('沒有可以復原的動作'); return }
+  future.push(JSON.parse(snap()))
+  state.offsets = prev
+  save()
+  emit()
+}
+export function redo() {
+  const next = future.pop()
+  if (!next) { toast('沒有可以重做的動作'); return }
+  past.push(JSON.parse(snap()))
+  state.offsets = next
+  save()
+  emit()
+}
 /** a piece moved (live, while it's dragged) */
 export function moveTo(id: string, v: V3) { state.offsets = { ...state.offsets, [id]: v }; state.selected = id; emit() }
 export const commitOffsets = () => save()
-export function resetAll() { state.offsets = {}; save(); emit() }
+export function resetAll() { beginChange(); state.offsets = {}; save(); emit() }
 export const select = (id: string | null) => { state.selected = id; emit() }
 
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
@@ -44,6 +73,7 @@ export function toggleEdit() {
   if (state.locked) { toast('營業中不能編輯，請先閉店'); return }
   state.on = !state.on
   state.selected = null
+  if (!state.on) { past.length = 0; future = [] }
   emit()
 }
 
@@ -97,6 +127,7 @@ function panel() {
         v[k] = Number(inp.value)
         moveTo(id, v)
       }
+      inp.onfocus = () => beginChange()
       inp.onchange = () => save()
       wrap.appendChild(inp)
       xyz.appendChild(wrap)
@@ -124,7 +155,15 @@ function panel() {
     done.textContent = '離開編輯'
     done.style.cssText = 'background:#16345a;color:#dff0ff;border:1px solid #3fa9ff;border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif'
     done.onclick = () => toggleEdit()
-    foot.append(reset, done)
+    const mk = (text: string, title: string, fn: () => void) => {
+      const b = document.createElement('button')
+      b.textContent = text
+      b.title = title
+      b.style.cssText = 'background:#16345a;color:#dff0ff;border:1px solid #3fa9ff;border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif'
+      b.onclick = fn
+      return b
+    }
+    foot.append(mk('復原', 'Ctrl+Z', undo), mk('重做', 'Ctrl+Y', redo), reset, done)
     el.appendChild(foot)
     document.body.appendChild(el)
     built = sig
@@ -144,11 +183,19 @@ function panel() {
 // ---- the key (once, whichever pieces are mounted)
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
+    const t0 = e.target
+    const typing = t0 instanceof HTMLInputElement || t0 instanceof HTMLTextAreaElement || (t0 instanceof HTMLElement && t0.isContentEditable)
+    // (Ctrl+Z / Ctrl+Y in edit mode, unless it's text being typed into a field, which has its own)
+    if ((e.ctrlKey || e.metaKey) && state.on && !typing) {
+      const k = e.key.toLowerCase()
+      if (k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return }
+      if (k === 'y') { e.preventDefault(); redo(); return }
+    }
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
     if (e.key !== 'g' && e.key !== 'G') return
     const t = e.target
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return
     toggleEdit()
   })
-  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, toggle: toggleEdit, setLocked }
+  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, toggle: toggleEdit, setLocked, undo, redo }
 }
