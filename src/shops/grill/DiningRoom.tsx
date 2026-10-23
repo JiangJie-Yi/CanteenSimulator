@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
@@ -1559,10 +1558,10 @@ const ALTAR_WOOD = canvasTex(512, 1024, (g) => {
   g.fillStyle = sh
   g.fillRect(0, 0, 512, 1024)
 }, true)
-const ALTAR_TOP_GEO = new RoundedBoxGeometry(1, 1, 1, 3, 0.2)
+const ALTAR_TOP_GEO = new THREE.BoxGeometry(1, 1, 1)
 /** the apron under the table's front edge: a board cut with a row of arched openings (花頭窓), its lower corners rounded */
 const ALTAR_APRON = (() => {
-  const W = 0.8, H = 0.07
+  const W = 0.86, H = 0.07
   const sh = new THREE.Shape()
   sh.moveTo(-W / 2, 0)
   sh.lineTo(-W / 2, -H + 0.012)
@@ -1588,33 +1587,36 @@ const ALTAR_APRON = (() => {
 /** the small shrine's offering table: the grained top with its raised lip along the front and sides, a fine gold line inlaid inside the lip, and the arched apron below */
 function AltarTable() {
   const L = 0.9, D = ALTAR_D, T = 0.034
+  const GOLD = <meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} />
+  // (square edges, everything laid to the top's own: the top spans x -D/2..D/2 (its front at -D/2, the wall at +D/2), z -L/2..L/2, y -T..0)
+  const CAP = 0.042, LIP = 0.014, LIP_H = 0.012
   return (
     <group>
       <mesh geometry={ALTAR_TOP_GEO} scale={[D, T, L]} position-y={-T / 2} castShadow receiveShadow>
         <meshToonMaterial color="#ffffff" map={ALTAR_WOOD} />
       </mesh>
-      <mesh geometry={ALTAR_TOP_GEO} scale={[D * 1.02, T * 1.04, L * 1.015]} position-y={-T / 2}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
-      {/* the lip: along the front and both sides, in darker wood, rounded */}
-      <mesh geometry={ALTAR_TOP_GEO} scale={[0.014, 0.012, L - 0.02]} position={[-D / 2 + 0.012, 0.004, 0]}><meshToonMaterial color="#3a2414" /></mesh>
+      <mesh geometry={ALTAR_TOP_GEO} scale={[D + 0.007, T + 0.007, L + 0.007]} position-y={-T / 2}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
+      {/* the lip: along the front and both sides, flush with the top's edges, in darker wood */}
+      <mesh geometry={ALTAR_TOP_GEO} scale={[LIP, LIP_H, L]} position={[-D / 2 + LIP / 2, LIP_H / 2, 0]}><meshToonMaterial color="#3a2414" /></mesh>
       {[-1, 1].map((sd) => (
-        <mesh key={sd} geometry={ALTAR_TOP_GEO} scale={[D - 0.03, 0.012, 0.014]} position={[0.0, 0.004, sd * (L / 2 - 0.012)]}><meshToonMaterial color="#3a2414" /></mesh>
+        <mesh key={sd} geometry={ALTAR_TOP_GEO} scale={[D, LIP_H, LIP]} position={[0, LIP_H / 2, sd * (L / 2 - LIP / 2)]}><meshToonMaterial color="#3a2414" /></mesh>
       ))}
-      {/* the gold line inlaid inside it */}
-      <mesh position={[-D / 2 + 0.03, 0.0008, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.004, L - 0.07]} /><meshBasicMaterial color="#b8924a" /></mesh>
+      {/* the gold line inlaid just inside it */}
+      <mesh position={[-D / 2 + LIP + 0.012, 0.0008, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.004, L - 2 * LIP - 0.024]} /><meshBasicMaterial color="#b8924a" /></mesh>
       {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[0.0, 0.0008, sd * (L / 2 - 0.03)]} rotation-x={-Math.PI / 2}><planeGeometry args={[D - 0.07, 0.004]} /><meshBasicMaterial color="#b8924a" /></mesh>
+        <mesh key={sd} position={[0.0, 0.0008, sd * (L / 2 - LIP - 0.012)]} rotation-x={-Math.PI / 2}><planeGeometry args={[D - LIP - 0.012, 0.004]} /><meshBasicMaterial color="#b8924a" /></mesh>
       ))}
-      {/* gold caps on the two front corners (隅金具): a plate over the top corner, wrapped down each of its two faces */}
+      {/* gold caps on the two front corners (隅金具): a plate over the lip's corner, wrapped down each face, all flush with the corner */}
       {[-1, 1].map((sd) => (
-        <group key={sd} position={[-D / 2, 0, sd * (L / 2)]}>
-          <mesh position={[0.02, 0.0012, -sd * 0.02]}><boxGeometry args={[0.042, 0.0024, 0.042]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
-          <mesh position={[-0.0008, -0.016, -sd * 0.02]}><boxGeometry args={[0.0024, 0.034, 0.042]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
-          <mesh position={[0.02, -0.016, -sd * 0.0008]}><boxGeometry args={[0.042, 0.034, 0.0024]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
-          <mesh position={[0.012, 0.0032, -sd * 0.012]}><sphereGeometry args={[0.004, 8, 6]} /><meshToonMaterial color="#8a6a1a" /></mesh>
+        <group key={sd}>
+          <mesh position={[-D / 2 + CAP / 2, LIP_H + 0.0012, sd * (L / 2 - CAP / 2)]}><boxGeometry args={[CAP, 0.0024, CAP]} />{GOLD}</mesh>
+          <mesh position={[-D / 2 - 0.0012, (LIP_H - T) / 2, sd * (L / 2 - CAP / 2)]}><boxGeometry args={[0.0024, LIP_H + T, CAP]} />{GOLD}</mesh>
+          <mesh position={[-D / 2 + CAP / 2, (LIP_H - T) / 2, sd * (L / 2 + 0.0012)]}><boxGeometry args={[CAP, LIP_H + T, 0.0024]} />{GOLD}</mesh>
+          <mesh position={[-D / 2 + CAP / 2 - 0.004, LIP_H + 0.0034, sd * (L / 2 - CAP / 2 + 0.004)]}><sphereGeometry args={[0.004, 8, 6]} /><meshToonMaterial color="#8a6a1a" /></mesh>
         </group>
       ))}
-      {/* the apron under the front edge */}
-      <mesh geometry={ALTAR_APRON} position={[-D / 2 + 0.034, -T + 0.002, 0]} rotation-y={Math.PI / 2}><meshToonMaterial color="#4a2c18" /></mesh>
+      {/* the apron under the front edge, set just behind the lip's line and under the top's whole length */}
+      <mesh geometry={ALTAR_APRON} position={[-D / 2 + LIP, -T + 0.001, 0]} rotation-y={Math.PI / 2}><meshToonMaterial color="#4a2c18" /></mesh>
     </group>
   )
 }
