@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { ALONG } from './bar'
 import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
@@ -306,7 +307,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
   const { on, offsets, rotations, scales, selected } = useEdit()
-  const [box, setBox] = useState<{ c: V3; s: V3 } | null>(null)
+  const [box, setBox] = useState<{ c: V3; s: V3; yaw: number } | null>(null)
   // (the piece's middle, in the frame of its own group as it stands untouched: what it turns and scales about; measured once it has been drawn)
   const [mid, setMid] = useState<V3>([0, 0, 0])
   const inner = useRef<THREE.Group>(null)
@@ -320,16 +321,40 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
     if (!grp || !inn) return null
     // (taken in the inner group's own frame, so the turn and scale on the wrapper outside it don't enter into it)
     grp.updateWorldMatrix(true, true)
-    const b = new THREE.Box3()
+    const toInner = new THREE.Matrix4().copy(inn.matrixWorld).invert()
+    const pts: THREE.Vector3[] = []
+    let yMin = Infinity, yMax = -Infinity
     inn.traverse((m) => {
       if (!(m instanceof THREE.Mesh)) return
       m.geometry.computeBoundingBox()
-      if (!m.geometry.boundingBox) return
-      b.union(m.geometry.boundingBox.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(new THREE.Matrix4().copy(inn.matrixWorld).invert(), m.matrixWorld)))
+      const gb = m.geometry.boundingBox
+      if (!gb) return
+      const mat = new THREE.Matrix4().multiplyMatrices(toInner, m.matrixWorld)
+      for (let i = 0; i < 8; i++) {
+        const v = new THREE.Vector3(i & 1 ? gb.max.x : gb.min.x, i & 2 ? gb.max.y : gb.min.y, i & 4 ? gb.max.z : gb.min.z).applyMatrix4(mat)
+        pts.push(v)
+        yMin = Math.min(yMin, v.y); yMax = Math.max(yMax, v.y)
+      }
     })
-    if (b.isEmpty()) return { c: [0, 0.3, 0] as V3, s: [0.5, 0.6, 0.5] as V3 }
-    const c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3())
-    return { c: [c.x, c.y, c.z] as V3, s: [Math.max(s.x, 0.2) + 0.06, Math.max(s.y, 0.2) + 0.06, Math.max(s.z, 0.2) + 0.06] as V3 }
+    if (!pts.length) return { c: [0, 0.3, 0] as V3, s: [0.5, 0.6, 0.5] as V3, yaw: 0 }
+    // (the box is squared to the room, like the gates' and the cats' stand: turned about the vertical to the bar's own direction, whatever
+    // way the piece's parent is turned, so none of them comes out a diamond)
+    const fit = (a: number) => {
+      const co = Math.cos(a), si = Math.sin(a)
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity
+      for (const v of pts) {
+        const x = v.x * co - v.z * si, z = v.x * si + v.z * co
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z)
+      }
+      return { a, x0, x1, z0, z1 }
+    }
+    const innYaw = new THREE.Euler().setFromQuaternion(inn.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
+    const best = fit(Math.atan2(ALONG.x, ALONG.z) - innYaw)
+    const cx = (best.x0 + best.x1) / 2, cz = (best.z0 + best.z1) / 2
+    const co = Math.cos(best.a), si = Math.sin(best.a)
+    // (the middle back out of the turned frame)
+    const c = [cx * co + cz * si, (yMin + yMax) / 2, -cx * si + cz * co] as V3
+    return { c, s: [Math.max(best.x1 - best.x0, 0.2) + 0.06, Math.max(yMax - yMin, 0.2) + 0.06, Math.max(best.z1 - best.z0, 0.2) + 0.06] as V3, yaw: best.a }
   }
 
   // (on the list of what can be moved, with a way to bring the camera to the middle of it)
@@ -399,7 +424,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
         <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}>{children}</group>
       </group>
       {on && box && (
-        <mesh userData={{ editHandle: true }} position={box.c} renderOrder={999} onPointerDown={down}>
+        <mesh userData={{ editHandle: true }} position={box.c} rotation-y={box.yaw} renderOrder={999} onPointerDown={down}>
           <boxGeometry args={box.s} />
           <meshBasicMaterial color={selected === id ? '#ffb23f' : '#3fa9ff'} transparent opacity={0.26} depthWrite={false} depthTest={false} />
         </mesh>

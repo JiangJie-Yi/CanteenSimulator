@@ -403,7 +403,7 @@ function scorchEarth(mesh: THREE.Mesh) {
 }
 /** the most sticks of charcoal the bed holds at once, and how long one lasts once it's burning, in game seconds (it burns down to a third of its length, then it's ash) */
 const UP_AXIS = new THREE.Vector3(0, 1, 0)
-const COAL_MAX = 10
+const COAL_MAX = 16
 const COAL_LAST_S = 170
 /** how long a fresh stick of charcoal takes to kindle to red-hot, in game seconds */
 const COAL_KINDLE_S = 22
@@ -2090,7 +2090,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
   // (each thrown stick its own length, thickness and bend, new each time: from the short to the long)
-  const randomStick = () => binchotanGeo(0.2 + Math.random() * 0.12, 0.04 + Math.random() * 0.012, Math.floor(Math.random() * 8))
+  const randomStick = () => binchotanGeo(0.28 + Math.random() * 0.04, 0.042 + Math.random() * 0.006, Math.floor(Math.random() * 8))
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -2116,7 +2116,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
   }
   const dropCoals = (from?: { x: number; y: number; z: number }) => {
-    const n = 4 + Math.floor(Math.random() * 2)
+    const n = 7 + Math.floor(Math.random() * 2)
     const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
     // (a bed only holds so many sticks: when the new ones would take it past the most, the oldest burn out at once, shrinking away)
     const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
@@ -2146,7 +2146,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       c.vz = (c.tz - c.z) / T
       c.vy = (c.top - c.y + 0.5 * 9.8 * T * T) / T
     }
-    setCoalIds((ids) => [...ids, ...Array.from({ length: n }, (_, k) => base + k)].slice(-16))
+    setCoalIds((ids) => [...ids, ...Array.from({ length: n }, (_, k) => base + k)].slice(-28))
   }
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dropCoals: dropCoals, __fire: fire, __coals: coals })
   const [shards, setShards] = useState<{ id: number; x: number; y: number; z: number; s: number; r: number; t: number }[]>([])

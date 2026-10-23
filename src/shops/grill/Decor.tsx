@@ -56,21 +56,6 @@ function Inked({ geometry, color, map, grow = 1.04, sideOnly = false, position, 
 // (painted again once the sign font has loaded: signFont)
 const canvas = (w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) => signTexture(w, h, (g) => draw(g))
 
-/** pale cedar planks with a few grain lines */
-const CRATE_WOOD = canvas(256, 128, (g) => {
-  g.fillStyle = '#c99a62'
-  g.fillRect(0, 0, 256, 128)
-  for (let i = 0; i < 26; i++) {
-    const y = Math.random() * 128
-    g.strokeStyle = `rgba(110,70,35,${0.12 + Math.random() * 0.2})`
-    g.lineWidth = 1 + Math.random() * 1.5
-    g.beginPath()
-    g.moveTo(0, y)
-    for (let x = 0; x <= 256; x += 32) g.lineTo(x, y + Math.sin(x * 0.03 + i) * 3)
-    g.stroke()
-  }
-})
-
 /** the washi label pasted on the crate: 紀州備長炭 brushed in black, a red seal */
 const CRATE_LABEL = canvas(128, 256, (g) => {
   g.fillStyle = '#efe6d2'
@@ -109,53 +94,82 @@ const FAN_PAPER = canvas(256, 256, (g) => {
   }
 })
 
-/** A wooden crate of white binchotan, its label on the front, the sticks heaped inside it. */
+/** water-hyacinth plaiting: pale straw bands, each a row of slanted strands that flips direction from cell to cell */
+const BASKET_WEAVE = canvas(256, 128, (g) => {
+  g.fillStyle = '#c9a366'
+  g.fillRect(0, 0, 256, 128)
+  const rows = 8, cell = 16, h = 128 / rows
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < 256 / cell; c++) {
+      const x = c * cell, y = r * h, flip = (c + r) % 2
+      g.fillStyle = flip ? '#d8b878' : '#bf9658'
+      g.fillRect(x + 0.5, y + 0.5, cell - 1, h - 1)
+      g.strokeStyle = 'rgba(120,85,40,0.55)'
+      g.lineWidth = 1.2
+      for (let k = 1; k < 4; k++) {
+        g.beginPath()
+        if (flip) { g.moveTo(x + k * 4, y + 1); g.lineTo(x + k * 4 - 3, y + h - 1) } else { g.moveTo(x + k * 4 - 3, y + 1); g.lineTo(x + k * 4, y + h - 1) }
+        g.stroke()
+      }
+    }
+    g.fillStyle = 'rgba(90,60,30,0.5)'
+    g.fillRect(0, r * h, 256, 1.5)
+  }
+})
+
+/** A square plaited basket of white binchotan stood on end, packed full, its tag on the front. */
 function Crate() {
-  const W = 0.62, D = 0.36, H = 0.2, T = 0.02
+  const W = 0.4, D = 0.4, H = 0.16, T = 0.02
   const geo = useMemo(() => ({
     side: new THREE.BoxGeometry(W, H, T),
     end: new THREE.BoxGeometry(T, H, D - 2 * T),
     floor: new THREE.BoxGeometry(W - 2 * T, T, D - 2 * T),
-    label: new THREE.PlaneGeometry(0.1, 0.17),
-    stick: new THREE.CylinderGeometry(0.022, 0.024, W - 0.08, 7),
+    rimSide: new THREE.BoxGeometry(W + 0.02, 0.03, 0.035),
+    rimEnd: new THREE.BoxGeometry(0.035, 0.03, D - 0.05),
+    label: new THREE.PlaneGeometry(0.075, 0.12),
   }), [])
-  // (each stick of the crate its own length (from a hand's breadth short of the crate's to its full) and thickness)
-  const stickGeos = useMemo(() => Array.from({ length: 24 }, (_, k) => binchotanGeo(0.22 + ((k * 37) % 21) * 0.005, 0.038 + ((k * 7) % 5) * 0.003, k)), [])
-  // the sticks heaped in rows, each turned and tilted a little differently
+  // (the sticks all about one length, a hand's breadth long: only a step or two between the shortest and the longest)
+  const stickGeos = useMemo(() => [0.26, 0.28, 0.3].flatMap((len) => [0, 1, 2, 3].map((k) => ({ geo: binchotanGeo(len, 0.026, k), len }))), [])
+  // the sticks packed in a grid, each stood a little off true and turned about its own axis
   const sticks = useMemo(() => {
-    const out: { p: [number, number, number]; r: [number, number, number] }[] = []
-    let seed = 7
+    const out: { p: [number, number, number]; r: [number, number, number]; g: number }[] = []
+    let seed = 11
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    for (let row = 0; row < 3; row++) {
-      const n = 6 - row
-      for (let k = 0; k < n; k++) {
-        const z = (k - (n - 1) / 2) * 0.05
-        out.push({ p: [(rnd() - 0.5) * 0.04, T + 0.025 + row * 0.04, z], r: [rnd() * 3, (rnd() - 0.5) * 0.12, Math.PI / 2] })
+    const N = 6, step = (W - 2 * T - 0.04) / (N - 1)
+    for (let i = 0; i < N; i++) {
+      for (let k = 0; k < N; k++) {
+        const g = Math.floor(rnd() * stickGeos.length)
+        const len = stickGeos[g].len
+        out.push({
+          p: [(i - (N - 1) / 2) * step + (rnd() - 0.5) * 0.008, T + len / 2 + (rnd() - 0.5) * 0.02, (k - (N - 1) / 2) * step + (rnd() - 0.5) * 0.008],
+          r: [(rnd() - 0.5) * 0.1, rnd() * 6, (rnd() - 0.5) * 0.1], g,
+        })
       }
     }
-    // two more laid along the top of the heap, inside the box (a stick is W - 0.08 long, the box's inside W - 0.04: none goes past
-    // the ends, none stands above the rim)
-    out.push({ p: [0, T + 0.025 + 3 * 0.04 + 0.012, 0.035], r: [0.6, 0.04, Math.PI / 2] })
-    out.push({ p: [0.01, T + 0.025 + 3 * 0.04 + 0.012, -0.045], r: [2.1, -0.03, Math.PI / 2] })
     return out
-  }, [])
-  const wood = CRATE_WOOD
+  }, [stickGeos])
+  const weave = BASKET_WEAVE
   return (
     <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35} userData={{ decor: 'charcoal' }}>
-      <Inked geometry={geo.side} map={wood} position={[0, H / 2, D / 2 - T / 2]}>
-        {/* the label faces out of the front */}
-        <mesh geometry={geo.label} position={[0.17, 0, T / 2 + 0.002]}>
+      <Inked geometry={geo.side} map={weave} position={[0, H / 2, D / 2 - T / 2]}>
+        {/* the tag faces out of the front */}
+        <mesh geometry={geo.label} position={[0.09, 0, T / 2 + 0.002]}>
           <meshToonMaterial map={CRATE_LABEL} />
         </mesh>
       </Inked>
-      <Inked geometry={geo.side} map={wood} position={[0, H / 2, -D / 2 + T / 2]} />
-      <Inked geometry={geo.end} map={wood} position={[W / 2 - T / 2, H / 2, 0]} />
-      <Inked geometry={geo.end} map={wood} position={[-W / 2 + T / 2, H / 2, 0]} />
+      <Inked geometry={geo.side} map={weave} position={[0, H / 2, -D / 2 + T / 2]} />
+      <Inked geometry={geo.end} map={weave} position={[W / 2 - T / 2, H / 2, 0]} />
+      <Inked geometry={geo.end} map={weave} position={[-W / 2 + T / 2, H / 2, 0]} />
+      {/* the rim, a thicker rolled edge of darker straw */}
+      <Inked geometry={geo.rimSide} color="#a47b42" position={[0, H, D / 2 - 0.01]} />
+      <Inked geometry={geo.rimSide} color="#a47b42" position={[0, H, -D / 2 + 0.01]} />
+      <Inked geometry={geo.rimEnd} color="#a47b42" position={[W / 2 - 0.01, H, 0]} />
+      <Inked geometry={geo.rimEnd} color="#a47b42" position={[-W / 2 + 0.01, H, 0]} />
       <mesh geometry={geo.floor} position={[0, T / 2, 0]} receiveShadow>
-        <meshToonMaterial map={wood} />
+        <meshToonMaterial map={weave} />
       </mesh>
       {sticks.map((s, i) => (
-        <Inked key={i} geometry={stickGeos[(i * 5 + 3) % stickGeos.length]} map={binchotanMap()} grow={1.07} sideOnly position={s.p} rotation={s.r} />
+        <Inked key={i} geometry={stickGeos[s.g].geo} map={binchotanMap()} grow={1.07} sideOnly position={s.p} rotation={s.r} />
       ))}
     </group>
   )
