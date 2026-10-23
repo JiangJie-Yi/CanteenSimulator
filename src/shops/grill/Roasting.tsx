@@ -26,7 +26,7 @@ import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateCut, gateOf, nudgeOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, GATE_EDIT, gateCut, gateOf, nudgeNow, nudgeOf, saveGateNudge, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -750,15 +750,99 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
   const G = gate.leaf
   const leaf = useRef<THREE.Group>(null)
   const open = useRef(0)
+  const body = useRef<THREE.Group>(null)
+  const label = useRef<HTMLDivElement>(null)
+  const { camera, gl, raycaster } = useThree()
+  const controls = useThree((s) => s.controls) as unknown as { enabled: boolean } | null
+  const [editing, setEditing] = useState(false)
+  const drag = useRef<{ at: THREE.Vector3; y: number; lift: boolean } | null>(null)
+  const idx = BAR_GATES.indexOf(gate)
+  // (G switches the gate to be moved by hand: drag it over the floor, hold Shift to lift it; the numbers are shown on it, kept in the browser)
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if ((e.key === 'g' || e.key === 'G') && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        // (every gate hears the key: the first to hear it flips the switch, the rest just follow it)
+        const ev = e as KeyboardEvent & { gateFlipped?: boolean }
+        if (!ev.gateFlipped) { ev.gateFlipped = true; GATE_EDIT.on = !GATE_EDIT.on }
+        setEditing(GATE_EDIT.on)
+      }
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [])
+  const showNumbers = () => {
+    const n = nudgeNow(gate)
+    const w = body.current?.getWorldPosition(new THREE.Vector3())
+    if (label.current) label.current.textContent = `gate ${idx}  nudge [${n.map((v) => v.toFixed(3)).join(', ')}]  world (${w ? [w.x, w.y, w.z].map((v) => v.toFixed(2)).join(', ') : '?'})`
+  }
+  useEffect(() => { if (editing) showNumbers() }, [editing])
+  const hit = (e: PointerEvent, y: number, lift: boolean) => {
+    const r = gl.domElement.getBoundingClientRect()
+    raycaster.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera)
+    // (over the floor: the plane at the gate's height; lifted: a upright plane through it, facing the camera)
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -y)
+    if (lift) {
+      plane.normal.copy(camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize().negate())
+      plane.constant = -plane.normal.dot(body.current!.getWorldPosition(new THREE.Vector3()))
+    }
+    return raycaster.ray.intersectPlane(plane, new THREE.Vector3())
+  }
+  const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
+    if (!GATE_EDIT.on || !body.current) return
+    e.stopPropagation()
+    const wp = body.current.getWorldPosition(new THREE.Vector3())
+    const lift = e.nativeEvent.shiftKey
+    const p = hit(e.nativeEvent, wp.y, lift)
+    if (!p) return
+    drag.current = { at: p, y: wp.y, lift }
+    if (controls) controls.enabled = false
+    const move = (ev: PointerEvent) => {
+      const d = drag.current
+      if (!d) return
+      const q = hit(ev, d.y, d.lift)
+      if (!q) return
+      // (the move in the world, taken into the bar's own frame and then the nudge's units: the bar is drawn GRILL_SCALE over its own size)
+      const par = body.current!.parent!
+      const a = par.worldToLocal(d.at.clone()), b = par.worldToLocal(q.clone())
+      const dl = b.sub(a)
+      const n = [...nudgeNow(gate)] as [number, number, number]
+      n[0] += dl.x * GRILL_SCALE; n[1] += dl.y * GRILL_SCALE; n[2] += dl.z * GRILL_SCALE
+      GATE_EDIT.nudge[idx] = n
+      d.at.copy(q)
+      showNumbers()
+    }
+    const up = () => {
+      drag.current = null
+      if (controls) controls.enabled = true
+      saveGateNudge()
+      window.removeEventListener('pointermove', move)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
+  }
   useFrame((_, dt) => {
     const near = SERVICE.walkers.some((w) => Math.hypot(w.x - middle.x, w.z - middle.z) < GATE_NEAR)
     open.current = THREE.MathUtils.clamp(open.current + (near ? 1 : -1) * Math.min(dt, 0.1) * GATE_SWING, 0, 1)
     const k = open.current
     if (leaf.current) leaf.current.rotation.y = -end * (Math.PI / 2) * k * k * (3 - 2 * k)
+    // (the whole gate where it's been put, the moment it's moved)
+    if (body.current) {
+      const n = nudgeOf(gate)
+      body.current.position.set(c.at.x + n[0], c.at.y + n[1], c.at.z + n[2])
+    }
   })
   const H = BAR_TOP - 0.02
   return (
-    <group position={c.at.clone().add(new THREE.Vector3(...nudgeOf(gate)))} rotation-y={yaw}>
+    <group ref={body} position={c.at.clone().add(new THREE.Vector3(...nudgeOf(gate)))} rotation-y={yaw} onPointerDown={down}>
+      {editing && (
+        <>
+          {/* (the handle: a pale box round the gate, to be taken hold of; its numbers float over it) */}
+          <mesh position={[hinge + end * G / 2, 0.55, 0.08]}><boxGeometry args={[G + 0.2, 1.1, 0.5]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
+          <Html position={[hinge + end * G / 2, 1.3, 0.08]} center zIndexRange={[60, 50]} style={{ pointerEvents: 'none' }}>
+            <div ref={label} style={{ background: 'rgba(10,20,40,0.88)', color: '#bfe3ff', font: '12px monospace', padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap' }} />
+          </Html>
+        </>
+      )}
       <group position={[hinge, 0, 0.08]}>
         <group ref={leaf} name="gate-leaf">
           <group position-x={end * (G / 2 - 0.005)}>

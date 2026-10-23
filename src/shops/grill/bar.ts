@@ -80,9 +80,17 @@ export type Gate = { end: 1 | -1; w: number; leaf: number
   shift?: number
   /** the whole gate (post, door and the way through it that the servers walk) moved in the world, by this much in x, y and z (world units: the bar is drawn twice its own size) */
   nudge?: [number, number, number] }
-export const BAR_GATES: Gate[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.56, leaf: 0.55, nudge: [5, 0, 0] }]
+export const BAR_GATES: Gate[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.56, leaf: 0.55, nudge: [0, 0, 0] }]
+/** where each gate's been dragged to by hand (kept in the browser, so it stays put), by gate: its nudge, in the same units as `nudge` */
+const GATE_KEY = 'jgs-gate-nudge'
+export const GATE_EDIT: { on: boolean; nudge: Record<number, [number, number, number]> } = { on: false, nudge: (() => {
+  try { return JSON.parse(localStorage.getItem(GATE_KEY) ?? '{}') } catch { return {} }
+})() }
+export const saveGateNudge = () => { try { localStorage.setItem(GATE_KEY, JSON.stringify(GATE_EDIT.nudge)) } catch { /* private window: it just won't be kept */ } }
+/** a gate's nudge (by hand if it's been dragged, else the one written down), in the units of `nudge` */
+export const nudgeNow = (g: Gate): [number, number, number] => GATE_EDIT.nudge[BAR_GATES.indexOf(g)] ?? g.nudge ?? [0, 0, 0]
 /** a gate's nudge in the bar's own units (the world's, over the bar's scale) */
-export const nudgeOf = (g: Gate): [number, number, number] => { const n = g.nudge ?? [0, 0, 0]; return [n[0] / GRILL_SCALE, n[1] / GRILL_SCALE, n[2] / GRILL_SCALE] }
+export const nudgeOf = (g: Gate): [number, number, number] => { const n = nudgeNow(g); return [n[0] / GRILL_SCALE, n[1] / GRILL_SCALE, n[2] / GRILL_SCALE] }
 /** how far the counter's base and top stop short of its end for a gate: its width, less however far the gate's been slid toward the end */
 export const gateCut = (g: { w: number; shift?: number }) => g.w - (g.shift ?? 0)
 /** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
