@@ -92,82 +92,80 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
   const [a, b] = [...mark]
   brushText(g, a ?? '', 64, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
   brushText(g, b ?? '', 320, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
-  // the middle panel (all of it inside the middle third, so the seams between the three cloths never cut it): a solid round crest like a stamp, the
-  // disc in the white dye with a fish swimming across it cut away in the cloth's indigo (its body scaled in seigaiha, its tail forked, a dorsal fin
-  // of spines, a ringed eye), three tongues of vermilion charcoal fire under it, and a fine ring round the disc
+  // the middle panel (all of it inside the middle third, so the seams between the three cloths never cut it): a fish in side view after the owner's
+  // reference, a solid silhouette in the white dye, the details cut away in the cloth's indigo: a round eye, the slits of the mouth, the crescent of the
+  // gill, and the dorsal, pectoral, belly and tail fins each ribbed; and three small tongues of vermilion charcoal fire under it
   {
     const CREAM = '#f6f0e0', INDIGO = '#25396a', VERMILION = '#d8452f'
-    const CX = 192, CY = 100, R = 54
+    // (drawn in the reference's own 400 x 240, then set on the panel: 0.31 of it, its nose at the panel's left)
+    const K = 0.31, X0 = 130, Y0 = 66
+    const T = (x: number, y: number): [number, number] => [X0 + x * K, Y0 + y * K]
+    const mv = (x: number, y: number) => g.moveTo(...T(x, y))
+    const ln = (x: number, y: number) => g.lineTo(...T(x, y))
+    const bz = (a: number, b: number, c: number, d: number, e: number, f: number) => g.bezierCurveTo(...T(a, b), ...T(c, d), ...T(e, f))
     g.fillStyle = CREAM
-    g.beginPath(); g.arc(CX, CY, R, 0, Math.PI * 2); g.fill()
-    g.strokeStyle = CREAM; g.lineWidth = 2
-    g.beginPath(); g.arc(CX, CY, R + 7, 0, Math.PI * 2); g.stroke()
-    // (the fish, cut away: nose at the left, tail at the right, a gentle S in its back)
-    g.save()
-    g.beginPath(); g.arc(CX, CY, R - 1, 0, Math.PI * 2); g.clip()
-    g.fillStyle = INDIGO
+    // the body, nose at the left, a long torpedo, the tail's wrist at the right
+    g.beginPath()
+    mv(20, 126)
+    bz(40, 96, 90, 74, 160, 72)
+    bz(230, 70, 290, 88, 330, 104)
+    ln(332, 136)
+    bz(290, 158, 230, 176, 160, 176)
+    bz(100, 176, 50, 164, 20, 126)
+    g.closePath(); g.fill()
+    // the tail: a fork, its notch in the middle
+    g.beginPath()
+    mv(318, 100)
+    bz(340, 88, 366, 74, 388, 70)
+    bz(380, 90, 366, 106, 358, 120)
+    bz(366, 138, 380, 156, 392, 172)
+    bz(368, 166, 342, 152, 320, 140)
+    g.closePath(); g.fill()
+    // the dorsal fin, a fan on the back
+    g.beginPath()
+    mv(150, 76)
+    bz(160, 50, 176, 36, 198, 32)
+    bz(222, 32, 236, 44, 240, 60)
+    bz(222, 66, 188, 76, 150, 76)
+    g.closePath(); g.fill()
+    // the belly fins
+    for (const [x, y, w] of [[168, 172, 34], [262, 164, 30]] as [number, number, number][]) {
+      g.beginPath(); mv(x, y); bz(x + 2, y + 22, x + w * 0.3, y + 34, x + w, y + 30); bz(x + w + 2, y + 14, x + w * 0.8, y + 4, x + w * 0.7, y); g.closePath(); g.fill()
+    }
+    // the cut-away details, in the indigo
     g.strokeStyle = INDIGO
-    const body = () => {
-      g.beginPath()
-      g.moveTo(147, 91)
-      g.bezierCurveTo(156, 77, 180, 68, 202, 78)
-      g.bezierCurveTo(212, 82, 220, 88, 228, 92)
-      g.lineTo(243, 76)
-      g.quadraticCurveTo(238, 91, 238, 94)
-      g.quadraticCurveTo(238, 97, 243, 112)
-      g.lineTo(228, 99)
-      g.bezierCurveTo(218, 106, 210, 112, 200, 115)
-      g.bezierCurveTo(178, 122, 156, 114, 147, 91)
-      g.closePath()
-    }
-    body(); g.fill()
-    // (the dorsal fin: a comb of spines along the back)
-    for (let k = 0; k < 6; k++) {
-      const x = 166 + k * 7.5, y = 74 - Math.sin((k / 5) * Math.PI) * 1.6 + k * 0.5
-      g.lineWidth = 2.3
-      g.beginPath(); g.moveTo(x, y + 3); g.lineTo(x + 3.5, y - 9 + k * 0.6); g.stroke()
-    }
-    // (the belly fin and the pectoral fin)
-    g.beginPath(); g.moveTo(172, 112); g.quadraticCurveTo(176, 124, 188, 124); g.quadraticCurveTo(184, 118, 186, 114); g.closePath(); g.fill()
-    g.beginPath(); g.moveTo(165, 99); g.quadraticCurveTo(172, 109, 182, 106); g.quadraticCurveTo(176, 102, 177, 98); g.closePath(); g.fill()
-    // (on it, in the white of the disc: the scales, the gill, the eye, the lateral line, the tail's ribs)
-    g.save()
-    body(); g.clip()
-    g.strokeStyle = CREAM
-    g.lineWidth = 1.05
-    for (let row = 0; row < 4; row++) {
-      for (let k = 0; k < 7; k++) {
-        const x = 183 + k * 7 + (row % 2 ? 3.5 : 0), y = 82 + row * 9
-        if (x > 222) continue
-        // (each scale a small arch, an outer line and an inner, open at the bottom, the way seigaiha is drawn)
-        g.beginPath(); g.arc(x, y + 3, 4.2, Math.PI, 2 * Math.PI); g.stroke()
-        g.beginPath(); g.arc(x, y + 3, 2.2, Math.PI, 2 * Math.PI); g.stroke()
-      }
-    }
-    g.lineWidth = 1.7
-    g.beginPath(); g.moveTo(172, 79); g.quadraticCurveTo(177, 95, 171, 113); g.stroke()
-    g.lineWidth = 0.9
-    g.beginPath(); g.moveTo(177, 96); g.quadraticCurveTo(200, 99, 226, 95); g.stroke()
-    for (const [y0, y1] of [[84, 79], [90, 87], [98, 101], [105, 112]] as [number, number][]) { g.lineWidth = 1; g.beginPath(); g.moveTo(230, 94 + (y0 - 94) * 0.2); g.lineTo(240, y1); g.stroke() }
-    g.restore()
-    g.fillStyle = CREAM
-    g.beginPath(); g.arc(158, 94, 4.4, 0, Math.PI * 2); g.fill()
     g.fillStyle = INDIGO
-    g.beginPath(); g.arc(158.6, 94, 2.4, 0, Math.PI * 2); g.fill()
-    g.fillStyle = CREAM
-    g.beginPath(); g.arc(159.4, 93.2, 0.8, 0, Math.PI * 2); g.fill()
-    // (the mouth)
-    g.strokeStyle = CREAM; g.lineWidth = 1.2
-    g.beginPath(); g.moveTo(148, 93); g.lineTo(155, 98); g.stroke()
-    // the charcoal fire, three tongues in vermilion on the disc under the fish, a cream heart in each
-    for (const [x, h, w] of [[178, 17, 8], [192, 25, 10], [207, 15, 7.5]] as [number, number, number][]) {
-      const base = CY + R - 6
+    g.lineCap = 'round'
+    // (the eye, a round one, with a high light left in it)
+    { const [ex, ey] = T(70, 108); g.beginPath(); g.arc(ex, ey, 12 * K, 0, Math.PI * 2); g.fill() }
+    // (the mouth: two slits)
+    g.lineWidth = 1.6
+    g.beginPath(); mv(28, 128); ln(62, 140); g.stroke()
+    g.beginPath(); mv(34, 138); ln(60, 148); g.stroke()
+    // (the gill: a crescent, thick in the middle, tapering at both ends)
+    g.beginPath(); mv(122, 100); bz(138, 118, 136, 142, 112, 156); bz(128, 140, 128, 118, 122, 100); g.closePath(); g.fill()
+    // (the fins' ribs, fanning from where each joins the body)
+    const ribs = (ox: number, oy: number, tips: [number, number][]) => { g.lineWidth = 1.5; for (const [tx, ty] of tips) { g.beginPath(); mv(ox, oy); ln(tx, ty); g.stroke() } }
+    ribs(178, 74, [[186, 42], [200, 40], [214, 42], [226, 50]])
+    ribs(334, 118, [[382, 80], [376, 100], [378, 122], [380, 148], [386, 166]])
+    ribs(180, 176, [[184, 200], [192, 204], [198, 196]])
+    ribs(272, 168, [[276, 190], [284, 194], [290, 186]])
+    // (the pectoral fin: an oval lined in the indigo, its ribs inside it)
+    g.lineWidth = 2
+    g.beginPath(); { const [cx, cy] = T(150, 140); g.ellipse(cx, cy, 30 * K, 19 * K, 0.18, 0, Math.PI * 2) } g.stroke()
+    ribs(128, 142, [[160, 128], [170, 140], [166, 152], [154, 154]])
+    // (a fine lateral line along the flank)
+    g.lineWidth = 0.9
+    g.beginPath(); mv(170, 124); bz(220, 120, 270, 120, 312, 122); g.stroke()
+    g.lineCap = 'butt'
+    // three small tongues of charcoal fire under it
+    for (const [x, h, w] of [[178, 14, 6.5], [192, 21, 8], [206, 12, 6]] as [number, number, number][]) {
+      const base = 170
       g.fillStyle = VERMILION
       g.beginPath(); g.moveTo(x - w, base); g.quadraticCurveTo(x - w * 0.9, base - h * 0.5, x + w * 0.1, base - h); g.quadraticCurveTo(x + w * 0.2, base - h * 0.5, x + w * 0.5, base - h * 0.62); g.quadraticCurveTo(x + w * 1.1, base - h * 0.35, x + w, base); g.closePath(); g.fill()
       g.fillStyle = CREAM
       g.beginPath(); g.moveTo(x - w * 0.38, base); g.quadraticCurveTo(x - w * 0.3, base - h * 0.4, x, base - h * 0.6); g.quadraticCurveTo(x + w * 0.45, base - h * 0.3, x + w * 0.38, base); g.closePath(); g.fill()
     }
-    g.restore()
   }
   // a band of seigaiha waves along the hem (concentric scales in tone-on-tone indigo, rows overlapping, a pale thread at their crests), and
   // a thin run of them under the rod: the cloth's own pattern, dyed in
@@ -580,7 +578,7 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
     // (the drawer: out while a customer's paying, or when it's been clicked open, easing out and in)
     const want = Math.max(TILL_STATE.drawer, TILL_STATE.manual ? 1 : 0)
     open.current += (want - open.current) * Math.min(1, delta * 9)
-    if (drawer.current) drawer.current.position.z = -open.current * 0.2
+    if (drawer.current) drawer.current.position.z = -open.current * 0.24
     if (cash.current) cash.current.visible = open.current > 0.15
     // (what's being paid, as notes and coins to draw: changes only with the customer)
     const key = `${TILL_STATE.tender}|${TILL_STATE.change}`
@@ -597,18 +595,24 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
         const t = smooth(0.54, 0.64, k)
         const kind = pay.tender[0] ?? 1000
         // (its slot in the drawer, in the till's frame: the drawer's own place, less how far out it's drawn)
-        const slot = new THREE.Vector3(0.05 - SLOT_X[kind], top + 0.114 + 0.02, 0.102 + 0.04 + 0.28 * open.current)
+        const slot = new THREE.Vector3(0.05 - SLOT_X[kind], top + 0.056, 0.114 + 0.336 * open.current)
         const tray = new THREE.Vector3(TRAY_AT.x, top + TRAY_AT.y + (1 - smooth(0.38, 0.44, k)) * 0.1, TRAY_AT.z)
         tg.position.lerpVectors(tray, slot, t)
         tg.position.y += Math.sin(Math.PI * t) * 0.07
         tg.rotation.y = THREE.MathUtils.lerp(Math.PI + 0.12, Math.PI / 2, t)
       }
     }
-    // (the change, set out on the tray when the drawer's been shut on the note, and taken away by the customer)
+    // (the change: taken out of the drawer's coin cups and notes while it's open, carried over to the tray, and taken away by the customer)
     const cg = change.current
     if (cg) {
-      cg.visible = k >= 0.66 && k < 0.95
-      if (cg.visible) cg.position.set(TRAY_AT.x, top + TRAY_AT.y + (1 - smooth(0.66, 0.72, k)) * 0.08 + smooth(0.9, 0.95, k) * 0.12, TRAY_AT.z)
+      cg.visible = k >= 0.64 && k < 0.95
+      if (cg.visible) {
+        const t = smooth(0.64, 0.74, k)
+        const from = new THREE.Vector3(0.05 - 0.12, top + 0.056, 0.114 + 0.336 * open.current)
+        const to = new THREE.Vector3(TRAY_AT.x, top + TRAY_AT.y, TRAY_AT.z)
+        cg.position.lerpVectors(from, to, t)
+        cg.position.y += Math.sin(Math.PI * t) * 0.06 + smooth(0.9, 0.95, k) * 0.12
+      }
     }
     if (shown.current === TILL_STATE.text) return
     shown.current = TILL_STATE.text
@@ -638,16 +642,26 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
         {coinList.map((v, j) => <CoinStack key={`c${j}`} kind={v} n={1} position={[-0.08 + (j % 4) * 0.032, 0, (Math.floor(j / 4) - 0.5) * 0.045]} />)}
       </group>
       <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={REG_SC}>
-        {/* the cash drawer: a lock and a label on its front; clicked, it comes out; out, it shows its insert, notes in slots behind and coins in cups before */}
+        {/* the cash drawer's case, fixed, bigger than the register that stands on it (as on the real ones): a steel box open at the front, the register's
+            foot sitting on its top plate; the drawer itself slides out of it */}
+        <Part geo={REG_GEO.body} color="#b9b3a5" outline={0} position={[0, 0.004, 0]} scale={[0.4, 0.008, 0.34]} />
+        {[-1, 1].map((sd) => <Part key={sd} geo={REG_GEO.body} color="#cfc9bb" outline={1.03} position={[sd * 0.195, 0.04, 0]} scale={[0.012, 0.072, 0.34]} />)}
+        <Part geo={REG_GEO.body} color="#cfc9bb" outline={1.03} position={[0, 0.04, 0.166]} scale={[0.4, 0.072, 0.012]} />
+        <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.0745, 0]} scale={[0.4, 0.012, 0.34]} />
+        {/* the drawer: its front panel (a lock, the label, a pull slot) and its tray behind it, in one piece that comes out; clicked, it opens */}
         <group ref={drawer} onClick={(e) => { e.stopPropagation(); TILL_STATE.manual = !TILL_STATE.manual }} {...handOver}>
-          <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.04, 0]} scale={[0.36, 0.08, 0.3]} />
-          <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.04, -0.1515]} scale={[0.33, 0.056, 0.004]} />
-          <Part geo={REG_GEO.body} color="#8a8478" outline={0} position={[-0.02, 0.058, -0.154]} scale={[0.12, 0.008, 0.004]} />
-          <mesh position={[0.11, 0.04, -0.155]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.009, 0.009, 0.006, 14]} /><meshToonMaterial color="#c8ccd0" /></mesh>
-          <mesh position={[0.11, 0.04, -0.1585]}><planeGeometry args={[0.012, 0.0025]} /><meshBasicMaterial color="#2a2c30" /></mesh>
-          <Part geo={REG_GEO.body} color="#f2e28a" outline={0} position={[-0.11, 0.024, -0.1535]} scale={[0.045, 0.014, 0.002]} />
+          <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.04, -0.176]} scale={[0.384, 0.068, 0.018]} />
+          <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.04, -0.1855]} scale={[0.35, 0.05, 0.002]} />
+          <Part geo={REG_GEO.body} color="#8a8478" outline={0} position={[-0.02, 0.058, -0.187]} scale={[0.12, 0.008, 0.003]} />
+          <mesh position={[0.11, 0.04, -0.188]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.009, 0.009, 0.006, 14]} /><meshToonMaterial color="#c8ccd0" /></mesh>
+          <mesh position={[0.11, 0.04, -0.1915]}><planeGeometry args={[0.012, 0.0025]} /><meshBasicMaterial color="#2a2c30" /></mesh>
+          <Part geo={REG_GEO.body} color="#f2e28a" outline={0} position={[-0.11, 0.024, -0.1865]} scale={[0.045, 0.014, 0.002]} />
+          {/* (the tray: a floor and four low walls, the front one the panel) */}
+          <Part geo={REG_GEO.body} color="#2c2d31" outline={0} position={[0, 0.0135, -0.01]} scale={[0.35, 0.007, 0.3]} />
+          {[-1, 1].map((sd) => <Part key={sd} geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[sd * 0.1715, 0.03, -0.01]} scale={[0.007, 0.04, 0.3]} />)}
+          <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.03, 0.1385]} scale={[0.35, 0.04, 0.007]} />
           {/* (the insert, laid out in the till's own units: the group is scaled back by the register's size) */}
-          <group ref={cash} visible={false} position={[0, 0.0815, -0.03]} scale={1 / REG_SC}>
+          <group ref={cash} visible={false} position={[0, 0.0175, -0.01]} scale={1 / REG_SC}>
             <mesh rotation-x={-Math.PI / 2}><planeGeometry args={[0.46, 0.28]} /><meshToonMaterial color="#2c2d31" /></mesh>
             {/* (ribs between the slots) */}
             {[-0.225, -0.155, -0.085, -0.015].map((x) => <mesh key={x} position={[x, 0.006, 0]}><boxGeometry args={[0.004, 0.012, 0.26]} /><meshToonMaterial color="#5a5c62" /></mesh>)}
