@@ -30,12 +30,27 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | 指令 | 用途 |
 |---|---|
 | `npm run dev` | 開發伺服器 http://localhost:5173/JapaneseGrillSimulator/ |
+| `npm run dev:sync` | 開發伺服器＋自動同步（見「同步流程」） |
+| `npm run sync` | 只做自動同步 |
 | `npm test` | 單元測試＋架構測試（Vitest，約 1 秒） |
 | `npm run e2e` | 瀏覽器實際玩一遍四間店（需先開 dev server，約 4 分鐘）。`node tests/e2e/flow.mjs <url> grilledfish` 只測一間 |
 | `npm run build` | 型別檢查＋建置 |
 | `npm run lint` | oxlint |
 
 **改完的檢查順序**：`npx tsc -b` → `npm test` → 有動到遊戲流程時跑 `npm run e2e` → commit。
+
+## 同步流程（本機優先）
+
+本機（`C:\Users\augus\Projects\JapaneseGrillSimulator`）是主；`main` 只從本機推，推上去就部署。雲端 chat（claude.ai 網頁上的 session）的修改**只推到 `cloud-work` 分支**，不碰 `main`。
+
+- 雲端每次動手前：`git fetch origin`，把 `origin/main` 合進 `cloud-work`（本機推的東西先拿到），改完只 `git push origin cloud-work`。
+- 本機收雲端的修改：`npm run dev:sync`（或只要同步：`npm run sync`）。每 20 秒看一次，有新東西且沒有未提交的修改時：
+  1. GitHub 的 `main` 有別台機器的新提交 → 快轉拉下來。
+  2. `cloud-work` 有新提交 → 合併進本機 `main` → 跑 `npx tsc -b && npm test` → **通過才** `git push origin main`；合併衝突或檢查失敗就退回原狀並提示，不推。
+  3. 本機自己還沒推的提交 → 同樣檢查通過才推。
+- 不想自動推：`SYNC_PUSH=0 npm run dev:sync`（只合併和檢查，推送自己來）。
+- 本機的 Claude Code 在這個專案開始工作時，若 `git fetch origin` 後 `origin/cloud-work` 有 `main` 沒有的提交，且工作目錄乾淨：合併它、跑 `npx tsc -b && npm test`、通過就 `git push origin main`；有衝突或失敗就停下來告訴使用者。
+- 遊戲裡的編輯模式（按 G，閉店時才能用）調的位置存在瀏覽器裡；確定後把面板上的 offset 數值告訴雲端 chat，由它寫成預設值。
 
 ## 常見改動要碰哪裡
 

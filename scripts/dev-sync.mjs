@@ -1,4 +1,4 @@
-// The dev server and the auto-pull together: `npm run dev:sync`. Stops both on Ctrl+C.
+// The dev server and the sync (scripts/auto-pull.mjs: cloud-work in, checked, main out) together: `npm run dev:sync`. Stops both on Ctrl+C.
 import { spawn } from 'node:child_process'
 
 // (node runs vite's own script directly, no shell in between: stopping this stops it, on Windows too)
