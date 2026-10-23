@@ -456,9 +456,9 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
       <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.4}>
         {/* the body, after a Sharp: a foot slab set in from the drawer case's edge, over it a wedge (low at the front where the keys are, climbing to a raised deck at the
             back), its sides sloped, its edges eased */}
-        <Part geo={REG_GEO.round} color="#b9b2a2" outline={1.03} position={[0, 0.088, 0.0]} scale={[0.31, 0.02, 0.3]} />
+        <Part geo={REG_GEO.round} color="#b9b2a2" outline={1.02} position={[0, 0.0975, 0.0]} scale={[0.3, 0.023, 0.29]} />
         <mesh geometry={REG_WEDGE} castShadow><meshToonMaterial color="#d9d1bf" /></mesh>
-        <mesh geometry={REG_WEDGE} scale={1.012}><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
+        <mesh geometry={REG_WEDGE_INK}><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
         {/* the sloped key panel, let into the wedge's slope */}
         <group position={[0, 0.172, -0.07]} rotation-x={-0.34}>
           <Part geo={REG_GEO.round} color="#cbc5b7" outline={1.04} scale={[0.335, 0.026, 0.16]} />
@@ -471,7 +471,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
             <Part geo={REG_GEO.body} color="#bdb5a3" outline={0} position={[-w / 2 - 0.004, 0.006, 0]} scale={[0.006, 0.012, 0.094]} />
             <Part geo={REG_GEO.body} color="#bdb5a3" outline={0} position={[w / 2 + 0.004, 0.006, 0]} scale={[0.006, 0.012, 0.094]} />
             <Part geo={REG_GEO.body} color="#bdb5a3" outline={0} position={[0, 0.006, -0.048]} scale={[w + 0.014, 0.012, 0.006]} />
-            <mesh position={[0, i ? 0.03 : 0.045, 0.012]} rotation={[0.28, Math.PI, 0]}><planeGeometry args={[w - 0.012, i ? 0.05 : 0.09]} /><meshBasicMaterial map={i ? REG_JOURNAL : REG_RECEIPT} toneMapped={false} side={THREE.DoubleSide} /></mesh>
+            <mesh position={[0, i ? 0.02 : 0.034, -0.012]} rotation={[0.2, Math.PI, 0]}><planeGeometry args={[w - 0.016, i ? 0.04 : 0.062]} /><meshBasicMaterial map={i ? REG_JOURNAL : REG_RECEIPT} toneMapped={false} side={THREE.DoubleSide} /></mesh>
           </group>
         ))}
         {/* the operator's display on its hinged stand, and the key switch beside it */}
@@ -511,7 +511,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         <mesh position={[0, 0.1, -0.012]} rotation-x={0.4}><planeGeometry args={[0.07, 0.05]} /><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
       </group>
       {/* the coin tray (カルトン), a lacquered dish at the register's front for the change, with coins and a folded note in it, the cup of pens, the bell */}
-      <group position={[-0.02, top, -0.2]}>
+      <group position={[0.0, top, -0.4]}>
         <Part geo={REG_GEO.round} color="#7a1f16" outline={1.04} position-y={0.009} scale={[0.22, 0.02, 0.14]} />
         <mesh position-y={0.0195} rotation-x={-Math.PI / 2}><planeGeometry args={[0.19, 0.11]} /><meshToonMaterial color="#3e100b" /></mesh>
         {([[-0.07, -0.03, 100, 3], [-0.04, -0.03, 500, 2], [-0.07, 0.02, 10, 2], [-0.04, 0.02, 50, 4]] as [number, number, CoinKind, number][]).map(([x, z, kind, n], i) => (
@@ -535,7 +535,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         <Part geo={REG_GEO.body} color="#2a2420" outline={0} position-y={0.004} scale={[0.06, 0.008, 0.06]} />
       </group>
       {/* the お会計 sign, in its little wooden stand, to the customers */}
-      <group position={[0.24, top, -0.19]} rotation-y={Math.PI}>
+      <group position={[0.36, top, -0.3]} rotation-y={Math.PI}>
         <Part geo={REG_GEO.body} color="#6a4428" position-y={0.006} scale={[0.14, 0.012, 0.05]} />
         <mesh position={[0, 0.05, 0]}><planeGeometry args={[0.12, 0.075]} /><meshToonMaterial color="#ffffff" map={PAY_SIGN} /></mesh>
       </group>
@@ -549,7 +549,7 @@ const REG_SC = 1.4
 /** where each kind of note lies in the drawer's insert, along its width (in the till's own units, from the insert's middle) */
 const SLOT_X: Record<Note, number> = { 1000: -0.19, 5000: -0.12, 10000: -0.05 }
 /** where the coin tray's middle is, and how far down the till's top its dish is, in the till's frame */
-const TRAY_AT = { x: -0.02, z: -0.2, y: 0.0215 }
+const TRAY_AT = { x: 0.0, z: -0.4, y: 0.0215 }
 const smooth = (e0: number, e1: number, x: number) => THREE.MathUtils.smoothstep(x, e0, e1)
 /**
  * the register's moving parts, apart from the batched till: its drawer, which slides out (by hand, a click on it, or on its own as a
@@ -648,12 +648,12 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
         {coinList.map((v, j) => <CoinStack key={`c${j}`} kind={v} n={1} position={[-0.08 + (j % 4) * 0.032, 0, (Math.floor(j / 4) - 0.5) * 0.045]} />)}
       </group>
       <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={REG_SC}>
-        {/* the cash drawer's case, fixed, bigger than the register that stands on it (as on the real ones): a steel box open at the front, the register's
-            foot sitting on its top plate; the drawer itself slides out of it */}
-        <Part geo={REG_GEO.body} color="#b9b3a5" outline={0} position={[0, 0.004, 0]} scale={[0.4, 0.008, 0.34]} />
-        {[-1, 1].map((sd) => <Part key={sd} geo={REG_GEO.body} color="#cfc9bb" outline={1.03} position={[sd * 0.195, 0.04, 0]} scale={[0.012, 0.072, 0.34]} />)}
-        <Part geo={REG_GEO.body} color="#cfc9bb" outline={1.03} position={[0, 0.04, 0.166]} scale={[0.4, 0.072, 0.012]} />
-        <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.0745, 0]} scale={[0.4, 0.012, 0.34]} />
+        {/* the cash drawer's case, fixed, bigger than the register that stands on it (as on the real ones): one steel shell, its top plate over the register's foot, its front
+            open where the drawer slides out (a dark recess behind), outlined once round the whole of it, so no two plates cross at the corners */}
+        <mesh geometry={REG_CASE} castShadow><meshToonMaterial color="#cfc9bb" /></mesh>
+        <mesh geometry={REG_CASE_INK}><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
+        {/* (the dark of the case's inside, seen through the opening when the drawer's out: a plane just inside it) */}
+        <mesh position={[0, 0.04, -0.163]} rotation-y={Math.PI}><planeGeometry args={[0.37, 0.058]} /><meshBasicMaterial color="#17181b" /></mesh>
         {/* the drawer: its front panel (a lock, the label, a pull slot) and its tray behind it, in one piece that comes out; clicked, it opens */}
         <group ref={drawer} onClick={(e) => { e.stopPropagation(); TILL_STATE.manual = !TILL_STATE.manual }} {...handOver}>
           <Part geo={REG_GEO.round} color="#d9d3c6" outline={1.03} position={[0, 0.04, -0.176]} scale={[0.384, 0.068, 0.018]} />
@@ -842,14 +842,44 @@ function RegisterKeys() {
     </>
   )
 }
+/** the drawer's case: a box 0.4 wide, 0.34 deep, 0.086 high, open at the front (z -0.17) where a 0.37 x 0.058 opening is cut, its edges eased: built as one extruded outline so its corners are shared */
+const REG_CASE = (() => {
+  const W = 0.4, D = 0.34, H = 0.086, OW = 0.37, OH = 0.062, OY = 0.006
+  // (the front face, with the opening as a hole, extruded the full depth; then the inside hollowed by a second, slightly smaller box taken out by being left open at the front)
+  const sh = new THREE.Shape()
+  sh.moveTo(-W / 2, 0); sh.lineTo(W / 2, 0); sh.lineTo(W / 2, H); sh.lineTo(-W / 2, H); sh.closePath()
+  const hole = new THREE.Path()
+  hole.moveTo(-OW / 2, OY); hole.lineTo(-OW / 2, OY + OH); hole.lineTo(OW / 2, OY + OH); hole.lineTo(OW / 2, OY); hole.closePath()
+  sh.holes.push(hole)
+  const g = new THREE.ExtrudeGeometry(sh, { depth: D, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2 })
+  g.translate(0, 0, -D / 2)
+  g.rotateY(Math.PI)
+  return g
+})()
 /** the register's body: a wedge, low at the front (z -0.172) where the keys are, climbing along their slope to a raised deck at the back; its sides sloped a little, edges eased */
 const REG_WEDGE = (() => {
   const sh = new THREE.Shape()
-  const pts: [number, number][] = [[-0.172, 0.092], [-0.172, 0.122], [0.012, 0.187], [0.018, 0.215], [0.158, 0.215], [0.166, 0.205], [0.166, 0.092]]
+  const pts: [number, number][] = [[-0.15, 0.109], [-0.15, 0.134], [0.01, 0.188], [0.018, 0.215], [0.14, 0.215], [0.148, 0.205], [0.148, 0.109]]
   pts.forEach(([z, y], k) => (k ? sh.lineTo(z, y) : sh.moveTo(z, y)))
-  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.31, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 4 })
-  g.translate(0, 0, -0.155)
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.27, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2, curveSegments: 4 })
+  g.translate(0, 0, -0.135)
   g.rotateY(-Math.PI / 2)
+  return g
+})()
+/** the case's outline, the same way */
+const REG_CASE_INK = (() => {
+  const g = REG_CASE.clone()
+  g.computeVertexNormals()
+  const p = g.attributes.position, n = g.attributes.normal
+  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + n.getX(i) * 0.0035, p.getY(i) + n.getY(i) * 0.0035, p.getZ(i) + n.getZ(i) * 0.0035)
+  return g
+})()
+/** the wedge's outline: the same shape pushed out along its normals, so it grows evenly all round (scaling it about the origin would slide it to one side) */
+const REG_WEDGE_INK = (() => {
+  const g = REG_WEDGE.clone()
+  g.computeVertexNormals()
+  const p = g.attributes.position, n = g.attributes.normal
+  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + n.getX(i) * 0.0035, p.getY(i) + n.getY(i) * 0.0035, p.getZ(i) + n.getZ(i) * 0.0035)
   return g
 })()
 /** the journal's paper, in the second window: a few lines of figures */
