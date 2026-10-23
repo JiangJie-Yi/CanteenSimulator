@@ -848,20 +848,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
             )))}
           </group>
         </group>
-        </group>
-        {/* the door's post (柱): a jamb of pale planed wood standing up the base's end, its face rounded, the hinges on it,
-            set apart from the dark base so the gate reads as a door hung on a post; and a thin dark shadow line down the
-            gap between it and the door */}
-        {/* (a hair wider, deeper and taller than the base it stands against, so its faces don't lie in the base's own planes and z-fight) */}
-        <mesh position={[-end * 0.022, (BAR_TOP - 0.06) / 2 + 0.002, 0]} castShadow>
-          <primitive object={gateGeo(0.056, BAR_TOP - 0.056, 0.436, 0.01)} attach="geometry" />
-          <meshToonMaterial color="#d8b88a" map={GATE_WOOD.up} />
-        </mesh>
-        <mesh position={[-end * 0.022, (BAR_TOP - 0.06) / 2 + 0.002, 0]} scale={[1.12, 1.01, 1.03]}>
-          <primitive object={gateGeo(0.056, BAR_TOP - 0.056, 0.436, 0.01)} attach="geometry" />
-          <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-        </mesh>
-        {/* the hinges, top and bottom: a brass knuckle on the hinge's line, a leaf screwed to the base's end and one to
+        {/* the hinges, top and bottom (they go with the door when it's moved by hand, so they're in its group): a brass knuckle on the hinge's line, a leaf screwed to the base's end and one to
             the door's stile (that one turns with it: GateHingeLeaf) */}
         {[0.16, BAR_TOP - 0.16].map((y) => (
           <group key={y} position-y={y}>
@@ -879,6 +866,19 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
             ))}
           </group>
         ))}
+        </group>
+        {/* the door's post (柱): a jamb of pale planed wood standing up the base's end, its face rounded, the hinges on it,
+            set apart from the dark base so the gate reads as a door hung on a post; and a thin dark shadow line down the
+            gap between it and the door */}
+        {/* (a hair wider, deeper and taller than the base it stands against, so its faces don't lie in the base's own planes and z-fight) */}
+        <mesh position={[-end * 0.022, (BAR_TOP - 0.06) / 2 + 0.002, 0]} castShadow>
+          <primitive object={gateGeo(0.056, BAR_TOP - 0.056, 0.436, 0.01)} attach="geometry" />
+          <meshToonMaterial color="#d8b88a" map={GATE_WOOD.up} />
+        </mesh>
+        <mesh position={[-end * 0.022, (BAR_TOP - 0.06) / 2 + 0.002, 0]} scale={[1.12, 1.01, 1.03]}>
+          <primitive object={gateGeo(0.056, BAR_TOP - 0.056, 0.436, 0.01)} attach="geometry" />
+          <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+        </mesh>
       </group>
     </group>
   )

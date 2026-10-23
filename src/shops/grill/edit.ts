@@ -16,7 +16,7 @@ const emit = () => { state = { ...state }; subs.forEach((f) => f()); panel() }
 export const getEdit = () => state
 export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f) }, () => state)
 /** where a piece stands when it hasn't been moved by hand: the places the owner has settled on */
-const DEFAULTS: Record<string, V3> = { gate1: [0, 0, 0.17] }
+const DEFAULTS: Record<string, V3> = { gate1: [0, -0.035, 0.16] }
 export const offsetOf = (id: string): V3 => state.offsets[id] ?? DEFAULTS[id] ?? [0, 0, 0]
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state.offsets)) } catch { /* private window: it just won't be kept */ } }
 // ---- undo: each change (a drag, an arrow, a field edited, reset all) is a step; Ctrl+Z goes back one, Ctrl+Y (or Ctrl+Shift+Z) forward again
