@@ -26,7 +26,7 @@ import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateOf, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -742,7 +742,7 @@ const GATE_SWING = 4
  * wood so it reads as the bar run on, hung on brass hinges on the base's end. It stands shut, flush with the bar, and
  * swings in toward the kitchen when one of the staff comes up to it (SERVICE.walkers), shutting again behind them.
  */
-function BarGate({ c, gate }: { c: Counter; gate: (typeof BAR_GATES)[number] }) {
+function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
   const end = gate.end
   // (the hinge: the inner edge of the gap, on the base's line; the leaf reaches from it across the doorway)
@@ -891,7 +891,7 @@ function barTopShape(grow: number) {
   const x0 = Math.min(a.x0, b.x0) + i
   // (short of each gate's flap, which is a piece of its own: at the first counter's far end, the side counter's near
   // one, which is its high-lay end here)
-  const ax1 = a.x1 - BAR_GATES[0].w, by1 = b.y1 - BAR_GATES[1].w
+  const ax1 = a.x1 - gateCut(BAR_GATES[0]), by1 = b.y1 - gateCut(BAR_GATES[1])
   const pts: [number, number][] = [[x0, a.y0 + i], [ax1 - i, a.y0 + i], [ax1 - i, a.y1 - i], [b.x1 - i, a.y1 - i], [b.x1 - i, by1 - i],
     [x0, by1 - i]]
   const sh = new THREE.Shape()
@@ -980,14 +980,14 @@ const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042,
  * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
  * and that end of the top too: the staff's way between the kitchen and the floor, shut by a little swing door (BarGate).
  */
-function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Counter; trim?: number; gate?: { end: 1 | -1; w: number; leaf: number }
+function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Counter; trim?: number; gate?: Gate
   /** its far end runs into the first counter's side (its lip runs on into the first one's, so they meet with no gap) */
   butt?: boolean
   /** its top drawn with the others' as one piece (BarTop), not its own */
   noTop?: boolean }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
   const L = c.length
-  const G = gate?.w ?? 0
+  const G = gate ? gateCut(gate) : 0
   const end = gate?.end ?? 1
   // (the base, short of the gate)
   const baseL = L + 0.2 - G
