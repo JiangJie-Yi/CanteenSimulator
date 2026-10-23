@@ -595,11 +595,11 @@ function FridgeAt() {
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
     <>
-      <Crate />
+      <Movable id="crate" label="備長炭籃"><Crate /></Movable>
       <Fan held={held} />
       <HeldStick held={held} />
       <Lantern at={lanternAt} />
-      <RiceTub />
+      <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /></group>
     </>
   )

@@ -1967,8 +1967,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         )
       })}
       {/* the way in, just past the end of the bar where the customers come and go */}
-      <Entrance at={doorOf(counters)} mark={mark} />
+      <Movable id="noren" label="門簾"><Entrance at={doorOf(counters)} mark={mark} /></Movable>
       {/* the till, just inside the door on the bar's side of the way in (the shops that lay out their own counters) */}
+      <Movable id="till" label="收銀機"><>
       {given && (
         <StaticBatch>
           <Register top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
@@ -1979,6 +1980,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         <RegisterLive top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
           at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + TILL.along).addScaledVector(counters[0].lay, TILL.lay)} />
       )}
+      </></Movable>
       {/* (each stool its own Movable, so each can be moved, turned and made larger or smaller by hand when the shop's shut: only the stool's look; where its guest
           sits and the way to it stay as they are, so no one is put out of a seat) */}
       {seats.map((st, n) => (
@@ -2007,7 +2009,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         })
       })()}
       {fridges && <Later stage={2}>{fridges.map((f) => (
-        <group key={f.n} name={f.n ? 'look-fridge-b' : 'look-fridge'} position={f.at} rotation-y={f.yaw}><DrinkFridge n={f.n} /><FridgeStock n={f.n} /><FridgeDoor n={f.n} /></group>
+        <Movable key={f.n} id={`drinkfridge${f.n}`} label={`飲料櫃 ${f.n + 1}`}><group name={f.n ? 'look-fridge-b' : 'look-fridge'} position={f.at} rotation-y={f.yaw}><DrinkFridge n={f.n} /><FridgeStock n={f.n} /><FridgeDoor n={f.n} /></group></Movable>
       ))}</Later>}
       {/* what each has fetched from the fridge, stood beside their plate, toward the cook */}
       {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => {
