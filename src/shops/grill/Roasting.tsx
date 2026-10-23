@@ -2083,11 +2083,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     /** seconds since it landed, whether it's burnt out, and how long it's been going out when it's pushed out by the new */
     age: number; gone: boolean; dying: boolean; dyT: number
     /** where it lies in plan (its landing), the way it points, how steeply it tips, and the pose it settles to */
-    tx: number; tz: number; yaw: number; slope: number; qEnd: THREE.Quaternion }
+    tx: number; tz: number; yaw: number; slope: number; qEnd: THREE.Quaternion; geo: THREE.BufferGeometry }
   const coals = useRef<Coal[]>([])
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
-  const coalGeos = useMemo(() => Array.from({ length: 6 }, (_, k) => binchotanGeo(0.5 + (k % 3) * 0.045, 0.03 + (k % 2) * 0.004, k + 11)), [])
+  // (each thrown stick its own length, thickness and bend, new each time: from the short to the long)
+  const randomStick = () => binchotanGeo(0.34 + Math.random() * 0.26, 0.026 + Math.random() * 0.01, Math.floor(Math.random() * 8))
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -2133,7 +2134,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
-        tx, tz, yaw, slope: rest.slope, qEnd: new THREE.Quaternion() }
+        tx, tz, yaw, slope: rest.slope, qEnd: new THREE.Quaternion(), geo: randomStick() }
     }
     restack()
     // (the flight to each one's place: about two thirds of a second)
@@ -4276,8 +4277,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       })}
       {coalIds.map((id) => coals.current[id] && (
         <group key={id} visible={false} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }}>
-          <mesh geometry={coalGeos[id % coalGeos.length]} material={coals.current[id].mat} castShadow />
-          <mesh geometry={coalGeos[id % coalGeos.length]} scale={1.07}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+          <mesh geometry={coals.current[id].geo} material={coals.current[id].mat} castShadow />
+          {/* (the outline: round the sides only, not past the ends, so the hollow ends stay open) */}
+          <mesh geometry={coals.current[id].geo} scale={[1.07, 1, 1.07]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
         </group>
       ))}
       <points geometry={sparkGeo} frustumCulled={false}><pointsMaterial size={0.024} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></points>

@@ -34,8 +34,10 @@ export type Held = { kind: 'charcoal' | 'fan'; at: THREE.Vector3; wave: number }
 const INK = '#3b2a20'
 
 /** a mesh with the shop's ink outline: the same shape again, a little bigger, drawn inside out */
-function Inked({ geometry, color, map, grow = 1.04, position, rotation, children }: {
+function Inked({ geometry, color, map, grow = 1.04, sideOnly = false, position, rotation, children }: {
   geometry: THREE.BufferGeometry; color?: string; map?: THREE.Texture | null; grow?: number
+  /** the outline grows round the sides only, along the y axis not at all (for a hollow tube, whose ends must stay open) */
+  sideOnly?: boolean
   position?: [number, number, number]; rotation?: [number, number, number]; children?: ReactNode
 }) {
   return (
@@ -43,7 +45,7 @@ function Inked({ geometry, color, map, grow = 1.04, position, rotation, children
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshToonMaterial color={color ?? '#ffffff'} map={map ?? null} />
       </mesh>
-      <mesh geometry={geometry} scale={grow}>
+      <mesh geometry={geometry} scale={sideOnly ? [grow, 1, grow] : grow}>
         <meshBasicMaterial color={INK} side={THREE.BackSide} />
       </mesh>
       {children}
@@ -117,7 +119,8 @@ function Crate() {
     label: new THREE.PlaneGeometry(0.1, 0.17),
     stick: new THREE.CylinderGeometry(0.022, 0.024, W - 0.08, 7),
   }), [])
-  const stickGeos = useMemo(() => Array.from({ length: 5 }, (_, k) => binchotanGeo(W - 0.08 - k * 0.025, 0.026 + (k % 3) * 0.003, k + 1)), [W])
+  // (each stick of the crate its own length (from a hand's breadth short of the crate's to its full) and thickness)
+  const stickGeos = useMemo(() => Array.from({ length: 24 }, (_, k) => binchotanGeo(0.34 + ((k * 37) % 21) * 0.0095, 0.024 + ((k * 7) % 5) * 0.0018, k)), [])
   // the sticks heaped in rows, each turned and tilted a little differently
   const sticks = useMemo(() => {
     const out: { p: [number, number, number]; r: [number, number, number] }[] = []
@@ -152,7 +155,7 @@ function Crate() {
         <meshToonMaterial map={wood} />
       </mesh>
       {sticks.map((s, i) => (
-        <Inked key={i} geometry={stickGeos[i % stickGeos.length]} map={binchotanMap()} grow={1.07} position={s.p} rotation={s.r} />
+        <Inked key={i} geometry={stickGeos[(i * 5 + 3) % stickGeos.length]} map={binchotanMap()} grow={1.07} sideOnly position={s.p} rotation={s.r} />
       ))}
     </group>
   )
@@ -307,7 +310,7 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
   })
   return (
     <group ref={g} visible={false} rotation={[0.3, 0.4, Math.PI / 2]}>
-      <Inked geometry={geo} map={binchotanMap()} grow={1.07} />
+      <Inked geometry={geo} map={binchotanMap()} grow={1.07} sideOnly />
     </group>
   )
 }

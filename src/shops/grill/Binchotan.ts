@@ -3,6 +3,7 @@
 // the hand and those thrown on the fire.
 
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 let map: THREE.CanvasTexture | null = null
 /** the stick's surface: charcoal grey with long streaks and cracks down it, pale ash dust here and there, specks, and short cross cracks */
@@ -60,23 +61,44 @@ export function binchotanMap() {
 }
 
 const cache = new Map<string, THREE.BufferGeometry>()
-/** a stick `len` long and about `r` thick, ridged, a little bent and a little thicker at one end; `seed` makes each one its own */
+/** how thick the hollow is, as a part of the stick's radius */
+const BORE = 0.46
+/**
+ * A stick `len` long and about `r` thick, ridged, a little bent and a little thicker at one end; `seed` makes each one its own. Hollow: a bore runs
+ * down it from end to end (the way a bamboo-charcoal tube is), the ends are rings, the bore's wall faces in.
+ */
 export function binchotanGeo(len: number, r: number, seed = 0) {
-  const key = `${len.toFixed(3)}|${r.toFixed(4)}|${seed}`
+  // (sizes in steps, so the many random sticks share a few shapes)
+  const L = Math.round(len / 0.02) * 0.02, R = Math.round(r / 0.002) * 0.002
+  const key = `${L.toFixed(3)}|${R.toFixed(4)}|${seed % 8}`
   const hit = cache.get(key)
   if (hit) return hit
-  const g = new THREE.CylinderGeometry(r * 1.0, r * 1.07, len, 11, 14)
+  const outer = new THREE.CylinderGeometry(R, R * 1.07, L, 11, 14, true)
+  const inner = new THREE.CylinderGeometry(R * BORE, R * 1.07 * BORE, L, 11, 14, true)
+  // (the bore's wall turned inside out, to face the hollow)
+  const idx = inner.index!
+  for (let i = 0; i < idx.count; i += 3) { const t = idx.getX(i + 1); idx.setX(i + 1, idx.getX(i + 2)); idx.setX(i + 2, t) }
+  const nrm = inner.attributes.normal
+  for (let i = 0; i < nrm.count; i++) nrm.setXYZ(i, -nrm.getX(i), -nrm.getY(i), -nrm.getZ(i))
+  const ring = (y: number, ro: number, ri: number, up: boolean) => {
+    const g = new THREE.RingGeometry(ri, ro, 11, 1)
+    g.rotateX(up ? -Math.PI / 2 : Math.PI / 2)
+    g.translate(0, y, 0)
+    return g
+  }
+  const g = mergeGeometries([outer, inner, ring(L / 2, R, R * BORE, true), ring(-L / 2, R * 1.07, R * 1.07 * BORE, false)])
   const p = g.attributes.position
-  const ph = seed * 1.7
+  const ph = (seed % 8) * 1.7
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i)
-    const t = y / len + 0.5
+    const t = y / L + 0.5
     const a = Math.atan2(z, x)
-    // (the ridges of the bark: wide ones and fine ones, running down the stick with a slow twist, the surface rough at a finer grain still)
-    const bump = 1 + 0.11 * Math.sin(a * 3 + ph + t * 2) + 0.07 * Math.sin(a * 6 - ph + t * 5) + 0.035 * Math.sin(a * 11 + y * 40 + ph) + 0.03 * Math.sin(y * 23 + a * 2)
+    // (the ridges of the bark: wide ones and fine ones, running down the stick with a slow twist, the surface rough at a finer grain still; the bore only a little)
+    const inBore = Math.hypot(x, z) < R * 0.75
+    const bump = inBore ? 1 + 0.04 * Math.sin(a * 4 + y * 30 + ph) : 1 + 0.11 * Math.sin(a * 3 + ph + t * 2) + 0.07 * Math.sin(a * 6 - ph + t * 5) + 0.035 * Math.sin(a * 11 + y * 40 + ph) + 0.03 * Math.sin(y * 23 + a * 2)
     // (a stick isn't straight: a gentle bow along it)
-    const bow = 0.035 * len * Math.sin(t * Math.PI) * Math.cos(ph)
-    const bowZ = 0.03 * len * Math.sin(t * Math.PI) * Math.sin(ph)
+    const bow = 0.035 * L * Math.sin(t * Math.PI) * Math.cos(ph)
+    const bowZ = 0.03 * L * Math.sin(t * Math.PI) * Math.sin(ph)
     p.setXYZ(i, x * bump + bow, y, z * bump + bowZ)
   }
   g.computeVertexNormals()
