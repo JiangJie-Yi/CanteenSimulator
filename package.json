@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "sync": "node scripts/auto-pull.mjs",
+    "dev:sync": "node scripts/dev-sync.mjs",
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "e2e": "node tests/e2e/flow.mjs",
