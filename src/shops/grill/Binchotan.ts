@@ -1,0 +1,85 @@
+// A stick of binchotan as it is: dark grey-black, the bark's rough ridges and long cracks running down it, a little dusty with ash, each one a
+// different thickness, bent and cut off square at both ends. One texture and one way of making the shape, for the crate's sticks, the one in
+// the hand and those thrown on the fire.
+
+import * as THREE from 'three'
+
+let map: THREE.CanvasTexture | null = null
+/** the stick's surface: charcoal grey with long streaks and cracks down it, pale ash dust here and there, specks, and short cross cracks */
+export function binchotanMap() {
+  if (map || typeof document === 'undefined') return map
+  const W = 128, H = 256
+  const c = document.createElement('canvas')
+  c.width = W
+  c.height = H
+  const g = c.getContext('2d')!
+  let seed = 17
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  g.fillStyle = '#5b5e63'
+  g.fillRect(0, 0, W, H)
+  // (broad tonal bands down the stick: some darker, some lighter, like the grain of the wood it was)
+  for (let i = 0; i < 22; i++) {
+    g.fillStyle = rnd() < 0.5 ? `rgba(24,26,29,${0.16 + rnd() * 0.22})` : `rgba(150,154,160,${0.08 + rnd() * 0.14})`
+    g.fillRect(rnd() * W, 0, 3 + rnd() * 10, H)
+  }
+  // (long thin cracks and ridges, wavering a little)
+  for (let i = 0; i < 70; i++) {
+    const x = rnd() * W
+    g.strokeStyle = rnd() < 0.62 ? `rgba(14,15,17,${0.45 + rnd() * 0.4})` : `rgba(150,154,160,${0.12 + rnd() * 0.2})`
+    g.lineWidth = 0.5 + rnd() * 1.6
+    g.beginPath()
+    g.moveTo(x, rnd() * 60)
+    g.bezierCurveTo(x + (rnd() - 0.5) * 8, 90, x + (rnd() - 0.5) * 8, 170, x + (rnd() - 0.5) * 6, H - rnd() * 60)
+    g.stroke()
+  }
+  // (short cross cracks, where the bark has split)
+  for (let i = 0; i < 40; i++) {
+    const x = rnd() * W, y = rnd() * H
+    g.strokeStyle = `rgba(6,7,8,${0.4 + rnd() * 0.4})`
+    g.lineWidth = 0.8 + rnd()
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 14, y + (rnd() - 0.5) * 5); g.stroke()
+  }
+  // (ash dust: pale grey patches, thicker toward the cracks, and fine speckle all over)
+  for (let i = 0; i < 26; i++) {
+    const x = rnd() * W, y = rnd() * H
+    const grad = g.createRadialGradient(x, y, 0, x, y, 6 + rnd() * 14)
+    grad.addColorStop(0, `rgba(176,180,186,${0.16 + rnd() * 0.16})`)
+    grad.addColorStop(1, 'rgba(176,180,186,0)')
+    g.fillStyle = grad
+    g.fillRect(x - 24, y - 24, 48, 48)
+  }
+  for (let i = 0; i < 700; i++) {
+    g.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.35)' : 'rgba(200,204,210,0.2)'
+    g.fillRect(rnd() * W, rnd() * H, 1, 1 + rnd() * 2)
+  }
+  map = new THREE.CanvasTexture(c)
+  map.wrapS = map.wrapT = THREE.RepeatWrapping
+  map.colorSpace = THREE.SRGBColorSpace
+  map.anisotropy = 4
+  return map
+}
+
+const cache = new Map<string, THREE.BufferGeometry>()
+/** a stick `len` long and about `r` thick, ridged, a little bent and a little thicker at one end; `seed` makes each one its own */
+export function binchotanGeo(len: number, r: number, seed = 0) {
+  const key = `${len.toFixed(3)}|${r.toFixed(4)}|${seed}`
+  const hit = cache.get(key)
+  if (hit) return hit
+  const g = new THREE.CylinderGeometry(r * 1.0, r * 1.07, len, 11, 14)
+  const p = g.attributes.position
+  const ph = seed * 1.7
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i)
+    const t = y / len + 0.5
+    const a = Math.atan2(z, x)
+    // (the ridges of the bark: wide ones and fine ones, running down the stick with a slow twist, the surface rough at a finer grain still)
+    const bump = 1 + 0.11 * Math.sin(a * 3 + ph + t * 2) + 0.07 * Math.sin(a * 6 - ph + t * 5) + 0.035 * Math.sin(a * 11 + y * 40 + ph) + 0.03 * Math.sin(y * 23 + a * 2)
+    // (a stick isn't straight: a gentle bow along it)
+    const bow = 0.035 * len * Math.sin(t * Math.PI) * Math.cos(ph)
+    const bowZ = 0.03 * len * Math.sin(t * Math.PI) * Math.sin(ph)
+    p.setXYZ(i, x * bump + bow, y, z * bump + bowZ)
+  }
+  g.computeVertexNormals()
+  cache.set(key, g)
+  return g
+}

@@ -25,6 +25,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { focusCamera } from './Movable'
+import { binchotanGeo, binchotanMap } from './Binchotan'
 import { commitOffsets, getEdit, moveTo, offsetOf, registerMovable, useEdit } from './edit'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
@@ -2081,7 +2082,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const coals = useRef<Coal[]>([])
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
-  const coalGeo = useMemo(() => new THREE.CylinderGeometry(0.022, 0.024, 0.54, 7), [])
+  const coalGeos = useMemo(() => Array.from({ length: 6 }, (_, k) => binchotanGeo(0.5 + (k % 3) * 0.045, 0.03 + (k % 2) * 0.004, k + 11)), [])
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -2123,7 +2124,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const yaw = crossYaw(tx, tz, lying) ?? Math.random() * Math.PI
       const rest = restOf(tx, tz, yaw, lying, PIT_LIFT)
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
-      const mat = new THREE.MeshToonMaterial({ color: '#8d8a86', emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
+      const mat = new THREE.MeshToonMaterial({ color: '#ffffff', map: binchotanMap(), emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
       coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
@@ -4270,8 +4271,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       })}
       {coalIds.map((id) => coals.current[id] && (
         <group key={id} visible={false} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }}>
-          <mesh geometry={coalGeo} material={coals.current[id].mat} castShadow />
-          <mesh geometry={coalGeo} scale={1.08}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+          <mesh geometry={coalGeos[id % coalGeos.length]} material={coals.current[id].mat} castShadow />
+          <mesh geometry={coalGeos[id % coalGeos.length]} scale={1.07}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
         </group>
       ))}
       <points geometry={sparkGeo} frustumCulled={false}><pointsMaterial size={0.024} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></points>

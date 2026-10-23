@@ -12,6 +12,7 @@ import { glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { ALONG, GRILL_OFFSET, KITCHEN_DROP, LAY } from './bar'
 import { Movable } from './Movable'
+import { binchotanGeo, binchotanMap } from './Binchotan'
 
 type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
@@ -116,6 +117,7 @@ function Crate() {
     label: new THREE.PlaneGeometry(0.1, 0.17),
     stick: new THREE.CylinderGeometry(0.022, 0.024, W - 0.08, 7),
   }), [])
+  const stickGeos = useMemo(() => Array.from({ length: 5 }, (_, k) => binchotanGeo(W - 0.08 - k * 0.025, 0.026 + (k % 3) * 0.003, k + 1)), [W])
   // the sticks heaped in rows, each turned and tilted a little differently
   const sticks = useMemo(() => {
     const out: { p: [number, number, number]; r: [number, number, number] }[] = []
@@ -150,7 +152,7 @@ function Crate() {
         <meshToonMaterial map={wood} />
       </mesh>
       {sticks.map((s, i) => (
-        <Inked key={i} geometry={geo.stick} color="#8d8a86" grow={1.08} position={s.p} rotation={s.r} />
+        <Inked key={i} geometry={stickGeos[i % stickGeos.length]} map={binchotanMap()} grow={1.07} position={s.p} rotation={s.r} />
       ))}
     </group>
   )
@@ -295,7 +297,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
 /** the stick of binchotan being carried from the crate to the fire */
 function HeldStick({ held }: { held: RefObject<Held> }) {
   const g = useRef<THREE.Group>(null)
-  const geo = useMemo(() => new THREE.CylinderGeometry(0.024, 0.026, 0.5, 7), [])
+  const geo = useMemo(() => binchotanGeo(0.5, 0.03, 7), [])
   useFrame(() => {
     const o = g.current
     if (!o) return
@@ -305,7 +307,7 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
   })
   return (
     <group ref={g} visible={false} rotation={[0.3, 0.4, Math.PI / 2]}>
-      <Inked geometry={geo} color="#8d8a86" grow={1.08} />
+      <Inked geometry={geo} map={binchotanMap()} grow={1.07} />
     </group>
   )
 }
