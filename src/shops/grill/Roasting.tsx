@@ -3694,12 +3694,29 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (c.gone) continue
       if (c.bounced) {
         c.age += delta * GAME_SPEED.value
-        // (burning down: shorter as it goes, a third of it left at the end; pushed out by new ones, it goes out in a second and a half)
+        // (burning down: a stick of binchotan keeps its length and shape as it goes, only a little slimmer, its glow dying back at the end as it
+        // greys over with ash and lies there pale until it's pushed out; pushed out by new ones, it crumbles to a puff of ash, fading away in a second and a half)
         const burnt = c.dying ? (c.dyT += delta) / 1.5 : Math.min(1, c.age / COAL_LAST_S)
-        c.g.scale.set(1, c.dying ? Math.max(0.02, 1 - burnt) : 1 - 0.67 * burnt * burnt, 1)
-        if (burnt >= 1) { c.gone = true; c.g.visible = false; restack(); continue }
+        if (c.dying) {
+          if (c.dyT <= delta) {
+            c.mat.transparent = true; c.mat.needsUpdate = true
+            burst(c.x, c.y, c.z)
+            const rim = c.g.children[1] as THREE.Mesh | undefined
+            if (rim) { const m = rim.material as THREE.Material; m.transparent = true; m.needsUpdate = true }
+          }
+          c.mat.opacity = Math.max(0, 1 - burnt)
+          const rim = c.g.children[1] as THREE.Mesh | undefined
+          if (rim) (rim.material as THREE.Material).opacity = Math.max(0, 1 - burnt)
+        } else {
+          const slim = 1 - 0.1 * burnt * burnt
+          c.g.scale.set(slim, 1, slim)
+        }
+        if (c.dying && burnt >= 1) { c.gone = true; c.g.visible = false; restack(); continue }
         c.heat = Math.min(1, c.heat + delta * GAME_SPEED.value / COAL_KINDLE_S)
-        const h = c.heat
+        // (the last third of its life: the glow dies back and the ash coat takes over)
+        const ashed = Math.max(0, Math.min(1, (Math.min(1, c.age / COAL_LAST_S) - 0.6) / 0.4))
+        const h = c.heat * (1 - ashed * ashed * (3 - 2 * ashed)) * (c.dying ? Math.max(0, 1 - burnt) : 1)
+        c.mat.color.set('#ffffff').lerp(ASH_TINT, ashed).multiplyScalar(1 + ((ASH_GAIN.Binchotan - 1) * ashed ** 1.5) * 0.55)
         const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
         c.mat.emissive.setRGB(0.25 + 0.75 * h, 0.03 + 0.4 * h ** 1.6, 0.0 + 0.1 * h ** 3)
         c.mat.emissiveIntensity = 0.9 * h ** 1.5 * flick

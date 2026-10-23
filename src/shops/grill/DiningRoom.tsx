@@ -461,6 +461,64 @@ function BannerRow({ zs, seed = 0, x0 = 0, x1 = 0 }: { zs: number[]; seed?: numb
   )
 }
 
+/**
+ * A string of little warm bulbs swagged along a wall's top under the frieze: a thin wire looped between brass pegs, a bulb every hand's width
+ * along each loop, and a small glowing paper globe at each peg. Light is painted (emissive bulbs, a soft halo), none cast.
+ */
+function Festoon({ l, mid }: { l: number; mid: number }) {
+  const built = useMemo(() => {
+    const spans = Math.max(1, Math.round(l / 0.8)), span = l / spans, sag = 0.075, per = 6
+    const wire: number[] = [], bulbs: [number, number][] = [], pegs: number[] = []
+    for (let i = 0; i < spans; i++) {
+      const z0 = -l / 2 + i * span
+      pegs.push(z0)
+      let prev: [number, number] | null = null
+      for (let k = 0; k <= 12; k++) {
+        const t = k / 12, pt: [number, number] = [z0 + t * span, -sag * 4 * t * (1 - t)]
+        if (prev) wire.push(0, prev[1], prev[0], 0, pt[1], pt[0])
+        prev = pt
+      }
+      for (let k = 1; k < per; k++) {
+        const t = k / per
+        bulbs.push([z0 + t * span, -sag * 4 * t * (1 - t) - 0.016])
+      }
+    }
+    pegs.push(l / 2)
+    const wireGeo = new THREE.BufferGeometry()
+    wireGeo.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3))
+    return { wireGeo, bulbs, pegs }
+  }, [l])
+  const bulb = useRef<THREE.InstancedMesh>(null), halo = useRef<THREE.InstancedMesh>(null), globe = useRef<THREE.InstancedMesh>(null)
+  useEffect(() => {
+    const m = new THREE.Matrix4(), c = new THREE.Color()
+    built.bulbs.forEach(([z, y], i) => {
+      m.makeTranslation(0, y, z)
+      bulb.current?.setMatrixAt(i, m)
+      halo.current?.setMatrixAt(i, m)
+      // (the bulbs go amber, white and gold in turn, so the string reads as a run of colours, not a bead chain)
+      bulb.current?.setColorAt(i, c.set(i % 3 === 0 ? '#ffd27a' : i % 3 === 1 ? '#fff0c4' : '#ffb85c'))
+    })
+    built.pegs.forEach((z, i) => globe.current?.setMatrixAt(i, m.makeTranslation(0, -0.04, z)))
+    for (const r of [bulb, halo, globe]) if (r.current) { r.current.instanceMatrix.needsUpdate = true; if (r.current.instanceColor) r.current.instanceColor.needsUpdate = true }
+  }, [built])
+  return (
+    <group position={[-0.034, WALL_H - 0.32, mid]}>
+      <group>
+        <lineSegments geometry={built.wireGeo}><lineBasicMaterial color="#2a1a10" /></lineSegments>
+        <instancedMesh ref={bulb} args={[undefined, undefined, built.bulbs.length]}>
+          <sphereGeometry args={[0.013, 8, 6]} /><meshBasicMaterial toneMapped={false} />
+        </instancedMesh>
+        <instancedMesh ref={halo} args={[undefined, undefined, built.bulbs.length]} renderOrder={2}>
+          <sphereGeometry args={[0.034, 8, 6]} /><meshBasicMaterial color="#ffc060" transparent opacity={0.16} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        </instancedMesh>
+        <instancedMesh ref={globe} args={[undefined, undefined, built.pegs.length]}>
+          <sphereGeometry args={[0.03, 10, 8]} /><meshBasicMaterial color="#ffd9a0" toneMapped={false} />
+        </instancedMesh>
+      </group>
+    </group>
+  )
+}
+
 /** a paper umbrella hung open from the ceiling by its handle: a dome of pastel paper ribbed with bamboo, a hanging cord */
 const WAGASA_COLORS = ['#f6b8c8', '#bfe3f0', '#f8e6a8', '#d8c4f0', '#c8ecd0', '#f8c8a8']
 const WAGASA_GEO = {
@@ -1397,6 +1455,8 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         </group>
           </>}
         </StaticBatch>
+        {/* (the string of bulbs under the frieze: instanced, so out of the batch) */}
+        <Festoon l={l} mid={mid} />
         {/* (the strings of banners overhead, clear of the altar, the fridges and the toilets' doors) */}
         {(() => {
           const zs: number[] = []

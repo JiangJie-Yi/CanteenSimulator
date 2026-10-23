@@ -426,7 +426,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
       {on && box && (
         <mesh userData={{ editHandle: true }} position={box.c} rotation-y={box.yaw} renderOrder={999} onPointerDown={down}>
           <boxGeometry args={box.s} />
-          <meshBasicMaterial color={selected === id ? '#ffb23f' : '#3fa9ff'} transparent opacity={0.26} depthWrite={false} depthTest={false} />
+          <meshBasicMaterial color={selected === id ? '#8fd0ff' : '#3fa9ff'} transparent opacity={selected === id ? 0.2 : 0.26} depthWrite={false} depthTest={false} />
         </mesh>
       )}
       {on && box && <AxisGizmo id={id} at={box.c} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}

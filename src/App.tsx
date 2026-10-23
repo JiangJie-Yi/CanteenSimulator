@@ -481,7 +481,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
     <>
       <directionalLight position={[3, 5, 2]} intensity={look.sunIntensity} color={look.sun} />
       <hemisphereLight args={[look.sky, look.ground, look.hemi]} />
-      <IndoorHDRI intensity={0.25 + look.hemi * 0.5} />
+      <IndoorHDRI night={theme === 'dark'} intensity={theme === 'dark' ? 0.3 + look.hemi * 0.4 : 0.5 + look.hemi * 0.5} />
       <spotLight
         ref={spot}
         position={SPOT_POSITION}
