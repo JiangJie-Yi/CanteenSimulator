@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -19,6 +19,27 @@ export function focusCamera(camera: THREE.Camera, controls: Controls, p: THREE.V
   controls.update?.()
 }
 
+const DEG = Math.PI / 180
+/** an axis's letter on a round disc in its colour, drawn once */
+const LETTERS = new Map<string, THREE.Texture>()
+function letterTex(name: string, color: string) {
+  const hit = LETTERS.get(name)
+  if (hit) return hit
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const g = c.getContext('2d')!
+  g.fillStyle = color
+  g.beginPath(); g.arc(32, 32, 30, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = '#ffffff'; g.lineWidth = 3
+  g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2); g.stroke()
+  g.fillStyle = '#ffffff'
+  g.font = 'bold 38px sans-serif'
+  g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText(name, 32, 35)
+  const t = new THREE.CanvasTexture(c)
+  LETTERS.set(name, t)
+  return t
+}
 const AXES = [
   { v: [1, 0, 0] as V3, color: '#ff3b30', rot: [0, 0, -Math.PI / 2] as V3, name: 'X' },
   { v: [0, 1, 0] as V3, color: '#34c759', rot: [0, 0, 0] as V3, name: 'Y' },
@@ -88,6 +109,10 @@ export function AxisGizmo({ id, at, size = 0.5 }: { id: string; at: V3; size?: n
             <coneGeometry args={[L * 0.07, L * 0.2, 12]} />
             <meshBasicMaterial color={a.color} depthTest={false} />
           </mesh>
+          {/* (the axis's letter, set a little past its tip, always facing the camera) */}
+          <sprite position-y={L * 1.12} scale={[L * 0.2, L * 0.2, 1]} renderOrder={1002} userData={{ editHandle: true, gizmo: false }}>
+            <spriteMaterial map={letterTex(a.name, a.color)} depthTest={false} transparent />
+          </sprite>
           {/* (a fatter, unseen one round it, so it's easy to take hold of) */}
           <mesh position-y={L * 0.5} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
             <cylinderGeometry args={[L * 0.09, L * 0.09, L, 8]} />
@@ -103,23 +128,27 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
   const g = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
-  const { on, offsets, selected } = useEdit()
+  const { on, offsets, rotations, scales, selected } = useEdit()
   const [box, setBox] = useState<{ c: V3; s: V3 } | null>(null)
-  void offsets // (read so it redraws as it's moved)
+  // (the piece's middle, in the frame of its own group as it stands untouched: what it turns and scales about; measured once it has been drawn)
+  const [mid, setMid] = useState<V3>([0, 0, 0])
+  const inner = useRef<THREE.Group>(null)
+  void offsets; void rotations; void scales // (read so it redraws as it's moved, turned or scaled)
   const o = positionOf(id)
+  const rot = rotationOf(id), sc = scaleOf(id)
 
-  /** its size as it is, in its own frame (the box round whatever's in it; the handle itself left out) */
+  /** its size and middle as it stands untouched: taken of the inner group alone (the handle and arrows are not in it), in the frame of the group that carries the offset */
   const measure = () => {
-    const grp = g.current
-    if (!grp) return null
+    const grp = g.current, inn = inner.current
+    if (!grp || !inn) return null
+    // (taken in the inner group's own frame, so the turn and scale on the wrapper outside it don't enter into it)
     grp.updateWorldMatrix(true, true)
-    const inv = new THREE.Matrix4().copy(grp.matrixWorld).invert()
     const b = new THREE.Box3()
-    grp.traverse((m) => {
-      if (!(m instanceof THREE.Mesh) || m.userData.editHandle) return
+    inn.traverse((m) => {
+      if (!(m instanceof THREE.Mesh)) return
       m.geometry.computeBoundingBox()
       if (!m.geometry.boundingBox) return
-      b.union(m.geometry.boundingBox.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)))
+      b.union(m.geometry.boundingBox.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(new THREE.Matrix4().copy(inn.matrixWorld).invert(), m.matrixWorld)))
     })
     if (b.isEmpty()) return { c: [0, 0.3, 0] as V3, s: [0.5, 0.6, 0.5] as V3 }
     const c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3())
@@ -132,8 +161,18 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
     if (m && g.current) focusCamera(camera, controls, g.current.localToWorld(new THREE.Vector3(...m.c)))
   }), [id, label, camera, controls])
 
-  // (its box, taken when editing begins)
-  useEffect(() => { setBox(on ? measure() : null) }, [on])
+  // (its middle, once it has been drawn (a frame later, for a batch that merges after mount), and its box when editing begins)
+  useEffect(() => {
+    const t = window.setTimeout(() => { const m = measure(); if (m) setMid(m.c) }, 400)
+    return () => window.clearTimeout(t)
+  }, [])
+  useEffect(() => {
+    if (!on) { setBox(null); return }
+    // (a batch merges its meshes a moment after mounting: measured at once and again a little later, so the box is there whenever it's switched on)
+    setBox(measure())
+    const t = window.setTimeout(() => { const m = measure(); if (m) { setBox(m); setMid(m.c) } }, 300)
+    return () => window.clearTimeout(t)
+  }, [on])
 
   const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent; intersections?: { object: THREE.Object3D }[] }) => {
     const grp = g.current
@@ -178,7 +217,10 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
 
   return (
     <group ref={g} position={o}>
-      {children}
+      {/* (turned and scaled about the piece's own middle, not the group's origin, which may be far from it) */}
+      <group position={mid} rotation={[rot[0] * DEG, rot[1] * DEG, rot[2] * DEG]} scale={sc}>
+        <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}>{children}</group>
+      </group>
       {on && box && (
         <mesh userData={{ editHandle: true }} position={box.c} renderOrder={999} onPointerDown={down}>
           <boxGeometry args={box.s} />

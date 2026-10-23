@@ -1955,11 +1955,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         <RegisterLive top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
           at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + TILL.along).addScaledVector(counters[0].lay, TILL.lay)} />
       )}
-      <StaticBatch key={seats.length}>
-        {seats.map((st, n) => (
-          <group key={n} position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>
-        ))}
-      </StaticBatch>
+      {/* (each stool its own Movable, so each can be moved, turned and made larger or smaller by hand when the shop's shut: only the stool's look; where its guest
+          sits and the way to it stay as they are, so no one is put out of a seat) */}
+      {seats.map((st, n) => (
+        <Movable key={`${seats.length}-${n}`} id={`stool${n}`} label={`座位 ${n + 1}`}>
+          <StaticBatch>
+            <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>
+          </StaticBatch>
+        </Movable>
+      ))}
       {/* their shoes, left in pairs on the genkan's stone by the step, a pair for each of them inside */}
       {given && (() => {
         const c0 = counters[0]

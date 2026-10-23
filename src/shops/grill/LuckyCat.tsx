@@ -24,6 +24,37 @@ const HEIGHT = 0.2
 const POSES = [0, 0.9, 1.8, 2.7, 3.6, 4.5, 5.4, 6.3, 7.2, 8]
 const STILL = 5.4
 
+/**
+ * The model's texture has three paw pads (pink, brown, brown) laid out for the soles of the paws, but on the raised arm they land on the arm's
+ * outer side and show as a fan of brown streaks. Painted out here, in the white of the fur round them, once per texture.
+ */
+const cleaned = new WeakMap<THREE.Texture, THREE.Texture>()
+function clean(tex: THREE.Texture): THREE.Texture {
+  const hit = cleaned.get(tex)
+  if (hit) return hit
+  const img = tex.image as CanvasImageSource & { width: number; height: number }
+  if (!img || typeof document === 'undefined' || img.width < 256) return tex
+  const k = img.width / 1024
+  const c = document.createElement('canvas')
+  c.width = img.width
+  c.height = img.height
+  const g = c.getContext('2d')!
+  g.drawImage(img, 0, 0)
+  // (the pads, as ellipses round each cluster of toes and the pad: x, y, half-width, half-height, in the 1024 square)
+  for (const [x, y, w, h] of [[500, 72, 72, 66], [757, 380, 74, 70], [943, 498, 72, 70], [655, 764, 66, 70]] as number[][]) {
+    g.fillStyle = '#f8f6f2'
+    g.beginPath(); g.ellipse(x * k, y * k, w * k, h * k, 0, 0, Math.PI * 2); g.fill()
+  }
+  const out = new THREE.CanvasTexture(c)
+  out.flipY = tex.flipY
+  out.colorSpace = tex.colorSpace
+  out.wrapS = tex.wrapS
+  out.wrapT = tex.wrapT
+  out.anisotropy = tex.anisotropy
+  cleaned.set(tex, out)
+  return out
+}
+
 function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.Color | null) {
   const root = cloneSkinned(gltf.scene) as THREE.Group
   const mixer = new THREE.AnimationMixer(root)
@@ -48,7 +79,7 @@ function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.
     g.deleteAttribute('skinWeight')
     g.computeVertexNormals()
     const src = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial
-    const mat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ?? null, side: THREE.DoubleSide })
+    const mat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ? clean(src.map) : null, side: THREE.DoubleSide })
     // (a differently coloured cat: the body's own material takes the tint)
     if (tint && src.map && !/coin|ring|red/i.test(src.name)) mat.color.lerp(tint, 0.85)
     out.push({ g, mat })
