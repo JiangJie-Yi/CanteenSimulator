@@ -19,6 +19,85 @@ export function focusCamera(camera: THREE.Camera, controls: Controls, p: THREE.V
   controls.update?.()
 }
 
+const AXES = [
+  { v: [1, 0, 0] as V3, color: '#ff3b30', rot: [0, 0, -Math.PI / 2] as V3, name: 'X' },
+  { v: [0, 1, 0] as V3, color: '#34c759', rot: [0, 0, 0] as V3, name: 'Y' },
+  { v: [0, 0, 1] as V3, color: '#0a84ff', rot: [Math.PI / 2, 0, 0] as V3, name: 'Z' },
+]
+/**
+ * The three axes of the selected piece (red X, green Y, blue Z, along the same axes as its X, Y, Z fields): drag an arrow to move it along
+ * that axis alone. It stands in the piece's own group, at `at`, so it moves with it.
+ */
+export function AxisGizmo({ id, at, size = 0.5 }: { id: string; at: V3; size?: number }) {
+  const root = useRef<THREE.Group>(null)
+  const { camera, gl, raycaster } = useThree()
+  const controls = useThree((s) => s.controls) as unknown as Controls
+  const { on, selected } = useEdit()
+  if (!on || selected !== id) return null
+  const down = (axis: 0 | 1 | 2) => (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
+    const r0 = root.current
+    const par = r0?.parent?.parent
+    if (!r0 || !par) return
+    e.stopPropagation()
+    par.updateWorldMatrix(true, false)
+    const origin = r0.getWorldPosition(new THREE.Vector3())
+    const dir = new THREE.Vector3(...AXES[axis].v).transformDirection(par.matrixWorld).normalize()
+    // (how far along the axis the pointer's ray comes nearest to it: where the two lines are closest)
+    const along = (ev: PointerEvent) => {
+      const r = gl.domElement.getBoundingClientRect()
+      raycaster.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera)
+      const v = raycaster.ray.direction, w0 = origin.clone().sub(raycaster.ray.origin)
+      const b = dir.dot(v), d = dir.dot(w0), ee = v.dot(w0)
+      const den = 1 - b * b
+      return Math.abs(den) < 1e-4 ? null : (b * ee - d) / den
+    }
+    let last = along(e.nativeEvent)
+    if (last === null) return
+    moveTo(id, offsetOf(id))
+    if (controls) controls.enabled = false
+    const move = (ev: PointerEvent) => {
+      const s1 = along(ev)
+      if (s1 === null || last === null) return
+      // (the way along the axis in the world, taken into the piece's parent's own frame: it's the one axis that changes)
+      const p0 = origin.clone().addScaledVector(dir, last), p1 = origin.clone().addScaledVector(dir, s1)
+      const d = par.worldToLocal(p1).sub(par.worldToLocal(p0))
+      const n = [...offsetOf(id)] as V3
+      n[axis] += [d.x, d.y, d.z][axis]
+      moveTo(id, n)
+      last = s1
+    }
+    const up = () => {
+      if (controls) controls.enabled = true
+      commitOffsets()
+      window.removeEventListener('pointermove', move)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
+  }
+  const L = size
+  return (
+    <group ref={root} position={at}>
+      {AXES.map((a, i) => (
+        <group key={a.name} rotation={a.rot} onPointerDown={down(i as 0 | 1 | 2)}>
+          <mesh position-y={L * 0.4} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
+            <cylinderGeometry args={[L * 0.022, L * 0.022, L * 0.8, 8]} />
+            <meshBasicMaterial color={a.color} depthTest={false} />
+          </mesh>
+          <mesh position-y={L * 0.9} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
+            <coneGeometry args={[L * 0.07, L * 0.2, 12]} />
+            <meshBasicMaterial color={a.color} depthTest={false} />
+          </mesh>
+          {/* (a fatter, unseen one round it, so it's easy to take hold of) */}
+          <mesh position-y={L * 0.5} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
+            <cylinderGeometry args={[L * 0.09, L * 0.09, L, 8]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
 export function Movable({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   const g = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
@@ -54,9 +133,11 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
   // (its box, taken when editing begins)
   useEffect(() => { setBox(on ? measure() : null) }, [on])
 
-  const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
+  const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent; intersections?: { object: THREE.Object3D }[] }) => {
     const grp = g.current
     if (!on || !grp || !grp.parent) return
+    // (an axis arrow under the pointer takes it: the box is only for the free move)
+    if (e.intersections?.some((i) => i.object.userData.gizmo)) return
     e.stopPropagation()
     const lift = e.nativeEvent.shiftKey
     const wp = grp.getWorldPosition(new THREE.Vector3())
@@ -101,6 +182,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
           <meshBasicMaterial color={selected === id ? '#ffb23f' : '#3fa9ff'} transparent opacity={0.26} depthWrite={false} depthTest={false} />
         </mesh>
       )}
+      {on && box && <AxisGizmo id={id} at={box.c} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
     </group>
   )
 }

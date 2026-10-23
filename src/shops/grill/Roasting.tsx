@@ -24,7 +24,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
-import { focusCamera } from './Movable'
+import { AxisGizmo, focusCamera } from './Movable'
 import { binchotanGeo, binchotanMap } from './Binchotan'
 import { commitOffsets, getEdit, moveTo, offsetOf, registerMovable, useEdit } from './edit'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
@@ -774,9 +774,12 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     }
     return raycaster.ray.intersectPlane(plane, new THREE.Vector3())
   }
-  const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
+  const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent; intersections?: { object: THREE.Object3D }[] }) => {
     if (!getEdit().on || !body.current) return
+    // (an axis arrow under the pointer takes it: the box is only for the free move)
+    if (e.intersections?.some((i) => i.object.userData.gizmo)) return
     e.stopPropagation()
+    moveTo(`gate${idx}`, offsetOf(`gate${idx}`))
     const wp = body.current.getWorldPosition(new THREE.Vector3())
     const lift = e.nativeEvent.shiftKey
     const p = hit(e.nativeEvent, wp.y, lift)
@@ -826,6 +829,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
         {editing && (
           <mesh position={[end * G / 2, 0.55, 0]}><boxGeometry args={[G + 0.1, 1.1, 0.3]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
         )}
+        {editing && <AxisGizmo id={`gate${idx}`} at={[end * G / 2, 0.5, 0]} size={0.3} />}
         <group ref={leaf} name="gate-leaf">
           <group position-x={end * (G / 2 - 0.005)}>
             {/* a framed door of planed wood: two stiles and three rails with rounded edges, the grain running up the

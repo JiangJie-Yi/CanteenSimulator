@@ -15,7 +15,9 @@ const subs = new Set<() => void>()
 const emit = () => { state = { ...state }; subs.forEach((f) => f()); panel() }
 export const getEdit = () => state
 export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f) }, () => state)
-export const offsetOf = (id: string): V3 => state.offsets[id] ?? [0, 0, 0]
+/** where a piece stands when it hasn't been moved by hand: the places the owner has settled on */
+const DEFAULTS: Record<string, V3> = { gate1: [0, 0, 0.17] }
+export const offsetOf = (id: string): V3 => state.offsets[id] ?? DEFAULTS[id] ?? [0, 0, 0]
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state.offsets)) } catch { /* private window: it just won't be kept */ } }
 /** a piece moved (live, while it's dragged) */
 export function moveTo(id: string, v: V3) { state.offsets = { ...state.offsets, [id]: v }; state.selected = id; emit() }
