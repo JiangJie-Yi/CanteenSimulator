@@ -101,6 +101,10 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
     g.strokeStyle = CREAM
     g.lineWidth = 5
     g.beginPath(); g.arc(CX, CY, R, 0, Math.PI * 2); g.stroke()
+    // a fine inner ring, the crest's double border
+    g.lineWidth = 1.2
+    g.beginPath(); g.arc(CX, CY, R - 8, 0, Math.PI * 2); g.stroke()
+    g.lineWidth = 5
     g.save()
     g.beginPath(); g.arc(CX, CY, R - 4, 0, Math.PI * 2); g.clip()
     // the sea: three bands, each a wave's long swell, the crest at the left lifted like a breaking one; cream, parted by indigo lines
@@ -135,6 +139,11 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
     // the dorsal fin, a swept-back fan on the arch, and the pectoral fin tucked under
     g.beginPath(); g.moveTo(182, 70); g.bezierCurveTo(188, 54, 198, 47, 207, 48); g.bezierCurveTo(205, 58, 208, 68, 216, 80); g.lineTo(190, 76); g.closePath(); g.fill()
     g.beginPath(); g.moveTo(176, 90); g.bezierCurveTo(176, 100, 184, 108, 194, 108); g.bezierCurveTo(190, 100, 190, 96, 192, 92); g.closePath(); g.fill()
+    // the scales, rows of small indigo arcs over the body behind the gill
+    g.strokeStyle = INDIGO; g.lineWidth = 1
+    for (const [y, x0, x1] of [[86, 184, 214], [94, 188, 220], [102, 198, 224], [110, 208, 222]] as number[][]) {
+      for (let x = x0 + ((y / 8) % 2) * 3; x < x1; x += 6) { g.beginPath(); g.arc(x, y - 2, 3, 0.1 * Math.PI, 0.9 * Math.PI); g.stroke() }
+    }
     // the details, cut away in the indigo: the eye, the gill, the mouth, the fins' ribs
     g.fillStyle = INDIGO
     g.beginPath(); g.arc(165, 78, 3.2, 0, Math.PI * 2); g.fill()
