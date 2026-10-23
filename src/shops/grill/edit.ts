@@ -5,7 +5,8 @@
 import { useSyncExternalStore } from 'react'
 
 export type V3 = [number, number, number]
-const KEY = 'jgs-edit-offsets'
+// (the second key: the first held offsets from before the places below were settled on; they're not carried over, or they'd count twice)
+const KEY = 'jgs-edit-offsets-2'
 const load = (): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') } catch { return {} }
 }
@@ -15,9 +16,23 @@ const subs = new Set<() => void>()
 const emit = () => { state = { ...state }; subs.forEach((f) => f()); panel() }
 export const getEdit = () => state
 export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f) }, () => state)
-/** where a piece stands when it hasn't been moved by hand: the places the owner has settled on */
-const DEFAULTS: Record<string, V3> = { gate1: [0, -0.035, 0.16] }
-export const offsetOf = (id: string): V3 => state.offsets[id] ?? DEFAULTS[id] ?? [0, 0, 0]
+/**
+ * Where each piece stands to begin with: the places the owner has settled on by hand (as X, Y, Z in the piece's parent's own units). The
+ * offset shown and typed in edit mode is from here, so every piece starts at 0, 0, 0, its own centre.
+ */
+export const BASES: Record<string, V3> = {
+  gate1: [0, 0, 0.16],
+  gate0: [0, 0, 0.17],
+  freezer: [-1.508, 0, 1.974],
+  willow: [0.38, 0, 0.201],
+  sake: [0.084, 0, 0.118],
+}
+export const offsetOf = (id: string): V3 => state.offsets[id] ?? [0, 0, 0]
+/** where the piece is: its settled place, and what's been moved by hand from it */
+export const positionOf = (id: string): V3 => {
+  const b = BASES[id] ?? [0, 0, 0], o = offsetOf(id)
+  return [b[0] + o[0], b[1] + o[1], b[2] + o[2]]
+}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state.offsets)) } catch { /* private window: it just won't be kept */ } }
 // ---- undo: each change (a drag, an arrow, a field edited, reset all) is a step; Ctrl+Z goes back one, Ctrl+Y (or Ctrl+Shift+Z) forward again
 const past: Record<string, V3>[] = []
@@ -75,19 +90,22 @@ export function toggleEdit() {
   state.selected = null
   if (!state.on) { past.length = 0; future = [] }
   emit()
+  toast(state.on ? '進入編輯模式：拖曳擺設，再按 G 或「編」離開' : '離開編輯模式', state.on ? 'edit' : 'plain')
 }
 
 // ---- the panel (plain DOM: it sits over the canvas, and must show even when what's being moved is out of view)
 let toastEl: HTMLDivElement | null = null
-function toast(text: string) {
+function toast(text: string, kind: 'warn' | 'edit' | 'plain' = 'warn') {
   if (typeof document === 'undefined') return
   toastEl?.remove()
   const el = document.createElement('div')
   el.textContent = text
-  el.style.cssText = 'position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:9999;background:rgba(60,16,12,.94);color:#ffd9d2;font:14px sans-serif;padding:8px 16px;border-radius:8px;border:1px solid #c0392b;pointer-events:none'
+  const look = kind === 'warn' ? 'background:rgba(60,16,12,.94);color:#ffd9d2;border:1px solid #c0392b'
+    : kind === 'edit' ? 'background:rgba(10,30,60,.94);color:#cfeaff;border:1px solid #3fa9ff' : 'background:rgba(30,30,30,.9);color:#eee;border:1px solid #888'
+  el.style.cssText = `position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:9999;${look};font:15px sans-serif;padding:9px 18px;border-radius:8px;pointer-events:none`
   document.body.appendChild(el)
   toastEl = el
-  window.setTimeout(() => { if (toastEl === el) { el.remove(); toastEl = null } }, 2600)
+  window.setTimeout(() => { if (toastEl === el) { el.remove(); toastEl = null } }, kind === 'edit' ? 3200 : 2200)
 }
 let el: HTMLDivElement | null = null
 let info: HTMLDivElement | null = null

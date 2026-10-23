@@ -1913,6 +1913,52 @@ button {
   }
 }
 
+/* the shop's edit mode (key G), to the left of the speed button: shown only while the shop is shut */
+.edit-toggle {
+  position: fixed;
+  z-index: 10;
+  top: 20px;
+  right: 280px;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 50%;
+  background: var(--page);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.edit-toggle:hover {
+  border-color: var(--text);
+}
+.edit-toggle.is-on {
+  background: #1f7ae0;
+  border-color: #1f7ae0;
+  color: #fff;
+}
+.edit-toggle:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .edit-toggle {
+    top: 14px;
+    right: 254px;
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}
+@media (max-width: 400px) {
+  .edit-toggle {
+    width: 34px;
+    height: 34px;
+    right: 204px;
+    font-size: 14px;
+  }
+}
+
 /* the game's speed, ▶▶ / ×2, at the left end of the round buttons top right */
 .speed-toggle {
   position: fixed;

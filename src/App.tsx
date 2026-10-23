@@ -37,6 +37,7 @@ import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
+import { toggleEdit, useEdit } from '@/shops/grill/edit'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
@@ -685,6 +686,7 @@ export default function App() {
   const [ai, setAi] = useState(false)
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
   const [speed, setSpeed] = useState(1)
+  const { on: editOn } = useEdit()
   useEffect(() => { GAME_SPEED.value = speed }, [speed])
   // the sake offered at the shrine by the door: for a minute more come in and they order more
   const [incenseAt, setIncenseAt] = useState<number | null>(null)
@@ -2169,6 +2171,13 @@ export default function App() {
         <button type="button" className={`incense-toggle${blessed ? ' is-on' : ''}`} onClick={lightIncense} disabled={blessed}
           title={lang === 'ja' ? 'お神酒を供える（NT$1,000、三分間、客足とご注文が増える）' : '供清酒（花 NT$1,000，三分鐘內客人變多、點得也多）'}>
           {blessed ? (lang === 'ja' ? 'お供え中' : '供酒中') : (lang === 'ja' ? 'お神酒' : '供酒')}
+        </button>
+      )}
+      {/* (the shop's edit mode, key G: only while it's shut, as it can't be switched on while customers are about) */}
+      {!ai && !!dish.roast && !flatGrill && (
+        <button type="button" className={`edit-toggle${editOn ? ' is-on' : ''}`} onClick={toggleEdit} aria-pressed={editOn}
+          title={lang === 'ja' ? '配置を編集（Gキー）' : '編輯店內擺設（快捷鍵 G）'}>
+          編
         </button>
       )}
       <button type="button" className={`speed-toggle${speed > 1 ? ' is-on' : ''}`} onClick={() => setSpeed((v) => (v > 1 ? 1 : 2))}

@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { beginChange, commitOffsets, moveTo, offsetOf, registerMovable, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -105,7 +105,8 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
   const controls = useThree((s) => s.controls) as unknown as Controls
   const { on, offsets, selected } = useEdit()
   const [box, setBox] = useState<{ c: V3; s: V3 } | null>(null)
-  const o = offsets[id] ?? [0, 0, 0]
+  void offsets // (read so it redraws as it's moved)
+  const o = positionOf(id)
 
   /** its size as it is, in its own frame (the box round whatever's in it; the handle itself left out) */
   const measure = () => {

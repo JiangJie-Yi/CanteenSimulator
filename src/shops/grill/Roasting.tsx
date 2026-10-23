@@ -26,7 +26,7 @@ import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { AxisGizmo, focusCamera } from './Movable'
 import { binchotanGeo, binchotanMap } from './Binchotan'
-import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, registerMovable, useEdit } from './edit'
+import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit } from './edit'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
 import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
@@ -817,7 +817,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     if (leaf.current) leaf.current.rotation.y = -end * (Math.PI / 2) * k * k * (3 - 2 * k)
     // (the whole gate where it's been put, the moment it's moved)
     if (body.current) {
-      const n = offsetOf(`gate${idx}`)
+      const n = positionOf(`gate${idx}`)
       body.current.position.set(n[0], n[1], n[2])
     }
   })
@@ -826,7 +826,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     <group position={c.at} rotation-y={yaw}>
       <group position={[hinge, 0, 0.08]}>
         {/* the swing door by itself: its own thing, apart from the post and the doorway, which stay where they are; it's this that's moved by hand */}
-        <group ref={body} position={offsetOf(`gate${idx}`)} onPointerDown={down}>
+        <group ref={body} position={positionOf(`gate${idx}`)} onPointerDown={down}>
         {editing && (
           <mesh position={[end * G / 2, 0.55, 0]}><boxGeometry args={[G + 0.1, 1.1, 0.3]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
         )}
