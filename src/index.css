@@ -782,27 +782,27 @@ button {
 .strips-page {
   position: absolute;
   z-index: 2;
-  top: 50%;
-  width: 36px;
-  height: 36px;
-  margin-top: -18px;
+  top: 22%;
+  width: 30px;
+  height: 30px;
+  margin-top: -15px;
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgb(214 176 98 / 0.55);
+  border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
   border-radius: 50%;
-  background: rgb(28 20 15 / 0.55);
+  background: color-mix(in srgb, var(--washi) 62%, transparent);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
-  color: #e2bd6e;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+  color: var(--text);
   cursor: pointer;
   transition: opacity 160ms ease, transform 160ms ease, background-color 160ms ease;
 }
 
 .strips-page svg {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -811,7 +811,7 @@ button {
 }
 
 .strips-page:hover:not(:disabled) {
-  background: rgb(28 20 15 / 0.8);
+  background: color-mix(in srgb, var(--washi) 88%, transparent);
 }
 
 /* the reset-view button, bottom left of the stage */
@@ -6402,4 +6402,14 @@ button {
 .is-flatgrill .ai-chat {
   top: 186px;
   bottom: auto;
+}
+
+/* edit mode (G) is for arranging the scene alone: the game's own controls are shut while it's on */
+.app.is-editing :is(.menu, .menu-backing, .menu-fold, .tools-toggle, .ledger-toggle, .ai-toggle, .speed-toggle) {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.app.is-editing .stage :is(button, input, select, a, [role='button']):not(.view-reset) {
+  pointer-events: none;
 }

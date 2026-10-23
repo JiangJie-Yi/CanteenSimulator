@@ -828,9 +828,9 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
         {/* the swing door by itself: its own thing, apart from the post and the doorway, which stay where they are; it's this that's moved by hand */}
         <group ref={body} position={positionOf(`gate${idx}`)} onPointerDown={down}>
         {editing && (
-          <mesh position={[end * G / 2, 0.55, 0]}><boxGeometry args={[G + 0.1, 1.1, 0.3]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
+          <mesh position={[end * G / 2, H / 2 + 0.01, 0]}><boxGeometry args={[G + 0.02, H - 0.02, 0.12]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
         )}
-        {editing && <AxisGizmo id={`gate${idx}`} at={[end * G / 2, 0.5, 0]} size={0.3} />}
+        {editing && <AxisGizmo id={`gate${idx}`} at={[end * G / 2, H / 2, 0]} />}
         <group ref={leaf} name="gate-leaf">
           <group position-x={end * (G / 2 - 0.005)}>
             {/* a framed door of planed wood: two stiles and three rails with rounded edges, the grain running up the
@@ -2085,10 +2085,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     /** where it lies in plan (its landing), the way it points, how steeply it tips, and the pose it settles to */
     tx: number; tz: number; yaw: number; slope: number; qEnd: THREE.Quaternion; geo: THREE.BufferGeometry }
   const coals = useRef<Coal[]>([])
+  /** whether the bed has been laid with its first sticks */
+  const bedSeeded = useRef(false)
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
   // (each thrown stick its own length, thickness and bend, new each time: from the short to the long)
-  const randomStick = () => binchotanGeo(0.34 + Math.random() * 0.26, 0.026 + Math.random() * 0.01, Math.floor(Math.random() * 8))
+  const randomStick = () => binchotanGeo(0.2 + Math.random() * 0.12, 0.04 + Math.random() * 0.012, Math.floor(Math.random() * 8))
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -3774,11 +3776,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (no fire: only a few lumps of grey ash and slag; charcoal is what swells the heap, kindles and glows)
     // (a plain swap: charcoal while there's a fire, the ash mound when there's none; no shrinking between)
     const burning = f > 0.02
-    // (burning: the model's own charcoal, as it was; out: the ash mound)
+    // (the model's own heap of orange lumps is never shown: the bed is the sticks thrown on it, all one kind, and a fire lit with none gets a few laid on it)
     for (const nm of ['Charcoal', 'BinchotanHeap']) {
       const o = root.getObjectByName(nm)
-      if (o) o.visible = burning
+      if (o) o.visible = false
     }
+    if (burning && !bedSeeded.current && !coals.current.some((c) => c && !c.gone && !c.dying)) { bedSeeded.current = true; dropCoals() }
     const bedAsh = root.getObjectByName('AshBed')
     if (bedAsh) bedAsh.visible = !burning
 

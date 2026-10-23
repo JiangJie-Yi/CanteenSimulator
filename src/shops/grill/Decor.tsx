@@ -120,7 +120,7 @@ function Crate() {
     stick: new THREE.CylinderGeometry(0.022, 0.024, W - 0.08, 7),
   }), [])
   // (each stick of the crate its own length (from a hand's breadth short of the crate's to its full) and thickness)
-  const stickGeos = useMemo(() => Array.from({ length: 24 }, (_, k) => binchotanGeo(0.34 + ((k * 37) % 21) * 0.0095, 0.024 + ((k * 7) % 5) * 0.0018, k)), [])
+  const stickGeos = useMemo(() => Array.from({ length: 24 }, (_, k) => binchotanGeo(0.22 + ((k * 37) % 21) * 0.005, 0.038 + ((k * 7) % 5) * 0.003, k)), [])
   // the sticks heaped in rows, each turned and tilted a little differently
   const sticks = useMemo(() => {
     const out: { p: [number, number, number]; r: [number, number, number] }[] = []
@@ -300,7 +300,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
 /** the stick of binchotan being carried from the crate to the fire */
 function HeldStick({ held }: { held: RefObject<Held> }) {
   const g = useRef<THREE.Group>(null)
-  const geo = useMemo(() => binchotanGeo(0.5, 0.03, 7), [])
+  const geo = useMemo(() => binchotanGeo(0.28, 0.045, 7), [])
   useFrame(() => {
     const o = g.current
     if (!o) return

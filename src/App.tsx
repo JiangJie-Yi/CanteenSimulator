@@ -687,6 +687,20 @@ export default function App() {
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
   const [speed, setSpeed] = useState(1)
   const { on: editOn } = useEdit()
+  // edit mode is for the scene alone: no game action goes through (a click on the 3D view is swallowed before it reaches what's clicked; the menu and buttons are shut by CSS)
+  useEffect(() => {
+    if (!editOn) return
+    const stop = (e: Event) => { e.stopPropagation() }
+    const layer = document.querySelector('.canvas-layer')
+    layer?.addEventListener('click', stop, true)
+    layer?.addEventListener('dblclick', stop, true)
+    layer?.addEventListener('contextmenu', stop, true)
+    return () => {
+      layer?.removeEventListener('click', stop, true)
+      layer?.removeEventListener('dblclick', stop, true)
+      layer?.removeEventListener('contextmenu', stop, true)
+    }
+  }, [editOn])
   useEffect(() => { GAME_SPEED.value = speed }, [speed])
   // the sake offered at the shrine by the door: for a minute more come in and they order more
   const [incenseAt, setIncenseAt] = useState<number | null>(null)
@@ -1821,7 +1835,7 @@ export default function App() {
 
 
   return (
-    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}`} ref={appRef}>
+    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (

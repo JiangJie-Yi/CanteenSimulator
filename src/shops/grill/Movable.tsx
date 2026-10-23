@@ -3,7 +3,7 @@
 // (Shift lifts it). Wrap it round a StaticBatch, not inside one: the batch's baked meshes then move with the group.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, turnTo, useEdit, type V3 } from './edit'
 
@@ -20,6 +20,8 @@ export function focusCamera(camera: THREE.Camera, controls: Controls, p: THREE.V
 }
 
 const DEG = Math.PI / 180
+/** how long the handles are on the screen, in pixels */
+const GIZMO_PX = 130
 /** an axis's letter on a round disc in its colour, drawn once */
 const LETTERS = new Map<string, THREE.Texture>()
 function letterTex(name: string, color: string) {
@@ -49,11 +51,22 @@ const AXES = [
  * The three axes of the selected piece (red X, green Y, blue Z, along the same axes as its X, Y, Z fields): drag an arrow to move it along
  * that axis alone. It stands in the piece's own group, at `at`, so it moves with it.
  */
-export function AxisGizmo({ id, at, size = 0.5 }: { id: string; at: V3; size?: number }) {
+export function AxisGizmo({ id, at }: { id: string; at: V3; size?: number }) {
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
   const { on, selected, tool } = useEdit()
+  // (the handles keep one size on the screen, whatever the piece's size or how far the camera is, as in a modelling program: the group is scaled to fit,
+  // undoing its parents' own scale so the arrows stay straight)
+  useFrame(() => {
+    const r = root.current
+    if (!r?.parent) return
+    const dist = camera.position.distanceTo(r.getWorldPosition(new THREE.Vector3()))
+    const fov = (camera as THREE.PerspectiveCamera).fov ?? 45
+    const world = dist * 2 * Math.tan((fov * DEG) / 2) * (GIZMO_PX / gl.domElement.clientHeight)
+    const ps = r.parent.getWorldScale(new THREE.Vector3())
+    r.scale.set(world / (ps.x || 1), world / (ps.y || 1), world / (ps.z || 1))
+  })
   if (!on || selected !== id) return null
   const down = (axis: 0 | 1 | 2) => (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
     const r0 = root.current
@@ -180,20 +193,44 @@ export function AxisGizmo({ id, at, size = 0.5 }: { id: string; at: V3; size?: n
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up, { once: true })
   }
-  const L = size
+  // ---- the middle cube: dragged right or up, the piece grows on all three axes together, left or down it shrinks
+  const growAll = (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
+    e.stopPropagation()
+    const from = [...scaleOf(id)] as V3
+    const x0 = e.nativeEvent.clientX, y0 = e.nativeEvent.clientY
+    beginChange()
+    scaleTo(id, from)
+    if (controls) controls.enabled = false
+    const move = (ev: PointerEvent) => {
+      const k = Math.max(0.05, Math.min(20, Math.exp((ev.clientX - x0 - (ev.clientY - y0)) / 160)))
+      scaleTo(id, from.map((x) => Math.round(x * k * 100) / 100) as V3)
+    }
+    const up = () => {
+      if (controls) controls.enabled = true
+      commitOffsets()
+      window.removeEventListener('pointermove', move)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
+  }
+  const L = 1
   if (tool === 'rotate') {
+    // (as in Blender or Maya: a ring in each axis's colour round a faint ball, thin to look at and easy to catch)
     return (
       <group ref={root} position={at}>
+        <mesh renderOrder={1000} userData={{ editHandle: true, gizmo: false }}>
+          <sphereGeometry args={[L * 0.8, 24, 16]} />
+          <meshBasicMaterial color="#9aa7b4" transparent opacity={0.09} depthWrite={false} depthTest={false} />
+        </mesh>
         {AXES.map((a, i) => (
           <group key={a.name} rotation={a.rot} onPointerDown={turn(i as 0 | 1 | 2)}>
-            {/* (the ring, lying round its axis: a torus turned to stand in the plane at right angles to it; and a fatter, unseen one to take hold of) */}
             <mesh rotation-x={Math.PI / 2} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
-              <torusGeometry args={[L * 0.8, L * 0.018, 8, 64]} />
-              <meshBasicMaterial color={a.color} depthTest={false} />
+              <torusGeometry args={[L * 0.8, L * 0.012, 6, 96]} />
+              <meshBasicMaterial color={a.color} depthTest={false} toneMapped={false} />
             </mesh>
             <mesh rotation-x={Math.PI / 2} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
-              <torusGeometry args={[L * 0.8, L * 0.075, 6, 48]} />
-              <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} />
+              <torusGeometry args={[L * 0.8, L * 0.05, 4, 64]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} colorWrite={false} />
             </mesh>
             <sprite position={[L * 0.8, 0, 0]} scale={[L * 0.2, L * 0.2, 1]} renderOrder={1002} userData={{ editHandle: true, gizmo: false }}>
               <spriteMaterial map={letterTex(a.name, a.color)} depthTest={false} transparent />
@@ -225,6 +262,15 @@ export function AxisGizmo({ id, at, size = 0.5 }: { id: string; at: V3; size?: n
             </sprite>
           </group>
         ))}
+        {/* (and the cube in the middle, to scale all three together) */}
+        <mesh renderOrder={1002} onPointerDown={growAll} userData={{ editHandle: true, gizmo: true }}>
+          <boxGeometry args={[L * 0.17, L * 0.17, L * 0.17]} />
+          <meshBasicMaterial color="#e6e6e6" depthTest={false} />
+        </mesh>
+        <mesh renderOrder={1003} userData={{ editHandle: true, gizmo: true }} onPointerDown={growAll}>
+          <boxGeometry args={[L * 0.17, L * 0.17, L * 0.17]} />
+          <meshBasicMaterial color="#555" wireframe depthTest={false} />
+        </mesh>
       </group>
     )
   }

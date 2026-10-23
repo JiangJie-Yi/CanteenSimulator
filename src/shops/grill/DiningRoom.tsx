@@ -11,6 +11,7 @@ import { brushText, signTexture } from '@/scene/signFont'
 import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Movable } from './Movable'
+import { getEdit } from './edit'
 import { Steam } from '@/scene/Steam'
 
 /**
@@ -1369,7 +1370,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         ))}
         {shrine !== undefined && <group position={[0, 1.78, shrine]}><Kamidana /></group>}
         {/* the shelf: sake bottles, two crocks and the cat; or, by the door, the altar */}
-        {altar ? <Movable id="altar" label="供桌與神龕"><group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
+        {altar ? <Movable id="altar" label="供桌"><group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
           {[-0.35, 0.35].map((z) => (
             <group key={z} position={[ALTAR_D / 2, -0.03, z - 0.015]}>
@@ -1425,7 +1426,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
           <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group>
         ))}
         {/* (the altar's flag stirs, its incense smokes: not merged) */}
-        {altar && <Movable id="altar" label="供桌與神龕"><group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}
+        {altar && <group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group>}
       </group>
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {
@@ -1717,17 +1718,17 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   return (
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
-      <group position-x={ALTAR_D / 2} scale={SC} onClick={offer}
-        {...handOver}><StaticBatch><Kamidana shelf={false} part="shrine" /></StaticBatch></group>
+      <Movable id="shrine" label="神龕"><group position-x={ALTAR_D / 2} scale={SC} onClick={offer}
+        {...handOver}><StaticBatch><Kamidana shelf={false} part="shrine" /></StaticBatch></group></Movable>
       {/* (the vases and cups beside it are not part of what's pointed at: they don't light with it) */}
-      <group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana shelf={false} part="extras" /></StaticBatch></group>
+      <Movable id="shrinecups" label="神龕旁花瓶與杯"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana shelf={false} part="extras" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={GLOW} color="#ffe0a0" size={0.07} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </points>
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}
       <Sutra />
-      <group ref={flaskRef} position={[-0.06, 0, 0.3]}>{flask(0, 'f')}</group>
+      <Movable id="flask" label="御神酒壺"><group ref={flaskRef} position={[-0.06, 0, 0.3]}>{flask(0, 'f')}</group></Movable>
       {/* (the clear sake: a thin stream down into the cup, and the cups, each filling with it) */}
       <mesh ref={streamRef} visible={false}>
         <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} /><meshBasicMaterial color="#e6f4ff" transparent opacity={0.55} depthWrite={false} />
@@ -1738,13 +1739,13 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         </mesh>
       ))}
       {/* the oranges on their dish, a leaf on the top one */}
-      <group position={[-0.17, 0, 0]}>
+      <Movable id="oranges" label="橘子盤"><group position={[-0.17, 0, 0]}>
         <mesh geometry={ALTAR_GEO.dish} position-y={0.008}><meshToonMaterial color="#e8e2d2" /></mesh>
         {[[0, 0.035, -0.02], [-0.02, 0.035, 0.025], [0.025, 0.035, 0.02], [0, 0.085, 0.008]].map((pt, k) => (
           <mesh key={k} geometry={ALTAR_GEO.fruit} position={pt as [number, number, number]}><meshToonMaterial color="#f08a1a" /></mesh>
         ))}
         <mesh geometry={ALTAR_GEO.leaf} position={[0, 0.118, 0.008]} rotation-z={0.3}><meshToonMaterial color="#3a7a2a" /></mesh>
-      </group>
+      </group></Movable>
     </group>
   )
 }
@@ -1966,6 +1967,8 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
   })
   type From = { kind: 'slot'; r: number; k: number } | { kind: 'out'; i: number }
   const begin = (from: From, ev: { stopPropagation: () => void }) => {
+    // (edit mode is for the scene alone)
+    if (getEdit().on) return
     // (a drink in the fridge only with its door open: the glass is in the way otherwise)
     if (from.kind === 'slot' && !doorOpen()) return
     ev.stopPropagation()
