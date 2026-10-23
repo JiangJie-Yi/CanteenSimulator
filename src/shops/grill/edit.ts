@@ -183,55 +183,130 @@ let el: HTMLDivElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
+let rows = new Map<string, HTMLDivElement>()
 let built = ''
+
+/** the panel's look: after Blender's dark interface (grey panels, a darker header bar, blue for what's active, red/green/blue axis stripes) */
+const PANEL_CSS = `
+.be { position:fixed; left:12px; bottom:92px; z-index:9999; width:292px; max-height:70vh; display:flex; background:#303030; color:#d6d6d6;
+  font:11.5px/1.35 "Inter","Segoe UI","Noto Sans TC",sans-serif; border:1px solid #1a1a1a; border-radius:6px; box-shadow:0 6px 22px rgba(0,0,0,.55); overflow:hidden; user-select:none }
+.be * { box-sizing:border-box }
+.be-tools { display:flex; flex-direction:column; gap:3px; padding:6px 4px; background:#262626; border-right:1px solid #1a1a1a }
+.be-tool { width:30px; height:30px; display:grid; place-items:center; background:#3c3c3c; border:0; border-radius:4px; color:#d6d6d6; cursor:pointer; padding:0 }
+.be-tool svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round }
+.be-tool:hover { background:#4d4d4d }
+.be-tool.on { background:#4772b3; color:#fff }
+.be-main { flex:1; min-width:0; display:flex; flex-direction:column }
+.be-head { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#1f1f1f; font-weight:600; letter-spacing:.02em; color:#e6e6e6 }
+.be-head small { margin-left:auto; font-weight:400; color:#8a8a8a }
+.be-body { overflow:auto; flex:1; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a }
+.be-sec { border-top:1px solid #1d1d1d }
+.be-sec > .be-st { display:flex; align-items:center; gap:5px; padding:4px 8px; background:#3d3d3d; color:#e0e0e0; font-weight:600; cursor:pointer }
+.be-sec > .be-st::before { content:'▾'; color:#9a9a9a; font-size:10px }
+.be-sec.shut > .be-st::before { content:'▸' }
+.be-sec.shut > .be-sc { display:none }
+.be-sc { padding:6px 8px 8px; background:#2b2b2b }
+.be-find { width:100%; background:#1d1d1d; color:#d6d6d6; border:1px solid #3a3a3a; border-radius:4px; padding:3px 7px; font:inherit; margin-bottom:5px }
+.be-list { max-height:150px; overflow:auto; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a; background:#242424; border-radius:4px; padding:2px }
+.be-row { padding:2px 8px 2px 18px; border-radius:3px; cursor:pointer; white-space:nowrap; position:relative }
+.be-row::before { content:''; position:absolute; left:7px; top:50%; width:6px; height:6px; margin-top:-3px; border:1px solid #e0a030; border-radius:1px }
+.be-row:hover { background:#3a3a3a }
+.be-row.on { background:#4772b3; color:#fff }
+.be-row.on::before { border-color:#fff; background:#ffd37a }
+.be-name { padding:2px 0 6px; color:#f0f0f0; font-weight:600; min-height:20px }
+.be-name em { font-style:normal; font-weight:400; color:#8a8a8a }
+.be-grp { margin-bottom:7px }
+.be-gl { display:flex; align-items:center; color:#a8a8a8; margin-bottom:2px }
+.be-gl button { margin-left:auto; background:#3c3c3c; color:#cfcfcf; border:0; border-radius:3px; width:22px; height:17px; cursor:pointer; padding:0; font:12px sans-serif; line-height:1 }
+.be-gl button:hover { background:#4d4d4d }
+.be-f { display:flex; align-items:stretch; margin-bottom:1px; border-radius:4px; overflow:hidden; background:#545454 }
+.be-f:hover { background:#626262 }
+.be-f b { width:20px; display:grid; place-items:center; font:600 10.5px monospace; color:#fff }
+.be-f input { flex:1; min-width:0; background:transparent; color:#f0f0f0; border:0; outline:0; text-align:right; padding:3px 7px; font:12px monospace }
+.be-f input:focus { background:#1d1d1d }
+.be-f input:disabled { color:#777 }
+.be-f.x b { background:#a8433f } .be-f.y b { background:#5f8f2e } .be-f.z b { background:#3b6fb0 }
+.be-foot { display:flex; flex-wrap:wrap; gap:4px; padding:6px 8px; background:#262626; border-top:1px solid #1a1a1a }
+.be-foot button { background:#4a4a4a; color:#e6e6e6; border:0; border-radius:4px; padding:3px 9px; font:inherit; cursor:pointer }
+.be-foot button:hover { background:#5c5c5c }
+.be-foot .warn { background:#6b3030 } .be-foot .warn:hover { background:#853a3a }
+.be-foot .ok { background:#4772b3; color:#fff; font-weight:600; margin-left:auto } .be-foot .ok:hover { background:#5a87cc }
+`
+const TOOL_ICONS: Record<Tool, string> = {
+  move: '<svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>',
+  rotate: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>',
+  scale: '<svg viewBox="0 0 24 24"><rect x="4" y="10" width="10" height="10" rx="1"/><path d="M14 10l6-6M15 4h5v5"/></svg>',
+}
 function panel() {
   if (typeof document === 'undefined') return
-  if (!state.on) { el?.remove(); el = null; info = null; fields = []; toolButtons = []; built = ''; return }
-  // (rebuilt only when the list of pieces changes; the numbers line is just rewritten as one is dragged)
+  if (!state.on) { el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; return }
+  if (!document.getElementById('be-style')) {
+    const st = document.createElement('style')
+    st.id = 'be-style'
+    st.textContent = PANEL_CSS
+    document.head.appendChild(st)
+  }
+  // (rebuilt only when the list of pieces changes; the numbers are just rewritten as one is dragged)
   const sig = [...registry.keys()].join('|')
   if (!el || built !== sig) {
     el?.remove()
     el = document.createElement('div')
-    el.style.cssText = 'position:fixed;left:16px;bottom:96px;z-index:9999;max-width:300px;background:rgba(10,20,40,.93);color:#bfe3ff;font:13px/1.5 sans-serif;padding:10px 12px;border-radius:8px;border:1px solid #3fa9ff;max-height:60vh;overflow:auto'
-    const title = document.createElement('div')
-    title.textContent = '編輯模式（G 離開）：W 位移　R 旋轉　S 縮放；拖把手或在下面輸入；↺ 放回原狀'
-    title.style.cssText = 'font-weight:bold;margin-bottom:6px'
-    el.appendChild(title)
-    // (the tool: W moves, R turns, S scales; the buttons do the same as the keys, the one in use lit)
-    const tools = document.createElement('div')
-    tools.style.cssText = 'display:flex;gap:4px;margin-bottom:6px'
+    el.className = 'be'
+    const h = (tag: string, cls?: string, text?: string) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n }
+    // the tool bar down the left edge: Move (W), Rotate (R), Scale (S)
+    const bar = h('div', 'be-tools')
     toolButtons = (['move', 'rotate', 'scale'] as Tool[]).map((t) => {
-      const b = document.createElement('button')
-      b.textContent = TOOL_NAMES[t]
+      const b = h('button', 'be-tool') as HTMLButtonElement
+      b.innerHTML = TOOL_ICONS[t]
+      b.title = `${TOOL_NAMES[t]}（${t === 'move' ? 'W' : t === 'rotate' ? 'R' : 'S'}）`
       b.onclick = () => setTool(t)
-      b.style.cssText = 'border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif;border:1px solid #3fa9ff'
-      tools.appendChild(b)
+      bar.appendChild(b)
       return b
     })
-    el.appendChild(tools)
-    info = document.createElement('div')
-    info.style.cssText = 'font:12px monospace;color:#9fd0ff;min-height:18px;margin-bottom:6px;white-space:pre'
-    el.appendChild(info)
-    // (the numbers by hand, three rows for the selected piece: where it is (X, Y, Z), how far it's turned (degrees about X, Y, Z) and how large it is
-    // (a multiple on X, Y, Z); each typed or stepped with the arrow keys, following the piece as it's dragged, each with its own button to put it back)
+    const main = h('div', 'be-main')
+    const head = h('div', 'be-head', '編輯模式')
+    head.appendChild(h('small', '', 'G 離開　Ctrl+Z / Y'))
+    const body = h('div', 'be-body')
+    const section = (title: string) => {
+      const sec = h('div', 'be-sec'), st = h('div', 'be-st', title), sc = h('div', 'be-sc')
+      st.onclick = () => sec.classList.toggle('shut')
+      sec.append(st, sc)
+      body.appendChild(sec)
+      return sc
+    }
+    // Outliner: every piece that can be taken hold of, a search above, the chosen one lit
+    const out = section('場景物件')
+    const find = h('input', 'be-find') as HTMLInputElement
+    find.placeholder = '搜尋…'
+    const list = h('div', 'be-list')
+    rows = new Map()
+    for (const [id, r] of registry) {
+      const row = h('div', 'be-row', r.label)
+      row.title = '把鏡頭帶到它'
+      row.onclick = () => { registry.get(id)?.focus(); select(id) }
+      list.appendChild(row)
+      rows.set(id, row as HTMLDivElement)
+    }
+    find.oninput = () => { const q = find.value.trim().toLowerCase(); for (const [id, row] of rows) row.style.display = !q || (registry.get(id)?.label ?? id).toLowerCase().includes(q) ? '' : 'none' }
+    out.append(find, list)
+    // Transform: what's chosen, then Location, Rotation, Scale each as X / Y / Z stacked, a reset beside each
+    const tr = section('變換')
+    info = h('div', 'be-name') as HTMLDivElement
+    tr.appendChild(info)
     fields = []
-    const row3 = (label: string, step: string, get: (id: string) => V3, set: (id: string, v: V3) => void, rest: V3, tip: string) => {
-      const line = document.createElement('div')
-      line.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;align-items:center;flex-wrap:wrap'
-      const name = document.createElement('span')
-      name.textContent = label
-      name.title = tip
-      name.style.cssText = 'width:28px;font:12px sans-serif;color:#dff0ff'
-      line.appendChild(name)
-      const mine: HTMLInputElement[] = []
+    const group = (label: string, step: string, get: (id: string) => V3, set: (id: string, v: V3) => void, rest: V3) => {
+      const g = h('div', 'be-grp'), gl = h('div', 'be-gl', label)
+      const back = h('button', '', '↺') as HTMLButtonElement
+      back.title = `${label}：放回原狀`
+      back.onclick = () => { const id = state.selected; if (id) { beginChange(); set(id, [...rest] as V3); save() } }
+      gl.appendChild(back)
+      g.appendChild(gl)
       ;['X', 'Y', 'Z'].forEach((axis, k) => {
-        const wrap = document.createElement('label')
-        wrap.style.cssText = `display:flex;align-items:center;gap:2px;font:12px monospace;color:${['#ff7b72', '#6fe08a', '#6fb4ff'][k]}`
-        wrap.append(axis)
+        const f = h('label', `be-f ${axis.toLowerCase()}`)
+        f.appendChild(h('b', '', axis))
         const inp = document.createElement('input')
         inp.type = 'number'
         inp.step = step
-        inp.style.cssText = 'width:54px;background:#0b1a2e;color:#dff0ff;border:1px solid #3fa9ff;border-radius:4px;padding:2px 3px;font:12px monospace'
         inp.oninput = () => {
           const id = state.selected
           if (!id || inp.value === '' || Number.isNaN(Number(inp.value))) return
@@ -241,71 +316,39 @@ function panel() {
         }
         inp.onfocus = () => beginChange()
         inp.onchange = () => save()
-        wrap.appendChild(inp)
-        line.appendChild(wrap)
-        mine.push(inp)
+        f.appendChild(inp)
+        g.appendChild(f)
         fields.push(inp)
       })
-      const back = document.createElement('button')
-      back.textContent = '↺'
-      back.title = `${tip}：放回原狀`
-      back.style.cssText = 'background:#16345a;color:#dff0ff;border:1px solid #3fa9ff;border-radius:4px;padding:0 6px;cursor:pointer;font:13px sans-serif'
-      back.onclick = () => { const id = state.selected; if (id) { beginChange(); set(id, [...rest] as V3); save() } }
-      line.appendChild(back)
-      el!.appendChild(line)
-      return mine
+      tr.appendChild(g)
     }
-    row3('位置', '0.01', offsetOf, moveTo, [0, 0, 0], '位置')
-    row3('旋轉', '5', rotationOf, turnTo, [0, 0, 0], '旋轉（度）')
-    row3('縮放', '0.05', scaleOf, scaleTo, [1, 1, 1], '縮放（倍數）')
-    const row = document.createElement('div')
-    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px'
-    for (const [id, r] of registry) {
-      const b = document.createElement('button')
-      b.textContent = r.label
-      b.title = '把鏡頭帶到它'
-      b.style.cssText = 'background:#16345a;color:#dff0ff;border:1px solid #3fa9ff;border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif'
-      b.onclick = () => { registry.get(id)?.focus(); select(id) }
-      row.appendChild(b)
-    }
-    el.appendChild(row)
-    const foot = document.createElement('div')
-    foot.style.cssText = 'display:flex;gap:6px;margin-top:8px'
-    const reset = document.createElement('button')
-    reset.textContent = '還原全部位置'
-    reset.style.cssText = 'background:#5a1f16;color:#ffe3de;border:1px solid #c0392b;border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif'
-    reset.onclick = () => { if (window.confirm('把所有被移動的擺設放回原位？')) resetAll() }
-    const done = document.createElement('button')
-    done.textContent = '取消'
-    done.title = '放棄這次所有變更'
-    done.style.cssText = 'background:#3a3a3a;color:#eee;border:1px solid #888;border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif'
-    done.onclick = () => cancelEdit()
-    const ok = document.createElement('button')
-    ok.textContent = '確認'
-    ok.title = '保留這次所有變更'
-    ok.style.cssText = 'background:#1d6b34;color:#e6ffe9;border:1px solid #3fd16b;border-radius:4px;padding:2px 10px;cursor:pointer;font:bold 12px sans-serif'
-    ok.onclick = () => confirmEdit()
-    const mk = (text: string, title: string, fn: () => void) => {
-      const b = document.createElement('button')
-      b.textContent = text
+    group('位置 Location', '0.01', offsetOf, moveTo, [0, 0, 0])
+    group('旋轉 Rotation（度）', '5', rotationOf, turnTo, [0, 0, 0])
+    group('縮放 Scale', '0.05', scaleOf, scaleTo, [1, 1, 1])
+    const foot = h('div', 'be-foot')
+    const mk = (text: string, title: string, fn: () => void, cls = '') => {
+      const b = h('button', cls, text) as HTMLButtonElement
       b.title = title
-      b.style.cssText = 'background:#16345a;color:#dff0ff;border:1px solid #3fa9ff;border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif'
       b.onclick = fn
       return b
     }
-    foot.append(mk('復原', 'Ctrl+Z', undo), mk('重做', 'Ctrl+Y', redo), reset, done, ok)
-    el.appendChild(foot)
+    foot.append(
+      mk('復原', 'Ctrl+Z', undo), mk('重做', 'Ctrl+Y', redo),
+      mk('全部還原', '把所有被移動的擺設放回原位', () => { if (window.confirm('把所有被移動的擺設放回原位？')) resetAll() }, 'warn'),
+      mk('取消', '放棄這次所有變更', () => cancelEdit()),
+      mk('確認', '保留這次所有變更', () => confirmEdit(), 'ok'),
+    )
+    main.append(head, body, foot)
+    el.append(bar, main)
     document.body.appendChild(el)
     built = sig
   }
-  ;(['move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => {
-    const b = toolButtons[k]
-    if (b) { b.style.background = state.tool === t ? '#1f7ae0' : '#16345a'; b.style.color = state.tool === t ? '#fff' : '#dff0ff' }
-  })
+  ;(['move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => toolButtons[k]?.classList.toggle('on', state.tool === t))
+  for (const [id, row] of rows) row.classList.toggle('on', state.selected === id)
   if (info) {
     const id = state.selected
     const r = id ? registry.get(id) : null
-    info.textContent = id ? `${r?.label ?? id}\n位置 [${offsetOf(id).map((v) => v.toFixed(3)).join(', ')}]  旋轉 [${rotationOf(id).map((v) => v.toFixed(0)).join(', ')}]°  縮放 [${scaleOf(id).map((v) => v.toFixed(2)).join(', ')}]` : '（點方塊或下面的名字選一個）'
+    info.innerHTML = id ? `${r?.label ?? id}` : '<em>（點方塊或左邊的名字選一個）</em>'
     const values = id ? [...offsetOf(id), ...rotationOf(id), ...scaleOf(id)] : []
     fields.forEach((f, k) => {
       f.disabled = !id
