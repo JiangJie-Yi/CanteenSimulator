@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -53,7 +53,7 @@ export function AxisGizmo({ id, at, size = 0.5 }: { id: string; at: V3; size?: n
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
-  const { on, selected } = useEdit()
+  const { on, selected, tool } = useEdit()
   if (!on || selected !== id) return null
   const down = (axis: 0 | 1 | 2) => (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
     const r0 = root.current
@@ -96,7 +96,138 @@ export function AxisGizmo({ id, at, size = 0.5 }: { id: string; at: V3; size?: n
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up, { once: true })
   }
+  // ---- turning: a ring round each axis; dragging round it turns the piece about that axis (the angle the pointer sweeps round the ring, from the piece's middle)
+  const turn = (axis: 0 | 1 | 2) => (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
+    const r0 = root.current
+    const par = r0?.parent?.parent
+    if (!r0 || !par) return
+    e.stopPropagation()
+    par.updateWorldMatrix(true, false)
+    const origin = r0.getWorldPosition(new THREE.Vector3())
+    const normal = new THREE.Vector3(...AXES[axis].v).transformDirection(par.matrixWorld).normalize()
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, origin)
+    // (the pointer's place on the ring's plane, as an angle about the axis)
+    const u = Math.abs(normal.y) < 0.9 ? new THREE.Vector3(0, 1, 0).cross(normal).normalize() : new THREE.Vector3(1, 0, 0).cross(normal).normalize()
+    const v = normal.clone().cross(u)
+    const angleAt = (ev: PointerEvent) => {
+      const r = gl.domElement.getBoundingClientRect()
+      raycaster.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera)
+      const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
+      if (!hit) return null
+      const d = hit.sub(origin)
+      return Math.atan2(d.dot(v), d.dot(u))
+    }
+    let last = angleAt(e.nativeEvent)
+    if (last === null) return
+    beginChange()
+    turnTo(id, rotationOf(id))
+    if (controls) controls.enabled = false
+    const move = (ev: PointerEvent) => {
+      const a1 = angleAt(ev)
+      if (a1 === null || last === null) return
+      let d = a1 - last
+      if (d > Math.PI) d -= 2 * Math.PI
+      if (d < -Math.PI) d += 2 * Math.PI
+      const n = [...rotationOf(id)] as V3
+      n[axis] = Math.round((n[axis] + (d * 180) / Math.PI) * 10) / 10
+      turnTo(id, n)
+      last = a1
+    }
+    const up = () => {
+      if (controls) controls.enabled = true
+      commitOffsets()
+      window.removeEventListener('pointermove', move)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
+  }
+  // ---- scaling: a cube at the end of each axis; dragging it out along the axis makes the piece larger on that axis, in toward the middle smaller (Shift: all three together)
+  const grow = (axis: 0 | 1 | 2) => (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
+    const r0 = root.current
+    const par = r0?.parent?.parent
+    if (!r0 || !par) return
+    e.stopPropagation()
+    par.updateWorldMatrix(true, false)
+    const origin = r0.getWorldPosition(new THREE.Vector3())
+    const dir = new THREE.Vector3(...AXES[axis].v).transformDirection(par.matrixWorld).normalize()
+    const along = (ev: PointerEvent) => {
+      const r = gl.domElement.getBoundingClientRect()
+      raycaster.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera)
+      const vv = raycaster.ray.direction, w0 = origin.clone().sub(raycaster.ray.origin)
+      const b = dir.dot(vv), d = dir.dot(w0), ee = vv.dot(w0)
+      const den = 1 - b * b
+      return Math.abs(den) < 1e-4 ? null : (b * ee - d) / den
+    }
+    const start = along(e.nativeEvent)
+    if (start === null || Math.abs(start) < 1e-3) return
+    const from = [...scaleOf(id)] as V3
+    beginChange()
+    scaleTo(id, from)
+    if (controls) controls.enabled = false
+    const move = (ev: PointerEvent) => {
+      const s1 = along(ev)
+      if (s1 === null) return
+      // (the handle's distance from the middle against where it began: the same ratio is the new size)
+      const k = Math.max(0.05, Math.min(20, s1 / start))
+      const n = (ev.shiftKey ? [from[0] * k, from[1] * k, from[2] * k] : from.map((x, j) => (j === axis ? x * k : x))) as V3
+      scaleTo(id, n.map((x) => Math.round(x * 100) / 100) as V3)
+    }
+    const up = () => {
+      if (controls) controls.enabled = true
+      commitOffsets()
+      window.removeEventListener('pointermove', move)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
+  }
   const L = size
+  if (tool === 'rotate') {
+    return (
+      <group ref={root} position={at}>
+        {AXES.map((a, i) => (
+          <group key={a.name} rotation={a.rot} onPointerDown={turn(i as 0 | 1 | 2)}>
+            {/* (the ring, lying round its axis: a torus turned to stand in the plane at right angles to it; and a fatter, unseen one to take hold of) */}
+            <mesh rotation-x={Math.PI / 2} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
+              <torusGeometry args={[L * 0.8, L * 0.018, 8, 64]} />
+              <meshBasicMaterial color={a.color} depthTest={false} />
+            </mesh>
+            <mesh rotation-x={Math.PI / 2} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
+              <torusGeometry args={[L * 0.8, L * 0.075, 6, 48]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} />
+            </mesh>
+            <sprite position={[L * 0.8, 0, 0]} scale={[L * 0.2, L * 0.2, 1]} renderOrder={1002} userData={{ editHandle: true, gizmo: false }}>
+              <spriteMaterial map={letterTex(a.name, a.color)} depthTest={false} transparent />
+            </sprite>
+          </group>
+        ))}
+      </group>
+    )
+  }
+  if (tool === 'scale') {
+    return (
+      <group ref={root} position={at}>
+        {AXES.map((a, i) => (
+          <group key={a.name} rotation={a.rot} onPointerDown={grow(i as 0 | 1 | 2)}>
+            <mesh position-y={L * 0.4} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
+              <cylinderGeometry args={[L * 0.022, L * 0.022, L * 0.8, 8]} />
+              <meshBasicMaterial color={a.color} depthTest={false} />
+            </mesh>
+            <mesh position-y={L * 0.9} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
+              <boxGeometry args={[L * 0.14, L * 0.14, L * 0.14]} />
+              <meshBasicMaterial color={a.color} depthTest={false} />
+            </mesh>
+            <mesh position-y={L * 0.9} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
+              <boxGeometry args={[L * 0.3, L * 0.3, L * 0.3]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} />
+            </mesh>
+            <sprite position-y={L * 1.12} scale={[L * 0.2, L * 0.2, 1]} renderOrder={1002} userData={{ editHandle: true, gizmo: false }}>
+              <spriteMaterial map={letterTex(a.name, a.color)} depthTest={false} transparent />
+            </sprite>
+          </group>
+        ))}
+      </group>
+    )
+  }
   return (
     <group ref={root} position={at}>
       {AXES.map((a, i) => (

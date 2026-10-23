@@ -359,11 +359,11 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           <>
             <button type="button" className="strips-page strips-page-left" aria-label="‹"
               disabled={ends.atLeft} onClick={() => page(-1)}>
-              <svg viewBox="0 0 22 44" aria-hidden="true"><path d="M17 3C12 11 7 17 3 22c4 5 9 11 14 19-3-8-6-14-8-19 2-5 5-11 8-19z" fill="currentColor" /><circle cx="19" cy="22" r="2.2" fill="#d9503c" /></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
             </button>
             <button type="button" className="strips-page strips-page-right" aria-label="›"
               disabled={ends.atRight} onClick={() => page(1)}>
-              <svg viewBox="0 0 22 44" aria-hidden="true"><path d="M5 3c5 8 10 14 14 19-4 5-9 11-14 19 3-8 6-14 8-19-2-5-5-11-8-19z" fill="currentColor" /><circle cx="3" cy="22" r="2.2" fill="#d9503c" /></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
             </button>
           </>
         )}

@@ -13,8 +13,9 @@ const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }
 /** offsets: where a piece is moved to (from its base); rotations: degrees turned about X, Y, Z; scales: how much larger or smaller on X, Y, Z (1 = as it is) */
-type State = { on: boolean; locked: boolean; offsets: Record<string, V3>; rotations: Record<string, V3>; scales: Record<string, V3>; selected: string | null }
-let state: State = { on: false, locked: false, offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null }
+export type Tool = 'move' | 'rotate' | 'scale'
+type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string, V3>; rotations: Record<string, V3>; scales: Record<string, V3>; selected: string | null }
+let state: State = { on: false, locked: false, tool: 'move', offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null }
 const subs = new Set<() => void>()
 const emit = () => { state = { ...state }; subs.forEach((f) => f()); panel() }
 export const getEdit = () => state
@@ -93,6 +94,14 @@ export function resetOne(id: string) {
   save(); emit()
 }
 export const select = (id: string | null) => { state.selected = id; emit() }
+const TOOL_NAMES: Record<Tool, string> = { move: '位移 (W)', rotate: '旋轉 (R)', scale: '縮放 (S)' }
+/** which handles the selected piece shows: arrows to move it, rings to turn it, boxes to scale it */
+export function setTool(t: Tool) {
+  if (!state.on || state.tool === t) return
+  state.tool = t
+  emit()
+  toast(`${TOOL_NAMES[t]}`, 'edit')
+}
 
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
 const registry = new Map<string, { label: string; focus: () => void }>()
@@ -106,39 +115,78 @@ export function registerMovable(id: string, label: string, focus: () => void) {
 export function setLocked(locked: boolean) {
   if (state.locked === locked) return
   state.locked = locked
-  if (locked) state.on = false
+  // (the shop opening while editing: whatever wasn't confirmed is taken back)
+  if (locked && state.on) { revert(); state.on = false; past.length = 0; future = [] }
   emit()
+}
+/** how things stood when edit mode was entered: what 取消 goes back to */
+let baseline: Snap | null = null
+/** puts everything back as it stood on entering (sizes, places and turns), and keeps that */
+function revert() {
+  if (baseline) { put(JSON.parse(JSON.stringify(baseline))); save() }
+  baseline = null
+}
+function leave(text: string) {
+  state.on = false
+  state.selected = null
+  state.tool = 'move'
+  past.length = 0; future = []
+  emit()
+  toast(text, 'plain')
+}
+/** 確認: the changes stay */
+export function confirmEdit() {
+  if (!state.on) return
+  baseline = null
+  save()
+  leave('已確認，擺設的位置、大小與方向已儲存')
+}
+/** 取消: back to how it all was before editing began */
+export function cancelEdit() {
+  if (!state.on) return
+  const changed = baseline ? JSON.stringify(baseline) !== snap() : false
+  revert()
+  leave(changed ? '已取消，擺設回到編輯前的位置、大小與方向' : '離開編輯模式')
 }
 export function toggleEdit() {
   if (state.locked) { toast('營業中不能編輯，請先閉店'); return }
-  state.on = !state.on
+  if (state.on) { cancelEdit(); return }
+  baseline = take()
+  state.on = true
   state.selected = null
-  if (!state.on) { past.length = 0; future = [] }
+  state.tool = 'move'
   emit()
-  toast(state.on ? '進入編輯模式：拖曳擺設，再按 G 或「編」離開' : '離開編輯模式', state.on ? 'edit' : 'plain')
+  toast('進入編輯模式：拖曳擺設，完成後按「確認」；按 G 或「取消」會放棄變更', 'edit')
 }
 
 // ---- the panel (plain DOM: it sits over the canvas, and must show even when what's being moved is out of view)
 let toastEl: HTMLDivElement | null = null
+let toastTimer = 0
+/** one notice at a time: a new one takes the old one's place at once (never two over each other) */
 function toast(text: string, kind: 'warn' | 'edit' | 'plain' = 'warn') {
   if (typeof document === 'undefined') return
+  window.clearTimeout(toastTimer)
   toastEl?.remove()
+  // (any left over from before, however it came about)
+  document.querySelectorAll('[data-edit-toast]').forEach((n) => n.remove())
   const el = document.createElement('div')
+  el.dataset.editToast = '1'
   el.textContent = text
   const look = kind === 'warn' ? 'background:rgba(60,16,12,.94);color:#ffd9d2;border:1px solid #c0392b'
     : kind === 'edit' ? 'background:rgba(10,30,60,.94);color:#cfeaff;border:1px solid #3fa9ff' : 'background:rgba(30,30,30,.9);color:#eee;border:1px solid #888'
-  el.style.cssText = `position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:9999;${look};font:15px sans-serif;padding:9px 18px;border-radius:8px;pointer-events:none`
+  el.style.cssText = `position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:9999;${look};font:15px sans-serif;padding:9px 18px;border-radius:8px;pointer-events:none;white-space:nowrap`
   document.body.appendChild(el)
   toastEl = el
-  window.setTimeout(() => { if (toastEl === el) { el.remove(); toastEl = null } }, kind === 'edit' ? 3200 : 2200)
+  toastTimer = window.setTimeout(() => { if (toastEl === el) { el.remove(); toastEl = null } }, kind === 'edit' ? 2400 : 1800)
 }
 let el: HTMLDivElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
+let toolButtons: HTMLButtonElement[] = []
 let built = ''
 function panel() {
   if (typeof document === 'undefined') return
-  if (!state.on) { el?.remove(); el = null; info = null; fields = []; built = ''; return }
+  if (!state.on) { el?.remove(); el = null; info = null; fields = []; toolButtons = []; built = ''; return }
   // (rebuilt only when the list of pieces changes; the numbers line is just rewritten as one is dragged)
   const sig = [...registry.keys()].join('|')
   if (!el || built !== sig) {
@@ -146,9 +194,21 @@ function panel() {
     el = document.createElement('div')
     el.style.cssText = 'position:fixed;left:16px;bottom:96px;z-index:9999;max-width:300px;background:rgba(10,20,40,.93);color:#bfe3ff;font:13px/1.5 sans-serif;padding:10px 12px;border-radius:8px;border:1px solid #3fa9ff;max-height:60vh;overflow:auto'
     const title = document.createElement('div')
-    title.textContent = '編輯模式（G 離開）：拖藍色方塊或三軸箭頭；旋轉、縮放在下面輸入；↺ 放回原狀'
+    title.textContent = '編輯模式（G 離開）：W 位移　R 旋轉　S 縮放；拖把手或在下面輸入；↺ 放回原狀'
     title.style.cssText = 'font-weight:bold;margin-bottom:6px'
     el.appendChild(title)
+    // (the tool: W moves, R turns, S scales; the buttons do the same as the keys, the one in use lit)
+    const tools = document.createElement('div')
+    tools.style.cssText = 'display:flex;gap:4px;margin-bottom:6px'
+    toolButtons = (['move', 'rotate', 'scale'] as Tool[]).map((t) => {
+      const b = document.createElement('button')
+      b.textContent = TOOL_NAMES[t]
+      b.onclick = () => setTool(t)
+      b.style.cssText = 'border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif;border:1px solid #3fa9ff'
+      tools.appendChild(b)
+      return b
+    })
+    el.appendChild(tools)
     info = document.createElement('div')
     info.style.cssText = 'font:12px monospace;color:#9fd0ff;min-height:18px;margin-bottom:6px;white-space:pre'
     el.appendChild(info)
@@ -216,9 +276,15 @@ function panel() {
     reset.style.cssText = 'background:#5a1f16;color:#ffe3de;border:1px solid #c0392b;border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif'
     reset.onclick = () => { if (window.confirm('把所有被移動的擺設放回原位？')) resetAll() }
     const done = document.createElement('button')
-    done.textContent = '離開編輯'
-    done.style.cssText = 'background:#16345a;color:#dff0ff;border:1px solid #3fa9ff;border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif'
-    done.onclick = () => toggleEdit()
+    done.textContent = '取消'
+    done.title = '放棄這次所有變更'
+    done.style.cssText = 'background:#3a3a3a;color:#eee;border:1px solid #888;border-radius:4px;padding:2px 8px;cursor:pointer;font:12px sans-serif'
+    done.onclick = () => cancelEdit()
+    const ok = document.createElement('button')
+    ok.textContent = '確認'
+    ok.title = '保留這次所有變更'
+    ok.style.cssText = 'background:#1d6b34;color:#e6ffe9;border:1px solid #3fd16b;border-radius:4px;padding:2px 10px;cursor:pointer;font:bold 12px sans-serif'
+    ok.onclick = () => confirmEdit()
     const mk = (text: string, title: string, fn: () => void) => {
       const b = document.createElement('button')
       b.textContent = text
@@ -227,11 +293,15 @@ function panel() {
       b.onclick = fn
       return b
     }
-    foot.append(mk('復原', 'Ctrl+Z', undo), mk('重做', 'Ctrl+Y', redo), reset, done)
+    foot.append(mk('復原', 'Ctrl+Z', undo), mk('重做', 'Ctrl+Y', redo), reset, done, ok)
     el.appendChild(foot)
     document.body.appendChild(el)
     built = sig
   }
+  ;(['move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => {
+    const b = toolButtons[k]
+    if (b) { b.style.background = state.tool === t ? '#1f7ae0' : '#16345a'; b.style.color = state.tool === t ? '#fff' : '#dff0ff' }
+  })
   if (info) {
     const id = state.selected
     const r = id ? registry.get(id) : null
@@ -257,10 +327,15 @@ if (typeof window !== 'undefined') {
       if (k === 'y') { e.preventDefault(); redo(); return }
     }
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+    if (state.on && !typing) {
+      const k = e.key.toLowerCase()
+      const t: Tool | null = k === 'w' ? 'move' : k === 'r' ? 'rotate' : k === 's' ? 'scale' : null
+      if (t) { e.preventDefault(); setTool(t); return }
+    }
     if (e.key !== 'g' && e.key !== 'G') return
     const t = e.target
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return
     toggleEdit()
   })
-  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, toggle: toggleEdit, setLocked, undo, redo }
+  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, toggle: toggleEdit, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool }
 }
