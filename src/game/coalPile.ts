@@ -50,3 +50,28 @@ export function crossYaw(x: number, z: number, below: Lay[], rnd: () => number =
   }
   return best ? best.yaw + (rnd() < 0.5 ? 1 : -1) * (Math.PI / 2 + (rnd() - 0.5) * 0.6) : null
 }
+
+/** a pile of sticks is only so many layers deep (each laid across the last): past that they'd roll off, so none rests higher */
+export const MAX_LAYERS = 3
+
+/** whether a stick resting with its middle at height y over (x, z) stays within the pile's depth */
+export function withinPile(x: number, z: number, y: number, lift = 0) {
+  return y - surfaceY(x, z, lift) <= STICK_R + (MAX_LAYERS - 1) * 2 * STICK_R + 0.012
+}
+
+/**
+ * Where the next stick lands: a few places tried over the heap (within `reach` of the middle), the first that stays within the pile's depth
+ * taken, and null if the heap is already as deep as it will go anywhere it was tried (the caller lets the oldest burn out first).
+ */
+export function placeStick(below: Lay[], rnd: () => number = Math.random, reach = 0.34, tries = 28, lift = 0) {
+  for (let i = 0; i < tries; i++) {
+    const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * reach
+    const x = Math.cos(a) * r, z = Math.sin(a) * r
+    const yaw = crossYaw(x, z, below, rnd) ?? rnd() * Math.PI
+    const rest = restOf(x, z, yaw, below, lift)
+    // (judged at its highest end, not only its middle: a stick leaning on a pile must not reach past the depth either)
+    const hi = rest.y + Math.abs(rest.slope) * STICK_HALF
+    if (withinPile(x, z, rest.y, lift) && hi - surfaceY(x, z, lift) <= STICK_R + (MAX_LAYERS - 1) * 2 * STICK_R + 0.05) return { x, z, yaw, rest }
+  }
+  return null
+}

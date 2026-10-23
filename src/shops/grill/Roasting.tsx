@@ -5,7 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
-import { crossYaw, restOf, type Lay } from '@/game/coalPile'
+import { placeStick, restOf, type Lay } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -2125,28 +2125,39 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const start = from ?? { x: DECOR.crate.at[0], y: 0.34, z: DECOR.crate.at[1] }
     const lying: Lay[] = []
     for (const c of coals.current) if (c && !c.gone && !c.dying) lying.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope })
+    let placed = 0
     for (let k = 0; k < n; k++) {
-      // (each lands at its own place on the heap, one after another; one that lands by another lies across it)
-      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.3
-      const tx = Math.cos(a) * r, tz = Math.sin(a) * r
-      const yaw = crossYaw(tx, tz, lying) ?? Math.random() * Math.PI
-      const rest = restOf(tx, tz, yaw, lying, PIT_LIFT)
+      // (each lands at its own place on the heap, one after another; one that lands by another lies across it. A heap only goes so deep: when
+      // there's no room left, the oldest stick burns out to make some, and when even that leaves none, the rest stay in the crate)
+      let spot = placeStick(lying)
+      for (let tries = 0; !spot && tries < 3; tries++) {
+        const oldest = coals.current.find((c) => c && !c.gone && !c.dying)
+        if (!oldest) break
+        oldest.dying = true
+        const at = lying.findIndex((l) => l.x === oldest.tx && l.z === oldest.tz)
+        if (at >= 0) lying.splice(at, 1)
+        spot = placeStick(lying)
+      }
+      if (!spot) break
+      const { x: tx, z: tz, yaw, rest } = spot
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
       const mat = new THREE.MeshToonMaterial({ color: '#ffffff', map: binchotanMap(), emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
       coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
         tx, tz, yaw, slope: rest.slope, qEnd: new THREE.Quaternion(), geo: randomStick() }
+      placed++
     }
+    if (!placed) return
     restack()
     // (the flight to each one's place: about two thirds of a second)
-    for (let k = 0; k < n; k++) {
+    for (let k = 0; k < placed; k++) {
       const c = coals.current[base + k], T = 0.5 + Math.random() * 0.25
       c.vx = (c.tx - c.x) / T
       c.vz = (c.tz - c.z) / T
       c.vy = (c.top - c.y + 0.5 * 9.8 * T * T) / T
     }
-    setCoalIds((ids) => [...ids, ...Array.from({ length: n }, (_, k) => base + k)].slice(-28))
+    setCoalIds((ids) => [...ids, ...Array.from({ length: placed }, (_, k) => base + k)].slice(-28))
   }
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dropCoals: dropCoals, __fire: fire, __coals: coals })
   const [shards, setShards] = useState<{ id: number; x: number; y: number; z: number; s: number; r: number; t: number }[]>([])
