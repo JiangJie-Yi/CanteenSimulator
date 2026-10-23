@@ -630,6 +630,22 @@ const SHRINE_GRAIN = canvasTex(128, 128, (g) => {
   g.fillStyle = 'rgba(100,70,40,0.4)'
   g.beginPath(); g.ellipse(40, 44, 3, 7, 0, 0, Math.PI * 2); g.fill()
 }, true)
+/** the shrine's roof: cypress-bark thatch, courses laid along the slope, each a different tone with a dark seam, the grain fine along it */
+const SHRINE_ROOF = canvasTex(128, 128, (g) => {
+  const tones = ['#c9a06a', '#bd9460', '#d2aa74', '#c19863', '#cba36c', '#b88e5a', '#d4ad78', '#c49b66']
+  for (let r = 0; r < 8; r++) {
+    g.fillStyle = tones[r]
+    g.fillRect(0, r * 16, 128, 16)
+    g.strokeStyle = 'rgba(40,24,10,0.3)'
+    g.lineWidth = 1
+    for (let k = 0; k < 6; k++) {
+      const y = r * 16 + 2.5 + k * 2.4
+      g.beginPath(); g.moveTo(0, y); g.lineTo(128, y + ((k + r) % 3 - 1) * 0.8); g.stroke()
+    }
+    g.fillStyle = 'rgba(30,16,6,0.6)'
+    g.fillRect(0, r * 16 + 14.5, 128, 1.8)
+  }
+}, true)
 /** a box with the shop's ink line round it (its back faces, a hair bigger), for the small shrine */
 function InkBox({ size, color, position, ...rest }: { size: [number, number, number]; color: string; position?: [number, number, number]; 'position-y'?: number; 'rotation-x'?: number }) {
   const e = 0.0035
@@ -1077,85 +1093,16 @@ function Bouquet({ lean = 0 }: { lean?: number }) {
   )
 }
 
-/** the zushi's lacquer black and its gold */
-const ZUSHI_BLACK = '#17120f'
+/** the gold of the altar table's fittings */
 const ZUSHI_GOLD = '#d4a940'
-/** the doors' face: black lacquer, a gold frame with the seam down the middle, a plate at each hinge and a bracket in each corner of each leaf, a great diamond across the two with a ring pull, a smaller above and below */
-const ZUSHI_DOORS = canvasTex(512, 320, (g) => {
-  const lac = g.createLinearGradient(0, 0, 0, 320)
-  lac.addColorStop(0, '#221a15')
-  lac.addColorStop(0.5, '#14100d')
-  lac.addColorStop(1, '#1d1612')
-  g.fillStyle = lac
-  g.fillRect(0, 0, 512, 320)
-  // (a faint sheen across the lacquer)
-  const sh = g.createLinearGradient(0, 0, 512, 120)
-  sh.addColorStop(0, 'rgba(255,255,255,0)')
-  sh.addColorStop(0.35, 'rgba(255,240,220,0.07)')
-  sh.addColorStop(0.5, 'rgba(255,255,255,0)')
-  g.fillStyle = sh
-  g.fillRect(0, 0, 512, 320)
-  const GOLD = '#d4a940', GOLD2 = '#f0cf72', DARK = '#7a5a14'
-  // (the frame of each leaf: a gold line, a thinner inside it)
-  for (const x0 of [10, 262]) {
-    g.strokeStyle = GOLD; g.lineWidth = 5
-    g.strokeRect(x0, 10, 240, 300)
-    g.strokeStyle = DARK; g.lineWidth = 1.5
-    g.strokeRect(x0 + 9, 19, 222, 282)
-    // (the brackets in the four corners, each a gold triangle with a stud)
-    for (const [cx, cy, sx, sy] of [[x0, 10, 1, 1], [x0 + 240, 10, -1, 1], [x0, 310, 1, -1], [x0 + 240, 310, -1, -1]] as [number, number, number, number][]) {
-      g.fillStyle = GOLD
-      g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + sx * 46, cy); g.lineTo(cx, cy + sy * 46); g.closePath(); g.fill()
-      g.fillStyle = DARK
-      g.beginPath(); g.arc(cx + sx * 13, cy + sy * 13, 3.5, 0, Math.PI * 2); g.fill()
-    }
-  }
-  // (a plate at each hinge, on the outer edges, two to a leaf)
-  for (const x of [10, 492]) for (const y of [76, 244]) {
-    g.fillStyle = GOLD; g.fillRect(x - 10, y - 20, 20, 40)
-    g.fillStyle = DARK
-    for (const dy of [-12, 12]) { g.beginPath(); g.arc(x, y + dy, 2.6, 0, Math.PI * 2); g.fill() }
-  }
-  // (the great diamond across the two doors, gold, with an engraved diamond inside it and a floral boss in its middle)
-  const diamond = (cx: number, cy: number, w: number, h: number, fill: string) => {
-    g.fillStyle = fill
-    g.beginPath(); g.moveTo(cx, cy - h); g.lineTo(cx + w, cy); g.lineTo(cx, cy + h); g.lineTo(cx - w, cy); g.closePath(); g.fill()
-  }
-  diamond(256, 160, 92, 118, GOLD)
-  g.strokeStyle = DARK; g.lineWidth = 2.5
-  for (const k of [0.82, 0.62]) {
-    g.beginPath(); g.moveTo(256, 160 - 118 * k); g.lineTo(256 + 92 * k, 160); g.lineTo(256, 160 + 118 * k); g.lineTo(256 - 92 * k, 160); g.closePath(); g.stroke()
-  }
-  // (scrolling leaves engraved along the diamond's sides: little arcs)
-  g.strokeStyle = '#a98124'; g.lineWidth = 2
-  for (let i = 0; i < 6; i++) {
-    const t = (i + 0.5) / 6
-    for (const sx of [-1, 1]) { g.beginPath(); g.arc(256 + sx * 92 * (1 - t) * 0.72, 160 - 118 * t * 0.72 + 4, 9, 0, Math.PI * 2); g.stroke() }
-    for (const sx of [-1, 1]) { g.beginPath(); g.arc(256 + sx * 92 * (1 - t) * 0.72, 160 + 118 * t * 0.72 - 4, 9, 0, Math.PI * 2); g.stroke() }
-  }
-  diamond(256, 160, 30, 38, GOLD2)
-  g.fillStyle = '#17120f'
-  g.beginPath(); g.arc(256, 160, 13, 0, Math.PI * 2); g.fill()
-  g.strokeStyle = GOLD2; g.lineWidth = 4
-  g.beginPath(); g.arc(256, 160, 8, 0, Math.PI * 2); g.stroke()
-  // (a smaller diamond above and below, on the seam)
-  diamond(256, 40, 26, 30, GOLD)
-  diamond(256, 280, 26, 30, GOLD)
-  g.fillStyle = DARK
-  for (const y of [40, 280]) { g.beginPath(); g.arc(256, y, 4, 0, Math.PI * 2); g.fill() }
-  // (the seam)
-  g.fillStyle = '#050403'
-  g.fillRect(254, 10, 4, 300)
-}, true)
-/** the zushi's roof: a four-sided cap whose faces curve (steep near the finial, flattening out and turning up at the eaves), as a lathe of four sides */
-const ZUSHI_ROOF = (() => {
-  const pts = [[0.0, 0.074], [0.012, 0.072], [0.03, 0.062], [0.055, 0.042], [0.085, 0.02], [0.112, 0.006], [0.13, 0.004], [0.139, 0.012], [0.141, 0.016]]
-  return new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 4)
-})()
-/** a gold band along the roof's eaves: the lip's last stretch, thickened */
-const ZUSHI_ROOF_EDGE = (() => {
-  const pts = [[0.13, 0.0], [0.139, 0.008], [0.1425, 0.0175], [0.1405, 0.0175], [0.1375, 0.0095], [0.128, 0.0025]]
-  return new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 4)
+
+/** the roof's two gable ends, closed with a plank triangle each, so there's no open hollow under the eaves */
+const GABLE_GEO = (() => {
+  const sh = new THREE.Shape()
+  sh.moveTo(-0.135, 0.185); sh.lineTo(0.135, 0.185); sh.lineTo(0, 0.268); sh.closePath()
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.012, bevelEnabled: false })
+  g.translate(0, 0, -0.006)
+  return g
 })()
 
 /**
@@ -1166,43 +1113,74 @@ const ZUSHI_ROOF_EDGE = (() => {
  */
 /** `part`: the shrine itself, the things set about it (vases, cups), or all of it (on the wall) */
 function Kamidana({ shelf = true, part = 'all' }: { shelf?: boolean; part?: 'all' | 'shrine' | 'extras' }) {
+  const HIN = '#e2c89a'
+  const GRAIN = '#cfae78'
+  const RED = '#d8b884'
+  const GOLD = '#d9b13e'
   return (
     <group>
       {part !== 'extras' && shelf && <InkBox size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />}
       {part !== 'extras' && shelf && [-0.3, 0.3].map((z) => <InkBox key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
-      {/* the shrine, a lacquered zushi (厨子) after the old portable ones: a black body with gold fittings on its double doors (a great
-          diamond across them, a smaller above and below, a plate at each hinge and each corner), a curved four-sided roof with upturned eaves
-          edged in gold and a jewel (宝珠) for a finial, and a stepped base of two tiers edged in gold on short feet */}
+      {/* the shrine: a stepped base, the railing, body, doors and roof */}
       {part !== 'extras' && <group position={[-0.14, 0.015, 0]}>
+        <InkBox size={[0.18, 0.02, 0.36]} color={GRAIN} position-y={0.01} />
+        <InkBox size={[0.16, 0.02, 0.33]} color={HIN} position-y={0.03} />
+        {/* (three steps down the front) */}
+        {[0, 1, 2].map((k) => <InkBox key={k} size={[0.02, 0.008, 0.07 - k * 0.006]} color="#d8bc88" position={[-0.09 - k * 0.018, 0.016 - k * 0.004, 0]} />)}
+        {/* (the railing round the platform, a post at each corner) */}
         {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
-          <InkBox key={`${sx}${sz}`} size={[0.03, 0.012, 0.045]} color={ZUSHI_GOLD} position={[sx * 0.072, 0.006, sz * 0.15]} />
+          <group key={`${sx}${sz}`}>
+            <InkBox size={[0.014, 0.05, 0.014]} color={RED} position={[sx * 0.073, 0.065, sz * 0.153]} />
+            <InkBox size={[0.011, 0.012, 0.011]} color={GOLD} position={[sx * 0.073, 0.096, sz * 0.153]} />
+          </group>
         )))}
-        {/* (the lower tier, black, a gold band at its top edge; the upper, narrower, a gold molding along it) */}
-        <InkBox size={[0.18, 0.024, 0.36]} color={ZUSHI_BLACK} position-y={0.024} />
-        <mesh position-y={0.0365}><boxGeometry args={[0.184, 0.004, 0.364]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
-        <InkBox size={[0.15, 0.02, 0.31]} color={ZUSHI_BLACK} position-y={0.048} />
-        <mesh position-y={0.0585}><boxGeometry args={[0.154, 0.004, 0.314]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
-        {/* (a row of small gold studs round the lower tier's face, as the carved apron on the old ones) */}
-        {Array.from({ length: 11 }, (_, k) => (
-          <mesh key={k} position={[-0.0905, 0.024, (k - 5) * 0.03]}><sphereGeometry args={[0.0055, 8, 6]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
+        <InkBox size={[0.008, 0.01, 0.31]} color={RED} position={[-0.073, 0.082, 0]} />
+        {[-1, 1].map((sz) => <InkBox key={sz} size={[0.15, 0.01, 0.008]} color={RED} position={[0, 0.082, sz * 0.153]} />)}
+        <InkBox size={[0.12, 0.16, 0.24]} color={HIN} position-y={0.12} />
+        {/* (the doors: two leaves with a dark seam between, a gold fitting on each, a lintel over them) */}
+        {[-1, 1].map((sd) => (
+          <group key={sd}>
+            <mesh position={[-0.0612, 0.12, sd * 0.0275]} rotation-y={-Math.PI / 2}>
+              <planeGeometry args={[0.05, 0.125]} /><meshToonMaterial color="#c8a868" />
+            </mesh>
+            <mesh position={[-0.0616, 0.12, sd * 0.0275]} rotation-y={-Math.PI / 2}>
+              <planeGeometry args={[0.036, 0.11]} /><meshToonMaterial color="#d6b878" />
+            </mesh>
+            <mesh position={[-0.0625, 0.12, sd * 0.008]} rotation-y={-Math.PI / 2}>
+              <circleGeometry args={[0.005, 10]} /><meshBasicMaterial color="#d4b04a" />
+            </mesh>
+          </group>
         ))}
-        {/* (the body: a black box, its front the painted double doors) */}
-        <InkBox size={[0.12, 0.15, 0.24]} color={ZUSHI_BLACK} position-y={0.135} />
-        <mesh position={[-0.0612, 0.135, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.24, 0.15]} /><meshToonMaterial color="#ffffff" map={ZUSHI_DOORS} /></mesh>
-        {/* (the roof's gold fascia under the eaves, and the roof: four curved faces, longer along the shrine, edged in gold) */}
-        <mesh position-y={0.214}><boxGeometry args={[0.15, 0.006, 0.288]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
-        {Array.from({ length: 9 }, (_, k) => (
-          <mesh key={k} position={[-0.077, 0.208, (k - 4) * 0.034]}><sphereGeometry args={[0.0065, 8, 6]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
+        <mesh position={[-0.0618, 0.12, 0]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[0.004, 0.125]} /><meshBasicMaterial color={INK} />
+        </mesh>
+        {/* (the gold crest in the middle of the doors, and a gold fitting in each corner of each leaf) */}
+        <mesh position={[-0.0632, 0.12, 0]} rotation-y={-Math.PI / 2}><circleGeometry args={[0.014, 14]} /><meshBasicMaterial color={GOLD} /></mesh>
+        <mesh position={[-0.0636, 0.12, 0]} rotation-y={-Math.PI / 2}><ringGeometry args={[0.007, 0.01, 12]} /><meshBasicMaterial color="#8a6a1a" /></mesh>
+        {[-1, 1].flatMap((sd) => [-1, 1].map((v) => (
+          <mesh key={`${sd}${v}`} position={[-0.0625, 0.12 + v * 0.05, sd * 0.045]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.014, 0.014]} /><meshBasicMaterial color={GOLD} /></mesh>
+        )))}
+        <InkBox size={[0.014, 0.012, 0.15]} color="#c9a56c" position={[-0.064, 0.19, 0]} />
+        {/* (the roof: two planks of cypress bark sloping down from the ridge, a modest eave all round, each edged with a thin darker
+            board; the ridge capped in gold, the crossed finials (千木) rising at both ends and the short logs (鰹木) laid across it) */}
+        {[-1, 1].map((sd) => (
+          <group key={sd} position={[sd * 0.066, 0.225, 0]} rotation-z={-sd * 0.5}>
+            <mesh><boxGeometry args={[0.15, 0.012, 0.3]} /><meshToonMaterial color="#ffffff" map={SHRINE_ROOF} /></mesh>
+            <mesh scale={[1.03, 1.5, 1.015]}><boxGeometry args={[0.15, 0.012, 0.3]} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+            <mesh position={[sd * -0.001, -0.0085, 0]}><boxGeometry args={[0.152, 0.005, 0.304]} /><meshToonMaterial color="#4a3622" /></mesh>
+            {[-1, 1].map((e) => <mesh key={e} position={[0, 0.0045, e * 0.1485]}><boxGeometry args={[0.15, 0.006, 0.006]} /><meshToonMaterial color="#4a3622" /></mesh>)}
+          </group>
         ))}
-        <group position-y={0.218} scale={[1, 1, 2]} rotation-y={Math.PI / 4}>
-          <mesh geometry={ZUSHI_ROOF} castShadow><meshToonMaterial color={ZUSHI_BLACK} side={THREE.DoubleSide} /></mesh>
-          <mesh geometry={ZUSHI_ROOF} scale={1.04}><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
-          <mesh geometry={ZUSHI_ROOF_EDGE}><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} side={THREE.DoubleSide} /></mesh>
-        </group>
-        {/* (the jewel on top: a gold ball on a neck over a little disc) */}
-        <mesh position-y={0.298}><cylinderGeometry args={[0.014, 0.018, 0.006, 14]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
-        <mesh position-y={0.31}><sphereGeometry args={[0.014, 14, 10]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
-        <mesh position-y={0.327}><coneGeometry args={[0.006, 0.014, 8]} /><meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} /></mesh>
+        <InkBox size={[0.026, 0.014, 0.31]} color="#d4b04a" position-y={0.272} />
+        {[-1, 1].map((sz) => <mesh key={sz} geometry={GABLE_GEO} position={[0, 0, sz * 0.148]} rotation-y={Math.PI / 2 * 0}><meshToonMaterial color="#e2c89a" map={SHRINE_GRAIN} /></mesh>)}
+        {[-1, 1].flatMap((sz) => [-1, 1].map((lean) => (
+          <InkBox key={`${sz}${lean}`} size={[0.008, 0.012, 0.085]} color="#d8b878" position={[0, 0.3, sz * 0.158]} rotation-x={lean * 0.62} />
+        )))}
+        {[-0.11, -0.055, 0, 0.055, 0.11].map((z) => (
+          <mesh key={z} position={[0, 0.285, z]} rotation-z={Math.PI / 2}>
+            <cylinderGeometry args={[0.008, 0.008, 0.075, 10]} /><meshToonMaterial color="#d4b04a" />
+          </mesh>
+        ))}
       </group>}
       {/* the bouquets in their vases, leaning in a little, and the cups */}
       {part !== 'shrine' && [-1, 1].map((sd) => (
