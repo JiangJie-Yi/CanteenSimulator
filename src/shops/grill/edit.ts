@@ -59,10 +59,11 @@ function toast(text: string) {
 }
 let el: HTMLDivElement | null = null
 let info: HTMLDivElement | null = null
+let fields: HTMLInputElement[] = []
 let built = ''
 function panel() {
   if (typeof document === 'undefined') return
-  if (!state.on) { el?.remove(); el = null; info = null; built = ''; return }
+  if (!state.on) { el?.remove(); el = null; info = null; fields = []; built = ''; return }
   // (rebuilt only when the list of pieces changes; the numbers line is just rewritten as one is dragged)
   const sig = [...registry.keys()].join('|')
   if (!el || built !== sig) {
@@ -76,6 +77,30 @@ function panel() {
     info = document.createElement('div')
     info.style.cssText = 'font:12px monospace;color:#9fd0ff;min-height:18px;margin-bottom:6px;white-space:pre'
     el.appendChild(info)
+    // (the numbers by hand: X, Y, Z of the selected piece, typed or stepped with the arrow keys; they follow it as it's dragged)
+    const xyz = document.createElement('div')
+    xyz.style.cssText = 'display:flex;gap:6px;margin-bottom:8px;align-items:center'
+    fields = ['X', 'Y', 'Z'].map((name, k) => {
+      const wrap = document.createElement('label')
+      wrap.style.cssText = 'display:flex;align-items:center;gap:3px;font:12px monospace;color:#9fd0ff'
+      wrap.append(name)
+      const inp = document.createElement('input')
+      inp.type = 'number'
+      inp.step = '0.01'
+      inp.style.cssText = 'width:64px;background:#0b1a2e;color:#dff0ff;border:1px solid #3fa9ff;border-radius:4px;padding:2px 4px;font:12px monospace'
+      inp.oninput = () => {
+        const id = state.selected
+        if (!id || inp.value === '' || Number.isNaN(Number(inp.value))) return
+        const v = [...offsetOf(id)] as V3
+        v[k] = Number(inp.value)
+        moveTo(id, v)
+      }
+      inp.onchange = () => save()
+      wrap.appendChild(inp)
+      xyz.appendChild(wrap)
+      return inp
+    })
+    el.appendChild(xyz)
     const row = document.createElement('div')
     row.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px'
     for (const [id, r] of registry) {
@@ -105,7 +130,12 @@ function panel() {
   if (info) {
     const id = state.selected
     const r = id ? registry.get(id) : null
-    info.textContent = id ? `${r?.label ?? id}\noffset [${offsetOf(id).map((v) => v.toFixed(3)).join(', ')}]` : '（點方塊或上面的名字選一個）'
+    info.textContent = id ? `${r?.label ?? id}\noffset [${offsetOf(id).map((v) => v.toFixed(3)).join(', ')}]` : '（點方塊或下面的名字選一個）'
+    fields.forEach((f, k) => {
+      f.disabled = !id
+      if (id && document.activeElement !== f) f.value = offsetOf(id)[k].toFixed(3)
+      if (!id) f.value = ''
+    })
   }
 }
 
