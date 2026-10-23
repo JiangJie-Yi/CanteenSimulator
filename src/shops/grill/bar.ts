@@ -77,14 +77,18 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 export type Gate = { end: 1 | -1; w: number; leaf: number
   /** the whole gate (post, doorway and door) slid this far along its counter toward the counter's end, its width as it was: the base and top then run on
    * that much further, up to the post */
-  shift?: number }
-export const BAR_GATES: Gate[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.56, leaf: 0.55, shift: 0.39 }]
+  shift?: number
+  /** the whole gate (post, door and the way through it that the servers walk) moved in the world, by this much in x, y and z (world units: the bar is drawn twice its own size) */
+  nudge?: [number, number, number] }
+export const BAR_GATES: Gate[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w: 0.56, leaf: 0.55, nudge: [5, 0, 0] }]
+/** a gate's nudge in the bar's own units (the world's, over the bar's scale) */
+export const nudgeOf = (g: Gate): [number, number, number] => { const n = g.nudge ?? [0, 0, 0]; return [n[0] / GRILL_SCALE, n[1] / GRILL_SCALE, n[2] / GRILL_SCALE] }
 /** how far the counter's base and top stop short of its end for a gate: its width, less however far the gate's been slid toward the end */
 export const gateCut = (g: { w: number; shift?: number }) => g.w - (g.shift ?? 0)
 /** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
 export function gateOf(c: Counter, g: Gate) {
   const hinge = g.end * ((c.length + 0.2) / 2 - gateCut(g))
-  return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, 0.08) }
+  return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, 0.08).add(new THREE.Vector3(...nudgeOf(g))) }
 }
 /**
  * The little dish of sauce at a seat (the bar's frame, on its top): to the customer's left of their place, or their
