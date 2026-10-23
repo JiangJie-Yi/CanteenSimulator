@@ -24,9 +24,11 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
+import { focusCamera } from './Movable'
+import { commitOffsets, getEdit, moveTo, offsetOf, registerMovable, useEdit } from './edit'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, GATE_EDIT, gateCut, gateOf, nudgeNow, nudgeOf, saveGateNudge, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
 
 export { BAR_AT, BAR_TOP }
 
@@ -751,44 +753,15 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
   const leaf = useRef<THREE.Group>(null)
   const open = useRef(0)
   const body = useRef<THREE.Group>(null)
-  const badge = useRef<HTMLDivElement | null>(null)
   const { camera, gl, raycaster } = useThree()
-  const controls = useThree((s) => s.controls) as unknown as { enabled: boolean } | null
-  const [editing, setEditing] = useState(false)
+  const controls = useThree((s) => s.controls) as unknown as { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
+  const { on: editing } = useEdit()
   const drag = useRef<{ at: THREE.Vector3; y: number; lift: boolean } | null>(null)
   const idx = BAR_GATES.indexOf(gate)
-  // (G switches the gate to be moved by hand: drag it over the floor, hold Shift to lift it; the numbers are shown on it, kept in the browser)
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if ((e.key === 'g' || e.key === 'G') && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
-        // (every gate hears the key: the first to hear it flips the switch, the rest just follow it)
-        const ev = e as KeyboardEvent & { gateFlipped?: boolean }
-        if (!ev.gateFlipped) { ev.gateFlipped = true; GATE_EDIT.on = !GATE_EDIT.on }
-        setEditing(GATE_EDIT.on)
-      }
-    }
-    window.addEventListener('keydown', key)
-    return () => window.removeEventListener('keydown', key)
-  }, [])
-  const showNumbers = () => {}
-  // (on screen, not on the gate, which may be out of view: a box at the corner with the numbers, and the camera brought up to the gate)
-  useEffect(() => {
-    if (!editing) return
-    const el = document.createElement('div')
-    el.style.cssText = `position:fixed;left:16px;bottom:${96 + idx * 110}px;z-index:9999;background:rgba(10,20,40,0.92);color:#bfe3ff;font:13px/1.5 monospace;padding:8px 12px;border-radius:8px;border:1px solid #3fa9ff;pointer-events:none;white-space:pre`
-    document.body.appendChild(el)
-    badge.current = el
-    const cam = controls as unknown as { target?: THREE.Vector3; update?: () => void } | null
-    if (idx === 1 && body.current && cam?.target) {
-      const w = body.current.getWorldPosition(new THREE.Vector3())
-      const off = camera.position.clone().sub(cam.target)
-      off.setLength(Math.min(off.length(), 6))
-      cam.target.set(w.x, w.y + 0.6, w.z)
-      camera.position.copy(cam.target.clone().add(off))
-      cam.update?.()
-    }
-    return () => { el.remove(); badge.current = null }
-  }, [editing])
+  // (in edit mode, key G with the shop shut: the swing door by itself is moved by hand, the post and doorway staying; on the list of what can be moved)
+  useEffect(() => registerMovable(`gate${idx}`, idx === 1 ? '水槽旁閘門門板' : '櫃檯尾閘門門板', () => {
+    if (leaf.current) focusCamera(camera, controls, leaf.current.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.5, 0)))
+  }), [idx, camera, controls])
   const hit = (e: PointerEvent, y: number, lift: boolean) => {
     const r = gl.domElement.getBoundingClientRect()
     raycaster.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera)
@@ -801,7 +774,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     return raycaster.ray.intersectPlane(plane, new THREE.Vector3())
   }
   const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
-    if (!GATE_EDIT.on || !body.current) return
+    if (!getEdit().on || !body.current) return
     e.stopPropagation()
     const wp = body.current.getWorldPosition(new THREE.Vector3())
     const lift = e.nativeEvent.shiftKey
@@ -818,16 +791,15 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
       const par = body.current!.parent!
       const a = par.worldToLocal(d.at.clone()), b = par.worldToLocal(q.clone())
       const dl = b.sub(a)
-      const n = [...nudgeNow(gate)] as [number, number, number]
-      n[0] += dl.x * GRILL_SCALE; n[1] += dl.y * GRILL_SCALE; n[2] += dl.z * GRILL_SCALE
-      GATE_EDIT.nudge[idx] = n
+      const n = offsetOf(`gate${idx}`)
+      // (the swing door's own offset, in the bar's units, its post and doorway staying where they are)
+      moveTo(`gate${idx}`, [n[0] + dl.x, n[1] + dl.y, n[2] + dl.z])
       d.at.copy(q)
-      showNumbers()
     }
     const up = () => {
       drag.current = null
       if (controls) controls.enabled = true
-      saveGateNudge()
+      commitOffsets()
       window.removeEventListener('pointermove', move)
     }
     window.addEventListener('pointermove', move)
@@ -840,12 +812,8 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     if (leaf.current) leaf.current.rotation.y = -end * (Math.PI / 2) * k * k * (3 - 2 * k)
     // (the whole gate where it's been put, the moment it's moved)
     if (body.current) {
-      const n = nudgeOf(gate)
+      const n = offsetOf(`gate${idx}`)
       body.current.position.set(n[0], n[1], n[2])
-      if (badge.current) {
-        const nn = nudgeNow(gate), w = (leaf.current ?? body.current).getWorldPosition(new THREE.Vector3())
-        badge.current.textContent = `調整模式 (G 離開)   閘門 ${idx}${idx === 1 ? '（水槽旁）' : ''}\n只移動門板（門柱不動），拖藍色方塊，Shift 抬高\nnudge [${nn.map((v) => v.toFixed(3)).join(', ')}]\nworld (${w.x.toFixed(2)}, ${w.y.toFixed(2)}, ${w.z.toFixed(2)})`
-      }
     }
   })
   const H = BAR_TOP - 0.02
@@ -853,7 +821,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     <group position={c.at} rotation-y={yaw}>
       <group position={[hinge, 0, 0.08]}>
         {/* the swing door by itself: its own thing, apart from the post and the doorway, which stay where they are; it's this that's moved by hand */}
-        <group ref={body} position={nudgeOf(gate)} onPointerDown={down}>
+        <group ref={body} position={offsetOf(`gate${idx}`)} onPointerDown={down}>
         {editing && (
           <mesh position={[end * G / 2, 0.55, 0]}><boxGeometry args={[G + 0.1, 1.1, 0.3]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
         )}

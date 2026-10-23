@@ -11,6 +11,7 @@ import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
+import { Movable } from './Movable'
 import { Steam } from '@/scene/Steam'
 
 /**
@@ -1369,14 +1370,14 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         ))}
         {shrine !== undefined && <group position={[0, 1.78, shrine]}><Kamidana /></group>}
         {/* the shelf: sake bottles, two crocks and the cat; or, by the door, the altar */}
-        {altar ? <group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
+        {altar ? <Movable id="altar" label="供桌與神龕"><group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
           {[-0.35, 0.35].map((z) => (
             <group key={z} position={[ALTAR_D / 2, -0.03, z - 0.015]}>
               <mesh geometry={SHELF_BRACKET}><meshToonMaterial color="#1c130d" /></mesh>
               <mesh geometry={SHELF_BRACKET} scale={[1.035, 1.035, 1.4]} position-z={-0.004}><meshBasicMaterial color="#c9a040" side={THREE.BackSide} /></mesh>
             </group>
-          ))}</group>
+          ))}</group></Movable>
           : shelf && <>
         <group position={[-0.1, 1.08, shelfZ]}>
           <Box size={[0.2, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
@@ -1425,7 +1426,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
           <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group>
         ))}
         {/* (the altar's flag stirs, its incense smokes: not merged) */}
-        {altar && <group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group>}
+        {altar && <Movable id="altar" label="供桌與神龕"><group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}
       </group>
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {
@@ -2505,17 +2506,28 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
     return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32)
   }, [fr, c1])
   return (
-    <StaticBatch key={lang}>
-      <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
-        <group rotation-y={Math.PI / 2}><SakeStack /></group>
-      </group>
+    // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
+    <>
+      <Movable id="sake" label="酒樽"><StaticBatch key={lang}>
+        <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
+          <group rotation-y={Math.PI / 2}><SakeStack /></group>
+        </group>
+      </StaticBatch></Movable>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
-      <group position={at(3.55, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
-      <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
-      <group position={cornerAt} rotation-y={0.4}><PottedBamboo /></group>
+      <Movable id="willow" label="柳樹"><StaticBatch key={lang}>
+        <group position={at(3.55, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
+      </StaticBatch></Movable>
+      <Movable id="staffmat" label="員工專用墊"><StaticBatch key={lang}>
+        <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
+      </StaticBatch></Movable>
+      <Movable id="bamboo" label="竹盆栽"><StaticBatch key={lang}>
+        <group position={cornerAt} rotation-y={0.4}><PottedBamboo /></group>
+      </StaticBatch></Movable>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
-      {fr && <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><BottleCrates /></group>}
-    </StaticBatch>
+      {fr && <Movable id="crates" label="酒箱"><StaticBatch key={lang}>
+        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><BottleCrates /></group>
+      </StaticBatch></Movable>}
+    </>
   )
 }

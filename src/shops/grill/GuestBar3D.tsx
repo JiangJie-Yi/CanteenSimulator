@@ -20,6 +20,8 @@ import { mapleTexture } from '@/scene/mapleGrain'
 import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
+import { Movable } from './Movable'
+import { setLocked } from './edit'
 import { changeOf, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
@@ -202,7 +204,8 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   })
   return (
     <group name="look-door" position={at} rotation-y={yaw}>
-      <StaticBatch>
+      {/* (in edit mode the cats' stand, the shoe cupboard and the like can each be moved: each its own batch inside its own Movable) */}
+      <Movable id="doorcats" label="門口招財貓台"><StaticBatch>
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
       <group position={[0.4, 0, -0.75]}>
         {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower) */}
@@ -213,12 +216,16 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           <group key={i} position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
         ))}
       </group>
+      </StaticBatch></Movable>
+      <StaticBatch>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       {/* the coir mat lying on the genkan's stone, just inside */}
       <mesh position={[0, -GENKAN.depth + 0.009, -0.18]} rotation-x={-Math.PI / 2} scale={[-1, 1, 1]}>
         <planeGeometry args={[0.34, 0.34]} />
         <meshToonMaterial color="#ffffff" map={DOORMAT} />
       </mesh>
+      </StaticBatch>
+      <Movable id="shoecab" label="鞋櫃"><StaticBatch>
       {/* the shoe cupboard (下駄箱) against the wall in the genkan: dark wood, its doors in a grid of small panels, a
           vase of a sprig on top */}
       <group position={[0.34, -GENKAN.depth, -0.24]}>
@@ -240,7 +247,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           <mesh key={`b${k}`} position={[Math.cos(k * 1.7) * 0.05, 1.1 + (k % 2) * 0.03, 0.05 + Math.sin(k * 1.7) * 0.05]}><sphereGeometry args={[0.014, 6, 5]} /><meshToonMaterial color="#f2b0c0" /></mesh>
         ))}
       </group>
-      </StaticBatch>
+      </StaticBatch></Movable>
       <group position-x={DX}>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (no posts: the rod hangs by a cord at each end from the beam above, and the lantern by its own) */}
@@ -1353,6 +1360,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
   }
   const shownRef = useRef<Shown[]>([])
+  // (the shop open: its furnishings can't be moved about by hand; shut, they can: edit mode, key G)
+  useEffect(() => { setLocked(open) }, [open])
   /** each shown guest's name tag, faded with them as they go out of the door */
   const labels = useRef(new Map<number, HTMLElement>())
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
