@@ -89,33 +89,8 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
   const peeked = dish.bases.find((b) => b.id === peek)
   const included = new Set(Object.keys(peeked?.includes ?? {}))
 
-  // when the tags don't fit across (phones, short windows), page through them with ‹ › instead of a scrollbar.
-  // The row is right-to-left, so in Chrome/Firefox scrollLeft runs from 0 (rightmost) to negative.
+  // the row is right-to-left, so in Chrome/Firefox scrollLeft runs from 0 (rightmost) to negative.
   const row = useRef<HTMLDivElement>(null)
-  const [ends, setEnds] = useState({ overflow: false, atLeft: true, atRight: true })
-  useEffect(() => {
-    const el = row.current
-    if (!el) return
-    const update = () => {
-      // only rows that actually scroll sideways (the narrow layouts) get paging buttons
-      const scrolls = getComputedStyle(el).overflowX !== 'visible'
-      const max = el.scrollWidth - el.clientWidth
-      const pos = Math.abs(el.scrollLeft)
-      setEnds({ overflow: scrolls && max > 2, atRight: pos < 2, atLeft: pos > max - 2 })
-    }
-    update()
-    el.addEventListener('scroll', update, { passive: true })
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => {
-      el.removeEventListener('scroll', update)
-      ro.disconnect()
-    }
-  }, [])
-  const page = (dir: -1 | 1) => {
-    const el = row.current
-    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
-  }
 
   // hold the left button and drag to slide the tags sideways; a drag isn't a click, so it doesn't order anything
   const grab = useRef<{ x: number; left: number; moved: boolean } | null>(null)
@@ -334,8 +309,10 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       const tall = (r: number) => (h - (r - 1) * gy) / (r * 15.5)
       while (best.rows > 1 && tall(best.rows) < best.font - 0.01) best = { ...best, rows: best.rows - 1 }
       if (tall(best.rows) < best.font) best = { ...best, font: tall(best.rows) }
+      // (one row only: what doesn't fit across slides sideways, by drag or wheel)
+      best = { ...best, rows: 1, font: Math.min(16, tall(1)) }
       const next = best.font >= 10 ? { font: Math.floor(best.font * 10) / 10, rows: best.rows }
-        : { font: Math.max(10, Math.min(16, (h - gy) / 31)), rows: 2 }
+        : { font: Math.max(10, Math.min(16, h / 15.5)), rows: 1 }
       if (research) foodsFont = next
       setFit((cur) => (cur && cur.font === next.font && cur.rows === next.rows ? cur : next))
     }
@@ -354,20 +331,8 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
       <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>
 
-      <div className={`strips-frame${ends.overflow ? ' is-paged' : ''}`}>
-        {ends.overflow && (
-          <>
-            <button type="button" className="strips-page strips-page-left" aria-label="‹"
-              disabled={ends.atLeft} onClick={() => page(-1)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-            </button>
-            <button type="button" className="strips-page strips-page-right" aria-label="›"
-              disabled={ends.atRight} onClick={() => page(1)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-            </button>
-          </>
-        )}
-        <div className="strips" ref={row} onPointerDown={onGrab} onPointerMove={onDrag} onPointerUp={onLetGo}
+      <div className="strips-frame">
+        <div className="strips" ref={row} onWheel={(e) => { if (row.current && Math.abs(e.deltaY) > Math.abs(e.deltaX)) row.current.scrollLeft -= e.deltaY }} onPointerDown={onGrab} onPointerMove={onDrag} onPointerUp={onLetGo}
           onPointerLeave={onLetGo}
           onClickCapture={(e) => {
             // the click that ends a drag doesn't order the tag it was released on
