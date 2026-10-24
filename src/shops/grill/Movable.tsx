@@ -2,7 +2,7 @@
 // offset (in its parent's own units), and while editing a pale blue box shows round it to be taken hold of and dragged over the floor
 // (Shift lifts it). Wrap it round a StaticBatch, not inside one: the batch's baked meshes then move with the group.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
@@ -119,7 +119,7 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
     e.stopPropagation()
     par.updateWorldMatrix(true, false)
     const origin = r0.getWorldPosition(new THREE.Vector3())
-    const normal = new THREE.Vector3(...AXES[axis].v).transformDirection(par.matrixWorld).normalize()
+    const normal = new THREE.Vector3(...AXES[axis].v).applyAxisAngle(new THREE.Vector3(0, 1, 0), theta).transformDirection(par.matrixWorld).normalize()
     const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, origin)
     // (the pointer's place on the ring's plane, as an angle about the axis)
     const u = Math.abs(normal.y) < 0.9 ? new THREE.Vector3(0, 1, 0).cross(normal).normalize() : new THREE.Vector3(1, 0, 0).cross(normal).normalize()
@@ -164,7 +164,7 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
     e.stopPropagation()
     par.updateWorldMatrix(true, false)
     const origin = r0.getWorldPosition(new THREE.Vector3())
-    const dir = new THREE.Vector3(...AXES[axis].v).transformDirection(par.matrixWorld).normalize()
+    const dir = new THREE.Vector3(...AXES[axis].v).applyAxisAngle(new THREE.Vector3(0, 1, 0), theta).transformDirection(par.matrixWorld).normalize()
     const along = (ev: PointerEvent) => {
       const r = gl.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera)
@@ -219,7 +219,7 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
   if (tool === 'rotate') {
     // (as in Blender or Maya: a ring in each axis's colour round a faint ball, thin to look at and easy to catch)
     return (
-      <group ref={root} position={at}>
+      <group ref={root} position={at} rotation-y={theta}>
         <mesh renderOrder={1000} userData={{ editHandle: true, gizmo: false }}>
           <sphereGeometry args={[L * 0.8, 24, 16]} />
           <meshBasicMaterial color="#9aa7b4" transparent opacity={0.09} depthWrite={false} depthTest={false} />
@@ -244,7 +244,7 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
   }
   if (tool === 'scale') {
     return (
-      <group ref={root} position={at}>
+      <group ref={root} position={at} rotation-y={theta}>
         {AXES.map((a, i) => (
           <group key={a.name} rotation={a.rot} onPointerDown={grow(i as 0 | 1 | 2)}>
             <mesh position-y={L * 0.4} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
@@ -312,6 +312,8 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
   // (the piece's middle, in the frame of its own group as it stands untouched: what it turns and scales about; measured once it has been drawn)
   const [mid, setMid] = useState<V3>([0, 0, 0])
   const inner = useRef<THREE.Group>(null)
+  // (the turn from the room's frame into the parent's, about the vertical; found once the piece is in place)
+  const [theta, setTheta] = useState(0)
   void offsets; void rotations; void scales // (read so it redraws as it's moved, turned or scaled)
   const o = positionOf(id)
   const rot = rotationOf(id), sc = scaleOf(id)
@@ -360,6 +362,16 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
     const c = [cx * co + cz * si, (yMin + yMax) / 2, -cx * si + cz * co] as V3
     return { c, s: [Math.max(best.x1 - best.x0, 0.2) + 0.06, Math.max(yMax - yMin, 0.2) + 0.06, Math.max(best.z1 - best.z0, 0.2) + 0.06] as V3, yaw: best.a, theta }
   }
+
+  const frame = () => {
+    const par = g.current?.parent
+    if (!par) return
+    par.updateWorldMatrix(true, false)
+    const t = Math.atan2(ALONG.x, ALONG.z) - new THREE.Euler().setFromQuaternion(par.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
+    setFrame(id, t)
+    setTheta(t)
+  }
+  useLayoutEffect(frame, [])
 
   // (on the list of what can be moved, with a way to bring the camera to the middle of it)
   useEffect(() => registerMovable(id, label, () => {
@@ -426,8 +438,14 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
   return (
     <group ref={g} position={o}>
       {/* (turned and scaled about the piece's own middle, not the group's origin, which may be far from it) */}
-      <group position={mid} rotation={[rot[0] * DEG, rot[1] * DEG, rot[2] * DEG]} scale={sc}>
-        <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}>{children}</group>
+      {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
+          scaled there, and stood back) */}
+      <group position={mid} rotation-y={theta}>
+        <group rotation={[rot[0] * DEG, rot[1] * DEG, rot[2] * DEG]} scale={sc}>
+          <group rotation-y={-theta}>
+            <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}>{children}</group>
+          </group>
+        </group>
       </group>
       {on && box && (
         <mesh userData={{ editHandle: true }} position={box.c} rotation-y={box.yaw} renderOrder={999} onPointerDown={down}>
@@ -435,7 +453,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
           <meshBasicMaterial color={selected === id ? '#8fd0ff' : '#3fa9ff'} transparent opacity={selected === id ? 0.2 : 0.26} depthWrite={false} depthTest={false} />
         </mesh>
       )}
-      {on && box && <AxisGizmo id={id} theta={box.theta} at={box.c} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
+      {on && box && <AxisGizmo id={id} theta={theta} at={box.c} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
     </group>
   )
 }
