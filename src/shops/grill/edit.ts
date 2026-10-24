@@ -103,6 +103,25 @@ export function setTool(t: Tool) {
   toast(`${TOOL_NAMES[t]}`, 'edit')
 }
 
+/** the axis the + and - keys scale along (null: all three together); set with the X, Y, Z keys or by clicking an axis's letter in the Scale rows */
+let scaleAxis: 0 | 1 | 2 | null = null
+export const SCALE_STEP = 1.05
+/** the size after one + (dir 1) or - (dir -1) step along an axis (null: all three): a twentieth bigger or smaller each, never past 0.05 or 20 times */
+export const stepScale = (v: V3, dir: 1 | -1, axis: 0 | 1 | 2 | null): V3 =>
+  v.map((x, k) => (axis === null || axis === k ? Math.round(Math.max(0.05, Math.min(20, dir > 0 ? x * SCALE_STEP : x / SCALE_STEP)) * 100) / 100 : x)) as V3
+export function nudgeScale(dir: 1 | -1, axis: 0 | 1 | 2 | null = scaleAxis) {
+  const id = state.selected
+  if (!state.on || !id) return
+  beginChange()
+  scaleTo(id, stepScale(scaleOf(id), dir, axis))
+  save()
+}
+export function setScaleAxis(a: 0 | 1 | 2 | null) {
+  scaleAxis = scaleAxis === a ? null : a
+  panel()
+  toast(scaleAxis === null ? '+ / − 縮放：X Y Z 三軸一起' : `+ / − 縮放：只動 ${'XYZ'[scaleAxis]} 軸`, 'edit')
+}
+
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
 const registry = new Map<string, { label: string; focus: () => void }>()
 export function registerMovable(id: string, label: string, focus: () => void) {
@@ -233,6 +252,9 @@ const PANEL_CSS = `
 .be-f:hover { background:#626262 }
 .be-f b { width:20px; display:grid; place-items:center; font:600 10.5px monospace; color:#fff }
 .be-f input { flex:1; min-width:0; background:transparent; color:#f0f0f0; border:0; outline:0; text-align:right; padding:3px 7px; font:12px monospace }
+.be-st1 { width:22px; background:#3c3c3c; color:#e6e6e6; border:0; border-left:1px solid #2a2a2a; cursor:pointer; font:600 13px sans-serif; padding:0; line-height:1 }
+.be-st1:hover { background:#5a5a5a }
+.be-f.axon b { outline:2px solid #ffd37a; outline-offset:-2px }
 .be-f input:focus { background:#1d1d1d }
 .be-f input:disabled { color:#777 }
 .be-f.x b { background:#a8433f } .be-f.y b { background:#5f8f2e } .be-f.z b { background:#3b6fb0 }
@@ -304,7 +326,7 @@ function panel() {
     info = h('div', 'be-name') as HTMLDivElement
     tr.appendChild(info)
     fields = []
-    const group = (label: string, step: string, get: (id: string) => V3, set: (id: string, v: V3) => void, rest: V3) => {
+    const group = (label: string, step: string, get: (id: string) => V3, set: (id: string, v: V3) => void, rest: V3, stepper = false) => {
       const g = h('div', 'be-grp'), gl = h('div', 'be-gl', label)
       const back = h('button', '', '↺') as HTMLButtonElement
       back.title = `${label}：放回原狀`
@@ -327,6 +349,16 @@ function panel() {
         inp.onfocus = () => beginChange()
         inp.onchange = () => save()
         f.appendChild(inp)
+        if (stepper) {
+          // (the scale rows: − and + beside each axis, a twentieth smaller or bigger along it; its letter picks the axis for the − and + keys)
+          const minus = h('button', 'be-st1', '−') as HTMLButtonElement, plus = h('button', 'be-st1', '+') as HTMLButtonElement
+          minus.title = `${axis} 軸縮小（- 鍵）`; plus.title = `${axis} 軸放大（+ 鍵）`
+          minus.onclick = () => nudgeScale(-1, k as 0 | 1 | 2); plus.onclick = () => nudgeScale(1, k as 0 | 1 | 2)
+          f.append(minus, plus)
+          f.firstElementChild!.addEventListener('click', () => setScaleAxis(k as 0 | 1 | 2))
+          ;(f.firstElementChild as HTMLElement).style.cursor = 'pointer'
+          ;(f.firstElementChild as HTMLElement).title = `選 ${axis} 軸：之後 + / - 鍵只縮放這一軸`
+        }
         g.appendChild(f)
         fields.push(inp)
       })
@@ -334,7 +366,7 @@ function panel() {
     }
     group('位置 Location', '0.01', (id) => toRoom(id, offsetOf(id)), (id, v) => moveTo(id, fromRoom(id, v)), [0, 0, 0])
     group('旋轉 Rotation（度）', '5', rotationOf, turnTo, [0, 0, 0])
-    group('縮放 Scale', '0.05', scaleOf, scaleTo, [1, 1, 1])
+    group('縮放 Scale（+ / − 鍵）', '0.05', scaleOf, scaleTo, [1, 1, 1], true)
     const foot = h('div', 'be-foot')
     const mk = (text: string, title: string, fn: () => void, cls = '') => {
       const b = h('button', cls, text) as HTMLButtonElement
@@ -355,6 +387,7 @@ function panel() {
   }
   ;(['move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => toolButtons[k]?.classList.toggle('on', state.tool === t))
   for (const [id, row] of rows) row.classList.toggle('on', state.selected === id)
+  el?.querySelectorAll('.be-grp:last-of-type .be-f').forEach((f, k) => f.classList.toggle('axon', scaleAxis === k))
   if (info) {
     const id = state.selected
     const r = id ? registry.get(id) : null
@@ -382,6 +415,10 @@ if (typeof window !== 'undefined') {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
     if (state.on && !typing) {
       const k = e.key.toLowerCase()
+      // (X, Y, Z choose the axis the + and - keys scale along (again, all three together); + and - scale the chosen piece)
+      if (k === 'x' || k === 'y' || k === 'z') { e.preventDefault(); setScaleAxis(({ x: 0, y: 1, z: 2 } as const)[k]); return }
+      if (k === '+' || k === '=') { e.preventDefault(); nudgeScale(1); return }
+      if (k === '-' || k === '_') { e.preventDefault(); nudgeScale(-1); return }
       const t: Tool | null = k === 'w' ? 'move' : k === 'r' ? 'rotate' : k === 's' ? 'scale' : null
       if (t) { e.preventDefault(); setTool(t); return }
     }

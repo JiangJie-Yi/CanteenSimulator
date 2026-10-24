@@ -1087,6 +1087,18 @@ export default function App() {
   const [theme, toggleTheme] = useTheme()
   // the menu can be folded away to give the food the whole screen
   const [menuFolded, setMenuFolded] = useState(false)
+  // (in edit mode the menu is folded away first, to leave the room in view; it comes back as it was when editing ends)
+  const foldedBeforeEdit = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (editOn) {
+      foldedBeforeEdit.current = menuFolded
+      setMenuFolded(true)
+    } else if (foldedBeforeEdit.current !== null) {
+      setMenuFolded(foldedBeforeEdit.current)
+      foldedBeforeEdit.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editOn])
   // bumped to send the camera back to its home view
   const [resetView, setResetView] = useState(0)
   const [overview, setOverview] = useState(false)

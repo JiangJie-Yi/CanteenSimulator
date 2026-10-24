@@ -2411,7 +2411,7 @@ function Inked({ geometry, color, map, grow = 1.04, side, ...rest }: { geometry:
   )
 }
 const BARRELS_URL = import.meta.env.BASE_URL + 'models/kazaridaru_sake_barrels_lowpoly_remesh.glb'
-/** a stack of decorative sake barrels (飾り樽), the downloaded model (its floor left out), toon-shaded and inked, stood on the floor, ~0.9 tall */
+/** a stack of decorative sake barrels (飾り樽) with a stack of plates beside it (the model's second part), the downloaded model (its floor left out), toon-shaded and inked, stood on the floor, ~0.9 tall */
 function SakeStack({ part }: { part: number }) {
   const gltf = useGLTF(BARRELS_URL) as unknown as { scene: THREE.Group }
   const stack = useMemo(() => {
@@ -2602,7 +2602,7 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
     // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
     <>
       {[0, 1].map((part) => (
-        <Movable key={part} id={part ? 'sake2' : 'sake'} label={part ? '酒樽（小）' : '酒樽（大）'}><StaticBatch key={lang}>
+        <Movable key={part} id={part ? 'sake2' : 'sake'} label={part ? '餐盤堆' : '酒樽'}><StaticBatch key={lang}>
           <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
             <group rotation-y={Math.PI / 2}><SakeStack part={part} /></group>
           </group>
