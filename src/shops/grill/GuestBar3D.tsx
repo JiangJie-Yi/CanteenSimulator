@@ -92,70 +92,112 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
   const [a, b] = [...mark]
   brushText(g, a ?? '', 64, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
   brushText(g, b ?? '', 320, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
-  // the middle panel (all of it inside the middle third, so the seams between the three cloths never cut it): after the owner's reference, a round crest, a
-  // fish leaping out of the sea, its tail still in the waves; the fish and the ring in the white dye, the waves as layered bands of it, parted by lines of
-  // the cloth's own indigo (no fire)
+  // the middle panel (all of it inside the middle third, so the seams between the three cloths never cut it): a family crest (家紋) in the way of the
+  // old shop curtains: a ring, and in it one fish leaping from the sea, drawn the way a signwriter would: flat cream shapes on the indigo, one weight of line,
+  // the fish a single sweep of an arc (its body built on a spine, widest behind the head and drawn down to the tail), the sea beneath in three scalloped bands
   {
-    const CREAM = '#f6f0e0', INDIGO = '#25396a'
-    const CX = 192, CY = 102, R = 55
+    const CREAM = '#f6f0e0', INDIGO = '#1d2f5c'
+    const CX = 192, CY = 102, R = 56
+    // (the ring: a heavy one and a fine one inside it)
     g.strokeStyle = CREAM
-    g.lineWidth = 5
+    g.lineWidth = 5.5
     g.beginPath(); g.arc(CX, CY, R, 0, Math.PI * 2); g.stroke()
-    // a fine inner ring, the crest's double border
-    g.lineWidth = 1.2
-    g.beginPath(); g.arc(CX, CY, R - 8, 0, Math.PI * 2); g.stroke()
-    g.lineWidth = 5
-    g.save()
-    g.beginPath(); g.arc(CX, CY, R - 4, 0, Math.PI * 2); g.clip()
-    // the sea: three bands, each a wave's long swell, the crest at the left lifted like a breaking one; cream, parted by indigo lines
-    const swell = (x: number, base: number, amp: number, ph: number) => base + Math.sin((x - 140) / 11 + ph) * amp + Math.sin((x - 140) / 5.5 + ph * 2) * amp * 0.25
-    for (const [base, amp, ph, fill] of [[124, 5, 0.2, true], [135, 4.5, 1.1, true], [147, 4, 2.0, true]] as [number, number, number, boolean][]) {
-      g.fillStyle = CREAM
-      g.beginPath(); g.moveTo(130, 170)
-      for (let x = 130; x <= 254; x += 2) g.lineTo(x, swell(x, base, amp, ph))
-      g.lineTo(254, 170); g.closePath()
-      if (fill) g.fill()
-      g.strokeStyle = INDIGO; g.lineWidth = 2.6
-      g.beginPath(); for (let x = 130; x <= 254; x += 2) { const y = swell(x, base, amp, ph); if (x === 130) g.moveTo(x, y); else g.lineTo(x, y) } g.stroke()
-    }
-    // the fish: head up at the left, the back in a high arch, the belly drawn in, the tail coming down into the water at the right
-    g.fillStyle = CREAM
-    g.beginPath()
-    g.moveTo(152, 80)
-    g.bezierCurveTo(166, 62, 198, 58, 218, 82)
-    g.bezierCurveTo(226, 92, 230, 104, 230, 116)
-    g.lineTo(220, 120)
-    g.bezierCurveTo(216, 108, 206, 98, 192, 96)
-    g.bezierCurveTo(176, 94, 160, 96, 152, 80)
-    g.closePath(); g.fill()
-    // the tail flukes, thrown up and out beyond the ring's water
-    g.beginPath()
-    g.moveTo(222, 114)
-    g.bezierCurveTo(229, 105, 237, 99, 241, 100)
-    g.bezierCurveTo(239, 108, 235, 113, 232, 117)
-    g.bezierCurveTo(238, 119, 241, 124, 241, 129)
-    g.bezierCurveTo(234, 131, 227, 128, 224, 124)
-    g.closePath(); g.fill()
-    // the dorsal fin, a swept-back fan on the arch, and the pectoral fin tucked under
-    g.beginPath(); g.moveTo(182, 70); g.bezierCurveTo(188, 54, 198, 47, 207, 48); g.bezierCurveTo(205, 58, 208, 68, 216, 80); g.lineTo(190, 76); g.closePath(); g.fill()
-    g.beginPath(); g.moveTo(176, 90); g.bezierCurveTo(176, 100, 184, 108, 194, 108); g.bezierCurveTo(190, 100, 190, 96, 192, 92); g.closePath(); g.fill()
-    // the scales, rows of small indigo arcs over the body behind the gill
-    g.strokeStyle = INDIGO; g.lineWidth = 1
-    for (const [y, x0, x1] of [[86, 184, 214], [94, 188, 220], [102, 198, 224], [110, 208, 222]] as number[][]) {
-      for (let x = x0 + ((y / 8) % 2) * 3; x < x1; x += 6) { g.beginPath(); g.arc(x, y - 2, 3, 0.1 * Math.PI, 0.9 * Math.PI); g.stroke() }
-    }
-    // the details, cut away in the indigo: the eye, the gill, the mouth, the fins' ribs
-    g.fillStyle = INDIGO
-    g.beginPath(); g.arc(165, 78, 3.2, 0, Math.PI * 2); g.fill()
-    g.strokeStyle = INDIGO; g.lineWidth = 1.8; g.lineCap = 'round'
-    g.beginPath(); g.moveTo(176, 68); g.quadraticCurveTo(182, 80, 176, 92); g.stroke()
     g.lineWidth = 1.4
-    g.beginPath(); g.moveTo(153, 83); g.lineTo(160, 87); g.stroke()
-    g.lineWidth = 1.2
-    for (const [x0, y0, x1, y1] of [[190, 66, 195, 54], [196, 66, 202, 54], [202, 68, 206, 58], [180, 94, 186, 104], [184, 94, 191, 104], [228, 112, 238, 104], [228, 116, 238, 113], [226, 120, 237, 126]] as number[][]) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke() }
-    // (spray where the tail meets the water: a few drops)
+    g.beginPath(); g.arc(CX, CY, R - 7.5, 0, Math.PI * 2); g.stroke()
+    g.save()
+    g.beginPath(); g.arc(CX, CY, R - 3, 0, Math.PI * 2); g.clip()
+    // (the fish's spine: a cubic from the snout, up over the crest of the leap and down to the tail's root)
+    const P: [number, number][] = [[150, 100], [156, 44], [224, 46], [230, 112]]
+    const at = (t: number): [number, number] => {
+      const u = 1 - t
+      return [u * u * u * P[0][0] + 3 * u * u * t * P[1][0] + 3 * u * t * t * P[2][0] + t * t * t * P[3][0], u * u * u * P[0][1] + 3 * u * u * t * P[1][1] + 3 * u * t * t * P[2][1] + t * t * t * P[3][1]]
+    }
+    const dir = (t: number): [number, number] => {
+      const e = 0.001, a1 = at(Math.max(0, t - e)), b1 = at(Math.min(1, t + e)), dx = b1[0] - a1[0], dy = b1[1] - a1[1], l = Math.hypot(dx, dy) || 1
+      return [dx / l, dy / l]
+    }
+    // (half its thickness along it: a round snout, the full belly behind the gills, then drawn fine to the tail's root)
+    const half = (t: number) => 0.98 * (t < 0.1 ? 11.5 * Math.sqrt(t / 0.1) : t < 0.42 ? 11.5 + 3 * Math.sin(((t - 0.1) / 0.32) * Math.PI / 2) : 14.5 - 11.5 * Math.sin(((t - 0.42) / 0.58) * Math.PI / 2) ** 1.4)
+    const side = (t: number, k: number): [number, number] => {
+      const [x, y] = at(t), [dx, dy] = dir(t), h = half(t) * k
+      return [x - dy * h, y + dx * h]
+    }
+    const N = 40
+    const body = () => {
+      g.beginPath()
+      for (let i = 0; i <= N; i++) { const [x, y] = side(i / N, 1); if (i) g.lineTo(x, y); else g.moveTo(x, y) }
+      for (let i = N; i >= 0; i--) { const [x, y] = side(i / N, -1); g.lineTo(x, y) }
+      g.closePath()
+    }
     g.fillStyle = CREAM
-    for (const [x, y, r] of [[235, 93, 1.6], [241, 88, 1.2], [229, 90, 1.1], [243, 104, 1.2]] as number[][]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill() }
+    // (the dorsal fin, swept back along the arch, and the tail: a forked fin laid along the spine's last direction)
+    {
+      const o = (t: number, k: number, along = 0): [number, number] => { const [x, y] = side(t, 1); const [dx, dy] = dir(t); return [x - dy * k + dx * along, y + dx * k + dy * along] }
+      g.beginPath()
+      const f0 = o(0.36, -0.5), f1 = o(0.5, 15, 9), f2 = o(0.66, -0.5)
+      g.moveTo(...f0); g.quadraticCurveTo(...o(0.4, 13, -2), ...f1); g.quadraticCurveTo(...o(0.6, 8, 4), ...f2); g.closePath(); g.fill()
+      const [tx, ty] = at(1), [dx, dy] = dir(1), nx = -dy, ny = dx
+      g.beginPath()
+      g.moveTo(tx - nx * 3.5, ty - ny * 3.5)
+      g.quadraticCurveTo(tx + dx * 8 - nx * 14, ty + dy * 8 - ny * 14, tx + dx * 26 - nx * 15, ty + dy * 26 - ny * 15)
+      g.quadraticCurveTo(tx + dx * 15 - nx * 2, ty + dy * 15 - ny * 2, tx + dx * 27 + nx * 14, ty + dy * 27 + ny * 14)
+      g.quadraticCurveTo(tx + dx * 8 + nx * 14, ty + dy * 8 + ny * 14, tx + nx * 3.5, ty + ny * 3.5)
+      g.closePath(); g.fill()
+    }
+    body(); g.fill()
+    // (the pectoral fin, a leaf tucked back under the gill, in the same cream with an indigo line round it so it reads against the body)
+    {
+      const [x, y] = side(0.3, -0.8), [dx, dy] = dir(0.3)
+      g.save()
+      g.beginPath()
+      g.moveTo(x, y)
+      g.quadraticCurveTo(x + dx * 6 + dy * 9, y + dy * 6 - dx * 9, x + dx * 17 + dy * 10, y + dy * 17 - dx * 10)
+      g.quadraticCurveTo(x + dx * 9 + dy * 1, y + dy * 9 - dx * 1, x, y)
+      g.fillStyle = CREAM; g.strokeStyle = INDIGO; g.lineWidth = 1.6; g.fill(); g.stroke()
+      g.restore()
+    }
+    // (cut away in the indigo: the eye, the gill's curve, the mouth's line, and the scales in rows, each a small arc opening toward the head)
+    g.save()
+    body(); g.clip()
+    g.strokeStyle = INDIGO; g.fillStyle = INDIGO; g.lineCap = 'round'
+    {
+      const [ex, ey] = side(0.075, 0.36)
+      g.beginPath(); g.arc(ex, ey, 2.7, 0, Math.PI * 2); g.fill()
+      g.fillStyle = CREAM; g.beginPath(); g.arc(ex + 0.8, ey - 0.8, 0.8, 0, Math.PI * 2); g.fill()
+      g.lineWidth = 1.9
+      g.beginPath()
+      const a0 = side(0.24, 1.05), a1 = side(0.27, 0), a2 = side(0.24, -1.05)
+      g.moveTo(...a0); g.quadraticCurveTo(a1[0] + dir(0.27)[0] * 5, a1[1] + dir(0.27)[1] * 5, ...a2); g.stroke()
+      g.lineWidth = 1.3
+      const m0 = side(0.012, -0.2), m1 = side(0.07, -0.25)
+      g.beginPath(); g.moveTo(...m0); g.lineTo(...m1); g.stroke()
+    }
+    g.lineWidth = 1.05
+    for (let row = 0; row < 7; row++) {
+      const t = 0.34 + row * 0.075
+      for (let k = -2; k <= 2; k++) {
+        const kk = k * 0.42 + (row % 2 ? 0.21 : 0)
+        if (Math.abs(kk) > 0.8 * 1) continue
+        const [x, y] = side(t, kk), [dx, dy] = dir(t), r = 3 * (half(t) / 17 + 0.35)
+        const base = Math.atan2(dy, dx)
+        g.beginPath(); g.arc(x, y, r, base - Math.PI * 0.62, base + Math.PI * 0.62); g.stroke()
+      }
+    }
+    g.restore()
+    // (spray where it breaks the water, and the drops it throws)
+    g.fillStyle = CREAM
+    for (const [x, y, r] of [[238, 100, 2.4], [244, 108, 1.7], [233, 94, 1.5], [246, 118, 2], [226, 124, 1.5], [165, 118, 1.8]] as number[][]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill() }
+    // (the sea: three bands, each with a scalloped crest, cream with an indigo line between them, the top one over the fish's tail)
+    const sea = (y0: number, ph: number) => {
+      g.beginPath(); g.moveTo(CX - R, y0 + 40)
+      for (let x = CX - R - 6; x <= CX + R + 6; x += 2) g.lineTo(x, y0 + Math.sin((x + ph) / 6.5) * 3.4 + Math.sin((x + ph) / 13) * 2)
+      g.lineTo(CX + R + 6, y0 + 40); g.closePath()
+    }
+    for (const [y0, ph] of [[136, 0], [146, 9], [156, 4]] as number[][]) {
+      sea(y0, ph); g.fillStyle = CREAM; g.fill()
+      g.strokeStyle = INDIGO; g.lineWidth = 2.6
+      g.beginPath(); for (let x = CX - R - 6; x <= CX + R + 6; x += 2) { const y = y0 + Math.sin((x + ph) / 6.5) * 3.4 + Math.sin((x + ph) / 13) * 2; if (x === CX - R - 6) g.moveTo(x, y); else g.lineTo(x, y) } g.stroke()
+    }
     g.lineCap = 'butt'
     g.restore()
   }
