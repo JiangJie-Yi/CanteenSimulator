@@ -136,7 +136,6 @@ export function CoinStack({ kind, n = 1, ...rest }: { kind: CoinKind; n?: number
   const h = 0.0016 * n
   return <group {...rest}><mesh geometry={coinGeo(kind)} material={mats} scale={[1, h, 1]} position-y={h / 2} castShadow /></group>
 }
-export const COIN_R = (kind: CoinKind) => COINS[kind].r
 
 /** a sum made up from the fewest notes and coins, biggest first */
 export function changeOf(sum: number): (Note | CoinKind)[] {

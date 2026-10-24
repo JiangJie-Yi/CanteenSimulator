@@ -12,12 +12,6 @@ const COOL_RATE = 0.004
 /** Steam only shows close to the boil (faint wisps first), and is fully going once it boils. */
 const STEAM_FROM = 88
 
-/** Temperature the pot settles at for a given flame, capped at boiling. Used to start the scene warm. */
-export function equilibriumTemp(heat: number) {
-  if (heat <= 0) return ROOM
-  return Math.min(BOIL, ROOM + (HEAT_RATE * heat) / 100 / COOL_RATE)
-}
-
 /** Advance the broth temperature by dt seconds at the given flame (0..100). */
 export function stepTemp(temp: number, heat: number, dt: number) {
   const next = temp + ((HEAT_RATE * heat) / 100 - COOL_RATE * (temp - ROOM)) * dt

@@ -40,4 +40,3 @@ const JA: typeof ZH = {
   trialNone: (who) => `${who}：材料がありません。先に仕入れを`,
 }
 export const LINES: Record<Lang, typeof ZH> = { zh: ZH, ja: JA }
-export const starsFor = (taste: number) => (taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1)

@@ -25,3 +25,7 @@ dist-ssr
 
 # Blender live-sync state (written by the dev server)
 blender/live_state.json
+
+# Blender backups and Python caches
+*.blend1
+__pycache__/

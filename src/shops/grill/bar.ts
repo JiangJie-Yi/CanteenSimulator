@@ -544,5 +544,3 @@ export const PLATE_STACKS = (() => {
 export const PLATE_STACK_Y = (CUBBY_FLOOR_Y - GRILL_OFFSET.y) / GRILL_SCALE
 /** a point given in the bar's own sizes, where it is in the scene as drawn */
 export const toGrillScene = (v: THREE.Vector3) => v.clone().multiplyScalar(GRILL_SCALE).add(GRILL_OFFSET)
-/** the cook's table's top (the scene's y = 0), in the bar's own frame */
-export const KITCHEN_TOP = -GRILL_OFFSET.y / GRILL_SCALE

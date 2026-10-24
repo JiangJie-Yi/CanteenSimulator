@@ -33,7 +33,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `npm run dev:sync` | 開發伺服器＋自動同步（見「同步流程」） |
 | `npm run sync` | 只做自動同步 |
 | `npm test` | 單元測試＋架構測試（Vitest，約 1 秒） |
-| `npm run e2e` | 瀏覽器實際玩一遍四間店（需先開 dev server，約 4 分鐘）。`node tests/e2e/flow.mjs <url> grilledfish` 只測一間 |
+| `npm run e2e` | 瀏覽器實際玩一遍（需先開 dev server，約 4 分鐘）。`node tests/e2e/flow.mjs <url> grilledfish` 只測一間；沒有 Chrome 時 `CHROME_PATH=<chromium 路徑>`；軟體 GL 很慢時 `OPEN_FOR=240000`（營業等待毫秒，預設 40000） |
 | `npm run build` | 型別檢查＋建置 |
 | `npm run lint` | oxlint |
 
@@ -60,6 +60,15 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 網站只在推 `main` 時部署，推 `cloud-work` 不會；所以雲端 chat 每做完一次就推 `cloud-work`，使用者的 localhost 看得到，網站不動。
 - 本機的 Claude Code 在這個專案開始工作時，若 `git fetch origin` 後 `origin/cloud-work` 有 `main` 沒有的提交，且工作目錄乾淨：合併它、跑 `npx tsc -b && npm test`、通過後**不要推 `main`**，除非使用者說；有衝突或失敗就停下來告訴使用者。
 - 遊戲裡的編輯模式（按 G，閉店時才能用）調的位置存在瀏覽器裡；確定後把面板上的 offset 數值告訴雲端 chat，由它寫成預設值。
+
+## 編輯模式（`src/shops/grill/edit.ts`、`Movable.tsx`）
+
+- 介面是 Blender 風格的深灰面板：左邊工具列（位移 W、旋轉 R、縮放 S），清單可搜尋，變換區的 X／Y／Z 是紅綠藍色條。位置、移動箭頭、旋轉環、縮放把手都用**房間軸**（吧台方向 `ALONG`），不是各物件父層的軸。
+- 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。選取框是從模型畫出來的頂點量的（不含墨線、貼面、發光），所以貼合模型。
+- **預設值**：位置預設寫在 `edit.ts` 的 `BASES`（父層單位）；大小與轉向預設用 `<Movable baseScale baseTurn>`。定好預設後面板歸零（位置 0、縮放 1）。改了預設要把 `edit.ts` 開頭的三個 localStorage key 版本加一，不然瀏覽器裡舊的偏移會重複計算。
+- **+ / −**：按 X、Y、Z 選軸（再按一次取消），+ 或 − 縮放選到的軸（沒選就三軸一起）；縮放區每軸旁也有 −、+ 按鈕。
+- **群組**：清單裡 Ctrl／Shift 點選多件 → 「成組」；群組可一起位移、繞垂直軸轉、整體縮放（轉動中心是成員的中間）。「解散」「改名」「復原」都能用。沒有中心點的東西（閘門）不能成組。
+- 進編輯模式會自動收起選單，離開後還原；選單收放或進出編輯模式不會讓鏡頭重新歸位（只有換菜、重設視角、總覽、視窗大小改變才會）。
 
 ## 常見改動要碰哪裡
 

@@ -125,15 +125,6 @@ export function resetAll() {
   state.groups = Object.fromEntries(Object.entries(state.groups).map(([k, g]) => [k, { ...g, t: [0, 0, 0] as V3, yaw: 0, s: 1 }]))
   save(); emit()
 }
-/** one piece back to where it stands to begin with: moved, turned and scaled alike */
-export function resetOne(id: string) {
-  beginChange()
-  const { [id]: _o, ...o } = state.offsets
-  const { [id]: _r, ...r } = state.rotations
-  const { [id]: _s, ...sc } = state.scales
-  state.offsets = o; state.rotations = r; state.scales = sc
-  save(); emit()
-}
 export const select = (id: string | null) => { state.selected = id; emit() }
 const TOOL_NAMES: Record<Tool, string> = { move: '位移 (W)', rotate: '旋轉 (R)', scale: '縮放 (S)' }
 /** which handles the selected piece shows: arrows to move it, rings to turn it, boxes to scale it */
