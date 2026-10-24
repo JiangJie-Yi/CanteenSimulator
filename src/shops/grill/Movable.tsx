@@ -329,6 +329,10 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
     let yMin = Infinity, yMax = -Infinity
     inn.traverse((m) => {
       if (!(m instanceof THREE.Mesh)) return
+      // (only what's drawn counts: not a hidden mesh (a batch's originals, a model's floor plane left out), nor an unseen hit-box or a clear glow)
+      for (let o: THREE.Object3D | null = m; o && o !== inn; o = o.parent) if (!o.visible) return
+      const mats = Array.isArray(m.material) ? m.material : [m.material]
+      if (mats.every((x) => !x.visible || x.opacity <= 0.02 || !x.colorWrite || x.blending === THREE.AdditiveBlending)) return
       m.geometry.computeBoundingBox()
       const gb = m.geometry.boundingBox
       if (!gb) return

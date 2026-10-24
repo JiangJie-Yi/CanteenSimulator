@@ -423,7 +423,9 @@ const TILL_GLOW = (() => {
 export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
   const { W, D } = TILL
   return (
-    <group position={at} rotation-y={yaw}>
+    <>
+      <Movable id="till-counter" label="收銀櫃檯"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
       {/* (local x along the bar, +z toward the cashier, behind it) */}
       {/* its body hollow, open on the cashier's side: the front, the two ends, a shelf low inside and one under the top,
           for the till roll, the bags and the cash box */}
@@ -463,6 +465,11 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           </group>
         ))}
       </group>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id="till-register" label="收銀機（含抽屜）">
+        <StaticBatch>
+      <group position={at} rotation-y={yaw}>
       {/* the register, an electronic one of the kind every shop has: a cream cash drawer (a lock and a label on its front)
           under a body whose sloped panel carries the keys (the coloured function keys to the left, the grey number pad, the
           big cream keys and the teal total key to the right), the till roll's cover at the back with its paper coming
@@ -478,19 +485,12 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           <Part geo={REG_GEO.round} color="#cbc5b7" outline={1.04} scale={[0.335, 0.026, 0.16]} />
           <RegisterKeys />
         </group>
-        {/* the deck at the back: two recessed receipt windows (journal and receipt), each with its paper guide and its paper standing in it */}
-        {[[-0.1, 0.07], [-0.025, 0.07]].map(([x, w], i) => (
-          <group key={i} position={[x, 0.2155, 0.088]}>
-            <Part geo={REG_GEO.body} color="#6a665c" outline={0} position={[0, 0.0005, 0]} scale={[w, 0.003, 0.09]} />
-            <Part geo={REG_GEO.body} color="#bdb5a3" outline={0} position={[-w / 2 - 0.004, 0.006, 0]} scale={[0.006, 0.012, 0.094]} />
-            <Part geo={REG_GEO.body} color="#bdb5a3" outline={0} position={[w / 2 + 0.004, 0.006, 0]} scale={[0.006, 0.012, 0.094]} />
-            <Part geo={REG_GEO.body} color="#bdb5a3" outline={0} position={[0, 0.006, -0.048]} scale={[w + 0.014, 0.012, 0.006]} />
-          </group>
-        ))}
         {/* the operator's display on its hinged stand, and the key switch beside it */}
         <Part geo={REG_GEO.round} color="#bdb5a3" outline={1.04} position={[0.085, 0.222, 0.05]} scale={[0.1, 0.014, 0.05]} />
-        <group position={[0.085, 0.245, 0.05]} rotation={[-0.55, 0, 0]}>
+        {/* (square to the operator: upright, level, leaning back only a hand's breadth, its screen facing straight out of the front) */}
+        <group position={[0.085, 0.252, 0.05]} rotation={[-0.14, 0, 0]}>
           <Part geo={REG_GEO.round} color="#cbc5b7" outline={1.04} scale={[0.15, 0.058, 0.014]} />
+          <mesh position={[0, 0, -0.0078]} rotation-y={Math.PI}><planeGeometry args={[0.12, 0.035]} /><meshBasicMaterial color="#10241a" /></mesh>
         </group>
         <group position={[0.145, 0.2155, 0.03]}>
           <mesh position-y={0.003}><cylinderGeometry args={[0.013, 0.014, 0.006, 16]} /><meshToonMaterial color="#a8a294" /></mesh>
@@ -507,6 +507,12 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           <Part geo={REG_GEO.round} color="#1a1c20" outline={1.04} scale={[0.17, 0.065, 0.02]} />
         </group>
       </group>
+      </group>
+        </StaticBatch>
+        <RegisterLive at={at} yaw={yaw} top={top} />
+      </Movable>
+      <Movable id="till-card" label="刷卡機"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
       {/* the card reader, its screen and keys, by the register on the customers' side */}
       <group position={[-0.38, top, -0.1]} rotation-x={-0.25}>
         <Part geo={REG_GEO.round} color="#2a2c30" position-y={0.02} scale={[0.075, 0.04, 0.14]} />
@@ -517,11 +523,19 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           </mesh>
         ))}
       </group>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id="till-printer" label="明細印表機"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
       {/* the receipt printer, a curl of paper out of its top */}
       <group position={[-0.38, top, 0.12]}>
         <Part geo={REG_GEO.round} color="#e8e6e0" position-y={0.04} scale={[0.12, 0.08, 0.13]} />
         <Part geo={REG_GEO.body} color="#2a2c30" outline={0} position={[0, 0.081, 0]} scale={[0.08, 0.002, 0.012]} />
       </group>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id="till-tray" label="找零盤與零錢"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
       {/* the coin tray (カルトン), a lacquered dish at the register's front for the change, with coins and a folded note in it, the cup of pens, the bell */}
       <group position={[0.0, top, -0.4]}>
         <Part geo={REG_GEO.round} color="#7a1f16" outline={1.04} position-y={0.009} scale={[0.22, 0.02, 0.14]} />
@@ -534,6 +548,10 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         ))}
         <NoteStack kind={1000} n={1} position={[0.05, 0.0198, 0.0]} rotation-y={Math.PI + 0.3} />
       </group>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id="till-pens" label="筆筒"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
       <group position={[-0.52, top, 0.12]}>
         <Part geo={REG_GEO.cup} color="#3a4a5a" position-y={0.03} />
         {[[-0.006, '#2a2a6a'], [0.007, '#a82a1e'], [0, '#2a2a2a']].map(([x, c], i) => (
@@ -542,18 +560,32 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
           </mesh>
         ))}
       </group>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id="till-bell" label="呼叫鈴"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
       <group position={[-0.52, top, -0.1]}>
         <Part geo={REG_GEO.ball} color="#d4b04a" position-y={0.012} scale={[0.6, 0.45, 0.6]} />
         <Part geo={REG_GEO.body} color="#2a2420" outline={0} position-y={0.004} scale={[0.06, 0.008, 0.06]} />
       </group>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id="till-sign" label="お会計牌"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
       {/* the お会計 sign, in its little wooden stand, to the customers */}
       <group position={[0.36, top, -0.3]} rotation-y={Math.PI}>
         <Part geo={REG_GEO.body} color="#6a4428" position-y={0.006} scale={[0.14, 0.012, 0.05]} />
         <mesh position={[0, 0.05, 0]}><planeGeometry args={[0.12, 0.075]} /><meshToonMaterial color="#ffffff" map={PAY_SIGN} /></mesh>
       </group>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id="till-cat" label="櫃檯招財貓"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
       {/* the beckoning cat, its paw up: bigger, at the till's corner by the door, facing the customers */}
       <group position={[0.5, top, -0.26]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.46} /></group>
-    </group>
+      </group>
+      </StaticBatch></Movable>
+    </>
   )
 }
 /** the register's size in the till (its drawer, keys and displays are drawn in units of 1/1.4 of this) */
@@ -682,9 +714,11 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
           if (!g) return
           const front = g.getWorldDirection(new THREE.Vector3()).negate()
           const from = e.camera.position.clone().sub(g.getWorldPosition(new THREE.Vector3()))
-          if (from.dot(front) < 0) return
+          if (from.dot(front) < -0.15 * from.length()) return
           TILL_STATE.manual = !TILL_STATE.manual
         }} {...handOver}>
+          {/* (an unseen, roomier box over the front panel, so it's easy to hit) */}
+          <mesh position={[0, 0.04, -0.19]}><boxGeometry args={[0.44, 0.12, 0.07]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} /></mesh>
           <Part geo={REG_GEO.body} color="#d9d3c6" outline={1.03} position={[0, 0.04, -0.176]} scale={[0.384, 0.068, 0.018]} />
           <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.04, -0.1855]} scale={[0.35, 0.05, 0.002]} />
           <Part geo={REG_GEO.body} color="#8a8478" outline={0} position={[-0.02, 0.058, -0.187]} scale={[0.12, 0.008, 0.003]} />
@@ -1969,18 +2003,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* the way in, just past the end of the bar where the customers come and go */}
       <Movable id="noren" label="門簾"><Entrance at={doorOf(counters)} mark={mark} /></Movable>
       {/* the till, just inside the door on the bar's side of the way in (the shops that lay out their own counters) */}
-      <Movable id="till" label="收銀機"><>
       {given && (
-        <StaticBatch>
-          <Register top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
-            at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + TILL.along).addScaledVector(counters[0].lay, TILL.lay)} />
-        </StaticBatch>
-      )}
-      {given && (
-        <RegisterLive top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
+        <Register top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}
           at={counters[0].at.clone().addScaledVector(counters[0].along, counters[0].length / 2 + TILL.along).addScaledVector(counters[0].lay, TILL.lay)} />
       )}
-      </></Movable>
       {/* (each stool its own Movable, so each can be moved, turned and made larger or smaller by hand when the shop's shut: only the stool's look; where its guest
           sits and the way to it stay as they are, so no one is put out of a seat) */}
       {seats.map((st, n) => (

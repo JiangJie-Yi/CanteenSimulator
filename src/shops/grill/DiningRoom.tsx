@@ -2390,24 +2390,30 @@ function Inked({ geometry, color, map, grow = 1.04, side, ...rest }: { geometry:
 }
 const BARRELS_URL = import.meta.env.BASE_URL + 'models/kazaridaru_sake_barrels_lowpoly_remesh.glb'
 /** a stack of decorative sake barrels (飾り樽), the downloaded model (its floor left out), toon-shaded and inked, stood on the floor, ~0.9 tall */
-function SakeStack() {
+function SakeStack({ part }: { part: number }) {
   const gltf = useGLTF(BARRELS_URL) as unknown as { scene: THREE.Group }
   const stack = useMemo(() => {
     const root = gltf.scene.clone(true)
+    const floors: THREE.Object3D[] = []
     root.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const geo = m.geometry
       geo.computeBoundingBox()
       const sz = geo.boundingBox!.getSize(new THREE.Vector3())
-      // (the model's floor plane is flat: not drawn)
-      if (sz.y < 0.01 && sz.x > 1.5) { m.visible = false; return }
+      // (the model's floor plane is flat: not drawn, and taken out altogether so it gets no outline and no part in the piece's size)
+      if (sz.y < 0.01 && sz.x > 1.5) { floors.push(m); return }
       const src = m.material as THREE.MeshStandardMaterial
       m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null })
       m.castShadow = true
     })
+    for (const f of floors) f.removeFromParent()
+    // (sized and set down as the whole stack, then only one of its two clusters of barrels kept: each is its own piece to move)
+    const clusters: THREE.Object3D[] = []
+    root.traverse((o) => { if ((o as THREE.Mesh).isMesh) clusters.push(o) })
+    const box = new THREE.Box3().setFromObject(root)
+    clusters.forEach((c, i) => { if (i !== part) c.removeFromParent() })
     inkModel(root)
-    const box = new THREE.Box3().setFromObject(root.children[0] ? root : root)
     const size = box.getSize(new THREE.Vector3())
     const k = 0.9 / (size.y || 1)
     const c = box.getCenter(new THREE.Vector3())
@@ -2416,7 +2422,7 @@ function SakeStack() {
     out.add(root)
     out.scale.setScalar(k)
     return out
-  }, [gltf])
+  }, [gltf, part])
   return <primitive object={stack} />
 }
 /** a clump of bamboo in a glazed pot: a few stalks, leaves in tufts at their joints */
@@ -2573,11 +2579,13 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   return (
     // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
     <>
-      <Movable id="sake" label="酒樽"><StaticBatch key={lang}>
-        <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
-          <group rotation-y={Math.PI / 2}><SakeStack /></group>
-        </group>
-      </StaticBatch></Movable>
+      {[0, 1].map((part) => (
+        <Movable key={part} id={part ? 'sake2' : 'sake'} label={part ? '酒樽（小）' : '酒樽（大）'}><StaticBatch key={lang}>
+          <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
+            <group rotation-y={Math.PI / 2}><SakeStack part={part} /></group>
+          </group>
+        </StaticBatch></Movable>
+      ))}
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
       <Movable id="willow" label="柳樹"><StaticBatch key={lang}>
