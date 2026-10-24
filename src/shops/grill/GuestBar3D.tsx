@@ -446,6 +446,7 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         </mesh>
         <mesh geometry={REG_GEO.round} scale={[(W + 0.1) * 1.02, 0.06 * 1.02, (D + 0.1) * 1.02]}><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
       </group>
+      <mesh position={[0, top + 0.0007, -0.03]} rotation-x={-Math.PI / 2}><planeGeometry args={[W + 0.08, D + 0.08]} /><meshBasicMaterial map={COUNTER_GRIME} transparent depthWrite={false} toneMapped={false} /></mesh>
       <mesh position={[0, top - 0.075, -D / 2 - 0.0]} rotation-y={Math.PI}><planeGeometry args={[W - 0.1, 0.025]} /><meshBasicMaterial color="#ffd89a" toneMapped={false} /></mesh>
       <mesh position={[0, top - 0.22, -D / 2 + 0.018]} rotation-y={Math.PI}><planeGeometry args={[W - 0.06, 0.3]} /><meshBasicMaterial map={TILL_GLOW} transparent depthWrite={false} toneMapped={false} /></mesh>
       {/* its front: upright battens of hinoki over the dark body, close set, a dark kick board at the foot */}
@@ -490,7 +491,6 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         {/* (square to the operator: upright, level, leaning back only a hand's breadth, its screen facing straight out of the front) */}
         <group position={[0.085, 0.252, 0.05]} rotation={[-0.14, 0, 0]}>
           <Part geo={REG_GEO.round} color="#cbc5b7" outline={1.04} scale={[0.15, 0.058, 0.014]} />
-          <mesh position={[0, 0, -0.0078]} rotation-y={Math.PI}><planeGeometry args={[0.12, 0.035]} /><meshBasicMaterial color="#10241a" /></mesh>
         </group>
         <group position={[0.145, 0.2155, 0.03]}>
           <mesh position-y={0.003}><cylinderGeometry args={[0.013, 0.014, 0.006, 16]} /><meshToonMaterial color="#a8a294" /></mesh>
@@ -505,6 +505,34 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         <mesh position={[0.085, 0.265, 0.12]}><cylinderGeometry args={[0.005, 0.006, 0.11, 8]} /><meshToonMaterial color="#8a8e92" /></mesh>
         <group position={[0.085, 0.33, 0.12]} rotation-x={-0.18}>
           <Part geo={REG_GEO.round} color="#1a1c20" outline={1.04} scale={[0.17, 0.065, 0.02]} />
+        </group>
+        {/* the cables out of the back: the mains lead (a thick black one down to the counter and away behind), the data lead across to the printer, a short one down to the drawer's
+            lock, each with its plug block, tied together where they leave */}
+        <mesh geometry={REG_CABLES.power}><meshToonMaterial color="#17171a" /></mesh>
+        <mesh geometry={REG_CABLES.data}><meshToonMaterial color="#4a4d52" /></mesh>
+        <mesh geometry={REG_CABLES.drawerLink}><meshToonMaterial color="#2a2c30" /></mesh>
+        <mesh position={[0.07, 0.17, 0.146]}><boxGeometry args={[0.02, 0.014, 0.012]} /><meshToonMaterial color="#17171a" /></mesh>
+        <mesh position={[0.0, 0.16, 0.146]}><boxGeometry args={[0.016, 0.012, 0.012]} /><meshToonMaterial color="#4a4d52" /></mesh>
+        <mesh position={[0.3, 0.03, -0.013]}><boxGeometry args={[0.014, 0.01, 0.014]} /><meshToonMaterial color="#4a4d52" /></mesh>
+        <mesh position={[0.036, 0.16, 0.2]} rotation-y={0.3}><boxGeometry args={[0.1, 0.006, 0.008]} /><meshToonMaterial color="#d8d4c8" /></mesh>
+        {/* the sockets on the sides: on the right a mains inlet, a LAN, a phone and a USB socket and the power switch; on the left, under the card slot, a serial port */}
+        {[[0.07, 0.019, 0.011, 0.04], [0.036, 0.012, 0.013, 0.08], [0.0, 0.0095, 0.01, 0.12], [-0.032, 0.013, 0.006, 0.15]].map(([z, w, h, y], i) => (
+          <group key={i} position={[0.1665, y, z - 0.01]} rotation-y={Math.PI / 2}>
+            <mesh position-z={0.0004}><planeGeometry args={[w + 0.005, h + 0.005]} /><meshBasicMaterial color="#8c867a" /></mesh>
+            <mesh position-z={0.0009}><planeGeometry args={[w, h]} /><meshBasicMaterial color="#14151a" /></mesh>
+            {i === 1 && Array.from({ length: 6 }, (_, k) => <mesh key={k} position={[-0.0055 + k * 0.0022, -0.003, 0.0013]}><planeGeometry args={[0.0008, 0.004]} /><meshBasicMaterial color="#d9b44a" /></mesh>)}
+          </group>
+        ))}
+        <mesh position={[0.1666, 0.105, 0.1]} rotation-y={Math.PI / 2}><planeGeometry args={[0.012, 0.018]} /><meshBasicMaterial color="#2a2c30" /></mesh>
+        <mesh position={[0.1668, 0.105, 0.097]} rotation-y={Math.PI / 2}><planeGeometry args={[0.004, 0.009]} /><meshBasicMaterial color="#d84a3a" /></mesh>
+        <group position={[-0.1666, 0.115, 0.06]} rotation-y={-Math.PI / 2}>
+          <mesh position-z={0.0004}><planeGeometry args={[0.04, 0.015]} /><meshBasicMaterial color="#8c867a" /></mesh>
+          <mesh position-z={0.0009}><planeGeometry args={[0.034, 0.0095]} /><meshBasicMaterial color="#14151a" /></mesh>
+          {[0, 1, 2, 3, 4].map((k) => <mesh key={k} position={[-0.0125 + k * 0.0062, 0.0015, 0.0013]}><planeGeometry args={[0.0015, 0.0015]} /><meshBasicMaterial color="#c8b060" /></mesh>)}
+        </group>
+        {/* wear: dust, smudges and scratches over the key panel, a rubbed-down patch on the number keys */}
+        <group position={[0, 0.172, -0.07]} rotation-x={-0.34}>
+          <mesh position-y={0.0137} rotation-x={-Math.PI / 2}><planeGeometry args={[0.335, 0.16]} /><meshBasicMaterial map={REG_GRIME} transparent depthWrite={false} toneMapped={false} /></mesh>
         </group>
       </group>
       </group>
@@ -587,6 +615,57 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
       </StaticBatch></Movable>
     </>
   )
+}
+
+/** dust, smudges, scratches and worn patches on a surface, mostly at its edges and corners where hands and cloths don't reach: a clear texture laid over it */
+const grime = (w: number, h: number, seed: number, wear: number) => signTexture(w, h, (g) => {
+  let r = seed
+  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+  g.clearRect(0, 0, w, h)
+  // (the grease and dust that gathers along the edges)
+  for (const [x0, y0, x1, y1] of [[0, 0, w, 0], [0, h, w, h], [0, 0, 0, h], [w, 0, w, h]] as number[][]) {
+    const e = g.createLinearGradient(x0, y0, x0 + (x1 === x0 ? (x0 ? -1 : 1) * 14 : 0), y0 + (y1 === y0 ? (y0 ? -1 : 1) * 14 : 0))
+    e.addColorStop(0, 'rgba(60,45,25,0.28)'); e.addColorStop(1, 'rgba(60,45,25,0)')
+    g.fillStyle = e
+    g.fillRect(0, 0, w, h)
+  }
+  // (smudges: finger marks and rings of wiped-over grease)
+  for (let i = 0; i < 9; i++) {
+    const x = rnd() * w, y = rnd() * h, rad = (0.05 + rnd() * 0.12) * Math.min(w, h) * 1.4
+    const b = g.createRadialGradient(x, y, 0, x, y, rad)
+    b.addColorStop(0, `rgba(70,52,30,${0.10 + rnd() * 0.12})`); b.addColorStop(1, 'rgba(70,52,30,0)')
+    g.fillStyle = b
+    g.fillRect(x - rad, y - rad, rad * 2, rad * 2)
+  }
+  // (dust: a fine pale speckle)
+  for (let i = 0; i < w * h / 90; i++) {
+    g.fillStyle = `rgba(235,230,215,${0.05 + rnd() * 0.18})`
+    g.fillRect(rnd() * w, rnd() * h, 1 + rnd(), 1)
+  }
+  // (scratches: thin pale lines, a few of them long)
+  g.lineCap = 'round'
+  for (let i = 0; i < 7 + wear * 10; i++) {
+    const x = rnd() * w, y = rnd() * h, a = rnd() * Math.PI, L = 6 + rnd() * (i % 4 ? 22 : 60) * (w / 128)
+    g.strokeStyle = `rgba(250,245,230,${0.20 + rnd() * 0.3})`
+    g.lineWidth = 0.6 + rnd() * 0.5
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke()
+  }
+  // (and the worn patches, where the finish has rubbed down to the bare, paler or darker, plastic)
+  for (let i = 0; i < wear * 5; i++) {
+    const x = rnd() * w, y = rnd() * h, rw = 6 + rnd() * 16, rh = 4 + rnd() * 9
+    g.fillStyle = `rgba(255,252,240,${0.10 + rnd() * 0.12})`
+    g.beginPath(); g.ellipse(x, y, rw, rh, rnd() * 3, 0, Math.PI * 2); g.fill()
+  }
+})
+const REG_GRIME = grime(256, 128, 7, 1)
+const REG_GRIME_FRONT = grime(256, 48, 19, 1)
+const COUNTER_GRIME = grime(256, 128, 31, 2)
+/** a cable run as a tube through the given points (in the register's own units), black rubber */
+const cable = (pts: [number, number, number][], r = 0.0042) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.4), 36, r, 6, false)
+const REG_CABLES = {
+  power: cable([[0.07, 0.17, 0.142], [0.075, 0.15, 0.2], [0.06, 0.09, 0.25], [0.05, 0.015, 0.28], [0.0, 0.006, 0.36], [-0.12, 0.006, 0.46]], 0.0055),
+  data: cable([[0.0, 0.16, 0.142], [0.02, 0.12, 0.22], [0.12, 0.05, 0.25], [0.24, 0.008, 0.2], [0.3, 0.008, 0.1], [0.3, 0.03, -0.01]], 0.0038),
+  drawerLink: cable([[-0.06, 0.15, 0.142], [-0.07, 0.1, 0.19], [-0.07, 0.07, 0.17]], 0.0034),
 }
 /** the register's size in the till (its drawer, keys and displays are drawn in units of 1/1.4 of this) */
 const REG_SC = 1.4
@@ -721,6 +800,7 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
           <mesh position={[0, 0.04, -0.19]}><boxGeometry args={[0.44, 0.12, 0.07]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} /></mesh>
           <Part geo={REG_GEO.body} color="#d9d3c6" outline={1.03} position={[0, 0.04, -0.176]} scale={[0.384, 0.068, 0.018]} />
           <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.04, -0.1855]} scale={[0.35, 0.05, 0.002]} />
+          <mesh position={[0, 0.04, -0.1873]} rotation-y={Math.PI}><planeGeometry args={[0.384, 0.068]} /><meshBasicMaterial map={REG_GRIME_FRONT} transparent depthWrite={false} toneMapped={false} /></mesh>
           <Part geo={REG_GEO.body} color="#8a8478" outline={0} position={[-0.02, 0.058, -0.187]} scale={[0.12, 0.008, 0.003]} />
           <mesh position={[0.11, 0.04, -0.188]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.009, 0.009, 0.006, 14]} /><meshToonMaterial color="#c8ccd0" /></mesh>
           <mesh position={[0.11, 0.04, -0.1915]}><planeGeometry args={[0.012, 0.0025]} /><meshBasicMaterial color="#2a2c30" /></mesh>
@@ -750,9 +830,9 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
         <mesh ref={slip} geometry={slipGeo} visible={false} position={[-0.025, 0.2185, 0.076]} rotation={[0.2, Math.PI, 0]}>
           <meshBasicMaterial map={REG_RECEIPT} toneMapped={false} side={THREE.DoubleSide} />
         </mesh>
-        {/* the operator's display, tilted back on the right segment */}
-        <group position={[0.085, 0.245, 0.05]} rotation={[-0.55, 0, 0]}>
-          <mesh position-z={-0.0075} rotation={[0, Math.PI, 0]}><planeGeometry args={[0.13, 0.04]} /><meshBasicMaterial map={led} toneMapped={false} /></mesh>
+        {/* the operator's display, in the housing's own pose: upright, facing straight out of the front */}
+        <group position={[0.085, 0.252, 0.05]} rotation={[-0.14, 0, 0]}>
+          <mesh position-z={-0.0078} rotation={[0, Math.PI, 0]}><planeGeometry args={[0.13, 0.04]} /><meshBasicMaterial map={led} toneMapped={false} /></mesh>
         </group>
         {/* the customers' display on its stalk */}
         <group position={[0.085, 0.33, 0.12]} rotation-x={-0.18}>
