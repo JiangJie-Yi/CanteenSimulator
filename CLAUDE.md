@@ -37,6 +37,15 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `npm run build` | 型別檢查＋建置 |
 | `npm run lint` | oxlint |
 
+## 行為驅動開發（BDD）
+
+新功能或改行為時，先用 Given / When / Then 把「使用者會看到的行為」寫成情境，再實作。工具是 `tests/bdd/bdd.ts`（Vitest 上的小包裝，不加套件）：`feature` 一個功能、`scenario` 一個情境，步驟 `given` / `when` / `then` / `and` / `but` 依序執行並共用一個 `w`；失敗時訊息會標出是哪一步（例如 `[Then 沒有任何一根的高度超過 3 層]`）。範例在 `tests/bdd/coal-pile.test.ts`（炭床）和 `tests/bdd/stock.test.ts`（庫存）。
+
+- 情境用中文描述行為（「炭堆不會疊得超過物理上限」），不要寫實作細節。
+- 只測 `data/`、`game/` 的純邏輯；3D 與 DOM 的行為用 `npm run e2e` 或 `__scene` 數值驗證。
+- 檔名放 `tests/bdd/<功能>.test.ts`，`npm test` 會一起跑。
+- 使用者提出新的行為要求（如「炭不能浮空」）時，先補一個情境，再改程式讓它通過。
+
 **改完的檢查順序**：`npx tsc -b` → `npm test` → 有動到遊戲流程時跑 `npm run e2e` → commit。
 
 ## 同步流程（本機優先）
