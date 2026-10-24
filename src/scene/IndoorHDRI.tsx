@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Environment, Lightformer } from '@react-three/drei'
 
 /**
@@ -6,7 +7,26 @@ import { Environment, Lightformer } from '@react-three/drei'
  * believable room round it: warm ceiling lamps above, a cool window panel to one side, a wall bounce, a wood-floor glow below.
  * (Toon materials take their light from the lamps; this is for the rest.)
  */
+const HDRI_BASE = import.meta.env.BASE_URL + 'hdri/'
+/** whether a real HDRI photograph has been put in public/hdri/ for the day or the night (day.hdr, night.hdr, e.g. from polyhaven.com/hdris, 1k is plenty) */
+function useHdriFile(name: 'day' | 'night') {
+  const [ok, setOk] = useState(false)
+  useEffect(() => {
+    let alive = true
+    // (a dev server answers a missing file with the page itself: only an actual radiance file, which starts "#?", counts)
+    fetch(`${HDRI_BASE}${name}.hdr`).then((r) => (r.ok ? r.arrayBuffer() : null)).then((b) => { if (alive) setOk(!!b && new TextDecoder().decode(b.slice(0, 2)) === '#?') }).catch(() => { if (alive) setOk(false) })
+    return () => { alive = false }
+  }, [name])
+  return ok
+}
+
 export function IndoorHDRI({ intensity = 0.5, night = false }: { intensity?: number; night?: boolean }) {
+  const real = useHdriFile(night ? 'night' : 'day')
+  // (a real HDRI photograph, if one's there, lights the glossy things; otherwise the room's own made-up one below)
+  if (real) return <Environment key={night ? 'real-night' : 'real-day'} files={`${HDRI_BASE}${night ? 'night' : 'day'}.hdr`} environmentIntensity={intensity} background={false} />
+  return <IndoorMock intensity={intensity} night={night} />
+}
+function IndoorMock({ intensity, night }: { intensity: number; night: boolean }) {
   // (day: bright daylight through the window, a pale shell, the lamps a lighter touch; night: a dim moonlit blue window, a dark shell, the lamps
   // and the lantern warm and strong, so the glossy things pick up a different room as the day turns. Keyed, so it's rendered afresh on a switch.)
   const L = night

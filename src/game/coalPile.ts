@@ -117,7 +117,7 @@ export function withinPile(x: number, z: number, y: number, lift = 0) {
  * Where the next stick lands: a few places tried over the heap (within `reach` of the middle), the first that stays within the pile's depth
  * taken, and null if the heap is already as deep as it will go anywhere it was tried (the caller lets the oldest burn out first).
  */
-export function placeStick(below: Lay[], rnd: () => number = Math.random, reach = 0.34, tries = 28, lift = 0) {
+export function placeStick(below: Lay[], rnd: () => number = Math.random, reach = 0.26, tries = 40, lift = 0) {
   for (let i = 0; i < tries; i++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * reach
     const x = Math.cos(a) * r, z = Math.sin(a) * r
@@ -133,3 +133,7 @@ export function placeStick(below: Lay[], rnd: () => number = Math.random, reach 
 
 /** whether the bed can take more sticks: under the most it holds, or some already burnt to ash that can be cleared (a burning stick is never pushed out) */
 export const roomFor = (alive: number, ashed: number, max: number) => alive < max || ashed > 0
+
+/** the most sticks the bed holds at once, and how many one load of charcoal puts on (3 or 4): six loads (what it takes to bring the fire to 100%) fit with room to spare */
+export const COAL_MAX = 26
+export const COAL_PER_ADD = { min: 3, max: 4 }

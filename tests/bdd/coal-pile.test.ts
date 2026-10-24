@@ -1,6 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { MAX_LAYERS, placeStick, roomFor, STICK_R, surfaceY, type Lay } from '@/game/coalPile'
+import { afterCharcoal, canAddCharcoal } from '@/game/economy'
+import { COAL_MAX, COAL_PER_ADD, MAX_LAYERS, placeStick, roomFor, STICK_R, surfaceY, type Lay } from '@/game/coalPile'
 
 const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 const lay = (s: NonNullable<ReturnType<typeof placeStick>>): Lay => ({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
@@ -64,5 +65,22 @@ feature('炭床滿了就不再加炭', () => {
     given('炭床有 8 根在燒', (w) => { w.alive = 8; w.ashed = 0 })
     when('想再加炭', (w) => { w.ok = roomFor(w.alive, w.ashed, 16) })
     then('可以加', (w) => { expect(w.ok).toBe(true) })
+  })
+})
+
+feature('加炭與火力', () => {
+  scenario('把火加到 100% 之前，炭堆不會先滿', ({ given, when, then }) => {
+    given('火力從 0 開始，每次加炭升 18%，每次放最多的根數', (w) => { w.level = 0; w.sticks = 0; w.adds = 0 })
+    when('一直加到火力 100%', (w) => {
+      while (canAddCharcoal(w.level)) { w.level = afterCharcoal(w.level); w.sticks += COAL_PER_ADD.max; w.adds++ }
+    })
+    then('炭堆還放得下這些炭', (w) => { expect(w.sticks).toBeLessThanOrEqual(COAL_MAX); expect(roomFor(w.sticks, 0, COAL_MAX) || w.sticks === COAL_MAX).toBe(true) })
+    then('點了兩次的時候，炭堆離滿還很遠', (w) => { expect(2 * COAL_PER_ADD.max).toBeLessThan(COAL_MAX / 2) })
+  })
+
+  scenario('炭放得緊密，沒有一根離中心太遠', ({ given, when, then }) => {
+    given('一個空的炭床', (w) => { w.pile = [] as Lay[]; w.rnd = seeded(13) })
+    when('放入 20 根炭', (w) => { for (let i = 0; i < 20; i++) { const s = placeStick(w.pile, w.rnd); if (s) w.pile.push(lay(s)) } })
+    then('都在離中心 0.45 以內', (w) => { for (const l of w.pile as Lay[]) expect(Math.hypot(l.x, l.z)).toBeLessThan(0.45) })
   })
 })

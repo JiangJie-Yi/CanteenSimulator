@@ -5,7 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
-import { placeStick, restOf, roomFor, surfaceY, type Lay } from '@/game/coalPile'
+import { COAL_MAX, COAL_PER_ADD, placeStick, restOf, roomFor, surfaceY, type Lay } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -464,7 +464,6 @@ function EmberBed({ fuel }: { fuel: { current: number } }) {
 }
 /** the most sticks of charcoal the bed holds at once, and how long one lasts once it's burning, in game seconds (it burns down to a third of its length, then it's ash) */
 const UP_AXIS = new THREE.Vector3(0, 1, 0)
-const COAL_MAX = 16
 const COAL_LAST_S = 170
 /** how long a fresh stick of charcoal takes to kindle to red-hot, in game seconds */
 const COAL_KINDLE_S = 22
@@ -2212,7 +2211,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const dropCoals = (from?: { x: number; y: number; z: number }) => {
     // (only as many as the bed has room for: the most it holds, less those still burning; ones burnt to ash are cleared to make room)
     const aliveNow = coals.current.filter((c) => c && !c.gone && !c.dying)
-    const n = Math.min(7 + Math.floor(Math.random() * 2), COAL_MAX - aliveNow.length + aliveNow.filter(ashedOut).length)
+    const n = Math.min(COAL_PER_ADD.min + Math.floor(Math.random() * (COAL_PER_ADD.max - COAL_PER_ADD.min + 1)), COAL_MAX - aliveNow.length + aliveNow.filter(ashedOut).length)
     if (n <= 0) return
     const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
     // (a bed only holds so many sticks: when the new ones would take it past the most, the oldest burn out at once, shrinking away)
