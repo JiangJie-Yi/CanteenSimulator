@@ -45,7 +45,7 @@ describe('coal pile', () => {
       if (!spot) break
       // the height of whatever is under it, along its length
       let gap = Infinity
-      for (const t of [-STICK_HALF, -0.15, 0, 0.15, STICK_HALF]) {
+      for (const t of Array.from({ length: 13 }, (_, k) => -STICK_HALF + (k * 2 * STICK_HALF) / 12)) {
         const px = spot.x + Math.cos(spot.yaw) * t, pz = spot.z + Math.sin(spot.yaw) * t
         const stick = spot.rest.y + spot.rest.slope * t
         let under = surfaceY(px, pz) + STICK_R

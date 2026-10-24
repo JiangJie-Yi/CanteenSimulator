@@ -4,9 +4,9 @@
 
 /** a stick lying in the pile: its middle in plan, the way it points (plan angle), its middle's height, and how steeply it rises along its length */
 export type Lay = { x: number; z: number; yaw: number; y: number; slope: number }
-/** half a stick's length, and its radius */
-export const STICK_HALF = 0.27
-export const STICK_R = 0.024
+/** half a stick's length, and its radius: as the sticks are drawn (about 0.3 long, 0.1 across), measured in the scene */
+export const STICK_HALF = 0.15
+export const STICK_R = 0.05
 /** the salt's mound (its height in the middle and how far it reaches) and the heap's hump on it */
 const SALT_TOP = 0.126, SALT_REACH = 1.12, HEAP_TOP = 0.12, HEAP_REACH = 0.5
 
@@ -24,7 +24,7 @@ function near(px: number, pz: number, o: Lay) {
 }
 
 /** how far along its length a stick is sampled for what holds it up, and the most it may tilt (steeper is clamped: it'd be sliding by then) */
-const SAMPLES = 21, MAX_SLOPE = 0.9
+const SAMPLES = 21, MAX_SLOPE = 1.5
 
 /**
  * Where a stick laid at (x, z) pointing `yaw` comes to rest on the bed and the sticks `below` it: its middle's height, and its slope.

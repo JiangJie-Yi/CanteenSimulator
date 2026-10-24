@@ -179,6 +179,16 @@ function toast(text: string, kind: 'warn' | 'edit' | 'plain' = 'warn') {
   toastEl = el
   toastTimer = window.setTimeout(() => { if (toastEl === el) { el.remove(); toastEl = null } }, kind === 'edit' ? 2400 : 1800)
 }
+/**
+ * Each piece's position is stored in its parent's own frame, which is turned a different way for different pieces; the panel shows it in the
+ * room's frame (the bar's direction) instead, the same way the move arrows point, so X and Z mean the same for every piece. `theta` is the
+ * turn about the vertical from the room's frame into the piece's parent's.
+ */
+const frames = new Map<string, number>()
+export const setFrame = (id: string, theta: number) => { frames.set(id, theta) }
+const turnY = (v: V3, a: number): V3 => [v[0] * Math.cos(a) + v[2] * Math.sin(a), v[1], -v[0] * Math.sin(a) + v[2] * Math.cos(a)]
+export const toRoom = (id: string, v: V3): V3 => turnY(v, -(frames.get(id) ?? 0))
+export const fromRoom = (id: string, v: V3): V3 => turnY(v, frames.get(id) ?? 0)
 let el: HTMLDivElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
@@ -322,7 +332,7 @@ function panel() {
       })
       tr.appendChild(g)
     }
-    group('位置 Location', '0.01', offsetOf, moveTo, [0, 0, 0])
+    group('位置 Location', '0.01', (id) => toRoom(id, offsetOf(id)), (id, v) => moveTo(id, fromRoom(id, v)), [0, 0, 0])
     group('旋轉 Rotation（度）', '5', rotationOf, turnTo, [0, 0, 0])
     group('縮放 Scale', '0.05', scaleOf, scaleTo, [1, 1, 1])
     const foot = h('div', 'be-foot')
@@ -349,7 +359,7 @@ function panel() {
     const id = state.selected
     const r = id ? registry.get(id) : null
     info.innerHTML = id ? `${r?.label ?? id}` : '<em>（點方塊或左邊的名字選一個）</em>'
-    const values = id ? [...offsetOf(id), ...rotationOf(id), ...scaleOf(id)] : []
+    const values = id ? [...toRoom(id, offsetOf(id)), ...rotationOf(id), ...scaleOf(id)] : []
     fields.forEach((f, k) => {
       f.disabled = !id
       if (id && document.activeElement !== f) f.value = k < 3 ? values[k].toFixed(3) : k < 6 ? values[k].toFixed(0) : values[k].toFixed(2)

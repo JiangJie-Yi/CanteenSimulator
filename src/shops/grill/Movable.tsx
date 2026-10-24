@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, turnTo, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, setFrame, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -52,7 +52,7 @@ const AXES = [
  * The three axes of the selected piece (red X, green Y, blue Z, along the same axes as its X, Y, Z fields): drag an arrow to move it along
  * that axis alone. It stands in the piece's own group, at `at`, so it moves with it.
  */
-export function AxisGizmo({ id, at }: { id: string; at: V3; size?: number }) {
+export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: number; theta?: number }) {
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
@@ -76,7 +76,8 @@ export function AxisGizmo({ id, at }: { id: string; at: V3; size?: number }) {
     e.stopPropagation()
     par.updateWorldMatrix(true, false)
     const origin = r0.getWorldPosition(new THREE.Vector3())
-    const dir = new THREE.Vector3(...AXES[axis].v).transformDirection(par.matrixWorld).normalize()
+    // (the arrows of the move tool point along the room's axes: turned by theta into the parent's frame)
+    const dir = new THREE.Vector3(...AXES[axis].v).applyAxisAngle(new THREE.Vector3(0, 1, 0), theta).transformDirection(par.matrixWorld).normalize()
     // (how far along the axis the pointer's ray comes nearest to it: where the two lines are closest)
     const along = (ev: PointerEvent) => {
       const r = gl.domElement.getBoundingClientRect()
@@ -98,7 +99,7 @@ export function AxisGizmo({ id, at }: { id: string; at: V3; size?: number }) {
       const p0 = origin.clone().addScaledVector(dir, last), p1 = origin.clone().addScaledVector(dir, s1)
       const d = par.worldToLocal(p1).sub(par.worldToLocal(p0))
       const n = [...offsetOf(id)] as V3
-      n[axis] += [d.x, d.y, d.z][axis]
+      n[0] += d.x; n[1] += d.y; n[2] += d.z
       moveTo(id, n)
       last = s1
     }
@@ -276,7 +277,7 @@ export function AxisGizmo({ id, at }: { id: string; at: V3; size?: number }) {
     )
   }
   return (
-    <group ref={root} position={at}>
+    <group ref={root} position={at} rotation-y={theta}>
       {AXES.map((a, i) => (
         <group key={a.name} rotation={a.rot} onPointerDown={down(i as 0 | 1 | 2)}>
           <mesh position-y={L * 0.4} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
@@ -307,7 +308,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
   const { on, offsets, rotations, scales, selected } = useEdit()
-  const [box, setBox] = useState<{ c: V3; s: V3; yaw: number } | null>(null)
+  const [box, setBox] = useState<{ c: V3; s: V3; yaw: number; theta: number } | null>(null)
   // (the piece's middle, in the frame of its own group as it stands untouched: what it turns and scales about; measured once it has been drawn)
   const [mid, setMid] = useState<V3>([0, 0, 0])
   const inner = useRef<THREE.Group>(null)
@@ -336,7 +337,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
         yMin = Math.min(yMin, v.y); yMax = Math.max(yMax, v.y)
       }
     })
-    if (!pts.length) return { c: [0, 0.3, 0] as V3, s: [0.5, 0.6, 0.5] as V3, yaw: 0 }
+    if (!pts.length) return { c: [0, 0.3, 0] as V3, s: [0.5, 0.6, 0.5] as V3, yaw: 0, theta: 0 }
     // (the box is squared to the room, like the gates' and the cats' stand: turned about the vertical to the bar's own direction, whatever
     // way the piece's parent is turned, so none of them comes out a diamond)
     const fit = (a: number) => {
@@ -350,11 +351,14 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
     }
     const innYaw = new THREE.Euler().setFromQuaternion(inn.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
     const best = fit(Math.atan2(ALONG.x, ALONG.z) - innYaw)
+    // (the room's direction against the parent's own frame: what the move arrows and the position fields are turned by)
+    const parentYaw = grp.parent ? new THREE.Euler().setFromQuaternion(grp.parent.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y : 0
+    const theta = Math.atan2(ALONG.x, ALONG.z) - parentYaw
     const cx = (best.x0 + best.x1) / 2, cz = (best.z0 + best.z1) / 2
     const co = Math.cos(best.a), si = Math.sin(best.a)
     // (the middle back out of the turned frame)
     const c = [cx * co + cz * si, (yMin + yMax) / 2, -cx * si + cz * co] as V3
-    return { c, s: [Math.max(best.x1 - best.x0, 0.2) + 0.06, Math.max(yMax - yMin, 0.2) + 0.06, Math.max(best.z1 - best.z0, 0.2) + 0.06] as V3, yaw: best.a }
+    return { c, s: [Math.max(best.x1 - best.x0, 0.2) + 0.06, Math.max(yMax - yMin, 0.2) + 0.06, Math.max(best.z1 - best.z0, 0.2) + 0.06] as V3, yaw: best.a, theta }
   }
 
   // (on the list of what can be moved, with a way to bring the camera to the middle of it)
@@ -371,8 +375,10 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
   useEffect(() => {
     if (!on) { setBox(null); return }
     // (a batch merges its meshes a moment after mounting: measured at once and again a little later, so the box is there whenever it's switched on)
-    setBox(measure())
-    const t = window.setTimeout(() => { const m = measure(); if (m) { setBox(m); setMid(m.c) } }, 300)
+    const first = measure()
+    if (first) setFrame(id, first.theta)
+    setBox(first)
+    const t = window.setTimeout(() => { const m = measure(); if (m) { setBox(m); setMid(m.c); setFrame(id, m.theta) } }, 300)
     return () => window.clearTimeout(t)
   }, [on])
 
@@ -429,7 +435,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
           <meshBasicMaterial color={selected === id ? '#8fd0ff' : '#3fa9ff'} transparent opacity={selected === id ? 0.2 : 0.26} depthWrite={false} depthTest={false} />
         </mesh>
       )}
-      {on && box && <AxisGizmo id={id} at={box.c} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
+      {on && box && <AxisGizmo id={id} theta={box.theta} at={box.c} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
     </group>
   )
 }
