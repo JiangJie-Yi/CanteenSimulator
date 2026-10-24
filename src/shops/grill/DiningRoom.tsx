@@ -519,29 +519,6 @@ function Festoon({ l, mid }: { l: number; mid: number }) {
   )
 }
 
-/** a paper umbrella hung open from the ceiling by its handle: a dome of pastel paper ribbed with bamboo, a hanging cord */
-const WAGASA_COLORS = ['#f6b8c8', '#bfe3f0', '#f8e6a8', '#d8c4f0', '#c8ecd0', '#f8c8a8']
-const WAGASA_GEO = {
-  dome: new THREE.SphereGeometry(0.34, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.42),
-  ribs: new THREE.SphereGeometry(0.34, 12, 2, 0, Math.PI * 2, 0, Math.PI * 0.42),
-  rim: new THREE.TorusGeometry(0.31, 0.004, 4, 28),
-}
-function Wagasa({ i }: { i: number }) {
-  const col = WAGASA_COLORS[i % WAGASA_COLORS.length]
-  return (
-    <group rotation={[0.28 * ((i % 3) - 1), 0, 0.22 * (((i + 1) % 3) - 1)]}>
-      {/* (hung with its mouth down, the way they're displayed: the dome upward, wider side down) */}
-      <group rotation-x={Math.PI} position-y={-0.2}>
-        <mesh geometry={WAGASA_GEO.dome} scale={[1, 0.55, 1]}><meshToonMaterial color={col} side={THREE.DoubleSide} /></mesh>
-        <mesh geometry={WAGASA_GEO.rim} position-y={0.0} rotation-x={Math.PI / 2} scale={[1.0, 1, 1]}><meshToonMaterial color="#e8dcc0" /></mesh>
-        {/* (the bamboo ribs: a coarse mesh of the same dome, drawn as lines just over the paper) */}
-        <mesh geometry={WAGASA_GEO.ribs} scale={[1.004, 0.554, 1.004]}><meshBasicMaterial color="#b8935a" wireframe /></mesh>
-      </group>
-      <mesh position-y={0.16}><cylinderGeometry args={[0.002, 0.002, 0.32, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
-    </group>
-  )
-}
-
 /** a big signboard (看板) on the wall: a cream board with the word brushed down it in great black strokes, a red seal at its foot */
 const KANBAN_LOOKS = [
   { text: '炭火燒烤', seal: '聞野', bg: '#ecd9a6', ink: '#1a0d06', frame: '#3a2416' },
@@ -1319,15 +1296,16 @@ const GLOW = (() => {
  * the bar top under it (added on, so it brightens what it falls on). Six real lights would cost every lit surface in
  * the room on every frame; these cost two quads each.
  */
-/** the paper lantern's body: a tall oval swelling in the middle and drawing in to its wooden rings, turned on a lathe */
+/** the paper lantern's body: a round ball, a circle in section, drawn in to the wooden rings at its two ends, turned on a lathe */
+const LANTERN_R = 0.125
+const LANTERN_END = Math.sqrt(LANTERN_R ** 2 - 0.05 ** 2)
 const LANTERN_GEO = (() => {
-  const H = 0.17, R = 0.092
   const pts: THREE.Vector2[] = []
-  for (let i = 0; i <= 22; i++) {
-    const y = -H + (2 * H * i) / 22, t = y / H
-    pts.push(new THREE.Vector2(0.046 + (R - 0.046) * Math.sqrt(Math.max(0, 1 - t * t)) ** 0.85, y))
+  for (let i = 0; i <= 24; i++) {
+    const y = -LANTERN_END + (2 * LANTERN_END * i) / 24
+    pts.push(new THREE.Vector2(Math.sqrt(Math.max(0, LANTERN_R ** 2 - y * y)), y))
   }
-  return new THREE.LatheGeometry(pts, 24)
+  return new THREE.LatheGeometry(pts, 28)
 })()
 /** thin washi in fine horizontal ribs, lit from within: bright cream in the middle of the belly, warmer toward its ends, a faint seam between each of the panels */
 const LANTERN_SKIN = signTexture(128, 256, (g) => {
@@ -1358,20 +1336,20 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
         <meshBasicMaterial color={INK} />
       </mesh>
       {/* (a paper lantern: the oval of ribbed washi, a pale wooden ring at each end, a little ring at the top for the cord) */}
-      <group position-y={-drop - 0.19}>
+      <group position-y={-drop - 0.13}>
         <mesh geometry={LANTERN_GEO}>
           <meshBasicMaterial color="#ffffff" map={LANTERN_SKIN} toneMapped={false} side={THREE.DoubleSide} />
         </mesh>
         <mesh geometry={LANTERN_GEO} scale={1.035}>
           <meshBasicMaterial color={INK} side={THREE.BackSide} />
         </mesh>
-        {[0.172, -0.172].map((y) => (
+        {[LANTERN_END + 0.004, -LANTERN_END - 0.004].map((y) => (
           <mesh key={y} position-y={y}>
             <cylinderGeometry args={[0.056, 0.056, 0.024, 16]} />
             <meshToonMaterial color="#cdb083" />
           </mesh>
         ))}
-        <mesh position-y={0.195} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 5, 12]} /><meshToonMaterial color="#8a6a3a" /></mesh>
+        <mesh position-y={LANTERN_END + 0.028} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 5, 12]} /><meshToonMaterial color="#8a6a3a" /></mesh>
         <sprite scale={0.85}>
           <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.6} color="#ffcf90" />
         </sprite>
@@ -1546,8 +1524,6 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
                   so no banner meets another) */}
               <Movable id={`banners${from.toFixed(1)}b`} label={`旗幟串 2（${from.toFixed(0)}）`}><group position={[0, 2.04, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 1)} seed={5} x0={-0.4} x1={-1.3} /></group></Movable>
               <Movable id={`banners${from.toFixed(1)}c`} label={`旗幟串 3（${from.toFixed(0)}）`}><group position={[0, 1.9, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 2)} seed={9} x0={-1.3} x1={-0.4} /></group></Movable>
-              {/* (and paper umbrellas (和傘), pastel, opened and hung upside-down over the aisle) */}
-              {zs.filter((_, k) => k % 6 === 4).map((z, k) => <Movable key={k} id={`umbrella${from.toFixed(1)}_${k}`} label={`和傘 ${k + 1}（${from.toFixed(0)}）`}><group position={[-1.9, 2.1 - (k % 2) * 0.1, z]} scale={0.5}><Wagasa i={k} /></group></Movable>)}
             </>
           ) : null
         })()}
