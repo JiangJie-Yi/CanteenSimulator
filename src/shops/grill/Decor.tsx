@@ -339,41 +339,76 @@ const RICE_SCALE = 2.0
 /** the side table it stands on: its top's height (the cook's table's top is the scene's y = 0), and its size */
 const SIDE_TOP = -0.3
 const SIDE_W = 1.35
-/** pale cypress staves round the tub, each its own tone, fine grain running up, a dark joint between */
+/** pale cypress staves round the tub: twenty-four of them, each its own tone, fine grain running up and a knot or two, a dark joint between */
 const STAVES = (() => {
   if (typeof document === 'undefined') return null
+  const N = 24, SW = 16
   const c = document.createElement('canvas')
-  c.width = 128
-  c.height = 64
+  c.width = N * SW
+  c.height = 128
   const g = c.getContext('2d')!
+  let seed = 3
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
   const tones = ['#ecd2a2', '#e3c593', '#f0d8ab', '#dfbf8c', '#e8cd9b', '#e1c28f', '#efd5a6', '#e5c898']
-  for (let i = 0; i < 8; i++) {
-    g.fillStyle = tones[i]
-    g.fillRect(i * 16, 0, 16, 64)
-    g.strokeStyle = 'rgba(150,100,50,0.28)'
-    g.lineWidth = 1
-    for (let k = 0; k < 5; k++) {
+  for (let i = 0; i < N; i++) {
+    g.fillStyle = tones[(i * 5) % tones.length]
+    g.fillRect(i * SW, 0, SW, 128)
+    // (the grain: long wavering lines, a few darker)
+    for (let k = 0; k < 9; k++) {
+      const x = i * SW + 1.5 + k * 1.6
+      g.strokeStyle = rnd() < 0.25 ? 'rgba(120,76,36,0.4)' : 'rgba(150,100,50,0.22)'
+      g.lineWidth = 0.6 + rnd() * 0.5
       g.beginPath()
-      g.moveTo(i * 16 + 2 + k * 3, 0)
-      g.bezierCurveTo(i * 16 + 3 + k * 3, 20, i * 16 + 1 + k * 3, 44, i * 16 + 2 + k * 3, 64)
+      g.moveTo(x, 0)
+      g.bezierCurveTo(x + (rnd() - 0.5) * 3, 40, x + (rnd() - 0.5) * 3, 88, x + (rnd() - 0.5) * 2, 128)
       g.stroke()
     }
+    // (a knot now and then, the grain bending round it)
+    if (rnd() < 0.3) {
+      const x = i * SW + 4 + rnd() * 8, y = 14 + rnd() * 100
+      g.strokeStyle = 'rgba(110,70,30,0.55)'
+      for (let r = 1; r <= 3; r++) { g.lineWidth = 0.8; g.beginPath(); g.ellipse(x, y, 1.2 * r, 2.4 * r, 0, 0, Math.PI * 2); g.stroke() }
+      g.fillStyle = 'rgba(90,56,24,0.6)'; g.beginPath(); g.ellipse(x, y, 1, 2, 0, 0, Math.PI * 2); g.fill()
+    }
+    // (a wet, darker foot where the tub has stood in water)
+    const wet = g.createLinearGradient(0, 100, 0, 128)
+    wet.addColorStop(0, 'rgba(120,80,40,0)'); wet.addColorStop(1, 'rgba(120,80,40,0.28)')
+    g.fillStyle = wet; g.fillRect(i * SW, 100, SW, 28)
   }
-  g.fillStyle = 'rgba(120,80,40,0.55)'
-  for (let i = 0; i < 8; i++) g.fillRect(i * 16, 0, 1, 64)
+  g.fillStyle = 'rgba(100,66,32,0.7)'
+  for (let i = 0; i < N; i++) g.fillRect(i * SW, 0, 1.4, 128)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = THREE.RepeatWrapping
-  t.repeat.set(2, 1)
+  t.repeat.set(1, 1)
+  t.anisotropy = 4
   return t
+})()
+/** a flat band of metal round the tub (a strip, not a rod): a lathe of a thin rectangle, its upper edge a little proud */
+const flatBand = (R: number, h: number, t = 0.007) => new THREE.LatheGeometry([[R - t, -h / 2], [R, -h / 2], [R + 0.0025, 0], [R, h / 2], [R - t, h / 2], [R - t, -h / 2]].map(([x, y]) => new THREE.Vector2(x, y)), 48)
+/** the rice's surface: little rounded clumps and single grains laid over the heap, none past the rim, each a slightly different white */
+const RICE_CLUMPS = (() => {
+  let seed = 11
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const whites = ['#fffdf8', '#fbf8f0', '#fffef9', '#f8f3e8']
+  return Array.from({ length: 70 }, (_, i) => {
+    const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 0.225
+    const y = 0.44 + Math.sqrt(Math.max(0, 1 - (r / 0.3) ** 2)) * 0.075
+    const big = i % 5 === 0
+    const k = big ? 0.016 + rnd() * 0.01 : 0.006 + rnd() * 0.003
+    return { p: [Math.cos(a) * r, y, Math.sin(a) * r] as [number, number, number], s: [k * 1.3, k * (big ? 0.7 : 0.55), k] as [number, number, number], r: [rnd() * 3, rnd() * 6, rnd() * 3] as [number, number, number], c: whites[i % whites.length] }
+  })
 })()
 const RICE_GEO = {
   tub: new THREE.CylinderGeometry(0.27, 0.255, 0.42, 32, 1, true),
   lidTop: new THREE.CylinderGeometry(0.255, 0.285, 0.035, 32),
   ear: new THREE.BoxGeometry(0.1, 0.12, 0.05),
-  band: new THREE.TorusGeometry(0.268, 0.01, 6, 40),
+  band: flatBand(0.2645, 0.03),
+  bandWide: flatBand(0.268, 0.045),
+  rivet: new THREE.CylinderGeometry(0.0055, 0.0055, 0.004, 8),
   floor: new THREE.CircleGeometry(0.25, 28),
   hoop: new THREE.TorusGeometry(0.272, 0.012, 6, 32),
+  grain: new THREE.SphereGeometry(1, 7, 5),
   rice: new THREE.SphereGeometry(0.255, 24, 10, 0, Math.PI * 2, 0, Math.PI * 0.32),
   cylRice: new THREE.CylinderGeometry(0.258, 0.248, 0.44, 28, 1, false),
   lid: new THREE.CylinderGeometry(0.29, 0.29, 0.03, 28),
@@ -439,6 +474,9 @@ function RiceTub() {
         <mesh geometry={g.floor} position-y={0.012} rotation-x={-Math.PI / 2}><meshToonMaterial color="#b88f58" /></mesh>
         <group ref={lid} position={[0, 0.4375, 0]}>
           <Inked geometry={g.lidTop} color="#ffffff" map={STAVES} grow={1.05} />
+          {/* (the lid's grain: rings turned into the top, and a pale edge band) */}
+          {[0.1, 0.17, 0.225].map((r) => <mesh key={r} position-y={0.0182} rotation-x={Math.PI / 2}><torusGeometry args={[r, 0.0011, 4, 40]} /><meshToonMaterial color="#b8955c" /></mesh>)}
+          <mesh position-y={0.0} rotation-x={Math.PI / 2}><torusGeometry args={[0.285, 0.004, 4, 40]} /><meshToonMaterial color="#c8a86e" /></mesh>
           <mesh geometry={g.slab} position={[0, 0.0375, 0]} scale={[0.22, 0.03, 0.05]} castShadow><meshToonMaterial color="#e0a868" /></mesh>
           <mesh geometry={g.slab} position={[0, 0.022, 0]} scale={[0.19, 0.03, 0.03]}><meshToonMaterial color="#d09858" /></mesh>
         </group>
@@ -447,11 +485,19 @@ function RiceTub() {
             <Inked geometry={g.ear} color="#ffffff" map={STAVES} grow={1.06} />
           </group>
         ))}
-        {[0.1, 0.12, 0.14].map((y, k) => (
-          <mesh key={y} geometry={g.band} position-y={y} rotation={[Math.PI / 2 + (k - 1) * 0.05, 0, 0]}>
-            <meshToonMaterial color={k === 1 ? '#c2a368' : '#a98a52'} />
-          </mesh>
+        {/* the copper hoops: three flat bands (a wide one low, a narrow pair above), each riveted at its lap, a foot ring below, a lip of dark wood at the rim */}
+        {[[0.07, 'bandWide'], [0.2, 'band'], [0.3, 'band']].map(([y, kind], k) => (
+          <group key={k} position-y={y as number}>
+            <mesh geometry={g[kind as 'band' | 'bandWide']}><meshToonMaterial color={k === 0 ? '#b8743a' : '#c58a4a'} /></mesh>
+            {[0, 1, 2].map((r) => (
+              <mesh key={r} geometry={g.rivet} position={[0.2745 * Math.cos(0.5 + r * 0.16), 0, 0.2745 * Math.sin(0.5 + r * 0.16)]} rotation={[Math.PI / 2, 0, -(0.5 + r * 0.16)]}>
+                <meshToonMaterial color="#6a4220" />
+              </mesh>
+            ))}
+          </group>
         ))}
+        <mesh position-y={0.012} rotation-x={Math.PI / 2}><torusGeometry args={[0.26, 0.012, 6, 36]} /><meshToonMaterial color="#c7a56c" /></mesh>
+        <mesh position-y={0.4175} rotation-x={Math.PI / 2}><torusGeometry args={[0.2645, 0.0075, 6, 40]} /><meshToonMaterial color="#d8b87c" /></mesh>
         {open && (
           <>
             {/* the rice, heaped a little over the rim, the paddle stood in it */}
@@ -461,6 +507,10 @@ function RiceTub() {
             <mesh geometry={g.rice} position-y={0.338} scale={[1.17, 0.6, 1.17]}>
               <meshToonMaterial color="#fbf8f0" />
             </mesh>
+            {/* (the surface of the rice: soft clumps and a scatter of single grains over the heap) */}
+            {RICE_CLUMPS.map((c, i) => (
+              <mesh key={i} geometry={g.grain} position={c.p} scale={c.s} rotation={c.r}><meshToonMaterial color={c.c} /></mesh>
+            ))}
             <group position={[0.08, 0.57, -0.04]} rotation={[0.25, 0, -0.35]}>
               <mesh geometry={g.paddle} position-y={0.06}><meshToonMaterial color="#e2c89a" /></mesh>
               <mesh geometry={g.blade} position-y={-0.12} scale={[1, 1.3, 0.25]}><meshToonMaterial color="#e2c89a" /></mesh>
