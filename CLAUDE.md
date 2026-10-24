@@ -70,6 +70,12 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **群組**：清單裡 Ctrl／Shift 點選多件 → 「成組」；群組可一起位移、繞垂直軸轉、整體縮放（轉動中心是成員的中間）。「解散」「改名」「復原」都能用。沒有中心點的東西（閘門）不能成組。
 - 進編輯模式會自動收起選單，離開後還原；選單收放或進出編輯模式不會讓鏡頭重新歸位（只有換菜、重設視角、總覽、視窗大小改變才會）。
 
+## 研製料理與營業（`game/mode.ts`）
+
+- 店關著是**研製料理**：手動夾食物、調味、看每塊的烤魚進度（`roast-tag`）、食材冷藏櫃（`ui/Menu.tsx` 的 `bin`，每格可點一下拿一份試做、+1／+10 叫貨、補 = 補到 `PAR`），視角固定在**攝影機 1**。店開著是**營業**：廚房自己烤（自己的 AI 主廚永遠工作，雇的員工一起），沒有手動烤魚與調味、沒有進度標籤、也沒有食材冷藏櫃。規則都在 `game/mode.ts`（有 BDD 情境 `tests/bdd/mode.test.ts`）。
+- **攝影機 1**：預設是該道菜的 home 視角（`App.tsx` 的 home），可在編輯模式選「攝影機 1（研製視角）」調位置與旋轉（`scene/camera1.ts`；畫成攝影機加視錐，由 `CameraRig` 畫）；編輯模式本身視角是自由的，離開後回到攝影機 1。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
+- **HDRI**：`scene/IndoorHDRI.tsx` 有 `public/hdri/day.hdr`、`night.hdr`（polyhaven.com/hdris 的 1k .hdr）就用真的，沒有就用內建的假 HDRI。**BGM**：`ui/Bgm.tsx` 找 `src/IzakayaNight.mp3`（或 `public/audio/`）。
+
 ## 常見改動要碰哪裡
 
 - **加一道食材**：在 `data/menu.ts` 的店家 `items` 加一筆；成本比例加在 `game/economy.ts` 的 `COST_SHARE`；燒烤類要在 `game/taste.ts` 的 `PAIRING` 加上調味搭配（調味的最佳時機在 `TIMING`）；有特別菜名的話加在 `data/recipes.ts`（`SPECIAL` / `BREAD`）。燒烤的 3D 模型由 `blender/grilledfish.py` 產生。

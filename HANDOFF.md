@@ -18,9 +18,14 @@
 - HDRI：`src/scene/IndoorHDRI.tsx` 若有 `public/hdri/day.hdr`、`night.hdr`（polyhaven.com/hdris 的 1k .hdr，CC0）就用真的，沒有就用內建的假 HDRI。雲端連不上 polyhaven，所以沒放檔。
 - 瘦身：移除沒人用的匯出（`starsFor`、`COIN_R`、`KITCHEN_TOP`、`resetOne`、`equilibriumTemp`、`MiniStomach`）、翻頁箭頭與迷你胃的 CSS、Blender 備份檔、`__pycache__`、`blender/archive`、`public/icons.svg`。
 
+## 後來加的
+- 研製料理／營業分開（`game/mode.ts`）：營業時不能手動烤魚調味、沒有進度標籤、廚房自己烤；研製時視角鎖在攝影機 1（編輯模式可調，離開恢復）；食材改成冷藏櫃樣式（可試做＋叫貨＋補貨）。
+- 炭火改成有稜角的炭塊、裂縫對齊溝槽發光；櫃台線路收成一束、加 iPad；收銀抽屜內部依日圓重做；飯桶更多細節；水桶箍圈改成片狀；吊燈圓形；傘移除；編輯模式面板顯示家具總數。
+
 ## 待辦
 1. 【你】`src/IzakayaNight.mp3` 要提交進 repo（雲端看不到；網站才會有 BGM）；另外下載日夜兩張 HDRI 放進 `public/hdri/`。
 2. 吧台本體、爐子與石頭、行燈、扇子還沒做成編輯物件（等使用者決定）。
+2b. HDRI：雲端連不上 polyhaven，還沒放真檔；使用者放進 `public/hdri/` 後確認有套用（白天／夜晚不同）。
 3. 【你】GitHub repo 改名 JapaneseGrillSimulator（push 時 GitHub 提示已搬到 JiangJie-Yi/CanteenSimulator）。
 4. 【你】看一遍畫面是否到位；編輯模式的舊設定若看起來歪，按「全部還原」。
 
