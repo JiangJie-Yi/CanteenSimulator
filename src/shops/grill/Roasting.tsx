@@ -5,7 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
-import { placeStick, restOf, roomFor, type Lay } from '@/game/coalPile'
+import { placeStick, restOf, roomFor, surfaceY, type Lay } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -25,7 +25,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { AxisGizmo, focusCamera } from './Movable'
-import { binchotanGeo, binchotanMap } from './Binchotan'
+import { binchotanGeo, binchotanMap, burningMaps } from './Binchotan'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit } from './edit'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
@@ -400,6 +400,67 @@ function scorchEarth(mesh: THREE.Mesh) {
   mat.alphaTest = 0.06
   mesh.renderOrder = -2
   mat.needsUpdate = true
+}
+/** the soft orange pool of light a heap of embers throws on what's round it: a radial gradient, drawn once */
+const EMBER_GLOW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+  gr.addColorStop(0, 'rgba(255,140,50,0.9)'); gr.addColorStop(0.4, 'rgba(255,90,20,0.35)'); gr.addColorStop(1, 'rgba(255,60,10,0)')
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128)
+  return new THREE.CanvasTexture(c)
+})()
+/**
+ * The bed of embers between and under the sticks: a scatter of small broken lumps of charcoal, some glowing hard, some dull, some only dark, and a pool of
+ * orange light on the salt. They glow with the fire (`fuel`, 0..1+) and breathe a little; as the fire dies they go grey with ash and stop glowing.
+ */
+function EmberBed({ fuel }: { fuel: { current: number } }) {
+  const lumps = useMemo(() => {
+    let seed = 23
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    const groups: { m: THREE.Matrix4[]; k: number }[] = [{ m: [], k: 1 }, { m: [], k: 0.55 }, { m: [], k: 0.18 }]
+    for (let i = 0; i < 96; i++) {
+      const a = rnd() * Math.PI * 2, r = 0.44 * rnd() ** 0.8
+      const x = Math.cos(a) * r, z = Math.sin(a) * r, size = 0.018 + rnd() * 0.03
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 6, rnd() * 3))
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(x, surfaceY(x, z, PIT_LIFT) + size * 0.35, z), q, new THREE.Vector3(size * (0.8 + rnd() * 0.7), size * 0.55, size * (0.8 + rnd() * 0.7)))
+      groups[i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : 2].m.push(m)
+    }
+    return groups
+  }, [])
+  const geo = useMemo(() => new THREE.IcosahedronGeometry(1, 0), [])
+  const mats = useMemo(() => lumps.map(() => new THREE.MeshToonMaterial({ color: '#141210', emissive: new THREE.Color('#ff4a0e'), emissiveIntensity: 0 })), [lumps])
+  const refs = useRef<(THREE.InstancedMesh | null)[]>([])
+  const pool = useRef<THREE.Mesh>(null)
+  useLayoutEffect(() => {
+    lumps.forEach((gr, i) => { const im = refs.current[i]; if (im) { gr.m.forEach((m, j) => im.setMatrixAt(j, m)); im.instanceMatrix.needsUpdate = true } })
+  }, [lumps])
+  const dark = useMemo(() => new THREE.Color('#141210'), [])
+  const ash = useMemo(() => new THREE.Color('#9a948a'), [])
+  useFrame(({ clock }) => {
+    const f = Math.max(0, fuel.current), t = clock.elapsedTime
+    const ashy = THREE.MathUtils.smoothstep(0.45 - f, 0, 0.4)
+    mats.forEach((m, i) => {
+      const flick = 0.85 + 0.15 * Math.sin(t * (2.1 + i) + i * 1.7)
+      m.emissiveIntensity = lumps[i].k * 1.5 * Math.min(1.3, f) ** 1.3 * flick * (1 - ashy)
+      m.color.copy(dark).lerp(ash, ashy)
+    })
+    if (pool.current) {
+      pool.current.visible = f > 0.03
+      ;(pool.current.material as THREE.MeshBasicMaterial).opacity = Math.min(0.85, 0.75 * Math.min(1.2, f) ** 1.2) * (0.9 + 0.1 * Math.sin(t * 3.1))
+    }
+  })
+  return (
+    <>
+      {lumps.map((gr, i) => <instancedMesh key={i} ref={(m) => { refs.current[i] = m }} args={[geo, mats[i], gr.m.length]} frustumCulled={false} />)}
+      <mesh ref={pool} position-y={surfaceY(0, 0, PIT_LIFT) + 0.03} rotation-x={-Math.PI / 2} renderOrder={2}>
+        <planeGeometry args={[1.5, 1.5]} />
+        <meshBasicMaterial map={EMBER_GLOW} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
+    </>
+  )
 }
 /** the most sticks of charcoal the bed holds at once, and how long one lasts once it's burning, in game seconds (it burns down to a third of its length, then it's ash) */
 const UP_AXIS = new THREE.Vector3(0, 1, 0)
@@ -2180,7 +2241,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (it lands where it was let go, then slides to where it settles)
       const ly = restOf(spot.from.x, spot.from.z, yaw, lying).y
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
-      const mat = new THREE.MeshToonMaterial({ color: '#ffffff', map: binchotanMap(), emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
+      const mats = burningMaps()
+      const mat = new THREE.MeshToonMaterial({ color: '#ffffff', map: mats?.dark ?? binchotanMap(), emissiveMap: mats?.glow ?? null, emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
       coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
@@ -3758,8 +3820,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const h = c.heat * (1 - ashed * ashed * (3 - 2 * ashed)) * (c.dying ? Math.max(0, 1 - burnt) : 1)
         c.mat.color.set('#ffffff').lerp(ASH_TINT, ashed).multiplyScalar(1 + ((ASH_GAIN.Binchotan - 1) * ashed ** 1.5) * 0.55)
         const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
-        c.mat.emissive.setRGB(0.25 + 0.75 * h, 0.03 + 0.4 * h ** 1.6, 0.0 + 0.1 * h ** 3)
-        c.mat.emissiveIntensity = 0.9 * h ** 1.5 * flick
+        // (only the fractures light up (the emissive map): an orange that goes yellower and brighter as the stick kindles, a dull red while it's still catching)
+        c.mat.emissive.setRGB(1, 0.42 + 0.45 * h ** 1.6, 0.1 + 0.25 * h ** 3)
+        c.mat.emissiveIntensity = (0.15 + 2.3 * h ** 1.3) * flick
       }
       if (c.settled) {
         // (what lay on it comes down as sticks beneath burn away; it eases to its pose)
@@ -4351,6 +4414,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             : <SideDish key={`${k}-${i}`} container="" position={at} />
         })
       })}
+      <EmberBed fuel={fuel} />
       {coalIds.map((id) => coals.current[id] && (
         <group key={id} visible={false} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }}>
           <mesh geometry={coals.current[id].geo} material={coals.current[id].mat} castShadow />

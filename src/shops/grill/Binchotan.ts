@@ -60,6 +60,93 @@ export function binchotanMap() {
   return map
 }
 
+let burning: { dark: THREE.CanvasTexture; glow: THREE.CanvasTexture } | null = null
+/**
+ * A stick on the fire, as a pair of textures that share their cracks: the charred surface (near-black, broken across into blocks by deep fractures,
+ * pale ash dust here and there) and the glow that shows through those fractures (orange, a hot yellow at their middles, a little along the edges),
+ * used as the emissive map, so it's the cracks that light up and the faces between them stay black.
+ */
+export function burningMaps() {
+  if (burning || typeof document === 'undefined') return burning
+  const W = 128, H = 256
+  let seed = 41
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  // (the fractures, drawn the same on both: each a jagged line across the stick, some with a branch running down it)
+  type Crack = { pts: [number, number][]; branch: [number, number][] | null }
+  const cracks: Crack[] = []
+  let y = 14 + rnd() * 20
+  while (y < H - 10) {
+    const pts: [number, number][] = []
+    let yy = y
+    for (let x = -4; x <= W + 4; x += 10 + rnd() * 12) { yy = y + (rnd() - 0.5) * 12; pts.push([x, yy]) }
+    let branch: [number, number][] | null = null
+    if (rnd() < 0.6) {
+      const bx = 10 + rnd() * (W - 20)
+      branch = [[bx, y], [bx + (rnd() - 0.5) * 10, y + 14 + rnd() * 12], [bx + (rnd() - 0.5) * 14, y + 30 + rnd() * 18]]
+    }
+    cracks.push({ pts, branch })
+    y += 30 + rnd() * 36
+  }
+  const draw = (g: CanvasRenderingContext2D, color: string, width: number, blur: number, glow: string | null) => {
+    g.lineCap = 'round'; g.lineJoin = 'round'
+    g.strokeStyle = color; g.lineWidth = width
+    if (glow) { g.shadowColor = glow; g.shadowBlur = blur } else g.shadowBlur = 0
+    for (const c of cracks) {
+      g.beginPath(); c.pts.forEach(([x, yy], i) => (i ? g.lineTo(x, yy) : g.moveTo(x, yy))); g.stroke()
+      if (c.branch) { g.beginPath(); c.branch.forEach(([x, yy], i) => (i ? g.lineTo(x, yy) : g.moveTo(x, yy))); g.stroke() }
+    }
+    g.shadowBlur = 0
+  }
+  const mk = (c: HTMLCanvasElement, srgb: boolean) => {
+    const t = new THREE.CanvasTexture(c)
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace
+    t.anisotropy = 4
+    return t
+  }
+  // the charred face
+  const dc = document.createElement('canvas'); dc.width = W; dc.height = H
+  const d = dc.getContext('2d')!
+  d.fillStyle = '#25221f'; d.fillRect(0, 0, W, H)
+  for (let i = 0; i < 26; i++) {
+    d.fillStyle = rnd() < 0.6 ? `rgba(8,7,6,${0.2 + rnd() * 0.3})` : `rgba(80,74,68,${0.06 + rnd() * 0.1})`
+    d.fillRect(rnd() * W, 0, 2 + rnd() * 9, H)
+  }
+  // (each block between two fractures: its own tone, its edges blackened)
+  for (let i = 0; i + 1 < cracks.length; i++) {
+    const y0 = cracks[i].pts[0][1], y1 = cracks[i + 1].pts[0][1]
+    d.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '70,64,58'},${0.06 + rnd() * 0.1})`
+    d.fillRect(0, y0, W, y1 - y0)
+  }
+  draw(d, 'rgba(4,3,3,0.95)', 5, 0, null)
+  for (let i = 0; i < 700; i++) {
+    d.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.35)' : 'rgba(170,164,156,0.14)'
+    d.fillRect(rnd() * W, rnd() * H, 1, 1 + rnd() * 2)
+  }
+  for (let i = 0; i < 12; i++) {
+    const x = rnd() * W, yy = rnd() * H
+    const gr = d.createRadialGradient(x, yy, 0, x, yy, 5 + rnd() * 11)
+    gr.addColorStop(0, `rgba(190,186,178,${0.14 + rnd() * 0.14})`); gr.addColorStop(1, 'rgba(190,186,178,0)')
+    d.fillStyle = gr; d.fillRect(x - 20, yy - 20, 40, 40)
+  }
+  // the light through the fractures
+  const gc = document.createElement('canvas'); gc.width = W; gc.height = H
+  const g = gc.getContext('2d')!
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H)
+  draw(g, 'rgba(255,90,20,0.9)', 7, 14, '#ff5a14')
+  draw(g, 'rgba(255,170,60,1)', 3.2, 6, '#ffa03c')
+  draw(g, 'rgba(255,235,150,1)', 1.2, 0, null)
+  // (a dull red along some of the edges of the blocks: the heat inside showing at their corners)
+  for (let i = 0; i < 18; i++) {
+    const x = rnd() * W, yy = rnd() * H
+    const gr = g.createRadialGradient(x, yy, 0, x, yy, 6 + rnd() * 9)
+    gr.addColorStop(0, `rgba(255,70,15,${0.25 + rnd() * 0.3})`); gr.addColorStop(1, 'rgba(255,70,15,0)')
+    g.fillStyle = gr; g.fillRect(x - 16, yy - 16, 32, 32)
+  }
+  burning = { dark: mk(dc, true), glow: mk(gc, true) }
+  return burning
+}
+
 const cache = new Map<string, THREE.BufferGeometry>()
 /** how thick the hollow is, as a part of the stick's radius */
 const BORE = 0.46
