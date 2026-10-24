@@ -716,6 +716,12 @@ const grime = (w: number, h: number, seed: number, wear: number) => signTexture(
   }
 })
 /** the tablet's screen: the shop's order screen, a header, the orders as rows with their prices, the total and a green button to settle up */
+/** the little plates on the notes' slots */
+const BILL_LABEL: Record<Note, THREE.Texture | null> = {
+  1000: signTexture(64, 22, (g) => { g.fillStyle = '#d9e6f2'; g.fillRect(0, 0, 64, 22); g.fillStyle = '#233a5c'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('¥1,000', 32, 12) }),
+  5000: signTexture(64, 22, (g) => { g.fillStyle = '#e6dcf0'; g.fillRect(0, 0, 64, 22); g.fillStyle = '#4a2f72'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('¥5,000', 32, 12) }),
+  10000: signTexture(64, 22, (g) => { g.fillStyle = '#efe3c4'; g.fillRect(0, 0, 64, 22); g.fillStyle = '#5a3f14'; g.font = 'bold 14px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('¥10,000', 32, 12) }),
+}
 const IPAD_SCREEN = signTexture(192, 264, (g) => {
   g.fillStyle = '#f4f6f9'; g.fillRect(0, 0, 192, 264)
   g.fillStyle = '#2f6fb0'; g.fillRect(0, 0, 192, 34)
@@ -892,20 +898,39 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
           <Part geo={REG_GEO.body} color="#bdb7a9" outline={0} position={[0, 0.03, 0.1385]} scale={[0.35, 0.04, 0.007]} />
           {/* (the insert, laid out in the till's own units: the group is scaled back by the register's size) */}
           <group ref={cash} visible={false} position={[0, 0.0175, -0.01]} scale={1 / REG_SC}>
-            <mesh rotation-x={-Math.PI / 2}><planeGeometry args={[0.46, 0.28]} /><meshToonMaterial color="#2c2d31" /></mesh>
-            {/* (ribs between the slots) */}
-            {[-0.225, -0.155, -0.085, -0.015].map((x) => <mesh key={x} position={[x, 0.006, 0]}><boxGeometry args={[0.004, 0.012, 0.26]} /><meshToonMaterial color="#5a5c62" /></mesh>)}
-            {/* (the notes standing in their slots, each kind its own stack, the long side along the drawer) */}
-            {([1000, 5000, 10000] as Note[]).map((kind) => <NoteStack key={kind} kind={kind} n={16} position={[SLOT_X[kind], 0, -0.04]} rotation-y={Math.PI / 2} />)}
-            {/* (the coins in their cups: 1, 5, 10 along the front, 50, 100, 500 behind them) */}
-            {([[1, 0.07, -0.08, 9], [5, 0.135, -0.08, 7], [10, 0.2, -0.08, 8], [50, 0.07, 0.03, 6], [100, 0.135, 0.03, 8], [500, 0.2, 0.03, 5]] as [CoinKind, number, number, number][]).map(([kind, x, z, n]) => (
-              <group key={kind} position={[x, 0, z]}>
-                <mesh position-y={0.003}><cylinderGeometry args={[0.027, 0.027, 0.006, 18, 1, true]} /><meshToonMaterial color="#5a5c62" side={THREE.DoubleSide} /></mesh>
-                <CoinStack kind={kind} n={n} />
+            {/* the insert, as in a real till: a graphite plastic tray with a low rim; the coins in a block of six wells at the right (1, 5, 10 along the front, 50, 100, 500 behind), each with
+                walls of its own and a scoop cut in the front lip for a finger; the notes at the left in three long slots, lying flat and leaning back a little against the tray's back, each
+                held by a spring clip across its front, a small plate at the slot's end naming what's in it */}
+            <mesh rotation-x={-Math.PI / 2}><planeGeometry args={[0.46, 0.28]} /><meshToonMaterial color="#26272b" /></mesh>
+            {[[0, 0.146, 0.46, 0.012, 0.007], [0, -0.146, 0.46, 0.012, 0.007]].map(([x, z, w, h, d], i) => <mesh key={`rz${i}`} position={[x, h / 2, z]}><boxGeometry args={[w, h, d]} /><meshToonMaterial color="#34363c" /></mesh>)}
+            {[-0.233, 0.233].map((x) => <mesh key={`rx${x}`} position={[x, 0.006, 0]}><boxGeometry args={[0.007, 0.012, 0.292]} /><meshToonMaterial color="#34363c" /></mesh>)}
+            {/* (the notes' slots: a divider either side, a lower floor, the label plate at the front end) */}
+            {([1000, 5000, 10000] as Note[]).map((kind) => (
+              <group key={kind}>
+                <mesh position={[SLOT_X[kind], 0.0012, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.066, 0.26]} /><meshToonMaterial color="#1b1c1f" /></mesh>
+                <mesh position={[SLOT_X[kind] - 0.0345, 0.01, 0]}><boxGeometry args={[0.003, 0.02, 0.26]} /><meshToonMaterial color="#44474e" /></mesh>
+                <mesh position={[SLOT_X[kind], 0.0125, -0.128]} rotation-x={-0.5}><planeGeometry args={[0.04, 0.014]} /><meshBasicMaterial map={BILL_LABEL[kind]} /></mesh>
+                <group position={[SLOT_X[kind], 0, -0.02]} rotation-x={-0.09}>
+                  <NoteStack kind={kind} n={14} rotation-y={Math.PI / 2} />
+                  {/* (the spring clip: a steel bar over the front of the stack on two posts) */}
+                  <mesh position={[0, 0.03, -0.088]}><boxGeometry args={[0.058, 0.0025, 0.005]} /><meshToonMaterial color="#aeb4ba" /></mesh>
+                  {[-0.027, 0.027].map((dx) => <mesh key={dx} position={[dx, 0.016, -0.088]}><boxGeometry args={[0.003, 0.03, 0.003]} /><meshToonMaterial color="#8a9096" /></mesh>)}
+                </group>
               </group>
             ))}
-            {/* (a thin bar across the notes, holding them down) */}
-            <mesh position={[-0.12, 0.034, 0.015]}><boxGeometry args={[0.21, 0.003, 0.006]} /><meshToonMaterial color="#9aa0a6" /></mesh>
+            <mesh position={[SLOT_X[10000] + 0.0345, 0.01, 0]}><boxGeometry args={[0.003, 0.02, 0.26]} /><meshToonMaterial color="#44474e" /></mesh>
+            {/* (the coin wells, each with its walls, its floor, a scoop at the front, and two loose stacks of the real coin, one a little tipped) */}
+            {([[1, 0.07, -0.08, 9], [5, 0.135, -0.08, 7], [10, 0.2, -0.08, 8], [50, 0.07, 0.03, 6], [100, 0.135, 0.03, 8], [500, 0.2, 0.03, 5]] as [CoinKind, number, number, number][]).map(([kind, x, z, n]) => (
+              <group key={kind} position={[x, 0, z]}>
+                <mesh position-y={0.0013} rotation-x={-Math.PI / 2}><planeGeometry args={[0.058, 0.082]} /><meshToonMaterial color="#18191c" /></mesh>
+                {[[0, 0.0425, 0.06, 0.003], [0, -0.0425, 0.06, 0.003], [-0.0295, 0, 0.003, 0.088], [0.0295, 0, 0.003, 0.088]].map(([wx, wz, ww, wd], i) => (
+                  <mesh key={i} position={[wx, 0.007, wz]}><boxGeometry args={[ww, 0.014, wd]} /><meshToonMaterial color="#40434a" /></mesh>
+                ))}
+                <mesh position={[0, 0.0016, -0.0405]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.014, 14, 0, Math.PI]} /><meshBasicMaterial color="#0c0d0f" /></mesh>
+                <CoinStack kind={kind} n={n} position={[-0.011, 0.0013, 0.004]} />
+                <CoinStack kind={kind} n={Math.max(2, Math.round(n * 0.55))} position={[0.012, 0.0013, -0.006]} rotation={[0.05, 0, 0.06]} />
+              </group>
+            ))}
           </group>
         </group>
         <mesh ref={slip} geometry={slipGeo} visible={false} position={[-0.025, 0.2185, 0.076]} rotation={[0.2, Math.PI, 0]}>

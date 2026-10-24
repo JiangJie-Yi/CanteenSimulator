@@ -91,6 +91,17 @@ const coinFace = (kind: CoinKind) => {
   return tex(64, 64, (g) => {
     g.fillStyle = c.base
     g.fillRect(0, 0, 64, 64)
+    // (the metal's sheen: a soft light from one side; the 500 yen's two metals, a gold ring round a silver centre)
+    if (kind === 500) {
+      g.fillStyle = '#e1e1dc'
+      g.beginPath(); g.arc(32, 32, 17, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = c.edge; g.lineWidth = 1.2
+      g.beginPath(); g.arc(32, 32, 17, 0, Math.PI * 2); g.stroke()
+    }
+    const sheen = g.createLinearGradient(0, 0, 64, 64)
+    sheen.addColorStop(0, 'rgba(255,255,255,0.28)'); sheen.addColorStop(0.5, 'rgba(255,255,255,0)'); sheen.addColorStop(1, 'rgba(0,0,0,0.18)')
+    g.fillStyle = sheen
+    g.fillRect(0, 0, 64, 64)
     g.strokeStyle = c.edge; g.lineWidth = 3
     g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2); g.stroke()
     g.lineWidth = 1
