@@ -1417,26 +1417,31 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
           <meshToonMaterial color="#ffffff" map={frieze} />
         </mesh>
         <Box size={[0.03, 0.025, l]} color="#3a2416" position={[-0.01, WALL_H - 0.31, mid]} />
-        {art.map((a) => (
-          <group key={a.z} position={[0, a.scroll ? 1.42 : 1.5, a.z]}>
-            {a.nobori !== undefined ? null : a.kanban !== undefined ? <Kanban i={a.kanban} /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
-          </group>
+        </StaticBatch>
+        {/* (everything below is its own piece in a batch of its own, so each can be moved by hand when the shop's shut: key G) */}
+        {art.filter((a) => a.nobori === undefined).map((a) => (
+          <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`${a.kanban !== undefined ? '木牌' : a.scroll ? '掛軸' : '畫'}（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><StaticBatch>
+            <group position={[0, a.scroll ? 1.42 : 1.5, a.z]}>
+              {a.kanban !== undefined ? <Kanban i={a.kanban} /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
+            </group>
+          </StaticBatch></Movable>
         ))}
         {/* the toilets, the men's and the women's, side by side */}
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
-          <group key={who} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletDoor who={who} /></group>
+          <Movable key={who} id={`wcdoor-${who}`} label={who === 'm' ? '男廁門框' : '女廁門框'}><StaticBatch>
+            <group position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletDoor who={who} /></group>
+          </StaticBatch></Movable>
         ))}
-        {shrine !== undefined && <group position={[0, 1.78, shrine]}><Kamidana /></group>}
-        {/* the shelf: sake bottles, two crocks and the cat; or, by the door, the altar */}
-        {altar ? <Movable id="altar" label="供桌"><group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
+        {shrine !== undefined && <Movable id="wallshrine" label="牆上神棚"><StaticBatch><group position={[0, 1.78, shrine]}><Kamidana /></group></StaticBatch></Movable>}
+        {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
           {[-0.35, 0.35].map((z) => (
             <group key={z} position={[ALTAR_D / 2, -0.03, z - 0.015]}>
               <mesh geometry={SHELF_BRACKET}><meshToonMaterial color="#1c130d" /></mesh>
               <mesh geometry={SHELF_BRACKET} scale={[1.035, 1.035, 1.4]} position-z={-0.004}><meshBasicMaterial color="#c9a040" side={THREE.BackSide} /></mesh>
             </group>
-          ))}</group></Movable>
-          : shelf && <>
+          ))}</group></StaticBatch></Movable>}
+        {!altar && shelf && <Movable id="wallshelf" label="牆上層架"><StaticBatch>
         <group position={[-0.1, 1.08, shelfZ]}>
           <Box size={[0.2, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
           {[-0.35, 0.35].map((z) => <Box key={z} size={[0.18, 0.08, 0.025]} color="#3a2416" position={[0.04, -0.06, z]} />)}
@@ -1453,10 +1458,9 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
           </mesh>
           <group position={[0, 0, 0.3]} rotation-y={-Math.PI / 2}><LuckyCat kind={3} height={0.3} still /></group>
         </group>
-          </>}
-        </StaticBatch>
+        </StaticBatch></Movable>}
         {/* (the string of bulbs under the frieze: instanced, so out of the batch) */}
-        <Festoon l={l} mid={mid} />
+        <Movable id={`festoon${from.toFixed(1)}`} label={`燈串（${from.toFixed(0)}）`}><Festoon l={l} mid={mid} /></Movable>
         {/* (the strings of banners overhead, clear of the altar, the fridges and the toilets' doors) */}
         {(() => {
           const zs: number[] = []
@@ -1469,29 +1473,29 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
           }
           return zs.length > 1 ? (
             <>
-              <group position={[0, 2.22, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 0)} x0={-0.3} x1={-0.3} /></group>
+              <Movable id={`banners${from.toFixed(1)}a`} label={`旗幟串 1（${from.toFixed(0)}）`}><group position={[0, 2.22, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 0)} x0={-0.3} x1={-0.3} /></group></Movable>
               {/* (and two more strings slanted across the aisle, crossing each other like an X, one a little lower than the other,
                   so no banner meets another) */}
-              <group position={[0, 2.04, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 1)} seed={5} x0={-0.4} x1={-1.3} /></group>
-              <group position={[0, 1.9, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 2)} seed={9} x0={-1.3} x1={-0.4} /></group>
+              <Movable id={`banners${from.toFixed(1)}b`} label={`旗幟串 2（${from.toFixed(0)}）`}><group position={[0, 2.04, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 1)} seed={5} x0={-0.4} x1={-1.3} /></group></Movable>
+              <Movable id={`banners${from.toFixed(1)}c`} label={`旗幟串 3（${from.toFixed(0)}）`}><group position={[0, 1.9, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 2)} seed={9} x0={-1.3} x1={-0.4} /></group></Movable>
               {/* (and paper umbrellas (和傘), pastel, opened and hung upside-down over the aisle) */}
-              {zs.filter((_, k) => k % 6 === 4).map((z, k) => <group key={k} position={[-1.9, 2.1 - (k % 2) * 0.1, z]} scale={0.5}><Wagasa i={k} /></group>)}
+              {zs.filter((_, k) => k % 6 === 4).map((z, k) => <Movable key={k} id={`umbrella${from.toFixed(1)}_${k}`} label={`和傘 ${k + 1}（${from.toFixed(0)}）`}><group position={[-1.9, 2.1 - (k % 2) * 0.1, z]} scale={0.5}><Wagasa i={k} /></group></Movable>)}
             </>
           ) : null
         })()}
         {/* (the banners sway: not merged) */}
-        {art.filter((a) => a.nobori !== undefined).map((a) => <group key={`n${a.z}`} position={[0, 1.08, a.z]}><Nobori i={a.nobori!} /></group>)}
+        {art.filter((a) => a.nobori !== undefined).map((a) => <Movable key={`n${a.z}`} id={`nobori${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`幟旗（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><group position={[0, 1.08, a.z]}><Nobori i={a.nobori!} /></group></Movable>)}
         {/* (the toilets' doors slide: not merged) */}
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
-          <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group>
+          <Movable key={who} id={`wcpanel-${who}`} label={who === 'm' ? '男廁拉門' : '女廁拉門'}><group name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group></Movable>
         ))}
         {/* (the altar's flag stirs, its incense smokes: not merged) */}
-        {altar && <group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group>}
+        {altar && <Movable id="altarfittings" label="供桌上的供品與線香"><group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}
       </group>
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {
         const z = (i - (lamps - 1) / 2) * (c.length / lamps)
-        return <group key={i} position-x={0.05}><Pendant z={z} drop={0.5} pool={top} /></group>
+        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05}><Pendant z={z} drop={0.5} pool={top} /></group></Movable>
       })}
     </group>
   )
