@@ -1319,6 +1319,37 @@ const GLOW = (() => {
  * the bar top under it (added on, so it brightens what it falls on). Six real lights would cost every lit surface in
  * the room on every frame; these cost two quads each.
  */
+/** the paper lantern's body: a tall oval swelling in the middle and drawing in to its wooden rings, turned on a lathe */
+const LANTERN_GEO = (() => {
+  const H = 0.17, R = 0.092
+  const pts: THREE.Vector2[] = []
+  for (let i = 0; i <= 22; i++) {
+    const y = -H + (2 * H * i) / 22, t = y / H
+    pts.push(new THREE.Vector2(0.046 + (R - 0.046) * Math.sqrt(Math.max(0, 1 - t * t)) ** 0.85, y))
+  }
+  return new THREE.LatheGeometry(pts, 24)
+})()
+/** thin washi in fine horizontal ribs, lit from within: bright cream in the middle of the belly, warmer toward its ends, a faint seam between each of the panels */
+const LANTERN_SKIN = signTexture(128, 256, (g) => {
+  const grad = g.createLinearGradient(0, 0, 0, 256)
+  grad.addColorStop(0, '#f2b878')
+  grad.addColorStop(0.22, '#ffe2b0')
+  grad.addColorStop(0.5, '#fff6e0')
+  grad.addColorStop(0.78, '#ffe2b0')
+  grad.addColorStop(1, '#f2b878')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 128, 256)
+  // (the bamboo ribs it's wound on: a fine line every few pixels, a shade darker, with a pale one beside it)
+  for (let y = 2; y < 256; y += 5) {
+    g.fillStyle = 'rgba(190,130,70,0.22)'
+    g.fillRect(0, y, 128, 1.3)
+    g.fillStyle = 'rgba(255,255,255,0.18)'
+    g.fillRect(0, y + 1.5, 128, 1)
+  }
+  // (the seams between its panels)
+  g.fillStyle = 'rgba(200,140,80,0.16)'
+  for (let x = 0; x < 128; x += 16) g.fillRect(x, 0, 1.4, 256)
+})
 function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
   return (
     <group position={[0, WALL_H, z]}>
@@ -1326,23 +1357,23 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
         <cylinderGeometry args={[0.004, 0.004, drop, 4]} />
         <meshBasicMaterial color={INK} />
       </mesh>
-      <group position-y={-drop - 0.09}>
-        <mesh>
-          <sphereGeometry args={[0.11, 16, 10]} />
-          <meshBasicMaterial color="#ffd9a0" toneMapped={false} />
+      {/* (a paper lantern: the oval of ribbed washi, a pale wooden ring at each end, a little ring at the top for the cord) */}
+      <group position-y={-drop - 0.19}>
+        <mesh geometry={LANTERN_GEO}>
+          <meshBasicMaterial color="#ffffff" map={LANTERN_SKIN} toneMapped={false} side={THREE.DoubleSide} />
         </mesh>
-        <mesh scale={1.06}>
-          <sphereGeometry args={[0.11, 16, 10]} />
+        <mesh geometry={LANTERN_GEO} scale={1.035}>
           <meshBasicMaterial color={INK} side={THREE.BackSide} />
         </mesh>
-        {[0.1, -0.1].map((y) => (
+        {[0.172, -0.172].map((y) => (
           <mesh key={y} position-y={y}>
-            <cylinderGeometry args={[0.045, 0.045, 0.02, 12]} />
-            <meshToonMaterial color={INK} />
+            <cylinderGeometry args={[0.056, 0.056, 0.024, 16]} />
+            <meshToonMaterial color="#cdb083" />
           </mesh>
         ))}
-        <sprite scale={0.75}>
-          <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
+        <mesh position-y={0.195} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 5, 12]} /><meshToonMaterial color="#8a6a3a" /></mesh>
+        <sprite scale={0.85}>
+          <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.6} color="#ffcf90" />
         </sprite>
       </group>
       {/* (the pool of light on the bar top below, down from the lamp's height) */}

@@ -5,10 +5,10 @@
 import { useSyncExternalStore } from 'react'
 
 export type V3 = [number, number, number]
-// (the second key: the first held offsets from before the places below were settled on; they're not carried over, or they'd count twice)
-const KEY = 'jgs-edit-offsets-2'
-const KEY_R = 'jgs-edit-rotations-1'
-const KEY_S = 'jgs-edit-scales-1'
+// (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
+const KEY = 'jgs-edit-offsets-3'
+const KEY_R = 'jgs-edit-rotations-2'
+const KEY_S = 'jgs-edit-scales-2'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }
