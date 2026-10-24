@@ -15,7 +15,8 @@ const SHOPS = ['grilledfish']
 const ONLY = process.argv.slice(3)
 const OPEN_FOR = Number(process.env.OPEN_FOR ?? 40000)
 
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
+// (CHROME_PATH: a Chromium to use instead of the installed Chrome, e.g. in a container)
+const browser = await chromium.launch({ ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }), headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
 const errors = []
 const failures = []
 const check = (shop, what, ok, got) => {
@@ -32,7 +33,7 @@ for (const [i, shop] of SHOPS.entries()) {
   page.on('pageerror', (e) => errors.push(`${shop}: ${e.message}`))
   const cash = async () => Number((await page.locator('.office-toggle b').innerText()).replace(/[^\d-]/g, ''))
   try {
-    await page.goto(URL)
+    await page.goto(URL, { timeout: 60000 })
     await page.waitForTimeout(5000)
     if (await page.locator('.welcome-go').count()) await page.locator('.welcome-go').click()
     await page.waitForTimeout(800)
