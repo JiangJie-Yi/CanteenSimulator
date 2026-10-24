@@ -12,6 +12,10 @@ export const CAPITAL = 300000
 export const SHOP_COST = 120000
 /** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
 export const CHARCOAL_COST = 18
+/** how much one load of charcoal raises the fire (0..1), and whether more can go on: at 100% the bed is full, so no more is added (nor paid for) */
+export const CHARCOAL_BOOST = 0.18
+export const canAddCharcoal = (level: number) => level < 1 - 1e-6
+export const afterCharcoal = (level: number) => (canAddCharcoal(level) ? Math.min(1, level + CHARCOAL_BOOST) : level)
 export const GAS_PER_HOUR = 30
 
 /**

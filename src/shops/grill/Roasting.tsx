@@ -1752,7 +1752,7 @@ type RoastingProps = {
   /** the AI customers order from the menu, and the chef adds charcoal, through the app */
   /** order something; false if it couldn't be (the fire or the basket is full) */
   onOrder?: (id: string, guest?: number) => boolean
-  onAddCharcoal?: () => void
+  onAddCharcoal?: () => boolean
   /** something the chef or a customer says */
   onSay?: (who: 'chef' | 'guest', text: string) => void
   /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
@@ -2732,7 +2732,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const { chef: hasChef, sous: hasSous } = helpers
     if (!hasChef && !hasSous) return
     if (fire && fire.current < 0.35) {
-      onAddCharcoal?.()
+      if (onAddCharcoal?.() === false) return
       say(L().addCharcoal)
       return
     }
@@ -3238,8 +3238,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (!picked) {
           // (a click on the coals themselves puts more charcoal on)
           if (pickCoal()) {
-            onAddCharcoal?.()
-            dropCoals()
+            // (nothing goes on once the fire's at 100%)
+            if (onAddCharcoal?.() !== false) dropCoals()
           }
           return
         }
@@ -3338,7 +3338,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       window.removeEventListener('pointermove', holdDecor)
       document.body.classList.remove('is-carrying')
       // the charcoal let go over the fire goes on it
-      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { onAddCharcoal?.(); dropCoals() }
+      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { if (onAddCharcoal?.() !== false) dropCoals() }
       held.current = null
       if (controls) controls.enabled = true
       el.style.cursor = ''
@@ -3809,7 +3809,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const f = fuel.current
     const ash = THREE.MathUtils.smoothstep(0.5 - f, 0, 0.45)
     // (no fire: only a few lumps of grey ash and slag; charcoal is what swells the heap, kindles and glows)
-    // (a plain swap: charcoal while there's a fire, the ash mound when there's none; no shrinking between)
+    // (the ash bed stays as it is under the charcoal, lit or not: the first sticks go on over it, and it isn't swapped away)
     const burning = f > 0.02
     // (the model's own heap of orange lumps is never shown: the bed is the sticks thrown on it, all one kind, and a fire lit with none gets a few laid on it)
     for (const nm of ['Charcoal', 'BinchotanHeap']) {
@@ -3818,7 +3818,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     if (burning && !bedSeeded.current && !coals.current.some((c) => c && !c.gone && !c.dying)) { bedSeeded.current = true; dropCoals() }
     const bedAsh = root.getObjectByName('AshBed')
-    if (bedAsh) bedAsh.visible = !burning
+    if (bedAsh) bedAsh.visible = true
 
     embers.current.forEach((e, i) => {
       // no fire, no glow; as the heap kindles its glow goes from a deep red, through orange, toward a yellower white at the full blaze, and it breathes

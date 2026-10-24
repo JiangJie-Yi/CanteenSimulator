@@ -21,7 +21,7 @@ import { moodOf } from '@/game/taste'
 import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
-import { menuPrice, restockOrder, topUpOrder, buyAllCost, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
+import { menuPrice, restockOrder, topUpOrder, buyAllCost, afterCharcoal, canAddCharcoal, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, GAS_PER_HOUR, goodsOf, needOf, partCost, partsOf,
   portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
 import { GuestCounter } from '@/ui/GuestCounter'
@@ -278,7 +278,7 @@ type SceneProps = {
   /** AI simulation on, and what it does through the app */
   ai: boolean
   onOrder: (id: string, guest?: number) => boolean
-  onAddCharcoal: () => void
+  onAddCharcoal: () => boolean
   onSay: (who: 'chef' | 'guest', text: string) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
@@ -1160,10 +1160,13 @@ export default function App() {
     }, 200)
     return () => window.clearInterval(id)
   }, [])
+  /** puts charcoal on (and pays for it), unless the fire is already at 100%: then nothing is added; returns whether it went on */
   const addCharcoal = () => {
+    if (!canAddCharcoal(fire.current)) { say(UI[lang].charcoalFull); return false }
     book('fuel', CHARCOAL_COST)
-    fire.current = Math.min(1, fire.current + 0.18)
+    fire.current = afterCharcoal(fire.current)
     setFireLevel(Math.round(fire.current * 100))
+    return true
   }
   const dish = DISHES[active]
   // a phone at the grill has no 3D view: the fire pit and the customers' bar are drawn flat (Grill2D)

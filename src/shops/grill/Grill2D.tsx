@@ -68,7 +68,7 @@ export type Grill2DProps = {
   onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
   ai?: boolean
   onOrder?: (id: string, guest?: number) => boolean
-  onAddCharcoal?: () => void
+  onAddCharcoal?: () => boolean
   onSay?: (who: 'chef' | 'guest', text: string) => void
   space?: 'closed' | 'open'
   helpers?: { chef: boolean; sous: boolean }
@@ -206,7 +206,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
     }
     if (!hasChef && !hasSous) return
     if (f && f.current < 0.35) {
-      cb.current.onAddCharcoal?.()
+      if (cb.current.onAddCharcoal?.() === false) return
       say(L().addCharcoal)
       return
     }
