@@ -552,15 +552,12 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
         <group position={[0.085, 0.33, 0.12]} rotation-x={-0.18}>
           <Part geo={REG_GEO.round} color="#1a1c20" outline={1.04} scale={[0.17, 0.065, 0.02]} />
         </group>
-        {/* the cables out of the back: the mains lead (a thick black one down to the counter and away behind), the data lead across to the printer, a short one down to the drawer's
-            lock, each with its plug block, tied together where they leave */}
+        {/* the cables: one tidy bundle out of the back through a grommet, held to the counter by a clip, with the card reader's lead and the tablet's branching from it */}
         <mesh geometry={REG_CABLES.power}><meshToonMaterial color="#17171a" /></mesh>
-        <mesh geometry={REG_CABLES.data}><meshToonMaterial color="#4a4d52" /></mesh>
-        <mesh geometry={REG_CABLES.drawerLink}><meshToonMaterial color="#2a2c30" /></mesh>
-        <mesh position={[0.07, 0.17, 0.146]}><boxGeometry args={[0.02, 0.014, 0.012]} /><meshToonMaterial color="#17171a" /></mesh>
-        <mesh position={[0.0, 0.16, 0.146]}><boxGeometry args={[0.016, 0.012, 0.012]} /><meshToonMaterial color="#4a4d52" /></mesh>
-        <mesh position={[0.3, 0.03, -0.013]}><boxGeometry args={[0.014, 0.01, 0.014]} /><meshToonMaterial color="#4a4d52" /></mesh>
-        <mesh position={[0.036, 0.16, 0.2]} rotation-y={0.3}><boxGeometry args={[0.1, 0.006, 0.008]} /><meshToonMaterial color="#d8d4c8" /></mesh>
+        <mesh geometry={REG_CABLES.data}><meshToonMaterial color="#2a2c30" /></mesh>
+        <mesh geometry={REG_CABLES.tablet}><meshToonMaterial color="#e9e9ec" /></mesh>
+        <mesh position={[0.05, 0.12, 0.151]}><boxGeometry args={[0.03, 0.018, 0.012]} /><meshToonMaterial color="#2a2c30" /></mesh>
+        <mesh position={[0.05, 0.006, 0.28]}><boxGeometry args={[0.03, 0.01, 0.026]} /><meshToonMaterial color="#d8d4c8" /></mesh>
         {/* the sockets on the sides: on the right a mains inlet, a LAN, a phone and a USB socket and the power switch; on the left, under the card slot, a serial port */}
         {[[0.07, 0.019, 0.011, 0.04], [0.036, 0.012, 0.013, 0.08], [0.0, 0.0095, 0.01, 0.12], [-0.032, 0.013, 0.006, 0.15]].map(([z, w, h, y], i) => (
           <group key={i} position={[0.1665, y, z - 0.01]} rotation-y={Math.PI / 2}>
@@ -659,6 +656,21 @@ export function Register({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top
       <group position={[0.5, top, -0.26]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.46} /></group>
       </group>
       </StaticBatch></Movable>
+      <Movable id="till-ipad" label="平板（iPad）"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
+        {/* the order tablet, an iPad on a folding stand, at the cashier's right hand, its screen toward the cashier, leaning back a little */}
+        <group position={[0.46, top, 0.1]}>
+          <Part geo={REG_GEO.round} color="#b8bcc2" outline={1.04} position={[0, 0.006, 0.0]} scale={[0.17, 0.012, 0.13]} />
+          <mesh position={[0, 0.075, -0.075]} rotation-x={0.62}><boxGeometry args={[0.07, 0.17, 0.008]} /><meshToonMaterial color="#9ea2a8" /></mesh>
+          <group position={[0, 0.014, 0.035]} rotation-x={-0.3}>
+            <Part geo={REG_GEO.round} color="#c9ccd2" outline={1.03} position={[0, 0.138, 0]} scale={[0.2, 0.275, 0.01]} />
+            <mesh position={[0, 0.138, 0.0056]}><planeGeometry args={[0.186, 0.261]} /><meshBasicMaterial color="#0b0c0e" /></mesh>
+            <mesh position={[0, 0.138, 0.0059]}><planeGeometry args={[0.168, 0.232]} /><meshBasicMaterial map={IPAD_SCREEN} toneMapped={false} /></mesh>
+            <mesh position={[0, 0.262, 0.0061]}><circleGeometry args={[0.0025, 8]} /><meshBasicMaterial color="#2a3340" /></mesh>
+          </group>
+        </group>
+      </group>
+      </StaticBatch></Movable>
     </>
   )
 }
@@ -703,15 +715,38 @@ const grime = (w: number, h: number, seed: number, wear: number) => signTexture(
     g.beginPath(); g.ellipse(x, y, rw, rh, rnd() * 3, 0, Math.PI * 2); g.fill()
   }
 })
+/** the tablet's screen: the shop's order screen, a header, the orders as rows with their prices, the total and a green button to settle up */
+const IPAD_SCREEN = signTexture(192, 264, (g) => {
+  g.fillStyle = '#f4f6f9'; g.fillRect(0, 0, 192, 264)
+  g.fillStyle = '#2f6fb0'; g.fillRect(0, 0, 192, 34)
+  g.fillStyle = '#ffffff'; g.font = 'bold 15px sans-serif'; g.textBaseline = 'middle'
+  g.fillText('注文  Orders', 10, 17)
+  g.font = '11px sans-serif'; g.textAlign = 'right'; g.fillText('9:41', 184, 17); g.textAlign = 'left'
+  const rows: [string, string, string][] = [['鹽烤香魚套餐', '×2', '840'], ['烤秋刀魚', '×1', '180'], ['生啤酒', '×3', '540'], ['烤飯糰', '×2', '160']]
+  rows.forEach(([name, n, price], i) => {
+    const y = 48 + i * 34
+    g.fillStyle = i % 2 ? '#ffffff' : '#eaeff5'; g.fillRect(6, y - 14, 180, 30)
+    g.fillStyle = '#1d2733'; g.font = 'bold 12px sans-serif'; g.fillText(name, 12, y)
+    g.fillStyle = '#6a7686'; g.font = '11px sans-serif'; g.fillText(n, 12, y + 12)
+    g.fillStyle = '#1d2733'; g.font = 'bold 13px sans-serif'; g.textAlign = 'right'; g.fillText(price, 180, y + 4); g.textAlign = 'left'
+  })
+  g.fillStyle = '#1d2733'; g.font = 'bold 12px sans-serif'; g.fillText('合計', 12, 214)
+  g.font = 'bold 20px sans-serif'; g.textAlign = 'right'; g.fillText('NT$ 1,720', 180, 214); g.textAlign = 'left'
+  g.fillStyle = '#2f9e5a'; g.beginPath(); g.roundRect(10, 226, 172, 30, 8); g.fill()
+  g.fillStyle = '#ffffff'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.fillText('會計  Pay', 96, 241); g.textAlign = 'left'
+})
 const REG_GRIME = grime(256, 128, 7, 1)
 const REG_GRIME_FRONT = grime(256, 48, 19, 1)
 const COUNTER_GRIME = grime(256, 128, 31, 2)
 /** a cable run as a tube through the given points (in the register's own units), black rubber */
 const cable = (pts: [number, number, number][], r = 0.0042) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.4), 36, r, 6, false)
 const REG_CABLES = {
-  power: cable([[0.07, 0.17, 0.142], [0.075, 0.15, 0.2], [0.06, 0.09, 0.25], [0.05, 0.015, 0.28], [0.0, 0.006, 0.36], [-0.12, 0.006, 0.46]], 0.0055),
-  data: cable([[0.0, 0.16, 0.142], [0.02, 0.12, 0.22], [0.12, 0.05, 0.25], [0.24, 0.008, 0.2], [0.3, 0.008, 0.1], [0.3, 0.03, -0.01]], 0.0038),
-  drawerLink: cable([[-0.06, 0.15, 0.142], [-0.07, 0.1, 0.19], [-0.07, 0.07, 0.17]], 0.0034),
+  // (one bundle out of the back through a grommet, down the back of the case and straight back over the counter's top and off its rear edge)
+  power: cable([[0.05, 0.12, 0.158], [0.05, 0.1, 0.19], [0.05, 0.05, 0.196], [0.05, 0.006, 0.2], [0.05, 0.004, 0.34], [0.05, 0.004, 0.62]], 0.0045),
+  // (the card reader's lead: from the bundle's clip along the counter, in one gentle curve, to the reader's foot)
+  data: cable([[0.05, 0.004, 0.27], [0.12, 0.004, 0.28], [0.22, 0.004, 0.22], [0.3, 0.006, 0.14], [0.31, 0.012, 0.115]], 0.0032),
+  // (the tablet's white lead, laid across to the same clip)
+  tablet: cable([[0.05, 0.004, 0.3], [-0.04, 0.004, 0.32], [-0.2, 0.004, 0.3], [-0.34, 0.004, 0.24], [-0.4, 0.004, 0.16]], 0.0028),
 }
 /** the register's size in the till (its drawer, keys and displays are drawn in units of 1/1.4 of this) */
 const REG_SC = 1.4

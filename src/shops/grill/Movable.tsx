@@ -322,12 +322,16 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   const rot = rotationOf(id), sc = scaleOf(id)
 
   /** its size and middle as it stands untouched: taken of the inner group alone (the handle and arrows are not in it), in the frame of the group that carries the offset */
-  const measure = () => {
+  /**
+   * Its size and middle. In the piece's own (inner) frame, the turn and scale of the wrapper outside it not entering into it (that's the pivot they act
+   * about); or, in the frame of the whole piece as it now stands, turned and scaled (that's what the box and the camera and a group see).
+   */
+  const measure = (frame: 'inner' | 'whole' = 'inner') => {
     const grp = g.current, inn = inner.current
     if (!grp || !inn) return null
-    // (taken in the inner group's own frame, so the turn and scale on the wrapper outside it don't enter into it)
     grp.updateWorldMatrix(true, true)
-    const toInner = new THREE.Matrix4().copy(inn.matrixWorld).invert()
+    const ref = frame === 'whole' ? grp : inn
+    const toInner = new THREE.Matrix4().copy(ref.matrixWorld).invert()
     const pts: THREE.Vector3[] = []
     let yMin = Infinity, yMax = -Infinity
     inn.traverse((m) => {
@@ -360,7 +364,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       }
       return { a, x0, x1, z0, z1 }
     }
-    const innYaw = new THREE.Euler().setFromQuaternion(inn.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
+    const innYaw = new THREE.Euler().setFromQuaternion(ref.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
     const best = fit(Math.atan2(ALONG.x, ALONG.z) - innYaw)
     // (the room's direction against the parent's own frame: what the move arrows and the position fields are turned by)
     const frameNode = gw.current ?? grp.parent
@@ -385,10 +389,10 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
 
   // (on the list of what can be moved, with a way to bring the camera to the middle of it)
   useEffect(() => registerMovable(id, label, () => {
-    const m = measure()
+    const m = measure('whole')
     if (m && g.current) focusCamera(camera, controls, g.current.localToWorld(new THREE.Vector3(...m.c)))
   }, () => {
-    const m = measure()
+    const m = measure('whole')
     return m && g.current ? (g.current.localToWorld(new THREE.Vector3(...m.c)).toArray() as V3) : null
   }), [id, label, camera, controls])
 
@@ -422,12 +426,21 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   useEffect(() => {
     if (!on) { setBox(null); return }
     // (a batch merges its meshes a moment after mounting: measured at once and again a little later, so the box is there whenever it's switched on)
-    const first = measure()
+    const first = measure('whole')
     if (first) setFrame(id, first.theta)
     setBox(first)
-    const t = window.setTimeout(() => { const m = measure(); if (m) { setBox(m); setMid(m.c); setFrame(id, m.theta) } }, 300)
+    const t = window.setTimeout(() => { const m = measure('whole'), n = measure(); if (m) { setBox(m); setFrame(id, m.theta) } if (n) setMid(n.c) }, 300)
     return () => window.clearTimeout(t)
   }, [on])
+
+  // (turned or sized by hand: the box is taken again to fit it as it now stands)
+  const poseKey = `${rot.join()}|${sc.join()}`
+  useEffect(() => {
+    if (!on) return
+    const m = measure('whole')
+    if (m) setBox(m)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on, poseKey])
 
   const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent; intersections?: { object: THREE.Object3D }[] }) => {
     const grp = g.current

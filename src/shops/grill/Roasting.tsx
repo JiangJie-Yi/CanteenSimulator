@@ -3,6 +3,7 @@ import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { COAL_MAX, COAL_PER_ADD, placeStick, restOf, roomFor, surfaceY, type Lay } from '@/game/coalPile'
@@ -25,7 +26,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { AxisGizmo, focusCamera } from './Movable'
-import { binchotanGeo, binchotanMap, burningMaps } from './Binchotan'
+import { binchotanMap, blockGeo, burningMaps } from './Binchotan'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit } from './edit'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
@@ -421,9 +422,9 @@ function EmberBed({ fuel }: { fuel: { current: number } }) {
     let seed = 23
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
     const groups: { m: THREE.Matrix4[]; k: number }[] = [{ m: [], k: 1 }, { m: [], k: 0.55 }, { m: [], k: 0.18 }]
-    for (let i = 0; i < 96; i++) {
-      const a = rnd() * Math.PI * 2, r = 0.44 * rnd() ** 0.8
-      const x = Math.cos(a) * r, z = Math.sin(a) * r, size = 0.018 + rnd() * 0.03
+    for (let i = 0; i < 170; i++) {
+      const a = rnd() * Math.PI * 2, r = 0.5 * rnd() ** 0.75
+      const x = Math.cos(a) * r, z = Math.sin(a) * r, size = 0.016 + rnd() * 0.034
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 6, rnd() * 3))
       const m = new THREE.Matrix4().compose(new THREE.Vector3(x, surfaceY(x, z, PIT_LIFT) + size * 0.35, z), q, new THREE.Vector3(size * (0.8 + rnd() * 0.7), size * 0.55, size * (0.8 + rnd() * 0.7)))
       groups[i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : 2].m.push(m)
@@ -464,7 +465,7 @@ function EmberBed({ fuel }: { fuel: { current: number } }) {
 }
 /** the most sticks of charcoal the bed holds at once, and how long one lasts once it's burning, in game seconds (it burns down to a third of its length, then it's ash) */
 const UP_AXIS = new THREE.Vector3(0, 1, 0)
-const COAL_LAST_S = 170
+const COAL_LAST_S = 300
 /** how long a fresh stick of charcoal takes to kindle to red-hot, in game seconds */
 const COAL_KINDLE_S = 22
 /** how much higher the salt is heaped in the pit than it was modelled */
@@ -1890,6 +1891,44 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const { scene } = useGLTF(url)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
+  // the water bucket's two hoops, made as flat bands (片) rather than round rods: the model's hoops are found by their material and each ring is
+  // measured (where along the bucket it stands, how wide it is), then the mesh is given two thin bands of the same height, flat in section
+  useMemo(() => {
+    root.getObjectByName('WaterBucket')?.traverse((o) => {
+      if (!(o instanceof THREE.Mesh) || o.userData.flatHoops || o.name.endsWith('_outline')) return
+      if ((o.material as THREE.Material).name !== 'BucketHoop') return
+      o.userData.flatHoops = true
+      const pos = o.geometry.getAttribute('position')
+      o.geometry.computeBoundingBox()
+      const bb = o.geometry.boundingBox!, sz = bb.getSize(new THREE.Vector3())
+      // (the bucket's own axis is the one the hoops are shortest along)
+      const ax = sz.x <= sz.y && sz.x <= sz.z ? 0 : sz.y <= sz.z ? 1 : 2
+      const get = (i: number, k: number) => (k === 0 ? pos.getX(i) : k === 1 ? pos.getY(i) : pos.getZ(i))
+      const mid = (bb.min.getComponent(ax) + bb.max.getComponent(ax)) / 2
+      const rings = [{ lo: Infinity, hi: -Infinity, r: 0 }, { lo: Infinity, hi: -Infinity, r: 0 }]
+      const u = (ax + 1) % 3, v = (ax + 2) % 3
+      for (let i = 0; i < pos.count; i++) {
+        const a = get(i, ax), ring = rings[a < mid ? 0 : 1]
+        ring.lo = Math.min(ring.lo, a); ring.hi = Math.max(ring.hi, a)
+        ring.r = Math.max(ring.r, Math.hypot(get(i, u), get(i, v)))
+      }
+      const bands = rings.map((r) => {
+        const h = Math.min((r.hi - r.lo) * 0.9, 0.05), t = 0.012, R = r.r
+        const prof = [[R - t, -h / 2], [R, -h / 2], [R + 0.003, h / 2], [R - t, h / 2], [R - t, -h / 2]].map(([x, y]) => new THREE.Vector2(x, y))
+        const g = new THREE.LatheGeometry(prof, 56)
+        g.translate(0, (r.lo + r.hi) / 2, 0)
+        return g
+      })
+      let merged = mergeGeometries(bands, false) as THREE.BufferGeometry
+      // (the lathe stands along Y: laid along the bucket's own axis if that's another)
+      if (ax === 2) merged.rotateX(Math.PI / 2)
+      else if (ax === 0) merged.rotateZ(-Math.PI / 2)
+      merged = merged.toNonIndexed()
+      merged.computeVertexNormals()
+      o.geometry = merged
+      for (const c of o.children) if (c instanceof THREE.Mesh && c.name.endsWith('_outline')) c.geometry = merged
+    })
+  }, [root])
   // the fire pit drawn bigger than it was modelled (its stones further out, the coals heaped wider), the skewers
   // still planted where they were, now well inside the ring
   useMemo(() => {
@@ -2176,7 +2215,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
   // (each thrown stick its own length, thickness and bend, new each time: from the short to the long)
-  const randomStick = () => binchotanGeo(0.28 + Math.random() * 0.04, 0.027 + Math.random() * 0.005, Math.floor(Math.random() * 8))
+  const randomStick = () => blockGeo(0.28 + Math.random() * 0.04, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 8))
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -2202,7 +2241,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
   }
   /** a stick that has burnt down to ash: the only kind that's cleared to make room (a burning one isn't pushed out by new charcoal) */
-  const ashedOut = (c: Coal) => c.age / COAL_LAST_S > 0.6
+  const ashedOut = (c: Coal) => c.age / COAL_LAST_S > 0.72
   /** whether there's room on the bed for more: under the most sticks it holds, or some already ash to be cleared */
   const roomForCoal = () => {
     const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
@@ -3815,9 +3854,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (c.dying && burnt >= 1) { c.gone = true; c.g.visible = false; restack(); continue }
         c.heat = Math.min(1, c.heat + delta * GAME_SPEED.value / COAL_KINDLE_S)
         // (the last third of its life: the glow dies back and the ash coat takes over)
-        const ashed = Math.max(0, Math.min(1, (Math.min(1, c.age / COAL_LAST_S) - 0.6) / 0.4))
+        const ashed = Math.max(0, Math.min(1, (Math.min(1, c.age / COAL_LAST_S) - 0.72) / 0.28))
         const h = c.heat * (1 - ashed * ashed * (3 - 2 * ashed)) * (c.dying ? Math.max(0, 1 - burnt) : 1)
-        c.mat.color.set('#ffffff').lerp(ASH_TINT, ashed).multiplyScalar(1 + ((ASH_GAIN.Binchotan - 1) * ashed ** 1.5) * 0.55)
+        c.mat.color.set('#ffffff').lerp(ASH_TINT, ashed).multiplyScalar(1 + 3.6 * ashed ** 1.5)
         const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
         // (only the fractures light up (the emissive map): an orange that goes yellower and brighter as the stick kindles, a dull red while it's still catching)
         c.mat.emissive.setRGB(1, 0.42 + 0.45 * h ** 1.6, 0.1 + 0.25 * h ** 3)

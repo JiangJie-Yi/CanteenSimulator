@@ -74,18 +74,17 @@ export function burningMaps() {
   // (the fractures, drawn the same on both: each a jagged line across the stick, some with a branch running down it)
   type Crack = { pts: [number, number][]; branch: [number, number][] | null }
   const cracks: Crack[] = []
-  let y = 14 + rnd() * 20
-  while (y < H - 10) {
+  // (the fractures fall where blockGeo's grooves do: four across the stick, so it reads as five blocks end to end)
+  for (const f of [0.2, 0.4, 0.6, 0.8]) {
+    const y = H * f
     const pts: [number, number][] = []
-    let yy = y
-    for (let x = -4; x <= W + 4; x += 10 + rnd() * 12) { yy = y + (rnd() - 0.5) * 12; pts.push([x, yy]) }
+    for (let x = -4; x <= W + 4; x += 9 + rnd() * 10) pts.push([x, y + (rnd() - 0.5) * 7])
     let branch: [number, number][] | null = null
-    if (rnd() < 0.6) {
+    if (rnd() < 0.75) {
       const bx = 10 + rnd() * (W - 20)
-      branch = [[bx, y], [bx + (rnd() - 0.5) * 10, y + 14 + rnd() * 12], [bx + (rnd() - 0.5) * 14, y + 30 + rnd() * 18]]
+      branch = [[bx, y], [bx + (rnd() - 0.5) * 10, y + 10 + rnd() * 10], [bx + (rnd() - 0.5) * 14, y + 24 + rnd() * 14]]
     }
     cracks.push({ pts, branch })
-    y += 30 + rnd() * 36
   }
   const draw = (g: CanvasRenderingContext2D, color: string, width: number, blur: number, glow: string | null) => {
     g.lineCap = 'round'; g.lineJoin = 'round'
@@ -145,6 +144,41 @@ export function burningMaps() {
   }
   burning = { dark: mk(dc, true), glow: mk(gc, true) }
   return burning
+}
+
+/**
+ * A chunk of burning charcoal, not a tube: five blocks end to end, each a little out of line with the next and a little different round, cut in
+ * between by deep grooves (where burningMaps puts its glowing fractures), the faces flat and angular.
+ */
+export function blockGeo(len: number, r: number, seed = 0) {
+  const L = Math.round(len / 0.02) * 0.02, R = Math.round(r / 0.002) * 0.002
+  const key = `block|${L.toFixed(3)}|${R.toFixed(4)}|${seed % 8}`
+  const hit = cache.get(key)
+  if (hit) return hit
+  const RAD = 9, ROWS = 20
+  const g0 = new THREE.CylinderGeometry(R, R * 1.06, L, RAD, ROWS, false)
+  let sd = 7919 + (seed % 8) * 104729
+  const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647)
+  // (one random size per row and corner, and one sideways offset per block)
+  const ring: number[][] = Array.from({ length: ROWS + 1 }, () => Array.from({ length: RAD + 1 }, () => 0.86 + rnd() * 0.3))
+  const off = Array.from({ length: 5 }, () => [(rnd() - 0.5) * R * 0.22, (rnd() - 0.5) * R * 0.22])
+  const pos = g0.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
+    const t = (y + L / 2) / L
+    const row = Math.round(t * ROWS)
+    if (Math.hypot(x, z) < 1e-6) continue
+    const m = row % 4
+    const groove = row > 0 && row < ROWS && m === 0 ? 0.74 : m === 1 || m === 3 ? 0.94 : 1
+    const ang = Math.round(((Math.atan2(z, x) + Math.PI) / (Math.PI * 2)) * RAD)
+    const k = groove * ring[row][ang]
+    const block = Math.max(0, Math.min(4, Math.floor(t * 5 - 1e-6)))
+    pos.setXYZ(i, x * k + off[block][0], y, z * k + off[block][1])
+  }
+  const g = g0.toNonIndexed()
+  g.computeVertexNormals()
+  cache.set(key, g)
+  return g
 }
 
 const cache = new Map<string, THREE.BufferGeometry>()

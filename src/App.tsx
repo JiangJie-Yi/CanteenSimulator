@@ -37,7 +37,10 @@ import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
-import { toggleEdit, useEdit } from '@/shops/grill/edit'
+import { offsetOf, registerMovable, rotationOf, select, setFrame, toggleEdit, useEdit } from '@/shops/grill/edit'
+import { AxisGizmo, focusCamera } from '@/shops/grill/Movable'
+import { ALONG } from '@/shops/grill/bar'
+import { cameraOneOf } from '@/scene/camera1'
 import { Bgm } from '@/ui/Bgm'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
@@ -313,6 +316,73 @@ type SceneProps = {
 
 /** the shop's own waiter, there when no one's been hired for the floor: the cooked food is always carried to the customers, never tossed over the bar */
 const HOUSE_SERVER: CrewMember = { id: 'house-server', role: 'server', look: { female: false, age: 'middle' } }
+/**
+ * Camera 1 as it's drawn in edit mode: a small camera body with a lens, and the pyramid of what it sees, standing where the view is held (see Scene), so it
+ * can be picked from the list or by a click, moved with the arrows, turned with the rings (a turn about the vertical, a tilt) and its numbers typed.
+ */
+function CameraRig({ home, target }: { home: { current: THREE.Vector3 }; target: THREE.Vector3 }) {
+  const { selected, offsets, rotations } = useEdit()
+  void offsets; void rotations
+  const camera = useThree((s) => s.camera)
+  const controls = useThree((s) => s.controls) as unknown as Parameters<typeof focusCamera>[1]
+  const pose = cameraOneOf(home.current, target, offsetOf('camera1'), rotationOf('camera1'))
+  const body = useRef<THREE.Group>(null)
+  const poseRef = useRef(pose)
+  poseRef.current = pose
+  useLayoutEffect(() => {
+    const g = body.current
+    if (!g) return
+    g.position.copy(pose.position)
+    g.lookAt(pose.target)
+  })
+  useEffect(() => {
+    // (its numbers are in the room's own axes, like everything else's)
+    setFrame('camera1', Math.atan2(ALONG.x, ALONG.z))
+    return registerMovable('camera1', '攝影機 1（研製視角）', () => focusCamera(camera, controls, poseRef.current.position))
+  }, [camera, controls])
+  const hit = selected === 'camera1'
+  const COL = hit ? '#8fd0ff' : '#3fa9ff'
+  // (the pyramid of the view: from the lens out to 1.4 ahead, a rectangle there)
+  const lines = useMemo(() => {
+    const L = 1.4, w = 0.62, h = 0.36
+    const c = [[-w, -h], [w, -h], [w, h], [-w, h]]
+    const pts: number[] = []
+    for (let i = 0; i < 4; i++) {
+      pts.push(0, 0, 0.12, c[i][0], c[i][1], L)
+      pts.push(c[i][0], c[i][1], L, c[(i + 1) % 4][0], c[(i + 1) % 4][1], L)
+    }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+    return g
+  }, [])
+  const pick = (e: { stopPropagation: () => void }) => { e.stopPropagation(); select('camera1') }
+  return (
+    <group>
+      <group ref={body}>
+        <mesh onPointerDown={pick} renderOrder={998} userData={{ editHandle: true }}>
+          <boxGeometry args={[0.24, 0.16, 0.14]} /><meshBasicMaterial color="#2b3138" depthTest={false} />
+        </mesh>
+        <mesh position={[0, 0, 0.12]} rotation-x={Math.PI / 2} onPointerDown={pick} renderOrder={998} userData={{ editHandle: true }}>
+          <cylinderGeometry args={[0.06, 0.075, 0.12, 16]} /><meshBasicMaterial color="#14171a" depthTest={false} />
+        </mesh>
+        <mesh position={[0, 0, 0.181]} renderOrder={999} userData={{ editHandle: true }}>
+          <circleGeometry args={[0.045, 16]} /><meshBasicMaterial color="#7fd8ff" depthTest={false} />
+        </mesh>
+        <mesh position={[0, 0.11, -0.01]} renderOrder={998} userData={{ editHandle: true }}>
+          <boxGeometry args={[0.1, 0.05, 0.1]} /><meshBasicMaterial color="#2b3138" depthTest={false} />
+        </mesh>
+        <mesh position={[0.07, 0.05, -0.072]} renderOrder={999} userData={{ editHandle: true }}>
+          <circleGeometry args={[0.012, 8]} /><meshBasicMaterial color="#ff3b30" depthTest={false} />
+        </mesh>
+        <lineSegments geometry={lines} renderOrder={997} userData={{ editHandle: true }}>
+          <lineBasicMaterial color={COL} transparent opacity={hit ? 0.95 : 0.6} depthTest={false} />
+        </lineSegments>
+      </group>
+      <AxisGizmo id="camera1" at={pose.position.toArray() as [number, number, number]} theta={Math.atan2(ALONG.x, ALONG.z)} />
+    </group>
+  )
+}
+
 function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, overview, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
@@ -320,6 +390,12 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
   // (in development, the view can be set from the console: __ctl.target, __cam.position)
   useEffect(() => { if (import.meta.env.DEV) Object.assign(window, { __ctl: controls.current }) })
   const camera = useThree((s) => s.camera)
+  // while the kitchen's being tried out (the shop's closed) the view is held at camera 1; edit mode, and the shop being open, leave it free
+  const { on: editing } = useEdit()
+  const lockView = !ai && !!DISHES[active].roast && !editing && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
+  const lockRef = useRef(lockView)
+  lockRef.current = lockView
+  const wasLocked = useRef(false)
   const scene = useThree((s) => s.scene)
   const size = useThree((s) => s.size)
   // frame the dish on the stage rather than the whole canvas: shift the projection so the stage's centre is
@@ -432,6 +508,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
       const c = controls.current
       if (!c) return
       e.preventDefault()
+      if (lockRef.current) return
       homing.current = false
       const now = zoomGoal.current ?? camera.position.distanceTo(c.target)
       zoomGoal.current = THREE.MathUtils.clamp(now * Math.exp(e.deltaY * 0.0011), 1.8, 20)
@@ -466,7 +543,21 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
     }
 
     const c = controls.current
-    if (c && homing.current) {
+    if (c && lockView) {
+      // (held at camera 1: it glides there, and the controls are off so nothing drags it away)
+      const pose = cameraOneOf(home.current, homeTarget, offsetOf('camera1'), rotationOf('camera1'))
+      c.enabled = false
+      homing.current = false
+      zoomGoal.current = null
+      camera.position.lerp(pose.position, k)
+      c.target.lerp(pose.target, k)
+      c.update()
+      wasLocked.current = true
+    } else if (c && wasLocked.current) {
+      // (let go: the view is where it was, free to be turned and moved again)
+      c.enabled = true
+      wasLocked.current = false
+    } else if (c && homing.current) {
       camera.position.lerp(home.current, k)
       // (any panning is undone too: the target slides back to the middle of the dish)
       c.target.lerp(homeTarget, k)
@@ -617,6 +708,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
       <ContactShadows position={[0, 0, 0]} opacity={look.shadowOpacity * 0.8} color={look.shadow} scale={6}
         blur={2.6} far={1.5} />
 
+      {editing && <CameraRig home={home} target={homeTarget} />}
       <OrbitControls
         ref={controls}
         // shared as the scene's controls so dragging a seasoning onto food can hold the camera still

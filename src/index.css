@@ -6364,3 +6364,225 @@ button {
     height: 40px;
   }
 }
+
+/* ---- the stock fridge: the shop's closed, and the board of foods is the kitchen's chiller (a steel cabinet, a row of glass-fronted bins), where a food
+   is taken out to try, and more is called in or topped up ---- */
+.fridge {
+  width: min(560px, 44vw);
+  max-height: min(74vh, 640px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 5px solid #46576a;
+  background: linear-gradient(180deg, #e8f1f7 0%, #d4e3ee 100%);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35), inset 0 0 0 2px #cdd5db;
+  overflow: hidden;
+}
+
+.fridge-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: linear-gradient(180deg, #46576a, #3a4858);
+  color: #eaf3f9;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  font-size: 15px;
+}
+
+.fridge-top i {
+  font: 600 13px/1 ui-monospace, monospace;
+  letter-spacing: 0.05em;
+  color: #7fe0ff;
+  background: #0d1a24;
+  padding: 3px 7px;
+  border-radius: 4px;
+  text-shadow: 0 0 6px #4ac8ee;
+}
+
+.fridge-bins {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #8aa2b6 transparent;
+}
+
+.fridge-foot {
+  height: 12px;
+  background: linear-gradient(180deg, #cdd5db, #46576a);
+}
+
+.fridge-bin {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 30px auto auto;
+  gap: 3px;
+  padding: 7px 8px 8px;
+  border-radius: 8px;
+  border: 1.5px solid #9fb7c8;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.85), rgb(228 240 248 / 0.7)),
+    #eef6fb;
+  color: #1d3550;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgb(30 60 90 / 0.18);
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.fridge-bin:hover {
+  transform: translateY(-1px);
+  border-color: #4a90c0;
+  box-shadow: inset 0 1px 0 #fff, 0 4px 10px rgb(30 60 90 / 0.28);
+}
+
+.fridge-bin:focus-visible {
+  outline: 3px solid var(--moss, #4a7c3a);
+  outline-offset: 2px;
+}
+
+.fridge-bin.is-taken {
+  border-color: #c0392b;
+  background: linear-gradient(180deg, #fff6f2, #fbe3dc);
+}
+
+.fridge-bin.is-out {
+  filter: saturate(0.5);
+  background: linear-gradient(180deg, rgb(235 240 244 / 0.9), rgb(214 224 232 / 0.85));
+}
+
+.fridge-bin-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fridge-bin-head .icon,
+.fridge-bin-head svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.fridge-bin-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.fridge-taken {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fridge-bin-en {
+  font-size: 10.5px;
+  color: #5a7388;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* the frozen packs in the bin, as many as there are in stock (up to twelve), each a slab of its own height, a frost of white on top */
+.fridge-packs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 3px 4px 0;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #cfe3f1, #b4d2e6);
+  overflow: hidden;
+}
+
+.fridge-packs i {
+  flex: 1;
+  min-width: 0;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(180deg, #fbfdff, #bcd6ea);
+  box-shadow: inset 0 0 0 1px rgb(80 120 160 / 0.35);
+}
+
+.fridge-packs em {
+  align-self: center;
+  font: 700 11px/1 sans-serif;
+  color: #3f6e92;
+}
+
+.fridge-bin-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.fridge-bin-info b {
+  color: #1d6b34;
+}
+
+.fridge-bin-info b.is-zero {
+  color: #c0392b;
+}
+
+.fridge-bin-info em {
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.fridge-bin-info small {
+  color: #5a7388;
+  font-size: 11px;
+}
+
+.fridge-bin-info small em {
+  font-size: 12px;
+}
+
+.fridge-buy {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+}
+
+.fridge-btn {
+  display: grid;
+  place-items: center;
+  padding: 3px 0;
+  border-radius: 5px;
+  background: #46576a;
+  color: #eaf3f9;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.fridge-btn:hover {
+  background: #2f6f9f;
+}
+
+.fridge-btn.fridge-top {
+  background: #1d6b34;
+}
+
+.fridge-btn.fridge-top:hover {
+  background: #2a8a46;
+}
+
+.fridge-btn.is-off {
+  opacity: 0.4;
+  pointer-events: none;
+}

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
   type PointerEvent as ReactPointerEvent } from 'react'
 import { nameIn, UI, type Lang } from '@/data/i18n'
 import { toChineseNumber, type Dish } from '@/data/menu'
+import { PAR } from '@/game/economy'
 import { Icon, iconFor } from './Icon'
 
 type MenuProps = {
@@ -246,6 +247,57 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     )
   }
 
+  /**
+   * One compartment of the stock fridge (the shop's closed: the board is the kitchen's chiller, not a menu): a glass-fronted bin with the food, its
+   * frozen packs stacked as high as the stock, what it costs, and the buttons to bring more in: +1, +10, and 補 to top it back up to the usual stock.
+   * The bin itself is what's clicked to take one out to try (right-click, or - / Delete, to put it back), as the tags were.
+   */
+  const bin = (x: { id: string; name: string; ja?: string; en?: string; price: number }, icon: string) => {
+    const n = quantities[x.id] ?? 0
+    const name = nameIn(lang, x)
+    const cost = unitCost ? unitCost(x.id) : 0
+    const have = stock?.[x.id] ?? 0
+    const out = have <= 0
+    const need = Math.max(0, PAR - have)
+    const can = (k: number) => !!onBuy && k > 0 && cash >= cost * k
+    const buy = (k: number) => (e: { stopPropagation: () => void; preventDefault: () => void }) => { e.stopPropagation(); e.preventDefault(); if (onBuy && can(k)) onBuy(x.id, k) }
+    return (
+      <div key={x.id} role="button" tabIndex={0} aria-pressed={n > 0} data-id={x.id}
+        className={`fridge-bin${out ? ' is-out' : ''}${n > 0 ? ' is-taken' : ''}`}
+        aria-label={`${name} ${x.en ?? ''}，${lang === 'ja' ? '在庫' : '庫存'} ${have}${n ? `，${t.ordered(n)}` : ''}`}
+        onClick={() => { const fired = press.current?.fired; press.current = null; if (!fired && !locked) onAdd(x.id) }}
+        onPointerDown={pressStart(x.id)} onPointerMove={pressMove} onPointerUp={pressEnd} onPointerCancel={pressEnd}
+        onContextMenu={(e) => { e.preventDefault(); if (!press.current && !locked) onRemove(x.id) }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!locked) onAdd(x.id) } else onKey(x.id)(e) }}>
+        <span className="fridge-bin-head">
+          <Icon name={icon} />
+          <span className="fridge-bin-name">{name}</span>
+          {n > 0 && <span key={n} className="fridge-taken" aria-hidden="true">{lang === 'ja' ? '試' : '試'}×{n}</span>}
+        </span>
+        {x.en && <span className="fridge-bin-en" lang="en">{x.en}</span>}
+        <span className="fridge-packs" aria-hidden="true">
+          {Array.from({ length: Math.min(12, have) }, (_, k) => <i key={k} style={{ height: `${60 + ((k * 37) % 5) * 8}%` }} />)}
+          {have > 12 && <em>+</em>}
+        </span>
+        <span className="fridge-bin-info" aria-hidden="true">
+          <b className={out ? 'is-zero' : ''}>{lang === 'ja' ? '在庫' : '庫存'} <em>{have}</em></b>
+          <small>{lang === 'ja' ? '原価' : '成本'} <em>{cost}</em></small>
+        </span>
+        {onBuy && (
+          <span className="fridge-buy">
+            <span role="button" tabIndex={-1} className={`fridge-btn${can(1) ? '' : ' is-off'}`} title={lang === 'ja' ? '1つ仕入れる' : '叫 1 份'}
+              onPointerDown={(e) => e.stopPropagation()} onClick={buy(1)}>+1</span>
+            <span role="button" tabIndex={-1} className={`fridge-btn${can(10) ? '' : ' is-off'}`} title={lang === 'ja' ? '10個仕入れる' : '叫 10 份'}
+              onPointerDown={(e) => e.stopPropagation()} onClick={buy(10)}>+10</span>
+            <span role="button" tabIndex={-1} className={`fridge-btn fridge-top${can(need) ? '' : ' is-off'}`}
+              title={need ? (lang === 'ja' ? `${PAR}まで補充（${need}）` : `補到 ${PAR} 份（${need} 份，NT$${cost * need}）`) : (lang === 'ja' ? '十分あります' : '已經夠了')}
+              onPointerDown={(e) => e.stopPropagation()} onClick={buy(need)}>{lang === 'ja' ? '補' : '補'}</span>
+          </span>
+        )}
+      </div>
+    )
+  }
+
   // side by side (desktop, tablets), the tags are sized and stacked to fill the space they have: as many rows as
   // gives the biggest tags (a short menu of 9 dishes in 3 rows of 3, not 2 rows with a hole and room to spare). Too
   // many to fit even small, they go back to two rows that slide sideways.
@@ -331,6 +383,17 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
       <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>
 
+      {research && onBuy && !taiwan ? (
+        <div className="strips-frame">
+          <div className="fridge" role="group" aria-label={lang === 'ja' ? '食材の冷蔵庫' : '食材冷藏櫃'}>
+            <div className="fridge-top"><span>{lang === 'ja' ? '冷蔵庫' : '冷藏櫃'}</span><i aria-hidden="true">−18℃</i></div>
+            <div className="fridge-bins">
+              {[...dish.bases.filter((b) => !b.includes), ...dish.items].map((x) => bin(x, iconFor(dish.id, { ...x, icon: iconOf(x) }, false)))}
+            </div>
+            <div className="fridge-foot" aria-hidden="true" />
+          </div>
+        </div>
+      ) : (
       <div className="strips-frame">
         <div className="strips" ref={row} onWheel={(e) => { if (row.current && Math.abs(e.deltaY) > Math.abs(e.deltaX)) row.current.scrollLeft -= e.deltaY }} onPointerDown={onGrab} onPointerMove={onDrag} onPointerUp={onLetGo}
           onPointerLeave={onLetGo}
@@ -358,6 +421,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           )}
         </div>
       </div>
+      )}
 
       <footer className="tally">
         {/* the shop's diary: which day it is, and how many have come in */}

@@ -293,6 +293,7 @@ let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
 let rows = new Map<string, HTMLDivElement>()
+let summary: HTMLDivElement | null = null
 let built = ''
 
 /** the panel's look: after Blender's dark interface (grey panels, a darker header bar, blue for what's active, red/green/blue axis stripes) */
@@ -315,6 +316,7 @@ const PANEL_CSS = `
 .be-sec.shut > .be-st::before { content:'▸' }
 .be-sec.shut > .be-sc { display:none }
 .be-sc { padding:6px 8px 8px; background:#2b2b2b }
+.be-sum { color:#9ab0c8; font-size:11px; margin-bottom:5px }
 .be-find { width:100%; background:#1d1d1d; color:#d6d6d6; border:1px solid #3a3a3a; border-radius:4px; padding:3px 7px; font:inherit; margin-bottom:5px }
 .be-list { max-height:150px; overflow:auto; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a; background:#242424; border-radius:4px; padding:2px }
 .be-row { padding:2px 8px 2px 18px; border-radius:3px; cursor:pointer; white-space:nowrap; position:relative }
@@ -391,6 +393,8 @@ function panel() {
     }
     // Outliner: every piece that can be taken hold of, a search above, the chosen one lit
     const out = section('場景物件')
+    summary = h('div', 'be-sum') as HTMLDivElement
+    out.appendChild(summary)
     const find = h('input', 'be-find') as HTMLInputElement
     find.placeholder = '搜尋…'
     const list = h('div', 'be-list')
@@ -486,6 +490,12 @@ function panel() {
   }
   ;(['move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => toolButtons[k]?.classList.toggle('on', state.tool === t))
   for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)) }
+  if (summary) {
+    // (how much furniture there is: every piece that can be taken hold of, how many have been moved, turned or sized from where they began, and the groups)
+    const pieces = [...registry.keys()]
+    const moved = pieces.filter((id) => offsetOf(id).some((v) => Math.abs(v) > 1e-6) || rotationOf(id).some((v) => Math.abs(v) > 1e-6) || scaleOf(id).some((v) => Math.abs(v - 1) > 1e-6)).length
+    summary.textContent = `共 ${pieces.length} 件擺設・調整過 ${moved} 件・群組 ${Object.keys(state.groups).length} 個`
+  }
   el?.querySelectorAll('.be-grp:last-of-type .be-f').forEach((f, k) => f.classList.toggle('axon', scaleAxis === k))
   if (info) {
     const id = state.selected
