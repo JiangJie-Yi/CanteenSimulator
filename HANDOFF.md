@@ -14,11 +14,12 @@
 - 炭火：真實尺寸的堆疊（不浮空、最多三層、疊在別根上的才會滑、滑不遠）、炭堆滿且還在燒就不能再加、火力 100% 不能再加（`game/economy.ts` 的 `canAddCharcoal`）、燒完變灰白的炭而不是縮短、黑炭裂縫發光加餘燼床。
 - 收銀機：顯示器擺正、抽屜好點、灰塵污漬磨損、背面纜線、側面接口；冷藏櫃去掉「食材」字牌與地板飾條。
 - 場景：日夜不同的 HDRI、牆頂燈串、和紙吊燈、神龕兩格階梯加帶小門的圍欄、門簾家紋魚圖。
-- BGM：`src/ui/Bgm.tsx` 會依序試 `public/audio/izakaya-night.mp3`、`居酒屋の夜.mp3`、m4a／ogg／wav；mp3 不在 repo，找不到時按鈕提示要放的路徑。
+- BGM：`src/ui/Bgm.tsx` 先找 `src/` 底下的音檔（使用者本機是 `src/IzakayaNight.mp3`，用 `import.meta.glob`，沒有檔也不會壞建置），再依序試 `public/audio/izakaya-night.mp3`、`居酒屋の夜.mp3`、m4a／ogg／wav；找不到時按鈕提示要放的路徑。檔案要提交進 repo 才會跟著部署。
+- HDRI：`src/scene/IndoorHDRI.tsx` 若有 `public/hdri/day.hdr`、`night.hdr`（polyhaven.com/hdris 的 1k .hdr，CC0）就用真的，沒有就用內建的假 HDRI。雲端連不上 polyhaven，所以沒放檔。
 - 瘦身：移除沒人用的匯出（`starsFor`、`COIN_R`、`KITCHEN_TOP`、`resetOne`、`equilibriumTemp`、`MiniStomach`）、翻頁箭頭與迷你胃的 CSS、Blender 備份檔、`__pycache__`、`blender/archive`、`public/icons.svg`。
 
 ## 待辦
-1. 【你】把「居酒屋の夜.mp3」放到 `public/audio/izakaya-night.mp3`（雲端看不到；檔案大就別提交）。
+1. 【你】`src/IzakayaNight.mp3` 要提交進 repo（雲端看不到；網站才會有 BGM）；另外下載日夜兩張 HDRI 放進 `public/hdri/`。
 2. 吧台本體、爐子與石頭、行燈、扇子還沒做成編輯物件（等使用者決定）。
 3. 【你】GitHub repo 改名 JapaneseGrillSimulator（push 時 GitHub 提示已搬到 JiangJie-Yi/CanteenSimulator）。
 4. 【你】看一遍畫面是否到位；編輯模式的舊設定若看起來歪，按「全部還原」。
