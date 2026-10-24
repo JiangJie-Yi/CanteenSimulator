@@ -955,6 +955,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
   const PLASTER = '#ece0c6'
   return (
     <group>
+      <StaticBatch>
       <mesh position={[D / 2, 0.004, 0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[D, w]} />
         <meshToonMaterial color="#ffffff" map={floor} />
@@ -984,6 +985,8 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       {/* the ceiling of dark boards, with two beams across it */}
       <mesh position={[D / 2, top, 0]} rotation-x={Math.PI / 2}><planeGeometry args={[D, w]} /><meshToonMaterial color="#3a2416" /></mesh>
       {[0.25, 0.7].map((x) => <mesh key={x} position={[x, top - 0.03, 0]}><boxGeometry args={[0.06, 0.06, w]} /><meshToonMaterial color="#241408" /></mesh>)}
+      </StaticBatch>
+      <Movable id={`wc-${who}-toilet`} label={`馬桶（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* the toilet, facing the door */}
       <group position={[D - 0.22, 0, 0]}>
         <mesh geometry={WC_GEO.foot} position-y={0.14}><meshToonMaterial color="#f6f6f2" /></mesh>
@@ -994,6 +997,10 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         <mesh geometry={WC_GEO.basin} position={[0.13, 0.725, -0.06]} scale={[0.8, 1, 0.8]}><meshToonMaterial color="#f6f6f2" /></mesh>
         <mesh position={[0.17, 0.78, -0.06]}><cylinderGeometry args={[0.006, 0.006, 0.07, 6]} /><meshToonMaterial color="#b8bcc0" /></mesh>
         <mesh position={[0.15, 0.815, -0.06]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.006, 0.006, 0.045, 6]} /><meshToonMaterial color="#b8bcc0" /></mesh>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-vase`} label={`竹花瓶（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
+      <group position={[D - 0.22, 0, 0]}>
         {/* (a bamboo vase of camellia beside it) */}
         <group position={[0.13, 0.7, 0.09]}>
           <mesh geometry={WC_GEO.pot} position-y={0.05}><meshToonMaterial color="#b8a060" /></mesh>
@@ -1007,6 +1014,8 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
           ))}
         </group>
       </group>
+      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-duck`} label={`簀之子踏板（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* the slatted duckboard (簀の子) before the toilet, and the slippers by the door */}
       <group position={[D - 0.54, 0, 0]}>
         {Array.from({ length: 9 }, (_, k) => (
@@ -1014,11 +1023,15 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         ))}
         {[-1, 1].map((sd) => <mesh key={sd} position={[0, 0.008, sd * 0.2]}><boxGeometry args={[0.4, 0.016, 0.03]} /><meshToonMaterial color="#6a4a28" /></mesh>)}
       </group>
+      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {[-1, 1].map((sd) => (
         <mesh key={sd} position={[0.07, 0.018, sd * 0.1]} rotation-y={sd * 0.1}>
           <boxGeometry args={[0.2, 0.03, 0.08]} /><meshToonMaterial color={accent} />
         </mesh>
       ))}
+      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-basin`} label={`石洗手台與鏡子（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* a stone basin on a wooden shelf by the side wall, a bamboo dipper laid across it, a round mirror in a wooden frame
           over it, the indigo hand towel on a rod */}
       <group position={[D * 0.45, 0, -w / 2 + 0.12]}>
@@ -1033,16 +1046,23 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         <mesh position={[0.24, 1.0, -0.1]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.005, 0.005, 0.12, 5]} /><meshToonMaterial color="#c8b070" /></mesh>
         <mesh position={[0.24, 0.9, -0.098]}><planeGeometry args={[0.1, 0.2]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI} side={THREE.DoubleSide} /></mesh>
       </group>
+      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-paper`} label={`衛生紙架（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* the paper, in a wooden holder on the other wall, and the plaque over it */}
       <group position={[D - 0.3, 0.55, w / 2 - 0.05]}>
         <mesh position={[0, 0, 0.03]}><boxGeometry args={[0.14, 0.12, 0.012]} /><meshToonMaterial color="#8a5a30" /></mesh>
         <mesh geometry={WC_GEO.roll} position={[0, 0, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#fafaf6" /></mesh>
         {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.06, 0, 0]}><boxGeometry args={[0.012, 0.1, 0.07]} /><meshToonMaterial color="#8a5a30" /></mesh>)}
       </group>
+      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-plaque`} label={`お手洗い牌（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       <mesh position={[D * 0.45, 1.5, w / 2 - 0.006]} rotation-y={Math.PI}><planeGeometry args={[0.3, 0.12]} /><meshToonMaterial color="#ffffff" map={WC_PLAQUE} /></mesh>
+      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-lamp`} label={`紙燈（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* a paper lamp, lit, overhead, in a wooden cage */}
       <mesh geometry={WC_GEO.lamp} position={[D / 2, h + 0.1, 0]}><meshBasicMaterial color="#fff1cc" toneMapped={false} /></mesh>
       <mesh position={[D / 2, h + 0.1, 0]}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
+      </StaticBatch></Movable>
     </group>
   )
 }
@@ -1428,9 +1448,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         ))}
         {/* the toilets, the men's and the women's, side by side */}
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
-          <Movable key={who} id={`wcdoor-${who}`} label={who === 'm' ? '男廁門框' : '女廁門框'}><StaticBatch>
-            <group position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletDoor who={who} /></group>
-          </StaticBatch></Movable>
+          <group key={who} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletDoor who={who} /></group>
         ))}
         {shrine !== undefined && <Movable id="wallshrine" label="牆上神棚"><StaticBatch><group position={[0, 1.78, shrine]}><Kamidana /></group></StaticBatch></Movable>}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
@@ -1487,7 +1505,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         {art.filter((a) => a.nobori !== undefined).map((a) => <Movable key={`n${a.z}`} id={`nobori${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`幟旗（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><group position={[0, 1.08, a.z]}><Nobori i={a.nobori!} /></group></Movable>)}
         {/* (the toilets' doors slide: not merged) */}
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
-          <Movable key={who} id={`wcpanel-${who}`} label={who === 'm' ? '男廁拉門' : '女廁拉門'}><group name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group></Movable>
+          <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group>
         ))}
         {/* (the altar's flag stirs, its incense smokes: not merged) */}
         {altar && <Movable id="altarfittings" label="供桌上的供品與線香"><group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}

@@ -756,7 +756,33 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
   const body = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
-  const { on: editing } = useEdit()
+  const { on: editing, selected } = useEdit()
+  // (the selection box fitted to the leaf itself, in the gate's own frame, measured from what's drawn once editing begins)
+  const [fitted, setFitted] = useState<{ c: [number, number, number]; s: [number, number, number] } | null>(null)
+  useEffect(() => {
+    if (!editing) { setFitted(null); return }
+    const t = window.setTimeout(() => {
+      const b = body.current
+      if (!b) return
+      b.updateWorldMatrix(true, true)
+      const inv = new THREE.Matrix4().copy(b.matrixWorld).invert()
+      const box = new THREE.Box3()
+      b.traverse((m) => {
+        if (!(m instanceof THREE.Mesh) || m.userData.editHandle) return
+        for (let o: THREE.Object3D | null = m; o && o !== b; o = o.parent) if (!o.visible) return
+        const mats = Array.isArray(m.material) ? m.material : [m.material]
+        if (mats.every((x) => x.side === THREE.BackSide || (x.transparent && !x.depthWrite))) return
+        const pos = m.geometry.getAttribute('position')
+        const mat = new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)
+        const v = new THREE.Vector3()
+        for (let i = 0; i < pos.count; i += Math.max(1, Math.ceil(pos.count / 1500))) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(mat))
+      })
+      if (box.isEmpty()) return
+      const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3())
+      setFitted({ c: [c.x, c.y, c.z], s: [sz.x + 0.02, sz.y + 0.02, sz.z + 0.02] })
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [editing])
   const drag = useRef<{ at: THREE.Vector3; y: number; lift: boolean } | null>(null)
   const idx = BAR_GATES.indexOf(gate)
   // (in edit mode, key G with the shop shut: the swing door by itself is moved by hand, the post and doorway staying; on the list of what can be moved)
@@ -828,7 +854,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
         {/* the swing door by itself: its own thing, apart from the post and the doorway, which stay where they are; it's this that's moved by hand */}
         <group ref={body} position={positionOf(`gate${idx}`)} onPointerDown={down}>
         {editing && (
-          <mesh position={[end * G / 2, H / 2 + 0.01, 0]}><boxGeometry args={[G + 0.02, H - 0.02, 0.12]} /><meshBasicMaterial color="#3fa9ff" transparent opacity={0.28} depthWrite={false} /></mesh>
+          <mesh position={fitted ? fitted.c : [end * G / 2, H / 2 + 0.01, 0]} renderOrder={999}><boxGeometry args={fitted ? fitted.s : [G + 0.02, H - 0.02, 0.12]} /><meshBasicMaterial color={selected === `gate${idx}` ? '#8fd0ff' : '#3fa9ff'} transparent opacity={selected === `gate${idx}` ? 0.2 : 0.26} depthWrite={false} depthTest={false} /></mesh>
         )}
         {editing && <AxisGizmo id={`gate${idx}`} at={[end * G / 2, H / 2, 0]} />}
         <group ref={leaf} name="gate-leaf">

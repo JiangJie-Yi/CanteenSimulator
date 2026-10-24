@@ -332,13 +332,15 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
       // (only what's drawn counts: not a hidden mesh (a batch's originals, a model's floor plane left out), nor an unseen hit-box or a clear glow)
       for (let o: THREE.Object3D | null = m; o && o !== inn; o = o.parent) if (!o.visible) return
       const mats = Array.isArray(m.material) ? m.material : [m.material]
-      if (mats.every((x) => !x.visible || x.opacity <= 0.02 || !x.colorWrite || x.blending === THREE.AdditiveBlending)) return
-      m.geometry.computeBoundingBox()
-      const gb = m.geometry.boundingBox
-      if (!gb) return
+      // (nor the ink outlines (back faces drawn a little larger), nor decals and glows laid over a surface (clear, no depth write): they'd only fatten the box)
+      if (mats.every((x) => !x.visible || x.opacity <= 0.02 || !x.colorWrite || x.blending === THREE.AdditiveBlending || x.side === THREE.BackSide || (x.transparent && !x.depthWrite))) return
+      const pos = m.geometry.getAttribute('position')
+      if (!pos) return
       const mat = new THREE.Matrix4().multiplyMatrices(toInner, m.matrixWorld)
-      for (let i = 0; i < 8; i++) {
-        const v = new THREE.Vector3(i & 1 ? gb.max.x : gb.min.x, i & 2 ? gb.max.y : gb.min.y, i & 4 ? gb.max.z : gb.min.z).applyMatrix4(mat)
+      // (the model's own vertices, not its bounding box's corners: a tilted or round piece fits snugly; a big mesh is sampled)
+      const stride = Math.max(1, Math.ceil(pos.count / 1500))
+      for (let i = 0; i < pos.count; i += stride) {
+        const v = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(mat)
         pts.push(v)
         yMin = Math.min(yMin, v.y); yMax = Math.max(yMax, v.y)
       }
@@ -364,7 +366,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
     const co = Math.cos(best.a), si = Math.sin(best.a)
     // (the middle back out of the turned frame)
     const c = [cx * co + cz * si, (yMin + yMax) / 2, -cx * si + cz * co] as V3
-    return { c, s: [Math.max(best.x1 - best.x0, 0.2) + 0.06, Math.max(yMax - yMin, 0.2) + 0.06, Math.max(best.z1 - best.z0, 0.2) + 0.06] as V3, yaw: best.a, theta }
+    return { c, s: [Math.max(best.x1 - best.x0, 0.06) + 0.02, Math.max(yMax - yMin, 0.06) + 0.02, Math.max(best.z1 - best.z0, 0.06) + 0.02] as V3, yaw: best.a, theta }
   }
 
   const frame = () => {
