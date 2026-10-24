@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
+import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
 import { COAL_MAX, COAL_PER_ADD, placeStick, restOf, roomFor, surfaceY, type Lay } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
@@ -1847,7 +1848,6 @@ type RoastingProps = {
   /** draw the bar (with the shop open) the food is served onto; a phone shows its customers in 2D, without it */
   bar?: boolean
   /** who's hired to help the owner (the head chef): a second chef, a sous chef */
-  helpers?: { chef: boolean; sous: boolean }
   /** who's on the staff here (each drawn at their place while the shop is open) */
   crew?: CrewMember[]
   /** what's said is in this language, with these names for the food */
@@ -1884,7 +1884,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {}, crowd = 1, blessed = false, onDrink, onWalkOut, lang = 'zh', names = {}, helpers = { chef: false, sous: false }, crew = [], bar = true,
+  locked = false, notes = {}, crowd = 1, blessed = false, onDrink, onWalkOut, lang = 'zh', names = {}, crew = [], bar = true,
   entries, onOrderEntry }: RoastingProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
@@ -2697,6 +2697,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [fireHint, setFireHint] = useState(0)
   const lockedRef = useRef(locked)
   lockedRef.current = locked
+  // (with the shop open nothing is cooked or seasoned by hand: the cooks do it; see game/mode)
+  const byHand = canCookByHand(modeOf(ai))
+  const byHandRef = useRef(byHand)
+  byHandRef.current = byHand
 
   // ---- two tables: the player's tasting (shop closed) and the shop's own (open). Switching puts one table's
   // food away exactly as it was and brings the other's back, each piece where it was and as cooked as it was.
@@ -2866,8 +2870,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     // the owner is the head chef and works the grill by hand; a hired chef cooks alongside (takes things off when
     // done, seasons them), the sous chef does the rest (keeps the fire up, puts what's waiting on, clears away)
-    const { chef: hasChef, sous: hasSous } = helpers
-    if (!hasChef && !hasSous) return
+    // (with the shop open the kitchen cooks by itself: the owner's own cook does all of it, a hired chef or sous chef working alongside)
+    const hasChef = true, hasSous = true
     if (fire && fire.current < 0.35) {
       if (!roomForCoal() || onAddCharcoal?.() === false) return
       say(L().addCharcoal)
@@ -3261,6 +3265,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     /** the food under the pointer: on the fire, or on the plate / in the basket once it's landed */
     const pickFood = (seasoning = false) => {
+      if (!byHandRef.current) return null
       const candidates = pieces.current.filter((p) => present(p) && !p.eaten &&
         !(roast.net?.includes(p.id) && !p.collected && p.netSpot === null) &&
         (!p.collected || (p.flight >= 1 && (p.eat === 0 || p.stickOnly))) && !(seasoning && p.stickOnly))
@@ -3271,6 +3276,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return candidates.find((p) => p.node === o) ?? null
     }
     const pickTool = () => {
+      if (!byHandRef.current) return null
       const hits = raycaster.intersectObjects([...tools.map((t) => t.node), ...pots.map((p) => p.pot)], true)
       if (!hits.length) return null
       let o: THREE.Object3D | null = hits[0].object
@@ -3490,6 +3496,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return mats.some((m) => /^(Ember|Binchotan|Bark)/.test(m.name))
     }
     const pickContainer = () => {
+      if (!byHandRef.current) return null
       const groups: THREE.Object3D[] = []
       world.traverse((o) => { if (typeof o.userData.container === 'string') groups.push(o) })
       for (const hit of raycaster.intersectObjects(groups, true)) {
@@ -3694,7 +3701,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
     }
     const onUp = (e: PointerEvent) => {
-      if (lockedRef.current) return
+      if (lockedRef.current || !byHandRef.current) return
       if (drag.current || shift.current || scrap.current?.started) return
       if (e.button !== 0 || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
       aim(e)
@@ -4521,7 +4528,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {wisps.map((w) => (
         <Wisp key={w.key} at={w.at} onDone={() => setWisps((all) => all.filter((x) => x.key !== w.key))} />
       ))}
-      {active && tags.map(({ key, id, name, state }) => (
+      {active && showsProgress(modeOf(ai)) && tags.map(({ key, id, name, state }) => (
         <group key={key} ref={(g) => { anchors.current[key] = g }}>
           <Html center zIndexRange={[30, 10]}>
             <button type="button"

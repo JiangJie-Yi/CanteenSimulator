@@ -41,6 +41,7 @@ import { offsetOf, registerMovable, rotationOf, select, setFrame, toggleEdit, us
 import { AxisGizmo, focusCamera } from '@/shops/grill/Movable'
 import { ALONG } from '@/shops/grill/bar'
 import { cameraOneOf } from '@/scene/camera1'
+import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
@@ -291,7 +292,6 @@ type SceneProps = {
   lang: Lang
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
-  helpersOf: (dishId: string) => { chef: boolean; sous: boolean }
   crewOf: (dishId: string) => CrewMember[]
   onWalkOut: (ids: string[], dish: DishInfo, guest?: number) => void
   /** (shop open) what's on each shop's menu, and a customer ordering one of them */
@@ -383,7 +383,7 @@ function CameraRig({ home, target }: { home: { current: THREE.Vector3 }; target:
   )
 }
 
-function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, overview, ai, lang, spotOn, chefOf, crowdOf, helpersOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
+function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, overview, ai, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -392,7 +392,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
   const camera = useThree((s) => s.camera)
   // while the kitchen's being tried out (the shop's closed) the view is held at camera 1; edit mode, and the shop being open, leave it free
   const { on: editing } = useEdit()
-  const lockView = !ai && !!DISHES[active].roast && !editing && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
+  const lockView = holdsCameraOne(modeOf(ai), editing) && !!DISHES[active].roast && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
   const lockRef = useRef(lockView)
   lockRef.current = lockView
   const wasLocked = useRef(false)
@@ -620,7 +620,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)} blessed={blessed} onDrink={onDrink}
-                  helpers={helpersOf(dish.id)} crew={crewOf(dish.id)} bar={!phone}
+                  crew={crewOf(dish.id)} bar={!phone}
                   onWalkOut={(ids, g) => onWalkOut(ids, dish, g)} lang={lang}
                   entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
                   names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))}
@@ -1998,7 +1998,7 @@ export default function App() {
             resetView={resetView} overview={overview} ai={ai} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
             incense={{ litAt: incenseAt, onLight: lightIncense }} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
-            guestsBy={guestsBy} speech={speech} helpersOf={(id) => ({ chef: staffOf(id, 'chef').length > 0, sous: staffOf(id, 'sous').length > 0 })}
+            guestsBy={guestsBy} speech={speech}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests} potAi={potAi} onPotGuestEat={onPotGuestEat}
             bakeKitchen={(() => {
               const k = ai ? shop.current.bakery?.kitchen : null
@@ -2019,7 +2019,6 @@ export default function App() {
             onOffFire={sceneOffFire} onEat={onEat} onNotice={sceneNotice} ai={ai} onOrder={sceneOrder} onAddCharcoal={addCharcoal}
             onSay={talk} chef={chefOf(dish.id)} onGuests={(g) => setShopGuests(dish.id, g)}
             crowd={(staffOf(dish.id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed} onDrink={onDrink}
-            helpers={{ chef: staffOf(dish.id, 'chef').length > 0, sous: staffOf(dish.id, 'sous').length > 0 }}
             onWalkOut={(ids, g) => refund(ids, dish, g)} lang={lang} entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
             names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))} space={ai ? 'open' : 'closed'}
             notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))}
@@ -2239,6 +2238,7 @@ export default function App() {
       <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : researchDish(dish)} research={!ai}
         layoutLike={ai ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })} days={days}
+        onBuy={ai ? undefined : (id, n) => buyIn(dish, id, n)} onBuyAll={ai ? undefined : (n) => buyAll(dish, n)} onTopUp={ai ? undefined : () => topUp(dish)} topUpCost={topUpOrder(dish, stock).cost}
          lang={lang} quantities={ai ? entryCount : orders[dish.id]}
         feed={feed} locked={ai} stock={ai ? entryStock(dish) : stock}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}

@@ -2,6 +2,7 @@
 // grill (Roasting) — what's ordered comes out raw on the tray, goes on the fire, browns and chars, is seasoned, taken
 // off, eaten by you (shop shut) or served to the customers (shop open), the AI chef and the customers working the same
 // way — drawn as a fire pit seen from above in SVG, with the customers' bar (GuestCounter) over it.
+import { canCookByHand, modeOf } from '@/game/mode'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
@@ -71,7 +72,6 @@ export type Grill2DProps = {
   onAddCharcoal?: () => boolean
   onSay?: (who: 'chef' | 'guest', text: string) => void
   space?: 'closed' | 'open'
-  helpers?: { chef: boolean; sous: boolean }
   lang?: Lang
   names?: Record<string, string>
   onWalkOut?: (ids: string[], guest: number) => void
@@ -87,14 +87,14 @@ export type Grill2DProps = {
 }
 
 export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, onEat, notes = {}, onNotice, ai = false, onOrder,
-  onAddCharcoal, onSay, space = 'closed', helpers = { chef: false, sous: false }, lang = 'zh', names = {}, onWalkOut, entries,
+  onAddCharcoal, onSay, space = 'closed', lang = 'zh', names = {}, onWalkOut, entries,
   onOrderEntry, crowd = 1, blessed = false, onDrink, chef = CHEFS[1], onGuests, top }: Grill2DProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   // the latest props, read by the loop
-  const live = useRef({ quantities, fire, ai, active, space, helpers, notes, chef, crowd, blessed, entries, lang })
-  live.current = { quantities, fire, ai, active, space, helpers, notes, chef, crowd, blessed, entries, lang }
+  const live = useRef({ quantities, fire, ai, active, space, notes, chef, crowd, blessed, entries, lang })
+  live.current = { quantities, fire, ai, active, space, notes, chef, crowd, blessed, entries, lang }
   const cb = useRef({ onOffFire, onEat, onNotice, onOrder, onAddCharcoal, onSay, onWalkOut, onOrderEntry, onDrink, onGuests })
   cb.current = { onOffFire, onEat, onNotice, onOrder, onAddCharcoal, onSay, onWalkOut, onOrderEntry, onDrink, onGuests }
 
@@ -197,7 +197,9 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
   }
   /** the AI chef, one thing at a time (as at the 3D grill) */
   const runChef = () => {
-    const { helpers: { chef: hasChef, sous: hasSous }, chef: who, notes: nts, fire: f } = live.current
+    // (with the shop open the kitchen cooks by itself, as at the 3D grill)
+    const hasChef = true, hasSous = true
+    const { chef: who, notes: nts, fire: f } = live.current
     const say = (text: string) => {
       if (performance.now() - clocks.current.said > 2500) {
         clocks.current.said = performance.now()
@@ -368,7 +370,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
       raf = requestAnimationFrame(tick)
       const dt = Math.min(0.1, Math.max(0, (t - last) / 1000)) * GAME_SPEED.value
       last = t
-      const { quantities: qty, fire: f, ai: isAi, active: on, helpers: h } = live.current
+      const { quantities: qty, fire: f, ai: isAi, active: on } = live.current
       const list = pieces()
       // a piece for every portion there could be
       for (const id of Object.keys(roast.times)) {
@@ -411,7 +413,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
         c.chef += dt
         if (c.chef > live.current.chef.pace) { c.chef = 0; runChef() }
         if (c.ai > 0.8) { c.ai = 0; runGuests() }
-      } else void h
+      }
       const off = list.filter((p) => present(p) && (p.collected || p.staged) && !p.eaten && !p.loose).length
       const loose = list.filter((p) => present(p) && p.loose && p.collected && !p.eaten).length
       if (off * 1000 + loose !== lastOff.current) {
@@ -456,7 +458,8 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
   // (how done, rounded, and the seasonings as one digit each: what a food's picture is memoised on)
   const doneOf = (p: Piece) => Math.round((p.progress / roast.times[p.id]) * 40) / 40
   const dkOf = (p: Piece) => DABS.map((k) => Math.min(9, p.dabs[k])).join('')
-  const down = (p: Piece) => (e: React.PointerEvent) => { e.stopPropagation(); tap(p) }
+  // (open, nothing's picked up or seasoned by hand: see game/mode)
+  const down = (p: Piece) => (e: React.PointerEvent) => { e.stopPropagation(); if (canCookByHand(modeOf(live.current.ai))) tap(p) }
   const art = (p: Piece) => <FoodArt id={p.id} r={doneOf(p)} dk={dkOf(p)} foil={/Potato/.test(p.id) && !p.collected} fallback={colorOf(p.id)} />
   /** a skewer stuck in the ash round the fire, its food toward the coals (a fish kept right way up) */
   const skewer = (p: Piece, x: number, y: number, a: number) => (
@@ -542,12 +545,12 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
         })}
       </svg>
       {/* the seasonings: pick one, then tap the food to put it on (tap it again to put it down) */}
-      <div className="grill2d-tools">
+      {canCookByHand(modeOf(ai)) && <div className="grill2d-tools">
         {([...DABS, 'water'] as Seasoning[]).map((k) => (
           <button key={k} type="button" className={`g2-tool${tool === k ? ' is-on' : ''}`} style={{ ['--dab' as string]: DAB_COLOR[k] }}
             onClick={() => setTool((t) => (t === k ? null : k))}><ToolIcon k={k} /><span>{DAB_NAME[lang][k]}</span></button>
         ))}
-      </div>
+      </div>}
     </div>
   )
 }

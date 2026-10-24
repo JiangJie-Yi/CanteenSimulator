@@ -263,33 +263,33 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     const buy = (k: number) => (e: { stopPropagation: () => void; preventDefault: () => void }) => { e.stopPropagation(); e.preventDefault(); if (onBuy && can(k)) onBuy(x.id, k) }
     return (
       <div key={x.id} role="button" tabIndex={0} aria-pressed={n > 0} data-id={x.id}
-        className={`fridge-bin${out ? ' is-out' : ''}${n > 0 ? ' is-taken' : ''}`}
+        className={`chiller-bin${out ? ' is-out' : ''}${n > 0 ? ' is-taken' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${lang === 'ja' ? '在庫' : '庫存'} ${have}${n ? `，${t.ordered(n)}` : ''}`}
         onClick={() => { const fired = press.current?.fired; press.current = null; if (!fired && !locked) onAdd(x.id) }}
         onPointerDown={pressStart(x.id)} onPointerMove={pressMove} onPointerUp={pressEnd} onPointerCancel={pressEnd}
         onContextMenu={(e) => { e.preventDefault(); if (!press.current && !locked) onRemove(x.id) }}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!locked) onAdd(x.id) } else onKey(x.id)(e) }}>
-        <span className="fridge-bin-head">
+        <span className="chiller-bin-head">
           <Icon name={icon} />
-          <span className="fridge-bin-name">{name}</span>
-          {n > 0 && <span key={n} className="fridge-taken" aria-hidden="true">{lang === 'ja' ? '試' : '試'}×{n}</span>}
+          <span className="chiller-bin-name">{name}</span>
+          {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{lang === 'ja' ? '試' : '試'}×{n}</span>}
         </span>
-        {x.en && <span className="fridge-bin-en" lang="en">{x.en}</span>}
-        <span className="fridge-packs" aria-hidden="true">
+        {x.en && <span className="chiller-bin-en" lang="en">{x.en}</span>}
+        <span className="chiller-packs" aria-hidden="true">
           {Array.from({ length: Math.min(12, have) }, (_, k) => <i key={k} style={{ height: `${60 + ((k * 37) % 5) * 8}%` }} />)}
           {have > 12 && <em>+</em>}
         </span>
-        <span className="fridge-bin-info" aria-hidden="true">
+        <span className="chiller-bin-info" aria-hidden="true">
           <b className={out ? 'is-zero' : ''}>{lang === 'ja' ? '在庫' : '庫存'} <em>{have}</em></b>
           <small>{lang === 'ja' ? '原価' : '成本'} <em>{cost}</em></small>
         </span>
         {onBuy && (
-          <span className="fridge-buy">
-            <span role="button" tabIndex={-1} className={`fridge-btn${can(1) ? '' : ' is-off'}`} title={lang === 'ja' ? '1つ仕入れる' : '叫 1 份'}
+          <span className="chiller-buy">
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(1) ? '' : ' is-off'}`} title={lang === 'ja' ? '1つ仕入れる' : '叫 1 份'}
               onPointerDown={(e) => e.stopPropagation()} onClick={buy(1)}>+1</span>
-            <span role="button" tabIndex={-1} className={`fridge-btn${can(10) ? '' : ' is-off'}`} title={lang === 'ja' ? '10個仕入れる' : '叫 10 份'}
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={lang === 'ja' ? '10個仕入れる' : '叫 10 份'}
               onPointerDown={(e) => e.stopPropagation()} onClick={buy(10)}>+10</span>
-            <span role="button" tabIndex={-1} className={`fridge-btn fridge-top${can(need) ? '' : ' is-off'}`}
+            <span role="button" tabIndex={-1} className={`chiller-btn chiller-top${can(need) ? '' : ' is-off'}`}
               title={need ? (lang === 'ja' ? `${PAR}まで補充（${need}）` : `補到 ${PAR} 份（${need} 份，NT$${cost * need}）`) : (lang === 'ja' ? '十分あります' : '已經夠了')}
               onPointerDown={(e) => e.stopPropagation()} onClick={buy(need)}>{lang === 'ja' ? '補' : '補'}</span>
           </span>
@@ -385,12 +385,12 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
 
       {research && onBuy && !taiwan ? (
         <div className="strips-frame">
-          <div className="fridge" role="group" aria-label={lang === 'ja' ? '食材の冷蔵庫' : '食材冷藏櫃'}>
-            <div className="fridge-top"><span>{lang === 'ja' ? '冷蔵庫' : '冷藏櫃'}</span><i aria-hidden="true">−18℃</i></div>
-            <div className="fridge-bins">
+          <div className="chiller" role="group" aria-label={lang === 'ja' ? '食材の冷蔵庫' : '食材冷藏櫃'}>
+            <div className="chiller-top"><span>{lang === 'ja' ? '冷蔵庫' : '冷藏櫃'}</span><i aria-hidden="true">−18℃</i></div>
+            <div className="chiller-bins">
               {[...dish.bases.filter((b) => !b.includes), ...dish.items].map((x) => bin(x, iconFor(dish.id, { ...x, icon: iconOf(x) }, false)))}
             </div>
-            <div className="fridge-foot" aria-hidden="true" />
+            <div className="chiller-foot" aria-hidden="true" />
           </div>
         </div>
       ) : (
