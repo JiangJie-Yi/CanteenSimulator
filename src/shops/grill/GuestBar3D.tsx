@@ -242,14 +242,14 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           </StaticBatch></Movable>
         ))}
       </group>
-      <StaticBatch>
+      <Movable id="genkan" label="玄關地墊"><StaticBatch>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       {/* the coir mat lying on the genkan's stone, just inside */}
       <mesh position={[0, -GENKAN.depth + 0.009, -0.18]} rotation-x={-Math.PI / 2} scale={[-1, 1, 1]}>
         <planeGeometry args={[0.34, 0.34]} />
         <meshToonMaterial color="#ffffff" map={DOORMAT} />
       </mesh>
-      </StaticBatch>
+      </StaticBatch></Movable>
       <Movable id="shoecab" label="鞋櫃"><StaticBatch>
       {/* the shoe cupboard (下駄箱) against the wall in the genkan: dark wood, its doors in a grid of small panels, a
           vase of a sprig on top */}
@@ -275,24 +275,28 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       </StaticBatch></Movable>
       <group position-x={DX}>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
-      {/* (no posts: the rod hangs by a cord at each end from the beam above, and the lantern by its own) */}
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[sd * (W / 2), H - 0.05 + 0.18, NZ]}><cylinderGeometry args={[0.004, 0.004, 0.36, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
-      ))}
-      <group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group>
-      {/* the noren: three panels side by side, hung from a bamboo rod under the lintel */}
-      <mesh position={[0, H - 0.05, NZ]} rotation-z={Math.PI / 2}>
-        <cylinderGeometry args={[0.012, 0.012, W, 8]} />
-        <meshToonMaterial color="#c9a46a" />
-      </mesh>
-      {[-1, 0, 1].map((k) => (
-        <group key={k} position={[k * (W / 3), H - 0.05, NZ + 0.005]}>
-          <mesh ref={(m) => { panels.current[k + 1] = m }} position-y={-NOREN / 2}>
-            <planeGeometry args={[W / 3 - 0.012, NOREN]} />
-            <meshToonMaterial map={panelTex(tex, k + 1)} side={THREE.DoubleSide} />
+      {/* (the red lantern, its own piece: hung by its own cord) */}
+      <Movable id="chochin" label="紅燈籠"><group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
+      {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
+      <Movable id="noren" label="門簾">
+        <group>
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} position={[sd * (W / 2), H - 0.05 + 0.18, NZ]}><cylinderGeometry args={[0.004, 0.004, 0.36, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
+          ))}
+          <mesh position={[0, H - 0.05, NZ]} rotation-z={Math.PI / 2}>
+            <cylinderGeometry args={[0.012, 0.012, W, 8]} />
+            <meshToonMaterial color="#c9a46a" />
           </mesh>
+          {[-1, 0, 1].map((k) => (
+            <group key={k} position={[k * (W / 3), H - 0.05, NZ + 0.005]}>
+              <mesh ref={(m) => { panels.current[k + 1] = m }} position-y={-NOREN / 2}>
+                <planeGeometry args={[W / 3 - 0.012, NOREN]} />
+                <meshToonMaterial map={panelTex(tex, k + 1)} side={THREE.DoubleSide} />
+              </mesh>
+            </group>
+          ))}
         </group>
-      ))}
+      </Movable>
       </group>
     </group>
   )
@@ -2081,7 +2085,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         )
       })}
       {/* the way in, just past the end of the bar where the customers come and go */}
-      <Movable id="noren" label="門簾"><Entrance at={doorOf(counters)} mark={mark} /></Movable>
+      <Entrance at={doorOf(counters)} mark={mark} />
       {/* the till, just inside the door on the bar's side of the way in (the shops that lay out their own counters) */}
       {given && (
         <Register top={top + TILL.rise} yaw={Math.atan2(-counters[0].along.z, counters[0].along.x)}

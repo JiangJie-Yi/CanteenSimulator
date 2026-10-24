@@ -514,7 +514,7 @@ function IngredientFridge() {
   })
   // (its size: along the wall, deep, and tall as a worktop; the compressor housing takes the right-hand end)
   const W = 1.5, D = 0.74, H = 0.86, HOUSE = 0.34, PLINTH = 0.1, WALL = 0.05, LID = 0.09
-  const BODY = '#dce9f1', TRIM = '#b6cad8', DARK = '#46576a', INNER = '#eef6fb'
+  const BODY = '#dce9f1', DARK = '#46576a', INNER = '#eef6fb'
   const STEEL = '#cdd5db'
   const LW = W - HOUSE
   // (the frozen packs inside: blocks and trays in cool whites and blues, heaped in the cavity)
@@ -546,9 +546,6 @@ function IngredientFridge() {
       </group>
       {/* the chrome rim all round the opening, and the gasket's dark line inside it */}
       <mesh position={[-HOUSE / 2, H - LID - 0.006, 0]}><boxGeometry args={[LW + 0.03, 0.012, D + 0.03]} /><meshToonMaterial color={STEEL} /></mesh>
-      {/* (the front's plate: 食材, a thin trim round the cabinet's foot, and the bottom edge's shadow line) */}
-      <mesh position={[-W / 2 + 0.34, 0.5, D / 2 + 0.003]}><planeGeometry args={[0.46, 0.17]} /><meshBasicMaterial map={FRIDGE_SIGN} toneMapped={false} /></mesh>
-      <mesh position={[-HOUSE / 2, PLINTH + 0.005, 0]}><boxGeometry args={[W + 0.01, 0.012, D + 0.01]} /><meshToonMaterial color={TRIM} /></mesh>
       {/* the compressor housing at the right end: a solid block, a top of its own, louvres, a dial and a lamp on its front */}
       <mesh position={[W / 2 - HOUSE / 2, (H + PLINTH) / 2, 0]} castShadow><boxGeometry args={[HOUSE, H - PLINTH, D]} /><meshToonMaterial color={BODY} /></mesh>
       <mesh position={[W / 2 - HOUSE / 2, H + 0.006, 0]}><boxGeometry args={[HOUSE + 0.02, 0.014, D + 0.02]} /><meshToonMaterial color={STEEL} /></mesh>
@@ -576,26 +573,18 @@ function IngredientFridge() {
     </group>
   )
 }
-const FRIDGE_SIGN = canvas(184, 64, (g) => {
-  g.fillStyle = '#f4f8fb'
-  g.fillRect(0, 0, 184, 64)
-  g.strokeStyle = '#3f7ca8'
-  g.lineWidth = 4
-  g.strokeRect(3, 3, 178, 58)
-  brushText(g, '食材', 92, 34, 40, { fill: '#2a5a80', spacing: 8 })
-})
 /** where it stands on the kitchen floor (along the first counter, across it): lying along the back wall, just to the cooks' side of the staff door, its back to the wall */
 const FRIDGE_AT = { along: 3.4, lay: 5.05 }
 function FridgeAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, FRIDGE_AT.along).addScaledVector(LAY, FRIDGE_AT.lay)
   // (its front, local +z, toward the room, and its length along the wall: local x runs along the first counter)
-  return <Movable id="freezer" label="食材冷凍櫃"><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><IngredientFridge /></group></Movable>
+  return <Movable id="freezer" label="冷藏櫃" baseScale={1.6}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><IngredientFridge /></group></Movable>
 }
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
     <>
-      <Movable id="crate" label="備長炭籃"><Crate /></Movable>
+      <Movable id="crate" label="備長炭籃" baseScale={1.75} baseTurn={[0, 44, 0]}><Crate /></Movable>
       <Fan held={held} />
       <HeldStick held={held} />
       <Lantern at={lanternAt} />

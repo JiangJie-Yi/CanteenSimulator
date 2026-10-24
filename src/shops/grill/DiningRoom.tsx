@@ -1204,17 +1204,40 @@ function Kamidana({ shelf = true, part = 'all' }: { shelf?: boolean; part?: 'all
       {part !== 'extras' && <group position={[-0.14, 0.015, 0]}>
         <InkBox size={[0.18, 0.02, 0.36]} color={GRAIN} position-y={0.01} />
         <InkBox size={[0.16, 0.02, 0.33]} color={HIN} position-y={0.03} />
-        {/* (three steps down the front) */}
-        {[0, 1, 2].map((k) => <InkBox key={k} size={[0.02, 0.008, 0.07 - k * 0.006]} color="#d8bc88" position={[-0.09 - k * 0.018, 0.016 - k * 0.004, 0]} />)}
-        {/* (the railing round the platform, a post at each corner) */}
+        {/* (two steps down the front, the width of the little gate above them) */}
+        {[0, 1].map((k) => <InkBox key={k} size={[0.024, 0.009, 0.08 - k * 0.008]} color="#d8bc88" position={[-0.092 - k * 0.022, 0.0165 - k * 0.0045, 0]} />)}
+        {/* (the fence round the platform, in plain hinoki like the rest: a post at each corner and each side of the gate, a gold ornament on each, two rails between
+            them with a row of short balusters, and an opening in the front for the way up, with a small gate leaf of its own, hung half open on its post) */}
         {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
           <group key={`${sx}${sz}`}>
-            <InkBox size={[0.014, 0.05, 0.014]} color={RED} position={[sx * 0.073, 0.065, sz * 0.153]} />
-            <InkBox size={[0.011, 0.012, 0.011]} color={GOLD} position={[sx * 0.073, 0.096, sz * 0.153]} />
+            <InkBox size={[0.016, 0.06, 0.016]} color={RED} position={[sx * 0.073, 0.07, sz * 0.153]} />
+            <InkBox size={[0.012, 0.012, 0.012]} color={GOLD} position={[sx * 0.073, 0.106, sz * 0.153]} />
           </group>
         )))}
-        <InkBox size={[0.008, 0.01, 0.31]} color={RED} position={[-0.073, 0.082, 0]} />
-        {[-1, 1].map((sz) => <InkBox key={sz} size={[0.15, 0.01, 0.008]} color={RED} position={[0, 0.082, sz * 0.153]} />)}
+        {[-1, 1].map((sz) => (
+          <group key={`g${sz}`}>
+            <InkBox size={[0.014, 0.055, 0.014]} color={RED} position={[-0.073, 0.0675, sz * 0.045]} />
+            <InkBox size={[0.011, 0.011, 0.011]} color={GOLD} position={[-0.073, 0.099, sz * 0.045]} />
+          </group>
+        ))}
+        {/* (the rails: along the back, along both sides, and the front in two halves either side of the gate) */}
+        {[0.087, 0.058].map((y) => (
+          <group key={y}>
+            <InkBox size={[0.008, 0.009, 0.31]} color={RED} position={[0.073, y, 0]} />
+            {[-1, 1].map((sz) => <InkBox key={sz} size={[0.146, 0.009, 0.008]} color={RED} position={[0, y, sz * 0.153]} />)}
+            {[-1, 1].map((sz) => <InkBox key={`f${sz}`} size={[0.008, 0.009, 0.1]} color={RED} position={[-0.073, y, sz * 0.099]} />)}
+          </group>
+        ))}
+        {[-0.12, -0.075, -0.03, 0.03, 0.075, 0.12].map((z) => <InkBox key={`bb${z}`} size={[0.006, 0.026, 0.006]} color={GRAIN} position={[0.073, 0.0725, z]} />)}
+        {[-0.04, 0, 0.04].map((x) => [-1, 1].map((sz) => <InkBox key={`bs${x}${sz}`} size={[0.006, 0.026, 0.006]} color={GRAIN} position={[x, 0.0725, sz * 0.153]} />))}
+        {[-0.135, -0.105, -0.075, 0.075, 0.105, 0.135].map((z) => <InkBox key={`bf${z}`} size={[0.006, 0.026, 0.006]} color={GRAIN} position={[-0.073, 0.0725, z]} />)}
+        {/* (the gate: one small leaf, a frame of two stiles and a rail with a board in it, swung open from the post on one side, a gold latch on its free edge) */}
+        <group position={[-0.073, 0.0675, 0.04]} rotation-y={-1.15}>
+          <InkBox size={[0.006, 0.05, 0.04]} color="#c9a46a" position={[0, 0, -0.02]} />
+          <InkBox size={[0.008, 0.008, 0.042]} color={RED} position={[0, 0.02, -0.02]} />
+          <InkBox size={[0.008, 0.008, 0.042]} color={RED} position={[0, -0.02, -0.02]} />
+          <InkBox size={[0.009, 0.01, 0.008]} color={GOLD} position={[0, 0, -0.038]} />
+        </group>
         <InkBox size={[0.12, 0.16, 0.24]} color={HIN} position-y={0.12} />
         {/* (the doors: two leaves with a dark seam between, a gold fitting on each, a lintel over them) */}
         {[-1, 1].map((sd) => (
@@ -1446,10 +1469,6 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
             </group>
           </StaticBatch></Movable>
         ))}
-        {/* the toilets, the men's and the women's, side by side */}
-        {door !== undefined && (['m', 'f'] as const).map((who, k) => (
-          <group key={who} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletDoor who={who} /></group>
-        ))}
         {shrine !== undefined && <Movable id="wallshrine" label="牆上神棚"><StaticBatch><group position={[0, 1.78, shrine]}><Kamidana /></group></StaticBatch></Movable>}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
@@ -1503,12 +1522,19 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         })()}
         {/* (the banners sway: not merged) */}
         {art.filter((a) => a.nobori !== undefined).map((a) => <Movable key={`n${a.z}`} id={`nobori${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`幟旗（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><group position={[0, 1.08, a.z]}><Nobori i={a.nobori!} /></group></Movable>)}
+        {/* (the altar's flag stirs, its incense smokes: not merged) */}
+        {altar && <Movable id="altarfittings" label="供桌上的供品與線香"><group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}
+      </group>
+      {/* the toilets: not part of the wall that's hidden from behind, so they're still there when the camera swings round to the back */}
+      <group position-x={-far}>
+        {/* the toilets, the men's and the women's, side by side */}
+        {door !== undefined && (['m', 'f'] as const).map((who, k) => (
+          <group key={who} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletDoor who={who} /></group>
+        ))}
         {/* (the toilets' doors slide: not merged) */}
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
           <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group>
         ))}
-        {/* (the altar's flag stirs, its incense smokes: not merged) */}
-        {altar && <Movable id="altarfittings" label="供桌上的供品與線香"><group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}
       </group>
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {

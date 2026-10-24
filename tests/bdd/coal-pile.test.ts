@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { MAX_LAYERS, placeStick, STICK_R, surfaceY, type Lay } from '@/game/coalPile'
+import { MAX_LAYERS, placeStick, roomFor, STICK_R, surfaceY, type Lay } from '@/game/coalPile'
 
 const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 const lay = (s: NonNullable<ReturnType<typeof placeStick>>): Lay => ({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
@@ -44,5 +44,25 @@ feature('炭火床上的備長炭', () => {
     then('每一根都離床中心不遠', (w) => {
       for (const l of w.pile as Lay[]) expect(Math.hypot(l.x, l.z)).toBeLessThan(0.6)
     })
+  })
+})
+
+feature('炭床滿了就不再加炭', () => {
+  scenario('炭床滿了而且都還在燒，就不能再加', ({ given, when, then }) => {
+    given('炭床放滿 16 根，都還在燒', (w) => { w.alive = 16; w.ashed = 0 })
+    when('想再加炭', (w) => { w.ok = roomFor(w.alive, w.ashed, 16) })
+    then('不能加', (w) => { expect(w.ok).toBe(false) })
+  })
+
+  scenario('底下有炭燒成灰時，可以清掉灰再加', ({ given, when, then }) => {
+    given('炭床放滿 16 根，其中 3 根已燒成灰', (w) => { w.alive = 16; w.ashed = 3 })
+    when('想再加炭', (w) => { w.ok = roomFor(w.alive, w.ashed, 16) })
+    then('可以加', (w) => { expect(w.ok).toBe(true) })
+  })
+
+  scenario('還沒滿時可以直接加', ({ given, when, then }) => {
+    given('炭床有 8 根在燒', (w) => { w.alive = 8; w.ashed = 0 })
+    when('想再加炭', (w) => { w.ok = roomFor(w.alive, w.ashed, 16) })
+    then('可以加', (w) => { expect(w.ok).toBe(true) })
   })
 })

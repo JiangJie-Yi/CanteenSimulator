@@ -303,7 +303,7 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
   )
 }
 
-export function Movable({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 0] }: { id: string; label: string; children: ReactNode; baseScale?: number; baseTurn?: V3 }) {
   const g = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
@@ -447,7 +447,7 @@ export function Movable({ id, label, children }: { id: string; label: string; ch
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
           scaled there, and stood back) */}
       <group position={mid} rotation-y={theta}>
-        <group rotation={[rot[0] * DEG, rot[1] * DEG, rot[2] * DEG]} scale={sc}>
+        <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]} scale={[sc[0] * baseScale, sc[1] * baseScale, sc[2] * baseScale]}>
           <group rotation-y={-theta}>
             <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}>{children}</group>
           </group>

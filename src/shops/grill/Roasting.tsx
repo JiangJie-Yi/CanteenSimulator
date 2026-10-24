@@ -5,7 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
-import { placeStick, restOf, type Lay } from '@/game/coalPile'
+import { placeStick, restOf, roomFor, type Lay } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -1768,7 +1768,7 @@ type RoastingProps = {
   /** the player's best way with each food, from the tasting notes: the chef may cook to it */
   notes?: Record<string, { doneness?: number; dabs?: Record<string, number> }>
   /** something to tell the diner (it isn't cooked yet, it's burnt) */
-  onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable') => void
+  onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull') => void
   /** written every frame: how much smoke is coming off the fire (0..1), from food that's cooked and still on it */
   smoke?: RefObject<number>
   /** likewise for black smoke, from food left on until it burns */
@@ -2116,7 +2116,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
   // (each thrown stick its own length, thickness and bend, new each time: from the short to the long)
-  const randomStick = () => binchotanGeo(0.28 + Math.random() * 0.04, 0.042 + Math.random() * 0.006, Math.floor(Math.random() * 8))
+  const randomStick = () => binchotanGeo(0.28 + Math.random() * 0.04, 0.027 + Math.random() * 0.005, Math.floor(Math.random() * 8))
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -2141,14 +2141,25 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       below.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: r.y, slope: r.slope })
     }
   }
+  /** a stick that has burnt down to ash: the only kind that's cleared to make room (a burning one isn't pushed out by new charcoal) */
+  const ashedOut = (c: Coal) => c.age / COAL_LAST_S > 0.6
+  /** whether there's room on the bed for more: under the most sticks it holds, or some already ash to be cleared */
+  const roomForCoal = () => {
+    const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
+    return roomFor(alive.length, alive.filter(ashedOut).length, COAL_MAX)
+  }
   const dropCoals = (from?: { x: number; y: number; z: number }) => {
-    const n = 7 + Math.floor(Math.random() * 2)
+    // (only as many as the bed has room for: the most it holds, less those still burning; ones burnt to ash are cleared to make room)
+    const aliveNow = coals.current.filter((c) => c && !c.gone && !c.dying)
+    const n = Math.min(7 + Math.floor(Math.random() * 2), COAL_MAX - aliveNow.length + aliveNow.filter(ashedOut).length)
+    if (n <= 0) return
     const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
     // (a bed only holds so many sticks: when the new ones would take it past the most, the oldest burn out at once, shrinking away)
     const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
-    for (const c of alive.slice(0, Math.max(0, alive.length + n - COAL_MAX))) c.dying = true
+    for (const c of alive.filter(ashedOut).slice(0, Math.max(0, alive.length + n - COAL_MAX))) c.dying = true
     // (always out of the crate of binchotan, whether it's clicked or a stick let go over the fire: thrown from there across the table)
-    const start = from ?? { x: DECOR.crate.at[0], y: 0.34, z: DECOR.crate.at[1] }
+    const crateAt = positionOf('crate')
+    const start = from ?? { x: DECOR.crate.at[0] + crateAt[0], y: 0.34 + crateAt[1], z: DECOR.crate.at[1] + crateAt[2] }
     const lying: Lay[] = []
     for (const c of coals.current) if (c && !c.gone && !c.dying) lying.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope })
     let placed = 0
@@ -2157,7 +2168,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // there's no room left, the oldest stick burns out to make some, and when even that leaves none, the rest stay in the crate)
       let spot = placeStick(lying)
       for (let tries = 0; !spot && tries < 3; tries++) {
-        const oldest = coals.current.find((c) => c && !c.gone && !c.dying)
+        const oldest = coals.current.find((c) => c && !c.gone && !c.dying && ashedOut(c))
         if (!oldest) break
         oldest.dying = true
         const at = lying.findIndex((l) => l.x === oldest.tx && l.z === oldest.tz)
@@ -2758,7 +2769,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const { chef: hasChef, sous: hasSous } = helpers
     if (!hasChef && !hasSous) return
     if (fire && fire.current < 0.35) {
-      if (onAddCharcoal?.() === false) return
+      if (!roomForCoal() || onAddCharcoal?.() === false) return
       say(L().addCharcoal)
       return
     }
@@ -3264,8 +3275,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (!picked) {
           // (a click on the coals themselves puts more charcoal on)
           if (pickCoal()) {
-            // (nothing goes on once the fire's at 100%)
-            if (onAddCharcoal?.() !== false) dropCoals()
+            // (nothing goes on once the fire's at 100%, or the bed is full of sticks still burning)
+            if (!roomForCoal()) onNotice?.('heapFull')
+            else if (onAddCharcoal?.() !== false) dropCoals()
           }
           return
         }
@@ -3364,7 +3376,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       window.removeEventListener('pointermove', holdDecor)
       document.body.classList.remove('is-carrying')
       // the charcoal let go over the fire goes on it
-      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { if (onAddCharcoal?.() !== false) dropCoals() }
+      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { if (!roomForCoal()) onNotice?.('heapFull'); else if (onAddCharcoal?.() !== false) dropCoals() }
       held.current = null
       if (controls) controls.enabled = true
       el.style.cursor = ''

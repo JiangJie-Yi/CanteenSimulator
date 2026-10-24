@@ -27,9 +27,13 @@ export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return (
 export const BASES: Record<string, V3> = {
   gate1: [0, 0, 0.16],
   gate0: [0, 0, 0.17],
-  freezer: [-1.508, 0, 1.974],
+  // (the owner's settled spot: moved by [0.2, 0.19, 0.47] in the room's frame from [-1.508, 0, 1.974], taken into this parent's own units)
+  freezer: [-1.2453, 0.19, 1.5359],
   willow: [0.38, 0, 0.201],
   sake: [0.084, 0, 0.118],
+  sake2: [0.084, 0, 0.118],
+  // (the charcoal basket: moved by [0.273, 0.125, 0.082] in the room's frame, taken into the parent's units; its 1.75 size and 44° turn are Decor's)
+  crate: [-0.0941, 0.125, -0.2691],
 }
 export const offsetOf = (id: string): V3 => state.offsets[id] ?? [0, 0, 0]
 /** where the piece is: its settled place, and what's been moved by hand from it */
@@ -427,5 +431,5 @@ if (typeof window !== 'undefined') {
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return
     toggleEdit()
   })
-  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, toggle: toggleEdit, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool }
+  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, toggle: toggleEdit, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id) }
 }

@@ -4,9 +4,9 @@
 
 /** a stick lying in the pile: its middle in plan, the way it points (plan angle), its middle's height, and how steeply it rises along its length */
 export type Lay = { x: number; z: number; yaw: number; y: number; slope: number }
-/** half a stick's length, and its radius: as the sticks are drawn (about 0.3 long, 0.1 across), measured in the scene */
+/** half a stick's length, and its radius: as the sticks are drawn (about 0.3 long, 0.065 across), measured in the scene */
 export const STICK_HALF = 0.15
-export const STICK_R = 0.05
+export const STICK_R = 0.032
 /** the salt's mound (its height in the middle and how far it reaches) and the heap's hump on it */
 const SALT_TOP = 0.126, SALT_REACH = 1.12, HEAP_TOP = 0.12, HEAP_REACH = 0.5
 
@@ -130,3 +130,6 @@ export function placeStick(below: Lay[], rnd: () => number = Math.random, reach 
   }
   return null
 }
+
+/** whether the bed can take more sticks: under the most it holds, or some already burnt to ash that can be cleared (a burning stick is never pushed out) */
+export const roomFor = (alive: number, ashed: number, max: number) => alive < max || ashed > 0

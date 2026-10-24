@@ -284,7 +284,7 @@ type SceneProps = {
   resetView: number
   /** the eye button's second view, on: the whole shop from above at 45 degrees */
   overview: boolean
-  onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable') => void
+  onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull') => void
   lang: Lang
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
@@ -399,7 +399,13 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
   const homing = useRef(true)
   const home = useRef(new THREE.Vector3())
   const homeTarget = useMemo(() => new THREE.Vector3(), [])
+  // (what the camera was last homed for: a change in the canvas's own shape alone (the menu folding or opening, edit mode folding it) isn't a reason to
+  // glide it back: it stays as it is, and only a new dish, the reset button, the overview or a resized window homes it)
+  const homedFor = useRef<{ active: number; resetView: number; overview: boolean; w: number; h: number } | null>(null)
   useEffect(() => {
+    const was = homedFor.current
+    homedFor.current = { active, resetView, overview, w: size.width, h: size.height }
+    if (was && was.active === active && was.resetView === resetView && was.overview === overview && was.w === size.width && was.h === size.height && frame.w > 0 && frame.h > 0) return
     const focus = new THREE.Vector3(0, DISHES[active].focusY, 0)
     // (a phone's stage sits above the menu inside a full-height canvas: what fits it is the stage's width against
     // the canvas height, and it mustn't back off just because the menu was folded away)
@@ -1185,7 +1191,7 @@ export default function App() {
   // (by the screen's size: a tablet, touch screen or not, keeps the 3D grill)
   const flatGrill = smallScreen && !!dish.roast
   const sceneOffFire = (n: number, loose: number) => { setOffFire(n); setLoose(loose) }
-  const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
+  const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
   const sceneOrder = (id: string, guest?: number) => {
     const ok = changeQty(id, 1)
     // a customer's order is written onto the menu below, so you see it come in
