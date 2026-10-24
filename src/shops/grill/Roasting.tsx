@@ -2083,7 +2083,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     /** seconds since it landed, whether it's burnt out, and how long it's been going out when it's pushed out by the new */
     age: number; gone: boolean; dying: boolean; dyT: number
     /** where it lies in plan (its landing), the way it points, how steeply it tips, and the pose it settles to */
-    tx: number; tz: number; yaw: number; slope: number; qEnd: THREE.Quaternion; geo: THREE.BufferGeometry }
+    tx: number; tz: number; yaw: number; slope: number; lx: number; lz: number; ly: number; qEnd: THREE.Quaternion; geo: THREE.BufferGeometry }
   const coals = useRef<Coal[]>([])
   /** whether the bed has been laid with its first sticks */
   const bedSeeded = useRef(false)
@@ -2140,12 +2140,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       if (!spot) break
       const { x: tx, z: tz, yaw, rest } = spot
+      // (it lands where it was let go, then slides to where it settles)
+      const ly = restOf(spot.from.x, spot.from.z, yaw, lying).y
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
       const mat = new THREE.MeshToonMaterial({ color: '#ffffff', map: binchotanMap(), emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
       coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
-        tx, tz, yaw, slope: rest.slope, qEnd: new THREE.Quaternion(), geo: randomStick() }
+        tx, tz, yaw, slope: rest.slope, lx: spot.from.x, lz: spot.from.z, ly, qEnd: new THREE.Quaternion(), geo: randomStick() }
       placed++
     }
     if (!placed) return
@@ -2153,9 +2155,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (the flight to each one's place: about two thirds of a second)
     for (let k = 0; k < placed; k++) {
       const c = coals.current[base + k], T = 0.5 + Math.random() * 0.25
-      c.vx = (c.tx - c.x) / T
-      c.vz = (c.tz - c.z) / T
-      c.vy = (c.top - c.y + 0.5 * 9.8 * T * T) / T
+      c.vx = (c.lx - c.x) / T
+      c.vz = (c.lz - c.z) / T
+      c.vy = (c.ly - c.y + 0.5 * 9.8 * T * T) / T
     }
     setCoalIds((ids) => [...ids, ...Array.from({ length: placed }, (_, k) => base + k)].slice(-28))
   }
@@ -3723,7 +3725,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       if (c.settled) {
         // (what lay on it comes down as sticks beneath burn away; it eases to its pose)
-        if (Math.abs(c.y - c.top) > 0.0005) { c.y += (c.top - c.y) * Math.min(1, delta * 6); c.g.position.y = c.y }
+        // (and slides down the heap to where it lies, if it landed where the ground fell away)
+        if (Math.abs(c.y - c.top) > 0.0005 || Math.abs(c.x - c.tx) > 0.0005 || Math.abs(c.z - c.tz) > 0.0005) {
+          const k = Math.min(1, delta * 6), sl = Math.min(1, delta * 3)
+          c.x += (c.tx - c.x) * sl; c.z += (c.tz - c.z) * sl; c.y += (c.top - c.y) * k
+          c.g.position.set(c.x, c.y, c.z)
+        }
         if (c.g.quaternion.angleTo(c.qEnd) > 0.002) c.g.quaternion.slerp(c.qEnd, Math.min(1, delta * 8))
         continue
       }
@@ -3739,12 +3746,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (tumbling in the air, then turning to the way it lies as it lands)
       if (!c.bounced) { c.rx += c.sx * cdt; c.rz += c.sz * cdt; c.g.rotation.set(c.rx, c.ry, c.rz) }
       else c.g.quaternion.slerp(c.qEnd, Math.min(1, delta * 14))
-      if (c.y <= c.top && c.vy < 0) {
-        c.y = c.top
+      if (c.y <= c.ly && c.vy < 0) {
+        c.y = c.ly
         if (!c.bounced) burst(c.x, c.y, c.z)
         c.bounced = true
         if (c.vy < -0.9) { c.vy = -c.vy * 0.3; c.vx *= 0.35; c.vz *= 0.35 }
-        else { c.vy = 0; c.x = c.tx; c.z = c.tz; c.vx = 0; c.vz = 0; c.settled = true }
+        else { c.vy = 0; c.x = c.lx; c.z = c.lz; c.vx = 0; c.vz = 0; c.settled = true }
       }
       c.g.position.set(c.x, c.y, c.z)
     }

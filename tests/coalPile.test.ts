@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { crossYaw, MAX_LAYERS, placeStick, restOf, STICK_R, surfaceY, type Lay } from '@/game/coalPile'
+import { crossYaw, MAX_LAYERS, placeStick, restOf, settle, STICK_HALF, STICK_R, surfaceY, type Lay } from '@/game/coalPile'
 
 describe('coal pile', () => {
   it('a lone stick lies on the bed', () => {
@@ -35,5 +35,36 @@ describe('coal pile', () => {
       lying.push({ x: spot.x, z: spot.z, yaw: spot.yaw, y: spot.rest.y, slope: spot.rest.slope })
     }
     expect(refused).toBe(true)
+  })
+  it('a stick never hangs in the air: some part of it touches what holds it up, and none sinks in', () => {
+    let seed = 9
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    const lying: Lay[] = []
+    for (let i = 0; i < 14; i++) {
+      const spot = placeStick(lying, rnd)
+      if (!spot) break
+      // the height of whatever is under it, along its length
+      let gap = Infinity
+      for (const t of [-STICK_HALF, -0.15, 0, 0.15, STICK_HALF]) {
+        const px = spot.x + Math.cos(spot.yaw) * t, pz = spot.z + Math.sin(spot.yaw) * t
+        const stick = spot.rest.y + spot.rest.slope * t
+        let under = surfaceY(px, pz) + STICK_R
+        for (const o of lying) {
+          const dx = Math.cos(o.yaw), dz = Math.sin(o.yaw)
+          const u = Math.max(-STICK_HALF, Math.min(STICK_HALF, (px - o.x) * dx + (pz - o.z) * dz))
+          const d = Math.hypot(px - (o.x + dx * u), pz - (o.z + dz * u))
+          if (d < 2 * STICK_R) under = Math.max(under, o.y + o.slope * u + Math.sqrt(Math.max(0, (2 * STICK_R) ** 2 - d * d)))
+        }
+        expect(stick).toBeGreaterThanOrEqual(under - 0.004)
+        gap = Math.min(gap, stick - under)
+      }
+      expect(gap).toBeLessThan(0.02)
+      lying.push({ x: spot.x, z: spot.z, yaw: spot.yaw, y: spot.rest.y, slope: spot.rest.slope })
+    }
+  })
+  it('one let go on a steep part of the heap slides down it', () => {
+    const under: Lay[] = [{ x: 0, z: 0, yaw: 0, y: 0.3, slope: 0.8 }, { x: 0.02, z: 0.05, yaw: 1.2, y: 0.34, slope: 0.7 }]
+    const end = settle(0.05, 0.02, 0.4, under)
+    expect(end.rest.y).toBeLessThan(restOf(0.05, 0.02, 0.4, under).y + 1e-9)
   })
 })
