@@ -9,13 +9,23 @@ export type V3 = [number, number, number]
 const KEY = 'jgs-edit-offsets-3'
 const KEY_R = 'jgs-edit-rotations-2'
 const KEY_S = 'jgs-edit-scales-2'
+const KEY_G = 'jgs-edit-groups-1'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }
 /** offsets: where a piece is moved to (from its base); rotations: degrees turned about X, Y, Z; scales: how much larger or smaller on X, Y, Z (1 = as it is) */
 export type Tool = 'move' | 'rotate' | 'scale'
-type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string, V3>; rotations: Record<string, V3>; scales: Record<string, V3>; selected: string | null }
-let state: State = { on: false, locked: false, tool: 'move', offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null }
+/**
+ * A group of pieces the owner has put together by hand: moved, turned about the vertical and sized as one. `pivot` is where it turns and grows
+ * from (the middle of its members, in the world, as it was when made); `t` is how far it's moved (in the room's frame), `yaw` how far it's turned
+ * (degrees) and `s` how much larger (one number for all three axes). Each member still keeps its own place inside it.
+ */
+export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: number; s: number }
+const loadGroups = (): Record<string, Group> => {
+  try { return JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { return {} }
+}
+type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string, V3>; rotations: Record<string, V3>; scales: Record<string, V3>; selected: string | null; groups: Record<string, Group>; picked: string[] }
+let state: State = { on: false, locked: false, tool: 'move', offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null, groups: loadGroups(), picked: [] }
 const subs = new Set<() => void>()
 const emit = () => { state = { ...state }; subs.forEach((f) => f()); panel() }
 export const getEdit = () => state
@@ -35,28 +45,34 @@ export const BASES: Record<string, V3> = {
   // (the charcoal basket: moved by [0.273, 0.125, 0.082] in the room's frame, taken into the parent's units; its 1.75 size and 44° turn are Decor's)
   crate: [-0.0941, 0.125, -0.2691],
 }
-export const offsetOf = (id: string): V3 => state.offsets[id] ?? [0, 0, 0]
+export const isGroup = (id: string | null) => !!id && id in state.groups
+/** the group a piece belongs to, if any */
+export const groupOf = (piece: string): string | null => Object.keys(state.groups).find((g) => state.groups[g].members.includes(piece)) ?? null
+/** whether a piece is the selected one, or in the selected group */
+export const isPicked = (piece: string) => state.selected === piece || (isGroup(state.selected) && state.groups[state.selected!].members.includes(piece))
+export const offsetOf = (id: string): V3 => state.groups[id] ? state.groups[id].t : state.offsets[id] ?? [0, 0, 0]
 /** where the piece is: its settled place, and what's been moved by hand from it */
 export const positionOf = (id: string): V3 => {
   const b = BASES[id] ?? [0, 0, 0], o = offsetOf(id)
   return [b[0] + o[0], b[1] + o[1], b[2] + o[2]]
 }
-export const rotationOf = (id: string): V3 => state.rotations[id] ?? [0, 0, 0]
-export const scaleOf = (id: string): V3 => state.scales[id] ?? [1, 1, 1]
+export const rotationOf = (id: string): V3 => state.groups[id] ? [0, state.groups[id].yaw, 0] : state.rotations[id] ?? [0, 0, 0]
+export const scaleOf = (id: string): V3 => state.groups[id] ? [state.groups[id].s, state.groups[id].s, state.groups[id].s] : state.scales[id] ?? [1, 1, 1]
 const save = () => {
   try {
     localStorage.setItem(KEY, JSON.stringify(state.offsets))
     localStorage.setItem(KEY_R, JSON.stringify(state.rotations))
     localStorage.setItem(KEY_S, JSON.stringify(state.scales))
+    localStorage.setItem(KEY_G, JSON.stringify(state.groups))
   } catch { /* private window: it just won't be kept */ }
 }
 // ---- undo: each change (a drag, an arrow, a field edited, reset all) is a step; Ctrl+Z goes back one, Ctrl+Y (or Ctrl+Shift+Z) forward again
-type Snap = { o: Record<string, V3>; r: Record<string, V3>; s: Record<string, V3> }
+type Snap = { o: Record<string, V3>; r: Record<string, V3>; s: Record<string, V3>; g: Record<string, Group> }
 const past: Snap[] = []
 let future: Snap[] = []
-const take = (): Snap => JSON.parse(JSON.stringify({ o: state.offsets, r: state.rotations, s: state.scales }))
+const take = (): Snap => JSON.parse(JSON.stringify({ o: state.offsets, r: state.rotations, s: state.scales, g: state.groups }))
 const snap = () => JSON.stringify(take())
-const put = (v: Snap) => { state.offsets = v.o; state.rotations = v.r; state.scales = v.s }
+const put = (v: Snap) => { state.offsets = v.o; state.rotations = v.r; state.scales = v.s; state.groups = v.g ?? {} }
 /** called as a change begins: the way things are now is kept, to go back to */
 export function beginChange() {
   const last = past.length ? JSON.stringify(past[past.length - 1]) : null
@@ -83,11 +99,32 @@ export function redo() {
   emit()
 }
 /** a piece moved (live, while it's dragged) */
-export function moveTo(id: string, v: V3) { state.offsets = { ...state.offsets, [id]: v }; state.selected = id; emit() }
-export function turnTo(id: string, v: V3) { state.rotations = { ...state.rotations, [id]: v }; state.selected = id; emit() }
-export function scaleTo(id: string, v: V3) { state.scales = { ...state.scales, [id]: v }; state.selected = id; emit() }
+export function moveTo(id: string, v: V3) {
+  if (state.groups[id]) state.groups = { ...state.groups, [id]: { ...state.groups[id], t: v } }
+  else state.offsets = { ...state.offsets, [id]: v }
+  state.selected = id; emit()
+}
+export function turnTo(id: string, v: V3) {
+  if (state.groups[id]) state.groups = { ...state.groups, [id]: { ...state.groups[id], yaw: v[1] } }
+  else state.rotations = { ...state.rotations, [id]: v }
+  state.selected = id; emit()
+}
+export function scaleTo(id: string, v: V3) {
+  const g = state.groups[id]
+  if (g) {
+    // (one size for the whole group: whichever field was changed gives it)
+    const was = g.s
+    const s = v.find((x) => Math.abs(x - was) > 1e-9) ?? was
+    state.groups = { ...state.groups, [id]: { ...g, s: Math.max(0.05, Math.min(20, s)) } }
+  } else state.scales = { ...state.scales, [id]: v }
+  state.selected = id; emit()
+}
 export const commitOffsets = () => save()
-export function resetAll() { beginChange(); state.offsets = {}; state.rotations = {}; state.scales = {}; save(); emit() }
+export function resetAll() {
+  beginChange(); state.offsets = {}; state.rotations = {}; state.scales = {}
+  state.groups = Object.fromEntries(Object.entries(state.groups).map(([k, g]) => [k, { ...g, t: [0, 0, 0] as V3, yaw: 0, s: 1 }]))
+  save(); emit()
+}
 /** one piece back to where it stands to begin with: moved, turned and scaled alike */
 export function resetOne(id: string) {
   beginChange()
@@ -127,11 +164,57 @@ export function setScaleAxis(a: 0 | 1 | 2 | null) {
 }
 
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
-const registry = new Map<string, { label: string; focus: () => void }>()
-export function registerMovable(id: string, label: string, focus: () => void) {
-  registry.set(id, { label, focus })
+const registry = new Map<string, { label: string; focus: () => void; center?: () => V3 | null }>()
+/** `center`: where the piece's middle is in the world (what a group of it turns and grows about); a piece without one can't be grouped */
+export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null) {
+  registry.set(id, { label, focus, center })
   panel()
   return () => { registry.delete(id); panel() }
+}
+
+// ---- groups
+let groupSeq = 0
+/** the pieces picked in the list (Ctrl- or Shift-click adds one), the selected one too, that can be grouped and aren't in a group already */
+export const groupable = () => [...new Set([...state.picked, ...(state.selected && !isGroup(state.selected) ? [state.selected] : [])])]
+  .filter((id) => registry.get(id)?.center && !groupOf(id))
+export function pickToggle(id: string) {
+  state.picked = state.picked.includes(id) ? state.picked.filter((x) => x !== id) : [...state.picked, id]
+  if (!state.selected || isGroup(state.selected)) state.selected = id
+  emit()
+}
+export function makeGroup() {
+  const ids = groupable()
+  if (ids.length < 2) { toast('先在清單裡 Ctrl 或 Shift 點選兩件以上的擺設，再按「成組」'); return }
+  const pts = ids.map((id) => registry.get(id)!.center!()).filter((v): v is V3 => !!v)
+  const pivot = (pts.length ? [0, 1, 2].map((k) => pts.reduce((a, v) => a + v[k], 0) / pts.length) : [0, 0, 0]) as V3
+  beginChange()
+  let n = ++groupSeq
+  while (state.groups[`grp${n}`]) n = ++groupSeq
+  const id = `grp${n}`
+  state.groups = { ...state.groups, [id]: { name: `群組 ${n}`, members: ids, pivot, t: [0, 0, 0], yaw: 0, s: 1 } }
+  state.picked = []
+  state.selected = id
+  save(); emit()
+  toast(`已把 ${ids.length} 件擺設成組：${state.groups[id].name}`, 'edit')
+}
+export function dissolveGroup(id: string | null = state.selected) {
+  if (!id || !state.groups[id]) return
+  beginChange()
+  const { [id]: _g, ...rest } = state.groups
+  state.groups = rest
+  state.selected = null
+  save(); emit()
+  toast('已解散群組，擺設各回自己的位置', 'edit')
+}
+export function renameGroup(id: string, name: string) {
+  if (!state.groups[id]) return
+  state.groups = { ...state.groups, [id]: { ...state.groups[id], name } }
+  save(); emit()
+}
+/** the transform of the group a piece is in, to lay over it: where it turns from, how far it's moved (in the room's frame), turned and sized */
+export const groupTransformOf = (piece: string) => {
+  const g = groupOf(piece)
+  return g ? state.groups[g] : null
 }
 
 /** the shop opening (locked) or shut: opening switches the mode off */
@@ -152,6 +235,7 @@ function revert() {
 function leave(text: string) {
   state.on = false
   state.selected = null
+  state.picked = []
   state.tool = 'move'
   past.length = 0; future = []
   emit()
@@ -177,6 +261,7 @@ export function toggleEdit() {
   baseline = take()
   state.on = true
   state.selected = null
+  state.picked = []
   state.tool = 'move'
   emit()
   toast('進入編輯模式：拖曳擺設，完成後按「確認」；按 G 或「取消」會放棄變更', 'edit')
@@ -244,6 +329,9 @@ const PANEL_CSS = `
 .be-row { padding:2px 8px 2px 18px; border-radius:3px; cursor:pointer; white-space:nowrap; position:relative }
 .be-row::before { content:''; position:absolute; left:7px; top:50%; width:6px; height:6px; margin-top:-3px; border:1px solid #e0a030; border-radius:1px }
 .be-row:hover { background:#3a3a3a }
+.be-grow { font-weight:600; color:#ffd37a }
+.be-grow::before { border-radius:50%; }
+.be-row.multi { background:#2f4a73; color:#fff }
 .be-row.on { background:#4772b3; color:#fff }
 .be-row.on::before { border-color:#fff; background:#ffd37a }
 .be-name { padding:2px 0 6px; color:#f0f0f0; font-weight:600; min-height:20px }
@@ -283,7 +371,7 @@ function panel() {
     document.head.appendChild(st)
   }
   // (rebuilt only when the list of pieces changes; the numbers are just rewritten as one is dragged)
-  const sig = [...registry.keys()].join('|')
+  const sig = [...registry.keys()].join('|') + '#' + Object.entries(state.groups).map(([k, g]) => `${k}:${g.name}:${g.members.join(',')}`).join(';')
   if (!el || built !== sig) {
     el?.remove()
     el = document.createElement('div')
@@ -316,14 +404,27 @@ function panel() {
     find.placeholder = '搜尋…'
     const list = h('div', 'be-list')
     rows = new Map()
-    for (const [id, r] of registry) {
-      const row = h('div', 'be-row', r.label)
-      row.title = '把鏡頭帶到它'
-      row.onclick = () => { registry.get(id)?.focus(); select(id) }
+    // (the groups first, each with its members under it; then every piece not in one)
+    const addRow = (id: string, label: string, indent: boolean, group: boolean) => {
+      const row = h('div', `be-row${group ? ' be-grow' : ''}`, label)
+      if (indent) row.style.paddingLeft = '30px'
+      row.title = group ? '選整個群組（一起移動、轉向、縮放）' : 'Ctrl 或 Shift 點選可多選，再按「成組」；單點是把鏡頭帶到它'
+      row.onclick = (e) => {
+        const ev = e as MouseEvent
+        if (!group && (ev.ctrlKey || ev.metaKey || ev.shiftKey)) { pickToggle(id); return }
+        if (!group) registry.get(id)?.focus()
+        state.picked = []
+        select(id)
+      }
       list.appendChild(row)
       rows.set(id, row as HTMLDivElement)
     }
-    find.oninput = () => { const q = find.value.trim().toLowerCase(); for (const [id, row] of rows) row.style.display = !q || (registry.get(id)?.label ?? id).toLowerCase().includes(q) ? '' : 'none' }
+    for (const [gid, g] of Object.entries(state.groups)) {
+      addRow(gid, `${g.name}（${g.members.length}）`, false, true)
+      for (const m of g.members) if (registry.has(m)) addRow(m, registry.get(m)!.label, true, false)
+    }
+    for (const [id, r] of registry) if (!groupOf(id)) addRow(id, r.label, false, false)
+    find.oninput = () => { const q = find.value.trim().toLowerCase(); for (const [id, row] of rows) row.style.display = !q || (registry.get(id)?.label ?? state.groups[id]?.name ?? id).toLowerCase().includes(q) ? '' : 'none' }
     out.append(find, list)
     // Transform: what's chosen, then Location, Rotation, Scale each as X / Y / Z stacked, a reset beside each
     const tr = section('變換')
@@ -379,6 +480,9 @@ function panel() {
       return b
     }
     foot.append(
+      mk('成組', '先在清單裡 Ctrl 或 Shift 點選兩件以上，再按這個：把它們組成一個群組，一起移動、轉向、縮放', makeGroup),
+      mk('解散', '解散選到的群組', () => dissolveGroup()),
+      mk('改名', '替選到的群組改名', () => { const g = state.selected ? state.groups[state.selected] : null; if (g) { const n = window.prompt('群組名稱', g.name); if (n) renameGroup(state.selected!, n) } }),
       mk('復原', 'Ctrl+Z', undo), mk('重做', 'Ctrl+Y', redo),
       mk('全部還原', '把所有被移動的擺設放回原位', () => { if (window.confirm('把所有被移動的擺設放回原位？')) resetAll() }, 'warn'),
       mk('取消', '放棄這次所有變更', () => cancelEdit()),
@@ -390,15 +494,15 @@ function panel() {
     built = sig
   }
   ;(['move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => toolButtons[k]?.classList.toggle('on', state.tool === t))
-  for (const [id, row] of rows) row.classList.toggle('on', state.selected === id)
+  for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)) }
   el?.querySelectorAll('.be-grp:last-of-type .be-f').forEach((f, k) => f.classList.toggle('axon', scaleAxis === k))
   if (info) {
     const id = state.selected
     const r = id ? registry.get(id) : null
-    info.innerHTML = id ? `${r?.label ?? id}` : '<em>（點方塊或左邊的名字選一個）</em>'
+    info.innerHTML = id ? `${state.groups[id] ? '▣ ' + state.groups[id].name + '（群組）' : r?.label ?? id}` : '<em>（點方塊或左邊的名字選一個）</em>'
     const values = id ? [...toRoom(id, offsetOf(id)), ...rotationOf(id), ...scaleOf(id)] : []
     fields.forEach((f, k) => {
-      f.disabled = !id
+      f.disabled = !id || (isGroup(id) && (k === 3 || k === 5))
       if (id && document.activeElement !== f) f.value = k < 3 ? values[k].toFixed(3) : k < 6 ? values[k].toFixed(0) : values[k].toFixed(2)
       if (!id) f.value = ''
     })

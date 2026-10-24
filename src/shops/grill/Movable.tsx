@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, setFrame, turnTo, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, groupTransformOf, isPicked, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, setFrame, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -305,16 +305,19 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
 
 export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 0] }: { id: string; label: string; children: ReactNode; baseScale?: number; baseTurn?: V3 }) {
   const g = useRef<THREE.Group>(null)
+  /** the group this piece is in lays its transform here, outside the piece's own place */
+  const gw = useRef<THREE.Group>(null)
+  const laid = useRef(false)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
-  const { on, offsets, rotations, scales, selected } = useEdit()
+  const { on, offsets, rotations, scales, selected, groups } = useEdit()
   const [box, setBox] = useState<{ c: V3; s: V3; yaw: number; theta: number } | null>(null)
   // (the piece's middle, in the frame of its own group as it stands untouched: what it turns and scales about; measured once it has been drawn)
   const [mid, setMid] = useState<V3>([0, 0, 0])
   const inner = useRef<THREE.Group>(null)
   // (the turn from the room's frame into the parent's, about the vertical; found once the piece is in place)
   const [theta, setTheta] = useState(0)
-  void offsets; void rotations; void scales // (read so it redraws as it's moved, turned or scaled)
+  void offsets; void rotations; void scales; void selected; void groups // (read so it redraws as it's moved, turned or scaled)
   const o = positionOf(id)
   const rot = rotationOf(id), sc = scaleOf(id)
 
@@ -360,7 +363,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const innYaw = new THREE.Euler().setFromQuaternion(inn.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
     const best = fit(Math.atan2(ALONG.x, ALONG.z) - innYaw)
     // (the room's direction against the parent's own frame: what the move arrows and the position fields are turned by)
-    const parentYaw = grp.parent ? new THREE.Euler().setFromQuaternion(grp.parent.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y : 0
+    const frameNode = gw.current ?? grp.parent
+    const parentYaw = frameNode ? new THREE.Euler().setFromQuaternion(frameNode.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y : 0
     const theta = Math.atan2(ALONG.x, ALONG.z) - parentYaw
     const cx = (best.x0 + best.x1) / 2, cz = (best.z0 + best.z1) / 2
     const co = Math.cos(best.a), si = Math.sin(best.a)
@@ -370,7 +374,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   }
 
   const frame = () => {
-    const par = g.current?.parent
+    const par = gw.current
     if (!par) return
     par.updateWorldMatrix(true, false)
     const t = Math.atan2(ALONG.x, ALONG.z) - new THREE.Euler().setFromQuaternion(par.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
@@ -383,7 +387,32 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   useEffect(() => registerMovable(id, label, () => {
     const m = measure()
     if (m && g.current) focusCamera(camera, controls, g.current.localToWorld(new THREE.Vector3(...m.c)))
+  }, () => {
+    const m = measure()
+    return m && g.current ? (g.current.localToWorld(new THREE.Vector3(...m.c)).toArray() as V3) : null
   }), [id, label, camera, controls])
+
+  // (the group this piece is in, if any: its move, turn and size laid over the piece as one, about the group's own middle, in the world)
+  const gt = groupTransformOf(id)
+  useFrame(() => {
+    const w = gw.current
+    if (!w) return
+    if (!gt) {
+      if (laid.current) { w.matrix.identity(); w.matrixWorldNeedsUpdate = true; laid.current = false; frame() }
+      return
+    }
+    const par = w.parent
+    if (!par) return
+    par.updateWorldMatrix(true, false)
+    const Y = new THREE.Vector3(0, 1, 0)
+    const shift = new THREE.Vector3(...gt.t).applyAxisAngle(Y, Math.atan2(ALONG.x, ALONG.z))
+    const pivot = new THREE.Vector3(...gt.pivot)
+    const world = new THREE.Matrix4().makeTranslation(pivot.x + shift.x, pivot.y + shift.y, pivot.z + shift.z)
+      .multiply(new THREE.Matrix4().makeRotationY(gt.yaw * DEG)).multiply(new THREE.Matrix4().makeScale(gt.s, gt.s, gt.s))
+      .multiply(new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z))
+    const local = new THREE.Matrix4().copy(par.matrixWorld).invert().multiply(world).multiply(par.matrixWorld)
+    if (!laid.current || !w.matrix.equals(local)) { w.matrix.copy(local); w.matrixWorldNeedsUpdate = true; laid.current = true }
+  })
 
   // (its middle, once it has been drawn (a frame later, for a batch that merges after mount), and its box when editing begins)
   useEffect(() => {
@@ -442,6 +471,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   }
 
   return (
+    <group ref={gw} matrixAutoUpdate={false}>
     <group ref={g} position={o}>
       {/* (turned and scaled about the piece's own middle, not the group's origin, which may be far from it) */}
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
@@ -456,10 +486,11 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       {on && box && (
         <mesh userData={{ editHandle: true }} position={box.c} rotation-y={box.yaw} renderOrder={999} onPointerDown={down}>
           <boxGeometry args={box.s} />
-          <meshBasicMaterial color={selected === id ? '#8fd0ff' : '#3fa9ff'} transparent opacity={selected === id ? 0.2 : 0.26} depthWrite={false} depthTest={false} />
+          <meshBasicMaterial color={isPicked(id) ? '#8fd0ff' : '#3fa9ff'} transparent opacity={isPicked(id) ? 0.2 : 0.26} depthWrite={false} depthTest={false} />
         </mesh>
       )}
       {on && box && <AxisGizmo id={id} theta={theta} at={box.c} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
+    </group>
     </group>
   )
 }
