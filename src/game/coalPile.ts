@@ -70,23 +70,26 @@ export function restOf(x: number, z: number, yaw: number, below: Lay[], lift = 0
 
 /**
  * A stick let go at (x, z) comes to rest, then slides if it can: where the ground under it falls away (a steep heap, a tilted stick
- * beneath) it rolls and slips downhill, a few centimetres at a time, until it's flat enough, or low enough, to stay put.
+ * beneath) it rolls and slips downhill, a couple of centimetres at a time (a hand's breadth at most), until it's flat enough, or low enough, to stay put.
  * Returns where it ends up, and the way it lies there.
  */
 export function settle(x: number, z: number, yaw: number, below: Lay[], lift = 0) {
   let cx = x, cz = z
   let rest = restOf(cx, cz, yaw, below, lift)
-  const STEP = 0.03
-  for (let i = 0; i < 60; i++) {
+  const STEP = 0.02, TRAVEL = 0.1
+  for (let i = 0; i < 40; i++) {
+    // (only a stick lying on others slips: one on the bed itself stays where it fell, the bed being nearly level; and none goes far, so the
+    // heap stays a heap)
+    if (rest.y - surfaceY(cx, cz, lift) < STICK_R + 0.01) break
     let low = { x: cx, z: cz, rest, y: rest.y }
     for (let k = 0; k < 8; k++) {
       const a = (k * Math.PI) / 4, nx = cx + Math.cos(a) * STEP, nz = cz + Math.sin(a) * STEP
+      if (Math.hypot(nx - x, nz - z) > TRAVEL) continue
       const r = restOf(nx, nz, yaw, below, lift)
       if (r.y < low.y - 1e-6) low = { x: nx, z: nz, rest: r, y: r.y }
     }
-    // (stays where it is when the ground round it is no lower by enough to matter, and it isn't tipped steeply)
     if (low.x === cx && low.z === cz) break
-    if (rest.y - low.y < 0.008 && Math.abs(rest.slope) < 0.3) break
+    if (rest.y - low.y < 0.004 && Math.abs(rest.slope) < 0.3) break
     cx = low.x; cz = low.z; rest = low.rest
   }
   return { x: cx, z: cz, rest }
