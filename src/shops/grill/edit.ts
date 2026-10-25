@@ -6,8 +6,8 @@ import { useSyncExternalStore } from 'react'
 
 export type V3 = [number, number, number]
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
-const KEY = 'jgs-edit-offsets-3'
-const KEY_R = 'jgs-edit-rotations-2'
+const KEY = 'jgs-edit-offsets-4'
+const KEY_R = 'jgs-edit-rotations-3'
 const KEY_S = 'jgs-edit-scales-2'
 const KEY_G = 'jgs-edit-groups-1'
 const load = (key: string): Record<string, V3> => {
@@ -44,6 +44,8 @@ export const BASES: Record<string, V3> = {
   sake2: [0.084, 0, 0.118],
   // (the charcoal basket: moved by [0.273, 0.125, 0.082] in the room's frame, taken into the parent's units; its 1.75 size and 44° turn are Decor's)
   crate: [-0.0941, 0.125, -0.2691],
+  // (the lantern: moved by [-0.083, 0, -0.651] in the room's frame, taken into this parent's units; its 12° turn is Decor's)
+  lantern: [-0.478, 0, 0.4497],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece belongs to, if any */

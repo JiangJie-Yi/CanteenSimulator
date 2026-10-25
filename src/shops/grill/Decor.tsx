@@ -225,22 +225,60 @@ function Fan({ held }: { held: RefObject<Held> }) {
   )
 }
 
-/** washi on the lantern: warm, a little uneven, a faint grid of the frame's cross-bars behind it */
-const LANTERN_PAPER = canvas(128, 256, (g) => {
-  const grad = g.createLinearGradient(0, 0, 0, 256)
-  grad.addColorStop(0, '#ffe2a8')
-  grad.addColorStop(0.55, '#ffd48a')
-  grad.addColorStop(1, '#f4b868')
+/**
+ * The lantern's faces (行燈の組子): warm washi in a wooden frame cut into four panels, one of them an 麻の葉 (hemp-leaf) lattice of fine wooden
+ * strips, one a diagonal 菱 lattice, the other two plain paper; the same on all four sides, so it reads whichever way it's turned.
+ */
+const LANTERN_PAPER = canvas(256, 256, (g) => {
+  const S = 256
+  const grad = g.createLinearGradient(0, 0, 0, S)
+  grad.addColorStop(0, '#ffe6b4')
+  grad.addColorStop(0.55, '#ffd68c')
+  grad.addColorStop(1, '#f6bc6c')
   g.fillStyle = grad
-  g.fillRect(0, 0, 128, 256)
-  for (let i = 0; i < 300; i++) {
-    g.fillStyle = `rgba(180,120,60,${Math.random() * 0.08})`
-    g.fillRect(Math.random() * 128, Math.random() * 256, 2 + Math.random() * 6, 1)
+  g.fillRect(0, 0, S, S)
+  for (let i = 0; i < 500; i++) {
+    g.fillStyle = `rgba(180,120,60,${Math.random() * 0.07})`
+    g.fillRect(Math.random() * S, Math.random() * S, 2 + Math.random() * 7, 1)
   }
-  g.fillStyle = 'rgba(70,40,20,0.2)'
-  g.fillRect(0, 84, 128, 3)
-  g.fillRect(0, 170, 128, 3)
-  g.fillRect(62, 0, 3, 256)
+  const wood = 'rgba(112,66,30,0.88)'
+  const panel = (x0: number, y0: number, w: number, kind: 'asanoha' | 'hishi' | 'plain') => {
+    if (kind === 'plain') return
+    g.save()
+    g.beginPath(); g.rect(x0, y0, w, w); g.clip()
+    g.strokeStyle = wood
+    g.lineCap = 'round'
+    if (kind === 'hishi') {
+      // diagonal lattice: strips both ways at 45°
+      g.lineWidth = 3
+      for (let k = -w; k < w * 2; k += w / 4) {
+        g.beginPath(); g.moveTo(x0 + k, y0); g.lineTo(x0 + k + w, y0 + w); g.stroke()
+        g.beginPath(); g.moveTo(x0 + k + w, y0); g.lineTo(x0 + k, y0 + w); g.stroke()
+      }
+    } else {
+      // 麻の葉: each unit cell (a quarter of the panel) cut by both diagonals and both middles, with the star's points between the edge middles
+      const c = w / 2
+      g.lineWidth = 2
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+        const x = x0 + i * c, y = y0 + j * c
+        const m = c / 2
+        const L = (ax: number, ay: number, bx: number, by: number) => { g.beginPath(); g.moveTo(x + ax, y + ay); g.lineTo(x + bx, y + by); g.stroke() }
+        L(0, 0, c, c); L(c, 0, 0, c); L(m, 0, m, c); L(0, m, c, m)
+        L(m, 0, 0, m); L(m, 0, c, m); L(m, c, 0, m); L(m, c, c, m)
+        L(0, 0, m, m * 0); L(0, 0, 0, m)
+      }
+    }
+    g.restore()
+  }
+  // the four panels, each between wooden strips (the frame and its cross)
+  const pad = 14, w = (S - pad * 2 - 8) / 2
+  panel(pad, pad, w, 'plain')
+  panel(pad + w + 8, pad, w, 'asanoha')
+  panel(pad, pad + w + 8, w, 'hishi')
+  panel(pad + w + 8, pad + w + 8, w, 'plain')
+  g.fillStyle = wood
+  g.fillRect(0, 0, S, pad); g.fillRect(0, S - pad, S, pad); g.fillRect(0, 0, pad, S); g.fillRect(S - pad, 0, pad, S)
+  g.fillRect(pad + w, pad, 8, S - pad * 2); g.fillRect(pad, pad + w, S - pad * 2, 8)
 })
 
 /** a soft round glow, bright in the middle and fading to nothing, for the light round the lantern */
@@ -700,7 +738,7 @@ export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [
       <Movable id="crate" label="備長炭籃" baseScale={1.75} baseTurn={[0, 44, 0]}><Crate /></Movable>
       <Movable id="fan" label="團扇"><Fan held={held} /></Movable>
       <HeldStick held={held} />
-      <Movable id="lantern" label="行燈"><Lantern at={lanternAt} /></Movable>
+      <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /></group>
     </>
