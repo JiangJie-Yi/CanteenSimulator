@@ -41,7 +41,7 @@ const DESIGNS: Paint[] = [
     g.fillRect(0, 0, S, S)
     g.strokeStyle = INK
     g.fillStyle = INK
-    for (let v = 0; v < 38; v++) {
+    for (let v = 0; v < 70; v++) {
       let x = S * (0.1 + rnd() * 0.8), y = S * (0.1 + rnd() * 0.8)
       let a = rnd() * Math.PI * 2
       g.lineWidth = S * 0.0035
@@ -74,7 +74,7 @@ const DESIGNS: Paint[] = [
     g.fillRect(0, 0, S, S)
     g.strokeStyle = '#e9eef7'
     const row = S * 0.075
-    for (let r = -1; r < 15; r++) {
+    for (let r = -1; r < 26; r++) {
       for (let c = -1; c < 11; c++) {
         const x = c * S * 0.105 + (r % 2 ? S * 0.0525 : 0)
         const y = r * row * 0.62
@@ -200,8 +200,8 @@ const DESIGNS: Paint[] = [
         }
       } else {
         g.strokeStyle = INK; g.lineWidth = S * 0.003
-        for (let r = 0; r < 12; r++) for (let q = 0; q < 14; q++) {
-          g.beginPath(); g.arc(q * S * 0.04 + (r % 2 ? S * 0.02 : 0), r * S * 0.025 + S * 0.15, S * 0.02, Math.PI, Math.PI * 2); g.stroke()
+        for (let r = 0; r < 26; r++) for (let q = 0; q < 22; q++) {
+          g.beginPath(); g.arc(q * S * 0.04 + (r % 2 ? S * 0.02 : 0), r * S * 0.02, S * 0.02, Math.PI, Math.PI * 2); g.stroke()
         }
       }
       g.restore()
