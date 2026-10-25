@@ -6809,3 +6809,10 @@ button {
 .tally-buy .tally-buyall:hover:not(:disabled) {
   background: #7a5336;
 }
+
+/* the music button is the speaker on the wall now; on a narrow screen (no way to reach it) the button stays */
+@media (min-width: 901px) {
+  .bgm-toggle {
+    display: none;
+  }
+}

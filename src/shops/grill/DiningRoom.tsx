@@ -2615,12 +2615,63 @@ function StaffMat({ lang: _lang }: { lang: Lang }) {
     </group>
   )
 }
+/** the glyphs of the notes that float out of the speaker, drawn once */
+const NOTE_TEX = (() => {
+  if (typeof document === 'undefined') return []
+  return ['♪', '♫', '♩', '♬'].map((ch, i) => {
+    const c = document.createElement('canvas')
+    c.width = c.height = 64
+    const g = c.getContext('2d')!
+    g.font = '700 52px sans-serif'
+    g.textAlign = 'center'; g.textBaseline = 'middle'
+    g.lineWidth = 6; g.strokeStyle = 'rgba(40,20,8,0.85)'
+    g.strokeText(ch, 32, 34)
+    g.fillStyle = ['#ffd98a', '#9fe3ae', '#ffb0a0', '#a8d0ff'][i]
+    g.fillText(ch, 32, 34)
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  })
+})()
+/**
+ * Notes floating out of the speaker's front while music plays: a handful of ♪ ♫ sprites, each rising and swaying on its own beat, growing in and
+ * fading out; with the music off they thin out and are gone.
+ */
+function MusicNotes({ playing }: { playing: boolean }) {
+  const N = 7
+  const refs = useRef<(THREE.Sprite | null)[]>([])
+  const k = useRef(0)
+  useFrame(({ clock }, dt) => {
+    k.current += ((playing ? 1 : 0) - k.current) * Math.min(1, dt * 3)
+    const t = clock.elapsedTime
+    for (let i = 0; i < N; i++) {
+      const sp = refs.current[i]
+      if (!sp) continue
+      const life = ((t * 0.32 + i / N) % 1)
+      const sway = Math.sin(t * 2.1 + i * 1.7)
+      sp.position.set(sway * 0.09 * life + (i % 3 - 1) * 0.07, 0.15 + life * 0.75, 0.2 + life * 0.55)
+      const grow = Math.min(1, life * 5) * 0.16
+      sp.scale.setScalar(grow * (0.7 + 0.3 * k.current))
+      ;(sp.material as THREE.SpriteMaterial).opacity = Math.min(1, life * 6) * (1 - life) ** 0.7 * k.current
+      sp.visible = k.current > 0.02
+    }
+  })
+  return (
+    <>
+      {Array.from({ length: N }, (_, i) => (
+        <sprite key={i} ref={(o) => { refs.current[i] = o }} visible={false}>
+          <spriteMaterial map={NOTE_TEX[i % NOTE_TEX.length]} transparent depthWrite={false} toneMapped={false} />
+        </sprite>
+      ))}
+    </>
+  )
+}
+
 /**
  * The speaker (スピーカー) hung high in the room's corner, angled down toward the floor: a dark wooden cabinet with a woofer and a tweeter behind
  * a cloth grille, on a bracket. Click it (when not editing) to open the music panel: on or off, and the volume.
  */
 function WallSpeaker() {
-  const [lit, setLit] = useState(false)
   const { off, panel } = useBgm()
   const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; toggleBgmPanel() }
   const cone = (r: number, y: number, key: string) => (
@@ -2632,12 +2683,12 @@ function WallSpeaker() {
     </group>
   )
   return (
-    <group onClick={press} onPointerOver={(e) => { e.stopPropagation(); setLit(true); document.body.style.cursor = 'pointer' }}
-      onPointerOut={() => { setLit(false); document.body.style.cursor = '' }} rotation-x={0.22}>
+    <group onClick={press} {...handOver} rotation-x={0.22}>
+      <MusicNotes playing={!off} />
       {/* the bracket: an arm back to the corner */}
       <mesh position={[0, 0.2, -0.12]}><boxGeometry args={[0.05, 0.05, 0.3]} /><meshToonMaterial color="#2a2d31" /></mesh>
       {/* the cabinet: dark wood, an inked edge */}
-      <mesh castShadow><boxGeometry args={[0.3, 0.46, 0.24]} /><meshToonMaterial color={lit ? '#6a4630' : '#523521'} /></mesh>
+      <mesh castShadow><boxGeometry args={[0.3, 0.46, 0.24]} /><meshToonMaterial color="#523521" /></mesh>
       <mesh scale={[1.04, 1.03, 1.05]}><boxGeometry args={[0.3, 0.46, 0.24]} /><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
       {/* the grille: a cloth front with the two drivers behind it */}
       <mesh position-z={0.1215}><planeGeometry args={[0.26, 0.42]} /><meshToonMaterial color="#b9ad90" /></mesh>
