@@ -74,16 +74,17 @@ export function burningMaps() {
   // (the fractures, drawn the same on both: each a jagged line across the stick, some with a branch running down it)
   type Crack = { pts: [number, number][]; branch: [number, number][] | null }
   const cracks: Crack[] = []
-  // (long fractures running down the stick, as a fire-split stick of binchotan has them: a few wander most of its length, a short one branches off here and there)
-  for (const f of [0.1, 0.3, 0.52, 0.72, 0.9]) {
-    const x0 = W * f
+  // (a few short, thin fractures here and there on the stick, each a broken, wandering run along it, with a hairline off it now and then: not stripes)
+  for (let n = 0; n < 7; n++) {
+    const x0 = 8 + rnd() * (W - 16)
+    const y0 = rnd() * (H - 70), len = 40 + rnd() * 80
     const pts: [number, number][] = []
     let x = x0
-    for (let y = -4; y <= H + 4; y += 14 + rnd() * 18) { x += (rnd() - 0.5) * 7; pts.push([x, y]) }
+    for (let y = y0; y <= y0 + len; y += 8 + rnd() * 10) { x += (rnd() - 0.5) * 9; pts.push([x, y]) }
     let branch: [number, number][] | null = null
-    if (rnd() < 0.6) {
-      const by = 30 + rnd() * (H - 90), bx = x0 + (rnd() - 0.5) * 6
-      branch = [[bx, by], [bx + (rnd() - 0.5) * 22, by + 8 + rnd() * 8], [bx + (rnd() - 0.5) * 30, by + 18 + rnd() * 12]]
+    if (rnd() < 0.5) {
+      const bx = x, by = y0 + len * (0.3 + rnd() * 0.4)
+      branch = [[bx, by], [bx + (rnd() - 0.5) * 18, by + 4 + rnd() * 6], [bx + (rnd() - 0.5) * 26, by + 10 + rnd() * 10]]
     }
     cracks.push({ pts, branch })
   }
@@ -112,7 +113,7 @@ export function burningMaps() {
     d.fillStyle = rnd() < 0.6 ? `rgba(8,7,6,${0.2 + rnd() * 0.3})` : `rgba(80,74,68,${0.06 + rnd() * 0.1})`
     d.fillRect(rnd() * W, 0, 2 + rnd() * 9, H)
   }
-  draw(d, 'rgba(4,3,3,0.95)', 5, 0, null)
+  draw(d, 'rgba(4,3,3,0.95)', 3, 0, null)
   for (let i = 0; i < 700; i++) {
     d.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.35)' : 'rgba(170,164,156,0.14)'
     d.fillRect(rnd() * W, rnd() * H, 1, 1 + rnd() * 2)
@@ -127,9 +128,9 @@ export function burningMaps() {
   const gc = document.createElement('canvas'); gc.width = W; gc.height = H
   const g = gc.getContext('2d')!
   g.fillStyle = '#000'; g.fillRect(0, 0, W, H)
-  draw(g, 'rgba(255,90,20,0.9)', 7, 14, '#ff5a14')
-  draw(g, 'rgba(255,170,60,1)', 3.2, 6, '#ffa03c')
-  draw(g, 'rgba(255,235,150,1)', 1.2, 0, null)
+  draw(g, 'rgba(255,90,20,0.8)', 4, 8, '#ff5a14')
+  draw(g, 'rgba(255,170,60,1)', 1.8, 3, '#ffa03c')
+  draw(g, 'rgba(255,235,150,1)', 0.7, 0, null)
   // (a dull red along some of the edges of the blocks: the heat inside showing at their corners)
   for (let i = 0; i < 18; i++) {
     const x = rnd() * W, yy = rnd() * H

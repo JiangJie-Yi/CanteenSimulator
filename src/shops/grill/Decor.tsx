@@ -180,6 +180,9 @@ function Crate() {
 function Fan({ held }: { held: RefObject<Held> }) {
   const g = useRef<THREE.Group>(null)
   const swing = useRef(0)
+  const last = useRef(0)
+  const beat = useRef(0)
+  const phase = useRef(0)
   useFrame((_, dt) => {
     const o = g.current
     if (!o) return
@@ -187,8 +190,13 @@ function Fan({ held }: { held: RefObject<Held> }) {
     if (h?.kind === 'fan') {
       o.position.copy(h.at)
       swing.current += (Math.sin(h.wave * 6) * 0.55 - swing.current) * Math.min(1, dt * 14)
+      // (the wrist's flick: the fan beats back and forth, harder the faster it's being waved, and settles when it's held still)
+      const speed = Math.min(1, Math.abs(h.wave - last.current) / Math.max(dt, 1e-3) / 2.5)
+      last.current = h.wave
+      beat.current += (speed - beat.current) * Math.min(1, dt * 8)
+      phase.current += dt * 22
       // face to the camera's side, handle down, rocking side to side as it fans
-      o.rotation.set(1.45, -0.6, swing.current)
+      o.rotation.set(1.45 + Math.sin(phase.current) * 0.35 * beat.current, -0.6, swing.current)
     } else {
       o.position.set(DECOR.fan.at[0], 0.01, DECOR.fan.at[1])
       o.rotation.set(0, 2.1, 0)

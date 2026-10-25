@@ -60,6 +60,8 @@ const SOUP_TASTE = 78
 const FAN_GAIN = 0.08
 const FAN_MAX = 0.3
 const FAN_FADE = 0.02
+/** how fast (per second) the heat that's been fanned up is let into the fire */
+const FAN_RISE = 0.06
 const FAN_BURN = 0.02
 const FIRE_FANNED_MAX = 1.2
 const FAN_OVER_BURN = 0.03
@@ -110,11 +112,11 @@ const DISH_TOP: [number, number, number] = [1.8, 0, -0.26]
 const BASKET_TOP: [number, number, number] = [2.0, 0, 0.4]
 /** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates) */
 const BOWL_TOP: [number, number, number] = [1.55, 0, -0.75]
-const BOWL_R = 0.3
+const BOWL_R = 0.52
+/** the bowl's rim above its foot: what's laid across it rests at this height */
+const BOWL_RIM = 0.15
 /** the table's pieces that edit mode moves by their nudge (the cutting board, the seasoning box, the water bucket): the edit id of each */
 const EDIT_PIECES: Record<string, string> = { tray: 'cutboard', box: 'seasoning', bin: 'bucket' }
-/** how many pieces the tasting bowl holds before the next goes on top (a ring of this many) */
-const BOWL_RING = 6
 /** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
 const PLATE_TOP: [number, number, number] = [1.45, 0.02, -1.24]
 /** what lives in the cubby under the table: kept there, not carried about (it's under the top, not on it) */
@@ -1504,8 +1506,8 @@ function SideDish({ position, container }: { position: [number, number, number];
 function TasteBowl({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = useMemo(() => {
     const R = BOWL_R
-    return wareGeometry([[0, 0], [R * 0.4, 0], [R * 0.46, 0.012], [R * 0.7, 0.05], [R * 0.93, 0.12], [R, 0.17], [R * 0.97, 0.178],
-      [R * 0.9, 0.12], [R * 0.66, 0.056], [R * 0.4, 0.024], [0, 0.024]], R)
+    return wareGeometry([[0, 0], [R * 0.4, 0], [R * 0.46, 0.012], [R * 0.7, 0.04], [R * 0.92, 0.1], [R, 0.15], [R * 0.98, 0.158],
+      [R * 0.9, 0.11], [R * 0.66, 0.05], [R * 0.4, 0.024], [0, 0.024]], R)
   }, [])
   return (
     <group position={position} userData={{ container }}>
@@ -2534,13 +2536,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return
     }
     if (bowl) {
-      // a ring of them lying in the bowl, the next ring on top of that
-      const ring = Math.floor(slot / BOWL_RING)
-      const a = ((slot % BOWL_RING) / BOWL_RING) * Math.PI * 2 + ring * 0.5
-      const rr = BOWL_R * 0.4 * (1 - ring * 0.25)
-      p.toP.copy(bowlAt()).add(new THREE.Vector3(Math.cos(a) * Math.max(0, rr), 0.07 + ring * 0.05, Math.sin(a) * Math.max(0, rr)))
+      // laid side by side across the bowl like on a plate, the skewers' sticks resting across its rim; a full row starts a layer on top
+      const within = slot % PER_PLATE
+      const col = within % PER_LAYER
+      const layer = Math.floor(within / PER_LAYER)
+      const across = (col - (PER_LAYER - 1) / 2) * SLOT_GAP + (layer % 2) * (SLOT_GAP / 2)
+      p.toP.copy(bowlAt()).addScaledVector(STACK_DIR, across)
+      p.toP.y += (p.loose ? 0.07 : BOWL_RIM + 0.02) + layer * LAYER_HEIGHT
       p.container = 'bowl-0'
-      p.toQ.copy(p.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(UP, Math.random() * Math.PI * 2))
     } else if (basket) {
       // tossed in from just above the basket; from there the physics drops it in and lets it settle
       const a = Math.random() * Math.PI * 2
@@ -2589,7 +2592,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // A skewer's local axes depend on how its parts were joined in Blender, so flatQ works from the stick itself
     // (it runs from its foot on the outer ring up and in to its tip, the food's broad side facing out) and turns
     // it to lie along LAY_DIR, broad side up; loose pieces just lie on their bottom
-    if (!basket && !dish && !bowl) flatQ(p, p.toQ)
+    if (!basket && !dish) flatQ(p, p.toQ)
   }
 
   /**
@@ -2683,7 +2686,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const sips = useRef(new Map<string, { left: number; level: number }>())
   /** a stick of charcoal or the fan in hand (see Decor), and the heat the fanning has added */
   const held = useRef<Held>(null)
-  const fanned = useRef({ extra: 0, last: 0 })
+  const fanned = useRef({ extra: 0, last: 0, pending: 0 })
   const [decorTip, setDecorTip] = useState<'charcoal' | 'fan' | null>(null)
   // how many things have gone in the bin (it starts empty), and the fire glowing as raw food is carried over it
   const trashedRef = useRef(0)
@@ -3163,6 +3166,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       editSeen.current[key] = at
       const next = nudge(key).clone().add(d)
       moved.current.set(key, next)
+      // (it can't be set down in the stones or through another piece: pushed clear, as when it's moved by hand)
+      const here = containerAt(key)
+      const clear = settle(key, here.clone())
+      clear.y = here.y
+      next.add(clear.sub(here))
+      moved.current.set(key, next)
       for (const b of carriers[key] ?? []) b.node.position.copy(b.home).add(next)
       for (const t of tools) {
         if (carrierOf(t.node.name) !== key) continue
@@ -3490,11 +3499,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (h.kind !== 'fan') return
       h.wave += moved
       if (fire && fire.current > 0.02 && Math.hypot(at.x, at.z) < RING_CLEAR + 0.1) {
-        const gain = Math.min(moved * FAN_GAIN, FAN_MAX - fanned.current.extra, FIRE_FANNED_MAX - fire.current)
-        if (gain > 0) {
-          fire.current += gain
-          fanned.current.extra += gain
-        }
+        // (the heat the fanning calls up is banked and let into the fire a little at a time: the fire rises, it doesn't jump)
+        const gain = Math.min(moved * FAN_GAIN, FAN_MAX - fanned.current.extra - fanned.current.pending)
+        if (gain > 0) fanned.current.pending += gain
         fanned.current.last = performance.now()
       }
     }
@@ -3888,7 +3895,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
         // (only the fractures light up (the emissive map): an orange that goes yellower and brighter as the stick kindles, a dull red while it's still catching)
         c.mat.emissive.setRGB(1, 0.42 + 0.45 * h ** 1.6, 0.1 + 0.25 * h ** 3)
-        c.mat.emissiveIntensity = (0.15 + 2.3 * h ** 1.3) * flick
+        c.mat.emissiveIntensity = (0.15 + 1.4 * h ** 1.3) * flick
       }
       if (c.settled) {
         // (what lay on it comes down as sticks beneath burn away; it eases to its pose)
@@ -3998,6 +4005,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // fanned-up heat burns the coals faster while it lasts (more the hotter it's been fanned), and dies back once the
     // fanning stops
     const fan = fanned.current
+    if (fan.pending > 0 && fire) {
+      const rise = Math.min(fan.pending, dt * FAN_RISE, Math.max(0, FIRE_FANNED_MAX - fire.current))
+      fire.current += rise
+      fan.extra += rise
+      fan.pending -= rise
+      if (rise <= 0) fan.pending = 0
+    }
     if (fan.extra > 0 && fire) {
       fire.current = Math.max(0, fire.current - dt * GAME_SPEED.value * FAN_BURN * (fan.extra / FAN_MAX))
       if (performance.now() - fan.last > 600) {
@@ -4005,7 +4019,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         fan.extra -= back
         fire.current = Math.max(0, fire.current - back)
       }
-      if (fire.current <= 0.02) fan.extra = 0
+      if (fire.current <= 0.02) { fan.extra = 0; fan.pending = 0 }
     }
     // (past 100% the coals are going up fast: the more over, the faster they're used up)
     if (fire && fire.current > 1) fire.current = Math.max(1, fire.current - dt * GAME_SPEED.value * FAN_OVER_BURN * ((fire.current - 1) / (FIRE_FANNED_MAX - 1)))
