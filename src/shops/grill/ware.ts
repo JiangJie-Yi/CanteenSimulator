@@ -23,7 +23,7 @@ export function forPhone(c: HTMLCanvasElement) {
  * branch with outlined blossoms, stamens, buds and a few falling petals (梅). The glaze has faint iron specks and
  * a fine crackle.
  */
-function wareTexture(motif: 'bamboo' | 'plum' | 'cloud') {
+function wareTexture(motif: 'bamboo' | 'plum') {
   if (typeof document === 'undefined') return null
   const S = 1536
   const c = document.createElement('canvas')
@@ -36,7 +36,7 @@ function wareTexture(motif: 'bamboo' | 'plum' | 'cloud') {
   const pale = 'rgba(80, 118, 190, 0.22)'
   const cx = S / 2
   const cy = S / 2
-  let seed = motif === 'bamboo' ? 7 : motif === 'plum' ? 13 : 29
+  let seed = motif === 'bamboo' ? 7 : 13
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 
   // glaze: warm cream, a little uneven, with iron specks and a faint crackle
@@ -276,57 +276,6 @@ function wareTexture(motif: 'bamboo' | 'plum' | 'cloud') {
       // leaves at the top of the stalk
       for (let q = 0; q < 4; q++) leaf(tx, ty, -Math.PI / 2 + (q - 1.5) * 0.5 + lean, 84 + rnd() * 30, 15)
     }
-  } else if (motif === 'cloud') {
-    // 瑞雲: auspicious clouds drifting across the well, each a curling head with a long trailing tail, in the
-    // deep and pale washes, outlined; and a line of geese flying over
-    const cloud = (x: number, y: number, k: number, flip: number) => {
-      g.save()
-      g.translate(x, y)
-      g.scale(flip * k, k)
-      // the tail, a long tapering band
-      g.fillStyle = pale
-      g.strokeStyle = ink
-      g.lineWidth = 3 / k
-      g.beginPath()
-      g.moveTo(-10, 18)
-      g.bezierCurveTo(-90, 26, -170, 10, -260, 28)
-      g.bezierCurveTo(-170, 0, -90, -8, -10, -14)
-      g.closePath()
-      g.fill()
-      g.stroke()
-      // the head: three curls, each a spiral
-      for (const [hx, hy, r] of [[0, 0, 34], [44, -14, 28], [78, 4, 22]] as [number, number, number][]) {
-        g.fillStyle = wash
-        g.beginPath()
-        g.arc(hx, hy, r, 0, Math.PI * 2)
-        g.fill()
-        g.stroke()
-        g.beginPath()
-        for (let q = 0; q <= 40; q++) {
-          const a = q * 0.35
-          const rr = r * (0.85 - q * 0.019)
-          const px = hx + Math.cos(a) * rr
-          const py = hy + Math.sin(a) * rr
-          if (q) g.lineTo(px, py)
-          else g.moveTo(px, py)
-        }
-        g.stroke()
-      }
-      g.restore()
-    }
-    cloud(S * 0.62, S * 0.36, 1.25, 1)
-    cloud(S * 0.42, S * 0.56, 1.05, -1)
-    cloud(S * 0.66, S * 0.7, 0.85, 1)
-    // geese, three V shapes going off up to the left
-    g.strokeStyle = ink
-    g.lineWidth = 3.2
-    for (const [x, y, k] of [[0.34, 0.3, 1], [0.27, 0.36, 0.85], [0.4, 0.4, 0.75]] as [number, number, number][]) {
-      g.beginPath()
-      g.moveTo(S * x - 26 * k, S * y - 8 * k)
-      g.quadraticCurveTo(S * x - 10 * k, S * y - 14 * k, S * x, S * y)
-      g.quadraticCurveTo(S * x + 12 * k, S * y - 16 * k, S * x + 30 * k, S * y - 12 * k)
-      g.stroke()
-    }
   } else {
     // the branch: a thick gnarled bough from lower left, one twig forking up, one out to the right
     stroke([[S * 0.2, S * 0.74], [S * 0.3, S * 0.66], [S * 0.36, S * 0.6], [S * 0.47, S * 0.55], [S * 0.6, S * 0.46],
@@ -437,11 +386,10 @@ function wareTexture(motif: 'bamboo' | 'plum' | 'cloud') {
 }
 /**
  * the shop's one set of ware, all with the same waves round the rim and the same brown lip: bamboo on the big
- * plates, plum blossom on the side dishes, clouds on the customers' plates at the bar
+ * plates and plum blossom on the side dishes; the customers' plates have their own set (wareDesigns.ts)
  */
 export const BAMBOO_WARE = wareTexture('bamboo')
 export const PLUM_WARE = wareTexture('plum')
-export const CLOUD_WARE = wareTexture('cloud')
 
 /** Lathe geometry for ware, with UVs projected straight down so a painted picture lies flat in the well. */
 export function wareGeometry(profile: [number, number][], R: number) {

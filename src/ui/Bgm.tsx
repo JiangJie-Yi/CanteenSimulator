@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { getBgm, setBgmOff, setBgmVolume, toggleBgmPanel, useBgm } from './bgmStore'
 
 /**
  * The shop's background music, 居酒屋の夜, looped quietly: src/IzakayaNight.mp3, or public/audio/izakaya-night.mp3. If those aren't there, the others it might have been
@@ -8,17 +9,15 @@ const NAMES = ['izakaya-night.mp3', '居酒屋の夜.mp3', 'izakaya-night.m4a', 
 // (the song kept in src/ as it is on the owner's machine (src/IzakayaNight.mp3) is bundled with the page when it's there; the glob finds nothing, and breaks nothing, when it isn't)
 const IN_SRC = Object.values(import.meta.glob<string>('/src/*.{mp3,m4a,ogg,wav}', { eager: true, query: '?url', import: 'default' }))
 const SRCS = [...IN_SRC, ...NAMES.map((n) => import.meta.env.BASE_URL + 'audio/' + encodeURIComponent(n))]
-const KEY = 'jgs-bgm-off'
-const VOLUME = 0.35
 
 export function Bgm() {
   const audio = useRef<HTMLAudioElement | null>(null)
-  const [off, setOff] = useState(() => { try { return localStorage.getItem(KEY) === '1' } catch { return false } })
+  const { off, volume, panel } = useBgm()
   const [missing, setMissing] = useState(false)
   useEffect(() => {
     const a = new Audio()
     a.loop = true
-    a.volume = VOLUME
+    a.volume = getVolume()
     let i = 0
     // (a file that isn't there (or can't be played) hands over to the next name on the list)
     const next = () => {
@@ -33,6 +32,7 @@ export function Bgm() {
     return () => { a.removeEventListener('error', next); a.pause(); audio.current = null }
   }, [])
   const startedRef = useRef(false)
+  useEffect(() => { if (audio.current) audio.current.volume = volume }, [volume])
   useEffect(() => {
     const a = audio.current
     if (!a) return
@@ -45,9 +45,21 @@ export function Bgm() {
     return () => { window.removeEventListener('pointerdown', go); window.removeEventListener('keydown', go) }
   }, [off])
   return (
-    <button type="button" className={`bgm-toggle${off || missing ? '' : ' is-on'}`} aria-pressed={!off} aria-label="背景音樂 BGM" title={missing ? '找不到音檔：請放到 src/IzakayaNight.mp3' : '居酒屋の夜'}
-      onClick={() => setOff((v) => { const n = !v; try { localStorage.setItem(KEY, n ? '1' : '0') } catch { /* private window */ } return n })}>
-      {off ? '♪̸' : '♪'}
-    </button>
+    <>
+      <button type="button" className={`bgm-toggle${off || missing ? '' : ' is-on'}`} aria-pressed={!off} aria-label="背景音樂 BGM" title={missing ? '找不到音檔：請放到 src/IzakayaNight.mp3' : '居酒屋の夜'}
+        onClick={() => toggleBgmPanel()}>
+        {off ? '♪̸' : '♪'}
+      </button>
+      {panel && (
+        <div className="bgm-panel" role="dialog" aria-label="音樂與音量">
+          <b>🔊 居酒屋の夜</b>
+          <button type="button" className={`bgm-power${off ? '' : ' is-on'}`} aria-pressed={!off} onClick={() => setBgmOff(!off)}>{off ? '播放' : '暫停'}</button>
+          <input type="range" min={0} max={100} value={Math.round(volume * 100)} onChange={(e) => setBgmVolume(Number(e.target.value) / 100)} aria-label="音量" />
+          <span>{Math.round(volume * 100)}%</span>
+          <button type="button" className="bgm-close" onClick={() => toggleBgmPanel(false)} aria-label="關閉">×</button>
+        </div>
+      )}
+    </>
   )
 }
+const getVolume = () => getBgm().volume

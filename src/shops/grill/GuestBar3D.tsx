@@ -17,7 +17,8 @@ import type { Lang } from '@/data/i18n'
 import { inkModel } from '@/scene/inkHull'
 import { Later } from '@/scene/Later'
 import { mapleTexture } from '@/scene/mapleGrain'
-import { CLOUD_WARE, wareGeometry } from './ware'
+import { wareGeometry } from './ware'
+import { designOf, wareDesign } from './wareDesigns'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { Movable } from './Movable'
@@ -1501,11 +1502,11 @@ const SMEAR_GEO = new THREE.CircleGeometry(0.058, 18)
 const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.18, 5)
 
 /** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and a used stick) */
-function Plate({ dirty = false }: { dirty?: boolean }) {
+function Plate({ dirty = false, design = 0 }: { dirty?: boolean; design?: number }) {
   return (
     <group>
       <mesh geometry={PLATE_GEO} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={CLOUD_WARE} />
+        <meshToonMaterial color="#ffffff" map={wareDesign(design)} />
       </mesh>
       <mesh geometry={PLATE_GEO} scale={[1.03, 1.08, 1.03]}>
         <meshBasicMaterial color={INK} side={THREE.BackSide} />
@@ -2251,12 +2252,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* the clean stack, the dirty one, and the plates out at the seats */}
       {clean.current.map((_, i) => (
         <group key={`c${i}`} ref={(o) => { cleanObjs.current[i] = o; if (o && !o.userData.placed) { o.userData.placed = true; o.position.copy(cleanAt(i)) } }}>
-          <Plate />
+          <Plate design={i} />
         </group>
       ))}
       <group ref={dirtyStack}>
         {Array.from({ length: dirty.current }, (_, i) => (
-          <group key={`d${i}`} position={dirtyAt(i)} rotation-y={i * 0.9}><Plate dirty /></group>
+          <group key={`d${i}`} position={dirtyAt(i)} rotation-y={i * 0.9}><Plate dirty design={i} /></group>
         ))}
       </group>
       {runs.current.map((r) => (
@@ -2268,7 +2269,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             o.position.copy(r.from)
           }
         }}>
-          <Plate dirty={r.phase === 'clear'} />
+          <Plate dirty={r.phase === 'clear'} design={designOf(r.key)} />
         </group>
       ))}
       <Later stage={3}>

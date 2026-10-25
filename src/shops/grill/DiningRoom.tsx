@@ -13,6 +13,7 @@ import { LuckyCat } from './LuckyCat'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { Steam } from '@/scene/Steam'
+import { toggleBgmPanel, useBgm } from '@/ui/bgmStore'
 
 /**
  * The customers' side of the room, behind the aisle: a wall of cream plaster over a dark wooden wainscot, a frieze of
@@ -2614,6 +2615,38 @@ function StaffMat({ lang: _lang }: { lang: Lang }) {
     </group>
   )
 }
+/**
+ * The speaker (スピーカー) hung high in the room's corner, angled down toward the floor: a dark wooden cabinet with a woofer and a tweeter behind
+ * a cloth grille, on a bracket. Click it (when not editing) to open the music panel: on or off, and the volume.
+ */
+function WallSpeaker() {
+  const [lit, setLit] = useState(false)
+  const { off, panel } = useBgm()
+  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; toggleBgmPanel() }
+  const cone = (r: number, y: number, key: string) => (
+    <group key={key} position={[0, y, 0.124]}>
+      <mesh rotation-x={Math.PI / 2}><torusGeometry args={[r, r * 0.12, 6, 28]} /><meshToonMaterial color="#25272b" /></mesh>
+      <mesh position-z={-0.002}><circleGeometry args={[r * 0.92, 28]} /><meshBasicMaterial color="#3c3f47" /></mesh>
+      <mesh position-z={0.001}><ringGeometry args={[r * 0.45, r * 0.8, 28]} /><meshBasicMaterial color="#2a2c32" /></mesh>
+      <mesh position-z={0.004}><circleGeometry args={[r * 0.3, 16]} /><meshBasicMaterial color="#6b6f79" /></mesh>
+    </group>
+  )
+  return (
+    <group onClick={press} onPointerOver={(e) => { e.stopPropagation(); setLit(true); document.body.style.cursor = 'pointer' }}
+      onPointerOut={() => { setLit(false); document.body.style.cursor = '' }} rotation-x={0.22}>
+      {/* the bracket: an arm back to the corner */}
+      <mesh position={[0, 0.2, -0.12]}><boxGeometry args={[0.05, 0.05, 0.3]} /><meshToonMaterial color="#2a2d31" /></mesh>
+      {/* the cabinet: dark wood, an inked edge */}
+      <mesh castShadow><boxGeometry args={[0.3, 0.46, 0.24]} /><meshToonMaterial color={lit ? '#6a4630' : '#523521'} /></mesh>
+      <mesh scale={[1.04, 1.03, 1.05]}><boxGeometry args={[0.3, 0.46, 0.24]} /><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
+      {/* the grille: a cloth front with the two drivers behind it */}
+      <mesh position-z={0.1215}><planeGeometry args={[0.26, 0.42]} /><meshToonMaterial color="#b9ad90" /></mesh>
+      {cone(0.095, -0.07, 'w')}{cone(0.04, 0.15, 't')}
+      <mesh position={[0.1, -0.2, 0.123]}><circleGeometry args={[0.009, 8]} /><meshBasicMaterial color={off ? '#a02020' : panel ? '#ffd24a' : '#3ddc6a'} /></mesh>
+    </group>
+  )
+}
+
 export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang?: Lang }) {
   const c0 = counters[0]
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, along).addScaledVector(c0.lay, lay)
@@ -2626,6 +2659,14 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
     const along = Math.min(-c0.length / 2 - 0.35, ...counters.slice(1).map((o) => o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c0.at).dot(c0.along)))
     return c0.at.clone().addScaledVector(c0.along, along + 0.42).addScaledVector(c0.lay, farOf(c0) + 0.42)
   }, [c0, counters])
+  // (the same corner, up under the ceiling, the speaker hung there and turned to face down the room's diagonal)
+  const speaker = useMemo(() => {
+    const along = Math.min(-c0.length / 2 - 0.35, ...counters.slice(1).map((o) => o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c0.at).dot(c0.along)))
+    const p = c0.at.clone().addScaledVector(c0.along, along + 0.3).addScaledVector(c0.lay, farOf(c0) + 0.3)
+    p.y += 1.55
+    const d = c0.along.clone().add(c0.lay)
+    return { p, yaw: Math.atan2(d.x, d.z) }
+  }, [c0, counters])
   const crateAt = useMemo(() => {
     if (!fr || !c1) return new THREE.Vector3()
     const last = fr[fr.length - 1]
@@ -2634,6 +2675,7 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   return (
     // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
     <>
+      <Movable id="speaker" label="喇叭"><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
       {[0, 1].map((part) => (
         <Movable key={part} id={part ? 'sake2' : 'sake'} label={part ? '餐盤堆' : '酒樽'}><StaticBatch key={lang}>
           <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>

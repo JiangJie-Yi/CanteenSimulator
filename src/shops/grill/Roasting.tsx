@@ -30,7 +30,8 @@ import { AxisGizmo, focusCamera } from './Movable'
 import { binchotanGeo, binchotanMap, burningMaps } from './Binchotan'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
 import { Movable } from './Movable'
-import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
+import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
+import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
 import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
 
@@ -1230,7 +1231,7 @@ function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Cou
             {/* (on the right instead at a seat where the left would be off the top, by the gate) */}
             <group position={[sauceSide(c, gate, x), 0.002, 0.13]}>
               <mesh geometry={SAUCE_DISH_GEO} castShadow>
-                <meshToonMaterial color="#ffffff" map={CLOUD_WARE} />
+                <meshToonMaterial color="#ffffff" map={wareDesign(n)} />
               </mesh>
               <mesh geometry={SAUCE_DISH_GEO} scale={[1.06, 1.15, 1.06]}>
                 <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />

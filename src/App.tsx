@@ -39,7 +39,7 @@ import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
 import { offsetOf, registerMovable, rotationOf, select, setFrame, toggleEdit, useEdit } from '@/shops/grill/edit'
 import { AxisGizmo, focusCamera } from '@/shops/grill/Movable'
-import { ALONG } from '@/shops/grill/bar'
+import { ALONG, LAY } from '@/shops/grill/bar'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
@@ -322,6 +322,33 @@ const HOUSE_SERVER: CrewMember = { id: 'house-server', role: 'server', look: { f
  * Camera 1 as it's drawn in edit mode: a small camera body with a lens, and the pyramid of what it sees, standing where the view is held (see Scene), so it
  * can be picked from the list or by a click, moved with the arrows, turned with the rings (a turn about the vertical, a tilt) and its numbers typed.
  */
+/**
+ * The world axes in a corner of the screen while editing, as a modelling program has them: the room's own X (along the bar, red), Y (up, green) and
+ * Z (across it, blue), turned with the camera, so a piece's X, Y, Z fields can be read against the view. It writes into the SVG that App draws.
+ */
+function AxisWidget() {
+  const { camera } = useThree()
+  useFrame(() => {
+    const root = document.getElementById('axis-widget')
+    if (!root) return
+    const inv = camera.matrixWorldInverse
+    const axes = [[ALONG.x, 0, ALONG.z], [0, 1, 0], [LAY.x, 0, LAY.z]]
+    axes.forEach((v, i) => {
+      const d = new THREE.Vector3(...v).transformDirection(inv)
+      const line = root.querySelector<SVGLineElement>(`.aw-line-${i}`), dot = root.querySelector<SVGGElement>(`.aw-dot-${i}`), neg = root.querySelector<SVGCircleElement>(`.aw-neg-${i}`)
+      if (!line || !dot || !neg) return
+      const x = 36 + d.x * 24, y = 36 - d.y * 24
+      line.setAttribute('x2', String(x)); line.setAttribute('y2', String(y))
+      dot.setAttribute('transform', `translate(${x} ${y})`)
+      neg.setAttribute('cx', String(72 - x)); neg.setAttribute('cy', String(72 - y))
+      // (the end pointing away from the viewer is drawn behind: fainter)
+      dot.setAttribute('opacity', d.z > 0.2 ? '0.55' : '1')
+      line.setAttribute('opacity', d.z > 0.2 ? '0.5' : '1')
+    })
+  })
+  return null
+}
+
 function CameraRig({ home, target }: { home: { current: THREE.Vector3 }; target: THREE.Vector3 }) {
   const { selected, offsets, rotations } = useEdit()
   void offsets; void rotations
@@ -711,6 +738,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
         blur={2.6} far={1.5} />
 
       {editing && <CameraRig home={home} target={homeTarget} />}
+      {editing && <AxisWidget />}
       <OrbitControls
         ref={controls}
         // shared as the scene's controls so dragging a seasoning onto food can hold the camera still
@@ -2313,6 +2341,17 @@ export default function App() {
           title={lang === 'ja' ? '研究モード（手で焼いて試す・食材の冷蔵庫・固定カメラ）' : '研製料理模式（手動烤魚與調味、食材冷藏櫃、固定視角）'}>
           研
         </button>
+      )}
+      {editOn && (
+        <svg id="axis-widget" className="axis-widget" viewBox="0 0 72 72" aria-label="世界座標 X Y Z">
+          {[['#ff3b30', 'X'], ['#34c759', 'Y'], ['#0a84ff', 'Z']].map(([c, n], i) => (
+            <g key={n}>
+              <circle className={`aw-neg-${i}`} r="4" fill="none" stroke={c} strokeWidth="1.5" opacity="0.5" />
+              <line className={`aw-line-${i}`} x1="36" y1="36" x2="36" y2="36" stroke={c} strokeWidth="3" strokeLinecap="round" />
+              <g className={`aw-dot-${i}`}><circle r="8" fill={c} /><text y="3.5" textAnchor="middle" fontSize="10" fontWeight="700" fill="#fff">{n}</text></g>
+            </g>
+          ))}
+        </svg>
       )}
       {/* (the shop's edit mode, key G: only while it's shut, as it can't be switched on while customers are about) */}
       {!ai && !!dish.roast && !flatGrill && (

@@ -12,6 +12,7 @@ import { glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { ALONG, GRILL_OFFSET, KITCHEN_DROP, LAY } from './bar'
 import { Movable } from './Movable'
+import { PlateRack } from './PlateRack'
 import { getEdit } from './edit'
 import { binchotanGeo, binchotanMap } from './Binchotan'
 
@@ -394,27 +395,78 @@ const STAVES = (() => {
   return t
 })()
 /** a flat band of metal round the tub (a strip, not a rod): a lathe of a thin rectangle, its upper edge a little proud */
-const flatBand = (R: number, h: number, t = 0.007) => new THREE.LatheGeometry([[R - t, -h / 2], [R, -h / 2], [R + 0.0025, 0], [R, h / 2], [R - t, h / 2], [R - t, -h / 2]].map(([x, y]) => new THREE.Vector2(x, y)), 48)
-/** the rice's surface: little rounded clumps and single grains laid over the heap, none past the rim, each a slightly different white */
-const RICE_CLUMPS = (() => {
-  let seed = 11
+const flatBand = (R: number, h: number, t = 0.007) => new THREE.LatheGeometry([[R - t, -h / 2], [R, -h / 2], [R + 0.0025, 0], [R, h / 2], [R - t, h / 2], [R - t, -h / 2]].map(([x, y]) => new THREE.Vector2(x, y)), 72)
+/** the tub's radius at a height up it (it widens toward the rim): what a hoop must stand clear of to lie on the staves, not sink in them */
+const tubR = (y: number) => 0.255 + 0.015 * (y / 0.42)
+/** steamed rice seen close: short plump grains, each with a soft shadow along one side, over warm white */
+const RICE_GRAIN = (() => {
+  if (typeof document === 'undefined') return null
+  const S = 256
+  const c = document.createElement('canvas')
+  c.width = c.height = S
+  const g = c.getContext('2d')!
+  let seed = 5
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  const whites = ['#fffdf8', '#fbf8f0', '#fffef9', '#f8f3e8']
-  return Array.from({ length: 70 }, (_, i) => {
-    const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 0.225
-    const y = 0.44 + Math.sqrt(Math.max(0, 1 - (r / 0.3) ** 2)) * 0.075
-    const big = i % 5 === 0
-    const k = big ? 0.016 + rnd() * 0.01 : 0.006 + rnd() * 0.003
-    return { p: [Math.cos(a) * r, y, Math.sin(a) * r] as [number, number, number], s: [k * 1.3, k * (big ? 0.7 : 0.55), k] as [number, number, number], r: [rnd() * 3, rnd() * 6, rnd() * 3] as [number, number, number], c: whites[i % whites.length] }
-  })
+  g.fillStyle = '#efe6d2'
+  g.fillRect(0, 0, S, S)
+  for (let i = 0; i < 1100; i++) {
+    const x = rnd() * S, y = rnd() * S, a = rnd() * Math.PI, l = 7 + rnd() * 3, w = 3.6 + rnd()
+    for (const [ox, oy] of [[-S, 0], [0, 0], [S, 0], [0, -S], [0, S]]) {
+      g.save()
+      g.translate(x + ox, y + oy)
+      g.rotate(a)
+      g.fillStyle = 'rgba(150,128,90,0.35)'
+      g.beginPath(); g.ellipse(0.9, 1.2, l, w, 0, 0, Math.PI * 2); g.fill()
+      g.fillStyle = `rgb(${250 - rnd() * 8},${246 - rnd() * 10},${236 - rnd() * 14})`
+      g.beginPath(); g.ellipse(0, 0, l, w, 0, 0, Math.PI * 2); g.fill()
+      g.restore()
+    }
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(2.2, 2.2)
+  t.anisotropy = 4
+  return t
+})()
+/** the heap of rice in the open tub: a low mound, lumpy, level with the rim at its edge, planar UVs for the grain */
+const RICE_HEAP = (() => {
+  const R = 0.252, h = 0.075
+  const th = 2 * Math.atan(h / R)
+  const Rs = R / Math.sin(th)
+  const g = new THREE.SphereGeometry(Rs, 48, 18, 0, Math.PI * 2, 0, th)
+  g.translate(0, -Rs * Math.cos(th), 0)
+  const p = g.attributes.position, uv = g.attributes.uv
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i)
+    const edge = 1 - Math.min(1, Math.hypot(x, z) / R) ** 2
+    p.setY(i, p.getY(i) + edge * (0.007 * Math.sin(x * 38 + z * 21) + 0.006 * Math.sin(z * 47 - x * 17) + 0.004 * Math.sin((x + z) * 71)))
+    uv.setXY(i, x / (2 * R) + 0.5, z / (2 * R) + 0.5)
+  }
+  g.computeVertexNormals()
+  return g
+})()
+/** a lug on the tub's side to lift it by: a rounded plate of wood with a hole through it */
+const EAR = (() => {
+  const sh = new THREE.Shape()
+  const w = 0.05, h = 0.06, r = 0.022
+  sh.moveTo(-w, -h + r); sh.lineTo(-w, h - r); sh.quadraticCurveTo(-w, h, -w + r, h); sh.lineTo(w - r, h); sh.quadraticCurveTo(w, h, w, h - r)
+  sh.lineTo(w, -h + r); sh.quadraticCurveTo(w, -h, w - r, -h); sh.lineTo(-w + r, -h); sh.quadraticCurveTo(-w, -h, -w, -h + r)
+  const hole = new THREE.Path()
+  hole.absarc(0.012, 0.012, 0.017, 0, Math.PI * 2, true)
+  sh.holes.push(hole)
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: true, bevelSize: 0.005, bevelThickness: 0.004, bevelSegments: 2, curveSegments: 10 })
+  g.translate(0, 0, -0.015)
+  return g
 })()
 const RICE_GEO = {
-  tub: new THREE.CylinderGeometry(0.27, 0.255, 0.42, 32, 1, true),
+  tub: new THREE.CylinderGeometry(0.27, 0.255, 0.42, 48, 1, true),
   lidTop: new THREE.CylinderGeometry(0.255, 0.285, 0.035, 32),
-  ear: new THREE.BoxGeometry(0.1, 0.12, 0.05),
-  band: flatBand(0.2645, 0.03),
-  bandWide: flatBand(0.268, 0.045),
-  rivet: new THREE.CylinderGeometry(0.0055, 0.0055, 0.004, 8),
+  ear: EAR,
+  band: flatBand(tubR(0.3) + 0.0035, 0.03),
+  band2: flatBand(tubR(0.2) + 0.0035, 0.03),
+  bandWide: flatBand(tubR(0.07) + 0.0035, 0.045),
+  lap: new THREE.BoxGeometry(0.004, 1, 0.035),
   floor: new THREE.CircleGeometry(0.25, 28),
   hoop: new THREE.TorusGeometry(0.272, 0.012, 6, 32),
   grain: new THREE.SphereGeometry(1, 7, 5),
@@ -490,37 +542,33 @@ function RiceTub() {
           <mesh geometry={g.slab} position={[0, 0.022, 0]} scale={[0.19, 0.03, 0.03]}><meshToonMaterial color="#d09858" /></mesh>
         </group>
         {[-1, 1].map((sd) => (
-          <group key={sd} position={[sd * 0.285, 0.365, 0]} rotation-z={-sd * 0.22}>
-            <Inked geometry={g.ear} color="#ffffff" map={STAVES} grow={1.06} />
+          <group key={sd} position={[sd * 0.292, 0.355, 0]} rotation-y={sd > 0 ? 0 : Math.PI} rotation-z={0}>
+            <Inked geometry={g.ear} color="#e9cf9e" grow={1.08} />
+            {/* (a loop of cord through the hole) */}
+            <mesh position={[0.012, 0.012, 0]} rotation-x={0}><torusGeometry args={[0.019, 0.0045, 5, 14]} /><meshToonMaterial color="#8a6a3c" /></mesh>
           </group>
         ))}
         {/* the copper hoops: three flat bands (a wide one low, a narrow pair above), each riveted at its lap, a foot ring below, a lip of dark wood at the rim */}
-        {[[0.07, 'bandWide'], [0.2, 'band'], [0.3, 'band']].map(([y, kind], k) => (
+        {[[0.07, 'bandWide'], [0.2, 'band2'], [0.3, 'band']].map(([y, kind], k) => (
           <group key={k} position-y={y as number}>
-            <mesh geometry={g[kind as 'band' | 'bandWide']}><meshToonMaterial color={k === 0 ? '#b8743a' : '#c58a4a'} /></mesh>
-            {[0, 1, 2].map((r) => (
-              <mesh key={r} geometry={g.rivet} position={[0.2745 * Math.cos(0.5 + r * 0.16), 0, 0.2745 * Math.sin(0.5 + r * 0.16)]} rotation={[Math.PI / 2, 0, -(0.5 + r * 0.16)]}>
-                <meshToonMaterial color="#6a4220" />
-              </mesh>
-            ))}
+            <mesh geometry={g[kind as 'band' | 'band2' | 'bandWide']}><meshToonMaterial color={k === 0 ? '#b8743a' : '#c58a4a'} /></mesh>
+            {/* (where the strip's two ends overlap: a paler seam, standing a hair proud of the band) */}
+            <mesh geometry={g.lap} position={[(tubR(y as number) + 0.0075) * Math.cos(0.5), 0, (tubR(y as number) + 0.0075) * Math.sin(0.5)]}
+              rotation-y={-0.5} scale={[1, k === 0 ? 0.045 : 0.03, 1]}><meshToonMaterial color="#d9a066" /></mesh>
           </group>
         ))}
         <mesh position-y={0.012} rotation-x={Math.PI / 2}><torusGeometry args={[0.26, 0.012, 6, 36]} /><meshToonMaterial color="#c7a56c" /></mesh>
         <mesh position-y={0.4175} rotation-x={Math.PI / 2}><torusGeometry args={[0.2645, 0.0075, 6, 40]} /><meshToonMaterial color="#d8b87c" /></mesh>
         {open && (
           <>
-            {/* the rice, heaped a little over the rim, the paddle stood in it */}
-            <mesh geometry={g.cylRice} position-y={0.21}>
-              <meshToonMaterial color="#fbf8f0" />
+            {/* the rice, heaped level with the rim and mounded a little in the middle, the paddle stood in it */}
+            <mesh geometry={g.cylRice} position-y={0.2} scale={[1, 0.91, 1]}>
+              <meshToonMaterial color="#f6f0e2" />
             </mesh>
-            <mesh geometry={g.rice} position-y={0.338} scale={[1.17, 0.6, 1.17]}>
-              <meshToonMaterial color="#fbf8f0" />
+            <mesh geometry={RICE_HEAP} position-y={0.41}>
+              <meshToonMaterial color="#ffffff" map={RICE_GRAIN} emissive="#4d4535" />
             </mesh>
-            {/* (the surface of the rice: soft clumps and a scatter of single grains over the heap) */}
-            {RICE_CLUMPS.map((c, i) => (
-              <mesh key={i} geometry={g.grain} position={c.p} scale={c.s} rotation={c.r}><meshToonMaterial color={c.c} /></mesh>
-            ))}
-            <group position={[0.08, 0.57, -0.04]} rotation={[0.25, 0, -0.35]}>
+            <group position={[0.08, 0.55, -0.04]} rotation={[0.25, 0, -0.35]}>
               <mesh geometry={g.paddle} position-y={0.06}><meshToonMaterial color="#e2c89a" /></mesh>
               <mesh geometry={g.blade} position-y={-0.12} scale={[1, 1.3, 0.25]}><meshToonMaterial color="#e2c89a" /></mesh>
             </group>
@@ -640,6 +688,12 @@ function FridgeAt() {
   // (its front, local +z, toward the room, and its length along the wall: local x runs along the first counter)
   return <Movable id="freezer" label="冷藏櫃" baseScale={1.6}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><IngredientFridge /></group></Movable>
 }
+const RACK_AT = { along: 2.0, lay: 5.05 }
+function RackAt() {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const p = new THREE.Vector3().addScaledVector(ALONG, RACK_AT.along).addScaledVector(LAY, RACK_AT.lay)
+  return <Movable id="platerack" label="碗盤櫃架"><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack /></group></Movable>
+}
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
     <>
@@ -648,7 +702,7 @@ export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [
       <HeldStick held={held} />
       <Movable id="lantern" label="行燈"><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
-      <group position={[0, 0, 0]}><FridgeAt /></group>
+      <group position={[0, 0, 0]}><FridgeAt /><RackAt /></group>
     </>
   )
 }
