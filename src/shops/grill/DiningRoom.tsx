@@ -2624,31 +2624,36 @@ const NOTE_TEX = (() => {
   })
 })()
 /**
- * Notes floating out of the speaker's front while music plays: a handful of ♪ ♫ sprites, each rising and swaying on its own beat, growing in and
- * fading out; with the music off they thin out and are gone.
+ * Notes coming out of the speaker's cones while music plays: ♪ ♫ ♩ ♬ sprites, big ones from the woofer and small ones from the tweeter, each
+ * rising and swaying on its own beat, growing as it goes and fading out; with the music off they thin out and are gone.
  */
 function MusicNotes({ playing }: { playing: boolean }) {
-  const N = 7
+  const N = 10
   const refs = useRef<(THREE.Sprite | null)[]>([])
   const k = useRef(0)
+  // (each note: which driver it comes out of (the big woofer or the little tweeter), how big it grows, its own speed and way to drift)
+  const notes = useMemo(() => Array.from({ length: N }, (_, i) => {
+    const woofer = i % 3 !== 2
+    return { x0: (((i * 37) % 7) - 3) * 0.008, y0: woofer ? -0.07 : 0.15, size: (woofer ? 0.17 : 0.09) * (0.8 + ((i * 53) % 5) * 0.1), speed: 0.22 + ((i * 29) % 6) * 0.025,
+      drift: (((i * 17) % 9) - 4) * 0.045, phase: i / N }
+  }), [])
   useFrame(({ clock }, dt) => {
     k.current += ((playing ? 1 : 0) - k.current) * Math.min(1, dt * 3)
     const t = clock.elapsedTime
-    for (let i = 0; i < N; i++) {
+    notes.forEach((n, i) => {
       const sp = refs.current[i]
-      if (!sp) continue
-      const life = ((t * 0.32 + i / N) % 1)
-      const sway = Math.sin(t * 2.1 + i * 1.7)
-      sp.position.set(sway * 0.09 * life + (i % 3 - 1) * 0.07, 0.15 + life * 0.75, 0.2 + life * 0.55)
-      const grow = Math.min(1, life * 5) * 0.16
-      sp.scale.setScalar(grow * (0.7 + 0.3 * k.current))
-      ;(sp.material as THREE.SpriteMaterial).opacity = Math.min(1, life * 6) * (1 - life) ** 0.7 * k.current
+      if (!sp) return
+      const life = (t * n.speed + n.phase) % 1
+      // (out of the cone, on and up in front of the speaker, swaying as it goes)
+      sp.position.set(n.x0 + n.drift * life + Math.sin(t * 2.1 + i * 1.7) * 0.04 * life, n.y0 + life * 0.55, 0.14 + life * 0.5)
+      sp.scale.setScalar(n.size * Math.min(1, life * 6) * (0.75 + 0.5 * life) * k.current)
+      ;(sp.material as THREE.SpriteMaterial).opacity = Math.min(1, life * 8) * (1 - life) ** 0.6 * k.current
       sp.visible = k.current > 0.02
-    }
+    })
   })
   return (
     <>
-      {Array.from({ length: N }, (_, i) => (
+      {notes.map((_, i) => (
         <sprite key={i} ref={(o) => { refs.current[i] = o }} visible={false}>
           <spriteMaterial map={NOTE_TEX[i % NOTE_TEX.length]} transparent depthWrite={false} toneMapped={false} />
         </sprite>
