@@ -49,6 +49,8 @@ export interface Receipt {
 }
 export interface RegEffect {
   drawer?: boolean
+  /** the drawer would have opened, but it's locked: it only rattles */
+  locked?: boolean
   receipt?: Receipt
   /** the paper fed on a little, blank */
   feed?: boolean
@@ -77,11 +79,20 @@ export interface RegState {
   count: number
   float: number
   receiptNo: number
+  /** the drawer locked with its key: nothing opens it */
+  drawerLocked: boolean
+  /** the little word lit beside the figures, saying what they are */
+  tag: RegTag
 }
+/** what the display's figures are: an item just rung, the subtotal, the total due, the change, a quantity, the time, the calculator, an error... */
+export type RegTag = '' | 'ITEM' | 'ST' | 'CG' | 'QTY' | 'TIME' | 'TAX' | 'CALC' | 'ERR' | 'RF' | 'X' | 'Z' | 'CLERK' | 'RCPT' | 'RA' | 'PO'
+/** the tags as the display spells them */
+export const REG_TAG_TEXT: Record<RegTag, string> = { '': '', ITEM: '品項', ST: '小計', CG: '找零', QTY: '數量', TIME: '時刻', TAX: '稅',
+  CALC: '計算', ERR: '錯誤', RF: '退貨', X: 'X 點檢', Z: 'Z 精算', CLERK: '店員', RCPT: '發票', RA: '入金', PO: '出金' }
 
 export const newRegister = (): RegState => ({
   mode: 'REG', entry: '', qty: 1, refund: false, lines: [], done: false, display: '0', receiptOn: true, clerk: 1, calc: null,
-  sales: 0, count: 0, float: 0, receiptNo: 1,
+  sales: 0, count: 0, float: 0, receiptNo: 1, drawerLocked: false, tag: '',
 })
 
 /** the figures as the displays show them: thousands commas, a minus in front */
@@ -92,22 +103,31 @@ export const taxIn = (amount: number) => Math.round((amount * TAX_RATE) / (1 + T
 const clock = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 const stamp = (d: Date) => `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${clock(d)}`
 
-const error = (s: RegState) => ({ state: { ...s, display: 'E' }, effect: { beep: 'error' } as RegEffect })
-const ok = (s: RegState, effect: RegEffect = {}) => ({ state: s, effect: { beep: 'ok', ...effect } as RegEffect })
+const error = (s: RegState) => ({ state: { ...s, display: 'E', tag: 'ERR' as RegTag }, effect: { beep: 'error' } as RegEffect })
+/** a key taken; if it would open the drawer and the drawer's locked, it stays shut (the rest of what the key does still happens) */
+const ok = (s: RegState, effect: RegEffect = {}) => {
+  const e: RegEffect = { beep: 'ok', ...effect }
+  if (e.drawer && s.drawerLocked) { e.drawer = false; e.locked = true }
+  return { state: s, effect: e }
+}
+
+/** turn the drawer's key: locked, nothing opens the drawer; unlocked, it opens as it should */
+export const turnDrawerKey = (s: RegState): RegState => ({ ...s, drawerLocked: !s.drawerLocked })
 
 /** turn the mode lock: OFF blanks the displays, X and Z show the day's takings, REG starts afresh */
 export function setMode(s: RegState, mode: RegMode): RegState {
   const base = { ...s, mode, entry: '', qty: 1, refund: false, calc: null }
-  if (mode === 'OFF') return { ...base, display: '' }
-  if (mode === 'X' || mode === 'Z') return { ...base, display: regFigure(s.sales) }
-  return { ...base, display: s.lines.length && !s.done ? regFigure(subtotalOf(s)) : '0' }
+  if (mode === 'OFF') return { ...base, display: '', tag: '' }
+  if (mode === 'X' || mode === 'Z') return { ...base, display: regFigure(s.sales), tag: mode }
+  const open = s.lines.length > 0 && !s.done
+  return { ...base, display: open ? regFigure(subtotalOf(s)) : '0', tag: open ? 'ST' : '' }
 }
 
 /** a sale settled (by a customer at the till, or rung up by hand): its receipt, and the takings counted */
 export function settle(s: RegState, lines: RegLine[], tender: number, kind: 'CASH' | 'CHECK' | 'CHARGE', now: Date) {
   const total = lines.reduce((a, l) => a + l.amount, 0)
   const receipt: Receipt = { kind, lines, total, tender, change: Math.max(0, tender - total), tax: taxIn(total), clerk: s.clerk, no: s.receiptNo, at: stamp(now) }
-  const state: RegState = { ...s, lines, entry: '', qty: 1, refund: false, done: true, display: regFigure(receipt.change), sales: s.sales + total,
+  const state: RegState = { ...s, lines, entry: '', qty: 1, refund: false, done: true, display: regFigure(receipt.change), tag: 'CG', sales: s.sales + total,
     count: s.count + 1, receiptNo: s.receiptNo + 1 }
   return { state, receipt }
 }
@@ -124,7 +144,7 @@ export function pressKey(s0: RegState, key: RegKey, now: Date = new Date()): { s
   if (s.mode === 'X' || s.mode === 'Z') {
     if (key === 'CASH') {
       const receipt: Receipt = { kind: s.mode, lines: [], total: s.sales, tender: 0, change: 0, tax: taxIn(s.sales), clerk: s.clerk, no: s.receiptNo, at: stamp(now) }
-      const next = s.mode === 'Z' ? { ...s, sales: 0, count: 0, float: 0, display: '0' } : { ...s }
+      const next: RegState = s.mode === 'Z' ? { ...s, sales: 0, count: 0, float: 0, display: '0', tag: 'Z' } : { ...s, tag: 'X' }
       return ok({ ...next, receiptNo: s.receiptNo + 1 }, { receipt })
     }
     if (key === 'FEED') return ok(s, { feed: true })
@@ -139,31 +159,31 @@ export function pressKey(s0: RegState, key: RegKey, now: Date = new Date()): { s
       if (key === 'DOT' && s.entry.includes('.')) return error(s)
       const entry = (s.entry === '' && key === 'DOT' ? '0' : s.entry) + (key === 'DOT' ? '.' : key)
       if (entry.replace('.', '').length > MAX_DIGITS) return error(s)
-      return ok({ ...s, entry, display: entry })
+      return ok({ ...s, entry, display: entry, tag: 'CALC' })
     }
     const ops: Partial<Record<RegKey, '+' | '-' | '*'>> = { PCTPLUS: '+', PCTMINUS: '-', XTIME: '*' }
     if (ops[key]) {
       const acc = entryNum === null ? c.acc : apply(c.acc, c.op, entryNum)
-      return ok({ ...s, entry: '', calc: { acc, op: ops[key]! }, display: regFigureCalc(acc) })
+      return ok({ ...s, entry: '', calc: { acc, op: ops[key]! }, display: regFigureCalc(acc), tag: 'CALC' })
     }
     if (key === 'SUBTOTAL' || key === 'CASH') {
       const acc = entryNum === null ? c.acc : apply(c.acc, c.op, entryNum)
-      return ok({ ...s, entry: '', calc: { acc, op: null }, display: regFigureCalc(acc) })
+      return ok({ ...s, entry: '', calc: { acc, op: null }, display: regFigureCalc(acc), tag: 'CALC' })
     }
-    if (key === 'CLEAR') return ok(s.entry ? { ...s, entry: '', display: regFigureCalc(c.acc) } : { ...s, calc: { acc: 0, op: null }, display: '0' })
-    if (key === 'CALC') return ok({ ...s, calc: null, entry: '', display: s.lines.length ? regFigure(subtotalOf(s)) : '0' })
+    if (key === 'CLEAR') return ok(s.entry ? { ...s, entry: '', display: regFigureCalc(c.acc), tag: 'CALC' } : { ...s, calc: { acc: 0, op: null }, display: '0', tag: 'CALC' })
+    if (key === 'CALC') return ok({ ...s, calc: null, entry: '', display: s.lines.length ? regFigure(subtotalOf(s)) : '0', tag: s.lines.length ? 'ST' : '' })
     return error(s)
   }
 
   if (digit) {
     const entry = (s.entry === '0' ? '' : s.entry) + key
     if (entry.length > MAX_DIGITS) return error(s)
-    return ok({ ...s, entry, display: regFigure(Number(entry)) })
+    return ok({ ...s, entry, display: regFigure(Number(entry)), tag: '' })
   }
   const ring = (label: string, price: number) => {
     const amount = price * s.qty * (s.refund ? -1 : 1)
     const lines = [...s.lines, { label: (s.refund ? '退 ' : '') + label, amount, qty: s.qty }]
-    return ok({ ...s, lines, entry: '', qty: 1, refund: false, display: regFigure(amount) })
+    return ok({ ...s, lines, entry: '', qty: 1, refund: false, display: regFigure(amount), tag: 'ITEM' })
   }
   const sub = subtotalOf(s)
   switch (key) {
@@ -171,7 +191,7 @@ export function pressKey(s0: RegState, key: RegKey, now: Date = new Date()): { s
       // (yen have no fractions)
       return error(s)
     case 'CLEAR':
-      return ok({ ...s, entry: '', qty: 1, refund: false, display: s.lines.length ? regFigure(sub) : '0' })
+      return ok({ ...s, entry: '', qty: 1, refund: false, display: s.lines.length ? regFigure(sub) : '0', tag: s.lines.length ? 'ST' : '' })
     case 'D1': case 'D2': case 'D3': case 'D4': {
       const d = DEPTS[Number(key[1]) - 1]
       return ring(d.name, entryNum ?? d.price)
@@ -182,30 +202,30 @@ export function pressKey(s0: RegState, key: RegKey, now: Date = new Date()): { s
       return ring(p.name, p.price)
     }
     case 'XTIME':
-      if (entryNum === null) return ok({ ...s, display: clock(now) })
+      if (entryNum === null) return ok({ ...s, display: clock(now), tag: 'TIME' })
       if (entryNum < 1) return error(s)
-      return ok({ ...s, qty: entryNum, entry: '', display: `${entryNum} X` })
+      return ok({ ...s, qty: entryNum, entry: '', display: `${entryNum} X`, tag: 'QTY' })
     case 'PCTMINUS': case 'PCTPLUS': {
       const last = s.lines[s.lines.length - 1]
       if (!last) return error(s)
       const pct = entryNum ?? 10
       const off = Math.round((last.amount * pct) / 100) * (key === 'PCTMINUS' ? -1 : 1)
       const lines = [...s.lines, { label: `${key === 'PCTMINUS' ? '−' : '+'}${pct}%`, amount: off, qty: 1 }]
-      return ok({ ...s, lines, entry: '', display: regFigure(off) })
+      return ok({ ...s, lines, entry: '', display: regFigure(off), tag: 'ITEM' })
     }
     case 'VOID': {
       if (!s.lines.length) return error(s)
       const lines = s.lines.slice(0, -1)
-      return ok({ ...s, lines, entry: '', display: regFigure(subtotalOf({ ...s, lines })) })
+      return ok({ ...s, lines, entry: '', display: regFigure(subtotalOf({ ...s, lines })), tag: 'ST' })
     }
     case 'RETURN':
-      return ok({ ...s, refund: true, display: 'rF' })
+      return ok({ ...s, refund: true, display: 'rF', tag: 'RF' })
     case 'CANCEL':
-      return ok({ ...s, lines: [], entry: '', qty: 1, refund: false, display: '0' })
+      return ok({ ...s, lines: [], entry: '', qty: 1, refund: false, display: '0', tag: '' })
     case 'SUBTOTAL':
-      return ok({ ...s, entry: '', display: regFigure(sub) })
+      return ok({ ...s, entry: '', display: regFigure(sub), tag: 'ST' })
     case 'TAX':
-      return ok({ ...s, entry: '', display: regFigure(taxIn(sub)) })
+      return ok({ ...s, entry: '', display: regFigure(taxIn(sub)), tag: 'TAX' })
     case 'CASH': case 'CHECK': case 'CHARGE': {
       if (!s.lines.length) return error(s)
       const tender = key === 'CASH' && entryNum !== null ? entryNum : sub
@@ -216,24 +236,24 @@ export function pressKey(s0: RegState, key: RegKey, now: Date = new Date()): { s
     case 'NOSALE': {
       if (s.lines.length) return error(s)
       const receipt: Receipt = { kind: 'NOSALE', lines: [], total: 0, tender: 0, change: 0, tax: 0, clerk: s.clerk, no: s.receiptNo, at: stamp(now) }
-      return ok({ ...s, entry: '', display: '0', receiptNo: s.receiptNo + 1 }, { drawer: true, receipt: s.receiptOn ? receipt : undefined })
+      return ok({ ...s, entry: '', display: '0', tag: '', receiptNo: s.receiptNo + 1 }, { drawer: true, receipt: s.receiptOn ? receipt : undefined })
     }
     case 'RA': case 'PO': {
       if (entryNum === null || s.lines.length) return error(s)
       const amount = key === 'RA' ? entryNum : -entryNum
       const receipt: Receipt = { kind: key, lines: [], total: amount, tender: 0, change: 0, tax: 0, clerk: s.clerk, no: s.receiptNo, at: stamp(now) }
-      return ok({ ...s, entry: '', float: s.float + amount, display: regFigure(amount), receiptNo: s.receiptNo + 1 },
+      return ok({ ...s, entry: '', float: s.float + amount, display: regFigure(amount), tag: key, receiptNo: s.receiptNo + 1 },
         { drawer: true, receipt: s.receiptOn ? receipt : undefined })
     }
     case 'CLERK':
       if (entryNum === null || entryNum < 1 || entryNum > 99) return error(s)
-      return ok({ ...s, clerk: entryNum, entry: '', display: `C-${String(entryNum).padStart(2, '0')}` })
+      return ok({ ...s, clerk: entryNum, entry: '', display: `C-${String(entryNum).padStart(2, '0')}`, tag: 'CLERK' })
     case 'RCPT':
-      return ok({ ...s, receiptOn: !s.receiptOn, display: s.receiptOn ? 'rc OFF' : 'rc on' })
+      return ok({ ...s, receiptOn: !s.receiptOn, display: s.receiptOn ? 'OFF' : 'ON', tag: 'RCPT' })
     case 'FEED':
       return ok(s, { feed: true })
     case 'CALC':
-      return ok({ ...s, entry: '', calc: { acc: 0, op: null }, display: '0' })
+      return ok({ ...s, entry: '', calc: { acc: 0, op: null }, display: '0', tag: 'CALC' })
   }
   return error(s)
 }
@@ -249,6 +269,7 @@ export function pressKeys(s: RegState, ks: RegKey[], now: Date = new Date()) {
     const r = pressKey(state, k, now)
     state = r.state
     if (r.effect.drawer) effect.drawer = true
+    if (r.effect.locked) effect.locked = true
     if (r.effect.receipt) effect.receipt = r.effect.receipt
     if (r.effect.feed) effect.feed = true
     if (r.effect.beep) effect.beep = r.effect.beep

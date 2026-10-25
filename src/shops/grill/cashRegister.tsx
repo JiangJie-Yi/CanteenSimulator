@@ -1,9 +1,11 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { useGLTF } from '@react-three/drei'
+import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { DEPTS, newRegister, pressKey, REG_MODES, regFigure, setMode, settle, type Receipt, type RegKey } from '@/game/register'
+import { DEPTS, newRegister, pressKey, REG_MODES, REG_TAG_TEXT, regFigure, setMode, settle, turnDrawerKey, type Receipt, type RegKey } from '@/game/register'
+import { keyHelp } from '@/data/registerKeys'
+import type { Lang } from '@/data/i18n'
 import { POINTER_HINT, TILL_STATE } from './bar'
 import { getEdit } from './edit'
 
@@ -13,7 +15,7 @@ import { getEdit } from './edit'
  */
 const REGISTER_URL = import.meta.env.BASE_URL + 'models/register.glb'
 /** the parts too small or too flat for an ink line: the lettering, the windows, the slots, and the keys */
-const REG_UNINKED = /^(Key(Cap|Face)_|Reg(Mode|Maker|PaperMark|DrawerLabelText|DisplayWindow|CustWindow|PaperSlot|MediaSlot|Keyway|CardSlot|Socket|CaseInside))/
+const REG_UNINKED = /^(Key(Cap|Face)_|Reg(DrawerKey|BillArm|BillHinge|BillRoller|RollLabel|Mode|Maker|PaperMark|DrawerLabelText|DisplayWindow|CustWindow|PaperSlot|MediaSlot|Keyway|CardSlot|Socket|CaseInside))/
 /** where the mode lock's key points for each mode (degrees, from straight away from the operator, toward their left) */
 const MODE_ANGLE: Record<string, number> = { OFF: -60, REG: -20, X: 20, Z: 60 }
 /** how far a key goes down when pressed (the register's own units) */
@@ -27,13 +29,27 @@ export const REGISTER = {
   printLen: 1,
   /** each key's last press (performance.now()) */
   pressed: new Map<string, number>(),
+  /** when the drawer last rattled against its lock (performance.now()) */
+  rattleAt: -1e9,
+  /** the help asked for by a part handled elsewhere (the drawer's key, on the drawer): its id and the part */
+  helpFor: null as { id: string; at: THREE.Object3D } | null,
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __register?: typeof REGISTER }).__register = REGISTER
 
 /** what the displays read: the customer's bill while one's paying, otherwise the register's own */
 export const registerText = () => (TILL_STATE.k >= 0 ? TILL_STATE.text : REGISTER.state.display)
+/** the word lit beside the figures (what they are), and the lock's mark when the drawer's locked */
+export const registerTag = () => {
+  const tag = TILL_STATE.k >= 0 ? (TILL_STATE.k < 0.32 ? '品項' : TILL_STATE.k < 0.44 ? '合計' : '找零') : REG_TAG_TEXT[REGISTER.state.tag]
+  return REGISTER.state.drawerLocked ? `${tag} 鎖`.trim() : tag
+}
+/** the drawer won't come: it knocks against the lock */
+export function rattle() {
+  REGISTER.rattleAt = performance.now()
+  beep('error')
+}
 
-let regModel: { body: THREE.Object3D; drawer: THREE.Object3D; keys: THREE.Object3D; modeKey: THREE.Object3D } | null = null
+let regModel: { body: THREE.Object3D; drawer: THREE.Object3D; keys: THREE.Object3D; modeKey: THREE.Object3D; drawerKey: THREE.Object3D; solid: THREE.Mesh[] } | null = null
 export function useRegisterModel() {
   const gltf = useGLTF(REGISTER_URL) as unknown as { scene: THREE.Group }
   if (regModel) return regModel
@@ -53,12 +69,32 @@ export function useRegisterModel() {
   })
   inkModel(root, (m) => REG_UNINKED.test(m.name), { width: 0.0022, weld: true })
   const get = (n: string) => root.getObjectByName(n)!
-  regModel = { body: get('RegBody'), drawer: get('RegDrawer'), keys: get('RegKeys'), modeKey: get('RegModeKey') }
+  // (the body's own surfaces, not their ink lines: what stands in front of the drawer, the keys and the keys' locks when seen from the side or behind)
+  const solid: THREE.Mesh[] = []
+  get('RegBody').traverse((o) => {
+    const m = o as THREE.Mesh
+    if (m.isMesh && (m.material as THREE.Material).side !== THREE.BackSide) solid.push(m)
+  })
+  regModel = { body: get('RegBody'), drawer: get('RegDrawer'), keys: get('RegKeys'), modeKey: get('RegModeKey'), drawerKey: get('RegDrawerKey'), solid }
   return regModel
 }
 /** the model once it's loaded (for handlers, outside of rendering), or null before */
 useRegisterModel.cached = () => regModel
 useGLTF.preload(REGISTER_URL)
+
+/**
+ * Is what the pointer's on hidden behind the register's body? (the pointer's events reach everything along its line, the case doesn't stop
+ * them: pointed at the case's side or back, the drawer inside it is hit too)
+ */
+const RAY = new THREE.Raycaster()
+export function behindBody(e: { ray: THREE.Ray; distance: number }) {
+  if (!regModel) return false
+  RAY.ray.copy(e.ray)
+  RAY.far = e.distance - 1e-4
+  return RAY.intersectObjects(regModel.solid, false).length > 0
+}
+/** the drawer's parts that can be taken hold of: its front and what's on it (not the tray inside, nor the money) */
+export const DRAWER_FRONT = /^Reg(DrawerFront|DrawerLip|MediaSlot|DrawerLabel|Lock|Keyway)/
 
 export function RegisterBody() {
   return <primitive object={useRegisterModel().body} />
@@ -191,6 +227,7 @@ export function press(key: RegKey, now = new Date()) {
   REGISTER.state = r.state
   if (r.effect.beep) beep(r.effect.beep)
   if (r.effect.drawer) TILL_STATE.manual = true
+  if (r.effect.locked) rattle()
   if (r.effect.receipt) {
     REGISTER.printLen = drawReceipt(r.effect.receipt)
     REGISTER.printAt = performance.now()
@@ -204,15 +241,16 @@ const keyOf = (o: THREE.Object3D | null) => {
   for (let x = o; x; x = x.parent) if (x.name.startsWith('Key_')) return x
   return null
 }
-type Ev = { stopPropagation: () => void; object: THREE.Object3D; nativeEvent: Event }
+type Ev = { stopPropagation: () => void; object: THREE.Object3D; nativeEvent: Event; ray: THREE.Ray; distance: number }
 
 /**
  * The keys and the mode lock: each key goes down under the finger and comes back up, beeps, and does what it does; the mode lock turns
  * OFF → REG → X → Z. While a customer's paying, the cashier's hands are on it: the keys go down as they ring the bill up, and the sale's
  * receipt is the one printed.
  */
-export function RegisterKeys() {
-  const { keys, modeKey } = useRegisterModel()
+export function RegisterKeys({ lang }: { lang: Lang }) {
+  const { keys, modeKey, drawerKey } = useRegisterModel()
+  const [help, setHelp] = useState<{ id: string; at: THREE.Object3D } | null>(null)
   const rest = useRef(new Map<THREE.Object3D, number>())
   const hovered = useRef<THREE.Object3D | null>(null)
   const lastK = useRef(-1)
@@ -240,7 +278,12 @@ export function RegisterKeys() {
         REGISTER.state = state
         if (state.receiptOn) { REGISTER.printLen = drawReceipt(receipt); REGISTER.printAt = -1 }
       }
-      if (pk < 0.44 && k >= 0.44) { REGISTER.pressed.set('CASH', now); beep('ok') }
+      if (pk < 0.44 && k >= 0.44) {
+        REGISTER.pressed.set('CASH', now)
+        beep('ok')
+        // (the cashier unlocks the drawer to take the money: the key's turned upright)
+        if (REGISTER.state.drawerLocked) REGISTER.state = turnDrawerKey(REGISTER.state)
+      }
     }
     lastK.current = k
     // the keys: down fast, held a moment, back up
@@ -250,12 +293,19 @@ export function RegisterKeys() {
       const d = t < 0.05 ? t / 0.05 : t < 0.13 ? 1 : Math.max(0, 1 - (t - 0.13) / 0.08)
       key.position.y = rest.current.get(key)! - d * KEY_TRAVEL
     })
-    // the mode lock's key, turned toward its mode
+    // the mode lock's key, turned toward its mode; the drawer's key, upright open, across locked
     const want = THREE.MathUtils.degToRad(-MODE_ANGLE[REGISTER.state.mode])
     knob.current += (want - knob.current) * Math.min(1, delta * 14)
     modeKey.rotation.y = knob.current
+    const lockWant = REGISTER.state.drawerLocked ? -Math.PI / 2 : 0
+    drawerKey.rotation.z += (lockWant - drawerKey.rotation.z) * Math.min(1, delta * 14)
+    // (help asked for by the drawer's key)
+    const ext = REGISTER.helpFor
+    if (ext && help?.id !== ext.id) setHelp(ext)
+    else if (!ext && help && help.id === 'DRAWER_KEY') setHelp(null)
   })
   const blocked = () => getEdit().on || TILL_STATE.k >= 0
+  const showHelp = (id: string | null, at: THREE.Object3D | null) => setHelp((h) => (id && at ? (h?.id === id ? h : { id, at }) : null))
   const point = (e: Ev, on: boolean) => {
     const el = e.nativeEvent.target as HTMLElement | null
     POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand + (on ? 1 : -1))
@@ -267,34 +317,78 @@ export function RegisterKeys() {
       <group
         onPointerMove={(e: Ev) => {
           e.stopPropagation()
-          const key = keyOf(e.object)
+          // (seen from the side or behind, the body's in front of them: nothing to point at)
+          const key = behindBody(e) || getEdit().on ? null : keyOf(e.object)
           if (key === hovered.current) return
           liftOn(hovered.current, false)
+          if (!!key !== !!hovered.current) point(e, !!key)
           hovered.current = key
-          liftOn(key, !getEdit().on)
+          liftOn(key, true)
+          showHelp(key?.name.slice(4) ?? null, key)
         }}
-        onPointerEnter={(e: Ev) => point(e, true)}
-        onPointerLeave={(e: Ev) => { liftOn(hovered.current, false); hovered.current = null; point(e, false) }}
+        onPointerLeave={(e: Ev) => {
+          if (hovered.current) point(e, false)
+          liftOn(hovered.current, false)
+          hovered.current = null
+          showHelp(null, null)
+        }}
         onClick={(e: Ev) => {
           e.stopPropagation()
           const key = keyOf(e.object)
-          if (!key || blocked()) return
+          if (!key || blocked() || behindBody(e)) return
           press(key.name.slice(4) as RegKey)
         }}>
         <primitive object={keys} />
       </group>
       <group
-        onPointerEnter={(e: Ev) => { liftOn(modeKey, true); point(e, true) }}
-        onPointerLeave={(e: Ev) => { liftOn(modeKey, false); point(e, false) }}
+        onPointerEnter={(e: Ev) => { if (behindBody(e)) return; liftOn(modeKey, true); point(e, true); showHelp('MODE', modeKey) }}
+        onPointerLeave={(e: Ev) => { if (!WAS_LIFTED(modeKey)) return; liftOn(modeKey, false); point(e, false); showHelp(null, null) }}
         onClick={(e: Ev) => {
           e.stopPropagation()
-          if (blocked()) return
+          if (blocked() || behindBody(e)) return
           const next = REG_MODES[(REG_MODES.indexOf(REGISTER.state.mode) + 1) % REG_MODES.length]
           REGISTER.state = setMode(REGISTER.state, next)
           beep('ok')
         }}>
         <primitive object={modeKey} />
       </group>
+      {/* what the key under the pointer does, over it */}
+      {help && <HelpLabel at={help.at} text={keyHelp(help.id, lang, /^D\d$/.test(help.id) ? DEPTS[Number(help.id[1]) - 1] : undefined)} />}
     </>
   )
+}
+
+/** whether a part's lit as pointed at just now */
+const WAS_LIFTED = (root: THREE.Object3D) => {
+  let lit = false
+  root.traverse((o) => { if ((o as THREE.Mesh).isMesh && WAS.has(o as THREE.Mesh)) lit = true })
+  return lit
+}
+
+/** a small dark label with what the key does, standing over it (following it in the world) */
+function HelpLabel({ at, text }: { at: THREE.Object3D; text: string }) {
+  const ref = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const g = ref.current
+    if (!g?.parent) return
+    at.getWorldPosition(g.position)
+    g.parent.worldToLocal(g.position)
+  })
+  if (!text) return null
+  return (
+    <group ref={ref}>
+      <Html center style={{ pointerEvents: 'none', transform: 'translateY(-34px)' }} zIndexRange={[40, 0]}>
+        <div style={{ background: 'rgba(24,20,16,0.88)', color: '#f6efe2', font: '600 12px/1.45 "Noto Sans TC", "Noto Sans JP", sans-serif', padding: '4px 9px',
+          borderRadius: 6, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>{text}</div>
+      </Html>
+    </group>
+  )
+}
+
+/** the drawer's key's parts (it rides on the drawer, whose handlers take it) */
+export const DRAWER_KEY = /^RegDrawerKey/
+/** turn the drawer's key a quarter: locked, or unlocked */
+export function turnKey() {
+  REGISTER.state = turnDrawerKey(REGISTER.state)
+  beep('ok')
 }

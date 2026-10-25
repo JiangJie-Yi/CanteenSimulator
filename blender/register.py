@@ -147,8 +147,8 @@ def cut(target, cutter):
     bpy.data.objects.remove(cutter)
 
 
-def text(name, body, size, mat, at, rot, align="CENTER"):
-    """flat printed lettering (a hair proud of the surface), lines split on '/'"""
+def text(name, body, size, mat, at, rot, align="CENTER", fit=None):
+    """flat printed lettering (a hair proud of the surface), lines split on '/'; squeezed sideways to `fit` wide if it's wider"""
     bpy.ops.object.text_add(location=at, rotation=rot)
     t = active()
     t.data.body = body.replace("/", "\n")
@@ -160,6 +160,9 @@ def text(name, body, size, mat, at, rot, align="CENTER"):
     t.data.space_line = 0.9
     bpy.ops.object.convert(target="MESH")
     t = active()
+    if fit and t.dimensions.x > fit:
+        t.scale.x = fit / t.dimensions.x
+        apply_scale(t)
     return finish(t, name, mat, smooth_shade=False)
 
 
@@ -296,13 +299,15 @@ for kid, col, row, cw, face, mat, ink in KEYS:
     g.location = P(x, PLATE_TOP, z)
     cap = keycap(f"KeyCap_{kid}", w, KD, M[mat], (0, 0, 0))
     top = 0.0091
+    # (as big as the cap's top takes: the long words squeezed a little to fit, never over its edge)
+    room = w * 0.86 * 0.86
     if face.startswith("#"):
-        # (its number small in the cap's lower right corner, as the operator sees it)
-        lab = text(f"KeyFace_{kid}", face[1:], 0.0058, M[ink], P(-0.0085, top, -0.0055), (0, 0, math.pi))
+        # (its number in the cap's lower right corner, as the operator sees it)
+        lab = text(f"KeyFace_{kid}", face[1:], 0.0085, M[ink], P(-0.0075, top, -0.0045), (0, 0, math.pi))
     else:
         digits = face in ("0", "00", ".") or face.isdigit()
-        size = 0.0108 if digits else 0.0068 if face == "PLU" else 0.0043 if "/" in face else 0.0050
-        lab = text(f"KeyFace_{kid}", face, size, M[ink], P(0, top, 0), (0, 0, math.pi))
+        size = 0.0135 if digits else 0.0095 if face == "PLU" else 0.0060 if "/" in face else 0.0074
+        lab = text(f"KeyFace_{kid}", face, size, M[ink], P(0, top, 0), (0, 0, math.pi), fit=room)
     for o in (cap, lab):
         o.parent = g
     key_parts += [g, cap, lab]
@@ -325,7 +330,7 @@ body_parts.append(cyl("RegModeBezel", 0.016, 0.004, MODE_AT + Vector((0, 0, 0.00
 body_parts.append(cyl("RegModeBarrel", 0.0105, 0.003, MODE_AT + Vector((0, 0, 0.0045)), M["chrome"], verts=28))
 for k, t in enumerate(["OFF", "REG", "X", "Z"]):
     a = math.radians(-60 + k * 40)
-    body_parts.append(text(f"RegMode{t}", t, 0.0046, M["ink"], tuple(MODE_AT + Vector(P(-math.sin(a) * 0.0235, 0.0002, math.cos(a) * 0.0235))), (0, 0, math.pi + a)))
+    body_parts.append(text(f"RegMode{t}", t, 0.006, M["ink"], tuple(MODE_AT + Vector(P(-math.sin(a) * 0.0235, 0.0002, math.cos(a) * 0.0235))), (0, 0, math.pi + a)))
 mode_key = bpy.data.objects.new("RegModeKey", None)
 bpy.context.collection.objects.link(mode_key)
 mode_key.location = MODE_AT + Vector((0, 0, 0.006))
@@ -376,11 +381,60 @@ drawer_parts.append(text("RegDrawerLabelText", "¥", 0.009, M["ink"], P(-0.11, 0
 drawer_parts.append(cyl("RegLock", 0.009, 0.006, P(0.11, 0.035, -0.184), M["chrome"], rot=(math.pi / 2, 0, 0), verts=28))
 drawer_parts.append(box("RegKeyway", S(0.0016, 0.009, 0.002), P(0.11, 0.035, -0.1872), M["dark"]))
 drawer_parts.append(box("RegLockRing", S(0.024, 0.024, 0.001), P(0.11, 0.035, -0.1822), M["steel"], bev=0.0008, rot=(0, 0, math.pi / 4)))
+# the drawer's key, left in its lock: its own node RegDrawerKey (turned a quarter by the game: upright open, across locked)
+dkey = bpy.data.objects.new("RegDrawerKey", None)
+bpy.context.collection.objects.link(dkey)
+dkey.location = P(0.11, 0.035, -0.187)
+dk = [cyl("RegDrawerKeyNeck", 0.0022, 0.008, P(0, 0, -0.004), M["chrome"], rot=(math.pi / 2, 0, 0), verts=12),
+      box("RegDrawerKeyBow", S(0.012, 0.018, 0.0025), P(0, 0.002, -0.009), M["steel"], bev=0.0012),
+      cyl("RegDrawerKeyHole", 0.0022, 0.003, P(0, 0.0075, -0.009), M["dark"], rot=(math.pi / 2, 0, 0), verts=12),
+      cyl("RegDrawerKeyRing", 0.006, 0.0012, P(0, 0.014, -0.0095), M["chrome"], rot=(math.pi / 2, 0, 0), verts=20)]
+for o in dk:
+    o.parent = dkey
+
 # the tray: a floor and walls, the front's back the fourth
 drawer_parts.append(box("RegTrayFloor", S(0.35, 0.007, 0.3), P(0, 0.0135, -0.01), M["tray"]))
 for sd in (-1, 1):
     drawer_parts.append(box(f"RegTraySide{sd}", S(0.007, 0.04, 0.3), P(sd * 0.1715, 0.03, -0.01), M["case"], bev=0.0015))
 drawer_parts.append(box("RegTrayBack", S(0.35, 0.04, 0.007), P(0, 0.03, 0.1385), M["case"], bev=0.0015))
+
+# the insert, as in a real Japanese till: one moulded black tray. At the back four long compartments for the notes (10000, 5000, the 2000
+# one that holds coin rolls instead, 1000), each with a sprung steel weight and roller lying on the notes; at the front six coin cups (500,
+# 100, 50, 10, 5, 1), their floors curving up to the front so coins can be slid out with a finger. The money itself is the game's.
+INS_Y = 0.017                      # the tray's floor
+INS_W, INS_Z0, INS_Z1 = 0.334, -0.152, 0.134
+BILL_Z0, COIN_Z1 = 0.004, -0.006   # where the note compartments begin, the coin cups end
+ins = box("RegInsert", S(INS_W, 0.022, INS_Z1 - INS_Z0), P(0, INS_Y + 0.011, (INS_Z0 + INS_Z1) / 2), M["tray"], bev=0.003)
+# (the note compartments: wide shallow wells, a low divider between each)
+for i in range(4):
+    cx = INS_W / 2 - (i + 0.5) * INS_W / 4
+    cut(ins, box("bc", S(INS_W / 4 - 0.006, 0.03, INS_Z1 - BILL_Z0 - 0.008), P(cx, INS_Y + 0.004 + 0.015, (BILL_Z0 + INS_Z1) / 2 - 0.002), M["tray"], bev=0.004))
+# (the coin cups: deep, round-cornered, their floors sweeping up to the front)
+for i in range(6):
+    cx = INS_W / 2 - (i + 0.5) * INS_W / 6
+    cutter = box("cc", S(INS_W / 6 - 0.008, 0.03, COIN_Z1 - INS_Z0 - 0.01), P(cx, INS_Y + 0.003 + 0.015, (INS_Z0 + COIN_Z1) / 2), M["tray"], bev=0.009, segs=5)
+    cutter.rotation_euler = (-0.12, 0, 0)
+    cut(ins, cutter)
+uv_box(ins)
+drawer_parts.append(ins)
+# the notes' weights: a steel arm hinged at the back wall, lying forward onto the notes, a grey roller at its end
+for i in range(4):
+    cx = INS_W / 2 - (i + 0.5) * INS_W / 4
+    hinge = Vector(P(cx, INS_Y + 0.024, INS_Z1 - 0.008))
+    roller = Vector(P(cx, INS_Y + 0.018, BILL_Z0 + 0.04))
+    mid = (hinge + roller) / 2
+    d = roller - hinge
+    arm = cyl(f"RegBillArm{i}", 0.0016, d.length, tuple(mid), M["steel"], verts=8)
+    arm.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
+    drawer_parts.append(arm)
+    drawer_parts.append(cyl(f"RegBillHinge{i}", 0.0028, 0.03, tuple(hinge), M["steel"], rot=(0, math.pi / 2, 0), verts=12))
+    drawer_parts.append(cyl(f"RegBillRoller{i}", 0.0042, 0.044, tuple(roller), M["rubber"] if "rubber" in M else M["dark"], rot=(0, math.pi / 2, 0), verts=16))
+# (in the 2000 compartment, as most shops do: rolls of coins in their bank paper)
+for k, (col, label) in enumerate((((0.86, 0.36, 0.3), "100"), ((0.72, 0.5, 0.32), "10"))):
+    cx = INS_W / 2 - 2.5 * INS_W / 4 + (k - 0.5) * 0.026
+    roll = cyl(f"RegCoinRoll{k}", 0.0085, 0.085, P(cx, INS_Y + 0.004 + 0.0085, 0.07), pbr(f"RegRollPaper{k}", col, rough=0.8), rot=(math.pi / 2, 0, 0), verts=16)
+    drawer_parts.append(roll)
+    drawer_parts.append(text(f"RegRollLabel{k}", label, 0.007, M["ink"], P(cx, INS_Y + 0.004 + 0.0172, 0.07), (0, 0, math.pi / 2)))
 
 # =====================================================================
 # Assemble: RegBody (fixed) and RegDrawer under the root
@@ -400,12 +454,14 @@ for o in drawer_parts:
     o.parent = drawer
 keys_root.parent = root
 mode_key.parent = root
-parts = [body, drawer, panel, keys_root, mode_key] + body_parts + panel_parts + key_parts + mk + drawer_parts
+dkey.parent = drawer
+parts = [body, drawer, panel, keys_root, mode_key, dkey] + body_parts + panel_parts + key_parts + mk + dk + drawer_parts
 
 if PREVIEW:
+    drawer.location.y += 0.2
     cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = (0.25, 0.75, 0.55)
+    cam.location = (0.2, 0.62, 0.42)
     cam.rotation_euler = (Vector((0, 0, 0.13)) - cam.location).to_track_quat("-Z", "Y").to_euler()
     cam.data.lens = 50
     bpy.context.scene.camera = cam
