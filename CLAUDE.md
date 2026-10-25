@@ -70,10 +70,13 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **群組**：清單裡 Ctrl／Shift 點選多件 → 「成組」；群組可一起位移、繞垂直軸轉、整體縮放（轉動中心是成員的中間）。「解散」「改名」「復原」都能用。沒有中心點的東西（閘門）不能成組。
 - 進編輯模式會自動收起選單，離開後還原；選單收放或進出編輯模式不會讓鏡頭重新歸位（只有換菜、重設視角、總覽、視窗大小改變才會）。
 
-## 研製料理與營業（`game/mode.ts`）
+## 廚房三種模式（`game/mode.ts`）
 
-- 店關著是**研製料理**：手動夾食物、調味、看每塊的烤魚進度（`roast-tag`）、食材冷藏櫃（`ui/Menu.tsx` 的 `bin`，每格可點一下拿一份試做、+1／+10 叫貨、補 = 補到 `PAR`），視角固定在**攝影機 1**。店開著是**營業**：廚房自己烤（自己的 AI 主廚永遠工作，雇的員工一起），沒有手動烤魚與調味、沒有進度標籤、也沒有食材冷藏櫃。規則都在 `game/mode.ts`（有 BDD 情境 `tests/bdd/mode.test.ts`）。
-- **攝影機 1**：預設是該道菜的 home 視角（`App.tsx` 的 home），可在編輯模式選「攝影機 1（研製視角）」調位置與旋轉（`scene/camera1.ts`；畫成攝影機加視錐，由 `CameraRig` 畫）；編輯模式本身視角是自由的，離開後回到攝影機 1。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
+- **自由**（閉店預設）：視角自由，菜單板是普通選單（鎖著）；沒有手動烤魚。**研製**：閉店時按右上角圓形綠色「研」鈕切入（再按離開），視角固定在**攝影機 1**，手動夾食物、調味、看每塊的烤魚進度（`roast-tag`）、食材冷藏櫃（`ui/Menu.tsx` 的 `bin`，在畫面右側，每格點一下拿一份試做、+1／+10 叫貨、補 = 補到 `PAR`）。**營業**（店開著）：廚房自己烤（AI 主廚永遠工作，雇的員工一起），沒有手動烤魚與調味、沒有進度標籤、沒有冷藏櫃；開店會自動離開研製。規則都在 `game/mode.ts`（`modeOf(shopOpen, research)`、`canCookByHand`、`showsProgress`、`showsStockFridge`、`holdsCameraOne`；BDD 情境 `tests/bdd/mode.test.ts`）。
+- 研製時：點冷藏櫃拿的食材**直接出現在大砧板（`tray`）上**（`Piece.fresh`，不從火堆滑過去）；烤好夾起的食物**一律放進桌上的試吃碗**（`bowl-0`、`TasteBowl`、`inBowl`，每圈 `BOWL_RING` 個）。
+- **攝影機 1**：預設是該道菜的 home 視角（`App.tsx` 的 home），可在編輯模式選「攝影機 1（研製視角）」調位置與旋轉（`scene/camera1.ts`；畫成攝影機加視錐，由 `CameraRig` 畫）；編輯模式本身視角是自由的，離開後回到原本的模式。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
+- **編輯模式只做編輯**：場景裡所有互動（夾食物、添炭、調味、澆水、收銀抽屜、廁所門、飲料櫃門、神棚、飯桶蓋、盤子拖曳）都擋掉（Roasting 的 `locked`、各元件的 `getEdit().on`、App 對 `.canvas-layer` 的 click 攔截）。
+- 桌上的**行燈、團扇**用 `<Movable>` 包起來；**大砧板（`cutboard`）、調味盒（`seasoning`）、水桶（`bucket`）**是由桌面的 nudge（`moved`）定位的，編輯模式用 `EditProxy`（不畫出來的同尺寸方塊）給框與箭頭，位移量會加進 nudge（食物、鍋具、水瓢跟著走）；這三件只有位移有效，旋轉與縮放沒有作用。
 - **HDRI**：`scene/IndoorHDRI.tsx` 有 `public/hdri/day.hdr`、`night.hdr`（polyhaven.com/hdris 的 1k .hdr）就用真的，沒有就用內建的假 HDRI。**BGM**：`ui/Bgm.tsx` 找 `src/IzakayaNight.mp3`（或 `public/audio/`）。
 
 ## 常見改動要碰哪裡

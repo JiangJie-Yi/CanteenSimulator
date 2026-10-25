@@ -636,9 +636,9 @@ export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [
   return (
     <>
       <Movable id="crate" label="備長炭籃" baseScale={1.75} baseTurn={[0, 44, 0]}><Crate /></Movable>
-      <Fan held={held} />
+      <Movable id="fan" label="團扇"><Fan held={held} /></Movable>
       <HeldStick held={held} />
-      <Lantern at={lanternAt} />
+      <Movable id="lantern" label="行燈"><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /></group>
     </>

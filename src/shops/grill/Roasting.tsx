@@ -28,7 +28,8 @@ import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { AxisGizmo, focusCamera } from './Movable'
 import { binchotanGeo, binchotanMap, burningMaps } from './Binchotan'
-import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit } from './edit'
+import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
+import { Movable } from './Movable'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
 import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
@@ -110,6 +111,8 @@ const BASKET_TOP: [number, number, number] = [2.0, 0, 0.4]
 /** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates) */
 const BOWL_TOP: [number, number, number] = [1.55, 0, -0.75]
 const BOWL_R = 0.3
+/** the table's pieces that edit mode moves by their nudge (the cutting board, the seasoning box, the water bucket): the edit id of each */
+const EDIT_PIECES: Record<string, string> = { tray: 'cutboard', box: 'seasoning', bin: 'bucket' }
 /** how many pieces the tasting bowl holds before the next goes on top (a ring of this many) */
 const BOWL_RING = 6
 /** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
@@ -1267,6 +1270,23 @@ function TissueBox() {
         </mesh>
       ))}
     </group>
+  )
+}
+
+/**
+ * What edit mode shows for a piece that is moved by the table's nudge rather than by wrapping it: a block of its size that is never drawn, standing
+ * where the piece is less the edit's own offset, in a Movable, so the box, the arrows and the fields work as for any other piece.
+ */
+function EditProxy({ id, label, at, size, yaw }: { id: string; label: string; at: THREE.Vector3; size: V3; yaw: number }) {
+  useEdit()
+  const o = positionOf(id)
+  return (
+    <Movable id={id} label={label}>
+      <mesh position={[at.x - o[0], at.y - o[1] + size[1] / 2, at.z - o[2]]} rotation-y={yaw} ref={(m) => { m?.layers.set(31) }}>
+        <boxGeometry args={size} />
+        <meshBasicMaterial />
+      </mesh>
+    </Movable>
   )
 }
 
@@ -3129,6 +3149,31 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const carrierOf = (name: string) =>
     (roast.toolBox ?? []).includes(name) ? 'box' : (roast.bucket ?? []).includes(name) ? 'bin' : null
   type Tool = (typeof tools)[number]
+  // (the cutting board, the seasoning box and the water bucket are moved in edit mode by the same nudge a hand moves them by: the change in what
+  // the edit says is added to it, and the box's pots and the bucket's dipper go along)
+  const { offsets: editOffsets } = useEdit()
+  const editSeen = useRef<Record<string, THREE.Vector3>>({})
+  useLayoutEffect(() => {
+    let any = false
+    for (const [key, id] of Object.entries(EDIT_PIECES)) {
+      const at = new THREE.Vector3(...positionOf(id))
+      const was = editSeen.current[key] ?? new THREE.Vector3()
+      const d = at.clone().sub(was)
+      if (d.lengthSq() < 1e-10) continue
+      editSeen.current[key] = at
+      const next = nudge(key).clone().add(d)
+      moved.current.set(key, next)
+      for (const b of carriers[key] ?? []) b.node.position.copy(b.home).add(next)
+      for (const t of tools) {
+        if (carrierOf(t.node.name) !== key) continue
+        t.home.copy(t.home0).add(next)
+        if (t.back >= 1) t.node.position.copy(t.home)
+      }
+      any = true
+    }
+    if (any) setMoveTick((t) => t + 1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editOffsets, carriers, tools])
   // the pots they stand in: pointing at or grabbing a pot means its utensil
   const pots = useMemo(() => Object.entries(roast.toolPots ?? {}).flatMap(([potName, toolName]) => {
     const pot = root.getObjectByName(potName)
@@ -4459,6 +4504,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </Html>
       )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
+      {/* (edit mode's boxes for what the nudge moves: an unseen block the size of each, in a group the edit moves; the pieces themselves follow by the nudge) */}
+      {roast.tray && <EditProxy id="cutboard" label="大砧板" at={containerAt('tray')} size={[TRAY_W, 0.12, TRAY_D]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
+      {carriers.box && <EditProxy id="seasoning" label="調味盒" at={containerAt('box')} size={[1.0, 0.3, 0.55]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
+      {carriers.bin && <EditProxy id="bucket" label="水桶" at={containerAt('bin')} size={[BIN_R * 2, 0.45, BIN_R * 2]} yaw={0} />}
       {/* (the table, the crew and the bar stay where they were drawn: the fire and all round it stand FIRE_SHIFT along from them, to the table's middle) */}
       <group position={[-FIRE_SHIFT.x, 0, -FIRE_SHIFT.z]}>
       <CookTable floor={!bar} />
