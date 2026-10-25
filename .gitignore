@@ -29,3 +29,6 @@ blender/live_state.json
 # Blender backups and Python caches
 *.blend1
 __pycache__/
+
+# Claude Code personal settings
+.claude/settings.local.json

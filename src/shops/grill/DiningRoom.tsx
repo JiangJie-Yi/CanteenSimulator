@@ -2615,125 +2615,56 @@ function StaffMat({ lang: _lang }: { lang: Lang }) {
     </group>
   )
 }
-/** the speaker's cabinet: width, height, depth, and how round its edges are */
-const SPK = { w: 0.3, h: 0.46, d: 0.22, r: 0.035 }
-/** a box with every edge rounded (an extruded rounded rectangle, bevelled front and back), centred */
-function roundedBox(w: number, h: number, d: number, r: number) {
-  const s = new THREE.Shape()
-  const x = w / 2 - r, y = h / 2 - r
-  s.moveTo(-x, -h / 2)
-  s.lineTo(x, -h / 2); s.quadraticCurveTo(w / 2, -h / 2, w / 2, -y)
-  s.lineTo(w / 2, y); s.quadraticCurveTo(w / 2, h / 2, x, h / 2)
-  s.lineTo(-x, h / 2); s.quadraticCurveTo(-w / 2, h / 2, -w / 2, y)
-  s.lineTo(-w / 2, -y); s.quadraticCurveTo(-w / 2, -h / 2, -x, -h / 2)
-  const b = Math.min(r * 0.6, d / 4)
-  const g = new THREE.ExtrudeGeometry(s, { depth: d - 2 * b, bevelEnabled: true, bevelSize: b, bevelThickness: b, bevelSegments: 3, curveSegments: 6 })
-  g.translate(0, 0, -(d - 2 * b) / 2)
-  g.computeVertexNormals()
-  return g
-}
-/** the speaker's metal grille: a black sheet punched with round holes in staggered rows (alpha: the holes see through) */
-const GRILLE_HOLES = canvasTex(64, 64, (g) => {
-  g.fillStyle = '#fff'
-  g.fillRect(0, 0, 64, 64)
-  g.fillStyle = '#000'
-  for (let row = 0; row < 4; row++) for (let col = 0; col < 5; col++) {
-    g.beginPath()
-    g.arc(col * 16 + (row % 2 ? 8 : 0), row * 16 + 8, 5.2, 0, Math.PI * 2)
-    g.fill()
-  }
-}, true)
-GRILLE_HOLES?.repeat.set(5, 7.5)
-/** the brushed-metal badge on the grille's foot */
-const SPK_BADGE = canvasTex(128, 32, (g) => {
-  const grad = g.createLinearGradient(0, 0, 0, 32)
-  grad.addColorStop(0, '#d9dbe0'); grad.addColorStop(0.5, '#9a9ea7'); grad.addColorStop(1, '#c9ccd3')
-  g.fillStyle = grad
-  g.fillRect(0, 0, 128, 32)
-  g.fillStyle = '#26282d'
-  g.font = 'bold 18px sans-serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillText('音 SOUND', 64, 17)
-})
 /**
- * The speaker (スピーカー) hung high in the room's corner, angled down toward the floor, as the ones over a shop's counter are: a black
- * cabinet with rounded edges, a perforated steel grille over a woofer and a horn tweeter, held in a U-shaped yoke whose arm runs back to a
- * plate screwed to the wall; its cable loops down out of the back. Click it (when not editing) to open the music panel: on or off, and the volume.
+ * The speaker (スピーカー) hung high in the room's corner, angled down toward the floor, as the ones over a shop's counter are: the model
+ * from blender/speaker.py (a black cabinet with rounded edges, a domed perforated grille over a woofer and a horn tweeter, a U-shaped yoke on
+ * an arm out from a wall plate, the cable looping down from the back). Click it (when not editing) to open the music panel: on or off, and
+ * the volume; its power light shows which.
  */
+const SPEAKER_URL = import.meta.env.BASE_URL + 'models/speaker.glb'
+/** the parts drawn with an ink line round them (the small ones, the grille and the light, without) */
+const SPEAKER_INKED = /^Speaker(Cabinet|Yoke|WallPlate|Arm|Joint|Knob)/
 function WallSpeaker() {
   const [lit, setLit] = useState(false)
   const { off, panel } = useBgm()
   const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; toggleBgmPanel() }
-  const geo = useMemo(() => ({
-    cabinet: roundedBox(SPK.w, SPK.h, SPK.d, SPK.r),
-    // (the grille's frame: a lip round the front, set into the cabinet's face)
-    rim: roundedBox(SPK.w - 0.022, SPK.h - 0.022, 0.012, SPK.r * 0.7),
-    // (the cable from the back terminal, looping down and back into the wall)
-    cable: new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, -0.08, -SPK.d / 2 - 0.01), new THREE.Vector3(0, -0.2, -0.17), new THREE.Vector3(0.02, -0.3, -0.24),
-      new THREE.Vector3(0.02, -0.26, -0.33), new THREE.Vector3(0.01, -0.16, -0.37),
-    ]), 24, 0.006, 6),
-  }), [])
-  const body = lit ? '#4a4e57' : '#33363d'
-  // a driver behind the grille: the frame, the rubber surround, the cone and its dust cap
-  const woofer = (r: number, y: number) => (
-    <group position={[0, y, SPK.d / 2 - 0.012]}>
-      <mesh><circleGeometry args={[r * 1.08, 32]} /><meshToonMaterial color="#141518" /></mesh>
-      <mesh position-z={0.002}><ringGeometry args={[r * 0.86, r, 32]} /><meshToonMaterial color="#55585f" /></mesh>
-      <mesh position-z={-0.004} rotation-x={-Math.PI / 2}><coneGeometry args={[r * 0.86, r * 0.35, 32, 1, true]} /><meshToonMaterial color="#3b3e45" side={THREE.DoubleSide} /></mesh>
-      <mesh position-z={-0.004} rotation-x={Math.PI / 2} scale-y={0.45}><sphereGeometry args={[r * 0.28, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshToonMaterial color="#6a6e77" /></mesh>
-    </group>
-  )
+  const gltf = useGLTF(SPEAKER_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    const toon = new Map<THREE.Material, THREE.MeshToonMaterial>()
+    let led: THREE.MeshBasicMaterial | null = null
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      if (src.name === 'SpeakerLED') {
+        led = new THREE.MeshBasicMaterial()
+        m.material = led
+        return
+      }
+      let t = toon.get(src)
+      if (!t) {
+        // (the grille's holes are cut by its alpha: tested, not blended, so what's behind shows sharp and sorts right)
+        const grille = src.name === 'SpeakerGrille'
+        t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, alphaTest: grille ? 0.5 : 0, side: grille ? THREE.DoubleSide : THREE.FrontSide })
+        t.name = src.name
+        toon.set(src, t)
+      }
+      m.material = t
+      m.castShadow = SPEAKER_INKED.test(m.name)
+    })
+    inkModel(root, (m) => !SPEAKER_INKED.test(m.name), { width: 0.004, weld: true })
+    return { root, led: led as THREE.MeshBasicMaterial | null, toon: [...toon.values()] }
+  }, [gltf])
+  useEffect(() => { model.led?.color.set(off ? '#d02a2a' : panel ? '#ffd24a' : '#3ddc6a') }, [model, off, panel])
+  // (pointed at, it lifts a little out of the dark, to say it can be clicked)
+  useEffect(() => { for (const t of model.toon) t.emissive.set(lit ? '#2a2a30' : '#000000') }, [model, lit])
   return (
-    <group onClick={press} onPointerOver={(e) => { e.stopPropagation(); setLit(true); document.body.style.cursor = 'pointer' }}
-      onPointerOut={() => { setLit(false); document.body.style.cursor = '' }}>
-      {/* the wall plate, screwed to the wall behind, and the arm out from it to the yoke */}
-      <group position={[0, 0.02, -0.38]}>
-        <mesh><boxGeometry args={[0.12, 0.16, 0.012]} /><meshToonMaterial color="#1d1f23" /></mesh>
-        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sy]) => (
-          <mesh key={`${sx}${sy}`} position={[sx * 0.042, sy * 0.06, 0.008]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.008, 0.008, 0.005, 10]} /><meshToonMaterial color="#8a8e96" /></mesh>
-        ))}
-      </group>
-      <mesh position={[0, 0.02, -0.29]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.016, 0.016, 0.18, 12]} /><meshToonMaterial color="#1d1f23" /></mesh>
-      <mesh position={[0, 0.02, -0.2]}><sphereGeometry args={[0.024, 12, 8]} /><meshToonMaterial color="#2a2c31" /></mesh>
-      {/* the yoke: a flat steel U round the cabinet's sides, its back bar on the arm */}
-      <mesh position={[0, 0.02, -0.185]}><boxGeometry args={[SPK.w + 0.05, 0.04, 0.012]} /><meshToonMaterial color="#1d1f23" /></mesh>
-      {[-1, 1].map((sx) => (
-        <group key={sx} position={[sx * (SPK.w / 2 + 0.019), 0.02, -0.1]}>
-          <mesh><boxGeometry args={[0.008, 0.04, 0.18]} /><meshToonMaterial color="#1d1f23" /></mesh>
-          {/* (the knob that clamps the tilt) */}
-          <mesh position={[sx * 0.014, 0, 0.08]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.02, 0.02, 0.018, 14]} /><meshToonMaterial color="#121316" /></mesh>
-        </group>
-      ))}
-      {/* the cabinet, tilted down in the yoke about the knobs */}
-      <group position={[0, 0.02, -0.02]} rotation-x={0.22}>
-        <group position={[0, -0.02, 0.02]}>
-          <mesh geometry={geo.cabinet} castShadow><meshToonMaterial color={body} /></mesh>
-          <mesh geometry={geo.cabinet} scale={[1.035, 1.025, 1.045]}><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
-          {/* the drivers, seen through the grille's holes: a woofer below, a horn tweeter above */}
-          {woofer(0.1, -0.07)}
-          <group position={[0, 0.14, SPK.d / 2 - 0.012]}>
-            <mesh><boxGeometry args={[0.15, 0.07, 0.004]} /><meshToonMaterial color="#141518" /></mesh>
-            <mesh position-z={-0.012} rotation-x={Math.PI / 2} scale={[1.8, 1, 0.8]}><cylinderGeometry args={[0.035, 0.008, 0.024, 4, 1, true, Math.PI / 4]} /><meshToonMaterial color="#26282d" side={THREE.DoubleSide} /></mesh>
-          </group>
-          {/* the grille: a lip round the front, and the punched steel sheet in it */}
-          <mesh geometry={geo.rim} position-z={SPK.d / 2 - 0.002}><meshToonMaterial color="#17181b" /></mesh>
-          <mesh position-z={SPK.d / 2 + 0.0045}>
-            <planeGeometry args={[SPK.w - 0.04, SPK.h - 0.04]} />
-            <meshToonMaterial color={lit ? '#4a4d55' : '#2e3036'} alphaMap={GRILLE_HOLES} alphaTest={0.5} side={THREE.DoubleSide} />
-          </mesh>
-          {/* the badge on the grille's foot, and the power light beside it */}
-          <mesh position={[-0.03, -SPK.h / 2 + 0.04, SPK.d / 2 + 0.006]}><planeGeometry args={[0.09, 0.022]} /><meshBasicMaterial map={SPK_BADGE} /></mesh>
-          <mesh position={[0.1, -SPK.h / 2 + 0.04, SPK.d / 2 + 0.007]}><circleGeometry args={[0.008, 12]} /><meshBasicMaterial color={off ? '#a02020' : panel ? '#ffd24a' : '#3ddc6a'} /></mesh>
-          {/* the terminal cup on the back */}
-          <mesh position={[0, -0.08, -SPK.d / 2 - 0.004]}><boxGeometry args={[0.07, 0.05, 0.01]} /><meshToonMaterial color="#121316" /></mesh>
-        </group>
-      </group>
-      <mesh geometry={geo.cable}><meshToonMaterial color="#0e0f11" /></mesh>
-    </group>
+    <primitive object={model.root} onClick={press} onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); setLit(true); document.body.style.cursor = 'pointer' }}
+      onPointerOut={() => { setLit(false); document.body.style.cursor = '' }} />
   )
 }
+useGLTF.preload(SPEAKER_URL)
 
 export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang?: Lang }) {
   const c0 = counters[0]
