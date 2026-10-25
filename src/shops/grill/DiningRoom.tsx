@@ -2747,10 +2747,10 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   // (the same corner, up under the ceiling, the speaker hung there and turned to face down the room's diagonal)
   const speaker = useMemo(() => {
     const along = Math.min(-c0.length / 2 - 0.35, ...counters.slice(1).map((o) => o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c0.at).dot(c0.along)))
-    const p = c0.at.clone().addScaledVector(c0.along, along + 0.3).addScaledVector(c0.lay, farOf(c0) + 0.3)
+    // (flat to the far wall and tucked right into the corner, so none of the banner strings (which hang no nearer than 0.3 from a wall) runs through it)
+    const p = c0.at.clone().addScaledVector(c0.along, along + 0.145).addScaledVector(c0.lay, farOf(c0) + 0.115)
     p.y += 1.55
-    const d = c0.along.clone().add(c0.lay)
-    return { p, yaw: Math.atan2(d.x, d.z) }
+    return { p, yaw: Math.atan2(c0.lay.x, c0.lay.z) }
   }, [c0, counters])
   const crateAt = useMemo(() => {
     if (!fr || !c1) return new THREE.Vector3()
