@@ -156,11 +156,16 @@ def text(name, body, size, mat, at, rot, align="CENTER"):
     t.data.align_x = align
     t.data.align_y = "CENTER"
     t.data.extrude = 0.00015
+    t.data.font = BOLD
     t.data.space_line = 0.9
     bpy.ops.object.convert(target="MESH")
     t = active()
     return finish(t, name, mat, smooth_shade=False)
 
+
+# (the lettering bold, as printed on real keys: Arial Bold, Blender's own font if it isn't there)
+BOLD_PATH = "C:/Windows/Fonts/arialbd.ttf"
+BOLD = bpy.data.fonts.load(BOLD_PATH) if os.path.exists(BOLD_PATH) else bpy.data.fonts.get("Bfont Regular")
 
 body_parts = []
 drawer_parts = []
@@ -253,45 +258,54 @@ def keycap(name, w, d, mat, at):
     return o
 
 
-# the keys as they were (every one kept), [col, row, cols wide, face, key material, ink]: col 0 at the operator's left, row 0 at the back;
-# the department keys (col 1) blank with their number in the corner
+# the keys as they were (every one kept), [id, col, row, cols wide, face, key material, ink]: col 0 at the operator's left, row 0 at the back;
+# the department keys (col 1) blank with their number in the corner. Each key is its own node, Key_<id> (the cap and its lettering), so the
+# game can press it; the ids are game/register.ts's keys.
 KEYS = [
-    (0, 1, 1, "RETURN", "k_blue", "ink"), (0, 2, 1, "VOID", "k_blue", "ink"), (0, 3, 1, "CANCEL", "k_blue", "ink"), (0, 4, 1, "TAX", "k_green", "inkw"),
-    *[(1, r, 1, f"#{r}", "k_grey", "ink") for r in range(1, 5)],
-    (2, 0, 1, "CLEAR", "k_blue", "ink"), (3, 0, 1, "PLU", "k_red", "inkw"), (4, 0, 1, "X/TIME", "k_blue", "ink"), (5, 0, 1, "RCPT/ON-OFF", "k_red", "inkw"),
-    *[(2 + n % 3, 1 + n // 3, 1, t, "k_num", "inkw") for n, t in enumerate(["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", "00", "."])],
-    (5, 1, 1, "CLERK−", "k_green", "inkw"), (5, 2, 1, "− %", "k_green", "inkw"), (5, 3, 1, "+ %", "k_green", "inkw"), (5, 4, 1, "FEED", "k_blue", "ink"),
-    (6, 0, 1, "NO SALE", "k_red", "inkw"), (7, 0, 1, "CALC", "k_green", "inkw"),
-    (6, 1, 1, "RA +", "k_yellow", "ink"), (7, 1, 1, "PO −", "k_yellow", "ink"),
-    (6, 2, 1, "CHECK", "k_blue", "ink"), (7, 2, 1, "CHARGE", "k_blue", "ink"),
-    (6, 3, 2, "SUBTOTAL", "k_white", "ink"), (6, 4, 2, "CASH/TEND =", "k_white", "ink"),
+    ("RETURN", 0, 1, 1, "RETURN", "k_blue", "ink"), ("VOID", 0, 2, 1, "VOID", "k_blue", "ink"), ("CANCEL", 0, 3, 1, "CANCEL", "k_blue", "ink"),
+    ("TAX", 0, 4, 1, "TAX", "k_green", "inkw"),
+    *[(f"D{r}", 1, r, 1, f"#{r}", "k_grey", "ink") for r in range(1, 5)],
+    ("CLEAR", 2, 0, 1, "CLEAR", "k_blue", "ink"), ("PLU", 3, 0, 1, "PLU", "k_red", "inkw"), ("XTIME", 4, 0, 1, "X/TIME", "k_blue", "ink"),
+    ("RCPT", 5, 0, 1, "RCPT/ON-OFF", "k_red", "inkw"),
+    *[(i, 2 + n % 3, 1 + n // 3, 1, t, "k_num", "inkw")
+      for n, (i, t) in enumerate([("7", "7"), ("8", "8"), ("9", "9"), ("4", "4"), ("5", "5"), ("6", "6"), ("1", "1"), ("2", "2"), ("3", "3"),
+                                  ("0", "0"), ("00", "00"), ("DOT", ".")])],
+    ("CLERK", 5, 1, 1, "CLERK−", "k_green", "inkw"), ("PCTMINUS", 5, 2, 1, "− %", "k_green", "inkw"), ("PCTPLUS", 5, 3, 1, "+ %", "k_green", "inkw"),
+    ("FEED", 5, 4, 1, "FEED", "k_blue", "ink"),
+    ("NOSALE", 6, 0, 1, "NO SALE", "k_red", "inkw"), ("CALC", 7, 0, 1, "CALC", "k_green", "inkw"),
+    ("RA", 6, 1, 1, "RA +", "k_yellow", "ink"), ("PO", 7, 1, 1, "PO −", "k_yellow", "ink"),
+    ("CHECK", 6, 2, 1, "CHECK", "k_blue", "ink"), ("CHARGE", 7, 2, 1, "CHARGE", "k_blue", "ink"),
+    ("SUBTOTAL", 6, 3, 2, "SUBTOTAL", "k_white", "ink"), ("CASH", 6, 4, 2, "CASH/TEND =", "k_white", "ink"),
 ]
 # (spaced out across the wider panel: smaller caps, wider gaps, all the small print one size)
 PX, PZ, KW, KD = 0.0395, 0.031, 0.031, 0.0235
 X0, Z0 = 0.138, 0.062
-for col, row, cw, face, mat, ink in KEYS:
+# the keys hang off a node of their own in the panel's frame (not batched with the body: they move)
+keys_root = bpy.data.objects.new("RegKeys", None)
+bpy.context.collection.objects.link(keys_root)
+keys_root.location = PANEL_AT
+keys_root.rotation_euler = (PANEL_TILT, 0, 0)
+key_parts = []
+for kid, col, row, cw, face, mat, ink in KEYS:
     x = X0 - (col + (cw - 1) / 2) * PX
     z = Z0 - row * PZ
     w = KW * cw + (cw - 1) * (PX - KW)
-    panel_parts.append(keycap(f"RegKey{col}{row}", w, KD, M[mat], P(x, PLATE_TOP, z)))
-    top = PLATE_TOP + 0.0091
+    g = bpy.data.objects.new(f"Key_{kid}", None)
+    bpy.context.collection.objects.link(g)
+    g.parent = keys_root
+    g.location = P(x, PLATE_TOP, z)
+    cap = keycap(f"KeyCap_{kid}", w, KD, M[mat], (0, 0, 0))
+    top = 0.0091
     if face.startswith("#"):
         # (its number small in the cap's lower right corner, as the operator sees it)
-        panel_parts.append(text(f"RegKeyFace{col}{row}", face[1:], 0.0052, M[ink], P(x - 0.0085, top, z - 0.0055), (0, 0, math.pi)))
-        continue
-    digits = face in ("0", "00", ".") or face.isdigit()
-    size = 0.0105 if digits else 0.0066 if face == "PLU" else 0.0043 if "/" in face else 0.0051
-    panel_parts.append(text(f"RegKeyFace{col}{row}", face, size, M[ink], P(x, top, z), (0, 0, math.pi)))
-# the mode dial in the panel's top left corner (over the first two columns), its positions round it
-dx, dz = X0 - 0.5 * PX, Z0
-panel_parts.append(cyl("RegDialBase", 0.016, 0.003, P(dx, PLATE_TOP + 0.0015, dz), M["steel"], verts=28))
-panel_parts.append(cyl("RegDialKnob", 0.011, 0.01, P(dx, PLATE_TOP + 0.008, dz), M["dial"], verts=24, r2=0.0095))
-panel_parts.append(box("RegDialPointer", S(0.003, 0.014, 0.011), P(dx, PLATE_TOP + 0.017, dz), M["dial"], bev=0.001, rot=(0, 0, 0.5)))
-panel_parts.append(box("RegDialMark", S(0.0012, 0.0004, 0.006), P(dx, PLATE_TOP + 0.0242, dz - 0.0025), M["inkw"], rot=(0, 0, 0.5)))
-for k, t in enumerate(["OFF", "REG", "X", "Z"]):
-    a = math.radians(-75 + k * 50)
-    # (round the dial's far side, reading for the operator)
-    panel_parts.append(text(f"RegMode{t}", t, 0.0045, M["ink"], P(dx - math.sin(a) * 0.023, PLATE_TOP + 0.0002, dz + math.cos(a) * 0.023), (0, 0, math.pi)))
+        lab = text(f"KeyFace_{kid}", face[1:], 0.0058, M[ink], P(-0.0085, top, -0.0055), (0, 0, math.pi))
+    else:
+        digits = face in ("0", "00", ".") or face.isdigit()
+        size = 0.0108 if digits else 0.0068 if face == "PLU" else 0.0043 if "/" in face else 0.0050
+        lab = text(f"KeyFace_{kid}", face, size, M[ink], P(0, top, 0), (0, 0, math.pi))
+    for o in (cap, lab):
+        o.parent = g
+    key_parts += [g, cap, lab]
 for o in panel_parts:
     o.parent = panel
 
@@ -304,10 +318,22 @@ bz = box("RegDisplayWindow", S(0.136, 0.044, 0.002), P(0, 0, 0), M["screen"], be
 bz.parent = disp
 bz.location = Vector(P(0, 0.002, -0.0068))
 body_parts.append(bz)
-ks = Vector(P(0.145, 0.2155, 0.03))
-body_parts.append(cyl("RegKeySwitch", 0.014, 0.006, ks + Vector((0, 0, 0.003)), M["steel"], verts=24))
-body_parts.append(cyl("RegKeyBarrel", 0.008, 0.005, ks + Vector((0, 0, 0.0085)), M["chrome"], verts=20))
-body_parts.append(box("RegKeyBow", S(0.004, 0.014, 0.014), tuple(ks + Vector((0, 0, 0.017))), M["dark"], bev=0.0015, rot=(0, 0, 0.6)))
+# the mode lock (one, on the deck to the operator's right, clear of the keys): a steel bezel, the positions printed round its far side, and
+# the key in it, its own node RegModeKey (turned by the game to the mode: its bow points at the position, at rest straight away)
+MODE_AT = Vector(P(-0.13, 0.215, 0.045))
+body_parts.append(cyl("RegModeBezel", 0.016, 0.004, MODE_AT + Vector((0, 0, 0.002)), M["steel"], verts=32))
+body_parts.append(cyl("RegModeBarrel", 0.0105, 0.003, MODE_AT + Vector((0, 0, 0.0045)), M["chrome"], verts=28))
+for k, t in enumerate(["OFF", "REG", "X", "Z"]):
+    a = math.radians(-60 + k * 40)
+    body_parts.append(text(f"RegMode{t}", t, 0.0046, M["ink"], tuple(MODE_AT + Vector(P(-math.sin(a) * 0.0235, 0.0002, math.cos(a) * 0.0235))), (0, 0, math.pi + a)))
+mode_key = bpy.data.objects.new("RegModeKey", None)
+bpy.context.collection.objects.link(mode_key)
+mode_key.location = MODE_AT + Vector((0, 0, 0.006))
+mk = [cyl("RegModeKeyNeck", 0.0035, 0.008, (0, 0, 0.004), M["chrome"], verts=12),
+      box("RegModeKeyBow", S(0.004, 0.016, 0.02), P(0, 0.016, 0.004), M["dark"], bev=0.0015),
+      box("RegModeKeyMark", S(0.0045, 0.012, 0.0015), P(0, 0.016, 0.0125), M["inkw"])]
+for o in mk:
+    o.parent = mode_key
 # the paper cover: a raised lid over the roll, the receipt coming up in front of it through a slot with a serrated tear bar
 body_parts.append(box("RegPaperCover", S(0.11, 0.012, 0.06), P(-0.035, 0.221, 0.112), M["body"], bev=0.005))
 body_parts.append(box("RegPaperSlot", S(0.07, 0.002, 0.006), P(-0.025, 0.2155, 0.076), M["dark"]))
@@ -372,7 +398,9 @@ for o in body_parts:
 panel.parent = body
 for o in drawer_parts:
     o.parent = drawer
-parts = [body, drawer, panel] + body_parts + panel_parts + drawer_parts
+keys_root.parent = root
+mode_key.parent = root
+parts = [body, drawer, panel, keys_root, mode_key] + body_parts + panel_parts + key_parts + mk + drawer_parts
 
 if PREVIEW:
     cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))

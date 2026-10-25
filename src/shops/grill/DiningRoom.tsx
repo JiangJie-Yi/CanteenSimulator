@@ -2660,8 +2660,11 @@ function WallSpeaker() {
   // (pointed at, it lifts a little out of the dark, to say it can be clicked)
   useEffect(() => { for (const t of model.toon) t.emissive.set(lit ? '#2a2a30' : '#000000') }, [model, lit])
   return (
-    <primitive object={model.root} onClick={press} onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); setLit(true); document.body.style.cursor = 'pointer' }}
-      onPointerOut={() => { setLit(false); document.body.style.cursor = '' }} />
+    <group onClick={press} onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); setLit(true); document.body.style.cursor = 'pointer' }}
+      onPointerOut={() => { setLit(false); document.body.style.cursor = '' }} >
+      {/* (the handlers on a group round it: a primitive's own aren't attached) */}
+      <primitive object={model.root} />
+    </group>
   )
 }
 useGLTF.preload(SPEAKER_URL)

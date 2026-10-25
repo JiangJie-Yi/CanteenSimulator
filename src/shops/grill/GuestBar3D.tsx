@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html, useGLTF } from '@react-three/drei'
+import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { FloorPiece } from '@/scene/FloorPiece'
@@ -21,12 +21,13 @@ import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
+import { liftOn, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
-import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, handOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, POINTER_HINT, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -720,6 +721,7 @@ const smooth = (e0: number, e1: number, x: number) => THREE.MathUtils.smoothstep
  */
 function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: number }) {
   const drawer = useRef<THREE.Group>(null)
+  const drawerHover = useRef(false)
   const cash = useRef<THREE.Group>(null)
   const tender = useRef<THREE.Group>(null)
   const change = useRef<THREE.Group>(null)
@@ -740,7 +742,8 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
     // (the drawer: out while a customer's paying, or when it's been clicked open, easing out and in)
     // (a spring: opening, the latch lets go and it shoots out, runs a little past where it stops and settles back; shutting, it's pushed home and
     // meets its stop with a small bounce)
-    const want = Math.max(TILL_STATE.drawer, TILL_STATE.manual ? 1 : 0)
+    // (pointed at while shut, it comes out a hair, as if a finger's on it)
+    const want = Math.max(TILL_STATE.drawer, TILL_STATE.manual ? 1 : 0, drawerHover.current ? 0.025 : 0)
     const dt2 = Math.min(delta, 0.03)
     const opening = want > open.current
     const stiff = opening ? 300 : 140, damp = opening ? 19 : 20
@@ -759,9 +762,15 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
     const k = TILL_STATE.k
     // (the receipt: printed out of its window while the customer pays, torn off and gone as they take their change)
     const sl = slip.current
-    if (sl) {
+    if (sl && k >= 0) {
       sl.visible = k >= 0.3 && k < 0.95
-      if (sl.visible) { sl.scale.y = Math.max(0.01, smooth(0.3, 0.52, k)); sl.position.y = 0.2185 + smooth(0.88, 0.95, k) * 0.05 }
+      if (sl.visible) { sl.scale.y = Math.max(0.01, smooth(0.3, 0.52, k) * REGISTER.printLen); sl.position.y = 0.2185 + smooth(0.88, 0.95, k) * 0.05 }
+    } else if (sl) {
+      // (a receipt printed by hand at the keys: fed out over a moment, left hanging till it's torn off, a click, or a while has passed)
+      const t = REGISTER.printAt < 0 ? -1 : (performance.now() - REGISTER.printAt) / 1000
+      if (t > 20) REGISTER.printAt = -1
+      sl.visible = t >= 0 && t <= 20
+      if (sl.visible) { sl.scale.y = Math.max(0.01, smooth(0, 0.3 + 0.4 * REGISTER.printLen, t) * REGISTER.printLen); sl.position.y = 0.2185 }
     }
     // (the note laid on the tray, then taken into its place in the drawer)
     const tg = tender.current
@@ -790,8 +799,9 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
         cg.position.y += Math.sin(Math.PI * t) * 0.06 + smooth(0.9, 0.95, k) * 0.12
       }
     }
-    if (shown.current === TILL_STATE.text) return
-    shown.current = TILL_STATE.text
+    const text = registerText()
+    if (shown.current === text) return
+    shown.current = text
     const g = (led.image as HTMLCanvasElement).getContext('2d')!
     g.fillStyle = '#07100a'
     g.fillRect(0, 0, 160, 40)
@@ -801,7 +811,7 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
     g.fillStyle = '#5cff7a'
     g.shadowColor = '#5cff7a'
     g.shadowBlur = 7
-    g.fillText(TILL_STATE.text, 152, 21)
+    g.fillText(text, 152, 21)
     led.needsUpdate = true
   })
   const coinList = pay.change.filter((v): v is CoinKind => !isNote(v))
@@ -829,7 +839,21 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
           const from = e.camera.position.clone().sub(g.getWorldPosition(new THREE.Vector3()))
           if (from.dot(front) < -0.15 * from.length()) return
           TILL_STATE.manual = !TILL_STATE.manual
-        }} {...handOver}>
+        }} onPointerOver={(e) => {
+          e.stopPropagation()
+          if (drawerHover.current) return
+          drawerHover.current = true
+          liftOn(useRegisterModel.cached()?.drawer ?? null, !getEdit().on)
+          POINTER_HINT.hand++
+          const el = e.nativeEvent.target as HTMLElement | null
+          if (el?.style) el.style.cursor = 'pointer'
+        }} onPointerOut={(e) => {
+          drawerHover.current = false
+          liftOn(useRegisterModel.cached()?.drawer ?? null, false)
+          POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand - 1)
+          const el = e.nativeEvent.target as HTMLElement | null
+          if (el?.style && !POINTER_HINT.hand) el.style.cursor = ''
+        }}>
           {/* (an unseen, roomier box over the front panel, so it's easy to hit) */}
           <mesh position={[0, 0.04, -0.19]}><boxGeometry args={[0.44, 0.12, 0.07]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} /></mesh>
           {/* (its front and its tray, from the model) */}
@@ -871,8 +895,12 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
             ))}
           </group>
         </group>
-        <mesh ref={slip} geometry={slipGeo} visible={false} position={[-0.025, 0.2185, 0.076]} rotation={[0.2, Math.PI, 0]}>
-          <meshBasicMaterial map={REG_RECEIPT} toneMapped={false} side={THREE.DoubleSide} />
+        {/* the keys and the mode lock */}
+        <RegisterKeys />
+        {/* the receipt (clicked, it's torn off) */}
+        <mesh ref={slip} geometry={slipGeo} visible={false} position={[-0.025, 0.2185, 0.076]} rotation={[0.2, Math.PI, 0]}
+          onClick={(e) => { e.stopPropagation(); if (!getEdit().on && TILL_STATE.k < 0) REGISTER.printAt = -1 }}>
+          <meshBasicMaterial map={RECEIPT_TEX} toneMapped={false} side={THREE.DoubleSide} />
         </mesh>
         {/* the operator's display, in the housing's own pose: upright, facing straight out of the front */}
         <group position={[0.085, 0.252, 0.05]} rotation={[-0.14, 0, 0]}>
@@ -920,67 +948,6 @@ const TILL_TOP_GEO = (() => {
   return g
 })()
 /** a key of the register's keyboard */
-/** the receipt: CASH RECEIPT, the shop's lines, a list of items with prices, tax and total */
-const REG_RECEIPT = signTexture(170, 200, (g) => {
-  g.fillStyle = '#fbfaf6'
-  g.fillRect(0, 0, 170, 200)
-  g.fillStyle = '#2a2a2a'
-  g.textAlign = 'center'
-  g.font = 'bold 15px "Courier New", monospace'
-  g.fillText('CASH RECEIPT', 85, 20)
-  g.font = '9px "Courier New", monospace'
-  g.fillText('Shop Name', 85, 34)
-  g.fillText('Address line', 85, 45)
-  g.textAlign = 'left'
-  g.fillText('Description', 12, 64)
-  g.textAlign = 'right'
-  g.fillText('Price', 158, 64)
-  const rows = [['Lorem ipsum', '12.50'], ['Dolor sit amet', '8.00'], ['Consectetur', '21.75'], ['Adipiscing elit', '15.40'], ['Sed do eiusmod', '25.37']]
-  rows.forEach(([d, pr], k) => {
-    g.textAlign = 'left'; g.fillText(d, 12, 80 + k * 13)
-    g.textAlign = 'right'; g.fillText(pr, 158, 80 + k * 13)
-  })
-  g.fillRect(12, 150, 146, 1)
-  g.textAlign = 'left'; g.fillText('Tax', 12, 165); g.textAlign = 'right'; g.fillText('$17.43', 158, 165)
-  g.font = 'bold 11px "Courier New", monospace'
-  g.textAlign = 'left'; g.fillText('Total', 12, 184); g.textAlign = 'right'; g.fillText('$100.45', 158, 184)
-})
-/**
- * The register from blender/register.py, in its own units (those of the group it goes in, before the till's 1.4): RegBody, everything fixed,
- * and RegDrawer, its drawer, which RegisterLive slides out. Their materials made toon, and the ink line drawn round the bigger parts.
- */
-const REGISTER_URL = import.meta.env.BASE_URL + 'models/register.glb'
-/** the parts too small or too flat for an ink line: the lettering, the windows, the slots */
-const REG_UNINKED = /^Reg(KeyFace|Mode|Maker|PaperMark|DrawerLabelText|DisplayWindow|CustWindow|PaperSlot|MediaSlot|Keyway|CardSlot|Socket|CaseInside)/
-let regModel: { body: THREE.Object3D; drawer: THREE.Object3D } | null = null
-function useRegisterModel() {
-  const gltf = useGLTF(REGISTER_URL) as unknown as { scene: THREE.Group }
-  if (regModel) return regModel
-  const root = gltf.scene.clone(true)
-  const toon = new Map<THREE.Material, THREE.Material>()
-  root.traverse((o) => {
-    const m = o as THREE.Mesh
-    if (!m.isMesh) return
-    const src = m.material as THREE.MeshStandardMaterial
-    let t = toon.get(src)
-    if (!t) {
-      t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
-      toon.set(src, t)
-    }
-    m.material = t
-    m.castShadow = !REG_UNINKED.test(m.name)
-  })
-  inkModel(root, (m) => REG_UNINKED.test(m.name) || /^RegKey\d/.test(m.name), { width: 0.0022, weld: true })
-  regModel = { body: root.getObjectByName('RegBody')!, drawer: root.getObjectByName('RegDrawer')! }
-  return regModel
-}
-useGLTF.preload(REGISTER_URL)
-function RegisterBody() {
-  return <primitive object={useRegisterModel().body} />
-}
-function RegisterDrawer() {
-  return <primitive object={useRegisterModel().drawer} />
-}
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
   key: new THREE.CylinderGeometry(0.004, 0.004, 0.016, 6),
@@ -1718,8 +1685,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       TILL_STATE.k = k
       TILL_STATE.tender = given
       TILL_STATE.change = Math.max(0, given - bill)
+      TILL_STATE.parts = parts
+      TILL_STATE.items = n
     } else {
-      TILL_STATE.text = '0'
       TILL_STATE.drawer = 0
       TILL_STATE.k = -1
       TILL_STATE.tender = 0

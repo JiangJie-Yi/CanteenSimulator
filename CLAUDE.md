@@ -92,6 +92,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 模型由 `blender/*.py`（Blender 5.2）產生，輸出到 `public/models/*.glb`；手機版用 `blender/make_lite.py` 產生 `*-lite.glb`。兩個版本都要更新。
 - 執行：`"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup --python blender/grilledfish.py -- <專案路徑>`
 - 喇叭（`blender/speaker.py` → `speaker.glb`）與收銀機（`blender/register.py` → `register.glb`，節點 `RegBody` 固定、`RegDrawer` 由遊戲滑出；顯示幕數字、發票、抽屜裡的錢仍由程式畫）也是 Blender 產生；兩者只在 3D 吧台出現，沒有 lite 版。描邊用 `inkModel(root, skip, { width, weld: true })`（細線、平滑法線，硬邊模型不會裂開）。
+- 收銀機可以操作（`shops/grill/cashRegister.tsx`）：按鍵（模型節點 `Key_<鍵名>`）與模式鎖（`RegModeKey`，OFF→REG→X→Z）照 `game/register.ts` 的純邏輯運作（BDD：`tests/bdd/register.test.ts`），印出的發票是 `drawReceipt` 畫的；客人結帳時收銀員自動按鍵並記入營業額。dev 時 `__register` 看狀態。r3f 的 `<primitive>` 上的事件不會生效，互動要包一層 `<group>`。
 - 客人（十五種 Q 版角色、每種有幾種髮型隨機搭配、共用一副骨架，動作 Sit／Eat／Walk；出現比例是 `data/guests.ts` 的 `weight`）由 `blender/guests.py` 產生 `public/models/guests.glb`，`scene/Person3D.tsx` 載入後依客人換膚色、髮色、衣服顏色與花紋。手機不跑 3D 吧台，所以沒有 lite 版。
 
 ## 烤魚店的 3D 店面（`src/shops/grill/`）

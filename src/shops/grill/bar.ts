@@ -372,6 +372,8 @@ export const TILL = { along: 0.75, W: 1.2, D: 0.82, rise: 0.22,
 export const TILL_STATE = { text: '0', drawer: 0,
   /** how far on the customer's payment has got (0..1; -1 when no one's paying), the note they hand over and the change they're due */
   k: -1, tender: 0, change: 0,
+  /** what's rung up for the customer paying: each dish, then the drink if any; and how many of those are dishes */
+  parts: [] as number[], items: 0,
   /** the drawer pulled out by hand (clicked), apart from the customers' payments */
   manual: false }
 /** what a customer's bill comes to: the dishes they ordered and the drink from the fridge, if they took one */
