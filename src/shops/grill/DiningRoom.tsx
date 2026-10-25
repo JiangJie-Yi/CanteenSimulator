@@ -8,12 +8,12 @@ import { inkModel } from '@/scene/inkHull'
 import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
-import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, POINTER_HINT, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
+import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { Steam } from '@/scene/Steam'
 import { setTip } from '@/scene/hoverTip'
-import { toggleBgmPanel, useBgm } from '@/ui/bgmStore'
+import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 
 /**
  * The customers' side of the room, behind the aisle: a wall of cream plaster over a dark wooden wainscot, a frieze of
@@ -2659,11 +2659,12 @@ function MusicNotes({ playing }: { playing: boolean }) {
 
 /**
  * The speaker (スピーカー) hung high in the room's corner, angled down toward the floor: a dark wooden cabinet with a woofer and a tweeter behind
- * a cloth grille, on a bracket. Click it (when not editing) to open the music panel: on or off, and the volume.
+ * a cloth grille, on a bracket. Click it (when not editing) to switch the music on, and again to switch it off; it begins off.
  */
 function WallSpeaker() {
-  const { off, panel } = useBgm()
-  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; toggleBgmPanel() }
+  const off = useBgmOff()
+  const tag = () => setTip({ title: '音箱', hint: getBgmOff() ? '點一下開啟音樂' : '點一下關閉音樂' })
+  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setBgmOff(!getBgmOff()); tag() }
   const cone = (r: number, y: number, key: string) => (
     <group key={key} position={[0, y, 0.124]}>
       <mesh rotation-x={Math.PI / 2}><torusGeometry args={[r, r * 0.12, 6, 28]} /><meshToonMaterial color="#25272b" /></mesh>
@@ -2673,7 +2674,8 @@ function WallSpeaker() {
     </group>
   )
   return (
-    <group name="look-speaker" onClick={press} {...tipOver('喇叭', '點一下開音樂、調音量')} rotation-x={0.22}>
+    <group name="look-speaker" onClick={press} rotation-x={0.22}
+      onPointerOver={(e) => { handOver.onPointerOver(e); tag() }} onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
       <MusicNotes playing={!off} />
       {/* the bracket: an arm back to the corner */}
       <mesh position={[0, 0.2, -0.12]}><boxGeometry args={[0.05, 0.05, 0.3]} /><meshToonMaterial color="#2a2d31" /></mesh>
@@ -2683,7 +2685,7 @@ function WallSpeaker() {
       {/* the grille: a cloth front with the two drivers behind it */}
       <mesh position-z={0.1215}><planeGeometry args={[0.26, 0.42]} /><meshToonMaterial color="#b9ad90" /></mesh>
       {cone(0.095, -0.07, 'w')}{cone(0.04, 0.15, 't')}
-      <mesh position={[0.1, -0.2, 0.123]}><circleGeometry args={[0.009, 8]} /><meshBasicMaterial color={off ? '#a02020' : panel ? '#ffd24a' : '#3ddc6a'} /></mesh>
+      <mesh position={[0.1, -0.2, 0.123]}><circleGeometry args={[0.009, 8]} /><meshBasicMaterial color={off ? '#a02020' : '#3ddc6a'} /></mesh>
     </group>
   )
 }

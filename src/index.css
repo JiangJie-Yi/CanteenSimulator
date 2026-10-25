@@ -3165,34 +3165,6 @@ button {
   color: #ffe58a;
   text-shadow: 0 0 0.06em #fff6c0, 0 0 0.22em rgb(255 200 80 / 0.95), 0 0 0.55em rgb(255 120 40 / 0.6);
 }
-/* background music switch, beside the others */
-.bgm-toggle {
-  position: fixed;
-  z-index: 10;
-  top: 20px;
-  right: 228px;
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border: 1.5px solid var(--text-soft);
-  border-radius: 50%;
-  background: var(--page);
-  color: var(--text);
-  font: 700 18px/1 var(--brush);
-  cursor: pointer;
-}
-
-.bgm-toggle svg {
-  width: 20px;
-  height: 20px;
-  opacity: 0.6;
-}
-
-.bgm-toggle.is-on {
-  color: #3d8a3a;
-}
-
 .tools-toggle {
   display: none;
 }
@@ -6142,35 +6114,8 @@ button {
   pointer-events: none;
 }
 
-/* the music switch, left of the edit button */
-.bgm-toggle {
-  position: fixed;
-  z-index: 10;
-  top: 20px;
-  right: 332px;
-  width: 44px;
-  height: 44px;
-  border: 1.5px solid var(--text-soft);
-  border-radius: 50%;
-  background: var(--page);
-  color: var(--text-soft);
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.bgm-toggle.is-on {
-  color: var(--text);
-  border-color: var(--text);
-}
-
 @media (max-width: 900px) {
-  .bgm-toggle {
-    top: 14px;
-    right: 306px;
-    width: 40px;
-    height: 40px;
   }
-}
 
 /* ---- the stock chiller: the shop's closed, and the board of foods is the kitchen's chiller (a steel cabinet, a row of glass-fronted bins), where a food
    is taken out to try, and more is called in or topped up ---- */
@@ -6416,44 +6361,6 @@ button {
 }
 
 
-/* the music panel: on / off and the volume, opened from the music button or the speaker on the wall */
-.bgm-panel {
-  position: fixed;
-  z-index: 11;
-  top: 72px;
-  right: 120px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border: 1.5px solid var(--text-soft);
-  border-radius: 12px;
-  background: var(--page);
-  color: var(--text);
-  font: 600 14px/1 var(--brush);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 0.3);
-}
-
-.bgm-panel input[type='range'] {
-  width: 120px;
-}
-
-.bgm-power,
-.bgm-close {
-  border: 1.5px solid var(--text-soft);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  padding: 4px 10px;
-  cursor: pointer;
-  font: inherit;
-}
-
-.bgm-power.is-on {
-  color: #3d8a3a;
-  border-color: #3d8a3a;
-}
-
 /* the world axes at the bottom left while editing */
 .axis-widget {
   position: fixed;
@@ -6580,10 +6487,7 @@ button {
 
 /* the music button is the speaker on the wall now: it only shows while the speaker is out of the picture (or on a narrow screen) */
 @media (min-width: 901px) {
-  .bgm-toggle.is-seen {
-    display: none;
   }
-}
 
 /* ---- wood grain: the one finish for every panel (dark wood on the title bars and frames, a faint grain on the pale panels), and the same ink and moss throughout ---- */
 :root {
@@ -6738,34 +6642,3 @@ button {
   background: var(--hanko);
 }
 
-/* the notes floating up from the music button */
-.bgm-notes {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 44px;
-  height: 44px;
-  pointer-events: none;
-}
-
-.bgm-notes i {
-  position: absolute;
-  bottom: 30px;
-  font: 700 20px/1 var(--brush);
-  font-style: normal;
-  color: #3d8a3a;
-  text-shadow: 0 0 3px rgb(255 255 255 / 0.9), 0 1px 2px rgb(0 0 0 / 0.35);
-  opacity: 0;
-  animation: bgm-note 3.4s ease-out infinite;
-}
-
-@keyframes bgm-note {
-  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
-  15% { opacity: 1; }
-  100% { transform: translate(calc(var(--sway, 14px)), 70px) scale(1.1) rotate(14deg); opacity: 0; }
-}
-
-.bgm-notes i:nth-child(even) {
-  --sway: -16px;
-  color: #c98a1e;
-}
