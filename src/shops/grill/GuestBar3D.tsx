@@ -26,7 +26,7 @@ import { getEdit, setLocked } from './edit'
 import { changeOf, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
-import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, handOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { tipOver, PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -884,7 +884,7 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
           const from = e.camera.position.clone().sub(g.getWorldPosition(new THREE.Vector3()))
           if (from.dot(front) < -0.15 * from.length()) return
           TILL_STATE.manual = !TILL_STATE.manual
-        }} {...handOver}>
+        }} {...tipOver('收銀機', '點一下開關抽屜')}>
           {/* (an unseen, roomier box over the front panel, so it's easy to hit) */}
           <mesh position={[0, 0.04, -0.19]}><boxGeometry args={[0.44, 0.12, 0.07]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} /></mesh>
           <Part geo={REG_GEO.body} color="#d9d3c6" outline={1.03} position={[0, 0.04, -0.176]} scale={[0.384, 0.068, 0.018]} />

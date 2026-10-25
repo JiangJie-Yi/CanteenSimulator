@@ -6734,3 +6734,19 @@ button {
 .ofc-slot {
   background: rgb(255 255 255 / 0.3);
 }
+
+/* the tag that follows the pointer over a usable thing in the room */
+.hover-tip {
+  position: fixed;
+  z-index: 40;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.hover-tip .tool-tag {
+  position: relative;
+  left: 16px;
+  top: -52px;
+}

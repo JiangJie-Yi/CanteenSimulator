@@ -11,6 +11,7 @@ import { Steam } from '@/scene/Steam'
 import { glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { ALONG, GRILL_OFFSET, KITCHEN_DROP, LAY } from './bar'
+import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { PlateRack } from './PlateRack'
 import { getEdit } from './edit'
@@ -563,8 +564,8 @@ function RiceTub() {
       ))}
       <group position-y={SIDE_TOP} scale={RICE_SCALE}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v) }}
-        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; glowOnly(e.eventObject) }}
-        onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null) }}>
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; glowOnly(e.eventObject); setTip({ title: '飯桶', hint: open ? '點一下蓋上蓋子' : '點一下掀開蓋子' }) }}
+        onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null); setTip(null) }}>
         {/* the tub: pale staves, an ear at each side to lift it by, a band of woven cane round the lower body, and its lid (a bar across
             the top) */}
         <Inked geometry={g.tub} color="#ffffff" map={STAVES} position={[0, 0.21, 0]} grow={1.03} />

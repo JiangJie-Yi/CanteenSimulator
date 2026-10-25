@@ -8,11 +8,12 @@ import { inkModel } from '@/scene/inkHull'
 import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
-import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, handOver, type Counter, type DrinkId } from './bar'
+import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, POINTER_HINT, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { LuckyCat } from './LuckyCat'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { Steam } from '@/scene/Steam'
+import { setTip } from '@/scene/hoverTip'
 import { toggleBgmPanel, useBgm } from '@/ui/bgmStore'
 
 /**
@@ -1068,7 +1069,7 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
   })
   return (
     <group ref={g} onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; TOILETS[who].open = !TOILETS[who].open }}
-      {...handOver}>
+      {...tipOver('廁所門', '點一下開關')}>
       <group position={[-0.03, H / 2, 0]}>
         <mesh position-y={0.2} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[W - 0.02, H - 0.44]} />
@@ -1085,6 +1086,37 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
         </mesh>
       </group>
     </group>
+  )
+}
+/**
+ * The whole doorway, noren and plaque too, as one easy thing to point at: an unseen plane just in front of it (clicking it works the door, pointing
+ * lights up the sliding panel and names it). Not merged, so it can be pointed at.
+ */
+function ToiletHit({ who }: { who: 'm' | 'f' }) {
+  const W = WC_W, H = WC_H
+  return (
+      <mesh position={[-0.16, (H + 0.3) / 2, 0]} rotation-y={-Math.PI / 2}
+        onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; TOILETS[who].open = !TOILETS[who].open }}
+        onPointerOver={(ev) => {
+          ev.stopPropagation()
+          // (the sliding panel lights up, not the plane)
+          let top: THREE.Object3D | null = ev.eventObject
+          while (top && !top.getObjectByName(`look-wc-${who}`)) top = top.parent
+          glowOnly(top?.getObjectByName(`look-wc-${who}`))
+          setTip({ title: '廁所門', hint: '點一下開關' })
+          POINTER_HINT.hand++
+          const el = ev.nativeEvent.target as HTMLElement | null
+          if (el?.style) el.style.cursor = 'pointer'
+        }}
+        onPointerOut={(ev) => {
+          glowOnly(null); setTip(null)
+          POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand - 1)
+          const el = ev.nativeEvent.target as HTMLElement | null
+          if (el?.style && !POINTER_HINT.hand) el.style.cursor = ''
+        }}>
+        <planeGeometry args={[W + 0.1, H + 0.3]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
   )
 }
 function ToiletDoor({ who }: { who: 'm' | 'f' }) {
@@ -1541,7 +1573,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
         ))}
         {/* (the toilets' doors slide: not merged) */}
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
-          <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /></group>
+          <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /><ToiletHit who={who} /></group>
         ))}
       </group>
       {/* pendant lamps over the bar's customer side, low */}
@@ -1835,7 +1867,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
       <Movable id="shrine" label="神龕"><group position-x={ALTAR_D / 2} scale={SC} onClick={offer}
-        {...handOver}><StaticBatch><Kamidana shelf={false} part="shrine" /></StaticBatch></group></Movable>
+        {...tipOver('神棚', '點一下供清酒')}><StaticBatch><Kamidana shelf={false} part="shrine" /></StaticBatch></group></Movable>
       {/* (the vases and cups beside it are not part of what's pointed at: they don't light with it) */}
       <Movable id="shrinecups" label="神龕旁花瓶與杯"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana shelf={false} part="extras" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
@@ -2004,7 +2036,7 @@ export function FridgeDoor({ n = 0 }: { n?: number }) {
   return (
     <group>
       {/* the model's own door, hung on its pivot (the glass and its frame), swung with the rest of the model's scale */}
-      <group onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...handOver}><primitive object={doorRoot} /></group>
+      <group onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...tipOver('飲料櫃', '點一下開關門')}><primitive object={doorRoot} /></group>
       {/* the mist, low at the foot of the open door, rolling out over the floor */}
       <group position={[0, 0.05, D / 2 + 0.1]}>
         <Steam width={W * 0.9} height={0.5} opacity={0.5} layers={2} color="#eaf6ff" shade="#bcd8ec" speed={0.06} level={mist} />
@@ -2683,7 +2715,7 @@ function WallSpeaker() {
     </group>
   )
   return (
-    <group name="look-speaker" onClick={press} {...handOver} rotation-x={0.22}>
+    <group name="look-speaker" onClick={press} {...tipOver('喇叭', '點一下開音樂、調音量')} rotation-x={0.22}>
       <MusicNotes playing={!off} />
       {/* the bracket: an arm back to the corner */}
       <mesh position={[0, 0.2, -0.12]}><boxGeometry args={[0.05, 0.05, 0.3]} /><meshToonMaterial color="#2a2d31" /></mesh>

@@ -43,6 +43,7 @@ import { ALONG, LAY } from '@/shops/grill/bar'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
+import { HoverTip } from '@/ui/HoverTip'
 import { setBgmSeen } from '@/ui/bgmStore'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
@@ -2385,6 +2386,7 @@ export default function App() {
         {theme === 'light' ? '夜' : '晝'}
       </button>
       <Bgm />
+      <HoverTip hidden={editOn} />
       <Loader />
     </div>
   )
