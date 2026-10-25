@@ -9,7 +9,6 @@ import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, POINTER_HINT, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
-import { LuckyCat } from './LuckyCat'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { Steam } from '@/scene/Steam'
@@ -697,30 +696,6 @@ function InkBox({ size, color, position, ...rest }: { size: [number, number, num
   )
 }
 
-/** an isshōbin of sake: a tall bottle, its label */
-function Bottle({ x, color, label }: { x: number; color: string; label: string }) {
-  return (
-    <group position={[0, 0, x]}>
-      <mesh position-y={0.11}>
-        <cylinderGeometry args={[0.04, 0.042, 0.22, 12]} />
-        <meshToonMaterial color={color} />
-      </mesh>
-      <mesh position-y={0.25}>
-        <cylinderGeometry args={[0.014, 0.036, 0.08, 10]} />
-        <meshToonMaterial color={color} />
-      </mesh>
-      <mesh position-y={0.3}>
-        <cylinderGeometry args={[0.016, 0.016, 0.03, 8]} />
-        <meshToonMaterial color="#d8c8a0" />
-      </mesh>
-      <mesh position={[-0.041, 0.11, 0]} rotation-y={-Math.PI / 2}>
-        <planeGeometry args={[0.05, 0.1]} />
-        <meshToonMaterial color={label} />
-      </mesh>
-    </group>
-  )
-}
-
 /** the plaque over the toilet door: お手洗い, and 廁所 under it */
 /** a toilet's door's height */
 const WC_H = 1.85
@@ -1201,15 +1176,13 @@ const GABLE_GEO = (() => {
  * paper streamers hung across the front.
  */
 /** `part`: the shrine itself, the things set about it (vases, cups), or all of it (on the wall) */
-function Kamidana({ shelf = true, part = 'all' }: { shelf?: boolean; part?: 'all' | 'shrine' | 'extras' }) {
+function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'extras' }) {
   const HIN = '#e2c89a'
   const GRAIN = '#cfae78'
   const RED = '#d8b884'
   const GOLD = '#d9b13e'
   return (
     <group>
-      {part !== 'extras' && shelf && <InkBox size={[0.26, 0.03, 0.78]} color="#c9a46a" position={[-0.13, 0, 0]} />}
-      {part !== 'extras' && shelf && [-0.3, 0.3].map((z) => <InkBox key={z} size={[0.16, 0.12, 0.03]} color="#a8844e" position={[-0.07, -0.07, z]} />)}
       {/* the shrine: a stepped base, the railing, body, doors and roof */}
       {part !== 'extras' && <group position={[-0.14, 0.015, 0]}>
         <InkBox size={[0.18, 0.02, 0.36]} color={GRAIN} position-y={0.01} />
@@ -1403,7 +1376,7 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
  * One counter's stretch of the room: the wall behind its aisle (from/to along it, in the counter's own frame), and
  * pendant lamps over it.
  */
-export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar = false, clear = [], corner = false }: { c: Counter; from: number; to: number; far: number
+export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, clear = [], corner = false }: { c: Counter; from: number; to: number; far: number
   /** the first of the room's two walls, whose start is the corner they meet in: its thickness runs on to close the corner */
   corner?: boolean
   /** stretches of it (along it) where something stands against it: nothing hung there, no post */
@@ -1415,8 +1388,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
   top: number
   /** where along it the sliding door to the toilet is, if it has one */
   door?: number
-  /** where along it the little household shrine (神棚) is put up, if it has one */
-  shrine?: number }) {
+  }) {
   const yaw = Math.atan2(c.along.x, c.along.z)
   const l = to - from
   const mid = (from + to) / 2
@@ -1443,13 +1415,13 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
       for (let i = 0; i < n; i++) spots.push(posts[b] + (w / n) * (i + 0.5))
     }
     return spots.filter((z) => (!shelf || Math.abs(z - shelfZ) > 0.85) && isClear(z, 0.3) && (door === undefined || Math.abs(z - door) > 0.95)
-      && (shrine === undefined || Math.abs(z - shrine) > 0.75) && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
+      && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length],
         // (a banner every third place along the wall, in turn)
         nobori: k % 3 === 2 ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined,
         // (and a big signboard every fifth, between)
         kanban: k % 5 === 3 && k % 3 !== 2 ? Math.floor(k / 5 + start) % KANBAN_LOOKS.length : undefined }))
-  }, [l, from, to, mid, shelfZ, c.length, door, shrine, shelf, clear])
+  }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear])
   const frieze = useMemo(() => {
     if (!SEIGAIHA) return null
     const t = SEIGAIHA.clone()
@@ -1471,7 +1443,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
       {/* (local x is away from the cook: the wall stands at the floor's far edge, facing back toward the bar) */}
       <group ref={wall} position-x={-far}>
         {/* (all of it standing still: drawn merged, a few meshes for the whole wall) */}
-        <StaticBatch key={`${from}|${to}|${door}|${shrine}|${!!altar}`}>
+        <StaticBatch key={`${from}|${to}|${door}|${!!altar}`}>
         {/* the plaster over the wainscot, open where the toilets' doors are (a strip between them, and over them) */}
         {/* (the wall's thickness: a slab behind it, the base's dark wood, full height, over the toilets' doorways only above them) */}
         {/* (down through the base's own thickness too, which stops at the room's outline, short of the wall's) */}
@@ -1514,7 +1486,6 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
             </group>
           </StaticBatch></Movable>
         ))}
-        {shrine !== undefined && <Movable id="wallshrine" label="牆上神棚"><StaticBatch><group position={[0, 1.78, shrine]}><Kamidana /></group></StaticBatch></Movable>}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
           {[-0.35, 0.35].map((z) => (
@@ -1523,24 +1494,6 @@ export function DiningWall({ c, from, to, far, lamps, top, door, shrine, altar =
               <mesh geometry={SHELF_BRACKET} scale={[1.035, 1.035, 1.4]} position-z={-0.004}><meshBasicMaterial color="#c9a040" side={THREE.BackSide} /></mesh>
             </group>
           ))}</group></StaticBatch></Movable>}
-        {!altar && shelf && <Movable id="wallshelf" label="牆上層架"><StaticBatch>
-        <group position={[-0.1, 1.08, shelfZ]}>
-          <Box size={[0.2, 0.03, 0.9]} color="#6a4428" position-y={-0.015} />
-          {[-0.35, 0.35].map((z) => <Box key={z} size={[0.18, 0.08, 0.025]} color="#3a2416" position={[0.04, -0.06, z]} />)}
-          <Bottle x={-0.32} color="#2f5a3a" label="#f2ead8" />
-          <Bottle x={-0.22} color="#5a3a22" label="#f2ead8" />
-          <Bottle x={-0.12} color="#2f5a3a" label="#e8d06a" />
-          <mesh position={[0, 0.06, 0.04]}>
-            <cylinderGeometry args={[0.05, 0.06, 0.12, 12]} />
-            <meshToonMaterial color="#8a5a34" />
-          </mesh>
-          <mesh position={[0, 0.06, 0.15]}>
-            <cylinderGeometry args={[0.04, 0.05, 0.1, 12]} />
-            <meshToonMaterial color="#3e4a5a" />
-          </mesh>
-          <group position={[0, 0, 0.3]} rotation-y={-Math.PI / 2}><LuckyCat kind={3} height={0.3} still /></group>
-        </group>
-        </StaticBatch></Movable>}
         {/* (the string of bulbs under the frieze: instanced, so out of the batch) */}
         <Movable id={`festoon${from.toFixed(1)}`} label={`燈串（${from.toFixed(0)}）`}><Festoon l={l} mid={mid} /></Movable>
         {/* (the strings of banners overhead, clear of the altar, the fridges and the toilets' doors) */}
@@ -1870,9 +1823,9 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
       <Movable id="shrine" label="神龕"><group position-x={ALTAR_D / 2} scale={SC} onClick={offer}
-        {...tipOver('神棚', '點一下供清酒')}><StaticBatch><Kamidana shelf={false} part="shrine" /></StaticBatch></group></Movable>
+        {...tipOver('神棚', '點一下供清酒')}><StaticBatch><Kamidana part="shrine" /></StaticBatch></group></Movable>
       {/* (the vases and cups beside it are not part of what's pointed at: they don't light with it) */}
-      <Movable id="shrinecups" label="神龕旁花瓶與杯"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana shelf={false} part="extras" /></StaticBatch></group></Movable>
+      <Movable id="shrinecups" label="神龕旁花瓶與杯"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="extras" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={GLOW} color="#ffe0a0" size={0.07} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </points>
