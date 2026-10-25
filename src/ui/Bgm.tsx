@@ -49,6 +49,11 @@ export function Bgm() {
       <button type="button" className={`bgm-toggle${off || missing ? '' : ' is-on'}${seen ? ' is-seen' : ''}`} aria-pressed={!off} aria-label="背景音樂 BGM" title={missing ? '找不到音檔：請放到 src/IzakayaNight.mp3' : '居酒屋の夜'}
         onClick={() => toggleBgmPanel()}>
         {off ? '♪̸' : '♪'}
+        {!off && !seen && (
+          <span className="bgm-notes" aria-hidden="true">
+            {['♪', '♫', '♩', '♬', '♪'].map((ch, i) => <i key={i} style={{ animationDelay: `${i * 0.7}s`, left: `${6 + (i % 3) * 12}px` }}>{ch}</i>)}
+          </span>
+        )}
       </button>
       {panel && (
         <div className="bgm-panel" role="dialog" aria-label="音樂與音量">
