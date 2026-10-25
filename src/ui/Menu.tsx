@@ -277,10 +277,8 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{lang === 'ja' ? '試' : '試'}×{n}</span>}
         </span>
         {x.en && <span className="chiller-bin-en" lang="en">{x.en}</span>}
-        <span className="chiller-packs" aria-hidden="true">
-          {Array.from({ length: Math.min(12, have) }, (_, k) => <i key={k} style={{ height: `${60 + ((k * 37) % 5) * 8}%` }} />)}
-          {have > 12 && <em>+</em>}
-        </span>
+        {/* (how well stocked: a bar against the par level, full at PAR and over; red when it's out) */}
+        <span className={`chiller-level${out ? ' is-zero' : have < PAR ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / PAR) * 100)}%` }} /></span>
         <span className="chiller-bin-info" aria-hidden="true">
           <b className={out ? 'is-zero' : ''}>{lang === 'ja' ? '在庫' : '庫存'} <em>{have}</em></b>
           <small>{lang === 'ja' ? '原価' : '成本'} <em>{cost}</em></small>

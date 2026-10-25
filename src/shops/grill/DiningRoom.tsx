@@ -1300,15 +1300,18 @@ function Kamidana({ shelf = true, part = 'all' }: { shelf?: boolean; part?: 'all
       ))}
       {part !== 'shrine' && [-0.09, 0, 0.09].map((z) => (
         <group key={z} position={[-0.3, 0.03, z]}>
-          {/* (a hollow cup: its wall open at the top, a floor in it, so the sake poured in is seen in it) */}
-          <mesh><cylinderGeometry args={[0.012, 0.01, 0.025, 12, 1, true]} /><meshToonMaterial color="#f4f1ea" side={THREE.DoubleSide} /></mesh>
-          <mesh position-y={-0.0115} rotation-x={-Math.PI / 2}><circleGeometry args={[0.01, 12]} /><meshToonMaterial color="#f4f1ea" /></mesh>
+          {/* (a cup with a wall of its own: a thick rim, a foot ring, a floor, the sake poured in is seen in it) */}
+          <mesh geometry={SAKE_CUP} position-y={-0.0125}><meshToonMaterial color="#f4f1ea" /></mesh>
+          <mesh geometry={SAKE_CUP} position-y={-0.0125} scale={[1.05, 1.03, 1.05]}><meshBasicMaterial color="#5a4a3a" side={THREE.BackSide} /></mesh>
         </group>
       ))}
     </group>
   )
 }
 
+/** a little sake cup (お猪口), thick-walled: foot ring, belly, a rounded rim, the inside hollow with its own floor */
+const SAKE_CUP = new THREE.LatheGeometry([[0, 0.0005], [0.0072, 0.0005], [0.0078, 0.0022], [0.0095, 0.008], [0.0118, 0.016], [0.0128, 0.0232], [0.0126, 0.0252],
+  [0.0116, 0.0256], [0.0106, 0.0246], [0.0102, 0.0225], [0.0088, 0.0125], [0.0066, 0.0062], [0, 0.0056]].map(([x, y]) => new THREE.Vector2(x, y)), 20)
 /** the glow round a lit lamp, and the pool of its light on what's under it: a soft warm disc, bright in the middle */
 const GLOW = (() => {
   if (typeof document === 'undefined') return null
