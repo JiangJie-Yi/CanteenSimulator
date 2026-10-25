@@ -6,9 +6,9 @@ import { useSyncExternalStore } from 'react'
 
 export type V3 = [number, number, number]
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
-const KEY = 'jgs-edit-offsets-4'
+const KEY = 'jgs-edit-offsets-5'
 const KEY_R = 'jgs-edit-rotations-3'
-const KEY_S = 'jgs-edit-scales-2'
+const KEY_S = 'jgs-edit-scales-3'
 const KEY_G = 'jgs-edit-groups-1'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
@@ -38,7 +38,8 @@ export const BASES: Record<string, V3> = {
   gate1: [0, 0, 0.16],
   gate0: [0, 0, 0.17],
   // (the owner's settled spot: moved by [0.2, 0.19, 0.47] in the room's frame from [-1.508, 0, 1.974], taken into this parent's own units)
-  freezer: [-1.2453, 0.19, 1.5359],
+  // (moved on by [0, 0, 0.341] in the room's frame, taken into this parent's units)
+  freezer: [-0.9694, 0.19, 1.3355],
   willow: [0.38, 0, 0.201],
   sake: [0.084, 0, 0.118],
   sake2: [0.084, 0, 0.118],
@@ -46,6 +47,8 @@ export const BASES: Record<string, V3> = {
   crate: [-0.0941, 0.125, -0.2691],
   // (the lantern: moved by [-0.083, 0, -0.651] in the room's frame, taken into this parent's units; its 12° turn is Decor's)
   lantern: [-0.478, 0, 0.4497],
+  // (the dish rack: moved by [-0.871, 0, -2.135] in the room's frame, taken into this parent's units; its 1.03 size is Decor's)
+  platerack: [-1.2158, 0, 1.9593],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece belongs to, if any */

@@ -26,7 +26,7 @@ const STILL = 5.4
 
 /**
  * The model's texture has three paw pads (pink, brown, brown) laid out for the soles of the paws, but on the raised arm they land on the arm's
- * outer side and show as a fan of brown streaks. Painted out here, in the white of the fur round them, once per texture.
+ * outer side and show as a fan of brown streaks. Painted out here, in the white of the fur round them, once per texture. (The spots were measured on the first model's texture alone: on the others they would land on the face.)
  */
 const cleaned = new WeakMap<THREE.Texture, THREE.Texture>()
 function clean(tex: THREE.Texture): THREE.Texture {
@@ -55,7 +55,7 @@ function clean(tex: THREE.Texture): THREE.Texture {
   return out
 }
 
-function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.Color | null) {
+function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.Color | null, tidy: boolean) {
   const root = cloneSkinned(gltf.scene) as THREE.Group
   const mixer = new THREE.AnimationMixer(root)
   if (gltf.animations.length) mixer.clipAction(gltf.animations[0]).play()
@@ -79,7 +79,7 @@ function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.
     g.deleteAttribute('skinWeight')
     g.computeVertexNormals()
     const src = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial
-    const mat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ? clean(src.map) : null, side: THREE.DoubleSide })
+    const mat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ? (tidy ? clean(src.map) : src.map) : null, side: THREE.DoubleSide })
     // (a differently coloured cat: the body's own material takes the tint)
     if (tint && src.map && !/coin|ring|red/i.test(src.name)) mat.color.lerp(tint, 0.85)
     out.push({ g, mat })
@@ -94,7 +94,7 @@ export function LuckyCat({ kind = 1, height = HEIGHT, still = false }: { kind?: 
     const tint = null
     // (only the first has a wave to play; the others are one pose)
     const times = still || kind !== 1 ? [STILL] : POSES
-    const baked = times.map((t) => bake(gltf, t, tint))
+    const baked = times.map((t) => bake(gltf, t, tint, kind === 1))
     // (its size and where it stands: scaled to HEIGHT tall, centred, its feet on the ground, by a middle pose's extent)
     const box = new THREE.Box3()
     for (const { g } of baked[Math.min(baked.length - 1, 4)]) {

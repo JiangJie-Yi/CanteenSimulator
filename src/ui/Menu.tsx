@@ -17,6 +17,8 @@ type MenuProps = {
   feed?: { key: number; id: string; guest: number }[]
   /** shop open: the customers order, not you (the tags only show what's been ordered) */
   locked?: boolean
+  /** the shop is open: the board is titled 菜單 (closed and not researching, it is an untitled preview) */
+  open?: boolean
   /** portions in stock (a tag with none left is marked 缺) */
   stock?: Record<string, number>
   /** (shop closed) the board is the shop's foods to try out, not a menu: there's no menu until dishes are worked out.
@@ -79,7 +81,7 @@ const CAT_NAMES: Record<string, Record<Lang, string>> = {
   xiaolongbao: { zh: '點心', ja: '点心' }, soup: { zh: '湯類', ja: 'スープ' },
 }
 
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0, days, layoutLike,
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, open = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0, days, layoutLike,
   cash = Infinity }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
@@ -275,10 +277,8 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{lang === 'ja' ? '試' : '試'}×{n}</span>}
         </span>
         {x.en && <span className="chiller-bin-en" lang="en">{x.en}</span>}
-        <span className="chiller-packs" aria-hidden="true">
-          {Array.from({ length: Math.min(12, have) }, (_, k) => <i key={k} style={{ height: `${60 + ((k * 37) % 5) * 8}%` }} />)}
-          {have > 12 && <em>+</em>}
-        </span>
+        {/* (how well stocked: a bar against the par level, full at PAR and over; red when it's out) */}
+        <span className={`chiller-level${out ? ' is-zero' : have < PAR ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / PAR) * 100)}%` }} /></span>
         <span className="chiller-bin-info" aria-hidden="true">
           <b className={out ? 'is-zero' : ''}>{lang === 'ja' ? '在庫' : '庫存'} <em>{have}</em></b>
           <small>{lang === 'ja' ? '原価' : '成本'} <em>{cost}</em></small>
@@ -380,8 +380,9 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
 
   return (
     <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
-      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
-      <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>
+      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}${research || open ? '' : ' no-title'}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
+      {/* (the board's name only where it's the shop's own: the foods' fridge, or the menu once the shop's open; closed, it's a plain preview) */}
+      {(research || open) && <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>}
 
       {research && onBuy && !taiwan ? (
         <div className="strips-frame">

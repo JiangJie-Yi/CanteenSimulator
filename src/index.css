@@ -3165,34 +3165,6 @@ button {
   color: #ffe58a;
   text-shadow: 0 0 0.06em #fff6c0, 0 0 0.22em rgb(255 200 80 / 0.95), 0 0 0.55em rgb(255 120 40 / 0.6);
 }
-/* background music switch, beside the others */
-.bgm-toggle {
-  position: fixed;
-  z-index: 10;
-  top: 20px;
-  right: 228px;
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border: 1.5px solid var(--text-soft);
-  border-radius: 50%;
-  background: var(--page);
-  color: var(--text);
-  font: 700 18px/1 var(--brush);
-  cursor: pointer;
-}
-
-.bgm-toggle svg {
-  width: 20px;
-  height: 20px;
-  opacity: 0.6;
-}
-
-.bgm-toggle.is-on {
-  color: #3d8a3a;
-}
-
 .tools-toggle {
   display: none;
 }
@@ -5529,199 +5501,6 @@ button {
 :root[data-theme='dark'] .office { background: rgb(30 26 22 / 0.85) !important; }
 :root[data-theme='dark'] .guest-board,
 :root[data-theme='dark'] .ledger { background: rgb(30 36 50 / 0.85); }
-/* ---------------------------------------------------------------------------------------------------------
-   冷藏櫃: a summary strip (what's in stock, what's out, the two buying buttons), then the shelves, each food a row:
-   its icon, name, cost a portion, a stock bar against PAR with the count, and +10 */
-.fridge {
-  overflow-y: auto;
-  min-height: 0;
-  padding: 10px 14px 14px;
-}
-.fr-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgb(255 255 255 / 0.55);
-  border: 1px solid rgb(59 42 32 / 0.12);
-}
-.fr-stats {
-  display: flex;
-  gap: 16px;
-}
-.fr-stats span {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-}
-.fr-stats small {
-  color: #7a6656;
-  font-size: 11px;
-}
-.fr-stats b {
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-}
-.fr-stats .is-out b { color: #c4442f; }
-.fr-stats .is-low b { color: #c98a1e; }
-.fr-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.fr-topup,
-.fr-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1.5px solid transparent;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgb(59 42 32 / 0.18);
-}
-.fr-topup { background: linear-gradient(#6fb04e, #4f8a34); }
-.fr-all { background: linear-gradient(#d4553f, #a8352a); }
-.fr-topup:disabled,
-.fr-all:disabled {
-  background: #b6ad9f;
-  box-shadow: none;
-  cursor: default;
-}
-.fr-topup .money,
-.fr-all .money { color: #f0fff3 !important; }
-.fr-shelf h4 {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin: 12px 0 4px;
-  padding-left: 8px;
-  border-left: 4px solid #6fa0c8;
-  font-size: 13px;
-}
-.fr-shelf h4 small {
-  color: #7a6656;
-  font-weight: 400;
-}
-.fr-shelf ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.fr-shelf li {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto minmax(110px, 0.9fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: 10px;
-}
-.fr-shelf li:nth-child(odd) {
-  background: rgb(255 255 255 / 0.35);
-}
-.fr-icon {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: rgb(111 160 200 / 0.14);
-  color: #3b2a20;
-}
-.fr-name {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.25;
-}
-.fr-name small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #8a7360;
-  font-size: 10px;
-}
-.fr-cost {
-  font-size: 11px;
-  color: #7a6656;
-  white-space: nowrap;
-}
-.fr-cost b {
-  margin-left: 4px;
-  font-size: 12px;
-}
-.fr-level {
-  display: grid;
-  grid-template-columns: minmax(40px, 1fr) 2.2em auto;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-}
-.fr-level i {
-  height: 7px;
-  border-radius: 4px;
-  background: rgb(59 42 32 / 0.12);
-  overflow: hidden;
-}
-.fr-level i b {
-  display: block;
-  height: 100%;
-  border-radius: 4px;
-  background: #6fb04e;
-}
-.fr-shelf li.is-low .fr-level i b { background: #e0a030; }
-.fr-level em {
-  font-style: normal;
-  font-weight: 700;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.fr-level small { color: #5f8a42; white-space: nowrap; }
-.fr-shelf li.is-low .fr-level small { color: #c98a1e; }
-.fr-shelf li.is-out .fr-level small,
-.fr-shelf li.is-out .fr-level em { color: #c4442f; }
-.fr-buy {
-  padding: 3px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: #3b2a20;
-  color: #fbf3e4;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.fr-buy:hover { background: #c4442f; }
-.fr-buy:disabled { background: #b6ad9f; cursor: default; }
-@media (max-width: 560px) {
-  .fr-shelf li { grid-template-columns: 30px minmax(0, 1fr) minmax(80px, 1fr) auto; }
-  .fr-cost { display: none; }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .fr-summary, :root:not([data-theme='light']) .fr-shelf li:nth-child(odd) { background: rgb(255 255 255 / 0.06); border-color: rgb(246 236 216 / 0.12); }
-  :root:not([data-theme='light']) .fr-icon { background: rgb(111 160 200 / 0.2); color: #f6ecd8; }
-  :root:not([data-theme='light']) .fr-stats small, :root:not([data-theme='light']) .fr-cost, :root:not([data-theme='light']) .fr-name small, :root:not([data-theme='light']) .fr-shelf h4 small { color: #c9bfae !important; }
-  :root:not([data-theme='light']) .fr-level i { background: rgb(255 255 255 / 0.14); }
-  :root:not([data-theme='light']) .fr-shelf li.is-out .fr-level small, :root:not([data-theme='light']) .fr-shelf li.is-out .fr-level em, :root:not([data-theme='light']) .fr-stats .is-out b { color: #ff8f78 !important; }
-  :root:not([data-theme='light']) .fr-shelf li.is-low .fr-level small, :root:not([data-theme='light']) .fr-stats .is-low b { color: #f2b84b !important; }
-  :root:not([data-theme='light']) .fr-level small { color: #9fe3ae !important; }
-}
-:root[data-theme='dark'] .fr-summary, :root[data-theme='dark'] .fr-shelf li:nth-child(odd) { background: rgb(255 255 255 / 0.06); border-color: rgb(246 236 216 / 0.12); }
-:root[data-theme='dark'] .fr-icon { background: rgb(111 160 200 / 0.2); color: #f6ecd8; }
-:root[data-theme='dark'] .fr-stats small, :root[data-theme='dark'] .fr-cost, :root[data-theme='dark'] .fr-name small, :root[data-theme='dark'] .fr-shelf h4 small { color: #c9bfae !important; }
-:root[data-theme='dark'] .fr-level i { background: rgb(255 255 255 / 0.14); }
-:root[data-theme='dark'] .fr-shelf li.is-out .fr-level small, :root[data-theme='dark'] .fr-shelf li.is-out .fr-level em, :root[data-theme='dark'] .fr-stats .is-out b { color: #ff8f78 !important; }
-:root[data-theme='dark'] .fr-shelf li.is-low .fr-level small, :root[data-theme='dark'] .fr-stats .is-low b { color: #f2b84b !important; }
-:root[data-theme='dark'] .fr-level small { color: #9fe3ae !important; }
 /* the 經營 button: a little shop front for its icon, frosted like the office it opens */
 .office-toggle {
   background: rgb(251 246 234 / 0.55);
@@ -6335,35 +6114,8 @@ button {
   pointer-events: none;
 }
 
-/* the music switch, left of the edit button */
-.bgm-toggle {
-  position: fixed;
-  z-index: 10;
-  top: 20px;
-  right: 332px;
-  width: 44px;
-  height: 44px;
-  border: 1.5px solid var(--text-soft);
-  border-radius: 50%;
-  background: var(--page);
-  color: var(--text-soft);
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.bgm-toggle.is-on {
-  color: var(--text);
-  border-color: var(--text);
-}
-
 @media (max-width: 900px) {
-  .bgm-toggle {
-    top: 14px;
-    right: 306px;
-    width: 40px;
-    height: 40px;
   }
-}
 
 /* ---- the stock chiller: the shop's closed, and the board of foods is the kitchen's chiller (a steel cabinet, a row of glass-fronted bins), where a food
    is taken out to try, and more is called in or topped up ---- */
@@ -6420,7 +6172,7 @@ button {
 .chiller-bin {
   position: relative;
   display: grid;
-  grid-template-rows: auto auto 30px auto auto;
+  grid-template-rows: auto auto 14px auto auto;
   gap: 3px;
   padding: 7px 8px 8px;
   border-radius: 8px;
@@ -6494,31 +6246,6 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* the frozen packs in the bin, as many as there are in stock (up to twelve), each a slab of its own height, a frost of white on top */
-.chiller-packs {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  padding: 3px 4px 0;
-  border-radius: 4px;
-  background: linear-gradient(180deg, #cfe3f1, #b4d2e6);
-  overflow: hidden;
-}
-
-.chiller-packs i {
-  flex: 1;
-  min-width: 0;
-  border-radius: 2px 2px 0 0;
-  background: linear-gradient(180deg, #fbfdff, #bcd6ea);
-  box-shadow: inset 0 0 0 1px rgb(80 120 160 / 0.35);
-}
-
-.chiller-packs em {
-  align-self: center;
-  font: 700 11px/1 sans-serif;
-  color: #3f6e92;
 }
 
 .chiller-bin-info {
@@ -6634,44 +6361,6 @@ button {
 }
 
 
-/* the music panel: on / off and the volume, opened from the music button or the speaker on the wall */
-.bgm-panel {
-  position: fixed;
-  z-index: 11;
-  top: 72px;
-  right: 120px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border: 1.5px solid var(--text-soft);
-  border-radius: 12px;
-  background: var(--page);
-  color: var(--text);
-  font: 600 14px/1 var(--brush);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 0.3);
-}
-
-.bgm-panel input[type='range'] {
-  width: 120px;
-}
-
-.bgm-power,
-.bgm-close {
-  border: 1.5px solid var(--text-soft);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  padding: 4px 10px;
-  cursor: pointer;
-  font: inherit;
-}
-
-.bgm-power.is-on {
-  color: #3d8a3a;
-  border-color: #3d8a3a;
-}
-
 /* the world axes at the bottom left while editing */
 .axis-widget {
   position: fixed;
@@ -6745,20 +6434,6 @@ button {
   background: var(--hanko);
 }
 
-.chiller-packs {
-  background: rgb(59 42 32 / 0.12);
-  box-shadow: inset 0 1px 3px rgb(59 42 32 / 0.25);
-}
-
-.chiller-packs i {
-  background: linear-gradient(180deg, #fffaf0, #e9d6ae);
-  box-shadow: inset 0 0 0 1px rgb(120 84 48 / 0.4);
-}
-
-.chiller-packs em {
-  color: var(--ink-soft);
-}
-
 .chiller-bin-info b {
   color: var(--moss);
 }
@@ -6809,3 +6484,161 @@ button {
 .tally-buy .tally-buyall:hover:not(:disabled) {
   background: #7a5336;
 }
+
+/* the music button is the speaker on the wall now: it only shows while the speaker is out of the picture (or on a narrow screen) */
+@media (min-width: 901px) {
+  }
+
+/* ---- wood grain: the one finish for every panel (dark wood on the title bars and frames, a faint grain on the pale panels), and the same ink and moss throughout ---- */
+:root {
+  --grain-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300'%3E%3Cfilter id='w' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.07' numOctaves='3' seed='7' result='n'/%3E%3CfeColorMatrix values='0 0 0 0 0.05 0 0 0 0 0.03 0 0 0 0 0.01 1.1 0 0 0 -0.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23w%29'/%3E%3C/svg%3E");
+  --grain-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300'%3E%3Cfilter id='w' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.003 0.05' numOctaves='3' seed='3' result='n'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.26 0 0 0 0 0.12 0.9 0 0 0 -0.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23w%29'/%3E%3C/svg%3E");
+  --wood-bar: linear-gradient(180deg, #6b4a30, #4a3020);
+}
+
+.office > header,
+.chiller-top {
+  background: var(--grain-dark) 0 0 / 420px 120px, var(--wood-bar) !important;
+  color: #f6e8cc;
+  border-bottom: 2px solid #8a6a44;
+}
+
+.office > header * {
+  color: inherit;
+}
+
+.office {
+  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 246 234 / 0.88) !important;
+  border: 3px solid #5a3d28;
+  border-radius: 10px;
+}
+
+.guest-board,
+.ledger,
+.notebook {
+  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 243 228 / 0.88);
+  border: 3px solid #5a3d28;
+  border-radius: 10px;
+}
+
+.chiller {
+  background: var(--grain-light) 0 0 / 520px 260px, linear-gradient(180deg, rgb(251 243 228 / 0.94), rgb(239 226 201 / 0.94));
+}
+
+.chiller-foot {
+  background: var(--grain-dark) 0 0 / 420px 60px, linear-gradient(180deg, #d9c19a, #5a3d28);
+}
+
+.tally-buy .tally-buyall,
+.chiller-btn {
+  background-image: var(--grain-dark);
+  background-size: 300px 60px;
+}
+
+.office-tab,
+.office > header button {
+  border-color: rgb(246 232 204 / 0.7);
+  color: #f6e8cc;
+}
+
+/* an untitled preview board: no column kept for the title */
+.menu.no-title {
+  grid-template-columns: auto;
+  padding-right: 16px;
+}
+
+/* glass, not wood, for what is only pressed: the chiller's tags and buttons, the stocking buttons, the panels themselves half see-through */
+.chiller {
+  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 243 228 / 0.62);
+  -webkit-backdrop-filter: blur(5px) saturate(1.1);
+  backdrop-filter: blur(5px) saturate(1.1);
+}
+
+.chiller-bin,
+.chiller-bin.is-out {
+  background: rgb(255 255 255 / 0.3);
+  box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.28), 0 4px 10px -8px rgb(59 42 32 / 0.5);
+}
+
+.chiller-bin.is-taken {
+  background: rgb(194 59 42 / 0.16);
+}
+
+.chiller-bin.is-out {
+  filter: saturate(0.6);
+}
+
+.chiller-btn,
+.tally-buy .tally-buyall {
+  background: rgb(59 42 32 / 0.55);
+  background-image: none;
+  color: #fff;
+}
+
+.chiller-btn.chiller-top,
+.tally-buy .tally-topup {
+  background: rgb(51 80 63 / 0.75);
+}
+
+.chiller-btn:hover,
+.tally-buy .tally-buyall:hover:not(:disabled) {
+  background: rgb(59 42 32 / 0.78);
+}
+
+.office,
+.guest-board,
+.ledger,
+.notebook {
+  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 246 234 / 0.66) !important;
+  -webkit-backdrop-filter: blur(5px) saturate(1.1);
+  backdrop-filter: blur(5px) saturate(1.1);
+}
+
+.ofc-person,
+.ofc-person.is-hired,
+.ofc-slot {
+  background: rgb(255 255 255 / 0.3);
+}
+
+/* the tag that follows the pointer over a usable thing in the room */
+.hover-tip {
+  position: fixed;
+  z-index: 40;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.hover-tip .tool-tag {
+  position: relative;
+  left: 16px;
+  top: -52px;
+}
+
+/* the stock bar on each chiller tag: how much there is against the par level */
+.chiller-level {
+  display: block;
+  height: 8px;
+  align-self: center;
+  border-radius: 4px;
+  background: rgb(59 42 32 / 0.16);
+  box-shadow: inset 0 1px 2px rgb(59 42 32 / 0.25);
+  overflow: hidden;
+}
+
+.chiller-level i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--moss);
+}
+
+.chiller-level.is-low i {
+  background: #c98a1e;
+}
+
+.chiller-level.is-zero i {
+  background: var(--hanko);
+}
+

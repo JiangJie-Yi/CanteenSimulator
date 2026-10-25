@@ -29,6 +29,7 @@ import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { AxisGizmo, focusCamera } from './Movable'
 import { binchotanGeo, binchotanMap, burningMaps } from './Binchotan'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
+import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
@@ -111,9 +112,17 @@ const ASH_TINT = new THREE.Color('#d8d2c8')
 const PLATE_STEP = 1.2
 const DISH_TOP: [number, number, number] = [1.8, 0, -0.26]
 const BASKET_TOP: [number, number, number] = [2.0, 0, 0.4]
+/** what a container on the table is called, and what can be done with it (by its key: plate-0, box, bin, tray...) */
+const CONTAINER_TIP = (key: string) => {
+  const kind = key.split('-')[0]
+  const name = ({ plate: '餐盤', dish: '小碟', basket: '竹籃', box: '調味盒', bin: '水桶', tray: '大砧板', trash: '廚餘桶', rawdish: '生食碟', lantern: '行燈', bowl: '試吃碗' } as Record<string, string>)[kind] ?? '擺設'
+  return { title: name, hint: '拖曳移動' }
+}
 /** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates) */
-const BOWL_TOP: [number, number, number] = [1.55, 0, -0.75]
+const BOWL_TOP: [number, number, number] = [1.95, 0, 1.0]
 const BOWL_R = 0.52
+/** how much room the bowl takes when the table's pieces are pushed clear of each other (less than it is: it sits among them) */
+const BOWL_PUSH = 0.3
 /** the bowl's rim above its foot: what's laid across it rests at this height */
 const BOWL_RIM = 0.15
 /** the table's pieces that edit mode moves by their nudge (the cutting board, the seasoning box, the water bucket): the edit id of each */
@@ -2328,7 +2337,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   const footprint = (key: string) => {
     const kind = key.split('-')[0]
-    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R, bowl: BOWL_R, lantern: DECOR.lantern.r }[kind] ?? 0.3
+    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R, bowl: BOWL_PUSH, lantern: DECOR.lantern.r }[kind] ?? 0.3
   }
   /** a container's footprint as circles: one for most, three in a row along the long tray */
   const circlesOf = (key: string, at: THREE.Vector3) => key === 'tray'
@@ -3355,8 +3364,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
 
     let down: { x: number; y: number } | null = null
+    let ownTip = false
     const onMove = (e: PointerEvent) => {
-      if (lockedRef.current) { glowOnly(null); return }
+      if (lockedRef.current) { glowOnly(null); if (ownTip) { setTip(null); ownTip = false } return }
       if (drag.current || held.current) return
       if (e.buttons) return
       aim(e)
@@ -3385,6 +3395,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       else if (dec) world.traverse((o) => { if (!lit && o.userData.decor === dec) lit = o })
       else if (cont) world.traverse((o) => { if (!lit && o.userData.container === cont) lit = o })
       glowOnly(lit)
+      // (what's under the pointer, named by a tag, for what isn't food or a tool (those have their own): a dish or the table's boxes, dragged about)
+      // (only its own tag is cleared here: the scene's other things set theirs through the pointer events)
+      if (!tool && !p && !soup && !dec && cont) { setTip(CONTAINER_TIP(cont)); ownTip = true } else if (ownTip) { setTip(null); ownTip = false }
       el.style.cursor = tool || dec ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : pickCoal() ? 'pointer' : POINTER_HINT.hand ? 'pointer' : ''
     }
     const onDown = (e: PointerEvent) => {
@@ -4482,7 +4495,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   })
 
   const byKey = (key: string) => pieces.current.find((p) => p.key === key)
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pieces: pieces, __collect: collect })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pieces: pieces, __collect: collect, __moved: moved })
 
   return (
     <>

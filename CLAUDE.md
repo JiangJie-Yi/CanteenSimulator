@@ -72,11 +72,17 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 ## 廚房三種模式（`game/mode.ts`）
 
-- **自由**（閉店預設）：視角自由，菜單板是普通選單（鎖著）；沒有手動烤魚。**研製**：閉店時按右上角圓形綠色「研」鈕切入（再按離開），視角固定在**攝影機 1**，手動夾食物、調味、看每塊的烤魚進度（`roast-tag`）、食材冷藏櫃（`ui/Menu.tsx` 的 `bin`，在畫面右側，每格點一下拿一份試做、+1／+10 叫貨、補 = 補到 `PAR`）。**營業**（店開著）：廚房自己烤（AI 主廚永遠工作，雇的員工一起），沒有手動烤魚與調味、沒有進度標籤、沒有冷藏櫃；開店會自動離開研製。規則都在 `game/mode.ts`（`modeOf(shopOpen, research)`、`canCookByHand`、`showsProgress`、`showsStockFridge`、`holdsCameraOne`；BDD 情境 `tests/bdd/mode.test.ts`）。
+- **三個視角**：攝影機 1＝研製（鎖定）、攝影機 2＝編輯模式（總覽、自由拖）、攝影機 3＝自由視角（閉店預設）。
+- **自由**（閉店預設，攝影機 3）：視角自由，**右邊沒有任何介面**（菜單板與收合鈕只在研製或營業時出現）；沒有手動烤魚。**研製**：閉店時按右上角圓形綠色「研」鈕切入（再按離開），視角固定在**攝影機 1**，手動夾食物、調味、看每塊的烤魚進度（`roast-tag`）、食材冷藏櫃（`ui/Menu.tsx` 的 `bin`，在畫面右側，每格點一下拿一份試做、+1／+10 叫貨、補 = 補到 `PAR`）。**營業**（店開著）：廚房自己烤（AI 主廚永遠工作，雇的員工一起），沒有手動烤魚與調味、沒有進度標籤、沒有冷藏櫃；開店會自動離開研製。規則都在 `game/mode.ts`（`modeOf(shopOpen, research)`、`canCookByHand`、`showsProgress`、`showsStockFridge`、`holdsCameraOne`；BDD 情境 `tests/bdd/mode.test.ts`）。
 - 研製時：點冷藏櫃拿的食材**直接出現在大砧板（`tray`）上**（`Piece.fresh`，不從火堆滑過去）；烤好夾起的食物**一律放進桌上的試吃碗**（`bowl-0`、`TasteBowl`、`inBowl`，排法同盤子）。
 - **攝影機 1**：預設是該道菜的 home 視角（`App.tsx` 的 home），可在編輯模式選「攝影機 1（研製視角）」調位置與旋轉（`scene/camera1.ts`；畫成攝影機加視錐，由 `CameraRig` 畫）；編輯模式本身視角是自由的，離開後回到原本的模式。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
 - **編輯模式只做編輯**：場景裡所有互動（夾食物、添炭、調味、澆水、收銀抽屜、廁所門、飲料櫃門、神棚、飯桶蓋、盤子拖曳）都擋掉（Roasting 的 `locked`、各元件的 `getEdit().on`、App 對 `.canvas-layer` 的 click 攔截）。
 - 桌上的**行燈、團扇**用 `<Movable>` 包起來；**大砧板（`cutboard`）、調味盒（`seasoning`）、水桶（`bucket`）**是由桌面的 nudge（`moved`）定位的，編輯模式用 `EditProxy`（不畫出來的同尺寸方塊）給框與箭頭，位移量會加進 nudge（食物、鍋具、水瓢跟著走）；這三件只有位移有效，旋轉與縮放沒有作用。
+- **能互動的東西都要有名稱標籤**：滑鼠移上去，游標旁出現和備長炭同款的紙標籤（名字＋做法）。3D 物件用 `shops/grill/bar.ts` 的 `tipOver(名稱, 提示)` 取代 `handOver`（會發亮、變手指、設標籤）；標籤的狀態在 `scene/hoverTip.ts`，由 `ui/HoverTip.tsx` 畫（編輯模式隱藏）。不能放在 `StaticBatch` 裡（合併後沒有事件）；門這類小目標用一片透明的感應面（見 `ToiletHit`）。目前沒有標籤的：招財貓、客人、食材冷藏櫃的蓋子（沒有互動）。
+- **牆角喇叭**（`DiningRoom.tsx` 的 `WallSpeaker`）是音樂唯一的開關：點一下開、再點一下關，預設關（`ui/bgmStore.ts`，`ui/Bgm.tsx` 負責播放，音量固定）；hover 會發亮並出現「音箱／點一下開啟（關閉）音樂」標籤，開著時飄出音符（`MusicNotes`）。沒有任何音樂的 2D 介面或按鈕。
+- **客人的盤子**：`shops/grill/wareDesigns.ts` 五款花色（唐草、青海波、鯉魚、梅花藍底、風車）依盤子輪流用；竹、梅仍是 `ware.ts` 的大盤與小碟。`PlateRack.tsx` 是碗盤櫃架（Decor 裡的 `RackAt`）。
+- **編輯模式左下角**有世界座標小圖（`App.tsx` 的 `AxisWidget`）：X 沿吧台、Y 向上、Z 橫過吧台，隨鏡頭轉。
+- **介面風格**：木紋深色外框與標題列、半透明淺色面板（`index.css` 末尾的 `--grain-dark`、`--grain-light`）；只是按的東西（食材卡、補貨鈕）用半透明玻璃，不用木色。
 - **HDRI**：`scene/IndoorHDRI.tsx` 有 `public/hdri/day.hdr`、`night.hdr`（polyhaven.com/hdris 的 1k .hdr）就用真的，沒有就用內建的假 HDRI。**BGM**：`ui/Bgm.tsx` 找 `src/IzakayaNight.mp3`（或 `public/audio/`）。
 
 ## 常見改動要碰哪裡

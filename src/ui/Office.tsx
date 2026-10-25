@@ -17,11 +17,9 @@ type Props = {
   onFire: (w: Worker) => void
   onClose: () => void
   /** which tab is showing, and the research notebook to show in its own */
-  tab: 'book' | 'staff' | 'fridge'
-  onTab: (t: 'book' | 'staff' | 'fridge') => void
+  tab: 'book' | 'staff'
+  onTab: (t: 'book' | 'staff') => void
   book: ReactNode
-  /** the 冷藏櫃: what's in stock, and buying in */
-  fridge: ReactNode
   /** start the business over (wipes the save) */
   onReset: () => void
   owner: string
@@ -42,7 +40,7 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
  * two cooks, someone on the floor and at the till — each filled with a face, or open, with the people who could
  * fill it. (Buying in is done on the 試做 board itself, tag by tag.)
  */
-export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, fridge }: Props) {
+export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -56,7 +54,6 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
         <div className="ofc-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('廚房', '厨房')}</button>
           <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{t('人事', '人事')}</button>
-          <button type="button" role="tab" aria-selected={tab === 'fridge'} onClick={() => onTab('fridge')}>{t('冷藏櫃', '冷蔵庫')}</button>
         </div>
         <span className={`ofc-cash${cash < 0 ? ' is-low' : ''}`}>{t('現金', '現金')} <b className="money">{money(cash)}</b></span>
         {/* every open job filled at once, by who's the best value for their pay */}
@@ -65,7 +62,7 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
           title={t('每個空缺各雇一位最划算的人', '空いている枠に一番お得な人を雇う')}>{t('一鍵徵人', 'おまかせ採用')}</button>
         <button type="button" className="ofc-close" onClick={onClose} aria-label="close">×</button>
       </header>
-      {tab === 'book' ? book : tab === 'fridge' ? fridge : (
+      {tab === 'book' ? book : (
         <div className="ofc-staff">
           {/* the team as it stands: the owner, then each place to fill */}
           <div className="ofc-team">

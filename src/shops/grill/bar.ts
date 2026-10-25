@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { glowOff, glowOnly } from '@/scene/hoverGlow'
+import { setTip } from '@/scene/hoverTip'
 
 /*
  * Where the customers sit: one or more counters, each a straight run of stools. A counter is given by its middle
@@ -114,6 +115,11 @@ export const handOver = {
     if (el?.style && !POINTER_HINT.hand) el.style.cursor = ''
   },
 }
+/** `handOver` that also names the thing and says what to do with it, in a tag by the pointer */
+export const tipOver = (title: string, hint: string) => ({
+  onPointerOver: (e: Parameters<typeof handOver.onPointerOver>[0]) => { handOver.onPointerOver(e); setTip({ title, hint }) },
+  onPointerOut: (e: Parameters<typeof handOver.onPointerOut>[0]) => { handOver.onPointerOut(e); setTip(null) },
+})
 /** each toilet's door's width, and how far it slides open along the wall */
 export const WC_W = 0.82
 export const WC_SLIDE = WC_W - 0.1

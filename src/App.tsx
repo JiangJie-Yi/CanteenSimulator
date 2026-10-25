@@ -43,6 +43,7 @@ import { ALONG, LAY } from '@/shops/grill/bar'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
+import { HoverTip } from '@/ui/HoverTip'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
@@ -55,7 +56,6 @@ import { useDrag } from '@/ui/useDrag'
 import { effective, restPerMin, ROLES, tirePerMin, type Role } from '@/data/staff'
 import { CANDIDATES, pickHires } from '@/game/hiring'
 import { Office } from '@/ui/Office'
-import { Fridge } from '@/ui/Fridge'
 import { Welcome } from '@/ui/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
 import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
@@ -463,6 +463,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
   const grillSmoke = useRef(0)
   const grillBlackSmoke = useRef(0)
+  if (import.meta.env.DEV) Object.assign(window, { __smoke: grillSmoke })
   // black smoke off a hot pot left on the flame with nothing in it
   const potSmoke = useRef(0)
   const steamLevel = useRef(0)
@@ -715,8 +716,9 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
               <group position={dish.roast ? [FIRE_SHIFT.x, PIT_LIFT, FIRE_SHIFT.z] : undefined}>
               {dish.smoke && (
                 // same white puffs as the soup steam, just taller and slower
-                <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height}
-                  opacity={theme === 'dark' ? 0.5 : 0.7} speed={0.05}
+                // (more, fainter sheets crossed at more angles, so from above it's a soft haze and not a few bright blades)
+                <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height} layers={7}
+                  opacity={theme === 'dark' ? 0.3 : 0.4} speed={0.05}
                   level={dish.heat === 'fire' ? grillSmoke : undefined} />
               )}
               {dish.heatControl && dish.brothY !== undefined && (
@@ -949,7 +951,7 @@ export default function App() {
       window.removeEventListener('pagehide', write)
     }
   }, [])
-  const [office, setOffice] = useState<null | 'book' | 'staff' | 'fridge'>(null)
+  const [office, setOffice] = useState<null | 'book' | 'staff'>(null)
   // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
   const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>({})
   const menuByRef = useRef(menuBy)
@@ -2089,12 +2091,6 @@ export default function App() {
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
             tab={office} onTab={setOffice}
-            fridge={(
-              <Fridge dish={dish} lang={lang} cash={cash} stock={stock}
-                unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
-                onBuy={(id, n) => buyIn(dish, id, n)} onBuyAll={(n) => buyAll(dish, n)} onTopUp={() => topUp(dish)}
-                topUpCost={topUpOrder(dish, stock).cost} />
-            )}
             book={(
               <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)}
                 partCost={(p) => partCost(dish, p)}
@@ -2268,8 +2264,10 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* (the right-hand board only where it has a use: the foods' fridge when researching, the menu once open; in the free view there is none) */}
+      {(hand || ai) && (<>
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id + (hand ? '' : '-menu')} dish={hand ? researchDish(dish) : menuDish(dish)} research={hand}
+      <Menu key={dish.id + (hand ? '' : '-menu')} dish={hand ? researchDish(dish) : menuDish(dish)} research={hand} open={ai}
         layoutLike={!hand ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })} days={days}
         onBuy={!hand ? undefined : (id, n) => buyIn(dish, id, n)} onBuyAll={!hand ? undefined : (n) => buyAll(dish, n)} onTopUp={!hand ? undefined : () => topUp(dish)} topUpCost={topUpOrder(dish, stock).cost}
@@ -2292,10 +2290,13 @@ export default function App() {
           }
           setOrders((all) => ({ ...all, [dish.id]: {} }))
         }} />
-      <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner !== null && !opened[dish.id])}
-        aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
-        <span>{menuFolded ? '‹' : '›'}</span>
-      </button>
+      </>)}
+      {(hand || ai) && (
+        <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner !== null && !opened[dish.id])}
+          aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
+          <span>{menuFolded ? '‹' : '›'}</span>
+        </button>
+      )}
       <button type="button" className="tools-toggle" onClick={() => setToolsOpen((o) => !o)} aria-expanded={toolsOpen}
         aria-label={UI[lang].tools}>{toolsOpen ? '×' : '☰'}</button>
       <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
@@ -2369,6 +2370,7 @@ export default function App() {
         {theme === 'light' ? '夜' : '晝'}
       </button>
       <Bgm />
+      <HoverTip hidden={editOn} />
       <Loader />
     </div>
   )
