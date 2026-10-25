@@ -380,7 +380,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
 
   return (
     <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
-      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}${research ? ' menu-research' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
+      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
       <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>
 
       {research && onBuy && !taiwan ? (

@@ -6633,18 +6633,6 @@ button {
   }
 }
 
-/* the chiller sits to the right, its title to the left of it (the board's usual order, mirrored) */
-.menu.menu-research {
-  padding: 40px 8px 32px 40px;
-}
-
-.menu.menu-research .menu-title {
-  grid-column: 1;
-}
-
-.menu.menu-research .strips-frame {
-  grid-column: 2;
-}
 
 /* the music panel: on / off and the volume, opened from the music button or the speaker on the wall */
 .bgm-panel {
@@ -6695,4 +6683,129 @@ button {
   border-radius: 50%;
   background: rgb(30 32 36 / 0.35);
   pointer-events: none;
+}
+
+/* the ingredient chiller in the menu board's own look: a dark-wood frame, paper-and-wood tags, the same ink and moss as the strips */
+.chiller {
+  border: 4px solid #5a3d28;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgb(251 243 228 / 0.94), rgb(239 226 201 / 0.94));
+  box-shadow: 0 8px 22px rgb(40 24 12 / 0.4), inset 0 0 0 1.5px rgb(255 255 255 / 0.5);
+}
+
+.chiller-top {
+  background: linear-gradient(180deg, #6b4a30, #4a3020);
+  color: #f6e8cc;
+  font-family: var(--brush);
+  letter-spacing: 0.35em;
+}
+
+.chiller-top i {
+  background: #2a1c12;
+  color: #ffd98a;
+  text-shadow: 0 0 6px rgb(255 190 80 / 0.7);
+}
+
+.chiller-bins {
+  scrollbar-color: #a88358 transparent;
+}
+
+.chiller-foot {
+  background: linear-gradient(180deg, #d9c19a, #5a3d28);
+}
+
+.chiller-bin {
+  border: none;
+  border-radius: 4px 5px 4px 6px;
+  background: linear-gradient(90deg, #d9b97f, #e8cfa0 16%, #ecd6a8 84%, #d9b97f);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.2), 0 5px 10px -7px rgb(59 42 32 / 0.6);
+}
+
+.chiller-bin:hover {
+  border: none;
+  box-shadow: inset 0 0 0 1.5px #8a5a32, 0 8px 14px -8px rgb(59 42 32 / 0.7);
+}
+
+.chiller-bin.is-taken {
+  background: linear-gradient(90deg, #e2b79a, #f0cbb0 16%, #f3d3b9 84%, #e2b79a);
+  box-shadow: inset 0 0 0 2px var(--hanko), 0 5px 10px -7px rgb(59 42 32 / 0.6);
+}
+
+.chiller-bin.is-out {
+  filter: saturate(0.55) brightness(0.96);
+  background: linear-gradient(90deg, #cdbd9f, #dccdae 16%, #dccdae 84%, #cdbd9f);
+}
+
+.chiller-bin-en {
+  color: var(--ink-soft);
+}
+
+.chiller-taken {
+  background: var(--hanko);
+}
+
+.chiller-packs {
+  background: rgb(59 42 32 / 0.12);
+  box-shadow: inset 0 1px 3px rgb(59 42 32 / 0.25);
+}
+
+.chiller-packs i {
+  background: linear-gradient(180deg, #fffaf0, #e9d6ae);
+  box-shadow: inset 0 0 0 1px rgb(120 84 48 / 0.4);
+}
+
+.chiller-packs em {
+  color: var(--ink-soft);
+}
+
+.chiller-bin-info b {
+  color: var(--moss);
+}
+
+.chiller-bin-info b.is-zero {
+  color: var(--hanko);
+}
+
+.chiller-bin-info small {
+  color: var(--ink-soft);
+}
+
+.chiller-btn {
+  background: #5a3d28;
+  color: #f6e8cc;
+}
+
+.chiller-btn:hover {
+  background: #7a5336;
+}
+
+.chiller-btn.chiller-top {
+  background: var(--moss);
+  color: #f6f1e2;
+}
+
+.chiller-btn.chiller-top:hover {
+  background: #44684f;
+}
+
+/* the two stocking buttons under the chiller: moss and dark wood, like the rest of the board */
+.tally-buy .tally-topup {
+  background: var(--moss);
+  border-color: var(--moss);
+  color: #f6f1e2;
+}
+
+.tally-buy .tally-buyall {
+  background: #5a3d28;
+  border-color: #5a3d28;
+  color: #f6e8cc;
+}
+
+.tally-buy .tally-topup:hover:not(:disabled) {
+  background: #44684f;
+}
+
+.tally-buy .tally-buyall:hover:not(:disabled) {
+  background: #7a5336;
 }

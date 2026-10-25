@@ -7,7 +7,7 @@ export const nameIn = (lang: Lang, x: Named) => (lang === 'ja' ? x.ja ?? x.name 
 
 export const UI = {
   zh: {
-    menuTitle: '點菜',
+    menuTitle: '菜單',
     researchTitle: '食材',
     nothingYet: '尚未點餐',
     hideMenu: '收起菜單',
