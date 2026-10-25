@@ -12,6 +12,7 @@ import { glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { ALONG, GRILL_OFFSET, KITCHEN_DROP, LAY } from './bar'
 import { Movable } from './Movable'
+import { getEdit } from './edit'
 import { binchotanGeo, binchotanMap } from './Binchotan'
 
 type Spot = { at: [number, number]; r: number }
@@ -463,7 +464,7 @@ function RiceTub() {
         </mesh>
       ))}
       <group position-y={SIDE_TOP} scale={RICE_SCALE}
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v) }}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v) }}
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; glowOnly(e.eventObject) }}
         onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null) }}>
         {/* the tub: pale staves, an ear at each side to lift it by, a band of woven cane round the lower body, and its lid (a bar across

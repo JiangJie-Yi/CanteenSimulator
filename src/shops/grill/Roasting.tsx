@@ -27,7 +27,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { AxisGizmo, focusCamera } from './Movable'
-import { binchotanMap, blockGeo, burningMaps } from './Binchotan'
+import { binchotanGeo, binchotanMap, burningMaps } from './Binchotan'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit } from './edit'
 import { BAMBOO_WARE, CLOUD_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { SHOP } from '@/game/shopState'
@@ -107,6 +107,11 @@ const ASH_TINT = new THREE.Color('#d8d2c8')
 const PLATE_STEP = 1.2
 const DISH_TOP: [number, number, number] = [1.8, 0, -0.26]
 const BASKET_TOP: [number, number, number] = [2.0, 0, 0.4]
+/** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates) */
+const BOWL_TOP: [number, number, number] = [1.55, 0, -0.75]
+const BOWL_R = 0.3
+/** how many pieces the tasting bowl holds before the next goes on top (a ring of this many) */
+const BOWL_RING = 6
 /** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
 const PLATE_TOP: [number, number, number] = [1.45, 0.02, -1.24]
 /** what lives in the cubby under the table: kept there, not carried about (it's under the top, not on it) */
@@ -317,41 +322,6 @@ const TRAY_D = 0.9
 const BOX_R = 0.46
 /** where the seasoning box's first half starts out: beside the cook, along and across the table */
 const BOX_SPOT = { along: 1.55, lay: 1.3 }
-/**
- * A handful of lumps dropped from above onto the pit's floor and let settle: each falls under gravity, rests on the ground, pushes
- * off the others it lands on (as spheres), and is held in by the stones. Run once as the heap's made, so it lies as it would fall.
- */
-function dropHeap(bodies: { x: number; y: number; z: number; r: number }[], floor: number, wall: number, steps = 90) {
-  const vy = bodies.map(() => 0)
-  for (let step = 0; step < steps; step++) {
-    for (let i = 0; i < bodies.length; i++) {
-      const b = bodies[i]
-      vy[i] -= 0.012
-      b.y += vy[i]
-      if (b.y - b.r < floor) { b.y = floor + b.r; vy[i] = 0 }
-      const d = Math.hypot(b.x, b.z)
-      if (d > wall) { b.x *= wall / d; b.z *= wall / d }
-    }
-    for (let i = 0; i < bodies.length; i++) {
-      for (let j = i + 1; j < bodies.length; j++) {
-        const a = bodies[i], c = bodies[j]
-        const dx = c.x - a.x, dy = c.y - a.y, dz = c.z - a.z
-        const dist = Math.hypot(dx, dy, dz) || 1e-6
-        const min = (a.r + c.r) * 0.9
-        if (dist < min) {
-          const push = (min - dist) / 2
-          const nx = dx / dist, ny = dy / dist, nz = dz / dist
-          // (the upper one is moved the more, so a lump lying on another stays up on it)
-          const wa = a.y > c.y ? 1.3 : 0.7, wc = 2 - wa
-          a.x -= nx * push * wa; a.y -= ny * push * wa; a.z -= nz * push * wa
-          c.x += nx * push * wc; c.y += ny * push * wc; c.z += nz * push * wc
-          if (c.y > a.y) vy[j] = Math.max(vy[j], 0); else vy[i] = Math.max(vy[i], 0)
-        }
-      }
-    }
-  }
-  return bodies
-}
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
 const PIT_SCALE = 1.3
 /**
@@ -1510,6 +1480,25 @@ function SideDish({ position, container }: { position: [number, number, number];
   )
 }
 
+/** The tasting bowl (試食碗): a deep round bowl of the same plum-blossom ware, where whatever's cooked by hand to try is put. */
+function TasteBowl({ position, container }: { position: [number, number, number]; container: string }) {
+  const geometry = useMemo(() => {
+    const R = BOWL_R
+    return wareGeometry([[0, 0], [R * 0.4, 0], [R * 0.46, 0.012], [R * 0.7, 0.05], [R * 0.93, 0.12], [R, 0.17], [R * 0.97, 0.178],
+      [R * 0.9, 0.12], [R * 0.66, 0.056], [R * 0.4, 0.024], [0, 0.024]], R)
+  }, [])
+  return (
+    <group position={position} userData={{ container }}>
+      <mesh geometry={geometry} castShadow receiveShadow>
+        <meshToonMaterial color="#ffffff" map={PLUM_WARE} />
+      </mesh>
+      <mesh geometry={geometry} scale={[1.03, 1.06, 1.03]}>
+        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+      </mesh>
+    </group>
+  )
+}
+
 /** Shallow woven bamboo basket with a rolled rim, inked like everything else. */
 function Basket({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = useMemo(() => {
@@ -1739,6 +1728,8 @@ type Piece = {
   /** ordered and waiting raw on the tray (carried or clicked onto the fire from there), and when it arrived */
   staged: boolean
   stagedAt: number
+  /** just put out on the tray: it appears in its spot there rather than sliding in from where it stood on the fire */
+  fresh: boolean
   /** was it on order last frame (a fresh order goes to the tray) */
   wasPresent: boolean
   /** 0 → 1 while moving from the tray onto the fire (1 once it's there) */
@@ -1944,40 +1935,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (the salt heaped higher, filling the ring)
       if (o.name === 'FirePit') { o.scale.y *= PIT_SALT_RISE; scorchEarth(o as THREE.Mesh) }
     }
-    // (the bed's ash, for when the fire is out: a thin grey layer and a few lumps of slag, nothing like the charcoal's own model)
-    if (!root.getObjectByName('AshBed')) {
-      const ground = root.getObjectByName('FirePit')
-      root.updateWorldMatrix(true, true)
-      const box = ground ? new THREE.Box3().setFromObject(ground).applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert()) : null
-      const y0 = box ? box.max.y : 0.02
-      const ash = new THREE.Group()
-      ash.name = 'AshBed'
-      const bed = new THREE.Mesh(new THREE.CircleGeometry(0.5, 28), new THREE.MeshToonMaterial({ color: '#b3b1ac' }))
-      bed.rotation.x = -Math.PI / 2
-      bed.position.y = y0 + 0.004
-      ash.add(bed)
-      // (about ninety lumps as ONE instanced mesh, each placed by chance on a low mound, flat and tilted, in a grey of its own: one draw, one material)
-      const rnd = Math.random
-      const lumps = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshToonMaterial({ color: '#ffffff' }), 90)
-      const d = new THREE.Object3D()
-      const col = new THREE.Color()
-      const ashBodies = Array.from({ length: 90 }, () => {
-        const r = 0.45 * Math.sqrt(rnd()), a = rnd() * Math.PI * 2, size = 0.025 + rnd() * 0.03
-        return { x: Math.cos(a) * r, y: y0 + 0.05 + rnd() * 0.5, z: Math.sin(a) * r, r: size * 1.2 }
-      })
-      dropHeap(ashBodies, y0, 0.5)
-      ashBodies.forEach((b, n) => {
-        d.position.set(b.x, b.y - b.r * 0.35, b.z)
-        d.rotation.set(rnd() * 3, rnd() * 6, rnd() * 3)
-        d.scale.set(b.r * (1.1 + rnd() * 0.5), b.r * (0.45 + rnd() * 0.2), b.r * (0.8 + rnd() * 0.4))
-        d.updateMatrix()
-        lumps.setMatrixAt(n, d.matrix)
-        lumps.setColorAt(n, col.setScalar(0.4 + rnd() * 0.26))
-      })
-      lumps.name = 'AshLump'
-      ash.add(lumps)
-      root.add(ash)
-    }
     // (no striped shadow acne on the salt and no lattice shadow of the net laid over the coals: the ground doesn't take shadows, the net casts none)
     root.traverse((o) => {
       const m = o as THREE.Mesh
@@ -2019,7 +1976,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
         toQ: new THREE.Quaternion(), mats, looks, bites: newBites(), sticks: [], food: [], puffs: [], stickOnly: false,
         netSpot: null, container: null, local: new THREE.Vector3(), carried: false, trash: -1,
-        dabs: { salt: 0, soy: 0, milk: 0, peanut: 0, miso: 0, wasabi: 0, shichimi: 0, yuzu: 0, lemon: 0, water: 0 }, steps: [], staged: false, stagedAt: 0, wasPresent: false, homeFlight: 1,
+        dabs: { salt: 0, soy: 0, milk: 0, peanut: 0, miso: 0, wasabi: 0, shichimi: 0, yuzu: 0, lemon: 0, water: 0 }, steps: [], staged: false, stagedAt: 0, fresh: false, wasPresent: false, homeFlight: 1,
         unwrapped: false, unwrapT: 0, chefSeasoned: false,
         trashFrom: new THREE.Vector3(),
         landed: -1,
@@ -2217,7 +2174,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
   // (each thrown stick its own length, thickness and bend, new each time: from the short to the long)
-  const randomStick = () => blockGeo(0.28 + Math.random() * 0.04, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 8))
+  const randomStick = () => binchotanGeo(0.28 + Math.random() * 0.12, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 8))
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -2328,6 +2285,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.y = 0
     return p
   }
+  const bowlAt = () => new THREE.Vector3(...BOWL_TOP).add(nudge('bowl-0'))
   const basketAt = (n: number) => {
     // (the first lives in the left cubby, on its shelf; more, as they're needed, stand on the table's top in a row)
     const [x, y, z] = n === 0 ? roast.basket!.at : BASKET_TOP
@@ -2342,11 +2300,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (kind === 'lantern') return new THREE.Vector3(DECOR.lantern.at[0], 0, DECOR.lantern.at[1]).add(nudge('lantern'))
     if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
     if (kind === 'rawdish') return onSpares('rawdish', new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])))
+    if (kind === 'bowl') return bowlAt()
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   const footprint = (key: string) => {
     const kind = key.split('-')[0]
-    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R, lantern: DECOR.lantern.r }[kind] ?? 0.3
+    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R, bowl: BOWL_R, lantern: DECOR.lantern.r }[kind] ?? 0.3
   }
   /** a container's footprint as circles: one for most, three in a row along the long tray */
   const circlesOf = (key: string, at: THREE.Vector3) => key === 'tray'
@@ -2361,6 +2320,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     ...(roast.tray ? ['tray'] : []),
     ...(roast.trash ? ['trash'] : []),
     ...(roast.rawDish ? ['rawdish'] : []),
+    'bowl-0',
     'lantern',
   ]
   /**
@@ -2435,9 +2395,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [basketCount, setBasketCount] = useState(1)
   const [wisps, setWisps] = useState<{ key: string; at: [number, number, number] }[]>([])
   // (with the shop open nothing goes in the basket or on the side dishes: it's all served at the bar, unwrapped)
-  const inBasket = (p: Piece) => space !== 'open' && !!roast.basket && !!roast.basketItems?.includes(p.id)
+  /** while the shop's closed and the cook's at it by hand, everything that comes off the fire goes into the tasting bowl */
+  const inBowl = (p: Piece) => (p.collected ? !!p.container?.startsWith('bowl') : space !== 'open' && byHandRef.current)
+  const inBasket = (p: Piece) => !inBowl(p) && space !== 'open' && !!roast.basket && !!roast.basketItems?.includes(p.id)
   // onigiri and mochi off the grill net go on little side dishes of their own
-  const onDish = (p: Piece) => space !== 'open' && !!roast.dish && !!roast.net?.includes(p.id)
+  const onDish = (p: Piece) => !inBowl(p) && space !== 'open' && !!roast.dish && !!roast.net?.includes(p.id)
   const dishAt = (n: number) => {
     // (the first is in the cubby, on its shelf; the rest, as more are needed, in a row on the table's top)
     const [x, y, z] = n === 0 ? roast.dish!.at : DISH_TOP
@@ -2487,7 +2449,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // (only what a customer ordered: cooked for no one, it stays with the cook, on a plate of their own, not sent off to some seat)
   const ownerOf = (p: Piece) => guests.current.find((g) => (g.state === 'waiting' || g.state === 'eating') &&
     g.orders.filter((o) => o === p.id).length > pieces.current.filter((q) => q !== p && q.guest === g.id && q.id === p.id).length)
-  const destination = (p: Piece) => (space === 'open' && (p.container === 'bar' || (!p.collected && ownerOf(p))) ? 'bar' : inBasket(p) ? 'basket' : onDish(p) ? 'dish' : 'plate')
+  const destination = (p: Piece) => (space === 'open' && (p.container === 'bar' || (!p.collected && ownerOf(p))) ? 'bar' : inBowl(p) ? 'bowl' : inBasket(p) ? 'basket' : onDish(p) ? 'dish' : 'plate')
 
   /** take this container out of its stack (or what's on it off it), set down clear of the rest */
   const unstack = (key: string) => {
@@ -2506,6 +2468,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   const collect = (p: Piece) => {
     if (p.collected || !present(p)) return
+    const bowl = inBowl(p)
     const basket = inBasket(p)
     const dish = onDish(p)
     // take the first free spot where it's going (basket, dishes or plates); eaten food frees its spot
@@ -2514,7 +2477,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     let slot = 0
     while (taken.has(slot)) slot++
     // (food comes off the fire onto a plate only if that plate is on the cook's table: a plate carried off it, or fallen to the floor, takes nothing)
-    if (space !== 'open' && !basket && !dish) {
+    if (bowl) {
+      if (outsideTable(bowlAt(), BOWL_R)) { onNotice?.('offTable'); return }
+    } else if (space !== 'open' && !basket && !dish) {
       const pl = plateAt(Math.floor(slot / PER_PLATE))
       if (outsideTable(pl, PLATE_R)) { onNotice?.('offTable'); return }
     }
@@ -2548,7 +2513,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.local.copy(p.toP).sub(containerAt('bar'))
       return
     }
-    if (basket) {
+    if (bowl) {
+      // a ring of them lying in the bowl, the next ring on top of that
+      const ring = Math.floor(slot / BOWL_RING)
+      const a = ((slot % BOWL_RING) / BOWL_RING) * Math.PI * 2 + ring * 0.5
+      const rr = BOWL_R * 0.4 * (1 - ring * 0.25)
+      p.toP.copy(bowlAt()).add(new THREE.Vector3(Math.cos(a) * Math.max(0, rr), 0.07 + ring * 0.05, Math.sin(a) * Math.max(0, rr)))
+      p.container = 'bowl-0'
+      p.toQ.copy(p.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(UP, Math.random() * Math.PI * 2))
+    } else if (basket) {
       // tossed in from just above the basket; from there the physics drops it in and lets it settle
       const a = Math.random() * Math.PI * 2
       const r = Math.random() * 0.1
@@ -2583,7 +2556,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // cutting through it
       p.toP.y += (p.loose ? 0.075 : 0.105) + layer * LAYER_HEIGHT
     }
-    if (basket) p.container = 'basket-0'
+    if (basket && !bowl) p.container = 'basket-0'
     // (onto a plate that's under another, or one stacked up: it's set down on its own first)
     if (p.container && STACKABLE(p.container) && (stackOn.current.has(p.container) || stackTop(p.container) !== p.container)) {
       const offset = p.toP.clone().sub(containerAt(p.container))
@@ -2596,7 +2569,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // A skewer's local axes depend on how its parts were joined in Blender, so flatQ works from the stick itself
     // (it runs from its foot on the outer ring up and in to its tip, the food's broad side facing out) and turns
     // it to lie along LAY_DIR, broad side up; loose pieces just lie on their bottom
-    if (!basket && !dish) flatQ(p, p.toQ)
+    if (!basket && !dish && !bowl) flatQ(p, p.toQ)
   }
 
   /**
@@ -3316,6 +3289,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
     let down: { x: number; y: number } | null = null
     const onMove = (e: PointerEvent) => {
+      if (lockedRef.current) { glowOnly(null); return }
       if (drag.current || held.current) return
       if (e.buttons) return
       aim(e)
@@ -3965,8 +3939,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (o) o.visible = false
     }
     if (burning && !bedSeeded.current && !coals.current.some((c) => c && !c.gone && !c.dying)) { bedSeeded.current = true; dropCoals() }
-    const bedAsh = root.getObjectByName('AshBed')
-    if (bedAsh) bedAsh.visible = true
 
     embers.current.forEach((e, i) => {
       // no fire, no glow; as the heap kindles its glow goes from a deep red, through orange, toward a yellower white at the full blaze, and it breathes
@@ -4105,6 +4077,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         if (menuIds.has(p.id) && roast.tray) {
           p.staged = true
+          p.fresh = true
           p.stagedAt = ++stageSeq.current
           FRIDGE_KICK.at = performance.now()
           p.node.userData.onPlate = true
@@ -4203,7 +4176,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // waiting raw on the tray, laid flat in its spot
         const at = p.loose ? trayLooseSpot(Math.max(0, onBoard.filter((q) => q.loose).indexOf(p)))
           : traySpot(Math.max(0, onBoard.filter((q) => !q.loose).indexOf(p)))
-        p.node.position.lerp(at, Math.min(1, dt * 10))
+        if (p.fresh) { p.node.position.copy(at); p.fresh = false } else p.node.position.lerp(at, Math.min(1, dt * 10))
         // (lying along the tray's long side, which runs across the front)
         flatQ(p, p.node.quaternion, STACK_DIR)
       } else if (!p.collected) {
@@ -4407,7 +4380,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const cap = roast.basket?.capacity ?? 10
     for (const p of pieces.current) {
       // (what's served at the bar has a slot too, but it's the customers' and needs no plate out by the fire)
-      if (p.slot === null || p.eaten || !present(p) || p.container === 'bar') continue
+      if (p.slot === null || p.eaten || !present(p) || p.container === 'bar' || p.container?.startsWith('bowl')) continue
       if (inBasket(p)) needBaskets = Math.max(needBaskets, Math.floor(p.slot / cap) + 1)
       else if (onDish(p)) needDishes = Math.max(needDishes, Math.floor(p.slot / roast.dish!.capacity) + 1)
       else need = Math.max(need, Math.floor(p.slot / PER_PLATE) + 1)
@@ -4437,6 +4410,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   })
 
   const byKey = (key: string) => pieces.current.find((p) => p.key === key)
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pieces: pieces, __collect: collect })
 
   return (
     <>
@@ -4461,6 +4435,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             : <SideDish key={`${k}-${i}`} container="" position={at} />
         })
       })}
+      <TasteBowl container="bowl-0" position={bowlAt().toArray() as [number, number, number]} />
       <EmberBed fuel={fuel} />
       {coalIds.map((id) => coals.current[id] && (
         <group key={id} visible={false} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }}>

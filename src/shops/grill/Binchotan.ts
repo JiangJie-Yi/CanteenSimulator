@@ -74,15 +74,16 @@ export function burningMaps() {
   // (the fractures, drawn the same on both: each a jagged line across the stick, some with a branch running down it)
   type Crack = { pts: [number, number][]; branch: [number, number][] | null }
   const cracks: Crack[] = []
-  // (the fractures fall where blockGeo's grooves do: four across the stick, so it reads as five blocks end to end)
-  for (const f of [0.2, 0.4, 0.6, 0.8]) {
-    const y = H * f
+  // (long fractures running down the stick, as a fire-split stick of binchotan has them: a few wander most of its length, a short one branches off here and there)
+  for (const f of [0.1, 0.3, 0.52, 0.72, 0.9]) {
+    const x0 = W * f
     const pts: [number, number][] = []
-    for (let x = -4; x <= W + 4; x += 9 + rnd() * 10) pts.push([x, y + (rnd() - 0.5) * 7])
+    let x = x0
+    for (let y = -4; y <= H + 4; y += 14 + rnd() * 18) { x += (rnd() - 0.5) * 7; pts.push([x, y]) }
     let branch: [number, number][] | null = null
-    if (rnd() < 0.75) {
-      const bx = 10 + rnd() * (W - 20)
-      branch = [[bx, y], [bx + (rnd() - 0.5) * 10, y + 10 + rnd() * 10], [bx + (rnd() - 0.5) * 14, y + 24 + rnd() * 14]]
+    if (rnd() < 0.6) {
+      const by = 30 + rnd() * (H - 90), bx = x0 + (rnd() - 0.5) * 6
+      branch = [[bx, by], [bx + (rnd() - 0.5) * 22, by + 8 + rnd() * 8], [bx + (rnd() - 0.5) * 30, by + 18 + rnd() * 12]]
     }
     cracks.push({ pts, branch })
   }
@@ -110,12 +111,6 @@ export function burningMaps() {
   for (let i = 0; i < 26; i++) {
     d.fillStyle = rnd() < 0.6 ? `rgba(8,7,6,${0.2 + rnd() * 0.3})` : `rgba(80,74,68,${0.06 + rnd() * 0.1})`
     d.fillRect(rnd() * W, 0, 2 + rnd() * 9, H)
-  }
-  // (each block between two fractures: its own tone, its edges blackened)
-  for (let i = 0; i + 1 < cracks.length; i++) {
-    const y0 = cracks[i].pts[0][1], y1 = cracks[i + 1].pts[0][1]
-    d.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '70,64,58'},${0.06 + rnd() * 0.1})`
-    d.fillRect(0, y0, W, y1 - y0)
   }
   draw(d, 'rgba(4,3,3,0.95)', 5, 0, null)
   for (let i = 0; i < 700; i++) {
@@ -146,42 +141,6 @@ export function burningMaps() {
   return burning
 }
 
-/**
- * A chunk of burning charcoal, not a tube: five blocks end to end, each a little out of line with the next and a little different round, cut in
- * between by deep grooves (where burningMaps puts its glowing fractures), the faces flat and angular.
- */
-export function blockGeo(len: number, r: number, seed = 0) {
-  const L = Math.round(len / 0.02) * 0.02, R = Math.round(r / 0.002) * 0.002
-  const key = `block|${L.toFixed(3)}|${R.toFixed(4)}|${seed % 8}`
-  const hit = cache.get(key)
-  if (hit) return hit
-  const RAD = 9, ROWS = 20
-  const g0 = new THREE.CylinderGeometry(R, R * 1.06, L, RAD, ROWS, false)
-  let sd = 7919 + (seed % 8) * 104729
-  const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647)
-  // (one random size per row and corner, and one sideways offset per block)
-  const ring: number[][] = Array.from({ length: ROWS + 1 }, () => Array.from({ length: RAD + 1 }, () => 0.86 + rnd() * 0.3))
-  const off = Array.from({ length: 5 }, () => [(rnd() - 0.5) * R * 0.22, (rnd() - 0.5) * R * 0.22])
-  const pos = g0.attributes.position
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
-    const t = (y + L / 2) / L
-    const row = Math.round(t * ROWS)
-    if (Math.hypot(x, z) < 1e-6) continue
-    const m = row % 4
-    const groove = row > 0 && row < ROWS && m === 0 ? 0.74 : m === 1 || m === 3 ? 0.94 : 1
-    const ang = Math.round(((Math.atan2(z, x) + Math.PI) / (Math.PI * 2)) * RAD)
-    const k = groove * ring[row][ang]
-    const block = Math.max(0, Math.min(4, Math.floor(t * 5 - 1e-6)))
-    pos.setXYZ(i, x * k + off[block][0], y, z * k + off[block][1])
-  }
-  const g = g0.toNonIndexed()
-  g.computeVertexNormals()
-  cache.set(key, g)
-  return g
-}
-
-const cache = new Map<string, THREE.BufferGeometry>()
 /** how thick the hollow is, as a part of the stick's radius */
 const BORE = 0.46
 /**
@@ -226,3 +185,5 @@ export function binchotanGeo(len: number, r: number, seed = 0) {
   cache.set(key, g)
   return g
 }
+
+const cache = new Map<string, THREE.BufferGeometry>()

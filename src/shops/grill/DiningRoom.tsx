@@ -1066,7 +1066,7 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     }
   })
   return (
-    <group ref={g} onClick={(ev) => { ev.stopPropagation(); TOILETS[who].open = !TOILETS[who].open }}
+    <group ref={g} onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; TOILETS[who].open = !TOILETS[who].open }}
       {...handOver}>
       <group position={[-0.03, H / 2, 0]}>
         <mesh position-y={0.2} rotation-y={-Math.PI / 2}>
@@ -1815,7 +1815,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       m.position.y = 0.0245 + 0.013 * fill
     }
   })
-  const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); incense?.onLight() }
+  const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; incense?.onLight() }
   // (the shrine's front, in the altar's frame: its doors' plane, and the roof's)
   const SC = 1.25
   const flask = (z: number, key: string) => (
@@ -2003,7 +2003,7 @@ export function FridgeDoor({ n = 0 }: { n?: number }) {
   return (
     <group>
       {/* the model's own door, hung on its pivot (the glass and its frame), swung with the rest of the model's scale */}
-      <group onClick={(ev) => { ev.stopPropagation(); FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...handOver}><primitive object={doorRoot} /></group>
+      <group onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...handOver}><primitive object={doorRoot} /></group>
       {/* the mist, low at the foot of the open door, rolling out over the floor */}
       <group position={[0, 0.05, D / 2 + 0.1]}>
         <Steam width={W * 0.9} height={0.5} opacity={0.5} layers={2} color="#eaf6ff" shade="#bcd8ec" speed={0.06} level={mist} />

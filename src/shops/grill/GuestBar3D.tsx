@@ -21,7 +21,7 @@ import { CLOUD_WARE, wareGeometry } from './ware'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { Movable } from './Movable'
-import { setLocked } from './edit'
+import { getEdit, setLocked } from './edit'
 import { changeOf, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
@@ -875,6 +875,7 @@ function RegisterLive({ at, yaw, top }: { at: THREE.Vector3; yaw: number; top: n
         {/* the drawer: its front panel (a lock, the label, a pull slot) and its tray behind it, in one piece that comes out; clicked, it opens */}
         <group ref={drawer} onClick={(e) => {
           e.stopPropagation()
+          if (getEdit().on) return
           // (the drawer's pulled from the operator's side, the front; from behind it's only the case's back)
           const g = drawer.current
           if (!g) return

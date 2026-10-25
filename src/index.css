@@ -6632,3 +6632,16 @@ button {
     font-size: 14px;
   }
 }
+
+/* the chiller sits to the right, its title to the left of it (the board's usual order, mirrored) */
+.menu.menu-research {
+  padding: 40px 8px 32px 40px;
+}
+
+.menu.menu-research .menu-title {
+  grid-column: 1;
+}
+
+.menu.menu-research .strips-frame {
+  grid-column: 2;
+}
