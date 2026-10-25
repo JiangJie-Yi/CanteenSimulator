@@ -55,7 +55,6 @@ import { useDrag } from '@/ui/useDrag'
 import { effective, restPerMin, ROLES, tirePerMin, type Role } from '@/data/staff'
 import { CANDIDATES, pickHires } from '@/game/hiring'
 import { Office } from '@/ui/Office'
-import { Fridge } from '@/ui/Fridge'
 import { Welcome } from '@/ui/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
 import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
@@ -949,7 +948,7 @@ export default function App() {
       window.removeEventListener('pagehide', write)
     }
   }, [])
-  const [office, setOffice] = useState<null | 'book' | 'staff' | 'fridge'>(null)
+  const [office, setOffice] = useState<null | 'book' | 'staff'>(null)
   // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
   const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>({})
   const menuByRef = useRef(menuBy)
@@ -2089,12 +2088,6 @@ export default function App() {
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
             tab={office} onTab={setOffice}
-            fridge={(
-              <Fridge dish={dish} lang={lang} cash={cash} stock={stock}
-                unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })}
-                onBuy={(id, n) => buyIn(dish, id, n)} onBuyAll={(n) => buyAll(dish, n)} onTopUp={() => topUp(dish)}
-                topUpCost={topUpOrder(dish, stock).cost} />
-            )}
             book={(
               <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)}
                 partCost={(p) => partCost(dish, p)}
@@ -2269,7 +2262,7 @@ export default function App() {
         </div>
       )}
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id + (hand ? '' : '-menu')} dish={hand ? researchDish(dish) : menuDish(dish)} research={hand}
+      <Menu key={dish.id + (hand ? '' : '-menu')} dish={hand ? researchDish(dish) : menuDish(dish)} research={hand} open={ai}
         layoutLike={!hand ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })} days={days}
         onBuy={!hand ? undefined : (id, n) => buyIn(dish, id, n)} onBuyAll={!hand ? undefined : (n) => buyAll(dish, n)} onTopUp={!hand ? undefined : () => topUp(dish)} topUpCost={topUpOrder(dish, stock).cost}

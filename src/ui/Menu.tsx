@@ -17,6 +17,8 @@ type MenuProps = {
   feed?: { key: number; id: string; guest: number }[]
   /** shop open: the customers order, not you (the tags only show what's been ordered) */
   locked?: boolean
+  /** the shop is open: the board is titled 菜單 (closed and not researching, it is an untitled preview) */
+  open?: boolean
   /** portions in stock (a tag with none left is marked 缺) */
   stock?: Record<string, number>
   /** (shop closed) the board is the shop's foods to try out, not a menu: there's no menu until dishes are worked out.
@@ -79,7 +81,7 @@ const CAT_NAMES: Record<string, Record<Lang, string>> = {
   xiaolongbao: { zh: '點心', ja: '点心' }, soup: { zh: '湯類', ja: 'スープ' },
 }
 
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0, days, layoutLike,
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, open = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0, days, layoutLike,
   cash = Infinity }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
@@ -380,8 +382,9 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
 
   return (
     <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
-      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
-      <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>
+      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}${research || open ? '' : ' no-title'}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
+      {/* (the board's name only where it's the shop's own: the foods' fridge, or the menu once the shop's open; closed, it's a plain preview) */}
+      {(research || open) && <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>}
 
       {research && onBuy && !taiwan ? (
         <div className="strips-frame">
