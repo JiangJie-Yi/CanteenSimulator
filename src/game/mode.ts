@@ -9,5 +9,7 @@ export const modeOf = (shopOpen: boolean, research = false): KitchenMode => (sho
 export const canCookByHand = (m: KitchenMode) => m === 'research'
 /** whether each piece shows its cooking progress over it */
 export const showsProgress = (m: KitchenMode) => m === 'research'
+/** whether the stock fridge (to take a food out to try, and to call in or top up stock) is on the board */
+export const showsStockFridge = (m: KitchenMode) => m === 'research'
 /** whether the view is held at camera 1: in research, unless the owner is editing the room (which needs a free view) */
 export const holdsCameraOne = (m: KitchenMode, editing: boolean) => m === 'research' && !editing
