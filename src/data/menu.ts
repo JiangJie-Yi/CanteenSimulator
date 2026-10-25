@@ -399,7 +399,7 @@ export const ALL_DISHES: Dish[] = [
       // potatoes toward the right, sweet potatoes toward the left
       spread: { Potato: 0.3, SweetPotato: -0.3 },
     },
-    smoke: { y: 0.85, width: 1.0, height: 2.0 },
+    smoke: { y: 0.85, width: 1.5, height: 1.5 },
     focusY: 0.5,
   },
   {

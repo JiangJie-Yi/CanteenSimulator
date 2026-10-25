@@ -462,6 +462,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
   const grillSmoke = useRef(0)
   const grillBlackSmoke = useRef(0)
+  if (import.meta.env.DEV) Object.assign(window, { __smoke: grillSmoke })
   // black smoke off a hot pot left on the flame with nothing in it
   const potSmoke = useRef(0)
   const steamLevel = useRef(0)
@@ -714,8 +715,9 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
               <group position={dish.roast ? [FIRE_SHIFT.x, PIT_LIFT, FIRE_SHIFT.z] : undefined}>
               {dish.smoke && (
                 // same white puffs as the soup steam, just taller and slower
-                <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height}
-                  opacity={theme === 'dark' ? 0.5 : 0.7} speed={0.05}
+                // (more, fainter sheets crossed at more angles, so from above it's a soft haze and not a few bright blades)
+                <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height} layers={7}
+                  opacity={theme === 'dark' ? 0.3 : 0.4} speed={0.05}
                   level={dish.heat === 'fire' ? grillSmoke : undefined} />
               )}
               {dish.heatControl && dish.brothY !== undefined && (
