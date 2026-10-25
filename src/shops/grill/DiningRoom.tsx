@@ -2665,16 +2665,17 @@ function MusicNotes({ playing }: { playing: boolean }) {
 /**
  * The speaker (スピーカー) hung high in the room's corner, angled down toward the floor, as the ones over a shop's counter are: the model
  * from blender/speaker.py (a black cabinet with rounded edges, a domed perforated grille over a woofer and a horn tweeter, a U-shaped yoke on
- * an arm out from a wall plate, the cable looping down from the back). Click it (when not editing) to open the music panel: on or off, and
- * the volume; its power light shows which.
+ * an arm out from a wall plate, the cable looping down from the back). Click it (when not editing) to switch the music on, and again to switch it off; its
+ * power light shows which.
  */
 const SPEAKER_URL = import.meta.env.BASE_URL + 'models/speaker.glb'
 /** the parts drawn with an ink line round them (the small ones, the grille and the light, without) */
 const SPEAKER_INKED = /^Speaker(Cabinet|Yoke|WallPlate|Arm|Joint|Knob)/
 function WallSpeaker() {
   const [lit, setLit] = useState(false)
-  const { off, panel } = useBgm()
-  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; toggleBgmPanel() }
+  const off = useBgmOff()
+  const tag = () => setTip({ title: '音箱', hint: getBgmOff() ? '點一下開啟音樂' : '點一下關閉音樂' })
+  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setBgmOff(!getBgmOff()); tag() }
   const gltf = useGLTF(SPEAKER_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const root = gltf.scene.clone(true)
@@ -2703,12 +2704,13 @@ function WallSpeaker() {
     inkModel(root, (m) => !SPEAKER_INKED.test(m.name), { width: 0.004, weld: true })
     return { root, led: led as THREE.MeshBasicMaterial | null, toon: [...toon.values()] }
   }, [gltf])
-  useEffect(() => { model.led?.color.set(off ? '#d02a2a' : panel ? '#ffd24a' : '#3ddc6a') }, [model, off, panel])
+  useEffect(() => { model.led?.color.set(off ? '#d02a2a' : '#3ddc6a') }, [model, off])
   // (pointed at, it lifts a little out of the dark, to say it can be clicked)
   useEffect(() => { for (const t of model.toon) t.emissive.set(lit ? '#2a2a30' : '#000000') }, [model, lit])
   return (
-    <group onClick={press} onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); setLit(true); document.body.style.cursor = 'pointer' }}
-      onPointerOut={() => { setLit(false); document.body.style.cursor = '' }} >
+    <group name="look-speaker" onClick={press} onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); setLit(true); handOver.onPointerOver(e as never); tag() }}
+      onPointerOut={(e: { stopPropagation: () => void }) => { setLit(false); handOver.onPointerOut(e as never); setTip(null) }} >
+      <MusicNotes playing={!off} />
       {/* (the handlers on a group round it: a primitive's own aren't attached) */}
       <primitive object={model.root} />
     </group>
