@@ -2215,8 +2215,8 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
         <group key={`${r}-${k}`} ref={reg(`${r}-${k}`)}
           position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin({ kind: 'slot', r, k }, ev)}
-          onPointerOver={(ev) => { if (doorOpen()) { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject) } }}
-          onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null) }}>
+          onPointerOver={(ev) => { if (doorOpen()) { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject) } setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
+          onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null); setTip(null) }}>
           <DrinkBottle id={id} lit />
         </group>
       )))}
@@ -2234,13 +2234,15 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       {/* (what's been taken out, stood on the floor before the fridge) */}
       {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
         <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
-          onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject) }} onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null) }}>
+          onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject); setTip({ title: drinkName(o.id), hint: '拖曳移動，放回櫃子或遞給客人' }) }} onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null); setTip(null) }}>
           <DrinkBottle id={o.id} />
         </group>
       ))}
     </group>
   )
 }
+/** a drink's name, for its tag */
+const drinkName = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? '飲料'
 /** a bottle of one of the drinks, standing (its foot at the origin): its glass or can, its label printed round it,
  * its neck and cap */
 /** how much bigger each drink stands than it's modelled, to be the size it is in a shop (a 350 ml can is 12 cm tall) */
