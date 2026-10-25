@@ -15,13 +15,14 @@ import { brushText, followSign, signTexture } from '@/scene/signFont'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel } from '@/scene/inkHull'
+import { setTip } from '@/scene/hoverTip'
 import { Later } from '@/scene/Later'
 import { mapleTexture } from '@/scene/mapleGrain'
 import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
-import { behindBody, DRAWER_FRONT, DRAWER_KEY, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
+import { behindBody, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
@@ -732,7 +733,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     keyHover.current = on
     const key = useRegisterModel.cached()?.drawerKey ?? null
     liftOn(key, on)
-    REGISTER.helpFor = on && key ? { id: 'DRAWER_KEY', at: key } : null
+    showKeyTip(on ? 'DRAWER_KEY' : null, lang)
     POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand + (on ? 1 : -1))
     const el = ev.target as HTMLElement | null
     if (el?.style) el.style.cursor = on || POINTER_HINT.hand ? 'pointer' : ''
@@ -741,6 +742,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     if (drawerHover.current === on) return
     drawerHover.current = on
     liftOn(useRegisterModel.cached()?.drawer ?? null, on)
+    setTip(on ? { title: lang === 'ja' ? 'レジのドロア' : '收銀抽屜', hint: lang === 'ja' ? 'クリックで開閉（施錠中は開かない）' : '點一下拉開／推回（上鎖時拉不開）' } : null)
     POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand + (on ? 1 : -1))
     const el = ev.target as HTMLElement | null
     if (el?.style) el.style.cursor = on || POINTER_HINT.hand ? 'pointer' : ''

@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html, useGLTF } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
+import { setTip } from '@/scene/hoverTip'
 import { DEPTS, newRegister, pressKey, REG_MODES, REG_TAG_TEXT, regFigure, setMode, settle, turnDrawerKey, type Receipt, type RegKey } from '@/game/register'
 import { keyHelp } from '@/data/registerKeys'
 import type { Lang } from '@/data/i18n'
@@ -31,8 +32,6 @@ export const REGISTER = {
   pressed: new Map<string, number>(),
   /** when the drawer last rattled against its lock (performance.now()) */
   rattleAt: -1e9,
-  /** the help asked for by a part handled elsewhere (the drawer's key, on the drawer): its id and the part */
-  helpFor: null as { id: string; at: THREE.Object3D } | null,
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __register?: typeof REGISTER }).__register = REGISTER
 
@@ -250,7 +249,6 @@ type Ev = { stopPropagation: () => void; object: THREE.Object3D; nativeEvent: Ev
  */
 export function RegisterKeys({ lang }: { lang: Lang }) {
   const { keys, modeKey, drawerKey } = useRegisterModel()
-  const [help, setHelp] = useState<{ id: string; at: THREE.Object3D } | null>(null)
   const rest = useRef(new Map<THREE.Object3D, number>())
   const hovered = useRef<THREE.Object3D | null>(null)
   const lastK = useRef(-1)
@@ -299,13 +297,9 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
     modeKey.rotation.y = knob.current
     const lockWant = REGISTER.state.drawerLocked ? -Math.PI / 2 : 0
     drawerKey.rotation.z += (lockWant - drawerKey.rotation.z) * Math.min(1, delta * 14)
-    // (help asked for by the drawer's key)
-    const ext = REGISTER.helpFor
-    if (ext && help?.id !== ext.id) setHelp(ext)
-    else if (!ext && help && help.id === 'DRAWER_KEY') setHelp(null)
   })
   const blocked = () => getEdit().on || TILL_STATE.k >= 0
-  const showHelp = (id: string | null, at: THREE.Object3D | null) => setHelp((h) => (id && at ? (h?.id === id ? h : { id, at }) : null))
+  const showHelp = (id: string | null) => showKeyTip(id, lang)
   const point = (e: Ev, on: boolean) => {
     const el = e.nativeEvent.target as HTMLElement | null
     POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand + (on ? 1 : -1))
@@ -324,13 +318,13 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
           if (!!key !== !!hovered.current) point(e, !!key)
           hovered.current = key
           liftOn(key, true)
-          showHelp(key?.name.slice(4) ?? null, key)
+          showHelp(key?.name.slice(4) ?? null)
         }}
         onPointerLeave={(e: Ev) => {
           if (hovered.current) point(e, false)
           liftOn(hovered.current, false)
           hovered.current = null
-          showHelp(null, null)
+          showHelp(null)
         }}
         onClick={(e: Ev) => {
           e.stopPropagation()
@@ -341,8 +335,8 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
         <primitive object={keys} />
       </group>
       <group
-        onPointerEnter={(e: Ev) => { if (behindBody(e)) return; liftOn(modeKey, true); point(e, true); showHelp('MODE', modeKey) }}
-        onPointerLeave={(e: Ev) => { if (!WAS_LIFTED(modeKey)) return; liftOn(modeKey, false); point(e, false); showHelp(null, null) }}
+        onPointerEnter={(e: Ev) => { if (behindBody(e)) return; liftOn(modeKey, true); point(e, true); showHelp('MODE') }}
+        onPointerLeave={(e: Ev) => { if (!WAS_LIFTED(modeKey)) return; liftOn(modeKey, false); point(e, false); showHelp(null) }}
         onClick={(e: Ev) => {
           e.stopPropagation()
           if (blocked() || behindBody(e)) return
@@ -352,8 +346,6 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
         }}>
         <primitive object={modeKey} />
       </group>
-      {/* what the key under the pointer does, over it */}
-      {help && <HelpLabel at={help.at} text={keyHelp(help.id, lang, /^D\d$/.test(help.id) ? DEPTS[Number(help.id[1]) - 1] : undefined)} />}
     </>
   )
 }
@@ -365,25 +357,6 @@ const WAS_LIFTED = (root: THREE.Object3D) => {
   return lit
 }
 
-/** a small dark label with what the key does, standing over it (following it in the world) */
-function HelpLabel({ at, text }: { at: THREE.Object3D; text: string }) {
-  const ref = useRef<THREE.Group>(null)
-  useFrame(() => {
-    const g = ref.current
-    if (!g?.parent) return
-    at.getWorldPosition(g.position)
-    g.parent.worldToLocal(g.position)
-  })
-  if (!text) return null
-  return (
-    <group ref={ref}>
-      <Html center style={{ pointerEvents: 'none', transform: 'translateY(-34px)' }} zIndexRange={[40, 0]}>
-        <div style={{ background: 'rgba(24,20,16,0.88)', color: '#f6efe2', font: '600 12px/1.45 "Noto Sans TC", "Noto Sans JP", sans-serif', padding: '4px 9px',
-          borderRadius: 6, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>{text}</div>
-      </Html>
-    </group>
-  )
-}
 
 /** the drawer's key's parts (it rides on the drawer, whose handlers take it) */
 export const DRAWER_KEY = /^RegDrawerKey/
@@ -391,4 +364,12 @@ export const DRAWER_KEY = /^RegDrawerKey/
 export function turnKey() {
   REGISTER.state = turnDrawerKey(REGISTER.state)
   beep('ok')
+}
+
+/** the room's name tag (the paper one by the pointer) for a key of the register: its name, and what it does */
+export function showKeyTip(id: string | null, lang: Lang) {
+  if (!id) { setTip(null); return }
+  const text = keyHelp(id, lang, /^D\d$/.test(id) ? DEPTS[Number(id[1]) - 1] : undefined)
+  const cut = text.indexOf('：')
+  setTip(cut > 0 ? { title: text.slice(0, cut), hint: text.slice(cut + 1) } : { title: text, hint: '' })
 }
