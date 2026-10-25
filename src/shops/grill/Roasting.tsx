@@ -119,8 +119,10 @@ const CONTAINER_TIP = (key: string) => {
   return { title: name, hint: '拖曳移動' }
 }
 /** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates) */
-const BOWL_TOP: [number, number, number] = [1.55, 0, -0.75]
+const BOWL_TOP: [number, number, number] = [1.95, 0, 1.0]
 const BOWL_R = 0.52
+/** how much room the bowl takes when the table's pieces are pushed clear of each other (less than it is: it sits among them) */
+const BOWL_PUSH = 0.3
 /** the bowl's rim above its foot: what's laid across it rests at this height */
 const BOWL_RIM = 0.15
 /** the table's pieces that edit mode moves by their nudge (the cutting board, the seasoning box, the water bucket): the edit id of each */
@@ -2335,7 +2337,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   const footprint = (key: string) => {
     const kind = key.split('-')[0]
-    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R, bowl: BOWL_R, lantern: DECOR.lantern.r }[kind] ?? 0.3
+    return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R, bowl: BOWL_PUSH, lantern: DECOR.lantern.r }[kind] ?? 0.3
   }
   /** a container's footprint as circles: one for most, three in a row along the long tray */
   const circlesOf = (key: string, at: THREE.Vector3) => key === 'tray'
@@ -4481,7 +4483,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   })
 
   const byKey = (key: string) => pieces.current.find((p) => p.key === key)
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pieces: pieces, __collect: collect })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pieces: pieces, __collect: collect, __moved: moved })
 
   return (
     <>
