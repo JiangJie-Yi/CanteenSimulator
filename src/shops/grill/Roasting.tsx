@@ -1837,6 +1837,8 @@ type RoastingProps = {
   blackSmoke?: RefObject<number>
   /** AI simulation: a chef who works the grill and customers who order and eat */
   ai?: boolean
+  /** the shop's shut and being worked by hand (see game/mode) */
+  research?: boolean
   /** the AI customers order from the menu, and the chef adds charcoal, through the app */
   /** order something; false if it couldn't be (the fire or the basket is full) */
   onOrder?: (id: string, guest?: number) => boolean
@@ -1883,7 +1885,7 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  * up the extra portions Dish clones in as they appear.
  */
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
-  onNotice, smoke, blackSmoke, ai = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
+  onNotice, smoke, blackSmoke, ai = false, research = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
   locked = false, notes = {}, crowd = 1, blessed = false, onDrink, onWalkOut, lang = 'zh', names = {}, crew = [], bar = true,
   entries, onOrderEntry }: RoastingProps) {
   const L = () => LINES[lang]
@@ -2698,7 +2700,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const lockedRef = useRef(locked)
   lockedRef.current = locked
   // (with the shop open nothing is cooked or seasoned by hand: the cooks do it; see game/mode)
-  const byHand = canCookByHand(modeOf(ai))
+  const byHand = canCookByHand(modeOf(ai, research))
   const byHandRef = useRef(byHand)
   byHandRef.current = byHand
 
@@ -4528,7 +4530,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {wisps.map((w) => (
         <Wisp key={w.key} at={w.at} onDone={() => setWisps((all) => all.filter((x) => x.key !== w.key))} />
       ))}
-      {active && showsProgress(modeOf(ai)) && tags.map(({ key, id, name, state }) => (
+      {active && showsProgress(modeOf(ai, research)) && tags.map(({ key, id, name, state }) => (
         <group key={key} ref={(g) => { anchors.current[key] = g }}>
           <Html center zIndexRange={[30, 10]}>
             <button type="button"

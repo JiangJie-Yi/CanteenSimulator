@@ -1,9 +1,9 @@
-// The two ways the kitchen is worked. With the shop shut it's research (研製料理): the owner cooks by hand, tries foods out, seasons them, watches how each
-// piece is coming on, and works from the stock fridge. With the shop open it's service (營業): customers order, the kitchen's cooks do the cooking by
-// themselves, and none of those hand tools is there.
+// The three ways the kitchen is: shut and free (the owner looks round, edits the room, reads the menu), shut and in research (研製料理: the owner cooks by hand, tries foods
+// out, seasons them, watches how each piece is coming on, and works from the stock fridge, the view held at camera 1), and open (營業: customers order, the
+// kitchen's cooks do all the cooking, and none of those hand tools is there, the view free).
 
-export type KitchenMode = 'research' | 'service'
-export const modeOf = (shopOpen: boolean): KitchenMode => (shopOpen ? 'service' : 'research')
+export type KitchenMode = 'free' | 'research' | 'service'
+export const modeOf = (shopOpen: boolean, research = false): KitchenMode => (shopOpen ? 'service' : research ? 'research' : 'free')
 
 /** whether food can be picked up, put on the fire and seasoned by hand */
 export const canCookByHand = (m: KitchenMode) => m === 'research'

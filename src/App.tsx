@@ -281,6 +281,8 @@ type SceneProps = {
   notes: Notes
   /** AI simulation on, and what it does through the app */
   ai: boolean
+  /** the shop's shut and being worked by hand (研製料理) */
+  research: boolean
   onOrder: (id: string, guest?: number) => boolean
   onAddCharcoal: () => boolean
   onSay: (who: 'chef' | 'guest', text: string) => void
@@ -383,7 +385,7 @@ function CameraRig({ home, target }: { home: { current: THREE.Vector3 }; target:
   )
 }
 
-function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, overview, ai, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
+function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, frame, onOffFire, onEat, onNotice, resetView, overview, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onGuests, potAi, onPotGuestEat, notes, inUse, phone, noodleWok, entriesOf, onOrderEntry, bakeKitchen,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -392,7 +394,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
   const camera = useThree((s) => s.camera)
   // while the kitchen's being tried out (the shop's closed) the view is held at camera 1; edit mode, and the shop being open, leave it free
   const { on: editing } = useEdit()
-  const lockView = holdsCameraOne(modeOf(ai), editing) && !!DISHES[active].roast && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
+  const lockView = holdsCameraOne(modeOf(ai, research), editing) && !!DISHES[active].roast && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
   const lockRef = useRef(lockView)
   lockRef.current = lockView
   const wasLocked = useRef(false)
@@ -619,12 +621,12 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
                 <Roasting url={url} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
                   active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
-                  ai={ai} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)} blessed={blessed} onDrink={onDrink}
+                  ai={ai} research={research} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)} blessed={blessed} onDrink={onDrink}
                   crew={crewOf(dish.id)} bar={!phone}
                   onWalkOut={(ids, g) => onWalkOut(ids, dish, g)} lang={lang}
                   entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
                   names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))}
-                  space={ai ? 'open' : 'closed'} locked={false}
+                  space={ai ? 'open' : 'closed'} locked={editing}
                   notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))} />
               )}
               {dish.heatControl && <StoveControls url={url} heat={heat} />}
@@ -783,6 +785,10 @@ export default function App() {
   // AI simulation: a chef and customers, and what they've said lately
   // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
+  // the shop's shut and being worked by hand (研製料理): the view is held at camera 1, food is cooked and seasoned by hand, the stock chiller is on the board
+  const [research, setResearch] = useState(false)
+  useEffect(() => { if (ai) setResearch(false) }, [ai])
+  const hand = modeOf(ai, research) === 'research'
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
   const [speed, setSpeed] = useState(1)
   const { on: editOn } = useEdit()
@@ -1995,7 +2001,7 @@ export default function App() {
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             heat={heat} fire={fire} frame={frame} onOffFire={sceneOffFire}
             onEat={onEat} onNotice={sceneNotice}
-            resetView={resetView} overview={overview} ai={ai} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
+            resetView={resetView} overview={overview} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
             incense={{ litAt: incenseAt, onLight: lightIncense }} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech}
@@ -2016,7 +2022,7 @@ export default function App() {
       <div className="stage" ref={stageRef}>
         {flatGrill && dish.roast && (
           <Grill2D roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])} active fire={fire}
-            onOffFire={sceneOffFire} onEat={onEat} onNotice={sceneNotice} ai={ai} onOrder={sceneOrder} onAddCharcoal={addCharcoal}
+            onOffFire={sceneOffFire} onEat={onEat} onNotice={sceneNotice} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal}
             onSay={talk} chef={chefOf(dish.id)} onGuests={(g) => setShopGuests(dish.id, g)}
             crowd={(staffOf(dish.id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed} onDrink={onDrink}
             onWalkOut={(ids, g) => refund(ids, dish, g)} lang={lang} entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
@@ -2235,12 +2241,12 @@ export default function App() {
         </div>
       )}
       <div className="menu-backing" aria-hidden="true" />
-      <Menu key={dish.id + (ai ? '-open' : '')} dish={ai ? menuDish(dish) : researchDish(dish)} research={!ai}
-        layoutLike={ai ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
+      <Menu key={dish.id + (hand ? '' : '-menu')} dish={hand ? researchDish(dish) : menuDish(dish)} research={hand}
+        layoutLike={!hand ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })} days={days}
-        onBuy={ai ? undefined : (id, n) => buyIn(dish, id, n)} onBuyAll={ai ? undefined : (n) => buyAll(dish, n)} onTopUp={ai ? undefined : () => topUp(dish)} topUpCost={topUpOrder(dish, stock).cost}
-         lang={lang} quantities={ai ? entryCount : orders[dish.id]}
-        feed={feed} locked={ai} stock={ai ? entryStock(dish) : stock}
+        onBuy={!hand ? undefined : (id, n) => buyIn(dish, id, n)} onBuyAll={!hand ? undefined : (n) => buyAll(dish, n)} onTopUp={!hand ? undefined : () => topUp(dish)} topUpCost={topUpOrder(dish, stock).cost}
+         lang={lang} quantities={hand ? orders[dish.id] : entryCount}
+        feed={feed} locked={!hand} stock={hand ? stock : entryStock(dish)}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {
           // cancelling everything refunds it (nothing was made)
@@ -2299,6 +2305,13 @@ export default function App() {
         <button type="button" className={`incense-toggle${blessed ? ' is-on' : ''}`} onClick={lightIncense} disabled={blessed}
           title={lang === 'ja' ? 'お神酒を供える（NT$1,000、三分間、客足とご注文が増える）' : '供清酒（花 NT$1,000，三分鐘內客人變多、點得也多）'}>
           {blessed ? (lang === 'ja' ? 'お供え中' : '供酒中') : (lang === 'ja' ? 'お神酒' : '供酒')}
+        </button>
+      )}
+      {/* (研製料理: only while the shop's shut: the view is held at camera 1 and the kitchen's worked by hand; the shop opening ends it) */}
+      {!ai && !!dish.roast && !editOn && (
+        <button type="button" className={`research-toggle${research ? ' is-on' : ''}`} onClick={() => setResearch((v) => !v)} aria-pressed={research}
+          title={lang === 'ja' ? '研究モード（手で焼いて試す・食材の冷蔵庫・固定カメラ）' : '研製料理模式（手動烤魚與調味、食材冷藏櫃、固定視角）'}>
+          研
         </button>
       )}
       {/* (the shop's edit mode, key G: only while it's shut, as it can't be switched on while customers are about) */}

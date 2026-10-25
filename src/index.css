@@ -6586,3 +6586,49 @@ button {
   opacity: 0.4;
   pointer-events: none;
 }
+
+/* 研製料理 (the shop's shut and the kitchen worked by hand), the round button to the left of the music: green when it's on */
+.research-toggle {
+  position: fixed;
+  z-index: 10;
+  top: 20px;
+  right: 384px;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--text-soft);
+  border-radius: 50%;
+  background: var(--page);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.research-toggle:hover {
+  border-color: var(--text);
+}
+.research-toggle.is-on {
+  background: #1d8a46;
+  border-color: #1d8a46;
+  color: #fff;
+}
+.research-toggle:focus-visible {
+  outline: 3px solid var(--moss);
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .research-toggle {
+    top: 14px;
+    right: 308px;
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}
+@media (max-width: 400px) {
+  .research-toggle {
+    width: 34px;
+    height: 34px;
+    right: 246px;
+    font-size: 14px;
+  }
+}

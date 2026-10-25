@@ -68,6 +68,7 @@ export type Grill2DProps = {
   notes?: Record<string, { doneness?: number; dabs?: Record<string, number> }>
   onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
   ai?: boolean
+  research?: boolean
   onOrder?: (id: string, guest?: number) => boolean
   onAddCharcoal?: () => boolean
   onSay?: (who: 'chef' | 'guest', text: string) => void
@@ -86,15 +87,15 @@ export type Grill2DProps = {
   top?: React.ReactNode
 }
 
-export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, onEat, notes = {}, onNotice, ai = false, onOrder,
+export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, onEat, notes = {}, onNotice, ai = false, research = false, onOrder,
   onAddCharcoal, onSay, space = 'closed', lang = 'zh', names = {}, onWalkOut, entries,
   onOrderEntry, crowd = 1, blessed = false, onDrink, chef = CHEFS[1], onGuests, top }: Grill2DProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   // the latest props, read by the loop
-  const live = useRef({ quantities, fire, ai, active, space, notes, chef, crowd, blessed, entries, lang })
-  live.current = { quantities, fire, ai, active, space, notes, chef, crowd, blessed, entries, lang }
+  const live = useRef({ quantities, fire, ai, research, active, space, notes, chef, crowd, blessed, entries, lang })
+  live.current = { quantities, fire, ai, research, active, space, notes, chef, crowd, blessed, entries, lang }
   const cb = useRef({ onOffFire, onEat, onNotice, onOrder, onAddCharcoal, onSay, onWalkOut, onOrderEntry, onDrink, onGuests })
   cb.current = { onOffFire, onEat, onNotice, onOrder, onAddCharcoal, onSay, onWalkOut, onOrderEntry, onDrink, onGuests }
 
@@ -459,7 +460,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
   const doneOf = (p: Piece) => Math.round((p.progress / roast.times[p.id]) * 40) / 40
   const dkOf = (p: Piece) => DABS.map((k) => Math.min(9, p.dabs[k])).join('')
   // (open, nothing's picked up or seasoned by hand: see game/mode)
-  const down = (p: Piece) => (e: React.PointerEvent) => { e.stopPropagation(); if (canCookByHand(modeOf(live.current.ai))) tap(p) }
+  const down = (p: Piece) => (e: React.PointerEvent) => { e.stopPropagation(); if (canCookByHand(modeOf(live.current.ai, live.current.research))) tap(p) }
   const art = (p: Piece) => <FoodArt id={p.id} r={doneOf(p)} dk={dkOf(p)} foil={/Potato/.test(p.id) && !p.collected} fallback={colorOf(p.id)} />
   /** a skewer stuck in the ash round the fire, its food toward the coals (a fish kept right way up) */
   const skewer = (p: Piece, x: number, y: number, a: number) => (
@@ -545,7 +546,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
         })}
       </svg>
       {/* the seasonings: pick one, then tap the food to put it on (tap it again to put it down) */}
-      {canCookByHand(modeOf(ai)) && <div className="grill2d-tools">
+      {canCookByHand(modeOf(ai, research)) && <div className="grill2d-tools">
         {([...DABS, 'water'] as Seasoning[]).map((k) => (
           <button key={k} type="button" className={`g2-tool${tool === k ? ' is-on' : ''}`} style={{ ['--dab' as string]: DAB_COLOR[k] }}
             onClick={() => setTool((t) => (t === k ? null : k))}><ToolIcon k={k} /><span>{DAB_NAME[lang][k]}</span></button>
