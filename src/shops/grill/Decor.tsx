@@ -730,7 +730,7 @@ const RACK_AT = { along: 2.0, lay: 5.05 }
 function RackAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, RACK_AT.along).addScaledVector(LAY, RACK_AT.lay)
-  return <Movable id="platerack" label="碗盤櫃架"><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack /></group></Movable>
+  return <Movable id="platerack" label="碗盤櫃架" baseScale={1.03}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack /></group></Movable>
 }
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (

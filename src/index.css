@@ -6617,9 +6617,9 @@ button {
   background: #7a5336;
 }
 
-/* the music button is the speaker on the wall now; on a narrow screen (no way to reach it) the button stays */
+/* the music button is the speaker on the wall now: it only shows while the speaker is out of the picture (or on a narrow screen) */
 @media (min-width: 901px) {
-  .bgm-toggle {
+  .bgm-toggle.is-seen {
     display: none;
   }
 }

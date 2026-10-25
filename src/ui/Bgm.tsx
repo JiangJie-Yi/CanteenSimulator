@@ -12,7 +12,7 @@ const SRCS = [...IN_SRC, ...NAMES.map((n) => import.meta.env.BASE_URL + 'audio/'
 
 export function Bgm() {
   const audio = useRef<HTMLAudioElement | null>(null)
-  const { off, volume, panel } = useBgm()
+  const { off, volume, panel, seen } = useBgm()
   const [missing, setMissing] = useState(false)
   useEffect(() => {
     const a = new Audio()
@@ -46,7 +46,7 @@ export function Bgm() {
   }, [off])
   return (
     <>
-      <button type="button" className={`bgm-toggle${off || missing ? '' : ' is-on'}`} aria-pressed={!off} aria-label="背景音樂 BGM" title={missing ? '找不到音檔：請放到 src/IzakayaNight.mp3' : '居酒屋の夜'}
+      <button type="button" className={`bgm-toggle${off || missing ? '' : ' is-on'}${seen ? ' is-seen' : ''}`} aria-pressed={!off} aria-label="背景音樂 BGM" title={missing ? '找不到音檔：請放到 src/IzakayaNight.mp3' : '居酒屋の夜'}
         onClick={() => toggleBgmPanel()}>
         {off ? '♪̸' : '♪'}
       </button>

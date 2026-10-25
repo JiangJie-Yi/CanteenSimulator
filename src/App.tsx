@@ -43,6 +43,7 @@ import { ALONG, LAY } from '@/shops/grill/bar'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
+import { setBgmSeen } from '@/ui/bgmStore'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
@@ -321,6 +322,20 @@ const HOUSE_SERVER: CrewMember = { id: 'house-server', role: 'server', look: { f
  * Camera 1 as it's drawn in edit mode: a small camera body with a lens, and the pyramid of what it sees, standing where the view is held (see Scene), so it
  * can be picked from the list or by a click, moved with the arrows, turned with the rings (a turn about the vertical, a tilt) and its numbers typed.
  */
+/** tells the music button whether the wall speaker is on the screen (see bgmStore): checked a few times a second */
+function SpeakerWatch() {
+  const { camera, scene } = useThree()
+  const n = useRef(0)
+  useFrame(() => {
+    if (n.current++ % 12) return
+    const o = scene.getObjectByName('look-speaker')
+    if (!o) { setBgmSeen(false); return }
+    const p = o.getWorldPosition(new THREE.Vector3()).project(camera)
+    setBgmSeen(p.z < 1 && Math.abs(p.x) < 0.92 && Math.abs(p.y) < 0.92)
+  })
+  return null
+}
+
 /**
  * The world axes in a corner of the screen while editing, as a modelling program has them: the room's own X (along the bar, red), Y (up, green) and
  * Z (across it, blue), turned with the camera, so a piece's X, Y, Z fields can be read against the view. It writes into the SVG that App draws.
@@ -740,6 +755,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, heat, fire, fram
 
       {editing && <CameraRig home={home} target={homeTarget} />}
       {editing && <AxisWidget />}
+      <SpeakerWatch />
       <OrbitControls
         ref={controls}
         // shared as the scene's controls so dragging a seasoning onto food can hold the camera still
@@ -2263,6 +2279,8 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* (the right-hand board only where it has a use: the foods' fridge when researching, the menu once open; in the free view there is none) */}
+      {(hand || ai) && (<>
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id + (hand ? '' : '-menu')} dish={hand ? researchDish(dish) : menuDish(dish)} research={hand} open={ai}
         layoutLike={!hand ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
@@ -2287,10 +2305,13 @@ export default function App() {
           }
           setOrders((all) => ({ ...all, [dish.id]: {} }))
         }} />
-      <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner !== null && !opened[dish.id])}
-        aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
-        <span>{menuFolded ? '‹' : '›'}</span>
-      </button>
+      </>)}
+      {(hand || ai) && (
+        <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner !== null && !opened[dish.id])}
+          aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
+          <span>{menuFolded ? '‹' : '›'}</span>
+        </button>
+      )}
       <button type="button" className="tools-toggle" onClick={() => setToolsOpen((o) => !o)} aria-expanded={toolsOpen}
         aria-label={UI[lang].tools}>{toolsOpen ? '×' : '☰'}</button>
       <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}

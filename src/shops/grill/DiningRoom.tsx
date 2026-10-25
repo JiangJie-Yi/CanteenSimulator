@@ -2683,7 +2683,7 @@ function WallSpeaker() {
     </group>
   )
   return (
-    <group onClick={press} {...handOver} rotation-x={0.22}>
+    <group name="look-speaker" onClick={press} {...handOver} rotation-x={0.22}>
       <MusicNotes playing={!off} />
       {/* the bracket: an arm back to the corner */}
       <mesh position={[0, 0.2, -0.12]}><boxGeometry args={[0.05, 0.05, 0.3]} /><meshToonMaterial color="#2a2d31" /></mesh>
