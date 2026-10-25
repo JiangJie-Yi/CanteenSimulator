@@ -2386,6 +2386,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         at.x *= (RING_CLEAR + r) / d
         at.z *= (RING_CLEAR + r) / d
       }
+      // (the tray's a long board, not a disc: its nearest edge or corner is kept out of the stones)
+      if (key === 'tray') {
+        const u = at.dot(STACK_DIR), w = at.dot(LAY_DIR)
+        const nu = u - THREE.MathUtils.clamp(u, -TRAY_W / 2, TRAY_W / 2), nw = w - THREE.MathUtils.clamp(w, -TRAY_D / 2, TRAY_D / 2)
+        const near = Math.hypot(nu, nw)
+        const want = RING_CLEAR + 0.04
+        if (near < want) {
+          // (pushed straight out from the fire, by as much as the nearest point is short)
+          const dir = near > 1e-6 ? new THREE.Vector3().addScaledVector(STACK_DIR, nu / near).addScaledVector(LAY_DIR, nw / near) : new THREE.Vector3(at.x, 0, at.z).normalize()
+          at.addScaledVector(dir, want - near)
+        }
+      }
       // (the tray is long: each of its circles is pushed clear, carrying the whole tray)
       for (const own of circlesOf(key, at)) {
         for (const o of others) {
