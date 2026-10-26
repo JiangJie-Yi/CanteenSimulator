@@ -1456,6 +1456,13 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
             </mesh>
           )
         })}
+        {/* (at the corner, the sliver between this wall's face and its slab where the other wall's slab ends: filled, so the two walls' tops
+            meet without a slot) */}
+        {corner && (
+          <mesh position={[0.006, (WALL_H - BASE_DEPTH) / 2, from - 0.012 - WALL_T / 2]}>
+            <boxGeometry args={[0.014, WALL_H + BASE_DEPTH, WALL_T + 0.002]} /><meshToonMaterial color="#3d2414" />
+          </mesh>
+        )}
         {spans.map(([z0, z1, y0]) => (
           <group key={`${z0}|${y0}`}>
             <WallPiece z0={z0} z1={z1} y0={Math.max(WAINSCOT, y0)} y1={WALL_H} plaster />
