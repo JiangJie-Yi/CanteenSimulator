@@ -6,16 +6,16 @@ import { inkModel } from '@/scene/inkHull'
 
 /**
  * The small things on the till's counter, from blender/tilldesk.py: the pen cup, the receipt printer, the card reader, the service bell, the
- * wooden desk mat and the cat's stand (a river stone). Each is its own node, shown wherever its group stands it (its own Movable in GuestBar3D); materials made toon, the bell's
+ * walnut stand with its drawers, the change tray (カルトン) and the cat's stand (a river stone). Each is its own node, shown wherever its group stands it (its own Movable in GuestBar3D); materials made toon, the bell's
  * dome and the steel bits real metal, an ink line round the bigger parts.
  */
 const URL = import.meta.env.BASE_URL + 'models/tilldesk.glb'
-export type DeskPiece = 'TillPens' | 'TillPrinter' | 'TillCardReader' | 'TillBell' | 'TillMat' | 'TillCatStand'
+export type DeskPiece = 'TillPens' | 'TillPrinter' | 'TillCardReader' | 'TillBell' | 'TillMat' | 'TillCatStand' | 'TillTray'
 /** how high the cat's stand lifts the cat: the stone's worn-flat top */
 export const CAT_STAND_H = 0.108
 /** the parts too small or too flat for an ink line: lettering, lights, slots, teeth, keys, cables and holes */
-const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever|Key|Fn|Nfc|Stripe|Screen|Cable|Hole|Clip|Cap|Felt|Band|Floor|Stem|Knob|Slip|Rim|Blades)/
-const METAL = new Set(['DeskChrome', 'DeskSteel', 'BellGold'])
+const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever|Key|Fn|Nfc|Stripe|Screen|Cable|Hole|Clip|Cap|Felt|Band|Floor|Stem|Knob|Slip|Rim|Blades|Ribs|Thanks|Foot|Post|Pull|Box)/
+const METAL = new Set(['DeskChrome', 'DeskSteel', 'BellGold', 'StandBrass', 'TrayGilt'])
 
 let pieces: Record<DeskPiece, THREE.Object3D> | null = null
 function piecesOf(scene: THREE.Group) {
@@ -28,7 +28,10 @@ function piecesOf(scene: THREE.Group) {
     const src = m.material as THREE.MeshStandardMaterial
     let t = mats.get(src)
     if (!t) {
-      t = METAL.has(src.name)
+      t = src.name === 'TrayResin'
+        // (the change tray's black resin: a soft gloss)
+        ? new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.25 })
+        : METAL.has(src.name)
         ? src.name === 'BellGold'
           // (polished brass: a warm gold that catches the lamps)
           ? new THREE.MeshPhysicalMaterial({ color: '#e2b94a', metalness: 1, roughness: 0.14, clearcoat: 0.6, clearcoatRoughness: 0.08, envMapIntensity: 1.2 })
@@ -42,7 +45,7 @@ function piecesOf(scene: THREE.Group) {
   })
   inkModel(root, (m) => UNINKED.test(m.name), { width: 0.0012, weld: true })
   const get = (n: DeskPiece) => { const o = root.getObjectByName(n)!; o.removeFromParent(); return o }
-  pieces = { TillPens: get('TillPens'), TillPrinter: get('TillPrinter'), TillCardReader: get('TillCardReader'), TillBell: get('TillBell'), TillMat: get('TillMat'), TillCatStand: get('TillCatStand') }
+  pieces = { TillPens: get('TillPens'), TillPrinter: get('TillPrinter'), TillCardReader: get('TillCardReader'), TillBell: get('TillBell'), TillMat: get('TillMat'), TillCatStand: get('TillCatStand'), TillTray: get('TillTray') }
   return pieces
 }
 

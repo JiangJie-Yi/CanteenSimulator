@@ -3,12 +3,23 @@
 // staff are walking about. Here: the state, the key, the panel at the screen's corner, and the list of what can be moved.
 
 import { useSyncExternalStore } from 'react'
+import { EDIT_TEXT, pieceName } from '@/data/editText'
+import type { Lang } from '@/data/i18n'
 
 export type V3 = [number, number, number]
+/** the panel's language (the game's: App sets it) */
+let lang: Lang = 'zh'
+const T = () => EDIT_TEXT[lang]
+export function setEditLang(l: Lang) {
+  if (lang === l) return
+  lang = l
+  built = ''
+  panel()
+}
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
-const KEY = 'jgs-edit-offsets-7'
-const KEY_R = 'jgs-edit-rotations-4'
-const KEY_S = 'jgs-edit-scales-3'
+const KEY = 'jgs-edit-offsets-8'
+const KEY_R = 'jgs-edit-rotations-5'
+const KEY_S = 'jgs-edit-scales-4'
 const KEY_G = 'jgs-edit-groups-1'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
@@ -59,6 +70,8 @@ export const BASES: Record<string, V3> = {
   'till-card': [0, 0.15, 0],
   'till-bell': [-0.1684, 0, -0.2312],
   'till-cat': [-0.0466, 0, -0.0403],
+  'till-tray': [-0.2353, 0, 0.6064],
+  'till-sign': [-0.6444, 0, 0.3636],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece belongs to, if any */
@@ -99,7 +112,7 @@ export function beginChange() {
 }
 export function undo() {
   const prev = past.pop()
-  if (!prev) { toast('沒有可以復原的動作'); return }
+  if (!prev) { toast(T().noUndo); return }
   future.push(take())
   put(prev)
   save()
@@ -107,7 +120,7 @@ export function undo() {
 }
 export function redo() {
   const next = future.pop()
-  if (!next) { toast('沒有可以重做的動作'); return }
+  if (!next) { toast(T().noRedo); return }
   past.push(take())
   put(next)
   save()
@@ -141,13 +154,12 @@ export function resetAll() {
   save(); emit()
 }
 export const select = (id: string | null) => { state.selected = id; emit() }
-const TOOL_NAMES: Record<Tool, string> = { move: '位移 (W)', rotate: '旋轉 (R)', scale: '縮放 (S)' }
 /** which handles the selected piece shows: arrows to move it, rings to turn it, boxes to scale it */
 export function setTool(t: Tool) {
   if (!state.on || state.tool === t) return
   state.tool = t
   emit()
-  toast(`${TOOL_NAMES[t]}`, 'edit')
+  toast(T().tools[t], 'edit')
 }
 
 /** the axis the + and - keys scale along (null: all three together); set with the X, Y, Z keys or by clicking an axis's letter in the Scale rows */
@@ -166,7 +178,7 @@ export function nudgeScale(dir: 1 | -1, axis: 0 | 1 | 2 | null = scaleAxis) {
 export function setScaleAxis(a: 0 | 1 | 2 | null) {
   scaleAxis = scaleAxis === a ? null : a
   panel()
-  toast(scaleAxis === null ? '+ / − 縮放：X Y Z 三軸一起' : `+ / − 縮放：只動 ${'XYZ'[scaleAxis]} 軸`, 'edit')
+  toast(scaleAxis === null ? T().scaleAll : T().scaleOne('XYZ'[scaleAxis]), 'edit')
 }
 
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
@@ -190,18 +202,18 @@ export function pickToggle(id: string) {
 }
 export function makeGroup() {
   const ids = groupable()
-  if (ids.length < 2) { toast('先在清單裡 Ctrl 或 Shift 點選兩件以上的擺設，再按「成組」'); return }
+  if (ids.length < 2) { toast(T().needTwo); return }
   const pts = ids.map((id) => registry.get(id)!.center!()).filter((v): v is V3 => !!v)
   const pivot = (pts.length ? [0, 1, 2].map((k) => pts.reduce((a, v) => a + v[k], 0) / pts.length) : [0, 0, 0]) as V3
   beginChange()
   let n = ++groupSeq
   while (state.groups[`grp${n}`]) n = ++groupSeq
   const id = `grp${n}`
-  state.groups = { ...state.groups, [id]: { name: `群組 ${n}`, members: ids, pivot, t: [0, 0, 0], yaw: 0, s: 1 } }
+  state.groups = { ...state.groups, [id]: { name: T().groupName(n), members: ids, pivot, t: [0, 0, 0], yaw: 0, s: 1 } }
   state.picked = []
   state.selected = id
   save(); emit()
-  toast(`已把 ${ids.length} 件擺設成組：${state.groups[id].name}`, 'edit')
+  toast(T().grouped(ids.length, state.groups[id].name), 'edit')
 }
 export function dissolveGroup(id: string | null = state.selected) {
   if (!id || !state.groups[id]) return
@@ -210,7 +222,7 @@ export function dissolveGroup(id: string | null = state.selected) {
   state.groups = rest
   state.selected = null
   save(); emit()
-  toast('已解散群組，擺設各回自己的位置', 'edit')
+  toast(T().ungrouped, 'edit')
 }
 export function renameGroup(id: string, name: string) {
   if (!state.groups[id]) return
@@ -252,17 +264,17 @@ export function confirmEdit() {
   if (!state.on) return
   baseline = null
   save()
-  leave('已確認，擺設的位置、大小與方向已儲存')
+  leave(T().confirmed)
 }
 /** 取消: back to how it all was before editing began */
 export function cancelEdit() {
   if (!state.on) return
   const changed = baseline ? JSON.stringify(baseline) !== snap() : false
   revert()
-  leave(changed ? '已取消，擺設回到編輯前的位置、大小與方向' : '離開編輯模式')
+  leave(changed ? T().cancelled : T().left)
 }
 export function toggleEdit() {
-  if (state.locked) { toast('營業中不能編輯，請先閉店'); return }
+  if (state.locked) { toast(T().locked); return }
   if (state.on) { cancelEdit(); return }
   baseline = take()
   state.on = true
@@ -270,7 +282,7 @@ export function toggleEdit() {
   state.picked = []
   state.tool = 'move'
   emit()
-  toast('進入編輯模式：拖曳擺設，完成後按「確認」；按 G 或「取消」會放棄變更', 'edit')
+  toast(T().entered, 'edit')
 }
 
 // ---- the panel (plain DOM: it sits over the canvas, and must show even when what's being moved is out of view)
@@ -390,14 +402,14 @@ function panel() {
     toolButtons = (['move', 'rotate', 'scale'] as Tool[]).map((t) => {
       const b = h('button', 'be-tool') as HTMLButtonElement
       b.innerHTML = TOOL_ICONS[t]
-      b.title = `${TOOL_NAMES[t]}（${t === 'move' ? 'W' : t === 'rotate' ? 'R' : 'S'}）`
+      b.title = T().tools[t]
       b.onclick = () => setTool(t)
       bar.appendChild(b)
       return b
     })
     const main = h('div', 'be-main')
-    const head = h('div', 'be-head', '編輯模式')
-    head.appendChild(h('small', '', 'G 離開　Ctrl+Z / Y'))
+    const head = h('div', 'be-head', T().title)
+    head.appendChild(h('small', '', T().keys))
     const body = h('div', 'be-body')
     const section = (title: string) => {
       const sec = h('div', 'be-sec'), st = h('div', 'be-st', title), sc = h('div', 'be-sc')
@@ -407,18 +419,18 @@ function panel() {
       return sc
     }
     // Outliner: every piece that can be taken hold of, a search above, the chosen one lit
-    const out = section('場景物件')
+    const out = section(T().outliner)
     summary = h('div', 'be-sum') as HTMLDivElement
     out.appendChild(summary)
     const find = h('input', 'be-find') as HTMLInputElement
-    find.placeholder = '搜尋…'
+    find.placeholder = T().find
     const list = h('div', 'be-list')
     rows = new Map()
     // (the groups first, each with its members under it; then every piece not in one)
     const addRow = (id: string, label: string, indent: boolean, group: boolean) => {
       const row = h('div', `be-row${group ? ' be-grow' : ''}`, label)
       if (indent) row.style.paddingLeft = '30px'
-      row.title = group ? '選整個群組（一起移動、轉向、縮放）' : 'Ctrl 或 Shift 點選可多選，再按「成組」；單點是把鏡頭帶到它'
+      row.title = group ? T().rowGroup : T().rowPiece
       row.onclick = (e) => {
         const ev = e as MouseEvent
         if (!group && (ev.ctrlKey || ev.metaKey || ev.shiftKey)) { pickToggle(id); return }
@@ -431,20 +443,20 @@ function panel() {
     }
     for (const [gid, g] of Object.entries(state.groups)) {
       addRow(gid, `${g.name}（${g.members.length}）`, false, true)
-      for (const m of g.members) if (registry.has(m)) addRow(m, registry.get(m)!.label, true, false)
+      for (const m of g.members) if (registry.has(m)) addRow(m, pieceName(registry.get(m)!.label, lang), true, false)
     }
-    for (const [id, r] of registry) if (!groupOf(id)) addRow(id, r.label, false, false)
-    find.oninput = () => { const q = find.value.trim().toLowerCase(); for (const [id, row] of rows) row.style.display = !q || (registry.get(id)?.label ?? state.groups[id]?.name ?? id).toLowerCase().includes(q) ? '' : 'none' }
+    for (const [id, r] of registry) if (!groupOf(id)) addRow(id, pieceName(r.label, lang), false, false)
+    find.oninput = () => { const q = find.value.trim().toLowerCase(); for (const [id, row] of rows) row.style.display = !q || (rows.get(id)?.textContent ?? id).toLowerCase().includes(q) ? '' : 'none' }
     out.append(find, list)
     // Transform: what's chosen, then Location, Rotation, Scale each as X / Y / Z stacked, a reset beside each
-    const tr = section('變換')
+    const tr = section(T().transform)
     info = h('div', 'be-name') as HTMLDivElement
     tr.appendChild(info)
     fields = []
     const group = (label: string, step: string, get: (id: string) => V3, set: (id: string, v: V3) => void, rest: V3, stepper = false) => {
       const g = h('div', 'be-grp'), gl = h('div', 'be-gl', label)
       const back = h('button', '', '↺') as HTMLButtonElement
-      back.title = `${label}：放回原狀`
+      back.title = T().resetRow(label)
       back.onclick = () => { const id = state.selected; if (id) { beginChange(); set(id, [...rest] as V3); save() } }
       gl.appendChild(back)
       g.appendChild(gl)
@@ -467,21 +479,21 @@ function panel() {
         if (stepper) {
           // (the scale rows: − and + beside each axis, a twentieth smaller or bigger along it; its letter picks the axis for the − and + keys)
           const minus = h('button', 'be-st1', '−') as HTMLButtonElement, plus = h('button', 'be-st1', '+') as HTMLButtonElement
-          minus.title = `${axis} 軸縮小（- 鍵）`; plus.title = `${axis} 軸放大（+ 鍵）`
+          minus.title = T().shrink(axis); plus.title = T().grow(axis)
           minus.onclick = () => nudgeScale(-1, k as 0 | 1 | 2); plus.onclick = () => nudgeScale(1, k as 0 | 1 | 2)
           f.append(minus, plus)
           f.firstElementChild!.addEventListener('click', () => setScaleAxis(k as 0 | 1 | 2))
           ;(f.firstElementChild as HTMLElement).style.cursor = 'pointer'
-          ;(f.firstElementChild as HTMLElement).title = `選 ${axis} 軸：之後 + / - 鍵只縮放這一軸`
+          ;(f.firstElementChild as HTMLElement).title = T().pickAxis(axis)
         }
         g.appendChild(f)
         fields.push(inp)
       })
       tr.appendChild(g)
     }
-    group('位置 Location', '0.01', (id) => toRoom(id, offsetOf(id)), (id, v) => moveTo(id, fromRoom(id, v)), [0, 0, 0])
-    group('旋轉 Rotation（度）', '5', rotationOf, turnTo, [0, 0, 0])
-    group('縮放 Scale（+ / − 鍵）', '0.05', scaleOf, scaleTo, [1, 1, 1], true)
+    group(T().location, '0.01', (id) => toRoom(id, offsetOf(id)), (id, v) => moveTo(id, fromRoom(id, v)), [0, 0, 0])
+    group(T().rotation, '5', rotationOf, turnTo, [0, 0, 0])
+    group(T().scale, '0.05', scaleOf, scaleTo, [1, 1, 1], true)
     const foot = h('div', 'be-foot')
     const mk = (text: string, title: string, fn: () => void, cls = '') => {
       const b = h('button', cls, text) as HTMLButtonElement
@@ -490,13 +502,13 @@ function panel() {
       return b
     }
     foot.append(
-      mk('成組', '先在清單裡 Ctrl 或 Shift 點選兩件以上，再按這個：把它們組成一個群組，一起移動、轉向、縮放', makeGroup),
-      mk('解散', '解散選到的群組', () => dissolveGroup()),
-      mk('改名', '替選到的群組改名', () => { const g = state.selected ? state.groups[state.selected] : null; if (g) { const n = window.prompt('群組名稱', g.name); if (n) renameGroup(state.selected!, n) } }),
-      mk('復原', 'Ctrl+Z', undo), mk('重做', 'Ctrl+Y', redo),
-      mk('全部還原', '把所有被移動的擺設放回原位', () => { if (window.confirm('把所有被移動的擺設放回原位？')) resetAll() }, 'warn'),
-      mk('取消', '放棄這次所有變更', () => cancelEdit()),
-      mk('確認', '保留這次所有變更', () => confirmEdit(), 'ok'),
+      mk(T().group, T().groupTip, makeGroup),
+      mk(T().ungroup, T().ungroupTip, () => dissolveGroup()),
+      mk(T().rename, T().renameTip, () => { const g = state.selected ? state.groups[state.selected] : null; if (g) { const n = window.prompt(T().renamePrompt, g.name); if (n) renameGroup(state.selected!, n) } }),
+      mk(T().undo, 'Ctrl+Z', undo), mk(T().redo, 'Ctrl+Y', redo),
+      mk(T().resetAll, T().resetAllTip, () => { if (window.confirm(T().resetAllAsk)) resetAll() }, 'warn'),
+      mk(T().cancel, T().cancelTip, () => cancelEdit()),
+      mk(T().confirm, T().confirmTip, () => confirmEdit(), 'ok'),
     )
     main.append(head, body, foot)
     el.append(bar, main)
@@ -509,13 +521,13 @@ function panel() {
     // (how much furniture there is: every piece that can be taken hold of, how many have been moved, turned or sized from where they began, and the groups)
     const pieces = [...registry.keys()]
     const moved = pieces.filter((id) => offsetOf(id).some((v) => Math.abs(v) > 1e-6) || rotationOf(id).some((v) => Math.abs(v) > 1e-6) || scaleOf(id).some((v) => Math.abs(v - 1) > 1e-6)).length
-    summary.textContent = `共 ${pieces.length} 件擺設・調整過 ${moved} 件・群組 ${Object.keys(state.groups).length} 個`
+    summary.textContent = T().summary(pieces.length, moved, Object.keys(state.groups).length)
   }
   el?.querySelectorAll('.be-grp:last-of-type .be-f').forEach((f, k) => f.classList.toggle('axon', scaleAxis === k))
   if (info) {
     const id = state.selected
     const r = id ? registry.get(id) : null
-    info.innerHTML = id ? `${state.groups[id] ? '▣ ' + state.groups[id].name + '（群組）' : r?.label ?? id}` : '<em>（點方塊或左邊的名字選一個）</em>'
+    info.innerHTML = id ? `${state.groups[id] ? '▣ ' + state.groups[id].name + T().groupMark : r ? pieceName(r.label, lang) : id}` : `<em>${T().nothing}</em>`
     const values = id ? [...toRoom(id, offsetOf(id)), ...rotationOf(id), ...scaleOf(id)] : []
     fields.forEach((f, k) => {
       f.disabled = !id || (isGroup(id) && (k === 3 || k === 5))

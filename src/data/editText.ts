@@ -1,0 +1,110 @@
+// The edit mode's words, in Chinese and in Japanese (each kept to its own language: no Japanese in the Chinese, none the other way),
+// and what each piece that can be moved is called in Japanese.
+import type { Lang } from './i18n'
+
+export const EDIT_TEXT = {
+  zh: {
+    title: '編輯模式',
+    keys: 'G 離開　Ctrl+Z / Y',
+    tools: { move: '位移 (W)', rotate: '旋轉 (R)', scale: '縮放 (S)' },
+    outliner: '場景物件',
+    find: '搜尋…',
+    rowGroup: '選整個群組（一起移動、轉向、縮放）',
+    rowPiece: 'Ctrl 或 Shift 點選可多選，再按「成組」；單點是把鏡頭帶到它',
+    transform: '變換',
+    location: '位置',
+    rotation: '旋轉（度）',
+    scale: '縮放（+ / − 鍵）',
+    resetRow: (label: string) => `${label}：放回原狀`,
+    shrink: (a: string) => `${a} 軸縮小（- 鍵）`,
+    grow: (a: string) => `${a} 軸放大（+ 鍵）`,
+    pickAxis: (a: string) => `選 ${a} 軸：之後 + / - 鍵只縮放這一軸`,
+    group: '成組', groupTip: '先在清單裡 Ctrl 或 Shift 點選兩件以上，再按這個：把它們組成一個群組，一起移動、轉向、縮放',
+    ungroup: '解散', ungroupTip: '解散選到的群組',
+    rename: '改名', renameTip: '替選到的群組改名', renamePrompt: '群組名稱',
+    undo: '復原', redo: '重做',
+    resetAll: '全部還原', resetAllTip: '把所有被移動的擺設放回原位', resetAllAsk: '把所有被移動的擺設放回原位？',
+    cancel: '取消', cancelTip: '放棄這次所有變更',
+    confirm: '確認', confirmTip: '保留這次所有變更',
+    summary: (n: number, moved: number, groups: number) => `共 ${n} 件擺設・調整過 ${moved} 件・群組 ${groups} 個`,
+    groupMark: '（群組）',
+    nothing: '（點方塊或左邊的名字選一個）',
+    groupName: (n: number) => `群組 ${n}`,
+    noUndo: '沒有可以復原的動作', noRedo: '沒有可以重做的動作',
+    scaleAll: '+ / − 縮放：X Y Z 三軸一起', scaleOne: (a: string) => `+ / − 縮放：只動 ${a} 軸`,
+    needTwo: '先在清單裡 Ctrl 或 Shift 點選兩件以上的擺設，再按「成組」',
+    grouped: (n: number, name: string) => `已把 ${n} 件擺設成組：${name}`,
+    ungrouped: '已解散群組，擺設各回自己的位置',
+    confirmed: '已確認，擺設的位置、大小與方向已儲存',
+    cancelled: '已取消，擺設回到編輯前的位置、大小與方向',
+    left: '離開編輯模式',
+    locked: '營業中不能編輯，請先閉店',
+    entered: '進入編輯模式：拖曳擺設，完成後按「確認」；按 G 或「取消」會放棄變更',
+  },
+  ja: {
+    title: '編集モード',
+    keys: 'G で終了　Ctrl+Z / Y',
+    tools: { move: '移動 (W)', rotate: '回転 (R)', scale: '拡大縮小 (S)' },
+    outliner: 'シーンの物',
+    find: '検索…',
+    rowGroup: 'グループごと選ぶ（まとめて移動・回転・拡大縮小）',
+    rowPiece: 'Ctrl か Shift を押しながらクリックで複数選択、「グループ化」でまとめる。クリックだけならカメラがその物へ',
+    transform: 'トランスフォーム',
+    location: '位置',
+    rotation: '回転（度）',
+    scale: '拡大縮小（+ / − キー）',
+    resetRow: (label: string) => `${label}：元に戻す`,
+    shrink: (a: string) => `${a} 軸を縮小（- キー）`,
+    grow: (a: string) => `${a} 軸を拡大（+ キー）`,
+    pickAxis: (a: string) => `${a} 軸を選ぶ：以後 + / - キーはこの軸だけを拡大縮小`,
+    group: 'グループ化', groupTip: 'リストで Ctrl か Shift を押しながら二つ以上選んでから押す：まとめてひとつのグループにし、一緒に移動・回転・拡大縮小',
+    ungroup: '解除', ungroupTip: '選んだグループを解除',
+    rename: '名前変更', renameTip: '選んだグループの名前を変える', renamePrompt: 'グループ名',
+    undo: '元に戻す', redo: 'やり直す',
+    resetAll: 'すべて戻す', resetAllTip: '動かした物をすべて元の位置に戻す', resetAllAsk: '動かした物をすべて元の位置に戻しますか？',
+    cancel: 'キャンセル', cancelTip: '今回の変更をすべて破棄',
+    confirm: '確定', confirmTip: '今回の変更をすべて保存',
+    summary: (n: number, moved: number, groups: number) => `全 ${n} 点・調整済み ${moved} 点・グループ ${groups} 個`,
+    groupMark: '（グループ）',
+    nothing: '（箱か左の名前をクリックして選ぶ）',
+    groupName: (n: number) => `グループ ${n}`,
+    noUndo: '元に戻せる操作がありません', noRedo: 'やり直せる操作がありません',
+    scaleAll: '+ / − 拡大縮小：X Y Z の三軸まとめて', scaleOne: (a: string) => `+ / − 拡大縮小：${a} 軸だけ`,
+    needTwo: 'リストで Ctrl か Shift を押しながら二つ以上選んでから「グループ化」を押してください',
+    grouped: (n: number, name: string) => `${n} 点をグループにしました：${name}`,
+    ungrouped: 'グループを解除しました。それぞれ元の位置に戻ります',
+    confirmed: '確定しました。位置・大きさ・向きを保存しました',
+    cancelled: 'キャンセルしました。編集前の位置・大きさ・向きに戻しました',
+    left: '編集モードを終了',
+    locked: '営業中は編集できません。先に閉店してください',
+    entered: '編集モード：物をドラッグして動かし、終わったら「確定」。G か「キャンセル」で変更を破棄',
+  },
+} satisfies Record<Lang, unknown>
+
+/** each piece's name in Japanese, by its Chinese name */
+const PIECES_JA: Record<string, string> = {
+  備長炭籃: '備長炭のかご', 團扇: 'うちわ', 行燈: '行灯', 飯桶: '飯びつ', 冷藏櫃: '冷蔵庫', 碗盤櫃架: '食器棚', 大砧板: '大まな板',
+  調味盒: '調味料入れ', 水桶: '水桶', 櫃檯尾閘門門板: 'カウンター端の扉', 水槽旁閘門門板: '流し横の扉', 供桌: '供え台', 神龕: '神棚',
+  神龕旁花瓶與杯: '神棚の花瓶と杯', 御神酒壺: '御神酒徳利', 橘子盤: 'みかんの皿', 供桌上的供品與線香: '供え物と線香',
+  門口招財貓台: '入口の招き猫台', 玄關地墊: '玄関マット', 鞋櫃: '下駄箱', 紅燈籠: '赤提灯', 門簾: '暖簾', 收銀櫃檯: 'レジカウンター',
+  '收銀機（含抽屜）': 'レジスター（ドロワー付き）', 刷卡機: 'カード端末', 明細印表機: 'レシートプリンター', 找零盤: 'カルトン', 筆筒: 'ペン立て',
+  服務鈴: '呼び鈴', '木質台座（含抽屜）': '木の台（引き出し付き）', 結帳牌: 'お会計札', 櫃檯招財貓: 'カウンターの招き猫',
+  '紙箱（紙袋）': '段ボール箱（紙袋）', '紙箱（收銀紙捲）': '段ボール箱（レジロール）', 收銀機操作說明書: 'レジスター取扱説明書', 錢箱: '手提げ金庫',
+  '平板（iPad）': 'タブレット（iPad）', 喇叭: 'スピーカー', 酒樽: '酒樽', 餐盤堆: '皿の山', 柳樹: '柳', 員工專用墊: '従業員用マット',
+  竹盆栽: '竹の鉢植え', 酒箱: '酒の木箱', '攝影機 1（研製視角）': 'カメラ 1（試作の視点）',
+}
+/** the words in the names made up as they're placed (畫（-5, -4.2）, 馬桶（男廁）, 座位 3…) */
+const WORDS_JA: [string, string][] = [
+  ['石洗手台與鏡子', '石の手洗い鉢と鏡'], ['簀之子踏板', 'すのこ'], ['室內拖鞋', 'トイレスリッパ'], ['衛生紙架', 'ペーパーホルダー'],
+  ['廁所牌', 'お手洗い札'], ['竹花瓶', '竹の花入れ'], ['旗幟串', '三角旗の連なり'], ['燈串', '提灯の連なり'], ['幟旗', 'のぼり旗'],
+  ['吊燈', '吊り灯'], ['馬桶', '便器'], ['紙燈', '紙の灯り'], ['招財貓', '招き猫'], ['飲料櫃', 'ドリンク冷蔵庫'], ['座位', '席'],
+  ['掛軸', '掛け軸'], ['木牌', '木札'], ['男廁', '男性用'], ['女廁', '女性用'], ['畫', '絵'],
+]
+/** a piece's name in the panel's language */
+export function pieceName(zh: string, lang: Lang) {
+  if (lang !== 'ja') return zh
+  if (PIECES_JA[zh]) return PIECES_JA[zh]
+  let s = zh
+  for (const [a, b] of WORDS_JA) s = s.split(a).join(b)
+  return s
+}

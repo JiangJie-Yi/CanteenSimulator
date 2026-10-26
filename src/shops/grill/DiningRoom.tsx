@@ -1009,7 +1009,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.06, 0, 0]}><boxGeometry args={[0.012, 0.1, 0.07]} /><meshToonMaterial color="#8a5a30" /></mesh>)}
       </group>
       </StaticBatch></Movable>
-      <Movable id={`wc-${who}-plaque`} label={`お手洗い牌（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
+      <Movable id={`wc-${who}-plaque`} label={`廁所牌（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       <mesh position={[D * 0.45, 1.5, w / 2 - 0.006]} rotation-y={Math.PI}><planeGeometry args={[0.3, 0.12]} /><meshToonMaterial color="#ffffff" map={WC_PLAQUE} /></mesh>
       </StaticBatch></Movable>
       <Movable id={`wc-${who}-lamp`} label={`紙燈（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>

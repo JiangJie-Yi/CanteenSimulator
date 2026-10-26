@@ -160,6 +160,34 @@ export function beep(kind: 'ok' | 'error') {
   } catch { /* (no sound to be had: the keys work all the same) */ }
 }
 
+/** the drawer springing open: the latch's clack, then the register's bell (a bright ding, two partials a little apart, ringing on) */
+export function chime() {
+  try {
+    audio ??= new AudioContext()
+    const t = audio.currentTime
+    const n = audio.createBufferSource()
+    const buf = audio.createBuffer(1, Math.round(audio.sampleRate * 0.03), audio.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2
+    n.buffer = buf
+    const ng = audio.createGain()
+    ng.gain.value = 0.05
+    n.connect(ng).connect(audio.destination)
+    n.start(t)
+    for (const [f, g, len] of [[2637, 0.045, 1.3], [2649, 0.03, 1.1], [3951, 0.018, 0.6], [5274, 0.008, 0.3]] as [number, number, number][]) {
+      const o = audio.createOscillator(), v = audio.createGain()
+      o.type = 'sine'
+      o.frequency.value = f
+      v.gain.setValueAtTime(0.0001, t + 0.02)
+      v.gain.exponentialRampToValueAtTime(g, t + 0.025)
+      v.gain.exponentialRampToValueAtTime(0.0001, t + 0.025 + len)
+      o.connect(v).connect(audio.destination)
+      o.start(t + 0.02)
+      o.stop(t + 0.05 + len)
+    }
+  } catch { /* (no sound to be had) */ }
+}
+
 /** the receipt's paper: a tall canvas, of which only the part printed on is shown */
 const RECEIPT_W = 170, RECEIPT_H = 360
 export const RECEIPT_TEX = (() => {

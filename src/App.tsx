@@ -29,7 +29,7 @@ import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
-import { offsetOf, registerMovable, rotationOf, select, setFrame, toggleEdit, useEdit } from '@/shops/grill/edit'
+import { offsetOf, registerMovable, rotationOf, select, setEditLang, setFrame, toggleEdit, useEdit } from '@/shops/grill/edit'
 import { AxisGizmo, focusCamera } from '@/shops/grill/Movable'
 import { ALONG, LAY } from '@/shops/grill/bar'
 import { cameraOneOf } from '@/scene/camera1'
@@ -1139,6 +1139,8 @@ export default function App() {
     }
   })
   langRef.current = lang
+  // (the edit mode's panel speaks the game's language)
+  useEffect(() => setEditLang(lang), [lang])
   const toggleLang = () =>
     setLang((l) => {
       const next: Lang = l === 'zh' ? 'ja' : 'zh'
@@ -1996,7 +1998,7 @@ export default function App() {
         </button>
       )}
       {editOn && (
-        <svg id="axis-widget" className="axis-widget" viewBox="0 0 72 72" aria-label="世界座標 X Y Z">
+        <svg id="axis-widget" className="axis-widget" viewBox="0 0 72 72" aria-label={lang === 'ja' ? 'ワールド座標 X Y Z' : '世界座標 X Y Z'}>
           {[['#ff3b30', 'X'], ['#34c759', 'Y'], ['#0a84ff', 'Z']].map(([c, n], i) => (
             <g key={n}>
               <circle className={`aw-neg-${i}`} r="4" fill="none" stroke={c} strokeWidth="1.5" opacity="0.5" />

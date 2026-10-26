@@ -25,7 +25,7 @@ import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
 import { TillCounter } from './TillCounter'
 import { CAT_STAND_H, TillBellLive, TillDeskPiece } from './TillDesk'
-import { behindBody, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
+import { behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
@@ -458,32 +458,14 @@ function Chochin({ mark }: { mark: string }) {
  * customers' display), a card reader, a receipt printer with its paper curling out, a tray for the change, a cup of
  * pens, a little bell to ring, the お会計 sign facing the customers, and a beckoning cat (招き猫) for luck.
  */
-/** the warm light washing down the till's front from under its top: bright at the top, fading out */
-const TILL_GLOW = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 8
-  c.height = 64
-  const g = c.getContext('2d')!
-  const grad = g.createLinearGradient(0, 0, 0, 64)
-  grad.addColorStop(0, 'rgba(255,214,150,0.55)')
-  grad.addColorStop(1, 'rgba(255,214,150,0)')
-  g.fillStyle = grad
-  g.fillRect(0, 0, 8, 64)
-  return new THREE.CanvasTexture(c)
-})()
 export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; top: number; lang: Lang }) {
-  const { W, D } = TILL
   return (
     <>
       <Movable id="till-counter" label="收銀櫃檯"><StaticBatch>
       <group position={at} rotation-y={yaw}>
       {/* (local x along the bar, +z toward the cashier, behind it) */}
-      {/* the counter itself, from blender/tillcounter.py: its dark body, the marble top, the acrylic partition along the customers' side and the end */}
+      {/* the counter itself, from blender/tillcounter.py: its dark body with the lit bamboo and the lantern window, the marble top, the walnut partition */}
       <TillCounter top={top} />
-      {/* (a warm light hidden under the top's overhang, washing down the customers' face) */}
-      <mesh position={[0, top - 0.075, -D / 2 - 0.0]} rotation-y={Math.PI}><planeGeometry args={[W - 0.1, 0.025]} /><meshBasicMaterial color="#ffd89a" toneMapped={false} /></mesh>
-      <mesh position={[0, top - 0.22, -D / 2 + 0.018]} rotation-y={Math.PI}><planeGeometry args={[W - 0.06, 0.3]} /><meshBasicMaterial map={TILL_GLOW} transparent depthWrite={false} toneMapped={false} /></mesh>
       </group>
       </StaticBatch></Movable>
       <Movable id="till-register" label="收銀機（含抽屜）">
@@ -521,20 +503,10 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       <group position={[-0.38, top, 0.12]}><TillDeskPiece name="TillPrinter" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-tray" label="找零盤與零錢"><StaticBatch>
+      <Movable id="till-tray" label="找零盤" baseTurn={[0, 90, 0]}><StaticBatch>
       <group position={at} rotation-y={yaw}>
-      {/* the coin tray (カルトン), a lacquered dish at the register's front for the change, with coins and a folded note in it, the cup of pens, the bell */}
-      <group position={[0.0, top, -0.4]}>
-        <Part geo={REG_GEO.round} color="#7a1f16" outline={1.04} position-y={0.009} scale={[0.22, 0.02, 0.14]} />
-        <mesh position-y={0.0195} rotation-x={-Math.PI / 2}><planeGeometry args={[0.19, 0.11]} /><meshToonMaterial color="#3e100b" /></mesh>
-        {([[-0.07, -0.03, 100, 3], [-0.04, -0.03, 500, 2], [-0.07, 0.02, 10, 2], [-0.04, 0.02, 50, 4]] as [number, number, CoinKind, number][]).map(([x, z, kind, n], i) => (
-          <CoinStack key={i} kind={kind} n={n} position={[x, 0.0198, z]} />
-        ))}
-        {([[0.0, -0.03, 1], [0.0, 0.02, 5]] as [number, number, CoinKind][]).map(([x, z, kind], i) => (
-          <CoinStack key={i} kind={kind} n={1} position={[x, 0.0198, z]} />
-        ))}
-        <NoteStack kind={1000} n={1} position={[0.05, 0.0198, 0.0]} rotation-y={Math.PI + 0.3} />
-      </group>
+      {/* the change tray (カルトン, blender/tilldesk.py): black resin, its floor ribbed, ありがとうございました in gold along its edge */}
+      <group position={[0.0, top, -0.4]}><TillDeskPiece name="TillTray" /></group>
       </group>
       </StaticBatch></Movable>
       <Movable id="till-pens" label="筆筒"><StaticBatch>
@@ -551,13 +523,13 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       </group>
       </group>
       </Movable>
-      <Movable id="till-mat" label="木質桌墊"><StaticBatch>
+      <Movable id="till-mat" label="木質台座（含抽屜）"><StaticBatch>
       <group position={at} rotation-y={yaw}>
       {/* the wooden desk mat the reader, the printer, the pens and the tablet stand on (blender/tilldesk.py) */}
       <group position={[-0.21, top, -0.005]}><TillDeskPiece name="TillMat" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-sign" label="お会計牌"><StaticBatch>
+      <Movable id="till-sign" label="結帳牌"><StaticBatch>
       <group position={at} rotation-y={yaw}>
       {/* the お会計 sign, in its little wooden stand, to the customers */}
       <group position={[0.36, top, -0.3]} rotation-y={Math.PI}>
@@ -660,6 +632,8 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
   const change = useRef<THREE.Group>(null)
   const open = useRef(0)
   const vel = useRef(0)
+  /** (whether the drawer was last sent out: it rings as it's let go) */
+  const sentOut = useRef(false)
   const [pay, setPay] = useState<{ tender: Note[]; change: (Note | CoinKind)[] }>({ tender: [], change: [] })
   const paySeen = useRef('')
   const led = useMemo(() => {
@@ -677,6 +651,10 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     // meets its stop with a small bounce)
     // (pointed at while shut, it comes out a hair, as if a finger's on it)
     const want = Math.max(TILL_STATE.drawer, TILL_STATE.manual ? 1 : 0, drawerHover.current ? 0.025 : 0)
+    if (want > 0.5 !== sentOut.current) {
+      sentOut.current = want > 0.5
+      if (sentOut.current) chime()
+    }
     const dt2 = Math.min(delta, 0.03)
     const opening = want > open.current
     const stiff = opening ? 300 : 140, damp = opening ? 19 : 20

@@ -320,6 +320,9 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   void offsets; void rotations; void scales; void selected; void groups // (read so it redraws as it's moved, turned or scaled)
   const o = positionOf(id)
   const rot = rotationOf(id), sc = scaleOf(id)
+  // (turned or sized about its middle, it can't be shown until that middle's known: drawn about the wrong point first, it would jump into place)
+  const pivoted = baseScale !== 1 || baseTurn.some((v) => v) || rot.some((v) => v) || sc.some((v) => v !== 1)
+  const [ready, setReady] = useState(false)
 
   /** its size and middle as it stands untouched: taken of the inner group alone (the handle and arrows are not in it), in the frame of the group that carries the offset */
   /**
@@ -419,9 +422,14 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   })
 
   // (its middle, once it has been drawn (a frame later, for a batch that merges after mount), and its box when editing begins)
+  // (tried every tenth of a second until there's something to measure: a model may still be loading)
   useEffect(() => {
-    const t = window.setTimeout(() => { const m = measure(); if (m) setMid(m.c) }, 400)
-    return () => window.clearTimeout(t)
+    let tries = 0
+    const t = window.setInterval(() => {
+      const m = measure()
+      if (m || ++tries > 80) { if (m) setMid(m.c); setReady(true); window.clearInterval(t) }
+    }, 100)
+    return () => window.clearInterval(t)
   }, [])
   useEffect(() => {
     if (!on) { setBox(null); return }
@@ -489,7 +497,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       {/* (turned and scaled about the piece's own middle, not the group's origin, which may be far from it) */}
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
           scaled there, and stood back) */}
-      <group position={mid} rotation-y={theta}>
+      <group position={mid} rotation-y={theta} visible={ready || !pivoted}>
         <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]} scale={[sc[0] * baseScale, sc[1] * baseScale, sc[2] * baseScale]}>
           <group rotation-y={-theta}>
             <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}>{children}</group>

@@ -5,12 +5,12 @@ import { inkModel } from '@/scene/inkHull'
 
 /**
  * The till counter, from blender/tillcounter.py, in the till's own frame (built for a top at TILL_TOP; another height stretches the body to
- * it): the dark wooden body with green bamboo up the customers' face and a round lit window with its halo, a polished white marble top, and
- * the low solid hinoki partition along the customers' side and the end by the cats.
+ * it): the dark wooden body with loose green bamboo up the customers' face (a warm light behind it showing through) and a round window lit
+ * from within like a paper lantern, a polished white marble top, and the walnut partition of fine slats along the customers' side and down the end.
  */
 const URL = import.meta.env.BASE_URL + 'models/tillcounter.glb'
 export const TILL_TOP = 0.86
-const UNINKED = /^(TillWindowPaper|TillWindowGlow|TillLattice|TillBambooNode|TillRope)/
+const UNINKED = /^(TillWindowPaper|TillWindowSleeve|TillBambooGlow|TillLattice|TillRope|TillSlat|TillBack|TillShoe)|Node\d/
 
 function finishOf(src: THREE.MeshStandardMaterial): THREE.Material {
   switch (src.name) {
@@ -21,11 +21,16 @@ function finishOf(src: THREE.MeshStandardMaterial): THREE.Material {
       // (green bamboo's waxy skin: a soft sheen)
       return new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.35, clearcoat: 0.4, clearcoatRoughness: 0.3 })
     case 'TillWindowPaper':
-      return new THREE.MeshBasicMaterial({ color: '#ffe2a8', toneMapped: false })
-    case 'TillWindowGlow':
-      // (the window's halo: its black edges add nothing, its warm middle brightens whatever is behind; drawn over the end without a depth test
-      // (the end's own faces hid half of it), its front only, so it's seen only from outside the end)
-      return new THREE.MeshBasicMaterial({ map: src.map, color: new THREE.Color(2.2, 1.9, 1.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })
+      // (the window's paper, lit from within like a lantern: brightest where the lamp is, its fibres showing)
+      return new THREE.MeshBasicMaterial({ map: src.map, color: new THREE.Color(1.25, 1.15, 1.05), toneMapped: false })
+    case 'TillBambooGlow':
+      // (the warm light behind the bamboo, showing between the culms)
+      return new THREE.MeshBasicMaterial({ map: src.map, color: new THREE.Color(1.1, 1.05, 1), toneMapped: false })
+    case 'TillShieldWalnut':
+      // (oiled walnut: a soft sheen)
+      return new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.35 })
+    case 'TillShieldShoe':
+      return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), metalness: 0.7, roughness: 0.35 })
     default:
       return new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
   }
@@ -47,7 +52,7 @@ export function TillCounter({ top }: { top: number }) {
       m.material = t
       m.castShadow = !UNINKED.test(m.name)
       m.receiveShadow = true
-      if (src.name === 'TillWindowGlow') { m.renderOrder = 3; m.castShadow = false; m.receiveShadow = false }
+      if (src.name === 'TillWindowPaper' || src.name === 'TillBambooGlow') { m.castShadow = false; m.receiveShadow = false }
     })
     inkModel(r, (m) => UNINKED.test(m.name), { width: 0.003, weld: true })
     model = r

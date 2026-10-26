@@ -63,6 +63,12 @@ hinoki_tex = image("hinoki2", hinoki)
 # (the cat's stone: a grey river stone, mottled, a few pale flecks)
 stone = mix(mix((0.22, 0.22, 0.21), (0.36, 0.35, 0.33), fbm(N, 5, 5, 5)), (0.7, 0.68, 0.64), (rng.random((N, N)) > 0.97).astype(np.float32) * 0.6)
 stone_tex = image("catstone", stone)
+# (the stand's walnut: a deep brown, its grain long and wavering, darker figure through it)
+wg = fbm(N, 3, 70, 5)
+walnut = mix(mix((0.2, 0.12, 0.07), (0.3, 0.19, 0.11), smooth(0.3, 0.75, wg)), (0.13, 0.08, 0.05), smooth(0.7, 0.95, fbm(N, 2, 18, 4)) * 0.6)
+walnut_tex = image("walnut", walnut)
+# (the change tray's floor: a black resin, a faint sheen in its texture)
+resin_tex = image("resin", mix((0.05, 0.05, 0.055), (0.09, 0.085, 0.09), fbm(N, 20, 20, 3)))
 
 
 def mat(name, hexs, rough=0.5, metal=0.0, tex=None):
@@ -80,6 +86,10 @@ M = {
     "keyGreen": mat("KeyGreen", "#2f9a4c", 0.4), "reader": mat("ReaderBody", "#26282d", 0.45), "readerTrim": mat("ReaderTrim", "#3b3e45", 0.4),
     "key": mat("ReaderKey", "#d6d9de", 0.4), "screen": mat("ReaderScreen", "#123a5c", 0.15), "bellBase": mat("BellBase", "#1d1b19", 0.4),
     "mat": mat("DeskMatWood", "#ffffff", 0.6, tex=hinoki_tex), "matEdge": mat("DeskMatEdge", "#b8915c", 0.6), "felt": mat("DeskMatFelt", "#3a3530", 0.9),
+    "walnut": mat("StandWalnut", "#ffffff", 0.45, tex=walnut_tex), "walnutEnd": mat("StandWalnutEnd", "#2a1a10", 0.5),
+    "brass": mat("StandBrass", "#c9a24a", 0.25, 1.0), "drawerIn": mat("StandDrawerInside", "#6a4a30", 0.7),
+    "resin": mat("TrayResin", "#ffffff", 0.35, tex=resin_tex), "resinRib": mat("TrayRib", "#1a1a1c", 0.5), "gilt": mat("TrayGilt", "#d4b25a", 0.3, 0.8),
+    "rubber": mat("TrayFoot", "#202020", 0.9),
     "hole": mat("DeskHole", "#060607", 0.6), "holeRing": mat("DeskHoleRing", "#3a3c40", 0.3, 0.8), "cable": mat("DeskCable", "#17171a", 0.4),
     "cableW": mat("DeskCableWhite", "#e9e9ec", 0.4),
     "stone": mat("CatStone", "#ffffff", 0.75, tex=stone_tex),
@@ -373,35 +383,90 @@ bl += pl
 nodes.append(node("TillBell", bl))
 
 # =====================================================================
-# The desk stand: a hinoki riser 15 cm high the reader, the printer, the pens and the tablet stand on: a thick top with eased edges, solid
-# sides with a hand-hold cut in each, a shelf between them, a back rail, felt pads under; the grain along the top, across the end grain
+# The desk stand: a walnut cabinet 15 cm high the reader, the printer, the pens and the tablet stand on: a thick top with eased edges
+# overhanging a little, solid sides and a back, a plinth set in under it, and below the top two drawers side by side across its front,
+# each with a raised fielded front and a brass bar pull, the divider between them; felt pads under
 # =====================================================================
 MW, MD, MH = 0.5, 0.39, 0.15
-TT, ST = 0.022, 0.018
+TT, ST, PL = 0.022, 0.016, 0.014         # the top's thickness, the sides', the plinth's height
 mt = []
-top_ = box("DeskMat", S(MW, TT, MD), P(0, MH - TT / 2, 0), M["mat"], bev=0.004)
-mt.append(top_)
+mt.append(box("DeskMat", S(MW, TT, MD), P(0, MH - TT / 2, 0), M["walnut"], bev=0.005))
+CW = MW - 0.024                            # the carcass, set in under the top's overhang
+CD = MD - 0.02
 for sx in (-1, 1):
-    side = box(f"DeskMatSide{sx}", S(ST, MH - TT, MD - 0.02), P(sx * (MW / 2 - 0.02 - ST / 2), (MH - TT) / 2, 0), M["mat"], bev=0.003)
-    hold = box("hold", S(0.05, 0.03, 0.1), P(sx * (MW / 2 - 0.02 - ST / 2), (MH - TT) * 0.62, 0), M["mat"], bev=0.012)
-    m_ = side.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = hold; m_.solver = "EXACT"
-    apply_mods(side)
-    bpy.data.objects.remove(hold)
-    mt.append(side)
-mt.append(box("DeskMatShelf", S(MW - 0.04 - 2 * ST, 0.014, MD - 0.04), P(0, 0.05, 0), M["mat"], bev=0.002))
-mt.append(box("DeskMatRail", S(MW - 0.04 - 2 * ST, 0.04, 0.014), P(0, MH - TT - 0.02, -MD / 2 + 0.02), M["mat"], bev=0.002))
+    mt.append(box(f"DeskMatSide{sx}", S(ST, MH - TT - PL, CD), P(sx * (CW / 2 - ST / 2), PL + (MH - TT - PL) / 2, 0), M["walnut"], bev=0.002))
+mt.append(box("DeskMatBack", S(CW - 2 * ST, MH - TT - PL, 0.01), P(0, PL + (MH - TT - PL) / 2, -CD / 2 + 0.005), M["walnut"], bev=0.001))
+mt.append(box("DeskMatBottom", S(CW - 2 * ST, 0.012, CD - 0.01), P(0, PL + 0.006, 0.005), M["walnut"], bev=0.001))
+mt.append(box("DeskMatPlinth", S(CW - 0.03, PL, CD - 0.03), P(0, PL / 2, -0.005), M["walnutEnd"], bev=0.001))
+# (the drawers: two openings across the front, the divider between them, each filled by its drawer)
+OH = MH - TT - PL - 0.012 - 0.006       # the openings' height, between the bottom and the top
+OY = PL + 0.012 + OH / 2
+FZ = CD / 2                               # the front face
+DW = (CW - 2 * ST - 0.012) / 2
+mt.append(box("DeskMatDivider", S(0.012, OH, CD - 0.02), P(0, OY, 0.0), M["walnut"], bev=0.001))
+for k, sx in enumerate((-1, 1)):
+    cx = sx * (0.006 + DW / 2)
+    # (its front: a board with a fielded panel standing a little proud in the middle, a fine gap all round it)
+    mt.append(box(f"DeskMatDrawer{k}Front", S(DW - 0.004, OH - 0.004, 0.016), P(cx, OY, FZ - 0.006), M["walnut"], bev=0.0025))
+    mt.append(box(f"DeskMatDrawer{k}Panel", S(DW - 0.034, OH - 0.032, 0.004), P(cx, OY, FZ + 0.003), M["walnut"], bev=0.003))
+    # (the box behind it, open on top, a little of its pale inside showing at the gap)
+    mt.append(box(f"DeskMatDrawer{k}Box", S(DW - 0.01, OH - 0.012, CD - 0.06), P(cx, OY - 0.002, FZ - 0.014 - (CD - 0.06) / 2), M["drawerIn"]))
+    # (a brass bar pull on two posts)
+    for px in (-1, 1):
+        mt.append(cyl(f"DeskMatDrawer{k}Post{px}", 0.0025, 0.012, P(cx + px * 0.035, OY, FZ + 0.011), M["brass"], rot=(math.pi / 2, 0, 0), verts=12))
+    mt.append(cyl(f"DeskMatDrawer{k}Pull", 0.0032, 0.082, P(cx, OY, FZ + 0.017), M["brass"], rot=(0, math.pi / 2, 0), verts=16))
 for sx in (-1, 1):
     for sz in (-1, 1):
-        mt.append(box(f"DeskMatFelt{sx}{sz}", S(0.03, 0.002, 0.03), P(sx * (MW / 2 - 0.035), 0.001, sz * (MD / 2 - 0.03)), M["felt"]))
+        mt.append(box(f"DeskMatFelt{sx}{sz}", S(0.03, 0.002, 0.03), P(sx * (CW / 2 - 0.04), 0.001, sz * (CD / 2 - 0.04)), M["felt"]))
 for o in mt:
-    bpy.ops.object.select_all(action="DESELECT")
-    o.select_set(True)
-    bpy.context.view_layer.objects.active = o
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.cube_project(cube_size=0.6)
-    bpy.ops.object.mode_set(mode="OBJECT")
+    if o.data.materials and o.data.materials[0].name.startswith("StandWalnut"):
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.cube_project(cube_size=0.6)
+        bpy.ops.object.mode_set(mode="OBJECT")
 nodes.append(node("TillMat", mt))
+
+# =====================================================================
+# The change tray (カルトン): a black resin tray with its corners well rounded and its rim sloping in, the floor ribbed in a fine diamond
+# so coins don't slide and can be picked up, ありがとうございました lettered in gold on the floor along the near edge, four rubber feet under
+# =====================================================================
+tr = []
+TW2, TD2, TH2 = 0.21, 0.15, 0.022
+outer = box("TillTrayBody", S(TW2, TH2, TD2), P(0, TH2 / 2, 0), M["resin"], bev=0.018)
+well = box("well", S(TW2 - 0.018, TH2, TD2 - 0.018), P(0, TH2 / 2 + 0.004, 0), M["resin"], bev=0.016)
+m_ = outer.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = well; m_.solver = "EXACT"
+apply_mods(outer)
+bpy.data.objects.remove(well)
+smooth_angle(outer, 50)
+tr.append(outer)
+# (the ribs: a diamond lattice standing a millimetre off the floor, inside the well)
+FW, FD = TW2 - 0.05, TD2 - 0.05
+ribs = []
+for k in range(-12, 13):
+    for sgn in (-1, 1):
+        L = 0.3
+        r_ = box(f"rib{k}{sgn}", S(0.0012, 0.0012, L), P(k * 0.012, 0.0046, 0), M["resinRib"], rot=(0, 0, sgn * math.radians(45)))
+        ribs.append(r_)
+bpy.ops.object.select_all(action="DESELECT")
+for r_ in ribs:
+    r_.select_set(True)
+bpy.context.view_layer.objects.active = ribs[0]
+bpy.ops.object.join()
+lattice = active()
+lattice.name = "TillTrayRibs"
+clip = box("clip", S(FW, 0.02, FD), P(0, 0.0046, 0), M["resinRib"], bev=0.01)
+m_ = lattice.modifiers.new("clip", "BOOLEAN"); m_.operation = "INTERSECT"; m_.object = clip; m_.solver = "EXACT"
+apply_mods(lattice)
+bpy.data.objects.remove(clip)
+tr.append(lattice)
+tr.append(text("TillTrayThanks", "ありがとうございました", 0.0068, M["gilt"], P(0, 0.0043, FD / 2 + 0.0075), (0, 0, 0), JA, fit=TW2 - 0.075))
+for sx in (-1, 1):
+    for sz in (-1, 1):
+        tr.append(cyl(f"TillTrayFoot{sx}{sz}", 0.006, 0.0016, P(sx * (TW2 / 2 - 0.02), -0.0008, sz * (TD2 / 2 - 0.02)), M["rubber"], verts=16))
+nodes.append(node("TillTray", tr))
 
 # =====================================================================
 # The cat's stand: a river stone, its top worn level, the cat (on its own red zabuton) sat up on it
@@ -431,9 +496,8 @@ for i, (e, ps) in enumerate(nodes):
     parts += [e] + ps
 if PREVIEW:
     # (laid out side by side for the picture only)
-    for i, (e, _) in enumerate(nodes[:4]):
-        e.location = (-0.3 + i * 0.2, 0, 0.0)
-    nodes[4][0].location = (0, 0.35, 0)
+    for i, (e, _) in enumerate(nodes):
+        e.location = ((i % 4 - 1.5) * 0.3, (i // 4) * 0.45, 0.0)
     cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
     bpy.context.collection.objects.link(cam)
     cam.location = (0.05, -0.75, 0.45)

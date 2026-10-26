@@ -65,7 +65,8 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 - 介面是 Blender 風格的深灰面板：左邊工具列（位移 W、旋轉 R、縮放 S），清單可搜尋，變換區的 X／Y／Z 是紅綠藍色條。位置、移動箭頭、旋轉環、縮放把手都用**房間軸**（吧台方向 `ALONG`），不是各物件父層的軸。
 - 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。選取框是從模型畫出來的頂點量的（不含墨線、貼面、發光），所以貼合模型。
-- **預設值**：位置預設寫在 `edit.ts` 的 `BASES`（父層單位）；大小與轉向預設用 `<Movable baseScale baseTurn>`。定好預設後面板歸零（位置 0、縮放 1）。改了預設要把 `edit.ts` 開頭的三個 localStorage key 版本加一，不然瀏覽器裡舊的偏移會重複計算。
+- **預設值**：位置預設寫在 `edit.ts` 的 `BASES`（父層單位）；大小與轉向預設用 `<Movable baseScale baseTurn>`。定好預設後面板歸零（位置 0、縮放 1）。改了預設要把 `edit.ts` 開頭的三個 localStorage key 版本加一，不然瀏覽器裡舊的偏移會重複計算。有預設轉向或縮放的擺設（例如備長炭籃、行燈），量到中心點之前先不顯示，避免載入時閃一下。
+- **編輯介面中日文**：文字在 `data/editText.ts`（`EDIT_TEXT` 中、日各一份，`pieceName` 把擺設名稱翻成日文）；App 用 `setEditLang` 跟著遊戲語言切換。新增擺設時，中文名稱只用中文，並在 `PIECES_JA`（或 `WORDS_JA`）補上日文。
 - **+ / −**：按 X、Y、Z 選軸（再按一次取消），+ 或 − 縮放選到的軸（沒選就三軸一起）；縮放區每軸旁也有 −、+ 按鈕。
 - **群組**：清單裡 Ctrl／Shift 點選多件 → 「成組」；群組可一起位移、繞垂直軸轉、整體縮放（轉動中心是成員的中間）。「解散」「改名」「復原」都能用。沒有中心點的東西（閘門）不能成組。
 - 進編輯模式會自動收起選單，離開後還原；選單收放或進出編輯模式不會讓鏡頭重新歸位（只有換菜、重設視角、總覽、視窗大小改變才會）。
@@ -100,8 +101,8 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 喇叭（`blender/speaker.py` → `speaker.glb`）與收銀機（`blender/register.py` → `register.glb`，節點 `RegBody` 固定、`RegDrawer` 由遊戲滑出；顯示幕數字、發票、抽屜裡的錢仍由程式畫）也是 Blender 產生；兩者只在 3D 吧台出現，沒有 lite 版。描邊用 `inkModel(root, skip, { width, weld: true })`（細線、平滑法線，硬邊模型不會裂開）。
 - 收銀機可以操作（`shops/grill/cashRegister.tsx`）：按鍵（模型節點 `Key_<鍵名>`）與模式鎖（`RegModeKey`，OFF→REG→X→Z）照 `game/register.ts` 的純邏輯運作（BDD：`tests/bdd/register.test.ts`），印出的發票是 `drawReceipt` 畫的；客人結帳時收銀員自動按鍵並記入營業額。dev 時 `__register` 看狀態。r3f 的 `<primitive>` 上的事件不會生效，互動要包一層 `<group>`。
 - 收銀櫃上的平板（`blender/ipad.py` → `ipad.glb`，`shops/grill/Ipad.tsx`；螢幕節點 `IpadScreen` 貼遊戲的點單畫面）與下層的紙箱和說明書（`blender/tillboxes.py` → `tillboxes.glb`，`TillBoxes.tsx`；點說明書 `TillManual` 打開 `ui/RegisterManual.tsx`，內容在 `data/registerManual.ts`）。
-- 收銀櫃檯本體（`blender/tillcounter.py` → `tillcounter.glb`，`TillCounter.tsx`）：深色木櫃、客人側正面是綠竹（竹節、上下橫竹、黑繩綁）、側面圓窗有光暈（`TillWindowGlow`，加法混合、不做深度測試）、白色大理石檯面（亮面）、沿客人側與招財貓那端的矮檜木實木隔板。櫃檯招財貓坐在 `tilldesk.py` 的 `TillCatStand` 石頭上（貓模型自帶坐墊；石頭不放進 StaticBatch，`CAT_STAND_H` 是墊高量）。
-- 收銀櫃上的小東西（`blender/tilldesk.py` → `tilldesk.glb`，`shops/grill/TillDesk.tsx`）：筆筒 `TillPens`、明細印表機 `TillPrinter`、刷卡機 `TillCardReader`、服務鈴 `TillBell`、檜木台座 `TillMat`（15 cm 高），各自一個 Movable；服務鈴可以按（`TillBellLive`：按壓桿 `TillBellPlunger` 下壓、叮一聲）。放在台座上的（平板、筆筒、印表機、刷卡機）在 `edit.ts` 的 `BASES` 裡 y 墊高 0.15；它們的線各自收進身後桌墊上的小孔（模型的一部分，跟著移動），平板的線藏在支架裡，收銀機的電源線從機身背後收進機身下的走線孔。**編輯面板顯示的是房間座標，`BASES` 存的是父層座標，寫預設前要用 `fromRoom(id, v)` 換算。**
+- 收銀櫃檯本體（`blender/tillcounter.py` → `tillcounter.glb`，`TillCounter.tsx`）：深色木櫃；客人側正面是鬆散不規則的綠竹（每根粗細、傾斜、彎度、竹節都不同，上下兩根橫竹用黑繩綁），後面一片暖光面 `TillBambooGlow` 從竹縫透出；側面圓窗是紙燈（窗紙 `TillWindowPaper` 內退、由裡發光，窗框、內襯、格子是淺色櫸木）；白色大理石檯面（亮面）；隔板是胡桃木立格子（底下深銅色踢腳、上下橫框、立柱、壓頂，格子後面是淺色檜木板），客人側左端（服務鈴那頭）留空，招財貓那端一路延伸到收銀員側邊緣。
+- 收銀櫃上的小東西（`blender/tilldesk.py` → `tilldesk.glb`，`shops/grill/TillDesk.tsx`）：筆筒 `TillPens`、明細印表機 `TillPrinter`、刷卡機 `TillCardReader`、服務鈴 `TillBell`、胡桃木台座 `TillMat`（15 cm 高，正面兩個抽屜、黃銅把手）、找零盤（カルトン）`TillTray`、招財貓石座 `TillCatStand`，各自一個 Movable；服務鈴可以按（`TillBellLive`：按壓桿 `TillBellPlunger` 下壓、叮一聲）。放在台座上的（平板、筆筒、印表機、刷卡機）在 `edit.ts` 的 `BASES` 裡 y 墊高 0.15；它們的線各自收進身後桌墊上的小孔（模型的一部分，跟著移動），平板的線藏在支架裡，收銀機的電源線從機身背後收進機身下的走線孔。**編輯面板顯示的是房間座標，`BASES` 存的是父層座標，寫預設前要用 `fromRoom(id, v)` 換算。**
 - 客人（十五種 Q 版角色、每種有幾種髮型隨機搭配、共用一副骨架，動作 Sit／Eat／Walk；出現比例是 `data/guests.ts` 的 `weight`）由 `blender/guests.py` 產生 `public/models/guests.glb`，`scene/Person3D.tsx` 載入後依客人換膚色、髮色、衣服顏色與花紋。手機不跑 3D 吧台，所以沒有 lite 版。
 
 ## 烤魚店的 3D 店面（`src/shops/grill/`）

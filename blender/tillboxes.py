@@ -146,39 +146,43 @@ def cardboard(name, at, w, h, d, label_zh, label_ja, sub):
     return top
 
 
-top1 = cardboard("TillBoxBags", (-0.3, 0.12), 0.22, 0.11, 0.16, "紙袋", "手さげ紙袋", "M サイズ ・ 100 枚入")
-cardboard("TillBoxRolls", (0.05, 0.1), 0.14, 0.09, 0.12, "收銀紙捲", "レジロール", "58 mm × 20 巻")
+top1 = cardboard("TillBoxBags", (-0.27, 0.11), 0.36, 0.2, 0.27, "紙袋", "手さげ紙袋", "M サイズ ・ 100 枚入")
+cardboard("TillBoxRolls", (0.14, 0.12), 0.25, 0.16, 0.21, "收銀紙捲", "レジロール", "58 mm × 20 巻")
 
 # =====================================================================
-# The manual: a stapled booklet lying on the bags' box, turned a little
+# The manual: a bound A5 book, a couple of centimetres thick, lying on the bags' box, turned a little: hard covers a hair bigger than the
+# pages, a rounded spine, the page block's edges showing pale between them
 # =====================================================================
-BW, BD, BT = 0.12, 0.155, 0.009
+BW, BD, BT = 0.15, 0.212, 0.024
+CB = 0.0028                              # a cover board's thickness
+K = BD / 0.155                           # (the cover's printing, laid out for the old booklet, scaled up to the book)
 book = bpy.data.objects.new("TillManual", None)
 bpy.context.collection.objects.link(book)
-book.location = P(-0.3, top1 + 0.0006, 0.115)
+book.location = P(-0.27, top1 + 0.0006, 0.1)
 book.rotation_euler = (0, 0, 0.12)
 bk = []
-# (the pages, a little in from the cover's edges, and the soft cover over and under them)
-bk.append(box("ManualPages", S(BW - 0.004, BT - 0.0016, BD - 0.004), P(0.001, BT / 2, 0), M["pages"]))
-bk.append(box("ManualCoverTop", S(BW, 0.0008, BD), P(0, BT - 0.0004, 0), M["cover"], bev=0.0003))
-bk.append(box("ManualCoverBottom", S(BW, 0.0008, BD), P(0, 0.0004, 0), M["cover"], bev=0.0003))
-bk.append(box("ManualSpine", S(0.0016, BT, BD), P(-BW / 2 - 0.0002, BT / 2, 0), M["cover"], bev=0.0004))
-# (the staples in the spine's fold)
-for k in (-1, 1):
-    bk.append(box(f"ManualStaple{k}", S(0.0012, 0.0006, 0.014), P(-BW / 2 + 0.006, BT + 0.0001, k * 0.04), M["staple"]))
+bk.append(box("ManualPages", S(BW - 0.006, BT - 2 * CB, BD - 0.006), P(0.002, BT / 2, 0), M["pages"], bev=0.0008))
+bk.append(box("ManualCoverTop", S(BW, CB, BD), P(0, BT - CB / 2, 0), M["cover"], bev=0.0009))
+bk.append(box("ManualCoverBottom", S(BW, CB, BD), P(0, CB / 2, 0), M["cover"], bev=0.0009))
+# (the spine: rounded, its edges well eased)
+bk.append(box("ManualSpine", S(0.007, BT, BD), P(-BW / 2 + 0.0015, BT / 2, 0), M["cover"], bev=0.0032))
+# (the hinge groove pressed into the cover beside the spine, and the headband peeping out top and bottom)
+bk.append(box("ManualHinge", S(0.0016, 0.0004, BD - 0.004), P(-BW / 2 + 0.011, BT + 0.0001, 0), M["band"]))
+for sz in (-1, 1):
+    bk.append(box(f"ManualHeadband{sz}", S(0.004, BT - 2 * CB, 0.0014), P(-BW / 2 + 0.004, BT / 2, sz * (BD / 2 - 0.0035)), M["red"]))
 # (the cover: a pale band across with the title, the Japanese under it, a line of small print at the foot, a register drawn in white)
 CT = BT + 0.0002
-bk.append(box("ManualBand", S(BW - 0.012, 0.0003, 0.05), P(0.004, CT, -0.03), M["band"]))
-bk.append(text("ManualTitle", "收銀機操作說明書", 0.0115, M["ink"], P(0.004, CT + 0.0003, -0.037), (0, 0, 0), ZH, fit=BW - 0.022))
-bk.append(text("ManualTitleJa", "レジスター 取扱説明書", 0.0068, M["ink"], P(0.004, CT + 0.0003, -0.019), (0, 0, 0), JA, fit=BW - 0.03))
-bk.append(text("ManualFoot", "闊野 日式烤魚　店內用", 0.0055, M["white"], P(0.004, CT, 0.064), (0, 0, 0), ZH, fit=BW - 0.03))
+bk.append(box("ManualBand", S(BW - 0.016, 0.0003, 0.05 * K), P(0.004, CT, -0.03 * K), M["band"]))
+bk.append(text("ManualTitle", "收銀機操作說明書", 0.0115 * K, M["ink"], P(0.004, CT + 0.0003, -0.037 * K), (0, 0, 0), ZH, fit=BW - 0.028))
+bk.append(text("ManualTitleJa", "レジスター 取扱説明書", 0.0068 * K, M["ink"], P(0.004, CT + 0.0003, -0.019 * K), (0, 0, 0), JA, fit=BW - 0.036))
+bk.append(text("ManualFoot", "聞野 日式烤魚　店內用", 0.0055 * K, M["white"], P(0.004, CT, 0.064 * K), (0, 0, 0), ZH, fit=BW - 0.036))
 # (the little register on the cover: its body, its display on a stalk, a grid of keys)
-bk.append(box("ManualPicBody", S(0.05, 0.0002, 0.026), P(0.004, CT, 0.03), M["white"]))
-bk.append(box("ManualPicStalk", S(0.003, 0.0002, 0.012), P(0.02, CT, 0.012), M["white"]))
-bk.append(box("ManualPicDisplay", S(0.022, 0.0002, 0.008), P(0.02, CT, 0.004), M["white"]))
+bk.append(box("ManualPicBody", S(0.05 * K, 0.0002, 0.026 * K), P(0.004, CT, 0.03 * K), M["white"]))
+bk.append(box("ManualPicStalk", S(0.003 * K, 0.0002, 0.012 * K), P(0.02 * K, CT, 0.012 * K), M["white"]))
+bk.append(box("ManualPicDisplay", S(0.022 * K, 0.0002, 0.008 * K), P(0.02 * K, CT, 0.004 * K), M["white"]))
 for i in range(5):
     for j in range(3):
-        bk.append(box(f"ManualPicKey{i}{j}", S(0.006, 0.0002, 0.004), P(-0.012 + i * 0.008, CT + 0.0001, 0.026 + j * 0.006), M["cover"]))
+        bk.append(box(f"ManualPicKey{i}{j}", S(0.006 * K, 0.0002, 0.004 * K), P((-0.012 + i * 0.008) * K, CT + 0.0001, (0.026 + j * 0.006) * K), M["cover"]))
 for o in bk:
     o.parent = book
 
