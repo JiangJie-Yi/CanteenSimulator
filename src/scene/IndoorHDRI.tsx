@@ -7,23 +7,37 @@ import { Environment, Lightformer } from '@react-three/drei'
  * believable room round it: warm ceiling lamps above, a cool window panel to one side, a wall bounce, a wood-floor glow below.
  * (Toon materials take their light from the lamps; this is for the rest.)
  */
-const HDRI_BASE = import.meta.env.BASE_URL + 'hdri/'
-/** whether a real HDRI photograph has been put in public/hdri/ for the day or the night (day.hdr, night.hdr, e.g. from polyhaven.com/hdris, 1k is plenty) */
-function useHdriFile(name: 'day' | 'night') {
-  const [ok, setOk] = useState(false)
+const HDRI_BASE = import.meta.env.BASE_URL + 'hdris/'
+/** the real HDRI photographs it looks for in public/hdris/, by the time of day, first found wins (.exr or .hdr, e.g. from polyhaven.com/hdris; 1k is plenty) */
+const FILES = { day: ['grill_day_1k.exr', 'day.exr', 'day.hdr'], night: ['grill_night_1k.exr', 'night.exr', 'night.hdr'] }
+/** whether a file really is an HDRI: OpenEXR starts 76 2f 31 01, Radiance "#?" (a dev server answers a missing file with the page itself) */
+const isHdri = (b: ArrayBuffer) => {
+  const h = new Uint8Array(b.slice(0, 4))
+  return (h[0] === 0x76 && h[1] === 0x2f && h[2] === 0x31 && h[3] === 0x01) || (h[0] === 0x23 && h[1] === 0x3f)
+}
+/** the first of the time of day's files that's there, or null */
+function useHdriFile(when: 'day' | 'night') {
+  const [file, setFile] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
-    // (a dev server answers a missing file with the page itself: only an actual radiance file, which starts "#?", counts)
-    fetch(`${HDRI_BASE}${name}.hdr`).then((r) => (r.ok ? r.arrayBuffer() : null)).then((b) => { if (alive) setOk(!!b && new TextDecoder().decode(b.slice(0, 2)) === '#?') }).catch(() => { if (alive) setOk(false) })
+    setFile(null)
+    ;(async () => {
+      for (const name of FILES[when]) {
+        try {
+          const r = await fetch(HDRI_BASE + name, { headers: { Range: 'bytes=0-3' } })
+          if (r.ok && isHdri(await r.arrayBuffer())) { if (alive) setFile(HDRI_BASE + name); return }
+        } catch { /* (not there) */ }
+      }
+    })()
     return () => { alive = false }
-  }, [name])
-  return ok
+  }, [when])
+  return file
 }
 
 export function IndoorHDRI({ intensity = 0.5, night = false }: { intensity?: number; night?: boolean }) {
-  const real = useHdriFile(night ? 'night' : 'day')
+  const file = useHdriFile(night ? 'night' : 'day')
   // (a real HDRI photograph, if one's there, lights the glossy things; otherwise the room's own made-up one below)
-  if (real) return <Environment key={night ? 'real-night' : 'real-day'} files={`${HDRI_BASE}${night ? 'night' : 'day'}.hdr`} environmentIntensity={intensity} background={false} />
+  if (file) return <Environment key={file} files={file} environmentIntensity={intensity} background={false} />
   return <IndoorMock intensity={intensity} night={night} />
 }
 function IndoorMock({ intensity, night }: { intensity: number; night: boolean }) {
