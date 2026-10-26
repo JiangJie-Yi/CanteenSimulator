@@ -1535,7 +1535,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {
         const z = (i - (lamps - 1) / 2) * (c.length / lamps)
-        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05} userData={{ fade: true }}><Pendant z={z} drop={0.5} pool={top} /></group></Movable>
+        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05} userData={{ fade: true }}><Pendant z={z} drop={0.25} pool={top} /></group></Movable>
       })}
     </group>
   )
