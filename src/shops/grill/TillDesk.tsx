@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
+import { reflectStudio, useStudio } from '@/scene/studio'
 
 /**
  * The small things on the till's counter, from blender/tilldesk.py: the pen cup, the receipt printer, the card reader, the service bell, the
@@ -19,20 +19,6 @@ const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever
 const METAL = new Set(['DeskChrome', 'DeskSteel', 'BellGold', 'StandBrass', 'TrayGilt', 'IngotGold'])
 
 let pieces: Record<DeskPiece, THREE.Object3D> | null = null
-/** the polished metals (the bell's brass, the gold, the chrome): they're given a bright room of their own to reflect, so they read as metal
- * however dim the shop's own light (a metal shows only what it reflects) */
-const SHINY: THREE.MeshPhysicalMaterial[] = []
-let studio: THREE.Texture | null = null
-function useStudio() {
-  const gl = useThree((s) => s.gl)
-  useMemo(() => {
-    if (studio) return
-    const pm = new THREE.PMREMGenerator(gl)
-    studio = pm.fromScene(new RoomEnvironment(), 0.04).texture
-    pm.dispose()
-  }, [gl])
-  useMemo(() => { for (const m of SHINY) if (m.envMap !== studio) { m.envMap = studio; m.needsUpdate = true } }, [])
-}
 function piecesOf(scene: THREE.Group) {
   if (pieces) return pieces
   const root = scene.clone(true)
@@ -55,7 +41,7 @@ function piecesOf(scene: THREE.Group) {
         : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
       mats.set(src, t)
     }
-    if (METAL.has(src.name) && !SHINY.includes(t as THREE.MeshPhysicalMaterial)) SHINY.push(t as THREE.MeshPhysicalMaterial)
+    if (METAL.has(src.name)) reflectStudio(t as THREE.MeshPhysicalMaterial)
     m.material = t
     m.castShadow = !UNINKED.test(m.name)
     m.receiveShadow = true

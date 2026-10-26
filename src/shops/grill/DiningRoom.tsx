@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
+import { reflectStudio, useStudio } from '@/scene/studio'
 import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
@@ -651,51 +652,6 @@ function Box({ size, color, ...rest }: { size: [number, number, number]; color: 
     </mesh>
   )
 }
-/** fine cypress grain for the small shrine's boards: pale, streaked, a little warm (tinted by each board's colour) */
-const SHRINE_GRAIN = canvasTex(128, 128, (g) => {
-  g.fillStyle = '#f2eee6'
-  g.fillRect(0, 0, 128, 128)
-  for (let i = 0; i < 46; i++) {
-    const x = (i * 2.9 + (i % 4) * 0.7) % 128
-    g.strokeStyle = i % 3 ? 'rgba(120,90,50,0.22)' : 'rgba(255,255,255,0.35)'
-    g.lineWidth = 0.8 + (i % 3) * 0.4
-    g.beginPath()
-    g.moveTo(x, 0)
-    g.bezierCurveTo(x + 3 * Math.sin(i), 40, x - 3 * Math.cos(i), 90, x + 1, 128)
-    g.stroke()
-  }
-  g.fillStyle = 'rgba(100,70,40,0.4)'
-  g.beginPath(); g.ellipse(40, 44, 3, 7, 0, 0, Math.PI * 2); g.fill()
-}, true)
-/** the shrine's roof: cypress-bark thatch, courses laid along the slope, each a different tone with a dark seam, the grain fine along it */
-const SHRINE_ROOF = canvasTex(128, 128, (g) => {
-  const tones = ['#c9a06a', '#bd9460', '#d2aa74', '#c19863', '#cba36c', '#b88e5a', '#d4ad78', '#c49b66']
-  for (let r = 0; r < 8; r++) {
-    g.fillStyle = tones[r]
-    g.fillRect(0, r * 16, 128, 16)
-    g.strokeStyle = 'rgba(40,24,10,0.3)'
-    g.lineWidth = 1
-    for (let k = 0; k < 6; k++) {
-      const y = r * 16 + 2.5 + k * 2.4
-      g.beginPath(); g.moveTo(0, y); g.lineTo(128, y + ((k + r) % 3 - 1) * 0.8); g.stroke()
-    }
-    g.fillStyle = 'rgba(30,16,6,0.6)'
-    g.fillRect(0, r * 16 + 14.5, 128, 1.8)
-  }
-}, true)
-/** a box with the shop's ink line round it (its back faces, a hair bigger), for the small shrine */
-function InkBox({ size, color, position, ...rest }: { size: [number, number, number]; color: string; position?: [number, number, number]; 'position-y'?: number; 'rotation-x'?: number }) {
-  const e = 0.0035
-  const sc: [number, number, number] = [1 + 2 * e / size[0], 1 + 2 * e / size[1], 1 + 2 * e / size[2]]
-  const at = position ?? [0, rest['position-y'] ?? 0, 0]
-  return (
-    <group position={at} rotation-x={rest['rotation-x'] ?? 0}>
-      <mesh><boxGeometry args={size} /><meshToonMaterial color={color} map={SHRINE_GRAIN} /></mesh>
-      <mesh scale={sc}><boxGeometry args={size} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
-    </group>
-  )
-}
-
 /** the plaque over the toilet door: お手洗い, and 廁所 under it */
 /** a toilet's door's height */
 const WC_H = 1.85
@@ -1160,15 +1116,6 @@ function Bouquet({ lean = 0 }: { lean?: number }) {
 /** the gold of the altar table's fittings */
 const ZUSHI_GOLD = '#d4a940'
 
-/** the roof's two gable ends, closed with a plank triangle each, so there's no open hollow under the eaves */
-const GABLE_GEO = (() => {
-  const sh = new THREE.Shape()
-  sh.moveTo(-0.135, 0.185); sh.lineTo(0.135, 0.185); sh.lineTo(0, 0.268); sh.closePath()
-  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.012, bevelEnabled: false })
-  g.translate(0, 0, -0.006)
-  return g
-})()
-
 /**
  * The household shrine (神棚) up on the wall: a shelf on two brackets, a little shrine of pale hinoki on a stepped base
  * with a railing, its two doors and a roof with the crossed finials (千木) and the short logs (鰹木) along its ridge,
@@ -1176,97 +1123,51 @@ const GABLE_GEO = (() => {
  * paper streamers hung across the front.
  */
 /** `part`: the shrine itself, the things set about it (vases, cups), or all of it (on the wall) */
+const KAMIDANA_URL = import.meta.env.BASE_URL + 'models/kamidana.glb'
+/** the shrine's model (and the oranges and the sutra, nodes of their own in it): its wood toon like the room, its gold real metal reflecting the
+ * studio, an ink line round the bigger parts; made once, each piece taken out of it to be shown where it stands */
+let kamidanaParts: Record<'shrine' | 'oranges' | 'sutra', THREE.Object3D> | null = null
+function kamidanaOf(scene: THREE.Group) {
+  if (kamidanaParts) return kamidanaParts
+  const r = scene.clone(true)
+  const mats = new Map<THREE.Material, THREE.Material>()
+  r.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh) return
+    const src = m.material as THREE.MeshStandardMaterial
+    let t = mats.get(src)
+    if (!t) {
+      if (src.name === 'KamiGold') {
+        const g = new THREE.MeshPhysicalMaterial({ color: '#d9a93c', metalness: 1, roughness: 0.18, clearcoat: 0.6, clearcoatRoughness: 0.1 })
+        reflectStudio(g)
+        t = g
+      } else if (src.name === 'KamiPeel' || src.name === 'KamiLeaf' || src.name === 'KamiDish') {
+        // (the mikan's waxy peel, the leaves' gloss, the dish's glaze: a soft sheen)
+        t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.4, clearcoat: 0.5, clearcoatRoughness: 0.3 })
+      } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
+      mats.set(src, t)
+    }
+    m.material = t
+    m.castShadow = true
+  })
+  inkModel(r, (m) => /Gold|Cap|Plate|Crest|Seam|Bal|Katsuogi|Fold|Char|Slip|Calyx|Stem|Bow|Cord/.test(m.name), { width: 0.0012, weld: true })
+  const take = (n: string) => { const o = r.getObjectByName(n)!; o.removeFromParent(); o.position.set(0, 0, 0); return o }
+  kamidanaParts = { oranges: take('KamiOranges'), sutra: take('KamiSutra'), shrine: r }
+  return kamidanaParts
+}
+function KamidanaModel({ part = 'shrine' }: { part?: 'shrine' | 'oranges' | 'sutra' }) {
+  const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
+  useStudio()
+  const obj = useMemo(() => kamidanaOf(gltf.scene)[part], [gltf, part])
+  return <primitive object={obj} />
+}
+useGLTF.preload(KAMIDANA_URL)
+
 function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'extras' }) {
-  const HIN = '#e2c89a'
-  const GRAIN = '#cfae78'
-  const RED = '#d8b884'
-  const GOLD = '#d9b13e'
   return (
     <group>
-      {/* the shrine: a stepped base, the railing, body, doors and roof */}
-      {part !== 'extras' && <group position={[-0.14, 0.015, 0]}>
-        <InkBox size={[0.18, 0.02, 0.36]} color={GRAIN} position-y={0.01} />
-        <InkBox size={[0.16, 0.02, 0.33]} color={HIN} position-y={0.03} />
-        {/* (two steps down the front, the width of the little gate above them) */}
-        {[0, 1].map((k) => <InkBox key={k} size={[0.024, 0.009, 0.08 - k * 0.008]} color="#d8bc88" position={[-0.092 - k * 0.022, 0.0165 - k * 0.0045, 0]} />)}
-        {/* (the fence round the platform, in plain hinoki like the rest: a post at each corner and each side of the gate, a gold ornament on each, two rails between
-            them with a row of short balusters, and an opening in the front for the way up, with a small gate leaf of its own, hung half open on its post) */}
-        {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
-          <group key={`${sx}${sz}`}>
-            <InkBox size={[0.016, 0.06, 0.016]} color={RED} position={[sx * 0.073, 0.07, sz * 0.153]} />
-            <InkBox size={[0.012, 0.012, 0.012]} color={GOLD} position={[sx * 0.073, 0.106, sz * 0.153]} />
-          </group>
-        )))}
-        {[-1, 1].map((sz) => (
-          <group key={`g${sz}`}>
-            <InkBox size={[0.014, 0.055, 0.014]} color={RED} position={[-0.073, 0.0675, sz * 0.045]} />
-            <InkBox size={[0.011, 0.011, 0.011]} color={GOLD} position={[-0.073, 0.099, sz * 0.045]} />
-          </group>
-        ))}
-        {/* (the rails: along the back, along both sides, and the front in two halves either side of the gate) */}
-        {[0.087, 0.058].map((y) => (
-          <group key={y}>
-            <InkBox size={[0.008, 0.009, 0.31]} color={RED} position={[0.073, y, 0]} />
-            {[-1, 1].map((sz) => <InkBox key={sz} size={[0.146, 0.009, 0.008]} color={RED} position={[0, y, sz * 0.153]} />)}
-            {[-1, 1].map((sz) => <InkBox key={`f${sz}`} size={[0.008, 0.009, 0.1]} color={RED} position={[-0.073, y, sz * 0.099]} />)}
-          </group>
-        ))}
-        {[-0.12, -0.075, -0.03, 0.03, 0.075, 0.12].map((z) => <InkBox key={`bb${z}`} size={[0.006, 0.026, 0.006]} color={GRAIN} position={[0.073, 0.0725, z]} />)}
-        {[-0.04, 0, 0.04].map((x) => [-1, 1].map((sz) => <InkBox key={`bs${x}${sz}`} size={[0.006, 0.026, 0.006]} color={GRAIN} position={[x, 0.0725, sz * 0.153]} />))}
-        {[-0.135, -0.105, -0.075, 0.075, 0.105, 0.135].map((z) => <InkBox key={`bf${z}`} size={[0.006, 0.026, 0.006]} color={GRAIN} position={[-0.073, 0.0725, z]} />)}
-        {/* (the gate: one small leaf, a frame of two stiles and a rail with a board in it, swung open from the post on one side, a gold latch on its free edge) */}
-        <group position={[-0.073, 0.0675, 0.04]} rotation-y={-1.15}>
-          <InkBox size={[0.006, 0.05, 0.04]} color="#c9a46a" position={[0, 0, -0.02]} />
-          <InkBox size={[0.008, 0.008, 0.042]} color={RED} position={[0, 0.02, -0.02]} />
-          <InkBox size={[0.008, 0.008, 0.042]} color={RED} position={[0, -0.02, -0.02]} />
-          <InkBox size={[0.009, 0.01, 0.008]} color={GOLD} position={[0, 0, -0.038]} />
-        </group>
-        <InkBox size={[0.12, 0.16, 0.24]} color={HIN} position-y={0.12} />
-        {/* (the doors: two leaves with a dark seam between, a gold fitting on each, a lintel over them) */}
-        {[-1, 1].map((sd) => (
-          <group key={sd}>
-            <mesh position={[-0.0612, 0.12, sd * 0.0275]} rotation-y={-Math.PI / 2}>
-              <planeGeometry args={[0.05, 0.125]} /><meshToonMaterial color="#c8a868" />
-            </mesh>
-            <mesh position={[-0.0616, 0.12, sd * 0.0275]} rotation-y={-Math.PI / 2}>
-              <planeGeometry args={[0.036, 0.11]} /><meshToonMaterial color="#d6b878" />
-            </mesh>
-            <mesh position={[-0.0625, 0.12, sd * 0.008]} rotation-y={-Math.PI / 2}>
-              <circleGeometry args={[0.005, 10]} /><meshBasicMaterial color="#d4b04a" />
-            </mesh>
-          </group>
-        ))}
-        <mesh position={[-0.0618, 0.12, 0]} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[0.004, 0.125]} /><meshBasicMaterial color={INK} />
-        </mesh>
-        {/* (the gold crest in the middle of the doors, and a gold fitting in each corner of each leaf) */}
-        <mesh position={[-0.0632, 0.12, 0]} rotation-y={-Math.PI / 2}><circleGeometry args={[0.014, 14]} /><meshBasicMaterial color={GOLD} /></mesh>
-        <mesh position={[-0.0636, 0.12, 0]} rotation-y={-Math.PI / 2}><ringGeometry args={[0.007, 0.01, 12]} /><meshBasicMaterial color="#8a6a1a" /></mesh>
-        {[-1, 1].flatMap((sd) => [-1, 1].map((v) => (
-          <mesh key={`${sd}${v}`} position={[-0.0625, 0.12 + v * 0.05, sd * 0.045]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.014, 0.014]} /><meshBasicMaterial color={GOLD} /></mesh>
-        )))}
-        <InkBox size={[0.014, 0.012, 0.15]} color="#c9a56c" position={[-0.064, 0.19, 0]} />
-        {/* (the roof: two planks of cypress bark sloping down from the ridge, a modest eave all round, each edged with a thin darker
-            board; the ridge capped in gold, the crossed finials (千木) rising at both ends and the short logs (鰹木) laid across it) */}
-        {[-1, 1].map((sd) => (
-          <group key={sd} position={[sd * 0.066, 0.225, 0]} rotation-z={-sd * 0.5}>
-            <mesh><boxGeometry args={[0.15, 0.012, 0.3]} /><meshToonMaterial color="#ffffff" map={SHRINE_ROOF} /></mesh>
-            <mesh scale={[1.03, 1.5, 1.015]}><boxGeometry args={[0.15, 0.012, 0.3]} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
-            <mesh position={[sd * -0.001, -0.0085, 0]}><boxGeometry args={[0.152, 0.005, 0.304]} /><meshToonMaterial color="#4a3622" /></mesh>
-            {[-1, 1].map((e) => <mesh key={e} position={[0, 0.0045, e * 0.1485]}><boxGeometry args={[0.15, 0.006, 0.006]} /><meshToonMaterial color="#4a3622" /></mesh>)}
-          </group>
-        ))}
-        <InkBox size={[0.026, 0.014, 0.31]} color="#d4b04a" position-y={0.272} />
-        {[-1, 1].map((sz) => <mesh key={sz} geometry={GABLE_GEO} position={[0, 0, sz * 0.148]} rotation-y={Math.PI / 2 * 0}><meshToonMaterial color="#e2c89a" map={SHRINE_GRAIN} /></mesh>)}
-        {[-1, 1].flatMap((sz) => [-1, 1].map((lean) => (
-          <InkBox key={`${sz}${lean}`} size={[0.008, 0.012, 0.085]} color="#d8b878" position={[0, 0.3, sz * 0.158]} rotation-x={lean * 0.62} />
-        )))}
-        {[-0.11, -0.055, 0, 0.055, 0.11].map((z) => (
-          <mesh key={z} position={[0, 0.285, z]} rotation-z={Math.PI / 2}>
-            <cylinderGeometry args={[0.008, 0.008, 0.075, 10]} /><meshToonMaterial color="#d4b04a" />
-          </mesh>
-        ))}
-      </group>}
+      {/* the shrine itself, from blender/kamidana.py: a three-bay shrine in hinoki, its fittings gold */}
+      {part !== 'extras' && <group position={[-0.14, 0.015, 0]}><KamidanaModel /></group>}
       {/* the bouquets in their vases, leaning in a little, and the cups */}
       {part !== 'shrine' && [-1, 1].map((sd) => (
         <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} /></group>
@@ -1282,6 +1183,18 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'extras' }) {
   )
 }
 
+/** the shrine's scale on the shelf (its cups too) */
+const KAMI_SC = 1.25
+/** the cup's inside: its floor's height, how high it's filled, and its radius at a height (the inner wall of SAKE_CUP's profile, in its own units) */
+const CUP_FLOOR = 0.0058, CUP_FULL = 0.0212
+const CUP_INNER: [number, number][] = [[0.0056, 0], [0.0062, 0.0066], [0.0125, 0.0088], [0.0225, 0.0102], [0.0246, 0.0106]]
+const cupInnerR = (y: number) => {
+  for (let i = 0; i < CUP_INNER.length - 1; i++) {
+    const [y0, r0] = CUP_INNER[i], [y1, r1] = CUP_INNER[i + 1]
+    if (y <= y1) return r0 + (r1 - r0) * THREE.MathUtils.clamp((y - y0) / (y1 - y0), 0, 1)
+  }
+  return CUP_INNER[CUP_INNER.length - 1][1]
+}
 /** a little sake cup (お猪口), thick-walled: foot ring, belly, a rounded rim, the inside hollow with its own floor */
 const SAKE_CUP = new THREE.LatheGeometry([[0, 0.0005], [0.0072, 0.0005], [0.0078, 0.0022], [0.0095, 0.008], [0.0118, 0.016], [0.0128, 0.0232], [0.0126, 0.0252],
   [0.0116, 0.0256], [0.0106, 0.0246], [0.0102, 0.0225], [0.0088, 0.0125], [0.0066, 0.0062], [0, 0.0056]].map(([x, y]) => new THREE.Vector2(x, y)), 20)
@@ -1597,23 +1510,6 @@ const ALTAR_D = 0.58
 const ALTAR_Y = 1.42
 /** how long the sake offered stands there, and the extra custom it brings (ms) */
 const INCENSE_MS = 180000
-/** the sutra laid by the shrine: a thread-bound book, an indigo cover, a cream label down it with the name brushed in a column */
-const SUTRA_COVER = canvasTex(96, 160, (g) => {
-  g.fillStyle = '#26365e'
-  g.fillRect(0, 0, 96, 160)
-  g.strokeStyle = 'rgba(255,255,255,0.07)'
-  for (let y = 0; y < 160; y += 3) { g.beginPath(); g.moveTo(0, y); g.lineTo(96, y); g.stroke() }
-  g.fillStyle = '#efe3c2'
-  g.fillRect(30, 14, 36, 132)
-  g.strokeStyle = '#8a2a20'
-  g.lineWidth = 1.5
-  g.strokeRect(33, 17, 30, 126)
-  const t = '觀世音菩薩普門品'
-  for (let i = 0; i < t.length; i++) brushText(g, t[i], 48, 29 + i * 15.2, 14, { fill: '#241810' })
-  // (the binding: white thread through four holes at the spine)
-  g.fillStyle = '#f4efe0'
-  for (const y of [22, 58, 102, 138]) { g.beginPath(); g.arc(10, y, 2.2, 0, Math.PI * 2); g.fill() }
-})
 /**
  * the offering table's top: three boards of dark keyaki laid side by side (their grain running along the table), each its own tone, with
  * a thin seam between, long wavering streaks with pores, a cathedral figure or two, a knot, and a soft sheen of oil across it
@@ -1735,11 +1631,7 @@ function AltarTable() {
 }
 function Sutra() {
   return (
-    <group position={[-0.12, 0.009, -0.34]} rotation-y={-Math.PI / 2}>
-      <mesh><boxGeometry args={[0.105, 0.016, 0.24]} /><meshToonMaterial color="#efe6cf" /></mesh>
-      <mesh position-y={0.0082} rotation-x={-Math.PI / 2}><planeGeometry args={[0.105, 0.24]} /><meshToonMaterial color="#ffffff" map={SUTRA_COVER} /></mesh>
-      <mesh scale={[1.04, 1.25, 1.02]}><boxGeometry args={[0.105, 0.016, 0.24]} /><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
-    </group>
+    <group position={[-0.12, 0.001, -0.34]} rotation-y={-Math.PI / 2}><KamidanaModel part="sutra" /></group>
   )
 }
 function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
@@ -1804,17 +1696,18 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     for (let i = 0; i < 3; i++) {
       const m = liquid.current[i]
       if (!m) continue
-      // (each cup fills as the stream is on it: 1.1 s each from 0.7 s in)
+      // (each cup fills as the stream is on it: 1.1 s each from 0.7 s in; what shows is the sake's surface, rising from the cup's floor and
+      // always just inside its wall at that height (the cup's walls are solid, so the rest of it is hidden), never through it)
       const fill = !on ? 0 : THREE.MathUtils.clamp((since - 0.7 - i * 1.1) / 1.1, 0, 1)
       m.visible = fill > 0
-      m.scale.y = Math.max(0.001, fill)
-      // (it fills from the cup's floor up: its bottom stays on the floor as it grows)
-      m.position.y = 0.0245 + 0.013 * fill
+      const h = CUP_FLOOR + (CUP_FULL - CUP_FLOOR) * fill
+      m.position.y = KAMI_SC * (0.03 - 0.0125 + h)
+      m.scale.setScalar(Math.max(0.0001, KAMI_SC * cupInnerR(h) * 0.96))
     }
   })
   const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; incense?.onLight() }
   // (the shrine's front, in the altar's frame: its doors' plane, and the roof's)
-  const SC = 1.25
+  const SC = KAMI_SC
   const flask = (z: number, key: string) => (
     <group key={key} position={[0, 0, z]}>
       <mesh geometry={ALTAR_GEO.tokkuri} castShadow><meshToonMaterial color="#f6f4ee" /></mesh>
@@ -1846,18 +1739,12 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} /><meshBasicMaterial color="#e6f4ff" transparent opacity={0.55} depthWrite={false} />
       </mesh>
       {[0, 1, 2].map((i) => (
-        <mesh key={i} ref={(m) => { liquid.current[i] = m }} position={[ALTAR_D / 2 - 0.375, 0.035, [-0.1125, 0, 0.1125][i]]} visible={false}>
-          <cylinderGeometry args={[0.0136, 0.0112, 0.026, 12]} /><meshBasicMaterial color="#d8ecfa" transparent opacity={0.62} depthWrite={false} />
+        <mesh key={i} ref={(m) => { liquid.current[i] = m }} position={[ALTAR_D / 2 - 0.375, 0.035, [-0.1125, 0, 0.1125][i]]} rotation-x={-Math.PI / 2} visible={false}>
+          <circleGeometry args={[1, 24]} /><meshBasicMaterial color="#e3f1fb" transparent opacity={0.8} depthWrite={false} />
         </mesh>
       ))}
       {/* the oranges on their dish, a leaf on the top one */}
-      <Movable id="oranges" label="橘子盤"><group position={[-0.17, 0, 0]}>
-        <mesh geometry={ALTAR_GEO.dish} position-y={0.008}><meshToonMaterial color="#e8e2d2" /></mesh>
-        {[[0, 0.035, -0.02], [-0.02, 0.035, 0.025], [0.025, 0.035, 0.02], [0, 0.085, 0.008]].map((pt, k) => (
-          <mesh key={k} geometry={ALTAR_GEO.fruit} position={pt as [number, number, number]}><meshToonMaterial color="#f08a1a" /></mesh>
-        ))}
-        <mesh geometry={ALTAR_GEO.leaf} position={[0, 0.118, 0.008]} rotation-z={0.3}><meshToonMaterial color="#3a7a2a" /></mesh>
-      </group></Movable>
+      <Movable id="oranges" label="橘子盤"><group position={[-0.17, 0, 0]}><KamidanaModel part="oranges" /></group></Movable>
     </group>
   )
 }
