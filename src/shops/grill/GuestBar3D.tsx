@@ -528,6 +528,14 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
         <RegisterBody />
         {/* the cables: one tidy bundle out of the back through a grommet, held to the counter by a clip, with the card reader's lead and the tablet's branching from it */}
         <mesh position={[0.05, 0.12, 0.151]}><boxGeometry args={[0.03, 0.018, 0.012]} /><meshToonMaterial color="#2a2c30" /></mesh>
+        {/* (the cables go with the register: moved in edit mode, they come along) */}
+        {/* the cables: the register's power, the card reader's and the tablet's leads, into the grommet in the top */}
+        <mesh geometry={REG_CABLES.power}><meshToonMaterial color="#17171a" /></mesh>
+        <mesh geometry={REG_CABLES.data}><meshToonMaterial color="#2a2c30" /></mesh>
+        <mesh geometry={REG_CABLES.tablet}><meshToonMaterial color="#e9e9ec" /></mesh>
+        {/* (the grommet: a dark metal ring let into the top, the hole black inside it) */}
+        <mesh position={[GROMMET[0], 0.0009, GROMMET[2]]} rotation-x={-Math.PI / 2}><ringGeometry args={[0.0062, 0.012, 28]} /><meshToonMaterial color="#3a3c40" /></mesh>
+        <mesh position={[GROMMET[0], 0.0007, GROMMET[2]]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.0062, 24]} /><meshBasicMaterial color="#060607" /></mesh>
       </group>
       </group>
         </StaticBatch>
@@ -621,19 +629,6 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
           <Part geo={REG_GEO.body} color="#2a3442" outline={1.02} position={[0.3, top - 0.155, 0.08]} scale={[0.2, 0.065, 0.16]} />
         </group>
       </StaticBatch></Movable>
-      <Movable id="till-cables" label="收銀線材與走線孔"><StaticBatch>
-        <group position={at} rotation-y={yaw}>
-          <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={REG_SC}>
-            {/* the cables: the register's power, the card reader's and the tablet's leads, into the grommet in the top */}
-            <mesh geometry={REG_CABLES.power}><meshToonMaterial color="#17171a" /></mesh>
-            <mesh geometry={REG_CABLES.data}><meshToonMaterial color="#2a2c30" /></mesh>
-            <mesh geometry={REG_CABLES.tablet}><meshToonMaterial color="#e9e9ec" /></mesh>
-            {/* (the grommet: a dark metal ring let into the top, the hole black inside it) */}
-            <mesh position={[GROMMET[0], 0.0009, GROMMET[2]]} rotation-x={-Math.PI / 2}><ringGeometry args={[0.0062, 0.012, 28]} /><meshToonMaterial color="#3a3c40" /></mesh>
-            <mesh position={[GROMMET[0], 0.0007, GROMMET[2]]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.0062, 24]} /><meshBasicMaterial color="#060607" /></mesh>
-          </group>
-        </group>
-      </StaticBatch></Movable>
       <Movable id="till-ipad" label="平板（iPad）"><StaticBatch>
       <group position={at} rotation-y={yaw}>
         {/* the order tablet, an iPad on a folding stand, at the cashier's right hand, its screen toward the cashier, leaning back a little */}
@@ -691,15 +686,17 @@ const grime = (w: number, h: number, seed: number, wear: number) => signTexture(
 const COUNTER_GRIME = grime(256, 128, 31, 2)
 /** a cable run as a tube through the given points (in the register's own units), black rubber */
 const cable = (pts: [number, number, number][], r = 0.0042) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.4), 36, r, 6, false)
-/** where the cables go down through the counter's top: a grommet just behind the register (in the register's own units) */
-const GROMMET: [number, number, number] = [0.036, 0, 0.2]
+/** where the cables go down through the counter's top: a grommet tucked against the register's back, mostly under it (the register's own units) */
+const GROMMET: [number, number, number] = [0.05, 0, 0.176]
+/** the height of a cable run under the register: on the counter, in the gap its feet leave under the case */
+const UNDER = 0.0026
 const REG_CABLES = {
-  // (the register's own: out of its back, down the case and straight into the grommet below)
-  power: cable([[0.05, 0.12, 0.158], [0.05, 0.1, 0.19], [0.045, 0.05, 0.198], [0.04, 0.012, 0.2], [GROMMET[0], -0.012, GROMMET[2]]], 0.0045),
-  // (the card reader's lead: from its foot, round behind the register, to the grommet)
-  data: cable([[0.307, 0.006, 0.13], [0.29, 0.004, 0.19], [0.2, 0.004, 0.24], [0.1, 0.004, 0.235], [0.05, 0.003, 0.212], [GROMMET[0], -0.012, GROMMET[2]]], 0.0032),
-  // (the tablet's white lead: from under its stand, along the register's side and behind it, to the grommet)
-  tablet: cable([[-0.321, 0.004, 0.0], [-0.24, 0.004, 0.06], [-0.212, 0.004, 0.15], [-0.15, 0.004, 0.215], [-0.05, 0.004, 0.235], [0.02, 0.003, 0.212], [GROMMET[0], -0.012, GROMMET[2]]], 0.0028),
+  // (the register's own: out of its back, over the case's back edge, straight down the case's back and into the grommet)
+  power: cable([[0.05, 0.12, 0.158], [0.05, 0.104, 0.177], [0.05, 0.07, 0.1775], [0.05, 0.02, 0.177], [GROMMET[0], -0.012, GROMMET[2]]], 0.0045),
+  // (the card reader's lead: a short way from its foot to the register's side, then under the register to the grommet, out of sight)
+  data: cable([[0.307, 0.004, 0.114], [0.26, UNDER, 0.118], [0.21, UNDER, 0.125], [0.12, UNDER, 0.16], [0.07, UNDER, 0.18], [GROMMET[0], -0.012, GROMMET[2]]], 0.0026),
+  // (the tablet's white lead: from under its stand straight to the register's side, then under it to the grommet, out of sight)
+  tablet: cable([[-0.321, UNDER, 0.0], [-0.26, UNDER, 0.01], [-0.21, UNDER, 0.03], [-0.1, UNDER, 0.1], [0.02, UNDER, 0.17], [GROMMET[0], -0.012, GROMMET[2]]], 0.0024),
 }
 /** the register's size in the till (its drawer, keys and displays are drawn in units of 1/1.4 of this) */
 const REG_SC = 1.4

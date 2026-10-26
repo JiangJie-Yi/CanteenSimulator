@@ -17,9 +17,9 @@ function realMaterial(src: THREE.MeshStandardMaterial): THREE.Material {
   switch (src.name) {
     case 'IpadAlu':
       // (silver: metal enough to catch the light, not so much that the room's warm lamps turn it to bronze)
-      return new THREE.MeshPhysicalMaterial({ color: '#e3e6ea', map: src.map, metalness: 0.5, roughness: 0.5, envMapIntensity: 0.7 })
+      return new THREE.MeshPhysicalMaterial({ color: '#e8ebf0', map: src.map, metalness: 0.3, roughness: 0.5, envMapIntensity: 0.45 })
     case 'IpadStand':
-      return new THREE.MeshPhysicalMaterial({ color: '#c9cdd3', metalness: 0.5, roughness: 0.45, envMapIntensity: 0.7 })
+      return new THREE.MeshPhysicalMaterial({ color: '#d2d6dc', metalness: 0.3, roughness: 0.45, envMapIntensity: 0.45 })
     case 'IpadGlass':
       return new THREE.MeshPhysicalMaterial({ color: '#08090b', metalness: 0, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.03 })
     case 'IpadLens':
