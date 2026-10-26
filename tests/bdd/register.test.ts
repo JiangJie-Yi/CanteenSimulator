@@ -1,6 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { DEPTS, newRegister, PLUS, pressKeys, pressKey, REG_TAG_TEXT, setMode, subtotalOf, turnDrawerKey, type RegKey, type RegTag } from '@/game/register'
+import { REGISTER_MANUAL, type ManualPage } from '@/data/registerManual'
 
 const NOW = new Date(2026, 9, 25, 19, 5)
 const keys = (s: string) => s.split(' ') as RegKey[]
@@ -184,6 +185,23 @@ feature('收銀機', () => {
       const r = pressKey(setMode(w.s, 'Z'), 'CASH', NOW)
       expect(r.effect.receipt?.kind).toBe('Z')
       expect(r.state.sales).toBe(0)
+    })
+  })
+})
+
+feature('收銀機操作說明書', () => {
+  scenario('說明書每一頁、每一步都有中文和日文，而且講到所有收銀機的鍵', ({ given, then, and }) => {
+    given('收銀櫃下的說明書', (w) => { w.pages = REGISTER_MANUAL })
+    then('每一頁都有中日文標題和步驟', (w) => {
+      for (const p of w.pages as ManualPage[]) {
+        expect(p.title.zh && p.title.ja).toBeTruthy()
+        for (const s of p.steps) expect(s.text.zh && s.text.ja).toBeTruthy()
+      }
+    })
+    and('功能鍵都寫在說明書裡', (w) => {
+      const all = (w.pages as ManualPage[]).flatMap((p) => p.steps.map((s) => s.keys)).join(' ')
+      for (const k of ['CLEAR', 'PLU', 'X/TIME', 'RCPT', 'NO SALE', 'CALC', 'RETURN', 'VOID', 'CANCEL', 'TAX', 'CLERK', 'FEED', 'RA+', 'PO−', 'CHECK', 'CHARGE', 'SUBTOTAL', 'CASH/TEND'])
+        expect(all, k).toContain(k)
     })
   })
 })

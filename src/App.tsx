@@ -44,6 +44,7 @@ import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
 import { HoverTip } from '@/ui/HoverTip'
+import { RegisterManual } from '@/ui/RegisterManual'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
@@ -2371,6 +2372,7 @@ export default function App() {
       </button>
       <Bgm />
       <HoverTip hidden={editOn} />
+      <RegisterManual lang={lang} />
       <Loader />
     </div>
   )

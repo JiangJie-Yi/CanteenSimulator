@@ -22,6 +22,8 @@ import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
+import { IpadModel } from './Ipad'
+import { TillBoxes } from './TillBoxes'
 import { behindBody, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
@@ -484,9 +486,7 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       ))}
       <Part geo={REG_GEO.body} color="#4a3626" outline={0} position={[0, 0.1, 0.03]} scale={[W - 0.14, 0.03, D - 0.14]} />
       <Part geo={REG_GEO.body} color="#4a3626" outline={0} position={[0, top - 0.2, 0.04]} scale={[W - 0.14, 0.025, D - 0.2]} />
-      {/* on the shelves: a stack of paper bags, a box of till rolls, the cash box */}
-      <Part geo={REG_GEO.body} color="#c8a878" outline={1.02} position={[-0.3, 0.17, 0.12]} scale={[0.22, 0.11, 0.16]} />
-      <Part geo={REG_GEO.body} color="#e8e2d2" outline={1.02} position={[0.05, 0.16, 0.1]} scale={[0.14, 0.09, 0.12]} />
+      {/* on the shelves: the cash box (the boxes of bags and till rolls, and the manual on them, are TillBoxes) */}
       <Part geo={REG_GEO.body} color="#2a3442" outline={1.02} position={[0.3, top - 0.155, 0.08]} scale={[0.2, 0.065, 0.16]} />
       {/* a thick top of pale hinoki, overhanging its front, a warm light hidden under the overhang washing down the front */}
       <group position={[0, top - 0.03, -0.03]}>
@@ -612,18 +612,15 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       <group position={[0.5, top, -0.26]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.46} /></group>
       </group>
       </StaticBatch></Movable>
+      <Movable id="till-boxes" label="紙箱與收銀說明書">
+        <group position={at} rotation-y={yaw}><TillBoxes lang={lang} /></group>
+      </Movable>
       <Movable id="till-ipad" label="平板（iPad）"><StaticBatch>
       <group position={at} rotation-y={yaw}>
         {/* the order tablet, an iPad on a folding stand, at the cashier's right hand, its screen toward the cashier, leaning back a little */}
         <group position={[0.46, top, 0.1]}>
-          <Part geo={REG_GEO.round} color="#b8bcc2" outline={1.04} position={[0, 0.006, 0.0]} scale={[0.17, 0.012, 0.13]} />
-          <mesh position={[0, 0.075, -0.075]} rotation-x={0.62}><boxGeometry args={[0.07, 0.17, 0.008]} /><meshToonMaterial color="#9ea2a8" /></mesh>
-          <group position={[0, 0.014, 0.035]} rotation-x={-0.3}>
-            <Part geo={REG_GEO.round} color="#c9ccd2" outline={1.03} position={[0, 0.138, 0]} scale={[0.2, 0.275, 0.01]} />
-            <mesh position={[0, 0.138, 0.0056]}><planeGeometry args={[0.186, 0.261]} /><meshBasicMaterial color="#0b0c0e" /></mesh>
-            <mesh position={[0, 0.138, 0.0059]}><planeGeometry args={[0.168, 0.232]} /><meshBasicMaterial map={IPAD_SCREEN} toneMapped={false} /></mesh>
-            <mesh position={[0, 0.262, 0.0061]}><circleGeometry args={[0.0025, 8]} /><meshBasicMaterial color="#2a3340" /></mesh>
-          </group>
+          {/* (the model from blender/ipad.py: the tablet, its screen the order screen, on its folding stand) */}
+          <IpadModel screen={IPAD_SCREEN} />
         </group>
       </group>
       </StaticBatch></Movable>

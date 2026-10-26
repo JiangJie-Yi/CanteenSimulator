@@ -6642,3 +6642,87 @@ button {
   background: var(--hanko);
 }
 
+
+/* the register's manual, opened from the booklet under the till: a booklet on the shared wood finish, one page at a time */
+.reg-manual-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgb(20 12 6 / 0.35);
+}
+.reg-manual {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 246 234 / 0.96);
+  border: 3px solid #5a3d28;
+  border-radius: 10px;
+  color: #2a1a10;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+}
+.reg-manual > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--grain-dark) 0 0 / 420px 120px, var(--wood-bar);
+  color: #f6e8cc;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.reg-manual > header button,
+.reg-manual > footer button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}
+.reg-manual h3 {
+  margin: 14px 18px 6px;
+  font-size: 17px;
+  border-bottom: 2px solid #c9a978;
+  padding-bottom: 4px;
+}
+.reg-manual dl {
+  margin: 0;
+  padding: 4px 18px 8px;
+}
+.reg-manual dl > div {
+  display: grid;
+  grid-template-columns: 9.5em 1fr;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgb(90 61 40 / 0.25);
+}
+.reg-manual dt kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid #8a6a44;
+  border-bottom-width: 3px;
+  border-radius: 5px;
+  background: #fffaf0;
+  font: 700 12px/1.4 "Arial", "Noto Sans TC", sans-serif;
+}
+.reg-manual dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.reg-manual > footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  padding: 6px 0 10px;
+  color: #5a3d28;
+}
+.reg-manual > footer button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+@media (max-width: 600px) {
+  .reg-manual dl > div { grid-template-columns: 1fr; gap: 2px; }
+}
