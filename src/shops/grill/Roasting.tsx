@@ -2170,7 +2170,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // charcoal added is thrown in: a few sticks leave the hand (or the crate), fly in an arc, land on the heap, bounce, tip and lie
   // where they land, a burst of sparks and ash where each strikes. Each stick starts black and kindles on its own, over some
   // seconds, to red-hot (its glow reddening, its face going ashy grey), as binchotan does
-  type Coal = { g: THREE.Object3D | null; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
+  type Coal = { g: THREE.Object3D | null; mat: THREE.MeshStandardMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
     sx: number; sz: number; settled: boolean; top: number; delay: number; heat: number; bounced: boolean
     /** seconds since it landed, whether it's burnt out, and how long it's been going out when it's pushed out by the new */
     age: number; gone: boolean; dying: boolean; dyT: number
@@ -2247,7 +2247,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const ly = restOf(spot.from.x, spot.from.z, yaw, lying).y
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
       const mats = burningMaps()
-      const mat = new THREE.MeshToonMaterial({ color: '#ffffff', map: mats?.dark ?? binchotanMap(), emissiveMap: mats?.glow ?? null, emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
+      // (matte, lit as a real surface so the crazed blocks show their relief; the cracks glow through the emissive map)
+      const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', map: mats?.dark ?? binchotanMap(), emissiveMap: mats?.glow ?? null, emissive: new THREE.Color('#000000'), emissiveIntensity: 0, roughness: 0.92, metalness: 0, bumpMap: mats?.dark ?? null, bumpScale: 2.5 })
       coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,

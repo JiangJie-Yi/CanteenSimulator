@@ -62,83 +62,94 @@ export function binchotanMap() {
 
 let burning: { dark: THREE.CanvasTexture; glow: THREE.CanvasTexture } | null = null
 /**
- * A stick on the fire, as a pair of textures that share their cracks: the charred surface (near-black, broken across into blocks by deep fractures,
- * pale ash dust here and there) and the glow that shows through those fractures (orange, a hot yellow at their middles, a little along the edges),
- * used as the emissive map, so it's the cracks that light up and the faces between them stay black.
+ * A stick on the fire, as a pair of textures that share their cracks, after the way binchotan burns: its skin crazes into blocks (rings of
+ * cracks around the stick, short ones along it between them, staggered like brickwork, every line jagged), the cracks open and glow from the
+ * fire inside (a wide orange bloom, orange, a hot yellow core), the blocks' corners and edges catch a dull red, and their faces go grey with ash
+ * in patches, darker where the char shows through. The glow is the emissive map, so it's the cracks that light up.
  */
 export function burningMaps() {
   if (burning || typeof document === 'undefined') return burning
-  const W = 128, H = 256
+  const W = 256, H = 512
   let seed = 41
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  // (the fractures, drawn the same on both: each a jagged line across the stick, some with a branch running down it)
-  type Crack = { pts: [number, number][]; branch: [number, number][] | null }
-  const cracks: Crack[] = []
-  // (a few short, thin fractures here and there on the stick, each a broken, wandering run along it, with a hairline off it now and then: not stripes)
-  for (let n = 0; n < 7; n++) {
-    const x0 = 8 + rnd() * (W - 16)
-    const y0 = rnd() * (H - 70), len = 40 + rnd() * 80
+  // (the cracks: each ring round the stick (across the texture) and each short run along it, a jagged polyline)
+  const lines: [number, number][][] = []
+  const jag = (x0: number, y0: number, x1: number, y1: number, amp: number) => {
     const pts: [number, number][] = []
-    let x = x0
-    for (let y = y0; y <= y0 + len; y += 8 + rnd() * 10) { x += (rnd() - 0.5) * 9; pts.push([x, y]) }
-    let branch: [number, number][] | null = null
-    if (rnd() < 0.5) {
-      const bx = x, by = y0 + len * (0.3 + rnd() * 0.4)
-      branch = [[bx, by], [bx + (rnd() - 0.5) * 18, by + 4 + rnd() * 6], [bx + (rnd() - 0.5) * 26, by + 10 + rnd() * 10]]
+    const n = Math.max(3, Math.round(Math.hypot(x1 - x0, y1 - y0) / 7))
+    for (let i = 0; i <= n; i++) {
+      const t = i / n
+      const nx = -(y1 - y0), ny = x1 - x0, l = Math.hypot(nx, ny) || 1
+      const o = i === 0 || i === n ? 0 : (rnd() - 0.5) * amp
+      pts.push([x0 + (x1 - x0) * t + (nx / l) * o, y0 + (y1 - y0) * t + (ny / l) * o])
     }
-    cracks.push({ pts, branch })
+    return pts
   }
-  const draw = (g: CanvasRenderingContext2D, color: string, width: number, blur: number, glow: string | null) => {
-    g.lineCap = 'round'; g.lineJoin = 'round'
-    g.strokeStyle = color; g.lineWidth = width
-    if (glow) { g.shadowColor = glow; g.shadowBlur = blur } else g.shadowBlur = 0
-    for (const c of cracks) {
-      g.beginPath(); c.pts.forEach(([x, yy], i) => (i ? g.lineTo(x, yy) : g.moveTo(x, yy))); g.stroke()
-      if (c.branch) { g.beginPath(); c.branch.forEach(([x, yy], i) => (i ? g.lineTo(x, yy) : g.moveTo(x, yy))); g.stroke() }
+  const rings: number[] = []
+  for (let y = 10 + rnd() * 12; y < H; y += 26 + rnd() * 22) rings.push(y)
+  rings.forEach((y) => lines.push(jag(-4, y, W + 4, y + (rnd() - 0.5) * 10, 7)))
+  for (let r = 0; r < rings.length - 1; r++) {
+    // (between two rings, a few cracks along the stick, staggered from the row before)
+    let x = (r % 2 ? 0.5 : 0) * 40 + rnd() * 20
+    while (x < W) {
+      lines.push(jag(x, rings[r], x + (rnd() - 0.5) * 8, rings[r + 1], 5))
+      x += 28 + rnd() * 40
+    }
+  }
+  const stroke = (g: CanvasRenderingContext2D, style: string, width: number, blur = 0, glow = '') => {
+    g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = style; g.lineWidth = width
+    g.shadowColor = glow; g.shadowBlur = blur
+    for (const l of lines) {
+      for (const dx of [-W, 0, W]) {
+        g.beginPath()
+        l.forEach(([x, y], i) => (i ? g.lineTo(x + dx, y) : g.moveTo(x + dx, y)))
+        g.stroke()
+      }
     }
     g.shadowBlur = 0
   }
-  const mk = (c: HTMLCanvasElement, srgb: boolean) => {
+  const mk = (c: HTMLCanvasElement) => {
     const t = new THREE.CanvasTexture(c)
     t.wrapS = t.wrapT = THREE.RepeatWrapping
-    if (srgb) t.colorSpace = THREE.SRGBColorSpace
+    t.colorSpace = THREE.SRGBColorSpace
     t.anisotropy = 4
     return t
   }
-  // the charred face
+  // the face: char black, the blocks' faces silvered with ash in soft patches and specks, darker toward the cracks; the cracks deep black
   const dc = document.createElement('canvas'); dc.width = W; dc.height = H
   const d = dc.getContext('2d')!
-  d.fillStyle = '#25221f'; d.fillRect(0, 0, W, H)
-  for (let i = 0; i < 26; i++) {
-    d.fillStyle = rnd() < 0.6 ? `rgba(8,7,6,${0.2 + rnd() * 0.3})` : `rgba(80,74,68,${0.06 + rnd() * 0.1})`
-    d.fillRect(rnd() * W, 0, 2 + rnd() * 9, H)
+  d.fillStyle = '#1d1a18'; d.fillRect(0, 0, W, H)
+  for (let i = 0; i < 90; i++) {
+    const x = rnd() * W, y = rnd() * H, r = 6 + rnd() * 26
+    const gr = d.createRadialGradient(x, y, 0, x, y, r)
+    const a = 0.12 + rnd() * 0.3
+    gr.addColorStop(0, `rgba(176,170,162,${a})`); gr.addColorStop(1, 'rgba(176,170,162,0)')
+    d.fillStyle = gr; d.fillRect(x - r, y - r, r * 2, r * 2)
   }
-  draw(d, 'rgba(4,3,3,0.95)', 3, 0, null)
-  for (let i = 0; i < 700; i++) {
-    d.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.35)' : 'rgba(170,164,156,0.14)'
-    d.fillRect(rnd() * W, rnd() * H, 1, 1 + rnd() * 2)
+  for (let i = 0; i < 2600; i++) {
+    d.fillStyle = rnd() < 0.55 ? `rgba(205,200,192,${0.08 + rnd() * 0.18})` : `rgba(0,0,0,${0.15 + rnd() * 0.25})`
+    d.fillRect(rnd() * W, rnd() * H, 1 + rnd() * 1.5, 1 + rnd() * 2.5)
   }
-  for (let i = 0; i < 12; i++) {
-    const x = rnd() * W, yy = rnd() * H
-    const gr = d.createRadialGradient(x, yy, 0, x, yy, 5 + rnd() * 11)
-    gr.addColorStop(0, `rgba(190,186,178,${0.14 + rnd() * 0.14})`); gr.addColorStop(1, 'rgba(190,186,178,0)')
-    d.fillStyle = gr; d.fillRect(x - 20, yy - 20, 40, 40)
-  }
-  // the light through the fractures
+  // (the grain of the wood it was, still in the char: faint lines along the stick)
+  for (let i = 0; i < 40; i++) { d.fillStyle = `rgba(0,0,0,${0.08 + rnd() * 0.12})`; d.fillRect(rnd() * W, 0, 1 + rnd() * 2, H) }
+  stroke(d, 'rgba(10,8,7,0.6)', 7)
+  stroke(d, 'rgba(0,0,0,0.95)', 3)
+  // the glow through the cracks
   const gc = document.createElement('canvas'); gc.width = W; gc.height = H
   const g = gc.getContext('2d')!
   g.fillStyle = '#000'; g.fillRect(0, 0, W, H)
-  draw(g, 'rgba(255,90,20,0.8)', 4, 8, '#ff5a14')
-  draw(g, 'rgba(255,170,60,1)', 1.8, 3, '#ffa03c')
-  draw(g, 'rgba(255,235,150,1)', 0.7, 0, null)
-  // (a dull red along some of the edges of the blocks: the heat inside showing at their corners)
-  for (let i = 0; i < 18; i++) {
-    const x = rnd() * W, yy = rnd() * H
-    const gr = g.createRadialGradient(x, yy, 0, x, yy, 6 + rnd() * 9)
-    gr.addColorStop(0, `rgba(255,70,15,${0.25 + rnd() * 0.3})`); gr.addColorStop(1, 'rgba(255,70,15,0)')
-    g.fillStyle = gr; g.fillRect(x - 16, yy - 16, 32, 32)
+  stroke(g, 'rgba(200,40,6,0.55)', 10, 14, '#c8280a')
+  stroke(g, 'rgba(255,96,18,0.95)', 4.5, 6, '#ff6012')
+  stroke(g, 'rgba(255,190,80,1)', 1.8, 2, '#ffbe50')
+  stroke(g, 'rgba(255,245,190,1)', 0.6)
+  // (the heat showing at some blocks' corners and in patches of their faces, a dull red)
+  for (let i = 0; i < 40; i++) {
+    const x = rnd() * W, y = rnd() * H, r = 5 + rnd() * 16
+    const gr = g.createRadialGradient(x, y, 0, x, y, r)
+    gr.addColorStop(0, `rgba(255,70,14,${0.2 + rnd() * 0.35})`); gr.addColorStop(1, 'rgba(255,70,14,0)')
+    g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2)
   }
-  burning = { dark: mk(dc, true), glow: mk(gc, true) }
+  burning = { dark: mk(dc), glow: mk(gc) }
   return burning
 }
 

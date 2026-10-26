@@ -138,14 +138,19 @@ function Crate() {
     const out: { p: [number, number, number]; r: [number, number, number]; g: number }[] = []
     let seed = 11
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    const N = 6, step = (W - 2 * T - 0.04) / (N - 1)
+    // (packed so that none, however it leans, reaches the basket's walls: the outer row's middle kept a stick's radius, its lean at the top and
+    // a margin in from the inside of the wall; each stood on the floor, never sunk through it)
+    const N = 6, R = 0.026, LEAN = 0.05, JIT = 0.003
+    const inner = W / 2 - T
+    const reach = inner - R - (LEAN / 2) * 0.15 - JIT - 0.004
+    const step = (2 * reach) / (N - 1)
     for (let i = 0; i < N; i++) {
       for (let k = 0; k < N; k++) {
         const g = Math.floor(rnd() * stickGeos.length)
         const len = stickGeos[g].len
         out.push({
-          p: [(i - (N - 1) / 2) * step + (rnd() - 0.5) * 0.008, T + len / 2 + (rnd() - 0.5) * 0.02, (k - (N - 1) / 2) * step + (rnd() - 0.5) * 0.008],
-          r: [(rnd() - 0.5) * 0.1, rnd() * 6, (rnd() - 0.5) * 0.1], g,
+          p: [(i - (N - 1) / 2) * step + (rnd() - 0.5) * 2 * JIT, T + len / 2 + rnd() * 0.012, (k - (N - 1) / 2) * step + (rnd() - 0.5) * 2 * JIT],
+          r: [(rnd() - 0.5) * LEAN, rnd() * 6, (rnd() - 0.5) * LEAN], g,
         })
       }
     }
