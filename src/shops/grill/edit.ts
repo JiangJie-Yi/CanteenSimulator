@@ -3,7 +3,6 @@
 // staff are walking about. Here: the state, the key, the panel at the screen's corner, and the list of what can be moved.
 
 import { useSyncExternalStore } from 'react'
-import DEFAULTS from './editDefaults.json'
 
 export type V3 = [number, number, number]
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
@@ -32,20 +31,25 @@ const emit = () => { state = { ...state }; subs.forEach((f) => f()); panel() }
 export const getEdit = () => state
 export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f) }, () => state)
 /**
- * Where each piece stands to begin with, and how it's turned and sized: the places the owner has settled on by hand, kept in
- * editDefaults.json (positions as X, Y, Z in the piece's parent's own units; turns in degrees added to the piece's own baseTurn; scales
- * multiplying its own baseScale). The offset shown and typed in edit mode is from here, so every piece starts at 0, 0, 0, its own centre.
- * In dev, the panel's 「設為預設」 writes what's been moved into that file (bakeDefaults), and the panel goes back to 0.
- * (The freezer's spot was moved by [0.2, 0.19, 0.47] then [0, 0, 0.341] in the room's frame; the charcoal basket's by [0.273, 0.125, 0.082],
- * its 1.75 size and 44° turn Decor's; the lantern's by [-0.083, 0, -0.651], its 12° turn Decor's; the dish rack's by [-0.871, 0, -2.135],
- * its 1.03 size Decor's: each taken into its parent's units.)
+ * Where each piece stands to begin with: the places the owner has settled on by hand (as X, Y, Z in the piece's parent's own units). The
+ * offset shown and typed in edit mode is from here, so every piece starts at 0, 0, 0, its own centre.
  */
-export const BASES: Record<string, V3> = DEFAULTS.positions as unknown as Record<string, V3>
-export const BASE_TURNS: Record<string, V3> = DEFAULTS.turns as unknown as Record<string, V3>
-export const BASE_SCALES: Record<string, V3> = DEFAULTS.scales as unknown as Record<string, V3>
-/** the settled turn (degrees) and size of a piece, on top of its own baseTurn and baseScale */
-export const baseTurnOf = (id: string): V3 => BASE_TURNS[id] ?? [0, 0, 0]
-export const baseScaleOf = (id: string): V3 => BASE_SCALES[id] ?? [1, 1, 1]
+export const BASES: Record<string, V3> = {
+  gate1: [0, 0, 0.16],
+  gate0: [0, 0, 0.17],
+  // (the owner's settled spot: moved by [0.2, 0.19, 0.47] in the room's frame from [-1.508, 0, 1.974], taken into this parent's own units)
+  // (moved on by [0, 0, 0.341] in the room's frame, taken into this parent's units)
+  freezer: [-0.9694, 0.19, 1.3355],
+  willow: [0.38, 0, 0.201],
+  sake: [0.084, 0, 0.118],
+  sake2: [0.084, 0, 0.118],
+  // (the charcoal basket: moved by [0.273, 0.125, 0.082] in the room's frame, taken into the parent's units; its 1.75 size and 44° turn are Decor's)
+  crate: [-0.0941, 0.125, -0.2691],
+  // (the lantern: moved by [-0.083, 0, -0.651] in the room's frame, taken into this parent's units; its 12° turn is Decor's)
+  lantern: [-0.478, 0, 0.4497],
+  // (the dish rack: moved by [-0.871, 0, -2.135] in the room's frame, taken into this parent's units; its 1.03 size is Decor's)
+  platerack: [-1.2158, 0, 1.9593],
+}
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece belongs to, if any */
 export const groupOf = (piece: string): string | null => Object.keys(state.groups).find((g) => state.groups[g].members.includes(piece)) ?? null
@@ -125,44 +129,6 @@ export function resetAll() {
   beginChange(); state.offsets = {}; state.rotations = {}; state.scales = {}
   state.groups = Object.fromEntries(Object.entries(state.groups).map(([k, g]) => [k, { ...g, t: [0, 0, 0] as V3, yaw: 0, s: 1 }]))
   save(); emit()
-}
-/**
- * 設為預設 (dev only): everything moved, turned or sized by hand becomes where it stands to begin with. The dev server writes the new defaults
- * into editDefaults.json; then the offsets go back to 0 (the piece stays where it is, its default now being there). Groups are left as they
- * are: dissolve one first to make its members' places their own.
- */
-const near = (v: V3, w: V3) => v.every((x, i) => Math.abs(x - w[i]) < 1e-6)
-const round = (v: V3): V3 => v.map((x) => Math.round(x * 1e5) / 1e5) as V3
-export async function bakeDefaults() {
-  const ids = new Set([...Object.keys(state.offsets), ...Object.keys(state.rotations), ...Object.keys(state.scales)])
-  const positions = { ...BASES }, turns = { ...BASE_TURNS }, scales = { ...BASE_SCALES }
-  const baked: string[] = []
-  for (const id of ids) {
-    const o = state.offsets[id] ?? [0, 0, 0], r = state.rotations[id] ?? [0, 0, 0], sc = state.scales[id] ?? [1, 1, 1]
-    if (near(o, [0, 0, 0]) && near(r, [0, 0, 0]) && near(sc, [1, 1, 1])) continue
-    const b = BASES[id] ?? [0, 0, 0], t = baseTurnOf(id), k = baseScaleOf(id)
-    if (!near(o, [0, 0, 0])) positions[id] = round([b[0] + o[0], b[1] + o[1], b[2] + o[2]])
-    if (!near(r, [0, 0, 0])) turns[id] = round([t[0] + r[0], t[1] + r[1], t[2] + r[2]])
-    if (!near(sc, [1, 1, 1])) scales[id] = round([k[0] * sc[0], k[1] * sc[1], k[2] * sc[2]])
-    baked.push(id)
-  }
-  const groupsMoved = Object.values(state.groups).some((g) => !near(g.t, [0, 0, 0]) || g.yaw || g.s !== 1)
-  if (!baked.length) { toast(groupsMoved ? '群組的變更不能設為預設，請先解散群組' : '沒有調整過的擺設'); return }
-  try {
-    const res = await fetch('/__canteen/edit-defaults', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ positions, turns, scales }) })
-    if (!res.ok) throw new Error(String(res.status))
-  } catch {
-    toast('寫入預設失敗：要在本機開發伺服器（npm run dev）上才能用')
-    return
-  }
-  // (the new defaults hold them where they are: their offsets back to nothing)
-  Object.assign(BASES, positions); Object.assign(BASE_TURNS, turns); Object.assign(BASE_SCALES, scales)
-  beginChange()
-  const drop = (rec: Record<string, V3>) => Object.fromEntries(Object.entries(rec).filter(([k]) => !baked.includes(k)))
-  state.offsets = drop(state.offsets); state.rotations = drop(state.rotations); state.scales = drop(state.scales)
-  baseline = take()
-  save(); emit()
-  toast(`已設為預設：${baked.length} 件，面板歸零${groupsMoved ? '（群組沒有寫入，請先解散）' : ''}`)
 }
 export const select = (id: string | null) => { state.selected = id; emit() }
 const TOOL_NAMES: Record<Tool, string> = { move: '位移 (W)', rotate: '旋轉 (R)', scale: '縮放 (S)' }
@@ -519,7 +485,6 @@ function panel() {
       mk('改名', '替選到的群組改名', () => { const g = state.selected ? state.groups[state.selected] : null; if (g) { const n = window.prompt('群組名稱', g.name); if (n) renameGroup(state.selected!, n) } }),
       mk('復原', 'Ctrl+Z', undo), mk('重做', 'Ctrl+Y', redo),
       mk('全部還原', '把所有被移動的擺設放回原位', () => { if (window.confirm('把所有被移動的擺設放回原位？')) resetAll() }, 'warn'),
-      ...(import.meta.env.DEV ? [mk('設為預設', '把調整過的擺設現在的位置、方向與大小寫進專案的預設值（editDefaults.json），面板歸零', () => { if (window.confirm('把調整過的擺設現在的位置、方向與大小設為預設？')) void bakeDefaults() }, 'ok')] : []),
       mk('取消', '放棄這次所有變更', () => cancelEdit()),
       mk('確認', '保留這次所有變更', () => confirmEdit(), 'ok'),
     )

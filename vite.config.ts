@@ -4,7 +4,6 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 
 const LIVE_STATE = fileURLToPath(new URL('./blender/live_state.json', import.meta.url))
-const EDIT_DEFAULTS = fileURLToPath(new URL('./src/shops/grill/editDefaults.json', import.meta.url))
 
 /**
  * Dev-only bridge to Blender: the page POSTs what's on screen (dish, ordered items) and we write it to
@@ -27,28 +26,6 @@ function blenderBridge(): Plugin {
           try {
             JSON.parse(body)
             await writeFile(LIVE_STATE, body)
-            res.statusCode = 204
-          } catch {
-            res.statusCode = 400
-          }
-          res.end()
-        })
-      })
-      // edit mode's 「設為預設」: the furnishings' settled places, turns and sizes, written into the project (src/shops/grill/editDefaults.json)
-      server.middlewares.use('/__canteen/edit-defaults', (req, res) => {
-        if (req.method !== 'POST') {
-          res.statusCode = 405
-          res.end()
-          return
-        }
-        let body = ''
-        req.on('data', (chunk) => (body += chunk))
-        req.on('end', async () => {
-          try {
-            const d = JSON.parse(body)
-            const ok = (rec: unknown) => !!rec && typeof rec === 'object' && Object.values(rec as object).every((v) => Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && Number.isFinite(x)))
-            if (!ok(d.positions) || !ok(d.turns) || !ok(d.scales)) throw new Error('bad defaults')
-            await writeFile(EDIT_DEFAULTS, JSON.stringify({ positions: d.positions, turns: d.turns, scales: d.scales }, null, 2) + '\n')
             res.statusCode = 204
           } catch {
             res.statusCode = 400
