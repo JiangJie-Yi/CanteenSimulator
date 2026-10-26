@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, groupTransformOf, isPicked, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, setFrame, turnTo, useEdit, type V3 } from './edit'
+import { baseScaleOf, baseTurnOf, beginChange, commitOffsets, groupTransformOf, isPicked, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, setFrame, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -320,6 +320,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   void offsets; void rotations; void scales; void selected; void groups // (read so it redraws as it's moved, turned or scaled)
   const o = positionOf(id)
   const rot = rotationOf(id), sc = scaleOf(id)
+  // (and the turn and size settled into the defaults, editDefaults.json)
+  const bt = baseTurnOf(id), bs = baseScaleOf(id)
 
   /** its size and middle as it stands untouched: taken of the inner group alone (the handle and arrows are not in it), in the frame of the group that carries the offset */
   /**
@@ -490,7 +492,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
           scaled there, and stood back) */}
       <group position={mid} rotation-y={theta}>
-        <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]} scale={[sc[0] * baseScale, sc[1] * baseScale, sc[2] * baseScale]}>
+        <group rotation={[(rot[0] + baseTurn[0] + bt[0]) * DEG, (rot[1] + baseTurn[1] + bt[1]) * DEG, (rot[2] + baseTurn[2] + bt[2]) * DEG]} scale={[sc[0] * baseScale * bs[0], sc[1] * baseScale * bs[1], sc[2] * baseScale * bs[2]]}>
           <group rotation-y={-theta}>
             <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}>{children}</group>
           </group>
