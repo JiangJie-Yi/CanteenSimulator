@@ -6,7 +6,7 @@ export const EDIT_TEXT = {
   zh: {
     title: '編輯模式',
     keys: 'G 離開　Ctrl+Z / Y',
-    tools: { move: '位移 (W)', rotate: '旋轉 (R)', scale: '縮放 (S)' },
+    tools: { select: '選取 (Q)', move: '位移 (W)', rotate: '旋轉 (R)', scale: '縮放 (S)' },
     outliner: '場景物件',
     find: '搜尋…',
     rowGroup: '選整個群組（一起移動、轉向、縮放）',
@@ -44,7 +44,7 @@ export const EDIT_TEXT = {
   ja: {
     title: '編集モード',
     keys: 'G で終了　Ctrl+Z / Y',
-    tools: { move: '移動 (W)', rotate: '回転 (R)', scale: '拡大縮小 (S)' },
+    tools: { select: '選択 (Q)', move: '移動 (W)', rotate: '回転 (R)', scale: '拡大縮小 (S)' },
     outliner: 'シーンの物',
     find: '検索…',
     rowGroup: 'グループごと選ぶ（まとめて移動・回転・拡大縮小）',

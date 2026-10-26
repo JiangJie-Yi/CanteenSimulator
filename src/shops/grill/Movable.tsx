@@ -1,6 +1,7 @@
 // A piece of the shop's furnishing that can be moved by hand in edit mode (edit.ts): its children sit in a group offset by the piece's saved
-// offset (in its parent's own units), and while editing a pale blue box shows round it to be taken hold of and dragged over the floor
-// (Shift lifts it). Wrap it round a StaticBatch, not inside one: the batch's baked meshes then move with the group.
+// offset (in its parent's own units), and while editing it glows faintly (it can be edited), brighter when pointed at and brightest when
+// chosen; it's taken hold of by the piece itself (whatever's nearest under the pointer, so a small thing in front of a big one is never
+// lost behind it) and dragged over the floor (Shift lifts it), or with the select tool (Q) only chosen. Wrap it round a StaticBatch, not inside one: the batch's baked meshes then move with the group.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -23,6 +24,60 @@ export function focusCamera(camera: THREE.Camera, controls: Controls, p: THREE.V
 const DEG = Math.PI / 180
 /** how long the handles are on the screen, in pixels */
 const GIZMO_PX = 130
+
+/**
+ * The glow laid over a piece while editing: its own shape drawn again, added on, a soft fill and a brighter rim where it turns away (so it reads
+ * whatever its colour), three strengths: editable, pointed at, chosen.
+ */
+const GLOW_VERT = `varying vec3 vN; varying vec3 vV;
+#include <common>
+void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`
+const GLOW_FRAG = `uniform vec3 uColor; uniform float uFill; uniform float uRim; varying vec3 vN; varying vec3 vV;
+void main() { float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.2); gl_FragColor = vec4(uColor * (uFill + uRim * f), 1.0); }`
+const glowMat = (color: string, fill: number, rim: number) => new THREE.ShaderMaterial({
+  vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, uniforms: { uColor: { value: new THREE.Color(color) }, uFill: { value: fill }, uRim: { value: rim } },
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthFunc: THREE.LessEqualDepth, toneMapped: false,
+})
+const GLOW = { idle: glowMat('#5fb4ff', 0.06, 0.55), hover: glowMat('#9ad6ff', 0.14, 0.95), chosen: glowMat('#ffc46a', 0.16, 1.1) }
+type Glow = keyof typeof GLOW
+/** (an edit proxy's unseen box: its edges only, in the same three strengths) */
+const lineMat = (color: string, opacity: number) => new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false, toneMapped: false })
+const GLOW_LINE: Record<Glow, THREE.LineBasicMaterial> = { idle: lineMat('#5fb4ff', 0.45), hover: lineMat('#9ad6ff', 0.8), chosen: lineMat('#ffc46a', 1) }
+
+/**
+ * While editing, what's under `root` glows: its own solid meshes drawn over again, each the child of its mesh so it follows it (an edit proxy's
+ * unseen box by its edges); looked for again a moment after editing starts, as a batch may merge its meshes then. `look`: how strongly.
+ */
+export function useEditGlow(root: { current: THREE.Object3D | null }, on: boolean, look: Glow, ready = true) {
+  const glows = useRef<(THREE.Mesh | THREE.LineSegments)[]>([])
+  useEffect(() => {
+    if (!on) return
+    const lay = () => {
+      for (const o of glows.current) o.removeFromParent()
+      glows.current = []
+      root.current?.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh || (m as THREE.InstancedMesh).isInstancedMesh || m.userData.glow || m.userData.editHandle || m.name.endsWith('_outline')) return
+        const mats = Array.isArray(m.material) ? m.material : [m.material]
+        if (mats.every((x) => x.side === THREE.BackSide)) return
+        // (nothing over glass, glows, decals or unseen hit-boxes: only what's solid (an edit proxy's box gets its edges))
+        if (!m.userData.proxy && mats.every((x) => !x.visible || x.opacity <= 0.02 || !x.colorWrite || x.blending === THREE.AdditiveBlending || (x.transparent && !x.depthWrite))) return
+        const gm = m.userData.proxy ? new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), GLOW_LINE.idle) : new THREE.Mesh(m.geometry, GLOW.idle)
+        gm.userData.glow = true
+        gm.raycast = () => {}
+        gm.renderOrder = 5
+        m.add(gm)
+        glows.current.push(gm)
+      })
+      for (const o of glows.current) o.material = o instanceof THREE.LineSegments ? GLOW_LINE[look] : GLOW[look]
+    }
+    lay()
+    const t = window.setTimeout(lay, 450)
+    return () => { window.clearTimeout(t); for (const o of glows.current) o.removeFromParent(); glows.current = [] }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on, ready])
+  useEffect(() => { for (const o of glows.current) o.material = o instanceof THREE.LineSegments ? GLOW_LINE[look] : GLOW[look] }, [look, on])
+}
 /** an axis's letter on a round disc in its colour, drawn once */
 const LETTERS = new Map<string, THREE.Texture>()
 function letterTex(name: string, color: string) {
@@ -68,7 +123,7 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
     const ps = r.parent.getWorldScale(new THREE.Vector3())
     r.scale.set(world / (ps.x || 1), world / (ps.y || 1), world / (ps.z || 1))
   })
-  if (!on || selected !== id) return null
+  if (!on || selected !== id || tool === 'select') return null
   const down = (axis: 0 | 1 | 2) => (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
     const r0 = root.current
     const par = r0?.parent?.parent
@@ -310,7 +365,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   const laid = useRef(false)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
-  const { on, offsets, rotations, scales, selected, groups } = useEdit()
+  const { on, offsets, rotations, scales, selected, groups, tool } = useEdit()
   const [box, setBox] = useState<{ c: V3; s: V3; yaw: number; theta: number } | null>(null)
   // (the piece's middle, in the frame of its own group as it stands untouched: what it turns and scales about; measured once it has been drawn)
   const [mid, setMid] = useState<V3>([0, 0, 0])
@@ -343,7 +398,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       for (let o: THREE.Object3D | null = m; o && o !== inn; o = o.parent) if (!o.visible) return
       const mats = Array.isArray(m.material) ? m.material : [m.material]
       // (nor the ink outlines (back faces drawn a little larger), nor decals and glows laid over a surface (clear, no depth write): they'd only fatten the box)
-      if (mats.every((x) => !x.visible || x.opacity <= 0.02 || !x.colorWrite || x.blending === THREE.AdditiveBlending || x.side === THREE.BackSide || (x.transparent && !x.depthWrite))) return
+      // (an edit proxy's unseen box is the piece, though)
+      if (!m.userData.proxy && mats.every((x) => !x.visible || x.opacity <= 0.02 || !x.colorWrite || x.blending === THREE.AdditiveBlending || x.side === THREE.BackSide || (x.transparent && !x.depthWrite))) return
       const pos = m.geometry.getAttribute('position')
       if (!pos) return
       const mat = new THREE.Matrix4().multiplyMatrices(toInner, m.matrixWorld)
@@ -456,6 +512,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     // (an axis arrow under the pointer takes it: the box is only for the free move)
     if (e.intersections?.some((i) => i.object.userData.gizmo)) return
     e.stopPropagation()
+    if (tool === 'select') { moveTo(id, offsetOf(id)); return }
     const lift = e.nativeEvent.shiftKey
     const wp = grp.getWorldPosition(new THREE.Vector3())
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -wp.y)
@@ -491,25 +548,26 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     window.addEventListener('pointerup', up, { once: true })
   }
 
+  const [hover, setHover] = useState(false)
+  useEditGlow(inner, on, selected === id || isPicked(id) ? 'chosen' : hover ? 'hover' : 'idle', ready)
+  useEffect(() => { if (!on) setHover(false) }, [on])
+
   return (
     <group ref={gw} matrixAutoUpdate={false}>
     <group ref={g} position={o}>
       {/* (turned and scaled about the piece's own middle, not the group's origin, which may be far from it) */}
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
           scaled there, and stood back) */}
-      <group position={mid} rotation-y={theta} visible={ready || !pivoted}>
+      <group position={mid} rotation-y={theta} visible={ready || !pivoted}
+        onPointerDown={on ? down : undefined}
+        onPointerOver={on ? (e: { stopPropagation: () => void }) => { e.stopPropagation(); setHover(true) } : undefined}
+        onPointerOut={on ? () => setHover(false) : undefined}>
         <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]} scale={[sc[0] * baseScale, sc[1] * baseScale, sc[2] * baseScale]}>
           <group rotation-y={-theta}>
             <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}>{children}</group>
           </group>
         </group>
       </group>
-      {on && box && (
-        <mesh userData={{ editHandle: true }} position={box.c} rotation-y={box.yaw} renderOrder={999} onPointerDown={down}>
-          <boxGeometry args={box.s} />
-          <meshBasicMaterial color={isPicked(id) ? '#8fd0ff' : '#3fa9ff'} transparent opacity={isPicked(id) ? 0.2 : 0.26} depthWrite={false} depthTest={false} />
-        </mesh>
-      )}
       {on && box && <AxisGizmo id={id} theta={theta} at={box.c} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
     </group>
     </group>

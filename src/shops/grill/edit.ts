@@ -25,7 +25,7 @@ const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }
 /** offsets: where a piece is moved to (from its base); rotations: degrees turned about X, Y, Z; scales: how much larger or smaller on X, Y, Z (1 = as it is) */
-export type Tool = 'move' | 'rotate' | 'scale'
+export type Tool = 'select' | 'move' | 'rotate' | 'scale'
 /**
  * A group of pieces the owner has put together by hand: moved, turned about the vertical and sized as one. `pivot` is where it turns and grows
  * from (the middle of its members, in the world, as it was when made); `t` is how far it's moved (in the room's frame), `yaw` how far it's turned
@@ -376,6 +376,7 @@ const PANEL_CSS = `
 .be-foot .ok { background:#4772b3; color:#fff; font-weight:600; margin-left:auto } .be-foot .ok:hover { background:#5a87cc }
 `
 const TOOL_ICONS: Record<Tool, string> = {
+  select: '<svg viewBox="0 0 24 24"><path d="M6 3l12 9-5.5 1.2L16 20l-2.6 1.2-3.2-6.9L6 18z"/></svg>',
   move: '<svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>',
   rotate: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>',
   scale: '<svg viewBox="0 0 24 24"><rect x="4" y="10" width="10" height="10" rx="1"/><path d="M14 10l6-6M15 4h5v5"/></svg>',
@@ -398,7 +399,7 @@ function panel() {
     const h = (tag: string, cls?: string, text?: string) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n }
     // the tool bar down the left edge: Move (W), Rotate (R), Scale (S)
     const bar = h('div', 'be-tools')
-    toolButtons = (['move', 'rotate', 'scale'] as Tool[]).map((t) => {
+    toolButtons = (['select', 'move', 'rotate', 'scale'] as Tool[]).map((t) => {
       const b = h('button', 'be-tool') as HTMLButtonElement
       b.innerHTML = TOOL_ICONS[t]
       b.title = T().tools[t]
@@ -514,7 +515,7 @@ function panel() {
     document.body.appendChild(el)
     built = sig
   }
-  ;(['move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => toolButtons[k]?.classList.toggle('on', state.tool === t))
+  ;(['select', 'move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => toolButtons[k]?.classList.toggle('on', state.tool === t))
   for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)) }
   if (summary) {
     // (how much furniture there is: every piece that can be taken hold of, how many have been moved, turned or sized from where they began, and the groups)
@@ -554,7 +555,7 @@ if (typeof window !== 'undefined') {
       if (k === 'x' || k === 'y' || k === 'z') { e.preventDefault(); setScaleAxis(({ x: 0, y: 1, z: 2 } as const)[k]); return }
       if (k === '+' || k === '=') { e.preventDefault(); nudgeScale(1); return }
       if (k === '-' || k === '_') { e.preventDefault(); nudgeScale(-1); return }
-      const t: Tool | null = k === 'w' ? 'move' : k === 'r' ? 'rotate' : k === 's' ? 'scale' : null
+      const t: Tool | null = k === 'q' ? 'select' : k === 'w' ? 'move' : k === 'r' ? 'rotate' : k === 's' ? 'scale' : null
       if (t) { e.preventDefault(); setTool(t); return }
     }
     if (e.key !== 'g' && e.key !== 'G') return

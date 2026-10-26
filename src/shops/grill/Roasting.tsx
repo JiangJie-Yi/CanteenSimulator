@@ -26,7 +26,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
-import { AxisGizmo, focusCamera } from './Movable'
+import { AxisGizmo, focusCamera, useEditGlow } from './Movable'
 import { binchotanGeo, binchotanMap, burningMaps } from './Binchotan'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
 import { setTip } from '@/scene/hoverTip'
@@ -804,34 +804,11 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
   const { on: editing, selected } = useEdit()
-  // (the selection box fitted to the leaf itself, in the gate's own frame, measured from what's drawn once editing begins)
-  const [fitted, setFitted] = useState<{ c: [number, number, number]; s: [number, number, number] } | null>(null)
-  useEffect(() => {
-    if (!editing) { setFitted(null); return }
-    const t = window.setTimeout(() => {
-      const b = body.current
-      if (!b) return
-      b.updateWorldMatrix(true, true)
-      const inv = new THREE.Matrix4().copy(b.matrixWorld).invert()
-      const box = new THREE.Box3()
-      b.traverse((m) => {
-        if (!(m instanceof THREE.Mesh) || m.userData.editHandle) return
-        for (let o: THREE.Object3D | null = m; o && o !== b; o = o.parent) if (!o.visible) return
-        const mats = Array.isArray(m.material) ? m.material : [m.material]
-        if (mats.every((x) => x.side === THREE.BackSide || (x.transparent && !x.depthWrite))) return
-        const pos = m.geometry.getAttribute('position')
-        const mat = new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)
-        const v = new THREE.Vector3()
-        for (let i = 0; i < pos.count; i += Math.max(1, Math.ceil(pos.count / 1500))) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(mat))
-      })
-      if (box.isEmpty()) return
-      const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3())
-      setFitted({ c: [c.x, c.y, c.z], s: [sz.x + 0.02, sz.y + 0.02, sz.z + 0.02] })
-    }, 300)
-    return () => window.clearTimeout(t)
-  }, [editing])
   const drag = useRef<{ at: THREE.Vector3; y: number; lift: boolean } | null>(null)
   const idx = BAR_GATES.indexOf(gate)
+  // (while editing, the leaf glows like any other piece that can be moved: brighter pointed at, brightest chosen)
+  const [hover, setHover] = useState(false)
+  useEditGlow(leaf, editing, selected === `gate${idx}` ? 'chosen' : hover ? 'hover' : 'idle')
   // (in edit mode, key G with the shop shut: the swing door by itself is moved by hand, the post and doorway staying; on the list of what can be moved)
   useEffect(() => registerMovable(`gate${idx}`, idx === 1 ? '水槽旁閘門門板' : '櫃檯尾閘門門板', () => {
     if (leaf.current) focusCamera(camera, controls, leaf.current.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.5, 0)))
@@ -899,10 +876,8 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
     <group position={c.at} rotation-y={yaw}>
       <group position={[hinge, 0, 0.08]}>
         {/* the swing door by itself: its own thing, apart from the post and the doorway, which stay where they are; it's this that's moved by hand */}
-        <group ref={body} position={positionOf(`gate${idx}`)} onPointerDown={down}>
-        {editing && (
-          <mesh position={fitted ? fitted.c : [end * G / 2, H / 2 + 0.01, 0]} renderOrder={999}><boxGeometry args={fitted ? fitted.s : [G + 0.02, H - 0.02, 0.12]} /><meshBasicMaterial color={selected === `gate${idx}` ? '#8fd0ff' : '#3fa9ff'} transparent opacity={selected === `gate${idx}` ? 0.2 : 0.26} depthWrite={false} depthTest={false} /></mesh>
-        )}
+        <group ref={body} position={positionOf(`gate${idx}`)} onPointerDown={down}
+          onPointerOver={editing ? (e: { stopPropagation: () => void }) => { e.stopPropagation(); setHover(true) } : undefined} onPointerOut={editing ? () => setHover(false) : undefined}>
         {editing && <AxisGizmo id={`gate${idx}`} at={[end * G / 2, H / 2, 0]} />}
         <group ref={leaf} name="gate-leaf">
           <group position-x={end * (G / 2 - 0.005)}>
@@ -1294,9 +1269,10 @@ function EditProxy({ id, label, at, size, yaw }: { id: string; label: string; at
   const o = positionOf(id)
   return (
     <Movable id={id} label={label}>
-      <mesh position={[at.x - o[0], at.y - o[1] + size[1] / 2, at.z - o[2]]} rotation-y={yaw} ref={(m) => { m?.layers.set(31) }}>
+      {/* (unseen, but there to be pointed at in edit mode, where its glow shows the piece's place) */}
+      <mesh position={[at.x - o[0], at.y - o[1] + size[1] / 2, at.z - o[2]]} rotation-y={yaw} userData={{ proxy: true }}>
         <boxGeometry args={size} />
-        <meshBasicMaterial />
+        <meshBasicMaterial transparent opacity={0} colorWrite={false} depthWrite={false} />
       </mesh>
     </Movable>
   )
