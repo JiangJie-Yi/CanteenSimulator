@@ -115,3 +115,8 @@ export function pickHires(people: Worker[], roles: { role: Role; max: number }[]
   }
   return out
 }
+
+/** whether someone can be let go now: not while the shop's open (there are customers in, and the hands can't just walk off mid-service) */
+export const canDismiss = (shopOpen: boolean) => !shopOpen
+/** whether someone can be taken on now: any time (a hand called in to help mid-service is fine) */
+export const canHire = (_shopOpen: boolean) => true

@@ -6317,3 +6317,6 @@ button {
 
 /* in edit mode nothing in the room offers itself to be used: the plain arrow throughout (the edit handles set their own) */
 body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; }
+
+/* (letting someone go is barred while the shop's open: the button greyed) */
+.ofc-fire:disabled { opacity: 0.4; cursor: not-allowed; }

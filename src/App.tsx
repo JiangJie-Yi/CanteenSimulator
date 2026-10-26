@@ -563,8 +563,12 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
         decay={1.6}
         castShadow
         shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]}
-        shadow-bias={-0.0005}
-        shadow-normalBias={0.02}
+        // (biased enough that a surface doesn't shadow itself in stripes (acne) across the bar and the floor, the shadow camera's range held
+        // to the room so its depth is spent where it's needed)
+        shadow-bias={-0.0015}
+        shadow-normalBias={0.05}
+        shadow-camera-near={0.5}
+        shadow-camera-far={14}
       />
 
       <OpeningSpot on={spotOn} focusY={DISHES[active].focusY} />
@@ -1677,7 +1681,9 @@ export default function App() {
         {!NO_WEBGL && !flatGrill && <Canvas
           shadows={QUALITY.shadows ? 'percentage' : false}
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
-          dpr={[1, QUALITY.dpr]}
+          // (a screen at its plain resolution (devicePixelRatio 1, as most desktops) is drawn a little finer than it shows, then scaled down:
+          // with the antialiasing that keeps edges from stepping; the frame pacer drops it to 1 if the frames can't keep up)
+          dpr={typeof window === 'undefined' ? 1 : Math.min(QUALITY.dpr, Math.max(window.devicePixelRatio || 1, phone ? 1 : 1.5))}
           onCreated={({ gl, camera, scene }) => {
             // (in development, the renderer's counts are to hand for checking how heavy a view is)
             if (import.meta.env.DEV) Object.assign(window, { __gl: gl, __cam: camera, __scene: scene })
@@ -1773,6 +1779,7 @@ export default function App() {
             }}
             hired={hired[dish.id] ?? {}}
             onHire={(w) => setHired((h) => ({ ...h, [dish.id]: { ...(h[dish.id] ?? {}), [w.id]: { fatigue: 0 } } }))}
+            shopOpen={ai}
             onFire={(w) => setHired((h) => {
               const mine = { ...(h[dish.id] ?? {}) }
               delete mine[w.id]

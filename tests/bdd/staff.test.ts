@@ -1,9 +1,20 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { ROLES, effective, fair, restPerMin, tirePerMin, type Worker } from '@/data/staff'
-import { makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
+import { canDismiss, canHire, makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
 
 feature('員工與徵人', () => {
+  scenario('營業中不能解雇員工，閉店後才可以', ({ given, when, then, and }) => {
+    given('店正在營業', (w) => { w.open = true })
+    when('老闆想解雇一位員工', (w) => { w.ok = canDismiss(w.open) })
+    then('不能解雇（客人還在，人手不能說走就走）', (w) => { expect(w.ok).toBe(false) })
+    and('閉店後就可以解雇', () => { expect(canDismiss(false)).toBe(true) })
+  })
+
+  scenario('營業中仍可臨時加派人手', ({ then }) => {
+    then('開店或閉店都能雇人', () => { expect(canHire(true)).toBe(true); expect(canHire(false)).toBe(true) })
+  })
+
   scenario('越累的人做事越差，最多掉到 55%', ({ given, when, then }) => {
     given('一位技能 80 的員工', (w) => { w.w = { skill: 80 } as Worker })
     when('看他精神飽滿和累到 100 的表現', (w) => { w.fresh = effective(w.w, 0); w.tired = effective(w.w, 100) })

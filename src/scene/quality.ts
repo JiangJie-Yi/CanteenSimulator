@@ -80,7 +80,7 @@ const TIER = choose()
 export const QUALITY: Quality = {
   high: { tier: 'high', dpr: 2, shadows: true, shadowSize: 2048, antialias: true, lite: true, upgrade: true, canvasMax: 1024,
     allDishes: true },
-  medium: { tier: 'medium', dpr: 1.5, shadows: true, shadowSize: 1024, antialias: false, lite: true, upgrade: false,
+  medium: { tier: 'medium', dpr: 1.5, shadows: true, shadowSize: 1024, antialias: true, lite: true, upgrade: false,
     canvasMax: 512, allDishes: false },
   low: { tier: 'low', dpr: 1, shadows: false, shadowSize: 512, antialias: false, lite: true, upgrade: false, canvasMax: 512,
     allDishes: false },

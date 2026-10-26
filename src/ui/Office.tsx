@@ -1,3 +1,4 @@
+import { canDismiss } from '@/game/hiring'
 import { CREDITS } from '@/data/credits'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
@@ -15,6 +16,8 @@ type Props = {
   hired: Record<string, { fatigue: number }>
   onHire: (w: Worker) => void
   onFire: (w: Worker) => void
+  /** the shop's open: no one can be let go until it's shut */
+  shopOpen?: boolean
   onClose: () => void
   /** which tab is showing, and the research notebook to show in its own */
   tab: 'book' | 'staff'
@@ -40,7 +43,7 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
  * two cooks, someone on the floor and at the till — each filled with a face, or open, with the people who could
  * fill it. (Buying in is done on the 試做 board itself, tag by tag.)
  */
-export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book }: Props) {
+export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, shopOpen = false }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -110,7 +113,8 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
                       </span>
                       <small>{t('精神', '元気')} {Math.round(100 - hired[w.id].fatigue)}・{money(w.wage)}/h</small>
                     </div>
-                    <button type="button" className="ofc-fire" onClick={() => onFire(w)}>{t('解雇', '解雇')}</button>
+                    <button type="button" className="ofc-fire" disabled={!canDismiss(shopOpen)} onClick={() => { if (canDismiss(shopOpen)) onFire(w) }}
+                      title={canDismiss(shopOpen) ? undefined : t('營業中不能解雇，請先閉店', '営業中は解雇できません。先に閉店してください')}>{t('解雇', '解雇')}</button>
                   </div>
                 ))}
                 {mine.length < r.max && open.map((w) => (
