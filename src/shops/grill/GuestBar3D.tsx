@@ -538,14 +538,15 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       </group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-cat" label="櫃檯招財貓" baseTurn={[0, -45, 0]}><StaticBatch>
+      <Movable id="till-cat" label="櫃檯招財貓" baseTurn={[0, -45, 0]}>
       <group position={at} rotation-y={yaw}>
-      {/* the beckoning cat, its paw up: bigger, at the till's corner by the door, facing the customers */}
-      <group position={[0.45, top + CAT_STAND_H, -0.21]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.46} /></group>
+      <group position={[0.45, top, -0.21]} rotation-y={Math.PI}>
+        {/* the beckoning cat, bigger, at the till's corner by the door, facing the customers, sat up on a river stone (blender/tilldesk.py);
+            not batched: it waves its paw (a batch would take every pose of the wave at once, a fan of paws) */}
+        <TillDeskPiece name="TillCatStand" />
+        <group position-y={CAT_STAND_H}><LuckyCat kind={1} height={0.46} /></group>
       </group>
-      </StaticBatch>
-      {/* (sat up on a river stone, from blender/tilldesk.py; not in the batch) */}
-      <group position={at} rotation-y={yaw}><group position={[0.45, top, -0.21]} rotation-y={Math.PI}><TillDeskPiece name="TillCatStand" /></group></group>
+      </group>
       </Movable>
       <Movable id="till-box-bags" label="紙箱（紙袋）">
         <group position={at} rotation-y={yaw}><TillBoxes part="bags" lang={lang} /></group>

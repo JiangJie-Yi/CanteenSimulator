@@ -94,7 +94,8 @@ M = {
     "slatBack": pbr("TillShieldBack", (1, 1, 1), tex=batten_tex, rough=0.6),
     "shoe": pbr("TillShieldShoe", lin("#2a2622"), rough=0.35, metal=0.6),
     "bamboo": pbr("TillBamboo", (1, 1, 1), tex=bamboo_tex, rough=0.35),
-    "node": pbr("TillBambooNode", lin("#a0a24a"), rough=0.4),
+    "node": pbr("TillBambooNode", lin("#b5b04e"), rough=0.4),
+    "scar": pbr("TillBambooScar", lin("#d8d29a"), rough=0.6),
     "rope": pbr("TillRope", lin("#1c140e"), rough=0.9),
     "lattice": pbr("TillLattice", (1, 1, 1), tex=keyaki_tex, rough=0.5),
 }
@@ -205,32 +206,45 @@ GAP_BACK = 0.012                          # how far they stand off it, so the li
 brng = np.random.default_rng(5)
 
 
-def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at):
-    """a culm of bamboo: rings of verts up its length, tapering a little, leaning and bowed, swelling at each node and pinched just above it"""
+def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell):
+    """a culm of bamboo: rings of verts up its length (close together round each node, so its shape shows), tapering a little, leaning and
+    bowed, thicker and thinner along its length (`swell`: amount, wavelength, phase), and at each node a sharp ridge with the sheath's scar
+    just under it and a little pinch above"""
     bm_ = bmesh.new()
-    seg, rings = 18, 40
+    seg = 20
     uvl = bm_.loops.layers.uv.new("UVMap")
-    grid = []
-    for i in range(rings + 1):
-        t = i / rings
-        y = y0 + h * t
-        rad = r * (1 - 0.06 * t)
+    ys = {round(y0 + h * i / 36, 5) for i in range(37)}
+    for n in nodes_at:
+        for d in (-0.016, -0.011, -0.008, -0.006, -0.004, -0.0025, -0.001, 0.0, 0.001, 0.0025, 0.004, 0.006, 0.009, 0.013, 0.018):
+            if y0 < n + d < y0 + h:
+                ys.add(round(n + d, 5))
+    ys = sorted(ys)
+    sa, sl, sp = swell
+
+    def radius(y):
+        t = (y - y0) / h
+        rad = r * (1 - 0.07 * t) * (1 + sa * math.sin(2 * math.pi * (y - y0) / sl + sp))
         for n in nodes_at:
-            d = (y - n) / 0.008
-            if -1.5 < d < 3.5:
-                rad *= 1 + 0.07 * math.exp(-d * d) - (0.025 * math.exp(-((d - 1.8) ** 2)) if d > 0 else 0)
-        cx = x + lean * (y - y0) + bow * math.sin(math.pi * t + phase) * math.sin(math.pi * t)
-        cz = z + bow * 0.4 * math.sin(math.pi * t)
-        row = []
-        for j in range(seg):
-            a_ = 2 * math.pi * j / seg
-            row.append(bm_.verts.new(P(cx + rad * math.cos(a_), y, cz + rad * math.sin(a_))))
-        grid.append(row)
-    for i in range(rings):
+            d = y - n
+            # (the ridge, sharp; the sheath's scar a little below it; the pinch just above)
+            rad *= 1 + 0.13 * math.exp(-(d / 0.0022) ** 2) + 0.07 * math.exp(-((d + 0.006) / 0.0022) ** 2) - 0.045 * math.exp(-((d - 0.009) / 0.005) ** 2)
+        return rad
+
+    def centre(y):
+        t = (y - y0) / h
+        return (x + lean * (y - y0) + bow * math.sin(math.pi * t + phase) * math.sin(math.pi * t), z + bow * 0.4 * math.sin(math.pi * t))
+
+    grid = []
+    for y in ys:
+        cx, cz = centre(y)
+        rad = radius(y)
+        grid.append([bm_.verts.new(P(cx + rad * math.cos(2 * math.pi * j / seg), y, cz + rad * math.sin(2 * math.pi * j / seg))) for j in range(seg)])
+    for i in range(len(ys) - 1):
+        v0, v1 = (ys[i] - y0) / h, (ys[i + 1] - y0) / h
         for j in range(seg):
             j2 = (j + 1) % seg
             f = bm_.faces.new((grid[i][j], grid[i][j2], grid[i + 1][j2], grid[i + 1][j]))
-            for lp, (uu, vv) in zip(f.loops, ((j / seg, i / rings), ((j + 1) / seg, i / rings), ((j + 1) / seg, (i + 1) / rings), (j / seg, (i + 1) / rings))):
+            for lp, (uu, vv) in zip(f.loops, ((j / seg, v0), ((j + 1) / seg, v0), ((j + 1) / seg, v1), (j / seg, v1))):
                 lp[uvl].uv = (uu, vv * 3)
     bm_.faces.new(list(reversed(grid[0])))
     bm_.faces.new(grid[-1])
@@ -242,14 +256,13 @@ def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at):
     bpy.context.collection.objects.link(o)
     finish(o, name, M["bamboo"])
     out = [o]
-    # (each node's ring: a raised band a shade yellower, where the culm is joined, following the culm's lean and bow)
+    # (each node's band: the ridge picked out a shade yellower, and the scar under it paler still)
     for n in nodes_at:
-        t = (n - y0) / h
-        cx = x + lean * (n - y0) + bow * math.sin(math.pi * t + phase) * math.sin(math.pi * t)
-        cz = z + bow * 0.4 * math.sin(math.pi * t)
-        rad = r * (1 - 0.06 * t) * 1.06
-        bpy.ops.mesh.primitive_torus_add(major_radius=rad, minor_radius=0.0021, major_segments=20, minor_segments=6, location=P(cx, n, cz))
-        out.append(finish(active(), f"{name}Node{int(n * 1000)}", M["node"]))
+        cx, cz = centre(n)
+        for dy, k, mn in ((0.0, 1.0, 0.0028), (-0.006, 0.97, 0.0018)):
+            bpy.ops.mesh.primitive_torus_add(major_radius=radius(n + dy) * k, minor_radius=mn, major_segments=24, minor_segments=6,
+                                             location=P(*(lambda c: (c[0], n + dy, c[1]))(centre(n + dy))))
+            out.append(finish(active(), f"{name}Node{int(n * 1000)}{'ab'[dy < 0]}", M["node"] if dy == 0 else M["scar"]))
     return out
 
 
@@ -264,10 +277,11 @@ while True:
     cx = x + r
     z = FACE_Z - GAP_BACK - r - float(brng.uniform(0, 0.006))
     first = float(brng.uniform(0.06, 0.2))
-    step = float(brng.uniform(0.2, 0.28))
+    step = float(brng.uniform(0.16, 0.24))
     nodes_at = [0.06 + first + n * step for n in range(6) if 0.06 + first + n * step < 0.06 + BH - 0.04]
     o = culm(f"TillBamboo{k}", cx, r, 0.06, BH - float(brng.uniform(0, 0.012)), z,
-             float(brng.normal(0, 0.012)), float(brng.uniform(-0.006, 0.006)), float(brng.uniform(0, 1.0)), nodes_at)
+             float(brng.normal(0, 0.012)), float(brng.uniform(-0.006, 0.006)), float(brng.uniform(0, 1.0)), nodes_at,
+             (float(brng.uniform(0.04, 0.11)), float(brng.uniform(0.25, 0.6)), float(brng.uniform(0, 6.28))))
     bd += o
     culms.append((cx, r, z))
     x += 2 * r + float(brng.uniform(0.005, 0.018))
@@ -334,39 +348,110 @@ XE = TW_ / 2 - 0.035                       # the end by the cats
 XL = -XE + 0.29                            # where it starts at the customers' left (the end by the bell is left open)
 ZB = TD_ / 2 - 0.03 - 0.04                 # where the end run stops: at the cashier's edge
 SHOE, RAIL, CAP = 0.008, 0.026, 0.022
+RC = 0.05                                  # the corner's radius (at the middle of the partition's thickness)
+YT = TOP + SH - CAP                        # the top rail's top, under the cap
+Y0 = TOP + SHOE                            # the bottom rail's foot, on the shoe
 
 
-def run(x0, z0, x1, z1, tag):
-    """one straight run of the partition from (x0, z0) to (x1, z1)"""
+def path(ext=0.0, n_arc=14):
+    """the partition's line, from its customers'-side start round the rounded corner by the cats to the cashier's edge, as (x, z) points"""
+    pts = [(XL - ext, ZF)]
+    cx, cz = XE - RC, ZF + RC
+    for i in range(n_arc + 1):
+        a_ = math.radians(-90 + 90 * i / n_arc)
+        pts.append((cx + RC * math.cos(a_), cz + RC * math.sin(a_)))
+    pts.append((XE, ZB + ext))
+    return pts
+
+
+def profile(hw, y0, y1, rc, seg=4):
+    """a rectangle across the line (half-width hw, from y0 to y1) with its corners rounded off (radius rc), as (across, up) points"""
+    out = []
+    for (cl, cy, a0) in ((hw - rc, y0 + rc, -90), (hw - rc, y1 - rc, 0), (-hw + rc, y1 - rc, 90), (-hw + rc, y0 + rc, 180)):
+        for i in range(seg + 1):
+            a_ = math.radians(a0 + 90 * i / seg)
+            out.append((cl + rc * math.cos(a_), cy + rc * math.sin(a_)))
+    return out
+
+
+def sweep(name, prof, pts, mat_):
+    """the profile carried along the line (each ring square to it), its two ends closed"""
+    bm_ = bmesh.new()
+    rings = []
+    for i, (px, pz) in enumerate(pts):
+        ax, az = pts[max(0, i - 1)]
+        bx, bz = pts[min(len(pts) - 1, i + 1)]
+        tx, tz = bx - ax, bz - az
+        L = math.hypot(tx, tz)
+        tx, tz = tx / L, tz / L
+        nx, nz = -tz, tx
+        rings.append([bm_.verts.new(P(px + nx * l, y, pz + nz * l)) for l, y in prof])
+    m = len(prof)
+    for i in range(len(rings) - 1):
+        for j in range(m):
+            bm_.faces.new((rings[i][j], rings[i][(j + 1) % m], rings[i + 1][(j + 1) % m], rings[i + 1][j]))
+    bm_.faces.new(rings[0])
+    bm_.faces.new(list(reversed(rings[-1])))
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me_ = bpy.data.meshes.new(name)
+    bm_.to_mesh(me_)
+    bm_.free()
+    o = bpy.data.objects.new(name, me_)
+    bpy.context.collection.objects.link(o)
+    finish(o, name, mat_)
+    smooth_angle(o, 50)
+    uv_box(o, 0.4)
+    return o
+
+
+sh.append(sweep("TillShoe", profile((FT + 0.006) / 2, TOP, TOP + SHOE, 0.002), path(), M["shoe"]))
+sh.append(sweep("TillRailLow", profile(FT / 2, Y0, Y0 + RAIL, 0.004), path(), M["walnut"]))
+sh.append(sweep("TillRailTop", profile(FT / 2, YT - RAIL, YT, 0.004), path(), M["walnut"]))
+sh.append(sweep("TillCap", profile((FT + 0.018) / 2, YT, YT + CAP, 0.007), path(0.01), M["walnut"]))
+# (the posts: a round one at the corner, square ones at the two ends and about every 30 cm along each straight run)
+mid = path()[8]
+sh.append(cyl("TillPostCorner", FT / 2 + 0.006, YT - Y0, P(mid[0], (Y0 + YT) / 2, mid[1]), M["walnut"], verts=32))
+
+
+def straight(x0, z0, x1, z1, tag, posts_at_end):
+    """the slats, the board behind them and the posts along one straight run (from its open end to where the corner's curve begins)"""
     L = math.hypot(x1 - x0, z1 - z0)
     ux, uz = (x1 - x0) / L, (z1 - z0) / L
     rot = (0, 0, -math.atan2(uz, ux))
     at = lambda t, y: P(x0 + ux * t, y, z0 + uz * t)   # noqa: E731
-    sh.append(box(f"TillShoe{tag}", S(L, SHOE, FT + 0.006), at(L / 2, TOP + SHOE / 2), M["shoe"], bev=0.002, rot=rot))
-    y0 = TOP + SHOE
-    sh.append(box(f"TillRailLow{tag}", S(L, RAIL, FT), at(L / 2, y0 + RAIL / 2), M["walnut"], bev=0.003, rot=rot, uv=0.4))
-    yt = TOP + SH - CAP
-    sh.append(box(f"TillRailTop{tag}", S(L, RAIL, FT), at(L / 2, yt - RAIL / 2), M["walnut"], bev=0.003, rot=rot, uv=0.4))
-    sh.append(box(f"TillCap{tag}", S(L + 0.02, CAP, FT + 0.018), at(L / 2, yt + CAP / 2), M["walnut"], bev=0.006, rot=rot, uv=0.4))
-    # (the posts: at both ends and about every 30 cm)
     n = max(1, round(L / 0.3))
-    for i in range(n + 1):
+    for i in range(n + (1 if posts_at_end else 0)):
         t = 0.015 + (L - 0.03) * i / n
-        sh.append(box(f"TillPost{tag}{i}", S(0.03, yt - y0, FT + 0.004), at(t, (y0 + yt) / 2), M["walnut"], bev=0.003, rot=rot, uv=0.4))
-    # (between the rails: the pale board, and the slats standing in front of it on both faces)
-    ph = yt - y0 - 2 * RAIL
-    pc = y0 + RAIL + ph / 2
-    sh.append(box(f"TillBack{tag}", S(L - 0.02, ph, 0.006), at(L / 2, pc), M["slatBack"], rot=rot, uv=0.4))
-    m = int((L - 0.04) / 0.021)
+        sh.append(box(f"TillPost{tag}{i}", S(0.03, YT - Y0, FT + 0.004), at(t, (Y0 + YT) / 2), M["walnut"], bev=0.003, rot=rot, uv=0.4))
+    ph = YT - Y0 - 2 * RAIL
+    pc = Y0 + RAIL + ph / 2
+    sh.append(box(f"TillBack{tag}", S(L, ph, 0.006), at(L / 2, pc), M["slatBack"], rot=rot, uv=0.4))
+    m = int((L - 0.03) / 0.021)
     for i in range(m):
-        t = 0.02 + (L - 0.04) * (i + 0.5) / m
+        t = 0.03 + (L - 0.04) * (i + 0.5) / m
         for side in (-1, 1):
-            off = side * (0.003 + 0.004)
+            off = side * 0.007
             sh.append(box(f"TillSlat{tag}{i}{'ab'[side > 0]}", S(0.011, ph, 0.007), P(x0 + ux * t - uz * off, pc, z0 + uz * t + ux * off), M["walnut"], bev=0.0015, rot=rot, uv=0.4))
 
 
-run(XL, ZF, XE, ZF, "F")
-run(XE, ZF, XE, ZB, "E")
+straight(XL, ZF, XE - RC, ZF, "F", False)
+straight(XE, ZB, XE, ZF + RC, "E", False)
+# (round the corner too: the board behind in short pieces following the curve, and the slats on it, so the run never breaks)
+arc = path()[1:16]
+ph = YT - Y0 - 2 * RAIL
+pc = Y0 + RAIL + ph / 2
+for i in range(len(arc) - 1):
+    (ax, az), (bx, bz) = arc[i], arc[i + 1]
+    L = math.hypot(bx - ax, bz - az)
+    sh.append(box(f"TillBackC{i}", S(L + 0.002, ph, 0.006), P((ax + bx) / 2, pc, (az + bz) / 2), M["slatBack"], rot=(0, 0, -math.atan2(bz - az, bx - ax)), uv=0.4))
+for k in range(1, 4):
+    a_ = math.radians(-90 + 90 * k / 4)
+    tx, tz = -math.sin(a_), math.cos(a_)
+    for side in (-1, 1):
+        off = side * 0.007
+        r_ = RC - off
+        sh.append(box(f"TillSlatC{k}{'ab'[side > 0]}", S(0.011, ph, 0.007), P(XE - RC + r_ * math.cos(a_), pc, ZF + RC + r_ * math.sin(a_)), M["walnut"], bev=0.0015,
+                      rot=(0, 0, -math.atan2(tz, tx)), uv=0.4))
 nodes.append(node("TillShield", sh))
 
 root = bpy.data.objects.new("TillCounter", None)
