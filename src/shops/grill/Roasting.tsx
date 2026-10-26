@@ -26,7 +26,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
-import { AxisGizmo, focusCamera, useEditGlow } from './Movable'
+import { AxisGizmo, focusCamera, useEditBox } from './Movable'
 import { binchotanGeo, binchotanMap, burningMaps } from './Binchotan'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
 import { setTip } from '@/scene/hoverTip'
@@ -806,9 +806,9 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
   const { on: editing, selected } = useEdit()
   const drag = useRef<{ at: THREE.Vector3; y: number; lift: boolean } | null>(null)
   const idx = BAR_GATES.indexOf(gate)
-  // (while editing, the leaf glows like any other piece that can be moved: brighter pointed at, brightest chosen)
+  // (while editing, the leaf is outlined like any other piece that can be moved: brighter pointed at, amber chosen)
   const [hover, setHover] = useState(false)
-  useEditGlow(leaf, editing, selected === `gate${idx}` ? 'chosen' : hover ? 'hover' : 'idle')
+  useEditBox(leaf, editing, selected === `gate${idx}` ? 'chosen' : hover ? 'hover' : 'idle')
   // (in edit mode, key G with the shop shut: the swing door by itself is moved by hand, the post and doorway staying; on the list of what can be moved)
   useEffect(() => registerMovable(`gate${idx}`, idx === 1 ? '水槽旁閘門門板' : '櫃檯尾閘門門板', () => {
     if (leaf.current) focusCamera(camera, controls, leaf.current.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.5, 0)))

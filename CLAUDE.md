@@ -64,7 +64,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 ## 編輯模式（`src/shops/grill/edit.ts`、`Movable.tsx`）
 
 - 介面是 Blender 風格的深灰面板：左邊工具列（選取 Q（純箭頭，只選不動，像 Maya）、位移 W、旋轉 R、縮放 S），清單可搜尋，變換區的 X／Y／Z 是紅綠藍色條。位置、移動箭頭、旋轉環、縮放把手都用**房間軸**（吧台方向 `ALONG`），不是各物件父層的軸。
-- 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。編輯模式不畫選取框：可編輯的物件本身微微發亮（藍色邊光；滑鼠移上去更亮，選到變橘色，`Movable.tsx` 的 `useEditGlow`），點的是物件本身的網格，所以大物件不會擋住前面的小物件。看不見的代理方塊（`EditProxy`）只亮邊線。位置框（量出的範圍）仍用來放箭頭和算中心。
+- 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。編輯模式每件物件有一個貼合模型的細線框（`Movable.tsx` 的 `useEditBox`：量模型的頂點，順著物件的斜度找最貼的角度）：平常淡藍、只在沒被擋住處顯示；滑鼠移上去變亮、選到變橘色，這兩種會穿透顯示。點選的是物件本身的網格，所以大物件不會擋住前面的小物件。位置框（量出的範圍）仍用來放箭頭和算中心。
 - **預設值**：位置預設寫在 `edit.ts` 的 `BASES`（父層單位）；大小與轉向預設用 `<Movable baseScale baseTurn>`。定好預設後面板歸零（位置 0、縮放 1）。改了預設要把 `edit.ts` 開頭的三個 localStorage key 版本加一，不然瀏覽器裡舊的偏移會重複計算。有預設轉向或縮放的擺設（例如備長炭籃、行燈），量到中心點之前先不顯示，避免載入時閃一下。
 - **編輯介面中日文**：文字在 `data/editText.ts`（`EDIT_TEXT` 中、日各一份，`pieceName` 把擺設名稱翻成日文）；App 用 `setEditLang` 跟著遊戲語言切換。新增擺設時，中文名稱只用中文，並在 `PIECES_JA`（或 `WORDS_JA`）補上日文。
 - **+ / −**：按 X、Y、Z 選軸（再按一次取消），+ 或 − 縮放選到的軸（沒選就三軸一起）；縮放區每軸旁也有 −、+ 按鈕。
