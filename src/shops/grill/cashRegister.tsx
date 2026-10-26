@@ -48,6 +48,18 @@ export function rattle() {
   beep('error')
 }
 
+/**
+ * The register's materials as they really are, not the room's flat toon: its cream body and drawer a satin plastic, the keys a glossier
+ * moulded plastic, the chrome and steel real metal, the screens dark glass.
+ */
+function realFinish(src: THREE.MeshStandardMaterial): THREE.Material {
+  const n = src.name
+  if (n === 'RegChrome') return new THREE.MeshPhysicalMaterial({ color: '#dfe3e8', metalness: 1, roughness: 0.12 })
+  if (n === 'RegSteel') return new THREE.MeshPhysicalMaterial({ color: '#a7adb5', metalness: 0.9, roughness: 0.3 })
+  if (n === 'RegScreen') return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), roughness: 0.05, clearcoat: 1 })
+  if (n.startsWith('RegKey')) return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.25 })
+  return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: Math.max(0.45, src.roughness), metalness: 0, sheen: 0.2 })
+}
 let regModel: { body: THREE.Object3D; drawer: THREE.Object3D; keys: THREE.Object3D; modeKey: THREE.Object3D; drawerKey: THREE.Object3D; solid: THREE.Mesh[] } | null = null
 export function useRegisterModel() {
   const gltf = useGLTF(REGISTER_URL) as unknown as { scene: THREE.Group }
@@ -60,7 +72,7 @@ export function useRegisterModel() {
     const src = m.material as THREE.MeshStandardMaterial
     let t = toon.get(src)
     if (!t) {
-      t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
+      t = realFinish(src)
       toon.set(src, t)
     }
     m.material = t

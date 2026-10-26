@@ -52,6 +52,14 @@ u, v = grid01(N)
 grain = fbm(N, 2, 40, 4)
 hinoki = mix((0.86, 0.74, 0.55), (0.78, 0.63, 0.43), smooth(0.4, 0.75, grain))
 hinoki_tex = image("hinoki", hinoki)
+# (the cup's glaze: a deep blue, speckled with iron, paler where it ran thin)
+speck = (rng.random((N, N)) > 0.985).astype(np.float32)
+glaze = mix(mix((0.13, 0.2, 0.33), (0.2, 0.3, 0.46), fbm(N, 6, 12, 4)), (0.55, 0.47, 0.36), speck * 0.8)
+glaze_tex = image("glaze", glaze)
+# (the grain of the stand's hinoki: straight, fine, a warm pale gold)
+grain2 = fbm(N, 3, 60, 5)
+hinoki = mix((0.93, 0.8, 0.6), (0.82, 0.66, 0.45), smooth(0.35, 0.8, grain2))
+hinoki_tex = image("hinoki2", hinoki)
 
 
 def mat(name, hexs, rough=0.5, metal=0.0, tex=None):
@@ -60,6 +68,8 @@ def mat(name, hexs, rough=0.5, metal=0.0, tex=None):
 
 M = {
     "cup": mat("PenCupGlaze", "#2c3e5c", 0.25), "cupBand": mat("PenCupBand", "#e8e2d4", 0.3), "cupIn": mat("PenCupInside", "#1a2333", 0.6),
+    "cupGlaze": mat("PenCupGlaze", "#ffffff", 0.2, tex=glaze_tex), "cupRim": mat("PenCupRim", "#b9a585", 0.7), "scissor": mat("ScissorHandle", "#ef7a1e", 0.4),
+    "gold": mat("BellGold", "#d4af37", 0.15, 1.0), "bellWood": mat("BellWood", "#3a2416", 0.4),
     "ink": mat("DeskInk", "#16171a", 0.5), "white": mat("DeskWhite", "#f2f0ea", 0.5), "chrome": mat("DeskChrome", "#d9dde2", 0.15, 1.0),
     "steel": mat("DeskSteel", "#9aa0a8", 0.3, 0.9), "printer": mat("PrinterBody", "#eceae4", 0.45), "printerDark": mat("PrinterDark", "#3a3c40", 0.45),
     "slot": mat("DeskSlot", "#0b0c0e", 0.6), "paper": mat("ReceiptPaper", "#fbfaf6", 0.8), "green": mat("LedGreen", "#3ddc6a", 0.3),
@@ -170,45 +180,49 @@ def node(name, parts):
 nodes = []
 
 # =====================================================================
-# The pen cup: a tall glazed cup, a pale band round it, full of pens and the rest
+# The pen cup: a glazed stoneware cup (a speckled glaze, a pale band, its rim left bare), the pens stood in it in order: a ring of
+# ballpoints round the inside, sorted by colour and leaning evenly out, and in the middle the markers, a highlighter and the scissors upright
 # =====================================================================
 pc = []
-CR, CH = 0.034, 0.088
-cup = cyl("PenCup", CR, CH, P(0, CH / 2, 0), M["cup"], verts=40, r2=CR * 0.94)
-inner = cyl("pcin", CR - 0.003, CH, P(0, CH / 2 + 0.004, 0), M["cup"], verts=40, r2=CR * 0.94 - 0.003)
+CR, CH = 0.034, 0.09
+cup = cyl("PenCup", CR, CH, P(0, CH / 2, 0), M["cupGlaze"], verts=48, r2=CR * 0.96)
+inner = cyl("pcin", CR - 0.0032, CH, P(0, CH / 2 + 0.004, 0), M["cupGlaze"], verts=48, r2=CR * 0.96 - 0.0032)
 m_ = cup.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = inner; m_.solver = "EXACT"
 apply_mods(cup)
 bpy.data.objects.remove(inner)
+bpy.ops.object.select_all(action="DESELECT"); cup.select_set(True); bpy.context.view_layer.objects.active = cup
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cylinder_project(); bpy.ops.object.mode_set(mode="OBJECT")
 pc.append(cup)
-pc.append(cyl("PenCupBand", CR * 0.975 + 0.0004, 0.012, P(0, CH * 0.62, 0), M["cupBand"], verts=40))
-pc.append(cyl("PenCupFloor", CR - 0.0035, 0.002, P(0, CH * 0.35, 0), M["cupIn"], verts=32))
-rng2 = np.random.default_rng(5)
-for i, col in enumerate(PEN_COLORS):
-    a = 2 * math.pi * i / len(PEN_COLORS) + rng2.uniform(-0.2, 0.2)
-    rr = (CR - 0.012) * math.sqrt(rng2.uniform(0.15, 1))
+pc.append(cyl("PenCupRim", CR * 0.96 + 0.0002, 0.003, P(0, CH - 0.0015, 0), M["cupRim"], verts=48))
+pc.append(cyl("PenCupBand", CR * 0.985 + 0.0004, 0.010, P(0, CH * 0.6, 0), M["cupBand"], verts=48))
+pc.append(cyl("PenCupFloor", CR - 0.0035, 0.002, P(0, 0.012, 0), M["cupIn"], verts=32))
+FLOOR = 0.013
+RING = ["#1f3f9c", "#1f9cc8", "#2f8a4a", "#f0e14a", "#ef8a2a", "#c22a24", "#e05a9c", "#7a4ab0", "#16171a", "#d0d4da"]
+LEAN = 0.13
+for i, col in enumerate(RING):
+    a = 2 * math.pi * i / len(RING)
+    rr = CR - 0.009
     bx, bz = rr * math.cos(a), rr * math.sin(a)
-    tilt = 0.12 + 0.16 * rr / CR
-    L = rng2.uniform(0.13, 0.15)
-    marker = i in (3, 7)
-    rad = 0.0055 if marker else 0.0038
-    # (leaning out from the middle, its foot on the cup's floor)
-    d = Vector((bx, bz, 0)).normalized() if rr > 1e-4 else Vector((1, 0, 0))
-    rot = (-d.y * tilt, d.x * tilt, 0)
-    body = cyl(f"Pen{i}", rad, L, (bx, -bz, CH * 0.35 + L / 2), mat(f"Pen{i}Col", col, 0.4), rot=rot, verts=10)
+    L = 0.14 if i % 2 == 0 else 0.132
+    # (leaning straight out from the middle, all by the same angle)
+    rot = (math.sin(a) * LEAN, math.cos(a) * LEAN, 0)
+    body = cyl(f"Pen{i}", 0.0037, L, (bx, -bz, FLOOR + L / 2), mat(f"Pen{i}Col", col, 0.35), rot=rot, verts=12)
     pc.append(body)
-    # (its cap, or its click button, at the top)
-    top = Vector((bx, -bz, CH * 0.35 + L / 2)) + body.matrix_world.to_3x3() @ Vector((0, 0, L / 2 + 0.006))
-    cap = cyl(f"PenCap{i}", rad * (1.15 if marker else 0.8), 0.014 if marker else 0.006, tuple(top), M["ink"] if not marker else mat(f"Pen{i}Col", col, 0.4), rot=rot, verts=10)
-    pc.append(cap)
-    if not marker and i % 2 == 0:
-        clip_at = Vector((bx, -bz, CH * 0.35 + L / 2)) + body.matrix_world.to_3x3() @ Vector((rad + 0.0006, 0, L / 2 - 0.012))
-        pc.append(box(f"PenClip{i}", (0.0012, 0.003, 0.022), tuple(clip_at), M["chrome"], rot=rot))
-# (scissors, their orange handles up; a clear ruler leaning at the back)
+    up = body.matrix_world.to_3x3() @ Vector((0, 0, 1))
+    tip = Vector((bx, -bz, FLOOR + L / 2)) + up * (L / 2 + 0.0035)
+    pc.append(cyl(f"PenCap{i}", 0.0029, 0.007, tuple(tip), M["chrome"] if i % 3 == 0 else M["ink"], rot=rot, verts=12))
+    # (a clip on each, down the outside)
+    out = Vector((math.cos(a), -math.sin(a), 0))
+    clip = Vector((bx, -bz, FLOOR + L / 2)) + up * (L / 2 - 0.012) + out * 0.0042
+    pc.append(box(f"PenClip{i}", (0.0014, 0.0014, 0.02), tuple(clip), M["chrome"], rot=rot))
+# (the middle: two thick markers, a highlighter, the scissors, upright and side by side)
+for k, (col, dx, dz, L, r) in enumerate((("#16171a", -0.007, -0.006, 0.13, 0.0058), ("#c22a24", 0.007, -0.006, 0.13, 0.0058), ("#f0e14a", 0.0, 0.008, 0.125, 0.0065))):
+    pc.append(cyl(f"Marker{k}", r, L, P(dx, FLOOR + L / 2, dz), mat(f"Marker{k}Col", col, 0.4), verts=14))
+    pc.append(cyl(f"MarkerCap{k}", r * 1.08, 0.022, P(dx, FLOOR + L - 0.011, dz), mat(f"Marker{k}Col", col, 0.4), verts=14))
+    pc.append(cyl(f"MarkerBand{k}", r * 1.1, 0.004, P(dx, FLOOR + L - 0.024, dz), M["white"], verts=14))
 for k in (-1, 1):
-    ring = cyl(f"ScissorRing{k}", 0.009, 0.004, P(0.012 * k, CH + 0.05, -0.006), mat("ScissorHandle", "#ef7a1e", 0.4), rot=(math.pi / 2, 0, 0.3 * k), verts=20)
-    pc.append(ring)
-pc.append(box("ScissorBlades", (0.006, 0.002, 0.07), P(0.0, CH + 0.005, -0.006), M["steel"]))
-pc.append(box("PenRuler", (0.028, 0.0015, 0.16), P(-0.01, CH * 0.35 + 0.08, 0.012), mat("RulerClear", "#cfe3ee", 0.1), rot=(-0.12, 0.05, 0)))
+    pc.append(cyl(f"ScissorRing{k}", 0.008, 0.0035, P(0.0105 * k, FLOOR + 0.142, 0.0), M["scissor"], rot=(0, math.pi / 2, 0), verts=24))
+pc.append(box("ScissorPivot", (0.003, 0.003, 0.03), P(0.0, FLOOR + 0.125, 0.0), M["steel"]))
 nodes.append(node("TillPens", pc))
 
 # =====================================================================
@@ -321,63 +335,68 @@ cr += hole("Reader", 0.0, 0.074)
 nodes.append(node("TillCardReader", cr))
 
 # =====================================================================
-# The service bell: a chrome dome on a black base, the plunger on top
+# The service bell: a polished brass dome on a dark wooden base with a felt foot, the plunger (its own node, TillBellPlunger) on top
 # =====================================================================
 bl = []
-bl.append(cyl("BellBase", 0.042, 0.014, P(0, 0.007, 0), M["bellBase"], verts=40))
-bl.append(cyl("BellBaseRim", 0.043, 0.003, P(0, 0.0015, 0), M["felt"], verts=40))
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.036, location=P(0, 0.014, 0), segments=40, ring_count=20)
+bl.append(cyl("BellBase", 0.044, 0.015, P(0, 0.0075, 0), M["bellWood"], verts=48))
+bl.append(cyl("BellBaseBevel", 0.045, 0.003, P(0, 0.0135, 0), M["bellWood"], verts=48, r2=0.042))
+bl.append(cyl("BellBaseRim", 0.0445, 0.002, P(0, 0.001, 0), M["felt"], verts=48))
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.037, location=P(0, 0.015, 0), segments=48, ring_count=24)
 dome = active()
-cut_ = box("domecut", (0.1, 0.1, 0.05), (0, 0, 0.014 - 0.025), M["chrome"])
+cut_ = box("domecut", (0.1, 0.1, 0.05), (0, 0, 0.015 - 0.025), M["gold"])
 m_ = dome.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = cut_; m_.solver = "EXACT"
 apply_mods(dome)
 bpy.data.objects.remove(cut_)
-finish(dome, "BellDome", M["chrome"])
-dome.scale = (1, 1, 0.78)
+# (the boolean leaves the dome's material slots in a muddle: cleared, and the brass given to every face)
+dome.data.materials.clear()
+finish(dome, "BellDome", M["gold"])
+for poly in dome.data.polygons:
+    poly.material_index = 0
+dome.scale = (1, 1, 0.8)
 apply_scale(dome)
+smooth_angle(dome, 60)
 bl.append(dome)
-bl.append(cyl("BellStem", 0.0025, 0.012, P(0, 0.014 + 0.028 + 0.006, 0), M["chrome"], verts=12))
-bl.append(cyl("BellKnob", 0.0075, 0.005, P(0, 0.014 + 0.028 + 0.013, 0), M["chrome"], verts=24))
+bl.append(cyl("BellCollar", 0.006, 0.004, P(0, 0.015 + 0.0296 + 0.0015, 0), M["gold"], verts=24))
+plunger = bpy.data.objects.new("TillBellPlunger", None)
+bpy.context.collection.objects.link(plunger)
+plunger.location = P(0, 0.015 + 0.0296 + 0.0035, 0)
+pl = [cyl("BellStem", 0.0024, 0.012, (0, 0, 0.006), M["gold"], verts=16),
+      cyl("BellKnob", 0.0085, 0.006, (0, 0, 0.0135), M["gold"], verts=32)]
+for o in pl:
+    o.parent = plunger
+bl.append(plunger)
+bl += pl
 nodes.append(node("TillBell", bl))
 
 # =====================================================================
-# The desk mat: a hinoki board with rounded corners and eased edges, felt underneath, the reader, the printer, the pens and the tablet on it
+# The desk stand: a hinoki riser 15 cm high the reader, the printer, the pens and the tablet stand on: a thick top with eased edges, solid
+# sides with a hand-hold cut in each, a shelf between them, a back rail, felt pads under; the grain along the top, across the end grain
 # =====================================================================
-MW, MD, MT = 0.5, 0.39, 0.015
+MW, MD, MH = 0.5, 0.39, 0.15
+TT, ST = 0.022, 0.018
 mt = []
-bm = bmesh.new()
-pts = []
-R = 0.03
-for cx, cz, a0 in ((MW / 2 - R, -MD / 2 + R, -90), (MW / 2 - R, MD / 2 - R, 0), (-MW / 2 + R, MD / 2 - R, 90), (-MW / 2 + R, -MD / 2 + R, 180)):
-    for k in range(9):
-        a = math.radians(a0 + 90 * k / 8)
-        pts.append((cx + R * math.cos(a), cz + R * math.sin(a)))
-bot = [bm.verts.new(P(x, 0.002, z)) for x, z in pts]
-topv = [bm.verts.new(P(x, MT, z)) for x, z in pts]
-bm.faces.new(list(reversed(bot)))
-bm.faces.new(topv)
-for i in range(len(pts)):
-    j = (i + 1) % len(pts)
-    bm.faces.new((bot[i], bot[j], topv[j], topv[i]))
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-me = bpy.data.meshes.new("DeskMat")
-bm.to_mesh(me)
-bm.free()
-board = bpy.data.objects.new("DeskMat", me)
-bpy.context.collection.objects.link(board)
-finish(board, "DeskMat", M["mat"], smooth_shade=False)
-bevel(board, 0.003, 3, angle=True)
-apply_mods(board)
-smooth_angle(board)
-bpy.ops.object.select_all(action="DESELECT")
-board.select_set(True)
-bpy.context.view_layer.objects.active = board
-bpy.ops.object.mode_set(mode="EDIT")
-bpy.ops.mesh.select_all(action="SELECT")
-bpy.ops.uv.cube_project(cube_size=0.6)
-bpy.ops.object.mode_set(mode="OBJECT")
-mt.append(board)
-mt.append(box("DeskMatFelt", S(MW - 0.01, 0.002, MD - 0.01), P(0, 0.001, 0), M["felt"]))
+top_ = box("DeskMat", S(MW, TT, MD), P(0, MH - TT / 2, 0), M["mat"], bev=0.004)
+mt.append(top_)
+for sx in (-1, 1):
+    side = box(f"DeskMatSide{sx}", S(ST, MH - TT, MD - 0.02), P(sx * (MW / 2 - 0.02 - ST / 2), (MH - TT) / 2, 0), M["mat"], bev=0.003)
+    hold = box("hold", S(0.05, 0.03, 0.1), P(sx * (MW / 2 - 0.02 - ST / 2), (MH - TT) * 0.62, 0), M["mat"], bev=0.012)
+    m_ = side.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = hold; m_.solver = "EXACT"
+    apply_mods(side)
+    bpy.data.objects.remove(hold)
+    mt.append(side)
+mt.append(box("DeskMatShelf", S(MW - 0.04 - 2 * ST, 0.014, MD - 0.04), P(0, 0.05, 0), M["mat"], bev=0.002))
+mt.append(box("DeskMatRail", S(MW - 0.04 - 2 * ST, 0.04, 0.014), P(0, MH - TT - 0.02, -MD / 2 + 0.02), M["mat"], bev=0.002))
+for sx in (-1, 1):
+    for sz in (-1, 1):
+        mt.append(box(f"DeskMatFelt{sx}{sz}", S(0.03, 0.002, 0.03), P(sx * (MW / 2 - 0.035), 0.001, sz * (MD / 2 - 0.03)), M["felt"]))
+for o in mt:
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.cube_project(cube_size=0.6)
+    bpy.ops.object.mode_set(mode="OBJECT")
 nodes.append(node("TillMat", mt))
 
 root = bpy.data.objects.new("TillDesk", None)

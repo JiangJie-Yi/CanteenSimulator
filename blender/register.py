@@ -316,7 +316,9 @@ for o in panel_parts:
 
 # ---- the deck: the operator's display on its base, the mode key switch with its positions, the paper cover and its tear bar
 body_parts.append(box("RegDisplayBase", S(0.1, 0.014, 0.05), P(0.085, 0.222, 0.05), M["body"], bev=0.004))
-disp = box("RegDisplay", S(0.15, 0.058, 0.014), P(0.085, 0.252, 0.05), M["body"], bev=0.004, rot=(-0.14, 0, 0))
+# (nearly upright, so the cashier reads it square on)
+DISP_TILT = -0.04
+disp = box("RegDisplay", S(0.15, 0.058, 0.014), P(0.085, 0.252, 0.05), M["body"], bev=0.004, rot=(DISP_TILT, 0, 0))
 body_parts.append(disp)
 # (its window: a dark bezel the figures show in, set into its face toward the operator)
 bz = box("RegDisplayWindow", S(0.136, 0.044, 0.002), P(0, 0, 0), M["screen"], bev=0.001)
@@ -326,17 +328,30 @@ body_parts.append(bz)
 # the mode lock (one, on the deck to the operator's right, clear of the keys): a steel bezel, the positions printed round its far side, and
 # the key in it, its own node RegModeKey (turned by the game to the mode: its bow points at the position, at rest straight away)
 MODE_AT = Vector(P(-0.13, 0.215, 0.045))
-body_parts.append(cyl("RegModeBezel", 0.016, 0.004, MODE_AT + Vector((0, 0, 0.002)), M["steel"], verts=32))
-body_parts.append(cyl("RegModeBarrel", 0.0105, 0.003, MODE_AT + Vector((0, 0, 0.0045)), M["chrome"], verts=28))
+# (the scale plate: a pale disc let into the deck, a dark rim, a tick at each position and its name beside it, all upright for the cashier)
+body_parts.append(cyl("RegModePlate", 0.0215, 0.0012, MODE_AT + Vector((0, 0, 0.0006)), M["panel"], verts=48))
+body_parts.append(cyl("RegModeRim", 0.0222, 0.0008, MODE_AT + Vector((0, 0, 0.0002)), M["dark"], verts=48))
 for k, t in enumerate(["OFF", "REG", "X", "Z"]):
     a = math.radians(-60 + k * 40)
-    body_parts.append(text(f"RegMode{t}", t, 0.006, M["ink"], tuple(MODE_AT + Vector(P(-math.sin(a) * 0.0235, 0.0002, math.cos(a) * 0.0235))), (0, 0, math.pi + a)))
+    dx, dz = -math.sin(a), math.cos(a)
+    tick = box(f"RegModeTick{t}", S(0.0009, 0.0004, 0.004), tuple(MODE_AT + Vector(P(dx * 0.0135, 0.0014, dz * 0.0135))), M["ink"], rot=(0, 0, -a))
+    body_parts.append(tick)
+    body_parts.append(text(f"RegMode{t}", t, 0.0042, M["ink"], tuple(MODE_AT + Vector(P(dx * 0.0182, 0.0014, dz * 0.0182))), (0, 0, math.pi)))
+# (the lock: a chrome cylinder standing a little proud of the plate, its face domed, the keyway black)
+body_parts.append(cyl("RegModeBarrel", 0.0095, 0.0045, MODE_AT + Vector((0, 0, 0.0035)), M["chrome"], verts=40))
+body_parts.append(cyl("RegModeFace", 0.0082, 0.0008, MODE_AT + Vector((0, 0, 0.0062)), M["steel"], verts=40))
 mode_key = bpy.data.objects.new("RegModeKey", None)
 bpy.context.collection.objects.link(mode_key)
-mode_key.location = MODE_AT + Vector((0, 0, 0.006))
-mk = [cyl("RegModeKeyNeck", 0.0035, 0.008, (0, 0, 0.004), M["chrome"], verts=12),
-      box("RegModeKeyBow", S(0.004, 0.016, 0.02), P(0, 0.016, 0.004), M["dark"], bev=0.0015),
-      box("RegModeKeyMark", S(0.0045, 0.012, 0.0015), P(0, 0.016, 0.0125), M["inkw"])]
+mode_key.location = MODE_AT + Vector((0, 0, 0.0066))
+# (the key, centred: its blade in the lock, a short neck, the bow a flat rounded head standing on edge, pointing along its own plane; a white
+# line along its top to read the position by)
+mk = [box("RegModeKeyNeck", S(0.0028, 0.006, 0.006), P(0, 0.003, 0), M["chrome"], bev=0.0006)]
+bow = cyl("RegModeKeyBow", 0.0095, 0.003, P(0, 0.0145, 0), M["dark"], rot=(0, math.pi / 2, 0), verts=32)
+bow.scale = (1, 1.15, 1)
+apply_scale(bow)
+mk.append(bow)
+mk.append(cyl("RegModeKeyHole", 0.0022, 0.0034, P(0, 0.019, 0), M["steel"], rot=(0, math.pi / 2, 0), verts=16))
+mk.append(box("RegModeKeyMark", S(0.0034, 0.0006, 0.009), P(0, 0.0255, 0.0), M["inkw"]))
 for o in mk:
     o.parent = mode_key
 # the paper cover: a raised lid over the roll, the receipt coming up in front of it through a slot with a serrated tear bar
@@ -348,7 +363,9 @@ body_parts.append(text("RegPaperMark", "PAPER", 0.006, M["ink"], P(-0.035, 0.227
 
 # ---- the customers' display, on a stalk at the back
 body_parts.append(cyl("RegStalk", 0.006, 0.11, P(0.085, 0.265, 0.12), M["steel"], verts=14, r2=0.005))
-cdisp = box("RegCustDisplay", S(0.17, 0.065, 0.02), P(0.085, 0.33, 0.12), M["body"], bev=0.005, rot=(-0.18, 0, 0))
+# (leaning back a little, and turned 24° about its stalk toward where the customers stand to pay)
+CUST_TILT, CUST_TURN = -0.18, math.radians(24)
+cdisp = box("RegCustDisplay", S(0.17, 0.065, 0.02), P(0.085, 0.33, 0.12), M["body"], bev=0.005, rot=(CUST_TILT, 0, CUST_TURN))
 body_parts.append(cdisp)
 cw_ = box("RegCustWindow", S(0.156, 0.05, 0.002), P(0, 0, 0), M["screen"], bev=0.001)
 cw_.parent = cdisp

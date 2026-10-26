@@ -17,21 +17,21 @@ import type { Lang } from '@/data/i18n'
 import { inkModel } from '@/scene/inkHull'
 import { setTip } from '@/scene/hoverTip'
 import { Later } from '@/scene/Later'
-import { mapleTexture } from '@/scene/mapleGrain'
 import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
-import { TillDeskPiece } from './TillDesk'
+import { TillCounter } from './TillCounter'
+import { TillBellLive, TillDeskPiece } from './TillDesk'
 import { behindBody, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
-import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, POINTER_HINT, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -479,42 +479,11 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       <Movable id="till-counter" label="收銀櫃檯"><StaticBatch>
       <group position={at} rotation-y={yaw}>
       {/* (local x along the bar, +z toward the cashier, behind it) */}
-      {/* its body hollow, open on the cashier's side: the front, the two ends, a shelf low inside and one under the top,
-          for the till roll, the bags and the cash box */}
-      <Part geo={REG_GEO.body} color="#3a2a1e" outline={1.015} position={[0, (top - 0.05) / 2, -D / 2 + 0.06]} scale={[W - 0.04, top - 0.05, 0.08]} />
-      {[-1, 1].map((sd) => (
-        <Part key={sd} geo={REG_GEO.body} color="#3a2a1e" outline={1.015} position={[sd * (W / 2 - 0.05), (top - 0.05) / 2, 0.02]} scale={[0.06, top - 0.05, D - 0.06]} />
-      ))}
-      <Part geo={REG_GEO.body} color="#4a3626" outline={0} position={[0, 0.1, 0.03]} scale={[W - 0.14, 0.03, D - 0.14]} />
-      <Part geo={REG_GEO.body} color="#4a3626" outline={0} position={[0, top - 0.2, 0.04]} scale={[W - 0.14, 0.025, D - 0.2]} />
-      {/* (what's on the shelves, each its own: the cash box, the two cardboard boxes and the manual on them) */}
-      {/* a thick top of pale hinoki, overhanging its front, a warm light hidden under the overhang washing down the front */}
-      <group position={[0, top - 0.03, -0.03]}>
-        <mesh geometry={TILL_TOP_GEO} scale={[W + 0.1, 0.06, D + 0.1]} castShadow receiveShadow>
-          <meshToonMaterial color="#ffffff" map={mapleTexture()} />
-        </mesh>
-        <mesh geometry={REG_GEO.round} scale={[(W + 0.1) * 1.02, 0.06 * 1.02, (D + 0.1) * 1.02]}><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
-      </group>
-      <mesh position={[0, top + 0.0007, -0.03]} rotation-x={-Math.PI / 2}><planeGeometry args={[W + 0.08, D + 0.08]} /><meshBasicMaterial map={COUNTER_GRIME} transparent depthWrite={false} toneMapped={false} /></mesh>
+      {/* the counter itself, from blender/tillcounter.py: its dark body, the marble top, the acrylic partition along the customers' side and the end */}
+      <TillCounter top={top} />
+      {/* (a warm light hidden under the top's overhang, washing down the customers' face) */}
       <mesh position={[0, top - 0.075, -D / 2 - 0.0]} rotation-y={Math.PI}><planeGeometry args={[W - 0.1, 0.025]} /><meshBasicMaterial color="#ffd89a" toneMapped={false} /></mesh>
       <mesh position={[0, top - 0.22, -D / 2 + 0.018]} rotation-y={Math.PI}><planeGeometry args={[W - 0.06, 0.3]} /><meshBasicMaterial map={TILL_GLOW} transparent depthWrite={false} toneMapped={false} /></mesh>
-      {/* its front: upright battens of hinoki over the dark body, close set, a dark kick board at the foot */}
-      {Array.from({ length: 15 }, (_, k) => (
-        <Part key={k} geo={REG_GEO.body} color={k % 2 ? '#c49a64' : '#b88c58'} outline={0} position={[(k - 7) * (W - 0.08) / 15, (top - 0.06) / 2 + 0.04, -D / 2 + 0.014]}
-          scale={[0.036, top - 0.14, 0.024]} />
-      ))}
-      <Part geo={REG_GEO.body} color="#22180f" outline={0} position={[0, 0.03, -D / 2 + 0.035]} scale={[W - 0.06, 0.06, 0.02]} />
-      {/* and at its end, toward the door, a round window (丸窓) in its side with a lattice in it, lit from within */}
-      <group position={[W / 2 - 0.018, (top - 0.05) / 2 + 0.03, 0.02]} rotation-y={Math.PI / 2}>
-        <mesh><circleGeometry args={[0.2, 28]} /><meshBasicMaterial color="#f2dcb0" toneMapped={false} /></mesh>
-        <mesh position-z={0.002}><ringGeometry args={[0.2, 0.235, 28]} /><meshToonMaterial color="#5a3a22" /></mesh>
-        {[-1, 0, 1].map((k) => (
-          <group key={k}>
-            <mesh position={[k * 0.1, 0, 0.003]}><planeGeometry args={[0.012, 0.4 * Math.sqrt(1 - (k * 0.1 / 0.2) ** 2)]} /><meshToonMaterial color="#5a3a22" /></mesh>
-            <mesh position={[0, k * 0.1, 0.003]}><planeGeometry args={[0.4 * Math.sqrt(1 - (k * 0.1 / 0.2) ** 2), 0.012]} /><meshToonMaterial color="#5a3a22" /></mesh>
-          </group>
-        ))}
-      </group>
       </group>
       </StaticBatch></Movable>
       <Movable id="till-register" label="收銀機（含抽屜）">
@@ -574,12 +543,14 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       <group position={[-0.52, top, 0.12]}><TillDeskPiece name="TillPens" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-bell" label="服務鈴"><StaticBatch>
+      <Movable id="till-bell" label="服務鈴">
       <group position={at} rotation-y={yaw}>
-      {/* the service bell (blender/tilldesk.py) */}
-      <group position={[-0.52, top, -0.1]}><TillDeskPiece name="TillBell" /></group>
+      {/* the service bell (blender/tilldesk.py): rung with a click */}
+      <group position={[-0.52, top, -0.1]}>
+        <TillBellLive tip={lang === 'ja' ? tipOver('呼び鈴', 'クリックで鳴らす') : tipOver('服務鈴', '點一下按鈴')} onRing={() => !getEdit().on} />
       </group>
-      </StaticBatch></Movable>
+      </group>
+      </Movable>
       <Movable id="till-mat" label="木質桌墊"><StaticBatch>
       <group position={at} rotation-y={yaw}>
       {/* the wooden desk mat the reader, the printer, the pens and the tablet stand on (blender/tilldesk.py) */}
@@ -628,48 +599,7 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
   )
 }
 
-/** dust, smudges, scratches and worn patches on a surface, mostly at its edges and corners where hands and cloths don't reach: a clear texture laid over it */
-const grime = (w: number, h: number, seed: number, wear: number) => signTexture(w, h, (g) => {
-  let r = seed
-  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
-  g.clearRect(0, 0, w, h)
-  // (the grease and dust that gathers along the edges)
-  for (const [x0, y0, x1, y1] of [[0, 0, w, 0], [0, h, w, h], [0, 0, 0, h], [w, 0, w, h]] as number[][]) {
-    const e = g.createLinearGradient(x0, y0, x0 + (x1 === x0 ? (x0 ? -1 : 1) * 14 : 0), y0 + (y1 === y0 ? (y0 ? -1 : 1) * 14 : 0))
-    e.addColorStop(0, 'rgba(60,45,25,0.28)'); e.addColorStop(1, 'rgba(60,45,25,0)')
-    g.fillStyle = e
-    g.fillRect(0, 0, w, h)
-  }
-  // (smudges: finger marks and rings of wiped-over grease)
-  for (let i = 0; i < 9; i++) {
-    const x = rnd() * w, y = rnd() * h, rad = (0.05 + rnd() * 0.12) * Math.min(w, h) * 1.4
-    const b = g.createRadialGradient(x, y, 0, x, y, rad)
-    b.addColorStop(0, `rgba(70,52,30,${0.10 + rnd() * 0.12})`); b.addColorStop(1, 'rgba(70,52,30,0)')
-    g.fillStyle = b
-    g.fillRect(x - rad, y - rad, rad * 2, rad * 2)
-  }
-  // (dust: a fine pale speckle)
-  for (let i = 0; i < w * h / 90; i++) {
-    g.fillStyle = `rgba(235,230,215,${0.05 + rnd() * 0.18})`
-    g.fillRect(rnd() * w, rnd() * h, 1 + rnd(), 1)
-  }
-  // (scratches: thin pale lines, a few of them long)
-  g.lineCap = 'round'
-  for (let i = 0; i < 7 + wear * 10; i++) {
-    const x = rnd() * w, y = rnd() * h, a = rnd() * Math.PI, L = 6 + rnd() * (i % 4 ? 22 : 60) * (w / 128)
-    g.strokeStyle = `rgba(250,245,230,${0.20 + rnd() * 0.3})`
-    g.lineWidth = 0.6 + rnd() * 0.5
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke()
-  }
-  // (and the worn patches, where the finish has rubbed down to the bare, paler or darker, plastic)
-  for (let i = 0; i < wear * 5; i++) {
-    const x = rnd() * w, y = rnd() * h, rw = 6 + rnd() * 16, rh = 4 + rnd() * 9
-    g.fillStyle = `rgba(255,252,240,${0.10 + rnd() * 0.12})`
-    g.beginPath(); g.ellipse(x, y, rw, rh, rnd() * 3, 0, Math.PI * 2); g.fill()
-  }
-})
 /** the little plates on the notes' slots */
-const COUNTER_GRIME = grime(256, 128, 31, 2)
 /** a cable run as a tube through the given points (in the register's own units), black rubber */
 const cable = (pts: [number, number, number][], r = 0.0042) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.4), 36, r, 6, false)
 /** where the register's lead goes down through the counter's top: a grommet under the register's back, out of sight (the register's own units) */
@@ -879,13 +809,13 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
           <meshBasicMaterial map={RECEIPT_TEX} toneMapped={false} side={THREE.DoubleSide} />
         </mesh>
         {/* the operator's display, in the housing's own pose: upright, facing straight out of the front */}
-        <group position={[0.085, 0.252, 0.05]} rotation={[-0.14, 0, 0]}>
+        <group position={[0.085, 0.252, 0.05]} rotation={[-0.04, 0, 0]}>
           <mesh position-z={-0.0086} rotation={[0, Math.PI, 0]}><planeGeometry args={[0.13, 0.04]} /><meshBasicMaterial map={led} toneMapped={false} /></mesh>
         </group>
         {/* the customers' display on its stalk */}
-        <group position={[0.085, 0.33, 0.12]} rotation-x={-0.18}>
+        <group position={[0.085, 0.33, 0.12]} rotation-y={(24 * Math.PI) / 180}><group rotation-x={-0.18}>
           <mesh position-z={0.0113}><planeGeometry args={[0.15, 0.044]} /><meshBasicMaterial map={led} toneMapped={false} /></mesh>
-        </group>
+        </group></group>
       </group>
     </group>
   )
@@ -918,11 +848,6 @@ const DOOR_CATS = [
 ]
 /** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
 /** the customers' display: green figures on black, the amount to pay */
-const TILL_TOP_GEO = (() => {
-  // (a rounded slab whose top and bottom faces take their texture coordinates from their own size: the grain along it, boards a hand wide)
-  const g = new RoundedBoxGeometry(1, 1, 1, 3, 0.12)
-  return g
-})()
 /** a key of the register's keyboard */
 const REG_GEO = {
   body: new THREE.BoxGeometry(1, 1, 1),
