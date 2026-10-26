@@ -6314,3 +6314,6 @@ button {
 @media (max-width: 600px) {
   .reg-manual dl > div { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* in edit mode nothing in the room offers itself to be used: the plain arrow throughout (the edit handles set their own) */
+body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; }

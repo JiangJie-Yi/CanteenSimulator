@@ -324,14 +324,16 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <group position-x={DX}>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
-      <Movable id="chochin" label="紅燈籠"><group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
+      <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
         <group userData={{ fade: true }}>
           {[-1, 1].map((sd) => (
-            <mesh key={sd} position={[sd * (W / 2), H - 0.05 + 0.18, NZ]}><cylinderGeometry args={[0.004, 0.004, 0.36, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
+            <mesh key={sd} position={[sd * (W / 2), H - 0.05 + NOREN_CORD + NOREN_CORD / 2, NZ]}><cylinderGeometry args={[0.004, 0.004, NOREN_CORD, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
           ))}
+          {/* (the rod and the panels hung that much higher on the shorter cords) */}
+          <group position-y={NOREN_CORD}>
           <mesh position={[0, H - 0.05, NZ]} rotation-z={Math.PI / 2}>
             <cylinderGeometry args={[0.012, 0.012, W, 8]} />
             <meshToonMaterial color="#c9a46a" />
@@ -344,12 +346,16 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
               </mesh>
             </group>
           ))}
+          </group>
         </group>
       </Movable>
       </group>
     </group>
   )
 }
+
+/** how long the noren's two cords are, from the beam down to its rod (the rod hung 0.18 higher than it was) */
+const NOREN_CORD = 0.18
 
 /** the coir doormat: tan bristle in ribs, a dark border, the shop's welcome (いらっしゃいませ) woven across it */
 const DOORMAT = (() => signTexture(256, 140, (g) => {
@@ -498,7 +504,7 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       <group position={[-0.38, top, -0.1]}><TillDeskPiece name="TillCardReader" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-printer" label="明細印表機"><StaticBatch>
+      <Movable id="till-printer" label="明細印表機" baseTurn={[0, 180, 0]}><StaticBatch>
       <group position={at} rotation-y={yaw}>
       {/* the receipt printer, its slip curling out (blender/tilldesk.py), on the desk mat */}
       <group position={[-0.38, top, 0.12]}><TillDeskPiece name="TillPrinter" /></group>
@@ -516,7 +522,7 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       <group position={[-0.52, top, 0.12]}><TillDeskPiece name="TillPens" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-bell" label="服務鈴">
+      <Movable id="till-bell" label="服務鈴" baseTurn={[0, 25, 0]}>
       <group position={at} rotation-y={yaw}>
       {/* the service bell (blender/tilldesk.py): rung with a click */}
       <group position={[-0.52, top, -0.1]}>

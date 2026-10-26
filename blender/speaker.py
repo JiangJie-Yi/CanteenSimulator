@@ -1,5 +1,5 @@
 """The shop's wall speaker (スピーカー): a black two-way cabinet with rounded edges, a domed perforated steel grille over a woofer
-and a horn tweeter, a bass port, a badge and a power light, held in a U-shaped steel yoke on an arm out from a wall plate, its
+and a horn tweeter, a bass port, a badge and a power light, held in a U-shaped steel yoke on an arm out from a corner bracket, its
 cable looping down from the terminal cup on the back.
 
 Run:
@@ -9,6 +9,7 @@ Writes public/models/speaker.glb and blender/speaker.blend.
 Frame: Blender Z-up, the speaker facing -Y (glTF +Z), the wall behind it at +Y; the origin is where the old in-code speaker had its
 own (the room places it there). The cabinet is tilted down in the yoke by TILT. Node names the game looks for:
     SpeakerLED   the power light (its colour is set by the game)
+    SpeakerArmReach, SpeakerMount  the arm (stretched along +Y) and the corner bracket (set into the room's corner) by the game
     SpeakerGrille the grille sheet (alpha-tested holes)
 """
 import math
@@ -327,26 +328,49 @@ for sx in (-1, 1):
     finish(k, f"SpeakerKnob{sx}", M["rubber"])
     bevel(k, 0.002, 2)
     parts.append(k)
-# the arm back to the wall, a ball joint where it meets the yoke, the wall plate and its four screws
+# the arm back to the corner, a ball joint where it meets the yoke, and the corner bracket: an angle of steel whose two flanges lie flat on the
+# two walls, the arm screwed into its spine. The game stretches the arm (its own node, SpeakerArmReach, along +Y from the joint) and sets the
+# bracket (SpeakerMount, its spine at its origin) into the room's corner behind it, however far that is.
 WALL = 0.38
-parts.append(cyl("SpeakerArm", 0.014, WALL - YB, (0, (YB + WALL) / 2, PIVOT.z), M["steel"], rot=(math.pi / 2, 0, 0)))
+reach = bpy.data.objects.new("SpeakerArmReach", None)
+bpy.context.collection.objects.link(reach)
+reach.location = (0, YB, PIVOT.z)
+arm = cyl("SpeakerArm", 0.014, WALL - YB, (0, (WALL - YB) / 2, 0), M["steel"], rot=(math.pi / 2, 0, 0))
+arm.parent = reach
+parts += [reach, arm]
 bpy.ops.mesh.primitive_uv_sphere_add(radius=0.022, location=(0, YB + 0.012, PIVOT.z), segments=24, ring_count=12)
 parts.append(finish(active(), "SpeakerJoint", M["steel"]))
 parts.append(cyl("SpeakerJointNut", 0.017, 0.012, (0, YB + 0.03, PIVOT.z), M["steel"], rot=(math.pi / 2, 0, 0), verts=6))
-plate = box("SpeakerWallPlate", (0.12, 0.012, 0.17), (0, WALL - 0.006, PIVOT.z), M["steel"], bev=0.01)
-parts.append(plate)
+mount = bpy.data.objects.new("SpeakerMount", None)
+bpy.context.collection.objects.link(mount)
+mount.location = (0, WALL, PIVOT.z)
+mp = []
+FL, FH, FT = 0.085, 0.17, 0.006           # each flange's width out from the corner, its height, its thickness
 for sx in (-1, 1):
+    # (each flange runs from the corner forward along its wall: 45° either side of the arm)
+    a_ = sx * math.radians(45)
+    d = Vector((math.sin(a_), -math.cos(a_), 0))
+    n = Vector((d.y, -d.x, 0)) * sx
+    c = d * (FL / 2) + n * (FT / 2)
+    f = box(f"SpeakerMountFlange{sx}", (FT, FL, FH), tuple(c), M["steel"], bev=0.002)
+    f.rotation_euler = (0, 0, a_)
+    mp.append(f)
     for sz in (-1, 1):
-        at = (sx * 0.042, WALL - 0.013, PIVOT.z + sz * 0.065)
-        parts.append(cyl(f"SpeakerPlateScrew{sx}{sz}", 0.006, 0.003, at, M["screw"], rot=(math.pi / 2, 0, 0), verts=16, bev=0.0012))
-        parts.append(box(f"SpeakerPlateSlot{sx}{sz}", (0.008, 0.001, 0.0012), (at[0], at[1] - 0.0016, at[2]), M["ink"]))
-        parts.append(box(f"SpeakerPlateSlotV{sx}{sz}", (0.0012, 0.001, 0.008), (at[0], at[1] - 0.0016, at[2]), M["ink"]))
+        at = d * (FL * 0.62) + n * (FT + 0.0015)
+        at = Vector((at.x, at.y, sz * 0.06))
+        mp.append(cyl(f"SpeakerMountScrew{sx}{sz}", 0.006, 0.003, tuple(at), M["screw"], rot=(math.pi / 2, 0, a_ + math.pi / 2), verts=16, bev=0.0012))
+# (the spine where the flanges meet, rounded, and a boss on it the arm screws into)
+mp.append(cyl("SpeakerMountSpine", 0.008, FH, (0, -0.004, 0), M["steel"], verts=16))
+mp.append(cyl("SpeakerMountBoss", 0.02, 0.024, (0, -0.016, 0), M["steel"], rot=(math.pi / 2, 0, 0), verts=24))
+for o in mp:
+    o.parent = mount
+parts += [mount] + mp
 
-# ---- the cable: out of the terminal, a loose loop down, back up into the wall under the plate
+# ---- the cable: out of the terminal, a loose loop down, back up into the arm at the joint (it runs inside the arm to the corner)
 bpy.context.view_layer.update()
 term = tilt.matrix_world @ (Vector((0, BACK + 0.01, -0.09)) - PIVOT)
-pts = [term, term + Vector((0, 0.03, -0.05)), Vector((0.02, 0.24, -0.27)), Vector((0.03, 0.33, -0.26)),
-       Vector((0.02, WALL - 0.01, PIVOT.z - 0.13)), Vector((0.02, WALL + 0.01, PIVOT.z - 0.13))]
+pts = [term, term + Vector((0, 0.03, -0.05)), Vector((0.02, 0.17, -0.2)), Vector((0.012, YB + 0.03, PIVOT.z - 0.05)),
+       Vector((0.0, YB + 0.045, PIVOT.z - 0.012))]
 cd = bpy.data.curves.new("SpeakerCable", "CURVE")
 cd.dimensions = "3D"
 cd.bevel_depth = 0.0042

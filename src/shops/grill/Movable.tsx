@@ -337,14 +337,14 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
             </sprite>
           </group>
         ))}
-        {/* (and the cube in the middle, to scale all three together) */}
-        <mesh renderOrder={1002} onPointerDown={growAll} userData={{ editHandle: true, gizmo: true }}>
-          <boxGeometry args={[L * 0.17, L * 0.17, L * 0.17]} />
-          <meshBasicMaterial color="#e6e6e6" depthTest={false} />
+        {/* (and the small cube in the middle, as Maya has it, to scale all three together: plain yellow, an unseen larger one round it to catch) */}
+        <mesh renderOrder={1002} userData={{ editHandle: true, gizmo: true }}>
+          <boxGeometry args={[L * 0.1, L * 0.1, L * 0.1]} />
+          <meshBasicMaterial color="#f2e33a" depthTest={false} toneMapped={false} />
         </mesh>
-        <mesh renderOrder={1003} userData={{ editHandle: true, gizmo: true }} onPointerDown={growAll}>
-          <boxGeometry args={[L * 0.17, L * 0.17, L * 0.17]} />
-          <meshBasicMaterial color="#555" wireframe depthTest={false} />
+        <mesh renderOrder={1002} onPointerDown={growAll} userData={{ editHandle: true, gizmo: true }}>
+          <boxGeometry args={[L * 0.2, L * 0.2, L * 0.2]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} colorWrite={false} />
         </mesh>
       </group>
     )

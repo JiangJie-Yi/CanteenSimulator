@@ -24,8 +24,11 @@ function brighten(m: THREE.Material): THREE.Material {
   return c
 }
 
+/** while edit mode is on, nothing in the room lights up under the pointer (edit.ts sets it) */
+export const HOVER = { paused: false }
+
 export function glowOn(root: THREE.Object3D | null | undefined) {
-  if (!root || LIT.has(root)) return
+  if (!root || LIT.has(root) || HOVER.paused) return
   LIT.add(root)
   root.traverse((o) => {
     const m = o as THREE.Mesh

@@ -1507,7 +1507,8 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
         {(() => {
           const zs: number[] = []
           // (not out to the way in at the end: nothing hung over the doorway)
-          for (let z = from + 0.25; z < to - 1.05; z += 0.145) {
+          // (and none in the corner where the speaker hangs: kept clear of it by its own reach and size)
+          for (let z = from + (corner ? 1.15 : 0.25); z < to - 1.05; z += 0.145) {
             if (altar && Math.abs(z - shelfZ) < 0.62) continue
             if (!isClear(z, 0.1)) continue
             if (door !== undefined && Math.abs(z - door) < WC_W + 0.3) continue
@@ -2678,6 +2679,9 @@ function MusicNotes({ playing }: { playing: boolean }) {
 const SPEAKER_URL = import.meta.env.BASE_URL + 'models/speaker.glb'
 /** the parts drawn with an ink line round them (the small ones, the grille and the light, without) */
 const SPEAKER_INKED = /^Speaker(Cabinet|Yoke|WallPlate|Arm|Joint|Knob)/
+/** the arm's length as the model has it (blender/speaker.py: WALL - YB), stretched from there to reach the corner */
+const SPEAKER_ARM = 0.38 - 0.19
+
 function WallSpeaker() {
   const [lit, setLit] = useState(false)
   const off = useBgmOff()
@@ -2712,10 +2716,34 @@ function WallSpeaker() {
     return { root, led: led as THREE.MeshBasicMaterial | null, toon: [...toon.values()] }
   }, [gltf])
   useEffect(() => { model.led?.color.set(off ? '#d02a2a' : '#3ddc6a') }, [model, off])
+  // (the arm reaches back to the room's corner and the bracket sits in it: found by a ray from the arm's joint straight back, every half second,
+  // so it still fits wherever the speaker's been moved to)
+  const { scene: room, camera } = useThree()
+  const reachAt = useRef(0)
+  useFrame((st) => {
+    if (st.clock.elapsedTime - reachAt.current < 0.5) return
+    reachAt.current = st.clock.elapsedTime
+    const reach = model.root.getObjectByName('SpeakerArmReach'), mount = model.root.getObjectByName('SpeakerMount')
+    if (!reach || !mount) return
+    reach.updateWorldMatrix(true, false)
+    const from = reach.getWorldPosition(new THREE.Vector3())
+    const back = new THREE.Vector3(0, 0, -1).transformDirection(reach.matrixWorld)
+    const ray = new THREE.Raycaster(from, back, 0.03, 2)
+    ray.camera = camera
+    ray.params.Line = { threshold: 0 }
+    ray.params.Points = { threshold: 0 }
+    const mine = (o: THREE.Object3D | null) => { for (; o; o = o.parent) if (o === model.root || o.userData.fade || o.userData.editHandle) return true; return false }
+    const hit = ray.intersectObjects(room.children, true).find((h) => (h.object as THREE.Mesh).isMesh && !mine(h.object))
+    if (!hit) return
+    const k = reach.getWorldScale(new THREE.Vector3()).z || 1
+    const len = Math.max(0.05, hit.distance / k)
+    reach.scale.z = len / SPEAKER_ARM
+    mount.position.z = reach.position.z - len
+  })
   // (pointed at, it lifts a little out of the dark, to say it can be clicked)
   useEffect(() => { for (const t of model.toon) t.emissive.set(lit ? '#2a2a30' : '#000000') }, [model, lit])
   return (
-    <group name="look-speaker" onClick={press} onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); setLit(true); handOver.onPointerOver(e as never); tag() }}
+    <group name="look-speaker" onClick={press} onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setLit(true); handOver.onPointerOver(e as never); tag() }}
       onPointerOut={(e: { stopPropagation: () => void }) => { setLit(false); handOver.onPointerOut(e as never); setTip(null) }} >
       <MusicNotes playing={!off} />
       {/* (the handlers on a group round it: a primitive's own aren't attached) */}
@@ -2753,7 +2781,7 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
   return (
     // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
     <>
-      <Movable id="speaker" label="喇叭"><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
+      <Movable id="speaker" label="音箱" baseTurn={[0, 45, 0]}><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
       {[0, 1].map((part) => (
         <Movable key={part} id={part ? 'sake2' : 'sake'} label={part ? '餐盤堆' : '酒樽'}><StaticBatch key={lang}>
           <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { glowOff, glowOnly } from '@/scene/hoverGlow'
+import { glowOff, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 
 /*
@@ -101,6 +101,8 @@ export const POINTER_HINT = { hand: 0 }
 export const handOver = {
   onPointerOver: (e: { stopPropagation: () => void; nativeEvent: Event; eventObject?: THREE.Object3D }) => {
     e.stopPropagation()
+    // (in edit mode nothing answers the pointer: only the pieces themselves)
+    if (HOVER.paused) return
     // (and the thing itself lights up, so it's plain which one is under the pointer)
     glowOnly(e.eventObject)
     POINTER_HINT.hand++
@@ -108,6 +110,7 @@ export const handOver = {
     if (el?.style) el.style.cursor = 'pointer'
   },
   onPointerOut: (e: { nativeEvent: Event; eventObject?: THREE.Object3D }) => {
+    if (HOVER.paused) return
     glowOff(e.eventObject)
     glowOnly(null)
     POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand - 1)

@@ -5,6 +5,8 @@
 import { useSyncExternalStore } from 'react'
 import { EDIT_TEXT, pieceName } from '@/data/editText'
 import type { Lang } from '@/data/i18n'
+import { glowOnly, HOVER } from '@/scene/hoverGlow'
+import { setTip } from '@/scene/hoverTip'
 
 export type V3 = [number, number, number]
 /** the panel's language (the game's: App sets it) */
@@ -17,9 +19,9 @@ export function setEditLang(l: Lang) {
   panel()
 }
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
-const KEY = 'jgs-edit-offsets-9'
-const KEY_R = 'jgs-edit-rotations-6'
-const KEY_S = 'jgs-edit-scales-5'
+const KEY = 'jgs-edit-offsets-10'
+const KEY_R = 'jgs-edit-rotations-7'
+const KEY_S = 'jgs-edit-scales-6'
 const KEY_G = 'jgs-edit-groups-1'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
@@ -38,7 +40,13 @@ const loadGroups = (): Record<string, Group> => {
 type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string, V3>; rotations: Record<string, V3>; scales: Record<string, V3>; selected: string | null; groups: Record<string, Group>; picked: string[] }
 let state: State = { on: false, locked: false, tool: 'move', offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null, groups: loadGroups(), picked: [] }
 const subs = new Set<() => void>()
-const emit = () => { state = { ...state }; subs.forEach((f) => f()); panel() }
+const emit = () => {
+  // (in edit mode the room's own pointing (lit things, name tags, the hand) is paused: what's lit now is put out)
+  if (HOVER.paused !== state.on) { HOVER.paused = state.on; if (state.on) { glowOnly(null); setTip(null); POINTER_RESET() } }
+  state = { ...state }; subs.forEach((f) => f()); panel()
+}
+/** (the cursor back to the arrow, wherever a hover had set it) */
+const POINTER_RESET = () => { if (typeof document === 'undefined') return; document.body.style.cursor = ''; document.querySelectorAll('canvas').forEach((c) => { c.style.cursor = '' }) }
 export const getEdit = () => state
 export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f) }, () => state)
 /**
@@ -53,6 +61,9 @@ export const BASES: Record<string, V3> = {
   freezer: [-0.9694, 0.19, 1.3355],
   // (moved on by X 0.215 in the room's frame, taken into this parent's units)
   willow: [0.2534, 0, 0.0272],
+  // (the speaker set at X -0.285 Y 0.518 Z 0.169, the red lantern raised 0.25, in the room's frame)
+  speaker: [0.3044, 0.518, 0.1309],
+  chochin: [0, 0.25, 0],
   sake: [0.084, 0, 0.118],
   sake2: [0.084, 0, 0.118],
   // (the charcoal basket: moved by [0.273, 0.125, 0.082] in the room's frame, taken into the parent's units; its 1.75 size and 44° turn are Decor's)
@@ -67,9 +78,10 @@ export const BASES: Record<string, V3> = {
   'till-register': [0.2116, 0, -0.1851],
   'till-ipad': [-0.5181, 0.15, 0.3774],
   'till-pens': [0.3202, 0.15, -0.43],
-  'till-printer': [-0.0177, 0.15, -0.0242],
+  'till-printer': [-0.0059, 0.15, -0.008],
   'till-card': [0, 0.15, 0],
-  'till-bell': [-0.1684, 0, -0.2312],
+  // (the bell moved on by X 0.012 Z -0.031, the printer by X -0.02, in the room's frame)
+  'till-bell': [-0.2005, 0, -0.2226],
   'till-cat': [-0.0466, 0, -0.0403],
   'till-tray': [-0.2353, 0, 0.6064],
 }
