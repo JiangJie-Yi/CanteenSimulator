@@ -1085,12 +1085,10 @@ button {
   display: contents;
 }
 
-/* wooden menu tags: hinoki for dishes, walnut for the base. The grain is SVG turbulence stretched
-   along the tag, so lines run lengthwise like a real plank */
+/* menu tags: hinoki-coloured for dishes, walnut for the base (plain, no grain) */
 .strip {
   --wood: #e8cfa0;
   --wood-dark: #d9b97f;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='640'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018 0.005' numOctaves='2' seed='11' result='w'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.15 0.007' numOctaves='3' seed='4' result='n'/%3E%3CfeDisplacementMap in='n' in2='w' scale='34' xChannelSelector='R' yChannelSelector='G'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.26 0 0 0 0 0.12 0.95 0 0 0 -0.34'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
   position: relative;
   direction: ltr;
   display: flex;
@@ -1102,9 +1100,7 @@ button {
   border: none;
   border-radius: 3px 4px 3px 5px;
   color: var(--ink);
-  background:
-    var(--grain) var(--grain-x, 50%) var(--grain-y, 0%) / 140% 260%,
-    linear-gradient(90deg, var(--wood-dark), var(--wood) 18%, var(--wood) 82%, var(--wood-dark));
+  background: linear-gradient(90deg, var(--wood-dark), var(--wood) 18%, var(--wood) 82%, var(--wood-dark));
   box-shadow:
     inset 0 0 0 1px rgb(59 42 32 / 0.18),
     0 6px 14px -8px rgb(59 42 32 / 0.5);
@@ -1116,11 +1112,11 @@ button {
 .strip:nth-child(3n) { --tilt: -0.8deg; }
 .strip:nth-child(3n + 1) { --tilt: 0.6deg; }
 
-/* each tag is cut from a different part of the plank, and none is sawn quite square */
-.strip:nth-child(2n) { --grain-x: 20%; --grain-y: 45%; border-radius: 4px 2px 5px 3px; }
-.strip:nth-child(3n) { --grain-x: 80%; --grain-y: 85%; }
-.strip:nth-child(5n + 1) { --grain-x: 35%; --grain-y: 25%; border-radius: 2px 5px 4px 3px; }
-.strip:nth-child(7n + 2) { --grain-x: 65%; --grain-y: 65%; border-radius: 5px 3px 2px 4px; }
+/* none of the tags is cut quite square */
+.strip:nth-child(2n) { border-radius: 4px 2px 5px 3px; }
+
+.strip:nth-child(5n + 1) { border-radius: 2px 5px 4px 3px; }
+.strip:nth-child(7n + 2) { border-radius: 5px 3px 2px 4px; }
 
 .strip:hover {
   transform: rotate(var(--tilt, 0deg)) translateY(-3px);
@@ -6120,139 +6116,25 @@ button {
   pointer-events: none;
 }
 
-/* the ingredient chiller in the menu board's own look: a dark-wood frame, paper-and-wood tags, the same ink and moss as the strips */
-.chiller {
-  border: 4px solid #5a3d28;
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgb(251 243 228 / 0.94), rgb(239 226 201 / 0.94));
-  box-shadow: 0 8px 22px rgb(40 24 12 / 0.4), inset 0 0 0 1.5px rgb(255 255 255 / 0.5);
-}
-
-.chiller-top {
-  background: linear-gradient(180deg, #6b4a30, #4a3020);
-  color: #f6e8cc;
-  font-family: var(--brush);
-  letter-spacing: 0.35em;
-}
-
-.chiller-top i {
-  background: #2a1c12;
-  color: #ffd98a;
-  text-shadow: 0 0 6px rgb(255 190 80 / 0.7);
-}
-
-.chiller-bins {
-  scrollbar-color: #a88358 transparent;
-}
-
-.chiller-foot {
-  background: linear-gradient(180deg, #d9c19a, #5a3d28);
-}
-
-.chiller-bin {
-  border: none;
-  border-radius: 4px 5px 4px 6px;
-  background: linear-gradient(90deg, #d9b97f, #e8cfa0 16%, #ecd6a8 84%, #d9b97f);
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.2), 0 5px 10px -7px rgb(59 42 32 / 0.6);
-}
-
-.chiller-bin:hover {
-  border: none;
-  box-shadow: inset 0 0 0 1.5px #8a5a32, 0 8px 14px -8px rgb(59 42 32 / 0.7);
-}
-
-.chiller-bin.is-taken {
-  background: linear-gradient(90deg, #e2b79a, #f0cbb0 16%, #f3d3b9 84%, #e2b79a);
-  box-shadow: inset 0 0 0 2px var(--hanko), 0 5px 10px -7px rgb(59 42 32 / 0.6);
-}
-
-.chiller-bin.is-out {
-  filter: saturate(0.55) brightness(0.96);
-  background: linear-gradient(90deg, #cdbd9f, #dccdae 16%, #dccdae 84%, #cdbd9f);
-}
-
-.chiller-bin-en {
-  color: var(--ink-soft);
-}
-
-.chiller-taken {
-  background: var(--hanko);
-}
-
-.chiller-bin-info b {
-  color: var(--moss);
-}
-
-.chiller-bin-info b.is-zero {
-  color: var(--hanko);
-}
-
-.chiller-bin-info small {
-  color: var(--ink-soft);
-}
-
-.chiller-btn {
-  background: #5a3d28;
-  color: #f6e8cc;
-}
-
-.chiller-btn:hover {
-  background: #7a5336;
-}
-
-.chiller-btn.chiller-top {
-  background: var(--moss);
-  color: #f6f1e2;
-}
-
-.chiller-btn.chiller-top:hover {
-  background: #44684f;
-}
-
-/* the two stocking buttons under the chiller: moss and dark wood, like the rest of the board */
-.tally-buy .tally-topup {
-  background: var(--moss);
-  border-color: var(--moss);
-  color: #f6f1e2;
-}
-
-.tally-buy .tally-buyall {
-  background: #5a3d28;
-  border-color: #5a3d28;
-  color: #f6e8cc;
-}
-
-.tally-buy .tally-topup:hover:not(:disabled) {
-  background: #44684f;
-}
-
-.tally-buy .tally-buyall:hover:not(:disabled) {
-  background: #7a5336;
-}
-
 /* the music button is the speaker on the wall now: it only shows while the speaker is out of the picture (or on a narrow screen) */
 
-/* ---- wood grain: the one finish for every panel (dark wood on the title bars and frames, a faint grain on the pale panels), and the same ink and moss throughout ---- */
+/* ---- the panels' one finish: dark wood colour on the title bars and frames, pale paper panels, the same ink and moss throughout (no grain) ---- */
 :root {
-  --grain-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300'%3E%3Cfilter id='w' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.07' numOctaves='3' seed='7' result='n'/%3E%3CfeColorMatrix values='0 0 0 0 0.05 0 0 0 0 0.03 0 0 0 0 0.01 1.1 0 0 0 -0.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23w%29'/%3E%3C/svg%3E");
-  --grain-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300'%3E%3Cfilter id='w' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.003 0.05' numOctaves='3' seed='3' result='n'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.26 0 0 0 0 0.12 0.9 0 0 0 -0.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23w%29'/%3E%3C/svg%3E");
   --wood-bar: linear-gradient(180deg, #6b4a30, #4a3020);
-}
-
-.office > header,
-.chiller-top {
-  background: var(--grain-dark) 0 0 / 420px 120px, var(--wood-bar) !important;
-  color: #f6e8cc;
-  border-bottom: 2px solid #8a6a44;
 }
 
 .office > header * {
   color: inherit;
 }
 
+.office > header {
+  background: var(--wood-bar) !important;
+  color: #f6e8cc;
+  border-bottom: 2px solid #8a6a44;
+}
+
 .office {
-  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 246 234 / 0.88) !important;
+  background: rgb(251 246 234 / 0.88) !important;
   border: 3px solid #5a3d28;
   border-radius: 10px;
 }
@@ -6260,23 +6142,9 @@ button {
 .guest-board,
 .ledger,
 .notebook {
-  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 243 228 / 0.88);
+  background: rgb(251 243 228 / 0.88);
   border: 3px solid #5a3d28;
   border-radius: 10px;
-}
-
-.chiller {
-  background: var(--grain-light) 0 0 / 520px 260px, linear-gradient(180deg, rgb(251 243 228 / 0.94), rgb(239 226 201 / 0.94));
-}
-
-.chiller-foot {
-  background: var(--grain-dark) 0 0 / 420px 60px, linear-gradient(180deg, #d9c19a, #5a3d28);
-}
-
-.tally-buy .tally-buyall,
-.chiller-btn {
-  background-image: var(--grain-dark);
-  background-size: 300px 60px;
 }
 
 .office-tab,
@@ -6292,39 +6160,16 @@ button {
 }
 
 /* glass, not wood, for what is only pressed: the chiller's tags and buttons, the stocking buttons, the panels themselves half see-through */
-.chiller {
-  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 243 228 / 0.62);
-  -webkit-backdrop-filter: blur(5px) saturate(1.1);
-  backdrop-filter: blur(5px) saturate(1.1);
-}
-
-.chiller-bin,
-.chiller-bin.is-out {
-  background: rgb(255 255 255 / 0.3);
-  box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.28), 0 4px 10px -8px rgb(59 42 32 / 0.5);
-}
-
-.chiller-bin.is-taken {
-  background: rgb(194 59 42 / 0.16);
-}
-
-.chiller-bin.is-out {
-  filter: saturate(0.6);
-}
-
-.chiller-btn,
 .tally-buy .tally-buyall {
   background: rgb(59 42 32 / 0.55);
   background-image: none;
   color: #fff;
 }
 
-.chiller-btn.chiller-top,
 .tally-buy .tally-topup {
   background: rgb(51 80 63 / 0.75);
 }
 
-.chiller-btn:hover,
 .tally-buy .tally-buyall:hover:not(:disabled) {
   background: rgb(59 42 32 / 0.78);
 }
@@ -6333,7 +6178,7 @@ button {
 .guest-board,
 .ledger,
 .notebook {
-  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 246 234 / 0.66) !important;
+  background: rgb(251 246 234 / 0.66) !important;
   -webkit-backdrop-filter: blur(5px) saturate(1.1);
   backdrop-filter: blur(5px) saturate(1.1);
 }
@@ -6386,7 +6231,7 @@ button {
   background: var(--hanko);
 }
 
-/* the register's manual, opened from the booklet under the till: a booklet on the shared wood finish, one page at a time */
+/* the register's manual, opened from the booklet under the till: a plain paper booklet, one page at a time */
 .reg-manual-veil {
   position: fixed;
   inset: 0;
@@ -6399,7 +6244,7 @@ button {
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
   overflow: auto;
-  background: var(--grain-light) 0 0 / 520px 260px, rgb(251 246 234 / 0.96);
+  background: rgb(251 246 234 / 0.96);
   border: 3px solid #5a3d28;
   border-radius: 10px;
   color: #2a1a10;
@@ -6410,7 +6255,7 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 8px 14px;
-  background: var(--grain-dark) 0 0 / 420px 120px, var(--wood-bar);
+  background: var(--wood-bar);
   color: #f6e8cc;
   font-weight: 700;
   letter-spacing: 0.08em;
