@@ -6,8 +6,8 @@ import { useSyncExternalStore } from 'react'
 
 export type V3 = [number, number, number]
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
-const KEY = 'jgs-edit-offsets-6'
-const KEY_R = 'jgs-edit-rotations-3'
+const KEY = 'jgs-edit-offsets-7'
+const KEY_R = 'jgs-edit-rotations-4'
 const KEY_S = 'jgs-edit-scales-3'
 const KEY_G = 'jgs-edit-groups-1'
 const load = (key: string): Record<string, V3> => {
@@ -49,6 +49,16 @@ export const BASES: Record<string, V3> = {
   lantern: [-0.478, 0, 0.4497],
   // (the dish rack: moved by [-0.871, 0, -2.135] in the room's frame, taken into this parent's units; its 1.03 size is Decor's)
   platerack: [-1.2158, 0, 1.9593],
+  // (the till's things, where the owner set them in the edit panel (the room's frame: register X 0.025 Z 0.28, tablet Z -0.641, pens X 0.159
+  // Z 0.512, printer X 0.03, bell X 0.286, cat X 0.06 Z -0.014), taken into each one's parent's own units; the tablet, pens, printer and
+  // card reader raised 0.015 onto the desk mat)
+  'till-register': [0.2116, 0, -0.1851],
+  'till-ipad': [-0.5181, 0.015, 0.3774],
+  'till-pens': [0.3202, 0.015, -0.43],
+  'till-printer': [-0.0177, 0.015, -0.0242],
+  'till-card': [0, 0.015, 0],
+  'till-bell': [-0.1684, 0, -0.2312],
+  'till-cat': [-0.0466, 0, -0.0403],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece belongs to, if any */

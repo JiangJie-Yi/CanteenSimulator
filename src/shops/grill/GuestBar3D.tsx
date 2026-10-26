@@ -24,6 +24,7 @@ import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProp
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
+import { TillDeskPiece } from './TillDesk'
 import { behindBody, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
@@ -531,8 +532,6 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
         {/* (the cables go with the register: moved in edit mode, they come along) */}
         {/* the cables: the register's power, the card reader's and the tablet's leads, into the grommet in the top */}
         <mesh geometry={REG_CABLES.power}><meshToonMaterial color="#17171a" /></mesh>
-        <mesh geometry={REG_CABLES.data}><meshToonMaterial color="#2a2c30" /></mesh>
-        <mesh geometry={REG_CABLES.tablet}><meshToonMaterial color="#e9e9ec" /></mesh>
         {/* (the grommet: a dark metal ring let into the top, the hole black inside it) */}
         <mesh position={[GROMMET[0], 0.0009, GROMMET[2]]} rotation-x={-Math.PI / 2}><ringGeometry args={[0.0062, 0.012, 28]} /><meshToonMaterial color="#3a3c40" /></mesh>
         <mesh position={[GROMMET[0], 0.0007, GROMMET[2]]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.0062, 24]} /><meshBasicMaterial color="#060607" /></mesh>
@@ -543,25 +542,14 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       </Movable>
       <Movable id="till-card" label="刷卡機"><StaticBatch>
       <group position={at} rotation-y={yaw}>
-      {/* the card reader, its screen and keys, by the register on the customers' side */}
-      <group position={[-0.38, top, -0.1]} rotation-x={-0.25}>
-        <Part geo={REG_GEO.round} color="#2a2c30" position-y={0.02} scale={[0.075, 0.04, 0.14]} />
-        <mesh position={[0, 0.041, -0.03]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.055, 0.045]} /><meshBasicMaterial color="#9ad0f0" /></mesh>
-        {Array.from({ length: 9 }, (_, i) => (
-          <mesh key={i} position={[-0.016 + (i % 3) * 0.016, 0.041, 0.018 + Math.floor(i / 3) * 0.014]} rotation-x={-Math.PI / 2}>
-            <planeGeometry args={[0.011, 0.009]} /><meshBasicMaterial color="#bfc4c8" />
-          </mesh>
-        ))}
-      </group>
+      {/* the card reader on its cradle, its face to the customers (blender/tilldesk.py), on the desk mat */}
+      <group position={[-0.38, top, -0.1]}><TillDeskPiece name="TillCardReader" /></group>
       </group>
       </StaticBatch></Movable>
       <Movable id="till-printer" label="明細印表機"><StaticBatch>
       <group position={at} rotation-y={yaw}>
-      {/* the receipt printer, a curl of paper out of its top */}
-      <group position={[-0.38, top, 0.12]}>
-        <Part geo={REG_GEO.round} color="#e8e6e0" position-y={0.04} scale={[0.12, 0.08, 0.13]} />
-        <Part geo={REG_GEO.body} color="#2a2c30" outline={0} position={[0, 0.081, 0]} scale={[0.08, 0.002, 0.012]} />
-      </group>
+      {/* the receipt printer, its slip curling out (blender/tilldesk.py), on the desk mat */}
+      <group position={[-0.38, top, 0.12]}><TillDeskPiece name="TillPrinter" /></group>
       </group>
       </StaticBatch></Movable>
       <Movable id="till-tray" label="找零盤與零錢"><StaticBatch>
@@ -582,22 +570,20 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       </StaticBatch></Movable>
       <Movable id="till-pens" label="筆筒"><StaticBatch>
       <group position={at} rotation-y={yaw}>
-      <group position={[-0.52, top, 0.12]}>
-        <Part geo={REG_GEO.cup} color="#3a4a5a" position-y={0.03} />
-        {[[-0.006, '#2a2a6a'], [0.007, '#a82a1e'], [0, '#2a2a2a']].map(([x, c], i) => (
-          <mesh key={i} position={[x as number, 0.075, (i - 1) * 0.006]} rotation-z={(x as number) * 20}>
-            <cylinderGeometry args={[0.003, 0.003, 0.09, 5]} /><meshToonMaterial color={c as string} />
-          </mesh>
-        ))}
-      </group>
+      {/* the pen cup, full (blender/tilldesk.py), on the desk mat */}
+      <group position={[-0.52, top, 0.12]}><TillDeskPiece name="TillPens" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-bell" label="呼叫鈴"><StaticBatch>
+      <Movable id="till-bell" label="服務鈴"><StaticBatch>
       <group position={at} rotation-y={yaw}>
-      <group position={[-0.52, top, -0.1]}>
-        <Part geo={REG_GEO.ball} color="#d4b04a" position-y={0.012} scale={[0.6, 0.45, 0.6]} />
-        <Part geo={REG_GEO.body} color="#2a2420" outline={0} position-y={0.004} scale={[0.06, 0.008, 0.06]} />
+      {/* the service bell (blender/tilldesk.py) */}
+      <group position={[-0.52, top, -0.1]}><TillDeskPiece name="TillBell" /></group>
       </group>
+      </StaticBatch></Movable>
+      <Movable id="till-mat" label="木質桌墊"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
+      {/* the wooden desk mat the reader, the printer, the pens and the tablet stand on (blender/tilldesk.py) */}
+      <group position={[-0.21, top, -0.005]}><TillDeskPiece name="TillMat" /></group>
       </group>
       </StaticBatch></Movable>
       <Movable id="till-sign" label="お会計牌"><StaticBatch>
@@ -609,7 +595,7 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       </group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-cat" label="櫃檯招財貓"><StaticBatch>
+      <Movable id="till-cat" label="櫃檯招財貓" baseTurn={[0, -45, 0]}><StaticBatch>
       <group position={at} rotation-y={yaw}>
       {/* the beckoning cat, its paw up: bigger, at the till's corner by the door, facing the customers */}
       <group position={[0.5, top, -0.26]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.46} /></group>
@@ -686,17 +672,11 @@ const grime = (w: number, h: number, seed: number, wear: number) => signTexture(
 const COUNTER_GRIME = grime(256, 128, 31, 2)
 /** a cable run as a tube through the given points (in the register's own units), black rubber */
 const cable = (pts: [number, number, number][], r = 0.0042) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.4), 36, r, 6, false)
-/** where the cables go down through the counter's top: a grommet tucked against the register's back, mostly under it (the register's own units) */
-const GROMMET: [number, number, number] = [0.05, 0, 0.176]
-/** the height of a cable run under the register: on the counter, in the gap its feet leave under the case */
-const UNDER = 0.0026
+/** where the register's lead goes down through the counter's top: a grommet under the register's back, out of sight (the register's own units) */
+const GROMMET: [number, number, number] = [0.05, 0, 0.13]
 const REG_CABLES = {
-  // (the register's own: out of its back, over the case's back edge, straight down the case's back and into the grommet)
-  power: cable([[0.05, 0.12, 0.158], [0.05, 0.104, 0.177], [0.05, 0.07, 0.1775], [0.05, 0.02, 0.177], [GROMMET[0], -0.012, GROMMET[2]]], 0.0045),
-  // (the card reader's lead: a short way from its foot to the register's side, then under the register to the grommet, out of sight)
-  data: cable([[0.307, 0.004, 0.114], [0.26, UNDER, 0.118], [0.21, UNDER, 0.125], [0.12, UNDER, 0.16], [0.07, UNDER, 0.18], [GROMMET[0], -0.012, GROMMET[2]]], 0.0026),
-  // (the tablet's white lead: from under its stand straight to the register's side, then under it to the grommet, out of sight)
-  tablet: cable([[-0.321, UNDER, 0.0], [-0.26, UNDER, 0.01], [-0.21, UNDER, 0.03], [-0.1, UNDER, 0.1], [0.02, UNDER, 0.17], [GROMMET[0], -0.012, GROMMET[2]]], 0.0024),
+  // (out of its back, held close down the case's back, under the case's back edge and into the grommet below: from above, none of it shows)
+  power: cable([[0.05, 0.12, 0.158], [0.05, 0.104, 0.175], [0.05, 0.06, 0.178], [0.05, 0.006, 0.178], [0.05, 0.0026, 0.16], [GROMMET[0], -0.012, GROMMET[2]]], 0.0045),
 }
 /** the register's size in the till (its drawer, keys and displays are drawn in units of 1/1.4 of this) */
 const REG_SC = 1.4
