@@ -49,9 +49,6 @@ export const BASES: Record<string, V3> = {
   lantern: [-0.478, 0, 0.4497],
   // (the dish rack: moved by [-0.871, 0, -2.135] in the room's frame, taken into this parent's units; its 1.03 size is Decor's)
   platerack: [-1.2158, 0, 1.9593],
-  // (the register and the tablet at the till: where the owner moved them, as the edit panel showed it)
-  'till-register': [0.007, 0, 0.27],
-  'till-ipad': [-0.023, 0, -0.63],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece belongs to, if any */
