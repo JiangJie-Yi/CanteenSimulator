@@ -83,13 +83,15 @@ M = {
     "steel": mat("DeskSteel", "#9aa0a8", 0.3, 0.9), "printer": mat("PrinterBody", "#eceae4", 0.45), "printerDark": mat("PrinterDark", "#3a3c40", 0.45),
     "slot": mat("DeskSlot", "#0b0c0e", 0.6), "paper": mat("ReceiptPaper", "#fbfaf6", 0.8), "green": mat("LedGreen", "#3ddc6a", 0.3),
     "amber": mat("LedAmber", "#ffb21e", 0.3), "red": mat("KeyRed", "#c8322a", 0.4), "yellow": mat("KeyYellow", "#e7bf2a", 0.4),
-    "keyGreen": mat("KeyGreen", "#2f9a4c", 0.4), "reader": mat("ReaderBody", "#26282d", 0.45), "readerTrim": mat("ReaderTrim", "#3b3e45", 0.4),
+    "keyGreen": mat("KeyGreen", "#2f9a4c", 0.4), "reader": mat("ReaderBody", "#383b40", 0.4), "readerTrim": mat("ReaderTrim", "#3b3e45", 0.4),
     "key": mat("ReaderKey", "#d6d9de", 0.4), "screen": mat("ReaderScreen", "#123a5c", 0.15), "bellBase": mat("BellBase", "#1d1b19", 0.4),
     "mat": mat("DeskMatWood", "#ffffff", 0.6, tex=hinoki_tex), "matEdge": mat("DeskMatEdge", "#b8915c", 0.6), "felt": mat("DeskMatFelt", "#3a3530", 0.9),
     "walnut": mat("StandWalnut", "#ffffff", 0.45, tex=walnut_tex), "walnutEnd": mat("StandWalnutEnd", "#2a1a10", 0.5),
     "brass": mat("StandBrass", "#c9a24a", 0.25, 1.0), "drawerIn": mat("StandDrawerInside", "#6a4a30", 0.7),
     "resin": mat("TrayResin", "#ffffff", 0.35, tex=resin_tex), "resinRib": mat("TrayRib", "#1a1a1c", 0.5), "gilt": mat("TrayGilt", "#d4b25a", 0.3, 0.8),
     "rubber": mat("TrayFoot", "#202020", 0.9),
+    "lcd": mat("ReaderLcd", "#aab3a6", 0.3), "lcdInk": mat("ReaderLcdInk", "#1c2420", 0.5), "card": mat("ReaderCardFace", "#2f7fd0", 0.3),
+    "cardBand": mat("ReaderCardBand", "#7fb6ea", 0.3), "keyRubber": mat("ReaderKeyRubber", "#3a3d42", 0.6),
     "hole": mat("DeskHole", "#060607", 0.6), "holeRing": mat("DeskHoleRing", "#3a3c40", 0.3, 0.8), "cable": mat("DeskCable", "#17171a", 0.4),
     "cableW": mat("DeskCableWhite", "#e9e9ec", 0.4),
     "stone": mat("CatStone", "#ffffff", 0.75, tex=stone_tex),
@@ -289,63 +291,132 @@ pr += hole("Printer", 0.03, -PD / 2 - 0.022)
 nodes.append(node("TillPrinter", pr))
 
 # =====================================================================
-# The card reader: a payment terminal, its face to the customers (-z), lying back on its cradle
+# The card reader: a countertop payment terminal lying on the stand, its keypad and card slot toward the customers (-z), its built-in
+# receipt printer at the back toward the cashier. Its shell rises from the slot at the front up the keypad's gentle slope to the screen,
+# then swells over the paper roll; under the screen two soft keys and the scroll keys; the rubber keypad, each key's figure and letters;
+# F, 0 and the point; the red, yellow and green keys across the foot; a card pushed into the chip slot; the lead out of the back
 # =====================================================================
 cr = []
-cradle = box("ReaderCradle", S(0.08, 0.012, 0.11), P(0, 0.006, 0.0), M["readerTrim"], bev=0.004)
-cr.append(cradle)
-term = bpy.data.objects.new("ReaderTerminal", None)
-bpy.context.collection.objects.link(term)
-# (high enough on its cradle that its low end, tipped back, clears the cradle's top)
-term.location = P(0, 0.012 + 0.015 * math.cos(0.35) + 0.075 * math.sin(0.35) + 0.002, 0)
-term.rotation_euler = (-0.35, 0, math.pi)  # (lying back on its cradle, its face up and turned to the customers)
-tp = []
-RW, RH, RD = 0.074, 0.15, 0.03
-body = box("ReaderBody", S(RW, RD, RH), P(0, 0, 0), M["reader"], bev=0.009)
-tp.append(body)
-FACE = RD / 2
-# the screen at the top of the face, its contactless mark above it; the keys below; the card slot at the foot
-tp.append(box("ReaderScreenBezel", S(RW - 0.012, 0.0008, 0.05), P(0, FACE + 0.0003, -0.035), M["slot"], bev=0.002))
-tp.append(box("ReaderScreen", S(RW - 0.018, 0.0006, 0.042), P(0, FACE + 0.0008, -0.035), M["screen"]))
-tp.append(text("ReaderAmount", "¥ 2,080", 0.008, M["white"], P(0, FACE + 0.0012, -0.042), (-math.pi / 2, 0, math.pi), BOLD))
-tp.append(text("ReaderPrompt", "カードをどうぞ", 0.0042, M["white"], P(0, FACE + 0.0012, -0.026), (-math.pi / 2, 0, math.pi), JA, fit=RW - 0.024))
-for k, rad in enumerate((0.003, 0.0045, 0.006)):
-    arc = cyl(f"ReaderNfc{k}", rad, 0.0003, P(0, FACE + 0.0003, -0.067), M["white"], verts=24)
-    inner = cyl("nfcin", rad - 0.0006, 0.002, P(0, FACE + 0.0003, -0.067), M["white"], verts=24)
-    m_ = arc.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = inner; m_.solver = "EXACT"
-    apply_mods(arc)
-    bpy.data.objects.remove(inner)
-    arc.rotation_euler = (math.pi / 2, 0, 0)
-    tp.append(arc)
-labels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"]
-for i, lab in enumerate(labels):
-    kx = (i % 3 - 1) * 0.019
-    kz = 0.0 + (i // 3) * 0.013
-    tp.append(box(f"ReaderKey{i}", S(0.015, 0.003, 0.009), P(kx, FACE + 0.0015, kz), M["key"], bev=0.0012))
-    tp.append(text(f"ReaderKeyLabel{i}", lab, 0.0055, M["ink"], P(kx, FACE + 0.0031, kz), (-math.pi / 2, 0, math.pi), BOLD))
+RW, RL = 0.082, 0.19                      # its width and length (front -z to back +z)
+FZ, BZ = -RL / 2, RL / 2
+# (the shell's side: (z, top height) from the front to the back)
+SIDE = [(FZ, 0.022), (FZ + 0.012, 0.026), (0.0, 0.036), (0.004, 0.037), (0.046, 0.046), (0.054, 0.052), (0.062, 0.062), (0.078, 0.066), (BZ - 0.004, 0.064), (BZ, 0.058)]
+bm_ = bmesh.new()
+left, right = [], []
+outline = [(FZ, 0.003)] + SIDE + [(BZ, 0.003)]
+for zz, yy in outline:
+    left.append(bm_.verts.new(P(-RW / 2, yy, zz)))
+    right.append(bm_.verts.new(P(RW / 2, yy, zz)))
+bm_.faces.new(left)
+bm_.faces.new(list(reversed(right)))
+n_ = len(outline)
+for i in range(n_):
+    j = (i + 1) % n_
+    bm_.faces.new((left[i], left[j], right[j], right[i]))
+bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+me_ = bpy.data.meshes.new("ReaderBody")
+bm_.to_mesh(me_)
+bm_.free()
+shell = bpy.data.objects.new("ReaderBody", me_)
+bpy.context.collection.objects.link(shell)
+finish(shell, "ReaderBody", M["reader"], smooth_shade=False)
+bevel(shell, 0.007, 4, angle=True)
+apply_mods(shell)
+smooth_angle(shell, 40)
+cr.append(shell)
+# (a softer grey band round its waist, the shell's two halves meeting)
+cr.append(box("ReaderSeamL", S(0.0012, 0.003, RL - 0.02), P(-RW / 2 - 0.0002, 0.012, 0), M["readerTrim"]))
+cr.append(box("ReaderSeamR", S(0.0012, 0.003, RL - 0.02), P(RW / 2 + 0.0002, 0.012, 0), M["readerTrim"]))
+
+
+def top_at(zz):
+    """the shell's top height at z (along the side's line)"""
+    for (z0, y0), (z1, y1) in zip(SIDE, SIDE[1:]):
+        if z0 <= zz <= z1:
+            return y0 + (y1 - y0) * (zz - z0) / (z1 - z0)
+    return SIDE[-1][1]
+
+
+def panel(name, z0, z1):
+    """an empty lying on the shell's top between z0 and z1, tilted to its slope, its local +y up out of the surface (children laid flat on it)"""
+    e = bpy.data.objects.new(name, None)
+    bpy.context.collection.objects.link(e)
+    y0, y1 = top_at(z0), top_at(z1)
+    e.location = P(0, (y0 + y1) / 2 + 0.0004, (z0 + z1) / 2)
+    e.rotation_euler = (-math.atan2(y1 - y0, z1 - z0), 0, 0)
+    return e
+
+
+def on(e, objs):
+    for o in objs:
+        o.parent = e
+    cr.extend(objs)
+    return objs
+
+
+TXT = (0, 0, math.pi)                     # (a text lying flat, reading from the customers' side)
+# (the keypad: the slope from the foot to the screen)
+kp = panel("ReaderKeypad", FZ + 0.012, 0.0)
+cr.append(kp)
+rows = [("1", "QZ"), ("2", "ABC"), ("3", "DEF"), ("4", "GHI"), ("5", "JKL"), ("6", "MNO"), ("7", "PRS"), ("8", "TUV"), ("9", "WXY"),
+        ("F", ""), ("0", ""), (".", "")]
+for i, (lab, sub) in enumerate(rows):
+    kx = (i % 3 - 1) * 0.022
+    kz = 0.031 - (i // 3) * 0.0155          # (in the panel's frame: the first row by the screen, down toward the foot)
+    key = box(f"ReaderKey{i}", S(0.017, 0.0035, 0.0105), P(kx, 0.0017, kz), M["keyRubber"], bev=0.0016)
+    # (the figure on the customer's left of the key, its letters small on the right)
+    lab_o = text(f"ReaderKeyLabel{i}", lab, 0.0058, M["white"], P(kx + (0.003 if sub else 0), 0.0036, kz), TXT, BOLD)
+    objs = [key, lab_o]
+    if sub:
+        objs.append(text(f"ReaderKeySub{i}", sub, 0.0024, M["white"], P(kx - 0.0042, 0.0036, kz - 0.0012), TXT, BOLD))
+    on(kp, objs)
+# (the red, yellow and green keys across the foot: cancel, correct, enter)
 for k, (m_, lab) in enumerate(((M["red"], "×"), (M["yellow"], "<"), (M["keyGreen"], "O"))):
-    kx = (k - 1) * 0.019
-    tp.append(box(f"ReaderFn{k}", S(0.015, 0.003, 0.009), P(kx, FACE + 0.0015, 0.054), m_, bev=0.0012))
-    tp.append(text(f"ReaderFnLabel{k}", lab, 0.006, M["white"], P(kx, FACE + 0.0031, 0.054), (-math.pi / 2, 0, math.pi), BOLD))
-tp.append(box("ReaderChipSlot", S(0.06, 0.004, 0.003), P(0, 0.002, RH / 2 + 0.0002), M["slot"]))
-tp.append(box("ReaderStripe", S(0.002, 0.004, 0.09), P(RW / 2 + 0.0002, 0.0, -0.01), M["slot"]))
-for o in tp:
-    o.parent = term
-# (set it down so its lowest point rests on the cradle's top, and prop its raised end on a wedge-shaped back rest)
-bpy.context.view_layer.update()
-low = min((term.matrix_world @ body.matrix_local @ vv.co).z for vv in body.data.vertices)
-term.location.z += (0.012 + 0.0005) - low
-bpy.context.view_layer.update()
-under = [(term.matrix_world @ body.matrix_local @ vv.co) for vv in body.data.vertices]
-# (the underside's highest point over the cradle, toward the cashier's side (+z three, Blender -y): the rest fills up to it)
-back = max(under, key=lambda q: -q.y)
-rest_h = max(0.004, min(q.z for q in under if q.y < back.y + 0.01) - 0.012)
-cr.append(box("ReaderRest", (0.05, 0.03, rest_h), (0, back.y + 0.012, 0.012 + rest_h / 2), M["readerTrim"], bev=0.002))
-cr.append(term)
-cr += tp
-# (its lead from the cradle's back (the cashier's side), down into the hole behind it)
-cr.append(tube("ReaderCable", [(0.0, 0.008, 0.055), (0.0, 0.006, 0.066), (0.0, 0.002, 0.072), (0.0, -0.01, 0.074)], 0.0024, M["cable"]))
-cr += hole("Reader", 0.0, 0.074)
+    kx = (k - 1) * 0.022
+    on(kp, [box(f"ReaderFn{k}", S(0.018, 0.004, 0.0105), P(-kx, 0.0018, -0.0335), m_, bev=0.0018)])
+# (under the screen: two soft keys at the sides, curved, and the up and down keys between them)
+nav = panel("ReaderNav", 0.004, 0.02)
+cr.append(nav)
+for sx in (-1, 1):
+    on(nav, [box(f"ReaderSoft{sx}", S(0.016, 0.003, 0.007), P(sx * 0.024, 0.0015, 0), M["key"], bev=0.0025)])
+for k, sym in enumerate(("▲", "▼")):
+    on(nav, [box(f"ReaderArrow{k}", S(0.011, 0.003, 0.007), P((k - 0.5) * 0.013, 0.0015, 0), M["key"], bev=0.0022),
+             text(f"ReaderArrowLabel{k}", sym, 0.004, M["ink"], P((k - 0.5) * 0.013, 0.0031, 0), TXT, JA)])
+# (the screen: a grey LCD in a glossy black surround, steeper than the keypad, its figures dark)
+sc = panel("ReaderScreenPanel", 0.022, 0.054)
+cr.append(sc)
+on(sc, [box("ReaderScreenBezel", S(RW - 0.012, 0.0012, 0.032), P(0, 0.0004, 0), M["slot"], bev=0.002),
+        box("ReaderScreen", S(RW - 0.026, 0.0008, 0.022), P(0, 0.0011, 0), M["lcd"]),
+        text("ReaderPrompt", "CREDIT", 0.0042, M["lcdInk"], P(0.017, 0.0017, -0.004), TXT, BOLD),
+        text("ReaderSale", "SALE", 0.0036, M["lcdInk"], P(-0.02, 0.0017, 0.006), TXT, BOLD),
+        text("ReaderAmount", "¥2,080", 0.0062, M["lcdInk"], P(-0.016, 0.0017, -0.004), TXT, BOLD)])
+# (the printer at the back: its lid's seam, the tear bar's slot, a little of the slip showing, the lid's catch)
+pt = panel("ReaderPrinter", 0.07, BZ - 0.006)
+cr.append(pt)
+on(pt, [box("ReaderLidSeam", S(RW - 0.014, 0.0008, 0.0012), P(0, 0.0003, -0.008), M["slot"]),
+        box("ReaderTearSlot", S(RW - 0.02, 0.001, 0.003), P(0, 0.0004, 0.008), M["slot"]),
+        box("ReaderSlip", S(RW - 0.026, 0.006, 0.0006), P(0, 0.003, 0.008), M["paper"], rot=(0.25, 0, 0)),
+        box("ReaderCatch", S(0.012, 0.0012, 0.004), P(0, 0.0008, -0.014), M["readerTrim"], bev=0.0006)])
+# (the chip slot at the foot, and a card pushed into it, standing out toward the customer)
+cr.append(box("ReaderChipSlot", S(0.062, 0.004, 0.003), P(0, 0.012, FZ - 0.0002), M["slot"]))
+card = bpy.data.objects.new("ReaderCard", None)
+bpy.context.collection.objects.link(card)
+card.location = P(0, 0.012, FZ + 0.012)
+card.rotation_euler = (-0.06, 0, 0)
+cd_ = [box("ReaderCardBody", S(0.054, 0.0008, 0.086), P(0, 0, -0.043), M["card"], bev=0.0012),
+       box("ReaderCardBand", S(0.054, 0.0004, 0.012), P(0, 0.0005, -0.07), M["cardBand"]),
+       text("ReaderCardWord", "DEBIT", 0.0042, M["white"], P(-0.012, 0.0008, -0.078), TXT, BOLD),
+       text("ReaderCardBank", "BANK", 0.0048, M["white"], P(0.012, 0.0008, -0.058), TXT, BOLD)]
+for o in cd_:
+    o.parent = card
+cr.append(card)
+cr += cd_
+# (felt feet, and its lead out of the back, down into the hole behind it)
+for sx in (-1, 1):
+    for sz in (-1, 1):
+        cr.append(cyl(f"ReaderFoot{sx}{sz}", 0.005, 0.002, P(sx * (RW / 2 - 0.012), 0.001, sz * (RL / 2 - 0.02)), M["felt"], verts=12))
+cr.append(tube("ReaderCable", [(0.0, 0.014, BZ - 0.002), (0.0, 0.012, BZ + 0.008), (0.0, 0.004, BZ + 0.014), (0.0, -0.01, BZ + 0.016)], 0.0024, M["cable"]))
+cr += hole("Reader", 0.0, BZ + 0.016)
 nodes.append(node("TillCardReader", cr))
 
 # =====================================================================
@@ -434,9 +505,9 @@ nodes.append(node("TillMat", mt))
 # so coins don't slide and can be picked up, ありがとうございました lettered in gold on the floor along the near edge, four rubber feet under
 # =====================================================================
 tr = []
-TW2, TD2, TH2 = 0.21, 0.15, 0.022
-outer = box("TillTrayBody", S(TW2, TH2, TD2), P(0, TH2 / 2, 0), M["resin"], bev=0.018)
-well = box("well", S(TW2 - 0.018, TH2, TD2 - 0.018), P(0, TH2 / 2 + 0.004, 0), M["resin"], bev=0.016)
+TW2, TD2, TH2 = 0.21, 0.15, 0.013
+outer = box("TillTrayBody", S(TW2, TH2, TD2), P(0, TH2 / 2, 0), M["resin"], bev=0.0105)
+well = box("well", S(TW2 - 0.012, TH2, TD2 - 0.012), P(0, TH2 / 2 + 0.0024, 0), M["resin"], bev=0.0095)
 m_ = outer.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = well; m_.solver = "EXACT"
 apply_mods(outer)
 bpy.data.objects.remove(well)
@@ -448,7 +519,7 @@ ribs = []
 for k in range(-12, 13):
     for sgn in (-1, 1):
         L = 0.3
-        r_ = box(f"rib{k}{sgn}", S(0.0012, 0.0012, L), P(k * 0.012, 0.0046, 0), M["resinRib"], rot=(0, 0, sgn * math.radians(45)))
+        r_ = box(f"rib{k}{sgn}", S(0.0012, 0.001, L), P(k * 0.012, 0.0029, 0), M["resinRib"], rot=(0, 0, sgn * math.radians(45)))
         ribs.append(r_)
 bpy.ops.object.select_all(action="DESELECT")
 for r_ in ribs:
@@ -457,12 +528,12 @@ bpy.context.view_layer.objects.active = ribs[0]
 bpy.ops.object.join()
 lattice = active()
 lattice.name = "TillTrayRibs"
-clip = box("clip", S(FW, 0.02, FD), P(0, 0.0046, 0), M["resinRib"], bev=0.01)
+clip = box("clip", S(FW, 0.02, FD), P(0, 0.0029, 0), M["resinRib"], bev=0.01)
 m_ = lattice.modifiers.new("clip", "BOOLEAN"); m_.operation = "INTERSECT"; m_.object = clip; m_.solver = "EXACT"
 apply_mods(lattice)
 bpy.data.objects.remove(clip)
 tr.append(lattice)
-tr.append(text("TillTrayThanks", "ありがとうございました", 0.0068, M["gilt"], P(0, 0.0043, FD / 2 + 0.0075), (0, 0, 0), JA, fit=TW2 - 0.075))
+tr.append(text("TillTrayThanks", "ありがとうございました", 0.0068, M["gilt"], P(0, 0.0027, FD / 2 + 0.0075), (0, 0, 0), JA, fit=TW2 - 0.075))
 for sx in (-1, 1):
     for sz in (-1, 1):
         tr.append(cyl(f"TillTrayFoot{sx}{sz}", 0.006, 0.0016, P(sx * (TW2 / 2 - 0.02), -0.0008, sz * (TD2 / 2 - 0.02)), M["rubber"], verts=16))

@@ -14,7 +14,7 @@ export type DeskPiece = 'TillPens' | 'TillPrinter' | 'TillCardReader' | 'TillBel
 /** how high the cat's stand lifts the cat: the stone's worn-flat top */
 export const CAT_STAND_H = 0.108
 /** the parts too small or too flat for an ink line: lettering, lights, slots, teeth, keys, cables and holes */
-const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever|Key|Fn|Nfc|Stripe|Screen|Cable|Hole|Clip|Cap|Felt|Band|Floor|Stem|Knob|Slip|Rim|Blades|Ribs|Thanks|Foot|Post|Pull|Box)/
+const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever|Key|Fn|Nfc|Stripe|Screen|Cable|Hole|Clip|Cap|Felt|Band|Floor|Stem|Knob|Slip|Rim|Blades|Ribs|Thanks|Foot|Post|Pull|Box|Sub|Seam|Arrow|Card|Lid|Tear|Catch)/
 const METAL = new Set(['DeskChrome', 'DeskSteel', 'BellGold', 'StandBrass', 'TrayGilt'])
 
 let pieces: Record<DeskPiece, THREE.Object3D> | null = null
@@ -29,8 +29,8 @@ function piecesOf(scene: THREE.Group) {
     let t = mats.get(src)
     if (!t) {
       t = src.name === 'TrayResin'
-        // (the change tray's black resin: a soft gloss)
-        ? new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.25 })
+        // (the change tray's moulded plastic: a smooth, fairly glossy black, the lamps sliding over it)
+        ? new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.2, clearcoat: 0.9, clearcoatRoughness: 0.12, specularIntensity: 0.8, sheen: 0.3, sheenRoughness: 0.4 })
         : METAL.has(src.name)
         ? src.name === 'BellGold'
           // (polished brass: a warm gold that catches the lamps)

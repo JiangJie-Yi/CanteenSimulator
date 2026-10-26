@@ -75,8 +75,6 @@ paper_tex = image("windowpaper", mix(mix((0.86, 0.55, 0.26), (1.0, 0.93, 0.78), 
 lv = gv
 wash = np.clip(np.exp(-lv / 0.16) + 0.75 * np.exp(-(1 - lv) / 0.14) + 0.18, 0, 1)
 bamboo_glow_tex = image("bambooglow", mix((0.12, 0.06, 0.02), (1.0, 0.8, 0.5), wash))
-# (the partition's washi: cream, its fibres faint)
-washi_tex = image("washi", mix((0.96, 0.93, 0.85), (0.9, 0.85, 0.74), smooth(0.6, 0.95, fbm(256, 12, 12, 4)) * 0.6))
 # (the window's ring and lattice: a pale keyaki, its grain showing)
 kg = fbm(256, 2, 46, 5)
 keyaki_tex = image("keyaki", mix((0.78, 0.6, 0.4), (0.64, 0.46, 0.29), smooth(0.35, 0.8, kg)))
@@ -97,7 +95,7 @@ M = {
     "paper": pbr("TillWindowPaper", (1, 1, 1), tex=paper_tex, rough=0.9, emit=(1, 0.85, 0.6), emit_strength=1.5),
     "bambooGlow": pbr("TillBambooGlow", (1, 1, 1), tex=bamboo_glow_tex, rough=1.0, emit=(1, 0.8, 0.5), emit_strength=1.0),
     "walnut": pbr("TillShieldWalnut", (1, 1, 1), tex=walnut_tex, rough=0.4),
-    "paper": pbr("TillShieldPaper", (1, 1, 1), tex=washi_tex, rough=0.9),
+    "slatBack": pbr("TillShieldBack", (1, 1, 1), tex=batten_tex, rough=0.6),
     "shoe": pbr("TillShieldShoe", lin("#2a2622"), rough=0.35, metal=0.6),
     "bamboo": pbr("TillBamboo", (1, 1, 1), tex=bamboo_tex, rough=0.35),
     **{f"bamboo{i}": pbr(f"TillBamboo{i}", (1, 1, 1), tex=bamboo_tex, rough=0.35) for i in range(5)},
@@ -342,10 +340,10 @@ uv_box(top, 1.4)
 nodes.append(node("TillCounterTop", [top]))
 
 # =====================================================================
-# The partition: shoji in walnut, along the customers' side (from a little in from its left end) and down the end by the cats to the cashier's
+# The partition: walnut, along the customers' side (from a little in from its left end) and down the end by the cats to the cashier's
 # edge. A dark bronze shoe where it meets the marble, a bottom and a top rail, posts at each end and corner and every so often between,
-# and between them washi paper in a sparse lattice (like the toilets' sliding doors), a capping rail along the top with its edges eased; round
-# posts at the two open ends
+# and between them fine vertical slats (立て格子) over a pale hinoki board, a capping rail along the top with its edges eased; round posts
+# at the two open ends
 # =====================================================================
 sh = []
 SH = 0.26                                  # its height above the top
@@ -430,8 +428,8 @@ sh.append(cyl("TillPostCorner", FT / 2 + 0.006, YT - Y0, P(mid[0], (Y0 + YT) / 2
 
 
 def straight(x0, z0, x1, z1, tag):
-    """one straight run (from its open end to where the corner's curve begins): the washi between the rails, the sparse lattice over it on
-    both faces, and the square posts along it (none at the open end: the round post is there)"""
+    """one straight run (from its open end to where the corner's curve begins): the pale hinoki board between the rails, the fine walnut
+    slats (立て格子) standing on both faces of it, and the square posts along it (none at the open end: the round post is there)"""
     L = math.hypot(x1 - x0, z1 - z0)
     ux, uz = (x1 - x0) / L, (z1 - z0) / L
     rot = (0, 0, -math.atan2(uz, ux))
@@ -441,33 +439,31 @@ def straight(x0, z0, x1, z1, tag):
         sh.append(box(f"TillPost{tag}{i}", S(0.03, YT - Y0, FT + 0.004), at(L * i / n, (Y0 + YT) / 2), M["walnut"], bev=0.003, rot=rot, uv=0.4))
     ph = YT - Y0 - 2 * RAIL
     pc = Y0 + RAIL + ph / 2
-    sh.append(box(f"TillPaper{tag}", S(L, ph, 0.003), at(L / 2, pc), M["paper"], rot=rot, uv=0.4))
-    # (the lattice: upright bars about every 9 cm, two cross bars, on each face of the paper)
-    m = max(2, round(L / 0.09))
-    for side in (-1, 1):
-        off = side * 0.004
-        for i in range(1, m):
-            sh.append(box(f"TillBar{tag}V{i}{'ab'[side > 0]}", S(0.012, ph, 0.006), at(L * i / m, pc, off), M["walnut"], bev=0.0012, rot=rot, uv=0.4))
-        for k in (1, 2):
-            sh.append(box(f"TillBar{tag}H{k}{'ab'[side > 0]}", S(L, 0.012, 0.006), at(L / 2, Y0 + RAIL + ph * k / 3, off), M["walnut"], bev=0.0012, rot=rot, uv=0.4))
+    sh.append(box(f"TillBack{tag}", S(L, ph, 0.006), at(L / 2, pc), M["slatBack"], rot=rot, uv=0.4))
+    m = int((L - 0.03) / 0.021)
+    for i in range(m):
+        t = 0.03 + (L - 0.04) * (i + 0.5) / m
+        for side in (-1, 1):
+            sh.append(box(f"TillSlat{tag}{i}{'ab'[side > 0]}", S(0.011, ph, 0.007), at(t, pc, side * 0.007), M["walnut"], bev=0.0015, rot=rot, uv=0.4))
 
 
 straight(XL, ZF, XE - RC, ZF, "F")
 straight(XE, ZB, XE, ZF + RC, "E")
-# (round the corner too: the paper in short pieces following the curve, the cross bars with it, so the run never breaks)
+# (round the corner too: the board behind in short pieces following the curve, and the slats on it, so the run never breaks)
 arc = path()[1:16]
 ph = YT - Y0 - 2 * RAIL
 pc = Y0 + RAIL + ph / 2
 for i in range(len(arc) - 1):
     (ax, az), (bx, bz) = arc[i], arc[i + 1]
     L = math.hypot(bx - ax, bz - az)
-    rot = (0, 0, -math.atan2(bz - az, bx - ax))
-    nx, nz = -(bz - az) / L, (bx - ax) / L
-    sh.append(box(f"TillPaperC{i}", S(L + 0.002, ph, 0.003), P((ax + bx) / 2, pc, (az + bz) / 2), M["paper"], rot=rot, uv=0.4))
+    sh.append(box(f"TillBackC{i}", S(L + 0.002, ph, 0.006), P((ax + bx) / 2, pc, (az + bz) / 2), M["slatBack"], rot=(0, 0, -math.atan2(bz - az, bx - ax)), uv=0.4))
+for k in range(1, 4):
+    a_ = math.radians(-90 + 90 * k / 4)
+    tx, tz = -math.sin(a_), math.cos(a_)
     for side in (-1, 1):
-        for k in (1, 2):
-            sh.append(box(f"TillBarCH{i}{k}{'ab'[side > 0]}", S(L + 0.002, 0.012, 0.006), P((ax + bx) / 2 + nx * side * 0.004, Y0 + RAIL + ph * k / 3, (az + bz) / 2 + nz * side * 0.004),
-                          M["walnut"], rot=rot, uv=0.4))
+        r_ = RC - side * 0.007
+        sh.append(box(f"TillSlatC{k}{'ab'[side > 0]}", S(0.011, ph, 0.007), P(XE - RC + r_ * math.cos(a_), pc, ZF + RC + r_ * math.sin(a_)), M["walnut"], bev=0.0015,
+                      rot=(0, 0, -math.atan2(tz, tx)), uv=0.4))
 nodes.append(node("TillShield", sh))
 
 root = bpy.data.objects.new("TillCounter", None)
