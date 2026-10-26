@@ -17,7 +17,7 @@ import sys
 import bmesh
 import bpy
 import numpy as np
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import *  # noqa: E402,F403
@@ -56,6 +56,20 @@ marble = mix(mix((0.95, 0.95, 0.94), (0.86, 0.86, 0.87), cloud * 0.6), (0.48, 0.
 marble_tex = image("marble", marble)
 g2 = fbm(256, 2, 50, 4)
 batten_tex = image("batten", mix((0.8, 0.62, 0.4), (0.7, 0.52, 0.32), smooth(0.4, 0.8, g2)))
+def flatsawn(n, light, dark, line, rings=11.0, seed_u=0.5):
+    """a flat-sawn board's face: growth rings cut through at a slant, so they come out as nested arches and long ellipses along the board
+    (u across it, v along it), wavering; the latewood a fine darker line in each, pores flecked along the grain"""
+    uu, vv = grid01(n)
+    wob = fbm(n, 3, 3, 4) - 0.5
+    d = np.sqrt(((uu - seed_u) * 3.2 + wob * 0.5) ** 2 + ((vv + 0.35) * 0.9 + wob * 0.25) ** 2)
+    ring = (d * rings + fbm(n, 2, 6, 3) * 0.8) % 1.0
+    late = smooth(0.72, 0.9, ring) * (1 - smooth(0.9, 1.0, ring))
+    body = mix(light, dark, smooth(0.15, 0.85, ring) * 0.55)
+    body = mix(body, line, late * 0.75)
+    pores = (fbm(n, 70, 4, 3) > 0.62).astype(np.float32)
+    return mix(body, line, pores * 0.18)
+
+
 # (green bamboo: a fresh green, paler streaks running along the culm, a faint bloom)
 bu, bv = grid01(256)
 streak = fbm(256, 40, 2, 4)
@@ -76,11 +90,15 @@ lv = gv
 wash = np.clip(np.exp(-lv / 0.16) + 0.75 * np.exp(-(1 - lv) / 0.14) + 0.18, 0, 1)
 bamboo_glow_tex = image("bambooglow", mix((0.12, 0.06, 0.02), (1.0, 0.8, 0.5), wash))
 # (the window's ring and lattice: a pale keyaki, its grain showing)
-kg = fbm(256, 2, 46, 5)
-keyaki_tex = image("keyaki", mix((0.78, 0.6, 0.4), (0.64, 0.46, 0.29), smooth(0.35, 0.8, kg)))
+kg = fbm(512, 3, 40, 5)
+kl = (np.sin((grid01(512)[1] * 34 + fbm(512, 4, 3, 4) * 3.0) * math.pi * 2) * 0.5 + 0.5)
+keyaki = mix(mix((0.8, 0.62, 0.42), (0.68, 0.49, 0.31), smooth(0.3, 0.85, kg)), (0.5, 0.34, 0.2), smooth(0.8, 1.0, kl) * 0.55)
+keyaki_tex = image("keyaki", mix(keyaki, (0.5, 0.34, 0.2), (fbm(512, 60, 3, 3) > 0.64).astype(np.float32) * 0.15))
+# (the lattice and anything boxy in keyaki: the same wood, flat-sawn)
+keyaki_flat_tex = image("keyakiflat", flatsawn(512, (0.8, 0.63, 0.43), (0.7, 0.52, 0.33), (0.48, 0.32, 0.19), rings=9.0))
 # (the partition: walnut for its frame and slats, a pale hinoki board behind the slats)
 pg = fbm(256, 3, 70, 5)
-walnut_tex = image("walnut", mix(mix((0.2, 0.12, 0.07), (0.3, 0.19, 0.11), smooth(0.3, 0.75, pg)), (0.13, 0.08, 0.05), smooth(0.7, 0.95, fbm(256, 2, 18, 4)) * 0.6))
+walnut_tex = image("walnut", flatsawn(512, (0.36, 0.23, 0.14), (0.24, 0.15, 0.09), (0.12, 0.07, 0.04)))
 dark_tex = image("darkwood", mix((0.25, 0.17, 0.11), (0.2, 0.13, 0.08), fbm(256, 2, 40, 4)))
 
 M = {
@@ -102,7 +120,7 @@ M = {
     "node": pbr("TillBambooNode", lin("#4e5a22"), rough=0.5),
     "lip": pbr("TillBambooLip", lin("#a8c468"), rough=0.4),
     "rope": pbr("TillRope", lin("#1c140e"), rough=0.9),
-    "lattice": pbr("TillLattice", (1, 1, 1), tex=keyaki_tex, rough=0.5),
+    "lattice": pbr("TillLattice", (1, 1, 1), tex=keyaki_flat_tex, rough=0.5),
 }
 
 
@@ -184,14 +202,14 @@ WY = H / 2 + 0.03
 bpy.ops.mesh.primitive_torus_add(major_radius=0.213, minor_radius=0.017, major_segments=64, minor_segments=12, location=P(W / 2 - 0.016, WY, 0.02), rotation=(0, math.pi / 2, 0))
 ring = active()
 finish(ring, "TillWindowRing", M["ring"])
-uv_box(ring, 0.3)
 bd.append(ring)
 sleeve = cyl("TillWindowSleeve", 0.201, 0.05, P(W / 2 - 0.045, WY, 0.02), M["ring"], rot=(0, math.pi / 2, 0), verts=64)
 inner_ = cyl("sl", 0.193, 0.06, P(W / 2 - 0.045, WY, 0.02), M["ring"], rot=(0, math.pi / 2, 0), verts=64)
 m_ = sleeve.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = inner_; m_.solver = "EXACT"
 apply_mods(sleeve)
 bpy.data.objects.remove(inner_)
-uv_box(sleeve, 0.3)
+bpy.ops.object.select_all(action="DESELECT"); sleeve.select_set(True); bpy.context.view_layer.objects.active = sleeve
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cylinder_project(); bpy.ops.object.mode_set(mode="OBJECT")
 bd.append(sleeve)
 # (the paper, set back near the inside face of the end: lit from within, a lantern's glow, not a light thrown outward)
 paper = cyl("TillWindowPaper", 0.196, 0.003, P(W / 2 - 0.066, WY, 0.02), M["paper"], rot=(0, math.pi / 2, 0), verts=64)
@@ -299,7 +317,16 @@ bd.append(finish(glow, "TillBambooGlow", M["bambooGlow"], smooth_shade=False))
 # (two bamboo rails across the front, tied to every third culm with black palm rope)
 RZ = min(z for _, _, z in culms) - 0.021 - 0.012
 for yy in (0.17, TOP - 0.17):
-    bd.append(cyl(f"TillBambooRail{int(yy * 100)}", 0.011, W - 0.07, P(0, yy, RZ), M["bamboo"], rot=(0, math.pi / 2, 0), verts=14))
+    RL_ = W - 0.07
+    first = float(brng.uniform(0.04, 0.12))
+    nodes_r = [-RL_ / 2 + first + n * float(brng.uniform(0.19, 0.24)) for n in range(6)]
+    rail = culm(f"TillBambooRail{int(yy * 100)}", 0.0, 0.0115, -RL_ / 2, RL_, 0.0, 0.0, float(brng.uniform(0.002, 0.004)), float(brng.uniform(0, 1)),
+                [n for n in nodes_r if n < RL_ / 2 - 0.03], (0.05, float(brng.uniform(0.3, 0.5)), float(brng.uniform(0, 6.28))), int(brng.integers(0, 5)))
+    # (built standing, laid along the face: turned so its length runs along x, then set in place)
+    lay_ = Matrix.Translation(Vector(P(0, yy, RZ))) @ Matrix.Rotation(math.pi / 2, 4, "Y")
+    for o in rail:
+        o.matrix_world = lay_ @ o.matrix_world
+    bd += rail
     for i, (cx, r, z) in enumerate(culms):
         if i % 3:
             continue
@@ -440,15 +467,33 @@ def straight(x0, z0, x1, z1, tag):
     ph = YT - Y0 - 2 * RAIL
     pc = Y0 + RAIL + ph / 2
     sh.append(box(f"TillBack{tag}", S(L, ph, 0.006), at(L / 2, pc), M["slatBack"], rot=rot, uv=0.4))
-    m = int((L - 0.03) / 0.021)
-    for i in range(m):
-        t = 0.03 + (L - 0.04) * (i + 0.5) / m
-        for side in (-1, 1):
-            sh.append(box(f"TillSlat{tag}{i}{'ab'[side > 0]}", S(0.011, ph, 0.007), at(t, pc, side * 0.007), M["walnut"], bev=0.0015, rot=rot, uv=0.4))
+    return [L * i / n for i in range(1, n)]
 
 
-straight(XL, ZF, XE - RC, ZF, "F")
-straight(XE, ZB, XE, ZF + RC, "E")
+LF = (XE - RC) - XL
+LE = ZB - (ZF + RC)
+LA = RC * math.pi / 2
+posts_f = straight(XL, ZF, XE - RC, ZF, "F")
+posts_e = straight(XE, ZB, XE, ZF + RC, "E")
+# (where the posts stand, as distances along the whole line: the slats keep clear of them)
+TOTAL = LF + LA + LE
+POSTS = [0.0, TOTAL, LF + LA / 2] + posts_f + [TOTAL - t for t in posts_e]
+LINE = path(n_arc=60)
+SEGS = []
+acc = 0.0
+for (ax, az), (bx, bz) in zip(LINE, LINE[1:]):
+    L = math.hypot(bx - ax, bz - az)
+    SEGS.append((acc, L, ax, az, (bx - ax) / L, (bz - az) / L))
+    acc += L
+
+
+def along(t):
+    """the point and the direction at distance t along the line"""
+    for a0, L, ax, az, ux, uz in SEGS:
+        if t <= a0 + L or (a0, L) == SEGS[-1][:2]:
+            k = t - a0
+            return ax + ux * k, az + uz * k, ux, uz
+    return LINE[-1][0], LINE[-1][1], 0.0, 1.0
 # (round the corner too: the board behind in short pieces following the curve, and the slats on it, so the run never breaks)
 arc = path()[1:16]
 ph = YT - Y0 - 2 * RAIL
@@ -457,13 +502,19 @@ for i in range(len(arc) - 1):
     (ax, az), (bx, bz) = arc[i], arc[i + 1]
     L = math.hypot(bx - ax, bz - az)
     sh.append(box(f"TillBackC{i}", S(L + 0.002, ph, 0.006), P((ax + bx) / 2, pc, (az + bz) / 2), M["slatBack"], rot=(0, 0, -math.atan2(bz - az, bx - ax)), uv=0.4))
-for k in range(1, 4):
-    a_ = math.radians(-90 + 90 * k / 4)
-    tx, tz = -math.sin(a_), math.cos(a_)
-    for side in (-1, 1):
-        r_ = RC - side * 0.007
-        sh.append(box(f"TillSlatC{k}{'ab'[side > 0]}", S(0.011, ph, 0.007), P(XE - RC + r_ * math.cos(a_), pc, ZF + RC + r_ * math.sin(a_)), M["walnut"], bev=0.0015,
-                      rot=(0, 0, -math.atan2(tz, tx)), uv=0.4))
+# (the slats: every 2.1 cm along the line from one end to the other, through the corner without a break, none where a post stands)
+STEP = 0.021
+t = 0.03
+i = 0
+while t < acc - 0.03:
+    if all(abs(t - q) > 0.024 for q in POSTS):
+        px, pz, ux, uz = along(t)
+        for side in (-1, 1):
+            off = side * 0.007
+            sh.append(box(f"TillSlat{i}{'ab'[side > 0]}", S(0.011, ph, 0.007), P(px - uz * off, pc, pz + ux * off), M["walnut"], bev=0.0015,
+                          rot=(0, 0, -math.atan2(uz, ux)), uv=0.4))
+        i += 1
+    t += STEP
 nodes.append(node("TillShield", sh))
 
 root = bpy.data.objects.new("TillCounter", None)

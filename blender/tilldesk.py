@@ -63,10 +63,19 @@ hinoki_tex = image("hinoki2", hinoki)
 # (the cat's stone: a grey river stone, mottled, a few pale flecks)
 stone = mix(mix((0.22, 0.22, 0.21), (0.36, 0.35, 0.33), fbm(N, 5, 5, 5)), (0.7, 0.68, 0.64), (rng.random((N, N)) > 0.97).astype(np.float32) * 0.6)
 stone_tex = image("catstone", stone)
-# (the stand's walnut: a deep brown, its grain long and wavering, darker figure through it)
-wg = fbm(N, 3, 70, 5)
-walnut = mix(mix((0.2, 0.12, 0.07), (0.3, 0.19, 0.11), smooth(0.3, 0.75, wg)), (0.13, 0.08, 0.05), smooth(0.7, 0.95, fbm(N, 2, 18, 4)) * 0.6)
-walnut_tex = image("walnut", walnut)
+# (the stand's walnut, flat-sawn: its growth rings cut through at a slant come out as nested arches and long ellipses, wavering, the latewood
+# a fine darker line, the pores flecked along the grain)
+def flatsawn(n, light, dark, line, rings=11.0, seed_u=0.5):
+    uu, vv = grid01(n)
+    wob = fbm(n, 3, 3, 4) - 0.5
+    d = np.sqrt(((uu - seed_u) * 3.2 + wob * 0.5) ** 2 + ((vv + 0.35) * 0.9 + wob * 0.25) ** 2)
+    ring = (d * rings + fbm(n, 2, 6, 3) * 0.8) % 1.0
+    late = smooth(0.72, 0.9, ring) * (1 - smooth(0.9, 1.0, ring))
+    body = mix(mix(light, dark, smooth(0.15, 0.85, ring) * 0.55), line, late * 0.75)
+    return mix(body, line, (fbm(n, 70, 4, 3) > 0.62).astype(np.float32) * 0.18)
+
+
+walnut_tex = image("walnut", flatsawn(512, (0.42, 0.27, 0.16), (0.3, 0.19, 0.11), (0.15, 0.09, 0.05)))
 # (the change tray's floor: a black resin, a faint sheen in its texture)
 resin_tex = image("resin", mix((0.05, 0.05, 0.055), (0.09, 0.085, 0.09), fbm(N, 20, 20, 3)))
 
