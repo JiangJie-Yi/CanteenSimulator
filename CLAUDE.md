@@ -76,7 +76,8 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **三個視角**：攝影機 1＝研製（鎖定）、攝影機 2＝編輯模式（總覽、自由拖）、攝影機 3＝自由視角（閉店預設）。
 - **自由**（閉店預設，攝影機 3）：視角自由，**右邊沒有任何介面**（菜單板與收合鈕只在研製或營業時出現）；沒有手動烤魚。**研製**：閉店時按右上角圓形綠色「研」鈕切入（再按離開），視角固定在**攝影機 1**，手動夾食物、調味、看每塊的烤魚進度（`roast-tag`）、食材冷藏櫃（`ui/Menu.tsx` 的 `bin`，在畫面右側，每格點一下拿一份試做、+1／+10 叫貨、補 = 補到 `PAR`）。**營業**（店開著）：廚房自己烤（AI 主廚永遠工作，雇的員工一起），沒有手動烤魚與調味、沒有進度標籤、沒有冷藏櫃；開店會自動離開研製。規則都在 `game/mode.ts`（`modeOf(shopOpen, research)`、`canCookByHand`、`showsProgress`、`showsStockFridge`、`holdsCameraOne`；BDD 情境 `tests/bdd/mode.test.ts`）。
 - 研製時：點冷藏櫃拿的食材**直接出現在大砧板（`tray`）上**（`Piece.fresh`，不從火堆滑過去）；烤好夾起的食物**一律放進桌上的試吃碗**（`bowl-0`、`TasteBowl`、`inBowl`，排法同盤子）。
-- **攝影機 1**：預設是該道菜的 home 視角（`App.tsx` 的 home），可在編輯模式選「攝影機 1（研製視角）」調位置與旋轉（`scene/camera1.ts`；畫成攝影機加視錐，由 `CameraRig` 畫）；編輯模式本身視角是自由的，離開後回到原本的模式。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
+- **攝影機 1**：該道菜的 home 視角（`App.tsx` 的 home），研製時鎖在這裡；編輯模式不再能調整它（`scene/camera1.ts` 的偏移仍會讀，但沒有編輯介面）。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
+- **視角選單**（左下眼睛鈕）：`data/views.ts` 的 `VIEW_SPOTS`：灶台區、自由視角、玄關區、櫃檯區、神龕區、冷藏櫃區、廁所區、後台區；各區看向一個具名群組（`look-door`、`TillMarble`、`look-altar`、`look-freezer`、`look-wc-m`、`look-back`），鏡頭從房間中央那一側、往後 `back`、往上 `up` 看過去（`App.tsx` 的 `aimPos`/`aimTarget`）。編輯模式在每個區的位置標出同樣的編號（`ViewMarkers`，像 Sketchfab 的註記），滑鼠移上去顯示名稱與說明，點一下鏡頭就飛過去。
 - **編輯模式只做編輯**：場景裡所有互動（夾食物、添炭、調味、澆水、收銀抽屜、廁所門、飲料櫃門、神棚、飯桶蓋、盤子拖曳）都擋掉（Roasting 的 `locked`、各元件的 `getEdit().on`、App 對 `.canvas-layer` 的 click 攔截）。
 - 桌上的**行燈、團扇**用 `<Movable>` 包起來；**大砧板（`cutboard`）、調味盒（`seasoning`）、水桶（`bucket`）**是由桌面的 nudge（`moved`）定位的，編輯模式用 `EditProxy`（不畫出來的同尺寸方塊）給框與箭頭，位移量會加進 nudge（食物、鍋具、水瓢跟著走）；這三件只有位移有效，旋轉與縮放沒有作用。
 - **能互動的東西都要有名稱標籤**：滑鼠移上去，游標旁出現和備長炭同款的紙標籤（名字＋做法）。3D 物件用 `shops/grill/bar.ts` 的 `tipOver(名稱, 提示)` 取代 `handOver`（會發亮、變手指、設標籤）；標籤的狀態在 `scene/hoverTip.ts`，由 `ui/HoverTip.tsx` 畫（編輯模式隱藏）。不能放在 `StaticBatch` 裡（合併後沒有事件）；門這類小目標用一片透明的感應面（見 `ToiletHit`）。目前沒有標籤的：招財貓、客人、食材冷藏櫃的蓋子（沒有互動）。

@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { IndoorHDRI } from '@/scene/IndoorHDRI'
 import { FpsMeter } from '@/scene/FpsMeter'
-import { ContactShadows, Loader, OrbitControls, useGLTF } from '@react-three/drei'
+import { ContactShadows, Html, Loader, OrbitControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { nameIn, UI, type Lang } from '@/data/i18n'
@@ -30,8 +30,7 @@ import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
-import { offsetOf, registerMovable, rotationOf, select, setEditLang, setFrame, toggleEdit, useEdit } from '@/shops/grill/edit'
-import { AxisGizmo, focusCamera } from '@/shops/grill/Movable'
+import { offsetOf, rotationOf, setEditLang, toggleEdit, useEdit } from '@/shops/grill/edit'
 import { ALONG, LAY } from '@/shops/grill/bar'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
@@ -55,6 +54,7 @@ import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { Grill2D } from '@/shops/grill/Grill2D'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
+import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
 
 // distance between dishes on the carousel
 const SPACING = 6
@@ -268,8 +268,10 @@ type SceneProps = {
   onSay: (who: 'chef' | 'guest', text: string) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
-  /** the eye button's second view, on: the whole shop from above at 45 degrees */
-  overview: boolean
+  /** which view the eye button's menu has chosen: the grill's own, the whole shop from above, or one of the shop's parts (data/views) */
+  view: ViewId
+  /** a view chosen from its numbered marker in edit mode */
+  onView: (v: ViewId) => void
   onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull') => void
   lang: Lang
   chefOf: (dishId: string) => Chef
@@ -291,10 +293,6 @@ type SceneProps = {
 
 /** the shop's own waiter, there when no one's been hired for the floor: the cooked food is always carried to the customers, never tossed over the bar */
 const HOUSE_SERVER: CrewMember = { id: 'house-server', role: 'server', look: { female: false, age: 'middle' } }
-/**
- * Camera 1 as it's drawn in edit mode: a small camera body with a lens, and the pyramid of what it sees, standing where the view is held (see Scene), so it
- * can be picked from the list or by a click, moved with the arrows, turned with the rings (a turn about the vertical, a tilt) and its numbers typed.
- */
 /**
  * The world axes in a corner of the screen while editing, as a modelling program has them: the room's own X (along the bar, red), Y (up, green) and
  * Z (across it, blue), turned with the camera, so a piece's X, Y, Z fields can be read against the view. It writes into the SVG that App draws.
@@ -322,70 +320,35 @@ function AxisWidget() {
   return null
 }
 
-function CameraRig({ home, target }: { home: { current: THREE.Vector3 }; target: THREE.Vector3 }) {
-  const { selected, offsets, rotations } = useEdit()
-  void offsets; void rotations
-  const camera = useThree((s) => s.camera)
-  const controls = useThree((s) => s.controls) as unknown as Parameters<typeof focusCamera>[1]
-  const pose = cameraOneOf(home.current, target, offsetOf('camera1'), rotationOf('camera1'))
-  const body = useRef<THREE.Group>(null)
-  const poseRef = useRef(pose)
-  poseRef.current = pose
-  useLayoutEffect(() => {
-    const g = body.current
-    if (!g) return
-    g.position.copy(pose.position)
-    g.lookAt(pose.target)
-  })
-  useEffect(() => {
-    // (its numbers are in the room's own axes, like everything else's)
-    setFrame('camera1', Math.atan2(ALONG.x, ALONG.z))
-    return registerMovable('camera1', '攝影機 1（研製視角）', () => focusCamera(camera, controls, poseRef.current.position))
-  }, [camera, controls])
-  const hit = selected === 'camera1'
-  const COL = hit ? '#8fd0ff' : '#3fa9ff'
-  // (the pyramid of the view: from the lens out to 1.4 ahead, a rectangle there)
-  const lines = useMemo(() => {
-    const L = 1.4, w = 0.62, h = 0.36
-    const c = [[-w, -h], [w, -h], [w, h], [-w, h]]
-    const pts: number[] = []
-    for (let i = 0; i < 4; i++) {
-      pts.push(0, 0, 0.12, c[i][0], c[i][1], L)
-      pts.push(c[i][0], c[i][1], L, c[(i + 1) % 4][0], c[(i + 1) % 4][1], L)
-    }
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
-    return g
-  }, [])
-  const pick = (e: { stopPropagation: () => void }) => { e.stopPropagation(); select('camera1') }
+/**
+ * The views, marked in the room while editing, numbered as in the eye button's menu: a round tag where each looks (on its named group), its
+ * name and what's there when pointed at; clicked, the camera goes there (drawn over the canvas, as Sketchfab's annotations are).
+ */
+function ViewMarkers({ lang, onPick }: { lang: Lang; onPick: (v: ViewId) => void }) {
+  const scene = useThree((s) => s.scene)
+  const [, tick] = useState(0)
+  // (the named groups are looked for again a moment after editing starts: the room's pieces may still be loading)
+  useEffect(() => { const t = window.setTimeout(() => tick((n) => n + 1), 500); return () => window.clearTimeout(t) }, [])
   return (
-    <group>
-      <group ref={body}>
-        <mesh onPointerDown={pick} renderOrder={998} userData={{ editHandle: true }}>
-          <boxGeometry args={[0.24, 0.16, 0.14]} /><meshBasicMaterial color="#2b3138" depthTest={false} />
-        </mesh>
-        <mesh position={[0, 0, 0.12]} rotation-x={Math.PI / 2} onPointerDown={pick} renderOrder={998} userData={{ editHandle: true }}>
-          <cylinderGeometry args={[0.06, 0.075, 0.12, 16]} /><meshBasicMaterial color="#14171a" depthTest={false} />
-        </mesh>
-        <mesh position={[0, 0, 0.181]} renderOrder={999} userData={{ editHandle: true }}>
-          <circleGeometry args={[0.045, 16]} /><meshBasicMaterial color="#7fd8ff" depthTest={false} />
-        </mesh>
-        <mesh position={[0, 0.11, -0.01]} renderOrder={998} userData={{ editHandle: true }}>
-          <boxGeometry args={[0.1, 0.05, 0.1]} /><meshBasicMaterial color="#2b3138" depthTest={false} />
-        </mesh>
-        <mesh position={[0.07, 0.05, -0.072]} renderOrder={999} userData={{ editHandle: true }}>
-          <circleGeometry args={[0.012, 8]} /><meshBasicMaterial color="#ff3b30" depthTest={false} />
-        </mesh>
-        <lineSegments geometry={lines} renderOrder={997} userData={{ editHandle: true }}>
-          <lineBasicMaterial color={COL} transparent opacity={hit ? 0.95 : 0.6} depthTest={false} />
-        </lineSegments>
-      </group>
-      <AxisGizmo id="camera1" at={pose.position.toArray() as [number, number, number]} theta={Math.atan2(ALONG.x, ALONG.z)} />
-    </group>
+    <>
+      {VIEW_SPOTS.map((v, i) => {
+        const at = v.id === 'grill' ? new THREE.Vector3(0, 0.6, 0) : v.id === 'free' ? null
+          : (() => { const o = v.anchor ? scene.getObjectByName(v.anchor) : null; if (!o) return null; const p = o.getWorldPosition(new THREE.Vector3()); if (p.y < OVERVIEW_TARGET.y - 1.2) p.y += 0.9; return p })()
+        if (!at) return null
+        return (
+          <Html key={v.id} position={at} center zIndexRange={[40, 0]}>
+            <button type="button" className="view-pin" onClick={(e) => { e.stopPropagation(); onPick(v.id) }}>
+              <i>{i + 1}</i>
+              <span><b>{viewName(v, lang)}</b>{v.about[lang]}</span>
+            </button>
+          </Html>
+        )
+      })}
+    </>
   )
 }
 
-function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, overview, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
+function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -450,27 +413,40 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   const homeTarget = useMemo(() => new THREE.Vector3(), [])
   // (what the camera was last homed for: a change in the canvas's own shape alone (the menu folding or opening, edit mode folding it) isn't a reason to
   // glide it back: it stays as it is, and only a new dish, the reset button, the overview or a resized window homes it)
-  const homedFor = useRef<{ active: number; resetView: number; overview: boolean; w: number; h: number } | null>(null)
+  const homedFor = useRef<{ active: number; resetView: number; view: ViewId; w: number; h: number } | null>(null)
+  // (where the camera glides to and looks at: the grill's home view, the whole shop, or a part of it; `home` itself stays the grill's, camera 1's base)
+  const aimPos = useRef(new THREE.Vector3())
+  const aimTarget = useMemo(() => new THREE.Vector3(), [])
   useEffect(() => {
     const was = homedFor.current
-    homedFor.current = { active, resetView, overview, w: size.width, h: size.height }
-    if (was && was.active === active && was.resetView === resetView && was.overview === overview && was.w === size.width && was.h === size.height && frame.w > 0 && frame.h > 0) return
+    homedFor.current = { active, resetView, view, w: size.width, h: size.height }
+    if (was && was.active === active && was.resetView === resetView && was.view === view && was.w === size.width && was.h === size.height && frame.w > 0 && frame.h > 0) return
     const focus = new THREE.Vector3(0, DISHES[active].focusY, 0)
     // (a phone's stage sits above the menu inside a full-height canvas: what fits it is the stage's width against
     // the canvas height, and it mustn't back off just because the menu was folded away)
     const phoneStage = frame.h > 0 && frame.h < size.height * 0.95 || (frame.w < 700 && size.height > size.width)
     const scale = phoneStage ? Math.min(3.4, (1.3 / (frame.w / size.height)) * 0.92) : cameraDistanceScale(aspect)
-    const wide = overview && !!DISHES[active].roast && !phoneStage
-    if (wide) {
-      home.current.copy(OVERVIEW_POSITION)
-      homeTarget.copy(OVERVIEW_TARGET)
-    } else {
-      home.current.set(...CAMERA_POSITION).sub(focus).multiplyScalar(scale).add(focus)
-      homeTarget.copy(focus)
+    home.current.set(...CAMERA_POSITION).sub(focus).multiplyScalar(scale).add(focus)
+    homeTarget.copy(focus)
+    aimPos.current.copy(home.current)
+    aimTarget.copy(homeTarget)
+    const spot = VIEW_SPOTS.find((v) => v.id === view)
+    const anchor = spot?.anchor ? scene.getObjectByName(spot.anchor) : null
+    if (view === 'free' && !!DISHES[active].roast && !phoneStage) {
+      aimPos.current.copy(OVERVIEW_POSITION)
+      aimTarget.copy(OVERVIEW_TARGET)
+    } else if (spot && anchor) {
+      // (a part of the shop: looked at from the room's middle side of it, a little above, at about table height)
+      const at = anchor.getWorldPosition(new THREE.Vector3())
+      const floor = OVERVIEW_TARGET.y - 1.5
+      if (at.y < floor + 0.3) at.y += 0.9
+      aimTarget.copy(at)
+      const toMiddle = new THREE.Vector3(-at.x, 0, -at.z).normalize()
+      aimPos.current.copy(at).addScaledVector(toMiddle, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0))
     }
     homing.current = true
     zoomGoal.current = null
-  }, [active, aspect, resetView, overview, frame.w, frame.h, size.width, size.height])
+  }, [active, aspect, resetView, view, frame.w, frame.h, size.width, size.height])
 
   // smooth wheel zoom: each notch nudges a target distance and the camera eases toward it
   const gl = useThree((s) => s.gl)
@@ -531,11 +507,11 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       c.enabled = true
       wasLocked.current = false
     } else if (c && homing.current) {
-      camera.position.lerp(home.current, k)
+      camera.position.lerp(aimPos.current, k)
       // (any panning is undone too: the target slides back to the middle of the dish)
-      c.target.lerp(homeTarget, k)
+      c.target.lerp(aimTarget, k)
       c.update()
-      if (camera.position.distanceTo(home.current) < 0.002 && c.target.distanceTo(homeTarget) < 0.002) {
+      if (camera.position.distanceTo(aimPos.current) < 0.002 && c.target.distanceTo(aimTarget) < 0.002) {
         homing.current = false
       }
     } else if (c && zoomGoal.current !== null) {
@@ -651,7 +627,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
 
       {/* (the hangings that come between the camera and what it's looking at fade out of the way) */}
       <OccluderFade target={() => controls.current?.target} />
-      {editing && <CameraRig home={home} target={homeTarget} />}
+      {/* (edit mode: the views marked where they look, numbered, as Sketchfab's annotations; camera 1 itself isn't placed by hand any more) */}
+      {editing && <ViewMarkers lang={lang} onPick={onView} />}
       {editing && <AxisWidget />}
       <OrbitControls
         ref={controls}
@@ -1131,7 +1108,8 @@ export default function App() {
   }, [editOn])
   // bumped to send the camera back to its home view
   const [resetView, setResetView] = useState(0)
-  const [overview, setOverview] = useState(false)
+  const [view, setView] = useState<ViewId>('grill')
+  const [viewMenu, setViewMenu] = useState(false)
   // the browser dropped the WebGL context (a phone out of GPU memory)
   const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
@@ -1704,7 +1682,7 @@ export default function App() {
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             fire={fire} frame={frame} onOffFire={sceneOffFire}
             onEat={onEat} onNotice={sceneNotice}
-            resetView={resetView} overview={overview} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
+            resetView={resetView} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
             incense={{ litAt: incenseAt, onLight: lightIncense }} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech}
@@ -1877,10 +1855,23 @@ export default function App() {
           </ul>
         )}
         <DishSwitcher dishes={DISHES} index={active} onChange={setActive} lang={lang} />
-        <button type="button" className="view-reset" onClick={() => { setOverview((v) => !v); setResetView((n) => n + 1) }}
-          aria-label={UI[lang].resetView} title={UI[lang].resetView}>
+        <button type="button" className={`view-reset${viewMenu ? ' is-open' : ''}`} onClick={() => setViewMenu((o) => !o)}
+          aria-label={UI[lang].resetView} title={UI[lang].resetView} aria-expanded={viewMenu}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
         </button>
+        {/* the views: the grill's own, the whole shop, and each part of it (data/views); the one chosen again glides back to it */}
+        {viewMenu && (
+          <ul className="view-menu" role="menu">
+            {VIEW_SPOTS.map((v, i) => (
+              <li key={v.id}>
+                <button type="button" role="menuitemradio" aria-checked={view === v.id} className={view === v.id ? 'is-on' : ''}
+                  onClick={() => { setView(v.id); setResetView((n) => n + 1); setViewMenu(false) }} title={v.about[lang]}>
+                  <i>{i + 1}</i>{viewName(v, lang)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         {owner !== null && !opened[dish.id] && (
           // not open yet: the whole shop is greyed out (see .is-unopened) until its sign is clicked and paid for
           <button type="button" className="unopened-hint" onClick={() => setAsking(true)}

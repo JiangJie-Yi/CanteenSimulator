@@ -725,13 +725,13 @@ function FridgeAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, FRIDGE_AT.along).addScaledVector(LAY, FRIDGE_AT.lay)
   // (its front, local +z, toward the room, and its length along the wall: local x runs along the first counter)
-  return <Movable id="freezer" label="冷藏櫃" baseScale={1.6}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><IngredientFridge /></group></Movable>
+  return <Movable id="freezer" label="冷藏櫃" baseScale={1.6}><group name="look-freezer" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><IngredientFridge /></group></Movable>
 }
 const RACK_AT = { along: 2.0, lay: 5.05 }
 function RackAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, RACK_AT.along).addScaledVector(LAY, RACK_AT.lay)
-  return <Movable id="platerack" label="碗盤櫃架" baseScale={1.03}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack /></group></Movable>
+  return <Movable id="platerack" label="碗盤櫃架" baseScale={1.03}><group name="look-back" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack /></group></Movable>
 }
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
