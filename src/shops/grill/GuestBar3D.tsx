@@ -324,10 +324,11 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <group position-x={DX}>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
-      <Movable id="chochin" label="紅燈籠"><group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
+      <Movable id="chochin" label="紅燈籠"><group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
-        <group>
+        {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
+        <group userData={{ fade: true }}>
           {[-1, 1].map((sd) => (
             <mesh key={sd} position={[sd * (W / 2), H - 0.05 + 0.18, NZ]}><cylinderGeometry args={[0.004, 0.004, 0.36, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
           ))}

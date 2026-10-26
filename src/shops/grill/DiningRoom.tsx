@@ -1495,7 +1495,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
             </group>
           ))}</group></StaticBatch></Movable>}
         {/* (the string of bulbs under the frieze: instanced, so out of the batch) */}
-        <Movable id={`festoon${from.toFixed(1)}`} label={`燈串（${from.toFixed(0)}）`}><Festoon l={l} mid={mid} /></Movable>
+        <Movable id={`festoon${from.toFixed(1)}`} label={`燈串（${from.toFixed(0)}）`}><group userData={{ fade: true }}><Festoon l={l} mid={mid} /></group></Movable>
         {/* (the strings of banners overhead, clear of the altar, the fridges and the toilets' doors) */}
         {(() => {
           const zs: number[] = []
@@ -1508,16 +1508,16 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
           }
           return zs.length > 1 ? (
             <>
-              <Movable id={`banners${from.toFixed(1)}a`} label={`旗幟串 1（${from.toFixed(0)}）`}><group position={[0, 2.22, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 0)} x0={-0.3} x1={-0.3} /></group></Movable>
+              <Movable id={`banners${from.toFixed(1)}a`} label={`旗幟串 1（${from.toFixed(0)}）`}><group position={[0, 2.22, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 3 === 0)} x0={-0.3} x1={-0.3} /></group></Movable>
               {/* (and two more strings slanted across the aisle, crossing each other like an X, one a little lower than the other,
                   so no banner meets another) */}
-              <Movable id={`banners${from.toFixed(1)}b`} label={`旗幟串 2（${from.toFixed(0)}）`}><group position={[0, 2.04, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 1)} seed={5} x0={-0.4} x1={-1.3} /></group></Movable>
-              <Movable id={`banners${from.toFixed(1)}c`} label={`旗幟串 3（${from.toFixed(0)}）`}><group position={[0, 1.9, 0]}><BannerRow zs={zs.filter((_, k) => k % 3 === 2)} seed={9} x0={-1.3} x1={-0.4} /></group></Movable>
+              <Movable id={`banners${from.toFixed(1)}b`} label={`旗幟串 2（${from.toFixed(0)}）`}><group position={[0, 2.04, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 3 === 1)} seed={5} x0={-0.4} x1={-1.3} /></group></Movable>
+              <Movable id={`banners${from.toFixed(1)}c`} label={`旗幟串 3（${from.toFixed(0)}）`}><group position={[0, 1.9, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 3 === 2)} seed={9} x0={-1.3} x1={-0.4} /></group></Movable>
             </>
           ) : null
         })()}
         {/* (the banners sway: not merged) */}
-        {art.filter((a) => a.nobori !== undefined).map((a) => <Movable key={`n${a.z}`} id={`nobori${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`幟旗（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><group position={[0, 1.08, a.z]}><Nobori i={a.nobori!} /></group></Movable>)}
+        {art.filter((a) => a.nobori !== undefined).map((a) => <Movable key={`n${a.z}`} id={`nobori${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`幟旗（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><group position={[0, 1.08, a.z]} userData={{ fade: true }}><Nobori i={a.nobori!} /></group></Movable>)}
         {/* (the altar's flag stirs, its incense smokes: not merged) */}
         {altar && <Movable id="altarfittings" label="供桌上的供品與線香"><group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}
       </group>
@@ -1535,7 +1535,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {
         const z = (i - (lamps - 1) / 2) * (c.length / lamps)
-        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05}><Pendant z={z} drop={0.5} pool={top} /></group></Movable>
+        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05} userData={{ fade: true }}><Pendant z={z} drop={0.5} pool={top} /></group></Movable>
       })}
     </group>
   )

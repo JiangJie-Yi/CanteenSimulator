@@ -17,9 +17,9 @@ export function setEditLang(l: Lang) {
   panel()
 }
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
-const KEY = 'jgs-edit-offsets-8'
-const KEY_R = 'jgs-edit-rotations-5'
-const KEY_S = 'jgs-edit-scales-4'
+const KEY = 'jgs-edit-offsets-9'
+const KEY_R = 'jgs-edit-rotations-6'
+const KEY_S = 'jgs-edit-scales-5'
 const KEY_G = 'jgs-edit-groups-1'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
@@ -51,7 +51,8 @@ export const BASES: Record<string, V3> = {
   // (the owner's settled spot: moved by [0.2, 0.19, 0.47] in the room's frame from [-1.508, 0, 1.974], taken into this parent's own units)
   // (moved on by [0, 0, 0.341] in the room's frame, taken into this parent's units)
   freezer: [-0.9694, 0.19, 1.3355],
-  willow: [0.38, 0, 0.201],
+  // (moved on by X 0.215 in the room's frame, taken into this parent's units)
+  willow: [0.2534, 0, 0.0272],
   sake: [0.084, 0, 0.118],
   sake2: [0.084, 0, 0.118],
   // (the charcoal basket: moved by [0.273, 0.125, 0.082] in the room's frame, taken into the parent's units; its 1.75 size and 44° turn are Decor's)

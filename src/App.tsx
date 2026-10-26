@@ -25,6 +25,7 @@ import { GuestCounter } from '@/ui/GuestCounter'
 import { Menu } from '@/ui/Menu'
 import { Crash } from '@/ui/Crash'
 import { OpeningSpot } from '@/scene/OpeningSpot'
+import { OccluderFade } from '@/scene/OccluderFade'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
@@ -644,6 +645,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       <ContactShadows position={[0, 0, 0]} opacity={look.shadowOpacity * 0.8} color={look.shadow} scale={6}
         blur={2.6} far={1.5} />
 
+      {/* (the hangings that come between the camera and what it's looking at fade out of the way) */}
+      <OccluderFade target={() => controls.current?.target} />
       {editing && <CameraRig home={home} target={homeTarget} />}
       {editing && <AxisWidget />}
       <OrbitControls
