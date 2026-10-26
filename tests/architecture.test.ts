@@ -17,9 +17,6 @@ const ALLOWED: Record<string, string[]> = {
   scene: ['data', 'game'],
   ui: ['data', 'game', 'scene'],
   'shops/grill': ['data', 'game', 'scene', 'ui'],
-  'shops/hotpot': ['data', 'game', 'scene', 'ui'],
-  'shops/noodle': ['data', 'game', 'scene', 'ui'],
-  'shops/bakery': ['data', 'game', 'scene', 'ui'],
 }
 const folderOf = (path: string) => Object.keys(ALLOWED).sort((a, b) => b.length - a.length).find((k) => path.startsWith(k + '/'))
 

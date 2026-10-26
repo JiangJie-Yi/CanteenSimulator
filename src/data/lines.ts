@@ -12,11 +12,6 @@ const ZH = {
   nothing: (id: number) => `#${id} 沒有想吃的，下次再來`,
   angry: (id: number) => `#${id} 等太久了，不吃了！`,
   verdict: (id: number, n: string, stars: number) => `#${id} ${n}${['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]}`,
-  lightPot: '開火，湯滾了就可以下料',
-  noodlesIn: (id: number) => `#${id} 的麵下鍋了`,
-  noodlesUp: (id: number, n: string) => `#${id} 的${n}來了`,
-  bakeIn: (id: number) => `#${id} 的麵包進爐了`,
-  bakeUp: (id: number, n: string) => `#${id} 的${n}出爐了，剛烤好的！`,
   trial: (who: string, names: string[]) => `${who}試做了：${names.join('、')}，記在試菜紀錄了`,
   trialNone: (who: string) => `${who}：沒有材料可以試，先進貨吧`,
 }
@@ -31,11 +26,6 @@ const JA: typeof ZH = {
   nothing: (id) => `#${id} 食べたいものがないな、また来ます`,
   angry: (id) => `#${id} 遅すぎる、もう帰る！`,
   verdict: (id, n, stars) => `#${id} ${n}、${['いまいち…', 'まあまあ', 'おいしい', 'うまい！', '最高にうまい！'][stars - 1]}`,
-  lightPot: '火を点けます、煮立ったら具をどうぞ',
-  noodlesIn: (id) => `#${id} さんの麺、茹でてます`,
-  noodlesUp: (id, n) => `#${id} さん、${n}お待ち！`,
-  bakeIn: (id) => `#${id} さんのパン、窯に入れました`,
-  bakeUp: (id, n) => `#${id} さん、焼きたての${n}です！`,
   trial: (who, names) => `${who}が試作：${names.join('、')}（ノートに記録）`,
   trialNone: (who) => `${who}：材料がありません。先に仕入れを`,
 }

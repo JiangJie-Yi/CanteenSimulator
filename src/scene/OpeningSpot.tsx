@@ -4,7 +4,7 @@ import * as THREE from 'three'
 
 /*
  * The spotlight over an unopened shop, while its 開業 button is pointed at: a real light slanting down from high
- * up on the left, lighting the stove or grill or bowl and throwing a warm, soft-edged pool on the floor around it,
+ * up on the left, lighting the grill and throwing a warm, soft-edged pool on the floor around it,
  * with a faint shaft of light through the air. It swings in and brightens, and fades away again.
  */
 

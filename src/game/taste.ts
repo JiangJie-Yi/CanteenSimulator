@@ -1,10 +1,8 @@
 // How good food is: the rules every shop and screen judge by, kept out of the components so they can be tested
 // and shared without one shop importing another.
-import type { Bake, Seasoning } from '@/data/menu'
-import type { Topping } from '@/data/recipes'
+import type { Seasoning } from '@/data/menu'
 import type { Stage } from '@/game/types'
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 /**
  * 美味: how well each seasoning goes with each food, from the way they're eaten in Japan and Taiwan — salt on
@@ -69,15 +67,6 @@ export const timingLoss = (k: string, at: Stage) => {
 }
 /** the best moment for a seasoning */
 export const bestStage = (k: string): Stage => TIMING[k as keyof typeof TIMING]?.best[0] ?? 'late'
-
-/** 美味: doneness first (doughy, golden best, burnt bad), then how the fillings suit the dough */
-export function breadTaste(bake: Bake, id: string, dabs: Topping[], r: number) {
-  let t = r < 0.6 ? 12 : r < 0.9 ? 25 + (r - 0.6) * 100 : r < 1.3 ? 58 + (1 - Math.abs(r - 1.1) * 4) * 8 : r < 1.8 ? 55 - (r - 1.3) * 60 : 10
-  const pair = bake.pairing[id] ?? {}
-  dabs.forEach((k, i) => { t += (pair[k] ?? -6) * (i === 0 ? 1 : 0.6) })
-  if (dabs.length > 2) t -= (dabs.length - 2) * 12
-  return Math.round(clamp(t, 0, 100))
-}
 
 /** 1-5 stars for a taste (0-100) */
 export const starsOf = (taste: number) => Math.max(1, Math.min(5, Math.round(taste / 20)))

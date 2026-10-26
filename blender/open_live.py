@@ -1,12 +1,12 @@
 """Live Blender view that follows the web app.
 
 Usage (once; it keeps following after that):
-  blender blender/hotpot.blend --python blender/open_live.py
+  blender blender/grilledfish.blend --python blender/open_live.py
 
 While it runs, every second it:
   * reads blender/live_state.json (written by the Vite dev server whenever the page changes dish or order)
     and opens that dish's .blend, hides the items that aren't ordered, and matches the web camera;
-  * reloads the open .blend when a generator script (hotpot.py, beefnoodle.py, ...) rewrites it.
+  * reloads the open .blend when a generator script (grilledfish.py, ...) rewrites it.
 Every 3D viewport is kept in Rendered (EEVEE) shading, looking through the camera.
 
 Edits made by hand in this Blender are not kept across a reload: the generator scripts are the source of truth.

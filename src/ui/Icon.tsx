@@ -2,168 +2,11 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 // Hand-drawn line icons for the menu strips. 24x24, stroked in currentColor so they ink like the text.
 const ICONS: Record<string, ReactNode> = {
-  // ---- the bakery and its doughs
-  bakery: (
-    <>
-      <path d="M4 13a8 5 0 0 1 16 0v5H4z" />
-      <path d="M8 10l1 3M12 9v4M16 10l-1 3" />
-    </>
-  ),
-  BriocheDough: (
-    <>
-      <path d="M4 15a8 6 0 0 1 16 0z" />
-      <path d="M7 11l3 3M11 9l4 4M15 9l2 2M9 9l-2 2" />
-    </>
-  ),
-  SourdoughDough: (
-    <>
-      <path d="M3 16a9 7 0 0 1 18 0z" />
-      <path d="M8 11l8 0M9 13.5l6 0M12 9v6" />
-    </>
-  ),
-  CroissantDough: (
-    <>
-      <path d="M3 15c2-6 6-9 9-9s7 3 9 9c-2 1-4 0-5-2-1 2-2 3-4 3s-3-1-4-3c-1 2-3 3-5 2z" />
-      <path d="M9 9l1 5M15 9l-1 5" />
-    </>
-  ),
-  BaguetteDough: (
-    <>
-      <path d="M4 18c-2-2 10-14 14-14 2 2-10 14-14 14z" />
-      <path d="M9 11l2 2M12 8l2 2M6 14l2 2" />
-    </>
-  ),
   // ---- bases
-  hotpot: (
-    <>
-      <path d="M4 11h16v3a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6z" />
-      <path d="M2 11h2M20 11h2M9 8c0-1.5 1-1.5 1-3M14 8c0-1.5 1-1.5 1-3" />
-    </>
-  ),
-  beefnoodle: (
-    <>
-      <path d="M3 11h18a9 9 0 0 1-18 0z" />
-      <path d="M7 11c1-2 2 0 3-2s2 0 3-2M15 4l5 6M17 3l4 6" />
-    </>
-  ),
   grilledfish: (
     <>
       <path d="M5 12c3-4 9-4 12 0-3 4-9 4-12 0zM17 12l3-3v6z" />
       <path d="M8 21l2-4 2 3 2-3 2 4" />
-    </>
-  ),
-  // ---- hot pot
-  NapaCabbage: (
-    <>
-      <path d="M12 21c-5-3-7-8-6-14 3 0 5 2 6 4 1-2 3-4 6-4 1 6-1 11-6 14z" />
-      <path d="M12 21V11M12 15l-3-2M12 17l3-2" />
-    </>
-  ),
-  BeefSlice: (
-    <>
-      <path d="M3 9c3-2 6 2 9 0s6-2 9 0v6c-3-2-6 2-9 0s-6-2-9 0z" />
-      <path d="M6 12c2 1 3-1 5 0M14 13c2-1 3 1 4 0" />
-    </>
-  ),
-  Meatball: (
-    <>
-      <circle cx="12" cy="12" r="7" />
-      <path d="M9 10h.01M14 9h.01M12 14h.01M15 13h.01M9 15h.01" />
-    </>
-  ),
-  Fishball: (
-    <>
-      <circle cx="12" cy="12" r="7" />
-      <path d="M8.5 9.5a4.5 4.5 0 0 1 3-2" />
-    </>
-  ),
-  Tofu: (
-    <>
-      <path d="M5 9l7-4 7 4v7l-7 4-7-4z" />
-      <path d="M5 9l7 4 7-4M12 13v7" />
-    </>
-  ),
-  FriedTofu: (
-    <>
-      <rect x="5" y="6" width="14" height="12" rx="3" />
-      <path d="M9 10h.01M13 9h.01M15 13h.01M10 14h.01" />
-    </>
-  ),
-  Taro: (
-    <>
-      <path d="M5 9l7-4 7 4v7l-7 4-7-4z" />
-      <path d="M8 14l2-3M12 16l3-4M10 18l1-1" />
-    </>
-  ),
-  Corn: (
-    <>
-      <ellipse cx="12" cy="12" rx="4.5" ry="8" />
-      <path d="M7.5 9h9M7.5 12h9M7.5 15h9M12 4v16" />
-    </>
-  ),
-  CrabStick: (
-    <>
-      <rect x="3" y="9" width="18" height="6" rx="3" />
-      <path d="M7 9v6M11 9v6M15 9v6" />
-    </>
-  ),
-  Shrimp: (
-    <>
-      <path d="M18 8a6 6 0 1 0-1 8" />
-      <path d="M17 16l3 1-1 3M9 9l1 2M12 7l.5 2M8 12l2 .5" />
-    </>
-  ),
-  ShiitakeCap: (
-    <>
-      <path d="M3 13a9 7 0 0 1 18 0z" />
-      <path d="M10 13v5a2 2 0 0 0 4 0v-5M9 9l6 2M15 9l-6 2" />
-    </>
-  ),
-  Enoki: (
-    <>
-      <path d="M8 21l1-14M12 21V6M16 21l-1-14M10 21l.5-12M14 21l-.5-12" />
-      <path d="M7.5 6.5h1.5M11.2 5.2h1.6M14.6 6.5h1.5" />
-    </>
-  ),
-  // ---- beef noodle
-  BeefShank: (
-    <>
-      <path d="M5 8c3-3 11-3 14 1s-1 9-7 9-10-6-7-10z" />
-      <path d="M9 10c2 1 3 3 2 5M14 9c-1 2 0 4 2 5" />
-    </>
-  ),
-  Tendon: (
-    <>
-      <path d="M4 12c0-4 6-6 9-4s7 1 7 4-4 5-8 4-8 0-8-4z" />
-      <path d="M8 11c2-1 4 0 5 1" />
-    </>
-  ),
-  Tripe: (
-    <>
-      <path d="M4 7h16v10H4z" />
-      <path d="M8 7l-2 3 2 3-2 4M12 7l-2 3 2 3-2 4M16 7l-2 3 2 3-2 4M4 10h16M4 13h16" />
-    </>
-  ),
-  BraisedEgg: (
-    <>
-      <path d="M4 12a8 7 0 0 0 16 0z" />
-      <path d="M4 12h16" />
-      <ellipse cx="12" cy="12" rx="3.5" ry="1.4" />
-    </>
-  ),
-  BokChoy: (
-    <>
-      <path d="M12 21c-4-2-7-7-5-13 3 1 4 4 5 6 1-2 2-5 5-6 2 6-1 11-5 13z" />
-      <path d="M10 21h4M12 21v-6" />
-    </>
-  ),
-  PickledGreens: (
-    <path d="M5 8h4v3H5zM11 6h4v3h-4zM16 10h3v3h-3zM7 14h4v3H7zM13 13h3v3h-3zM10 19h3v2h-3z" />
-  ),
-  ExtraNoodles: (
-    <>
-      <path d="M3 8c2-2 3 2 5 0s3-2 5 0 3 2 5 0 2-1 3 0M3 12c2-2 3 2 5 0s3-2 5 0 3 2 5 0 2-1 3 0M3 16c2-2 3 2 5 0s3-2 5 0 3 2 5 0 2-1 3 0" />
-      <path d="M19 3v4M17 5h4" />
     </>
   ),
   // ---- grilled fish
@@ -400,68 +243,7 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M5 12c0-3 3-5 7-5s7 2 7 5M8 10h.01M11 9h.01M14 9.5h.01M16 10.5h.01M9.5 19h5" />
     </>
   ),
-  // ---- the noodle shop, by the kind of dish (each listed one without its own drawing takes its kind's)
-  noodleSoup: (
-    <>
-      <path d="M3 11h18a9 8 0 0 1-18 0z" />
-      <path d="M6 11c1-2 2 0 3-2s2 0 3-2 2 0 3-2M15 3l5 7M17.5 2.5l4 6.5" />
-    </>
-  ),
-  quick: (
-    <>
-      <path d="M2.5 14h19a2 2 0 0 1-2 3h-15a2 2 0 0 1-2-3z" />
-      <path d="M5 14c0-3 3-5 7-5s7 2 7 5M8 12h.01M11 11h.01M14 11.5h.01M10 9c1-1.5 3-1.5 4 0" />
-    </>
-  ),
-  friedRice: (
-    <>
-      <path d="M2 11h17a8 6 0 0 1-17 0z" />
-      <path d="M19 12l3-1.5M5 9h.01M8 8h.01M11 8.5h.01M14 8h.01M7 6l1 1M12 5.5l-1 1M16 9.5h.01" />
-    </>
-  ),
-  friedNoodles: (
-    <>
-      <path d="M3 15h18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" />
-      <path d="M5 14c2-3 3 0 5-3s3 0 5-3 3 0 4 1M6 12c1-1 2 1 4-1" />
-    </>
-  ),
-  vermicelli: (
-    <>
-      <path d="M3 15h18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" />
-      <path d="M5 14c1.5-2 3 1 4.5-1s3 1 4.5-1 3 1 4.5-1M6 12c1.5-2 3 1 4.5-1s3 1 4.5-1M8 10c1.5-2 3 1 4.5-1" />
-    </>
-  ),
-  saucyRice: (
-    <>
-      <path d="M2.5 14h19a2 2 0 0 1-2 3h-15a2 2 0 0 1-2-3z" />
-      <path d="M5 14c0-3 3-5 7-5s7 2 7 5" />
-      <path d="M7 13c1-2 3-2 4-1s3 1 4-1 2 0 2 1" strokeWidth="2.2" />
-    </>
-  ),
-  dumplings: (
-    <>
-      <path d="M3 15c0-4 4-7 9-7s9 3 9 7z" />
-      <path d="M6 9.5l1 2M9 8.3l.6 2.2M12 8v2.3M15 8.3l-.6 2.2M18 9.5l-1 2M3 15h18" />
-    </>
-  ),
-  soupDumplings: (
-    <>
-      <path d="M3 12h18a9 7 0 0 1-18 0z" />
-      <path d="M7 12c0-2 2-3.5 3.5-3.5S14 10 14 12M13 12c0-2 1.5-3 3-3s3 1 3 3M9 9.5l.5 1M16 9.5l.3 1" />
-    </>
-  ),
-  xiaolongbao: (
-    <>
-      <path d="M4 18h16M5 18c0-6 3-11 7-11s7 5 7 11" />
-      <path d="M12 7c-.5-1.5.5-3 0-4M9 9l1.5 2M15 9l-1.5 2M7.5 13l2 1M16.5 13l-2 1" />
-    </>
-  ),
-  soup: (
-    <>
-      <path d="M3 12h18a9 7 0 0 1-18 0z" />
-      <path d="M8 19h8M8 9c0-1.5 1-1.5 1-3M12 9c0-1.5 1-1.5 1-3M16 9c0-1.5 1-1.5 1-3" />
-    </>
-  ),
+
 }
 
 export const hasIcon = (name: string) => name in ICONS
@@ -496,25 +278,10 @@ export function Icon({ name, size = 24 }: { name: string; size?: number }) {
   )
 }
 
-/**
- * The drawing for something on a menu: its own if it has one; a set's (set-<id>), or at the grill a set meal; at the
- * noodle shop the drawing for its kind of dish (湯麵, 炒飯, 水餃…); failing all that, by what its name says (…麵,
- * …飯, …湯), and last the shop's own.
- */
-export function iconFor(shop: string, x: { id: string; name?: string; icon?: string; table?: string }, base: boolean) {
+/** The drawing for something on a menu: its own if it has one; a set's (set-<id>), else a set meal; last the shop's own. */
+export function iconFor(shop: string, x: { id: string; name?: string; icon?: string }, base: boolean) {
   const own = x.icon ?? x.id
   if (hasIcon(own)) return own
-  if (base) return hasIcon(`set-${x.id}`) ? `set-${x.id}` : shop === 'grilledfish' ? 'setMeal' : shop === 'beefnoodle' ? 'noodleSoup' : shop
-  if (x.table && hasIcon(x.table)) return x.table
-  const n = x.name ?? ''
-  if (/米粉/.test(n)) return 'vermicelli'
-  if (/炒麵/.test(n)) return 'friedNoodles'
-  if (/炒飯/.test(n)) return 'friedRice'
-  if (/燴飯/.test(n)) return 'saucyRice'
-  if (/湯餃/.test(n)) return 'soupDumplings'
-  if (/餃/.test(n)) return 'dumplings'
-  if (/麵/.test(n)) return 'noodleSoup'
-  if (/飯/.test(n)) return 'quick'
-  if (/湯/.test(n)) return 'soup'
+  if (base) return hasIcon(`set-${x.id}`) ? `set-${x.id}` : 'setMeal'
   return hasIcon(shop) ? shop : 'grilledfish'
 }

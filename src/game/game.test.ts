@@ -1,7 +1,6 @@
 // The rules of the game, checked on their own (npm test). Each block guards one module in src/game or src/data.
 import { describe, expect, it } from 'vitest'
-// (every shop is checked, whether or not this build has it open)
-import { ALL_DISHES as DISHES } from '@/data/menu'
+import { DISHES } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPrice, type Entry } from '@/data/recipes'
 import { ROLES } from '@/data/staff'
 import { KINDS, kindOf } from '@/data/guests'
@@ -10,15 +9,15 @@ import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost
 import { trialIdeas } from '@/game/research'
 import { makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
 import { bestDabs, expectedTaste, understand } from '@/game/chefChat'
-import { breadTaste, moodOf, PAIRING, PAIRING_DEFAULT, starText } from '@/game/taste'
+import { moodOf, PAIRING, PAIRING_DEFAULT, starText } from '@/game/taste'
 
 const shop = (id: string) => DISHES.find((d) => d.id === id)!
 const entry = (shopId: string, ids: string[], dabs: Entry['parts'][number]['dabs'] = []): Entry =>
   ({ key: ids.join('/'), shop: shopId, name: '', ja: '', price: 100, parts: ids.map((id) => ({ id, dabs, name: '', ja: '' })) })
 
 describe('data: every shop', () => {
-  it('has the four shops', () => {
-    expect(DISHES.map((d) => d.id).sort()).toEqual(['bakery', 'beefnoodle', 'grilledfish', 'hotpot'])
+  it('is the Japanese grill alone', () => {
+    expect(DISHES.map((d) => d.id)).toEqual(['grilledfish'])
   })
   it('has unique food ids within a shop, each findable', () => {
     for (const d of DISHES) {
@@ -70,11 +69,6 @@ describe('recipes: names and keys', () => {
     expect(partName(corn, '玉米', 'GrilledCorn', [], 'zh')).toBe('烤玉米')
     expect(partName({ name: '杏鮑菇' }, '杏鮑菇', 'KingOyster', ['soy', 'peanut'], 'zh')).toBe('醬烤杏鮑菇佐花生粉')
   })
-  it('names breads as a bakery would', () => {
-    const c = findItem(shop('bakery'), 'CroissantDough')!
-    expect(partName(c, '可頌', 'CroissantDough', [], 'zh', 'bake')).toBe('原味可頌')
-    expect(partName(c, '可頌', 'CroissantDough', ['cheese', 'ham'], 'zh', 'bake')).toBe('火腿起司可頌')
-  })
   it('suggests about three times the cost, in fives, at least NT$10', () => {
     expect(suggestPrice(20)).toBe(60)
     expect(suggestPrice(21) % 5).toBe(0)
@@ -94,10 +88,10 @@ describe('economy: cost and stock', () => {
     expect(partCost(g, { id: 'GrilledCorn', dabs: ['salt', 'soy'], name: '', ja: '' })).toBe(plain + 1 + 2)
     expect(entryCost(entry('grilledfish', ['GrilledCorn', 'GrilledCorn'], ['salt']))).toBe((plain + 1) * 2)
   })
-  it('takes a bowl’s beef, not the bowl, out of stock', () => {
-    const e = entry('beefnoodle', ['braised'])
-    expect(needOf(e)).toEqual({ BeefShank: 1 })
-    expect(partsOf(e)).toEqual({ braised: 1 })
+  it('takes a set’s parts, not the set, out of stock', () => {
+    const e = entry('grilledfish', ['ayu'])
+    expect(needOf(e).ayu).toBeUndefined()
+    expect(partsOf(e)).toMatchObject({ ayu: 1 })
   })
   it('serves only with stock enough, and takes it', () => {
     const e = entry('grilledfish', ['GrilledCorn', 'GrilledCorn'])
@@ -108,9 +102,9 @@ describe('economy: cost and stock', () => {
     expect(takeStock(e, { GrilledCorn: 1 })).toBeNull()
   })
   it('prices buying in everything as the sum of its goods', () => {
-    const d = shop('bakery')
+    const d = shop('grilledfish')
     expect(buyAllCost(d, 10)).toBe(goodsOf(d).reduce((n, g) => n + costOf(g) * 10, 0))
-    expect(goodsOf(shop('beefnoodle')).some((g) => g.id === 'braised')).toBe(false) // (bowls aren't bought)
+    expect(goodsOf(d).some((g) => g.id === 'ayu')).toBe(false) // (sets aren't bought)
   })
 })
 
@@ -126,13 +120,6 @@ describe('research: what the second chef can try', () => {
 })
 
 describe('taste', () => {
-  it('bakes best just past done, badly raw or burnt', () => {
-    const bake = shop('bakery').bake!
-    const at = (r: number) => breadTaste(bake, 'CroissantDough', [], r)
-    expect(at(1.1)).toBeGreaterThan(at(0.5))
-    expect(at(1.1)).toBeGreaterThan(at(2))
-    for (const r of [0, 0.5, 1, 1.5, 3]) expect(at(r)).toBeGreaterThanOrEqual(0)
-  })
   it('turns a rating into stars and a face', () => {
     expect(starText(100)).toBe('★★★★★')
     expect(starText(0)).toBe('★☆☆☆☆')
@@ -157,26 +144,24 @@ describe('hiring: a new lot of people each game', () => {
     expect(taken.size).toBe(DISHES.length * 16)
   })
   it('is different from one game to the next', () => {
-    const a = makeCandidates('hotpot', seeded(1)).map((w) => w.zh).join()
-    const b = makeCandidates('hotpot', seeded(2)).map((w) => w.zh).join()
+    const a = makeCandidates('grilledfish', seeded(1)).map((w) => w.zh).join()
+    const b = makeCandidates('grilledfish', seeded(2)).map((w) => w.zh).join()
     expect(a).not.toBe(b)
   })
   it('makes Japanese names readable in Japanese', () => {
-    const w = makeCandidates('hotpot', seeded(3))
+    const w = makeCandidates('grilledfish', seeded(3))
     for (const x of w) expect(x.ja).toMatch(/^\S+ \S+$/)
   })
 })
 
 describe('chef chat: understanding what the owner asks', () => {
-  const g = shop('grilledfish'), b = shop('bakery'), n = shop('beefnoodle')
+  const g = shop('grilledfish')
   it('picks out the food and its seasonings, however it is put', () => {
     expect(understand('幫我做鹽烤玉米', g)).toEqual({ kind: 'make', id: 'GrilledCorn', dabs: ['salt'] })
     expect(understand('鮭魚刷醬油烤一下', g)).toEqual({ kind: 'make', id: 'Salmon', dabs: ['soy'] })
     expect(understand('來一串原味的香菇', g)).toMatchObject({ kind: 'make', dabs: [] })
     expect(understand('烤個年糕，加煉乳和花生', g)).toEqual({ kind: 'make', id: 'NetMochi', dabs: ['milk', 'peanut'] })
     expect(understand('做紅喉', g)).toEqual({ kind: 'make', id: 'Nodoguro', dabs: null })
-    expect(understand('火腿起司可頌一個', b)).toEqual({ kind: 'make', id: 'CroissantDough', dabs: ['cheese', 'ham'] })
-    expect(understand('煮一碗紅燒牛肉麵', n)).toMatchObject({ kind: 'make', id: 'braised' })
   })
   it('tells a question from an order', () => {
     expect(understand('玉米配什麼好？', g)).toEqual({ kind: 'advise', id: 'GrilledCorn' })

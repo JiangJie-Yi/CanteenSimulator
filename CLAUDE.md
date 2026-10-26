@@ -2,7 +2,7 @@
 
 React 19 + TypeScript + Vite + three.js（@react-three/fiber / drei）。推到 `main` 就會由 GitHub Actions 測試、建置，並部署到 GitHub Pages。
 
-目前只開放日式烤魚（`data/menu.ts` 的 `ENABLED_SHOPS`），新遊戲直接進到已開業的烤魚店；其他三間店的資料都還在（`ALL_DISHES`），單元測試仍會檢查全部四間。
+這是一間日式燒烤店（聞野・日式烤魚），遊戲裡只有這一間：`data/menu.ts` 的 `DISHES` 只有 `grilledfish`。火鍋、牛肉麵、麵包店已整個移除（資料、程式、模型、測試）。
 
 ## 資料夾分類（依賴只能往左）
 
@@ -16,7 +16,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `src/game/` | **純邏輯**（不碰 React 和 three）：成本與庫存（`economy.ts`）、口味與評分（`taste.ts`）、研發與試做（`research.ts`）、共用型別（`types.ts`） | data |
 | `src/scene/` | 各店共用的 3D 元件：`Dish`、`Steam`、`OpeningSpot`、裝置等級（`quality.ts`）、shader | data、game |
 | `src/ui/` | 2D 介面：菜單板、研發筆記、辦公室、歡迎頁、表情、頭像…… | data、game、scene |
-| `src/shops/<店>/` | 每間店自己的 3D 與互動：`grill`（烤魚，Roasting）、`hotpot`（火鍋）、`noodle`（台式麵食）、`bakery`（麵包） | data、game、scene、ui |
+| `src/shops/grill/` | 烤魚店的 3D 與互動（Roasting、吧台、客人、收銀櫃…） | data、game、scene、ui |
 | `src/App.tsx` | 把各部分組起來：存檔、帳本、營業模擬的計時器、場景 | 全部 |
 
 規則：

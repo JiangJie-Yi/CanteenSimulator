@@ -1,10 +1,10 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { ALL_DISHES } from '@/data/menu'
+import { DISHES } from '@/data/menu'
 import { PAR, REORDER_AT, restockOrder, topUpOrder, goodsOf, costOf, type Stock } from '@/game/economy'
 import type { Entry } from '@/data/recipes'
 
-const grill = ALL_DISHES.find((d) => d.id === 'grilledfish')!
+const grill = DISHES.find((d) => d.id === 'grilledfish')!
 const entryOf = (id: string): Entry => ({ key: id, shop: 'grilledfish', name: id, ja: id, price: 100, parts: [{ id, dabs: [], name: id, ja: id }] })
 
 feature('倉儲自動補貨', () => {

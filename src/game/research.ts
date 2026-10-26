@@ -1,16 +1,15 @@
 // Working out the menu: what a shop's foods could be made into, and how good each ought to come out.
 import type { Dish } from '@/data/menu'
-import { SEASONINGS, type Seasoning, type Topping } from '@/data/recipes'
+import { SEASONINGS, type Seasoning } from '@/data/recipes'
 import type { Lang } from '@/data/i18n'
 import type { Stage, Step } from '@/game/types'
-import { bestStage, breadTaste, PAIRING, PAIRING_DEFAULT, timingLoss } from '@/game/taste'
+import { bestStage, PAIRING, PAIRING_DEFAULT, timingLoss } from '@/game/taste'
 
 export type Idea = { id: string; dabs: Seasoning[]; taste: number }
 
 /**
  * Every dish a cook could try at a shop, with how good it ought to come out made well: at the grill each food plain
- * and with each seasoning that suits it; at the bakery each dough plain and with each filling that suits it;
- * elsewhere each soup, bowl and side as it comes.
+ * and with each seasoning that suits it; anything else as it comes.
  */
 export function trialIdeas(d: Dish): Idea[] {
   const ideas: Idea[] = []
@@ -26,15 +25,8 @@ export function trialIdeas(d: Dish): Idea[] {
         ideas.push({ id: it.id, dabs: [good[i].k, good[j].k], taste: Math.min(98, 62 + good[i].w + good[j].w * 0.6) })
       }
     }
-  } else if (d.bake) {
-    for (const it of d.items) {
-      ideas.push({ id: it.id, dabs: [], taste: breadTaste(d.bake, it.id, [], 1.1) })
-      for (const [k, w] of Object.entries(d.bake.pairing[it.id] ?? {})) {
-        if ((w ?? 0) > 5) ideas.push({ id: it.id, dabs: [k as Topping], taste: breadTaste(d.bake, it.id, [k as Topping], 1.1) })
-      }
-    }
   } else {
-    for (const it of [...d.bases.filter((b) => !b.includes || d.id === 'beefnoodle'), ...d.items]) ideas.push({ id: it.id, dabs: [], taste: 72 })
+    for (const it of [...d.bases.filter((b) => !b.includes), ...d.items]) ideas.push({ id: it.id, dabs: [], taste: 72 })
   }
   return ideas
 }

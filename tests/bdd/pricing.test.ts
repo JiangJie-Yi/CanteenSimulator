@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { ALL_DISHES } from '@/data/menu'
+import { DISHES } from '@/data/menu'
 import { suggestPrice, MENU_MAX, MENU_MIN } from '@/data/recipes'
 import { buyAllCost, costOf, goodsOf, supplierDiscount } from '@/game/economy'
 
@@ -13,14 +13,14 @@ feature('成本與定價', () => {
   })
 
   scenario('每間店賣的每樣東西都有正的成本', ({ given, then }) => {
-    given('四間店的全部商品', (w) => { w.goods = ALL_DISHES.flatMap((d) => goodsOf(d)) })
+    given('店裡的全部商品', (w) => { w.goods = DISHES.flatMap((d) => goodsOf(d)) })
     then('每一樣的成本都大於 0 且低於它的售價', (w) => {
       for (const g of w.goods as ReturnType<typeof goodsOf>) { expect(costOf(g)).toBeGreaterThan(0); expect(costOf(g)).toBeLessThan(g.price) }
     })
   })
 
   scenario('全買 n 份的成本隨份數線性增加', ({ given, when, then }) => {
-    given('日式烤魚店', (w) => { w.d = ALL_DISHES.find((d) => d.id === 'grilledfish')! })
+    given('日式烤魚店', (w) => { w.d = DISHES.find((d) => d.id === 'grilledfish')! })
     when('分別全買 1 份和 3 份', (w) => { w.one = buyAllCost(w.d, 1); w.three = buyAllCost(w.d, 3) })
     then('3 份是 1 份的 3 倍', (w) => { expect(w.three).toBe(w.one * 3) })
   })
@@ -37,7 +37,7 @@ feature('成本與定價', () => {
 
   scenario('開店要有足夠的菜，菜單也有上限', ({ then }) => {
     then('每間店至少要 10 道才能開，最多 40 道', () => {
-      for (const d of ALL_DISHES) expect(MENU_MIN[d.id]).toBeGreaterThanOrEqual(1)
+      for (const d of DISHES) expect(MENU_MIN[d.id]).toBeGreaterThanOrEqual(1)
       expect(MENU_MAX).toBeGreaterThan(Math.max(...Object.values(MENU_MIN)))
     })
   })

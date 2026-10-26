@@ -68,8 +68,8 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
     setDraft('')
   }
   const roast = dish.roast
-  // (at the grill and the bakery what goes on a food makes it a dish of its own)
-  const kind = roast ? 'grill' : dish.bake ? 'bake' : 'plain'
+  // (at the grill what goes on a food makes it a dish of its own)
+  const kind = roast ? 'grill' : 'plain'
   const seasoned = kind !== 'plain'
   const short = (id: string) => roast?.names[id] ?? findItem(dish, id)?.name ?? id
 
@@ -77,8 +77,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   const recipes: Recipe[] = []
   for (const [id, n] of Object.entries(notes)) {
     const item = findItem(dish, id)
-    // (the grill's ready-made sets aren't a dish to work out: their parts are; a bowl of noodles that comes with its
-    // beef is a dish, though)
+    // (the grill's ready-made sets aren't a dish to work out: their parts are)
     if (!item || (roast && (item as { includes?: object }).includes)) continue
     const by = new Map<string, Try[]>()
     for (const tr of n.tries) {

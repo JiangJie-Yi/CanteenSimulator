@@ -1,6 +1,6 @@
 // Money and stock: what things cost, what a dish on the menu takes out of stock, and whether it can be served.
 // Pure functions over the data in src/data, so App (and the tests) all reckon the same way.
-import { ALL_DISHES, type Dish } from '@/data/menu'
+import { DISHES, type Dish } from '@/data/menu'
 import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Seasoning } from '@/data/recipes'
 
 export type Stock = Record<string, number>
@@ -16,33 +16,27 @@ export const CHARCOAL_COST = 18
 export const CHARCOAL_BOOST = 0.18
 export const canAddCharcoal = (level: number) => level < 1 - 1e-6
 export const afterCharcoal = (level: number) => (canAddCharcoal(level) ? Math.min(1, level + CHARCOAL_BOOST) : level)
-export const GAS_PER_HOUR = 30
 
 /**
  * What the ingredients of something on the menu cost, as a share of its price, roughly as in small eateries in
  * Taiwan: fish and seafood dear (around half), meat a little less, vegetables, tofu and mushrooms cheap, rice and
- * miso soup cheapest; a soup base or a bowl of noodles in between.
+ * miso soup cheapest.
  */
 export const COST_SHARE: Record<string, number> = {
-  // dough: flour, butter, eggs, sugar (what goes on it is costed on its own)
-  CroissantDough: 0.38, BaguetteDough: 0.26, BriocheDough: 0.34, SourdoughDough: 0.3,
   ExtraFish: 0.48, Saury: 0.46, Mackerel: 0.48, Aji: 0.45, Iwashi: 0.4, Shishamo: 0.42, Salmon: 0.5, Hokke: 0.48,
-  Buri: 0.5, Gindara: 0.52, Nodoguro: 0.56, ShrimpSkewer: 0.52, Scallop: 0.55, Squid: 0.5, Shrimp: 0.5, CrabStick: 0.42,
-  BeefSlice: 0.45, Meatball: 0.36, Fishball: 0.34, Yakitori: 0.4, PorkBelly: 0.42, Sausage: 0.38, BloodCake: 0.3,
-  BeefShank: 0.48, Tendon: 0.45, Tripe: 0.4, BraisedEgg: 0.25,
-  NapaCabbage: 0.22, Tofu: 0.24, FriedTofu: 0.26, Taro: 0.28, Corn: 0.28, GrilledCorn: 0.28, ShiitakeCap: 0.3,
-  GrilledShiitake: 0.3, Enoki: 0.25, Shishito: 0.25, KingOyster: 0.3, Asparagus: 0.32, Okra: 0.28, BokChoy: 0.2,
-  PickledGreens: 0.18, Potato: 0.22, SweetPotato: 0.22, Onigiri: 0.22, NetMochi: 0.24, Rice: 0.18, MisoSoup: 0.2, Sake: 0.4,
-  ExtraNoodles: 0.25, mala: 0.32, tomato: 0.3, kombu: 0.26, braised: 0.4, clear: 0.42, plain: 0.3, dry: 0.3, sesame: 0.32,
+  Buri: 0.5, Gindara: 0.52, Nodoguro: 0.56, ShrimpSkewer: 0.52, Scallop: 0.55, Squid: 0.5, Yakitori: 0.4,
+  PorkBelly: 0.42, Sausage: 0.38, BloodCake: 0.3, GrilledCorn: 0.28, GrilledShiitake: 0.3, Shishito: 0.25,
+  KingOyster: 0.3, Asparagus: 0.32, Okra: 0.28, Potato: 0.22, SweetPotato: 0.22, Onigiri: 0.22, NetMochi: 0.24,
+  Rice: 0.18, MisoSoup: 0.2, Sake: 0.4,
 }
 
 /** what one of something costs to buy in */
 export const costOf = (x: { id?: string; price: number; cost?: number }) =>
   x.cost ?? Math.round(x.price * (COST_SHARE[x.id ?? ''] ?? 0.38))
 
-const shopOf = (e: Entry) => ALL_DISHES.find((x) => x.id === e.shop)!
+const shopOf = (e: Entry) => DISHES.find((x) => x.id === e.shop)!
 
-/** what a thing takes out of stock (a bowl that comes with its beef: the beef; it isn't bought as a bowl) */
+/** what a thing takes out of stock (a set: its parts; it isn't bought as a set) */
 export const takesOf = (d: Dish, id: string): Stock =>
   (findItem(d, id) as { includes?: Stock } | undefined)?.includes ?? { [id]: 1 }
 

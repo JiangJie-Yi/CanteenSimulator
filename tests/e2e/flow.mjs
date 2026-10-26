@@ -1,6 +1,6 @@
 // The whole game played through in a browser, shop by shop: open the shop, buy stock on the board, hire the
 // second chef, have him try dishes out, put them all on the menu, open for business, and let customers come in.
-// Each shop is played from a fresh save (the starting capital opens one shop, not all four). Any page error, or a
+// Each shop is played from a fresh save. Any page error, or a
 // step that doesn't do what it should, fails the run.
 //
 //   npm run dev          (in another terminal)

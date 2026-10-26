@@ -4,8 +4,8 @@
 // (「想吃魚」, 「有什麼蔬菜？」), left to him (「你決定」, 「幫我客製化」), or just talk (天氣, 累不累, 你是誰…).
 import { FOOD_KINDS, type FoodKind } from '@/data/foodKinds'
 import type { Dish } from '@/data/menu'
-import { findItem, partName, SEASONINGS, TOPPINGS, type Seasoning } from '@/data/recipes'
-import { breadTaste, PAIRING, PAIRING_DEFAULT } from '@/game/taste'
+import { findItem, partName, SEASONINGS, type Seasoning } from '@/data/recipes'
+import { PAIRING, PAIRING_DEFAULT } from '@/game/taste'
 
 export type Intent =
   /** cook this (dabs null: the chef's choice) */
@@ -54,24 +54,17 @@ const SEASON_WORDS: Record<Seasoning, string[]> = {
   shichimi: ['七味', '辣椒粉', '一味', 'とうがらし', 'shichimi'],
   yuzu: ['柚子胡椒', '柚子', 'ゆず', 'yuzu'],
   lemon: ['檸檬', '酢橘', 'すだち', 'レモン', 'lemon'],
-  chocolate: ['巧克力', 'チョコ', 'chocolate'],
-  almond: ['杏仁', 'アーモンド', 'almond'],
-  cheese: ['起司', '乳酪', '起士', 'チーズ', 'cheese'],
-  ham: ['火腿', 'ハム', 'ham'],
-  custard: ['卡士達', '奶油餡', 'カスタード', 'custard'],
-  garlic: ['蒜', 'ガーリック', 'にんにく', 'garlic'],
 }
 const NUMBERS: Record<string, number> = { 一: 1, 兩: 2, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 }
 
-/** what a shop's cook can make, one by one: the grill's foods, the bakery's doughs, the other shops' dishes */
+/** what the cook can make, one by one: the grill's foods (anything else on the menu as it comes) */
 export const cookable = (d: Dish) => d.roast ? d.items.filter((x) => x.id in d.roast!.times)
-  : d.bake ? d.items
-  : [...d.bases.filter((b) => !b.includes || d.id === 'beefnoodle'), ...d.items]
+  : [...d.bases.filter((b) => !b.includes), ...d.items]
 
 /** the seasonings a shop uses (none: its dishes come as they are) */
-export const seasoningsOf = (d: Dish): Seasoning[] => (d.roast ? SEASONINGS : d.bake ? TOPPINGS : [])
+export const seasoningsOf = (d: Dish): Seasoning[] => (d.roast ? SEASONINGS : [])
 
-const kindOf = (d: Dish) => (d.roast ? 'grill' : d.bake ? 'bake' : 'plain') as 'grill' | 'bake' | 'plain'
+const kindOf = (d: Dish) => (d.roast ? 'grill' : 'plain') as 'grill' | 'plain'
 
 /** every way a food might be named in what's typed, longest first: its own names, and (where a seasoning makes it a
  * dish of its own) the dish's names, 鹽烤玉米 and the like */
@@ -145,7 +138,7 @@ export function understand(text: string, d: Dish): Intent {
 }
 
 /** how good a dish ought to come out, made well: at the grill by how its seasonings suit the food (the first in
- * full, a second a little, past two overdone); a bread by its fillings; anything else as it comes */
+ * full, a second a little, past two overdone); anything else as it comes */
 export function expectedTaste(d: Dish, id: string, dabs: Seasoning[]) {
   if (d.roast) {
     let t = 62
@@ -158,7 +151,6 @@ export function expectedTaste(d: Dish, id: string, dabs: Seasoning[]) {
     if (dabs.length > 2) t -= (dabs.length - 2) * 12
     return Math.round(Math.max(5, Math.min(98, t)))
   }
-  if (d.bake) return breadTaste(d.bake, id, dabs as Parameters<typeof breadTaste>[2], 1.1)
   return 72
 }
 

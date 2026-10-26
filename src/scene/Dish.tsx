@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { BASE_MATERIAL } from './baseMaterial'
-import { useGLTF, useTexture } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { CopyLayout } from '@/data/menu'
@@ -8,13 +8,12 @@ import type { CopyLayout } from '@/data/menu'
 const INK = new THREE.Color('#3b2a20')
 const OUTLINE_WIDTH = 0.007
 // too small, thin or flat to look good with an ink line
-const NO_OUTLINE = new Set(['Broth', 'FirePit', 'DriedChili', 'SichuanPepper', 'Scallion', 'Charcoal', 'PickledGreens',
-  'Noodles', 'ExtraNoodles', 'GrillNet', 'AshLump', 'CoalChunk', 'CoalStick'])
+const NO_OUTLINE = new Set(['FirePit', 'Charcoal', 'GrillNet', 'AshLump', 'CoalChunk', 'CoalStick'])
 /** parts too fine for an ink line (a shrimp's legs and feelers would come out as heavy black wire) */
 // (and the fish's eyes: an outline as thick as on the body would be a black ring as wide as the eye itself)
 const NO_OUTLINE_MATERIALS = new Set(['ShrimpLeg', 'FishEye', 'FishPupil'])
 // flat ground pieces: they catch shadows but shouldn't throw any
-const NO_CAST = new Set(['Broth', 'FirePit'])
+const NO_CAST = new Set(['FirePit'])
 
 type Piece = {
   node: THREE.Object3D
@@ -47,9 +46,6 @@ const BOUNCE = 0.38
 // which spreads them evenly without lining up
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5))
 const UP = new THREE.Vector3(0, 1, 0)
-// "float" entrance: start a little below where it rests and drift up, easing out with no bounce
-const FLOAT_DEPTH = 0.12
-const FLOAT_EASE = 2.6
 
 /**
  * Natural variation for one piece: ±15% in size and a random turn — about its own skewer (local X, the stick
@@ -162,41 +158,14 @@ function makeOutline(mesh: THREE.Mesh): THREE.Mesh {
   return outline
 }
 
-/** Keeps the broth surface showing the chosen soup base's texture. */
-function BrothSurface({ scene, url }: { scene: THREE.Object3D; url: string }) {
-  const texture = useTexture(url)
-  useEffect(() => {
-    texture.flipY = false   // glTF UV convention
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.needsUpdate = true
-  }, [texture])
-  // checked every frame because the parent swaps in toon materials after this mounts
-  useFrame(() => {
-    const broth = scene.getObjectByName('Broth') as THREE.Mesh | undefined
-    const mat = broth?.material as THREE.MeshToonMaterial | undefined
-    if (mat && mat.map !== texture) {
-      mat.map = texture
-      mat.needsUpdate = true
-    }
-  })
-  return null
-}
-
 type DishProps = ThreeElements['group'] & {
   url: string
   /** every menu item id this model has */
   itemIds: string[]
   /** how many portions of each menu item are ordered */
   quantities: Record<string, number>
-  /** broth texture for the chosen soup base */
-  broth?: string
-  /** object name prefixes to keep hidden (they don't go with the chosen base) */
+  /** object name prefixes to keep hidden (they don't go with the chosen set) */
   hidden?: string[]
-  /** objects recoloured flat (texture dropped), and tinted over their texture, for the chosen base */
-  fill?: Record<string, string>
-  tint?: Record<string, string>
-  /** item ids that rise gently into place instead of dropping in */
-  floatIds?: string[]
   /** where extra portions go (see menu.ts CopyLayout); default spreads them evenly around the centre */
   layout?: CopyLayout
   /** skip the pop-in animation (prefers-reduced-motion) */
@@ -204,11 +173,10 @@ type DishProps = ThreeElements['group'] & {
 }
 
 /** A dish exported from blender/*.py, drawn in a hand-painted toon style, with menu items that pop in and out. */
-export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floatIds, layout, instant = false,
+export function Dish({ url, itemIds, quantities, hidden, layout, instant = false,
   ...props }: DishProps) {
   const { scene } = useGLTF(url)
   const ids = useMemo(() => new Set(itemIds), [itemIds])
-  const floats = useMemo(() => new Set(floatIds), [floatIds])
 
   // menu-item nodes grouped by id, with their authored transform and animation state. The model has one
   // portion of each item (copy 0); extra portions are cloned on demand in the frame loop.
@@ -367,73 +335,6 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
     })
   }, [scene, hidden, ids])
 
-  // with no noodles in the bowl there's nothing for the chopsticks to rest in: they're laid down on the table beside
-  // the bowl, side by side with their tips to the left, and picked back up into the noodles when a bowl is ordered
-  const sticks = useMemo(() => {
-    const found: { node: THREE.Object3D; homeP: THREE.Vector3; homeQ: THREE.Quaternion;
-      restP: THREE.Vector3; restQ: THREE.Quaternion }[] = []
-    scene.updateMatrixWorld(true)
-    scene.traverse((o) => { if (baseName(o.name) === 'Chopstick' && !(o.parent && baseName(o.parent.name) === 'Chopstick')) {
-      found.push({ node: o, homeP: o.position.clone(), homeQ: o.quaternion.clone(),
-        restP: new THREE.Vector3(), restQ: new THREE.Quaternion() })
-    } })
-    const along = new THREE.Vector3(-0.81, 0, 0.59)          // tips toward the left of the screen
-    const across = new THREE.Vector3(0.59, 0, 0.81)
-    found.forEach((s, i) => {
-      // the stick's length runs along its longest local axis; which way it points now decides how to lay it down
-      const mesh = s.node instanceof THREE.Mesh ? s.node : s.node.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh
-      if (!mesh) return
-      mesh.geometry.computeBoundingBox()
-      const size = mesh.geometry.boundingBox!.getSize(new THREE.Vector3())
-      const axis = size.x > size.y && size.x > size.z ? new THREE.Vector3(1, 0, 0)
-        : size.y > size.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1)
-      const tipNow = axis.clone().applyQuaternion(s.node.getWorldQuaternion(new THREE.Quaternion())).normalize()
-      // which end is the tip: the end that's lower now (the tips are down in the noodles)
-      if (tipNow.y > 0) tipNow.negate()
-      const turn = new THREE.Quaternion().setFromUnitVectors(tipNow, along)
-      const worldQ = turn.multiply(s.node.getWorldQuaternion(new THREE.Quaternion()))
-      const parentQ = s.node.parent!.getWorldQuaternion(new THREE.Quaternion())
-      s.restQ.copy(parentQ.invert().multiply(worldQ))
-      // lying on the table (its thick end is 0.017 across) just clear of the bowl's rim, toward the camera
-      const at = new THREE.Vector3(0.62, 0.017, 0.86).addScaledVector(across, (i - (found.length - 1) / 2) * 0.07)
-      s.restP.copy(s.node.parent!.worldToLocal(scene.localToWorld(at)))
-    })
-    return found
-  }, [scene])
-  const sticksDown = (hidden ?? []).includes('Noodles')
-  useFrame((_, delta) => {
-    const k = instant ? 1 : Math.min(1, delta * 6)
-    for (const s of sticks) {
-      s.node.position.lerp(sticksDown ? s.restP : s.homeP, k)
-      s.node.quaternion.slerp(sticksDown ? s.restQ : s.homeQ, k)
-    }
-  })
-
-  // colours that change with the base: a different soup, sauce-coated noodles. Checked each frame because the toon
-  // materials are swapped in by an effect; each material remembers its own colour and texture to go back to.
-  const fillKey = JSON.stringify([fill, tint])
-  useFrame(() => {
-    scene.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh) || obj.name.endsWith('_outline')) return
-      const mat = obj.material
-      if (!(mat instanceof THREE.MeshToonMaterial)) return
-      const owner = obj.parent && obj.parent !== scene && !obj.name ? obj.parent : obj
-      const type = baseName(owner.name.replace(/_\d+$/, ''))
-      if (mat.userData.fillKey === fillKey) return
-      if (!mat.userData.original) mat.userData.original = { color: mat.color.clone(), map: mat.map }
-      const orig = mat.userData.original as { color: THREE.Color; map: THREE.Texture | null }
-      const flat = fill?.[type]
-      const over = tint?.[type]
-      const map = flat ? null : orig.map
-      if (mat.map !== map) {
-        mat.map = map
-        mat.needsUpdate = true
-      }
-      mat.color.copy(flat ? new THREE.Color(flat) : over ? orig.color.clone().multiply(new THREE.Color(over)) : orig.color)
-      mat.userData.fillKey = fillKey
-    })
-  })
-
   // items drop in from above, bounce on landing and spring up to size; taking one out shrinks it away
   const first = useRef(true)
   useFrame((_, delta) => {
@@ -444,7 +345,6 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
       const qty = quantities[id] ?? 0
       let copies = 1 + Math.max(0, ...pieces.map((p) => p.copy))
       while (copies < qty) addCopy(id, pieces, copies++)
-      const float = floats.has(id)
       pieces.forEach((p) => {
         const wanted = p.copy < qty
         const i = p.index
@@ -457,19 +357,14 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
           p.on = true
           p.v = 0
           p.vy = 0
-          p.s = float ? 0.85 : 0.15
-          p.y = float ? -FLOAT_DEPTH : DROP_HEIGHT + i * 0.07
+          p.s = 0.15
+          p.y = DROP_HEIGHT + i * 0.07
         } else if (!wanted && p.on) {
           p.on = false
         }
 
         if (!snap) {
-          if (p.on && float) {
-            // drift up out of the soup and ease to size
-            const e = Math.min(1, dt * FLOAT_EASE)
-            p.y += (0 - p.y) * e
-            p.s += (1 - p.s) * e
-          } else if (p.on) {
+          if (p.on) {
             // underdamped spring toward full size: overshoots, then settles
             p.v += (SPRING_K * (1 - p.s) - SPRING_DAMPING * p.v) * dt
             p.s += p.v * dt
@@ -492,8 +387,7 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
         const s = Math.max(p.s, 0.0001) * ((p.node.userData.shrink as number | undefined) ?? 1)
         p.node.scale.copy(p.baseScale).multiplyScalar(s)
         // once Roasting has moved a piece to the plate it owns the position
-        // (userData.bob: PotCooking bobs food on a rolling boil)
-        if (!p.node.userData.onPlate) p.node.position.y = p.baseY + p.y + ((p.node.userData.bob as number | undefined) ?? 0)
+        if (!p.node.userData.onPlate) p.node.position.y = p.baseY + p.y
         // (nor is food that's been eaten, or a portion still to pop in: nothing invisible is drawn)
         p.node.visible = p.s > 0.01 && s > 0.002
       })
@@ -503,7 +397,6 @@ export function Dish({ url, itemIds, quantities, broth, hidden, fill, tint, floa
   return (
     <>
       <primitive object={scene} {...props} />
-      {broth && <BrothSurface scene={scene} url={broth} />}
     </>
   )
 }

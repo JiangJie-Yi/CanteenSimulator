@@ -77,7 +77,7 @@ export function makeCandidates(shop: string, rand: Rand = Math.random, taken = n
     for (let k = 0; k < COUNTS[role]; k++) {
       // (a shop's applicants for a job cover the ages: one of each first, then any)
       const age = k < 3 ? AGES[(k + off) % 3] : pick(rand, AGES)
-      const female = rand() < (shop === 'bakery' && role === 'chef' ? 0.5 : WOMEN[role])
+      const female = rand() < WOMEN[role]
       let name = nameOf(rand, shop, female, age)
       for (let tries = 0; taken.has(name.zh) && tries < 20; tries++) name = nameOf(rand, shop, female, age)
       taken.add(name.zh)

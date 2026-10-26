@@ -5,13 +5,9 @@ import { guestLabel, kindOf } from '@/data/guests'
 import type { Lang } from '@/data/i18n'
 
 /*
- * The inside of the shop on screen, drawn small above the guest list, each of the three in its own style:
- *   聞野燒烤  a dark-timbered robata bar: menu slips (短冊) hung along the wall, red paper lanterns, a shelf of sake,
- *            and behind the counter the charcoal grill with the chef (板前) fanning it, the cashier at the till
- *   鼎沸火鍋  a red-walled hot pot room: a gold 福 diamond, round lanterns with tassels, a black menu board, a pass
- *            window onto the kitchen where the back-kitchen cooks chop, floor staff carrying trays out
- *   甲粗飽食堂 a white-tiled noodle shop: wooden menu plaques, a ceiling fan, the stockpot steaming, the noodle cook
- *            in his tall white hat lifting noodles with a strainer
+ * The inside of the shop, drawn small above the guest list: a dark-timbered robata bar, menu slips (短冊) hung along
+ * the wall, red paper lanterns, a shelf of sake, and behind the counter the charcoal grill with the chef (板前) fanning
+ * it, the cashier at the till.
  * Customers come in through the noren (it sways), walk to a stool and sit; a "…" while they wait, nodding over the
  * bowl while they eat; when they're done their face says how it was and they walk back out. Someone kept waiting
  * too long stamps out with an anger mark. Only the staff actually hired are there.
@@ -140,20 +136,17 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
 }
 
 /** a member of staff, drawn standing behind the counter (or walking, for floor staff) */
-function Staff({ look, action }: { look: 'itamae' | 'cook' | 'noodle' | 'cashier' | 'server'; action?: boolean }) {
-  const coat = { itamae: '#f1ece0', cook: '#f4f1ea', noodle: '#f6f4ee', cashier: '#3d6a9a', server: '#2a2a2e' }[look]
+function Staff({ look, action }: { look: 'itamae' | 'cashier' | 'server'; action?: boolean }) {
+  const coat = { itamae: '#f1ece0', cashier: '#3d6a9a', server: '#2a2a2e' }[look]
   return (
     <svg viewBox="0 0 40 60" className={`gc-staff gc-staff-${look}${action ? ' is-working' : ''}`} aria-hidden="true">
       <path d="M8 60c0-14 5-24 12-24s12 10 12 24z" fill={coat} stroke={INK} strokeWidth="1.1" />
       {look === 'itamae' && <path d="M15 37l5 10 5-10" fill="none" stroke="#2f3a4a" strokeWidth="1.6" />}
-      {(look === 'cook' || look === 'noodle') && <><circle cx="17" cy="44" r="0.9" fill={INK} /><circle cx="17" cy="50" r="0.9" fill={INK} /><circle cx="23" cy="44" r="0.9" fill={INK} /><circle cx="23" cy="50" r="0.9" fill={INK} /></>}
       {look === 'server' && <path d="M12 46h16v14H12z" fill="#7a2a22" />}
       {look === 'cashier' && <path d="M14 42h12v18H14z" fill="#e8e0d0" />}
       <circle cx="20" cy="27" r="8" fill="#eac39c" stroke={INK} strokeWidth="1.1" />
       <path d="M12 26c0-6 4-9 8-9s8 3 8 9c-2-3-5-4-8-4s-6 1-8 4z" fill="#2b1d14" />
       {look === 'itamae' && <><rect x="11.5" y="20" width="17" height="3.4" rx="1.6" fill="#f6f2ea" stroke="#b4302a" strokeWidth="0.9" /><path d="M28 21l4-2M28 22l4 2" stroke="#b4302a" strokeWidth="1" /></>}
-      {look === 'noodle' && <path d="M12 21c-2-9 18-9 16 0z" fill="#fbfaf6" stroke={INK} strokeWidth="1" />}
-      {look === 'cook' && <rect x="12" y="17" width="16" height="5" rx="2" fill="#fbfaf6" stroke={INK} strokeWidth="0.9" />}
       {look === 'server' && <path d="M12 22h16" stroke="#7a2a22" strokeWidth="2.4" />}
       <circle cx="17" cy="28" r="0.9" fill="#2a1d16" />
       <circle cx="23" cy="28" r="0.9" fill="#2a1d16" />
@@ -163,18 +156,6 @@ function Staff({ look, action }: { look: 'itamae' | 'cook' | 'noodle' | 'cashier
         <g className="gc-tool">
           <path d="M31 46l5-9" stroke="#8a5a30" strokeWidth="1.2" />
           <ellipse cx="36.5" cy="35" rx="4" ry="4.6" fill="#e8d6a8" stroke={INK} strokeWidth="0.8" />
-        </g>
-      )}
-      {look === 'noodle' && (
-        <g className="gc-tool">
-          <path d="M31 50l4-14" stroke="#8a5a30" strokeWidth="1.2" />
-          <circle cx="35.5" cy="34" r="3.4" fill="none" stroke="#9aa0a6" strokeWidth="1.1" />
-          <path d="M33 34h5M35.5 31.5v5" stroke="#9aa0a6" strokeWidth="0.5" />
-        </g>
-      )}
-      {look === 'cook' && (
-        <g className="gc-tool">
-          <path d="M28 50l9-4" stroke="#c8ccd0" strokeWidth="2" strokeLinecap="round" />
         </g>
       )}
       {look === 'server' && (
@@ -187,85 +168,8 @@ function Staff({ look, action }: { look: 'itamae' | 'cook' | 'noodle' | 'cashier
   )
 }
 
-/** the back wall and fittings of each shop (a 300 × 140 picture) */
-function Backdrop({ shop }: { shop: string }): ReactNode {
-  if (shop === 'hotpot') {
-    return (
-      <svg className="gc-backdrop" viewBox="0 0 300 140" preserveAspectRatio="none" aria-hidden="true">
-        <rect width="300" height="140" fill="#a8352a" />
-        <rect y="0" width="300" height="10" fill="#5a1a14" />
-        <path d="M0 18h300" stroke="#e0a83a" strokeWidth="1.2" opacity="0.6" />
-        {/* the gold 福 diamond, upside down for luck */}
-        <g transform="translate(140 40) rotate(45)">
-          <rect x="-13" y="-13" width="26" height="26" fill="#c4302a" stroke="#f2c75c" strokeWidth="1.6" />
-        </g>
-        <text x="140" y="46" textAnchor="middle" fontSize="16" fill="#f2c75c" transform="rotate(180 140 40)" fontFamily="serif">福</text>
-        {/* round red lanterns with gold bands and tassels */}
-        {[86, 196].map((x) => (
-          <g key={x} className="gc-sway">
-            <path d={`M${x} 10v8`} stroke="#3b2a20" strokeWidth="1" />
-            <ellipse cx={x} cy="30" rx="11" ry="12" fill="#d63a26" stroke="#7a140e" strokeWidth="1" />
-            <path d={`M${x - 11} 30h22M${x - 9} 23h18M${x - 9} 37h18`} stroke="#f2c75c" strokeWidth="1" />
-            <path d={`M${x} 42v8`} stroke="#f2c75c" strokeWidth="1.6" />
-          </g>
-        ))}
-        {/* the black menu board with gold lettering */}
-        <rect x="222" y="16" width="64" height="40" rx="2" fill="#1e1a18" stroke="#c49a3a" strokeWidth="1.4" />
-        {[0, 1, 2, 3, 4].map((i) => (
-          <path key={i} d={`M${230 + i * 11} 22v28`} stroke="#e0c070" strokeWidth="1.6" strokeDasharray="3 2" />
-        ))}
-        {/* the pass window onto the kitchen, where the back-kitchen cooks work */}
-        <rect x="44" y="40" width="58" height="34" fill="#3a2a22" stroke="#5a1a14" strokeWidth="2" />
-        <rect x="44" y="40" width="58" height="6" fill="#e0a83a" opacity="0.5" />
-        {/* the wainscot */}
-        <rect y="74" width="300" height="20" fill="#5a2a1c" />
-        <path d="M0 74h300" stroke="#e0a83a" strokeWidth="1" />
-        {/* the counter */}
-        <rect y="88" width="300" height="10" fill="#7a3a22" stroke={INK} strokeWidth="0.8" />
-        <rect y="98" width="300" height="42" fill="#5a2e1e" />
-        <path d="M0 98h300" stroke="rgb(0 0 0 / 0.3)" strokeWidth="2" />
-      </svg>
-    )
-  }
-  if (shop === 'beefnoodle') {
-    return (
-      <svg className="gc-backdrop" viewBox="0 0 300 140" preserveAspectRatio="none" aria-hidden="true">
-        <rect width="300" height="140" fill="#eef0ea" />
-        {/* white tiles above, a band of green tiles below */}
-        <g stroke="rgb(90 110 100 / 0.22)" strokeWidth="0.8">
-          {Array.from({ length: 30 }, (_, i) => <path key={`v${i}`} d={`M${i * 10} 0v74`} />)}
-          {Array.from({ length: 8 }, (_, i) => <path key={`h${i}`} d={`M0 ${i * 10}h300`} />)}
-        </g>
-        <rect y="62" width="300" height="14" fill="#5f8f7a" />
-        <g stroke="rgb(255 255 255 / 0.35)" strokeWidth="0.7">
-          {Array.from({ length: 30 }, (_, i) => <path key={i} d={`M${i * 10} 62v14`} />)}
-        </g>
-        {/* wooden menu plaques with prices */}
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <g key={i}>
-            <rect x={118 + i * 26} y="8" width="20" height="40" fill="#e6c88e" stroke="#7a5a30" strokeWidth="1" />
-            <path d={`M${128 + i * 26} 13v20`} stroke="#3b2a20" strokeWidth="2" strokeDasharray="3 2" />
-            <circle cx={128 + i * 26} cy="41" r="2.4" fill="#c4302a" />
-          </g>
-        ))}
-        {/* the ceiling fan */}
-        <g className="gc-fan">
-          <path d="M70 0v8" stroke="#555" strokeWidth="1.4" />
-          <ellipse cx="70" cy="9" rx="22" ry="1.8" fill="#6a6a6a" />
-        </g>
-        {/* the stockpot on its burner, steaming */}
-        <rect x="26" y="52" width="38" height="34" rx="3" fill="#b8bec4" stroke={INK} strokeWidth="1" />
-        <path d="M26 58h38" stroke="#8a9096" strokeWidth="2" />
-        <g className="gc-steam" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinecap="round" opacity="0.8">
-          <path d="M36 50q-4-8 0-14t0-14" />
-          <path d="M48 50q4-8 0-14t0-14" />
-        </g>
-        <rect y="88" width="300" height="10" fill="#c49a5a" stroke={INK} strokeWidth="0.8" />
-        <rect y="98" width="300" height="42" fill="#8a6a44" />
-        <path d="M0 98h300" stroke="rgb(0 0 0 / 0.25)" strokeWidth="2" />
-      </svg>
-    )
-  }
+/** the back wall and fittings of the shop (a 300 × 140 picture) */
+function Backdrop(): ReactNode {
   return (
     <svg className="gc-backdrop" viewBox="0 0 300 140" preserveAspectRatio="none" aria-hidden="true">
       {/* dark timber walls, a beam along the top */}
@@ -324,8 +228,6 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave'; at: n
 /** each shop's noren: its colour and words */
 const NOREN: Record<string, [string, string]> = {
   grilledfish: ['炭', '火'],
-  hotpot: ['火', '鍋'],
-  beefnoodle: ['麵', '處'],
 }
 
 export type StaffOnShow = { chef: number; cashier: number; server: number }
@@ -367,16 +269,13 @@ export function GuestCounter({ guests, shop = 'grilledfish', staff = { chef: 1, 
   const busy = guests.some((g) => g.state === 'waiting' || g.state === 'eating')
   return (
     <div className={`gc-scene shop-${shop}`} aria-hidden="true">
-      <Backdrop shop={shop} />
+      <Backdrop />
       {/* the staff: the chef behind the counter, the back-kitchen cooks in the pass window, the cashier at the
           till at the far end, floor staff walking between */}
       {staff.chef > 0 && (
         <div className={`gc-stand gc-stand-chef gc-at-${shop}`}>
-          <Staff look={shop === 'grilledfish' ? 'itamae' : shop === 'beefnoodle' ? 'noodle' : 'cook'} action={busy} />
+          <Staff look="itamae" action={busy} />
         </div>
-      )}
-      {shop === 'hotpot' && staff.chef > 1 && (
-        <div className="gc-stand gc-stand-chef2"><Staff look="cook" action={busy} /></div>
       )}
       {staff.cashier > 0 && (
         <div className="gc-stand gc-stand-cashier">

@@ -4,9 +4,6 @@
 // Each shop is staffed the way such a place really is:
 //   聞野燒烤 (a robata counter): the chef grills right in front of the customers and takes their orders himself, so
 //     there's one chef (板前) and one cashier, no floor staff
-//   鼎沸火鍋 (a hot pot restaurant): back-kitchen cooks prepare the plates, one cashier, and floor staff who seat
-//     people and carry the food out
-//   甲粗飽食堂 (a noodle shop): one or two noodle cooks at the pot, one cashier, perhaps one server
 //
 // Everyone has 手藝 (skill), 速度 (speed) and 體力 (stamina), from 1 to 100, and a wage by the hour. Better people
 // cost more — mostly. Now and then someone is a bargain (good and cheap), and now and then someone is overpaid. While
@@ -46,9 +43,6 @@ const STAFFING = (chef: string, sous: string, chefJa: string, sousJa: string) =>
 ]
 export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: string }[]> = {
   grilledfish: STAFFING('二廚（顧爐・烤魚）', '三廚（備料・上火・收拾）', '二番手', '追い回し'),
-  hotpot: STAFFING('二廚（顧湯）', '三廚（備料）', '二番手', '仕込み'),
-  beefnoodle: STAFFING('二廚（煮麵・快炒）', '三廚（顧湯・配料）', '二番手', '仕込み'),
-  bakery: STAFFING('二廚（麵包師傅）', '三廚（備料・整形）', 'パン職人', '仕込み'),
 }
 
 // a fair wage for someone this good at this job (NT$/h): from about minimum wage (NT$196) up

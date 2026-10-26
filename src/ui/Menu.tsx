@@ -74,12 +74,6 @@ let foodsFont: { font: number; rows: number } | null = null
 /** (a dish on the menu is drawn with the icon of the food it's made from) */
 const iconOf = (x: object) => (x as { icon?: string }).icon
 
-const CAT_NAMES: Record<string, Record<Lang, string>> = {
-  noodleSoup: { zh: '湯麵類', ja: '汁そば' }, extra: { zh: '加點', ja: 'トッピング' }, quick: { zh: '快餐', ja: '定食' },
-  friedRice: { zh: '炒飯類', ja: '炒飯' }, friedNoodles: { zh: '炒麵類', ja: '焼きそば' }, vermicelli: { zh: '炒米粉類', ja: '焼きビーフン' },
-  saucyRice: { zh: '燴飯類', ja: 'あんかけご飯' }, dumplings: { zh: '水餃類', ja: '水餃子' }, soupDumplings: { zh: '湯餃類', ja: 'スープ餃子' },
-  xiaolongbao: { zh: '點心', ja: '点心' }, soup: { zh: '湯類', ja: 'スープ' },
-}
 
 export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, open = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0, days, layoutLike,
   cash = Infinity }: MenuProps) {
@@ -153,20 +147,6 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     el?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
   }, [lastFeed])
   const all = [...dish.bases, ...dish.items]
-  // the 台式小吃 menu: things grouped under 湯麵類, 快餐, 炒飯類… as on a Taiwanese menu board
-  const taiwan = dish.items.some((x) => x.table)
-  const groups = useMemo(() => {
-    if (!taiwan) return []
-    const order = ['noodleSoup', 'extra', 'quick', 'friedRice', 'friedNoodles', 'vermicelli', 'saucyRice', 'dumplings',
-      'soupDumplings', 'xiaolongbao', 'soup']
-    const out = new Map<string, { x: (typeof all)[number]; base: boolean }[]>()
-    for (const b of dish.bases) out.set('noodleSoup', [...(out.get('noodleSoup') ?? []), { x: b, base: true }])
-    for (const it of dish.items) {
-      const cat = it.table ?? 'extra'
-      out.set(cat, [...(out.get(cat) ?? []), { x: it, base: false }])
-    }
-    return order.filter((c) => out.has(c)).map((cat) => ({ cat, list: out.get(cat)! }))
-  }, [dish, taiwan])
 
   const onKey = (id: string) => (e: KeyboardEvent) => {
     if (locked) return
@@ -177,7 +157,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
   }
 
   // every tag on the board is lettered the same size: the size the longest one needs (with room for its stamp)
-  const priceText = (x: { price: number }) => (research ? '' : taiwan ? String(x.price) : toChineseNumber(x.price))
+  const priceText = (x: { price: number }) => (research ? '' : toChineseNumber(x.price))
   const boardFit = Math.min(1, ...all.map((x) => tagFit(nameIn(lang, x), x.en, priceText(x), true, research && !!onBuy, !!layoutLike)))
   const fitStyle = { '--fit': boardFit.toFixed(3) } as CSSProperties
 
@@ -189,9 +169,9 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     const n = quantities[x.id] ?? 0
     const incl = !base && included.has(x.id)
     const name = nameIn(lang, x)
-    // (a Taiwanese menu prints its prices in plain figures, in red; the test kitchen's board shows what it costs)
+    // (the test kitchen's board shows what it costs)
     const cost = research && unitCost ? unitCost(x.id) : 0
-    const price = research ? `${cost}` : taiwan ? String(x.price) : toChineseNumber(x.price)
+    const price = research ? `${cost}` : toChineseNumber(x.price)
     const hasSet = base && !!(x as { includes?: object }).includes
     const filling = feed.filter((f) => f.id === x.id)
     const parts = (x as { includes?: Record<string, number> }).includes ?? { [x.id]: 1 }
@@ -308,7 +288,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
   const likeTags = layoutLike?.tags ?? 0, likeBases = layoutLike?.bases ?? 0
   useLayoutEffect(() => {
     const menu = aside.current, strips = row.current
-    if (!menu || !strips || taiwan) return
+    if (!menu || !strips) return
     const wide = window.matchMedia('(min-width: 901px) and (min-height: 521px)')
     const px = (v: string) => parseFloat(v) || 0
     const measure = () => {
@@ -376,15 +356,15 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       ro.disconnect()
       wide.removeEventListener('change', measure)
     }
-  }, [tagCount, baseCount, likeTags, likeBases, taiwan, research])
+  }, [tagCount, baseCount, likeTags, likeBases, research])
 
   return (
     <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
-      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${taiwan ? ' menu-taiwan' : ''}${research || open ? '' : ' no-title'}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
+      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${research || open ? '' : ' no-title'}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
       {/* (the board's name only where it's the shop's own: the foods' fridge, or the menu once the shop's open; closed, it's a plain preview) */}
       {(research || open) && <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>}
 
-      {research && onBuy && !taiwan ? (
+      {research && onBuy ? (
         <div className="strips-frame">
           <div className="chiller" role="group" aria-label={lang === 'ja' ? '食材の冷蔵庫' : '食材冷藏櫃'}>
             <div className="chiller-top"><span>{lang === 'ja' ? '冷蔵庫' : '冷藏櫃'}</span><i aria-hidden="true">−18℃</i></div>
@@ -408,18 +388,8 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
             dragged.current = 0
           }}>
           {/* bases (the dark walnut tags) are ordered the same way as everything else */}
-          {taiwan ? (
-            // grouped the way a Taiwanese 小吃 menu board is, each group under its magenta header
-            groups.map((grp) => [
-              <div key={`cat-${grp.cat}`} className="strip-cat" aria-hidden="true"><b>{CAT_NAMES[grp.cat][lang]}</b></div>,
-              ...grp.list.map(({ x, base }) => tag(x, iconFor(dish.id, { ...x, icon: iconOf(x) }, base), base)),
-            ])
-          ) : (
-            <>
-              {dish.bases.map((b) => tag(b, iconFor(dish.id, { ...b, icon: iconOf(b) }, true), true))}
-              {dish.items.map((item) => tag(item, iconFor(dish.id, { ...item, icon: iconOf(item) }, false), false))}
-            </>
-          )}
+          {dish.bases.map((b) => tag(b, iconFor(dish.id, { ...b, icon: iconOf(b) }, true), true))}
+          {dish.items.map((item) => tag(item, iconFor(dish.id, { ...item, icon: iconOf(item) }, false), false))}
         </div>
       </div>
       )}

@@ -1,13 +1,13 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { ALL_DISHES } from '@/data/menu'
+import { DISHES } from '@/data/menu'
 import { idealSteps, recipeSteps, timingTips, trialIdeas } from '@/game/research'
 import { timingLoss } from '@/game/taste'
 
 feature('研發與試做', () => {
   scenario('每間店都有東西可以試做，口味分數在 0 到 100 之間', ({ given, when, then }) => {
-    given('四間店', (w) => { w.dishes = ALL_DISHES })
-    when('列出每間店可試做的菜', (w) => { w.ideas = ALL_DISHES.map((d) => [d.id, trialIdeas(d)]) })
+    given('店裡', (w) => { w.dishes = DISHES })
+    when('列出每間店可試做的菜', (w) => { w.ideas = DISHES.map((d) => [d.id, trialIdeas(d)]) })
     then('每間店至少一道，分數都落在 0 到 100', (w) => {
       for (const [, ideas] of w.ideas as [string, ReturnType<typeof trialIdeas>][]) {
         expect(ideas.length).toBeGreaterThan(0)
@@ -17,7 +17,7 @@ feature('研發與試做', () => {
   })
 
   scenario('烤魚店的魚配對的調味越合，口味分數越高', ({ given, when, then }) => {
-    given('日式烤魚店的試做清單', (w) => { w.ideas = trialIdeas(ALL_DISHES.find((d) => d.id === 'grilledfish')!) })
+    given('日式烤魚店的試做清單', (w) => { w.ideas = trialIdeas(DISHES.find((d) => d.id === 'grilledfish')!) })
     when('比較同一種魚的原味與加了調味的版本', (w) => {
       const id = (w.ideas as ReturnType<typeof trialIdeas>)[0].id
       w.plain = w.ideas.find((i: { id: string; dabs: string[] }) => i.id === id && i.dabs.length === 0)
