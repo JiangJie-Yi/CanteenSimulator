@@ -529,15 +529,6 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       <group position={[-0.21, top, -0.005]}><TillDeskPiece name="TillMat" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-sign" label="結帳牌"><StaticBatch>
-      <group position={at} rotation-y={yaw}>
-      {/* the お会計 sign, in its little wooden stand, to the customers */}
-      <group position={[0.36, top, -0.3]} rotation-y={Math.PI}>
-        <Part geo={REG_GEO.body} color="#6a4428" position-y={0.006} scale={[0.14, 0.012, 0.05]} />
-        <mesh position={[0, 0.05, 0]}><planeGeometry args={[0.12, 0.075]} /><meshToonMaterial color="#ffffff" map={PAY_SIGN} /></mesh>
-      </group>
-      </group>
-      </StaticBatch></Movable>
       <Movable id="till-cat" label="櫃檯招財貓" baseTurn={[0, -45, 0]}>
       <group position={at} rotation-y={yaw}>
       <group position={[0.45, top, -0.21]} rotation-y={Math.PI}>
@@ -802,19 +793,6 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     </group>
   )
 }
-/** the sign on the till: お会計 brushed on cream, with its Chinese under it */
-const PAY_SIGN = (() => signTexture(160, 100, (g) => {
-  g.fillStyle = '#f2e8d0'
-  g.fillRect(0, 0, 160, 100)
-  g.strokeStyle = '#6a4428'
-  g.lineWidth = 6
-  g.strokeRect(3, 3, 154, 94)
-  g.strokeStyle = '#b8261c'
-  g.lineWidth = 1.6
-  g.strokeRect(10, 10, 140, 80)
-  brushText(g, 'お会計', 80, 40, 44, { fill: '#b8261c', edge: '#f8f0dc', shadow: 'rgba(60,30,10,0.4)', spacing: 3 })
-  brushText(g, '結帳', 80, 76, 22, { fill: '#1d140c', weight: 'normal', spacing: 6 })
-}))()
 
 /**
  * The cats at the door, on their stand just inside it against the wall (the entrance's +x side; the till is on the

@@ -6,13 +6,18 @@ import { inkModel } from '@/scene/inkHull'
 /**
  * The till counter, from blender/tillcounter.py, in the till's own frame (built for a top at TILL_TOP; another height stretches the body to
  * it): the dark wooden body with loose green bamboo up the customers' face (a warm light behind it showing through) and a round window lit
- * from within like a paper lantern, a polished white marble top, and the walnut partition of fine slats along the customers' side and down the end.
+ * from within like a paper lantern, a polished white marble top, and the walnut shoji partition (washi in a sparse lattice) along the customers' side and down the end.
  */
 const URL = import.meta.env.BASE_URL + 'models/tillcounter.glb'
 export const TILL_TOP = 0.86
-const UNINKED = /^(TillWindowPaper|TillWindowSleeve|TillBambooGlow|TillLattice|TillRope|TillSlat|TillBack|TillShoe)|Node\d/
+const UNINKED = /^(TillWindowPaper|TillWindowSleeve|TillBambooGlow|TillLattice|TillRope|TillPaper|TillBar|TillShoe)|Node\d/
+
+/** the bamboo's shades, culm to culm: a fresh green, a yellower one, a deeper one… (laid over the one skin) */
+const BAMBOO_SHADES = ['#ffffff', '#f2f5c8', '#d6e6b4', '#fff2bf', '#c4d6a8']
 
 function finishOf(src: THREE.MeshStandardMaterial): THREE.Material {
+  const shade = /^TillBamboo(\d)$/.exec(src.name)
+  if (shade) return new THREE.MeshPhysicalMaterial({ map: src.map, color: BAMBOO_SHADES[+shade[1]], roughness: 0.35, clearcoat: 0.4, clearcoatRoughness: 0.3 })
   switch (src.name) {
     case 'TillMarble':
       // (polished marble: the lamps glint in it)

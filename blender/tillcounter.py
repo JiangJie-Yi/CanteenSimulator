@@ -59,7 +59,11 @@ batten_tex = image("batten", mix((0.8, 0.62, 0.4), (0.7, 0.52, 0.32), smooth(0.4
 # (green bamboo: a fresh green, paler streaks running along the culm, a faint bloom)
 bu, bv = grid01(256)
 streak = fbm(256, 40, 2, 4)
-bamboo_tex = image("bamboo", mix(mix((0.2, 0.42, 0.12), (0.34, 0.56, 0.2), streak), (0.55, 0.66, 0.36), smooth(0.75, 1.0, streak) * 0.5))
+fibre_b = fbm(256, 90, 3, 3)
+light_b = np.exp(-((bu - 0.32) / 0.12) ** 2)          # (a soft lit streak down one side of the culm)
+bamboo_base = mix(mix((0.3, 0.52, 0.16), (0.4, 0.62, 0.22), streak), (0.62, 0.76, 0.38), smooth(0.8, 1.0, streak) * 0.4)
+bamboo_base = mix(bamboo_base, (0.25, 0.44, 0.13), smooth(0.55, 0.95, fibre_b) * 0.35)
+bamboo_tex = image("bamboo", mix(bamboo_base, (0.78, 0.88, 0.55), light_b * 0.35))
 # (the window's paper, lit from behind like a paper lantern: brightest in the middle where the lamp is, warmer and dimmer toward the rim,
 # the paper's long fibres showing through)
 gu, gv = grid01(256)
@@ -71,6 +75,8 @@ paper_tex = image("windowpaper", mix(mix((0.86, 0.55, 0.26), (1.0, 0.93, 0.78), 
 lv = gv
 wash = np.clip(np.exp(-lv / 0.16) + 0.75 * np.exp(-(1 - lv) / 0.14) + 0.18, 0, 1)
 bamboo_glow_tex = image("bambooglow", mix((0.12, 0.06, 0.02), (1.0, 0.8, 0.5), wash))
+# (the partition's washi: cream, its fibres faint)
+washi_tex = image("washi", mix((0.96, 0.93, 0.85), (0.9, 0.85, 0.74), smooth(0.6, 0.95, fbm(256, 12, 12, 4)) * 0.6))
 # (the window's ring and lattice: a pale keyaki, its grain showing)
 kg = fbm(256, 2, 46, 5)
 keyaki_tex = image("keyaki", mix((0.78, 0.6, 0.4), (0.64, 0.46, 0.29), smooth(0.35, 0.8, kg)))
@@ -91,11 +97,12 @@ M = {
     "paper": pbr("TillWindowPaper", (1, 1, 1), tex=paper_tex, rough=0.9, emit=(1, 0.85, 0.6), emit_strength=1.5),
     "bambooGlow": pbr("TillBambooGlow", (1, 1, 1), tex=bamboo_glow_tex, rough=1.0, emit=(1, 0.8, 0.5), emit_strength=1.0),
     "walnut": pbr("TillShieldWalnut", (1, 1, 1), tex=walnut_tex, rough=0.4),
-    "slatBack": pbr("TillShieldBack", (1, 1, 1), tex=batten_tex, rough=0.6),
+    "paper": pbr("TillShieldPaper", (1, 1, 1), tex=washi_tex, rough=0.9),
     "shoe": pbr("TillShieldShoe", lin("#2a2622"), rough=0.35, metal=0.6),
     "bamboo": pbr("TillBamboo", (1, 1, 1), tex=bamboo_tex, rough=0.35),
-    "node": pbr("TillBambooNode", lin("#b5b04e"), rough=0.4),
-    "scar": pbr("TillBambooScar", lin("#d8d29a"), rough=0.6),
+    **{f"bamboo{i}": pbr(f"TillBamboo{i}", (1, 1, 1), tex=bamboo_tex, rough=0.35) for i in range(5)},
+    "node": pbr("TillBambooNode", lin("#4e5a22"), rough=0.5),
+    "lip": pbr("TillBambooLip", lin("#a8c468"), rough=0.4),
     "rope": pbr("TillRope", lin("#1c140e"), rough=0.9),
     "lattice": pbr("TillLattice", (1, 1, 1), tex=keyaki_tex, rough=0.5),
 }
@@ -206,7 +213,7 @@ GAP_BACK = 0.012                          # how far they stand off it, so the li
 brng = np.random.default_rng(5)
 
 
-def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell):
+def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell, shade):
     """a culm of bamboo: rings of verts up its length (close together round each node, so its shape shows), tapering a little, leaning and
     bowed, thicker and thinner along its length (`swell`: amount, wavelength, phase), and at each node a sharp ridge with the sheath's scar
     just under it and a little pinch above"""
@@ -227,7 +234,7 @@ def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell):
         for n in nodes_at:
             d = y - n
             # (the ridge, sharp; the sheath's scar a little below it; the pinch just above)
-            rad *= 1 + 0.13 * math.exp(-(d / 0.0022) ** 2) + 0.07 * math.exp(-((d + 0.006) / 0.0022) ** 2) - 0.045 * math.exp(-((d - 0.009) / 0.005) ** 2)
+            rad *= 1 + 0.07 * math.exp(-(d / 0.0024) ** 2) + 0.025 * math.exp(-((d + 0.006) / 0.003) ** 2) - 0.03 * math.exp(-((d - 0.009) / 0.006) ** 2)
         return rad
 
     def centre(y):
@@ -254,15 +261,14 @@ def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell):
     bm_.free()
     o = bpy.data.objects.new(name, me_)
     bpy.context.collection.objects.link(o)
-    finish(o, name, M["bamboo"])
+    finish(o, name, M[f"bamboo{shade}"])
     out = [o]
-    # (each node's band: the ridge picked out a shade yellower, and the scar under it paler still)
+    # (each node: the joint a fine dark line round the ridge, the lip just over it a little paler)
     for n in nodes_at:
-        cx, cz = centre(n)
-        for dy, k, mn in ((0.0, 1.0, 0.0028), (-0.006, 0.97, 0.0018)):
-            bpy.ops.mesh.primitive_torus_add(major_radius=radius(n + dy) * k, minor_radius=mn, major_segments=24, minor_segments=6,
-                                             location=P(*(lambda c: (c[0], n + dy, c[1]))(centre(n + dy))))
-            out.append(finish(active(), f"{name}Node{int(n * 1000)}{'ab'[dy < 0]}", M["node"] if dy == 0 else M["scar"]))
+        for dy, k, mn, m in ((0.0, 0.985, 0.0012, "node"), (0.0028, 0.99, 0.0011, "lip")):
+            cx, cz = centre(n + dy)
+            bpy.ops.mesh.primitive_torus_add(major_radius=radius(n + dy) * k, minor_radius=mn, major_segments=28, minor_segments=5, location=P(cx, n + dy, cz))
+            out.append(finish(active(), f"{name}Node{int(n * 1000)}{'ab'[dy > 0]}", M[m]))
     return out
 
 
@@ -281,7 +287,7 @@ while True:
     nodes_at = [0.06 + first + n * step for n in range(6) if 0.06 + first + n * step < 0.06 + BH - 0.04]
     o = culm(f"TillBamboo{k}", cx, r, 0.06, BH - float(brng.uniform(0, 0.012)), z,
              float(brng.normal(0, 0.012)), float(brng.uniform(-0.006, 0.006)), float(brng.uniform(0, 1.0)), nodes_at,
-             (float(brng.uniform(0.04, 0.11)), float(brng.uniform(0.25, 0.6)), float(brng.uniform(0, 6.28))))
+             (float(brng.uniform(0.04, 0.11)), float(brng.uniform(0.25, 0.6)), float(brng.uniform(0, 6.28))), int(brng.integers(0, 5)))
     bd += o
     culms.append((cx, r, z))
     x += 2 * r + float(brng.uniform(0.005, 0.018))
@@ -336,9 +342,10 @@ uv_box(top, 1.4)
 nodes.append(node("TillCounterTop", [top]))
 
 # =====================================================================
-# The partition: walnut, along the customers' side (from a little in from its left end) and down the end by the cats to the cashier's
+# The partition: shoji in walnut, along the customers' side (from a little in from its left end) and down the end by the cats to the cashier's
 # edge. A dark bronze shoe where it meets the marble, a bottom and a top rail, posts at each end and corner and every so often between,
-# and between them fine vertical slats (立て格子) over a pale hinoki board, a capping rail along the top with its edges eased
+# and between them washi paper in a sparse lattice (like the toilets' sliding doors), a capping rail along the top with its edges eased; round
+# posts at the two open ends
 # =====================================================================
 sh = []
 SH = 0.26                                  # its height above the top
@@ -407,51 +414,60 @@ def sweep(name, prof, pts, mat_):
 sh.append(sweep("TillShoe", profile((FT + 0.006) / 2, TOP, TOP + SHOE, 0.002), path(), M["shoe"]))
 sh.append(sweep("TillRailLow", profile(FT / 2, Y0, Y0 + RAIL, 0.004), path(), M["walnut"]))
 sh.append(sweep("TillRailTop", profile(FT / 2, YT - RAIL, YT, 0.004), path(), M["walnut"]))
-sh.append(sweep("TillCap", profile((FT + 0.018) / 2, YT, YT + CAP, 0.007), path(0.01), M["walnut"]))
-# (the posts: a round one at the corner, square ones at the two ends and about every 30 cm along each straight run)
+sh.append(sweep("TillCap", profile((FT + 0.018) / 2, YT, YT + CAP, 0.007), path(), M["walnut"]))
+# (the posts: round ones at the two open ends, standing the full height with a domed top over the cap's end; a round one at the corner;
+# square ones about every 30 cm along each straight run)
+for tag, (ex, ez) in (("Start", (XL, ZF)), ("End", (XE, ZB))):
+    pr = (FT + 0.018) / 2 + 0.002
+    sh.append(cyl(f"TillPost{tag}", pr, YT + CAP - TOP, P(ex, (TOP + YT + CAP) / 2, ez), M["walnut"], verts=40))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=pr, segments=40, ring_count=16, location=P(ex, YT + CAP, ez))
+    dome = active()
+    dome.scale = (1, 1, 0.35)
+    apply_scale(dome)
+    sh.append(finish(dome, f"TillPost{tag}Top", M["walnut"]))
 mid = path()[8]
 sh.append(cyl("TillPostCorner", FT / 2 + 0.006, YT - Y0, P(mid[0], (Y0 + YT) / 2, mid[1]), M["walnut"], verts=32))
 
 
-def straight(x0, z0, x1, z1, tag, posts_at_end):
-    """the slats, the board behind them and the posts along one straight run (from its open end to where the corner's curve begins)"""
+def straight(x0, z0, x1, z1, tag):
+    """one straight run (from its open end to where the corner's curve begins): the washi between the rails, the sparse lattice over it on
+    both faces, and the square posts along it (none at the open end: the round post is there)"""
     L = math.hypot(x1 - x0, z1 - z0)
     ux, uz = (x1 - x0) / L, (z1 - z0) / L
     rot = (0, 0, -math.atan2(uz, ux))
-    at = lambda t, y: P(x0 + ux * t, y, z0 + uz * t)   # noqa: E731
-    n = max(1, round(L / 0.3))
-    for i in range(n + (1 if posts_at_end else 0)):
-        t = 0.015 + (L - 0.03) * i / n
-        sh.append(box(f"TillPost{tag}{i}", S(0.03, YT - Y0, FT + 0.004), at(t, (Y0 + YT) / 2), M["walnut"], bev=0.003, rot=rot, uv=0.4))
+    at = lambda t, y, off=0.0: P(x0 + ux * t - uz * off, y, z0 + uz * t + ux * off)   # noqa: E731
+    n = max(1, round(L / 0.32))
+    for i in range(1, n):
+        sh.append(box(f"TillPost{tag}{i}", S(0.03, YT - Y0, FT + 0.004), at(L * i / n, (Y0 + YT) / 2), M["walnut"], bev=0.003, rot=rot, uv=0.4))
     ph = YT - Y0 - 2 * RAIL
     pc = Y0 + RAIL + ph / 2
-    sh.append(box(f"TillBack{tag}", S(L, ph, 0.006), at(L / 2, pc), M["slatBack"], rot=rot, uv=0.4))
-    m = int((L - 0.03) / 0.021)
-    for i in range(m):
-        t = 0.03 + (L - 0.04) * (i + 0.5) / m
-        for side in (-1, 1):
-            off = side * 0.007
-            sh.append(box(f"TillSlat{tag}{i}{'ab'[side > 0]}", S(0.011, ph, 0.007), P(x0 + ux * t - uz * off, pc, z0 + uz * t + ux * off), M["walnut"], bev=0.0015, rot=rot, uv=0.4))
+    sh.append(box(f"TillPaper{tag}", S(L, ph, 0.003), at(L / 2, pc), M["paper"], rot=rot, uv=0.4))
+    # (the lattice: upright bars about every 9 cm, two cross bars, on each face of the paper)
+    m = max(2, round(L / 0.09))
+    for side in (-1, 1):
+        off = side * 0.004
+        for i in range(1, m):
+            sh.append(box(f"TillBar{tag}V{i}{'ab'[side > 0]}", S(0.012, ph, 0.006), at(L * i / m, pc, off), M["walnut"], bev=0.0012, rot=rot, uv=0.4))
+        for k in (1, 2):
+            sh.append(box(f"TillBar{tag}H{k}{'ab'[side > 0]}", S(L, 0.012, 0.006), at(L / 2, Y0 + RAIL + ph * k / 3, off), M["walnut"], bev=0.0012, rot=rot, uv=0.4))
 
 
-straight(XL, ZF, XE - RC, ZF, "F", False)
-straight(XE, ZB, XE, ZF + RC, "E", False)
-# (round the corner too: the board behind in short pieces following the curve, and the slats on it, so the run never breaks)
+straight(XL, ZF, XE - RC, ZF, "F")
+straight(XE, ZB, XE, ZF + RC, "E")
+# (round the corner too: the paper in short pieces following the curve, the cross bars with it, so the run never breaks)
 arc = path()[1:16]
 ph = YT - Y0 - 2 * RAIL
 pc = Y0 + RAIL + ph / 2
 for i in range(len(arc) - 1):
     (ax, az), (bx, bz) = arc[i], arc[i + 1]
     L = math.hypot(bx - ax, bz - az)
-    sh.append(box(f"TillBackC{i}", S(L + 0.002, ph, 0.006), P((ax + bx) / 2, pc, (az + bz) / 2), M["slatBack"], rot=(0, 0, -math.atan2(bz - az, bx - ax)), uv=0.4))
-for k in range(1, 4):
-    a_ = math.radians(-90 + 90 * k / 4)
-    tx, tz = -math.sin(a_), math.cos(a_)
+    rot = (0, 0, -math.atan2(bz - az, bx - ax))
+    nx, nz = -(bz - az) / L, (bx - ax) / L
+    sh.append(box(f"TillPaperC{i}", S(L + 0.002, ph, 0.003), P((ax + bx) / 2, pc, (az + bz) / 2), M["paper"], rot=rot, uv=0.4))
     for side in (-1, 1):
-        off = side * 0.007
-        r_ = RC - off
-        sh.append(box(f"TillSlatC{k}{'ab'[side > 0]}", S(0.011, ph, 0.007), P(XE - RC + r_ * math.cos(a_), pc, ZF + RC + r_ * math.sin(a_)), M["walnut"], bev=0.0015,
-                      rot=(0, 0, -math.atan2(tz, tx)), uv=0.4))
+        for k in (1, 2):
+            sh.append(box(f"TillBarCH{i}{k}{'ab'[side > 0]}", S(L + 0.002, 0.012, 0.006), P((ax + bx) / 2 + nx * side * 0.004, Y0 + RAIL + ph * k / 3, (az + bz) / 2 + nz * side * 0.004),
+                          M["walnut"], rot=rot, uv=0.4))
 nodes.append(node("TillShield", sh))
 
 root = bpy.data.objects.new("TillCounter", None)

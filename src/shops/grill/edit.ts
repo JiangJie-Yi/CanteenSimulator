@@ -71,7 +71,6 @@ export const BASES: Record<string, V3> = {
   'till-bell': [-0.1684, 0, -0.2312],
   'till-cat': [-0.0466, 0, -0.0403],
   'till-tray': [-0.2353, 0, 0.6064],
-  'till-sign': [-0.6444, 0, 0.3636],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece belongs to, if any */
