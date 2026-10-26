@@ -5,12 +5,14 @@ import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 
 /**
- * The small things on the till's counter, from blender/tilldesk.py: the pen cup, the receipt printer, the card reader, the service bell and
- * the wooden desk mat. Each is its own node, shown wherever its group stands it (its own Movable in GuestBar3D); materials made toon, the bell's
+ * The small things on the till's counter, from blender/tilldesk.py: the pen cup, the receipt printer, the card reader, the service bell, the
+ * wooden desk mat and the cat's stand (a river stone). Each is its own node, shown wherever its group stands it (its own Movable in GuestBar3D); materials made toon, the bell's
  * dome and the steel bits real metal, an ink line round the bigger parts.
  */
 const URL = import.meta.env.BASE_URL + 'models/tilldesk.glb'
-export type DeskPiece = 'TillPens' | 'TillPrinter' | 'TillCardReader' | 'TillBell' | 'TillMat'
+export type DeskPiece = 'TillPens' | 'TillPrinter' | 'TillCardReader' | 'TillBell' | 'TillMat' | 'TillCatStand'
+/** how high the cat's stand lifts the cat: the stone's worn-flat top */
+export const CAT_STAND_H = 0.108
 /** the parts too small or too flat for an ink line: lettering, lights, slots, teeth, keys, cables and holes */
 const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever|Key|Fn|Nfc|Stripe|Screen|Cable|Hole|Clip|Cap|Felt|Band|Floor|Stem|Knob|Slip|Rim|Blades)/
 const METAL = new Set(['DeskChrome', 'DeskSteel', 'BellGold'])
@@ -40,7 +42,7 @@ function piecesOf(scene: THREE.Group) {
   })
   inkModel(root, (m) => UNINKED.test(m.name), { width: 0.0012, weld: true })
   const get = (n: DeskPiece) => { const o = root.getObjectByName(n)!; o.removeFromParent(); return o }
-  pieces = { TillPens: get('TillPens'), TillPrinter: get('TillPrinter'), TillCardReader: get('TillCardReader'), TillBell: get('TillBell'), TillMat: get('TillMat') }
+  pieces = { TillPens: get('TillPens'), TillPrinter: get('TillPrinter'), TillCardReader: get('TillCardReader'), TillBell: get('TillBell'), TillMat: get('TillMat'), TillCatStand: get('TillCatStand') }
   return pieces
 }
 

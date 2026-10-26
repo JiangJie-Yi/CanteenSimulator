@@ -60,6 +60,9 @@ glaze_tex = image("glaze", glaze)
 grain2 = fbm(N, 3, 60, 5)
 hinoki = mix((0.93, 0.8, 0.6), (0.82, 0.66, 0.45), smooth(0.35, 0.8, grain2))
 hinoki_tex = image("hinoki2", hinoki)
+# (the cat's stone: a grey river stone, mottled, a few pale flecks)
+stone = mix(mix((0.22, 0.22, 0.21), (0.36, 0.35, 0.33), fbm(N, 5, 5, 5)), (0.7, 0.68, 0.64), (rng.random((N, N)) > 0.97).astype(np.float32) * 0.6)
+stone_tex = image("catstone", stone)
 
 
 def mat(name, hexs, rough=0.5, metal=0.0, tex=None):
@@ -79,6 +82,7 @@ M = {
     "mat": mat("DeskMatWood", "#ffffff", 0.6, tex=hinoki_tex), "matEdge": mat("DeskMatEdge", "#b8915c", 0.6), "felt": mat("DeskMatFelt", "#3a3530", 0.9),
     "hole": mat("DeskHole", "#060607", 0.6), "holeRing": mat("DeskHoleRing", "#3a3c40", 0.3, 0.8), "cable": mat("DeskCable", "#17171a", 0.4),
     "cableW": mat("DeskCableWhite", "#e9e9ec", 0.4),
+    "stone": mat("CatStone", "#ffffff", 0.75, tex=stone_tex),
 }
 PEN_COLORS = ["#1f3f9c", "#c22a24", "#16171a", "#2f8a4a", "#e05a9c", "#f0e14a", "#7a4ab0", "#ef8a2a", "#1f9cc8", "#16171a", "#d0d4da"]
 
@@ -398,6 +402,26 @@ for o in mt:
     bpy.ops.uv.cube_project(cube_size=0.6)
     bpy.ops.object.mode_set(mode="OBJECT")
 nodes.append(node("TillMat", mt))
+
+# =====================================================================
+# The cat's stand: a river stone, its top worn level, the cat (on its own red zabuton) sat up on it
+# =====================================================================
+cs = []
+bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=1.0)
+st = active()
+SX, SZ, SY = 0.1, 0.135, 0.11
+for vtx in st.data.vertices:
+    x, y, z = vtx.co
+    w = 1 + 0.07 * math.sin(x * 5.1 + y * 3.3) + 0.05 * math.sin(y * 7.7 - x * 2.1) + 0.03 * math.sin(z * 9 + x * 6)
+    x, y = x * SX * w, y * SZ * w
+    z = (min(z, 0.55) / 0.55 * 0.5 + 0.5) if z > -0.7 else 0.0
+    vtx.co = (x, y, max(0.0, z) * SY)
+finish(st, "CatStone", M["stone"])
+bpy.ops.object.select_all(action="DESELECT"); st.select_set(True); bpy.context.view_layer.objects.active = st
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cube_project(cube_size=0.4); bpy.ops.object.mode_set(mode="OBJECT")
+smooth_angle(st, 70)
+cs.append(st)
+nodes.append(node("TillCatStand", cs))
 
 root = bpy.data.objects.new("TillDesk", None)
 bpy.context.collection.objects.link(root)

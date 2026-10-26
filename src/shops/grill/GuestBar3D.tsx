@@ -24,7 +24,7 @@ import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
 import { TillCounter } from './TillCounter'
-import { TillBellLive, TillDeskPiece } from './TillDesk'
+import { CAT_STAND_H, TillBellLive, TillDeskPiece } from './TillDesk'
 import { behindBody, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
@@ -569,9 +569,12 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       <Movable id="till-cat" label="櫃檯招財貓" baseTurn={[0, -45, 0]}><StaticBatch>
       <group position={at} rotation-y={yaw}>
       {/* the beckoning cat, its paw up: bigger, at the till's corner by the door, facing the customers */}
-      <group position={[0.5, top, -0.26]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.46} /></group>
+      <group position={[0.45, top + CAT_STAND_H, -0.21]} rotation-y={Math.PI}><LuckyCat kind={1} height={0.46} /></group>
       </group>
-      </StaticBatch></Movable>
+      </StaticBatch>
+      {/* (sat up on a river stone, from blender/tilldesk.py; not in the batch) */}
+      <group position={at} rotation-y={yaw}><group position={[0.45, top, -0.21]} rotation-y={Math.PI}><TillDeskPiece name="TillCatStand" /></group></group>
+      </Movable>
       <Movable id="till-box-bags" label="紙箱（紙袋）">
         <group position={at} rotation-y={yaw}><TillBoxes part="bags" lang={lang} /></group>
       </Movable>

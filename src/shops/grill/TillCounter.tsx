@@ -5,23 +5,27 @@ import { inkModel } from '@/scene/inkHull'
 
 /**
  * The till counter, from blender/tillcounter.py, in the till's own frame (built for a top at TILL_TOP; another height stretches the body to
- * it): the dark wooden body with its battens and round lit window, a polished white marble top, and the clear acrylic partition in its hinoki
- * frame along the customers' side and the end by the cats.
+ * it): the dark wooden body with green bamboo up the customers' face and a round lit window with its halo, a polished white marble top, and
+ * the low solid hinoki partition along the customers' side and the end by the cats.
  */
 const URL = import.meta.env.BASE_URL + 'models/tillcounter.glb'
 export const TILL_TOP = 0.86
-const UNINKED = /^(TillPane|TillWindowPaper|TillLattice|TillFoot)/
+const UNINKED = /^(TillWindowPaper|TillWindowGlow|TillLattice|TillBambooNode|TillRope)/
 
 function finishOf(src: THREE.MeshStandardMaterial): THREE.Material {
   switch (src.name) {
     case 'TillMarble':
       // (polished marble: the lamps glint in it)
       return new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 0.9 })
-    case 'TillAcrylic':
-      // (clear acrylic: barely there but for its sheen)
-      return new THREE.MeshPhysicalMaterial({ color: '#f4fbff', transparent: true, opacity: 0.16, roughness: 0.04, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false })
+    case 'TillBamboo':
+      // (green bamboo's waxy skin: a soft sheen)
+      return new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.35, clearcoat: 0.4, clearcoatRoughness: 0.3 })
     case 'TillWindowPaper':
-      return new THREE.MeshBasicMaterial({ color: '#f2dcb0', toneMapped: false })
+      return new THREE.MeshBasicMaterial({ color: '#ffe2a8', toneMapped: false })
+    case 'TillWindowGlow':
+      // (the window's halo: its black edges add nothing, its warm middle brightens whatever is behind; drawn over the end without a depth test
+      // (the end's own faces hid half of it), its front only, so it's seen only from outside the end)
+      return new THREE.MeshBasicMaterial({ map: src.map, color: new THREE.Color(2.2, 1.9, 1.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })
     default:
       return new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
   }
@@ -43,7 +47,7 @@ export function TillCounter({ top }: { top: number }) {
       m.material = t
       m.castShadow = !UNINKED.test(m.name)
       m.receiveShadow = true
-      if (src.name === 'TillAcrylic') m.renderOrder = 3
+      if (src.name === 'TillWindowGlow') { m.renderOrder = 3; m.castShadow = false; m.receiveShadow = false }
     })
     inkModel(r, (m) => UNINKED.test(m.name), { width: 0.003, weld: true })
     model = r

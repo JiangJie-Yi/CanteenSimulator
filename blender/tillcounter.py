@@ -1,13 +1,13 @@
 """The till counter by the door: its dark wooden body (open on the cashier's side, two shelves inside, hinoki battens up the customers' face,
-a kick board, a round lattice window in its end lit from within), a white marble top with grey veins overhanging all round, and the partition
-along the customers' side and the end by the cats: clear acrylic in a hinoki frame, a pass-through cut low in it over the coin tray.
+a kick board, a round lattice window in its end lit from within and glowing), green bamboo up the customers' face, a white marble top with grey veins
+overhanging all round, and a low solid hinoki partition along the customers' side and the end by the cats.
 
 Run:
     blender -b --factory-startup --python blender/tillcounter.py -- <project path> [preview.png]
 Writes public/models/tillcounter.glb and blender/tillcounter.blend.
 
 Frame: the till's own (GuestBar3D's Register group): +y up, x along the bar, the cashier at +z, the customers at -z; the top's surface at
-TOP. Node names the game looks for: TillCounterBody, TillCounterTop (the marble), TillShield (the partition), TillWindowPaper (lit).
+TOP. Node names the game looks for: TillCounterBody, TillCounterTop (the marble), TillShield (the partition), TillWindowPaper (lit), TillWindowGlow (its halo, drawn added).
 """
 import math
 import os
@@ -55,6 +55,15 @@ marble = mix(mix((0.95, 0.95, 0.94), (0.86, 0.86, 0.87), cloud * 0.6), (0.48, 0.
 marble_tex = image("marble", marble)
 g2 = fbm(256, 2, 50, 4)
 batten_tex = image("batten", mix((0.8, 0.62, 0.4), (0.7, 0.52, 0.32), smooth(0.4, 0.8, g2)))
+# (green bamboo: a fresh green, paler streaks running along the culm, a faint bloom)
+bu, bv = grid01(256)
+streak = fbm(256, 40, 2, 4)
+bamboo_tex = image("bamboo", mix(mix((0.2, 0.42, 0.12), (0.34, 0.56, 0.2), streak), (0.55, 0.66, 0.36), smooth(0.75, 1.0, streak) * 0.5))
+# (the window's halo: warm light falling off softly from the middle, black at the edges, added over whatever is behind)
+gu, gv = grid01(256)
+rr = np.sqrt((gu - 0.5) ** 2 + (gv - 0.5) ** 2) * 2
+halo = np.clip(1 - rr, 0, 1) ** 1.6
+glow_tex = image("windowglow", mix((0, 0, 0), (1.0, 0.78, 0.45), halo))
 dark_tex = image("darkwood", mix((0.25, 0.17, 0.11), (0.2, 0.13, 0.08), fbm(256, 2, 40, 4)))
 
 M = {
@@ -66,7 +75,11 @@ M = {
     "frame": pbr("TillShieldFrame", lin("#c7a174"), tex=batten_tex, rough=0.5),
     "acrylic": pbr("TillAcrylic", lin("#eef6fa"), rough=0.02),
     "ring": pbr("TillWindowRing", lin("#5a3a22"), rough=0.5),
-    "paper": pbr("TillWindowPaper", lin("#f2dcb0"), rough=0.9),
+    "paper": pbr("TillWindowPaper", lin("#ffe6b8"), rough=0.9, emit=lin("#ffd89a"), emit_strength=2.0),
+    "glow": pbr("TillWindowGlow", (1, 1, 1), tex=glow_tex, rough=1.0),
+    "bamboo": pbr("TillBamboo", (1, 1, 1), tex=bamboo_tex, rough=0.35),
+    "node": pbr("TillBambooNode", lin("#7d8a3e"), rough=0.4),
+    "rope": pbr("TillRope", lin("#1c140e"), rough=0.9),
     "lattice": pbr("TillLattice", lin("#5a3a22"), rough=0.5),
 }
 
@@ -154,10 +167,35 @@ for k in (-1, 0, 1):
     L = 0.4 * math.sqrt(1 - (k * 0.1 / 0.2) ** 2)
     bd.append(box(f"TillLatticeV{k}", S(0.012, L, 0.012), P(W / 2 - 0.02, WY, 0.02 + k * 0.1), M["lattice"]))
     bd.append(box(f"TillLatticeH{k}", S(0.012, 0.012, L), P(W / 2 - 0.02, WY + k * 0.1, 0.02), M["lattice"]))
+# (its halo: a soft disc of warm light just outside the window, spreading onto the end round it)
+bpy.ops.mesh.primitive_plane_add(size=0.9, location=P(W / 2 + 0.004, WY, 0.02), rotation=(math.pi / 2, 0, math.pi / 2))
+bd.append(finish(active(), "TillWindowGlow", M["glow"], smooth_shade=False))
 bd.append(box("TillShelfLow", S(W - 0.14, 0.03, D - 0.14), P(0, 0.1, 0.03), M["shelf"], bev=0.003))
 bd.append(box("TillShelfHigh", S(W - 0.14, 0.025, D - 0.2), P(0, TOP - 0.2, 0.04), M["shelf"], bev=0.003))
-for k in range(15):
-    bd.append(box(f"TillBatten{k}", S(0.036, TOP - 0.14, 0.024), P((k - 7) * (W - 0.08) / 15, (TOP - 0.06) / 2 + 0.04, -D / 2 + 0.014), M["batten"], bev=0.004, uv=0.6))
+BR = 0.021
+NB = int((W - 0.08) // (2 * BR + 0.003))
+BH = TOP - 0.1
+ZC = -D / 2 - BR + 0.02
+for k in range(NB):
+    x = (k - (NB - 1) / 2) * (2 * BR + 0.003)
+    r = BR * (0.92 + 0.08 * ((k * 37) % 5) / 4)
+    c = cyl(f"TillBamboo{k}", r, BH, P(x, 0.06 + BH / 2, ZC), M["bamboo"], verts=16)
+    bpy.ops.object.select_all(action="DESELECT"); c.select_set(True); bpy.context.view_layer.objects.active = c
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cylinder_project(); bpy.ops.object.mode_set(mode="OBJECT")
+    bd.append(c)
+    # (the nodes: a slight swelling ring every so often, staggered from culm to culm)
+    y = 0.06 + 0.1 + ((k * 0.071) % 0.16)
+    while y < 0.06 + BH - 0.05:
+        bpy.ops.mesh.primitive_torus_add(major_radius=r, minor_radius=0.0035, major_segments=16, minor_segments=6, location=P(x, y, ZC))
+        bd.append(finish(active(), f"TillBambooNode{k}_{int(y * 100)}", M["node"]))
+        y += 0.24
+for yy in (0.16, TOP - 0.16):
+    bd.append(cyl(f"TillBambooRail{int(yy * 100)}", 0.013, W - 0.06, P(0, yy, ZC - BR - 0.012), M["bamboo"], rot=(0, math.pi / 2, 0), verts=14))
+    for k in range(0, NB, 3):
+        x = (k - (NB - 1) / 2) * (2 * BR + 0.003)
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.016, minor_radius=0.003, major_segments=12, minor_segments=5, location=P(x, yy, ZC - BR - 0.006), rotation=(0, 0, 0))
+        t_ = active(); t_.scale = (0.7, 1.4, 1.0); apply_scale(t_)
+        bd.append(finish(t_, f"TillRope{int(yy * 100)}_{k}", M["rope"]))
 bd.append(box("TillKick", S(W - 0.06, 0.06, 0.02), P(0, 0.03, -D / 2 + 0.035), M["kick"], bev=0.002))
 nodes.append(node("TillCounterBody", bd))
 
@@ -193,33 +231,32 @@ uv_box(top, 1.4)
 nodes.append(node("TillCounterTop", [top]))
 
 # =====================================================================
-# The partition: along the customers' side and down the end by the cats, clear acrylic held in a slim hinoki frame on the top, a
-# pass-through cut low in the customers' panel over the coin tray
+# The partition: low solid hinoki boards along the customers' side and down the end by the cats, standing on the top: upright planks
+# with eased edges (a fine seam between each), a cap rail along the top
 # =====================================================================
 sh = []
-SH, FR, AT = 0.38, 0.022, 0.005           # its height above the top, the frame's square, the acrylic's thickness
+SH, BT = 0.19, 0.018                       # its height above the top, the boards' thickness
 ZF = -0.03 - TD_ / 2 + 0.03               # the customers' side, a little in from the edge
 XE = TW_ / 2 - 0.03                       # the end by the cats
 ZB = 0.3                                  # where the end panel stops, short of the cashier's end
-# (the frame: posts at the corners and between, a rail along the top and the foot)
-for x in (-XE, -0.2, 0.2, XE):
-    sh.append(box(f"TillPost{x:+.2f}", S(FR, SH, FR), P(x, TOP + SH / 2, ZF), M["frame"], bev=0.003, uv=0.4))
-sh.append(box("TillPostEnd", S(FR, SH, FR), P(XE, TOP + SH / 2, ZB), M["frame"], bev=0.003, uv=0.4))
-sh.append(box("TillRailFront", S(2 * XE + FR, FR, FR), P(0, TOP + SH - FR / 2, ZF), M["frame"], bev=0.003, uv=0.4))
-sh.append(box("TillRailEnd", S(FR, FR, ZB - ZF), P(XE, TOP + SH - FR / 2, (ZB + ZF) / 2), M["frame"], bev=0.003, uv=0.4))
-sh.append(box("TillFootEnd", S(FR, 0.012, ZB - ZF), P(XE, TOP + 0.006, (ZB + ZF) / 2), M["frame"], bev=0.002, uv=0.4))
-for x0, x1 in ((-XE, -0.2), (0.2, XE)):
-    sh.append(box(f"TillFootFront{x0:+.1f}", S(x1 - x0, 0.012, FR), P((x0 + x1) / 2, TOP + 0.006, ZF), M["frame"], bev=0.002, uv=0.4))
-# (the acrylic: the customers' panel in three, the middle one cut away at the foot over the coin tray; the end panel whole)
-for x0, x1 in ((-XE, -0.2), (-0.2, 0.2), (0.2, XE)):
-    pane = box(f"TillPane{x0:+.1f}", S(x1 - x0 - FR, SH - FR - 0.012, AT), P((x0 + x1) / 2, TOP + 0.012 + (SH - FR - 0.012) / 2, ZF), M["acrylic"])
-    if x0 == -0.2:
-        gap = box("gap", S(0.3, 0.09, 0.05), P(0, TOP + 0.045, ZF), M["acrylic"], bev=0.02)
-        m_ = pane.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = gap; m_.solver = "EXACT"
-        apply_mods(pane)
-        bpy.data.objects.remove(gap)
-    sh.append(pane)
-sh.append(box("TillPaneEnd", S(AT, SH - FR - 0.012, ZB - ZF - FR), P(XE, TOP + 0.012 + (SH - FR - 0.012) / 2, (ZB + ZF) / 2), M["acrylic"]))
+PL = 0.12                                 # a plank's width
+
+
+def planks(x0, x1, z0, z1, tag):
+    L = math.hypot(x1 - x0, z1 - z0)
+    n = max(1, round(L / PL))
+    for i in range(n):
+        f0, f1 = i / n, (i + 1) / n
+        cx, cz = x0 + (x1 - x0) * (f0 + f1) / 2, z0 + (z1 - z0) * (f0 + f1) / 2
+        along_x = abs(x1 - x0) > abs(z1 - z0)
+        size = S(L / n - 0.002, SH - 0.016, BT) if along_x else S(BT, SH - 0.016, L / n - 0.002)
+        sh.append(box(f"TillBoard{tag}{i}", size, P(cx, TOP + (SH - 0.016) / 2, cz), M["frame"], bev=0.003, uv=0.4))
+
+
+planks(-XE, XE, ZF, ZF, "F")
+planks(XE, XE, ZF + BT / 2, ZB, "E")
+sh.append(box("TillCapFront", S(2 * XE + 0.03, 0.016, 0.034), P(0, TOP + SH - 0.008, ZF), M["frame"], bev=0.004, uv=0.4))
+sh.append(box("TillCapEnd", S(0.034, 0.016, ZB - ZF + 0.017), P(XE, TOP + SH - 0.008, (ZB + ZF) / 2 + 0.008), M["frame"], bev=0.004, uv=0.4))
 nodes.append(node("TillShield", sh))
 
 root = bpy.data.objects.new("TillCounter", None)
