@@ -618,9 +618,9 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       <Movable id="till-ipad" label="平板（iPad）"><StaticBatch>
       <group position={at} rotation-y={yaw}>
         {/* the order tablet, an iPad on a folding stand, at the cashier's right hand, its screen toward the cashier, leaning back a little */}
-        <group position={[0.46, top, 0.1]}>
+        <group position={[0.5, top, 0.1]}>
           {/* (the model from blender/ipad.py: the tablet, its screen the order screen, on its folding stand) */}
-          <IpadModel screen={IPAD_SCREEN} />
+          <IpadModel />
         </group>
       </group>
       </StaticBatch></Movable>
@@ -668,27 +668,7 @@ const grime = (w: number, h: number, seed: number, wear: number) => signTexture(
     g.beginPath(); g.ellipse(x, y, rw, rh, rnd() * 3, 0, Math.PI * 2); g.fill()
   }
 })
-/** the tablet's screen: the shop's order screen, a header, the orders as rows with their prices, the total and a green button to settle up */
 /** the little plates on the notes' slots */
-const IPAD_SCREEN = signTexture(192, 264, (g) => {
-  g.fillStyle = '#f4f6f9'; g.fillRect(0, 0, 192, 264)
-  g.fillStyle = '#2f6fb0'; g.fillRect(0, 0, 192, 34)
-  g.fillStyle = '#ffffff'; g.font = 'bold 15px sans-serif'; g.textBaseline = 'middle'
-  g.fillText('注文  Orders', 10, 17)
-  g.font = '11px sans-serif'; g.textAlign = 'right'; g.fillText('9:41', 184, 17); g.textAlign = 'left'
-  const rows: [string, string, string][] = [['鹽烤香魚套餐', '×2', '840'], ['烤秋刀魚', '×1', '180'], ['生啤酒', '×3', '540'], ['烤飯糰', '×2', '160']]
-  rows.forEach(([name, n, price], i) => {
-    const y = 48 + i * 34
-    g.fillStyle = i % 2 ? '#ffffff' : '#eaeff5'; g.fillRect(6, y - 14, 180, 30)
-    g.fillStyle = '#1d2733'; g.font = 'bold 12px sans-serif'; g.fillText(name, 12, y)
-    g.fillStyle = '#6a7686'; g.font = '11px sans-serif'; g.fillText(n, 12, y + 12)
-    g.fillStyle = '#1d2733'; g.font = 'bold 13px sans-serif'; g.textAlign = 'right'; g.fillText(price, 180, y + 4); g.textAlign = 'left'
-  })
-  g.fillStyle = '#1d2733'; g.font = 'bold 12px sans-serif'; g.fillText('合計', 12, 214)
-  g.font = 'bold 20px sans-serif'; g.textAlign = 'right'; g.fillText('NT$ 1,720', 180, 214); g.textAlign = 'left'
-  g.fillStyle = '#2f9e5a'; g.beginPath(); g.roundRect(10, 226, 172, 30, 8); g.fill()
-  g.fillStyle = '#ffffff'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.fillText('會計  Pay', 96, 241); g.textAlign = 'left'
-})
 const COUNTER_GRIME = grime(256, 128, 31, 2)
 /** a cable run as a tube through the given points (in the register's own units), black rubber */
 const cable = (pts: [number, number, number][], r = 0.0042) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.4), 36, r, 6, false)
