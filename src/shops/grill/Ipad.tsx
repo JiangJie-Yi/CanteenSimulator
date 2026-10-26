@@ -10,15 +10,16 @@ import { inkModel } from '@/scene/inkHull'
  */
 const IPAD_URL = import.meta.env.BASE_URL + 'models/ipad.glb'
 /** the parts too small or too flat for an ink line */
-const UNINKED = /^Ipad(Screen|Glass|FrontCam|Grille|Port|Connector|BackLens|BackIris|Flash|MicHole|TopButton|Volume|StandFoot|StandLedgePad)/
+const UNINKED = /^Ipad(Screen|Glass|FrontCam|Grille|Port|Connector|BackLens|BackIris|Lidar|Flash|MicHole|TopButton|Volume|Logo|StandFoot|StandLedgePad)/
 
 /** each of the model's materials as it really looks */
 function realMaterial(src: THREE.MeshStandardMaterial): THREE.Material {
   switch (src.name) {
     case 'IpadAlu':
-      return new THREE.MeshPhysicalMaterial({ color: '#d4d7dc', map: src.map, metalness: 0.85, roughness: 0.42, envMapIntensity: 1.1 })
+      // (silver: metal enough to catch the light, not so much that the room's warm lamps turn it to bronze)
+      return new THREE.MeshPhysicalMaterial({ color: '#e3e6ea', map: src.map, metalness: 0.5, roughness: 0.5, envMapIntensity: 0.7 })
     case 'IpadStand':
-      return new THREE.MeshPhysicalMaterial({ color: '#b9bdc3', metalness: 0.8, roughness: 0.38 })
+      return new THREE.MeshPhysicalMaterial({ color: '#c9cdd3', metalness: 0.5, roughness: 0.45, envMapIntensity: 0.7 })
     case 'IpadGlass':
       return new THREE.MeshPhysicalMaterial({ color: '#08090b', metalness: 0, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.03 })
     case 'IpadLens':
@@ -29,6 +30,11 @@ function realMaterial(src: THREE.MeshStandardMaterial): THREE.Material {
       return new THREE.MeshPhysicalMaterial({ color: '#2b3f80', metalness: 0.6, roughness: 0.08, iridescence: 0.8 })
     case 'IpadFlashGlass':
       return new THREE.MeshPhysicalMaterial({ color: '#efe6cf', roughness: 0.15, clearcoat: 1 })
+    case 'IpadLogo':
+      // (polished, as the maker's mark is: a mirror in the bead-blasted back)
+      return new THREE.MeshPhysicalMaterial({ color: '#f1f3f6', metalness: 1, roughness: 0.06 })
+    case 'IpadLogoStone':
+      return new THREE.MeshPhysicalMaterial({ color: '#c3c7cd', metalness: 0.9, roughness: 0.28 })
     case 'IpadRubber':
       return new THREE.MeshStandardMaterial({ color: src.color.clone(), roughness: 0.9 })
     default:
@@ -59,8 +65,8 @@ const GLARE = (() => {
  * category tabs as a segmented control, the menu as rounded cards, the order on the right with the subtotal, tax, total and a big blue pay
  * button, and the home indicator at the foot. System fonts, its greys and its blue.
  */
-// (the screen's own proportions: 2360 x 1640)
-const W = 1024, H = 712
+// (the screen's own proportions: 2752 x 2064, 4:3)
+const W = 1024, H = 768
 const SANS = '-apple-system, "SF Pro Text", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Segoe UI", sans-serif'
 const BLUE = '#007aff'
 const ITEMS: [string, number, string][] = [

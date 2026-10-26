@@ -16,9 +16,11 @@ const URL = import.meta.env.BASE_URL + 'models/tillboxes.glb'
 /** the parts too small or too flat for an ink line: the printing, the tape, the cover's band and drawing */
 const UNINKED = /(Label|Sub|Up|Seam|Tape|Band|Title|Foot|Pic|Staple)/
 
-export function TillBoxes({ lang }: { lang: Lang }) {
-  const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const { boxes, manual } = useMemo(() => {
+/** the model, cut into its three pieces once: each box (and its tape and printing) and the manual, so each can be moved on its own */
+let pieces: Record<'bags' | 'rolls' | 'manual', THREE.Object3D> | null = null
+function piecesOf(gltf: { scene: THREE.Group }) {
+  if (pieces) return pieces
+  const { boxes, manual } = (() => {
     const root = gltf.scene.clone(true)
     const toon = new Map<THREE.Material, THREE.Material>()
     root.traverse((o) => {
@@ -39,16 +41,24 @@ export function TillBoxes({ lang }: { lang: Lang }) {
     const manual = root.getObjectByName('TillManual')!
     manual.removeFromParent()
     return { boxes: root, manual }
-  }, [gltf])
+  })()
+  const bags = new THREE.Group(), rolls = new THREE.Group()
+  for (const o of [...boxes.children]) (o.name.startsWith('TillBoxRolls') ? rolls : bags).add(o)
+  pieces = { bags, rolls, manual }
+  return pieces
+}
+
+/** one piece of the shelf's things: a box, or the manual (which opens when it's clicked) */
+export function TillBoxes({ part, lang }: { part: 'bags' | 'rolls' | 'manual'; lang: Lang }) {
+  const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => piecesOf(gltf)[part], [gltf, part])
+  if (part !== 'manual') return <StaticBatch><primitive object={obj} /></StaticBatch>
   const tip = lang === 'ja' ? tipOver('レジスター取扱説明書', 'クリックで読む') : tipOver('收銀機操作說明書', '點一下翻閱')
   return (
-    <>
-      <StaticBatch><primitive object={boxes} /></StaticBatch>
-      {/* (handlers on a group round it: a primitive's own aren't attached) */}
-      <group {...tip} onClick={(e) => { e.stopPropagation(); if (!getEdit().on) openRegisterManual() }}>
-        <primitive object={manual} />
-      </group>
-    </>
+    // (handlers on a group round it: a primitive's own aren't attached)
+    <group {...tip} onClick={(e) => { e.stopPropagation(); if (!getEdit().on) openRegisterManual() }}>
+      <primitive object={obj} />
+    </group>
   )
 }
 useGLTF.preload(URL)

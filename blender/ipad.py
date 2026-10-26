@@ -56,6 +56,8 @@ M = {
     "ring": pbr("IpadRing", lin("#3a3c40"), rough=0.3, metal=0.9),
     "iris": pbr("IpadIris", lin("#2a3a66"), rough=0.1, metal=0.5),
     "flash": pbr("IpadFlashGlass", lin("#e8e0c8"), rough=0.2),
+    "logo": pbr("IpadLogo", lin("#e9ebee"), rough=0.08, metal=1.0),
+    "logoStone": pbr("IpadLogoStone", lin("#c9ccd1"), rough=0.3, metal=0.9),
     "rubber": pbr("IpadRubber", lin("#2a2b2e"), rough=0.8),
 }
 
@@ -127,44 +129,90 @@ def cyl(name, r, depth, at, mat, rot=(0, 0, 0), verts=24):
 # =====================================================================
 # The tablet, upright in its own frame (screen toward three's +z = Blender -y), its middle at its origin
 # =====================================================================
-# (the current iPad's proportions, 248.6 x 179.5 x 7.0 mm, its corners about 18.5 mm round, the screen (2360 x 1640) inside an even 10.8 mm
-# border; scaled so its long side is 0.275, the size the till has room for)
-K = 0.275 / 0.2486
-TW, TH, TD, TR = 0.1795 * K, 0.2486 * K, 0.0070 * K, 0.0185 * K
-BORDER = 0.0108 * K
+# (the iPad Pro 13-inch's proportions, 281.6 x 215.5 x 5.1 mm, its corners about 18 mm round, the 4:3 screen (2752 x 2064) inside an even
+# 8.8 mm border, its own corners rounded to match; scaled so its long side is 0.28, the size the till has room for)
+K = 0.28 / 0.2816
+TW, TH, TD, TR = 0.2155 * K, 0.2816 * K, 0.0051 * K, 0.018 * K
+BORDER = 0.0088 * K
+SCREEN_R = TR - BORDER
 tab = []
-body = rounded_slab("IpadBody", TW, TH, TD, TR, M["alu"], edge=0.0012)
+body = rounded_slab("IpadBody", TW, TH, TD, TR, M["alu"], edge=0.0009)
 tab.append(body)
 # the front: one sheet of black glass, the screen inside its even border
-glass = rounded_slab("IpadGlass", TW - 0.0016, TH - 0.0016, 0.0006, TR - 0.0008, M["glass"])
+glass = rounded_slab("IpadGlass", TW - 0.0012, TH - 0.0012, 0.0005, TR - 0.0006, M["glass"])
 glass.location = (0, -TD / 2 - 0.0002, 0)
 tab.append(glass)
 # the front camera, in the border on the long side (on top when held landscape, as it stands here): a ring and the lens in it
 FCX = TW / 2 - BORDER / 2
-tab.append(cyl("IpadFrontCamRing", 0.0021, 0.0003, (FCX, -TD / 2 - 0.00062, 0), M["dark"], rot=(math.pi / 2, 0, 0), verts=20))
-tab.append(cyl("IpadFrontCam", 0.0013, 0.0003, (FCX, -TD / 2 - 0.0007, 0), M["lens"], rot=(math.pi / 2, 0, 0), verts=20))
+tab.append(cyl("IpadFrontCamRing", 0.0019, 0.0003, (FCX, -TD / 2 - 0.00055, 0), M["dark"], rot=(math.pi / 2, 0, 0), verts=20))
+tab.append(cyl("IpadFrontCam", 0.0012, 0.0003, (FCX, -TD / 2 - 0.00062, 0), M["lens"], rot=(math.pi / 2, 0, 0), verts=20))
 # the top button on the top edge at the right, the volume keys down the right edge, near the top
-tab.append(box("IpadTopButton", S(0.022, 0.0012, 0.003), P(TW / 2 - 0.035, TH / 2 + 0.0004, 0), M["alu"], bev=0.0005))
+tab.append(box("IpadTopButton", S(0.024, 0.001, 0.0024), P(TW / 2 - 0.038, TH / 2 + 0.0003, 0), M["alu"], bev=0.0004))
 for k in range(2):
-    tab.append(box(f"IpadVolume{k}", S(0.0012, 0.017, 0.003), P(TW / 2 + 0.0004, TH / 2 - 0.045 - k * 0.022, 0), M["alu"], bev=0.0005))
-# the speaker grilles: rows of small holes on the top and bottom edges; the USB-C port in the middle of the bottom
+    tab.append(box(f"IpadVolume{k}", S(0.001, 0.018, 0.0024), P(TW / 2 + 0.0003, TH / 2 - 0.046 - k * 0.023, 0), M["alu"], bev=0.0004))
+# the four speakers: a short row of holes near each end of the top and bottom edges; the USB-C port in the middle of the bottom
 for sy in (1, -1):
     for side in (-1, 1):
-        for k in range(7):
-            tab.append(cyl(f"IpadGrille{sy}{side}{k}", 0.0006, 0.001, P(side * (0.045 + k * 0.004), sy * (TH / 2 + 0.0001), 0), M["dark"], verts=8))
-tab.append(box("IpadPort", S(0.009, 0.0012, 0.0028), P(0, -TH / 2 - 0.0002, 0), M["dark"], bev=0.0009))
-# the back camera, top left seen from the back: a rounded-square bump standing a little proud, the lens in a dark metal ring, the coated
-# glass over it and the iris inside showing blue, the flash beside it and the microphone's pinhole
-CX, CY, BACK = TW / 2 - 0.016, TH / 2 - 0.016, -TD / 2
-tab.append(rounded_on_back := box("IpadCamBump", S(0.0145, 0.0145, 0.0012), P(CX, CY, BACK - 0.0006), M["alu"], bev=0.0035))
-tab.append(cyl("IpadBackLensRing", 0.0052, 0.0009, P(CX, CY, BACK - 0.0014), M["ring"], rot=(math.pi / 2, 0, 0), verts=32))
-tab.append(cyl("IpadBackLens", 0.0040, 0.0007, P(CX, CY, BACK - 0.0019), M["lens"], rot=(math.pi / 2, 0, 0), verts=32))
-tab.append(cyl("IpadBackIris", 0.0017, 0.0002, P(CX, CY, BACK - 0.0023), M["iris"], rot=(math.pi / 2, 0, 0), verts=20))
-tab.append(cyl("IpadFlash", 0.0016, 0.0003, P(CX, CY - 0.0125, BACK - 0.0002), M["flash"], rot=(math.pi / 2, 0, 0), verts=16))
-tab.append(cyl("IpadMicHole", 0.0005, 0.0003, P(CX - 0.0105, CY, BACK - 0.0002), M["dark"], rot=(math.pi / 2, 0, 0), verts=8))
-# the connector's three dots, on the left edge (the bottom held landscape)
+        for k in range(6):
+            tab.append(cyl(f"IpadGrille{sy}{side}{k}", 0.0005, 0.001, P(side * (0.062 + k * 0.0035), sy * (TH / 2 + 0.0001), 0), M["dark"], verts=8))
+tab.append(box("IpadPort", S(0.0085, 0.001, 0.0024), P(0, -TH / 2 - 0.0002, 0), M["dark"], bev=0.0008))
+# the back camera, top left seen from the back, as on the Pro: a rounded-square plateau in the body's own metal standing proud, and on it
+# the wide lens (top left) in its dark ring, the LiDAR scanner's black glass (below it), the flash (bottom right), the microphone (top right)
+BACK = -TD / 2
+BS, BR, BH = 0.03, 0.0085, 0.0012
+BX, BY = TW / 2 - 0.009 - BS / 2, TH / 2 - 0.009 - BS / 2
+bump = rounded_slab("IpadCamBump", BS, BS, BH, BR, M["alu"], edge=0.0005)
+bump.location = P(BX, BY, BACK - BH / 2)
+tab.append(bump)
+TOPB = BACK - BH
+q = BS / 4.1
+LX, LY = BX + q, BY + q          # (seen from the back, +x is the left)
+tab.append(cyl("IpadBackLensRing", 0.0058, 0.0012, P(LX, LY, TOPB - 0.0006), M["ring"], rot=(math.pi / 2, 0, 0), verts=36))
+tab.append(cyl("IpadBackLens", 0.0045, 0.0006, P(LX, LY, TOPB - 0.0012), M["lens"], rot=(math.pi / 2, 0, 0), verts=36))
+tab.append(cyl("IpadBackIris", 0.002, 0.0002, P(LX, LY, TOPB - 0.0015), M["iris"], rot=(math.pi / 2, 0, 0), verts=24))
+tab.append(cyl("IpadLidarRing", 0.0042, 0.0006, P(LX, BY - q, TOPB - 0.0003), M["ring"], rot=(math.pi / 2, 0, 0), verts=32))
+tab.append(cyl("IpadLidar", 0.0034, 0.0004, P(LX, BY - q, TOPB - 0.0006), M["lens"], rot=(math.pi / 2, 0, 0), verts=32))
+tab.append(cyl("IpadFlash", 0.0028, 0.0003, P(BX - q, BY - q, TOPB - 0.0002), M["flash"], rot=(math.pi / 2, 0, 0), verts=24))
+tab.append(cyl("IpadMicHole", 0.0007, 0.0003, P(BX - q, LY, TOPB - 0.0002), M["dark"], rot=(math.pi / 2, 0, 0), verts=10))
+# the logo, in the middle of the back where the maker's would be: an avocado cut in half, polished, its stone a round hollow
+def avocado(w, h, n=48):
+    """the outline of a halved avocado: round at the foot, narrowing to the stalk end (x, y around its middle)"""
+    pts = []
+    for k in range(n):
+        t = 2 * math.pi * k / n
+        y = math.sin(t)
+        x = math.cos(t) * (1 - 0.3 * y) * (1 + 0.04 * y * y)
+        pts.append((x * w / 2, y * h / 2 - 0.08 * h))
+    return pts
+import bmesh as _bm
+lb = _bm.new()
+outer = [lb.verts.new((x, 0, y)) for x, y in avocado(0.026, 0.034)]
+lb.faces.new(outer)
+lmesh = bpy.data.meshes.new("IpadLogo")
+lb.to_mesh(lmesh)
+lb.free()
+logo = bpy.data.objects.new("IpadLogo", lmesh)
+bpy.context.collection.objects.link(logo)
+finish(logo, "IpadLogo", M["logo"], smooth_shade=False)
+sol = logo.modifiers.new("Solidify", "SOLIDIFY")
+sol.thickness = 0.0002
+apply_mods(logo)
+# (its stone: a round hollow, a little below the middle)
+bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.0062, depth=0.01, location=(0, 0, -0.006), rotation=(math.pi / 2, 0, 0))
+stone = active()
+m = logo.modifiers.new("cut", "BOOLEAN")
+m.operation = "DIFFERENCE"
+m.object = stone
+m.solver = "EXACT"
+apply_mods(logo)
+bpy.data.objects.remove(stone)
+# (upright when held upright, as the maker's is: on the back, facing out of it)
+logo.location = P(0, 0.0, BACK - 0.00012)
+tab.append(logo)
+tab.append(cyl("IpadLogoStone", 0.0055, 0.00015, P(0, -0.006 + 0.0, BACK - 0.0001), M["logoStone"], rot=(math.pi / 2, 0, 0), verts=32))
+# the connector's three dots, on the back by the long edge that's the bottom held landscape (where a keyboard case clips on)
 for k in range(3):
-    tab.append(cyl(f"IpadConnector{k}", 0.0009, 0.0006, P(-TW / 2 - 0.0002, (k - 1) * 0.004, 0), M["dark"], rot=(0, math.pi / 2, 0), verts=8))
+    tab.append(cyl(f"IpadConnector{k}", 0.0011, 0.0003, P(-TW / 2 + 0.006, (k - 1) * 0.005, BACK - 0.0001), M["dark"], rot=(math.pi / 2, 0, 0), verts=12))
 
 # the tablet held landscape, as a till's is: everything above turned a quarter about the screen's normal (the camera's long edge to the
 # top), leaning back on the stand with its long foot on the ledge
@@ -181,13 +229,15 @@ turn.rotation_euler = (0, -math.pi / 2, 0)
 for o in tab:
     o.parent = turn
 # the screen, landscape: its UV 0..1 left to right and bottom to top as the cashier sees it
-bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 0, 0), rotation=(math.pi / 2, 0, 0))
-scr = active()
-scr.scale = (TH - 2 * BORDER, TW - 2 * BORDER, 1)
-apply_scale(scr)
-finish(scr, "IpadScreen", M["screen"], smooth_shade=False)
+scr = rounded_slab("IpadScreen", TH - 2 * BORDER, TW - 2 * BORDER, 0.0001, SCREEN_R, M["screen"])
+# (its UVs straight across it, 0..1 left to right and bottom to top as the cashier sees it)
+uvl = scr.data.uv_layers.new(name="UVMap")
+for poly in scr.data.polygons:
+    for li in poly.loop_indices:
+        co = scr.data.vertices[scr.data.loops[li].vertex_index].co
+        uvl.data[li].uv = (co.x / (TH - 2 * BORDER) + 0.5, co.z / (TW - 2 * BORDER) + 0.5)
 scr.parent = tilt
-scr.location = Vector(P(0, TILT_UP, TD / 2 + 0.00055))
+scr.location = Vector(P(0, TILT_UP, TD / 2 + 0.0005))
 tab.append(scr)
 
 # =====================================================================
