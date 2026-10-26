@@ -160,31 +160,66 @@ export function beep(kind: 'ok' | 'error') {
   } catch { /* (no sound to be had: the keys work all the same) */ }
 }
 
-/** the drawer springing open: the latch's clack, then the register's bell (a bright ding, two partials a little apart, ringing on) */
+/**
+ * the drawer springing open, as a real till does it: the solenoid's clack as the latch lets go, the little bell inside struck once (a bright
+ * small bell, its partials inharmonic and beating), and the drawer running out on its steel rails (a rolling rumble of the bearings) to knock
+ * against its stop
+ */
 export function chime() {
   try {
     audio ??= new AudioContext()
     const t = audio.currentTime
-    const n = audio.createBufferSource()
-    const buf = audio.createBuffer(1, Math.round(audio.sampleRate * 0.03), audio.sampleRate)
-    const d = buf.getChannelData(0)
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2
-    n.buffer = buf
-    const ng = audio.createGain()
-    ng.gain.value = 0.05
-    n.connect(ng).connect(audio.destination)
-    n.start(t)
-    for (const [f, g, len] of [[2637, 0.045, 1.3], [2649, 0.03, 1.1], [3951, 0.018, 0.6], [5274, 0.008, 0.3]] as [number, number, number][]) {
+    const sr = audio.sampleRate
+    const noise = (len: number, shape: (x: number) => number) => {
+      const b = audio!.createBuffer(1, Math.round(sr * len), sr)
+      const d = b.getChannelData(0)
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * shape(i / d.length)
+      const n = audio!.createBufferSource()
+      n.buffer = b
+      return n
+    }
+    const out = audio.createGain()
+    out.gain.value = 0.9
+    out.connect(audio.destination)
+    // (the latch: a sharp mechanical clack, low and high together)
+    const clack = noise(0.04, (x) => (1 - x) ** 4)
+    const cf = audio.createBiquadFilter(), cg = audio.createGain()
+    cf.type = 'bandpass'
+    cf.frequency.value = 1800
+    cf.Q.value = 0.8
+    cg.gain.value = 0.35
+    clack.connect(cf).connect(cg).connect(out)
+    clack.start(t)
+    // (the bell: struck a moment after the latch)
+    const tb = t + 0.015
+    for (const [f, g, len] of [[1975, 0.05, 1.4], [1981, 0.03, 1.2], [4580, 0.02, 0.6], [7320, 0.008, 0.3]] as [number, number, number][]) {
       const o = audio.createOscillator(), v = audio.createGain()
       o.type = 'sine'
       o.frequency.value = f
-      v.gain.setValueAtTime(0.0001, t + 0.02)
-      v.gain.exponentialRampToValueAtTime(g, t + 0.025)
-      v.gain.exponentialRampToValueAtTime(0.0001, t + 0.025 + len)
-      o.connect(v).connect(audio.destination)
-      o.start(t + 0.02)
-      o.stop(t + 0.05 + len)
+      v.gain.setValueAtTime(0.0001, tb)
+      v.gain.exponentialRampToValueAtTime(g, tb + 0.003)
+      v.gain.exponentialRampToValueAtTime(0.0001, tb + len)
+      o.connect(v).connect(out)
+      o.start(tb)
+      o.stop(tb + len + 0.05)
     }
+    // (the run out on its rails: a rolling, ribbed rumble rising and falling as it speeds and slows)
+    const run = 0.22
+    const rail = noise(run, (x) => Math.sin(Math.PI * x) ** 0.7 * (0.55 + 0.45 * Math.sin(x * 140)))
+    const rf = audio.createBiquadFilter(), rg = audio.createGain()
+    rf.type = 'lowpass'
+    rf.frequency.value = 1200
+    rg.gain.value = 0.22
+    rail.connect(rf).connect(rg).connect(out)
+    rail.start(t + 0.02)
+    // (and its knock against the stop at the end)
+    const stop = noise(0.05, (x) => (1 - x) ** 3)
+    const sf = audio.createBiquadFilter(), sg = audio.createGain()
+    sf.type = 'lowpass'
+    sf.frequency.value = 500
+    sg.gain.value = 0.5
+    stop.connect(sf).connect(sg).connect(out)
+    stop.start(t + 0.02 + run)
   } catch { /* (no sound to be had) */ }
 }
 

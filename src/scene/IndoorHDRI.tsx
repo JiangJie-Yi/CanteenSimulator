@@ -19,7 +19,7 @@ const isHdri = (b: ArrayBuffer) => {
  * how much a real photograph is turned down: a grill at night photographed is far brighter overall than the made-up room the glossy things were
  * tuned against (its lamps alone are hundreds of times over white), and at full strength the marble, the register and the stand glare
  */
-const REAL_GAIN = 0.2
+const REAL_GAIN = 1 / 6
 /** the first of the time of day's files that's there, or null */
 function useHdriFile(when: 'day' | 'night') {
   const [file, setFile] = useState<string | null>(null)

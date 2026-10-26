@@ -80,17 +80,20 @@ def walnut_board(n):
     wavering, a soft cathedral of growth rings rising through part of it, darker streaks of heartwood, open pores flecked along the grain;
     a warm brown, not near black"""
     uu, vv = grid01(n)
-    warp = (fbm(n, 4, 1, 4) - 0.5) * 0.05
-    fine = np.sin((vv + warp) * math.pi * 2 * 70 + fbm(n, 6, 1, 3) * 1.2) * 0.5 + 0.5
-    fine = smooth(0.55, 0.95, fine)
+    warp = (fbm(n, 4, 1, 4) - 0.5) * 0.06 + (fbm(n, 1, 2, 3) - 0.5) * 0.04
+    # (the fine grain: lines of uneven spacing and strength, some fading out and coming back, not a regular stripe)
+    phase = (vv + warp) * 64 + fbm(n, 6, 1, 3) * 2.2 + fbm(n, 2, 1, 2) * 3
+    fine = (np.sin(phase * math.pi * 2) * 0.5 + 0.5) * (0.4 + 0.6 * fbm(n, 9, 2, 3))
+    fine = smooth(0.45, 0.9, fine)
     # (the cathedral: wide arches along the board, only through the middle of it, faint)
     d = np.sqrt(((vv - 0.5) * 2.6 + warp) ** 2 + ((uu + 0.6) * 0.55) ** 2)
     arch = smooth(0.75, 0.95, (d * 7 + fbm(n, 5, 2, 3) * 0.6) % 1.0) * np.exp(-((vv - 0.5) / 0.22) ** 2)
     streak = smooth(0.45, 0.85, fbm(n, 1, 5, 4))
-    col = mix((0.46, 0.3, 0.19), (0.36, 0.23, 0.14), streak * 0.8)
-    col = mix(col, (0.24, 0.15, 0.09), fine * 0.28 + arch * 0.22)
-    pores = (fbm(n, 5, 120, 2) > 0.66).astype(np.float32)
-    return mix(col, (0.17, 0.1, 0.06), pores * 0.25)
+    # (a lighter, warm walnut: honey-brown sapwood tones through the darker heart, the grain a soft shade darker, not a heavy line)
+    col = mix((0.6, 0.42, 0.27), (0.48, 0.32, 0.2), streak * 0.85)
+    col = mix(col, (0.36, 0.23, 0.14), fine * 0.18 + arch * 0.14)
+    pores = (fbm(n, 5, 120, 2) > 0.68).astype(np.float32)
+    return mix(col, (0.28, 0.18, 0.11), pores * 0.18)
 
 
 walnut_tex = image("walnut", walnut_board(512))
@@ -117,6 +120,10 @@ M = {
     "brass": mat("StandBrass", "#c9a24a", 0.25, 1.0), "drawerIn": mat("StandDrawerInside", "#6a4a30", 0.7),
     "resin": mat("TrayResin", "#ffffff", 0.35, tex=resin_tex), "resinRib": mat("TrayRib", "#1a1a1c", 0.5), "gilt": mat("TrayGilt", "#d4b25a", 0.3, 0.8),
     "rubber": mat("TrayFoot", "#202020", 0.9),
+    "potGlaze": mat("TreePotGlaze", "#9c2a1e", 0.2), "potFoot": mat("TreePotFoot", "#5a3a28", 0.8), "soil": mat("TreeSoil", "#3a2a1c", 0.95),
+    "pebble": mat("TreePebble", "#e8e2d4", 0.6), "bark": mat("TreeBark", "#8a7a52", 0.8), "stem": mat("TreeStem", "#6f8a3a", 0.6),
+    "leaf": mat("TreeLeaf", "#2f7a2e", 0.3), "leaf2": mat("TreeLeaf2", "#3f9238", 0.3), "ribbonRed": mat("TreeRibbon", "#c8221a", 0.5),
+    "coinGold": mat("IngotGold", "#e0b24a", 0.15, 1.0), "lacquerRed": mat("IngotStand", "#8e1e16", 0.25), "cushion": mat("IngotCushion", "#c4321e", 0.7),
     "lcd": mat("ReaderLcd", "#aab3a6", 0.3), "lcdInk": mat("ReaderLcdInk", "#1c2420", 0.5), "card": mat("ReaderCardFace", "#2f7fd0", 0.3),
     "cardBand": mat("ReaderCardBand", "#7fb6ea", 0.3), "keyRubber": mat("ReaderKeyRubber", "#3a3d42", 0.6),
     "hole": mat("DeskHole", "#060607", 0.6), "holeRing": mat("DeskHoleRing", "#3a3c40", 0.3, 0.8), "cable": mat("DeskCable", "#17171a", 0.4),
@@ -313,8 +320,12 @@ for k in range(6):
     pr.append(box(f"PrinterVent{k}", S(0.0008, 0.03, 0.003), P(-PW / 2 - 0.0002, 0.04, -0.03 + k * 0.009), M["slot"]))
 pr.append(box("PrinterSwitch", S(0.003, 0.012, 0.008), P(PW / 2 + 0.0012, 0.035, -0.04), M["printerDark"], bev=0.001))
 # (its lead out of the back, down into the hole behind it)
-pr.append(tube("PrinterCable", [(0.03, 0.02, -PD / 2), (0.03, 0.012, -PD / 2 - 0.012), (0.03, 0.002, -PD / 2 - 0.02), (0.03, -0.01, -PD / 2 - 0.022)], 0.0028, M["cable"]))
-pr += hole("Printer", 0.03, -PD / 2 - 0.022)
+# (its lead: out of the back low down, a short loop round the back corner and along beside it, down into a hole by its side, so it stays on the
+# stand however the printer is turned)
+HX, HZ = PW / 2 + 0.018, -PD / 2 + 0.035
+pr.append(tube("PrinterCable", [(0.03, 0.02, -PD / 2), (0.034, 0.012, -PD / 2 - 0.01), (PW / 2 + 0.006, 0.006, -PD / 2 - 0.012),
+                                (HX, 0.004, -PD / 2 + 0.004), (HX, 0.002, HZ - 0.008), (HX, -0.01, HZ)], 0.0028, M["cable"]))
+pr += hole("Printer", HX, HZ)
 nodes.append(node("TillPrinter", pr))
 
 # =====================================================================
@@ -492,20 +503,33 @@ DW = (CW - 2 * ST - 0.012) / 2
 mt.append(box("DeskMatDivider", S(0.012, OH, CD - 0.02), P(0, OY, 0.0), M["walnut"], bev=0.001))
 for k, sx in enumerate((-1, 1)):
     cx = sx * (0.006 + DW / 2)
+    first_ = len(mt)
     # (its front: a board with a fielded panel standing a little proud in the middle, a fine gap all round it)
     mt.append(box(f"DeskMatDrawer{k}Front", S(DW - 0.004, OH - 0.004, 0.016), P(cx, OY, FZ - 0.006), M["walnut"], bev=0.0025))
     mt.append(box(f"DeskMatDrawer{k}Panel", S(DW - 0.034, OH - 0.032, 0.004), P(cx, OY, FZ + 0.003), M["walnut"], bev=0.003))
     # (the box behind it, open on top, a little of its pale inside showing at the gap)
-    mt.append(box(f"DeskMatDrawer{k}Box", S(DW - 0.01, OH - 0.012, CD - 0.06), P(cx, OY - 0.002, FZ - 0.014 - (CD - 0.06) / 2), M["drawerIn"]))
+    dbox = box(f"DeskMatDrawer{k}Box", S(DW - 0.01, OH - 0.012, CD - 0.06), P(cx, OY - 0.002, FZ - 0.014 - (CD - 0.06) / 2), M["drawerIn"])
+    # (hollow: thin sides and a floor, open on top)
+    hol = box("hol", S(DW - 0.026, OH, CD - 0.076), P(cx, OY + 0.006, FZ - 0.014 - (CD - 0.06) / 2), M["drawerIn"])
+    m_ = dbox.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = hol; m_.solver = "EXACT"
+    apply_mods(dbox)
+    bpy.data.objects.remove(hol)
+    mt.append(dbox)
     # (a brass bar pull on two posts)
     for px in (-1, 1):
         mt.append(cyl(f"DeskMatDrawer{k}Post{px}", 0.0025, 0.012, P(cx + px * 0.035, OY, FZ + 0.011), M["brass"], rot=(math.pi / 2, 0, 0), verts=12))
     mt.append(cyl(f"DeskMatDrawer{k}Pull", 0.0032, 0.082, P(cx, OY, FZ + 0.017), M["brass"], rot=(0, math.pi / 2, 0), verts=16))
+    # (each drawer its own node, DeskMatDrawer0/1, so the game can slide it out (along +z, toward the cashier))
+    dr = bpy.data.objects.new(f"DeskMatDrawer{k}", None)
+    bpy.context.collection.objects.link(dr)
+    for o in mt[first_:]:
+        o.parent = dr
+    mt.append(dr)
 for sx in (-1, 1):
     for sz in (-1, 1):
         mt.append(box(f"DeskMatFelt{sx}{sz}", S(0.03, 0.002, 0.03), P(sx * (CW / 2 - 0.04), 0.001, sz * (CD / 2 - 0.04)), M["felt"]))
 for o in mt:
-    if o.data.materials and o.data.materials[0].name.startswith("StandWalnut"):
+    if o.type == "MESH" and o.data.materials and o.data.materials[0].name.startswith("StandWalnut"):
         bpy.ops.object.select_all(action="DESELECT")
         o.select_set(True)
         bpy.context.view_layer.objects.active = o
@@ -560,7 +584,7 @@ nodes.append(node("TillTray", tr))
 cs = []
 bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=1.0)
 st = active()
-SX, SZ, SY = 0.1, 0.135, 0.11
+SX, SZ, SY = 0.1, 0.135, 0.17
 for vtx in st.data.vertices:
     x, y, z = vtx.co
     w = 1 + 0.07 * math.sin(x * 5.1 + y * 3.3) + 0.05 * math.sin(y * 7.7 - x * 2.1) + 0.03 * math.sin(z * 9 + x * 6)
@@ -573,6 +597,121 @@ bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); 
 smooth_angle(st, 70)
 cs.append(st)
 nodes.append(node("TillCatStand", cs))
+
+# =====================================================================
+# The money tree (発財樹, a pachira): three trunks braided together in a glazed red pot, its soil topped with pale pebbles, branching at the top
+# into stems each holding a hand of five glossy leaflets; a red ribbon round the braid with a gold coin hanging from it
+# =====================================================================
+mtree = []
+PR, PH2 = 0.055, 0.075
+pot = cyl("TreePot", PR, PH2, P(0, PH2 / 2, 0), M["potGlaze"], verts=40, r2=PR * 0.78)
+potin = cyl("tpin", PR - 0.006, PH2, P(0, PH2 / 2 + 0.008, 0), M["potGlaze"], verts=40, r2=PR * 0.78 - 0.006)
+m_ = pot.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = potin; m_.solver = "EXACT"
+apply_mods(pot)
+bpy.data.objects.remove(potin)
+mtree.append(pot)
+mtree.append(cyl("TreePotRim", PR + 0.002, 0.008, P(0, PH2 - 0.004, 0), M["potGlaze"], verts=40))
+mtree.append(cyl("TreePotFoot", PR * 0.8, 0.006, P(0, 0.003, 0), M["potFoot"], verts=40))
+mtree.append(cyl("TreeSoil", PR - 0.007, 0.004, P(0, PH2 - 0.012, 0), M["soil"], verts=32))
+for i in range(14):
+    a_ = i * 2.399
+    rr = 0.012 + (i % 5) * 0.008
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.0055 + (i % 3) * 0.0012, location=P(rr * math.cos(a_), PH2 - 0.009, rr * math.sin(a_)))
+    pb = active(); pb.scale = (1, 1, 0.6); apply_scale(pb)
+    mtree.append(finish(pb, f"TreePebble{i}", M["pebble"]))
+# (the braid: three trunks winding round each other as they rise, thinning, then each spreading out)
+TB, TT_ = PH2 - 0.01, 0.2
+for k in range(3):
+    pts = []
+    for j in range(13):
+        t = j / 12
+        y = TB + (TT_ - TB) * t
+        a_ = k * 2.094 + t * 7.0
+        rr = 0.008 * (1 - 0.5 * t)
+        pts.append((rr * math.cos(a_), y, rr * math.sin(a_)))
+    # (and out into its branch at the top)
+    ox, oz = math.cos(k * 2.094 + 0.5), math.sin(k * 2.094 + 0.5)
+    pts += [(ox * 0.02, TT_ + 0.03, oz * 0.02), (ox * 0.045, TT_ + 0.06, oz * 0.045)]
+    mtree.append(tube(f"TreeTrunk{k}", pts, 0.0055 - k * 0.0004, M["bark"]))
+    # (the stems off each branch, each with a hand of leaflets)
+    for h in range(3):
+        b = h * 2.1 + k * 0.7
+        sx, sz = ox * 0.045, oz * 0.045
+        ex, ez = sx + math.cos(b) * 0.045, sz + math.sin(b) * 0.045
+        ey = TT_ + 0.075 + (h % 2) * 0.02
+        mtree.append(tube(f"TreeStem{k}{h}", [(sx, TT_ + 0.06, sz), ((sx + ex) / 2, ey + 0.005, (sz + ez) / 2), (ex, ey, ez)], 0.0012, M["stem"]))
+        for f in range(5):
+            fa = b + (f - 2) * 0.55
+            L = 0.045 if f == 2 else 0.038 - abs(f - 2) * 0.003
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=7)
+            lf = active()
+            lf.scale = (L / 2, 0.009, 0.0012)
+            apply_scale(lf)
+            lf.location = P(ex + math.cos(fa) * L / 2, ey + 0.004 - (abs(f - 2)) * 0.003, ez + math.sin(fa) * L / 2)
+            lf.rotation_euler = (0.25 * (f - 2) * 0.3, -0.18, -fa)
+            mtree.append(finish(lf, f"TreeLeaf{k}{h}{f}", M["leaf"] if (k + h + f) % 3 else M["leaf2"]))
+# (a red ribbon tied round the braid, and a gold coin hung from it)
+bpy.ops.mesh.primitive_torus_add(major_radius=0.011, minor_radius=0.0028, major_segments=24, minor_segments=6, location=P(0, TB + 0.06, 0))
+rb = active(); rb.scale = (1, 1, 1.6); apply_scale(rb)
+mtree.append(finish(rb, "TreeRibbon", M["ribbonRed"]))
+mtree.append(tube("TreeRibbonTail", [(0.011, TB + 0.06, 0), (0.016, TB + 0.045, 0.004), (0.017, TB + 0.03, 0.006)], 0.0018, M["ribbonRed"]))
+coin = cyl("TreeCoin", 0.011, 0.002, P(0.018, TB + 0.022, 0.007), M["coinGold"], rot=(math.pi / 2, 0, 0.3), verts=28)
+hole_ = box("ch", S(0.006, 0.006, 0.02), P(0.018, TB + 0.022, 0.007), M["coinGold"])
+m_ = coin.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = hole_; m_.solver = "EXACT"
+apply_mods(coin)
+bpy.data.objects.remove(hole_)
+mtree.append(coin)
+nodes.append(node("TillMoneyTree", mtree))
+
+# =====================================================================
+# The gold ingot (元寶): a boat-shaped shoe of gold, its two ends curling up, a round dome rising from its middle, on a small red lacquer
+# stand with a gold rim and a tasselled cushion
+# =====================================================================
+ig = []
+ig.append(cyl("IngotStand", 0.05, 0.012, P(0, 0.006, 0), M["lacquerRed"], verts=40, r2=0.046))
+ig.append(cyl("IngotStandRim", 0.0505, 0.003, P(0, 0.0125, 0), M["coinGold"], verts=40))
+cush = box("IngotCushion", S(0.07, 0.012, 0.05), P(0, 0.02, 0), M["cushion"], bev=0.006)
+ig.append(cush)
+bm_ = bmesh.new()
+L, Wd, H_ = 0.075, 0.042, 0.022
+NU, NV = 28, 14
+grid = []
+for i in range(NU + 1):
+    u = i / NU * 2 - 1                       # -1..1 along
+    row = []
+    for j in range(NV + 1):
+        v_ = j / NV * 2 - 1                  # -1..1 across
+        x = u * L / 2
+        z = v_ * Wd / 2 * (1 - 0.35 * u * u)
+        # (the shoe: low in the middle, its ends swept up in a curl, its sides rounded)
+        y = H_ * (0.25 + 0.75 * u ** 4) * (1 - 0.6 * v_ * v_) + 0.006 * (1 - v_ * v_)
+        row.append(bm_.verts.new(P(x, 0.026 + y, z)))
+    grid.append(row)
+for i in range(NU):
+    for j in range(NV):
+        bm_.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
+# (its underside: a flat-ish bottom joining the rims)
+under = [bm_.verts.new(P(u * L / 2 * 0.9, 0.026, 0)) for u in [i / NU * 2 - 1 for i in range(NU + 1)]]
+for i in range(NU):
+    bm_.faces.new((grid[i][0], under[i], under[i + 1], grid[i + 1][0]))
+    bm_.faces.new((grid[i + 1][NV], under[i + 1], under[i], grid[i][NV]))
+bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+me_ = bpy.data.meshes.new("IngotShoe")
+bm_.to_mesh(me_)
+bm_.free()
+shoe = bpy.data.objects.new("IngotShoe", me_)
+bpy.context.collection.objects.link(shoe)
+finish(shoe, "IngotShoe", M["coinGold"])
+sol = shoe.modifiers.new("thick", "SOLIDIFY"); sol.thickness = 0.003
+apply_mods(shoe)
+smooth_angle(shoe, 60)
+ig.append(shoe)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.017, segments=32, ring_count=16, location=P(0, 0.034, 0))
+dome = active(); dome.scale = (1, 1, 0.85); apply_scale(dome)
+ig.append(finish(dome, "IngotDome", M["coinGold"]))
+for sx in (-1, 1):
+    ig.append(tube(f"IngotTassel{sx}", [(sx * 0.036, 0.02, 0.026), (sx * 0.04, 0.01, 0.03), (sx * 0.041, 0.0, 0.031)], 0.0022, M["ribbonRed"]))
+nodes.append(node("TillIngot", ig))
 
 root = bpy.data.objects.new("TillDesk", None)
 bpy.context.collection.objects.link(root)

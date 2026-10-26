@@ -24,7 +24,7 @@ import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
 import { TillCounter } from './TillCounter'
-import { CAT_STAND_H, TillBellLive, TillDeskPiece } from './TillDesk'
+import { CAT_STAND_H, TillBellLive, TillDeskPiece, TillMatLive } from './TillDesk'
 import { behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
@@ -530,10 +530,25 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       </group>
       </group>
       </Movable>
-      <Movable id="till-mat" label="木質台座（含抽屜）"><StaticBatch>
+      <Movable id="till-mat" label="木質台座（含抽屜）">
       <group position={at} rotation-y={yaw}>
-      {/* the wooden desk mat the reader, the printer, the pens and the tablet stand on (blender/tilldesk.py) */}
-      <group position={[-0.21, top, -0.005]}><TillDeskPiece name="TillMat" /></group>
+      {/* the walnut stand the reader, the printer, the pens and the tablet stand on (blender/tilldesk.py); its drawers open with a click (not batched) */}
+      <group position={[-0.21, top, -0.005]}>
+        <TillMatLive editing={() => getEdit().on}
+          tip={(open) => lang === 'ja' ? tipOver('引き出し', open ? 'クリックで閉める' : 'クリックで開ける') : tipOver('抽屜', open ? '點一下關上' : '點一下拉開')} />
+      </group>
+      </group>
+      </Movable>
+      <Movable id="till-ingot" label="元寶"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
+      {/* a gold ingot (元寶) on its red stand, for wealth, between the bell and the cat (blender/tilldesk.py) */}
+      <group position={[-0.3, top, -0.34]} rotation-y={0.3} scale={1.5}><TillDeskPiece name="TillIngot" /></group>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id="till-tree" label="招財樹"><StaticBatch>
+      <group position={at} rotation-y={yaw}>
+      {/* a money tree (pachira) in its red pot, by the cat (blender/tilldesk.py) */}
+      <group position={[0.12, top, -0.34]}><TillDeskPiece name="TillMoneyTree" /></group>
       </group>
       </StaticBatch></Movable>
       <Movable id="till-cat" label="櫃檯招財貓" baseTurn={[0, -45, 0]}>

@@ -98,7 +98,39 @@ keyaki_tex = image("keyaki", mix(keyaki, (0.5, 0.34, 0.2), (fbm(512, 60, 3, 3) >
 keyaki_flat_tex = image("keyakiflat", flatsawn(512, (0.8, 0.63, 0.43), (0.7, 0.52, 0.33), (0.48, 0.32, 0.19), rings=9.0))
 # (the partition: walnut for its frame and slats, a pale hinoki board behind the slats)
 pg = fbm(256, 3, 70, 5)
-walnut_tex = image("walnut", flatsawn(512, (0.36, 0.23, 0.14), (0.24, 0.15, 0.09), (0.12, 0.07, 0.04)))
+def soft_walnut(n):
+    """the partition's walnut: a soft, uneven grain, mostly long and straight with now and then a wandering arch, the lines faint and broken,
+    warm patches of lighter and darker wood through it; never a regular pattern"""
+    uu, vv = grid01(n)
+    wob = (fbm(n, 2, 5, 4) - 0.5) * 0.4 + (fbm(n, 1, 2, 3) - 0.5) * 0.3
+    phase = (uu + wob * 0.12) * 38 + fbm(n, 3, 8, 3) * 2.5
+    lines = (np.sin(phase * math.pi * 2) * 0.5 + 0.5) * fbm(n, 6, 2, 4)
+    d = np.sqrt(((uu - 0.55) * 2.4 + wob) ** 2 + ((vv + 0.5) * 0.7) ** 2)
+    arch = smooth(0.8, 0.96, (d * 6 + fbm(n, 2, 5, 3)) % 1.0) * smooth(0.45, 0.8, fbm(n, 2, 3, 3))
+    patch = fbm(n, 2, 3, 4)
+    col = mix((0.5, 0.33, 0.21), (0.38, 0.25, 0.15), patch)
+    col = mix(col, (0.28, 0.18, 0.11), smooth(0.5, 0.95, lines) * 0.28 + arch * 0.22)
+    return mix(col, (0.24, 0.15, 0.09), (fbm(n, 4, 90, 2) > 0.7).astype(np.float32) * 0.12)
+
+
+def hinoki_board(n):
+    """the pale hinoki board behind the slats: its grain fine and close, gently wavering, some lines stronger than others, a few soft knots'
+    swirls, a faint warm blush here and there"""
+    uu, vv = grid01(n)
+    wob = (fbm(n, 2, 4, 4) - 0.5) * 0.08
+    phase = (uu + wob) * 70 + fbm(n, 4, 6, 3) * 3
+    lines = smooth(0.55, 0.95, (np.sin(phase * math.pi * 2) * 0.5 + 0.5) * (0.5 + 0.5 * fbm(n, 8, 2, 3)))
+    knot = np.zeros((n, n), np.float32)
+    for kx, ky in ((0.3, 0.25), (0.72, 0.68), (0.15, 0.8)):
+        r = np.sqrt(((uu - kx) * 3) ** 2 + ((vv - ky) * 1.2) ** 2)
+        knot = np.maximum(knot, smooth(0.9, 0.0, r) * (np.sin(r * 60) * 0.5 + 0.5))
+    col = mix((0.86, 0.72, 0.52), (0.8, 0.63, 0.43), fbm(n, 2, 3, 4))
+    col = mix(col, (0.66, 0.5, 0.33), lines * 0.35 + knot * 0.3)
+    return col
+
+
+walnut_tex = image("walnut", soft_walnut(512))
+hinoki_back_tex = image("hinokiback", hinoki_board(512))
 dark_tex = image("darkwood", mix((0.25, 0.17, 0.11), (0.2, 0.13, 0.08), fbm(256, 2, 40, 4)))
 
 M = {
@@ -113,7 +145,7 @@ M = {
     "paper": pbr("TillWindowPaper", (1, 1, 1), tex=paper_tex, rough=0.9, emit=(1, 0.85, 0.6), emit_strength=1.5),
     "bambooGlow": pbr("TillBambooGlow", (1, 1, 1), tex=bamboo_glow_tex, rough=1.0, emit=(1, 0.8, 0.5), emit_strength=1.0),
     "walnut": pbr("TillShieldWalnut", (1, 1, 1), tex=walnut_tex, rough=0.4),
-    "slatBack": pbr("TillShieldBack", (1, 1, 1), tex=batten_tex, rough=0.6),
+    "slatBack": pbr("TillShieldBack", (1, 1, 1), tex=hinoki_back_tex, rough=0.6),
     "shoe": pbr("TillShieldShoe", lin("#2a2622"), rough=0.35, metal=0.6),
     "bamboo": pbr("TillBamboo", (1, 1, 1), tex=bamboo_tex, rough=0.35),
     **{f"bamboo{i}": pbr(f"TillBamboo{i}", (1, 1, 1), tex=bamboo_tex, rough=0.35) for i in range(5)},
@@ -244,13 +276,22 @@ def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell, shade):
     ys = sorted(ys)
     sa, sl, sp = swell
 
+    # (each length between two nodes a little thicker or thinner than the next, eased across the node so it doesn't step)
+    seg_k = [1 + float(brng.uniform(-0.09, 0.09)) for _ in range(len(nodes_at) + 1)]
+
     def radius(y):
         t = (y - y0) / h
-        rad = r * (1 - 0.07 * t) * (1 + sa * math.sin(2 * math.pi * (y - y0) / sl + sp))
+        idx = sum(1 for n in nodes_at if n < y)
+        kk = seg_k[idx]
+        for n in nodes_at:
+            if abs(y - n) < 0.012:
+                j = nodes_at.index(n)
+                kk = seg_k[j] + (seg_k[j + 1] - seg_k[j]) * (0.5 + (y - n) / 0.024)
+        rad = r * kk * (1 - 0.07 * t) * (1 + sa * math.sin(2 * math.pi * (y - y0) / sl + sp))
         for n in nodes_at:
             d = y - n
             # (the ridge, sharp; the sheath's scar a little below it; the pinch just above)
-            rad *= 1 + 0.07 * math.exp(-(d / 0.0024) ** 2) + 0.025 * math.exp(-((d + 0.006) / 0.003) ** 2) - 0.03 * math.exp(-((d - 0.009) / 0.006) ** 2)
+            rad *= 1 + 0.11 * math.exp(-(d / 0.0026) ** 2) + 0.04 * math.exp(-((d + 0.006) / 0.003) ** 2) - 0.04 * math.exp(-((d - 0.009) / 0.006) ** 2)
         return rad
 
     def centre(y):
@@ -319,9 +360,10 @@ RZ = min(z for _, _, z in culms) - 0.021 - 0.012
 for yy in (0.17, TOP - 0.17):
     RL_ = W - 0.07
     first = float(brng.uniform(0.04, 0.12))
-    nodes_r = [-RL_ / 2 + first + n * float(brng.uniform(0.19, 0.24)) for n in range(6)]
+    step_r = float(brng.uniform(0.13, 0.17))
+    nodes_r = [-RL_ / 2 + first + n * step_r * float(brng.uniform(0.9, 1.1)) for n in range(9)]
     rail = culm(f"TillBambooRail{int(yy * 100)}", 0.0, 0.0115, -RL_ / 2, RL_, 0.0, 0.0, float(brng.uniform(0.002, 0.004)), float(brng.uniform(0, 1)),
-                [n for n in nodes_r if n < RL_ / 2 - 0.03], (0.05, float(brng.uniform(0.3, 0.5)), float(brng.uniform(0, 6.28))), int(brng.integers(0, 5)))
+                [n for n in nodes_r if n < RL_ / 2 - 0.03], (0.03, float(brng.uniform(0.3, 0.5)), float(brng.uniform(0, 6.28))), int(brng.integers(0, 5)))
     # (built standing, laid along the face: turned so its length runs along x, then set in place)
     lay_ = Matrix.Translation(Vector(P(0, yy, RZ))) @ Matrix.Rotation(math.pi / 2, 4, "Y")
     for o in rail:
