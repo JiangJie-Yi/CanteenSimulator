@@ -75,7 +75,25 @@ def flatsawn(n, light, dark, line, rings=11.0, seed_u=0.5):
     return mix(body, line, (fbm(n, 70, 4, 3) > 0.62).astype(np.float32) * 0.18)
 
 
-walnut_tex = image("walnut", flatsawn(512, (0.42, 0.27, 0.16), (0.3, 0.19, 0.11), (0.15, 0.09, 0.05)))
+def walnut_board(n):
+    """walnut as it's usually seen on furniture: mostly straight, fine grain running along the board (along u: the stand's width), gently
+    wavering, a soft cathedral of growth rings rising through part of it, darker streaks of heartwood, open pores flecked along the grain;
+    a warm brown, not near black"""
+    uu, vv = grid01(n)
+    warp = (fbm(n, 4, 1, 4) - 0.5) * 0.05
+    fine = np.sin((vv + warp) * math.pi * 2 * 70 + fbm(n, 6, 1, 3) * 1.2) * 0.5 + 0.5
+    fine = smooth(0.55, 0.95, fine)
+    # (the cathedral: wide arches along the board, only through the middle of it, faint)
+    d = np.sqrt(((vv - 0.5) * 2.6 + warp) ** 2 + ((uu + 0.6) * 0.55) ** 2)
+    arch = smooth(0.75, 0.95, (d * 7 + fbm(n, 5, 2, 3) * 0.6) % 1.0) * np.exp(-((vv - 0.5) / 0.22) ** 2)
+    streak = smooth(0.45, 0.85, fbm(n, 1, 5, 4))
+    col = mix((0.46, 0.3, 0.19), (0.36, 0.23, 0.14), streak * 0.8)
+    col = mix(col, (0.24, 0.15, 0.09), fine * 0.28 + arch * 0.22)
+    pores = (fbm(n, 5, 120, 2) > 0.66).astype(np.float32)
+    return mix(col, (0.17, 0.1, 0.06), pores * 0.25)
+
+
+walnut_tex = image("walnut", walnut_board(512))
 # (the change tray's floor: a black resin, a faint sheen in its texture)
 resin_tex = image("resin", mix((0.05, 0.05, 0.055), (0.09, 0.085, 0.09), fbm(N, 20, 20, 3)))
 
@@ -303,7 +321,7 @@ nodes.append(node("TillPrinter", pr))
 # The card reader: a countertop payment terminal lying on the stand, its keypad and card slot toward the customers (-z), its built-in
 # receipt printer at the back toward the cashier. Its shell rises from the slot at the front up the keypad's gentle slope to the screen,
 # then swells over the paper roll; under the screen two soft keys and the scroll keys; the rubber keypad, each key's figure and letters;
-# F, 0 and the point; the red, yellow and green keys across the foot; a card pushed into the chip slot; the lead out of the back
+# F, 0 and the point; the red, yellow and green keys across the foot; the chip slot; the lead out of the back
 # =====================================================================
 cr = []
 RW, RL = 0.082, 0.19                      # its width and length (front -z to back +z)
@@ -406,20 +424,8 @@ on(pt, [box("ReaderLidSeam", S(RW - 0.014, 0.0008, 0.0012), P(0, 0.0003, -0.008)
         box("ReaderTearSlot", S(RW - 0.02, 0.001, 0.003), P(0, 0.0004, 0.008), M["slot"]),
         box("ReaderSlip", S(RW - 0.026, 0.006, 0.0006), P(0, 0.003, 0.008), M["paper"], rot=(0.25, 0, 0)),
         box("ReaderCatch", S(0.012, 0.0012, 0.004), P(0, 0.0008, -0.014), M["readerTrim"], bev=0.0006)])
-# (the chip slot at the foot, and a card pushed into it, standing out toward the customer)
+# (the chip slot at the foot, empty until someone pays)
 cr.append(box("ReaderChipSlot", S(0.062, 0.004, 0.003), P(0, 0.012, FZ - 0.0002), M["slot"]))
-card = bpy.data.objects.new("ReaderCard", None)
-bpy.context.collection.objects.link(card)
-card.location = P(0, 0.012, FZ + 0.012)
-card.rotation_euler = (-0.06, 0, 0)
-cd_ = [box("ReaderCardBody", S(0.054, 0.0008, 0.086), P(0, 0, -0.043), M["card"], bev=0.0012),
-       box("ReaderCardBand", S(0.054, 0.0004, 0.012), P(0, 0.0005, -0.07), M["cardBand"]),
-       text("ReaderCardWord", "DEBIT", 0.0042, M["white"], P(-0.012, 0.0008, -0.078), TXT, BOLD),
-       text("ReaderCardBank", "BANK", 0.0048, M["white"], P(0.012, 0.0008, -0.058), TXT, BOLD)]
-for o in cd_:
-    o.parent = card
-cr.append(card)
-cr += cd_
 # (felt feet, and its lead out of the back, down into the hole behind it)
 for sx in (-1, 1):
     for sz in (-1, 1):
