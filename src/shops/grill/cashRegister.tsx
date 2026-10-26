@@ -39,7 +39,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 export const registerText = () => (TILL_STATE.k >= 0 ? TILL_STATE.text : REGISTER.state.display)
 /** the word lit beside the figures (what they are), and the lock's mark when the drawer's locked */
 export const registerTag = () => {
-  const tag = TILL_STATE.k >= 0 ? (TILL_STATE.k < 0.32 ? '品項' : TILL_STATE.k < 0.44 ? '合計' : '找零') : REG_TAG_TEXT[REGISTER.state.tag]
+  const tag = TILL_STATE.k >= 0 ? (TILL_STATE.k < 0.32 ? '品項' : TILL_STATE.k < 0.44 || TILL_STATE.card ? '合計' : '找零') : REG_TAG_TEXT[REGISTER.state.tag]
   return REGISTER.state.drawerLocked ? `${tag} 鎖`.trim() : tag
 }
 /** the drawer won't come: it knocks against the lock */
@@ -347,15 +347,16 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
         REGISTER.pressed.set('SUBTOTAL', now)
         const lines = parts.map((amount, i) => ({ label: i < TILL_STATE.items ? DEPTS[0].name : DEPTS[1].name, amount, qty: 1 }))
         const base = REGISTER.state.mode === 'REG' ? REGISTER.state : setMode(REGISTER.state, 'REG')
-        const { state, receipt } = settle(base, lines, TILL_STATE.tender, 'CASH', new Date())
+        // (a card's sale settled as CHARGE: no cash tendered, the drawer left shut)
+        const { state, receipt } = settle(base, lines, TILL_STATE.card ? 0 : TILL_STATE.tender, TILL_STATE.card ? 'CHARGE' : 'CASH', new Date())
         REGISTER.state = state
         if (state.receiptOn) { REGISTER.printLen = drawReceipt(receipt); REGISTER.printAt = -1 }
       }
       if (pk < 0.44 && k >= 0.44) {
-        REGISTER.pressed.set('CASH', now)
+        REGISTER.pressed.set(TILL_STATE.card ? 'CHARGE' : 'CASH', now)
         beep('ok')
         // (the cashier unlocks the drawer to take the money: the key's turned upright)
-        if (REGISTER.state.drawerLocked) REGISTER.state = turnDrawerKey(REGISTER.state)
+        if (!TILL_STATE.card && REGISTER.state.drawerLocked) REGISTER.state = turnDrawerKey(REGISTER.state)
       }
     }
     lastK.current = k

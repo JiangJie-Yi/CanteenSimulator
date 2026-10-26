@@ -384,7 +384,11 @@ export const TILL_STATE = { text: '0', drawer: 0,
   /** what's rung up for the customer paying: each dish, then the drink if any; and how many of those are dishes */
   parts: [] as number[], items: 0,
   /** the drawer pulled out by hand (clicked), apart from the customers' payments */
-  manual: false }
+  manual: false,
+  /** the one paying pays by card (on the reader, no cash), how many groups are waiting to pay, and so whether the tablet's in use (game/till) */
+  card: false, queue: 0, tablet: false,
+  /** what the one paying owes, and their number */
+  bill: 0, payer: 0 }
 /** what a customer's bill comes to: the dishes they ordered and the drink from the fridge, if they took one */
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __till?: typeof TILL_STATE }).__till = TILL_STATE
 export const billOf = (items: number, drink?: DrinkId) => Math.max(1, items) * 380 + (drink ? 320 : 0)

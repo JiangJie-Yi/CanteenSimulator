@@ -24,6 +24,7 @@ import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
 import { TillCounter } from './TillCounter'
+import { drawerOpens, paysByCard, tabletActive } from '@/game/till'
 import { CAT_STAND_H, TillBellLive, TillDeskPiece, TillMatLive } from './TillDesk'
 import { behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
@@ -1456,6 +1457,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     clock.current += Math.min(dt, 0.1)
     let done: number[] = []
     let paying: { s: Shown; k: number } | null = null
+    let queue = 0
     for (const s of shown) {
       s.t += Math.min(dt, 0.1)
       // (they come and go whether or not they're drawn: on a phone they aren't, but their plates still follow them)
@@ -1537,6 +1539,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         g?.position.copy(p)
         if (g) g.rotation.y = s.t < 0.8 ? st.yaw : Math.atan2(-dir.x, -dir.z)
         // (at the till, facing it: the register's reading follows what they owe)
+        // (waiting to pay: on the way out and not yet past the till)
+        if (lp.payD && raw < payAt + PAY_S * v) queue++
         if (lp.payD && raw >= payAt && raw < payAt + PAY_S * v) {
           if (g) g.rotation.y = Math.atan2(counters[0].lay.x, counters[0].lay.z)
           paying = { s, k: (raw - payAt) / (PAY_S * v) }
@@ -1563,11 +1567,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const given = Math.min(10000, Math.ceil(bill / 1000) * 1000)
       const rung = Math.min(parts.length, Math.floor(k / 0.32 * parts.length) + 1)
       TILL_STATE.text = yen(k < 0.32 ? parts.slice(0, rung).reduce((a, b) => a + b, 0) : k < 0.62 ? bill : Math.max(0, given - bill))
-      // (the cashier presses the cash key at 0.44, the drawer shoots out; the note goes in, the change comes out; at 0.78 it's pushed shut)
-      TILL_STATE.drawer = k >= 0.44 && k < 0.78 ? 1 : 0
+      // (a card: rung up and paid on the reader, the drawer staying shut and no money changing hands; cash: the cashier presses the cash key
+      // at 0.44, the drawer shoots out, the note goes in, the change comes out, and at 0.78 it's pushed shut)
+      const card = paysByCard(x.id)
+      TILL_STATE.card = card
+      TILL_STATE.drawer = drawerOpens(card) && k >= 0.44 && k < 0.78 ? 1 : 0
       TILL_STATE.k = k
-      TILL_STATE.tender = given
-      TILL_STATE.change = Math.max(0, given - bill)
+      TILL_STATE.tender = card ? 0 : given
+      TILL_STATE.change = card ? 0 : Math.max(0, given - bill)
+      TILL_STATE.bill = bill
+      TILL_STATE.payer = x.id
       TILL_STATE.parts = parts
       TILL_STATE.items = n
     } else {
@@ -1575,7 +1584,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       TILL_STATE.k = -1
       TILL_STATE.tender = 0
       TILL_STATE.change = 0
+      TILL_STATE.card = false
     }
+    TILL_STATE.queue = queue
+    TILL_STATE.tablet = tabletActive(queue, TILL_STATE.k >= 0 && TILL_STATE.card)
     SEATS_TAKEN.clear()
     for (const x of shown) SEATS_TAKEN.add(x.seat)
     // nobody walks through anybody: those walking (in, out, to the toilet or the fridge) keep a body's width apart,

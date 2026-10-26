@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
+import { TILL_STATE } from './bar'
 
 /**
  * The till's order tablet on its stand, from blender/ipad.py, in the frame the till had it (the stand's middle at the origin, the screen
@@ -153,11 +155,77 @@ export const TILL_APP = (() => {
   g.fillStyle = '#fff'; g.font = `700 24px ${SANS}`; g.textAlign = 'center'; g.fillText('会計する', px + pw / 2, H - 78); g.textAlign = 'left'
   // the home indicator
   rr(g, W / 2 - 70, H - 12, 140, 5, 3); g.fillStyle = '#1c1c1e'; g.fill()
+  return c
+})()
+
+/**
+ * What the tablet shows, by what's going on at the till (TILL_STATE.tablet, from game/till): at rest, the lock screen (dark, the time and the
+ * shop's name, "待機中"); in use with a queue, the order screen (the POS above, the queue's count on it); taking a card, the order screen under
+ * a payment sheet (the amount, "カードを端末に"). Redrawn only when that changes.
+ */
+const SCREEN = (() => {
+  if (typeof document === 'undefined' || !TILL_APP) return null
+  const c = document.createElement('canvas')
+  c.width = W
+  c.height = H
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.anisotropy = 8
-  return t
+  return { c, g: c.getContext('2d')!, t, key: '' }
 })()
+function drawScreen(mode: 'idle' | 'queue' | 'card', bill: number, queue: number) {
+  if (!SCREEN || !TILL_APP) return
+  const key = `${mode}|${bill}|${queue}`
+  if (SCREEN.key === key) return
+  SCREEN.key = key
+  const g = SCREEN.g
+  g.textBaseline = 'middle'
+  g.textAlign = 'center'
+  if (mode === 'idle') {
+    // (asleep: a dark lock screen, the time large, the shop and the app's name under it)
+    const grad = g.createLinearGradient(0, 0, 0, H)
+    grad.addColorStop(0, '#1b1d27'); grad.addColorStop(1, '#0c0d12')
+    g.fillStyle = grad
+    g.fillRect(0, 0, W, H)
+    g.fillStyle = 'rgba(255,255,255,0.92)'
+    g.font = `200 150px ${SANS}`
+    g.fillText('9:41', W / 2, H * 0.36)
+    g.font = `500 28px ${SANS}`
+    g.fillText('10月26日 日曜日', W / 2, H * 0.17)
+    g.fillStyle = 'rgba(255,255,255,0.7)'
+    g.font = `600 30px ${SANS}`
+    g.fillText('聞野 POS ・ 待機中', W / 2, H * 0.62)
+    g.font = `400 22px ${SANS}`
+    g.fillText('混雑時・カード決済時に起動', W / 2, H * 0.68)
+    rr(g, W / 2 - 70, H - 12, 140, 5, 3); g.fillStyle = 'rgba(255,255,255,0.8)'; g.fill()
+  } else {
+    g.drawImage(TILL_APP, 0, 0)
+    // (the queue's count on the order screen, a red badge at its top)
+    if (queue > 0) {
+      rr(g, W / 2 - 110, 30, 220, 40, 20); g.fillStyle = '#ff3b30'; g.fill()
+      g.fillStyle = '#fff'; g.font = `700 22px ${SANS}`
+      g.fillText(`会計待ち ${queue} 組`, W / 2, 50)
+    }
+    if (mode === 'card') {
+      // (the payment sheet over it: dimmed behind, a white card in the middle with the amount and what to do)
+      g.fillStyle = 'rgba(0,0,0,0.38)'
+      g.fillRect(0, 0, W, H)
+      rr(g, W / 2 - 250, H / 2 - 190, 500, 380, 28); g.fillStyle = '#fff'; g.fill()
+      g.fillStyle = '#8e8e93'; g.font = `600 24px ${SANS}`
+      g.fillText('クレジットカード決済', W / 2, H / 2 - 140)
+      g.fillStyle = '#000'; g.font = `700 78px ${SANS}`
+      g.fillText(yen(bill), W / 2, H / 2 - 50)
+      // (a card going into a reader, drawn simply)
+      rr(g, W / 2 - 60, H / 2 + 20, 120, 76, 10); g.fillStyle = '#2f7fd0'; g.fill()
+      g.fillStyle = '#e8c56a'; g.fillRect(W / 2 - 40, H / 2 + 44, 26, 20)
+      g.fillStyle = '#000'; g.font = `500 24px ${SANS}`
+      g.fillText('カードを端末に挿入してください', W / 2, H / 2 + 135)
+    }
+  }
+  g.textAlign = 'left'
+  SCREEN.t.needsUpdate = true
+}
+drawScreen('idle', 0, 0)
 
 export function IpadModel() {
   const gltf = useGLTF(IPAD_URL) as unknown as { scene: THREE.Group }
@@ -183,7 +251,7 @@ export function IpadModel() {
       const uv = g.attributes.uv
       for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i))
       s.geometry = g
-      s.material = new THREE.MeshBasicMaterial({ map: TILL_APP, toneMapped: false })
+      s.material = new THREE.MeshBasicMaterial({ map: SCREEN?.t ?? null, toneMapped: false })
       // (and the glare on its glass, a hair in front)
       const glare = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: GLARE, transparent: true, depthWrite: false, toneMapped: false }))
       glare.position.z = 0.0002
@@ -193,6 +261,8 @@ export function IpadModel() {
     }
     return r
   }, [gltf])
+  // (what's on the screen follows the till: asleep, the order screen, or a card being taken)
+  useFrame(() => drawScreen(TILL_STATE.tablet ? (TILL_STATE.k >= 0 && TILL_STATE.card ? 'card' : 'queue') : 'idle', TILL_STATE.bill, TILL_STATE.queue))
   return <primitive object={root} />
 }
 useGLTF.preload(IPAD_URL)
