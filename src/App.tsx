@@ -355,6 +355,22 @@ function ViewMarkers({ lang, onPick }: { lang: Lang; onPick: (v: ViewId) => void
   )
 }
 
+/** where the fire is on the screen (as parts of the window), for the grill's shallow focus (.grill-focus) to centre on, every few frames */
+function FocusTracker() {
+  const n = useRef(0)
+  const v = useMemo(() => new THREE.Vector3(), [])
+  useFrame(({ camera, gl }) => {
+    if (++n.current % 6) return
+    const r = gl.domElement.getBoundingClientRect()
+    v.set(0, 0.25, 0).project(camera)
+    const x = (r.left + ((v.x + 1) / 2) * r.width) / window.innerWidth, y = (r.top + ((1 - v.y) / 2) * r.height) / window.innerHeight
+    const st = document.documentElement.style
+    st.setProperty('--focus-x', `${(x * 100).toFixed(1)}%`)
+    st.setProperty('--focus-y', `${(y * 100).toFixed(1)}%`)
+  })
+  return null
+}
+
 /** whether a view's camera has been placed by hand (moved or turned in edit mode) */
 const viewCamPlaced = (id: ViewId) => [...offsetOf(`viewcam-${id}`), ...rotationOf(`viewcam-${id}`)].some((x) => Math.abs(x) > 1e-6)
 
@@ -696,6 +712,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       {/* (the views: their numbered spots in the room while the view menu's open; in edit mode each view's camera, to be placed by hand) */}
       {pins && !editing && <ViewMarkers lang={lang} onPick={onView} />}
       <ViewCams editing={editing} lang={lang} pose={poseOf} />
+      <FocusTracker />
       {editing && <AxisWidget />}
       <OrbitControls
         ref={controls}
@@ -1713,6 +1730,9 @@ export default function App() {
       )}
       <div className="canvas-layer" style={glLost || NO_WEBGL ? { visibility: 'hidden' } : undefined}
 >
+        {/* (researching at the grill: the eye on the fire, as a lens focused on it: what's round it soft and darker; in the canvas's own layer,
+            under everything drawn over the view) */}
+        {hand && !!dish.roast && !editOn && !phone && <div className="grill-focus" aria-hidden="true"><i /><b /></div>}
         <Crash inline>
         {/* (a phone at the grill draws it all flat, in 2D: no 3D view at all) */}
         {!NO_WEBGL && !flatGrill && <Canvas

@@ -6472,3 +6472,16 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
   font-size: 12px; white-space: nowrap; }
 .view-cam-tag i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #f2a33a; color: #141416;
   font-style: normal; font-weight: 700; font-size: 12px; }
+
+/* researching at the grill: a shallow focus on the fire, what's round it out of focus and darker (over the 3D view, under the panels) */
+.grill-focus { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.grill-focus i, .grill-focus b { position: absolute; inset: 0; }
+.grill-focus i {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  -webkit-mask-image: radial-gradient(ellipse 44% 50% at var(--focus-x, 38%) var(--focus-y, 56%), transparent 58%, #000 100%);
+  mask-image: radial-gradient(ellipse 44% 50% at var(--focus-x, 38%) var(--focus-y, 56%), transparent 58%, #000 100%);
+}
+.grill-focus b {
+  background: radial-gradient(ellipse 50% 58% at var(--focus-x, 38%) var(--focus-y, 56%), transparent 48%, rgb(8 5 3 / 0.55) 100%);
+}
