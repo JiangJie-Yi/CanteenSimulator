@@ -535,20 +535,45 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   /** how near the grill's held view is drawn (1: camera 1 as it is; smaller nearer), by the wheel */
   const lockZoom = useRef(1)
   const lockZoomNow = useRef(1)
+  /** and how far it's turned round its target there (yaw, pitch in radians), by a right-button drag: only a little either way */
+  const lockTurn = useRef({ yaw: 0, pitch: 0 })
+  const lockTurnNow = useRef({ yaw: 0, pitch: 0 })
   useEffect(() => {
     const el = gl.domElement
     const onWheel = (e: WheelEvent) => {
       const c = controls.current
       if (!c) return
       e.preventDefault()
-      // (held at the grill: the wheel only brings the camera a little nearer or takes it a little further, along its line, not round)
-      if (lockRef.current) { lockZoom.current = THREE.MathUtils.clamp(lockZoom.current * Math.exp(e.deltaY * 0.0011), 0.75, 1.3); return }
+      // (held at the grill: the wheel only brings the camera a little nearer, along its line, never further out than camera 1)
+      if (lockRef.current) { lockZoom.current = THREE.MathUtils.clamp(lockZoom.current * Math.exp(e.deltaY * 0.0011), 0.75, 1); return }
       homing.current = false
       const now = zoomGoal.current ?? camera.position.distanceTo(c.target)
       zoomGoal.current = THREE.MathUtils.clamp(now * Math.exp(e.deltaY * 0.0011), 1.8, 20)
     }
+    // (held at the grill: a right-button drag turns the view a little round what it looks at; the left button stays for the food)
+    let drag: { x: number; y: number } | null = null
+    const onDown = (e: PointerEvent) => { if (lockRef.current && e.button === 2) drag = { x: e.clientX, y: e.clientY } }
+    const onMove = (e: PointerEvent) => {
+      if (!drag || !lockRef.current) return
+      const t = lockTurn.current
+      t.yaw = THREE.MathUtils.clamp(t.yaw - (e.clientX - drag.x) * 0.0025, -0.2, 0.2)
+      t.pitch = THREE.MathUtils.clamp(t.pitch + (e.clientY - drag.y) * 0.0025, -0.1, 0.1)
+      drag = { x: e.clientX, y: e.clientY }
+    }
+    const onUp = () => { drag = null }
+    const onMenu = (e: MouseEvent) => { if (lockRef.current) e.preventDefault() }
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+    el.addEventListener('pointerdown', onDown)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    el.addEventListener('contextmenu', onMenu)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      el.removeEventListener('contextmenu', onMenu)
+    }
   }, [gl, camera])
   const zoomDir = useRef(new THREE.Vector3())
 
@@ -585,7 +610,15 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       zoomGoal.current = null
       // (nearer or further along its line, eased)
       lockZoomNow.current += (lockZoom.current - lockZoomNow.current) * Math.min(1, k * 1.5)
-      pose.position.sub(pose.target).multiplyScalar(lockZoomNow.current).add(pose.target)
+      // (and turned a little round its target, eased: yaw round the up axis, pitch over it)
+      const tn = lockTurnNow.current, tg = lockTurn.current, e = Math.min(1, k * 1.5)
+      tn.yaw += (tg.yaw - tn.yaw) * e
+      tn.pitch += (tg.pitch - tn.pitch) * e
+      const arm = pose.position.sub(pose.target).multiplyScalar(lockZoomNow.current)
+      const sph = new THREE.Spherical().setFromVector3(arm)
+      sph.theta += tn.yaw
+      sph.phi = THREE.MathUtils.clamp(sph.phi + tn.pitch, 0.05, Math.PI / 2 - 0.02)
+      pose.position.setFromSpherical(sph).add(pose.target)
       camera.position.lerp(pose.position, k)
       c.target.lerp(pose.target, k)
       c.update()
