@@ -408,18 +408,34 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
         apply_mods(g_)
         uv_grain(g_, 0.15)
         out.append(g_)
-        # (and out under the bargeboards, the gable's face filled with upright battens of wood (妻の板), a tie beam across their foot, so
-        # nothing shows open between the roof's edge and the walls)
+        # (and out under the bargeboards, the gable's face boarded over: boards laid across it (妻の板), one above another from the tie beam
+        # up to the ridge, each as long as the roof's underside lets it be at its height, so the whole triangle is filled)
         zf = zc + sz * (W / 2 - 0.001)
-        out.append(box(f"Kami{tag}GableBeam{sz}", S(2 * run * 0.96, 0.007, 0.006), P(cx0, top + 0.0035, zf), M["woodDark"], bev=0.0006))
-        n_sl = max(4, int(2 * run * 0.96 / 0.011))
-        for i in range(n_sl):
-            x = cx0 - run * 0.96 + (i + 0.5) * (2 * run * 0.96 / n_sl)
-            s_ = abs(x - cx0) / run
-            hgt = y_top(s_) - RT * 0.6 - (top + 0.007)
-            if hgt < 0.003:
-                continue
-            out.append(box(f"Kami{tag}Batten{sz}{i}", S(0.0085, hgt, 0.004), P(x, top + 0.007 + hgt / 2, zf), wood(), bev=0.0004, uv=0.1))
+        out.append(box(f"Kami{tag}GableBeam{sz}", S(2 * run * 0.98, 0.007, 0.006), P(cx0, top + 0.0035, zf), M["woodDark"], bev=0.0006))
+        under = lambda s_: y_top(s_) - RT * 0.55  # noqa: E731
+
+        def reach(y):
+            # (how far out from the middle the roof's underside comes down to y: the s where it's at y)
+            lo, hi = 0.0, 1.0
+            if under(0) <= y:
+                return 0.0
+            for _ in range(30):
+                mid_ = (lo + hi) / 2
+                if under(mid_) > y:
+                    lo = mid_
+                else:
+                    hi = mid_
+            return lo
+        BH = 0.0075
+        y = top + 0.007
+        i = 0
+        while y + BH * 0.5 < under(0):
+            hw = run * reach(min(y + BH, under(0) - 0.0005))
+            if hw < 0.002:
+                break
+            out.append(box(f"Kami{tag}GableBoard{sz}{i}", S(2 * hw, BH - 0.0007, 0.004), P(cx0, y + BH / 2, zf), wood(), bev=0.0003, uv=0.12))
+            y += BH
+            i += 1
     # (the bargeboards and the crossed finials (千木): at each gable, each slope's board runs from the eave up along the roof's edge and on
     # past the ridge, straight, as one finial; the two cross over the ridge as one piece of wood (joined where they cross))
     tan0 = -(rise + sag * math.pi)  # (the slope's rise per unit of s at the ridge)
@@ -453,14 +469,35 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
             out += [a, b]
     # (the gold ridge on the roof's top, the logs across it with gold caps)
     out.append(box(f"Kami{tag}Ridge", S(0.016, 0.01, W + 0.004), P(cx0, ridge_h + 0.014, zc), M["gold"], bev=0.002, uv=0))
+    # (the ridge logs (鰹木): spaced well apart along the ridge, each a log swelling in the middle and tapering to its ends like a cigar, its
+    # grain running along it, a gold cap on each end)
     n = 3 if width > 0.12 else 2
+    gap = width * (0.32 if n == 3 else 0.55)
+    LL = 0.05
     for k in range(n):
-        z = zc + (k - (n - 1) / 2) * width * 0.32
-        lg = cyl(f"Kami{tag}Katsuogi{k}", 0.0065, 0.05, P(cx0, ridge_h + 0.025, z), M["woodDark"], rot=(0, math.pi / 2, 0), verts=14)
-        uv_grain(lg, 0.1)
+        z = zc + (k - (n - 1) / 2) * gap
+        lg = cyl(f"Kami{tag}Katsuogi{k}", 0.0068, LL, P(cx0, ridge_h + 0.025, z), M["woodDark"], rot=(0, math.pi / 2, 0), verts=20)
+        bpy.ops.object.select_all(action="DESELECT"); lg.select_set(True); bpy.context.view_layer.objects.active = lg
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.mesh.select_mode(type="EDGE")
+        bpy.ops.object.mode_set(mode="OBJECT")
+        for e in lg.data.edges:
+            v0, v1 = lg.data.vertices[e.vertices[0]].co, lg.data.vertices[e.vertices[1]].co
+            e.select = abs(v0.x - v1.x) > LL * 0.5
+        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.subdivide(number_cuts=8); bpy.ops.object.mode_set(mode="OBJECT")
+        for vt in lg.data.vertices:
+            u_ = vt.co.x / (LL / 2)
+            k_ = 1 - 0.2 * u_ * u_
+            vt.co.y *= k_
+            vt.co.z *= k_
+        lg.data.update()
+        for poly in lg.data.polygons:
+            poly.use_smooth = True
+        uv_grain(lg, 0.06)
         out.append(lg)
         for sx in (-1, 1):
-            out.append(cyl(f"Kami{tag}KatsuogiCap{k}{sx}", 0.0069, 0.005, P(cx0 + sx * 0.025, ridge_h + 0.025, z), M["gold"], rot=(0, math.pi / 2, 0), verts=14))
+            out.append(cyl(f"Kami{tag}KatsuogiCap{k}{sx}", 0.0058, 0.0045, P(cx0 + sx * (LL / 2 - 0.0005), ridge_h + 0.025, z), M["gold"], rot=(0, math.pi / 2, 0), verts=20))
     return out
 
 
