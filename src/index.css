@@ -6437,6 +6437,7 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
   background: none;
   cursor: pointer;
   font: inherit;
+  position: relative;
 }
 .view-pin i {
   display: grid;
@@ -6451,10 +6452,19 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
   font-size: 14px;
   font-weight: 700;
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.45);
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.25s cubic-bezier(0.3, 1.5, 0.6, 1);
 }
+/* (its label slides out from the pin and fades in, and back) */
 .view-pin span {
-  display: none;
+  position: absolute;
+  left: 100%;
+  top: 50%;
   margin-left: 8px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-6px, -50%);
+  transition: opacity 0.2s ease, transform 0.25s ease, visibility 0s linear 0.25s;
   padding: 8px 12px;
   max-width: 240px;
   border-radius: 4px;
@@ -6467,8 +6477,9 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
   width: max-content;
 }
 .view-pin span b { display: block; margin-bottom: 4px; color: #fff; font-size: 14px; }
-.view-pin:hover i { background: #fff; color: #141416; }
-.view-pin:hover span { display: block; }
+.view-pin:hover i { background: #fff; color: #141416; transform: scale(1.12); }
+.view-pin:hover span { opacity: 1; visibility: visible; transform: translate(0, -50%); transition: opacity 0.2s ease, transform 0.25s ease, visibility 0s; }
+@media (prefers-reduced-motion: reduce) { .view-pin i, .view-pin span { transition: none; } }
 /* edit mode: each view's camera tagged with its number and name */
 .view-cam-tag { display: flex; align-items: center; gap: 6px; padding: 3px 8px 3px 3px; border-radius: 12px; background: rgb(20 20 22 / 0.8); color: #fff;
   font-size: 12px; white-space: nowrap; }
