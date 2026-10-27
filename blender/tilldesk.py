@@ -423,11 +423,18 @@ for k, sym in enumerate(("▲", "▼")):
 # (the screen: a grey LCD in a glossy black surround, steeper than the keypad, its figures dark)
 sc = panel("ReaderScreenPanel", 0.022, 0.054)
 cr.append(sc)
-on(sc, [box("ReaderScreenBezel", S(RW - 0.012, 0.0012, 0.032), P(0, 0.0004, 0), M["slot"], bev=0.002),
-        box("ReaderScreen", S(RW - 0.026, 0.0008, 0.022), P(0, 0.0011, 0), M["lcd"]),
-        text("ReaderPrompt", "CREDIT", 0.0042, M["lcdInk"], P(0.017, 0.0017, -0.004), TXT, BOLD),
-        text("ReaderSale", "SALE", 0.0036, M["lcdInk"], P(-0.02, 0.0017, 0.006), TXT, BOLD),
-        text("ReaderAmount", "¥2,080", 0.0062, M["lcdInk"], P(-0.016, 0.0017, -0.004), TXT, BOLD)])
+# (what it shows is the game's to draw (TillDesk's reader screen: ready, or the amount while a card is being paid): the LCD's face carries UVs
+# from corner to corner, upright as the customer reads it)
+lcd_ = box("ReaderScreen", S(RW - 0.026, 0.0008, 0.022), P(0, 0.0011, 0), M["lcd"])
+_me = lcd_.data
+_xs = [v.co.x for v in _me.vertices]
+_ys = [v.co.y for v in _me.vertices]
+_uvl = _me.uv_layers.active.data if _me.uv_layers else _me.uv_layers.new().data
+for _poly in _me.polygons:
+    for _li in _poly.loop_indices:
+        _co = _me.vertices[_me.loops[_li].vertex_index].co
+        _uvl[_li].uv = (1 - (_co.x - min(_xs)) / (max(_xs) - min(_xs)), (_co.y - min(_ys)) / (max(_ys) - min(_ys)))
+on(sc, [box("ReaderScreenBezel", S(RW - 0.012, 0.0012, 0.032), P(0, 0.0004, 0), M["slot"], bev=0.002), lcd_])
 # (the printer at the back: its lid's seam, the tear bar's slot, a little of the slip showing, the lid's catch)
 pt = panel("ReaderPrinter", 0.07, BZ - 0.006)
 cr.append(pt)

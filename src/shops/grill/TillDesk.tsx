@@ -4,6 +4,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
+import { TILL_STATE, yen } from './bar'
 
 /**
  * The small things on the till's counter, from blender/tilldesk.py: the pen cup, the receipt printer, the card reader, the service bell, the
@@ -17,6 +18,50 @@ export const CAT_STAND_H = 0.166
 /** the parts too small or too flat for an ink line: lettering, lights, slots, teeth, keys, cables and holes */
 const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever|Key|Fn|Nfc|Stripe|Screen|Cable|Hole|Clip|Cap|Felt|Band|Floor|Stem|Knob|Slip|Rim|Blades|Ribs|Thanks|Foot|Post|Pull|Box|Sub|Seam|Arrow|Card|Lid|Tear|Catch)/
 const METAL = new Set(['DeskChrome', 'DeskSteel', 'BellGold', 'StandBrass', 'TrayGilt', 'IngotGold'])
+
+/**
+ * The card reader's LCD, drawn as a real one reads: standing by, it says it's ready and asks for a card (and the time); while a customer pays
+ * by card it shows the sale and the amount, then asks for the PIN or a tap, and thanks them once it's gone through
+ */
+const READER = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 320; c.height = 140
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return { c, g: c.getContext('2d')!, t, key: '' }
+})()
+function drawReader() {
+  if (!READER) return
+  const paying = TILL_STATE.card && TILL_STATE.k >= 0
+  const now = new Date()
+  const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const stage = !paying ? 'idle' : TILL_STATE.k < 0.62 ? 'sale' : 'done'
+  const key = `${stage}|${TILL_STATE.bill}|${stage === 'idle' ? hm : ''}`
+  if (READER.key === key) return
+  READER.key = key
+  const { g, c } = READER
+  g.fillStyle = '#aab3a6'; g.fillRect(0, 0, c.width, c.height)
+  g.fillStyle = '#1c2420'
+  g.textBaseline = 'middle'
+  const font = (px: number, w = 700) => `${w} ${px}px ui-monospace, Menlo, Consolas, monospace`
+  if (stage === 'idle') {
+    g.font = font(22, 500); g.textAlign = 'left'; g.fillText('MULTI PAY', 14, 22)
+    g.textAlign = 'right'; g.fillText(hm, c.width - 14, 22)
+    g.textAlign = 'center'; g.font = font(40); g.fillText('READY', c.width / 2, 70)
+    g.font = font(20, 500); g.fillText('INSERT / TAP CARD', c.width / 2, 114)
+  } else if (stage === 'sale') {
+    g.font = font(22); g.textAlign = 'left'; g.fillText('CREDIT  SALE', 14, 22)
+    g.textAlign = 'right'; g.font = font(44); g.fillText(`¥${yen(TILL_STATE.bill)}`, c.width - 14, 72)
+    g.textAlign = 'center'; g.font = font(20, 500); g.fillText('ENTER PIN OR TAP', c.width / 2, 118)
+  } else {
+    g.font = font(22); g.textAlign = 'left'; g.fillText('CREDIT  SALE', 14, 22)
+    g.textAlign = 'right'; g.font = font(36); g.fillText(`¥${yen(TILL_STATE.bill)}`, c.width - 14, 64)
+    g.textAlign = 'center'; g.font = font(24); g.fillText('APPROVED  THANK YOU', c.width / 2, 112)
+  }
+  READER.t.needsUpdate = true
+}
+drawReader()
 
 let pieces: Record<DeskPiece, THREE.Object3D> | null = null
 function piecesOf(scene: THREE.Group) {
@@ -42,7 +87,7 @@ function piecesOf(scene: THREE.Group) {
       mats.set(src, t)
     }
     if (METAL.has(src.name)) reflectStudio(t as THREE.MeshPhysicalMaterial)
-    m.material = t
+    m.material = m.name === 'ReaderScreen' && READER ? new THREE.MeshBasicMaterial({ map: READER.t, toneMapped: false }) : t
     m.castShadow = !UNINKED.test(m.name)
     m.receiveShadow = true
   })
@@ -56,6 +101,7 @@ export function TillDeskPiece({ name }: { name: DeskPiece }) {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => piecesOf(gltf.scene)[name], [gltf, name])
   useStudio()
+  useFrame(() => { if (name === 'TillCardReader') drawReader() })
   return <primitive object={obj} />
 }
 useGLTF.preload(URL)
