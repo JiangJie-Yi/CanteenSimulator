@@ -539,6 +539,101 @@ for sz in (-1, 1):
     parts.append(box(f"KamiFudaFold{sz}", S(0.0045, 0.012, 0.0265), P(BX + 0.05, DY + 0.005 + 0.068, zc_), M["fuda"], uv=0))
     parts.append(box(f"KamiFudaSeal{sz}", S(0.0008, 0.008, 0.008), P(BX + 0.0476, DY + 0.005 + 0.03, zc_), M["fudaSeal"], uv=0))
 
+# =====================================================================
+# The sacred rope (注連縄) across the shrine's front, over the doors: twisted green-gold straw, fat in the middle and tapering to its tied
+# ends, hanging in a shallow sag; three straw tassels (〆の子) hanging from it, each bound with a gold band, and four zigzag paper streamers
+# (紙垂) between and outside them
+# =====================================================================
+_su2, _sv2 = grid01(256)
+straw = mix((0.66, 0.66, 0.42), (0.52, 0.55, 0.32), fbm(256, 40, 3, 3))
+straw = mix(straw, (0.4, 0.42, 0.24), (np.sin((_su2 * 90 + fbm(256, 4, 2, 3) * 4) * math.pi * 2) > 0.6).astype(np.float32) * 0.35)
+M["straw"] = pbr("KamiStraw", (1, 1, 1), tex=image("straw", straw), rough=0.8)
+M["shide"] = pbr("KamiShide", lin("#fbfaf4"), rough=0.75)
+sn = []
+
+
+def tube(name, pts, radii, mat_, ring=10):
+    """a tube along pts (game frame), radius radii[i] at each; its UVs round it and along it"""
+    bm = bmesh.new() if False else None
+    vs, fs, uvs = [], [], []
+    n = len(pts)
+    for i, p_ in enumerate(pts):
+        a = Vector(pts[max(0, i - 1)]); b = Vector(pts[min(n - 1, i + 1)])
+        t_ = (b - a).normalized()
+        u_ = t_.cross(Vector((0, 1, 0)))
+        if u_.length < 1e-6:
+            u_ = t_.cross(Vector((1, 0, 0)))
+        u_.normalize()
+        w_ = t_.cross(u_).normalized()
+        for k in range(ring):
+            ang = 2 * math.pi * k / ring
+            q = Vector(p_) + (u_ * math.cos(ang) + w_ * math.sin(ang)) * radii[i]
+            vs.append(P(q.x, q.y, q.z))
+            uvs.append((k / ring, i / (n - 1) * 6))
+    for i in range(n - 1):
+        for k in range(ring):
+            k1 = (k + 1) % ring
+            fs.append((i * ring + k, i * ring + k1, (i + 1) * ring + k1, (i + 1) * ring + k))
+    o = mesh_obj(name, vs, fs, mat_, smooth_shade=True)
+    uvl = o.data.uv_layers.new().data
+    for poly in o.data.polygons:
+        for li in poly.loop_indices:
+            uvl[li].uv = uvs[o.data.loops[li].vertex_index]
+    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return o
+
+
+RX0, RY0, RZ0, SAG = -0.066, 0.178, 0.168, 0.012     # (in front of the doors, over them; half its span; how far it sags in the middle)
+
+
+def rope_at(t):
+    """the rope's middle line at t (0..1 from one end to the other), and how thick it is there"""
+    z = -RZ0 + 2 * RZ0 * t
+    return Vector((RX0, RY0 - SAG * math.sin(math.pi * t), z)), 0.0035 + 0.0065 * math.sin(math.pi * t) ** 0.8
+
+
+# (two strands twisted round each other about the middle line, thick where the rope is thick)
+NSEG = 90
+for strand in (0, 1):
+    pts, rad = [], []
+    for i in range(NSEG + 1):
+        t = i / NSEG
+        c, r = rope_at(t)
+        ang = t * 14 * math.pi + strand * math.pi
+        pts.append((c.x + math.cos(ang) * r * 0.5, c.y + math.sin(ang) * r * 0.5, c.z))
+        rad.append(r * 0.62)
+    sn.append(tube(f"KamiShimenawa{strand}", pts, rad, M["straw"]))
+# (the ends tied off: a little band of straw round each, the cut straw splaying past it)
+for sd in (0, 1):
+    c, r = rope_at(sd * 1.0)
+    out_ = -1 if sd == 0 else 1
+    sn.append(cyl(f"KamiShimenawaTie{sd}", 0.0048, 0.004, P(c.x, c.y, c.z - out_ * 0.003), M["straw"], rot=(math.pi / 2, 0, 0), verts=12))
+    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.0035, radius2=0.0055, depth=0.012, location=P(c.x, c.y, c.z + out_ * 0.004), rotation=(math.pi / 2 * (1 if out_ > 0 else -1), 0, 0))
+    sn.append(finish(active(), f"KamiShimenawaEnd{sd}", M["straw"]))
+# (the three tassels: hung from the rope's underside, a gold band round the top, the straw flaring out to a cut bottom)
+for k, t in enumerate((0.25, 0.5, 0.75)):
+    c, r = rope_at(t)
+    top = c.y - r * 0.9
+    L = 0.03 if k != 1 else 0.034
+    sn.append(cyl(f"KamiShimenawaBand{k}", 0.0043, 0.004, P(c.x, top - 0.003, c.z), M["gold"], verts=14))
+    bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.0085, radius2=0.0036, depth=L, location=P(c.x, top - 0.005 - L / 2, c.z))
+    tas = active()
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cylinder_project(); bpy.ops.object.mode_set(mode="OBJECT")
+    sn.append(finish(tas, f"KamiShimenawaTassel{k}", M["straw"]))
+    # (its knob over the band, where it's bound to the rope)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0042, segments=12, ring_count=8, location=P(c.x, top + 0.0005, c.z))
+    sn.append(finish(active(), f"KamiShimenawaKnob{k}", M["straw"]))
+# (the paper streamers: each folded in four, zigzagging down, hung over the rope)
+for k, t in enumerate((0.12, 0.38, 0.62, 0.88)):
+    c, r = rope_at(t)
+    y = c.y - r * 0.6
+    for j in range(4):
+        dz = (0.0045 if j % 2 else -0.0045) * (1 if k % 2 else -1)
+        sn.append(box(f"KamiShide{k}{j}", S(0.0007, 0.0135, 0.0105), P(c.x - 0.001, y - 0.0065 - j * 0.0125, c.z + dz), M["shide"], uv=0))
+parts += sn
+
 root = bpy.data.objects.new("Kamidana", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
