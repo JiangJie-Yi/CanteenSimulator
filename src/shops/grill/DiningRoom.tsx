@@ -1126,7 +1126,8 @@ function Bouquet({ lean = 0 }: { lean?: number }) {
 const KAMIDANA_URL = import.meta.env.BASE_URL + 'models/kamidana.glb'
 /** the shrine's model (and the oranges and the sutra, nodes of their own in it): its wood toon like the room, its gold real metal reflecting the
  * studio, an ink line round the bigger parts; made once, each piece taken out of it to be shown where it stands */
-let kamidanaParts: Record<'shrine' | 'oranges' | 'sutra' | 'table', THREE.Object3D> | null = null
+type KamiPart = 'shrine' | 'oranges' | 'sutra' | 'table' | 'flask' | 'cupstand'
+let kamidanaParts: Record<KamiPart, THREE.Object3D> | null = null
 function kamidanaOf(scene: THREE.Group) {
   if (kamidanaParts) return kamidanaParts
   const r = scene.clone(true)
@@ -1150,12 +1151,12 @@ function kamidanaOf(scene: THREE.Group) {
     m.material = t
     m.castShadow = true
   })
-  inkModel(r, (m) => /Gold|Cap|Plate|Crest|Seam|Bal|Katsuogi|Fold|Char|Slip|Calyx|Stem|Bow|Cord|Tail|Tassel|Fringe|Line|Inlay|Nail|Core|Pillar|Beam/.test(m.name), { width: 0.0012, weld: true })
+  inkModel(r, (m) => /Gold|Cap|Plate|Crest|Seam|Bal|Katsuogi|Fold|Char|Slip|Calyx|Stem|Bow|Cord|Tail|Tassel|Fringe|Line|Inlay|Nail|Core|Pillar|Beam|Shide|Label|Knot|Edge/.test(m.name), { width: 0.0012, weld: true })
   const take = (n: string) => { const o = r.getObjectByName(n)!; o.removeFromParent(); o.position.set(0, 0, 0); return o }
-  kamidanaParts = { oranges: take('KamiOranges'), sutra: take('KamiSutra'), table: take('KamiTable'), shrine: r }
+  kamidanaParts = { oranges: take('KamiOranges'), sutra: take('KamiSutra'), table: take('KamiTable'), flask: take('KamiFlask'), cupstand: take('KamiCupStand'), shrine: r }
   return kamidanaParts
 }
-function KamidanaModel({ part = 'shrine' }: { part?: 'shrine' | 'oranges' | 'sutra' | 'table' }) {
+function KamidanaModel({ part = 'shrine' }: { part?: KamiPart }) {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
   useStudio()
   const obj = useMemo(() => kamidanaOf(gltf.scene)[part], [gltf, part])
@@ -1172,6 +1173,8 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'extras' }) {
       {part !== 'shrine' && [-1, 1].map((sd) => (
         <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} /></group>
       ))}
+      {/* the cups' stand: a low hinoki board on two feet, the cups on it (blender/kamidana.py) */}
+      {part !== 'shrine' && <group position={[-0.3, 0, 0]}><KamidanaModel part="cupstand" /></group>}
       {part !== 'shrine' && [-0.09, 0, 0.09].map((z) => (
         <group key={z} position={[-0.3, 0.03, z]}>
           {/* (a cup with a wall of its own: a thick rim, a foot ring, a floor, the sake poured in is seen in it) */}
@@ -1463,28 +1466,6 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
   )
 }
 
-const ALTAR_GEO = {
-  // a round-bellied sake flask with a long slim neck and a flared lip (徳利), in white glaze
-  tokkuri: new THREE.LatheGeometry([[0, 0], [0.022, 0], [0.034, 0.008], [0.04, 0.026], [0.038, 0.05], [0.028, 0.072], [0.016, 0.088], [0.0115, 0.104],
-    [0.0108, 0.128], [0.0135, 0.14], [0.015, 0.146], [0.0128, 0.15], [0, 0.15]].map(([r, y]) => new THREE.Vector2(r, y)), 20),
-  cord: new THREE.TorusGeometry(0.0128, 0.0022, 6, 18),
-  knot: new THREE.SphereGeometry(0.0045, 6, 5),
-  shide: new THREE.PlaneGeometry(0.02, 0.05),
-  cup: new THREE.CylinderGeometry(0.03, 0.017, 0.016, 16),
-  sake: new THREE.CircleGeometry(0.026, 16),
-  fruit: new THREE.SphereGeometry(0.03, 12, 8),
-  leaf: new THREE.ConeGeometry(0.01, 0.026, 6),
-  dish: new THREE.CylinderGeometry(0.08, 0.06, 0.015, 18),
-}
-/** the paper label stuck on each tokkuri: 御神酒 down it in black on white, a red seal */
-const SAKE_LABEL = canvasTex(48, 96, (g) => {
-  g.fillStyle = '#fbf8ef'
-  g.fillRect(0, 0, 48, 96)
-  g.strokeStyle = '#b8261c'
-  g.lineWidth = 2
-  g.strokeRect(3, 3, 42, 90)
-  ;[...'御神酒'].forEach((ch, k) => brushText(g, ch, 24, 20 + k * 25, 22, { fill: '#1a0d06' }))
-})
 /**
  * The altar on the shelf by the door: the household shrine (神棚), a pair of sake flasks (御神酒徳利) and a cup set out before it, a
  * dish of oranges. Offering the sake (a click) fills the cup and makes the shrine itself glow for a minute.
@@ -1595,23 +1576,17 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; incense?.onLight() }
   // (the shrine's front, in the altar's frame: its doors' plane, and the roof's)
   const SC = KAMI_SC
+  // (the flask (blender/kamidana.py): clicked, it's lifted and pours the offering; a box round it to point at)
   const flask = (z: number, key: string) => (
-    <group key={key} position={[0, 0, z]}>
-      <mesh geometry={ALTAR_GEO.tokkuri} castShadow><meshToonMaterial color="#f6f4ee" /></mesh>
-      <mesh geometry={ALTAR_GEO.tokkuri} scale={1.03}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
-      {/* (a red cord round the neck with its knot, a paper shide hanging from it, a small label on the belly) */}
-      <mesh geometry={ALTAR_GEO.cord} position-y={0.112} rotation-x={Math.PI / 2}><meshToonMaterial color="#c4302a" /></mesh>
-      <mesh geometry={ALTAR_GEO.knot} position={[-0.0128, 0.112, 0]}><meshToonMaterial color="#c4302a" /></mesh>
-      <mesh geometry={ALTAR_GEO.shide} position={[-0.0165, 0.088, 0]} rotation-y={-Math.PI / 2}><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
-      <mesh position={[-0.0405, 0.04, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.03, 0.06]} /><meshToonMaterial color="#ffffff" map={SAKE_LABEL} /></mesh>
-      <mesh position={[0, 0.07, 0]} visible={false}><boxGeometry args={[0.1, 0.16, 0.1]} /></mesh>
+    <group key={key} position={[0, 0, z]} onClick={offer} {...tipOver('御神酒', '點一下供清酒')}>
+      <KamidanaModel part="flask" />
+      <mesh position={[0, 0.075, 0]} visible={false}><boxGeometry args={[0.09, 0.16, 0.09]} /></mesh>
     </group>
   )
   return (
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
-      <Movable id="shrine" label="神龕"><group position-x={ALTAR_D / 2} scale={SC} onClick={offer}
-        {...tipOver('神棚', '點一下供清酒')}><StaticBatch><Kamidana part="shrine" /></StaticBatch></group></Movable>
+      <Movable id="shrine" label="神龕"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="shrine" /></StaticBatch></group></Movable>
       {/* (the vases and cups beside it are not part of what's pointed at: they don't light with it) */}
       <Movable id="shrinecups" label="神龕旁花瓶與杯"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="extras" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>

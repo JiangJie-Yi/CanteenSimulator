@@ -200,14 +200,31 @@ parts = []
 # =====================================================================
 # The base: two stepped plinths, gold plates along their fronts; three steps up the front to the middle bay, gold plates on their risers
 # =====================================================================
+RX_ = 0.083  # (the railing's half depth: its front posts stand at BX - RX_)
 BX = 0.015  # (the base's middle, set back a little: the shrine is deeper than it was, all of it toward the back)
 parts.append(box("KamiPlinth", S(0.2, 0.02, 0.36), P(BX, 0.01, 0), wood(), bev=0.002))
 parts.append(box("KamiDeck", S(0.18, 0.02, 0.33), P(BX, 0.03, 0), wood(), bev=0.002))
-for y in (0.01, 0.03):
-    parts.append(box(f"KamiBaseGold{int(y * 1000)}", S(0.002, 0.004, 0.2), P(BX - (0.1 if y < 0.02 else 0.09), y, 0), M["gold"], uv=0))
+# (the steps up to the deck between the front posts: three solid blocks standing on the table, each a tread lower and further out, a brass
+# nosing along the whole top edge of each riser, flush on its face)
+SW = 0.096            # (their width: from one front post to the other)
+SD = 0.018            # (each tread's depth)
+DF = BX - 0.09        # (the deck's front face)
 for k in range(3):
-    parts.append(box(f"KamiStep{k}", S(0.022, 0.012, 0.09 - k * 0.008), P(BX - 0.085 - k * 0.02, 0.034 - k * 0.011, 0), wood(), bev=0.001))
-    parts.append(box(f"KamiStepGold{k}", S(0.0015, 0.004, 0.05 - k * 0.006), P(BX - 0.096 - k * 0.02, 0.034 - k * 0.011, 0), M["gold"], uv=0))
+    top = 0.03 - k * 0.01
+    front = DF - (k + 1) * SD
+    parts.append(box(f"KamiStep{k}", S(DF - front, top, SW), P((front + DF) / 2, top / 2, 0), wood(), bev=0.0008))
+    parts.append(box(f"KamiStepGold{k}", S(0.0008, 0.0026, SW - 0.003), P(front - 0.0004, top - 0.0015, 0), M["gold"], uv=0))
+# (a side board each side of the steps (袖), like a stair's string: from the front post's foot down to the table in front of the bottom step,
+# its top edge sloping as the steps do, so the steps don't stand out as bare blocks)
+FB = DF - 3 * SD
+for sz in (-1, 1):
+    pts = [(BX - RX_ + 0.004, 0.058), (BX - RX_ + 0.004, 0.0), (FB - 0.004, 0.0), (FB - 0.004, 0.012)]
+    g_ = mesh_obj(f"KamiStepSide{sz}", [P(x, y, sz * (SW / 2 + 0.003)) for x, y in pts], [(0, 1, 2, 3)], M["woodDark"])
+    sol = g_.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.006; sol.offset = 0
+    bev_ = g_.modifiers.new("b", "BEVEL"); bev_.width = 0.0008; bev_.segments = 1
+    apply_mods(g_)
+    uv_grain(g_, 0.1)
+    parts.append(g_)
 
 # =====================================================================
 # The railing round the deck: posts with gold caps, two rails and a row of balusters between, open at the front for the steps
@@ -669,13 +686,90 @@ for o in tx_:
     if o.parent is None:
         o.parent = table
 
+# =====================================================================
+# The sake flask (御神酒徳利): white porcelain, a round belly narrowing to a long neck and a flared lip; a red cord tied round the neck with
+# its knot, a folded paper streamer (紙垂) hanging from it, and a paper label down the belly with 御神酒 written on it inside a red border.
+# Its foot's middle at the origin (it's tipped about it as it pours)
+# =====================================================================
+fx_ = []
+M["redCord"] = pbr("KamiRedCord", lin("#c4302a"), rough=0.55)
+FPROF = [(0.0, 0.0), (0.022, 0.0), (0.03, 0.003), (0.036, 0.01), (0.04, 0.026), (0.0395, 0.042), (0.036, 0.056), (0.028, 0.072), (0.019, 0.086),
+         (0.0125, 0.1), (0.011, 0.114), (0.0108, 0.128), (0.0125, 0.138), (0.015, 0.145), (0.0148, 0.1495), (0.012, 0.15), (0.009, 0.147),
+         (0.0085, 0.136)]
+fx_.append(lathe("KamiFlaskBody", FPROF, M["dish"], segs=40))
+bpy.ops.mesh.primitive_torus_add(major_radius=0.0122, minor_radius=0.0021, major_segments=24, minor_segments=6, location=P(0, 0.112, 0))
+fx_.append(finish(active(), "KamiFlaskCord", M["redCord"]))
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0042, segments=10, ring_count=6, location=P(-0.0128, 0.112, 0))
+fx_.append(finish(active(), "KamiFlaskKnot", M["redCord"]))
+for j, (dz, ln) in enumerate(((-0.003, 0.03), (0.003, 0.026))):
+    tail = box(f"KamiFlaskCordTail{j}", S(0.0018, ln, 0.0024), P(-0.0135 - 0.002, 0.112 - ln / 2, dz), M["redCord"], uv=0)
+    tail.rotation_euler = (0, 0.08 * (1 if j else -1), 0)
+    fx_.append(tail)
+# (the streamer: a strip of paper cut and folded back and forth, hanging in four steps)
+zz_, yy_ = 0.0, 0.106
+for k in range(4):
+    w_ = 0.013
+    fx_.append(box(f"KamiFlaskShide{k}", S(0.0006, 0.012, w_), P(-0.017 - k * 0.001, yy_ - 0.006, zz_ + (0.004 if k % 2 else -0.004)), M["paper"], uv=0))
+    yy_ -= 0.012
+# (the label down the belly, facing out from the flask's front (-x), a red border round it, its name written in black)
+LX = -0.0402
+fx_.append(box("KamiFlaskLabel", S(0.0008, 0.06, 0.03), P(LX, 0.04, 0), M["paper"], uv=0))
+for nm, size, at in (("T", S(0.0006, 0.0015, 0.027), (0.067,)), ("B", S(0.0006, 0.0015, 0.027), (0.013,))):
+    fx_.append(box(f"KamiFlaskLabelRed{nm}", size, P(LX - 0.0006, at[0], 0), M["redCord"], uv=0))
+for sd in (-1, 1):
+    fx_.append(box(f"KamiFlaskLabelRedS{sd}", S(0.0006, 0.055, 0.0015), P(LX - 0.0006, 0.04, sd * 0.0128), M["redCord"], uv=0))
+for k, ch in enumerate("御神酒"):
+    cu = bpy.data.curves.new(f"KamiFlaskChar{k}", "FONT")
+    cu.body = ch
+    if font:
+        cu.font = font
+    cu.size = 0.0145
+    cu.align_x = "CENTER"
+    cu.align_y = "CENTER"
+    cu.extrude = 0.00015
+    t = bpy.data.objects.new(f"KamiFlaskChar{k}", cu)
+    bpy.context.collection.objects.link(t)
+    t.location = P(LX - 0.0008, 0.056 - k * 0.016, 0)
+    t.rotation_euler = (math.pi / 2, 0, -math.pi / 2)
+    bpy.ops.object.select_all(action="DESELECT"); t.select_set(True); bpy.context.view_layer.objects.active = t
+    bpy.ops.object.convert(target="MESH")
+    fx_.append(finish(active(), f"KamiFlaskChar{k}", M["ink"], smooth_shade=False))
+flask = bpy.data.objects.new("KamiFlask", None)
+bpy.context.collection.objects.link(flask)
+for o in fx_:
+    if o.parent is None:
+        o.parent = flask
+
+# =====================================================================
+# The stand the three sake cups sit on (in the shrine's frame, before it): a low board of hinoki on two feet, a fine raised edge round it,
+# its top 1.75 cm up, where the cups' feet are
+# =====================================================================
+cs_ = []
+CST, CSD, CSW = 0.0175, 0.07, 0.29
+cs_.append(box("KamiCupStandTop", S(CSD, 0.006, CSW), P(0, CST - 0.003, 0), wood(), bev=0.001))
+for sd in (-1, 1):
+    cs_.append(box(f"KamiCupStandFoot{sd}", S(CSD - 0.012, CST - 0.006, 0.014), P(0, (CST - 0.006) / 2, sd * (CSW / 2 - 0.02)), wood(), bev=0.0008))
+for sx in (-1, 1):
+    cs_.append(box(f"KamiCupStandEdgeX{sx}", S(0.003, 0.002, CSW), P(sx * (CSD / 2 - 0.0015), CST + 0.001, 0), M["woodDark"], uv=0.1))
+for sd in (-1, 1):
+    cs_.append(box(f"KamiCupStandEdgeZ{sd}", S(CSD, 0.002, 0.003), P(0, CST + 0.001, sd * (CSW / 2 - 0.0015)), M["woodDark"], uv=0.1))
+cupstand = bpy.data.objects.new("KamiCupStand", None)
+bpy.context.collection.objects.link(cupstand)
+for o in cs_:
+    if o.parent is None:
+        o.parent = cupstand
+
 oranges.parent = root
 sutra.parent = root
 table.parent = root
+flask.parent = root
+cupstand.parent = root
+flask.location = (1.0, 0, 0)
+cupstand.location = (1.3, 0, 0)
 oranges.location = (0.4, 0, 0)
 sutra.location = (0.7, 0, 0)
 table.location = (0, 1.2, 0)
-parts += ox + sx_ + tx_ + [oranges, sutra, table]
+parts += ox + sx_ + tx_ + fx_ + cs_ + [oranges, sutra, table, flask, cupstand]
 
 if PREVIEW:
     cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
