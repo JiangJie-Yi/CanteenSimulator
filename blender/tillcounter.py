@@ -70,14 +70,24 @@ def flatsawn(n, light, dark, line, rings=11.0, seed_u=0.5):
     return mix(body, line, pores * 0.18)
 
 
-# (green bamboo: a fresh green, paler streaks running along the culm, a faint bloom)
-bu, bv = grid01(256)
-streak = fbm(256, 40, 2, 4)
-fibre_b = fbm(256, 90, 3, 3)
+# (green bamboo: a fresh green, paler streaks running along the culm, a faint bloom; the texture is one length between two nodes (v 0 at a
+# node, 1 at the next), so the nodes are painted: the joint a fine dark line, the lip just over it paler, the sheath's scar darker just under
+# the next node, and a shade where the culm swells to its ridge (the culm's mesh is plain and light: what it lacks the picture gives))
+bu, bv = grid01(512)
+streak = fbm(512, 40, 2, 4)
+fibre_b = fbm(512, 90, 3, 3)
 light_b = np.exp(-((bu - 0.32) / 0.12) ** 2)          # (a soft lit streak down one side of the culm)
 bamboo_base = mix(mix((0.3, 0.52, 0.16), (0.4, 0.62, 0.22), streak), (0.62, 0.76, 0.38), smooth(0.8, 1.0, streak) * 0.4)
 bamboo_base = mix(bamboo_base, (0.25, 0.44, 0.13), smooth(0.55, 0.95, fibre_b) * 0.35)
-bamboo_tex = image("bamboo", mix(bamboo_base, (0.78, 0.88, 0.55), light_b * 0.35))
+bamboo_base = mix(bamboo_base, (0.78, 0.88, 0.55), light_b * 0.35)
+_wob = (fbm(512, 8, 1, 2) - 0.5) * 0.004
+_vn = bv + _wob
+bamboo_base = mix(bamboo_base, (0.2, 0.3, 0.08), np.exp(-((_vn - 0.0) / 0.012) ** 2) * 0.45)          # (the ridge's shade, either side)
+bamboo_base = mix(bamboo_base, (0.2, 0.3, 0.08), np.exp(-((_vn - 1.0) / 0.012) ** 2) * 0.45)
+bamboo_base = mix(bamboo_base, (0.42, 0.42, 0.24), np.exp(-((_vn - 0.965) / 0.012) ** 2) * 0.35)      # (the sheath's scar)
+bamboo_base = mix(bamboo_base, (0.68, 0.78, 0.42), np.exp(-((_vn - 0.016) / 0.007) ** 2) * 0.7)       # (the lip, paler)
+bamboo_base = mix(bamboo_base, (0.23, 0.27, 0.1), ((_vn < 0.006) | (_vn > 0.994)).astype(np.float32) * 0.9)  # (the joint's line)
+bamboo_tex = image("bamboo", bamboo_base)
 # (the window's paper, lit from behind like a paper lantern: brightest in the middle where the lamp is, warmer and dimmer toward the rim,
 # the paper's long fibres showing through)
 gu, gv = grid01(256)
@@ -266,11 +276,11 @@ def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell, shade):
     bowed, thicker and thinner along its length (`swell`: amount, wavelength, phase), and at each node a sharp ridge with the sheath's scar
     just under it and a little pinch above"""
     bm_ = bmesh.new()
-    seg = 20
+    seg = 12
     uvl = bm_.loops.layers.uv.new("UVMap")
-    ys = {round(y0 + h * i / 36, 5) for i in range(37)}
+    ys = {round(y0 + h * i / 12, 5) for i in range(13)}
     for n in nodes_at:
-        for d in (-0.016, -0.011, -0.008, -0.006, -0.004, -0.0025, -0.001, 0.0, 0.001, 0.0025, 0.004, 0.006, 0.009, 0.013, 0.018):
+        for d in (-0.006, -0.0025, 0.0, 0.0025, 0.009):
             if y0 < n + d < y0 + h:
                 ys.add(round(n + d, 5))
     ys = sorted(ys)
@@ -298,18 +308,30 @@ def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell, shade):
         t = (y - y0) / h
         return (x + lean * (y - y0) + bow * math.sin(math.pi * t + phase) * math.sin(math.pi * t), z + bow * 0.4 * math.sin(math.pi * t))
 
+    # (v: which length between nodes, and how far up it: the texture's tile is one such length, its node at the foot)
+    def v_of(y):
+        ns = sorted(nodes_at)
+        if not ns:
+            return (y - y0) / 0.2
+        step_ = (ns[-1] - ns[0]) / max(1, len(ns) - 1) if len(ns) > 1 else 0.2
+        edges = [ns[0] - step_] + ns + [ns[-1] + step_]
+        for i_ in range(len(edges) - 1):
+            if y <= edges[i_ + 1] or i_ == len(edges) - 2:
+                return i_ + (y - edges[i_]) / (edges[i_ + 1] - edges[i_])
+        return 0.0
+
     grid = []
     for y in ys:
         cx, cz = centre(y)
         rad = radius(y)
         grid.append([bm_.verts.new(P(cx + rad * math.cos(2 * math.pi * j / seg), y, cz + rad * math.sin(2 * math.pi * j / seg))) for j in range(seg)])
     for i in range(len(ys) - 1):
-        v0, v1 = (ys[i] - y0) / h, (ys[i + 1] - y0) / h
+        v0, v1 = v_of(ys[i]), v_of(ys[i + 1])
         for j in range(seg):
             j2 = (j + 1) % seg
             f = bm_.faces.new((grid[i][j], grid[i][j2], grid[i + 1][j2], grid[i + 1][j]))
             for lp, (uu, vv) in zip(f.loops, ((j / seg, v0), ((j + 1) / seg, v0), ((j + 1) / seg, v1), (j / seg, v1))):
-                lp[uvl].uv = (uu, vv * 3)
+                lp[uvl].uv = (uu, vv)
     bm_.faces.new(list(reversed(grid[0])))
     bm_.faces.new(grid[-1])
     bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
@@ -319,14 +341,7 @@ def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell, shade):
     o = bpy.data.objects.new(name, me_)
     bpy.context.collection.objects.link(o)
     finish(o, name, M[f"bamboo{shade}"])
-    out = [o]
-    # (each node: the joint a fine dark line round the ridge, the lip just over it a little paler)
-    for n in nodes_at:
-        for dy, k, mn, m in ((0.0, 0.985, 0.0012, "node"), (0.0028, 0.99, 0.0011, "lip")):
-            cx, cz = centre(n + dy)
-            bpy.ops.mesh.primitive_torus_add(major_radius=radius(n + dy) * k, minor_radius=mn, major_segments=28, minor_segments=5, location=P(cx, n + dy, cz))
-            out.append(finish(active(), f"{name}Node{int(n * 1000)}{'ab'[dy > 0]}", M[m]))
-    return out
+    return [o]
 
 
 # (laid along the face one by one: each a little thicker or thinner than the last, with a gap between that's never the same twice)
