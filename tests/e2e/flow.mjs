@@ -47,12 +47,12 @@ for (const [i, shop] of SHOPS.entries()) {
     check(shop, 'shop set up', (await page.locator('.unopened-hint').count()) === 0)
     // buy in stock on the board
     const before = await cash()
-    // (buying in is done in the research mode's chiller: the 研 button, then 全部各 +10)
-    await page.locator('.research-toggle').click()
+    // (buying in is done in the ingredients' panel at the grill (research): the fridge button opens it, then 補滿, and it's shut again)
+    await page.locator('.fridge-toggle').click()
     await page.waitForTimeout(500)
-    await page.locator('.tally-buyall').click()
+    await page.locator('.tally-restock.is-full').click()
     await page.waitForTimeout(200)
-    await page.locator('.research-toggle').click()
+    await page.locator('.fridge-toggle').click()
     await page.waitForTimeout(300)
     check(shop, 'buying stock costs money', (await cash()) < before, `${before} -> ${await cash()}`)
     // hire the second chef, and have him try dishes out until there are enough for the menu
