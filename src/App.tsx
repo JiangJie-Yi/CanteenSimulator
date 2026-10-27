@@ -31,6 +31,7 @@ import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
 import { offsetOf, rotationOf, setEditLang, toggleEdit, useEdit } from '@/shops/grill/edit'
+import { Movable } from '@/shops/grill/Movable'
 import { ALONG, LAY } from '@/shops/grill/bar'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
@@ -268,6 +269,8 @@ type SceneProps = {
   onSay: (who: 'chef' | 'guest', text: string) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
+  /** the view menu's open: its numbered spots shown in the room */
+  pins?: boolean
   /** which view the eye button's menu has chosen: the grill's own, the whole shop from above, or one of the shop's parts (data/views) */
   view: ViewId
   /** a view chosen from its numbered marker in edit mode */
@@ -348,7 +351,55 @@ function ViewMarkers({ lang, onPick }: { lang: Lang; onPick: (v: ViewId) => void
   )
 }
 
-function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
+/** whether a view's camera has been placed by hand (moved or turned in edit mode) */
+const viewCamPlaced = (id: ViewId) => [...offsetOf(`viewcam-${id}`), ...rotationOf(`viewcam-${id}`)].some((x) => Math.abs(x) > 1e-6)
+
+/** a film camera's shape, pointing down its -z: the body, the lens, two reels on top */
+function CamIcon({ editing, n, name }: { editing: boolean; n: number; name: string }) {
+  const g = useRef<THREE.Group>(null)
+  // (only seen, and only to be pointed at, in edit mode: otherwise on a layer the camera doesn't draw and the pointer doesn't reach)
+  useEffect(() => { g.current?.traverse((o) => o.layers.set(editing ? 0 : 5)) }, [editing])
+  return (
+    <group ref={g}>
+      <mesh><boxGeometry args={[0.12, 0.14, 0.2]} /><meshBasicMaterial color="#2b2d33" /></mesh>
+      <mesh position-z={-0.13} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.045, 0.035, 0.07, 16]} /><meshBasicMaterial color="#f2a33a" /></mesh>
+      {[-0.05, 0.06].map((z) => (
+        <mesh key={z} position={[0, 0.12, z]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.055, 0.055, 0.03, 18]} /><meshBasicMaterial color="#4a4d55" /></mesh>
+      ))}
+      {editing && (
+        <Html position={[0, 0.24, 0]} center zIndexRange={[40, 0]} style={{ pointerEvents: 'none' }}>
+          <span className="view-cam-tag"><i>{n}</i>{name}</span>
+        </Html>
+      )}
+    </group>
+  )
+}
+
+/**
+ * Each view's camera, standing where the view looks from and pointing the way it looks: always there (it's what a view placed by hand is read
+ * from), seen only in edit mode, where it's a piece like any other (位置・旋轉 in the panel, or dragged): the view then looks from it.
+ */
+function ViewCams({ editing, lang, pose }: { editing: boolean; lang: Lang; pose: (id: ViewId) => { pos: THREE.Vector3; target: THREE.Vector3 } | null }) {
+  const [, tick] = useState(0)
+  // (the parts of the room they look at may still be loading: looked for again a few times)
+  useEffect(() => { let n = 0; const t = window.setInterval(() => { tick((k) => k + 1); if (++n > 8) window.clearInterval(t) }, 800); return () => window.clearInterval(t) }, [])
+  return (
+    <>
+      {VIEW_SPOTS.map((v, i) => {
+        const p = pose(v.id)
+        if (!p) return null
+        const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(p.pos, p.target, new THREE.Vector3(0, 1, 0)))
+        return (
+          <Movable key={v.id} id={`viewcam-${v.id}`} label={`視角 ${i + 1}・${v.zh}`}>
+            <group name={`viewcam-${v.id}`} position={p.pos} quaternion={q}><CamIcon editing={editing} n={i + 1} name={viewName(v, lang)} /></group>
+          </Movable>
+        )
+      })}
+    </>
+  )
+}
+
+function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -417,6 +468,20 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   // (where the camera glides to and looks at: the grill's home view, the whole shop, or a part of it; `home` itself stays the grill's, camera 1's base)
   const aimPos = useRef(new THREE.Vector3())
   const aimTarget = useMemo(() => new THREE.Vector3(), [])
+  /** where a view looks from and at, as worked out (before any hand placing): the grill's own home, the whole shop, or a part of it seen from
+   * the room's middle side, a little above, at about table height */
+  const poseOf = (id: ViewId): { pos: THREE.Vector3; target: THREE.Vector3 } | null => {
+    if (id === 'grill') return { pos: home.current.clone(), target: homeTarget.clone() }
+    if (id === 'free') return DISHES[active].roast ? { pos: OVERVIEW_POSITION.clone(), target: OVERVIEW_TARGET.clone() } : null
+    const spot = VIEW_SPOTS.find((v) => v.id === id)
+    const anchor = spot?.anchor ? scene.getObjectByName(spot.anchor) : null
+    if (!spot || !anchor) return null
+    const at = anchor.getWorldPosition(new THREE.Vector3())
+    const floor = OVERVIEW_TARGET.y - 1.5
+    if (at.y < floor + 0.3) at.y += 0.9
+    const toMiddle = new THREE.Vector3(-at.x, 0, -at.z).normalize()
+    return { pos: at.clone().addScaledVector(toMiddle, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0)), target: at }
+  }
   useEffect(() => {
     const was = homedFor.current
     homedFor.current = { active, resetView, view, w: size.width, h: size.height }
@@ -430,19 +495,15 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     homeTarget.copy(focus)
     aimPos.current.copy(home.current)
     aimTarget.copy(homeTarget)
-    const spot = VIEW_SPOTS.find((v) => v.id === view)
-    const anchor = spot?.anchor ? scene.getObjectByName(spot.anchor) : null
-    if (view === 'free' && !!DISHES[active].roast && !phoneStage) {
-      aimPos.current.copy(OVERVIEW_POSITION)
-      aimTarget.copy(OVERVIEW_TARGET)
-    } else if (spot && anchor) {
-      // (a part of the shop: looked at from the room's middle side of it, a little above, at about table height)
-      const at = anchor.getWorldPosition(new THREE.Vector3())
-      const floor = OVERVIEW_TARGET.y - 1.5
-      if (at.y < floor + 0.3) at.y += 0.9
-      aimTarget.copy(at)
-      const toMiddle = new THREE.Vector3(-at.x, 0, -at.z).normalize()
-      aimPos.current.copy(at).addScaledVector(toMiddle, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0))
+    const def = view === 'free' && phoneStage ? null : poseOf(view)
+    if (def) { aimPos.current.copy(def.pos); aimTarget.copy(def.target) }
+    // (a view whose camera was placed by hand in edit mode (its camera marker moved or turned): from there, looking the way it points)
+    const cam = scene.getObjectByName(`viewcam-${view}`)
+    if (def && cam && viewCamPlaced(view)) {
+      cam.updateWorldMatrix(true, false)
+      cam.getWorldPosition(aimPos.current)
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()))
+      aimTarget.copy(aimPos.current).addScaledVector(dir, def.pos.distanceTo(def.target))
     }
     homing.current = true
     zoomGoal.current = null
@@ -628,7 +689,9 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       {/* (the hangings that come between the camera and what it's looking at fade out of the way) */}
       <OccluderFade target={() => controls.current?.target} />
       {/* (edit mode: the views marked where they look, numbered, as Sketchfab's annotations; camera 1 itself isn't placed by hand any more) */}
-      {editing && <ViewMarkers lang={lang} onPick={onView} />}
+      {/* (the views: their numbered spots in the room while the view menu's open; in edit mode each view's camera, to be placed by hand) */}
+      {pins && !editing && <ViewMarkers lang={lang} onPick={onView} />}
+      <ViewCams editing={editing} lang={lang} pose={poseOf} />
       {editing && <AxisWidget />}
       <OrbitControls
         ref={controls}
@@ -1682,7 +1745,7 @@ export default function App() {
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             fire={fire} frame={frame} onOffFire={sceneOffFire}
             onEat={onEat} onNotice={sceneNotice}
-            resetView={resetView} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
+            resetView={resetView} pins={viewMenu} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1); setViewMenu(false) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
             incense={{ litAt: incenseAt, onLight: lightIncense }} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech}

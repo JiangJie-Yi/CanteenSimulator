@@ -6411,3 +6411,8 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
 .view-pin span b { display: block; margin-bottom: 4px; color: #fff; font-size: 14px; }
 .view-pin:hover i { background: #fff; color: #141416; }
 .view-pin:hover span { display: block; }
+/* edit mode: each view's camera tagged with its number and name */
+.view-cam-tag { display: flex; align-items: center; gap: 6px; padding: 3px 8px 3px 3px; border-radius: 12px; background: rgb(20 20 22 / 0.8); color: #fff;
+  font-size: 12px; white-space: nowrap; }
+.view-cam-tag i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #f2a33a; color: #141416;
+  font-style: normal; font-weight: 700; font-size: 12px; }
