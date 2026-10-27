@@ -545,9 +545,9 @@ for sz in (-1, 1):
     parts += bay(f"S{sz}", sz * 0.112, 0.07, 0.125, 0.215, depth=0.112)
 
 _su2, _sv2 = grid01(256)
-straw = mix((0.7, 0.68, 0.44), (0.56, 0.57, 0.34), fbm(256, 60, 2, 3))
-straw = mix(straw, (0.44, 0.45, 0.26), (np.sin((_su2 * 160 + fbm(256, 6, 2, 3) * 3) * math.pi * 2) > 0.7).astype(np.float32) * 0.25)
-straw = mix(straw, (0.8, 0.78, 0.55), (np.sin((_su2 * 230 + 0.3) * math.pi * 2) > 0.85).astype(np.float32) * 0.2)
+straw = mix((0.9, 0.8, 0.6), (0.78, 0.66, 0.47), fbm(256, 60, 2, 3))
+straw = mix(straw, (0.58, 0.5, 0.38), (np.sin((_su2 * 160 + fbm(256, 6, 2, 3) * 3) * math.pi * 2) > 0.7).astype(np.float32) * 0.25)
+straw = mix(straw, (0.95, 0.92, 0.84), (np.sin((_su2 * 230 + 0.3) * math.pi * 2) > 0.85).astype(np.float32) * 0.2)
 M["straw"] = pbr("KamiStraw", (1, 1, 1), tex=image("straw", straw), rough=0.8)
 M["shide"] = pbr("KamiShide", lin("#fbfaf4"), rough=0.75)
 
@@ -759,7 +759,7 @@ def tube(name, pts, radii, mat_, ring=10):
     return o
 
 
-RX0, RY0, RZ0, SAG = -0.0655, 0.188, 0.066, 0.006     # (over the middle bay's doors, in front of its lintel; half its span; its sag)
+RX0, RY0, RZ0, SAG = -0.0655, 0.192, 0.066, 0.006     # (over the middle bay's doors, in front of its lintel; half its span; its sag)
 
 
 def rope_at(t):

@@ -1213,7 +1213,27 @@ function ShrineDoors() {
     const d = kamidanaOf(gltf.scene).doors
     // (widened with the shrine: each leaf's hinge moved out, the leaf itself widened in its own frame, so it still swings true when opened)
     if (!d.userData.wide) {
-      for (const leaf of d.children) { leaf.position.z *= SHRINE_WIDE; leaf.scale.z *= SHRINE_WIDE }
+      d.updateMatrixWorld(true)
+      for (const leaf of d.children) {
+        // (but the crest and the gold plates on it kept their shape (a round crest, square plates): their meshes narrowed back by as much,
+        // the crest about the line where the doors meet, the plates about their own middles)
+        const toLeaf = new THREE.Matrix4(), back = new THREE.Matrix4(), box = new THREE.Box3()
+        const meshes: THREE.Mesh[] = []
+        leaf.traverse((o) => { if ((o as THREE.Mesh).isMesh && /Crest|DoorPlate/.test(o.name + (o.parent?.name ?? ''))) meshes.push(o as THREE.Mesh) })
+        for (const m of meshes) {
+          toLeaf.copy(leaf.matrixWorld).invert().multiply(m.matrixWorld)
+          m.geometry = m.geometry.clone()
+          m.geometry.applyMatrix4(toLeaf)
+          box.setFromBufferAttribute(m.geometry.getAttribute('position') as THREE.BufferAttribute)
+          const crest = /Crest/.test(m.name + (m.parent?.name ?? ''))
+          const pivot = crest ? (Math.abs(box.max.z) > Math.abs(box.min.z) ? box.max.z : box.min.z) : (box.min.z + box.max.z) / 2
+          m.geometry.applyMatrix4(back.makeTranslation(0, 0, -pivot)).applyMatrix4(back.makeScale(1, 1, 1 / SHRINE_WIDE)).applyMatrix4(back.makeTranslation(0, 0, pivot))
+          m.geometry.applyMatrix4(toLeaf.invert())
+          m.geometry.computeBoundingSphere(); m.geometry.computeBoundingBox()
+        }
+        leaf.position.z *= SHRINE_WIDE
+        leaf.scale.z *= SHRINE_WIDE
+      }
       d.userData.wide = true
     }
     return d
