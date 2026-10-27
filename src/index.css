@@ -6057,51 +6057,107 @@ button {
   pointer-events: none;
 }
 
-/* 研製料理 (the shop's shut and the kitchen worked by hand), the round button to the left of the music: green when it's on */
-.research-toggle {
+/* at the grill, researching: a little fridge, top right beside the edit button, no ring round it; it opens and shuts the ingredients' panel */
+.fridge-toggle {
   position: fixed;
   z-index: 10;
   top: 20px;
-  right: 384px;
+  right: 332px;
   width: 44px;
   height: 44px;
-  border: 1.5px solid var(--text-soft);
-  border-radius: 50%;
-  background: var(--page);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text);
-  font-size: 18px;
-  font-weight: 700;
   cursor: pointer;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
 }
-.research-toggle:hover {
-  border-color: var(--text);
+.fridge-toggle svg {
+  width: 30px;
+  height: 30px;
+  fill: #e8f1f7;
+  stroke: #3a4858;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 160ms ease;
 }
-.research-toggle.is-on {
-  background: #1d8a46;
-  border-color: #1d8a46;
-  color: #fff;
-}
-.research-toggle:focus-visible {
-  outline: 3px solid var(--moss);
-  outline-offset: 3px;
-}
+.fridge-toggle:hover svg { transform: translateY(-1px) scale(1.06); }
+.fridge-toggle.is-on svg { fill: #bfe6ff; stroke: #1d5e8a; }
+.fridge-toggle:focus-visible { outline: 3px solid var(--moss); outline-offset: 3px; border-radius: 8px; }
 @media (max-width: 900px) {
-  .research-toggle {
-    top: 14px;
-    right: 308px;
-    width: 40px;
-    height: 40px;
-    font-size: 16px;
-  }
+  .fridge-toggle { top: 14px; right: 260px; width: 40px; height: 40px; }
 }
 @media (max-width: 400px) {
-  .research-toggle {
-    width: 34px;
-    height: 34px;
-    right: 246px;
-    font-size: 14px;
-  }
+  .fridge-toggle { right: 206px; width: 34px; height: 34px; }
 }
+
+/* the ingredients' panel while researching: further right (no board title beside it), in three zones: frozen, chilled, room temperature */
+.menu.is-research { padding-right: 14px; justify-content: end; }
+.menu.is-research .strips-frame { justify-self: end; }
+.menu.is-research .menu-title { display: none; }
+.chiller-scroll {
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #8aa2b6 transparent;
+}
+.chiller-scroll .chiller-bins { overflow: visible; }
+.chiller-zone + .chiller-zone { border-top: 2px solid #9fb7c8; }
+.chiller-zone-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 5px 12px;
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  color: #eaf3f9;
+}
+.chiller-zone-head i {
+  font: 600 12px/1 ui-monospace, monospace;
+  letter-spacing: 0.05em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #0d1a24;
+}
+.chiller-zone.is-frozen .chiller-zone-head { background: linear-gradient(180deg, #3d6a8e, #315a7a); }
+.chiller-zone.is-frozen .chiller-zone-head i { color: #7fe0ff; text-shadow: 0 0 6px #4ac8ee; }
+.chiller-zone.is-chilled .chiller-zone-head { background: linear-gradient(180deg, #4a7a6a, #3d6a5a); }
+.chiller-zone.is-chilled .chiller-zone-head i { color: #9ff0c8; text-shadow: 0 0 6px #4aeea0; }
+.chiller-zone.is-ambient { background: linear-gradient(180deg, #f3ece0, #e9dfcd); }
+.chiller-zone.is-ambient .chiller-zone-head { background: linear-gradient(180deg, #8a6a46, #745838); }
+.chiller-zone.is-ambient .chiller-zone-head i { color: #ffd9a0; text-shadow: 0 0 6px #eea84a; }
+
+/* the test kitchen's foot: what's out to try, put it all back, and the three ways to restock */
+.tally-research { align-items: center; }
+.tally-research .tally-trying { flex: 1 1 auto; font-size: 14px; }
+.tally-research .tally-buy { flex-basis: 100%; margin-left: 0; justify-content: flex-end; }
+.tally-restock {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1.5px solid #3d6a8e;
+  border-radius: 8px;
+  background: #315a7a;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tally-restock.is-each { background: #4f8a34; border-color: #4f8a34; }
+.tally-restock.is-full { background: #c4442f; border-color: #c4442f; }
+.tally-restock small { font-weight: 400; opacity: 0.9; }
+.tally-restock .money { color: #e8f6ff !important; }
+.tally-restock:hover:not(:disabled) { filter: brightness(1.12); }
+.tally-restock:disabled { opacity: 0.4; cursor: default; }
 
 /* the world axes at the bottom left while editing */
 .axis-widget {

@@ -129,6 +129,28 @@ export function topUpOrder(d: Dish, stock: Stock, par = PAR) {
   return { buy, cost }
 }
 
+/** 補到平均: every good below the average stock (over all of this shop's goods, rounded) is brought up to it; the rest left as they are */
+export function averageOrder(d: Dish, stock: Stock) {
+  const goods = goodsOf(d)
+  const avg = Math.round(goods.reduce((n, g) => n + (stock[g.id] ?? 0), 0) / Math.max(1, goods.length))
+  const buy: Stock = {}
+  let cost = 0
+  for (const g of goods) {
+    const n = avg - (stock[g.id] ?? 0)
+    if (n <= 0) continue
+    buy[g.id] = n
+    cost += costOf(g) * n
+  }
+  return { buy, cost, avg }
+}
+
+/** 各補 n: n more of every good */
+export function eachOrder(d: Dish, n: number) {
+  const buy: Stock = {}
+  for (const g of goodsOf(d)) buy[g.id] = n
+  return { buy, cost: buyAllCost(d, n) }
+}
+
 /** what to ask for a dish on the menu: the food's own price plus a little for what goes on it (at the grill: the
  * price list is a mid-range Taipei robata's), or, for something without a price of its own, three times its cost */
 export const menuPrice = (d: Dish, p: Part) => {

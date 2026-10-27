@@ -18,7 +18,7 @@ import { moodOf } from '@/game/taste'
 import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
-import { menuPrice, restockOrder, topUpOrder, buyAllCost, afterCharcoal, canAddCharcoal, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
+import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, afterCharcoal, canAddCharcoal, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
 import { GuestCounter } from '@/ui/GuestCounter'
@@ -38,6 +38,7 @@ import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
 import { HoverTip } from '@/ui/HoverTip'
 import { RegisterManual } from '@/ui/RegisterManual'
+import type { Restock } from '@/ui/Menu'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
@@ -329,13 +330,16 @@ function AxisWidget() {
  */
 function ViewMarkers({ lang, onPick }: { lang: Lang; onPick: (v: ViewId) => void }) {
   const scene = useThree((s) => s.scene)
+  const camera = useThree((s) => s.camera)
   const [, tick] = useState(0)
+  // (the grill's spot off to the right of the fire as it's seen, over the stones, not on the fire itself)
+  const grillAt = new THREE.Vector3(0, 0.75, 0).add(new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize().multiplyScalar(0.62))
   // (the named groups are looked for again a moment after editing starts: the room's pieces may still be loading)
   useEffect(() => { const t = window.setTimeout(() => tick((n) => n + 1), 500); return () => window.clearTimeout(t) }, [])
   return (
     <>
       {VIEW_SPOTS.map((v, i) => {
-        const at = v.id === 'grill' ? new THREE.Vector3(0, 0.6, 0) : v.id === 'free' ? null
+        const at = v.id === 'grill' ? grillAt : v.id === 'free' ? null
           : (() => { const o = v.anchor ? scene.getObjectByName(v.anchor) : null; if (!o) return null; const p = o.getWorldPosition(new THREE.Vector3()); if (p.y < OVERVIEW_TARGET.y - 1.2) p.y += 0.9; return p })()
         if (!at) return null
         return (
@@ -756,10 +760,15 @@ export default function App() {
   // AI simulation: a chef and customers, and what they've said lately
   // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
-  // the shop's shut and being worked by hand (研製料理): the view is held at camera 1, food is cooked and seasoned by hand, the stock chiller is on the board
-  const [research, setResearch] = useState(false)
-  useEffect(() => { if (ai) setResearch(false) }, [ai])
+  // which view the camera's on (data/views): the grill's own, the whole shop, or a part of it
+  const [view, setView] = useState<ViewId>('grill')
+  const [viewMenu, setViewMenu] = useState(false)
+  // the shop's shut and being worked by hand (研製料理) whenever the camera's at the grill (火烤灶台): held at camera 1, food cooked and seasoned by
+  // hand; any other view leaves it, and so does opening the shop
+  const research = !ai && view === 'grill'
   const hand = modeOf(ai, research) === 'research'
+  // (the ingredients' panel, opened and shut by the fridge button, while researching)
+  const [fridgeOpen, setFridgeOpen] = useState(false)
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
   const [speed, setSpeed] = useState(1)
   const { on: editOn } = useEdit()
@@ -1106,21 +1115,10 @@ export default function App() {
     book('bought', cost)
     setStock((st) => ({ ...st, [id]: (st[id] ?? 0) + n }))
   }
-  /** buy in n of everything this shop sells */
-  const buyAll = (d: DishInfo, n: number) => {
-    const goods = goodsOf(d)
-    const cost = buyAllCost(d, n)
-    if (cost > cash) return
-    book('bought', cost)
-    setStock((st) => {
-      const next = { ...st }
-      for (const g of goods) next[g.id] = (next[g.id] ?? 0) + n
-      return next
-    })
-  }
-  /** 一鍵補貨: top everything this shop sells up to 10 portions */
-  const topUp = (d: DishInfo) => {
-    const { buy, cost } = topUpOrder(d, stock)
+  /** the three ways to restock all at once: 補到平均 (whatever's under the average, up to it), 各補 5, 補滿 (everything up to PAR) */
+  const restockOf = (d: DishInfo, how: Restock) => (how === 'avg' ? averageOrder(d, stock) : how === 'each' ? eachOrder(d, 5) : topUpOrder(d, stock))
+  const restock = (d: DishInfo, how: Restock) => {
+    const { buy, cost } = restockOf(d, how)
     if (!cost || cost > cash) return
     book('bought', cost)
     setStock((st) => {
@@ -1171,8 +1169,6 @@ export default function App() {
   }, [editOn])
   // bumped to send the camera back to its home view
   const [resetView, setResetView] = useState(0)
-  const [view, setView] = useState<ViewId>('grill')
-  const [viewMenu, setViewMenu] = useState(false)
   // the browser dropped the WebGL context (a phone out of GPU memory)
   const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
@@ -1527,7 +1523,7 @@ export default function App() {
     }
     const order = topUpOrder(d, stock)
     if (order.cost && order.cost <= cash) {
-      topUp(d)
+      restock(d, 'full')
       return
     }
     if (entriesOf(d.id).length < (MENU_MIN[d.id] ?? 1) && cooksNow(d).length) {
@@ -1983,12 +1979,13 @@ export default function App() {
         </div>
       )}
       {/* (the right-hand board only where it has a use: the foods' fridge when researching, the menu once open; in the free view there is none) */}
-      {(hand || ai) && (<>
+      {((hand && fridgeOpen) || ai) && (<>
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id + (hand ? '' : '-menu')} dish={hand ? researchDish(dish) : menuDish(dish)} research={hand} open={ai}
         layoutLike={!hand ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })} days={days}
-        onBuy={!hand ? undefined : (id, n) => buyIn(dish, id, n)} onBuyAll={!hand ? undefined : (n) => buyAll(dish, n)} onTopUp={!hand ? undefined : () => topUp(dish)} topUpCost={topUpOrder(dish, stock).cost}
+        onBuy={!hand ? undefined : (id, n) => buyIn(dish, id, n)} onRestock={!hand ? undefined : (how) => restock(dish, how)}
+        restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
          lang={lang} quantities={hand ? orders[dish.id] : entryCount}
         feed={feed} locked={!hand} stock={hand ? stock : entryStock(dish)}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
@@ -2054,11 +2051,11 @@ export default function App() {
           {blessed ? (lang === 'ja' ? 'お供え中' : '供酒中') : (lang === 'ja' ? 'お神酒' : '供酒')}
         </button>
       )}
-      {/* (研製料理: only while the shop's shut: the view is held at camera 1 and the kitchen's worked by hand; the shop opening ends it) */}
-      {!ai && !!dish.roast && !editOn && (
-        <button type="button" className={`research-toggle${research ? ' is-on' : ''}`} onClick={() => setResearch((v) => !v)} aria-pressed={research}
-          title={lang === 'ja' ? '研究モード（手で焼いて試す・食材の冷蔵庫・固定カメラ）' : '研製料理模式（手動烤魚與調味、食材冷藏櫃、固定視角）'}>
-          研
+      {/* (at the grill with the shop shut, researching: a little fridge, top right, opens and shuts the ingredients' panel) */}
+      {hand && !!dish.roast && !editOn && (
+        <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => setFridgeOpen((v) => !v)} aria-pressed={fridgeOpen}
+          title={lang === 'ja' ? '食材庫を開く／閉じる' : '打開／關上食材櫃'}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2.2" /><path d="M5 9.5h14" /><path d="M8 5.5v2M8 12.5v4" /><path d="M7 21.5v1M17 21.5v1" /></svg>
         </button>
       )}
       {editOn && (

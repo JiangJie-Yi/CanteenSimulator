@@ -3,7 +3,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { nameIn, UI, type Lang } from '@/data/i18n'
 import { toChineseNumber, type Dish } from '@/data/menu'
 import { PAR } from '@/game/economy'
+import { STORAGES, storageName, storageOf } from '@/data/storage'
 import { Icon, iconFor } from './Icon'
+
+export type Restock = 'avg' | 'each' | 'full'
 
 type MenuProps = {
   dish: Dish
@@ -26,11 +29,9 @@ type MenuProps = {
   research?: boolean
   unitCost?: (id: string) => number
   onBuy?: (id: string, n: number) => void
-  /** buy n of everything on the board */
-  onBuyAll?: (n: number) => void
-  /** 一鍵補貨: top everything up to 10, and what that costs (0: nothing's short) */
-  onTopUp?: () => void
-  topUpCost?: number
+  /** the three ways to restock everything at once (補到平均, 各補 5, 補滿), and what each costs (0: nothing to buy) */
+  onRestock?: (how: Restock) => void
+  restockCost?: Record<Restock, number>
   /** the shop's diary: which day of business, and how many customers today and all told */
   days?: { day: number; today: number; total: number }
   /** (the menu, open) size its tags as the board of the shop's foods is sized: this many tags, this many sets */
@@ -75,7 +76,7 @@ let foodsFont: { font: number; rows: number } | null = null
 const iconOf = (x: object) => (x as { icon?: string }).icon
 
 
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, open = false, stock, research = false, unitCost, onBuy, onBuyAll, onTopUp, topUpCost = 0, days, layoutLike,
+export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, open = false, stock, research = false, unitCost, onBuy, onRestock, restockCost, days, layoutLike,
   cash = Infinity }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
@@ -360,16 +361,26 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
 
   return (
     <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
-      className={`menu${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${research || open ? '' : ' no-title'}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
+      className={`menu${research ? ' is-research' : ''}${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${research || open ? '' : ' no-title'}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
       {/* (the board's name only where it's the shop's own: the foods' fridge, or the menu once the shop's open; closed, it's a plain preview) */}
       {(research || open) && <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>}
 
       {research && onBuy ? (
         <div className="strips-frame">
-          <div className="chiller" role="group" aria-label={lang === 'ja' ? '食材の冷蔵庫' : '食材冷藏櫃'}>
-            <div className="chiller-top"><span>{lang === 'ja' ? '冷蔵庫' : '冷藏櫃'}</span><i aria-hidden="true">−18℃</i></div>
-            <div className="chiller-bins">
-              {[...dish.bases.filter((b) => !b.includes), ...dish.items].map((x) => bin(x, iconFor(dish.id, { ...x, icon: iconOf(x) }, false)))}
+          <div className="chiller" role="group" aria-label={lang === 'ja' ? '食材庫' : '食材櫃'}>
+            <div className="chiller-top"><span>{lang === 'ja' ? '食材庫' : '食材櫃'}</span></div>
+            {/* (in three: the freezer, the fridge, and the larder at room temperature) */}
+            <div className="chiller-scroll">
+              {STORAGES.map((st) => {
+                const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items].filter((x) => storageOf(x.id) === st.id)
+                if (!goods.length) return null
+                return (
+                  <section key={st.id} className={`chiller-zone is-${st.id}`}>
+                    <h3 className="chiller-zone-head"><span>{storageName(st, lang)}</span><i aria-hidden="true">{st.temp}</i></h3>
+                    <div className="chiller-bins">{goods.map((x) => bin(x, iconFor(dish.id, { ...x, icon: iconOf(x) }, false)))}</div>
+                  </section>
+                )
+              })}
             </div>
             <div className="chiller-foot" aria-hidden="true" />
           </div>
@@ -394,6 +405,30 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       </div>
       )}
 
+      {research && onBuy ? (
+        // (the test kitchen's foot: what's out on the board to try, a way to put it all back, and the three ways to restock)
+        <footer className="tally tally-research">
+          <p className="tally-trying">
+            {count > 0
+              ? (lang === 'ja' ? <>試作中 <strong>{count}</strong> 品</> : <>試做中 <strong>{count}</strong> 份</>)
+              : (lang === 'ja' ? '食材をクリックで一つ取り出して試作（右クリックで戻す）' : '點食材拿一份到砧板試做（右鍵放回）')}
+          </p>
+          {count > 0 && (
+            <button type="button" className="clear" onClick={onClear}>{lang === 'ja' ? '全部戻す' : '全部放回'}</button>
+          )}
+          {onRestock && restockCost && (
+            <span className="tally-buy">
+              {([['avg', lang === 'ja' ? '平均まで補充' : '補到平均', lang === 'ja' ? '平均より少ないものを平均まで' : '低於平均的食材補到平均'],
+                ['each', lang === 'ja' ? '各 +5' : '各補 5', lang === 'ja' ? 'すべて5つずつ' : '每樣多 5 份'],
+                ['full', lang === 'ja' ? '満タン' : '補滿', lang === 'ja' ? `すべて${PAR}まで` : `每樣補到 ${PAR} 份`]] as [Restock, string, string][]).map(([k, label, title]) => (
+                <button key={k} type="button" className={`tally-restock is-${k}`} disabled={!restockCost[k] || cash < restockCost[k]} onClick={() => onRestock(k)} title={title}>
+                  {label}{restockCost[k] > 0 && <small className="money">NT${restockCost[k].toLocaleString()}</small>}
+                </button>
+              ))}
+            </span>
+          )}
+        </footer>
+      ) : (
       <footer className="tally">
         {/* the shop's diary: which day it is, and how many have come in */}
         {days && days.day > 0 && (
@@ -412,25 +447,9 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           </button>
         )}
         <p className="tally-hint">{locked ? t.lockedHint : touchOnly ? t.hintTouch : t.hint}
-          {research && onBuyAll && unitCost && (() => {
-            // (stock everything on the board at once)
-            const all = [...dish.bases.filter((b) => !b.includes), ...dish.items].reduce((n, x) => n + unitCost(x.id) * 10, 0)
-            return (
-              <span className="tally-buy">
-                {onTopUp && (
-                  <button type="button" className="tally-topup" disabled={!topUpCost || cash < topUpCost} onClick={onTopUp}
-                    title={lang === 'ja' ? '足りない分を各10まで補充' : '不足的食材全部補到各 10 份'}>
-                    {topUpCost ? (lang === 'ja' ? '一括補充' : '一鍵補貨') : (lang === 'ja' ? '在庫十分' : '庫存都滿了')}
-                    {topUpCost > 0 && <small className="money">NT${topUpCost.toLocaleString()}</small>}
-                  </button>
-                )}
-                <button type="button" className="tally-buyall" disabled={cash < all} onClick={() => onBuyAll(10)}>
-                  {lang === 'ja' ? '全部 +10' : '全部各 +10'} <small className="money">NT${all.toLocaleString()}</small>
-                </button>
-              </span>
-            )
-          })()}</p>
+</p>
       </footer>
+      )}
     </aside>
   )
 }
