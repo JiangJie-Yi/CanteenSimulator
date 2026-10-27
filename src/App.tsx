@@ -1825,9 +1825,9 @@ export default function App() {
         )}
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
  />
-        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={() => addCharcoal()} lang={lang} />}
-        {/* (how full you are is about tasting with the shop shut: open, the customers do the eating) */}
-        {!ai && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
+        {/* (the fire and how full you are are only for the grill's own view (research): elsewhere, and open, they're out of the way) */}
+        {research && dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={() => addCharcoal()} lang={lang} />}
+        {research && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
           title={lang === 'ja' ? '開発ノート・人事' : '經營（廚房・人事）'}>
           <svg className="office-icon" viewBox="0 0 28 28" aria-hidden="true">

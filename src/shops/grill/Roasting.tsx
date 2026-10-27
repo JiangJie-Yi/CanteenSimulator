@@ -3119,6 +3119,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return node ? [{ node, kind, home: node.position.clone(), home0: node.position.clone(),
       homeQ: node.quaternion.clone(), back: 1 }] : []
   }), [root, roast.tools])
+  // (the utensils' thin handles cast no shadow: from the spot high over the bar they only laid thin dark stripes across the table)
+  useEffect(() => {
+    for (const t of tools) t.node.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = false })
+  }, [tools])
   // the seasoning box and what stands in it (but not the utensils, which have their own homes), for dragging
   // the seasoning box and the water bucket: each moves as one with whatever stands in it (the utensils have their
   // own homes, which move along)
