@@ -111,6 +111,7 @@ M = {
     "eaveLine": pbr("KamiEaveLine", lin("#3a2414"), rough=0.8),
     "gold": pbr("KamiGold", lin("#d9a93c"), rough=0.22, metal=1.0),
     "seam": pbr("KamiSeam", lin("#2a1a10"), rough=0.8),
+    "inside": pbr("KamiInside", lin("#3a2818"), rough=0.9),
 }
 _w = [0]
 
@@ -288,7 +289,22 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
     out = []
     y0 = DY
     cx0 = BX + 0.005
-    out.append(box(f"Kami{tag}Body", S(depth, body_h, width), P(cx0, y0 + body_h / 2, zc), wood(), bev=0.0015))
+    # (the body: a hollow box of boards, its inside a shadowed dark wood, a doorway cut in its front (the doors open into it))
+    T_ = 0.005
+    out.append(box(f"Kami{tag}WallBack", S(T_, body_h, width), P(cx0 + depth / 2 - T_ / 2, y0 + body_h / 2, zc), wood(), bev=0.001))
+    for sz in (-1, 1):
+        out.append(box(f"Kami{tag}WallSide{sz}", S(depth, body_h, T_), P(cx0, y0 + body_h / 2, zc + sz * (width / 2 - T_ / 2)), wood(), bev=0.001))
+    out.append(box(f"Kami{tag}Floor", S(depth, T_, width), P(cx0, y0 + T_ / 2, zc), wood(), bev=0.0008))
+    out.append(box(f"Kami{tag}Ceiling", S(depth, T_, width), P(cx0, y0 + body_h - T_ / 2, zc), wood(), bev=0.0008))
+    OW, OH, OY = width * 0.66, body_h * 0.74, y0 + body_h * 0.46     # (the doorway: its width, height and middle)
+    fzx = cx0 - depth / 2 + T_ / 2
+    for sz in (-1, 1):
+        sw = (width - OW) / 2
+        out.append(box(f"Kami{tag}WallFront{sz}", S(T_, body_h, sw), P(fzx, y0 + body_h / 2, zc + sz * (OW / 2 + sw / 2)), wood(), bev=0.0008))
+    out.append(box(f"Kami{tag}WallFrontTop", S(T_, y0 + body_h - (OY + OH / 2), OW), P(fzx, (OY + OH / 2 + y0 + body_h) / 2, zc), wood()))
+    out.append(box(f"Kami{tag}WallFrontLow", S(T_, OY - OH / 2 - y0, OW), P(fzx, (OY - OH / 2 + y0) / 2, zc), wood()))
+    # (inside, shadowed: dark boards behind and either side)
+    out.append(box(f"Kami{tag}Inside", S(0.001, body_h - 2 * T_, width - 2 * T_), P(cx0 + depth / 2 - T_ - 0.0006, y0 + body_h / 2, zc), M["inside"], uv=0))
     # (the posts at its corners, standing a little proud of the walls)
     for sx in (-1, 1):
         for sz in (-1, 1):
@@ -298,15 +314,37 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
     out.append(box(f"Kami{tag}Beam", S(depth + 0.006, 0.008, width + 0.006), P(cx0, y0 + body_h - 0.006, zc), M["woodDark"], bev=0.001))
     # (the doors: two leaves in a frame on the front, a dark seam, the gold crest where they meet, a gold plate at each corner)
     fx = cx0 - depth / 2 - 0.0012
-    out.append(box(f"Kami{tag}DoorFrame", S(0.004, body_h * 0.8, width * 0.72), P(fx, y0 + body_h * 0.46, zc), M["woodDark"]))
+    # (the doorway's frame: four dark bars round it)
+    for sz in (-1, 1):
+        out.append(box(f"Kami{tag}DoorJamb{sz}", S(0.006, OH + 0.008, 0.006), P(fx, OY, zc + sz * (OW / 2 + 0.003)), M["woodDark"], bev=0.0006))
+    for sv in (-1, 1):
+        out.append(box(f"Kami{tag}DoorSill{sv}", S(0.006, 0.006, OW + 0.012), P(fx, OY + sv * (OH / 2 + 0.003), zc), M["woodDark"], bev=0.0006))
+    # (the two door leaves, each hung from its outer edge (a hinge the game turns it about): the leaf, a gold plate at each corner, and half the
+    # crest where they meet)
+    DW = OW / 2
     for sd in (-1, 1):
-        out.append(box(f"Kami{tag}Door{sd}", S(0.002, body_h * 0.74, width * 0.33), P(fx - 0.002, y0 + body_h * 0.46, zc + sd * width * 0.17), wood()))
+        hinge = Vector(P(fx - 0.0025, OY, zc + sd * OW / 2))
+        leaf = bpy.data.objects.new(f"Kami{tag}DoorLeaf{sd}", None)
+        bpy.context.collection.objects.link(leaf)
+        leaf.location = hinge
+        kids = [box(f"Kami{tag}Door{sd}", S(0.0025, OH - 0.001, DW - 0.0006), P(fx - 0.0025, OY, zc + sd * (OW / 2 - DW / 2)), wood())]
         for sv in (-1, 1):
-            out.append(box(f"Kami{tag}DoorPlate{sd}{sv}", S(0.0012, 0.009, 0.009),
-                           P(fx - 0.0035, y0 + body_h * 0.46 + sv * body_h * 0.33, zc + sd * width * 0.3), M["gold"], uv=0))
-    out.append(box(f"Kami{tag}Seam", S(0.0014, body_h * 0.74, 0.0016), P(fx - 0.0035, y0 + body_h * 0.46, zc), M["seam"], uv=0))
-    out.append(cyl(f"Kami{tag}Crest", width * 0.07, 0.002, P(fx - 0.004, y0 + body_h * 0.46, zc), M["gold"], rot=(0, math.pi / 2, 0), verts=24))
-    out.append(cyl(f"Kami{tag}CrestRing", width * 0.045, 0.0025, P(fx - 0.0045, y0 + body_h * 0.46, zc), M["seam"], rot=(0, math.pi / 2, 0), verts=20))
+            kids.append(box(f"Kami{tag}DoorPlate{sd}{sv}", S(0.0012, 0.009, 0.009), P(fx - 0.0045, OY + sv * OH * 0.44, zc + sd * (OW / 2 - 0.006)), M["gold"], uv=0))
+        # (the crest's half on this leaf: a gold half disc at its meeting edge)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=width * 0.07, depth=0.002, location=P(fx - 0.0045, OY, zc), rotation=(0, math.pi / 2, 0))
+        cr = active()
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+        # (kept: the half on this leaf's side of the meeting line)
+        bpy.ops.mesh.bisect(plane_co=P(fx, OY, zc), plane_no=(0, -sd, 0), clear_inner=True)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        kids.append(finish(cr, f"Kami{tag}Crest{sd}", M["gold"]))
+        for k_ in kids:
+            mw = k_.matrix_world.copy()
+            k_.parent = leaf
+            k_.matrix_world = mw
+        out.append(leaf)
+        out += kids
     out.append(box(f"Kami{tag}Lintel", S(0.012, 0.01, width * 0.9), P(fx - 0.004, y0 + body_h - 0.018, zc), M["woodDark"], bev=0.001))
     out.append(box(f"Kami{tag}LintelGold", S(0.002, 0.003, width * 0.9), P(fx - 0.0105, y0 + body_h - 0.022, zc), M["gold"], uv=0))
 
@@ -418,6 +456,77 @@ parts += bay("M", 0.0, 0.15, 0.165, 0.28)
 for sz in (-1, 1):
     parts += bay(f"S{sz}", sz * 0.112, 0.07, 0.125, 0.215, depth=0.112)
 
+# =====================================================================
+# Inside: in the middle bay a little stone Ebisu (恵比寿), seated, round and smiling under his folded eboshi, a sea bream under his left arm
+# and his fishing rod over his right shoulder, carved from one grey granite; in each side bay a talisman (御札) in its paper wrapper,
+# stood against the back wall
+# =====================================================================
+_gu, _gv = grid01(256)
+granite = mix((0.6, 0.59, 0.56), (0.48, 0.47, 0.45), fbm(256, 10, 10, 4))
+granite = mix(granite, (0.25, 0.24, 0.23), (fbm(256, 70, 70, 2) > 0.67).astype(np.float32) * 0.6)
+granite = mix(granite, (0.82, 0.8, 0.76), (fbm(256, 80, 80, 2) > 0.74).astype(np.float32) * 0.5)
+M["stone"] = pbr("KamiStone", (1, 1, 1), tex=image("granite", granite), rough=0.85)
+M["stoneDark"] = pbr("KamiStoneDark", lin("#3b3833"), rough=0.9)
+eb = []
+
+
+def blob(name, at, r, rot=(0, 0, 0), mat_=None, seg=20, rings=12):
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=seg, ring_count=rings, location=P(*at), rotation=rot)
+    o = active()
+    o.scale = S(*r)
+    bpy.ops.object.transform_apply(scale=True)
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.sphere_project(); bpy.ops.object.mode_set(mode="OBJECT")
+    o = finish(o, name, mat_ or M["stone"])
+    eb.append(o)
+    return o
+
+
+# (seated on a low rock)
+eb.append(cyl("KamiEbisuRock", 0.032, 0.008, P(0, 0.004, 0), M["stone"], verts=18))
+blob("KamiEbisuLegs", (-0.006, 0.014, 0), (0.026, 0.009, 0.03))                       # (crossed legs, wide)
+blob("KamiEbisuBody", (0.002, 0.034, 0), (0.022, 0.026, 0.026))                        # (a round belly and chest)
+blob("KamiEbisuHead", (-0.002, 0.066, 0), (0.0145, 0.015, 0.016))                      # (a full round face)
+blob("KamiEbisuCheekL", (-0.011, 0.062, 0.008), (0.006, 0.006, 0.006))
+blob("KamiEbisuCheekR", (-0.011, 0.062, -0.008), (0.006, 0.006, 0.006))
+blob("KamiEbisuEar0", (0.0, 0.066, 0.016), (0.003, 0.006, 0.002))
+blob("KamiEbisuEar1", (0.0, 0.066, -0.016), (0.003, 0.006, 0.002))
+# (the folded eboshi: leaning back off the crown, its tip curled forward)
+blob("KamiEbisuHat", (0.006, 0.083, 0), (0.016, 0.011, 0.012), rot=(0, 0, 0))
+blob("KamiEbisuHatTip", (-0.004, 0.092, 0), (0.007, 0.006, 0.009))
+# (arms: the left round the fish, the right up holding the rod)
+blob("KamiEbisuArmL", (-0.012, 0.033, 0.02), (0.008, 0.012, 0.007))
+blob("KamiEbisuArmR", (-0.012, 0.042, -0.02), (0.008, 0.013, 0.007))
+# (the sea bream under his left arm: its body, its tail fanned behind)
+tai = blob("KamiEbisuTai", (-0.016, 0.026, 0.026), (0.016, 0.009, 0.004), seg=16, rings=10)
+tai.rotation_euler = (0, 0, 0.35)
+blob("KamiEbisuTaiTail", (0.0, 0.03, 0.03), (0.004, 0.008, 0.002), seg=10, rings=6)
+# (the rod: from his right hand up past his shoulder)
+a_, b_ = Vector(P(-0.016, 0.044, -0.022)), Vector(P(0.02, 0.098, -0.03))
+bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.0012, depth=(b_ - a_).length, location=(a_ + b_) / 2)
+rod = active()
+rod.rotation_euler = (b_ - a_).to_track_quat("Z", "Y").to_euler()
+eb.append(finish(rod, "KamiEbisuRod", M["stone"]))
+# (the face cut in: two crescent eyes and the smile, darker in the stone)
+for sz in (-1, 1):
+    eb.append(box(f"KamiEbisuEye{sz}", S(0.001, 0.0012, 0.0045), P(-0.0158, 0.069, sz * 0.0055), M["stoneDark"], uv=0))
+eb.append(box("KamiEbisuSmile", S(0.001, 0.0012, 0.008), P(-0.0158, 0.059, 0), M["stoneDark"], uv=0))
+ebisu = bpy.data.objects.new("KamiEbisu", None)
+bpy.context.collection.objects.link(ebisu)
+for o in eb:
+    mw = o.matrix_world.copy()
+    o.parent = ebisu
+    o.matrix_world = mw
+ebisu.location = P(BX + 0.012, DY + 0.005, 0)
+parts += eb + [ebisu]
+# (the talismans in the side bays)
+M["fuda"] = pbr("KamiFuda", lin("#f3eedd"), rough=0.8)
+M["fudaSeal"] = pbr("KamiFudaSeal", lin("#b8261c"), rough=0.6)
+for sz in (-1, 1):
+    zc_ = sz * 0.112
+    parts.append(box(f"KamiFuda{sz}", S(0.004, 0.075, 0.026), P(BX + 0.05, DY + 0.005 + 0.0375, zc_), M["fuda"], bev=0.0006, uv=0))
+    parts.append(box(f"KamiFudaFold{sz}", S(0.0045, 0.012, 0.0265), P(BX + 0.05, DY + 0.005 + 0.068, zc_), M["fuda"], uv=0))
+    parts.append(box(f"KamiFudaSeal{sz}", S(0.0008, 0.008, 0.008), P(BX + 0.0476, DY + 0.005 + 0.03, zc_), M["fudaSeal"], uv=0))
+
 root = bpy.data.objects.new("Kamidana", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
@@ -473,17 +582,44 @@ ox.append(lathe("KamiDish", PROF, M["dish"]))
 for nm, r, y, rr in (("Rim", 0.0895, 0.0555, 0.0012), ("Foot", 0.0475, 0.004, 0.001)):
     bpy.ops.mesh.primitive_torus_add(major_radius=r, minor_radius=rr, major_segments=72, minor_segments=6, location=P(0, y, 0))
     ox.append(finish(active(), f"KamiDishLine{nm}", M["cobalt"]))
-DISH_Y = 0.046 - 0.004
-for k, (x, y, z, r) in enumerate([(0, 0.03, -0.022, 0.03), (-0.022, 0.03, 0.022, 0.029), (0.024, 0.03, 0.02, 0.03), (0, 0.078, 0.006, 0.027)]):
-    y += DISH_Y
+# (where each comes to rest, as they would if set down and let go: the three below each sitting in the dish's well (its surface under its
+# middle), the fourth on top settling down until it touches the three (its height the highest at which it meets any of them))
+WELL = [(0.0, 0.046), (0.03, 0.0465), (0.06, 0.049), (0.08, 0.054), (0.087, 0.0565)]
+
+
+def well_at(d):
+    for (r0, y0), (r1, y1) in zip(WELL, WELL[1:]):
+        if d <= r1:
+            return y0 + (y1 - y0) * (d - r0) / (r1 - r0)
+    return WELL[-1][1]
+
+
+FLAT = 0.82
+LOW = [(0.0, -0.023, 0.03), (-0.021, 0.0125, 0.029), (0.021, 0.0125, 0.03)]
+rest = []
+for x, z, r in LOW:
+    d = math.hypot(x, z)
+    # (its underside on the well: the lowest point of the flattened ball, a touch above the curve at its edge too)
+    rest.append((x, max(well_at(d), well_at(d + r * 0.5) - 0.0015) + r * FLAT, z, r))
+tx, tz, tr = 0.0, 0.0, 0.027
+ty = 0.0
+for x, y, z, r in rest:
+    dd = math.hypot(tx - x, tz - z)
+    reach = (r + tr) * 0.93
+    if dd < reach:
+        ty = max(ty, y + math.sqrt(reach * reach - dd * dd) * FLAT)
+rest.append((tx, ty, tz, tr))
+TOP_Y = ty
+for k, (x, y, z, r) in enumerate(rest):
     bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=32, ring_count=20, location=P(x, y, z))
     o = active()
     rng_ = np.random.default_rng(k + 3)
     for vv in o.data.vertices:
         n_ = vv.co.normalized()
-        vv.co.z *= 0.82
+        vv.co.z *= FLAT
         vv.co += n_ * float(rng_.normal(0, r * 0.012))
-    o.rotation_euler = (float(rng_.normal(0, 0.2)), float(rng_.normal(0, 0.2)), float(rng_.uniform(0, 6.28)))
+    # (turned about the vertical only, so it sits on its flattened underside)
+    o.rotation_euler = (0, 0, float(rng_.uniform(0, 6.28)))
     finish(o, f"KamiOrange{k}", M["peel"])
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
     bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.sphere_project(); bpy.ops.object.mode_set(mode="OBJECT")
@@ -502,7 +638,7 @@ for j, (rz, lean) in enumerate(((0.4, 0.5), (2.6, 0.4))):
     apply_scale(lf)
     for vv in lf.data.vertices:
         vv.co.z += (vv.co.x / 0.022) ** 2 * 0.003
-    lf.location = Vector(P(0, DISH_Y + 0.078 + 0.027 * 0.82 + 0.002, 0.006)) + Vector((math.cos(rz) * 0.014, math.sin(rz) * 0.014, 0.001))
+    lf.location = Vector(P(0, TOP_Y + 0.027 * FLAT + 0.002, 0.0)) + Vector((math.cos(rz) * 0.014, math.sin(rz) * 0.014, 0.001))
     lf.rotation_euler = (lean * 0.3, -lean * 0.4, rz)
     ox.append(finish(lf, f"KamiOrangeLeaf{j}", M["leaf"]))
 oranges = bpy.data.objects.new("KamiOranges", None)
@@ -696,7 +832,31 @@ M["redCord"] = pbr("KamiRedCord", lin("#c4302a"), rough=0.55)
 FPROF = [(0.0, 0.0), (0.022, 0.0), (0.03, 0.003), (0.036, 0.01), (0.04, 0.026), (0.0395, 0.042), (0.036, 0.056), (0.028, 0.072), (0.019, 0.086),
          (0.0125, 0.1), (0.011, 0.114), (0.0108, 0.128), (0.0125, 0.138), (0.015, 0.145), (0.0148, 0.1495), (0.012, 0.15), (0.009, 0.147),
          (0.0085, 0.136)]
-fx_.append(lathe("KamiFlaskBody", FPROF, M["dish"], segs=40))
+# (its glaze painted in cobalt (染付): a double line round the foot, a band of waves (青海波) round the shoulder between double lines, a line
+# round the neck; UVs round it (u) and up it (v, the flask's height))
+_fu, _fv = grid01(512)
+fl = np.ones((512, 512, 3), np.float32) * np.asarray((0.95, 0.94, 0.9), np.float32)
+COB = (0.12, 0.2, 0.5)
+for lo_, hi_ in ((0.035, 0.045), (0.06, 0.066), (0.5, 0.507), (0.52, 0.525), (0.665, 0.67), (0.685, 0.692), (0.84, 0.848)):
+    fl = mix(fl, COB, ((_fv >= lo_) & (_fv <= hi_)).astype(np.float32) * 0.9)
+# (the waves: rows of nested arcs, each row's arcs offset by half from the one under it)
+band = (_fv > 0.53) & (_fv < 0.66)
+wy = (_fv - 0.53) / 0.13 * 2.0
+row = np.floor(wy)
+wx = _fu * 18 + row * 0.5
+cx_ = np.floor(wx) + 0.5
+dd = np.sqrt(((wx - cx_) * 1.0) ** 2 + ((wy - row) * 1.0) ** 2)
+waves = (np.abs((dd * 6) % 1.0 - 0.5) < 0.16) & (dd < 0.55)
+fl = mix(fl, COB, (band & waves).astype(np.float32) * 0.85)
+M["flaskGlaze"] = pbr("KamiFlaskGlaze", (1, 1, 1), tex=image("flaskGlaze", fl), rough=0.22)
+fb_ = lathe("KamiFlaskBody", FPROF, M["flaskGlaze"], segs=48)
+_me = fb_.data
+_uvl = _me.uv_layers.active.data
+for _poly in _me.polygons:
+    for _li in _poly.loop_indices:
+        _co = _me.vertices[_me.loops[_li].vertex_index].co
+        _uvl[_li].uv = (math.atan2(_co.y, _co.x) / (2 * math.pi) + 0.5, _co.z / 0.15)
+fx_.append(fb_)
 bpy.ops.mesh.primitive_torus_add(major_radius=0.0122, minor_radius=0.0021, major_segments=24, minor_segments=6, location=P(0, 0.112, 0))
 fx_.append(finish(active(), "KamiFlaskCord", M["redCord"]))
 bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0042, segments=10, ring_count=6, location=P(-0.0128, 0.112, 0))
@@ -734,6 +894,37 @@ for k, ch in enumerate("御神酒"):
     bpy.ops.object.select_all(action="DESELECT"); t.select_set(True); bpy.context.view_layer.objects.active = t
     bpy.ops.object.convert(target="MESH")
     fx_.append(finish(active(), f"KamiFlaskChar{k}", M["ink"], smooth_shade=False))
+# (the label and all on it wrapped onto the belly: every point taken round the flask at its height, as far out from the glaze as it was from
+# the label's flat back, so it lies on the curve, not off it)
+OUT = [(r, y) for r, y in FPROF[1:10]]
+
+
+def body_r(y):
+    for (r0, y0), (r1, y1) in zip(OUT, OUT[1:]):
+        if y0 <= y <= y1:
+            return r0 + (r1 - r0) * (y - y0) / (y1 - y0)
+    return OUT[-1][0]
+
+
+def wrap(o, cuts=0):
+    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    if cuts:
+        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.subdivide(number_cuts=cuts)
+        bpy.ops.object.mode_set(mode="OBJECT")
+    for vt in o.data.vertices:
+        gx, gy, gz = vt.co.x, vt.co.z, -vt.co.y          # (the game's frame)
+        r = body_r(gy)
+        rad = r + 0.0004 + (LX - gx)
+        a = gz / r
+        vt.co = Vector(P(-rad * math.cos(a), gy, rad * math.sin(a)))
+    o.data.update()
+
+
+for o in fx_:
+    if o.name.startswith(("KamiFlaskLabel", "KamiFlaskChar")):
+        wrap(o, cuts=10 if o.name.startswith("KamiFlaskLabel") else 0)
 flask = bpy.data.objects.new("KamiFlask", None)
 bpy.context.collection.objects.link(flask)
 for o in fx_:
@@ -750,12 +941,12 @@ uu_, vv_ = grid01(512)
 warp_ = (fbm(512, 3, 3, 4) - 0.5) * 0.35
 flow = fbm(512, 6, 2, 5)
 band = np.sin((uu_ * 7 + vv_ * 2 + warp_ * 3 + flow * 2.5) * math.pi * 2) * 0.5 + 0.5
-glaze_ = mix((0.03, 0.08, 0.28), (0.05, 0.14, 0.42), fbm(512, 8, 8, 4))
-glaze_ = mix(glaze_, (0.06, 0.45, 0.5), smooth(0.72, 0.92, band) * smooth(0.35, 0.7, flow))      # (turquoise runs)
-glaze_ = mix(glaze_, (0.08, 0.42, 0.24), smooth(0.8, 0.95, fbm(512, 5, 5, 4)) * 0.75)            # (emerald pools)
-glaze_ = mix(glaze_, (0.6, 0.78, 0.82), smooth(0.93, 0.99, band) * 0.35)                          # (pale where it thinned)
+glaze_ = mix((0.015, 0.035, 0.13), (0.025, 0.065, 0.2), fbm(512, 8, 8, 4))
+glaze_ = mix(glaze_, (0.04, 0.26, 0.3), smooth(0.74, 0.93, band) * smooth(0.35, 0.7, flow) * 0.8)   # (turquoise runs)
+glaze_ = mix(glaze_, (0.05, 0.24, 0.14), smooth(0.8, 0.95, fbm(512, 5, 5, 4)) * 0.6)              # (emerald pools)
+glaze_ = mix(glaze_, (0.3, 0.42, 0.46), smooth(0.94, 0.995, band) * 0.25)                         # (paler where it thinned)
 M["ruri"] = pbr("KamiRuri", (1, 1, 1), tex=image("ruri", glaze_), rough=0.08, coat=1.0)
-CST, RX_S, RZ_S = 0.0175, 0.04, 0.15
+CST, RX_S, RZ_S = 0.0175, 0.029, 0.128
 # (the section from the foot's middle out and round to the well's middle: (how far out, as a part of the outline), height)
 SEC = [(0.0, 0.0), (0.78, 0.0), (0.82, 0.0015), (0.83, 0.0045), (0.8, 0.006), (0.86, 0.008), (0.94, 0.012), (1.0, 0.0165), (1.035, 0.021),
        (1.045, 0.0232), (1.025, 0.0238), (0.985, 0.0212), (0.95, 0.0185), (0.9, 0.0176), (0.0, CST)]
@@ -770,7 +961,7 @@ for j in range(NA):
     ex_z = math.copysign(abs(st_) ** ex, st_) * RZ_S
     for k_, (f, y) in enumerate(SEC):
         vs.append(P(ex_x * f, y, ex_z * f))
-        uvs.append((j / NA * 4, k_ / len(SEC)))
+        uvs.append((ex_x * f / 0.09 + 0.5, ex_z * f / 0.32 + 0.5 + y * 2))
 n_ = len(SEC)
 for j in range(NA):
     j2 = (j + 1) % NA

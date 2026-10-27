@@ -1127,7 +1127,7 @@ function Bouquet({ lean = 0 }: { lean?: number }) {
 const KAMIDANA_URL = import.meta.env.BASE_URL + 'models/kamidana.glb'
 /** the shrine's model (and the oranges and the sutra, nodes of their own in it): its wood toon like the room, its gold real metal reflecting the
  * studio, an ink line round the bigger parts; made once, each piece taken out of it to be shown where it stands */
-type KamiPart = 'shrine' | 'oranges' | 'sutra' | 'table' | 'flask' | 'cupstand'
+type KamiPart = 'shrine' | 'oranges' | 'sutra' | 'table' | 'flask' | 'cupstand' | 'doors' | 'ebisu'
 let kamidanaParts: Record<KamiPart, THREE.Object3D> | null = null
 function kamidanaOf(scene: THREE.Group) {
   if (kamidanaParts) return kamidanaParts
@@ -1149,18 +1149,28 @@ function kamidanaOf(scene: THREE.Group) {
         reflectStudio(g)
         g.envMapIntensity = 0.7
         t = g
-      } else if (src.name === 'KamiPeel' || src.name === 'KamiLeaf' || src.name === 'KamiDish' || src.name === 'KamiCobalt') {
-        // (the mikan's waxy peel, the leaves' gloss, the dish's glaze: a soft sheen)
-        t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.4, clearcoat: 0.5, clearcoatRoughness: 0.3 })
+      } else if (src.name === 'KamiPeel') {
+        // (the mikan's peel: a dull waxy skin, only a soft sheen)
+        t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.62, clearcoat: 0.12, clearcoatRoughness: 0.5, specularIntensity: 0.4 })
+      } else if (src.name === 'KamiLeaf' || src.name === 'KamiDish' || src.name === 'KamiCobalt' || src.name === 'KamiFlaskGlaze') {
+        // (the leaves' gloss, the porcelain's glaze: a soft sheen)
+        t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.35, clearcoat: 0.4, clearcoatRoughness: 0.25 })
       } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
       mats.set(src, t)
     }
     m.material = t
     m.castShadow = true
+    m.receiveShadow = true
   })
-  inkModel(r, (m) => /Gold|Cap|Plate|Crest|Seam|Bal|Katsuogi|Fold|Char|Slip|Calyx|Stem|Bow|Cord|Tail|Tassel|Fringe|Line|Inlay|Nail|Core|Pillar|Beam|Shide|Label|Knot|Edge/.test(m.name), { width: 0.0012, weld: true })
+  inkModel(r, (m) => /Gold|Cap|Plate|Crest|Seam|Bal|Katsuogi|Fold|Char|Slip|Calyx|Stem|Bow|Cord|Tail|Tassel|Fringe|Line|Inlay|Nail|Core|Pillar|Beam|Shide|Label|Knot|Edge|Jamb|Sill|Inside|Fuda|Eye|Smile|Ear|Cheek|Rod/.test(m.name), { width: 0.0012, weld: true })
   const take = (n: string) => { const o = r.getObjectByName(n)!; o.removeFromParent(); o.position.set(0, 0, 0); return o }
-  kamidanaParts = { oranges: take('KamiOranges'), sutra: take('KamiSutra'), table: take('KamiTable'), flask: take('KamiFlask'), cupstand: take('KamiCupStand'), shrine: r }
+  // (the doors' leaves, each hung from its hinge, apart from the rest (they swing open); the Ebisu inside, a piece of its own)
+  const doors = new THREE.Group()
+  const shrineNode = r.getObjectByName('Kamidana') ?? r
+  doors.position.copy(shrineNode.position); doors.quaternion.copy(shrineNode.quaternion); doors.scale.copy(shrineNode.scale)
+  for (const leaf of [...shrineNode.children].filter((o) => /DoorLeaf/.test(o.name))) { leaf.removeFromParent(); doors.add(leaf) }
+  kamidanaParts = { oranges: take('KamiOranges'), sutra: take('KamiSutra'), table: take('KamiTable'), flask: take('KamiFlask'), cupstand: take('KamiCupStand'),
+    ebisu: (() => { const o = r.getObjectByName('KamiEbisu')!; o.removeFromParent(); return o })(), doors, shrine: r }
   return kamidanaParts
 }
 function KamidanaModel({ part = 'shrine' }: { part?: KamiPart }) {
@@ -1171,22 +1181,60 @@ function KamidanaModel({ part = 'shrine' }: { part?: KamiPart }) {
 }
 useGLTF.preload(KAMIDANA_URL)
 
-function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'extras' }) {
+/** a soft round shadow under something standing on the table (a contact shadow: dark in the middle, gone at the edge) */
+const CONTACT = canvasTex(64, 64, (g) => {
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+  gr.addColorStop(0, 'rgba(20,12,6,0.55)'); gr.addColorStop(0.55, 'rgba(20,12,6,0.28)'); gr.addColorStop(1, 'rgba(20,12,6,0)')
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64)
+})
+export function ContactShadow({ r, y = 0.0008 }: { r: number; y?: number }) {
+  return (
+    <mesh position-y={y} rotation-x={-Math.PI / 2} renderOrder={1}>
+      <planeGeometry args={[r * 2, r * 2]} /><meshBasicMaterial map={CONTACT} transparent depthWrite={false} toneMapped={false} />
+    </mesh>
+  )
+}
+
+/** the shrine's doors: each pair swings open about its hinges when clicked, and shut again */
+function ShrineDoors() {
+  const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
+  const doors = useMemo(() => kamidanaOf(gltf.scene).doors, [gltf])
+  const [open, setOpen] = useState(false)
+  const k = useRef(0)
+  useFrame((_, dt) => {
+    k.current += ((open ? 1 : 0) - k.current) * Math.min(1, dt * 4)
+    for (const leaf of doors.children) {
+      // (each leaf swings out to the front, the left one one way and the right the other)
+      const sd = leaf.name.endsWith('-1') ? -1 : 1
+      leaf.rotation.y = sd * k.current * 1.75
+    }
+  })
+  return (
+    <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v); setTip({ title: '神棚の扉', hint: open ? '點一下打開' : '點一下關上' }) }}
+      {...tipOver('神棚門', open ? '點一下關上' : '點一下打開')}>
+      <primitive object={doors} />
+    </group>
+  )
+}
+
+function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase1' | 'cups' }) {
   return (
     <group>
       {/* the shrine itself, from blender/kamidana.py: a three-bay shrine in hinoki, its fittings gold */}
-      {part !== 'extras' && <group position={[-0.14, 0.015, 0]}><KamidanaModel /></group>}
-      {/* the bouquets in their vases, leaning in a little, and the cups */}
-      {part !== 'shrine' && [-1, 1].map((sd) => (
-        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} /></group>
+      {(part === 'all' || part === 'shrine') && <group position={[-0.14, 0.015, 0]}><KamidanaModel /></group>}
+      {/* the bouquets in their vases, leaning in a little, each its own piece */}
+      {[-1, 1].filter((sd) => part === 'all' || part === `vase${sd}`).map((sd) => (
+        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} /><ContactShadow r={0.05} y={-0.014} /></group>
       ))}
-      {/* the cups' stand: a low hinoki board on two feet, the cups on it (blender/kamidana.py) */}
-      {part !== 'shrine' && <group position={[-0.3, 0, 0]}><KamidanaModel part="cupstand" /></group>}
-      {part !== 'shrine' && [-0.09, 0, 0.09].map((z) => (
+      {/* the cups' stand (blender/kamidana.py), the cups on it */}
+      {(part === 'all' || part === 'cups') && <group position={[-0.3, 0, 0]}><KamidanaModel part="cupstand" /><ContactShadow r={0.15} /></group>}
+      {(part === 'all' || part === 'cups') && [-0.09, 0, 0.09].map((z) => (
         <group key={z} position={[-0.3, 0.03, z]}>
           {/* (a cup with a wall of its own: a thick rim, a foot ring, a floor, the sake poured in is seen in it) */}
           <mesh geometry={SAKE_CUP} position-y={-0.0125}><meshToonMaterial color="#f4f1ea" /></mesh>
           <mesh geometry={SAKE_CUP} position-y={-0.0125} scale={[1.05, 1.03, 1.05]}><meshBasicMaterial color="#5a4a3a" side={THREE.BackSide} /></mesh>
+          {/* (a soft shadow under it on the stand) */}
+          <group position-y={-0.0125}><ContactShadow r={0.02} y={0.0004} /></group>
         </group>
       ))}
     </group>
@@ -1585,15 +1633,25 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   const flask = (z: number, key: string) => (
     <group key={key} position={[0, 0, z]} onClick={offer} {...tipOver('御神酒', '點一下供清酒')}>
       <KamidanaModel part="flask" />
+      <ContactShadow r={0.055} />
       <mesh position={[0, 0.075, 0]} visible={false}><boxGeometry args={[0.09, 0.16, 0.09]} /></mesh>
     </group>
   )
   return (
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
-      <Movable id="shrine" label="神龕"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="shrine" /></StaticBatch></group></Movable>
-      {/* (the vases and cups beside it are not part of what's pointed at: they don't light with it) */}
-      <Movable id="shrinecups" label="神龕旁花瓶與杯"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="extras" /></StaticBatch></group></Movable>
+      <Movable id="shrine" label="神龕"><group position-x={ALTAR_D / 2} scale={SC}>
+        <StaticBatch><Kamidana part="shrine" /></StaticBatch>
+        {/* (its doors, which open; the Ebisu inside, a piece of its own) */}
+        <group position={[-0.14, 0.015, 0]}>
+          <ShrineDoors />
+          <Movable id="ebisu" label="惠比壽石像"><group><KamidanaModel part="ebisu" /></group></Movable>
+        </group>
+      </group></Movable>
+      {/* (the vases and the cups beside it, each its own piece: not part of what's pointed at, they don't light with it) */}
+      <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="vase-1" /></StaticBatch></group></Movable>
+      <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="vase1" /></StaticBatch></group></Movable>
+      <Movable id="shrinecups" label="清酒杯與琉璃台"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={GLOW} color="#ffe0a0" size={0.07} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </points>
@@ -1611,7 +1669,8 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         </mesh>
       ))}
       {/* the oranges on their dish, a leaf on the top one */}
-      <Movable id="oranges" label="橘子盤"><group position={[-0.17, 0, 0]}><KamidanaModel part="oranges" /></group></Movable>
+      {/* (in front, to the right of the cups' stand, a little smaller: clear of it, the flask and the vase) */}
+      <Movable id="oranges" label="橘子盤"><group name="look-oranges" position={[-0.206, 0, 0.205]} scale={0.8}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group></Movable>
     </group>
   )
 }
