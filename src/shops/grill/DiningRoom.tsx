@@ -1331,7 +1331,8 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
       && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length],
         // (a banner every third place along the wall, in turn)
-        nobori: k % 3 === 2 ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined,
+        // (none by the drinks fridges: the wall there is left plain)
+        nobori: k % 3 === 2 && isClear(z, 0.9) ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined,
         // (and a big signboard every fifth, between)
         kanban: k % 5 === 3 && k % 3 !== 2 ? Math.floor(k / 5 + start) % KANBAN_LOOKS.length : undefined }))
   }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear])
@@ -1423,7 +1424,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
           // (and none in the corner where the speaker hangs: kept clear of it by its own reach and size)
           for (let z = from + (corner ? 1.15 : 0.25); z < to - 1.05; z += 0.145) {
             if (altar && Math.abs(z - shelfZ) < 0.62) continue
-            if (!isClear(z, 0.1)) continue
+            if (!isClear(z, 0.6)) continue
             if (door !== undefined && Math.abs(z - door) < WC_W + 0.3) continue
             zs.push(z)
           }
