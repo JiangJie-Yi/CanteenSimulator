@@ -1198,9 +1198,26 @@ export function ContactShadow({ r, y = 0.0008 }: { r: number; y?: number }) {
 /** whether an offering of sake stands just now (Altar sets it): the shrine's doors open of themselves, the Ebisu glows */
 const BLESSING = { on: false, k: 0 }
 /** the shrine's doors: each pair swings open about its hinges when clicked, and shut again */
+/** pointer props that only name a thing when pointed at (no glow, the cursor as it is, nothing to click): the shrine's offerings */
+function nameOnly(title: string, hint: string) {
+  return {
+    onPointerOver: (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title, hint }) },
+    onPointerOut: () => setTip(null),
+  }
+}
+/** the shrine drawn wider than it was modelled, across its front (along z): the owner's 1.25 */
+const SHRINE_WIDE = 1.25
 function ShrineDoors() {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
-  const doors = useMemo(() => kamidanaOf(gltf.scene).doors, [gltf])
+  const doors = useMemo(() => {
+    const d = kamidanaOf(gltf.scene).doors
+    // (widened with the shrine: each leaf's hinge moved out, the leaf itself widened in its own frame, so it still swings true when opened)
+    if (!d.userData.wide) {
+      for (const leaf of d.children) { leaf.position.z *= SHRINE_WIDE; leaf.scale.z *= SHRINE_WIDE }
+      d.userData.wide = true
+    }
+    return d
+  }, [gltf])
   const [open, setOpen] = useState(false)
   const k = useRef(0)
   useFrame((_, dt) => {
@@ -1741,18 +1758,18 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         {/* (pointed at, the shrine is only named (it isn't clicked: no glow, the cursor as it is); its doors and the flask are what's worked) */}
         <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '神棚', hint: '供奉惠比壽；點御神酒供酒，點門開關' }) }}
           onPointerOut={() => setTip(null)}>
-          <StaticBatch><Kamidana part="shrine" /></StaticBatch>
+          <group scale-z={SHRINE_WIDE}><StaticBatch><Kamidana part="shrine" /></StaticBatch></group>
         </group>
         {/* (its doors, which open; the Ebisu inside, a piece of its own) */}
         <group position={[-0.14, 0.015, 0]}>
           <ShrineDoors />
-          <Movable id="ebisu" label="惠比壽石像"><group><KamidanaModel part="ebisu" /></group></Movable>
+          <Movable id="ebisu" label="惠比壽石像"><group {...nameOnly('惠比壽石像', '七福神之一，保佑生意興隆、漁獲豐收')}><KamidanaModel part="ebisu" /></group></Movable>
         </group>
       </group></Movable>
       {/* (the vases and the cups beside it, each its own piece: not part of what's pointed at, they don't light with it) */}
-      <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="vase-1" /></StaticBatch></group></Movable>
-      <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="vase1" /></StaticBatch></group></Movable>
-      <Movable id="shrinecups" label="清酒杯與琉璃台"><group position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
+      <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC} {...nameOnly('供花', '楊桐與白菊，供在神棚兩側')}><StaticBatch><Kamidana part="vase-1" /></StaticBatch></group></Movable>
+      <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC} {...nameOnly('供花', '楊桐與白菊，供在神棚兩側')}><StaticBatch><Kamidana part="vase1" /></StaticBatch></group></Movable>
+      <Movable id="shrinecups" label="清酒杯與琉璃台"><group position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC} {...nameOnly('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={GLOW} color="#ffd890" size={1} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
           onBeforeCompile={(sh) => {
@@ -1776,7 +1793,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       <pointLight ref={lamp} position={[EBISU_AT[0] - 0.06, EBISU_AT[1] + 0.02, EBISU_AT[2]]} color="#ffc070" intensity={0} distance={0.9} decay={2} />
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}
-      <Movable id="sutra" label="經書"><group><Sutra /></group></Movable>
+      <Movable id="sutra" label="經書"><group {...nameOnly('經書', '般若心經，供在神前')}><Sutra /></group></Movable>
       <Movable id="flask" label="御神酒壺"><group ref={flaskRef} position={[-0.06, 0, 0.3]}>{flask(0, 'f')}</group></Movable>
       {/* (the clear sake: a thin stream down into the cup, and the cups, each filling with it) */}
       <mesh ref={streamRef} visible={false}>
@@ -1789,7 +1806,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       ))}
       {/* the oranges on their dish, a leaf on the top one */}
       {/* (in front of the cups' stand, a little smaller: where the owner set it in the edit panel (X −0.010, Z −0.203)) */}
-      <Movable id="oranges" label="橘子盤"><group name="look-oranges" position={[-0.216, 0, 0.002]} scale={0.8}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group></Movable>
+      <Movable id="oranges" label="橘子盤"><group name="look-oranges" position={[-0.216, 0, 0.002]} scale={0.8} {...nameOnly('椪柑', '供品，圓滿吉祥')}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group></Movable>
     </group>
   )
 }

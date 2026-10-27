@@ -282,6 +282,44 @@ def strip(name, pts, h, z0, th, mat_):
     return o
 
 
+M["plaque"] = pbr("KamiPlaque", lin("#141210"), rough=0.35)
+
+
+def crest_half(name, at, rad, sd):
+    """the family crest (三つ柏: three oak leaves in a ring, gold on a black lacquer disc) facing out of the doors at at (game frame), rad its
+    radius; only the half on door leaf sd's side of the meeting line, so each leaf carries its half and they part when the doors open"""
+    x, y, z = at
+    f = rad / 0.0105
+    objs = []
+    bpy.ops.mesh.primitive_cylinder_add(vertices=40, radius=rad, depth=0.0016, location=P(x, y, z), rotation=(0, math.pi / 2, 0))
+    objs.append((active(), M["plaque"]))
+    bpy.ops.mesh.primitive_torus_add(major_radius=rad * 0.86, minor_radius=0.0006 * f, major_segments=48, minor_segments=6, location=P(x - 0.0009, y, z),
+                                     rotation=(0, math.pi / 2, 0))
+    objs.append((active(), M["gold"]))
+    for j in range(3):
+        a_ = math.pi / 2 + j * 2 * math.pi / 3
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=8, location=P(x - 0.0009, y + math.sin(a_) * 0.0046 * f, z + math.cos(a_) * 0.0046 * f))
+        lf = active()
+        lf.scale = (0.0004, 0.0028 * f, 0.005 * f)
+        lf.rotation_euler = (a_ - math.pi / 2, 0, 0)
+        objs.append((lf, M["gold"]))
+        # (its midrib, cut dark down the leaf from the middle out)
+        bpy.ops.mesh.primitive_cube_add(size=1, location=P(x - 0.0014, y + math.sin(a_) * 0.0042 * f, z + math.cos(a_) * 0.0042 * f))
+        vn = active()
+        vn.scale = (0.0003, 0.0003 * f, 0.0084 * f)
+        vn.rotation_euler = (a_ - math.pi / 2, 0, 0)
+        objs.append((vn, M["plaque"]))
+    out_ = []
+    for k_, (o, m_) in enumerate(objs):
+        bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.bisect(plane_co=P(x, y, z), plane_no=(0, -sd, 0), clear_inner=True, use_fill=True)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        out_.append(finish(o, f"{name}{k_}", m_))
+    return out_
+
+
 def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
     """one bay of the shrine: its body with a post at each corner, its pair of doors with the gold crest and corner plates, and its roof: two
     curved slopes of bark laid deep, each gable's bargeboards running up past the ridge as the crossed finials (one board each, the pair one
@@ -330,15 +368,18 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
         kids = [box(f"Kami{tag}Door{sd}", S(0.0025, OH - 0.001, DW - 0.0006), P(fx - 0.0025, OY, zc + sd * (OW / 2 - DW / 2)), wood())]
         for sv in (-1, 1):
             kids.append(box(f"Kami{tag}DoorPlate{sd}{sv}", S(0.0012, 0.009, 0.009), P(fx - 0.0045, OY + sv * OH * 0.44, zc + sd * (OW / 2 - 0.006)), M["gold"], uv=0))
-        # (the crest's half on this leaf: a gold half disc at its meeting edge)
-        bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=width * 0.07, depth=0.002, location=P(fx - 0.0045, OY, zc), rotation=(0, math.pi / 2, 0))
-        cr = active()
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
-        # (kept: the half on this leaf's side of the meeting line)
-        bpy.ops.mesh.bisect(plane_co=P(fx, OY, zc), plane_no=(0, -sd, 0), clear_inner=True)
-        bpy.ops.object.mode_set(mode="OBJECT")
-        kids.append(finish(cr, f"Kami{tag}Crest{sd}", M["gold"]))
+        # (the crest's half on this leaf: on the big middle doors the family crest, on the side bays a gold half disc at its meeting edge)
+        if tag == "M":
+            kids += crest_half(f"Kami{tag}Crest{sd}_", (fx - 0.0045, OY, zc), width * 0.085, sd)
+        else:
+            bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=width * 0.07, depth=0.002, location=P(fx - 0.0045, OY, zc), rotation=(0, math.pi / 2, 0))
+            cr = active()
+            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+            bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+            # (kept: the half on this leaf's side of the meeting line)
+            bpy.ops.mesh.bisect(plane_co=P(fx, OY, zc), plane_no=(0, -sd, 0), clear_inner=True)
+            bpy.ops.object.mode_set(mode="OBJECT")
+            kids.append(finish(cr, f"Kami{tag}Crest{sd}", M["gold"]))
         for k_ in kids:
             mw = k_.matrix_world.copy()
             k_.parent = leaf
@@ -657,24 +698,9 @@ eb.append(ebtube("KamiEbisuRope", [(-0.022 * math.cos(a_), 0.03 + 0.002 * math.s
 eb.append(ebtube("KamiEbisuRopeEnd", [(-0.022, 0.03, 0.002), (-0.0235, 0.022, 0.003), (-0.0245, 0.016, 0.004)], 0.0008, M["straw"], ring=5))
 for _j in range(3):
     eb.append(box(f"KamiEbisuShide{_j}", S(0.0004, 0.0048, 0.0036), P(-0.0236, 0.025 - _j * 0.0042, 0.006 + (0.0016 if _j % 2 else -0.0016)), M["shide"], uv=0))
-# ---- the pedestal: a square block of the same granite under him, a black plaque on its front with a gold crest (three oak leaves in a ring,
-# 三つ柏)
+# ---- the pedestal: a square block of the same granite under him
 PED = 0.016
 eb.append(box("KamiEbisuPedestal", S(0.068, PED, 0.068), P(0, -PED / 2, 0), M["stone"], bev=0.0012, uv=0.05))
-M["plaque"] = pbr("KamiPlaque", lin("#141210"), rough=0.35)
-eb.append(box("KamiEbisuPlaque", S(0.0012, 0.0115, 0.0115), P(-0.0346, -PED / 2, 0), M["plaque"], bev=0.0004, uv=0))
-bpy.ops.mesh.primitive_torus_add(major_radius=0.0043, minor_radius=0.00045, major_segments=32, minor_segments=6, location=P(-0.0354, -PED / 2, 0), rotation=(0, math.pi / 2, 0))
-eb.append(finish(active(), "KamiEbisuCrestRing", M["gold"]))
-for _j in range(3):
-    _a = math.pi / 2 + _j * 2 * math.pi / 3
-    _c = (-0.0354, -PED / 2 + math.sin(_a) * 0.0019, math.cos(_a) * 0.0019)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*_c))
-    _lf = active()
-    _lf.scale = (0.0004, 0.0012, 0.0021)
-    bpy.ops.object.transform_apply(scale=True)
-    _lf.rotation_euler = (_a - math.pi / 2, 0, 0)
-    eb.append(finish(_lf, f"KamiEbisuCrestLeaf{_j}", M["gold"]))
-    eb.append(ebtube(f"KamiEbisuCrestVein{_j}", [(-0.0357, -PED / 2, 0), (-0.0357, -PED / 2 + math.sin(_a) * 0.0034, math.cos(_a) * 0.0034)], 0.00018, M["plaque"], ring=4))
 ebisu = bpy.data.objects.new("KamiEbisu", None)
 bpy.context.collection.objects.link(ebisu)
 for o in eb:
