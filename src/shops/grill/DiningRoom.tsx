@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
-import { glowOnly } from '@/scene/hoverGlow'
+import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import type { Lang } from '@/data/i18n'
@@ -1040,7 +1040,9 @@ function ToiletHit({ who }: { who: 'm' | 'f' }) {
           if (el?.style) el.style.cursor = 'pointer'
         }}
         onPointerOut={(ev) => {
-          glowOnly(null); setTip(null)
+          let top: THREE.Object3D | null = ev.eventObject
+          while (top && !top.getObjectByName(`look-wc-${who}`)) top = top.parent
+          glowLeave(top?.getObjectByName(`look-wc-${who}`)); setTip(null)
           POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand - 1)
           const el = ev.nativeEvent.target as HTMLElement | null
           if (el?.style && !POINTER_HINT.hand) el.style.cursor = ''
@@ -1951,7 +1953,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
         <group key={`${r}-${k}`} ref={reg(`${r}-${k}`)}
           position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin({ kind: 'slot', r, k }, ev)}
           onPointerOver={(ev) => { if (doorOpen()) { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject) } setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
-          onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null); setTip(null) }}>
+          onPointerOut={(ev) => { document.body.style.cursor = ''; glowLeave(ev.eventObject); setTip(null) }}>
           <DrinkBottle id={id} lit />
         </group>
       )))}
@@ -1969,7 +1971,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       {/* (what's been taken out, stood on the floor before the fridge) */}
       {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
         <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
-          onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject); setTip({ title: drinkName(o.id), hint: '拖曳移動，放回櫃子或遞給客人' }) }} onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null); setTip(null) }}>
+          onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject); setTip({ title: drinkName(o.id), hint: '拖曳移動，放回櫃子或遞給客人' }) }} onPointerOut={(ev) => { document.body.style.cursor = ''; glowLeave(ev.eventObject); setTip(null) }}>
           <DrinkBottle id={o.id} />
         </group>
       ))}

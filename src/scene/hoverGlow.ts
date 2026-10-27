@@ -15,7 +15,8 @@ function brighten(m: THREE.Material): THREE.Material {
   if ('emissive' in c) {
     // (lit materials: a warm emissive, and the colour itself a little lighter)
     mm.emissive = GLOW.clone()
-    mm.emissiveIntensity = Math.max(mm.emissiveIntensity ?? 0, 0) + 0.2
+    // (more on a physically lit one: dark wood under the room's light hardly shows a little)
+    mm.emissiveIntensity = Math.max(mm.emissiveIntensity ?? 0, 0) + ((c as THREE.MeshStandardMaterial).isMeshStandardMaterial ? 0.5 : 0.32)
     if (mm.color) mm.color = mm.color.clone().multiplyScalar(1.04)
   } else if (mm.color) {
     // (unlit ones, which have no emissive: the colour lifted and warmed)
@@ -62,4 +63,10 @@ export function glowOnly(root: THREE.Object3D | null | undefined) {
   glowOff(current)
   current = root ?? null
   glowOn(current)
+}
+/** the pointer has left this one: put it out, and only it (what's lit now may be something else, lit since, that stays lit) */
+export function glowLeave(root: THREE.Object3D | null | undefined) {
+  if (!root) return
+  if (root === current) glowOnly(null)
+  else glowOff(root)
 }

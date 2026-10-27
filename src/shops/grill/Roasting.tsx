@@ -3371,8 +3371,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
     let down: { x: number; y: number } | null = null
     let ownTip = false
+    // (only what this lit is put out here: the glow is shared, and the till's drawers, the shrine and the rest light their own through the pointer events)
+    let ownGlow = false
     const onMove = (e: PointerEvent) => {
-      if (lockedRef.current) { glowOnly(null); if (ownTip) { setTip(null); ownTip = false } return }
+      if (lockedRef.current) { if (ownGlow) { glowOnly(null); ownGlow = false } if (ownTip) { setTip(null); ownTip = false } return }
       if (drag.current || held.current) return
       if (e.buttons) return
       aim(e)
@@ -3400,7 +3402,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       else if (soup) lit = soup
       else if (dec) world.traverse((o) => { if (!lit && o.userData.decor === dec) lit = o })
       else if (cont) world.traverse((o) => { if (!lit && o.userData.container === cont) lit = o })
-      glowOnly(lit)
+      if (lit || ownGlow) { glowOnly(lit); ownGlow = !!lit }
       // (what's under the pointer, named by a tag, for what isn't food or a tool (those have their own): a dish or the table's boxes, dragged about)
       // (only its own tag is cleared here: the scene's other things set theirs through the pointer events)
       if (!tool && !p && !soup && !dec && cont) { setTip(CONTAINER_TIP(cont)); ownTip = true } else if (ownTip) { setTip(null); ownTip = false }
@@ -3408,7 +3410,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const onDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY }
-      glowOnly(null)
+      if (ownGlow) { glowOnly(null); ownGlow = false }
       if (e.button !== 0 || lockedRef.current) return
       aim(e)
       const tool = pickTool()

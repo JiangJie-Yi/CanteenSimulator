@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { glowOff, glowOnly, HOVER } from '@/scene/hoverGlow'
+import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 
 /*
@@ -111,8 +111,7 @@ export const handOver = {
   },
   onPointerOut: (e: { nativeEvent: Event; eventObject?: THREE.Object3D }) => {
     if (HOVER.paused) return
-    glowOff(e.eventObject)
-    glowOnly(null)
+    glowLeave(e.eventObject)
     POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand - 1)
     const el = e.nativeEvent.target as HTMLElement | null
     if (el?.style && !POINTER_HINT.hand) el.style.cursor = ''

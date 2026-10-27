@@ -8,7 +8,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
-import { glowOnly } from '@/scene/hoverGlow'
+import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { ALONG, GRILL_OFFSET, KITCHEN_DROP, LAY } from './bar'
 import { setTip } from '@/scene/hoverTip'
@@ -345,7 +345,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
     <group position={at} rotation-y={0.4} scale={LANTERN_SCALE} userData={{ container: 'lantern' }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '行燈', hint: lit ? '點一下點燈' : '點一下熄燈' }); setLit(!lit) }}
       onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; document.body.style.cursor = 'pointer'; glowOnly(e.eventObject); setTip({ title: '行燈', hint: lit ? '點一下熄燈' : '點一下點燈' }) }}
-      onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null); setTip(null) }}>
+      onPointerOut={(e) => { document.body.style.cursor = ''; glowLeave(e.eventObject); setTip(null) }}>
       {posts.map(([x, z], i) => (
         <Inked key={i} geometry={geo.post} color="#3a2416" grow={1.12} position={[x, (H + LEG + 0.04) / 2, z]} />
       ))}
@@ -584,7 +584,7 @@ function RiceTub() {
       <group position-y={SIDE_TOP} scale={RICE_SCALE}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v) }}
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; glowOnly(e.eventObject); setTip({ title: '飯桶', hint: open ? '點一下蓋上蓋子' : '點一下掀開蓋子' }) }}
-        onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null); setTip(null) }}>
+        onPointerOut={(e) => { document.body.style.cursor = ''; glowLeave(e.eventObject); setTip(null) }}>
         {/* the tub: pale staves, an ear at each side to lift it by, a band of woven cane round the lower body, and its lid (a bar across
             the top) */}
         <Inked geometry={g.tub} color="#ffffff" map={STAVES} position={[0, 0.21, 0]} grow={1.03} />

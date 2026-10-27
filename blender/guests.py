@@ -132,7 +132,7 @@ mat("WorkDark", srgb("#5f5230"))
 # =====================================================================
 
 HC = Vector((0, 0, 0.835))        # the middle of the head
-HEAD_R = 0.128
+HEAD_R = 0.158   # (a big round head sat straight on the body, as Overcooked's cooks have)
 
 HREF = lambda p: HC                     # noqa: E731
 BREF = lambda p: Vector((0, 0, p.z))     # noqa: E731
@@ -430,30 +430,36 @@ def body(kind):
         radii.append(r)
         return len(verts) - 1
 
-    pelvis = v((0, 0, 0.44), 0.078 * hi)
-    waist = v((0, 0, 0.51), 0.07 * wa)
-    chest = v((0, 0, 0.6), 0.077 * (sh * 0.5 + wa * 0.5))
-    top = v((0, 0, 0.655), 0.07 * sh)
-    neck0 = v((0, 0, 0.69), 0.033)
-    neck1 = v((0, 0, 0.765), 0.03)
-    edges += [(pelvis, waist), (waist, chest), (chest, top), (top, neck0), (neck0, neck1)]
+    # (a round body like an egg, its widest low, rising straight into the head: no waist to speak of, no neck showing)
+    # (a round bean of a body from nearly the floor up into the head, widest low: the legs are inside it, only the feet showing; no neck)
+    # (the skin's radii shrink as it's smoothed: set a third larger than they'll show)
+    seat = v((0, 0, 0.16), 0.17 * hi)
+    pelvis = v((0, 0, 0.29), 0.19 * hi)
+    waist = v((0, 0, 0.43), 0.185 * wa)
+    chest = v((0, 0, 0.55), 0.16 * (sh * 0.5 + wa * 0.5))
+    top = v((0, 0, 0.64), 0.1 * sh)
+    neck0 = v((0, 0, 0.69), 0.06)
+    neck1 = v((0, 0, 0.73), 0.05)
+    edges += [(seat, pelvis), (pelvis, waist), (waist, chest), (chest, top), (top, neck0), (neck0, neck1)]
     for sd in (1, -1):
-        shoulder = v((sd * 0.088 * sh, 0, 0.66), 0.038)
-        elbow = v((sd * 0.152, 0, 0.552), 0.028)
-        wrist = v((sd * 0.198, 0, 0.448), 0.022)
-        palm = v((sd * 0.206, -0.002, 0.42), 0.031)
-        knuckle = v((sd * 0.212, -0.004, 0.4), 0.029)
-        tip = v((sd * 0.216, -0.006, 0.386), 0.021)
-        thumb0 = v((sd * 0.2, -0.02, 0.428), 0.013)
-        thumb1 = v((sd * 0.205, -0.033, 0.41), 0.011)
+        # (short, thick arms ending in round mitten hands, a stub of a thumb)
+        shoulder = v((sd * 0.11 * sh, 0, 0.6), 0.05)
+        elbow = v((sd * 0.165, 0, 0.535), 0.045)
+        wrist = v((sd * 0.19, 0, 0.475), 0.042)
+        palm = v((sd * 0.198, -0.002, 0.448), 0.052)
+        knuckle = v((sd * 0.203, -0.004, 0.43), 0.046)
+        tip = v((sd * 0.206, -0.006, 0.42), 0.03)
+        thumb0 = v((sd * 0.19, -0.028, 0.452), 0.022)
+        thumb1 = v((sd * 0.192, -0.038, 0.442), 0.018)
         edges += [(top, shoulder), (shoulder, elbow), (elbow, wrist), (wrist, palm), (palm, knuckle), (knuckle, tip),
                   (palm, thumb0), (thumb0, thumb1)]
         bg = st.get("baggy", 1.0)
-        hip = v((sd * 0.052 * hi, 0, 0.425), 0.054 * hi * (1 + (bg - 1) * 0.4))
-        knee = v((sd * 0.06, 0, 0.262), 0.04 * bg)
-        ankle = v((sd * 0.06, 0.004, 0.085), 0.03)
-        heel = v((sd * 0.06, 0.016, 0.032), 0.032)
-        toe = v((sd * 0.062, -0.06, 0.03), 0.032)
+        # (short, stout legs: what shows under the round body is a thick stub and a big round shoe)
+        hip = v((sd * 0.045 * hi, 0, 0.29), 0.05 * hi * (1 + (bg - 1) * 0.4))
+        knee = v((sd * 0.05, 0, 0.17), 0.045 * bg)
+        ankle = v((sd * 0.058, 0.0, 0.08), 0.045)
+        heel = v((sd * 0.06, 0.012, 0.04), 0.05)
+        toe = v((sd * 0.062, -0.07, 0.04), 0.055)
         edges += [(pelvis, hip), (hip, knee), (knee, ankle), (ankle, heel), (ankle, toe)]
     me = bpy.data.meshes.new(f"{kind}.body")
     me.from_pydata([tuple(p) for p in verts], edges, [])
@@ -474,7 +480,7 @@ def body(kind):
         name, t, _ = nearest_bone(p)
         if abs(p.x) < 0.11 and 0.36 < p.z < 0.72 and not name.startswith(("upperarm", "forearm", "hand", "clavicle")):
             k = smoothstep(0.36, 0.43, p.z) * (1 - smoothstep(0.66, 0.72, p.z))
-            p.y *= 1 - 0.24 * k
+            p.y *= 1 - 0.06 * k
             if p.y < 0:
                 p.y -= st["belly"] * math.exp(-((p.z - 0.53) / 0.06) ** 2) * (1 - (p.x / 0.11) ** 2)
                 p.y -= st["chest"] * math.exp(-((p.z - 0.615) / 0.03) ** 2) * math.exp(-((abs(p.x) - 0.035) / 0.025) ** 2)
@@ -624,7 +630,7 @@ def head(kind):
     fc = FACE[kind]
     k = st.get("head", 1.0)
     bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=22, radius=HEAD_R * k)
+    bmesh.ops.create_uvsphere(bm, u_segments=18, v_segments=12, radius=HEAD_R * k)
     for vt in bm.verts:
         p = vt.co
         # a chibi face: round, a little wider than tall at the cheeks, the jaw tucked in, the back of the head full
@@ -1989,11 +1995,7 @@ for kind in KINDS:
         else:
             copy_weights(bd, o)
         bind(o, rig)
-    st = STYLE[kind]
-    if st["legs"] == "skirt":
-        cut_under(bd, st["skirt"][0] + 0.035, 0.42, ("hips", "thigh.L", "thigh.R"))
-    elif st["legs"] == "robe":
-        cut_under(bd, 0.17, 0.42, ("hips", "thigh.L", "thigh.R", "shin.L", "shin.R"))
+    # (the round body stays whole under a skirt or a robe: it's the skirt's shape, and nothing shows through)
     print("built", kind)
 
 
@@ -2378,6 +2380,15 @@ SHARE = {"body": 0.5, "head": 0.5, "eyes": 0.45, "eyesJoy": 0.45, "eyesShut": 0.
          "details": 0.5, "mouth": 0.6, "mouthJoy": 0.5, "mouthOpen": 0.5, "mouthMad": 0.6, "mouthSad": 0.6, "face": 0.6, "browsSad": 0.6,
          "robe": 0.6, "apron": 0.6, "belt": 0.6}
 SMALL = 260
+# (and a web game with a dozen of them at once, drawn small: every part cut to about a tenth of what it was built with, the hair to a few
+# hundred, the body and head each to a few hundred; small parts (eyes, mouths) left alone)
+BUDGET = {k: max(70, v // 14) for k, v in BUDGET.items()}
+BUDGET["hair"] = 130
+BUDGET.update({"body": 560, "head": 240, "eyes": 50, "cuffs": 40, "details": 50, "face": 30})
+for p_ in ("eyesJoy", "eyesShut", "browsJoy", "browsMad", "browsSad", "brows", "mouth", "mouthOpen", "mouthJoy", "mouthMad", "mouthSad", "glasses", "phones"):
+    BUDGET[p_] = 36
+SHARE = {k: v * 0.2 for k, v in SHARE.items()}
+SMALL = 50
 for o in list(COL.objects):
     if o.type != "MESH":
         continue
@@ -2387,7 +2398,9 @@ for o in list(COL.objects):
     if part in BUDGET and tris > BUDGET[part]:
         ratio = BUDGET[part] / tris
     elif part in SHARE and tris > SMALL:
-        ratio = SHARE[part]
+        ratio = max(SHARE[part], SMALL / tris)
+    elif tris > 200:
+        ratio = max(0.1, 120 / tris)
     if ratio is not None:
         bpy.context.view_layer.objects.active = o
         m = o.modifiers.new("Lighter", "DECIMATE")
