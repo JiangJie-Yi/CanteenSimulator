@@ -741,18 +741,19 @@ for o in fx_:
         o.parent = flask
 
 # =====================================================================
-# The stand the three sake cups sit on (in the shrine's frame, before it): a low board of hinoki on two feet, a fine raised edge round it,
-# its top 1.75 cm up, where the cups' feet are
+# The stand the three sake cups sit on (in the shrine's frame, before it): deep blue glass (瑠璃), a low slab on two feet with a fine raised
+# edge round it and softly rounded corners, its top 1.75 cm up, where the cups' feet are
 # =====================================================================
 cs_ = []
+M["ruri"] = pbr("KamiRuri", lin("#123a8c"), rough=0.05, coat=1.0)
 CST, CSD, CSW = 0.0175, 0.07, 0.29
-cs_.append(box("KamiCupStandTop", S(CSD, 0.006, CSW), P(0, CST - 0.003, 0), wood(), bev=0.001))
+cs_.append(box("KamiCupStandTop", S(CSD, 0.006, CSW), P(0, CST - 0.003, 0), M["ruri"], bev=0.0022, uv=0))
 for sd in (-1, 1):
-    cs_.append(box(f"KamiCupStandFoot{sd}", S(CSD - 0.012, CST - 0.006, 0.014), P(0, (CST - 0.006) / 2, sd * (CSW / 2 - 0.02)), wood(), bev=0.0008))
+    cs_.append(box(f"KamiCupStandFoot{sd}", S(CSD - 0.012, CST - 0.006, 0.014), P(0, (CST - 0.006) / 2, sd * (CSW / 2 - 0.02)), M["ruri"], bev=0.0018, uv=0))
 for sx in (-1, 1):
-    cs_.append(box(f"KamiCupStandEdgeX{sx}", S(0.003, 0.002, CSW), P(sx * (CSD / 2 - 0.0015), CST + 0.001, 0), M["woodDark"], uv=0.1))
+    cs_.append(box(f"KamiCupStandEdgeX{sx}", S(0.003, 0.002, CSW), P(sx * (CSD / 2 - 0.0015), CST + 0.001, 0), M["ruri"], bev=0.0009, uv=0))
 for sd in (-1, 1):
-    cs_.append(box(f"KamiCupStandEdgeZ{sd}", S(CSD, 0.002, 0.003), P(0, CST + 0.001, sd * (CSW / 2 - 0.0015)), M["woodDark"], uv=0.1))
+    cs_.append(box(f"KamiCupStandEdgeZ{sd}", S(CSD, 0.002, 0.003), P(0, CST + 0.001, sd * (CSW / 2 - 0.0015)), M["ruri"], bev=0.0009, uv=0))
 cupstand = bpy.data.objects.new("KamiCupStand", None)
 bpy.context.collection.objects.link(cupstand)
 for o in cs_:
