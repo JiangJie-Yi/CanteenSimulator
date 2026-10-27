@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, groupTransformOf, isPicked, moveTo, offsetOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, setFrame, turnTo, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, getEdit, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -125,7 +125,7 @@ const AXES = [
  * The three axes of the selected piece (red X, green Y, blue Z, along the same axes as its X, Y, Z fields): drag an arrow to move it along
  * that axis alone. It stands in the piece's own group, at `at`, so it moves with it.
  */
-export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: number; theta?: number }) {
+export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V3; size?: number; theta?: number; pivotGroup?: { current: THREE.Group | null } }) {
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
@@ -165,15 +165,29 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
     beginChange()
     moveTo(id, offsetOf(id))
     if (controls) controls.enabled = false
+    // (in pivot mode (D) the arrows carry the pivot, not the piece: the piece's place is moved by what turning and sizing about the new pivot
+    // would shift it, so it stays put)
+    const pg = pivotGroup?.current
+    const turnScale = new THREE.Matrix3()
+    if (pg && pg.children[0]?.children[0]) {
+      pg.updateMatrix(); pg.children[0].updateMatrix(); pg.children[0].children[0].updateMatrix()
+      turnScale.setFromMatrix4(new THREE.Matrix4().multiplyMatrices(pg.matrix, pg.children[0].matrix).multiply(pg.children[0].children[0].matrix))
+    }
     const move = (ev: PointerEvent) => {
       const s1 = along(ev)
       if (s1 === null || last === null) return
       // (the way along the axis in the world, taken into the piece's parent's own frame: it's the one axis that changes)
       const p0 = origin.clone().addScaledVector(dir, last), p1 = origin.clone().addScaledVector(dir, s1)
       const d = par.worldToLocal(p1).sub(par.worldToLocal(p0))
-      const n = [...offsetOf(id)] as V3
-      n[0] += d.x; n[1] += d.y; n[2] += d.z
-      moveTo(id, n)
+      if (getEdit().pivotMode && pg) {
+        const pv = pivotOf(id)
+        const shift = d.clone().applyMatrix3(turnScale).sub(d)
+        setPivot(id, [pv[0] + d.x, pv[1] + d.y, pv[2] + d.z], [shift.x, shift.y, shift.z])
+      } else {
+        const n = [...offsetOf(id)] as V3
+        n[0] += d.x; n[1] += d.y; n[2] += d.z
+        moveTo(id, n)
+      }
       last = s1
     }
     const up = () => {
@@ -386,16 +400,24 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   const laid = useRef(false)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
-  const { on, offsets, rotations, scales, selected, groups, tool } = useEdit()
+  const { on, offsets, rotations, scales, selected, groups, tool, pivots, space } = useEdit()
+  void pivots
+  /** the group the turn and scale act about (the pivot): its matrix, with what's inside it, is what moving the pivot must make up for */
+  const pg = useRef<THREE.Group>(null)
   const [box, setBox] = useState<{ c: V3; s: V3; yaw: number; theta: number } | null>(null)
   // (the piece's middle, in the frame of its own group as it stands untouched: what it turns and scales about; measured once it has been drawn)
   const [mid, setMid] = useState<V3>([0, 0, 0])
   const inner = useRef<THREE.Group>(null)
   // (the turn from the room's frame into the parent's, about the vertical; found once the piece is in place)
-  const [theta, setTheta] = useState(0)
+  const [thetaRoom, setTheta] = useState(0)
+  // (the axes gone by: the room's turned into this frame, or (the piece's own) none)
+  const theta = space === 'local' ? 0 : thetaRoom
   void offsets; void rotations; void scales; void selected; void groups // (read so it redraws as it's moved, turned or scaled)
   const o = positionOf(id)
   const rot = rotationOf(id), sc = scaleOf(id)
+  // (the pivot: the piece's middle, moved by hand if it has been (D))
+  const pvo = pivotOf(id)
+  const piv: V3 = [mid[0] + pvo[0], mid[1] + pvo[1], mid[2] + pvo[2]]
   // (turned or sized about its middle, it can't be shown until that middle's known: drawn about the wrong point first, it would jump into place)
   const pivoted = baseScale !== 1 || baseTurn.some((v) => v) || rot.some((v) => v) || sc.some((v) => v !== 1)
   const [ready, setReady] = useState(false)
@@ -580,17 +602,17 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       {/* (turned and scaled about the piece's own middle, not the group's origin, which may be far from it) */}
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
           scaled there, and stood back) */}
-      <group position={mid} rotation-y={theta} visible={ready || !pivoted}
+      <group ref={pg} position={piv} rotation-y={theta} visible={ready || !pivoted}
         onPointerDown={on ? down : undefined}
         onPointerOver={on ? (e: { stopPropagation: () => void }) => { e.stopPropagation(); setHover(true) } : undefined}
         onPointerOut={on ? () => setHover(false) : undefined}>
         <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]} scale={[sc[0] * baseScale, sc[1] * baseScale, sc[2] * baseScale]}>
           <group rotation-y={-theta}>
-            <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}><ParentPiece.Provider value={id}>{children}</ParentPiece.Provider></group>
+            <group ref={inner} position={[-piv[0], -piv[1], -piv[2]]}><ParentPiece.Provider value={id}>{children}</ParentPiece.Provider></group>
           </group>
         </group>
       </group>
-      {on && box && <AxisGizmo id={id} theta={theta} at={box.c} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
+      {on && box && <AxisGizmo id={id} theta={theta} at={piv} pivotGroup={pg} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
     </group>
     </group>
   )

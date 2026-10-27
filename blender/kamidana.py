@@ -408,10 +408,22 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
         apply_mods(g_)
         uv_grain(g_, 0.15)
         out.append(g_)
+        # (and out under the bargeboards, the gable's face filled with upright battens of wood (妻の板), a tie beam across their foot, so
+        # nothing shows open between the roof's edge and the walls)
+        zf = zc + sz * (W / 2 - 0.001)
+        out.append(box(f"Kami{tag}GableBeam{sz}", S(2 * run * 0.96, 0.007, 0.006), P(cx0, top + 0.0035, zf), M["woodDark"], bev=0.0006))
+        n_sl = max(4, int(2 * run * 0.96 / 0.011))
+        for i in range(n_sl):
+            x = cx0 - run * 0.96 + (i + 0.5) * (2 * run * 0.96 / n_sl)
+            s_ = abs(x - cx0) / run
+            hgt = y_top(s_) - RT * 0.6 - (top + 0.007)
+            if hgt < 0.003:
+                continue
+            out.append(box(f"Kami{tag}Batten{sz}{i}", S(0.0085, hgt, 0.004), P(x, top + 0.007 + hgt / 2, zf), wood(), bev=0.0004, uv=0.1))
     # (the bargeboards and the crossed finials (千木): at each gable, each slope's board runs from the eave up along the roof's edge and on
     # past the ridge, straight, as one finial; the two cross over the ridge as one piece of wood (joined where they cross))
     tan0 = -(rise + sag * math.pi)  # (the slope's rise per unit of s at the ridge)
-    CH = 0.06  # (how far each finial reaches past the ridge, along x)
+    CH = 0.032  # (how far each finial reaches past the ridge, along x: a short crossing, not a tall one)
     # (a side bay's inner gable tucks under the middle bay's roof: no finials there, they'd come up through it)
     for sz in ((-1, 1) if zc == 0 else (1 if zc > 0 else -1,)):
         zg = zc + sz * (W / 2 + 0.0025)

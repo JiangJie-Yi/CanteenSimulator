@@ -59,31 +59,32 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
   3. （只在 `SYNC_PUSH=1`）本機自己還沒推的提交 → 檢查通過才推。
 - 網站只在推 `main` 時部署，推 `cloud-work` 不會；所以雲端 chat 每做完一次就推 `cloud-work`，使用者的 localhost 看得到，網站不動。
 - 本機的 Claude Code 在這個專案開始工作時，若 `git fetch origin` 後 `origin/cloud-work` 有 `main` 沒有的提交，且工作目錄乾淨：合併它、跑 `npx tsc -b && npm test`、通過後**不要推 `main`**，除非使用者說；有衝突或失敗就停下來告訴使用者。
-- 遊戲裡的編輯模式（按 G，閉店時才能用）調的位置存在瀏覽器裡；確定後把面板上的 offset 數值告訴雲端 chat，由它寫成預設值。
+- 遊戲裡的開發者模式（按 G，閉店時才能用）調的位置存在瀏覽器裡；確定後把面板上的 offset 數值告訴雲端 chat，由它寫成預設值。
 
-## 編輯模式（`src/shops/grill/edit.ts`、`Movable.tsx`）
+## 開發者模式（`src/shops/grill/edit.ts`、`Movable.tsx`）
 
 - 介面是 Blender 風格的深灰面板：左邊工具列（選取 Q（純箭頭，只選不動，像 Maya）、位移 W、旋轉 R、縮放 S），清單可搜尋，變換區的 X／Y／Z 是紅綠藍色條。位置、移動箭頭、旋轉環、縮放把手都用**房間軸**（吧台方向 `ALONG`），不是各物件父層的軸。
-- 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。編輯模式每件物件有一個貼合模型的細線框（`Movable.tsx` 的 `useEditBox`：量模型的頂點，順著物件的斜度找最貼的角度）：平常淡藍、只在沒被擋住處顯示；滑鼠移上去變亮、選到變橘色，這兩種會穿透顯示。點選的是物件本身的網格，所以大物件不會擋住前面的小物件。位置框（量出的範圍）仍用來放箭頭和算中心。
+- 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。開發者模式每件物件有一個貼合模型的細線框（`Movable.tsx` 的 `useEditBox`：量模型的頂點，順著物件的斜度找最貼的角度）：平常淡藍、只在沒被擋住處顯示；滑鼠移上去變亮、選到變橘色，這兩種會穿透顯示。點選的是物件本身的網格，所以大物件不會擋住前面的小物件。位置框（量出的範圍）仍用來放箭頭和算中心。
 - **預設值**：位置預設寫在 `edit.ts` 的 `BASES`（父層單位）；大小與轉向預設用 `<Movable baseScale baseTurn>`。定好預設後面板歸零（位置 0、縮放 1）。改了預設要把 `edit.ts` 開頭的三個 localStorage key 版本加一，不然瀏覽器裡舊的偏移會重複計算。有預設轉向或縮放的擺設（例如備長炭籃、行燈），量到中心點之前先不顯示，避免載入時閃一下。
 - **編輯介面中日文**：文字在 `data/editText.ts`（`EDIT_TEXT` 中、日各一份，`pieceName` 把擺設名稱翻成日文）；App 用 `setEditLang` 跟著遊戲語言切換。新增擺設時，中文名稱只用中文，並在 `PIECES_JA`（或 `WORDS_JA`）補上日文。
+- **座標軸與中心點（像 Maya）**：工具列下方「物／世」切換物件座標（軸跟著擺設自己的方向，預設）與世界座標（房間軸）；位置欄位也跟著換。按 **D**（或工具列的 D）進中心點模式：移動箭頭改成搬中心點（`edit.ts` 的 `pivots`、`setPivot`，存在 localStorage），物件本身不動（自動補償位移），之後旋轉、縮放都繞新中心點；再按 D 回到搬物件。
 - **+ / −**：按 X、Y、Z 選軸（再按一次取消），+ 或 − 縮放選到的軸（沒選就三軸一起）；縮放區每軸旁也有 −、+ 按鈕。
 - **群組**：清單裡 Ctrl／Shift 點選多件 → 「成組」；群組可一起位移、繞垂直軸轉、整體縮放（轉動中心是成員的中間）。「解散」「改名」「復原」都能用。沒有中心點的東西（閘門）不能成組。
-- 進編輯模式會自動收起選單，離開後還原；選單收放或進出編輯模式不會讓鏡頭重新歸位（只有換菜、重設視角、總覽、視窗大小改變才會）。
+- 進開發者模式會自動收起選單，離開後還原；選單收放或進出開發者模式不會讓鏡頭重新歸位（只有換菜、重設視角、總覽、視窗大小改變才會）。
 
 ## 廚房三種模式（`game/mode.ts`）
 
-- **三個視角**：攝影機 1＝研製（鎖定）、攝影機 2＝編輯模式（總覽、自由拖）、攝影機 3＝自由視角（閉店預設）。
+- **三個視角**：攝影機 1＝研製（鎖定）、攝影機 2＝開發者模式（總覽、自由拖）、攝影機 3＝自由視角（閉店預設）。
 - **研製＝火烤灶台視角**：閉店時鏡頭在視角 2（火烤灶台）就是研製模式（`App.tsx` 的 `research = !ai && view === 'grill'`），換到其他視角就離開；營業時沒有研製。研製時右上角（編輯鈕左邊）有一個冷藏櫃小圖示（`fridge-toggle`），點一下開關右側的食材櫃（`ui/Menu.tsx` 的 `chiller`）。食材櫃分三區：冷凍、冷藏、常溫（`data/storage.ts` 的 `storageOf`；清酒、馬鈴薯、地瓜是常溫），底部是試做數量、全部放回，與三個補貨鍵：補到平均（`averageOrder`）、各補 5（`eachOrder`）、補滿（`topUpOrder`，補到 `PAR`）；BDD `tests/bdd/fridge.test.ts`。沒有手動烤魚。**研製**：視角固定在**攝影機 1**，手動夾食物、調味、看每塊的烤魚進度（`roast-tag`）。**營業**（店開著）：廚房自己烤（AI 主廚永遠工作，雇的員工一起），沒有手動烤魚與調味、沒有進度標籤、沒有食材櫃。規則都在 `game/mode.ts`（`modeOf(shopOpen, research)`、`canCookByHand`、`showsProgress`、`showsStockFridge`、`holdsCameraOne`；BDD 情境 `tests/bdd/mode.test.ts`）。
 - 研製時：點冷藏櫃拿的食材**直接出現在大砧板（`tray`）上**（`Piece.fresh`，不從火堆滑過去）；烤好夾起的食物**一律放進桌上的試吃碗**（`bowl-0`、`TasteBowl`、`inBowl`，排法同盤子）。
-- **攝影機 1**：該道菜的 home 視角（`App.tsx` 的 home），研製時鎖在這裡；編輯模式不再能調整它（`scene/camera1.ts` 的偏移仍會讀，但沒有編輯介面）。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
-- **視角選單**（左下眼睛鈕）：`data/views.ts` 的 `VIEW_SPOTS`，依序 1 自由視角、2 火烤灶台、3 櫃檯、4 玄關、5 小神龕、6 飲品櫃、7 廁所、8 後台區；各區看向一個具名群組（`TillMarble`、`look-door`、`look-altar`、`look-fridge`、`look-wc-m`、`look-back`），預設鏡頭從房間中央那一側、往後 `back`、往上 `up` 看過去（`App.tsx` 的 `poseOf`）。打開選單時場景裡同時標出編號圈圈（`ViewMarkers`，像 Sketchfab 的註記，點一下飛過去）。編輯模式下每個視角是一台攝影機（`ViewCams`，Movable id `viewcam-<id>`），可調位置與旋轉；調過的視角就從那台攝影機的位置、朝它指的方向看（`viewCamPlaced`）。
-- **編輯模式只做編輯**：場景裡所有互動（夾食物、添炭、調味、澆水、收銀抽屜、廁所門、飲料櫃門、神棚、飯桶蓋、盤子拖曳）都擋掉（Roasting 的 `locked`、各元件的 `getEdit().on`、App 對 `.canvas-layer` 的 click 攔截）。
-- 桌上的**行燈、團扇**用 `<Movable>` 包起來；**大砧板（`cutboard`）、調味盒（`seasoning`）、水桶（`bucket`）**是由桌面的 nudge（`moved`）定位的，編輯模式用 `EditProxy`（不畫出來的同尺寸方塊）給框與箭頭，位移量會加進 nudge（食物、鍋具、水瓢跟著走）；這三件只有位移有效，旋轉與縮放沒有作用。
-- **能互動的東西都要有名稱標籤**：滑鼠移上去，游標旁出現和備長炭同款的紙標籤（名字＋做法）。3D 物件用 `shops/grill/bar.ts` 的 `tipOver(名稱, 提示)` 取代 `handOver`（會發亮、變手指、設標籤）；標籤的狀態在 `scene/hoverTip.ts`，由 `ui/HoverTip.tsx` 畫（編輯模式隱藏）。不能放在 `StaticBatch` 裡（合併後沒有事件）；門這類小目標用一片透明的感應面（見 `ToiletHit`）。目前沒有標籤的：招財貓、客人、食材冷藏櫃的蓋子（沒有互動）。
+- **攝影機 1**：該道菜的 home 視角（`App.tsx` 的 home），研製時鎖在這裡；開發者模式不再能調整它（`scene/camera1.ts` 的偏移仍會讀，但沒有編輯介面）。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
+- **視角選單**（左下眼睛鈕）：`data/views.ts` 的 `VIEW_SPOTS`，依序 1 自由視角、2 火烤灶台、3 櫃檯、4 玄關、5 小神龕、6 飲品櫃、7 廁所、8 後台區；各區看向一個具名群組（`TillMarble`、`look-door`、`look-altar`、`look-fridge`、`look-wc-m`、`look-back`），預設鏡頭從房間中央那一側、往後 `back`、往上 `up` 看過去（`App.tsx` 的 `poseOf`）。打開選單時場景裡同時標出編號圈圈（`ViewMarkers`，像 Sketchfab 的註記，點一下飛過去）。開發者模式下每個視角是一台攝影機（`ViewCams`，Movable id `viewcam-<id>`），可調位置與旋轉；調過的視角就從那台攝影機的位置、朝它指的方向看（`viewCamPlaced`）。
+- **開發者模式只做編輯**：場景裡所有互動（夾食物、添炭、調味、澆水、收銀抽屜、廁所門、飲料櫃門、神棚、飯桶蓋、盤子拖曳）都擋掉（Roasting 的 `locked`、各元件的 `getEdit().on`、App 對 `.canvas-layer` 的 click 攔截）。
+- 桌上的**行燈、團扇**用 `<Movable>` 包起來；**大砧板（`cutboard`）、調味盒（`seasoning`）、水桶（`bucket`）**是由桌面的 nudge（`moved`）定位的，開發者模式用 `EditProxy`（不畫出來的同尺寸方塊）給框與箭頭，位移量會加進 nudge（食物、鍋具、水瓢跟著走）；這三件只有位移有效，旋轉與縮放沒有作用。
+- **能互動的東西都要有名稱標籤**：滑鼠移上去，游標旁出現和備長炭同款的紙標籤（名字＋做法）。3D 物件用 `shops/grill/bar.ts` 的 `tipOver(名稱, 提示)` 取代 `handOver`（會發亮、變手指、設標籤）；標籤的狀態在 `scene/hoverTip.ts`，由 `ui/HoverTip.tsx` 畫（開發者模式隱藏）。不能放在 `StaticBatch` 裡（合併後沒有事件）；門這類小目標用一片透明的感應面（見 `ToiletHit`）。目前沒有標籤的：招財貓、客人、食材冷藏櫃的蓋子（沒有互動）。
 - **牆角喇叭**（`DiningRoom.tsx` 的 `WallSpeaker`）是音樂唯一的開關：點一下開、再點一下關，預設關（`ui/bgmStore.ts`，`ui/Bgm.tsx` 負責播放，音量固定）；hover 會發亮並出現「音箱／點一下開啟（關閉）音樂」標籤，開著時飄出音符（`MusicNotes`）。沒有任何音樂的 2D 介面或按鈕。
 - **客人的盤子**：`shops/grill/wareDesigns.ts` 五款花色（唐草、青海波、鯉魚、梅花藍底、風車）依盤子輪流用；竹、梅仍是 `ware.ts` 的大盤與小碟。`PlateRack.tsx` 是碗盤櫃架（Decor 裡的 `RackAt`）。
-- **編輯模式左下角**有世界座標小圖（`App.tsx` 的 `AxisWidget`）：X 沿吧台、Y 向上、Z 橫過吧台，隨鏡頭轉。
+- **開發者模式左下角**有世界座標小圖（`App.tsx` 的 `AxisWidget`）：X 沿吧台、Y 向上、Z 橫過吧台，隨鏡頭轉。
 - **介面風格**：木紋深色外框與標題列、半透明淺色面板（`index.css` 末尾的 `--grain-dark`、`--grain-light`）；只是按的東西（食材卡、補貨鈕）用半透明玻璃，不用木色。
 - **HDRI**：`scene/IndoorHDRI.tsx` 在 `public/hdris/` 找真的 HDRI（夜晚 `grill_night_1k.exr`、`night.exr`、`night.hdr`；白天 `grill_day_1k.exr`、`day.exr`、`day.hdr`，.exr 或 .hdr 都可以），沒有就用內建的假 HDRI。**BGM**：`ui/Bgm.tsx` 播 `public/music/IzakayaNight.mp3`。
 

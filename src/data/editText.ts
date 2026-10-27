@@ -4,9 +4,12 @@ import type { Lang } from './i18n'
 
 export const EDIT_TEXT = {
   zh: {
-    title: '編輯模式',
+    title: '開發者模式',
     keys: 'G 離開　Ctrl+Z / Y',
     tools: { select: '選取 (Q)', move: '位移 (W)', rotate: '旋轉 (R)', scale: '縮放 (S)' },
+    spaceLocalShort: '物', spaceWorldShort: '世',
+    spaceLocal: '物件座標：軸跟著擺設自己的方向（點一下改世界座標）', spaceWorld: '世界座標：軸是房間的方向（點一下改物件座標）',
+    pivot: '中心點模式 (D)：箭頭改成搬中心點，旋轉與縮放就繞著它；再按 D 回到搬物件',
     outliner: '場景物件',
     find: '搜尋…',
     rowGroup: '選整個群組（一起移動、轉向、縮放）',
@@ -37,14 +40,17 @@ export const EDIT_TEXT = {
     ungrouped: '已解散群組，擺設各回自己的位置',
     confirmed: '已確認，擺設的位置、大小與方向已儲存',
     cancelled: '已取消，擺設回到編輯前的位置、大小與方向',
-    left: '離開編輯模式',
+    left: '離開開發者模式',
     locked: '營業中不能編輯，請先閉店',
-    entered: '進入編輯模式：拖曳擺設，完成後按「確認」；按 G 或「取消」會放棄變更',
+    entered: '進入開發者模式：拖曳擺設，完成後按「確認」；按 G 或「取消」會放棄變更',
   },
   ja: {
-    title: '編集モード',
+    title: '開発者モード',
     keys: 'G で終了　Ctrl+Z / Y',
     tools: { select: '選択 (Q)', move: '移動 (W)', rotate: '回転 (R)', scale: '拡大縮小 (S)' },
+    spaceLocalShort: 'ロ', spaceWorldShort: 'ワ',
+    spaceLocal: 'ローカル座標：軸は物の向き（クリックでワールド座標）', spaceWorld: 'ワールド座標：軸は部屋の向き（クリックでローカル座標）',
+    pivot: 'ピボット編集 (D)：矢印でピボットを動かし、回転・拡大縮小はその周りで；もう一度 D で物の移動に戻る',
     outliner: 'シーンの物',
     find: '検索…',
     rowGroup: 'グループごと選ぶ（まとめて移動・回転・拡大縮小）',
@@ -75,9 +81,9 @@ export const EDIT_TEXT = {
     ungrouped: 'グループを解除しました。それぞれ元の位置に戻ります',
     confirmed: '確定しました。位置・大きさ・向きを保存しました',
     cancelled: 'キャンセルしました。編集前の位置・大きさ・向きに戻しました',
-    left: '編集モードを終了',
+    left: '開発者モードを終了',
     locked: '営業中は編集できません。先に閉店してください',
-    entered: '編集モード：物をドラッグして動かし、終わったら「確定」。G か「キャンセル」で変更を破棄',
+    entered: '開発者モード：物をドラッグして動かし、終わったら「確定」。G か「キャンセル」で変更を破棄',
   },
 } satisfies Record<Lang, unknown>
 

@@ -23,6 +23,7 @@ const KEY = 'jgs-edit-offsets-11'
 const KEY_R = 'jgs-edit-rotations-8'
 const KEY_S = 'jgs-edit-scales-7'
 const KEY_G = 'jgs-edit-groups-2'
+const KEY_P = 'jgs-edit-pivots-1'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }
@@ -37,8 +38,13 @@ export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: nu
 const loadGroups = (): Record<string, Group> => {
   try { return JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { return {} }
 }
-type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string, V3>; rotations: Record<string, V3>; scales: Record<string, V3>; selected: string | null; groups: Record<string, Group>; picked: string[] }
-let state: State = { on: false, locked: false, tool: 'move', offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null, groups: loadGroups(), picked: [] }
+/** the axes the arrows, rings and fields go by: the room's (world), or the piece's own (local: its parent's frame, as it stands on its wall) */
+export type Space = 'world' | 'local'
+type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string, V3>; rotations: Record<string, V3>; scales: Record<string, V3>; selected: string | null; groups: Record<string, Group>; picked: string[]
+  /** each piece's pivot, moved from its middle by hand (in its own frame), what it turns and grows about; and whether the arrows move the pivot (D) */
+  pivots: Record<string, V3>; pivotMode: boolean; space: Space }
+let state: State = { on: false, locked: false, tool: 'move', offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null, groups: loadGroups(), picked: [],
+  pivots: load(KEY_P), pivotMode: false, space: 'local' }
 const subs = new Set<() => void>()
 const emit = () => {
   // (in edit mode the room's own pointing (lit things, name tags, the hand) is paused: what's lit now is put out)
@@ -96,6 +102,19 @@ export const positionOf = (id: string): V3 => {
   const b = BASES[id] ?? [0, 0, 0], o = offsetOf(id)
   return [b[0] + o[0], b[1] + o[1], b[2] + o[2]]
 }
+/** where a piece's pivot is moved to from its middle (its own frame) */
+export const pivotOf = (id: string): V3 => state.pivots[id] ?? [0, 0, 0]
+/** the pivot moved to v, and the piece's place moved by `shift` with it (so the piece itself stays where it is, turned or sized as it is) */
+export function setPivot(id: string, v: V3, shift: V3 = [0, 0, 0]) {
+  state.pivots = { ...state.pivots, [id]: v }
+  const o = state.offsets[id] ?? [0, 0, 0]
+  state.offsets = { ...state.offsets, [id]: [o[0] + shift[0], o[1] + shift[1], o[2] + shift[2]] }
+  emit()
+}
+/** D: the arrows move the pivot instead of the piece (as Maya's D), again to move the piece */
+export function togglePivotMode() { state.pivotMode = !state.pivotMode; emit() }
+/** the axes gone by: the room's or the piece's own */
+export function setSpace(s: Space) { state.space = s; emit() }
 export const rotationOf = (id: string): V3 => state.groups[id] ? [0, state.groups[id].yaw, 0] : state.rotations[id] ?? [0, 0, 0]
 export const scaleOf = (id: string): V3 => state.groups[id] ? [state.groups[id].s, state.groups[id].s, state.groups[id].s] : state.scales[id] ?? [1, 1, 1]
 const save = () => {
@@ -104,6 +123,7 @@ const save = () => {
     localStorage.setItem(KEY_R, JSON.stringify(state.rotations))
     localStorage.setItem(KEY_S, JSON.stringify(state.scales))
     localStorage.setItem(KEY_G, JSON.stringify(state.groups))
+    localStorage.setItem(KEY_P, JSON.stringify(state.pivots))
   } catch { /* private window: it just won't be kept */ }
 }
 // ---- undo: each change (a drag, an arrow, a field edited, reset all) is a step; Ctrl+Z goes back one, Ctrl+Y (or Ctrl+Shift+Z) forward again
@@ -326,12 +346,13 @@ function toast(text: string, kind: 'warn' | 'edit' | 'plain' = 'warn') {
 const frames = new Map<string, number>()
 export const setFrame = (id: string, theta: number) => { frames.set(id, theta) }
 const turnY = (v: V3, a: number): V3 => [v[0] * Math.cos(a) + v[2] * Math.sin(a), v[1], -v[0] * Math.sin(a) + v[2] * Math.cos(a)]
-export const toRoom = (id: string, v: V3): V3 => turnY(v, -(frames.get(id) ?? 0))
-export const fromRoom = (id: string, v: V3): V3 => turnY(v, frames.get(id) ?? 0)
+export const toRoom = (id: string, v: V3): V3 => (state.space === 'local' ? v : turnY(v, -(frames.get(id) ?? 0)))
+export const fromRoom = (id: string, v: V3): V3 => (state.space === 'local' ? v : turnY(v, frames.get(id) ?? 0))
 let el: HTMLDivElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
+let spaceButton: HTMLButtonElement | null = null, pivotButton: HTMLButtonElement | null = null
 let rows = new Map<string, HTMLDivElement>()
 let summary: HTMLDivElement | null = null
 let built = ''
@@ -346,6 +367,8 @@ const PANEL_CSS = `
 .be-tool svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round }
 .be-tool:hover { background:#4d4d4d }
 .be-tool.on { background:#4772b3; color:#fff }
+.be-tool-text { font:700 13px/1 system-ui, sans-serif }
+.be-tool-gap { height:8px; border-bottom:1px solid #4a4a4a; margin-bottom:4px }
 .be-main { flex:1; min-width:0; display:flex; flex-direction:column }
 .be-head { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#1f1f1f; font-weight:600; letter-spacing:.02em; color:#e6e6e6 }
 .be-head small { margin-left:auto; font-weight:400; color:#8a8a8a }
@@ -421,6 +444,13 @@ function panel() {
       bar.appendChild(b)
       return b
     })
+    // (and below the tools: the axes gone by (the room's or the piece's own), and the pivot mode)
+    bar.appendChild(h('div', 'be-tool-gap'))
+    spaceButton = h('button', 'be-tool be-tool-text') as HTMLButtonElement
+    spaceButton.onclick = () => setSpace(state.space === 'local' ? 'world' : 'local')
+    pivotButton = h('button', 'be-tool be-tool-text') as HTMLButtonElement
+    pivotButton.onclick = togglePivotMode
+    bar.append(spaceButton, pivotButton)
     const main = h('div', 'be-main')
     const head = h('div', 'be-head', T().title)
     head.appendChild(h('small', '', T().keys))
@@ -536,6 +566,8 @@ function panel() {
     built = sig
   }
   ;(['select', 'move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => toolButtons[k]?.classList.toggle('on', state.tool === t))
+  if (spaceButton) { spaceButton.textContent = state.space === 'local' ? T().spaceLocalShort : T().spaceWorldShort; spaceButton.title = state.space === 'local' ? T().spaceLocal : T().spaceWorld }
+  if (pivotButton) { pivotButton.textContent = 'D'; pivotButton.title = T().pivot; pivotButton.classList.toggle('on', state.pivotMode) }
   for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)) }
   if (summary) {
     // (how much furniture there is: every piece that can be taken hold of, how many have been moved, turned or sized from where they began, and the groups)
@@ -575,6 +607,7 @@ if (typeof window !== 'undefined') {
       if (k === 'x' || k === 'y' || k === 'z') { e.preventDefault(); setScaleAxis(({ x: 0, y: 1, z: 2 } as const)[k]); return }
       if (k === '+' || k === '=') { e.preventDefault(); nudgeScale(1); return }
       if (k === '-' || k === '_') { e.preventDefault(); nudgeScale(-1); return }
+      if (k === 'd') { e.preventDefault(); togglePivotMode(); return }
       const t: Tool | null = k === 'q' ? 'select' : k === 'w' ? 'move' : k === 'r' ? 'rotate' : k === 's' ? 'scale' : null
       if (t) { e.preventDefault(); setTool(t); return }
     }

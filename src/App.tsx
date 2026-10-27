@@ -2094,8 +2094,8 @@ export default function App() {
       {/* (the shop's edit mode, key G: only while it's shut, as it can't be switched on while customers are about) */}
       {!ai && !!dish.roast && !flatGrill && (
         <button type="button" className={`edit-toggle${editOn ? ' is-on' : ''}`} onClick={toggleEdit} aria-pressed={editOn}
-          title={lang === 'ja' ? '配置を編集（Gキー）' : '編輯店內擺設（快捷鍵 G）'}>
-          編
+          title={lang === 'ja' ? '開発者モード（Gキー）：配置・カメラの調整' : '開發者模式（快捷鍵 G）：調整擺設與鏡頭'}>
+          開
         </button>
       )}
       <button type="button" className={`speed-toggle${speed > 1 ? ' is-on' : ''}`} onClick={() => setSpeed((v) => (v > 1 ? 1 : 2))}
