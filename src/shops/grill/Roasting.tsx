@@ -127,8 +127,9 @@ const BOWL_PUSH = 0.3
 const BOWL_RIM = 0.15
 /** the table's pieces that edit mode moves by their nudge (the cutting board, the seasoning box, the water bucket): the edit id of each */
 const EDIT_PIECES: Record<string, string> = { tray: 'cutboard', box: 'seasoning', bin: 'bucket' }
-/** what stands on the table but isn't dragged about by hand: the water bucket (its ladle scoops), the lantern (a click lights it or puts it out) */
-const FIXED_PIECES = new Set(['bin', 'lantern'])
+/** whether the table's pieces (the plates, the seasoning box, the cutting board, the bowl...) can be dragged about by hand: not any more, they
+ * stay where they're set (the owner moves them in developer mode); only the food, the tools and the charcoal are picked up */
+const DRAG_PIECES = false
 /** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
 const PLATE_TOP: [number, number, number] = [1.45, 0.02, -1.24]
 /** what lives in the cubby under the table: kept there, not carried about (it's under the top, not on it) */
@@ -3566,13 +3567,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     /** the plate / dish / basket under the pointer, by the container key its group carries */
     const pickContainer = () => {
-      if (!byHandRef.current) return null
+      if (!DRAG_PIECES || !byHandRef.current) return null
       const groups: THREE.Object3D[] = []
       world.traverse((o) => { if (typeof o.userData.container === 'string') groups.push(o) })
       for (const hit of raycaster.intersectObjects(groups, true)) {
         for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) {
-          // (the bucket stays put (only its ladle is used, to scoop water) and the lantern is only switched on and off, by its own click)
-          if (typeof o.userData.container === 'string') return FIXED_PIECES.has(o.userData.container) ? null : o.userData.container as string
+          if (typeof o.userData.container === 'string') return o.userData.container as string
         }
       }
       return null
