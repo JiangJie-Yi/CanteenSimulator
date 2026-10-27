@@ -1545,18 +1545,31 @@ const SHELF_BRACKET = (() => {
 const EBISU_AT: [number, number, number] = [0.29 + 1.25 * (-0.14 + 0.027), 1.25 * (0.015 + 0.045 + 0.04), 0]
 /** a faint rainbow aura: a soft ring of the spectrum round a clear middle, fading out at its edge */
 const AURA = canvasTex(128, 128, (g) => {
-  // (it's painted again once the sign font loads: begin from a clear canvas, drawing over, every time)
+  // (a pale, warm glow ring, only a hint of colour round it (a faint, desaturated rainbow), broken up by grainy noise; painted per pixel, so a
+  // repaint once the sign font loads gives the same picture)
   g.globalCompositeOperation = 'source-over'
-  g.clearRect(0, 0, 128, 128)
-  for (let a = 0; a < 360; a += 2) {
-    g.fillStyle = `hsla(${a}, 90%, 65%, 1)`
-    g.beginPath(); g.moveTo(64, 64); g.arc(64, 64, 64, (a * Math.PI) / 180, ((a + 2.5) * Math.PI) / 180); g.closePath(); g.fill()
+  const img = g.createImageData(128, 128)
+  const hash = (x: number, y: number) => {
+    const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453
+    return h - Math.floor(h)
   }
-  g.globalCompositeOperation = 'destination-in'
-  const r = g.createRadialGradient(64, 64, 0, 64, 64, 64)
-  r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(0.42, 'rgba(0,0,0,0.05)'); r.addColorStop(0.62, 'rgba(0,0,0,0.85)'); r.addColorStop(0.8, 'rgba(0,0,0,0.35)'); r.addColorStop(1, 'rgba(0,0,0,0)')
-  g.fillStyle = r; g.fillRect(0, 0, 128, 128)
-  g.globalCompositeOperation = 'source-over'
+  const vnoise = (x: number, y: number) => {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf)
+    const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1)
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v
+  }
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+    const dx = (x - 63.5) / 64, dy = (y - 63.5) / 64, r = Math.hypot(dx, dy)
+    const ring = Math.exp(-(((r - 0.66) / 0.17) ** 2)) * (r < 1 ? 1 : 0)
+    const n = 0.55 * vnoise(x / 9, y / 9) + 0.3 * vnoise(x / 4, y / 4) + 0.15 * hash(x, y)
+    const hue = (Math.atan2(dy, dx) / (2 * Math.PI) + 0.5 + n * 0.3) * 6
+    const rgb = [0, 2, 4].map((o) => Math.max(0, Math.min(1, Math.abs(((hue + o) % 6) - 3) - 1)))
+    const i = (y * 128 + x) * 4
+    for (let k = 0; k < 3; k++) img.data[i + k] = 255 * (0.86 * [1, 0.93, 0.78][k] + 0.14 * rgb[k])
+    img.data[i + 3] = 255 * ring * Math.max(0, Math.min(1, (n - 0.3) * 1.8))
+  }
+  g.putImageData(img, 0, 0)
 })
 /** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015) */
 const CUPS_SHIFT = -0.015
@@ -1654,7 +1667,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     // (round him a faint rainbow aura, its colours turning slowly, breathing)
     if (aura.current) {
       const am = aura.current.material as THREE.SpriteMaterial
-      am.opacity = 0.75 * BLESSING.k * (0.8 + 0.2 * Math.sin(t * 1.3))
+      am.opacity = 0.32 * BLESSING.k * (0.8 + 0.2 * Math.sin(t * 1.3))
       am.rotation = t * 0.35
       aura.current.scale.setScalar(0.19 + 0.015 * Math.sin(t * 1.1))
       aura.current.visible = BLESSING.k > 0.01
