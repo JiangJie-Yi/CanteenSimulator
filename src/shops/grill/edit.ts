@@ -19,11 +19,11 @@ export function setEditLang(l: Lang) {
   panel()
 }
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
-const KEY = 'jgs-edit-offsets-11'
-const KEY_R = 'jgs-edit-rotations-8'
-const KEY_S = 'jgs-edit-scales-7'
+const KEY = 'jgs-edit-offsets-12'
+const KEY_R = 'jgs-edit-rotations-9'
+const KEY_S = 'jgs-edit-scales-8'
 const KEY_G = 'jgs-edit-groups-2'
-const KEY_P = 'jgs-edit-pivots-1'
+const KEY_P = 'jgs-edit-pivots-2'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }

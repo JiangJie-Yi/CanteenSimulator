@@ -1539,6 +1539,8 @@ const SHELF_BRACKET = (() => {
   const g = new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 10 })
   return g
 })()
+/** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015) */
+const CUPS_SHIFT = -0.015
 /** the altar shelf's depth, out from the wall: the god at the back, raised, the censer before him */
 const ALTAR_D = 0.58
 /** and its height: up over the beckoning cats' stand below it, by the door */
@@ -1589,7 +1591,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     burning.current = on
     // (pouring: a few seconds from the moment it's offered; the cups stay full while the offering stands)
     const since = at === null ? 99 : (performance.now() - at) / 1000
-    const CUP_X = ALTAR_D / 2 - 0.375, CUP_TOP = 0.05
+    const CUP_X = ALTAR_D / 2 - 0.375 + CUPS_SHIFT, CUP_TOP = 0.05
     const cupZ = [-0.1125, 0, 0.1125]
     const rest = { x: -0.06, y: 0, z: 0.3 }
     const f = flaskRef.current
@@ -1651,7 +1653,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       {/* (the vases and the cups beside it, each its own piece: not part of what's pointed at, they don't light with it) */}
       <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="vase-1" /></StaticBatch></group></Movable>
       <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="vase1" /></StaticBatch></group></Movable>
-      <Movable id="shrinecups" label="清酒杯與琉璃台"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
+      <Movable id="shrinecups" label="清酒杯與琉璃台"><group position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={GLOW} color="#ffe0a0" size={0.07} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </points>
@@ -1664,13 +1666,13 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} /><meshBasicMaterial color="#e6f4ff" transparent opacity={0.55} depthWrite={false} />
       </mesh>
       {[0, 1, 2].map((i) => (
-        <mesh key={i} ref={(m) => { liquid.current[i] = m }} position={[ALTAR_D / 2 - 0.375, 0.035, [-0.1125, 0, 0.1125][i]]} rotation-x={-Math.PI / 2} visible={false}>
+        <mesh key={i} ref={(m) => { liquid.current[i] = m }} position={[ALTAR_D / 2 - 0.375 + CUPS_SHIFT, 0.035, [-0.1125, 0, 0.1125][i]]} rotation-x={-Math.PI / 2} visible={false}>
           <circleGeometry args={[1, 24]} /><meshBasicMaterial color="#e3f1fb" transparent opacity={0.8} depthWrite={false} />
         </mesh>
       ))}
       {/* the oranges on their dish, a leaf on the top one */}
-      {/* (in front, to the right of the cups' stand, a little smaller: clear of it, the flask and the vase) */}
-      <Movable id="oranges" label="橘子盤"><group name="look-oranges" position={[-0.206, 0, 0.205]} scale={0.8}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group></Movable>
+      {/* (in front of the cups' stand, a little smaller: where the owner set it in the edit panel (X −0.010, Z −0.203)) */}
+      <Movable id="oranges" label="橘子盤"><group name="look-oranges" position={[-0.216, 0, 0.002]} scale={0.8}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group></Movable>
     </group>
   )
 }
