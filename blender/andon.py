@@ -39,8 +39,9 @@ def lin(hexs):
 
 N = 256
 u, v = grid01(N)
-wood = mix((0.9, 0.78, 0.6), (0.82, 0.68, 0.5), smooth(0.3, 0.8, fbm(N, 2, 12, 4)))
-wood_tex = image("andonWood", mix(wood, (0.7, 0.55, 0.37), (np.sin((u + fbm(N, 2, 6, 3) * 0.05) * math.pi * 2 * 30) > 0.85).astype(np.float32) * 0.3))
+# (plain wood, as kumiko is left: a warm natural hinoki-and-cedar brown, its grain showing, not bleached pale)
+wood = mix((0.72, 0.52, 0.32), (0.62, 0.43, 0.25), smooth(0.3, 0.8, fbm(N, 2, 12, 4)))
+wood_tex = image("andonWood", mix(wood, (0.48, 0.32, 0.18), (np.sin((u + fbm(N, 2, 6, 3) * 0.05) * math.pi * 2 * 30) > 0.85).astype(np.float32) * 0.35))
 # (washi: warm white, its long fibres faintly showing)
 paper = mix((1.0, 0.95, 0.84), (0.97, 0.9, 0.76), fbm(N, 6, 6, 4) * 0.7)
 paper = mix(paper, (0.93, 0.84, 0.68), (fbm(N, 40, 3, 2) > 0.7).astype(np.float32) * 0.3)
@@ -98,10 +99,19 @@ o = active()
 o.scale = (S_, S_, 0.012)
 bpy.ops.object.transform_apply(scale=True)
 parts.append(finish(o, "AndonShelf", M["shelf"], smooth_shade=False))
-# (the handle: a half ring arching over the top, across the lantern)
-pts_h = [(S_ * 0.35 * math.cos(a), TOP + 0.02 + S_ * 0.35 * math.sin(a), 0) for a in np.linspace(0, math.pi, 13)]
+# (the handle: an arch from the top of one front post's pair to the other's, its feet set into the posts' tops, rising over the shade)
+HR = S_ / 2
+pts_h = [(HR * math.cos(a), TOP + 0.03 + HR * 0.6 * math.sin(a), 0) for a in np.linspace(0, math.pi, 17)]
+pts_h[0] = (S_ / 2, TOP + 0.03, 0)
+pts_h[-1] = (-S_ / 2, TOP + 0.03, 0)
 for i in range(len(pts_h) - 1):
-    bar(f"AndonHandle{i}", pts_h[i], pts_h[i + 1], 0.016, 0.016, M["frame"])
+    # (each piece a little longer than its stretch, so the joints close)
+    a_, b_ = Vector(pts_h[i]), Vector(pts_h[i + 1])
+    d_ = (b_ - a_).normalized() * 0.003
+    bar(f"AndonHandle{i}", a_ - d_, b_ + d_, 0.016, 0.016, M["frame"])
+# (a cap on each post the handle's feet sit in)
+for sx in (-1, 1):
+    bar(f"AndonHandleFoot{sx}", (sx * S_ / 2, TOP + 0.015, 0), (sx * S_ / 2, TOP + 0.045, 0), 0.026, 0.026, M["frame"])
 
 # the shade's faces: each one's middle, the directions across it (right, up as seen from outside), and the way out
 HW = S_ / 2 - PT / 2          # (the open half-width between the posts)
