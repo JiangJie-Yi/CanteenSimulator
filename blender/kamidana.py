@@ -545,8 +545,9 @@ for sz in (-1, 1):
 # (紙垂) between and outside them
 # =====================================================================
 _su2, _sv2 = grid01(256)
-straw = mix((0.66, 0.66, 0.42), (0.52, 0.55, 0.32), fbm(256, 40, 3, 3))
-straw = mix(straw, (0.4, 0.42, 0.24), (np.sin((_su2 * 90 + fbm(256, 4, 2, 3) * 4) * math.pi * 2) > 0.6).astype(np.float32) * 0.35)
+straw = mix((0.7, 0.68, 0.44), (0.56, 0.57, 0.34), fbm(256, 60, 2, 3))
+straw = mix(straw, (0.44, 0.45, 0.26), (np.sin((_su2 * 160 + fbm(256, 6, 2, 3) * 3) * math.pi * 2) > 0.7).astype(np.float32) * 0.25)
+straw = mix(straw, (0.8, 0.78, 0.55), (np.sin((_su2 * 230 + 0.3) * math.pi * 2) > 0.85).astype(np.float32) * 0.2)
 M["straw"] = pbr("KamiStraw", (1, 1, 1), tex=image("straw", straw), rough=0.8)
 M["shide"] = pbr("KamiShide", lin("#fbfaf4"), rough=0.75)
 sn = []
@@ -585,53 +586,66 @@ def tube(name, pts, radii, mat_, ring=10):
     return o
 
 
-RX0, RY0, RZ0, SAG = -0.066, 0.178, 0.168, 0.012     # (in front of the doors, over them; half its span; how far it sags in the middle)
+RX0, RY0, RZ0, SAG = -0.063, 0.188, 0.066, 0.006     # (over the middle bay's doors, in front of its lintel; half its span; its sag)
 
 
 def rope_at(t):
     """the rope's middle line at t (0..1 from one end to the other), and how thick it is there"""
     z = -RZ0 + 2 * RZ0 * t
-    return Vector((RX0, RY0 - SAG * math.sin(math.pi * t), z)), 0.0035 + 0.0065 * math.sin(math.pi * t) ** 0.8
+    return Vector((RX0, RY0 - SAG * math.sin(math.pi * t), z)), 0.0026 + 0.0042 * math.sin(math.pi * t) ** 0.7
 
 
-# (two strands twisted round each other about the middle line, thick where the rope is thick)
-NSEG = 90
-for strand in (0, 1):
+# (three strands twisted tight round the middle line, many turns, smooth, thick where the rope's thick)
+NSEG = 160
+for strand in range(3):
     pts, rad = [], []
     for i in range(NSEG + 1):
         t = i / NSEG
         c, r = rope_at(t)
-        ang = t * 14 * math.pi + strand * math.pi
+        ang = t * 22 * math.pi + strand * 2 * math.pi / 3
         pts.append((c.x + math.cos(ang) * r * 0.5, c.y + math.sin(ang) * r * 0.5, c.z))
-        rad.append(r * 0.62)
-    sn.append(tube(f"KamiShimenawa{strand}", pts, rad, M["straw"]))
-# (the ends tied off: a little band of straw round each, the cut straw splaying past it)
+        rad.append(r * 0.55)
+    sn.append(tube(f"KamiShimenawa{strand}", pts, rad, M["straw"], ring=12))
+# (the ends bound and cut: a band of straw round each, the ends splaying a little past it)
 for sd in (0, 1):
     c, r = rope_at(sd * 1.0)
     out_ = -1 if sd == 0 else 1
-    sn.append(cyl(f"KamiShimenawaTie{sd}", 0.0048, 0.004, P(c.x, c.y, c.z - out_ * 0.003), M["straw"], rot=(math.pi / 2, 0, 0), verts=12))
-    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.0035, radius2=0.0055, depth=0.012, location=P(c.x, c.y, c.z + out_ * 0.004), rotation=(math.pi / 2 * (1 if out_ > 0 else -1), 0, 0))
-    sn.append(finish(active(), f"KamiShimenawaEnd{sd}", M["straw"]))
-# (the three tassels: hung from the rope's underside, a gold band round the top, the straw flaring out to a cut bottom)
+    sn.append(cyl(f"KamiShimenawaTie{sd}", 0.0034, 0.003, P(c.x, c.y, c.z - out_ * 0.002), M["straw"], rot=(math.pi / 2, 0, 0), verts=14))
+    for j in range(10):
+        a_ = j * 2 * math.pi / 10
+        p0 = Vector((c.x + math.cos(a_) * 0.0018, c.y + math.sin(a_) * 0.0018, c.z))
+        p1 = Vector((c.x + math.cos(a_) * 0.0032, c.y + math.sin(a_) * 0.0032, c.z + out_ * 0.007))
+        sn.append(tube(f"KamiShimenawaEnd{sd}{j}", [tuple(p0), tuple(p1)], [0.0006, 0.0005], M["straw"], ring=5))
+# (the three tassels (〆の子): a knot where each is tied on, a gold band, then a bundle of straws hanging and spreading a little, cut square)
+FIB = 14
 for k, t in enumerate((0.25, 0.5, 0.75)):
     c, r = rope_at(t)
-    top = c.y - r * 0.9
-    L = 0.03 if k != 1 else 0.034
-    sn.append(cyl(f"KamiShimenawaBand{k}", 0.0043, 0.004, P(c.x, top - 0.003, c.z), M["gold"], verts=14))
-    bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.0085, radius2=0.0036, depth=L, location=P(c.x, top - 0.005 - L / 2, c.z))
-    tas = active()
-    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cylinder_project(); bpy.ops.object.mode_set(mode="OBJECT")
-    sn.append(finish(tas, f"KamiShimenawaTassel{k}", M["straw"]))
-    # (its knob over the band, where it's bound to the rope)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0042, segments=12, ring_count=8, location=P(c.x, top + 0.0005, c.z))
+    top = c.y - r * 0.85
+    L = 0.024 if k != 1 else 0.028
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0028, segments=14, ring_count=8, location=P(c.x, top, c.z))
     sn.append(finish(active(), f"KamiShimenawaKnob{k}", M["straw"]))
-# (the paper streamers: each folded in four, zigzagging down, hung over the rope)
-for k, t in enumerate((0.12, 0.38, 0.62, 0.88)):
+    sn.append(cyl(f"KamiShimenawaBand{k}", 0.0031, 0.0026, P(c.x, top - 0.0028, c.z), M["gold"], verts=16))
+    rng_t = np.random.default_rng(40 + k)
+    for j in range(FIB):
+        a_ = j * 2 * math.pi / FIB + float(rng_t.uniform(-0.15, 0.15))
+        r0, r1 = 0.0022, 0.0045 + float(rng_t.uniform(0, 0.0012))
+        ll = L * float(rng_t.uniform(0.92, 1.0))
+        p0 = (c.x + math.cos(a_) * r0, top - 0.004, c.z + math.sin(a_) * r0)
+        pm = (c.x + math.cos(a_) * (r0 + r1) * 0.5, top - 0.004 - ll * 0.5, c.z + math.sin(a_) * (r0 + r1) * 0.5)
+        p1 = (c.x + math.cos(a_) * r1, top - 0.004 - ll, c.z + math.sin(a_) * r1)
+        sn.append(tube(f"KamiShimenawaStraw{k}{j}", [p0, pm, p1], [0.0011, 0.0011, 0.0009], M["straw"], ring=5))
+    # (and a core, so the bundle reads full)
+    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.0038, radius2=0.002, depth=L * 0.9, location=P(c.x, top - 0.004 - L * 0.45, c.z))
+    sn.append(finish(active(), f"KamiShimenawaCore{k}", M["straw"]))
+# (the paper streamers: a strip cut and folded in four, each fold stepping down and across, sharp and flat, hung over the rope)
+SW, SH_ = 0.0062, 0.0085
+for k, t in enumerate((0.07, 0.375, 0.625, 0.93)):
     c, r = rope_at(t)
-    y = c.y - r * 0.6
+    y = c.y - r * 0.5
+    sgn = 1 if k % 2 else -1
     for j in range(4):
-        dz = (0.0045 if j % 2 else -0.0045) * (1 if k % 2 else -1)
-        sn.append(box(f"KamiShide{k}{j}", S(0.0007, 0.0135, 0.0105), P(c.x - 0.001, y - 0.0065 - j * 0.0125, c.z + dz), M["shide"], uv=0))
+        dz = sgn * (SW * 0.5 if j % 2 else -SW * 0.5) * 0.9
+        sn.append(box(f"KamiShide{k}{j}", S(0.0005, SH_, SW), P(c.x - 0.0012, y - SH_ * 0.5 - j * (SH_ - 0.0012), c.z + dz), M["shide"], uv=0))
 parts += sn
 
 root = bpy.data.objects.new("Kamidana", None)
