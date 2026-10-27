@@ -388,11 +388,7 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
         sol.use_rim = True
         apply_mods(o)
         out.append(o)
-        # (the eave's cut edge: a dark line along it, the bark's layers)
-        ex = cx0 + sx * (run + 0.0005)
-        for k, dy in enumerate((-0.004, -0.009)):
-            out.append(box(f"Kami{tag}EaveLine{sx}{k}", S(0.0012, 0.0012, W + 0.001), P(ex, y_top(1) + dy, zc), M["eaveLine"], uv=0))
-        out.append(box(f"Kami{tag}EaveGold{sx}", S(0.0025, 0.003, W + 0.002), P(ex - sx * 0.002, y_top(1) - RT - 0.001, zc), M["gold"], uv=0))
+
     # (the gable ends: wood up under the roof, following its curve)
     for sz in (-1, 1):
         zz = zc + sz * (width / 2 - 0.004)
@@ -408,8 +404,8 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
         apply_mods(g_)
         uv_grain(g_, 0.15)
         out.append(g_)
-        # (and out under the bargeboards, the gable's face boarded over: boards laid across it (妻の板), one above another from the tie beam
-        # up to the ridge, each as long as the roof's underside lets it be at its height, so the whole triangle is filled)
+        # (and out under the bargeboards, the gable's face filled with round logs laid across it, a darker wood, one on another from the tie
+        # beam up to the ridge, each as long as the roof's underside lets it be at its height, so the whole triangle is filled)
         zf = zc + sz * (W / 2 - 0.001)
         out.append(box(f"Kami{tag}GableBeam{sz}", S(2 * run * 0.98, 0.007, 0.006), P(cx0, top + 0.0035, zf), M["woodDark"], bev=0.0006))
         under = lambda s_: y_top(s_) - RT * 0.55  # noqa: E731
@@ -433,7 +429,9 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
             hw = run * reach(min(y + BH, under(0) - 0.0005))
             if hw < 0.002:
                 break
-            out.append(box(f"Kami{tag}GableBoard{sz}{i}", S(2 * hw, BH - 0.0007, 0.004), P(cx0, y + BH / 2, zf), wood(), bev=0.0003, uv=0.12))
+            lg_ = cyl(f"Kami{tag}GableLog{sz}{i}", BH / 2, 2 * hw, P(cx0, y + BH / 2, zf), M["woodDark"], rot=(0, math.pi / 2, 0), verts=12)
+            uv_grain(lg_, 0.08)
+            out.append(lg_)
             y += BH
             i += 1
     # (the bargeboards and the crossed finials (千木): at each gable, each slope's board runs from the eave up along the roof's edge and on
@@ -505,67 +503,185 @@ parts += bay("M", 0.0, 0.15, 0.165, 0.28)
 for sz in (-1, 1):
     parts += bay(f"S{sz}", sz * 0.112, 0.07, 0.125, 0.215, depth=0.112)
 
+_su2, _sv2 = grid01(256)
+straw = mix((0.7, 0.68, 0.44), (0.56, 0.57, 0.34), fbm(256, 60, 2, 3))
+straw = mix(straw, (0.44, 0.45, 0.26), (np.sin((_su2 * 160 + fbm(256, 6, 2, 3) * 3) * math.pi * 2) > 0.7).astype(np.float32) * 0.25)
+straw = mix(straw, (0.8, 0.78, 0.55), (np.sin((_su2 * 230 + 0.3) * math.pi * 2) > 0.85).astype(np.float32) * 0.2)
+M["straw"] = pbr("KamiStraw", (1, 1, 1), tex=image("straw", straw), rough=0.8)
+M["shide"] = pbr("KamiShide", lin("#fbfaf4"), rough=0.75)
+
 # =====================================================================
 # Inside: in the middle bay a little stone Ebisu (恵比寿), seated, round and smiling under his folded eboshi, a sea bream under his left arm
 # and his fishing rod over his right shoulder, carved from one grey granite; in each side bay a talisman (御札) in its paper wrapper,
 # stood against the back wall
 # =====================================================================
-_gu, _gv = grid01(256)
-granite = mix((0.6, 0.59, 0.56), (0.48, 0.47, 0.45), fbm(256, 10, 10, 4))
-granite = mix(granite, (0.25, 0.24, 0.23), (fbm(256, 70, 70, 2) > 0.67).astype(np.float32) * 0.6)
-granite = mix(granite, (0.82, 0.8, 0.76), (fbm(256, 80, 80, 2) > 0.74).astype(np.float32) * 0.5)
-M["stone"] = pbr("KamiStone", (1, 1, 1), tex=image("granite", granite), rough=0.85)
-M["stoneDark"] = pbr("KamiStoneDark", lin("#3b3833"), rough=0.9)
+_gu, _gv = grid01(512)
+# (granite: grey with black and white grains, weathered: paler where it's been rubbed smooth, a little lichen green-grey low down, its face
+# pitted (the relief a normal map))
+_gr = fbm(512, 14, 14, 5)
+granite = mix((0.62, 0.61, 0.58), (0.5, 0.49, 0.47), _gr)
+granite = mix(granite, (0.22, 0.21, 0.2), (fbm(512, 110, 110, 2) > 0.66).astype(np.float32) * 0.65)
+granite = mix(granite, (0.86, 0.84, 0.8), (fbm(512, 130, 130, 2) > 0.73).astype(np.float32) * 0.55)
+granite = mix(granite, (0.52, 0.55, 0.47), smooth(0.62, 0.85, fbm(512, 5, 5, 4)) * 0.3)
+pits = fbm(512, 90, 90, 3)
+M["stone"] = pbr("KamiStone", (1, 1, 1), tex=image("granite", granite), nrm=image("graniteN", to_normal((pits * 0.6 + _gr * 0.4).astype(np.float32), 5.0), data=True),
+                 nrm_strength=0.9, rough=0.82)
+M["stoneDark"] = pbr("KamiStoneDark", lin("#34312d"), rough=0.9)
 eb = []
+carve = []
 
 
-def blob(name, at, r, rot=(0, 0, 0), mat_=None, seg=20, rings=12):
+def blob(name, at, r, rot=(0, 0, 0), seg=32, rings=20, into=None):
+    """an ellipsoid of the stone, at (game frame), radii (x, y, z), turned (Blender euler)"""
     bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=seg, ring_count=rings, location=P(*at), rotation=rot)
     o = active()
     o.scale = S(*r)
-    bpy.ops.object.transform_apply(scale=True)
-    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.sphere_project(); bpy.ops.object.mode_set(mode="OBJECT")
-    o = finish(o, name, mat_ or M["stone"])
-    eb.append(o)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    (carve if into is None else into).append(o)
     return o
 
 
-# (seated on a low rock)
-eb.append(cyl("KamiEbisuRock", 0.032, 0.008, P(0, 0.004, 0), M["stone"], verts=18))
-blob("KamiEbisuLegs", (-0.006, 0.014, 0), (0.026, 0.009, 0.03))                       # (crossed legs, wide)
-blob("KamiEbisuBody", (0.002, 0.034, 0), (0.022, 0.026, 0.026))                        # (a round belly and chest)
-blob("KamiEbisuHead", (-0.002, 0.066, 0), (0.0145, 0.015, 0.016))                      # (a full round face)
-blob("KamiEbisuCheekL", (-0.011, 0.062, 0.008), (0.006, 0.006, 0.006))
-blob("KamiEbisuCheekR", (-0.011, 0.062, -0.008), (0.006, 0.006, 0.006))
-blob("KamiEbisuEar0", (0.0, 0.066, 0.016), (0.003, 0.006, 0.002))
-blob("KamiEbisuEar1", (0.0, 0.066, -0.016), (0.003, 0.006, 0.002))
-# (the folded eboshi: leaning back off the crown, its tip curled forward)
-blob("KamiEbisuHat", (0.006, 0.083, 0), (0.016, 0.011, 0.012), rot=(0, 0, 0))
-blob("KamiEbisuHatTip", (-0.004, 0.092, 0), (0.007, 0.006, 0.009))
-# (arms: the left round the fish, the right up holding the rod)
-blob("KamiEbisuArmL", (-0.012, 0.033, 0.02), (0.008, 0.012, 0.007))
-blob("KamiEbisuArmR", (-0.012, 0.042, -0.02), (0.008, 0.013, 0.007))
-# (the sea bream under his left arm: its body, its tail fanned behind)
-tai = blob("KamiEbisuTai", (-0.016, 0.026, 0.026), (0.016, 0.009, 0.004), seg=16, rings=10)
-tai.rotation_euler = (0, 0, 0.35)
-blob("KamiEbisuTaiTail", (0.0, 0.03, 0.03), (0.004, 0.008, 0.002), seg=10, rings=6)
-# (the rod: from his right hand up past his shoulder)
-a_, b_ = Vector(P(-0.016, 0.044, -0.022)), Vector(P(0.02, 0.098, -0.03))
-bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.0012, depth=(b_ - a_).length, location=(a_ + b_) / 2)
-rod = active()
-rod.rotation_euler = (b_ - a_).to_track_quat("Z", "Y").to_euler()
-eb.append(finish(rod, "KamiEbisuRod", M["stone"]))
-# (the face cut in: two crescent eyes and the smile, darker in the stone)
+def ebtube(name, pts, r, mat_, ring=8):
+    """a thin rod through pts (game frame), r thick: one smooth sweep along a curve through them, its ends rounded off"""
+    cu = bpy.data.curves.new(name, "CURVE")
+    cu.dimensions = "3D"
+    sp = cu.splines.new("NURBS")
+    sp.points.add(len(pts) - 1)
+    for i, q in enumerate(pts):
+        sp.points[i].co = (*P(*q), 1)
+    sp.use_endpoint_u = True
+    sp.order_u = min(3, len(pts))
+    cu.bevel_depth = r
+    cu.bevel_resolution = 2
+    cu.resolution_u = 6
+    cu.use_fill_caps = True
+    o = bpy.data.objects.new(name, cu)
+    bpy.context.collection.objects.link(o)
+    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+    bpy.ops.object.convert(target="MESH")
+    return finish(active(), name, mat_)
+
+
+# ---- the figure, modelled in rounded parts, then fused and smoothed into one carving (as cut from one stone, no seams)
+# (the rock he sits on: low, rough, wider than him)
+bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=1, location=P(0, 0.006, 0))
+rk = active()
+rk.scale = S(0.036, 0.009, 0.034)
+bpy.ops.object.transform_apply(scale=True)
+_rr = np.random.default_rng(8)
+for vt in rk.data.vertices:
+    vt.co += vt.co.normalized() * float(_rr.normal(0, 0.0012))
+    vt.co.z = max(vt.co.z, -0.0055 + 0.006)
+carve.append(rk)
+# (his legs under the robe: the left folded flat across, the right knee raised in front, its bare foot planted on the rock, toes and all)
+blob("LegL", (-0.008, 0.016, 0.006), (0.024, 0.009, 0.022))
+blob("KneeR", (-0.019, 0.03, -0.013), (0.011, 0.012, 0.01))
+blob("ShinR", (-0.026, 0.02, -0.015), (0.007, 0.012, 0.0075))
+blob("FootR", (-0.031, 0.012, -0.015), (0.009, 0.0045, 0.008))
+for _k in range(5):
+    blob(f"Toe{_k}", (-0.0395, 0.0125, -0.0195 + _k * 0.0022), (0.0016, 0.0016, 0.0013))
+# (the round belly and chest under the robe, its hem flaring over the legs)
+blob("Belly", (-0.004, 0.034, 0), (0.021, 0.02, 0.024))
+blob("Chest", (0.002, 0.046, 0), (0.018, 0.014, 0.021))
+# (wide sleeves hanging at his sides)
+blob("SleeveL", (-0.002, 0.034, 0.022), (0.012, 0.016, 0.009), rot=(0.25, 0, 0))
+blob("SleeveR", (-0.004, 0.04, -0.022), (0.012, 0.014, 0.009), rot=(-0.3, 0, 0))
+# (his hands: the left under the fish, holding it up at his chest; the right at his side gripping the rod)
+blob("HandL", (-0.02, 0.04, 0.014), (0.005, 0.0045, 0.005))
+blob("HandR", (-0.019, 0.04, -0.024), (0.0048, 0.0052, 0.0048))
+# (the head: round and full, heavy cheeks, a little nose, long earlobes (福耳), a hint of chin)
+blob("Head", (-0.002, 0.066, 0), (0.0145, 0.0148, 0.0155))
+blob("CheekL", (-0.011, 0.061, 0.0075), (0.0062, 0.0058, 0.006))
+blob("CheekR", (-0.011, 0.061, -0.0075), (0.0062, 0.0058, 0.006))
+blob("Nose", (-0.0158, 0.064, 0), (0.0026, 0.0024, 0.0028))
+blob("Chin", (-0.01, 0.053, 0), (0.007, 0.004, 0.0085))
+# (a short pointed beard under the chin, and a moustache over the smile)
+blob("Beard", (-0.0135, 0.0505, 0), (0.0045, 0.0058, 0.0055))
+blob("BeardTip", (-0.0148, 0.0455, 0), (0.0028, 0.0035, 0.003))
+blob("Moustache", (-0.0158, 0.0605, 0), (0.0016, 0.0013, 0.0058))
 for sz in (-1, 1):
-    eb.append(box(f"KamiEbisuEye{sz}", S(0.001, 0.0012, 0.0045), P(-0.0158, 0.069, sz * 0.0055), M["stoneDark"], uv=0))
-eb.append(box("KamiEbisuSmile", S(0.001, 0.0012, 0.008), P(-0.0158, 0.059, 0), M["stoneDark"], uv=0))
+    blob(f"Ear{sz}", (0.0, 0.064, sz * 0.0155), (0.0032, 0.0075, 0.0022))
+    blob(f"Lobe{sz}", (-0.001, 0.057, sz * 0.0158), (0.0034, 0.0034, 0.0026))
+# (the eboshi: tall, folded, leaning back off the crown, its crease and its tip turned forward)
+blob("Hat", (0.006, 0.082, 0), (0.015, 0.012, 0.0115), rot=(0, -0.35, 0))
+blob("HatTop", (0.008, 0.093, 0), (0.009, 0.007, 0.0095), rot=(0, -0.5, 0))
+blob("HatTip", (-0.004, 0.097, 0), (0.006, 0.0045, 0.0075))
+# (the sea bream held up at his chest in his left hand, head up and out: plump, its back fin, its tail fanned below)
+tai_parts = []
+blob("Tai", (-0.022, 0.052, 0.015), (0.0048, 0.017, 0.0095), rot=(0.25, 0, 0), into=tai_parts)
+blob("TaiFin", (-0.022, 0.054, 0.0255), (0.0016, 0.011, 0.003), rot=(0.25, 0, 0), into=tai_parts)
+blob("TaiTail", (-0.021, 0.035, 0.0105), (0.0018, 0.0045, 0.0085), rot=(0.25, 0, 0), into=tai_parts)
+carve += tai_parts
+# (fused: a mesh by voxels round all of it, smoothed, then thinned to a sensible count)
+for o in carve:
+    finish(o, o.name, M["stone"])
+fig = join(carve, "KamiEbisuFigure")
+fig.data.remesh_voxel_size = 0.0009
+bpy.ops.object.select_all(action="DESELECT"); fig.select_set(True); bpy.context.view_layer.objects.active = fig
+bpy.ops.object.voxel_remesh()
+sm = fig.modifiers.new("s", "SMOOTH"); sm.factor = 0.6; sm.iterations = 6
+dc = fig.modifiers.new("d", "DECIMATE"); dc.ratio = 0.22
+apply_mods(fig)
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cube_project(cube_size=0.06); bpy.ops.object.mode_set(mode="OBJECT")
+finish(fig, "KamiEbisuFigure", M["stone"])
+eb.append(fig)
+# ---- what's cut into the stone, darker: closed, smiling eyes (two arcs), raised brows, a wide smile, the robe's crossed collar, the fish's eye
+# and gill, the rod and its line
+FX = -0.0163
+
+
+def arc(name, cz, cy, w, h, n=7, up=True, rr=0.0006, x=FX):
+    pts = []
+    for i in range(n):
+        u = -1 + 2 * i / (n - 1)
+        pts.append((x - 0.0006 * (1 - u * u), cy + (h * (1 - u * u) if up else -h * (1 - u * u)), cz + u * w / 2))
+    eb.append(ebtube(name, pts, rr, M["stoneDark"], ring=6))
+
+
+for sz in (-1, 1):
+    arc(f"KamiEbisuEye{sz}", sz * 0.0056, 0.0675, 0.0055, 0.0014, up=True)
+    arc(f"KamiEbisuBrow{sz}", sz * 0.0058, 0.0722, 0.0062, 0.0011, up=True, rr=0.0005, x=FX + 0.0012)
+arc("KamiEbisuSmile", 0.0, 0.0585, 0.0105, 0.0024, up=False, rr=0.0007, x=FX + 0.0006)
+# (the collar: two bands crossing on his chest, left over right)
+for sz in (-1, 1):
+    eb.append(ebtube(f"KamiEbisuCollar{sz}", [(-0.0168, 0.0515, sz * 0.0085), (-0.0205, 0.0435, sz * 0.0025), (-0.0238, 0.0365, -sz * 0.0035)], 0.0009, M["stone"], ring=6))
+# (the fish's eye and its gill line)
+eb.append(cyl("KamiEbisuTaiEye", 0.0012, 0.001, P(-0.027, 0.064, 0.018), M["stoneDark"], rot=(0, math.pi / 2, 0), verts=10))
+eb.append(ebtube("KamiEbisuTaiGill", [(-0.0272, 0.06, 0.0125), (-0.0275, 0.058, 0.0165), (-0.0272, 0.0585, 0.021)], 0.0004, M["stoneDark"], ring=5))
+# (the rod: from his raised hand up past his shoulder, bending a little, its line hanging from the tip)
+# (the rod: upright in his right hand, from the rock up past his hat, a little bent; its line hanging from the tip)
+eb.append(ebtube("KamiEbisuRod", [(-0.019, 0.008, -0.025), (-0.019, 0.04, -0.025), (-0.017, 0.08, -0.026), (-0.012, 0.112, -0.027)], 0.0011, M["stone"], ring=7))
+eb.append(ebtube("KamiEbisuLine", [(-0.012, 0.112, -0.027), (-0.016, 0.09, -0.03), (-0.018, 0.07, -0.031)], 0.00025, M["stoneDark"], ring=4))
+# (a straw rope tied round his waist, its ends and a paper streamer hanging at the front, as at a shrine)
+eb.append(ebtube("KamiEbisuRope", [(-0.022 * math.cos(a_), 0.03 + 0.002 * math.sin(a_ * 2), 0.0245 * math.sin(a_)) for a_ in [i * 2 * math.pi / 16 for i in range(17)]], 0.0012, M["straw"], ring=6))
+eb.append(ebtube("KamiEbisuRopeEnd", [(-0.022, 0.03, 0.002), (-0.0235, 0.022, 0.003), (-0.0245, 0.016, 0.004)], 0.0008, M["straw"], ring=5))
+for _j in range(3):
+    eb.append(box(f"KamiEbisuShide{_j}", S(0.0004, 0.0048, 0.0036), P(-0.0236, 0.025 - _j * 0.0042, 0.006 + (0.0016 if _j % 2 else -0.0016)), M["shide"], uv=0))
+# ---- the pedestal: a square block of the same granite under him, a black plaque on its front with a gold crest (three oak leaves in a ring,
+# 三つ柏)
+PED = 0.016
+eb.append(box("KamiEbisuPedestal", S(0.068, PED, 0.068), P(0, -PED / 2, 0), M["stone"], bev=0.0012, uv=0.05))
+M["plaque"] = pbr("KamiPlaque", lin("#141210"), rough=0.35)
+eb.append(box("KamiEbisuPlaque", S(0.0012, 0.0115, 0.0115), P(-0.0346, -PED / 2, 0), M["plaque"], bev=0.0004, uv=0))
+bpy.ops.mesh.primitive_torus_add(major_radius=0.0043, minor_radius=0.00045, major_segments=32, minor_segments=6, location=P(-0.0354, -PED / 2, 0), rotation=(0, math.pi / 2, 0))
+eb.append(finish(active(), "KamiEbisuCrestRing", M["gold"]))
+for _j in range(3):
+    _a = math.pi / 2 + _j * 2 * math.pi / 3
+    _c = (-0.0354, -PED / 2 + math.sin(_a) * 0.0019, math.cos(_a) * 0.0019)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*_c))
+    _lf = active()
+    _lf.scale = (0.0004, 0.0012, 0.0021)
+    bpy.ops.object.transform_apply(scale=True)
+    _lf.rotation_euler = (_a - math.pi / 2, 0, 0)
+    eb.append(finish(_lf, f"KamiEbisuCrestLeaf{_j}", M["gold"]))
+    eb.append(ebtube(f"KamiEbisuCrestVein{_j}", [(-0.0357, -PED / 2, 0), (-0.0357, -PED / 2 + math.sin(_a) * 0.0034, math.cos(_a) * 0.0034)], 0.00018, M["plaque"], ring=4))
 ebisu = bpy.data.objects.new("KamiEbisu", None)
 bpy.context.collection.objects.link(ebisu)
 for o in eb:
     mw = o.matrix_world.copy()
     o.parent = ebisu
     o.matrix_world = mw
-ebisu.location = P(BX + 0.012, DY + 0.005, 0)
+ebisu.location = P(BX + 0.012, DY + 0.005 + 0.016, 0)
 parts += eb + [ebisu]
 # (the talismans in the side bays)
 M["fuda"] = pbr("KamiFuda", lin("#f3eedd"), rough=0.8)
@@ -581,12 +697,6 @@ for sz in (-1, 1):
 # ends, hanging in a shallow sag; three straw tassels (〆の子) hanging from it, each bound with a gold band, and four zigzag paper streamers
 # (紙垂) between and outside them
 # =====================================================================
-_su2, _sv2 = grid01(256)
-straw = mix((0.7, 0.68, 0.44), (0.56, 0.57, 0.34), fbm(256, 60, 2, 3))
-straw = mix(straw, (0.44, 0.45, 0.26), (np.sin((_su2 * 160 + fbm(256, 6, 2, 3) * 3) * math.pi * 2) > 0.7).astype(np.float32) * 0.25)
-straw = mix(straw, (0.8, 0.78, 0.55), (np.sin((_su2 * 230 + 0.3) * math.pi * 2) > 0.85).astype(np.float32) * 0.2)
-M["straw"] = pbr("KamiStraw", (1, 1, 1), tex=image("straw", straw), rough=0.8)
-M["shide"] = pbr("KamiShide", lin("#fbfaf4"), rough=0.75)
 sn = []
 
 

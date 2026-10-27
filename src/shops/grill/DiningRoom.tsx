@@ -1545,6 +1545,9 @@ const SHELF_BRACKET = (() => {
 const EBISU_AT: [number, number, number] = [0.29 + 1.25 * (-0.14 + 0.027), 1.25 * (0.015 + 0.045 + 0.04), 0]
 /** a faint rainbow aura: a soft ring of the spectrum round a clear middle, fading out at its edge */
 const AURA = canvasTex(128, 128, (g) => {
+  // (it's painted again once the sign font loads: begin from a clear canvas, drawing over, every time)
+  g.globalCompositeOperation = 'source-over'
+  g.clearRect(0, 0, 128, 128)
   for (let a = 0; a < 360; a += 2) {
     g.fillStyle = `hsla(${a}, 90%, 65%, 1)`
     g.beginPath(); g.moveTo(64, 64); g.arc(64, 64, 64, (a * Math.PI) / 180, ((a + 2.5) * Math.PI) / 180); g.closePath(); g.fill()
@@ -1553,6 +1556,7 @@ const AURA = canvasTex(128, 128, (g) => {
   const r = g.createRadialGradient(64, 64, 0, 64, 64, 64)
   r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(0.42, 'rgba(0,0,0,0.05)'); r.addColorStop(0.62, 'rgba(0,0,0,0.85)'); r.addColorStop(0.8, 'rgba(0,0,0,0.35)'); r.addColorStop(1, 'rgba(0,0,0,0)')
   g.fillStyle = r; g.fillRect(0, 0, 128, 128)
+  g.globalCompositeOperation = 'source-over'
 })
 /** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015) */
 const CUPS_SHIFT = -0.015
@@ -1605,6 +1609,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   }, [gltfK])
   const halo = useRef<THREE.Sprite>(null)
   const aura = useRef<THREE.Sprite>(null)
+  const ring = useRef<THREE.Mesh>(null)
   const lamp = useRef<THREE.PointLight>(null)
   const moteGeo = useMemo(() => {
     const g = new THREE.BufferGeometry()
@@ -1649,10 +1654,21 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     // (round him a faint rainbow aura, its colours turning slowly, breathing)
     if (aura.current) {
       const am = aura.current.material as THREE.SpriteMaterial
-      am.opacity = 0.5 * BLESSING.k * (0.8 + 0.2 * Math.sin(t * 1.3))
+      am.opacity = 0.75 * BLESSING.k * (0.8 + 0.2 * Math.sin(t * 1.3))
       am.rotation = t * 0.35
-      aura.current.scale.setScalar(0.2 + 0.015 * Math.sin(t * 1.1))
+      aura.current.scale.setScalar(0.19 + 0.015 * Math.sin(t * 1.1))
       aura.current.visible = BLESSING.k > 0.01
+    }
+    // (the moment the offering's poured in, a ripple of light spreads out once across the table from the cups)
+    if (ring.current) {
+      const since0 = (performance.now() - (at ?? 0)) / 1000 - 3.6
+      const show = on && since0 > 0 && since0 < 1.8
+      ring.current.visible = show
+      if (show) {
+        const q = since0 / 1.8
+        ring.current.scale.setScalar(0.08 + q * 1.0)
+        ;(ring.current.material as THREE.MeshBasicMaterial).opacity = 0.45 * (1 - q) * Math.min(1, since0 * 8)
+      }
     }
     if (lamp.current) lamp.current.intensity = 0.3 * BLESSING.k * pulse
     // (pouring: a few seconds from the moment it's offered; the cups stay full while the offering stands)
@@ -1739,6 +1755,11 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       <sprite ref={aura} position={[EBISU_AT[0] - 0.012, EBISU_AT[1], EBISU_AT[2]]} scale={0.17} visible={false} renderOrder={5}>
         <spriteMaterial map={AURA} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </sprite>
+      {/* (the ripple of light spreading once from the cups as the offering's poured) */}
+      <mesh ref={ring} position={[ALTAR_D / 2 - 0.375 + CUPS_SHIFT, 0.004, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
+        <ringGeometry args={[0.42, 0.5, 64]} />
+        <meshBasicMaterial color="#ffd27a" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
       <pointLight ref={lamp} position={[EBISU_AT[0] - 0.06, EBISU_AT[1] + 0.02, EBISU_AT[2]]} color="#ffc070" intensity={0} distance={0.9} decay={2} />
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}

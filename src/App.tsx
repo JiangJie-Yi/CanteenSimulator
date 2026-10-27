@@ -532,13 +532,17 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   // smooth wheel zoom: each notch nudges a target distance and the camera eases toward it
   const gl = useThree((s) => s.gl)
   const zoomGoal = useRef<number | null>(null)
+  /** how near the grill's held view is drawn (1: camera 1 as it is; smaller nearer), by the wheel */
+  const lockZoom = useRef(1)
+  const lockZoomNow = useRef(1)
   useEffect(() => {
     const el = gl.domElement
     const onWheel = (e: WheelEvent) => {
       const c = controls.current
       if (!c) return
       e.preventDefault()
-      if (lockRef.current) return
+      // (held at the grill: the wheel only brings the camera a little nearer or takes it a little further, along its line, not round)
+      if (lockRef.current) { lockZoom.current = THREE.MathUtils.clamp(lockZoom.current * Math.exp(e.deltaY * 0.0011), 0.75, 1.3); return }
       homing.current = false
       const now = zoomGoal.current ?? camera.position.distanceTo(c.target)
       zoomGoal.current = THREE.MathUtils.clamp(now * Math.exp(e.deltaY * 0.0011), 1.8, 20)
@@ -579,6 +583,9 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       c.enabled = false
       homing.current = false
       zoomGoal.current = null
+      // (nearer or further along its line, eased)
+      lockZoomNow.current += (lockZoom.current - lockZoomNow.current) * Math.min(1, k * 1.5)
+      pose.position.sub(pose.target).multiplyScalar(lockZoomNow.current).add(pose.target)
       camera.position.lerp(pose.position, k)
       c.target.lerp(pose.target, k)
       c.update()
