@@ -117,7 +117,7 @@ export function withinPile(x: number, z: number, y: number, lift = 0) {
  * Where the next stick lands: a few places tried over the heap (within `reach` of the middle), the first that stays within the pile's depth
  * taken, and null if the heap is already as deep as it will go anywhere it was tried (the caller lets the oldest burn out first).
  */
-export function placeStick(below: Lay[], rnd: () => number = Math.random, reach = 0.26, tries = 40, lift = 0) {
+export function placeStick(below: Lay[], rnd: () => number = Math.random, reach = 0.2, tries = 40, lift = 0) {
   for (let i = 0; i < tries; i++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * reach
     const x = Math.cos(a) * r, z = Math.sin(a) * r
@@ -134,6 +134,49 @@ export function placeStick(below: Lay[], rnd: () => number = Math.random, reach 
 /** whether the bed can take more sticks: under the most it holds, or some already burnt to ash that can be cleared (a burning stick is never pushed out) */
 export const roomFor = (alive: number, ashed: number, max: number) => alive < max || ashed > 0
 
-/** the most sticks the bed holds at once, and how many one load of charcoal puts on (3 or 4): six loads (what it takes to bring the fire to 100%) fit with room to spare */
-export const COAL_MAX = 26
-export const COAL_PER_ADD = { min: 3, max: 4 }
+/** the most sticks the bed holds at once, and how many one load of charcoal puts on (6 or 7: a fire is laid close, the sticks touching, or it
+ * won't catch): six loads (what it takes to bring the fire to 100%) fit */
+export const COAL_MAX = 42
+export const COAL_PER_ADD = { min: 6, max: 7 }
+
+/** a broken-off piece of a stick that has burnt through: about this round (it's thinner than the stick it came from) */
+export const CHUNK_R = STICK_R * 0.75
+
+/** a piece of a burnt-through stick, where it comes to rest: plan x / z, height of its middle, the way it points, and its length */
+export type Chunk = { x: number; z: number; y: number; yaw: number; len: number }
+
+/** the height a piece of radius r comes to rest at over (x, z): on the bed, or on the highest stick under it there */
+function supportAt(x: number, z: number, r: number, below: Lay[], lift: number) {
+  let y = surfaceY(x, z, lift) + r
+  for (const o of below) {
+    const { d, u } = near(x, z, o)
+    if (d < STICK_R + r) y = Math.max(y, o.y + o.slope * u + Math.sqrt(Math.max(0, (STICK_R + r) ** 2 - d * d)))
+  }
+  return y
+}
+
+/**
+ * A stick burnt through gives way: it breaks into three to five pieces along its length (uneven ones), each falling straight down from where
+ * it was onto what's under it there (the bed, or a stick beneath), a little askew. None rises above where it broke from, none floats.
+ */
+export function crumble(l: Lay, below: Lay[], rnd: () => number = Math.random, lift = 0): Chunk[] {
+  const n = 3 + Math.floor(rnd() * 3)
+  // (where it breaks: n uneven lengths along it)
+  const cuts = Array.from({ length: n }, () => 0.6 + rnd() * 0.8)
+  const total = cuts.reduce((a, b) => a + b, 0)
+  const dx = Math.cos(l.yaw), dz = Math.sin(l.yaw)
+  const out: Chunk[] = []
+  let t = -STICK_HALF
+  for (const c of cuts) {
+    const len = (2 * STICK_HALF * c) / total
+    const u = t + len / 2
+    t += len
+    // (each piece drops where it was, nudged a little sideways as it goes)
+    const side = (rnd() - 0.5) * 0.03
+    const x = l.x + dx * u - dz * side, z = l.z + dz * u + dx * side
+    const from = l.y + l.slope * u
+    const y = Math.min(from, supportAt(x, z, CHUNK_R, below, lift))
+    out.push({ x, z, y, yaw: l.yaw + (rnd() - 0.5) * 0.9, len: len * 0.92 })
+  }
+  return out
+}

@@ -7,7 +7,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
-import { COAL_MAX, COAL_PER_ADD, placeStick, restOf, roomFor, surfaceY, type Lay } from '@/game/coalPile'
+import { COAL_MAX, COAL_PER_ADD, crumble, placeStick, restOf, roomFor, surfaceY, type Lay } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -27,7 +27,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
-import { binchotanGeo, binchotanMap, burningMaps } from './Binchotan'
+import { charcoalMaterial, useBinchotan } from './binchotanModel'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
@@ -419,8 +419,10 @@ function EmberBed({ fuel }: { fuel: { current: number } }) {
     }
     return groups
   }, [])
-  const geo = useMemo(() => new THREE.IcosahedronGeometry(1, 0), [])
-  const mats = useMemo(() => lumps.map(() => new THREE.MeshToonMaterial({ color: '#141210', emissive: new THREE.Color('#ff4a0e'), emissiveIntensity: 0 })), [lumps])
+  // (broken pieces of binchotan, as the sticks break into: the Blender pieces, drawn small)
+  const bin = useBinchotan()
+  const geo = useMemo(() => bin.chunk(0).clone().scale(14, 14, 14), [bin])
+  const mats = useMemo(() => lumps.map(() => new THREE.MeshToonMaterial({ color: '#2a2724', map: bin.face, emissive: new THREE.Color('#c0300a'), emissiveIntensity: 0 })), [lumps, bin])
   const refs = useRef<(THREE.InstancedMesh | null)[]>([])
   const pool = useRef<THREE.Mesh>(null)
   useLayoutEffect(() => {
@@ -433,7 +435,8 @@ function EmberBed({ fuel }: { fuel: { current: number } }) {
     const ashy = THREE.MathUtils.smoothstep(0.45 - f, 0, 0.4)
     mats.forEach((m, i) => {
       const flick = 0.85 + 0.15 * Math.sin(t * (2.1 + i) + i * 1.7)
-      m.emissiveIntensity = lumps[i].k * 1.5 * Math.min(1.3, f) ** 1.3 * flick * (1 - ashy)
+      // (embers of what's nearly burnt through: a dull red under the ash, not a blaze)
+      m.emissiveIntensity = lumps[i].k * 0.6 * Math.min(1.3, f) ** 1.3 * flick * (1 - ashy)
       m.color.copy(dark).lerp(ash, ashy)
     })
     if (pool.current) {
@@ -2182,9 +2185,34 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** whether the bed has been laid with its first sticks */
   const bedSeeded = useRef(false)
   const [coalIds, setCoalIds] = useState<number[]>([])
-  // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
-  // (each thrown stick its own length, thickness and bend, new each time: from the short to the long)
-  const randomStick = () => binchotanGeo(0.28 + Math.random() * 0.12, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 8), true)
+  // (the same sticks as the crate's, from Blender (blender/binchotan.py): each thrown one its own of the six, its own length and thickness)
+  const bin = useBinchotan()
+  const randomStick = () => bin.stick(0.28 + Math.random() * 0.12, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 6))
+  /** the pieces of sticks that burnt through and broke: falling onto what's under them, lying there as grey ash a while, then gone */
+  type Crumb = { id: number; geo: THREE.BufferGeometry; mat: THREE.MeshStandardMaterial; x: number; y: number; z: number; ty: number; vy: number; q: THREE.Quaternion; age: number; m: THREE.Mesh | null }
+  const crumbs = useRef<Crumb[]>([])
+  const [crumbIds, setCrumbIds] = useState<number[]>([])
+  const crumbSeq = useRef(0)
+  /** a stick burnt through gives way: it's gone from the heap (what lay on it comes down) and its pieces fall */
+  const breakStick = (c: Coal) => {
+    c.gone = true
+    if (c.g) c.g.visible = false
+    const below: Lay[] = []
+    for (const o of coals.current) if (o && o !== c && !o.gone && !o.dying && o.top < c.top + 0.01) below.push({ x: o.tx, z: o.tz, yaw: o.yaw, y: o.top, slope: o.slope })
+    const parts = crumble({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope }, below, Math.random, PIT_LIFT)
+    const made = parts.map((p) => {
+      const mat = charcoalMaterial(bin)
+      mat.color.copy(ASH_TINT).multiplyScalar(2)
+      // (lying on its side the way it fell, a little askew)
+      const q = new THREE.Quaternion().setFromUnitVectors(UP_AXIS, new THREE.Vector3(Math.cos(p.yaw), (Math.random() - 0.5) * 0.4, Math.sin(p.yaw)).normalize())
+        .multiply(new THREE.Quaternion().setFromAxisAngle(UP_AXIS, Math.random() * 6))
+      return { id: crumbSeq.current++, geo: bin.chunk(Math.floor(Math.random() * 6), p.len), mat, x: p.x, y: c.y + 0.004, z: p.z, ty: p.y, vy: 0, q, age: 0, m: null } as Crumb
+    })
+    crumbs.current = [...crumbs.current, ...made].slice(-40)
+    setCrumbIds(crumbs.current.map((k) => k.id))
+    burst(c.x, c.top, c.z)
+    restack()
+  }
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -2248,9 +2276,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (it lands where it was let go, then slides to where it settles)
       const ly = restOf(spot.from.x, spot.from.z, yaw, lying).y
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
-      const mats = burningMaps()
-      // (matte, lit as a real surface; the glow under the ash comes through the emissive map)
-      const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', map: mats?.dark ?? binchotanMap(), emissiveMap: mats?.glow ?? null, emissive: new THREE.Color('#000000'), emissiveIntensity: 0, roughness: 0.95, metalness: 0, bumpMap: mats?.dark ?? null, bumpScale: 0.8 })
+      // (the charcoal as it came from the crate; the cracks light up only as it heats (the emissive map))
+      const mat = charcoalMaterial(bin)
       coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
@@ -3893,6 +3920,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           c.g.scale.set(slim, 1, slim)
         }
         if (c.dying && burnt >= 1) { c.gone = true; c.g.visible = false; restack(); continue }
+        // (burnt through near the end of its life, it gives way and breaks, the pieces falling)
+        if (!c.dying && c.age / COAL_LAST_S >= 0.95) { breakStick(c); continue }
         c.heat = Math.min(1, c.heat + delta * GAME_SPEED.value / COAL_KINDLE_S)
         // (the last third of its life: the glow dies back and the ash coat takes over)
         const ashed = Math.max(0, Math.min(1, (Math.min(1, c.age / COAL_LAST_S) - 0.72) / 0.28))
@@ -3901,7 +3930,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
         // (only the fractures light up (the emissive map): an orange that goes yellower and brighter as the stick kindles, a dull red while it's still catching)
         c.mat.emissive.setRGB(1, 0.42 + 0.45 * h ** 1.6, 0.1 + 0.25 * h ** 3)
-        c.mat.emissiveIntensity = (0.12 + 1.1 * h ** 1.3) * flick
+        c.mat.emissiveIntensity = 1.25 * h ** 1.3 * flick
       }
       if (c.settled) {
         // (what lay on it comes down as sticks beneath burn away; it eases to its pose)
@@ -3934,6 +3963,28 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         else { c.vy = 0; c.x = c.lx; c.z = c.lz; c.vx = 0; c.vz = 0; c.settled = true }
       }
       c.g.position.set(c.x, c.y, c.z)
+    }
+    // (the broken pieces: falling to rest, a faint red in them dying out (it's burnt nearly through), then lying grey until they fade)
+    for (const k of crumbs.current) {
+      if (!k.m) continue
+      k.age += delta * GAME_SPEED.value
+      if (k.y > k.ty || k.vy > 0) {
+        k.vy -= 9.8 * cdt
+        k.y += k.vy * cdt
+        if (k.y <= k.ty) { k.y = k.ty; k.vy = k.vy < -0.6 ? -k.vy * 0.2 : 0 }
+        k.m.position.y = k.y
+      }
+      const glowLeft = Math.max(0, 1 - k.age / 12)
+      k.mat.emissive.setRGB(0.9, 0.22, 0.05)
+      k.mat.emissiveIntensity = 0.35 * glowLeft * (0.85 + 0.15 * Math.sin(clock * 3 + k.id))
+      if (k.age > 40) {
+        if (!k.mat.transparent) { k.mat.transparent = true; k.mat.needsUpdate = true }
+        k.mat.opacity = Math.max(0, 1 - (k.age - 40) / 3)
+      }
+    }
+    if (crumbs.current.some((k) => k.age > 43)) {
+      crumbs.current = crumbs.current.filter((k) => k.age <= 43)
+      setCrumbIds(crumbs.current.map((k) => k.id))
     }
     // (sparks and ash from the landings: thrown up, falling back, fading out)
     {
@@ -4509,6 +4560,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           <mesh geometry={coals.current[id].geo} scale={[1.07, 1, 1.07]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
         </group>
       ))}
+      {crumbIds.map((id) => {
+        const k = crumbs.current.find((q) => q.id === id)
+        return k && <mesh key={id} ref={(m) => { k.m = m; if (m) { m.position.set(k.x, k.y, k.z); m.quaternion.copy(k.q) } }} geometry={k.geo} material={k.mat} castShadow />
+      })}
       <points geometry={sparkGeo} frustumCulled={false}><pointsMaterial size={0.024} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></points>
       <points geometry={ashGeo} frustumCulled={false}><pointsMaterial size={0.05} vertexColors transparent opacity={0.6} depthWrite={false} toneMapped={false} /></points>
       {shards.map((sh) => (

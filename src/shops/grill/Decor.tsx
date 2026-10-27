@@ -15,7 +15,7 @@ import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { PlateRack } from './PlateRack'
 import { getEdit } from './edit'
-import { binchotanGeo, binchotanMap } from './Binchotan'
+import { useBinchotan } from './binchotanModel'
 
 type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
@@ -132,7 +132,8 @@ function Crate() {
     label: new THREE.PlaneGeometry(0.075, 0.12),
   }), [])
   // (the sticks all about one length, a hand's breadth long: only a step or two between the shortest and the longest)
-  const stickGeos = useMemo(() => [0.26, 0.28, 0.3].flatMap((len) => [0, 1, 2, 3].map((k) => ({ geo: binchotanGeo(len, 0.026, k), len }))), [])
+  const bin = useBinchotan()
+  const stickGeos = useMemo(() => [0.26, 0.28, 0.3].flatMap((len) => [0, 1, 2, 3, 4, 5].map((k) => ({ geo: bin.stick(len, 0.026, k), len }))), [bin])
   // the sticks packed in a grid, each stood a little off true and turned about its own axis
   const sticks = useMemo(() => {
     const out: { p: [number, number, number]; r: [number, number, number]; g: number }[] = []
@@ -177,7 +178,7 @@ function Crate() {
         <meshToonMaterial map={weave} />
       </mesh>
       {sticks.map((s, i) => (
-        <Inked key={i} geometry={stickGeos[s.g].geo} map={binchotanMap()} grow={1.07} sideOnly position={s.p} rotation={s.r} />
+        <Inked key={i} geometry={stickGeos[s.g].geo} map={bin.face ?? undefined} grow={1.07} sideOnly position={s.p} rotation={s.r} />
       ))}
     </group>
   )
@@ -380,7 +381,8 @@ function Lantern({ at }: { at: [number, number, number] }) {
 /** the stick of binchotan being carried from the crate to the fire */
 function HeldStick({ held }: { held: RefObject<Held> }) {
   const g = useRef<THREE.Group>(null)
-  const geo = useMemo(() => binchotanGeo(0.28, 0.045, 7), [])
+  const bin = useBinchotan()
+  const geo = useMemo(() => bin.stick(0.28, 0.045, 1), [bin])
   useFrame(() => {
     const o = g.current
     if (!o) return
@@ -390,7 +392,7 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
   })
   return (
     <group ref={g} visible={false} rotation={[0.3, 0.4, Math.PI / 2]}>
-      <Inked geometry={geo} map={binchotanMap()} grow={1.07} sideOnly />
+      <Inked geometry={geo} map={bin.face ?? undefined} grow={1.07} sideOnly />
     </group>
   )
 }

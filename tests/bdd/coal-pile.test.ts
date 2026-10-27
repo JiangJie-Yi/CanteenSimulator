@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { afterCharcoal, canAddCharcoal } from '@/game/economy'
-import { COAL_MAX, COAL_PER_ADD, MAX_LAYERS, placeStick, roomFor, STICK_R, surfaceY, type Lay } from '@/game/coalPile'
+import { CHUNK_R, COAL_MAX, COAL_PER_ADD, crumble, MAX_LAYERS, placeStick, roomFor, STICK_HALF, STICK_R, surfaceY, type Lay } from '@/game/coalPile'
 
 const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 const lay = (s: NonNullable<ReturnType<typeof placeStick>>): Lay => ({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
@@ -82,5 +82,51 @@ feature('加炭與火力', () => {
     given('一個空的炭床', (w) => { w.pile = [] as Lay[]; w.rnd = seeded(13) })
     when('放入 20 根炭', (w) => { for (let i = 0; i < 20; i++) { const s = placeStick(w.pile, w.rnd); if (s) w.pile.push(lay(s)) } })
     then('都在離中心 0.45 以內', (w) => { for (const l of w.pile as Lay[]) expect(Math.hypot(l.x, l.z)).toBeLessThan(0.45) })
+  })
+})
+
+feature('一次加炭要夠多、夠密，火才燒得起來', () => {
+  scenario('第一次加炭就放上好幾根', ({ then }) => {
+    then('一次至少放 6 根', () => { expect(COAL_PER_ADD.min).toBeGreaterThanOrEqual(6) })
+  })
+  scenario('第一次加的炭聚在一起，彼此靠著', ({ given, when, then }) => {
+    given('一個空的炭床', (w) => { w.pile = [] as Lay[]; w.rnd = seeded(21) })
+    when('放入一次的量', (w) => { for (let i = 0; i < COAL_PER_ADD.min; i++) { const s = placeStick(w.pile, w.rnd); if (s) w.pile.push(lay(s)) } })
+    then('全都放上去了', (w) => { expect((w.pile as Lay[]).length).toBe(COAL_PER_ADD.min) })
+    then('每一根的中心都在離床中心 0.3 以內', (w) => { for (const l of w.pile as Lay[]) expect(Math.hypot(l.x, l.z)).toBeLessThan(0.3) })
+  })
+})
+
+feature('燒到最後的炭會垮掉碎裂', () => {
+  scenario('燒透的炭斷成幾塊', ({ given, when, then }) => {
+    given('一根橫跨在別根炭上的炭', (w) => {
+      w.rnd = seeded(7)
+      w.below = [] as Lay[]
+      for (let i = 0; i < 6; i++) w.below.push(lay(placeStick(w.below, w.rnd)!))
+      w.stick = lay(placeStick(w.below, w.rnd)!)
+    })
+    when('它燒透了', (w) => { w.chunks = crumble(w.stick, w.below, w.rnd) })
+    then('斷成 3 到 5 塊', (w) => { expect(w.chunks.length).toBeGreaterThanOrEqual(3); expect(w.chunks.length).toBeLessThanOrEqual(5) })
+    then('碎塊加起來不比原本那根長', (w) => { expect(w.chunks.reduce((a: number, c: { len: number }) => a + c.len, 0)).toBeLessThanOrEqual(2 * STICK_HALF) })
+  })
+  scenario('碎塊往下掉，落在下面的東西上', ({ given, when, then }) => {
+    given('一根架在炭堆上的炭', (w) => {
+      w.rnd = seeded(11)
+      w.below = [] as Lay[]
+      for (let i = 0; i < 8; i++) w.below.push(lay(placeStick(w.below, w.rnd)!))
+      w.stick = lay(placeStick(w.below, w.rnd)!)
+    })
+    when('它燒透碎掉', (w) => { w.chunks = crumble(w.stick, w.below, w.rnd) })
+    then('沒有一塊比斷掉前的位置高', (w) => {
+      const l = w.stick as Lay
+      for (const c of w.chunks) expect(c.y).toBeLessThanOrEqual(l.y + Math.abs(l.slope) * STICK_HALF + 1e-9)
+    })
+    then('沒有一塊浮在空中或陷進床裡', (w) => {
+      for (const c of w.chunks) expect(c.y).toBeGreaterThanOrEqual(surfaceY(c.x, c.z) + CHUNK_R - 1e-9)
+    })
+    then('碎塊都在原本那根炭的附近', (w) => {
+      const l = w.stick as Lay
+      for (const c of w.chunks) expect(Math.hypot(c.x - l.x, c.z - l.z)).toBeLessThan(STICK_HALF + 0.03)
+    })
   })
 })
