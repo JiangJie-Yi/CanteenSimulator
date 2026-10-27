@@ -1543,15 +1543,16 @@ const SHELF_BRACKET = (() => {
 })()
 /** where the Ebisu sits, in the altar's frame (the shrine at the wall, scaled up, its middle bay's floor) */
 const EBISU_AT: [number, number, number] = [0.29 + 1.25 * (-0.14 + 0.027), 1.25 * (0.015 + 0.045 + 0.04), 0]
-/** a soft upright pillar of light: bright up its middle, fading to its sides and to its top */
-const PILLAR = canvasTex(64, 128, (g) => {
-  const gx = g.createLinearGradient(0, 0, 64, 0)
-  gx.addColorStop(0, 'rgba(255,255,255,0)'); gx.addColorStop(0.5, 'rgba(255,255,255,1)'); gx.addColorStop(1, 'rgba(255,255,255,0)')
-  g.fillStyle = gx; g.fillRect(0, 0, 64, 128)
+/** a faint rainbow aura: a soft ring of the spectrum round a clear middle, fading out at its edge */
+const AURA = canvasTex(128, 128, (g) => {
+  for (let a = 0; a < 360; a += 2) {
+    g.fillStyle = `hsla(${a}, 90%, 65%, 1)`
+    g.beginPath(); g.moveTo(64, 64); g.arc(64, 64, 64, (a * Math.PI) / 180, ((a + 2.5) * Math.PI) / 180); g.closePath(); g.fill()
+  }
   g.globalCompositeOperation = 'destination-in'
-  const gy = g.createLinearGradient(0, 0, 0, 128)
-  gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(0.6, 'rgba(0,0,0,0.7)'); gy.addColorStop(1, 'rgba(0,0,0,1)')
-  g.fillStyle = gy; g.fillRect(0, 0, 64, 128)
+  const r = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+  r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(0.42, 'rgba(0,0,0,0.05)'); r.addColorStop(0.62, 'rgba(0,0,0,0.85)'); r.addColorStop(0.8, 'rgba(0,0,0,0.35)'); r.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = r; g.fillRect(0, 0, 128, 128)
 })
 /** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015) */
 const CUPS_SHIFT = -0.015
@@ -1580,8 +1581,15 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   const burning = useRef(false)
   const motes = useRef<THREE.Points>(null)
   const moteMat = useRef<THREE.PointsMaterial>(null)
-  const MOTES = 64
-  // (the Ebisu's stone, glowing; a halo round him, a soft pillar of light up from the shrine and a ring spreading out as the offering's taken)
+  const MOTES = 22
+  // (each mote its own: how fast it rises, how far and how fast it sways, which way it drifts, when it starts, how big it is)
+  const moteRnd = useMemo(() => {
+    let seed = 7
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    return Array.from({ length: MOTES }, () => ({ speed: 0.12 + rnd() * 0.22, sway: 0.008 + rnd() * 0.04, swayF: 0.6 + rnd() * 2.4, phase: rnd() * 6.28,
+      dx: (rnd() - 0.5) * 0.08, z0: (rnd() - 0.5) * 0.3, rise: 0.35 + rnd() * 0.45, offset: rnd(), size: rnd() }))
+  }, [])
+  // (the Ebisu's stone, glowing, a soft halo and a faint rainbow aura round him while the offering stands)
   const gltfK = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
   const ebisuMats = useMemo(() => {
     const out = new Set<THREE.MeshToonMaterial>()
@@ -1596,14 +1604,15 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     return [...out]
   }, [gltfK])
   const halo = useRef<THREE.Sprite>(null)
-  const pillar = useRef<THREE.Mesh>(null)
-  const ring = useRef<THREE.Mesh>(null)
+  const aura = useRef<THREE.Sprite>(null)
   const lamp = useRef<THREE.PointLight>(null)
   const moteGeo = useMemo(() => {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MOTES * 3), 3))
+    g.setAttribute('size', new THREE.BufferAttribute(new Float32Array(MOTES), 1))
     return g
   }, [])
+  const sizes = moteGeo.attributes.size as THREE.BufferAttribute
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime
     // (the motes: each rises from the shrine's base and fades as it goes, over about three seconds, swaying a little)
@@ -1611,12 +1620,14 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     if (motes.current && moteMat.current && moteMat.current.opacity > 0.01) {
       const pos = moteGeo.attributes.position as THREE.BufferAttribute
       for (let i = 0; i < MOTES; i++) {
-        // (gold motes rising out of the open shrine and spiralling up past its roof, some from the Ebisu inside, fading as they go)
-        const life = ((t * (0.22 + (i % 5) * 0.03) + i / MOTES) % 1)
-        const a = i * 2.39 + t * (0.6 + (i % 3) * 0.2)
-        const rr = 0.04 + life * 0.14
-        pos.setXYZ(i, 0.12 + Math.cos(a) * rr * 0.6, 0.06 + life * 0.75, ((i * 0.37) % 1 - 0.5) * 0.36 + Math.sin(a) * rr)
+        // (gold motes drifting up out of the open shrine, each at its own pace, swaying its own way, fading as they go)
+        const m = moteRnd[i]
+        const life = (t * m.speed + m.offset) % 1
+        const sw = Math.sin(t * m.swayF + m.phase) * m.sway * (0.4 + life)
+        pos.setXYZ(i, 0.12 + m.dx * life + sw * 0.5, 0.07 + life * m.rise, m.z0 + sw)
+        sizes.setX(i, (0.03 + m.size * 0.075) * (1 - life * 0.6) * Math.min(1, life * 6))
       }
+      sizes.needsUpdate = true
       pos.needsUpdate = true
     }
     // (offered, the sake stands in its cup for a minute and the shrine glows, then goes quiet; then another can be offered)
@@ -1635,21 +1646,13 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       hm.opacity = 0.1 + 0.25 * BLESSING.k * pulse
       halo.current.scale.setScalar(0.14 + 0.06 * BLESSING.k * pulse)
     }
-    if (pillar.current) {
-      const pm = pillar.current.material as THREE.MeshBasicMaterial
-      pm.opacity = 0.1 * BLESSING.k * (0.8 + 0.2 * Math.sin(t * 1.7))
-      pillar.current.visible = BLESSING.k > 0.01
-    }
-    // (a ring of light spreading out once from the shrine as the blessing comes)
-    if (ring.current) {
-      const since0 = (performance.now() - (at ?? 0)) / 1000 - 3.6
-      const show = on && since0 > 0 && since0 < 1.6
-      ring.current.visible = show
-      if (show) {
-        const q = since0 / 1.6
-        ring.current.scale.setScalar(0.1 + q * 1.1)
-        ;(ring.current.material as THREE.MeshBasicMaterial).opacity = 0.32 * (1 - q)
-      }
+    // (round him a faint rainbow aura, its colours turning slowly, breathing)
+    if (aura.current) {
+      const am = aura.current.material as THREE.SpriteMaterial
+      am.opacity = 0.5 * BLESSING.k * (0.8 + 0.2 * Math.sin(t * 1.3))
+      am.rotation = t * 0.35
+      aura.current.scale.setScalar(0.2 + 0.015 * Math.sin(t * 1.1))
+      aura.current.visible = BLESSING.k > 0.01
     }
     if (lamp.current) lamp.current.intensity = 0.3 * BLESSING.k * pulse
     // (pouring: a few seconds from the moment it's offered; the cups stay full while the offering stands)
@@ -1722,22 +1725,20 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><StaticBatch><Kamidana part="vase1" /></StaticBatch></group></Movable>
       <Movable id="shrinecups" label="清酒杯與琉璃台"><group position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
-        <pointsMaterial ref={moteMat} map={GLOW} color="#ffd890" size={0.085} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <pointsMaterial ref={moteMat} map={GLOW} color="#ffd890" size={1} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
+          onBeforeCompile={(sh) => {
+            // (each mote its own size: the size attribute in place of the one size for all)
+            sh.vertexShader = sh.vertexShader.replace('uniform float size;', 'attribute float size;')
+          }} />
       </points>
       {/* (the Ebisu's halo, a faint glow always (hidden behind the shut doors), bright while blessed) */}
       <sprite ref={halo} position={[EBISU_AT[0] - 0.01, EBISU_AT[1], EBISU_AT[2]]} scale={0.16} renderOrder={4}>
         <spriteMaterial map={GLOW} color="#ffd27a" transparent opacity={0.18} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </sprite>
-      {/* (a soft pillar of light rising from the shrine while it's blessed) */}
-      <mesh ref={pillar} position={[0.12, 0.55, 0]} rotation-y={Math.PI / 2} visible={false} renderOrder={4}>
-        <planeGeometry args={[0.36, 0.9]} />
-        <meshBasicMaterial map={PILLAR} color="#ffe2a0" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} side={THREE.DoubleSide} />
-      </mesh>
-      {/* (and a ring of light spreading out across the table once, as the offering's taken) */}
-      <mesh ref={ring} position={[0.05, 0.004, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
-        <ringGeometry args={[0.42, 0.5, 64]} />
-        <meshBasicMaterial color="#ffd27a" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </mesh>
+      {/* (a faint rainbow aura round him while blessed, its colours slowly turning) */}
+      <sprite ref={aura} position={[EBISU_AT[0] - 0.012, EBISU_AT[1], EBISU_AT[2]]} scale={0.17} visible={false} renderOrder={5}>
+        <spriteMaterial map={AURA} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </sprite>
       <pointLight ref={lamp} position={[EBISU_AT[0] - 0.06, EBISU_AT[1] + 0.02, EBISU_AT[2]]} color="#ffc070" intensity={0} distance={0.9} decay={2} />
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}
