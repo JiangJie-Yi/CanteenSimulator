@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -183,22 +183,29 @@ export function TillMatLive({ tip, editing }: { tip: (open: boolean) => Record<s
   })
   // (which drawer, if any, the pointer's on: the hit mesh's ancestors)
   const which = (o: THREE.Object3D | undefined) => { for (let p = o ?? null; p; p = p.parent) { const k = drawers.indexOf(p); if (k >= 0) return k } return -1 }
-  const [hover, setHover] = useState(-1)
-  const tipFor = hover >= 0 ? tip(open.current[hover]) : null
+  // (a ref, not state: one pointer move reaches the group once per mesh it crosses, and each must see the last one's change)
+  const hover = useRef(-1)
+  type Ev = { stopPropagation: () => void; object: THREE.Object3D; eventObject: THREE.Object3D; nativeEvent: Event; intersections?: { object: THREE.Object3D }[] }
+  // (only what's nearest under the pointer counts: a ray through the stand's top or face would still reach a drawer's hidden box inside)
+  const nearest = (e: Ev) => which(e.intersections?.[0]?.object ?? e.object)
+  type Tip = { onPointerOver: (e: Ev) => void; onPointerOut: (e: Ev) => void }
+  // (the glow and the name go to the drawer itself, not the whole stand: the event passed on as if it were the drawer's own)
+  const asDrawer = (e: Ev, k: number) => ({ ...e, eventObject: drawers[k], stopPropagation: () => e.stopPropagation() })
   return (
     // (handlers on a group round it: a primitive's own aren't attached)
     <group
-      onPointerMove={(e: { stopPropagation: () => void; object: THREE.Object3D }) => {
-        const k = editing() ? -1 : which(e.object)
-        if (k !== hover) {
-          if (hover >= 0) (tip(open.current[hover]) as { onPointerOut: (e: unknown) => void }).onPointerOut(e)
-          if (k >= 0) { e.stopPropagation(); (tip(open.current[k]) as { onPointerOver: (e: unknown) => void }).onPointerOver(e) }
-          setHover(k)
+      onPointerMove={(e: Ev) => {
+        const k = editing() ? -1 : nearest(e)
+        if (k >= 0) e.stopPropagation()
+        if (k !== hover.current) {
+          if (hover.current >= 0) (tip(open.current[hover.current]) as Tip).onPointerOut(asDrawer(e, hover.current))
+          if (k >= 0) (tip(open.current[k]) as Tip).onPointerOver(asDrawer(e, k))
+          hover.current = k
         }
       }}
-      onPointerOut={(e: unknown) => { if (hover >= 0) (tipFor as { onPointerOut: (e: unknown) => void }).onPointerOut(e); setHover(-1) }}
-      onClick={(e: { stopPropagation: () => void; object: THREE.Object3D }) => {
-        const k = which(e.object)
+      onPointerOut={(e: Ev) => { if (hover.current >= 0) (tip(open.current[hover.current]) as Tip).onPointerOut(asDrawer(e, hover.current)); hover.current = -1 }}
+      onClick={(e: Ev) => {
+        const k = nearest(e)
         if (k < 0 || editing()) return
         e.stopPropagation()
         open.current[k] = !open.current[k]

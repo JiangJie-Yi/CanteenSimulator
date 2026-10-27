@@ -17,9 +17,10 @@ const isHdri = (b: ArrayBuffer) => {
 }
 /**
  * how much a real photograph is turned down: a grill at night photographed is far brighter overall than the made-up room the glossy things were
- * tuned against (its lamps alone are hundreds of times over white), and at full strength the marble, the register and the stand glare
+ * tuned against (its lamps alone are hundreds of times over white), and at full strength the marble, the register and the stand glare; at night
+ * further still, so the room reads as night
  */
-const REAL_GAIN = 1 / 6
+const REAL_GAIN = { day: 1 / 6, night: 1 / 12 }
 /** the first of the time of day's files that's there, or null */
 function useHdriFile(when: 'day' | 'night') {
   const [file, setFile] = useState<string | null>(null)
@@ -42,7 +43,7 @@ function useHdriFile(when: 'day' | 'night') {
 export function IndoorHDRI({ intensity = 0.5, night = false }: { intensity?: number; night?: boolean }) {
   const file = useHdriFile(night ? 'night' : 'day')
   // (a real HDRI photograph, if one's there, lights the glossy things; otherwise the room's own made-up one below)
-  if (file) return <Environment key={file} files={file} environmentIntensity={intensity * REAL_GAIN} background={false} />
+  if (file) return <Environment key={file} files={file} environmentIntensity={intensity * REAL_GAIN[night ? 'night' : 'day']} background={false} />
   return <IndoorMock intensity={intensity} night={night} />
 }
 function IndoorMock({ intensity, night }: { intensity: number; night: boolean }) {
