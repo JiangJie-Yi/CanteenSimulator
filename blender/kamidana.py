@@ -320,6 +320,43 @@ def crest_half(name, at, rad, sd):
     return out_
 
 
+def face_uv(o):
+    """UVs straight across its face (u along game z, v up), the whole picture once over it"""
+    me_ = o.data
+    if not me_.uv_layers:
+        me_.uv_layers.new()
+    ys = [-v.co.y for v in me_.vertices]; zs = [v.co.z for v in me_.vertices]
+    y0_, y1_, z0_, z1_ = min(ys), max(ys), min(zs), max(zs)
+    for poly in me_.polygons:
+        for li in poly.loop_indices:
+            co = me_.vertices[me_.loops[li].vertex_index].co
+            me_.uv_layers.active.data[li].uv = ((-co.y - y0_) / (y1_ - y0_), (co.z - z0_) / (z1_ - z0_))
+
+
+# (gold leaf: squares of leaf each a shade off its neighbours, their overlapping edges a little darker, and over it the waves (青海波) traced
+# faintly in a deeper gold)
+_gu, _gv = grid01(512)
+_n = 9
+_cell = (np.floor(_gu * _n) * 7 + np.floor(_gv * _n) * 13) % 5 / 5.0
+leaf = mix((0.86, 0.66, 0.3), (0.95, 0.78, 0.4), _cell * 0.8 + fbm(512, 20, 20, 3) * 0.2)
+_edge = np.minimum((_gu * _n) % 1, (_gv * _n) % 1)
+leaf = mix(leaf, (0.62, 0.44, 0.18), (_edge < 0.025).astype(np.float32) * 0.5)
+_Rw = 1.0 / 7
+_d = np.full(_gu.shape, 9.0, np.float32)
+_rows = int(1 / (_Rw / 2)) + 3
+for r in range(_rows, -2, -1):
+    cy = 1 - r * _Rw / 2
+    off = (_Rw if r % 2 else 0)
+    for i in range(-1, 9):
+        cx = i * 2 * _Rw + off
+        dd = np.sqrt((_gu - cx) ** 2 + (_gv - cy) ** 2)
+        cover = (dd < _Rw) & (_gv > cy - _Rw)
+        _d = np.where(cover, dd, _d)
+_wave = (((_d / _Rw) * 4) % 1 < 0.13) & (_d < _Rw)
+leaf = mix(leaf, (0.55, 0.38, 0.14), _wave.astype(np.float32) * 0.45)
+M["goldLeaf"] = pbr("KamiGoldLeaf", (1, 1, 1), tex=image("goldleaf", leaf), rough=0.35, metal=0.75)
+
+
 def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
     """one bay of the shrine: its body with a post at each corner, its pair of doors with the gold crest and corner plates, and its roof: two
     curved slopes of bark laid deep, each gable's bargeboards running up past the ridge as the crossed finials (one board each, the pair one
@@ -343,6 +380,12 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
     out.append(box(f"Kami{tag}WallFrontLow", S(T_, OY - OH / 2 - y0, OW), P(fzx, (OY - OH / 2 + y0) / 2, zc), wood()))
     # (inside, shadowed: dark boards behind and either side)
     out.append(box(f"Kami{tag}Inside", S(0.001, body_h - 2 * T_, width - 2 * T_), P(cx0 + depth / 2 - T_ - 0.0006, y0 + body_h / 2, zc), M["inside"], uv=0))
+    if tag == "M":
+        # (behind the god in the middle bay: a gilt back panel, gold leaf laid in squares with the waves (青海波) drawn faintly over it)
+        gp = box(f"Kami{tag}GoldBack", S(0.001, body_h - 2 * T_ - 0.004, width - 2 * T_ - 0.004), P(cx0 + depth / 2 - T_ - 0.0012, y0 + body_h / 2, zc),
+                 M["goldLeaf"], uv=0)
+        face_uv(gp)
+        out.append(gp)
     # (the posts at its corners, standing a little proud of the walls)
     for sx in (-1, 1):
         for sz in (-1, 1):
@@ -550,6 +593,18 @@ straw = mix(straw, (0.58, 0.5, 0.38), (np.sin((_su2 * 160 + fbm(256, 6, 2, 3) * 
 straw = mix(straw, (0.95, 0.92, 0.84), (np.sin((_su2 * 230 + 0.3) * math.pi * 2) > 0.85).astype(np.float32) * 0.2)
 M["straw"] = pbr("KamiStraw", (1, 1, 1), tex=image("straw", straw), rough=0.8)
 M["shide"] = pbr("KamiShide", lin("#fbfaf4"), rough=0.75)
+
+# (a pair of gohei (御幣) standing either side of the god in the middle bay: a plain wooden wand on a small black stand, the white paper
+# folded in zigzags hanging both sides from its top)
+GX = BX + 0.005 + 0.13 / 2 - 0.022
+for sz in (-1, 1):
+    gz = sz * 0.052
+    parts.append(box(f"KamiGoheiStand{sz}", S(0.012, 0.004, 0.012), P(GX, DY + 0.002, gz), M["woodDark"], bev=0.0006, uv=0))
+    parts.append(cyl(f"KamiGoheiWand{sz}", 0.0011, 0.112, P(GX, DY + 0.004 + 0.056, gz), M["wood"][0]))
+    for side in (-1, 1):
+        for j in range(4):
+            parts.append(box(f"KamiGoheiShide{sz}{side}{j}", S(0.0004, 0.0085, 0.0055),
+                             P(GX - 0.0012, DY + 0.104 - 0.0045 - j * 0.0073, gz + side * (0.0036 + (0.0024 if j % 2 else 0))), M["shide"], uv=0))
 
 # =====================================================================
 # Inside: in the middle bay a little stone Ebisu (恵比寿), seated, round and smiling under his folded eboshi, a sea bream under his left arm
