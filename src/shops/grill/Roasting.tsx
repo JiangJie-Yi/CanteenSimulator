@@ -407,10 +407,10 @@ function EmberBed({ fuel }: { fuel: { current: number } }) {
   const lumps = useMemo(() => {
     let seed = 23
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    const groups: { m: THREE.Matrix4[]; k: number }[] = [{ m: [], k: 1 }, { m: [], k: 0.55 }, { m: [], k: 0.18 }]
-    for (let i = 0; i < 170; i++) {
-      const a = rnd() * Math.PI * 2, r = 0.5 * rnd() ** 0.75
-      const x = Math.cos(a) * r, z = Math.sin(a) * r, size = 0.016 + rnd() * 0.034
+    const groups: { m: THREE.Matrix4[]; k: number }[] = [{ m: [], k: 0.6 }, { m: [], k: 0.3 }, { m: [], k: 0.08 }]
+    for (let i = 0; i < 80; i++) {
+      const a = rnd() * Math.PI * 2, r = 0.36 * rnd() ** 0.75
+      const x = Math.cos(a) * r, z = Math.sin(a) * r, size = 0.012 + rnd() * 0.022
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 6, rnd() * 3))
       const m = new THREE.Matrix4().compose(new THREE.Vector3(x, surfaceY(x, z, PIT_LIFT) + size * 0.35, z), q, new THREE.Vector3(size * (0.8 + rnd() * 0.7), size * 0.55, size * (0.8 + rnd() * 0.7)))
       groups[i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : 2].m.push(m)
@@ -2182,7 +2182,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same stick as the crate's: a long, pale, ashy-white binchotan, seven-sided, inked)
   // (each thrown stick its own length, thickness and bend, new each time: from the short to the long)
-  const randomStick = () => binchotanGeo(0.28 + Math.random() * 0.12, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 8))
+  const randomStick = () => binchotanGeo(0.28 + Math.random() * 0.12, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 8), true)
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
   const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
@@ -2247,8 +2247,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const ly = restOf(spot.from.x, spot.from.z, yaw, lying).y
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
       const mats = burningMaps()
-      // (matte, lit as a real surface so the crazed blocks show their relief; the cracks glow through the emissive map)
-      const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', map: mats?.dark ?? binchotanMap(), emissiveMap: mats?.glow ?? null, emissive: new THREE.Color('#000000'), emissiveIntensity: 0, roughness: 0.92, metalness: 0, bumpMap: mats?.dark ?? null, bumpScale: 2.5 })
+      // (matte, lit as a real surface; the glow under the ash comes through the emissive map)
+      const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', map: mats?.dark ?? binchotanMap(), emissiveMap: mats?.glow ?? null, emissive: new THREE.Color('#000000'), emissiveIntensity: 0, roughness: 0.95, metalness: 0, bumpMap: mats?.dark ?? null, bumpScale: 0.8 })
       coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
@@ -3898,7 +3898,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
         // (only the fractures light up (the emissive map): an orange that goes yellower and brighter as the stick kindles, a dull red while it's still catching)
         c.mat.emissive.setRGB(1, 0.42 + 0.45 * h ** 1.6, 0.1 + 0.25 * h ** 3)
-        c.mat.emissiveIntensity = (0.15 + 1.4 * h ** 1.3) * flick
+        c.mat.emissiveIntensity = (0.12 + 1.1 * h ** 1.3) * flick
       }
       if (c.settled) {
         // (what lay on it comes down as sticks beneath burn away; it eases to its pose)
