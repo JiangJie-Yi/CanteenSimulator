@@ -301,7 +301,7 @@ const GLOW = canvas(128, 128, (g) => {
 /**
  * A floor lantern (行燈): a square wooden frame on four legs, washi panels lit from inside by a flame — the paper
  * brightens and dims a little as it flickers, a warm halo hangs round it, and (on a strong GPU) it throws a little
- * flickering light on what's near.
+ * flickering light on what's near. A click puts it out or lights it again; it isn't moved by hand (only in edit mode).
  */
 const LANTERN_SCALE = 1.8
 function Lantern({ at }: { at: [number, number, number] }) {
@@ -309,16 +309,25 @@ function Lantern({ at }: { at: [number, number, number] }) {
   const halo = useRef<THREE.Sprite>(null)
   const flame = useRef<THREE.Sprite>(null)
   const lamp = useRef<THREE.PointLight>(null)
-  useFrame(({ clock }) => {
+  const [lit, setLit] = useState(true)
+  const glow = useRef(1)
+  useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime
+    // (lit or put out, the flame coming up or dying down over a moment)
+    glow.current += ((lit ? 1 : 0) - glow.current) * Math.min(1, dt * 5)
+    const k = glow.current
     // a flame's flicker: a slow breath and a quicker shiver, never quite repeating
-    const f = 0.88 + 0.07 * Math.sin(t * 2.3) + 0.05 * Math.sin(t * 7.9 + 1.3) + 0.03 * Math.sin(t * 17.1)
-    if (paper.current) paper.current.color.setScalar(f)
+    const f0 = 0.88 + 0.07 * Math.sin(t * 2.3) + 0.05 * Math.sin(t * 7.9 + 1.3) + 0.03 * Math.sin(t * 17.1)
+    const f = f0 * k
+    // (out, the paper is only paper: dim, as the room's light leaves it)
+    if (paper.current) paper.current.color.setScalar(Math.max(f, 0.32))
+    if (halo.current) halo.current.visible = k > 0.02
+    if (flame.current) flame.current.visible = k > 0.02
     if (halo.current) {
-      halo.current.material.opacity = 0.55 + (f - 0.88) * 2.2
-      halo.current.scale.setScalar(0.95 + (f - 0.88) * 0.6)
+      halo.current.material.opacity = (0.55 + (f0 - 0.88) * 2.2) * k
+      halo.current.scale.setScalar(0.95 + (f0 - 0.88) * 0.6)
     }
-    if (flame.current) flame.current.scale.setScalar(0.22 * (0.9 + (f - 0.88) * 1.8))
+    if (flame.current) flame.current.scale.setScalar(0.22 * (0.9 + (f0 - 0.88) * 1.8) * Math.max(0.05, k))
     if (lamp.current) lamp.current.intensity = 0.7 * f
   })
   const S = 0.2, H = 0.36, LEG = 0.16
@@ -332,7 +341,10 @@ function Lantern({ at }: { at: [number, number, number] }) {
   const posts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [a * S / 2, b * S / 2] as const)
   const top = LEG + H
   return (
-    <group position={at} rotation-y={0.4} scale={LANTERN_SCALE} userData={{ container: 'lantern' }}>
+    <group position={at} rotation-y={0.4} scale={LANTERN_SCALE} userData={{ container: 'lantern' }}
+      onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '行燈', hint: lit ? '點一下點燈' : '點一下熄燈' }); setLit(!lit) }}
+      onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; document.body.style.cursor = 'pointer'; glowOnly(e.eventObject); setTip({ title: '行燈', hint: lit ? '點一下熄燈' : '點一下點燈' }) }}
+      onPointerOut={() => { document.body.style.cursor = ''; glowOnly(null); setTip(null) }}>
       {posts.map(([x, z], i) => (
         <Inked key={i} geometry={geo.post} color="#3a2416" grow={1.12} position={[x, (H + LEG + 0.04) / 2, z]} />
       ))}
