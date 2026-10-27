@@ -1143,11 +1143,10 @@ function kamidanaOf(scene: THREE.Group) {
         reflectStudio(g)
         t = g
       } else if (src.name === 'KamiRuri') {
-        // (the cups' stand: deep blue glass (瑠璃), glossy, a little see-through at its edges, the studio's lights sliding over it)
-        const g = new THREE.MeshPhysicalMaterial({ color: '#06184a', metalness: 0.1, roughness: 0.03, clearcoat: 1, clearcoatRoughness: 0.02,
-          transparent: true, opacity: 0.93, specularIntensity: 1, ior: 1.5, iridescence: 0.1 })
+        // (the cups' stand: porcelain under a deep cobalt glaze run through with emerald and turquoise, glossy, the studio's light sliding over it)
+        const g = new THREE.MeshPhysicalMaterial({ color: '#ffffff', map: src.map, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04, specularIntensity: 0.9 })
         reflectStudio(g)
-        g.envMapIntensity = 0.55
+        g.envMapIntensity = 0.7
         t = g
       } else if (src.name === 'KamiPeel' || src.name === 'KamiLeaf' || src.name === 'KamiDish' || src.name === 'KamiCobalt') {
         // (the mikan's waxy peel, the leaves' gloss, the dish's glaze: a soft sheen)

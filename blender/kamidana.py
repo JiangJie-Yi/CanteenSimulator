@@ -741,19 +741,55 @@ for o in fx_:
         o.parent = flask
 
 # =====================================================================
-# The stand the three sake cups sit on (in the shrine's frame, before it): deep blue glass (瑠璃), a low slab on two feet with a fine raised
-# edge round it and softly rounded corners, its top 1.75 cm up, where the cups' feet are
+# The stand the three sake cups sit on (in the shrine's frame, before it): a long porcelain tray, its corners rounded and its rim curling up
+# and out, on a low foot ring; glazed a deep cobalt (瑠璃釉) with emerald and turquoise running through it in flowing streaks, as a kiln
+# leaves them; its well flat at 1.75 cm up, where the cups' feet are
 # =====================================================================
 cs_ = []
-M["ruri"] = pbr("KamiRuri", lin("#123a8c"), rough=0.05, coat=1.0)
-CST, CSD, CSW = 0.0175, 0.07, 0.29
-cs_.append(box("KamiCupStandTop", S(CSD, 0.006, CSW), P(0, CST - 0.003, 0), M["ruri"], bev=0.0022, uv=0))
-for sd in (-1, 1):
-    cs_.append(box(f"KamiCupStandFoot{sd}", S(CSD - 0.012, CST - 0.006, 0.014), P(0, (CST - 0.006) / 2, sd * (CSW / 2 - 0.02)), M["ruri"], bev=0.0018, uv=0))
-for sx in (-1, 1):
-    cs_.append(box(f"KamiCupStandEdgeX{sx}", S(0.003, 0.002, CSW), P(sx * (CSD / 2 - 0.0015), CST + 0.001, 0), M["ruri"], bev=0.0009, uv=0))
-for sd in (-1, 1):
-    cs_.append(box(f"KamiCupStandEdgeZ{sd}", S(CSD, 0.002, 0.003), P(0, CST + 0.001, sd * (CSW / 2 - 0.0015)), M["ruri"], bev=0.0009, uv=0))
+uu_, vv_ = grid01(512)
+warp_ = (fbm(512, 3, 3, 4) - 0.5) * 0.35
+flow = fbm(512, 6, 2, 5)
+band = np.sin((uu_ * 7 + vv_ * 2 + warp_ * 3 + flow * 2.5) * math.pi * 2) * 0.5 + 0.5
+glaze_ = mix((0.03, 0.08, 0.28), (0.05, 0.14, 0.42), fbm(512, 8, 8, 4))
+glaze_ = mix(glaze_, (0.06, 0.45, 0.5), smooth(0.72, 0.92, band) * smooth(0.35, 0.7, flow))      # (turquoise runs)
+glaze_ = mix(glaze_, (0.08, 0.42, 0.24), smooth(0.8, 0.95, fbm(512, 5, 5, 4)) * 0.75)            # (emerald pools)
+glaze_ = mix(glaze_, (0.6, 0.78, 0.82), smooth(0.93, 0.99, band) * 0.35)                          # (pale where it thinned)
+M["ruri"] = pbr("KamiRuri", (1, 1, 1), tex=image("ruri", glaze_), rough=0.08, coat=1.0)
+CST, RX_S, RZ_S = 0.0175, 0.04, 0.15
+# (the section from the foot's middle out and round to the well's middle: (how far out, as a part of the outline), height)
+SEC = [(0.0, 0.0), (0.78, 0.0), (0.82, 0.0015), (0.83, 0.0045), (0.8, 0.006), (0.86, 0.008), (0.94, 0.012), (1.0, 0.0165), (1.035, 0.021),
+       (1.045, 0.0232), (1.025, 0.0238), (0.985, 0.0212), (0.95, 0.0185), (0.9, 0.0176), (0.0, CST)]
+NA = 72
+vs, fs, uvs = [], [], []
+for j in range(NA):
+    t = j / NA * 2 * math.pi
+    # (a rounded oblong: a superellipse, square-ish with soft corners)
+    ct, st_ = math.cos(t), math.sin(t)
+    ex = 0.25
+    ex_x = math.copysign(abs(ct) ** ex, ct) * RX_S
+    ex_z = math.copysign(abs(st_) ** ex, st_) * RZ_S
+    for k_, (f, y) in enumerate(SEC):
+        vs.append(P(ex_x * f, y, ex_z * f))
+        uvs.append((j / NA * 4, k_ / len(SEC)))
+n_ = len(SEC)
+for j in range(NA):
+    j2 = (j + 1) % NA
+    for k_ in range(n_ - 1):
+        fs.append((j * n_ + k_, j * n_ + k_ + 1, j2 * n_ + k_ + 1, j2 * n_ + k_))
+me_ = bpy.data.meshes.new("KamiCupStand")
+me_.from_pydata(vs, [], fs)
+me_.update()
+uvl = me_.uv_layers.new().data
+for poly in me_.polygons:
+    for li in poly.loop_indices:
+        uvl[li].uv = uvs[me_.loops[li].vertex_index]
+st_o = bpy.data.objects.new("KamiCupStandBody", me_)
+bpy.context.collection.objects.link(st_o)
+finish(st_o, "KamiCupStandBody", M["ruri"], smooth_shade=True)
+bpy.ops.object.select_all(action="DESELECT"); st_o.select_set(True); bpy.context.view_layer.objects.active = st_o
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.mesh.remove_doubles(threshold=1e-6)
+bpy.ops.mesh.normals_make_consistent(inside=False); bpy.ops.object.mode_set(mode="OBJECT")
+cs_.append(st_o)
 cupstand = bpy.data.objects.new("KamiCupStand", None)
 bpy.context.collection.objects.link(cupstand)
 for o in cs_:
