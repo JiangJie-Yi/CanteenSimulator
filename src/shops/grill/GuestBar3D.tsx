@@ -576,15 +576,15 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
           <Part geo={REG_GEO.body} color="#2a3442" outline={1.02} position={[0.3, top - 0.155, 0.08]} scale={[0.2, 0.065, 0.16]} />
         </group>
       </StaticBatch></Movable>
-      <Movable id="till-ipad" label="平板（iPad）"><StaticBatch>
+      <Movable id="till-ipad" label="平板（iPad）">
       <group position={at} rotation-y={yaw}>
         {/* the order tablet, an iPad on a folding stand, at the cashier's right hand, its screen toward the cashier, leaning back a little */}
         <group position={[0.5, top, 0.1]}>
-          {/* (the model from blender/ipad.py: the tablet, its screen the order screen, on its folding stand) */}
-          <IpadModel />
+          {/* (the model from blender/ipad.py: the tablet, its screen the order screen, on its folding stand; not batched: its screen is touched) */}
+          <IpadModel lang={lang} />
         </group>
       </group>
-      </StaticBatch></Movable>
+      </Movable>
     </>
   )
 }

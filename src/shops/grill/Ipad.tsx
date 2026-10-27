@@ -3,7 +3,9 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { TILL_STATE } from './bar'
+import { TILL_STATE, tipOver } from './bar'
+import { getEdit } from './edit'
+import type { Lang } from '@/data/i18n'
 
 /**
  * The till's order tablet on its stand, from blender/ipad.py, in the frame the till had it (the stand's middle at the origin, the screen
@@ -71,20 +73,29 @@ const GLARE = (() => {
 const W = 1024, H = 768
 const SANS = '-apple-system, "SF Pro Text", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Segoe UI", sans-serif'
 const BLUE = '#007aff'
-const ITEMS: [string, number, string][] = [
-  ['鮎の塩焼き', 420, '#f2c38b'], ['秋刀魚', 380, '#9fb7d9'], ['鯖の塩焼き', 400, '#a9c8a0'], ['焼きおにぎり', 160, '#e9d79c'],
-  ['ししとう', 120, '#b9d79a'], ['エリンギ', 140, '#d9c4a6'], ['生ビール', 180, '#f4d36b'], ['烏龍茶', 120, '#c9a27a'],
-  ['鮎定食', 1200, '#e8b98a'], ['秋刀魚定食', 1100, '#a8bfe0'], ['味噌汁', 150, '#d6b48a'], ['枝豆', 300, '#9fcf8a'],
+/** the menu: name, price, the picture's colour, and its tab (1 焼き物, 2 飲み物, 3 定食, 4 小鉢; tab 0 shows all) */
+const ITEMS: [string, number, string, number][] = [
+  ['鮎の塩焼き', 420, '#f2c38b', 1], ['秋刀魚', 380, '#9fb7d9', 1], ['鯖の塩焼き', 400, '#a9c8a0', 1], ['焼きおにぎり', 160, '#e9d79c', 1],
+  ['ししとう', 120, '#b9d79a', 1], ['エリンギ', 140, '#d9c4a6', 1], ['生ビール', 180, '#f4d36b', 2], ['烏龍茶', 120, '#c9a27a', 2],
+  ['鮎定食', 1200, '#e8b98a', 3], ['秋刀魚定食', 1100, '#a8bfe0', 3], ['味噌汁', 150, '#d6b48a', 4], ['枝豆', 300, '#9fcf8a', 4],
 ]
-const ORDER: [string, number, number][] = [['鮎の塩焼き', 2, 840], ['秋刀魚', 1, 380], ['生ビール', 3, 540], ['焼きおにぎり', 2, 320]]
+const TABS = ['すべて', '焼き物', '飲み物', '定食', '小鉢']
+/**
+ * The tablet as the owner works it, by touching its screen: asleep it wakes at a touch; awake, the category tabs choose what's shown, a menu
+ * card adds one of it to the order, a line of the order takes one off, 会計する settles it (a sheet with the total, then a fresh order), and a
+ * touch on the home bar (or a minute untouched) puts it back to sleep
+ */
+const POS = { awakeUntil: 0, tab: 0, order: new Map<string, number>(), paid: 0, paidAt: -1e9, seq: 42, rev: 0 }
+const shown = () => ITEMS.filter((it) => POS.tab === 0 || it[3] === POS.tab)
+const orderLines = () => [...POS.order].filter(([, n]) => n > 0).map(([name, n]) => [name, n, n * (ITEMS.find((i) => i[0] === name)?.[1] ?? 0)] as [string, number, number])
+/** the layout's measures, shared by the drawing and the touches */
+const TAB = { x: 24, y: 96, w: 644, h: 32 }, CARD = { x: 24, y: 142, w: 152, h: 168, gx: 12, gy: 10 }
+const PANEL = { x: 692, w: W - 692 - 20 }
+const PAY = { x: PANEL.x + 16, y: H - 104, w: PANEL.w - 32, h: 52 }
 const yen = (n: number) => '¥' + n.toLocaleString('ja-JP')
 const rr = (g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => { g.beginPath(); g.roundRect(x, y, w, h, r) }
-export const TILL_APP = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = W
-  c.height = H
-  const g = c.getContext('2d')!
+/** the till app as it stands (POS's tab and order) */
+function drawPos(g: CanvasRenderingContext2D) {
   g.textBaseline = 'middle'
   // the app's background, the system's grouped grey
   g.fillStyle = '#f2f2f7'
@@ -111,39 +122,41 @@ export const TILL_APP = (() => {
   g.fillStyle = '#8e8e93'; g.font = `400 16px ${SANS}`; g.fillText('🔍  メニューを検索', 184, 66)
   g.fillStyle = BLUE; g.font = `500 17px ${SANS}`; g.textAlign = 'right'; g.fillText('履歴', 668, 65); g.textAlign = 'left'
   // the category tabs, a segmented control
-  const tabs = ['すべて', '焼き物', '飲み物', '定食', '小鉢']
-  rr(g, 24, 96, 644, 32, 9); g.fillStyle = '#e3e3e8'; g.fill()
-  const tw = 644 / tabs.length
-  rr(g, 26, 98, tw - 4, 28, 7); g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,0.12)'; g.shadowBlur = 4; g.fill(); g.shadowBlur = 0
+  rr(g, TAB.x, TAB.y, TAB.w, TAB.h, 9); g.fillStyle = '#e3e3e8'; g.fill()
+  const tw = TAB.w / TABS.length
+  rr(g, TAB.x + 2 + tw * POS.tab, TAB.y + 2, tw - 4, 28, 7); g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,0.12)'; g.shadowBlur = 4; g.fill(); g.shadowBlur = 0
   g.font = `700 17px ${SANS}`; g.fillStyle = '#000'; g.textAlign = 'center'
-  tabs.forEach((t, i) => g.fillText(t, 24 + tw * (i + 0.5), 113))
+  TABS.forEach((t, i) => g.fillText(t, TAB.x + tw * (i + 0.5), TAB.y + 17))
   g.textAlign = 'left'
   // the menu as cards: a picture swatch, the name, the price
-  const cw = 152, ch = 168
-  ITEMS.forEach(([name, price, col], i) => {
-    const x = 24 + (i % 4) * (cw + 12), y = 142 + Math.floor(i / 4) * (ch + 10)
+  const cw = CARD.w, ch = CARD.h
+  shown().forEach(([name, price, col], i) => {
+    const x = CARD.x + (i % 4) * (cw + CARD.gx), y = CARD.y + Math.floor(i / 4) * (ch + CARD.gy)
     rr(g, x, y, cw, ch, 14); g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,0.08)'; g.shadowBlur = 8; g.shadowOffsetY = 2; g.fill()
     g.shadowBlur = 0; g.shadowOffsetY = 0
     g.save(); rr(g, x, y, cw, 92, 14); g.clip(); g.fillStyle = col; g.fillRect(x, y, cw, 92)
     g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.ellipse(x + cw / 2, y + 48, 40, 24, -0.3, 0, Math.PI * 2); g.fill(); g.restore()
     g.fillStyle = '#000'; g.font = `700 21px ${SANS}`; g.fillText(name, x + 12, y + 118, cw - 20)
     g.fillStyle = '#6c6c70'; g.font = `600 19px ${SANS}`; g.fillText(yen(price), x + 12, y + 146)
-    if (i === 0 || i === 6) { g.beginPath(); g.arc(x + cw - 18, y + 18, 11, 0, Math.PI * 2); g.fillStyle = BLUE; g.fill(); g.fillStyle = '#fff'; g.font = `700 13px ${SANS}`; g.textAlign = 'center'; g.fillText(i === 0 ? '2' : '3', x + cw - 18, y + 18); g.textAlign = 'left' }
+    const n = POS.order.get(name) ?? 0
+    if (n > 0) { g.beginPath(); g.arc(x + cw - 18, y + 18, 11, 0, Math.PI * 2); g.fillStyle = BLUE; g.fill(); g.fillStyle = '#fff'; g.font = `700 13px ${SANS}`; g.textAlign = 'center'; g.fillText(String(n), x + cw - 18, y + 18); g.textAlign = 'left' }
   })
   // the order, a panel down the right: its lines, the sums, the pay button
-  const px = 692, pw = W - px - 20
+  const px = PANEL.x, pw = PANEL.w
   rr(g, px, 48, pw, H - 74, 16); g.fillStyle = '#fff'; g.fill()
   g.fillStyle = '#000'; g.font = `700 24px ${SANS}`; g.fillText('ご注文', px + 18, 76)
-  g.fillStyle = '#8e8e93'; g.font = `500 14px ${SANS}`; g.textAlign = 'right'; g.fillText('3番テーブル・#0042', px + pw - 16, 77); g.textAlign = 'left'
+  g.fillStyle = '#8e8e93'; g.font = `500 14px ${SANS}`; g.textAlign = 'right'; g.fillText(`#${String(POS.seq).padStart(4, '0')}`, px + pw - 16, 77); g.textAlign = 'left'
   let y = 112
-  for (const [name, n, sum] of ORDER) {
+  const lines = orderLines()
+  if (!lines.length) { g.fillStyle = '#8e8e93'; g.font = `500 18px ${SANS}`; g.fillText('メニューをタップして追加', px + 18, y + 10) }
+  for (const [name, n, sum] of lines.slice(0, 6)) {
     g.fillStyle = '#000'; g.font = `600 20px ${SANS}`; g.fillText(name, px + 18, y)
     g.fillStyle = '#8e8e93'; g.font = `500 16px ${SANS}`; g.fillText(`× ${n}`, px + 18, y + 24)
     g.fillStyle = '#000'; g.font = `600 20px ${SANS}`; g.textAlign = 'right'; g.fillText(yen(sum), px + pw - 18, y + 6); g.textAlign = 'left'
     g.fillStyle = '#e5e5ea'; g.fillRect(px + 18, y + 40, pw - 36, 1)
     y += 60
   }
-  const total = ORDER.reduce((a, o) => a + o[2], 0)
+  const total = lines.reduce((a, o) => a + o[2], 0)
   const row = (a: string, b: string, yy: number, big = false) => {
     g.fillStyle = big ? '#000' : '#6c6c70'; g.font = `${big ? 700 : 600} ${big ? 28 : 18}px ${SANS}`
     g.fillText(a, px + 18, yy); g.textAlign = 'right'; g.fillText(b, px + pw - 18, yy); g.textAlign = 'left'
@@ -151,10 +164,29 @@ export const TILL_APP = (() => {
   row('小計', yen(total), H - 200)
   row('内消費税 (10%)', yen(Math.round(total / 11)), H - 174)
   row('合計', yen(total), H - 136, true)
-  rr(g, px + 16, H - 104, pw - 32, 52, 14); g.fillStyle = BLUE; g.fill()
+  rr(g, PAY.x, PAY.y, PAY.w, PAY.h, 14); g.fillStyle = lines.length ? BLUE : '#b8c9e0'; g.fill()
   g.fillStyle = '#fff'; g.font = `700 24px ${SANS}`; g.textAlign = 'center'; g.fillText('会計する', px + pw / 2, H - 78); g.textAlign = 'left'
   // the home indicator
   rr(g, W / 2 - 70, H - 12, 140, 5, 3); g.fillStyle = '#1c1c1e'; g.fill()
+  // (settled just now: a sheet with what was paid, for a moment)
+  if (performance.now() - POS.paidAt < 2200) {
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, W, H)
+    rr(g, W / 2 - 220, H / 2 - 130, 440, 260, 26); g.fillStyle = '#fff'; g.fill()
+    g.textAlign = 'center'
+    g.beginPath(); g.arc(W / 2, H / 2 - 60, 30, 0, Math.PI * 2); g.fillStyle = '#34c759'; g.fill()
+    g.strokeStyle = '#fff'; g.lineWidth = 6; g.beginPath(); g.moveTo(W / 2 - 13, H / 2 - 60); g.lineTo(W / 2 - 3, H / 2 - 49); g.lineTo(W / 2 + 15, H / 2 - 72); g.stroke()
+    g.fillStyle = '#000'; g.font = `700 30px ${SANS}`; g.fillText('お会計完了', W / 2, H / 2 + 5)
+    g.font = `700 44px ${SANS}`; g.fillText(yen(POS.paid), W / 2, H / 2 + 60)
+    g.textAlign = 'left'
+  }
+}
+/** the till app drawn once as it starts (for anything that wants a picture of it) */
+export const TILL_APP = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = W
+  c.height = H
+  drawPos(c.getContext('2d')!)
   return c
 })()
 
@@ -175,7 +207,7 @@ const SCREEN = (() => {
 })()
 function drawScreen(mode: 'idle' | 'queue' | 'card', bill: number, queue: number) {
   if (!SCREEN || !TILL_APP) return
-  const key = `${mode}|${bill}|${queue}`
+  const key = `${mode}|${bill}|${queue}|${POS.rev}|${performance.now() - POS.paidAt < 2200}`
   if (SCREEN.key === key) return
   SCREEN.key = key
   const g = SCREEN.g
@@ -199,7 +231,7 @@ function drawScreen(mode: 'idle' | 'queue' | 'card', bill: number, queue: number
     g.fillText('混雑時・カード決済時に起動', W / 2, H * 0.68)
     rr(g, W / 2 - 70, H - 12, 140, 5, 3); g.fillStyle = 'rgba(255,255,255,0.8)'; g.fill()
   } else {
-    g.drawImage(TILL_APP, 0, 0)
+    drawPos(g)
     // (the queue's count on the order screen, a red badge at its top)
     if (queue > 0) {
       rr(g, W / 2 - 110, 30, 220, 40, 20); g.fillStyle = '#ff3b30'; g.fill()
@@ -227,7 +259,34 @@ function drawScreen(mode: 'idle' | 'queue' | 'card', bill: number, queue: number
 }
 drawScreen('idle', 0, 0)
 
-export function IpadModel() {
+/** a touch on the screen, at (x, y) in the screen's pixels */
+function touch(x: number, y: number) {
+  const now = performance.now()
+  const awake = now < POS.awakeUntil || TILL_STATE.tablet
+  POS.awakeUntil = now + 60000
+  POS.rev++
+  if (!awake || now - POS.paidAt < 2200) return
+  // (the home bar: back to sleep)
+  if (y > H - 34 && Math.abs(x - W / 2) < 120) { POS.awakeUntil = 0; return }
+  if (y >= TAB.y && y <= TAB.y + TAB.h && x >= TAB.x && x <= TAB.x + TAB.w) { POS.tab = Math.min(TABS.length - 1, Math.floor((x - TAB.x) / (TAB.w / TABS.length))); return }
+  if (x < PANEL.x - 10) {
+    const col = Math.floor((x - CARD.x) / (CARD.w + CARD.gx)), row = Math.floor((y - CARD.y) / (CARD.h + CARD.gy))
+    const inCard = x - CARD.x - col * (CARD.w + CARD.gx) <= CARD.w && y - CARD.y - row * (CARD.h + CARD.gy) <= CARD.h
+    const it = col >= 0 && col < 4 && row >= 0 && inCard ? shown()[row * 4 + col] : undefined
+    if (it) POS.order.set(it[0], (POS.order.get(it[0]) ?? 0) + 1)
+    return
+  }
+  if (x >= PAY.x && x <= PAY.x + PAY.w && y >= PAY.y && y <= PAY.y + PAY.h) {
+    const total = orderLines().reduce((a, o) => a + o[2], 0)
+    if (total > 0) { POS.paid = total; POS.paidAt = now; POS.order.clear(); POS.seq++ }
+    return
+  }
+  // (a line of the order: one fewer of it)
+  const line = orderLines()[Math.floor((y - 112 + 24) / 60)]
+  if (line && y > 88) { const n = (POS.order.get(line[0]) ?? 0) - 1; if (n > 0) POS.order.set(line[0], n); else POS.order.delete(line[0]) }
+}
+
+export function IpadModel({ lang = 'zh' }: { lang?: Lang }) {
   const gltf = useGLTF(IPAD_URL) as unknown as { scene: THREE.Group }
   const root = useMemo(() => {
     const r = gltf.scene.clone(true)
@@ -262,7 +321,23 @@ export function IpadModel() {
     return r
   }, [gltf])
   // (what's on the screen follows the till: asleep, the order screen, or a card being taken)
-  useFrame(() => drawScreen(TILL_STATE.tablet ? (TILL_STATE.k >= 0 && TILL_STATE.card ? 'card' : 'queue') : 'idle', TILL_STATE.bill, TILL_STATE.queue))
-  return <primitive object={root} />
+  // (and the owner's touches: awake while it's being worked, or while the till has it in use)
+  useFrame(() => {
+    const awake = performance.now() < POS.awakeUntil
+    drawScreen(TILL_STATE.tablet ? (TILL_STATE.k >= 0 && TILL_STATE.card ? 'card' : 'queue') : awake ? 'queue' : 'idle', TILL_STATE.bill, TILL_STATE.tablet ? TILL_STATE.queue : 0)
+  })
+  const tip = lang === 'ja' ? tipOver('タブレット', '画面をタップして操作') : tipOver('平板', '點螢幕操作：點單、分類、結帳')
+  return (
+    // (handlers on a group round it: a primitive's own aren't attached)
+    <group {...tip} onClick={(e: { stopPropagation: () => void; object: THREE.Object3D; uv?: THREE.Vector2 }) => {
+      e.stopPropagation()
+      if (getEdit().on) return
+      // (where on the screen: its UVs were flipped to run top to bottom as the canvas does)
+      if (e.object.name === 'IpadScreen' && e.uv) touch(e.uv.x * W, (1 - e.uv.y) * H)
+      else { POS.awakeUntil = performance.now() + 60000; POS.rev++ }
+    }}>
+      <primitive object={root} />
+    </group>
+  )
 }
 useGLTF.preload(IPAD_URL)
