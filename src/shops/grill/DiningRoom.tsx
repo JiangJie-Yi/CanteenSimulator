@@ -1113,8 +1113,6 @@ function Bouquet({ lean = 0 }: { lean?: number }) {
   )
 }
 
-/** the gold of the altar table's fittings */
-const ZUSHI_GOLD = '#d4a940'
 
 /**
  * The household shrine (神棚) up on the wall: a shelf on two brackets, a little shrine of pale hinoki on a stepped base
@@ -1126,7 +1124,7 @@ const ZUSHI_GOLD = '#d4a940'
 const KAMIDANA_URL = import.meta.env.BASE_URL + 'models/kamidana.glb'
 /** the shrine's model (and the oranges and the sutra, nodes of their own in it): its wood toon like the room, its gold real metal reflecting the
  * studio, an ink line round the bigger parts; made once, each piece taken out of it to be shown where it stands */
-let kamidanaParts: Record<'shrine' | 'oranges' | 'sutra', THREE.Object3D> | null = null
+let kamidanaParts: Record<'shrine' | 'oranges' | 'sutra' | 'table', THREE.Object3D> | null = null
 function kamidanaOf(scene: THREE.Group) {
   if (kamidanaParts) return kamidanaParts
   const r = scene.clone(true)
@@ -1141,7 +1139,7 @@ function kamidanaOf(scene: THREE.Group) {
         const g = new THREE.MeshPhysicalMaterial({ color: '#d9a93c', metalness: 1, roughness: 0.18, clearcoat: 0.6, clearcoatRoughness: 0.1 })
         reflectStudio(g)
         t = g
-      } else if (src.name === 'KamiPeel' || src.name === 'KamiLeaf' || src.name === 'KamiDish') {
+      } else if (src.name === 'KamiPeel' || src.name === 'KamiLeaf' || src.name === 'KamiDish' || src.name === 'KamiCobalt') {
         // (the mikan's waxy peel, the leaves' gloss, the dish's glaze: a soft sheen)
         t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.4, clearcoat: 0.5, clearcoatRoughness: 0.3 })
       } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
@@ -1150,12 +1148,12 @@ function kamidanaOf(scene: THREE.Group) {
     m.material = t
     m.castShadow = true
   })
-  inkModel(r, (m) => /Gold|Cap|Plate|Crest|Seam|Bal|Katsuogi|Fold|Char|Slip|Calyx|Stem|Bow|Cord/.test(m.name), { width: 0.0012, weld: true })
+  inkModel(r, (m) => /Gold|Cap|Plate|Crest|Seam|Bal|Katsuogi|Fold|Char|Slip|Calyx|Stem|Bow|Cord|Tail|Tassel|Fringe|Line|Inlay|Nail|Core|Pillar|Beam/.test(m.name), { width: 0.0012, weld: true })
   const take = (n: string) => { const o = r.getObjectByName(n)!; o.removeFromParent(); o.position.set(0, 0, 0); return o }
-  kamidanaParts = { oranges: take('KamiOranges'), sutra: take('KamiSutra'), shrine: r }
+  kamidanaParts = { oranges: take('KamiOranges'), sutra: take('KamiSutra'), table: take('KamiTable'), shrine: r }
   return kamidanaParts
 }
-function KamidanaModel({ part = 'shrine' }: { part?: 'shrine' | 'oranges' | 'sutra' }) {
+function KamidanaModel({ part = 'shrine' }: { part?: 'shrine' | 'oranges' | 'sutra' | 'table' }) {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
   useStudio()
   const obj = useMemo(() => kamidanaOf(gltf.scene)[part], [gltf, part])
@@ -1510,124 +1508,10 @@ const ALTAR_D = 0.58
 const ALTAR_Y = 1.42
 /** how long the sake offered stands there, and the extra custom it brings (ms) */
 const INCENSE_MS = 180000
-/**
- * the offering table's top: three boards of dark keyaki laid side by side (their grain running along the table), each its own tone, with
- * a thin seam between, long wavering streaks with pores, a cathedral figure or two, a knot, and a soft sheen of oil across it
- */
-const ALTAR_WOOD = canvasTex(512, 1024, (g) => {
-  let seed = 11
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  const W = 512 / 3
-  const tones = ['#7a4a2a', '#6c4124', '#84532f']
-  for (let b = 0; b < 3; b++) {
-    const x0 = b * W
-    g.fillStyle = tones[b]
-    g.fillRect(x0, 0, W + 1, 1024)
-    // (the grain: streaks along the board, wavering, some dark, some light, with pores as tiny dashes in them)
-    for (let i = 0; i < 110; i++) {
-      const x = x0 + rnd() * W
-      g.strokeStyle = rnd() < 0.55 ? `rgba(44,24,10,${0.1 + rnd() * 0.22})` : `rgba(216,164,104,${0.07 + rnd() * 0.15})`
-      g.lineWidth = 0.5 + rnd() * 1.7
-      g.beginPath()
-      g.moveTo(x, 0)
-      g.bezierCurveTo(x + (rnd() - 0.5) * 18, 340, x + (rnd() - 0.5) * 18, 680, x + (rnd() - 0.5) * 12, 1024)
-      g.stroke()
-    }
-    g.fillStyle = 'rgba(30,14,5,0.28)'
-    for (let i = 0; i < 260; i++) g.fillRect(x0 + rnd() * W, rnd() * 1024, 0.8, 3 + rnd() * 9)
-    // (a cathedral figure per board: nested arches of the growth rings, the board's own)
-    const cx = x0 + W * (0.3 + rnd() * 0.4), top = 180 + rnd() * 520
-    for (let k = 0; k < 10; k++) {
-      g.strokeStyle = `rgba(38,18,7,${0.34 - k * 0.022})`
-      g.lineWidth = 1.1
-      g.beginPath()
-      g.moveTo(cx - 40 + k * 3, 1024)
-      g.bezierCurveTo(cx - 40 + k * 3, top + 120 + k * 36, cx + 40 - k * 3, top + 80 + k * 40, cx + 40 - k * 3, 1024)
-      g.stroke()
-    }
-  }
-  // (a knot in the middle board, its rings crowding round it)
-  for (let k = 0; k < 7; k++) {
-    g.strokeStyle = `rgba(35,16,6,${0.58 - k * 0.07})`
-    g.lineWidth = 1.2
-    g.beginPath(); g.ellipse(256, 300, 4 + k * 4, 12 + k * 11, 0, 0, Math.PI * 2); g.stroke()
-  }
-  g.fillStyle = 'rgba(22,9,3,0.8)'
-  g.beginPath(); g.ellipse(256, 300, 3, 8, 0, 0, Math.PI * 2); g.fill()
-  // (the seams: a dark joint with a pale lip beside it)
-  for (const x of [W, 2 * W]) {
-    g.fillStyle = 'rgba(14,6,2,0.85)'; g.fillRect(x - 1, 0, 2.5, 1024)
-    g.fillStyle = 'rgba(230,180,120,0.18)'; g.fillRect(x + 1.5, 0, 1.5, 1024)
-  }
-  // (a soft sheen of oil: a pale band slanting across it)
-  const sh = g.createLinearGradient(0, 200, 512, 420)
-  sh.addColorStop(0, 'rgba(255,230,190,0)')
-  sh.addColorStop(0.5, 'rgba(255,230,190,0.1)')
-  sh.addColorStop(1, 'rgba(255,230,190,0)')
-  g.fillStyle = sh
-  g.fillRect(0, 0, 512, 1024)
-}, true)
-const ALTAR_TOP_GEO = new THREE.BoxGeometry(1, 1, 1)
-/** the apron under the table's front edge: a board cut with a row of arched openings (花頭窓), its lower corners rounded */
-const ALTAR_APRON = (() => {
-  const W = 0.86, H = 0.07
-  const sh = new THREE.Shape()
-  sh.moveTo(-W / 2, 0)
-  sh.lineTo(-W / 2, -H + 0.012)
-  sh.quadraticCurveTo(-W / 2, -H, -W / 2 + 0.012, -H)
-  sh.lineTo(W / 2 - 0.012, -H)
-  sh.quadraticCurveTo(W / 2, -H, W / 2, -H + 0.012)
-  sh.lineTo(W / 2, 0)
-  sh.lineTo(-W / 2, 0)
-  // (five arched openings, a pointed little ogee at the top of each)
-  for (let k = 0; k < 5; k++) {
-    const cx = (k - 2) * 0.15, w = 0.05
-    const hole = new THREE.Path()
-    hole.moveTo(cx - w / 2, -H + 0.016)
-    hole.lineTo(cx - w / 2, -0.034)
-    hole.quadraticCurveTo(cx - w / 2, -0.02, cx, -0.012)
-    hole.quadraticCurveTo(cx + w / 2, -0.02, cx + w / 2, -0.034)
-    hole.lineTo(cx + w / 2, -H + 0.016)
-    hole.lineTo(cx - w / 2, -H + 0.016)
-    sh.holes.push(hole)
-  }
-  return new THREE.ExtrudeGeometry(sh, { depth: 0.016, bevelEnabled: true, bevelThickness: 0.002, bevelSize: 0.002, bevelSegments: 1 })
-})()
-/** the small shrine's offering table: the grained top with its raised lip along the front and sides, a fine gold line inlaid inside the lip, and the arched apron below */
+/** the small shrine's offering table (blender/kamidana.py's KamiTable): three keyaki boards, a dark lip with a gold line inside it, gold front
+ * corners, the arched apron below; in the altar's own frame (its top's surface at y = 0, its front at x = -D/2) */
 function AltarTable() {
-  const L = 0.9, D = ALTAR_D, T = 0.034
-  const GOLD = <meshToonMaterial color={ZUSHI_GOLD} emissive="#4a360a" emissiveIntensity={0.5} />
-  // (square edges, everything laid to the top's own: the top spans x -D/2..D/2 (its front at -D/2, the wall at +D/2), z -L/2..L/2, y -T..0)
-  const CAP = 0.042, LIP = 0.014, LIP_H = 0.012
-  return (
-    <group>
-      <mesh geometry={ALTAR_TOP_GEO} scale={[D, T, L]} position-y={-T / 2} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={ALTAR_WOOD} />
-      </mesh>
-      <mesh geometry={ALTAR_TOP_GEO} scale={[D + 0.007, T + 0.007, L + 0.007]} position-y={-T / 2}><meshBasicMaterial color="#2a1a10" side={THREE.BackSide} /></mesh>
-      {/* the lip: along the front and both sides, flush with the top's edges, in darker wood */}
-      <mesh geometry={ALTAR_TOP_GEO} scale={[LIP, LIP_H, L]} position={[-D / 2 + LIP / 2, LIP_H / 2, 0]}><meshToonMaterial color="#3a2414" /></mesh>
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} geometry={ALTAR_TOP_GEO} scale={[D, LIP_H, LIP]} position={[0, LIP_H / 2, sd * (L / 2 - LIP / 2)]}><meshToonMaterial color="#3a2414" /></mesh>
-      ))}
-      {/* the gold line inlaid just inside it */}
-      <mesh position={[-D / 2 + LIP + 0.012, 0.0008, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.004, L - 2 * LIP - 0.024]} /><meshBasicMaterial color="#b8924a" /></mesh>
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[0.0, 0.0008, sd * (L / 2 - LIP - 0.012)]} rotation-x={-Math.PI / 2}><planeGeometry args={[D - LIP - 0.012, 0.004]} /><meshBasicMaterial color="#b8924a" /></mesh>
-      ))}
-      {/* gold caps on the two front corners (隅金具): a plate over the lip's corner, wrapped down each face, all flush with the corner */}
-      {[-1, 1].map((sd) => (
-        <group key={sd}>
-          <mesh position={[-D / 2 + CAP / 2, LIP_H + 0.0012, sd * (L / 2 - CAP / 2)]}><boxGeometry args={[CAP, 0.0024, CAP]} />{GOLD}</mesh>
-          <mesh position={[-D / 2 - 0.0012, (LIP_H - T) / 2, sd * (L / 2 - CAP / 2)]}><boxGeometry args={[0.0024, LIP_H + T, CAP]} />{GOLD}</mesh>
-          <mesh position={[-D / 2 + CAP / 2, (LIP_H - T) / 2, sd * (L / 2 + 0.0012)]}><boxGeometry args={[CAP, LIP_H + T, 0.0024]} />{GOLD}</mesh>
-          <mesh position={[-D / 2 + CAP / 2 - 0.004, LIP_H + 0.0034, sd * (L / 2 - CAP / 2 + 0.004)]}><sphereGeometry args={[0.004, 8, 6]} /><meshToonMaterial color="#8a6a1a" /></mesh>
-        </group>
-      ))}
-      {/* the apron under the front edge, set just behind the lip's line and under the top's whole length */}
-      <mesh geometry={ALTAR_APRON} position={[-D / 2 + LIP, -T + 0.001, 0]} rotation-y={Math.PI / 2}><meshToonMaterial color="#4a2c18" /></mesh>
-    </group>
-  )
+  return <KamidanaModel part="table" />
 }
 function Sutra() {
   return (
@@ -1732,7 +1616,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       </points>
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}
-      <Sutra />
+      <Movable id="sutra" label="經書"><group><Sutra /></group></Movable>
       <Movable id="flask" label="御神酒壺"><group ref={flaskRef} position={[-0.06, 0, 0.3]}>{flask(0, 'f')}</group></Movable>
       {/* (the clear sake: a thin stream down into the cup, and the cups, each filling with it) */}
       <mesh ref={streamRef} visible={false}>

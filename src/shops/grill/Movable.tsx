@@ -3,7 +3,7 @@
 // when chosen); it's taken hold of by the piece itself (whatever's nearest under the pointer, so a small thing in front of a big one is never
 // lost behind it) and dragged over the floor (Shift lifts it), or with the select tool (Q) only chosen. Wrap it round a StaticBatch, not inside one: the batch's baked meshes then move with the group.
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
@@ -376,6 +376,9 @@ export function AxisGizmo({ id, at, theta = 0 }: { id: string; at: V3; size?: nu
   )
 }
 
+/** the Movable a piece sits inside, if any: the outliner lists it under that one */
+const ParentPiece = createContext<string | null>(null)
+
 export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 0] }: { id: string; label: string; children: ReactNode; baseScale?: number; baseTurn?: V3 }) {
   const g = useRef<THREE.Group>(null)
   /** the group this piece is in lays its transform here, outside the piece's own place */
@@ -465,13 +468,14 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   useLayoutEffect(frame, [])
 
   // (on the list of what can be moved, with a way to bring the camera to the middle of it)
+  const parentPiece = useContext(ParentPiece)
   useEffect(() => registerMovable(id, label, () => {
     const m = measure('whole')
     if (m && g.current) focusCamera(camera, controls, g.current.localToWorld(new THREE.Vector3(...m.c)))
   }, () => {
     const m = measure('whole')
     return m && g.current ? (g.current.localToWorld(new THREE.Vector3(...m.c)).toArray() as V3) : null
-  }), [id, label, camera, controls])
+  }, parentPiece), [id, label, camera, controls, parentPiece])
 
   // (the group this piece is in, if any: its move, turn and size laid over the piece as one, about the group's own middle, in the world)
   const gt = groupTransformOf(id)
@@ -582,7 +586,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
         onPointerOut={on ? () => setHover(false) : undefined}>
         <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]} scale={[sc[0] * baseScale, sc[1] * baseScale, sc[2] * baseScale]}>
           <group rotation-y={-theta}>
-            <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}>{children}</group>
+            <group ref={inner} position={[-mid[0], -mid[1], -mid[2]]}><ParentPiece.Provider value={id}>{children}</ParentPiece.Provider></group>
           </group>
         </group>
       </group>

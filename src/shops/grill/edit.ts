@@ -194,10 +194,11 @@ export function setScaleAxis(a: 0 | 1 | 2 | null) {
 }
 
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
-const registry = new Map<string, { label: string; focus: () => void; center?: () => V3 | null }>()
-/** `center`: where the piece's middle is in the world (what a group of it turns and grows about); a piece without one can't be grouped */
-export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null) {
-  registry.set(id, { label, focus, center })
+const registry = new Map<string, { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null }>()
+/** `center`: where the piece's middle is in the world (what a group of it turns and grows about); a piece without one can't be grouped.
+ * `parent`: the piece it sits inside (a Movable within another), which the outliner lists it under, as Maya's does */
+export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null) {
+  registry.set(id, { label, focus, center, parent })
   panel()
   return () => { registry.delete(id); panel() }
 }
@@ -404,7 +405,7 @@ function panel() {
     document.head.appendChild(st)
   }
   // (rebuilt only when the list of pieces changes; the numbers are just rewritten as one is dragged)
-  const sig = [...registry.keys()].join('|') + '#' + Object.entries(state.groups).map(([k, g]) => `${k}:${g.name}:${g.members.join(',')}`).join(';')
+  const sig = [...registry].map(([k, r]) => `${k}<${r.parent ?? ''}`).join('|') + '#' + Object.entries(state.groups).map(([k, g]) => `${k}:${g.name}:${g.members.join(',')}`).join(';')
   if (!el || built !== sig) {
     el?.remove()
     el = document.createElement('div')
@@ -440,9 +441,9 @@ function panel() {
     const list = h('div', 'be-list')
     rows = new Map()
     // (the groups first, each with its members under it; then every piece not in one)
-    const addRow = (id: string, label: string, indent: boolean, group: boolean) => {
-      const row = h('div', `be-row${group ? ' be-grow' : ''}`, label)
-      if (indent) row.style.paddingLeft = '30px'
+    const addRow = (id: string, label: string, depth: number, group: boolean) => {
+      const row = h('div', `be-row${group ? ' be-grow' : ''}`, (depth > 0 && !group ? '└ ' : '') + label)
+      if (depth) row.style.paddingLeft = `${12 + depth * 16}px`
       row.title = group ? T().rowGroup : T().rowPiece
       row.onclick = (e) => {
         const ev = e as MouseEvent
@@ -454,11 +455,17 @@ function panel() {
       list.appendChild(row)
       rows.set(id, row as HTMLDivElement)
     }
-    for (const [gid, g] of Object.entries(state.groups)) {
-      addRow(gid, `${g.name}（${g.members.length}）`, false, true)
-      for (const m of g.members) if (registry.has(m)) addRow(m, pieceName(registry.get(m)!.label, lang), true, false)
+    // (each piece followed by the pieces inside it, a step further in, as an outliner's hierarchy)
+    const childrenOf = (id: string) => [...registry].filter(([, r]) => r.parent === id).map(([k]) => k)
+    const addTree = (id: string, depth: number) => {
+      addRow(id, pieceName(registry.get(id)!.label, lang), depth, false)
+      for (const k of childrenOf(id)) if (!groupOf(k)) addTree(k, depth + 1)
     }
-    for (const [id, r] of registry) if (!groupOf(id)) addRow(id, pieceName(r.label, lang), false, false)
+    for (const [gid, g] of Object.entries(state.groups)) {
+      addRow(gid, `${g.name}（${g.members.length}）`, 0, true)
+      for (const m of g.members) if (registry.has(m)) addTree(m, 1)
+    }
+    for (const [id, r] of registry) if (!groupOf(id) && !(r.parent && registry.has(r.parent))) addTree(id, 0)
     find.oninput = () => { const q = find.value.trim().toLowerCase(); for (const [id, row] of rows) row.style.display = !q || (rows.get(id)?.textContent ?? id).toLowerCase().includes(q) ? '' : 'none' }
     out.append(find, list)
     // Transform: what's chosen, then Location, Rotation, Scale each as X / Y / Z stacked, a reset beside each
