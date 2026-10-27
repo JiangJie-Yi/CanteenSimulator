@@ -2,7 +2,7 @@
 // charcoal), a paper fan by the seasonings (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
 // glowing behind the stones, which can be moved about like the dishes. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
 // them like anything else (DECOR is their footprint, for its settle()).
-import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -232,61 +232,6 @@ function Fan({ held }: { held: RefObject<Held> }) {
   )
 }
 
-/**
- * The lantern's faces (行燈の組子): warm washi in a wooden frame cut into four panels, one of them an 麻の葉 (hemp-leaf) lattice of fine wooden
- * strips, one a diagonal 菱 lattice, the other two plain paper; the same on all four sides, so it reads whichever way it's turned.
- */
-const LANTERN_PAPER = canvas(256, 256, (g) => {
-  const S = 256
-  const grad = g.createLinearGradient(0, 0, 0, S)
-  grad.addColorStop(0, '#ffe6b4')
-  grad.addColorStop(0.55, '#ffd68c')
-  grad.addColorStop(1, '#f6bc6c')
-  g.fillStyle = grad
-  g.fillRect(0, 0, S, S)
-  for (let i = 0; i < 500; i++) {
-    g.fillStyle = `rgba(180,120,60,${Math.random() * 0.07})`
-    g.fillRect(Math.random() * S, Math.random() * S, 2 + Math.random() * 7, 1)
-  }
-  const wood = 'rgba(112,66,30,0.88)'
-  const panel = (x0: number, y0: number, w: number, kind: 'asanoha' | 'hishi' | 'plain') => {
-    if (kind === 'plain') return
-    g.save()
-    g.beginPath(); g.rect(x0, y0, w, w); g.clip()
-    g.strokeStyle = wood
-    g.lineCap = 'round'
-    if (kind === 'hishi') {
-      // diagonal lattice: strips both ways at 45°
-      g.lineWidth = 3
-      for (let k = -w; k < w * 2; k += w / 4) {
-        g.beginPath(); g.moveTo(x0 + k, y0); g.lineTo(x0 + k + w, y0 + w); g.stroke()
-        g.beginPath(); g.moveTo(x0 + k + w, y0); g.lineTo(x0 + k, y0 + w); g.stroke()
-      }
-    } else {
-      // 麻の葉: each unit cell (a quarter of the panel) cut by both diagonals and both middles, with the star's points between the edge middles
-      const c = w / 2
-      g.lineWidth = 2
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
-        const x = x0 + i * c, y = y0 + j * c
-        const m = c / 2
-        const L = (ax: number, ay: number, bx: number, by: number) => { g.beginPath(); g.moveTo(x + ax, y + ay); g.lineTo(x + bx, y + by); g.stroke() }
-        L(0, 0, c, c); L(c, 0, 0, c); L(m, 0, m, c); L(0, m, c, m)
-        L(m, 0, 0, m); L(m, 0, c, m); L(m, c, 0, m); L(m, c, c, m)
-        L(0, 0, m, m * 0); L(0, 0, 0, m)
-      }
-    }
-    g.restore()
-  }
-  // the four panels, each between wooden strips (the frame and its cross)
-  const pad = 14, w = (S - pad * 2 - 8) / 2
-  panel(pad, pad, w, 'plain')
-  panel(pad + w + 8, pad, w, 'asanoha')
-  panel(pad, pad + w + 8, w, 'hishi')
-  panel(pad + w + 8, pad + w + 8, w, 'plain')
-  g.fillStyle = wood
-  g.fillRect(0, 0, S, pad); g.fillRect(0, S - pad, S, pad); g.fillRect(0, 0, pad, S); g.fillRect(S - pad, 0, pad, S)
-  g.fillRect(pad + w, pad, 8, S - pad * 2); g.fillRect(pad, pad + w, S - pad * 2, 8)
-})
 
 /** a soft round glow, bright in the middle and fading to nothing, for the light round the lantern */
 const GLOW = canvas(128, 128, (g) => {
@@ -305,6 +250,8 @@ const GLOW = canvas(128, 128, (g) => {
  * flickering light on what's near. A click puts it out or lights it again; it isn't moved by hand (only in edit mode).
  */
 const LANTERN_SCALE = 1.8
+const ANDON_URL = import.meta.env.BASE_URL + 'models/andon.glb'
+useGLTF.preload(ANDON_URL)
 function Lantern({ at }: { at: [number, number, number] }) {
   const paper = useRef<THREE.MeshBasicMaterial>(null)
   const halo = useRef<THREE.Sprite>(null)
@@ -331,49 +278,43 @@ function Lantern({ at }: { at: [number, number, number] }) {
     if (flame.current) flame.current.scale.setScalar(0.22 * (0.9 + (f0 - 0.88) * 1.8) * Math.max(0.05, k))
     if (lamp.current) lamp.current.intensity = 0.7 * f
   })
-  const S = 0.2, H = 0.36, LEG = 0.16
-  const geo = useMemo(() => ({
-    post: new THREE.BoxGeometry(0.022, H + LEG + 0.04, 0.022),
-    rail: new THREE.BoxGeometry(S + 0.03, 0.02, 0.02),
-    shade: new THREE.BoxGeometry(S, H, S),
-    shelf: new THREE.BoxGeometry(S, 0.012, S),
-    handle: new THREE.TorusGeometry(S * 0.35, 0.008, 6, 20, Math.PI),
-  }), [])
-  const posts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [a * S / 2, b * S / 2] as const)
-  const top = LEG + H
+  // (the lantern itself, from Blender (blender/andon.py): a kumiko cube of pale hinoki, its washi drawn lit (unshaded, the same by day or
+  // night, brightening and dimming with the flame))
+  const gltf = useGLTF(ANDON_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    const paperMat = new THREE.MeshBasicMaterial({ toneMapped: false, side: THREE.DoubleSide })
+    const woodMats = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      if (src.name === 'AndonPaper') { paperMat.map = src.map; m.material = paperMat; return }
+      if (!woodMats.has(src)) woodMats.set(src, new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map }))
+      m.material = woodMats.get(src)!
+      m.castShadow = true
+    })
+    return { r, paperMat }
+  }, [gltf])
+  useLayoutEffect(() => { (paper as { current: THREE.MeshBasicMaterial | null }).current = model.paperMat }, [model])
+  // (the cube's middle, as modelled: 0.22 across on a thin base, drawn a quarter larger than that)
+  const MID = 0.123, K = 1.25
   return (
     <group position={at} rotation-y={0.4} scale={LANTERN_SCALE} userData={{ container: 'lantern' }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '行燈', hint: lit ? '點一下點燈' : '點一下熄燈' }); setLit(!lit) }}
       onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; document.body.style.cursor = 'pointer'; glowOnly(e.eventObject); setTip({ title: '行燈', hint: lit ? '點一下熄燈' : '點一下點燈' }) }}
       onPointerOut={(e) => { document.body.style.cursor = ''; glowLeave(e.eventObject); setTip(null) }}>
-      {posts.map(([x, z], i) => (
-        <Inked key={i} geometry={geo.post} color="#3a2416" grow={1.12} position={[x, (H + LEG + 0.04) / 2, z]} />
-      ))}
-      {/* rails top and bottom of the shade, both ways */}
-      {[LEG, top].flatMap((y) => [0, 1].flatMap((turn) => [-1, 1].map((side) => (
-        <Inked key={`${y}-${turn}-${side}`} geometry={geo.rail} color="#3a2416" grow={1.1}
-          position={turn ? [side * S / 2, y, 0] : [0, y, side * S / 2]} rotation={[0, turn * Math.PI / 2, 0]} />
-      ))))}
-      {/* the lit paper: unshaded, it glows the same by day or night */}
-      <mesh geometry={geo.shade} position={[0, LEG + H / 2, 0]}>
-        <meshBasicMaterial ref={paper} map={LANTERN_PAPER} toneMapped={false} />
-      </mesh>
-      <mesh geometry={geo.shelf} position={[0, LEG * 0.45, 0]}>
-        <meshToonMaterial color="#4a2e1c" />
-      </mesh>
-      <mesh geometry={geo.handle} position={[0, top + 0.02, 0]}>
-        <meshToonMaterial color="#2a1a10" />
-      </mesh>
+      <primitive object={model.r} scale={K} />
       {/* the flame inside, seen through the paper */}
       {/* (a soft glow, not a solid shape: a hard cone showing through the paper cut dark wedges across it) */}
-      <sprite ref={flame} position={[0, LEG + H * 0.4, 0]} scale={0.22}>
+      <sprite ref={flame} position={[0, MID * K * 0.85, 0]} scale={0.16}>
         <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.7} color="#ffcf80" />
       </sprite>
       {/* the glow round it, always facing the camera, laid on additively */}
-      <sprite ref={halo} position={[0, LEG + H / 2, 0]} scale={0.95}>
+      <sprite ref={halo} position={[0, MID * K, 0]} scale={0.95}>
         <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
       </sprite>
-      {QUALITY.tier === 'high' && <pointLight ref={lamp} position={[0, LEG + H / 2, 0]} color="#ffb060" intensity={0.7} distance={1.8} decay={2} />}
+      {QUALITY.tier === 'high' && <pointLight ref={lamp} position={[0, MID * K, 0]} color="#ffb060" intensity={0.7} distance={1.8} decay={2} />}
     </group>
   )
 }
