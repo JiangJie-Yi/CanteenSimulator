@@ -2308,28 +2308,97 @@ centre_origin(top, (c.x, c.y, BOX_Z + 0.07))
 
 # ---------------------------------------------------------------------------------------------------------
 # a wooden bucket of water on the left, with a dipper (柄杓) in it: splash food or the coals, and drop the bare
-# sticks and burnt scraps in it, as you do at a real fire
-M["bucket_wood"] = pbr("BucketWood", tex=TEX["bamboo"], rough=0.65)
-M["hoop"] = pbr("BucketHoop", (0.16, 0.16, 0.17), rough=0.4, metal=0.8)
+# sticks and burnt scraps in it, as you do at a real fire. Coopered of cedar staves, each its own board (the grain running up it, its tone a
+# little different from the next, a fine dark joint between), two hoops of woven bamboo round it (no iron); the dipper a little coopered cup
+# of the same wood on a long handle, water in it shown or not by the game (DipperWater)
+_su, _sv = grid01(256)
+_grain = np.sin((_su * 26 + fbm(256, 2, 8, 4) * 1.6) * math.pi * 2) * 0.5 + 0.5
+_cedar = mix(mix((0.78, 0.58, 0.38), (0.66, 0.46, 0.29), fbm(256, 3, 10, 4)), (0.5, 0.33, 0.19), smooth(0.7, 0.95, _grain) * 0.45)
+_cedar = mix(_cedar, (0.86, 0.68, 0.48), (fbm(256, 2, 30, 3) > 0.7).astype(np.float32) * 0.2)
+TEX["cedar"] = image("T_BucketCedar", _cedar)
+_band = np.sin((_su * 18 + _sv * 18) * math.pi * 2) * 0.5 + 0.5
+TEX["hoopband"] = image("T_BucketBamboo", mix((0.72, 0.6, 0.36), (0.55, 0.43, 0.23), smooth(0.4, 0.8, _band)))
+M["bucket_wood"] = pbr("BucketWood", tex=TEX["cedar"], rough=0.7)
+M["hoop"] = pbr("BucketBand", tex=TEX["hoopband"], rough=0.6)
+M["stave_joint"] = pbr("BucketJoint", (0.18, 0.11, 0.06), rough=0.8)
 M["water"] = pbr("Water", (0.3, 0.5, 0.62), rough=0.05, coat=1.0)
 bx, by = -1.75, -0.16
 BUCKET_R, BUCKET_H = 0.24, 0.34
-bucket = open_pot(bx, by, BUCKET_R, BUCKET_H, M["bucket_wood"], belly=0.08, name="WaterBucket")
+
+
+def coopered(cx, cy, r0, r1, h, wall, n, name, z0=0.0, seed_=0):
+    """a coopered tub: n staves round (each its own board with its own part of the grain), wider at the top (r1) than the foot (r0), a bottom
+    board let in, a dark line at each joint"""
+    rng_ = np.random.default_rng(seed_)
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    for k in range(n):
+        a0, a1 = 2 * math.pi * k / n, 2 * math.pi * (k + 1) / n
+        ou = float(rng_.uniform(0, 1))
+        vs = []
+        for (z, rr) in ((z0, r0), (z0 + h, r1)):
+            for a in (a0, a1):
+                for ri in (rr, rr - wall):
+                    vs.append(bm.verts.new((cx + ri * math.cos(a), cy + ri * math.sin(a), z)))
+        # (0 bottom-a0-out, 1 bottom-a0-in, 2 bottom-a1-out, 3 bottom-a1-in, 4.. top)
+        quads = [(0, 2, 6, 4), (3, 1, 5, 7), (1, 0, 4, 5), (2, 3, 7, 6), (4, 6, 7, 5), (1, 3, 2, 0)]
+        for q in quads:
+            f = bm.faces.new([vs[i] for i in q])
+            f.material_index = 0
+            for li, l in enumerate(f.loops):
+                co = l.vert.co
+                l[uvl].uv = (ou + (math.atan2(co.y - cy, co.x - cx) - a0) * r1 / 0.12, (co.z - z0) / 0.3)
+    # (the bottom board, let in a little above the foot)
+    ret = bmesh.ops.create_circle(bm, cap_ends=True, radius=r0 - wall * 0.6, segments=n * 2, matrix=Matrix.Translation((cx, cy, z0 + 0.02)))
+    for f in {f for v in ret["verts"] for f in v.link_faces}:
+        f.material_index = 0
+        for l in f.loops:
+            l[uvl].uv = ((l.vert.co.x - cx) / 0.2, (l.vert.co.y - cy) / 0.2)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(M["bucket_wood"])
+    # (the joints: a thin dark strip down the outside of each)
+    joints = []
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        p0 = Vector((cx + (r0 + 0.0008) * math.cos(a), cy + (r0 + 0.0008) * math.sin(a), z0 + 0.002))
+        p1 = Vector((cx + (r1 + 0.0008) * math.cos(a), cy + (r1 + 0.0008) * math.sin(a), z0 + h - 0.002))
+        joints.append(stick_between(p0, p1, 0.0012, M["stave_joint"], f"{name}Joint{k}"))
+    for p_ in o.data.polygons:
+        p_.use_smooth = False
+    return join([o, *joints], name)
+
+
+bucket = coopered(bx, by, BUCKET_R * 0.86, BUCKET_R * 0.96, BUCKET_H, 0.016, 22, "WaterBucket")
 hoops = []
-for hz in (0.07, 0.26):
-    bpy.ops.mesh.primitive_torus_add(major_radius=BUCKET_R * 0.86 + 0.012, minor_radius=0.008, major_segments=40,
-                                     minor_segments=6, location=(bx, by, hz))
-    hoops.append(finish(active(), "Hoop", M["hoop"]))
-bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=BUCKET_R * 0.84, depth=0.006, location=(bx, by, BUCKET_H * 0.78))
+for hz, hr in ((0.075, 0.88), (0.25, 0.93)):
+    # (a hoop of woven bamboo: a flat band, a little proud of the staves)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=BUCKET_R * hr + 0.006, depth=0.03, location=(bx, by, hz))
+    band = active()
+    bm_ = bmesh.new(); bm_.from_mesh(band.data)
+    bmesh.ops.delete(bm_, geom=[f for f in bm_.faces if abs(f.normal.z) > 0.9], context="FACES")
+    bm_.to_mesh(band.data); bm_.free()
+    sol = band.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.008
+    bpy.ops.object.select_all(action="DESELECT"); band.select_set(True); bpy.context.view_layer.objects.active = band
+    bpy.ops.object.modifier_apply(modifier="t")
+    cyl_uv(band)
+    hoops.append(finish(band, "Hoop", M["hoop"]))
+bpy.ops.mesh.primitive_cylinder_add(vertices=40, radius=BUCKET_R * 0.86, depth=0.006, location=(bx, by, BUCKET_H * 0.78))
 surface = finish(active(), "WaterSurface", M["water"])
 centre_origin(join([bucket, *hoops, surface], "WaterBucket"), (bx, by, 0.0))
-# the dipper: a little round cup on a long handle, leaning out of the bucket
+# the dipper: a little coopered cup on a long handle, leaning out of the bucket, and the water it holds (shown by the game when it's full)
 cup_at = Vector((bx + 0.05, by, BUCKET_H * 0.82))
-bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.045, depth=0.05, location=cup_at)
-cup = finish(active(), "DipperCup", M["bucket_wood"])
-handle = stick_between(cup_at + Vector((-0.04, 0, 0.0)), cup_at + Vector((-0.2, 0.02, 0.28)), 0.007, M["spoon_wood"],
-                       "DipperHandle")
-centre_origin(join([cup, handle], "WaterDipper"), tuple(cup_at))
+cup = coopered(cup_at.x, cup_at.y, 0.042, 0.046, 0.055, 0.006, 12, "DipperCup", z0=cup_at.z - 0.0275, seed_=3)
+handle = stick_between(cup_at + Vector((-0.04, 0, 0.0)), cup_at + Vector((-0.2, 0.02, 0.28)), 0.007, M["spoon_wood"], "DipperHandle")
+dipper = join([cup, handle], "WaterDipper")
+centre_origin(dipper, tuple(cup_at))
+bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.036, depth=0.003, location=cup_at + Vector((0, 0, 0.012)))
+dw = finish(active(), "DipperWater", M["water"])
+dw.parent = dipper
+dw.matrix_parent_inverse = dipper.matrix_world.inverted()
 
 # ---------------------------------------------------------------------------------------------------------
 # a little wire grill net laid over the coals, just for toasting mochi (切り餅) on
@@ -2586,7 +2655,7 @@ root = bpy.data.objects.new("GrilledFish", None)
 bpy.context.collection.objects.link(root)
 parts = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 for o in parts:
-    if o.name not in ("MisoLiquid", "SakeLiquid"):     # (the soup stays inside its bowl, the sake in its cup)
+    if o.name not in ("MisoLiquid", "SakeLiquid", "DipperWater"):     # (the soup stays inside its bowl, the sake in its cup, the water in the dipper)
         o.parent = root
 
 bpy.ops.mesh.primitive_plane_add(size=12, location=(0, 0, 0))

@@ -3217,7 +3217,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const tool = tools.find((t) => t.node.name === toolName)
     return pot && tool ? [{ pot, tool }] : []
   }), [root, roast.toolPots, tools])
-  const drag = useRef<{ tool: Tool; target: Piece | null; at: THREE.Vector3; pour: number } | null>(null)
+  const drag = useRef<{ tool: Tool; target: Piece | null; at: THREE.Vector3; pour: number; scoop: number } | null>(null)
+  /** the dipper pouring out what it scooped, where it was let go: how long it has left (s) */
+  const pouring = useRef<{ tool: Tool; left: number; at: THREE.Vector3 } | null>(null)
+  /** the water standing in the dipper's cup (shown once it's scooped some up, gone as it's poured out) */
+  const dipperWater = useMemo(() => root.getObjectByName('DipperWater') ?? null, [root])
+  useLayoutEffect(() => { if (dipperWater) dipperWater.visible = false }, [dipperWater])
   const hoveredTool = useRef<Tool | null>(null)
   const [toolLabel, setToolLabel] = useState<{ kind: Seasoning; at: [number, number, number] } | null>(null)
 
@@ -3334,10 +3339,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const pickTool = () => {
       if (!byHandRef.current) return null
-      const hits = raycaster.intersectObjects([...tools.map((t) => t.node), ...pots.map((p) => p.pot)], true)
+      // (the whole water bucket is a handle on its dipper: pointing anywhere on it takes the dipper, to scoop up water)
+      const bucket = root.getObjectByName('WaterBucket')
+      const dipper = tools.find((t) => t.kind === 'water') ?? null
+      const hits = raycaster.intersectObjects([...tools.map((t) => t.node), ...pots.map((p) => p.pot), ...(bucket && dipper ? [bucket] : [])], true)
       if (!hits.length) return null
       let o: THREE.Object3D | null = hits[0].object
-      while (o && !tools.some((t) => t.node === o) && !pots.some((p) => p.pot === o)) o = o.parent
+      while (o && !tools.some((t) => t.node === o) && !pots.some((p) => p.pot === o) && o !== bucket) o = o.parent
+      if (o && o === bucket) return pouring.current ? null : dipper
       return tools.find((t) => t.node === o) ?? pots.find((p) => p.pot === o)?.tool ?? null
     }
     // where a carried seasoning is held: on a level plane a little above the food, under the pointer
@@ -3471,7 +3480,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       // pick it up: the camera holds still while it's carried, and the pointer is followed over the whole window
       // (it passes over the food tags, which sit above the canvas)
-      drag.current = { tool, target: null, at: tool.node.position.clone(), pour: 0 }
+      if (pouring.current?.tool === tool) return
+      drag.current = { tool, target: null, at: tool.node.position.clone(), pour: 0, scoop: tool.kind === 'water' ? 0 : 1 }
       if (tool.kind === 'salt') setSaltInHand(true)
       if (controls) controls.enabled = false
       el.style.cursor = 'grabbing'
@@ -3487,16 +3497,23 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       document.body.classList.remove('is-carrying')
       if (!d) return
       // let go over food: season it; either way the seasoning goes back to its place
+      // (the dipper, once it's scooped, pours where it's let go first, tipping its water out over a moment, then goes back)
+      const scooped = d.tool.kind === 'water' && d.scoop >= 1
+      const overCoals = d.tool.kind === 'water' && Math.hypot(d.at.x, d.at.z) < RING_CLEAR * 0.7
       if (d.target) {
         season(d.target, d.tool.kind)
-        emit(d.tool.kind, d.at.clone().add(new THREE.Vector3(0, -0.1, 0)), 40)
-      } else if (d.tool.kind === 'water' && Math.hypot(d.at.x, d.at.z) < RING_CLEAR * 0.7) {
+        if (d.tool.kind !== 'water') emit(d.tool.kind, d.at.clone().add(new THREE.Vector3(0, -0.1, 0)), 40)
+      } else if (overCoals && scooped) {
         // water thrown on the coals: they hiss and steam, and the fire drops right down
-        emit('water', d.at.clone().add(new THREE.Vector3(0, -0.1, 0)), 60)
         if (fire) fire.current = Math.max(0, fire.current - 0.3)
         setWisps((all) => [...all.filter((w) => w.key !== 'douse'), { key: 'douse', at: [0, 0.15, 0] }])
       }
-      d.tool.back = 0
+      // (scooped, it's always poured out where it's let go: on the food, the coals, or just the table)
+      if (scooped) pouring.current = { tool: d.tool, left: 0.8, at: d.tool.node.position.clone() }
+      else {
+        d.tool.back = 0
+        if (d.tool.kind === 'water' && dipperWater) dipperWater.visible = false
+      }
       drag.current = null
       setSaltInHand(false)
       if (controls) controls.enabled = true
@@ -4115,12 +4132,37 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (const t of tools) {
       const held = d?.tool === t
       if (held && t.kind === 'salt' && hand.current) hand.current.position.copy(t.node.position).add(HAND_OFFSET)
-      if (held) {
+      const pour = pouring.current?.tool === t ? pouring.current : null
+      if (held && t.kind === 'water' && d!.scoop < 1) {
+        // (the dipper first goes down into the bucket and comes up full: down to the water, a dip under it, and up out again)
+        d!.scoop = Math.min(1, d!.scoop + dt / 0.55)
+        const k = d!.scoop
+        const down = Math.sin(Math.min(1, k * 1.25) * Math.PI)
+        t.node.position.copy(t.home).add(new THREE.Vector3(0, -0.11 * down + 0.06 * Math.max(0, k - 0.6) / 0.4, 0))
+        t.node.quaternion.copy(t.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, -1).normalize(), -0.25 * down))
+        if (k > 0.45 && dipperWater) { dipperWater.visible = true; dipperWater.scale.setScalar(1) }
+        if (Math.random() < dt * 12 * down) emit('water', t.node.position.clone().add(new THREE.Vector3(0, 0.02, 0)), 2)
+      } else if (held) {
         t.node.position.lerp(d!.at, Math.min(1, dt * 14))
-        d!.pour += ((d!.target ? 1 : 0) - d!.pour) * Math.min(1, dt * 8)
+        // (the dipper, full, held level so as not to spill until it's let go; the rest tip toward the food they're over)
+        const want = t.kind === 'water' ? 0 : d!.target ? 1 : 0
+        d!.pour += (want - d!.pour) * Math.min(1, dt * 8)
         t.node.quaternion.copy(t.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(
-          new THREE.Vector3(1, 0, -1).normalize(), 0.2 + d!.pour * 0.9))
-        if (d!.target && Math.random() < dt * 30) emit(t.kind, t.node.position.clone().add(new THREE.Vector3(0, -0.05, 0)), 2)
+          new THREE.Vector3(1, 0, -1).normalize(), (t.kind === 'water' ? 0 : 0.2) + d!.pour * 0.9))
+        if (t.kind !== 'water' && d!.target && Math.random() < dt * 30) emit(t.kind, t.node.position.clone().add(new THREE.Vector3(0, -0.05, 0)), 2)
+      } else if (pour) {
+        // (pouring: the dipper tips over where it was let go, its water running out in a stream, then it's carried back)
+        pour.left -= dt
+        const k = 1 - Math.max(0, pour.left) / 0.8
+        t.node.position.lerp(pour.at, Math.min(1, dt * 14))
+        t.node.quaternion.copy(t.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, -1).normalize(), Math.min(1, k * 2) * 1.9))
+        if (k > 0.2 && k < 0.95) emit('water', t.node.position.clone().add(new THREE.Vector3(0.03, -0.04, 0.03)), 4)
+        if (dipperWater) dipperWater.scale.setScalar(Math.max(0.01, 1 - Math.max(0, k - 0.25) / 0.6))
+        if (pour.left <= 0) {
+          pouring.current = null
+          t.back = 0
+          if (dipperWater) dipperWater.visible = false
+        }
       } else if (t.back < 1) {
         // carried back home in a little arc
         t.back = Math.min(1, t.back + dt * 2.5)

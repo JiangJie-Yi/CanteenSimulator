@@ -2026,7 +2026,8 @@ export default function App() {
           setOrders((all) => ({ ...all, [dish.id]: {} }))
         }} />
       </>)}
-      {(hand || ai) && (
+      {/* (the fold tab only for the open shop's menu: researching, the fridge button opens and shuts the panel) */}
+      {ai && (
         <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner !== null && !opened[dish.id])}
           aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
           <span>{menuFolded ? '‹' : '›'}</span>
@@ -2073,7 +2074,7 @@ export default function App() {
       )}
       {/* (at the grill with the shop shut, researching: a little fridge, top right, opens and shuts the ingredients' panel) */}
       {hand && !!dish.roast && !editOn && (
-        <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => setFridgeOpen((v) => !v)} aria-pressed={fridgeOpen}
+        <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => { setFridgeOpen((v) => !v); setMenuFolded(false) }} aria-pressed={fridgeOpen}
           title={lang === 'ja' ? '食材庫を開く／閉じる' : '打開／關上食材櫃'}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2.2" /><path d="M5 9.5h14" /><path d="M8 5.5v2M8 12.5v4" /><path d="M7 21.5v1M17 21.5v1" /></svg>
         </button>
