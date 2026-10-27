@@ -141,6 +141,26 @@ def hinoki_board(n):
 
 walnut_tex = image("walnut", soft_walnut(512))
 hinoki_back_tex = image("hinokiback", hinoki_board(512))
+# (the partition's lattice (立て格子) as a picture: four walnut slats across a tile, the pale hinoki board between them shadowed at their
+# edges, each slat's edges eased (darker), a sheen down one side; and a normal map from its relief, so the slats stand off the board in the
+# light)
+_su, _sv = grid01(512)
+_ph = (_su * 4) % 1.0                                      # (across one slat's period)
+_half = 0.011 / 0.021 / 2
+_d = np.abs(_ph - 0.5)                                     # (from the slat's middle)
+_slat = smooth(_half + 0.012, _half - 0.012, _d)
+_wal = soft_walnut(512)
+_hin = hinoki_board(512)
+_gap_shade = np.exp(-((_d - _half) / 0.06) ** 2)          # (the board's shadow close by each slat)
+lat = mix(_hin, _hin * 0.45, _gap_shade * (1 - _slat) * 0.6)
+_edge = smooth(_half - 0.07, _half, _d) * _slat
+_sheen = np.exp(-((_ph - 0.43) / 0.05) ** 2) * _slat
+lat = mix(lat, _wal, _slat)
+lat = mix(lat, _wal * 0.55, _edge * 0.7)
+lat = mix(lat, np.clip(_wal * 1.5, 0, 1), _sheen * 0.35)
+slat_tex = image("shieldslats", lat)
+_hgt = _slat * (1 - 0.5 * smooth(_half - 0.08, _half, _d))
+slat_nrm = image("shieldslatsN", to_normal(_hgt.astype(np.float32), 3.0), data=True)
 dark_tex = image("darkwood", mix((0.25, 0.17, 0.11), (0.2, 0.13, 0.08), fbm(256, 2, 40, 4)))
 
 M = {
@@ -155,6 +175,7 @@ M = {
     "paper": pbr("TillWindowPaper", (1, 1, 1), tex=paper_tex, rough=0.9, emit=(1, 0.85, 0.6), emit_strength=1.5),
     "bambooGlow": pbr("TillBambooGlow", (1, 1, 1), tex=bamboo_glow_tex, rough=1.0, emit=(1, 0.8, 0.5), emit_strength=1.0),
     "walnut": pbr("TillShieldWalnut", (1, 1, 1), tex=walnut_tex, rough=0.4),
+    "slats": pbr("TillShieldSlats", (1, 1, 1), tex=slat_tex, nrm=slat_nrm, nrm_strength=1.0, rough=0.45),
     "slatBack": pbr("TillShieldBack", (1, 1, 1), tex=hinoki_back_tex, rough=0.6),
     "shoe": pbr("TillShieldShoe", lin("#2a2622"), rough=0.35, metal=0.6),
     "bamboo": pbr("TillBamboo", (1, 1, 1), tex=bamboo_tex, rough=0.35),
@@ -501,14 +522,14 @@ sh.append(sweep("TillCap", profile((FT + 0.018) / 2, YT, YT + CAP, 0.007), path(
 # square ones about every 30 cm along each straight run)
 for tag, (ex, ez) in (("Start", (XL, ZF)), ("End", (XE, ZB))):
     pr = (FT + 0.018) / 2 + 0.002
-    sh.append(cyl(f"TillPost{tag}", pr, YT + CAP - TOP, P(ex, (TOP + YT + CAP) / 2, ez), M["walnut"], verts=40))
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=pr, segments=40, ring_count=16, location=P(ex, YT + CAP, ez))
+    sh.append(cyl(f"TillPost{tag}", pr, YT + CAP - TOP, P(ex, (TOP + YT + CAP) / 2, ez), M["walnut"], verts=20))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=pr, segments=20, ring_count=8, location=P(ex, YT + CAP, ez))
     dome = active()
     dome.scale = (1, 1, 0.35)
     apply_scale(dome)
     sh.append(finish(dome, f"TillPost{tag}Top", M["walnut"]))
 mid = path()[8]
-sh.append(cyl("TillPostCorner", FT / 2 + 0.006, YT - Y0, P(mid[0], (Y0 + YT) / 2, mid[1]), M["walnut"], verts=32))
+sh.append(cyl("TillPostCorner", FT / 2 + 0.006, YT - Y0, P(mid[0], (Y0 + YT) / 2, mid[1]), M["walnut"], verts=16))
 
 
 def straight(x0, z0, x1, z1, tag):
@@ -521,9 +542,6 @@ def straight(x0, z0, x1, z1, tag):
     n = max(1, round(L / 0.32))
     for i in range(1, n):
         sh.append(box(f"TillPost{tag}{i}", S(0.03, YT - Y0, FT + 0.004), at(L * i / n, (Y0 + YT) / 2), M["walnut"], bev=0.003, rot=rot, uv=0.4))
-    ph = YT - Y0 - 2 * RAIL
-    pc = Y0 + RAIL + ph / 2
-    sh.append(box(f"TillBack{tag}", S(L, ph, 0.006), at(L / 2, pc), M["slatBack"], rot=rot, uv=0.4))
     return [L * i / n for i in range(1, n)]
 
 
@@ -551,27 +569,43 @@ def along(t):
             k = t - a0
             return ax + ux * k, az + uz * k, ux, uz
     return LINE[-1][0], LINE[-1][1], 0.0, 1.0
-# (round the corner too: the board behind in short pieces following the curve, and the slats on it, so the run never breaks)
-arc = path()[1:16]
+# (the lattice: one board from end to end round the corner, as thick as the slats stood on both its faces, the slats and the hinoki between
+# painted on (STEP apart, four to a tile of the picture), its edges hidden in the rails and the end posts)
 ph = YT - Y0 - 2 * RAIL
 pc = Y0 + RAIL + ph / 2
-for i in range(len(arc) - 1):
-    (ax, az), (bx, bz) = arc[i], arc[i + 1]
-    L = math.hypot(bx - ax, bz - az)
-    sh.append(box(f"TillBackC{i}", S(L + 0.002, ph, 0.006), P((ax + bx) / 2, pc, (az + bz) / 2), M["slatBack"], rot=(0, 0, -math.atan2(bz - az, bx - ax)), uv=0.4))
-# (the slats: every 2.1 cm along the line from one end to the other, through the corner without a break, none where a post stands)
 STEP = 0.021
-t = 0.03
-i = 0
-while t < acc - 0.03:
-    if all(abs(t - q) > 0.024 for q in POSTS):
-        px, pz, ux, uz = along(t)
-        for side in (-1, 1):
-            off = side * 0.007
-            sh.append(box(f"TillSlat{i}{'ab'[side > 0]}", S(0.011, ph, 0.007), P(px - uz * off, pc, pz + ux * off), M["walnut"], bev=0.0015,
-                          rot=(0, 0, -math.atan2(uz, ux)), uv=0.4))
-        i += 1
-    t += STEP
+HT = 0.0105
+bm_ = bmesh.new()
+uvl = bm_.loops.layers.uv.new("UVMap")
+LINE2 = path(n_arc=16)
+rows = []
+acc2 = 0.0
+for i, (px, pz) in enumerate(LINE2):
+    if i:
+        acc2 += math.hypot(px - LINE2[i - 1][0], pz - LINE2[i - 1][1])
+    ax, az = LINE2[max(0, i - 1)]
+    bx, bz = LINE2[min(len(LINE2) - 1, i + 1)]
+    tx, tz = bx - ax, bz - az
+    L_ = math.hypot(tx, tz)
+    nx, nz = -tz / L_, tx / L_
+    rows.append((acc2, [bm_.verts.new(P(px + nx * side * HT, y, pz + nz * side * HT)) for side in (-1, 1) for y in (pc - ph / 2, pc + ph / 2)]))
+for (t0, r0), (t1, r1) in zip(rows, rows[1:]):
+    u0, u1 = t0 / (4 * STEP), t1 / (4 * STEP)
+    # (each face: lo, hi of this ring and the next, wound to face out)
+    for (a_, b_), side in (((0, 1), -1), ((2, 3), 1)):
+        f = bm_.faces.new([r0[a_], r1[a_], r1[b_], r0[b_]])
+        for lp, uv in zip(f.loops, [(u0, 0), (u1, 0), (u1, 1), (u0, 1)]):
+            lp[uvl].uv = uv
+        # (turned to face out of its own side)
+        f.normal_update()
+        if f.normal.dot(Vector(r0[2].co) - Vector(r0[0].co)) * side < 0:
+            f.normal_flip()
+me_ = bpy.data.meshes.new("TillLattice")
+bm_.to_mesh(me_)
+bm_.free()
+lat_o = bpy.data.objects.new("TillLattice", me_)
+bpy.context.collection.objects.link(lat_o)
+sh.append(finish(lat_o, "TillLattice", M["slats"], smooth_shade=False))
 nodes.append(node("TillShield", sh))
 
 root = bpy.data.objects.new("TillCounter", None)

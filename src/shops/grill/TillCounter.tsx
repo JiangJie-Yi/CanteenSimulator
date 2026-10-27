@@ -34,6 +34,9 @@ function finishOf(src: THREE.MeshStandardMaterial): THREE.Material {
     case 'TillShieldWalnut':
       // (oiled walnut: a soft sheen)
       return new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.35 })
+    case 'TillShieldSlats':
+      // (the partition's lattice, painted: walnut slats over pale hinoki, the normal map standing the slats off the board)
+      return new THREE.MeshPhysicalMaterial({ map: src.map, normalMap: src.normalMap, roughness: 0.45, clearcoat: 0.25, clearcoatRoughness: 0.4, side: THREE.DoubleSide })
     case 'TillShieldShoe':
       return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), metalness: 0.7, roughness: 0.35 })
     default:
