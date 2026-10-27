@@ -25,9 +25,9 @@ import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
-import { DECOR, Decor, FRIDGE_KICK, type Held } from './Decor'
+import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
-import { charcoalMaterial, useBinchotan } from './binchotanModel'
+import { ashMaterial, charcoalMaterial, useBinchotan } from './binchotanModel'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
@@ -402,42 +402,38 @@ const EMBER_GLOW = (() => {
   return new THREE.CanvasTexture(c)
 })()
 /**
- * The bed of embers between and under the sticks: a scatter of small broken lumps of charcoal, some glowing hard, some dull, some only dark, and a pool of
- * orange light on the salt. They glow with the fire (`fuel`, 0..1+) and breathe a little; as the fire dies they go grey with ash and stop glowing.
+ * The bed of ash between and under the sticks: grey granular clumps (blender/binchotan.py's BinAsh), lying flat on the salt (none on a point,
+ * none in the air), some with a faint red in them while the fire's up (what's left of burnt sticks: not a blaze), and a pool of orange light on
+ * the salt.
  */
 function EmberBed({ fuel }: { fuel: { current: number } }) {
   const lumps = useMemo(() => {
     let seed = 23
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    const groups: { m: THREE.Matrix4[]; k: number }[] = [{ m: [], k: 0.6 }, { m: [], k: 0.3 }, { m: [], k: 0.08 }]
-    for (let i = 0; i < 80; i++) {
-      const a = rnd() * Math.PI * 2, r = 0.36 * rnd() ** 0.75
-      const x = Math.cos(a) * r, z = Math.sin(a) * r, size = 0.012 + rnd() * 0.022
-      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 6, rnd() * 3))
-      const m = new THREE.Matrix4().compose(new THREE.Vector3(x, surfaceY(x, z, PIT_LIFT) + size * 0.35, z), q, new THREE.Vector3(size * (0.8 + rnd() * 0.7), size * 0.55, size * (0.8 + rnd() * 0.7)))
-      groups[i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : 2].m.push(m)
+    const groups: { m: THREE.Matrix4[]; k: number }[] = [{ m: [], k: 0.35 }, { m: [], k: 0.12 }, { m: [], k: 0 }]
+    for (let i = 0; i < 70; i++) {
+      const a = rnd() * Math.PI * 2, r = 0.34 * rnd() ** 0.75
+      const x = Math.cos(a) * r, z = Math.sin(a) * r, s = 0.7 + rnd() * 1.1
+      // (lying flat, only turned about the vertical, its flat underside a hair into the salt so no gap shows under it)
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 6.28)
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(x, surfaceY(x, z, PIT_LIFT) - 0.002, z), q, new THREE.Vector3(s * (0.85 + rnd() * 0.4), s * (0.7 + rnd() * 0.5), s * (0.85 + rnd() * 0.4)))
+      groups[i % 3].m.push(m)
     }
     return groups
   }, [])
-  // (broken pieces of binchotan, as the sticks break into: the Blender pieces, drawn small)
   const bin = useBinchotan()
-  const geo = useMemo(() => bin.chunk(0).clone().scale(14, 14, 14), [bin])
-  const mats = useMemo(() => lumps.map(() => new THREE.MeshToonMaterial({ color: '#2a2724', map: bin.face, emissive: new THREE.Color('#c0300a'), emissiveIntensity: 0 })), [lumps, bin])
+  const mats = useMemo(() => lumps.map(() => { const m = ashMaterial(bin); m.emissive.set('#a8280a'); return m }), [lumps, bin])
   const refs = useRef<(THREE.InstancedMesh | null)[]>([])
   const pool = useRef<THREE.Mesh>(null)
   useLayoutEffect(() => {
     lumps.forEach((gr, i) => { const im = refs.current[i]; if (im) { gr.m.forEach((m, j) => im.setMatrixAt(j, m)); im.instanceMatrix.needsUpdate = true } })
   }, [lumps])
-  const dark = useMemo(() => new THREE.Color('#141210'), [])
-  const ash = useMemo(() => new THREE.Color('#9a948a'), [])
   useFrame(({ clock }) => {
     const f = Math.max(0, fuel.current), t = clock.elapsedTime
-    const ashy = THREE.MathUtils.smoothstep(0.45 - f, 0, 0.4)
     mats.forEach((m, i) => {
       const flick = 0.85 + 0.15 * Math.sin(t * (2.1 + i) + i * 1.7)
-      // (embers of what's nearly burnt through: a dull red under the ash, not a blaze)
-      m.emissiveIntensity = lumps[i].k * 0.6 * Math.min(1.3, f) ** 1.3 * flick * (1 - ashy)
-      m.color.copy(dark).lerp(ash, ashy)
+      // (ash of what's burnt through: at most a faint red in it while the fire's up)
+      m.emissiveIntensity = lumps[i].k * Math.min(1.2, f) * flick
     })
     if (pool.current) {
       pool.current.visible = f > 0.03
@@ -446,7 +442,7 @@ function EmberBed({ fuel }: { fuel: { current: number } }) {
   })
   return (
     <>
-      {lumps.map((gr, i) => <instancedMesh key={i} ref={(m) => { refs.current[i] = m }} args={[geo, mats[i], gr.m.length]} frustumCulled={false} />)}
+      {lumps.map((gr, i) => <instancedMesh key={i} ref={(m) => { refs.current[i] = m }} args={[bin.ash(i * 2), mats[i], gr.m.length]} frustumCulled={false} receiveShadow />)}
       <mesh ref={pool} position-y={surfaceY(0, 0, PIT_LIFT) + 0.03} rotation-x={-Math.PI / 2} renderOrder={2}>
         <planeGeometry args={[1.5, 1.5]} />
         <meshBasicMaterial map={EMBER_GLOW} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
@@ -1846,7 +1842,7 @@ type RoastingProps = {
   /** the AI customers order from the menu, and the chef adds charcoal, through the app */
   /** order something; false if it couldn't be (the fire or the basket is full) */
   onOrder?: (id: string, guest?: number) => boolean
-  onAddCharcoal?: () => boolean
+  onAddCharcoal?: (one?: boolean) => boolean
   /** something the chef or a customer says */
   onSay?: (who: 'chef' | 'guest', text: string) => void
   /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
@@ -2175,7 +2171,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // charcoal added is thrown in: a few sticks leave the hand (or the crate), fly in an arc, land on the heap, bounce, tip and lie
   // where they land, a burst of sparks and ash where each strikes. Each stick starts black and kindles on its own, over some
   // seconds, to red-hot (its glow reddening, its face going ashy grey), as binchotan does
-  type Coal = { g: THREE.Object3D | null; mat: THREE.MeshStandardMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
+  type Coal = { g: THREE.Object3D | null; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
     sx: number; sz: number; settled: boolean; top: number; delay: number; heat: number; bounced: boolean
     /** seconds since it landed, whether it's burnt out, and how long it's been going out when it's pushed out by the new */
     age: number; gone: boolean; dying: boolean; dyT: number
@@ -2189,7 +2185,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const bin = useBinchotan()
   const randomStick = () => bin.stick(0.28 + Math.random() * 0.12, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 6))
   /** the pieces of sticks that burnt through and broke: falling onto what's under them, lying there as grey ash a while, then gone */
-  type Crumb = { id: number; geo: THREE.BufferGeometry; mat: THREE.MeshStandardMaterial; x: number; y: number; z: number; ty: number; vy: number; q: THREE.Quaternion; age: number; m: THREE.Mesh | null }
+  type Crumb = { id: number; geo: THREE.BufferGeometry; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; ty: number; vy: number; q: THREE.Quaternion; age: number; m: THREE.Mesh | null }
   const crumbs = useRef<Crumb[]>([])
   const [crumbIds, setCrumbIds] = useState<number[]>([])
   const crumbSeq = useRef(0)
@@ -2201,8 +2197,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (const o of coals.current) if (o && o !== c && !o.gone && !o.dying && o.top < c.top + 0.01) below.push({ x: o.tx, z: o.tz, yaw: o.yaw, y: o.top, slope: o.slope })
     const parts = crumble({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope }, below, Math.random, PIT_LIFT)
     const made = parts.map((p) => {
-      const mat = charcoalMaterial(bin)
-      mat.color.copy(ASH_TINT).multiplyScalar(2)
+      // (burnt through: grey ash, granular, the pieces' shapes but the ash's own face)
+      const mat = ashMaterial(bin)
       // (lying on its side the way it fell, a little askew)
       const q = new THREE.Quaternion().setFromUnitVectors(UP_AXIS, new THREE.Vector3(Math.cos(p.yaw), (Math.random() - 0.5) * 0.4, Math.sin(p.yaw)).normalize())
         .multiply(new THREE.Quaternion().setFromAxisAngle(UP_AXIS, Math.random() * 6))
@@ -2244,10 +2240,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
     return roomFor(alive.length, alive.filter(ashedOut).length, COAL_MAX)
   }
-  const dropCoals = (from?: { x: number; y: number; z: number }) => {
+  /** charcoal onto the fire: a load (the chef, the button), or `count` sticks (one, dragged from the crate by hand) */
+  const dropCoals = (from?: { x: number; y: number; z: number }, count?: number) => {
     // (only as many as the bed has room for: the most it holds, less those still burning; ones burnt to ash are cleared to make room)
     const aliveNow = coals.current.filter((c) => c && !c.gone && !c.dying)
-    const n = Math.min(COAL_PER_ADD.min + Math.floor(Math.random() * (COAL_PER_ADD.max - COAL_PER_ADD.min + 1)), COAL_MAX - aliveNow.length + aliveNow.filter(ashedOut).length)
+    const n = Math.min(count ?? COAL_PER_ADD.min + Math.floor(Math.random() * (COAL_PER_ADD.max - COAL_PER_ADD.min + 1)), COAL_MAX - aliveNow.length + aliveNow.filter(ashedOut).length)
     if (n <= 0) return
     const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
     // (a bed only holds so many sticks: when the new ones would take it past the most, the oldest burn out at once, shrinking away)
@@ -3415,7 +3412,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (what's under the pointer, named by a tag, for what isn't food or a tool (those have their own): a dish or the table's boxes, dragged about)
       // (only its own tag is cleared here: the scene's other things set theirs through the pointer events)
       if (!tool && !p && !soup && !dec && cont) { setTip(CONTAINER_TIP(cont)); ownTip = true } else if (ownTip) { setTip(null); ownTip = false }
-      el.style.cursor = tool || dec ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : pickCoal() ? 'pointer' : POINTER_HINT.hand ? 'pointer' : ''
+      el.style.cursor = tool || dec ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : POINTER_HINT.hand ? 'pointer' : ''
     }
     const onDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY }
@@ -3451,15 +3448,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         // otherwise grab a plate, side dish, the basket, the seasoning box or the bin (not the food on them)
         const picked = food ? null : pickContainer()
-        if (!picked) {
-          // (a click on the coals themselves puts more charcoal on)
-          if (pickCoal()) {
-            // (nothing goes on once the fire's at 100%, or the bed is full of sticks still burning)
-            if (!roomForCoal()) onNotice?.('heapFull')
-            else if (onAddCharcoal?.() !== false) dropCoals()
-          }
-          return
-        }
+        // (charcoal goes on only by dragging a stick from the crate: a click on the fire does nothing)
+        if (!picked) return
         // (from a stack, the one on top comes off)
         const key = STACKABLE(picked) ? stackTop(picked) : picked
         if (stackOn.current.has(key)) {
@@ -3561,19 +3551,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       window.removeEventListener('pointermove', holdDecor)
       document.body.classList.remove('is-carrying')
       // the charcoal let go over the fire goes on it
-      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) { if (!roomForCoal()) onNotice?.('heapFull'); else if (onAddCharcoal?.() !== false) dropCoals() }
+      // (one stick, from where it's let go; the crate is a stick the fewer)
+      if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) {
+        if (!roomForCoal()) onNotice?.('heapFull')
+        else if (onAddCharcoal?.(true) !== false) { dropCoals({ x: h.at.x, y: h.at.y, z: h.at.z }, 1); takeFromCrate() }
+      }
       held.current = null
       if (controls) controls.enabled = true
       el.style.cursor = ''
     }
     /** the plate / dish / basket under the pointer, by the container key its group carries */
-    /** the charcoal (and the logs) in the fire, under the pointer, with nothing nearer in the way */
-    const pickCoal = () => {
-      const hit = raycaster.intersectObject(root, true)[0]
-      if (!hit || !(hit.object instanceof THREE.Mesh)) return false
-      const mats = ([] as THREE.Material[]).concat(hit.object.material)
-      return mats.some((m) => /^(Ember|Binchotan|Bark)/.test(m.name))
-    }
     const pickContainer = () => {
       if (!byHandRef.current) return null
       const groups: THREE.Object3D[] = []
@@ -3945,11 +3932,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (the last third of its life: the glow dies back and the ash coat takes over)
         const ashed = Math.max(0, Math.min(1, (Math.min(1, c.age / COAL_LAST_S) - 0.72) / 0.28))
         const h = c.heat * (1 - ashed * ashed * (3 - 2 * ashed)) * (c.dying ? Math.max(0, 1 - burnt) : 1)
-        c.mat.color.set('#ffffff').lerp(ASH_TINT, ashed).multiplyScalar(1 + 3.6 * ashed ** 1.5)
+        // (charcoal-dark under the fire's light, only its cracks glowing; greying with ash at the end)
+        c.mat.color.set('#6a6a6a').lerp(ASH_TINT, ashed).multiplyScalar(1 + 2.2 * ashed ** 1.5)
         const flick = 0.9 + 0.1 * Math.sin(clock * 9 + c.top * 90) * Math.sin(clock * 4.3 + c.rx)
         // (only the fractures light up (the emissive map): an orange that goes yellower and brighter as the stick kindles, a dull red while it's still catching)
-        c.mat.emissive.setRGB(1, 0.42 + 0.45 * h ** 1.6, 0.1 + 0.25 * h ** 3)
-        c.mat.emissiveIntensity = 1.25 * h ** 1.3 * flick
+        c.mat.emissive.setRGB(1, 0.32 + 0.4 * h ** 1.6, 0.06 + 0.2 * h ** 3)
+        c.mat.emissiveIntensity = 0.8 * h ** 1.3 * flick
       }
       if (c.settled) {
         // (what lay on it comes down as sticks beneath burn away; it eases to its pose)

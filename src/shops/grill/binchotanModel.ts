@@ -17,6 +17,9 @@ export type BinchotanKit = {
   stick: (len: number, r: number, k: number) => THREE.BufferGeometry
   /** the `k`th broken piece, drawn `len` long */
   chunk: (k: number, len?: number) => THREE.BufferGeometry
+  /** the `k`th clump of ash (flat underneath, at y = 0) */
+  ash: (k: number) => THREE.BufferGeometry
+  ashMap: THREE.Texture | null
   /** the charcoal's face, its relief, and the cracks' glow */
   face: THREE.Texture | null
   normal: THREE.Texture | null
@@ -26,11 +29,12 @@ export type BinchotanKit = {
 let kit: BinchotanKit | null = null
 function kitOf(scene: THREE.Group): BinchotanKit {
   if (kit) return kit
-  const sticks: THREE.BufferGeometry[] = [], chunks: { g: THREE.BufferGeometry; len: number }[] = []
-  let src: THREE.MeshStandardMaterial | null = null
+  const sticks: THREE.BufferGeometry[] = [], chunks: { g: THREE.BufferGeometry; len: number }[] = [], ashes: THREE.BufferGeometry[] = []
+  let src: THREE.MeshStandardMaterial | null = null, ashSrc: THREE.MeshStandardMaterial | null = null
   scene.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh) return
+    if (m.name.startsWith('BinAsh')) { ashes[Number(m.name.slice(6))] = m.geometry; ashSrc = m.material as THREE.MeshStandardMaterial; return }
     src ??= m.material as THREE.MeshStandardMaterial
     const g = m.geometry
     g.computeBoundingBox()
@@ -55,6 +59,8 @@ function kitOf(scene: THREE.Group): BinchotanKit {
       const L = len === undefined ? c.len : Math.round(len / 0.01) * 0.01
       return scaled(`c${k % 6}|${L}`, c.g, 1, L / c.len)
     },
+    ash: (k) => ashes[((k % 6) + 6) % 6],
+    ashMap: (ashSrc as THREE.MeshStandardMaterial | null)?.map ?? null,
     face: s?.map ?? null,
     normal: s?.normalMap ?? null,
     glow: s?.emissiveMap ?? null,
@@ -67,11 +73,23 @@ export function useBinchotan(): BinchotanKit {
   return useMemo(() => kitOf(gltf.scene), [gltf])
 }
 
-/** a material of the charcoal for one stick or piece of its own (its glow and ash set by the fire): the face, its relief, a dull silver sheen;
- * dark (no glow) until it's lit */
+/** the toon steps the fire's charcoal is shaded in (a cartoon's flat light and shade, as the rest of the room) */
+const TOON_STEPS = (() => {
+  const t = new THREE.DataTexture(new Uint8Array([90, 170, 255]), 3, 1, THREE.RedFormat)
+  t.minFilter = THREE.NearestFilter
+  t.magFilter = THREE.NearestFilter
+  t.needsUpdate = true
+  return t
+})()
+/** a material of the charcoal for one stick or piece of its own (its glow and ash set by the fire): the face and its relief in flat toon
+ * shading, a cartoon's charcoal; dark (no glow) until it's lit, then its cracks glow through (the emissive map) */
 export function charcoalMaterial(k: BinchotanKit) {
-  return new THREE.MeshStandardMaterial({
-    color: '#ffffff', map: k.face, normalMap: k.normal, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.5, metalness: 0.3,
+  return new THREE.MeshToonMaterial({
+    color: '#ffffff', map: k.face, normalMap: k.normal, normalScale: new THREE.Vector2(0.6, 0.6), gradientMap: TOON_STEPS,
     emissiveMap: k.glow, emissive: new THREE.Color('#000000'), emissiveIntensity: 0,
   })
+}
+/** the ash a burnt stick leaves: pale grey and granular, flat-shaded in the same toon steps (a faint red can be laid on it) */
+export function ashMaterial(k: BinchotanKit) {
+  return new THREE.MeshToonMaterial({ color: '#ffffff', map: k.ashMap, gradientMap: TOON_STEPS, emissive: new THREE.Color('#000000'), emissiveIntensity: 0 })
 }

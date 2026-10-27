@@ -18,7 +18,7 @@ import { moodOf } from '@/game/taste'
 import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
-import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, afterCharcoal, canAddCharcoal, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
+import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, STICK_BOOST, STICK_COST, afterCharcoal, canAddCharcoal, canServe, CAPITAL, CHARCOAL_COST, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
 import { GuestCounter } from '@/ui/GuestCounter'
@@ -266,7 +266,7 @@ type SceneProps = {
   /** the shop's shut and being worked by hand (研製料理) */
   research: boolean
   onOrder: (id: string, guest?: number) => boolean
-  onAddCharcoal: () => boolean
+  onAddCharcoal: (one?: boolean) => boolean
   onSay: (who: 'chef' | 'guest', text: string) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
@@ -1255,10 +1255,11 @@ export default function App() {
     return () => window.clearInterval(id)
   }, [])
   /** puts charcoal on (and pays for it), unless the fire is already at 100%: then nothing is added; returns whether it went on */
-  const addCharcoal = () => {
+  /** a load of charcoal on the fire (the button, the chef), or `one` stick dragged on by hand */
+  const addCharcoal = (one = false) => {
     if (!canAddCharcoal(fire.current)) { say(UI[lang].charcoalFull); return false }
-    book('fuel', CHARCOAL_COST)
-    fire.current = afterCharcoal(fire.current)
+    book('fuel', one ? STICK_COST : CHARCOAL_COST)
+    fire.current = afterCharcoal(fire.current, one ? STICK_BOOST : undefined)
     setFireLevel(Math.round(fire.current * 100))
     return true
   }
@@ -1784,7 +1785,7 @@ export default function App() {
         )}
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
  />
-        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={addCharcoal} lang={lang} />}
+        {dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={() => addCharcoal()} lang={lang} />}
         {/* (how full you are is about tasting with the shop shut: open, the customers do the eating) */}
         {!ai && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}

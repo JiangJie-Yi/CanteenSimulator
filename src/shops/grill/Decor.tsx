@@ -120,7 +120,17 @@ const BASKET_WEAVE = canvas(256, 128, (g) => {
   }
 })
 
-/** A square plaited basket of white binchotan stood on end, packed full, its tag on the front. */
+/** the crate's sticks: how many are in it (36 packed; each one dragged to the fire is one fewer; the last gone, a fresh crate comes) */
+const CRATE_FULL = 36
+export const CRATE = { left: CRATE_FULL }
+/** a stick taken out of the crate (onto the fire) */
+export function takeFromCrate() {
+  CRATE.left -= 1
+  if (CRATE.left <= 0) CRATE.left = CRATE_FULL
+}
+
+/** A square plaited basket of white binchotan stood on end, packed full, its tag on the front. Only the sticks are taken hold of (pointed at,
+ * dragged to the fire), not the basket; each one taken leaves a gap, taken from the front rows back. */
 function Crate() {
   const W = 0.4, D = 0.4, H = 0.16, T = 0.02
   const geo = useMemo(() => ({
@@ -158,8 +168,11 @@ function Crate() {
     return out
   }, [stickGeos])
   const weave = BASKET_WEAVE
+  // (as many shown as are left in it: the last ones in the list (the front rows) go first)
+  const stickRefs = useRef<(THREE.Group | null)[]>([])
+  useFrame(() => { stickRefs.current.forEach((g, i) => { if (g) g.visible = i < CRATE.left }) })
   return (
-    <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35} userData={{ decor: 'charcoal' }}>
+    <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35}>
       <Inked geometry={geo.side} map={weave} position={[0, H / 2, D / 2 - T / 2]}>
         {/* the tag faces out of the front */}
         <mesh geometry={geo.label} position={[0.09, 0, T / 2 + 0.002]}>
@@ -177,9 +190,13 @@ function Crate() {
       <mesh geometry={geo.floor} position={[0, T / 2, 0]} receiveShadow>
         <meshToonMaterial map={weave} />
       </mesh>
-      {sticks.map((s, i) => (
-        <Inked key={i} geometry={stickGeos[s.g].geo} map={bin.face ?? undefined} grow={1.07} sideOnly position={s.p} rotation={s.r} />
-      ))}
+      <group userData={{ decor: 'charcoal' }}>
+        {sticks.map((s, i) => (
+          <group key={i} ref={(g) => { stickRefs.current[i] = g }}>
+            <Inked geometry={stickGeos[s.g].geo} map={bin.face ?? undefined} grow={1.07} sideOnly position={s.p} rotation={s.r} />
+          </group>
+        ))}
+      </group>
     </group>
   )
 }

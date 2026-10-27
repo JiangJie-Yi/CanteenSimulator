@@ -11,7 +11,8 @@ Run:
 Writes public/models/binchotan.glb and blender/binchotan.blend.
 
 Frame: each piece along +y (the game's up; Blender's +z), its middle at the origin: a stick 0.3 long and about 0.032 round (the game scales
-it to each stick's length and thickness), a piece 0.05 to 0.1 long. Nodes: BinStick0..5, BinChunk0..5.
+it to each stick's length and thickness), a piece 0.05 to 0.1 long. Nodes: BinStick0..5, BinChunk0..5, and BinAsh0..5 (clumps of ash about
+0.04 across, flat underneath at y = 0).
 """
 import math
 import os
@@ -171,12 +172,43 @@ for k in range(6):
     rng = np.random.default_rng(200 + k)
     parts.append(piece(f"BinChunk{k}", float(rng.uniform(0.05, 0.1)), 0.024, 0.012, rng, bend=0.01, NL=6))
 
+# (the ash a stick burns down to: grey clumps, granular, lumpy on top and flat underneath (they lie on the bed, none balanced on a point),
+# a pale ash grey flecked with darker grains and a few white ones; their own material)
+ash_c = mix((0.62, 0.6, 0.57), (0.48, 0.46, 0.44), fbm(N, 12, 12, 4))
+ash_c = mix(ash_c, (0.25, 0.24, 0.23), (fbm(N, 80, 80, 2) > 0.66).astype(np.float32) * 0.7)
+ash_c = mix(ash_c, (0.85, 0.84, 0.82), (fbm(N, 90, 90, 2) > 0.72).astype(np.float32) * 0.6)
+ASH = pbr("BinAsh", (1, 1, 1), tex=image("binAsh", ash_c), rough=0.95)
+
+
+def ash_clump(name, rng):
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.0)
+    o = active()
+    sx, sz = float(rng.uniform(0.8, 1.25)), float(rng.uniform(0.8, 1.25))
+    ph = rng.uniform(0, 6.28, 3)
+    for vt in o.data.vertices:
+        p = vt.co
+        a = math.atan2(p.y, p.x)
+        bump = 1 + 0.18 * math.sin(3 * a + ph[0]) * math.cos(2 * p.z + ph[1]) + 0.1 * math.sin(7 * a + 5 * p.z + ph[2]) + float(rng.normal(0, 0.06))
+        p.x *= sx * bump
+        p.y *= sz * bump
+        # (a low lump: flat underneath, domed and uneven on top)
+        p.z = max(0.0, p.z) * 0.55 * bump
+    o.scale = (0.02, 0.02, 0.02)
+    apply_scale(o)
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.mesh.remove_doubles(threshold=1e-5)
+    bpy.ops.uv.sphere_project(); bpy.ops.object.mode_set(mode="OBJECT")
+    return finish(o, name, ASH, smooth_shade=False)
+
+
+for k in range(6):
+    parts.append(ash_clump(f"BinAsh{k}", np.random.default_rng(300 + k)))
+
 root = bpy.data.objects.new("Binchotan", None)
 bpy.context.collection.objects.link(root)
 for k, o in enumerate(parts):
     o.parent = root
     # (laid out apart in the file, set back at the origin by the game)
-    o.location = ((k % 6) * 0.1, (k // 6) * 0.4, 0)
+    o.location = ((k % 6) * 0.1, (k // 6) * 0.4, 0) if not o.name.startswith("BinAsh") else ((k % 6) * 0.1, -0.4, 0)
 
 os.makedirs(os.path.join(PROJECT, "public", "models"), exist_ok=True)
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "binchotan.glb"), os.path.join(PROJECT, "blender", "binchotan.blend"))

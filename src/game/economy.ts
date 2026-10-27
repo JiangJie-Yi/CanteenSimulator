@@ -15,7 +15,10 @@ export const CHARCOAL_COST = 18
 /** how much one load of charcoal raises the fire (0..1), and whether more can go on: at 100% the bed is full, so no more is added (nor paid for) */
 export const CHARCOAL_BOOST = 0.18
 export const canAddCharcoal = (level: number) => level < 1 - 1e-6
-export const afterCharcoal = (level: number) => (canAddCharcoal(level) ? Math.min(1, level + CHARCOAL_BOOST) : level)
+/** one stick of binchotan dragged from the crate onto the fire by hand: what it costs and how much it raises the fire */
+export const STICK_COST = 3
+export const STICK_BOOST = 0.05
+export const afterCharcoal = (level: number, boost = CHARCOAL_BOOST) => (canAddCharcoal(level) ? Math.min(1, level + boost) : level)
 
 /**
  * What the ingredients of something on the menu cost, as a share of its price, roughly as in small eateries in

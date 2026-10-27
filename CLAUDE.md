@@ -119,7 +119,8 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `Grill2D.tsx`、`Grill2DArt.tsx` | 手機（螢幕短邊 < 600px，平板不算）不用 3D：同樣的烤爐玩法畫成 2D（邏輯在 Grill2D，SVG 插圖在 Grill2DArt） |
 
 - 客人模型由 `blender/guests.py` 產生：表情（`eyesJoy`、`brows*`、`mouth*`，依評分切換，見 `scene/people.ts`）、走路動作（`Walk`／`WalkF` 女性／`WalkU` 大叔／`WalkO` 老人，速度也不同）、大學生的耳機 `student.phones`。臉型（圓、長、方、瓜子）是在 `scene/Person3D.tsx` 的 `shapeFace` 依 id 變形。
-- 備長炭（`blender/binchotan.py` → `binchotan.glb`，`shops/grill/binchotanModel.ts` 的 `useBinchotan`）：六根炭、六種碎塊，一個材質（炭面、凹凸、龜裂發光貼圖）。炭箱、手上拿的、火裡的都用它，丟進火裡外觀不變，隨溫度（`emissiveIntensity`）亮起龜裂紋；燒到 95% 會斷成 3～5 塊往下掉（`game/coalPile.ts` 的 `crumble`，BDD `coal-pile`），上面的炭跟著塌下來。一次加炭 6～7 根（`COAL_PER_ADD`）。
+- 備長炭（`blender/binchotan.py` → `binchotan.glb`，`shops/grill/binchotanModel.ts` 的 `useBinchotan`）：六根炭、六種碎塊、六種灰渣（`BinAsh`，灰色顆粒、底部平的），炭用卡通（toon）材質（炭面、凹凸、龜裂發光貼圖）。炭箱、手上拿的、火裡的都用它，丟進火裡外觀不變，隨溫度亮起龜裂紋；燒到 95% 會斷成 3～5 塊往下掉，變成灰（`game/coalPile.ts` 的 `crumble`，BDD `coal-pile`），上面的炭跟著塌下來。**添炭只能從炭箱拖一根炭到火上**（點火堆沒有作用；只有炭能 hover，籃子不行），一次一根（`STICK_COST`、`STICK_BOOST`，BDD `fire`），炭箱少一根（`Decor.tsx` 的 `CRATE`、`takeFromCrate`，拿完換一箱）。火力條的按鈕與 AI 主廚仍是一次一份（6～7 根，`COAL_PER_ADD`）。
+- 水桶與水瓢在 `blender/grilledfish.py`（`WaterBucket`、`WaterDipper`、`DipperWater`）：杉木桶板、竹箍。指到整個水桶就是拿水瓢：先舀水（水瓢沉進桶裡再提起，杯裡有水），放開就倒水（傾倒、水流），倒在食物上是灑水、倒在炭上是澆熄。
 - 神棚（`blender/kamidana.py` → `kamidana.glb`，`DiningRoom.tsx` 的 `KamidanaModel`）：三社造的檜木神棚，金屬配件（千木、鰹木的金頭、屋脊、門上的金紋、擬寶珠、台階金片）用真金屬材質並反射 `scene/studio.ts` 的攝影棚環境（金屬靠反射才看得出是金屬，店內光暗也照樣亮）；橘子盤 `KamiOranges`、經本 `KamiSutra` 也在同一個檔裡。倒酒時杯中酒面依杯子內壁的半徑長高（`cupInnerR`），不會穿出杯子。
 - 供清酒（點門口神棚前的酒瓶）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`；名稱沿用舊的點香）。
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。
