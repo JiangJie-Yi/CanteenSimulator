@@ -278,7 +278,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
     if (flame.current) flame.current.scale.setScalar(0.22 * (0.9 + (f0 - 0.88) * 1.8) * Math.max(0.05, k))
     if (lamp.current) lamp.current.intensity = 0.7 * f
   })
-  // (the lantern itself, from Blender (blender/andon.py): a kumiko cube of pale hinoki, its washi drawn lit (unshaded, the same by day or
+  // (the lantern itself, from Blender (blender/andon.py): on its four dark legs, its shade panelled in kumiko, its washi drawn lit (unshaded, the same by day or
   // night, brightening and dimming with the flame))
   const gltf = useGLTF(ANDON_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
@@ -297,8 +297,8 @@ function Lantern({ at }: { at: [number, number, number] }) {
     return { r, paperMat }
   }, [gltf])
   useLayoutEffect(() => { (paper as { current: THREE.MeshBasicMaterial | null }).current = model.paperMat }, [model])
-  // (the cube's middle, as modelled: 0.22 across on a thin base, drawn a quarter larger than that)
-  const MID = 0.123, K = 1.25
+  // (the shade's middle, as modelled: on its legs, 0.16 up to its foot, 0.36 tall)
+  const MID = 0.34, K = 1
   return (
     <group position={at} rotation-y={0.4} scale={LANTERN_SCALE} userData={{ container: 'lantern' }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '行燈', hint: lit ? '點一下點燈' : '點一下熄燈' }); setLit(!lit) }}
@@ -307,7 +307,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
       <primitive object={model.r} scale={K} />
       {/* the flame inside, seen through the paper */}
       {/* (a soft glow, not a solid shape: a hard cone showing through the paper cut dark wedges across it) */}
-      <sprite ref={flame} position={[0, MID * K * 0.85, 0]} scale={0.16}>
+      <sprite ref={flame} position={[0, MID * K * 0.9, 0]} scale={0.22}>
         <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.7} color="#ffcf80" />
       </sprite>
       {/* the glow round it, always facing the camera, laid on additively */}
