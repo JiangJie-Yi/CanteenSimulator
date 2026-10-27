@@ -6379,6 +6379,8 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
 
 /* the views menu, opened from the eye button at the bottom left: a short list of the shop's parts, numbered as edit mode marks them */
 .view-menu {
+  /* (its panel is light paper by day and by night: its words always dark ink on it) */
+  --menu-ink: #2b2118;
   position: absolute;
   left: 22px;
   bottom: 74px;
@@ -6386,7 +6388,7 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
   margin: 0;
   padding: 6px;
   list-style: none;
-  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--menu-ink) 18%, transparent);
   border-radius: 10px;
   background: color-mix(in srgb, var(--washi) 82%, transparent);
   -webkit-backdrop-filter: blur(8px);
@@ -6402,14 +6404,14 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: var(--text);
+  color: var(--menu-ink);
   font: inherit;
   font-size: 14px;
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
 }
-.view-menu button:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
+.view-menu button:hover { background: color-mix(in srgb, var(--menu-ink) 10%, transparent); }
 .view-menu button.is-on { font-weight: 700; }
 .view-menu i {
   display: grid;
@@ -6422,7 +6424,7 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
   font-size: 12px;
   font-weight: 700;
 }
-.view-menu button.is-on i { background: var(--text); color: var(--washi); }
+.view-menu button.is-on i { background: var(--menu-ink); color: #f4ead8; }
 .view-reset.is-open { outline: 2px solid color-mix(in srgb, var(--text) 40%, transparent); }
 
 /* edit mode's numbered view markers (as Sketchfab's annotations): a round number on the spot, its name and a line on it beside when pointed at */
