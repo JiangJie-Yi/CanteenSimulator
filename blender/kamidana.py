@@ -577,9 +577,11 @@ def lathe(name, prof, mat_, segs=64, smooth_shade=True):
 # two glossy leaves on the top one
 # =====================================================================
 ox = []
-peel = mix((0.95, 0.5, 0.06), (0.88, 0.4, 0.04), fbm(256, 6, 6, 4))
-dots = (fbm(256, 60, 60, 2) > 0.62).astype(np.float32)
-peel_tex = image("peel", mix(peel, (1.0, 0.62, 0.18), dots * 0.5))
+peel = mix((0.96, 0.46, 0.04), (0.86, 0.34, 0.02), fbm(256, 6, 6, 4))
+pores = fbm(256, 46, 46, 2)
+peel = mix(peel, (0.74, 0.28, 0.02), smooth(0.62, 0.8, pores) * 0.45)          # (the pits of the big oil pores, a little darker)
+peel = mix(peel, (1.0, 0.6, 0.16), smooth(0.25, 0.08, pores) * 0.4)           # (the skin between them catching the light)
+peel_tex = image("peel", peel)
 M["peel"] = pbr("KamiPeel", (1, 1, 1), tex=peel_tex, rough=0.45)
 M["calyx"] = pbr("KamiCalyx", lin("#4c6a22"), rough=0.6)
 M["leaf"] = pbr("KamiLeaf", lin("#2f6a24"), rough=0.3)
@@ -626,17 +628,23 @@ for k, (x, y, z, r) in enumerate(rest):
     bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=32, ring_count=20, location=P(x, y, z))
     o = active()
     rng_ = np.random.default_rng(k + 3)
+    ph_ = rng_.uniform(0, 6.28, 3)
     for vv in o.data.vertices:
         n_ = vv.co.normalized()
         vv.co.z *= FLAT
-        vv.co += n_ * float(rng_.normal(0, r * 0.012))
+        # (a ponkan's peel: loose and pebbly, a few soft lobes round it, and the knob (its neck) pushed up round the stem)
+        a_ = math.atan2(n_.y, n_.x)
+        lobe = 0.03 * math.sin(5 * a_ + ph_[0]) * (1 - abs(n_.z))
+        knob = 0.22 * max(0.0, n_.z - 0.82) / 0.18
+        vv.co += n_ * r * (lobe + float(rng_.normal(0, 0.016)))
+        vv.co.z += r * knob * 0.35
     # (turned about the vertical only, so it sits on its flattened underside)
     o.rotation_euler = (0, 0, float(rng_.uniform(0, 6.28)))
     finish(o, f"KamiOrange{k}", M["peel"])
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
     bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.sphere_project(); bpy.ops.object.mode_set(mode="OBJECT")
     ox.append(o)
-    topv = Vector(P(x, y + r * 0.82, z))
+    topv = Vector(P(x, y + r * (0.82 + 0.077), z))   # (on the knob round the stem)
     for j in range(5):
         a_ = j * 2 * math.pi / 5
         sp = box(f"KamiCalyx{k}{j}", S(0.007, 0.0015, 0.004), tuple(topv + Vector(P(math.cos(a_) * 0.0035, 0.0, math.sin(a_) * 0.0035))), M["calyx"], uv=0)
@@ -650,7 +658,7 @@ for j, (rz, lean) in enumerate(((0.4, 0.5), (2.6, 0.4))):
     apply_scale(lf)
     for vv in lf.data.vertices:
         vv.co.z += (vv.co.x / 0.022) ** 2 * 0.003
-    lf.location = Vector(P(0, TOP_Y + 0.027 * FLAT + 0.002, 0.0)) + Vector((math.cos(rz) * 0.014, math.sin(rz) * 0.014, 0.001))
+    lf.location = Vector(P(0, TOP_Y + 0.027 * (FLAT + 0.077) + 0.002, 0.0)) + Vector((math.cos(rz) * 0.014, math.sin(rz) * 0.014, 0.001))
     lf.rotation_euler = (lean * 0.3, -lean * 0.4, rz)
     ox.append(finish(lf, f"KamiOrangeLeaf{j}", M["leaf"]))
 oranges = bpy.data.objects.new("KamiOranges", None)
@@ -849,17 +857,28 @@ FPROF = [(0.0, 0.0), (0.022, 0.0), (0.03, 0.003), (0.036, 0.01), (0.04, 0.026), 
 _fu, _fv = grid01(512)
 fl = np.ones((512, 512, 3), np.float32) * np.asarray((0.95, 0.94, 0.9), np.float32)
 COB = (0.12, 0.2, 0.5)
-for lo_, hi_ in ((0.035, 0.045), (0.06, 0.066), (0.5, 0.507), (0.52, 0.525), (0.665, 0.67), (0.685, 0.692), (0.84, 0.848)):
+for lo_, hi_ in ((0.012, 0.022), (0.84, 0.848)):
     fl = mix(fl, COB, ((_fv >= lo_) & (_fv <= hi_)).astype(np.float32) * 0.9)
-# (the waves: rows of nested arcs, each row's arcs offset by half from the one under it)
-band = (_fv > 0.53) & (_fv < 0.66)
-wy = (_fv - 0.53) / 0.13 * 2.0
+# (the sea round its foot: rows of nested arcs (青海波) from the foot up to about a third of its height, deeper blue toward the bottom, fading
+# out as they rise)
+SEA_TOP = 0.34
+band = (_fv > 0.025) & (_fv < SEA_TOP)
+wy = (_fv - 0.025) / (SEA_TOP - 0.025) * 4.0
 row = np.floor(wy)
-wx = _fu * 18 + row * 0.5
+wx = _fu * 22 + row * 0.5
 cx_ = np.floor(wx) + 0.5
-dd = np.sqrt(((wx - cx_) * 1.0) ** 2 + ((wy - row) * 1.0) ** 2)
-waves = (np.abs((dd * 6) % 1.0 - 0.5) < 0.16) & (dd < 0.55)
-fl = mix(fl, COB, (band & waves).astype(np.float32) * 0.85)
+dd = np.sqrt((wx - cx_) ** 2 + (wy - row) ** 2)
+waves = (np.abs((dd * 5) % 1.0 - 0.5) < 0.17) & (dd < 0.62)
+depth = np.clip(1.0 - (_fv - 0.025) / (SEA_TOP - 0.025), 0, 1)
+SEA_DEEP, SEA_LIGHT = (0.06, 0.13, 0.42), (0.3, 0.48, 0.78)
+sea = mix(np.broadcast_to(np.asarray(SEA_LIGHT, np.float32), _fv.shape + (3,)), SEA_DEEP, depth)
+fl = mix(fl, sea, (band & waves).astype(np.float32) * (0.45 + 0.5 * depth))
+# (a wash of pale blue under the waves, the water itself, strongest at the foot)
+fl = mix(fl, (0.55, 0.68, 0.88), band.astype(np.float32) * depth * 0.35)
+# (along the top of the sea, the crests breaking: a scalloped line of foam curling over)
+crest_y = SEA_TOP - 0.012 + 0.012 * np.abs(np.sin(_fu * math.pi * 22))
+crest = np.abs(_fv - crest_y) < 0.006
+fl = mix(fl, COB, crest.astype(np.float32) * 0.85)
 M["flaskGlaze"] = pbr("KamiFlaskGlaze", (1, 1, 1), tex=image("flaskGlaze", fl), rough=0.22)
 fb_ = lathe("KamiFlaskBody", FPROF, M["flaskGlaze"], segs=48)
 _me = fb_.data

@@ -1150,8 +1150,8 @@ function kamidanaOf(scene: THREE.Group) {
         g.envMapIntensity = 0.7
         t = g
       } else if (src.name === 'KamiPeel') {
-        // (the mikan's peel: a dull waxy skin, only a soft sheen)
-        t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.62, clearcoat: 0.12, clearcoatRoughness: 0.5, specularIntensity: 0.4 })
+        // (the ponkan's peel: a little gloss on its oily skin, not a polish)
+        t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.48, clearcoat: 0.22, clearcoatRoughness: 0.35, specularIntensity: 0.55 })
       } else if (src.name === 'KamiLeaf' || src.name === 'KamiDish' || src.name === 'KamiCobalt' || src.name === 'KamiFlaskGlaze') {
         // (the leaves' gloss, the porcelain's glaze: a soft sheen)
         t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.35, clearcoat: 0.4, clearcoatRoughness: 0.25 })
