@@ -623,7 +623,7 @@ def tube(name, pts, radii, mat_, ring=10):
     return o
 
 
-RX0, RY0, RZ0, SAG = -0.063, 0.188, 0.066, 0.006     # (over the middle bay's doors, in front of its lintel; half its span; its sag)
+RX0, RY0, RZ0, SAG = -0.0655, 0.188, 0.066, 0.006     # (over the middle bay's doors, in front of its lintel; half its span; its sag)
 
 
 def rope_at(t):
@@ -632,16 +632,17 @@ def rope_at(t):
     return Vector((RX0, RY0 - SAG * math.sin(math.pi * t), z)), 0.0026 + 0.0042 * math.sin(math.pi * t) ** 0.7
 
 
-# (three strands twisted tight round the middle line, many turns, smooth, thick where the rope's thick)
-NSEG = 160
-for strand in range(3):
+# (two strands twisted round the middle line, as loosely as a straw rope this long is (about 2.7 turns over its span), smooth, thick where
+# the rope's thick)
+NSEG = 120
+for strand in range(2):
     pts, rad = [], []
     for i in range(NSEG + 1):
         t = i / NSEG
         c, r = rope_at(t)
-        ang = t * 22 * math.pi + strand * 2 * math.pi / 3
+        ang = t * 2.7 * 2 * math.pi + strand * math.pi
         pts.append((c.x + math.cos(ang) * r * 0.5, c.y + math.sin(ang) * r * 0.5, c.z))
-        rad.append(r * 0.55)
+        rad.append(r * 0.62)
     sn.append(tube(f"KamiShimenawa{strand}", pts, rad, M["straw"], ring=12))
 # (the ends bound and cut: a band of straw round each, the ends splaying a little past it)
 for sd in (0, 1):
@@ -674,15 +675,20 @@ for k, t in enumerate((0.25, 0.5, 0.75)):
     # (and a core, so the bundle reads full)
     bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.0038, radius2=0.002, depth=L * 0.9, location=P(c.x, top - 0.004 - L * 0.45, c.z))
     sn.append(finish(active(), f"KamiShimenawaCore{k}", M["straw"]))
-# (the paper streamers: a strip cut and folded in four, each fold stepping down and across, sharp and flat, hung over the rope)
-SW, SH_ = 0.0062, 0.0085
+# (the paper streamers: one strip of paper cut and folded into a zigzag of four, each fold stepping down and across over the one above,
+# all one piece, hung over the rope)
+SW, SH_ = 0.0052, 0.0092
 for k, t in enumerate((0.07, 0.375, 0.625, 0.93)):
     c, r = rope_at(t)
-    y = c.y - r * 0.5
+    y = c.y - r * 0.4
     sgn = 1 if k % 2 else -1
+    folds = []
     for j in range(4):
-        dz = sgn * (SW * 0.5 if j % 2 else -SW * 0.5) * 0.9
-        sn.append(box(f"KamiShide{k}{j}", S(0.0005, SH_, SW), P(c.x - 0.0012, y - SH_ * 0.5 - j * (SH_ - 0.0012), c.z + dz), M["shide"], uv=0))
+        dz = sgn * (SW * 0.27 if j % 2 else -SW * 0.27)
+        hj = SH_ * (1.15 if j == 3 else 1.0)
+        # (each fold overlapping the one above by a little, the paper turned over at it, so the strip is one piece; a hair in front of it)
+        folds.append(box(f"KamiShideF{k}{j}", S(0.00045, hj, SW), P(c.x - 0.0016 - j * 0.0002, y - hj * 0.5 - j * (SH_ - 0.0022), c.z + dz), M["shide"], uv=0))
+    sn.append(join(folds, f"KamiShide{k}"))
 parts += sn
 
 root = bpy.data.objects.new("Kamidana", None)
