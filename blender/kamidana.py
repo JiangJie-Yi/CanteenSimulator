@@ -716,7 +716,7 @@ fig.data.remesh_voxel_size = 0.0009
 bpy.ops.object.select_all(action="DESELECT"); fig.select_set(True); bpy.context.view_layer.objects.active = fig
 bpy.ops.object.voxel_remesh()
 sm = fig.modifiers.new("s", "SMOOTH"); sm.factor = 0.6; sm.iterations = 6
-dc = fig.modifiers.new("d", "DECIMATE"); dc.ratio = 0.22
+dc = fig.modifiers.new("d", "DECIMATE"); dc.ratio = 0.11
 apply_mods(fig)
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cube_project(cube_size=0.06); bpy.ops.object.mode_set(mode="OBJECT")
 finish(fig, "KamiEbisuFigure", M["stone"])
@@ -834,7 +834,7 @@ for strand in range(2):
         ang = t * 2.7 * 2 * math.pi + strand * math.pi
         pts.append((c.x + math.cos(ang) * r * 0.5, c.y + math.sin(ang) * r * 0.5, c.z))
         rad.append(r * 0.62)
-    sn.append(tube(f"KamiShimenawa{strand}", pts, rad, M["straw"], ring=12))
+    sn.append(tube(f"KamiShimenawa{strand}", pts, rad, M["straw"], ring=8))
 # (the ends bound and cut: a band of straw round each, the ends splaying a little past it)
 for sd in (0, 1):
     c, r = rope_at(sd * 1.0)
@@ -1068,7 +1068,8 @@ for k, ch in enumerate(TITLE):
     cu.size = 0.019
     cu.align_x = "CENTER"
     cu.align_y = "CENTER"
-    cu.extrude = 0.0002
+    cu.extrude = 0.0
+    cu.resolution_u = 3
     t = bpy.data.objects.new(f"KamiSutraChar{k}", cu)
     bpy.context.collection.objects.link(t)
     # (written down the slip, top to bottom from its far end; each upright with its top toward the slip's far end)
@@ -1260,7 +1261,8 @@ for k, ch in enumerate("御神酒"):
     cu.size = 0.0145
     cu.align_x = "CENTER"
     cu.align_y = "CENTER"
-    cu.extrude = 0.00015
+    cu.extrude = 0.0
+    cu.resolution_u = 3
     t = bpy.data.objects.new(f"KamiFlaskChar{k}", cu)
     bpy.context.collection.objects.link(t)
     t.location = P(LX - 0.0008, 0.056 - k * 0.016, 0)
@@ -1393,6 +1395,40 @@ if PREVIEW:
     world.node_tree.nodes["Background"].inputs[1].default_value = 0.6
     bpy.context.scene.world = world
 
+# ---- for the game: under each node the many small pieces merged into a few meshes, one for each material (and apart, those the game's ink
+# outline passes over (the same test as DiningRoom.tsx's inkModel skip), and on the doors the crest and the corner plates, which the game finds
+# by name), so it draws a handful of meshes, not hundreds
+import re as _re
+NO_INK = _re.compile(r"Gold|Cap|Plate|Crest|Seam|Bal|Katsuogi|Fold|Char|Slip|Calyx|Stem|Bow|Cord|Tail|Tassel|Fringe|Line|Inlay|Nail|Core|Pillar|Beam|Shide|Label|Knot|Edge|Jamb|Sill|Inside|Fuda|Eye|Smile|Ear|Cheek|Rod")
+_jn = [0]
+
+
+def merge_kids(node):
+    groups = {}
+    for c in [c for c in node.children if c.type == "MESH" and not c.children]:
+        keep = "Crest" if "Crest" in c.name else "DoorPlate" if "DoorPlate" in c.name else ""
+        key = (c.active_material.name if c.active_material else "", bool(NO_INK.search(c.name)), keep)
+        groups.setdefault(key, []).append(c)
+    for (mat_name, no_ink, keep), objs in groups.items():
+        _jn[0] += 1
+        name = f"KamiJ{_jn[0]}" + (keep or ("Line" if no_ink else "Part"))
+        if len(objs) == 1:
+            objs[0].name = name
+            continue
+        bpy.ops.object.select_all(action="DESELECT")
+        for o in objs:
+            o.select_set(True)
+        bpy.context.view_layer.objects.active = objs[0]
+        bpy.ops.object.join()
+        objs[0].name = name
+
+
+bpy.ops.object.mode_set(mode="OBJECT") if bpy.context.object and bpy.context.object.mode != "OBJECT" else None
+for nd in [o for o in bpy.data.objects if o.type == "EMPTY"]:
+    merge_kids(nd)
+parts = [o for o in bpy.data.objects if o != root and (o.type in ("MESH", "EMPTY"))]
+_tri = sum(sum(len(pl.vertices) - 2 for pl in o.data.polygons) for o in parts if o.type == "MESH")
+print("KAMI_MERGED", len([o for o in parts if o.type == "MESH"]), "meshes", _tri, "tris")
 os.makedirs(os.path.join(PROJECT, "public", "models"), exist_ok=True)
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "kamidana.glb"), os.path.join(PROJECT, "blender", "kamidana.blend"), PREVIEW)
 print("KAMIDANA_DONE", len(parts), "parts")
