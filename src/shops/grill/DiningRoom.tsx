@@ -398,7 +398,8 @@ function Nobori({ i }: { i: number }) {
  * The banners strung overhead as an izakaya hangs them: a rope along the wall's aisle, a close row of narrow banners of every
  * colour hung from it, each swinging a little on its own.
  */
-function BannerRow({ zs, seed = 0, x0 = 0, x1 = 0 }: { zs: number[]; seed?: number; x0?: number; x1?: number }) {
+/** `start`, `step`: which cloths it takes in turn (two strings taking every other one, offset by one, never show the same cloth side by side) */
+function BannerRow({ zs, start = 0, step = 1, x0 = 0, x1 = 0 }: { zs: number[]; start?: number; step?: number; x0?: number; x1?: number }) {
   const refs = useRef<(THREE.Group | null)[]>([])
   // (the same every time: a mix of cloths and lengths, a wide banner every so often taking three places)
   const items = useMemo(() => {
@@ -408,12 +409,12 @@ function BannerRow({ zs, seed = 0, x0 = 0, x1 = 0 }: { zs: number[]; seed?: numb
         out.push({ z: zs[k + 1], look: (k * 3) % HBANNER_LOOKS.length, len: 0.2, w: 0.62, wide: true })
         k += 2
       } else {
-        const look = (k * 5 + 3 + seed) % NOBORI_LOOKS.length
+        const look = (start + k * step) % NOBORI_LOOKS.length
         out.push({ z: zs[k], look, len: 0.36 + 0.09 * ((k * 7) % 4), w: NOBORI_LOOKS[look].shape === 'rect' ? 0.15 : 0.17, wide: false })
       }
     }
     return out
-  }, [zs])
+  }, [zs, start, step])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
@@ -1439,11 +1440,9 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
           }
           return zs.length > 1 ? (
             <>
-              <Movable id={`banners${from.toFixed(1)}a`} label={`旗幟串 1（${from.toFixed(0)}）`}><group position={[0, 2.22, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 3 === 0)} x0={-0.3} x1={-0.3} /></group></Movable>
-              {/* (and two more strings slanted across the aisle, crossing each other like an X, one a little lower than the other,
-                  so no banner meets another) */}
-              <Movable id={`banners${from.toFixed(1)}b`} label={`旗幟串 2（${from.toFixed(0)}）`}><group position={[0, 2.04, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 3 === 1)} seed={5} x0={-0.4} x1={-1.3} /></group></Movable>
-              <Movable id={`banners${from.toFixed(1)}c`} label={`旗幟串 3（${from.toFixed(0)}）`}><group position={[0, 1.9, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 3 === 2)} seed={9} x0={-1.3} x1={-0.4} /></group></Movable>
+              {/* (two strings: one along the wall, one slanting out over the aisle; each takes every other cloth, so none repeats beside another) */}
+              <Movable id={`banners${from.toFixed(1)}a`} label={`旗幟串 1（${from.toFixed(0)}）`}><group position={[0, 2.22, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 2 === 0)} start={0} step={2} x0={-0.3} x1={-0.3} /></group></Movable>
+              <Movable id={`banners${from.toFixed(1)}b`} label={`旗幟串 2（${from.toFixed(0)}）`}><group position={[0, 2.0, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 2 === 1)} start={1} step={2} x0={-0.5} x1={-1.2} /></group></Movable>
             </>
           ) : null
         })()}
