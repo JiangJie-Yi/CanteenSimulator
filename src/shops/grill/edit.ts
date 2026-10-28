@@ -39,6 +39,8 @@ export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: nu
  * edit mode opens, once the pieces have been measured */
 const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[] }> = {
   'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3'] },
+  // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
+  'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'] },
 }
 const unsettled = new Set<string>()
 /** the default groups the owner has broken up: not made again */

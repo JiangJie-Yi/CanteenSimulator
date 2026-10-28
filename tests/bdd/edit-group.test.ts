@@ -20,6 +20,12 @@ feature('編輯模式的群組', () => {
     })
   })
 
+  scenario('小神龕的供桌和桌上的東西，一開始就是一組', ({ then }) => {
+    then('有一個群組，成員是供桌和供桌上的供品', () => {
+      expect([...getEdit().groups['grp-altar'].members].sort()).toEqual(['altar', 'altarfittings'])
+    })
+  })
+
   scenario('點選兩件以上的擺設可以成組，群組的中心在它們中間', ({ given, when, then, and }) => {
     given('清單裡有 a、b、c 三件可成組的擺設', (w) => { w.off = setup(); select(null) })
     when('Ctrl 點選 a 和 b，再按成組', () => { pickToggle('a'); pickToggle('b'); makeGroup() })

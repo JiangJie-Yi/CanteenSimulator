@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, getEdit, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, getEdit, groupOf, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -556,6 +556,9 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     // (an axis arrow under the pointer takes it: the box is only for the free move)
     if (e.intersections?.some((i) => i.object.userData.gizmo)) return
     e.stopPropagation()
+    // (a piece in a group is picked as its group, and the group's own handles move, turn and size it all together; Alt picks the piece alone)
+    const grpId = groupOf(id)
+    if (grpId && !e.nativeEvent.altKey) { select(grpId); return }
     if (tool === 'select') { moveTo(id, offsetOf(id)); return }
     const lift = e.nativeEvent.shiftKey
     const wp = grp.getWorldPosition(new THREE.Vector3())
