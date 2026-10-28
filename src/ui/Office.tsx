@@ -47,7 +47,11 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
-  const t = (zh: string, jp: string) => (ja ? jp : zh)
+  // (English for what has it; the rest falls back to the Chinese)
+  const EN: Record<string, string> = { 一鍵徵人: 'Hire all', 人事: 'Staff', '大廚（你）': 'Head chef (you)', 女: 'F', 廚房: 'Kitchen', 手藝: 'Skill', 歲: 'yrs',
+    每個空缺各雇一位最划算的人: 'Fill every opening with the best-value hire', '營業中不能解雇，請先閉店': 'Can’t dismiss while open: close first', 現金: 'Cash',
+    男: 'M', 精神: 'Spirit', 經營: 'Office', 老闆: 'Owner', 解雇: 'Dismiss', 速度: 'Speed', 重新開始遊戲: 'Start over', 雇用: 'Hire', 體力: 'Stamina', 點我徵人: 'Hiring' }
+  const t = (zh: string, jp: string) => (ja ? jp : lang === 'en' ? EN[zh] ?? zh : zh)
   const drag = useDrag('office')
   const wages = people.filter((w) => hired[w.id]).reduce((s, w) => s + w.wage, 0)
   // (put on the page itself, over the menu and everything else)
