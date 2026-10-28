@@ -459,7 +459,8 @@ export function seatsOf(cs: Counter[]): Seat[] {
  * past the doorway and from the room's end back to the step up into the room (the first counter's frame: along it,
  * and lay, from its middle). Customers step up out of their shoes there, and into slippers.
  */
-export const GENKAN = { depth: 0.1, along: [0.5, 1.45] as [number, number], lay: [FLOOR_FAR, -0.42] as [number, number] }
+// (its step drawn back toward the bar: a longer stone floor to come in on, take off one's shoes and step up, not crowded at the door)
+export const GENKAN = { depth: 0.1, along: [0.15, 1.45] as [number, number], lay: [FLOOR_FAR, -0.42] as [number, number] }
 /** whether a point (the bar's frame) is down in the genkan */
 export function inGenkan(cs: Counter[], p: THREE.Vector3) {
   const c0 = cs[0], d = p.clone().sub(c0.at)

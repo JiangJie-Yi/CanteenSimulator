@@ -293,7 +293,12 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <group position={[0.4, 0, -0.92]}>
         {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower) */}
         {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7]].map(([x, d, h, l], i) => (
-          <Part key={i} geo={REG_GEO.round} color={i ? '#4a2e1c' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
+          <group key={i}>
+            <Part geo={REG_GEO.round} color={i ? '#4a2e1c' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
+            {/* (a red felt (毛氈) laid over each tier, hanging a little down its front, as under a festival's dolls) */}
+            <mesh position={[x, h + 0.004, 0]}><boxGeometry args={[d + 0.01, 0.008, l + 0.01]} /><meshToonMaterial color="#b8261c" /></mesh>
+            <mesh position={[x - d / 2 - 0.004, h - 0.03, 0]}><boxGeometry args={[0.008, 0.06, l + 0.01]} /><meshToonMaterial color="#a8201a" /></mesh>
+          </group>
         ))}
       </group>
       </StaticBatch></Movable>
@@ -320,10 +325,20 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           vase of a sprig on top */}
       <group position={[0.34, -GENKAN.depth, -0.24]}>
         <Part geo={REG_GEO.round} color="#4a2e1c" outline={1.02} position={[0, 0.42, 0]} scale={[0.3, 0.84, 0.42]} />
+        {/* (its plinth, set back a little, dark) */}
+        <mesh position={[0.01, 0.025, 0]}><boxGeometry args={[0.29, 0.05, 0.41]} /><meshToonMaterial color="#24160c" /></mesh>
         {[0, 1, 2].map((r) => [-1, 1].map((sd) => (
-          <group key={`${r}${sd}`} position={[-0.152, 0.16 + r * 0.25, sd * 0.1]}>
-            <mesh rotation-y={-Math.PI / 2}><planeGeometry args={[0.17, 0.21]} /><meshToonMaterial color="#6a4428" /></mesh>
-            <mesh position={[-0.004, 0, -sd * 0.06]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.008, 0.008, 0.008, 8]} /><meshToonMaterial color="#c8a050" /></mesh>
+          <group key={`${r}${sd}`} position={[-0.152, 0.17 + r * 0.24, sd * 0.1]}>
+            {/* (each door a frame round a kumiko lattice over pale paper, a brass pull) */}
+            <mesh rotation-y={-Math.PI / 2}><planeGeometry args={[0.17, 0.21]} /><meshToonMaterial color="#5a3820" /></mesh>
+            <mesh position-x={-0.002} rotation-y={-Math.PI / 2}><planeGeometry args={[0.13, 0.17]} /><meshToonMaterial color="#e8dcc0" /></mesh>
+            {[-0.04, 0, 0.04].map((k) => (
+              <mesh key={`v${k}`} position={[-0.004, 0, k]}><boxGeometry args={[0.004, 0.17, 0.006]} /><meshToonMaterial color="#6a4428" /></mesh>
+            ))}
+            {[-0.055, -0.0185, 0.0185, 0.055].map((k) => (
+              <mesh key={`h${k}`} position={[-0.004, k, 0]}><boxGeometry args={[0.004, 0.006, 0.13]} /><meshToonMaterial color="#6a4428" /></mesh>
+            ))}
+            <mesh position={[-0.008, 0, -sd * 0.07]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.009, 0.009, 0.01, 10]} /><meshToonMaterial color="#c8a050" /></mesh>
           </group>
         )))}
         <Part geo={REG_GEO.round} color="#3a2416" outline={1.02} position={[0, 0.855, 0]} scale={[0.32, 0.03, 0.44]} />
@@ -386,16 +401,21 @@ function NorenModel({ tex, panels }: { tex: THREE.Texture | null; panels: React.
 const NOREN_CORD = 0.18
 
 /** the coir doormat: tan bristle in ribs, a dark border, the shop's welcome (いらっしゃいませ) woven across it */
-const DOORMAT = (() => signTexture(256, 140, (g) => {
-  g.fillStyle = '#4a3020'
-  g.fillRect(0, 0, 256, 140)
-  g.fillStyle = '#a77d4c'
-  g.fillRect(12, 12, 232, 116)
-  for (let x = 14; x < 244; x += 6) {
-    g.fillStyle = x % 12 ? 'rgba(90,60,30,0.28)' : 'rgba(255,230,180,0.14)'
-    g.fillRect(x, 12, 3, 116)
+const DOORMAT = (() => signTexture(512, 280, (g) => {
+  // (a coir mat: its bristles in tufts, a woven indigo border with a cream line, the welcome brushed in and a crest of waves at each end)
+  g.setTransform(2, 0, 0, 2, 0, 0)
+  g.fillStyle = '#1e2c4c'; g.fillRect(0, 0, 256, 140)
+  g.fillStyle = '#f2e6c8'; g.fillRect(8, 8, 240, 124)
+  g.fillStyle = '#a77d4c'; g.fillRect(11, 11, 234, 118)
+  let seed = 5
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  for (let k = 0; k < 3200; k++) {
+    const x = 11 + rnd() * 234, y = 11 + rnd() * 118
+    g.fillStyle = rnd() < 0.5 ? 'rgba(80,50,22,0.35)' : 'rgba(230,200,150,0.25)'
+    g.fillRect(x, y, 1.2, 2.6)
   }
-  brushText(g, 'いらっしゃいませ', 128, 70, 26, { fill: '#3a2414', shadow: 'rgba(255,230,180,0.35)', spacing: 2 })
+  for (const cx of [36, 220]) for (let r = 4; r <= 16; r += 4) { g.strokeStyle = 'rgba(40,24,10,0.55)'; g.lineWidth = 1.4; g.beginPath(); g.arc(cx, 82, r, Math.PI, 0); g.stroke() }
+  brushText(g, 'いらっしゃいませ', 128, 66, 24, { fill: '#2e1c0e', shadow: 'rgba(255,230,180,0.35)', spacing: 2 })
 }))()
 
 /** the red paper lantern's skin: red washi with its ribs, and the shop's name brushed down it in black */
@@ -1128,23 +1148,46 @@ function RoomFloor({ counters, drop }: { counters: Counter[]; drop: number }) {
     </group>
   )
 }
-/** the genkan's stone: dark grey slate laid in rough rectangles */
+/**
+ * The genkan's stone: flagstones of grey granite and darker slate, each its own shape (cut on a jittered grid), its own shade and speckle,
+ * set in a pale mortar with a fine pebble wash (洗い出し) between them; worn smoother and darker where feet go
+ */
 const GENKAN_STONE = (() => {
   if (typeof document === 'undefined') return null
+  const S = 512
   const c = document.createElement('canvas')
-  c.width = c.height = 128
+  c.width = c.height = S
   const g = c.getContext('2d')!
-  g.fillStyle = '#2e2c2a'
-  g.fillRect(0, 0, 128, 128)
-  for (let j = 0; j < 4; j++) for (let i = 0; i < 3; i++) {
-    const v = 52 + ((i * 7 + j * 13) % 5) * 6
-    g.fillStyle = `rgb(${v},${v - 2},${v - 5})`
-    g.fillRect(i * 43 + (j % 2) * 20 - 20 + 2, j * 32 + 2, 39, 28)
+  let seed = 19
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  // (the mortar and its pebbles)
+  g.fillStyle = '#8a8478'; g.fillRect(0, 0, S, S)
+  for (let k = 0; k < 2600; k++) { const v = 90 + rnd() * 90; g.fillStyle = `rgb(${v},${v - 4},${v - 10})`; g.beginPath(); g.arc(rnd() * S, rnd() * S, 0.8 + rnd() * 1.8, 0, Math.PI * 2); g.fill() }
+  // (the stones: a 4 x 4 grid of corners, each moved about, a stone in each cell inset from its neighbours)
+  const N = 4, cell = S / N
+  const corner: [number, number][][] = []
+  for (let j = 0; j <= N; j++) { corner.push([]); for (let i = 0; i <= N; i++) corner[j].push([i * cell + (i % N ? (rnd() - 0.5) * cell * 0.4 : 0), j * cell + (j % N ? (rnd() - 0.5) * cell * 0.4 : 0)]) }
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const q = [corner[j][i], corner[j][i + 1], corner[j + 1][i + 1], corner[j + 1][i]]
+    const cx = q.reduce((a, p) => a + p[0], 0) / 4, cy = q.reduce((a, p) => a + p[1], 0) / 4
+    const pts = q.map(([x, y]) => [cx + (x - cx) * 0.92, cy + (y - cy) * 0.92] as [number, number])
+    const dark = rnd() < 0.35
+    const v = dark ? 46 + rnd() * 16 : 92 + rnd() * 26
+    const path = () => { g.beginPath(); pts.forEach(([x, y], k) => { const [nx, ny] = pts[(k + 1) % 4]; const mx = (x + nx) / 2 + (rnd() - 0.5) * 8, my = (y + ny) / 2 + (rnd() - 0.5) * 8; if (!k) g.moveTo(x, y); g.quadraticCurveTo(mx, my, nx, ny) }); g.closePath() }
+    path()
+    const gr = g.createLinearGradient(cx - cell / 2, cy - cell / 2, cx + cell / 2, cy + cell / 2)
+    gr.addColorStop(0, `rgb(${v + 10},${v + 8},${v + 4})`); gr.addColorStop(1, `rgb(${v - 8},${v - 9},${v - 12})`)
+    g.fillStyle = gr; g.fill()
+    g.save(); path(); g.clip()
+    for (let k = 0; k < 260; k++) { const w = rnd() < 0.5; g.fillStyle = w ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.14)'; g.fillRect(cx + (rnd() - 0.5) * cell, cy + (rnd() - 0.5) * cell, 1.5, 1.5) }
+    g.restore()
+    path(); g.strokeStyle = 'rgba(30,26,22,0.6)'; g.lineWidth = 2; g.stroke()
   }
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set(1.5, 1.5)
+  t.anisotropy = 4
+  t.repeat.set(1.2, 1.2)
   return t
 })()
 
