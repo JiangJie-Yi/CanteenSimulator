@@ -93,8 +93,9 @@ const PASS_SCENE = toGrillScene(passOf(GRILL_COUNTERS)).setY(GRILL_BAR_TOP * GRI
 const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 /**
- * A stick of binchotan striking the heap: struck, it rings like fired clay or a thin bell (that's how its hardness is known), a short bright
- * 'kin' of a few inharmonic partials over a dry click. Several thrown at once don't all sound: one strike in each little while.
+ * A stick of charcoal dropped on the heap: a dull, dry clatter, not a ring. A woody knock (noise through a mid band, gone in a few hundredths of
+ * a second), a little rattle of smaller knocks after it as it settles against the others, a soft low thump under them. Several thrown at once
+ * don't all sound: one in each little while.
  */
 let coalAudio: AudioContext | null = null
 let coalLast = 0
@@ -105,36 +106,44 @@ function coalClink(strength: number) {
     coalLast = now
     coalAudio ??= new AudioContext()
     const ac = coalAudio
-    const t = ac.currentTime
-    const pitch = 0.85 + Math.random() * 0.35
+    const t0 = ac.currentTime
     const out = ac.createGain()
-    out.gain.value = 0.16 * strength
+    out.gain.value = 0.5 * strength
     out.connect(ac.destination)
-    for (const [f, a, d] of [[2150, 1, 0.22], [3480, 0.6, 0.15], [5230, 0.35, 0.09], [7400, 0.2, 0.05]]) {
-      const o = ac.createOscillator()
+    const knock = (t: number, gain: number, freq: number, len: number) => {
+      const n = Math.max(1, Math.floor(ac.sampleRate * len))
+      const buf = ac.createBuffer(1, n, ac.sampleRate)
+      const ch = buf.getChannelData(0)
+      for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * Math.exp(-i / (n * 0.18))
+      const src = ac.createBufferSource()
+      src.buffer = buf
+      const bp = ac.createBiquadFilter()
+      bp.type = 'bandpass'
+      bp.frequency.value = freq
+      bp.Q.value = 1.6
       const g = ac.createGain()
-      o.type = 'sine'
-      o.frequency.value = f * pitch
-      g.gain.setValueAtTime(a, t)
-      g.gain.exponentialRampToValueAtTime(0.0001, t + d * (0.7 + strength * 0.5))
-      o.connect(g).connect(out)
-      o.start(t)
-      o.stop(t + d + 0.05)
+      g.gain.value = gain
+      src.connect(bp).connect(g).connect(out)
+      src.start(t)
     }
-    // (the dry click of the strike itself)
-    const n = Math.floor(ac.sampleRate * 0.012)
-    const buf = ac.createBuffer(1, n, ac.sampleRate)
-    const ch = buf.getChannelData(0)
-    for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * Math.exp(-i / (n * 0.2))
-    const src = ac.createBufferSource()
-    src.buffer = buf
-    const hp = ac.createBiquadFilter()
-    hp.type = 'highpass'
-    hp.frequency.value = 1800
-    const cg = ac.createGain()
-    cg.gain.value = 0.5
-    src.connect(hp).connect(cg).connect(out)
-    src.start(t)
+    // (the strike, then two or three smaller ones as it tips and settles)
+    knock(t0, 1, 1100 + Math.random() * 500, 0.035)
+    const rattles = 1 + Math.floor(Math.random() * 3 * strength)
+    let t = t0
+    for (let i = 0; i < rattles; i++) {
+      t += 0.025 + Math.random() * 0.05
+      knock(t, 0.35 + Math.random() * 0.3, 1400 + Math.random() * 900, 0.02)
+    }
+    // (the soft thump of its weight)
+    const o = ac.createOscillator()
+    const og = ac.createGain()
+    o.frequency.setValueAtTime(170, t0)
+    o.frequency.exponentialRampToValueAtTime(80, t0 + 0.05)
+    og.gain.setValueAtTime(0.25, t0)
+    og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.06)
+    o.connect(og).connect(out)
+    o.start(t0)
+    o.stop(t0 + 0.08)
   } catch { /* (no sound to be had) */ }
 }
 
@@ -4017,7 +4026,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (c.y <= c.ly && c.vy < 0) {
         c.y = c.ly
         if (!c.bounced) burst(c.x, c.y, c.z)
-        // (binchotan rings as it lands, hard and almost metallic: loud on the first strike, softer on the bounce)
+        // (it clatters as it lands: loud on the first strike, softer on the bounce)
         if (c.vy < -0.4) coalClink(c.bounced ? 0.35 : 1)
         c.bounced = true
         if (c.vy < -0.9) { c.vy = -c.vy * 0.3; c.vx *= 0.35; c.vz *= 0.35 }
