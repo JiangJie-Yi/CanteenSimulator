@@ -424,6 +424,7 @@ def body(kind):
     st = STYLE[kind]
     sh, wa, hi = st["sh"], st["waist"], st["hip"]
     verts, radii, edges = [], [], []
+    hand_roots = []
 
     def v(p, r):
         verts.append(Vector(p))
@@ -442,17 +443,7 @@ def body(kind):
     neck1 = v((0, 0, 0.73), 0.05)
     edges += [(seat, pelvis), (pelvis, waist), (waist, chest), (chest, top), (top, neck0), (neck0, neck1)]
     for sd in (1, -1):
-        # (short, thick arms ending in round mitten hands, a stub of a thumb)
-        shoulder = v((sd * 0.11 * sh, 0, 0.6), 0.05)
-        elbow = v((sd * 0.165, 0, 0.535), 0.045)
-        wrist = v((sd * 0.19, 0, 0.475), 0.042)
-        palm = v((sd * 0.198, -0.002, 0.448), 0.052)
-        knuckle = v((sd * 0.203, -0.004, 0.43), 0.046)
-        tip = v((sd * 0.206, -0.006, 0.42), 0.03)
-        thumb0 = v((sd * 0.19, -0.028, 0.452), 0.022)
-        thumb1 = v((sd * 0.192, -0.038, 0.442), 0.018)
-        edges += [(top, shoulder), (shoulder, elbow), (elbow, wrist), (wrist, palm), (palm, knuckle), (knuckle, tip),
-                  (palm, thumb0), (thumb0, thumb1)]
+        # (as Overcooked's cooks: no arms; the hands are their own floating mittens (hands(), below), not part of the body)
         bg = st.get("baggy", 1.0)
         # (short, stout legs: what shows under the round body is a thick stub and a big round shoe)
         hip = v((sd * 0.045 * hi, 0, 0.29), 0.05 * hi * (1 + (bg - 1) * 0.4))
@@ -470,6 +461,8 @@ def body(kind):
     for i, r in enumerate(radii):
         me.skin_vertices[0].data[i].radius = (r, r)
     me.skin_vertices[0].data[pelvis].use_root = True
+    for hr in hand_roots:
+        me.skin_vertices[0].data[hr].use_root = True
     sub = o.modifiers.new("Sub", "SUBSURF")
     sub.levels = 2
     o = evaluated_copy(o, f"{kind}.body")
@@ -509,8 +502,9 @@ def body_mat(name, t, p, st, kind):
         if st["collar"] == "hood" and p.z < 0.705:
             return "Top"
         return "Skin"
-    if name.startswith("hand"):
-        return "Skin"
+    # (there are no arms: what of the body lies nearest an arm's bone is its shoulder and side, in the top's colour)
+    if name.startswith(("hand", "forearm", "upperarm")):
+        return "Top"
     if name.startswith("forearm"):
         if st["sleeves"] == "short":
             return "Skin"
@@ -756,56 +750,15 @@ def face(kind, hd):
             arc = [(y + sd * a * 0.11, ez + 0.012 - 0.05 * (a * a) + 0.03) for a in (-1, -0.6, -0.2, 0.2, 0.6, 1)]
             decal_strip(bm, surf, arc, [0.0, 0.013, 0.016, 0.016, 0.013, 0.0], mi["Eye"])
             continue
-        rw, rh = (0.105, 0.16) if girl or kind == "kid" else (0.092, 0.14)
-        # (each kind its own eyes, and boldly: big and bright for the kid, the girls and the tourist, small and beady
-        # for the uncle, heavy-lidded for the tired office worker and the student)
-        rw, rh = {"kid": (0.125, 0.19), "maid": (0.125, 0.19), "highSchoolGirl": (0.118, 0.18), "gyaru": (0.12, 0.17), "tourist": (0.112, 0.16),
-                  "uncle": (0.06, 0.075), "civilServant": (0.07, 0.095)}.get(kind, (rw, rh))
-        sleepy = kind in ("salaryman", "student")
-        # (rounder, bigger eyes all round: the shape that reads as a face at a distance)
-        if kind not in ("uncle", "civilServant"):
-            rw, rh = rw * 1.2, rh * 1.26
-        if tough:
-            # (a narrowed glare: shorter eyes, flat along the top)
-            rh *= 0.72
-        lid = 0.6 if tough else 0.3 if sleepy else None
+        # (Overcooked's eyes: two glossy black beans, a little taller than wide, one bright catchlight up on the one side; a girl's with a
+        # short flick of lash at the outer corner, a tough one's flattened along the top into a glare)
+        rw, rh = (0.07, 0.1) if girl or kind == "kid" else (0.062, 0.092)
+        lid = 0.55 if tough else None
         decal_ellipse(bm, surf, y, ez, rw, rh, mi["Eye"],
                       squash=(lambda x, yy, lid=lid, rh=rh: (x, min(yy, lid * rh))) if lid else None)
-        if sleepy:
-            # (the heavy lid's line across the top of the eye, drooping at its outer end)
-            decal_strip(bm, surf, [(y - sd * rw * 1.15, ez + rh * 0.36), (y, ez + rh * 0.42), (y + sd * rw * 1.2, ez + rh * 0.22)],
-                        [0.0, 0.014, 0.0], mi["Lash"], off=0.0024)
-        if kind == "salaryman":
-            # (and bags under them, from the late nights)
-            decal_strip(bm, surf, [(y + sd * a * rw, ez - rh * 1.05 - 0.012 * (1 - a * a)) for a in (-1, 0, 1)],
-                        [0.0, 0.007, 0.0], mi["Wrinkle"], off=0.0022)
-        # a big iris filling most of the eye, darker at the top and warmer toward the lower rim, a dark pupil in it, and
-        # a large catchlight up on the one side with a small one low on the other
-        decal_ellipse(bm, surf, y, ez - rh * 0.12, rw * 0.86, rh * 0.8, mi["Iris"], off=0.0021)
-        decal_ellipse(bm, surf, y, ez - rh * 0.46, rw * 0.66, rh * 0.34, mi["IrisLight"], off=0.0022,
-                      squash=lambda x, yy: (x, yy if yy < 0 else yy * 0.5))
-        decal_ellipse(bm, surf, y, ez - rh * 0.08, rw * 0.42, rh * 0.46, mi["Eye"], off=0.0023)
-        if not sleepy:
-            decal_ellipse(bm, surf, y + sd * rw * 0.22, ez + rh * 0.3, rw * 0.36, rh * 0.3, mi["EyeWhite"], off=0.0026)
-        decal_ellipse(bm, surf, y - sd * rw * 0.3, ez - rh * 0.42, rw * 0.16, rh * 0.12, mi["EyeWhite"], off=0.0026)
-        if kind == "gyaru":
-            # (her liner, thick along the top lid and flicked out past the corner)
-            decal_strip(bm, surf, [(y - sd * rw * 0.9, ez + rh * 0.85), (y, ez + rh * 1.02), (y + sd * rw * 1.15, ez + rh * 0.8),
-                                   (y + sd * rw * 1.6, ez + rh * 1.0)], [0.0, 0.02, 0.022, 0.0], mi["Lash"], off=0.0025)
-        if kind in ("kid", "maid", "highSchoolGirl", "gyaru"):
-            # (a third sparkle, for the starry-eyed)
-            decal_ellipse(bm, surf, y + sd * rw * 0.45, ez - rh * 0.05, rw * 0.12, rh * 0.09, mi["EyeWhite"], off=0.0026)
+        decal_ellipse(bm, surf, y + sd * rw * 0.28, ez + rh * 0.34, rw * 0.32, rh * 0.26, mi["EyeWhite"], off=0.0026)
         if girl:
-            lash = [(y + sd * a * rw * 1.25, ez + rh * (0.95 - 0.25 * a * a) + 0.01) for a in (-1, -0.5, 0, 0.5, 1, 1.25)]
-            decal_strip(bm, surf, lash, [0.0, 0.026, 0.034, 0.034, 0.025, 0.0], mi["Lash"], off=0.0024)
-            # (and a little flick out past the outer corner, and a fold of the lid above)
-            decal_strip(bm, surf, [(y + sd * rw * 1.1, ez + rh * 0.78), (y + sd * rw * 1.5, ez + rh * 0.92)],
-                        [0.012, 0.0], mi["Lash"], off=0.0025)
-            decal_strip(bm, surf, [(y + sd * a * rw * 0.95, ez + rh * (1.18 - 0.3 * a * a)) for a in (-1, -0.4, 0.4, 1)],
-                        [0.0, 0.006, 0.006, 0.0], mi["Wrinkle"], off=0.0021)
-        elif not (sleepy or tough):
-            lash = [(y + sd * a * rw * 1.1, ez + rh * (0.96 - 0.22 * a * a)) for a in (-1, -0.5, 0, 0.5, 1)]
-            decal_strip(bm, surf, lash, [0.0, 0.016, 0.019, 0.016, 0.0], mi["Lash"], off=0.0024)
+            decal_strip(bm, surf, [(y + sd * rw * 0.8, ez + rh * 0.7), (y + sd * rw * 1.5, ez + rh * 1.0)], [0.012, 0.0], mi["Lash"], off=0.0024)
     eyes = from_bm(f"{kind}.eyes", bm, mats, HREF)
 
     bm = bmesh.new()
@@ -1734,11 +1687,7 @@ def clothes(kind, bd, hd, surf):
     # hems and cuffs: a rolled edge at each sleeve and trouser end
     hb = bmesh.new()
     for sd in (1, -1):
-        sname = {"long": ("forearm", 0.84), "short": ("upperarm", 0.55), "elbow": ("forearm", 0.45)}[st["sleeves"]]
-        a, b2 = BONE[f"{sname[0]}.{'L' if sd > 0 else 'R'}"]
-        cpt = a + (b2 - a) * sname[1]
-        r = limb_radius(bd, a, b2, sname[1])
-        tube_ring(hb, cpt, b2 - a, r + 0.002, (0.004 if st["sleeves"] != "elbow" else 0.006, 0.005), mi=0, seg=20)
+        # (no sleeves' cuffs: there are no arms, only the floating hands)
         if st["legs"] == "shorts":
             a, b2 = BONE[f"thigh.{'L' if sd > 0 else 'R'}"]
             cpt = a + (b2 - a) * 0.72
@@ -1982,6 +1931,18 @@ for kind in KINDS:
         from_bm(f"{kind}.band", hb, [MATS["Collar"], MATS["Button"]], HREF)
     # skin them all to the rig: the body by heat, the head and all on it rigidly, garments by their own rules
     auto_weights(bd, rig)
+    # (the floating hands: a round mitten on each hand bone, a stub of a thumb toward the front, each held rigidly by its own bone)
+    for s_, sd in (("L", 1), ("R", -1)):
+        hb_ = bmesh.new()
+        a_, b_ = BONE[f"hand.{s_}"]
+        c_ = a_ + (b_ - a_) * 0.45
+        ellipsoid(hb_, c_, (0.04, 0.034, 0.046), mi=0, seg=20, rings=12)
+        ellipsoid(hb_, c_ + Vector((-sd * 0.012, -0.03, 0.012)), (0.015, 0.016, 0.019), mi=0, seg=12, rings=8)
+        for f in hb_.faces:
+            f.smooth = True
+        hand_o = from_bm(f"{kind}.hand{s_}", hb_, [MATS["Skin"]], BREF)
+        weights_rigid(hand_o, f"hand.{s_}")
+        bind(hand_o, rig)
     for o in [hd, *hrs, *gl, *feats] + [x for x in COL.objects if x.name.startswith(f"{kind}.")
                                          and x.name.split(".")[1].split("_")[0] in ("hat", "band", "pin", "toque", "wacap", "workcap")]:
         if o.parent is None:
