@@ -117,7 +117,7 @@ const SWAPPED = new Set(['eyes', 'eyesShut', 'mouth', 'mouthOpen'])
 /** the parts drawn without an outline (things lying on the surface, and fine ones) */
 const FLAT = /^(eyes|eyesShut|face|mouth|mouthOpen|brows|details|cuffs|glasses|pin)/
 
-const UP = new THREE.Vector3(), QA = new THREE.Quaternion(), QB = new THREE.Quaternion()
+const UP = new THREE.Vector3(), SIDE = new THREE.Vector3(), QA = new THREE.Quaternion(), QB = new THREE.Quaternion()
 
 const smooth = (a: number, b: number, x: number) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k) }
 
@@ -137,6 +137,8 @@ type Rigged = {
   /** the head as the action left it, and as it was turned to look about */
   posed: THREE.Quaternion
   looked: THREE.Quaternion
+  /** where the head's turned to just now (yaw, pitch), eased toward what it's looking at next */
+  lookNow: { x: number; y: number }
 }
 
 /** which side of the phone (in the hand's frame) its screen is on: the one facing whoever holds it */
@@ -292,7 +294,7 @@ function useRigged(id: number, kind: Kind, glasses: boolean, phones: boolean,
     head?.scale.set(0.95 + 0.1 * hash(id, 3), 0.97 + 0.06 * hash(id, 5), 0.97 + 0.06 * hash(id, 3))
     // and the face's shape, one of four: round, long, square-jawed, or a narrow pointed one (瓜子臉)
     if (head) shapeFace(root, head, FACES[Math.floor(hash(id, 31) * FACES.length)])
-    return { root, mixer, actions, head, hand, handL, eyes, shut, mouth, open, face, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0) }
+    return { root, mixer, actions, head, hand, handL, eyes, shut, mouth, open, face, posed: new THREE.Quaternion(), looked: new THREE.Quaternion(0, 0, 0, 0), lookNow: { x: 0, y: 0 } }
   }, [gltf, id, kind, glasses, phones, lookGiven, styleGiven, showGiven])
   // (when they've gone, let go of what the GPU holds for them: each skeleton's bone texture, their own materials;
   // left alone these pile up over a day of customers until the browser drops the 3D)
@@ -408,7 +410,8 @@ export function Person({ id, eating, walking, still, t: tGiven, clock, talk = 0,
   // (alone) pass the time one way and then another every half a minute or so: look about, look at their phone, sit
   // with their chin in their hand
   const timeNow = () => tGiven ?? clock?.current ?? 0
-  const spellOf = (t: number) => Math.floor((t + id * 9) / 24)
+  // (each their own pace: some settle into one thing for half a minute, some fidget from one to the next every dozen seconds)
+  const spellOf = (t: number) => Math.floor((t + id * 9) / (12 + 18 * hash(id, 7)))
   const [spell, setSpell] = useState(() => spellOf(timeNow()))
   const idle = (['Sit', 'Phone', 'Chin', 'Phone', 'Sit', 'Chin'] as const)[Math.floor(hash(id, spell) * 6)]
   const [stopped, setStopped] = useState(false)
@@ -488,18 +491,34 @@ export function Person({ id, eating, walking, still, t: tGiven, clock, talk = 0,
     const dt = last.current === null ? 0 : Math.min(0.1, Math.max(0, t - last.current))
     last.current = t
     r.mixer.update(dt)
-    if (r.head && !walking && !eating && now === 'Sit') {
-      // (now and then a slow look round the room, not a shake of the head)
-      const look = Math.sin(t * 0.3 + id * 1.7) * 0.35 * smooth(0.7, 0.95, Math.abs(Math.sin(t * 0.13 + id)))
-      // (about the figure's own up, in the neck's frame)
+    if (r.head && !walking) {
+      // (a life of their own, sitting: every few seconds (each their own beat) the head goes to something new, eased there: the next
+      // stool, the fire, the wall's pictures, down to the plate or the phone; while talking, small nods; eating, mostly down with a
+      // glance up now and then)
+      const beat = 2.5 + 4 * hash(id, 11)
+      const n = Math.floor((t + id * 3.1) / beat)
+      const pick = (k: number) => hash(id * 7 + n, k)
+      let yaw = (pick(1) - 0.5) * (now === 'Phone' ? 0.3 : 1.2)
+      let pitch = (pick(2) - 0.6) * 0.45
+      if (now === 'Phone' || eating) { pitch = -0.25 + (eating && pick(3) > 0.7 ? 0.35 : 0); yaw *= 0.4 }
+      if (now === 'Chin') { yaw *= 0.5; pitch = 0.05 }
+      if (talk) { yaw = talk * 0.45; pitch = 0.05 + Math.sin(t * 7 + id) * 0.06 * (Math.sin(t * 1.3 + id) > 0 ? 1 : 0) }
+      const ease = 1 - Math.exp(-dt * 3)
+      r.lookNow.x += (yaw - r.lookNow.x) * ease
+      r.lookNow.y += (pitch - r.lookNow.y) * ease
       // (the mixer only writes a bone that changed: start from its own pose, not last frame's look)
       if (r.head.quaternion.equals(r.looked)) r.head.quaternion.copy(r.posed)
       else r.posed.copy(r.head.quaternion)
       const up = UP.set(0, 1, 0).applyQuaternion(r.root.getWorldQuaternion(QA))
       up.applyQuaternion(r.head.parent!.getWorldQuaternion(QB).invert())
-      r.head.quaternion.premultiply(QA.setFromAxisAngle(up.normalize(), look))
+      const side = SIDE.set(1, 0, 0).applyQuaternion(r.root.getWorldQuaternion(QA)).applyQuaternion(r.head.parent!.getWorldQuaternion(QB).invert())
+      r.head.quaternion.premultiply(QA.setFromAxisAngle(up.normalize(), r.lookNow.x)).premultiply(QA.setFromAxisAngle(side.normalize(), -r.lookNow.y))
       r.looked.copy(r.head.quaternion)
-    }
+      // (breathing, and pleased, a happy little bounce on the stool now and then)
+      const hop = mood === 'joy' ? Math.max(0, Math.sin(t * 9 + id)) * 0.018 * smooth(0.85, 1, Math.sin(t * 0.7 + id * 2)) : 0
+      r.root.position.y = hop
+      r.root.scale.y = 1 + Math.sin(t * 1.7 + id) * 0.008
+    } else if (r.root.position.y || r.root.scale.y !== 1) { r.root.position.y = 0; r.root.scale.y = 1 }
     // (pleased, their eyes are squeezed shut in happy arcs: no blinking)
     const joy = mood === 'joy' && !!r.face.eyesJoy
     const blink = !joy && (t * 0.9 + id * 0.37) % 4 < 0.12

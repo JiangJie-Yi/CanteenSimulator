@@ -7,6 +7,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
+import { FLOWS, flowOf, wantOf, type FlowKind } from '@/game/flow'
 import { COAL_MAX, COAL_PER_ADD, crumble, placeStick, restOf, roomFor, surfaceY, type Lay, throwForce } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
@@ -2000,6 +2001,11 @@ const roastRate = (fire: number) => 0.25 + 1.75 * fire
  * Rendered as a sibling after <Dish>, so its per-frame transforms land after Dish's pop-in animation, and it picks
  * up the extra portions Dish clones in as they appear.
  */
+/** how many times the shop has opened since the page was loaded (each opening draws the next pattern of trade) */
+const OPENINGS = { n: 0 }
+/** a session of trade, on the shop's clock (runGuests counts 0.8 a beat): what the day's pattern is laid over */
+const SESSION_LEN = 420
+
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, research = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
   locked = false, notes = {}, crowd = 1, blessed = false, onDrink, onWalkOut, lang = 'zh', names = {}, crew = [], bar = true,
@@ -2982,6 +2988,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const aiClock = useRef(0)
   const guestClock = useRef(0)
   const guestTime = useRef(0)
+  // (the day's pattern of trade, drawn as the shop opens (game/flow), and when it opened on the shop's clock; the chef says what kind of day it is)
+  const flow = useRef<FlowKind>('steady')
+  const openedAt = useRef(0)
+  useEffect(() => {
+    if (!ai || !bar) return
+    flow.current = flowOf(OPENINGS.n++)
+    openedAt.current = guestTime.current
+    const t = window.setTimeout(() => onSay?.('chef', FLOWS[flow.current].say[lang]), 1500)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ai])
   const chefClock = useRef(0)
   const guests = useRef<Guest[]>([])
   /** what's been ordered off the menu and not yet brought out: each food, as which dish */
@@ -3113,7 +3130,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       drank.current.add(g.id)
       onDrink(g.id, drinkFor(kindOf(g.id).kind, g.id))
     }
-    if (onOrder && !SHOP.closing && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd) {
+    // (how far into the session it is, a session being some minutes of the shop's clock, and so how busy the day's pattern runs just now)
+    const dayK = (now - openedAt.current) / SESSION_LEN
+    const fl = FLOWS[flow.current]
+    if (onOrder && !SHOP.closing && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK)) {
       guestClock.current = 0
       // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
       const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
@@ -3122,7 +3142,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const free = (n: number) => n < BAR_SEATS && !used.has(n)
       // now and then a couple comes in together, if two stools side by side on one counter are free: a young man and
       // a young woman (the next ids that are), sat next to each other
-      const pairAt = Math.random() < 0.2
+      const pairAt = Math.random() < fl.pairs
         ? Array.from({ length: BAR_SEATS - 1 }, (_, n) => n).find((n) => free(n) && free(n + 1) && GRILL_SEATS[n].counter === GRILL_SEATS[n + 1].counter)
         : undefined
       let ids = [guestSeq.current + 1]
@@ -3136,7 +3156,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (a stool for them, before they order: with every one taken, or someone still at it, they don't come in)
         const seatFor = couple ? pairAt! + k : Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n))
         if (seatFor === undefined || used.has(seatFor)) continue
-        const want = 1 + Math.floor(Math.random() * 3) + (blessed && Math.random() < 0.6 ? 1 : 0)
+        const want = Math.max(1, wantOf(flow.current, Math.random(), Math.random())) + (blessed && Math.random() < 0.6 ? 1 : 0)
         const orders: string[] = []
         const said: string[] = []
         for (let j = 0; j < (entries ? Math.min(want, blessed ? 3 : 2) : want); j++) {
