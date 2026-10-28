@@ -34,6 +34,7 @@ import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
 import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { tl } from '@/data/i18n'
+import { Kabuto } from './Kabuto'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -292,6 +293,8 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           </StaticBatch></Movable>
         ))}
       </group>
+      {/* a samurai helmet (兜) on its stand, set out on top of the shoe cupboard as a decoration, facing into the room */}
+      <Movable id="kabuto" label="武士頭盔"><group position={[0.34, -GENKAN.depth + 0.84, -0.24]} rotation-y={Math.PI / 2} scale={1.1}><Kabuto /></group></Movable>
       <Movable id="genkan" label="玄關地墊"><StaticBatch>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       {/* the coir mat lying on the genkan's stone, just inside */}

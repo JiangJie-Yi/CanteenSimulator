@@ -156,7 +156,7 @@ const PIECES_JA: Record<string, string> = {
   服務鈴: '呼び鈴', 元寶: '金の馬蹄銀', 招財樹: '発財樹', '木質台座（含抽屜）': '木の台（引き出し付き）', 結帳牌: 'お会計札', 櫃檯招財貓: 'カウンターの招き猫',
   '紙箱（紙袋）': '段ボール箱（紙袋）', '紙箱（收銀紙捲）': '段ボール箱（レジロール）', 收銀機操作說明書: 'レジスター取扱説明書', 錢箱: '手提げ金庫',
   '平板（iPad）': 'タブレット（iPad）', 音箱: 'スピーカー', 酒樽: '酒樽', 餐盤堆: '皿の山', 柳樹: '柳', 員工專用墊: '従業員用マット',
-  竹盆栽: '竹の鉢植え', 酒箱: '酒の木箱', '攝影機 1（研製視角）': 'カメラ 1（試作の視点）',
+  竹盆栽: '竹の鉢植え', 酒箱: '酒の木箱', 武士頭盔: '兜', '攝影機 1（研製視角）': 'カメラ 1（試作の視点）',
 }
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
 const PIECES_EN: Record<string, string> = {
@@ -166,7 +166,7 @@ const PIECES_EN: Record<string, string> = {
   '收銀機（含抽屜）': 'Cash register', 刷卡機: 'Card reader', 明細印表機: 'Receipt printer', 找零盤: 'Change tray', 筆筒: 'Pen pot',
   服務鈴: 'Service bell', 元寶: 'Gold ingot', 招財樹: 'Money tree', '木質台座（含抽屜）': 'Wooden stand', 櫃檯招財貓: 'Counter lucky cat',
   '平板（iPad）': 'Tablet (iPad)', 音箱: 'Speaker', 酒樽: 'Sake barrel', 柳樹: 'Willow', 竹盆栽: 'Potted bamboo', 酒箱: 'Sake crate',
-  惠比壽石像: 'Ebisu statue', 門口招財貓組: 'Lucky cats (group)', 小神龕組: 'Shrine (group)',
+  惠比壽石像: 'Ebisu statue', 武士頭盔: 'Samurai helmet', 門口招財貓組: 'Lucky cats (group)', 小神龕組: 'Shrine (group)',
 }
 /** the words in the names made up as they're placed (畫（-5, -4.2）, 馬桶（男廁）, 座位 3…) */
 const WORDS_JA: [string, string][] = [
