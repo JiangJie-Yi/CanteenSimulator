@@ -1,4 +1,4 @@
-import { BambooModel } from './BarFurnish'
+import { BambooModel, ToiletModel, WashstandModel } from './BarFurnish'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -1084,20 +1084,12 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       {[0.25, 0.7].map((x) => <mesh key={x} position={[x, top - 0.03, 0]}><boxGeometry args={[0.06, 0.06, w]} /><meshToonMaterial color="#241408" /></mesh>)}
       </StaticBatch>
       <Movable id={`wc-${who}-toilet`} label={`馬桶（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      {/* the toilet, facing the door */}
-      <group position={[D - 0.22, 0, 0]}>
-        <mesh geometry={WC_GEO.foot} position-y={0.14}><meshToonMaterial color="#f6f6f2" /></mesh>
-        <mesh geometry={WC_GEO.bowl} position-y={0.36} rotation-x={Math.PI} scale={[1.15, 0.7, 1]}><meshToonMaterial color="#f6f6f2" side={THREE.DoubleSide} /></mesh>
-        <mesh geometry={WC_GEO.seat} position={[-0.02, 0.37, 0]} rotation-x={-Math.PI / 2} scale={[1.15, 1, 1]}><meshToonMaterial color="#e8d4a8" /></mesh>
-        <mesh geometry={WC_GEO.tank} position={[0.13, 0.55, 0]}><meshToonMaterial color="#f6f6f2" /></mesh>
-        {/* (a small basin on the cistern's top to wash the hands in as it fills, its tap curving over it) */}
-        <mesh geometry={WC_GEO.basin} position={[0.13, 0.725, -0.06]} scale={[0.8, 1, 0.8]}><meshToonMaterial color="#f6f6f2" /></mesh>
-        <mesh position={[0.17, 0.78, -0.06]}><cylinderGeometry args={[0.006, 0.006, 0.07, 6]} /><meshToonMaterial color="#b8bcc0" /></mesh>
-        <mesh position={[0.15, 0.815, -0.06]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.006, 0.006, 0.045, 6]} /><meshToonMaterial color="#b8bcc0" /></mesh>
-      </group>
+      {/* the toilet with its washlet, facing the door, its cistern to the back wall (blender/wc.py) */}
+      <group position={[D - 0.4, 0, 0]}><ToiletModel /></group>
       </StaticBatch></Movable>
       <Movable id={`wc-${who}-vase`} label={`竹花瓶（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      <group position={[D - 0.22, 0, 0]}>
+      {/* (on the hand-wash counter, beside the bowl) */}
+      <group position={[D * 0.45 - 0.26, 0.06, -w / 2 + 0.01]}>
         {/* (a bamboo vase of camellia beside it) */}
         <group position={[0.13, 0.7, 0.09]}>
           <mesh geometry={WC_GEO.pot} position-y={0.05}><meshToonMaterial color="#b8a060" /></mesh>
@@ -1114,7 +1106,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       </StaticBatch></Movable>
       <Movable id={`wc-${who}-duck`} label={`簀之子踏板（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* the slatted duckboard (簀の子) before the toilet, and the slippers by the door */}
-      <group position={[D - 0.54, 0, 0]}>
+      <group position={[D - 0.7, 0, 0]}>
         {Array.from({ length: 9 }, (_, k) => (
           <mesh key={k} position={[0, 0.02, (k - 4) * 0.052]}><boxGeometry args={[0.4, 0.02, 0.04]} /><meshToonMaterial color="#d8c08a" /></mesh>
         ))}
@@ -1122,27 +1114,20 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       </group>
       </StaticBatch></Movable>
       <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
+      {/* (a pair of toilet slippers: rounded soles, a cloth band over the toes, the toilet's own colour, set side by side toes out) */}
       {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[0.07, 0.018, sd * 0.1]} rotation-y={sd * 0.1}>
-          <boxGeometry args={[0.2, 0.03, 0.08]} /><meshToonMaterial color={accent} />
-        </mesh>
+        <group key={sd} position={[0.09, 0, sd * 0.055]} rotation-y={sd * 0.06}>
+          <mesh position-y={0.008} scale={[0.13, 0.016, 0.046]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color="#e8dcc4" /></mesh>
+          <mesh position-y={0.017} scale={[0.125, 0.004, 0.042]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color={accent} /></mesh>
+          <mesh position={[-0.055, 0.024, 0]} rotation-x={Math.PI / 2} scale={[1, 1, 0.8]}><torusGeometry args={[0.04, 0.016, 6, 16, Math.PI]} /><meshToonMaterial color={accent} /></mesh>
+        </group>
       ))}
       </StaticBatch></Movable>
       <Movable id={`wc-${who}-basin`} label={`石洗手台與鏡子（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      {/* a stone basin on a wooden shelf by the side wall, a bamboo dipper laid across it, a round mirror in a wooden frame
-          over it, the indigo hand towel on a rod */}
-      <group position={[D * 0.45, 0, -w / 2 + 0.12]}>
-        <mesh position={[0, 0.74, 0]}><boxGeometry args={[0.28, 0.035, 0.2]} /><meshToonMaterial color="#b88a52" /></mesh>
-        {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.11, 0.66, 0]}><boxGeometry args={[0.025, 0.14, 0.16]} /><meshToonMaterial color="#6a4428" /></mesh>)}
-        <mesh geometry={WC_GEO.basin} position-y={0.79}><meshToonMaterial color="#6a6e70" /></mesh>
-        <mesh position={[0, 0.82, 0]}><circleGeometry args={[0.075, 18]} /><meshBasicMaterial color="#9ab8c4" /></mesh>
-        <mesh position={[0.02, 0.835, 0.03]} rotation-z={Math.PI / 2} rotation-y={0.3}><cylinderGeometry args={[0.005, 0.005, 0.26, 5]} /><meshToonMaterial color="#c8b070" /></mesh>
-        <mesh position={[-0.13, 0.84, 0.03]}><cylinderGeometry args={[0.028, 0.024, 0.04, 10]} /><meshToonMaterial color="#c8b070" /></mesh>
-        <mesh position={[0, 1.3, -0.115]}><circleGeometry args={[0.13, 24]} /><meshBasicMaterial color="#c8d8e0" /></mesh>
-        <mesh position={[0, 1.3, -0.117]}><circleGeometry args={[0.16, 24]} /><meshToonMaterial color="#6a4428" /></mesh>
-        <mesh position={[0.24, 1.0, -0.1]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.005, 0.005, 0.12, 5]} /><meshToonMaterial color="#c8b070" /></mesh>
-        <mesh position={[0.24, 0.9, -0.098]}><planeGeometry args={[0.1, 0.2]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI} side={THREE.DoubleSide} /></mesh>
-      </group>
+      {/* the hand-wash counter against the side wall: a cedar plank on brackets, a stone bowl, a brass tap arching over it, a round
+          mirror and a towel ring (blender/wc.py); the indigo hand towel hung beside */}
+      <group position={[D * 0.45, 0, -w / 2]} rotation-y={Math.PI / 2}><WashstandModel /></group>
+      <mesh position={[D * 0.45 + 0.26, 0.86, -w / 2 + 0.035]}><planeGeometry args={[0.1, 0.2]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI} side={THREE.DoubleSide} /></mesh>
       </StaticBatch></Movable>
       <Movable id={`wc-${who}-paper`} label={`衛生紙架（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* the paper, in a wooden holder on the other wall, and the plaque over it */}
