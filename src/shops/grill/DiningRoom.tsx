@@ -50,7 +50,9 @@ const seal = (g: CanvasRenderingContext2D, x: number, y: number, s: number) => {
 }
 
 /** the frieze under the beam: seigaiha, overlapping waves of rings in indigo on cream */
-const SEIGAIHA = canvasTex(64, 32, (g) => {
+const SEIGAIHA = canvasTex(64 * 8, 32 * 8, (g) => {
+  // (drawn eight times over its laid-out size, so the rings' edges stay clean along the whole frieze)
+  g.setTransform(8, 0, 0, 8, 0, 0)
   g.fillStyle = '#e9dcc0'
   g.fillRect(0, 0, 64, 32)
   for (let row = 0; row < 3; row++) {
@@ -61,6 +63,10 @@ const SEIGAIHA = canvasTex(64, 32, (g) => {
         g.arc(cx, cy + 8, r, Math.PI, 0)
         g.fillStyle = r % 8 ? '#e9dcc0' : '#3a5578'
         g.fill()
+        // (a fine pale thread at each ring's crest, as a dyed pattern's resist line)
+        g.strokeStyle = r % 8 ? 'rgba(58,85,120,0.35)' : 'rgba(233,220,192,0.5)'
+        g.lineWidth = 0.25
+        g.stroke()
       }
     }
   }
@@ -315,7 +321,9 @@ const noboriCache = new Map<number, THREE.Texture | null>()
 const noboriTex = (i: number) => {
   if (!noboriCache.has(i)) {
     const look = NOBORI_LOOKS[i]
-    noboriCache.set(i, signTexture(96, 296, (g) => {
+    noboriCache.set(i, signTexture(96 * 3, 296 * 3, (g) => {
+      // (drawn at three times its laid-out size: the letters and the stitching stay crisp seen close)
+      g.setTransform(3, 0, 0, 3, 0, 0)
       // (the cloth's cut: square, a swallow's tail, a point, or scallops along its foot)
       g.save()
       g.beginPath()
@@ -386,6 +394,8 @@ const noboriTex = (i: number) => {
         g.restore()
         g.globalAlpha = 1
       }
+      // (the cotton's slub: flecks a little lighter and darker all over)
+      for (let k = 0; k < 900; k++) { g.fillStyle = k % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'; g.fillRect((k * 37) % 96, (k * 89) % 296, 1.4, 0.6) }
       // (the cloth's own life: a soft shade down it, two vertical folds, the dye heavier at the top where it's hung)
       const shade = g.createLinearGradient(0, 0, 96, 0)
       shade.addColorStop(0, 'rgba(0,0,0,0.16)')
@@ -444,7 +454,8 @@ const hbannerCache = new Map<number, THREE.Texture | null>()
 const hbannerTex = (i: number) => {
   if (!hbannerCache.has(i)) {
     const look = HBANNER_LOOKS[i]
-    hbannerCache.set(i, signTexture(320, 96, (g) => {
+    hbannerCache.set(i, signTexture(320 * 3, 96 * 3, (g) => {
+      g.setTransform(3, 0, 0, 3, 0, 0)
       g.fillStyle = look.cloth
       g.fillRect(0, 0, 320, 96)
       g.strokeStyle = 'rgba(0,0,0,0.07)'
@@ -460,6 +471,14 @@ const hbannerTex = (i: number) => {
       const chars = [...look.text]
       const size = chars.length > 5 ? 40 : 54
       brushText(g, look.text, 160, 49, Math.min(size, 290 / chars.length), { fill: look.ink, shadow: 'rgba(0,0,0,0.25)' })
+      // (a shade along it as it sags between its cords, stitched hems, brass grommets at its top corners)
+      const sag = g.createLinearGradient(0, 0, 0, 96)
+      sag.addColorStop(0, 'rgba(0,0,0,0.18)'); sag.addColorStop(0.3, 'rgba(0,0,0,0)'); sag.addColorStop(1, 'rgba(0,0,0,0.12)')
+      g.fillStyle = sag; g.fillRect(0, 0, 320, 96)
+      g.setLineDash([5, 4]); g.strokeStyle = look.edge; g.lineWidth = 1; g.globalAlpha = 0.7
+      g.beginPath(); g.moveTo(0, 12); g.lineTo(320, 12); g.moveTo(0, 84); g.lineTo(320, 84); g.stroke()
+      g.setLineDash([]); g.globalAlpha = 1
+      for (const x of [10, 310]) { g.fillStyle = '#c8a050'; g.beginPath(); g.arc(x, 10, 5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#2a1a10'; g.beginPath(); g.arc(x, 10, 2.4, 0, Math.PI * 2); g.fill() }
     }))
   }
   return hbannerCache.get(i) ?? null
@@ -809,21 +828,38 @@ function Scroll({ art }: { art: ArtKey }) {
   )
 }
 
-/** the plaster: warm cream, faintly mottled */
+/** the plaster: a warm earthen wall (聚楽壁) of cream clay, mottled, its fine sand in it, the trowel's long strokes faint across it and
+ * short chopped straw showing here and there */
 const PLASTER = (() => {
   if (typeof document === 'undefined') return null
+  const S = 512
   const c = document.createElement('canvas')
-  c.width = c.height = 128
+  c.width = c.height = S
   const g = c.getContext('2d')!
   g.fillStyle = '#efe3cb'
-  g.fillRect(0, 0, 128, 128)
+  g.fillRect(0, 0, S, S)
   let seed = 7
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  for (let k = 0; k < 260; k++) {
-    g.fillStyle = `rgba(${rnd() < 0.5 ? '150,120,80' : '255,250,235'},${0.05 + rnd() * 0.08})`
+  for (let k = 0; k < 900; k++) {
+    g.fillStyle = `rgba(${rnd() < 0.5 ? '150,120,80' : '255,250,235'},${0.04 + rnd() * 0.07})`
     g.beginPath()
-    g.arc(rnd() * 128, rnd() * 128, 2 + rnd() * 7, 0, Math.PI * 2)
+    g.arc(rnd() * S, rnd() * S, 6 + rnd() * 26, 0, Math.PI * 2)
     g.fill()
+  }
+  // (the trowel: long shallow arcs, a shade lighter and darker along their edges)
+  for (let k = 0; k < 40; k++) {
+    const x = rnd() * S, y = rnd() * S, r = 80 + rnd() * 160, a = rnd() * 6.28
+    g.strokeStyle = `rgba(${rnd() < 0.5 ? '120,95,60' : '255,248,230'},0.07)`
+    g.lineWidth = 6 + rnd() * 10
+    g.beginPath(); g.arc(x, y, r, a, a + 0.5 + rnd() * 0.6); g.stroke()
+  }
+  // (sand: fine grains)
+  for (let k = 0; k < 9000; k++) { g.fillStyle = rnd() < 0.5 ? 'rgba(90,70,40,0.18)' : 'rgba(255,255,245,0.25)'; g.fillRect(rnd() * S, rnd() * S, 1, 1) }
+  // (chopped straw)
+  for (let k = 0; k < 120; k++) {
+    const x = rnd() * S, y = rnd() * S, a = rnd() * 6.28, l = 4 + rnd() * 9
+    g.strokeStyle = 'rgba(176,138,74,0.55)'; g.lineWidth = 0.9
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke()
   }
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
@@ -845,7 +881,8 @@ const WC_H = 1.85
 /** a stretch of the wall (the wall's own frame: z along it, y up), plaster or the dark wainscot, the plaster's
  * pattern laid from the wall's own z so stretches side by side run on into each other */
 /** upright boards of warm brown wood, each with its own tone and grain, for the wall's foot (the wainscot) */
-const WALL_BOARDS = canvasTex(128, 128, (g) => {
+const WALL_BOARDS = canvasTex(512, 512, (g) => {
+  g.setTransform(4, 0, 0, 4, 0, 0)
   g.fillStyle = '#6a4a2e'
   g.fillRect(0, 0, 128, 128)
   const tones = ['#6e4c30', '#5f4128', '#76553a', '#684830', '#6a4a2c', '#5a3e26', '#74523a', '#644530']
