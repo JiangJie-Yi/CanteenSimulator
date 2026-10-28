@@ -585,6 +585,77 @@ function Framed({ art }: { art: ArtKey }) {
   )
 }
 
+/** the round window's paper: lit warm from behind, brightest in the middle, the shadows of bamboo outside falling on it */
+const ROUND_PAPER = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 512
+  const g = c.getContext('2d')!
+  const gr = g.createRadialGradient(256, 236, 20, 256, 256, 280)
+  gr.addColorStop(0, '#fff6e2'); gr.addColorStop(0.6, '#f6dfb4'); gr.addColorStop(1, '#d9a868')
+  g.fillStyle = gr; g.fillRect(0, 0, 512, 512)
+  // (the fibres of the washi)
+  g.strokeStyle = 'rgba(160,120,70,0.12)'; g.lineWidth = 1
+  for (let k = 0; k < 160; k++) { const x = (k * 97) % 512, y = (k * 233) % 512; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 14, y + (k % 5) - 2); g.stroke() }
+  // (bamboo outside: soft grey-green shadows of culms and leaves)
+  g.fillStyle = 'rgba(70,80,50,0.28)'
+  for (const [x, w, lean] of [[120, 16, 0.04], [190, 12, -0.03], [360, 18, 0.02], [420, 11, -0.05]] as [number, number, number][]) {
+    g.save(); g.translate(x, 512); g.rotate(lean); g.fillRect(-w / 2, -520, w, 520)
+    for (let y = 60; y < 520; y += 95) g.fillRect(-w / 2 - 2, -y, w + 4, 3)
+    g.restore()
+  }
+  for (let k = 0; k < 26; k++) {
+    const x = 90 + (k * 53) % 360, y = 60 + (k * 71) % 230, a = (k % 7) * 0.5 - 1.4
+    g.save(); g.translate(x, y); g.rotate(a); g.beginPath(); g.ellipse(26, 0, 30, 6, 0, 0, Math.PI * 2); g.fill(); g.restore()
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+/**
+ * A round window (丸窓) let into the plaster: a deep reveal of wood round it, a thick turned frame of warm keyaki, and inside, a light
+ * lattice over washi lit from outside, bamboo's shadows on it
+ */
+function RoundWindow() {
+  const R = 0.4
+  const lat = [-0.2, 0, 0.2]
+  return (
+    <group>
+      {/* (the reveal, the wall's thickness lined in wood) */}
+      <mesh position-x={-0.03} rotation-z={Math.PI / 2}>
+        <cylinderGeometry args={[R + 0.004, R + 0.004, 0.06, 64, 1, true]} />
+        <meshToonMaterial color="#7a4e2c" side={THREE.BackSide} />
+      </mesh>
+      {/* (the paper, set back in the reveal) */}
+      <mesh position-x={-0.004} rotation-y={-Math.PI / 2}>
+        <circleGeometry args={[R, 64]} />
+        <meshBasicMaterial map={ROUND_PAPER} toneMapped={false} />
+      </mesh>
+      {/* (the lattice: three bars each way, their ends let into the reveal) */}
+      {lat.map((k) => {
+        const L = 2 * Math.sqrt(R * R - k * k)
+        return (
+          <group key={k}>
+            <mesh position={[-0.012, 0, k]}><boxGeometry args={[0.016, L, 0.018]} /><meshToonMaterial color="#8a5a34" /></mesh>
+            <mesh position={[-0.012, k, 0]}><boxGeometry args={[0.016, 0.018, L]} /><meshToonMaterial color="#8a5a34" /></mesh>
+          </group>
+        )
+      })}
+      {/* (the frame: a thick ring of warm wood standing proud of the wall, a fine darker bead inside it) */}
+      <mesh position-x={-0.05} rotation-y={Math.PI / 2}>
+        <torusGeometry args={[R + 0.035, 0.04, 14, 72]} />
+        <meshToonMaterial color="#a8703e" />
+      </mesh>
+      <mesh position-x={-0.062} rotation-y={Math.PI / 2}>
+        <torusGeometry args={[R + 0.004, 0.012, 8, 72]} />
+        <meshToonMaterial color="#5a361c" />
+      </mesh>
+      {/* (a little sill under it) */}
+      <mesh position={[-0.05, -R - 0.06, 0]}><boxGeometry args={[0.1, 0.03, 0.5]} /><meshToonMaterial color="#8a5a34" /></mesh>
+    </group>
+  )
+}
+
 /** a hanging scroll: the painting on paper mounted in brocade, its cord over a nail, a weighted rod at the foot */
 function Scroll({ art }: { art: ArtKey }) {
   const W = 0.26, H = 0.62
@@ -1264,6 +1335,8 @@ function nameOnly(title: string, hint: string) {
 }
 /** the shrine drawn wider than it was modelled, across its front (along z): the owner's 1.25 */
 const SHRINE_WIDE = 1.25
+/** and a little shallower front to back, its back still to the wall (the offerings' shelf in front of it as it was) */
+const SHRINE_DEEP = 0.8
 function ShrineDoors() {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
   const doors = useMemo(() => {
@@ -1486,6 +1559,8 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
     return spots.filter((z) => (!shelf || Math.abs(z - shelfZ) > 0.85 * ALTAR_SCALE) && isClear(z, 0.3) && (door === undefined || Math.abs(z - door) > 0.95)
       && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length],
+        // (on the back wall, the plum scroll's place is a round window let into the plaster instead)
+        round: shelf && k % 2 === 1 && SCROLLS[(start + k) % SCROLLS.length] === 'plum',
         // (a banner every third place along the wall, in turn)
         // (none by the drinks fridges: the wall there is left plain)
         nobori: k % 3 === 2 && isClear(z, 0.9) ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined,
@@ -1557,9 +1632,9 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
         </StaticBatch>
         {/* (everything below is its own piece in a batch of its own, so each can be moved by hand when the shop's shut: key G) */}
         {art.filter((a) => a.nobori === undefined).map((a) => (
-          <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`${a.kanban !== undefined ? '木牌' : a.scroll ? '掛軸' : '畫'}（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><StaticBatch>
-            <group position={[0, a.scroll ? 1.42 : 1.5, a.z]}>
-              {a.kanban !== undefined ? <Kanban i={a.kanban} /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
+          <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`${a.kanban !== undefined ? '木牌' : a.round ? '圓窗' : a.scroll ? '掛軸' : '畫'}（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><StaticBatch>
+            <group position={[0, a.round ? 1.55 : a.scroll ? 1.42 : 1.5, a.z]}>
+              {a.kanban !== undefined ? <Kanban i={a.kanban} /> : a.round ? <RoundWindow /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
             </group>
           </StaticBatch></Movable>
         ))}
@@ -1670,7 +1745,8 @@ const AURA = canvasTex(128, 128, (g) => {
 /** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015) */
 const CUPS_SHIFT = -0.015
 /** where the Ebisu's feet are, on his pedestal (the ring of light spreads out from there) */
-const EBISU_FEET: [number, number, number] = [0.145, 0.077, 0]
+// (where the shrine's back stands, ALTAR_D / 2, and the Ebisu brought back toward it with the shrine's shallower depth)
+const EBISU_FEET: [number, number, number] = [0.29 + (0.145 - 0.29) * SHRINE_DEEP, 0.077, 0]
 /** where the cups stand along the shelf's depth (the offering's light comes from there) */
 const CUPS_FX = 0.29 - 0.375 + CUPS_SHIFT
 /** the altar shelf's depth, out from the wall: the god at the back, raised, the censer before him */
@@ -1928,13 +2004,13 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         {/* (pointed at, the shrine is only named (it isn't clicked: no glow, the cursor as it is); its doors and the flask are what's worked) */}
         <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '神棚', hint: '供奉惠比壽；點御神酒供酒，點門開關' }) }}
           onPointerOut={() => setTip(null)}>
-          <group scale-z={SHRINE_WIDE}><StaticBatch><Kamidana part="shrine" /></StaticBatch></group>
+          <group scale-z={SHRINE_WIDE} scale-x={SHRINE_DEEP}><StaticBatch><Kamidana part="shrine" /></StaticBatch></group>
         </group>
-        {/* (its doors, which open; the Ebisu inside, a piece of its own) */}
-        <group position={[-0.14, 0.015, 0]}>
+        {/* (its doors, which open; the Ebisu inside, a piece of its own: brought back with the shallower shrine, he himself not squashed) */}
+        <group scale-x={SHRINE_DEEP}><group position={[-0.14, 0.015, 0]}>
           <ShrineDoors />
-          <Movable id="ebisu" label="惠比壽石像"><group {...nameOnly('惠比壽石像', '七福神之一，保佑生意興隆、漁獲豐收')}><KamidanaModel part="ebisu" /></group></Movable>
-        </group>
+          <Movable id="ebisu" label="惠比壽石像"><group scale-x={1 / SHRINE_DEEP} {...nameOnly('惠比壽石像', '七福神之一，保佑生意興隆、漁獲豐收')}><KamidanaModel part="ebisu" /></group></Movable>
+        </group></group>
       </group></Movable>
       {/* (the vases and the cups beside it, each its own piece: not part of what's pointed at, they don't light with it; the vases not batched,
           a batch takes no clicks, and clicked they change their flowers) */}
