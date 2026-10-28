@@ -712,38 +712,140 @@ carve += tai_parts
 for o in carve:
     finish(o, o.name, M["stone"])
 fig = join(carve, "KamiEbisuFigure")
-fig.data.remesh_voxel_size = 0.0009
+# ---- the carving made twice: a fine one, every detail cut into it (the eyes, brows and smile, the collar, the beard's strands, the robe's
+# folds, the hat's crease, the fish's scales and gill, the toes), and a light one for the game; the fine one's relief and its shadowed hollows
+# are baked into the light one's pictures (a normal map, and its colour darkened in the cuts), so it looks carved but costs little
+fig.data.remesh_voxel_size = 0.00045
 bpy.ops.object.select_all(action="DESELECT"); fig.select_set(True); bpy.context.view_layer.objects.active = fig
 bpy.ops.object.voxel_remesh()
-sm = fig.modifiers.new("s", "SMOOTH"); sm.factor = 0.6; sm.iterations = 6
-dc = fig.modifiers.new("d", "DECIMATE"); dc.ratio = 0.11
+sm = fig.modifiers.new("s", "SMOOTH"); sm.factor = 0.6; sm.iterations = 8
 apply_mods(fig)
-bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cube_project(cube_size=0.06); bpy.ops.object.mode_set(mode="OBJECT")
-finish(fig, "KamiEbisuFigure", M["stone"])
-eb.append(fig)
-# ---- what's cut into the stone, darker: closed, smiling eyes (two arcs), raised brows, a wide smile, the robe's crossed collar, the fish's eye
-# and gill, the rod and its line
 FX = -0.0163
 
 
-def arc(name, cz, cy, w, h, n=7, up=True, rr=0.0006, x=FX):
-    pts = []
-    for i in range(n):
-        u = -1 + 2 * i / (n - 1)
-        pts.append((x - 0.0006 * (1 - u * u), cy + (h * (1 - u * u) if up else -h * (1 - u * u)), cz + u * w / 2))
-    eb.append(ebtube(name, pts, rr, M["stoneDark"], ring=6))
+def arcpts(cz, cy, w, h, n=9, up=True, x=FX):
+    return [(x - 0.0006 * (1 - u * u), cy + (h * (1 - u * u) if up else -h * (1 - u * u)), cz + u * w / 2) for u in [-1 + 2 * i / (n - 1) for i in range(n)]]
 
 
+# (each cut: a line through the game frame, how wide and how deep)
+CUTS = []
 for sz in (-1, 1):
-    arc(f"KamiEbisuEye{sz}", sz * 0.0056, 0.0675, 0.0055, 0.0014, up=True)
-    arc(f"KamiEbisuBrow{sz}", sz * 0.0058, 0.0722, 0.0062, 0.0011, up=True, rr=0.0005, x=FX + 0.0012)
-arc("KamiEbisuSmile", 0.0, 0.0585, 0.0105, 0.0024, up=False, rr=0.0007, x=FX + 0.0006)
-# (the collar: two bands crossing on his chest, left over right)
-for sz in (-1, 1):
-    eb.append(ebtube(f"KamiEbisuCollar{sz}", [(-0.0168, 0.0515, sz * 0.0085), (-0.0205, 0.0435, sz * 0.0025), (-0.0238, 0.0365, -sz * 0.0035)], 0.0009, M["stone"], ring=6))
-# (the fish's eye and its gill line)
+    CUTS.append((arcpts(sz * 0.0056, 0.0675, 0.0058, 0.0015), 0.0007, 0.0011))       # (closed, smiling eyes)
+    CUTS.append((arcpts(sz * 0.0058, 0.0722, 0.0064, 0.0011, x=FX + 0.0012), 0.0006, 0.0008))   # (raised brows)
+    CUTS.append(([(-0.0168, 0.0515, sz * 0.0085), (-0.0205, 0.0435, sz * 0.0025), (-0.0238, 0.0365, -sz * 0.0035)], 0.0006, 0.0006))  # (the collar)
+CUTS.append((arcpts(0.0, 0.0585, 0.011, 0.0025, up=False, x=FX + 0.0006), 0.0006, 0.0008))  # (the wide smile)
+CUTS.append(([(-0.0158, 0.0612, -0.006), (-0.0165, 0.0603, 0.0), (-0.0158, 0.0612, 0.006)], 0.0004, 0.0004))  # (the moustache's line)
+for k in range(-3, 4):                                   # (the beard's strands, falling to a point)
+    CUTS.append(([(-0.0138, 0.0545, k * 0.0012), (-0.0146, 0.0485, k * 0.0009), (-0.0152, 0.0435, k * 0.0004)], 0.00022, 0.00028))
+CUTS.append(([(-0.004, 0.088, 0.0), (0.006, 0.096, 0.0), (0.012, 0.093, 0.0)], 0.0008, 0.00035))   # (the eboshi's crease, shallow)
+for k in range(4):                                       # (folds of the robe over the knee and the lap, curving down)
+    z0 = -0.004 + k * 0.006
+    CUTS.append(([(-0.012, 0.03 - k * 0.002, z0), (-0.021, 0.022 - k * 0.002, z0 - 0.004), (-0.028, 0.017 - k * 0.001, z0 - 0.006)], 0.0005, 0.0006))
+for sd in (-1, 1):                                       # (and down the sleeves)
+    for k in range(3):
+        CUTS.append(([(-0.004 + k * 0.004, 0.044, sd * 0.024), (-0.006 + k * 0.004, 0.034, sd * 0.027), (-0.008 + k * 0.004, 0.026, sd * 0.026)], 0.0005, 0.0005))
+CUTS.append(([(-0.0272, 0.06, 0.0125), (-0.0276, 0.058, 0.0165), (-0.0272, 0.0585, 0.021)], 0.00035, 0.0005))   # (the fish's gill)
+for k in range(4):                                       # (between the toes)
+    zz = -0.0184 + k * 0.0022
+    CUTS.append(([(-0.0405, 0.0135, zz), (-0.036, 0.0125, zz)], 0.00025, 0.00035))
+
+
+def seg_dist(p, a, b):
+    ab = b - a
+    t = max(0.0, min(1.0, (p - a).dot(ab) / max(ab.length_squared, 1e-12)))
+    return (p - (a + ab * t)).length
+
+
+cut_segs = []
+for pts, w, d in CUTS:
+    vv = [Vector(P(*q)) for q in pts]
+    for i in range(len(vv) - 1):
+        cut_segs.append((vv[i], vv[i + 1], w, d))
+fig.data.update()
+me_ = fig.data
+nv = len(me_.vertices)
+co_ = np.empty(nv * 3, np.float32); me_.vertices.foreach_get("co", co_); co_ = co_.reshape(nv, 3)
+nr_ = np.empty(nv * 3, np.float32); me_.vertices.foreach_get("normal", nr_); nr_ = nr_.reshape(nv, 3)
+push = np.zeros(nv, np.float32)
+for a_, b_, w, d in cut_segs:
+    A = np.array(a_, np.float32); B = np.array(b_, np.float32); AB = B - A
+    t_ = np.clip(((co_ - A) @ AB) / max(float(AB @ AB), 1e-12), 0, 1)
+    dd = np.linalg.norm(co_ - (A + t_[:, None] * AB), axis=1)
+    push = np.maximum(push, np.where(dd < w, d * (1 - (dd / w) ** 2), 0))
+# (the fish's scales: a lattice of little round bumps over its side)
+gx, gy, gz = co_[:, 0], co_[:, 2], -co_[:, 1]
+on = (gx > -0.03) & (gx < -0.016) & (gy > 0.04) & (gy < 0.068) & (gz > 0.006) & (gz < 0.027)
+u_ = gy / 0.0024
+v_ = gz / 0.0024 + np.where(np.floor(u_).astype(int) % 2 == 1, 0.5, 0.0)
+push = push - np.where(on, 0.00018 * (np.cos(2 * np.pi * u_) * 0.5 + 0.5) * (np.cos(2 * np.pi * v_) * 0.5 + 0.5), 0)
+co_ = co_ - nr_ * push[:, None]
+me_.vertices.foreach_set("co", co_.ravel())
+me_.update()
+hi = fig
+hi.name = "KamiEbisuHigh"
+# (the light one: the same carving thinned to a few thousand triangles, unwrapped flat for its own pictures)
+lo = hi.copy(); lo.data = hi.data.copy(); bpy.context.collection.objects.link(lo)
+dc = lo.modifiers.new("d", "DECIMATE"); dc.ratio = 2600 / max(1, len(hi.data.polygons))
+apply_mods(lo)
+bpy.ops.object.select_all(action="DESELECT"); lo.select_set(True); bpy.context.view_layer.objects.active = lo
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.uv.smart_project(angle_limit=math.radians(55), island_margin=0.012)
+bpy.ops.object.mode_set(mode="OBJECT")
+for pl in lo.data.polygons:
+    pl.use_smooth = True
+# (the fine one wears the granite as it would (cube-projected), so its colour can be baked across too)
+bpy.ops.object.select_all(action="DESELECT"); hi.select_set(True); bpy.context.view_layer.objects.active = hi
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cube_project(cube_size=0.06); bpy.ops.object.mode_set(mode="OBJECT")
+# (only the granite's colour, not its pitting: the normal map is to carry the carving, the stone's grain is left to the colour)
+_hm = pbr("EbisuHiBake", (1, 1, 1), tex=bpy.data.images["granite"], rough=0.85)
+# (laid on by a blended box projection from the object's own coordinates: no seam where one face of the box gives way to the next)
+for _n in _hm.node_tree.nodes:
+    if _n.type == "TEX_IMAGE":
+        _n.projection = "BOX"; _n.projection_blend = 0.35
+        _tc = _hm.node_tree.nodes.new("ShaderNodeTexCoord"); _mp = _hm.node_tree.nodes.new("ShaderNodeMapping")
+        _mp.inputs["Scale"].default_value = (1 / 0.06, 1 / 0.06, 1 / 0.06)
+        _hm.node_tree.links.new(_tc.outputs["Object"], _mp.inputs["Vector"]); _hm.node_tree.links.new(_mp.outputs["Vector"], _n.inputs["Vector"])
+hi.data.materials.clear(); hi.data.materials.append(_hm)
+BK = 2048
+img_n = bpy.data.images.new("EbisuNormal", BK, BK, float_buffer=False); img_n.colorspace_settings.name = "Non-Color"
+img_c = bpy.data.images.new("EbisuColor", BK, BK)
+img_a = bpy.data.images.new("EbisuAO", BK, BK); img_a.colorspace_settings.name = "Non-Color"
+bake_mat = bpy.data.materials.new("EbisuBake"); bake_mat.use_nodes = True
+tn = bake_mat.node_tree.nodes.new("ShaderNodeTexImage")
+lo.data.materials.clear(); lo.data.materials.append(bake_mat)
+sc_ = bpy.context.scene
+sc_.render.engine = "CYCLES"; sc_.cycles.device = "CPU"; sc_.cycles.samples = 24
+# (the shadow in the hollows from the carving alone, within a few millimetres: not the whole shrine darkening it from round about)
+if sc_.world is None:
+    sc_.world = bpy.data.worlds.new("EbisuBakeWorld")
+sc_.world.light_settings.distance = 0.006
+bpy.ops.object.select_all(action="DESELECT"); hi.select_set(True); lo.select_set(True); bpy.context.view_layer.objects.active = lo
+
+
+def bake(kind, img, **kw):
+    tn.image = img
+    bake_mat.node_tree.nodes.active = tn
+    bpy.ops.object.bake(type=kind, use_selected_to_active=True, cage_extrusion=0.003, max_ray_distance=0.012, margin=8, **kw)
+
+
+bake("NORMAL", img_n, normal_space="TANGENT")
+sc_.render.bake.use_pass_direct = False; sc_.render.bake.use_pass_indirect = False; sc_.render.bake.use_pass_color = True
+bake("DIFFUSE", img_c, pass_filter={"COLOR"})
+bake("AO", img_a)
+# (the colour darkened where the shadows gather in the cuts and hollows, so they read as carved even under flat light)
+col = np.array(img_c.pixels[:], np.float32).reshape(BK, BK, 4)
+ao = np.array(img_a.pixels[:], np.float32).reshape(BK, BK, 4)[..., :1]
+col[..., :3] *= 0.35 + 0.65 * np.clip(ao, 0, 1) ** 1.4
+img_c.pixels = col.ravel()
+img_c.pack(); img_n.pack()
+M["ebisuStone"] = pbr("KamiEbisuStone", (1, 1, 1), tex=img_c, nrm=img_n, nrm_strength=1.0, rough=0.85)
+lo.data.materials.clear(); lo.data.materials.append(M["ebisuStone"])
+sc_.render.engine = "BLENDER_EEVEE"
+bpy.data.objects.remove(hi)
+fig = lo
+fig.name = "KamiEbisuFigure"
+eb.append(fig)
 eb.append(cyl("KamiEbisuTaiEye", 0.0012, 0.001, P(-0.027, 0.064, 0.018), M["stoneDark"], rot=(0, math.pi / 2, 0), verts=10))
-eb.append(ebtube("KamiEbisuTaiGill", [(-0.0272, 0.06, 0.0125), (-0.0275, 0.058, 0.0165), (-0.0272, 0.0585, 0.021)], 0.0004, M["stoneDark"], ring=5))
 # (the rod: from his raised hand up past his shoulder, bending a little, its line hanging from the tip)
 # (the rod: upright in his right hand, from the rock up past his hat, a little bent; its line hanging from the tip)
 eb.append(ebtube("KamiEbisuRod", [(-0.019, 0.008, -0.025), (-0.019, 0.04, -0.025), (-0.017, 0.08, -0.026), (-0.012, 0.112, -0.027)], 0.0011, M["stone"], ring=7))

@@ -10,7 +10,17 @@ const STALL_MS = 20000
  * dev server restarting), a word saying so and a button to load the page again.
  */
 export function LoadingScreen() {
-  const { active, loaded, total, errors, progress } = useProgress()
+  // (read a few times a second, not on every file: dozens of textures finishing at once fired an update apiece, and that storm of renders
+  // tripped React's guard against runaway updates)
+  const [prog, setProg] = useState(() => useProgress.getState())
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      const st = useProgress.getState()
+      setProg((p) => (p.active === st.active && p.loaded === st.loaded && p.total === st.total && p.errors.length === st.errors.length ? p : st))
+    }, 250)
+    return () => window.clearInterval(t)
+  }, [])
+  const { active, loaded, total, errors, progress } = prog
   const [stuck, setStuck] = useState(false)
   // (only the first load is covered: once the shop has come in, a model or picture fetched later (a guest, a light) loads behind the scenes,
   // never bringing the veil back over the game; and a count that never started (nothing went through the loaders' tally) isn't waited on)

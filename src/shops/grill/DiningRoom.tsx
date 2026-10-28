@@ -1149,6 +1149,10 @@ function kamidanaOf(scene: THREE.Group) {
         reflectStudio(g)
         g.envMapIntensity = 0.7
         t = g
+      } else if (src.name === 'KamiEbisuStone') {
+        // (the Ebisu: a light carving wearing the fine one's relief (a normal map baked from it) and its hollows' shadow in the colour; lit, not
+        // toon-flat, so the carving shows)
+        t = new THREE.MeshStandardMaterial({ map: src.map, normalMap: src.normalMap, roughness: 0.85 })
       } else if (src.name === 'KamiPeel') {
         // (the ponkan's peel: a little gloss on its oily skin, not a polish)
         t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.48, clearcoat: 0.22, clearcoatRoughness: 0.35, specularIntensity: 0.55 })
