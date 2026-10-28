@@ -468,23 +468,63 @@ function EmberBed({ fuel }: { fuel: { current: number } }) {
     let seed = 23
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
     const groups: { m: THREE.Matrix4[]; k: number }[] = [{ m: [], k: 0.35 }, { m: [], k: 0.12 }, { m: [], k: 0 }]
-    for (let i = 0; i < 70; i++) {
-      const a = rnd() * Math.PI * 2, r = 0.34 * rnd() ** 0.75
-      const x = Math.cos(a) * r, z = Math.sin(a) * r, s = 0.7 + rnd() * 1.1
+    // (fine and many, flatter, crumbled, heaped more toward the middle where the sticks burn down)
+    for (let i = 0; i < 132; i++) {
+      const a = rnd() * Math.PI * 2, r = 0.33 * rnd() ** 0.9
+      const x = Math.cos(a) * r, z = Math.sin(a) * r, s = 0.45 + rnd() * 0.85
       // (lying flat, only turned about the vertical, its flat underside a hair into the salt so no gap shows under it)
       const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 6.28)
-      const m = new THREE.Matrix4().compose(new THREE.Vector3(x, surfaceY(x, z, PIT_LIFT) - 0.002, z), q, new THREE.Vector3(s * (0.85 + rnd() * 0.4), s * (0.7 + rnd() * 0.5), s * (0.85 + rnd() * 0.4)))
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(x, surfaceY(x, z, PIT_LIFT) - 0.002, z), q, new THREE.Vector3(s * (0.85 + rnd() * 0.5), s * (0.35 + rnd() * 0.4), s * (0.85 + rnd() * 0.5)))
       groups[i % 3].m.push(m)
     }
     return groups
   }, [])
   const bin = useBinchotan()
-  const mats = useMemo(() => lumps.map(() => { const m = ashMaterial(bin); m.emissive.set('#a8280a'); return m }), [lumps, bin])
+  // (three greys: pale, ashen, and a darker one of half-burnt bits)
+  const mats = useMemo(() => lumps.map((_, i) => { const m = ashMaterial(bin); m.emissive.set('#a8280a'); m.color.multiplyScalar([1.15, 0.9, 0.62][i]); return m }), [lumps, bin])
   const refs = useRef<(THREE.InstancedMesh | null)[]>([])
   const pool = useRef<THREE.Mesh>(null)
   useLayoutEffect(() => {
     lumps.forEach((gr, i) => { const im = refs.current[i]; if (im) { gr.m.forEach((m, j) => im.setMatrixAt(j, m)); im.instanceMatrix.needsUpdate = true } })
   }, [lumps])
+  // (each lump set down on the salt as it's actually modelled (the fire pit's mesh, measured once it's there): a height map of its top in
+  // the bed's own frame, every lump's foot put on it, so none floats over the salt or sinks out of sight)
+  const settled = useRef(false)
+  useFrame(({ scene }) => {
+    if (settled.current) return
+    const pit = scene.getObjectByName('FirePit') as THREE.Mesh | undefined
+    const im0 = refs.current[0]
+    if (!pit?.geometry || !im0) return
+    settled.current = true
+    const toLocal = im0.parent!.matrixWorld.clone().invert()
+    const N = 48, R = 0.4, top = new Float32Array(N * N).fill(-Infinity)
+    const pa = pit.geometry.attributes.position, v = new THREE.Vector3()
+    for (let i = 0; i < pa.count; i++) {
+      v.fromBufferAttribute(pa, i).applyMatrix4(pit.matrixWorld).applyMatrix4(toLocal)
+      const gx = Math.floor((v.x + R) / (2 * R) * N), gz = Math.floor((v.z + R) / (2 * R) * N)
+      if (gx >= 0 && gz >= 0 && gx < N && gz < N) top[gz * N + gx] = Math.max(top[gz * N + gx], v.y)
+    }
+    const at = (x: number, z: number) => {
+      const gx = Math.floor((x + R) / (2 * R) * N), gz = Math.floor((z + R) / (2 * R) * N)
+      let h = -Infinity
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const k = (gz + dz) * N + gx + dx; if (k >= 0 && k < top.length) h = Math.max(h, top[k]) }
+      return h
+    }
+    // (the salt's own level, the commonest height under the lumps: none set up on the rim's stones or the grate's feet, held to the salt)
+    const hs = lumps.flatMap((gr) => gr.m.map((m) => at(m.elements[12], m.elements[14]))).filter(Number.isFinite).sort((a, b) => a - b)
+    const salt = hs[hs.length >> 1] ?? 0
+    const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3()
+    lumps.forEach((gr, i) => {
+      const im = refs.current[i]
+      if (!im) return
+      gr.m.forEach((m, j) => {
+        m.decompose(p, q, sc)
+        const h = Math.min(at(p.x, p.z), salt + 0.012)
+        if (Number.isFinite(h)) { p.y = h - 0.003; m.compose(p, q, sc); im.setMatrixAt(j, m) }
+      })
+      im.instanceMatrix.needsUpdate = true
+    })
+  })
   useFrame(({ clock }) => {
     const f = Math.max(0, fuel.current), t = clock.elapsedTime
     mats.forEach((m, i) => {
@@ -862,9 +902,20 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
   const body = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
-  const { on: editing, selected } = useEdit()
+  const { on: editing, selected, space } = useEdit()
   const drag = useRef<{ at: THREE.Vector3; y: number; lift: boolean } | null>(null)
   const idx = BAR_GATES.indexOf(gate)
+  // (its handles hang in the gate's own turned frame: for the world's axes they're turned back by that frame's turn; for its own, not at all)
+  const gizmoFrame = useRef<THREE.Group>(null)
+  const [gateWorld, setGateWorld] = useState(0)
+  useEffect(() => {
+    if (!editing) return
+    const t = window.setTimeout(() => {
+      const f = gizmoFrame.current
+      if (f) setGateWorld(-new THREE.Euler().setFromQuaternion(f.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y)
+    }, 50)
+    return () => window.clearTimeout(t)
+  }, [editing, selected])
   // (while editing, the leaf is outlined like any other piece that can be moved: brighter pointed at, amber chosen)
   const [hover, setHover] = useState(false)
   useEditBox(leaf, editing, selected === `gate${idx}` ? 'chosen' : hover ? 'hover' : 'idle')
@@ -937,7 +988,7 @@ function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
         {/* the swing door by itself: its own thing, apart from the post and the doorway, which stay where they are; it's this that's moved by hand */}
         <group ref={body} position={positionOf(`gate${idx}`)} onPointerDown={down}
           onPointerOver={editing ? (e: { stopPropagation: () => void }) => { e.stopPropagation(); setHover(true) } : undefined} onPointerOut={editing ? () => setHover(false) : undefined}>
-        {editing && <AxisGizmo id={`gate${idx}`} at={[end * G / 2, H / 2, 0]} />}
+        {editing && <group ref={gizmoFrame}><AxisGizmo id={`gate${idx}`} at={[end * G / 2, H / 2, 0]} theta={space === 'world' ? gateWorld : 0} /></group>}
         <group ref={leaf} name="gate-leaf">
           <group position-x={end * (G / 2 - 0.005)}>
             {/* a framed door of planed wood: two stiles and three rails with rounded edges, the grain running up the

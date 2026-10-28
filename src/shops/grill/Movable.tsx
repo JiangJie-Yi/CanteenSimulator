@@ -398,7 +398,7 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
   if (tool === 'rotate') {
     // (as in Blender or Maya: a ring in each axis's colour round a faint ball, thin to look at and easy to catch)
     return (
-      <group ref={root} position={at} rotation-y={theta}>
+      <group ref={root} name="edit-gizmo" position={at} rotation-y={theta}>
         <mesh renderOrder={1000} userData={{ editHandle: true, gizmo: false }}>
           <sphereGeometry args={[L * 0.8, 24, 16]} />
           <meshBasicMaterial color="#9aa7b4" transparent opacity={0.09} depthWrite={false} depthTest={false} />
@@ -423,7 +423,7 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
   }
   if (tool === 'scale') {
     return (
-      <group ref={root} position={at} rotation-y={theta}>
+      <group ref={root} name="edit-gizmo" position={at} rotation-y={theta}>
         {AXES.map((a, i) => (
           <group key={a.name} rotation={a.rot} onPointerDown={grow(i as 0 | 1 | 2)}>
             <mesh position-y={L * 0.4} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
@@ -457,7 +457,7 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
     )
   }
   return (
-    <group ref={root} position={at} rotation-y={theta}>
+    <group ref={root} name="edit-gizmo" position={at} rotation-y={theta}>
       {AXES.map((a, i) => (
         <group key={a.name} rotation={a.rot} onPointerDown={down(i as 0 | 1 | 2)}>
           <mesh position-y={L * 0.4} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
@@ -511,11 +511,16 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   // (the axes gone by: the room's turned into this frame, or (the piece's own) none)
   const rot0 = rotationOf(id)
   /** its own turn about the vertical: what the object axes add to the world's */
-  const ownYaw = (rot0[1] + baseTurn[1]) * DEG
+  // (and the turn its contents carry inside it (a group turned to face its way, a model's own root): the object axes follow what's seen,
+  // not only the turn given here)
+  const [inYaw, setInYaw] = useState(0)
+  const ownYaw = (rot0[1] + baseTurn[1]) * DEG + inYaw
   // (the frame its turn is kept in is always the world's; the handles and the place fields go by the world's axes, or (object space) its own)
   const thetaW = thetaRoom
-  const theta = space === 'local' ? thetaW + ownYaw : thetaW
-  useEffect(() => { setFrame(id, thetaW, thetaW + ownYaw) }, [id, thetaW, ownYaw])
+  // (both turns are in the parent's own frame, which the handles hang in: the world's axes are the parent's turned back by its own turn (thetaW);
+  // the piece's own axes are simply its turn there)
+  const theta = space === 'local' ? ownYaw : thetaW
+  useEffect(() => { setFrame(id, thetaW, ownYaw) }, [id, thetaW, ownYaw])
   void offsets; void rotations; void scales; void selected; void groups // (read so it redraws as it's moved, turned or scaled)
   const o = positionOf(id)
   const rot = rotationOf(id), sc = scaleOf(id)
@@ -584,12 +589,25 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     return { c, s: [Math.max(best.x1 - best.x0, 0.06) + 0.02, Math.max(yMax - yMin, 0.06) + 0.02, Math.max(best.z1 - best.z0, 0.06) + 0.02] as V3, yaw: best.a, theta }
   }
 
+  /** the turn about the vertical its contents carry: down the chain of single groups inside it to where it branches or a mesh is */
+  const contentYaw = () => {
+    const inn = inner.current
+    if (!inn) return 0
+    let n: THREE.Object3D = inn
+    // (the editor's own wire box hung in it is not part of what's seen)
+    const kids = (o: THREE.Object3D) => o.children.filter((c) => !(c as THREE.LineSegments).isLineSegments)
+    while (kids(n).length === 1 && !(kids(n)[0] as THREE.Mesh).isMesh) n = kids(n)[0]
+    inn.updateWorldMatrix(true, true)
+    const yaw = (o: THREE.Object3D) => new THREE.Euler().setFromQuaternion(o.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
+    const d = yaw(n) - yaw(inn)
+    return Math.atan2(Math.sin(d), Math.cos(d))
+  }
   const frame = () => {
     const par = gw.current
     if (!par) return
     par.updateWorldMatrix(true, false)
     const t = -new THREE.Euler().setFromQuaternion(par.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
-    setFrame(id, t, t + ownYaw)
+    setFrame(id, t, ownYaw)
     setTheta(t)
   }
   useLayoutEffect(frame, [])
@@ -631,15 +649,18 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     let tries = 0
     const t = window.setInterval(() => {
       const m = measure()
-      if (m || ++tries > 80) { if (m) setMid(m.c); setReady(true); window.clearInterval(t) }
+      if (m || ++tries > 80) { if (m) setMid(m.c); setInYaw(contentYaw()); setReady(true); window.clearInterval(t) }
     }, 100)
     return () => window.clearInterval(t)
   }, [])
   useEffect(() => {
     if (!on) { setBox(null); return }
+    // (the parent's turn measured again now: taken at mount, a parent still being laid out could give the wrong one, and the world's axes with it)
+    frame()
+    setInYaw(contentYaw())
     // (a batch merges its meshes a moment after mounting: measured at once and again a little later, so the box is there whenever it's switched on)
     const first = measure('whole')
-    if (first) setFrame(id, first.theta, first.theta + ownYaw)
+    if (first) setFrame(id, first.theta, ownYaw)
     // (what it's made of, for the panel: its triangles, vertices and meshes as drawn)
     const countIt = () => {
       let tris = 0, verts = 0, meshes = 0
@@ -656,7 +677,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     }
     countIt()
     setBox(first)
-    const t = window.setTimeout(() => { const m = measure('whole'), n = measure(); if (m) { setBox(m); setFrame(id, m.theta, m.theta + ownYaw) } if (n) setMid(n.c); countIt() }, 300)
+    const t = window.setTimeout(() => { const m = measure('whole'), n = measure(); if (m) { setBox(m); setFrame(id, m.theta, ownYaw); setTheta(m.theta) } if (n) setMid(n.c); countIt() }, 300)
     return () => window.clearTimeout(t)
   }, [on])
 
