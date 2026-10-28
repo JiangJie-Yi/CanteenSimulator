@@ -16,6 +16,7 @@ import { Movable } from './Movable'
 import { PlateRack } from './PlateRack'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
+import { inkModel } from '@/scene/inkHull'
 
 type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
@@ -365,103 +366,10 @@ const RICE_SCALE = 2.0
 /** the side table it stands on: its top's height (the cook's table's top is the scene's y = 0), and its size */
 const SIDE_TOP = -0.3
 const SIDE_W = 1.35
-/** pale cypress staves round the tub: twenty-four of them, each its own tone, fine grain running up and a knot or two, a dark joint between */
-const STAVES = (() => {
-  if (typeof document === 'undefined') return null
-  const N = 24, SW = 16
-  const c = document.createElement('canvas')
-  c.width = N * SW
-  c.height = 128
-  const g = c.getContext('2d')!
-  let seed = 3
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  const tones = ['#ecd2a2', '#e3c593', '#f0d8ab', '#dfbf8c', '#e8cd9b', '#e1c28f', '#efd5a6', '#e5c898']
-  for (let i = 0; i < N; i++) {
-    g.fillStyle = tones[(i * 5) % tones.length]
-    g.fillRect(i * SW, 0, SW, 128)
-    // (the grain: long wavering lines, a few darker)
-    for (let k = 0; k < 9; k++) {
-      const x = i * SW + 1.5 + k * 1.6
-      g.strokeStyle = rnd() < 0.25 ? 'rgba(120,76,36,0.4)' : 'rgba(150,100,50,0.22)'
-      g.lineWidth = 0.6 + rnd() * 0.5
-      g.beginPath()
-      g.moveTo(x, 0)
-      g.bezierCurveTo(x + (rnd() - 0.5) * 3, 40, x + (rnd() - 0.5) * 3, 88, x + (rnd() - 0.5) * 2, 128)
-      g.stroke()
-    }
-    // (a knot now and then, the grain bending round it)
-    if (rnd() < 0.3) {
-      const x = i * SW + 4 + rnd() * 8, y = 14 + rnd() * 100
-      g.strokeStyle = 'rgba(110,70,30,0.55)'
-      for (let r = 1; r <= 3; r++) { g.lineWidth = 0.8; g.beginPath(); g.ellipse(x, y, 1.2 * r, 2.4 * r, 0, 0, Math.PI * 2); g.stroke() }
-      g.fillStyle = 'rgba(90,56,24,0.6)'; g.beginPath(); g.ellipse(x, y, 1, 2, 0, 0, Math.PI * 2); g.fill()
-    }
-    // (a wet, darker foot where the tub has stood in water)
-    const wet = g.createLinearGradient(0, 100, 0, 128)
-    wet.addColorStop(0, 'rgba(120,80,40,0)'); wet.addColorStop(1, 'rgba(120,80,40,0.28)')
-    g.fillStyle = wet; g.fillRect(i * SW, 100, SW, 28)
-  }
-  g.fillStyle = 'rgba(100,66,32,0.7)'
-  for (let i = 0; i < N; i++) g.fillRect(i * SW, 0, 1.4, 128)
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = THREE.RepeatWrapping
-  t.repeat.set(1, 1)
-  t.anisotropy = 4
-  return t
-})()
 /** a flat band of metal round the tub (a strip, not a rod): a lathe of a thin rectangle, its upper edge a little proud */
 const flatBand = (R: number, h: number, t = 0.007) => new THREE.LatheGeometry([[R - t, -h / 2], [R, -h / 2], [R + 0.0025, 0], [R, h / 2], [R - t, h / 2], [R - t, -h / 2]].map(([x, y]) => new THREE.Vector2(x, y)), 72)
 /** the tub's radius at a height up it (it widens toward the rim): what a hoop must stand clear of to lie on the staves, not sink in them */
 const tubR = (y: number) => 0.255 + 0.015 * (y / 0.42)
-/** steamed rice seen close: short plump grains, each with a soft shadow along one side, over warm white */
-const RICE_GRAIN = (() => {
-  if (typeof document === 'undefined') return null
-  const S = 256
-  const c = document.createElement('canvas')
-  c.width = c.height = S
-  const g = c.getContext('2d')!
-  let seed = 5
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  g.fillStyle = '#efe6d2'
-  g.fillRect(0, 0, S, S)
-  for (let i = 0; i < 1100; i++) {
-    const x = rnd() * S, y = rnd() * S, a = rnd() * Math.PI, l = 7 + rnd() * 3, w = 3.6 + rnd()
-    for (const [ox, oy] of [[-S, 0], [0, 0], [S, 0], [0, -S], [0, S]]) {
-      g.save()
-      g.translate(x + ox, y + oy)
-      g.rotate(a)
-      g.fillStyle = 'rgba(150,128,90,0.35)'
-      g.beginPath(); g.ellipse(0.9, 1.2, l, w, 0, 0, Math.PI * 2); g.fill()
-      g.fillStyle = `rgb(${250 - rnd() * 8},${246 - rnd() * 10},${236 - rnd() * 14})`
-      g.beginPath(); g.ellipse(0, 0, l, w, 0, 0, Math.PI * 2); g.fill()
-      g.restore()
-    }
-  }
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set(2.2, 2.2)
-  t.anisotropy = 4
-  return t
-})()
-/** the heap of rice in the open tub: a low mound, lumpy, level with the rim at its edge, planar UVs for the grain */
-const RICE_HEAP = (() => {
-  const R = 0.252, h = 0.075
-  const th = 2 * Math.atan(h / R)
-  const Rs = R / Math.sin(th)
-  const g = new THREE.SphereGeometry(Rs, 48, 18, 0, Math.PI * 2, 0, th)
-  g.translate(0, -Rs * Math.cos(th), 0)
-  const p = g.attributes.position, uv = g.attributes.uv
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), z = p.getZ(i)
-    const edge = 1 - Math.min(1, Math.hypot(x, z) / R) ** 2
-    p.setY(i, p.getY(i) + edge * (0.007 * Math.sin(x * 38 + z * 21) + 0.006 * Math.sin(z * 47 - x * 17) + 0.004 * Math.sin((x + z) * 71)))
-    uv.setXY(i, x / (2 * R) + 0.5, z / (2 * R) + 0.5)
-  }
-  g.computeVertexNormals()
-  return g
-})()
 /** a lug on the tub's side to lift it by: a rounded plate of wood with a hole through it */
 const EAR = (() => {
   const sh = new THREE.Shape()
@@ -499,7 +407,41 @@ const RICE_GEO = {
  * steaming white rice, the wooden paddle (しゃもじ) stood in it, on a plain side table of its own (作業台); its lid and
  * a stack of rice bowls on the shelf under it.
  */
+/** the rice tub's model (blender/ricetub.py) cut into its body, its lid (lifted off) and the rice with its paddle (shown with the lid off),
+ * in the room's toon light, the copper keeping a little shine */
+const RICETUB_URL = import.meta.env.BASE_URL + 'models/ricetub.glb'
+let riceParts: { body: THREE.Object3D; lid: THREE.Object3D; rice: THREE.Object3D } | null = null
+function useRiceTub() {
+  const gltf = useGLTF(RICETUB_URL) as unknown as { scene: THREE.Group }
+  return useMemo(() => {
+    if (riceParts) return riceParts
+    const root = gltf.scene.clone(true)
+    const mats = new Map<THREE.Material, THREE.Material>()
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = mats.get(src)
+      if (!t) {
+        t = /Copper|Rivet/.test(src.name)
+          ? new THREE.MeshStandardMaterial({ color: src.color.clone(), map: src.map, metalness: 0.7, roughness: 0.35 })
+          : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
+        mats.set(src, t)
+      }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(root, (m) => /Rivet|Cord|Gap|Floor|Mound|Paddle|Hoop/.test(m.name), { width: 0.0016, weld: true })
+    const get = (n: string) => { const o = root.getObjectByName(n)!; o.removeFromParent(); return o }
+    riceParts = { body: get('RiceTubBody'), lid: get('RiceTubLid'), rice: get('RiceTubRice') }
+    return riceParts
+  }, [gltf])
+}
+useGLTF.preload(RICETUB_URL)
+
 function RiceTub() {
+  const tub = useRiceTub()
   const [x, z] = DECOR.rice.at
   // (the lid: on the tub, or lifted off and leant against its side; click the tub to lift it or put it back. Open, the rice shows,
   // steaming, with its paddle in it)
@@ -510,7 +452,7 @@ function RiceTub() {
     lidT.current = THREE.MathUtils.clamp(lidT.current + (open ? 1 : -1) * Math.min(dt, 0.1) * 2.2, 0, 1)
     const k = lidT.current * lidT.current * (3 - 2 * lidT.current)
     if (!lid.current) return
-    lid.current.position.set(-0.32 * k, 0.4375 - 0.1585 * k + Math.sin(k * Math.PI) * 0.22, 0)
+    lid.current.position.set(-0.32 * k, 0.42 - 0.1585 * k + Math.sin(k * Math.PI) * 0.22, 0)
     lid.current.rotation.z = k * 1.36
   })
   const g = RICE_GEO
@@ -543,51 +485,13 @@ function RiceTub() {
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v) }}
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; glowOnly(e.eventObject); setTip({ title: '飯桶', hint: open ? '點一下蓋上蓋子' : '點一下掀開蓋子' }) }}
         onPointerOut={(e) => { document.body.style.cursor = ''; glowLeave(e.eventObject); setTip(null) }}>
-        {/* the tub: pale staves, an ear at each side to lift it by, a band of woven cane round the lower body, and its lid (a bar across
-            the top) */}
-        <Inked geometry={g.tub} color="#ffffff" map={STAVES} position={[0, 0.21, 0]} grow={1.03} />
-        {/* (hollow: its inside wall and floor, so the rice fills it rather than lying on a lid) */}
-        <mesh geometry={g.tub} position-y={0.21} scale={0.985}><meshToonMaterial color="#b88f58" side={THREE.BackSide} /></mesh>
-        <mesh geometry={g.floor} position-y={0.012} rotation-x={-Math.PI / 2}><meshToonMaterial color="#b88f58" /></mesh>
-        <group ref={lid} position={[0, 0.4375, 0]}>
-          <Inked geometry={g.lidTop} color="#ffffff" map={STAVES} grow={1.05} />
-          {/* (the lid's grain: rings turned into the top, and a pale edge band) */}
-          {[0.1, 0.17, 0.225].map((r) => <mesh key={r} position-y={0.0182} rotation-x={Math.PI / 2}><torusGeometry args={[r, 0.0011, 4, 40]} /><meshToonMaterial color="#b8955c" /></mesh>)}
-          <mesh position-y={0.0} rotation-x={Math.PI / 2}><torusGeometry args={[0.285, 0.004, 4, 40]} /><meshToonMaterial color="#c8a86e" /></mesh>
-          <mesh geometry={g.slab} position={[0, 0.0375, 0]} scale={[0.22, 0.03, 0.05]} castShadow><meshToonMaterial color="#e0a868" /></mesh>
-          <mesh geometry={g.slab} position={[0, 0.022, 0]} scale={[0.19, 0.03, 0.03]}><meshToonMaterial color="#d09858" /></mesh>
-        </group>
-        {[-1, 1].map((sd) => (
-          <group key={sd} position={[sd * 0.292, 0.355, 0]} rotation-y={sd > 0 ? 0 : Math.PI} rotation-z={0}>
-            <Inked geometry={g.ear} color="#e9cf9e" grow={1.08} />
-            {/* (a loop of cord through the hole) */}
-            <mesh position={[0.012, 0.012, 0]} rotation-x={0}><torusGeometry args={[0.019, 0.0045, 5, 14]} /><meshToonMaterial color="#8a6a3c" /></mesh>
-          </group>
-        ))}
-        {/* the copper hoops: three flat bands (a wide one low, a narrow pair above), each riveted at its lap, a foot ring below, a lip of dark wood at the rim */}
-        {[[0.07, 'bandWide'], [0.2, 'band2'], [0.3, 'band']].map(([y, kind], k) => (
-          <group key={k} position-y={y as number}>
-            <mesh geometry={g[kind as 'band' | 'band2' | 'bandWide']}><meshToonMaterial color={k === 0 ? '#b8743a' : '#c58a4a'} /></mesh>
-            {/* (where the strip's two ends overlap: a paler seam, standing a hair proud of the band) */}
-            <mesh geometry={g.lap} position={[(tubR(y as number) + 0.0075) * Math.cos(0.5), 0, (tubR(y as number) + 0.0075) * Math.sin(0.5)]}
-              rotation-y={-0.5} scale={[1, k === 0 ? 0.045 : 0.03, 1]}><meshToonMaterial color="#d9a066" /></mesh>
-          </group>
-        ))}
-        <mesh position-y={0.012} rotation-x={Math.PI / 2}><torusGeometry args={[0.26, 0.012, 6, 36]} /><meshToonMaterial color="#c7a56c" /></mesh>
-        <mesh position-y={0.4175} rotation-x={Math.PI / 2}><torusGeometry args={[0.2645, 0.0075, 6, 40]} /><meshToonMaterial color="#d8b87c" /></mesh>
+        {/* the tub (blender/ricetub.py): pale staves bound in copper, an ear either side; its lid, lifted off and leant by it when it's open */}
+        <primitive object={tub.body} />
+        <group ref={lid} position={[0, 0.42, 0]}><primitive object={tub.lid} /></group>
         {open && (
           <>
-            {/* the rice, heaped level with the rim and mounded a little in the middle, the paddle stood in it */}
-            <mesh geometry={g.cylRice} position-y={0.2} scale={[1, 0.91, 1]}>
-              <meshToonMaterial color="#f6f0e2" />
-            </mesh>
-            <mesh geometry={RICE_HEAP} position-y={0.41}>
-              <meshToonMaterial color="#ffffff" map={RICE_GRAIN} emissive="#4d4535" />
-            </mesh>
-            <group position={[0.08, 0.55, -0.04]} rotation={[0.25, 0, -0.35]}>
-              <mesh geometry={g.paddle} position-y={0.06}><meshToonMaterial color="#e2c89a" /></mesh>
-              <mesh geometry={g.blade} position-y={-0.12} scale={[1, 1.3, 0.25]}><meshToonMaterial color="#e2c89a" /></mesh>
-            </group>
+            {/* the rice, heaped a little over the rim, the paddle stood in it */}
+            <primitive object={tub.rice} />
             <Steam position={[0, 0.5, 0]} width={0.4} height={0.55} opacity={0.32} layers={2} />
           </>
         )}
