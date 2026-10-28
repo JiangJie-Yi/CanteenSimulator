@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProgress } from '@react-three/drei'
+import { GrillingFish } from './GrillingFish'
 
 /** how long the loading may sit without any file coming in before it's called stuck (ms) */
 const STALL_MS = 20000
@@ -44,6 +45,7 @@ export function LoadingScreen() {
   const pct = total > 0 && Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : null
   return (
     <div className="loading-screen" role="status" aria-live="polite">
+      <GrillingFish done={(pct ?? 0) / 100} />
       <div className="loading-board">
         <h1>聞野</h1>
         <small>日式烤魚</small>
