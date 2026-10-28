@@ -283,7 +283,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (in edit mode the cats' stand, the shoe cupboard and the like can each be moved: each its own batch inside its own Movable) */}
       <Movable id="doorcats" label="門口招財貓台"><StaticBatch>
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
-      <group position={[0.4, 0, -0.75]}>
+      <group position={[0.4, 0, -0.92]}>
         {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower) */}
         {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7]].map(([x, d, h, l], i) => (
           <Part key={i} geo={REG_GEO.round} color={i ? '#4a2e1c' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
@@ -291,7 +291,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       </group>
       </StaticBatch></Movable>
       {/* (each cat its own piece in edit mode, on the stand's frame) */}
-      <group position={[0.4, 0, -0.75]}>
+      <group position={[0.4, 0, -0.92]}>
         {DOOR_CATS.map((k, i) => (
           <Movable key={i} id={`doorcat${i}`} label={`招財貓 ${i + 1}`}><StaticBatch>
             <group position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
@@ -878,10 +878,11 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
 const DOOR_CATS = [
   // (on the stand: x out from the wall, y the tier's top, z along it; the big white pair on the upper tier)
   // (each its own model and size, in its own colours: two big ones on top, two smaller below)
-  { x: -0.05, y: 0.6, z: -0.2, yaw: 0.2, kind: 1 as const, h: 0.66 },
-  { x: -0.05, y: 0.6, z: 0.2, yaw: -0.2, kind: 3 as const, h: 0.56 },
-  { x: -0.26, y: 0.32, z: -0.26, yaw: 0.25, kind: 2 as const, h: 0.46 },
-  { x: -0.26, y: 0.32, z: 0.26, yaw: -0.25, kind: 1 as const, h: 0.56 },
+  // (each with room round it: none touching the next, nor the shoe cupboard and the helmet beside the stand)
+  { x: -0.05, y: 0.6, z: -0.17, yaw: 0.2, kind: 1 as const, h: 0.5 },
+  { x: -0.05, y: 0.6, z: 0.17, yaw: -0.2, kind: 3 as const, h: 0.44 },
+  { x: -0.27, y: 0.32, z: -0.29, yaw: 0.25, kind: 2 as const, h: 0.38 },
+  { x: -0.27, y: 0.32, z: 0.29, yaw: -0.25, kind: 1 as const, h: 0.42 },
 ]
 /** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
 /** the customers' display: green figures on black, the amount to pay */

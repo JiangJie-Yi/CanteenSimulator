@@ -435,6 +435,10 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   const lockView = holdsCameraOne(modeOf(ai, research), editing) && !!DISHES[active].roast && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
   const lockRef = useRef(lockView)
   lockRef.current = lockView
+  // (every view but the free one is fixed where it's set: no turning, sliding or zooming it; the developer mode leaves them all free)
+  const spotLock = !editing && !lockView && view !== 'free' && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
+  const spotRef = useRef(spotLock)
+  spotRef.current = spotLock
   const wasLocked = useRef(false)
   const scene = useThree((s) => s.scene)
   const size = useThree((s) => s.size)
@@ -560,6 +564,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       e.preventDefault()
       // (held at the grill: the wheel only brings the camera a little nearer, along its line, never further out than camera 1)
       if (lockRef.current) { lockZoom.current = THREE.MathUtils.clamp(lockZoom.current * Math.exp(e.deltaY * 0.0011), 0.75, 1); return }
+      if (spotRef.current) return
       homing.current = false
       const now = zoomGoal.current ?? camera.position.distanceTo(c.target)
       zoomGoal.current = THREE.MathUtils.clamp(now * Math.exp(e.deltaY * 0.0011), 1.8, 20)
@@ -665,9 +670,10 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       wasLocked.current = true
     } else if (c && wasLocked.current) {
       // (let go: the view is where it was, free to be turned and moved again)
-      c.enabled = true
+      c.enabled = !spotLock
       wasLocked.current = false
     } else if (c && homing.current) {
+      c.enabled = !spotLock
       camera.position.lerp(aimPos.current, k)
       // (any panning is undone too: the target slides back to the middle of the dish)
       c.target.lerp(aimTarget, k)
@@ -677,6 +683,9 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       const gap = camera.position.distanceTo(aimPos.current) + c.target.distanceTo(aimTarget)
       if (gap < 0.004 || Math.abs(gap - homeGap.current) < 1e-5) homing.current = false
       homeGap.current = gap
+    } else if (c && c.enabled === spotLock) {
+      // (a fixed view: the controls off; the free view and the developer mode: on)
+      c.enabled = !spotLock
     } else if (c && zoomGoal.current !== null) {
       const dir = zoomDir.current.copy(camera.position).sub(c.target)
       const dist = dir.length()

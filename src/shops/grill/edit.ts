@@ -481,6 +481,7 @@ const PANEL_CSS = `
 .be-main { flex:1; min-width:0; display:flex; flex-direction:column }
 .be-head { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#1f1f1f; font-weight:600; letter-spacing:.02em; color:#e6e6e6 }
 .be-head small { margin-left:auto; font-weight:400; color:#8a8a8a }
+.be-cat { padding:5px 8px 3px; margin-top:4px; font-size:11px; font-weight:700; letter-spacing:.08em; color:#e0a040; border-bottom:1px solid #3c3c3c; position:sticky; top:0; background:#2a2a2a; z-index:1 }
 .be-win { width:20px; height:20px; padding:0; border:0; border-radius:3px; background:#3a3a3a; color:#ddd; font:600 13px/20px sans-serif; cursor:pointer; flex:none }
 .be-win:hover { background:#4a4a4a } .be-close:hover { background:#b8433a; color:#fff }
 .be.be-min { max-height:none } .be.be-min .be-body, .be.be-min .be-tools { display:none }
@@ -611,11 +612,17 @@ function panel() {
       addRow(id, pieceName(registry.get(id)!.label, lang), depth, false)
       for (const k of childrenOf(id)) if (!groupOf(k)) addTree(k, depth + 1)
     }
+    // (in two lists, as an outliner's: the scene's pieces, then the views' cameras)
+    const isCam = (id: string) => id.startsWith('viewcam-')
+    const catHead = (text: string) => { list.appendChild(h('div', 'be-cat', text)) }
+    catHead(T().sceneHead)
     for (const [gid, g] of Object.entries(state.groups)) {
       addRow(gid, `${g.name}（${g.members.length}）`, 0, true)
       for (const m of g.members) if (registry.has(m)) addTree(m, 1)
     }
-    for (const [id, r] of registry) if (!groupOf(id) && !(r.parent && registry.has(r.parent))) addTree(id, 0)
+    for (const [id, r] of registry) if (!isCam(id) && !groupOf(id) && !(r.parent && registry.has(r.parent))) addTree(id, 0)
+    catHead(T().cameraHead)
+    for (const [id, r] of registry) if (isCam(id) && !groupOf(id) && !(r.parent && registry.has(r.parent))) addTree(id, 0)
     find.oninput = () => { const q = find.value.trim().toLowerCase(); for (const [id, row] of rows) row.style.display = !q || (rows.get(id)?.textContent ?? id).toLowerCase().includes(q) ? '' : 'none' }
     out.append(find, list)
     // Transform: what's chosen, then Location, Rotation, Scale each as X / Y / Z stacked, a reset beside each
