@@ -78,9 +78,15 @@ type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string,
   /** the scene drawn as its wireframe (Maya's 4), to see each model's topology; off is shaded (5) */
   wire: boolean }
 let state: State = { on: false, locked: false, tool: 'move', offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null, groups: loadGroups(), picked: [],
-  pivots: load(KEY_P), pivotMode: false, space: 'world', wire: false }
+  pivots: load(KEY_P), pivotMode: false, space: 'local', wire: false }
 const subs = new Set<() => void>()
+/** what was selected last time round: a newly picked piece starts in its own (object) axes */
+let lastSelected: string | null = null
 const emit = () => {
+  if (state.selected !== lastSelected) {
+    lastSelected = state.selected
+    if (state.selected) state.space = 'local'
+  }
   // (in edit mode the room's own pointing (lit things, name tags, the hand) is paused: what's lit now is put out)
   if (HOVER.paused !== state.on) { HOVER.paused = state.on; if (state.on) { glowOnly(null); setTip(null); POINTER_RESET() } }
   state = { ...state }; subs.forEach((f) => f()); panel()
