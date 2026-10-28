@@ -16,7 +16,7 @@ export type DeskPiece = 'TillPens' | 'TillPrinter' | 'TillCardReader' | 'TillBel
 /** how high the cat's stand lifts the cat: the stone's worn-flat top */
 export const CAT_STAND_H = 0.166
 /** the parts too small or too flat for an ink line: lettering, lights, slots, teeth, keys, cables and holes */
-const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever|Key|Fn|Nfc|Stripe|Screen|Cable|Hole|Clip|Cap|Felt|Band|Floor|Stem|Knob|Slip|Rim|Blades|Ribs|Thanks|Foot|Post|Pull|Box|Sub|Seam|Arrow|Card|Lid|Tear|Catch)/
+const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever|Key|Fn|Nfc|Stripe|Screen|Cable|Hole|Clip|Cap|Felt|Band|Floor|Stem|Knob|Slip|Rim|Blades|Ribs|Thanks|Foot|Post|Pull|Box|Sub|Seam|Arrow|Card|Lid|Tear|Catch|Lip|Tassel)/
 const METAL = new Set(['DeskChrome', 'DeskSteel', 'BellGold', 'StandBrass', 'TrayGilt', 'IngotGold'])
 
 /**
@@ -79,9 +79,9 @@ function piecesOf(scene: THREE.Group) {
         ? new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.2, clearcoat: 0.9, clearcoatRoughness: 0.12, specularIntensity: 0.8, sheen: 0.3, sheenRoughness: 0.4 })
         : METAL.has(src.name)
         ? src.name === 'BellGold' || src.name === 'IngotGold'
-          // (polished brass: a warm gold that catches the lamps)
-          ? new THREE.MeshPhysicalMaterial({ color: '#d9a441', metalness: 1, roughness: 0.07, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.0,
-            specularColor: new THREE.Color('#fff1c8'), iridescence: 0.08 })
+          // (polished gold: a deep warm yellow, the lamps' gleam broad and soft over its curves, not glinting in spots; no oily rainbow sheen)
+          ? new THREE.MeshPhysicalMaterial({ color: '#e9b43a', metalness: 1, roughness: 0.16, clearcoat: 0.5, clearcoatRoughness: 0.12, envMapIntensity: 1.25,
+            specularColor: new THREE.Color('#ffe7a8') })
           : new THREE.MeshPhysicalMaterial({ color: src.color.clone(), metalness: 0.9, roughness: src.name === 'DeskChrome' ? 0.12 : 0.3, envMapIntensity: 0.8 })
         : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
       mats.set(src, t)

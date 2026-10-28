@@ -123,7 +123,7 @@ M = {
     "potGlaze": mat("TreePotGlaze", "#9c2a1e", 0.2), "potFoot": mat("TreePotFoot", "#5a3a28", 0.8), "soil": mat("TreeSoil", "#3a2a1c", 0.95),
     "pebble": mat("TreePebble", "#e8e2d4", 0.6), "bark": mat("TreeBark", "#8a7a52", 0.8), "stem": mat("TreeStem", "#6f8a3a", 0.6),
     "leaf": mat("TreeLeaf", "#2f7a2e", 0.3), "leaf2": mat("TreeLeaf2", "#3f9238", 0.3), "ribbonRed": mat("TreeRibbon", "#c8221a", 0.5),
-    "coinGold": mat("IngotGold", "#e0b24a", 0.15, 1.0), "lacquerRed": mat("IngotStand", "#8e1e16", 0.25), "cushion": mat("IngotCushion", "#c4321e", 0.7),
+    "coinGold": mat("IngotGold", "#e0b24a", 0.15, 1.0), "lacquer": mat("IngotLacquer", "#141012", 0.2), "zabuton": mat("IngotZabuton", "#3c1650", 0.65),
     "lcd": mat("ReaderLcd", "#aab3a6", 0.3), "lcdInk": mat("ReaderLcdInk", "#1c2420", 0.5), "card": mat("ReaderCardFace", "#2f7fd0", 0.3),
     "cardBand": mat("ReaderCardBand", "#7fb6ea", 0.3), "keyRubber": mat("ReaderKeyRubber", "#3a3d42", 0.6),
     "hole": mat("DeskHole", "#060607", 0.6), "holeRing": mat("DeskHoleRing", "#3a3c40", 0.3, 0.8), "cable": mat("DeskCable", "#17171a", 0.4),
@@ -459,21 +459,23 @@ bl = []
 bl.append(cyl("BellBase", 0.044, 0.015, P(0, 0.0075, 0), M["bellWood"], verts=48))
 bl.append(cyl("BellBaseBevel", 0.045, 0.003, P(0, 0.0135, 0), M["bellWood"], verts=48, r2=0.042))
 bl.append(cyl("BellBaseRim", 0.0445, 0.002, P(0, 0.001, 0), M["felt"], verts=48))
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.037, location=P(0, 0.015, 0), segments=48, ring_count=24)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.037, location=P(0, 0.015, 0), segments=64, ring_count=32)
 dome = active()
-cut_ = box("domecut", (0.1, 0.1, 0.05), (0, 0, 0.015 - 0.025), M["gold"])
-m_ = dome.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = cut_; m_.solver = "EXACT"
-apply_mods(dome)
-bpy.data.objects.remove(cut_)
-# (the boolean leaves the dome's material slots in a muddle: cleared, and the brass given to every face)
-dome.data.materials.clear()
+# (its lower half taken away, the cut edge left exactly on the equator: a clean hemisphere, smooth all over, for an unbroken gleam)
+bm_ = bmesh.new()
+bm_.from_mesh(dome.data)
+bmesh.ops.delete(bm_, geom=[v for v in bm_.verts if v.co.z < -1e-6], context="VERTS")
+bm_.to_mesh(dome.data)
+bm_.free()
 finish(dome, "BellDome", M["gold"])
-for poly in dome.data.polygons:
-    poly.material_index = 0
 dome.scale = (1, 1, 0.8)
 apply_scale(dome)
-smooth_angle(dome, 60)
+for poly in dome.data.polygons:
+    poly.use_smooth = True
 bl.append(dome)
+# (a fine rolled lip round the dome's foot, and a thin gold ring where it meets the base)
+bpy.ops.mesh.primitive_torus_add(major_radius=0.0368, minor_radius=0.0012, major_segments=64, minor_segments=10, location=P(0, 0.0157, 0))
+bl.append(finish(active(), "BellLip", M["gold"]))
 bl.append(cyl("BellCollar", 0.006, 0.004, P(0, 0.015 + 0.0296 + 0.0015, 0), M["gold"], verts=24))
 plunger = bpy.data.objects.new("TillBellPlunger", None)
 bpy.context.collection.objects.link(plunger)
@@ -671,53 +673,97 @@ mtree.append(coin)
 nodes.append(node("TillMoneyTree", mtree))
 
 # =====================================================================
-# The gold ingot (元寶): a boat-shaped shoe of gold, its two ends curling up, a round dome rising from its middle, on a small red lacquer
-# stand with a gold rim and a tasselled cushion
+# The gold ingot (元寶), as a shop in Japan sets one out: cast in one piece and polished, an oval boat whose rim rolls up high and round at its
+# two ends, a smooth dome swelling from its middle; on a purple zabuton (座布団) with a gold tassel at each corner, on a small low stand of
+# black lacquer edged in gold
 # =====================================================================
 ig = []
-ig.append(cyl("IngotStand", 0.05, 0.012, P(0, 0.006, 0), M["lacquerRed"], verts=40, r2=0.046))
-ig.append(cyl("IngotStandRim", 0.0505, 0.003, P(0, 0.0125, 0), M["coinGold"], verts=40))
-cush = box("IngotCushion", S(0.07, 0.012, 0.05), P(0, 0.02, 0), M["cushion"], bev=0.006)
-ig.append(cush)
+# (the stand: black lacquer, its top's edge a fine gold line, four short feet)
+SW_, SD_, SH2 = 0.088, 0.066, 0.012
+ig.append(box("IngotStand", S(SW_, SH2, SD_), P(0, 0.003 + SH2 / 2, 0), M["lacquer"], bev=0.0025))
+ig.append(box("IngotStandRim", S(SW_ + 0.0006, 0.0012, SD_ + 0.0006), P(0, 0.003 + SH2 - 0.0016, 0), M["coinGold"], bev=0.0005))
+for sx in (-1, 1):
+    for sz in (-1, 1):
+        ig.append(box(f"IngotStandFoot{sx}{sz}", S(0.01, 0.003, 0.01), P(sx * (SW_ / 2 - 0.008), 0.0015, sz * (SD_ / 2 - 0.008)), M["lacquer"], bev=0.0008))
+# (the zabuton: a plump square of purple silk, its middle tufted, a gold tassel at each corner)
+ZT = 0.003 + SH2
+bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, ZT + 0.007, 0))
+zb = active()
+zb.scale = S(0.074, 0.014, 0.056)
+apply_scale(zb)
+sd_ = zb.modifiers.new("s", "SUBSURF"); sd_.levels = 3
+apply_mods(zb)
+for vt in zb.data.vertices:
+    # (puffed: fullest in the middle, the edges pinched in, the very middle drawn down where it's tufted)
+    x_, z_ = vt.co.x / 0.037, -vt.co.y / 0.028
+    k_ = max(0.0, 1 - max(abs(x_), abs(z_)) ** 4)
+    if vt.co.z > 0:
+        vt.co.z += 0.0025 * k_ - 0.0018 * math.exp(-(x_ * x_ + z_ * z_) / 0.02)
+finish(zb, "IngotCushion", M["zabuton"])
+smooth_angle(zb, 70)
+ig.append(zb)
+for sx in (-1, 1):
+    for sz in (-1, 1):
+        cx_, cz_ = sx * 0.035, sz * 0.026
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0021, segments=12, ring_count=8, location=P(cx_, ZT + 0.0045, cz_))
+        ig.append(finish(active(), f"IngotTasselKnot{sx}{sz}", M["coinGold"]))
+        # (the tassel lying out from the corner across the stand, flaring at its end)
+        d_ = Vector((sx, -sz, 0)).normalized()
+        bpy.ops.mesh.primitive_cone_add(vertices=14, radius1=0.0026, radius2=0.0011, depth=0.009, location=Vector(P(cx_, ZT + 0.0016, cz_)) + d_ * 0.0055)
+        tc_ = active()
+        tc_.rotation_euler = (-d_).to_track_quat("Z", "Y").to_euler()
+        ig.append(finish(tc_, f"IngotTassel{sx}{sz}", M["coinGold"]))
+# (the ingot: one surface swept round it, its cross-section the same all the way round but stretched to an oval and taller toward the two
+# ends: a flat foot, the outer wall swelling out, the rim rolled over and round, down the inner wall into the bowl's valley, then up over the
+# dome to its crown. Smooth all over, so the lamps' gleam slides over it unbroken)
+GY = ZT + 0.0125
+IA, IB = 0.034, 0.0205                    # (the oval's half length and half width at the rim)
+
+
+def isect(s_, h_):
+    """the cross-section, as (how far out, 0..1 of the rim's oval; height), for a rim of height h_"""
+    return [(0.0, 0.0), (0.3, 0.0), (0.62, 0.0006), (0.84, 0.0028), (0.95, 0.0075), (1.01, 0.42 * h_), (1.035, 0.68 * h_), (1.02, 0.86 * h_),
+            (0.97, 0.97 * h_), (0.9, 1.0 * h_), (0.82, 0.95 * h_), (0.75, 0.8 * h_), (0.68, 0.58 * h_ + 0.004), (0.6, 0.0118), (0.53, 0.0122),
+            (0.47, 0.0142), (0.43, 0.0178), (0.37, 0.0212), (0.29, 0.0238), (0.19, 0.0256), (0.09, 0.0265), (0.0, 0.0267)]
+
+
+NT = 72
 bm_ = bmesh.new()
-L, Wd, H_ = 0.075, 0.042, 0.022
-NU, NV = 28, 14
-grid = []
-for i in range(NU + 1):
-    u = i / NU * 2 - 1                       # -1..1 along
+rings = []
+for i in range(NT):
+    th = 2 * math.pi * i / NT
+    c2 = math.cos(th) ** 2
+    h_ = 0.0155 + 0.0135 * c2 ** 1.3          # (the rim low along the sides, high and full at the ends)
     row = []
-    for j in range(NV + 1):
-        v_ = j / NV * 2 - 1                  # -1..1 across
-        x = u * L / 2
-        z = v_ * Wd / 2 * (1 - 0.35 * u * u)
-        # (the shoe: low in the middle, its ends swept up in a curl, its sides rounded)
-        y = H_ * (0.25 + 0.75 * u ** 4) * (1 - 0.6 * v_ * v_) + 0.006 * (1 - v_ * v_)
-        row.append(bm_.verts.new(P(x, 0.026 + y, z)))
-    grid.append(row)
-for i in range(NU):
-    for j in range(NV):
-        bm_.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
-# (its underside: a flat-ish bottom joining the rims)
-under = [bm_.verts.new(P(u * L / 2 * 0.9, 0.026, 0)) for u in [i / NU * 2 - 1 for i in range(NU + 1)]]
-for i in range(NU):
-    bm_.faces.new((grid[i][0], under[i], under[i + 1], grid[i + 1][0]))
-    bm_.faces.new((grid[i + 1][NV], under[i + 1], under[i], grid[i][NV]))
+    prof = isect(0, h_)
+    for (sv, yv) in prof[1:-1]:
+        # (toward the middle the oval rounds off, so the dome is round, not long)
+        k = min(1.0, max(0.0, (sv - 0.38) / 0.3))
+        k = k * k * (3 - 2 * k)
+        ax = IB * 1.08 + (IA * (1 + 0.07 * c2) - IB * 1.08) * k
+        row.append(bm_.verts.new(P(math.cos(th) * ax * sv, GY + yv, math.sin(th) * IB * sv)))
+    rings.append(row)
+foot = bm_.verts.new(P(0, GY, 0))
+crown = bm_.verts.new(P(0, GY + 0.0267, 0))
+nP = len(rings[0])
+for i in range(NT):
+    r0, r1 = rings[i], rings[(i + 1) % NT]
+    bm_.faces.new((foot, r1[0], r0[0]))
+    for j in range(nP - 1):
+        bm_.faces.new((r0[j], r1[j], r1[j + 1], r0[j + 1]))
+    bm_.faces.new((r0[-1], r1[-1], crown))
 bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
-me_ = bpy.data.meshes.new("IngotShoe")
+me_ = bpy.data.meshes.new("IngotBody")
 bm_.to_mesh(me_)
 bm_.free()
-shoe = bpy.data.objects.new("IngotShoe", me_)
-bpy.context.collection.objects.link(shoe)
-finish(shoe, "IngotShoe", M["coinGold"])
-sol = shoe.modifiers.new("thick", "SOLIDIFY"); sol.thickness = 0.003
-apply_mods(shoe)
-smooth_angle(shoe, 60)
-ig.append(shoe)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.017, segments=32, ring_count=16, location=P(0, 0.034, 0))
-dome = active(); dome.scale = (1, 1, 0.85); apply_scale(dome)
-ig.append(finish(dome, "IngotDome", M["coinGold"]))
-for sx in (-1, 1):
-    ig.append(tube(f"IngotTassel{sx}", [(sx * 0.036, 0.02, 0.026), (sx * 0.04, 0.01, 0.03), (sx * 0.041, 0.0, 0.031)], 0.0022, M["ribbonRed"]))
+fig = bpy.data.objects.new("IngotBody", me_)
+bpy.context.collection.objects.link(fig)
+ss_ = fig.modifiers.new("s", "SUBSURF"); ss_.levels = 1
+apply_mods(fig)
+finish(fig, "IngotBody", M["coinGold"])
+for poly in fig.data.polygons:
+    poly.use_smooth = True
+ig.append(fig)
 nodes.append(node("TillIngot", ig))
 
 root = bpy.data.objects.new("TillDesk", None)

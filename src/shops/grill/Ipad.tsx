@@ -332,6 +332,7 @@ export function IpadModel({ lang = 'zh' }: { lang?: Lang }) {
     <group {...tip} onClick={(e: { stopPropagation: () => void; object: THREE.Object3D; uv?: THREE.Vector2 }) => {
       e.stopPropagation()
       if (getEdit().on) return
+      tapSound()
       // (where on the screen: its UVs were flipped to run top to bottom as the canvas does)
       if (e.object.name === 'IpadScreen' && e.uv) touch(e.uv.x * W, (1 - e.uv.y) * H)
       else { POS.awakeUntil = performance.now() + 60000; POS.rev++ }
@@ -339,5 +340,37 @@ export function IpadModel({ lang = 'zh' }: { lang?: Lang }) {
       <primitive object={root} />
     </group>
   )
+}
+/** a touch on the glass: the tablet's soft keyboard click, a very short muffled tick (a burst of noise through a low filter, over a faint
+ * low knock) */
+let audio: AudioContext | null = null
+function tapSound() {
+  try {
+    audio ??= new AudioContext()
+    const t = audio.currentTime
+    const n = Math.floor(audio.sampleRate * 0.03)
+    const buf = audio.createBuffer(1, n, audio.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (n * 0.12))
+    const src = audio.createBufferSource()
+    src.buffer = buf
+    const f = audio.createBiquadFilter()
+    f.type = 'bandpass'
+    f.frequency.value = 2600
+    f.Q.value = 0.9
+    const g = audio.createGain()
+    g.gain.value = 0.22
+    src.connect(f).connect(g).connect(audio.destination)
+    src.start(t)
+    const o = audio.createOscillator()
+    const og = audio.createGain()
+    o.frequency.setValueAtTime(320, t)
+    o.frequency.exponentialRampToValueAtTime(140, t + 0.03)
+    og.gain.setValueAtTime(0.05, t)
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.04)
+    o.connect(og).connect(audio.destination)
+    o.start(t)
+    o.stop(t + 0.05)
+  } catch { /* (no sound to be had: the tablet works all the same) */ }
 }
 useGLTF.preload(IPAD_URL)
