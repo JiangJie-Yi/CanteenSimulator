@@ -144,6 +144,8 @@ cell = np.sqrt(((su % 1) - 0.5) ** 2 + ((sv % 1) - 0.15) ** 2)
 scales = smooth(0.42, 0.52, cell)
 # grill marks: a few scorched bars across the body, blistered and broken up
 scorch = smooth(0.84, 0.95, 0.5 + 0.5 * np.sin((v * 11 + u * 1.5) * 2 * np.pi)) * smooth(0.55, 0.8, fbm(N, 8, 8) + 0.3)
+# (not painted on: a raw fish has no grill marks; the game sears these same bars on as it cooks (Roasting's sear, uSear))
+scorch = scorch * 0.0
 blister = smooth(0.8, 0.9, vnoise(N, 70, 40)) * 0.5
 lateral = smooth(0.012, 0.0, np.abs(t - 0.52 - 0.01 * np.sin(v * 40)))            # the lateral line
 

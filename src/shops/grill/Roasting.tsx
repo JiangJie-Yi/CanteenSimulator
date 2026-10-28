@@ -1602,7 +1602,7 @@ function Basket({ position, container }: { position: [number, number, number]; c
 
 type Uniform = { value: number }
 /** per-piece look: how charred it is, and how much of each seasoning is on it (all 0 → 1) */
-type Looks = { uChar: Uniform; uSalt: Uniform; uSoy: Uniform; uMilk: Uniform; uPeanut: Uniform
+type Looks = { uChar: Uniform; uSear?: Uniform; uSalt: Uniform; uSoy: Uniform; uMilk: Uniform; uPeanut: Uniform
   /** miso glaze; green dabs (wasabi, yuzu kosho); red flakes (shichimi); a glisten of lemon juice */
   uMiso: Uniform; uGreen: Uniform; uRed: Uniform; uLemon: Uniform }
 
@@ -1612,7 +1612,7 @@ type Looks = { uChar: Uniform; uSalt: Uniform; uSoy: Uniform; uMilk: Uniform; uP
  * specks, soy as a dark lacquer over everything, condensed milk in wavy drizzled ribbons.
  */
 /** a fish's eyes neither brown, char nor take the seasoning: they stay a clear white with a dark pupil */
-const EYE_LOOKS: Looks = { uChar: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
+const EYE_LOOKS: Looks = { uChar: { value: 0 }, uSear: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
   uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 } }
 
 function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
@@ -1623,6 +1623,7 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
     shader.fragmentShader = BITE_FRAGMENT(shader.fragmentShader
       .replace('#include <common>', /* glsl */ `#include <common>
         uniform float uChar;
+        uniform float uSear;
         uniform float uSalt;
         uniform float uSoy;
         uniform float uMilk;
@@ -1644,6 +1645,12 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
           float charN = charNoise(vMapUv * 9.0) * 0.65 + charNoise(vMapUv * 23.0) * 0.35;
         #else
           float charN = 0.5;
+        #endif
+        // the grill's bars seared across it as it cooks (none on it raw): dark brown, blistered and broken up, deepening as it roasts
+        #ifdef USE_MAP
+          float searBar = smoothstep(0.84, 0.95, 0.5 + 0.5 * sin((vMapUv.y * 11.0 + vMapUv.x * 1.5) * 6.2831853))
+            * smoothstep(0.55, 0.8, charNoise(vMapUv * 8.0) + 0.3);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.12, 0.06), clamp(searBar * 0.75, 0.0, 1.0) * uSear);
         #endif
         float charMask = smoothstep(1.0 - uChar * 1.15, 1.0 - uChar * 1.15 + 0.2, charN);
         diffuseColor.rgb = mix(diffuseColor.rgb, uCharColor, charMask);
@@ -2032,7 +2039,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         obj.position.copy(home.p)
         obj.quaternion.copy(home.q)
       }
-      const looks: Looks = { uChar: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
+      const looks: Looks = { uChar: { value: 0 }, uSear: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
         uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 } }
       pieces.current.push({
         key: obj.uuid, id, copy: (obj.userData.copy as number | undefined) ?? 0, loose: roast.loose.includes(id),
@@ -4513,6 +4520,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const r = p.progress / time
       const charred = THREE.MathUtils.smootherstep(r, CHAR_START, CHAR_FULL)
       p.looks.uChar.value = charred
+      // (the grill's marks come on as it browns: none raw, full by the time it's done)
+      if (p.looks.uSear) p.looks.uSear.value = THREE.MathUtils.smoothstep(r, 0.25, 0.9)
       // mochi on the net swells up as it toasts, and breathes a little while it's still over the coals
       if (p.puffs.length) {
         const puff = THREE.MathUtils.smoothstep(r, 0.55, 1.15)
