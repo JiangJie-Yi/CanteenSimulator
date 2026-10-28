@@ -30,7 +30,7 @@ import { OccluderFade } from '@/scene/OccluderFade'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
-import { DRINKS, type DrinkId, PANTRY } from '@/shops/grill/bar'
+import { DRINKS, type DrinkId, PANTRY, TILL_CASH } from '@/shops/grill/bar'
 import { offsetOf, rotationOf, setEditLang, toggleEdit, useEdit } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { cameraOneOf } from '@/scene/camera1'
@@ -65,7 +65,7 @@ const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
 const SAVE_KEY = 'canteen-save'
-type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number }
+type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
   fresh?: Record<string, number> }
 // Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff).
@@ -966,9 +966,9 @@ export default function App() {
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
   // (a new game starts with the grill already set up: its opening cost is already paid)
-  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
+  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
-  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0) - (ledger.offering ?? 0)
+  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0) - (ledger.offering ?? 0) + (ledger.till ?? 0)
   // ingredients in stock, by portion; nothing until it's bought
   const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
   // how fresh each food in stock is (game/freshness): what's bought comes in fresh and mixes with what's there; it goes off as time passes
@@ -1683,6 +1683,16 @@ export default function App() {
     window.clearTimeout(noticeTimer.current)
     noticeTimer.current = window.setTimeout(() => setNotice(null), 2600)
   }
+  // (the owner taking money out of the register's drawer: it goes into the shop's cash)
+  const sayRef = useRef(say)
+  sayRef.current = say
+  useEffect(() => {
+    TILL_CASH.onTake = (amount) => {
+      book('till', amount)
+      sayRef.current(tl(langRef.current, `從收銀機取出 NT$${amount.toLocaleString()}`, `レジから NT$${amount.toLocaleString()} を取り出しました`, `Took NT$${amount.toLocaleString()} from the till`))
+    }
+    return () => { TILL_CASH.onTake = null }
+  }, [])
   // skewers count toward the fire's limit; potatoes in the ash and mochi on the net have their own
   const isSkewer = (id: string) => !!dish.roast && id in dish.roast.times && !dish.roast.loose.includes(id)
   const onTheFire = () => {
@@ -1938,7 +1948,7 @@ export default function App() {
               } catch {
                 // storage blocked
               }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0 }, stock: {}, hired: {}, notes: {}, owner: null, opened: {} }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0 }, stock: {}, hired: {}, notes: {}, owner: null, opened: {} }
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}
@@ -2010,6 +2020,7 @@ export default function App() {
               <p className="ledger-cash"><span>{tl(lang, '現金', '現金', 'Cash')}</span><b className="money">NT${Math.round(cash).toLocaleString()}</b></p>
               <p><span>{tl(lang, '開業費用', '開業費', 'Opening cost')}</span><b className="money">−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
               <p><span>{tl(lang, '採買支出', '仕入れ', 'Purchasing')}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
+              <p><span>{tl(lang, '收銀機取款', 'レジから取り出し', 'Taken from till')}</span><b className="money">+{Math.round(ledger.till ?? 0).toLocaleString()}</b></p>
               <p><span>{tl(lang, '供品費用', 'お供え', 'Offerings')}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
               {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
                 .map(([k, v]) => (

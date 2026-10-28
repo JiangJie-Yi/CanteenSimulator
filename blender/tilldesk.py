@@ -45,6 +45,7 @@ def lin(hexs):
 
 BOLD = bpy.data.fonts.load("C:/Windows/Fonts/arialbd.ttf") if os.path.exists("C:/Windows/Fonts/arialbd.ttf") else None
 JA = bpy.data.fonts.load("C:/Windows/Fonts/YuGothB.ttc") if os.path.exists("C:/Windows/Fonts/YuGothB.ttc") else BOLD
+HAN_ = bpy.data.fonts.load("C:/Windows/Fonts/msjhbd.ttc") if os.path.exists("C:/Windows/Fonts/msjhbd.ttc") else JA
 
 N = 256
 u, v = grid01(N)
@@ -101,6 +102,25 @@ walnut_tex = image("walnut", walnut_board(512))
 resin_tex = image("resin", mix((0.05, 0.05, 0.055), (0.09, 0.085, 0.09), fbm(N, 20, 20, 3)))
 
 
+# (a pachira leaflet, along u: dark glossy green, paler toward its edge and tip, a pale midrib and fine veins running out from it)
+_ac = np.abs(v - 0.5) * 2
+_leaf = mix((0.06, 0.36, 0.04), (0.14, 0.52, 0.08), smooth(0.3, 1.0, _ac) * 0.6 + u * 0.3 + fbm(N, 8, 8, 3) * 0.2)
+_rib = smooth(0.06, 0.0, _ac)
+_veins = smooth(0.84, 1.0, np.cos((u * 14 - _ac * 3.2) * np.pi) * 0.5 + 0.5) * (1 - _rib) * (_ac < 0.85)
+_leaf = mix(_leaf, (0.42, 0.68, 0.22), np.maximum(_rib * 0.9, _veins * 0.35))
+leaf_tex = image("pachiraLeaf", _leaf)
+# (the bark: grey-green, fine streaks up it, a few darker rings where leaves once were)
+_bk = mix((0.42, 0.42, 0.3), (0.56, 0.55, 0.4), fbm(N, 60, 4, 3))
+_bk = _bk * (1 - 0.25 * smooth(0.82, 0.95, np.sin(v * np.pi * 2 * 9 + fbm(N, 4, 4, 2) * 3) * 0.5 + 0.5))[..., None]
+bark_tex = image("pachiraBark", _bk)
+# (the ingot's red cloth: a crimson silk with a small gold 七宝 (linked rings) woven in)
+_gx, _gy = (u * 10) % 1, (v * 10) % 1
+_ring = np.minimum.reduce([np.abs(np.hypot(_gx - cx, _gy - cy) - 0.5) for cx, cy in ((0, 0), (1, 0), (0, 1), (1, 1), (0.5, 0.5))])
+_br = mix((0.55, 0.05, 0.05), (0.66, 0.09, 0.07), fbm(N, 30, 30, 2))
+_br = mix(_br, (0.85, 0.62, 0.25), smooth(0.05, 0.02, _ring) * 0.85)
+brocade_tex = image("ingotBrocade", _br)
+
+
 def mat(name, hexs, rough=0.5, metal=0.0, tex=None):
     return pbr(name, lin(hexs) if tex is None else (1, 1, 1), tex=tex, rough=rough, metal=metal)
 
@@ -121,9 +141,9 @@ M = {
     "resin": mat("TrayResin", "#ffffff", 0.35, tex=resin_tex), "resinRib": mat("TrayRib", "#1a1a1c", 0.5), "gilt": mat("TrayGilt", "#d4b25a", 0.3, 0.8),
     "rubber": mat("TrayFoot", "#202020", 0.9),
     "potGlaze": mat("TreePotGlaze", "#9c2a1e", 0.2), "potFoot": mat("TreePotFoot", "#5a3a28", 0.8), "soil": mat("TreeSoil", "#3a2a1c", 0.95),
-    "pebble": mat("TreePebble", "#e8e2d4", 0.6), "bark": mat("TreeBark", "#8a7a52", 0.8), "stem": mat("TreeStem", "#6f8a3a", 0.6),
-    "leaf": mat("TreeLeaf", "#2f7a2e", 0.3), "leaf2": mat("TreeLeaf2", "#3f9238", 0.3), "ribbonRed": mat("TreeRibbon", "#c8221a", 0.5),
-    "coinGold": mat("IngotGold", "#e0b24a", 0.15, 1.0), "lacquer": mat("IngotLacquer", "#141012", 0.2), "zabuton": mat("IngotZabuton", "#3c1650", 0.65),
+    "pebble": mat("TreePebble", "#e8e2d4", 0.6), "bark": mat("TreeBark", "#8a7a52", 0.8, tex=bark_tex), "stem": mat("TreeStem", "#6f8a3a", 0.6),
+    "leaf": mat("TreeLeaf", "#2f7a2e", 0.3, tex=leaf_tex), "leaf2": mat("TreeLeaf2", "#3f9238", 0.3, tex=leaf_tex), "ribbonRed": mat("TreeRibbon", "#c8221a", 0.5),
+    "coinGold": mat("IngotGold", "#e0b24a", 0.15, 1.0), "lacquer": mat("IngotLacquer", "#141012", 0.2), "zabuton": mat("IngotZabuton", "#8a1410", 0.65, tex=brocade_tex),
     "lcd": mat("ReaderLcd", "#aab3a6", 0.3), "lcdInk": mat("ReaderLcdInk", "#1c2420", 0.5), "card": mat("ReaderCardFace", "#2f7fd0", 0.3),
     "cardBand": mat("ReaderCardBand", "#7fb6ea", 0.3), "keyRubber": mat("ReaderKeyRubber", "#3a3d42", 0.6),
     "hole": mat("DeskHole", "#060607", 0.6), "holeRing": mat("DeskHoleRing", "#3a3c40", 0.3, 0.8), "cable": mat("DeskCable", "#17171a", 0.4),
@@ -620,7 +640,9 @@ m_ = pot.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object
 apply_mods(pot)
 bpy.data.objects.remove(potin)
 mtree.append(pot)
-mtree.append(cyl("TreePotRim", PR + 0.002, 0.008, P(0, PH2 - 0.004, 0), M["potGlaze"], verts=40))
+# (its rim: a rolled lip round the top, open in the middle so the soil and pebbles show)
+bpy.ops.mesh.primitive_torus_add(major_radius=PR - 0.001, minor_radius=0.0042, major_segments=48, minor_segments=8, location=P(0, PH2 - 0.002, 0))
+mtree.append(finish(active(), "TreePotRim", M["potGlaze"]))
 mtree.append(cyl("TreePotFoot", PR * 0.8, 0.006, P(0, 0.003, 0), M["potFoot"], verts=40))
 mtree.append(cyl("TreeSoil", PR - 0.007, 0.004, P(0, PH2 - 0.012, 0), M["soil"], verts=32))
 for i in range(14):
@@ -629,42 +651,94 @@ for i in range(14):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.0055 + (i % 3) * 0.0012, location=P(rr * math.cos(a_), PH2 - 0.009, rr * math.sin(a_)))
     pb = active(); pb.scale = (1, 1, 0.6); apply_scale(pb)
     mtree.append(finish(pb, f"TreePebble{i}", M["pebble"]))
-# (the braid: three trunks winding round each other as they rise, thinning, then each spreading out)
+# (a gold band round the pot's shoulder, and 發 in gold on its front)
+mtree.append(cyl("TreePotBand", PR * 0.985 + 0.0006, 0.004, P(0, PH2 - 0.016, 0), M["coinGold"], verts=40, r2=PR * 0.96 + 0.0006))
+mtree.append(text("TreePotChar", "發", 0.034, M["coinGold"], P(0, PH2 * 0.45, PR * 0.885 + 0.0012), (math.pi / 2, 0, 0), HAN_))
+
+
+def leaflet(name, at, ang, L, W, droop, mat_):
+    """one pachira leaflet: a long pointed oval, fanned out at `ang` from where it joins, arching down along its length, its UVs along it"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    NU, NV = 8, 4
+    vs = []
+    for i in range(NU + 1):
+        t = i / NU
+        half = W / 2 * math.sin(math.pi * t ** 0.8) * (1 - 0.15 * t)
+        row = []
+        for j in range(NV + 1):
+            q = j / NV * 2 - 1
+            x, z = t * L, q * half
+            # (arched down along it, and cupped a little across it, folded up along the midrib)
+            y = -droop * t * t + abs(q) * half * 0.25
+            row.append((bm.verts.new((x * math.cos(ang) - z * math.sin(ang) + at[0], -(x * math.sin(ang) + z * math.cos(ang)) - at[2], y + at[1])), (t, j / NV)))
+        vs.append(row)
+    for i in range(NU):
+        for j in range(NV):
+            quad = (vs[i][j], vs[i + 1][j], vs[i + 1][j + 1], vs[i][j + 1])
+            f = bm.faces.new([q[0] for q in quad])
+            for lp, q in zip(f.loops, quad):
+                lp[uvl].uv = q[1]
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    sol = o.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.0006
+    apply_mods(o)
+    finish(o, name, mat_)
+    for poly in o.data.polygons:
+        poly.use_smooth = True
+    return o
+
+
+# (the braid: three trunks winding round each other as they rise from a swollen base, thinning, then each spreading out into its branch)
 TB, TT_ = PH2 - 0.01, 0.2
 for k in range(3):
     pts = []
-    for j in range(13):
-        t = j / 12
+    for j in range(15):
+        t = j / 14
         y = TB + (TT_ - TB) * t
-        a_ = k * 2.094 + t * 7.0
-        rr = 0.008 * (1 - 0.5 * t)
+        a_ = k * 2.094 + t * 7.4
+        rr = 0.0085 * (1 - 0.5 * t) + 0.004 * max(0.0, 1 - t * 6)
         pts.append((rr * math.cos(a_), y, rr * math.sin(a_)))
-    # (and out into its branch at the top)
     ox, oz = math.cos(k * 2.094 + 0.5), math.sin(k * 2.094 + 0.5)
     pts += [(ox * 0.02, TT_ + 0.03, oz * 0.02), (ox * 0.045, TT_ + 0.06, oz * 0.045)]
-    mtree.append(tube(f"TreeTrunk{k}", pts, 0.0055 - k * 0.0004, M["bark"]))
-    # (the stems off each branch, each with a hand of leaflets)
-    for h in range(3):
-        b = h * 2.1 + k * 0.7
+    tr_ = tube(f"TreeTrunk{k}", pts, 0.0055 - k * 0.0004, M["bark"])
+    # (the trunk's bark wrapped round it: UVs up its length)
+    bpy.ops.object.select_all(action="DESELECT"); tr_.select_set(True); bpy.context.view_layer.objects.active = tr_
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cylinder_project(scale_to_bounds=True); bpy.ops.object.mode_set(mode="OBJECT")
+    mtree.append(tr_)
+    # (the swelling at the trunk's foot, where the three meet the soil)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.009, segments=14, ring_count=8, location=P(math.cos(k * 2.094) * 0.007, TB + 0.004, math.sin(k * 2.094) * 0.007))
+    sw_ = active(); sw_.scale = (1, 1, 0.75); apply_scale(sw_)
+    mtree.append(finish(sw_, f"TreeTrunkFoot{k}", M["bark"]))
+    # (the stems off each branch, four to a branch, rising and arching out, each ending in a hand of five to seven leaflets)
+    for h in range(4):
+        b = h * 1.57 + k * 0.7
         sx, sz = ox * 0.045, oz * 0.045
-        ex, ez = sx + math.cos(b) * 0.045, sz + math.sin(b) * 0.045
-        ey = TT_ + 0.075 + (h % 2) * 0.02
-        mtree.append(tube(f"TreeStem{k}{h}", [(sx, TT_ + 0.06, sz), ((sx + ex) / 2, ey + 0.005, (sz + ez) / 2), (ex, ey, ez)], 0.0012, M["stem"]))
-        for f in range(5):
-            fa = b + (f - 2) * 0.55
-            L = 0.045 if f == 2 else 0.038 - abs(f - 2) * 0.003
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=7)
-            lf = active()
-            lf.scale = (L / 2, 0.009, 0.0012)
-            apply_scale(lf)
-            lf.location = P(ex + math.cos(fa) * L / 2, ey + 0.004 - (abs(f - 2)) * 0.003, ez + math.sin(fa) * L / 2)
-            lf.rotation_euler = (0.25 * (f - 2) * 0.3, -0.18, -fa)
-            mtree.append(finish(lf, f"TreeLeaf{k}{h}{f}", M["leaf"] if (k + h + f) % 3 else M["leaf2"]))
-# (a red ribbon tied round the braid, and a gold coin hung from it)
+        reach = 0.05 + (h % 2) * 0.012
+        ex, ez = sx + math.cos(b) * reach, sz + math.sin(b) * reach
+        ey = TT_ + 0.08 + ((h + k) % 3) * 0.014
+        mtree.append(tube(f"TreeStem{k}{h}", [(sx, TT_ + 0.06, sz), (sx + math.cos(b) * reach * 0.4, ey + 0.012, sz + math.sin(b) * reach * 0.4), (ex, ey, ez)], 0.0011, M["stem"]))
+        nleaf = 5 + (h + k) % 3
+        for f in range(nleaf):
+            mid = (nleaf - 1) / 2
+            fa = b + (f - mid) * (2.4 / nleaf)
+            L = 0.05 - abs(f - mid) * 0.006
+            mtree.append(leaflet(f"TreeLeaf{k}{h}{f}", (ex, ey + 0.002, ez), fa, L, L * 0.34, 0.012 + 0.004 * abs(f - mid),
+                                 M["leaf"] if (k + h + f) % 3 else M["leaf2"]))
+# (a red ribbon tied round the braid in a bow, its two tails hanging, and a gold coin hung from it)
 bpy.ops.mesh.primitive_torus_add(major_radius=0.011, minor_radius=0.0028, major_segments=24, minor_segments=6, location=P(0, TB + 0.06, 0))
 rb = active(); rb.scale = (1, 1, 1.6); apply_scale(rb)
 mtree.append(finish(rb, "TreeRibbon", M["ribbonRed"]))
+for sd in (-1, 1):
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.0065, minor_radius=0.0018, major_segments=18, minor_segments=6,
+                                     location=P(0.006 * sd, TB + 0.062, 0.0125), rotation=(math.pi / 2, 0.5 * sd, 0))
+    lp_ = active(); lp_.scale = (1.4, 1, 0.7); apply_scale(lp_)
+    mtree.append(finish(lp_, f"TreeRibbonLoop{sd}", M["ribbonRed"]))
 mtree.append(tube("TreeRibbonTail", [(0.011, TB + 0.06, 0), (0.016, TB + 0.045, 0.004), (0.017, TB + 0.03, 0.006)], 0.0018, M["ribbonRed"]))
+mtree.append(tube("TreeRibbonTail2", [(0.0, TB + 0.06, 0.012), (-0.004, TB + 0.045, 0.014), (-0.006, TB + 0.032, 0.015)], 0.0016, M["ribbonRed"]))
 coin = cyl("TreeCoin", 0.011, 0.002, P(0.018, TB + 0.022, 0.007), M["coinGold"], rot=(math.pi / 2, 0, 0.3), verts=28)
 hole_ = box("ch", S(0.006, 0.006, 0.02), P(0.018, TB + 0.022, 0.007), M["coinGold"])
 m_ = coin.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = hole_; m_.solver = "EXACT"
@@ -680,7 +754,7 @@ nodes.append(node("TillMoneyTree", mtree))
 # =====================================================================
 ig = []
 # (the stand: black lacquer, its top's edge a fine gold line, four short feet)
-SW_, SD_, SH2 = 0.088, 0.066, 0.012
+SW_, SD_, SH2 = 0.118, 0.092, 0.012
 ig.append(box("IngotStand", S(SW_, SH2, SD_), P(0, 0.003 + SH2 / 2, 0), M["lacquer"], bev=0.0025))
 ig.append(box("IngotStandRim", S(SW_ + 0.0006, 0.0012, SD_ + 0.0006), P(0, 0.003 + SH2 - 0.0016, 0), M["coinGold"], bev=0.0005))
 for sx in (-1, 1):
@@ -690,13 +764,13 @@ for sx in (-1, 1):
 ZT = 0.003 + SH2
 bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, ZT + 0.007, 0))
 zb = active()
-zb.scale = S(0.074, 0.014, 0.056)
+zb.scale = S(0.106, 0.018, 0.082)
 apply_scale(zb)
 sd_ = zb.modifiers.new("s", "SUBSURF"); sd_.levels = 3
 apply_mods(zb)
 for vt in zb.data.vertices:
     # (puffed: fullest in the middle, the edges pinched in, the very middle drawn down where it's tufted)
-    x_, z_ = vt.co.x / 0.037, -vt.co.y / 0.028
+    x_, z_ = vt.co.x / 0.053, -vt.co.y / 0.041
     k_ = max(0.0, 1 - max(abs(x_), abs(z_)) ** 4)
     if vt.co.z > 0:
         vt.co.z += 0.0025 * k_ - 0.0018 * math.exp(-(x_ * x_ + z_ * z_) / 0.02)
@@ -705,7 +779,7 @@ smooth_angle(zb, 70)
 ig.append(zb)
 for sx in (-1, 1):
     for sz in (-1, 1):
-        cx_, cz_ = sx * 0.035, sz * 0.026
+        cx_, cz_ = sx * 0.051, sz * 0.039
         bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0021, segments=12, ring_count=8, location=P(cx_, ZT + 0.0045, cz_))
         ig.append(finish(active(), f"IngotTasselKnot{sx}{sz}", M["coinGold"]))
         # (the tassel lying out from the corner across the stand, flaring at its end)
@@ -717,7 +791,7 @@ for sx in (-1, 1):
 # (the ingot: one surface swept round it, its cross-section the same all the way round but stretched to an oval and taller toward the two
 # ends: a flat foot, the outer wall swelling out, the rim rolled over and round, down the inner wall into the bowl's valley, then up over the
 # dome to its crown. Smooth all over, so the lamps' gleam slides over it unbroken)
-GY = ZT + 0.0125
+GY = ZT + 0.0165
 IA, IB = 0.034, 0.0205                    # (the oval's half length and half width at the rim)
 
 
@@ -761,6 +835,11 @@ fig = bpy.data.objects.new("IngotBody", me_)
 bpy.context.collection.objects.link(fig)
 ss_ = fig.modifiers.new("s", "SUBSURF"); ss_.levels = 1
 apply_mods(fig)
+# (a size bigger: the ingot fills its cushion)
+for vt in fig.data.vertices:
+    vt.co.x *= 1.2
+    vt.co.y *= 1.2
+    vt.co.z = GY + (vt.co.z - GY) * 1.2
 finish(fig, "IngotBody", M["coinGold"])
 for poly in fig.data.polygons:
     poly.use_smooth = True

@@ -354,7 +354,26 @@ for r in range(_rows, -2, -1):
         _d = np.where(cover, dd, _d)
 _wave = (((_d / _Rw) * 4) % 1 < 0.13) & (_d < _Rw)
 leaf = mix(leaf, (0.55, 0.38, 0.14), _wave.astype(np.float32) * 0.45)
-M["goldLeaf"] = pbr("KamiGoldLeaf", (1, 1, 1), tex=image("goldleaf", leaf), rough=0.35, metal=0.75)
+# (and pressed into the leaf, large, high behind the god's head: the house's crest (三つ柏), a ring with three oak leaves, each with its midrib,
+# darkened into the gold as a multiply would, and stamped in (the relief a normal map))
+cu_, cv_, R_ = 0.5, 0.74, 0.3
+dx_, dy_ = (_gu - cu_) / R_, (_gv - cv_) / R_
+rr_ = np.sqrt(dx_ ** 2 + dy_ ** 2)
+crest = ((rr_ > 0.86) & (rr_ < 1.0)).astype(np.float32)
+for j in range(3):
+    a_ = math.pi / 2 + j * 2 * math.pi / 3
+    cx_, cy_ = math.cos(a_) * 0.42, math.sin(a_) * 0.42
+    # (a leaf: an ellipse along its own direction, pointed outward)
+    px_, py_ = dx_ - cx_, dy_ - cy_
+    along_ = px_ * math.cos(a_) + py_ * math.sin(a_)
+    across_ = -px_ * math.sin(a_) + py_ * math.cos(a_)
+    lf_ = ((along_ / 0.4) ** 2 + (across_ / 0.22) ** 2 < 1).astype(np.float32)
+    rib_ = ((np.abs(across_) < 0.025) & (np.abs(along_) < 0.36)).astype(np.float32)
+    crest = np.maximum(crest, lf_ * (1 - rib_))
+crest = crest * (rr_ < 1.0)
+leaf = leaf * (1 - 0.48 * crest[..., None])
+leaf_n = image("goldleafN", to_normal((-crest).astype(np.float32), 6.0), data=True)
+M["goldLeaf"] = pbr("KamiGoldLeaf", (1, 1, 1), tex=image("goldleaf", leaf), nrm=leaf_n, nrm_strength=1.0, rough=0.35, metal=0.75)
 
 
 def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
@@ -386,6 +405,7 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
                  M["goldLeaf"], uv=0)
         face_uv(gp)
         out.append(gp)
+
     # (the posts at its corners, standing a little proud of the walls)
     for sx in (-1, 1):
         for sz in (-1, 1):
@@ -861,9 +881,20 @@ eb.append(ebtube("KamiEbisuRope", [(-0.022 * math.cos(a_), 0.03 + 0.002 * math.s
 eb.append(ebtube("KamiEbisuRopeEnd", [(-0.022, 0.03, 0.002), (-0.0235, 0.022, 0.003), (-0.0245, 0.016, 0.004)], 0.0008, M["straw"], ring=5))
 for _j in range(3):
     eb.append(box(f"KamiEbisuShide{_j}", S(0.0004, 0.0048, 0.0036), P(-0.0236, 0.025 - _j * 0.0042, 0.006 + (0.0016 if _j % 2 else -0.0016)), M["shide"], uv=0))
-# ---- the pedestal: a square block of the same granite under him
+# ---- the pedestal: a round drum of the same granite under him, its rim softened, its base flat on the floor of the bay
 PED = 0.016
-eb.append(box("KamiEbisuPedestal", S(0.068, PED, 0.068), P(0, -PED / 2, 0), M["stone"], bev=0.0012, uv=0.05))
+bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.036, depth=PED, location=P(0, -PED / 2, 0))
+_ped = bpy.context.view_layer.objects.active
+_bv = _ped.modifiers.new("b", "BEVEL"); _bv.width = 0.0014; _bv.segments = 2
+bpy.ops.object.modifier_apply(modifier="b")
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.uv.cylinder_project(direction="ALIGN_TO_OBJECT", scale_to_bounds=True)
+bpy.ops.object.mode_set(mode="OBJECT")
+_ped.name = "KamiEbisuPedestal"
+_ped.data.materials.append(M["stone"])
+for _p in _ped.data.polygons:
+    _p.use_smooth = True
+eb.append(_ped)
 ebisu = bpy.data.objects.new("KamiEbisu", None)
 bpy.context.collection.objects.link(ebisu)
 for o in eb:
@@ -875,11 +906,28 @@ parts += eb + [ebisu]
 # (the talismans in the side bays)
 M["fuda"] = pbr("KamiFuda", lin("#f3eedd"), rough=0.8)
 M["fudaSeal"] = pbr("KamiFudaSeal", lin("#b8261c"), rough=0.6)
+M["sideLeaf"] = pbr("KamiSideLeaf", lin("#2f6a24"), rough=0.3)
+M["daidai"] = pbr("KamiDaidai", lin("#e8801a"), rough=0.45)
 for sz in (-1, 1):
     zc_ = sz * 0.112
     parts.append(box(f"KamiFuda{sz}", S(0.004, 0.075, 0.026), P(BX + 0.05, DY + 0.005 + 0.0375, zc_), M["fuda"], bev=0.0006, uv=0))
     parts.append(box(f"KamiFudaFold{sz}", S(0.0045, 0.012, 0.0265), P(BX + 0.05, DY + 0.005 + 0.068, zc_), M["fuda"], uv=0))
     parts.append(box(f"KamiFudaSeal{sz}", S(0.0008, 0.008, 0.008), P(BX + 0.0476, DY + 0.005 + 0.03, zc_), M["fudaSeal"], uv=0))
+    # (before the talisman: a pair of little white vases of sakaki either side, and a small hinoki stand (三方) with a pair of round rice cakes on
+    # it, an orange on top)
+    for s2 in (-1, 1):
+        parts.append(cyl(f"KamiSideVase{sz}{s2}", 0.006, 0.026, P(BX + 0.03, DY + 0.005 + 0.013, zc_ + s2 * 0.021), M["shide"], verts=14))
+        for k_ in range(4):
+            a_ = k_ * 1.6 + s2
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=8, ring_count=5,
+                                                 location=P(BX + 0.03 + 0.005 * math.cos(a_), DY + 0.005 + 0.032 + k_ * 0.006, zc_ + s2 * 0.021 + 0.006 * math.sin(a_)))
+            lf_ = active(); lf_.scale = (0.0045, 0.009, 0.0022); lf_.rotation_euler = (0.4 * math.sin(a_), 0.4 * math.cos(a_), a_)
+            parts.append(finish(lf_, f"KamiSideSakaki{sz}{s2}{k_}", M["sideLeaf"]))
+    parts.append(box(f"KamiSideSanbo{sz}", S(0.024, 0.011, 0.024), P(BX + 0.008, DY + 0.005 + 0.0055, zc_), wood(), bev=0.0008, uv=0))
+    for k_, r_ in enumerate((0.0095, 0.008)):
+        parts.append(cyl(f"KamiSideMochi{sz}{k_}", r_, 0.0055, P(BX + 0.008, DY + 0.005 + 0.0137 + k_ * 0.0055, zc_), M["shide"], verts=16))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0048, segments=10, ring_count=6, location=P(BX + 0.008, DY + 0.005 + 0.027, zc_))
+    parts.append(finish(active(), f"KamiSideDaidai{sz}", M["daidai"]))
 
 # =====================================================================
 # The sacred rope (注連縄) across the shrine's front, over the doors: twisted green-gold straw, fat in the middle and tapering to its tied

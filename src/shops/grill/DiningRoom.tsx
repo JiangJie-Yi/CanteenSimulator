@@ -1079,7 +1079,7 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
 }
 
 /** the two vases' arrangements (blender/shrinevase.py): 0 white and gold chrysanthemums, 1 pink, crimson and violet blooms */
-const VASE_URLS = [0, 1].map((v) => import.meta.env.BASE_URL + `models/shrinevase${v}.glb`)
+const VASE_URLS = ['shrinevase', 'shrinevase0', 'shrinevase1'].map((v) => import.meta.env.BASE_URL + `models/${v}.glb`)
 /** a shrine vase (榊立て, blender/shrinevase.py): white porcelain with a cobalt band of waves, a spray of glossy sakaki and small chrysanthemums */
 function Bouquet({ lean = 0, variant = 0 }: { lean?: number; variant?: number }) {
   const gltf = useGLTF(VASE_URLS[variant]) as unknown as { scene: THREE.Group }
@@ -1102,6 +1102,19 @@ function Bouquet({ lean = 0, variant = 0 }: { lean?: number; variant?: number })
   return <group rotation-z={lean}><primitive object={root} /></group>
 }
 VASE_URLS.forEach((u) => useGLTF.preload(u))
+/** a vase whose flowers change at a click: the sakaki with small chrysanthemums first, then the white and gold, then the pink and crimson; each
+ * time set at a slightly different turn and lean, so the two sides never look stamped out alike */
+function BouquetPick({ lean = 0 }: { lean?: number }) {
+  const [v, setV] = useState(0)
+  const turn = useMemo(() => (Math.random() - 0.5) * 1.2, [v])
+  const tilt = useMemo(() => (Math.random() - 0.5) * 0.06, [v])
+  return (
+    <group rotation-y={turn} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setV((x) => (x + 1) % VASE_URLS.length) }}
+      {...tipOver('供花', '點一下換一組花')}>
+      <Bouquet lean={lean + tilt} variant={v} />
+    </group>
+  )
+}
 
 
 /**
@@ -1306,7 +1319,7 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase
       {(part === 'all' || part === 'shrine') && <group position={[-0.14, 0.015, 0]}><KamidanaModel /></group>}
       {/* the bouquets in their vases, leaning in a little, each its own piece */}
       {[-1, 1].filter((sd) => part === 'all' || part === `vase${sd}`).map((sd) => (
-        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} variant={sd < 0 ? 0 : 1} /><ContactShadow r={0.05} y={-0.014} /></group>
+        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><BouquetPick lean={sd * -0.08} /><ContactShadow r={0.05} y={-0.014} /></group>
       ))}
       {/* the cups' stand (blender/kamidana.py), the cups on it */}
       {(part === 'all' || part === 'cups') && <group position={[-0.3, 0, 0]}><KamidanaModel part="cupstand" /><ContactShadow r={0.15} /></group>}
@@ -1453,7 +1466,9 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
   }, [from, to, door])
   // (pictures along the wall, a print then a scroll in turn, about a metre apart, leaving the shelf's stretch clear)
   // (the shelf in the far third of the wall, or the near one if the door's in the far one)
-  const shelfZ = door !== undefined && Math.abs(door - (mid + l * 0.3)) < 1.3 ? mid - l * 0.3 : mid + l * 0.3
+  const shelfZ0 = door !== undefined && Math.abs(door - (mid + l * 0.3)) < 1.3 ? mid - l * 0.3 : mid + l * 0.3
+  // (moved along the wall away from the door, the owner's wish: more room round it)
+  const shelfZ = shelfZ0 + (door !== undefined ? Math.sign(shelfZ0 - door) || 1 : 1) * 0.35
   // (the wall with the toilets has the fridge and the doors' sliding along it: no shelf there)
   const shelf = door === undefined
   const isClear = (z: number, pad: number) => clear.every(([a, b]) => z < a - pad || z > b + pad)
@@ -1467,7 +1482,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
       const n = Math.max(0, Math.floor(w / 0.95))
       for (let i = 0; i < n; i++) spots.push(posts[b] + (w / n) * (i + 0.5))
     }
-    return spots.filter((z) => (!shelf || Math.abs(z - shelfZ) > 0.85) && isClear(z, 0.3) && (door === undefined || Math.abs(z - door) > 0.95)
+    return spots.filter((z) => (!shelf || Math.abs(z - shelfZ) > 0.85 * ALTAR_SCALE) && isClear(z, 0.3) && (door === undefined || Math.abs(z - door) > 0.95)
       && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length],
         // (a banner every third place along the wall, in turn)
@@ -1547,7 +1562,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
             </group>
           </StaticBatch></Movable>
         ))}
-        {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><AltarTable />
+        {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
           {[-0.35, 0.35].map((z) => (
             <group key={z} position={[ALTAR_D / 2, -0.03, z - 0.015]}>
@@ -1563,7 +1578,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
           // (not out to the way in at the end: nothing hung over the doorway)
           // (and none in the corner where the speaker hangs: kept clear of it by its own reach and size)
           for (let z = from + (corner ? 1.15 : 0.25); z < to - 1.05; z += 0.145) {
-            if (altar && Math.abs(z - shelfZ) < 0.62) continue
+            if (altar && Math.abs(z - shelfZ) < 0.62 * ALTAR_SCALE) continue
             if (!isClear(z, 0.6)) continue
             if (door !== undefined && Math.abs(z - door) < WC_W + 0.3) continue
             zs.push(z)
@@ -1579,7 +1594,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
         {/* (the banners sway: not merged) */}
         {art.filter((a) => a.nobori !== undefined).map((a) => <Movable key={`n${a.z}`} id={`nobori${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`幟旗（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><group position={[0, 1.08, a.z]} userData={{ fade: true }}><Nobori i={a.nobori!} /></group></Movable>)}
         {/* (the altar's flag stirs, its incense smokes: not merged) */}
-        {altar && <Movable id="altarfittings" label="供桌上的供品與線香"><group name="look-altar" position={[-ALTAR_D / 2, ALTAR_Y, shelfZ]}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}
+        {altar && <Movable id="altarfittings" label="供桌上的供品與線香"><group name="look-altar" position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}
       </group>
       {/* the toilets: not part of the wall that's hidden from behind, so they're still there when the camera swings round to the back */}
       <group position-x={-far}>
@@ -1658,6 +1673,8 @@ const EBISU_FEET: [number, number, number] = [0.145, 0.077, 0]
 /** where the cups stand along the shelf's depth (the offering's light comes from there) */
 const CUPS_FX = 0.29 - 0.375 + CUPS_SHIFT
 /** the altar shelf's depth, out from the wall: the god at the back, raised, the censer before him */
+/** the whole shrine area drawn a size larger, its back still against the wall */
+const ALTAR_SCALE = 1.2
 const ALTAR_D = 0.58
 /** and its height: up over the beckoning cats' stand below it, by the door */
 const ALTAR_Y = 1.42
@@ -1676,6 +1693,7 @@ function Sutra() {
 function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
   // (the offering: one flask pours clear sake into the three cups in turn, the stream and the cups filling; then it's set back)
   const flaskRef = useRef<THREE.Group>(null)
+  const flaskShadow = useRef<THREE.Group>(null)
   const streamRef = useRef<THREE.Mesh>(null)
   const liquid = useRef<(THREE.Mesh | null)[]>([null, null, null])
   // (the motes: while the offering stands, faint glowing ones drift up from the shrine)
@@ -1862,6 +1880,13 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       f.position.set(THREE.MathUtils.lerp(rest.x, CUP_X, k), THREE.MathUtils.lerp(rest.y, POUR_Y, k) + hop * k + arc, THREE.MathUtils.lerp(rest.z, z, k))
       f.rotation.x = -tipSide * (k * (0.85 + 0.25 * pourK) + Math.sin(since * 9) * 0.01 * pourK)
     }
+    const sh = flaskShadow.current
+    if (sh) {
+      const lift = THREE.MathUtils.smoothstep(k, 0, 0.35)
+      sh.scale.setScalar(1 + 0.6 * lift)
+      sh.visible = lift < 0.99
+      sh.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined; if (m) m.opacity = 1 - lift })
+    }
     const pouring = pourK > 0.01
     if (streamRef.current) {
       streamRef.current.visible = pouring
@@ -1892,7 +1917,6 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   const flask = (z: number, key: string) => (
     <group key={key} position={[0, 0, z]} onClick={offer} {...tipOver('御神酒', '點一下供清酒')}>
       <KamidanaModel part="flask" />
-      <ContactShadow r={0.055} />
       <mesh position={[0, 0.075, 0]} visible={false}><boxGeometry args={[0.09, 0.16, 0.09]} /></mesh>
     </group>
   )
@@ -1911,9 +1935,10 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
           <Movable id="ebisu" label="惠比壽石像"><group {...nameOnly('惠比壽石像', '七福神之一，保佑生意興隆、漁獲豐收')}><KamidanaModel part="ebisu" /></group></Movable>
         </group>
       </group></Movable>
-      {/* (the vases and the cups beside it, each its own piece: not part of what's pointed at, they don't light with it) */}
-      <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC} {...nameOnly('供花', '楊桐與白菊，供在神棚兩側')}><StaticBatch><Kamidana part="vase-1" /></StaticBatch></group></Movable>
-      <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC} {...nameOnly('供花', '楊桐與白菊，供在神棚兩側')}><StaticBatch><Kamidana part="vase1" /></StaticBatch></group></Movable>
+      {/* (the vases and the cups beside it, each its own piece: not part of what's pointed at, they don't light with it; the vases not batched,
+          a batch takes no clicks, and clicked they change their flowers) */}
+      <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase-1" /></group></Movable>
+      <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase1" /></group></Movable>
       <Movable id="shrinecups" label="清酒杯與琉璃台"><group position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC} {...nameOnly('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={STAR} vertexColors size={1} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} onBeforeCompile={pointsEach} />
@@ -1949,7 +1974,9 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}
       <Movable id="sutra" label="經書"><group {...nameOnly('經書', '般若心經，供在神前')}><Sutra /></group></Movable>
-      <Movable id="flask" label="御神酒壺"><group ref={flaskRef} position={[-0.06, 0, 0.3]}>{flask(0, 'f')}</group></Movable>
+      <Movable id="flask" label="御神酒壺"><group ref={flaskRef} position={[-0.06, 0, 0.3]}>{flask(0, 'f')}</group>
+        {/* (its shadow stays on the stand where it stood: fading and spreading as it's lifted off, not carried up with it) */}
+        <group ref={flaskShadow} position={[-0.06, 0, 0.3]}><ContactShadow r={0.055} /></group></Movable>
       {/* (the clear sake: a thin stream down into the cup, and the cups, each filling with it) */}
       <mesh ref={streamRef} visible={false}>
         <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} /><meshBasicMaterial color="#e6f4ff" transparent opacity={0.55} depthWrite={false} />

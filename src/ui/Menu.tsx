@@ -7,6 +7,7 @@ import { STORAGES, storageName, storageOf } from '@/data/storage'
 import { Icon, iconFor } from './Icon'
 import { tl } from '@/data/i18n'
 import { freshGrade } from '@/game/freshness'
+import { FoodArt } from './FoodArt'
 
 export type Restock = 'avg' | 'each' | 'full'
 
@@ -239,7 +240,7 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
    * frozen packs stacked as high as the stock, what it costs, and the buttons to bring more in: +1, +10, and 補 to top it back up to the usual stock.
    * The bin itself is what's clicked to take one out to try (right-click, or - / Delete, to put it back), as the tags were.
    */
-  const bin = (x: { id: string; name: string; ja?: string; en?: string; price: number }, icon: string) => {
+  const bin = (x: { id: string; name: string; ja?: string; en?: string; price: number }, _icon: string) => {
     const n = quantities[x.id] ?? 0
     const name = nameIn(lang, x)
     const cost = unitCost ? unitCost(x.id) : 0
@@ -257,7 +258,7 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
         onContextMenu={(e) => { e.preventDefault(); if (!press.current && !locked) onRemove(x.id) }}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!locked) onAdd(x.id) } else onKey(x.id)(e) }}>
         <span className="chiller-bin-head">
-          <Icon name={icon} />
+          <FoodArt id={x.id} store={storageOf(x.id)} />
           <span className="chiller-bin-name">{name}</span>
           {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{tl(lang, '試', '試', 'Try')}×{n}</span>}
         </span>

@@ -130,7 +130,7 @@ def noren():
             # (soft folds down it, deeper toward the hem, each panel its own; the hem turned a touch toward the room)
             fold = (0.004 + 0.012 * v) * math.sin(u * math.pi * 5 + k * 1.3) + 0.004 * math.sin(u * math.pi * 11 + k)
             curl = 0.01 * max(0.0, v - 0.94) / 0.06
-            return P(x, y, fold - curl), (u, 1 - v)
+            return P(x, y, fold - curl), (u, v)
         pnl = grid_mesh(f"NorenPanel{k}", 24, 20, panel)
         sol = pnl.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.003
         bpy.context.view_layer.objects.active = pnl

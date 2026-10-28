@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
+import { openingFloat, type DrawerCash } from '@/game/till'
 
 /*
  * Where the customers sit: one or more counters, each a straight run of stools. A counter is given by its middle
@@ -392,6 +393,11 @@ export const TILL_STATE = { text: '0', drawer: 0,
   bill: 0, payer: 0 }
 /** what a customer's bill comes to: the dishes they ordered and the drink from the fridge, if they took one */
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __till?: typeof TILL_STATE }).__till = TILL_STATE
+/**
+ * the money in the register's drawer (game/till): the day's float, and each cash customer's bill put in as they pay; the owner takes a
+ * compartment's worth out by clicking it, and `onTake` (set by App) puts it to the shop's cash
+ */
+export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void) | null } = { drawer: openingFloat(), onTake: null }
 export const billOf = (items: number, drink?: DrinkId) => Math.max(1, items) * 380 + (drink ? 320 : 0)
 /** the figures on the register's displays: a number with its thousands comma */
 export const yen = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')

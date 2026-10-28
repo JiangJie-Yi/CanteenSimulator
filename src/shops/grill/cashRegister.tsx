@@ -7,7 +7,8 @@ import { setTip } from '@/scene/hoverTip'
 import { DEPTS, newRegister, pressKey, REG_MODES, REG_TAG_TEXT, regFigure, setMode, settle, turnDrawerKey, type Receipt, type RegKey } from '@/game/register'
 import { keyHelp } from '@/data/registerKeys'
 import type { Lang } from '@/data/i18n'
-import { POINTER_HINT, TILL_STATE } from './bar'
+import { deposit } from '@/game/till'
+import { POINTER_HINT, TILL_CASH, TILL_STATE } from './bar'
 import { getEdit } from './edit'
 
 /**
@@ -355,8 +356,9 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
       if (pk < 0.44 && k >= 0.44) {
         REGISTER.pressed.set(TILL_STATE.card ? 'CHARGE' : 'CASH', now)
         beep('ok')
-        // (the cashier unlocks the drawer to take the money: the key's turned upright)
+        // (the cashier unlocks the drawer to take the money: the key's turned upright; the bill goes into it)
         if (!TILL_STATE.card && REGISTER.state.drawerLocked) REGISTER.state = turnDrawerKey(REGISTER.state)
+        if (!TILL_STATE.card) TILL_CASH.drawer = deposit(TILL_CASH.drawer, TILL_STATE.bill)
       }
     }
     lastK.current = k

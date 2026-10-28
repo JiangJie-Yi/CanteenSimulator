@@ -23,16 +23,20 @@ import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProp
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
+
+/** the boxes on the till's low shelf, each its own piece, and its name in the developer panel */
+const TILL_BOXES = [['bags', '紙袋'], ['napkins', '紙巾'], ['rolls', '收銀紙捲'], ['coasters', '杯墊'], ['chopsticks', '割箸']] as const
 import { TillCounter } from './TillCounter'
 import { drawerOpens, paysByCard, tabletActive } from '@/game/till'
 import { CAT_STAND_H, TillBellLive, TillDeskPiece, TillMatLive } from './TillDesk'
-import { behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
+import { beep, behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
+import { takeOut, type Denom } from '@/game/till'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
-import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
 
@@ -257,7 +261,7 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
  * The way in: a noren hanging just past the end of the bar, three panels that sway a little.
  */
 export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
-  const lantern = mark === '聞野' ? '炭火' : mark
+  const lantern = mark === '聞野' ? '燒' : mark
   // (the grill's noren reads 烤魚, the shop's trade, with a fish on it; the other shops' name their own)
   const tex = useMemo(() => norenTexture(mark === '聞野' ? '烤魚' : mark), [mark])
   const panels = useRef<(THREE.Mesh | null)[]>([])
@@ -406,8 +410,10 @@ const chochinTexture = (mark: string) => signTexture(512, 256, (g) => {
   // the name, down the side facing out (and again round the back): a signwriter's black, edged in gold leaf, with a
   // glow of the lamp behind it
   const chars = [...mark]
+  // (one character, as on most: big, filling the lantern's face)
+  const size = chars.length === 1 ? 168 : 104
   for (const u of [128, 384]) chars.forEach((ch, i) =>
-    brushText(g, ch, u, 128 + (i - (chars.length - 1) / 2) * 100, 104, { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' }))
+    brushText(g, ch, u, 128 + (i - (chars.length - 1) / 2) * 100, size, { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' }))
 })
 const CHOCHIN_GLOW = (() => {
   if (typeof document === 'undefined') return null
@@ -582,12 +588,11 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
       </group>
       </group>
       </Movable>
-      <Movable id="till-box-bags" label="紙箱（紙袋）">
-        <group position={at} rotation-y={yaw}><TillBoxes part="bags" lang={lang} /></group>
-      </Movable>
-      <Movable id="till-box-rolls" label="紙箱（收銀紙捲）">
-        <group position={at} rotation-y={yaw}><TillBoxes part="rolls" lang={lang} /></group>
-      </Movable>
+      {TILL_BOXES.map(([k, zh]) => (
+        <Movable key={k} id={`till-box-${k}`} label={`紙箱（${zh}）`}>
+          <group position={at} rotation-y={yaw}><TillBoxes part={k} lang={lang} /></group>
+        </Movable>
+      ))}
       <Movable id="till-manual" label="收銀機操作說明書">
         <group position={at} rotation-y={yaw}><TillBoxes part="manual" lang={lang} /></group>
       </Movable>
@@ -670,6 +675,22 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
   /** (whether the drawer was last sent out: it rings as it's let go) */
   const sentOut = useRef(false)
   const [pay, setPay] = useState<{ tender: Note[]; change: (Note | CoinKind)[] }>({ tender: [], change: [] })
+  // (what's in the drawer, drawn: follows TILL_CASH as customers pay in and the owner takes out)
+  const [inDrawer, setInDrawer] = useState(TILL_CASH.drawer)
+  const drawerSeen = useRef(TILL_CASH.drawer)
+  /** the owner takes a compartment's money: only with the drawer out, and it goes to the shop's cash */
+  const takeCash = (e: { stopPropagation: () => void }, k: Denom) => {
+    e.stopPropagation()
+    if (getEdit().on || open.current < 0.5) return
+    const r = takeOut(TILL_CASH.drawer, k)
+    if (!r.amount) return
+    TILL_CASH.drawer = r.drawer
+    TILL_CASH.onTake?.(r.amount)
+    beep('ok')
+  }
+  const cashTip = (k: Denom) => tipOver(
+    tl(lang, `${k.toLocaleString()} 円${k >= 1000 ? '鈔' : '硬幣'}`, `${k.toLocaleString()} 円${k >= 1000 ? '札' : '玉'}`, `¥${k.toLocaleString()} ${k >= 1000 ? 'notes' : 'coins'}`),
+    tl(lang, `點一下取出 ¥${(k * inDrawer[k]).toLocaleString()}，加進現金`, `クリックで ¥${(k * inDrawer[k]).toLocaleString()} を取り出す`, `Click to take ¥${(k * inDrawer[k]).toLocaleString()} into cash`))
   const paySeen = useRef('')
   const led = useMemo(() => {
     const c = document.createElement('canvas')
@@ -702,6 +723,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     const knock = rt < 0.3 ? Math.abs(Math.sin(rt * Math.PI * 2 / 0.15)) * 0.0025 * (1 - rt / 0.3) : 0
     if (drawer.current) drawer.current.position.z = -open.current * 0.24 - knock
     if (cash.current) cash.current.visible = open.current > 0.15
+    if (drawerSeen.current !== TILL_CASH.drawer) { drawerSeen.current = TILL_CASH.drawer; setInDrawer(TILL_CASH.drawer) }
     // (what's being paid, as notes and coins to draw: changes only with the customer)
     const key = `${TILL_STATE.tender}|${TILL_STATE.change}`
     if (paySeen.current !== key) {
@@ -808,13 +830,24 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
           <group ref={cash} visible={false} position={[0, 0.0175, -0.01]} scale={1 / REG_SC}>
             {/* the money in the insert (the insert itself is the model's): the notes face up in their compartments under the weights, a stray one
                 askew on top; the coins heaped loose in their cups */}
-            {(Object.keys(NOTE_X).map(Number) as Note[]).map((kind, i) => (
-              <group key={kind} position={[NOTE_X[kind], NOTE_Y, NOTE_Z]}>
-                <NoteStack kind={kind} n={9} rotation-y={Math.PI / 2 + (i - 1) * 0.012} />
-                <NoteStack kind={kind} n={1} position={[0.002 * (i - 1), 0.0118, -0.004]} rotation-y={Math.PI / 2 + 0.05 - i * 0.03} />
+            {/* (as many as there are, a stack's worth at most; clicked, the owner takes them) */}
+            {(Object.keys(NOTE_X).map(Number) as Note[]).map((kind, i) => {
+              const n = Math.min(inDrawer[kind], 12)
+              return (
+                <group key={kind} position={[NOTE_X[kind], NOTE_Y, NOTE_Z]} onClick={(e) => takeCash(e, kind)} {...cashTip(kind)}>
+                  {n > 1 && <NoteStack kind={kind} n={n - 1} rotation-y={Math.PI / 2 + (i - 1) * 0.012} />}
+                  {n > 0 && <NoteStack kind={kind} n={1} position={[0.002 * (i - 1), 0.0012 * (n - 1) + 0.001, -0.004]} rotation-y={Math.PI / 2 + 0.05 - i * 0.03} />}
+                  {/* (a touch area over the compartment, so even an empty one can be pointed at) */}
+                  <mesh visible={false} position-y={0.01}><boxGeometry args={[0.1, 0.03, 0.16]} /></mesh>
+                </group>
+              )
+            })}
+            {COIN_CUPS.map(([kind, x]) => (
+              <group key={kind} position={[x, COIN_Y, COIN_Z]} onClick={(e) => takeCash(e, kind)} {...cashTip(kind)}>
+                {inDrawer[kind] > 0 && <CoinPile kind={kind} n={Math.min(inDrawer[kind], 40)} w={0.056} d={0.15} seed={kind} />}
+                <mesh visible={false} position-y={0.008}><boxGeometry args={[0.06, 0.02, 0.15]} /></mesh>
               </group>
             ))}
-            {COIN_CUPS.map(([kind, x, n]) => <CoinPile key={kind} kind={kind} n={n} w={0.056} d={0.15} seed={kind} position={[x, COIN_Y, COIN_Z]} />)}
           </group>
         </group>
         {/* the keys and the mode lock */}
