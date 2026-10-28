@@ -8,12 +8,12 @@ export type Lay = { x: number; z: number; yaw: number; y: number; slope: number 
 export const STICK_HALF = 0.15
 export const STICK_R = 0.032
 /** the salt's mound (its height in the middle and how far it reaches) and the heap's hump on it */
-const SALT_TOP = 0.126, SALT_REACH = 1.12, HEAP_TOP = 0.12, HEAP_REACH = 0.5
+const SALT_TOP = 0.196, SALT_REACH = 1.12, HEAP_TOP = 0.12, HEAP_REACH = 0.5
 
 /** the height of the bed's surface at a place in plan */
 export function surfaceY(x: number, z: number, lift = 0) {
   const r = Math.hypot(x, z)
-  return lift + SALT_TOP * Math.max(0, 1 - (r / SALT_REACH) ** 2) ** 1.5 + HEAP_TOP * Math.max(0, 1 - (r / HEAP_REACH) ** 2)
+  return lift + SALT_TOP * Math.max(0, 1 - (r / SALT_REACH) ** 2) ** 0.9 + HEAP_TOP * Math.max(0, 1 - (r / HEAP_REACH) ** 2)
 }
 
 /** how far a point is from a stick's axis in plan, and how far along the axis (from its middle) the nearest part is */

@@ -448,7 +448,7 @@ def centre_origin(o, at=(0.0, 0.0, 0.0)):
 # ground disc reaching well past the stone ring; its texture fades the edge out (see T_FirePit)
 PIT_R = 1.55
 SALT_R = 0.86
-SALT_H = 0.045
+SALT_H = 0.07          # (a thick bed: the salt piled well up inside the stones, full out toward them)
 
 
 def salt_height(x, y):
@@ -456,7 +456,7 @@ def salt_height(x, y):
     r = math.hypot(x, y) / SALT_R
     if r >= 1:
         return 0.0
-    return SALT_H * (1 - r * r) ** 1.5 + 0.004 * math.sin(x * 23 + y * 7) * math.sin(y * 19 - x * 5) * (1 - r)
+    return SALT_H * (1 - r * r) ** 0.9 + 0.004 * math.sin(x * 23 + y * 7) * math.sin(y * 19 - x * 5) * (1 - r)
 
 
 # a polar grid (not a single fan) so the salt can mound up in the middle
