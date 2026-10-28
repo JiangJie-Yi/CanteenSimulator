@@ -533,6 +533,10 @@ def body_mat(name, t, p, st, kind):
             return "Top"  # (under a long coat: in its colour, so a thigh pushing through it as they walk won't show)
         if legs in ("skirt", "robe") and name.startswith("thigh") and p.z > (st["skirt"][0] if legs == "skirt" else 0.1) + 0.02:
             return "Bottom"  # (under the skirt: in its colour, in case the hip shows at its waist as they move)
+        # (the legs are inside the round body: what's thigh there is the body's lower half, the lap when sitting; under a skirt or shorts it's
+        # in their colour, not a great round of skin)
+        if legs in ("skirt", "shorts", "robe") and name.startswith("thigh"):
+            return "Bottom"
         socks = st.get("socks")
         if socks and name.startswith("shin") and t > 1 - socks:
             return "Socks"
@@ -544,7 +548,7 @@ def body_mat(name, t, p, st, kind):
     # the torso: the top down to the waist, then the trousers (or the robe, or the skirt)
     if st["legs"] in ("skirt", "robe"):
         return "Top" if p.z > (0.44 if st.get("jacket") else 0.47) or st["legs"] == "robe" else "Bottom"
-    if st.get("jacket") and p.z > 0.43:
+    if st.get("jacket") and p.z > 0.39:
         return "Top"
     return "Top" if p.z > 0.47 else "Bottom"
 
@@ -630,7 +634,7 @@ def head(kind):
     fc = FACE[kind]
     k = st.get("head", 1.0)
     bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=18, v_segments=12, radius=HEAD_R * k)
+    bmesh.ops.create_uvsphere(bm, u_segments=28, v_segments=18, radius=HEAD_R * k)
     for vt in bm.verts:
         p = vt.co
         # a chibi face: round, a little wider than tall at the cheeks, the jaw tucked in, the back of the head full
@@ -1597,8 +1601,8 @@ def clothes(kind, bd, hd, surf):
         for dx in (-0.006, 0.006):
             loft(b, [kp, kp + Vector((dx, -0.004, -0.04))], [0.007, 0.005], [0.003, 0.003], [B, B], mi=mi["Top"], tip=False)
         parts.append(b)
-    if st.get("jacket") and st["legs"] != "skirt":
-        # the jacket's skirts over the hips: a little flare, open at the front (a long coat's down to the knee or more)
+    if st.get("jacket") and st["legs"] != "skirt" and st.get("coat"):
+        # a long coat's skirts, down to the knee or more (a suit jacket's are painted on the round body: a flared hem stood out from it like a brim)
         hem = st.get("coat", 0.405)
         out.append(skirt(kind, bd, 0.475, hem, 0.012 + 0.13 * (0.405 - hem), 0, mi_name="Top"))
         out[-1].name = f"{kind}.hem"
@@ -2382,13 +2386,16 @@ SHARE = {"body": 0.5, "head": 0.5, "eyes": 0.45, "eyesJoy": 0.45, "eyesShut": 0.
 SMALL = 260
 # (and a web game with a dozen of them at once, drawn small: every part cut to about a tenth of what it was built with, the hair to a few
 # hundred, the body and head each to a few hundred; small parts (eyes, mouths) left alone)
-BUDGET = {k: max(70, v // 14) for k, v in BUDGET.items()}
-BUDGET["hair"] = 130
-BUDGET.update({"body": 560, "head": 240, "eyes": 50, "cuffs": 40, "details": 50, "face": 30})
-for p_ in ("eyesJoy", "eyesShut", "browsJoy", "browsMad", "browsSad", "brows", "mouth", "mouthOpen", "mouthJoy", "mouthMad", "mouthSad", "glasses", "phones"):
-    BUDGET[p_] = 36
-SHARE = {k: v * 0.2 for k, v in SHARE.items()}
-SMALL = 50
+# (cut too far (the hair to 130, the body to 560, the cuffs to 40) the parts came apart: hair in spikes, hems torn, the body cut coarser than the
+# clothes over it and poking through them. So a middle way: about a quarter of what they were built with, the body kept finer than what's
+# worn over it (so it stays inside), the little parts of the face left whole)
+BUDGET = {k: max(160, v // 4) for k, v in BUDGET.items()}
+BUDGET["hair"] = 520
+BUDGET.update({"body": 2200, "head": 900, "eyes": 160, "cuffs": 260, "details": 220, "face": 120})
+SHARE = {k: min(1.0, v * 0.7) for k, v in SHARE.items()}
+SHARE.update({"body": 1.0, "eyes": 1.0, "eyesJoy": 1.0, "eyesShut": 1.0, "mouth": 1.0, "mouthJoy": 1.0, "mouthOpen": 1.0, "mouthMad": 1.0, "mouthSad": 1.0,
+              "browsSad": 1.0, "glasses": 0.8})
+SMALL = 300
 for o in list(COL.objects):
     if o.type != "MESH":
         continue
@@ -2399,8 +2406,8 @@ for o in list(COL.objects):
         ratio = BUDGET[part] / tris
     elif part in SHARE and tris > SMALL:
         ratio = max(SHARE[part], SMALL / tris)
-    elif tris > 200:
-        ratio = max(0.1, 120 / tris)
+    elif tris > 600:
+        ratio = max(0.35, 400 / tris)
     if ratio is not None:
         bpy.context.view_layer.objects.active = o
         m = o.modifiers.new("Lighter", "DECIMATE")

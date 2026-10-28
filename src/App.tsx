@@ -2,7 +2,8 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { IndoorHDRI } from '@/scene/IndoorHDRI'
 import { FpsMeter } from '@/scene/FpsMeter'
-import { ContactShadows, Html, Loader, OrbitControls, useGLTF } from '@react-three/drei'
+import { ContactShadows, Html, OrbitControls, useGLTF } from '@react-three/drei'
+import { LoadingScreen } from '@/ui/LoadingScreen'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { nameIn, UI, type Lang } from '@/data/i18n'
@@ -2158,7 +2159,7 @@ export default function App() {
       <Bgm />
       <HoverTip hidden={editOn} />
       <RegisterManual lang={lang} />
-      <Loader />
+      <LoadingScreen />
     </div>
   )
 }

@@ -6501,3 +6501,11 @@ body:has(.view-menu) > .be { opacity: 0.15; pointer-events: none; }
 .grill-focus b {
   background: radial-gradient(ellipse 50% 58% at var(--focus-x, 38%) var(--focus-y, 56%), transparent 55%, rgb(8 5 3 / 0.35) 100%);
 }
+
+/* ---- the loading veil over the 3D shop (ui/LoadingScreen) ---- */
+.loading-screen { position: fixed; inset: 0; z-index: 20000; display: grid; place-content: center; justify-items: center; gap: 10px;
+  background: #171717; color: #eee; font-size: 13px; }
+.loading-bar { width: 220px; height: 3px; background: rgb(255 255 255 / 0.15); border-radius: 2px; overflow: hidden; }
+.loading-bar i { display: block; height: 100%; background: #f2c46d; transition: width 0.3s ease; }
+.loading-stuck { display: grid; justify-items: center; gap: 8px; margin-top: 8px; color: #c8c0b4; }
+.loading-stuck button { padding: 6px 16px; border: 0; border-radius: 6px; background: #f2c46d; color: #1a1a1a; font: inherit; font-weight: 700; cursor: pointer; }
