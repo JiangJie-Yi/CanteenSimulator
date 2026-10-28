@@ -29,4 +29,18 @@ const JA: typeof ZH = {
   trial: (who, names) => `${who}が試作：${names.join('、')}（ノートに記録）`,
   trialNone: (who) => `${who}：材料がありません。先に仕入れを`,
 }
-export const LINES: Record<Lang, typeof ZH> = { zh: ZH, ja: JA }
+const EN: typeof ZH = {
+  addCharcoal: 'The fire’s low, more charcoal',
+  done: (n) => `${n}, done!`,
+  seasoned: (n, k) => `${n}: ${({ salt: 'a pinch of salt', soy: 'a brush of soy', milk: 'condensed milk over it', peanut: 'peanut powder on it', miso: 'miso spread on', wasabi: 'wasabi on the side', shichimi: 'shichimi shaken on', yuzu: 'a dab of yuzu kosho', lemon: 'a squeeze of lemon' } as Record<string, string>)[k] ?? ''}`,
+  onFire: (n) => `${n}, on the fire`,
+  stickAway: 'Clearing the skewers',
+  burntAway: 'This one’s burnt, out it goes',
+  order: (id, names) => `#${id} I’ll have ${names.join(', ')}!`,
+  nothing: (id) => `#${id} Nothing I fancy, next time`,
+  angry: (id) => `#${id} This is taking too long, I’m off!`,
+  verdict: (id, n, stars) => `#${id} ${n}: ${['not great...', 'okay', 'tasty', 'delicious!', 'amazing!'][stars - 1]}`,
+  trial: (who, names) => `${who} tried out: ${names.join(', ')} (in the tasting notes)`,
+  trialNone: (who) => `${who}: nothing to try with, stock up first`,
+}
+export const LINES: Record<Lang, typeof ZH> = { zh: ZH, ja: JA, en: EN }

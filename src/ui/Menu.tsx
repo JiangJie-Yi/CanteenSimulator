@@ -5,6 +5,7 @@ import { toChineseNumber, type Dish } from '@/data/menu'
 import { PAR } from '@/game/economy'
 import { STORAGES, storageName, storageOf } from '@/data/storage'
 import { Icon, iconFor } from './Icon'
+import { tl } from '@/data/i18n'
 
 export type Restock = 'avg' | 'each' | 'full'
 
@@ -210,8 +211,8 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           // (stocked right here: it isn't the tag itself, which takes one to try)
           <span className="strip-stock" aria-hidden="true">
             {/* (label over number, so a four-figure cost still fits a narrow tag) */}
-            <small>{lang === 'ja' ? '原価' : '成本'}<em>{cost}</em></small>
-            <b>{lang === 'ja' ? '在庫' : '庫存'}<em>{stock?.[x.id] ?? 0}</em></b>
+            <small>{tl(lang, '成本', '原価', 'Cost')}<em>{cost}</em></small>
+            <b>{tl(lang, '庫存', '在庫', 'Stock')}<em>{stock?.[x.id] ?? 0}</em></b>
             <span role="button" tabIndex={-1} className={`strip-buy${cash < cost * 10 ? ' is-off' : ''}`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (cash >= cost * 10) onBuy(x.id, 10) }}>+10</span>
@@ -219,7 +220,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         )}
         {incl && <span className="stamp stamp-incl" aria-hidden="true">{t.included}</span>}
         {/* (on the test board the stock line already shows it, in red) */}
-        {out && <span className="out-tag" aria-hidden="true">{lang === 'ja' ? '切' : '缺'}</span>}
+        {out && <span className="out-tag" aria-hidden="true">{tl(lang, '缺', '切', 'Out')}</span>}
         {filling.map((f) => <span key={f.key} className="fill-guest" aria-hidden="true">#{f.guest}</span>)}
         {n > 0 && (
           <span key={n} className="stamp" aria-hidden="true">
@@ -247,7 +248,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
     return (
       <div key={x.id} role="button" tabIndex={0} aria-pressed={n > 0} data-id={x.id}
         className={`chiller-bin${out ? ' is-out' : ''}${n > 0 ? ' is-taken' : ''}`}
-        aria-label={`${name} ${x.en ?? ''}，${lang === 'ja' ? '在庫' : '庫存'} ${have}${n ? `，${t.ordered(n)}` : ''}`}
+        aria-label={`${name} ${x.en ?? ''}，${tl(lang, '庫存', '在庫', 'Stock')} ${have}${n ? `，${t.ordered(n)}` : ''}`}
         onClick={() => { const fired = press.current?.fired; press.current = null; if (!fired && !locked) onAdd(x.id) }}
         onPointerDown={pressStart(x.id)} onPointerMove={pressMove} onPointerUp={pressEnd} onPointerCancel={pressEnd}
         onContextMenu={(e) => { e.preventDefault(); if (!press.current && !locked) onRemove(x.id) }}
@@ -255,24 +256,24 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         <span className="chiller-bin-head">
           <Icon name={icon} />
           <span className="chiller-bin-name">{name}</span>
-          {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{lang === 'ja' ? '試' : '試'}×{n}</span>}
+          {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{tl(lang, '試', '試', 'Try')}×{n}</span>}
         </span>
         {x.en && <span className="chiller-bin-en" lang="en">{x.en}</span>}
         {/* (how well stocked: a bar against the par level, full at PAR and over; red when it's out) */}
         <span className={`chiller-level${out ? ' is-zero' : have < PAR ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / PAR) * 100)}%` }} /></span>
         <span className="chiller-bin-info" aria-hidden="true">
-          <b className={out ? 'is-zero' : ''}>{lang === 'ja' ? '在庫' : '庫存'} <em>{have}</em></b>
-          <small>{lang === 'ja' ? '原価' : '成本'} <em>{cost}</em></small>
+          <b className={out ? 'is-zero' : ''}>{tl(lang, '庫存', '在庫', 'Stock')} <em>{have}</em></b>
+          <small>{tl(lang, '成本', '原価', 'Cost')} <em>{cost}</em></small>
         </span>
         {onBuy && (
           <span className="chiller-buy">
-            <span role="button" tabIndex={-1} className={`chiller-btn${can(1) ? '' : ' is-off'}`} title={lang === 'ja' ? '1つ仕入れる' : '叫 1 份'}
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(1) ? '' : ' is-off'}`} title={tl(lang, '叫 1 份', '1つ仕入れる', 'Order 1')}
               onPointerDown={(e) => e.stopPropagation()} onClick={buy(1)}>+1</span>
-            <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={lang === 'ja' ? '10個仕入れる' : '叫 10 份'}
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={tl(lang, '叫 10 份', '10個仕入れる', 'Order 10')}
               onPointerDown={(e) => e.stopPropagation()} onClick={buy(10)}>+10</span>
             <span role="button" tabIndex={-1} className={`chiller-btn chiller-top${can(need) ? '' : ' is-off'}`}
-              title={need ? (lang === 'ja' ? `${PAR}まで補充（${need}）` : `補到 ${PAR} 份（${need} 份，NT$${cost * need}）`) : (lang === 'ja' ? '十分あります' : '已經夠了')}
-              onPointerDown={(e) => e.stopPropagation()} onClick={buy(need)}>{lang === 'ja' ? '補' : '補'}</span>
+              title={need ? tl(lang, `補到 ${PAR} 份（${need} 份，NT$${cost * need}）`, `${PAR}まで補充（${need}）`, `Fill up to ${PAR} (${need}, NT$${cost * need})`) : (tl(lang, '已經夠了', '十分あります', 'Enough already'))}
+              onPointerDown={(e) => e.stopPropagation()} onClick={buy(need)}>{tl(lang, '補', '補', '+')}</span>
           </span>
         )}
       </div>
@@ -361,14 +362,14 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
 
   return (
     <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
-      className={`menu${research ? ' is-research' : ''}${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${research || open ? '' : ' no-title'}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={lang === 'ja' ? 'ja' : 'zh-Hant'}>
+      className={`menu${research ? ' is-research' : ''}${locked ? ' is-locked' : ''}${layoutLike ? ' menu-two-col' : ''}${research || open ? '' : ' no-title'}`} aria-label={`${nameIn(lang, dish)} ${t.menuTitle}`} lang={tl(lang, 'zh-Hant', 'ja', 'en')}>
       {/* (the board's name only where it's the shop's own: the foods' fridge, or the menu once the shop's open; closed, it's a plain preview) */}
       {(research || open) && <h2 className="menu-title">{research ? t.researchTitle : t.menuTitle}<span className="menu-title-en" lang="en">{research ? 'INGREDIENTS' : 'MENU'}</span></h2>}
 
       {research && onBuy ? (
         <div className="strips-frame">
-          <div className="chiller" role="group" aria-label={lang === 'ja' ? '食材庫' : '食材櫃'}>
-            <div className="chiller-top"><span>{lang === 'ja' ? '食材庫' : '食材櫃'}</span></div>
+          <div className="chiller" role="group" aria-label={tl(lang, '食材櫃', '食材庫', 'Pantry')}>
+            <div className="chiller-top"><span>{tl(lang, '食材櫃', '食材庫', 'Pantry')}</span></div>
             {/* (in three: the freezer, the fridge, and the larder at room temperature) */}
             <div className="chiller-scroll">
               {STORAGES.map((st) => {
@@ -410,17 +411,17 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         <footer className="tally tally-research">
           <p className="tally-trying">
             {count > 0
-              ? (lang === 'ja' ? <>試作中 <strong>{count}</strong> 品</> : <>試做中 <strong>{count}</strong> 份</>)
-              : (lang === 'ja' ? '食材をクリックで一つ取り出して試作（右クリックで戻す）' : '點食材拿一份到砧板試做（右鍵放回）')}
+              ? (lang === 'ja' ? <>試作中 <strong>{count}</strong> 品</> : lang === 'en' ? <>Trying <strong>{count}</strong></> : <>試做中 <strong>{count}</strong> 份</>)
+              : (tl(lang, '點食材拿一份到砧板試做（右鍵放回）', '食材をクリックで一つ取り出して試作（右クリックで戻す）', 'Click an ingredient to put one on the board to try (right-click to put back)'))}
           </p>
           {count > 0 && (
-            <button type="button" className="clear" onClick={onClear}>{lang === 'ja' ? '全部戻す' : '全部放回'}</button>
+            <button type="button" className="clear" onClick={onClear}>{tl(lang, '全部放回', '全部戻す', 'Put all back')}</button>
           )}
           {onRestock && restockCost && (
             <span className="tally-buy">
-              {([['avg', lang === 'ja' ? '平均まで補充' : '補到平均', lang === 'ja' ? '平均より少ないものを平均まで' : '低於平均的食材補到平均'],
-                ['each', lang === 'ja' ? '各 +5' : '各補 5', lang === 'ja' ? 'すべて5つずつ' : '每樣多 5 份'],
-                ['full', lang === 'ja' ? '満タン' : '補滿', lang === 'ja' ? `すべて${PAR}まで` : `每樣補到 ${PAR} 份`]] as [Restock, string, string][]).map(([k, label, title]) => (
+              {([['avg', tl(lang, '補到平均', '平均まで補充', 'Up to average'), tl(lang, '低於平均的食材補到平均', '平均より少ないものを平均まで', 'Bring anything below average up to average')],
+                ['each', tl(lang, '各補 5', '各 +5', '+5 each'), tl(lang, '每樣多 5 份', 'すべて5つずつ', '5 more of each')],
+                ['full', tl(lang, '補滿', '満タン', 'Fill up'), tl(lang, `每樣補到 ${PAR} 份`, `すべて${PAR}まで`, `Everything up to ${PAR}`)]] as [Restock, string, string][]).map(([k, label, title]) => (
                 <button key={k} type="button" className={`tally-restock is-${k}`} disabled={!restockCost[k] || cash < restockCost[k]} onClick={() => onRestock(k)} title={title}>
                   {label}{restockCost[k] > 0 && <small className="money">NT${restockCost[k].toLocaleString()}</small>}
                 </button>
@@ -434,6 +435,7 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
         {days && days.day > 0 && (
           <p className="tally-day">
             {lang === 'ja' ? <>営業 <strong>{days.day}</strong> 日目・本日の来客 <strong>{days.today}</strong> 名・累計 <strong>{days.total}</strong> 名</>
+              : lang === 'en' ? <>Day <strong>{days.day}</strong> · today <strong>{days.today}</strong> guests · <strong>{days.total}</strong> in all</>
               : <>第 <strong>{days.day}</strong> 天・今日來客 <strong>{days.today}</strong> 位・累計 <strong>{days.total}</strong> 位</>}
           </p>
         )}

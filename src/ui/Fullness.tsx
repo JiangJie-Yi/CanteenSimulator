@@ -1,5 +1,6 @@
 import { UI, type Lang } from '@/data/i18n'
 import { starText } from '@/game/taste'
+import { tl } from '@/data/i18n'
 
 type FullnessProps = {
   /** calories eaten and not yet digested */
@@ -65,7 +66,7 @@ export function Fullness({ kcal, full, lang, rating, lastTry }: FullnessProps) {
         <span className="heat-word">{fullWord(pct, lang)}</span> {Math.round(kcal)} kcal
         {lastTry ? (
           <span key={lastTry.key} className="fullness-rating fullness-try" title={`美味 ${Math.round(lastTry.taste)}`}>
-            {lang === 'ja' ? '試食' : '試吃'} {lastTry.name} {starText(lastTry.taste)}
+            {tl(lang, '試吃', '試食', 'Tasting')} {lastTry.name} {starText(lastTry.taste)}
             <small> 美味 {Math.round(lastTry.taste)}</small>
           </span>
         ) : rating !== null && (

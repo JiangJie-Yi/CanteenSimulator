@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { Lang } from '@/data/i18n'
 import { REGISTER_MANUAL } from '@/data/registerManual'
+import { tl } from '@/data/i18n'
 
 /** whether the register's manual is open (opened by clicking the booklet under the till) */
 let open = false
@@ -66,17 +67,17 @@ export function RegisterManual({ lang }: { lang: Lang }) {
   const last = REGISTER_MANUAL.length - 1
   return (
     <div className="reg-manual-veil" onClick={() => set(false)} role="presentation">
-      <div className="reg-manual" role="dialog" aria-label={lang === 'ja' ? 'レジスター取扱説明書' : '收銀機操作說明書'} onClick={(e) => e.stopPropagation()}>
+      <div className="reg-manual" role="dialog" aria-label={tl(lang, '收銀機操作說明書', 'レジスター取扱説明書', 'Register manual')} onClick={(e) => e.stopPropagation()}>
         <header>
-          <span>{lang === 'ja' ? 'レジスター 取扱説明書' : '收銀機操作說明書'}</span>
-          <button type="button" onClick={() => set(false)} aria-label={lang === 'ja' ? '閉じる' : '關閉'}>×</button>
+          <span>{tl(lang, '收銀機操作說明書', 'レジスター 取扱説明書', 'Register manual')}</span>
+          <button type="button" onClick={() => set(false)} aria-label={tl(lang, '關閉', '閉じる', 'Close')}>×</button>
         </header>
-        <h3>{p.title[lang]}</h3>
+        <h3>{p.title[lang] ?? p.title.zh}</h3>
         <dl>
           {p.steps.map((s, i) => (
             <div key={i}>
               <dt><kbd>{s.keys}</kbd></dt>
-              <dd>{s.text[lang]}</dd>
+              <dd>{s.text[lang] ?? s.text.zh}</dd>
             </div>
           ))}
         </dl>

@@ -12,6 +12,7 @@ const maybe = (p: number, s: string) => (Math.random() < p ? s : '')
 const ASIDE: Record<Lang, string[]> = {
   zh: ['（擦了擦手）', '（把毛巾甩上肩）', '（翻了一下炭）', '（抬頭看了你一眼）', '（一邊切菜一邊說）', '（笑了笑）', '（壓低聲音）'],
   ja: ['（手を拭きながら）', '（炭を返しつつ）', '（ちらっと顔を上げて）', '（笑って）'],
+  en: ['(wiping his hands) ', '(turning the coals) ', '(looking up) ', '(smiling) '],
 }
 const aside = (lang: Lang, p = 0.3) => maybe(p, pick(ASIDE[lang]))
 
@@ -23,6 +24,8 @@ const verdict: Record<Lang, (taste: number) => string> = {
     : ['老實說……這個不太搭。', '這味道我不太推，客人可能會皺眉。', '做是做了，但我不會推薦。', '呃，我自己吃了一口就放下了。']),
   ja: (t) => pick(t >= 85 ? ['これは旨い。看板にできますよ。', '上出来です。', 'いやあ、これはいい。'] : t >= 70 ? ['悪くない、メニューに出せます。', 'いけますね。']
     : t >= 55 ? ['まあまあですね。', '可もなく不可もなく、かな。'] : ['正直……合わないですね。', 'お勧めはしません。']),
+  en: (t) => pick(t >= 85 ? ['This is good, could be a signature dish.', 'Lovely, customers will love it.'] : t >= 70 ? ['Tastes good, it can go on the menu.', 'Solid.']
+    : t >= 55 ? ['So-so: it’ll sell, but nobody will remember it.'] : ['Honestly... this doesn’t go together.', 'I wouldn’t recommend it.']),
 }
 
 export const CHEF_TALK = {
@@ -115,5 +118,50 @@ export const CHEF_TALK = {
     menuMade: (dishes: string[], who: string) => `${who}で${dishes.length}品作って、メニューに載せました：${dishes.join('、')}`,
     menuNone: () => 'もう載せられるものがないか、材料が足りません。',
     together: (a: string, b: string) => `${a}と${b}`,
+  },
+  en: {
+    hello: () => pick(['Boss! What shall we try today?', 'Here. Tell me what to make.', 'What can I do for you?', 'Coming! What do you fancy today?']),
+    thanks: () => pick(['My pleasure.', 'Any time, just call.', 'That’s the job, boss.', 'Hearing that is enough.']) + aside('en'),
+    unknown: (suggest: string) => pick([
+      `Sorry boss, I didn’t catch that... shall I grill some ${suggest}?`,
+      'Hm? You mean...? Tell me fish, meat or veg and I’ll put something together.',
+      `Lost me there, ha. Name an ingredient, like "${suggest}", or say "you choose".`,
+    ]),
+    confused: () => pick(['(looks at you) What is it? Say whatever comes to mind.', 'No rush. Fish, meat, or shall I decide?']),
+    makeWhat: () => pick(['Which one? Tell me the ingredient, and any seasoning.', 'Sure, what shall I make?', 'You say, I grill. Fish, meat, veg, we’ve got it.']),
+    no: () => pick(['Right, that’s it for now.', 'No problem, call me if you need.', 'Got it, I’ll mind the fire.']),
+    noStock: (dish: string) => pick([`We’re out of what ${dish} needs, stock up first.`, `Nothing in the fridge for ${dish}, order some in.`]),
+    unknownFood: () => pick(['We don’t have that here, try something else.', 'Not in stock, how about something else?']),
+    made: (dish: string, taste: number, chose: boolean) =>
+      `${aside('en', 0.25)}${chose ? pick([`I made it my way: ${dish}. `, `${dish} it is. `]) : pick([`${dish}, done. `, `Here, ${dish}. `, `${dish}, careful, it’s hot. `])}${verdict.en(taste)} It’s in the tasting notes.`,
+    warn: (dish: string) => pick([`${dish}? ...that’s a bit of a gamble, `, `Sure, boss? I’ve never made ${dish}, `]),
+    batch: (dishes: string[]) => pick([`I tried ${dishes.join(', ')}, all in the notes. See which can go on the menu.`, `Made ${dishes.join(', ')} in one go, take your pick.`]),
+    batchNone: () => pick(['Everything’s been tried, or we’re short of ingredients.']),
+    advise: (food: string, best: string, dish: string) => pick([`With ${food} I’d ${best}: ${dish}. Shall I make one?`, `${food}... ${best} suits it best: ${dish}. Try it?`]),
+    advisePlain: (food: string) => pick([`${food} is best plain, nothing on it. Shall I grill one?`]),
+    adviseAny: (dish: string) => pick([`How about ${dish}? Customers would like it. Make one?`, `Haven’t tried ${dish} yet, have we? I’ll make one?`]),
+    adviseNone: () => 'We’ve tried all there is; put some sets together, boss.',
+    byKind: (kind: string, dish: string) => pick([`Fancy ${kind}? Then ${dish}. Make one?`, `${kind}... ${dish} is best today, one?`]),
+    byKindNone: (kind: string) => pick([`No ${kind} in right now, stock up first.`, `Nothing ${kind} to make here, something else?`]),
+    stock: (low: string[]) => (low.length ? pick([`${low.join(', ')} running low, the rest is fine.`]) : pick(['Plenty of everything, don’t worry.', 'Fridge is full, relax.'])),
+    stockEmpty: () => pick(['The fridge is empty, nothing at all. Stock up first.']),
+    chat: {
+      weather: () => pick(['Weather like this calls for something hot.', 'Whatever it’s like out there, it’s always summer at the grill.']),
+      tired: (fatigue: number) => fatigue > 60 ? pick(['Honestly, a bit tired... but I’ll manage.', 'Back’s aching, I’ll lie down after closing.'])
+        : pick(['Not tired at all, full of beans!', 'Fine, I’m used to the charcoal.']),
+      praise: () => pick(['Hehe, praise from the boss, I’m fired up today.', 'Stop, I’ll get a big head.']),
+      complain: () => pick(['Really? I’ll adjust the heat.', 'Sorry... I’ll watch the next one.', 'What was wrong, too salty or burnt?']),
+      who: (name: string, about: string) => pick([`I’m ${name}, boss, did you forget? ${about}`, `${name}, your sous chef. ${about}`]),
+      joke: () => pick(['Charcoal and I are close: it’s always warm with me.', 'A customer said my fish has soul. I said that’s the salt.']),
+      business: (open: boolean, guests: number) => open ? (guests ? pick([`${guests} customers in, gotta be quick.`, 'Business is good, smile, boss.']) : pick(['Quiet so far, good time to prep.']))
+        : pick(['Not open yet, let’s settle the menu first.']),
+      bye: () => pick(['Right, call me any time.', 'I’ll mind the grill, you go on.']),
+    },
+    placeholder: 'Talk to the sous chef… (e.g. make salt-grilled corn, I want fish, you choose)',
+    send: 'Say',
+    chips: ['Make a 10-dish menu', 'Any recommendations?', 'Try 3 at random', 'Enough stock?'],
+    menuMade: (dishes: string[], who: string) => `${who} put together ${dishes.length} dishes: ${dishes.join(', ')}. All on the menu; check the prices.`,
+    menuNone: () => pick(['Nothing more to add: all on already, or not enough ingredients. Stock up first.']),
+    together: (a: string, b: string) => `${a} and ${b}`,
   },
 } satisfies Record<Lang, unknown>

@@ -1,8 +1,9 @@
 import type { Lang } from '@/data/i18n'
+import { tl } from '@/data/i18n'
 
 // the shop's name: 聞野 日式烤魚 ("smelt from out in the fields"), on a vermilion lacquered board cut like a fish
 const NAMES: Record<string, Record<Lang, { main: string; sub: string }>> = {
-  grilledfish: { zh: { main: '聞野', sub: '日式烤魚' }, ja: { main: '聞野', sub: '炭火焼' } },
+  grilledfish: { zh: { main: '聞野', sub: '日式烤魚' }, ja: { main: '聞野', sub: '炭火焼' }, en: { main: '聞野', sub: 'Charcoal Grill' } },
 }
 
 /**
@@ -35,7 +36,7 @@ export function Brand({ night, lang, shop = 'grilledfish', dark = false, ignite 
   return (
     // dark: the business hasn't been founded yet (the sign is unlit); ignite: it's just been founded (it comes to life)
     <h1 key={`${shop}-${ignite}`} className={`brand brand-${shop}${night ? ' brand-night' : ''} brand-${lang}${dark ? ' brand-dark' : ''}${ignite ? ' brand-ignite' : ''}`}
-      lang={lang === 'ja' ? 'ja' : 'zh-Hant'} aria-label={`${main}${sub}${night ? ' 深夜' : ''}`}
+      lang={tl(lang, 'zh-Hant', 'ja', 'en')} aria-label={`${main}${sub}${night ? ' 深夜' : ''}`}
       onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}
       style={onClick ? { pointerEvents: 'auto', cursor: 'pointer' } : undefined}>
       <span className="brand-plate" aria-hidden="true">

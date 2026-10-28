@@ -12,9 +12,9 @@ const AMBIENT = new Set(['Sake', 'Potato', 'SweetPotato'])
 export const storageOf = (id: string): Storage => (FROZEN.has(id) ? 'frozen' : AMBIENT.has(id) ? 'ambient' : 'chilled')
 
 /** the panel's sections, in order: their names and the temperature on each one's display */
-export const STORAGES: { id: Storage; zh: string; ja: string; temp: string }[] = [
-  { id: 'frozen', zh: '冷凍', ja: '冷凍', temp: '−18℃' },
-  { id: 'chilled', zh: '冷藏', ja: '冷蔵', temp: '4℃' },
-  { id: 'ambient', zh: '常溫', ja: '常温', temp: '22℃' },
+export const STORAGES: { id: Storage; zh: string; ja: string; en: string; temp: string }[] = [
+  { id: 'frozen', zh: '冷凍', ja: '冷凍', en: 'Frozen', temp: '−18℃' },
+  { id: 'chilled', zh: '冷藏', ja: '冷蔵', en: 'Chilled', temp: '4℃' },
+  { id: 'ambient', zh: '常溫', ja: '常温', en: 'Room temp', temp: '22℃' },
 ]
-export const storageName = (s: (typeof STORAGES)[number], lang: Lang) => (lang === 'ja' ? s.ja : s.zh)
+export const storageName = (s: (typeof STORAGES)[number], lang: Lang) => (lang === 'ja' ? s.ja : lang === 'en' ? s.en : s.zh)

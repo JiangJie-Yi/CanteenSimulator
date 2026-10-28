@@ -28,6 +28,7 @@ export const SEASON_COST: Record<Seasoning, number> = { salt: 1, soy: 2, peanut:
 export const SEASON_NAME: Record<Lang, Record<Seasoning, string>> = {
   zh: { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉', miso: '味噌', wasabi: '山葵', shichimi: '七味粉', yuzu: '柚子胡椒', lemon: '檸檬' },
   ja: { salt: '塩', soy: '醤油', milk: '練乳', peanut: 'きな粉', miso: '味噌', wasabi: 'わさび', shichimi: '七味', yuzu: '柚子胡椒', lemon: 'レモン' },
+  en: { salt: 'salt', soy: 'soy', milk: 'condensed milk', peanut: 'peanut powder', miso: 'miso', wasabi: 'wasabi', shichimi: 'shichimi', yuzu: 'yuzu kosho', lemon: 'lemon' },
 }
 
 /** the seasonings that went on, in a fixed order (what makes it one recipe or another) */
@@ -58,10 +59,16 @@ const SPECIAL: Record<string, Partial<Record<string, string>>> = {
  * put on to finish, unless the dish has a name of its own; with nothing on it, 烤 and the food. Elsewhere than the
  * grill it's just the dish. (What's bought in is the bare food: 玉米, not 烤玉米.)
  */
-export function partName(item: { name: string; ja?: string }, short: string, id: string, dabs: Seasoning[], lang: Lang,
+export function partName(item: { name: string; ja?: string; en?: string }, short: string, id: string, dabs: Seasoning[], lang: Lang,
   kind: 'grill' | 'plain' = 'grill') {
   const ja = item.ja ?? item.name
-  if (kind === 'plain') return lang === 'ja' ? ja : item.name
+  const en = item.en ?? item.name
+  if (kind === 'plain') return lang === 'ja' ? ja : lang === 'en' ? en : item.name
+  // (in English: what went on it, then grilled, then the food: "Salt & soy grilled saury", "Grilled corn")
+  if (lang === 'en') {
+    const how = dabs.map((k) => SEASON_NAME.en[k]).join(' & ')
+    return how ? `${how[0].toUpperCase()}${how.slice(1)} grilled ${en.toLowerCase()}` : `Grilled ${en.toLowerCase()}`
+  }
   if (lang === 'ja') return (dabs.length ? dabs.map((k) => SEASON_NAME.ja[k]).join('・') : '') + '焼き' + ja
   const sig = dabs.join('+')
   const special = SPECIAL[id]?.[sig]

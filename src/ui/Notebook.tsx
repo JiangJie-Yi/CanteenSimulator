@@ -14,6 +14,7 @@ import type { Notes, Talk, Try } from '@/game/types'
 const DONE: Record<Lang, string[]> = {
   zh: ['生', '半熟', '剛好', '偏老', '焦了'],
   ja: ['生', '半生', 'ちょうど', '焼きすぎ', '焦げ'],
+  en: ['raw', 'underdone', 'just right', 'overdone', 'burnt'],
 }
 export const donenessWord = (r: number, lang: Lang) =>
   DONE[lang][r < 0.75 ? 0 : r < 1 ? 1 : r < 1.35 ? 2 : r < 1.8 ? 3 : 4]

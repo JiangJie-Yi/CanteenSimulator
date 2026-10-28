@@ -33,6 +33,7 @@ import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type N
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
 import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_STATE, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { tl } from '@/data/i18n'
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -637,7 +638,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     if (drawerHover.current === on) return
     drawerHover.current = on
     liftOn(useRegisterModel.cached()?.drawer ?? null, on)
-    setTip(on ? { title: lang === 'ja' ? 'レジのドロア' : '收銀抽屜', hint: lang === 'ja' ? 'クリックで開閉（施錠中は開かない）' : '點一下拉開／推回（上鎖時拉不開）' } : null)
+    setTip(on ? { title: tl(lang, '收銀抽屜', 'レジのドロア', 'Till drawer'), hint: tl(lang, '點一下拉開／推回（上鎖時拉不開）', 'クリックで開閉（施錠中は開かない）', 'Click to open / close (won’t open locked)') } : null)
     POINTER_HINT.hand = Math.max(0, POINTER_HINT.hand + (on ? 1 : -1))
     const el = ev.target as HTMLElement | null
     if (el?.style) el.style.cursor = on || POINTER_HINT.hand ? 'pointer' : ''

@@ -97,6 +97,53 @@ export const EDIT_TEXT = {
     locked: '営業中は編集できません。先に閉店してください',
     entered: '開発者モード：物をドラッグして動かし、終わったら「確定」。G か「キャンセル」で変更を破棄',
   },
+  en: {
+    title: 'Developer mode',
+    keys: 'G to leave   Ctrl+Z / Y',
+    tools: { select: 'Select (Q)', move: 'Move (W, again to switch object / world)', rotate: 'Rotate (E)', scale: 'Scale (R)' },
+    spaceLocalShort: 'Obj', spaceWorldShort: 'Wld',
+    spaceLocal: 'Object space: the axes follow the piece (click, or W / E / R again, for world)', spaceWorld: 'World space: the scene’s own X, Y, Z (click, or W / E / R again, for object)',
+    hotkeys: 'Q select   W move   E rotate   R scale (again: switch space)\nF frame selection   A frame all   Esc deselect   D pivot\n4 wireframe   5 shaded   Alt+left orbit   Alt+middle pan   Alt+right dolly',
+    spaceBadgeWorld: '🌐 World space (the scene’s X / Y / Z)', spaceBadgeLocal: '📦 Object space (follows the piece)',
+    spaceBadgeTip: 'Click to switch (or W / E / R again)', spaceNowWorld: 'Now: world space (the scene’s X / Y / Z)', spaceNowLocal: 'Now: object space (follows the piece)',
+    wireOn: 'Wireframe (4): see the topology, 5 for shaded', wireOff: 'Shaded (5)',
+    stats: (t: number, v: number, m: number) => `${t.toLocaleString()} tris · ${v.toLocaleString()} verts · ${m} meshes`,
+    pivot: 'Pivot mode (D): the arrows move the pivot, turning and scaling go round it; D again to move the piece',
+    outliner: 'Scene',
+    find: 'Search…',
+    rowGroup: 'Select the whole group (move, turn and scale together)',
+    rowPiece: 'Ctrl or Shift click to pick several, then Group; a click frames it',
+    transform: 'Transform',
+    location: 'Location',
+    rotation: 'Rotation (°)',
+    scale: 'Scale (+ / − keys)',
+    resetRow: (label: string) => `${label}: reset`,
+    shrink: (a: string) => `Shrink along ${a} (- key)`,
+    grow: (a: string) => `Grow along ${a} (+ key)`,
+    pickAxis: (a: string) => `Pick ${a}: the + / - keys then scale this axis only`,
+    group: 'Group', groupTip: 'Ctrl or Shift click two or more in the list first, then this: they move, turn and scale as one',
+    ungroup: 'Ungroup', ungroupTip: 'Break up the selected group',
+    rename: 'Rename', renameTip: 'Rename the selected group', renamePrompt: 'Group name',
+    undo: 'Undo', redo: 'Redo',
+    resetAll: 'Reset all', resetAllTip: 'Put every moved piece back where it was', resetAllAsk: 'Put every moved piece back where it was?',
+    freeze: 'Freeze', freezeTip: 'Take the selected piece’s (or group’s) place, turn and size as its new zero (as Maya’s Freeze Transformations); nothing moves', frozen: 'Frozen: its place, turn and size now read zero',
+    cancel: 'Cancel', cancelTip: 'Discard all changes this time',
+    confirm: 'Confirm', confirmTip: 'Keep all changes this time',
+    summary: (n: number, moved: number, groups: number) => `${n} pieces · ${moved} adjusted · ${groups} groups`,
+    groupMark: ' (group)',
+    nothing: '(click a box, or a name on the left)',
+    groupName: (n: number) => `Group ${n}`,
+    noUndo: 'Nothing to undo', noRedo: 'Nothing to redo',
+    scaleAll: '+ / − scale: X Y Z together', scaleOne: (a: string) => `+ / − scale: ${a} only`,
+    needTwo: 'Ctrl or Shift click two or more pieces in the list first, then Group',
+    grouped: (n: number, name: string) => `Grouped ${n} pieces: ${name}`,
+    ungrouped: 'Group broken up; each piece back in its own place',
+    confirmed: 'Confirmed: places, sizes and turns saved',
+    cancelled: 'Cancelled: everything back as it was before editing',
+    left: 'Left developer mode',
+    locked: 'Can’t edit while open: close the shop first',
+    entered: 'Developer mode: drag pieces about, Confirm when done; G or Cancel discards the changes',
+  },
 } satisfies Record<Lang, unknown>
 
 /** each piece's name in Japanese, by its Chinese name */
@@ -111,6 +158,16 @@ const PIECES_JA: Record<string, string> = {
   '平板（iPad）': 'タブレット（iPad）', 音箱: 'スピーカー', 酒樽: '酒樽', 餐盤堆: '皿の山', 柳樹: '柳', 員工專用墊: '従業員用マット',
   竹盆栽: '竹の鉢植え', 酒箱: '酒の木箱', '攝影機 1（研製視角）': 'カメラ 1（試作の視点）',
 }
+/** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
+const PIECES_EN: Record<string, string> = {
+  備長炭籃: 'Charcoal crate', 團扇: 'Fan', 行燈: 'Paper lantern', 飯桶: 'Rice tub', 冷藏櫃: 'Fridge', 碗盤櫃架: 'Dish rack', 大砧板: 'Cutting board',
+  調味盒: 'Seasoning box', 水桶: 'Water bucket', 供桌: 'Offering shelf', 神龕: 'Shrine', 御神酒壺: 'Sake flask', 橘子盤: 'Ponkan dish', 經書: 'Sutra',
+  門口招財貓台: 'Lucky cat stand', 玄關地墊: 'Doormat', 鞋櫃: 'Shoe rack', 紅燈籠: 'Red lantern', 門簾: 'Noren', 收銀櫃檯: 'Till counter',
+  '收銀機（含抽屜）': 'Cash register', 刷卡機: 'Card reader', 明細印表機: 'Receipt printer', 找零盤: 'Change tray', 筆筒: 'Pen pot',
+  服務鈴: 'Service bell', 元寶: 'Gold ingot', 招財樹: 'Money tree', '木質台座（含抽屜）': 'Wooden stand', 櫃檯招財貓: 'Counter lucky cat',
+  '平板（iPad）': 'Tablet (iPad)', 音箱: 'Speaker', 酒樽: 'Sake barrel', 柳樹: 'Willow', 竹盆栽: 'Potted bamboo', 酒箱: 'Sake crate',
+  惠比壽石像: 'Ebisu statue', 門口招財貓組: 'Lucky cats (group)', 小神龕組: 'Shrine (group)',
+}
 /** the words in the names made up as they're placed (畫（-5, -4.2）, 馬桶（男廁）, 座位 3…) */
 const WORDS_JA: [string, string][] = [
   ['石洗手台與鏡子', '石の手洗い鉢と鏡'], ['簀之子踏板', 'すのこ'], ['室內拖鞋', 'トイレスリッパ'], ['衛生紙架', 'ペーパーホルダー'],
@@ -120,6 +177,7 @@ const WORDS_JA: [string, string][] = [
 ]
 /** a piece's name in the panel's language */
 export function pieceName(zh: string, lang: Lang) {
+  if (lang === 'en') return PIECES_EN[zh] ?? zh
   if (lang !== 'ja') return zh
   if (PIECES_JA[zh]) return PIECES_JA[zh]
   let s = zh

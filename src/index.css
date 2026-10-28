@@ -6520,3 +6520,8 @@ body:has(.view-menu) > .be { opacity: 0.15; pointer-events: none; }
 .loading-stuck button { padding: 7px 22px; border: 1px solid #2a1a0f; border-radius: 8px; background: var(--washi, #fbf3e4); color: var(--ink, #3b2a20);
   font: inherit; font-weight: 700; letter-spacing: 0.1em; cursor: pointer; box-shadow: 0 3px 0 #2a1a0f; }
 .loading-stuck button:active { transform: translateY(2px); box-shadow: 0 1px 0 #2a1a0f; }
+
+/* ---- English: what stands upright in Chinese and Japanese lies across, smaller where it has to fit a small space ---- */
+html[lang='en'] :is(.heat-label, .brand-sub, .menu-title, .strip-price, .strip-en) { writing-mode: horizontal-tb; letter-spacing: 0.02em; }
+html[lang='en'] .brand-sub { font-size: 0.62em; white-space: nowrap; }
+html[lang='en'] .heat-label { font-size: 13px; }

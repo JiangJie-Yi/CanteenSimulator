@@ -1,10 +1,11 @@
-import type { Lang } from './i18n'
 
 /**
  * The till register's operating manual (the booklet on the boxes under the till), page by page: Chinese and Japanese. Each page a heading
  * and its steps; a step is a key (or keys) and what it does.
  */
-export interface ManualPage { title: Record<Lang, string>; steps: { keys: string; text: Record<Lang, string> }[] }
+/** (English where it's been written; the rest falls back to the Chinese) */
+type Text = { zh: string; ja: string; en?: string }
+export interface ManualPage { title: Text; steps: { keys: string; text: Text }[] }
 
 export const REGISTER_MANUAL: ManualPage[] = [
   {

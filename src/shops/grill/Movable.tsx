@@ -443,10 +443,11 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
             </sprite>
           </group>
         ))}
-        {/* (and the small cube in the middle, as Maya has it, to scale all three together: plain yellow, an unseen larger one round it to catch) */}
+        {/* (and the box in the middle, as Maya has it, to scale all three together: orange, as the move handles' middle box, an unseen larger one round
+            it to catch) */}
         <mesh renderOrder={1002} userData={{ editHandle: true, gizmo: true }}>
-          <boxGeometry args={[L * 0.1, L * 0.1, L * 0.1]} />
-          <meshBasicMaterial color="#f2e33a" depthTest={false} toneMapped={false} />
+          <boxGeometry args={[L * 0.16, L * 0.16, L * 0.16]} />
+          <meshBasicMaterial color="#f2a33a" depthTest={false} toneMapped={false} transparent opacity={0.9} />
         </mesh>
         <mesh renderOrder={1002} onPointerDown={growAll} userData={{ editHandle: true, gizmo: true }}>
           <boxGeometry args={[L * 0.2, L * 0.2, L * 0.2]} />

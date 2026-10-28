@@ -34,6 +34,7 @@ export function trialIdeas(d: Dish): Idea[] {
 const STAGE_WORD: Record<Lang, Record<Stage, string>> = {
   zh: { before: '上火前', early: '烤到一半時', late: '起鍋前', after: '起鍋後' },
   ja: { before: '焼く前に', early: '焼いている途中で', late: '焼き上がり直前に', after: '焼き上がってから' },
+  en: { before: 'before the fire', early: 'halfway through', late: 'just before it comes off', after: 'once it’s off' },
 }
 /** how each seasoning is put on, in words: 撒鹽, 刷醬油, 抹味噌… */
 const HOW: Record<Lang, Record<string, string>> = {
@@ -41,6 +42,8 @@ const HOW: Record<Lang, Record<string, string>> = {
     yuzu: '點柚子胡椒', lemon: '擠檸檬汁', water: '灑水' },
   ja: { salt: '塩を振る', soy: '醤油を塗る', milk: '練乳をかける', peanut: 'きな粉を振る', miso: '味噌を塗る', wasabi: 'わさびを添える',
     shichimi: '七味を振る', yuzu: '柚子胡椒を添える', lemon: 'レモンを搾る', water: '水を打つ' },
+  en: { salt: 'salt it', soy: 'brush on soy', milk: 'pour on condensed milk', peanut: 'dust with peanut powder', miso: 'spread on miso', wasabi: 'add a little wasabi',
+    shichimi: 'shake on shichimi', yuzu: 'dab on yuzu kosho', lemon: 'squeeze on lemon', water: 'sprinkle water' },
 }
 /**
  * A dish written out as a recipe, step by step in the order it's done: what goes on before the fire, the cooking

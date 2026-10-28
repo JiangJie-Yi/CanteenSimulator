@@ -1,9 +1,11 @@
 // UI language for the menu and the stage. Both modes show English small under the main name.
-export type Lang = 'zh' | 'ja'
+export type Lang = 'zh' | 'ja' | 'en'
 
-type Named = { name: string; ja?: string }
-/** The main (Chinese or Japanese) name of a dish, base or menu item. */
-export const nameIn = (lang: Lang, x: Named) => (lang === 'ja' ? x.ja ?? x.name : x.name)
+type Named = { name: string; ja?: string; en?: string }
+/** The main name of a dish, base or menu item in the language shown (English where it has one, else the Chinese). */
+export const nameIn = (lang: Lang, x: Named) => (lang === 'ja' ? x.ja ?? x.name : lang === 'en' ? x.en ?? x.name : x.name)
+/** a phrase in the language shown: Chinese, Japanese, English (English falling back to the Chinese where it hasn't one) */
+export const tl = (lang: Lang, zh: string, ja: string, en?: string) => (lang === 'ja' ? ja : lang === 'en' ? en ?? zh : zh)
 
 export const UI = {
   zh: {
@@ -157,7 +159,83 @@ export const UI = {
     burnt: '焦げてしまって食べられません',
     waste: 'もったいない！せっかく焼けたのに…',
     fullWords: ['空腹', '腹三分', '腹八分', '満腹', '食べ過ぎ'],
+    lang: 'EN',
+    langLabel: '英語に切り替え',
+  },
+  en: {
+    menuTitle: 'Menu',
+    researchTitle: 'Ingredients',
+    nothingYet: 'Nothing ordered yet',
+    hideMenu: 'Hide menu',
+    resetView: 'Reset view',
+    ai: 'AI',
+    aiLabel: 'Open / closed: when open, the chef cooks and customers come in to order',
+    shopOpen: 'On',
+    shopClosed: 'Off',
+    auto: 'Auto-run',
+    autoLabel: 'Auto-run: hires staff, restocks, builds the menu, opens up, and rests the staff when they tire',
+    autoOn: 'Auto-run: running the shop',
+    autoOff: 'Auto-run: stopped, over to you',
+    autoHired: (n: number) => `AI: hired ${n} staff`,
+    autoOpen: 'AI: menu and stock are ready, opening up!',
+    autoRest: 'AI: the staff are tired, closing for a rest',
+    pullMore: 'Pull down to refresh',
+    lockedHint: 'Open: customers order, you watch',
+    outOfStock: (n: string) => `Out of "${n}": restock under Office › Purchasing`,
+    needChef: 'No chef yet: hire one under Staff before opening',
+    soldOut: 'Sold out: once everyone has eaten, the shop closes',
+    cantOpen: 'A dish on the menu is out of ingredients: restock at Office › Fridge (one tap does it all)',
+    buyOnBoard: 'Open for business! Stock up at Office › Fridge, then tap an ingredient on the right to try it out',
+    ownerCooks: "Open! You're the head chef: put the skewers on the fire, tap a tag to serve when done (hire cooks to help)",
+    menuShort: (n: number, min: number) => `Only ${n} dishes on the menu; at least ${min} to open: add tried dishes under Kitchen › Tasting (or have a cook try them)`,
+    moods: { love: 'Delighted', happy: 'Happy', ok: 'OK', meh: 'Not great', sad: 'Disappointed', wait: 'Waiting', angry: 'Walked out' },
+    tools: 'Menu',
+    music: 'Music',
+    pullGo: 'Release to refresh',
+    wrote: (guest: string, name: string) => `${guest} ordered ${name}`,
+    chef: 'Chef',
+    guest: 'Guest',
+    stock: 'Stock',
+    restocked: (who: string, what: string) => `${who} ordered in: ${what}`,
+    rating: 'Rating',
+    ledger: '$',
+    ledgerLabel: 'Accounts (costs and profit)',
+    revenue: 'Revenue',
+    foodCost: 'Food cost',
+    fuel: 'Fuel (charcoal / gas)',
+    wage: 'Wages',
+    profit: 'Profit',
+    margin: 'Margin',
+    guests: (n: number, here: number) => `${n} guests · ${here} seated`,
+    waiting: 'Waiting',
+    eating: 'Eating',
+    leftAngry: 'Left after waiting too long',
+    chefPick: 'Head chef',
+    showMenu: 'Show menu',
+    tally: (base: string | null, count: number, total: number, open: boolean) => (open ? ['Guests ordered ', count, ' · revenue NT$', total, '']
+      : !count ? ['Nothing ordered yet', null, '', null, ''] : base ? [`${base}: `, count, ' in all · NT$', total, ''] : ['Ordered ', count, ' · NT$', total, '']) as readonly [string, number | null, string, number | null, string],
+    clear: 'Clear all',
+    hint: 'Tap to take one to try, right-click for one less; once tasted, add it under Kitchen › Tasting',
+    hintTouch: 'Tap for one more, hold for one less',
+    included: 'with',
+    ordered: (n: number) => `${n} ordered`,
+    fireFull: (n: number) => `The fire is full (at most ${n}): take off what's done before adding more`,
+    charcoalFull: 'The fire is at 100%: no more charcoal',
+    heapFull: 'The charcoal heap is full: wait for the bottom to burn to ash',
+    basketFull: (n: number) => `The basket holds at most ${n} potatoes and sweet potatoes: eat a few first`,
+    itemFull: (name: string, n: number) => `At most ${n} ${name} at a time`,
+    heat: 'Heat',
+    heatWords: ['Off', 'Low', 'Medium', 'High'],
+    fire: 'Fire',
+    fireWords: ['Dying', 'Low', 'Medium', 'Roaring', 'Out'],
+    tapCoals: 'Tap the coals to add charcoal', addCharcoal: 'Add charcoal',
+    fullness: 'Full',
+    notCooked: 'Not cooked yet, give it a moment',
+    offTable: "The plate isn't on the counter: food can't go in it",
+    burnt: 'Burnt: not fit to eat',
+    waste: 'What a waste! It was done just right…',
+    fullWords: ['Hungry', 'Peckish', 'Half full', 'Full', 'Stuffed'],
     lang: '中',
-    langLabel: '中国語に切り替え',
+    langLabel: 'Switch to Chinese',
   },
 } as const

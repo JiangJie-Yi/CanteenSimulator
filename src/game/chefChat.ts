@@ -1,3 +1,4 @@
+import type { Lang } from '@/data/i18n'
 // Talking with the second chef: what the owner typed, understood as a request (make this dish, try a few, what
 // goes with that, how's the stock…), with the food and the seasonings picked out of it however it was put —
 // 「幫我做鹽烤玉米」, 「鮭魚刷醬油烤一下」, 「玉米配什麼好？」, 「隨便試三道」, 「サーモンを塩で」 — or by kind
@@ -161,7 +162,7 @@ export function bestDabs(d: Dish, id: string): Seasoning[] {
 }
 
 /** the dish's name, as the chef would say it */
-export const dishName = (d: Dish, id: string, dabs: Seasoning[], lang: 'zh' | 'ja') => {
+export const dishName = (d: Dish, id: string, dabs: Seasoning[], lang: Lang) => {
   const it = findItem(d, id)!
   return partName(it, d.roast?.names[id] ?? it.name, id, dabs, lang, kindOf(d))
 }

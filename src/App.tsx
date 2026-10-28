@@ -57,6 +57,7 @@ import { Grill2D } from '@/shops/grill/Grill2D'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
+import { tl } from '@/data/i18n'
 
 // distance between dishes on the carousel
 const SPACING = 6
@@ -893,14 +894,14 @@ export default function App() {
   const lightIncense = () => {
     if (incenseAt !== null && performance.now() - incenseAt < INCENSE_MS) return
     if (cash < OFFERING_COST) {
-      say(lang === 'ja' ? 'お金が足りません：お神酒をお供えするには NT$1,000 かかります' : '現金不足：供清酒需要 NT$1,000')
+      say(tl(lang, '現金不足：供清酒需要 NT$1,000', 'お金が足りません：お神酒をお供えするには NT$1,000 かかります', 'Not enough cash: offering sake costs NT$1,000'))
       return
     }
     book('offering', OFFERING_COST)
     setIncenseAt(performance.now())
     setBlessed(true)
     window.setTimeout(() => setBlessed(false), INCENSE_MS)
-    say(lang === 'ja' ? 'お神酒をお供えしました（NT$1,000）：三分間、お客さんが増えて、よく注文してくれます' : '供了一杯清酒（花費 NT$1,000）：這三分鐘客人會變多，也點得比較多')
+    say(tl(lang, '供了一杯清酒（花費 NT$1,000）：這三分鐘客人會變多，也點得比較多', 'お神酒をお供えしました（NT$1,000）：三分間、お客さんが増えて、よく注文してくれます', 'Sake offered (NT$1,000): for three minutes more customers come, and order more'))
   }
   const space: 'closed' | 'open' = ai ? 'open' : 'closed'
   // (opening is the start of a new day)
@@ -1152,7 +1153,7 @@ export default function App() {
       }
       case 'stock': {
         const goods = goodsOf(d)
-        const low = goods.filter((g) => (stock[g.id] ?? 0) < 3).map((g) => `${foodOf(g.id)}${lang === 'ja' ? '残り' : '剩'} ${stock[g.id] ?? 0}`)
+        const low = goods.filter((g) => (stock[g.id] ?? 0) < 3).map((g) => `${foodOf(g.id)}${tl(lang, '剩', '残り', 'left')} ${stock[g.id] ?? 0}`)
         reply = goods.every((g) => !(stock[g.id] ?? 0)) ? T.stockEmpty() : T.stock(low.slice(0, 6))
         break
       }
@@ -1281,9 +1282,11 @@ export default function App() {
   langRef.current = lang
   // (the edit mode's panel speaks the game's language)
   useEffect(() => setEditLang(lang), [lang])
+  // (the page's language, for the styles that set English across where Chinese and Japanese stand upright)
+  useEffect(() => { document.documentElement.lang = lang === 'ja' ? 'ja' : lang === 'en' ? 'en' : 'zh-Hant' }, [lang])
   const toggleLang = () =>
     setLang((l) => {
-      const next: Lang = l === 'zh' ? 'ja' : 'zh'
+      const next: Lang = l === 'zh' ? 'ja' : l === 'ja' ? 'en' : 'zh'
       try {
         void next
       } catch {
@@ -1355,7 +1358,7 @@ export default function App() {
       const key = ++feedSeq.current
       setFeed((f) => [...f.slice(-2), { key, id, guest }])
       const it = findItem(dish, id)
-      talk('order', `#${guest} ${lang === 'ja' ? 'から' : '點了'} ${it ? nameIn(lang, it) : id}`)
+      talk('order', `#${guest} ${tl(lang, '點了', 'から', ' ordered ')} ${it ? nameIn(lang, it) : id}`)
       window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
     }
     return ok
@@ -1443,7 +1446,7 @@ export default function App() {
         if (DISHES[active].id === d.id) {
           const names = Object.entries(buy).map(([k, n]) => {
             const it = ALL_ITEMS.get(k) ?? d.bases.find((b) => b.id === k)
-            return `${(lang === 'ja' ? it?.ja : it?.name) ?? k} ${n}`
+            return `${(it ? nameIn(lang, it) : null) ?? k} ${n}`
           })
           talk('stock', UI[lang].restocked(lang === 'ja' ? keeper.ja : keeper.zh, names.join('、')))
         }
@@ -1768,7 +1771,7 @@ export default function App() {
     setEntryCount((c) => ({ ...c, [e.key]: (c[e.key] ?? 0) + 1 }))
     const key = ++feedSeq.current
     setFeed((fd) => [...fd.slice(-2), { key, id: e.key, guest }])
-    talk('order', `#${guest} ${lang === 'ja' ? 'から' : '點了'} ${nameIn(lang, e)}`)
+    talk('order', `#${guest} ${tl(lang, '點了', 'から', ' ordered ')} ${nameIn(lang, e)}`)
     window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
     return true
   }
@@ -1778,7 +1781,7 @@ export default function App() {
     if (!d) return
     book('revenue', d.price)
     book('food', Math.round(d.price * 0.35))
-    talk('order', `#${guest} ${lang === 'ja' ? 'が冷蔵庫から' : '從冰箱拿了'} ${lang === 'ja' ? d.ja : d.zh}`)
+    talk('order', `#${guest} ${tl(lang, '從冰箱拿了', 'が冷蔵庫から', ' took from the fridge ')} ${lang === 'ja' ? d.ja : lang === 'en' ? (d as { en?: string }).en ?? d.zh : d.zh}`)
   }
   const sellDrinkRef = useRef(sellDrink)
   sellDrinkRef.current = sellDrink
@@ -1868,7 +1871,7 @@ export default function App() {
         {research && dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={() => addCharcoal()} lang={lang} />}
         {research && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
-          title={lang === 'ja' ? '開発ノート・人事' : '經營（廚房・人事）'}>
+          title={tl(lang, '經營（廚房・人事）', '開発ノート・人事', 'Office (kitchen · staff)')}>
           <svg className="office-icon" viewBox="0 0 28 28" aria-hidden="true">
             {/* the shop front: a tiled eave, a noren split in three with the shop's mark, a lantern at the side */}
             <path d="M3 10.5 14 4l11 6.5z" fill="#3b2a20" />
@@ -1879,7 +1882,7 @@ export default function App() {
             <circle cx="14" cy="14.4" r="1.6" fill="none" stroke="#fbf3e4" strokeWidth=".9" />
             <rect x="11.5" y="19.5" width="5" height="4.5" fill="#5a3a26" />
             <ellipse cx="24.6" cy="15" rx="1.6" ry="2.2" fill="#f2b84b" stroke="#3b2a20" strokeWidth=".7" />
-          </svg><em>{lang === 'ja' ? '経営' : '經營'}</em><b className="money">NT${Math.round(cash).toLocaleString()}</b>
+          </svg><em>{tl(lang, '經營', '経営', 'Office')}</em><b className="money">NT${Math.round(cash).toLocaleString()}</b>
         </button>
         <button type="button" className={`auto-toggle${auto ? ' is-on' : ''}`} aria-pressed={auto} title={UI[lang].autoLabel}
           onClick={() => {
@@ -1905,7 +1908,7 @@ export default function App() {
                 onReprice={(key, price) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).map((x) => (x.key === key ? { ...x, price } : x)) }))} />
             )}
             onReset={() => {
-              if (!window.confirm(lang === 'ja' ? '資金・在庫・スタッフ・ノートを全部リセットしますか？' : '確定要重新開始？資金、庫存、員工和試吃筆記都會清空。')) return
+              if (!window.confirm(tl(lang, '確定要重新開始？資金、庫存、員工和試吃筆記都會清空。', '資金・在庫・スタッフ・ノートを全部リセットしますか？', 'Start over? Money, stock, staff and tasting notes will all be cleared.'))) return
               try {
                 localStorage.removeItem(SAVE_KEY)
               } catch {
@@ -1934,7 +1937,7 @@ export default function App() {
                 return (
                   <span className="chip-part">
                     {avg !== null && <MoodFace guest={{ id: 0, state: 'done', rating: avg, items: 0, ate: [] }} />}
-                    {lang === 'ja' ? '客' : '客'} {here.length}/{visits}
+                    {tl(lang, '客', '客', 'Guests')} {here.length}/{visits}
                   </span>
                 )
               })()}
@@ -1950,8 +1953,8 @@ export default function App() {
               onPointerDown={dragBoard.onPointerDown} onDoubleClick={dragBoard.onDoubleClick}>
               <div className="chef-pick">
                 <span>{UI[lang].chefPick}</span>
-                <b>{[owner || (lang === 'ja' ? '店主' : '老闆'), ...staffOf(DISHES[active].id, 'chef'), ...staffOf(DISHES[active].id, 'sous')].map((w) => (typeof w === 'string' ? w : lang === 'ja' ? w.ja : w.zh)).filter(Boolean).join('、')}</b>
-                <button type="button" onClick={() => setOffice('staff')}>{lang === 'ja' ? '人事' : '人事'}</button>
+                <b>{[owner || (tl(lang, '老闆', '店主', 'Owner')), ...staffOf(DISHES[active].id, 'chef'), ...staffOf(DISHES[active].id, 'sous')].map((w) => (typeof w === 'string' ? w : lang === 'ja' ? w.ja : w.zh)).filter(Boolean).join('、')}</b>
+                <button type="button" onClick={() => setOffice('staff')}>{tl(lang, '人事', '人事', 'Staff')}</button>
               </div>
               <p className="guest-count">
                 {UI[lang].guests(visits, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
@@ -1980,10 +1983,10 @@ export default function App() {
           {ledgerOn && (
             <section className="ledger is-draggable" aria-label={UI[lang].ledgerLabel} style={dragLedger.style}
               onPointerDown={dragLedger.onPointerDown} onDoubleClick={dragLedger.onDoubleClick}>
-              <p className="ledger-cash"><span>{lang === 'ja' ? '現金' : '現金'}</span><b className="money">NT${Math.round(cash).toLocaleString()}</b></p>
-              <p><span>{lang === 'ja' ? '開業費' : '開業費用'}</span><b className="money">−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
-              <p><span>{lang === 'ja' ? '仕入れ' : '採買支出'}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
-              <p><span>{lang === 'ja' ? 'お供え' : '供品費用'}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
+              <p className="ledger-cash"><span>{tl(lang, '現金', '現金', 'Cash')}</span><b className="money">NT${Math.round(cash).toLocaleString()}</b></p>
+              <p><span>{tl(lang, '開業費用', '開業費', 'Opening cost')}</span><b className="money">−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
+              <p><span>{tl(lang, '採買支出', '仕入れ', 'Purchasing')}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
+              <p><span>{tl(lang, '供品費用', 'お供え', 'Offerings')}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
               {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
                 .map(([k, v]) => (
                   <p key={k}><span>{UI[lang][k]}</span><b className="money">{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : 1)}</b></p>
@@ -2007,7 +2010,7 @@ export default function App() {
             onPointerDown={dragChat.onPointerDown} onDoubleClick={dragChat.onDoubleClick}>
             {chat.map((m) => (
               <li key={m.id} className={`ai-line ai-${m.who}`}>
-                <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : m.who === 'stock' ? UI[lang].stock : m.who === 'order' ? (lang === 'ja' ? '注文' : '點單')
+                <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : m.who === 'stock' ? UI[lang].stock : m.who === 'order' ? (tl(lang, '點單', '注文', 'Orders'))
                   : UI[lang].guest}</span>{m.text}
               </li>
             ))}
@@ -2036,8 +2039,8 @@ export default function App() {
           <button type="button" className="unopened-hint" onClick={() => setAsking(true)}
             onPointerEnter={() => setSpotOn(true)} onPointerLeave={() => setSpotOn(false)}
             onFocus={() => setSpotOn(true)} onBlur={() => setSpotOn(false)}>
-            <b>{lang === 'ja' ? '開業する' : '開業'}</b>
-            <small>{lang === 'ja' ? `「${nameIn(lang, dish)}」・NT$${SHOP_COST.toLocaleString()}` : `「${nameIn(lang, dish)}」・NT$${SHOP_COST.toLocaleString()}`}</small>
+            <b>{tl(lang, '開業', '開業する', 'Open the shop')}</b>
+            <small>{`「${nameIn(lang, dish)}」・NT$${SHOP_COST.toLocaleString()}`}</small>
           </button>
         )}
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
@@ -2061,10 +2064,10 @@ export default function App() {
       {asking && (
         <div className="welcome" role="dialog" aria-modal="true">
           <div className="welcome-card">
-            <h2>{lang === 'ja' ? '開業しますか？' : '要開業嗎？'}</h2>
-            <p>{lang === 'ja' ? `「${nameIn(lang, dish)}」の開業費は NT$${SHOP_COST.toLocaleString()}` : `開一間「${nameIn(lang, dish)}」需要 NT$${SHOP_COST.toLocaleString()}`}</p>
-            <p className="welcome-sub">{lang === 'ja' ? `手持ち NT$${Math.round(cash).toLocaleString()}` : `手上現金 NT$${Math.round(cash).toLocaleString()}`}</p>
-            {cash < SHOP_COST && <p className="welcome-warn">{lang === 'ja' ? '資金が足りません' : '資金不足，還開不了'}</p>}
+            <h2>{tl(lang, '要開業嗎？', '開業しますか？', 'Open the shop?')}</h2>
+            <p>{tl(lang, `開一間「${nameIn(lang, dish)}」需要 NT$${SHOP_COST.toLocaleString()}`, `「${nameIn(lang, dish)}」の開業費は NT$${SHOP_COST.toLocaleString()}`, `Opening "${nameIn(lang, dish)}" costs NT$${SHOP_COST.toLocaleString()}`)}</p>
+            <p className="welcome-sub">{tl(lang, `手上現金 NT$${Math.round(cash).toLocaleString()}`, `手持ち NT$${Math.round(cash).toLocaleString()}`, `Cash in hand NT$${Math.round(cash).toLocaleString()}`)}</p>
+            {cash < SHOP_COST && <p className="welcome-warn">{tl(lang, '資金不足，還開不了', '資金が足りません', 'Not enough money to open yet')}</p>}
             <button type="button" className="welcome-go" disabled={cash < SHOP_COST} onClick={() => {
               book('setup', SHOP_COST)
               setOpened((o) => ({ ...o, [dish.id]: true }))
@@ -2073,8 +2076,8 @@ export default function App() {
               window.setTimeout(() => setIgnite(0), 3200)
               // first thing a new shop needs: stock, bought in right on the board
               window.setTimeout(() => say(UI[lang].buyOnBoard), 900)
-            }}>{lang === 'ja' ? '開業' : '開業'}</button>
-            <button type="button" className="welcome-back" onClick={() => setAsking(false)}>{lang === 'ja' ? 'やめる' : '先不要'}</button>
+            }}>{tl(lang, '開業', '開業', 'Open the shop')}</button>
+            <button type="button" className="welcome-back" onClick={() => setAsking(false)}>{tl(lang, '先不要', 'やめる', 'Not now')}</button>
           </div>
         </div>
       )}
@@ -2140,7 +2143,7 @@ export default function App() {
         }
       }}
         aria-pressed={ai} title={UI[lang].aiLabel}>
-        {ai ? (closing ? (lang === 'ja' ? '閉店準備中' : '準備閉店') : UI[lang].shopOpen) : UI[lang].shopClosed}
+        {ai ? (closing ? (tl(lang, '準備閉店', '閉店準備中', 'Closing up')) : UI[lang].shopOpen) : UI[lang].shopClosed}
       </button>
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}
@@ -2148,19 +2151,19 @@ export default function App() {
       {/* (on a phone there's no 3D room and no shrine to click: the sake is offered from here) */}
       {phone && ai && !!dish.roast && (
         <button type="button" className={`incense-toggle${blessed ? ' is-on' : ''}`} onClick={lightIncense} disabled={blessed}
-          title={lang === 'ja' ? 'お神酒を供える（NT$1,000、三分間、客足とご注文が増える）' : '供清酒（花 NT$1,000，三分鐘內客人變多、點得也多）'}>
-          {blessed ? (lang === 'ja' ? 'お供え中' : '供酒中') : (lang === 'ja' ? 'お神酒' : '供酒')}
+          title={tl(lang, '供清酒（花 NT$1,000，三分鐘內客人變多、點得也多）', 'お神酒を供える（NT$1,000、三分間、客足とご注文が増える）', 'Offer sake (NT$1,000: three minutes of more customers ordering more)')}>
+          {blessed ? (tl(lang, '供酒中', 'お供え中', 'Offering')) : (tl(lang, '供酒', 'お神酒', 'Offer sake'))}
         </button>
       )}
       {/* (at the grill with the shop shut, researching: a little fridge, top right, opens and shuts the ingredients' panel) */}
       {hand && !!dish.roast && !editOn && (
         <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => { setFridgeOpen((v) => !v); setMenuFolded(false) }} aria-pressed={fridgeOpen}
-          title={lang === 'ja' ? '食材庫を開く／閉じる' : '打開／關上食材櫃'}>
+          title={tl(lang, '打開／關上食材櫃', '食材庫を開く／閉じる', 'Open / close the pantry')}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2.2" /><path d="M5 9.5h14" /><path d="M8 5.5v2M8 12.5v4" /><path d="M7 21.5v1M17 21.5v1" /></svg>
         </button>
       )}
       {editOn && (
-        <svg id="axis-widget" className="axis-widget" viewBox="0 0 72 72" aria-label={lang === 'ja' ? 'ワールド座標 X Y Z' : '世界座標 X Y Z'}>
+        <svg id="axis-widget" className="axis-widget" viewBox="0 0 72 72" aria-label={tl(lang, '世界座標 X Y Z', 'ワールド座標 X Y Z', 'World X Y Z')}>
           {[['#ff3b30', 'X'], ['#34c759', 'Y'], ['#0a84ff', 'Z']].map(([c, n], i) => (
             <g key={n}>
               <circle className={`aw-neg-${i}`} r="4" fill="none" stroke={c} strokeWidth="1.5" opacity="0.5" />
@@ -2173,12 +2176,12 @@ export default function App() {
       {/* (the shop's edit mode, key G: only while it's shut, as it can't be switched on while customers are about) */}
       {!ai && !!dish.roast && !flatGrill && (
         <button type="button" className={`edit-toggle${editOn ? ' is-on' : ''}`} onClick={toggleEdit} aria-pressed={editOn}
-          title={lang === 'ja' ? '開発者モード（Gキー）：配置・カメラの調整' : '開發者模式（快捷鍵 G）：調整擺設與鏡頭'}>
+          title={tl(lang, '開發者模式（快捷鍵 G）：調整擺設與鏡頭', '開発者モード（Gキー）：配置・カメラの調整', 'Developer mode (G): arrange pieces and cameras')}>
           開
         </button>
       )}
       <button type="button" className={`speed-toggle${speed > 1 ? ' is-on' : ''}`} onClick={() => setSpeed((v) => (v > 1 ? 1 : 2))}
-        aria-pressed={speed > 1} title={lang === 'ja' ? '早送り ×2' : '快速 ×2'}>
+        aria-pressed={speed > 1} title={tl(lang, '快速 ×2', '早送り ×2', 'Fast ×2')}>
         {speed > 1 ? '×2' : '▶▶'}
       </button>
       <button type="button" className="theme-toggle" onClick={toggleTheme}

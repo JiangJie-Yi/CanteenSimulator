@@ -5,6 +5,7 @@
 import { memo, type ReactNode } from 'react'
 import type { Lang } from '@/data/i18n'
 import { DRINKS, type DrinkId } from './bar'
+import { tl } from '@/data/i18n'
 
 export const INK = '#3b2a20'
 /** the whole picture, in the SVG's own units: the cook's table on the left, the fridge on the right */
@@ -777,7 +778,7 @@ export const Fridge = memo(function Fridge({ x, taken, lang }: { x: number; take
       <ellipse cx={w / 2} cy={9} rx={w * 0.62} ry={14} fill="url(#g2fr-halo)" />
       <rect x={6} y={0} width={w - 12} height={17} rx={4} fill="#e8202a" stroke={INK} strokeWidth={1.2} />
       <rect x={8} y={1.6} width={w - 16} height={5} rx={2.5} fill="#fff" opacity={0.28} />
-      <text x={w / 2} y={12.6} textAnchor="middle" className="g2-fridge-sign">{lang === 'ja' ? 'ドリンク' : '飲料'}</text>
+      <text x={w / 2} y={12.6} textAnchor="middle" className="g2-fridge-sign">{tl(lang, '飲料', 'ドリンク', 'Drinks')}</text>
       {/* the cabinet: lacquer red, a chrome trim, and its lit inside */}
       <rect x={0} y={19} width={w} height={h - 19} rx={7} fill="url(#g2fr-body)" stroke={INK} strokeWidth={1.6} />
       <path d={`M4 ${h - 4}V26Q4 22 8 22H${w - 8}`} fill="none" stroke="#ff8a7a" strokeWidth={1} opacity={0.6} />

@@ -15,6 +15,7 @@ import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { drinkFor, GRILL_SEATS, type DrinkId } from './bar'
 import { COAL_GLOW, COAL_STICKS, DEFS, FIRE_LIFE, FoodArt, NET, COAL_X, COAL_Y, PIT_ART, PIT_X, PIT_Y, Plate, Soup, TABLE, Tag, ToolIcon, Tray, VIEW_H, VIEW_W } from './Grill2DArt'
+import { tl } from '@/data/i18n'
 
 const EAT_SECONDS = 3
 const PATIENCE = 150
@@ -55,6 +56,7 @@ const DAB_COLOR: Record<string, string> = { salt: '#ffffff', soy: '#5a2a10', mil
 const DAB_NAME: Record<Lang, Record<string, string>> = {
   zh: { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉', miso: '味噌', wasabi: '山葵', shichimi: '七味', yuzu: '柚子胡椒', lemon: '檸檬', water: '水' },
   ja: { salt: '塩', soy: '醤油', milk: '練乳', peanut: 'きな粉', miso: '味噌', wasabi: 'わさび', shichimi: '七味', yuzu: '柚子胡椒', lemon: 'レモン', water: '水' },
+  en: { salt: 'salt', soy: 'soy', milk: 'milk', peanut: 'peanut', miso: 'miso', wasabi: 'wasabi', shichimi: 'shichimi', yuzu: 'yuzu', lemon: 'lemon', water: 'water' },
 }
 
 export type Grill2DProps = {
@@ -527,10 +529,10 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
         {[...spots].sort((m, n) => m.y - n.y).map((s) => skewer(s.p, s.x, s.y, (s.a * 180) / Math.PI))}
         <g opacity={0.2 + 0.8 * fl}>{FIRE_LIFE}</g>
         {/* the tray of what's waiting raw, bottom left; the plate of what's off the fire, bottom right */}
-        <Tray x={6} y={172} w={172} h={44} label={lang === 'ja' ? '生（タップで火へ）' : '待烤（點一下上火）'} />
+        <Tray x={6} y={172} w={172} h={44} label={tl(lang, '待烤（點一下上火）', '生（タップで火へ）', 'Raw (tap to put on the fire)')} />
         {tray.slice(0, 10).map((p, i) => flat(p, 28 + (i % 5) * 32, 188 + Math.floor(i / 5) * 16, 0.64))}
         {tray.length > 10 && <text x={172} y={212} textAnchor="end" className="g2-label g2-more">+{tray.length - 10}</text>}
-        <Plate cx={296} cy={193} rx={92} ry={23} label={space === 'open' ? (lang === 'ja' ? '出来上がり' : '烤好的') : (lang === 'ja' ? 'お皿（タップで食べる）' : '盤子（點一下吃）')} />
+        <Plate cx={296} cy={193} rx={92} ry={23} label={space === 'open' ? (tl(lang, '烤好的', '出来上がり', 'Done')) : (tl(lang, '盤子（點一下吃）', 'お皿（タップで食べる）', 'Plate (tap to eat)'))} />
         {served.slice(0, 10).map((p, i) => flat(p, 296 + ((i % 5) - (Math.min(served.length, 5) - 1) / 2) * 32, 192 + Math.floor(i / 5) * 12, 0.66))}
         {/* each skewer's paper tag at its end, over everything, and how much a seasoning did */}
         {spots.map(({ p, a }) => {
