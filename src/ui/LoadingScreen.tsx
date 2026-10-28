@@ -19,14 +19,19 @@ export function LoadingScreen() {
     const t = window.setInterval(() => { if (performance.now() - last.current.at > STALL_MS) setStuck(true) }, 1000)
     return () => window.clearInterval(t)
   }, [active, loaded])
-  const failed = errors.length > 0
-  if (!active && !failed) return null
+  // (some files are only looked for (the HDRIs are tried by several names): a miss isn't a failure unless the loading has stopped too)
+  const failed = errors.length > 0 && stuck
+  if (!active) return null
   const pct = total > 0 && Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : null
   return (
     <div className="loading-screen" role="status" aria-live="polite">
-      <div className="loading-bar"><i style={{ width: `${pct ?? 0}%` }} /></div>
-      <p>{pct === null ? '載入中…' : `載入中 ${pct.toFixed(0)}%（${loaded}/${total}）`}</p>
-      {(stuck || failed) && (
+      <div className="loading-board">
+        <h1>聞野</h1>
+        <small>日式烤魚</small>
+        <div className="loading-bar"><i style={{ width: `${pct ?? 0}%` }} /></div>
+        <p>{pct === null ? '開店準備中…' : `開店準備中 ${pct.toFixed(0)}%`}</p>
+      </div>
+      {stuck && (
         <div className="loading-stuck">
           <p>{failed ? `有 ${errors.length} 個檔案沒有載入成功` : '載入好像卡住了'}（可能是模型正在更新，或開發伺服器在重啟）</p>
           <button type="button" onClick={() => window.location.reload()}>重新載入</button>
