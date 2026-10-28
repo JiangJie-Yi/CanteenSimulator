@@ -367,7 +367,9 @@ function shapeFace(root: THREE.Object3D, head: THREE.Bone, shape: (typeof FACES)
 }
 
 /** one customer, sitting on their stool (or walking), eating or waiting; t is their own clock (seconds) */
-export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: idleGiven, mood = null, fade, slippers, pose, held }: { id: number; eating: boolean; walking: boolean
+export function Person({ id, eating, walking, still, t: tGiven, clock, talk = 0, idle: idleGiven, mood = null, fade, slippers, pose, held }: { id: number; eating: boolean; walking: boolean
+  /** on their way but stopped just now (read each frame): at the genkan's step changing their shoes, at the till paying; they stand, not walk on the spot */
+  still?: () => boolean
   /** their own clock (seconds): given as a number (re-rendered each frame), or read each frame from a ref, which
    * moves the figure without re-rendering it (only a change of what they're doing re-renders) */
   t?: number; clock?: { current: number }
@@ -408,7 +410,13 @@ export function Person({ id, eating, walking, t: tGiven, clock, talk = 0, idle: 
   const spellOf = (t: number) => Math.floor((t + id * 9) / 24)
   const [spell, setSpell] = useState(() => spellOf(timeNow()))
   const idle = (['Sit', 'Phone', 'Chin', 'Phone', 'Sit', 'Chin'] as const)[Math.floor(hash(id, spell) * 6)]
-  const now = pose ?? (walking ? walkOf(kind) : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idleGiven ?? idle)
+  const [stopped, setStopped] = useState(false)
+  const stoppedRef = useRef(false)
+  useFrame(() => {
+    const v = !!(walking && still?.())
+    if (v !== stoppedRef.current) { stoppedRef.current = v; setStopped(v) }
+  })
+  const now = pose ?? (walking ? (stopped ? 'Stand' : walkOf(kind)) : eating ? 'Eat' : talk > 0 ? 'TalkL' : talk < 0 ? 'TalkR' : idleGiven ?? idle)
   useEffect(() => {
     const next = r.actions[now]
     if (!next) return

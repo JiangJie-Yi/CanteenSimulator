@@ -1143,6 +1143,8 @@ function Counter({ length }: { length: number }) {
 }
 
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcBack'; t: number
+  /** how far along their way they'd come last frame, and whether they've stood still since (a pause: shoes, paying, getting up) */
+  lastD?: number; still?: boolean
   /** (off to the toilet, or to the fridge for a drink) where, and the way there from their stool; told to go home
    * meanwhile, they do once they're back */
   wc?: { who: 'm' | 'f' | 'drink'; path: THREE.Vector3[]; len: number; unit?: number; pick?: DrinkId }
@@ -1471,6 +1473,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (stopping at the genkan's step a moment, to step out of their shoes and up into slippers)
         const d = Math.min(len, withPause(s.t * SPEED * walkSpeedOf(kindOf(s.id).kind), stepAt(path), SHOES_S * SPEED * walkSpeedOf(kindOf(s.id).kind)))
         const { p, dir } = alongPath(path, d)
+        s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < len
+        s.lastD = d
         g?.position.copy(p)
         if (g) g.rotation.y = d < len ? Math.atan2(dir.x, dir.z) : st.yaw
         s.slippers = d > stepAt(path)
@@ -1535,6 +1539,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const payAt = lp.len - lp.payD
         const d = Math.max(0, Math.min(lp.len, withPause(withPause(raw, payAt, lp.payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v)))
         const { p, dir } = alongPath(lp.path, lp.len - d)
+        s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < lp.len
+        s.lastD = d
         s.slippers = lp.len - d > stepAt(lp.path)
         g?.position.copy(p)
         if (g) g.rotation.y = s.t < 0.8 ? st.yaw : Math.atan2(-dir.x, -dir.z)
@@ -2030,7 +2036,7 @@ function Say({ text }: { text: string }) {
 function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number
   guest?: GuestView }) {
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
-  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
+  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined}
     held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} /> : undefined} />
 }
