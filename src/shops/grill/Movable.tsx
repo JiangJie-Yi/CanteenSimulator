@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, getEdit, groupOf, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, getEdit, groupOf, setStats, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -127,7 +127,8 @@ const AXES = [
  */
 /** a group's turn, about the room's axes (X along the bar, Y up, Z across it), as a matrix in the world */
 function groupTurn(g: { yaw: number; r?: V3 }) {
-  const a = Math.atan2(ALONG.x, ALONG.z)
+  // (about the world's own axes)
+  const a = 0
   const r = g.r ?? [0, g.yaw, 0]
   return new THREE.Matrix4().makeRotationY(a)
     .multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(r[0] * DEG, r[1] * DEG, r[2] * DEG)))
@@ -140,8 +141,8 @@ export function GroupGizmo() {
   const { on, selected, groups } = useEdit()
   const g = on && selected ? groups[selected] : null
   if (!g || !selected) return null
-  const a = Math.atan2(ALONG.x, ALONG.z)
-  // (in the room's frame: the pivot (kept in the world) turned into it, and the group's move added)
+  // (in the world's frame, as the group's move is kept)
+  const a = 0
   const p = new THREE.Vector3(...g.pivot).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a)
   return (
     <group name="group-gizmo" rotation-y={a}>
@@ -150,6 +151,34 @@ export function GroupGizmo() {
       </group>
     </group>
   )
+}
+
+/** developer mode's wireframe (Maya's 4): every material drawn as its edges, so each model's topology shows; 5 (or leaving) puts it back */
+export function WireView() {
+  const { wire, on } = useEdit()
+  const scene = useThree((st) => st.scene)
+  useEffect(() => {
+    if (!wire || !on) return
+    const was = new Map<THREE.Material, boolean>()
+    const apply = () => scene.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh || m.userData.editHandle) return
+      for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+        const w = mat as THREE.Material & { wireframe?: boolean }
+        if (w.wireframe === undefined || was.has(mat)) continue
+        was.set(mat, w.wireframe)
+        w.wireframe = true
+      }
+    })
+    apply()
+    // (models still loading, or batches merging, are caught a moment later)
+    const t = window.setInterval(apply, 1000)
+    return () => {
+      window.clearInterval(t)
+      for (const [mat, w] of was) (mat as THREE.Material & { wireframe: boolean }).wireframe = w
+    }
+  }, [wire, on, scene])
+  return null
 }
 
 export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V3; size?: number; theta?: number; pivotGroup?: { current: THREE.Group | null } }) {
@@ -438,7 +467,13 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   // (the turn from the room's frame into the parent's, about the vertical; found once the piece is in place)
   const [thetaRoom, setTheta] = useState(0)
   // (the axes gone by: the room's turned into this frame, or (the piece's own) none)
-  const theta = space === 'local' ? 0 : thetaRoom
+  const rot0 = rotationOf(id)
+  /** its own turn about the vertical: what the object axes add to the world's */
+  const ownYaw = (rot0[1] + baseTurn[1]) * DEG
+  // (the frame its turn is kept in is always the world's; the handles and the place fields go by the world's axes, or (object space) its own)
+  const thetaW = thetaRoom
+  const theta = space === 'local' ? thetaW + ownYaw : thetaW
+  useEffect(() => { setFrame(id, thetaW, thetaW + ownYaw) }, [id, thetaW, ownYaw])
   void offsets; void rotations; void scales; void selected; void groups // (read so it redraws as it's moved, turned or scaled)
   const o = positionOf(id)
   const rot = rotationOf(id), sc = scaleOf(id)
@@ -498,7 +533,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     // (the room's direction against the parent's own frame: what the move arrows and the position fields are turned by)
     const frameNode = gw.current ?? grp.parent
     const parentYaw = frameNode ? new THREE.Euler().setFromQuaternion(frameNode.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y : 0
-    const theta = Math.atan2(ALONG.x, ALONG.z) - parentYaw
+    // (the world's axes against the parent's own frame)
+    const theta = -parentYaw
     const cx = (best.x0 + best.x1) / 2, cz = (best.z0 + best.z1) / 2
     const co = Math.cos(best.a), si = Math.sin(best.a)
     // (the middle back out of the turned frame)
@@ -510,8 +546,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const par = gw.current
     if (!par) return
     par.updateWorldMatrix(true, false)
-    const t = Math.atan2(ALONG.x, ALONG.z) - new THREE.Euler().setFromQuaternion(par.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
-    setFrame(id, t)
+    const t = -new THREE.Euler().setFromQuaternion(par.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
+    setFrame(id, t, t + ownYaw)
     setTheta(t)
   }
   useLayoutEffect(frame, [])
@@ -538,8 +574,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const par = w.parent
     if (!par) return
     par.updateWorldMatrix(true, false)
-    const Y = new THREE.Vector3(0, 1, 0)
-    const shift = new THREE.Vector3(...gt.t).applyAxisAngle(Y, Math.atan2(ALONG.x, ALONG.z))
+    const shift = new THREE.Vector3(...gt.t)
     const pivot = new THREE.Vector3(...gt.pivot)
     const world = new THREE.Matrix4().makeTranslation(pivot.x + shift.x, pivot.y + shift.y, pivot.z + shift.z)
       .multiply(groupTurn(gt)).multiply(new THREE.Matrix4().makeScale(gt.s, gt.s, gt.s))
@@ -562,9 +597,24 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     if (!on) { setBox(null); return }
     // (a batch merges its meshes a moment after mounting: measured at once and again a little later, so the box is there whenever it's switched on)
     const first = measure('whole')
-    if (first) setFrame(id, first.theta)
+    if (first) setFrame(id, first.theta, first.theta + ownYaw)
+    // (what it's made of, for the panel: its triangles, vertices and meshes as drawn)
+    const countIt = () => {
+      let tris = 0, verts = 0, meshes = 0
+      inner.current?.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh) return
+        for (let q: THREE.Object3D | null = m; q && q !== inner.current; q = q.parent) if (!q.visible) return
+        const geo = m.geometry, n = (m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 1
+        tris += ((geo.index ? geo.index.count : geo.attributes.position.count) / 3) * n
+        verts += geo.attributes.position.count * n
+        meshes++
+      })
+      setStats(id, { tris: Math.round(tris), verts, meshes })
+    }
+    countIt()
     setBox(first)
-    const t = window.setTimeout(() => { const m = measure('whole'), n = measure(); if (m) { setBox(m); setFrame(id, m.theta) } if (n) setMid(n.c) }, 300)
+    const t = window.setTimeout(() => { const m = measure('whole'), n = measure(); if (m) { setBox(m); setFrame(id, m.theta, m.theta + ownYaw) } if (n) setMid(n.c); countIt() }, 300)
     return () => window.clearTimeout(t)
   }, [on])
 
@@ -632,12 +682,12 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       {/* (turned and scaled about the piece's own middle, not the group's origin, which may be far from it) */}
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
           scaled there, and stood back) */}
-      <group ref={pg} position={piv} rotation-y={theta} visible={ready || !pivoted}
+      <group ref={pg} position={piv} rotation-y={thetaW} visible={ready || !pivoted}
         onPointerDown={on ? down : undefined}
         onPointerOver={on ? (e: { stopPropagation: () => void }) => { e.stopPropagation(); setHover(true) } : undefined}
         onPointerOut={on ? () => setHover(false) : undefined}>
         <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]} scale={[sc[0] * baseScale, sc[1] * baseScale, sc[2] * baseScale]}>
-          <group rotation-y={-theta}>
+          <group rotation-y={-thetaW}>
             <group ref={inner} position={[-piv[0], -piv[1], -piv[2]]}><ParentPiece.Provider value={id}>{children}</ParentPiece.Provider></group>
           </group>
         </group>

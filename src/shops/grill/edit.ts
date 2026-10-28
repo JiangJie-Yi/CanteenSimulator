@@ -74,9 +74,11 @@ function settleGroups() {
 export type Space = 'world' | 'local'
 type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string, V3>; rotations: Record<string, V3>; scales: Record<string, V3>; selected: string | null; groups: Record<string, Group>; picked: string[]
   /** each piece's pivot, moved from its middle by hand (in its own frame), what it turns and grows about; and whether the arrows move the pivot (D) */
-  pivots: Record<string, V3>; pivotMode: boolean; space: Space }
+  pivots: Record<string, V3>; pivotMode: boolean; space: Space
+  /** the scene drawn as its wireframe (Maya's 4), to see each model's topology; off is shaded (5) */
+  wire: boolean }
 let state: State = { on: false, locked: false, tool: 'move', offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null, groups: loadGroups(), picked: [],
-  pivots: load(KEY_P), pivotMode: false, space: 'local' }
+  pivots: load(KEY_P), pivotMode: false, space: 'world', wire: false }
 const subs = new Set<() => void>()
 const emit = () => {
   // (in edit mode the room's own pointing (lit things, name tags, the hand) is paused: what's lit now is put out)
@@ -360,6 +362,7 @@ export function toggleEdit() {
   if (state.locked) { toast(T().locked); return }
   if (state.on) { cancelEdit(); return }
   settleGroups()
+  state.wire = false
   baseline = take()
   state.on = true
   state.selected = null
@@ -395,14 +398,29 @@ function toast(text: string, kind: 'warn' | 'edit' | 'plain' = 'warn') {
  * turn about the vertical from the room's frame into the piece's parent's.
  */
 const frames = new Map<string, number>()
-export const setFrame = (id: string, theta: number) => { frames.set(id, theta) }
+/** and the piece's own frame (its parent's, turned by its own turn about the vertical): what the object axes go by */
+const framesObj = new Map<string, number>()
+export const setFrame = (id: string, theta: number, own?: number) => { frames.set(id, theta); if (own !== undefined) framesObj.set(id, own) }
 const turnY = (v: V3, a: number): V3 => [v[0] * Math.cos(a) + v[2] * Math.sin(a), v[1], -v[0] * Math.sin(a) + v[2] * Math.cos(a)]
-export const toRoom = (id: string, v: V3): V3 => (state.space === 'local' ? v : turnY(v, -(frames.get(id) ?? 0)))
+/** the turn (about the vertical) the panel's place goes by: the world's (world space) or the piece's own (object space), into its parent's frame */
+const frameFor = (id: string) => (state.space === 'local' ? framesObj.get(id) ?? 0 : frames.get(id) ?? 0)
+export const toRoom = (id: string, v: V3): V3 => turnY(v, -frameFor(id))
 /** what the panel shows: the place, turn and size counted from the piece's zero */
 const readLoc = (id: string): V3 => { const o = offsetOf(id), z = zeroOf(id).o; return toRoom(id, [o[0] - z[0], o[1] - z[1], o[2] - z[2]]) }
 const readRot = (id: string): V3 => { const r = rotationOf(id), z = zeroOf(id).r; return [r[0] - z[0], r[1] - z[1], r[2] - z[2]] }
 const readScale = (id: string): V3 => { const sc = scaleOf(id), z = zeroOf(id).s; return [sc[0] / (z[0] || 1), sc[1] / (z[1] || 1), sc[2] / (z[2] || 1)] }
-export const fromRoom = (id: string, v: V3): V3 => (state.space === 'local' ? v : turnY(v, frames.get(id) ?? 0))
+export const fromRoom = (id: string, v: V3): V3 => turnY(v, frameFor(id))
+/** wireframe (Maya's 4) or shaded (5) */
+export function setWire(on: boolean) { if (state.wire === on) return; state.wire = on; emit(); toast(on ? T().wireOn : T().wireOff, 'edit') }
+/** what a piece is made of (its triangles, vertices and meshes), told by the piece once edit mode opens: for the panel */
+const stats = new Map<string, { tris: number; verts: number; meshes: number }>()
+export const setStats = (id: string, st: { tris: number; verts: number; meshes: number }) => { stats.set(id, st); panel() }
+export const statsOf = (id: string) => {
+  const g = state.groups[id]
+  if (!g) return stats.get(id) ?? null
+  const ms = g.members.map((m) => stats.get(m)).filter((x): x is { tris: number; verts: number; meshes: number } => !!x)
+  return ms.length ? ms.reduce((a, b) => ({ tris: a.tris + b.tris, verts: a.verts + b.verts, meshes: a.meshes + b.meshes })) : null
+}
 let el: HTMLDivElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
@@ -417,6 +435,7 @@ const PANEL_CSS = `
 .be { position:fixed; left:12px; bottom:92px; z-index:9999; width:292px; max-height:70vh; display:flex; background:#303030; color:#d6d6d6;
   font:11.5px/1.35 "Inter","Segoe UI","Noto Sans TC",sans-serif; border:1px solid #1a1a1a; border-radius:6px; box-shadow:0 6px 22px rgba(0,0,0,.55); overflow:hidden; user-select:none }
 .be * { box-sizing:border-box }
+.be-stats { margin-top:3px; font:11px monospace; color:#9ab }
 .be-tools { display:flex; flex-direction:column; gap:3px; padding:6px 4px; background:#262626; border-right:1px solid #1a1a1a }
 .be-tool { width:30px; height:30px; display:grid; place-items:center; background:#3c3c3c; border:0; border-radius:4px; color:#d6d6d6; cursor:pointer; padding:0 }
 .be-tool svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round }
@@ -637,6 +656,8 @@ function panel() {
     const id = state.selected
     const r = id ? registry.get(id) : null
     info.innerHTML = id ? `${state.groups[id] ? '▣ ' + state.groups[id].name + T().groupMark : r ? pieceName(r.label, lang) : id}` : `<em>${T().nothing}</em>`
+    const st = id ? statsOf(id) : null
+    if (st) info.innerHTML += `<div class="be-stats">${T().stats(st.tris, st.verts, st.meshes)}</div>`
     const values = id ? [...readLoc(id), ...readRot(id), ...readScale(id)] : []
     fields.forEach((f, k) => {
       f.disabled = !id
@@ -665,8 +686,17 @@ if (typeof window !== 'undefined') {
       if (k === '+' || k === '=') { e.preventDefault(); nudgeScale(1); return }
       if (k === '-' || k === '_') { e.preventDefault(); nudgeScale(-1); return }
       if (k === 'd') { e.preventDefault(); togglePivotMode(); return }
-      const t: Tool | null = k === 'q' ? 'select' : k === 'w' ? 'move' : k === 'r' ? 'rotate' : k === 's' ? 'scale' : null
-      if (t) { e.preventDefault(); setTool(t); return }
+      // (as in Maya: Q select, W move, E rotate, R scale; the tool's key pressed again while it's on flips its axes between the world's and the
+      // object's own, as Maya's W/E held for its marking menu does; 4 the wireframe, 5 shaded)
+      const t: Tool | null = k === 'q' ? 'select' : k === 'w' ? 'move' : k === 'e' ? 'rotate' : k === 'r' ? 'scale' : null
+      if (t) {
+        e.preventDefault()
+        if (t === state.tool && t !== 'select') { setSpace(state.space === 'local' ? 'world' : 'local'); toast(state.space === 'local' ? T().spaceLocal : T().spaceWorld, 'edit') }
+        else setTool(t)
+        return
+      }
+      if (k === '4') { e.preventDefault(); setWire(true); return }
+      if (k === '5') { e.preventDefault(); setWire(false); return }
     }
     if (e.key !== 'g' && e.key !== 'G') return
     const t = e.target

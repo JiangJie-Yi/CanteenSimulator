@@ -31,8 +31,7 @@ import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
 import { offsetOf, rotationOf, setEditLang, toggleEdit, useEdit } from '@/shops/grill/edit'
-import { GroupGizmo, Movable } from '@/shops/grill/Movable'
-import { ALONG, LAY } from '@/shops/grill/bar'
+import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
@@ -307,7 +306,8 @@ function AxisWidget() {
     const root = document.getElementById('axis-widget')
     if (!root) return
     const inv = camera.matrixWorldInverse
-    const axes = [[ALONG.x, 0, ALONG.z], [0, 1, 0], [LAY.x, 0, LAY.z]]
+    // (the world's own axes, as the developer panel's world space goes by)
+    const axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
     axes.forEach((v, i) => {
       const d = new THREE.Vector3(...v).transformDirection(inv)
       const line = root.querySelector<SVGLineElement>(`.aw-line-${i}`), dot = root.querySelector<SVGGElement>(`.aw-dot-${i}`), neg = root.querySelector<SVGCircleElement>(`.aw-neg-${i}`)
@@ -759,6 +759,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       <ViewCams editing={editing} lang={lang} pose={poseOf} />
       {/* (a group picked in developer mode: its own handles, to move, turn and size it as one) */}
       <GroupGizmo />
+      {/* (developer mode's wireframe, 4 / 5) */}
+      <WireView />
       <FocusTracker />
       {editing && <AxisWidget />}
       <OrbitControls
