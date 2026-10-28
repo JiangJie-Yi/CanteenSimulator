@@ -12,6 +12,15 @@ const STALL_MS = 20000
 export function LoadingScreen() {
   const { active, loaded, total, errors, progress } = useProgress()
   const [stuck, setStuck] = useState(false)
+  // (only the first load is covered: once the shop has come in, a model or picture fetched later (a guest, a light) loads behind the scenes,
+  // never bringing the veil back over the game; and a count that never started (nothing went through the loaders' tally) isn't waited on)
+  const [done, setDone] = useState(false)
+  useEffect(() => {
+    if (done) return
+    if (!active && total > 0) { setDone(true); return }
+    const t = window.setTimeout(() => { if (useProgress.getState().total === 0) setDone(true) }, 3000)
+    return () => window.clearTimeout(t)
+  }, [active, total, done])
   const last = useRef({ loaded: -1, at: performance.now() })
   useEffect(() => {
     if (loaded !== last.current.loaded) { last.current = { loaded, at: performance.now() }; setStuck(false) }
@@ -21,7 +30,7 @@ export function LoadingScreen() {
   }, [active, loaded])
   // (some files are only looked for (the HDRIs are tried by several names): a miss isn't a failure unless the loading has stopped too)
   const failed = errors.length > 0 && stuck
-  if (!active) return null
+  if (done || !active) return null
   const pct = total > 0 && Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : null
   return (
     <div className="loading-screen" role="status" aria-live="polite">
