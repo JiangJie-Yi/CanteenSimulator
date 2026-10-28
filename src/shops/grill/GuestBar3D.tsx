@@ -294,7 +294,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
         ))}
       </group>
       {/* a samurai helmet (兜) on its stand, set out on top of the shoe cupboard as a decoration, facing into the room */}
-      <Movable id="kabuto" label="武士頭盔"><group position={[0.34, -GENKAN.depth + 0.84, -0.24]} rotation-y={Math.PI / 2} scale={1.1}><Kabuto /></group></Movable>
+      <Movable id="kabuto" label="武士頭盔"><group position={[0.34, -GENKAN.depth + 0.87, -0.33]} rotation-y={Math.PI / 2} scale={0.82}><Kabuto /></group></Movable>
       <Movable id="genkan" label="玄關地墊"><StaticBatch>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       {/* the coir mat lying on the genkan's stone, just inside */}
@@ -315,14 +315,14 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           </group>
         )))}
         <Part geo={REG_GEO.round} color="#3a2416" outline={1.02} position={[0, 0.855, 0]} scale={[0.32, 0.03, 0.44]} />
-        <mesh position={[0, 0.93, 0.05]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
+        <mesh position={[0, 0.93, 0.15]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
         {[0, 1, 2].map((k) => (
-          <mesh key={k} position={[Math.cos(k * 2) * 0.02, 1.04 + k * 0.02, 0.05 + Math.sin(k * 2) * 0.02]} rotation={[Math.sin(k * 2) * 0.4, 0, Math.cos(k * 2) * 0.4]}>
+          <mesh key={k} position={[Math.cos(k * 2) * 0.02, 1.04 + k * 0.02, 0.15 + Math.sin(k * 2) * 0.02]} rotation={[Math.sin(k * 2) * 0.4, 0, Math.cos(k * 2) * 0.4]}>
             <cylinderGeometry args={[0.003, 0.004, 0.16, 4]} /><meshToonMaterial color="#5a3a1e" />
           </mesh>
         ))}
         {[0, 1, 2, 3].map((k) => (
-          <mesh key={`b${k}`} position={[Math.cos(k * 1.7) * 0.05, 1.1 + (k % 2) * 0.03, 0.05 + Math.sin(k * 1.7) * 0.05]}><sphereGeometry args={[0.014, 6, 5]} /><meshToonMaterial color="#f2b0c0" /></mesh>
+          <mesh key={`b${k}`} position={[Math.cos(k * 1.7) * 0.05, 1.1 + (k % 2) * 0.03, 0.15 + Math.sin(k * 1.7) * 0.05]}><sphereGeometry args={[0.014, 6, 5]} /><meshToonMaterial color="#f2b0c0" /></mesh>
         ))}
       </group>
       </StaticBatch></Movable>

@@ -100,7 +100,7 @@ def lathe(name, prof, mat, seg=48, ribs=0, rib_depth=0.0, uv_rows=1.0, arc=(0.0,
     return fin(o, name, mat)
 
 
-H0 = 0.16                      # (the stand's height: the helmet sits on it)
+H0 = 0.04                     # (no stand: the helmet's neck guard rests on what it's set on)
 # ---- the bowl: a low dome, a little longer front to back, its 32 ribs standing up, gold at its crown (the tehen)
 bowl = [(0.11 * math.cos(t), H0 + 0.07 + 0.085 * math.sin(t)) for t in [i / 14 * math.pi / 2 for i in range(15)]]
 bowl[-1] = (0.004, bowl[-1][1])
@@ -171,25 +171,6 @@ for sd in (-1, 1):
     fin(active(), f"KabutoHorn{sd}", M["gold"])
 bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.03, depth=0.005, location=P(0, H0 + 0.112, -0.122), rotation=(math.pi / 2 - 0.3, 0, 0))
 fin(active(), "KabutoSun", M["gold"])
-# ---- the stand: a black lacquer box, a gold edge round its top, short feet, a purple silk tassel hanging from the front
-bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, H0 / 2 + 0.01, 0))
-st = active(); st.scale = (0.26, 0.26, H0 - 0.02); bpy.ops.object.transform_apply(scale=True)
-bv = st.modifiers.new("b", "BEVEL"); bv.width = 0.006; bv.segments = 3
-bpy.ops.object.modifier_apply(modifier="b")
-fin(st, "KabutoStand", M["stand"])
-bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, H0 - 0.002, 0))
-gt = active(); gt.scale = (0.265, 0.265, 0.004); bpy.ops.object.transform_apply(scale=True)
-fin(gt, "KabutoStandEdge", M["gold"])
-for sx in (-1, 1):
-    for sz in (-1, 1):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=P(sx * 0.11, 0.005, sz * 0.11))
-        f = active(); f.scale = (0.03, 0.03, 0.01); bpy.ops.object.transform_apply(scale=True)
-        fin(f, f"KabutoFoot{sx}{sz}", M["stand"])
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.009, segments=12, ring_count=8, location=P(0, H0 - 0.03, -0.134))
-fin(active(), "KabutoTasselKnot", M["silk"])
-bpy.ops.mesh.primitive_cone_add(vertices=14, radius1=0.016, radius2=0.004, depth=0.05, location=P(0, H0 - 0.064, -0.134))
-fin(active(), "KabutoTassel", M["silk"])
-
 root = bpy.data.objects.new("Kabuto", None)
 bpy.context.collection.objects.link(root)
 for o in parts:

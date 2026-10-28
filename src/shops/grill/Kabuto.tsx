@@ -21,13 +21,13 @@ export function Kabuto() {
       const src = m.material as THREE.MeshStandardMaterial
       m.material = src.name === 'KabutoGold'
         ? new THREE.MeshStandardMaterial({ color: '#e0b247', metalness: 1, roughness: 0.28 })
-        : src.name === 'KabutoLacquer' || src.name === 'KabutoStand'
+        : src.name === 'KabutoLacquer'
           ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 })
           : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
       m.castShadow = true
       m.receiveShadow = true
     })
-    inkModel(r, (m) => /Rivet|Tehen|Hem|Sun|Edge|Tassel/.test(m.name), { width: 0.0012, weld: true })
+    inkModel(r, (m) => /Rivet|Tehen|Hem|Sun/.test(m.name), { width: 0.0012, weld: true })
     return r
   }, [gltf])
   return (
