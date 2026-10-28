@@ -3517,6 +3517,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     /** the crate of charcoal or the fan under the pointer */
     const pickDecor = () => {
+      // (the crate's charcoal and the fan are only taken up by hand while researching, as the food and the tools are)
+      if (!byHandRef.current) return null
       const groups: THREE.Object3D[] = []
       world.traverse((o) => { if (typeof o.userData.decor === 'string') groups.push(o) })
       const hit = raycaster.intersectObjects(groups, true)[0]

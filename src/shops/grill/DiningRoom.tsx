@@ -1712,12 +1712,12 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     // (the moment the offering's poured in, a ripple of light spreads out once across the table from the cups)
     if (ring.current) {
       const since0 = (performance.now() - (at ?? 0)) / 1000 - 3.6
-      const show = on && since0 > 0 && since0 < 1.8
+      const show = on && since0 > 0 && since0 < 1.6
       ring.current.visible = show
       if (show) {
-        const q = since0 / 1.8
-        ring.current.scale.setScalar(0.08 + q * 1.0)
-        ;(ring.current.material as THREE.MeshBasicMaterial).opacity = 0.45 * (1 - q) * Math.min(1, since0 * 8)
+        const q = since0 / 1.6
+        ring.current.scale.setScalar(0.1 + q * 1.1)
+        ;(ring.current.material as THREE.MeshBasicMaterial).opacity = 0.32 * (1 - q)
       }
     }
     if (lamp.current) lamp.current.intensity = 0.3 * BLESSING.k * pulse
@@ -1806,7 +1806,8 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         <spriteMaterial map={AURA} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </sprite>
       {/* (the ripple of light spreading once from the cups as the offering's poured) */}
-      <mesh ref={ring} position={[ALTAR_D / 2 - 0.375 + CUPS_SHIFT, 0.004, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
+      {/* (and a ring of light spreading out across the table once from the shrine, as the offering's taken: as it first was) */}
+      <mesh ref={ring} position={[0.05, 0.004, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
         <ringGeometry args={[0.42, 0.5, 64]} />
         <meshBasicMaterial color="#ffd27a" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>

@@ -35,8 +35,38 @@ export type Tool = 'select' | 'move' | 'rotate' | 'scale'
  * (degrees) and `s` how much larger (one number for all three axes). Each member still keeps its own place inside it.
  */
 export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: number; s: number }
+/** groups the shop comes with (the owner's own are added to them): the door's cat stand with its four cats; their pivot is found the first time
+ * edit mode opens, once the pieces have been measured */
+const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[] }> = {
+  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3'] },
+}
+const unsettled = new Set<string>()
+/** the default groups the owner has broken up: not made again */
+const KEY_GD = 'jgs-edit-groups-dropped'
+const dropped = (): string[] => { try { return JSON.parse(localStorage.getItem(KEY_GD) ?? '[]') } catch { return [] } }
 const loadGroups = (): Record<string, Group> => {
-  try { return JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { return {} }
+  let g: Record<string, Group> = {}
+  try { g = JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { /* storage blocked */ }
+  for (const [id, d] of Object.entries(DEFAULT_GROUPS)) {
+    // (not when the owner has already put any of its pieces in a group of their own, or broken it up)
+    const taken = Object.values(g).some((x) => x.members.some((m) => d.members.includes(m)))
+    if (g[id] || taken || dropped().includes(id)) continue
+    g[id] = { name: d.zh, members: d.members, pivot: [0, 0, 0], t: [0, 0, 0], yaw: 0, s: 1 }
+    unsettled.add(id)
+  }
+  return g
+}
+/** a default group's pivot: the middle of its members, once they've all been measured */
+function settleGroups() {
+  for (const id of [...unsettled]) {
+    const g = state.groups[id]
+    if (!g) { unsettled.delete(id); continue }
+    const pts = g.members.map((m) => registry.get(m)?.center?.() ?? null)
+    if (pts.some((v) => !v)) continue
+    const pivot = [0, 1, 2].map((k) => pts.reduce((a, v) => a + v![k], 0) / pts.length) as V3
+    state.groups = { ...state.groups, [id]: { ...g, pivot } }
+    unsettled.delete(id)
+  }
 }
 /** the axes the arrows, rings and fields go by: the room's (world), or the piece's own (local: its parent's frame, as it stands on its wall) */
 export type Space = 'world' | 'local'
@@ -253,6 +283,7 @@ export function dissolveGroup(id: string | null = state.selected) {
   beginChange()
   const { [id]: _g, ...rest } = state.groups
   state.groups = rest
+  if (DEFAULT_GROUPS[id]) try { localStorage.setItem(KEY_GD, JSON.stringify([...dropped(), id])) } catch { /* storage blocked */ }
   state.selected = null
   save(); emit()
   toast(T().ungrouped, 'edit')
@@ -309,6 +340,7 @@ export function cancelEdit() {
 export function toggleEdit() {
   if (state.locked) { toast(T().locked); return }
   if (state.on) { cancelEdit(); return }
+  settleGroups()
   baseline = take()
   state.on = true
   state.selected = null

@@ -5856,7 +5856,8 @@ button {
   opacity: 0.4;
 }
 
-.app.is-editing .stage :is(button, input, select, a, [role='button']):not(.view-reset) {
+/* (the views' menu stays usable: developer mode places each view's camera, and flies to them) */
+.app.is-editing .stage :is(button, input, select, a, [role='button']):not(.view-reset):not(.view-menu button) {
   pointer-events: none;
 }
 
@@ -6395,6 +6396,8 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
   backdrop-filter: blur(8px);
   box-shadow: 0 8px 22px -10px rgb(0 0 0 / 0.45);
 }
+/* (the developer panel shares the corner: while the views' menu is open the panel fades and lets the pointer through to it) */
+body:has(.view-menu) > .be { opacity: 0.15; pointer-events: none; }
 .view-menu button {
   display: flex;
   align-items: center;

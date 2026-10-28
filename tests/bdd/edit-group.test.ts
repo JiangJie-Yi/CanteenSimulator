@@ -4,11 +4,22 @@ import { dissolveGroup, getEdit, groupable, groupOf, makeGroup, moveTo, offsetOf
 
 const centers: Record<string, V3> = { a: [0, 0, 0], b: [2, 0, 0], c: [0, 0, 4], noCenter: [9, 9, 9] }
 const setup = () => {
+  // (the groups the shop comes with are set aside: each scenario starts with none)
+  Object.keys(getEdit().groups).forEach((g) => dissolveGroup(g))
   const offs = Object.entries(centers).map(([id, c]) => registerMovable(id, id, () => {}, id === 'noCenter' ? undefined : () => c))
   return () => offs.forEach((f) => f())
 }
 
 feature('編輯模式的群組', () => {
+  scenario('門口的招財貓台和四隻招財貓，一開始就是一組', ({ then }) => {
+    then('有一個群組，成員是貓台和四隻貓', () => {
+      const g = getEdit().groups['grp-doorcats']
+      expect(g).toBeDefined()
+      expect([...g.members].sort()).toEqual(['doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'doorcats'])
+      expect([g.t, g.yaw, g.s]).toEqual([[0, 0, 0], 0, 1])
+    })
+  })
+
   scenario('點選兩件以上的擺設可以成組，群組的中心在它們中間', ({ given, when, then, and }) => {
     given('清單裡有 a、b、c 三件可成組的擺設', (w) => { w.off = setup(); select(null) })
     when('Ctrl 點選 a 和 b，再按成組', () => { pickToggle('a'); pickToggle('b'); makeGroup() })

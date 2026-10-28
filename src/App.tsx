@@ -526,6 +526,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       aimTarget.copy(aimPos.current).addScaledVector(dir, def.pos.distanceTo(def.target))
     }
     homing.current = true
+    homeGap.current = Infinity
     zoomGoal.current = null
   }, [active, aspect, resetView, view, frame.w, frame.h, size.width, size.height])
 
@@ -576,6 +577,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     }
   }, [gl, camera])
   const zoomDir = useRef(new THREE.Vector3())
+  /** how far the gliding camera was from where it's going, last frame */
+  const homeGap = useRef(Infinity)
 
   useFrame((_, delta) => {
     const k = reducedMotion ? 1 : Math.min(1, delta * 6)
@@ -632,9 +635,11 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       // (any panning is undone too: the target slides back to the middle of the dish)
       c.target.lerp(aimTarget, k)
       c.update()
-      if (camera.position.distanceTo(aimPos.current) < 0.002 && c.target.distanceTo(aimTarget) < 0.002) {
-        homing.current = false
-      }
+      // (there, or as near as it can come: the controls' limits (distance, how low it looks) can keep it off the aim, and then it would be held
+      // there for good, every frame, the view never let go)
+      const gap = camera.position.distanceTo(aimPos.current) + c.target.distanceTo(aimTarget)
+      if (gap < 0.004 || Math.abs(gap - homeGap.current) < 1e-5) homing.current = false
+      homeGap.current = gap
     } else if (c && zoomGoal.current !== null) {
       const dir = zoomDir.current.copy(camera.position).sub(c.target)
       const dist = dir.length()
