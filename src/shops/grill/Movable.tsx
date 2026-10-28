@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, getEdit, groupOf, setStats, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, getEdit, GIZMO, groupOf, setStats, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -193,7 +193,7 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
     if (!r?.parent) return
     const dist = camera.position.distanceTo(r.getWorldPosition(new THREE.Vector3()))
     const fov = (camera as THREE.PerspectiveCamera).fov ?? 45
-    const world = dist * 2 * Math.tan((fov * DEG) / 2) * (GIZMO_PX / gl.domElement.clientHeight)
+    const world = dist * 2 * Math.tan((fov * DEG) / 2) * ((GIZMO_PX * GIZMO.size) / gl.domElement.clientHeight)
     const ps = r.parent.getWorldScale(new THREE.Vector3())
     r.scale.set(world / (ps.x || 1), world / (ps.y || 1), world / (ps.z || 1))
   })

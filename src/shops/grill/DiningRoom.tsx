@@ -1078,43 +1078,29 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   )
 }
 
-/** a bunch of flowers in a white vase with a blue band: stems up from its mouth, a blossom and a leaf or two on each */
-const BLOOMS = ['#f48fb1', '#fbfaf6', '#ffd54f', '#ef5350', '#ce93d8', '#ff9a62', '#fff0a0']
-const BOUQUET_GEO = {
-  vase: new THREE.CylinderGeometry(0.02, 0.024, 0.07, 14),
-  neck: new THREE.CylinderGeometry(0.014, 0.02, 0.02, 14),
-  band: new THREE.CylinderGeometry(0.0245, 0.0245, 0.012, 14),
-  stem: new THREE.CylinderGeometry(0.0013, 0.0013, 1, 5),
-  bloom: new THREE.SphereGeometry(0.014, 10, 8),
-  heart: new THREE.SphereGeometry(0.005, 8, 6),
-  leaf: new THREE.ConeGeometry(0.01, 0.034, 5),
-}
+const VASE_URL = import.meta.env.BASE_URL + 'models/shrinevase.glb'
+/** a shrine vase (榊立て, blender/shrinevase.py): white porcelain with a cobalt band of waves, a spray of glossy sakaki and small chrysanthemums */
 function Bouquet({ lean = 0 }: { lean?: number }) {
-  // (seven blooms fanned over the vase's mouth, the tall ones in the middle; the same every time)
-  const stems = [[0, 0.17, 0], [-0.03, 0.14, 0.01], [0.03, 0.145, -0.01], [-0.016, 0.115, -0.03], [0.018, 0.12, 0.03],
-    [-0.04, 0.1, -0.01], [0.04, 0.105, 0.012]]
-  return (
-    <group rotation-z={lean}>
-      <mesh geometry={BOUQUET_GEO.vase} position-y={0.035}><meshToonMaterial color="#f4f1ea" /></mesh>
-      <mesh geometry={BOUQUET_GEO.band} position-y={0.03}><meshToonMaterial color="#3a5a9a" /></mesh>
-      <mesh geometry={BOUQUET_GEO.neck} position-y={0.08}><meshToonMaterial color="#f4f1ea" /></mesh>
-      {stems.map(([x, y, z], k) => {
-        const len = Math.hypot(x, y - 0.09, z)
-        return (
-          <group key={k}>
-            <mesh geometry={BOUQUET_GEO.stem} position={[x / 2, 0.09 + (y - 0.09) / 2, z / 2]} scale={[1, len, 1]}
-              rotation={[Math.atan2(z, y - 0.09), 0, -Math.atan2(x, y - 0.09)]}><meshToonMaterial color="#3a7a2a" /></mesh>
-            <mesh geometry={BOUQUET_GEO.bloom} position={[x, y, z]} scale={[1, 0.8, 1]}><meshToonMaterial color={BLOOMS[k % BLOOMS.length]} /></mesh>
-            <mesh geometry={BOUQUET_GEO.heart} position={[x, y + 0.008, z]}><meshToonMaterial color="#e8a82a" /></mesh>
-            <mesh geometry={BOUQUET_GEO.leaf} position={[x * 0.55 + (k % 2 ? -0.012 : 0.012), 0.115, z * 0.55]} rotation-z={k % 2 ? 0.7 : -0.7}>
-              <meshToonMaterial color="#3a8a2a" />
-            </mesh>
-          </group>
-        )
-      })}
-    </group>
-  )
+  const gltf = useGLTF(VASE_URL) as unknown as { scene: THREE.Group }
+  const root = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      m.material = src.name === 'VasePorcelain'
+        ? new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.08 })
+        : src.name === 'VaseLeaf'
+          ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.2, side: THREE.DoubleSide })
+          : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: THREE.DoubleSide })
+      m.castShadow = true
+    })
+    inkModel(r, (m) => /Leaves|Mum|Stems/.test(m.name), { width: 0.0008, weld: true })
+    return r
+  }, [gltf])
+  return <group rotation-z={lean}><primitive object={root} /></group>
 }
+useGLTF.preload(VASE_URL)
 
 
 /**
@@ -1666,6 +1652,8 @@ const AURA = canvasTex(128, 128, (g) => {
 })
 /** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015) */
 const CUPS_SHIFT = -0.015
+/** where the Ebisu's feet are, on his pedestal (the ring of light spreads out from there) */
+const EBISU_FEET: [number, number, number] = [0.145, 0.077, 0]
 /** where the cups stand along the shelf's depth (the offering's light comes from there) */
 const CUPS_FX = 0.29 - 0.375 + CUPS_SHIFT
 /** the altar shelf's depth, out from the wall: the god at the back, raised, the censer before him */
@@ -1700,8 +1688,8 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     let seed = 7
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
     const tints = [[1, 0.78, 0.4], [1, 0.86, 0.55], [1, 0.95, 0.82], [1, 0.82, 0.7], [0.85, 0.92, 1]]
-    return Array.from({ length: MOTES }, (_, i) => ({ speed: 0.07 + rnd() * 0.16, turn: (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 1.4), r0: 0.015 + rnd() * 0.07,
-      twF: 2 + rnd() * 7, phase: rnd() * 6.28, z0: (rnd() - 0.5) * 0.2, rise: 0.08 + rnd() * 0.16, offset: rnd(), size: i < 6 ? 2.2 + rnd() : 0.4 + rnd(),
+    return Array.from({ length: MOTES }, (_, i) => ({ speed: 0.025 + rnd() * 0.045, turn: (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 1.4), r0: 0.01 + rnd() * 0.03,
+      twF: 2 + rnd() * 7, phase: rnd() * 6.28, z0: (rnd() - 0.5) * 0.6, rise: 0.32 + rnd() * 0.2, x0: -0.09 + rnd() * 0.12, offset: rnd(), size: i < 6 ? 2.2 + rnd() : 0.4 + rnd(),
       tint: tints[Math.floor(rnd() * (rnd() < 0.85 ? 3 : 5))] }))
   }, [])
   const sparkRnd = useMemo(() => {
@@ -1760,7 +1748,8 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         const ang = m.phase + life * m.turn * Math.PI * 2
         const rr = m.r0 * (0.6 + life * 0.8)
         // (out in front of the open doors, where they're seen, not inside the shrine's walls)
-        pos.setXYZ(i, -0.03 + Math.cos(ang) * rr * 0.5, 0.07 + life * m.rise, m.z0 * (1 - life * 0.3) + Math.sin(ang) * rr)
+        // (slowly up the whole face of the shrine, from its base to above its roof, spread across its width, in front of it)
+        pos.setXYZ(i, m.x0 + Math.cos(ang) * rr * 0.5, 0.03 + life * m.rise, m.z0 + Math.sin(ang) * rr)
         // (in quickly, held, out softly near the top: the shelf's group is scaled, so all this is in its own small units)
         const fade = THREE.MathUtils.smoothstep(life, 0, 0.12) * (1 - THREE.MathUtils.smoothstep(life, 0.55, 1))
         const tw = 0.65 + 0.35 * Math.sin(t * m.twF + m.phase) ** 2
@@ -1801,7 +1790,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     // (the moment the offering's taken: a flash of light up from the cups, sparks thrown out from it in arcs, and two soft rings of light, one
     // after the other, rippling out across the shelf, easing as they spread, turning a little, fading as they go)
     const since0 = on ? (performance.now() - (at ?? 0)) / 1000 - 3.6 : -1
-    for (const [r, delay, dur, size, peak] of [[ring.current, 0, 1.8, 0.62, 0.95], [ring2.current, 0.3, 2.2, 0.46, 0.7]] as const) {
+    for (const [r, delay, dur, size, peak] of [[ring.current, 0, 1.8, 0.34, 0.95], [ring2.current, 0.3, 2.2, 0.26, 0.7]] as const) {
       if (!r) continue
       const q = (since0 - delay) / dur
       r.visible = q > 0 && q < 1
@@ -1843,29 +1832,44 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     if (lamp.current) lamp.current.intensity = 0.3 * BLESSING.k * pulse
     // (pouring: a few seconds from the moment it's offered; the cups stay full while the offering stands)
     const since = at === null ? 99 : (performance.now() - at) / 1000
-    const CUP_X = ALTAR_D / 2 - 0.375 + CUPS_SHIFT, CUP_TOP = 0.05
+    const CUP_X = ALTAR_D / 2 - 0.375 + CUPS_SHIFT, CUP_TOP = 0.05, POUR_Y = 0.085
     const cupZ = [-0.1125, 0, 0.1125]
     const rest = { x: -0.06, y: 0, z: 0.3 }
     const f = flaskRef.current
-    let k = 0, which = -1
-    if (on && since < 4.6) {
-      which = Math.min(2, Math.max(0, Math.floor((since - 0.7) / 1.1)))
-      // (lifts and tips in over the first 0.7 s, back at the end)
-      k = THREE.MathUtils.smoothstep(since, 0, 0.7) * (1 - THREE.MathUtils.smoothstep(since, 4.0, 4.6))
-    }
+    // (one cup after another: 1.1 s each from 0.7 s in, the first quarter second gliding over from the last cup, tipped back a little so
+    // nothing spills between, then pouring; all of it eased, nothing jumps)
+    const GLIDE = 0.28, EACH = 1.1
+    const tt = since - 0.7
+    const which = on && tt >= 0 && tt < 3 * EACH ? Math.min(2, Math.floor(tt / EACH)) : on && tt >= 3 * EACH ? 2 : -1
+    const inSeg = which >= 0 ? tt - which * EACH : 0
+    // (the move to the last cup goes over the top: a little longer)
+    const glideT = which === 2 ? 0.45 : GLIDE
+    const glide = which > 0 ? THREE.MathUtils.smootherstep(inSeg, 0, glideT) : 1
+    const pourK = which >= 0 && tt < 3 * EACH ? THREE.MathUtils.smoothstep(inSeg, which > 0 ? glideT : 0.05, (which > 0 ? glideT : 0.05) + 0.15) * (1 - THREE.MathUtils.smoothstep(inSeg, EACH - 0.12, EACH)) : 0
+    // (lifted out and tipped in over the first 0.7 s, set back down over the last 0.6)
+    const k = on && since < 4.6 ? THREE.MathUtils.smootherstep(since, 0, 0.7) * (1 - THREE.MathUtils.smootherstep(since, 4.0, 4.6)) : 0
     if (f) {
-      const z = which >= 0 ? cupZ[which] - 0.1337 : rest.z
-      f.position.set(THREE.MathUtils.lerp(rest.x, CUP_X, k), THREE.MathUtils.lerp(rest.y, 0.045, k), THREE.MathUtils.lerp(rest.z, z, k))
-      f.rotation.x = k * 1.1
+      // (it pours from beside each cup, on the side away from the oranges: the first two from the near side, the last from the far one,
+      // lifted up over the cups to get there, turning upright on the way and tipping the other way)
+      const side = (i: number) => (i === 2 ? 1 : -1)
+      const zAt = (i: number) => cupZ[i] + side(i) * 0.1337
+      const z = which <= 0 ? zAt(0) : THREE.MathUtils.lerp(zAt(which - 1), zAt(which), glide)
+      const tipSide = which <= 0 ? -1 : THREE.MathUtils.lerp(side(which - 1), side(which), glide)
+      const hop = which > 0 ? Math.sin(Math.PI * glide) * (side(which) !== side(which - 1) ? 0.16 : 0.025) : 0
+      // (held well above the cups and their stand, and arcing up as it's lifted across, so it never passes through them or the oranges)
+      const arc = Math.sin(Math.PI * k) * 0.06
+      f.position.set(THREE.MathUtils.lerp(rest.x, CUP_X, k), THREE.MathUtils.lerp(rest.y, POUR_Y, k) + hop * k + arc, THREE.MathUtils.lerp(rest.z, z, k))
+      f.rotation.x = -tipSide * (k * (0.85 + 0.25 * pourK) + Math.sin(since * 9) * 0.01 * pourK)
     }
-    const pouring = on && since > 0.7 && since < 4.0
+    const pouring = pourK > 0.01
     if (streamRef.current) {
       streamRef.current.visible = pouring
       if (pouring) {
         const z = cupZ[which]
-        const a = 0.045 + 0.068, b = CUP_TOP
+        const a = POUR_Y + 0.068, b = CUP_TOP
+        // (the stream thins in as it starts and out as it stops, wavering a little)
         streamRef.current.position.set(CUP_X, (a + b) / 2, z)
-        streamRef.current.scale.set(1, a - b, 1)
+        streamRef.current.scale.set(pourK * (0.85 + 0.15 * Math.sin(since * 23)), a - b, pourK * (0.85 + 0.15 * Math.cos(since * 19)))
       }
     }
     for (let i = 0; i < 3; i++) {
@@ -1873,7 +1877,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       if (!m) continue
       // (each cup fills as the stream is on it: 1.1 s each from 0.7 s in; what shows is the sake's surface, rising from the cup's floor and
       // always just inside its wall at that height (the cup's walls are solid, so the rest of it is hidden), never through it)
-      const fill = !on ? 0 : THREE.MathUtils.clamp((since - 0.7 - i * 1.1) / 1.1, 0, 1)
+      const fill = !on ? 0 : THREE.MathUtils.smoothstep(since - 0.7 - i * 1.1, i ? 0.32 : 0.1, 1.0)
       m.visible = fill > 0
       const h = CUP_FLOOR + (CUP_FULL - CUP_FLOOR) * fill
       m.position.y = KAMI_SC * (0.03 - 0.0125 + h)
@@ -1932,11 +1936,11 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       {/* (the ripple of light spreading once from the cups as the offering's poured) */}
       {/* (and a ring of light spreading out across the table once from the shrine, as the offering's taken: as it first was) */}
       {/* (just over the shelf's top, so all of it shows on the shelf; gold drawn over, not only added, so it shows by day as well as by night) */}
-      <mesh ref={ring} position={[CUPS_FX, 0.022, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
+      <mesh ref={ring} position={EBISU_FEET} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
         <planeGeometry args={[1, 1]} />
         <meshBasicMaterial map={RIPPLE} color="#ffc95a" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
-      <mesh ref={ring2} position={[CUPS_FX, 0.023, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
+      <mesh ref={ring2} position={[EBISU_FEET[0], EBISU_FEET[1] + 0.001, EBISU_FEET[2]]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
         <planeGeometry args={[1, 1]} />
         <meshBasicMaterial map={RIPPLE} color="#fff0c0" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>

@@ -443,11 +443,15 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   const aspect = frame.w > 0 && frame.h > 0 ? frame.w / frame.h : size.width / size.height
   // (entering developer mode folds the menu away, which widens the stage: the framing is held as it was then, so the view doesn't slide; a
   // change of the window's own size still reframes it)
-  const framedFor = useRef({ w: 0, h: 0 })
+  // (and leaving it, the menu unfolding again doesn't jolt it back either: the framing held from going in stays, until the window's own size
+  // changes)
+  const framedFor = useRef({ w: 0, h: 0, held: false })
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera) || frame.w <= 0) return
-    if (editing && framedFor.current.w === size.width && framedFor.current.h === size.height) return
-    framedFor.current = { w: size.width, h: size.height }
+    const same = framedFor.current.w === size.width && framedFor.current.h === size.height
+    if (editing) framedFor.current.held = true
+    if (same && framedFor.current.held) return
+    framedFor.current = { w: size.width, h: size.height, held: false }
     const offX = size.width / 2 - frame.cx
     const offY = size.height / 2 - frame.cy
     camera.setViewOffset(size.width, size.height, offX, offY, size.width, size.height)

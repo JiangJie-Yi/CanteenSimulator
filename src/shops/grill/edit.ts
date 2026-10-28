@@ -258,6 +258,14 @@ export const SCALE_STEP = 1.05
 /** the size after one + (dir 1) or - (dir -1) step along an axis (null: all three): a twentieth bigger or smaller each, never past 0.05 or 20 times */
 export const stepScale = (v: V3, dir: 1 | -1, axis: 0 | 1 | 2 | null): V3 =>
   v.map((x, k) => (axis === null || axis === k ? Math.round(Math.max(0.05, Math.min(20, dir > 0 ? x * SCALE_STEP : x / SCALE_STEP)) * 100) / 100 : x)) as V3
+/** how big the move / turn / scale handles are drawn (a factor of their usual size), kept in the browser */
+const KEY_GZ = 'jgs-edit-gizmo-size'
+export const GIZMO = { size: (() => { try { return Number(localStorage.getItem(KEY_GZ)) || 0.6 } catch { return 0.6 } })() }
+export function setGizmoSize(dir: 1 | -1) {
+  GIZMO.size = Math.max(0.25, Math.min(2, Math.round(GIZMO.size * (dir > 0 ? 1.15 : 1 / 1.15) * 100) / 100))
+  try { localStorage.setItem(KEY_GZ, String(GIZMO.size)) } catch { /* storage blocked */ }
+  toast(T().gizmoSize(Math.round(GIZMO.size * 100)), 'edit')
+}
 export function nudgeScale(dir: 1 | -1, axis: 0 | 1 | 2 | null = scaleAxis) {
   const id = state.selected
   if (!state.on || !id) return
@@ -717,8 +725,9 @@ if (typeof window !== 'undefined') {
       const k = e.key.toLowerCase()
       // (X, Y, Z choose the axis the + and - keys scale along (again, all three together); + and - scale the chosen piece)
       if (k === 'x' || k === 'y' || k === 'z') { e.preventDefault(); setScaleAxis(({ x: 0, y: 1, z: 2 } as const)[k]); return }
-      if (k === '+' || k === '=') { e.preventDefault(); nudgeScale(1); return }
-      if (k === '-' || k === '_') { e.preventDefault(); nudgeScale(-1); return }
+      // (as Maya's + and -: the handles bigger or smaller on the screen, not the piece; the panel's − / + scale the piece)
+      if (k === '+' || k === '=') { e.preventDefault(); setGizmoSize(1); return }
+      if (k === '-' || k === '_') { e.preventDefault(); setGizmoSize(-1); return }
       if (k === 'd') { e.preventDefault(); togglePivotMode(); return }
       // (as in Maya: Q select, W move, E rotate, R scale; the tool's key pressed again while it's on flips its axes between the world's and the
       // object's own, as Maya's W/E held for its marking menu does; 4 the wireframe, 5 shaded)
