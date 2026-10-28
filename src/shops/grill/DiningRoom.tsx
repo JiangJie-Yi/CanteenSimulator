@@ -1,3 +1,4 @@
+import { BambooModel } from './BarFurnish'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -2687,31 +2688,6 @@ function SakeStack({ part }: { part: number }) {
   }, [gltf, part])
   return <primitive object={stack} />
 }
-/** a clump of bamboo in a glazed pot: a few stalks, leaves in tufts at their joints */
-function PottedBamboo() {
-  const stalks = [[0.04, 0.02, 1.25, 0.05], [-0.05, 0.03, 1.05, -0.08], [0.0, -0.06, 0.9, 0.1]]
-  return (
-    <group>
-      <Inked geometry={PROP_GEO.pot} color="#2c4a5c" position-y={0.13} />
-      <mesh position-y={0.255} rotation-x={-Math.PI / 2}><circleGeometry args={[0.14, 16]} /><meshToonMaterial color="#4a3020" /></mesh>
-      {stalks.map(([x, z, h, lean], i) => (
-        <group key={i} position={[x, 0.25, z]} rotation-z={lean}>
-          <mesh geometry={PROP_GEO.stalk} position-y={h / 2} scale={[1, h, 1]}><meshToonMaterial color="#6f8a3a" /></mesh>
-          {[0.55, 0.75, 0.95].filter((k) => k * h < h).map((k) => (
-            <group key={k} position-y={k * h}>
-              {[0, 2.1, 4.2].map((a) => (
-                <mesh key={a} geometry={PROP_GEO.leaf} position={[Math.cos(a + i) * 0.09, 0.02, Math.sin(a + i) * 0.09]}
-                  rotation={[Math.sin(a + i) * 1.1, 0, -Math.cos(a + i) * 1.1]}>
-                  <meshToonMaterial color={i % 2 ? '#4f7a32' : '#5f8c3a'} />
-                </mesh>
-              ))}
-            </group>
-          ))}
-        </group>
-      ))}
-    </group>
-  )
-}
 /** the willow's weeping branches: each a thin tube arching out from the top of its trunk and falling away */
 const WILLOW = (() => {
   const branches: THREE.BufferGeometry[] = []
@@ -3006,7 +2982,7 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
         <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
       </StaticBatch></Movable>
       <Movable id="bamboo" label="竹盆栽"><StaticBatch key={lang}>
-        <group position={cornerAt} rotation-y={0.4}><PottedBamboo /></group>
+        <group position={cornerAt} rotation-y={0.4}><BambooModel /></group>
       </StaticBatch></Movable>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
       {fr && <Movable id="crates" label="酒箱"><StaticBatch key={lang}>

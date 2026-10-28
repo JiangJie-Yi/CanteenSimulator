@@ -23,6 +23,7 @@ import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProp
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
+import { StoolModel } from './BarFurnish'
 
 /** the boxes on the till's low shelf, each its own piece, and its name in the developer panel */
 const TILL_BOXES = [['bags', '紙袋'], ['napkins', '紙巾'], ['rolls', '收銀紙捲'], ['coasters', '杯墊'], ['chopsticks', '割箸']] as const
@@ -1141,44 +1142,6 @@ const GENKAN_STONE = (() => {
   return t
 })()
 
-/**
- * A Japanese bar stool (丸椅子): a thick round seat of pale wood with a rounded edge and a flat indigo cushion tied on,
- * four square legs splayed out a little, and a ring of rails low between them to rest the feet on.
- */
-const STOOL_GEO = {
-  seat: new THREE.CylinderGeometry(0.115, 0.105, 0.035, 24),
-  cushion: new THREE.CylinderGeometry(0.1, 0.1, 0.018, 24),
-  leg: new THREE.BoxGeometry(0.022, 0.32, 0.022),
-  rail: new THREE.BoxGeometry(0.012, 0.012, 1),
-}
-function Stool() {
-  const legs = [0, 1, 2, 3].map((k) => (k / 4) * Math.PI * 2 + Math.PI / 4)
-  return (
-    <group>
-      <Part geo={STOOL_GEO.seat} color="#c49a64" position={[0, 0.322, 0]} outline={1.05} />
-      <Part geo={STOOL_GEO.cushion} color="#2c3e66" position={[0, 0.347, 0]} outline={1.04} />
-      {legs.map((a) => (
-        // (each leg leans out, its foot further out than its top)
-        <mesh key={a} geometry={STOOL_GEO.leg} position={[Math.cos(a) * 0.082, 0.155, Math.sin(a) * 0.082]}
-          rotation={[Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12]}>
-          <meshToonMaterial color="#8a5a30" />
-        </mesh>
-      ))}
-      {/* the foot rails, a square of them between the legs */}
-      {legs.map((a, k) => {
-        const b = legs[(k + 1) % 4], r = 0.093
-        const p = [(Math.cos(a) + Math.cos(b)) / 2 * r, (Math.sin(a) + Math.sin(b)) / 2 * r]
-        const len = Math.hypot(Math.cos(a) - Math.cos(b), Math.sin(a) - Math.sin(b)) * r
-        return (
-          <mesh key={k} geometry={STOOL_GEO.rail} position={[p[0], 0.1, p[1]]} rotation-y={Math.atan2(Math.cos(b) - Math.cos(a), Math.sin(b) - Math.sin(a))} scale={[1, 1, len]}>
-            <meshToonMaterial color="#7a4e2a" />
-          </mesh>
-        )
-      })}
-    </group>
-  )
-}
-
 /** the counter itself (for the shops that don't draw their own): hinoki top, panelled dark front, a lip */
 function Counter({ length }: { length: number }) {
   const top = useMemo(() => new THREE.BoxGeometry(length + 0.3, 0.07, 0.62), [length])
@@ -1988,7 +1951,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {seats.map((st, n) => (
         <Movable key={`${seats.length}-${n}`} id={`stool${n}`} label={`座位 ${n + 1}`}>
           <StaticBatch>
-            <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><Stool /></group>
+            <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><StoolModel /></group>
           </StaticBatch>
         </Movable>
       ))}
