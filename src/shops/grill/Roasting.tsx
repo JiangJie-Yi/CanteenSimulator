@@ -2298,6 +2298,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
     return roomFor(alive.length, alive.filter(ashedOut).length, COAL_MAX)
   }
+  /** whether one more stick can go on: the bed has room for it, and there's a place on the heap for it to lie (not just a count: a heap piled
+   * as high as it goes has none) */
+  const canPlaceCoal = () => {
+    if (!roomForCoal()) return false
+    const lying: Lay[] = []
+    for (const c of coals.current) if (c && !c.gone && !c.dying) lying.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope })
+    return !!placeStick(lying) || coals.current.some((c) => c && !c.gone && !c.dying && ashedOut(c))
+  }
   /** charcoal onto the fire: a load (the chef, the button), or `count` sticks (one, dragged from the crate by hand) */
   const dropCoals = (from?: { x: number; y: number; z: number }, count?: number, force = 0) => {
     // (only as many as the bed has room for: the most it holds, less those still burning; ones burnt to ash are cleared to make room)
@@ -3588,6 +3596,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // carried a little above the fire; the fan, waved over a lit fire, fans the coals up
     /** the stick or fan in hand: how fast it's moving (scene units a second) and when it last moved */
     const swing = { v: 0, t: 0 }
+    /** whether the 'heap full' tag is showing over the fire while a stick's held */
+    let heapWarn = false
     const holdDecor = (e: PointerEvent) => {
       const h = held.current
       if (!h) return
@@ -3604,6 +3614,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         return
       }
       const moved = at.distanceTo(h.at)
+      // (a stick held over a fire that has no room for it: its tag says so before it's let go)
+      if (h.kind === 'charcoal') {
+        const over = Math.hypot(at.x, at.z) < RING_CLEAR
+        const full = over && !canPlaceCoal()
+        if (full !== heapWarn) { heapWarn = full; setTip(full ? { title: '炭堆已滿', hint: '放不下了，等底下的炭燒成灰再加' } : null) }
+      }
       // (how fast it's being swung (eased over the last few moves): let go, that's how hard it's thrown)
       const dt = Math.max(0.008, (tNow - swing.t) / 1000)
       swing.v = swing.v * 0.5 + (moved / dt) * 0.5
@@ -3622,13 +3638,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const h = held.current
       // (a swing stopped before letting go is no throw: only what's moving at the moment of release counts)
       const force = throwForce(swing.v, performance.now() - swing.t)
+      if (heapWarn) { heapWarn = false; setTip(null) }
       swing.v = 0
       window.removeEventListener('pointermove', holdDecor)
       document.body.classList.remove('is-carrying')
       // the charcoal let go over the fire goes on it
       // (one stick, from where it's let go; the crate is a stick the fewer)
       if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) {
-        if (!roomForCoal()) onNotice?.('heapFull')
+        // (full, it isn't taken from the crate or paid for: it goes back, with a word why)
+        if (!canPlaceCoal()) onNotice?.('heapFull')
         else if (onAddCharcoal?.(true) !== false) { dropCoals({ x: h.at.x, y: h.at.y, z: h.at.z }, 1, force); takeFromCrate() }
       }
       held.current = null
