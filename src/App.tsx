@@ -31,7 +31,7 @@ import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { DRINKS, type DrinkId } from '@/shops/grill/bar'
 import { offsetOf, rotationOf, setEditLang, toggleEdit, useEdit } from '@/shops/grill/edit'
-import { Movable } from '@/shops/grill/Movable'
+import { GroupGizmo, Movable } from '@/shops/grill/Movable'
 import { ALONG, LAY } from '@/shops/grill/bar'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
@@ -757,6 +757,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       {/* (the views: their numbered spots in the room while the view menu's open; in edit mode each view's camera, to be placed by hand) */}
       {pins && !editing && <ViewMarkers lang={lang} onPick={onView} />}
       <ViewCams editing={editing} lang={lang} pose={poseOf} />
+      {/* (a group picked in developer mode: its own handles, to move, turn and size it as one) */}
+      <GroupGizmo />
       <FocusTracker />
       {editing && <AxisWidget />}
       <OrbitControls

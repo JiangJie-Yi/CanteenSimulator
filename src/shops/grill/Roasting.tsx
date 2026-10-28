@@ -92,6 +92,52 @@ const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
 const PASS_SCENE = toGrillScene(passOf(GRILL_COUNTERS)).setY(GRILL_BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y + 0.04)
 const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
+/**
+ * A stick of binchotan striking the heap: struck, it rings like fired clay or a thin bell (that's how its hardness is known), a short bright
+ * 'kin' of a few inharmonic partials over a dry click. Several thrown at once don't all sound: one strike in each little while.
+ */
+let coalAudio: AudioContext | null = null
+let coalLast = 0
+function coalClink(strength: number) {
+  try {
+    const now = performance.now()
+    if (now - coalLast < 45) return
+    coalLast = now
+    coalAudio ??= new AudioContext()
+    const ac = coalAudio
+    const t = ac.currentTime
+    const pitch = 0.85 + Math.random() * 0.35
+    const out = ac.createGain()
+    out.gain.value = 0.16 * strength
+    out.connect(ac.destination)
+    for (const [f, a, d] of [[2150, 1, 0.22], [3480, 0.6, 0.15], [5230, 0.35, 0.09], [7400, 0.2, 0.05]]) {
+      const o = ac.createOscillator()
+      const g = ac.createGain()
+      o.type = 'sine'
+      o.frequency.value = f * pitch
+      g.gain.setValueAtTime(a, t)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d * (0.7 + strength * 0.5))
+      o.connect(g).connect(out)
+      o.start(t)
+      o.stop(t + d + 0.05)
+    }
+    // (the dry click of the strike itself)
+    const n = Math.floor(ac.sampleRate * 0.012)
+    const buf = ac.createBuffer(1, n, ac.sampleRate)
+    const ch = buf.getChannelData(0)
+    for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * Math.exp(-i / (n * 0.2))
+    const src = ac.createBufferSource()
+    src.buffer = buf
+    const hp = ac.createBiquadFilter()
+    hp.type = 'highpass'
+    hp.frequency.value = 1800
+    const cg = ac.createGain()
+    cg.gain.value = 0.5
+    src.connect(hp).connect(cg).connect(out)
+    src.start(t)
+  } catch { /* (no sound to be had) */ }
+}
+
 const FLIGHT_SECONDS = 0.7
 // the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
 // enough room that neighbours don't overlap, then in a second layer on top
@@ -3971,6 +4017,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (c.y <= c.ly && c.vy < 0) {
         c.y = c.ly
         if (!c.bounced) burst(c.x, c.y, c.z)
+        // (binchotan rings as it lands, hard and almost metallic: loud on the first strike, softer on the bounce)
+        if (c.vy < -0.4) coalClink(c.bounced ? 0.35 : 1)
         c.bounced = true
         if (c.vy < -0.9) { c.vy = -c.vy * 0.3; c.vx *= 0.35; c.vz *= 0.35 }
         else { c.vy = 0; c.x = c.lx; c.z = c.lz; c.vx = 0; c.vz = 0; c.settled = true }

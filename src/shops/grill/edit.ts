@@ -31,10 +31,10 @@ const load = (key: string): Record<string, V3> => {
 export type Tool = 'select' | 'move' | 'rotate' | 'scale'
 /**
  * A group of pieces the owner has put together by hand: moved, turned about the vertical and sized as one. `pivot` is where it turns and grows
- * from (the middle of its members, in the world, as it was when made); `t` is how far it's moved (in the room's frame), `yaw` how far it's turned
+ * from (the middle of its members, in the world, as it was when made); `t` is how far it's moved (in the room's frame), `yaw` how far it's turned about the vertical (and `r`, when set, its turn about all three of the room's axes)
  * (degrees) and `s` how much larger (one number for all three axes). Each member still keeps its own place inside it.
  */
-export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: number; s: number }
+export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: number; s: number; r?: V3 }
 /** groups the shop comes with (the owner's own are added to them): the door's cat stand with its four cats; their pivot is found the first time
  * edit mode opens, once the pieces have been measured */
 const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[] }> = {
@@ -147,7 +147,22 @@ export function setPivot(id: string, v: V3, shift: V3 = [0, 0, 0]) {
 export function togglePivotMode() { state.pivotMode = !state.pivotMode; emit() }
 /** the axes gone by: the room's or the piece's own */
 export function setSpace(s: Space) { state.space = s; emit() }
-export const rotationOf = (id: string): V3 => state.groups[id] ? [0, state.groups[id].yaw, 0] : state.rotations[id] ?? [0, 0, 0]
+// ---- frozen zeros (Maya's Freeze Transformations): a piece's place, turn and size as they stand taken for its new 0, 0, 0 / 1, 1, 1. The piece
+// doesn't move: only what the panel reads and takes is counted from there (kept in the browser, with the rest of the edits)
+const KEY_F = 'jgs-edit-frozen-1'
+type Frozen = { o: Record<string, V3>; r: Record<string, V3>; s: Record<string, V3> }
+let frozen: Frozen = (() => { try { return { o: {}, r: {}, s: {}, ...JSON.parse(localStorage.getItem(KEY_F) ?? '{}') } } catch { return { o: {}, r: {}, s: {} } } })()
+const saveFrozen = () => { try { localStorage.setItem(KEY_F, JSON.stringify(frozen)) } catch { /* storage blocked */ } }
+/** the zero a piece's readings are counted from */
+export const zeroOf = (id: string) => ({ o: frozen.o[id] ?? [0, 0, 0] as V3, r: frozen.r[id] ?? [0, 0, 0] as V3, s: frozen.s[id] ?? [1, 1, 1] as V3 })
+/** the selected piece's (or group's) place, turn and size as they stand made its zero */
+export function freezeSelected(id: string | null = state.selected) {
+  if (!id) return
+  frozen = { o: { ...frozen.o, [id]: offsetOf(id) }, r: { ...frozen.r, [id]: rotationOf(id) }, s: { ...frozen.s, [id]: scaleOf(id) } }
+  saveFrozen(); emit()
+  toast(T().frozen, 'edit')
+}
+export const rotationOf = (id: string): V3 => state.groups[id] ? state.groups[id].r ?? [0, state.groups[id].yaw, 0] : state.rotations[id] ?? [0, 0, 0]
 export const scaleOf = (id: string): V3 => state.groups[id] ? [state.groups[id].s, state.groups[id].s, state.groups[id].s] : state.scales[id] ?? [1, 1, 1]
 const save = () => {
   try {
@@ -197,7 +212,7 @@ export function moveTo(id: string, v: V3) {
   state.selected = id; emit()
 }
 export function turnTo(id: string, v: V3) {
-  if (state.groups[id]) state.groups = { ...state.groups, [id]: { ...state.groups[id], yaw: v[1] } }
+  if (state.groups[id]) state.groups = { ...state.groups, [id]: { ...state.groups[id], yaw: v[1], r: v } }
   else state.rotations = { ...state.rotations, [id]: v }
   state.selected = id; emit()
 }
@@ -213,8 +228,10 @@ export function scaleTo(id: string, v: V3) {
 }
 export const commitOffsets = () => save()
 export function resetAll() {
+  frozen = { o: {}, r: {}, s: {} }
+  saveFrozen()
   beginChange(); state.offsets = {}; state.rotations = {}; state.scales = {}
-  state.groups = Object.fromEntries(Object.entries(state.groups).map(([k, g]) => [k, { ...g, t: [0, 0, 0] as V3, yaw: 0, s: 1 }]))
+  state.groups = Object.fromEntries(Object.entries(state.groups).map(([k, g]) => [k, { ...g, t: [0, 0, 0] as V3, yaw: 0, s: 1, r: [0, 0, 0] as V3 }]))
   save(); emit()
 }
 export const select = (id: string | null) => { state.selected = id; emit() }
@@ -381,6 +398,10 @@ const frames = new Map<string, number>()
 export const setFrame = (id: string, theta: number) => { frames.set(id, theta) }
 const turnY = (v: V3, a: number): V3 => [v[0] * Math.cos(a) + v[2] * Math.sin(a), v[1], -v[0] * Math.sin(a) + v[2] * Math.cos(a)]
 export const toRoom = (id: string, v: V3): V3 => (state.space === 'local' ? v : turnY(v, -(frames.get(id) ?? 0)))
+/** what the panel shows: the place, turn and size counted from the piece's zero */
+const readLoc = (id: string): V3 => { const o = offsetOf(id), z = zeroOf(id).o; return toRoom(id, [o[0] - z[0], o[1] - z[1], o[2] - z[2]]) }
+const readRot = (id: string): V3 => { const r = rotationOf(id), z = zeroOf(id).r; return [r[0] - z[0], r[1] - z[1], r[2] - z[2]] }
+const readScale = (id: string): V3 => { const sc = scaleOf(id), z = zeroOf(id).s; return [sc[0] / (z[0] || 1), sc[1] / (z[1] || 1), sc[2] / (z[2] || 1)] }
 export const fromRoom = (id: string, v: V3): V3 => (state.space === 'local' ? v : turnY(v, frames.get(id) ?? 0))
 let el: HTMLDivElement | null = null
 let info: HTMLDivElement | null = null
@@ -575,9 +596,10 @@ function panel() {
       })
       tr.appendChild(g)
     }
-    group(T().location, '0.01', (id) => toRoom(id, offsetOf(id)), (id, v) => moveTo(id, fromRoom(id, v)), [0, 0, 0])
-    group(T().rotation, '5', rotationOf, turnTo, [0, 0, 0])
-    group(T().scale, '0.05', scaleOf, scaleTo, [1, 1, 1], true)
+    // (each read from the piece's zero (its frozen place, turn and size, if it has one) and written back onto it)
+    group(T().location, '0.01', readLoc, (id, v) => { const z = zeroOf(id).o, w = fromRoom(id, v); moveTo(id, [w[0] + z[0], w[1] + z[1], w[2] + z[2]]) }, [0, 0, 0])
+    group(T().rotation, '5', readRot, (id, v) => { const z = zeroOf(id).r; turnTo(id, [v[0] + z[0], v[1] + z[1], v[2] + z[2]]) }, [0, 0, 0])
+    group(T().scale, '0.05', readScale, (id, v) => { const z = zeroOf(id).s; scaleTo(id, [v[0] * z[0], v[1] * z[1], v[2] * z[2]]) }, [1, 1, 1], true)
     const foot = h('div', 'be-foot')
     const mk = (text: string, title: string, fn: () => void, cls = '') => {
       const b = h('button', cls, text) as HTMLButtonElement
@@ -586,6 +608,7 @@ function panel() {
       return b
     }
     foot.append(
+      mk(T().freeze, T().freezeTip, () => freezeSelected()),
       mk(T().group, T().groupTip, makeGroup),
       mk(T().ungroup, T().ungroupTip, () => dissolveGroup()),
       mk(T().rename, T().renameTip, () => { const g = state.selected ? state.groups[state.selected] : null; if (g) { const n = window.prompt(T().renamePrompt, g.name); if (n) renameGroup(state.selected!, n) } }),
@@ -614,9 +637,9 @@ function panel() {
     const id = state.selected
     const r = id ? registry.get(id) : null
     info.innerHTML = id ? `${state.groups[id] ? '▣ ' + state.groups[id].name + T().groupMark : r ? pieceName(r.label, lang) : id}` : `<em>${T().nothing}</em>`
-    const values = id ? [...toRoom(id, offsetOf(id)), ...rotationOf(id), ...scaleOf(id)] : []
+    const values = id ? [...readLoc(id), ...readRot(id), ...readScale(id)] : []
     fields.forEach((f, k) => {
-      f.disabled = !id || (isGroup(id) && (k === 3 || k === 5))
+      f.disabled = !id
       if (id && document.activeElement !== f) f.value = k < 3 ? values[k].toFixed(3) : k < 6 ? values[k].toFixed(0) : values[k].toFixed(2)
       if (!id) f.value = ''
     })

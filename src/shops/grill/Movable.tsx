@@ -125,6 +125,33 @@ const AXES = [
  * The three axes of the selected piece (red X, green Y, blue Z, along the same axes as its X, Y, Z fields): drag an arrow to move it along
  * that axis alone. It stands in the piece's own group, at `at`, so it moves with it.
  */
+/** a group's turn, about the room's axes (X along the bar, Y up, Z across it), as a matrix in the world */
+function groupTurn(g: { yaw: number; r?: V3 }) {
+  const a = Math.atan2(ALONG.x, ALONG.z)
+  const r = g.r ?? [0, g.yaw, 0]
+  return new THREE.Matrix4().makeRotationY(a)
+    .multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(r[0] * DEG, r[1] * DEG, r[2] * DEG)))
+    .multiply(new THREE.Matrix4().makeRotationY(-a))
+}
+
+/** the selected group's handles: the arrows, rings or boxes at its pivot (where it's been moved to), along the room's axes; they move, turn and
+ * size the group as one, as a piece's own handles do it */
+export function GroupGizmo() {
+  const { on, selected, groups } = useEdit()
+  const g = on && selected ? groups[selected] : null
+  if (!g || !selected) return null
+  const a = Math.atan2(ALONG.x, ALONG.z)
+  // (in the room's frame: the pivot (kept in the world) turned into it, and the group's move added)
+  const p = new THREE.Vector3(...g.pivot).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a)
+  return (
+    <group name="group-gizmo" rotation-y={a}>
+      <group>
+        <AxisGizmo id={selected} at={[p.x + g.t[0], p.y + g.t[1], p.z + g.t[2]]} theta={0} />
+      </group>
+    </group>
+  )
+}
+
 export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V3; size?: number; theta?: number; pivotGroup?: { current: THREE.Group | null } }) {
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
@@ -515,7 +542,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const shift = new THREE.Vector3(...gt.t).applyAxisAngle(Y, Math.atan2(ALONG.x, ALONG.z))
     const pivot = new THREE.Vector3(...gt.pivot)
     const world = new THREE.Matrix4().makeTranslation(pivot.x + shift.x, pivot.y + shift.y, pivot.z + shift.z)
-      .multiply(new THREE.Matrix4().makeRotationY(gt.yaw * DEG)).multiply(new THREE.Matrix4().makeScale(gt.s, gt.s, gt.s))
+      .multiply(groupTurn(gt)).multiply(new THREE.Matrix4().makeScale(gt.s, gt.s, gt.s))
       .multiply(new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z))
     const local = new THREE.Matrix4().copy(par.matrixWorld).invert().multiply(world).multiply(par.matrixWorld)
     if (!laid.current || !w.matrix.equals(local)) { w.matrix.copy(local); w.matrixWorldNeedsUpdate = true; laid.current = true }
