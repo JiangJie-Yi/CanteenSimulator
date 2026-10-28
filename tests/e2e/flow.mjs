@@ -94,6 +94,8 @@ for (const [i, shop] of SHOPS.entries()) {
       best = Math.max(best, await cash())
     }
     check(shop, 'customers come in and pay', best > open, `${open} -> ${best}`)
+    // (SHOT=<path>: a picture of the shop at work, customers in, for a look at how they're drawn)
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT })
   } catch (e) {
     failures.push(`${shop} stopped: ${e.message.split('\n')[0]}`)
   }

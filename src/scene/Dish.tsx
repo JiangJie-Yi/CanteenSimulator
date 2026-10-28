@@ -74,10 +74,11 @@ function jitter(node: THREE.Object3D, skewer: boolean, gentle = false) {
 const baseName = (name: string) => name.replace(/\d+$/, '')
 
 // three-tone cel shading ramp
+// (soft, as the hand-painted models are: five tones blended, not three hard bands)
 const gradientMap = (() => {
-  const t = new THREE.DataTexture(new Uint8Array([95, 175, 255]), 3, 1, THREE.RedFormat)
-  t.minFilter = THREE.NearestFilter
-  t.magFilter = THREE.NearestFilter
+  const t = new THREE.DataTexture(new Uint8Array([105, 150, 192, 228, 255]), 5, 1, THREE.RedFormat)
+  t.minFilter = THREE.LinearFilter
+  t.magFilter = THREE.LinearFilter
   t.needsUpdate = true
   return t
 })()

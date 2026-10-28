@@ -109,6 +109,9 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 收銀櫃上的小東西（`blender/tilldesk.py` → `tilldesk.glb`，`shops/grill/TillDesk.tsx`）：筆筒 `TillPens`、明細印表機 `TillPrinter`、刷卡機 `TillCardReader`（桌上型：斜面機身、灰色液晶、導覽鍵、橡膠數字鍵、紅黃綠鍵、內建出單機，前端插著一張卡）、服務鈴 `TillBell`、胡桃木台座 `TillMat`（15 cm 高，正面兩個抽屜、黃銅把手）、找零盤（カルトン）`TillTray`、招財貓石座 `TillCatStand`，各自一個 Movable；服務鈴可以按（`TillBellLive`：按壓桿 `TillBellPlunger` 下壓、叮一聲）。放在台座上的（平板、筆筒、印表機、刷卡機）在 `edit.ts` 的 `BASES` 裡 y 墊高 0.15；它們的線各自收進身後桌墊上的小孔（模型的一部分，跟著移動），平板的線藏在支架裡，收銀機的電源線從機身背後收進機身下的走線孔。**編輯面板顯示的是房間座標，`BASES` 存的是父層座標，寫預設前要用 `fromRoom(id, v)` 換算。**
 - 客人（十五種 Q 版角色、每種有幾種髮型隨機搭配、共用一副骨架，動作 Sit／Eat／Walk；出現比例是 `data/guests.ts` 的 `weight`）由 `blender/guests.py` 產生 `public/models/guests.glb`，`scene/Person3D.tsx` 載入後依客人換膚色、髮色、衣服顏色與花紋。手機不跑 3D 吧台，所以沒有 lite 版。
 
+- 其他 Blender 模型：吧台椅與竹盆栽（`blender/barfurnish.py` → `stool.glb`、`bamboopot.glb`，`BarFurnish.tsx`）、廁所免治馬桶與洗手台（`blender/wc.py` → `toilet.glb`、`washstand.glb`）、飯桶（`blender/ricetub.py` → `ricetub.glb`，節點 `RiceTubBody`／`RiceTubLid`／`RiceTubRice`，蓋子仍可點開）。
+- 人物與食物的光影是柔和五階漸層（`Person3D.tsx`、`Dish.tsx` 的 `gradientMap`），人物另有手繪式由下往上的明暗與邊緣微光（`airbrush`），參考冷凍櫃上那條手繪藍魚的風格。
+
 ## 烤魚店的 3D 店面（`src/shops/grill/`）
 
 | 檔案 | 內容 |
@@ -127,6 +130,10 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 供清酒（點門口神棚前的酒瓶）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`；名稱沿用舊的點香）。
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。
 - **擋住視線的吊掛物會變淡**：`scene/OccluderFade.tsx` 每幾格從鏡頭朝看的目標（`__ctl.target` 在畫面上的位置，周圍一圈）打射線，標了 `userData.fade` 的群組（門簾、紅燈籠、旗幟串、幟旗、燈串、吊燈）擋在中間就淡到 18%，移開就恢復（各自複製材質，不影響共用同一材質的東西）。新的吊掛擺設要會變淡，就在它的群組加 `userData={{ fade: true }}`。
+- **收銀抽屜的錢**（`game/till.ts` 的 `openingFloat`／`deposit`／`takeOut`，BDD `till`）：付現的客人把帳單放進抽屜；抽屜開著時老闆點紙鈔格或硬幣格把整格拿走，加進現金（帳本的「收銀機取款」，`ledger.till`）。
+- **碗盤櫃是盤子的來源**（`game/plates.ts`，BDD `plates`）：櫃上顯示幾個就是幾個；點一下搬一疊到出餐口（最多 12 個），出餐口空了服務生自己去拿，洗好放不下的回到櫃上。
+- **自動營運的營業套路**（`game/flow.ts`，BDD `flow`）：每次開店抽一種（平日、午餐尖峰、晚餐尖峰、雨天、祭典、觀光團、熟客日），各自的來客節奏、結伴比例、點單量不同，開店時主廚會說。
+- 店面沿吧台縮短了 `BAR_TRIM`（`bar.ts`）；玄關 `GENKAN.along` 往吧台拉長。
 - 卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps；右上角 ×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
 
 **開發用（只在 dev）**：瀏覽器 console 可用 `__gl`（renderer，看 draw calls）、`__scene`、`__cam` 與 `__ctl`（設定視角：`__ctl.target.set(...)`、`__cam.position.set(...)`）、`__service`、`__toilets`（例如 `__toilets.m.open = true`）。場景裡名稱 `look-*` 的群組（`look-altar`、`look-fridge`、`look-door`、`look-wc-m`…）方便用 `__scene.getObjectByName` 找位置截圖。
