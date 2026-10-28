@@ -80,7 +80,9 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
 const PEOPLE_SCALE = 1.3
 
 /** the noren's cloth: deep indigo, a white band of the shop's mark across its three panels, faded at the hem */
-const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
+const norenTexture = (mark: string) => signTexture(384 * 3, 256 * 3, (g) => {
+  // (drawn at three times the size it's laid out in, so the crest's fine lines stay crisp up close)
+  g.setTransform(3, 0, 0, 3, 0, 0)
   // indigo dyed cloth, darker at the top where it's hung, a fine weave, the dye gone uneven
   const grad = g.createLinearGradient(0, 0, 0, 256)
   grad.addColorStop(0, '#17244a')
@@ -115,14 +117,16 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
     const CX = 192, CY = 102, R = 56
     // (the ring: a heavy one and a fine one inside it)
     g.strokeStyle = CREAM
-    g.lineWidth = 5.5
+    g.lineWidth = 4.2
     g.beginPath(); g.arc(CX, CY, R, 0, Math.PI * 2); g.stroke()
-    g.lineWidth = 1.4
-    g.beginPath(); g.arc(CX, CY, R - 7.5, 0, Math.PI * 2); g.stroke()
+    g.lineWidth = 0.9
+    g.beginPath(); g.arc(CX, CY, R - 6.5, 0, Math.PI * 2); g.stroke()
+    g.beginPath(); g.arc(CX, CY, R + 4.5, 0, Math.PI * 2); g.stroke()
     g.save()
     g.beginPath(); g.arc(CX, CY, R - 3, 0, Math.PI * 2); g.clip()
     // (the fish's spine: a cubic from the snout, up over the crest of the leap and down to the tail's root)
-    const P: [number, number][] = [[150, 100], [156, 44], [224, 46], [230, 112]]
+    // (a gentle arch, the fish leaping out of the waves from left to right and about to dive again: not curled on itself)
+    const P: [number, number][] = [[146, 104], [160, 62], [208, 58], [228, 94]]
     const at = (t: number): [number, number] => {
       const u = 1 - t
       return [u * u * u * P[0][0] + 3 * u * u * t * P[1][0] + 3 * u * t * t * P[2][0] + t * t * t * P[3][0], u * u * u * P[0][1] + 3 * u * u * t * P[1][1] + 3 * u * t * t * P[2][1] + t * t * t * P[3][1]]
@@ -147,7 +151,8 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
     g.fillStyle = CREAM
     // (the dorsal fin, swept back along the arch, and the tail: a forked fin laid along the spine's last direction)
     {
-      const o = (t: number, k: number, along = 0): [number, number] => { const [x, y] = side(t, 1); const [dx, dy] = dir(t); return [x - dy * k + dx * along, y + dx * k + dy * along] }
+      // (on the back, the arch's outer side)
+      const o = (t: number, k: number, along = 0): [number, number] => { const [x, y] = side(t, -1); const [dx, dy] = dir(t); return [x + dy * k + dx * along, y - dx * k + dy * along] }
       g.beginPath()
       const f0 = o(0.36, -0.5), f1 = o(0.5, 15, 9), f2 = o(0.66, -0.5)
       g.moveTo(...f0); g.quadraticCurveTo(...o(0.4, 13, -2), ...f1); g.quadraticCurveTo(...o(0.6, 8, 4), ...f2); g.closePath(); g.fill()
@@ -162,12 +167,13 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
     body(); g.fill()
     // (the pectoral fin, a leaf tucked back under the gill, in the same cream with an indigo line round it so it reads against the body)
     {
-      const [x, y] = side(0.3, -0.8), [dx, dy] = dir(0.3)
+      // (on the belly side, swept back)
+      const [x, y] = side(0.3, 0.8), [dx, dy] = dir(0.3)
       g.save()
       g.beginPath()
       g.moveTo(x, y)
-      g.quadraticCurveTo(x + dx * 6 + dy * 9, y + dy * 6 - dx * 9, x + dx * 17 + dy * 10, y + dy * 17 - dx * 10)
-      g.quadraticCurveTo(x + dx * 9 + dy * 1, y + dy * 9 - dx * 1, x, y)
+      g.quadraticCurveTo(x + dx * 6 - dy * 9, y + dy * 6 + dx * 9, x + dx * 17 - dy * 10, y + dy * 17 + dx * 10)
+      g.quadraticCurveTo(x + dx * 9 - dy * 1, y + dy * 9 + dx * 1, x, y)
       g.fillStyle = CREAM; g.strokeStyle = INDIGO; g.lineWidth = 1.6; g.fill(); g.stroke()
       g.restore()
     }
@@ -187,7 +193,7 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
       const m0 = side(0.012, -0.2), m1 = side(0.07, -0.25)
       g.beginPath(); g.moveTo(...m0); g.lineTo(...m1); g.stroke()
     }
-    g.lineWidth = 1.05
+    g.lineWidth = 0.7
     for (let row = 0; row < 7; row++) {
       const t = 0.34 + row * 0.075
       for (let k = -2; k <= 2; k++) {
@@ -201,7 +207,7 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
     g.restore()
     // (spray where it breaks the water, and the drops it throws)
     g.fillStyle = CREAM
-    for (const [x, y, r] of [[238, 100, 2.4], [244, 108, 1.7], [233, 94, 1.5], [246, 118, 2], [226, 124, 1.5], [165, 118, 1.8]] as number[][]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill() }
+    for (const [x, y, r] of [[142, 118, 2.2], [150, 124, 1.6], [136, 126, 1.4], [158, 130, 1.8], [132, 112, 1.2], [236, 120, 1.6], [229, 126, 1.2]] as number[][]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill() }
     // (the sea: three bands, each with a scalloped crest, cream with an indigo line between them, the top one over the fish's tail)
     const sea = (y0: number, ph: number) => {
       g.beginPath(); g.moveTo(CX - R, y0 + 40)
@@ -210,7 +216,7 @@ const norenTexture = (mark: string) => signTexture(384, 256, (g) => {
     }
     for (const [y0, ph] of [[136, 0], [146, 9], [156, 4]] as number[][]) {
       sea(y0, ph); g.fillStyle = CREAM; g.fill()
-      g.strokeStyle = INDIGO; g.lineWidth = 2.6
+      g.strokeStyle = INDIGO; g.lineWidth = 1.8
       g.beginPath(); for (let x = CX - R - 6; x <= CX + R + 6; x += 2) { const y = y0 + Math.sin((x + ph) / 6.5) * 3.4 + Math.sin((x + ph) / 13) * 2; if (x === CX - R - 6) g.moveTo(x, y); else g.lineTo(x, y) } g.stroke()
     }
     g.lineCap = 'butt'
