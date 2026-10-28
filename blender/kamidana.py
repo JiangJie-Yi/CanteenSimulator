@@ -845,6 +845,12 @@ bpy.data.objects.remove(hi)
 fig = lo
 fig.name = "KamiEbisuFigure"
 eb.append(fig)
+# (the face drawn in as well, dark in the carved lines, so it reads from across the room and not only up close in the relief: closed smiling
+# eyes, brows, the wide smile, the moustache's line)
+for sz in (-1, 1):
+    eb.append(ebtube(f"KamiEbisuEye{sz}", arcpts(sz * 0.0056, 0.0675, 0.0058, 0.0015, x=FX - 0.0003), 0.00055, M["stoneDark"], ring=6))
+    eb.append(ebtube(f"KamiEbisuBrow{sz}", arcpts(sz * 0.0058, 0.0722, 0.0064, 0.0011, x=FX + 0.0009), 0.00042, M["stoneDark"], ring=6))
+eb.append(ebtube("KamiEbisuSmile", arcpts(0.0, 0.0585, 0.011, 0.0025, up=False, x=FX + 0.0002), 0.0006, M["stoneDark"], ring=6))
 eb.append(cyl("KamiEbisuTaiEye", 0.0012, 0.001, P(-0.027, 0.064, 0.018), M["stoneDark"], rot=(0, math.pi / 2, 0), verts=10))
 # (the rod: from his raised hand up past his shoulder, bending a little, its line hanging from the tip)
 # (the rod: upright in his right hand, from the rock up past his hat, a little bent; its line hanging from the tip)

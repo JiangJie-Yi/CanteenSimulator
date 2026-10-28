@@ -1201,6 +1201,58 @@ export function ContactShadow({ r, y = 0.0008 }: { r: number; y?: number }) {
 
 /** whether an offering of sake stands just now (Altar sets it): the shrine's doors open of themselves, the Ebisu glows */
 const BLESSING = { on: false, k: 0 }
+/** a ring of light, feathered both sides, a little brighter and broken with sparkle along its band (the ripple when the sake's offered) */
+const RIPPLE = (() => {
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')!
+  const img = g.createImageData(256, 256)
+  let seed = 3
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const spark = Array.from({ length: 90 }, () => [rnd() * Math.PI * 2, 0.72 + rnd() * 0.14, 0.4 + rnd() * 0.6])
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+    const dx = (x - 127.5) / 128, dy = (y - 127.5) / 128, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx)
+    let v = Math.exp(-(((r - 0.8) / 0.05) ** 2)) * 0.9 + Math.exp(-(((r - 0.8) / 0.16) ** 2)) * 0.35
+    for (const [sa, sr, sb] of spark) {
+      const da = Math.abs(((a - sa + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * r, dr = r - sr
+      v += sb * Math.exp(-(da * da + dr * dr) / 0.0004)
+    }
+    const i = (y * 256 + x) * 4
+    img.data[i] = 255; img.data[i + 1] = 226; img.data[i + 2] = 160; img.data[i + 3] = Math.min(255, v * 255) * (r < 1 ? 1 : 0)
+  }
+  g.putImageData(img, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+/** the burst of sparks at the moment it's poured, and the motes that rise round the shrine while it stands */
+const SPARKS = 36, MOTES = 60
+/** points with a size and a transparency of their own each (the size and alpha attributes), so a mote can fade without going dark */
+const pointsEach = (sh: { vertexShader: string; fragmentShader: string }) => {
+  sh.vertexShader = sh.vertexShader.replace('uniform float size;', 'attribute float size;\nattribute float alpha;\nvarying float vAlpha;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vAlpha = alpha;')
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vAlpha;')
+    .replace('#include <premultiplied_alpha_fragment>', 'gl_FragColor.a *= vAlpha;\n#include <premultiplied_alpha_fragment>')
+}
+/** a glint: a white-hot core, a soft glow, and four thin rays (the motes and the sparks: a twinkle that reads on pale wood as on dark) */
+const STAR = (() => {
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const g = c.getContext('2d')!
+  const img = g.createImageData(64, 64)
+  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+    const dx = (x - 31.5) / 32, dy = (y - 31.5) / 32, r = Math.hypot(dx, dy)
+    const core = Math.exp(-((r / 0.09) ** 2)), glow = Math.exp(-((r / 0.35) ** 2)) * 0.55
+    const rays = (Math.exp(-((dx / 0.035) ** 2)) + Math.exp(-((dy / 0.035) ** 2))) * Math.max(0, 1 - r) ** 2 * 0.8
+    const v = Math.min(1, core + glow + rays)
+    const i = (y * 64 + x) * 4
+    img.data[i] = 255; img.data[i + 1] = 255; img.data[i + 2] = 255; img.data[i + 3] = v * 255
+  }
+  g.putImageData(img, 0, 0)
+  return new THREE.CanvasTexture(c)
+})()
+/** a gentle ease out */
+const easeOut = (q: number) => 1 - (1 - q) ** 3
 /** the shrine's doors: each pair swings open about its hinges when clicked, and shut again */
 /** pointer props that only name a thing when pointed at (no glow, the cursor as it is, nothing to click): the shrine's offerings */
 function nameOnly(title: string, hint: string) {
@@ -1614,6 +1666,8 @@ const AURA = canvasTex(128, 128, (g) => {
 })
 /** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015) */
 const CUPS_SHIFT = -0.015
+/** where the cups stand along the shelf's depth (the offering's light comes from there) */
+const CUPS_FX = 0.29 - 0.375 + CUPS_SHIFT
 /** the altar shelf's depth, out from the wall: the god at the back, raised, the censer before him */
 const ALTAR_D = 0.58
 /** and its height: up over the beckoning cats' stand below it, by the door */
@@ -1639,13 +1693,21 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   const burning = useRef(false)
   const motes = useRef<THREE.Points>(null)
   const moteMat = useRef<THREE.PointsMaterial>(null)
-  const MOTES = 22
-  // (each mote its own: how fast it rises, how far and how fast it sways, which way it drifts, when it starts, how big it is)
+  const sparks = useRef<THREE.Points>(null)
+  // (each mote its own: how fast it rises, round which way and how far it spirals, how it twinkles, when it starts, how big, its tint (gold,
+  // a paler gold, nearly white, now and then a faint rose or sky), and a few large soft ones, as light out of focus)
   const moteRnd = useMemo(() => {
     let seed = 7
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    return Array.from({ length: MOTES }, () => ({ speed: 0.12 + rnd() * 0.22, sway: 0.008 + rnd() * 0.04, swayF: 0.6 + rnd() * 2.4, phase: rnd() * 6.28,
-      dx: (rnd() - 0.5) * 0.08, z0: (rnd() - 0.5) * 0.3, rise: 0.35 + rnd() * 0.45, offset: rnd(), size: rnd() }))
+    const tints = [[1, 0.78, 0.4], [1, 0.86, 0.55], [1, 0.95, 0.82], [1, 0.82, 0.7], [0.85, 0.92, 1]]
+    return Array.from({ length: MOTES }, (_, i) => ({ speed: 0.07 + rnd() * 0.16, turn: (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 1.4), r0: 0.015 + rnd() * 0.07,
+      twF: 2 + rnd() * 7, phase: rnd() * 6.28, z0: (rnd() - 0.5) * 0.2, rise: 0.08 + rnd() * 0.16, offset: rnd(), size: i < 6 ? 2.2 + rnd() : 0.4 + rnd(),
+      tint: tints[Math.floor(rnd() * (rnd() < 0.85 ? 3 : 5))] }))
+  }, [])
+  const sparkRnd = useMemo(() => {
+    let seed = 11
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    return Array.from({ length: SPARKS }, () => ({ a: rnd() * Math.PI * 2, out: 0.12 + rnd() * 0.3, up: 0.05 + rnd() * 0.22, life: 0.9 + rnd() * 1.1, size: 0.5 + rnd() }))
   }, [])
   // (the Ebisu's stone, glowing, a soft halo and a faint rainbow aura round him while the offering stands)
   const gltfK = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
@@ -1664,30 +1726,53 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   const halo = useRef<THREE.Sprite>(null)
   const aura = useRef<THREE.Sprite>(null)
   const ring = useRef<THREE.Mesh>(null)
+  const ring2 = useRef<THREE.Mesh>(null)
+  const flash = useRef<THREE.Sprite>(null)
   const lamp = useRef<THREE.PointLight>(null)
   const moteGeo = useMemo(() => {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MOTES * 3), 3))
     g.setAttribute('size', new THREE.BufferAttribute(new Float32Array(MOTES), 1))
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MOTES * 3), 3))
+    g.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(MOTES), 1))
+    return g
+  }, [])
+  const sparkGeo = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3))
+    g.setAttribute('size', new THREE.BufferAttribute(new Float32Array(SPARKS), 1))
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3))
+    g.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(SPARKS), 1))
     return g
   }, [])
   const sizes = moteGeo.attributes.size as THREE.BufferAttribute
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime
     // (the motes: each rises from the shrine's base and fades as it goes, over about three seconds, swaying a little)
-    if (moteMat.current) moteMat.current.opacity += ((burning.current ? 0.6 : 0) - moteMat.current.opacity) * Math.min(1, dt * 6)
+    if (moteMat.current) moteMat.current.opacity += ((BLESSING.on ? 0.9 : 0) - moteMat.current.opacity) * Math.min(1, dt * 1.5)
     if (motes.current && moteMat.current && moteMat.current.opacity > 0.01) {
       const pos = moteGeo.attributes.position as THREE.BufferAttribute
+      const col = moteGeo.attributes.color as THREE.BufferAttribute
       for (let i = 0; i < MOTES; i++) {
-        // (gold motes drifting up out of the open shrine, each at its own pace, swaying its own way, fading as they go)
+        // (each spirals up round the shrine at its own pace and turn, swelling in, twinkling, thinning as it climbs, gone at the top)
         const m = moteRnd[i]
         const life = (t * m.speed + m.offset) % 1
-        const sw = Math.sin(t * m.swayF + m.phase) * m.sway * (0.4 + life)
-        pos.setXYZ(i, 0.12 + m.dx * life + sw * 0.5, 0.07 + life * m.rise, m.z0 + sw)
-        sizes.setX(i, (0.03 + m.size * 0.075) * (1 - life * 0.6) * Math.min(1, life * 6))
+        const ang = m.phase + life * m.turn * Math.PI * 2
+        const rr = m.r0 * (0.6 + life * 0.8)
+        // (out in front of the open doors, where they're seen, not inside the shrine's walls)
+        pos.setXYZ(i, -0.03 + Math.cos(ang) * rr * 0.5, 0.07 + life * m.rise, m.z0 * (1 - life * 0.3) + Math.sin(ang) * rr)
+        // (in quickly, held, out softly near the top: the shelf's group is scaled, so all this is in its own small units)
+        const fade = THREE.MathUtils.smoothstep(life, 0, 0.12) * (1 - THREE.MathUtils.smoothstep(life, 0.55, 1))
+        const tw = 0.65 + 0.35 * Math.sin(t * m.twF + m.phase) ** 2
+        sizes.setX(i, 0.045 * m.size * (0.7 + 0.3 * tw) * (0.6 + fade * 0.4))
+        // (its tint, and the fade and the twinkle in its transparency: it shows by day as well as by night)
+        col.setXYZ(i, m.tint[0], m.tint[1], m.tint[2])
+        ;(moteGeo.attributes.alpha as THREE.BufferAttribute).setX(i, fade * tw * (m.size > 2 ? 0.35 : 1))
       }
       sizes.needsUpdate = true
       pos.needsUpdate = true
+      col.needsUpdate = true
+      ;(moteGeo.attributes.alpha as THREE.BufferAttribute).needsUpdate = true
     }
     // (offered, the sake stands in its cup for a minute and the shrine glows, then goes quiet; then another can be offered)
     const at = incense?.litAt ?? null
@@ -1713,15 +1798,46 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       aura.current.scale.setScalar(0.19 + 0.015 * Math.sin(t * 1.1))
       aura.current.visible = BLESSING.k > 0.01
     }
-    // (the moment the offering's poured in, a ripple of light spreads out once across the table from the cups)
-    if (ring.current) {
-      const since0 = (performance.now() - (at ?? 0)) / 1000 - 3.6
-      const show = on && since0 > 0 && since0 < 1.6
-      ring.current.visible = show
-      if (show) {
-        const q = since0 / 1.6
-        ring.current.scale.setScalar(0.1 + q * 1.1)
-        ;(ring.current.material as THREE.MeshBasicMaterial).opacity = 0.32 * (1 - q)
+    // (the moment the offering's taken: a flash of light up from the cups, sparks thrown out from it in arcs, and two soft rings of light, one
+    // after the other, rippling out across the shelf, easing as they spread, turning a little, fading as they go)
+    const since0 = on ? (performance.now() - (at ?? 0)) / 1000 - 3.6 : -1
+    for (const [r, delay, dur, size, peak] of [[ring.current, 0, 1.8, 0.62, 0.95], [ring2.current, 0.3, 2.2, 0.46, 0.7]] as const) {
+      if (!r) continue
+      const q = (since0 - delay) / dur
+      r.visible = q > 0 && q < 1
+      if (r.visible) {
+        r.scale.setScalar(0.08 + easeOut(q) * size)
+        r.rotation.z = q * 0.6 * (delay ? -1 : 1)
+        ;(r.material as THREE.MeshBasicMaterial).opacity = peak * Math.min(1, q * 8) * (1 - q) ** 1.6
+      }
+    }
+    if (flash.current) {
+      const q = since0 / 0.7
+      flash.current.visible = q > 0 && q < 1
+      if (flash.current.visible) {
+        ;(flash.current.material as THREE.SpriteMaterial).opacity = 0.7 * Math.sin(Math.PI * Math.min(1, q * 1.4)) * (1 - q)
+        flash.current.scale.setScalar(0.12 + 0.3 * easeOut(q))
+      }
+    }
+    if (sparks.current) {
+      const on2 = since0 > 0 && since0 < 2.4
+      sparks.current.visible = on2
+      if (on2) {
+        const pos = sparkGeo.attributes.position as THREE.BufferAttribute
+        const siz = sparkGeo.attributes.size as THREE.BufferAttribute
+        const col = sparkGeo.attributes.color as THREE.BufferAttribute
+        for (let i = 0; i < SPARKS; i++) {
+          const sp = sparkRnd[i]
+          const q = Math.min(1, since0 / sp.life)
+          const o = easeOut(q) * sp.out
+          // (out from the cups and up, then falling back a little, as thrown)
+          pos.setXYZ(i, CUPS_FX + Math.cos(sp.a) * o * 0.5, 0.04 + sp.up * Math.sin(Math.PI * Math.min(1, q * 1.2)) * 0.8, Math.sin(sp.a) * o)
+          siz.setX(i, 0.045 * sp.size * (1 - q * 0.6) * Math.min(1, (1 - q) * 3))
+          col.setXYZ(i, 1, 0.82 + 0.15 * (1 - q), 0.42 + 0.4 * (1 - q))
+          ;(sparkGeo.attributes.alpha as THREE.BufferAttribute).setX(i, Math.min(1, (1 - q) * 2.5))
+        }
+        pos.needsUpdate = true; siz.needsUpdate = true; col.needsUpdate = true
+        ;(sparkGeo.attributes.alpha as THREE.BufferAttribute).needsUpdate = true
       }
     }
     if (lamp.current) lamp.current.intensity = 0.3 * BLESSING.k * pulse
@@ -1795,12 +1911,16 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC} {...nameOnly('供花', '楊桐與白菊，供在神棚兩側')}><StaticBatch><Kamidana part="vase1" /></StaticBatch></group></Movable>
       <Movable id="shrinecups" label="清酒杯與琉璃台"><group position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC} {...nameOnly('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
-        <pointsMaterial ref={moteMat} map={GLOW} color="#ffd890" size={1} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
-          onBeforeCompile={(sh) => {
-            // (each mote its own size: the size attribute in place of the one size for all)
-            sh.vertexShader = sh.vertexShader.replace('uniform float size;', 'attribute float size;')
-          }} />
+        <pointsMaterial ref={moteMat} map={STAR} vertexColors size={1} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} onBeforeCompile={pointsEach} />
       </points>
+      {/* (the sparks thrown out from the cups as it's poured) */}
+      <points ref={sparks} geometry={sparkGeo} frustumCulled={false} renderOrder={4} visible={false}>
+        <pointsMaterial map={STAR} vertexColors size={1} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} onBeforeCompile={pointsEach} />
+      </points>
+      {/* (and the flash of light up from them) */}
+      <sprite ref={flash} position={[CUPS_FX, 0.07, 0]} visible={false} renderOrder={5}>
+        <spriteMaterial map={GLOW} color="#ffe39a" transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </sprite>
       {/* (the Ebisu's halo, a faint glow always (hidden behind the shut doors), bright while blessed) */}
       <sprite ref={halo} position={[EBISU_AT[0] - 0.01, EBISU_AT[1], EBISU_AT[2]]} scale={0.16} renderOrder={4}>
         <spriteMaterial map={GLOW} color="#ffd27a" transparent opacity={0.18} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
@@ -1811,9 +1931,14 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       </sprite>
       {/* (the ripple of light spreading once from the cups as the offering's poured) */}
       {/* (and a ring of light spreading out across the table once from the shrine, as the offering's taken: as it first was) */}
-      <mesh ref={ring} position={[0.05, 0.004, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
-        <ringGeometry args={[0.42, 0.5, 64]} />
-        <meshBasicMaterial color="#ffd27a" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      {/* (just over the shelf's top, so all of it shows on the shelf; gold drawn over, not only added, so it shows by day as well as by night) */}
+      <mesh ref={ring} position={[CUPS_FX, 0.022, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial map={RIPPLE} color="#ffc95a" transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh ref={ring2} position={[CUPS_FX, 0.023, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={4}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial map={RIPPLE} color="#fff0c0" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <pointLight ref={lamp} position={[EBISU_AT[0] - 0.06, EBISU_AT[1] + 0.02, EBISU_AT[2]]} color="#ffc070" intensity={0} distance={0.9} decay={2} />
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
