@@ -178,7 +178,8 @@ def text(name, body, size, mat_, at, rot, font=None, fit=None):
     t.data.size = size
     t.data.align_x = "CENTER"
     t.data.align_y = "CENTER"
-    t.data.extrude = 0.0001
+    t.data.extrude = 0.0
+    t.data.resolution_u = 3    # (flat lettering, coarse curves: its sides never showed, and the curves were most of the triangles)
     if font:
         t.data.font = font
     bpy.ops.object.convert(target="MESH")

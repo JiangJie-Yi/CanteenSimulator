@@ -155,7 +155,8 @@ def text(name, body, size, mat, at, rot, align="CENTER", fit=None):
     t.data.size = size
     t.data.align_x = align
     t.data.align_y = "CENTER"
-    t.data.extrude = 0.00015
+    t.data.extrude = 0.0
+    t.data.resolution_u = 3    # (flat lettering, coarse curves: its sides never showed, and the curves were most of the triangles)
     t.data.font = BOLD
     t.data.space_line = 0.9
     bpy.ops.object.convert(target="MESH")

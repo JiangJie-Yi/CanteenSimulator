@@ -83,6 +83,8 @@ export function OpeningSpot({ on, focusY }: { on: boolean; focusY: number }) {
     const l = light.current
     if (l) {
       l.intensity = v * 26
+      // (its shadow drawn only while it's lit: off, it would still cost a whole extra shadow pass of the room every frame)
+      l.castShadow = v > 0.01
       // it swings in: from a little off to the left onto the shop
       l.target.position.set(-1.2 * (1 - v), focusY * 0.5, 0)
       l.visible = v > 0.01
