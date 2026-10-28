@@ -21,9 +21,11 @@ from common import *  # noqa: E402,F403
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PREVIEW = argv[1] if len(argv) > 1 else None
+PREVIEW = argv[1] if len(argv) > 1 and argv[1] else None
+# (which arrangement: 0 white and gold chrysanthemums, 1 pink, crimson and violet blooms with white)
+VARIANT = int(argv[2]) if len(argv) > 2 else 0
 bpy.ops.wm.read_factory_settings(use_empty=True)
-random.seed(5)
+random.seed(5 + 11 * VARIANT)
 
 
 def P(x, y, z):
@@ -59,6 +61,10 @@ M = {
     "white": pbr("VaseMumWhite", lin("#f4f1e6"), rough=0.6),
     "yellow": pbr("VaseMumYellow", lin("#e8b82a"), rough=0.6),
     "heart": pbr("VaseMumHeart", lin("#c98a1a"), rough=0.7),
+    "pink": pbr("VaseMumPink", lin("#f08aa8"), rough=0.55),
+    "crimson": pbr("VaseMumCrimson", lin("#c8283c"), rough=0.55),
+    "violet": pbr("VaseMumViolet", lin("#9a5ac8"), rough=0.55),
+    "bud": pbr("VaseBud", lin("#6a9a3a"), rough=0.6),
 }
 parts = []
 
@@ -123,10 +129,11 @@ LEAF = leaf_mesh()
 leaves = []
 stems = []
 MOUTH = Vector(P(0, 0.112, 0))
-for s in range(5):
-    ang = s * 2 * math.pi / 5 + random.uniform(-0.3, 0.3)
-    lean = random.uniform(0.35, 0.7)
-    length = random.uniform(0.07, 0.1)
+NST = 7
+for s in range(NST):
+    ang = s * 2 * math.pi / NST + random.uniform(-0.3, 0.3)
+    lean = random.uniform(0.4, 0.95)
+    length = random.uniform(0.08, 0.13)
     d = Vector(P(math.cos(ang) * math.sin(lean), math.cos(lean), math.sin(ang) * math.sin(lean)))
     pts = [MOUTH + d * length * t + Vector(P(0, -0.01 * t * t, 0)) for t in (0, 0.5, 1)]
     cu = bpy.data.curves.new(f"stem{s}", "CURVE")
@@ -140,8 +147,8 @@ for s in range(5):
     o = bpy.data.objects.new(f"stem{s}", cu)
     bpy.context.collection.objects.link(o)
     stems.append(o)
-    for k in range(5):
-        t = 0.25 + k * 0.18
+    for k in range(3):
+        t = 0.35 + k * 0.22
         at = MOUTH + d * length * t
         for side in (-1, 1):
             lo = bpy.data.objects.new(f"leaf{s}{k}{side}", LEAF.copy())
@@ -183,11 +190,11 @@ fin(lv, "VaseLeaves", M["leaf"])
 # ---- the chrysanthemums: a few small ones among the leaves, rows of slim petals round a domed heart, outer ones splayed, inner ones cupped
 def mum(name, at, r, mat):
     b = bmesh.new()
-    for ring, (n, rr, up) in enumerate(((16, r, 0.15), (13, r * 0.78, 0.55), (10, r * 0.55, 0.95))):
+    for ring, (n, rr, up) in enumerate(((20, r, 0.1), (18, r * 0.85, 0.4), (15, r * 0.66, 0.75), (11, r * 0.45, 1.05))):
         for i in range(n):
             a = 2 * math.pi * (i + ring * 0.37) / n
             tip = Vector((math.cos(a) * rr, math.sin(a) * rr, rr * up))
-            side = Vector((-math.sin(a), math.cos(a), 0)) * rr * 0.12
+            side = Vector((-math.sin(a), math.cos(a), 0)) * rr * 0.22
             base = Vector((0, 0, 0))
             vs = [b.verts.new(base + side * 0.3), b.verts.new(tip * 0.55 + side), b.verts.new(tip), b.verts.new(tip * 0.55 - side), b.verts.new(base - side * 0.3)]
             b.faces.new((vs[0], vs[1], vs[2], vs[3], vs[4]))
@@ -201,19 +208,41 @@ def mum(name, at, r, mat):
     bpy.context.view_layer.objects.active = o
     bpy.ops.object.modifier_apply(modifier="t")
     fin(o, name, mat)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=r * 0.28, segments=10, ring_count=6, location=at + Vector((0, 0, r * 0.3)))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=r * 0.22, segments=10, ring_count=6, location=at + Vector((0, 0, r * 0.45)))
     hb = active(); hb.scale = (1, 1, 0.6)
     fin(hb, name + "Heart", M["heart"])
 
 
-for i, (x, y, z, r, m) in enumerate(((0.0, 0.17, 0.0, 0.024, "white"), (-0.03, 0.15, 0.012, 0.02, "yellow"), (0.028, 0.152, -0.014, 0.02, "white"),
-                                      (0.014, 0.138, 0.028, 0.017, "yellow"))):
-    mum(f"VaseMum{i}", Vector(P(x, y, z)), r, M[m])
-
-root = bpy.data.objects.new("ShrineVase", None)
+# (the blooms: a crowd of them heaped over the mouth and spilling out round it, the biggest at the top, some leaning well out; a few buds)
+PAL = (["white", "yellow", "white", "yellow", "white"] if VARIANT == 0 else ["pink", "crimson", "violet", "pink", "white", "crimson"])
+NB = 9 if VARIANT == 0 else 10
+for i in range(NB):
+    a_ = i * 2.399 + random.uniform(-0.2, 0.2)
+    rr = 0.0 if i == 0 else random.uniform(0.022, 0.05)
+    up = 0.185 - rr * 0.9 + random.uniform(-0.008, 0.008)
+    r = (0.032 if i == 0 else random.uniform(0.02, 0.028)) * (1.0 if VARIANT == 0 else 0.95)
+    at = Vector(P(math.cos(a_) * rr, up, math.sin(a_) * rr))
+    mum(f"VaseMum{i}", at, r, M[PAL[i % len(PAL)]])
+    # (its stalk, down to the mouth)
+    cu = bpy.data.curves.new(f"stalk{i}", "CURVE"); cu.dimensions = "3D"
+    sp = cu.splines.new("POLY"); sp.points.add(1)
+    sp.points[0].co = (*MOUTH, 1); sp.points[1].co = (*(at - Vector((0, 0, r * 0.2))), 1)
+    cu.bevel_depth = 0.001
+    o = bpy.data.objects.new(f"stalk{i}", cu); bpy.context.collection.objects.link(o)
+    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+    bpy.ops.object.convert(target="MESH")
+    fin(active(), f"VaseStalk{i}", M["stem"])
+for i in range(5):
+    a_ = random.uniform(0, 2 * math.pi)
+    rr = random.uniform(0.04, 0.06)
+    at = Vector(P(math.cos(a_) * rr, random.uniform(0.15, 0.175), math.sin(a_) * rr))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0035, segments=10, ring_count=6, location=at)
+    bd = active(); bd.scale = (1, 1, 1.4)
+    fin(bd, f"VaseBud{i}", M["bud"] if VARIANT == 0 else M[PAL[i % len(PAL)]])
+root = bpy.data.objects.new(f"ShrineVase{VARIANT}", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
     o.parent = root
 os.makedirs(os.path.join(PROJECT, "public", "models"), exist_ok=True)
-export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "shrinevase.glb"), os.path.join(PROJECT, "blender", "shrinevase.blend"), PREVIEW)
+export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", f"shrinevase{VARIANT}.glb"), os.path.join(PROJECT, "blender", f"shrinevase{VARIANT}.blend"), PREVIEW)
 print("SHRINEVASE_DONE", len(parts), "parts", sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in parts), "tris")

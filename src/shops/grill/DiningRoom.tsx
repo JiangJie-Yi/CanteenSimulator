@@ -1078,10 +1078,11 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   )
 }
 
-const VASE_URL = import.meta.env.BASE_URL + 'models/shrinevase.glb'
+/** the two vases' arrangements (blender/shrinevase.py): 0 white and gold chrysanthemums, 1 pink, crimson and violet blooms */
+const VASE_URLS = [0, 1].map((v) => import.meta.env.BASE_URL + `models/shrinevase${v}.glb`)
 /** a shrine vase (榊立て, blender/shrinevase.py): white porcelain with a cobalt band of waves, a spray of glossy sakaki and small chrysanthemums */
-function Bouquet({ lean = 0 }: { lean?: number }) {
-  const gltf = useGLTF(VASE_URL) as unknown as { scene: THREE.Group }
+function Bouquet({ lean = 0, variant = 0 }: { lean?: number; variant?: number }) {
+  const gltf = useGLTF(VASE_URLS[variant]) as unknown as { scene: THREE.Group }
   const root = useMemo(() => {
     const r = gltf.scene.clone(true)
     r.traverse((o) => {
@@ -1100,7 +1101,7 @@ function Bouquet({ lean = 0 }: { lean?: number }) {
   }, [gltf])
   return <group rotation-z={lean}><primitive object={root} /></group>
 }
-useGLTF.preload(VASE_URL)
+VASE_URLS.forEach((u) => useGLTF.preload(u))
 
 
 /**
@@ -1305,7 +1306,7 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase
       {(part === 'all' || part === 'shrine') && <group position={[-0.14, 0.015, 0]}><KamidanaModel /></group>}
       {/* the bouquets in their vases, leaning in a little, each its own piece */}
       {[-1, 1].filter((sd) => part === 'all' || part === `vase${sd}`).map((sd) => (
-        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} /><ContactShadow r={0.05} y={-0.014} /></group>
+        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><Bouquet lean={sd * -0.08} variant={sd < 0 ? 0 : 1} /><ContactShadow r={0.05} y={-0.014} /></group>
       ))}
       {/* the cups' stand (blender/kamidana.py), the cups on it */}
       {(part === 'all' || part === 'cups') && <group position={[-0.3, 0, 0]}><KamidanaModel part="cupstand" /><ContactShadow r={0.15} /></group>}
