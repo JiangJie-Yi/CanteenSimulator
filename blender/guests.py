@@ -2119,15 +2119,16 @@ def walk(phase, style="man"):
     shuffling steps on bent knees, the hands held behind the back"""
     a = math.sin(2 * math.pi * phase)
     c = math.cos(2 * math.pi * phase)
-    st = {"man": dict(step=0.45, lean=-0.04, twist=0.06, wide=0.02, arm=0.5, out=0.3, knee=0.08, bob=0.012),
-          "woman": dict(step=0.32, lean=-0.02, twist=0.11, wide=-0.02, arm=0.32, out=0.16, knee=0.06, bob=0.008),
-          "uncle": dict(step=0.36, lean=0.05, twist=0.04, wide=0.07, arm=0.32, out=0.45, knee=0.06, bob=0.016),
-          "old": dict(step=0.22, lean=-0.32, twist=0.03, wide=0.04, arm=0.0, out=0.2, knee=0.3, bob=0.006)}[style]
+    # (roll: the round body rocking side to side onto the foot that's down, Overcooked's waddle; bob: up on each step, a bounce)
+    st = {"man": dict(step=0.45, lean=-0.04, twist=0.06, wide=0.02, arm=0.5, out=0.3, knee=0.08, bob=0.02, roll=0.07),
+          "woman": dict(step=0.32, lean=-0.02, twist=0.11, wide=-0.02, arm=0.32, out=0.16, knee=0.06, bob=0.016, roll=0.06),
+          "uncle": dict(step=0.36, lean=0.05, twist=0.04, wide=0.07, arm=0.32, out=0.45, knee=0.06, bob=0.022, roll=0.1),
+          "old": dict(step=0.22, lean=-0.32, twist=0.03, wide=0.04, arm=0.0, out=0.2, knee=0.3, bob=0.008, roll=0.04)}[style]
 
     def pose():
         z0 = 0.46 - 0.008 - (0.03 if style == "old" else 0) + st["bob"] * abs(c)
         move_hips(z0, 0)
-        aim("spine", (0, st["lean"], 1), twist=st["twist"] * a)
+        aim("spine", (st["roll"] * a, st["lean"], 1), twist=st["twist"] * a)
         aim("chest", (0, st["lean"] * 0.8 - 0.01, 1), twist=-st["twist"] * 1.4 * a)
         # (the old look up ahead from their stoop)
         aim("head", (0, 0.25 if style == "old" else 0.0, 1), twist=0.04 * a)
@@ -2157,11 +2158,11 @@ def walk(phase, style="man"):
 
 action("Sit", [(0, sit(0)), (36, sit(0.025)), (72, sit(0))])
 action("Eat", [(0, eat(0)), (14, eat(0.6)), (22, eat(1)), (32, eat(1)), (44, eat(0.4)), (56, eat(0)), (72, eat(0))])
-action("Walk", [(i * 3, walk(i / 8)) for i in range(9)])
+action("Walk", [(i * 2, walk(i / 12)) for i in range(13)])
 # (the others' strides take their own time: quick little steps, a heavier tread, a slow shuffle)
-action("WalkF", [(i * 3, walk(i / 8, "woman")) for i in range(9)])
-action("WalkU", [(i * 4, walk(i / 8, "uncle")) for i in range(9)])
-action("WalkO", [(i * 5, walk(i / 8, "old")) for i in range(9)])
+action("WalkF", [(i * 2, walk(i / 12, "woman")) for i in range(13)])
+action("WalkU", [(round(i * 8 / 3), walk(i / 12, "uncle")) for i in range(13)])
+action("WalkO", [(round(i * 10 / 3), walk(i / 12, "old")) for i in range(13)])
 
 
 def cook(phase):
@@ -2351,7 +2352,7 @@ SMALL = 260
 # clothes over it and poking through them. So a middle way: about a quarter of what they were built with, the body kept finer than what's
 # worn over it (so it stays inside), the little parts of the face left whole)
 BUDGET = {k: max(160, v // 4) for k, v in BUDGET.items()}
-BUDGET["hair"] = 520
+BUDGET["hair"] = 1000
 BUDGET.update({"body": 2200, "head": 900, "eyes": 160, "cuffs": 260, "details": 220, "face": 120})
 SHARE = {k: min(1.0, v * 0.7) for k, v in SHARE.items()}
 SHARE.update({"body": 1.0, "eyes": 1.0, "eyesJoy": 1.0, "eyesShut": 1.0, "mouth": 1.0, "mouthJoy": 1.0, "mouthOpen": 1.0, "mouthMad": 1.0, "mouthSad": 1.0,
