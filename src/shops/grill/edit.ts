@@ -148,7 +148,8 @@ export function setPivot(id: string, v: V3, shift: V3 = [0, 0, 0]) {
 /** D: the arrows move the pivot instead of the piece (as Maya's D), again to move the piece */
 export function togglePivotMode() { state.pivotMode = !state.pivotMode; emit() }
 /** the axes gone by: the room's or the piece's own */
-export function setSpace(s: Space) { state.space = s; emit() }
+/** world or object axes; said so whenever it changes (the badge in the panel says which it is all the while) */
+export function setSpace(s: Space) { if (state.space === s) return; state.space = s; emit(); toast(s === 'world' ? T().spaceNowWorld : T().spaceNowLocal, 'edit') }
 // ---- frozen zeros (Maya's Freeze Transformations): a piece's place, turn and size as they stand taken for its new 0, 0, 0 / 1, 1, 1. The piece
 // doesn't move: only what the panel reads and takes is counted from there (kept in the browser, with the rest of the edits)
 const KEY_F = 'jgs-edit-frozen-1'
@@ -422,6 +423,7 @@ export const statsOf = (id: string) => {
   return ms.length ? ms.reduce((a, b) => ({ tris: a.tris + b.tris, verts: a.verts + b.verts, meshes: a.meshes + b.meshes })) : null
 }
 let el: HTMLDivElement | null = null
+let spaceBadge: HTMLButtonElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
@@ -435,6 +437,12 @@ const PANEL_CSS = `
 .be { position:fixed; left:12px; bottom:92px; z-index:9999; width:292px; max-height:70vh; display:flex; background:#303030; color:#d6d6d6;
   font:11.5px/1.35 "Inter","Segoe UI","Noto Sans TC",sans-serif; border:1px solid #1a1a1a; border-radius:6px; box-shadow:0 6px 22px rgba(0,0,0,.55); overflow:hidden; user-select:none }
 .be * { box-sizing:border-box }
+.be-space { display:block; width:100%; margin:0 0 6px; padding:5px 8px; border:0; border-radius:4px; text-align:left; cursor:pointer;
+  font:600 12px/1.3 inherit; color:#fff; background:#2f6fb0 }
+.be-space.local { background:#c27a1e }
+.be-space:hover { filter:brightness(1.12) }
+.be-tool-text { background:#2f6fb0 !important; color:#fff !important }
+.be-tool-text.local { background:#c27a1e !important }
 .be-stats { margin-top:3px; font:11px monospace; color:#9ab }
 .be-tools { display:flex; flex-direction:column; gap:3px; padding:6px 4px; background:#262626; border-right:1px solid #1a1a1a }
 .be-tool { width:30px; height:30px; display:grid; place-items:center; background:#3c3c3c; border:0; border-radius:4px; color:#d6d6d6; cursor:pointer; padding:0 }
@@ -574,6 +582,10 @@ function panel() {
     out.append(find, list)
     // Transform: what's chosen, then Location, Rotation, Scale each as X / Y / Z stacked, a reset beside each
     const tr = section(T().transform)
+    // (which axes the handles and the place fields go by, always in sight, a click switches them)
+    spaceBadge = h('button', 'be-space') as HTMLButtonElement
+    spaceBadge.onclick = () => setSpace(state.space === 'local' ? 'world' : 'local')
+    tr.appendChild(spaceBadge)
     info = h('div', 'be-name') as HTMLDivElement
     tr.appendChild(info)
     fields = []
@@ -642,6 +654,12 @@ function panel() {
     built = sig
   }
   ;(['select', 'move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => toolButtons[k]?.classList.toggle('on', state.tool === t))
+  if (spaceBadge) {
+    spaceBadge.textContent = state.space === 'world' ? T().spaceBadgeWorld : T().spaceBadgeLocal
+    spaceBadge.title = T().spaceBadgeTip
+    spaceBadge.classList.toggle('local', state.space === 'local')
+  }
+  if (spaceButton) spaceButton.classList.toggle('local', state.space === 'local')
   if (spaceButton) { spaceButton.textContent = state.space === 'local' ? T().spaceLocalShort : T().spaceWorldShort; spaceButton.title = state.space === 'local' ? T().spaceLocal : T().spaceWorld }
   if (pivotButton) { pivotButton.textContent = 'D'; pivotButton.title = T().pivot; pivotButton.classList.toggle('on', state.pivotMode) }
   for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)) }
@@ -691,7 +709,7 @@ if (typeof window !== 'undefined') {
       const t: Tool | null = k === 'q' ? 'select' : k === 'w' ? 'move' : k === 'e' ? 'rotate' : k === 'r' ? 'scale' : null
       if (t) {
         e.preventDefault()
-        if (t === state.tool && t !== 'select') { setSpace(state.space === 'local' ? 'world' : 'local'); toast(state.space === 'local' ? T().spaceLocal : T().spaceWorld, 'edit') }
+        if (t === state.tool && t !== 'select') setSpace(state.space === 'local' ? 'world' : 'local')
         else setTool(t)
         return
       }
