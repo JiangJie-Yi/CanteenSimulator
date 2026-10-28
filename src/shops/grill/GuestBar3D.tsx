@@ -34,9 +34,10 @@ import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { takeOut, type Denom } from '@/game/till'
+import { fromRack, putAway, TAKE } from '@/game/plates'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
-import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
 
@@ -1910,8 +1911,25 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         wash.current = null
         dirtyStack.current?.position.set(0, 0, 0)
         const now = clock.current
-        clean.current = [...clean.current, ...Array.from({ length: n }, (_, i) => now + 1.2 + i * 0.35)]
+        // (onto the clean stack while there's room; the rest back on the dish rack)
+        const { toStack, toRack } = putAway(PLATE_RACK.n, clean.current.length, n)
+        PLATE_RACK.n += toRack
+        clean.current = [...clean.current, ...Array.from({ length: toStack }, (_, i) => now + 1.2 + i * 0.35)]
         redraw()
+      }
+    }
+    // plates fetched from the dish rack: a stack's worth when the owner clicks it, or when the pass has run out and none are being washed
+    {
+      const short = !clean.current.length && dirty.current === 0 && wash.current === null
+      if (PLATE_RACK.want > 0 || short) {
+        const n = fromRack(PLATE_RACK.n, clean.current.length, PLATE_RACK.want > 0 ? PLATE_RACK.want : TAKE)
+        PLATE_RACK.want = 0
+        if (n) {
+          PLATE_RACK.n -= n
+          const now = clock.current
+          clean.current = [...clean.current, ...Array.from({ length: n }, (_, i) => now + 0.6 + i * 0.25)]
+          redraw()
+        }
       }
     }
     // clean plates coming back drop onto the stack

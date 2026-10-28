@@ -6583,3 +6583,13 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .is-frozen .chiller-bin-head svg.food-art { background: radial-gradient(ellipse at 50% 60%, #fff, #d6e9f8 72%); }
 .is-chilled .chiller-bin-head svg.food-art { background: radial-gradient(ellipse at 50% 60%, #fff, #d8f0e6 72%); }
 .is-ambient .chiller-bin-head svg.food-art { background: radial-gradient(ellipse at 50% 60%, #fff, #f5e6cc 72%); }
+
+/* (the pantry's fridge button: the icon draws its own colours; a cold glow behind it while it's open) */
+.fridge-toggle svg.fridge-icon { width: 36px; height: 36px; fill: none; stroke: none; filter: drop-shadow(0 2px 3px rgb(20 40 60 / 0.35)); }
+.fridge-toggle .fr-cold { opacity: 0; transition: opacity 0.25s ease; }
+.fridge-toggle.is-on .fr-cold { opacity: 1; }
+.fridge-toggle.is-on svg.fridge-icon { fill: none; stroke: none; transform: translateY(-1px); }
+/* (a round chip like the buttons beside it, the fridge standing in it) */
+.fridge-toggle { border: 1.5px solid var(--text-soft); border-radius: 50%; background: radial-gradient(circle at 50% 35%, #ffffff, #e4eef5); filter: none; box-shadow: 0 1px 3px rgb(0 0 0 / 0.25); overflow: hidden; }
+.fridge-toggle svg.fridge-icon { width: 34px; height: 40px; margin-top: 6px; }
+.fridge-toggle.is-on { border-color: #3d8fd0; box-shadow: 0 0 12px rgb(61 143 208 / 0.6); }

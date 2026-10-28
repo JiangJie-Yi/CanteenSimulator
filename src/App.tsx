@@ -2194,7 +2194,32 @@ export default function App() {
       {hand && !!dish.roast && !editOn && (
         <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => { setFridgeOpen((v) => !v); setMenuFolded(false) }} aria-pressed={fridgeOpen}
           title={tl(lang, '打開／關上食材櫃', '食材庫を開く／閉じる', 'Open / close the pantry')}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2.2" /><path d="M5 9.5h14" /><path d="M8 5.5v2M8 12.5v4" /><path d="M7 21.5v1M17 21.5v1" /></svg>
+          {/* (a little two-door fridge: enamel white going cool blue down it, chrome handles, a snowflake on the freezer, a fish on the chiller,
+              a gleam down its side and its shadow under it) */}
+          <svg className="fridge-icon" viewBox="6 1 36 46" aria-hidden="true">
+            <defs>
+              <linearGradient id="fr-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffffff" /><stop offset="0.55" stopColor="#e3f0f8" /><stop offset="1" stopColor="#b9d3e6" /></linearGradient>
+              <linearGradient id="fr-chrome" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8796a6" /><stop offset="0.45" stopColor="#f4f8fb" /><stop offset="1" stopColor="#7a8a9a" /></linearGradient>
+              <radialGradient id="fr-glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stopColor="#bfe8ff" stopOpacity="0.9" /><stop offset="1" stopColor="#bfe8ff" stopOpacity="0" /></radialGradient>
+            </defs>
+            <ellipse cx="24" cy="44.5" rx="13" ry="2.2" fill="#1d2a36" opacity="0.25" stroke="none" />
+            <rect className="fr-cold" x="6" y="2" width="36" height="42" rx="10" fill="url(#fr-glow)" stroke="none" />
+            <rect x="13" y="42" width="3" height="2.2" rx="0.8" fill="#3a4858" stroke="none" /><rect x="32" y="42" width="3" height="2.2" rx="0.8" fill="#3a4858" stroke="none" />
+            <rect x="11" y="4" width="26" height="38.5" rx="5" fill="url(#fr-body)" stroke="#2f4a62" strokeWidth="1.6" />
+            <path d="M11 17.5h26" stroke="#2f4a62" strokeWidth="1.4" fill="none" />
+            <path d="M14 7.5v31" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" opacity="0.85" fill="none" />
+            <rect x="31.2" y="8" width="2.8" height="6.5" rx="1.4" fill="url(#fr-chrome)" stroke="#4a5a6a" strokeWidth="0.7" />
+            <rect x="31.2" y="21" width="2.8" height="11" rx="1.4" fill="url(#fr-chrome)" stroke="#4a5a6a" strokeWidth="0.7" />
+            <g stroke="#3d8fd0" strokeWidth="1.3" strokeLinecap="round" fill="none">
+              <path d="M22 7.2v6.6M19.1 8.9l5.8 3.2M19.1 12.1l5.8-3.2" /><path d="M21 7.9l1 1 1-1M21 13.1l1-1 1 1" strokeWidth="0.9" />
+            </g>
+            <g transform="translate(21.5 29.5)">
+              <path d="M-6 0 C-3.5 -3.6 2.6 -3.6 4.8 0 C2.6 3.6 -3.5 3.6 -6 0 Z" fill="#f08a5a" stroke="#7a3a1e" strokeWidth="0.9" />
+              <path d="M4.4 0 L7.6 -2.6 L7 0 L7.6 2.6 Z" fill="#f08a5a" stroke="#7a3a1e" strokeWidth="0.9" strokeLinejoin="round" />
+              <circle cx="-3.6" cy="-0.6" r="0.75" fill="#2a1a12" stroke="none" />
+              <path d="M-4 1.6 C-1 2.6 2 2.4 3.6 0.8" stroke="#ffd2b8" strokeWidth="0.8" fill="none" strokeLinecap="round" />
+            </g>
+          </svg>
         </button>
       )}
       {editOn && (
