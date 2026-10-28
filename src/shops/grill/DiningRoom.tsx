@@ -155,10 +155,124 @@ const ART = {
     }
     seal(g, 8, 12, 14)
   }),
+  // ---- ukiyo-e, as a woodblock print has them: flat colours, a bokashi graded across the sky, a black key line, a title cartouche, the seal
+  // a red Fuji in the clear south wind: the cone in rust red streaked with snow, dark forest at its foot, a blue sky with rows of mackerel cloud
+  akaFuji: canvasTex(512, 360, (g) => {
+    const sky = g.createLinearGradient(0, 0, 0, 360)
+    sky.addColorStop(0, '#1c3c78'); sky.addColorStop(0.45, '#5a86b8'); sky.addColorStop(0.7, '#d8e2e0'); sky.addColorStop(1, '#efe4c8')
+    g.fillStyle = sky; g.fillRect(0, 0, 512, 360)
+    g.fillStyle = 'rgba(250,248,240,0.9)'
+    for (let row = 0; row < 4; row++) for (let k = 0; k < 18; k++) { g.beginPath(); g.ellipse(30 + k * 28 + (row % 2) * 14, 40 + row * 16 + Math.sin(k) * 3, 9, 3.5, 0, 0, Math.PI * 2); g.fill() }
+    const red = g.createLinearGradient(0, 100, 0, 330)
+    red.addColorStop(0, '#6a1a0e'); red.addColorStop(0.5, '#b0361e'); red.addColorStop(1, '#d4603a')
+    g.fillStyle = red
+    g.beginPath(); g.moveTo(40, 330); g.bezierCurveTo(150, 250, 210, 140, 236, 110); g.lineTo(276, 108); g.bezierCurveTo(300, 140, 370, 250, 480, 330); g.closePath(); g.fill()
+    g.fillStyle = '#f4f0e6'
+    g.beginPath(); g.moveTo(236, 110); g.lineTo(276, 108); g.lineTo(286, 124)
+    for (let k = 0; k < 7; k++) g.lineTo(282 - k * 7, 132 + (k % 2) * 26)
+    g.lineTo(228, 128); g.closePath(); g.fill()
+    g.strokeStyle = 'rgba(244,240,230,0.85)'; g.lineWidth = 2
+    for (const [x, y, l] of [[250, 140, 40], [262, 150, 52], [238, 150, 34], [274, 160, 30]]) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + (x - 256) * 0.3, y + l); g.stroke() }
+    g.fillStyle = '#1e3a24'
+    g.beginPath(); g.moveTo(0, 360); g.lineTo(0, 318)
+    for (let x = 0; x <= 512; x += 10) g.lineTo(x, 318 + Math.sin(x / 9) * 6 - (x > 120 && x < 400 ? 8 : 0))
+    g.lineTo(512, 360); g.closePath(); g.fill()
+    g.strokeStyle = '#1a1210'; g.lineWidth = 2.2
+    g.beginPath(); g.moveTo(40, 330); g.bezierCurveTo(150, 250, 210, 140, 236, 110); g.lineTo(276, 108); g.bezierCurveTo(300, 140, 370, 250, 480, 330); g.stroke()
+    g.fillStyle = '#efe6cc'; g.fillRect(420, 14, 30, 92); g.strokeStyle = '#1a1210'; g.lineWidth = 1.2; g.strokeRect(420, 14, 30, 92)
+    g.fillStyle = '#1a1210'; g.font = '700 20px "Zen Antique", serif'; g.textAlign = 'center'
+    ;['凱', '風', '快', '晴'].forEach((c, k) => g.fillText(c, 435, 36 + k * 21))
+    seal(g, 464, 24, 24)
+  }),
+  // rain on a great bridge: driving lines of rain over all, a dark sky graded down, people under umbrellas hurrying across, the far bank in grey
+  rainBridge: canvasTex(512, 360, (g) => {
+    const sky = g.createLinearGradient(0, 0, 0, 360)
+    sky.addColorStop(0, '#1a1c20'); sky.addColorStop(0.3, '#5a6066'); sky.addColorStop(0.6, '#c8cabe'); sky.addColorStop(1, '#6a8a9a')
+    g.fillStyle = sky; g.fillRect(0, 0, 512, 360)
+    g.fillStyle = 'rgba(70,80,84,0.7)'
+    g.beginPath(); g.moveTo(0, 200); for (let x = 0; x <= 512; x += 16) g.lineTo(x, 196 - Math.sin(x / 40) * 6 - (x > 300 ? 10 : 0)); g.lineTo(512, 220); g.lineTo(0, 220); g.fill()
+    g.fillStyle = '#4a7a8a'; g.fillRect(0, 220, 512, 140)
+    g.fillStyle = '#8a6a44'
+    g.beginPath(); g.moveTo(-10, 300); g.quadraticCurveTo(260, 200, 530, 250); g.lineTo(530, 270); g.quadraticCurveTo(260, 222, -10, 322); g.closePath(); g.fill()
+    g.strokeStyle = '#3a2814'; g.lineWidth = 3
+    for (let x = 20; x < 512; x += 46) { const y = 300 - (x / 512) * 60 + Math.sin(x / 160) * 0; g.beginPath(); g.moveTo(x, y + 6); g.lineTo(x + 4, 360); g.stroke() }
+    g.lineWidth = 1.6; g.beginPath(); g.moveTo(-10, 300); g.quadraticCurveTo(260, 200, 530, 250); g.stroke()
+    for (const [x, c] of [[150, '#2a3a5a'], [210, '#6a2a1a'], [300, '#2a4a3a'], [340, '#3a3020']] as [number, string][]) {
+      const y = 300 - (x / 512) * 60 - 22
+      g.fillStyle = c; g.beginPath(); g.moveTo(x - 6, y + 22); g.lineTo(x, y + 4); g.lineTo(x + 6, y + 22); g.fill()
+      g.fillStyle = '#d8c89a'; g.beginPath(); g.moveTo(x - 16, y + 4); g.quadraticCurveTo(x, y - 12, x + 16, y + 4); g.closePath(); g.fill()
+      g.strokeStyle = '#1a1210'; g.lineWidth = 1; g.stroke()
+    }
+    g.strokeStyle = 'rgba(30,30,34,0.55)'; g.lineWidth = 0.9
+    for (let k = 0; k < 220; k++) { const x = (k * 53) % 560 - 20, y = (k * 97) % 380 - 20; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 9, y + 40); g.stroke() }
+    g.fillStyle = '#efe6cc'; g.fillRect(452, 14, 28, 96); g.strokeStyle = '#1a1210'; g.strokeRect(452, 14, 28, 96)
+    g.fillStyle = '#1a1210'; g.font = '700 19px "Zen Antique", serif'; g.textAlign = 'center'
+    ;['大', '橋', '夕', '立'].forEach((c, k) => g.fillText(c, 466, 36 + k * 22))
+    seal(g, 418, 20, 24)
+  }),
+  // a kabuki actor's head and shoulders (yakusha-e): a white face with red kumadori lines, the brows drawn up, eyes crossed in a glare, a black
+  // topknot wig, a robe of bold checks, on a dark mica ground
+  kabuki: canvasTex(200, 476, (g) => {
+    const bg = g.createLinearGradient(0, 0, 0, 476)
+    bg.addColorStop(0, '#3a3438'); bg.addColorStop(1, '#5a5254')
+    g.fillStyle = bg; g.fillRect(0, 0, 200, 476)
+    g.fillStyle = 'rgba(220,210,200,0.08)'; for (let k = 0; k < 300; k++) g.fillRect((k * 37) % 200, (k * 71) % 476, 2, 2)
+    g.fillStyle = '#2a1e18'; g.beginPath(); g.ellipse(100, 150, 62, 70, 0, Math.PI, 0); g.fill()
+    g.beginPath(); g.ellipse(100, 80, 26, 18, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#f4eee2'; g.beginPath(); g.ellipse(100, 186, 50, 64, 0, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = '#c4201a'; g.lineWidth = 4; g.lineCap = 'round'
+    for (const sd of [-1, 1]) {
+      g.beginPath(); g.moveTo(100 + sd * 10, 170); g.quadraticCurveTo(100 + sd * 34, 150, 100 + sd * 48, 132); g.stroke()
+      g.beginPath(); g.moveTo(100 + sd * 22, 200); g.quadraticCurveTo(100 + sd * 40, 210, 100 + sd * 46, 236); g.stroke()
+    }
+    g.strokeStyle = '#1a1210'; g.lineWidth = 4
+    for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(100 + sd * 8, 160); g.lineTo(100 + sd * 36, 146); g.stroke() }
+    g.fillStyle = '#fff'; g.lineWidth = 1.5
+    for (const sd of [-1, 1]) { g.beginPath(); g.ellipse(100 + sd * 22, 176, 11, 6, sd * -0.2, 0, Math.PI * 2); g.fill(); g.stroke() }
+    g.fillStyle = '#1a1210'; for (const sd of [-1, 1]) { g.beginPath(); g.arc(100 + sd * 22 - sd * 5, 176, 3.4, 0, Math.PI * 2); g.fill() }
+    g.beginPath(); g.moveTo(100, 184); g.lineTo(94, 206); g.lineTo(102, 208); g.stroke()
+    g.strokeStyle = '#8a1a14'; g.lineWidth = 3; g.beginPath(); g.moveTo(84, 226); g.quadraticCurveTo(100, 218, 116, 226); g.stroke()
+    for (let row = 0; row < 8; row++) for (let col = 0; col < 6; col++) { g.fillStyle = (row + col) % 2 ? '#1c2a52' : '#d8b04a'; g.fillRect(16 + col * 28, 262 + row * 26, 28, 26) }
+    g.fillStyle = '#f4eee2'; g.beginPath(); g.moveTo(70, 250); g.lineTo(100, 300); g.lineTo(130, 250); g.closePath(); g.fill()
+    g.strokeStyle = '#1a1210'; g.lineWidth = 2; g.strokeRect(16, 262, 168, 208)
+    g.fillStyle = '#d8c89a'; g.fillRect(150, 12, 36, 120); g.strokeStyle = '#1a1210'; g.lineWidth = 1; g.strokeRect(150, 12, 36, 120)
+    g.fillStyle = '#1a1210'; g.font = '700 20px "Zen Antique", serif'; g.textAlign = 'center'
+    ;['市', '川', '團', '十', '郎'].forEach((c, k) => g.fillText(c, 168, 34 + k * 22))
+    seal(g, 14, 14, 26)
+  }),
+  // a beauty (bijin-ga): her hair dressed high with combs and pins, a fan in her hand, a kimono of blue waves over red, on a pale ground
+  bijin: canvasTex(200, 476, (g) => {
+    g.fillStyle = '#f0e6d0'; g.fillRect(0, 0, 200, 476)
+    g.fillStyle = 'rgba(160,130,90,0.12)'; for (let k = 0; k < 120; k++) g.fillRect((k * 41) % 200, (k * 67) % 476, 18, 1)
+    g.fillStyle = '#1a1210'
+    g.beginPath(); g.ellipse(104, 96, 50, 40, 0, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.ellipse(104, 52, 30, 22, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#c8a050'; g.fillRect(60, 70, 88, 6)
+    g.strokeStyle = '#c8a050'; g.lineWidth = 3
+    for (const [x0, y0, x1, y1] of [[80, 50, 50, 26], [130, 50, 160, 28], [140, 90, 176, 76]]) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke() }
+    g.fillStyle = '#c4201a'; g.beginPath(); g.arc(50, 26, 5, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#f6efe4'; g.beginPath(); g.ellipse(100, 134, 30, 38, 0.1, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = '#1a1210'; g.lineWidth = 1.4
+    for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(100 + sd * 6, 124); g.quadraticCurveTo(100 + sd * 14, 120, 100 + sd * 20, 124); g.stroke() }
+    g.beginPath(); g.moveTo(100, 132); g.lineTo(98, 144); g.stroke()
+    g.fillStyle = '#c4201a'; g.beginPath(); g.ellipse(100, 156, 4, 2.2, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#b8261c'; g.beginPath(); g.moveTo(40, 476); g.lineTo(54, 190); g.quadraticCurveTo(100, 170, 150, 190); g.lineTo(168, 476); g.closePath(); g.fill()
+    g.fillStyle = '#28487a'; g.beginPath(); g.moveTo(54, 476); g.lineTo(62, 200); g.quadraticCurveTo(100, 186, 140, 200); g.lineTo(156, 476); g.closePath(); g.fill()
+    g.strokeStyle = 'rgba(230,236,240,0.7)'; g.lineWidth = 1.6
+    for (let y = 220; y < 476; y += 22) for (let x = 60; x < 160; x += 22) { g.beginPath(); g.arc(x + ((y / 22) % 2) * 11, y, 10, Math.PI, 0); g.stroke() }
+    g.fillStyle = '#e8c45a'; g.fillRect(56, 268, 98, 34)
+    g.fillStyle = '#f4ead4'; g.beginPath(); g.moveTo(120, 300); g.arc(120, 300, 46, -2.4, -1.2); g.closePath(); g.fill()
+    g.strokeStyle = '#1a1210'; g.lineWidth = 1; g.stroke()
+    g.fillStyle = '#d8c89a'; g.fillRect(156, 12, 30, 100); g.strokeRect(156, 12, 30, 100)
+    g.fillStyle = '#1a1210'; g.font = '700 18px "Zen Antique", serif'; g.textAlign = 'center'
+    ;['美', '人', '團', '扇'].forEach((c, k) => g.fillText(c, 171, 34 + k * 22))
+    seal(g, 14, 430, 26)
+  }),
 }
 type ArtKey = keyof typeof ART
-const PRINTS: ArtKey[] = ['fuji', 'wave', 'koi']
-const SCROLLS: ArtKey[] = ['calligraphy', 'plum']
+// (the woodblock prints in turn with the others along the walls)
+const PRINTS: ArtKey[] = ['akaFuji', 'fuji', 'rainBridge', 'wave', 'koi']
+const SCROLLS: ArtKey[] = ['calligraphy', 'kabuki', 'plum', 'bijin']
 
 /**
  * Nobori (幟), the tall narrow banners a yakitori or grill shop hangs: a cloth of red, indigo or white with the shop's
