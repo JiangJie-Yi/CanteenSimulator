@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { afterCharcoal, canAddCharcoal } from '@/game/economy'
-import { CHUNK_R, COAL_MAX, COAL_PER_ADD, crumble, MAX_LAYERS, placeStick, roomFor, STICK_HALF, STICK_R, surfaceY, type Lay } from '@/game/coalPile'
+import { CHUNK_R, COAL_MAX, COAL_PER_ADD, crumble, MAX_LAYERS, placeStick, roomFor, STICK_HALF, STICK_R, surfaceY, throwForce, type Lay } from '@/game/coalPile'
 
 const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 const lay = (s: NonNullable<ReturnType<typeof placeStick>>): Lay => ({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
@@ -128,5 +128,16 @@ feature('燒到最後的炭會垮掉碎裂', () => {
       const l = w.stick as Lay
       for (const c of w.chunks) expect(Math.hypot(c.x - l.x, c.z - l.z)).toBeLessThan(STICK_HALF + 0.03)
     })
+  })
+})
+
+feature('丟炭的力道', () => {
+  scenario('拖得越快，丟得越用力', ({ then, and, but }) => {
+    then('慢慢放下是輕放', () => { expect(throwForce(0.3, 10)).toBeLessThan(0.15) })
+    and('快速甩出是用力丟，而且不會超過上限', () => {
+      expect(throwForce(2, 10)).toBeGreaterThan(throwForce(1, 10))
+      expect(throwForce(20, 10)).toBe(1)
+    })
+    but('甩到一半停住再放手，就不算丟', () => { expect(throwForce(5, 300)).toBe(0) })
   })
 })

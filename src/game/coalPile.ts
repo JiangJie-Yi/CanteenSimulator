@@ -180,3 +180,12 @@ export function crumble(l: Lay, below: Lay[], rnd: () => number = Math.random, l
   }
   return out
 }
+
+/**
+ * How hard a stick dragged from the crate is thrown when it's let go: 0 (laid down) .. 1 (flung), from how fast it was moving (scene units a
+ * second) and how long ago it last moved (ms): a swing stopped before letting go is no throw.
+ */
+export function throwForce(speed: number, stillFor: number) {
+  if (stillFor > 120 || !(speed > 0)) return 0
+  return Math.min(1, speed / 3.5)
+}

@@ -7,7 +7,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
-import { COAL_MAX, COAL_PER_ADD, crumble, placeStick, restOf, roomFor, surfaceY, type Lay } from '@/game/coalPile'
+import { COAL_MAX, COAL_PER_ADD, crumble, placeStick, restOf, roomFor, surfaceY, type Lay, throwForce } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -2229,6 +2229,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // seconds, to red-hot (its glow reddening, its face going ashy grey), as binchotan does
   type Coal = { g: THREE.Object3D | null; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
     sx: number; sz: number; settled: boolean; top: number; delay: number; heat: number; bounced: boolean
+    /** how hard it was thrown (0 dropped gently .. 1 flung): how high it bounces; and a hop it's been jolted into by another landing hard by it */
+    force?: number; hopY?: number; hopV?: number
     /** seconds since it landed, whether it's burnt out, and how long it's been going out when it's pushed out by the new */
     age: number; gone: boolean; dying: boolean; dyT: number
     /** where it lies in plan (its landing), the way it points, how steeply it tips, and the pose it settles to */
@@ -2297,7 +2299,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return roomFor(alive.length, alive.filter(ashedOut).length, COAL_MAX)
   }
   /** charcoal onto the fire: a load (the chef, the button), or `count` sticks (one, dragged from the crate by hand) */
-  const dropCoals = (from?: { x: number; y: number; z: number }, count?: number) => {
+  const dropCoals = (from?: { x: number; y: number; z: number }, count?: number, force = 0) => {
     // (only as many as the bed has room for: the most it holds, less those still burning; ones burnt to ash are cleared to make room)
     const aliveNow = coals.current.filter((c) => c && !c.gone && !c.dying)
     const n = Math.min(count ?? COAL_PER_ADD.min + Math.floor(Math.random() * (COAL_PER_ADD.max - COAL_PER_ADD.min + 1)), COAL_MAX - aliveNow.length + aliveNow.filter(ashedOut).length)
@@ -2332,7 +2334,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (the charcoal as it came from the crate; the cracks light up only as it heats (the emissive map))
       const mat = charcoalMaterial(bin)
       coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
-        rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14, sz: (Math.random() - 0.5) * 14,
+        rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14 * (1 + 1.5 * force), sz: (Math.random() - 0.5) * 14 * (1 + 1.5 * force), force,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
         tx, tz, yaw, slope: rest.slope, lx: spot.from.x, lz: spot.from.z, ly, qEnd: new THREE.Quaternion(), geo: randomStick() }
       placed++
@@ -2341,7 +2343,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     restack()
     // (the flight to each one's place: about two thirds of a second)
     for (let k = 0; k < placed; k++) {
-      const c = coals.current[base + k], T = 0.5 + Math.random() * 0.25
+      // (thrown harder, it gets there sooner, flatter and faster)
+      const c = coals.current[base + k], T = (0.5 + Math.random() * 0.25) * (1 - 0.55 * force)
       c.vx = (c.lx - c.x) / T
       c.vz = (c.lz - c.z) / T
       c.vy = (c.ly - c.y + 0.5 * 9.8 * T * T) / T
@@ -3583,9 +3586,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return null
     }
     // carried a little above the fire; the fan, waved over a lit fire, fans the coals up
+    /** the stick or fan in hand: how fast it's moving (scene units a second) and when it last moved */
+    const swing = { v: 0, t: 0 }
     const holdDecor = (e: PointerEvent) => {
       const h = held.current
       if (!h) return
+      const tNow = performance.now()
       aim(e)
       const y = root.localToWorld(new THREE.Vector3(0, h.kind === 'fan' ? 0.62 : 0.5, 0)).y
       holdPlane.set(UP, -y)
@@ -3598,6 +3604,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         return
       }
       const moved = at.distanceTo(h.at)
+      // (how fast it's being swung (eased over the last few moves): let go, that's how hard it's thrown)
+      const dt = Math.max(0.008, (tNow - swing.t) / 1000)
+      swing.v = swing.v * 0.5 + (moved / dt) * 0.5
+      swing.t = tNow
       h.at.copy(at)
       if (h.kind !== 'fan') return
       h.wave += moved
@@ -3610,13 +3620,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const dropDecor = () => {
       const h = held.current
+      // (a swing stopped before letting go is no throw: only what's moving at the moment of release counts)
+      const force = throwForce(swing.v, performance.now() - swing.t)
+      swing.v = 0
       window.removeEventListener('pointermove', holdDecor)
       document.body.classList.remove('is-carrying')
       // the charcoal let go over the fire goes on it
       // (one stick, from where it's let go; the crate is a stick the fewer)
       if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) {
         if (!roomForCoal()) onNotice?.('heapFull')
-        else if (onAddCharcoal?.(true) !== false) { dropCoals({ x: h.at.x, y: h.at.y, z: h.at.z }, 1); takeFromCrate() }
+        else if (onAddCharcoal?.(true) !== false) { dropCoals({ x: h.at.x, y: h.at.y, z: h.at.z }, 1, force); takeFromCrate() }
       }
       held.current = null
       if (controls) controls.enabled = true
@@ -4009,6 +4022,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           c.g.position.set(c.x, c.y, c.z)
         }
         if (c.g.quaternion.angleTo(c.qEnd) > 0.002) c.g.quaternion.slerp(c.qEnd, Math.min(1, delta * 8))
+        // (jolted by one landing hard beside it: a little hop, falling back with a smaller bounce or two)
+        if (c.hopV || c.hopY) {
+          c.hopV = (c.hopV ?? 0) - 9.8 * cdt
+          c.hopY = (c.hopY ?? 0) + c.hopV * cdt
+          if (c.hopY <= 0) { c.hopY = 0; c.hopV = c.hopV < -0.35 ? -c.hopV * 0.3 : 0 }
+          c.g.position.set(c.x, c.y + c.hopY, c.z)
+        }
         continue
       }
       if (c.delay > 0) {
@@ -4027,9 +4047,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         c.y = c.ly
         if (!c.bounced) burst(c.x, c.y, c.z)
         // (it clatters as it lands: loud on the first strike, softer on the bounce)
-        if (c.vy < -0.4) coalClink(c.bounced ? 0.35 : 1)
+        const f = c.force ?? 0
+        if (c.vy < -0.4) coalClink(Math.min(1, (-c.vy / 4) * (c.bounced ? 0.5 : 1)))
+        // (landing hard, it jolts the sticks lying by it: each hops a little, more the nearer and the harder)
+        if (!c.bounced && f > 0.15) {
+          for (const o of coals.current) {
+            if (!o || o === c || !o.settled || o.gone) continue
+            const d = Math.hypot(o.x - c.x, o.z - c.z)
+            if (d < 0.25) o.hopV = (o.hopV ?? 0) + f * 1.4 * (1 - d / 0.25)
+          }
+        }
         c.bounced = true
-        if (c.vy < -0.9) { c.vy = -c.vy * 0.3; c.vx *= 0.35; c.vz *= 0.35 }
+        if (c.vy < -0.9) { c.vy = -c.vy * (0.3 + 0.3 * f); c.vx *= 0.35 + 0.3 * f; c.vz *= 0.35 + 0.3 * f }
         else { c.vy = 0; c.x = c.lx; c.z = c.lz; c.vx = 0; c.vz = 0; c.settled = true }
       }
       c.g.position.set(c.x, c.y, c.z)
