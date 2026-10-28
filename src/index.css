@@ -6045,11 +6045,11 @@ button {
   background: #2f6f9f;
 }
 
-.chiller-btn.chiller-top {
+.chiller-btn.chiller-fill {
   background: #1d6b34;
 }
 
-.chiller-btn.chiller-top:hover {
+.chiller-btn.chiller-fill:hover {
   background: #2a8a46;
 }
 
@@ -6098,7 +6098,7 @@ button {
 /* the ingredients' panel while researching: further right (no board title beside it), in three zones: frozen, chilled, room temperature */
 .menu.is-research { padding-right: 14px; justify-content: end; }
 .menu.is-research .strips-frame { justify-self: end; }
-.menu.is-research .menu-title { display: none; }
+.menu.is-research .menu-title { display: block; color: #eaf3f9; text-shadow: 0 2px 6px rgb(0 0 0 / 0.45); }
 .chiller-scroll {
   overflow-y: auto;
   min-height: 0;
@@ -6525,3 +6525,28 @@ body:has(.view-menu) > .be { opacity: 0.15; pointer-events: none; }
 html[lang='en'] :is(.heat-label, .brand-sub, .menu-title, .strip-price, .strip-en) { writing-mode: horizontal-tb; letter-spacing: 0.02em; }
 html[lang='en'] .brand-sub { font-size: 0.62em; white-space: nowrap; }
 html[lang='en'] .heat-label { font-size: 13px; }
+
+/* ---- the pantry, finer: its name upright at the right as the menu's is; each bin a frosted card, its food's icon in a round badge tinted by
+   where it's kept, how much there is and how fresh it is as two slim meters, the order buttons as pills ---- */
+.chiller { border: 0; border-radius: 14px; background: linear-gradient(180deg, rgb(236 243 248 / 0.94), rgb(214 227 237 / 0.94));
+  box-shadow: 0 10px 26px -8px rgb(0 0 0 / 0.5), inset 0 0 0 1px rgb(255 255 255 / 0.6); backdrop-filter: blur(6px); }
+.chiller-zone-head { border-radius: 0; letter-spacing: 0.25em; }
+.chiller-bin { border-radius: 12px; background: linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(240 245 249 / 0.92));
+  box-shadow: 0 2px 6px -2px rgb(30 50 70 / 0.35), inset 0 0 0 1px rgb(255 255 255 / 0.9); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.chiller-bin:hover { transform: translateY(-2px); box-shadow: 0 8px 16px -6px rgb(30 50 70 / 0.45), inset 0 0 0 1px #fff; }
+.chiller-bin-head :is(.icon, svg) { width: 26px; height: 26px; padding: 4px; border-radius: 50%; background: #dfeaf2; color: #2e4a62; flex: none; }
+.is-frozen .chiller-bin-head :is(.icon, svg) { background: #d9ecfa; color: #1f5f8f; }
+.is-chilled .chiller-bin-head :is(.icon, svg) { background: #dff3ec; color: #24705a; }
+.is-ambient .chiller-bin-head :is(.icon, svg) { background: #f7ebd6; color: #8a5a1c; }
+.chiller-bin-name { font-weight: 700; }
+.chiller-level { height: 5px; border-radius: 3px; }
+.chiller-btn { border-radius: 999px; background: #4a5d70; }
+.chiller-btn.chiller-fill { background: #3f7d5c; }
+.chiller-fresh { display: flex; align-items: center; gap: 4px; margin: 2px 0 4px; font-size: 10.5px; }
+.chiller-fresh svg { width: 12px; height: 12px; fill: currentColor; flex: none; }
+.chiller-fresh-bar { flex: 1; height: 4px; border-radius: 2px; background: rgb(0 0 0 / 0.1); overflow: hidden; }
+.chiller-fresh-bar i { display: block; height: 100%; border-radius: 2px; background: currentColor; transition: width 0.6s ease; }
+.chiller-fresh em { font-style: normal; font-weight: 700; min-width: 30px; text-align: right; }
+.chiller-fresh.is-fresh { color: #2f9a5c; }
+.chiller-fresh.is-good { color: #c98a1e; }
+.chiller-fresh.is-tired { color: #c0463a; }

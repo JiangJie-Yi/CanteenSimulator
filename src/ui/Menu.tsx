@@ -6,12 +6,15 @@ import { PAR } from '@/game/economy'
 import { STORAGES, storageName, storageOf } from '@/data/storage'
 import { Icon, iconFor } from './Icon'
 import { tl } from '@/data/i18n'
+import { freshGrade } from '@/game/freshness'
 
 export type Restock = 'avg' | 'each' | 'full'
 
 type MenuProps = {
   dish: Dish
   lang: Lang
+  /** how fresh each food in the pantry is (0..100, game/freshness) */
+  fresh?: Record<string, number>
   /** portions ordered per item, and per base (soup, bowl, set meal) */
   quantities: Record<string, number>
   onAdd: (id: string) => void
@@ -77,7 +80,7 @@ let foodsFont: { font: number; rows: number } | null = null
 const iconOf = (x: object) => (x as { icon?: string }).icon
 
 
-export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, open = false, stock, research = false, unitCost, onBuy, onRestock, restockCost, days, layoutLike,
+export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, open = false, stock, research = false, unitCost, onBuy, onRestock, restockCost, days, layoutLike,
   cash = Infinity }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
@@ -265,13 +268,25 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
           <b className={out ? 'is-zero' : ''}>{tl(lang, '庫存', '在庫', 'Stock')} <em>{have}</em></b>
           <small>{tl(lang, '成本', '原価', 'Cost')} <em>{cost}</em></small>
         </span>
+        {/* (how fresh what's in stock is: a leaf and a bar, green fresh, amber going, red tired; nothing to show with none in) */}
+        {!out && (() => {
+          const f = Math.round(fresh?.[x.id] ?? 100)
+          const grade = freshGrade(f)
+          return (
+            <span className={`chiller-fresh is-${grade}`} aria-hidden="true" title={tl(lang, `鮮度 ${f}%：越不新鮮，做出來越不好吃`, `鮮度 ${f}%：鮮度が落ちると味も落ちる`, `Freshness ${f}%: the staler, the less tasty`)}>
+              <svg viewBox="0 0 16 16"><path d="M13.5 2.5C7 2.5 3 5.5 3 10c0 1.3.4 2.4 1 3.2C5 9.5 7.5 7 11 5.5 8 7.5 6 10 5.2 13.6 6 14 7 14 8 14c4 0 5.5-4.5 5.5-11.5z" /></svg>
+              <span className="chiller-fresh-bar"><i style={{ width: `${f}%` }} /></span>
+              <em>{f}%</em>
+            </span>
+          )
+        })()}
         {onBuy && (
           <span className="chiller-buy">
             <span role="button" tabIndex={-1} className={`chiller-btn${can(1) ? '' : ' is-off'}`} title={tl(lang, '叫 1 份', '1つ仕入れる', 'Order 1')}
               onPointerDown={(e) => e.stopPropagation()} onClick={buy(1)}>+1</span>
             <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={tl(lang, '叫 10 份', '10個仕入れる', 'Order 10')}
               onPointerDown={(e) => e.stopPropagation()} onClick={buy(10)}>+10</span>
-            <span role="button" tabIndex={-1} className={`chiller-btn chiller-top${can(need) ? '' : ' is-off'}`}
+            <span role="button" tabIndex={-1} className={`chiller-btn chiller-fill${can(need) ? '' : ' is-off'}`}
               title={need ? tl(lang, `補到 ${PAR} 份（${need} 份，NT$${cost * need}）`, `${PAR}まで補充（${need}）`, `Fill up to ${PAR} (${need}, NT$${cost * need})`) : (tl(lang, '已經夠了', '十分あります', 'Enough already'))}
               onPointerDown={(e) => e.stopPropagation()} onClick={buy(need)}>{tl(lang, '補', '補', '+')}</span>
           </span>
@@ -369,7 +384,6 @@ export function Menu({ dish, lang, quantities, onAdd, onRemove, onClear, feed = 
       {research && onBuy ? (
         <div className="strips-frame">
           <div className="chiller" role="group" aria-label={tl(lang, '食材櫃', '食材庫', 'Pantry')}>
-            <div className="chiller-top"><span>{tl(lang, '食材櫃', '食材庫', 'Pantry')}</span></div>
             {/* (in three: the freezer, the fridge, and the larder at room temperature) */}
             <div className="chiller-scroll">
               {STORAGES.map((st) => {

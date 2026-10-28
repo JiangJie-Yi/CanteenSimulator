@@ -54,6 +54,8 @@ export const SEATS_TAKEN = new Set<number>()
  * sets it down in front of them. Roasting moves the food, GuestBar3D the server and the plates; this is what they tell
  * each other, by the food's key.
  */
+/** how fresh each food in the pantry is just now (0..100, game/freshness), kept by the App, read when a dish is tasted */
+export const PANTRY = { fresh: {} as Record<string, number> }
 export const SERVICE = {
   /** how many servers there are to carry (GuestBar3D says): none, and the cook hands it over the bar himself */
   servers: 0,

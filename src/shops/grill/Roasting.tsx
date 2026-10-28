@@ -34,7 +34,8 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
+import { freshFactor } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
 
@@ -3168,7 +3169,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (not made the way it's on the menu: not what they ordered)
       const asOrdered = !dish.want || dish.want.dabs.slice().sort().join() ===
         Object.entries(dish.dabs).filter(([k, n]) => n > 0 && k !== 'water').map(([k]) => k).sort().join()
-      const taste = Math.max(0, tasteOf(dish) - (asOrdered ? 0 : 15))
+      // (and as fresh as what it was made from: a tired fish tastes of it)
+      const taste = Math.max(0, tasteOf(dish) * freshFactor(PANTRY.fresh[dish.id] ?? 100) - (asOrdered ? 0 : 15))
       dish.node.userData.byGuest = true
       eat(dish)
       g.eaten.push(taste)

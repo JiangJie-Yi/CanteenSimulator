@@ -30,7 +30,7 @@ import { OccluderFade } from '@/scene/OccluderFade'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
-import { DRINKS, type DrinkId } from '@/shops/grill/bar'
+import { DRINKS, type DrinkId, PANTRY } from '@/shops/grill/bar'
 import { offsetOf, rotationOf, setEditLang, toggleEdit, useEdit } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { cameraOneOf } from '@/scene/camera1'
@@ -58,6 +58,7 @@ import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
 import { tl } from '@/data/i18n'
+import { ageFresh, blendFresh } from '@/game/freshness'
 
 // distance between dishes on the carousel
 const SPACING = 6
@@ -65,7 +66,8 @@ const SPACING = 6
 const FIRE_CAPACITY = 16
 const SAVE_KEY = 'canteen-save'
 type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number }
-  stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean> }
+  stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
+  fresh?: Record<string, number> }
 // Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff).
 // (Any save left by an older version is cleared.)
 const SAVED: Saved | null = (() => {
@@ -965,6 +967,24 @@ export default function App() {
   const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0) - (ledger.offering ?? 0)
   // ingredients in stock, by portion; nothing until it's bought
   const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
+  // how fresh each food in stock is (game/freshness): what's bought comes in fresh and mixes with what's there; it goes off as time passes
+  const [fresh, setFresh] = useState<Record<string, number>>(() => SAVED?.fresh ?? {})
+  const stockWas = useRef(stock)
+  useEffect(() => {
+    const was = stockWas.current
+    stockWas.current = stock
+    const grew = Object.keys(stock).filter((k) => (stock[k] ?? 0) > (was[k] ?? 0))
+    if (grew.length) setFresh((f) => ({ ...f, ...Object.fromEntries(grew.map((k) => [k, blendFresh(was[k] ?? 0, f[k] ?? 100, (stock[k] ?? 0) - (was[k] ?? 0))])) }))
+  }, [stock])
+  useEffect(() => {
+    // (every few seconds: a game-minute is a second of play, sped up with the game)
+    const t = window.setInterval(() => {
+      const mins = 5 * GAME_SPEED.value
+      setFresh((f) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, (stockWas.current[k] ?? 0) > 0 ? ageFresh(k, v, mins / 6) : v])))
+    }, 5000)
+    return () => window.clearInterval(t)
+  }, [])
+  PANTRY.fresh = fresh
   // the owner's name ('' while they aren't asked it: they're 老闆); null until they've founded the business, while the
   // welcome is up and the sign is dark
   const [owner, setOwner] = useState<string | null>(() => SAVED?.owner ?? '老闆')
@@ -976,8 +996,8 @@ export default function App() {
   // the 開業 button is hovered: a spotlight swings onto the shop
   const [spotOn, setSpotOn] = useState(false)
   // the business is saved as it goes (every few seconds and when the page is left), and picked up next time
-  const saveRef = useRef<Omit<Saved, 'v'>>({ ledger, stock, hired, notes, owner, opened })
-  saveRef.current = { ledger, stock, hired, notes, owner, opened }
+  const saveRef = useRef<Omit<Saved, 'v'>>({ ledger, stock, hired, notes, owner, opened, fresh })
+  saveRef.current = { ledger, stock, hired, notes, owner, opened, fresh }
   useEffect(() => {
     const write = () => {
       try {
@@ -2090,7 +2110,7 @@ export default function App() {
         onBuy={!hand ? undefined : (id, n) => buyIn(dish, id, n)} onRestock={!hand ? undefined : (how) => restock(dish, how)}
         restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
          lang={lang} quantities={hand ? orders[dish.id] : entryCount}
-        feed={feed} locked={!hand} stock={hand ? stock : entryStock(dish)}
+        feed={feed} locked={!hand} stock={hand ? stock : entryStock(dish)} fresh={fresh}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={() => {
           // cancelling everything refunds it (nothing was made)
