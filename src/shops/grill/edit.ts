@@ -275,6 +275,13 @@ export function setScaleAxis(a: 0 | 1 | 2 | null) {
 const registry = new Map<string, { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null }>()
 /** `center`: where the piece's middle is in the world (what a group of it turns and grows about); a piece without one can't be grouped.
  * `parent`: the piece it sits inside (a Movable within another), which the outliner lists it under, as Maya's does */
+/** the camera brought to what's picked (a group: to its first piece) */
+export function frameSelected() {
+  const id = state.selected
+  if (!id) return
+  const target = state.groups[id] ? state.groups[id].members[0] : id
+  registry.get(target)?.focus()
+}
 export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null) {
   registry.set(id, { label, focus, center, parent })
   panel()
@@ -443,6 +450,7 @@ const PANEL_CSS = `
 .be { position:fixed; left:12px; bottom:92px; z-index:9999; width:292px; max-height:70vh; display:flex; background:#303030; color:#d6d6d6;
   font:11.5px/1.35 "Inter","Segoe UI","Noto Sans TC",sans-serif; border:1px solid #1a1a1a; border-radius:6px; box-shadow:0 6px 22px rgba(0,0,0,.55); overflow:hidden; user-select:none }
 .be * { box-sizing:border-box }
+.be-keys { margin:6px 0 2px; padding:5px 7px; border-radius:4px; background:#262626; color:#9a9a9a; font:10.5px/1.6 monospace; white-space:pre-line }
 .be-space { display:block; width:100%; margin:0 0 6px; padding:5px 8px; border:0; border-radius:4px; text-align:left; cursor:pointer;
   font:600 12px/1.3 inherit; color:#fff; background:#2f6fb0 }
 .be-space.local { background:#c27a1e }
@@ -637,6 +645,8 @@ function panel() {
     group(T().location, '0.01', readLoc, (id, v) => { const z = zeroOf(id).o, w = fromRoom(id, v); moveTo(id, [w[0] + z[0], w[1] + z[1], w[2] + z[2]]) }, [0, 0, 0])
     group(T().rotation, '5', readRot, (id, v) => { const z = zeroOf(id).r; turnTo(id, [v[0] + z[0], v[1] + z[1], v[2] + z[2]]) }, [0, 0, 0])
     group(T().scale, '0.05', readScale, (id, v) => { const z = zeroOf(id).s; scaleTo(id, [v[0] * z[0], v[1] * z[1], v[2] * z[2]]) }, [1, 1, 1], true)
+    // (the keys, as in Maya, at a glance)
+    tr.appendChild(h('div', 'be-keys', T().hotkeys))
     const foot = h('div', 'be-foot')
     const mk = (text: string, title: string, fn: () => void, cls = '') => {
       const b = h('button', cls, text) as HTMLButtonElement
@@ -719,6 +729,10 @@ if (typeof window !== 'undefined') {
         else setTool(t)
         return
       }
+      // (as in Maya: F frames what's picked, A the whole shop, Esc lets go of it)
+      if (k === 'f') { e.preventDefault(); frameSelected(); return }
+      if (k === 'a') { e.preventDefault(); window.dispatchEvent(new CustomEvent('edit-frame-all')); return }
+      if (k === 'escape') { e.preventDefault(); state.picked = []; select(null); return }
       if (k === '4') { e.preventDefault(); setWire(true); return }
       if (k === '5') { e.preventDefault(); setWire(false); return }
     }

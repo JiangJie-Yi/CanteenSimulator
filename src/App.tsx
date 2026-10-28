@@ -438,13 +438,18 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   // frame the dish on the stage rather than the whole canvas: shift the projection so the stage's centre is
   // the view's centre, and size the shot to the stage's shape
   const aspect = frame.w > 0 && frame.h > 0 ? frame.w / frame.h : size.width / size.height
+  // (entering developer mode folds the menu away, which widens the stage: the framing is held as it was then, so the view doesn't slide; a
+  // change of the window's own size still reframes it)
+  const framedFor = useRef({ w: 0, h: 0 })
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera) || frame.w <= 0) return
+    if (editing && framedFor.current.w === size.width && framedFor.current.h === size.height) return
+    framedFor.current = { w: size.width, h: size.height }
     const offX = size.width / 2 - frame.cx
     const offY = size.height / 2 - frame.cy
     camera.setViewOffset(size.width, size.height, offX, offY, size.width, size.height)
     camera.updateProjectionMatrix()
-  }, [camera, size, frame])
+  }, [camera, size, frame, editing])
   const look = LIGHTING[theme]
 
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
@@ -578,6 +583,30 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     }
   }, [gl, camera])
   const zoomDir = useRef(new THREE.Vector3())
+  // (developer mode navigates as Maya does: Alt with the left button turns the view, with the middle pans, with the right dollies; without Alt
+  // a drag doesn't move the view, so picking and dragging pieces never knocks it about. A frames the whole shop)
+  useEffect(() => {
+    const c = controls.current
+    if (!c) return
+    if (!editing) { c.enableRotate = true; c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }; return }
+    c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.DOLLY }
+    const alt = (e: KeyboardEvent | PointerEvent) => { c.enabled = e.altKey }
+    const down = (e: PointerEvent) => { c.enabled = e.altKey || e.button === 1 }
+    const keyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') c.enabled = false }
+    c.enabled = false
+    window.addEventListener('keydown', alt)
+    window.addEventListener('keyup', keyUp)
+    gl.domElement.addEventListener('pointerdown', down, true)
+    const all = () => { onView('free') }
+    window.addEventListener('edit-frame-all', all)
+    return () => {
+      window.removeEventListener('keydown', alt)
+      window.removeEventListener('keyup', keyUp)
+      gl.domElement.removeEventListener('pointerdown', down, true)
+      window.removeEventListener('edit-frame-all', all)
+      c.enabled = true
+    }
+  }, [editing, gl])
   /** how far the gliding camera was from where it's going, last frame */
   const homeGap = useRef(Infinity)
 

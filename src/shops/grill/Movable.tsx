@@ -198,6 +198,42 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
     r.scale.set(world / (ps.x || 1), world / (ps.y || 1), world / (ps.z || 1))
   })
   if (!on || selected !== id || tool === 'select') return null
+  // the orange box in the middle: moved freely in the plane facing the camera, all three axes at once (as Maya's middle square)
+  const downFree = (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
+    const r0 = root.current
+    const par = r0?.parent?.parent
+    if (!r0 || !par) return
+    e.stopPropagation()
+    par.updateWorldMatrix(true, false)
+    const origin = r0.getWorldPosition(new THREE.Vector3())
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), origin)
+    const hit = (ev: PointerEvent) => {
+      const r = gl.domElement.getBoundingClientRect()
+      raycaster.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera)
+      return raycaster.ray.intersectPlane(plane, new THREE.Vector3())
+    }
+    let last = hit(e.nativeEvent)
+    if (!last) return
+    beginChange()
+    moveTo(id, offsetOf(id))
+    if (controls) controls.enabled = false
+    const move = (ev: PointerEvent) => {
+      const p1 = hit(ev)
+      if (!p1 || !last) return
+      const d = par.worldToLocal(p1.clone()).sub(par.worldToLocal(last.clone()))
+      const n = [...offsetOf(id)] as V3
+      n[0] += d.x; n[1] += d.y; n[2] += d.z
+      moveTo(id, n)
+      last = p1
+    }
+    const up = () => {
+      if (controls) controls.enabled = true
+      commitOffsets()
+      window.removeEventListener('pointermove', move)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
+  }
   const down = (axis: 0 | 1 | 2) => (e: { stopPropagation: () => void; nativeEvent: PointerEvent }) => {
     const r0 = root.current
     const par = r0?.parent?.parent
@@ -442,6 +478,11 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
           </mesh>
         </group>
       ))}
+      {/* (the middle: an orange box, dragged to move it freely in the plane facing the camera) */}
+      <mesh renderOrder={1002} onPointerDown={downFree} userData={{ editHandle: true, gizmo: true }}>
+        <boxGeometry args={[L * 0.16, L * 0.16, L * 0.16]} />
+        <meshBasicMaterial color="#f2a33a" depthTest={false} transparent opacity={0.9} />
+      </mesh>
     </group>
   )
 }
