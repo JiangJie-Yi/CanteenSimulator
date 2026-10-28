@@ -258,7 +258,7 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
         onContextMenu={(e) => { e.preventDefault(); if (!press.current && !locked) onRemove(x.id) }}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!locked) onAdd(x.id) } else onKey(x.id)(e) }}>
         <span className="chiller-bin-head">
-          <FoodArt id={x.id} store={storageOf(x.id)} />
+          <FoodArt id={x.id} store={storageOf(x.id)} band />
           <span className="chiller-bin-name">{name}</span>
           {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{tl(lang, '試', '試', 'Try')}×{n}</span>}
         </span>

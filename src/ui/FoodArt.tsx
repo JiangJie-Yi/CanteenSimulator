@@ -16,7 +16,7 @@ const FISH: Record<string, Fish> = {
   Salmon: { back: '#e8826a', belly: '#f6b8a0', len: 1, deep: 0.5, fillet: true },
   Hokke: { back: '#8a7a5a', belly: '#efe6d0', len: 1, deep: 0.4, stripe: '#5a4a32' },
   Buri: { back: '#3a5a7a', belly: '#eef2f0', len: 1.05, deep: 0.36, stripe: '#e6c23a' },                               // yellowtail
-  Gindara: { back: '#f2ece2', belly: '#fbf8f2', len: 1, deep: 0.5, fillet: true },                                    // black cod, pale fillet
+  Gindara: { back: '#34343c', belly: '#fbf6ec', len: 1, deep: 0.5, fillet: true },                                    // black cod: snow-white flesh, its skin near black
   Nodoguro: { back: '#d8443a', belly: '#f6c8b8', len: 0.95, deep: 0.4, fin: '#b82a20' },                               // blackthroat, red
 }
 
@@ -106,18 +106,19 @@ function OtherArt({ id }: { id: string }) {
   }
 }
 
-export function FoodArt({ id, store, size = 34 }: { id: string; store: string; size?: number }) {
+/** `band`: drawn across the top of a card (no round tile, the food cropped close to fill the band; the card's band behind it) */
+export function FoodArt({ id, store, size = 34, band = false }: { id: string; store: string; size?: number; band?: boolean }) {
   const uid = `fa${id}`
   const f = FISH[id]
   const [g0, g1] = ground(store)
   return (
-    <svg className="food-art" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+    <svg className="food-art" width={band ? undefined : size} height={band ? undefined : size} viewBox={!band ? '0 0 64 64' : f ? (f.fillet ? '6 11 52 33' : '1 13 62 34') : '4 6 56 52'} aria-hidden="true">
       <defs>
         <radialGradient id={`${uid}g`} cx="0.4" cy="0.3" r="0.8"><stop offset="0" stopColor={g0} /><stop offset="1" stopColor={g1} /></radialGradient>
         {f && <linearGradient id={`${uid}b`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={f.back} /><stop offset="0.55" stopColor={f.belly} /><stop offset="1" stopColor={f.belly} /></linearGradient>}
       </defs>
-      <circle cx="32" cy="32" r="30" fill={`url(#${uid}g)`} />
-      <circle cx="32" cy="32" r="30" fill="none" stroke="#fff" strokeWidth="1.5" opacity="0.7" />
+      {!band && <circle cx="32" cy="32" r="30" fill={`url(#${uid}g)`} />}
+      {!band && <circle cx="32" cy="32" r="30" fill="none" stroke="#fff" strokeWidth="1.5" opacity="0.7" />}
       {f ? <FishArt f={f} uid={uid} /> : <OtherArt id={id} />}
     </svg>
   )

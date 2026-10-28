@@ -354,9 +354,10 @@ function shapeFace(root: THREE.Object3D, head: THREE.Bone, shape: (typeof FACES)
       if (shape === 'round') { sx = 1.07; sy = 0.95 }
       else if (shape === 'long') { sx = 0.93; sy = 1.06 + 0.06 * low }
       else if (shape === 'square') { sx = 1 + 0.2 * lo; sy = 1 - 0.06 * low }
-      else { sx = 1 - 0.24 * lo; sy = 1 + 0.1 * low }
+      // (the oval: only a little narrower toward the chin, the jaw kept full: pinched in more, the head reads as a light bulb on its neck)
+      else { sx = 1 - 0.1 * lo; sy = 1 + 0.04 * low }
       v.x *= sx
-      v.z *= shape === 'round' ? 1.03 : shape === 'oval' ? 1 - 0.08 * lo : 1
+      v.z *= shape === 'round' ? 1.03 : shape === 'oval' ? 1 - 0.03 * lo : 1
       v.y *= sy
       v.add(c).applyMatrix4(inv)
       p.setXYZ(i, v.x, v.y, v.z)

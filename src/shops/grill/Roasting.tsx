@@ -683,7 +683,8 @@ function crewPlaces(crew: CrewMember[]) {
     chef: [{ at: CHEF_AT, yaw: CHEF_YAW }],
     sous: [{ at: kitchenAt(1.3), yaw: KITCHEN_YAW }],
     stock: [{ at: kitchenAt(-0.6), yaw: KITCHEN_YAW }],
-    cashier: [{ at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + TILL.along).addScaledVector(c0.lay, TILL.lay + TILL.D / 2 + 0.3)),
+    // (stood back far enough that the register's drawer, run all the way out, stops short of them)
+    cashier: [{ at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + TILL.along).addScaledVector(c0.lay, TILL.lay + TILL.D / 2 + 0.5)),
       yaw: Math.atan2(-c0.lay.x, -c0.lay.z) }],
     // (the servers are on the floor with the customers, and walk: GuestBar3D draws them)
     server: [],

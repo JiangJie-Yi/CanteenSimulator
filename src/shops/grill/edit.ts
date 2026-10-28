@@ -481,6 +481,9 @@ const PANEL_CSS = `
 .be-main { flex:1; min-width:0; display:flex; flex-direction:column }
 .be-head { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#1f1f1f; font-weight:600; letter-spacing:.02em; color:#e6e6e6 }
 .be-head small { margin-left:auto; font-weight:400; color:#8a8a8a }
+.be-win { width:20px; height:20px; padding:0; border:0; border-radius:3px; background:#3a3a3a; color:#ddd; font:600 13px/20px sans-serif; cursor:pointer; flex:none }
+.be-win:hover { background:#4a4a4a } .be-close:hover { background:#b8433a; color:#fff }
+.be.be-min { max-height:none } .be.be-min .be-body, .be.be-min .be-tools { display:none }
 .be-body { overflow:auto; flex:1; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a }
 .be-sec { border-top:1px solid #1d1d1d }
 .be-sec > .be-st { display:flex; align-items:center; gap:5px; padding:4px 8px; background:#3d3d3d; color:#e0e0e0; font-weight:600; cursor:pointer }
@@ -563,6 +566,14 @@ function panel() {
     const main = h('div', 'be-main')
     const head = h('div', 'be-head', T().title)
     head.appendChild(h('small', '', T().keys))
+    // (the panel folded down to its title bar, and shut (leaving the mode, as G or Esc))
+    const minB = h('button', 'be-win', '−') as HTMLButtonElement
+    minB.title = T().minimize
+    minB.onclick = (e) => { e.stopPropagation(); const r = minB.closest('.be'); r?.classList.toggle('be-min'); minB.textContent = r?.classList.contains('be-min') ? '▢' : '−' }
+    const closeB = h('button', 'be-win be-close', '×') as HTMLButtonElement
+    closeB.title = T().close
+    closeB.onclick = (e) => { e.stopPropagation(); toggleEdit() }
+    head.append(minB, closeB)
     const body = h('div', 'be-body')
     const section = (title: string) => {
       const sec = h('div', 'be-sec'), st = h('div', 'be-st', title), sc = h('div', 'be-sc')
@@ -746,7 +757,8 @@ if (typeof window !== 'undefined') {
       // (as in Maya: F frames what's picked, A the whole shop, Esc lets go of it)
       if (k === 'f') { e.preventDefault(); frameSelected(); return }
       if (k === 'a') { e.preventDefault(); window.dispatchEvent(new CustomEvent('edit-frame-all')); return }
-      if (k === 'escape') { e.preventDefault(); state.picked = []; select(null); return }
+      // (Esc: lets go of what's picked; with nothing picked, leaves the developer mode, as G does)
+      if (k === 'escape') { e.preventDefault(); if (state.selected || state.picked.length) { state.picked = []; select(null) } else toggleEdit(); return }
       if (k === '4') { e.preventDefault(); setWire(true); return }
       if (k === '5') { e.preventDefault(); setWire(false); return }
     }

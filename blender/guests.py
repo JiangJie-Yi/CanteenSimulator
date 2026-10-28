@@ -438,9 +438,11 @@ def body(kind):
     pelvis = v((0, 0, 0.29), 0.19 * hi)
     waist = v((0, 0, 0.43), 0.185 * wa)
     chest = v((0, 0, 0.55), 0.16 * (sh * 0.5 + wa * 0.5))
-    top = v((0, 0, 0.64), 0.1 * sh)
-    neck0 = v((0, 0, 0.69), 0.06)
-    neck1 = v((0, 0, 0.73), 0.05)
+    # (the shoulders round and full right up under the head: a bean, no neck between)
+    top = v((0, 0, 0.64), 0.135 * sh)
+    # (the neck as thick as the jaw over it, so body and head meet in one line)
+    neck0 = v((0, 0, 0.69), 0.11)
+    neck1 = v((0, 0, 0.73), 0.11)
     edges += [(seat, pelvis), (pelvis, waist), (waist, chest), (chest, top), (top, neck0), (neck0, neck1)]
     for sd in (1, -1):
         # (as Overcooked's cooks: no arms; the hands are their own floating mittens (hands(), below), not part of the body)
@@ -634,7 +636,8 @@ def head(kind):
         # a chibi face: round, a little wider than tall at the cheeks, the jaw tucked in, the back of the head full
         # (each kind's own: wider or narrower, longer, squarer or more pointed at the chin)
         z = p.z / (HEAD_R * k)
-        p.x *= fc["wide"] - fc["jaw"] * smoothstep(-0.2, -1.0, z)
+        # (as Overcooked's cooks: next to no chin; the face's lower half full and broad, its underside flattened to sit straight on the body)
+        p.x *= fc["wide"] - 0.25 * fc["jaw"] * smoothstep(-0.35, -1.0, z) + 0.05 * smoothstep(-0.3, -0.8, z)
         p.y *= 0.96
         if p.y < 0:
             p.y *= 1 - 0.03 * smoothstep(-0.1, -0.9, z)
@@ -645,8 +648,9 @@ def head(kind):
         else:
             p.y *= 1.04
         p.z *= 0.97 * (fc["long"] if z < 0 else 1 + (fc["long"] - 1) * 0.3)
-        if z < -0.6:
-            p.z -= fc["chin"] * k * smoothstep(-0.6, -1.0, z) * (1 if p.y < 0 else 0.3)
+        if z < -0.45:
+            # (the bottom of the head pressed flat: a broad base, no point of a chin)
+            p.z += (-0.45 - z) * 0.55 * HEAD_R * k
         vt.co = p + HC + Vector((0, 0, (k - 1) * HEAD_R * 0.6))
     for f in bm.faces:
         f.smooth = True

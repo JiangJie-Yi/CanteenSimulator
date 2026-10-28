@@ -506,9 +506,12 @@ export const singleCounter = (at: THREE.Vector3, length: number): Counter[] => [
  */
 /** how far the side counter, its stools and its aisle are pulled in from the wall (bar units) */
 export const SIDE_PULL = 0.3
+/** how much shorter the first counter is than it was laid out: the room closes up along it by this (twice it, the bar being drawn double) */
+export const BAR_TRIM = 0.4
 export const GRILL_COUNTERS: Counter[] = [
   // (its start drawn in to meet the side counter, which is drawn in from the wall by SIDE_PULL: the far end stays where it was)
-  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL, seats: 6 },
+  // (and its far end drawn in by BAR_TRIM: the strip of floor that was left between the kitchen and the till taken out, all past it closing up)
+  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2 - BAR_TRIM / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL - BAR_TRIM, seats: 6 },
   // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)
   { at: new THREE.Vector3().addScaledVector(LAY, -0.42 + 0.25).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14 + 0.5, seats: 4, shift: 0.25 - 0.1,
     // (its wall set further back, for the drinks fridges by the toilets: where it was, the counter having moved off it)
