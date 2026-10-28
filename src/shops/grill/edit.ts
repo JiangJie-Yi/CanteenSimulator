@@ -280,7 +280,12 @@ export function setScaleAxis(a: 0 | 1 | 2 | null) {
 }
 
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
-const registry = new Map<string, { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null }>()
+// (kept on the window, so a live code update in development (which loads this module afresh) doesn't lose the pieces that weren't remounted: the
+// panel would list only some of them)
+type Entry = { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null }
+const registry: Map<string, Entry> = typeof window !== 'undefined'
+  ? ((window as unknown as { __editRegistry?: Map<string, Entry> }).__editRegistry ??= new Map())
+  : new Map()
 /** `center`: where the piece's middle is in the world (what a group of it turns and grows about); a piece without one can't be grouped.
  * `parent`: the piece it sits inside (a Movable within another), which the outliner lists it under, as Maya's does */
 /** the camera brought to what's picked (a group: to its first piece) */

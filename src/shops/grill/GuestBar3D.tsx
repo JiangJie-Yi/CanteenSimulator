@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
+import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { FloorPiece } from '@/scene/FloorPiece'
@@ -264,7 +264,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const yaw = Math.atan2(ALONG.x, ALONG.z)
   // (hung high, its rod well over a customer's head: they duck through only its hem)
   // (the doorway wide, its middle a little off the way in toward the till: the wall's close on the other side)
-  const W = 1.05, H = 2.14, NOREN = 0.68, DX = -0.12
+  const W = 1.05, H = 2.14, DX = -0.12
   // (the rod and cloth hung out toward the doorway's own line, not back in the room)
   const NZ = 0.27
   useFrame(({ clock }) => {
@@ -339,24 +339,35 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
           ))}
           {/* (the rod and the panels hung that much higher on the shorter cords) */}
           <group position-y={NOREN_CORD}>
-          <mesh position={[0, H - 0.05, NZ]} rotation-z={Math.PI / 2}>
-            <cylinderGeometry args={[0.012, 0.012, W, 8]} />
-            <meshToonMaterial color="#c9a46a" />
-          </mesh>
-          {[-1, 0, 1].map((k) => (
-            <group key={k} position={[k * (W / 3), H - 0.05, NZ + 0.005]}>
-              <mesh ref={(m) => { panels.current[k + 1] = m }} position-y={-NOREN / 2}>
-                <planeGeometry args={[W / 3 - 0.012, NOREN]} />
-                <meshToonMaterial map={panelTex(tex, k + 1)} side={THREE.DoubleSide} />
-              </mesh>
-            </group>
-          ))}
+          <group position={[0, H - 0.05, NZ]}><NorenModel tex={tex} panels={panels} /></group>
           </group>
         </group>
       </Movable>
       </group>
     </group>
   )
+}
+
+/** the noren (blender/genkan.py): its lacquered rod with brass caps, and three cloth panels in soft folds with their tabs over the rod, each painted
+ * with its third of the shop's cloth and swung from its top edge */
+function NorenModel({ tex, panels }: { tex: THREE.Texture | null; panels: React.MutableRefObject<(THREE.Mesh | null)[]> }) {
+  const gltf = useGLTF(NOREN_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      const k = /NorenPanel(\d)/.exec(m.name)
+      if (k) {
+        m.material = new THREE.MeshToonMaterial({ map: panelTex(tex, +k[1]), side: THREE.DoubleSide })
+        panels.current[+k[1]] = m
+      } else m.material = src.name === 'NorenBrass' ? new THREE.MeshStandardMaterial({ color: '#c9a04a', metalness: 1, roughness: 0.3 })
+        : new THREE.MeshToonMaterial({ color: src.color.clone() })
+    })
+    return r
+  }, [gltf, tex, panels])
+  return <primitive object={model} />
 }
 
 /** how long the noren's two cords are, from the beam down to its rod (the rod hung 0.18 higher than it was) */
@@ -411,14 +422,10 @@ const CHOCHIN_GLOW = (() => {
   g.fillRect(0, 0, 128, 128)
   return new THREE.CanvasTexture(c)
 })()
-const CHOCHIN_GEO = (() => {
-  // a barrel of paper, round in the middle and drawn in at top and bottom
-  const pts = Array.from({ length: 13 }, (_, i) => {
-    const y = i / 12
-    return new THREE.Vector2(0.07 + 0.09 * Math.sin(Math.PI * y), y * 0.42 - 0.21)
-  })
-  return new THREE.LatheGeometry(pts, 24)
-})()
+const CHOCHIN_URL = import.meta.env.BASE_URL + 'models/chochin.glb'
+const NOREN_URL = import.meta.env.BASE_URL + 'models/noren.glb'
+useGLTF.preload(CHOCHIN_URL)
+useGLTF.preload(NOREN_URL)
 
 /**
  * A red paper lantern (赤提灯) hung at the door on a little arm off a post, the shop's name on it, lit from inside:
@@ -428,6 +435,24 @@ function Chochin({ mark }: { mark: string }) {
   const tex = useMemo(() => chochinTexture(mark), [mark])
   const hang = useRef<THREE.Group>(null)
   const skin = useRef<THREE.MeshBasicMaterial>(null)
+  // (blender/genkan.py's lantern: its paper lit from within and painted with the name, its caps lacquer, its bands and bail gold)
+  const gltf = useGLTF(CHOCHIN_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      if (src.name === 'ChochinPaper') {
+        const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })
+        skin.current = mat
+        m.material = mat
+      } else m.material = src.name === 'ChochinGold' ? new THREE.MeshStandardMaterial({ color: '#d6a84a', metalness: 1, roughness: 0.3 })
+        : new THREE.MeshToonMaterial({ color: src.color.clone() })
+    })
+    inkModel(r, (m) => /Skin|Band|Bail|Tassel/.test(m.name), { width: 0.0015, weld: true })
+    return r
+  }, [gltf, tex])
   const halo = useRef<THREE.Sprite>(null)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -445,16 +470,7 @@ function Chochin({ mark }: { mark: string }) {
           <meshBasicMaterial color="#1a0d08" />
         </mesh>
         <group position-y={-0.36}>
-          <mesh geometry={CHOCHIN_GEO}>
-            <meshBasicMaterial ref={skin} map={tex} toneMapped={false} />
-          </mesh>
-          {/* the black lacquered rings top and bottom */}
-          {[0.215, -0.215].map((y) => (
-            <mesh key={y} position-y={y}>
-              <cylinderGeometry args={[0.075, 0.075, 0.035, 18]} />
-              <meshToonMaterial color="#1a0d08" />
-            </mesh>
-          ))}
+          <primitive object={model} />
           <sprite ref={halo} scale={0.9}>
             <spriteMaterial map={CHOCHIN_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.5} />
           </sprite>
