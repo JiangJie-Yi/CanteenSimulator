@@ -99,7 +99,7 @@ def walnut_board(n):
 
 walnut_tex = image("walnut", walnut_board(512))
 # (the change tray's floor: a black resin, a faint sheen in its texture)
-resin_tex = image("resin", mix((0.05, 0.05, 0.055), (0.09, 0.085, 0.09), fbm(N, 20, 20, 3)))
+resin_tex = image("resin", mix((0.17, 0.17, 0.18), (0.21, 0.21, 0.22), fbm(N, 20, 20, 3)))
 
 
 # (a pachira leaflet, along u: dark glossy green, paler toward its edge and tip, a pale midrib and fine veins running out from it)
@@ -114,10 +114,16 @@ _bk = mix((0.42, 0.42, 0.3), (0.56, 0.55, 0.4), fbm(N, 60, 4, 3))
 _bk = _bk * (1 - 0.25 * smooth(0.82, 0.95, np.sin(v * np.pi * 2 * 9 + fbm(N, 4, 4, 2) * 3) * 0.5 + 0.5))[..., None]
 bark_tex = image("pachiraBark", _bk)
 # (the ingot's red cloth: a crimson silk with a small gold 七宝 (linked rings) woven in)
-_gx, _gy = (u * 10) % 1, (v * 10) % 1
+_gx, _gy = (u * 14) % 1, (v * 14) % 1
 _ring = np.minimum.reduce([np.abs(np.hypot(_gx - cx, _gy - cy) - 0.5) for cx, cy in ((0, 0), (1, 0), (0, 1), (1, 1), (0.5, 0.5))])
 _br = mix((0.55, 0.05, 0.05), (0.66, 0.09, 0.07), fbm(N, 30, 30, 2))
-_br = mix(_br, (0.85, 0.62, 0.25), smooth(0.05, 0.02, _ring) * 0.85)
+# (the weave: fine threads across, a sheen)
+_br = _br * (0.9 + 0.1 * (np.sin(u * np.pi * 2 * 220) * 0.5 + 0.5))[..., None]
+_br = mix(_br, (0.9, 0.68, 0.3), smooth(0.045, 0.018, _ring) * 0.9)
+# (a little gold flower in each ring's eye, and a pale dot in each lozenge)
+_eye = np.hypot(_gx - 0.5, _gy - 0.5)
+_br = mix(_br, (0.96, 0.8, 0.45), smooth(0.07, 0.04, _eye))
+_br = mix(_br, (0.95, 0.85, 0.7), smooth(0.03, 0.015, np.minimum.reduce([np.hypot(_gx - a, _gy - b) for a, b in ((0, 0.5), (0.5, 0), (1, 0.5), (0.5, 1))])) * 0.6)
 brocade_tex = image("ingotBrocade", _br)
 
 
@@ -128,20 +134,20 @@ def mat(name, hexs, rough=0.5, metal=0.0, tex=None):
 M = {
     "cup": mat("PenCupGlaze", "#2c3e5c", 0.25), "cupBand": mat("PenCupBand", "#e8e2d4", 0.3), "cupIn": mat("PenCupInside", "#1a2333", 0.6),
     "cupGlaze": mat("PenCupGlaze", "#ffffff", 0.2, tex=glaze_tex), "cupRim": mat("PenCupRim", "#b9a585", 0.7), "scissor": mat("ScissorHandle", "#ef7a1e", 0.4),
-    "gold": mat("BellGold", "#d4af37", 0.15, 1.0), "bellWood": mat("BellWood", "#3a2416", 0.4),
+    "gold": mat("BellGold", "#d4af37", 0.15, 1.0), "nickel": mat("BellNickel", "#cfd3d7", 0.25, 1.0), "bellWood": mat("BellWood", "#3a2416", 0.4),
     "ink": mat("DeskInk", "#16171a", 0.5), "white": mat("DeskWhite", "#f2f0ea", 0.5), "chrome": mat("DeskChrome", "#d9dde2", 0.15, 1.0),
     "steel": mat("DeskSteel", "#9aa0a8", 0.3, 0.9), "printer": mat("PrinterBody", "#eceae4", 0.45), "printerDark": mat("PrinterDark", "#3a3c40", 0.45),
     "slot": mat("DeskSlot", "#0b0c0e", 0.6), "paper": mat("ReceiptPaper", "#fbfaf6", 0.8), "green": mat("LedGreen", "#3ddc6a", 0.3),
     "amber": mat("LedAmber", "#ffb21e", 0.3), "red": mat("KeyRed", "#c8322a", 0.4), "yellow": mat("KeyYellow", "#e7bf2a", 0.4),
     "keyGreen": mat("KeyGreen", "#2f9a4c", 0.4), "reader": mat("ReaderBody", "#383b40", 0.4), "readerTrim": mat("ReaderTrim", "#3b3e45", 0.4),
-    "key": mat("ReaderKey", "#d6d9de", 0.4), "screen": mat("ReaderScreen", "#123a5c", 0.15), "bellBase": mat("BellBase", "#1d1b19", 0.4),
+    "key": mat("ReaderKey", "#d6d9de", 0.4), "screen": mat("ReaderScreen", "#123a5c", 0.15), "bellBase": mat("BellBase", "#ffffff", 0.45, tex=walnut_tex),
     "mat": mat("DeskMatWood", "#ffffff", 0.6, tex=hinoki_tex), "matEdge": mat("DeskMatEdge", "#b8915c", 0.6), "felt": mat("DeskMatFelt", "#3a3530", 0.9),
     "walnut": mat("StandWalnut", "#ffffff", 0.45, tex=walnut_tex), "walnutEnd": mat("StandWalnutEnd", "#2a1a10", 0.5),
     "brass": mat("StandBrass", "#c9a24a", 0.25, 1.0), "drawerIn": mat("StandDrawerInside", "#6a4a30", 0.7),
-    "resin": mat("TrayResin", "#ffffff", 0.35, tex=resin_tex), "resinRib": mat("TrayRib", "#1a1a1c", 0.5), "gilt": mat("TrayGilt", "#d4b25a", 0.3, 0.8),
+    "resin": mat("TrayResin", "#ffffff", 0.35, tex=resin_tex), "resinRib": mat("TrayRib", "#2c2c30", 0.5), "gilt": mat("TrayGilt", "#d4b25a", 0.3, 0.8),
     "rubber": mat("TrayFoot", "#202020", 0.9),
     "potGlaze": mat("TreePotGlaze", "#9c2a1e", 0.2), "potFoot": mat("TreePotFoot", "#5a3a28", 0.8), "soil": mat("TreeSoil", "#3a2a1c", 0.95),
-    "pebble": mat("TreePebble", "#e8e2d4", 0.6), "bark": mat("TreeBark", "#8a7a52", 0.8, tex=bark_tex), "stem": mat("TreeStem", "#6f8a3a", 0.6),
+    "pebble": mat("TreePebble", "#e8e2d4", 0.35), "pebble2": mat("TreePebble2", "#c9c3b6", 0.35), "pebble3": mat("TreePebble3", "#a8a296", 0.35), "bark": mat("TreeBark", "#8a7a52", 0.8, tex=bark_tex), "stem": mat("TreeStem", "#6f8a3a", 0.6),
     "leaf": mat("TreeLeaf", "#2f7a2e", 0.3, tex=leaf_tex), "leaf2": mat("TreeLeaf2", "#3f9238", 0.3, tex=leaf_tex), "ribbonRed": mat("TreeRibbon", "#c8221a", 0.5),
     "coinGold": mat("IngotGold", "#e0b24a", 0.15, 1.0), "lacquer": mat("IngotLacquer", "#141012", 0.2), "zabuton": mat("IngotZabuton", "#8a1410", 0.65, tex=brocade_tex),
     "lcd": mat("ReaderLcd", "#aab3a6", 0.3), "lcdInk": mat("ReaderLcdInk", "#1c2420", 0.5), "card": mat("ReaderCardFace", "#2f7fd0", 0.3),
@@ -488,7 +494,7 @@ bm_.from_mesh(dome.data)
 bmesh.ops.delete(bm_, geom=[v for v in bm_.verts if v.co.z < -1e-6], context="VERTS")
 bm_.to_mesh(dome.data)
 bm_.free()
-finish(dome, "BellDome", M["gold"])
+finish(dome, "BellDome", M["nickel"])
 dome.scale = (1, 1, 0.8)
 apply_scale(dome)
 for poly in dome.data.polygons:
@@ -496,13 +502,13 @@ for poly in dome.data.polygons:
 bl.append(dome)
 # (a fine rolled lip round the dome's foot, and a thin gold ring where it meets the base)
 bpy.ops.mesh.primitive_torus_add(major_radius=0.0368, minor_radius=0.0012, major_segments=64, minor_segments=10, location=P(0, 0.0157, 0))
-bl.append(finish(active(), "BellLip", M["gold"]))
-bl.append(cyl("BellCollar", 0.006, 0.004, P(0, 0.015 + 0.0296 + 0.0015, 0), M["gold"], verts=24))
+bl.append(finish(active(), "BellLip", M["nickel"]))
+bl.append(cyl("BellCollar", 0.006, 0.004, P(0, 0.015 + 0.0296 + 0.0015, 0), M["nickel"], verts=24))
 plunger = bpy.data.objects.new("TillBellPlunger", None)
 bpy.context.collection.objects.link(plunger)
 plunger.location = P(0, 0.015 + 0.0296 + 0.0035, 0)
-pl = [cyl("BellStem", 0.0024, 0.012, (0, 0, 0.006), M["gold"], verts=16),
-      cyl("BellKnob", 0.0085, 0.006, (0, 0, 0.0135), M["gold"], verts=32)]
+pl = [cyl("BellStem", 0.0024, 0.012, (0, 0, 0.006), M["nickel"], verts=16),
+      cyl("BellKnob", 0.0085, 0.006, (0, 0, 0.0135), M["nickel"], verts=32)]
 for o in pl:
     o.parent = plunger
 bl.append(plunger)
@@ -634,26 +640,31 @@ nodes.append(node("TillCatStand", cs))
 # =====================================================================
 mtree = []
 PR, PH2 = 0.055, 0.075
-pot = cyl("TreePot", PR, PH2, P(0, PH2 / 2, 0), M["potGlaze"], verts=40, r2=PR * 0.78)
-potin = cyl("tpin", PR - 0.006, PH2, P(0, PH2 / 2 + 0.008, 0), M["potGlaze"], verts=40, r2=PR * 0.78 - 0.006)
+# (a pot widening up to its lip)
+pot = cyl("TreePot", PR * 0.8, PH2, P(0, PH2 / 2, 0), M["potGlaze"], verts=40, r2=PR)
+potin = cyl("tpin", PR * 0.8 - 0.006, PH2, P(0, PH2 / 2 + 0.008, 0), M["potGlaze"], verts=40, r2=PR - 0.006)
 m_ = pot.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = potin; m_.solver = "EXACT"
 apply_mods(pot)
 bpy.data.objects.remove(potin)
 mtree.append(pot)
 # (its rim: a rolled lip round the top, open in the middle so the soil and pebbles show)
-bpy.ops.mesh.primitive_torus_add(major_radius=PR - 0.001, minor_radius=0.0042, major_segments=48, minor_segments=8, location=P(0, PH2 - 0.002, 0))
+bpy.ops.mesh.primitive_torus_add(major_radius=PR - 0.003, minor_radius=0.0045, major_segments=48, minor_segments=8, location=P(0, PH2, 0))
 mtree.append(finish(active(), "TreePotRim", M["potGlaze"]))
-mtree.append(cyl("TreePotFoot", PR * 0.8, 0.006, P(0, 0.003, 0), M["potFoot"], verts=40))
-mtree.append(cyl("TreeSoil", PR - 0.007, 0.004, P(0, PH2 - 0.012, 0), M["soil"], verts=32))
-for i in range(14):
+mtree.append(cyl("TreePotFoot", PR * 0.74, 0.006, P(0, 0.003, 0), M["potFoot"], verts=40))
+mtree.append(cyl("TreeSoil", PR - 0.008, 0.004, P(0, PH2 - 0.012, 0), M["soil"], verts=32))
+# (pale river pebbles over the soil: smooth, each its own size and squash and turn, three shades, packed round the trunks)
+_pr = __import__("random").Random(7)
+for i in range(30):
     a_ = i * 2.399
-    rr = 0.012 + (i % 5) * 0.008
-    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.0055 + (i % 3) * 0.0012, location=P(rr * math.cos(a_), PH2 - 0.009, rr * math.sin(a_)))
-    pb = active(); pb.scale = (1, 1, 0.6); apply_scale(pb)
-    mtree.append(finish(pb, f"TreePebble{i}", M["pebble"]))
+    rr = 0.014 + math.sqrt(i / 30) * (PR - 0.026)
+    sz = 0.0042 + _pr.random() * 0.0028
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=sz, segments=12, ring_count=7, location=P(rr * math.cos(a_), PH2 - 0.0095, rr * math.sin(a_)),
+                                         rotation=(0, 0, _pr.random() * 6.28))
+    pb = active(); pb.scale = (1 + _pr.random() * 0.5, 1, 0.55); apply_scale(pb)
+    mtree.append(finish(pb, f"TreePebble{i}", M[("pebble", "pebble2", "pebble3")[i % 3]]))
 # (a gold band round the pot's shoulder, and 發 in gold on its front)
-mtree.append(cyl("TreePotBand", PR * 0.985 + 0.0006, 0.004, P(0, PH2 - 0.016, 0), M["coinGold"], verts=40, r2=PR * 0.96 + 0.0006))
-mtree.append(text("TreePotChar", "發", 0.034, M["coinGold"], P(0, PH2 * 0.45, PR * 0.885 + 0.0012), (math.pi / 2, 0, 0), HAN_))
+mtree.append(cyl("TreePotBand", PR * 0.954 + 0.0008, 0.004, P(0, PH2 - 0.016, 0), M["coinGold"], verts=40, r2=PR * 0.965 + 0.0008))
+mtree.append(text("TreePotChar", "發", 0.034, M["coinGold"], P(0, PH2 * 0.45, PR * 0.895 + 0.0015), (math.pi / 2 - 0.13, 0, 0), HAN_))
 
 
 def leaflet(name, at, ang, L, W, droop, mat_):
@@ -777,6 +788,19 @@ for vt in zb.data.vertices:
 finish(zb, "IngotCushion", M["zabuton"])
 smooth_angle(zb, 70)
 ig.append(zb)
+# (a gold cord piping round the cushion's edge, and four little tufts sewn into its top)
+_cw, _cd = 0.047, 0.036
+_pts = []
+for i in range(41):
+    t_ = i / 40 * 2 * math.pi
+    cx_, sy_ = math.cos(t_), math.sin(t_)
+    # (a rounded square: a superellipse)
+    _pts.append((math.copysign(abs(cx_) ** 0.5, cx_) * _cw, ZT + 0.0085, math.copysign(abs(sy_) ** 0.5, sy_) * _cd))
+ig.append(tube("IngotCushionCord", _pts, 0.0016, M["coinGold"]))
+for sx in (-1, 1):
+    for sz in (-1, 1):
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0018, segments=10, ring_count=6, location=P(sx * 0.016, ZT + 0.0135, sz * 0.012))
+        ig.append(finish(active(), f"IngotTuft{sx}{sz}", M["coinGold"]))
 for sx in (-1, 1):
     for sz in (-1, 1):
         cx_, cz_ = sx * 0.051, sz * 0.039

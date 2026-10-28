@@ -212,6 +212,22 @@ def uv_box(o, size=0.6):
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
+def uv_along(o, tile=0.45, k=0):
+    """a stick's UVs with the grain down its length: v along its longest side (a tile of the board's picture every `tile`), u a narrow slice
+    across, each stick (`k`) its own slice"""
+    me = o.data
+    uvl = me.uv_layers.active or me.uv_layers.new()
+    cs = [vt.co for vt in me.vertices]
+    ext = [max(c[i] for c in cs) - min(c[i] for c in cs) for i in range(3)]
+    ax = ext.index(max(ext))
+    a, b = [i for i in range(3) if i != ax]
+    lo = min(c[ax] for c in cs)
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            c = me.vertices[me.loops[li].vertex_index].co
+            uvl.data[li].uv = (0.15 + 0.17 * (k % 4) + (c[a] + c[b]) * 2.5, (c[ax] - lo) / tile)
+
+
 def box(name, size, at, mat_, bev=0.0, rot=(0, 0, 0), uv=0.0):
     bpy.ops.mesh.primitive_cube_add(size=1, location=at, rotation=rot)
     o = active()
@@ -282,8 +298,12 @@ bd.append(paper)
 # (the lattice just in front of the paper: three bars each way, their ends let into the sleeve)
 for k in (-1, 0, 1):
     L = 2 * math.sqrt(0.196 ** 2 - (k * 0.095) ** 2)
-    bd.append(box(f"TillLatticeV{k}", S(0.012, L, 0.011), P(W / 2 - 0.058, WY, 0.02 + k * 0.095), M["lattice"], bev=0.0015, uv=0.3))
-    bd.append(box(f"TillLatticeH{k}", S(0.012, 0.011, L), P(W / 2 - 0.057, WY + k * 0.095, 0.02), M["lattice"], bev=0.0015, uv=0.3))
+    # (the grain running down each bar, as a sawn stick has it)
+    lv = box(f"TillLatticeV{k}", S(0.012, L, 0.011), P(W / 2 - 0.058, WY, 0.02 + k * 0.095), M["lattice"], bev=0.0015)
+    lh = box(f"TillLatticeH{k}", S(0.012, 0.011, L), P(W / 2 - 0.057, WY + k * 0.095, 0.02), M["lattice"], bev=0.0015)
+    uv_along(lv, k=k + 1)
+    uv_along(lh, k=k + 2)
+    bd += [lv, lh]
 bd.append(box("TillShelfLow", S(W - 0.14, 0.03, D - 0.14), P(0, 0.1, 0.03), M["shelf"], bev=0.003))
 bd.append(box("TillShelfHigh", S(W - 0.14, 0.025, D - 0.2), P(0, TOP - 0.2, 0.04), M["shelf"], bev=0.003))
 BH = TOP - 0.1                            # how tall the culms stand (from just above the kick board to under the top)
@@ -396,8 +416,9 @@ RZ = min(z for _, _, z in culms) - 0.021 - 0.012
 for yy in (0.17, TOP - 0.17):
     RL_ = W - 0.07
     first = float(brng.uniform(0.04, 0.12))
-    step_r = float(brng.uniform(0.13, 0.17))
-    nodes_r = [-RL_ / 2 + first + n * step_r * float(brng.uniform(0.9, 1.1)) for n in range(9)]
+    # (its nodes evenly spaced, as a cut length of one culm has them, a good hand apart: the texture's painted node lands on each)
+    step_r = float(brng.uniform(0.21, 0.25))
+    nodes_r = [-RL_ / 2 + first + n * step_r for n in range(6)]
     rail = culm(f"TillBambooRail{int(yy * 100)}", 0.0, 0.0115, -RL_ / 2, RL_, 0.0, 0.0, float(brng.uniform(0.002, 0.004)), float(brng.uniform(0, 1)),
                 [n for n in nodes_r if n < RL_ / 2 - 0.03], (0.03, float(brng.uniform(0.3, 0.5)), float(brng.uniform(0, 6.28))), int(brng.integers(0, 5)))
     # (built standing, laid along the face: turned so its length runs along x, then set in place)
@@ -405,11 +426,16 @@ for yy in (0.17, TOP - 0.17):
     for o in rail:
         o.matrix_world = lay_ @ o.matrix_world
     bd += rail
+    # (lashed to every third culm with black palm rope: two loops crossed over the joint (an X), round the rail and the culm together;
+    # not where a node of the rail is)
     for i, (cx, r, z) in enumerate(culms):
-        if i % 3:
+        if i % 3 or any(abs(cx - n) < 0.03 for n in nodes_r):
             continue
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.013, minor_radius=0.0026, major_segments=12, minor_segments=5, location=P(cx, yy, RZ + 0.004), rotation=(0, math.pi / 2, 0))
-        bd.append(finish(active(), f"TillRope{int(yy * 100)}_{i}", M["rope"]))
+        for sgn in (-1, 1):
+            bpy.ops.mesh.primitive_torus_add(major_radius=0.019, minor_radius=0.0017, major_segments=16, minor_segments=5,
+                                             location=P(cx, yy, (RZ + z) / 2), rotation=(0, sgn * math.pi / 4, 0))
+            tl_ = active(); tl_.scale = (1, 0.75, 1); apply_scale(tl_)
+            bd.append(finish(tl_, f"TillRope{int(yy * 100)}_{i}_{sgn}", M["rope"]))
 bd.append(box("TillKick", S(W - 0.06, 0.06, 0.02), P(0, 0.03, -D / 2 + 0.035), M["kick"], bev=0.002))
 nodes.append(node("TillCounterBody", bd))
 

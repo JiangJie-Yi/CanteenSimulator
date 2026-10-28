@@ -1349,6 +1349,8 @@ def band(kind, bd, z, h, mi, name, extra=0.004, dz=0.0):
     for k in range(9):
         r = body_radius(bd, z - h / 2 + h * k / 8)
         rx, ry = max(rx, r[0]), max(ry, r[1])
+    # (and a little clear of it besides: as the body bends sitting and eating, it never pushes out through the band)
+    extra += 0.007
     for zz in (z - h / 2, z + h / 2):
         rings.append([bm.verts.new((math.sin(2 * math.pi * j / segs) * (rx + extra), -math.cos(2 * math.pi * j / segs) * (ry + extra), zz + dz))
                       for j in range(segs)])
@@ -1641,7 +1643,8 @@ def clothes(kind, bd, hd, surf):
         out.append(band(kind, bd, 0.53, 0.07, "Obi", "obi", extra=0.008))
         b = bmesh.new()
         # the bow at the back, and the cord round the front
-        bc = Vector((0, 0.085, 0.535))
+        # (on the band's back, wherever the body's back is: out of it, never sunk in)
+        bc = Vector((0, body_radius(bd, 0.535)[1] + 0.024, 0.535))
         for sd in (1, -1):
             ellipsoid(b, bc + Vector((sd * 0.045, 0.01, 0.01)), (0.045, 0.014, 0.03), mi=mi["Obi"], seg=14, rings=8,
                       rot=Matrix.Rotation(sd * 0.25, 3, "Y"))

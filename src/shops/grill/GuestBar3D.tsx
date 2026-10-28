@@ -1654,12 +1654,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     {
       const walkers: { p: THREE.Vector3; give: boolean }[] = []
       for (const x of shown) {
-        if (x.phase === 'sit' || x.phase === 'wcIn' && x.wc?.who !== 'drink') continue
+        if (x.phase === 'wcIn' && x.wc?.who !== 'drink') continue
         const gp = groups.current.get(x.id)?.position
-        if (gp) walkers.push({ p: gp, give: true })
+        // (those sitting don't move aside, but nobody walks through them either: the ones going by step round them)
+        if (gp) walkers.push({ p: gp, give: x.phase !== 'sit' })
       }
       for (const w of waiters.current) walkers.push({ p: waiterObjs.current[waiters.current.indexOf(w)]?.position ?? w.pos, give: false })
-      const R = 0.3
+      // (a body's width, the round bodies' shoulders and all, so no two ever overlap)
+      const R = 0.38
       for (let i = 0; i < walkers.length; i++) for (let j = i + 1; j < walkers.length; j++) {
         const a = walkers[i], b = walkers[j]
         const dx = a.p.x - b.p.x, dz = a.p.z - b.p.z, d = Math.hypot(dx, dz)

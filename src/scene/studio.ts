@@ -21,7 +21,8 @@ export function useStudio() {
   useMemo(() => {
     if (!studio) {
       const pm = new THREE.PMREMGenerator(gl)
-      studio = pm.fromScene(new RoomEnvironment(), 0.04).texture
+      // (blurred a little: polished metal shows the room's light as soft broad gleams, not the box lights' hard spots)
+      studio = pm.fromScene(new RoomEnvironment(), 0.08).texture
       pm.dispose()
     }
     for (const m of waiting) { m.envMap = studio; m.needsUpdate = true }

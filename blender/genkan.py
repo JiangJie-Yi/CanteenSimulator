@@ -77,7 +77,8 @@ def lantern():
 
     def skin(u, v):
         y = v * 0.42 - 0.21
-        base = 0.07 + 0.09 * math.sin(math.pi * v)
+        # (plump: swelling out fast from the caps to a full round belly, nearly a ball)
+        base = 0.074 + 0.15 * math.sin(math.pi * v) ** 0.6
         # (the paper bellying out a little between each pair of ribs)
         r = base * (1 + 0.035 * abs(math.sin(math.pi * v * RIBS)))
         a = 2 * math.pi * u

@@ -17,7 +17,7 @@ export type DeskPiece = 'TillPens' | 'TillPrinter' | 'TillCardReader' | 'TillBel
 export const CAT_STAND_H = 0.166
 /** the parts too small or too flat for an ink line: lettering, lights, slots, teeth, keys, cables and holes */
 const UNINKED = /(Label|Amount|Prompt|Led|Seam|Slot|Tooth|Vent|Switch|Feed|Lever|Key|Fn|Nfc|Stripe|Screen|Cable|Hole|Clip|Cap|Felt|Band|Floor|Stem|Knob|Slip|Rim|Blades|Ribs|Thanks|Foot|Post|Pull|Box|Sub|Seam|Arrow|Card|Lid|Tear|Catch|Lip|Tassel)/
-const METAL = new Set(['DeskChrome', 'DeskSteel', 'BellGold', 'StandBrass', 'TrayGilt', 'IngotGold'])
+const METAL = new Set(['DeskChrome', 'DeskSteel', 'BellGold', 'BellNickel', 'StandBrass', 'IngotGold'])
 
 /**
  * The card reader's LCD, drawn as a real one reads: standing by, it says it's ready and asks for a card (and the time); while a customer pays
@@ -75,13 +75,15 @@ function piecesOf(scene: THREE.Group) {
     let t = mats.get(src)
     if (!t) {
       t = src.name === 'TrayResin'
-        // (the change tray's moulded plastic: a smooth, fairly glossy black, the lamps sliding over it)
-        ? new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.2, clearcoat: 0.9, clearcoatRoughness: 0.12, specularIntensity: 0.8, sheen: 0.3, sheenRoughness: 0.4 })
+        // (the change tray's moulded plastic: a charcoal grey, a soft satin sheen as injection-moulded ABS has, nothing like metal)
+        ? new THREE.MeshPhysicalMaterial({ color: '#ffffff', map: src.map, metalness: 0, roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.45, specularIntensity: 0.5 })
         : METAL.has(src.name)
         ? src.name === 'BellGold' || src.name === 'IngotGold'
-          // (polished gold: a deep warm yellow, the lamps' gleam broad and soft over its curves, not glinting in spots; no oily rainbow sheen)
-          ? new THREE.MeshPhysicalMaterial({ color: '#e9b43a', metalness: 1, roughness: 0.16, clearcoat: 0.5, clearcoatRoughness: 0.12, envMapIntensity: 1.25,
-            specularColor: new THREE.Color('#ffe7a8') })
+          // (the ingot: cast and polished, a deep warm yellow, the gleam broad and soft over its curves, not glinting in spots)
+          ? new THREE.MeshPhysicalMaterial({ color: '#e9b43a', metalness: 1, roughness: 0.22, clearcoat: 0.35, clearcoatRoughness: 0.2, envMapIntensity: 1.0 })
+          : src.name === 'BellNickel'
+          // (the service bell: nickel plate, a cool grey, satin rather than mirror)
+          ? new THREE.MeshPhysicalMaterial({ color: '#cfd4d9', metalness: 1, roughness: 0.26, clearcoat: 0.4, clearcoatRoughness: 0.25, envMapIntensity: 0.95 })
           : new THREE.MeshPhysicalMaterial({ color: src.color.clone(), metalness: 0.9, roughness: src.name === 'DeskChrome' ? 0.12 : 0.3, envMapIntensity: 0.8 })
         : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
       mats.set(src, t)

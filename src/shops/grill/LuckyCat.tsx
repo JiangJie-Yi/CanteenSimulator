@@ -78,6 +78,11 @@ function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.
     g.deleteAttribute('skinIndex')
     g.deleteAttribute('skinWeight')
     g.computeVertexNormals()
+    // (its bounds measured afresh from the posed points: the source's own were for the model's bind pose and units, and culled the cat away
+    // as the camera came near, so that it flickered out)
+    g.boundingBox = null
+    g.boundingSphere = null
+    g.computeBoundingSphere()
     const src = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial
     const mat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ? (tidy ? clean(src.map) : src.map) : null, side: THREE.DoubleSide })
     // (a differently coloured cat: the body's own material takes the tint)

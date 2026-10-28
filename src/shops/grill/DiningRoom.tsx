@@ -1140,7 +1140,8 @@ function kamidanaOf(scene: THREE.Group) {
     let t = mats.get(src)
     if (!t) {
       if (src.name === 'KamiGold') {
-        const g = new THREE.MeshPhysicalMaterial({ color: '#d9a93c', metalness: 1, roughness: 0.18, clearcoat: 0.6, clearcoatRoughness: 0.1 })
+        // (the shrine's fittings: gilt, a paler, softer gold than the ingot's polished casting, its gleam spread wide)
+        const g = new THREE.MeshPhysicalMaterial({ color: '#dcb25a', metalness: 1, roughness: 0.34, envMapIntensity: 0.9 })
         reflectStudio(g)
         t = g
       } else if (src.name === 'KamiRuri') {
