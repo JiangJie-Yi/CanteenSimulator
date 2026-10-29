@@ -27,6 +27,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
+import { COAL_BRIDGE } from './bar'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
 import { ashMaterial, charcoalMaterial, useBinchotan } from './binchotanModel'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
@@ -2015,7 +2016,7 @@ type RoastingProps = {
   /** the AI customers order from the menu, and the chef adds charcoal, through the app */
   /** order something; false if it couldn't be (the fire or the basket is full) */
   onOrder?: (id: string, guest?: number) => boolean
-  onAddCharcoal?: (one?: boolean) => boolean
+  onAddCharcoal?: (sticks?: number, byHand?: boolean) => boolean
   /** something the chef or a customer says */
   onSay?: (who: 'chef' | 'guest', text: string) => void
   /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
@@ -2433,7 +2434,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (only as many as the bed has room for: the most it holds, less those still burning; ones burnt to ash are cleared to make room)
     const aliveNow = coals.current.filter((c) => c && !c.gone && !c.dying)
     const n = Math.min(count ?? COAL_PER_ADD.min + Math.floor(Math.random() * (COAL_PER_ADD.max - COAL_PER_ADD.min + 1)), COAL_MAX - aliveNow.length + aliveNow.filter(ashedOut).length)
-    if (n <= 0) return
+    if (n <= 0) return 0
     const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
     // (a bed only holds so many sticks: when the new ones would take it past the most, the oldest burn out at once, shrinking away)
     const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
@@ -2469,7 +2470,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         tx, tz, yaw, slope: rest.slope, lx: spot.from.x, lz: spot.from.z, ly, qEnd: new THREE.Quaternion(), geo: randomStick() }
       placed++
     }
-    if (!placed) return
+    if (!placed) return 0
     restack()
     // (the flight to each one's place: about two thirds of a second)
     for (let k = 0; k < placed; k++) {
@@ -2480,7 +2481,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       c.vy = (c.ly - c.y + 0.5 * 9.8 * T * T) / T
     }
     setCoalIds((ids) => [...ids, ...Array.from({ length: placed }, (_, k) => base + k)].slice(-28))
+    return placed
   }
+  // (the fire bar's button, in App: a portion out of the crate, as many as the bed takes; it pays for those)
+  useEffect(() => {
+    if (!active || !bar) return
+    COAL_BRIDGE.place = () => (fire && fire.current >= 1 - 1e-6 ? 0 : dropCoals())
+    return () => { COAL_BRIDGE.place = null }
+  })
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dropCoals: dropCoals, __fire: fire, __coals: coals })
   const [shards, setShards] = useState<{ id: number; x: number; y: number; z: number; s: number; r: number; t: number }[]>([])
   /** the kitchen's floor, where a dish let go off the table lands (the scene's y) */
@@ -3096,7 +3104,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (with the shop open the kitchen cooks by itself: the owner's own cook does all of it, a hired chef or sous chef working alongside)
     const hasChef = true, hasSous = true
     if (fire && fire.current < 0.35) {
-      if (!roomForCoal() || onAddCharcoal?.() === false) return
+      // (a handful out of the crate, as many as the bed takes; paid for only those, and none at all when it's full)
+      if (!roomForCoal()) return
+      const placed = dropCoals()
+      if (!placed || onAddCharcoal?.(placed) === false) return
       say(L().addCharcoal)
       return
     }
@@ -3784,7 +3795,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) {
         // (full, it isn't taken from the crate or paid for: it goes back, with a word why)
         if (!canPlaceCoal()) onNotice?.('heapFull')
-        else if (onAddCharcoal?.(true) !== false) { dropCoals({ x: h.at.x, y: h.at.y, z: h.at.z }, 1, force); takeFromCrate() }
+        else if (fire && fire.current >= 1 - 1e-6) onNotice?.('heapFull')
+        else if (dropCoals({ x: h.at.x, y: h.at.y, z: h.at.z }, 1, force) > 0) { onAddCharcoal?.(1, true); takeFromCrate() }
       }
       held.current = null
       if (controls) controls.enabled = true

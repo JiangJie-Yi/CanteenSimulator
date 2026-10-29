@@ -19,6 +19,19 @@ export const canAddCharcoal = (level: number) => level < 1 - 1e-6
 export const STICK_COST = 3
 export const STICK_BOOST = 0.05
 export const afterCharcoal = (level: number, boost = CHARCOAL_BOOST) => (canAddCharcoal(level) ? Math.min(1, level + boost) : level)
+/** how many sticks make one portion (the fire bar's button, the chef's handful) */
+export const STICKS_PER_PORTION = 6.5
+/**
+ * What charcoal put on the fire costs and how much it raises the fire: only for the sticks that actually went on. A bed that's full takes
+ * none, and then nothing is paid and the fire isn't raised. By hand it's a stick at a time (STICK_COST, STICK_BOOST); a portion's sticks are
+ * a little cheaper each (CHARCOAL_COST over STICKS_PER_PORTION).
+ */
+export function coalCharge(placed: number, byHand = false) {
+  if (placed <= 0) return { cost: 0, boost: 0 }
+  return byHand
+    ? { cost: placed * STICK_COST, boost: placed * STICK_BOOST }
+    : { cost: Math.round((CHARCOAL_COST * placed) / STICKS_PER_PORTION), boost: (CHARCOAL_BOOST * placed) / STICKS_PER_PORTION }
+}
 
 /**
  * What the ingredients of something on the menu cost, as a share of its price, roughly as in small eateries in

@@ -401,6 +401,9 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void) | null } = { drawer: openingFloat(), onTake: null }
 /** the dish rack's plates (game/plates): how many are on it, and how many the owner has asked to be taken over to the pass (a click) */
 export const PLATE_RACK = { n: RACK_FULL, want: 0 }
+/** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
+ * (none when the bed is full); the scene sets it while it's showing */
+export const COAL_BRIDGE: { place: (() => number) | null } = { place: null }
 export const billOf = (items: number, drink?: DrinkId) => Math.max(1, items) * 380 + (drink ? 320 : 0)
 /** the figures on the register's displays: a number with its thousands comma */
 export const yen = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
