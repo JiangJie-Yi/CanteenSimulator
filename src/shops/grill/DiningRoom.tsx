@@ -1,3 +1,4 @@
+import { blessingChime, shrineDoor } from './shrineSound'
 import { BambooModel, ToiletModel, WashstandModel } from './BarFurnish'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -1507,8 +1508,12 @@ function ShrineDoors() {
   }, [gltf])
   const [open, setOpen] = useState(false)
   const k = useRef(0)
+  const wasOpen = useRef(false)
   useFrame((_, dt) => {
-    k.current += ((open || BLESSING.on ? 1 : 0) - k.current) * Math.min(1, dt * 4)
+    const want = open || BLESSING.on
+    // (each time they start to swing, their creak and knock)
+    if (want !== wasOpen.current) { wasOpen.current = want; shrineDoor(want) }
+    k.current += ((want ? 1 : 0) - k.current) * Math.min(1, dt * 4)
     for (const leaf of doors.children) {
       // (each leaf swings out to the front, the left one one way and the right the other)
       const sd = leaf.name.endsWith('-1') ? -1 : 1
@@ -2002,7 +2007,10 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     const on = left > 0
     burning.current = on
     // (the blessing's strength: up as the pour ends, a pulse while it stands, down at its end; the doors open for it)
-    BLESSING.on = on && (performance.now() - (at ?? 0)) / 1000 > 3.6
+    const blessed = on && (performance.now() - (at ?? 0)) / 1000 > 3.6
+    // (as it comes down: the bowl's ring and the little bells)
+    if (blessed && !BLESSING.on) blessingChime()
+    BLESSING.on = blessed
     BLESSING.k += ((BLESSING.on ? 1 : 0) - BLESSING.k) * Math.min(1, dt * 2.5)
     const pulse = 0.85 + 0.15 * Math.sin(t * 2.4)
     // (the Ebisu: always a faint warm glow in the stone, much brighter while blessed)
