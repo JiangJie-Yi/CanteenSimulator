@@ -28,6 +28,7 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
 import { COAL_BRIDGE } from './bar'
+import { Boss } from './Boss'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
 import { ashMaterial, charcoalMaterial, useBinchotan } from './binchotanModel'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
@@ -4881,6 +4882,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       <CookTable floor={!bar} />
       {/* (the crew keep their own places on the kitchen floor: carried back by the shift) */}
       <group position={[FIRE_SHIFT.x, 0, FIRE_SHIFT.z]}>
+      {/* the owner, at his grill while the shop's shut (open, his chef and crew are there instead) */}
+      {space !== 'open' && bar && (
+        <Movable id="boss" label="老闆"><group position={CHEF_AT} rotation-y={CHEF_YAW} scale={CHEF_SCALE}><BlobShadow r={0.2} /><Boss /></group></Movable>
+      )}
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
         <CrewWalk key={m.id} at={at} yaw={yaw}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></CrewWalk>
       ))}

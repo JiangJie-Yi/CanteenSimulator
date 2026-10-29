@@ -67,7 +67,7 @@ function lookOf(id: number, kind: Kind): Look {
 }
 
 // (soft shading, as a hand-painted model's: five tones blended into one another rather than three hard bands)
-const gradientMap = (() => {
+export const gradientMap = (() => {
   const t = new THREE.DataTexture(new Uint8Array([120, 158, 196, 230, 255]), 5, 1, THREE.RedFormat)
   t.minFilter = THREE.LinearFilter
   t.magFilter = THREE.LinearFilter
@@ -78,7 +78,7 @@ const gradientMap = (() => {
  * A painter's airbrush over the figure, as on a hand-painted model: a shade darker toward the feet and lighter up to the head and shoulders
  * (by the model's own height, so it moves with them), and a soft pale rim where a surface turns away from the eye
  */
-function airbrush(m: THREE.MeshToonMaterial) {
+export function airbrush(m: THREE.MeshToonMaterial) {
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
 varying float vHgt;`).replace('#include <begin_vertex>', `#include <begin_vertex>
