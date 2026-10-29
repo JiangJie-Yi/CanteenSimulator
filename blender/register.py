@@ -157,7 +157,7 @@ def text(name, body, size, mat, at, rot, align="CENTER", fit=None):
     t.data.align_y = "CENTER"
     t.data.extrude = 0.0
     t.data.resolution_u = 3    # (flat lettering, coarse curves: its sides never showed, and the curves were most of the triangles)
-    t.data.font = BOLD
+    t.data.font = JP if any(ord(ch) > 127 for ch in body) else BOLD
     t.data.space_line = 0.9
     bpy.ops.object.convert(target="MESH")
     t = active()
@@ -170,6 +170,8 @@ def text(name, body, size, mat, at, rot, align="CENTER", fit=None):
 # (the lettering bold, as printed on real keys: Arial Bold, Blender's own font if it isn't there)
 BOLD_PATH = "C:/Windows/Fonts/arialbd.ttf"
 BOLD = bpy.data.fonts.load(BOLD_PATH) if os.path.exists(BOLD_PATH) else bpy.data.fonts.get("Bfont Regular")
+# (and Japanese, for what's printed on the coin rolls)
+JP = bpy.data.fonts.load("C:/Windows/Fonts/YuGothB.ttc") if os.path.exists("C:/Windows/Fonts/YuGothB.ttc") else BOLD
 
 body_parts = []
 drawer_parts = []
@@ -448,11 +450,29 @@ for i in range(4):
     drawer_parts.append(cyl(f"RegBillHinge{i}", 0.0028, 0.03, tuple(hinge), M["steel"], rot=(0, math.pi / 2, 0), verts=12))
     drawer_parts.append(cyl(f"RegBillRoller{i}", 0.0042, 0.044, tuple(roller), M["rubber"] if "rubber" in M else M["dark"], rot=(0, math.pi / 2, 0), verts=16))
 # (in the 2000 compartment, as most shops do: rolls of coins in their bank paper)
-for k, (col, label) in enumerate((((0.86, 0.36, 0.3), "100"), ((0.72, 0.5, 0.32), "10"))):
+# (棒金: fifty coins wrapped tight in the bank's paper, its ends crimped over so the coin shows in the middle; the paper printed in the
+# coin's colour with a pale band, its value and count along it)
+for k, (col, metal, label) in enumerate((((0.93, 0.62, 0.62), (0.82, 0.83, 0.84), "百円 50枚"), ((0.95, 0.82, 0.58), (0.72, 0.42, 0.24), "拾円 50枚"))):
     cx = INS_W / 2 - 2.5 * INS_W / 4 + (k - 0.5) * 0.026
-    roll = cyl(f"RegCoinRoll{k}", 0.0085, 0.085, P(cx, INS_Y + 0.004 + 0.0085, 0.07), pbr(f"RegRollPaper{k}", col, rough=0.8), rot=(math.pi / 2, 0, 0), verts=16)
+    R_, L_ = 0.0088, 0.088
+    cy_, cz_ = INS_Y + 0.004 + R_, 0.07
+    roll = cyl(f"RegCoinRoll{k}", R_, L_, P(cx, cy_, cz_), pbr(f"RegRollPaper{k}", col, rough=0.75), rot=(math.pi / 2, 0, 0), verts=20)
     drawer_parts.append(roll)
-    drawer_parts.append(text(f"RegRollLabel{k}", label, 0.007, M["ink"], P(cx, INS_Y + 0.004 + 0.0172, 0.07), (0, 0, math.pi / 2)))
+    # (the pale band round its middle, and two fine printed rules)
+    drawer_parts.append(cyl(f"RegRollBand{k}", R_ + 0.0002, L_ * 0.42, P(cx, cy_, cz_), pbr(f"RegRollBand{k}", (0.97, 0.95, 0.9), rough=0.8), rot=(math.pi / 2, 0, 0), verts=20))
+    for dz in (-L_ * 0.22, L_ * 0.22):
+        drawer_parts.append(cyl(f"RegRollRule{k}{int(dz * 1000)}", R_ + 0.0003, 0.0012, P(cx, cy_, cz_ + dz), M["ink"], rot=(math.pi / 2, 0, 0), verts=20))
+    # (each end: the paper crimped over the rim, the coin's face showing inside it)
+    for sd in (-1, 1):
+        ez = cz_ + sd * (L_ / 2 + 0.0004)
+        drawer_parts.append(cyl(f"RegRollCoin{k}{sd}", R_ * 0.62, 0.001, P(cx, cy_, ez), pbr(f"RegRollMetal{k}", metal, rough=0.3, metal=0.9), rot=(math.pi / 2, 0, 0), verts=20))
+        bpy.ops.mesh.primitive_torus_add(major_radius=R_ * 0.8, minor_radius=R_ * 0.22, major_segments=24, minor_segments=6, location=P(cx, cy_, ez - sd * 0.0012), rotation=(math.pi / 2, 0, 0))
+        cr = bpy.context.view_layer.objects.active
+        cr.name = f"RegRollCrimp{k}{sd}"
+        cr.data.materials.append(bpy.data.materials[f"RegRollPaper{k}"])
+        drawer_parts.append(cr)
+    # (its value and count printed along it, on the band, facing up)
+    drawer_parts.append(text(f"RegRollLabel{k}", label, 0.0055, M["ink"], P(cx, cy_ + R_ + 0.0003, cz_), (0, 0, math.pi / 2), fit=L_ * 0.4))
 
 # =====================================================================
 # Assemble: RegBody (fixed) and RegDrawer under the root
