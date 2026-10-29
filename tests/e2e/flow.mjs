@@ -48,6 +48,8 @@ for (const [i, shop] of SHOPS.entries()) {
     // buy in stock on the board
     const before = await cash()
     // (buying in is done in the ingredients' panel at the grill (research): the fridge button opens it, then 補滿, and it's shut again)
+    // (just after a code change the dev server may still be compiling: wait for the button rather than give up at the first try)
+    await page.locator('.fridge-toggle').waitFor({ timeout: 45000 })
     await page.locator('.fridge-toggle').click()
     await page.waitForTimeout(500)
     await page.locator('.tally-restock.is-full').click()

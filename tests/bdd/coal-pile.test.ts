@@ -141,3 +141,13 @@ feature('丟炭的力道', () => {
     but('甩到一半停住再放手，就不算丟', () => { expect(throwForce(5, 300)).toBe(0) })
   })
 })
+
+feature('炭貼著鹽床，不會浮空', () => {
+  scenario('鹽床的高度和模型量到的一致（中央沒有多出來的隆起）', ({ given, then }) => {
+    // (the salt as the fire pit's mesh has it, measured in the scene: radius → height of its top)
+    given('模型實測的鹽床高度', (w) => { w.measured = [[0, 0.209], [0.2, 0.207], [0.4, 0.189], [0.5, 0.17], [0.7, 0.13], [0.9, 0.071]] })
+    then('每一處都在 1.5 公分以內', (w) => {
+      for (const [r, y] of w.measured as [number, number][]) expect(Math.abs(surfaceY(r, 0) - y)).toBeLessThan(0.015)
+    })
+  })
+})

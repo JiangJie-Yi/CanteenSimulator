@@ -1,4 +1,4 @@
-// How sticks of charcoal lie on the fire bed: each rests on the salt (and the heap in the middle), or across whatever sticks lie
+// How sticks of charcoal lie on the fire bed: each rests on the salt, or across whatever sticks lie
 // beneath it, tipped to rest on the two sides it touches, laid across them rather than along them, as a pile is built. Pure
 // numbers (in the pit's own frame, plan x / z and height y) so the pile can be worked out and tested apart from the drawing.
 
@@ -7,13 +7,14 @@ export type Lay = { x: number; z: number; yaw: number; y: number; slope: number 
 /** half a stick's length, and its radius: as the sticks are drawn (about 0.3 long, 0.065 across), measured in the scene */
 export const STICK_HALF = 0.15
 export const STICK_R = 0.032
-/** the salt's mound (its height in the middle and how far it reaches) and the heap's hump on it */
-const SALT_TOP = 0.196, SALT_REACH = 1.12, HEAP_TOP = 0.12, HEAP_REACH = 0.5
+/** the salt's mound, fitted to the fire pit's mesh as it is (its height in the middle, how far it reaches, how full its shoulder): there's
+ * no heap on it any more, so nothing is raised over the middle and nothing lies in the air there */
+const SALT_TOP = 0.212, SALT_REACH = 1.03, SALT_FULL = 0.75
 
 /** the height of the bed's surface at a place in plan */
 export function surfaceY(x: number, z: number, lift = 0) {
   const r = Math.hypot(x, z)
-  return lift + SALT_TOP * Math.max(0, 1 - (r / SALT_REACH) ** 2) ** 0.9 + HEAP_TOP * Math.max(0, 1 - (r / HEAP_REACH) ** 2)
+  return lift + SALT_TOP * Math.max(0, 1 - (r / SALT_REACH) ** 2) ** SALT_FULL
 }
 
 /** how far a point is from a stick's axis in plan, and how far along the axis (from its middle) the nearest part is */
