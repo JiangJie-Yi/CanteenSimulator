@@ -21,7 +21,7 @@ import { bossLineText, bossSituation, nextBossLine, type BossSituation } from '@
  */
 const URL = import.meta.env.BASE_URL + 'models/boss.glb'
 /** the small parts: no ink line round them */
-const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan)/
+const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan)/
 let made: THREE.Object3D | null = null
 
 /** where his hands hang at rest (as modelled, the node's own frame) */
@@ -55,6 +55,8 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     h = window.setTimeout(next, 1500)
     return () => window.clearTimeout(h)
   }, [open, lang])
+  const sayRef = useRef(say)
+  sayRef.current = say
   const openRef = useRef(open)
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
   const root = useMemo(() => {
@@ -88,6 +90,8 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     handL: root.getObjectByName('BossHandL'),
     tongs: root.getObjectByName('BossTongs'),
     fan: root.getObjectByName('BossFan'),
+    smile: root.getObjectByName('BossMouth'),
+    talk: ['BossMouthOpen', 'BossMouthTongue'].map((n) => root.getObjectByName(n)).filter(Boolean) as THREE.Object3D[],
     eyes: ['BossEye-1', 'BossEye1', 'BossEyeShine-1', 'BossEyeShine1', 'BossEyeShineB-1', 'BossEyeShineB1']
       .map((n) => root.getObjectByName(n)).filter(Boolean) as THREE.Object3D[],
   }), [root])
@@ -126,6 +130,7 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     })
     return { mats: [...set], inks: ink }
   }, [root])
+  const controls = useThree((s) => s.controls) as unknown as { target?: THREE.Vector3 } | null
   useFrame(({ camera: cam }, dt) => {
     const m = mover.current
     if (!m) return
@@ -133,11 +138,14 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     const at = m.localToWorld(new THREE.Vector3(0, 0.8, 0))
     const fwd = cam.getWorldDirection(new THREE.Vector3())
     const along = at.clone().sub(cam.position).dot(fwd)
-    // (what the camera's on: where its line of sight meets the floor of the room's middle, or a few metres on)
-    const lookD = fwd.y < -0.05 ? cam.position.y / -fwd.y : 6
+    // (what the camera's on: its controls' target, or where its line of sight meets the floor; he fades only standing well in front of it,
+    // between it and the camera, never when it's him that's looked at)
+    const tgt = controls?.target
+    const lookD = tgt ? tgt.clone().sub(cam.position).dot(fwd) : fwd.y < -0.05 ? cam.position.y / -fwd.y : 6
     const ndc = at.clone().project(cam)
     const inView = Math.abs(ndc.x) < 1.1 && ndc.y > -1.3 && ndc.y < 1.05 && ndc.z < 1
-    const want = !getEdit().on && inView && along > 0 && along < lookD * 0.55 ? 0.22 : 1
+    const lookedAt = tgt ? tgt.distanceTo(m.getWorldPosition(new THREE.Vector3())) < 1.6 : false
+    const want = !getEdit().on && !lookedAt && inView && along > 0 && along < lookD - 1.2 ? 0.22 : 1
     ghost.current += (want - ghost.current) * Math.min(1, Math.min(dt, 0.1) * 6)
     const k = ghost.current
     for (const o of inks) o.visible = k > 0.95
@@ -253,6 +261,15 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
       parts.fan.rotation.set(-0.5 + Math.sin(T * 13) * 0.55, 0, -0.15)
     }
 
+    // ---- his mouth: while a line's up over his head, it flaps open and shut as he says it, in syllables; the rest of the time his smile
+    const talking = !!sayRef.current
+    const gape = talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2
+    if (parts.smile) parts.smile.visible = !gape
+    for (const o of parts.talk) {
+      o.visible = gape
+      const sy = (o.userData.sy ??= o.scale.y) as number
+      o.scale.y = sy * (0.7 + 0.3 * Math.abs(Math.sin(T * 17)))
+    }
     // ---- a blink every few seconds, now and then twice
     let lid = 1
     const since = T - s.blinkAt
