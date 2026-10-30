@@ -525,11 +525,13 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     const at = anchor.getWorldPosition(new THREE.Vector3())
     const floor = OVERVIEW_TARGET.y - 1.5
     if (at.y < floor + 0.3) at.y += 0.9
-    // (one that follows: through his own eyes, a little in front of his face so it isn't in the way, looking the way he faces and a little
-    // down, at his hands and the fire)
+    // (one that follows: from his eyes, carried along wherever he goes, but held facing one way (toward the fire from his place), never
+    // turning as he turns about; a little in front of his face so it isn't in the way, looking a little down)
     if (spot.follow) {
-      anchor.updateWorldMatrix(true, false)
-      return { pos: anchor.localToWorld(new THREE.Vector3(0, 0.83, 0.42)), target: anchor.localToWorld(new THREE.Vector3(0, 0.58, 1.6)) }
+      const frame = anchor.parent ?? anchor
+      frame.updateWorldMatrix(true, false)
+      const p = anchor.position
+      return { pos: frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.83, p.z + 0.42)), target: frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.58, p.z + 1.6)) }
     }
     const toMiddle = new THREE.Vector3(-at.x, 0, -at.z).normalize()
     return { pos: at.clone().addScaledVector(toMiddle, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0)), target: at }
@@ -925,6 +927,12 @@ export default function App() {
       layer?.removeEventListener('dblclick', stop, true)
       layer?.removeEventListener('contextmenu', stop, true)
     }
+  }, [editOn])
+  // (entering the developer mode (G) the view goes over to the free one, the whole shop in sight to edit)
+  useEffect(() => {
+    if (!editOn) return
+    setView('free')
+    setResetView((n) => n + 1)
   }, [editOn])
   useEffect(() => { GAME_SPEED.value = speed }, [speed])
   // the sake offered at the shrine by the door: for a minute more come in and they order more

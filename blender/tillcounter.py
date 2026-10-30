@@ -163,8 +163,8 @@ _hgt = _slat * (1 - 0.5 * smooth(_half - 0.08, _half, _d))
 slat_nrm = image("shieldslatsN", to_normal(_hgt.astype(np.float32), 3.0), data=True)
 # (the body's dark wood: a flat-sawn chestnut stained dark, its rings' arches and latewood lines and pores plain under the stain; the shelves
 # the same wood, a shade lighter)
-dark_tex = image("darkwood", flatsawn(512, (0.34, 0.21, 0.12), (0.22, 0.13, 0.075), (0.1, 0.06, 0.035), rings=9.0, seed_u=0.45))
-shelf_tex = image("shelfwood", flatsawn(512, (0.42, 0.28, 0.17), (0.3, 0.19, 0.11), (0.15, 0.09, 0.05), rings=7.0, seed_u=0.6))
+dark_tex = image("darkwood", flatsawn(512, (0.3, 0.19, 0.11), (0.23, 0.14, 0.08), (0.16, 0.095, 0.055), rings=22.0, seed_u=0.45))
+shelf_tex = image("shelfwood", flatsawn(512, (0.4, 0.27, 0.16), (0.32, 0.2, 0.12), (0.22, 0.14, 0.08), rings=16.0, seed_u=0.6))
 
 M = {
     "body": pbr("TillBodyWood", (1, 1, 1), tex=dark_tex, rough=0.6),

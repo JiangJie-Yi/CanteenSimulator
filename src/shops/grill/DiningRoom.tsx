@@ -1322,7 +1322,8 @@ function BouquetPick({ lean = 0, slot }: { lean?: number; slot: number }) {
   const turn = useMemo(() => (Math.random() - 0.5) * 1.2, [v])
   const tilt = useMemo(() => (Math.random() - 0.5) * 0.06, [v])
   return (
-    <group rotation-y={turn} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const n = nextFlower(v); setShrineFlower(slot, n); setV(n) }}
+    // (smaller than they were: the vases stood nearly as tall as the shrine; a sakaki vase comes to about two thirds of it)
+    <group rotation-y={turn} scale={0.78} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const n = nextFlower(v); setShrineFlower(slot, n); setV(n) }}
       {...tipOver(`供花・${FLOWERS[v].name}`, `${FLOWERS[v].buff}｜點一下換一組花`)}>
       <Bouquet lean={lean + tilt} variant={v} />
     </group>

@@ -538,7 +538,7 @@ export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: numbe
           under a body whose sloped panel carries the keys (the coloured function keys to the left, the grey number pad, the
           big cream keys and the teal total key to the right), the till roll's cover at the back with its paper coming
           out, a small operator's display on a stalk, and over it all the customers' display, its green figures facing both ways */}
-      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={1.4}>
+      <group position={[0.05, top, 0.06]} rotation-y={Math.PI} scale={REG_SC}>
         {/* the register itself, from blender/register.py: the drawer's case, the body on it with its keys, the displays' housings, the deck */}
         <RegisterBody />
         {/* the cables: one tidy bundle out of the back through a grommet, held to the counter by a clip, with the card reader's lead and the tablet's branching from it */}
@@ -652,8 +652,9 @@ const REG_CABLES = {
   // (out of its back, held close down the case's back, under the case's back edge and into the grommet below: from above, none of it shows)
   power: cable([[0.05, 0.12, 0.158], [0.05, 0.104, 0.175], [0.05, 0.06, 0.178], [0.05, 0.006, 0.178], [0.05, 0.0026, 0.16], [GROMMET[0], -0.012, GROMMET[2]]], 0.0045),
 }
-/** the register's size in the till (its drawer, keys and displays are drawn in units of 1/1.4 of this) */
-const REG_SC = 1.4
+/** the register's size in the till, its body and its working parts (drawer, keys, displays) alike: as it's modelled, at one with the tablet,
+ * printer and card reader beside it (it had been 1.4 times larger, out of scale with them) */
+const REG_SC = 1
 /** where each kind of note lies in the drawer's insert, along its width (in the till's own units, from the insert's middle) */
 /**
  * The insert's layout (blender/register.py's RegInsert), in the till's own units from the insert's middle: the notes' compartments along the
