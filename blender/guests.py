@@ -2361,8 +2361,9 @@ SMALL = 260
 # clothes over it and poking through them. So a middle way: about a quarter of what they were built with, the body kept finer than what's
 # worn over it (so it stays inside), the little parts of the face left whole)
 BUDGET = {k: max(160, v // 4) for k, v in BUDGET.items()}
-BUDGET["hair"] = 1000
-BUDGET.update({"body": 2200, "head": 900, "eyes": 160, "cuffs": 260, "details": 220, "face": 120})
+# (the hair kept whole enough that its locks stay smooth (cut to 1000 it showed spikes and jagged edges), the head round)
+BUDGET["hair"] = 2600
+BUDGET.update({"body": 2600, "head": 1400, "eyes": 160, "cuffs": 260, "details": 220, "face": 120})
 SHARE = {k: min(1.0, v * 0.7) for k, v in SHARE.items()}
 SHARE.update({"body": 1.0, "eyes": 1.0, "eyesJoy": 1.0, "eyesShut": 1.0, "mouth": 1.0, "mouthJoy": 1.0, "mouthOpen": 1.0, "mouthMad": 1.0, "mouthSad": 1.0,
               "browsSad": 1.0, "glasses": 0.8})
