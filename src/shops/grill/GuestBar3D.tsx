@@ -1350,6 +1350,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const [shown, setShown] = useState<Shown[]>([])
   const guestsRef = useRef(guests)
   guestsRef.current = guests
+  if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __guestStates?: typeof guestsRef }).__guestStates = guestsRef
   const groups = useRef(new Map<number, THREE.Group>())
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __guestGroups?: typeof groups }).__guestGroups = groups
   const clock = useRef(0)

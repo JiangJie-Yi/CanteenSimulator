@@ -497,6 +497,8 @@ export function Person({ id, eating, walking, still, t: tGiven, clock, talk = 0,
     return { mats: out, own: out[0]?.color.clone() }
   }, [r])
   const inSlippers = useRef<boolean | null>(null)
+  /** when their food came (their clock): a little hop of delight, squashed and stretched, and their eyes shut happy for a moment */
+  const served = useRef<{ was: boolean; at: number }>({ was: eating, at: -99 })
   // their own clock moves the figure: the action, then a look about (waiting), a blink, chewing
   const step = () => {
     applyFade(fade?.() ?? 1)
@@ -535,11 +537,19 @@ export function Person({ id, eating, walking, still, t: tGiven, clock, talk = 0,
       r.looked.copy(r.head.quaternion)
       // (breathing, and pleased, a happy little bounce on the stool now and then)
       const hop = mood === 'joy' ? Math.max(0, Math.sin(t * 9 + id)) * 0.018 * smooth(0.85, 1, Math.sin(t * 0.7 + id * 2)) : 0
-      r.root.position.y = hop
-      r.root.scale.y = 1 + Math.sin(t * 1.7 + id) * 0.008
-    } else if (r.root.position.y || r.root.scale.y !== 1) { r.root.position.y = 0; r.root.scale.y = 1 }
-    // (pleased, their eyes are squeezed shut in happy arcs: no blinking)
-    const joy = mood === 'joy' && !!r.face.eyesJoy
+      // (the food's come: a crouch, a hop up stretched tall, and down again squashed, over half a second)
+      const since = t - served.current.at
+      const yay = since >= 0 && since < 0.55 ? since / 0.55 : -1
+      const lift = yay >= 0 ? Math.max(0, Math.sin(yay * Math.PI)) * 0.06 : 0
+      const squash = yay >= 0 ? (yay < 0.15 ? -0.08 * Math.sin((yay / 0.15) * Math.PI) : yay < 0.8 ? 0.07 * Math.sin(((yay - 0.15) / 0.65) * Math.PI) : -0.05 * Math.sin(((yay - 0.8) / 0.2) * Math.PI)) : 0
+      r.root.position.y = hop + lift
+      r.root.scale.y = 1 + Math.sin(t * 1.7 + id) * 0.008 + squash
+      r.root.scale.x = r.root.scale.z = 1 - squash * 0.5
+    } else if (r.root.position.y || r.root.scale.y !== 1) { r.root.position.y = 0; r.root.scale.set(1, 1, 1) }
+    if (eating !== served.current.was) { served.current.was = eating; if (eating && !walking) { served.current.at = t; r.root.userData.served = (r.root.userData.served ?? 0) + 1 } }
+    // (pleased, their eyes are squeezed shut in happy arcs: no blinking; so too for a moment when their food comes)
+    const delighted = t - served.current.at >= 0 && t - served.current.at < 1.2
+    const joy = (mood === 'joy' || delighted) && !!r.face.eyesJoy
     const blink = !joy && (t * 0.9 + id * 0.37) % 4 < 0.12
     for (const o of r.eyes) o.visible = !blink && !joy
     for (const o of r.shut) o.visible = blink

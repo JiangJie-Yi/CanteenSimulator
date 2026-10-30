@@ -130,6 +130,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `Decor.tsx` | 料理台上的擺設：炭箱、扇子、行燈、飯桶與作業台 |
 | `Grill2D.tsx`、`Grill2DArt.tsx` | 手機（螢幕短邊 < 600px，平板不算）不用 3D：同樣的烤爐玩法畫成 2D（邏輯在 Grill2D，SVG 插圖在 Grill2DArt） |
 
+- 客人的餐點送到的那一刻會開心地彈一下（蹲、拉長跳起、壓扁落下，約半秒，眼睛瞇成開心的弧線約 1 秒；`scene/Person3D.tsx` 的 `served`）；dev 時 `__guestStates` 看每位客人的狀態。
 - 客人模型由 `blender/guests.py` 產生：表情（`eyesJoy`、`brows*`、`mouth*`，依評分切換，見 `scene/people.ts`）、走路動作（`Walk`／`WalkF` 女性／`WalkU` 大叔／`WalkO` 老人，速度也不同）、大學生的耳機 `student.phones`。臉型（圓、長、方、瓜子）是在 `scene/Person3D.tsx` 的 `shapeFace` 依 id 變形。
 - 火爐是方形的囲炉裏（`blender/grilledfish.py` 的 `IRORI_IN`／`IRORI_W`：直紋櫸木爐框 `Robuchi`、黃銅護角；原本的石頭方正擺在框內、逐顆量過不超出框內緣；爐框大小讓前排的盤、碗、砧板都在框外），遊戲裡轉到跟桌邊平行；東西不能放進爐框（Roasting 的 `clearOfHearth`，方形判斷）。火爐後方有刀具組（`blender/knives.py` → `knives.glb`），桌角有切魚砧板（`cut_fish.glb`）；大砧板是暖橘棕木板（Roasting 的 `BOARD_WOOD`）。
 - 備長炭（`blender/binchotan.py` → `binchotan.glb`，`shops/grill/binchotanModel.ts` 的 `useBinchotan`）：六根炭、六種碎塊、六種灰渣（`BinAsh`，灰色顆粒、底部平的），炭用卡通（toon）材質（炭面、凹凸、龜裂發光貼圖）。炭箱、手上拿的、火裡的都用它，丟進火裡外觀不變，隨溫度亮起龜裂紋；燒到 95% 會斷成 3～5 塊往下掉，變成灰（`game/coalPile.ts` 的 `crumble`，BDD `coal-pile`），上面的炭跟著塌下來。**添炭只能從炭箱拖一根炭到火上**（點火堆沒有作用；只有炭能 hover，籃子不行），一次一根（`STICK_COST`、`STICK_BOOST`，BDD `fire`），炭箱少一根（`Decor.tsx` 的 `CRATE`、`takeFromCrate`，拿完換一箱）。火力條的按鈕與 AI 主廚仍是一次一份（6～7 根，`COAL_PER_ADD`）。
