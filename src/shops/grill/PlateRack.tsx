@@ -20,26 +20,46 @@ const GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 
 
 type Spot = { m: THREE.Matrix4; design: number }
 
-/** every plate on the rack: where it is, and which design */
+/** a plate's height off what it sits on, rim to foot (the profile above, at this size) */
+const PLATE_T = 0.042 * PLATE_R * 2
+/** how far each plate in a pile stands above the one under it: they nest, foot in the one below's well */
+const NEST = PLATE_T * 0.72
+/** the slots on the lowest shelf: how far apart the plates stand in them, and how many */
+const SLOT = 0.075, SLOTS = 14
+const slotX = (k: number) => -((SLOTS - 1) * SLOT) / 2 + k * SLOT
+/** where the three show plates stand on the middle shelf, and the three piles on the top one */
+const SHOW_X = [-0.4, 0, 0.4]
+
+/** every plate on the rack: where it is, and which design. Set as they'd really stand, none through another: on the lowest shelf each stands
+ * on its edge in its slot between the dowels, its face to the side, leaning back a touch; on the middle one three show their faces, leaning
+ * against the back rail, well apart; on the top, three piles, each plate nested in the one under it, a little off true */
 function platesOf() {
   const out: Spot[] = []
   const q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1)
   let n = 0
-  // (standing on edge along each shelf, leaning back a little against the back, the painted face to the front)
-  for (const y of SHELVES.slice(0, 2)) {
-    for (let k = 0; k < 7; k++) {
-      e.set(Math.PI / 2 - 0.14, 0, 0)
-      q.setFromEuler(e)
-      p.set(-W / 2 + 0.17 + k * 0.16, y + 0.04 + PLATE_R, -0.02)
-      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: n++ })
-    }
+  const shelfTop = (y: number) => y + 0.0175
+  // (in the slots: turned on edge, face to the side (about z), leaning 8° toward the next; resting on its rim)
+  const lean = 0.14
+  for (let k = 0; k < SLOTS; k++) {
+    e.set(0, 0, Math.PI / 2 - lean, 'ZYX')
+    q.setFromEuler(e)
+    p.set(slotX(k), shelfTop(SHELVES[0]) + PLATE_R * Math.cos(lean) + 0.002, 0)
+    out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: n++ })
   }
-  // (piles on the top shelf, each a stack of the one design)
-  for (let k = 0; k < 3; k++) {
-    for (let j = 0; j < 6; j++) {
-      e.set(0, k * 1.3 + j * 0.2, 0)
+  // (on show: face front, leaning back against the rail behind, its foot in the groove in front)
+  const back = 0.2
+  for (const [k, x] of SHOW_X.entries()) {
+    e.set(Math.PI / 2 - back, 0, 0)
+    q.setFromEuler(e)
+    p.set(x, shelfTop(SHELVES[1]) + PLATE_R * Math.cos(back) + 0.004, -0.02)
+    out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 2 })
+  }
+  // (the piles: nested, each turned and set a hair off the one under it)
+  for (const [k, x] of SHOW_X.entries()) {
+    for (let j = 0; j < 5; j++) {
+      e.set(0, k * 1.3 + j * 0.7, 0)
       q.setFromEuler(e)
-      p.set(-0.38 + k * 0.38, SHELVES[2] + 0.04 + j * 0.034, 0)
+      p.set(x + Math.sin(j * 2.1 + k) * 0.004, shelfTop(SHELVES[2]) + j * NEST, Math.cos(j * 1.7 + k) * 0.004)
       out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 1 })
     }
   }
@@ -138,9 +158,18 @@ export function PlateRack() {
       {SHELVES.map((y) => (
         <mesh key={`r${y}`} position={[0, y + 0.07, D / 2 - 0.015]}><boxGeometry args={[W - 0.06, 0.035, 0.025]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
       ))}
-      {SHELVES.slice(0, 2).flatMap((y) => Array.from({ length: 8 }, (_, k) => (
-        <mesh key={`d${y}${k}`} position={[-W / 2 + 0.09 + k * 0.16, y + 0.11, 0.06]}><cylinderGeometry args={[0.007, 0.007, 0.17, 8]} /><meshToonMaterial color="#5a3a1e" /></mesh>
+      {/* (the lowest shelf's slots: a dowel either side of each plate, a row at the front and one at the back, set in a rail along the foot) */}
+      {[-1, 1].flatMap((zs) => Array.from({ length: SLOTS + 1 }, (_, k) => (
+        <mesh key={`d${zs}${k}`} position={[slotX(k) - SLOT / 2, SHELVES[0] + 0.0175 + 0.07, zs * 0.12]} castShadow>
+          <cylinderGeometry args={[0.006, 0.007, 0.14, 8]} /><meshToonMaterial color="#5a3a1e" />
+        </mesh>
       )))}
+      {[-1, 1].map((zs) => (
+        <mesh key={`dr${zs}`} position={[0, SHELVES[0] + 0.0175 + 0.008, zs * 0.12]}><boxGeometry args={[SLOTS * SLOT + 0.02, 0.016, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+      ))}
+      {/* (the middle shelf's show: a rail behind for the plates to lean on, a groove strip in front to hold their feet) */}
+      <mesh position={[0, SHELVES[1] + 0.25, -0.17]}><boxGeometry args={[W - 0.06, 0.03, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+      <mesh position={[0, SHELVES[1] + 0.0175 + 0.008, 0.06]}><boxGeometry args={[W - 0.06, 0.016, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
       {/* (the sides: a frame with three rails across) */}
       {[-1, 1].flatMap((sd) => [0.36, 0.84, 1.3].map((y) => (
         <mesh key={`s${sd}${y}`} position={[sd * W / 2, y, 0]}><boxGeometry args={[0.03, 0.03, D - 0.04]} /><meshToonMaterial map={wood(w.dark, 1, 0.2)} /></mesh>
