@@ -564,8 +564,8 @@ const PIT_PARTS = /^(FirePit|Stone|Robuchi|Charcoal|BinchotanHeap)/
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15 * PIT_SCALE
 /** the square hearth's frame (炉縁, blender/grilledfish.py IRORI_IN + IRORI_W), its outer half-width as drawn: square to the table, along
- * ALONG and LAY; nothing is set down on it or inside it */
-const HEARTH_HALF = (0.98 + 0.17) * PIT_SCALE
+ * ALONG and LAY; nothing is set down on it or inside it (sized so the table's front row of plates, bowls and the board stand clear of it) */
+const HEARTH_HALF = (0.7 + 0.13) * PIT_SCALE
 /** a thing at `at` (from the fire's middle) of reach `r`, or a w x d board turned to the table, moved out of the square hearth the short way */
 function clearOfHearth(at: THREE.Vector3, r: number, w = 0, d = 0) {
   const u = at.dot(ALONG), v = at.dot(LAY)

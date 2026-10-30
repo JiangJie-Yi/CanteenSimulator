@@ -87,15 +87,15 @@ stone = mix((0.33, 0.33, 0.32), (0.55, 0.54, 0.51), lumps)
 stone = mix(stone, (0.5, 0.44, 0.37), smooth(0.6, 0.85, fbm(N, 3, 3)) * 0.25)          # browner patches
 stone = mix(stone, (0.3, 0.31, 0.31), smooth(0.6, 0.85, fbm(N, 2, 5)) * 0.3)           # cooler bands
 # (the toon shading flattens the normal map into a few bands, so the detail has to be in the colour)
-fine = vnoise(N, 170, 170) * 0.7 + vnoise(N, 340, 340) * 0.3
+fine = vnoise(N, 300, 300) * 0.6 + vnoise(N, 600, 600) * 0.4
 grain_dark = smooth(0.66, 0.76, fine)
 grain_light = smooth(0.3, 0.22, fine)
 mottle = fbm(N, 20, 20)
-stone = mix(stone, stone * 0.78, smooth(0.45, 0.7, mottle) * 0.8)                   # blotchy weathering
-cluster = smooth(0.86, 0.92, vnoise(N, 150, 150)) * smooth(0.4, 0.6, fbm(N, 8, 8))
-stone = mix(stone, (0.16, 0.15, 0.14), grain_dark * 0.75)
-stone = mix(stone, (0.74, 0.72, 0.67), grain_light * 0.55)
-stone = mix(stone, (0.09, 0.085, 0.08), cluster * 0.85)
+stone = mix(stone, stone * 0.86, smooth(0.45, 0.75, mottle) * 0.5)                   # soft weathering, no blotches
+cluster = smooth(0.9, 0.95, vnoise(N, 260, 260)) * smooth(0.45, 0.65, fbm(N, 8, 8))
+stone = mix(stone, (0.22, 0.21, 0.2), grain_dark * 0.45)
+stone = mix(stone, (0.7, 0.68, 0.64), grain_light * 0.35)
+stone = mix(stone, (0.14, 0.13, 0.12), cluster * 0.6)
 vein = (smooth(0.006, 0.001, np.abs(fbm(N, 3, 2) + (warp - 0.5) * 0.25 - 0.5)) * smooth(0.35, 0.6, fbm(N, 2, 3)) +
         smooth(0.004, 0.0, np.abs(fbm(N, 2, 4) + (warp - 0.5) * 0.3 - 0.5)) * 0.5 * smooth(0.5, 0.7, fbm(N, 3, 2)))
 vein = np.clip(vein, 0, 1)
@@ -103,7 +103,7 @@ stone = mix(stone, (0.7, 0.69, 0.65), vein * 0.45)
 crack = np.clip(smooth(0.007, 0.001, np.abs(fbm(N, 6, 6) - 0.5)) * smooth(0.4, 0.55, fbm(N, 2, 2)) +
                 smooth(0.005, 0.0, np.abs(fbm(N, 11, 11) - 0.5)) * smooth(0.55, 0.7, fbm(N, 3, 3)) * 0.8, 0, 1)
 stone = mix(stone, (0.08, 0.07, 0.06), crack * 0.9)
-pits = smooth(0.91, 0.95, vnoise(N, 110, 110))
+pits = smooth(0.93, 0.96, vnoise(N, 220, 220))
 stone = mix(stone, (0.17, 0.15, 0.13), pits * 0.8)
 rust = smooth(0.66, 0.82, fbm(N, 4, 3)) * (0.6 + 0.4 * fbm(N, 16, 16))
 stone = mix(stone, (0.5, 0.36, 0.24), rust * 0.22)
@@ -456,9 +456,9 @@ PIT_R = 1.55
 SALT_R = 0.86
 SALT_H = 0.07          # (a thick bed: the salt piled well up inside the stones, full out toward them)
 # the hearth's frame (炉縁): its inner half-width and its bars' width and height
-IRORI_IN = 0.98
-IRORI_W = 0.17
-IRORI_H = 0.17
+IRORI_IN = 0.7
+IRORI_W = 0.13
+IRORI_H = 0.15
 
 
 def salt_height(x, y):
@@ -648,7 +648,7 @@ for i, half in enumerate(sizes):
             for l in f.loops:
                 c = l.vert.co
                 pu, pv = ((c.y, c.z), (c.x, c.z), (c.x, c.y))[ax]
-                l[uvl].uv = ((pu * ct - pv * st) * 0.24 + off[0], (pu * st + pv * ct) * 0.24 + off[1])
+                l[uvl].uv = ((pu * ct - pv * st) * 0.5 + off[0], (pu * st + pv * ct) * 0.5 + off[1])
     # scorched by the fire on the side facing it (local -X points at the fire): sooted black, heaviest low down
     # where the flames lick and along the top edge where the smoke rolls over, in ragged patches; round the soot a
     # band of rock baked a rusty brown; the side away from the fire left its own grey
@@ -681,7 +681,7 @@ for i, half in enumerate(sizes):
 # (the hearth is square now: its stones, the same ones, set round a square inside the frame (between the sticks' feet and it), evenly along
 # its four sides, each turned square to its side with its sooted face still to the fire, a touch askew; smaller, a little flattened, as
 # rough-cut blocks, sitting down into the salt)
-STONE_SQ = 0.86
+STONE_SQ = 0.635
 _st = sorted([o for o in bpy.data.objects if o.name.startswith("Stone")], key=lambda o: math.atan2(o.location.y, o.location.x))
 _per = 8 * STONE_SQ
 for i, o in enumerate(_st):
@@ -695,19 +695,31 @@ for i, o in enumerate(_st):
     o.location.z *= 0.5
     o.rotation_euler.z += math.atan2(-ny, -nx) - a0 + random.uniform(-0.12, 0.12)
     # (thickened across, so each is a squarish block rather than a slab on end)
-    o.scale = (o.scale.x * 1.25, o.scale.y * 0.6, o.scale.z * 0.5)
+    o.scale = (o.scale.x * 0.95, o.scale.y * 0.42, o.scale.z * 0.4)
+# (then each measured as it now stands, and any that reaches past the frame's inner edge moved in until it's clear by a hair)
+bpy.context.view_layer.update()
+for o in _st:
+    pts = [o.matrix_world @ Vector(c) for c in o.bound_box]
+    for ax in (0, 1):
+        hi, lo = max(p[ax] for p in pts), min(p[ax] for p in pts)
+        lim = IRORI_IN - 0.02
+        if hi > lim:
+            o.location[ax] -= hi - lim
+        if lo < -lim:
+            o.location[ax] += -lim - lo
 # ---- the hearth's frame (炉縁): four thick bars of dark keyaki, lacquered, round the square bed, their corners mitred, each a soft bevel;
 # a brass plate wrapped over each corner (隅金具), a fine brass line inlaid round the inner edge
-_ku, _kv = grid01(512)
-_kw = (fbm(512, 2, 6, 4) - 0.5) * 0.06
-_kring = ((_kv + _kw) * 22 + fbm(512, 3, 10, 3) * 1.4) % 1.0
-# (keyaki's strong figure: broad bands of lighter earlywood and dark latewood, each ring's line crisp, a lighter ripple through it here and
-# there, under the lacquer's warm depth)
-_kcol = mix((0.44, 0.25, 0.12), (0.26, 0.13, 0.06), smooth(0.15, 0.85, _kring))
-_kcol = mix(_kcol, (0.1, 0.05, 0.02), smooth(0.84, 0.93, _kring) * (1 - smooth(0.93, 1.0, _kring)) * 0.85)
-_kcol = mix(_kcol, (0.55, 0.33, 0.17), smooth(0.65, 0.95, fbm(512, 4, 30, 3)) * 0.3)
-_kcol = mix(_kcol, (0.14, 0.07, 0.03), (fbm(512, 2, 120, 2) > 0.7).astype(np.float32) * 0.25)
-M["robuchi"] = pbr("Robuchi", tex=image("T_Robuchi", _kcol), rough=0.3, coat=0.6)
+_ku, _kv = grid01(1024)
+# (keyaki as a frame's bars are cut: quarter-sawn, the grain running straight down the bar in fine close lines, some darker and bolder,
+# wavering a hair; a soft ripple of figure across it (the wood's flecks) and warm light-and-dark streaks along it, under the lacquer)
+_kw = (fbm(1024, 1, 3, 4) - 0.5) * 0.02
+_kline = np.sin((_kv + _kw) * 2 * np.pi * 70 + fbm(1024, 2, 40, 3) * 3)
+_kline2 = np.sin((_kv + _kw * 1.3) * 2 * np.pi * 19 + 1.3)
+_kcol = mix((0.42, 0.23, 0.11), (0.3, 0.15, 0.07), smooth(-0.2, 0.9, _kline2) * 0.55)
+_kcol = mix(_kcol, (0.17, 0.08, 0.035), smooth(0.55, 0.95, _kline) * 0.45)
+_kcol = mix(_kcol, (0.52, 0.31, 0.16), smooth(0.6, 0.9, fbm(1024, 14, 3, 3)) * 0.18)
+_kcol = mix(_kcol, (0.2, 0.1, 0.05), smooth(0.55, 0.85, fbm(1024, 3, 1, 3)) * 0.25)
+M["robuchi"] = pbr("Robuchi", tex=image("T_Robuchi", _kcol), rough=0.28, coat=0.7)
 M["brass"] = pbr("RobuchiBrass", (0.78, 0.58, 0.26), rough=0.3, metal=1.0)
 bars = []
 OUT = IRORI_IN + IRORI_W
@@ -733,14 +745,16 @@ for k in range(4):
     bpy.ops.object.transform_apply(rotation=True)
     bevel(o, 0.012, 3, angle=False)
     bpy.ops.object.modifier_apply(modifier="Bevel")
-    # (the grain along each bar: its UVs from its own length)
+    # (the grain along each bar: u along its length; v across its top, or down its sides, at one scale everywhere so nothing stretches)
     bm_ = bmesh.new(); bm_.from_mesh(o.data)
     uvl_ = bm_.loops.layers.uv.verify()
     along_x = k % 2 == 0
     for f in bm_.faces:
+        top = abs(f.normal.z) > 0.6
         for l in f.loops:
             c = l.vert.co
-            l[uvl_].uv = ((c.x if along_x else c.y) * 0.5, (c.y if along_x else c.x) * 0.5 + c.z * 0.5)
+            al, ac = (c.x, c.y) if along_x else (c.y, c.x)
+            l[uvl_].uv = (al * 0.7 + k * 0.31, (ac if top else c.z + ac * 0.3) * 0.7)
     bm_.to_mesh(o.data); bm_.free()
     bars.append(finish(o, f"Robuchi{k}", M["robuchi"]))
 # (the brass: an L-shaped plate over each corner, and a fine inlaid line round the inner edge's top)
