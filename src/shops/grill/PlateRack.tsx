@@ -16,15 +16,34 @@ const SHELVES = [0.12, 0.6, 1.0, 1.5]
 const WOOD = '#a9774a'
 const WOOD_DARK = '#7d5430'
 
-const GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 0.038], [0.49, 0.042], [0.44, 0.026], [0.3, 0.01], [0, 0.01]] as [number, number][])
-  .map(([x, y]) => [x * PLATE_R * 2, y * PLATE_R * 2 / 0.26 * 0.26] as [number, number]), PLATE_R)
+/** a plate's section, out from the middle (x) and up (y), in its radius: a foot ring under it, a flat well, the rim curving up to a rounded
+ * lip, and back down the inside a little thinner; all the way round (wareGeometry turns it) */
+function plateProfile(R: number): [number, number][] {
+  const pts: [number, number][] = [[0, 0.018], [0.3, 0.018], [0.33, 0.004], [0.36, 0], [0.42, 0], [0.45, 0.012], [0.5, 0.02]]
+  // (the underside of the rim, sweeping up and out)
+  for (let k = 1; k <= 8; k++) { const t = k / 8; pts.push([0.5 + 0.48 * t, 0.02 + 0.13 * t ** 1.8]) }
+  // (the lip, rounded over, and the top of the rim back in)
+  pts.push([0.995, 0.162], [0.99, 0.172], [0.975, 0.172])
+  for (let k = 8; k >= 1; k--) { const t = k / 8; pts.push([0.5 + 0.46 * t, 0.045 + 0.12 * t ** 1.8]) }
+  pts.push([0.45, 0.042], [0, 0.04])
+  return pts.map(([x, y]) => [x * R, y * R])
+}
+const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R)
+/** a rice bowl's section (茶碗) in its radius: a small foot ring, the body rounding up from it to the rim, a fine lip, the inside following */
+function bowlProfile(R: number): [number, number][] {
+  const pts: [number, number][] = [[0, 0.1], [0.3, 0.1], [0.32, 0.02], [0.35, 0], [0.42, 0], [0.44, 0.08]]
+  for (let k = 1; k <= 12; k++) { const t = k / 12; pts.push([0.44 + 0.56 * Math.sin((t * Math.PI) / 2), 0.1 + 0.85 * (1 - Math.cos((t * Math.PI) / 2))]) }
+  pts.push([0.99, 0.965], [0.96, 0.965])
+  for (let k = 12; k >= 1; k--) { const t = k / 12; pts.push([0.4 + 0.56 * Math.sin((t * Math.PI) / 2), 0.17 + 0.78 * (1 - Math.cos((t * Math.PI) / 2))]) }
+  pts.push([0, 0.17])
+  return pts.map(([x, y]) => [x * R, y * R])
+}
 
 type Spot = { m: THREE.Matrix4; design: number }
 
-/** a plate's height off what it sits on, rim to foot (the profile above, at this size) */
-const PLATE_T = 0.042 * PLATE_R * 2
-/** how far each plate in a pile stands above the one under it: they nest, foot in the one below's well */
-const NEST = PLATE_T * 0.72
+/** how far each plate in a pile stands above the one under it: they nest, foot in the one below's well (the plate's well sits 0.04 R up,
+ * its foot 0.02 R into the one below) */
+const NEST = 0.045 * PLATE_R
 /** the slots on the lowest shelf: how far apart the plates stand in them, and how many */
 const SLOT = 0.075, SLOTS = 22
 const slotX = (k: number) => -((SLOTS - 1) * SLOT) / 2 + k * SLOT
@@ -33,8 +52,43 @@ const SHOW_X = [-0.66, -0.22, 0.22, 0.66]
 /** the bowls on the second shelf: piles turned over, as bowls are put away */
 const BOWL_R = 0.1
 const BOWL_X = [-0.72, -0.36, 0, 0.36, 0.72]
-const BOWL_GEO = wareGeometry(([[0, 0], [0.2, 0], [0.22, 0.03], [0.28, 0.1], [0.38, 0.28], [0.47, 0.46], [0.5, 0.5], [0.48, 0.5], [0.44, 0.45],
-  [0.34, 0.27], [0.24, 0.12], [0.18, 0.06], [0, 0.05]] as [number, number][]).map(([x, y]) => [x * BOWL_R * 2, y * BOWL_R * 2] as [number, number]), BOWL_R)
+const BOWL_GEO = (() => {
+  const g = wareGeometry(bowlProfile(BOWL_R), BOWL_R)
+  // (its picture wrapped round it, as a bowl's is painted: u round the bowl, v up from the foot to the rim)
+  const pos = g.attributes.position, uv = g.attributes.uv
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
+    uv.setXY(i, Math.atan2(z, x) / (2 * Math.PI) + 0.5, y / (0.965 * BOWL_R))
+  }
+  uv.needsUpdate = true
+  return g
+})()
+const bowlArt = new Map<number, THREE.Texture | null>()
+/** a bowl's own picture from a plate's design: a square of the design's middle repeated four times round, a cobalt line at the rim and a
+ * band above the foot, the glaze's white between */
+function bowlDesign(n: number) {
+  const i = ((n % DESIGN_COUNT) + DESIGN_COUNT) % DESIGN_COUNT
+  if (bowlArt.has(i)) return bowlArt.get(i)!
+  const src = wareDesign(i)?.image as HTMLCanvasElement | undefined
+  if (!src || typeof document === 'undefined') { bowlArt.set(i, null); return null }
+  const c = document.createElement('canvas')
+  c.width = 1024; c.height = 256
+  const g = c.getContext('2d')!
+  g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, 1024, 256)
+  const S = src.width, cut = S * 0.36
+  for (let k = 0; k < 4; k++) g.drawImage(src, S / 2 - cut / 2, S / 2 - cut / 2, cut, cut, k * 256, 40, 256, 176)
+  // (the foot: bare clay under a cobalt band; the rim's fine double line, the lip itself a warm brown as the plates')
+  g.fillStyle = '#c9b89a'; g.fillRect(0, 0, 1024, 26)
+  g.fillStyle = '#1f3a7a'; g.fillRect(0, 26, 1024, 14)
+  g.fillStyle = '#1f3a7a'; g.fillRect(0, 222, 1024, 6); g.fillRect(0, 234, 1024, 3)
+  g.fillStyle = '#6a4a2e'; g.fillRect(0, 248, 1024, 8)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = THREE.RepeatWrapping
+  t.anisotropy = 4
+  bowlArt.set(i, t)
+  return t
+}
 
 /** every plate on the rack: where it is, and which design. Set as they'd really stand, none through another: on the lowest shelf each stands
  * on its edge in its slot between the dowels, its face to the side, leaning back a touch; on the middle one three show their faces, leaning
@@ -82,7 +136,7 @@ function bowlsOf() {
       e.set(Math.PI, k * 0.9 + j * 0.6, 0)
       q.setFromEuler(e)
       // (turned over its rim rests on the shelf: its height above it, then each one up by the nest)
-      p.set(x + Math.sin(j * 1.9 + k) * 0.003, SHELVES[1] + 0.0175 + BOWL_R + j * 0.028, Math.cos(j * 1.3 + k) * 0.003 - 0.03)
+      p.set(x + Math.sin(j * 1.9 + k) * 0.003, SHELVES[1] + 0.0175 + 0.965 * BOWL_R + j * 0.17 * BOWL_R, Math.cos(j * 1.3 + k) * 0.003 - 0.03)
       out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k })
     }
   }
@@ -94,24 +148,25 @@ function Bowls() {
     for (const sp of bowlsOf()) out[sp.design % DESIGN_COUNT].push(sp.m)
     return out
   }, [])
-  return <>{byDesign.map((list, i) => <Plates key={`bowl${i}`} design={i} list={list} geo={BOWL_GEO} />)}</>
+  return <>{byDesign.map((list, i) => <Plates key={`bowl${i}`} design={i} list={list} geo={BOWL_GEO} ink={false} map={bowlDesign(i)} />)}</>
 }
-function Plates({ design, list, geo = GEO }: { design: number; list: Matrix4List; geo?: THREE.BufferGeometry }) {
+function Plates({ design, list, geo = GEO, ink: inked = true, map }: { design: number; list: Matrix4List; geo?: THREE.BufferGeometry; ink?: boolean; map?: THREE.Texture | null }) {
   const ref = useRef<THREE.InstancedMesh>(null)
   const ink = useRef<THREE.InstancedMesh>(null)
   useLayoutEffect(() => {
-    list.forEach((m, i) => { ref.current?.setMatrixAt(i, m); ink.current?.setMatrixAt(i, m.clone().scale(new THREE.Vector3(1.03, 1.08, 1.03))) })
+    list.forEach((m, i) => { ref.current?.setMatrixAt(i, m); ink.current?.setMatrixAt(i, m.clone().scale(new THREE.Vector3(1.012, 1.012, 1.012))) })
     for (const r of [ref.current, ink.current]) if (r) r.instanceMatrix.needsUpdate = true
   }, [list])
   if (!list.length) return null
   return (
     <>
       <instancedMesh ref={ref} args={[geo, undefined, list.length]} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={wareDesign(design)} />
+        <meshToonMaterial color="#ffffff" map={map === undefined ? wareDesign(design) : map} />
       </instancedMesh>
-      <instancedMesh ref={ink} args={[geo, undefined, list.length]}>
+      {/* (an ink line round each; not for the bowls, whose piles' rims would show it as dark bands) */}
+      {inked && <instancedMesh ref={ink} args={[geo, undefined, list.length]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-      </instancedMesh>
+      </instancedMesh>}
     </>
   )
 }
@@ -184,9 +239,9 @@ export function PlateRack() {
       <mesh position={[0, H - 0.02, 0]} castShadow><boxGeometry args={[W + 0.06, 0.05, D + 0.06]} /><meshToonMaterial map={wood(w.dark, 2, 0.4)} /></mesh>
       <mesh position={[0, H + 0.025, 0.01]} castShadow><boxGeometry args={[W + 0.12, 0.04, D + 0.1]} /><meshToonMaterial map={wood(w.dark, 2, 0.4)} /></mesh>
       <mesh position={[0, 0.05, D / 2 - 0.02]}><boxGeometry args={[W - 0.06, 0.1, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.3)} /></mesh>
-      {/* (a rail across the front of each shelf, so the plates can't slide off, and thin dowels between the standing plates) */}
+      {/* (a low lip along the front of each shelf, so nothing slides off, kept low so it hides nothing that stands on it) */}
       {SHELVES.map((y) => (
-        <mesh key={`r${y}`} position={[0, y + 0.07, D / 2 - 0.015]}><boxGeometry args={[W - 0.06, 0.035, 0.025]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+        <mesh key={`r${y}`} position={[0, y + 0.03, D / 2 - 0.012]}><boxGeometry args={[W - 0.06, 0.03, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
       ))}
       {/* (the lowest shelf's slots: a dowel either side of each plate, a row at the front and one at the back, set in a rail along the foot) */}
       {[-1, 1].flatMap((zs) => Array.from({ length: SLOTS + 1 }, (_, k) => (
