@@ -296,6 +296,30 @@ def ellipsoid(bm, c, r, mi=0, seg=16, rings=10, rot=None):
     return ret["verts"]
 
 
+def surf_ring(bm, surf, pitch, off, thick, mi=0, n=48, rg=6):
+    """a rolled band laid round the head on its own surface (a headband, a cap's seam): through pitch(yaw) at `off` out from it; its
+    section an oval, thick[0] out from the head and thick[1] up it"""
+    rows = []
+    for i in range(n):
+        y = -math.pi + 2 * math.pi * i / n
+        pb = pitch(y)
+        q = surf.ang(y, pb, 0.0)[0]
+        nrm = (q - surf.c).normalized()
+        q = q + nrm * off
+        tang = ang_dir(y + 0.01, pb) - ang_dir(y - 0.01, pb)
+        up = tang.cross(nrm).normalized()
+        if up.z < 0:
+            up = -up
+        rows.append([bm.verts.new(q + nrm * math.cos(2 * math.pi * k / rg) * thick[0] + up * math.sin(2 * math.pi * k / rg) * thick[1])
+                     for k in range(rg)])
+    for i in range(n):
+        a_, b_ = rows[i], rows[(i + 1) % n]
+        for k in range(rg):
+            f = bm.faces.new((a_[k], b_[k], b_[(k + 1) % rg], a_[(k + 1) % rg]))
+            f.material_index = mi
+            f.smooth = True
+
+
 def tube_ring(bm, c, axis, r, thick, mi=0, seg=24, rx=None):
     """a torus round axis at c (a hem, a cuff, a belt)"""
     axis = axis.normalized()
@@ -588,7 +612,64 @@ def paint_body(o, kind):
         c = poly.center
         name, t, _ = nearest_bone(c)
         poly.material_index = order.index(body_mat(name, t, c, st, kind))
+    smooth_seams(o)
     cyl_uv_layer(o, lambda p: nearest_bone(p))
+
+
+def smooth_seams(o, rounds=60):
+    """where one colour of the body meets the next (the neck of a jacket, a waistband, the top of a shoe) the line runs along the
+    mesh's faces in steps: ease it level, each vertex on such a line moved up or down toward the middle of its two neighbours on it"""
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    seam = {}
+    for e in bm.edges:
+        if len(e.link_faces) == 2 and e.link_faces[0].material_index != e.link_faces[1].material_index:
+            a, b = e.verts
+            seam.setdefault(a, set()).add(b)
+            seam.setdefault(b, set()).add(a)
+    for _ in range(rounds):
+        moved = {}
+        for vt, ns in seam.items():
+            if len(ns) != 2:
+                continue
+            z = sum(n.co.z for n in ns) / 2
+            moved[vt] = vt.co.z + (z - vt.co.z) * 0.6
+        for vt, z in moved.items():
+            vt.co.z = z
+    # (the neckline, where skin meets the top high on the round shoulders, still shows the faces' steps from above: a little rolled hem
+    # in the top's colour laid along it, as a jacket's neck has)
+    neck = {}
+    for e in bm.edges:
+        if len(e.link_faces) != 2:
+            continue
+        m0, m1 = e.link_faces[0].material_index, e.link_faces[1].material_index
+        if m0 != m1 and 0 in (m0, m1):
+            for vt in e.verts:
+                if vt.co.z > 0.62:
+                    neck[vt] = m1 if m0 == 0 else m0
+    if len(neck) > 8:
+        mat = max(set(neck.values()), key=list(neck.values()).count)
+        pts = [vt.co.copy() for vt in neck]
+        N, RG = 48, 6
+        rows = []
+        for i in range(N):
+            a_ = 2 * math.pi * i / N
+            d = Vector((math.sin(a_), -math.cos(a_), 0))
+            # (the seam's points nearest this direction: where the hem lies, at their height and reach)
+            near = sorted(pts, key=lambda q: -Vector((q.x, q.y, 0)).normalized().dot(d))[:3]
+            z = sum(q.z for q in near) / len(near)
+            r = sum(Vector((q.x, q.y, 0)).length for q in near) / len(near)
+            c = d * r + Vector((0, 0, z))
+            rows.append([bm.verts.new(c + d * math.cos(2 * math.pi * k / RG) * 0.008 + Vector((0, 0, math.sin(2 * math.pi * k / RG) * 0.012)))
+                         for k in range(RG)])
+        for i in range(N):
+            a_, b_ = rows[i], rows[(i + 1) % N]
+            for k in range(RG):
+                f = bm.faces.new((a_[k], b_[k], b_[(k + 1) % RG], a_[(k + 1) % RG]))
+                f.material_index = mat
+                f.smooth = True
+    bm.to_mesh(o.data)
+    bm.free()
 
 
 # =====================================================================
@@ -907,6 +988,8 @@ def face(kind, hd):
     # nose and ears, on the head mesh itself
     bm = bmesh.new()
     bm.from_mesh(hd.data)
+    # (the head's own vertices are those before the nose and ears: hair caps are cut from those alone)
+    hd["shell"] = len(bm.verts)
     # (a round button of a nose, as the owner's: the family look of the shop's people; a girl's and a child's a size smaller)
     nr = 0.016 if (girl or kind == "kid") else 0.02
     np_, nn = surf.ang(0, -0.24, nr * 0.35)
@@ -963,18 +1046,128 @@ def hang(bm, surf, start, down, width, thick, off, mi=0, curl=0.0, n=7, splay=0.
     loft(bm, path, widths, thicks, normals, ring=8, mi=mi)
 
 
-def cap(hd, surf, keep, off=0.006, thick=0.008):
-    """a shell of hair over the head where keep(yaw, pitch)"""
+def cap(hd, surf, keep, off=0.006, thick=0.008, grid=True):
+    """a shell of hair over the head where keep(yaw, pitch). Laid as a grid over the head's surface: for each of many columns round
+    the head, from the crown down to the lowest pitch where keep() still holds, so its edge follows keep()'s line smoothly and not
+    the head mesh's faces (grid=False cuts it from the head mesh instead, for a cap that isn't one piece from the crown down)"""
+    if grid:
+        NY, NP, TOP = 64, 10, 1.5
+
+        def flip(yaw, a, b):
+            """where keep() changes between pitches a (kept) and b (not)"""
+            for _ in range(12):
+                m = (a + b) / 2
+                if keep(yaw, m):
+                    a = m
+                else:
+                    b = m
+            return a
+        bm = bmesh.new()
+        spans = []
+        for i in range(NY):
+            yaw = -math.pi + 2 * math.pi * i / NY
+            # (from the crown down: the first pitch with hair and the last, so a band (hair round the back only) is laid too)
+            hi_ = lo_ = None
+            p = TOP
+            while p > -1.4:
+                if keep(yaw, p) and hi_ is None:
+                    hi_ = p if p >= TOP else flip(yaw, p, p + 0.02)
+                if hi_ is not None and not keep(yaw, p - 0.02):
+                    lo_ = flip(yaw, p, p - 0.02)
+                    break
+                p -= 0.02
+            spans.append((yaw, hi_, lo_ if lo_ is not None else p))
+        # (a column with no hair has no faces either side of it)
+        cols = []
+        for yaw, hi_, lo_ in spans:
+            if hi_ is None:
+                cols.append(None)
+                continue
+            col = []
+            for j in range(NP + 1):
+                t = j / NP
+                # (rows closer together at the lower edge, where the line is drawn)
+                pp = lo_ + (hi_ - lo_) * (1 - (1 - t) ** 1.6)
+                col.append(bm.verts.new(surf.ang(yaw, pp, off)[0]))
+            cols.append(col)
+        crown = all(h is not None and h >= TOP for _, h, _l in spans)
+        pole = bm.verts.new(surf.ang(0, math.pi / 2, off)[0]) if crown else None
+        for i in range(NY):
+            a_, b_ = cols[i], cols[(i + 1) % NY]
+            if a_ is None or b_ is None:
+                continue
+            for j in range(NP):
+                bm.faces.new((a_[j], b_[j], b_[j + 1], a_[j + 1]))
+            if pole:
+                bm.faces.new((a_[NP], b_[NP], pole))
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+        bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
+        # (eased smooth, the head's own facets not shown through it; the edge kept where it is)
+        inner = [v for v in bm.verts if not v.is_boundary]
+        # (a cap of cloth stood off the head (a hat, off > 1 cm) smoothed further: cloth over the head, not its every bump)
+        for _ in range(3 + (12 if off > 0.01 else 0)):
+            bmesh.ops.smooth_vert(bm, verts=inner, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        c_ = surf.c
+        if bm.faces and sum((f.calc_center_median() - c_).dot(f.normal) for f in bm.faces) < 0:
+            bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+        ret = bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=-thick)
+        del ret
+        for f in bm.faces:
+            f.material_index = 0
+            f.smooth = True
+        return bm
     bm = bmesh.new()
     bm.from_mesh(hd.data)
     drop = []
+    shell = hd.get("shell", 1 << 30)
+    bm.verts.ensure_lookup_table()
     for vt in bm.verts:
+        if vt.index >= shell:
+            drop.append(vt)
+            continue
         r = vt.co - surf.c
         yaw = math.atan2(r.x, -r.y)
         pitch = math.asin(max(-1, min(1, r.z / r.length)))
         if not keep(yaw, pitch):
             drop.append(vt)
     bmesh.ops.delete(bm, geom=drop, context="VERTS")
+    # (the edge of the hair on the line keep() draws, not stepped along the head's faces: each vertex on the edge is moved out to where
+    # keep() turns false nearest it, along the pitch or the yaw, whichever is closer)
+    def edge_at(yaw, pitch, dy, dp):
+        prev = 0.0
+        for k in range(1, 15):
+            t = k * 0.012
+            if not keep(yaw + dy * t, pitch + dp * t):
+                lo, hi = prev, t
+                for _ in range(10):
+                    m = (lo + hi) / 2
+                    if keep(yaw + dy * m, pitch + dp * m):
+                        lo = m
+                    else:
+                        hi = m
+                return lo
+            prev = t
+        return None
+    for vt in [v for v in bm.verts if v.is_boundary]:
+        r = vt.co - surf.c
+        ln = r.length
+        yaw = math.atan2(r.x, -r.y)
+        pitch = math.asin(max(-1, min(1, r.z / ln)))
+        best = None
+        # (along the pitch first, as most hairlines run round the head; the yaw only for an edge that runs up and down)
+        for dirs in (((0, 1), (0, -1)), ((1, 0), (-1, 0))):
+            for dy, dp in dirs:
+                t = edge_at(yaw, pitch, dy, dp)
+                if t is None:
+                    continue
+                if best is None or t < best[0]:
+                    best = (t, yaw + dy * t, pitch + dp * t)
+            if best:
+                break
+        if best:
+            _, y2, p2 = best
+            vt.co = surf.c + Vector((math.cos(p2) * math.sin(y2), -math.cos(p2) * math.cos(y2), math.sin(p2))) * ln
     for vt in bm.verts:
         vt.co = vt.co + (vt.co - surf.c).normalized() * off
     bm.normal_update()
@@ -992,27 +1185,54 @@ def hair(kind, hd, surf, style=None):
     mats = [MATS["Hair"]]
     if style == "bald":
         # a horseshoe of hair round the back and over the ears
-        bm = cap(hd, surf, lambda y, p: abs(y) > 1.3 and -0.4 < p < 0.22, off=0.004, thick=0.012)
-        # (soft tufts over it, swept back)
+        bm = cap(hd, surf, lambda y, p: abs(y) > 1.3 - 0.15 * smoothstep(0.0, 0.22, p) and -0.4 + 0.1 * smoothstep(1.3, 2.0, abs(y)) < p < 0.22, off=0.004, thick=0.012)
+        # (soft round puffs over it, a cloud of hair either side and round the back, fuller over the ears)
         for sd in (1, -1):
             for i in range(6):
-                y0 = sd * (1.35 + i * 0.3)
-                for p0 in (0.15, -0.12):
-                    lock(bm, surf, [(y0, p0), (y0 + sd * 0.12, p0 - 0.12), (y0 + sd * 0.2, p0 - 0.3)],
-                         0.035, 0.009, [0.006, 0.01, 0.006], ring=6)
+                for p0, big, shift in ((0.05, 1.0, 0.0), (-0.21, 0.82, 0.15)):
+                    y0 = sd * (1.38 + i * 0.3 + shift)
+                    if abs(y0) > math.pi + 0.05:
+                        continue
+                    q = surf.ang(y0, p0 + 0.03 * math.sin(i * 2.1), 0.006)[0]
+                    k = big * (1.0 + 0.18 * math.sin(i * 1.7 + p0 * 9)) * (1.15 if i < 2 else 1.0)
+                    out = (q - surf.c).normalized()
+                    rot = Vector((0, 0, 1)).rotation_difference(out).to_matrix() @ Matrix.Rotation(i * 0.7, 3, "Z")
+                    ellipsoid(bm, q, (0.052 * k, 0.044 * k, 0.014 * k), mi=0, seg=12, rings=7, rot=rot)
         return from_bm(f"{kind}.hair", bm, mats, HREF)
 
     if style in ("crop", "short"):
         # a close crop with a receding front (and for "crop", a twisted headband, a hachimaki, on top)
-        bm = cap(hd, surf, lambda y, p: (p > 0.55 - 0.15 * min(1, abs(y))) if abs(y) < 1.3 else p > -0.35, off=0.004, thick=0.007)
+        # (the hairline one smooth line: low at the brow, just under the band, a little in at the temples, up over the ears, down to the nape)
+        line = [(0, 0.3), (0.5, 0.33), (0.9, 0.28), (1.3, 0.16), (1.6, 0.1), (2.0, -0.12), (2.5, -0.32), (math.pi + 0.01, -0.4)]
+
+        def crop_line(y):
+            a = abs(y)
+            for (a0, p0), (a1, p1) in zip(line, line[1:]):
+                if a <= a1:
+                    t = (a - a0) / (a1 - a0)
+                    t = t * t * (3 - 2 * t)
+                    return p0 + (p1 - p0) * t
+            return line[-1][1]
+        bm = cap(hd, surf, lambda y, p: p > crop_line(y), off=0.004, thick=0.007)
+        # (short tufts over the crown, swept up and back, so it reads as cropped hair and not a helmet; a few at the brow over the band)
+        for i, (y0, p0) in enumerate([(-0.5, 0.75), (0.0, 0.8), (0.5, 0.75), (-0.25, 1.0), (0.25, 1.0), (-1.0, 0.7), (1.0, 0.7),
+                                      (-1.6, 0.45), (1.6, 0.45), (math.pi - 0.4, 0.5), (math.pi + 0.4, 0.5), (math.pi, 0.75)]):
+            dy = 0.08 * math.sin(i * 2.3)
+            lock(bm, surf, [(y0, p0), (y0 + dy, p0 + 0.12), (y0 + dy * 2, p0 + 0.22)], 0.05, 0.01, [0.003, 0.009, 0.013], ring=8)
         o = from_bm(f"{kind}.hair", bm, mats, HREF)
         if style == "short":
             return o
         bm = bmesh.new()
-        tube_ring(bm, surf.c + Vector((0, 0.005, 0.045)), Vector((0, -0.18, 1)), HEAD_R * 1.03, (0.012, 0.016), mi=0, seg=32)
+        # (the band laid round on the hair, following the head's own shape (not a circle that the hair pokes through at the sides),
+        # low on the brow and a little higher behind; a rolled cloth: its section an oval, flatter against the head)
+        surf_ring(bm, surf, lambda y: 0.27 - 0.05 * (1 - math.cos(y)) / 2, 0.016, (0.009, 0.016))
+        # (the knot at the back of the band, and its two ends: flat strips of the cloth hanging down and a little apart, square at the tips)
+        kp = surf.ang(math.pi, 0.22, 0.03)[0]
+        ellipsoid(bm, kp, (0.024, 0.016, 0.018), mi=0, seg=14, rings=8)
         for sd in (1, -1):
-            lock(bm, surf, [(math.pi - sd * 0.12, 0.25), (math.pi - sd * 0.25, -0.05), (math.pi - sd * 0.32, -0.45)],
-                 0.02, 0.005, [0.016, 0.02, 0.022])
+            path = [kp + Vector((sd * (0.008 + 0.03 * t), 0.012 + 0.02 * t, -0.008 - 0.075 * t)) for t in [k / 5 for k in range(6)]]
+            normals = [Vector((sd * 0.25, 1, 0.1)).normalized()] * 6
+            loft(bm, path, [0.012 + 0.003 * k / 5 for k in range(6)], [0.004] * 6, normals, ring=8, mi=0, tip=False)
         from_bm(f"{kind}.band", bm, [MATS["Band"]], HREF)
         return o
 
@@ -1123,11 +1343,18 @@ def hair(kind, hd, surf, style=None):
             for i in range(4):
                 p0 = 0.5 - i * 0.12
                 lock(bm, surf, [(sd * 1.05, p0), (sd * 1.8, p0 + 0.04), (sd * 2.6, p0 + 0.01), (sd * 3.0, p0 - 0.06)], 0.04,
-                     0.008, [0.005, 0.007, 0.007, 0.009], ring=6)
-        # the duck's tail at the back of the neck
-        for sd in (1, -1):
-            lock(bm, surf, [(math.pi - sd * 0.3, -0.2), (math.pi - sd * 0.08, -0.45), (math.pi, -0.6)], 0.06, 0.014,
-                 [0.008, 0.02, 0.03], ring=6)
+                     0.008, [0.009, 0.011, 0.011, 0.012], ring=8)
+        # the duck's tail at the back of the neck: the two sides combed in to meet down the middle, ending in a little flip up and out
+        path, normals = [], []
+        for i in range(7):
+            t = i / 6
+            q, _n = surf.ang(math.pi, -0.12 - 0.42 * t, 0.012 + 0.012 * t)
+            out = (q - surf.c).normalized()
+            q = q + out * 0.03 * smoothstep(0.6, 1.0, t)
+            path.append(q)
+            normals.append(out)
+        loft(bm, path, [0.05, 0.056, 0.056, 0.05, 0.042, 0.032, 0.02], [0.01, 0.014, 0.016, 0.016, 0.014, 0.01, 0.006], normals,
+             ring=10, tip=False)
     elif style == "side":
         # neat short hair, parted on one side and combed over
         bm = cap(hd, surf, lambda y, p: p > (0.32 if abs(y) < 0.9 else -0.1 - 0.25 * smoothstep(1.2, 2.6, abs(y))))
@@ -1216,7 +1443,9 @@ def hair(kind, hd, surf, style=None):
             y0 = -1.4 + i * 0.31
             lock(bm, surf, [(y0, 0.5 if abs(y0) < 0.8 else 0.1), (y0 * 0.7 + math.pi * (1 if y0 > 0 else -1) * 0.3, 0.75),
                             (math.pi * (1 if y0 > 0 else -1) * 0.85, 0.7)], 0.05, 0.014, [0.008, 0.016, 0.01])
-        ellipsoid(bm, surf.c + Vector((0, HEAD_R * 0.95, HEAD_R * 0.55)), (0.05, 0.045, 0.045), seg=16, rings=10)
+        # (a cook's is low at the nape, under her white cap; a grandmother's up at the back of the crown)
+        ellipsoid(bm, surf.c + (Vector((0, HEAD_R * 1.0, HEAD_R * 0.08)) if kind == "staffF" else Vector((0, HEAD_R * 0.95, HEAD_R * 0.55))),
+                  (0.05, 0.045, 0.045), seg=16, rings=10)
     elif style == "updo":
         # put up with a bun on top, a hairpin with a flower, loose locks by the ears
         bm = cap(hd, surf, lambda y, p: p > (0.4 if abs(y) < 0.85 else -0.5), off=0.006)
@@ -1257,8 +1486,10 @@ def headwear(kind, hd, surf):
         f.smooth = True
     from_bm(f"{kind}.toque", bm, [MATS["Toque"]], HREF)
     # the low white cap: a soft dome down to the brow, a seam round it
-    bm = cap(hd, surf, lambda y, p: p > 0.36 - 0.08 * math.cos(y), off=0.022, thick=0.01)
-    tube_ring(bm, surf.c + Vector((0, 0, HEAD_R * 0.36)), Vector((0, -0.05, 1)), HEAD_R * 1.1, (0.004, 0.006), mi=0, seg=32)
+    # (down to the brow in front and lower behind, over the hair, the bun left out under it at the nape; a rolled hem round its edge)
+    wedge = lambda y: 0.26 + 0.08 * math.cos(y)
+    bm = cap(hd, surf, lambda y, p: p > wedge(y), off=0.03, thick=0.01)
+    surf_ring(bm, surf, lambda y: wedge(y) + 0.012, 0.032, (0.007, 0.009))
     from_bm(f"{kind}.wacap", bm, [MATS["Toque"]], HREF)
     # the work cap: a crown, a peak to the front, a button on top
     cb = bmesh.new()
@@ -2363,6 +2594,9 @@ SMALL = 260
 BUDGET = {k: max(160, v // 4) for k, v in BUDGET.items()}
 # (the hair kept whole enough that its locks stay smooth (cut to 1000 it showed spikes and jagged edges), the head round)
 BUDGET["hair"] = 2600
+# (the caps and bands laid on the head as grids and rings: kept whole enough that they stay smooth and their edges clean (cut to 160 they
+# came out in facets and ragged flaps))
+BUDGET.update({"hair": 4200, "band": 900, "wacap": 1400, "toque": 900, "workcap": 1400, "hat": 1200})
 BUDGET.update({"body": 2600, "head": 1400, "eyes": 160, "cuffs": 260, "details": 220, "face": 120})
 SHARE = {k: min(1.0, v * 0.7) for k, v in SHARE.items()}
 SHARE.update({"body": 1.0, "eyes": 1.0, "eyesJoy": 1.0, "eyesShut": 1.0, "mouth": 1.0, "mouthJoy": 1.0, "mouthOpen": 1.0, "mouthMad": 1.0, "mouthSad": 1.0,
@@ -2407,5 +2641,37 @@ if PREVIEW:
     scene.camera = cam
     scene.render.engine = "BLENDER_WORKBENCH"
     scene.render.resolution_x, scene.render.resolution_y = 1200, 600
-    scene.render.filepath = PREVIEW
-    bpy.ops.render.render(write_still=True)
+    # (PREVIEW_KIND=chef[,style] looks at one figure's head close up, from the front and three-quarters, only its parts shown)
+    pk = os.environ.get("PREVIEW_KIND")
+    if pk:
+        # (PREVIEW_KIND="chef,crop;salaryman" and PREVIEW_YAW="25;150": one picture each, <PREVIEW>_<kind>_<yaw>.png, the plain face only)
+        scene.render.resolution_x, scene.render.resolution_y = 600, 600
+        scene.display.shading.light = "STUDIO"
+        scene.display.shading.color_type = "MATERIAL"
+        cam.data.lens = 60
+        moods = ("toque", "workcap", "eyesShut", "eyesJoy", "browsJoy", "browsMad", "browsSad", "mouthOpen", "mouthJoy", "mouthMad", "mouthSad")
+        for one in pk.split(";"):
+            kd, _, sty = one.partition(",")
+            sty = sty or HAIRS[kd][0]
+            for o in COL.objects:
+                n = o.name
+                mine = n.startswith(kd + ".")
+                part = n.split(".")[1] if mine else ""
+                if mine and "_" in part and part.split("_")[1] in HAIRS[kd] and part.split("_")[1] != sty:
+                    mine = False
+                if mine and part.split("_")[0] in moods:
+                    mine = False
+                o.hide_render = not mine and o.type == "MESH"
+            hdo = bpy.data.objects[f"{kd}.head"]
+            cs = [hdo.matrix_world @ Vector(v) for v in hdo.bound_box]
+            hc = sum(cs, Vector()) / 8 + Vector((0, 0, -0.06))
+            for yw in os.environ.get("PREVIEW_YAW", "25").split(";"):
+                yaw = math.radians(float(yw))
+                cam.location = hc + Vector((math.sin(yaw) * 1.1, -math.cos(yaw) * 1.1, 0.12))
+                cam.rotation_mode = "QUATERNION"
+                cam.rotation_quaternion = (hc - cam.location).to_track_quat("-Z", "Y")
+                scene.render.filepath = PREVIEW.replace(".png", f"_{kd}{'_' + sty if '_' in one or ',' in one else ''}_{yw}.png")
+                bpy.ops.render.render(write_still=True)
+    else:
+        scene.render.filepath = PREVIEW
+        bpy.ops.render.render(write_still=True)
