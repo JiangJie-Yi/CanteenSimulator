@@ -181,7 +181,9 @@ export function WireView() {
   return null
 }
 
-export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V3; size?: number; theta?: number; pivotGroup?: { current: THREE.Group | null } }) {
+export function AxisGizmo({ id, at, theta = 0, own, pivotGroup }: { id: string; at: V3; size?: number; theta?: number; own?: number; pivotGroup?: { current: THREE.Group | null } }) {
+  // (sizing always goes by the piece's own axes, as Maya's does: its handles stand on them whichever axes the rest go by)
+  const sizeTheta = own ?? theta
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
@@ -343,7 +345,7 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
     e.stopPropagation()
     par.updateWorldMatrix(true, false)
     const origin = r0.getWorldPosition(new THREE.Vector3())
-    const dir = new THREE.Vector3(...AXES[axis].v).applyAxisAngle(new THREE.Vector3(0, 1, 0), theta).transformDirection(par.matrixWorld).normalize()
+    const dir = new THREE.Vector3(...AXES[axis].v).applyAxisAngle(new THREE.Vector3(0, 1, 0), sizeTheta).transformDirection(par.matrixWorld).normalize()
     const along = (ev: PointerEvent) => {
       const r = gl.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera)
@@ -423,7 +425,7 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
   }
   if (tool === 'scale' && !FIXED_SIZE.has(id)) {
     return (
-      <group ref={root} name="edit-gizmo" position={at} rotation-y={theta}>
+      <group ref={root} name="edit-gizmo" position={at} rotation-y={sizeTheta}>
         {AXES.map((a, i) => (
           <group key={a.name} rotation={a.rot} onPointerDown={grow(i as 0 | 1 | 2)}>
             <mesh position-y={L * 0.4} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
@@ -749,13 +751,17 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
         onPointerDown={on ? down : undefined}
         onPointerOver={on ? (e: { stopPropagation: () => void }) => { e.stopPropagation(); setHover(true) } : undefined}
         onPointerOut={on ? () => setHover(false) : undefined}>
-        <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]} scale={[sc[0] * baseScale, sc[1] * baseScale, sc[2] * baseScale]}>
-          <group rotation-y={-thetaW}>
-            <group ref={inner} position={[-piv[0], -piv[1], -piv[2]]}><ParentPiece.Provider value={id}>{children}</ParentPiece.Provider></group>
-          </group>
+        <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]}>
+          {/* (sized along the piece's own axes, the way its own X, Y, Z handles point: turned from the room's into the content's own, scaled,
+              turned back) */}
+          <group rotation-y={inYaw - thetaW}><group scale={[sc[0] * baseScale, sc[1] * baseScale, sc[2] * baseScale]}><group rotation-y={thetaW - inYaw}>
+            <group rotation-y={-thetaW}>
+              <group ref={inner} position={[-piv[0], -piv[1], -piv[2]]}><ParentPiece.Provider value={id}>{children}</ParentPiece.Provider></group>
+            </group>
+          </group></group></group>
         </group>
       </group>
-      {on && box && <AxisGizmo id={id} theta={theta} at={piv} pivotGroup={pg} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
+      {on && box && <AxisGizmo id={id} theta={theta} own={ownYaw} at={piv} pivotGroup={pg} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
     </group>
     </group>
   )

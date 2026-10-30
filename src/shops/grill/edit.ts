@@ -77,7 +77,15 @@ type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string,
   pivots: Record<string, V3>; pivotMode: boolean; space: Space
   /** the scene drawn as its wireframe (Maya's 4), to see each model's topology; off is shaded (5) */
   wire: boolean }
-let state: State = { on: false, locked: false, tool: 'move', offsets: load(KEY), rotations: load(KEY_R), scales: load(KEY_S), selected: null, groups: loadGroups(), picked: [],
+/** offsets made defaults (BASES) since they were set by hand: a browser still holding just that offset drops it, so it isn't counted twice
+ * (the rest it holds are kept, as a new KEY would lose them) */
+const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.0502, 0, 0] }
+const loadOffsets = () => {
+  const o = load(KEY)
+  for (const [id, v] of Object.entries(SETTLED)) if (o[id]?.every((x, i) => Math.abs(x - v[i]) < 0.002)) delete o[id]
+  return o
+}
+let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: load(KEY_R), scales: load(KEY_S), selected: null, groups: loadGroups(), picked: [],
   pivots: load(KEY_P), pivotMode: false, space: 'local', wire: false }
 const subs = new Set<() => void>()
 /** what was selected last time round: a newly picked piece starts in its own (object) axes */
@@ -100,6 +108,9 @@ export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return (
  * offset shown and typed in edit mode is from here, so every piece starts at 0, 0, 0, its own centre.
  */
 export const BASES: Record<string, V3> = {
+  // (the shrine's oranges and its cups' stand set by hand at X 0.027 and X 0.050 in the room's frame)
+  oranges: [0.0275, 0, 0],
+  shrinecups: [0.0502, 0, 0],
   gate1: [0, 0, 0.16],
   gate0: [0, 0, 0.17],
   // (the owner's settled spot: moved by [0.2, 0.19, 0.47] in the room's frame from [-1.508, 0, 1.974], taken into this parent's own units)
@@ -264,6 +275,8 @@ export const stepScale = (v: V3, dir: 1 | -1, axis: 0 | 1 | 2 | null): V3 =>
   v.map((x, k) => (axis === null || axis === k ? Math.round(Math.max(0.05, Math.min(20, dir > 0 ? x * SCALE_STEP : x / SCALE_STEP)) * 100) / 100 : x)) as V3
 /** how big the move / turn / scale handles are drawn (a factor of their usual size), kept in the browser */
 const KEY_GZ = 'jgs-edit-gizmo-size'
+/** how tall the panel's been dragged to */
+const KEY_PH = 'jgs-edit-panel-h'
 export const GIZMO = { size: (() => { try { return Number(localStorage.getItem(KEY_GZ)) || 0.6 } catch { return 0.6 } })() }
 export function setGizmoSize(dir: 1 | -1) {
   GIZMO.size = Math.max(0.25, Math.min(2, Math.round(GIZMO.size * (dir > 0 ? 1.15 : 1 / 1.15) * 100) / 100))
@@ -490,6 +503,9 @@ const PANEL_CSS = `
 .be-win:hover { background:#4a4a4a } .be-close:hover { background:#b8433a; color:#fff }
 .be.be-min { max-height:none } .be.be-min .be-body, .be.be-min .be-tools { display:none }
 .be-body { overflow:auto; flex:1; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a }
+.be-grip { position:absolute; left:0; right:0; top:-5px; height:10px; cursor:ns-resize; z-index:3 }
+.be-grip::after { content:''; position:absolute; left:50%; top:3px; width:44px; height:4px; margin-left:-22px; border-radius:2px; background:#5a5a5a }
+.be-grip:hover::after { background:#e08a2c }
 .be-sec { border-top:1px solid #1d1d1d }
 .be-sec > .be-st { display:flex; align-items:center; gap:5px; padding:4px 8px; background:#3d3d3d; color:#e0e0e0; font-weight:600; cursor:pointer }
 .be-sec > .be-st::before { content:'▾'; color:#9a9a9a; font-size:10px }
@@ -551,6 +567,24 @@ function panel() {
     el = document.createElement('div')
     el.className = 'be'
     const h = (tag: string, cls?: string, text?: string) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n }
+    // (its top edge a grip: dragged up, the panel grows taller (it stands on the bottom); the height kept for next time)
+    const grip = h('div', 'be-grip')
+    grip.title = T().resize
+    const panel = el
+    const keptH = Number(localStorage.getItem(KEY_PH) ?? 0)
+    const fit = (px: number) => Math.max(220, Math.min(window.innerHeight - 110, px))
+    if (keptH > 0) { panel.style.height = `${fit(keptH)}px`; panel.style.maxHeight = 'none' }
+    grip.onpointerdown = (e) => {
+      e.preventDefault(); e.stopPropagation()
+      const y0 = e.clientY, h0 = panel.offsetHeight
+      grip.setPointerCapture(e.pointerId)
+      grip.onpointermove = (m) => { panel.style.height = `${fit(h0 + (y0 - m.clientY))}px`; panel.style.maxHeight = 'none' }
+      grip.onpointerup = () => {
+        grip.onpointermove = null; grip.onpointerup = null
+        try { localStorage.setItem(KEY_PH, String(panel.offsetHeight)) } catch { /* (not kept) */ }
+      }
+    }
+    el.appendChild(grip)
     // the tool bar down the left edge: Move (W), Rotate (R), Scale (S)
     const bar = h('div', 'be-tools')
     toolButtons = (['select', 'move', 'rotate', 'scale'] as Tool[]).map((t) => {
