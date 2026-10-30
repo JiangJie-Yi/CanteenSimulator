@@ -678,9 +678,15 @@ for i, half in enumerate(sizes):
     # the slicing pares a rock down by about a sixth; scale back up so the ring still closes
     o.scale = (sx, sy, sz) if oval else (sx * 1.15, sy * 1.2, sz * 1.15)
     finish(o, "Stone", M["stone"], smooth_shade=oval)
-# (the stone ring is no more: the hearth is square now. Its stones were still made above, so the dice fall as they did for everything after)
+# (the hearth is square now: its stones, the same ones, brought in from the frame's edge to a looser ring inside it, between the sticks' feet
+# and the frame, smaller, each still turned with its sooted face to the fire, sitting down into the salt)
+STONE_IN = 0.88
 for o in [o for o in bpy.data.objects if o.name.startswith("Stone")]:
-    bpy.data.objects.remove(o, do_unlink=True)
+    k = STONE_IN / STONE_R
+    o.location.x *= k
+    o.location.y *= k
+    o.location.z *= 0.55
+    o.scale = (o.scale.x * 0.55, o.scale.y * 0.55, o.scale.z * 0.55)
 
 # ---- the hearth's frame (炉縁): four thick bars of dark keyaki, lacquered, round the square bed, their corners mitred, each a soft bevel;
 # a brass plate wrapped over each corner (隅金具), a fine brass line inlaid round the inner edge

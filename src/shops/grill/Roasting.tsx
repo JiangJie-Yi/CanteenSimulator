@@ -1467,6 +1467,60 @@ function EditProxy({ id, label, at, size, yaw }: { id: string; label: string; at
   )
 }
 
+/**
+ * The big chopping board's wood, after the board the cut fish lies on: a warm orange-brown, four broad planks along its length each its own
+ * shade, lighter down its middle, a dark groove between them with a lit lip, soft long grain and a knot or two; painted, not photographic.
+ * Mapped as the tray's (one texture across 1.6 x 1.6).
+ */
+const BOARD_WOOD = (() => {
+  if (typeof document === 'undefined') return null
+  const S = 1024
+  const c = document.createElement('canvas')
+  c.width = c.height = S
+  const g = c.getContext('2d')!
+  let seed = 41
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const planks = 4, ph = S / planks
+  const tones = ['#b9692f', '#c4763a', '#ad5f2a', '#bf7036']
+  for (let b = 0; b < planks; b++) {
+    const y0 = b * ph
+    const grad = g.createLinearGradient(0, y0, 0, y0 + ph)
+    grad.addColorStop(0, '#8f4a1e'); grad.addColorStop(0.18, tones[b]); grad.addColorStop(0.5, tones[b]); grad.addColorStop(0.82, tones[b]); grad.addColorStop(1, '#8f4a1e')
+    g.fillStyle = grad
+    g.fillRect(0, y0, S, ph)
+    // (long soft grain, wavering a little)
+    for (let k = 0; k < 22; k++) {
+      const yy = y0 + 10 + rnd() * (ph - 20)
+      g.strokeStyle = `rgba(110, 50, 18, ${0.12 + rnd() * 0.18})`
+      g.lineWidth = 1 + rnd() * 2.5
+      g.beginPath()
+      for (let x = 0; x <= S; x += 16) { const y = yy + Math.sin(x * 0.004 + k) * 6 + Math.sin(x * 0.017 + b) * 2; if (x) g.lineTo(x, y); else g.moveTo(x, y) }
+      g.stroke()
+    }
+    // (a knot)
+    if (rnd() < 0.7) {
+      const kx = rnd() * S, ky = y0 + ph * (0.3 + rnd() * 0.4)
+      g.fillStyle = 'rgba(105, 48, 16, 0.6)'; g.beginPath(); g.ellipse(kx, ky, 14, 9, 0, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = 'rgba(105, 48, 16, 0.3)'; g.lineWidth = 2
+      for (const r of [22, 32]) { g.beginPath(); g.ellipse(kx, ky, r * 1.5, r * 0.7, 0, 0, Math.PI * 2); g.stroke() }
+    }
+    // (the groove to the next plank, its lower lip catching the light)
+    g.fillStyle = '#4a200c'; g.fillRect(0, y0 + ph - 5, S, 7)
+    g.fillStyle = 'rgba(255, 210, 160, 0.35)'; g.fillRect(0, y0 + ph + 2, S, 3)
+  }
+  // (knife marks, faint, across the planks)
+  for (let i = 0; i < 70; i++) {
+    const x = rnd() * S, y = rnd() * S, l = 20 + rnd() * 70, a = (rnd() - 0.5) * 1.2
+    g.strokeStyle = `rgba(80, 36, 12, ${0.08 + rnd() * 0.12})`; g.lineWidth = 1
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke()
+  }
+  const t = new THREE.CanvasTexture(forPhone(c))
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(1 / 1.6, 1 / 1.6)
+  t.anisotropy = 8
+  return t
+})()
 /** A shallow wooden tray (盛り板) where ordered food waits raw, to be carried onto the fire. */
 function Tray({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = useMemo(() => {
@@ -1474,7 +1528,7 @@ function Tray({ position, container }: { position: [number, number, number]; con
     const shape = new THREE.Shape()
     const w = TRAY_W / 2
     const d = TRAY_D / 2
-    const r = 0.06
+    const r = 0.1
     shape.moveTo(-w + r, -d)
     shape.lineTo(w - r, -d)
     shape.quadraticCurveTo(w, -d, w, -d + r)
@@ -1494,7 +1548,7 @@ function Tray({ position, container }: { position: [number, number, number]; con
   return (
     <group position={position} rotation-y={yaw} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={TRAY_WOOD} />
+        <meshToonMaterial color="#ffffff" map={BOARD_WOOD} />
       </mesh>
       <mesh geometry={geometry} scale={[1.02, 1.1, 1.02]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />

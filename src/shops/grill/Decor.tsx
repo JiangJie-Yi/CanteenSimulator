@@ -614,6 +614,57 @@ function RackAt() {
   const p = new THREE.Vector3().addScaledVector(ALONG, RACK_AT.along).addScaledVector(LAY, RACK_AT.lay)
   return <Movable id="platerack" label="碗盤櫃架" baseScale={1.03}><group name="look-back" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack /></group></Movable>
 }
+/** the cut fish on its board (the downloaded hand-painted model), its colours as they are, at `width` across */
+function useCutFish(width: number) {
+  const gltf = useGLTF(CUTFISH_URL) as unknown as { scene: THREE.Group }
+  return useMemo(() => {
+    const root = gltf.scene.clone(true)
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null })
+      m.castShadow = true
+    })
+    const b = new THREE.Box3().setFromObject(root)
+    const d = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3())
+    const wrap = new THREE.Group()
+    root.position.set(-c.x, -b.min.y, -c.z)
+    wrap.add(root)
+    wrap.scale.setScalar(width / Math.max(d.x, d.z))
+    return wrap
+  }, [gltf, width])
+}
+const KNIVES_URL = import.meta.env.BASE_URL + 'models/knives.glb'
+/** the cook's knives on their folded cloth (blender/knives.py), laid along the table behind the hearth */
+function KnifeSet() {
+  const gltf = useGLTF(KNIVES_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      m.material = /Steel/.test(src.name)
+        ? new THREE.MeshStandardMaterial({ color: '#ffffff', map: src.map, metalness: 0.55, roughness: 0.3 })
+        : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, (m) => /Mark|Cloth/.test(m.name), { width: 0.0012, weld: true })
+    return r
+  }, [gltf])
+  // (behind the hearth, on the strip of table toward the bar: the front's taken by the fan, the plate and the tasting bowl)
+  const p = new THREE.Vector3().addScaledVector(ALONG, -0.2).addScaledVector(LAY, -1.82)
+  return <group position={[p.x, 0.002, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} scale={1.6}><primitive object={obj} /></group>
+}
+useGLTF.preload(KNIVES_URL)
+/** a fish being cut on its own board, at the table's back corner by the lantern: as the one on the freezer, a size bigger */
+function CutFishBoard() {
+  const fish = useCutFish(0.95)
+  const p = new THREE.Vector3().addScaledVector(ALONG, -2.2).addScaledVector(LAY, -0.45)
+  return <group position={[p.x, 0.002, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x) + 0.35}><primitive object={fish} /></group>
+}
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
     <>
@@ -622,6 +673,8 @@ export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [
       <HeldStick held={held} />
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
+      <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
+      <Movable id="cutfish" label="切魚砧板"><CutFishBoard /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /></group>
     </>
   )
