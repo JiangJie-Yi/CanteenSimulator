@@ -6,7 +6,7 @@ open), sized as the game's own (its foot at y 0, 0.42 tall, 0.27 across the rim)
   loop of cord through it; the inside wall and floor in the same wood.
 - RiceTubLid: the lid, its origin at its underside's middle: a disc of the same wood with its rings turned into it, an eased edge, a
   bar of darker wood across it to lift it by.
-- RiceTubRice: the rice heaped a little over the rim, its grains in relief, and the paddle (しゃもじ) stood in it.
+- RiceTubRice: the rice filled to a little under the rim, gently heaped, every grain painted, and the paddle (しゃもじ) laid in it on the rim.
 
 Run:
     blender -b --factory-startup --python blender/ricetub.py -- <project path>
@@ -71,10 +71,30 @@ cop = mix(cop, (0.36, 0.6, 0.5), smooth(0.85, 1.0, np.abs(v - 0.5) * 2) * 0.45)
 rr = np.sqrt((u - 0.5) ** 2 + (v - 0.5) ** 2)
 lidt = mix((0.84, 0.7, 0.48), (0.76, 0.6, 0.38), smooth(0.3, 0.9, fbm(N, 6, 6, 4)))
 lidt = mix(lidt, (0.6, 0.44, 0.26), smooth(0.82, 1.0, np.sin((rr * 40 + fbm(N, 4, 4, 3) * 0.8) * math.pi * 2) * 0.5 + 0.5) * 0.4)
-rice = np.ones((N, N, 3), np.float32) * 0.96
-for k in range(1400):
-    x, y = rng.randrange(N), rng.randrange(N)
-    rice[max(0, y - 1):y + 2, max(0, x - 2):x + 3] = 0.86
+# (cooked rice, close up: grain on grain, each a plump little oval lying its own way, lit on top and shaded under, the gaps between them
+# in soft shadow; a pearly white with the faintest warm cast)
+RN = 1024
+rice = np.ones((RN, RN, 3), np.float32) * np.array([0.84, 0.83, 0.8], np.float32)
+yy, xx = np.mgrid[0:RN, 0:RN].astype(np.float32)
+grng = np.random.default_rng(11)
+for k in range(9000):
+    cx, cy = grng.uniform(0, RN), grng.uniform(0, RN)
+    a = grng.uniform(0, np.pi)
+    L, W = grng.uniform(9, 13), grng.uniform(4.5, 6)
+    x0, x1, y0, y1 = int(max(0, cx - 14)), int(min(RN, cx + 15)), int(max(0, cy - 14)), int(min(RN, cy + 15))
+    if x1 <= x0 or y1 <= y0:
+        continue
+    dx, dy = xx[y0:y1, x0:x1] - cx, yy[y0:y1, x0:x1] - cy
+    u_ = (dx * np.cos(a) + dy * np.sin(a)) / L
+    v_ = (-dx * np.sin(a) + dy * np.cos(a)) / W
+    d = u_ * u_ + v_ * v_
+    m = d < 1
+    # (lit from above: brighter toward its upper side, a highlight, darker at its rim)
+    shade = 0.9 + 0.1 * np.clip(-dy / W * 0.6 + 0.5, 0, 1) - 0.06 * d
+    shade = shade + 0.08 * np.exp(-((u_ + 0.15) ** 2 + (v_ + 0.35) ** 2) * 6)
+    col = np.stack([shade * 1.0, shade * 0.995, shade * 0.97], -1)
+    rice[y0:y1, x0:x1][m] = np.clip(col[m], 0, 1)
+
 M = {"saw": [pbr(f"RiceStave{k}", (1 - 0.06 * k, 1 - 0.07 * k, 1 - 0.09 * k), tex=image(f"ricesaw{k}", saw), rough=0.55) for k in range(3)],
      "gap": pbr("RiceGap", lin("#6a4a2a"), rough=0.8),
      "inside": pbr("RiceInside", lin("#c8a470"), rough=0.7),
@@ -83,7 +103,7 @@ M = {"saw": [pbr(f"RiceStave{k}", (1 - 0.06 * k, 1 - 0.07 * k, 1 - 0.09 * k), te
      "cord": pbr("RiceCord", lin("#8a6a3c"), rough=0.9),
      "lid": pbr("RiceLidTop", (1, 1, 1), tex=image("ricelid", lidt), rough=0.5),
      "bar": pbr("RiceLidBar", lin("#9a6a3a"), rough=0.5),
-     "rice": pbr("RiceRice", (1, 1, 1), tex=image("ricegrain", rice), rough=0.6),
+     "rice": pbr("RiceRice", (1, 1, 1), tex=image("ricegrain", rice), rough=0.35, coat=0.25),
      "paddle": pbr("RicePaddle", lin("#e2c89a"), rough=0.5)}
 
 H, R0, R1 = 0.42, 0.255, 0.27
@@ -184,21 +204,84 @@ bpy.context.view_layer.objects.active = bar
 bpy.ops.object.modifier_apply(modifier="b")
 fin(bar, "RiceTubLidBar", M["bar"], lidp)
 
-# ---- the rice: a mound a little over the rim, and the paddle in it
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=32, ring_count=12, location=(0, 0, 0))
-rc = active()
-for vt in rc.data.vertices:
-    x, y, z = vt.co
-    rad = math.hypot(x, y)
-    vt.co = Vector(P(x * (R1 - 0.012), 0.33 + max(0.0, z) * 0.1 + (0 if z >= 0 else z * 0.25), y * (R1 - 0.012)))
+# ---- the rice: filled to a little under the rim, its top gently heaped and uneven where it's been turned with the paddle, meeting the
+# wall all round; the paddle (しゃもじ) laid in it, leaning on the rim
+RTOP = H - 0.045
+RIN = R0 + (R1 - R0) * (RTOP / H) - 0.006
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+NR, NA = 18, 64
+rings = []
+centre = bm.verts.new(P(0, RTOP + 0.022, 0))
+for i in range(1, NR + 1):
+    t = i / NR
+    row = []
+    for j in range(NA):
+        a_ = 2 * math.pi * j / NA
+        r = RIN * t
+        # (a soft heap, and the paddle's furrows and lumps)
+        h = 0.022 * (1 - t * t) + 0.006 * math.sin(a_ * 3 + t * 5) * t * (1 - t) * 4 + 0.003 * math.sin(a_ * 11 + t * 17)
+        row.append(bm.verts.new(P(r * math.cos(a_), RTOP + h, r * math.sin(a_))))
+    rings.append(row)
+faces = [bm.faces.new((centre, rings[0][(j + 1) % NA], rings[0][j])) for j in range(NA)]
+for i in range(NR - 1):
+    for j in range(NA):
+        jn = (j + 1) % NA
+        faces.append(bm.faces.new((rings[i][j], rings[i][jn], rings[i + 1][jn], rings[i + 1][j])))
+# (and down the inside of the wall a little, so no gap shows at its edge)
+skirt = [bm.verts.new(P(RIN * math.cos(2 * math.pi * j / NA), RTOP - 0.03, RIN * math.sin(2 * math.pi * j / NA))) for j in range(NA)]
+for j in range(NA):
+    jn = (j + 1) % NA
+    faces.append(bm.faces.new((rings[-1][j], rings[-1][jn], skirt[jn], skirt[j])))
+for f in faces:
+    for l in f.loops:
+        co = l.vert.co
+        l[uvl].uv = (co.x * 3.0, co.y * 3.0)
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+for f in bm.faces:
+    if f.normal.z < 0 and f.calc_center_median().z > RTOP - 0.001:
+        f.normal_flip()
+me_ = bpy.data.meshes.new("RiceTubRiceMound"); bm.to_mesh(me_); bm.free()
+rc = bpy.data.objects.new("RiceTubRiceMound", me_); bpy.context.collection.objects.link(rc)
 fin(rc, "RiceTubRiceMound", M["rice"], ricep)
-pts = [(0.06, 0.62, -0.03), (0.04, 0.5, -0.02), (0.02, 0.4, -0.01)]
-bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.012, depth=0.26, location=P(0.07, 0.56, -0.03), rotation=(0.25, 0.35, 0))
-fin(active(), "RiceTubPaddleHandle", M["paddle"], ricep)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=10, location=P(0.035, 0.43, -0.015))
-bl = active(); bl.scale = (0.045, 0.012, 0.06); bl.rotation_euler = (0.25, 0.35, 0)
+# (the paddle: a flat oval blade a little dished, a slim handle widening into it; its blade lying in the rice at a slant, the handle resting
+# on the rim and out over it)
+bm = bmesh.new()
+outline = []
+for k in range(40):
+    t = 2 * math.pi * k / 40
+    x, y = math.cos(t), math.sin(t)
+    # (the blade: an oval, wider toward its tip; y runs along the paddle, the blade's end at +y)
+    w = 0.036 * (1 + 0.12 * y)
+    outline.append((x * w, 0.05 * y))
+top = [bm.verts.new((x, y, 0.004 - 0.003 * (1 - (x / 0.04) ** 2))) for x, y in outline]
+bot = [bm.verts.new((x, y, -0.002 - 0.003 * (1 - (x / 0.04) ** 2))) for x, y in outline]
+bm.faces.new(top); bm.faces.new(bot[::-1])
+for k in range(40):
+    kn = (k + 1) % 40
+    bm.faces.new((top[k], top[kn], bot[kn], bot[k]))
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+me_ = bpy.data.meshes.new("RiceTubPaddleBlade"); bm.to_mesh(me_); bm.free()
+bl = bpy.data.objects.new("RiceTubPaddleBlade", me_); bpy.context.collection.objects.link(bl)
+bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=1, depth=1, location=(0, -0.05 - 0.15, 0.001))
+hd = active(); hd.scale = (0.011, 0.007, 0.3); hd.rotation_euler = (math.pi / 2, 0, 0)
 bpy.ops.object.transform_apply(scale=True, rotation=True)
-fin(bl, "RiceTubPaddleBlade", M["paddle"], ricep)
+# (the neck where the handle widens into the blade)
+bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.02, radius2=0.011, depth=0.04, location=(0, -0.06, 0.001), rotation=(math.pi / 2, 0, 0))
+nk = active(); nk.scale = (1, 0.45, 1)
+bpy.ops.object.transform_apply(scale=True, rotation=True)
+for o in (hd, nk):
+    bpy.ops.object.select_all(action="DESELECT")
+bpy.ops.object.select_all(action="DESELECT")
+for o in (bl, hd, nk):
+    o.select_set(True)
+bpy.context.view_layer.objects.active = bl
+bpy.ops.object.join()
+pd = bl
+# (laid in: its blade in the rice toward the far side, tilted up along its length so the handle rests on the near rim)
+pd.rotation_euler = (math.radians(-22), 0, math.radians(30))
+pd.location = P(-0.02, RTOP + 0.03, -0.1)
+fin(pd, "RiceTubPaddle", M["paddle"], ricep)
 
 nodes = []
 for name, ps in (("RiceTubBody", body), ("RiceTubLid", lidp), ("RiceTubRice", ricep)):
