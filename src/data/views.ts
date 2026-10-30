@@ -16,6 +16,11 @@ export type ViewSpot = {
   /** how far back the camera stands from it, and how high above it */
   back?: number
   up?: number
+  /** the point looked at moved this far across the room (x, z) from the anchor: for a part by the room's open side, so the frame
+   * keeps to the room and not the empty outside */
+  shift?: [number, number]
+  /** the way (x, z) the camera stands off from what it looks at, in place of the overview's */
+  from?: [number, number]
   /** seen from straight in front of what it looks at (its own +z), not from the room's open side */
   faceOn?: boolean
   /** seen through the eyes of what it's on (the owner), following him as he goes, a wide lens */
@@ -27,7 +32,7 @@ export const VIEW_SPOTS: ViewSpot[] = [
   { id: 'grill', zh: '火烤灶台', ja: '炉端', en: 'Grill', about: { zh: '圍爐燒烤的灶台：炭火、烤魚、調味', ja: '囲炉裏の炉端：炭火、焼き魚、味付け', en: 'The hearth grill: charcoal, fish, seasoning' } },
   { id: 'till', zh: '櫃檯', ja: 'レジ', en: 'Till', anchor: 'TillMarble', back: 3.0, up: 2.0,
     about: { zh: '收銀櫃檯：收銀機、平板、刷卡機、服務鈴', ja: 'レジカウンター：レジ、タブレット、カード端末、呼び鈴', en: 'The till counter: register, tablet, card reader, bell' } },
-  { id: 'genkan', zh: '玄關', ja: '玄関', en: 'Entrance', anchor: 'look-door', back: 4.2, up: 2.1,
+  { id: 'genkan', zh: '玄關', ja: '玄関', en: 'Entrance', anchor: 'look-door', back: 3.9, up: 2.6, shift: [-1.5, 0], from: [0.59, 0.81],
     about: { zh: '入口：門簾、紅燈籠、鞋櫃、招財貓台', ja: '入口：暖簾、赤提灯、下駄箱、招き猫の台', en: 'The entrance: noren, red lantern, shoe rack, lucky cats' } },
   { id: 'altar', zh: '小神龕', ja: '神棚', en: 'Shrine', anchor: 'look-altar', back: 2.6, up: 0.2,
     about: { zh: '神棚與供桌：點御神酒供酒，可招來更多客人', ja: '神棚と供え台：御神酒を供えると客が増える', en: 'The household shrine: offer sake to bring more customers' } },

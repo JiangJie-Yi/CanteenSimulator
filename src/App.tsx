@@ -525,17 +525,23 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     const at = anchor.getWorldPosition(new THREE.Vector3())
     const floor = OVERVIEW_TARGET.y - 1.5
     if (at.y < floor + 0.3) at.y += 0.9
+    if (spot.shift) at.add(new THREE.Vector3(spot.shift[0], 0, spot.shift[1]))
     // (one that follows: from his eyes, carried along wherever he goes, but held facing one way (toward the fire from his place), never
     // turning as he turns about; a little in front of his face so it isn't in the way, looking a little down)
     if (spot.follow) {
       const frame = anchor.parent ?? anchor
       frame.updateWorldMatrix(true, false)
       const p = anchor.position
-      return { pos: frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.83, p.z + 0.42)), target: frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.58, p.z + 1.6)) }
+      // (looking at the fire, wherever he's standing: what he's minding; from where he was looking straight ahead the view was the
+      // underside of the table by him)
+      const eye = frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.98, p.z + 0.42))
+      const pit = scene.getObjectByName('FirePit')
+      const fire = pit ? pit.getWorldPosition(new THREE.Vector3()) : null
+      return { pos: eye, target: fire && fire.distanceTo(eye) < 6 ? fire : frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.58, p.z + 1.6)) }
     }
     // (seen from the way the whole shop's overview looks in: from the open side of the room, so the walls are always behind what's seen,
     // never the empty outside; from the room's middle a part by the open side looked out into nothing)
-    const fromOpen = spot.faceOn
+    const fromOpen = spot.from ? new THREE.Vector3(spot.from[0], 0, spot.from[1]).normalize() : spot.faceOn
       ? new THREE.Vector3(0, 0, 1).transformDirection(anchor.matrixWorld).setY(0).normalize()
       : OVERVIEW_POSITION.clone().sub(OVERVIEW_TARGET).setY(0).normalize()
     return { pos: at.clone().addScaledVector(fromOpen, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0)), target: at }
