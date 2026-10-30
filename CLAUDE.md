@@ -134,6 +134,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 水桶與水瓢在 `blender/grilledfish.py`（`WaterBucket`、`WaterDipper`、`DipperWater`）：杉木桶板、竹箍。指到整個水桶就是拿水瓢：先舀水（水瓢沉進桶裡再提起，杯裡有水），放開就倒水（傾倒、水流），倒在食物上是灑水、倒在炭上是澆熄。
 - 神棚（`blender/kamidana.py` → `kamidana.glb`，`DiningRoom.tsx` 的 `KamidanaModel`）：三社造的檜木神棚，金屬配件（千木、鰹木的金頭、屋脊、門上的金紋、擬寶珠、台階金片）用真金屬材質並反射 `scene/studio.ts` 的攝影棚環境（金屬靠反射才看得出是金屬，店內光暗也照樣亮）；橘子盤 `KamiOranges`、經本 `KamiSutra` 也在同一個檔裡。倒酒時杯中酒面依杯子內壁的半徑長高（`cupInnerR`），不會穿出杯子。
 - **供花**（神棚兩側花瓶，點一下換花，存在 localStorage `jgs-shrine-flowers-1`）：三組花各有加持（`game/shrineFlowers.ts`，BDD `shrine-flowers`）：榊與小菊＝平安（客人耐心較長）、白金菊（`shrinevase.py` 變體 0：輪菊、糸菊、小菊）＝金運（更常拿飲料）、紅粉花（變體 1：芍藥、紅椿、桔梗、霞草）＝良緣（情侶較常來）；兩瓶同一種加倍。神棚門聲（`shrineSound.ts`）是黏滑摩擦合成的吱呀聲＋檜木共鳴＋門扣與門片碰撞聲。
+- **炭火的聲音**（`shops/grill/fireAmbience.ts`，WebAudio 即時合成）：炭的劈啪聲隨火力、烤物的滋滋聲隨火上的數量（`game/fireSound.ts`，BDD `fire-sound`）；鏡頭離火越遠越小聲；玩家第一次點擊後才開始（瀏覽器規定）。
 - 供清酒（點門口神棚前的酒瓶）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`；名稱沿用舊的點香）。
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。
 - **擋住視線的吊掛物會變淡**：`scene/OccluderFade.tsx` 每幾格從鏡頭朝看的目標（`__ctl.target` 在畫面上的位置，周圍一圈）打射線，標了 `userData.fade` 的群組（門簾、紅燈籠、旗幟串、幟旗、燈串、吊燈）擋在中間就淡到 18%，移開就恢復（各自複製材質，不影響共用同一材質的東西）。新的吊掛擺設要會變淡，就在它的群組加 `userData={{ fade: true }}`。

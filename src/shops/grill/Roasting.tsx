@@ -28,6 +28,8 @@ import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
 import { COAL_BRIDGE, SHRINE_FLOWERS } from './bar'
+import { fireAmbience } from './fireAmbience'
+import { fireSound } from '@/game/fireSound'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { Boss } from './Boss'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
@@ -4208,7 +4210,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // (starts at the fire's own level, so a cold pit is ash from the first frame, not charcoal easing down to it)
   const fuel = useRef(fire?.current ?? 0.55)
 
-  useFrame(({ clock: clk }, delta) => {
+  useFrame(({ clock: clk, camera: frameCam }, delta) => {
     const clock = clk.elapsedTime
     const cdt = Math.min(delta, 0.05)
     for (const c of coals.current) {
@@ -4368,6 +4370,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
     }
     const target = fire?.current ?? 0.55
+    // (the fire's sound: its crackle by how hot, its sizzle by what's over it; loud with the camera near the fire, faint across the room)
+    if (active) {
+      const over = pieces.current.filter((p) => present(p) && !p.collected && !p.staged && !p.carried).length
+      const snd = fireSound(Math.min(1, target), over)
+      const camD = frameCam.position.distanceTo(root.getWorldPosition(new THREE.Vector3()))
+      fireAmbience(snd.crackle, snd.sizzle, THREE.MathUtils.clamp(1.4 - camD / 12, 0.15, 1), Math.min(delta, 0.1))
+    }
     // (the coals' own state eases toward the fire: charcoal added swells up and kindles over a moment, the pile shrinks back slowly as it burns)
     const ease = target > fuel.current ? 0.05 : 0.35
     fuel.current += (target - fuel.current) * Math.min(1, delta * ease)
