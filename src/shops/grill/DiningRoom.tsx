@@ -752,6 +752,8 @@ const ROUND_PAPER = (() => {
  * A round window (丸窓) let into the plaster: a deep reveal of wood round it, a thick turned frame of warm keyaki, and inside, a light
  * lattice over washi lit from outside, bamboo's shadows on it
  */
+/** where along the back wall the second round window goes (the wall's own frame) */
+const ROUND_AT = -1.36
 function RoundWindow() {
   const R = 0.4
   const lat = [-0.2, 0, 0.2]
@@ -1700,16 +1702,19 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
       const n = Math.max(0, Math.floor(w / 0.95))
       for (let i = 0; i < n; i++) spots.push(posts[b] + (w / n) * (i + 0.5))
     }
-    return spots.filter((z) => (!shelf || Math.abs(z - shelfZ) > 0.85 * ALTAR_SCALE) && isClear(z, 0.3) && (door === undefined || Math.abs(z - door) > 0.95)
+    const kept = spots.filter((z) => (!shelf || Math.abs(z - shelfZ) > 0.85 * ALTAR_SCALE) && isClear(z, 0.3) && (door === undefined || Math.abs(z - door) > 0.95)
       && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
+    // (and on the back wall a second round window, in the bay among the bunting left of the specials' boards: the place nearest it)
+    const extra = shelf && kept.length ? kept.reduce((m, z) => (Math.abs(z - ROUND_AT) < Math.abs(m - ROUND_AT) ? z : m), kept[0]) : null
+    return kept
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length],
         // (on the back wall, the plum scroll's place is a round window let into the plaster instead)
-        round: shelf && k % 2 === 1 && SCROLLS[(start + k) % SCROLLS.length] === 'plum',
+        round: (shelf && k % 2 === 1 && SCROLLS[(start + k) % SCROLLS.length] === 'plum') || z === extra,
         // (a banner every third place along the wall, in turn)
         // (none by the drinks fridges: the wall there is left plain)
-        nobori: k % 3 === 2 && isClear(z, 0.9) ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined,
+        nobori: z !== extra && k % 3 === 2 && isClear(z, 0.9) ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined,
         // (and a big signboard every fifth, between)
-        kanban: k % 5 === 3 && k % 3 !== 2 ? Math.floor(k / 5 + start) % KANBAN_LOOKS.length : undefined }))
+        kanban: z !== extra && k % 5 === 3 && k % 3 !== 2 ? Math.floor(k / 5 + start) % KANBAN_LOOKS.length : undefined }))
   }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear])
   const frieze = useMemo(() => {
     if (!SEIGAIHA) return null
@@ -1730,7 +1735,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
   return (
     <group position={c.at} rotation-y={yaw}>
       {/* (local x is away from the cook: the wall stands at the floor's far edge, facing back toward the bar) */}
-      <group ref={wall} position-x={-far}>
+      <group ref={wall} position-x={-far} name="room-wall" userData={{ from, to, shelf }}>
         {/* (all of it standing still: drawn merged, a few meshes for the whole wall) */}
         <StaticBatch key={`${from}|${to}|${door}|${!!altar}`}>
         {/* the plaster over the wainscot, open where the toilets' doors are (a strip between them, and over them) */}

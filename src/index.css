@@ -6501,6 +6501,8 @@ body:has(.view-menu) > .be { opacity: 0.15; pointer-events: none; }
 .grill-focus b {
   background: radial-gradient(ellipse 50% 58% at var(--focus-x, 38%) var(--focus-y, 56%), transparent 55%, rgb(8 5 3 / 0.35) 100%);
 }
+/* (the other fixed views: focused on the middle of the picture) */
+.grill-focus.is-centered { --focus-x: 50%; --focus-y: 50%; }
 
 /* ---- the loading veil over the 3D shop (ui/LoadingScreen): the shop's own look, a dark board with its name in the sign's lettering, a strip of
    paper filling as the models come in, paper buttons ---- */
@@ -6601,4 +6603,14 @@ html[lang='en'] .heat-label { font-size: 13px; }
   font-size: 13px;
   background: #fffaf0;
   box-shadow: 0 2px 6px rgba(59, 42, 32, 0.18);
+}
+
+/* ---- the top left: the fire (the grill's view) and the owner's hunger (his view) take the rows over the office and auto buttons; with one
+   of them shown the buttons move up a row, with none up to the top (on a wide screen; narrow ones lay these out their own way) ---- */
+@media (min-width: 901px) {
+  .office-toggle, .auto-toggle { transition: margin-top 0.3s ease; }
+  .hud-rows-1 .office-toggle, .hud-rows-1 .auto-toggle { margin-top: -62px; }
+  .hud-rows-0 .office-toggle, .hud-rows-0 .auto-toggle { margin-top: -152px; }
+  /* (the hunger, alone on the owner's view, sits in the fire's row) */
+  .hud-rows-1 .fullness { top: 96px; }
 }

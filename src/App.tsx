@@ -27,7 +27,6 @@ import { Menu } from '@/ui/Menu'
 import { Crash } from '@/ui/Crash'
 import { OpeningSpot } from '@/scene/OpeningSpot'
 import { OccluderFade } from '@/scene/OccluderFade'
-import { LensFX } from '@/scene/LensFX'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
@@ -824,8 +823,6 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
 
       {/* (the hangings that come between the camera and what it's looking at fade out of the way) */}
       <OccluderFade target={() => controls.current?.target} />
-      {/* (the fixed views, every one but the free view: soft at the edges, darkened round the rim; not on a weak device, it's a second pass) */}
-      {(lockView || spotLock) && QUALITY.tier !== 'low' && <LensFX />}
       {/* (edit mode: the views marked where they look, numbered, as Sketchfab's annotations; camera 1 itself isn't placed by hand any more) */}
       {/* (the views: their numbered spots in the room while the view menu's open; in edit mode each view's camera, to be placed by hand) */}
       {pins && !editing && <ViewMarkers lang={lang} onPick={onView} />}
@@ -906,6 +903,10 @@ export default function App() {
   // hand; any other view leaves it, and so does opening the shop
   const research = !ai && view === 'grill'
   const hand = modeOf(ai, research) === 'research'
+  // (what's at the top left over the buttons: the grill's fire at its own view, the owner's hunger on his; none of either, the buttons go up)
+  const showFire = research && DISHES[active].heat === 'fire'
+  const showFull = view === 'boss'
+  const hudRows = (showFire ? 1 : 0) + (showFull ? 1 : 0)
   // (the ingredients' panel, opened and shut by the fridge button, while researching)
   const [fridgeOpen, setFridgeOpen] = useState(false)
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
@@ -1866,7 +1867,7 @@ export default function App() {
     return !!e && orderEntryRef.current(e, guest)
   }, [])
   return (
-    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}`} ref={appRef}>
+    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''} hud-rows-${hudRows}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -1886,9 +1887,12 @@ export default function App() {
       )}
       <div className="canvas-layer" style={glLost || NO_WEBGL ? { visibility: 'hidden' } : undefined}
 >
-        {/* (researching at the grill: the eye on the fire, as a lens focused on it: what's round it soft and darker; in the canvas's own layer,
-            under everything drawn over the view) */}
-        {hand && !!dish.roast && !editOn && !phone && <div className="grill-focus" aria-hidden="true"><i /><b /></div>}
+        {/* (every fixed view, as through a lens focused on what it's on: what's round it soft and darker (researching at the grill, focused on
+            the fire); not the free view or the owner's own eyes, nor in the editor; in the canvas's own layer, under everything drawn over the
+            view) */}
+        {!!dish.roast && !editOn && !phone && view !== 'free' && !VIEW_SPOTS.find((v) => v.id === view)?.follow && (
+          <div className={`grill-focus${hand ? '' : ' is-centered'}`} aria-hidden="true"><i /><b /></div>
+        )}
         <Crash inline>
         {/* (a phone at the grill draws it all flat, in 2D: no 3D view at all) */}
         {!NO_WEBGL && !flatGrill && <Canvas
@@ -1940,9 +1944,10 @@ export default function App() {
         )}
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
  />
-        {/* (the fire and how full you are are only for the grill's own view (research): elsewhere, and open, they're out of the way) */}
-        {research && dish.heat === 'fire' && <FireControl level={fireLevel} onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
-        {research && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
+        {/* (the fire is the grill's own (research, at the grill's view); how full is the owner's own, on his view: the rest of the time they're
+            out of the way, and the buttons under them move up into the room left) */}
+        {showFire && <FireControl level={fireLevel} onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
+        {showFull && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
           title={tl(lang, '經營（廚房・人事）', '開発ノート・人事', 'Office (kitchen · staff)')}>
           <svg className="office-icon" viewBox="0 0 28 28" aria-hidden="true">

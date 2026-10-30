@@ -204,7 +204,7 @@ export const DISHES: Dish[] = [
       faceCamera: ['ShrimpSkewer'],
       drinks: ['MisoSoup', 'Sake'],
       // the net's three spots (x, z); the model's mochi sits on the first, its onigiri on the second
-      netSpots: [[-0.11, 0.0], [0.1, 0.07], [0.06, -0.11]],
+      netSpots: [[-0.15, 0.0], [0.135, 0.095], [0.08, -0.15]],
       // just outside the stones, to the upper right of the fire as the camera sees it
       // (kept clear of the corn skewer at -55°, which used to stand right in front of it)
       // plates and dishes on the right of the fire as the camera sees it, the box and the bucket on the left

@@ -2403,25 +2403,52 @@ dw.parent = dipper
 dw.matrix_parent_inverse = dipper.matrix_world.inverted()
 
 # ---------------------------------------------------------------------------------------------------------
-# a little wire grill net laid over the coals, just for toasting mochi (切り餅) on
+# a wire grill net (焼き網) over the coals for toasting mochi (切り餅) on, sat on a cast-iron trivet (五徳)
 NET_Z = 0.62
-NET_R = 0.25
+NET_R = 0.34
 wires = []
-# a round net: a wire hoop, with straight wires across it both ways, standing on three legs splayed out
-for k in range(-6, 7):
-    t = k * NET_R / 6.5
+# (the net: fine wires both ways, those one way a hair under the others as they're woven; a thick outer hoop and a finer ring inside it,
+# a little loop handle either side to lift it by)
+for k in range(-8, 9):
+    t = k * NET_R / 8.6
     half = math.sqrt(max(0.0, NET_R * NET_R - t * t))
-    wires.append(stick_between((-half, t, NET_Z), (half, t, NET_Z), 0.0028, M["net"], "Wire"))
-    wires.append(stick_between((t, -half, NET_Z - 0.004), (t, half, NET_Z - 0.004), 0.0028, M["net"], "Wire"))
-hoop = 48
-for k in range(hoop):
-    a0, a1 = 2 * math.pi * k / hoop, 2 * math.pi * (k + 1) / hoop
-    wires.append(stick_between((NET_R * math.cos(a0), NET_R * math.sin(a0), NET_Z),
-                               (NET_R * math.cos(a1), NET_R * math.sin(a1), NET_Z), 0.006, M["net"], "Hoop"))
+    wires.append(stick_between((-half, t, NET_Z), (half, t, NET_Z), 0.0026, M["net"], "Wire"))
+    wires.append(stick_between((t, -half, NET_Z - 0.004), (t, half, NET_Z - 0.004), 0.0026, M["net"], "Wire"))
+
+
+def ring(r, z, thick, n, name):
+    for k in range(n):
+        a0, a1 = 2 * math.pi * k / n, 2 * math.pi * (k + 1) / n
+        wires.append(stick_between((r * math.cos(a0), r * math.sin(a0), z), (r * math.cos(a1), r * math.sin(a1), z), thick, M["net"], name))
+
+
+ring(NET_R, NET_Z, 0.0075, 56, "Hoop")
+ring(NET_R * 0.93, NET_Z + 0.002, 0.0035, 48, "Hoop")
+for sd in (-1, 1):
+    # (a loop handle: a half-hoop standing out past the rim)
+    pts = [(sd * (NET_R + 0.05 * math.sin(math.pi * u)), 0.06 * math.cos(math.pi * u), NET_Z + 0.012 * math.sin(math.pi * u)) for u in [k / 8 for k in range(9)]]
+    for q0, q1 in zip(pts, pts[1:]):
+        wires.append(stick_between(q0, q1, 0.005, M["net"], "Handle"))
+# (the trivet under it: an iron ring a little below the net, three claws up from it holding the net, three legs bowing out from it to the
+# salt, each with a little round foot)
+TRZ = NET_Z - 0.07
+ring(NET_R * 0.86, TRZ, 0.009, 40, "Trivet")
 for k in range(3):
     a = math.radians(90 + 120 * k)
-    top = (NET_R * math.cos(a), NET_R * math.sin(a), NET_Z)
-    wires.append(stick_between(top, (NET_R * 1.3 * math.cos(a), NET_R * 1.3 * math.sin(a), 0.0), 0.006, M["net"], "Leg"))
+    ca, sa = math.cos(a), math.sin(a)
+    r0 = NET_R * 0.86
+    # (claw: up from the ring and hooked over the net's rim)
+    wires.append(stick_between((r0 * ca, r0 * sa, TRZ), (r0 * ca, r0 * sa, NET_Z - 0.006), 0.007, M["net"], "Claw"))
+    wires.append(stick_between((r0 * ca, r0 * sa, NET_Z - 0.006), ((NET_R + 0.012) * ca, (NET_R + 0.012) * sa, NET_Z + 0.008), 0.006, M["net"], "Claw"))
+    # (leg: out and down in a bow, three straight pieces)
+    pts = [(r0 * ca, r0 * sa, TRZ)]
+    for u in (0.35, 0.7, 1.0):
+        rr = r0 + NET_R * 0.42 * math.sin(u * math.pi / 2)
+        pts.append((rr * ca, rr * sa, TRZ * (1 - u) ** 1.3))
+    for q0, q1 in zip(pts, pts[1:]):
+        wires.append(stick_between(q0, q1, 0.009, M["net"], "Leg"))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.02, depth=0.01, location=(pts[-1][0], pts[-1][1], 0.005))
+    wires.append(finish(active(), "Foot", M["net"]))
 join(wires, "GrillNet")
 
 # the mochi: a flat block of pounded rice, with a "Puffed" shape key the web app turns up as it toasts —
