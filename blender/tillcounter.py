@@ -161,11 +161,14 @@ lat = mix(lat, np.clip(_wal * 1.5, 0, 1), _sheen * 0.35)
 slat_tex = image("shieldslats", lat)
 _hgt = _slat * (1 - 0.5 * smooth(_half - 0.08, _half, _d))
 slat_nrm = image("shieldslatsN", to_normal(_hgt.astype(np.float32), 3.0), data=True)
-dark_tex = image("darkwood", mix((0.25, 0.17, 0.11), (0.2, 0.13, 0.08), fbm(256, 2, 40, 4)))
+# (the body's dark wood: a flat-sawn chestnut stained dark, its rings' arches and latewood lines and pores plain under the stain; the shelves
+# the same wood, a shade lighter)
+dark_tex = image("darkwood", flatsawn(512, (0.34, 0.21, 0.12), (0.22, 0.13, 0.075), (0.1, 0.06, 0.035), rings=9.0, seed_u=0.45))
+shelf_tex = image("shelfwood", flatsawn(512, (0.42, 0.28, 0.17), (0.3, 0.19, 0.11), (0.15, 0.09, 0.05), rings=7.0, seed_u=0.6))
 
 M = {
     "body": pbr("TillBodyWood", (1, 1, 1), tex=dark_tex, rough=0.6),
-    "shelf": pbr("TillShelf", lin("#4a3626"), rough=0.6),
+    "shelf": pbr("TillShelf", (1, 1, 1), tex=shelf_tex, rough=0.55),
     "batten": pbr("TillBatten", (1, 1, 1), tex=batten_tex, rough=0.55),
     "kick": pbr("TillKick", lin("#22180f"), rough=0.6),
     "marble": pbr("TillMarble", (1, 1, 1), tex=marble_tex, rough=0.12),
@@ -304,8 +307,8 @@ for k in (-1, 0, 1):
     uv_along(lv, k=k + 1)
     uv_along(lh, k=k + 2)
     bd += [lv, lh]
-bd.append(box("TillShelfLow", S(W - 0.14, 0.03, D - 0.14), P(0, 0.1, 0.03), M["shelf"], bev=0.003))
-bd.append(box("TillShelfHigh", S(W - 0.14, 0.025, D - 0.2), P(0, TOP - 0.2, 0.04), M["shelf"], bev=0.003))
+bd.append(box("TillShelfLow", S(W - 0.14, 0.03, D - 0.14), P(0, 0.1, 0.03), M["shelf"], bev=0.003, uv=0.6))
+bd.append(box("TillShelfHigh", S(W - 0.14, 0.025, D - 0.2), P(0, TOP - 0.2, 0.04), M["shelf"], bev=0.003, uv=0.6))
 BH = TOP - 0.1                            # how tall the culms stand (from just above the kick board to under the top)
 FACE_Z = -D / 2 + 0.02                    # the face behind them
 GAP_BACK = 0.012                          # how far they stand off it, so the light behind shows round them

@@ -48,7 +48,9 @@ function piecesOf(gltf: { scene: THREE.Group }) {
   const out = { manual } as Record<TillPart, THREE.Object3D>
   for (const k of BOXES) out[k] = new THREE.Group()
   // (each box with everything on it: its name, TillBox<Name>, starts every part of it)
-  for (const o of [...boxes.children]) {
+  // (they hang under the model's own root node, TillBoxes, not straight under the scene: looked for there)
+  const holder = boxes.getObjectByName('TillBoxes') ?? boxes
+  for (const o of [...holder.children]) {
     const k = BOXES.find((b) => o.name.startsWith('TillBox' + b[0].toUpperCase() + b.slice(1)))
     if (k) out[k].add(o)
   }
