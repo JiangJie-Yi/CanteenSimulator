@@ -416,7 +416,7 @@ export function payOf(cs: Counter[]) {
   const c0 = cs[0]
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, c0.length / 2 + along).addScaledVector(c0.lay, lay)
   // (stood a step back from the counter's marble edge, which comes to their chest: close, it went into them)
-  return { spot: at(TILL.along, TILL.lay - TILL.D / 2 - 0.36), lane: at(0.4, TILL.lay - TILL.D / 2 - 0.36), aisle: at(0.4, -AISLE) }
+  return { spot: at(TILL.along, TILL.lay - TILL.D / 2 - 0.46), lane: at(0.4, TILL.lay - TILL.D / 2 - 0.46), aisle: at(0.4, -AISLE) }
 }
 
 /** the pass, in the bar's own frame (on the first counter's top, at its start, the customers' side of it) */
