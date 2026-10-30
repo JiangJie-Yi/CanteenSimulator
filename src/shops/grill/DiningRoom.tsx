@@ -788,8 +788,6 @@ function RoundWindow() {
         <torusGeometry args={[R + 0.004, 0.012, 8, 72]} />
         <meshToonMaterial color="#5a361c" />
       </mesh>
-      {/* (a little sill under it) */}
-      <mesh position={[-0.05, -R - 0.06, 0]}><boxGeometry args={[0.1, 0.03, 0.5]} /><meshToonMaterial color="#8a5a34" /></mesh>
     </group>
   )
 }
