@@ -5951,6 +5951,20 @@ button {
   background: linear-gradient(180deg, rgb(235 240 244 / 0.9), rgb(214 224 232 / 0.85));
 }
 
+/* (an empty bin clicked: a short shake, and its order buttons glow to say "buy some first") */
+.chiller-bin.is-nudged { animation: bin-nudge 0.5s ease; }
+.chiller-bin.is-nudged .chiller-btn:not(.is-off) { animation: bin-buy-glow 0.5s ease 2; }
+@keyframes bin-nudge {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+@keyframes bin-buy-glow {
+  50% { background: #3f8f5a; box-shadow: 0 0 0 3px rgb(80 200 120 / 0.45); }
+}
+
 .chiller-bin-head {
   display: flex;
   align-items: center;

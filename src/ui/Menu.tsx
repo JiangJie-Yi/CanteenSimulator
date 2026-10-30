@@ -124,6 +124,8 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
   // on a phone there's no right button: a long press on a tag takes a portion off instead (and the tap that ends
   // it doesn't add one back)
   const press = useRef<{ timer: number; fired: boolean; x: number; y: number } | null>(null)
+  // (an empty bin clicked: it shakes and its order buttons light up, so it's clear there's none to take until some's bought)
+  const [nudge, setNudge] = useState<{ id: string; k: number } | null>(null)
   const pressStart = (id: string) => (e: ReactPointerEvent) => {
     if (e.pointerType !== 'touch') return
     const p = { timer: 0, fired: false, x: e.clientX, y: e.clientY }
@@ -251,9 +253,10 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
     const buy = (k: number) => (e: { stopPropagation: () => void; preventDefault: () => void }) => { e.stopPropagation(); e.preventDefault(); if (onBuy && can(k)) onBuy(x.id, k) }
     return (
       <div key={x.id} role="button" tabIndex={0} aria-pressed={n > 0} data-id={x.id}
-        className={`chiller-bin${out ? ' is-out' : ''}${n > 0 ? ' is-taken' : ''}`}
+        className={`chiller-bin${out ? ' is-out' : ''}${n > 0 ? ' is-taken' : ''}${nudge?.id === x.id ? ' is-nudged' : ''}`}
         aria-label={`${name} ${x.en ?? ''}，${tl(lang, '庫存', '在庫', 'Stock')} ${have}${n ? `，${t.ordered(n)}` : ''}`}
-        onClick={() => { const fired = press.current?.fired; press.current = null; if (!fired && !locked) onAdd(x.id) }}
+        onClick={() => { const fired = press.current?.fired; press.current = null; if (fired || locked) return; if (out) setNudge({ id: x.id, k: Date.now() }); else onAdd(x.id) }}
+        onAnimationEnd={(e) => { if (e.animationName === 'bin-nudge') setNudge(null) }}
         onPointerDown={pressStart(x.id)} onPointerMove={pressMove} onPointerUp={pressEnd} onPointerCancel={pressEnd}
         onContextMenu={(e) => { e.preventDefault(); if (!press.current && !locked) onRemove(x.id) }}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!locked) onAdd(x.id) } else onKey(x.id)(e) }}>
