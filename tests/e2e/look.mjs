@@ -80,5 +80,30 @@ for (const id of ids.slice(0, 4)) {
     await page.screenshot({ path: `${OUT}/person_${n++}_${tag}.png` })
   }
 }
+// (and the staff: everyone drawn by StaffFigure)
+const staff = await page.evaluate(() => {
+  const out = []
+  window.__scene.traverse((o) => { if (o.userData?.staffRole) out.push(o.uuid) })
+  return out
+})
+for (const [k, uuid] of staff.slice(0, 4).entries()) {
+  await page.evaluate((uuid) => {
+    const V = window.__cam.position.constructor
+    let g = null
+    window.__scene.traverse((o) => { if (o.uuid === uuid) g = o })
+    if (!g) return
+    let lo = new V(1e9, 1e9, 1e9), hi = new V(-1e9, -1e9, -1e9)
+    g.updateWorldMatrix(true, true)
+    g.traverse((o) => { if (!o.isMesh) return; o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox; for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) { const p = new V(x, y, z).applyMatrix4(o.matrixWorld); lo.min(p); hi.max(p) } })
+    const h = hi.y - lo.y
+    const mid = new V((lo.x + hi.x) / 2, lo.y + h * 0.6, (lo.z + hi.z) / 2)
+    const face = new V(0, 0, 1).transformDirection(g.matrixWorld).setY(0).normalize()
+    window.__ctl.target.copy(mid)
+    window.__cam.position.copy(mid).addScaledVector(face, h * 2.2).add(new V(0, h * 0.3, 0))
+    window.__ctl.update()
+  }, uuid)
+  await page.waitForTimeout(900)
+  await page.screenshot({ path: `${OUT}/staff_${k}.png` })
+}
 await browser.close()
-console.log('shots', n, 'people', ids.length)
+console.log('shots', n, 'people', ids.length, 'staff', staff.length)

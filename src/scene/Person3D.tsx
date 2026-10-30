@@ -684,7 +684,7 @@ export function StaffFigure({ id, role, look: who, moving = false }: { id: strin
     for (const o of r.shut) o.visible = blink
   })
   return (
-    <group>
+    <group userData={{ staffRole: role }}>
       <primitive object={r.root} />
       {/* the uchiwa: a round paper fan on a bamboo handle, along the hand from the fist */}
       <group ref={fan} position={[0, 0.03, 0]} visible={cook}>
