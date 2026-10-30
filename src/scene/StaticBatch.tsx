@@ -89,3 +89,37 @@ export function StaticBatch({ children }: { children: ReactNode }) {
     </>
   )
 }
+
+/**
+ * A loaded model of many small parts (a lantern's every lattice bar its own mesh) folded in place into one mesh per material, so it's a few
+ * draws instead of hundreds. Unlike StaticBatch the merged meshes are ordinary ones under the model's root: it can still be pointed at,
+ * moved and lit up as a whole. For a model whose parts never move on their own; skinned, instanced and multi-material meshes are left be.
+ */
+export function mergeByMaterial(root: THREE.Object3D) {
+  root.updateWorldMatrix(true, true)
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert()
+  const groups = new Map<THREE.Material, { geos: THREE.BufferGeometry[]; meshes: THREE.Mesh[] }>()
+  root.traverse((m) => {
+    if (!(m instanceof THREE.Mesh) || m instanceof THREE.SkinnedMesh || m instanceof THREE.InstancedMesh || Array.isArray(m.material) || !m.visible) return
+    const g = groups.get(m.material) ?? { geos: [], meshes: [] }
+    g.geos.push(bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)))
+    g.meshes.push(m)
+    groups.set(m.material, g)
+  })
+  for (const [mat, { geos, meshes }] of groups) {
+    if (meshes.length < 2) { for (const x of geos) x.dispose(); continue }
+    const geo = mergeGeometries(geos)
+    for (const x of geos) x.dispose()
+    if (!geo) continue
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.name = meshes[0].name
+    mesh.castShadow = meshes.some((x) => x.castShadow)
+    mesh.receiveShadow = meshes.some((x) => x.receiveShadow)
+    // (an ink hull stays one: not pointed at, not inked again)
+    if (meshes.every((x) => x.raycast === meshes[0].raycast)) mesh.raycast = meshes[0].raycast
+    if (meshes.some((x) => x.userData.inked)) mesh.userData.inked = true
+    for (const x of meshes) x.removeFromParent()
+    root.add(mesh)
+  }
+  return root
+}

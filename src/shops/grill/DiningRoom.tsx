@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { StaticBatch } from '@/scene/StaticBatch'
+import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
@@ -1295,18 +1295,26 @@ function Bouquet({ lean = 0, variant = 0 }: { lean?: number; variant?: number })
   const gltf = useGLTF(VASE_URLS[variant]) as unknown as { scene: THREE.Group }
   const root = useMemo(() => {
     const r = gltf.scene.clone(true)
+    // (one material for each of the model's: the petals sharing theirs, the bouquet folds into a few draws below)
+    const mats = new Map<THREE.Material, THREE.Material>()
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
-      m.material = src.name === 'VasePorcelain'
-        ? new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.08 })
-        : src.name === 'VaseLeaf'
-          ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.2, side: THREE.DoubleSide })
-          : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: THREE.DoubleSide })
+      let t = mats.get(src)
+      if (!t) {
+        t = src.name === 'VasePorcelain'
+          ? new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.08 })
+          : src.name === 'VaseLeaf'
+            ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.2, side: THREE.DoubleSide })
+            : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: THREE.DoubleSide })
+        mats.set(src, t)
+      }
+      m.material = t
       m.castShadow = true
     })
     inkModel(r, (m) => /Leaves|Mum|Stems|Stalk|Bud|Breath|Flower/.test(m.name), { width: 0.0008, weld: true })
+    mergeByMaterial(r)
     return r
   }, [gltf])
   return <group rotation-z={lean}><primitive object={root} /></group>
@@ -1388,6 +1396,8 @@ function kamidanaOf(scene: THREE.Group) {
   for (const leaf of [...shrineNode.children].filter((o) => /DoorLeaf/.test(o.name))) { leaf.removeFromParent(); doors.add(leaf) }
   kamidanaParts = { oranges: take('KamiOranges'), sutra: take('KamiSutra'), table: take('KamiTable'), flask: take('KamiFlask'), cupstand: take('KamiCupStand'),
     ebisu: (() => { const o = r.getObjectByName('KamiEbisu')!; o.removeFromParent(); return o })(), doors, shrine: r }
+  // (what's left, the shrine itself, never moves: its hundred parts folded into a mesh per material)
+  mergeByMaterial(r)
   return kamidanaParts
 }
 function KamidanaModel({ part = 'shrine' }: { part?: KamiPart }) {

@@ -6,6 +6,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObj
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { mergeByMaterial } from '@/scene/StaticBatch'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
@@ -312,6 +313,8 @@ function Lantern({ at }: { at: [number, number, number] }) {
       m.material = woodMats.get(src)!
       m.castShadow = true
     })
+    // (its two hundred little parts, a mesh each, folded into one per material: a few draws, not two hundred)
+    mergeByMaterial(r)
     return { r, paperMat }
   }, [gltf])
   useLayoutEffect(() => { (paper as { current: THREE.MeshBasicMaterial | null }).current = model.paperMat }, [model])
