@@ -560,9 +560,20 @@ const COAL_KINDLE_S = 22
 const PIT_SALT_RISE = 2.4
 /** how much higher the pit (its stones, coals and net) stands than it was modelled, with the flames and smoke over it */
 export const PIT_LIFT = 0
-const PIT_PARTS = /^(FirePit|Stone|Charcoal|BinchotanHeap)/
+const PIT_PARTS = /^(FirePit|Stone|Robuchi|Charcoal|BinchotanHeap)/
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15 * PIT_SCALE
+/** the square hearth's frame (炉縁, blender/grilledfish.py IRORI_IN + IRORI_W), its outer half-width as drawn: square to the table, along
+ * ALONG and LAY; nothing is set down on it or inside it */
+const HEARTH_HALF = (0.98 + 0.17) * PIT_SCALE
+/** a thing at `at` (from the fire's middle) of reach `r`, or a w x d board turned to the table, moved out of the square hearth the short way */
+function clearOfHearth(at: THREE.Vector3, r: number, w = 0, d = 0) {
+  const u = at.dot(ALONG), v = at.dot(LAY)
+  const hu = HEARTH_HALF + r + w / 2, hv = HEARTH_HALF + r + d / 2
+  if (Math.abs(u) >= hu || Math.abs(v) >= hv) return
+  if (hu - Math.abs(u) < hv - Math.abs(v)) at.addScaledVector(ALONG, Math.sign(u || 1) * hu - u)
+  else at.addScaledVector(LAY, Math.sign(v || 1) * hv - v)
+}
 
 /**
  * The tray's planed cedar: three boards with the grain running along them, drawn as wavering growth lines that
@@ -2130,6 +2141,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       o.position.z *= PIT_SCALE
       o.position.y += PIT_LIFT
       o.scale.multiplyScalar(o.name === 'FirePit' ? PIT_SCALE * PIT_GROUND : PIT_SCALE)
+      // (the square hearth (its bed and its frame) turned square to the table; the round things in it don't mind)
+      if (/^(FirePit|Robuchi)/.test(o.name)) o.rotateOnWorldAxis(UP_AXIS, Math.atan2(-ALONG.z, ALONG.x))
       // (the salt heaped higher, filling the ring)
       if (o.name === 'FirePit') { o.scale.y *= PIT_SALT_RISE; scorchEarth(o as THREE.Mesh) }
     }
@@ -2600,23 +2613,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const acrossMax = COOK_TABLE.lay[1] - FIRE_SHIFT.dot(LAY) - r - 0.16, acrossMin = COOK_TABLE.lay[0] - FIRE_SHIFT.dot(LAY) + r + 0.16
       if (across > acrossMax) at.addScaledVector(LAY, acrossMax - across)
       else if (across < acrossMin) at.addScaledVector(LAY, acrossMin - across)
-      const d = Math.hypot(at.x, at.z) || 1e-6
-      if (d < RING_CLEAR + r) {
-        at.x *= (RING_CLEAR + r) / d
-        at.z *= (RING_CLEAR + r) / d
-      }
-      // (the tray's a long board, not a disc: its nearest edge or corner is kept out of the stones)
-      if (key === 'tray') {
-        const u = at.dot(STACK_DIR), w = at.dot(LAY_DIR)
-        const nu = u - THREE.MathUtils.clamp(u, -TRAY_W / 2, TRAY_W / 2), nw = w - THREE.MathUtils.clamp(w, -TRAY_D / 2, TRAY_D / 2)
-        const near = Math.hypot(nu, nw)
-        const want = RING_CLEAR + 0.04
-        if (near < want) {
-          // (pushed straight out from the fire, by as much as the nearest point is short)
-          const dir = near > 1e-6 ? new THREE.Vector3().addScaledVector(STACK_DIR, nu / near).addScaledVector(LAY_DIR, nw / near) : new THREE.Vector3(at.x, 0, at.z).normalize()
-          at.addScaledVector(dir, want - near)
-        }
-      }
+      // (kept off the square hearth: a round thing by its reach, the tray (a long board, square to the table) by its whole length and width)
+      if (key === 'tray') clearOfHearth(at, 0.04, TRAY_W, TRAY_D)
+      else clearOfHearth(at, r)
       // (the tray is long: each of its circles is pushed clear, carrying the whole tray)
       for (const own of circlesOf(key, at)) {
         for (const o of others) {

@@ -127,8 +127,12 @@ dirt = mix(dirt, (0.25, 0.18, 0.12), (vnoise(N, 90, 90) > 0.8).astype(np.float32
 grit = vnoise(N, 260, 260)
 salt = mix((0.86, 0.86, 0.84), (0.98, 0.98, 0.96), np.clip(grit * 0.6 + fbm(N, 12, 12) * 0.5, 0, 1))
 salt = mix(salt, (0.72, 0.71, 0.69), smooth(0.2, 0.05, rad) * 0.35)
-ground = mix(salt, dirt, smooth(0.56, 0.62, rad + wobble * 0.3))
-alpha = 1 - smooth(0.72, 0.98, rad + wobble)
+# (the hearth is square (囲炉裏): the salt laid square across it, a margin of grey ash out to the frame, wobbling a little; no fade, the
+# frame closes it)
+sqd = np.maximum(np.abs(u - 0.5), np.abs(v - 0.5)) * 2
+ash = mix((0.4, 0.38, 0.36), (0.55, 0.53, 0.5), fbm(N, 14, 14))
+ground = mix(salt, ash, smooth(0.57, 0.66, sqd + wobble * 0.15))
+alpha = np.ones_like(sqd)
 TEX["pit"] = image("T_FirePit", ground, alpha=alpha)
 TEX["pit_n"] = image("T_FirePit_N", to_normal(fbm(N, 24, 24) * 0.5 + grit * 0.5, 1.5), data=True)
 
@@ -451,6 +455,10 @@ def centre_origin(o, at=(0.0, 0.0, 0.0)):
 PIT_R = 1.55
 SALT_R = 0.86
 SALT_H = 0.07          # (a thick bed: the salt piled well up inside the stones, full out toward them)
+# the hearth's frame (炉縁): its inner half-width and its bars' width and height
+IRORI_IN = 0.98
+IRORI_W = 0.17
+IRORI_H = 0.17
 
 
 def salt_height(x, y):
@@ -461,25 +469,19 @@ def salt_height(x, y):
     return SALT_H * (1 - r * r) ** 0.9 + 0.004 * math.sin(x * 23 + y * 7) * math.sin(y * 19 - x * 5) * (1 - r)
 
 
-# a polar grid (not a single fan) so the salt can mound up in the middle
+# a square grid, fine enough for the salt to mound up in the middle, reaching in under the hearth's frame (the game draws it 0.9 the size)
+BED_HALF = (IRORI_IN + 0.04) / 0.9
 bm = bmesh.new()
 uv = bm.loops.layers.uv.verify()
-rings, segs = 30, 96
-centre = bm.verts.new((0, 0, 0.004 + salt_height(0, 0)))
-grid = []
-for i in range(1, rings + 1):
-    rr = PIT_R * (i / rings) ** 1.3                      # rings closer together in the middle
-    grid.append([bm.verts.new((rr * math.cos(2 * math.pi * j / segs), rr * math.sin(2 * math.pi * j / segs),
-                               0.004 + salt_height(rr * math.cos(2 * math.pi * j / segs),
-                                                   rr * math.sin(2 * math.pi * j / segs)))) for j in range(segs)])
-faces = [bm.faces.new((centre, grid[0][j], grid[0][(j + 1) % segs])) for j in range(segs)]
-for i in range(rings - 1):
-    for j in range(segs):
-        jn = (j + 1) % segs
-        faces.append(bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][jn], grid[i][jn])))
-for f in faces:
-    for l in f.loops:
-        l[uv].uv = (l.vert.co.x / (2 * PIT_R) + 0.5, l.vert.co.y / (2 * PIT_R) + 0.5)
+NG = 64
+grid = [[bm.verts.new((BED_HALF * (2 * i / NG - 1), BED_HALF * (2 * j / NG - 1),
+                       0.004 + salt_height(BED_HALF * (2 * i / NG - 1), BED_HALF * (2 * j / NG - 1)))) for j in range(NG + 1)]
+        for i in range(NG + 1)]
+for i in range(NG):
+    for j in range(NG):
+        f = bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
+        for l in f.loops:
+            l[uv].uv = (l.vert.co.x / (2 * PIT_R) + 0.5, l.vert.co.y / (2 * PIT_R) + 0.5)
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 me = bpy.data.meshes.new("FirePit")
 bm.to_mesh(me)
@@ -676,6 +678,68 @@ for i, half in enumerate(sizes):
     # the slicing pares a rock down by about a sixth; scale back up so the ring still closes
     o.scale = (sx, sy, sz) if oval else (sx * 1.15, sy * 1.2, sz * 1.15)
     finish(o, "Stone", M["stone"], smooth_shade=oval)
+# (the stone ring is no more: the hearth is square now. Its stones were still made above, so the dice fall as they did for everything after)
+for o in [o for o in bpy.data.objects if o.name.startswith("Stone")]:
+    bpy.data.objects.remove(o, do_unlink=True)
+
+# ---- the hearth's frame (炉縁): four thick bars of dark keyaki, lacquered, round the square bed, their corners mitred, each a soft bevel;
+# a brass plate wrapped over each corner (隅金具), a fine brass line inlaid round the inner edge
+_ku, _kv = grid01(512)
+_kw = (fbm(512, 2, 6, 4) - 0.5) * 0.06
+_kring = ((_kv + _kw) * 26 + fbm(512, 3, 10, 3) * 1.2) % 1.0
+_kcol = mix((0.3, 0.16, 0.08), (0.2, 0.1, 0.05), smooth(0.2, 0.9, _kring) * 0.7)
+_kcol = mix(_kcol, (0.12, 0.06, 0.03), smooth(0.85, 0.95, _kring) * 0.5)
+_kcol = mix(_kcol, (0.38, 0.22, 0.12), smooth(0.6, 0.95, fbm(512, 4, 30, 3)) * 0.25)
+M["robuchi"] = pbr("Robuchi", tex=image("T_Robuchi", _kcol), rough=0.3, coat=0.6)
+M["brass"] = pbr("RobuchiBrass", (0.78, 0.58, 0.26), rough=0.3, metal=1.0)
+bars = []
+OUT = IRORI_IN + IRORI_W
+for k in range(4):
+    # (each bar a box along x at y = -(IN + W/2), then turned to its side; its ends cut at 45° to meet the next)
+    bm_ = bmesh.new()
+    zs = (0.0, IRORI_H)
+    ring = [(-OUT, -OUT), (OUT, -OUT), (IRORI_IN, -IRORI_IN), (-IRORI_IN, -IRORI_IN)]
+    lo = [bm_.verts.new((x, y, zs[0])) for x, y in ring]
+    hi = [bm_.verts.new((x, y, zs[1])) for x, y in ring]
+    bm_.faces.new(hi)
+    bm_.faces.new(lo[::-1])
+    for i in range(4):
+        bm_.faces.new((lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]))
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me_ = bpy.data.meshes.new(f"Robuchi{k}")
+    bm_.to_mesh(me_); bm_.free()
+    o = bpy.data.objects.new(f"Robuchi{k}", me_)
+    bpy.context.collection.objects.link(o)
+    o.rotation_euler = (0, 0, k * math.pi / 2)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True)
+    bpy.ops.object.transform_apply(rotation=True)
+    bevel(o, 0.012, 3, angle=False)
+    bpy.ops.object.modifier_apply(modifier="Bevel")
+    # (the grain along each bar: its UVs from its own length)
+    bm_ = bmesh.new(); bm_.from_mesh(o.data)
+    uvl_ = bm_.loops.layers.uv.verify()
+    along_x = k % 2 == 0
+    for f in bm_.faces:
+        for l in f.loops:
+            c = l.vert.co
+            l[uvl_].uv = ((c.x if along_x else c.y) * 0.5, (c.y if along_x else c.x) * 0.5 + c.z * 0.5)
+    bm_.to_mesh(o.data); bm_.free()
+    bars.append(finish(o, f"Robuchi{k}", M["robuchi"]))
+# (the brass: an L-shaped plate over each corner, and a fine inlaid line round the inner edge's top)
+for k in range(4):
+    sx, sy = (1 if k in (1, 2) else -1), (1 if k >= 2 else -1)
+    for (w, d, cx, cy) in ((0.2, 0.05, OUT - 0.1, OUT - 0.025), (0.05, 0.2, OUT - 0.025, OUT - 0.1)):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(sx * cx, sy * cy, IRORI_H + 0.002))
+        o = active(); o.scale = (w, d, 0.006)
+        bars.append(finish(o, f"RobuchiBrassCorner{k}", M["brass"], smooth_shade=False))
+for k in range(4):
+    a_ = k * math.pi / 2
+    ca, sa = math.cos(a_), math.sin(a_)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(-sa * (IRORI_IN + 0.012), ca * -(IRORI_IN + 0.012), IRORI_H + 0.001))
+    o = active(); o.scale = ((2 * IRORI_IN) if k % 2 == 0 else 0.006, 0.006 if k % 2 == 0 else (2 * IRORI_IN), 0.003)
+    bars.append(finish(o, f"RobuchiBrassLine{k}", M["brass"], smooth_shade=False))
+join(bars, "Robuchi")
 
 
 # =====================================================================
