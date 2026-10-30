@@ -92,3 +92,51 @@ export function fireAmbience(crackle: number, sizz: number, near: number, dt: nu
     spitAt = (0.05 + Math.random() * 0.4) / (0.2 + sizz)
   }
 }
+
+// ---- the room's murmur while it's open: a few soft voices, each breathy noise through two speech formants, its loudness rising and falling
+// in syllables and phrases, panned about the room; together, with game/fireSound's murmur, a busy hum that grows as the bar fills
+type Voice = { g: GainNode; f1: BiquadFilterNode; f2: BiquadFilterNode; phase: number; rate: number; pause: number; pitch: number }
+let crowd: GainNode | null = null
+const voices: Voice[] = []
+function startCrowd() {
+  if (!ac || !out || crowd) return
+  crowd = ac.createGain()
+  crowd.gain.value = 0
+  crowd.connect(ac.destination)
+  for (let k = 0; k < 6; k++) {
+    const src = noiseLoop(ac, 2 + k * 0.37, () => 1)
+    const f1 = ac.createBiquadFilter(); f1.type = 'bandpass'; f1.Q.value = 6
+    const f2 = ac.createBiquadFilter(); f2.type = 'bandpass'; f2.Q.value = 8
+    const g = ac.createGain(); g.gain.value = 0
+    const pan = ac.createStereoPanner(); pan.pan.value = -0.8 + (1.6 * k) / 5
+    const mix = ac.createGain(); mix.gain.value = 1
+    src.connect(f1).connect(mix)
+    src.connect(f2).connect(mix)
+    mix.connect(g).connect(pan).connect(crowd)
+    src.start()
+    voices.push({ g, f1, f2, phase: Math.random() * 10, rate: 4 + Math.random() * 2.5, pause: 0, pitch: k % 2 ? 1.25 : 0.9 })
+  }
+}
+
+/** set the room's murmur this frame (0..1 from game/fireSound's murmur; `near` as for the fire) */
+export function crowdAmbience(level: number, near: number, dt: number) {
+  if (!ac || ac.state !== 'running') return
+  startCrowd()
+  if (!crowd) return
+  const t = ac.currentTime
+  crowd.gain.setTargetAtTime(0.22 * level * (0.5 + 0.5 * near), t, 0.6)
+  // (how many voices are talking just now: more with more people; each speaks in phrases, a pause between)
+  const talking = Math.round(level * voices.length)
+  voices.forEach((v, k) => {
+    v.phase += dt * v.rate
+    v.pause -= dt
+    if (v.pause < -2 - Math.random() * 3) v.pause = 0.6 + Math.random() * 2
+    const speaking = k < talking && v.pause < 0
+    // (syllables: a rounded pulse a few times a second, the vowel's formants moving as it goes)
+    const syl = Math.max(0, Math.sin(v.phase * Math.PI)) ** 2
+    v.g.gain.setTargetAtTime(speaking ? 0.6 * syl : 0, t, 0.03)
+    const vowel = (Math.sin(v.phase * 0.7) + 1) / 2
+    v.f1.frequency.setTargetAtTime((350 + 450 * vowel) * v.pitch, t, 0.05)
+    v.f2.frequency.setTargetAtTime((900 + 1300 * (1 - vowel)) * v.pitch, t, 0.05)
+  })
+}

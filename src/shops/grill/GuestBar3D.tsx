@@ -39,6 +39,8 @@ import { fromRack, putAway, TAKE } from '@/game/plates'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
+import { murmur } from '@/game/fireSound'
+import { crowdAmbience } from './fireAmbience'
 import { SHRINE_FLOWERS, PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -1553,8 +1555,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     })
   }, [guests])
 
-  useFrame((_, dt) => {
+  useFrame(({ camera: cam }, dt) => {
     clock.current += Math.min(dt, 0.1)
+    // (the room's murmur: by how many are sat at the bar; louder with the camera among them)
+    if (people) {
+      const sat = shown.filter((x) => x.phase === 'sit').length
+      const mid = groups.current.values().next().value as THREE.Object3D | undefined
+      const d = mid ? cam.position.distanceTo(mid.getWorldPosition(new THREE.Vector3())) : 8
+      crowdAmbience(murmur(sat), THREE.MathUtils.clamp(1.4 - d / 12, 0.2, 1), Math.min(dt, 0.1))
+    }
     let done: number[] = []
     let paying: { s: Shown; k: number } | null = null
     let queue = 0

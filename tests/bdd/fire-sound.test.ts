@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { fireSound } from '@/game/fireSound'
+import { fireSound, murmur } from '@/game/fireSound'
 
 feature('炭火的聲音', () => {
   scenario('沒有火就沒有聲音', ({ given, when, then }) => {
@@ -27,5 +27,15 @@ feature('炭火的聲音', () => {
     when('比較', () => {})
     then('越多越大', (w) => { expect(w.s[1]).toBeGreaterThan(w.s[0]); expect(w.s[2]).toBeGreaterThan(w.s[1]) })
     and('最多到 1', (w) => { expect(w.s[2]).toBeLessThanOrEqual(1) })
+  })
+})
+
+feature('店裡的人聲', () => {
+  scenario('沒有客人就安靜，客人越多越熱鬧，但不會吵翻', ({ given, when, then, and }) => {
+    given('零、二、八、二十位客人在座', (w) => { w.m = [0, 2, 8, 20].map((n) => murmur(n)) })
+    when('聽', () => {})
+    then('沒人時沒有人聲', (w) => { expect(w.m[0]).toBe(0) })
+    and('人越多越大聲', (w) => { expect(w.m[2]).toBeGreaterThan(w.m[1]); expect(w.m[3]).toBeGreaterThan(w.m[2]) })
+    and('最多到 1', (w) => { expect(w.m[3]).toBeLessThanOrEqual(1) })
   })
 })

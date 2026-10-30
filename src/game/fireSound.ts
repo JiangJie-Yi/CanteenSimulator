@@ -11,3 +11,9 @@ export function fireSound(fire: number, onFire: number) {
   const sizzle = food * (0.35 + 0.65 * heat)
   return { crackle, sizzle }
 }
+
+/** the room's murmur while the shop's open (scene's crowd ambience plays it): the talk of those at the bar, 0..1; empty, quiet; it grows
+ * with each one sat down, less with each more (a full bar is a busy hum, not a din) */
+export function murmur(seated: number) {
+  return seated <= 0 ? 0 : Math.min(1, 1 - Math.exp(-seated / 5))
+}
