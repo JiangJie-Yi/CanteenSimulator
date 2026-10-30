@@ -34,6 +34,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `npm run sync` | 只做自動同步 |
 | `npm test` | 單元測試＋架構測試（Vitest，約 1 秒） |
 | `npm run e2e` | 瀏覽器實際玩一遍（需先開 dev server，約 4 分鐘；預設用 `?q=low` 跑，軟體 GL 在最高畫質只有 1 FPS，`Q=high` 可改）。`node tests/e2e/flow.mjs <url> grilledfish` 只測一間；沒有 Chrome 時 `CHROME_PATH=<chromium 路徑>`；軟體 GL 很慢時 `OPEN_FOR=240000`（營業等待毫秒，預設 40000） |
+| `node tests/e2e/views.mjs` | 從乾淨的瀏覽器把 9 個視角各截一張（`OUT=<資料夾>`、`Q=low`），檢查每個視角的構圖 |
 | `node tests/e2e/look.mjs` | 開店後近拍吧台客人（`OUT=<資料夾>`），看人物造型用 |
 | `node tests/e2e/paths.mjs [url]` | 客人動線檢查：開店後每 0.3 秒量每位走動中的客人四周（膝、胸高度），報告撞到的擺設；坐上自己的椅子不算（`WATCH=<ms>` 觀察時間） |
 | `npm run build` | 型別檢查＋建置 |

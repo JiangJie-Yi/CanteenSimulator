@@ -16,6 +16,8 @@ export type ViewSpot = {
   /** how far back the camera stands from it, and how high above it */
   back?: number
   up?: number
+  /** seen from straight in front of what it looks at (its own +z), not from the room's open side */
+  faceOn?: boolean
   /** seen through the eyes of what it's on (the owner), following him as he goes, a wide lens */
   follow?: boolean
 }
@@ -33,7 +35,7 @@ export const VIEW_SPOTS: ViewSpot[] = [
     about: { zh: '飲料冷藏櫃：客人自己拿飲料', ja: '飲み物の冷蔵庫：客がセルフで取る', en: 'The drinks fridge: customers help themselves' } },
   { id: 'toilet', zh: '廁所', ja: 'お手洗い', en: 'Toilets', anchor: 'look-wc-m', back: 3.8, up: 2.1,
     about: { zh: '男女廁所的拉門與洗手台', ja: '男女のお手洗いの引き戸と手洗い', en: 'The toilets: sliding doors and wash basins' } },
-  { id: 'back', zh: '後台區', ja: '裏方', en: 'Back room', anchor: 'look-back', back: 3.5, up: 2.0,
+  { id: 'back', zh: '後台區', ja: '裏方', en: 'Back room', anchor: 'look-back', back: 3.2, up: 1.4, faceOn: true,
     about: { zh: '後場：碗盤櫃架、飯桶與作業台', ja: '裏方：食器棚、飯びつと作業台', en: 'Behind the scenes: dish rack, rice tub, work table' } },
   { id: 'boss', zh: '老闆', ja: '店主', en: 'Owner', anchor: 'BossFollow', follow: true,
     about: { zh: '老闆的第一人稱廣角視角（閉店時）', ja: '店主の目線、広角（閉店中）', en: "The owner's own eyes, wide (while closed)" } },

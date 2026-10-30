@@ -533,8 +533,12 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       const p = anchor.position
       return { pos: frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.83, p.z + 0.42)), target: frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.58, p.z + 1.6)) }
     }
-    const toMiddle = new THREE.Vector3(-at.x, 0, -at.z).normalize()
-    return { pos: at.clone().addScaledVector(toMiddle, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0)), target: at }
+    // (seen from the way the whole shop's overview looks in: from the open side of the room, so the walls are always behind what's seen,
+    // never the empty outside; from the room's middle a part by the open side looked out into nothing)
+    const fromOpen = spot.faceOn
+      ? new THREE.Vector3(0, 0, 1).transformDirection(anchor.matrixWorld).setY(0).normalize()
+      : OVERVIEW_POSITION.clone().sub(OVERVIEW_TARGET).setY(0).normalize()
+    return { pos: at.clone().addScaledVector(fromOpen, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0)), target: at }
   }
   useEffect(() => {
     const was = homedFor.current
