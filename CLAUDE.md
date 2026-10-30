@@ -34,6 +34,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `npm run sync` | 只做自動同步 |
 | `npm test` | 單元測試＋架構測試（Vitest，約 1 秒） |
 | `npm run e2e` | 瀏覽器實際玩一遍（需先開 dev server，約 4 分鐘）。`node tests/e2e/flow.mjs <url> grilledfish` 只測一間；沒有 Chrome 時 `CHROME_PATH=<chromium 路徑>`；軟體 GL 很慢時 `OPEN_FOR=240000`（營業等待毫秒，預設 40000） |
+| `node tests/e2e/paths.mjs [url]` | 客人動線檢查：開店後每 0.3 秒量每位走動中的客人四周（膝、胸高度），報告撞到的擺設；坐上自己的椅子不算（`WATCH=<ms>` 觀察時間） |
 | `npm run build` | 型別檢查＋建置 |
 | `npm run lint` | oxlint |
 
@@ -137,7 +138,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **碗盤櫃是盤子的來源**（`game/plates.ts`，BDD `plates`）：大容量，滿的時候 50 個（`RACK_FULL`；下層插盤架 22、第三層展示 4、頂層 4 疊各 6，第二層倒扣的碗是裝飾）；盤子照實際擺法放，不互相穿透；櫃上顯示幾個就是幾個；點一下搬一疊到出餐口（最多 12 個），出餐口空了服務生自己去拿，洗好放不下的回到櫃上。
 - **自動營運的營業套路**（`game/flow.ts`，BDD `flow`）：每次開店抽一種（平日、午餐尖峰、晚餐尖峰、雨天、祭典、觀光團、熟客日），各自的來客節奏、結伴比例、點單量不同，開店時主廚會說。
 - 店面沿吧台縮短了 `BAR_TRIM`（`bar.ts`）；玄關 `GENKAN.along` 往吧台拉長。
-- 卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps；右上角 ×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
+- 桌機（非觸控）一律最高畫質（`scene/quality.ts`），只有手機才判斷降級；卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps；右上角 ×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
 
 **開發用（只在 dev）**：瀏覽器 console 可用 `__gl`（renderer，看 draw calls）、`__scene`、`__cam` 與 `__ctl`（設定視角：`__ctl.target.set(...)`、`__cam.position.set(...)`）、`__service`、`__toilets`（例如 `__toilets.m.open = true`）。場景裡名稱 `look-*` 的群組（`look-altar`、`look-fridge`、`look-door`、`look-wc-m`…）方便用 `__scene.getObjectByName` 找位置截圖。
 

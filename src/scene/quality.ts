@@ -64,6 +64,9 @@ function choose(): Tier {
   if (typeof window === 'undefined') return 'high'
   const forced = new URLSearchParams(window.location.search).get('q')
   if (forced === 'low' || forced === 'medium' || forced === 'high') return forced
+  // (a desktop or laptop always gets the best: its full models, sharp shadows and the canvas at full density; only touch devices are judged
+  // and stepped down)
+  if (!window.matchMedia('(hover: none)').matches) return 'high'
   let tier = detect()
   try {
     // a level that lost its context before is stepped down from

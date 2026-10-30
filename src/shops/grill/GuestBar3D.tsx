@@ -1349,6 +1349,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const guestsRef = useRef(guests)
   guestsRef.current = guests
   const groups = useRef(new Map<number, THREE.Group>())
+  if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __guestGroups?: typeof groups }).__guestGroups = groups
   const clock = useRef(0)
   const counters = useMemo(() => given ?? singleCounter(at, length), [given, at, length])
   const seats = useMemo(() => seatsOf(counters), [counters])
