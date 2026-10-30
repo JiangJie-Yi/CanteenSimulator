@@ -105,7 +105,7 @@ def tube(name, pts, r, mat, cyclic=False):
     return fin(o, name, mat)
 
 
-def wrap_text(text, size, z, mat, name, depth=0.0015, spread=1.0):
+def wrap_text(text, size, z, mat, name, spread=1.0):
     """brushed lettering on the barrel's front: a text laid flat, then bent round the barrel's curve so it lies on the straw"""
     bpy.ops.object.text_add(location=(0, 0, 0))
     tx = active()
@@ -119,7 +119,9 @@ def wrap_text(text, size, z, mat, name, depth=0.0015, spread=1.0):
         tx.data.font = font
     tx.data.size = size
     tx.data.align_x = "CENTER"; tx.data.align_y = "CENTER"
-    tx.data.extrude = depth
+    # (printed flat, its curves at a modest resolution: seen at a few metres a brushed character needs no more)
+    tx.data.extrude = 0.0
+    tx.data.resolution_u = 3
     bpy.ops.object.convert(target="MESH")
     o = active()
     # (the text lies in x-y; stood up on the barrel's front (+y out of it), x bent round the barrel)
