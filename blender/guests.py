@@ -627,15 +627,20 @@ def smooth_seams(o, rounds=60):
             a, b = e.verts
             seam.setdefault(a, set()).add(b)
             seam.setdefault(b, set()).add(a)
+    # (moved within the surface, along it and not into it: a ring's middle-of-neighbours lies inside it, and a ring eased toward that shrinks;
+    # so only the part of the move that runs along the surface is taken, which straightens a line running any way, round or down)
+    bm.normal_update()
+    nrm = {vt: vt.normal.copy() for vt in seam}
     for _ in range(rounds):
         moved = {}
         for vt, ns in seam.items():
             if len(ns) != 2:
                 continue
-            z = sum(n.co.z for n in ns) / 2
-            moved[vt] = vt.co.z + (z - vt.co.z) * 0.6
-        for vt, z in moved.items():
-            vt.co.z = z
+            d = sum((n.co for n in ns), Vector()) / 2 - vt.co
+            d -= nrm[vt] * d.dot(nrm[vt])
+            moved[vt] = vt.co + d * 0.5
+        for vt, q in moved.items():
+            vt.co = q
     # (the neckline, where skin meets the top high on the round shoulders, still shows the faces' steps from above: a little rolled hem
     # in the top's colour laid along it, as a jacket's neck has)
     neck = {}
@@ -1033,11 +1038,14 @@ def hang(bm, surf, start, down, width, thick, off, mi=0, curl=0.0, n=7, splay=0.
     for i in range(1, n):
         t = i / (n - 1)
         q = root + Vector((0, 0, -down * t)) + d * (0.01 * t + splay * t * t) + Vector((-d.y, d.x, 0)) * curl * t * t
-        # keep clear of the head
+        # keep clear of the head: of its own surface (wider than a ball at the cheeks), and of the hair's cap over it, so a lock running down
+        # from its root lies on the cap all the way and doesn't sink into it below the root (which left the roots standing out like a brim)
         c = surf.c
         r = (q - c)
-        if r.length < HEAD_R + off + 0.004 and q.z > c.z - HEAD_R:
-            q = c + r.normalized() * (HEAD_R + off + 0.004)
+        if q.z > c.z - HEAD_R:
+            clear = (surf.at(r)[0] - c).length + off + 0.004
+            if r.length < clear:
+                q = c + r.normalized() * clear
         path.append(q)
     normals = [((p_ - surf.c) * Vector((1, 1, 0))).normalized() if (p_ - surf.c).xy.length > 1e-4 else d for p_ in path]
     widths = [width * (1 - 0.65 * (i / (n - 1)) ** 2) for i in range(n)]
@@ -1436,7 +1444,8 @@ def hair(kind, hd, surf, style=None):
         for j in range(13):
             y0 = 0.8 + j * (2 * math.pi - 1.6) / 12
             front = abs(abs(y0 - math.pi) - math.pi) < 1.2
-            hang(bm, surf, (y0, 0.25), 0.3 if not front else 0.26, 0.042, 0.016, 0.012, splay=0.035, n=8)
+            # (from high on the head, so each lock runs down over it and on (from the ears' height they stood off it in a ledge all round))
+            hang(bm, surf, (y0, 0.62), 0.37 if not front else 0.33, 0.042, 0.016, 0.012, splay=0.035, n=11)
     elif style == "bun":
         # pulled back into a bun, grey, a few soft waves
         bm = cap(hd, surf, lambda y, p: p > (0.5 if abs(y) < 0.8 else -0.45), off=0.006)
