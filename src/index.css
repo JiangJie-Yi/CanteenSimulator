@@ -6625,3 +6625,16 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .food-art-band img { height: 100%; max-width: 100%; object-fit: contain; filter: drop-shadow(0 4px 4px rgb(30 50 70 / 0.28)); }
 .food-art-tile { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; }
 .food-art-tile img { width: 92%; height: 92%; object-fit: contain; }
+
+/* ---- behind the shop, where its open sides look out: not a flat wash but a stage's backdrop, a warm glow behind the room fading to a deep
+   edge (day: paper and dusk; night: lamplight into the dark), so the cut-away room reads as a diorama set on it ---- */
+.canvas-layer {
+  background:
+    radial-gradient(ellipse 70% 60% at 55% 45%, rgb(255 236 206 / 0.95), rgb(236 212 178 / 0.0) 70%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, #e9dcc8 0%, #cbb89c 55%, #8f7a62 100%);
+}
+:root[data-theme='dark'] .canvas-layer {
+  background:
+    radial-gradient(ellipse 60% 55% at 55% 45%, rgb(255 170 90 / 0.22), rgb(255 170 90 / 0) 70%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, #2a2028 0%, #17121a 60%, #08060a 100%);
+}
