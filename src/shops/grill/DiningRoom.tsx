@@ -2984,32 +2984,23 @@ function Inked({ geometry, color, map, grow = 1.04, side, ...rest }: { geometry:
     </group>
   )
 }
-const BARRELS_URL = import.meta.env.BASE_URL + 'models/kazaridaru_sake_barrels_lowpoly_remesh.glb'
-/** a stack of decorative sake barrels (飾り樽) with a stack of plates beside it (the model's second part), the downloaded model (its floor left out), toon-shaded and inked, stood on the floor, ~0.9 tall */
+const BARRELS_URL = import.meta.env.BASE_URL + 'models/komodaru.glb'
+/** a stack of straw-wrapped sake barrels (菰樽, blender/komodaru.py: two on the floor, one on them), toon-shaded and inked, stood on the
+ * floor, ~0.9 tall; `part` turns each stack its own way so two never look alike */
 function SakeStack({ part }: { part: number }) {
   const gltf = useGLTF(BARRELS_URL) as unknown as { scene: THREE.Group }
   const stack = useMemo(() => {
     const root = gltf.scene.clone(true)
-    const floors: THREE.Object3D[] = []
     root.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
-      const geo = m.geometry
-      geo.computeBoundingBox()
-      const sz = geo.boundingBox!.getSize(new THREE.Vector3())
-      // (the model's floor plane is flat: not drawn, and taken out altogether so it gets no outline and no part in the piece's size)
-      if (sz.y < 0.01 && sz.x > 1.5) { floors.push(m); return }
       const src = m.material as THREE.MeshStandardMaterial
-      m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null })
+      m.material = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
       m.castShadow = true
+      m.receiveShadow = true
     })
-    for (const f of floors) f.removeFromParent()
-    // (sized and set down as the whole stack, then only one of its two clusters of barrels kept: each is its own piece to move)
-    const clusters: THREE.Object3D[] = []
-    root.traverse((o) => { if ((o as THREE.Mesh).isMesh) clusters.push(o) })
+    inkModel(root, (m) => /Ink|Red|Label/.test(m.name), { width: 0.0018, weld: true })
     const box = new THREE.Box3().setFromObject(root)
-    clusters.forEach((c, i) => { if (i !== part) c.removeFromParent() })
-    inkModel(root)
     const size = box.getSize(new THREE.Vector3())
     const k = 0.9 / (size.y || 1)
     const c = box.getCenter(new THREE.Vector3())
@@ -3017,6 +3008,10 @@ function SakeStack({ part }: { part: number }) {
     root.position.set(-c.x, -box.min.y, -c.z)
     out.add(root)
     out.scale.setScalar(k)
+    // (both stacks stand on the one spot: set apart along the wall, the first a little this way and the second that, their marks turned to
+    // the room, each a touch differently)
+    out.rotation.y = part ? -0.95 : -0.62
+    out.position.set(part ? 0.42 : -0.42, 0, part ? 0.43 : -0.43)
     return out
   }, [gltf, part])
   return <primitive object={stack} />
