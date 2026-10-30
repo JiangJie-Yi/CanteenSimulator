@@ -2195,8 +2195,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       o.position.z *= PIT_SCALE
       o.position.y += PIT_LIFT
       o.scale.multiplyScalar(o.name === 'FirePit' ? PIT_SCALE * PIT_GROUND : PIT_SCALE)
-      // (the square hearth (its bed and its frame) turned square to the table; the round things in it don't mind)
-      if (/^(FirePit|Robuchi)/.test(o.name)) o.rotateOnWorldAxis(UP_AXIS, Math.atan2(-ALONG.z, ALONG.x))
+      // (the square hearth (its bed, its frame and the stones round it) turned square to the table; the round things in it don't mind)
+      if (/^(FirePit|Robuchi|Stone)/.test(o.name)) {
+        // (the stones, set round the square, carried round with it about the fire's middle)
+        const turn = Math.atan2(-ALONG.z, ALONG.x)
+        if (/^Stone/.test(o.name)) o.position.applyAxisAngle(UP_AXIS, turn)
+        o.rotateOnWorldAxis(UP_AXIS, turn)
+      }
       // (the salt heaped higher, filling the ring)
       if (o.name === 'FirePit') { o.scale.y *= PIT_SALT_RISE; scorchEarth(o as THREE.Mesh) }
     }

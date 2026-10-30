@@ -678,24 +678,35 @@ for i, half in enumerate(sizes):
     # the slicing pares a rock down by about a sixth; scale back up so the ring still closes
     o.scale = (sx, sy, sz) if oval else (sx * 1.15, sy * 1.2, sz * 1.15)
     finish(o, "Stone", M["stone"], smooth_shade=oval)
-# (the hearth is square now: its stones, the same ones, brought in from the frame's edge to a looser ring inside it, between the sticks' feet
-# and the frame, smaller, each still turned with its sooted face to the fire, sitting down into the salt)
-STONE_IN = 0.88
-for o in [o for o in bpy.data.objects if o.name.startswith("Stone")]:
-    k = STONE_IN / STONE_R
-    o.location.x *= k
-    o.location.y *= k
-    o.location.z *= 0.55
-    o.scale = (o.scale.x * 0.55, o.scale.y * 0.55, o.scale.z * 0.55)
-
+# (the hearth is square now: its stones, the same ones, set round a square inside the frame (between the sticks' feet and it), evenly along
+# its four sides, each turned square to its side with its sooted face still to the fire, a touch askew; smaller, a little flattened, as
+# rough-cut blocks, sitting down into the salt)
+STONE_SQ = 0.86
+_st = sorted([o for o in bpy.data.objects if o.name.startswith("Stone")], key=lambda o: math.atan2(o.location.y, o.location.x))
+_per = 8 * STONE_SQ
+for i, o in enumerate(_st):
+    d = (i + 0.5) / len(_st) * _per
+    side, t = int(d // (2 * STONE_SQ)), d % (2 * STONE_SQ) - STONE_SQ
+    # (the point along the square's side, and the way in from it)
+    px, py, nx, ny = ((STONE_SQ, t, -1, 0), (-t, STONE_SQ, 0, -1), (-STONE_SQ, -t, 1, 0), (t, -STONE_SQ, 0, 1))[side]
+    # (turned by the difference between where it faced on the ring and where it faces now: its turn on the ring is already in its shape)
+    a0 = math.atan2(o.location.y, o.location.x)
+    o.location.x, o.location.y = px, py
+    o.location.z *= 0.5
+    o.rotation_euler.z += math.atan2(-ny, -nx) - a0 + random.uniform(-0.12, 0.12)
+    # (thickened across, so each is a squarish block rather than a slab on end)
+    o.scale = (o.scale.x * 1.25, o.scale.y * 0.6, o.scale.z * 0.5)
 # ---- the hearth's frame (炉縁): four thick bars of dark keyaki, lacquered, round the square bed, their corners mitred, each a soft bevel;
 # a brass plate wrapped over each corner (隅金具), a fine brass line inlaid round the inner edge
 _ku, _kv = grid01(512)
 _kw = (fbm(512, 2, 6, 4) - 0.5) * 0.06
-_kring = ((_kv + _kw) * 26 + fbm(512, 3, 10, 3) * 1.2) % 1.0
-_kcol = mix((0.3, 0.16, 0.08), (0.2, 0.1, 0.05), smooth(0.2, 0.9, _kring) * 0.7)
-_kcol = mix(_kcol, (0.12, 0.06, 0.03), smooth(0.85, 0.95, _kring) * 0.5)
-_kcol = mix(_kcol, (0.38, 0.22, 0.12), smooth(0.6, 0.95, fbm(512, 4, 30, 3)) * 0.25)
+_kring = ((_kv + _kw) * 22 + fbm(512, 3, 10, 3) * 1.4) % 1.0
+# (keyaki's strong figure: broad bands of lighter earlywood and dark latewood, each ring's line crisp, a lighter ripple through it here and
+# there, under the lacquer's warm depth)
+_kcol = mix((0.44, 0.25, 0.12), (0.26, 0.13, 0.06), smooth(0.15, 0.85, _kring))
+_kcol = mix(_kcol, (0.1, 0.05, 0.02), smooth(0.84, 0.93, _kring) * (1 - smooth(0.93, 1.0, _kring)) * 0.85)
+_kcol = mix(_kcol, (0.55, 0.33, 0.17), smooth(0.65, 0.95, fbm(512, 4, 30, 3)) * 0.3)
+_kcol = mix(_kcol, (0.14, 0.07, 0.03), (fbm(512, 2, 120, 2) > 0.7).astype(np.float32) * 0.25)
 M["robuchi"] = pbr("Robuchi", tex=image("T_Robuchi", _kcol), rough=0.3, coat=0.6)
 M["brass"] = pbr("RobuchiBrass", (0.78, 0.58, 0.26), rough=0.3, metal=1.0)
 bars = []
