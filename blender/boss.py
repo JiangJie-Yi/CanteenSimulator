@@ -2,12 +2,12 @@
 
 Made as the cooks of Overcooked 2 are: a big round head set straight down on a plump body about as tall as the head is wide, rounding
 off underneath (no legs, no feet), no arms, floating mitten hands (a plump paddle and a thumb). His face is the one on his picture
-(ui/Avatar.tsx, role 'owner'), done the way a cartoon from America would: thick, chunky brown hair with a pompadour curl swept up over the
-front, sideburns; a twisted white headband (ねじり鉢巻) with a red strand through it knotted at his left, its two ends sticking out;
-round-cornered glasses over small dark eyes, short thick brows, a round button nose, a moustache and a smile, ears, a pencil behind his
-right one; a white kappōgi crossed at the front, a red neckerchief knotted at the throat, a little gold fish pinned to his chest and 聞野
-stitched opposite, its hem over checked cook's trousers, a red cord round the waist bowed at his left, a blue-striped hand towel tucked in
-at his right.
+(ui/Avatar.tsx, role 'owner'); dressed as a Japanese cook: his head wrapped in an indigo tenugui dotted white (豆絞り) knotted at the back,
+its front edge rolled, a little brown hair at the sides and the nape; round-cornered glasses over small dark eyes, short thick brows, a round
+button nose, a moustache and a smile, ears, a pencil behind his right one; a white kappōgi crossed at the front over an indigo under-collar,
+a little gold fish pinned to his chest, indigo trousers and a navy apron (前掛け) with 聞野 on it in white, its cream cord tied in a bow at
+his left, a blue-striped hand towel tucked in at his right. Kept light in geometry, the cloth and hair given their look by painted
+textures (the tenugui's dots, the cotton's weave, the indigo's dye, the hair's strands).
 - his hands are separate nodes (BossHandL, BossHandR) so the game can move them, and so are the tongs and the fan he picks up
   (BossTongs, BossFan: hidden till he holds them).
 
@@ -65,11 +65,42 @@ M = {
     "fan": pbr("BossFanPaper", lin("#f6efe0"), rough=0.7),
     "bamboo": pbr("BossBamboo", lin("#c8a86a"), rough=0.6),
 }
+# ---- painted textures: the look of the cloth and hair, so the shapes can stay simple
+_n = 256
+_u, _v = grid01(_n)
+_rng = np.random.default_rng(7)
+_grain = _rng.random((_n, _n)).astype(np.float32)
+
+
+def _weave(base, k=0.05, lines=96):
+    """a cloth's colour with its weave: fine crossing threads and a little unevenness of the dye"""
+    w = 0.5 + 0.5 * np.sin(_u * lines * 2 * np.pi) * np.sin(_v * lines * 2 * np.pi)
+    t = 1.0 + (w - 0.5) * k + (_grain - 0.5) * k * 0.8
+    return (np.array(base, np.float32)[None, None, :] * t[..., None]).clip(0, 1).astype(np.float32)
+
+
+# (the tenugui: indigo, white dots in rows, each row offset half a step (豆絞り), a soft edge to each dot as dye would give)
+_du, _dv = (_u * 24) % 1.0, (_v * 12) % 1.0
+_row = np.floor(_v * 12) % 2
+_du = (_du + 0.5 * _row) % 1.0
+_dot = np.clip(1.3 - np.hypot(_du - 0.5, (_dv - 0.5) * 0.9) / 0.2, 0, 1)
+_tg = _weave((0.16, 0.22, 0.42), 0.08)
+_tg = _tg * (1 - _dot[..., None]) + np.array([0.95, 0.94, 0.9], np.float32) * _dot[..., None]
+M["tenugui"] = pbr("BossTenugui", (1, 1, 1), tex=image("boss_tenugui", _tg.astype(np.float32)), rough=0.8)
+# (the kappōgi's cotton: white with its weave, a faint shade down the folds)
+_ct = _weave((0.96, 0.94, 0.9), 0.06) * (1 - 0.05 * (0.5 + 0.5 * np.sin(_u * 2 * np.pi * 9)))[..., None]
+M["coat"] = pbr("BossCoat", (1, 1, 1), tex=image("boss_cotton", _ct.astype(np.float32)), rough=0.75)
+# (indigo cloth for the trousers and a deeper navy for the apron, both dyed a touch unevenly)
+M["pants"] = pbr("BossPants", (1, 1, 1), tex=image("boss_indigo", _weave((0.2, 0.25, 0.4), 0.1)), rough=0.85)
+M["apron"] = pbr("BossApron", (1, 1, 1), tex=image("boss_navy", _weave((0.12, 0.16, 0.28), 0.12, 128)), rough=0.85)
+# (hair: brown with strands combed down from the crown, lighter and darker by turns)
+_hs = 0.75 + 0.25 * np.sin(_u * 2 * np.pi * 60 + np.sin(_u * 2 * np.pi * 7) * 2) * (0.6 + 0.4 * _grain)
+M["hair"] = pbr("BossHair", (1, 1, 1), tex=image("boss_hair", (np.array([0.36, 0.23, 0.16], np.float32)[None, None, :] * _hs[..., None]).astype(np.float32)), rough=0.6)
 # (the cook's trousers: a small grey-and-charcoal check, its squares square round the body)
 _n = 512
 _u, _v = grid01(_n)
 _ck = ((np.floor(_u * 72) + np.floor(_v * 72)) % 2)[..., None]
-M["pants"] = pbr("BossPants", (1, 1, 1), tex=image("boss_check", (np.array([0.11, 0.12, 0.14]) * _ck + np.array([0.62, 0.64, 0.68]) * (1 - _ck)).astype(np.float32)), rough=0.8)
+_ck = None
 parts = []
 
 
@@ -178,54 +209,26 @@ def head_at(a, e, out=0.0):
     return C + n * (R + out)
 
 
-# (his hair, thick: a shell well proud of the head over its crown, down the back to the nape and to the tops of the ears at the sides; at
-# the front only above the headband; chunky clumps over it, a pompadour curl swept up at the front and sideburns down to the ears)
-HT = 0.026
-bpy.ops.mesh.primitive_uv_sphere_add(radius=R + HT, segments=48, ring_count=24, location=P(*C))
+# (his hair: only what shows under the tenugui, short at the sides and the nape; a light shell, its strands painted)
+HT = 0.012
+bpy.ops.mesh.primitive_uv_sphere_add(radius=R + HT, segments=24, ring_count=12, location=P(*C))
 hair = active()
 bm = bmesh.new(); bm.from_mesh(hair.data)
 gone = []
 for f in bm.faces:
     c = f.calc_center_median()
     x, y, z = c.x, c.z, -c.y
-    keep = y > 0.1 or (z < -0.04 and y > -0.13) or (z < 0.06 and abs(x) > 0.16 and y > 0.02)
+    keep = y < 0.16 and ((z < -0.04 and y > -0.15) or (z < 0.05 and abs(x) > 0.17 and y > 0.0))
     if not keep:
         gone.append(f)
 bmesh.ops.delete(bm, geom=gone, context="FACES")
 bm.to_mesh(hair.data); bm.free()
-so = hair.modifiers.new("t", "SOLIDIFY"); so.thickness = HT; so.offset = -1
-bpy.context.view_layer.objects.active = hair
-bpy.ops.object.modifier_apply(modifier="t")
 fin(hair, "BossHair", M["hair"])
-# (the clumps: soft lumps laid over the crown and back, so it reads as a sculpted head of hair rather than a cap)
-import random as _rnd
-_rnd.seed(3)
-for k in range(16):
-    a = _rnd.uniform(0, 2 * math.pi)
-    e = _rnd.uniform(0.55, 1.35)
-    if math.cos(a) > 0.3 and e < 0.75:
-        continue
-    q = head_at(a, e, HT - 0.006)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*q))
-    o = active(); o.scale = (0.07, 0.07, 0.03)
-    n = (q - C).normalized()
-    o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Z", "Y")
-    fin(o, f"BossHairClump{k}", M["hair"])
-# (the pompadour: a fat roll swept up and back from over the brow, curling over at its tip toward his left)
-roll = []
-for k in range(24):
-    u = k / 23
-    a = -0.6 + 1.05 * u
-    e = 0.66 + 0.2 * math.sin(math.pi * u)
-    roll.append((head_at(a, e, HT + 0.012 + 0.03 * math.sin(math.pi * u ** 0.8)), 0.05 * (1 - 0.5 * u) + 0.01))
-for k, (q, r) in enumerate(roll):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=14, ring_count=8, location=P(*q))
-    fin(active(), f"BossQuiff{k}", M["hair"])
-# (sideburns: chunky blocks down in front of the ears)
+# (sideburns down in front of the ears)
 for sd in (-1, 1):
     q = head_at(sd * math.radians(76), -0.05, 0.004)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*q))
-    o = active(); o.scale = (0.018, 0.022, 0.05)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=10, ring_count=6, location=P(*q))
+    o = active(); o.scale = (0.016, 0.02, 0.045)
     fin(o, f"BossSideburn{sd}", M["hair"])
 
 # ---- the face
@@ -280,80 +283,80 @@ for sd in (-1, 1):
     e = active(); e.scale = (0.5, 0.8, 1.0)
     fin(e, f"BossEar{sd}", M["skin"])
 
-# ---- the headband: two white strands and a red one twisted round the brow, knotted at his left, its two ends sticking out
-BE = math.asin(0.13 / R)
-KA = math.radians(78)
-for k, (mat, r, ph) in enumerate(((M["band"], 0.017, 0.0), (M["band"], 0.017, 2.1), (M["red"], 0.009, 4.2))):
-    pts = []
-    for i in range(97):
-        a = 2 * math.pi * i / 96
-        base = head_at(a, BE, 0.016 + HT - 0.006)
-        out = (base - C); out.y = 0; out.normalize()
-        tw = 24 * a + ph
-        pts.append(base + out * 0.011 * math.cos(tw) + Vector((0, 1, 0)) * 0.011 * math.sin(tw))
-    tube(f"BossBand{k}", pts[:-1], r, mat, cyclic=True)
-kp = head_at(KA, BE, 0.03 + HT - 0.006)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.034, segments=16, ring_count=8, location=P(*kp))
-fin(active(), "BossKnot", M["band"])
-side = Vector((math.sin(KA), 0, math.cos(KA)))
-for k, (up, ln) in enumerate(((0.55, 0.11), (-0.45, 0.1))):
-    d = (side + Vector((0, up, 0))).normalized()
-    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.026, radius2=0.012, depth=ln, location=P(*(kp + d * ln * 0.5)))
-    t = active(); t.scale = (1.0, 0.45, 1.0)
+# ---- the tenugui: indigo dotted white, wrapped over the crown like a cap down to the brow, its front edge rolled, knotted at the back with
+# its two corners sticking out
+BE = math.asin(0.12 / R)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=R + 0.02, segments=32, ring_count=16, location=P(*C))
+cap = active()
+bm = bmesh.new(); bm.from_mesh(cap.data)
+gone = []
+for f in bm.faces:
+    c = f.calc_center_median()
+    x, y, z = c.x, c.z, -c.y
+    # (down to the brow at the front, lower over the ears and the back)
+    edge = (R + 0.02) * math.sin(BE) - 0.07 * max(0.0, -z / (R + 0.02))
+    if y < edge:
+        gone.append(f)
+bmesh.ops.delete(bm, geom=gone, context="FACES")
+bm.to_mesh(cap.data); bm.free()
+fin(cap, "BossTenugui", M["tenugui"])
+# (its rolled front edge: a soft roll round where it ends)
+roll = []
+for i in range(40):
+    a = 2 * math.pi * i / 40
+    zc = math.cos(a)
+    e = math.asin(max(-0.9, ((R + 0.02) * math.sin(BE) - 0.07 * max(0.0, -zc)) / (R + 0.02)))
+    roll.append(head_at(a, e, 0.022))
+tube("BossTenuguiRoll", roll, 0.013, M["tenugui"], cyclic=True)
+# (the knot at the back, and its two corners)
+kp = head_at(math.pi, 0.15, 0.04)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.03, segments=12, ring_count=8, location=P(*kp))
+k_ = active(); k_.scale = (1.2, 0.9, 0.8)
+fin(k_, "BossKnot", M["tenugui"])
+for k, (dx, dy) in enumerate(((0.6, 0.5), (-0.6, 0.45))):
+    d = Vector((dx, dy, -0.5)).normalized()
+    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.03, radius2=0.004, depth=0.09, location=P(*(kp + d * 0.045)))
+    t = active(); t.scale = (1.0, 0.3, 1.0)
     t.rotation_mode = "QUATERNION"; t.rotation_quaternion = Vector(P(*d)).to_track_quat("Z", "Y")
-    fin(t, f"BossBandEnd{k}", M["band"])
+    fin(t, f"BossKnotEnd{k}", M["tenugui"], smooth=False)
 
 # ---- the kappōgi's collar: crossed left over right, a red under-collar showing at the neck
 tube("BossCollarUnder", [on_body(0.1 - 0.1 * u, 0.43 + DY - 0.11 * u, 0.006) for u in [k / 8 for k in range(9)]], 0.013, M["collar"])
 tube("BossCollarOver", [on_body(-0.1 + 0.24 * u, 0.43 + DY - 0.19 * u, 0.012) for u in [k / 10 for k in range(11)]], 0.014, M["collar"])
-# (a red neckerchief round his throat, knotted at the front, its two corners hanging over the collar)
-NK = 0.585
-tube("BossScarf", [Vector((math.sin(2 * math.pi * i / 48) * (rb(NK) + 0.012), NK - 0.012 * math.cos(2 * math.pi * i / 48),
-                           math.cos(2 * math.pi * i / 48) * (rb(NK) + 0.012))) for i in range(48)], 0.016, M["red"], cyclic=True)
-kn = on_body(0, NK - 0.024, 0.03)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.026, segments=16, ring_count=8, location=P(*kn))
-k_ = active(); k_.scale = (1.15, 0.9, 0.8)
-fin(k_, "BossScarfKnot", M["red"])
-for sd in (-1, 1):
-    tip = on_body(sd * 0.05, NK - 0.11, 0.02)
-    d = (tip - kn)
-    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.04, radius2=0.004, depth=d.length, location=P(*((kn + tip) / 2)))
-    t = active(); t.scale = (1.0, 0.25, 1.0)
-    t.rotation_mode = "QUATERNION"; t.rotation_quaternion = (Vector(P(*(-d))).normalized()).to_track_quat("Z", "Y")
-    fin(t, f"BossScarfEnd{sd}", M["red"], smooth=False)
-# (white polka dots on the knot)
-for k in range(5):
-    a = k * 1.26
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0045, segments=8, ring_count=5,
-                                         location=P(*(kn + Vector((math.cos(a) * 0.016, math.sin(a) * 0.012, 0.02)))))
-    fin(active(), f"BossScarfDot{k}", M["band"])
+tube("BossCollarUnderNeck", [on_body(-0.07 + 0.14 * u, 0.437 + DY - 0.05 * (1 - abs(2 * u - 1)), 0.008) for u in [k / 8 for k in range(9)]],
+     0.008, M["pants"])
 # (the jacket's hem standing a little proud over the trousers, and a cord tied round the waist, its bow at his left)
 tube("BossHem", [Vector((math.sin(2 * math.pi * i / 64) * (rb(HEM) + 0.012), HEM, math.cos(2 * math.pi * i / 64) * (rb(HEM) + 0.012)))
                  for i in range(64)], 0.009, M["coat"], cyclic=True)
 BELT = 0.235 * BH
-tube("BossCord", [Vector((math.sin(2 * math.pi * i / 64) * (rb(BELT) + 0.007), BELT, math.cos(2 * math.pi * i / 64) * (rb(BELT) + 0.007)))
-                  for i in range(64)], 0.009, M["red"], cyclic=True)
+tube("BossCord", [Vector((math.sin(2 * math.pi * i / 64) * (rb(BELT) + 0.007), BELT, math.cos(2 * math.pi * i / 64) * (rb(BELT) + 0.014)))
+                  for i in range(64)], 0.009, M["cord"], cyclic=True)
 ba = math.radians(60)
 bc = Vector((math.sin(ba) * (rb(BELT) + 0.02), BELT, math.cos(ba) * (rb(BELT) + 0.02)))
 side_ = Vector((math.cos(ba), 0, -math.sin(ba)))
 for sd in (-1, 1):
     tube(f"BossCordBow{sd}", [bc + side_ * sd * 0.03 * math.sin(math.pi * u) + Vector((0, 0.022 * math.sin(2 * math.pi * u), 0)) * sd
-                              for u in [k / 12 for k in range(13)]], 0.007, M["red"])
-    tube(f"BossCordTail{sd}", [bc + side_ * sd * 0.012 * u + Vector((0, -0.05 * u, 0.01 * u)) for u in (0, 0.5, 1)], 0.006, M["red"])
-# (the shop's name stitched small on his chest, navy on the white)
+                              for u in [k / 12 for k in range(13)]], 0.007, M["cord"])
+    tube(f"BossCordTail{sd}", [bc + side_ * sd * 0.012 * u + Vector((0, -0.05 * u, 0.01 * u)) for u in (0, 0.5, 1)], 0.006, M["cord"])
+# (the apron (前掛け): navy, from the cord down over his front nearly to the ground, a little proud of him; 聞野 on it in white)
+AP = [(y, rb(y) + 0.012) for y in (0.04, 0.08, 0.13, 0.19, 0.25, BELT - 0.004)]
+ap = lathe("BossApron", AP, M["apron"], seg=20, a0=-math.radians(68), a1=math.radians(68))
+so = ap.modifiers.new("t", "SOLIDIFY"); so.thickness = 0.005
+bpy.context.view_layer.objects.active = ap
+bpy.ops.object.modifier_apply(modifier="t")
 bpy.ops.object.text_add(location=(0, 0, 0))
 tx = active()
 tx.data.body = "聞野"
 JP = bpy.data.fonts.load("C:/Windows/Fonts/YuGothB.ttc") if os.path.exists("C:/Windows/Fonts/YuGothB.ttc") else None
 if JP:
     tx.data.font = JP
-tx.data.size = 0.05
+tx.data.size = 0.075
 tx.data.align_x = "CENTER"; tx.data.align_y = "CENTER"
-tx.rotation_euler = (math.pi / 2, 0, math.asin(0.105 / rb(0.33 * BH + 0.03)))
+tx.rotation_euler = (math.pi / 2, 0, 0)
 bpy.ops.object.convert(target="MESH")
 tx = active()
-tx.location = P(*on_body(0.105, 0.33 * BH + 0.03, 0.009))
-fin(tx, "BossPrint", M["apron"], smooth=False)
+tx.location = P(*on_body(0, 0.15, 0.019))
+fin(tx, "BossPrint", M["print"], smooth=False)
 
 # ---- the little things about him
 M["gold"] = pbr("BossGold", lin("#e0b040"), rough=0.3, metal=1.0) if "metal" in pbr.__code__.co_varnames else pbr("BossGold", lin("#e0b040"), rough=0.3)
@@ -362,7 +365,7 @@ M["blue"] = pbr("BossTowelBlue", lin("#2c4a8a"), rough=0.8)
 M["pencil"] = pbr("BossPencil", lin("#f2c230"), rough=0.6)
 M["pink"] = pbr("BossEraser", lin("#ec8a9a"), rough=0.7)
 # (a little gold fish pinned on his chest, his left)
-fp = on_body(-0.115, 0.33 * BH + 0.06, 0.012)
+fp = on_body(0.12, 0.33 * BH + 0.06, 0.012)
 bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*fp))
 o = active(); o.scale = (0.028, 0.008, 0.016)
 fin(o, "BossPinFish", M["gold"])
