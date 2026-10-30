@@ -172,7 +172,10 @@ export function freezeSelected(id: string | null = state.selected) {
   toast(T().frozen, 'edit')
 }
 export const rotationOf = (id: string): V3 => state.groups[id] ? state.groups[id].r ?? [0, state.groups[id].yaw, 0] : state.rotations[id] ?? [0, 0, 0]
-export const scaleOf = (id: string): V3 => state.groups[id] ? [state.groups[id].s, state.groups[id].s, state.groups[id].s] : state.scales[id] ?? [1, 1, 1]
+/** pieces whose size isn't for changing by hand (the owner: he's as big as he is) */
+export const FIXED_SIZE = new Set(['boss'])
+export const scaleOf = (id: string): V3 => FIXED_SIZE.has(id) ? [1, 1, 1]
+  : state.groups[id] ? [state.groups[id].s, state.groups[id].s, state.groups[id].s] : state.scales[id] ?? [1, 1, 1]
 const save = () => {
   try {
     localStorage.setItem(KEY, JSON.stringify(state.offsets))
@@ -226,6 +229,7 @@ export function turnTo(id: string, v: V3) {
   state.selected = id; emit()
 }
 export function scaleTo(id: string, v: V3) {
+  if (FIXED_SIZE.has(id)) return
   const g = state.groups[id]
   if (g) {
     // (one size for the whole group: whichever field was changed gives it)

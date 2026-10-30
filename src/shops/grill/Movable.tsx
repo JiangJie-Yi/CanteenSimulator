@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, getEdit, GIZMO, groupOf, setStats, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, FIXED_SIZE, getEdit, GIZMO, groupOf, setStats, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -421,7 +421,7 @@ export function AxisGizmo({ id, at, theta = 0, pivotGroup }: { id: string; at: V
       </group>
     )
   }
-  if (tool === 'scale') {
+  if (tool === 'scale' && !FIXED_SIZE.has(id)) {
     return (
       <group ref={root} name="edit-gizmo" position={at} rotation-y={theta}>
         {AXES.map((a, i) => (

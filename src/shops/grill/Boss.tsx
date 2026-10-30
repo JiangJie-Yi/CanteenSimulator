@@ -1,5 +1,5 @@
 import { useMemo, useRef, type ReactNode } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
@@ -23,7 +23,7 @@ const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Print|Collar|Knot|Band|Co
 let made: THREE.Object3D | null = null
 
 /** where his hands hang at rest (as modelled, the node's own frame) */
-const REST = { L: new THREE.Vector3(-0.3, 0.2, 0.05), R: new THREE.Vector3(0.3, 0.2, 0.05) }
+const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
 type Phase = { act: 'tongs' | 'walk' | 'fan' | 'run' | 'wave' | 'idle'; len: number }
 /** his round of the day, in seconds */
 const ROUND: Phase[] = [
@@ -69,7 +69,26 @@ export function Boss({ to = [0, 0], children }: { to?: [number, number]; childre
     eyes: ['BossEye-1', 'BossEye1', 'BossEyeShine-1', 'BossEyeShine1', 'BossEyeShineB-1', 'BossEyeShineB1']
       .map((n) => root.getObjectByName(n)).filter(Boolean) as THREE.Object3D[],
   }), [root])
-  const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0 })
+  const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0, y: 0, vy: 0, ground: 0, probeAt: -1 })
+  const scene = useThree((s) => s.scene)
+  const camera = useThree((s) => s.camera)
+  const ray = useMemo(() => new THREE.Raycaster(), [])
+  /** what's under him (in his frame's height): the first solid surface straight down from his middle, anything drawn but himself and the
+   * editor's handles; the floor where he stands if nothing's found */
+  const groundBelow = (m: THREE.Object3D, x: number, z: number) => {
+    const frame = m.parent
+    if (!frame) return 0
+    const from = frame.localToWorld(new THREE.Vector3(x, 0.5, z))
+    ray.set(from, new THREE.Vector3(0, -1, 0))
+    // (the camera too: the scene's sprites (labels, glints) need it to be tested at all)
+    ray.camera = camera
+    for (const h of ray.intersectObjects(scene.children, true)) {
+      const o = h.object as THREE.Mesh
+      if (!o.isMesh || !solid(o, m)) continue
+      return frame.worldToLocal(h.point.clone()).y
+    }
+    return 0
+  }
   useFrame(({ clock }) => {
     const s = st.current
     const T = clock.elapsedTime
@@ -107,7 +126,16 @@ export function Boss({ to = [0, 0], children }: { to?: [number, number]; childre
       if (s.t > ph.len) { s.phase = (s.phase + 1) % ROUND.length; s.t = 0 }
     }
     if (edit) act = 'idle'
-    m.position.set(s.x, 0, s.z)
+    // ---- gravity: he stands on whatever's under him, and if he's left in the air (put up high in the editor) he drops onto it, with a
+    // little bounce
+    if (T - s.probeAt > 0.2) { s.probeAt = T; s.ground = groundBelow(m, s.x, s.z) }
+    const scale = m.parent?.getWorldScale(new THREE.Vector3()).y || 1
+    if (s.y > s.ground + 1e-4 || s.vy > 0) {
+      s.vy -= (9 / scale) * dt
+      s.y += s.vy * dt
+      if (s.y <= s.ground) { s.y = s.ground; s.vy = s.vy < -1.2 ? -s.vy * 0.28 : 0 }
+    } else { s.y = s.ground; s.vy = 0 }
+    m.position.set(s.x, s.y, s.z)
     m.rotation.y = s.yaw
 
     // ---- the body: a waddle (up at each step, rocking, leaning in) when moving, breathing when not
@@ -184,6 +212,15 @@ export function Boss({ to = [0, 0], children }: { to?: [number, number]; childre
   )
 }
 
+/** whether a mesh is something to stand on: shown (it and all above it), not see-through, not part of him, not the editor's handles */
+function solid(o: THREE.Object3D, self: THREE.Object3D) {
+  const mat = (o as THREE.Mesh).material as THREE.Material | THREE.Material[]
+  for (const mm of Array.isArray(mat) ? mat : [mat]) if (!mm.visible || (mm.transparent && mm.opacity < 0.2) || !mm.colorWrite) return false
+  for (let p: THREE.Object3D | null = o; p; p = p.parent) {
+    if (p === self || !p.visible || p.userData.editHandle || p.name === 'edit-gizmo') return false
+  }
+  return true
+}
 /** turn toward a heading, the short way round, at most `k` of the way this frame */
 function turnTo(s: { yaw: number }, to: number, k: number) {
   let d = to - s.yaw

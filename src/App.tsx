@@ -530,7 +530,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     // down, at his hands and the fire)
     if (spot.follow) {
       anchor.updateWorldMatrix(true, false)
-      return { pos: anchor.localToWorld(new THREE.Vector3(0, 0.7, 0.4)), target: anchor.localToWorld(new THREE.Vector3(0, 0.45, 1.6)) }
+      return { pos: anchor.localToWorld(new THREE.Vector3(0, 0.83, 0.42)), target: anchor.localToWorld(new THREE.Vector3(0, 0.58, 1.6)) }
     }
     const toMiddle = new THREE.Vector3(-at.x, 0, -at.z).normalize()
     return { pos: at.clone().addScaledVector(toMiddle, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0)), target: at }

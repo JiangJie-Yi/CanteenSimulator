@@ -1,10 +1,13 @@
 """The owner (老闆), standing at his grill when the shop's shut: boss.glb, node "Boss", about 0.95 tall, facing +z three, resting on y 0.
 
-Made as the cooks of Overcooked 2 are: a big round head set straight down on a short, plump body that rounds off underneath (no legs, no
-feet), no arms, floating mitten hands (a plump paddle and a thumb). His face is the one on his picture (ui/Avatar.tsx, role 'owner'): brown
-hair cropped short, a twisted white headband (ねじり鉢巻) with a red strand through it knotted at his left, its two ends sticking out;
-round-cornered glasses over big dark eyes, kind arched brows, a moustache, a smile, rosy cheeks, ears; a white kappōgi crossed at the
-front over a red under-collar, its hem over checked cook's trousers, a red cord round the waist bowed at his left, 聞野 on his chest.
+Made as the cooks of Overcooked 2 are: a big round head set straight down on a plump body about as tall as the head is wide, rounding
+off underneath (no legs, no feet), no arms, floating mitten hands (a plump paddle and a thumb). His face is the one on his picture
+(ui/Avatar.tsx, role 'owner'), done the way a cartoon from America would: thick, chunky brown hair with a pompadour curl swept up over the
+front, sideburns; a twisted white headband (ねじり鉢巻) with a red strand through it knotted at his left, its two ends sticking out;
+round-cornered glasses over small dark eyes, short thick brows, a round button nose, a moustache and a smile, ears, a pencil behind his
+right one; a white kappōgi crossed at the front, a red neckerchief knotted at the throat, a little gold fish pinned to his chest and 聞野
+stitched opposite, its hem over checked cook's trousers, a red cord round the waist bowed at his left, a blue-striped hand towel tucked in
+at his right.
 - his hands are separate nodes (BossHandL, BossHandR) so the game can move them, and so are the tongs and the fan he picks up
   (BossTongs, BossFan: hidden till he holds them).
 
@@ -96,8 +99,12 @@ def tube(name, pts, r, mat, cyclic=False):
 # ---- the body: short and plump, turned on a lathe; its top a low dome the head sits down into
 PROFILE = [(0.0, 0.0), (0.0, 0.0), (0.008, 0.08), (0.03, 0.155), (0.07, 0.21), (0.12, 0.243), (0.18, 0.26), (0.24, 0.262),
            (0.3, 0.255), (0.36, 0.238), (0.41, 0.21), (0.45, 0.17), (0.48, 0.11), (0.495, 0.05), (0.5, 0.0)]
+# (stood up taller: the body about as tall as the head is wide, as Overcooked's cooks are)
+BH = 1.24
+DY = 0.5 * (BH - 1)
+PROFILE = [(y * BH, r) for (y, r) in PROFILE]
 # (where the jacket's hem comes down to, over the trousers)
-HEM = 0.17
+HEM = 0.17 * BH
 
 
 def rb(y):
@@ -152,7 +159,7 @@ lathe("BossBody", [(y, r + (0.006 if y < HEM + 0.04 else 0.0)) for (y, r) in PRO
       M["coat"], seg=48)
 
 # ---- the head: a big ball, set down on the body
-C = Vector((0.0, 0.68, 0.0))
+C = Vector((0.0, 0.68 + DY, 0.0))
 R = 0.27
 bpy.ops.mesh.primitive_uv_sphere_add(radius=R, segments=48, ring_count=24, location=P(*C))
 head = fin(active(), "BossHead", M["skin"])
@@ -171,9 +178,10 @@ def head_at(a, e, out=0.0):
     return C + n * (R + out)
 
 
-# (his hair, cropped short: a skin a hair proud of the head over its crown, down the back to the nape and to the tops of the ears at the
-# sides; at the front only above the headband)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=R + 0.008, segments=48, ring_count=24, location=P(*C))
+# (his hair, thick: a shell well proud of the head over its crown, down the back to the nape and to the tops of the ears at the sides; at
+# the front only above the headband; chunky clumps over it, a pompadour curl swept up at the front and sideburns down to the ears)
+HT = 0.026
+bpy.ops.mesh.primitive_uv_sphere_add(radius=R + HT, segments=48, ring_count=24, location=P(*C))
 hair = active()
 bm = bmesh.new(); bm.from_mesh(hair.data)
 gone = []
@@ -185,10 +193,40 @@ for f in bm.faces:
         gone.append(f)
 bmesh.ops.delete(bm, geom=gone, context="FACES")
 bm.to_mesh(hair.data); bm.free()
-so = hair.modifiers.new("t", "SOLIDIFY"); so.thickness = 0.008; so.offset = -1
+so = hair.modifiers.new("t", "SOLIDIFY"); so.thickness = HT; so.offset = -1
 bpy.context.view_layer.objects.active = hair
 bpy.ops.object.modifier_apply(modifier="t")
 fin(hair, "BossHair", M["hair"])
+# (the clumps: soft lumps laid over the crown and back, so it reads as a sculpted head of hair rather than a cap)
+import random as _rnd
+_rnd.seed(3)
+for k in range(16):
+    a = _rnd.uniform(0, 2 * math.pi)
+    e = _rnd.uniform(0.55, 1.35)
+    if math.cos(a) > 0.3 and e < 0.75:
+        continue
+    q = head_at(a, e, HT - 0.006)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*q))
+    o = active(); o.scale = (0.07, 0.07, 0.03)
+    n = (q - C).normalized()
+    o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Z", "Y")
+    fin(o, f"BossHairClump{k}", M["hair"])
+# (the pompadour: a fat roll swept up and back from over the brow, curling over at its tip toward his left)
+roll = []
+for k in range(24):
+    u = k / 23
+    a = -0.6 + 1.05 * u
+    e = 0.66 + 0.2 * math.sin(math.pi * u)
+    roll.append((head_at(a, e, HT + 0.012 + 0.03 * math.sin(math.pi * u ** 0.8)), 0.05 * (1 - 0.5 * u) + 0.01))
+for k, (q, r) in enumerate(roll):
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=14, ring_count=8, location=P(*q))
+    fin(active(), f"BossQuiff{k}", M["hair"])
+# (sideburns: chunky blocks down in front of the ears)
+for sd in (-1, 1):
+    q = head_at(sd * math.radians(76), -0.05, 0.004)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*q))
+    o = active(); o.scale = (0.018, 0.022, 0.05)
+    fin(o, f"BossSideburn{sd}", M["hair"])
 
 # ---- the face
 EY = 0.015
@@ -224,12 +262,6 @@ for sd in (-1, 1):
     # (brows: arched and kind, over the frames)
     tube(f"BossBrow{sd}", [on_head(ex + 0.028 * (2 * u - 1), EY + 0.078 + 0.01 * (1 - (2 * u - 1) ** 2), 0.006)[0]
                            for u in [k / 8 for k in range(9)]], 0.011, M["brow"])
-    # (rosy cheeks under the frames)
-    p, n = on_head(sd * 0.135, -0.05, -0.003)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=8, location=P(*p))
-    o = active(); o.scale = (0.03, 0.008, 0.026)
-    o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
-    fin(o, f"BossCheek{sd}", M["cheek"])
 # (the bridge between the frames)
 tube("BossGlassBridge", [on_head(x, EY + 0.012 + 0.006 * (1 - (x / 0.033) ** 2), 0.024)[0] for x in (-0.033, -0.017, 0, 0.017, 0.033)], 0.005, M["frame"])
 # (a round nose)
@@ -255,12 +287,12 @@ for k, (mat, r, ph) in enumerate(((M["band"], 0.017, 0.0), (M["band"], 0.017, 2.
     pts = []
     for i in range(97):
         a = 2 * math.pi * i / 96
-        base = head_at(a, BE, 0.016)
+        base = head_at(a, BE, 0.016 + HT - 0.006)
         out = (base - C); out.y = 0; out.normalize()
         tw = 24 * a + ph
         pts.append(base + out * 0.011 * math.cos(tw) + Vector((0, 1, 0)) * 0.011 * math.sin(tw))
     tube(f"BossBand{k}", pts[:-1], r, mat, cyclic=True)
-kp = head_at(KA, BE, 0.03)
+kp = head_at(KA, BE, 0.03 + HT - 0.006)
 bpy.ops.mesh.primitive_uv_sphere_add(radius=0.034, segments=16, ring_count=8, location=P(*kp))
 fin(active(), "BossKnot", M["band"])
 side = Vector((math.sin(KA), 0, math.cos(KA)))
@@ -272,13 +304,33 @@ for k, (up, ln) in enumerate(((0.55, 0.11), (-0.45, 0.1))):
     fin(t, f"BossBandEnd{k}", M["band"])
 
 # ---- the kappōgi's collar: crossed left over right, a red under-collar showing at the neck
-tube("BossCollarUnder", [on_body(0.1 - 0.1 * u, 0.43 - 0.11 * u, 0.006) for u in [k / 8 for k in range(9)]], 0.013, M["collar"])
-tube("BossCollarOver", [on_body(-0.1 + 0.24 * u, 0.43 - 0.19 * u, 0.012) for u in [k / 10 for k in range(11)]], 0.014, M["collar"])
-tube("BossCollarRed", [on_body(-0.07 + 0.14 * u, 0.437 - 0.05 * (1 - abs(2 * u - 1)), 0.008) for u in [k / 8 for k in range(9)]], 0.008, M["red"])
+tube("BossCollarUnder", [on_body(0.1 - 0.1 * u, 0.43 + DY - 0.11 * u, 0.006) for u in [k / 8 for k in range(9)]], 0.013, M["collar"])
+tube("BossCollarOver", [on_body(-0.1 + 0.24 * u, 0.43 + DY - 0.19 * u, 0.012) for u in [k / 10 for k in range(11)]], 0.014, M["collar"])
+# (a red neckerchief round his throat, knotted at the front, its two corners hanging over the collar)
+NK = 0.585
+tube("BossScarf", [Vector((math.sin(2 * math.pi * i / 48) * (rb(NK) + 0.012), NK - 0.012 * math.cos(2 * math.pi * i / 48),
+                           math.cos(2 * math.pi * i / 48) * (rb(NK) + 0.012))) for i in range(48)], 0.016, M["red"], cyclic=True)
+kn = on_body(0, NK - 0.024, 0.03)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.026, segments=16, ring_count=8, location=P(*kn))
+k_ = active(); k_.scale = (1.15, 0.9, 0.8)
+fin(k_, "BossScarfKnot", M["red"])
+for sd in (-1, 1):
+    tip = on_body(sd * 0.05, NK - 0.11, 0.02)
+    d = (tip - kn)
+    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.04, radius2=0.004, depth=d.length, location=P(*((kn + tip) / 2)))
+    t = active(); t.scale = (1.0, 0.25, 1.0)
+    t.rotation_mode = "QUATERNION"; t.rotation_quaternion = (Vector(P(*(-d))).normalized()).to_track_quat("Z", "Y")
+    fin(t, f"BossScarfEnd{sd}", M["red"], smooth=False)
+# (white polka dots on the knot)
+for k in range(5):
+    a = k * 1.26
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0045, segments=8, ring_count=5,
+                                         location=P(*(kn + Vector((math.cos(a) * 0.016, math.sin(a) * 0.012, 0.02)))))
+    fin(active(), f"BossScarfDot{k}", M["band"])
 # (the jacket's hem standing a little proud over the trousers, and a cord tied round the waist, its bow at his left)
 tube("BossHem", [Vector((math.sin(2 * math.pi * i / 64) * (rb(HEM) + 0.012), HEM, math.cos(2 * math.pi * i / 64) * (rb(HEM) + 0.012)))
                  for i in range(64)], 0.009, M["coat"], cyclic=True)
-BELT = 0.235
+BELT = 0.235 * BH
 tube("BossCord", [Vector((math.sin(2 * math.pi * i / 64) * (rb(BELT) + 0.007), BELT, math.cos(2 * math.pi * i / 64) * (rb(BELT) + 0.007)))
                   for i in range(64)], 0.009, M["red"], cyclic=True)
 ba = math.radians(60)
@@ -297,16 +349,55 @@ if JP:
     tx.data.font = JP
 tx.data.size = 0.05
 tx.data.align_x = "CENTER"; tx.data.align_y = "CENTER"
-tx.rotation_euler = (math.pi / 2, 0, math.asin(0.105 / rb(0.33)))
+tx.rotation_euler = (math.pi / 2, 0, math.asin(0.105 / rb(0.33 * BH + 0.03)))
 bpy.ops.object.convert(target="MESH")
 tx = active()
-tx.location = P(*on_body(0.105, 0.33, 0.009))
+tx.location = P(*on_body(0.105, 0.33 * BH + 0.03, 0.009))
 fin(tx, "BossPrint", M["apron"], smooth=False)
+
+# ---- the little things about him
+M["gold"] = pbr("BossGold", lin("#e0b040"), rough=0.3, metal=1.0) if "metal" in pbr.__code__.co_varnames else pbr("BossGold", lin("#e0b040"), rough=0.3)
+M["towel"] = pbr("BossTowel", lin("#f4f1e8"), rough=0.8)
+M["blue"] = pbr("BossTowelBlue", lin("#2c4a8a"), rough=0.8)
+M["pencil"] = pbr("BossPencil", lin("#f2c230"), rough=0.6)
+M["pink"] = pbr("BossEraser", lin("#ec8a9a"), rough=0.7)
+# (a little gold fish pinned on his chest, his left)
+fp = on_body(-0.115, 0.33 * BH + 0.06, 0.012)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*fp))
+o = active(); o.scale = (0.028, 0.008, 0.016)
+fin(o, "BossPinFish", M["gold"])
+bpy.ops.mesh.primitive_cone_add(vertices=3, radius1=0.016, radius2=0.0, depth=0.02, location=P(*(fp + Vector((0.032, 0, 0)))))
+o = active(); o.rotation_euler = (0, math.pi / 2, 0); o.scale = (1, 0.4, 1)
+fin(o, "BossPinTail", M["gold"], smooth=False)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.003, segments=8, ring_count=5, location=P(*(fp + Vector((-0.015, 0.004, 0.008)))))
+fin(active(), "BossPinEye", M["dark"])
+# (a hand towel (手拭い) tucked under the cord at his right, hanging down, two blue stripes across it)
+ta = math.radians(-62)
+tt = Vector((math.sin(ta) * (rb(BELT) + 0.012), BELT, math.cos(ta) * (rb(BELT) + 0.012)))
+tw = Vector((math.cos(ta), 0, -math.sin(ta)))
+for k, (y0, y1, mat, out) in enumerate(((0.0, 0.17, M["towel"], 0.0), (0.035, 0.05, M["blue"], 0.004), (0.12, 0.135, M["blue"], 0.004))):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=P(*(tt + Vector((0, -(y0 + y1) / 2 + 0.01, 0)) + Vector((math.sin(ta), 0, math.cos(ta))) * (0.006 + out))))
+    o = active(); o.scale = (0.075 + out * 2, 0.006 + out, y1 - y0)
+    o.rotation_euler = (0, 0, ta)
+    fin(o, f"BossTowel{k}", mat, smooth=False)
+# (a pencil behind his right ear)
+ep = Vector((-(R - 0.01), C.y + 0.03, -0.0))
+d = Vector((0.15, 0.95, -0.35)).normalized()
+for k, (off, ln, r, mat) in enumerate(((0.0, 0.11, 0.007, M["pencil"]),)):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=r, depth=ln, location=P(*(ep + d * off)))
+    o = active(); o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*d)).to_track_quat("Z", "Y")
+    fin(o, "BossPencil", mat, smooth=False)
+bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.0072, depth=0.014, location=P(*(ep + d * 0.062)))
+o = active(); o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*d)).to_track_quat("Z", "Y")
+fin(o, "BossPencilEraser", M["pink"])
+bpy.ops.mesh.primitive_cone_add(vertices=6, radius1=0.007, radius2=0.0, depth=0.022, location=P(*(ep - d * 0.066)))
+o = active(); o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*(-d))).to_track_quat("Z", "Y")
+fin(o, "BossPencilTip", M["towel"], smooth=False)
 
 # ---- hands: floating mittens as Overcooked's, a plump rounded paddle (the fingers together, curled a little) and a thumb of its own,
 # hanging at his sides; each its own node so the game can swing them, raise them, hold things in them
 hands = {}
-HAND_AT = {-1: Vector((-0.3, 0.2, 0.05)), 1: Vector((0.3, 0.2, 0.05))}
+HAND_AT = {-1: Vector((-0.31, 0.26, 0.05)), 1: Vector((0.31, 0.26, 0.05))}
 for sd, at in HAND_AT.items():
     bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=20, ring_count=12, location=(0, 0, 0))
     h = active()
@@ -367,7 +458,7 @@ for e in list(hands.values()) + props:
 if PREVIEW:
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = P(0.35, 0.8, 1.3)
+    cam.location = P(0.5, 1.05, 2.3)
     cam.rotation_mode = "QUATERNION"
     cam.rotation_quaternion = (Vector(P(0, 0.5, 0)) - cam.location).to_track_quat("-Z", "Y")
     cam.data.lens = 42
