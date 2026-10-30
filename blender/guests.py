@@ -1360,8 +1360,9 @@ def hair(kind, hd, surf, style=None):
         bm = cap(hd, surf, lambda y, p: p > (0.32 if abs(y) < 0.9 else -0.1 - 0.25 * smoothstep(1.2, 2.6, abs(y))))
         for i in range(7):
             y0 = -0.75 + i * 0.25
-            lock(bm, surf, [(0.25, 1.1), (y0 * 0.6 + 0.1, 0.75), (y0, 0.45), (y0 - 0.12, 0.3)], 0.05, 0.016,
-                 [0.004, 0.016, 0.016, 0.01])
+            # (from along the parting, not all from one point: one point made a star of creases on the crown)
+            lock(bm, surf, [(0.25 + y0 * 0.25, 1.0 - 0.1 * abs(y0)), (y0 * 0.6 + 0.1, 0.75), (y0, 0.45), (y0 - 0.12, 0.3)], 0.05, 0.016,
+                 [0.006, 0.016, 0.016, 0.01])
         for sd in (1, -1):
             for i in range(3):
                 lock(bm, surf, [(sd * (0.9 + i * 0.3), 0.5), (sd * (1.0 + i * 0.3), 0.15), (sd * (1.05 + i * 0.3), -0.12)],
