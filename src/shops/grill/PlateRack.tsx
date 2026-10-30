@@ -9,9 +9,10 @@ import { getEdit } from './edit'
 import { wareGeometry } from './ware'
 import { DESIGN_COUNT, wareDesign } from './wareDesigns'
 
-const W = 1.3, H = 1.75, D = 0.42
+// (a big one: wide and tall, four shelves, to hold a busy night's plates and bowls)
+const W = 1.9, H = 2.15, D = 0.44
 const PLATE_R = 0.17
-const SHELVES = [0.12, 0.6, 1.06]
+const SHELVES = [0.12, 0.6, 1.0, 1.5]
 const WOOD = '#a9774a'
 const WOOD_DARK = '#7d5430'
 
@@ -25,10 +26,15 @@ const PLATE_T = 0.042 * PLATE_R * 2
 /** how far each plate in a pile stands above the one under it: they nest, foot in the one below's well */
 const NEST = PLATE_T * 0.72
 /** the slots on the lowest shelf: how far apart the plates stand in them, and how many */
-const SLOT = 0.075, SLOTS = 14
+const SLOT = 0.075, SLOTS = 22
 const slotX = (k: number) => -((SLOTS - 1) * SLOT) / 2 + k * SLOT
-/** where the three show plates stand on the middle shelf, and the three piles on the top one */
-const SHOW_X = [-0.4, 0, 0.4]
+/** where the four show plates stand on the third shelf, and the four piles on the top one */
+const SHOW_X = [-0.66, -0.22, 0.22, 0.66]
+/** the bowls on the second shelf: piles turned over, as bowls are put away */
+const BOWL_R = 0.1
+const BOWL_X = [-0.72, -0.36, 0, 0.36, 0.72]
+const BOWL_GEO = wareGeometry(([[0, 0], [0.2, 0], [0.22, 0.03], [0.28, 0.1], [0.38, 0.28], [0.47, 0.46], [0.5, 0.5], [0.48, 0.5], [0.44, 0.45],
+  [0.34, 0.27], [0.24, 0.12], [0.18, 0.06], [0, 0.05]] as [number, number][]).map(([x, y]) => [x * BOWL_R * 2, y * BOWL_R * 2] as [number, number]), BOWL_R)
 
 /** every plate on the rack: where it is, and which design. Set as they'd really stand, none through another: on the lowest shelf each stands
  * on its edge in its slot between the dowels, its face to the side, leaning back a touch; on the middle one three show their faces, leaning
@@ -51,22 +57,46 @@ function platesOf() {
   for (const [k, x] of SHOW_X.entries()) {
     e.set(Math.PI / 2 - back, 0, 0)
     q.setFromEuler(e)
-    p.set(x, shelfTop(SHELVES[1]) + PLATE_R * Math.cos(back) + 0.004, -0.02)
+    p.set(x, shelfTop(SHELVES[2]) + PLATE_R * Math.cos(back) + 0.004, -0.02)
     out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 2 })
   }
   // (the piles: nested, each turned and set a hair off the one under it)
   for (const [k, x] of SHOW_X.entries()) {
-    for (let j = 0; j < 5; j++) {
+    for (let j = 0; j < 6; j++) {
       e.set(0, k * 1.3 + j * 0.7, 0)
       q.setFromEuler(e)
-      p.set(x + Math.sin(j * 2.1 + k) * 0.004, shelfTop(SHELVES[2]) + j * NEST, Math.cos(j * 1.7 + k) * 0.004)
+      p.set(x + Math.sin(j * 2.1 + k) * 0.004, shelfTop(SHELVES[3]) + j * NEST, Math.cos(j * 1.7 + k) * 0.004)
       out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 1 })
     }
   }
   return out
 }
 
-function Plates({ design, list }: { design: number; list: Matrix4List }) {
+/** the bowls' piles: each turned over, its foot up, nested in the one under it, a little off true */
+function bowlsOf() {
+  const out: Spot[] = []
+  const q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1)
+  for (const [k, x] of BOWL_X.entries()) {
+    const n = 3 + ((k * 2) % 3)
+    for (let j = 0; j < n; j++) {
+      e.set(Math.PI, k * 0.9 + j * 0.6, 0)
+      q.setFromEuler(e)
+      // (turned over its rim rests on the shelf: its height above it, then each one up by the nest)
+      p.set(x + Math.sin(j * 1.9 + k) * 0.003, SHELVES[1] + 0.0175 + BOWL_R + j * 0.028, Math.cos(j * 1.3 + k) * 0.003 - 0.03)
+      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k })
+    }
+  }
+  return out
+}
+function Bowls() {
+  const byDesign = useMemo(() => {
+    const out: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
+    for (const sp of bowlsOf()) out[sp.design % DESIGN_COUNT].push(sp.m)
+    return out
+  }, [])
+  return <>{byDesign.map((list, i) => <Plates key={`bowl${i}`} design={i} list={list} geo={BOWL_GEO} />)}</>
+}
+function Plates({ design, list, geo = GEO }: { design: number; list: Matrix4List; geo?: THREE.BufferGeometry }) {
   const ref = useRef<THREE.InstancedMesh>(null)
   const ink = useRef<THREE.InstancedMesh>(null)
   useLayoutEffect(() => {
@@ -76,10 +106,10 @@ function Plates({ design, list }: { design: number; list: Matrix4List }) {
   if (!list.length) return null
   return (
     <>
-      <instancedMesh ref={ref} args={[GEO, undefined, list.length]} castShadow receiveShadow>
+      <instancedMesh ref={ref} args={[geo, undefined, list.length]} castShadow receiveShadow>
         <meshToonMaterial color="#ffffff" map={wareDesign(design)} />
       </instancedMesh>
-      <instancedMesh ref={ink} args={[GEO, undefined, list.length]}>
+      <instancedMesh ref={ink} args={[geo, undefined, list.length]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </instancedMesh>
     </>
@@ -167,18 +197,19 @@ export function PlateRack() {
       {[-1, 1].map((zs) => (
         <mesh key={`dr${zs}`} position={[0, SHELVES[0] + 0.0175 + 0.008, zs * 0.12]}><boxGeometry args={[SLOTS * SLOT + 0.02, 0.016, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
       ))}
-      {/* (the middle shelf's show: a rail behind for the plates to lean on, a groove strip in front to hold their feet) */}
-      <mesh position={[0, SHELVES[1] + 0.25, -0.17]}><boxGeometry args={[W - 0.06, 0.03, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
-      <mesh position={[0, SHELVES[1] + 0.0175 + 0.008, 0.06]}><boxGeometry args={[W - 0.06, 0.016, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+      {/* (the third shelf's show: a rail behind for the plates to lean on, a groove strip in front to hold their feet) */}
+      <mesh position={[0, SHELVES[2] + 0.25, -0.17]}><boxGeometry args={[W - 0.06, 0.03, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+      <mesh position={[0, SHELVES[2] + 0.0175 + 0.008, 0.06]}><boxGeometry args={[W - 0.06, 0.016, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
       {/* (the sides: a frame with three rails across) */}
-      {[-1, 1].flatMap((sd) => [0.36, 0.84, 1.3].map((y) => (
+      {[-1, 1].flatMap((sd) => [0.36, 0.8, 1.25, 1.8].map((y) => (
         <mesh key={`s${sd}${y}`} position={[sd * W / 2, y, 0]}><boxGeometry args={[0.03, 0.03, D - 0.04]} /><meshToonMaterial map={wood(w.dark, 1, 0.2)} /></mesh>
       )))}
       {/* (the back, in tongue-and-groove boards, a dark line between each) */}
-      {Array.from({ length: 8 }, (_, k) => (
-        <mesh key={`b${k}`} position={[-W / 2 + 0.08 + k * ((W - 0.16) / 7), H / 2, -D / 2 + 0.01]} rotation-z={Math.PI / 2}><boxGeometry args={[H - 0.1, 0.152, 0.015]} /><meshToonMaterial map={wood(w.back, 1.5, 0.4)} /></mesh>
+      {Array.from({ length: 12 }, (_, k) => (
+        <mesh key={`b${k}`} position={[-W / 2 + 0.08 + k * ((W - 0.16) / 11), H / 2, -D / 2 + 0.01]} rotation-z={Math.PI / 2}><boxGeometry args={[H - 0.1, 0.152, 0.015]} /><meshToonMaterial map={wood(w.back, 1.5, 0.4)} /></mesh>
       ))}
       {byDesign.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
+      <Bowls />
     </group>
   )
 }

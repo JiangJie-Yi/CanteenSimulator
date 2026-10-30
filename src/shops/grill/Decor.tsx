@@ -608,7 +608,8 @@ function FridgeAt() {
   // (its front, local +z, toward the room, and its length along the wall: local x runs along the first counter)
   return <Movable id="freezer" label="冷藏櫃" baseScale={1.6}><group name="look-freezer" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><IngredientFridge /></group></Movable>
 }
-const RACK_AT = { along: 2.0, lay: 5.05 }
+// (set clear of the freezer by it, now the rack is wide)
+const RACK_AT = { along: 1.12, lay: 5.05 }
 function RackAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, RACK_AT.along).addScaledVector(LAY, RACK_AT.lay)

@@ -3,7 +3,7 @@
 // back on the rack.
 
 /** how many plates the rack holds when full */
-export const RACK_FULL = 32
+export const RACK_FULL = 50
 /** how many the clean stack at the pass holds */
 export const CLEAN_CAP = 12
 /** how many are carried over from the rack at once */

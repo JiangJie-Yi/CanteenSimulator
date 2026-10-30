@@ -25,3 +25,10 @@ feature('碗盤櫃供應客人的盤子', () => {
     and('其餘 5 個回碗盤櫃', (w) => { expect(w.r.toRack).toBe(5) })
   })
 })
+
+feature('碗盤櫃是大容量的', () => {
+  scenario('碗盤櫃滿的時候能放 50 個盤子', ({ given, then }) => {
+    given('碗盤櫃剛開店時是滿的', (w) => { w.rack = RACK_FULL })
+    then('裡面有 50 個盤子', (w) => { expect(w.rack).toBe(50) })
+  })
+})
