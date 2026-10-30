@@ -1,10 +1,12 @@
-import { useMemo, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useGLTF } from '@react-three/drei'
+import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 import { airbrush, gradientMap } from '@/scene/Person3D'
 import { getEdit } from './edit'
+import type { Lang } from '@/data/i18n'
+import { bossLineText, bossSituation, nextBossLine, type BossSituation } from '@/data/bossLines'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -29,11 +31,31 @@ type Phase = { act: 'tongs' | 'walk' | 'fan' | 'run' | 'wave' | 'idle'; len: num
 const ROUND: Phase[] = [
   { act: 'tongs', len: 7 }, { act: 'walk', len: 0 }, { act: 'fan', len: 5 }, { act: 'run', len: 0 }, { act: 'wave', len: 4 }, { act: 'idle', len: 4 },
 ]
+/** and while the shop's open, out of his chef's way: a wave now and then, keeping an eye */
+const ROUND_OPEN: Phase[] = [{ act: 'idle', len: 6 }, { act: 'wave', len: 3 }]
 const WALK_SPEED = 0.9
 const RUN_SPEED = 2.4
 
 /** `to`: the far end of his walk, in the frame he stands in (x, z), from his place at its origin, facing +z */
-export function Boss({ to = [0, 0], children }: { to?: [number, number]; children?: ReactNode }) {
+/** `to`: the far end of his walk; `open`: the shop's open (his chef has the grill, he stays put); he mutters in `lang` */
+export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?: [number, number]; open?: boolean; lang?: Lang; children?: ReactNode }) {
+  // ---- muttering to himself, always: a line every few seconds, by day or night, open or shut (data/bossLines), never the same twice running
+  const [say, setSay] = useState<{ text: string; key: number } | null>(null)
+  useEffect(() => {
+    let last: { s: BossSituation; i: number } | null = null
+    let n = 0
+    let h = 0
+    const next = () => {
+      const s = bossSituation(document.documentElement.dataset.theme === 'dark', open)
+      const i = nextBossLine(s, last?.s === s ? last.i : null, Math.random())
+      last = { s, i }
+      setSay({ text: bossLineText(s, i, lang), key: ++n })
+      h = window.setTimeout(() => { setSay(null); h = window.setTimeout(next, 1000 + Math.random() * 1800) }, 4200)
+    }
+    h = window.setTimeout(next, 1500)
+    return () => window.clearTimeout(h)
+  }, [open, lang])
+  const openRef = useRef(open)
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
   const root = useMemo(() => {
     if (!made) {
@@ -99,8 +121,11 @@ export function Boss({ to = [0, 0], children }: { to?: [number, number]; childre
     const m = mover.current, b = body.current
     if (!m || !b) return
     const edit = getEdit().on
+    // (the shop opening or shutting: he starts his round over, from his place)
+    if (openRef.current !== open) { openRef.current = open; s.phase = 0; s.t = 0; s.x = 0; s.z = 0 }
+    const ROUNDS = open ? ROUND_OPEN : ROUND
     if (edit) { s.phase = 0; s.t = 0; s.x = 0; s.z = 0; s.yaw = 0 }
-    const ph = ROUND[s.phase]
+    const ph = ROUNDS[s.phase % ROUNDS.length]
     s.t += edit ? 0 : dt
     // (where he's going: the far end on the walk out, home on the run back; what he's doing when he's there)
     let act = ph.act
@@ -112,7 +137,7 @@ export function Boss({ to = [0, 0], children }: { to?: [number, number]; childre
       speed = act === 'walk' ? WALK_SPEED : RUN_SPEED
       if (d < 0.02) {
         s.x = gx; s.z = gz
-        s.phase = (s.phase + 1) % ROUND.length; s.t = 0
+        s.phase = (s.phase + 1) % ROUNDS.length; s.t = 0
         speed = 0
       } else {
         const step = Math.min(d, speed * dt)
@@ -123,7 +148,7 @@ export function Boss({ to = [0, 0], children }: { to?: [number, number]; childre
     } else {
       // (at a stop he turns back to face the fire)
       turnTo(s, 0, dt * 5)
-      if (s.t > ph.len) { s.phase = (s.phase + 1) % ROUND.length; s.t = 0 }
+      if (s.t > ph.len) { s.phase = (s.phase + 1) % ROUNDS.length; s.t = 0 }
     }
     if (edit) act = 'idle'
     // ---- gravity: he stands on whatever's under him, and if he's left in the air (put up high in the editor) he drops onto it, with a
@@ -207,15 +232,24 @@ export function Boss({ to = [0, 0], children }: { to?: [number, number]; childre
   return (
     <group ref={mover} name="BossFollow">
       {children}
+      {/* (what he's muttering, over his head) */}
+      {say && !getEdit().on && (
+        <Html position={[0, 1.42, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+          <span key={say.key} className="g3-bubble g3-say boss-say">{say.text}</span>
+        </Html>
+      )}
       <group ref={body}><primitive object={root} /></group>
     </group>
   )
 }
 
-/** whether a mesh is something to stand on: shown (it and all above it), not see-through, not part of him, not the editor's handles */
+/** whether a mesh is something to stand on: shown (it and all above it), not see-through or a shadow, not part of him, not the editor's handles */
 function solid(o: THREE.Object3D, self: THREE.Object3D) {
   const mat = (o as THREE.Mesh).material as THREE.Material | THREE.Material[]
-  for (const mm of Array.isArray(mat) ? mat : [mat]) if (!mm.visible || (mm.transparent && mm.opacity < 0.2) || !mm.colorWrite) return false
+  // (nor a shadow: the floor's shadow-catching sheet, blob shadows and other see-through decals laid over things)
+  for (const mm of Array.isArray(mat) ? mat : [mat]) {
+    if (!mm.visible || !mm.colorWrite || (mm as THREE.ShadowMaterial).isShadowMaterial || (mm.transparent && (mm.opacity < 0.2 || !mm.depthWrite))) return false
+  }
   for (let p: THREE.Object3D | null = o; p; p = p.parent) {
     if (p === self || !p.visible || p.userData.editHandle || p.name === 'edit-gizmo') return false
   }
