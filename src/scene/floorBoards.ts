@@ -32,18 +32,25 @@ export function plankTexture(colours: string[], boardsAcross = 4, size: [number,
     g.beginPath(); g.rect(x0, 0, w, H); g.clip()
     // (flat-sawn grain: long nested arches up the board, its heart off to one side)
     const hx = x0 + w * (0.3 + rnd() * 0.4)
-    for (let k = 0; k < 14; k++) {
-      const top = rnd() * H, len = H * (0.25 + rnd() * 0.4), sp = 2 + k * 1.6
-      g.strokeStyle = `rgba(40,22,10,${0.1 + rnd() * 0.12})`
-      g.lineWidth = 0.4 + rnd() * 0.5
+    for (let k = 0; k < 24; k++) {
+      const top = rnd() * H, len = H * (0.25 + rnd() * 0.45), sp = 1.5 + k * 1.1
+      g.strokeStyle = `rgba(40,22,10,${0.16 + rnd() * 0.16})`
+      g.lineWidth = 0.45 + rnd() * 0.6
       g.beginPath()
       g.moveTo(hx - sp, top + len); g.bezierCurveTo(hx - sp, top + len * 0.2, hx + sp, top + len * 0.2, hx + sp, top + len)
       g.stroke()
     }
     // (straight grain beside it, and the pores flecked along it)
-    for (let k = 0; k < 8; k++) {
+    // (the board's figure: soft broad streaks of lighter and darker wood running its length)
+    for (let k = 0; k < 5; k++) {
+      const gx = x0 + rnd() * w
+      g.strokeStyle = rnd() < 0.5 ? `rgba(30,16,6,${0.06 + rnd() * 0.06})` : `rgba(255,225,180,${0.05 + rnd() * 0.05})`
+      g.lineWidth = 2 + rnd() * 4
+      g.beginPath(); g.moveTo(gx, 0); g.bezierCurveTo(gx - 3, H / 3, gx + 3, (H * 2) / 3, gx, H); g.stroke()
+    }
+    for (let k = 0; k < 16; k++) {
       const gx = x0 + 1 + rnd() * (w - 2)
-      g.strokeStyle = `rgba(30,18,10,${0.08 + rnd() * 0.1})`; g.lineWidth = 0.4
+      g.strokeStyle = `rgba(30,18,10,${0.12 + rnd() * 0.14})`; g.lineWidth = 0.4 + rnd() * 0.3
       g.beginPath(); g.moveTo(gx, 0); g.bezierCurveTo(gx - 1, H / 3, gx + 1.5, (H * 2) / 3, gx, H); g.stroke()
     }
     for (let k = 0; k < 220; k++) { g.fillStyle = 'rgba(25,14,6,0.25)'; g.fillRect(x0 + rnd() * w, rnd() * H, 0.35, 1.6) }

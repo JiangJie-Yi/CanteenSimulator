@@ -984,11 +984,10 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   const layers = (al: [number, number], ly: [number, number], key: string) => {
     const cx = -(ly[0] + ly[1]) / 2, cz = (al[0] + al[1]) / 2
     const W = ly[1] - ly[0], L = al[1] - al[0]
+    // (its rim board, its dark body in boards laid the long way, its toe board: each in timber, the grain running along it)
     return [[top, 0.06], [top - 0.06, 0.22], [top - 0.28, 0.05]].map(([y0, h], i) => (
-      <mesh key={`${key}${i}`} position={[cx, (y0 as number) - (h as number) / 2, cz]} receiveShadow>
-        <boxGeometry args={[W, h as number, L]} />
-        <meshToonMaterial color={BASE_COLOR} />
-      </mesh>
+      <mesh key={`${key}${i}`} position={[cx, (y0 as number) - (h as number) / 2, cz]} receiveShadow geometry={timberBox(W, h as number, L)}
+        material={BASE_TIMBER[i]} />
     ))
   }
   const [gal, gly] = genkan
@@ -1004,6 +1003,35 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
     </>
   )
 }
+/** the base's timber, dark: its rim board a shade lighter, its body boards with their seams, its toe board darkest; long grain, a few streaks */
+const BASE_TIMBER = (() => {
+  const make = (base: string, seams: boolean) => {
+    if (typeof document === 'undefined') return new THREE.MeshToonMaterial({ color: base })
+    const c = document.createElement('canvas')
+    c.width = 256
+    c.height = 64
+    const g = c.getContext('2d')!
+    g.fillStyle = base
+    g.fillRect(0, 0, 256, 64)
+    let seed = base.charCodeAt(2) * 31 + 7
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    for (let i = 0; i < 46; i++) {
+      const y = rnd() * 64
+      g.strokeStyle = rnd() < 0.7 ? `rgba(15,8,3,${0.18 + rnd() * 0.2})` : `rgba(200,150,100,${0.08 + rnd() * 0.08})`
+      g.lineWidth = 0.5 + rnd() * 1.1
+      g.beginPath()
+      g.moveTo(0, y)
+      g.bezierCurveTo(85, y + (rnd() - 0.5) * 3, 170, y + (rnd() - 0.5) * 3, 256, y + (rnd() - 0.5) * 2)
+      g.stroke()
+    }
+    if (seams) { g.fillStyle = 'rgba(10,5,2,0.6)'; for (const y of [0, 21, 42]) g.fillRect(0, y, 256, 1.6) }
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    return new THREE.MeshToonMaterial({ color: '#ffffff', map: t })
+  }
+  return [make('#5c3a22', false), make('#3d2414', true), make('#2a180c', false)]
+})()
 /** raw timber for the steps: warm unplaned wood, its long grain wavering, a knot or two, and the dark rough of the cut */
 const STEP_LOG = (() => {
   if (typeof document === 'undefined') return null
@@ -1130,9 +1158,9 @@ function RoomFloor({ counters, drop }: { counters: Counter[]; drop: number }) {
       <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={drop} />
       {/* (and a solid fill under the customers' boards, down to the base, round the kitchen's well) */}
       {[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => minus(al as [number, number], ly as [number, number], kitchen).map(([a, l], i) => (
-        <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, -(drop + 0.006) / 2 - 0.004, (a[0] + a[1]) / 2]}>
-          <boxGeometry args={[l[1] - l[0], drop - 0.002, a[1] - a[0]]} /><meshToonMaterial color={BASE_COLOR} />
-        </mesh>
+        // (its sides, showing as the step down into the kitchen, in the base's dark timber boards)
+        <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, -(drop + 0.006) / 2 - 0.004, (a[0] + a[1]) / 2]}
+          geometry={timberBox(l[1] - l[0], drop - 0.002, a[1] - a[0])} material={BASE_TIMBER[1]} />
       )))}
       <KitchenPit counters={counters} drop={drop} />
       {/* the genkan: its stone, the step's riser round its two inner sides, and the polished kamachi on the edge */}
