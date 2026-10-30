@@ -127,4 +127,6 @@ const by = new Map()
 for (const c of list) { const k = c.what; by.set(k, [...(by.get(k) ?? []), c]) }
 for (const [what, cs] of by) console.log(`✗ ${cs.length}× into ${what}: e.g. guest ${cs[0].id} (${cs[0].phase}) at ${cs[0].at.join(', ')}, height ${cs[0].h}, sat ${JSON.stringify(sitAt.get(cs[0].id)?.map((x) => +x.toFixed(2)))}`)
 for (const e of errors) console.log('page error: ' + e)
-console.log(list.length ? `\n${list.length} clashes` : '\nno clashes')
+// (and it says how much walking it saw: no clashes means nothing unless someone walked while it watched)
+console.log(`\n${samples} walking samples; ` + (list.length ? `${list.length} clashes` : 'no clashes'))
+if (samples < 20) console.log('✗ too little walking seen to judge: watch longer (WATCH)')
