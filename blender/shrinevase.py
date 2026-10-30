@@ -187,62 +187,209 @@ sol = lv.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.0006
 bpy.ops.object.modifier_apply(modifier="t")
 fin(lv, "VaseLeaves", M["leaf"])
 
-# ---- the chrysanthemums: a few small ones among the leaves, rows of slim petals round a domed heart, outer ones splayed, inner ones cupped
-def mum(name, at, r, mat):
-    b = bmesh.new()
-    for ring, (n, rr, up) in enumerate(((20, r, 0.1), (18, r * 0.85, 0.4), (15, r * 0.66, 0.75), (11, r * 0.45, 1.05))):
-        for i in range(n):
-            a = 2 * math.pi * (i + ring * 0.37) / n
-            tip = Vector((math.cos(a) * rr, math.sin(a) * rr, rr * up))
-            side = Vector((-math.sin(a), math.cos(a), 0)) * rr * 0.22
-            base = Vector((0, 0, 0))
-            vs = [b.verts.new(base + side * 0.3), b.verts.new(tip * 0.55 + side), b.verts.new(tip), b.verts.new(tip * 0.55 - side), b.verts.new(base - side * 0.3)]
-            b.faces.new((vs[0], vs[1], vs[2], vs[3], vs[4]))
-    me_ = bpy.data.meshes.new(name)
-    b.to_mesh(me_)
-    b.free()
-    o = bpy.data.objects.new(name, me_)
-    bpy.context.collection.objects.link(o)
-    o.location = at
-    sol_ = o.modifiers.new("t", "SOLIDIFY"); sol_.thickness = 0.0005
-    bpy.context.view_layer.objects.active = o
-    bpy.ops.object.modifier_apply(modifier="t")
-    fin(o, name, mat)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=r * 0.22, segments=10, ring_count=6, location=at + Vector((0, 0, r * 0.45)))
-    hb = active(); hb.scale = (1, 1, 0.6)
-    fin(hb, name + "Heart", M["heart"])
+# ---- the blooms, each built petal by petal: every petal a little curved sheet (its width along it shaped round, narrow or pointed),
+# rising from the heart at its own angle and curling as it goes, cupped across; laid in rings, each ring turned from the last
+def petal(b, a, r0, L, W, elev, curl, cup, shape, nt=7, ns=5):
+    rad = Vector((math.cos(a), math.sin(a), 0))
+    tan = Vector((-math.sin(a), math.cos(a), 0))
+    up = Vector((0, 0, 1))
+    spine, p_ = [], rad * r0
+    for i in range(nt + 1):
+        t = i / nt
+        e = elev + curl * t
+        spine.append((p_.copy(), e))
+        p_ += (rad * math.cos(e) + up * math.sin(e)) * (L / nt)
+    rows = []
+    for i, (c, e) in enumerate(spine):
+        t = i / nt
+        w = {"round": math.sin(math.pi * min(0.999, t ** 0.6)) ** 0.5 if t < 1 else 0.25,
+             "narrow": math.sin(math.pi * t ** 0.8) ** 0.7 * 0.9 + (0.1 if t < 1 else 0.0),
+             "point": math.sin(math.pi * t ** 1.25) ** 0.9}[shape] * W / 2
+        nrm = up * math.cos(e) - rad * math.sin(e)
+        across = [k / (ns // 2) - 1 for k in range(ns)]
+        rows.append([b.verts.new(c + tan * w * s_ + nrm * cup * w * (s_ * s_)) for s_ in across])
+    for i in range(nt):
+        for k in range(ns - 1):
+            b.faces.new((rows[i][k], rows[i][k + 1], rows[i + 1][k + 1], rows[i + 1][k]))
 
 
-# (the blooms: a crowd of them heaped over the mouth and spilling out round it, the biggest at the top, some leaning well out; a few buds)
-PAL = (["white", "yellow", "white", "yellow", "white"] if VARIANT == 0 else ["pink", "crimson", "violet", "pink", "white", "crimson"])
-NB = 9 if VARIANT == 0 else 10
-for i in range(NB):
-    a_ = i * 2.399 + random.uniform(-0.2, 0.2)
-    rr = 0.0 if i == 0 else random.uniform(0.022, 0.05)
-    up = 0.185 - rr * 0.9 + random.uniform(-0.008, 0.008)
-    r = (0.032 if i == 0 else random.uniform(0.02, 0.028)) * (1.0 if VARIANT == 0 else 0.95)
-    at = Vector(P(math.cos(a_) * rr, up, math.sin(a_) * rr))
-    mum(f"VaseMum{i}", at, r, M[PAL[i % len(PAL)]])
-    # (its stalk, down to the mouth)
-    cu = bpy.data.curves.new(f"stalk{i}", "CURVE"); cu.dimensions = "3D"
-    sp = cu.splines.new("POLY"); sp.points.add(1)
-    sp.points[0].co = (*MOUTH, 1); sp.points[1].co = (*(at - Vector((0, 0, r * 0.2))), 1)
-    cu.bevel_depth = 0.001
-    o = bpy.data.objects.new(f"stalk{i}", cu); bpy.context.collection.objects.link(o)
+def stalk(name, at):
+    cu = bpy.data.curves.new(name + "Stalk", "CURVE"); cu.dimensions = "3D"
+    sp = cu.splines.new("POLY"); sp.points.add(2)
+    mid = (MOUTH + at) / 2 + Vector((0, 0, -0.006))
+    for k, q in enumerate((MOUTH, mid, at)):
+        sp.points[k].co = (*q, 1)
+    cu.bevel_depth = 0.0011
+    o = bpy.data.objects.new(name + "Stalk", cu); bpy.context.collection.objects.link(o)
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
     bpy.ops.object.convert(target="MESH")
-    fin(active(), f"VaseStalk{i}", M["stem"])
-for i in range(5):
+    fin(active(), name + "Stalk", M["stem"])
+
+
+def bloom(name, at, face, rings, mat, heart=None, extra=None, with_stalk=True):
+    """a flower at `at` (the Blender frame) facing along `face`: `rings` of (count, start radius, length, width, rise, curl, cup, shape)"""
+    b = bmesh.new()
+    for (n, r0, L, W, elev, curl, cup, shape) in rings:
+        ph = random.uniform(0, 1)
+        for i in range(n):
+            petal(b, 2 * math.pi * (i + ph) / n, r0, L * random.uniform(0.88, 1.12), W * random.uniform(0.9, 1.1),
+                  elev + random.uniform(-0.12, 0.12), curl * random.uniform(0.8, 1.2), cup, shape, nt=5 if shape == "narrow" else 7,
+                  ns=3 if shape == "narrow" else 5)
+    me_ = bpy.data.meshes.new(name); b.to_mesh(me_); b.free()
+    o = bpy.data.objects.new(name, me_); bpy.context.collection.objects.link(o)
+    q = Vector(face).normalized().to_track_quat("Z", "Y")
+    o.rotation_mode = "QUATERNION"; o.rotation_quaternion = q
+    o.location = at
+    fin(o, name, mat)
+    if heart:
+        hm, hr, hz = heart
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=hr, segments=12, ring_count=7, location=at + q @ Vector((0, 0, hz)))
+        hb = active(); hb.scale = (1, 1, 0.65); hb.rotation_mode = "QUATERNION"; hb.rotation_quaternion = q
+        fin(hb, name + "Heart", hm)
+    if extra:
+        extra(name, at, q)
+    if with_stalk:
+        stalk(name, at)
+
+
+def stamens(name, at, q):
+    """a camellia's heart: a short pale column of filaments crowned with a ring of yellow anthers"""
+    bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.0045, depth=0.009, location=at + q @ Vector((0, 0, 0.006)))
+    c = active(); c.rotation_mode = "QUATERNION"; c.rotation_quaternion = q
+    fin(c, name + "Filament", M["cream"])
+    for k in range(12):
+        a = 2 * math.pi * k / 12
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0014, segments=6, ring_count=4,
+                                             location=at + q @ Vector((math.cos(a) * 0.0047, math.sin(a) * 0.0047, 0.0108)))
+        fin(active(), f"{name}Anther{k}", M["yellow"])
+
+
+def spot(i, n, rmin, rmax, hmin, hmax):
+    """where the i-th of n blooms sits: spread round the mouth by the golden angle, the outer ones lower and leaning out"""
+    a_ = i * 2.399 + random.uniform(-0.25, 0.25)
+    rr = rmin + (rmax - rmin) * (i / max(1, n - 1)) ** 0.7 + random.uniform(-0.004, 0.004)
+    h = hmax - (hmax - hmin) * (rr - rmin) / max(1e-6, rmax - rmin) + random.uniform(-0.006, 0.006)
+    at = Vector(P(math.cos(a_) * max(0.0, rr), h, math.sin(a_) * max(0.0, rr)))
+    out = at - MOUTH
+    out.z = 0
+    face = out * 12 + Vector((0, 0, 1))
+    return at, face
+
+
+M["cream"] = pbr("VaseFlowerCream", lin("#f2ead0"), rough=0.6)
+M["gold"] = pbr("VaseMumGold", lin("#e0a020"), rough=0.55)
+M["green"] = pbr("VaseMumGreen", lin("#b8c860"), rough=0.6)
+M["peony"] = pbr("VaseMumPeony", lin("#f4a6bc"), rough=0.55)
+M["blush"] = pbr("VaseMumBlush", lin("#fbd6de"), rough=0.55)
+if VARIANT == 0:
+    # 金運: white and gold chrysanthemums in three kinds: big incurved ball blooms (輪菊) heaped at the top, gold spider mums (糸菊) with long
+    # thread petals curling at their ends, and a scatter of small single spray mums (小菊) round them, white and yellow with green hearts
+    def BALL(r):
+        return [(22, 0.002, r, r * 0.3, 0.15, 0.5, 0.6, "narrow"), (20, 0.002, r * 0.92, r * 0.32, 0.55, 0.7, 0.7, "narrow"),
+                (17, 0.001, r * 0.85, r * 0.34, 0.95, 0.8, 0.8, "narrow"), (13, 0.0, r * 0.72, r * 0.36, 1.3, 0.9, 0.8, "narrow"),
+                (9, 0.0, r * 0.55, r * 0.38, 1.5, 1.0, 0.8, "narrow")]
+
+    def SPIDER(r):
+        return [(26, 0.003, r, r * 0.07, 0.25, 1.7, 0.3, "narrow"), (20, 0.002, r * 0.8, r * 0.08, 0.7, 1.6, 0.3, "narrow"),
+                (14, 0.0, r * 0.45, r * 0.12, 1.2, 0.9, 0.5, "narrow")]
+
+    def SINGLE(r):
+        return [(16, r * 0.25, r * 0.8, r * 0.26, 0.12, -0.15, 0.25, "narrow")]
+
+    for i, (c, r) in enumerate([("white", 0.034), ("gold", 0.03), ("white", 0.028)]):
+        at, face = spot(i, 3, 0.0, 0.03, 0.17, 0.19)
+        bloom(f"VaseMumBall{i}", at, face, BALL(r), M[c])
+    for i in range(2):
+        at, face = spot(i + 3, 5, 0.03, 0.05, 0.155, 0.17)
+        bloom(f"VaseMumSpider{i}", at, face, SPIDER(0.036), M["gold" if i == 0 else "yellow"])
+    for i in range(9):
+        at, face = spot(i + 2, 11, 0.032, 0.058, 0.145, 0.172)
+        c = ("yellow", "white")[i % 2]
+        bloom(f"VaseMumSmall{i}", at, face, SINGLE(0.014), M[c], heart=(M["green"] if c == "white" else M["heart"], 0.004, 0.001))
+    NBUD, BUDMAT = 6, ["bud"]
+else:
+    # 良緣: a softer, livelier mix: full pink peony-like blooms (cupped round petals, paler at the heart), crimson camellias (椿) opened
+    # wide round a column of stamens, violet bellflowers (桔梗) with their five pointed petals and balloon buds, and clouds of baby's
+    # breath (霞草) through them
+    def PEONY(r):
+        return [(9, 0.003, r, r * 0.75, 0.3, 0.5, 0.6, "round"), (8, 0.002, r * 0.85, r * 0.7, 0.7, 0.6, 0.65, "round"),
+                (7, 0.001, r * 0.65, r * 0.65, 1.05, 0.6, 0.65, "round"), (6, 0.0, r * 0.45, r * 0.6, 1.35, 0.5, 0.6, "round")]
+
+    def PEONY_IN(r):
+        return [(5, 0.0, r * 0.32, r * 0.55, 1.45, 0.4, 0.5, "round")]
+
+    def CAMELLIA(r):
+        return [(6, 0.003, r, r * 0.9, 0.25, 0.35, 0.5, "round"), (5, 0.002, r * 0.8, r * 0.85, 0.75, 0.35, 0.6, "round")]
+
+    def BELL(r):
+        return [(5, 0.0015, r, r * 0.6, 0.75, -0.35, 0.4, "point")]
+
+    for i, (c, kind) in enumerate([("peony", "p"), ("crimson", "c"), ("peony", "p"), ("crimson", "c"), ("violet", "b"), ("violet", "b"),
+                                   ("blush", "p"), ("violet", "b")]):
+        at, face = spot(i, 8, 0.0, 0.055, 0.14, 0.19)
+        if kind == "p":
+            bloom(f"VaseMumPeony{i}", at, face, PEONY(0.03), M[c])
+            bloom(f"VaseMumPeonyIn{i}", at, face, PEONY_IN(0.03), M["blush" if c == "peony" else "white"], with_stalk=False)
+        elif kind == "c":
+            bloom(f"VaseMumCamellia{i}", at, face, CAMELLIA(0.026), M[c], extra=stamens)
+        else:
+            bloom(f"VaseMumBell{i}", at, face, BELL(0.022), M[c], heart=(M["white"], 0.0035, 0.004))
+    # (baby's breath: fine twigs forking out between the blooms, each tip a tiny white puff)
+    twigs, dots = [], []
+    for k in range(7):
+        a_ = k * 0.9 + random.uniform(-0.3, 0.3)
+        rr = random.uniform(0.05, 0.075)
+        tip = Vector(P(math.cos(a_) * rr, random.uniform(0.15, 0.2), math.sin(a_) * rr))
+        mid = MOUTH + (tip - MOUTH) * 0.55
+        for f in range(6):
+            end = tip + Vector((random.uniform(-0.018, 0.018), random.uniform(-0.018, 0.018), random.uniform(-0.01, 0.014)))
+            twigs.append((MOUTH, mid, end) if f == 0 else (mid, end))
+            for d_ in range(3):
+                dots.append(end + Vector((random.uniform(-0.004, 0.004), random.uniform(-0.004, 0.004), random.uniform(-0.003, 0.003))))
+    cu = bpy.data.curves.new("VaseBreathTwigs", "CURVE"); cu.dimensions = "3D"; cu.bevel_depth = 0.0005
+    for tw in twigs:
+        sp = cu.splines.new("POLY"); sp.points.add(len(tw) - 1)
+        for k, q in enumerate(tw):
+            sp.points[k].co = (*q, 1)
+    o = bpy.data.objects.new("VaseBreathTwigs", cu); bpy.context.collection.objects.link(o)
+    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+    bpy.ops.object.convert(target="MESH")
+    fin(active(), "VaseBreathTwigs", M["bud"])
+    bm2 = bmesh.new()
+    for q in dots:
+        bmesh.ops.create_icosphere(bm2, subdivisions=1, radius=random.uniform(0.0016, 0.0024), matrix=Matrix.Translation(q))
+    me2 = bpy.data.meshes.new("VaseMumBreath"); bm2.to_mesh(me2); bm2.free()
+    o = bpy.data.objects.new("VaseMumBreath", me2); bpy.context.collection.objects.link(o)
+    fin(o, "VaseMumBreath", M["white"])
+    NBUD, BUDMAT = 5, ["violet"]
+for i in range(NBUD):
     a_ = random.uniform(0, 2 * math.pi)
-    rr = random.uniform(0.04, 0.06)
-    at = Vector(P(math.cos(a_) * rr, random.uniform(0.15, 0.175), math.sin(a_) * rr))
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0035, segments=10, ring_count=6, location=at)
+    rr = random.uniform(0.04, 0.065)
+    at = Vector(P(math.cos(a_) * rr, random.uniform(0.15, 0.18), math.sin(a_) * rr))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0042 if VARIANT else 0.0035, segments=10, ring_count=6, location=at)
     bd = active(); bd.scale = (1, 1, 1.4)
-    fin(bd, f"VaseBud{i}", M["bud"] if VARIANT == 0 else M[PAL[i % len(PAL)]])
+    fin(bd, f"VaseBud{i}", M[BUDMAT[i % len(BUDMAT)]])
+    stalk(f"VaseBud{i}", at)
 root = bpy.data.objects.new(f"ShrineVase{VARIANT}", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
     o.parent = root
+if PREVIEW:
+    # (a close look for checking it: a camera a little above, a sun and a grey world)
+    cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
+    bpy.context.collection.objects.link(cam)
+    cam.location = P(0.0, 0.24, 0.62)
+    cam.rotation_mode = "QUATERNION"
+    cam.rotation_quaternion = (Vector(P(0, 0.12, 0)) - cam.location).to_track_quat("-Z", "Y")
+    cam.data.lens = 70
+    bpy.context.scene.camera = cam
+    sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
+    sun.data.energy = 4
+    sun.rotation_euler = (0.6, 0.3, 0.4)
+    bpy.context.collection.objects.link(sun)
+    w = bpy.data.worlds.new("W"); w.use_nodes = True
+    w.node_tree.nodes["Background"].inputs[0].default_value = (0.45, 0.45, 0.45, 1)
+    bpy.context.scene.world = w
 os.makedirs(os.path.join(PROJECT, "public", "models"), exist_ok=True)
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", f"shrinevase{VARIANT}.glb"), os.path.join(PROJECT, "blender", f"shrinevase{VARIANT}.blend"), PREVIEW)
 print("SHRINEVASE_DONE", len(parts), "parts", sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in parts), "tris")

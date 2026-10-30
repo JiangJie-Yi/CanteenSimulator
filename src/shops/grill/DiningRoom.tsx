@@ -11,9 +11,10 @@ import { reflectStudio, useStudio } from '@/scene/studio'
 import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
-import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, restockDrink, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
+import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, restockDrink, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
+import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
 import { Steam } from '@/scene/Steam'
 import { setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
@@ -1305,21 +1306,22 @@ function Bouquet({ lean = 0, variant = 0 }: { lean?: number; variant?: number })
           : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: THREE.DoubleSide })
       m.castShadow = true
     })
-    inkModel(r, (m) => /Leaves|Mum|Stems/.test(m.name), { width: 0.0008, weld: true })
+    inkModel(r, (m) => /Leaves|Mum|Stems|Stalk|Bud|Breath|Flower/.test(m.name), { width: 0.0008, weld: true })
     return r
   }, [gltf])
   return <group rotation-z={lean}><primitive object={root} /></group>
 }
 VASE_URLS.forEach((u) => useGLTF.preload(u))
-/** a vase whose flowers change at a click: the sakaki with small chrysanthemums first, then the white and gold, then the pink and crimson; each
- * time set at a slightly different turn and lean, so the two sides never look stamped out alike */
-function BouquetPick({ lean = 0 }: { lean?: number }) {
-  const [v, setV] = useState(0)
+/** a vase whose flowers change at a click: the sakaki with small chrysanthemums, the white and gold, the pink and crimson, each bringing its
+ * own blessing while it stands there (game/shrineFlowers); each time set at a slightly different turn and lean, so the two sides never
+ * look stamped out alike. `slot`: 0 the left vase, 1 the right */
+function BouquetPick({ lean = 0, slot }: { lean?: number; slot: number }) {
+  const [v, setV] = useState<Flower>(SHRINE_FLOWERS[slot] ?? 0)
   const turn = useMemo(() => (Math.random() - 0.5) * 1.2, [v])
   const tilt = useMemo(() => (Math.random() - 0.5) * 0.06, [v])
   return (
-    <group rotation-y={turn} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setV((x) => (x + 1) % VASE_URLS.length) }}
-      {...tipOver('供花', '點一下換一組花')}>
+    <group rotation-y={turn} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const n = nextFlower(v); setShrineFlower(slot, n); setV(n) }}
+      {...tipOver(`供花・${FLOWERS[v].name}`, `${FLOWERS[v].buff}｜點一下換一組花`)}>
       <Bouquet lean={lean + tilt} variant={v} />
     </group>
   )
@@ -1535,7 +1537,7 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase
       {(part === 'all' || part === 'shrine') && <group position={[-0.14, 0.015, 0]}><KamidanaModel /></group>}
       {/* the bouquets in their vases, leaning in a little, each its own piece */}
       {[-1, 1].filter((sd) => part === 'all' || part === `vase${sd}`).map((sd) => (
-        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><BouquetPick lean={sd * -0.08} /><ContactShadow r={0.05} y={-0.014} /></group>
+        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><BouquetPick lean={sd * -0.08} slot={sd < 0 ? 0 : 1} /><ContactShadow r={0.05} y={-0.014} /></group>
       ))}
       {/* the cups' stand (blender/kamidana.py), the cups on it */}
       {(part === 'all' || part === 'cups') && <group position={[-0.3, 0, 0]}><KamidanaModel part="cupstand" /><ContactShadow r={0.15} /></group>}

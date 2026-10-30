@@ -3,6 +3,7 @@ import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 import { openingFloat, type DrawerCash } from '@/game/till'
 import { RACK_FULL } from '@/game/plates'
+import type { Flower } from '@/game/shrineFlowers'
 
 /*
  * Where the customers sit: one or more counters, each a straight run of stools. A counter is given by its middle
@@ -576,3 +577,17 @@ export const PLATE_STACKS = (() => {
 export const PLATE_STACK_Y = (CUBBY_FLOOR_Y - GRILL_OFFSET.y) / GRILL_SCALE
 /** a point given in the bar's own sizes, where it is in the scene as drawn */
 export const toGrillScene = (v: THREE.Vector3) => v.clone().multiplyScalar(GRILL_SCALE).add(GRILL_OFFSET)
+
+/** the flowers standing in the shrine's two vases, left and right (game/shrineFlowers: each kind its own blessing); kept in the browser */
+const FLOWERS_KEY = 'jgs-shrine-flowers-1'
+export const SHRINE_FLOWERS: Flower[] = (() => {
+  try {
+    const v = JSON.parse(localStorage.getItem(FLOWERS_KEY) ?? 'null')
+    if (Array.isArray(v) && v.length === 2 && v.every((x) => x === 0 || x === 1 || x === 2)) return v as Flower[]
+  } catch { /* (none kept) */ }
+  return [0, 0]
+})()
+export function setShrineFlower(slot: number, f: Flower) {
+  SHRINE_FLOWERS[slot] = f
+  try { localStorage.setItem(FLOWERS_KEY, JSON.stringify(SHRINE_FLOWERS)) } catch { /* (not kept) */ }
+}

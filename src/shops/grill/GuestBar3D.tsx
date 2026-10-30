@@ -38,7 +38,8 @@ import { takeOut, type Denom } from '@/game/till'
 import { fromRack, putAway, TAKE } from '@/game/plates'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
-import { PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { flowerBuffs } from '@/game/shrineFlowers'
+import { SHRINE_FLOWERS, PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
 
@@ -1556,7 +1557,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (now and then, while they wait, off to the toilet: their kind's own)
         const guest = guestsRef.current.find((x) => x.id === s.id)
         if (guest) s.items = guest.items
-        if (fridges && guest?.state === 'waiting' && !s.drink && Math.random() < drinkRate() * Math.min(dt, 0.1)) {
+        if (fridges && guest?.state === 'waiting' && !s.drink && Math.random() < drinkRate() * flowerBuffs(SHRINE_FLOWERS).drinks * Math.min(dt, 0.1)) {
           // (they choose what they want, and go to the fridge it's in)
           const pick = drinkFor(kindOf(s.id).kind, s.id)
           const fr = fridges[fridgeUnitOf(pick)]

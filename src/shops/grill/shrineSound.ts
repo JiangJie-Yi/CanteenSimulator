@@ -1,5 +1,6 @@
 // The shrine's sounds, made on the spot with WebAudio (no recordings): the blessing coming down as the offering's taken (a temple bowl's long
-// ring under a fall of small bright bells and a breath of air), and the shrine's little doors (a dry wooden creak, a soft knock as they stop).
+// ring under a fall of small bright bells and a breath of air), and the shrine's little doors (their pins creaking by stick-slip friction
+// through a hinoki panel's resonances, the latch, a knock as they stop or meet).
 
 let audio: AudioContext | null = null
 const ctx = () => (audio ??= new AudioContext())
@@ -61,35 +62,128 @@ export function blessingChime() {
   }
 }
 
-/** the shrine's doors swinging: a dry creak of the wooden pins, and as they stop, a soft knock (opening) or a closing clack */
+/**
+ * A creak, made as friction makes it (after the stick-slip door in "Designing Sound", Farnell, as worked in SuperCollider): the pin
+ * sticks till the force on it builds enough to slip, slips with a click as loud as the force that built, and sticks again; the harder
+ * it's pushed the quicker the slips come (1 to ~330 a second), their timing a little unsteady. `force` (0..1) along the sound's length.
+ */
+function stickSlip(a: AudioContext, len: number, force: (x: number) => number) {
+  const sr = a.sampleRate
+  const b = a.createBuffer(1, Math.round(sr * len), sr)
+  const d = b.getChannelData(0)
+  let phase = 0, build = 0, env = 0, fall = 0, jit = 0, jitTo = 0
+  for (let i = 0; i < d.length; i++) {
+    const f = force(i / d.length)
+    // (the unsteadiness: a slow wander of the slip rate, from half to twice)
+    if (i % Math.round(sr / 50) === 0) jitTo = Math.random() * 2 - 1
+    jit += (jitTo - jit) * (50 / sr) * 3
+    build = Math.min(1, build + 10 / sr)
+    if (f > 0.1) {
+      phase += ((1 + ((f - 0.1) / 0.9) * 332) * 2 ** (jit * jit * Math.sign(jit))) / sr
+      if (phase >= 1) {
+        phase -= 1
+        env = Math.sqrt(build) * Math.min(1, f * 1.6)
+        fall = Math.exp(-1 / (Math.sqrt(env + 1e-4) * 0.01 * sr))
+        build = 0
+      }
+    }
+    d[i] = env * (0.75 + 0.25 * Math.random())
+    env *= fall
+  }
+  const n = a.createBufferSource()
+  n.buffer = b
+  return n
+}
+
+/** what a small panel of hinoki does to a sound in it: the wood's own formants (a bank of band-passes), then the panel's quick echoes */
+function woodPanel(a: AudioContext, out: AudioNode, k: number, gain: number) {
+  const inp = a.createGain()
+  const body = a.createGain()
+  const dry = a.createGain()
+  dry.gain.value = 0.2
+  inp.connect(dry).connect(body)
+  ;[62.5, 125, 250, 395, 560, 790].forEach((f, i) => {
+    const bp = a.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.value = f * k
+    bp.Q.value = [1, 1, 2, 2, 3, 3][i]
+    inp.connect(bp).connect(body)
+  })
+  const mix = a.createGain()
+  mix.gain.value = 1 / 8
+  for (const ms of [4.52, 5.06, 6.27, 8, 5.48, 7.14, 10.12, 16]) {
+    const dl = a.createDelay(0.05)
+    dl.delayTime.value = (ms / 1000) / k
+    body.connect(dl).connect(mix)
+  }
+  const hp = a.createBiquadFilter()
+  hp.type = 'highpass'
+  hp.frequency.value = 125 * k
+  const g = a.createGain()
+  g.gain.value = gain
+  mix.connect(hp).connect(g).connect(out)
+  return inp
+}
+
+/** a knock of hinoki on hinoki: a tick of noise ringing the wood's few modes, short and dry */
+function knock(a: AudioContext, out: AudioNode, t: number, pitch: number, gain: number) {
+  const tick = noise(a, 0.012, (x) => (1 - x) ** 3)
+  const g = a.createGain()
+  g.gain.value = gain
+  g.connect(out)
+  ;[[480, 8, 1], [1150, 10, 0.7], [2100, 12, 0.45], [3300, 14, 0.25]].forEach(([f, q, v]) => {
+    const bp = a.createBiquadFilter(), bg = a.createGain()
+    bp.type = 'bandpass'
+    bp.frequency.value = f * pitch
+    bp.Q.value = q
+    bg.gain.value = v * 3
+    tick.connect(bp).connect(bg).connect(g)
+  })
+  tick.start(t)
+}
+
+/** a little click of the doors' brass latch catching or letting go */
+function latch(a: AudioContext, out: AudioNode, t: number, gain: number) {
+  const c = noise(a, 0.006, (x) => (1 - x) ** 2)
+  const hp = a.createBiquadFilter(), g = a.createGain()
+  hp.type = 'highpass'
+  hp.frequency.value = 3500
+  g.gain.value = gain
+  c.connect(hp).connect(g).connect(out)
+  c.start(t)
+  ring(a, out, t, 4700, gain * 0.05, 0.08)
+  ring(a, out, t, 6900, gain * 0.03, 0.06)
+}
+
+/**
+ * The shrine's little double doors (観音開き) swinging on their wooden pins. Opening: the latch lets go, the pins creak as the doors swing
+ * out, slowing, and they knock softly against their stops. Closing: a quicker, higher creak as they're swung to, and the two leaves
+ * meeting, one a moment after the other, the latch catching.
+ */
 export function shrineDoor(open: boolean) {
   try {
     const a = ctx()
     const t = a.currentTime + 0.01
     const out = a.createGain()
-    out.gain.value = 0.5
+    out.gain.value = 0.7
     out.connect(a.destination)
-    // (the creak: a narrow band of rough noise, its pitch sliding as the door turns)
-    const cr = noise(a, 0.45, (x) => Math.sin(Math.PI * x) * (0.6 + 0.4 * Math.sin(x * 90)))
-    const cf = a.createBiquadFilter(), cg = a.createGain()
-    cf.type = 'bandpass'
-    cf.Q.value = 9
-    cf.frequency.setValueAtTime(open ? 700 : 1100, t)
-    cf.frequency.linearRampToValueAtTime(open ? 1100 : 650, t + 0.45)
-    cg.gain.value = 0.5
-    cr.connect(cf).connect(cg).connect(out)
-    cr.start(t)
-    // (the stop: a hollow wooden knock, lower and softer for opening, sharper for the doors meeting)
-    const tk = t + 0.42
-    const kn = noise(a, 0.08, (x) => (1 - x) ** 5)
-    const kf = a.createBiquadFilter(), kg = a.createGain()
-    kf.type = 'bandpass'
-    kf.frequency.value = open ? 420 : 900
-    kf.Q.value = 2
-    kg.gain.value = open ? 0.5 : 0.8
-    kn.connect(kf).connect(kg).connect(out)
-    kn.start(tk)
-    ring(a, out, tk, open ? 210 : 320, 0.12, 0.18)
+    const panel = woodPanel(a, out, 2.4, 3.2)
+    if (open) {
+      latch(a, out, t, 0.5)
+      // (the swing: the push builds, wavers, and eases off as the doors slow)
+      const cr = stickSlip(a, 0.7, (x) => (x < 0.15 ? x / 0.15 : 1) * (1 - x) ** 0.6 * (0.5 + 0.06 * Math.sin(x * 23)))
+      cr.connect(panel)
+      cr.start(t + 0.04)
+      knock(a, out, t + 0.76, 0.85, 0.35)
+      knock(a, out, t + 0.8, 0.9, 0.12)
+    } else {
+      const cr = stickSlip(a, 0.42, (x) => Math.sin(Math.PI * Math.min(1, x * 1.2)) * (0.62 + 0.05 * Math.sin(x * 31)))
+      cr.connect(panel)
+      cr.start(t)
+      knock(a, out, t + 0.44, 1.1, 0.7)
+      knock(a, out, t + 0.475, 1.18, 0.5)
+      latch(a, out, t + 0.5, 0.7)
+    }
   } catch {
     // (no audio: silent)
   }

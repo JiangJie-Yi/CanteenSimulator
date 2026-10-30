@@ -27,7 +27,8 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE } from './bar'
+import { COAL_BRIDGE, SHRINE_FLOWERS } from './bar'
+import { flowerBuffs } from '@/game/shrineFlowers'
 import { Boss } from './Boss'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
 import { ashMaterial, charcoalMaterial, useBinchotan } from './binchotanModel'
@@ -3210,7 +3211,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const free = (n: number) => n < BAR_SEATS && !used.has(n)
       // now and then a couple comes in together, if two stools side by side on one counter are free: a young man and
       // a young woman (the next ids that are), sat next to each other
-      const pairAt = Math.random() < fl.pairs
+      const pairAt = Math.random() < Math.min(0.9, fl.pairs * flowerBuffs(SHRINE_FLOWERS).pairs)
         ? Array.from({ length: BAR_SEATS - 1 }, (_, n) => n).find((n) => free(n) && free(n + 1) && GRILL_SEATS[n].counter === GRILL_SEATS[n + 1].counter)
         : undefined
       let ids = [guestSeq.current + 1]
@@ -3269,7 +3270,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     // someone kept waiting too long goes
     for (const g of seated) {
-      if (g.eaten.length === 0 && now - g.since > PATIENCE) {
+      if (g.eaten.length === 0 && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience) {
         g.state = 'angry'
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
