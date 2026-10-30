@@ -128,6 +128,30 @@ def tube(name, pts, r, mat, cyclic=False):
     return fin(active(), name, mat)
 
 
+def ribbon(name, pts, outs, width, thick, mat):
+    """a flat band of cloth through points (three's frame) lying on a surface whose outward normals are `outs`: `width` across it, `thick`
+    off the surface, its edges eased"""
+    bm = bmesh.new()
+    rows = []
+    n = len(pts)
+    for i, (q, o) in enumerate(zip(pts, outs)):
+        t = (pts[min(n - 1, i + 1)] - pts[max(0, i - 1)]).normalized()
+        o = o.normalized()
+        side = t.cross(o).normalized()
+        row = []
+        for (a, b) in ((-0.5, 0.0), (-0.47, 1.0), (0.47, 1.0), (0.5, 0.0)):
+            row.append(bm.verts.new(P(*(q + side * width * a + o * thick * b))))
+        rows.append(row)
+    for i in range(n - 1):
+        for k in range(3):
+            bm.faces.new((rows[i][k], rows[i][k + 1], rows[i + 1][k + 1], rows[i + 1][k]))
+    bm.faces.new(rows[0][::-1]); bm.faces.new(rows[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o)
+    return fin(o, name, mat)
+
+
 # ---- the body: short and plump, turned on a lathe; its top a low dome the head sits down into
 PROFILE = [(0.0, 0.0), (0.0, 0.0), (0.008, 0.08), (0.03, 0.155), (0.07, 0.21), (0.12, 0.243), (0.18, 0.26), (0.24, 0.262),
            (0.3, 0.255), (0.36, 0.238), (0.41, 0.21), (0.45, 0.17), (0.48, 0.11), (0.495, 0.05), (0.5, 0.0)]
@@ -212,17 +236,17 @@ def head_at(a, e, out=0.0):
 
 # (his hair: only what shows under the tenugui, short at the sides and the nape; a light shell, its strands painted)
 HT = 0.012
-bpy.ops.mesh.primitive_uv_sphere_add(radius=R + HT, segments=24, ring_count=12, location=P(*C))
+bpy.ops.mesh.primitive_uv_sphere_add(radius=R + HT, segments=64, ring_count=32, location=P(*C))
 hair = active()
 bm = bmesh.new(); bm.from_mesh(hair.data)
-gone = []
-for f in bm.faces:
-    c = f.calc_center_median()
-    x, y, z = c.x, c.z, -c.y
-    keep = y < 0.16 and ((z < -0.04 and y > -0.15) or (z < 0.05 and abs(x) > 0.17 and y > 0.0))
-    if not keep:
-        gone.append(f)
-bmesh.ops.delete(bm, geom=gone, context="FACES")
+# (cut clean with planes, not face by face, so its edges are smooth lines: off in front of the ears, off under the tenugui's edge, and a
+# nape line, higher at the sides than at the back)
+
+for co, no in ((Vector(P(0, 0, 0.055)), Vector(P(0, 0, 1))),                     # (nothing in front of the ears)
+               (Vector(P(0, 0.17, 0)), Vector(P(0, 1, 0))),                      # (nothing over the crown: the tenugui's there)
+               (Vector(P(0, -0.15, -R)), Vector(P(0, -1, 0.4)).normalized())):  # (the nape, rising toward the ears)
+    geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no, clear_outer=True)  # (the shell's own frame: its middle at the head's)
 bm.to_mesh(hair.data); bm.free()
 fin(hair, "BossHair", M["hair"])
 # (sideburns down in front of the ears)
@@ -253,15 +277,15 @@ for sd in (-1, 1):
     for i in range(32):
         t = 2 * math.pi * i / 32
         c_, s_ = math.cos(t), math.sin(t)
-        fx = ex + 0.055 * math.copysign(abs(c_) ** 0.45, c_)
-        fy = EY + 0.044 * math.copysign(abs(s_) ** 0.45, s_)
+        fx = ex + 0.05 * math.copysign(abs(c_) ** 0.7, c_)
+        fy = EY + 0.04 * math.copysign(abs(s_) ** 0.7, s_)
         ring.append(on_head(fx, fy, 0.022)[0])
     tube(f"BossGlass{sd}", ring, 0.0055, M["frame"], cyclic=True)
     # (its arm back to the ear)
     arm = [on_head(sd * 0.143, EY + 0.012, 0.022)[0]]
     a_out = math.asin(0.143 / R)
     for k in range(1, 7):
-        arm.append(head_at(sd * (a_out + (math.pi / 2 - a_out) * k / 6), math.asin((EY + 0.012) / R), 0.012 + 0.01 * (1 - k / 6)))
+        arm.append(head_at(sd * (a_out + (math.radians(84) - a_out) * k / 6), math.asin((EY + 0.012) / R), 0.012 + 0.01 * (1 - k / 6)))
     tube(f"BossGlassArm{sd}", arm, 0.0045, M["frame"])
     # (brows: arched and kind, over the frames)
     tube(f"BossBrow{sd}", [on_head(ex + 0.028 * (2 * u - 1), EY + 0.078 + 0.01 * (1 - (2 * u - 1) ** 2), 0.006)[0]
@@ -280,8 +304,8 @@ for sd in (-1, 1):
 tube("BossMouth", [on_head(0.022 * (2 * u - 1), -0.118 - 0.01 * (1 - (2 * u - 1) ** 2), 0.003)[0] for u in [k / 10 for k in range(11)]], 0.0055, M["mouth"])
 # (ears)
 for sd in (-1, 1):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.048, segments=16, ring_count=8, location=P(sd * (R - 0.01), C.y + 0.0, -0.01))
-    e = active(); e.scale = (0.5, 0.8, 1.0)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.048, segments=16, ring_count=8, location=P(sd * (R + 0.006), C.y - 0.005, -0.015))
+    e = active(); e.scale = (0.45, 0.85, 0.95)
     fin(e, f"BossEar{sd}", M["skin"])
 
 # ---- the tenugui: indigo with a white fish pressed on the front (押花), wrapped over the crown like a cap down to the brow, its front edge rolled, knotted at the back with
@@ -346,29 +370,36 @@ for i in range(40):
     e = math.asin(max(-0.9, ((R + 0.02) * math.sin(BE) - 0.07 * max(0.0, -zc)) / (R + 0.02)))
     roll.append(head_at(a, e, 0.022))
 tube("BossTenuguiRoll", roll, 0.013, M["tenugui"], cyclic=True)
-# (the knot at the back, and its two corners)
-kp = head_at(math.pi, 0.15, 0.04)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.03, segments=12, ring_count=8, location=P(*kp))
-k_ = active(); k_.scale = (1.2, 0.9, 0.8)
+# (the knot at the back, and its two corners: flat flaps of the cloth, hanging and flaring out)
+kp = head_at(math.pi, 0.14, 0.035)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.034, segments=16, ring_count=10, location=P(*kp))
+k_ = active(); k_.scale = (1.35, 0.95, 0.85)
 fin(k_, "BossKnot", M["tenugui"])
-for k, (dx, dy) in enumerate(((0.6, 0.5), (-0.6, 0.45))):
-    d = Vector((dx, dy, -0.5)).normalized()
-    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.03, radius2=0.004, depth=0.09, location=P(*(kp + d * 0.045)))
-    t = active(); t.scale = (1.0, 0.3, 1.0)
-    t.rotation_mode = "QUATERNION"; t.rotation_quaternion = Vector(P(*d)).to_track_quat("Z", "Y")
-    fin(t, f"BossKnotEnd{k}", M["tenugui"], smooth=False)
+for k, sd in enumerate((-1, 1)):
+    pts, outs = [], []
+    for i in range(7):
+        t = i / 6
+        q = kp + Vector((sd * (0.02 + 0.07 * t), -0.02 - 0.09 * t * t, -0.025 - 0.02 * t))
+        pts.append(q); outs.append(Vector((sd * 0.3, 0.1, -1)))
+    o = ribbon(f"BossKnotEnd{k}", pts, outs, 0.045, 0.006, M["tenugui"])
 
-# ---- the kappōgi's collar: crossed left over right, a red under-collar showing at the neck
-tube("BossCollarUnder", [on_body(0.1 - 0.1 * u, 0.43 + DY - 0.11 * u, 0.006) for u in [k / 8 for k in range(9)]], 0.013, M["collar"])
-tube("BossCollarOver", [on_body(-0.1 + 0.24 * u, 0.43 + DY - 0.19 * u, 0.012) for u in [k / 10 for k in range(11)]], 0.014, M["collar"])
-tube("BossCollarUnderNeck", [on_body(-0.07 + 0.14 * u, 0.437 + DY - 0.05 * (1 - abs(2 * u - 1)), 0.008) for u in [k / 8 for k in range(9)]],
-     0.008, M["pants"])
-# (the jacket's hem standing a little proud over the trousers, and a cord tied round the waist, its bow at his left)
-tube("BossHem", [Vector((math.sin(2 * math.pi * i / 64) * (rb(HEM) + 0.012), HEM, math.cos(2 * math.pi * i / 64) * (rb(HEM) + 0.012)))
-                 for i in range(64)], 0.009, M["coat"], cyclic=True)
+# ---- the kappōgi's collar: wide flat bands crossed left over right on the chest, lying on it; the indigo under-collar at the neck
+def body_out(q):
+    return Vector((q.x, 0, q.z)).normalized() + Vector((0, 0.35, 0))
+
+
+under = [on_body(0.1 - 0.1 * u, 0.43 + DY - 0.11 * u, 0.002) for u in [k / 8 for k in range(9)]]
+ribbon("BossCollarUnder", under, [body_out(q) for q in under], 0.05, 0.008, M["collar"])
+over = [on_body(-0.1 + 0.24 * u, 0.43 + DY - 0.19 * u, 0.008) for u in [k / 10 for k in range(11)]]
+ribbon("BossCollarOver", over, [body_out(q) for q in over], 0.055, 0.008, M["collar"])
+neck = [on_body(-0.08 + 0.16 * u, 0.44 + DY - 0.055 * (1 - abs(2 * u - 1)), 0.001) for u in [k / 10 for k in range(11)]]
+ribbon("BossCollarUnderNeck", neck, [body_out(q) for q in neck], 0.03, 0.006, M["pants"])
+# (the jacket's hem: a band standing a hair proud of the trousers all round; the cord pressed round the waist, its bow at his left)
+lathe("BossHem", [(HEM - 0.016, rb(HEM - 0.016) + 0.002), (HEM - 0.012, rb(HEM - 0.012) + 0.008), (HEM + 0.012, rb(HEM + 0.012) + 0.008),
+                  (HEM + 0.016, rb(HEM + 0.016) + 0.002)], M["coat"], seg=64)
 BELT = 0.235 * BH
-tube("BossCord", [Vector((math.sin(2 * math.pi * i / 64) * (rb(BELT) + 0.007), BELT, math.cos(2 * math.pi * i / 64) * (rb(BELT) + 0.014)))
-                  for i in range(64)], 0.009, M["cord"], cyclic=True)
+tube("BossCord", [Vector((math.sin(2 * math.pi * i / 64) * (rb(BELT) + 0.005), BELT, math.cos(2 * math.pi * i / 64) * (rb(BELT) + 0.005)))
+                  for i in range(64)], 0.008, M["cord"], cyclic=True)
 ba = math.radians(60)
 bc = Vector((math.sin(ba) * (rb(BELT) + 0.02), BELT, math.cos(ba) * (rb(BELT) + 0.02)))
 side_ = Vector((math.cos(ba), 0, -math.sin(ba)))
@@ -418,8 +449,12 @@ tt = Vector((math.sin(ta) * (rb(BELT) + 0.012), BELT, math.cos(ta) * (rb(BELT) +
 tw = Vector((math.cos(ta), 0, -math.sin(ta)))
 for k, (y0, y1, mat, out) in enumerate(((0.0, 0.17, M["towel"], 0.0), (0.035, 0.05, M["blue"], 0.004), (0.12, 0.135, M["blue"], 0.004))):
     bpy.ops.mesh.primitive_cube_add(size=1, location=P(*(tt + Vector((0, -(y0 + y1) / 2 + 0.01, 0)) + Vector((math.sin(ta), 0, math.cos(ta))) * (0.006 + out))))
-    o = active(); o.scale = (0.075 + out * 2, 0.006 + out, y1 - y0)
+    o = active(); o.scale = (0.075 + out * 2, 0.012 + out, y1 - y0)
     o.rotation_euler = (0, 0, ta)
+    bpy.ops.object.transform_apply(scale=True)
+    bv = o.modifiers.new("b", "BEVEL"); bv.width = 0.004; bv.segments = 2
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.modifier_apply(modifier="b")
     fin(o, f"BossTowel{k}", mat, smooth=False)
 # (a pencil behind his right ear)
 ep = Vector((-(R - 0.01), C.y + 0.03, -0.0))
@@ -499,7 +534,8 @@ for e in list(hands.values()) + props:
 if PREVIEW:
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = P(0.3, 1.6, 1.6)
+    # (where the preview looks from: PREVIEW_CAM="x,y,z" in three's frame, or a little above and in front)
+    cam.location = P(*map(float, os.environ.get("PREVIEW_CAM", "0.3,1.6,1.6").split(",")))
     cam.rotation_mode = "QUATERNION"
     cam.rotation_quaternion = (Vector(P(0, 0.5, 0)) - cam.location).to_track_quat("-Z", "Y")
     cam.data.lens = 42
