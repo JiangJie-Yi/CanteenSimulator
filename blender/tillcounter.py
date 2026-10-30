@@ -161,10 +161,10 @@ lat = mix(lat, np.clip(_wal * 1.5, 0, 1), _sheen * 0.35)
 slat_tex = image("shieldslats", lat)
 _hgt = _slat * (1 - 0.5 * smooth(_half - 0.08, _half, _d))
 slat_nrm = image("shieldslatsN", to_normal(_hgt.astype(np.float32), 3.0), data=True)
-# (the body's dark wood: a flat-sawn chestnut stained dark, its rings' arches and latewood lines and pores plain under the stain; the shelves
-# the same wood, a shade lighter)
-dark_tex = image("darkwood", flatsawn(512, (0.3, 0.19, 0.11), (0.23, 0.14, 0.08), (0.16, 0.095, 0.055), rings=22.0, seed_u=0.45))
-shelf_tex = image("shelfwood", flatsawn(512, (0.4, 0.27, 0.16), (0.32, 0.2, 0.12), (0.22, 0.14, 0.08), rings=16.0, seed_u=0.6))
+# (the body's dark wood and its shelves: the partition's soft walnut grain (long and mostly straight, the lines faint and broken, warm patches
+# through it), stained darker for the body, a little less for the shelves; quiet, as a cabinet's wood is)
+dark_tex = image("darkwood", (soft_walnut(512) * 0.6).astype(np.float32))
+shelf_tex = image("shelfwood", (soft_walnut(512) * 0.78).astype(np.float32))
 
 M = {
     "body": pbr("TillBodyWood", (1, 1, 1), tex=dark_tex, rough=0.6),

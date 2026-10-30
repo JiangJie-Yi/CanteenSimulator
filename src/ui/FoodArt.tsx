@@ -106,11 +106,24 @@ function OtherArt({ id }: { id: string }) {
   }
 }
 
+/** the foods with a picture of their own 3D model (blender/food_icons.py: each lit as in a studio, on a clear ground) */
+const PHOTOS = new Set(['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Salmon', 'Hokke', 'Buri', 'Gindara', 'Nodoguro', 'GrilledCorn',
+  'GrilledShiitake', 'Onigiri', 'ShrimpSkewer', 'Sausage', 'Potato', 'SweetPotato', 'Yakitori', 'PorkBelly', 'Squid', 'Shishito', 'KingOyster',
+  'Asparagus', 'Okra', 'Scallop', 'BloodCake', 'NetMochi', 'MisoSoup', 'Sake'])
+
 /** `band`: drawn across the top of a card (no round tile, the food cropped close to fill the band; the card's band behind it) */
 export function FoodArt({ id, store, size = 34, band = false }: { id: string; store: string; size?: number; band?: boolean }) {
   const uid = `fa${id}`
   const f = FISH[id]
   const [g0, g1] = ground(store)
+  // (the food as it is in the shop: its own model's picture, on the card's band or on its round tile)
+  if (PHOTOS.has(id)) {
+    const src = `${import.meta.env.BASE_URL}icons/food/${id}.png`
+    return band
+      ? <span className="food-art food-art-band"><img src={src} alt="" draggable={false} /></span>
+      : <span className="food-art food-art-tile" style={{ width: size, height: size, background: `radial-gradient(circle at 40% 30%, ${g0}, ${g1})` }}>
+        <img src={src} alt="" draggable={false} /></span>
+  }
   return (
     <svg className="food-art" width={band ? undefined : size} height={band ? undefined : size} viewBox={!band ? '0 0 64 64' : f ? (f.fillet ? '6 11 52 33' : '1 13 62 34') : '4 6 56 52'} aria-hidden="true">
       <defs>
