@@ -6,13 +6,14 @@ import { inkModel } from '@/scene/inkHull'
 import { airbrush, gradientMap } from '@/scene/Person3D'
 
 /**
- * The owner (blender/boss.py): round as an Overcooked cook, in his headband, samue and apron, standing at his grill while the shop's shut.
+ * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body) with the face on his picture: glasses,
+ * moustache, headband, kappōgi and apron, standing at his grill while the shop's shut.
  * Drawn in the people's soft paint (the same five-tone light and airbrush); he breathes, sways a little, waves now and then with his
  * raised hand, and blinks.
  */
 const URL = import.meta.env.BASE_URL + 'models/boss.glb'
 /** the small parts: no ink line round them */
-const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|BandEnd|Cord|Nose|Thumb)/
+const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass)/
 let made: THREE.Object3D | null = null
 
 export function Boss() {
