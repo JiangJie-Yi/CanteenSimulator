@@ -2,12 +2,12 @@
 
 Made as the cooks of Overcooked 2 are: a big round head set straight down on a plump body about as tall as the head is wide, rounding
 off underneath (no legs, no feet), no arms, floating mitten hands (a plump paddle and a thumb). His face is the one on his picture
-(ui/Avatar.tsx, role 'owner'); dressed as a Japanese cook: his head wrapped in an indigo tenugui dotted white (豆絞り) knotted at the back,
+(ui/Avatar.tsx, role 'owner'); dressed as a Japanese cook: his head wrapped in an indigo tenugui, a white fish pressed on its front, knotted at the back,
 its front edge rolled, a little brown hair at the sides and the nape; round-cornered glasses over small dark eyes, short thick brows, a round
 button nose, a moustache and a smile, ears, a pencil behind his right one; a white kappōgi crossed at the front over an indigo under-collar,
 a little gold fish pinned to his chest, indigo trousers and a navy apron (前掛け) with 聞野 on it in white, its cream cord tied in a bow at
 his left, a blue-striped hand towel tucked in at his right. Kept light in geometry, the cloth and hair given their look by painted
-textures (the tenugui's dots, the cotton's weave, the indigo's dye, the hair's strands).
+textures (the tenugui's fish, the cotton's weave, the indigo's dye, the hair's strands).
 - his hands are separate nodes (BossHandL, BossHandR) so the game can move them, and so are the tongs and the fan he picks up
   (BossTongs, BossFan: hidden till he holds them).
 
@@ -85,7 +85,8 @@ _row = np.floor(_v * 12) % 2
 _du = (_du + 0.5 * _row) % 1.0
 _dot = np.clip(1.3 - np.hypot(_du - 0.5, (_dv - 0.5) * 0.9) / 0.2, 0, 1)
 _tg = _weave((0.16, 0.22, 0.42), 0.08)
-_tg = _tg * (1 - _dot[..., None]) + np.array([0.95, 0.94, 0.9], np.float32) * _dot[..., None]
+_tgCap = _tg.copy()
+# (plain indigo for the roll and the knot; the cap's own cloth, with the fish pressed on it, is made once its front is found)
 M["tenugui"] = pbr("BossTenugui", (1, 1, 1), tex=image("boss_tenugui", _tg.astype(np.float32)), rough=0.8)
 # (the kappōgi's cotton: white with its weave, a faint shade down the folds)
 _ct = _weave((0.96, 0.94, 0.9), 0.06) * (1 - 0.05 * (0.5 + 0.5 * np.sin(_u * 2 * np.pi * 9)))[..., None]
@@ -283,7 +284,7 @@ for sd in (-1, 1):
     e = active(); e.scale = (0.5, 0.8, 1.0)
     fin(e, f"BossEar{sd}", M["skin"])
 
-# ---- the tenugui: indigo dotted white, wrapped over the crown like a cap down to the brow, its front edge rolled, knotted at the back with
+# ---- the tenugui: indigo with a white fish pressed on the front (押花), wrapped over the crown like a cap down to the brow, its front edge rolled, knotted at the back with
 # its two corners sticking out
 BE = math.asin(0.12 / R)
 bpy.ops.mesh.primitive_uv_sphere_add(radius=R + 0.02, segments=32, ring_count=16, location=P(*C))
@@ -298,8 +299,45 @@ for f in bm.faces:
     if y < edge:
         gone.append(f)
 bmesh.ops.delete(bm, geom=gone, context="FACES")
+# (where on its picture the front of the crown falls, for the fish)
+uvl = bm.loops.layers.uv.active
+front = Vector(P(0, math.sin(0.72), math.cos(0.72)))
+best = min(bm.faces, key=lambda f: (f.calc_center_median().normalized() - front).length)
+u0 = sum(l[uvl].uv.x for l in best.loops) / len(best.loops)
+v0 = sum(l[uvl].uv.y for l in best.loops) / len(best.loops)
 bm.to_mesh(cap.data); bm.free()
-fin(cap, "BossTenugui", M["tenugui"])
+
+
+def fish_mask(x, y):
+    """a fish pressed in white (押花) in its own frame (nose at -x, about 1 long): its body, tail, fins, eye, gill and a line down its side left
+    in the cloth's indigo, as a stencil leaves them"""
+    t = (x + 0.5)
+    half = 0.2 * np.sin(np.pi * np.clip(t / 0.85, 0, 1)) ** 0.75
+    body = (t > 0) & (t < 0.85) & (np.abs(y) < half)
+    tail = (t >= 0.78) & (t < 1.05) & (np.abs(y) < (t - 0.78) * 1.25 + 0.02) & ~((t > 0.98) & (np.abs(y) < (t - 0.98) * 3))
+    dorsal = (t > 0.3) & (t < 0.62) & (y > 0) & (y < half + 0.07 * np.sin(np.pi * (t - 0.3) / 0.32))
+    belly = (t > 0.45) & (t < 0.62) & (y < 0) & (-y < half + 0.04 * np.sin(np.pi * (t - 0.45) / 0.17))
+    white = body | tail | dorsal | belly
+    eye = np.hypot(t - 0.12, y - 0.04) < 0.028
+    gill = np.abs(np.hypot(t - 0.05, y) - 0.17) < 0.012
+    gill &= (t > 0.15) & (np.abs(y) < 0.14)
+    # (and a fine line down its side, from the gill to the tail)
+    line = (t > 0.22) & (t < 0.8) & (np.abs(y - 0.01 * np.sin(t * 9)) < 0.008)
+    return (white & ~eye & ~gill & ~line).astype(np.float32)
+
+
+# (the picture's pixels round the front, in the fish's frame: across is round the head at that height, up is over it, scaled so the fish
+# isn't stretched; about 0.75 of a radian long)
+lat = (v0 - 0.5) * math.pi
+_fu, _fv = grid01(512)
+fx = ((_fu - u0 + 0.5) % 1.0 - 0.5) * 2 * math.pi * math.cos(lat) / 0.75
+fy = (_fv - v0) * math.pi / 0.75
+mask = fish_mask(-fx, fy)
+# (soft at its edge, as a print on cloth)
+mask = 0.25 * mask + 0.75 * np.clip((mask + np.roll(mask, 1, 0) + np.roll(mask, -1, 0) + np.roll(mask, 1, 1) + np.roll(mask, -1, 1)) / 5, 0, 1)
+_cap = np.repeat(np.repeat(_tgCap, 2, 0), 2, 1) * (1 - mask[..., None]) + np.array([0.94, 0.92, 0.86], np.float32) * mask[..., None]
+M["tenuguiCap"] = pbr("BossTenuguiFish", (1, 1, 1), tex=image("boss_tenugui_fish", _cap.astype(np.float32)), rough=0.8)
+fin(cap, "BossTenugui", M["tenuguiCap"])
 # (its rolled front edge: a soft roll round where it ends)
 roll = []
 for i in range(40):
@@ -461,7 +499,7 @@ for e in list(hands.values()) + props:
 if PREVIEW:
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = P(0.5, 1.05, 2.3)
+    cam.location = P(0.3, 1.6, 1.6)
     cam.rotation_mode = "QUATERNION"
     cam.rotation_quaternion = (Vector(P(0, 0.5, 0)) - cam.location).to_track_quat("-Z", "Y")
     cam.data.lens = 42
