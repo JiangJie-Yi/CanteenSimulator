@@ -111,6 +111,43 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     }
     return 0
   }
+  // ---- out of the way of the camera: standing between it and what it's on (the grill, from camera 1 right behind him), he fades to a ghost
+  // of himself, as a game's characters do; his own materials, so nothing else fades with him
+  const ghost = useRef(1)
+  const { mats, inks } = useMemo(() => {
+    const set = new Set<THREE.Material>()
+    const ink: THREE.Object3D[] = []
+    root.traverse((o) => {
+      const m = (o as THREE.Mesh).material
+      if (!m) return
+      // (the ink line round him is drawn on its own back faces: it goes while he's faded, or it would hang there as a dark ring)
+      if (/outline/i.test(o.name) || (!Array.isArray(m) && m.side === THREE.BackSide)) { ink.push(o); return }
+      for (const x of Array.isArray(m) ? m : [m]) set.add(x)
+    })
+    return { mats: [...set], inks: ink }
+  }, [root])
+  useFrame(({ camera: cam }, dt) => {
+    const m = mover.current
+    if (!m) return
+    // (his head: what shows first at the foot of the picture)
+    const at = m.localToWorld(new THREE.Vector3(0, 0.8, 0))
+    const fwd = cam.getWorldDirection(new THREE.Vector3())
+    const along = at.clone().sub(cam.position).dot(fwd)
+    // (what the camera's on: where its line of sight meets the floor of the room's middle, or a few metres on)
+    const lookD = fwd.y < -0.05 ? cam.position.y / -fwd.y : 6
+    const ndc = at.clone().project(cam)
+    const inView = Math.abs(ndc.x) < 1.1 && ndc.y > -1.3 && ndc.y < 1.05 && ndc.z < 1
+    const want = !getEdit().on && inView && along > 0 && along < lookD * 0.55 ? 0.22 : 1
+    ghost.current += (want - ghost.current) * Math.min(1, Math.min(dt, 0.1) * 6)
+    const k = ghost.current
+    for (const o of inks) o.visible = k > 0.95
+    for (const x of mats) {
+      const on = k < 0.99
+      if (x.transparent !== on) { x.transparent = on; x.needsUpdate = true }
+      x.opacity = k
+      x.depthWrite = !on
+    }
+  })
   useFrame(({ clock }) => {
     const s = st.current
     const T = clock.elapsedTime

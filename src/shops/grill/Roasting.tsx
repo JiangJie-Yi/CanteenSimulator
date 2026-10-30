@@ -4949,9 +4949,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       <CookTable floor={!bar} />
       {/* (the crew keep their own places on the kitchen floor: carried back by the shift) */}
       <group position={[FIRE_SHIFT.x, 0, FIRE_SHIFT.z]}>
-      {/* the owner: at his grill while the shop's shut; open, his chef has the grill and he stands along the aisle from it, keeping an eye */}
+      {/* the owner: at his grill while the shop's shut; open, his chef has the grill and he stands along the aisle from it, keeping an eye  (and fading out of the way when he stands between the camera and what it looks at: at his grill he's right in front of camera 1) */}
       {bar && (
-        <Movable id="boss" label="老闆"><group position={space === 'open' ? BOSS_OPEN_AT : CHEF_AT} rotation-y={CHEF_YAW} scale={BOSS_SCALE}>
+        <Movable id="boss" label="老闆"><group position={space === 'open' ? BOSS_OPEN_AT : CHEF_AT} rotation-y={CHEF_YAW} scale={BOSS_SCALE} userData={{ fade: true }}>
           <Boss to={BOSS_WALK} open={space === 'open'} lang={lang}><BlobShadow r={0.24} /></Boss>
         </group></Movable>
       )}

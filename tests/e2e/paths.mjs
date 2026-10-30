@@ -16,7 +16,8 @@ page.setDefaultTimeout(8000)
 const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
 
-await page.goto(URL, { timeout: 60000 })
+// (the game's logic at the low tier: software GL draws the high one at a frame a second, and the customers' clock runs by the frame)
+await page.goto(URL + (URL.includes('?') ? '&' : '?') + (process.env.Q ? `q=${process.env.Q}` : 'q=low'), { timeout: 60000 })
 await page.waitForTimeout(5000)
 if (await page.locator('.welcome-go').count()) await page.locator('.welcome-go').click()
 await page.waitForTimeout(2500)
