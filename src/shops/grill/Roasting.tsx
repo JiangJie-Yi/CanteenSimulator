@@ -744,6 +744,12 @@ function crewPlaces(crew: CrewMember[]) {
 /** where the cook stands (on the floor, in the notch), and the way he faces: in at the fire */
 const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.62).addScaledVector(ALONG, -0.4).setY(GRILL_OFFSET.y - KITCHEN_DROP)
 const CHEF_YAW = Math.atan2(-CHEF_AT.x, -CHEF_AT.z)
+/** the owner, smaller than the cooks (round and short, as Overcooked's), and how far down the cook's aisle his walk goes, in his own frame */
+const BOSS_SCALE = 1.05 * GRILL_SCALE
+const BOSS_WALK = ((): [number, number] => {
+  const v = ALONG.clone().multiplyScalar(1.6).applyAxisAngle(new THREE.Vector3(0, 1, 0), -CHEF_YAW).divideScalar(BOSS_SCALE)
+  return [v.x, v.z]
+})()
 const COOK_TABLE_WOOD = (() => {
   if (!TRAY_WOOD) return null
   const t = TRAY_WOOD.clone()
@@ -4885,7 +4891,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       <group position={[FIRE_SHIFT.x, 0, FIRE_SHIFT.z]}>
       {/* the owner, at his grill while the shop's shut (open, his chef and crew are there instead) */}
       {space !== 'open' && bar && (
-        <Movable id="boss" label="老闆"><group position={CHEF_AT} rotation-y={CHEF_YAW} scale={CHEF_SCALE}><BlobShadow r={0.2} /><Boss /></group></Movable>
+        <Movable id="boss" label="老闆"><group position={CHEF_AT} rotation-y={CHEF_YAW} scale={BOSS_SCALE}><Boss to={BOSS_WALK}><BlobShadow r={0.24} /></Boss></group></Movable>
       )}
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
         <CrewWalk key={m.id} at={at} yaw={yaw}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></CrewWalk>

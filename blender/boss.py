@@ -1,11 +1,12 @@
-"""The owner (老闆), standing at his grill when the shop's shut: boss.glb, node "Boss", about 1.0 tall, facing +z three, his feet at y 0.
+"""The owner (老闆), standing at his grill when the shop's shut: boss.glb, node "Boss", about 0.95 tall, facing +z three, resting on y 0.
 
-Made as the cooks of Overcooked 2 are: a big round head set straight down on a short, plump body (no neck between), no arms, floating
-mitten hands, two small shoes peeping out under it. His face is the one on his picture (ui/Avatar.tsx, role 'owner'): brown hair cropped
-short, a twisted white headband (ねじり鉢巻) with a red strand through it knotted at his left, its two ends sticking out; round-cornered
-glasses, kind arched brows, a moustache, a smile, rosy cheeks, ears; a white kappōgi crossed at the front over a red under-collar, a
-navy apron from the waist with 聞野 on it and its cord tied round.
-- his hands are separate nodes (BossHandL, BossHandR) so the game can move them; the right one raised.
+Made as the cooks of Overcooked 2 are: a big round head set straight down on a short, plump body that rounds off underneath (no legs, no
+feet), no arms, floating mitten hands (a plump paddle and a thumb). His face is the one on his picture (ui/Avatar.tsx, role 'owner'): brown
+hair cropped short, a twisted white headband (ねじり鉢巻) with a red strand through it knotted at his left, its two ends sticking out;
+round-cornered glasses over big dark eyes, kind arched brows, a moustache, a smile, rosy cheeks, ears; a white kappōgi crossed at the
+front over a red under-collar, its hem over checked cook's trousers, a red cord round the waist bowed at his left, 聞野 on his chest.
+- his hands are separate nodes (BossHandL, BossHandR) so the game can move them, and so are the tongs and the fan he picks up
+  (BossTongs, BossFan: hidden till he holds them).
 
 Run:
     blender -b --factory-startup --python blender/boss.py -- <project path> [preview.png]
@@ -16,6 +17,7 @@ import sys
 
 import bmesh
 import bpy
+import numpy as np
 from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -41,7 +43,7 @@ def active():
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 M = {
-    "skin": pbr("BossSkin", lin("#ecbf94"), rough=0.6),
+    "skin": pbr("BossSkin", lin("#d99a68"), rough=0.6),
     "cheek": pbr("BossCheek", lin("#ee8a78"), rough=0.6),
     "hair": pbr("BossHair", lin("#5a3a2a"), rough=0.6),
     "brow": pbr("BossBrow", lin("#3a2418"), rough=0.6),
@@ -57,7 +59,14 @@ M = {
     "mouth": pbr("BossMouth", lin("#5a2018"), rough=0.6),
     "shoe": pbr("BossShoe", lin("#3a2a20"), rough=0.6),
     "print": pbr("BossPrint", lin("#f4efe2"), rough=0.7),
+    "fan": pbr("BossFanPaper", lin("#f6efe0"), rough=0.7),
+    "bamboo": pbr("BossBamboo", lin("#c8a86a"), rough=0.6),
 }
+# (the cook's trousers: a small grey-and-charcoal check, its squares square round the body)
+_n = 512
+_u, _v = grid01(_n)
+_ck = ((np.floor(_u * 72) + np.floor(_v * 72)) % 2)[..., None]
+M["pants"] = pbr("BossPants", (1, 1, 1), tex=image("boss_check", (np.array([0.11, 0.12, 0.14]) * _ck + np.array([0.62, 0.64, 0.68]) * (1 - _ck)).astype(np.float32)), rough=0.8)
 parts = []
 
 
@@ -85,8 +94,10 @@ def tube(name, pts, r, mat, cyclic=False):
 
 
 # ---- the body: short and plump, turned on a lathe; its top a low dome the head sits down into
-PROFILE = [(0.03, 0.0), (0.03, 0.19), (0.06, 0.24), (0.12, 0.262), (0.22, 0.268), (0.32, 0.262), (0.40, 0.245), (0.46, 0.22),
-           (0.51, 0.18), (0.55, 0.12), (0.575, 0.05), (0.58, 0.0)]
+PROFILE = [(0.0, 0.0), (0.0, 0.0), (0.008, 0.08), (0.03, 0.155), (0.07, 0.21), (0.12, 0.243), (0.18, 0.26), (0.24, 0.262),
+           (0.3, 0.255), (0.36, 0.238), (0.41, 0.21), (0.45, 0.17), (0.48, 0.11), (0.495, 0.05), (0.5, 0.0)]
+# (where the jacket's hem comes down to, over the trousers)
+HEM = 0.17
 
 
 def rb(y):
@@ -107,6 +118,7 @@ def on_body(x, y, out=0.0):
 
 def lathe(name, profile, mat, seg=48, a0=0.0, a1=2 * math.pi):
     bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
     full = abs(a1 - a0 - 2 * math.pi) < 1e-6
     n = seg if full else seg + 1
     rings = []
@@ -121,21 +133,27 @@ def lathe(name, profile, mat, seg=48, a0=0.0, a1=2 * math.pi):
             i2 = (i + 1) % n
             vs = [rings[j][i], rings[j][i2], rings[j + 1][i2], rings[j + 1][i]]
             try:
-                bm.faces.new(vs)
+                f = bm.faces.new(vs)
             except ValueError:
-                pass
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+                continue
+            # (u round it, v up it, to the same scale: a pattern on it comes out square)
+            y0, y1 = profile[j][0], profile[j + 1][0]
+            for lp, uv in zip(f.loops, ((i / seg, y0 / 1.64), ((i + 1) / seg, y0 / 1.64), ((i + 1) / seg, y1 / 1.64), (i / seg, y1 / 1.64))):
+                lp[uvl].uv = uv
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o)
     return fin(o, name, mat)
 
 
-body = lathe("BossBody", PROFILE, M["coat"], seg=48)
+# (the trousers below, the jacket from just under its hem up, the two overlapping)
+body = lathe("BossPants", [q for q in PROFILE if q[0] <= HEM + 0.02], M["pants"], seg=48)
+lathe("BossBody", [(y, r + (0.006 if y < HEM + 0.04 else 0.0)) for (y, r) in PROFILE if y >= HEM - 0.03 or (y, r) == PROFILE[0] and False],
+      M["coat"], seg=48)
 
 # ---- the head: a big ball, set down on the body
-C = Vector((0.0, 0.765, 0.0))
-R = 0.265
+C = Vector((0.0, 0.68, 0.0))
+R = 0.27
 bpy.ops.mesh.primitive_uv_sphere_add(radius=R, segments=48, ring_count=24, location=P(*C))
 head = fin(active(), "BossHead", M["skin"])
 
@@ -175,52 +193,55 @@ fin(hair, "BossHair", M["hair"])
 # ---- the face
 EY = 0.015
 for sd in (-1, 1):
-    ex = sd * 0.085
-    # (eyes: dark ovals with a glint)
+    ex = sd * 0.09
+    # (eyes: big dark ovals with two glints)
     p, n = on_head(ex, EY, 0.0)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=8, location=P(*p))
-    o = active(); o.scale = (0.022, 0.012, 0.028)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=18, ring_count=10, location=P(*p))
+    o = active(); o.scale = (0.016, 0.01, 0.021)
     o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
     fin(o, f"BossEye{sd}", M["dark"])
-    p, n = on_head(ex + 0.008, EY + 0.012, 0.008)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0065, segments=10, ring_count=6, location=P(*p))
+    p, n = on_head(ex + 0.006, EY + 0.008, 0.007)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0055, segments=10, ring_count=6, location=P(*p))
     fin(active(), f"BossEyeShine{sd}", M["white"])
+    p, n = on_head(ex - 0.005, EY - 0.009, 0.007)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0025, segments=8, ring_count=5, location=P(*p))
+    fin(active(), f"BossEyeShineB{sd}", M["white"])
     # (the glasses: a round-cornered frame round each eye, standing a little off the face)
     ring = []
     for i in range(32):
         t = 2 * math.pi * i / 32
         c_, s_ = math.cos(t), math.sin(t)
-        fx = ex + 0.05 * math.copysign(abs(c_) ** 0.45, c_)
-        fy = EY + 0.038 * math.copysign(abs(s_) ** 0.45, s_)
+        fx = ex + 0.055 * math.copysign(abs(c_) ** 0.45, c_)
+        fy = EY + 0.044 * math.copysign(abs(s_) ** 0.45, s_)
         ring.append(on_head(fx, fy, 0.022)[0])
     tube(f"BossGlass{sd}", ring, 0.0055, M["frame"], cyclic=True)
     # (its arm back to the ear)
-    arm = [on_head(sd * 0.135, EY + 0.012, 0.022)[0]]
-    a_out = math.asin(0.135 / R)
+    arm = [on_head(sd * 0.143, EY + 0.012, 0.022)[0]]
+    a_out = math.asin(0.143 / R)
     for k in range(1, 7):
         arm.append(head_at(sd * (a_out + (math.pi / 2 - a_out) * k / 6), math.asin((EY + 0.012) / R), 0.012 + 0.01 * (1 - k / 6)))
     tube(f"BossGlassArm{sd}", arm, 0.0045, M["frame"])
     # (brows: arched and kind, over the frames)
-    tube(f"BossBrow{sd}", [on_head(ex + 0.042 * (2 * u - 1), EY + 0.072 + 0.014 * (1 - (2 * u - 1) ** 2), 0.006)[0]
-                           for u in [k / 8 for k in range(9)]], 0.009, M["brow"])
+    tube(f"BossBrow{sd}", [on_head(ex + 0.028 * (2 * u - 1), EY + 0.078 + 0.01 * (1 - (2 * u - 1) ** 2), 0.006)[0]
+                           for u in [k / 8 for k in range(9)]], 0.011, M["brow"])
     # (rosy cheeks under the frames)
-    p, n = on_head(sd * 0.13, -0.055, -0.003)
+    p, n = on_head(sd * 0.135, -0.05, -0.003)
     bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=8, location=P(*p))
-    o = active(); o.scale = (0.03, 0.008, 0.02)
+    o = active(); o.scale = (0.03, 0.008, 0.026)
     o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
     fin(o, f"BossCheek{sd}", M["cheek"])
 # (the bridge between the frames)
-tube("BossGlassBridge", [on_head(x, EY + 0.012 + 0.006 * (1 - (x / 0.035) ** 2), 0.024)[0] for x in (-0.035, -0.018, 0, 0.018, 0.035)], 0.005, M["frame"])
+tube("BossGlassBridge", [on_head(x, EY + 0.012 + 0.006 * (1 - (x / 0.033) ** 2), 0.024)[0] for x in (-0.033, -0.017, 0, 0.017, 0.033)], 0.005, M["frame"])
 # (a round nose)
-p, n = on_head(0.0, -0.035, -0.006)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.028, segments=16, ring_count=8, location=P(*p))
+p, n = on_head(0.0, -0.04, 0.012)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.042, segments=16, ring_count=8, location=P(*p))
 fin(active(), "BossNose", M["skin"])
 # (a moustache: two soft brown wings either side under the nose)
 for sd in (-1, 1):
-    tube(f"BossMoustache{sd}", [on_head(sd * (0.006 + 0.05 * u), -0.07 + 0.012 * math.sin(math.pi * u) - 0.012 * u * u, 0.004)[0]
-                                for u in [k / 8 for k in range(9)]], 0.012, M["hair"])
+    tube(f"BossMoustache{sd}", [on_head(sd * (0.012 + 0.036 * u), -0.088 + 0.008 * math.sin(math.pi * u) - 0.01 * u * u, 0.006)[0]
+                                for u in [k / 8 for k in range(9)]], 0.0095, M["hair"])
 # (a smile under it)
-tube("BossMouth", [on_head(0.035 * (2 * u - 1), -0.112 - 0.014 * (1 - (2 * u - 1) ** 2), 0.003)[0] for u in [k / 10 for k in range(11)]], 0.0055, M["mouth"])
+tube("BossMouth", [on_head(0.022 * (2 * u - 1), -0.118 - 0.01 * (1 - (2 * u - 1) ** 2), 0.003)[0] for u in [k / 10 for k in range(11)]], 0.0055, M["mouth"])
 # (ears)
 for sd in (-1, 1):
     bpy.ops.mesh.primitive_uv_sphere_add(radius=0.048, segments=16, ring_count=8, location=P(sd * (R - 0.01), C.y + 0.0, -0.01))
@@ -251,62 +272,102 @@ for k, (up, ln) in enumerate(((0.55, 0.11), (-0.45, 0.1))):
     fin(t, f"BossBandEnd{k}", M["band"])
 
 # ---- the kappōgi's collar: crossed left over right, a red under-collar showing at the neck
-tube("BossCollarUnder", [on_body(0.11 - 0.11 * u, 0.53 - 0.13 * u, 0.006) for u in [k / 8 for k in range(9)]], 0.014, M["collar"])
-tube("BossCollarOver", [on_body(-0.11 + 0.27 * u, 0.53 - 0.2 * u, 0.012) for u in [k / 10 for k in range(11)]], 0.015, M["collar"])
-tube("BossCollarRed", [on_body(-0.075 + 0.15 * u, 0.535 - 0.06 * (1 - abs(2 * u - 1)), 0.008) for u in [k / 8 for k in range(9)]], 0.009, M["red"])
-
-# ---- the apron: a navy cloth over his front from the waist down, its cord round the waist, 聞野 on it
-AP = [(y, rb(y) + 0.008) for y in (0.06, 0.1, 0.16, 0.22, 0.28, 0.33)]
-ap = lathe("BossApron", AP, M["apron"], seg=24, a0=-math.radians(80), a1=math.radians(80))
-so = ap.modifiers.new("t", "SOLIDIFY"); so.thickness = 0.006
-bpy.context.view_layer.objects.active = ap
-bpy.ops.object.modifier_apply(modifier="t")
-tube("BossCord", [Vector((math.sin(2 * math.pi * i / 64) * (rb(0.335) + 0.009), 0.335, math.cos(2 * math.pi * i / 64) * (rb(0.335) + 0.009)))
-                  for i in range(64)], 0.011, M["cord"], cyclic=True)
+tube("BossCollarUnder", [on_body(0.1 - 0.1 * u, 0.43 - 0.11 * u, 0.006) for u in [k / 8 for k in range(9)]], 0.013, M["collar"])
+tube("BossCollarOver", [on_body(-0.1 + 0.24 * u, 0.43 - 0.19 * u, 0.012) for u in [k / 10 for k in range(11)]], 0.014, M["collar"])
+tube("BossCollarRed", [on_body(-0.07 + 0.14 * u, 0.437 - 0.05 * (1 - abs(2 * u - 1)), 0.008) for u in [k / 8 for k in range(9)]], 0.008, M["red"])
+# (the jacket's hem standing a little proud over the trousers, and a cord tied round the waist, its bow at his left)
+tube("BossHem", [Vector((math.sin(2 * math.pi * i / 64) * (rb(HEM) + 0.012), HEM, math.cos(2 * math.pi * i / 64) * (rb(HEM) + 0.012)))
+                 for i in range(64)], 0.009, M["coat"], cyclic=True)
+BELT = 0.235
+tube("BossCord", [Vector((math.sin(2 * math.pi * i / 64) * (rb(BELT) + 0.007), BELT, math.cos(2 * math.pi * i / 64) * (rb(BELT) + 0.007)))
+                  for i in range(64)], 0.009, M["red"], cyclic=True)
+ba = math.radians(60)
+bc = Vector((math.sin(ba) * (rb(BELT) + 0.02), BELT, math.cos(ba) * (rb(BELT) + 0.02)))
+side_ = Vector((math.cos(ba), 0, -math.sin(ba)))
+for sd in (-1, 1):
+    tube(f"BossCordBow{sd}", [bc + side_ * sd * 0.03 * math.sin(math.pi * u) + Vector((0, 0.022 * math.sin(2 * math.pi * u), 0)) * sd
+                              for u in [k / 12 for k in range(13)]], 0.007, M["red"])
+    tube(f"BossCordTail{sd}", [bc + side_ * sd * 0.012 * u + Vector((0, -0.05 * u, 0.01 * u)) for u in (0, 0.5, 1)], 0.006, M["red"])
+# (the shop's name stitched small on his chest, navy on the white)
 bpy.ops.object.text_add(location=(0, 0, 0))
 tx = active()
 tx.data.body = "聞野"
 JP = bpy.data.fonts.load("C:/Windows/Fonts/YuGothB.ttc") if os.path.exists("C:/Windows/Fonts/YuGothB.ttc") else None
 if JP:
     tx.data.font = JP
-tx.data.size = 0.085
+tx.data.size = 0.05
 tx.data.align_x = "CENTER"; tx.data.align_y = "CENTER"
-tx.rotation_euler = (math.pi / 2, 0, 0)
+tx.rotation_euler = (math.pi / 2, 0, math.asin(0.105 / rb(0.33)))
 bpy.ops.object.convert(target="MESH")
 tx = active()
-tx.location = P(*on_body(0, 0.2, 0.018))
-fin(tx, "BossPrint", M["print"], smooth=False)
+tx.location = P(*on_body(0.105, 0.33, 0.009))
+fin(tx, "BossPrint", M["apron"], smooth=False)
 
-# ---- hands (floating mittens) and shoes
+# ---- hands: floating mittens as Overcooked's, a plump rounded paddle (the fingers together, curled a little) and a thumb of its own,
+# hanging at his sides; each its own node so the game can swing them, raise them, hold things in them
 hands = {}
-for sd, at in ((-1, (-0.33, 0.27, 0.08)), (1, (0.37, 0.5, 0.08))):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.07, segments=18, ring_count=10, location=P(*at))
-    h = active(); h.scale = (0.95, 0.85, 1.05)
+HAND_AT = {-1: Vector((-0.3, 0.2, 0.05)), 1: Vector((0.3, 0.2, 0.05))}
+for sd, at in HAND_AT.items():
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=20, ring_count=12, location=(0, 0, 0))
+    h = active()
+    # (the paddle: wider than thick, longest down the fingers; the finger end fuller, curled in toward the palm)
+    for v in h.data.vertices:
+        x, y, z = v.co.x, v.co.z, -v.co.y          # three frame: y along the fingers (down), x across, z thickness
+        w = 1.0 + 0.12 * (-y)                       # fuller at the finger end (y < 0)
+        v.co = Vector(P(x * 0.05 * w, y * 0.06, z * 0.036))
+        cz = 0.016 * max(0.0, -y) ** 2            # the fingers curling forward
+        v.co += Vector(P(0, 0, cz))
+    h.location = P(*at)
+    h.rotation_euler = (0, -sd * 0.25, 0)
     hn = fin(h, f"BossHand{'L' if sd < 0 else 'R'}Mitt", M["skin"])
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.028, segments=12, ring_count=8, location=P(at[0] - sd * 0.02, at[1] + 0.045, at[2] + 0.04))
-    th = fin(active(), f"BossHand{'L' if sd < 0 else 'R'}Thumb", M["skin"])
-    # (its own node at the world's origin, the mitt and thumb under it where they are: the game moves the node)
+    # (the thumb: a short rounded stub out from the side of the palm, toward the front)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*(at + Vector((-sd * 0.036, 0.014, 0.024)))))
+    th = active(); th.scale = (0.019, 0.019, 0.03)
+    th.rotation_euler = (0.5, 0, -sd * 0.6)
+    th = fin(th, f"BossHand{'L' if sd < 0 else 'R'}Thumb", M["skin"])
     e = bpy.data.objects.new(f"BossHand{'L' if sd < 0 else 'R'}", None)
     bpy.context.collection.objects.link(e)
+    bpy.context.view_layer.update()
     for o in (hn, th):
         mw = o.matrix_world.copy(); o.parent = e; o.matrix_world = mw
     hands[sd] = e
+
+# ---- what he holds (shown by the game when he holds it): long steel tongs and a round paper fan (団扇), each its own node with its grip
+# at the node's origin, the tongs pointing forward (+z), the fan's face up the +y
+props = []
+tg = bpy.data.objects.new("BossTongs", None); bpy.context.collection.objects.link(tg)
 for sd in (-1, 1):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.07, segments=16, ring_count=8, location=P(sd * 0.11, 0.035, 0.13))
-    s_ = active(); s_.scale = (0.85, 1.25, 0.6)
-    fin(s_, f"BossShoe{sd}", M["shoe"])
+    pts = [Vector((sd * 0.004, 0, -0.02)), Vector((sd * 0.008, 0, 0.06)), Vector((sd * 0.012, 0, 0.16)), Vector((sd * 0.006, -0.004, 0.2))]
+    o = tube(f"BossTongsArm{sd}", pts, 0.0035, M["frame"])
+    o.parent = tg
+tube("BossTongsHinge", [Vector((-0.006, 0, -0.024)), Vector((0.006, 0, -0.024))], 0.006, M["frame"]).parent = tg
+props.append(tg)
+fan = bpy.data.objects.new("BossFan", None); bpy.context.collection.objects.link(fan)
+bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.07, depth=0.004, location=P(0, 0.1, 0), rotation=(0, 0, 0))
+fp = active(); fp.rotation_euler = (0, 0, 0)
+fp.scale = (1, 1, 1)
+fp.rotation_mode = "XYZ"; fp.rotation_euler = (math.pi / 2, 0, 0)
+bpy.ops.object.transform_apply(rotation=True)
+fin(fp, "BossFanPaper", M["fan"]).parent = fan
+for k in range(9):
+    a = math.radians(-80 + 20 * k)
+    tube(f"BossFanRib{k}", [Vector((0, 0.035, 0.003)), Vector((math.sin(a) * 0.066, 0.1 + math.cos(a) * 0.066, 0.003))], 0.0012, M["bamboo"]).parent = fan
+tube("BossFanHandle", [Vector((0, -0.03, 0)), Vector((0, 0.035, 0))], 0.006, M["bamboo"]).parent = fan
+tube("BossFanRim", [Vector((math.sin(2 * math.pi * i / 40) * 0.07, 0.1 + math.cos(2 * math.pi * i / 40) * 0.07, 0)) for i in range(40)],
+     0.002, M["red"], cyclic=True).parent = fan
+props.append(fan)
 
 root = bpy.data.objects.new("Boss", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
     if o.parent is None:
         o.parent = root
-for e in hands.values():
+for e in list(hands.values()) + props:
     e.parent = root
 if PREVIEW:
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = P(1.2, 1.1, 2.2)
+    cam.location = P(0.35, 0.8, 1.3)
     cam.rotation_mode = "QUATERNION"
     cam.rotation_quaternion = (Vector(P(0, 0.5, 0)) - cam.location).to_track_quat("-Z", "Y")
     cam.data.lens = 42
@@ -318,5 +379,5 @@ if PREVIEW:
     w = bpy.data.worlds.new("W"); w.use_nodes = True
     w.node_tree.nodes["Background"].inputs[0].default_value = (0.5, 0.5, 0.5, 1)
     bpy.context.scene.world = w
-export_dish(root, parts + list(hands.values()) + [root], os.path.join(PROJECT, "public", "models", "boss.glb"), os.path.join(PROJECT, "blender", "boss.blend"), PREVIEW)
+export_dish(root, parts + list(hands.values()) + props + [root], os.path.join(PROJECT, "public", "models", "boss.glb"), os.path.join(PROJECT, "blender", "boss.blend"), PREVIEW)
 print("BOSS_DONE", sum(len(o.data.polygons) for o in parts))
