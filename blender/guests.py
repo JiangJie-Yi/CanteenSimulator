@@ -907,8 +907,10 @@ def face(kind, hd):
     # nose and ears, on the head mesh itself
     bm = bmesh.new()
     bm.from_mesh(hd.data)
-    np_, nn = surf.ang(0, -0.235, -0.002)
-    ellipsoid(bm, np_, (0.0075 * k, 0.006 * k, 0.006 * k), mi=0)
+    # (a round button of a nose, as the owner's: the family look of the shop's people; a girl's and a child's a size smaller)
+    nr = 0.016 if (girl or kind == "kid") else 0.02
+    np_, nn = surf.ang(0, -0.24, nr * 0.35)
+    ellipsoid(bm, np_, (nr * k, nr * 0.85 * k, nr * 0.9 * k), mi=0)
     for sd in (1, -1):
         ep, en = surf.ang(sd * 1.5, -0.14, -0.012)
         rot = Vector((0, 0, 1)).rotation_difference(Vector((sd, 0.25, 0))).to_matrix()

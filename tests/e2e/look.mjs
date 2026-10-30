@@ -56,27 +56,29 @@ for (let t = 0; t < Number(process.env.WAIT ?? 240000); t += 2000) {
   const sat = await page.evaluate(() => (window.__shown?.current ?? []).filter((s) => s.phase === 'sit').length)
   if (sat >= 3) break
 }
-const people = await page.evaluate(() => {
-  const groups = window.__guestGroups?.current, shown = window.__shown?.current
-  return (shown ?? []).filter((s) => s.phase === 'sit').map((s) => { const p = groups.get(s.id).getWorldPosition(groups.get(s.id).position.clone()); return [s.id, p.x, p.y, p.z] })
-})
+const ids = await page.evaluate(() => (window.__shown?.current ?? []).filter((s) => s.phase === 'sit').map((s) => s.id))
 let n = 0
-for (const [id, x, y, z] of people.slice(0, 4)) {
-  for (const [ang, tag] of [[0, 'front'], [1.2, 'side']]) {
-    await page.evaluate(([x, y, z, ang]) => {
+for (const id of ids.slice(0, 4)) {
+  for (const [ang, tag] of [[0, 'front'], [0.9, 'side']]) {
+    await page.evaluate(([id, ang]) => {
       window.__freeCam = true
+      const g = window.__guestGroups.current.get(id)
       const V = window.__cam.position.constructor
-      const at = new V(x, y + 0.9, z)
-      const toMid = new V(-x, 0, -z).normalize()
-      const d = toMid.clone().applyAxisAngle(new V(0, 1, 0), ang)
-      // (from the kitchen's side of the bar, looking at their face)
-      window.__ctl.target.copy(at)
-      window.__cam.position.copy(at).addScaledVector(d, -1.6).add(new V(0, 0.35, 0))
+      // (their size and where their face is: the top part of their box; they face their own +z)
+      const box = new (Object.getPrototypeOf(g).constructor === undefined ? Object : Object)()
+      g.updateWorldMatrix(true, true)
+      let lo = new V(1e9, 1e9, 1e9), hi = new V(-1e9, -1e9, -1e9)
+      g.traverse((o) => { if (!o.isMesh || !o.geometry?.boundingBox && !o.geometry) return; o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox; for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) { const p = new V(x, y, z).applyMatrix4(o.matrixWorld); lo.min(p); hi.max(p) } })
+      const h = hi.y - lo.y
+      const head = new V((lo.x + hi.x) / 2, lo.y + h * 0.78, (lo.z + hi.z) / 2)
+      const face = new V(0, 0, 1).transformDirection(g.matrixWorld).setY(0).normalize().applyAxisAngle(new V(0, 1, 0), ang)
+      window.__ctl.target.copy(head).add(new V(0, -h * 0.2, 0))
+      window.__cam.position.copy(head).addScaledVector(face, h * 1.5).add(new V(0, h * 0.15, 0))
       window.__ctl.update()
-    }, [x, y, z, ang])
+    }, [id, ang])
     await page.waitForTimeout(900)
     await page.screenshot({ path: `${OUT}/person_${n++}_${tag}.png` })
   }
 }
 await browser.close()
-console.log('shots', n, 'people', people.length)
+console.log('shots', n, 'people', ids.length)
