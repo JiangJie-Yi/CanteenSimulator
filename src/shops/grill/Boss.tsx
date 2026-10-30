@@ -177,7 +177,7 @@ export function Boss({ to = [0, 0], children }: { to?: [number, number]; childre
     }
   })
   return (
-    <group ref={mover}>
+    <group ref={mover} name="BossFollow">
       {children}
       <group ref={body}><primitive object={root} /></group>
     </group>

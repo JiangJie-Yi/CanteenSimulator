@@ -27,6 +27,7 @@ import { Menu } from '@/ui/Menu'
 import { Crash } from '@/ui/Crash'
 import { OpeningSpot } from '@/scene/OpeningSpot'
 import { OccluderFade } from '@/scene/OccluderFade'
+import { LensFX } from '@/scene/LensFX'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
@@ -126,6 +127,8 @@ const CAMERA_POSITION: [number, number, number] = [2.9, 2.2, 4.0]
 const OVERVIEW_TARGET = new THREE.Vector3(0.0, 0.3, -1.2)
 const OVERVIEW_POSITION = new THREE.Vector3(21.7, 15.5, 2.2)
 const CAMERA_FOV = 40
+/** the lens of the view through the owner's eyes: wide, as a first-person view is */
+const WIDE_FOV = 85
 
 const ITEM_IDS = Object.fromEntries(DISHES.map((d) => [d.id, d.items.map((it) => it.id)]))
 /** every menu item by id (for its calories when it's eaten) */
@@ -440,6 +443,13 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   const spotRef = useRef(spotLock)
   spotRef.current = spotLock
   const wasLocked = useRef(false)
+  // (the view through the owner's eyes is a wide one; every other view the usual lens)
+  const wide = !editing && !!VIEW_SPOTS.find((v) => v.id === view)?.follow
+  useEffect(() => {
+    const cam = camera as THREE.PerspectiveCamera
+    cam.fov = wide ? WIDE_FOV : CAMERA_FOV
+    cam.updateProjectionMatrix()
+  }, [wide, camera])
   const scene = useThree((s) => s.scene)
   const size = useThree((s) => s.size)
   // frame the dish on the stage rather than the whole canvas: shift the projection so the stage's centre is
@@ -516,6 +526,12 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     const at = anchor.getWorldPosition(new THREE.Vector3())
     const floor = OVERVIEW_TARGET.y - 1.5
     if (at.y < floor + 0.3) at.y += 0.9
+    // (one that follows: through his own eyes, a little in front of his face so it isn't in the way, looking the way he faces and a little
+    // down, at his hands and the fire)
+    if (spot.follow) {
+      anchor.updateWorldMatrix(true, false)
+      return { pos: anchor.localToWorld(new THREE.Vector3(0, 0.7, 0.4)), target: anchor.localToWorld(new THREE.Vector3(0, 0.45, 1.6)) }
+    }
     const toMiddle = new THREE.Vector3(-at.x, 0, -at.z).normalize()
     return { pos: at.clone().addScaledVector(toMiddle, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0)), target: at }
   }
@@ -647,6 +663,15 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     }
 
     const c = controls.current
+    // (a view that follows what it looks at (the owner, about his grill): its aim moved on with him every frame, the camera gliding after)
+    const follow = VIEW_SPOTS.find((v) => v.id === view)?.follow && spotLock ? poseOf(view) : null
+    if (c && follow) {
+      // (first person: held to his eyes every frame, no gliding after)
+      camera.position.copy(follow.pos)
+      c.target.copy(follow.target)
+      c.update()
+      homing.current = false
+    }
     if (c && lockView) {
       // (held at camera 1: it glides there, and the controls are off so nothing drags it away)
       const pose = cameraOneOf(home.current, homeTarget, offsetOf('camera1'), rotationOf('camera1'))
@@ -799,6 +824,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
 
       {/* (the hangings that come between the camera and what it's looking at fade out of the way) */}
       <OccluderFade target={() => controls.current?.target} />
+      {/* (the fixed views, every one but the free view: soft at the edges, darkened round the rim; not on a weak device, it's a second pass) */}
+      {(lockView || spotLock) && QUALITY.tier !== 'low' && <LensFX />}
       {/* (edit mode: the views marked where they look, numbered, as Sketchfab's annotations; camera 1 itself isn't placed by hand any more) */}
       {/* (the views: their numbered spots in the room while the view menu's open; in edit mode each view's camera, to be placed by hand) */}
       {pins && !editing && <ViewMarkers lang={lang} onPick={onView} />}

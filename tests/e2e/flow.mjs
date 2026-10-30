@@ -50,7 +50,8 @@ for (const [i, shop] of SHOPS.entries()) {
     // (buying in is done in the ingredients' panel at the grill (research): the fridge button opens it, then 補滿, and it's shut again)
     // (just after a code change the dev server may still be compiling: wait for the button rather than give up at the first try)
     await page.locator('.fridge-toggle').waitFor({ timeout: 45000 })
-    await page.locator('.fridge-toggle').click()
+    // (and the first click given time: the room's shaders may still be compiling on software GL, the page not answering for a while)
+    await page.locator('.fridge-toggle').click({ timeout: 60000 })
     await page.waitForTimeout(500)
     await page.locator('.tally-restock.is-full').click()
     await page.waitForTimeout(200)
@@ -100,6 +101,9 @@ for (const [i, shop] of SHOPS.entries()) {
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT })
   } catch (e) {
     failures.push(`${shop} stopped: ${e.message.split('\n')[0]}`)
+    // (and with SHOT, a picture of where it stopped, and which element it was after)
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT }).catch(() => {})
+    console.log(e.message.split('\n').slice(0, 14).join('\n'))
   }
   await ctx.close()
 }

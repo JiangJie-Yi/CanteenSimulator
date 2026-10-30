@@ -3,7 +3,7 @@
 // the whole shop's have their own framing).
 import type { Lang } from './i18n'
 
-export type ViewId = 'free' | 'grill' | 'till' | 'genkan' | 'altar' | 'drinks' | 'toilet' | 'back'
+export type ViewId = 'free' | 'grill' | 'till' | 'genkan' | 'altar' | 'drinks' | 'toilet' | 'back' | 'boss'
 export type ViewSpot = {
   id: ViewId
   zh: string
@@ -16,6 +16,8 @@ export type ViewSpot = {
   /** how far back the camera stands from it, and how high above it */
   back?: number
   up?: number
+  /** seen through the eyes of what it's on (the owner), following him as he goes, a wide lens */
+  follow?: boolean
 }
 
 export const VIEW_SPOTS: ViewSpot[] = [
@@ -33,6 +35,8 @@ export const VIEW_SPOTS: ViewSpot[] = [
     about: { zh: '男女廁所的拉門與洗手台', ja: '男女のお手洗いの引き戸と手洗い', en: 'The toilets: sliding doors and wash basins' } },
   { id: 'back', zh: '後台區', ja: '裏方', en: 'Back room', anchor: 'look-back', back: 3.5, up: 2.0,
     about: { zh: '後場：碗盤櫃架、飯桶與作業台', ja: '裏方：食器棚、飯びつと作業台', en: 'Behind the scenes: dish rack, rice tub, work table' } },
+  { id: 'boss', zh: '老闆', ja: '店主', en: 'Owner', anchor: 'BossFollow', follow: true,
+    about: { zh: '老闆的第一人稱廣角視角（閉店時）', ja: '店主の目線、広角（閉店中）', en: "The owner's own eyes, wide (while closed)" } },
 ]
 
 export const viewName = (v: ViewSpot, lang: Lang) => (lang === 'ja' ? v.ja : lang === 'en' ? v.en : v.zh)
