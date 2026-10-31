@@ -9,6 +9,7 @@ import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
 import { Person } from '@/scene/Person3D'
+import { FolkFigure } from '@/scene/FolkFigure'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
@@ -85,9 +86,13 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
 
 /** the customers (and their stools) at life size beside the bar, which is drawn to match them */
 const PEOPLE_SCALE = 1.3
+/** the customers drawn in the boss's style (scene/FolkFigure), his height; ?guests=old brings back the old figures (scene/Person3D) */
+const FOLK_GUESTS = typeof location === 'undefined' || new URLSearchParams(location.search).get('guests') !== 'old'
 /** the staff (the servers) drawn the boss's height, a head shorter than the customers: the boss (Roasting's BOSS_SCALE) is 0.95 tall at 1.68,
  * a figure here 0.97 tall at this and the shop's own scale of 2 */
 const STAFF_SCALE = (1.05 * 0.8 * 2 * 0.95) / (0.97 * 2)
+/** a customer in the boss's style, drawn in the customers' frame (PEOPLE_SCALE): the staff's size */
+const FOLK_FIT = STAFF_SCALE / PEOPLE_SCALE
 
 /**
  * The way in's noren, in the manner of a modern shop's: unbleached cotton, plain, the shop's crest large in dark brown across the middle
@@ -2400,8 +2405,9 @@ function Say({ text }: { text: string }) {
 function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number
   guest?: GuestView }) {
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
-  return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
-    fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined}
+  const Figure = FOLK_GUESTS ? FolkFigure : Person
+  return <Figure id={s.id} eating={eating()} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
+    fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined} fit={FOLK_FIT}
     held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} />
 }
 

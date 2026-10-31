@@ -30,13 +30,13 @@ const SKIN = ['#f3d2b0', '#eac39c', '#d9a77e', '#f6dcc0', '#c99470']
 const HAIR = ['#2b1d14', '#4a3020', '#1c1c22', '#7a5a3a', '#5a3a2a']
 const pick = <T,>(l: T[], n: number) => l[n % l.length]
 
-type Look = { top: string; legs: string; hair: string; skin: string; shoes: string; size: number
+export type Look = { top: string; legs: string; hair: string; skin: string; shoes: string; size: number
   /** the cloth of what they wear on top, and on their legs (or skirt) */
   topCloth?: Pattern; legCloth?: Pattern }
 /** the cook at the fire (the same rig as the customers, in his own clothes and his own action) */
 type Kind = GuestKind | 'chef' | 'staffM' | 'staffF'
 const CHEF_LOOK: Look = { top: '#2c3a58', legs: '#263049', hair: '#2b1d14', skin: '#e2b48c', shoes: '#2a2220', size: 1 }
-function lookOf(id: number, kind: Kind): Look {
+export function lookOf(id: number, kind: Kind): Look {
   if (kind === 'chef' || kind === 'staffM' || kind === 'staffF') return CHEF_LOOK
   const old = kind === 'grandma' || kind === 'grandpa'
   const top: Record<GuestKind, string> = {
@@ -163,7 +163,7 @@ type Rigged = {
 const PHONE_FACE = -1
 
 /** a black leather briefcase hanging from its handle (the handle at the origin, the case below along +y) */
-function Briefcase() {
+export function Briefcase() {
   return (
     <group>
       <mesh position-y={0.012} rotation-z={Math.PI / 2}>
@@ -189,7 +189,7 @@ function Briefcase() {
 }
 
 /** a number from 0 to 1 that's always the same for this id (and this salt), spread so neighbours differ */
-const hash = (id: number, salt: number) => {
+export const hash = (id: number, salt: number) => {
   let h = Math.imul(id ^ Math.imul(salt + 1, 0x9e3779b1), 0x45d9f3b)
   h = Math.imul(h ^ (h >>> 16), 0x45d9f3b)
   return (((h ^ (h >>> 16)) >>> 0) % 1000) / 1000
