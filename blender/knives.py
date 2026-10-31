@@ -1,10 +1,12 @@
-"""A cook's knives laid out on a folded cloth by the hearth: knives.glb, node "KnifeSet". Three Japanese knives side by side, each a steel
-blade (its edge ground bright, a darker spine, the maker's little mark) in a wa-handle of pale magnolia with a black horn ferrule:
+"""A cook's knives hung on the side of the hearth: knives.glb, node "KnifeSet". Three Japanese knives, each a steel blade (its edge
+ground bright, a darker spine, the maker's little mark) in a wa-handle of pale magnolia with a black horn ferrule:
 - yanagiba (柳刃): long and slender, for slicing;
 - deba (出刃): short, broad and heavy, for taking a fish apart;
 - nakiri (菜切): a straight-edged rectangle, for vegetables.
-They lie on an indigo cotton cloth (布巾) folded in three. Real size in metres, x along the blades (tip toward +x), z up, the cloth's
-middle at the origin.
+They hang flat against a knife board (包丁掛け) of pale hinoki screwed to the hearth frame's side: two bars of dark walnut across it, one
+for each row, that the blades are held to, the yanagiba and the nakiri end to end along the upper, the deba on the lower; their edges down,
+their handles all one way. Real size in metres, x along the blades (tips toward +x), z up; the board's back at y = 0, the knives out
+toward -y (the game's +z, out from the frame's face); the board's middle at the origin.
 
 Run:
     blender -b --factory-startup --python blender/knives.py -- <project path> [preview.png]
@@ -167,36 +169,63 @@ def handle(name, x0, length, r, at_y):
     fin(o, name + "Ferrule", M["horn"], smooth=False)
 
 
+import mathutils
+# (each knife built lying flat as before, at width 0, then stood up on its edge (its width up, z) and set in its place on the board)
+UP = mathutils.Matrix.Rotation(math.pi / 2, 4, "X")
+
+
+def stand(names, x, z):
+    """the parts named, turned up on their edges and moved to x along the board, their edge at height z, out in front of it"""
+    # (each part's matrix brought up to date first: one just scaled still holds its old one till the scene's updated, and would lose its size)
+    bpy.context.view_layer.update()
+    for o in parts:
+        if o.name in names:
+            o.matrix_world = mathutils.Matrix.Translation((x, -0.03, z)) @ UP @ o.matrix_world
+
+
 # (yanagiba: long and slender, its edge straight, sweeping up into a fine point near the spine)
-blade("KnifeYanagiba", [(0, 0), (0.2, 0.0), (0.28, 0.01), (0.29, 0.016)], [(0, 0.033), (0.2, 0.033), (0.27, 0.026), (0.29, 0.016)], 0.29, 0.0042, -0.11)
-handle("KnifeYanagibaHandle", 0.0, 0.14, 0.0125, -0.11 + 0.02)
+blade("KnifeYanagiba", [(0, 0), (0.2, 0.0), (0.28, 0.01), (0.29, 0.016)], [(0, 0.033), (0.2, 0.033), (0.27, 0.026), (0.29, 0.016)], 0.29, 0.0042, 0.0)
+handle("KnifeYanagibaHandle", 0.0, 0.14, 0.0125, 0.016)
 # (deba: short and broad, a strong curved belly rising to its point, a thick spine)
 blade("KnifeDeba", [(0, 0), (0.07, -0.001), (0.12, 0.004), (0.152, 0.016), (0.168, 0.034)], [(0, 0.052), (0.08, 0.054), (0.14, 0.05), (0.168, 0.034)], 0.168, 0.008, 0.0)
 handle("KnifeDebaHandle", 0.0, 0.12, 0.016, 0.028)
 # (nakiri: a straight edge and spine, its square end just eased)
-blade("KnifeNakiri", [(0, 0), (0.16, 0.0), (0.168, 0.006)], [(0, 0.05), (0.16, 0.05), (0.168, 0.044)], 0.168, 0.0032, 0.1)
-handle("KnifeNakiriHandle", 0.0, 0.12, 0.013, 0.127)
+blade("KnifeNakiri", [(0, 0), (0.16, 0.0), (0.168, 0.006)], [(0, 0.05), (0.16, 0.05), (0.168, 0.044)], 0.168, 0.0032, 0.0)
+handle("KnifeNakiriHandle", 0.0, 0.12, 0.013, 0.027)
 # (each maker's mark stamped near the heel: a small round seal and a short line of signature beside it)
-for i, (y, th) in enumerate(((-0.11 + 0.02, 0.0042), (0.026, 0.008), (0.125, 0.0032))):
+for i, (name, y, th) in enumerate((("KnifeYanagiba", 0.017, 0.0042), ("KnifeDeba", 0.028, 0.008), ("KnifeNakiri", 0.027, 0.0032))):
     zt = 0.012 + th / 2 + 0.0002
-    bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.0042, depth=0.0006, location=(0.028, y + 0.002, zt))
-    fin(active(), f"KnifeMark{i}", M["mark"], smooth=False)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.0042, depth=0.0006, location=(0.028, y, zt))
+    fin(active(), f"{name}Mark", M["mark"], smooth=False)
     for k in range(3):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=(0.04 + k * 0.006, y + 0.002, zt))
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(0.04 + k * 0.006, y, zt))
         o = active(); o.scale = (0.0035, 0.0012, 0.0005)
-        fin(o, f"KnifeSign{i}{k}", M["mark"], smooth=False)
-# ---- the cloth under them: folded in three, its layers stepping up a little, a soft fold at each side
-for k, (w, h) in enumerate(((0.62, 0.003), (0.6, 0.0065), (0.58, 0.01))):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0.0, 0.01, h / 2 if k == 0 else 0.003 * k + 0.0015))
-    o = active(); o.scale = (w, 0.36 - k * 0.006, 0.003)
-    bevel(o, 0.0015, 2, angle=False)
+        fin(o, f"{name}Sign{k}", M["mark"], smooth=False)
+# (on the board: the yanagiba and the nakiri end to end along the upper row, the deba below; handles toward -x)
+# (a hand's width between the yanagiba's tip and the nakiri's handle: nothing runs through anything)
+stand({n for n in (o.name for o in parts) if n.startswith("KnifeYanagiba")}, -0.2, 0.072)
+stand({n for n in (o.name for o in parts) if n.startswith("KnifeNakiri")}, 0.33, 0.07)
+stand({n for n in (o.name for o in parts) if n.startswith("KnifeDeba")}, -0.02, 0.0)
+# ---- the board: pale hinoki, its edges eased, a bar of dark walnut across it behind each row, brass screws at its corners
+M["board"] = pbr("KnifeBoard", lin("#d9c39a"), rough=0.55)
+M["bar"] = pbr("KnifeBar", lin("#3a2618"), rough=0.4, coat=0.3)
+M["screw"] = pbr("KnifeScrew", lin("#c9a24a"), rough=0.3, metal=1.0)
+BW, BH, BD, BX = 0.92, 0.13, 0.014, 0.06
+bpy.ops.mesh.primitive_cube_add(size=1, location=(BX, -BD / 2, 0.055))
+o = active(); o.scale = (BW, BD, BH)
+bevel(o, 0.003, 2, angle=False)
+bpy.ops.object.modifier_apply(modifier="Bevel")
+fin(o, "KnifeBoard", M["board"], smooth=False)
+for k, z in enumerate((0.1, 0.025)):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(BX, -BD - 0.006, z))
+    o = active(); o.scale = (BW - 0.06, 0.012, 0.022)
+    bevel(o, 0.002, 2, angle=False)
     bpy.ops.object.modifier_apply(modifier="Bevel")
-    fin(o, f"KnifeCloth{k}", M["cloth"], smooth=False)
-# (the knives laid on it: lifted to its top, set a little apart, a touch askew)
-for o in parts:
-    if o.name.startswith("Knife") and not o.name.startswith("KnifeCloth"):
-        o.location.z += 0.006
-        o.location.x -= 0.02
+    fin(o, f"KnifeBar{k}", M["bar"], smooth=False)
+for x in (BX - BW / 2 + 0.018, BX + BW / 2 - 0.018):
+    for z in (0.055 - BH / 2 + 0.014, 0.055 + BH / 2 - 0.014):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.0045, depth=0.004, location=(x, -BD - 0.0015, z), rotation=(math.pi / 2, 0, 0))
+        fin(active(), "KnifeScrew", M["screw"], smooth=False)
 
 root = bpy.data.objects.new("KnifeSet", None)
 bpy.context.collection.objects.link(root)
@@ -205,14 +234,14 @@ for o in parts:
 if PREVIEW:
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = (0.15, -0.6, 0.5)
+    cam.location = (0.25, -1.25, 0.45)
     cam.rotation_mode = "QUATERNION"
     cam.rotation_quaternion = (Vector((0, 0, 0)) - cam.location).to_track_quat("-Z", "Y")
     cam.data.lens = 50
     bpy.context.scene.camera = cam
     sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
     sun.data.energy = 4
-    sun.rotation_euler = (0.6, 0.3, 0.4)
+    sun.rotation_euler = (1.1, 0.0, 0.35)
     bpy.context.collection.objects.link(sun)
     w = bpy.data.worlds.new("W"); w.use_nodes = True
     w.node_tree.nodes["Background"].inputs[0].default_value = (0.45, 0.45, 0.45, 1)

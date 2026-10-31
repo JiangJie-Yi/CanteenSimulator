@@ -27,8 +27,9 @@ export const DECOR = {
   crate: { at: [0.62, -2.0], r: 0.38 },
   // (lying at the table's back, left of the knives: the front middle is the notch cut in under the hearth, its right the tasting bowl)
   fan: { at: [-1.79, -0.68], r: 0.3 },
-  // (drawn 1.8 times its own size, at the table's back right, well in from the bar's edge (a lantern's feet and shade need the table's room), clear of the stones, the crate and the plates)
-  lantern: { at: [-2.12, -0.81], r: 0.34 },
+  // (drawn 1.8 times its own size, at the table's back, left of the middle, well in from the bar's lip (its corner, where it stood, had it
+  // into the lip), clear of the hearth's frame and the crate; what's drawn is this and the edit's own offset for it (edit.ts BASES))
+  lantern: { at: [-1.247, -1.202], r: 0.34 },
   // (the cooked rice the rice balls are made from: a shop's big tub, on a side table of its own just past the cook's
   // table's right-hand end, by the other cooks)
   rice: { at: [3.5, -2.12], r: 1.1 },
@@ -211,7 +212,9 @@ function Crate() {
 }
 
 /** A round paper fan (団扇) lying by the seasoning boxes; picked up, it's held upright and swings as it's waved. */
-function Fan({ held }: { held: RefObject<Held> }) {
+/** the fan hung on its hook: handle up, its paper toward the cook (turned up off the table, then round to face along the table's lay) */
+const FAN_HUNG = new THREE.Euler(-Math.PI / 2, Math.atan2(-LAY.x, -LAY.z), 0, 'YXZ')
+function Fan({ held, at }: { held: RefObject<Held>; at: [number, number, number] }) {
   const g = useRef<THREE.Group>(null)
   const swing = useRef(0)
   const last = useRef(0)
@@ -230,10 +233,11 @@ function Fan({ held }: { held: RefObject<Held> }) {
       beat.current += (speed - beat.current) * Math.min(1, dt * 8)
       phase.current += dt * 22
       // face to the camera's side, handle down, rocking side to side as it fans
-      o.rotation.set(1.45 + Math.sin(phase.current) * 0.35 * beat.current, -0.6, swing.current)
+      o.rotation.set(1.45 + Math.sin(phase.current) * 0.35 * beat.current, -0.6, swing.current, 'XYZ')
     } else {
-      o.position.set(DECOR.fan.at[0], 0.01, DECOR.fan.at[1])
-      o.rotation.set(0, 2.1, 0)
+      // (back on its hook)
+      o.position.set(at[0], at[1], at[2])
+      o.rotation.copy(FAN_HUNG)
     }
   })
   const geo = useMemo(() => {
@@ -670,6 +674,9 @@ function RackAt() {
 }
 const KNIVES_URL = import.meta.env.BASE_URL + 'models/knives.glb'
 /** the cook's knives on their folded cloth (blender/knives.py), laid along the table behind the hearth */
+/** the knife board (blender/knives.py) on the hearth frame's right-hand face: how far along that face is, where along the side its middle is,
+ * how high it's hung, and its size (the model's real size, drawn up a little to the hearth's) */
+const KNIFE_BOARD = { face: 1.402, lay: 0.68, y: 0.025, scale: 1.3 }
 function KnifeSet() {
   const gltf = useGLTF(KNIVES_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
@@ -690,21 +697,22 @@ function KnifeSet() {
       m.castShadow = true
       m.receiveShadow = true
     })
-    inkModel(r, (m) => /Mark|Sign|Cloth|Neck/.test(m.name), { width: 0.0012, weld: true })
+    inkModel(r, (m) => /Mark|Sign|Cloth|Neck|Screw/.test(m.name), { width: 0.0012, weld: true })
     // (the set never moves: drawn a few parts at a time)
     mergeByMaterial(r)
     return r
   }, [gltf])
-  // (behind the hearth, on the strip of table toward the bar: the front's taken by the fan, the plate and the tasting bowl)
-  const p = new THREE.Vector3().addScaledVector(ALONG, -0.2).addScaledVector(LAY, -1.82)
-  return <group position={[p.x, 0.002, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} scale={1.6}><primitive object={obj} /></group>
+  // (hung on the hearth frame's right-hand side, its front half (the bucket's by its back half), the board's back to the frame's face: turned to
+  // face out along the table, the knives' handles toward the cook; the board's middle KNIFE_BOARD.lay along the side)
+  const p = new THREE.Vector3().addScaledVector(ALONG, KNIFE_BOARD.face).addScaledVector(LAY, KNIFE_BOARD.lay + 0.06 * KNIFE_BOARD.scale)
+  return <group position={[p.x, KNIFE_BOARD.y, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)} scale={KNIFE_BOARD.scale}><primitive object={obj} /></group>
 }
 useGLTF.preload(KNIVES_URL)
-function DecorImpl({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
+function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternAt: [number, number, number]; fanAt: [number, number, number] }) {
   return (
     <>
       <Movable id="crate" label="備長炭籃" baseScale={1.75} baseTurn={[0, 44, 0]}><Crate /></Movable>
-      <Movable id="fan" label="團扇"><Fan held={held} /></Movable>
+      <Movable id="fan" label="團扇"><Fan held={held} at={fanAt} /></Movable>
       <HeldStick held={held} />
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
@@ -715,4 +723,4 @@ function DecorImpl({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [num
 }
 
 // (drawn again only when their own props change, not each time the page above them redraws: while the shop's open that's many times a second)
-export const Decor = memo(DecorImpl, (a, b) => a.held === b.held && a.lanternAt.every((v, i) => v === b.lanternAt[i]))
+export const Decor = memo(DecorImpl, (a, b) => a.held === b.held && a.lanternAt.every((v, i) => v === b.lanternAt[i]) && a.fanAt.every((v, i) => v === b.fanAt[i]))

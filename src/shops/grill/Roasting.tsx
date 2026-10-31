@@ -435,8 +435,17 @@ const TRAY_W = 1.6
 const TRAY_D = 0.9
 /** the seasoning box, as a round footprint for bumping into things */
 const BOX_R = 0.46
-/** where the seasoning box's first half starts out: beside the cook, along and across the table */
-const BOX_SPOT = { along: 1.55, lay: 1.3 }
+/** where the seasoning ledge (blender/grilledfish.py: its middle) is hung: on the hearth's front face, over the cook's place in the notch
+ * (along as the notch's middle; out from the frame's face by half the ledge's depth) */
+const BOX_SPOT = { along: -0.04, lay: 1.222 + 0.1 }
+/** the ledge's length, and the fan's peg at the end of the hook past its left end: how far along from the ledge's middle and how high above it
+ * (blender/grilledfish.py: LEDGE_L, the hook's arm 0.2 past the end at 0.985 high, the ledge's middle at 0.19) */
+const LEDGE_L = 1.62
+const FAN_PEG = { along: -LEDGE_L / 2 - 0.2, up: 0.985 - 0.19 }
+/** the fan hung on its peg: its paper's middle this far below the peg (its handle's length, 1.6 times its own, and the loop) */
+const FAN_DROP = 0.487
+/** the containers that stay where they're set, whatever's beside them: the ledge, fixed to the hearth */
+const FIXED = new Set(['box'])
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
 const PIT_SCALE = 1.3
 /**
@@ -2819,6 +2828,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (kind === 'bowl') return bowlAt()
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
+  /** where the fan hangs: from its peg past the ledge's left end, its paper's middle below it (Decor turns it to face the cook) */
+  const fanAt = () => containerAt('box').addScaledVector(ALONG, FAN_PEG.along).add(new THREE.Vector3(0, FAN_PEG.up - FAN_DROP, 0))
   const footprint = (key: string) => {
     const kind = key.split('-')[0]
     return { plate: PLATE_R, dish: DISH_R, basket: BASKET_R, box: BOX_R, bin: BIN_R, tray: 0.6, trash: TRASH_R, rawdish: DISH_R, bowl: BOWL_PUSH, lantern: DECOR.lantern.r }[kind] ?? 0.3
@@ -2844,16 +2855,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * plate, dish, basket, the box and the bin (round footprints, pushed apart until they just touch).
    */
   const settle = (key: string, at: THREE.Vector3, stacking = false) => {
+    // (the ledge is fixed to the hearth: nothing pushes it, and it pushes nothing (it's up off the table, over the cook's place))
+    if (FIXED.has(key)) return at
     const r = footprint(key)
     // (what it's stacked with doesn't push it away; nor, while an empty one is carried, other empty ones it could go on)
-    const others = containerKeys().filter((k) => k !== key && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
+    const others = containerKeys().filter((k) => k !== key && !FIXED.has(k) && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
       .flatMap((k) => circlesOf(k, containerAt(k)))
     for (const k of Object.keys(SPARES)) {
       const h = k !== key && spareHome(k)
       if (h) others.push({ p: h, r: footprint(k) })
     }
-    // the crate and the fan
-    for (const d of [DECOR.crate, DECOR.fan, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
+    // the crate (the fan hangs on its hook, up off the table)
+    for (const d of [DECOR.crate, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
     if (bar) for (const c of GRILL_COUNTERS) for (let k = -2; k <= 2; k++) others.push({ p: toGrillScene(c.at.clone().addScaledVector(c.along, k * c.length / 4.5)).sub(FIRE_SHIFT), r: 0.42 * GRILL_SCALE })
     // the soup bowls on the table are in the way too
@@ -5335,9 +5348,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           <circleGeometry args={[sh.s, 3]} /><meshToonMaterial color="#efece4" side={THREE.DoubleSide} />
         </mesh>
       ))}
-      <Decor held={held} lanternAt={containerAt('lantern').toArray() as [number, number, number]} />
+      <Decor held={held} lanternAt={containerAt('lantern').toArray() as [number, number, number]} fanAt={fanAt().toArray() as [number, number, number]} />
       {active && decorTip && (
-        <Html position={decorTip === 'fan' ? [DECOR.fan.at[0], 0.35, DECOR.fan.at[1]] : [DECOR.crate.at[0], 0.5, DECOR.crate.at[1]]}
+        <Html position={decorTip === 'fan' ? (fanAt().add(new THREE.Vector3(0, 0.3, 0)).toArray() as [number, number, number]) : [DECOR.crate.at[0], 0.5, DECOR.crate.at[1]]}
           center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
           <span className="tool-tag">{decorTip === 'fan' ? '團扇' : '備長炭'}<small>{decorTip === 'fan' ? '拿到火上來回搧' : '拖到火上添炭'}</small></span>
         </Html>
@@ -5345,7 +5358,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       {/* (edit mode's boxes for what the nudge moves: an unseen block the size of each, in a group the edit moves; the pieces themselves follow by the nudge) */}
       {roast.tray && <EditProxy id="cutboard" label="大砧板" at={containerAt('tray')} size={[TRAY_W, 0.12, TRAY_D]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
-      {carriers.box && <EditProxy id="seasoning" label="調味盒" at={containerAt('box')} size={[1.0, 0.3, 0.55]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
+      {carriers.box && <EditProxy id="seasoning" label="調味盒" at={containerAt('box').add(new THREE.Vector3(0, -0.12, 0))} size={[LEDGE_L, 0.42, 0.22]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
       {carriers.bin && <EditProxy id="bucket" label="水桶" at={containerAt('bin')} size={[BIN_R * 2, 0.45, BIN_R * 2]} yaw={0} />}
       {/* (the table, the crew and the bar stay where they were drawn: the fire and all round it stand FIRE_SHIFT along from them, to the table's middle) */}
       <group position={[-FIRE_SHIFT.x, 0, -FIRE_SHIFT.z]}>

@@ -2418,33 +2418,74 @@ def at_angle(angle_deg, r):
     return r * math.cos(a), r * math.sin(a)
 
 
-# all four live in a wooden seasoning box beside the fire; only their spoons and the brush are picked up
-BOX_ANGLE, BOX_R, BOX_Z = -134.0, 1.75, 0.016      # on the left of the fire as the camera sees it
+# all the seasonings stand in one row on a ledge hung on the front of the hearth, at the cook's hand as he grills (掛け棚): a cedar shelf on
+# two brackets fixed to the frame's front face, a low lip along its front edge; the spoons and brushes stand in their pots, their handles
+# leaning out toward him; and from a bamboo hook at its left end the fan hangs. Laid along the table's long way (the game's ALONG, which is
+# (-0.81, -0.59) here: the game shows this model turned half round), the cook's side out (-0.59, 0.81). The game sets the whole set, the
+# ledge's middle, against the hearth (Roasting's BOX_SPOT).
+BOX_ANGLE, BOX_R = -134.0, 1.75
 a = math.radians(BOX_ANGLE)
 box_c = Vector((BOX_R * math.cos(a), BOX_R * math.sin(a), 0))
-tang = Vector((-math.sin(a), math.cos(a), 0))
-out = Vector((math.cos(a), math.sin(a), 0))
-M["box_wood"] = pbr("SeasoningBoxWood", tex=TEX["bamboo"], rough=0.6)
+tang = Vector((-0.81, -0.59, 0)).normalized()
+out = Vector((-0.59, 0.81, 0)).normalized()
+# (its top level with the frame's; its depth room for the widest bowl; its length the row's, ten across)
+LEDGE_TOP, LEDGE_T, LEDGE_D, LEDGE_L = 0.205, 0.03, 0.2, 1.62
+BOX_Z = LEDGE_TOP
+POT_K = 0.82
+_lu, _lv = grid01(256)
+_lg = np.sin((_lv * 30 + fbm(256, 2, 6, 4) * 1.4) * math.pi * 2) * 0.5 + 0.5
+_ledge = mix(mix((0.56, 0.36, 0.2), (0.47, 0.29, 0.15), fbm(256, 3, 9, 4)), (0.33, 0.19, 0.09), smooth(0.65, 0.95, _lg) * 0.5)
+M["box_wood"] = pbr("SeasoningBoxWood", tex=image("T_LedgeCedar", _ledge), rough=0.55, coat=0.15)
+M["hook_bamboo"] = pbr("FanHookBamboo", (0.74, 0.62, 0.36), rough=0.45)
+_turn = math.atan2(tang.y, tang.x)
 
-# the box: an open wooden tray, long side along the stones
-bpy.ops.mesh.primitive_cube_add(size=1, location=(box_c.x, box_c.y, 0.04), rotation=(0, 0, a + math.pi / 2))
-box = active()
-box.scale = (0.86, 0.27, 0.08)
-apply_scale(box)
-bm = bmesh.new()
-bm.from_mesh(box.data)
-bm.normal_update()
-bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.9], context="FACES")
-bm.to_mesh(box.data)
-bm.free()
-sol = box.modifiers.new("Solidify", "SOLIDIFY")
-sol.thickness = 0.014
-bpy.ops.object.select_all(action="DESELECT")
-box.select_set(True)
-bpy.context.view_layer.objects.active = box
-bpy.ops.object.modifier_apply(modifier="Solidify")
+
+def ledge_block(along0, along1, out0, out1, z0, z1, name):
+    """a block of the ledge's wood lying along it: from along0 to along1, out0 to out1 (from the ledge's middle), z0 to z1"""
+    c = box_c + tang * ((along0 + along1) / 2) + out * ((out0 + out1) / 2)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(c.x, c.y, (z0 + z1) / 2), rotation=(0, 0, _turn))
+    o = active()
+    o.scale = (along1 - along0, out1 - out0, z1 - z0)
+    apply_scale(o)
+    return o
+
+
+_parts = [
+    # (the shelf, and the lip along its front)
+    ledge_block(-LEDGE_L / 2, LEDGE_L / 2, -LEDGE_D / 2, LEDGE_D / 2, LEDGE_TOP - LEDGE_T, LEDGE_TOP, "LedgeBoard"),
+    ledge_block(-LEDGE_L / 2, LEDGE_L / 2, LEDGE_D / 2 - 0.012, LEDGE_D / 2, LEDGE_TOP, LEDGE_TOP + 0.016, "LedgeLip"),
+]
+for side in (-1, 1):
+    # (each bracket: a cleat screwed to the frame's face, and a brace from its foot out under the shelf)
+    x = side * (LEDGE_L / 2 - 0.18)
+    _parts.append(ledge_block(x - 0.022, x + 0.022, -LEDGE_D / 2, -LEDGE_D / 2 + 0.03, 0.06, LEDGE_TOP - LEDGE_T, "LedgeCleat"))
+    br = ledge_block(x - 0.018, x + 0.018, -0.13, 0.13, -0.012, 0.012, "LedgeBrace")
+    # (tilted up from the cleat's foot to the shelf's underside near its front)
+    br.rotation_euler = (0, 0, 0)
+    bpy.ops.object.select_all(action="DESELECT")
+    br.select_set(True)
+    bpy.context.view_layer.objects.active = br
+    mid = box_c + tang * x + out * (-LEDGE_D / 2 + 0.095)
+    br.location = (mid.x, mid.y, (0.075 + LEDGE_TOP - LEDGE_T) / 2)
+    _axis = tang
+    import mathutils
+    br.matrix_world = mathutils.Matrix.Translation(br.location) @ mathutils.Matrix.Rotation(-math.atan2(LEDGE_TOP - LEDGE_T - 0.075, 0.17), 4, Vector(_axis)) @ mathutils.Matrix.Translation(-br.location) @ br.matrix_world
+    _parts.append(br)
+box = join(_parts, "SeasoningBox")
+for _p in box.data.polygons:
+    _p.use_smooth = False
+box.data.materials.clear()
+box.data.materials.append(M["box_wood"])
 cyl_uv(box)
-finish(box, "SeasoningBox", M["box_wood"], smooth_shade=False)
+centre_origin(box, (box_c.x, box_c.y, LEDGE_TOP - LEDGE_T / 2))
+# (the fan's hook: a bamboo post up from the ledge's left end, an arm out past it, a peg the fan's loop hangs on (FAN_PEG in Roasting))
+_hp = box_c + tang * (-LEDGE_L / 2 + 0.03)
+_hook = [stick_between((_hp.x, _hp.y, LEDGE_TOP), (_hp.x, _hp.y, 0.99), 0.011, M["hook_bamboo"], "FanHookPost")]
+_he = box_c + tang * (-LEDGE_L / 2 - 0.2)
+_hook.append(stick_between((_hp.x, _hp.y, 0.985), (_he.x, _he.y, 0.985), 0.008, M["hook_bamboo"], "FanHookArm"))
+_hook.append(stick_between((_he.x, _he.y, 0.975), (_he.x, _he.y, 1.02), 0.007, M["hook_bamboo"], "FanHookPeg"))
+hook = join(_hook, "FanHook")
+centre_origin(hook, (box_c.x, box_c.y, LEDGE_TOP - LEDGE_T / 2))
 
 
 def in_box(offset):
@@ -2494,12 +2535,23 @@ def spoon_head(kind, at):
 
 
 lean = out * 0.09 + Vector((0, 0, 0.21))
+# (where each stands along the ledge: the row's widths laid end to end from its left, a little room between)
+ROW = (("SaltPot", 0.17), ("SoyPot", 0.16), ("MilkJar", 0.14), ("PeanutBowl", 0.205), ("MisoPot", 0.14), ("WasabiDish", 0.15),
+       ("ShichimiBowl", 0.135), ("YuzuJar", 0.12), ("LemonDish", 0.17))
+_gap = (LEDGE_L - 0.08 - sum(w for _, w in ROW)) / (len(ROW) - 1)
+ROW_AT = {}
+_x = -LEDGE_L / 2 + 0.04
+for _n, _w in ROW:
+    ROW_AT[_n] = _x + _w / 2
+    _x += _w + _gap
+
 pots = (("SaltPot", -0.3, 0.085, 0.1, M["pot"], 0.3, M["salt"], 0.03, 0.06),
         ("SoyPot", -0.1, 0.08, 0.11, M["soy_pot"], 0.3, M["soy"], 0.008, 0.0),
         ("MilkJar", 0.1, 0.075, 0.1, M["milk_jar"], 0.2, M["milk"], 0.016, 0.0),
         ("PeanutBowl", 0.3, 0.095, 0.07, M["bowl_wood"], 0.45, M["peanut"], 0.03, 0.08))
 for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
-    c = in_box(off)
+    c = in_box(ROW_AT[name])
+    rad, depth = rad * POT_K, depth * POT_K
     pot = open_pot(c.x, c.y, rad, depth, glaze, belly=belly, name=name)
     fl = filling(c.x, c.y, depth * 0.85, rad * 0.9, fill_h, fill, rough=rough)
     for o in (pot, fl):
@@ -2535,33 +2587,15 @@ M["lemon"] = pbr("Lemon", (0.98, 0.86, 0.25), rough=0.35, coat=0.4)
 M["lemon_flesh"] = pbr("LemonFlesh", (1.0, 0.94, 0.55), rough=0.2, coat=0.6)
 M["white_dish"] = pbr("SmallWhiteDish", (0.93, 0.91, 0.86), rough=0.25, coat=0.6)
 
-BOX2_R = BOX_R + 0.3
-box2_c = Vector((BOX2_R * math.cos(a), BOX2_R * math.sin(a), 0))
-bpy.ops.mesh.primitive_cube_add(size=1, location=(box2_c.x, box2_c.y, 0.04), rotation=(0, 0, a + math.pi / 2))
-box2 = active()
-box2.scale = (0.86, 0.27, 0.08)
-apply_scale(box2)
-bm = bmesh.new()
-bm.from_mesh(box2.data)
-bm.normal_update()
-bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.9], context="FACES")
-bm.to_mesh(box2.data)
-bm.free()
-sol = box2.modifiers.new("Solidify", "SOLIDIFY")
-sol.thickness = 0.014
-bpy.ops.object.select_all(action="DESELECT")
-box2.select_set(True)
-bpy.context.view_layer.objects.active = box2
-bpy.ops.object.modifier_apply(modifier="Solidify")
-cyl_uv(box2)
-finish(box2, "SeasoningBox2", M["box_wood"], smooth_shade=False)
+# (no second box: they stand on along the same ledge)
 
 pots2 = (("MisoPot", -0.32, 0.07, 0.08, M["pot"], 0.3, M["miso_paste"], 0.03, 0.08, "MisoSpoon"),
          ("WasabiDish", -0.16, 0.065, 0.035, M["white_dish"], 0.5, M["wasabi"], 0.025, 0.12, "WasabiSpoon"),
          ("ShichimiBowl", 0.0, 0.06, 0.06, M["bowl_wood"], 0.45, M["shichimi"], 0.02, 0.1, "ShichimiSpoon"),
          ("YuzuJar", 0.16, 0.06, 0.08, M["soy_pot"], 0.25, M["yuzu_kosho"], 0.02, 0.06, "YuzuSpoon"))
 for name, off, rad, depth, glaze, belly, fill, fill_h, rough, tool in pots2:
-    c = box2_c + tang * off
+    c = in_box(ROW_AT[name])
+    rad, depth = rad * POT_K, depth * POT_K
     pot = open_pot(c.x, c.y, rad, depth, glaze, belly=belly, name=name)
     fl = filling(c.x, c.y, depth * 0.8, rad * 0.88, fill_h, fill, rough=rough)
     for o in (pot, fl):
@@ -2573,8 +2607,8 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough, tool in pots2:
     utensil(tool, head, head + out * 0.08 + Vector((0, 0, 0.18 if kind != "shichimi" else 0.15)), obj, thick, mat)
 
 # the lemon: a little dish of wedges; the one on top is what's picked up and squeezed
-c = box2_c + tang * 0.33
-bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.082, depth=0.014, location=(c.x, c.y, BOX_Z + 0.007))
+c = in_box(ROW_AT["LemonDish"])
+bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.082 * POT_K, depth=0.014, location=(c.x, c.y, BOX_Z + 0.007))
 dish_l = finish(active(), "LemonDish", M["white_dish"])
 centre_origin(dish_l, (c.x, c.y, 0.0))
 

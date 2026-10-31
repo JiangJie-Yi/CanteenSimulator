@@ -226,19 +226,19 @@ export const DISHES: Dish[] = [
         MisoSpoon: 'miso', WasabiSpoon: 'wasabi', ShichimiSpoon: 'shichimi', YuzuSpoon: 'yuzu', LemonWedge: 'lemon' },
       toolPots: { SaltPot: 'SaltPinch', SoyPot: 'SoyBrush', MilkJar: 'MilkBrush', PeanutBowl: 'PeanutSpoon',
         MisoPot: 'MisoSpoon', WasabiDish: 'WasabiSpoon', ShichimiBowl: 'ShichimiSpoon', YuzuJar: 'YuzuSpoon', LemonDish: 'LemonWedge', LemonWedges: 'LemonWedge' },
-      // the seasoning box (dragged as a whole) and everything standing in it
-      toolBox: ['SeasoningBox', 'SaltPot', 'SoyPot', 'MilkJar', 'PeanutBowl', 'SaltPinch', 'SoyBrush', 'MilkBrush',
+      // the seasoning ledge on the hearth's front (moved as a whole) and everything standing on it, and the fan's hook at its end
+      toolBox: ['SeasoningBox', 'FanHook', 'SaltPot', 'SoyPot', 'MilkJar', 'PeanutBowl', 'SaltPinch', 'SoyBrush', 'MilkBrush',
         'PeanutSpoon', 'SeasoningBox2', 'MisoPot', 'WasabiDish', 'ShichimiBowl', 'YuzuJar', 'LemonDish', 'LemonWedges',
         'MisoSpoon', 'WasabiSpoon', 'ShichimiSpoon', 'YuzuSpoon', 'LemonWedge'],
       // a bucket of water for splashing, the trash bin beside it (both on the left); the tray where ordered food
       // waits to go on the fire
       bucket: ['WaterBucket', 'WaterDipper'],
-      // (the bin on the table's top at its left end, in front of the basket, between it and the tray, where it can be seen)
-      trash: [-1.285, 0, 1.556],
+      // (the bin on the table's right, beside the hearth's middle, by the knives hung on the frame's side)
+      trash: [1.993, 0, -0.584],
       tray: [-0.31, 0.0, 2.16],
       // the rice balls come out on their own little dish, just past the front end of the tray
-      // (beside the front end of the tray, between it and the basket: the prep side, all on the right)
-      rawDish: { at: [2.3, 0, -0.62], items: ['Onigiri'] },
+      // (at the table's front right, where the seasonings stood before they were hung on the hearth's front)
+      rawDish: { at: [2.354, 0, 0.083], items: ['Onigiri'] },
     },
     layout: {
       mode: 'ring',
