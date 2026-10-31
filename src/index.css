@@ -1891,53 +1891,7 @@ button {
   }
 }
 
-/* the shop's edit mode (key G), to the left of the speed button: shown only while the shop is shut */
-.edit-toggle {
-  position: fixed;
-  z-index: 10;
-  top: 20px;
-  right: 228px;
-  width: 44px;
-  height: 44px;
-  border: 1.5px solid var(--text-soft);
-  border-radius: 50%;
-  background: var(--page);
-  color: var(--text);
-  font-size: 18px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.edit-toggle:hover {
-  border-color: var(--text);
-}
-.edit-toggle.is-on {
-  background: #1f7ae0;
-  border-color: #1f7ae0;
-  color: #fff;
-}
-.edit-toggle:focus-visible {
-  outline: 3px solid var(--moss);
-  outline-offset: 3px;
-}
-@media (max-width: 900px) {
-  .edit-toggle {
-    top: 14px;
-    right: 206px;
-    width: 40px;
-    height: 40px;
-    font-size: 16px;
-  }
-}
-@media (max-width: 400px) {
-  .edit-toggle {
-    width: 34px;
-    height: 34px;
-    right: 164px;
-    font-size: 14px;
-  }
-}
-
-/* the game's speed, ▶▶ / ×2, at the left end of the round buttons top right */
+/* the game's speed, ▶▶ / ×2, in the round buttons top right (經營 and 自動營運 to its left on a wide screen) */
 .speed-toggle {
   position: fixed;
   z-index: 10;
@@ -5817,7 +5771,7 @@ button {
 }
 
 /* edit mode (G) is for arranging the scene alone: the game's own controls are shut while it's on */
-.app.is-editing :is(.menu, .menu-backing, .menu-fold, .tools-toggle, .ai-toggle, .speed-toggle) {
+.app.is-editing :is(.menu, .menu-backing, .menu-fold, .tools-toggle, .ai-toggle, .speed-toggle, .office-toggle, .auto-toggle) {
   pointer-events: none;
   opacity: 0.4;
 }
@@ -6624,4 +6578,64 @@ html[lang='en'] .heat-label { font-size: 13px; }
 }
 :root[data-theme='dark'] .canvas-layer::after {
   background: radial-gradient(ellipse 72% 66% at 50% 50%, rgb(0 0 0 / 0) 45%, rgb(2 6 14 / 0.62) 100%);
+}
+
+/* ---- 經營 and 自動營運, on a wide screen: round buttons at the left end of the row top right (經營 its shop front, 自動營運 自 with its
+   lamp at the rim); the cash on its own at the top left where 經營 was, always in sight (a click opens the books). Narrower screens keep
+   the two as they were, the cash in 經營 ---- */
+.money-chip { display: none; }
+.auto-toggle .auto-short { display: none; }
+@media (min-width: 901px) {
+  .app .office-toggle,
+  .app .auto-toggle {
+    position: fixed;
+    z-index: 10;
+    top: 20px;
+    left: auto;
+    width: 44px;
+    height: 44px;
+    margin-top: 0;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+    animation-name: ui-pop-top;
+  }
+  .app .office-toggle { right: 280px; }
+  .app .auto-toggle { right: 228px; }
+  .app .office-toggle em,
+  .app .office-toggle .money,
+  .app .auto-toggle .auto-long { display: none; }
+  .app .office-toggle .office-icon { width: 27px; height: 27px; }
+  .app .auto-toggle .auto-short { display: inline; font: 700 17px/1 var(--brush); }
+  .app .auto-toggle .auto-lamp { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; box-shadow: 0 0 0 1.5px var(--page); }
+  .money-chip {
+    display: flex;
+    position: absolute;
+    top: 248px;
+    left: 24px;
+    z-index: 4;
+    height: 36px;
+    align-items: center;
+    padding: 0 14px 0 11px;
+    border: 1.5px solid rgb(59 42 32 / 0.35);
+    border-radius: 10px;
+    background: rgb(251 246 234 / 0.55);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    box-shadow: 0 4px 12px -6px rgb(59 42 32 / 0.5);
+    font: 700 16px/1 var(--brush);
+    cursor: pointer;
+    transition: margin-top 0.3s ease, transform 0.15s;
+  }
+  .money-chip:hover { transform: translateY(-1px); }
+  .hud-rows-1 .money-chip { margin-top: -62px; }
+  .hud-rows-0 .money-chip { margin-top: -152px; }
+  .app.is-hushed .money-chip { display: none; }
+  .app:not(.is-hushed) .money-chip { animation: ui-pop-left 520ms cubic-bezier(0.2, 1.5, 0.4, 1) 380ms both; }
+}
+@media (min-width: 901px) and (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .money-chip { background: rgb(30 36 50 / 0.55); border-color: rgb(246 236 216 / 0.3); }
+}
+@media (min-width: 901px) {
+  :root[data-theme='dark'] .money-chip { background: rgb(30 36 50 / 0.55); border-color: rgb(246 236 216 / 0.3); }
 }

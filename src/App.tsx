@@ -32,7 +32,7 @@ import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { COAL_BRIDGE, DRINKS, type DrinkId, PANTRY, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
-import { offsetOf, positionOf, rotationOf, setEditLang, toggleEdit, useEdit, type V3 } from '@/shops/grill/edit'
+import { offsetOf, positionOf, rotationOf, setEditLang, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
@@ -2062,8 +2062,14 @@ export default function App() {
             out of the way, and the buttons under them move up into the room left) */}
         {showFire && <FireControl level={fireLevel} onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
         {showFull && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
+        {/* (on a wide screen 經營 and 自動營運 are round buttons in the row top right, and the cash stands on its own here, where 經營 was:
+            a click on it opens the books) */}
+        <button type="button" className="money-chip" onClick={() => setOffice('ledger')}
+          title={tl(lang, '現金（點一下看帳簿）', '現金（クリックで帳簿）', 'Cash (click for the ledger)')}>
+          <b className="money">NT${Math.round(cash).toLocaleString()}</b>
+        </button>
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
-          title={tl(lang, '經營（廚房・人事・帳簿）', '開発ノート・人事・帳簿', 'Office (kitchen · staff · ledger)')}>
+          aria-label={tl(lang, '經營', '経営', 'Office')} title={tl(lang, '經營（廚房・人事・帳簿）', '開発ノート・人事・帳簿', 'Office (kitchen · staff · ledger)')}>
           <svg className="office-icon" viewBox="0 0 28 28" aria-hidden="true">
             {/* the shop front: a tiled eave, a noren split in three with the shop's mark, a lantern at the side */}
             <path d="M3 10.5 14 4l11 6.5z" fill="#3b2a20" />
@@ -2076,12 +2082,13 @@ export default function App() {
             <ellipse cx="24.6" cy="15" rx="1.6" ry="2.2" fill="#f2b84b" stroke="#3b2a20" strokeWidth=".7" />
           </svg><em>{tl(lang, '經營', '経営', 'Office')}</em><b className="money">NT${Math.round(cash).toLocaleString()}</b>
         </button>
-        <button type="button" className={`auto-toggle${auto ? ' is-on' : ''}`} aria-pressed={auto} title={UI[lang].autoLabel}
+        <button type="button" className={`auto-toggle${auto ? ' is-on' : ''}`} aria-pressed={auto} title={UI[lang].autoLabel} aria-label={UI[lang].auto}
           onClick={() => {
             setAuto((v) => !v)
             say(auto ? UI[lang].autoOff : UI[lang].autoOn)
           }}>
-          <span className="auto-lamp" aria-hidden="true" />{UI[lang].auto}
+          <span className="auto-lamp" aria-hidden="true" /><b className="auto-short" aria-hidden="true">{tl(lang, '自', '自', 'A')}</b>
+          <span className="auto-long">{UI[lang].auto}</span>
         </button>
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
@@ -2383,13 +2390,6 @@ export default function App() {
             </g>
           ))}
         </svg>
-      )}
-      {/* (the shop's edit mode, key G: only while it's shut, as it can't be switched on while customers are about) */}
-      {!ai && !!dish.roast && !flatGrill && (
-        <button type="button" className={`edit-toggle${editOn ? ' is-on' : ''}`} onClick={toggleEdit} aria-pressed={editOn}
-          title={tl(lang, '開發者模式（快捷鍵 G）：調整擺設與鏡頭', '開発者モード（Gキー）：配置・カメラの調整', 'Developer mode (G): arrange pieces and cameras')}>
-          開
-        </button>
       )}
       <button type="button" className={`speed-toggle${speed > 1 ? ' is-on' : ''}`} onClick={() => setSpeed((v) => (v > 1 ? 1 : 2))}
         aria-pressed={speed > 1} title={tl(lang, '快速 ×2', '早送り ×2', 'Fast ×2')}>

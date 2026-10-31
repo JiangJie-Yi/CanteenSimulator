@@ -68,7 +68,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 ## 開發者模式（`src/shops/grill/edit.ts`、`Movable.tsx`）
 
-- 介面是 Blender 風格的深灰面板：左邊工具列，熱鍵照 Maya（選取 Q、位移 W、旋轉 E、縮放 R；同一個鍵再按一次切換世界／物件座標；4 線框看拓撲、5 回到著色），選到物件時面板顯示它的三角面、頂點、網格數；F 對準選取、A 看全部、Esc 取消選取；視角照 Maya：Alt＋左鍵旋轉、Alt＋中鍵平移、Alt＋右鍵推拉，不按 Alt 拖曳不會動到鏡頭；移動把手中間的橘色小方框可在面向鏡頭的平面上自由移動（三軸一起）；進開發者模式（G）時視角切到 1 自由視角（總覽），離開時鏡頭不動（選單收起不會改構圖）；面板下方列出熱鍵；清單分「場景」「攝影機」兩個頁籤（`edit.ts` 的 `listTab`；點選到的東西在哪一頁就自動切過去），可搜尋（只找目前那一頁），變換區的 X／Y／Z 是紅綠藍色條。位置、移動箭頭、旋轉環、縮放把手都用**房間軸**（吧台方向 `ALONG`），不是各物件父層的軸。
+- 只用 **G** 鍵進出（沒有按鈕）。介面是 Blender 風格的深灰面板：左邊工具列，熱鍵照 Maya（選取 Q、位移 W、旋轉 E、縮放 R；同一個鍵再按一次切換世界／物件座標；4 線框看拓撲、5 回到著色），選到物件時面板顯示它的三角面、頂點、網格數；F 對準選取、A 看全部、Esc 取消選取；視角照 Maya：Alt＋左鍵旋轉、Alt＋中鍵平移、Alt＋右鍵推拉，不按 Alt 拖曳不會動到鏡頭；移動把手中間的橘色小方框可在面向鏡頭的平面上自由移動（三軸一起）；進開發者模式（G）時視角切到 1 自由視角（總覽），離開時鏡頭不動（選單收起不會改構圖）；面板下方列出熱鍵；清單分「場景」「攝影機」兩個頁籤（`edit.ts` 的 `listTab`；點選到的東西在哪一頁就自動切過去），可搜尋（只找目前那一頁），變換區的 X／Y／Z 是紅綠藍色條。位置、移動箭頭、旋轉環、縮放把手都用**房間軸**（吧台方向 `ALONG`），不是各物件父層的軸。
 - 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。開發者模式每件物件有一個貼合模型的細線框（`Movable.tsx` 的 `useEditBox`：量模型的頂點，順著物件的斜度找最貼的角度）：平常淡藍、只在沒被擋住處顯示；滑鼠移上去變亮、選到變橘色，這兩種會穿透顯示。點選的是物件本身的網格，所以大物件不會擋住前面的小物件。位置框（量出的範圍）仍用來放箭頭和算中心。
 - **預設值**：位置預設寫在 `edit.ts` 的 `BASES`（父層單位）；大小與轉向預設用 `<Movable baseScale baseTurn>`。定好預設後面板歸零（位置 0、縮放 1）。改了預設要把 `edit.ts` 開頭的三個 localStorage key 版本加一，不然瀏覽器裡舊的偏移會重複計算。有預設轉向或縮放的擺設（例如備長炭籃、行燈），量到中心點之前先不顯示，避免載入時閃一下。
 - **編輯介面中日文**：文字在 `data/editText.ts`（`EDIT_TEXT` 中、日各一份，`pieceName` 把擺設名稱翻成日文）；App 用 `setEditLang` 跟著遊戲語言切換。新增擺設時，中文名稱只用中文，並在 `PIECES_JA`（或 `WORDS_JA`）補上日文。
@@ -176,7 +176,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
   - drei 的 `<Environment>`（`IndoorHDRI`）要 `memo`：它的 children 一換就重算整個環境貼圖（6 個方向畫一次房間＋60 次模糊），開店時上層一秒重畫很多次。同理，不常變的大場景元件（`ShopProps`、`DiningWall`、`Decor`、`Bar`、`CookTable`、`BarCounter`、`BarGate`、`DiningFloor`、`RoomFloor`）都包了 `memo`；新加的、會被常重畫的父層包住的大元件也要包。
   - 用 `StaticBatch` 或 `mergeByMaterial(root, keep)`（`scene/StaticBatch.tsx`）把不會動的零件依材質合併成少數幾次繪製；`keep` 留下自己會動的部分（手、眼、嘴、蓋子、按鍵、抽屜、螢幕…）。模型的材質要依來源材質共用一份（用 Map），不然每個零件一個材質就合併不起來。合併後的網格不能被指到：要能點的東西放一個 `visible={false}` 的感應方塊（r3f 的射線不管 visible），例如飲料櫃的瓶子、炭籃的炭、碗盤櫃。`StaticBatch` 藏起來的原物件不再每格更新矩陣。
   - 目前（Intel Arc B580，1920×1080，最高畫質）：閉店總覽約 1,700 次繪製、60 fps；火烤灶台 840 次、60 fps；開店總覽約 2,200 次、約 45 fps（dev 模式）。
-- 桌機（非觸控）一律最高畫質（`scene/quality.ts`），只有手機才判斷降級；卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps（載入後 10 秒才開始判斷、看一段時間裡中位數的那一格，偶爾的頓一下不算；降到 1 倍解析度後會一直維持；網址加 `?pace=0` 就不會降）；右上角 ×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
+- 桌機（非觸控）一律最高畫質（`scene/quality.ts`），只有手機才判斷降級；卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps（載入後 10 秒才開始判斷、看一段時間裡中位數的那一格，偶爾的頓一下不算；降到 1 倍解析度後會一直維持；網址加 `?pace=0` 就不會降）；右上角一排圓鈕（由左到右：經營（店面小圖）、自動營運（自，亮燈＝開）、×2 遊戲倍速、開店／閉店、語言、日夜；窄於 900px 時經營與自動營運仍是左上的長鈕），現金單獨顯示在左上（`money-chip`，點一下開帳簿）；×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
 
 **開發用（只在 dev）**：瀏覽器 console 可用 `__gl`（renderer，看 draw calls）、`__scene`、`__cam` 與 `__ctl`（設定視角：`__ctl.target.set(...)`、`__cam.position.set(...)`）、`__service`、`__toilets`（例如 `__toilets.m.open = true`）。場景裡名稱 `look-*` 的群組（`look-altar`、`look-fridge`、`look-door`、`look-wc-m`…）方便用 `__scene.getObjectByName` 找位置截圖。
 

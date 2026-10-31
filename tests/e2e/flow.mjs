@@ -31,7 +31,7 @@ for (const [i, shop] of SHOPS.entries()) {
   const page = await ctx.newPage()
   page.setDefaultTimeout(8000)
   page.on('pageerror', (e) => errors.push(`${shop}: ${e.message}`))
-  const cash = async () => Number((await page.locator('.office-toggle b').innerText()).replace(/[^\d-]/g, ''))
+  const cash = async () => Number((await page.locator('.money-chip b').innerText()).replace(/[^\d-]/g, ''))
   try {
     // (the game's logic at the low tier: software GL draws the high one at a frame a second, and the customers' clock runs by the frame)
     await page.goto(URL + (URL.includes('?') ? '&' : '?') + (process.env.Q ? `q=${process.env.Q}` : 'q=low'), { timeout: 60000 })
