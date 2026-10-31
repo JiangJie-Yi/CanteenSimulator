@@ -102,9 +102,8 @@ const BAR_TOP_SCENE = BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y
 const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
 /** the pass, where what's grilled is put out for a server to carry */
 const PASS_SCENE = toGrillScene(passOf(GRILL_COUNTERS)).setY(GRILL_BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y + 0.04)
-/** the pass's tray (a lacquered 盆 on the bar where what's cooked is put out for the servers): its size along the bar and across it, and its
- * places: six side by side along it, each laid across it (a skewer's stick resting over its rims), then six more on top */
-const PASS_TRAY = { along: 0.42 * GRILL_SCALE, across: 0.22 * GRILL_SCALE }
+/** the pass's tray's places (the tray a lacquered 盆 on the bar where what's cooked is put out for the servers, 0.84 along and 0.44 across:
+ * blender/passtray.py): six side by side along it, each laid across it (a skewer's stick resting over its rims), then six more on top */
 const PASS_ROW = 6
 const passSpot = (n: number) => PASS_SCENE.clone().addScaledVector(ALONG, ((n % PASS_ROW) - (PASS_ROW - 1) / 2) * 0.065 * GRILL_SCALE)
   .add(new THREE.Vector3(0, Math.floor(n / PASS_ROW) * 0.025 * GRILL_SCALE, 0))
@@ -410,21 +409,36 @@ function TrashBin({ position, container, contents = 0 }: { position: [number, nu
   )
 }
 
-/** the pass's tray: black lacquer, its well vermilion, a low rim round it (on the bar where the cooks put out what's ready for the servers) */
+const PASS_TRAY_URL = import.meta.env.BASE_URL + 'models/passtray.glb'
+/** the pass's tray (blender/passtray.py): black lacquer, its inside vermilion, a gold line along its lip, on two runners; in the room's toon light */
 function PassTray() {
   const at = PASS_SCENE.clone().setY(PASS_SCENE.y - 0.04)
-  const { along: L2, across: W } = PASS_TRAY
-  const rim = 0.012 * GRILL_SCALE
-  return (
-    <group position={at} rotation-y={Math.atan2(ALONG.x, ALONG.z)}>
-      <mesh position-y={0.006} receiveShadow><boxGeometry args={[W, 0.012, L2]} /><meshToonMaterial color="#1e1512" /></mesh>
-      <mesh position-y={0.0125} rotation-x={-Math.PI / 2} receiveShadow><planeGeometry args={[W - rim * 2, L2 - rim * 2]} /><meshToonMaterial color="#7a2a1c" /></mesh>
-      {[[0, L2 / 2 - rim / 2, W, rim], [0, -L2 / 2 + rim / 2, W, rim], [W / 2 - rim / 2, 0, rim, L2], [-W / 2 + rim / 2, 0, rim, L2]].map(([x, z, w, d], k) => (
-        <mesh key={k} position={[x, 0.02, z]}><boxGeometry args={[w, 0.016, d]} /><meshToonMaterial color="#1e1512" /></mesh>
-      ))}
-    </group>
-  )
+  const gltf = useGLTF(PASS_TRAY_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const conv = (src: THREE.Material) => {
+        let t = made.get(src)
+        if (!t) {
+          const sm = src as THREE.MeshStandardMaterial
+          t = sm.name === 'TrayGold' ? new THREE.MeshStandardMaterial({ color: '#d2a64e', metalness: 1, roughness: 0.3 })
+            : new THREE.MeshToonMaterial({ color: sm.color.clone() })
+          made.set(src, t)
+        }
+        return t
+      }
+      m.material = Array.isArray(m.material) ? m.material.map(conv) : conv(m.material)
+      m.receiveShadow = true
+    })
+    inkModel(r, () => false, { width: 0.002, weld: true })
+    return r
+  }, [gltf])
+  return <group position={at} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><primitive object={obj} /></group>
 }
+useGLTF.preload(PASS_TRAY_URL)
 
 /** the tray for raw food waiting to go on the fire: a row of sticks across it, a few more laid in the gaps on top; loose food in a row along
  * its back. It holds no more than that: the rest wait in the fridge until there's room, brought out as the tray's cleared */
