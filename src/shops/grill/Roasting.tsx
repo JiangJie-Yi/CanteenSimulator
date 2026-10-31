@@ -1804,108 +1804,6 @@ const STICK_TOP_Y = 1.15
 const LAYER_HEIGHT = 0.1
 const CHAR_COLOR = new THREE.Color(0.045, 0.035, 0.03)
 
-/**
- * A woven bamboo (ざる) texture: strips over and under in a twill, pale and honey-coloured — and well used. One
- * picture across the whole basket (not tiled), so the wear can be where it would be: the middle darkened by
- * oil and ash from the potatoes, brown stains and a smudge or two of charcoal, strips bleached and worn toward
- * the rim, a few frayed or split, and the bamboo greyed unevenly with age.
- */
-const weaveTexture = (() => {
-  if (typeof document === 'undefined') return null
-  const S = 1024
-  const c = document.createElement('canvas')
-  c.width = c.height = S
-  const g = c.getContext('2d')!
-  let seed = 11
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  const n = 26                       // strips across (the old tile was 8 strips, repeated 3.2 times)
-  const cell = S / n
-  const k = cell / 16
-  // gaps between the strips show dark
-  g.fillStyle = '#5a3d1c'
-  g.fillRect(0, 0, S, S)
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      const over = (i + j) % 4 < 2
-      const x = i * cell
-      const y = j * cell
-      // each strip piece a touch different in shade: older bamboo greys and darkens unevenly
-      const age = rnd()
-      const top = over ? [217, 183, 121] : [179, 138, 77]
-      const grey = age * 0.18
-      const col = top.map((v, q) => Math.round(v * (1 - grey) + [150, 140, 120][q] * grey))
-      g.fillStyle = `rgb(${col[0]}, ${col[1]}, ${col[2]})`
-      if (over) g.fillRect(x, y + 2 * k, cell, cell - 4 * k)
-      else g.fillRect(x + 2 * k, y, cell - 4 * k, cell)
-      g.fillStyle = 'rgba(255, 240, 200, 0.3)'
-      if (over) g.fillRect(x, y + 5 * k, cell, 2 * k)
-      else g.fillRect(x + 5 * k, y, 2 * k, cell)
-      g.fillStyle = 'rgba(90, 60, 25, 0.35)'
-      if (over) g.fillRect(x, y + 10 * k, cell, k)
-      else g.fillRect(x + 10 * k, y, k, cell)
-      // now and then a split along the strip, or a frayed end lifting
-      if (rnd() < 0.05) {
-        g.strokeStyle = 'rgba(60, 38, 16, 0.7)'
-        g.lineWidth = 1.2
-        g.beginPath()
-        if (over) {
-          g.moveTo(x + cell * 0.1, y + cell * (0.35 + rnd() * 0.3))
-          g.lineTo(x + cell * 0.9, y + cell * (0.35 + rnd() * 0.3))
-        } else {
-          g.moveTo(x + cell * (0.35 + rnd() * 0.3), y + cell * 0.1)
-          g.lineTo(x + cell * (0.35 + rnd() * 0.3), y + cell * 0.9)
-        }
-        g.stroke()
-      }
-      if (rnd() < 0.025) {
-        g.fillStyle = 'rgba(240, 220, 175, 0.75)'
-        for (let q = 0; q < 4; q++) g.fillRect(x + rnd() * cell, y + rnd() * cell, 1.5, 4 + rnd() * 6)
-      }
-    }
-  }
-  const blot = (x: number, y: number, r: number, rgba: string, rgba0: string) => {
-    const grad = g.createRadialGradient(x, y, r * 0.1, x, y, r)
-    grad.addColorStop(0, rgba)
-    grad.addColorStop(1, rgba0)
-    g.fillStyle = grad
-    g.beginPath()
-    // a ragged edge: a wobbly ring rather than a circle
-    for (let q = 0; q <= 24; q++) {
-      const a = (q / 24) * Math.PI * 2
-      const rr = r * (0.75 + 0.25 * Math.sin(a * 3 + x) + rnd() * 0.15)
-      if (q === 0) g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr)
-      else g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr)
-    }
-    g.fill()
-  }
-  // the middle, where hot potatoes have sat for years: oil and ash worked into it
-  blot(S / 2, S / 2, S * 0.3, 'rgba(70, 42, 18, 0.38)', 'rgba(70, 42, 18, 0)')
-  // stains here and there
-  for (let q = 0; q < 9; q++) {
-    const a = rnd() * Math.PI * 2
-    const d = rnd() * S * 0.32
-    blot(S / 2 + Math.cos(a) * d, S / 2 + Math.sin(a) * d, 25 + rnd() * 55, 'rgba(95, 55, 20, 0.3)', 'rgba(95, 55, 20, 0)')
-  }
-  // a couple of charcoal smudges from sooty foil
-  for (let q = 0; q < 3; q++) {
-    const a = rnd() * Math.PI * 2
-    const d = rnd() * S * 0.22
-    blot(S / 2 + Math.cos(a) * d, S / 2 + Math.sin(a) * d, 18 + rnd() * 26, 'rgba(25, 20, 18, 0.35)', 'rgba(25, 20, 18, 0)')
-  }
-  // toward the rim the bamboo is rubbed paler by hands
-  const rim = g.createRadialGradient(S / 2, S / 2, S * 0.33, S / 2, S / 2, S * 0.5)
-  rim.addColorStop(0, 'rgba(255, 240, 210, 0)')
-  rim.addColorStop(1, 'rgba(255, 240, 210, 0.22)')
-  g.fillStyle = rim
-  g.fillRect(0, 0, S, S)
-  const t = new THREE.CanvasTexture(forPhone(c))
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  // mapped straight down onto the bowl (see Basket), so the strips run in two straight crossing directions
-  // right across it, the way a woven zaru is made, instead of pinching into the centre
-  t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 8
-  return t
-})()
 
 /** A small round side dish (小皿) for onigiri and mochi, of the same set as the plates (plum blossom), inked. */
 function SideDish({ position, container }: { position: [number, number, number]; container: string }) {
@@ -1945,41 +1843,36 @@ function TasteBowl({ position, container }: { position: [number, number, number]
   )
 }
 
-/** Shallow woven bamboo basket with a rolled rim, inked like everything else. */
+const ZARU_URL = import.meta.env.BASE_URL + 'models/zaru.glb'
+/** the basket's model, made once: its weave and its bound rim in the room's toon light (their relief maps kept), an ink line round it */
+let zaruBase: THREE.Object3D | null = null
+/** The woven bamboo basket (竹ざる) the foil-roasted potatoes are served into (blender/zaru.py): a plain weave of split bamboo, a rolled rim
+ * bound with cane. */
 function Basket({ position, container }: { position: [number, number, number]; container: string }) {
-  const geometry = useMemo(() => {
-    const R = BASKET_R
-    const profile = [[0, 0.01], [R * 0.55, 0.012], [R * 0.82, 0.04], [R * 0.97, 0.1], [R * 1.02, 0.13], [R * 0.99, 0.145],
-      [R * 0.93, 0.12], [R * 0.78, 0.055], [R * 0.5, 0.028], [0, 0.026]].map(([x, y]) => new THREE.Vector2(x, y))
-    const g = new THREE.LatheGeometry(profile, 64)
-    // top-down UVs: the weave lies across the bowl in straight lines
-    const pos = g.attributes.position
-    const uv = g.attributes.uv
-    for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / (2 * R) + 0.5, pos.getZ(i) / (2 * R) + 0.5)
-    uv.needsUpdate = true
-    // shade the inside: the rim throws a soft shadow down into the bowl, deepest low against the wall
-    const col = new Float32Array(pos.count * 3)
-    for (let i = 0; i < pos.count; i++) {
-      const j = i % profile.length
-      const inner = j >= 6
-      const r = Math.hypot(pos.getX(i), pos.getZ(i)) / R
-      const k = inner ? 0.55 + 0.25 * (1 - r) + 0.25 * THREE.MathUtils.smoothstep(pos.getY(i), 0.03, 0.12) : 1
-      col.set([k, k * 0.97, k * 0.92], i * 3)
+  const gltf = useGLTF(ZARU_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    if (!zaruBase) {
+      const r = gltf.scene.clone(true)
+      r.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh) return
+        const src = m.material as THREE.MeshStandardMaterial
+        m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map, normalMap: src.normalMap, side: THREE.DoubleSide })
+        m.castShadow = true
+        m.receiveShadow = true
+      })
+      inkModel(r, () => false, { width: 0.004, weld: true })
+      zaruBase = r
     }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3))
-    return g
-  }, [])
+    return zaruBase.clone(true)
+  }, [gltf])
   return (
     <group position={position} userData={{ container }}>
-      <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={weaveTexture} side={THREE.DoubleSide} vertexColors />
-      </mesh>
-      <mesh geometry={geometry} scale={[1.03, 1.08, 1.03]}>
-        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-      </mesh>
+      <primitive object={obj} />
     </group>
   )
 }
+useGLTF.preload(ZARU_URL)
 
 type Uniform = { value: number }
 /** per-piece look: how charred it is, and how much of each seasoning is on it (all 0 → 1) */
