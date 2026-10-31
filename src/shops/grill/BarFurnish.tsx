@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 
 /**
- * The bar stool and the till's two (blender/stools.py) and the potted bamboo (blender/barfurnish.py): drawn in the room's toon light, with
+ * The bar stool (blender/stools.py), the till's two seats (blender/tillstools.py) and the potted bamboo (blender/barfurnish.py): drawn in the room's toon light, with
  * the room's ink line round them; the pot's glaze keeps a little gloss.
  */
 const STOOL_URL = import.meta.env.BASE_URL + 'models/stool.glb'
@@ -14,7 +14,7 @@ const TOILET_URL = import.meta.env.BASE_URL + 'models/toilet.glb'
 const WASH_URL = import.meta.env.BASE_URL + 'models/washstand.glb'
 const GLOSSY = new Set(['StoolBrass', 'PotGlaze', 'WcChina', 'WcIvory', 'WcChrome', 'WcWater', 'WashBrass', 'WashMirror', 'WashWater'])
 /** parts too thin or small for an ink line */
-const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring)/
+const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel)/
 
 const made = new Map<string, THREE.Object3D>()
 function toonOf(url: string, scene: THREE.Group) {
@@ -47,7 +47,8 @@ export function StoolModel() {
   const obj = useMemo(() => toonOf(STOOL_URL, gltf.scene), [gltf])
   return <primitive object={obj} />
 }
-/** one of the till's two stools (blender/stools.py): the cashier's taller (`High`), a helper's lower (`Low`), each stood at its own origin */
+/** one of the till's two seats (blender/tillstools.py): the cashier's walnut chair with its kumiko back (`High`), a helper's stool of the same
+ * make (`Low`), each stood at its own origin, facing -z */
 export function TillStoolModel({ which }: { which: 'High' | 'Low' }) {
   const gltf = useGLTF(TILLSTOOL_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {

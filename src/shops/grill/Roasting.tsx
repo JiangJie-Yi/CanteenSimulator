@@ -21,6 +21,7 @@ import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { QUALITY } from '@/scene/quality'
+import { seasonSound, sprinkleTick } from './seasonSound'
 import { kindOf, type GuestKind } from '@/data/guests'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
@@ -398,8 +399,11 @@ function TrashBin({ position, container, contents = 0 }: { position: [number, nu
   )
 }
 
-/** the tray for raw food waiting to go on the fire: a grid of spots */
-const TRAY_ROWS = 4
+/** the tray for raw food waiting to go on the fire: a row of sticks across it, a few more laid in the gaps on top; loose food in a row along
+ * its back. It holds no more than that: the rest wait in the fridge until there's room, brought out as the tray's cleared */
+const TRAY_ROWS = 5
+const TRAY_CAP = TRAY_ROWS * 2 - 1
+const LOOSE_CAP = 7
 const TRAY_W = 1.6
 const TRAY_D = 0.9
 /** the seasoning box, as a round footprint for bumping into things */
@@ -741,23 +745,47 @@ function crewWayOut(role: Role, at: THREE.Vector3) {
     : role === 'cashier' ? [new THREE.Vector3().addScaledVector(ALONG, 5.35).addScaledVector(LAY, -0.3)] : []
   return [at.clone(), ...via, ...staffWayOut(GRILL_COUNTERS).map(fromBar)].map((v) => v.setY(floorAt(v)))
 }
-/** one of the staff at their place; once the shop's shut and empty (SHOP.leaving) they walk their way out (`way`) and are gone */
-function CrewWalk({ at, yaw, way, children }: { at: THREE.Vector3; yaw: number; way: THREE.Vector3[]; children: React.ReactNode }) {
+/**
+ * One of the staff at their place; once the shop's shut and empty (SHOP.leaving) they walk their way out (`way`, from wherever they are)
+ * and are gone. `seat`: the name of an unseen mark in the scene they sit on instead, facing its -z (the cashier's chair: it can be moved).
+ */
+function CrewWalk({ at, yaw, way, seat, children }: { at: THREE.Vector3; yaw: number; way: THREE.Vector3[]; seat?: string; children: React.ReactNode }) {
   const g = useRef<THREE.Group>(null)
   const gone = useRef(0)
-  const len = useMemo(() => pathLength(way), [way])
+  const path = useRef<{ way: THREE.Vector3[]; len: number } | null>(null)
+  const scene = useThree((s) => s.scene)
+  const mark = useRef<THREE.Object3D | null>(null)
   useFrame((_, dt) => {
     const o = g.current
     if (!o) return
     if (!SHOP.leaving) {
       gone.current = 0
+      path.current = null
+      o.visible = true
+      if (seat && o.parent) {
+        if (!mark.current?.parent) mark.current = scene.getObjectByName(seat) ?? null
+        const m = mark.current
+        if (m) {
+          const inv = o.parent.matrixWorld.clone().invert()
+          o.position.setFromMatrixPosition(m.matrixWorld).applyMatrix4(inv)
+          const dir = new THREE.Vector3(0, 0, -1).transformDirection(m.matrixWorld).transformDirection(inv)
+          o.rotation.y = Math.atan2(dir.x, dir.z)
+          return
+        }
+      }
       o.position.copy(at)
       o.rotation.y = yaw
-      o.visible = true
       return
     }
+    // (on their way: from where they are, down off a seat onto the floor, then the way out)
+    if (!path.current) {
+      const from = o.position.clone().setY(way[0].y)
+      const w = [from, ...way.slice(1)]
+      path.current = { way: w, len: pathLength(w) }
+    }
+    const { way: w, len } = path.current
     gone.current = Math.min(len, gone.current + Math.min(dt, 0.1) * 1.6)
-    const { p, dir } = alongPath(way, gone.current)
+    const { p, dir } = alongPath(w, gone.current)
     o.position.copy(p)
     if (dir.x || dir.z) o.rotation.y = Math.atan2(dir.x, dir.z)
     o.visible = gone.current < len - 0.2
@@ -782,7 +810,9 @@ function crewPlaces(crew: CrewMember[]) {
     const k = used[m.role] ?? 0
     used[m.role] = k + 1
     const spot = spots[m.role][k]
-    return spot ? [{ m, ...spot, way: crewWayOut(m.role, spot.at) }] : []
+    // (the first cashier sits on the till's chair: GuestBar3D's Register marks its seat)
+    const seat = m.role === 'cashier' && k === 0 ? 'cashier-seat' : undefined
+    return spot ? [{ m, ...spot, way: crewWayOut(m.role, spot.at), seat }] : []
   })
 }
 /** where the cook stands (on the floor, in the notch), and the way he faces: in at the fire */
@@ -1681,6 +1711,35 @@ const BOWL_CURVE = 0.45
 const BASKET_STEP = 0.85
 /** grains and drops falling from a seasoning while it's held over food */
 const GRAINS = 360
+/** a seasoning held over the food goes on no more than once every this many seconds (whichever piece it's over), and only once it's been
+ * over the piece a moment */
+const DAB_EVERY = 0.7
+const DAB_FIRST = 0.25
+/**
+ * How each seasoning is worked over the food while it's held there, at time `t` (s): where it moves to from where it's held (in the
+ * table's frame), how much more it tips, and how many grains or drops a second fall. A pinch of salt rubbed between the fingers (a quick
+ * small jitter), the powders shaken off their spoons (a bob), the sauces brushed along (a stroke back and forth), the pastes dabbed on (a
+ * dip), the lemon squeezed (a press and twist).
+ */
+function toolAction(kind: Seasoning, t: number) {
+  const tau = Math.PI * 2
+  switch (kind) {
+    case 'salt': return { off: new THREE.Vector3(Math.sin(t * tau * 9) * 0.004, Math.sin(t * tau * 13) * 0.003, Math.cos(t * tau * 11) * 0.004), tilt: 0, rate: 46 }
+    case 'peanut':
+    case 'shichimi': return { off: new THREE.Vector3(0, Math.max(0, Math.sin(t * tau * 5.5)) * 0.022, 0), tilt: Math.sin(t * tau * 5.5) * 0.12, rate: 40 }
+    case 'soy':
+    case 'milk': return { off: STACK_DIR.clone().multiplyScalar(Math.sin(t * tau * 1.8) * 0.06).add(new THREE.Vector3(0, -0.015, 0)), tilt: 0.15, rate: 9 }
+    case 'lemon': return { off: new THREE.Vector3(0, -Math.abs(Math.sin(t * tau * 1.6)) * 0.02, 0), tilt: Math.sin(t * tau * 1.6) * 0.25, rate: 14 }
+    case 'water': return { off: new THREE.Vector3(), tilt: 0, rate: 0 }
+    default: return { off: new THREE.Vector3(0, -Math.max(0, Math.sin(t * tau * 2.2)) * 0.03, 0), tilt: 0.1, rate: 6 }
+  }
+}
+/** the rings that spread from a piece as a seasoning goes on: how many can be out at once, and how long each lasts (s) */
+const RINGS = 6
+const RING_LIFE = 0.45
+/** a seasoned piece's bounce: how long (s) and how much bigger at its height */
+const BOUNCE_TIME = 0.3
+const BOUNCE = 0.13
 const GRAIN_COLORS: Record<Seasoning, THREE.Color> = {
   salt: new THREE.Color('#ffffff'),
   soy: new THREE.Color('#3a1a08'),
@@ -2475,20 +2534,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // (where each thing stands, kept off the hearth's frame as it's dragged and as it's first set out: the hearth grew, and things set out
   // round the old one would sit on its frame)
   const trayAt = () => { const v = new THREE.Vector3(...(roast.tray ?? [0, 0, 0])).add(nudge('tray')); clearOfHearth(v, 0.04, TRAY_W, TRAY_D); return v }
-  // skewers lie along the tray's long side, in rows from back to front, a second layer across the first when full
-  /** loose food (potatoes, rice balls, mochi) waits in a row along the back of the tray, clear of the sticks */
+  // skewers lie along the tray's long side, in a row from back to front, then a few laid on top in the gaps between them (TRAY_CAP)
+  /** loose food (potatoes, rice balls, mochi) waits in a row along the back of the tray, clear of the sticks (LOOSE_CAP) */
   const trayLooseSpot = (n: number) => trayAt()
-    .addScaledVector(STACK_DIR, ((n % 7) - 3) * 0.2)
+    .addScaledVector(STACK_DIR, ((n % LOOSE_CAP) - 3) * 0.2)
     .addScaledVector(LAY_DIR, -(TRAY_D / 2 - 0.13))
-    .add(new THREE.Vector3(0, 0.07 + Math.floor(n / 7) * 0.12, 0))
+    .add(new THREE.Vector3(0, 0.07, 0))
   const traySpot = (n: number) => {
-    const row = n % TRAY_ROWS
-    const layer = Math.floor(n / TRAY_ROWS)
+    const top = n >= TRAY_ROWS
+    const row = top ? n - TRAY_ROWS + 0.5 : n
     return trayAt()
       .addScaledVector(LAY_DIR, 0.1 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.34) / (TRAY_ROWS - 1))
-      .addScaledVector(STACK_DIR, 0.05 + ((layer % 2) - 0.5) * 0.06)
-      .add(new THREE.Vector3(0, 0.07 + layer * 0.06, 0))
+      .addScaledVector(STACK_DIR, 0.05)
+      .add(new THREE.Vector3(0, top ? 0.115 : 0.07, 0))
   }
+  /** how many more are waiting in the fridge for room on the tray (shown by it) */
+  const [trayMore, setTrayMore] = useState(0)
 
   /**
    * Plate n of the run. They go around the fire at the first plate's distance: the 2nd to its front-right, the
@@ -3624,7 +3685,32 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const tool = tools.find((t) => t.node.name === toolName)
     return pot && tool ? [{ pot, tool }] : []
   }), [root, roast.toolPots, tools])
-  const drag = useRef<{ tool: Tool; target: Piece | null; at: THREE.Vector3; pour: number; scoop: number } | null>(null)
+  const drag = useRef<{ tool: Tool; target: Piece | null; at: THREE.Vector3; pour: number; scoop: number
+    /** where it's held, eased after the pointer; its own clock (its working motion); the piece it's over and how long it's been there; the
+     * time since it last went on; the pieces it's put some on this time; the grains owed; the time since the last patter */
+    base: THREE.Vector3; t: number; on: Piece | null; dwell: number; since: number; dabbed: Set<Piece>; acc: number; tick: number } | null>(null)
+  /** the pieces just seasoned, each bouncing a little (how far through, 0..1) */
+  const bounces = useRef(new Map<Piece, number>())
+  /** the rings spreading where a seasoning's just gone on */
+  const ringObjs = useRef<(THREE.Mesh | null)[]>([])
+  const ringLife = useRef<number[]>(Array(RINGS).fill(0))
+  const ringNext = useRef(0)
+  /** a seasoning goes on: the piece seasoned, a burst of it falling, the piece bouncing a little, a ring spreading from it in its colour,
+   * and its sound */
+  const dabNow = (p: Piece, kind: Seasoning, from: THREE.Vector3) => {
+    season(p, kind)
+    emit(kind, from.clone().add(new THREE.Vector3(0, -0.04, 0)), kind === 'salt' || kind === 'peanut' || kind === 'shichimi' ? 22 : 10)
+    bounces.current.set(p, 0)
+    const k = ringNext.current
+    ringNext.current = (k + 1) % RINGS
+    const ring = ringObjs.current[k]
+    if (ring) {
+      ring.position.copy(p.node.position).add(new THREE.Vector3(0, 0.03, 0))
+      ;(ring.material as THREE.MeshBasicMaterial).color.copy(GRAIN_COLORS[kind])
+      ringLife.current[k] = RING_LIFE
+    }
+    seasonSound(kind)
+  }
   /** the dipper pouring out what it scooped, where it was let go: how long it has left (s) */
   const pouring = useRef<{ tool: Tool; left: number; at: THREE.Vector3 } | null>(null)
   /** the water standing in the dipper's cup (shown once it's scooped some up, gone as it's poured out) */
@@ -3881,7 +3967,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // pick it up: the camera holds still while it's carried, and the pointer is followed over the whole window
       // (it passes over the food tags, which sit above the canvas)
       if (pouring.current?.tool === tool) return
-      drag.current = { tool, target: null, at: tool.node.position.clone(), pour: 0, scoop: tool.kind === 'water' ? 0 : 1 }
+      drag.current = { tool, target: null, at: tool.node.position.clone(), pour: 0, scoop: tool.kind === 'water' ? 0 : 1,
+        base: tool.node.position.clone(), t: 0, on: null, dwell: 0, since: DAB_EVERY, dabbed: new Set(), acc: 0, tick: 0 }
       if (tool.kind === 'salt') setSaltInHand(true)
       if (controls) controls.enabled = false
       el.style.cursor = 'grabbing'
@@ -3901,8 +3988,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const scooped = d.tool.kind === 'water' && d.scoop >= 1
       const overCoals = d.tool.kind === 'water' && Math.hypot(d.at.x, d.at.z) < RING_CLEAR * 0.7
       if (d.target) {
-        season(d.target, d.tool.kind)
-        if (d.tool.kind !== 'water') emit(d.tool.kind, d.at.clone().add(new THREE.Vector3(0, -0.1, 0)), 40)
+        if (d.tool.kind === 'water') season(d.target, 'water')
+        else if (!d.dabbed.has(d.target)) dabNow(d.target, d.tool.kind, d.tool.node.position)
       } else if (overCoals && scooped) {
         // water thrown on the coals: they hiss and steam, and the fire drops right down
         if (fire) fire.current = Math.max(0, fire.current - 0.3)
@@ -4587,13 +4674,36 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (k > 0.45 && dipperWater) { dipperWater.visible = true; dipperWater.scale.setScalar(1) }
         if (Math.random() < dt * 12 * down) emit('water', t.node.position.clone().add(new THREE.Vector3(0, 0.02, 0)), 2)
       } else if (held) {
-        t.node.position.lerp(d!.at, Math.min(1, dt * 14))
-        // (the dipper, full, held level so as not to spill until it's let go; the rest tip toward the food they're over)
-        const want = t.kind === 'water' ? 0 : d!.target ? 1 : 0
-        d!.pour += (want - d!.pour) * Math.min(1, dt * 8)
+        const dd = d!
+        dd.t += dt
+        // (the dipper, full, held level so as not to spill until it's let go; the rest tip toward the food they're over, and work it there)
+        const want = t.kind === 'water' ? 0 : dd.target ? 1 : 0
+        dd.pour += (want - dd.pour) * Math.min(1, dt * 8)
+        dd.base.lerp(dd.at, Math.min(1, dt * 14))
+        const act = toolAction(t.kind, dd.t)
+        t.node.position.copy(dd.base).addScaledVector(act.off, dd.pour)
         t.node.quaternion.copy(t.homeQ).premultiply(new THREE.Quaternion().setFromAxisAngle(
-          new THREE.Vector3(1, 0, -1).normalize(), (t.kind === 'water' ? 0 : 0.2) + d!.pour * 0.9))
-        if (t.kind !== 'water' && d!.target && Math.random() < dt * 30) emit(t.kind, t.node.position.clone().add(new THREE.Vector3(0, -0.05, 0)), 2)
+          new THREE.Vector3(1, 0, -1).normalize(), (t.kind === 'water' ? 0 : 0.2) + dd.pour * (0.9 + act.tilt)))
+        // (its grains or drops falling evenly, as fast as it's worked: none while it's only being carried)
+        if (t.kind !== 'water' && dd.target) {
+          dd.acc += dt * act.rate * dd.pour
+          for (; dd.acc >= 1; dd.acc -= 1) emit(t.kind, t.node.position.clone().add(new THREE.Vector3(0, -0.05, 0)), 1)
+          dd.tick += dt
+          if (dd.tick > 0.16) { dd.tick = 0; sprinkleTick(t.kind) }
+          // (held over a piece, it goes on every so often: a moment after it's come over the piece, and no sooner after the last time than
+          // DAB_EVERY, however the hand wavers between pieces)
+          if (dd.on !== dd.target) { dd.on = dd.target; dd.dwell = 0 }
+          dd.dwell += dt
+          if (dd.dwell >= DAB_FIRST && dd.since >= DAB_EVERY) {
+            dd.since = 0
+            dabNow(dd.target, t.kind, t.node.position)
+            dd.dabbed.add(dd.target)
+          }
+        } else {
+          dd.on = null
+          dd.dwell = 0
+        }
+        dd.since += dt
       } else if (pour) {
         // (pouring: the dipper tips over where it was let go, its water running out in a stream, then it's carried back)
         pour.left -= dt
@@ -4649,6 +4759,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (any) grains.geometry.attributes.position.needsUpdate = true
       grains.geometry.attributes.color.needsUpdate = true
     }
+    // (the seasoned pieces' bounces run on; the rings spread and fade)
+    for (const [p, k] of bounces.current) {
+      if (k + dt / BOUNCE_TIME >= 1) bounces.current.delete(p)
+      else bounces.current.set(p, k + dt / BOUNCE_TIME)
+    }
+    ringObjs.current.forEach((ring, k) => {
+      if (!ring) return
+      const left = ringLife.current[k]
+      ring.visible = left > 0
+      if (left <= 0) return
+      ringLife.current[k] = left - dt
+      const u = 1 - Math.max(0, ringLife.current[k]) / RING_LIFE
+      ring.scale.setScalar(0.6 + u * 1.6)
+      ;(ring.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - u)
+    })
     // the grill net holds a few at a time: hand free spots to waiting pieces, first ordered first
     const spots = roast.netSpots ?? []
     if (spots.length) {
@@ -4667,6 +4792,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       .sort((a, b) => a.stagedAt - b.stagedAt)
     // (those on the raw dish don't take a place on the tray)
     const onBoard = onTray.filter((p) => !roast.rawDish?.items.includes(p.id))
+    // (the tray takes so many: the rest wait in the fridge, unseen, until there's room)
+    const boardSticks = onBoard.filter((q) => !q.loose), boardLoose = onBoard.filter((q) => q.loose)
+    const inFridge = new Set([...boardSticks.slice(TRAY_CAP), ...boardLoose.slice(LOOSE_CAP)])
+    if (inFridge.size !== trayMore) setTrayMore(inFridge.size)
 
     pieces.current.forEach((p, n) => {
       bindMaterials(p)
@@ -4776,10 +4905,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           Math.sin(a) * (k < 3 ? 0.1 : 0)))
         p.node.position.lerp(at, Math.min(1, dt * 10))
         p.node.quaternion.copy(p.homeQ)
+      } else if (p.staged && inFridge.has(p)) {
+        // (still in the fridge: set straight down in its spot when it's brought out)
+        p.fresh = true
       } else if (p.staged) {
         // waiting raw on the tray, laid flat in its spot
-        const at = p.loose ? trayLooseSpot(Math.max(0, onBoard.filter((q) => q.loose).indexOf(p)))
-          : traySpot(Math.max(0, onBoard.filter((q) => !q.loose).indexOf(p)))
+        const at = p.loose ? trayLooseSpot(Math.max(0, boardLoose.indexOf(p))) : traySpot(Math.max(0, boardSticks.indexOf(p)))
         if (p.fresh) { p.node.position.copy(at); p.fresh = false } else p.node.position.lerp(at, Math.min(1, dt * 10))
         // (lying along the tray's long side, which runs across the front)
         flatQ(p, p.node.quaternion, STACK_DIR)
@@ -4945,7 +5076,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // served at the bar it comes down to the size of the customers and their plates (the fire is drawn big, to
       // cook on; the bar is in the people's own scale), shrinking as it's carried over
       if (p.container === 'bar' && p.collected) shrink *= p.small ? BAR_FOOD_SCALE : THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1))
-      if (p.eaten || waiting(p)) shrink = 0.0001
+      if (p.eaten || waiting(p) || inFridge.has(p)) shrink = 0.0001
+      const bounce = bounces.current.get(p)
+      if (bounce !== undefined) shrink *= 1 + BOUNCE * Math.sin(Math.PI * bounce)
       if (menuIds.has(p.id)) p.node.userData.shrink = shrink
       else p.node.scale.setScalar(shrink)
 
@@ -5100,8 +5233,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           <Boss to={BOSS_WALK} open={space === 'open'} lang={lang}><BlobShadow r={0.24} /></Boss>
         </group></Movable>
       )}
-      {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw, way }) => (
-        <CrewWalk key={m.id} at={at} yaw={yaw} way={way}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></CrewWalk>
+      {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw, way, seat }) => (
+        <CrewWalk key={m.id} at={at} yaw={yaw} way={way} seat={seat}>
+          {!seat && <BlobShadow r={0.17} />}<StaffFigure id={m.id} role={m.role} look={m.look} seated={!!seat} />
+        </CrewWalk>
       ))}
       </group>
       {bar && <Bar />}
@@ -5128,6 +5263,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </group>
       )}
       <points geometry={grains.geometry} material={grainMaterial} frustumCulled={false} renderOrder={3} />
+      {active && trayMore > 0 && roast.tray && (
+        <Html position={trayAt().addScaledVector(STACK_DIR, TRAY_W / 2 - 0.1).addScaledVector(LAY_DIR, TRAY_D / 2 - 0.05).add(new THREE.Vector3(0, 0.12, 0))}
+          center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
+          <span className="tray-more" title="冷藏櫃裡還有，砧板空出位置就會拿出來">+{trayMore}<small>冷藏</small></span>
+        </Html>
+      )}
+      {Array.from({ length: RINGS }, (_, k) => (
+        <mesh key={`ring${k}`} ref={(m) => { ringObjs.current[k] = m }} visible={false} rotation-x={-Math.PI / 2} renderOrder={4}>
+          <ringGeometry args={[0.07, 0.085, 32]} />
+          <meshBasicMaterial transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
       {active && tasteTip && (
         <Html position={tasteTip.at} center zIndexRange={[35, 25]} style={{ pointerEvents: 'none' }}>
           <span className="taste-tip">美味 <b>{tasteTip.taste}</b></span>

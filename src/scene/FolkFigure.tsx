@@ -155,7 +155,9 @@ function template(scene: THREE.Group, hair: string, acc: string[]): Template {
       const mesh = new THREE.Mesh(geo, mat)
       mesh.name = mat.name
       mesh.castShadow = mat.name !== 'FolkFace'
-      mesh.receiveShadow = true
+      // (the head takes no shadows: the shop's one shadow map is too coarse for a face, and the hair's and the hat's fell on it in blotches
+      // and streaks; its toon light shades it)
+      mesh.receiveShadow = part !== 'head'
       g.add(mesh)
     }
     if (at) g.position.copy(at)

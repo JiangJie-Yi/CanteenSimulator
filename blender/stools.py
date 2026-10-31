@@ -4,7 +4,7 @@
   running straight across it, the late wood in soft arches, open pores), its edge rolled round like a bun; a plump indigo cushion piped
   round its rim and buttoned in the middle; four stout round legs splayed out, tapering a little to rounded feet; one bent ring between
   them low down for the feet. The grain follows each piece: across the seat, down each leg, round the ring.
-- tillstool.glb, nodes "TillStoolHigh" (the cashier's, 43 cm, two rings) and "TillStoolLow" (a helper's, 33 cm): the same stool made taller.
+(The till's two seats are blender/tillstools.py's: a walnut chair and stool of their own.)
 
 Every piece's UVs are its own (the seat's laid flat from above, the legs' and the ring's along them), so the oak's grain runs the way it
 would in the wood. Low in triangles: the round parts 20 to 24 round, smooth shaded.
@@ -295,16 +295,3 @@ if PREVIEW:
     preview_rig(0.18, 1.0)
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "stool.glb"), os.path.join(PROJECT, "blender", "stool.blend"), PREVIEW)
 print("STOOL_DONE", tris(parts))
-
-# ---- the till's two: the cashier's taller, a helper's lower, side by side in one file
-bpy.ops.wm.read_factory_settings(use_empty=True)
-M = materials()
-hi, hp = stool("TillStoolHigh", M, seat_top=0.43, R=0.13, rings_at=(0.14, 0.29), splay=0.065)
-lo, lp = stool("TillStoolLow", M, seat_top=0.33, R=0.13, rings_at=(0.11,), splay=0.055)
-lo.location = P(0.5, 0, 0)
-till = bpy.data.objects.new("TillStools", None)
-bpy.context.collection.objects.link(till)
-hi.parent = till
-lo.parent = till
-export_dish(till, hp + lp + [hi, lo, till], os.path.join(PROJECT, "public", "models", "tillstool.glb"), os.path.join(PROJECT, "blender", "tillstool.blend"), None)
-print("TILLSTOOL_DONE", tris(hp), tris(lp))

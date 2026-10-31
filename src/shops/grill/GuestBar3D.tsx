@@ -503,16 +503,23 @@ function Chochin({ mark }: { mark: string }) {
  * customers' display), a card reader, a receipt printer with its paper curling out, a tray for the change, a cup of
  * pens, a little bell to ring, the お会計 sign facing the customers, and a beckoning cat (招き猫) for luck.
  */
+/** where the cashier's chair stands behind the till (its frame: x along the bar, +z behind it), and its seat's height (the model's) */
+const TILL_CHAIR: [number, number, number] = [0.05, 0, 0.64]
+const TILL_SEAT = 0.452
 export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; top: number; lang: Lang }) {
   return (
     <>
-      {/* (two stools behind it, tucked in under the top: the cashier's taller one at the register, just in front of where they stand, and a
-          helper's lower one along from it, behind the tablet) */}
-      <Movable id="till-stool-hi" label="收銀高腳凳"><StaticBatch>
-        <group position={at} rotation-y={yaw}><group position={[0.3, 0, 0.56]} rotation-y={0.3} scale={PEOPLE_SCALE}><TillStoolModel which="High" /></group></group>
-      </StaticBatch></Movable>
+      {/* (two seats of their own behind it (blender/tillstools.py), clear of its back: the cashier's walnut chair squarely behind the
+          register, where the cashier sits (the unseen mark on its seat, which Roasting sits them on, the chair's way round), and a helper's
+          stool of the same make along from it) */}
+      <Movable id="till-stool-hi" label="收銀高腳凳">
+        <StaticBatch>
+          <group position={at} rotation-y={yaw}><group position={TILL_CHAIR} scale={PEOPLE_SCALE}><TillStoolModel which="High" /></group></group>
+        </StaticBatch>
+        <group position={at} rotation-y={yaw}><group name="cashier-seat" position={[TILL_CHAIR[0], TILL_SEAT * PEOPLE_SCALE, TILL_CHAIR[2]]} /></group>
+      </Movable>
       <Movable id="till-stool-lo" label="收銀矮凳"><StaticBatch>
-        <group position={at} rotation-y={yaw}><group position={[-0.3, 0, 0.56]} rotation-y={-0.4} scale={PEOPLE_SCALE}><TillStoolModel which="Low" /></group></group>
+        <group position={at} rotation-y={yaw}><group position={[-0.44, 0, 0.68]} rotation-y={-0.28} scale={PEOPLE_SCALE}><TillStoolModel which="Low" /></group></group>
       </StaticBatch></Movable>
       <Movable id="till-counter" label="收銀櫃檯"><StaticBatch>
       <group position={at} rotation-y={yaw}>
@@ -1172,6 +1179,8 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
   const kitchen = useMemo(() => kitchenOf(counters), [counters])
   // (the genkan's corner, by the door, is left out of the boards: it's a step down, in stone)
   const g0 = c.length / 2 + GENKAN.along[0], gl = GENKAN.lay[1], D = GENKAN.depth
+  // (how far down the base's top lies: below the sunk kitchen's floor, or the genkan's stone, whichever's lower)
+  const baseDrop = Math.max(drop, D + 0.02)
   // (the kitchen's cut out of the boards: it lies lower, KitchenPit)
   const piece = (al: [number, number], ly: [number, number], k: string) => minus(al, ly, kitchen).map(([a, l], i) => (
     <FloorPiece key={`${k}${i}`} w={l[1] - l[0]} l={a[1] - a[0]} position={[-(l[0] + l[1]) / 2, 0.004, (a[0] + a[1]) / 2]} />
@@ -1180,17 +1189,19 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
     <group position={c.at} rotation-y={Math.atan2(c.along.x, c.along.z)}>
       {piece([a0, g0], [l0, l1], 'a')}
       {piece([g0, a1], [gl, l1], 'b')}
-      <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={Math.max(drop, D + 0.02)} />
+      <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={baseDrop} />
       {/* (the whole shop's soft shadow on the ground it stands on, under its base and spreading out past it a little) */}
-      <mesh position={[-(l0 + l1) / 2 - 0.12, -Math.max(drop, D + 0.02) - 0.34, (a0 + a1) / 2 + 0.1]} rotation-x={-Math.PI / 2} renderOrder={-1}>
+      <mesh position={[-(l0 + l1) / 2 - 0.12, -baseDrop - 0.34, (a0 + a1) / 2 + 0.1]} rotation-x={-Math.PI / 2} renderOrder={-1}>
         <planeGeometry args={[(l1 - l0) + 2.4, (a1 - a0) + 2.4]} />
         <meshBasicMaterial map={GROUND_SHADOW} transparent depthWrite={false} toneMapped={false} />
       </mesh>
-      {/* (and a solid fill under the customers' boards, down to the base, round the kitchen's well) */}
-      {drop > 0 && [[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => minus(al as [number, number], ly as [number, number], kitchen).map(([a, l], i) => (
+      {/* (and a solid fill under the boards right down to the base: round the kitchen's well when it's sunk, under the kitchen's dais as
+          well when it's raised; nothing to see through between the floor and the base) */}
+      {[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => (drop > 0 ? minus(al as [number, number], ly as [number, number], kitchen)
+        : [[al, ly] as [[number, number], [number, number]]]).map(([a, l], i) => (
         // (its sides, showing as the step down into the kitchen, in the base's dark timber boards)
-        <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, -(drop + 0.006) / 2 - 0.004, (a[0] + a[1]) / 2]}
-          geometry={timberBox(l[1] - l[0], drop - 0.002, a[1] - a[0])} material={BASE_TIMBER[1]} />
+        <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, 0.001 - (baseDrop + 0.004) / 2, (a[0] + a[1]) / 2]} receiveShadow
+          geometry={timberBox(l[1] - l[0], baseDrop + 0.004, a[1] - a[0])} material={BASE_TIMBER[1]} />
       )))}
       {drop > 0 ? <KitchenPit counters={counters} drop={drop} /> : <KitchenDais counters={counters} rise={-drop} />}
       {/* the genkan: its stone, the step's riser round its two inner sides, and the polished kamachi on the edge */}

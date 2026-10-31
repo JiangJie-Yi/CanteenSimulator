@@ -118,7 +118,9 @@ function build(scene: THREE.Group): Built {
  * hands, the cashier with their hands together, the stock keeper with his clipboard; `moving`: walking somewhere (a server carrying a
  * plate, the stock keeper a case). Faces +z, stands on y 0.
  */
-export function StaffFigure({ id, role, look: who, moving = false }: { id: string; role: Role; look: StaffLook; moving?: boolean }) {
+export function StaffFigure({ id, role, look: who, moving = false, seated = false }: { id: string; role: Role; look: StaffLook; moving?: boolean
+  /** sat (the cashier on the till's chair): leaning in a little, the hands up on the counter in front, now and then tapping at the keys */
+  seated?: boolean }) {
   const h = avHash(id)
   const seed = h % 997
   const cook = role === 'chef' || role === 'sous'
@@ -171,11 +173,18 @@ export function StaffFigure({ id, role, look: who, moving = false }: { id: strin
     const ph = t * 9
     fig.body.position.y = walk * Math.abs(Math.sin(ph)) * 0.035
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07
-    fig.body.rotation.x = walk * 0.08
+    fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0)
     fig.body.scale.y = 1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008
     const hold = role === 'server' || role === 'stock' ? 1 : role === 'cashier' ? 0.6 : 0
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
       if (!hand) continue
+      if (seated) {
+        // (on the counter in front, a little apart; a spell of tapping at the keys every so often, a hand at a time)
+        const tap = (t + seed) % 7 < 2.2 ? Math.max(0, Math.sin(t * 14 + (sd > 0 ? Math.PI : 0))) * 0.03 : 0
+        hand.position.set(sd * 0.15, 0.4 + tap, 0.34)
+        hand.rotation.set(-0.5, 0, 0)
+        continue
+      }
       // (held out in front (a tray, a clipboard), together at the front (the cashier), swinging as they walk, or the fan waved)
       const swing = walk * Math.sin(ph + (sd > 0 ? Math.PI : 0)) * 0.07
       const out = new THREE.Vector3(sd * (hold === 1 ? 0.13 : 0.12), hold === 1 ? TRAY_AT[1] - 0.04 : 0.22, hold === 1 ? TRAY_AT[2] - 0.02 : 0.26)
