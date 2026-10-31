@@ -1074,6 +1074,25 @@ export default function App() {
     }
   }, [])
   const [office, setOffice] = useState<null | 'book' | 'staff'>(null)
+  // (Esc shuts whatever's open, the one on top first: the office, the ledger, the boards, the tools, the pantry, the views. Not in the
+  // editor, where Esc lets go of what's picked; nor when something of its own has taken it (the register's manual))
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || editOn) return
+      // (looked at once every other listener has had it, so one that's taken it (the manual shutting) is left alone)
+      window.setTimeout(() => {
+        if (e.defaultPrevented) return
+        if (office) setOffice(null)
+        else if (ledgerOn) setLedgerOn(false)
+        else if (boardsOpen) setBoardsOpen(false)
+        else if (toolsOpen) setToolsOpen(false)
+        else if (fridgeOpen) setFridgeOpen(false)
+        else if (viewMenu) setViewMenu(false)
+      }, 0)
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [office, ledgerOn, boardsOpen, toolsOpen, fridgeOpen, viewMenu, editOn])
   // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
   const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>({})
   const menuByRef = useRef(menuBy)

@@ -55,7 +55,7 @@ export function RegisterManual({ lang }: { lang: Lang }) {
   useEffect(() => {
     if (!isOpen) return
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') set(false)
+      if (e.key === 'Escape') { set(false); e.preventDefault() }
       if (e.key === 'ArrowRight') turn(setPage, 1)
       if (e.key === 'ArrowLeft') turn(setPage, -1)
     }
