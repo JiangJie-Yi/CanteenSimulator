@@ -29,12 +29,13 @@ import { OpeningSpot } from '@/scene/OpeningSpot'
 import { OccluderFade } from '@/scene/OccluderFade'
 import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
+import { DrinkStockPanel } from '@/shops/grill/DrinkStockPanel'
 import { useLights } from '@/scene/lightsStore'
 import { lampGlow, roomDim } from '@/game/roomLights'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
-import { COAL_BRIDGE, DRINKS, type DrinkId, PANTRY, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
+import { COAL_BRIDGE, DRINKS, DRINKS_KEY, type DrinkId, PANTRY, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
 import { offsetOf, positionOf, rotationOf, setEditLang, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { cameraOneOf } from '@/scene/camera1'
@@ -2098,6 +2099,8 @@ export default function App() {
           <span className="auto-lamp" aria-hidden="true" /><b className="auto-short" aria-hidden="true">{tl(lang, '自', '自', 'A')}</b>
           <span className="auto-long">{UI[lang].auto}</span>
         </button>
+        {/* (the drinks' stock, opened from the back stock by the fridges) */}
+        <DrinkStockPanel lang={lang} />
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
             tab={office} onTab={setOffice}
@@ -2142,6 +2145,7 @@ export default function App() {
               if (!window.confirm(tl(lang, '確定要重新開始？資金、庫存、員工和試吃筆記都會清空。', '資金・在庫・スタッフ・ノートを全部リセットしますか？', 'Start over? Money, stock, staff and tasting notes will all be cleared.'))) return
               try {
                 localStorage.removeItem(SAVE_KEY)
+                localStorage.removeItem(DRINKS_KEY)
               } catch {
                 // storage blocked
               }

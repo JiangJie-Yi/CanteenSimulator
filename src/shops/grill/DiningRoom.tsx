@@ -13,8 +13,8 @@ import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { BOSS_DRINK } from './Boss'
-import { buyCase, caseCost, CASE_SIZE } from '@/game/drinkStock'
-import { fridgesOf, farOf, DRINK_BACK, SHOP_PURSE, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
+import { CASE_SIZE } from '@/game/drinkStock'
+import { fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -3260,25 +3260,82 @@ const drinkLabel = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? id
 /** the drinks that live in the fridges, the lowest in the back first */
 const lowestBack = () => [...new Set(FRIDGE_UNITS.flatMap((u) => u.shelves.flatMap((sh) => sh.ids)))]
   .sort((a, b) => (DRINK_BACK.back[a] ?? 0) / (CASE_SIZE[a] ?? 24) - (DRINK_BACK.back[b] ?? 0) / (CASE_SIZE[b] ?? 24))
-/** an unseen box over the crates: they're the drinks' back stock; pointed at it says what's lowest, a click buys a case of that */
-function BackStockHit() {
-  const hint = () => `後場：${lowestBack().slice(0, 3).map((id) => `${drinkLabel(id)} ${DRINK_BACK.back[id] ?? 0}`).join('、')}｜點一下訂一箱 ${drinkLabel(lowestBack()[0])}（NT$${caseCost(lowestBack()[0])}）`
-  const buy = (e: { stopPropagation: () => void }) => {
+const CARTONS_URL = import.meta.env.BASE_URL + 'models/drinkcartons.glb'
+/** what each case in the stack holds (blender/drinkcartons.py's CartonPrint0..4): the canned drinks come by the carton, the bottles by the crate */
+const CARTON_DRINKS: DrinkId[] = ['beerCan', 'greenTea', 'cola', 'highball', 'chuhai']
+/** a carton's print: the kraft board, a band of the drink's own colour across it with its name big, a row of its cans and how many are in */
+const cartonPrint = (id: DrinkId) => canvasTex(512, 256, (g) => {
+  const d = DRINKS.find((x) => x.id === id)!
+  const [bg, fg, text] = d.label
+  g.fillStyle = '#b98a5c'; g.fillRect(0, 0, 512, 256)
+  g.fillStyle = 'rgba(90,60,30,0.08)'
+  for (let x = 0; x < 512; x += 9) g.fillRect(x, 0, 3, 256)
+  // (the band, and a thinner one of the drink's second colour under it)
+  g.fillStyle = bg; g.fillRect(0, 46, 512, 128)
+  g.fillStyle = fg; g.fillRect(0, 174, 512, 10)
+  g.fillStyle = fg
+  g.font = '900 70px "Zen Antique", serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText(text, 300, 112)
+  // (a little can at the band's left, in the drink's colours)
+  g.fillStyle = '#c8ccd2'; g.beginPath(); g.roundRect(46, 66, 64, 92, 10); g.fill()
+  g.fillStyle = bg; g.fillRect(48, 88, 60, 46)
+  g.fillStyle = fg; g.fillRect(58, 104, 40, 12)
+  g.strokeStyle = '#3b2a20'; g.lineWidth = 3; g.beginPath(); g.roundRect(46, 66, 64, 92, 10); g.stroke()
+  // (what's in it, printed small on the board under the band)
+  g.fillStyle = '#3b2a20'
+  g.font = '700 26px "Arial Black", sans-serif'
+  g.fillText(`350ml × ${CASE_SIZE[id] ?? 24}`, 256, 220)
+  g.font = '700 18px sans-serif'; g.textAlign = 'left'
+  g.fillText('↑ 天地無用', 18, 24)
+})
+/** the cartons of canned drinks stacked by the crates (blender/drinkcartons.py), each printed for its drink, in the room's toon light */
+function DrinkCartons() {
+  const gltf = useGLTF(CARTONS_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    const mats = new Map<THREE.Material, THREE.Material>()
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = mats.get(src)
+      if (!t) {
+        const k = /^CartonPrint(\d)/.exec(src.name)
+        // (a glTF model's pictures are read top row first: the print's canvas too)
+        const print = k ? cartonPrint(CARTON_DRINKS[+k[1]]) : null
+        if (print) { print.flipY = false; print.needsUpdate = true }
+        t = new THREE.MeshToonMaterial({ color: k ? '#ffffff' : src.color.clone(), map: print ?? src.map })
+        mats.set(src, t)
+      }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(root, (m) => /Tape/.test((m.material as THREE.Material).name ?? ''), { width: 0.0012, weld: true })
+    return root
+  }, [gltf])
+  return <primitive object={obj} />
+}
+useGLTF.preload(CARTONS_URL)
+/** an unseen box over the crates and cartons: they're the drinks' back stock; pointed at it says what's lowest, a click opens the drinks' stock
+ * (DrinkStockPanel: order cases, fill the fridges) */
+function BackStockHit({ size = [0.42, 0.62, 0.34] }: { size?: [number, number, number] }) {
+  const hint = () => `後場最少：${lowestBack().slice(0, 3).map((id) => `${drinkLabel(id)} ${DRINK_BACK.back[id] ?? 0}`).join('、')}｜點一下打開飲料庫存`
+  const open = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
     if (getEdit().on) return
-    const id = lowestBack()[0]
-    const r = buyCase(DRINK_BACK.back, id, SHOP_PURSE.cash())
-    if (r.ok) { DRINK_BACK.back = r.back; DRINK_BACK.ver++; SHOP_PURSE.spend(caseCost(id)) }
-    setTip({ title: r.ok ? `訂了一箱${drinkLabel(id)}` : '現金不夠', hint: hint() })
+    setDrinkPanel(true)
   }
   return (
-    <mesh position={[0, 0.3, 0]} onClick={buy} onPointerOver={(e) => { handOver.onPointerOver(e); setTip({ title: '飲料後場庫存', hint: hint() }) }}
+    <mesh position={[0, size[1] / 2, 0]} onClick={open} onPointerOver={(e) => { handOver.onPointerOver(e); setTip({ title: '飲料後場庫存', hint: hint() }) }}
       onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
-      <boxGeometry args={[0.42, 0.62, 0.34]} />
+      <boxGeometry args={size} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
   )
 }
+/** how far along from the crates the cartons stand (the crates' own frame) */
+const CARTONS_X = -0.56
 function BottleCrates() {
   const W = 0.36, D = 0.29, H = 0.2
   const cols = 5, rows = 4
@@ -3548,10 +3605,17 @@ function ShopPropsImpl({ counters, lang = 'zh' }: { counters: Counter[]; lang?: 
       </StaticBatch></Movable>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
       {fr && <Movable id="crates" label="酒箱"><StaticBatch key={lang}>
-        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><BottleCrates /></group>
+        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
+          <BottleCrates />
+          {/* (and beside them the cartons of canned drinks) */}
+          <group position={[CARTONS_X, 0, 0.03]} rotation-y={0.05}><DrinkCartons /></group>
+        </group>
       </StaticBatch>
-        {/* (the back stock: pointed at, what's running low; a click buys in a case of whatever's lowest) */}
-        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><BackStockHit /></group>
+        {/* (the back stock: pointed at, what's running low; a click opens the drinks' stock) */}
+        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
+          <BackStockHit />
+          <group position={[CARTONS_X, 0, 0.03]}><BackStockHit size={[0.66, 0.46, 0.24]} /></group>
+        </group>
       </Movable>}
     </>
   )

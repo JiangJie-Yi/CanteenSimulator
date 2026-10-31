@@ -6639,3 +6639,77 @@ html[lang='en'] .heat-label { font-size: 13px; }
 @media (min-width: 901px) {
   :root[data-theme='dark'] .money-chip { background: rgb(30 36 50 / 0.55); border-color: rgb(246 236 216 / 0.3); }
 }
+
+/* ---- the drinks' stock, opened from the back stock by the fridges (shops/grill/DrinkStockPanel): a drinks fridge of its own, its two
+   fridges' drinks as the pantry's bins, a case to order and the fridge to fill for each, the whole lot filled at its foot ---- */
+.drink-stock {
+  position: fixed;
+  z-index: 30;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, 94vw);
+  max-height: min(76vh, 720px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 5px solid #3c4a58;
+  background: linear-gradient(180deg, #e8f1f7 0%, #d4e3ee 100%);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.45), inset 0 0 0 2px #cdd5db;
+  overflow: hidden;
+  font: 14px/1.35 var(--brush);
+  color: #1d3550;
+}
+.drink-stock-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px 9px 16px;
+  background: linear-gradient(180deg, #4a5b6e, #3a4858);
+  color: #eaf3f9;
+}
+.drink-stock-head > b { font-size: 16px; letter-spacing: 0.3em; }
+.drink-stock-cash { margin-left: auto; font-weight: 700; }
+.drink-stock-cash .money { color: #a6ecb4 !important; }
+.drink-stock-close {
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid rgb(234 243 249 / 0.5);
+  border-radius: 50%;
+  background: transparent;
+  color: #eaf3f9;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.drink-stock-close:hover { background: rgb(255 255 255 / 0.12); }
+.drink-stock .chiller-bins { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+.chiller-zone.is-drinks-alcohol .chiller-zone-head { background: linear-gradient(180deg, #8a3a30, #6e2c24); }
+.chiller-zone.is-drinks-alcohol .chiller-zone-head i { color: #ffc9a0; text-shadow: 0 0 6px #ff9a5a; }
+.chiller-zone.is-chilled .chiller-zone-head { background: linear-gradient(180deg, #4a7a6a, #3d6a5a); }
+.drink-bin { cursor: default; }
+.drink-bin .chiller-bin-head { display: flex; align-items: center; gap: 6px; }
+.drink-icon { width: 22px; height: 30px; flex: none; }
+.drink-bin-sub { font-size: 11px; color: #5a7088; }
+.drink-bin-buy { grid-template-columns: 1.4fr 1fr; }
+.drink-stock-foot {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #cdd5db, #b9c5cf);
+  border-top: 2px solid #9fb7c8;
+}
+.drink-stock-foot button {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #1d6b34;
+  color: #fff;
+  font: 700 13px/1 var(--brush);
+  cursor: pointer;
+}
+.drink-stock-foot button + button { background: #2f5f8f; }
+.drink-stock-foot button:hover:not(:disabled) { filter: brightness(1.12); }
+.drink-stock-foot button:disabled { opacity: 0.45; cursor: default; }
+.drink-stock-foot .money { color: #d8ffe0 !important; }
