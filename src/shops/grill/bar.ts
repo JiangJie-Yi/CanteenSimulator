@@ -533,9 +533,10 @@ export function pathTo(cs: Counter[], s: Seat): THREE.Vector3[] {
 /** a point that far along a path, and the way it's heading there */
 export function alongPath(path: THREE.Vector3[], d: number): { p: THREE.Vector3; dir: THREE.Vector3 } {
   for (let i = 1; i < path.length; i++) {
-    const seg = path[i].clone().sub(path[i - 1])
-    const len = seg.length()
+    // (the legs walked past measured without making anything: it's called for every walker every frame)
+    const len = path[i].distanceTo(path[i - 1])
     if (d <= len || i === path.length - 1) {
+      const seg = path[i].clone().sub(path[i - 1])
       const k = len ? Math.min(1, Math.max(0, d / len)) : 1
       return { p: path[i - 1].clone().addScaledVector(seg, k), dir: len ? seg.divideScalar(len) : new THREE.Vector3(0, 0, 1) }
     }

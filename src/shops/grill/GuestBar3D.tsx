@@ -1464,11 +1464,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return { path, len: pathLength(path), payD: base[0].distanceTo(spot) }
   }), [counters, seats, given])
   const plateAt = (n: number) => seats[n].plate.clone().setY(top)
-  /** how far along a way in (from the door) the genkan's step up into the room is */
+  /** how far along a way in (from the door) the genkan's step up into the room is (found once for each way: it was walked out in a hundred
+   * steps for every walker twice a frame) */
+  const stepMemo = useMemo(() => new WeakMap<THREE.Vector3[], number>(), [counters, given])
   const stepAt = (path: THREE.Vector3[]) => {
     if (!given) return 0
-    for (let d = 0; d < 2; d += 0.02) if (!inGenkan(counters, alongPath(path, d).p)) return d
-    return 0
+    const known = stepMemo.get(path)
+    if (known !== undefined) return known
+    let at = 0
+    for (let d = 0; d < 2; d += 0.02) if (!inGenkan(counters, alongPath(path, d).p)) { at = d; break }
+    stepMemo.set(path, at)
+    return at
   }
   // where a server stands at the pass to take what's put out there (on the floor, by the first counter's start)
   const pass = useMemo(() => passOf(counters), [counters])

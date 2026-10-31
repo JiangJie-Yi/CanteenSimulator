@@ -224,7 +224,14 @@ function ShadowPacer() {
       const v = new THREE.Vector3()
       scene.traverse((o) => {
         const m = o as THREE.Mesh
-        if (!m.isMesh || m.userData.sunSeen === m.geometry) return
+        if (!m.isMesh) return
+        // (and anything see-through and two-sided drawn in one pass: three otherwise draws it twice a frame, back faces then front, flagging
+        // its material changed before each (its program's parameters worked out afresh twice a frame, for every banner, glow and glass);
+        // they're all flat cloths, glows and panes here, which look the same either way)
+        for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+          if (mat && mat.transparent && mat.side === THREE.DoubleSide && !mat.forceSinglePass) mat.forceSinglePass = true
+        }
+        if (m.userData.sunSeen === m.geometry) return
         m.userData.sunSeen = m.geometry
         const g = m.geometry
         if (!g.boundingSphere) g.computeBoundingSphere()

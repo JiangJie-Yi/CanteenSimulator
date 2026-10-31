@@ -126,14 +126,8 @@ const AXES = [
  * that axis alone. It stands in the piece's own group, at `at`, so it moves with it.
  */
 /** a group's turn, about the room's axes (X along the bar, Y up, Z across it), as a matrix in the world */
-function groupTurn(g: { yaw: number; r?: V3 }) {
-  // (about the world's own axes)
-  const a = 0
-  const r = g.r ?? [0, g.yaw, 0]
-  return new THREE.Matrix4().makeRotationY(a)
-    .multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(r[0] * DEG, r[1] * DEG, r[2] * DEG)))
-    .multiply(new THREE.Matrix4().makeRotationY(-a))
-}
+/** scratch for laying a group's transform over its pieces each frame (the group's turn about the world's own axes) */
+const GT = { world: new THREE.Matrix4(), local: new THREE.Matrix4(), m: new THREE.Matrix4(), e: new THREE.Euler() }
 
 /** the selected group's handles: the arrows, rings or boxes at its pivot (where it's been moved to), along the room's axes; they move, turn and
  * size the group as one, as a piece's own handles do it */
@@ -651,13 +645,14 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const par = w.parent
     if (!par) return
     par.updateWorldMatrix(true, false)
-    const shift = new THREE.Vector3(...gt.t)
-    const pivot = new THREE.Vector3(...gt.pivot)
-    const world = new THREE.Matrix4().makeTranslation(pivot.x + shift.x, pivot.y + shift.y, pivot.z + shift.z)
-      .multiply(groupTurn(gt)).multiply(new THREE.Matrix4().makeScale(gt.s, gt.s, gt.s))
-      .multiply(new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z))
-    const local = new THREE.Matrix4().copy(par.matrixWorld).invert().multiply(world).multiply(par.matrixWorld)
-    if (!laid.current || !w.matrix.equals(local)) { w.matrix.copy(local); w.matrixWorldNeedsUpdate = true; laid.current = true }
+    // (worked out in the module's scratch matrices: this runs every frame for each piece in a group, and made new ones each time)
+    const r = gt.r ?? [0, gt.yaw, 0]
+    GT.world.makeTranslation(gt.pivot[0] + gt.t[0], gt.pivot[1] + gt.t[1], gt.pivot[2] + gt.t[2])
+      .multiply(GT.m.makeRotationFromEuler(GT.e.set(r[0] * DEG, r[1] * DEG, r[2] * DEG)))
+      .multiply(GT.m.makeScale(gt.s, gt.s, gt.s))
+      .multiply(GT.m.makeTranslation(-gt.pivot[0], -gt.pivot[1], -gt.pivot[2]))
+    GT.local.copy(par.matrixWorld).invert().multiply(GT.world).multiply(par.matrixWorld)
+    if (!laid.current || !w.matrix.equals(GT.local)) { w.matrix.copy(GT.local); w.matrixWorldNeedsUpdate = true; laid.current = true }
   })
 
   // (its middle, once it has been drawn (a frame later, for a batch that merges after mount), and its box when editing begins)
