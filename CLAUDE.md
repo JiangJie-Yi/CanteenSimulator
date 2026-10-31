@@ -106,6 +106,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **右上角（寬螢幕）**：沒有「經營」按鈕；金額是一塊毛玻璃（`.money-chip`），點它打開經營視窗，頁籤依序 帳簿、人事、廚房（視窗標題列不再重複顯示現金）；手機仍用經營按鈕。e2e 從 `.money-chip` 進經營，廚房是第 3 個頁籤。**英文介面**：字型 Cormorant Garamond（`html[lang='en']` 換掉 `--brush`），右側直式標題只留一個（不再加小字的英文）。
 - **逃生出口燈**（`blender/exitsign.py` → `exitsign.glb`，DiningRoom 的 `ExitSign`、Movable `exitsign`，`look-exit`）：照台灣常見的導光板款式：上方一條鋁擠型燈座（真金屬、反射 studio），下面吊一片壓克力導光板，邊緣微亮；板面兩面都畫（`exitFace`：綠底，左邊 EXIT、中間白色門框與往外跑的人形、右邊跟著語系的字：緊急出口／非常口／WAY OUT，`useDocLang` 跟著 `<html lang>` 換），一直亮著（不受電燈開關影響），周圍淡淡的綠光；掛在神龕上方、門口那頭的波浪飾帶上。
 - **牆角喇叭的外觀**：機身、網罩、支臂改成炭灰色（模型原本近黑，卡通光影下變成一塊沒有形狀的黑洞），整體 0.82 倍。
+- **左上角的招牌**（`ui/Brand.tsx` 的 `FishSign`）：整塊是一張 SVG（300×110）：魚形櫸木板（鯛的輪廓：鈍頭、背上一排低的扇形背鰭、腹下小鰭、分岔的尾，`SIGN` 依剖面函數算出外形），有板厚、落影、上亮下暗的斜邊、木紋（turbulence 細紋＋被雜訊扭曲的年輪弧線）、雕刻的鰓線、胸鰭、鱗片、尾鰭線（暗刻線加亮邊）、金色鑲線沿身體一圈、金圈的眼睛；店名「聞野」是凸起的金箔字（漸層＋深色描邊＋小落影），副標（中：日式烤魚、日：炭火焼、英：Charcoal Grill 小型大寫）在下方兩條金短線之間（`SUB_WIDTH` 依語言給寬度，`textLength` 撐開）；兩條繩子綁在背上的黃銅吊環（`SIGN.eyes`，繩長由它算）。夜晚木板變暗（`.fs-night`）、字後面亮起暖光（`.fs-glow`，閃一下再亮）；還沒開業時整塊變灰；當作開店按鈕時沿外形發光（`fs-beckon`，不是方框）。注意：SVG 漸層用 objectBoundingBox 時，水平直線（高度 0）不會畫出來，要用純色。
 - **介面風格**：木紋深色外框與標題列、半透明淺色面板（`index.css` 末尾的 `--grain-dark`、`--grain-light`）；只是按的東西（食材卡、補貨鈕）用半透明玻璃，不用木色。
 - **HDRI**：`scene/IndoorHDRI.tsx` 在 `public/hdris/` 找真的 HDRI（夜晚 `grill_night_1k.exr`、`night.exr`、`night.hdr`；白天 `grill_day_1k.exr`、`day.exr`、`day.hdr`，.exr 或 .hdr 都可以），沒有就用內建的假 HDRI。**BGM**：`ui/Bgm.tsx` 播 `public/music/IzakayaNight.mp3`。
 
