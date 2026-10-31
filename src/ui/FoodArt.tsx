@@ -20,123 +20,232 @@ const shade = (hex: string, k: number) => {
   return `rgb(${ch(n >> 16)},${ch((n >> 8) & 255)},${ch(n & 255)})`
 }
 
-type Fish = { back: string; belly: string; len: number; deep: number; fin: string; iris?: string; stripe?: string; spot?: string; dots?: string
-  beak?: string; scutes?: boolean; bars?: string; roe?: boolean; eye?: number
-  fillet?: { flesh: string; skin: string; line: string } }
+/** a fin on the back or the belly: from `a` to `b` along the body (0 the snout, 1 the tail's root), `h` its height (in the body's half
+ * depth); `spiny`: the front dorsal of a mackerel or a horse mackerel, its spines' tips standing clear of the web between them */
+type Fin = { a: number; b: number; h: number; spiny?: boolean }
+type Fish = {
+  back: string; belly: string; fin: string; len: number; deep: number
+  /** where the body's deepest (0 snout, 1 tail root), how full the belly, how thin the tail's root (in half depths) */
+  peak?: number; full?: number; ped?: number
+  iris?: string; eye?: number
+  /** the fins: dorsal ones, anal, whether there's a little adipose fin, finlets before the tail; the tail's fork (0 square, 1 deep) */
+  dorsal: Fin[]; anal?: Fin; adipose?: boolean; finlets?: number; fork?: number; tailFin?: string
+  /** markings */
+  spot?: string; stripe?: string; bars?: string; zigzag?: string; dots?: string; scutes?: boolean; speckle?: string; roe?: boolean
+  beak?: string; big?: boolean
+  fillet?: { flesh: string; skin: string; line: string; kind: 'salmon' | 'cod' }
+}
 const FISH: Record<string, Fish> = {
-  ExtraFish: { back: '#6b8a6a', belly: '#efe9cf', len: 1, deep: 0.33, fin: '#e2be62', spot: '#f2c94c', iris: '#e8c45a' },          // ayu, a golden spot
-  Saury: { back: '#2f5a90', belly: '#eef2f7', len: 1.3, deep: 0.17, fin: '#90a6c0', beak: '#f2b43a', iris: '#d8dce4' },            // long and slim
-  Mackerel: { back: '#2e7078', belly: '#eef2f2', len: 1.05, deep: 0.28, fin: '#93b0b0', bars: '#173f45', iris: '#d8dce0' },          // wavy bars
-  Aji: { back: '#62808f', belly: '#f1f2ed', len: 0.96, deep: 0.33, fin: '#d2c88e', stripe: '#ecc65a', scutes: true, iris: '#e8d27a', eye: 1.2 },
-  Iwashi: { back: '#3d5f92', belly: '#f3f5f7', len: 0.9, deep: 0.28, fin: '#a2b6cc', dots: '#1d2c48', iris: '#d8dce4' },
-  Shishamo: { back: '#a8905e', belly: '#f6e9c9', len: 0.86, deep: 0.27, fin: '#dccaa0', roe: true, iris: '#d8c890' },
-  Hokke: { back: '#86765a', belly: '#f2ead6', len: 1, deep: 0.36, fin: '#bea980', bars: '#5c4c34', iris: '#d8c890' },
-  Buri: { back: '#36597e', belly: '#f2f4f2', len: 1.05, deep: 0.33, fin: '#dcc45e', stripe: '#efc83c', iris: '#d8dce0' },
-  Nodoguro: { back: '#d9483a', belly: '#f9d6c8', len: 0.95, deep: 0.38, fin: '#c63a2c', iris: '#e8d27a', eye: 1.45 },
-  Salmon: { back: '', belly: '', len: 1, deep: 0.5, fin: '', fillet: { flesh: '#f6966e', skin: '#8e9ea9', line: '#fde3d2' } },
-  Gindara: { back: '', belly: '', len: 1, deep: 0.5, fin: '', fillet: { flesh: '#fbf5ea', skin: '#30303a', line: '#e9dcc2' } },
+  // (ayu: slender and olive, the golden spot behind the gill, a tall dorsal and a little adipose fin, its fins yellowed)
+  ExtraFish: { back: '#5f8460', belly: '#f0ecd4', fin: '#dcc277', len: 1, deep: 0.3, peak: 0.36, full: 0.92, ped: 0.3, iris: '#e8c45a',
+    dorsal: [{ a: 0.34, b: 0.56, h: 0.95 }], anal: { a: 0.64, b: 0.8, h: 0.5 }, adipose: true, fork: 0.5, spot: '#f2c34a' },
+  // (saury: long and slim as a blade, blue over silver, the yellow tip of its jaw, its small fins far back and the finlets before the tail)
+  Saury: { back: '#24508c', belly: '#eef2f8', fin: '#8aa2c0', len: 1.32, deep: 0.15, peak: 0.45, full: 0.95, ped: 0.38, iris: '#dfe3ea',
+    dorsal: [{ a: 0.72, b: 0.81, h: 0.9 }], anal: { a: 0.7, b: 0.8, h: 0.8 }, finlets: 5, fork: 0.85, beak: '#f2b43a' },
+  // (mackerel: a spindle, blue-green with dark wavy bars over the back, two dorsals, finlets, a deep fork)
+  Mackerel: { back: '#2b6d76', belly: '#eef2f1', fin: '#8fb0b0', len: 1.05, deep: 0.27, peak: 0.42, full: 0.95, ped: 0.24, iris: '#dde0e2',
+    dorsal: [{ a: 0.3, b: 0.43, h: 0.75, spiny: true }, { a: 0.6, b: 0.7, h: 0.55 }], anal: { a: 0.62, b: 0.71, h: 0.5 }, finlets: 5, fork: 0.8, zigzag: '#163e44' },
+  // (horse mackerel: the row of bony scutes down its rear flank, a big eye, its fins yellowed)
+  Aji: { back: '#5c7b8a', belly: '#f1f2ec', fin: '#d4c88e', len: 0.96, deep: 0.33, peak: 0.4, full: 1, ped: 0.22, iris: '#ead07a', eye: 1.25,
+    dorsal: [{ a: 0.3, b: 0.42, h: 0.8, spiny: true }, { a: 0.46, b: 0.84, h: 0.45 }], anal: { a: 0.56, b: 0.84, h: 0.42 }, fork: 0.75, scutes: true, stripe: '#e8c45a' },
+  // (sardine: blue over silver, a row of dark spots along its side, one small dorsal)
+  Iwashi: { back: '#2f5590', belly: '#f2f5f8', fin: '#9fb3cb', len: 0.9, deep: 0.27, peak: 0.4, full: 0.95, ped: 0.26, iris: '#dde2ea',
+    dorsal: [{ a: 0.42, b: 0.55, h: 0.75 }], anal: { a: 0.74, b: 0.85, h: 0.4 }, fork: 0.7, dots: '#1a2a48' },
+  // (shishamo: slim and sandy, freckled, its belly full of roe showing through)
+  Shishamo: { back: '#a28c5e', belly: '#f6e8c8', fin: '#d8c8a0', len: 0.86, deep: 0.26, peak: 0.45, full: 1.12, ped: 0.3, iris: '#dcca92',
+    dorsal: [{ a: 0.4, b: 0.53, h: 0.75 }], anal: { a: 0.66, b: 0.82, h: 0.5 }, adipose: true, fork: 0.45, speckle: '#6a5636', roe: true },
+  // (atka mackerel: dark bars across a brown back, a long dorsal down most of it)
+  Hokke: { back: '#7e6d50', belly: '#f2e9d4', fin: '#bca67e', len: 1, deep: 0.33, peak: 0.38, full: 0.95, ped: 0.28, iris: '#dcca92',
+    dorsal: [{ a: 0.24, b: 0.86, h: 0.55 }], anal: { a: 0.52, b: 0.86, h: 0.45 }, fork: 0.45, bars: '#4f4029' },
+  // (yellowtail: a torpedo, blue over silver, the yellow stripe from eye to tail and a yellow tail)
+  Buri: { back: '#31557c', belly: '#f1f3f2', fin: '#dcc25c', len: 1.05, deep: 0.31, peak: 0.42, full: 0.95, ped: 0.2, iris: '#dde0e2',
+    dorsal: [{ a: 0.3, b: 0.4, h: 0.45, spiny: true }, { a: 0.44, b: 0.72, h: 0.55 }], anal: { a: 0.58, b: 0.74, h: 0.42 }, fork: 0.85,
+    stripe: '#efc83c', tailFin: '#e8c43c' },
+  // (blackthroat seaperch: rose red, deep in the body, its great eye)
+  Nodoguro: { back: '#d4433a', belly: '#f8d3c4', fin: '#cf4636', len: 0.95, deep: 0.38, peak: 0.35, full: 1, ped: 0.32, iris: '#f0d27a', eye: 1.6, big: true,
+    dorsal: [{ a: 0.28, b: 0.5, h: 0.75, spiny: true }, { a: 0.52, b: 0.74, h: 0.6 }], anal: { a: 0.6, b: 0.76, h: 0.5 }, fork: 0.25 },
+  Salmon: { back: '', belly: '', fin: '', len: 1, deep: 0.5, dorsal: [], fillet: { flesh: '#f7926a', skin: '#8f9ea8', line: '#fde4d4', kind: 'salmon' } },
+  Gindara: { back: '', belly: '', fin: '', len: 1, deep: 0.5, dorsal: [], fillet: { flesh: '#fbf5ea', skin: '#2d2d36', line: '#e8dbc2', kind: 'cod' } },
 }
 
 const ground = (store: string) => (store === 'frozen' ? ['#d6ecfb', '#9ec8ea'] : store === 'ambient' ? ['#fbecd2', '#e8c58e'] : ['#def4e8', '#a6d6b8'])
 
-/** a whole fish's measures, head to the left, centred on (64, 64) */
-function fishParts(f: Fish) {
-  const L = 44 * f.len, H = 44 * f.deep, cy = 64
-  const x0 = 64 - L, xt = 64 + L * 0.76
-  return { L, H, cy, x0, xt, T: Math.max(H * 0.95, 11) }
+/** a smooth line through points (Catmull-Rom, as cubic curves) */
+function smoothPath(pts: [number, number][], move = true) {
+  let d = move ? `M${pts[0][0].toFixed(2)} ${pts[0][1].toFixed(2)}` : ''
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)]
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6]
+    d += ` C${c1[0].toFixed(2)} ${c1[1].toFixed(2)} ${c2[0].toFixed(2)} ${c2[1].toFixed(2)} ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`
+  }
+  return d
 }
+
+/** a whole fish's frame on the 128 square: its body from x0 (the snout) to x1 (the tail's root), H its half depth, the tail's reach beyond */
+function fishParts(f: Fish) {
+  const Lb = 76 * f.len, H = 44 * f.deep, cy = 64
+  const x0 = 64 - Lb * 0.56, x1 = x0 + Lb
+  const tail = Math.max(H * 1.1, 13) * (0.9 + (f.fork ?? 0.5) * 0.3)
+  return { Lb, H, cy, x0, x1, tail, T: Math.max(H * 1.05, 11) }
+}
+
 function FishArt({ f, u }: { f: Fish; u: string }) {
-  const { L, H, cy, x0, xt, T } = fishParts(f)
-  const X = (k: number) => x0 + L * k
-  const belly = f.roe ? 1.15 : 1
-  // (the body: a rounded snout, the forehead rising to the back's highest a little behind the head, narrowing to the tail's root; the belly
-  // fuller, round with roe for a shishamo)
-  const body = `M${x0 + 1} ${cy + H * 0.12}
-    C${x0 - 1} ${cy - H * 0.45} ${X(0.2)} ${cy - H} ${X(0.58)} ${cy - H}
-    C${X(1.02)} ${cy - H} ${xt - L * 0.36} ${cy - H * 0.36} ${xt} ${cy - H * 0.16}
-    L${xt} ${cy + H * 0.16}
-    C${xt - L * 0.36} ${cy + H * 0.4} ${X(1.02)} ${cy + H * belly} ${X(0.55)} ${cy + H * belly}
-    C${X(0.22)} ${cy + H * belly} ${x0 + 2} ${cy + H * 0.62} ${x0 + 1} ${cy + H * 0.12} Z`
-  // (the line where the dark back meets the pale belly, a little wave in it)
-  const backLine = `M${x0 - 4} ${cy + H * 0.02} C${X(0.3)} ${cy - H * 0.12} ${X(0.75)} ${cy + H * 0.02} ${X(1.1)} ${cy - H * 0.02} S${xt} ${cy} ${xt + 6} ${cy}`
-  const backD = `${backLine} L${xt + 6} ${cy - H - 6} L${x0 - 4} ${cy - H - 6} Z`
-  const finDark = shade(f.fin, -0.28)
-  const er = Math.max(3.4, H * 0.2) * (f.eye ?? 1), ex = X(0.16), ey = cy - H * 0.18
+  const { Lb, H, cy, x0, x1, tail, T } = fishParts(f)
+  const X = (k: number) => x0 + Lb * k
+  const Y = (k: number) => cy + H * k
+  const P = (x: number, y: number): [number, number] => [X(x), Y(y)]
+  const peak = f.peak ?? 0.4, full = f.full ?? 1, ped = f.ped ?? 0.26
+  const finDark = shade(f.fin, -0.3), finLight = shade(f.fin, 0.4)
+  const tailC = f.tailFin ?? f.fin
+  // (the body: the snout, the forehead rising to the back's highest, tapering to the tail's root; the belly fuller, round with roe)
+  const upper: [number, number][] = [P(0, 0.06), P(0.035, -0.32), P(0.14, -0.78), P(peak, -1), P(0.66, -0.84), P(0.84, -0.46), P(0.95, -ped * 1.05), P(1, -ped)]
+  const lower: [number, number][] = [P(1, ped), P(0.95, ped * 1.05), P(0.82, full * 0.55), P(Math.min(0.62, peak + 0.16), full), P(0.26, full * 0.88), P(0.08, 0.6), P(0, 0.06)]
+  const body = `${smoothPath(upper)} L${lower[0][0].toFixed(2)} ${lower[0][1].toFixed(2)}${smoothPath(lower, false)} Z`
+  // (the back's dark over the pale belly: a little wave in the line between them, lower toward the head)
+  const split = smoothPath([P(-0.05, 0.12), P(0.25, -0.02), P(0.55, 0.02), P(0.8, -0.02), P(1.05, 0)])
+  const backD = `${split} L${X(1.05)} ${Y(-1.6)} L${X(-0.05)} ${Y(-1.6)} Z`
+  const er = Math.max(3.2, H * 0.21) * (f.eye ?? 1), ex = X(0.105), ey = Y(-0.2)
+  const fin = (g: Fin, top: boolean) => {
+    const s = top ? -1 : 1
+    const baseY = (x: number) => (top ? -1 : full) * (x < peak ? 1 - ((peak - x) / peak) ** 2 * 0.7 : 1 - ((x - peak) / (1 - peak)) ** 1.6 * (1 - ped / (top ? 1 : full)))
+    const a = g.a, b = g.b, m = a + (b - a) * (g.spiny ? 0.3 : 0.42)
+    const tip = (x: number) => Y(s * Math.abs(baseY(x)) + s * g.h * (1 - Math.abs((x - m) / (b - a)) * 0.4))
+    const pts: [number, number][] = g.spiny
+      ? [[X(a), Y(baseY(a) * 1)], ...Array.from({ length: 5 }, (_, k): [number, number][] => {
+          const x = a + ((b - a) * (k + 0.5)) / 5.5
+          return [[X(x), tip(x)], [X(x + (b - a) / 11), Y(baseY(x) + s * g.h * 0.45)]]
+        }).flat(), [X(b), Y(baseY(b))]]
+      : [[X(a), Y(baseY(a))], [X(a + (b - a) * 0.12), tip(a + (b - a) * 0.12)], [X(m), tip(m) + s * 1.5], [X(b - (b - a) * 0.08), Y(baseY(b) + s * g.h * 0.35)], [X(b), Y(baseY(b))]]
+    const d = g.spiny ? `M${pts.map((q) => q.map((v) => v.toFixed(2)).join(' ')).join(' L')} Z` : `${smoothPath(pts)} Z`
+    const rays = Array.from({ length: Math.max(3, Math.round((b - a) * 22)) }, (_, k) => {
+      const x = a + ((b - a) * (k + 0.6)) / (Math.max(3, Math.round((b - a) * 22)) + 0.4)
+      return <path key={k} d={`M${X(x)} ${Y(baseY(x))} L${X(x + 0.02)} ${tip(x) - s * 1.2}`} stroke={finDark} strokeWidth="0.7" opacity="0.6" />
+    })
+    return (
+      <g>
+        <path d={d} fill={top ? f.fin : shade(f.fin, 0.12)} fillOpacity={0.92} stroke={INK} strokeWidth={OUT * 0.8} strokeLinejoin="round" />
+        {rays}
+      </g>
+    )
+  }
+  // (finlets: a row of little fins before the tail, top and bottom)
+  const finlets = f.finlets ? Array.from({ length: f.finlets }, (_, k) => {
+    const x = 0.8 + (k * 0.15) / f.finlets!
+    const w = 0.022
+    const yt = Y(-Math.max(ped, 0.46 - k * 0.04) - 0.02), yb = Y(Math.max(ped, 0.46 - k * 0.04) + 0.02)
+    return (
+      <g key={k}>
+        <path d={`M${X(x)} ${yt + 1} L${X(x + w * 1.6)} ${yt - H * 0.32} L${X(x + w)} ${yt + 1} Z`} fill={f.fin} stroke={INK} strokeWidth="0.9" strokeLinejoin="round" />
+        <path d={`M${X(x)} ${yb - 1} L${X(x + w * 1.6)} ${yb + H * 0.32} L${X(x + w)} ${yb - 1} Z`} fill={f.fin} stroke={INK} strokeWidth="0.9" strokeLinejoin="round" />
+      </g>
+    )
+  }) : null
+  // (the tail: two lobes, forked as deep as the fish's own, its rays fanning out)
+  const fk = f.fork ?? 0.5
+  const tailD = `M${x1 - 2} ${Y(-ped * 0.9)} C${x1 + tail * 0.3} ${Y(-ped * 1.2)} ${x1 + tail * 0.7} ${cy - T * 0.8} ${x1 + tail} ${cy - T}
+    C${x1 + tail * (1 - fk * 0.45)} ${cy - T * 0.45} ${x1 + tail * (1 - fk * 0.6)} ${cy - T * 0.12} ${x1 + tail * (1 - fk * 0.62)} ${cy}
+    C${x1 + tail * (1 - fk * 0.6)} ${cy + T * 0.12} ${x1 + tail * (1 - fk * 0.45)} ${cy + T * 0.45} ${x1 + tail} ${cy + T}
+    C${x1 + tail * 0.7} ${cy + T * 0.8} ${x1 + tail * 0.3} ${Y(ped * 1.2)} ${x1 - 2} ${Y(ped * 0.9)} Z`
   return (
     <g>
       <defs>
         <clipPath id={`${u}c`}><path d={body} /></clipPath>
-        <pattern id={`${u}s`} width="6" height="5" patternUnits="userSpaceOnUse">
-          <path d="M0 5 A3 3 0 0 1 6 5 M-3 2.5 A3 3 0 0 1 3 2.5 M3 2.5 A3 3 0 0 1 9 2.5" fill="none" stroke={shade(f.back, 0.45)} strokeWidth="0.6" opacity="0.55" />
+        {/* (the flank's sheen, darker toward the back, a bright band along the middle, the belly pale) */}
+        <linearGradient id={`${u}b`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={shade(f.back, -0.18)} />
+          <stop offset="0.55" stopColor={f.back} />
+          <stop offset="1" stopColor={shade(f.back, 0.18)} />
+        </linearGradient>
+        <linearGradient id={`${u}t`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={shade(tailC, -0.1)} />
+          <stop offset="1" stopColor={shade(tailC, 0.25)} />
+        </linearGradient>
+        <pattern id={`${u}s`} width="5" height="4.2" patternUnits="userSpaceOnUse">
+          <path d="M0 4.2 A2.5 2.5 0 0 1 5 4.2 M-2.5 2.1 A2.5 2.5 0 0 1 2.5 2.1 M2.5 2.1 A2.5 2.5 0 0 1 7.5 2.1" fill="none" stroke={shade(f.back, 0.5)} strokeWidth="0.55" />
         </pattern>
       </defs>
-      {/* tail: forked, its two lobes curving, rays fanning out */}
-      <path d={`M${xt - 2} ${cy - H * 0.14} C${xt + 5} ${cy - H * 0.3} ${xt + 13} ${cy - T * 0.75} ${xt + 21} ${cy - T}
-        C${xt + 17} ${cy - T * 0.45} ${xt + 14} ${cy - T * 0.15} ${xt + 13} ${cy}
-        C${xt + 14} ${cy + T * 0.15} ${xt + 17} ${cy + T * 0.45} ${xt + 21} ${cy + T}
-        C${xt + 13} ${cy + T * 0.75} ${xt + 5} ${cy + H * 0.3} ${xt - 2} ${cy + H * 0.14} Z`} fill={f.fin} stroke={INK} strokeWidth={OUT} strokeLinejoin="round" />
-      <path d={`M${xt} ${cy} C${xt + 6} ${cy + T * 0.25} ${xt + 13} ${cy + T * 0.6} ${xt + 19} ${cy + T * 0.92} C${xt + 13} ${cy + T * 0.72} ${xt + 6} ${cy + T * 0.4} ${xt} ${cy + H * 0.14} Z`} fill={finDark} opacity="0.35" />
-      {[-0.7, -0.38, -0.12, 0.12, 0.38, 0.7].map((k) => <path key={k} d={`M${xt + 1} ${cy + k * H * 0.12} Q${xt + 9} ${cy + k * T * 0.45} ${xt + 16 + Math.abs(k) * 3} ${cy + k * T * 0.9}`} fill="none" stroke={finDark} strokeWidth="0.8" opacity="0.7" />)}
-      {/* dorsal fin: a curved sail on the back, rays along it; the anal fin under the rear, the pelvic under the middle */}
-      <path d={`M${X(0.42)} ${cy - H * 0.97} C${X(0.46)} ${cy - H * 1.5} ${X(0.6)} ${cy - H * 1.62} ${X(0.72)} ${cy - H * 1.5}
-        C${X(0.86)} ${cy - H * 1.32} ${X(1.0)} ${cy - H * 1.0} ${X(1.12)} ${cy - H * 0.66} Z`} fill={f.fin} stroke={INK} strokeWidth={OUT} strokeLinejoin="round" />
-      {[0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map((t) => <path key={t} d={`M${X(t)} ${cy - H * (0.98 - (t - 0.5) * 0.5)} L${X(t + 0.05)} ${cy - H * (1.5 - Math.max(0, t - 0.6) * 1.4)}`} stroke={finDark} strokeWidth="0.8" opacity="0.7" />)}
-      {/* (the anal and pelvic fins: pointed, sweeping back from the belly, as a fish's lie flat when it swims) */}
-      <path d={`M${X(1.0)} ${cy + H * 0.66} Q${X(1.1)} ${cy + H * 1.22} ${X(1.38)} ${cy + H * 1.02} Q${X(1.3)} ${cy + H * 0.62} ${X(1.3)} ${cy + H * 0.38} Z`} fill={f.fin} stroke={INK} strokeWidth={OUT * 0.8} strokeLinejoin="round" />
-      <path d={`M${X(0.56)} ${cy + H * 0.94} Q${X(0.62)} ${cy + H * 1.36} ${X(0.84)} ${cy + H * 1.24} Q${X(0.75)} ${cy + H * 1.02} ${X(0.74)} ${cy + H * 0.9} Z`} fill={f.fin} stroke={INK} strokeWidth={OUT * 0.8} strokeLinejoin="round" />
-      {/* the body: the pale belly, the dark back over it, a soft scale pattern along the back, the shade along the underside, the light along the top */}
+      {/* the fins behind the body: tail, dorsal(s), anal, the pelvic under the middle, an adipose before the tail */}
+      <path d={tailD} fill={`url(#${u}t)`} stroke={INK} strokeWidth={OUT} strokeLinejoin="round" />
+      {[-0.82, -0.55, -0.28, 0, 0.28, 0.55, 0.82].map((k) => <path key={k} d={`M${x1 + 1} ${cy + k * H * ped} Q${x1 + tail * 0.45} ${cy + k * T * 0.45} ${x1 + tail * (0.86 - (1 - Math.abs(k)) * fk * 0.5)} ${cy + k * T * 0.95}`} fill="none" stroke={shade(tailC, -0.32)} strokeWidth="0.75" opacity="0.65" />)}
+      {f.dorsal.map((g, k) => <g key={k}>{fin(g, true)}</g>)}
+      {f.anal && fin(f.anal, false)}
+      <path d={`M${X(0.4)} ${Y(full * 0.94)} Q${X(0.44)} ${Y(full * 1.42)} ${X(0.56)} ${Y(full * 1.36)} Q${X(0.52)} ${Y(full * 1.06)} ${X(0.52)} ${Y(full * 0.9)} Z`} fill={shade(f.fin, 0.12)} stroke={INK} strokeWidth={OUT * 0.75} strokeLinejoin="round" />
+      {f.adipose && <path d={`M${X(0.8)} ${Y(-0.5)} C${X(0.81)} ${Y(-0.82)} ${X(0.86)} ${Y(-0.82)} ${X(0.87)} ${Y(-0.42)} Z`} fill={f.fin} stroke={INK} strokeWidth={OUT * 0.75} strokeLinejoin="round" />}
+      {finlets}
+      {/* the body: the pale belly, the back's sheen over it, the scales along the back, the markings; its shade below, its light above */}
       <path d={body} fill={f.belly} />
       <g clipPath={`url(#${u}c)`}>
-        <path d={backD} fill={f.back} />
-        <path d={backD} fill={`url(#${u}s)`} />
-        {f.bars && [0.48, 0.64, 0.8, 0.96, 1.12, 1.28, 1.44].map((t) => <path key={t} d={`M${X(t)} ${cy - H * 1.1} q4 ${H * 0.3} -1 ${H * 0.55} q5 ${H * 0.25} 1 ${H * 0.55}`} fill="none" stroke={f.bars} strokeWidth="2.4" strokeLinecap="round" opacity="0.8" />)}
-        {f.stripe && <path d={`M${X(0.3)} ${cy - H * 0.06} C${X(0.8)} ${cy - H * 0.16} ${X(1.25)} ${cy - H * 0.06} ${xt + 4} ${cy}`} fill="none" stroke={f.stripe} strokeWidth="3" strokeLinecap="round" />}
-        {f.roe && <ellipse cx={X(0.62)} cy={cy + H * 0.62} rx={L * 0.32} ry={H * 0.34} fill="#f6c88a" opacity="0.55" />}
-        <path d={`M${x0 - 4} ${cy + H * 0.62} C${X(0.4)} ${cy + H * 0.85} ${X(1.0)} ${cy + H * 0.5} ${xt + 6} ${cy + H * 0.12} L${xt + 6} ${cy + H + 8} L${x0 - 4} ${cy + H + 8} Z`} fill={shade(f.belly, -0.14)} />
-        {/* (the head: a touch darker, the gill cover's edge curving down behind the eye) */}
-        <path d={`M${x0 - 4} ${cy - H - 4} L${X(0.32)} ${cy - H - 4} C${X(0.4)} ${cy - H * 0.35} ${X(0.4)} ${cy + H * 0.35} ${X(0.3)} ${cy + H + 4} L${x0 - 4} ${cy + H + 4} Z`} fill="#000" opacity="0.06" />
-        <path d={`M${X(0.48)} ${cy - H * 0.82} C${X(0.8)} ${cy - H * 0.86} ${X(1.15)} ${cy - H * 0.55} ${xt - 2} ${cy - H * 0.2}`} fill="none" stroke="#fff" strokeWidth={Math.max(2.4, H * 0.16)} strokeLinecap="round" opacity="0.4" />
+        {f.roe && <ellipse cx={X(0.55)} cy={Y(full * 0.62)} rx={Lb * 0.24} ry={H * 0.4} fill="#f6b878" opacity="0.6" />}
+        <path d={backD} fill={`url(#${u}b)`} />
+        <path d={backD} fill={`url(#${u}s)`} opacity="0.45" />
+        {/* (a silver line where the back meets the belly) */}
+        <path d={split} fill="none" stroke="#fff" strokeWidth="1.1" opacity="0.5" />
+        {f.zigzag && [0.26, 0.36, 0.46, 0.56, 0.66, 0.76, 0.86].map((t) => <path key={t} d={`M${X(t)} ${Y(-1.05)} l${Lb * 0.03} ${H * 0.25} l${-Lb * 0.035} ${H * 0.22} l${Lb * 0.035} ${H * 0.24} l${-Lb * 0.02} ${H * 0.2}`} fill="none" stroke={f.zigzag} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />)}
+        {f.bars && [0.3, 0.44, 0.58, 0.72, 0.86].map((t) => <path key={t} d={`M${X(t)} ${Y(-1.1)} C${X(t + 0.03)} ${Y(-0.5)} ${X(t - 0.02)} ${Y(0)} ${X(t + 0.01)} ${Y(0.35)}`} fill="none" stroke={f.bars} strokeWidth={Math.max(2.4, H * 0.22)} strokeLinecap="round" opacity="0.55" />)}
+        {f.speckle && Array.from({ length: 26 }, (_, k) => <circle key={k} cx={X(0.2 + ((k * 37) % 70) / 100)} cy={Y(-0.9 + ((k * 53) % 60) / 100)} r="0.8" fill={f.speckle} opacity="0.55" />)}
+        {f.stripe && <path d={smoothPath([P(0.12, -0.14), P(0.4, -0.2), P(0.7, -0.1), P(1.02, 0)])} fill="none" stroke={f.stripe} strokeWidth={Math.max(2.2, H * 0.17)} strokeLinecap="round" opacity="0.9" />}
+        {/* (the shade along the underside, crisp; the light along the back, a long gleam) */}
+        <path d={`${smoothPath([P(-0.05, 0.62), P(0.3, 0.8), P(0.7, 0.62), P(1.05, ped * 0.6)])} L${X(1.05)} ${Y(1.8)} L${X(-0.05)} ${Y(1.8)} Z`} fill={shade(f.belly, -0.16)} />
+        <path d={smoothPath([P(0.2, -0.62), P(0.45, -0.72), P(0.7, -0.55), P(0.9, -0.3)])} fill="none" stroke="#fff" strokeWidth={Math.max(2.2, H * 0.17)} strokeLinecap="round" opacity="0.42" />
+        {/* (the head a touch darker, the gill cover's edge curving down behind the eye, the gill slit behind it) */}
+        <path d={`M${X(-0.05)} ${Y(-1.4)} L${X(0.22)} ${Y(-1.4)} C${X(0.27)} ${Y(-0.4)} ${X(0.27)} ${Y(0.4)} ${X(0.2)} ${Y(1.4)} L${X(-0.05)} ${Y(1.4)} Z`} fill="#000" opacity="0.07" />
       </g>
-      {/* lateral line; the scutes of a horse mackerel along its rear; a sardine's row of dots; the ayu's golden spot */}
-      <path d={`M${X(0.34)} ${cy - H * 0.36} C${X(0.75)} ${cy - H * 0.46} ${X(1.15)} ${cy - H * 0.16} ${xt} ${cy}`} fill="none" stroke={shade(f.back, -0.3)} strokeWidth="0.9" opacity="0.6" />
-      {f.scutes && [0.86, 0.96, 1.06, 1.16, 1.26, 1.36, 1.46].map((t) => <path key={t} d={`M${X(t)} ${cy - H * 0.04 + (t - 0.86) * H * 0.1} l2.6 -1.6 l2.6 1.6`} fill="none" stroke={shade(f.back, -0.35)} strokeWidth="1" />)}
-      {f.dots && [0.48, 0.64, 0.8, 0.96, 1.12, 1.28].map((t) => <circle key={t} cx={X(t)} cy={cy - H * 0.2 + (t - 0.48) * H * 0.12} r="1.9" fill={f.dots} />)}
-      {f.spot && <ellipse cx={X(0.46)} cy={cy - H * 0.34} rx="4.2" ry="2.6" fill={f.spot} stroke={shade(f.spot, -0.3)} strokeWidth="0.8" />}
-      <path d={`M${X(0.31)} ${cy - H * 0.62} C${X(0.4)} ${cy - H * 0.15} ${X(0.4)} ${cy + H * 0.25} ${X(0.28)} ${cy + H * 0.66}`} fill="none" stroke={shade(f.back, -0.35)} strokeWidth={IN} strokeLinecap="round" />
+      <path d={smoothPath([P(0.21, -0.66), P(0.255, -0.2), P(0.25, 0.25), P(0.2, 0.66)])} fill="none" stroke={shade(f.back, -0.4)} strokeWidth={IN} strokeLinecap="round" />
+      <path d={smoothPath([P(0.235, -0.52), P(0.275, -0.1), P(0.265, 0.3)])} fill="none" stroke="#c4586a" strokeWidth="0.9" strokeLinecap="round" opacity="0.5" />
+      {/* lateral line; a horse mackerel's scutes along its rear; a sardine's spots; the ayu's golden spot */}
+      <path d={smoothPath([P(0.27, -0.42), P(0.55, -0.4), P(0.82, -0.18), P(1, 0)])} fill="none" stroke={shade(f.back, -0.3)} strokeWidth="0.8" opacity="0.55" />
+      {f.scutes && Array.from({ length: 9 }, (_, k) => { const t = 0.56 + k * 0.05; return <path key={k} d={`M${X(t)} ${Y(-0.3 + (t - 0.56) * 0.7)} l${Lb * 0.022} ${-H * 0.09} l${Lb * 0.022} ${H * 0.09}`} fill="none" stroke={shade(f.back, -0.35)} strokeWidth="1" strokeLinejoin="round" /> })}
+      {f.dots && [0.34, 0.42, 0.5, 0.58, 0.66, 0.74, 0.82].map((t, k) => <circle key={t} cx={X(t)} cy={Y(-0.22 + k * 0.02)} r={Math.max(1.5, H * 0.1)} fill={f.dots} />)}
+      {f.spot && <ellipse cx={X(0.34)} cy={Y(-0.3)} rx={Lb * 0.05} ry={H * 0.2} fill={f.spot} stroke={shade(f.spot, -0.3)} strokeWidth="0.8" />}
       {/* the outline over it all */}
       <path d={body} fill="none" stroke={INK} strokeWidth={OUT} strokeLinejoin="round" />
-      {/* pectoral fin: a little fan behind the gill cover, laid back along the flank */}
-      <path d={`M${X(0.36)} ${cy + H * 0.2} C${X(0.44)} ${cy + H * 0.02} ${X(0.58)} ${cy + H * 0.02} ${X(0.62)} ${cy + H * 0.14}
-        C${X(0.6)} ${cy + H * 0.34} ${X(0.48)} ${cy + H * 0.44} ${X(0.36)} ${cy + H * 0.2} Z`} fill={shade(f.fin, 0.35)} fillOpacity="0.85" stroke={finDark} strokeWidth={IN} strokeLinejoin="round" />
-      {[0.12, 0.2, 0.28].map((t) => <path key={t} d={`M${X(0.38)} ${cy + H * 0.2} L${X(0.6)} ${cy + H * t}`} stroke={finDark} strokeWidth="0.7" opacity="0.7" />)}
-      {/* the mouth; a saury's yellow beak */}
-      {f.beak && <path d={`M${x0 + 2} ${cy + H * 0.02} L${x0 - 9} ${cy + H * 0.16} L${x0 + 2} ${cy + H * 0.34} Z`} fill={f.beak} stroke={INK} strokeWidth={IN} strokeLinejoin="round" />}
-      <path d={`M${x0 + 1.5} ${cy + H * 0.14} q${L * 0.06} ${H * 0.08} ${L * 0.11} ${-H * 0.01}`} fill="none" stroke={INK} strokeWidth={IN} strokeLinecap="round" />
-      {/* the eye: a pale ring, the iris, a dark pupil, the light caught twice */}
+      {/* the pectoral fin behind the gill cover, laid back along the flank, see-through */}
+      <path d={`M${X(0.27)} ${Y(0.12)} C${X(0.33)} ${Y(-0.1)} ${X(0.45)} ${Y(-0.06)} ${X(0.47)} ${Y(0.1)} C${X(0.44)} ${Y(0.3)} ${X(0.34)} ${Y(0.36)} ${X(0.27)} ${Y(0.12)} Z`}
+        fill={finLight} fillOpacity="0.8" stroke={finDark} strokeWidth={IN} strokeLinejoin="round" />
+      {[0.0, 0.1, 0.2].map((t) => <path key={t} d={`M${X(0.285)} ${Y(0.12)} L${X(0.45)} ${Y(t)}`} stroke={finDark} strokeWidth="0.65" opacity="0.7" />)}
+      {/* the mouth, a saury's yellow jaw-tip, a seaperch's big mouth */}
+      {f.beak && <path d={`M${X(0.01)} ${Y(0.02)} L${X(-0.09)} ${Y(0.2)} L${X(0.02)} ${Y(0.36)} Z`} fill={f.beak} stroke={INK} strokeWidth={IN} strokeLinejoin="round" />}
+      <path d={`M${X(0.004)} ${Y(0.14)} q${Lb * (f.big ? 0.07 : 0.045)} ${H * 0.1} ${Lb * (f.big ? 0.1 : 0.07)} ${-H * 0.02}`} fill="none" stroke={INK} strokeWidth={IN} strokeLinecap="round" />
+      {/* the eye: a pale ring, the iris, the dark pupil, the light caught twice */}
       <circle cx={ex} cy={ey} r={er} fill="#fbf6e8" stroke={INK} strokeWidth={IN} />
-      <circle cx={ex + er * 0.06} cy={ey + er * 0.04} r={er * 0.72} fill={f.iris ?? '#d8dce0'} />
-      <circle cx={ex + er * 0.1} cy={ey + er * 0.06} r={er * 0.46} fill="#1c1612" />
-      <circle cx={ex - er * 0.18} cy={ey - er * 0.22} r={er * 0.2} fill="#fff" />
-      <circle cx={ex + er * 0.3} cy={ey + er * 0.3} r={er * 0.09} fill="#fff" />
+      <circle cx={ex + er * 0.05} cy={ey + er * 0.04} r={er * 0.74} fill={f.iris ?? '#d8dce0'} />
+      <circle cx={ex + er * 0.08} cy={ey + er * 0.06} r={er * 0.47} fill="#1c1612" />
+      <circle cx={ex - er * 0.2} cy={ey - er * 0.24} r={er * 0.22} fill="#fff" />
+      <circle cx={ex + er * 0.3} cy={ey + er * 0.3} r={er * 0.1} fill="#fff" />
     </g>
   )
 }
 
-/** a fillet (切り身): a thick slab, the flakes of the muscle in pale arcs across it, the skin a band along its back, its cut side below */
+/** a fillet (切り身): a thick slab seen from above and a little in front, its cut face lit, its flesh's grain (a salmon's white fat in
+ * chevrons, a cod's flakes), its skin a band along the back, its thickness below */
 function FilletArt({ f, u }: { f: NonNullable<Fish['fillet']>; u: string }) {
-  const top = 'M20 62 C20 44 38 34 66 34 C92 34 108 44 108 58 C108 72 92 82 64 82 C36 82 20 76 20 62 Z'
+  const top = 'M18 60 C18 44 34 34 62 33 C90 32 110 42 110 56 C110 70 94 80 64 81 C34 82 18 74 18 60 Z'
+  const side = 'M18 60 C18 74 34 90 64 90 C96 90 110 79 110 64 L110 56 C110 70 94 80 64 81 C34 82 18 74 18 60 Z'
+  const grain = f.kind === 'salmon'
+    ? [26, 37, 48, 59, 70, 81, 92].map((x) => <path key={x} d={`M${x} 31 C${x + 7} 40 ${x - 4} 46 ${x + 4} 54 C${x + 11} 62 ${x - 2} 70 ${x + 6} 82`} fill="none" stroke={f.line} strokeWidth="2.8" strokeLinecap="round" />)
+    : [30, 42, 54, 66, 78, 90].map((x) => <path key={x} d={`M${x - 4} 34 C${x + 6} 44 ${x - 6} 56 ${x + 2} 66 C${x + 6} 72 ${x} 78 ${x + 4} 84`} fill="none" stroke={f.line} strokeWidth="1.6" strokeLinecap="round" />)
   return (
     <g>
-      <defs><clipPath id={`${u}k`}><path d={top} /></clipPath></defs>
-      {/* (its thickness, the side below the face) */}
-      <path d="M20 62 C20 74 34 90 64 90 C94 90 108 80 108 64 L108 58 C108 72 92 82 64 82 C36 82 20 76 20 62 Z" fill={shade(f.flesh, -0.18)} stroke={INK} strokeWidth={OUT} strokeLinejoin="round" />
-      <path d={top} fill={f.flesh} />
+      <defs>
+        <clipPath id={`${u}k`}><path d={top} /></clipPath>
+        <radialGradient id={`${u}f`} cx="45%" cy="40%" r="70%"><stop offset="0" stopColor={shade(f.flesh, 0.18)} /><stop offset="1" stopColor={shade(f.flesh, -0.06)} /></radialGradient>
+        <linearGradient id={`${u}d`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={shade(f.flesh, -0.12)} /><stop offset="1" stopColor={shade(f.flesh, -0.3)} /></linearGradient>
+      </defs>
+      {/* (its thickness, the side below the face, the grain showing on it too) */}
+      <path d={side} fill={`url(#${u}d)`} stroke={INK} strokeWidth={OUT} strokeLinejoin="round" />
+      {[34, 50, 66, 82, 98].map((x) => <path key={x} d={`M${x} ${80 - Math.abs(x - 64) * 0.12} l1.5 7`} stroke={shade(f.line, -0.1)} strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />)}
+      <path d={top} fill={`url(#${u}f)`} />
       <g clipPath={`url(#${u}k)`}>
-        {[30, 43, 56, 69, 82, 95].map((x) => <path key={x} d={`M${x} 30 C${x + 10} 42 ${x - 7} 52 ${x + 3} 60 C${x + 12} 70 ${x - 3} 78 ${x + 5} 88`} fill="none" stroke={f.line} strokeWidth="2.6" strokeLinecap="round" />)}
-        <path d="M14 72 C40 84 88 84 112 66 L112 92 L14 92 Z" fill="#000" opacity="0.06" />
-        <path d="M14 44 C40 30 92 28 114 42 L114 26 L14 26 Z" fill={f.skin} />
-        <path d="M16 45 C42 32 90 30 112 43" fill="none" stroke={shade(f.skin, 0.4)} strokeWidth="1.2" />
-        <path d="M32 54 C46 46 68 44 86 47" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" opacity="0.45" />
+        {grain}
+        {/* (a fillet's dark meat just under the skin, then the skin: a cod's black, a salmon's silver with its scales) */}
+        <path d="M12 46 C40 33 92 30 116 44 L116 50 C92 38 40 41 12 54 Z" fill={f.kind === 'salmon' ? '#d8625a' : '#e8d8c0'} opacity="0.6" />
+        <path d="M12 43 C40 30 92 27 116 40 L116 22 L12 22 Z" fill={f.skin} />
+        {f.kind === 'salmon' && <path d="M12 43 C40 30 92 27 116 40 L116 22 L12 22 Z" fill="none" />}
+        <path d="M14 44 C42 31 90 28 114 41" fill="none" stroke={shade(f.skin, 0.45)} strokeWidth="1.2" />
+        {/* (the face's shade toward the front, its gleam across the top) */}
+        <path d="M12 70 C40 84 88 84 116 64 L116 92 L12 92 Z" fill="#000" opacity="0.07" />
+        <path d="M34 54 C48 47 70 45 88 48" fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" opacity="0.5" />
+        <path d="M40 62 C46 59 54 58 60 58" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
       </g>
       <path d={top} fill="none" stroke={INK} strokeWidth={OUT} strokeLinejoin="round" />
     </g>
@@ -351,8 +460,10 @@ export function FoodArt({ id, store, size = 34, band = false }: { id: string; st
   const [g0, g1] = ground(store)
   // (cropped on a card's band to the food itself: a whole fish to its own outline, tail and fins and all)
   const fishView = (q: Fish) => {
-    const { H, cy, x0, xt, T } = fishParts(q)
-    const a = x0 - (q.beak ? 12 : 4), b = xt + 25, y0 = cy - H * 1.65 - 3, y1 = cy + Math.max(H * 1.05, T) + 4
+    const { H, cy, x0, x1, tail, T } = fishParts(q)
+    const a = x0 - (q.beak ? 10 : 4), b = x1 + tail + 3
+    const top = Math.max(...q.dorsal.map((g) => g.h), 0.6) + 1.15
+    const y0 = cy - Math.max(H * top, T) - 3, y1 = cy + Math.max(H * 1.5, T) + 3
     return `${a} ${y0} ${b - a} ${y1 - y0}`
   }
   const view = !band ? '0 0 128 128' : f ? (f.fillet ? '14 26 100 70' : fishView(f)) : '6 4 116 116'
