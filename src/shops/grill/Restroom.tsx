@@ -4,6 +4,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { setTip } from '@/scene/hoverTip'
 import { cleanRoom, FLIES_AT, DIRTY_AT, newRoll, ROLL_USES } from '@/game/restroom'
+import { mergeByMaterial } from '@/scene/StaticBatch'
 import { toonOf } from './BarFurnish'
 import { handOver, TOILETS } from './bar'
 import { getEdit } from './edit'
@@ -313,6 +314,9 @@ function useBits() {
     const lcd = r.remote.getObjectByName('RemLcd') as THREE.Mesh | undefined
     lit(lcd, '#a8e0c8')
     const ledMat = lit(r.led.getObjectByName('OtoLed') as THREE.Mesh, '#5ab4ff')
+    // (the parts that never move on their own, their buttons and ink lines, folded into a mesh or two per material: the remote and the
+    // Otohime were near thirty draws apiece, in each of the two toilets; the lit screen keeps its own)
+    for (const o of [r.remote, r.oto, r.holder, r.pot, r.bin]) mergeByMaterial(o)
     return { ...r, ledMat }
   }, [gltf])
 }
