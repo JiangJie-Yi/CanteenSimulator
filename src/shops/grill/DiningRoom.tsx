@@ -3238,7 +3238,8 @@ function SakeStack({ part }: { part: number }) {
       m.castShadow = true
       m.receiveShadow = true
     })
-    inkModel(root, (m) => /Ink|Red|Label/.test(m.name), { width: 0.0018, weld: true })
+    // (no ink round the straw's frayed ends over the lids: a line round every blade drew a black zigzag along each rim)
+    inkModel(root, (m) => /Ink|Red|Label|Fringe/.test(m.name), { width: 0.0018, weld: true })
     const box = new THREE.Box3().setFromObject(root)
     const size = box.getSize(new THREE.Vector3())
     const k = 1.1 / (size.y || 1)

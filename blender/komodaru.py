@@ -54,13 +54,36 @@ ru, rv = grid01(256)
 twist = np.sin((ru * 3 + rv * 9) * 2 * np.pi)
 rope = mix((0.5, 0.42, 0.28), (0.78, 0.69, 0.5), smooth(-0.6, 0.8, twist))
 rope = rope * (0.9 + 0.1 * np.sin(ru * 2 * np.pi * 60))[..., None]
+# (the label printed on the straw: cream paper with its fibres, the straw's rows faintly through it, a red double border with a black hairline
+# inside, a red diamond crest at its head over the brewer's name, a deep red band at its foot ruled with gold)
+LW, LH = 256, 352
+lu, lv = np.meshgrid((np.arange(LW) + 0.5) / LW, (np.arange(LH) + 0.5) / LH)
+paper = mix((0.86, 0.8, 0.66), (0.92, 0.88, 0.76), (np.sin(lu * 380 + np.sin(lv * 60) * 3) * 0.5 + 0.5) * 0.25)
+paper = paper * (0.93 + 0.07 * (np.abs(((lv * 46) % 1.0) - 0.5) * 2))[..., None]
+red = np.array((0.66, 0.1, 0.07), np.float32)
+dx, dy = np.minimum(lu, 1 - lu), np.minimum(lv, 1 - lv)
+d = np.minimum(dx * LW / LH, dy)
+border = ((d > 0.012) & (d < 0.04)) | ((d > 0.052) & (d < 0.06))
+paper[border] = red
+paper[(d > 0.07) & (d < 0.074)] = (0.08, 0.06, 0.05)
+# (the crest: a red diamond at the head, a cream diamond in it, a red dot in that)
+cx, cy = np.abs(lu - 0.5) * LW / LH, np.abs(lv - 0.86)
+dia = cx + cy
+paper[(dia < 0.075) & (lv > 0.7)] = red
+paper[(dia < 0.05) & (lv > 0.7)] = (0.9, 0.84, 0.7)
+paper[(dia < 0.022) & (lv > 0.7)] = red
+# (the band at the foot, ruled with two gold lines)
+band = (lv > 0.08) & (lv < 0.17) & (d > 0.075)
+paper[band] = (0.5, 0.07, 0.05)
+paper[band & ((np.abs(lv - 0.1) < 0.004) | (np.abs(lv - 0.15) < 0.004))] = (0.82, 0.64, 0.3)
+LABEL_TEX = image("komo_label", np.clip(paper, 0, 1).astype(np.float32))
 M = {
     "straw": pbr("KomoStraw", (1, 1, 1), tex=image("komo_straw", straw.astype(np.float32)), rough=0.85),
     "lid": pbr("KomoLid", (1, 1, 1), tex=image("komo_lid", straw.astype(np.float32)), rough=0.85),
     "rope": pbr("KomoRope", (1, 1, 1), tex=image("komo_rope", rope.astype(np.float32)), rough=0.9),
     "ink": pbr("KomoInk", (0.04, 0.03, 0.025), rough=0.8),
     "red": pbr("KomoRed", (0.62, 0.08, 0.05), rough=0.7),
-    "label": pbr("KomoLabel", (0.74, 0.64, 0.45), rough=0.85),
+    "label": pbr("KomoLabel", (1, 1, 1), tex=LABEL_TEX, rough=0.85),
 }
 parts = []
 
@@ -169,15 +192,35 @@ def barrel(at, turn, k):
     me = bpy.data.meshes.new(f"KomoBody{k}"); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(f"KomoBody{k}", me); bpy.context.collection.objects.link(o)
     fin(o, f"KomoBody{k}", M["straw"])
-    # (the straw's ends standing up round the lid's rim, a ragged fringe)
-    for i in range(28):
-        a = 2 * math.pi * i / 28 + random.uniform(-0.03, 0.03)
-        r0 = radius_at(HT) - 0.01
-        p0 = Vector((math.cos(a) * r0, math.sin(a) * r0, HT - 0.005))
-        p1 = p0 + Vector((math.cos(a) * 0.01, math.sin(a) * 0.01, random.uniform(0.025, 0.045)))
-        bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.006, radius2=0.001, depth=(p1 - p0).length, location=(p0 + p1) / 2)
-        f_ = active(); f_.rotation_mode = "QUATERNION"; f_.rotation_quaternion = (p1 - p0).to_track_quat("Z", "Y")
-        fin(f_, f"KomoFringe{k}_{i}", M["lid"], smooth=False)
+    # (the mat's straw ends where it's gathered over the lid's rim: a ragged frill of flat blades, each a little up out of the rope, then
+    # flaring out and drooping over the edge as straw does, their lengths and lean uneven; both faces, seen from in and out)
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    NB = 96
+    for i in range(NB):
+        a = 2 * math.pi * i / NB + random.uniform(-0.02, 0.02)
+        out_ = Vector((math.cos(a), math.sin(a), 0))
+        side = Vector((-math.sin(a), math.cos(a), 0))
+        r0 = radius_at(HT) - 0.006
+        L = random.uniform(0.022, 0.042)
+        w = random.uniform(0.014, 0.02)
+        rise, flare, droop = random.uniform(0.008, 0.016), random.uniform(0.6, 1.0), random.uniform(0.3, 0.8)
+        base = Vector((math.cos(a) * r0, math.sin(a) * r0, HT - 0.004)) + side * random.uniform(-0.003, 0.003)
+        pts = []
+        for t in (0.0, 0.45, 1.0):
+            pts.append(base + out_ * (L * flare * t) + Vector((0, 0, rise * math.sin(math.pi * min(1.0, t * 1.4)) - droop * L * t * t)))
+        # (each face of the blade its own vertices: the two sides wound opposite ways)
+        for flip in (False, True):
+            rows = [[bm.verts.new(q + side * (w / 2) * (1 - 0.7 * t)), bm.verts.new(q - side * (w / 2) * (1 - 0.7 * t))] for q, t in zip(pts, (0.0, 0.45, 1.0))]
+            for j in range(2):
+                a0, b0, a1, b1 = rows[j][0], rows[j][1], rows[j + 1][0], rows[j + 1][1]
+                f = bm.faces.new((a1, b1, b0, a0) if flip else (a0, b0, b1, a1))
+                for l in f.loops:
+                    co = l.vert.co
+                    l[uvl].uv = (0.5 + co.x * 1.6, 0.5 + co.y * 1.6)
+    me = bpy.data.meshes.new(f"KomoFringe{k}"); bm.to_mesh(me); bm.free()
+    o = bpy.data.objects.new(f"KomoFringe{k}", me); bpy.context.collection.objects.link(o)
+    fin(o, f"KomoFringe{k}", M["lid"], smooth=False)
     # (the ropes: two bands round it, near the top and near the foot; eight running up between them over the side; a ring round the lid)
     for zb in (0.07, HT - 0.06):
         tube(f"KomoBand{k}{int(zb * 100)}", [Vector((math.cos(2 * math.pi * i / 24) * (radius_at(zb) + 0.012), math.sin(2 * math.pi * i / 24) * (radius_at(zb) + 0.012), zb)) for i in range(24)],
@@ -222,13 +265,13 @@ def barrel(at, turn, k):
     fin(pl, f"KomoLabel{k}", M["label"])
     wrap_text(names[0], 0.12, HT * 0.58, M["ink"], f"KomoMark{k}a")
     wrap_text(names[1], 0.075, HT * 0.36, M["ink"], f"KomoMark{k}b")
-    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.022, depth=0.002, location=(0.075, -(radius_at(HT * 0.7) + 0.004), HT * 0.7), rotation=(math.pi / 2, 0, 0))
-    seal = active(); seal.rotation_euler.z = -0.3
-    fin(seal, f"KomoSeal{k}", M["red"], smooth=False)
-    for dz in (-0.12, 0.12):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=(0, -(radius_at(HT * 0.5 + dz) + 0.004), HT * 0.5 + dz))
-        ln = active(); ln.scale = (0.2, 0.002, 0.006)
-        fin(ln, f"KomoRule{k}{dz > 0}", M["ink"], smooth=False)
+    # (the brewer's red seal stamped low at the label's right, beside the second line, inside its border)
+    zs = HT * 0.37
+    xs = 0.062
+    asl = xs / radius_at(zs)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.014, depth=0.002,
+                                        location=(math.sin(asl) * (radius_at(zs) + 0.004), -math.cos(asl) * (radius_at(zs) + 0.004), zs), rotation=(math.pi / 2, 0, asl))
+    fin(active(), f"KomoSeal{k}", M["red"], smooth=False)
     # (the whole barrel turned and set in place, a hair askew)
     tilt = Matrix.Rotation(random.uniform(-0.03, 0.03), 4, "X")
     # (each part's own scale and turn taken into its matrix first: set just now, they aren't in it until the scene's updated)
