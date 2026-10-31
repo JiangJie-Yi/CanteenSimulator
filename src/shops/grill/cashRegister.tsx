@@ -62,7 +62,8 @@ function realFinish(src: THREE.MeshStandardMaterial): THREE.Material {
   if (n.startsWith('RegKey')) return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.25 })
   return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: Math.max(0.45, src.roughness), metalness: 0, sheen: 0.2 })
 }
-let regModel: { body: THREE.Object3D; drawer: THREE.Object3D; keys: THREE.Object3D; modeKey: THREE.Object3D; drawerKey: THREE.Object3D; solid: THREE.Mesh[] } | null = null
+let regModel: { body: THREE.Object3D; drawer: THREE.Object3D; keys: THREE.Object3D; keysAll: THREE.Object3D; modeKey: THREE.Object3D; drawerKey: THREE.Object3D
+  solid: THREE.Mesh[] } | null = null
 export function useRegisterModel() {
   const gltf = useGLTF(REGISTER_URL) as unknown as { scene: THREE.Group }
   if (regModel) return regModel
@@ -90,7 +91,13 @@ export function useRegisterModel() {
     const m = o as THREE.Mesh
     if (m.isMesh && (m.material as THREE.Material).side !== THREE.BackSide) solid.push(m)
   })
-  regModel = { body: get('RegBody'), drawer: get('RegDrawer'), keys: get('RegKeys'), modeKey: get('RegModeKey'), drawerKey: get('RegDrawerKey'), solid }
+  // (the seventy keys drawn as a few meshes while none of them moves or is pointed at: a copy of them all at rest, folded together by material,
+  // shown in their place; the keys themselves (each its own, with its ink line, some 140 draws) shown only while one's going down or lit
+  // under the pointer, and pointed at all the while (the pointer finds the unseen too))
+  const keysAll = get('RegKeys').clone(true)
+  mergeByMaterial(keysAll)
+  keysAll.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).raycast = () => {} })
+  regModel = { body: get('RegBody'), drawer: get('RegDrawer'), keys: get('RegKeys'), keysAll, modeKey: get('RegModeKey'), drawerKey: get('RegDrawerKey'), solid }
   return regModel
 }
 /** the model once it's loaded (for handlers, outside of rendering), or null before */
@@ -327,7 +334,7 @@ type Ev = { stopPropagation: () => void; object: THREE.Object3D; nativeEvent: Ev
  * receipt is the one printed.
  */
 export function RegisterKeys({ lang }: { lang: Lang }) {
-  const { keys, modeKey, drawerKey } = useRegisterModel()
+  const { keys, keysAll, modeKey, drawerKey } = useRegisterModel()
   const rest = useRef(new Map<THREE.Object3D, number>())
   const hovered = useRef<THREE.Object3D | null>(null)
   const lastK = useRef(-1)
@@ -365,6 +372,11 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
       }
     }
     lastK.current = k
+    // (the keys themselves shown while one's moving or under the pointer; at rest, their folded copy)
+    let busy = !!hovered.current
+    if (!busy) for (const at of REGISTER.pressed.values()) if (now - at < 300) { busy = true; break }
+    keys.visible = busy
+    keysAll.visible = !busy
     // the keys: down fast, held a moment, back up
     keys.children.forEach((key) => {
       if (!rest.current.has(key)) rest.current.set(key, key.position.y)
@@ -414,6 +426,7 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
           press(key.name.slice(4) as RegKey)
         }}>
         <primitive object={keys} />
+        <primitive object={keysAll} />
       </group>
       <group
         onPointerEnter={(e: Ev) => { if (behindBody(e)) return; liftOn(modeKey, true); point(e, true); showHelp('MODE') }}
