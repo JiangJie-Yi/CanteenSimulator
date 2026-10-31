@@ -1,7 +1,7 @@
 // The money at the till: yen notes (1000 blue, 5000 violet, 10000 brown, the 2024 series) and coins (1, 5, 10, 50, 100, 500), drawn
 // the way they are in the drawer: stacks of notes, piles of coins, each with its own printed face.
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 
 /** a canvas texture drawn by `draw` */
@@ -374,17 +374,28 @@ const coinFace = (kind: CoinKind) => {
 
 const noteTex = new Map<Note, THREE.Texture>()
 const coinTex = new Map<CoinKind, THREE.Texture>()
+// (each kind's materials made once and shared by every note and coin of it: made again for every payment, they piled up all day)
+const noteMatsMade = new Map<Note, THREE.Material[]>()
+const coinMatsMade = new Map<CoinKind, THREE.Material[]>()
 const noteMats = (kind: Note) => {
+  const had = noteMatsMade.get(kind)
+  if (had) return had
   if (!noteTex.has(kind)) noteTex.set(kind, noteFace(kind))
   const edge = new THREE.MeshToonMaterial({ color: '#e9e4d0' })
-  return [edge, edge, new THREE.MeshToonMaterial({ color: '#ffffff', map: noteTex.get(kind) }), edge, edge, edge]
+  const out = [edge, edge, new THREE.MeshToonMaterial({ color: '#ffffff', map: noteTex.get(kind) }), edge, edge, edge]
+  noteMatsMade.set(kind, out)
+  return out
 }
 const coinMats = (kind: CoinKind) => {
+  const had = coinMatsMade.get(kind)
+  if (had) return had
   if (!coinTex.has(kind)) coinTex.set(kind, coinFace(kind))
   // (struck metal: a satin sheen that catches the lamps, the aluminium 1 duller; the edge the metal's own darker tone)
   const metal = kind === 1 ? 0.55 : 0.85, rough = kind === 1 ? 0.5 : 0.32
   const side = new THREE.MeshStandardMaterial({ color: COINS[kind].edge, metalness: metal, roughness: rough + 0.1 })
-  return [side, new THREE.MeshStandardMaterial({ color: '#ffffff', map: coinTex.get(kind), metalness: metal, roughness: rough, envMapIntensity: 1.2 }), side]
+  const out = [side, new THREE.MeshStandardMaterial({ color: '#ffffff', map: coinTex.get(kind), metalness: metal, roughness: rough, envMapIntensity: 1.2 }), side]
+  coinMatsMade.set(kind, out)
+  return out
 }
 const NOTE_GEO = new THREE.BoxGeometry(NOTE_W, 1, NOTE_D)
 const COIN_GEO: Partial<Record<CoinKind, THREE.CylinderGeometry>> = {}
@@ -442,5 +453,7 @@ export function CoinPile({ kind, n, w, d, seed = 1, ...rest }: { kind: CoinKind;
     m.castShadow = true
     return m
   }, [kind, n, w, d, seed, mats])
+  // (the pile made again as the drawer's coins change: the last one's instance buffer let go)
+  useEffect(() => () => mesh.dispose(), [mesh])
   return <group {...rest}><primitive object={mesh} /></group>
 }

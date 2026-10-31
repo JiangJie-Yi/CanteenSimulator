@@ -1807,13 +1807,21 @@ const LAYER_HEIGHT = 0.1
 const CHAR_COLOR = new THREE.Color(0.045, 0.035, 0.03)
 
 
+/** the table's ware's shapes, each made once and shared by every one set out (they come and go as something's put on them: one made each
+ * time stayed on the GPU, never let go) */
+const WARE_GEO = new Map<string, THREE.BufferGeometry>()
+const wareOnce = (key: string, make: () => THREE.BufferGeometry) => {
+  let g = WARE_GEO.get(key)
+  if (!g) { g = make(); WARE_GEO.set(key, g) }
+  return g
+}
 /** A small round side dish (小皿) for onigiri and mochi, of the same set as the plates (plum blossom), inked. */
 function SideDish({ position, container }: { position: [number, number, number]; container: string }) {
-  const geometry = useMemo(() => {
+  const geometry = wareOnce('dish', () => {
     const R = DISH_R
     return wareGeometry([[0, 0], [R * 0.55, 0], [R * 0.62, 0.012], [R * 0.85, 0.03], [R, 0.05], [R * 0.97, 0.056],
       [R * 0.82, 0.038], [R * 0.55, 0.018], [0, 0.018]], R)
-  }, [])
+  })
   return (
     <group position={position} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
@@ -1828,11 +1836,11 @@ function SideDish({ position, container }: { position: [number, number, number];
 
 /** The tasting bowl (試食碗): a deep round bowl of the same plum-blossom ware, where whatever's cooked by hand to try is put. */
 function TasteBowl({ position, container }: { position: [number, number, number]; container: string }) {
-  const geometry = useMemo(() => {
+  const geometry = wareOnce('bowl', () => {
     const R = BOWL_R
     return wareGeometry([[0, 0], [R * 0.4, 0], [R * 0.46, 0.012], [R * 0.7, 0.04], [R * 0.92, 0.1], [R, 0.15], [R * 0.98, 0.158],
       [R * 0.9, 0.11], [R * 0.66, 0.05], [R * 0.4, 0.024], [0, 0.024]], R)
-  }, [])
+  })
   return (
     <group position={position} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
@@ -2120,12 +2128,12 @@ const stageOf = (r: number) => ROAST_STAGES.find((s) => r < s.until)!
 
 /** Plate the roasted pieces are served onto: a shallow cream dish with a blue rim line and an ink outline. */
 function Plate({ position, container }: { position: [number, number, number]; container: string }) {
-  const geometry = useMemo(() => {
+  const geometry = wareOnce('plate', () => {
     // profile drawn for a 0.5 radius plate, scaled up to PLATE_R
     const k = PLATE_R / 0.5
     return wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.025], [0.47, 0.06], [0.5, 0.075], [0.49, 0.082], [0.44, 0.052],
       [0.3, 0.02], [0, 0.02]] as [number, number][]).map(([x, y]) => [x * k, y] as [number, number]), PLATE_R)
-  }, [])
+  })
   return (
     <group position={position} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
@@ -2575,7 +2583,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         .multiply(new THREE.Quaternion().setFromAxisAngle(UP_AXIS, Math.random() * 6))
       return { id: crumbSeq.current++, geo: bin.chunk(Math.floor(Math.random() * 6), p.len), mat, x: p.x, y: c.y + 0.004, z: p.z, ty: p.y, vy: 0, q, age: 0, m: null } as Crumb
     })
-    crumbs.current = [...crumbs.current, ...made].slice(-40)
+    const all = [...crumbs.current, ...made]
+    for (const k of all.slice(0, Math.max(0, all.length - 40))) k.mat.dispose()
+    crumbs.current = all.slice(-40)
     setCrumbIds(crumbs.current.map((k) => k.id))
     burst(c.x, c.top, c.z)
     restack()
@@ -4549,6 +4559,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
     }
     if (crumbs.current.some((k) => k.age > 43)) {
+      for (const k of crumbs.current) if (k.age > 43) k.mat.dispose()
       crumbs.current = crumbs.current.filter((k) => k.age <= 43)
       setCrumbIds(crumbs.current.map((k) => k.id))
     }

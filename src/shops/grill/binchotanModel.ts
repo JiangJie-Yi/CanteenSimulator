@@ -56,7 +56,8 @@ function kitOf(scene: THREE.Group): BinchotanKit {
     },
     chunk: (k, len) => {
       const c = chunks[((k % 6) + 6) % 6]
-      const L = len === undefined ? c.len : Math.round(len / 0.01) * 0.01
+      // (lengths in 2 cm steps: the pieces share a few dozen shapes all day, not a new one for every break)
+      const L = len === undefined ? c.len : Math.max(0.02, Math.round(len / 0.02) * 0.02)
       return scaled(`c${k % 6}|${L}`, c.g, 1, L / c.len)
     },
     ash: (k) => ashes[((k % 6) + 6) % 6],

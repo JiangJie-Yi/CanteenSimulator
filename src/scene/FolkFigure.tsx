@@ -213,8 +213,17 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       m.material = t
     })
     const get = (n: string) => root.getObjectByName(n) ?? null
-    return { root, body: get('body')!, head: get('head'), handL: get('handL'), handR: get('handR'), face: face as THREE.MeshToonMaterial | null, mats: [...new Set(own.values())] }
+    // (what's theirs alone, to let go when they've gone: their copies, not the ink lines all of them share)
+    const mine = [...new Set([...own.entries()].filter(([src, t]) => t !== src).map(([, t]) => t))]
+    return { root, body: get('body')!, head: get('head'), handL: get('handL'), handR: get('handR'), face: face as THREE.MeshToonMaterial | null, mats: [...new Set(own.values())], mine }
   }, [gltf, spec, pictures])
+  // (a customer gone: their own materials and their face's copy let go (the shapes are the template's, shared, kept))
+  useEffect(() => () => {
+    for (const m of fig.mine) {
+      if (m.name === 'FolkFace') (m as THREE.MeshToonMaterial).map?.dispose()
+      m.dispose()
+    }
+  }, [fig])
 
   const chop = useRef<THREE.Group>(null)
   const bowl = useRef<THREE.Group>(null)

@@ -188,6 +188,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **底座**（GuestBar3D 的 `ShopBase`）：地板下一路實心到底座（`RoomFloorImpl` 的填充，高 `baseDrop`；廚房是高台或下沉都會填，高台時連廚房底下也填），地板邊緣看不到空隙；底座三層（淺色邊板、深色本體、踢腳）。
 - 店面沿吧台縮短了 `BAR_TRIM`（`bar.ts`）；玄關 `GENKAN.along` 往吧台拉長。
 - **效能（改東西時要守的）**：
+  - **執行中新建的 GPU 資源一定要釋放或共用**（three.js 不會自己回收：沒 `dispose()` 的幾何體連同頂點緩衝、VAO 一直留在 GPU）：會一直出現又消失的元件（`WhenHeld` 裡的盤子、碗，每道菜的蒸氣，收銀抽屜的硬幣堆，每位客人）不要在 `useMemo` 裡各自建幾何體：改用模組層級共用（Roasting 的 `wareOnce`），或在 `useEffect` 的清理裡 `dispose()`（`Steam`、`CoinPile`、`FolkFigure` 釋放客人自己的材質與臉部貼圖複本，但不動共用的描邊材質）；同種東西的材質做一次共用（Cash 的 `noteMats`、`coinMats`）；炭的碎塊形狀以 2 公分分級快取（`binchotanModel` 的 `chunk`）。檢查工具：`tests/e2e/_leakfind.mjs`（開店後記錄每個貼圖、幾何體、材質是誰建的，幾分鐘後列出「沒釋放又不在場景裡」且還在增加的，依建立位置分組；在 git 外，複製一份即可用）。
   - **營業時食物模型要回收**：每點一份，`Dish` 就複製一份食物模型（`addCopy`），吃完只是藏起來（`present` 看的是 `copy < 數量`，營業的點單數只增不減）；以前整天下來越堆越多，每格都要算、矩陣都要更新，玩久了越來越卡。現在新點單先找同一種已吃完、清掉的那份（Roasting 的 `recyclable`），重設後當新的上砧板（`revive`），App 的點單只收錢扣庫存、不增加數量（`onOrder(id, guest, reuse)`、`onOrderEntry(key, guest, reuse)`）；模型數停在同時在用的份量。
   - **不要用 transmission（透光）材質**：場景裡只要有一個，three.js 就會每一格把整個房間先畫進一張圖再畫一次（曾經一顆冷凍櫃燈泡就多了 2,500 次繪製，畫面從 60 掉到 19）。玻璃感用 clearcoat、反光點、透明度做。
   - drei 的 `<Environment>`（`IndoorHDRI`）要 `memo`：它的 children 一換就重算整個環境貼圖（6 個方向畫一次房間＋60 次模糊），開店時上層一秒重畫很多次。同理，不常變的大場景元件（`ShopProps`、`DiningWall`、`Decor`、`Bar`、`CookTable`、`BarCounter`、`BarGate`、`DiningFloor`、`RoomFloor`）都包了 `memo`；新加的、會被常重畫的父層包住的大元件也要包。

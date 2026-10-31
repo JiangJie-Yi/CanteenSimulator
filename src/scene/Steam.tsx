@@ -1,4 +1,4 @@
-import { useMemo, useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
 import { snoise as noise } from '@/scene/shaders/noise'
@@ -95,6 +95,8 @@ export function Steam({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, c
     [layers],
   )
 
+  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => () => { for (const m of materials) m.dispose() }, [materials])
   const time = useRef(0)
   const group = useRef<THREE.Group>(null)
   useFrame((_, delta) => {
