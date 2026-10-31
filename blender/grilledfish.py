@@ -728,6 +728,15 @@ _kcol = mix(_kcol, (0.52, 0.31, 0.16), smooth(0.6, 0.9, fbm(1024, 14, 3, 3)) * 0
 _kcol = mix(_kcol, (0.2, 0.1, 0.05), smooth(0.55, 0.85, fbm(1024, 3, 1, 3)) * 0.25)
 M["robuchi"] = pbr("Robuchi", tex=image("T_Robuchi", _kcol), rough=0.28, coat=0.7)
 M["brass"] = pbr("RobuchiBrass", (0.78, 0.58, 0.26), rough=0.3, metal=1.0)
+# (the frame's inner faces, toward the fire: the same keyaki gone dark with the years' heat, blotched with soot and a few scorched patches
+# near black, a little ash caught in the grain)
+_soot = smooth(0.35, 0.8, fbm(1024, 5, 3, 4))
+_char = smooth(0.62, 0.8, fbm(1024, 9, 5, 4))
+_bcol = mix(_kcol, (0.2, 0.1, 0.05), np.full((1024, 1024), 0.35, np.float32))
+_bcol = mix(_bcol, (0.09, 0.05, 0.03), _soot * 0.6)
+_bcol = mix(_bcol, (0.03, 0.02, 0.015), _char * 0.85)
+_bcol = mix(_bcol, (0.45, 0.42, 0.38), (vnoise(1024, 200, 60) > 0.9).astype(np.float32) * _soot * 0.35)
+M["robuchi_burnt"] = pbr("RobuchiBurnt", tex=image("T_RobuchiBurnt", _bcol), rough=0.55, coat=0.3)
 bars = []
 OUT = IRORI_IN + IRORI_W
 for k in range(4):
@@ -763,7 +772,15 @@ for k in range(4):
             al, ac = (c.x, c.y) if along_x else (c.y, c.x)
             l[uvl_].uv = (al * 0.7 + k * 0.31, (ac if top else c.z + ac * 0.3) * 0.7)
     bm_.to_mesh(o.data); bm_.free()
-    bars.append(finish(o, f"Robuchi{k}", M["robuchi"]))
+    o = finish(o, f"Robuchi{k}", M["robuchi"])
+    # (its face toward the fire scorched)
+    o.data.materials.append(M["robuchi_burnt"])
+    for f in o.data.polygons:
+        c = f.center
+        toward = Vector((-c.x, -c.y, 0)).normalized()
+        if abs(f.normal.z) < 0.5 and f.normal.dot(toward) > 0.6:
+            f.material_index = 1
+    bars.append(o)
 # (the brass: an L-shaped plate over each corner, and a fine inlaid line round the inner edge's top)
 # (each corner capped whole, as an irori's 隅金具 is: one cast sleeve of brass, L-shaped in plan, wrapped over the corner's top and down
 # both its outer faces to the foot, a hair proud of the wood all round and its edges eased, so it reads as one piece with no seams;

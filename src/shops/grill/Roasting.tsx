@@ -568,11 +568,13 @@ const RING_CLEAR = 1.15 * PIT_SCALE
 /** the square hearth's frame (炉縁, blender/grilledfish.py IRORI_IN + IRORI_W), its outer half-width as drawn: square to the table, along
  * ALONG and LAY; nothing is set down on it or inside it (sized so the table's front row of plates, bowls and the board stand clear of it) */
 const HEARTH_HALF = (0.8 + 0.13) * PIT_SCALE
+/** the hearth a little longer along the table than across it (an oblong 囲炉裏): its frame and bed stretched this much along */
+const HEARTH_LONG = 1.15
 /** a thing at `at` (from the fire's middle) of reach `r`, or a w x d board turned to the table, moved out of the square hearth the short way */
 function clearOfHearth(at: THREE.Vector3, r: number, w = 0, d = 0) {
   for (let k = 0; k < 2; k++) {
     const u = at.dot(ALONG), v = at.dot(LAY)
-    const hu = HEARTH_HALF + r + w / 2, hv = HEARTH_HALF + r + d / 2
+    const hu = HEARTH_HALF * HEARTH_LONG + r + w / 2, hv = HEARTH_HALF + r + d / 2
     if (Math.abs(u) < hu && Math.abs(v) < hv) {
       if (hu - Math.abs(u) < hv - Math.abs(v)) at.addScaledVector(ALONG, Math.sign(u || 1) * hu - u)
       else at.addScaledVector(LAY, Math.sign(v || 1) * hv - v)
@@ -921,8 +923,8 @@ function CubbyFrame() {
   )
 }
 /**
- * A cupboard's doors (開き戸) in the table's front, of lighter keyaki than the body round them so they read as doors: one leaf hung at
- * its outer end (`hinge` 'low' or 'high' along the table) or a pair hung at both ends meeting in the middle ('both'), a small dark pull
+ * A cupboard's doors (開き戸) in the table's front, frame-and-panel in the body's own cedar a shade lighter: one leaf hung at its outer
+ * end (`hinge` 'low' or 'high' along the table) or a pair hung at both ends meeting in the middle ('both'), a small oval pull let in
  * near each free edge. Shut, they close it off; pointed at they swing open outward so what's in it shows (shutting again a moment after
  * the pointer's gone; kept open while the pointer's inside, so what's there can be taken), and a click keeps them open (another shuts
  * them). `front`: the face they hang on (lay); `back`: how far in the cupboard goes (lay), its inside dark.
@@ -975,21 +977,24 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.075,
         <group key={i} ref={(g) => { doors.current[i] = g }} position={[sd * span / 2, 0, 0.0125]}
           onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.kept = !st.current.kept; tip() }}
           onPointerOver={over} onPointerMove={() => { st.current.hoverUntil = performance.now() + 2500 }} onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
-          <mesh geometry={geo} position={[-sd * (W / 2 + 0.003), bottom + H / 2, 0]}>
-            <meshToonMaterial color="#f2e2cf" map={COOK_TABLE_WOOD} />
-          </mesh>
-          {/* (the pull, a short dark bar standing near the free edge) */}
-          <mesh position={[-sd * (W - 0.07), bottom + H * 0.55, 0.03]}>
-            <boxGeometry args={[0.025, 0.16, 0.025]} />
-            <meshToonMaterial color="#1e140d" />
-          </mesh>
-          {/* (two hinges on the outer edge) */}
-          {[0.18, 0.82].map((f) => (
-            <mesh key={f} position={[-sd * 0.004, bottom + H * f, 0.014]}>
-              <boxGeometry args={[0.02, 0.07, 0.008]} />
-              <meshToonMaterial color="#5a4630" />
+          {/* (a frame-and-panel door in the body's own cedar, a shade lighter: its stiles and rails standing a little proud of the panel
+              set in them, so it reads as joinery of a piece with the table rather than a board stuck on) */}
+          <group position={[-sd * (W / 2 + 0.003), bottom + H / 2, 0]}>
+            <mesh geometry={geo} scale={[1, 1, 0.7]}>
+              <meshToonMaterial color="#efe0cc" map={COOK_PANEL_WOOD} />
             </mesh>
-          ))}
+            {[-1, 1].map((e) => (
+              <group key={e}>
+                <mesh position={[e * (W / 2 - 0.03), 0, 0.006]}><boxGeometry args={[0.06, H, 0.02]} /><meshToonMaterial color="#d9c3a6" map={COOK_PANEL_WOOD} /></mesh>
+                <mesh position={[0, e * (H / 2 - 0.03), 0.006]}><boxGeometry args={[W - 0.12, 0.06, 0.02]} /><meshToonMaterial color="#d9c3a6" map={COOK_PANEL_WOOD} /></mesh>
+              </group>
+            ))}
+          </group>
+          {/* (the pull: a small oval let into the stile near the free edge, dark inside) */}
+          <mesh position={[-sd * (W - 0.032), bottom + H * 0.55, 0.0172]} scale={[0.6, 1, 1]}>
+            <circleGeometry args={[0.022, 20]} />
+            <meshBasicMaterial color="#3a2616" />
+          </mesh>
         </group>
       ))}
     </group>
@@ -2266,6 +2271,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (the stones, set round the square, carried round with it about the fire's middle)
         const turn = Math.atan2(-ALONG.z, ALONG.x)
         if (/^Stone/.test(o.name)) o.position.applyAxisAngle(UP_AXIS, turn)
+        // (the frame and its bed drawn longer along the table: its own x is the table's length once turned)
+        if (/^(FirePit|Robuchi)/.test(o.name)) o.scale.x *= HEARTH_LONG
         o.rotateOnWorldAxis(UP_AXIS, turn)
       }
       // (the salt heaped higher, filling the ring)

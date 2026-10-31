@@ -2612,27 +2612,32 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
           <DrinkBottle id={id} lit />
         </group>
       )))}
-      {/* (and a rank behind each, stood a little further back: a shelf of drinks is never one deep) */}
-      {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
-        <group key={`b${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? 0.012 : -0.012), slotAt(r, k).y, slotAt(r, k).z - 0.13]}>
-          <DrinkBottle id={id} lit />
-        </group>
-      )))}
-      {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
-        <group key={`c${r}-${k}`} position={[slotAt(r, k).x + (k % 2 ? -0.01 : 0.01), slotAt(r, k).y, slotAt(r, k).z - 0.26]}>
-          <DrinkBottle id={id} lit />
-        </group>
-      )))}
+      {/* (and ranks behind each, packed shoulder to shoulder back to the fridge's back wall, as a shop's shelves are: one batch, redrawn
+          as the stock changes; a hair of play in each so the rows aren't ruled) */}
+      <StaticBatch key={`ranks${FRIDGE_STOCK.ver}`}>
+        {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => {
+          if (!id) return null
+          const sp = slotAt(r, k), step = shelves[r].pitch * 1.02
+          const ranks = Math.max(1, Math.floor(RANK_DEPTH / step))
+          return Array.from({ length: ranks }, (_, j) => (
+            <group key={`b${r}-${k}-${j}`} position={[sp.x + (((k * 7 + j * 3) % 5) - 2) * 0.003, sp.y, sp.z - step * (j + 1)]} rotation-y={((k + j) % 3 - 1) * 0.25}>
+              <DrinkBottle id={id} lit />
+            </group>
+          ))
+        }))}
+      </StaticBatch>
       {/* (what's been taken out, stood on the floor before the fridge) */}
       {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
         <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
           onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject); setTip({ title: drinkName(o.id), hint: '拖曳移動，放回櫃子或遞給客人' }) }} onPointerOut={(ev) => { document.body.style.cursor = ''; glowLeave(ev.eventObject); setTip(null) }}>
-          <DrinkBottle id={o.id} />
+          <DrinkBottle id={o.id} wet />
         </group>
       ))}
     </group>
   )
 }
+/** how far back behind the front rank the shelves are filled */
+const RANK_DEPTH = 0.42
 /** a drink's name, for its tag */
 const drinkName = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? '飲料'
 /** a bottle of one of the drinks, standing (its foot at the origin): its glass or can, its label printed round it,
@@ -2643,8 +2648,9 @@ const drinkName = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? '飲料
 const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.2, sake: 1.12, oolong: 1.26, ramune: 1.06, beerCan: 1.36, highball: 1.36, coffee: 1.2, greenTea: 1.3,
   cola: 1.3, yakult: 1.12, sports: 1.3, milk: 1.1, chuhai: 1.36 }
 /** (`lit`: standing in a fridge, in its cove lights' wash: lifted by a soft glow of its own, which can't leak out through the cabinet as a lamp's light would) */
-export function DrinkBottle({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
-  return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} lit={lit} /></group>
+/** (`wet`: out of the fridge, misted over with beads of condensation, a few run down) */
+export function DrinkBottle({ id, lit = false, wet = false }: { id: DrinkId; lit?: boolean; wet?: boolean }) {
+  return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} lit={lit} wet={wet} /></group>
 }
 /** each drink's look with a gentle glow, for those standing in a fridge */
 const LIT_LOOK = new Map<DrinkId, { glass: THREE.Material; label: THREE.Material }>()
@@ -2664,7 +2670,7 @@ function litLook(id: DrinkId) {
   }
   return l
 }
-function DrinkBottleRaw({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
+function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: boolean; wet?: boolean }) {
   const d = DRINKS.find((x) => x.id === id)!
   const look = lit ? litLook(id) : BOTTLE_LOOK[id]
   // (turned so its label's name faces +z)
@@ -2673,6 +2679,7 @@ function DrinkBottleRaw({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
     <group rotation-y={-Math.PI / 2}>
       <mesh geometry={BOTTLE_GEO.can} material={look.glass} />
       <mesh geometry={BOTTLE_GEO.canLabel} position-y={0.046} material={look.label} />
+      {wet && <mesh geometry={BOTTLE_GEO.canLabel} position-y={0.046} material={DEW} scale={[1.012, 1, 1.012]} />}
       <mesh geometry={BOTTLE_GEO.canTop} position-y={0.0905} material={look.glass} />
       <mesh geometry={BOTTLE_GEO.canRim} position-y={0.09}><meshToonMaterial color="#aeb3b9" /></mesh>
       <mesh geometry={BOTTLE_GEO.canTab} position={[0, 0.0928, 0.002]}><meshToonMaterial color="#d8dce0" /></mesh>
@@ -2682,6 +2689,7 @@ function DrinkBottleRaw({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
     // the little cultured milk bottle: waisted, a red foil top
     <group rotation-y={-Math.PI / 2}>
       <mesh geometry={BOTTLE_GEO.small} position-y={0.036} material={look.label} />
+      {wet && <mesh geometry={BOTTLE_GEO.small} position-y={0.036} material={DEW} scale={[1.02, 1, 1.02]} />}
       <mesh geometry={BOTTLE_GEO.smallTop} position-y={0.074}><meshToonMaterial color={d.cap} /></mesh>
     </group>
   )
@@ -2694,7 +2702,7 @@ function DrinkBottleRaw({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
       {/* (the drink inside, seen through the glass or plastic: made before the bottle, so at the same depth it is drawn first and the bottle over it) */}
       <mesh geometry={BOTTLE_DRINK[drinkKey]} material={DRINK_FILL[id]} />
       <mesh geometry={shaped.body} material={look.glass} />
-      {lit && <mesh geometry={shaped.body} material={DEW} scale={[1.004, 1, 1.004]} />}
+      {wet && <mesh geometry={shaped.body} material={DEW} scale={[1.006, 1, 1.006]} />}
       <mesh geometry={shaped.label} position-y={shaped.labelY} material={look.label} />
       <mesh geometry={shaped.cap} position-y={shaped.capY}><meshToonMaterial color={d.cap} /></mesh>
       {/* (the foil round the beer's neck, the sake's paper collar) */}
@@ -2707,7 +2715,7 @@ function DrinkBottleRaw({ id, lit = false }: { id: DrinkId; lit?: boolean }) {
       <mesh geometry={BOTTLE_GEO.ramuneDrink} material={DRINK_FILL[id]} />
       <mesh geometry={BOTTLE_GEO.marble} position-y={0.1402} material={MARBLE} />
       <mesh geometry={BOTTLE_GEO.ramune} material={look.glass} />
-      {lit && <mesh geometry={BOTTLE_GEO.ramune} material={DEW} scale={[1.004, 1, 1.004]} />}
+      {wet && <mesh geometry={BOTTLE_GEO.ramune} material={DEW} scale={[1.006, 1, 1.006]} />}
       <mesh geometry={BOTTLE_GEO.ramuneLabel} position-y={0.055} material={look.label} />
       <mesh geometry={BOTTLE_GEO.ramuneCap} position-y={0.182}><meshToonMaterial color={d.cap} /></mesh>
     </group>

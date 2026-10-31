@@ -2192,7 +2192,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const at = st.plate.clone().addScaledVector(c.along, 0.17).addScaledVector(c.lay, 0.1).setY(top)
         return (
           <group key={`drink${s.id}`} position={at}>
-            <DrinkBottle id={d.id} />
+            <DrinkBottle id={d.id} wet />
           </group>
         )
       })}
@@ -2284,5 +2284,5 @@ function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () =
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
   return <Person id={s.id} eating={eating()} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined}
-    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} /> : undefined} />
+    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} />
 }
