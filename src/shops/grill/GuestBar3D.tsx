@@ -408,17 +408,14 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <group position-x={DX}>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
-      <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_BIG + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
+      <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
         <group userData={{ fade: true }}>
-          {[-1, 1].map((sd) => (
-            <mesh key={sd} position={[sd * (W / 2) * NOREN_BIG, H - 0.05 + NOREN_CORD + NOREN_CORD / 2, NZ]}><cylinderGeometry args={[0.004, 0.004, NOREN_CORD, 4]} /><meshBasicMaterial color="#b89a6a" /></mesh>
-          ))}
-          {/* (the rod and the panels hung that much higher on the shorter cords; the cloth a size bigger than the doorway, wider and longer) */}
+          {/* (the pole laid on the lintel's brackets, no cords; the cloth longer than it was, as wide as the doorway so it stays clear of the walls) */}
           <group position-y={NOREN_CORD}>
-          <group position={[0, H - 0.05, NZ]} scale={[NOREN_BIG, NOREN_BIG * 1.05, 1]}><NorenModel tex={tex} panels={panels} pole="wood" /></group>
+          <group position={[0, H - 0.05, NZ]} scale={[NOREN_WIDE, NOREN_BIG * 1.05, 1]}><NorenModel tex={tex} panels={panels} pole="wood" /></group>
           </group>
         </group>
       </Movable>
@@ -496,8 +493,9 @@ export function StaffNoren({ mark }: { mark: string }) {
   )
 }
 
-/** how much bigger than the doorway the way in's noren is drawn */
+/** how much longer the way in's noren is drawn than it was made, and how much wider (kept to the doorway's width) */
 const NOREN_BIG = 1.3
+const NOREN_WIDE = 1.0
 /** how long the noren's two cords are, from the beam down to its rod (the rod hung 0.18 higher than it was) */
 const NOREN_CORD = 0.18
 

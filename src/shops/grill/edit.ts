@@ -276,6 +276,15 @@ export const stepScale = (v: V3, dir: 1 | -1, axis: 0 | 1 | 2 | null): V3 =>
 const KEY_GZ = 'jgs-edit-gizmo-size'
 /** how tall the panel's been dragged to */
 const KEY_PH = 'jgs-edit-panel-h'
+/** the backdrop behind the shop (index.css's --scene-bg): its colour, chosen in the panel, kept in the browser */
+const KEY_BG = 'jgs-scene-bg'
+export const BACKDROP_DEFAULT = '#0d1c33'
+const backdropColor = () => { try { return localStorage.getItem(KEY_BG) ?? BACKDROP_DEFAULT } catch { return BACKDROP_DEFAULT } }
+export function setBackdrop(c: string) {
+  if (typeof document !== 'undefined') document.documentElement.style.setProperty('--scene-bg', c)
+  try { if (c === BACKDROP_DEFAULT) localStorage.removeItem(KEY_BG); else localStorage.setItem(KEY_BG, c) } catch { /* (not kept) */ }
+}
+if (typeof document !== 'undefined') document.documentElement.style.setProperty('--scene-bg', backdropColor())
 /** where the panel was dragged to (its left edge and its bottom's distance from the window's), kept for next time */
 const KEY_PPOS = 'jgs-edit-panel-pos'
 export const GIZMO = { size: (() => { try { return Number(localStorage.getItem(KEY_GZ)) || 0.6 } catch { return 0.6 } })() }
@@ -545,6 +554,9 @@ const PANEL_CSS = `
 .be-foot button:hover { background:#5c5c5c }
 .be-foot .warn { background:#6b3030 } .be-foot .warn:hover { background:#853a3a }
 .be-foot .ok { background:#4772b3; color:#fff; font-weight:600; margin-left:auto } .be-foot .ok:hover { background:#5a87cc }
+.be-color { width:44px; height:24px; padding:0; border:1px solid #555; background:#2a2a2a; vertical-align:middle; margin-right:8px; cursor:pointer; }
+.be-btn { background:#3d3d3d; color:#d6d6d6; border:1px solid #555; border-radius:3px; padding:3px 10px; font-size:12px; cursor:pointer; }
+.be-btn:hover { background:#4a4a4a; }
 `
 const TOOL_ICONS: Record<Tool, string> = {
   select: '<svg viewBox="0 0 24 24"><path d="M6 3l12 9-5.5 1.2L16 20l-2.6 1.2-3.2-6.9L6 18z"/></svg>',
@@ -646,6 +658,15 @@ function panel() {
       return sc
     }
     // Outliner: every piece that can be taken hold of, a search above, the chosen one lit
+    // (the backdrop behind the shop: its colour picked here, the glow in its middle and the dark at its edges following it; kept in the browser)
+    const bgRow = section(T().backdrop)
+    const pick = h('input', 'be-color') as HTMLInputElement
+    pick.type = 'color'
+    pick.value = backdropColor()
+    pick.oninput = () => setBackdrop(pick.value)
+    const bgReset = h('button', 'be-btn', T().backdropReset) as HTMLButtonElement
+    bgReset.onclick = () => { setBackdrop(BACKDROP_DEFAULT); pick.value = BACKDROP_DEFAULT }
+    bgRow.append(pick, bgReset)
     const out = section(T().outliner)
     summary = h('div', 'be-sum') as HTMLDivElement
     out.appendChild(summary)

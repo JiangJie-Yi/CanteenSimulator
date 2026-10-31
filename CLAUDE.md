@@ -149,8 +149,9 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **廁所**（`shops/grill/Restroom.tsx`，規則在 `game/restroom.ts`，BDD `restroom`）：每間有清潔度與衛生紙（`TOILETS[who].room`）；客人用一次變髒一點、用掉一捲的 1/5，髒（`DIRTY_AT`）或沒紙時會抱怨，之後吃的東西評分扣分（`WC_GRUMBLE`，Roasting 讀）；開店前店員會打掃，衛生紙不會自己補。點馬桶：不乾淨就用馬桶刷打掃（刷子從角落的筒子飛過去刷、刷完發亮），乾淨就沖水（水漩下去、水箱上的洗手龍頭流水）；點衛生紙架換新捲（捲越用越細，新捲的紙頭摺成三角）；牆上有免治遙控器（點一下溫水噴一下）、沖水鈕、音姬（流水與鳥叫，女廁有人進去會自己播）。一間一次只進一位（有人在去、在裡面、在出來時，下一位等）；有人在裡面時門關著、門上小窗顯示「使用中」，點門會敲門；沒人時「空き」。進門時馬桶蓋自動掀起，燈是感應式（有人或門開才亮）；髒了地上有污漬、馬桶裡有黃圈，很髒有蒼蠅。聲音都是 WebAudio 即時合成（`restroomSound.ts`）。
 - **供花**（神棚兩側花瓶，點一下換花，存在 localStorage `jgs-shrine-flowers-1`）：三組花各有加持（`game/shrineFlowers.ts`，BDD `shrine-flowers`）：榊與小菊＝平安（客人耐心較長）、白金菊（`shrinevase.py` 變體 0：輪菊、糸菊、小菊）＝金運（更常拿飲料）、紅粉花（變體 1：芍藥、紅椿、桔梗、霞草）＝良緣（情侶較常來）；兩瓶同一種加倍。神棚門聲（`shrineSound.ts`）是黏滑摩擦合成的吱呀聲＋檜木共鳴＋門扣與門片碰撞聲。
 - **炭火的聲音**（`shops/grill/fireAmbience.ts`，WebAudio 即時合成）：炭的劈啪聲隨火力、烤物的滋滋聲隨火上的數量（`game/fireSound.ts`，BDD `fire-sound`）；鏡頭離火越遠越小聲；營業時另有客人的人聲（`crowdAmbience`，隨在座人數 `murmur`）；玩家第一次點擊後才開始（瀏覽器規定）。
-- **門簾**：入口的是米白棉布、深褐菱形家紋（中間「聞」）與一行 KIKUNO · YAKIZAKANA（`GuestBar3D.tsx` 的 `crestNorenTexture`，左右翻轉畫，從店內讀起來是正的），原木橫桿（`NorenModel` 的 `pole="wood"`），比門寬大 `NOREN_BIG`；舊的藍色「烤魚」門簾掛在員工出入口（`StaffNoren`：深色門洞＋木框，位置 `bar.ts` 的 `STAFF_DOOR`，地墊與員工下班的出口跟著它）。
-- 場景外的背景是深藍 `#0d1c33`，白天晚上一樣（`index.css` 的 `.canvas-layer`），畫面四周有暗角（`.canvas-layer::after`，夜晚較深）；整間店底下有一片柔和的落地陰影（GuestBar3D 的 `GROUND_SHADOW`）。吊燈、燈串的光暈與桌面光圈白天淡、夜晚亮且多一圈大光暈（DiningRoom 的 `nightGlow`，跟著 data-theme）。
+- 太陽光（App 的 directionalLight）會投影，影子涵蓋整間店；陰影圖每 3 格重畫一次（`ShadowPacer`）。
+- **門簾**：入口的是米白棉布、深褐菱形家紋（中間「聞」）與一行 KIKUNO · YAKIZAKANA（`GuestBar3D.tsx` 的 `crestNorenTexture`，左右翻轉畫，從店內讀起來是正的），原木橫桿（`NorenModel` 的 `pole="wood"`，沒有吊線），寬同門口、加長 `NOREN_BIG`；舊的藍色「烤魚」門簾掛在員工出入口（`StaffNoren`：深色門洞＋木框，位置 `bar.ts` 的 `STAFF_DOOR`，地墊與員工下班的出口跟著它）。
+- 場景外的背景是深藍 `#0d1c33`（CSS 變數 `--scene-bg`，開發者面板「背景色」可改，存 localStorage `jgs-scene-bg`，`edit.ts` 的 `setBackdrop`），白天晚上一樣，中心較亮往外變暗的放射漸層（`index.css` 的 `.canvas-layer`），畫面四周有暗角（`.canvas-layer::after`，夜晚較深）；整間店底下有一片柔和的落地陰影（GuestBar3D 的 `GROUND_SHADOW`）。吊燈、燈串的光暈與桌面光圈白天淡、夜晚亮且多一圈大光暈（DiningRoom 的 `nightGlow`，跟著 data-theme）。
 - 開店（載入）時的起始視角是 1 自由視角（總覽，App 的 `view` 初始值 `free`）；e2e 會先切到 2 火烤灶台再補貨。
 - 供清酒（點門口神棚前的酒瓶）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`；名稱沿用舊的點香）。
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。

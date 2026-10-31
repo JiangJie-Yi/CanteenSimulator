@@ -6640,10 +6640,13 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .food-art-tile { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; }
 .food-art-tile img { width: 92%; height: 92%; object-fit: contain; }
 
-/* ---- behind the shop, where its open sides look out: one flat deep navy, the same by day and by night ---- */
+/* ---- behind the shop, where its open sides look out: deep navy (--scene-bg, set in the developer panel), the same by day and by night,
+   lit softly from the middle where the shop stands and falling away darker to the edges, as a stage's backdrop ---- */
+:root { --scene-bg: #0d1c33; }
 .canvas-layer,
 :root[data-theme='dark'] .canvas-layer {
-  background: #0d1c33;
+  background:
+    radial-gradient(ellipse 62% 58% at 50% 48%, color-mix(in srgb, var(--scene-bg), #ffffff 16%) 0%, var(--scene-bg) 58%, color-mix(in srgb, var(--scene-bg), #000000 50%) 100%);
 }
 /* (and the picture darkening toward its edges, a vignette, so the room in the middle holds the eye; deeper by night) */
 .canvas-layer::after {

@@ -6,7 +6,7 @@ export const EDIT_TEXT = {
   zh: {
     title: '開發者模式',
     keys: 'G／Esc 離開　Ctrl+Z / Y',
-    minimize: '縮小面板', close: '關閉（離開開發者模式）', sceneHead: '場景', cameraHead: '攝影機',
+    minimize: '縮小面板', close: '關閉（離開開發者模式）', sceneHead: '場景', cameraHead: '攝影機', backdrop: '背景色', backdropReset: '還原',
     tools: { select: '選取 (Q)', move: '位移 (W，再按一次切換物件／世界座標)', rotate: '旋轉 (E)', scale: '縮放 (R)' },
     spaceLocalShort: '物', spaceWorldShort: '世',
     spaceLocal: '物件座標：軸跟著擺設自己的方向（點一下或再按一次 W／E／R 改世界座標）', spaceWorld: '世界座標：軸是整個場景的 X、Y、Z（點一下或再按一次 W／E／R 改物件座標）',
@@ -56,7 +56,7 @@ export const EDIT_TEXT = {
   ja: {
     title: '開発者モード',
     keys: 'G／Esc で終了　Ctrl+Z / Y',
-    minimize: 'パネルを畳む', close: '閉じる（開発者モード終了）', sceneHead: 'シーン', cameraHead: 'カメラ',
+    minimize: 'パネルを畳む', close: '閉じる（開発者モード終了）', sceneHead: 'シーン', cameraHead: 'カメラ', backdrop: '背景色', backdropReset: '元に戻す',
     tools: { select: '選択 (Q)', move: '移動 (W、もう一度でローカル／ワールド切替)', rotate: '回転 (E)', scale: '拡大縮小 (R)' },
     spaceLocalShort: 'ロ', spaceWorldShort: 'ワ',
     spaceLocal: 'ローカル座標：軸は物の向き（クリックか W／E／R をもう一度でワールド座標）', spaceWorld: 'ワールド座標：軸はシーン全体の X・Y・Z（クリックか W／E／R をもう一度でローカル座標）',
@@ -106,7 +106,7 @@ export const EDIT_TEXT = {
   en: {
     title: 'Developer mode',
     keys: 'G / Esc to leave   Ctrl+Z / Y',
-    minimize: 'Fold the panel', close: 'Close (leave developer mode)', sceneHead: 'Scene', cameraHead: 'Cameras',
+    minimize: 'Fold the panel', close: 'Close (leave developer mode)', sceneHead: 'Scene', cameraHead: 'Cameras', backdrop: 'Backdrop', backdropReset: 'Reset',
     tools: { select: 'Select (Q)', move: 'Move (W, again to switch object / world)', rotate: 'Rotate (E)', scale: 'Scale (R)' },
     spaceLocalShort: 'Obj', spaceWorldShort: 'Wld',
     spaceLocal: 'Object space: the axes follow the piece (click, or W / E / R again, for world)', spaceWorld: 'World space: the scene’s own X, Y, Z (click, or W / E / R again, for object)',

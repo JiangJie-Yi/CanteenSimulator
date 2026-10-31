@@ -200,6 +200,14 @@ function usePhone() {
   return phone
 }
 
+/** the shadow maps drawn again only every third frame: the sun's covers the whole shop, and redrawn every frame it would cost as much as the room */
+function ShadowPacer() {
+  const gl = useThree((st) => st.gl)
+  const n = useRef(0)
+  useEffect(() => { gl.shadowMap.autoUpdate = false; gl.shadowMap.needsUpdate = true; return () => { gl.shadowMap.autoUpdate = true } }, [gl])
+  useFrame(() => { if (++n.current % 3 === 0) gl.shadowMap.needsUpdate = true })
+  return null
+}
 function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
@@ -733,7 +741,12 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
 
   return (
     <>
-      <directionalLight position={[3, 5, 2]} intensity={look.sunIntensity} color={look.sun} />
+      {/* (the sun casts the room's shadows, the figures' and the furniture's on the floor: from high over the open side, its shadow camera
+          spanning the whole shop; redrawn every third frame (ShadowPacer), the shadows moving a little behind what casts them) */}
+      <directionalLight position={[9, 16, 7]} intensity={look.sunIntensity} color={look.sun} castShadow={QUALITY.shadows}
+        shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04}
+        shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
+      <ShadowPacer />
       <hemisphereLight args={[look.sky, look.ground, look.hemi]} />
       <IndoorHDRI night={theme === 'dark'} intensity={theme === 'dark' ? 0.3 + look.hemi * 0.4 : 0.5 + look.hemi * 0.5} />
       <spotLight
