@@ -2481,6 +2481,7 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
       <primitive object={body} />
       {/* the cove lights (槽燈): a narrow slot let into each inner side, a thin line of white light deep in it, and
           the light washing softly along the wall, shelf and drinks beside it (up each side only) */}
+      <StaticBatch>
       {[-1, 1].map((sd) => (
         <group key={sd} position={[sd * (W / 2 - 0.075), H / 2 - 0.02, D / 2 - 0.1]}>
           <mesh><boxGeometry args={[0.03, H - 0.46, 0.03]} /><meshBasicMaterial color="#202226" /></mesh>
@@ -2489,8 +2490,11 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
             <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.75} side={THREE.DoubleSide} /></mesh>
         </group>
       ))}
+      </StaticBatch>
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
       <group position={[0, H + 0.03, D / 2 - 0.1]} rotation-x={-0.12}>
+        {/* (its box and its twenty-one bulbs drawn as a few: they never move) */}
+        <StaticBatch>
         <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
         <mesh position={[0, 0.1, 0.0115]}><planeGeometry args={[W * 0.86, 0.17]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGNS[n]} toneMapped={false} /></mesh>
         {/* (a strip of light round the sign's edge: little bulbs in a row, warm white, and a glowing bar along its foot) */}
@@ -2500,6 +2504,7 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
         {[-1, 1].map((sd) => Array.from({ length: 4 }, (_, k) => (
           <mesh key={`s${sd}${k}`} position={[sd * W * 0.45, 0.04 + k * 0.045, 0.012]}><sphereGeometry args={[0.009, 8, 6]} /><meshBasicMaterial color="#ffe9a8" toneMapped={false} /></mesh>
         )))}
+        </StaticBatch>
         <sprite position={[0, 0.1, 0.1]} scale={[W * 1.1, 0.4, 1]}><spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.22} /></sprite>
       </group>
     </group>
