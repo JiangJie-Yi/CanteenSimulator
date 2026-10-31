@@ -1,12 +1,12 @@
-"""The emergency exit sign (誘導灯) on the wall by the way out: a slim light box of white-enamelled steel, its corners rounded, the lit face
-let into its front (the game paints the face: the running figure, the door, the arrow and the words, in the language on screen), held off the
-wall on a little bracket at each end.
+"""The emergency exit sign (誘導灯) on the wall by the way out, made as the edge-lit kind: a slim housing of brushed aluminium along the top,
+fixed to the wall, its front sloping back to a lip; and hanging from a slot along its underside a thin pane of acrylic, lit from the edge,
+its face printed (the game paints the face: EXIT, the running figure leaving by a doorway, the words in the language on screen).
 
-- "ExitBox": the housing, 36 x 13 cm, 4.5 deep, its front edge a little chamfered round the face.
-- "ExitFace": the face, a plane just inside the front, its UVs the whole face (0..1), facing +z.
-- "ExitBracket": the two brackets from the box's back to the wall (the wall at z = -0.04).
+- "ExitBox": the housing, 44 cm along, 6 tall, 7 deep; its end caps a little darker.
+- "ExitFace": the pane's front, its UVs the whole face (0..1), facing +z; "ExitBack": its back, the same picture (u turned, so it reads
+  right from behind too); "ExitPane": the pane's clear edges.
 
-The sign faces +z, its back toward the wall (-z), its middle at the origin.
+The sign faces +z, its back toward the wall (-z), the middle of the pane at the origin.
 
 Run:
     blender -b --factory-startup --python blender/exitsign.py -- <project path> [preview.png]
@@ -25,7 +25,9 @@ from common import *  # noqa: E402,F403
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREVIEW = argv[1] if len(argv) > 1 else None
-W, H, D = 0.36, 0.13, 0.045
+# (the pane: its width and height, its thickness; the housing over it)
+PW, PH, PT = 0.42, 0.155, 0.006
+HW, HH, HD = 0.44, 0.06, 0.07
 
 
 def P(x, y, z):
@@ -33,94 +35,91 @@ def P(x, y, z):
     return Vector((x, -z, y))
 
 
-def rounded_box(name, w, h, d, r, bevel_segments=3):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, 0, 0))
-    o = bpy.context.view_layer.objects.active
-    o.name = name
-    o.scale = (w, d, h)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    mod = o.modifiers.new("round", "BEVEL")
-    mod.width = r
-    mod.segments = bevel_segments
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    for f in o.data.polygons:
-        f.use_smooth = True
-    return o
+def quad(bm, uvl, pts, uvs):
+    f = bm.faces.new([bm.verts.new(P(*p)) for p in pts])
+    for lp, uv in zip(f.loops, uvs):
+        lp[uvl].uv = uv
+    return f
 
 
-def face(name, w, h, z):
+def mesh_from(name, build, smooth=False):
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    vs = [bm.verts.new(P(x, y, z)) for (x, y) in ((-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2))]
-    f = bm.faces.new(vs)
-    for lp, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
-        lp[uvl].uv = uv
+    build(bm, uvl)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
-    # (facing +z: the game's front)
-    if o.data.polygons[0].normal.y > 0:
-        o.data.flip_normals()
+    for p in o.data.polygons:
+        p.use_smooth = smooth
     return o
 
 
-def bracket(name, x):
-    """an L of flat steel: down the wall, then out under the box"""
-    parts = []
-    for (cx, cy, cz, sx, sy, sz) in ((x, -H / 2 - 0.004, -D / 2 - 0.02, 0.022, 0.006, 0.04), (x, -H / 2 + 0.01, -D / 2 - 0.038, 0.022, 0.03, 0.004)):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=P(cx, cy, cz))
-        o = bpy.context.view_layer.objects.active
-        o.scale = (sx, sz, sy)
-        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        parts.append(o)
-    bpy.ops.object.select_all(action="DESELECT")
-    for o in parts:
-        o.select_set(True)
-    bpy.context.view_layer.objects.active = parts[0]
-    bpy.ops.object.join()
-    o = bpy.context.view_layer.objects.active
-    o.name = name
-    return o
+def housing(bm, uvl):
+    """the aluminium extrusion along x: its section (y, z) swept from end to end, the ends capped. Section: the wall side straight up, the
+    top flat, the front sloping down and back to a lip, the underside with the slot the pane hangs in"""
+    y0 = PH / 2 + 0.004
+    sec = [(y0, -HD / 2), (y0 + HH, -HD / 2), (y0 + HH, HD / 2 - 0.022), (y0 + HH * 0.55, HD / 2), (y0 + 0.008, HD / 2 - 0.004), (y0, HD / 2 - 0.012)]
+    n = len(sec)
+    ends = []
+    for x in (-HW / 2, HW / 2):
+        ends.append([bm.verts.new(P(x, y, z)) for (y, z) in sec])
+    run = 0.0
+    for k in range(n):
+        k2 = (k + 1) % n
+        (ya, za), (yb, zb) = sec[k], sec[k2]
+        L = math.hypot(yb - ya, zb - za)
+        f = bm.faces.new((ends[0][k], ends[0][k2], ends[1][k2], ends[1][k]))
+        for lp, uv in zip(f.loops, ((0, run), (0, run + L), (1, run + L), (1, run))):
+            lp[uvl].uv = (uv[0] * 4, uv[1] * 8)
+        run += L
+    for e, rev in ((0, True), (1, False)):
+        f = bm.faces.new(list(reversed(ends[e])) if rev else ends[e])
+        for lp in f.loops:
+            lp[uvl].uv = (0.5, 0.5)
 
 
-def fin(o, mat, parts):
-    o.data.materials.clear()
-    o.data.materials.append(mat)
-    parts.append(o)
-    return o
+def pane_front(bm, uvl):
+    quad(bm, uvl, [(-PW / 2, -PH / 2, PT / 2), (PW / 2, -PH / 2, PT / 2), (PW / 2, PH / 2, PT / 2), (-PW / 2, PH / 2, PT / 2)],
+         [(0, 0), (1, 0), (1, 1), (0, 1)])
+
+
+def pane_back(bm, uvl):
+    # (seen from behind it reads the right way round: its u runs the other way)
+    quad(bm, uvl, [(PW / 2, -PH / 2, -PT / 2), (-PW / 2, -PH / 2, -PT / 2), (-PW / 2, PH / 2, -PT / 2), (PW / 2, PH / 2, -PT / 2)],
+         [(0, 0), (1, 0), (1, 1), (0, 1)])
+
+
+def pane_edges(bm, uvl):
+    c = [(-PW / 2, -PH / 2), (PW / 2, -PH / 2), (PW / 2, PH / 2), (-PW / 2, PH / 2)]
+    for k in range(4):
+        (xa, ya), (xb, yb) = c[k], c[(k + 1) % 4]
+        quad(bm, uvl, [(xa, ya, -PT / 2), (xb, yb, -PT / 2), (xb, yb, PT / 2), (xa, ya, PT / 2)], [(0, 0), (1, 0), (1, 1), (0, 1)])
 
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 M = {
-    "box": pbr("ExitEnamel", (0.86, 0.87, 0.86), rough=0.35, coat=0.3),
+    "alu": pbr("ExitAluminium", (0.78, 0.79, 0.8), rough=0.32, metal=1.0),
     "face": pbr("ExitFaceLit", (0.05, 0.55, 0.25), emit=(0.05, 0.55, 0.25), emit_strength=2.0),
-    "steel": pbr("ExitSteel", (0.55, 0.56, 0.57), rough=0.4, metal=0.8),
+    "edge": pbr("ExitPaneEdge", (0.55, 0.9, 0.7), emit=(0.4, 0.9, 0.6), emit_strength=1.0),
 }
 parts = []
-fin(rounded_box("ExitBox", W, H, D, 0.012), M["box"], parts)
-fin(face("ExitFace", W - 0.03, H - 0.026, D / 2 + 0.0012), M["face"], parts)
-b1 = bracket("ExitBracketL", -W / 2 + 0.05)
-b2 = bracket("ExitBracketR", W / 2 - 0.05)
-bpy.ops.object.select_all(action="DESELECT")
-b1.select_set(True)
-b2.select_set(True)
-bpy.context.view_layer.objects.active = b1
-bpy.ops.object.join()
-b1.name = "ExitBracket"
-fin(b1, M["steel"], parts)
+for name, build, mat in (("ExitBox", housing, "alu"), ("ExitFace", pane_front, "face"), ("ExitBack", pane_back, "face"), ("ExitPane", pane_edges, "edge")):
+    o = mesh_from(name, build)
+    o.data.materials.append(M[mat])
+    parts.append(o)
 root = bpy.data.objects.new("ExitSign", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
     o.parent = root
 print("EXIT_TRIS", sum(len(p.vertices) - 2 for o in parts for p in o.data.polygons))
 if PREVIEW:
-    target = P(0, 0, 0)
+    target = P(0, 0.02, 0)
     cam = bpy.data.objects.new("PreviewCam", bpy.data.cameras.new("PreviewCam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = P(0.25, 0.12, 0.55)
+    cam.location = P(0.18, 0.08, 0.7)
     cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
     bpy.context.scene.camera = cam
     lt = bpy.data.objects.new("Key", bpy.data.lights.new("Key", "SUN"))

@@ -3583,75 +3583,81 @@ function useDocLang() {
   }, [])
   return lang
 }
-/** the exit sign's face: green, lit; a doorway and the running figure making for it, the arrow toward it, the words in the language on screen */
+/** the exit sign's face, as Taiwan's edge-lit ones: green, lit; EXIT spaced out on the left, in the middle a white doorway with the running
+ * figure leaving by it, on the right the words in the language on screen */
 const exitFace = (lang: string) => {
-  const words = lang === 'ja' ? '非常口' : lang === 'en' ? 'EXIT' : '緊急出口'
-  return canvasTex(768, 280, (g) => {
-    const grad = g.createLinearGradient(0, 0, 0, 280)
-    grad.addColorStop(0, '#1aa552'); grad.addColorStop(1, '#0b7f39')
-    g.fillStyle = grad; g.fillRect(0, 0, 768, 280)
-    g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 6; g.strokeRect(14, 14, 740, 252)
-    // (all of it running one way, toward the way out: the figure making for an open doorway ahead of it, then the arrow on past it)
+  const words = lang === 'ja' ? '非常口' : lang === 'en' ? 'WAY OUT' : '緊急出口'
+  return canvasTex(1024, 378, (g) => {
+    const grad = g.createLinearGradient(0, 0, 0, 378)
+    grad.addColorStop(0, '#22b25f'); grad.addColorStop(1, '#13914a')
+    g.fillStyle = grad; g.fillRect(0, 0, 1024, 378)
+    // (the light from the pane's top edge, a little brighter there)
+    const edge = g.createLinearGradient(0, 0, 0, 60)
+    edge.addColorStop(0, 'rgba(255,255,255,0.22)'); edge.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = edge; g.fillRect(0, 0, 1024, 60)
+    g.fillStyle = '#ffffff'; g.strokeStyle = '#ffffff'; g.lineCap = 'round'; g.lineJoin = 'round'
+    g.textBaseline = 'middle'
+    // (EXIT, wide and spaced)
+    g.font = '600 92px "Arial", "Helvetica", sans-serif'
+    g.textAlign = 'center'
+    'EXIT'.split('').forEach((ch, k) => g.fillText(ch, 70 + k * 62, 214))
+    // (the doorway: a white frame, open, the green showing through it)
+    g.fillRect(452, 70, 150, 236)
+    g.fillStyle = '#16a052'; g.fillRect(470, 88, 114, 218)
+    // (the figure, white, running out through it to the right: head, a leaning trunk, its arms and legs in long strides)
     g.fillStyle = '#ffffff'
-    g.fillRect(196, 44, 14, 192); g.fillRect(196, 44, 118, 14); g.fillRect(300, 44, 14, 192)
-    g.fillStyle = '#0d8a40'; g.fillRect(210, 58, 90, 178)
-    // (the running figure, white: head, a leaning trunk, arms and legs in long strides, its leading hand reaching into the doorway)
-    g.strokeStyle = '#ffffff'; g.fillStyle = '#ffffff'; g.lineCap = 'round'; g.lineJoin = 'round'
-    g.beginPath(); g.arc(150, 82, 19, 0, Math.PI * 2); g.fill()
-    g.lineWidth = 26
-    g.beginPath(); g.moveTo(134, 112); g.lineTo(114, 168); g.stroke()
-    g.lineWidth = 18
-    g.beginPath(); g.moveTo(131, 120); g.lineTo(166, 140); g.lineTo(206, 126); g.stroke()
-    g.beginPath(); g.moveTo(131, 120); g.lineTo(104, 128); g.lineTo(86, 154); g.stroke()
-    g.beginPath(); g.moveTo(114, 168); g.lineTo(144, 196); g.lineTo(136, 236); g.stroke()
-    g.beginPath(); g.moveTo(114, 168); g.lineTo(86, 196); g.lineTo(50, 200); g.stroke()
-    // (the arrow on toward the door)
-    g.beginPath(); g.moveTo(340, 140); g.lineTo(404, 140); g.lineWidth = 22; g.stroke()
-    g.beginPath(); g.moveTo(436, 140); g.lineTo(398, 108); g.lineTo(398, 172); g.closePath(); g.fill()
+    g.beginPath(); g.arc(548, 112, 21, 0, Math.PI * 2); g.fill()
+    g.lineWidth = 30
+    g.beginPath(); g.moveTo(532, 146); g.lineTo(512, 206); g.stroke()
+    g.lineWidth = 20
+    g.beginPath(); g.moveTo(530, 152); g.lineTo(566, 176); g.lineTo(600, 162); g.stroke()
+    g.beginPath(); g.moveTo(530, 152); g.lineTo(500, 160); g.lineTo(482, 190); g.stroke()
+    g.beginPath(); g.moveTo(512, 206); g.lineTo(546, 238); g.lineTo(540, 282); g.stroke()
+    g.beginPath(); g.moveTo(512, 206); g.lineTo(484, 238); g.lineTo(450, 244); g.stroke()
+    // (and the step out over the threshold: a white bar along the doorway's foot to the right, the way out)
+    g.fillRect(452, 296, 210, 12)
     // (the words)
-    g.textAlign = 'center'; g.textBaseline = 'middle'
-    g.font = lang === 'en' ? '900 120px "Arial Black", Arial, sans-serif' : '900 104px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif'
-    g.fillText(words, 600, 146, 300)
+    g.textAlign = 'center'
+    g.font = lang === 'en' ? '700 76px "Arial", "Helvetica", sans-serif' : '700 96px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif'
+    g.fillText(words, 830, 214, 330)
   })
 }
 /**
- * The emergency exit sign on the wall by the way out (blender/exitsign.py): its white housing in the room's toon light, its face lit
- * (unshaded: an exit sign stays lit whatever the room's lights), the words in the language on screen
+ * The emergency exit sign on the wall by the way out (blender/exitsign.py): an aluminium housing along the top, an acrylic pane hanging from
+ * it lit from its edge, its face (both sides) lit whatever the room's lights, the words in the language on screen
  */
 function ExitSign() {
   const lang = useDocLang()
   const gltf = useGLTF(EXIT_URL) as unknown as { scene: THREE.Group }
-  const face = useMemo(() => new THREE.MeshBasicMaterial({ toneMapped: false }), [])
+  const face = useMemo(() => new THREE.MeshBasicMaterial({ toneMapped: false, side: THREE.FrontSide }), [])
   useEffect(() => {
     const t = exitFace(lang)
     if (!t) return
     t.flipY = false
     face.map = t
-    face.color.set('#ffffff').multiplyScalar(1.15)
     face.needsUpdate = true
     return () => t.dispose()
   }, [lang, face])
   const model = useMemo(() => {
     const root = gltf.scene.clone(true)
-    const toon = new Map<THREE.Material, THREE.Material>()
+    const alu = new THREE.MeshStandardMaterial({ color: '#c9cdd2', metalness: 1, roughness: 0.34 })
+    reflectStudio(alu)
+    const edge = new THREE.MeshBasicMaterial({ color: '#b8f5cf', toneMapped: false, transparent: true, opacity: 0.8 })
     root.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
-      if (src.name === 'ExitFaceLit') { m.material = face; return }
-      let t = toon.get(src)
-      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone() }); toon.set(src, t) }
-      m.material = t
+      m.material = src.name === 'ExitFaceLit' ? face : src.name === 'ExitPaneEdge' ? edge : alu
     })
-    inkModel(root, (m) => /Face/.test(m.name), { width: 0.0012, weld: true })
+    inkModel(root, (m) => !/ExitBox/.test(m.name), { width: 0.0012, weld: true })
     return root
   }, [gltf, face])
   return (
     <group>
       <primitive object={model} />
       {/* (its glow on the wall round it, faint) */}
-      <sprite scale={[0.62, 0.3, 1]} position={[0, 0, 0.03]}>
-        <spriteMaterial map={GLOW} color="#36d17a" transparent opacity={0.22} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      <sprite scale={[0.66, 0.32, 1]} position={[0, 0, -0.01]}>
+        <spriteMaterial map={GLOW} color="#36d17a" transparent opacity={0.2} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </sprite>
     </group>
   )
