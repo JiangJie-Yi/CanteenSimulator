@@ -5,6 +5,7 @@ import { openingFloat, type DrawerCash } from '@/game/till'
 import { RACK_FULL } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
+import { startBack, type Back } from '@/game/drinkStock'
 
 /*
  * Where the customers sit: one or more counters, each a straight run of stools. A counter is given by its middle
@@ -222,6 +223,11 @@ export const fridgeUnitOf = (id: DrinkId) => Math.max(0, FRIDGE_UNITS.findIndex(
  * one back after a while; and the player can drag any drink to another place in the same fridge (an empty one, or
  * swapping), or out onto the floor, and back in again. `ver` goes up with every change, for the drawing to follow.
  */
+/** the drinks kept in the back (the crates by the fridges, game/drinkStock): what the stocker carries out to the fridges, bought by the case */
+export const DRINK_BACK: { back: Back; ver: number } = { back: startBack(), ver: 0 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __drinkBack?: typeof DRINK_BACK }).__drinkBack = DRINK_BACK
+/** the shop's cash, for buying from the room itself (App fills it in): how much there is, and paying out (a purchase in the ledger) */
+export const SHOP_PURSE = { cash: () => Infinity as number, spend: (n: number) => { void n } }
 export const FRIDGE_STOCK = {
   units: FRIDGE_UNITS.map((u) => u.shelves.map((sh) => [...sh.ids] as (DrinkId | null)[])),
   /** (x, z: out on the floor before the fridge, in its own frame; w: set down on a table, anywhere, in the scene's) */

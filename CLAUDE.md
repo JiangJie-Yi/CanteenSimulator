@@ -158,6 +158,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。
 - **擋住視線的吊掛物會變淡**：`scene/OccluderFade.tsx` 每幾格從鏡頭朝看的目標（`__ctl.target` 在畫面上的位置，周圍一圈）打射線，標了 `userData.fade` 的群組（門簾、紅燈籠、旗幟串、幟旗、燈串、吊燈）擋在中間就淡到 18%，移開就恢復（各自複製材質，不影響共用同一材質的東西）。新的吊掛擺設要會變淡，就在它的群組加 `userData={{ fade: true }}`。
 - **收銀抽屜的錢**（`game/till.ts` 的 `openingFloat`／`deposit`／`takeOut`，BDD `till`）：付現的客人把帳單放進抽屜；抽屜開著時老闆點紙鈔格或硬幣格把整格拿走，加進現金（帳本的「收銀機取款」，`ledger.till`）。
+- **飲料後場庫存**（`game/drinkStock.ts`，BDD `drink-stock`）：飲料櫃旁的酒箱是後場（`bar.ts` 的 `DRINK_BACK`，開始各兩箱）；櫃裡缺 3 格以上，倉儲店員（GuestBar3D 的 `Stocker`）抱一箱走過去開門補（一趟最多 `STOCK_CARRY`），補多少扣多少，後場沒貨就補不上；點酒箱訂一箱最缺的飲料，從現金扣進價（`SHOP_PURSE`，記在帳本的採買）。
 - 飲料櫃每格從前排往後一路排滿（`RANK_DEPTH`，後排合併成一批 `StaticBatch`）；拿出冰箱的飲料（地上、桌上、客人面前、手上）有凝結水珠（`DrinkBottle` 的 `wet`，櫃內的沒有）。
 - **碗盤櫃是盤子的來源**（`game/plates.ts`，BDD `plates`）：大容量，滿的時候 50 個（`RACK_FULL`；下層插盤架 22、第三層展示 4、頂層 4 疊各 6，第二層倒扣的碗是裝飾）；盤子照實際擺法放，不互相穿透；櫃上顯示幾個就是幾個；點一下搬一疊到出餐口（最多 12 個），出餐口空了服務生自己去拿，洗好放不下的回到櫃上。
 - **自動營運的營業套路**（`game/flow.ts`，BDD `flow`）：每次開店抽一種（平日、午餐尖峰、晚餐尖峰、雨天、祭典、觀光團、熟客日），各自的來客節奏、結伴比例、點單量不同，開店時主廚會說。

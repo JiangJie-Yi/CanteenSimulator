@@ -30,7 +30,7 @@ import { OccluderFade } from '@/scene/OccluderFade'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
-import { COAL_BRIDGE, DRINKS, type DrinkId, PANTRY, TILL_CASH } from '@/shops/grill/bar'
+import { COAL_BRIDGE, DRINKS, type DrinkId, PANTRY, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
 import { offsetOf, rotationOf, setEditLang, toggleEdit, useEdit } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { cameraOneOf } from '@/scene/camera1'
@@ -1039,6 +1039,13 @@ export default function App() {
   const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
   const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0) - (ledger.offering ?? 0) + (ledger.till ?? 0)
+  // (the room's own purchases (a case of drinks from the crates) paid from the same cash, into what's bought)
+  const cashNow = useRef(cash)
+  cashNow.current = cash
+  useEffect(() => {
+    SHOP_PURSE.cash = () => cashNow.current
+    SHOP_PURSE.spend = (n: number) => setLedger((l) => ({ ...l, bought: l.bought + n }))
+  }, [])
   // ingredients in stock, by portion; nothing until it's bought
   const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
   // how fresh each food in stock is (game/freshness): what's bought comes in fresh and mixes with what's there; it goes off as time passes

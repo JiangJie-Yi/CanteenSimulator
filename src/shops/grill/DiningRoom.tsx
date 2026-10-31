@@ -14,7 +14,8 @@ import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { StaffNoren } from './GuestBar3D'
 import { BOSS_DRINK } from './Boss'
-import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, restockDrink, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
+import { buyCase, caseCost, CASE_SIZE } from '@/game/drinkStock'
+import { fridgesOf, farOf, STAFF_DOOR, DRINK_BACK, SHOP_PURSE, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -2481,7 +2482,6 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
   const controls = useThree((st) => st.controls) as unknown as { enabled: boolean } | null
   const [, setVer] = useState(0)
   const seen = useRef(-1)
-  const clock = useRef(0)
   const objs = useRef(new Map<string, THREE.Group>())
   const dragKey = useRef<string | null>(null)
   const shelves = FRIDGE_UNITS[n].shelves
@@ -2531,12 +2531,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
         }
       })
     }
-    // (the shop puts one back every forty seconds, where one's been taken)
-    clock.current += Math.min(dt, 0.1)
-    if (clock.current > 40) {
-      clock.current = 0
-      restockDrink(n)
-    }
+    // (what's been taken is put back by the stocker, carried out from the back (GuestBar3D's stocker), not by itself)
   })
   type From = { kind: 'slot'; r: number; k: number } | { kind: 'out'; i: number }
   const begin = (from: From, ev: { stopPropagation: () => void }) => {
@@ -3180,6 +3175,30 @@ const CRATE_SIDE = canvasTex(256, 128, (g) => {
  * The empty-bottle crates (P箱) by the fridges, the brewer's red plastic, two stacked: each a frame of ribbed sides with hand-holds,
  * a grid of cells inside, and its brown beer bottles standing in the cells, their necks and caps up out of it
  */
+/** the drinks' names, for the back stock's tag */
+const drinkLabel = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? id
+/** the drinks that live in the fridges, the lowest in the back first */
+const lowestBack = () => [...new Set(FRIDGE_UNITS.flatMap((u) => u.shelves.flatMap((sh) => sh.ids)))]
+  .sort((a, b) => (DRINK_BACK.back[a] ?? 0) / (CASE_SIZE[a] ?? 24) - (DRINK_BACK.back[b] ?? 0) / (CASE_SIZE[b] ?? 24))
+/** an unseen box over the crates: they're the drinks' back stock; pointed at it says what's lowest, a click buys a case of that */
+function BackStockHit() {
+  const hint = () => `後場：${lowestBack().slice(0, 3).map((id) => `${drinkLabel(id)} ${DRINK_BACK.back[id] ?? 0}`).join('、')}｜點一下訂一箱 ${drinkLabel(lowestBack()[0])}（NT$${caseCost(lowestBack()[0])}）`
+  const buy = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation()
+    if (getEdit().on) return
+    const id = lowestBack()[0]
+    const r = buyCase(DRINK_BACK.back, id, SHOP_PURSE.cash())
+    if (r.ok) { DRINK_BACK.back = r.back; DRINK_BACK.ver++; SHOP_PURSE.spend(caseCost(id)) }
+    setTip({ title: r.ok ? `訂了一箱${drinkLabel(id)}` : '現金不夠', hint: hint() })
+  }
+  return (
+    <mesh position={[0, 0.3, 0]} onClick={buy} onPointerOver={(e) => { handOver.onPointerOver(e); setTip({ title: '飲料後場庫存', hint: hint() }) }}
+      onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
+      <boxGeometry args={[0.42, 0.62, 0.34]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
+  )
+}
 function BottleCrates() {
   const W = 0.36, D = 0.29, H = 0.2
   const cols = 5, rows = 4
@@ -3465,7 +3484,10 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
       {fr && <Movable id="crates" label="酒箱"><StaticBatch key={lang}>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><BottleCrates /></group>
-      </StaticBatch></Movable>}
+      </StaticBatch>
+        {/* (the back stock: pointed at, what's running low; a click buys in a case of whatever's lowest) */}
+        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><BackStockHit /></group>
+      </Movable>}
     </>
   )
 }

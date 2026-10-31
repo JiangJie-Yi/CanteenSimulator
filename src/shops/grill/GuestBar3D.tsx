@@ -43,7 +43,8 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { SHRINE_FLOWERS, PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { SHRINE_FLOWERS, PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
 
@@ -315,6 +316,74 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
     cache[key] = t
   }
   return cache[key]
+}
+
+/**
+ * The stocker (倉儲): stands by the crates of drinks at the back (the back stock, DRINK_BACK) and, when a fridge is three or more short
+ * of what the back can fill, carries a case over, opens it, fills its empty places from the back (game/drinkStock's restockRun, as many
+ * as a trip carries) and goes back to the crates.
+ */
+const STOCK_CARRY = 8
+function Stocker({ counters, fridges }: { counters: Counter[]; fridges: NonNullable<ReturnType<typeof fridgesOf>> }) {
+  const g = useRef<THREE.Group>(null)
+  const box = useRef<THREE.Mesh>(null)
+  const c1 = counters[1]
+  const home = useMemo(() => {
+    const last = fridges[fridges.length - 1]
+    return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32 + 0.55)
+  }, [c1, fridges])
+  const st = useRef({ phase: 'idle' as 'idle' | 'go' | 'fill' | 'back', t: 0, unit: 0, pos: home.clone(), yaw: 0, check: 0 })
+  const [moving, setMoving] = useState(false)
+  useFrame((_, dt0) => {
+    const dt = Math.min(dt0, 0.1)
+    const s = st.current
+    const walk = (to: THREE.Vector3) => {
+      const d = to.clone().sub(s.pos).setY(0)
+      const len = d.length()
+      if (len < 0.03) return true
+      s.pos.addScaledVector(d.normalize(), Math.min(len, dt * 1.0))
+      s.yaw = Math.atan2(d.x, d.z)
+      return false
+    }
+    if (s.phase === 'idle') {
+      s.check += dt
+      if (s.check > 1) {
+        s.check = 0
+        const n = fridges.findIndex((f) => emptyFillable(FRIDGE_STOCK.units[f.n], FRIDGE_UNITS[f.n].shelves.map((sh) => sh.ids), DRINK_BACK.back) >= 3)
+        if (n >= 0) { s.phase = 'go'; s.unit = fridges[n].n; setMoving(true) }
+      }
+      s.yaw += (Math.atan2(-c1.lay.x, -c1.lay.z) - s.yaw) * Math.min(1, dt * 4)
+    } else if (s.phase === 'go') {
+      if (walk(fridges.find((f) => f.n === s.unit)!.front)) { s.phase = 'fill'; s.t = 0; FRIDGE_STATE[s.unit].passing++; setMoving(false) }
+    } else if (s.phase === 'fill') {
+      s.t += dt
+      const f = fridges.find((x) => x.n === s.unit)!
+      s.yaw = Math.atan2(f.at.x - s.pos.x, f.at.z - s.pos.z)
+      if (s.t > 1.6) {
+        const run = restockRun(FRIDGE_STOCK.units[s.unit], FRIDGE_UNITS[s.unit].shelves.map((sh) => sh.ids), DRINK_BACK.back, STOCK_CARRY)
+        run.rows.forEach((r, i) => { FRIDGE_STOCK.units[s.unit][i] = r })
+        DRINK_BACK.back = run.back
+        DRINK_BACK.ver++
+        FRIDGE_STOCK.ver++
+        FRIDGE_STATE[s.unit].passing = Math.max(0, FRIDGE_STATE[s.unit].passing - 1)
+        s.phase = 'back'
+        setMoving(true)
+      }
+    } else if (walk(home)) { s.phase = 'idle'; setMoving(false) }
+    if (g.current) { g.current.position.copy(s.pos); g.current.rotation.y = s.yaw }
+    // (the case in his arms, carried out full; back empty-handed)
+    if (box.current) box.current.visible = s.phase === 'go' || s.phase === 'fill'
+  })
+  return (
+    <group ref={g} position={home} scale={STAFF_SCALE}>
+      <BlobShadow r={0.17} />
+      <StaffFigure id="stocker" role="stock" look={{ female: false, age: 'middle' }} moving={moving} />
+      <mesh ref={box} position={[0, 0.48, 0.17]} visible={false}>
+        <boxGeometry args={[0.2, 0.12, 0.14]} />
+        <meshToonMaterial color="#b98a52" />
+      </mesh>
+    </group>
+  )
 }
 
 /**
@@ -2280,6 +2349,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </group>
       ))}
       <Later stage={3}>
+      {given && fridges && <Stocker counters={counters} fridges={fridges} />}
       {servers.slice(0, homes.length).map((w, i) => (
         <group key={w.id} ref={(o) => { waiterObjs.current[i] = o }} position={homes[i].at} rotation-y={homes[i].yaw} scale={STAFF_SCALE}>
           <BlobShadow r={0.17} />
