@@ -2010,6 +2010,9 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
   const flaskShadow = useRef<THREE.Group>(null)
   const streamRef = useRef<THREE.Mesh>(null)
   const liquid = useRef<(THREE.Mesh | null)[]>([null, null, null])
+  // (the cups as they stand, moved by hand or not: the pour, the stream, the sake in them and the sparks all go where they are)
+  const cupsRef = useRef<THREE.Group>(null)
+  const cupsOff = useMemo(() => new THREE.Vector3(), [])
   // (the motes: while the offering stands, faint glowing ones drift up from the shrine)
   const burning = useRef(false)
   const motes = useRef<THREE.Points>(null)
@@ -2168,8 +2171,15 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     if (lamp.current) lamp.current.intensity = 0.3 * BLESSING.k * pulse
     // (pouring: a few seconds from the moment it's offered; the cups stay full while the offering stands)
     const since = at === null ? 99 : (performance.now() - at) / 1000
-    const CUP_X = ALTAR_D / 2 - 0.375 + CUPS_SHIFT, CUP_TOP = 0.05, POUR_Y = 0.085
-    const cupZ = [-0.1125, 0, 0.1125]
+    // (how far the cups have been moved from where they were made to stand, in this frame: the middle cup's place as it is now)
+    const host = streamRef.current?.parent
+    if (cupsRef.current && host) {
+      const w = cupsRef.current.localToWorld(new THREE.Vector3(-0.3, 0.03, 0))
+      const l = host.worldToLocal(w)
+      cupsOff.set(l.x - (ALTAR_D / 2 - 0.375 + CUPS_SHIFT), l.y - 0.03 * KAMI_SC, l.z)
+    }
+    const CUP_X = ALTAR_D / 2 - 0.375 + CUPS_SHIFT + cupsOff.x, CUP_TOP = 0.05 + cupsOff.y, POUR_Y = 0.085 + cupsOff.y
+    const cupZ = [-0.1125, 0, 0.1125].map((z) => z + cupsOff.z)
     const rest = { x: -0.06, y: 0, z: 0.3 }
     const f = flaskRef.current
     // (one cup after another: 1.1 s each from 0.7 s in, the first quarter second gliding over from the last cup, tipped back a little so
@@ -2223,7 +2233,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       const fill = !on ? 0 : THREE.MathUtils.smoothstep(since - 0.7 - i * 1.1, i ? 0.32 : 0.1, 1.0)
       m.visible = fill > 0
       const h = CUP_FLOOR + (CUP_FULL - CUP_FLOOR) * fill
-      m.position.y = KAMI_SC * (0.03 - 0.0125 + h)
+      m.position.set(ALTAR_D / 2 - 0.375 + CUPS_SHIFT + cupsOff.x, KAMI_SC * (0.03 - 0.0125 + h) + cupsOff.y, [-0.1125, 0, 0.1125][i] + cupsOff.z)
       m.scale.setScalar(Math.max(0.0001, KAMI_SC * cupInnerR(h) * 0.96))
     }
   })
@@ -2256,7 +2266,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
           a batch takes no clicks, and clicked they change their flowers) */}
       <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase-1" /></group></Movable>
       <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase1" /></group></Movable>
-      <Movable id="shrinecups" label="清酒杯與琉璃台"><group position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC} {...nameOnly('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
+      <Movable id="shrinecups" label="清酒杯與琉璃台"><group ref={cupsRef} position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC} {...nameOnly('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={STAR} vertexColors size={1} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} onBeforeCompile={pointsEach} />
       </points>
