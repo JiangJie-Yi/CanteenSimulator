@@ -217,12 +217,14 @@ def text(name, body, size, mat_, at, rot, font=None, fit=None):
 
 
 def tube(name, pts, r, mat_):
-    """a cable through the points (three frame)"""
+    """a cable through the points (three frame). Its roundness and the steps along it go by how thick it is and how many points it's drawn
+    through: a stem a millimetre thick is six-sided, a trunk eight, anything thicker ten; a path of many points (the cushion's cord, forty)
+    needs few steps between them"""
     cd = bpy.data.curves.new(name, "CURVE")
     cd.dimensions = "3D"
     cd.bevel_depth = r
-    cd.bevel_resolution = 3
-    cd.resolution_u = 10
+    cd.bevel_resolution = 1 if r < 0.003 else 2 if r < 0.007 else 3
+    cd.resolution_u = max(2, min(10 if r >= 0.003 else 6, round(60 / len(pts))))
     sp = cd.splines.new("BEZIER")
     sp.bezier_points.add(len(pts) - 1)
     for bp, p in zip(sp.bezier_points, pts):
@@ -658,7 +660,8 @@ for i in range(30):
     a_ = i * 2.399
     rr = 0.014 + math.sqrt(i / 30) * (PR - 0.026)
     sz = 0.0042 + _pr.random() * 0.0028
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=sz, segments=12, ring_count=7, location=P(rr * math.cos(a_), PH2 - 0.0095, rr * math.sin(a_)),
+    # (eight round and five up: squashed and half buried, smoothed, they're as round as ever)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=sz, segments=8, ring_count=5, location=P(rr * math.cos(a_), PH2 - 0.0095, rr * math.sin(a_)),
                                          rotation=(0, 0, _pr.random() * 6.28))
     pb = active(); pb.scale = (1 + _pr.random() * 0.5, 1, 0.55); apply_scale(pb)
     mtree.append(finish(pb, f"TreePebble{i}", M[("pebble", "pebble2", "pebble3")[i % 3]]))
@@ -671,7 +674,8 @@ def leaflet(name, at, ang, L, W, droop, mat_):
     """one pachira leaflet: a long pointed oval, fanned out at `ang` from where it joins, arching down along its length, its UVs along it"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    NU, NV = 8, 4
+    # (four steps across, not two: the midrib's fold and an edge each side are all that show of it; eight along its arch)
+    NU, NV = 8, 2
     vs = []
     for i in range(NU + 1):
         t = i / NU
@@ -826,7 +830,8 @@ def isect(s_, h_):
             (0.47, 0.0142), (0.43, 0.0178), (0.37, 0.0212), (0.29, 0.0238), (0.19, 0.0256), (0.09, 0.0265), (0.0, 0.0267)]
 
 
-NT = 72
+# (forty-four round it: smoothed once over, still round at its rim's ends however close it's looked at)
+NT = 44
 bm_ = bmesh.new()
 rings = []
 for i in range(NT):
