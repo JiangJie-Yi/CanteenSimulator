@@ -96,6 +96,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **開發者模式只做編輯**：場景裡所有互動（夾食物、添炭、調味、澆水、收銀抽屜、廁所門、飲料櫃門、神棚、飯桶蓋、盤子拖曳）都擋掉（Roasting 的 `locked`、各元件的 `getEdit().on`、App 對 `.canvas-layer` 的 click 攔截）。
 - 桌上的**行燈、團扇**用 `<Movable>` 包起來；**大砧板（`cutboard`）、調味盒（`seasoning`）、水桶（`bucket`）**是由桌面的 nudge（`moved`）定位的，開發者模式用 `EditProxy`（不畫出來的同尺寸方塊）給框與箭頭，位移量會加進 nudge（食物、鍋具、水瓢跟著走）；這三件只有位移有效，旋轉與縮放沒有作用。
 - **能互動的東西都要有名稱標籤**：滑鼠移上去，游標旁出現和備長炭同款的紙標籤（名字＋做法）。3D 物件用 `shops/grill/bar.ts` 的 `tipOver(名稱, 提示)` 取代 `handOver`（會發亮、變手指、設標籤）；標籤的狀態在 `scene/hoverTip.ts`，由 `ui/HoverTip.tsx` 畫（開發者模式隱藏）。不能放在 `StaticBatch` 裡（合併後沒有事件）；門這類小目標用一片透明的感應面（見 `ToiletHit`）。目前沒有標籤的：招財貓、客人、食材冷藏櫃的蓋子（沒有互動）。
+- **電燈開關**（門邊牆上、手的高度，`blender/lightswitch.py` → `lightswitch.glb`，`DiningRoom.tsx` 的 `LightSwitch`，Movable `lightswitch`）：點一下關燈、再點一下開燈（規則 `game/roomLights.ts`，BDD `room-lights`；狀態 `scene/lightsStore.ts`，存 localStorage `jgs-lights-1`）。關燈時吊燈與燈串變成沒點亮的紙與燈泡、光暈與桌上的光圈消失（`nightGlow` 的 `lamp`；窗外的天光不受影響）、灶台上方的暖色聚光燈熄、店裡的環境光降到 `roomDim`（白天剩窗外的天光，晚上連代表月光的主光一起暗，只剩爐火、行燈與飲料櫃的光）；關燈時開關上的小綠燈（ホタル）亮著，黑暗中找得到。
 - **牆角喇叭**（`DiningRoom.tsx` 的 `WallSpeaker`）是音樂唯一的開關：點一下開、再點一下關，預設關（`ui/bgmStore.ts`，`ui/Bgm.tsx` 負責播放，音量固定）；hover 會發亮並出現「音箱／點一下開啟（關閉）音樂」標籤，開著時飄出音符（`MusicNotes`）。沒有任何音樂的 2D 介面或按鈕。
 - **客人的盤子**：`shops/grill/wareDesigns.ts` 五款花色（唐草、青海波、鯉魚、梅花藍底、風車）依盤子輪流用；竹、梅仍是 `ware.ts` 的大盤與小碟。`PlateRack.tsx` 是碗盤櫃架（Decor 裡的 `RackAt`）。
 - **開發者模式左下角**有世界座標小圖（`App.tsx` 的 `AxisWidget`）：X 沿吧台、Y 向上、Z 橫過吧台，隨鏡頭轉。

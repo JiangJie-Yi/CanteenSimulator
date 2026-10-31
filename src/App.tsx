@@ -29,6 +29,8 @@ import { OpeningSpot } from '@/scene/OpeningSpot'
 import { OccluderFade } from '@/scene/OccluderFade'
 import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
+import { useLights } from '@/scene/lightsStore'
+import { lampGlow, roomDim } from '@/game/roomLights'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
@@ -512,6 +514,10 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     camera.updateProjectionMatrix()
   }, [camera, size, frame, editing])
   const look = LIGHTING[theme]
+  // (the wall switch by the door: with the lights out, the warm lamp over the fire is out and the room's own light falls to the daylight by day,
+  // to little by night (the night's key light, standing for the moon, with it: the fire then carries the room); the day's sun is as it was)
+  const lights = useLights()
+  const dim = roomDim(lights.on, theme === 'dark')
 
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
   const grillSmoke = useRef(0)
@@ -786,17 +792,17 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     <>
       {/* (the sun casts the room's shadows, the figures' and the furniture's on the floor: from high over the open side, its shadow camera
           spanning the whole shop; redrawn every third frame (ShadowPacer), the shadows moving a little behind what casts them) */}
-      <directionalLight position={[9, 16, 7]} intensity={look.sunIntensity} color={look.sun} castShadow={QUALITY.shadows}
+      <directionalLight position={[9, 16, 7]} intensity={look.sunIntensity * (theme === 'dark' ? dim : 1)} color={look.sun} castShadow={QUALITY.shadows}
         shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04}
         shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
       <ShadowPacer />
-      <hemisphereLight args={[look.sky, look.ground, look.hemi]} />
-      <IndoorHDRI night={theme === 'dark'} intensity={theme === 'dark' ? 0.3 + look.hemi * 0.4 : 0.5 + look.hemi * 0.5} />
+      <hemisphereLight args={[look.sky, look.ground, look.hemi * dim]} />
+      <IndoorHDRI night={theme === 'dark'} intensity={(theme === 'dark' ? 0.3 + look.hemi * 0.4 : 0.5 + look.hemi * 0.5) * dim} />
       <spotLight
         ref={spot}
         position={SPOT_POSITION}
         color="#ffbf7a"
-        intensity={look.spot}
+        intensity={look.spot * lampGlow(lights.on)}
         angle={0.5}
         penumbra={0.9}
         distance={14}

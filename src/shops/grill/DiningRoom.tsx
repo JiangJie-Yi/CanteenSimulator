@@ -21,21 +21,35 @@ import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
 import { Steam } from '@/scene/Steam'
 import { setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
+import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
+import { lampGlow } from '@/game/roomLights'
 
 /**
  * The lamps' painted light (their halos and the pools they throw) by the time of day: faint by day, when the room's lit anyway; full and
  * wider by night, a glow blooming round each (data-theme on the page, followed as it changes).
  */
-const NIGHT_GLOWS: { m: THREE.Material; day: number; night: number }[] = []
+/** (a lamp's: out with the wall switch; the daylight through the windows isn't) */
+const NIGHT_GLOWS: { m: THREE.Material; day: number; night: number; lamp: boolean }[] = []
 const isNight = () => typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark'
-function nightGlow<M extends THREE.Material>(m: M, day: number, night: number): M {
-  NIGHT_GLOWS.push({ m, day, night })
-  m.opacity = isNight() ? night : day
+function nightGlow<M extends THREE.Material>(m: M, day: number, night: number, lamp = true): M {
+  NIGHT_GLOWS.push({ m, day, night, lamp })
+  m.opacity = (isNight() ? night : day) * (lamp ? lampGlow(getLights().on) : 1)
   return m
 }
+/** the lamps themselves, lit or not: the paper pendants' shades and the string of bulbs, dull paper and glass with the switch off */
+const LAMP_SHADES: { m: THREE.MeshBasicMaterial; lit: THREE.Color; day: THREE.Color; night: THREE.Color }[] = []
+function lampLit(m: THREE.MeshBasicMaterial, day: string, night: string) {
+  LAMP_SHADES.push({ m, lit: m.color.clone(), day: new THREE.Color(day), night: new THREE.Color(night) })
+  return m
+}
+function lightsNow() {
+  const n = isNight(), on = getLights().on
+  for (const g of NIGHT_GLOWS) g.m.opacity = (n ? g.night : g.day) * (g.lamp ? lampGlow(on) : 1)
+  for (const s of LAMP_SHADES) s.m.color.copy(on ? s.lit : n ? s.night : s.day)
+}
 if (typeof document !== 'undefined') {
-  new MutationObserver(() => { const n = isNight(); for (const g of NIGHT_GLOWS) g.m.opacity = n ? g.night : g.day })
-    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  new MutationObserver(lightsNow).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  onLights(lightsNow)
 }
 
 /**
@@ -623,6 +637,8 @@ function BannerRow({ zs, start = 0, step = 1 }: { zs: number[]; start?: number; 
  * A string of little warm bulbs swagged along a wall's top under the frieze: a thin wire looped between brass pegs, a bulb every hand's width
  * along each loop, and a small glowing paper globe at each peg. Light is painted (emissive bulbs, a soft halo), none cast.
  */
+const FESTOON_BULB = lampLit(new THREE.MeshBasicMaterial({ toneMapped: false }), '#6a6258', '#2c2824')
+const FESTOON_GLOBE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffd9a0', toneMapped: false }), '#b8a68a', '#3a332a')
 const FESTOON_HALO = nightGlow(new THREE.MeshBasicMaterial({ color: '#ffc060', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }), 0.1, 0.32)
 function Festoon({ l, mid }: { l: number; mid: number }) {
   const built = useMemo(() => {
@@ -665,13 +681,13 @@ function Festoon({ l, mid }: { l: number; mid: number }) {
       <group>
         <lineSegments geometry={built.wireGeo}><lineBasicMaterial color="#2a1a10" /></lineSegments>
         <instancedMesh ref={bulb} args={[undefined, undefined, built.bulbs.length]}>
-          <sphereGeometry args={[0.013, 8, 6]} /><meshBasicMaterial toneMapped={false} />
+          <sphereGeometry args={[0.013, 8, 6]} /><primitive object={FESTOON_BULB} attach="material" />
         </instancedMesh>
         <instancedMesh ref={halo} args={[undefined, undefined, built.bulbs.length]} renderOrder={2}>
           <sphereGeometry args={[0.034, 8, 6]} /><primitive object={FESTOON_HALO} attach="material" />
         </instancedMesh>
         <instancedMesh ref={globe} args={[undefined, undefined, built.pegs.length]}>
-          <sphereGeometry args={[0.03, 10, 8]} /><meshBasicMaterial color="#ffd9a0" toneMapped={false} />
+          <sphereGeometry args={[0.03, 10, 8]} /><primitive object={FESTOON_GLOBE} attach="material" />
         </instancedMesh>
       </group>
     </group>
@@ -822,9 +838,9 @@ const DAYLIGHT = (() => {
   return { halo: tex(halo), beam: tex(beam) }
 })()
 const WINDOW_HALO = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.halo, color: '#8fc4ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false }), 0.8, 0)
+  toneMapped: false }), 0.8, 0, false)
 const SUNBEAM = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, color: '#78b2ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false, side: THREE.DoubleSide }), 0.55, 0)
+  toneMapped: false, side: THREE.DoubleSide }), 0.55, 0, false)
 /** the shaft's two crossed sheets, in the window's frame (the room toward -x): from the window's face, slanting down and in */
 const SUNBEAM_GEO = (() => {
   const R = 0.4, L = 2.3, tilt = 0.62
@@ -1764,6 +1780,7 @@ const PENDANT_BLOOM = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparen
 // (pulled toward the camera in depth so it never fights the bar's top under it, seen from far off)
 const PENDANT_POOL = nightGlow(new THREE.MeshBasicMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
   polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), 0.18, 0.42)
+const LANTERN_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: LANTERN_SKIN, toneMapped: false, side: THREE.DoubleSide }), '#b4ab9c', '#3c362e')
 function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
   return (
     <group position={[0, WALL_H, z]}>
@@ -1773,9 +1790,7 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
       </mesh>
       {/* (a paper lantern: the oval of ribbed washi, a pale wooden ring at each end, a little ring at the top for the cord) */}
       <group position-y={-drop - 0.13}>
-        <mesh geometry={LANTERN_GEO}>
-          <meshBasicMaterial color="#ffffff" map={LANTERN_SKIN} toneMapped={false} side={THREE.DoubleSide} />
-        </mesh>
+        <mesh geometry={LANTERN_GEO} material={LANTERN_SHADE} />
         <mesh geometry={LANTERN_GEO} scale={1.035}>
           <meshBasicMaterial color={INK} side={THREE.BackSide} />
         </mesh>
@@ -1928,6 +1943,8 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
             </group>
           </StaticBatch></Movable>
         ))}
+        {/* (the light switch by the door, at hand height near the wall's end) */}
+        {altar && <Movable id="lightswitch" label="電燈開關"><group position={[-0.002, 1.12, to - 0.16]}><LightSwitch /></group></Movable>}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
           {[-0.35, 0.35].map((z) => (
@@ -3440,6 +3457,50 @@ function WallSpeaker() {
   )
 }
 useGLTF.preload(SPEAKER_URL)
+
+const SWITCH_URL = import.meta.env.BASE_URL + 'models/lightswitch.glb'
+/**
+ * The light switch on the wall by the door (blender/lightswitch.py): an ivory wide rocker at hand height. A click puts the shop's lights out
+ * or on again (scene/lightsStore; the lamps and the room's light follow it): the rocker rocks over, and while the lights are out its
+ * little guide light (ホタル) glows green, to find it by in the dark. Facing -x (the wall's own frame: the room).
+ */
+function LightSwitch() {
+  const { on } = useLights()
+  const [lit, setLit] = useState(false)
+  const tag = () => setTip({ title: '電燈開關', hint: getLights().on ? '點一下關燈' : '點一下開燈' })
+  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; pressLightSwitch(); tag() }
+  const gltf = useGLTF(SWITCH_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    const toon = new Map<THREE.Material, THREE.MeshToonMaterial>()
+    const lamp = new THREE.MeshBasicMaterial({ toneMapped: false })
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      if (src.name === 'SwitchLamp') { m.material = lamp; return }
+      let t = toon.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone() }); toon.set(src, t) }
+      m.material = t
+    })
+    inkModel(root, (m) => /Lamp/.test(m.name), { width: 0.0012, weld: true })
+    return { root, rocker: root.getObjectByName('SwitchRocker'), lamp, toon: [...toon.values()] }
+  }, [gltf])
+  useEffect(() => {
+    if (model.rocker) model.rocker.rotation.x = on ? -0.14 : 0.14
+    model.lamp.color.set(on ? '#7c8a72' : '#8dffb0')
+  }, [model, on])
+  useEffect(() => { for (const t of model.toon) t.emissive.set(lit ? '#2a2a30' : '#000000') }, [model, lit])
+  return (
+    <group rotation-y={-Math.PI / 2} onClick={press}
+      onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setLit(true); handOver.onPointerOver(e as never); tag() }}
+      onPointerOut={(e: { stopPropagation: () => void }) => { setLit(false); handOver.onPointerOut(e as never); setTip(null) }}>
+      {/* (the handlers on a group round it: a primitive's own aren't attached) */}
+      <primitive object={model.root} />
+    </group>
+  )
+}
+useGLTF.preload(SWITCH_URL)
 
 function ShopPropsImpl({ counters, lang = 'zh' }: { counters: Counter[]; lang?: Lang }) {
   const c0 = counters[0]
