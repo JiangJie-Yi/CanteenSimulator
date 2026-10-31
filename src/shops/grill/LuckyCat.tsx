@@ -110,7 +110,15 @@ export function LuckyCat({ kind = 1, height = HEIGHT, still = false }: { kind?: 
     const k = (height * model.fudge) / size.y
     const centre = box.getCenter(new THREE.Vector3())
     const place = new THREE.Matrix4().makeRotationY((model as { yaw?: number }).yaw ?? 0).multiply(new THREE.Matrix4().makeScale(k, k, k)).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -box.min.y, -centre.z))
-    return baked.map((parts) => parts.map(({ g, mat }) => { g.applyMatrix4(place); return { g, mat } }))
+    // (and its bounds measured again where it now stands: carried through the placing they came out a speck (1 cm across), and the cat was
+    // culled away whenever that speck's place went off the edge of the picture, so it vanished now and then)
+    return baked.map((parts) => parts.map(({ g, mat }) => {
+      g.applyMatrix4(place)
+      g.boundingBox = null
+      g.boundingSphere = null
+      g.computeBoundingSphere()
+      return { g, mat }
+    }))
   }, [gltf, kind, height, model, still])
   const group = useRef<THREE.Group>(null)
   const t = useRef(Math.random() * 10)
