@@ -369,7 +369,6 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
 const RICE_SCALE = 2.0
 /** the side table it stands on: its top's height (the cook's table's top is the scene's y = 0), and its size */
 const SIDE_TOP = -0.3
-const SIDE_W = 1.35
 /** a flat band of metal round the tub (a strip, not a rod): a lathe of a thin rectangle, its upper edge a little proud */
 const flatBand = (R: number, h: number, t = 0.007) => new THREE.LatheGeometry([[R - t, -h / 2], [R, -h / 2], [R + 0.0025, 0], [R, h / 2], [R - t, h / 2], [R - t, -h / 2]].map(([x, y]) => new THREE.Vector2(x, y)), 72)
 /** the tub's radius at a height up it (it widens toward the rim): what a hoop must stand clear of to lie on the staves, not sink in them */
@@ -408,7 +407,7 @@ const RICE_GEO = {
 }
 /**
  * The rice the rice balls are shaped from (おひつ): a big round tub of pale sawara bound with copper hoops, heaped with
- * steaming white rice, the wooden paddle (しゃもじ) stood in it, on a plain side table of its own (作業台); its lid and
+ * steaming white rice, the wooden paddle (しゃもじ) stood in it, on a stand of its own (飯台, blender/ricestand.py); its lid and
  * a stack of rice bowls on the shelf under it.
  */
 /** the rice tub's model (blender/ricetub.py) cut into its body, its lid (lifted off) and the rice with its paddle (shown with the lid off),
@@ -444,8 +443,24 @@ function useRiceTub() {
 }
 useGLTF.preload(RICETUB_URL)
 
+const RICESTAND_URL = import.meta.env.BASE_URL + 'models/ricestand.glb'
+useGLTF.preload(RICESTAND_URL)
 function RiceTub() {
   const tub = useRiceTub()
+  const standGltf = useGLTF(RICESTAND_URL) as unknown as { scene: THREE.Group }
+  const stand = useMemo(() => {
+    const r = standGltf.scene.clone(true)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      m.material = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, () => false, { width: 0.0016, weld: true })
+    return r
+  }, [standGltf])
   const [x, z] = DECOR.rice.at
   // (the lid: on the tub, or lifted off and leant against its side; click the tub to lift it or put it back. Open, the rice shows,
   // steaming, with its paddle in it)
@@ -461,24 +476,11 @@ function RiceTub() {
   })
   const g = RICE_GEO
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
-  const legH = SIDE_TOP - 0.05 - floor
   return (
     <group position={[x, 0, z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
-      {/* the table: a thick top, four square legs, a shelf low between them */}
-      <mesh geometry={g.slab} position-y={SIDE_TOP - 0.025} scale={[SIDE_W, 0.05, SIDE_W]} castShadow receiveShadow>
-        <meshToonMaterial color="#b98a58" />
-      </mesh>
-      <mesh geometry={g.slab} position-y={SIDE_TOP - 0.025} scale={[SIDE_W * 1.015, 0.065, SIDE_W * 1.015]}>
-        <meshBasicMaterial color={INK} side={THREE.BackSide} />
-      </mesh>
-      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([i, k]) => (
-        <mesh key={`${i}${k}`} geometry={g.slab} position={[i * (SIDE_W / 2 - 0.08), floor + legH / 2, k * (SIDE_W / 2 - 0.08)]} scale={[0.09, legH, 0.09]}>
-          <meshToonMaterial color="#7a5434" />
-        </mesh>
-      ))}
-      <mesh geometry={g.slab} position-y={floor + 0.28} scale={[SIDE_W - 0.12, 0.035, SIDE_W - 0.12]} receiveShadow>
-        <meshToonMaterial color="#9a7046" />
-      </mesh>
+      {/* the stand (blender/ricestand.py): a hinoki top in a raised walnut border, tapered legs splayed a little, walnut aprons with a
+          cloud-shaped arch cut from them, a shelf of bamboo slats low down; drawn its own height from the floor up to the top */}
+      <primitive object={stand} position-y={floor} scale={[1, (SIDE_TOP - floor) / 1.08, 1]} />
       {/* on the shelf: the rice bowls, stacked upside down */}
       {[0, 1, 2].map((k) => (
         <mesh key={k} geometry={g.bowl} position={[0.5, floor + 0.3 + k * 0.07, 0.35]} rotation-x={Math.PI} scale={[1.6, 1.4, 1.6]}>
