@@ -84,6 +84,50 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
 /** the customers (and their stools) at life size beside the bar, which is drawn to match them */
 const PEOPLE_SCALE = 1.3
 
+/**
+ * The way in's noren, in the manner of a modern shop's: unbleached cotton, plain, the shop's crest large in dark brown across the middle
+ * (a rounded diamond, a fine one inside it, and in it the shop's first character in a rounded square), and its name in small spaced
+ * capitals under it. The old indigo one now hangs in the staff's doorway (StaffNoren).
+ */
+const crestNorenTexture = (mark: string) => signTexture(384 * 3, 256 * 3, (g) => {
+  // (drawn mirrored: the cloth's face is the side toward the room, so the crest and the name read right from inside)
+  g.setTransform(-3, 0, 0, 3, 384 * 3, 0)
+  const BROWN = '#3e2a1c'
+  // (the cloth: warm off-white, a little darker toward the hem, a fine weave, the dye-free cotton's slubs)
+  const grad = g.createLinearGradient(0, 0, 0, 256)
+  grad.addColorStop(0, '#efe8d8'); grad.addColorStop(1, '#ddd3bd')
+  g.fillStyle = grad; g.fillRect(0, 0, 384, 256)
+  g.strokeStyle = 'rgba(120,100,70,0.06)'
+  for (let y = 0; y < 256; y += 2.5) { g.beginPath(); g.moveTo(0, y); g.lineTo(384, y); g.stroke() }
+  for (let x = 0; x < 384; x += 3) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 256); g.stroke() }
+  let seed = 11
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  g.fillStyle = 'rgba(150,125,90,0.12)'
+  for (let k = 0; k < 220; k++) g.fillRect(rnd() * 384, rnd() * 256, 3 + rnd() * 6, 0.8)
+  // (the crest: a rounded diamond in a heavy line with a fine one inside it)
+  const CX = 192, CY = 104
+  const diamond = (r: number, round: number) => {
+    g.beginPath()
+    const pts: [number, number][] = [[CX, CY - r], [CX + r, CY], [CX, CY + r], [CX - r, CY]]
+    g.moveTo((pts[0][0] + pts[3][0]) / 2, (pts[0][1] + pts[3][1]) / 2)
+    for (let i = 0; i < 4; i++) g.arcTo(pts[i][0], pts[i][1], pts[(i + 1) % 4][0], pts[(i + 1) % 4][1], round)
+    g.closePath()
+  }
+  g.strokeStyle = BROWN
+  g.lineWidth = 6; diamond(68, 14); g.stroke()
+  g.lineWidth = 1.6; diamond(58, 11); g.stroke()
+  // (in it, a rounded square with the character)
+  g.lineWidth = 3.2
+  g.beginPath(); g.roundRect(CX - 27, CY - 27, 54, 54, 9); g.stroke()
+  brushText(g, [...mark][0] ?? '', CX, CY + 2, 40, { fill: BROWN })
+  // (the name under it, small and spaced, in the brown)
+  g.fillStyle = BROWN
+  g.font = '700 12px Georgia, serif'
+  g.textAlign = 'center'; g.textBaseline = 'middle'
+  const name = 'K I K U N O   ·   Y A K I Z A K A N A'
+  g.fillText(name, CX, CY + 92)
+})
+
 /** the noren's cloth: deep indigo, a white band of the shop's mark across its three panels, faded at the hem */
 const norenTexture = (mark: string) => signTexture(384 * 3, 256 * 3, (g) => {
   // (drawn at three times the size it's laid out in, so the crest's fine lines stay crisp up close)
@@ -276,7 +320,7 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
 export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const lantern = mark === '聞野' ? '燒' : mark
   // (the grill's noren reads 烤魚, the shop's trade, with a fish on it; the other shops' name their own)
-  const tex = useMemo(() => norenTexture(mark === '聞野' ? '烤魚' : mark), [mark])
+  const tex = useMemo(() => crestNorenTexture(mark), [mark])
   const panels = useRef<(THREE.Mesh | null)[]>([])
   const yaw = Math.atan2(ALONG.x, ALONG.z)
   // (hung high, its rod well over a customer's head: they duck through only its hem)
@@ -367,11 +411,11 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
         <group userData={{ fade: true }}>
           {[-1, 1].map((sd) => (
-            <mesh key={sd} position={[sd * (W / 2), H - 0.05 + NOREN_CORD + NOREN_CORD / 2, NZ]}><cylinderGeometry args={[0.004, 0.004, NOREN_CORD, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
+            <mesh key={sd} position={[sd * (W / 2) * NOREN_BIG, H - 0.05 + NOREN_CORD + NOREN_CORD / 2, NZ]}><cylinderGeometry args={[0.004, 0.004, NOREN_CORD, 4]} /><meshBasicMaterial color="#b89a6a" /></mesh>
           ))}
-          {/* (the rod and the panels hung that much higher on the shorter cords) */}
+          {/* (the rod and the panels hung that much higher on the shorter cords; the cloth a size bigger than the doorway, wider and longer) */}
           <group position-y={NOREN_CORD}>
-          <group position={[0, H - 0.05, NZ]}><NorenModel tex={tex} panels={panels} /></group>
+          <group position={[0, H - 0.05, NZ]} scale={[NOREN_BIG, NOREN_BIG * 1.05, 1]}><NorenModel tex={tex} panels={panels} pole="wood" /></group>
           </group>
         </group>
       </Movable>
@@ -382,7 +426,30 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
 
 /** the noren (blender/genkan.py): its lacquered rod with brass caps, and three cloth panels in soft folds with their tabs over the rod, each painted
  * with its third of the shop's cloth and swung from its top edge */
-function NorenModel({ tex, panels }: { tex: THREE.Texture | null; panels: React.MutableRefObject<(THREE.Mesh | null)[]> }) {
+/** a natural wood pole's grain: pale peeled cedar, long streaks along it and a knot here and there */
+const POLE_WOOD = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 256; c.height = 64
+  const g = c.getContext('2d')!
+  g.fillStyle = '#c99f6e'; g.fillRect(0, 0, 256, 64)
+  let seed = 3
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  for (let k = 0; k < 70; k++) {
+    const y = rnd() * 64
+    g.strokeStyle = rnd() < 0.5 ? 'rgba(120,80,40,0.35)' : 'rgba(240,210,160,0.35)'
+    g.lineWidth = 0.6 + rnd() * 1.4
+    g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(80, y + rnd() * 4 - 2, 170, y + rnd() * 4 - 2, 256, y); g.stroke()
+  }
+  for (const x of [60, 190]) { g.fillStyle = 'rgba(100,60,30,0.6)'; g.beginPath(); g.ellipse(x, 30, 5, 3, 0, 0, Math.PI * 2); g.fill() }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  return t
+})()
+function NorenModel({ tex, panels, pole = 'lacquer' }: { tex: THREE.Texture | null; panels: React.MutableRefObject<(THREE.Mesh | null)[]>
+  /** the rod: the old black lacquer with brass caps, or a plain pole of natural wood */
+  pole?: 'lacquer' | 'wood' }) {
   const gltf = useGLTF(NOREN_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const r = gltf.scene.clone(true)
@@ -394,14 +461,40 @@ function NorenModel({ tex, panels }: { tex: THREE.Texture | null; panels: React.
       if (k) {
         m.material = new THREE.MeshToonMaterial({ map: panelTex(tex, +k[1]), side: THREE.DoubleSide })
         panels.current[+k[1]] = m
-      } else m.material = src.name === 'NorenBrass' ? new THREE.MeshStandardMaterial({ color: '#c9a04a', metalness: 1, roughness: 0.3 })
+      } else if (pole === 'wood') m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: POLE_WOOD })
+      else m.material = src.name === 'NorenBrass' ? new THREE.MeshStandardMaterial({ color: '#c9a04a', metalness: 1, roughness: 0.3 })
         : new THREE.MeshToonMaterial({ color: src.color.clone() })
     })
     return r
-  }, [gltf, tex, panels])
+  }, [gltf, tex, panels, pole])
   return <primitive object={model} />
 }
 
+/**
+ * The staff's doorway at the back of the kitchen: an opening in the wall, dark beyond, framed in wood, with the shop's old indigo noren
+ * (烤魚, the leaping fish) hung across it, swaying a little. Stood with its back to the wall, facing into the room (+x of its group).
+ */
+export function StaffNoren({ mark }: { mark: string }) {
+  const tex = useMemo(() => norenTexture(mark === '聞野' ? '烤魚' : mark), [mark])
+  const panels = useRef<(THREE.Mesh | null)[]>([])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    panels.current.forEach((m, i) => { if (m) m.rotation.x = Math.sin(t * 1.1 + i * 0.9) * 0.03 })
+  })
+  const W = 1.05, H = 2.0
+  return (
+    <group>
+      {/* (the opening, dark beyond, and its frame of wood: two posts and a lintel standing a little proud of the wall) */}
+      <mesh position={[0, H / 2, 0.005]}><planeGeometry args={[W, H]} /><meshBasicMaterial color="#120c08" /></mesh>
+      {[-1, 1].map((sd) => <mesh key={sd} position={[sd * (W / 2 + 0.04), H / 2 + 0.03, 0.03]}><boxGeometry args={[0.08, H + 0.06, 0.06]} /><meshToonMaterial color="#4a2e1c" /></mesh>)}
+      <mesh position={[0, H + 0.06, 0.03]}><boxGeometry args={[W + 0.16, 0.08, 0.07]} /><meshToonMaterial color="#4a2e1c" /></mesh>
+      <group position={[0, H - 0.02, 0.12]}><NorenModel tex={tex} panels={panels} /></group>
+    </group>
+  )
+}
+
+/** how much bigger than the doorway the way in's noren is drawn */
+const NOREN_BIG = 1.3
 /** how long the noren's two cords are, from the beam down to its rod (the rod hung 0.18 higher than it was) */
 const NOREN_CORD = 0.18
 

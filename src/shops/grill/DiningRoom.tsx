@@ -12,6 +12,7 @@ import { reflectStudio, useStudio } from '@/scene/studio'
 import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
+import { StaffNoren } from './GuestBar3D'
 import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, restockDrink, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
@@ -3404,6 +3405,10 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
       <Movable id="willow" label="柳樹"><StaticBatch key={lang}>
         <group position={at(3.55, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       </StaticBatch></Movable>
+      {/* the staff's doorway in the back wall over their mat, the shop's old indigo noren across it */}
+      <Movable id="staffnoren" label="員工休息室門簾">
+        <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay + 0.3)} rotation-y={face} scale={0.5} userData={{ fade: true }}><StaffNoren mark="聞野" /></group>
+      </Movable>
       <Movable id="staffmat" label="員工專用墊"><StaticBatch key={lang}>
         <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
       </StaticBatch></Movable>

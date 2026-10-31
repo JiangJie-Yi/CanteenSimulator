@@ -512,6 +512,17 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 /** the freezer's lid, opened by hand (a click): it stays up till it's clicked shut */
 export const FREEZER = { open: false }
 const FREEZER_URL = import.meta.env.BASE_URL + 'models/freezer.glb'
+/** a soft round glow, for a lit lamp */
+const GLOW_TEX = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const g = c.getContext('2d')!
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.3, 'rgba(255,255,255,0.45)'); r.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64)
+  return new THREE.CanvasTexture(c)
+})()
 /** the freezer's thermostat: its setting (kept in the browser) and the cavity's temperature as it drifts (game/freezer) */
 const TEMP_KEY = 'jgs-freezer-temp-1'
 export const FREEZER_TEMP = (() => {
@@ -529,28 +540,17 @@ function drawTemp(g: CanvasRenderingContext2D, t: number, setting: boolean) {
   g.fillText('℃', setting ? 188 : 202, 40)
   if (setting) { g.font = 'bold 22px monospace'; g.fillText('SET', 190, 76) }
 }
-/** a button's arrow, white on its dark face */
-const arrowTex = (up: boolean) => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = c.height = 64
-  const g = c.getContext('2d')!
-  g.fillStyle = '#3a444e'; g.fillRect(0, 0, 64, 64)
-  g.fillStyle = '#f2f6f8'; g.beginPath()
-  if (up) { g.moveTo(32, 16); g.lineTo(50, 46); g.lineTo(14, 46) } else { g.moveTo(32, 48); g.lineTo(50, 18); g.lineTo(14, 18) }
-  g.fill()
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-}
-const ARROWS = { up: arrowTex(true), down: arrowTex(false) }
+/** the thermostat knob's angle for a setting: from the coldest a quarter-and-a-half round to the left to the warmest as far right */
+const knobTurn = (set: number) => -((set - FREEZER_MIN) / (FREEZER_MAX - FREEZER_MIN) - 0.5) * Math.PI * 1.5
+/** the knob's ridges round its rim, for a grip */
+const KNOB_RIDGES = Array.from({ length: 16 }, (_, i) => (i / 16) * Math.PI * 2)
 useGLTF.preload(FREEZER_URL)
 /**
  * The ingredient freezer (blender/freezer.py): a wide chest freezer along the kitchen's back wall by the staff door, pale blue-white on a
  * dark plinth, its compressor housing at the right end (louvres, the temperature display and the red lamp), the lid hinged on its back
  * edge, no ink lines round it. Inside, as a fish shop's freezer: whole fish glazed in ice, vacuum-packed fillets, a styrofoam fish box,
  * the saury in a wire basket, blocks of ice, the stock packed below. Its lid swings up for a moment each time something's taken out for an order, a cool light spilling out over what's in it,
- * and it can be opened by hand, a click (and shut again with another). Its display shows the temperature inside, and its two buttons under it set the thermostat (game/freezer).
+ * and it can be opened by hand, a click (and shut again with another). Its display shows the temperature inside, and the knob under it sets the thermostat (game/freezer).
  */
 function IngredientFridge() {
   const lid = useRef<THREE.Object3D | null>(null)
@@ -584,6 +584,8 @@ function IngredientFridge() {
     tex.colorSpace = THREE.SRGBColorSpace
     return { g: c.getContext('2d')!, tex, last: '' }
   }, [])
+  const knob = useRef<THREE.Group>(null)
+  const knobCap = useRef<THREE.Group>(null)
   const press = (dir: 1 | -1) => {
     FREEZER_TEMP.set = stepTemp(FREEZER_TEMP.set, dir)
     FREEZER_TEMP.shownAt = performance.now()
@@ -596,6 +598,8 @@ function IngredientFridge() {
     const shows = setting ? FREEZER_TEMP.set : Math.round(FREEZER_TEMP.now)
     const key = `${shows}${setting}`
     if (key !== temp.last) { temp.last = key; drawTemp(temp.g, shows, setting); temp.tex.needsUpdate = true }
+    // (the knob turns to its setting, a quick ease)
+    if (knobCap.current) knobCap.current.rotation.z += (knobTurn(FREEZER_TEMP.set) - knobCap.current.rotation.z) * Math.min(1, dt * 12)
     // (the lid hinged on its back edge, swinging up and over)
     if (lid.current) lid.current.rotation.x += ((-open * 1.85) - lid.current.rotation.x) * 0.1
     if (light.current) light.current.intensity += (open * 0.45 - light.current.intensity) * 0.12
@@ -614,16 +618,53 @@ function IngredientFridge() {
         <planeGeometry args={[0.1, 0.038]} />
         <meshBasicMaterial map={temp.tex} toneMapped={false} />
       </mesh>
-      {([['up', 1, -0.055], ['down', -1, -0.005]] as const).map(([k, dir, dx]) => (
-        <mesh key={k} position={[W / 2 - HOUSE / 2 + dx, 0.575, 0.74 / 2 + 0.008]}
-          onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; press(dir) }}
-          onPointerOver={(e) => { e.stopPropagation(); handOver.onPointerOver(e); setTip({ title: '溫控', hint: `點一下${dir > 0 ? '調高' : '調低'} 1℃（${FREEZER_MIN}～${FREEZER_MAX}℃）` }) }}
+      {/* the thermostat: a knob under the display, its white mark pointing to the setting; a click on its left turns it colder, on
+          its right warmer (a degree a time), and the wheel turns it too */}
+      <group name="FreezerKnob" position={[W / 2 - HOUSE / 2 - 0.03, 0.562, 0.74 / 2 + 0.004]}>
+        <group ref={knob}
+          onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; press(e.point.clone().sub(e.eventObject.getWorldPosition(new THREE.Vector3())).dot(new THREE.Vector3(1, 0, 0).applyQuaternion(e.eventObject.getWorldQuaternion(new THREE.Quaternion()))) < 0 ? -1 : 1) }}
+          onWheel={(e) => { e.stopPropagation(); if (getEdit().on) return; press(e.deltaY > 0 ? -1 : 1) }}
+          onPointerOver={(e) => { e.stopPropagation(); handOver.onPointerOver(e); setTip({ title: '溫控旋鈕', hint: `點左邊調冷、右邊調暖（或滾輪），${FREEZER_MIN}～${FREEZER_MAX}℃` }) }}
           onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
-          <boxGeometry args={[0.03, 0.022, 0.008]} />
-          <meshToonMaterial attach="material-4" color="#ffffff" map={ARROWS[k]} />
-          {[0, 1, 2, 3, 5].map((i) => <meshToonMaterial key={i} attach={`material-${i}`} color="#3a444e" />)}
+          {/* (its skirt, chrome, and the black cap with ridges round it) */}
+          <mesh rotation-x={Math.PI / 2} position-z={0.004}>
+            <cylinderGeometry args={[0.024, 0.026, 0.008, 28]} />
+            <meshStandardMaterial color="#c9d0d6" metalness={0.85} roughness={0.25} />
+          </mesh>
+          <group ref={knobCap}>
+            <mesh rotation-x={Math.PI / 2} position-z={0.016}>
+              <cylinderGeometry args={[0.018, 0.02, 0.018, 24]} />
+              <meshStandardMaterial color="#22272c" metalness={0.1} roughness={0.45} />
+            </mesh>
+            {KNOB_RIDGES.map((a) => (
+              <mesh key={a} position={[Math.cos(a) * 0.0195, Math.sin(a) * 0.0195, 0.016]} rotation-z={a}>
+                <boxGeometry args={[0.003, 0.003, 0.016]} />
+                <meshStandardMaterial color="#15191c" roughness={0.5} />
+              </mesh>
+            ))}
+            {/* (the white mark on its face) */}
+            <mesh position={[0, 0.011, 0.0255]}><boxGeometry args={[0.003, 0.012, 0.001]} /><meshBasicMaterial color="#f4f4ee" /></mesh>
+          </group>
+        </group>
+        {/* (the scale round it: a dot at each end and the middle, blue for cold, red for warm) */}
+        {[-1, 0, 1].map((k) => (
+          <mesh key={k} position={[Math.sin(k * Math.PI * 0.75) * 0.033, Math.cos(k * Math.PI * 0.75) * 0.033, 0.001]}>
+            <circleGeometry args={[0.003, 10]} />
+            <meshBasicMaterial color={k < 0 ? '#3a7ad0' : k > 0 ? '#d04a3a' : '#e8eaec'} />
+          </mesh>
+        ))}
+      </group>
+      {/* the power lamp: a red glass bulb in the chrome bezel, lit from inside, a highlight on its glass and a soft glow round it */}
+      <group position={[W / 2 - HOUSE / 2 + 0.07, 0.62, 0.74 / 2 + 0.008]}>
+        <mesh scale={[1, 1, 0.7]}>
+          <sphereGeometry args={[0.011, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshPhysicalMaterial color="#ff3a2a" emissive="#ff2a18" emissiveIntensity={1.6} roughness={0.08} clearcoat={1} transmission={0.2} toneMapped={false} />
         </mesh>
-      ))}
+        <mesh position={[-0.0035, 0.004, 0.0075]}><sphereGeometry args={[0.0022, 8, 6]} /><meshBasicMaterial color="#fff2ec" toneMapped={false} /></mesh>
+        <sprite scale={[0.06, 0.06, 1]} position-z={0.004}>
+          <spriteMaterial map={GLOW_TEX} color="#ff5a3a" transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        </sprite>
+      </group>
     </group>
   )
 }

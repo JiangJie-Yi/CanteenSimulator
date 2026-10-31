@@ -148,8 +148,8 @@ for k in range(5):
 # (the temperature display, reading -20, in its dark frame)
 box("FzDisplay", (0.11, 0.045, 0.006), (HX - 0.03, 0.62, D / 2 + 0.004), M["lcd"], 0.003, 1, body)
 box("FzDisplayFrame", (0.125, 0.06, 0.004), (HX - 0.03, 0.62, D / 2 + 0.001), M["gasket"], 0.003, 1, body)
-bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.011, location=P(HX + 0.07, 0.62, D / 2 + 0.004))
-o = act(); o.name = "FzLampMesh"; o.data.materials.append(M["lamp"]); body.append(o)
+# (the power lamp's chrome bezel; its glass bulb is the game's own, so it can glow: Decor's IngredientFridge)
+cyl("FzLampBezel", 0.016, 0.008, (HX + 0.07, 0.62, D / 2 + 0.004), (math.pi / 2, 0, 0), M["steel"], body, 20)
 
 # ---------------------------------------------------------------- the lid, hinged on its back edge
 lid = []

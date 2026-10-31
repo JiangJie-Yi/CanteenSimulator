@@ -6640,15 +6640,15 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .food-art-tile { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; }
 .food-art-tile img { width: 92%; height: 92%; object-fit: contain; }
 
-/* ---- behind the shop, where its open sides look out: not a flat wash but a stage's backdrop, a warm glow behind the room fading to a deep
-   edge (day: paper and dusk; night: lamplight into the dark), so the cut-away room reads as a diorama set on it ---- */
+/* ---- behind the shop, where its open sides look out: one blue-grey backdrop, a little lighter behind the room and deeper at the edges, so
+   the cut-away room reads as a diorama set on it (by night the same blue-grey, darker) ---- */
 .canvas-layer {
   background:
-    radial-gradient(ellipse 70% 60% at 55% 45%, rgb(255 236 206 / 0.95), rgb(236 212 178 / 0.0) 70%),
-    radial-gradient(ellipse 120% 100% at 50% 50%, #e9dcc8 0%, #cbb89c 55%, #8f7a62 100%);
+    radial-gradient(ellipse 70% 60% at 55% 45%, rgb(170 186 204 / 0.55), rgb(170 186 204 / 0) 70%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, #8796a8 0%, #6d7b8d 55%, #4d5866 100%);
 }
 :root[data-theme='dark'] .canvas-layer {
   background:
-    radial-gradient(ellipse 60% 55% at 55% 45%, rgb(255 170 90 / 0.22), rgb(255 170 90 / 0) 70%),
-    radial-gradient(ellipse 120% 100% at 50% 50%, #2a2028 0%, #17121a 60%, #08060a 100%);
+    radial-gradient(ellipse 60% 55% at 55% 45%, rgb(110 126 150 / 0.3), rgb(110 126 150 / 0) 70%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, #3a4452 0%, #2a323d 60%, #1a1f27 100%);
 }
