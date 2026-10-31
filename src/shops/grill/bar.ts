@@ -453,9 +453,11 @@ export function payOf(cs: Counter[]) {
   return { spot: at(TILL.along, TILL.lay - TILL.D / 2 - 0.46), lane: at(0.4, TILL.lay - TILL.D / 2 - 0.46), aisle: at(0.4, -AISLE) }
 }
 
-/** the pass, in the bar's own frame (on the first counter's top, at its start, the customers' side of it) */
-export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + 0.2)
-  .addScaledVector(cs[0].lay, -0.16)
+/** the pass, in the bar's own frame: on the first counter's top, on the kitchen's half of it, between its first two places (`PASS_ALONG`
+ * in from its start), so what's put out there doesn't stand at a customer's place as if it were theirs */
+export const PASS_ALONG = 0.75
+export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + PASS_ALONG)
+  .addScaledVector(cs[0].lay, 0.14)
 
 /**
  * The whole shop's floor as one rectangle, in the first counter's frame (along it and across it, lay, from its middle):

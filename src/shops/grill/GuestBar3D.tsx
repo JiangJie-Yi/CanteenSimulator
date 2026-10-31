@@ -45,7 +45,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { SHRINE_FLOWERS, PLATE_STACK_Y, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { PASS_ALONG, SHRINE_FLOWERS, PLATE_STACK_Y, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -1433,7 +1433,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const pass = useMemo(() => passOf(counters), [counters])
   const passSpot = useMemo(() => {
     const c0 = counters[0]
-    return c0.at.clone().addScaledVector(c0.along, -c0.length / 2 - 0.25).addScaledVector(c0.lay, -0.75)
+    // (in the aisle across the bar from the pass, between the first two stools)
+    return c0.at.clone().addScaledVector(c0.along, -c0.length / 2 + PASS_ALONG).addScaledVector(c0.lay, -0.75)
   }, [counters])
   /** where the first counter's aisle meets another's */
   const aisleCorner = (c: Counter) => {
