@@ -929,7 +929,7 @@ function CubbyFrame() {
  * the pointer's gone; kept open while the pointer's inside, so what's there can be taken), and a click keeps them open (another shuts
  * them). `front`: the face they hang on (lay); `back`: how far in the cupboard goes (lay), its inside dark.
  */
-function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.075, back = CUBBY.lay[0] }: { along: [number, number]
+function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, back = CUBBY.lay[0] }: { along: [number, number]
   hinge: 'low' | 'high' | 'both'; front?: number; back?: number }) {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const top = -0.3, bottom = floor + CUBBY.plinth
