@@ -13,7 +13,9 @@ const URL = process.argv[2] ?? 'http://localhost:5173/JapaneseGrillSimulator/'
 // (only the grill is open in this build; a new game starts in it, already set up)
 const SHOPS = ['grilledfish']
 const ONLY = process.argv.slice(3)
-const OPEN_FOR = Number(process.env.OPEN_FOR ?? 40000)
+// (software GL draws the full shop at about ten frames a second, and the customers' clock runs by the frame (each frame's step held to a
+// tenth of a second): the first order takes about a minute to come in)
+const OPEN_FOR = Number(process.env.OPEN_FOR ?? 90000)
 
 // (CHROME_PATH: a Chromium to use instead of the installed Chrome, e.g. in a container)
 const browser = await chromium.launch({ ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }), headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
