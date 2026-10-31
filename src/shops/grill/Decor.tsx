@@ -658,7 +658,9 @@ function IngredientFridge() {
       <group position={[W / 2 - HOUSE / 2 + 0.07, 0.62, 0.74 / 2 + 0.008]}>
         <mesh scale={[1, 1, 0.7]}>
           <sphereGeometry args={[0.011, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshPhysicalMaterial color="#ff3a2a" emissive="#ff2a18" emissiveIntensity={1.6} roughness={0.08} clearcoat={1} transmission={0.2} toneMapped={false} />
+          {/* (glassy by its clear coat and its glint, not by transmission: a transmissive material anywhere makes three draw the whole
+              room a second time every frame, for what shows through it) */}
+          <meshPhysicalMaterial color="#ff3a2a" emissive="#ff2a18" emissiveIntensity={1.6} roughness={0.08} clearcoat={1} toneMapped={false} />
         </mesh>
         <mesh position={[-0.0035, 0.004, 0.0075]}><sphereGeometry args={[0.0022, 8, 6]} /><meshBasicMaterial color="#fff2ec" toneMapped={false} /></mesh>
         <sprite scale={[0.06, 0.06, 1]} position-z={0.004}>

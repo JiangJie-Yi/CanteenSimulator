@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { IndoorHDRI } from '@/scene/IndoorHDRI'
 import { FpsMeter } from '@/scene/FpsMeter'
-import { ContactShadows, Html, OrbitControls, useGLTF } from '@react-three/drei'
+import { Html, OrbitControls, useGLTF } from '@react-three/drei'
 import { LoadingScreen } from '@/ui/LoadingScreen'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -866,9 +866,6 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
           </group>
         )
       })}
-
-      <ContactShadows position={[0, 0, 0]} opacity={look.shadowOpacity * 0.8} color={look.shadow} scale={6}
-        blur={2.6} far={1.5} />
 
       {/* (the hangings that come between the camera and what it's looking at fade out of the way) */}
       <OccluderFade target={() => controls.current?.target} />
@@ -1983,9 +1980,10 @@ export default function App() {
           // (a screen at its plain resolution (devicePixelRatio 1, as most desktops) is drawn a little finer than it shows, then scaled down:
           // with the antialiasing that keeps edges from stepping; the frame pacer drops it to 1 if the frames can't keep up)
           dpr={typeof window === 'undefined' ? 1 : Math.min(QUALITY.dpr, Math.max(window.devicePixelRatio || 1, phone ? 1 : 1.5))}
-          onCreated={({ gl, camera, scene }) => {
-            // (in development, the renderer's counts are to hand for checking how heavy a view is)
-            if (import.meta.env.DEV) Object.assign(window, { __gl: gl, __cam: camera, __scene: scene, __THREE: THREE })
+          onCreated={({ gl, camera, scene, get }) => {
+            // (in development, the renderer's counts are to hand for checking how heavy a view is; and the canvas's state (its frame
+            // callbacks), for timing them)
+            if (import.meta.env.DEV) Object.assign(window, { __gl: gl, __cam: camera, __scene: scene, __THREE: THREE, __r3f: get })
             // if the phone runs out of GPU memory the browser drops the 3D view and it would stay blank:
             // reload once to bring it back
             gl.domElement.addEventListener('webglcontextlost', (e) => {

@@ -2,21 +2,29 @@ import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { GAME_SPEED } from './speed'
 
-/** below this many frames a second (averaged over a couple of seconds) the view is lagging */
+/** below this many frames a second (the typical frame over a couple of seconds) the view is lagging */
 const LAG_FPS = 40
 /** how long it's watched before each step down (s) */
 const WINDOW_S = 2.5
+/** how long after it starts before it judges at all (s): while the shop's still loading (its models coming in, its shaders compiled the
+ * first time each is seen) the frames come slow and uneven, and that's no measure of the machine */
+const WARMUP_S = 10
+/** a frame this long (s) is a hitch (something loading, a shader compiling), not the drawing being slow: the window starts over */
+const HITCH_S = 0.25
 /** the frame rate it's held to once it's still lagging on a lighter canvas */
 const CAP_FPS = 30
 /** the longest step the game takes in one frame (s): a stall (a hidden tab, a hitch) isn't a leap forward */
 const MAX_STEP = 0.1
+/** ?pace=0: never steps down (for measuring how heavy a view is) */
+const OFF = typeof location !== 'undefined' && new URLSearchParams(location.search).get('pace') === '0'
 
 /**
  * Drives the 3D view's clock, and keeps it smooth on a machine that can't keep up.
  *
  * - Lagging: when the frame rate stays low it first draws the canvas at one pixel per screen pixel, and if that isn't
  *   enough holds it to a steady 30 frames a second (an even 30 looks smoother than a stuttering 40). It only steps
- *   down, once each, for the session.
+ *   down, once each, for the session; it judges by the typical frame (the median, so a hitch now and then doesn't count), and not
+ *   until the shop's had time to load.
  * - Game speed (GAME_SPEED, the ×2 button): the loop is run by hand, the game's clock moving on at that many times
  *   the real one, so everything in the scene (cooking, customers, servers) goes that much faster together.
  *
@@ -24,23 +32,29 @@ const MAX_STEP = 0.1
  * jumps.
  */
 export function FramePacer() {
-  const { setDpr, setFrameloop, advance, clock } = useThree()
+  const { setDpr, setFrameloop, advance, clock, gl } = useThree()
   const level = useRef(0)
-  const frames = useRef(0)
+  const times = useRef<number[]>([])
   const since = useRef(0)
+  const age = useRef(0)
   const capped = useRef(false)
 
   useFrame((_, dt) => {
-    if (level.current >= 2 || document.hidden) return
+    // (stepped down to one pixel per screen pixel, it stays there: the canvas's own size, set again as the page redraws, would undo it)
+    if (level.current >= 1 && gl.getPixelRatio() !== 1) setDpr(1)
+    if (OFF || level.current >= 2 || document.hidden) return
     // (a long gap is the tab coming back, or loading: not the drawing being slow; and at ×2 the clock runs faster
     // than the frames come, so it's real frames per real second that are counted)
     const real = dt / GAME_SPEED.value
-    if (real > 0.5) return
-    frames.current++
+    age.current += Math.min(real, 0.5)
+    if (age.current < WARMUP_S) return
+    if (real > HITCH_S) { times.current = []; since.current = 0; return }
+    times.current.push(real)
     since.current += real
     if (since.current < WINDOW_S) return
-    const fps = frames.current / since.current
-    frames.current = 0
+    const sorted = times.current.sort((a, b) => a - b)
+    const fps = 1 / sorted[sorted.length >> 1]
+    times.current = []
     since.current = 0
     if (fps >= LAG_FPS) return
     level.current++
