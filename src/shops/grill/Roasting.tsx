@@ -20,6 +20,7 @@ import { LINES } from '@/data/lines'
 import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
 import { StaffFigure } from '@/scene/StaffFigure'
+import { QUALITY } from '@/scene/quality'
 import { kindOf, type GuestKind } from '@/data/guests'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
@@ -40,7 +41,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { ALONG, handOver, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -195,7 +196,7 @@ const DRAG_PIECES = false
 /** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
 const PLATE_TOP: [number, number, number] = [1.45, 0.02, -1.24]
 /** what lives in the cubby under the table: kept there, not carried about (it's under the top, not on it) */
-const CUBBY_KEYS = new Set(['plate-0', 'dish-0', 'rawdish', 'trash', 'basket-0'])
+const CUBBY_KEYS = new Set(['plate-0', 'dish-0', 'rawdish'])
 /**
  * Spare plates and dishes stacked where the first of each stands, as they are in a shop: the one in use sits on top
  * of the stack, and taken off it (dragged away), it leaves the rest standing. How many under each, and how high each
@@ -721,27 +722,42 @@ export type CrewMember = { id: string; role: Role; look: Look }
  */
 const KITCHEN_YAW = Math.atan2(-ALONG.x, -ALONG.z)
 const kitchenAt = (lay: number) => new THREE.Vector3().addScaledVector(LAY, lay).addScaledVector(ALONG, 3.55).setY(GRILL_OFFSET.y - KITCHEN_DROP)
-/** one of the staff at their place; once the shop's shut and empty (SHOP.leaving) they walk out by the staff door and are gone */
-function CrewWalk({ at, yaw, children }: { at: THREE.Vector3; yaw: number; children: React.ReactNode }) {
+/** a place in the bar's plan (the first counter's frame) as the crew stand (Roasting's frame: the fire FIRE_SHIFT along from the bar's), and back */
+const fromBar = (v: THREE.Vector3) => toGrillScene(v).sub(FIRE_SHIFT)
+const toBar = (v: THREE.Vector3) => v.clone().add(FIRE_SHIFT).sub(GRILL_OFFSET).divideScalar(GRILL_SCALE)
+/** the floor under a place (Roasting's frame): the kitchen's raised floor, or the customers' */
+const floorAt = (v: THREE.Vector3) => (inKitchen(GRILL_COUNTERS, toBar(v)) ? GRILL_OFFSET.y - KITCHEN_DROP : GRILL_OFFSET.y)
+/**
+ * The crew's way home once the shop's shut and empty (Roasting's frame), each from their place: past the table's end (between it and the
+ * rice tub) to the gate by the till, through it and out of the front door; the cook first out of his notch, along the table's front;
+ * the cashier along behind the till to the gate.
+ */
+function crewWayOut(role: Role, at: THREE.Vector3) {
+  const end = (lay: number) => new THREE.Vector3().addScaledVector(ALONG, 2.95).addScaledVector(LAY, lay)
+  const via = role === 'chef' ? [end(2.62), end(-0.8)] : role === 'sous' ? [end(1.3), end(-0.8)]
+    : role === 'cashier' ? [new THREE.Vector3().addScaledVector(ALONG, 5.35).addScaledVector(LAY, -0.5)] : []
+  return [at.clone(), ...via, ...staffWayOut(GRILL_COUNTERS).map(fromBar)].map((v) => v.setY(floorAt(v)))
+}
+/** one of the staff at their place; once the shop's shut and empty (SHOP.leaving) they walk their way out (`way`) and are gone */
+function CrewWalk({ at, yaw, way, children }: { at: THREE.Vector3; yaw: number; way: THREE.Vector3[]; children: React.ReactNode }) {
   const g = useRef<THREE.Group>(null)
-  const exit = useMemo(() => toGrillScene(staffDoorAt(GRILL_COUNTERS[0])).setY(GRILL_OFFSET.y), [])
+  const gone = useRef(0)
+  const len = useMemo(() => pathLength(way), [way])
   useFrame((_, dt) => {
     const o = g.current
     if (!o) return
     if (!SHOP.leaving) {
+      gone.current = 0
       o.position.copy(at)
       o.rotation.y = yaw
       o.visible = true
       return
     }
-    const d = exit.clone().sub(o.position).setY(0)
-    const len = d.length()
-    if (len > 0.05) {
-      o.position.addScaledVector(d.normalize(), Math.min(len, Math.min(dt, 0.1) * 1.6))
-      o.rotation.y = Math.atan2(d.x, d.z)
-    }
-    o.position.y = at.y
-    o.visible = len > 0.2
+    gone.current = Math.min(len, gone.current + Math.min(dt, 0.1) * 1.6)
+    const { p, dir } = alongPath(way, gone.current)
+    o.position.copy(p)
+    if (dir.x || dir.z) o.rotation.y = Math.atan2(dir.x, dir.z)
+    o.visible = gone.current < len - 0.2
   })
   return <group ref={g} position={at} rotation-y={yaw} scale={CHEF_SCALE}>{children}</group>
 }
@@ -763,7 +779,7 @@ function crewPlaces(crew: CrewMember[]) {
     const k = used[m.role] ?? 0
     used[m.role] = k + 1
     const spot = spots[m.role][k]
-    return spot ? [{ m, ...spot }] : []
+    return spot ? [{ m, ...spot, way: crewWayOut(m.role, spot.at) }] : []
   })
 }
 /** where the cook stands (on the floor, in the notch), and the way he faces: in at the fire */
@@ -830,8 +846,8 @@ function CookTableImpl({ floor = true }: { floor?: boolean }) {
         inset={[[0.06, -0.01, 0.06, 0.06], [-0.01, 0.06, 0.06, -0.01], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, -0.01], [-0.01, 0.06, 0.06, -0.01]][i] as [number, number, number, number]} />)}
       <CubbyFrame />
       {/* (the cubbies either side a door each, hung at the table's ends; under the hearth, at the back of the notch, a pair) */}
-      <CubbyDoors along={CUBBY2.along as [number, number]} hinge="low" />
-      <CubbyDoors along={CUBBY.along as [number, number]} hinge="high" />
+      <CubbyDoors along={CUBBY2.along as [number, number]} hinge="low" lit />
+      <CubbyDoors along={CUBBY.along as [number, number]} hinge="high" lit />
       <CubbyDoors along={COOK_NOTCH.along as [number, number]} hinge="both" front={COOK_NOTCH.lay[0] - 0.06} back={COOK_NOTCH.lay[0] - 0.36} />
       <CookTableTop />
       {/* (the same boards as the customers', laid the same way; with the shop open and the room drawn, its one floor
@@ -927,10 +943,13 @@ function CubbyFrame() {
  * end (`hinge` 'low' or 'high' along the table) or a pair hung at both ends meeting in the middle ('both'), a small oval pull let in
  * near each free edge. Shut, they close it off; pointed at they swing open outward so what's in it shows (shutting again a moment after
  * the pointer's gone; kept open while the pointer's inside, so what's there can be taken), and a click keeps them open (another shuts
- * them). `front`: the face they hang on (lay); `back`: how far in the cupboard goes (lay), its inside dark.
+ * them). `front`: the face they hang on (lay); `back`: how far in the cupboard goes (lay), its inside dark. `lit`: a strip of warm
+ * light under its header inside, coming on as the doors open (and off as they shut, so none leaks out through them), lighting what's in it.
  */
-function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, back = CUBBY.lay[0] }: { along: [number, number]
-  hinge: 'low' | 'high' | 'both'; front?: number; back?: number }) {
+const STRIP_OFF = new THREE.Color('#5a4a38')
+const STRIP_ON = new THREE.Color('#fff0cc')
+function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, back = CUBBY.lay[0], lit = false }: { along: [number, number]
+  hinge: 'low' | 'high' | 'both'; front?: number; back?: number; lit?: boolean }) {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const top = -0.3, bottom = floor + CUBBY.plinth
   const H = top - bottom, span = a1 - a0
@@ -940,6 +959,9 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
   const doors = useRef<(THREE.Group | null)[]>([])
   const frame = useRef<THREE.Group>(null)
   const st = useRef({ k: 0, kept: false, hoverUntil: 0 })
+  const lamp = useRef<THREE.PointLight>(null)
+  const strip = useRef<THREE.MeshBasicMaterial>(null)
+  if (import.meta.env?.DEV && typeof window !== 'undefined') ((window as unknown as { __cubbies?: Record<string, typeof st> }).__cubbies ??= {})[hinge] = st
   const geo = useMemo(() => panelBox(W, H, 0.025, 0.45), [W, H])
   // (the cupboard's opening, in the doors' own frame: while the pointer's over it, they stay open, so what's inside can be reached and taken)
   const inside = useMemo(() => new THREE.Box3(new THREE.Vector3(-span / 2, bottom, back - front), new THREE.Vector3(span / 2, top, 0.06)), [span, bottom, top, front, back])
@@ -957,6 +979,8 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
     // (each door about its hinge at its outer edge, its free edge swinging out toward the cook, a little past square)
     const e = s.k * s.k * (3 - 2 * s.k)
     doors.current.forEach((d, i) => { if (d) d.rotation.y = leaves[i] * e * 1.75 })
+    if (lamp.current) lamp.current.intensity = e * 1.6
+    strip.current?.color.lerpColors(STRIP_OFF, STRIP_ON, Math.min(1, e * 1.5))
   })
   const tip = () => setTip({ title: '櫃門', hint: st.current.kept ? '點一下關上' : '點一下打開' })
   const over = (e: Parameters<typeof handOver.onPointerOver>[0]) => {
@@ -966,6 +990,15 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
   }
   return (
     <group ref={frame} position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+      {lit && (
+        <>
+          <mesh name={`CubbyStrip-${hinge}`} position={[0, top - 0.007, -0.045]}>
+            <boxGeometry args={[span - 0.12, 0.012, 0.022]} />
+            <meshBasicMaterial ref={strip} color={STRIP_OFF} toneMapped={false} />
+          </mesh>
+          {QUALITY.tier === 'high' && <pointLight ref={lamp} position={[0, top - 0.05, (back - front) * 0.35]} color="#ffd8a0" intensity={0} distance={1.4} decay={2} />}
+        </>
+      )}
       {/* (under the hearth the cupboard's only a shallow one: its inside dark, seen with the doors open) */}
       {hinge === 'both' && (
         <mesh position={[0, bottom + H / 2, 0.001]}>
@@ -2676,7 +2709,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   const bowlAt = () => { const v = new THREE.Vector3(...BOWL_TOP).add(nudge('bowl-0')); clearOfHearth(v, BOWL_R); return v }
   const basketAt = (n: number) => {
-    // (the first lives in the left cubby, on its shelf; more, as they're needed, stand on the table's top in a row)
+    // (the first stands at the table's left end; more, as they're needed, stand on the table's top in a row)
     const [x, y, z] = n === 0 ? roast.basket!.at : BASKET_TOP
     return new THREE.Vector3(x, y, z).addScaledVector(LAY_DIR, -Math.max(0, n - 1) * BASKET_STEP).add(nudge(`basket-${n}`))
   }
@@ -4014,7 +4047,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       carriedOut.current = out
       if (carriedOut.current) next.y = LIFT - base.y
       // (taken out of the cubby, it comes up onto the table's top)
-      if (!carriedOut.current && CUBBY_KEYS.has(s.key)) next.y = (s.key === 'plate-0' ? PLATE_TOP[1] : s.key === 'trash' || s.key === 'basket-0' ? 0 : DISH_TOP[1]) - base.y
+      if (!carriedOut.current && CUBBY_KEYS.has(s.key)) next.y = (s.key === 'plate-0' ? PLATE_TOP[1] : DISH_TOP[1]) - base.y
       moved.current.set(s.key, next)
       if (carriers[s.key]) {
         // the box carries its pots and utensils with it, the bucket its dipper
@@ -4997,7 +5030,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   })
 
   const byKey = (key: string) => pieces.current.find((p) => p.key === key)
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pieces: pieces, __collect: collect, __moved: moved })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pieces: pieces, __collect: collect, __moved: moved,
+    __table: () => containerKeys().map((k) => ({ k, at: containerAt(k).toArray().map((v) => +v.toFixed(3)), r: footprint(k) })) })
 
   return (
     <>
@@ -5065,8 +5099,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           <Boss to={BOSS_WALK} open={space === 'open'} lang={lang}><BlobShadow r={0.24} /></Boss>
         </group></Movable>
       )}
-      {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw }) => (
-        <CrewWalk key={m.id} at={at} yaw={yaw}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></CrewWalk>
+      {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw, way }) => (
+        <CrewWalk key={m.id} at={at} yaw={yaw} way={way}><BlobShadow r={0.17} /><StaffFigure id={m.id} role={m.role} look={m.look} /></CrewWalk>
       ))}
       </group>
       {bar && <Bar />}

@@ -541,11 +541,19 @@ export const GRILL_COUNTERS: Counter[] = [
     far: FLOOR_FAR - 0.45 - SIDE_PULL },
 ]
 export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)
-/** the staff door in the room's front edge (the first counter's frame: along it, and lay from its middle) and the spot just
- * inside it, where the staff go in and out */
-// (the mat's outer edge flush with the room's front edge, lay 3.97: its middle half its depth in from it)
-export const STAFF_DOOR = { along: 2.9, lay: 4.1 }
-export const staffDoorAt = (c: Counter, lay = STAFF_DOOR.lay - 0.25) => c.at.clone().addScaledVector(c.along, STAFF_DOOR.along).addScaledVector(c.lay, lay)
+/**
+ * The staff's way home once the shop's shut and empty (the first counter's frame): from just inside its gate by the till, through it and
+ * along the aisle out of the front door, as the customers go. Each comes to it their own way first.
+ */
+export function staffWayOut(cs: Counter[]): THREE.Vector3[] {
+  const c = cs[0], { mid } = gateOf(c, BAR_GATES[0])
+  return [mid.clone().addScaledVector(c.lay, 0.45), mid.clone().addScaledVector(c.lay, -0.5), doorOf(cs)]
+}
+/** whether a place (the first counter's frame) is over the kitchen's raised floor */
+export function inKitchen(cs: Counter[], p: THREE.Vector3) {
+  const k = kitchenOf(cs), d = p.clone().sub(cs[0].at), a = d.dot(cs[0].along), l = d.dot(cs[0].lay)
+  return a > k.along[0] && a < k.along[1] && l > k.lay[0] && l < k.lay[1]
+}
 /**
  * The grill's bar, stools and customers are all drawn this much bigger than their sizes here, to stand beside the
  * fire pit and its big skewers: scaled about the inside corner of the two counters' cook's edges, so those edges stay

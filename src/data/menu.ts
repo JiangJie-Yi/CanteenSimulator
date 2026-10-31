@@ -214,8 +214,8 @@ export const DISHES: Dish[] = [
       // (the plates and dishes are kept in the cubby under the cook's table: the big plate on its floor, the side dishes on its
       // shelf over it; Roasting's plateAt and dishAt put the ones past the first back on the table's top, where this was)
       plate: [2.333, -1.26, 0.224],
-      // just outside the stones on the left as the camera sees it
-      basket: { at: [-0.412, -0.74, 2.16], capacity: 20 },
+      // (on the table's top at its left end, clear of the hearth, behind the bin)
+      basket: { at: [-1.821, 0, 0.768], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
       // (in the front row, left of the miso soup bowls)
       dish: { at: [2.133, -0.74, 0.374], capacity: 3 },
@@ -233,9 +233,8 @@ export const DISHES: Dish[] = [
       // a bucket of water for splashing, the trash bin beside it (both on the left); the tray where ordered food
       // waits to go on the fire
       bucket: ['WaterBucket', 'WaterDipper'],
-      // (the bin to the left of the bucket, where it can be seen, not hidden behind it)
-      // (kept on the table, whose left edge is drawn in by the side counter's pull: SIDE_PULL in shops/grill/bar.ts)
-      trash: [-0.533, -1.26, 2.248],
+      // (the bin on the table's top at its left end, in front of the basket, between it and the tray, where it can be seen)
+      trash: [-1.285, 0, 1.556],
       tray: [-0.31, 0.0, 2.16],
       // the rice balls come out on their own little dish, just past the front end of the tray
       // (beside the front end of the tray, between it and the basket: the prep side, all on the right)

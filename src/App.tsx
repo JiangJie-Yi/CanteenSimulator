@@ -550,7 +550,9 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   const homeTarget = useMemo(() => new THREE.Vector3(), [])
   // (what the camera was last homed for: a change in the canvas's own shape alone (the menu folding or opening, edit mode folding it) isn't a reason to
   // glide it back: it stays as it is, and only a new dish, the reset button, the overview or a resized window homes it)
-  const homedFor = useRef<{ active: number; resetView: number; view: ViewId; w: number; h: number } | null>(null)
+  const homedFor = useRef<{ active: number; resetView: number; view: ViewId; w: number; h: number; camTry: number } | null>(null)
+  /** a view's placed camera not yet laid out when it was wanted (just loaded: turned about a middle not yet measured): looked for again */
+  const [camTry, setCamTry] = useState(0)
   // (where the camera glides to and looks at: the grill's home view, the whole shop, or a part of it; `home` itself stays the grill's, camera 1's base)
   const aimPos = useRef(new THREE.Vector3())
   const aimTarget = useMemo(() => new THREE.Vector3(), [])
@@ -588,8 +590,9 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   }
   useEffect(() => {
     const was = homedFor.current
-    homedFor.current = { active, resetView, view, w: size.width, h: size.height }
-    if (was && was.active === active && was.resetView === resetView && was.view === view && was.w === size.width && was.h === size.height && frame.w > 0 && frame.h > 0) return
+    homedFor.current = { active, resetView, view, w: size.width, h: size.height, camTry }
+    if (was && was.active === active && was.resetView === resetView && was.view === view && was.w === size.width && was.h === size.height && was.camTry === camTry
+      && frame.w > 0 && frame.h > 0) return
     const focus = new THREE.Vector3(0, DISHES[active].focusY, 0)
     // (a phone's stage sits above the menu inside a full-height canvas: what fits it is the stage's width against
     // the canvas height, and it mustn't back off just because the menu was folded away)
@@ -603,6 +606,13 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     if (def) { aimPos.current.copy(def.pos); aimTarget.copy(def.target) }
     // (a view whose camera was placed by hand in edit mode (its camera marker moved or turned): from there, looking the way it points)
     const cam = scene.getObjectByName(`viewcam-${view}`)
+    // (its marker still being laid out, as when the shop's just loaded (the free view first of all): the view waits for it, so the first
+    // look is the same as choosing the view again)
+    const laidOut = (o: THREE.Object3D | null | undefined) => { for (let q = o; q; q = q.parent) if (!q.visible) return false; return !!o }
+    if (def && viewCamPlaced(view) && !laidOut(cam) && camTry < 60) {
+      const t = window.setTimeout(() => setCamTry((n) => n + 1), 100)
+      return () => window.clearTimeout(t)
+    }
     if (def && cam && viewCamPlaced(view)) {
       cam.updateWorldMatrix(true, false)
       cam.getWorldPosition(aimPos.current)
@@ -612,7 +622,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     homing.current = true
     homeGap.current = Infinity
     zoomGoal.current = null
-  }, [active, aspect, resetView, view, frame.w, frame.h, size.width, size.height])
+  }, [active, aspect, resetView, view, frame.w, frame.h, size.width, size.height, camTry])
 
   // smooth wheel zoom: each notch nudges a target distance and the camera eases toward it
   const gl = useThree((s) => s.gl)

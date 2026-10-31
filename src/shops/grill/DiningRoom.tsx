@@ -12,10 +12,9 @@ import { reflectStudio, useStudio } from '@/scene/studio'
 import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
-import { StaffNoren } from './GuestBar3D'
 import { BOSS_DRINK } from './Boss'
 import { buyCase, caseCost, CASE_SIZE } from '@/game/drinkStock'
-import { fridgesOf, farOf, STAFF_DOOR, DRINK_BACK, SHOP_PURSE, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
+import { fridgesOf, farOf, DRINK_BACK, SHOP_PURSE, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -3249,61 +3248,7 @@ function BottleCrates() {
  * the kitchen, a pot of bamboo at the dead end of the side counter's aisle, and the empty-bottle crates at the
  * kitchen's end — all of it on the floor out of everyone's way, and facing the room.
  */
-/**
- * The mat that marks where the staff go in and out (関係者専用): a tatami mat, woven rush in pale straw green with the dark
- * cloth border (heri) along its two long sides, the words on a cream plaque in its middle.
- */
-/** the tatami top: fine rush weave along the mat, uneven in tone, with the heri sewn along both long edges */
-const TATAMI_TEX = canvasTex(512, 256, (g) => {
-  g.fillStyle = '#b7b178'
-  g.fillRect(0, 0, 512, 256)
-  // (the rush: thin strands side by side, each a little lighter or darker, with now and then a pale fleck)
-  let seed = 7
-  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
-  for (let y = 0; y < 256; y += 2) {
-    const t = rnd()
-    g.fillStyle = `rgba(${t < 0.5 ? '96,100,52' : '236,228,160'},${0.1 + rnd() * 0.16})`
-    g.fillRect(0, y, 512, 1 + (rnd() < 0.3 ? 1 : 0))
-  }
-  for (let i = 0; i < 900; i++) {
-    g.fillStyle = `rgba(250,244,190,${0.15 + rnd() * 0.2})`
-    g.fillRect(rnd() * 512, rnd() * 256, 6 + rnd() * 18, 1)
-  }
-  // (the weft stitching across the mat, a fine twill)
-  g.strokeStyle = 'rgba(80,80,40,0.10)'
-  g.lineWidth = 1
-  for (let x = 0; x < 512; x += 6) { g.beginPath(); g.moveTo(x, 20); g.lineTo(x, 236); g.stroke() }
-  // (the heri: dark indigo cloth with a thin cream line each side of it and a row of small diamonds)
-  for (const y of [0, 236]) {
-    g.fillStyle = '#1d2540'
-    g.fillRect(0, y, 512, 20)
-    g.fillStyle = '#c9b98a'
-    g.fillRect(0, y === 0 ? 17 : 236, 512, 1.5)
-    g.fillStyle = 'rgba(201,185,138,0.55)'
-    for (let x = 6; x < 512; x += 16) {
-      g.beginPath(); g.moveTo(x, y + 10); g.lineTo(x + 4, y + 6); g.lineTo(x + 8, y + 10); g.lineTo(x + 4, y + 14); g.closePath(); g.fill()
-    }
-  }
-  // (the ends: a sewn edge, a shade darker)
-  g.fillStyle = 'rgba(60,60,30,0.28)'
-  g.fillRect(0, 20, 3, 216); g.fillRect(509, 20, 3, 216)
-})
-/** the mat that marks where the staff go in and out: a flat tatami mat, the words keyed on its middle */
-const MAT = { w: 1.5, d: 0.75, h: 0.03 }
-function StaffMat({ lang: _lang }: { lang: Lang }) {
-  const mats = useMemo(() => {
-    const side = new THREE.MeshToonMaterial({ color: '#8e8a5a' })
-    const top = new THREE.MeshToonMaterial({ color: '#ffffff', map: TATAMI_TEX })
-    return [side, side, top, side, side, side]
-  }, [])
-  return (
-    <group>
-      <mesh position={[0, MAT.h / 2, 0]} material={mats}>
-        <boxGeometry args={[MAT.w, MAT.h, MAT.d]} />
-      </mesh>
-    </group>
-  )
-}
+
 /** the glyphs of the notes that float out of the speaker, drawn once */
 const NOTE_TEX = (() => {
   if (typeof document === 'undefined') return []
@@ -3485,13 +3430,6 @@ function ShopPropsImpl({ counters, lang = 'zh' }: { counters: Counter[]; lang?: 
           (none against the side wall: the two drinks fridges stand there) */}
       <Movable id="willow" label="柳樹"><StaticBatch key={lang}>
         <group position={at(3.55, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
-      </StaticBatch></Movable>
-      {/* the staff's doorway in the back wall over their mat, the shop's old indigo noren across it */}
-      <Movable id="staffnoren" label="員工休息室門簾">
-        <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay + 0.3)} rotation-y={face} scale={0.5} userData={{ fade: true }}><StaffNoren mark="聞野" /></group>
-      </Movable>
-      <Movable id="staffmat" label="員工專用墊"><StaticBatch key={lang}>
-        <group position={at(STAFF_DOOR.along, STAFF_DOOR.lay)} rotation-y={face + Math.PI} scale={0.64}><StaffMat lang={lang} /></group>
       </StaticBatch></Movable>
       <Movable id="bamboo" label="竹盆栽"><StaticBatch key={lang}>
         <group position={cornerAt} rotation-y={0.4}><BambooModel /></group>

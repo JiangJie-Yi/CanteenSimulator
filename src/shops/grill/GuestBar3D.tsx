@@ -45,7 +45,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { SHRINE_FLOWERS, PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { SHRINE_FLOWERS, PLATE_STACK_Y, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -97,7 +97,7 @@ const FOLK_FIT = STAFF_SCALE / PEOPLE_SCALE
 /**
  * The way in's noren, in the manner of a modern shop's: unbleached cotton, plain, the shop's crest large in dark brown across the middle
  * (a rounded diamond, a fine one inside it, and in it the shop's first character in a rounded square), and its name in small spaced
- * capitals under it. The old indigo one now hangs in the staff's doorway (StaffNoren).
+ * capitals under it.
  */
 const crestNorenTexture = (mark: string) => signTexture(384 * 3, 256 * 3, (g) => {
   // (drawn mirrored: the cloth's face is the side toward the room, so the crest and the name read right from inside)
@@ -138,176 +138,6 @@ const crestNorenTexture = (mark: string) => signTexture(384 * 3, 256 * 3, (g) =>
   g.fillText(name, CX, CY + 92)
 })
 
-/** the noren's cloth: deep indigo, a white band of the shop's mark across its three panels, faded at the hem */
-const norenTexture = (mark: string) => signTexture(384 * 3, 256 * 3, (g) => {
-  // (drawn at three times the size it's laid out in, so the crest's fine lines stay crisp up close)
-  g.setTransform(3, 0, 0, 3, 0, 0)
-  // indigo dyed cloth, darker at the top where it's hung, a fine weave, the dye gone uneven
-  const grad = g.createLinearGradient(0, 0, 0, 256)
-  grad.addColorStop(0, '#17244a')
-  grad.addColorStop(0.7, '#25396a')
-  grad.addColorStop(1, '#31487c')
-  g.fillStyle = grad
-  g.fillRect(0, 0, 384, 256)
-  g.strokeStyle = 'rgba(255,255,255,0.05)'
-  for (let y = 0; y < 256; y += 3) {
-    g.beginPath()
-    g.moveTo(0, y)
-    g.lineTo(384, y)
-    g.stroke()
-  }
-  g.strokeStyle = 'rgba(0,0,10,0.12)'
-  for (let x = 0; x < 384; x += 4) {
-    g.beginPath()
-    g.moveTo(x, 0)
-    g.lineTo(x, 256)
-    g.stroke()
-  }
-  // the shop's name, one character on each outer panel, big and bold in the sign font, white dye with a soft
-  // shadow in the cloth; and a crest of waves in a ring on the middle one
-  const [a, b] = [...mark]
-  brushText(g, a ?? '', 64, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
-  brushText(g, b ?? '', 320, 116, 112, { fill: '#f6f0e0', shadow: 'rgba(5,10,30,0.6)' })
-  // the middle panel (all of it inside the middle third, so the seams between the three cloths never cut it): a family crest (家紋) in the way of the
-  // old shop curtains: a ring, and in it one fish leaping from the sea, drawn the way a signwriter would: flat cream shapes on the indigo, one weight of line,
-  // the fish a single sweep of an arc (its body built on a spine, widest behind the head and drawn down to the tail), the sea beneath in three scalloped bands
-  {
-    const CREAM = '#f6f0e0', INDIGO = '#1d2f5c'
-    const CX = 192, CY = 102, R = 56
-    // (the ring: a heavy one and a fine one inside it)
-    g.strokeStyle = CREAM
-    g.lineWidth = 4.2
-    g.beginPath(); g.arc(CX, CY, R, 0, Math.PI * 2); g.stroke()
-    g.lineWidth = 0.9
-    g.beginPath(); g.arc(CX, CY, R - 6.5, 0, Math.PI * 2); g.stroke()
-    g.beginPath(); g.arc(CX, CY, R + 4.5, 0, Math.PI * 2); g.stroke()
-    g.save()
-    g.beginPath(); g.arc(CX, CY, R - 3, 0, Math.PI * 2); g.clip()
-    // (the fish's spine: a cubic from the snout, up over the crest of the leap and down to the tail's root)
-    // (a gentle arch, the fish leaping out of the waves from left to right and about to dive again: not curled on itself)
-    const P: [number, number][] = [[146, 104], [160, 62], [208, 58], [228, 94]]
-    const at = (t: number): [number, number] => {
-      const u = 1 - t
-      return [u * u * u * P[0][0] + 3 * u * u * t * P[1][0] + 3 * u * t * t * P[2][0] + t * t * t * P[3][0], u * u * u * P[0][1] + 3 * u * u * t * P[1][1] + 3 * u * t * t * P[2][1] + t * t * t * P[3][1]]
-    }
-    const dir = (t: number): [number, number] => {
-      const e = 0.001, a1 = at(Math.max(0, t - e)), b1 = at(Math.min(1, t + e)), dx = b1[0] - a1[0], dy = b1[1] - a1[1], l = Math.hypot(dx, dy) || 1
-      return [dx / l, dy / l]
-    }
-    // (half its thickness along it: a round snout, the full belly behind the gills, then drawn fine to the tail's root)
-    const half = (t: number) => 0.98 * (t < 0.1 ? 11.5 * Math.sqrt(t / 0.1) : t < 0.42 ? 11.5 + 3 * Math.sin(((t - 0.1) / 0.32) * Math.PI / 2) : 14.5 - 11.5 * Math.sin(((t - 0.42) / 0.58) * Math.PI / 2) ** 1.4)
-    const side = (t: number, k: number): [number, number] => {
-      const [x, y] = at(t), [dx, dy] = dir(t), h = half(t) * k
-      return [x - dy * h, y + dx * h]
-    }
-    const N = 40
-    const body = () => {
-      g.beginPath()
-      for (let i = 0; i <= N; i++) { const [x, y] = side(i / N, 1); if (i) g.lineTo(x, y); else g.moveTo(x, y) }
-      for (let i = N; i >= 0; i--) { const [x, y] = side(i / N, -1); g.lineTo(x, y) }
-      g.closePath()
-    }
-    g.fillStyle = CREAM
-    // (the dorsal fin, swept back along the arch, and the tail: a forked fin laid along the spine's last direction)
-    {
-      // (on the back, the arch's outer side)
-      const o = (t: number, k: number, along = 0): [number, number] => { const [x, y] = side(t, -1); const [dx, dy] = dir(t); return [x + dy * k + dx * along, y - dx * k + dy * along] }
-      g.beginPath()
-      const f0 = o(0.36, -0.5), f1 = o(0.5, 15, 9), f2 = o(0.66, -0.5)
-      g.moveTo(...f0); g.quadraticCurveTo(...o(0.4, 13, -2), ...f1); g.quadraticCurveTo(...o(0.6, 8, 4), ...f2); g.closePath(); g.fill()
-      const [tx, ty] = at(1), [dx, dy] = dir(1), nx = -dy, ny = dx
-      g.beginPath()
-      g.moveTo(tx - nx * 3.5, ty - ny * 3.5)
-      g.quadraticCurveTo(tx + dx * 8 - nx * 14, ty + dy * 8 - ny * 14, tx + dx * 26 - nx * 15, ty + dy * 26 - ny * 15)
-      g.quadraticCurveTo(tx + dx * 15 - nx * 2, ty + dy * 15 - ny * 2, tx + dx * 27 + nx * 14, ty + dy * 27 + ny * 14)
-      g.quadraticCurveTo(tx + dx * 8 + nx * 14, ty + dy * 8 + ny * 14, tx + nx * 3.5, ty + ny * 3.5)
-      g.closePath(); g.fill()
-    }
-    body(); g.fill()
-    // (the pectoral fin, a leaf tucked back under the gill, in the same cream with an indigo line round it so it reads against the body)
-    {
-      // (on the belly side, swept back)
-      const [x, y] = side(0.3, 0.8), [dx, dy] = dir(0.3)
-      g.save()
-      g.beginPath()
-      g.moveTo(x, y)
-      g.quadraticCurveTo(x + dx * 6 - dy * 9, y + dy * 6 + dx * 9, x + dx * 17 - dy * 10, y + dy * 17 + dx * 10)
-      g.quadraticCurveTo(x + dx * 9 - dy * 1, y + dy * 9 + dx * 1, x, y)
-      g.fillStyle = CREAM; g.strokeStyle = INDIGO; g.lineWidth = 1.6; g.fill(); g.stroke()
-      g.restore()
-    }
-    // (cut away in the indigo: the eye, the gill's curve, the mouth's line, and the scales in rows, each a small arc opening toward the head)
-    g.save()
-    body(); g.clip()
-    g.strokeStyle = INDIGO; g.fillStyle = INDIGO; g.lineCap = 'round'
-    {
-      const [ex, ey] = side(0.075, 0.36)
-      g.beginPath(); g.arc(ex, ey, 2.7, 0, Math.PI * 2); g.fill()
-      g.fillStyle = CREAM; g.beginPath(); g.arc(ex + 0.8, ey - 0.8, 0.8, 0, Math.PI * 2); g.fill()
-      g.lineWidth = 1.9
-      g.beginPath()
-      const a0 = side(0.24, 1.05), a1 = side(0.27, 0), a2 = side(0.24, -1.05)
-      g.moveTo(...a0); g.quadraticCurveTo(a1[0] + dir(0.27)[0] * 5, a1[1] + dir(0.27)[1] * 5, ...a2); g.stroke()
-      g.lineWidth = 1.3
-      const m0 = side(0.012, -0.2), m1 = side(0.07, -0.25)
-      g.beginPath(); g.moveTo(...m0); g.lineTo(...m1); g.stroke()
-    }
-    g.lineWidth = 0.7
-    for (let row = 0; row < 7; row++) {
-      const t = 0.34 + row * 0.075
-      for (let k = -2; k <= 2; k++) {
-        const kk = k * 0.42 + (row % 2 ? 0.21 : 0)
-        if (Math.abs(kk) > 0.8 * 1) continue
-        const [x, y] = side(t, kk), [dx, dy] = dir(t), r = 3 * (half(t) / 17 + 0.35)
-        const base = Math.atan2(dy, dx)
-        g.beginPath(); g.arc(x, y, r, base - Math.PI * 0.62, base + Math.PI * 0.62); g.stroke()
-      }
-    }
-    g.restore()
-    // (spray where it breaks the water, and the drops it throws)
-    g.fillStyle = CREAM
-    for (const [x, y, r] of [[142, 118, 2.2], [150, 124, 1.6], [136, 126, 1.4], [158, 130, 1.8], [132, 112, 1.2], [236, 120, 1.6], [229, 126, 1.2]] as number[][]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill() }
-    // (the sea: three bands, each with a scalloped crest, cream with an indigo line between them, the top one over the fish's tail)
-    const sea = (y0: number, ph: number) => {
-      g.beginPath(); g.moveTo(CX - R, y0 + 40)
-      for (let x = CX - R - 6; x <= CX + R + 6; x += 2) g.lineTo(x, y0 + Math.sin((x + ph) / 6.5) * 3.4 + Math.sin((x + ph) / 13) * 2)
-      g.lineTo(CX + R + 6, y0 + 40); g.closePath()
-    }
-    for (const [y0, ph] of [[136, 0], [146, 9], [156, 4]] as number[][]) {
-      sea(y0, ph); g.fillStyle = CREAM; g.fill()
-      g.strokeStyle = INDIGO; g.lineWidth = 1.8
-      g.beginPath(); for (let x = CX - R - 6; x <= CX + R + 6; x += 2) { const y = y0 + Math.sin((x + ph) / 6.5) * 3.4 + Math.sin((x + ph) / 13) * 2; if (x === CX - R - 6) g.moveTo(x, y); else g.lineTo(x, y) } g.stroke()
-    }
-    g.lineCap = 'butt'
-    g.restore()
-  }
-  // a band of seigaiha waves along the hem (concentric scales in tone-on-tone indigo, rows overlapping, a pale thread at their crests), and
-  // a thin run of them under the rod: the cloth's own pattern, dyed in
-  const waves = (y0: number, rows: number, R: number) => {
-    for (let row = 0; row < rows; row++) {
-      for (let col = -1; col < 384 / R + 1; col++) {
-        const cx = col * R + (row % 2 ? R / 2 : 0), cy = y0 + row * R * 0.5
-        for (let ring = 0; ring < 4; ring++) {
-          g.beginPath()
-          g.arc(cx, cy, R * 0.5 * (1 - ring * 0.22), Math.PI, 0)
-          g.strokeStyle = ring % 2 ? 'rgba(120,150,210,0.5)' : 'rgba(190,205,235,0.55)'
-          g.lineWidth = 1.6
-          g.stroke()
-        }
-      }
-    }
-  }
-  g.save()
-  g.beginPath(); g.rect(0, 188, 384, 68); g.clip()
-  g.fillStyle = 'rgba(20,34,78,0.55)'; g.fillRect(0, 188, 384, 68)
-  waves(196, 8, 24)
-  g.restore()
-  g.save()
-  g.beginPath(); g.rect(0, 0, 384, 24); g.clip()
-  waves(4, 2, 16)
-  g.restore()
-  g.fillStyle = 'rgba(244,239,226,0.85)'; g.fillRect(0, 186, 384, 2.4)
-})
 /** one panel's third of the noren cloth (a clone of the texture, offset) */
 const panelTex = (tex: THREE.Texture | null, i: number) => {
   if (!tex) return null
@@ -546,28 +376,6 @@ function NorenModel({ tex, panels, pole = 'lacquer' }: { tex: THREE.Texture | nu
   return <primitive object={model} />
 }
 
-/**
- * The staff's doorway at the back of the kitchen: an opening in the wall, dark beyond, framed in wood, with the shop's old indigo noren
- * (烤魚, the leaping fish) hung across it, swaying a little. Stood with its back to the wall, facing into the room (+x of its group).
- */
-export function StaffNoren({ mark }: { mark: string }) {
-  const tex = useMemo(() => norenTexture(mark === '聞野' ? '烤魚' : mark), [mark])
-  const panels = useRef<(THREE.Mesh | null)[]>([])
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
-    panels.current.forEach((m, i) => { if (m) m.rotation.x = Math.sin(t * 1.1 + i * 0.9) * 0.03 })
-  })
-  const W = 1.05, H = 2.0
-  return (
-    <group>
-      {/* (the opening, dark beyond, and its frame of wood: two posts and a lintel standing a little proud of the wall) */}
-      <mesh position={[0, H / 2, 0.005]}><planeGeometry args={[W, H]} /><meshBasicMaterial color="#120c08" /></mesh>
-      {[-1, 1].map((sd) => <mesh key={sd} position={[sd * (W / 2 + 0.04), H / 2 + 0.03, 0.03]}><boxGeometry args={[0.08, H + 0.06, 0.06]} /><meshToonMaterial color="#4a2e1c" /></mesh>)}
-      <mesh position={[0, H + 0.06, 0.03]}><boxGeometry args={[W + 0.16, 0.08, 0.07]} /><meshToonMaterial color="#4a2e1c" /></mesh>
-      <group position={[0, H - 0.02, 0.12]}><NorenModel tex={tex} panels={panels} /></group>
-    </group>
-  )
-}
 
 /** how much longer the way in's noren is drawn than it was made, and how much wider (kept to the doorway's width) */
 const NOREN_BIG = 1.3
@@ -1663,7 +1471,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return [...h.way.map((v) => v.clone()), ...turn, st.aisle.clone(), besideSeat(n)]
   }
   const waiters = useRef<{ phase: 'idle' | 'fetch' | 'pickup' | 'go' | 'set' | 'back'; t: number; seat: number; keys: string[]; run: number | null
-    path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number }[]>([])
+    path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number
+    /** their way home once the shop's shut, and how far along it they are */
+    out?: { way: THREE.Vector3[]; len: number; d: number } }[]>([])
   const waiterObjs = useRef<(THREE.Group | null)[]>([])
   const kitchen = useMemo(() => kitchenOf(counters), [counters])
   const [moving, setMoving] = useState<boolean[]>([])
@@ -2162,18 +1972,23 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       const o = waiterObjs.current[wi]
       if (o && SHOP.leaving) {
-        // (the shop's shut and empty: out by the staff door, and gone)
-        const gate = staffDoorAt(counters[0])
-        const d = gate.clone().sub(w.pos).setY(0)
-        const len = d.length()
-        if (len > 0.05) {
-          w.pos.addScaledVector(d.normalize(), Math.min(len, Math.min(dt, 0.1) * 1.1))
-          w.yaw = Math.atan2(d.x, d.z)
+        // (the shop's shut and empty: out through their gate, along the aisle (round the corner from the side counter's) and through the
+        // front door, as the customers go, and gone)
+        if (!w.out) {
+          const h = homes[wi]
+          const way = [w.pos.clone(), ...h.way.slice(1).map((v) => v.clone()), ...(h.counter ? [aisleCorner(counters[h.counter])] : []), doorOf(counters)]
+          w.out = { way, len: pathLength(way), d: 0 }
         }
+        const out = w.out
+        out.d = Math.min(out.len, out.d + Math.min(dt, 0.1) * 1.1)
+        const { p, dir } = alongPath(out.way, out.d)
+        w.pos.copy(p)
+        if (dir.x || dir.z) w.yaw = Math.atan2(dir.x, dir.z)
         o.position.copy(w.pos)
         o.rotation.y = w.yaw
-        o.visible = len > 0.12
+        o.visible = out.d < out.len - 0.12
       } else if (o) {
+        w.out = undefined
         o.visible = true
         o.position.copy(w.pos)
         o.rotation.y = w.yaw
@@ -2241,7 +2056,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   })
 
   return (
-    <group scale={scale} position={offset}>
+    <group name="bar-frame" scale={scale} position={offset}>
       {drawCounter && <group position={at}><Counter length={length} /></group>}
       {counters.map((c, i) => {
         // the first counter's floor runs on past its end to the door, and back to meet the others' aisles; each other
