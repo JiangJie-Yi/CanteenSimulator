@@ -107,16 +107,23 @@ fin(vase, "VaseBody", M["porcelain"])
 leaf_bm = bmesh.new()
 
 
-def leaf_mesh():
-    """a sakaki leaf along +y: pointed oval, folded a little along its midrib, 4 cm long (its pale back on the other side)"""
+def leaf_mesh(bend=0.0, twist=0.0, L=0.034, W=0.013):
+    """a sakaki leaf along +y: pointed oval, folded a little along its midrib, 4 cm long (its pale back on the other side); arched down along
+    its length by `bend` and turned a little about it by `twist`, as a leaf hangs off its stalk"""
     b = bmesh.new()
-    L, W = 0.034, 0.013
     cols = []
-    for i in range(9):
-        t = i / 8
-        w = W / 2 * math.sin(math.pi * t) ** 0.8
-        cols.append([b.verts.new((s * w, t * L, abs(s) * w * 0.35 - 0.002 * math.sin(math.pi * t))) for s in (-1, 0, 1)])
     for i in range(8):
+        t = i / 7
+        w = W / 2 * math.sin(math.pi * t) ** 0.8
+        row = []
+        for s_ in (-1, 0, 1):
+            x, z = s_ * w, abs(s_) * w * 0.35 - 0.002 * math.sin(math.pi * t)
+            # (the twist grows toward the tip; the arch drops it)
+            a = twist * t
+            x, z = x * math.cos(a) - z * math.sin(a), x * math.sin(a) + z * math.cos(a)
+            row.append(b.verts.new((x, t * L * (1 - 0.25 * bend * t), z - bend * L * t * t)))
+        cols.append(row)
+    for i in range(7):
         for k in range(2):
             b.faces.new((cols[i][k], cols[i][k + 1], cols[i + 1][k + 1], cols[i + 1][k]))
     me_ = bpy.data.meshes.new("leaf")
@@ -125,46 +132,75 @@ def leaf_mesh():
     return me_
 
 
-LEAF = leaf_mesh()
+LEAVES = [leaf_mesh(bend, tw) for bend, tw in ((0.12, 0.1), (0.25, -0.2), (0.38, 0.25), (0.18, -0.35), (0.3, 0.0))]
 leaves = []
 stems = []
 MOUTH = Vector(P(0, 0.112, 0))
+UP = Vector((0, 0, 1))
 NST = 7
+
+
+def place_leaf(at, along, out, k, droop, size):
+    """a leaf at `at` on a stem running `along`, set out to `out` (a side of it), its blade leaning out from the stem and drooping"""
+    d = (along * 0.45 + out * 0.9).normalized()
+    d.z -= droop
+    d.normalize()
+    n = UP - d * UP.dot(d)
+    if n.length < 1e-4:
+        n = out.copy()
+    n.normalize()
+    x = d.cross(n)
+    m = Matrix((x, d, n)).transposed()
+    lo = bpy.data.objects.new(f"leaf{len(leaves)}", random.choice(LEAVES).copy())
+    bpy.context.collection.objects.link(lo)
+    lo.location = at
+    lo.rotation_euler = m.to_euler()
+    lo.scale = (size, size, size)
+    leaves.append(lo)
+
+
 for s in range(NST):
     ang = s * 2 * math.pi / NST + random.uniform(-0.3, 0.3)
-    lean = random.uniform(0.4, 0.95)
-    length = random.uniform(0.08, 0.13)
+    lean = random.uniform(0.35, 0.9)
+    length = random.uniform(0.09, 0.14)
     d = Vector(P(math.cos(ang) * math.sin(lean), math.cos(lean), math.sin(ang) * math.sin(lean)))
-    pts = [MOUTH + d * length * t + Vector(P(0, -0.01 * t * t, 0)) for t in (0, 0.5, 1)]
+    side = d.cross(UP).normalized() if abs(d.dot(UP)) < 0.99 else Vector((1, 0, 0))
+    # (the stem's line: up and out from the mouth, then giving under its leaves' weight, the further out the more; a little wander sideways)
+    droop = random.uniform(0.012, 0.03) * (0.6 + lean)
+    wob, ph = random.uniform(0.004, 0.01), random.uniform(0, 6.28)
+
+    def at_t(t):
+        return MOUTH + d * length * t + UP * (0.012 * math.sin(math.pi * t * 0.7)) - UP * (droop * t * t) + side * (wob * math.sin(ph + t * 4.5))
+    pts = [at_t(i / 10) for i in range(11)]
     cu = bpy.data.curves.new(f"stem{s}", "CURVE")
     cu.dimensions = "3D"
-    sp = cu.splines.new("POLY")
+    sp = cu.splines.new("NURBS")
     sp.points.add(len(pts) - 1)
     for i, q in enumerate(pts):
         sp.points[i].co = (*q, 1)
+    sp.use_endpoint_u = True
+    sp.order_u = 4
     cu.bevel_depth = 0.0012
     cu.bevel_resolution = 1
+    cu.taper_radius_mode = "MULTIPLY"
     o = bpy.data.objects.new(f"stem{s}", cu)
     bpy.context.collection.objects.link(o)
     stems.append(o)
-    for k in range(3):
-        t = 0.35 + k * 0.22
-        at = MOUTH + d * length * t
-        for side in (-1, 1):
-            lo = bpy.data.objects.new(f"leaf{s}{k}{side}", LEAF.copy())
-            bpy.context.collection.objects.link(lo)
-            lo.location = at
-            # (out from the stem, then up along it, each pair turned a quarter from the last)
-            lo.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
-            lo.rotation_euler.rotate(Euler((side * 1.1, 0, k * 1.57 + random.uniform(-0.3, 0.3))))
-            lo.scale = (1, random.uniform(0.75, 1.1), 1)
-            leaves.append(lo)
-    # (and a leaf at its tip)
-    lo = bpy.data.objects.new(f"leafTip{s}", LEAF.copy())
-    bpy.context.collection.objects.link(lo)
-    lo.location = MOUTH + d * length
-    lo.rotation_euler = (d.to_track_quat("Y", "Z")).to_euler()
-    leaves.append(lo)
+    # (the leaves: alternate along it, each a little round from the last, larger lower down, drooping more toward the tip)
+    nl = random.randint(6, 8)
+    for k in range(nl):
+        t = 0.28 + 0.7 * k / (nl - 1)
+        a, b2 = at_t(t), at_t(min(1, t + 0.02))
+        along = (b2 - a).normalized()
+        perp = along.cross(UP).normalized() if abs(along.dot(UP)) < 0.99 else side
+        turn = k * 2.4 + random.uniform(-0.3, 0.3)
+        out = (perp * math.cos(turn) + along.cross(perp).normalized() * math.sin(turn) * 0.6).normalized()
+        place_leaf(a, along, out, k, 0.15 + 0.45 * t + random.uniform(-0.1, 0.1), (1.1 - 0.35 * t) * random.uniform(0.85, 1.1))
+    # (and a pair of young leaves at its tip, folded up together)
+    tip, pre = at_t(1.0), at_t(0.96)
+    tdir = (tip - pre).normalized()
+    for sd in (-1, 1):
+        place_leaf(tip, tdir, (tdir.cross(UP).normalized() * sd * 0.4 + UP * 0.2).normalized() if abs(tdir.dot(UP)) < 0.99 else side, 0, 0.05, 0.65)
 for o in stems:
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
     bpy.ops.object.convert(target="MESH")
@@ -215,10 +251,14 @@ def petal(b, a, r0, L, W, elev, curl, cup, shape, nt=7, ns=5):
 
 def stalk(name, at):
     cu = bpy.data.curves.new(name + "Stalk", "CURVE"); cu.dimensions = "3D"
-    sp = cu.splines.new("POLY"); sp.points.add(2)
-    mid = (MOUTH + at) / 2 + Vector((0, 0, -0.006))
-    for k, q in enumerate((MOUTH, mid, at)):
+    # (a soft arc from the mouth, up and over to the flower, not a straight stick)
+    sp = cu.splines.new("NURBS"); sp.points.add(6)
+    span = at - MOUTH
+    for k in range(7):
+        t = k / 6
+        q = MOUTH + span * t + Vector((0, 0, 0.01 * math.sin(math.pi * t) - 0.004 * t * t))
         sp.points[k].co = (*q, 1)
+    sp.use_endpoint_u = True; sp.order_u = 4
     cu.bevel_depth = 0.0011
     o = bpy.data.objects.new(name + "Stalk", cu); bpy.context.collection.objects.link(o)
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
