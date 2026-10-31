@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { IndoorHDRI } from '@/scene/IndoorHDRI'
 import { FpsMeter } from '@/scene/FpsMeter'
@@ -451,7 +451,10 @@ function CamIcon({ editing, n, name }: { editing: boolean; n: number; name: stri
  * Each view's camera, standing where the view looks from and pointing the way it looks: always there (it's what a view placed by hand is read
  * from), seen only in edit mode, where it's a piece like any other (位置・旋轉 in the panel, or dragged): the view then looks from it.
  */
-function ViewCams({ editing, lang, pose }: { editing: boolean; lang: Lang; pose: (id: ViewId) => { pos: THREE.Vector3; target: THREE.Vector3 } | null }) {
+// (drawn again only when edit mode or the language changes, or by its own ticks while the views' targets are still loading: the poses are
+// read through a ref to the latest, so the app's many redraws a second (a new function each) don't redraw its ten pieces)
+const ViewCams = memo(ViewCamsImpl, (a, b) => a.editing === b.editing && a.lang === b.lang)
+function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; pose: (id: ViewId) => { pos: THREE.Vector3; target: THREE.Vector3 } | null }) {
   const [, tick] = useState(0)
   const poseNow = useRef(pose)
   poseNow.current = pose
@@ -464,7 +467,7 @@ function ViewCams({ editing, lang, pose }: { editing: boolean; lang: Lang; pose:
   return (
     <>
       {VIEW_SPOTS.map((v, i) => {
-        const p = pose(v.id)
+        const p = poseNow.current(v.id)
         if (!p) return null
         const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(p.pos, p.target, new THREE.Vector3(0, 1, 0)))
         return (

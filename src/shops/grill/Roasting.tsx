@@ -1694,7 +1694,9 @@ useGLTF.preload(SETTING_URL)
  * What edit mode shows for a piece that is moved by the table's nudge rather than by wrapping it: a block of its size that is never drawn, standing
  * where the piece is less the edit's own offset, in a Movable, so the box, the arrows and the fields work as for any other piece.
  */
-function EditProxy({ id, label, at, size, yaw }: { id: string; label: string; at: THREE.Vector3; size: V3; yaw: number }) {
+// (drawn again only when its place or size changes, not with every redraw of the kitchen: `at` is worked out afresh each time)
+const EditProxy = memo(EditProxyImpl, (a, b) => a.id === b.id && a.label === b.label && a.yaw === b.yaw && a.at.equals(b.at) && a.size.every((v, i) => v === b.size[i]))
+function EditProxyImpl({ id, label, at, size, yaw }: { id: string; label: string; at: THREE.Vector3; size: V3; yaw: number }) {
   useEdit()
   const o = positionOf(id)
   return (
@@ -1707,6 +1709,16 @@ function EditProxy({ id, label, at, size, yaw }: { id: string; label: string; at
     </Movable>
   )
 }
+
+/** the owner in his place (at the grill while the shop's shut, along the aisle while it's open): drawn again only when that or the language
+ * changes, not with every redraw of the kitchen (he walks, turns and fades by his own frame loop) */
+const BossSpot = memo(function BossSpot({ open, lang }: { open: boolean; lang: Lang }) {
+  return (
+    <Movable id="boss" label="老闆"><group position={open ? BOSS_OPEN_AT : CHEF_AT} rotation-y={CHEF_YAW} scale={BOSS_SCALE}>
+      <Boss to={BOSS_WALK} open={open} lang={lang}><BlobShadow r={0.24} /></Boss>
+    </group></Movable>
+  )
+})
 
 /**
  * The big chopping board (blender/cutboard.py): thick warm wood, four planks edge-glued along its length, its corners rounded and edges
@@ -5287,9 +5299,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       <group position={[FIRE_SHIFT.x, 0, FIRE_SHIFT.z]}>
       {/* the owner: at his grill while the shop's shut; open, his chef has the grill and he stands along the aisle from it, keeping an eye  (he fades himself out of the way when he stands between the camera and what it looks at: Boss.tsx) */}
       {bar && (
-        <Movable id="boss" label="老闆"><group position={space === 'open' ? BOSS_OPEN_AT : CHEF_AT} rotation-y={CHEF_YAW} scale={BOSS_SCALE}>
-          <Boss to={BOSS_WALK} open={space === 'open'} lang={lang}><BlobShadow r={0.24} /></Boss>
-        </group></Movable>
+        <BossSpot open={space === 'open'} lang={lang} />
       )}
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw, way, seat }) => (
         <CrewWalk key={m.id} at={at} yaw={yaw} way={way} seat={seat}>

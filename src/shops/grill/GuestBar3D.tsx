@@ -2189,9 +2189,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {fridges && QUALITY.tier === 'high' && (
         <pointLight position={fridges[0].at.clone().lerp(fridges[1].at, 0.5).setY(FRIDGE.H * 0.55)} color="#eaf4ff" intensity={1.1} distance={FRIDGE.H * 2.4} decay={1.4} />
       )}
-      {fridges && <Later stage={2}>{fridges.map((f) => (
-        <Movable key={f.n} id={`drinkfridge${f.n}`} label={`飲料櫃 ${f.n + 1}`}><group name={f.n ? 'look-fridge-b' : 'look-fridge'} position={f.at} rotation-y={f.yaw}><DrinkFridge n={f.n} /><FridgeStock n={f.n} /><FridgeDoor n={f.n} /></group></Movable>
-      ))}</Later>}
+      {fridges && <Later stage={2}><Fridges fridges={fridges} /></Later>}
       {/* what each has fetched from the fridge, stood beside their plate, toward the cook */}
       {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => {
         const st = seats[s.seat], c = counters[st.counter]
@@ -2275,6 +2273,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     </group>
   )
 }
+
+/** the drinks fridges, each its own piece for edit mode: drawn again only if they move */
+const Fridges = memo(function Fridges({ fridges }: { fridges: NonNullable<ReturnType<typeof fridgesOf>> }) {
+  return (
+    <>
+      {fridges.map((f) => (
+        <Movable key={f.n} id={`drinkfridge${f.n}`} label={`飲料櫃 ${f.n + 1}`}><group name={f.n ? 'look-fridge-b' : 'look-fridge'} position={f.at} rotation-y={f.yaw}><DrinkFridge n={f.n} /><FridgeStock n={f.n} /><FridgeDoor n={f.n} /></group></Movable>
+      ))}
+    </>
+  )
+})
 
 /** the stools, each its own piece for edit mode: drawn again only if the seats change */
 const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsOf> }) {
