@@ -116,8 +116,30 @@ for z in (1, -1):
     box("FzLinerFB", (LW - 2 * WALL, CH - 0.06, 0.004), (CX, PLINTH + 0.05 + (CH - 0.06) / 2, z * (D / 2 - WALL - 0.002)), M["liner"], 0, 1, body)
 box("FzSep", (0.004, CH - 0.06, D - 2 * WALL), (W / 2 - HOUSE - 0.002, PLINTH + 0.05 + (CH - 0.06) / 2, 0), M["liner"], 0, 1, body)
 # (the chrome rim round the opening)
-for (sx_, sz_, cx, cz) in ((LW + 0.02, 0.022, CX, D / 2 - 0.011), (LW + 0.02, 0.022, CX, -D / 2 + 0.011), (0.022, D, -W / 2 + 0.011, 0), (0.022, D, W / 2 - HOUSE + 0.011, 0)):
-    box("FzRim", (sx_, 0.012, sz_), (cx, H - LID - 0.006, cz), M["steel"], 0.003, 2, body)
+# (one flat frame, mitred at its corners, set in a little from the body's rounded outer edges so no end of it sticks out)
+RI = 0.008                  # (how far in from the body's outer faces)
+RW = 0.022                  # (its width)
+x0_, x1_, z0_, z1_ = -W / 2 + RI, W / 2 - HOUSE - 0.002, -D / 2 + RI, D / 2 - RI
+outer = [(x0_, z0_), (x1_, z0_), (x1_, z1_), (x0_, z1_)]
+inner = [(x0_ + RW, z0_ + RW), (x1_ - RW, z0_ + RW), (x1_ - RW, z1_ - RW), (x0_ + RW, z1_ - RW)]
+bm = bmesh.new()
+ry0, ry1 = H - LID - 0.012, H - LID
+vo = [[bm.verts.new(P(x, y, z)) for (x, z) in outer] for y in (ry0, ry1)]
+vi = [[bm.verts.new(P(x, y, z)) for (x, z) in inner] for y in (ry0, ry1)]
+for i in range(4):
+    j = (i + 1) % 4
+    bm.faces.new((vo[1][i], vo[1][j], vi[1][j], vi[1][i]))
+    bm.faces.new((vo[0][j], vo[0][i], vi[0][i], vi[0][j]))
+    bm.faces.new((vo[0][i], vo[0][j], vo[1][j], vo[1][i]))
+    bm.faces.new((vi[0][j], vi[0][i], vi[1][i], vi[1][j]))
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+me = bpy.data.meshes.new("FzRim"); bm.to_mesh(me); bm.free()
+o = bpy.data.objects.new("FzRim", me); bpy.context.collection.objects.link(o)
+o.data.materials.append(M["steel"])
+bpy.context.view_layer.objects.active = o
+m_ = o.modifiers.new("b", "BEVEL"); m_.width = 0.002; m_.segments = 2
+bpy.ops.object.modifier_apply(modifier="b")
+body.append(o)
 # (the housing: its top capped in steel, a louvred grille low on its face, the red lamp above)
 HX = W / 2 - HOUSE / 2
 box("FzHouseTop", (HOUSE + 0.01, 0.012, D + 0.01), (HX, H + 0.006, 0), M["steel"], 0.004, 2, body)

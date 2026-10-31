@@ -11,7 +11,8 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ALONG, GRILL_OFFSET, KITCHEN_DROP, LAY } from './bar'
+import { ALONG, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver } from './bar'
+import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { PlateRack } from './PlateRack'
@@ -509,26 +510,45 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 /** the freezer's lid, opened by hand (a click): it stays up till it's clicked shut */
 export const FREEZER = { open: false }
 const FREEZER_URL = import.meta.env.BASE_URL + 'models/freezer.glb'
-/** the freezer's display: -20 °C in green on its dark glass */
-const TEMP_TEX = (() => {
+/** the freezer's thermostat: its setting (kept in the browser) and the cavity's temperature as it drifts (game/freezer) */
+const TEMP_KEY = 'jgs-freezer-temp-1'
+export const FREEZER_TEMP = (() => {
+  let set = FREEZER_DEFAULT
+  try { const v = Number(localStorage.getItem(TEMP_KEY)); if (v >= FREEZER_MIN && v <= FREEZER_MAX && Number.isInteger(v)) set = v } catch { /* (none kept) */ }
+  return { set, now: set, shownAt: -1e9 }
+})()
+/** the display: the cavity's temperature in green on its dark glass, or the setting with SET beside it just after a button's pressed */
+function drawTemp(g: CanvasRenderingContext2D, t: number, setting: boolean) {
+  g.fillStyle = '#0e1a14'; g.fillRect(0, 0, 256, 96)
+  g.fillStyle = '#5affb0'; g.textBaseline = 'middle'
+  g.font = 'bold 66px monospace'; g.textAlign = 'right'
+  g.fillText(`${t}`, setting ? 186 : 200, 52)
+  g.font = 'bold 30px monospace'; g.textAlign = 'left'
+  g.fillText('℃', setting ? 188 : 202, 40)
+  if (setting) { g.font = 'bold 22px monospace'; g.fillText('SET', 190, 76) }
+}
+/** a button's arrow, white on its dark face */
+const arrowTex = (up: boolean) => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')
-  c.width = 256; c.height = 96
+  c.width = c.height = 64
   const g = c.getContext('2d')!
-  g.fillStyle = '#0e1a14'; g.fillRect(0, 0, 256, 96)
-  g.fillStyle = '#5affb0'; g.font = 'bold 72px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.fillText('-20℃', 128, 52)
+  g.fillStyle = '#3a444e'; g.fillRect(0, 0, 64, 64)
+  g.fillStyle = '#f2f6f8'; g.beginPath()
+  if (up) { g.moveTo(32, 16); g.lineTo(50, 46); g.lineTo(14, 46) } else { g.moveTo(32, 48); g.lineTo(50, 18); g.lineTo(14, 18) }
+  g.fill()
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   return t
-})()
+}
+const ARROWS = { up: arrowTex(true), down: arrowTex(false) }
 useGLTF.preload(FREEZER_URL)
 /**
  * The ingredient freezer (blender/freezer.py): a wide chest freezer along the kitchen's back wall by the staff door, pale blue-white on a
  * dark plinth, its compressor housing at the right end (louvres, the temperature display and the red lamp), the lid hinged on its back
  * edge, no ink lines round it. Inside, as a fish shop's freezer: whole fish glazed in ice, vacuum-packed fillets, a styrofoam fish box,
  * the saury in a wire basket, blocks of ice, the stock packed below. Its lid swings up for a moment each time something's taken out for an order, a cool light spilling out over what's in it,
- * and it can be opened by hand, a click (and shut again with another). Its display shows the temperature.
+ * and it can be opened by hand, a click (and shut again with another). Its display shows the temperature inside, and its two buttons under it set the thermostat (game/freezer).
  */
 function IngredientFridge() {
   const lid = useRef<THREE.Object3D | null>(null)
@@ -554,8 +574,26 @@ function IngredientFridge() {
   }, [fz])
   // (its lid, looked up in the model as drawn)
   lid.current = model.getObjectByName('FreezerLid') ?? null
-  useFrame(() => {
+  // (the display's own canvas, drawn again whenever what it shows changes)
+  const temp = useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 256; c.height = 96
+    const tex = new THREE.CanvasTexture(c)
+    tex.colorSpace = THREE.SRGBColorSpace
+    return { g: c.getContext('2d')!, tex, last: '' }
+  }, [])
+  const press = (dir: 1 | -1) => {
+    FREEZER_TEMP.set = stepTemp(FREEZER_TEMP.set, dir)
+    FREEZER_TEMP.shownAt = performance.now()
+    try { localStorage.setItem(TEMP_KEY, String(FREEZER_TEMP.set)) } catch { /* (not kept) */ }
+  }
+  useFrame((_, dt) => {
     const open = FREEZER.open || performance.now() - FRIDGE_KICK.at < 1800 ? 1 : 0
+    FREEZER_TEMP.now = driftTemp(FREEZER_TEMP.now, FREEZER_TEMP.set, open > 0, Math.min(dt, 0.1))
+    const setting = performance.now() - FREEZER_TEMP.shownAt < 2000
+    const shows = setting ? FREEZER_TEMP.set : Math.round(FREEZER_TEMP.now)
+    const key = `${shows}${setting}`
+    if (key !== temp.last) { temp.last = key; drawTemp(temp.g, shows, setting); temp.tex.needsUpdate = true }
     // (the lid hinged on its back edge, swinging up and over)
     if (lid.current) lid.current.rotation.x += ((-open * 1.85) - lid.current.rotation.x) * 0.1
     if (light.current) light.current.intensity += (open * 0.45 - light.current.intensity) * 0.12
@@ -569,11 +607,21 @@ function IngredientFridge() {
         <primitive object={model} />
       </group>
       <pointLight ref={light} position={[-HOUSE / 2, H - 0.12, 0.15]} color="#cfe9ff" intensity={0} distance={2.4} decay={1.6} />
-      {/* the temperature on the housing's display, in green segments: -20 °C, a degree warmer while the lid's up */}
+      {/* the temperature on the housing's display, and the thermostat's two buttons under it (up a degree, down a degree) */}
       <mesh position={[W / 2 - HOUSE / 2 - 0.03, 0.62, 0.74 / 2 + 0.009]}>
         <planeGeometry args={[0.1, 0.038]} />
-        <meshBasicMaterial map={TEMP_TEX} transparent toneMapped={false} />
+        <meshBasicMaterial map={temp.tex} toneMapped={false} />
       </mesh>
+      {([['up', 1, -0.055], ['down', -1, -0.005]] as const).map(([k, dir, dx]) => (
+        <mesh key={k} position={[W / 2 - HOUSE / 2 + dx, 0.575, 0.74 / 2 + 0.008]}
+          onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; press(dir) }}
+          onPointerOver={(e) => { e.stopPropagation(); handOver.onPointerOver(e); setTip({ title: '溫控', hint: `點一下${dir > 0 ? '調高' : '調低'} 1℃（${FREEZER_MIN}～${FREEZER_MAX}℃）` }) }}
+          onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
+          <boxGeometry args={[0.03, 0.022, 0.008]} />
+          <meshToonMaterial attach="material-4" color="#ffffff" map={ARROWS[k]} />
+          {[0, 1, 2, 3, 5].map((i) => <meshToonMaterial key={i} attach={`material-${i}`} color="#3a444e" />)}
+        </mesh>
+      ))}
     </group>
   )
 }
