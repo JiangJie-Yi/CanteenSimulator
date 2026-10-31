@@ -1921,7 +1921,7 @@ export default function App() {
           dpr={typeof window === 'undefined' ? 1 : Math.min(QUALITY.dpr, Math.max(window.devicePixelRatio || 1, phone ? 1 : 1.5))}
           onCreated={({ gl, camera, scene }) => {
             // (in development, the renderer's counts are to hand for checking how heavy a view is)
-            if (import.meta.env.DEV) Object.assign(window, { __gl: gl, __cam: camera, __scene: scene })
+            if (import.meta.env.DEV) Object.assign(window, { __gl: gl, __cam: camera, __scene: scene, __THREE: THREE })
             // if the phone runs out of GPU memory the browser drops the 3D view and it would stay blank:
             // reload once to bring it back
             gl.domElement.addEventListener('webglcontextlost', (e) => {

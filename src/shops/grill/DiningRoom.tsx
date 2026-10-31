@@ -1138,7 +1138,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <ToiletLive who={who} at={[D - 0.4, 0, 0]} />
       </Movable>
       {/* (marks on the duckboard as it gets dirty) */}
-      <WcMarks who={who} at={[D - 0.7, 0.032, 0]} size={[0.42, 0.46]} />
+      <WcMarks who={who} at={[0.105, 0.032, 0]} size={[0.21, 0.46]} />
       <Movable id={`wc-${who}-remote`} label={`免治馬桶遙控器（${who === 'm' ? '男廁' : '女廁'}）`}>
         <group position={[D - 0.36, 0.86, w / 2]} rotation-y={Math.PI}><WcRemote who={who} /></group>
       </Movable>
@@ -1172,17 +1172,18 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       </StaticBatch></Movable>
       <Movable id={`wc-${who}-duck`} label={`簀之子踏板（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* the slatted duckboard (簀の子) before the toilet, and the slippers by the door */}
-      <group position={[D - 0.7, 0, 0]}>
+      {/* (from the door to the toilet's front, stopping short of it: the toilet stands on the floor) */}
+      <group position={[0.105, 0, 0]}>
         {Array.from({ length: 9 }, (_, k) => (
-          <mesh key={k} position={[0, 0.02, (k - 4) * 0.052]}><boxGeometry args={[0.4, 0.02, 0.04]} /><meshToonMaterial color="#d8c08a" /></mesh>
+          <mesh key={k} position={[0, 0.02, (k - 4) * 0.052]}><boxGeometry args={[0.2, 0.02, 0.04]} /><meshToonMaterial color="#d8c08a" /></mesh>
         ))}
-        {[-1, 1].map((sd) => <mesh key={sd} position={[0, 0.008, sd * 0.2]}><boxGeometry args={[0.4, 0.016, 0.03]} /><meshToonMaterial color="#6a4a28" /></mesh>)}
+        {[-1, 1].map((sd) => <mesh key={sd} position={[0, 0.008, sd * 0.2]}><boxGeometry args={[0.2, 0.016, 0.03]} /><meshToonMaterial color="#6a4a28" /></mesh>)}
       </group>
       </StaticBatch></Movable>
       <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* (a pair of toilet slippers: rounded soles, a cloth band over the toes, the toilet's own colour, set side by side toes out) */}
       {[-1, 1].map((sd) => (
-        <group key={sd} position={[0.09, 0.03, sd * 0.055]} rotation-y={sd * 0.06}>
+        <group key={sd} position={[0.15, 0.03, sd * 0.055]} rotation-y={sd * 0.06}>
           <mesh position-y={0.008} scale={[0.13, 0.016, 0.046]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color="#e8dcc4" /></mesh>
           <mesh position-y={0.017} scale={[0.125, 0.004, 0.042]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color={accent} /></mesh>
           <mesh position={[-0.055, 0.024, 0]} rotation-x={Math.PI / 2} scale={[1, 1, 0.8]}><torusGeometry args={[0.04, 0.016, 6, 16, Math.PI]} /><meshToonMaterial color={accent} /></mesh>

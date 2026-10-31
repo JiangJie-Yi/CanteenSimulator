@@ -743,7 +743,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
 
   return (
     <group ref={gw} matrixAutoUpdate={false}>
-    <group ref={g} position={o}>
+    <group ref={g} position={o} userData={{ editId: id }}>
       {/* (turned and scaled about the piece's own middle, not the group's origin, which may be far from it) */}
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
           scaled there, and stood back) */}

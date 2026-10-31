@@ -37,6 +37,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `node tests/e2e/views.mjs` | 從乾淨的瀏覽器把 9 個視角各截一張（`OUT=<資料夾>`、`Q=low`），檢查每個視角的構圖 |
 | `node tests/e2e/look.mjs` | 開店後近拍吧台客人（`OUT=<資料夾>`），看人物造型用 |
 | `node tests/e2e/paths.mjs [url]` | 客人動線檢查：開店後每 0.3 秒量每位走動中的客人四周（膝、胸高度），報告撞到的擺設；坐上自己的椅子不算（`WATCH=<ms>` 觀察時間） |
+| `node tests/e2e/clips.mjs [url]` | 穿模檢查：量場景裡每個實心網格，不同擺設（`Movable` 的 id，群組上有 `userData.editId`）的包圍盒重疊時，取一邊的頂點檢查是否埋進另一邊超過 `TOL`（預設 1.5 公分），列出最嚴重的配對（`TOP`、`OUT=<json>`）。模型不是封閉網格（飲料櫃）、本來就插進孔裡的線（收銀台的機器）會誤報 |
 | `npm run build` | 型別檢查＋建置 |
 | `npm run lint` | oxlint |
 
