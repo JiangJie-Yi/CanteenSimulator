@@ -181,7 +181,9 @@ export function WireView() {
   return null
 }
 
-export function AxisGizmo({ id, at, theta = 0, own, pivotGroup }: { id: string; at: V3; size?: number; theta?: number; own?: number; pivotGroup?: { current: THREE.Group | null } }) {
+export function AxisGizmo({ id, at, theta = 0, own, pivotGroup, tilt }: { id: string; at: V3; size?: number; theta?: number; own?: number; pivotGroup?: { current: THREE.Group | null }
+  /** (object axes) the piece's whole turn in the parent's frame, pitch and roll too: the move arrows stand on it, as Maya's object axes do */
+  tilt?: THREE.Quaternion }) {
   // (sizing always goes by the piece's own axes, as Maya's does: its handles stand on them whichever axes the rest go by)
   const sizeTheta = own ?? theta
   const root = useRef<THREE.Group>(null)
@@ -243,8 +245,9 @@ export function AxisGizmo({ id, at, theta = 0, own, pivotGroup }: { id: string; 
     e.stopPropagation()
     par.updateWorldMatrix(true, false)
     const origin = r0.getWorldPosition(new THREE.Vector3())
-    // (the arrows of the move tool point along the room's axes: turned by theta into the parent's frame)
-    const dir = new THREE.Vector3(...AXES[axis].v).applyAxisAngle(new THREE.Vector3(0, 1, 0), theta).transformDirection(par.matrixWorld).normalize()
+    // (the arrows of the move tool point along the room's axes: turned by theta into the parent's frame; or, on the piece's own axes, by its whole turn)
+    const local = tilt ? new THREE.Vector3(...AXES[axis].v).applyQuaternion(tilt) : new THREE.Vector3(...AXES[axis].v).applyAxisAngle(new THREE.Vector3(0, 1, 0), theta)
+    const dir = local.transformDirection(par.matrixWorld).normalize()
     // (how far along the axis the pointer's ray comes nearest to it: where the two lines are closest)
     const along = (ev: PointerEvent) => {
       const r = gl.domElement.getBoundingClientRect()
@@ -459,7 +462,7 @@ export function AxisGizmo({ id, at, theta = 0, own, pivotGroup }: { id: string; 
     )
   }
   return (
-    <group ref={root} name="edit-gizmo" position={at} rotation-y={theta}>
+    <group ref={root} name="edit-gizmo" position={at} {...(tilt ? { quaternion: tilt } : { "rotation-y": theta })}>
       {AXES.map((a, i) => (
         <group key={a.name} rotation={a.rot} onPointerDown={down(i as 0 | 1 | 2)}>
           <mesh position-y={L * 0.4} renderOrder={1001} userData={{ editHandle: true, gizmo: true }}>
@@ -516,6 +519,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   // (and the turn its contents carry inside it (a group turned to face its way, a model's own root): the object axes follow what's seen,
   // not only the turn given here)
   const [inYaw, setInYaw] = useState(0)
+  // (and its whole turn inside, pitch and roll too, for the move arrows on its own axes)
+  const [inQuat, setInQuat] = useState<THREE.Quaternion | null>(null)
   const ownYaw = (rot0[1] + baseTurn[1]) * DEG + inYaw
   // (the frame its turn is kept in is always the world's; the handles and the place fields go by the world's axes, or (object space) its own)
   const thetaW = thetaRoom
@@ -602,6 +607,10 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     inn.updateWorldMatrix(true, true)
     const yaw = (o: THREE.Object3D) => new THREE.Euler().setFromQuaternion(o.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
     const d = yaw(n) - yaw(inn)
+    // (the whole turn, relative to the piece's own frame: kept only if it leans (a camera looking down), else the yaw alone does)
+    const q = inn.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(n.getWorldQuaternion(new THREE.Quaternion()))
+    const e = new THREE.Euler().setFromQuaternion(q, 'YXZ')
+    setInQuat(Math.abs(e.x) > 0.02 || Math.abs(e.z) > 0.02 ? q : null)
     return Math.atan2(Math.sin(d), Math.cos(d))
   }
   const frame = () => {
@@ -761,7 +770,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
           </group></group></group>
         </group>
       </group>
-      {on && box && <AxisGizmo id={id} theta={theta} own={ownYaw} at={piv} pivotGroup={pg} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))} />}
+      {on && box && <AxisGizmo id={id} theta={theta} own={ownYaw} at={piv} pivotGroup={pg} size={Math.min(0.9, Math.max(0.3, Math.max(...box.s) * 0.45))}
+        tilt={space === 'local' && inQuat ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (rot0[1] + baseTurn[1]) * DEG).multiply(inQuat) : undefined} />}
     </group>
     </group>
   )
