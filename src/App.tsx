@@ -910,7 +910,8 @@ export default function App() {
   // (the running costs are ticked in a second-by-second effect further down)
   const [ai, setAi] = useState(false)
   // which view the camera's on (data/views): the grill's own, the whole shop, or a part of it
-  const [view, setView] = useState<ViewId>('grill')
+  // (the shop opens on the whole room's overview, 1 自由視角)
+  const [view, setView] = useState<ViewId>('free')
   const [viewMenu, setViewMenu] = useState(false)
   // the shop's shut and being worked by hand (研製料理) whenever the camera's at the grill (火烤灶台): held at camera 1, food cooked and seasoned by
   // hand; any other view leaves it, and so does opening the shop

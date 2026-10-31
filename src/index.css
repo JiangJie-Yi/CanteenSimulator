@@ -6645,3 +6645,14 @@ html[lang='en'] .heat-label { font-size: 13px; }
 :root[data-theme='dark'] .canvas-layer {
   background: #0d1c33;
 }
+/* (and the picture darkening toward its edges, a vignette, so the room in the middle holds the eye; deeper by night) */
+.canvas-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 75% 70% at 50% 50%, rgb(0 0 0 / 0) 55%, rgb(4 10 22 / 0.42) 100%);
+}
+:root[data-theme='dark'] .canvas-layer::after {
+  background: radial-gradient(ellipse 72% 66% at 50% 50%, rgb(0 0 0 / 0) 45%, rgb(2 6 14 / 0.62) 100%);
+}

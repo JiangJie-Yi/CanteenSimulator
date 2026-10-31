@@ -22,6 +22,22 @@ import { setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 
 /**
+ * The lamps' painted light (their halos and the pools they throw) by the time of day: faint by day, when the room's lit anyway; full and
+ * wider by night, a glow blooming round each (data-theme on the page, followed as it changes).
+ */
+const NIGHT_GLOWS: { m: THREE.Material; day: number; night: number }[] = []
+const isNight = () => typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark'
+function nightGlow<M extends THREE.Material>(m: M, day: number, night: number): M {
+  NIGHT_GLOWS.push({ m, day, night })
+  m.opacity = isNight() ? night : day
+  return m
+}
+if (typeof document !== 'undefined') {
+  new MutationObserver(() => { const n = isNight(); for (const g of NIGHT_GLOWS) g.m.opacity = n ? g.night : g.day })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+}
+
+/**
  * The customers' side of the room, behind the aisle: a wall of cream plaster over a dark wooden wainscot, a frieze of
  * seigaiha waves under the beam, prints and hanging scrolls along the plaster, a shelf of sake bottles, crocks and a beckoning cat, and paper
  * pendant lamps hung low over the bar, their warm light painted on it. Seen from behind (the camera swung round),
@@ -606,6 +622,7 @@ function BannerRow({ zs, start = 0, step = 1, x0 = 0, x1 = 0 }: { zs: number[]; 
  * A string of little warm bulbs swagged along a wall's top under the frieze: a thin wire looped between brass pegs, a bulb every hand's width
  * along each loop, and a small glowing paper globe at each peg. Light is painted (emissive bulbs, a soft halo), none cast.
  */
+const FESTOON_HALO = nightGlow(new THREE.MeshBasicMaterial({ color: '#ffc060', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }), 0.1, 0.32)
 function Festoon({ l, mid }: { l: number; mid: number }) {
   const built = useMemo(() => {
     const spans = Math.max(1, Math.round(l / 0.8)), span = l / spans, sag = 0.075, per = 6
@@ -650,7 +667,7 @@ function Festoon({ l, mid }: { l: number; mid: number }) {
           <sphereGeometry args={[0.013, 8, 6]} /><meshBasicMaterial toneMapped={false} />
         </instancedMesh>
         <instancedMesh ref={halo} args={[undefined, undefined, built.bulbs.length]} renderOrder={2}>
-          <sphereGeometry args={[0.034, 8, 6]} /><meshBasicMaterial color="#ffc060" transparent opacity={0.16} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+          <sphereGeometry args={[0.034, 8, 6]} /><primitive object={FESTOON_HALO} attach="material" />
         </instancedMesh>
         <instancedMesh ref={globe} args={[undefined, undefined, built.pegs.length]}>
           <sphereGeometry args={[0.03, 10, 8]} /><meshBasicMaterial color="#ffd9a0" toneMapped={false} />
@@ -1691,6 +1708,9 @@ const LANTERN_SKIN = signTexture(128, 256, (g) => {
   g.fillStyle = 'rgba(200,140,80,0.16)'
   for (let x = 0; x < 128; x += 16) g.fillRect(x, 0, 1.4, 256)
 })
+const PENDANT_GLOW = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffcf90' }), 0.35, 0.75)
+const PENDANT_BLOOM = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffb870' }), 0, 0.28)
+const PENDANT_POOL = nightGlow(new THREE.MeshBasicMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }), 0.18, 0.42)
 function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
   return (
     <group position={[0, WALL_H, z]}>
@@ -1713,14 +1733,14 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
           </mesh>
         ))}
         <mesh position-y={LANTERN_END + 0.028} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 5, 12]} /><meshToonMaterial color="#8a6a3a" /></mesh>
-        <sprite scale={0.85}>
-          <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.6} color="#ffcf90" />
-        </sprite>
+        <sprite scale={0.85} material={PENDANT_GLOW} />
+        {/* (and by night a wide soft bloom round it) */}
+        <sprite scale={2.2} material={PENDANT_BLOOM} />
       </group>
       {/* (the pool of light on the bar top below, down from the lamp's height) */}
       <mesh position-y={pool - WALL_H + 0.004} rotation-x={-Math.PI / 2} renderOrder={1}>
         <planeGeometry args={[1.3, 1.3]} />
-        <meshBasicMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.32} />
+        <primitive object={PENDANT_POOL} attach="material" />
       </mesh>
     </group>
   )

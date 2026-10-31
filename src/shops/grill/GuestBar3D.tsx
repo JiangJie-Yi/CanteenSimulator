@@ -1263,6 +1263,19 @@ function KitchenPit({ counters, drop }: { counters: Counter[]; drop: number }) {
   )
 }
 
+/** a soft dark shadow, a rounded oblong blurred out to nothing at its edges, for the shop to stand on */
+const GROUND_SHADOW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 512; c.height = 512
+  const g = c.getContext('2d')!
+  g.filter = 'blur(38px)'
+  g.fillStyle = 'rgba(0,4,12,0.85)'
+  g.beginPath(); g.roundRect(90, 90, 332, 332, 40); g.fill()
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
 function RoomFloor({ counters, drop }: { counters: Counter[]; drop: number }) {
   const c = counters[0]
   const { along: [a0, a1], lay: [l0, l1] } = useMemo(() => roomOf(counters), [counters])
@@ -1278,6 +1291,11 @@ function RoomFloor({ counters, drop }: { counters: Counter[]; drop: number }) {
       {piece([a0, g0], [l0, l1], 'a')}
       {piece([g0, a1], [gl, l1], 'b')}
       <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={Math.max(drop, D + 0.02)} />
+      {/* (the whole shop's soft shadow on the ground it stands on, under its base and spreading out past it a little) */}
+      <mesh position={[-(l0 + l1) / 2 - 0.12, -Math.max(drop, D + 0.02) - 0.34, (a0 + a1) / 2 + 0.1]} rotation-x={-Math.PI / 2} renderOrder={-1}>
+        <planeGeometry args={[(l1 - l0) + 2.4, (a1 - a0) + 2.4]} />
+        <meshBasicMaterial map={GROUND_SHADOW} transparent depthWrite={false} toneMapped={false} />
+      </mesh>
       {/* (and a solid fill under the customers' boards, down to the base, round the kitchen's well) */}
       {drop > 0 && [[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => minus(al as [number, number], ly as [number, number], kitchen).map(([a, l], i) => (
         // (its sides, showing as the step down into the kitchen, in the base's dark timber boards)

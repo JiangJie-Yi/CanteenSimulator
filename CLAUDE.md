@@ -149,7 +149,8 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **供花**（神棚兩側花瓶，點一下換花，存在 localStorage `jgs-shrine-flowers-1`）：三組花各有加持（`game/shrineFlowers.ts`，BDD `shrine-flowers`）：榊與小菊＝平安（客人耐心較長）、白金菊（`shrinevase.py` 變體 0：輪菊、糸菊、小菊）＝金運（更常拿飲料）、紅粉花（變體 1：芍藥、紅椿、桔梗、霞草）＝良緣（情侶較常來）；兩瓶同一種加倍。神棚門聲（`shrineSound.ts`）是黏滑摩擦合成的吱呀聲＋檜木共鳴＋門扣與門片碰撞聲。
 - **炭火的聲音**（`shops/grill/fireAmbience.ts`，WebAudio 即時合成）：炭的劈啪聲隨火力、烤物的滋滋聲隨火上的數量（`game/fireSound.ts`，BDD `fire-sound`）；鏡頭離火越遠越小聲；營業時另有客人的人聲（`crowdAmbience`，隨在座人數 `murmur`）；玩家第一次點擊後才開始（瀏覽器規定）。
 - **門簾**：入口的是米白棉布、深褐菱形家紋（中間「聞」）與一行 KIKUNO · YAKIZAKANA（`GuestBar3D.tsx` 的 `crestNorenTexture`，左右翻轉畫，從店內讀起來是正的），原木橫桿（`NorenModel` 的 `pole="wood"`），比門寬大 `NOREN_BIG`；舊的藍色「烤魚」門簾掛在員工出入口（`StaffNoren`：深色門洞＋木框，位置 `bar.ts` 的 `STAFF_DOOR`，地墊與員工下班的出口跟著它）。
-- 場景外的背景是深藍 `#0d1c33`，白天晚上一樣（`index.css` 的 `.canvas-layer`）。
+- 場景外的背景是深藍 `#0d1c33`，白天晚上一樣（`index.css` 的 `.canvas-layer`），畫面四周有暗角（`.canvas-layer::after`，夜晚較深）；整間店底下有一片柔和的落地陰影（GuestBar3D 的 `GROUND_SHADOW`）。吊燈、燈串的光暈與桌面光圈白天淡、夜晚亮且多一圈大光暈（DiningRoom 的 `nightGlow`，跟著 data-theme）。
+- 開店（載入）時的起始視角是 1 自由視角（總覽，App 的 `view` 初始值 `free`）；e2e 會先切到 2 火烤灶台再補貨。
 - 供清酒（點門口神棚前的酒瓶）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`；名稱沿用舊的點香）。
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。
 - **擋住視線的吊掛物會變淡**：`scene/OccluderFade.tsx` 每幾格從鏡頭朝看的目標（`__ctl.target` 在畫面上的位置，周圍一圈）打射線，標了 `userData.fade` 的群組（門簾、紅燈籠、旗幟串、幟旗、燈串、吊燈）擋在中間就淡到 18%，移開就恢復（各自複製材質，不影響共用同一材質的東西）。新的吊掛擺設要會變淡，就在它的群組加 `userData={{ fade: true }}`。
