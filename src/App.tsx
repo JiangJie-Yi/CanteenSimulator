@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { IndoorHDRI } from '@/scene/IndoorHDRI'
 import { FpsMeter } from '@/scene/FpsMeter'
@@ -35,7 +35,7 @@ import { lampGlow, roomDim } from '@/game/roomLights'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
-import { COAL_BRIDGE, DRINKS, DRINKS_KEY, type DrinkId, PANTRY, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
+import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
 import { offsetOf, positionOf, rotationOf, setEditLang, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { cameraOneOf } from '@/scene/camera1'
@@ -987,6 +987,8 @@ export default function App() {
   const hudRows = (showFire ? 1 : 0) + (showFull ? 1 : 0)
   // (the ingredients' panel, opened and shut by the fridge button, while researching)
   const [fridgeOpen, setFridgeOpen] = useState(false)
+  // (the panels docked at the right, the pantry, the office and the drinks' stock, open one at a time: opening one shuts the others)
+  const drinksOpen = useSyncExternalStore(onDrinkPanel, () => DRINK_PANEL.open)
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
   const [speed, setSpeed] = useState(1)
   const { on: editOn } = useEdit()
@@ -1144,6 +1146,9 @@ export default function App() {
     }
   }, [])
   const [office, setOffice] = useState<null | OfficeTab>(null)
+  useEffect(() => { if (office) { setFridgeOpen(false); setDrinkPanel(false) } }, [office])
+  useEffect(() => { if (fridgeOpen) { setOffice(null); setDrinkPanel(false) } }, [fridgeOpen])
+  useEffect(() => { if (drinksOpen) { setOffice(null); setFridgeOpen(false) } }, [drinksOpen])
   // (Esc shuts whatever's open, the one on top first: the office, the ledger, the boards, the tools, the pantry, the views. Not in the
   // editor, where Esc lets go of what's picked; nor when something of its own has taken it (the register's manual))
   useEffect(() => {
@@ -1989,7 +1994,7 @@ export default function App() {
     return !!e && orderEntryRef.current(e, guest)
   }, [])
   return (
-    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''} hud-rows-${hudRows}`} ref={appRef}>
+    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}${hand && !!dish.roast && !editOn ? ' has-fridge' : ''} hud-rows-${hudRows}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (

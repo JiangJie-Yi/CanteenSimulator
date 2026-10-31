@@ -90,6 +90,8 @@ export function DrinkStockPanel({ lang }: { lang: Lang }) {
   const shortCost = short.reduce((n, id) => n + caseCost(id), 0)
   const anyToFill = UNIT_DRINKS.flat().some((id) => { const t = total(id); return t.have < t.places && (DRINK_BACK.back[id] ?? 0) > 0 })
   return createPortal(
+    <>
+    <h2 className="dock-title" aria-hidden="true">{tl(lang, '飲料', 'ドリンク', 'Drinks')}<small lang="en">DRINKS</small></h2>
     <section className="drink-stock" role="dialog" aria-label={tl(lang, '飲料庫存', 'ドリンク在庫', 'Drinks stock')}>
       <header className="drink-stock-head">
         <b>{tl(lang, '飲料庫存', 'ドリンク在庫', 'Drinks stock')}</b>
@@ -140,7 +142,8 @@ export function DrinkStockPanel({ lang }: { lang: Lang }) {
           {tl(lang, `缺的各訂一箱`, `足りない分を各1ケース`, `A case of each that's short`)}{short.length ? <> <b className="money">{shortCost.toLocaleString()}</b></> : null}
         </button>
       </footer>
-    </section>,
+    </section>
+    </>,
     document.body,
   )
 }

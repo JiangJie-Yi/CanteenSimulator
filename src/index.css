@@ -6610,34 +6610,27 @@ html[lang='en'] .heat-label { font-size: 13px; }
   .app .auto-toggle .auto-lamp { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; box-shadow: 0 0 0 1.5px var(--page); }
   .money-chip {
     display: flex;
-    position: absolute;
-    top: 248px;
-    left: 24px;
-    z-index: 4;
-    height: 36px;
+    position: fixed;
+    top: 20px;
+    right: 332px;
+    left: auto;
+    z-index: 10;
+    height: 44px;
     align-items: center;
-    padding: 0 14px 0 11px;
-    border: 1.5px solid rgb(59 42 32 / 0.35);
-    border-radius: 10px;
-    background: rgb(251 246 234 / 0.55);
-    -webkit-backdrop-filter: blur(3px);
-    backdrop-filter: blur(3px);
+    padding: 0 16px 0 12px;
+    border: 1.5px solid var(--text-soft);
+    border-radius: 22px;
+    background: var(--page);
     box-shadow: 0 4px 12px -6px rgb(59 42 32 / 0.5);
     font: 700 16px/1 var(--brush);
     cursor: pointer;
     transition: margin-top 0.3s ease, transform 0.15s;
   }
   .money-chip:hover { transform: translateY(-1px); }
-  .hud-rows-1 .money-chip { margin-top: -62px; }
-  .hud-rows-0 .money-chip { margin-top: -152px; }
+  /* (left of the pantry's little fridge when that's there, at the grill) */
+  .app.has-fridge .money-chip { right: 384px; }
   .app.is-hushed .money-chip { display: none; }
-  .app:not(.is-hushed) .money-chip { animation: ui-pop-left 520ms cubic-bezier(0.2, 1.5, 0.4, 1) 380ms both; }
-}
-@media (min-width: 901px) and (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .money-chip { background: rgb(30 36 50 / 0.55); border-color: rgb(246 236 216 / 0.3); }
-}
-@media (min-width: 901px) {
-  :root[data-theme='dark'] .money-chip { background: rgb(30 36 50 / 0.55); border-color: rgb(246 236 216 / 0.3); }
+  .app:not(.is-hushed) .money-chip { animation: ui-pop-top 520ms cubic-bezier(0.2, 1.5, 0.4, 1) 300ms both; }
 }
 
 /* ---- the drinks' stock, opened from the back stock by the fridges (shops/grill/DrinkStockPanel): a drinks fridge of its own, its two
@@ -6713,3 +6706,36 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .drink-stock-foot button:hover:not(:disabled) { filter: brightness(1.12); }
 .drink-stock-foot button:disabled { opacity: 0.45; cursor: default; }
 .drink-stock-foot .money { color: #d8ffe0 !important; }
+
+/* ---- the panels that open over the room, docked at the right as the pantry is (one at a time: App shuts the others), each with its name
+   standing upright beside it as the pantry's 食材 does ---- */
+.dock-title { display: none; }
+@media (min-width: 901px) {
+  .office,
+  .drink-stock {
+    left: auto;
+    right: 89px;
+    top: 110px;
+    transform: none;
+    max-height: calc(100vh - 200px);
+  }
+  .drink-stock { width: 460px; }
+  .dock-title {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    position: fixed;
+    z-index: 30;
+    top: 72px;
+    right: 14px;
+    margin: 0;
+    writing-mode: vertical-rl;
+    font: 700 44px/1 var(--brush);
+    letter-spacing: 0.3em;
+    color: #eaf3f9;
+    text-shadow: 0 2px 6px rgb(0 0 0 / 0.45);
+    pointer-events: none;
+  }
+  .dock-title small { font: 600 11px/1 var(--brush); letter-spacing: 0.25em; opacity: 0.8; }
+}

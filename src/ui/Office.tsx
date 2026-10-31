@@ -60,6 +60,8 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
   const wages = people.filter((w) => hired[w.id]).reduce((s, w) => s + w.wage, 0)
   // (put on the page itself, over the menu and everything else)
   return createPortal(
+    <>
+    <h2 className="dock-title" aria-hidden="true">{t('經營', '経営')}<small lang="en">OFFICE</small></h2>
     <section className="office" aria-label={t('經營', '事務所')} style={drag.move}>
       <header {...drag.handle}>
         <div className="ofc-tabs" role="tablist">
@@ -157,7 +159,8 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
           </p>
         </div>
       )}
-    </section>,
+    </section>
+    </>,
     document.body,
   )
 }
