@@ -21,9 +21,9 @@ export function setEditLang(l: Lang) {
   panel()
 }
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
-const KEY = 'jgs-edit-offsets-12'
-const KEY_R = 'jgs-edit-rotations-9'
-const KEY_S = 'jgs-edit-scales-9'
+const KEY = 'jgs-edit-offsets-13'
+const KEY_R = 'jgs-edit-rotations-10'
+const KEY_S = 'jgs-edit-scales-10'
 const KEY_G = 'jgs-edit-groups-2'
 const KEY_P = 'jgs-edit-pivots-2'
 const load = (key: string): Record<string, V3> => {
@@ -142,6 +142,9 @@ export const BASES: Record<string, V3> = {
   'till-bell': [-0.2005, 0, -0.2226],
   'till-cat': [-0.0466, 0, -0.0403],
   'till-tray': [-0.2353, 0, 0.6064],
+  // (the free view's camera: moved X -0.45 along its own axes (object space), taken into its parent's (the world's) units; its turn of
+  // Y 15° Z 5° is App's VIEWCAM_TURN)
+  'viewcam-free': [0.0478, 0, 0.4475],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece belongs to, if any */
@@ -282,7 +285,7 @@ const KEY_GZ = 'jgs-edit-gizmo-size'
 const KEY_PH = 'jgs-edit-panel-h'
 /** the backdrop behind the shop (index.css's --scene-bg): its colour, chosen in the panel, kept in the browser */
 const KEY_BG = 'jgs-scene-bg'
-export const BACKDROP_DEFAULT = '#0d1c33'
+export const BACKDROP_DEFAULT = '#26262c'
 const backdropColor = () => { try { return localStorage.getItem(KEY_BG) ?? BACKDROP_DEFAULT } catch { return BACKDROP_DEFAULT } }
 export function setBackdrop(c: string) {
   if (typeof document !== 'undefined') document.documentElement.style.setProperty('--scene-bg', c)
@@ -486,6 +489,12 @@ let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
 let spaceButton: HTMLButtonElement | null = null, pivotButton: HTMLButtonElement | null = null
 let rows = new Map<string, HTMLDivElement>()
+/** the outliner's two tabs (the scene's pieces, the views' cameras): which one each row is in, the one shown, and the pick it last followed */
+type ListTab = 'scene' | 'camera'
+let rowTab = new Map<string, ListTab>()
+let listTab: ListTab = 'scene'
+let tabFollows: string | null = null
+let showRows: (() => void) | null = null
 /** the Render section brought up to date with what's chosen */
 let renderView: (() => void) | null = null
 let summary: HTMLDivElement | null = null
@@ -514,7 +523,11 @@ const PANEL_CSS = `
 .be-main { flex:1; min-width:0; display:flex; flex-direction:column }
 .be-head { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#1f1f1f; font-weight:600; letter-spacing:.02em; color:#e6e6e6 }
 .be-head small { margin-left:auto; font-weight:400; color:#8a8a8a }
-.be-cat { padding:5px 8px 3px; margin-top:4px; font-size:11px; font-weight:700; letter-spacing:.08em; color:#e0a040; border-bottom:1px solid #3c3c3c; position:sticky; top:0; background:#2a2a2a; z-index:1 }
+.be-tabs { display:flex; gap:2px; border-bottom:2px solid #e0a040 }
+.be-tab { flex:1; padding:4px 8px 3px; background:#1d1d1d; color:#8c8c8c; border:1px solid #333; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font:inherit; font-weight:700; letter-spacing:.08em }
+.be-tab:hover { color:#d6d6d6; background:#2c2c2c }
+.be-tab.on { background:#e0a040; border-color:#e0a040; color:#1d1d1d }
+.be-tabs + .be-list { border-top-left-radius:0; border-top-right-radius:0 }
 .be-win { width:20px; height:20px; padding:0; border:0; border-radius:3px; background:#3a3a3a; color:#ddd; font:600 13px/20px sans-serif; cursor:pointer; flex:none }
 .be-win:hover { background:#4a4a4a } .be-close:hover { background:#b8433a; color:#fff }
 .be.be-min { max-height:none } .be.be-min .be-body, .be.be-min .be-tools { display:none }
@@ -686,6 +699,8 @@ function panel() {
     find.placeholder = T().find
     const list = h('div', 'be-list')
     rows = new Map()
+    rowTab = new Map()
+    let building: ListTab = 'scene'
     // (the groups first, each with its members under it; then every piece not in one)
     const addRow = (id: string, label: string, depth: number, group: boolean) => {
       const row = h('div', `be-row${group ? ' be-grow' : ''}`, (depth > 0 && !group ? '└ ' : '') + label)
@@ -700,6 +715,7 @@ function panel() {
       }
       list.appendChild(row)
       rows.set(id, row as HTMLDivElement)
+      rowTab.set(id, building)
     }
     // (each piece followed by the pieces inside it, a step further in, as an outliner's hierarchy)
     const childrenOf = (id: string) => [...registry].filter(([, r]) => r.parent === id).map(([k]) => k)
@@ -707,19 +723,30 @@ function panel() {
       addRow(id, pieceName(registry.get(id)!.label, lang), depth, false)
       for (const k of childrenOf(id)) if (!groupOf(k)) addTree(k, depth + 1)
     }
-    // (in two lists, as an outliner's: the scene's pieces, then the views' cameras)
+    // (in two tabs: the scene's pieces, and the views' cameras)
     const isCam = (id: string) => id.startsWith('viewcam-')
-    const catHead = (text: string) => { list.appendChild(h('div', 'be-cat', text)) }
-    catHead(T().sceneHead)
     for (const [gid, g] of Object.entries(state.groups)) {
       addRow(gid, `${g.name}（${g.members.length}）`, 0, true)
       for (const m of g.members) if (registry.has(m)) addTree(m, 1)
     }
     for (const [id, r] of registry) if (!isCam(id) && !groupOf(id) && !(r.parent && registry.has(r.parent))) addTree(id, 0)
-    catHead(T().cameraHead)
+    building = 'camera'
     for (const [id, r] of registry) if (isCam(id) && !groupOf(id) && !(r.parent && registry.has(r.parent))) addTree(id, 0)
-    find.oninput = () => { const q = find.value.trim().toLowerCase(); for (const [id, row] of rows) row.style.display = !q || (rows.get(id)?.textContent ?? id).toLowerCase().includes(q) ? '' : 'none' }
-    out.append(find, list)
+    const tabs = h('div', 'be-tabs')
+    const tabButtons = (['scene', 'camera'] as const).map((t) => {
+      const b = h('button', 'be-tab', t === 'scene' ? T().sceneHead : T().cameraHead) as HTMLButtonElement
+      b.onclick = () => { listTab = t; showRows?.() }
+      tabs.appendChild(b)
+      return [t, b] as const
+    })
+    // (only the rows of the tab shown, and of those only what the search finds)
+    showRows = () => {
+      const q = find.value.trim().toLowerCase()
+      for (const [id, row] of rows) row.style.display = rowTab.get(id) === listTab && (!q || (row.textContent ?? id).toLowerCase().includes(q)) ? '' : 'none'
+      for (const [t, b] of tabButtons) b.classList.toggle('on', t === listTab)
+    }
+    find.oninput = () => showRows?.()
+    out.append(find, tabs, list)
     // Transform: what's chosen, then Location, Rotation, Scale each as X / Y / Z stacked, a reset beside each
     const tr = section(T().transform)
     // (which axes the handles and the place fields go by, always in sight, a click switches them)
@@ -844,6 +871,13 @@ function panel() {
   if (spaceButton) { spaceButton.textContent = state.space === 'local' ? T().spaceLocalShort : T().spaceWorldShort; spaceButton.title = state.space === 'local' ? T().spaceLocal : T().spaceWorld }
   if (pivotButton) { pivotButton.textContent = 'D'; pivotButton.title = T().pivot; pivotButton.classList.toggle('on', state.pivotMode) }
   for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)) }
+  // (a new pick shows its own tab: a camera picked in the scene brings up the cameras)
+  if (state.selected !== tabFollows) {
+    tabFollows = state.selected
+    const t = state.selected ? rowTab.get(state.selected) : undefined
+    if (t) listTab = t
+  }
+  showRows?.()
   if (summary) {
     // (how much furniture there is: every piece that can be taken hold of, how many have been moved, turned or sized from where they began, and the groups)
     const pieces = [...registry.keys()]

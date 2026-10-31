@@ -68,7 +68,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 ## 開發者模式（`src/shops/grill/edit.ts`、`Movable.tsx`）
 
-- 介面是 Blender 風格的深灰面板：左邊工具列，熱鍵照 Maya（選取 Q、位移 W、旋轉 E、縮放 R；同一個鍵再按一次切換世界／物件座標；4 線框看拓撲、5 回到著色），選到物件時面板顯示它的三角面、頂點、網格數；F 對準選取、A 看全部、Esc 取消選取；視角照 Maya：Alt＋左鍵旋轉、Alt＋中鍵平移、Alt＋右鍵推拉，不按 Alt 拖曳不會動到鏡頭；移動把手中間的橘色小方框可在面向鏡頭的平面上自由移動（三軸一起）；進開發者模式（G）時視角切到 1 自由視角（總覽），離開時鏡頭不動（選單收起不會改構圖）；面板下方列出熱鍵；清單可搜尋，變換區的 X／Y／Z 是紅綠藍色條。位置、移動箭頭、旋轉環、縮放把手都用**房間軸**（吧台方向 `ALONG`），不是各物件父層的軸。
+- 介面是 Blender 風格的深灰面板：左邊工具列，熱鍵照 Maya（選取 Q、位移 W、旋轉 E、縮放 R；同一個鍵再按一次切換世界／物件座標；4 線框看拓撲、5 回到著色），選到物件時面板顯示它的三角面、頂點、網格數；F 對準選取、A 看全部、Esc 取消選取；視角照 Maya：Alt＋左鍵旋轉、Alt＋中鍵平移、Alt＋右鍵推拉，不按 Alt 拖曳不會動到鏡頭；移動把手中間的橘色小方框可在面向鏡頭的平面上自由移動（三軸一起）；進開發者模式（G）時視角切到 1 自由視角（總覽），離開時鏡頭不動（選單收起不會改構圖）；面板下方列出熱鍵；清單分「場景」「攝影機」兩個頁籤（`edit.ts` 的 `listTab`；點選到的東西在哪一頁就自動切過去），可搜尋（只找目前那一頁），變換區的 X／Y／Z 是紅綠藍色條。位置、移動箭頭、旋轉環、縮放把手都用**房間軸**（吧台方向 `ALONG`），不是各物件父層的軸。
 - 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。開發者模式每件物件有一個貼合模型的細線框（`Movable.tsx` 的 `useEditBox`：量模型的頂點，順著物件的斜度找最貼的角度）：平常淡藍、只在沒被擋住處顯示；滑鼠移上去變亮、選到變橘色，這兩種會穿透顯示。點選的是物件本身的網格，所以大物件不會擋住前面的小物件。位置框（量出的範圍）仍用來放箭頭和算中心。
 - **預設值**：位置預設寫在 `edit.ts` 的 `BASES`（父層單位）；大小與轉向預設用 `<Movable baseScale baseTurn>`。定好預設後面板歸零（位置 0、縮放 1）。改了預設要把 `edit.ts` 開頭的三個 localStorage key 版本加一，不然瀏覽器裡舊的偏移會重複計算。有預設轉向或縮放的擺設（例如備長炭籃、行燈），量到中心點之前先不顯示，避免載入時閃一下。
 - **編輯介面中日文**：文字在 `data/editText.ts`（`EDIT_TEXT` 中、日各一份，`pieceName` 把擺設名稱翻成日文）；App 用 `setEditLang` 跟著遊戲語言切換。新增擺設時，中文名稱只用中文，並在 `PIECES_JA`（或 `WORDS_JA`）補上日文。
@@ -84,13 +84,15 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 - **三個視角**：攝影機 1＝研製（鎖定）、攝影機 2＝開發者模式（總覽、自由拖）、攝影機 3＝自由視角（閉店預設）。
 - **研製＝火烤灶台視角**：閉店時鏡頭在視角 2（火烤灶台）就是研製模式（`App.tsx` 的 `research = !ai && view === 'grill'`），換到其他視角就離開；營業時沒有研製。研製時右上角（編輯鈕左邊）有一個冷藏櫃小圖示（`fridge-toggle`），點一下開關右側的食材櫃（`ui/Menu.tsx` 的 `chiller`）。食材櫃分三區：冷凍、冷藏、常溫（`data/storage.ts` 的 `storageOf`；清酒、馬鈴薯、地瓜是常溫），底部是試做數量、全部放回，與三個補貨鍵：補到平均（`averageOrder`）、各補 5（`eachOrder`）、補滿（`topUpOrder`，補到 `PAR`）；BDD `tests/bdd/fridge.test.ts`。沒有手動烤魚。**研製**：視角固定在**攝影機 1**，手動夾食物、調味、看每塊的烤魚進度（`roast-tag`）。**營業**（店開著）：廚房自己烤（AI 主廚永遠工作，雇的員工一起），沒有手動烤魚與調味、沒有進度標籤、沒有食材櫃。規則都在 `game/mode.ts`（`modeOf(shopOpen, research)`、`canCookByHand`、`showsProgress`、`showsStockFridge`、`holdsCameraOne`；BDD 情境 `tests/bdd/mode.test.ts`）。
-- **Esc** 關掉目前開著的介面（由上而下：辦公室、帳本、看板、工具選單、食材櫃、視角選單；開發者模式與收銀機說明書自己處理）。
+- **Esc** 關掉目前開著的介面（由上而下：辦公室、看板、工具選單、食材櫃、視角選單；開發者模式與收銀機說明書自己處理）。
+- **帳本**是「經營」（`ui/Office.tsx`）的第三個頁籤「帳簿」（現金、開業費用、採買、收銀機取款、供品、營業額、食材、燃料、人事、利潤、利潤率）；右上角沒有「帳」按鈕。
+- 客人看板（掌廚、來客、在座、最近四位的心情，`guest-board`）只在手機版顯示；電腦上客人就在 3D 吧台。
 - **試吃**：研製時點試吃碗裡烤好的東西，老闆會沿他的走道走到最靠近碗的地方、轉向它、說一句（`data/bossLines.ts` 的 `TASTE_LINES`），把它拿到嘴邊吃完，再跑回原本的作息（`Boss.tsx` 的 `BOSS_TASTE`；Roasting 的 `awaitBoss`、`byBoss`）。一次一份。
 - 廚師只是偶爾搧火：一段時間拿著扇子搧，再放下站著（`Person3D.tsx` 的 `fanning`），每人錯開。
 - 老闆擋住鏡頭看的東西時會變淡（只在他真的蓋住畫面中央附近時），用 `alphaHash` 抖動透明，不會變黑或透出身體內部。
 - 研製時：點冷藏櫃拿的食材**直接出現在大砧板（`tray`）上**（`Piece.fresh`，不從火堆滑過去）；烤好夾起的食物**一律放進桌上的試吃碗**（`bowl-0`、`TasteBowl`、`inBowl`，排法同盤子）。
 - **攝影機 1**：該道菜的 home 視角（`App.tsx` 的 home），研製時鎖在這裡；開發者模式不再能調整它（`scene/camera1.ts` 的偏移仍會讀，但沒有編輯介面）。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
-- **視角選單**（左下眼睛鈕）：`data/views.ts` 的 `VIEW_SPOTS`，依序 1 自由視角、2 火烤灶台、3 櫃檯、4 玄關、5 小神龕、6 飲品櫃、7 廁所、8 後台區、9 老闆（`follow`：老闆的第一人稱、廣角 `WIDE_FOV`，跟著他走，閉店時才有）；各區看向一個具名群組（`TillMarble`、`look-door`、`look-altar`、`look-fridge`、`look-wc-m`、`look-back`），預設鏡頭從房間剖開的那一側（總覽的方向）、往後 `back`、往上 `up` 看過去（`App.tsx` 的 `poseOf`）；`from` 可指定別的方向、`shift` 把看的點往房內移（玄關在剖開的牆邊，用這兩個避免拍到外面的空白）；老闆視角從他眼睛的高度看著火爐。打開選單時場景裡同時標出編號圈圈（`ViewMarkers`，像 Sketchfab 的註記，點一下飛過去）。**除了 1 自由視角，其他視角都鎖定**（不能轉、平移、縮放；App 的 `spotLock`；研製的火烤灶台另由 `lockView` 鎖在攝影機 1），開發者模式不鎖。鎖定的視角都有四周模糊＋昏暗的鏡頭效果（CSS 疊層 `.grill-focus`，研製時焦點在火上，其他視角 `is-centered` 在畫面中央），自由視角、老闆視角與開發者模式沒有。開發者模式下每個視角是一台攝影機（`ViewCams`，Movable id `viewcam-<id>`），可調位置與旋轉；調過的視角就從那台攝影機的位置、朝它指的方向看（`viewCamPlaced`）。
+- **視角選單**（左下眼睛鈕）：`data/views.ts` 的 `VIEW_SPOTS`，依序 1 自由視角、2 火烤灶台、3 櫃檯、4 玄關、5 小神龕、6 飲品櫃、7 廁所、8 後台區、9 老闆（`follow`：老闆的第一人稱、廣角 `WIDE_FOV`，跟著他走，閉店時才有）；各區看向一個具名群組（`TillMarble`、`look-door`、`look-altar`、`look-fridge`、`look-wc-m`、`look-back`），預設鏡頭從房間剖開的那一側（總覽的方向）、往後 `back`、往上 `up` 看過去（`App.tsx` 的 `poseOf`）；`from` 可指定別的方向、`shift` 把看的點往房內移（玄關在剖開的牆邊，用這兩個避免拍到外面的空白）；老闆視角從他眼睛的高度看著火爐。打開選單時場景裡同時標出編號圈圈（`ViewMarkers`，像 Sketchfab 的註記，點一下飛過去）；選單開著時點畫面其他地方（不是拖曳轉視角）就收起。**除了 1 自由視角，其他視角都鎖定**（不能轉、平移、縮放；App 的 `spotLock`；研製的火烤灶台另由 `lockView` 鎖在攝影機 1），開發者模式不鎖。鎖定的視角都有四周模糊＋昏暗的鏡頭效果（CSS 疊層 `.grill-focus`，研製時焦點在火上，其他視角 `is-centered` 在畫面中央），自由視角、老闆視角與開發者模式沒有。開發者模式下每個視角是一台攝影機（`ViewCams`，Movable id `viewcam-<id>`），可調位置與旋轉；調過的視角就從那台攝影機的位置、朝它指的方向看（`viewCamPlaced`）。自由視角的攝影機預設就調過：物件座標 X -0.45、旋轉 Y 15° Z 5°（位置在 `edit.ts` 的 `BASES['viewcam-free']`，轉向在 App 的 `VIEWCAM_TURN`，面板「還原」回到這裡）。
 - **開發者模式只做編輯**：場景裡所有互動（夾食物、添炭、調味、澆水、收銀抽屜、廁所門、飲料櫃門、神棚、飯桶蓋、盤子拖曳）都擋掉（Roasting 的 `locked`、各元件的 `getEdit().on`、App 對 `.canvas-layer` 的 click 攔截）。
 - 桌上的**行燈、團扇**用 `<Movable>` 包起來；**大砧板（`cutboard`）、調味盒（`seasoning`）、水桶（`bucket`）**是由桌面的 nudge（`moved`）定位的，開發者模式用 `EditProxy`（不畫出來的同尺寸方塊）給框與箭頭，位移量會加進 nudge（食物、鍋具、水瓢跟著走）；這三件只有位移有效，旋轉與縮放沒有作用。
 - **能互動的東西都要有名稱標籤**：滑鼠移上去，游標旁出現和備長炭同款的紙標籤（名字＋做法）。3D 物件用 `shops/grill/bar.ts` 的 `tipOver(名稱, 提示)` 取代 `handOver`（會發亮、變手指、設標籤）；標籤的狀態在 `scene/hoverTip.ts`，由 `ui/HoverTip.tsx` 畫（開發者模式隱藏）。不能放在 `StaticBatch` 裡（合併後沒有事件）；門這類小目標用一片透明的感應面（見 `ToiletHit`）。目前沒有標籤的：招財貓、客人、食材冷藏櫃的蓋子（沒有互動）。
@@ -155,14 +157,14 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **炭火的聲音**（`shops/grill/fireAmbience.ts`，WebAudio 即時合成）：炭的劈啪聲隨火力、烤物的滋滋聲隨火上的數量（`game/fireSound.ts`，BDD `fire-sound`）；鏡頭離火越遠越小聲；營業時另有客人的人聲（`crowdAmbience`，隨在座人數 `murmur`）；玩家第一次點擊後才開始（瀏覽器規定）。
 - 太陽光（App 的 directionalLight）會投影，影子涵蓋整間店；陰影圖每 3 格重畫一次（`ShadowPacer`）；只有夠大的東西會投影（包圍球半徑 ≥ `CASTER_R` 0.3，`ShadowPacer` 每 1.5 秒把新出現的小網格設成不投影：盤子、瓶子、杯子這類小東西不進陰影圖）。
 - **門簾**：入口的是米白棉布、深褐菱形家紋（中間「聞」）與一行 KIKUNO · YAKIZAKANA（`GuestBar3D.tsx` 的 `crestNorenTexture`，左右翻轉畫，從店內讀起來是正的），原木橫桿（`NorenModel` 的 `pole="wood"`，沒有吊線），寬同門口、加長 `NOREN_BIG`；舊的藍色「烤魚」門簾掛在員工出入口（`StaffNoren`：深色門洞＋木框，位置 `bar.ts` 的 `STAFF_DOOR`，地墊與員工下班的出口跟著它）。
-- 場景外的背景是深藍 `#0d1c33`（CSS 變數 `--scene-bg`，開發者面板「背景色」可改，存 localStorage `jgs-scene-bg`，`edit.ts` 的 `setBackdrop`），白天晚上一樣，中心較亮往外變暗的放射漸層（`index.css` 的 `.canvas-layer`），畫面四周有暗角（`.canvas-layer::after`，夜晚較深）；整間店底下有一片柔和的落地陰影（GuestBar3D 的 `GROUND_SHADOW`）。吊燈、燈串的光暈與桌面光圈白天淡、夜晚亮且多一圈大光暈（DiningRoom 的 `nightGlow`，跟著 data-theme）。
+- 場景外的背景是深灰 `#26262c`（CSS 變數 `--scene-bg`，開發者面板「背景色」可改，存 localStorage `jgs-scene-bg`，`edit.ts` 的 `setBackdrop`），白天晚上一樣，中心較亮往外變暗的放射漸層（`index.css` 的 `.canvas-layer`），畫面四周有暗角（`.canvas-layer::after`，夜晚較深）；整間店底下有一片柔和的落地陰影（GuestBar3D 的 `GROUND_SHADOW`）。吊燈、燈串的光暈與桌面光圈白天淡、夜晚亮且多一圈大光暈（DiningRoom 的 `nightGlow`，跟著 data-theme）。
 - 開店（載入）時的起始視角是 1 自由視角（總覽，App 的 `view` 初始值 `free`）；e2e 會先切到 2 火烤灶台再補貨。
 - 把飲料從飲料櫃拖到老闆附近（3 以內）的桌上放下，老闆會走過去拿起來喝、說一句話（`Boss.tsx` 的 `BOSS_DRINK`，台詞 `data/bossLines.ts` 的 `DRINK_LINES`；dev 時 `__bossDrink`）。
 - 供清酒（點門口神棚前的酒瓶）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`；名稱沿用舊的點香）。
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。
 - **擋住視線的吊掛物會變淡**：`scene/OccluderFade.tsx` 每幾格從鏡頭朝看的目標（`__ctl.target` 在畫面上的位置，周圍一圈）打射線，標了 `userData.fade` 的群組（門簾、紅燈籠、旗幟串、幟旗、燈串、吊燈）擋在中間就淡到 18%，移開就恢復（各自複製材質，不影響共用同一材質的東西）。新的吊掛擺設要會變淡，就在它的群組加 `userData={{ fade: true }}`。
 - **收銀抽屜的錢**（`game/till.ts` 的 `openingFloat`／`deposit`／`takeOut`，BDD `till`）：付現的客人把帳單放進抽屜；抽屜開著時老闆點紙鈔格或硬幣格把整格拿走，加進現金（帳本的「收銀機取款」，`ledger.till`）。
-- **飲料後場庫存**（`game/drinkStock.ts`，BDD `drink-stock`）：飲料櫃旁的酒箱是後場（`bar.ts` 的 `DRINK_BACK`，開始各兩箱）；櫃裡缺 3 格以上，倉儲店員（GuestBar3D 的 `Stocker`）抱一箱走過去開門補（一趟最多 `STOCK_CARRY`），補多少扣多少，後場沒貨就補不上；點酒箱訂一箱最缺的飲料，從現金扣進價（`SHOP_PURSE`，記在帳本的採買）。
+- **飲料後場庫存**（`game/drinkStock.ts`，BDD `drink-stock`）：飲料櫃旁的酒箱是後場（`bar.ts` 的 `DRINK_BACK`，開始各兩箱）；櫃裡缺 3 格以上，倉儲店員（GuestBar3D 的 `Stocker`；**雇了倉儲、店開著才出現**，外表是那位員工，沒雇就沒人補）抱一箱走過去開門補（一趟最多 `STOCK_CARRY`），補多少扣多少，後場沒貨就補不上；點酒箱訂一箱最缺的飲料，從現金扣進價（`SHOP_PURSE`，記在帳本的採買）。
 - 飲料櫃每格是前排加後面一排（`RANK_DEPTH`，每台約 80 瓶；瓶子 16 段車削；前排與後排合併成一批 `StaticBatch`，每格一個看不見的感應方塊給滑鼠指，指到的瓶子周圍亮一圈 `BOTTLE_HALO`，拿起來的那瓶單獨畫）；拿出冰箱的飲料（地上、桌上、客人面前、手上）有凝結水珠（`DrinkBottle` 的 `wet`，櫃內的沒有）。
 - **碗盤櫃是盤子的來源**（`game/plates.ts`，BDD `plates`）：大容量，滿的時候 50 個（`RACK_FULL`；下層插盤架 22、第三層展示 4、頂層 4 疊各 6，第二層倒扣的碗是裝飾）；盤子照實際擺法放，不互相穿透；櫃上顯示幾個就是幾個；點一下搬一疊到出餐口（最多 12 個），出餐口空了服務生自己去拿，洗好放不下的回到櫃上。
 - **自動營運的營業套路**（`game/flow.ts`，BDD `flow`）：每次開店抽一種（平日、午餐尖峰、晚餐尖峰、雨天、祭典、觀光團、熟客日），各自的來客節奏、結伴比例、點單量不同，開店時主廚會說。

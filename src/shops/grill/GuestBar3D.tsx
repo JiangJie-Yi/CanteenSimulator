@@ -325,12 +325,13 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
 }
 
 /**
- * The stocker (倉儲): stands by the crates of drinks at the back (the back stock, DRINK_BACK) and, when a fridge is three or more short
+ * The stocker (倉儲), there only once one's hired and while the shop's open (drawn as that hire): stands by the crates of drinks at the
+ * back (the back stock, DRINK_BACK) and, when a fridge is three or more short
  * of what the back can fill, carries a case over, opens it, fills its empty places from the back (game/drinkStock's restockRun, as many
  * as a trip carries) and goes back to the crates.
  */
 const STOCK_CARRY = 8
-function Stocker({ counters, fridges }: { counters: Counter[]; fridges: NonNullable<ReturnType<typeof fridgesOf>> }) {
+function Stocker({ counters, fridges, who }: { counters: Counter[]; fridges: NonNullable<ReturnType<typeof fridgesOf>>; who: { id: string; look: StaffLook } }) {
   const g = useRef<THREE.Group>(null)
   const box = useRef<THREE.Mesh>(null)
   const c1 = counters[1]
@@ -383,7 +384,7 @@ function Stocker({ counters, fridges }: { counters: Counter[]; fridges: NonNulla
   return (
     <group ref={g} position={home} scale={STAFF_SCALE}>
       <BlobShadow r={0.17} />
-      <StaffFigure id="stocker" role="stock" look={{ female: false, age: 'middle' }} moving={moving} />
+      <StaffFigure id={who.id} role="stock" look={who.look} moving={moving} />
       <mesh ref={box} position={[0, HELD_AT[1] + 0.06, HELD_AT[2]]} visible={false}>
         <boxGeometry args={[0.22, 0.13, 0.16]} />
         <meshToonMaterial color="#b98a52" />
@@ -1536,7 +1537,7 @@ function Plate({ dirty = false, design = 0 }: { dirty?: boolean; design?: number
 }
 
 export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
-  speech = {}, servers = [], incense, onDrink, onSay, open = true }:
+  speech = {}, servers = [], stocker = null, incense, onDrink, onSay, open = true }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
@@ -1558,6 +1559,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     incense?: { litAt: number | null; onLight: () => void }
     /** the servers on the floor: they carry what's put out at the pass to the customers, a plate with it */
     servers?: { id: string; look: StaffLook }[]
+    /** the stocker, once one's hired (none: no one by the crates, and the fridges aren't filled from the back) */
+    stocker?: { id: string; look: StaffLook } | null
     /** drawn this much bigger, all of it */
     scale?: number
     /** and moved by this (after scaling) */
@@ -2355,7 +2358,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </group>
       ))}
       <Later stage={3}>
-      {given && fridges && <Stocker counters={counters} fridges={fridges} />}
+      {given && fridges && stocker && <Stocker counters={counters} fridges={fridges} who={stocker} />}
       {servers.slice(0, homes.length).map((w, i) => (
         <group key={w.id} ref={(o) => { waiterObjs.current[i] = o }} position={homes[i].at} rotation-y={homes[i].yaw} scale={STAFF_SCALE}>
           <BlobShadow r={0.17} />

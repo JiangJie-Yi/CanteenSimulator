@@ -32,7 +32,7 @@ import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { COAL_BRIDGE, DRINKS, type DrinkId, PANTRY, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
-import { offsetOf, rotationOf, setEditLang, toggleEdit, useEdit } from '@/shops/grill/edit'
+import { offsetOf, positionOf, rotationOf, setEditLang, toggleEdit, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
@@ -50,7 +50,7 @@ import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
 import { effective, restPerMin, ROLES, tirePerMin, type Role } from '@/data/staff'
 import { CANDIDATES, pickHires } from '@/game/hiring'
-import { Office } from '@/ui/Office'
+import { Office, type OfficeTab } from '@/ui/Office'
 import { Welcome } from '@/ui/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
 import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
@@ -409,8 +409,10 @@ function FocusTracker() {
   return null
 }
 
-/** whether a view's camera has been placed by hand (moved or turned in edit mode) */
-const viewCamPlaced = (id: ViewId) => [...offsetOf(`viewcam-${id}`), ...rotationOf(`viewcam-${id}`)].some((x) => Math.abs(x) > 1e-6)
+/** the turn (X, Y, Z degrees) a view's camera starts with, set by the owner in edit mode (its place is in edit.ts's BASES) */
+const VIEWCAM_TURN: Partial<Record<ViewId, V3>> = { free: [0, 15, 5] }
+/** whether a view's camera has been placed (moved or turned in edit mode, or set so to begin with) */
+const viewCamPlaced = (id: ViewId) => [...positionOf(`viewcam-${id}`), ...rotationOf(`viewcam-${id}`), ...(VIEWCAM_TURN[id] ?? [])].some((x) => Math.abs(x) > 1e-6)
 
 /** a film camera's shape, pointing down its -z: the body, the lens, two reels on top */
 function CamIcon({ editing, n, name }: { editing: boolean; n: number; name: string }) {
@@ -439,8 +441,14 @@ function CamIcon({ editing, n, name }: { editing: boolean; n: number; name: stri
  */
 function ViewCams({ editing, lang, pose }: { editing: boolean; lang: Lang; pose: (id: ViewId) => { pos: THREE.Vector3; target: THREE.Vector3 } | null }) {
   const [, tick] = useState(0)
-  // (the parts of the room they look at may still be loading: looked for again a few times)
-  useEffect(() => { let n = 0; const t = window.setInterval(() => { tick((k) => k + 1); if (++n > 8) window.clearInterval(t) }, 800); return () => window.clearInterval(t) }, [])
+  const poseNow = useRef(pose)
+  poseNow.current = pose
+  // (the parts of the room they look at may still be loading (the drinks' fridges come late): looked for again until every one is found)
+  useEffect(() => {
+    let n = 0
+    const t = window.setInterval(() => { tick((k) => k + 1); if (++n > 60 || VIEW_SPOTS.every((v) => poseNow.current(v.id))) window.clearInterval(t) }, 800)
+    return () => window.clearInterval(t)
+  }, [])
   return (
     <>
       {VIEW_SPOTS.map((v, i) => {
@@ -448,7 +456,7 @@ function ViewCams({ editing, lang, pose }: { editing: boolean; lang: Lang; pose:
         if (!p) return null
         const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(p.pos, p.target, new THREE.Vector3(0, 1, 0)))
         return (
-          <Movable key={v.id} id={`viewcam-${v.id}`} label={`視角 ${i + 1}・${v.zh}`}>
+          <Movable key={v.id} id={`viewcam-${v.id}`} label={`視角 ${i + 1}・${v.zh}`} baseTurn={VIEWCAM_TURN[v.id]}>
             <group name={`viewcam-${v.id}`} position={p.pos} quaternion={q}><CamIcon editing={editing} n={i + 1} name={viewName(v, lang)} /></group>
           </Movable>
         )
@@ -828,6 +836,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
                 // the grill's room is there before it opens too, empty
                 <group position={dish.roast ? FIRE_SHIFT.clone().negate() : undefined}><GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
                   servers={dish.roast && ai ? (() => { const hired = crewOf(dish.id).filter((w) => w.role === 'server'); return hired.length ? hired : [HOUSE_SERVER] })() : []}
+                  stocker={dish.roast && ai ? crewOf(dish.id).find((w) => w.role === 'stock') ?? null : null}
                   mark={dish.roast ? '聞野' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(1.95)}
@@ -1046,7 +1055,6 @@ export default function App() {
     if (fresh) setDays((d) => ({ ...d, today: d.today + fresh, total: d.total + fresh }))
   }, [])
   // revenue mode: what's been sold, and what it cost to make (ingredients, fuel, the chef's wages)
-  const [ledgerOn, setLedgerOn] = useState(false)
   // customers' orders as they come in, for the menu to write them down
   const [feed, setFeed] = useState<{ key: number; id: string; guest: number }[]>([])
   const feedSeq = useRef(0)
@@ -1054,7 +1062,6 @@ export default function App() {
   const [boardsOpen, setBoardsOpen] = useState(false)
   // the guest board and the books can be dragged anywhere on the screen
   const dragBoard = useDrag('guests')
-  const dragLedger = useDrag('ledger')
   const dragChat = useDrag('chat')
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -1117,7 +1124,7 @@ export default function App() {
       window.removeEventListener('pagehide', write)
     }
   }, [])
-  const [office, setOffice] = useState<null | 'book' | 'staff'>(null)
+  const [office, setOffice] = useState<null | OfficeTab>(null)
   // (Esc shuts whatever's open, the one on top first: the office, the ledger, the boards, the tools, the pantry, the views. Not in the
   // editor, where Esc lets go of what's picked; nor when something of its own has taken it (the register's manual))
   useEffect(() => {
@@ -1127,7 +1134,6 @@ export default function App() {
       window.setTimeout(() => {
         if (e.defaultPrevented) return
         if (office) setOffice(null)
-        else if (ledgerOn) setLedgerOn(false)
         else if (boardsOpen) setBoardsOpen(false)
         else if (toolsOpen) setToolsOpen(false)
         else if (fridgeOpen) setFridgeOpen(false)
@@ -1136,7 +1142,22 @@ export default function App() {
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
-  }, [office, ledgerOn, boardsOpen, toolsOpen, fridgeOpen, viewMenu, editOn])
+  }, [office, boardsOpen, toolsOpen, fridgeOpen, viewMenu, editOn])
+  // (the views' menu folds away at a click anywhere else: not at its own button, its list or the numbered pins it puts in the scene,
+  // nor at the end of a drag that turned the view)
+  useEffect(() => {
+    if (!viewMenu) return
+    const ours = (t: EventTarget | null) => t instanceof Element && !!t.closest('.view-menu, .view-reset, .view-pin')
+    let down: { x: number; y: number } | null = null
+    const onDown = (e: PointerEvent) => { down = ours(e.target) ? null : { x: e.clientX, y: e.clientY } }
+    const onUp = (e: PointerEvent) => {
+      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6 && !ours(e.target)) setViewMenu(false)
+      down = null
+    }
+    window.addEventListener('pointerdown', onDown, true)
+    window.addEventListener('pointerup', onUp, true)
+    return () => { window.removeEventListener('pointerdown', onDown, true); window.removeEventListener('pointerup', onUp, true) }
+  }, [viewMenu])
   // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
   const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>({})
   const menuByRef = useRef(menuBy)
@@ -2032,7 +2053,7 @@ export default function App() {
         {showFire && <FireControl level={fireLevel} onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
         {showFull && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
-          title={tl(lang, '經營（廚房・人事）', '開発ノート・人事', 'Office (kitchen · staff)')}>
+          title={tl(lang, '經營（廚房・人事・帳簿）', '開発ノート・人事・帳簿', 'Office (kitchen · staff · ledger)')}>
           <svg className="office-icon" viewBox="0 0 28 28" aria-hidden="true">
             {/* the shop front: a tiled eave, a noren split in three with the shop's mark, a lantern at the side */}
             <path d="M3 10.5 14 4l11 6.5z" fill="#3b2a20" />
@@ -2055,6 +2076,30 @@ export default function App() {
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
             tab={office} onTab={setOffice}
+            ledger={(
+              <>
+                <p className="ledger-cash"><span>{tl(lang, '現金', '現金', 'Cash')}</span><b className="money">NT${Math.round(cash).toLocaleString()}</b></p>
+                <p><span>{tl(lang, '開業費用', '開業費', 'Opening cost')}</span><b className="money">−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
+                <p><span>{tl(lang, '採買支出', '仕入れ', 'Purchasing')}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
+                <p><span>{tl(lang, '收銀機取款', 'レジから取り出し', 'Taken from till')}</span><b className="money">+{Math.round(ledger.till ?? 0).toLocaleString()}</b></p>
+                <p><span>{tl(lang, '供品費用', 'お供え', 'Offerings')}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
+                {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
+                  .map(([k, v]) => (
+                    <p key={k}><span>{UI[lang][k]}</span><b className="money">{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : 1)}</b></p>
+                  ))}
+                {(() => {
+                  const profit = ledger.revenue - ledger.food - ledger.fuel - ledger.wage
+                  return (
+                    <>
+                      <p className={`ledger-profit${profit < 0 ? ' is-loss' : ''}`}><span>{UI[lang].profit}</span>
+                        <b className={profit < 0 ? '' : 'money'}>{profit < 0 ? '−' : ''}NT${Math.abs(profit).toFixed(0)}</b></p>
+                      <p className="ledger-margin"><span>{UI[lang].margin}</span>
+                        <b>{ledger.revenue > 0 ? `${((profit / ledger.revenue) * 100).toFixed(1)}%` : '—'}</b></p>
+                    </>
+                  )
+                })()}
+              </>
+            )}
             book={(
               <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)}
                 partCost={(p) => partCost(dish, p)}
@@ -2089,7 +2134,7 @@ export default function App() {
         )}
         <div className={`side-boards${boardsOpen ? ' is-open' : ''}`}>
           {/* on a phone the boards fold into one line at the top: tap it to open them */}
-          {(ai || ledgerOn) && (
+          {ai && (
             <button type="button" className="boards-chip" onClick={() => setBoardsOpen((o) => !o)} aria-expanded={boardsOpen}>
               {ai && (() => {
                 const here = guests.filter((g) => g.state === 'waiting' || g.state === 'eating')
@@ -2102,14 +2147,11 @@ export default function App() {
                   </span>
                 )
               })()}
-              {ledgerOn && (() => {
-                const profit = ledger.revenue - ledger.food - ledger.fuel - ledger.wage
-                return <span className={`chip-part chip-profit${profit < 0 ? ' is-loss' : ''}`}>{UI[lang].profit} {profit < 0 ? '−' : ''}{Math.abs(profit).toFixed(0)}</span>
-              })()}
               <span className="chip-caret">{boardsOpen ? '▲' : '▼'}</span>
             </button>
           )}
-          {ai && (
+          {/* (the customers' board only on a phone, where the bar is the 2D one; on a computer they're seen at the bar itself) */}
+          {ai && phone && (
             <section className="guest-board is-draggable" aria-label={UI[lang].guests(0, 0)} style={dragBoard.style}
               onPointerDown={dragBoard.onPointerDown} onDoubleClick={dragBoard.onDoubleClick}>
               <div className="chef-pick">
@@ -2120,9 +2162,8 @@ export default function App() {
               <p className="guest-count">
                 {UI[lang].guests(visits, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
               </p>
-              {/* (on a computer the customers sit at the bar in 3D; a phone shows them here, in the 2D bar, which
-                  stays sharp and clear of the rest on a small screen) */}
-              {phone && !flatGrill && (
+              {/* (a phone shows the customers here, in the 2D bar, which stays sharp and clear of the rest on a small screen) */}
+              {!flatGrill && (
                 <GuestCounter guests={guests} shop={DISHES[active].id} lang={lang} staff={{ chef: staffOf(DISHES[active].id, 'chef').length,
                   cashier: staffOf(DISHES[active].id, 'cashier').length, server: staffOf(DISHES[active].id, 'server').length }} />
               )}
@@ -2139,31 +2180,6 @@ export default function App() {
                   )
                 })}
               </ul>
-            </section>
-          )}
-          {ledgerOn && (
-            <section className="ledger is-draggable" aria-label={UI[lang].ledgerLabel} style={dragLedger.style}
-              onPointerDown={dragLedger.onPointerDown} onDoubleClick={dragLedger.onDoubleClick}>
-              <p className="ledger-cash"><span>{tl(lang, '現金', '現金', 'Cash')}</span><b className="money">NT${Math.round(cash).toLocaleString()}</b></p>
-              <p><span>{tl(lang, '開業費用', '開業費', 'Opening cost')}</span><b className="money">−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
-              <p><span>{tl(lang, '採買支出', '仕入れ', 'Purchasing')}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
-              <p><span>{tl(lang, '收銀機取款', 'レジから取り出し', 'Taken from till')}</span><b className="money">+{Math.round(ledger.till ?? 0).toLocaleString()}</b></p>
-              <p><span>{tl(lang, '供品費用', 'お供え', 'Offerings')}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
-              {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
-                .map(([k, v]) => (
-                  <p key={k}><span>{UI[lang][k]}</span><b className="money">{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : 1)}</b></p>
-                ))}
-              {(() => {
-                const profit = ledger.revenue - ledger.food - ledger.fuel - ledger.wage
-                return (
-                  <>
-                    <p className={`ledger-profit${profit < 0 ? ' is-loss' : ''}`}><span>{UI[lang].profit}</span>
-                      <b className={profit < 0 ? '' : 'money'}>{profit < 0 ? '−' : ''}NT${Math.abs(profit).toFixed(0)}</b></p>
-                    <p className="ledger-margin"><span>{UI[lang].margin}</span>
-                      <b>{ledger.revenue > 0 ? `${((profit / ledger.revenue) * 100).toFixed(1)}%` : '—'}</b></p>
-                  </>
-                )
-              })()}
             </section>
           )}
         </div>
@@ -2280,8 +2296,6 @@ export default function App() {
       )}
       <button type="button" className="tools-toggle" onClick={() => setToolsOpen((o) => !o)} aria-expanded={toolsOpen}
         aria-label={UI[lang].tools}>{toolsOpen ? '×' : '☰'}</button>
-      <button type="button" className={`ledger-toggle${ledgerOn ? ' is-on' : ''}`} onClick={() => setLedgerOn((v) => !v)}
-        aria-pressed={ledgerOn} title={UI[lang].ledgerLabel}>{UI[lang].ledger}</button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => {
         // (opening with nothing a customer could order would only shut again at once: say what's missing instead)
         if (!ai && entriesOf(dish.id).length < (MENU_MIN[dish.id] ?? 1)) {
