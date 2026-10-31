@@ -1,12 +1,19 @@
 import { useId } from 'react'
 
 /*
- * A food's picture for the pantry: a hand-inked illustration in SVG, the same look as the workers' faces (ui/Avatar). On a round tile tinted by
- * where it's kept, or cropped close across a card's band. Each is drawn with care: soft gradients for its form, a highlight where the light
- * catches, one weight of ink line, and the details that make it itself (a fish's scales, gill cover, rayed fins and eye; a fillet's flakes
+ * A food's picture for the pantry: a hand-inked illustration in SVG, drawn the way the workers' faces are (ui/Avatar): flat colours cel-shaded
+ * (each form lit from the top left, its shade a crisp darker tone, not a blur), little white highlights where the light catches, one ink line,
+ * no shadow under it. On a round tile tinted by where it's kept (its faint dashed ring as the faces have), or cropped close across a card's
+ * band. And the details that make each itself (a fish's scales, gill cover, rayed fins and eye; a fillet's flakes
  * and skin; the corn's kernels, the shiitake's cross cut, the squid's scoring...).
  */
-const INK = '#2e2118'
+const INK = '#3b2a20'
+/** a colour a little lighter (k > 0) or darker (k < 0), as ui/Avatar shades */
+const shade = (hex: string, k: number) => {
+  const n = parseInt(hex.slice(1), 16)
+  const ch = (v: number) => Math.round(k > 0 ? v + (255 - v) * k : v * (1 + k))
+  return `rgb(${ch(n >> 16)},${ch((n >> 8) & 255)},${ch(n & 255)})`
+}
 
 type Fish = { back: string; belly: string; len: number; deep: number; fin: string; stripe?: string; spots?: string; beak?: string; scutes?: boolean
   bars?: string; fillet?: { flesh: string; deep: string; skin: string; fat?: string } }
@@ -43,19 +50,20 @@ function FishArt({ f, u }: { f: Fish; u: string }) {
   return (
     <g>
       <defs>
+        {/* (cel-shaded: the back, a lighter band where the light falls along it, the pale belly, and its shade a crisp darker tone underneath) */}
         <linearGradient id={`${u}b`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={f.back} /><stop offset="0.42" stopColor={f.back} stopOpacity="0.85" />
-          <stop offset="0.6" stopColor={f.belly} /><stop offset="1" stopColor={f.belly} />
+          <stop offset="0" stopColor={shade(f.back, -0.08)} /><stop offset="0.22" stopColor={shade(f.back, -0.08)} />
+          <stop offset="0.22" stopColor={f.back} /><stop offset="0.5" stopColor={f.back} />
+          <stop offset="0.5" stopColor={f.belly} /><stop offset="0.8" stopColor={f.belly} />
+          <stop offset="0.8" stopColor={shade(f.belly, -0.12)} /><stop offset="1" stopColor={shade(f.belly, -0.12)} />
         </linearGradient>
-        <linearGradient id={`${u}f`} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor={f.fin} stopOpacity="0.95" /><stop offset="1" stopColor={f.fin} stopOpacity="0.55" /></linearGradient>
+        <linearGradient id={`${u}f`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={shade(f.fin, 0.15)} /><stop offset="0.55" stopColor={shade(f.fin, 0.15)} /><stop offset="0.55" stopColor={f.fin} /><stop offset="1" stopColor={f.fin} /></linearGradient>
         <pattern id={`${u}s`} width="3.2" height="2.6" patternUnits="userSpaceOnUse">
-          <path d="M0 2.6 A1.6 1.6 0 0 1 3.2 2.6" fill="none" stroke="#fff" strokeWidth="0.45" opacity="0.55" />
-          <path d="M-1.6 1.3 A1.6 1.6 0 0 1 1.6 1.3 M1.6 1.3 A1.6 1.6 0 0 1 4.8 1.3" fill="none" stroke="#000" strokeWidth="0.35" opacity="0.18" />
+          <path d="M0 2.6 A1.6 1.6 0 0 1 3.2 2.6" fill="none" stroke="#fff" strokeWidth="0.4" opacity="0.38" />
+          <path d="M-1.6 1.3 A1.6 1.6 0 0 1 1.6 1.3 M1.6 1.3 A1.6 1.6 0 0 1 4.8 1.3" fill="none" stroke="#000" strokeWidth="0.3" opacity="0.1" />
         </pattern>
         <clipPath id={`${u}c`}><path d={body} /></clipPath>
       </defs>
-      {/* the shadow it casts */}
-      <ellipse cx={32 + L * 0.05} cy={bot + 3.2} rx={L * 0.95} ry="1.8" fill="#1a2a30" opacity="0.16" />
       {/* tail: forked, its rays fanning out */}
       <path d={`M${x1 - 1} ${cy - H * 0.14} L${x1 + 10} ${cy - tailTip} Q${x1 + 7.5} ${cy - tailTip * 0.2} ${x1 + 6} ${cy}
         Q${x1 + 7.5} ${cy + tailTip * 0.2} ${x1 + 10} ${cy + tailTip} L${x1 - 1} ${cy + H * 0.14} Z`} fill={`url(#${u}f)`} stroke={INK} strokeWidth="1.2" strokeLinejoin="round" />
@@ -79,8 +87,10 @@ function FishArt({ f, u }: { f: Fish; u: string }) {
       {/* lateral line, gill cover, pectoral fin */}
       <path d={`M${x0 + L * 0.38} ${cy - H * 0.28} C${x0 + L * 0.8} ${cy - H * 0.38} ${x1 - L * 0.3} ${cy - H * 0.1} ${x1} ${cy}`} fill="none" stroke={INK} strokeWidth="0.6" opacity="0.4" />
       <path d={`M${x0 + L * 0.33} ${cy - H * 0.62} C${x0 + L * 0.42} ${cy - H * 0.1} ${x0 + L * 0.42} ${cy + H * 0.25} ${x0 + L * 0.3} ${cy + H * 0.68}`} fill="none" stroke={INK} strokeWidth="1.1" opacity="0.75" />
-      <path d={`M${x0 + L * 0.38} ${cy + H * 0.12} L${x0 + L * 0.62} ${cy - H * 0.02} L${x0 + L * 0.66} ${cy + H * 0.25} Z`} fill={`url(#${u}f)`} stroke={INK} strokeWidth="0.9" strokeLinejoin="round" />
-      {[0.5, 0.56].map((t) => <path key={t} d={`M${x0 + L * 0.39} ${cy + H * 0.12} L${x0 + L * (t + 0.06)} ${cy + H * 0.08}`} stroke={INK} strokeWidth="0.4" opacity="0.5" />)}
+      {/* (the pectoral fin: a little fan laid back along the flank behind the gill cover, its rays spreading) */}
+      <path d={`M${x0 + L * 0.4} ${cy + H * 0.18} C${x0 + L * 0.5} ${cy + H * 0.02} ${x0 + L * 0.62} ${cy + H * 0.06} ${x0 + L * 0.68} ${cy + H * 0.16}
+        C${x0 + L * 0.66} ${cy + H * 0.3} ${x0 + L * 0.56} ${cy + H * 0.42} ${x0 + L * 0.4} ${cy + H * 0.18} Z`} fill={shade(f.fin, 0.25)} stroke={INK} strokeWidth="0.8" strokeLinejoin="round" />
+      {[0.12, 0.2, 0.28].map((t) => <path key={t} d={`M${x0 + L * 0.41} ${cy + H * 0.18} L${x0 + L * 0.65} ${cy + H * t}`} stroke={INK} strokeWidth="0.35" opacity="0.45" />)}
       {f.spots && (f.spots === '#f0c84a'
         ? <ellipse cx={x0 + L * 0.48} cy={cy - H * 0.32} rx="2.4" ry="1.5" fill={f.spots} opacity="0.95" />
         : [0.5, 0.68, 0.86, 1.04, 1.22].map((t) => <circle key={t} cx={x0 + L * t} cy={cy - H * 0.18} r="1.05" fill={f.spots} opacity="0.85" />))}
@@ -100,10 +110,9 @@ function FilletArt({ f, u }: { f: NonNullable<Fish['fillet']>; u: string }) {
   return (
     <g>
       <defs>
-        <linearGradient id={`${u}l`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={f.flesh} /><stop offset="1" stopColor={f.deep} /></linearGradient>
+        <linearGradient id={`${u}l`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={f.flesh} /><stop offset="0.62" stopColor={f.flesh} /><stop offset="0.62" stopColor={f.deep} /><stop offset="1" stopColor={f.deep} /></linearGradient>
         <clipPath id={`${u}k`}><path d={slab} /></clipPath>
       </defs>
-      <ellipse cx="33" cy="43" rx="22" ry="2" fill="#1a2a30" opacity="0.16" />
       {/* (the side of the slab, its thickness, below the face) */}
       <path d="M9 30 C9 37 17 44 32 44 C47 44 55 39 55 31 L55 28 C55 36 47 41 32 41 C17 41 9 37 9 30 Z" fill={f.deep} stroke={INK} strokeWidth="1.3" />
       <path d={slab} fill={`url(#${u}l)`} stroke={INK} strokeWidth="1.5" />
@@ -120,15 +129,17 @@ function FilletArt({ f, u }: { f: NonNullable<Fish['fillet']>; u: string }) {
 /** the rest, each its own small picture */
 function OtherArt({ id, u }: { id: string; u: string }) {
   const s = { stroke: INK, strokeWidth: 1.4, strokeLinejoin: 'round' as const, strokeLinecap: 'round' as const }
-  const shadow = (cx = 32, cy = 54, rx = 20) => <ellipse cx={cx} cy={cy} rx={rx} ry="2" fill="#1a2a30" opacity="0.16" />
   const shine = (d: string, w = 2) => <path d={d} fill="none" stroke="#fff" strokeWidth={w} strokeLinecap="round" opacity="0.55" />
+  // (two flat tones, cel-shaded: lit side and shade, a crisp edge between, the light from the top left)
   const grad = (k: string, a: string, b: string, vertical = true) => (
-    <linearGradient id={`${u}${k}`} x1="0" y1="0" x2={vertical ? 0 : 1} y2={vertical ? 1 : 0}><stop offset="0" stopColor={a} /><stop offset="1" stopColor={b} /></linearGradient>
+    <linearGradient id={`${u}${k}`} x1="0" y1="0" x2={vertical ? 0.35 : 1} y2={vertical ? 1 : 0.35}>
+      <stop offset="0" stopColor={a} /><stop offset="0.58" stopColor={a} /><stop offset="0.58" stopColor={b} /><stop offset="1" stopColor={b} />
+    </linearGradient>
   )
   const skewer = <g><line x1="9" y1="50" x2="56" y2="13" stroke="#8a6436" strokeWidth="3" strokeLinecap="round" /><line x1="9" y1="50" x2="56" y2="13" stroke="#d8ae6c" strokeWidth="1.6" strokeLinecap="round" /></g>
   switch (id) {
     case 'GrilledCorn':
-      return <g><defs>{grad('k', '#ffd862', '#e8a628')}</defs>{shadow(32, 55, 16)}
+      return <g><defs>{grad('k', '#ffd862', '#e8a628')}</defs>
         <g transform="rotate(-32 32 32)">
           <path d="M32 7 C42 9 45 21 45 32 C45 45 39 54 32 56 C25 54 19 45 19 32 C19 21 22 9 32 7 Z" fill={`url(#${u}k)`} {...s} />
           {Array.from({ length: 8 }, (_, r) => Array.from({ length: 4 }, (_, c) => (
@@ -139,8 +150,8 @@ function OtherArt({ id, u }: { id: string; u: string }) {
           {shine('M26 14 C24 20 24 26 25 30', 2.4)}
         </g></g>
     case 'GrilledShiitake':
-      return <g><defs><radialGradient id={`${u}c`} cx="0.4" cy="0.3" r="0.7"><stop offset="0" stopColor="#a06a3e" /><stop offset="1" stopColor="#5e3a1e" /></radialGradient>{grad('t', '#f6ecd6', '#d8c4a0')}</defs>
-        {shadow(32, 55, 17)}
+      return <g><defs><radialGradient id={`${u}c`} cx="0.4" cy="0.3" r="0.7"><stop offset="0" stopColor="#a06a3e" /><stop offset="0.6" stopColor="#a06a3e" /><stop offset="0.6" stopColor="#5e3a1e" /><stop offset="1" stopColor="#5e3a1e" /></radialGradient>{grad('t', '#f6ecd6', '#d8c4a0')}</defs>
+        
         <path d="M27 33 L25 52 Q32 56 39 52 L37 33 Z" fill={`url(#${u}t)`} {...s} />
         <path d="M8 34 C8 14 56 14 56 34 C50 37 14 37 8 34 Z" fill={`url(#${u}c)`} {...s} />
         <path d="M11 34 C20 38 44 38 53 34 C46 41 18 41 11 34 Z" fill="#e6d4b2" {...s} />
@@ -149,13 +160,13 @@ function OtherArt({ id, u }: { id: string; u: string }) {
         {[[16, 28], [47, 27], [30, 19], [38, 33]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="1" fill="#e8d4b0" opacity="0.8" />)}
         {shine('M15 26 C17 21 22 18 27 17', 2)}</g>
     case 'KingOyster':
-      return <g><defs>{grad('t', '#fbf4e6', '#e2d2b4', false)}{grad('c', '#b48a5e', '#7e5a36')}</defs>{shadow(32, 56, 14)}
+      return <g><defs>{grad('t', '#fbf4e6', '#e2d2b4', false)}{grad('c', '#b48a5e', '#7e5a36')}</defs>
         <path d="M23 28 C21 42 22 52 32 55 C42 52 43 42 41 28 Z" fill={`url(#${u}t)`} {...s} />
         <path d="M14 29 C14 17 50 17 50 29 C50 33 14 33 14 29 Z" fill={`url(#${u}c)`} {...s} />
         {[27, 31, 35, 39].map((x) => <path key={x} d={`M${x} 34 C${x - 1} 42 ${x} 48 ${x - 0.5} 52`} fill="none" stroke="#d6c4a2" strokeWidth="0.8" />)}
         {shine('M19 25 C22 21 28 20 32 20', 2)}{shine('M26 36 C25 42 25 47 27 51', 1.6)}</g>
     case 'Onigiri':
-      return <g><defs>{grad('r', '#ffffff', '#ece8dc')}{grad('n', '#2c3a2c', '#141c16')}</defs>{shadow(32, 55, 19)}
+      return <g><defs>{grad('r', '#ffffff', '#ece8dc')}{grad('n', '#2c3a2c', '#141c16')}</defs>
         <path d="M32 8 C41 8 55 38 51 48 C48 54 16 54 13 48 C9 38 23 8 32 8 Z" fill={`url(#${u}r)`} {...s} />
         {[[24, 20], [33, 15], [40, 24], [28, 30], [36, 33], [21, 37], [44, 37], [30, 38]].map(([x, y], k) => (
           <ellipse key={k} cx={x} cy={y} rx="1.6" ry="0.8" transform={`rotate(${k * 37} ${x} ${y})`} fill="none" stroke="#cfc8b4" strokeWidth="0.6" />
@@ -165,7 +176,7 @@ function OtherArt({ id, u }: { id: string; u: string }) {
         <circle cx="32" cy="27" r="3" fill="#c8384a" opacity="0.9" />
         {shine('M25 15 C23 19 21 23 20 27', 2.2)}</g>
     case 'ShrimpSkewer':
-      return <g><defs>{grad('p', '#ff9a66', '#d84a2a')}</defs>{shadow(32, 55, 20)}{skewer}
+      return <g><defs>{grad('p', '#ff9a66', '#d84a2a')}</defs>{skewer}
         <path d="M16 44 C9 34 15 20 29 17 C41 15 50 22 47 32 C45 38 38 39 36 34 C35 30 39 28 41 30" fill={`url(#${u}p)`} {...s} />
         {[[22, 22, 25, 33], [28, 19, 30, 30], [34, 18, 35, 28], [40, 19, 40, 27]].map(([a, b, c, d]) => <path key={a} d={`M${a} ${b} Q${(a + c) / 2 + 2} ${(b + d) / 2} ${c} ${d}`} fill="none" stroke="#b83a1e" strokeWidth="1" />)}
         <path d="M16 44 L9 52 L14 52 L19 47 Z" fill="#e8603a" {...s} />
@@ -174,20 +185,20 @@ function OtherArt({ id, u }: { id: string; u: string }) {
         <circle cx="43" cy="24" r="1.5" fill={INK} /><circle cx="42.6" cy="23.5" r="0.45" fill="#fff" />
         {shine('M21 23 C25 19 31 18 36 18', 2)}</g>
     case 'Sausage':
-      return <g><defs>{grad('s', '#d8684a', '#94321e')}</defs>{shadow(32, 54, 18)}{skewer}
+      return <g><defs>{grad('s', '#d8684a', '#94321e')}</defs>{skewer}
         <g transform="rotate(-38 33 31)">
           <rect x="13" y="23" width="40" height="16" rx="8" fill={`url(#${u}s)`} {...s} />
           {[22, 30, 38, 46].map((x) => <path key={x} d={`M${x} 24.5 l-4 13`} stroke="#5a1a0e" strokeWidth="1.6" opacity="0.75" />)}
           {shine('M19 27 H46', 2)}
         </g></g>
     case 'Potato':
-      return <g><defs><radialGradient id={`${u}p`} cx="0.4" cy="0.35" r="0.7"><stop offset="0" stopColor="#ecc888" /><stop offset="1" stopColor="#b88a4a" /></radialGradient></defs>{shadow(32, 52, 19)}
+      return <g><defs><radialGradient id={`${u}p`} cx="0.4" cy="0.35" r="0.7"><stop offset="0" stopColor="#ecc888" /><stop offset="0.6" stopColor="#ecc888" /><stop offset="0.6" stopColor="#b88a4a" /><stop offset="1" stopColor="#b88a4a" /></radialGradient></defs>
         <path d="M12 32 C12 20 25 13 36 15 C49 17 54 28 51 37 C48 47 36 50 25 48 C16 46 12 40 12 32 Z" fill={`url(#${u}p)`} {...s} />
         {[[22, 25], [38, 22], [31, 38], [45, 35], [18, 37]].map(([x, y]) => <g key={x}><path d={`M${x - 1.6} ${y} q1.6 -1.4 3.2 0`} fill="none" stroke="#7a5a2a" strokeWidth="0.9" /><circle cx={x} cy={y + 0.6} r="0.6" fill="#7a5a2a" /></g>)}
         {[[28, 30], [42, 27], [24, 42]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="0.5" fill="#8a6a3a" />)}
         {shine('M18 26 C21 20 27 17 33 17', 2.2)}</g>
     case 'SweetPotato':
-      return <g><defs>{grad('p', '#b44a6c', '#7a2440')}</defs>{shadow(32, 51, 22)}
+      return <g><defs>{grad('p', '#b44a6c', '#7a2440')}</defs>
         <path d="M7 38 C14 22 39 13 53 20 C59 24 52 40 37 45 C24 49 11 47 7 38 Z" fill={`url(#${u}p)`} {...s} />
         <path d="M44 41 C48 38 52 33 53 28 L56 30 C55 36 51 41 47 43 Z" fill="#f2d07a" {...s} />
         {[[18, 36, 30, 31], [28, 39, 40, 33], [22, 30, 34, 25]].map(([a, b, c, d]) => <path key={a} d={`M${a} ${b} Q${(a + c) / 2} ${(b + d) / 2 - 2} ${c} ${d}`} fill="none" stroke="#5a1a30" strokeWidth="0.8" opacity="0.7" />)}
@@ -195,7 +206,7 @@ function OtherArt({ id, u }: { id: string; u: string }) {
         {shine('M15 33 C24 25 36 21 47 21', 2)}</g>
     case 'Yakitori': case 'PorkBelly': case 'BloodCake':
       return <g><defs>{grad('y', '#e0964a', '#a8582a')}{grad('p', '#f6c6ae', '#d8927a')}{grad('b', '#4a2c2a', '#241414')}</defs>
-        {shadow(32, 54, 21)}{skewer}{[0, 1, 2].map((k) => {
+        {skewer}{[0, 1, 2].map((k) => {
           const cx = 19 + k * 12, cy = 42 - k * 9.5
           if (id === 'BloodCake') return <g key={k}><rect x={cx - 6.5} y={cy - 6.5} width="13" height="13" rx="2.4" fill={`url(#${u}b)`} {...s} />{[[-2, -2], [2, 1], [-1, 3]].map(([a, b]) => <circle key={a} cx={cx + a} cy={cy + b} r="0.9" fill="#f2ead6" />)}</g>
           if (id === 'PorkBelly') return <g key={k}><rect x={cx - 7.5} y={cy - 6.5} width="15" height="13" rx="3" fill={`url(#${u}p)`} {...s} /><path d={`M${cx - 7.5} ${cy - 2} h15 M${cx - 7.5} ${cy + 2.5} h15`} stroke="#fff4ea" strokeWidth="1.8" /><path d={`M${cx - 5} ${cy - 6.5} l3 13 M${cx + 2} ${cy - 6.5} l3 13`} stroke="#7a3a1e" strokeWidth="1.1" opacity="0.6" /></g>
@@ -206,7 +217,7 @@ function OtherArt({ id, u }: { id: string; u: string }) {
               <path d={`M${cx - 4} ${cy + 3} l3 -6 M${cx + 1} ${cy + 4} l3 -6`} stroke="#6a2e12" strokeWidth="1.3" opacity="0.7" />{shine(`M${cx - 4} ${cy - 4} l4 -1.5`, 1.4)}</g>}</g>
         })}</g>
     case 'Squid':
-      return <g><defs>{grad('q', '#fbf0e6', '#e8c8b4')}</defs>{shadow(32, 59, 14)}
+      return <g><defs>{grad('q', '#fbf0e6', '#e8c8b4')}</defs>
         <path d="M32 5 L45 20 C46 33 41 40 37 42 H27 C23 40 18 33 19 20 Z" fill={`url(#${u}q)`} {...s} />
         <path d="M32 5 L45 20 L40 22 L32 12 L24 22 L19 20 Z" fill="#f4dcd0" {...s} />
         {[[22, 27, 42, 33], [22, 33, 42, 27]].map(([a, b, c, d]) => [0, 5, 10].map((o) => <path key={`${a}${b}${o}`} d={`M${a} ${b + o - 5} L${c} ${d + o - 5}`} stroke="#d2a48c" strokeWidth="0.7" />))}
@@ -216,7 +227,7 @@ function OtherArt({ id, u }: { id: string; u: string }) {
         <circle cx="27" cy="38" r="1.7" fill={INK} /><circle cx="37" cy="38" r="1.7" fill={INK} />
         {shine('M25 18 C24 24 24 30 25 34', 2)}</g>
     case 'Asparagus':
-      return <g><defs>{grad('a', '#8cbc52', '#4e7a2a', false)}</defs>{shadow(32, 55, 15)}
+      return <g><defs>{grad('a', '#8cbc52', '#4e7a2a', false)}</defs>
         {[0, 1, 2].map((k) => <g key={k} transform={`rotate(${-20 + k * 14} 32 52)`}>
           <path d="M29.5 53 L29.5 15 Q32 7 34.5 15 L34.5 53 Z" fill={`url(#${u}a)`} {...s} />
           <path d="M29.6 15 Q32 9 34.4 15 Q32 13 29.6 15 Z" fill="#6a4a7a" opacity="0.6" />
@@ -224,22 +235,22 @@ function OtherArt({ id, u }: { id: string; u: string }) {
           {shine('M31 20 V48', 1)}
         </g>)}</g>
     case 'Okra':
-      return <g><defs>{grad('o', '#7cb44a', '#3e7024', false)}</defs>{shadow(33, 55, 12)}
+      return <g><defs>{grad('o', '#7cb44a', '#3e7024', false)}</defs>
         <path d="M22 14 L29 9 L33 15 C41 25 45 39 43 52 C39 55 34 53 32 48 C26 36 22 25 22 14 Z" fill={`url(#${u}o)`} {...s} />
         <path d="M27 15 C33 27 37 39 38 51 M31 14 C37 26 41 38 41 50" fill="none" stroke="#2e5a1a" strokeWidth="1" opacity="0.7" />
         <path d="M22 14 L29 9 L33 15 L28 13 Z" fill="#5a7a2a" {...s} />
         {[[30, 26], [35, 36], [33, 44]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="0.5" fill="#cde0a8" />)}
         {shine('M25 19 C28 28 31 36 33 44', 1.6)}</g>
     case 'Shishito':
-      return <g><defs>{grad('sh', '#6aa83a', '#2e6a1a')}</defs>{shadow(32, 52, 19)}
+      return <g><defs>{grad('sh', '#6aa83a', '#2e6a1a')}</defs>
         <path d="M12 45 C14 31 29 18 45 15 C50 14 53 19 48 24 C41 32 30 44 17 49 C13 50 11 48 12 45 Z" fill={`url(#${u}sh)`} {...s} />
         <path d="M17 42 C24 38 33 30 41 22" fill="none" stroke="#24521a" strokeWidth="0.9" opacity="0.6" />
         <path d="M46 15 C48 13 50 13 51 15 L49 17 Z" fill="#4a6a24" {...s} />
         <path d="M50 14 C52 10 54 8 57 7" fill="none" stroke="#5a7a2a" strokeWidth="2" strokeLinecap="round" />
         {shine('M19 40 C26 33 34 25 43 19', 1.8)}</g>
     case 'Scallop':
-      return <g><defs>{grad('h', '#f6d2aa', '#d8946a')}<radialGradient id={`${u}m`} cx="0.4" cy="0.35" r="0.7"><stop offset="0" stopColor="#fffaf0" /><stop offset="1" stopColor="#ecdcc0" /></radialGradient></defs>
-        {shadow(32, 56, 21)}
+      return <g><defs>{grad('h', '#f6d2aa', '#d8946a')}<radialGradient id={`${u}m`} cx="0.4" cy="0.35" r="0.7"><stop offset="0" stopColor="#fffaf0" /><stop offset="0.6" stopColor="#fffaf0" /><stop offset="0.6" stopColor="#ecdcc0" /><stop offset="1" stopColor="#ecdcc0" /></radialGradient></defs>
+        
         <path d="M32 53 L10 27 C14 10 50 10 54 27 Z" fill={`url(#${u}h)`} {...s} />
         {[-16, -11, -5.5, 0, 5.5, 11, 16].map((d) => <path key={d} d={`M32 53 Q${32 + d * 0.7} 34 ${32 + d * 1.35} 14`} fill="none" stroke="#b8704a" strokeWidth="1" />)}
         <path d="M24 53 h16 l-3 6 h-10 Z" fill="#e2a272" {...s} />
@@ -247,15 +258,15 @@ function OtherArt({ id, u }: { id: string; u: string }) {
         <path d="M23 34 C26 40 38 40 41 34" fill="none" stroke="#f0a060" strokeWidth="2.4" opacity="0.8" />
         {shine('M27 27 C29 25 32 24 35 25', 1.6)}</g>
     case 'NetMochi':
-      return <g><defs>{grad('w', '#ffffff', '#ece4d2')}</defs>{shadow(32, 50, 21)}
+      return <g><defs>{grad('w', '#ffffff', '#ece4d2')}</defs>
         <rect x="11" y="22" width="42" height="24" rx="7" fill={`url(#${u}w)`} {...s} />
         <path d="M11 37 C21 30 41 29 53 35 L53 39 C51 44 47 46 46 46 H18 C14 46 11 43 11 39 Z" fill="#e2b468" opacity="0.75" />
         {[18, 26, 34, 42].map((x) => <path key={x} d={`M${x} 23 l6 22`} stroke="#8a5a2a" strokeWidth="1.2" opacity="0.5" />)}
         <path d="M30 22 C30 16 36 16 36 21" fill="#fff" {...s} />
         {shine('M16 27 H30', 2.2)}</g>
     case 'MisoSoup':
-      return <g><defs>{grad('b', '#9a2a1a', '#4a0e08')}<radialGradient id={`${u}s`} cx="0.5" cy="0.5" r="0.6"><stop offset="0" stopColor="#d89a4e" /><stop offset="1" stopColor="#a8682a" /></radialGradient></defs>
-        {shadow(32, 56, 18)}
+      return <g><defs>{grad('b', '#9a2a1a', '#4a0e08')}<radialGradient id={`${u}s`} cx="0.5" cy="0.5" r="0.6"><stop offset="0" stopColor="#d89a4e" /><stop offset="0.6" stopColor="#d89a4e" /><stop offset="0.6" stopColor="#a8682a" /><stop offset="1" stopColor="#a8682a" /></radialGradient></defs>
+        
         <path d="M9 27 H55 C55 42 46 53 32 53 C18 53 9 42 9 27 Z" fill={`url(#${u}b)`} {...s} />
         <path d="M24 53 h16 v3 h-16 Z" fill="#2a0a06" {...s} />
         <ellipse cx="32" cy="27" rx="23" ry="6.5" fill={`url(#${u}s)`} {...s} />
@@ -266,7 +277,7 @@ function OtherArt({ id, u }: { id: string; u: string }) {
         <path d="M24 18 C22 14 26 12 24 8 M34 18 C32 14 36 12 34 8" fill="none" stroke="#fff" strokeWidth="1.2" opacity="0.6" />
         {shine('M13 32 C14 38 17 43 21 46', 2)}</g>
     case 'Sake':
-      return <g><defs>{grad('k', '#ffffff', '#e6e2d8', false)}</defs>{shadow(32, 58, 17)}
+      return <g><defs>{grad('k', '#ffffff', '#e6e2d8', false)}</defs>
         <path d="M27 6 H37 V12 C45 18 48 29 48 40 C48 51 41 57 32 57 C23 57 16 51 16 40 C16 29 19 18 27 12 Z" fill={`url(#${u}k)`} {...s} />
         <path d="M27 6 H37 V9 H27 Z" fill="#2a4a8a" {...s} />
         <path d="M17.5 44 C26 47 38 47 46.5 44" fill="none" stroke="#2a4a8a" strokeWidth="2.6" />
@@ -296,7 +307,8 @@ export function FoodArt({ id, store, size = 34, band = false }: { id: string; st
         <radialGradient id={`${u}g`} cx="0.4" cy="0.3" r="0.8"><stop offset="0" stopColor={g0} /><stop offset="1" stopColor={g1} /></radialGradient>
       </defs>
       {!band && <circle cx="32" cy="32" r="30" fill={`url(#${u}g)`} />}
-      {!band && <circle cx="32" cy="32" r="30" fill="none" stroke="#fff" strokeWidth="1.5" opacity="0.7" />}
+      {!band && <circle cx="32" cy="32" r="30" fill="none" stroke={INK} strokeWidth="1.5" />}
+      {!band && <circle cx="32" cy="32" r="26" fill="none" stroke="#fff" strokeOpacity=".2" strokeWidth="1" strokeDasharray="2 3" />}
       {f ? (f.fillet ? <FilletArt f={f.fillet} u={u} /> : <FishArt f={f} u={u} />) : <OtherArt id={id} u={u} />}
     </svg>
   )

@@ -114,7 +114,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
   - 頭髮：`cap()` 預設把髮殼鋪成貼著頭的網格（每一欄從頭頂到 keep() 的髮際線），髮際線是平順的線，不是沿頭部網格的鋸齒；頭巾、帽緣用 `surf_ring` 沿頭型繞一圈。身上不同顏色的交界由 `smooth_seams` 拉平，脖子處加一圈同色的滾邊。頭飾的三角面預算在檔尾 `BUDGET`（太低會被減面成碎片）。
   - 預覽單一角色的頭部特寫：`PREVIEW_KIND="chef,crop;staffF,bun" PREVIEW_YAW="25;160" blender -b --factory-startup --python blender/guests.py -- <輸出專案路徑> <圖檔.png>`（每個角色每個角度一張；輸出專案路徑可指到暫存資料夾，避免動到正式的 glb）。
 
-- 食材櫃卡片的食材圖是 `ui/FoodArt.tsx` 手繪的 SVG（不用圖片）：整條魚有身形、背到腹的漸層與光澤、鱗片、側線、鰓蓋、有鰭條的背鰭與尾鰭、胸鰭、眼睛（虹膜＋反光）與各魚種的花紋；切身有肌肉的白色紋路與魚皮；其他食材各自一張（玉米粒、香菇十字刀、魷魚格紋…）。卡片上方的帶狀圖依各自的外框裁切。`public/icons/food/*.png`（`blender/food_icons.py`）已不用。
+- 食材櫃卡片的食材圖是 `ui/FoodArt.tsx` 手繪的 SVG（不用圖片），畫風照員工大頭貼（`ui/Avatar`）：平塗、明暗是俐落的兩階色塊（不是模糊漸層）、白色小反光、同一種墨線、不畫影子；整條魚有身形、背到腹的漸層與光澤、鱗片、側線、鰓蓋、有鰭條的背鰭與尾鰭、胸鰭、眼睛（虹膜＋反光）與各魚種的花紋；切身有肌肉的白色紋路與魚皮；其他食材各自一張（玉米粒、香菇十字刀、魷魚格紋…）。卡片上方的帶狀圖依各自的外框裁切。`public/icons/food/*.png`（`blender/food_icons.py`）已不用。
 - 料理台的木紋是 `blender/woodtex.py` 產生的貼圖（`public/textures/keyaki_top.jpg`：四片櫸木拼板、山形紋，每 1.6 單位一格；`cedar_panel.jpg`：台身的直立杉木板＋框），Roasting 的 `woodTex`、`panelBox`（依面寬給 UV，木板不會被拉長）；台身腳下一條深色踢腳。烤網架高（`grilledfish.py` 的 `NET_Z`，網上的食物跟著）。
 - 店內的菰樽（草蓆包的清酒桶，兩疊各三個）是 `blender/komodaru.py` → `komodaru.glb`（`DiningRoom.tsx` 的 `SakeStack`）；飯桶 `blender/ricetub.py` 的白飯是一粒粒畫出的米。
 - 其他 Blender 模型：吧台椅與竹盆栽（`blender/barfurnish.py` → `stool.glb`、`bamboopot.glb`，`BarFurnish.tsx`）、廁所免治馬桶、洗手台與小配件（`blender/wc.py` → `toilet.glb`、`washstand.glb`、`wcbits.glb`）、大砧板（`blender/cutboard.py` → `cutboard.glb`，淡色檜木四片拼板，Roasting 的 `Tray`）、飯桶（`blender/ricetub.py` → `ricetub.glb`，節點 `RiceTubBody`／`RiceTubLid`／`RiceTubRice`，蓋子仍可點開）。
