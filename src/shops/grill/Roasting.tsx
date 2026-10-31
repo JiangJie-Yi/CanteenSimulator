@@ -765,14 +765,33 @@ const BOSS_WALK = ((): [number, number] => {
   const v = ALONG.clone().multiplyScalar(1.6).applyAxisAngle(new THREE.Vector3(0, 1, 0), -CHEF_YAW).divideScalar(BOSS_SCALE)
   return [v.x, v.z]
 })()
-const COOK_TABLE_WOOD = (() => {
-  if (!TRAY_WOOD) return null
-  const t = TRAY_WOOD.clone()
+/** a wood texture of blender/woodtex.py's, tiled every `w` x `h` of the table's units */
+function woodTex(file: string, w: number, h: number) {
+  if (typeof document === 'undefined') return null
+  const t = new THREE.TextureLoader().load(import.meta.env.BASE_URL + 'textures/' + file)
+  t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set(1 / 1.6, 1 / 1.6)
-  t.needsUpdate = true
+  t.repeat.set(1 / w, 1 / h)
+  t.anisotropy = 8
   return t
-})()
+}
+/** the cook's table's top: keyaki planks, cathedral figure, a tile every 1.6 */
+const COOK_TABLE_WOOD = woodTex('keyaki_top.jpg', 1.6, 1.6)
+/** its body: cedar boards standing in framed panels, a panel every 0.6 across, one the body's height */
+const COOK_PANEL_WOOD = woodTex('cedar_panel.jpg', 1, 1)
+/** a box whose sides carry the panel texture at its true size: each side's u stretched to how wide it is (a panel every `tile` across), v
+ * the whole height */
+function panelBox(w: number, h: number, d: number, tile = 0.6) {
+  const g = new THREE.BoxGeometry(w, h, d)
+  const uv = g.attributes.uv as THREE.BufferAttribute
+  // (the faces in order +x, -x, +y, -y, +z, -z, four corners each: the x faces are d wide, the z faces w)
+  for (let f = 0; f < 6; f++) {
+    const across = f < 2 ? d : f >= 4 ? w : 0
+    for (let k = 0; k < 4; k++) uv.setX(f * 4 + k, uv.getX(f * 4 + k) * (across ? across / tile : 1))
+  }
+  uv.needsUpdate = true
+  return g
+}
 /**
  * The kitchen's floor, inside the counters: from the first counter's floor's edge (lay) and the side counter's (along)
  * to the side counter's near end and the first counter's far end, so it meets the customers' floors without a gap or
@@ -847,7 +866,7 @@ function CookTableTop() {
   return (
     <group rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
       <mesh geometry={TABLE_TOP} receiveShadow>
-        <meshToonMaterial color="#d8c4a6" map={COOK_TABLE_WOOD} />
+        <meshToonMaterial color="#ffffff" map={COOK_TABLE_WOOD} />
       </mesh>
       <mesh geometry={TABLE_TOP_INK}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
@@ -895,10 +914,13 @@ function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [num
   // (the top is one piece over all of them: CookTableTop)
   return (
     <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
-      {/* the body, set back a little under the top */}
-      <mesh position-y={(floor - 0.08) / 2}>
-        <boxGeometry args={[W - 0.12, -floor - 0.08, D - 0.12]} />
-        <meshToonMaterial color="#3a2a1e" />
+      {/* the body, set back a little under the top: cedar boards in framed panels, a dark kick at its foot */}
+      <mesh position-y={(floor - 0.08) / 2} geometry={useMemo(() => panelBox(W - 0.12, -floor - 0.08, D - 0.12), [W, D, floor])}>
+        <meshToonMaterial color="#ffffff" map={COOK_PANEL_WOOD} />
+      </mesh>
+      <mesh position-y={floor + 0.05}>
+        <boxGeometry args={[W - 0.1, 0.1, D - 0.1]} />
+        <meshToonMaterial color="#1e140d" />
       </mesh>
     </group>
   )

@@ -1613,7 +1613,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.wc = { who: 'drink', path, len: pathLength(path), unit: fr.n, pick }
           s.phase = 'wcGo'
           s.t = 0
-        } else if (wcs && guest?.state === 'waiting' && Math.random() < wcRate() * Math.min(dt, 0.1)) {
+        } else if (wcs && guest?.state === 'waiting' && Math.random() < wcRate() * Math.min(dt, 0.1)
+          // (one at a time: a toilet someone's on their way to, in, or coming out of is left till they're done)
+          && !shown.some((x) => x !== s && x.wc?.who === (HER.has(kindOf(s.id).kind) ? 'f' : 'm') && x.phase.startsWith('wc'))) {
           const who = HER.has(kindOf(s.id).kind) ? 'f' : 'm'
           const w = wcs[who]
           const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]

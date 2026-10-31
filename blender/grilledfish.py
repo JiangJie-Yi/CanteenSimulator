@@ -2551,7 +2551,7 @@ dw.matrix_parent_inverse = dipper.matrix_world.inverted()
 
 # ---------------------------------------------------------------------------------------------------------
 # a wire grill net (焼き網) over the coals for toasting mochi (切り餅) on, sat on a cast-iron trivet (五徳)
-NET_Z = 0.62
+NET_Z = 0.82          # (set up high over the coals, clear of the charcoal stood under it)
 NET_R = 0.34
 wires = []
 # (the net: fine wires both ways, those one way a hair under the others as they're woven; a thick outer hoop and a finer ring inside it,
