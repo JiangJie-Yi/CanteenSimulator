@@ -122,8 +122,8 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 食材櫃卡片的食材圖是 `ui/FoodArt.tsx` 手繪的 SVG（不用圖片），畫風照員工大頭貼（`ui/Avatar`）：平塗、明暗是俐落的兩階色塊（不是模糊漸層）、白色小反光、同一種墨線、不畫影子；整條魚有身形、背到腹的漸層與光澤、鱗片、側線、鰓蓋、有鰭條的背鰭與尾鰭、胸鰭、眼睛（虹膜＋反光）與各魚種的花紋；切身有肌肉的白色紋路與魚皮；其他食材各自一張（玉米粒、香菇十字刀、魷魚格紋…）。卡片上方的帶狀圖依各自的外框裁切。`public/icons/food/*.png`（`blender/food_icons.py`）已不用。
 - 料理台的木紋是 `blender/woodtex.py` 產生的貼圖（`public/textures/keyaki_top.jpg`：四片櫸木拼板、山形紋，每 1.6 單位一格；`cedar_panel.jpg`：台身的直立杉木板＋框），Roasting 的 `woodTex`、`panelBox`（依面寬給 UV，木板不會被拉長）；台身腳下一條深色踢腳。烤網架高（`grilledfish.py` 的 `NET_Z`，網上的食物跟著）。
 - 食材冷凍櫃（`blender/freezer.py` → `freezer.glb`，Decor 的 `IngredientFridge`）：節點 `FreezerBody`、`FreezerLid`（鉸鏈在後緣，遊戲掀起）、`FreezerGoods`（打開要豐富：冰衣整魚、真空包魚片、保麗龍魚箱、網籃裡的秋刀魚、冰塊；底下一層庫存箱，看起來半滿）；外觀保持乾淨：不描黑線，只有格柵、溫控（顯示幕顯示櫃內溫度，下方上／下兩鍵一次調 1℃，-25～-15℃，預設 -20℃，設定存 localStorage `jgs-freezer-temp-1`；開蓋時櫃內慢慢回溫、關上後回到設定；邏輯在 `game/freezer.ts`，BDD `freezer`）與紅燈；開口的鍍鉻邊框是一整圈、從機身外緣內縮，角落不凸出，不加多餘小零件；點一下開／關（`FREEZER.open`），拿食材時也會自己掀一下。
-- 灶台桌前緣的缺口（`bar.ts` 的 `COOK_NOTCH`）是老闆站著烤的地方，夠一個人站進去；東西不會放在缺口上方（Roasting 的 `clearOfHearth` 也把東西推出缺口）。兩側的櫃子（`CUBBY`、`CUBBY2`）前面是左右對開的櫃門（`CubbyDoors`，鉸鏈在外側、往外打開；滑鼠移上去打開一下，點一下保持開著；滑鼠停在櫃子開口裡時門不會關，裡面的盤子拿得出來）。
-- 店內的菰樽（草蓆包的清酒桶，兩疊各三個）是 `blender/komodaru.py` → `komodaru.glb`（`DiningRoom.tsx` 的 `SakeStack`）；飯桶 `blender/ricetub.py` 的白飯是一粒粒畫出的米。
+- 灶台桌前緣的缺口（`bar.ts` 的 `COOK_NOTCH`）是老闆站著烤的地方，夠一個人站進去；東西不會放在缺口上方（Roasting 的 `clearOfHearth` 也把東西推出缺口）；桌上東西互推（`settle`）時不算桌下櫃子裡的盤子。兩側的櫃子（`CUBBY`、`CUBBY2`）各一扇單開門（鉸鏈在桌子外端），缺口正面（灶台下）是中間對開的淺櫃；門用比桌身亮的櫸木（`CubbyDoors`，`hinge` 'low'／'high'／'both'，往外打開；滑鼠移上去打開一下，點一下保持開著；滑鼠停在櫃子開口裡時門不會關，裡面的盤子拿得出來）。
+- 店內的菰樽（草蓆包的清酒桶，一疊三個，約 1.1 高）是 `blender/komodaru.py` → `komodaru.glb`（`DiningRoom.tsx` 的 `SakeStack`）；飯桶 `blender/ricetub.py` 的白飯是一粒粒畫出的米。
 - 其他 Blender 模型：吧台椅與竹盆栽（`blender/barfurnish.py` → `stool.glb`、`bamboopot.glb`，`BarFurnish.tsx`）、廁所免治馬桶、洗手台與小配件（`blender/wc.py` → `toilet.glb`、`washstand.glb`、`wcbits.glb`）、大砧板（`blender/cutboard.py` → `cutboard.glb`，淡色檜木四片拼板，Roasting 的 `Tray`）、飯桶（`blender/ricetub.py` → `ricetub.glb`，節點 `RiceTubBody`／`RiceTubLid`／`RiceTubRice`，蓋子仍可點開）。
 - 人物與食物的光影是柔和五階漸層（`Person3D.tsx`、`Dish.tsx` 的 `gradientMap`），人物另有手繪式由下往上的明暗與邊緣微光（`airbrush`），參考冷凍櫃上那條手繪藍魚的風格。
 

@@ -827,8 +827,10 @@ function CookTable({ floor = true }: { floor?: boolean }) {
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]}
         inset={[[0.06, -0.01, 0.06, 0.06], [-0.01, 0.06, 0.06, -0.01], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, -0.01], [-0.01, 0.06, 0.06, -0.01]][i] as [number, number, number, number]} />)}
       <CubbyFrame />
-      <CubbyDoors along={CUBBY2.along as [number, number]} />
-      <CubbyDoors along={CUBBY.along as [number, number]} />
+      {/* (the cubbies either side a door each, hung at the table's ends; under the hearth, at the back of the notch, a pair) */}
+      <CubbyDoors along={CUBBY2.along as [number, number]} hinge="low" />
+      <CubbyDoors along={CUBBY.along as [number, number]} hinge="high" />
+      <CubbyDoors along={COOK_NOTCH.along as [number, number]} hinge="both" front={COOK_NOTCH.lay[0] - 0.06} back={COOK_NOTCH.lay[0] - 0.36} />
       <CookTableTop />
       {/* (the same boards as the customers', laid the same way; with the shop open and the room drawn, its one floor
           runs under the kitchen too) */}
@@ -919,22 +921,26 @@ function CubbyFrame() {
   )
 }
 /**
- * A cubby's doors (開き戸): two panels of the body's cedar, each hung on hinges at the cubby's outer edge, a small dark pull near
- * where they meet. Shut, they close it off; pointed at they swing open outward so what's in it shows (shutting again a moment after
- * the pointer's gone), and a click keeps them open (another shuts them).
+ * A cupboard's doors (開き戸) in the table's front, of lighter keyaki than the body round them so they read as doors: one leaf hung at
+ * its outer end (`hinge` 'low' or 'high' along the table) or a pair hung at both ends meeting in the middle ('both'), a small dark pull
+ * near each free edge. Shut, they close it off; pointed at they swing open outward so what's in it shows (shutting again a moment after
+ * the pointer's gone; kept open while the pointer's inside, so what's there can be taken), and a click keeps them open (another shuts
+ * them). `front`: the face they hang on (lay); `back`: how far in the cupboard goes (lay), its inside dark.
  */
-function CubbyDoors({ along: [a0, a1] }: { along: [number, number] }) {
+function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.075, back = CUBBY.lay[0] }: { along: [number, number]
+  hinge: 'low' | 'high' | 'both'; front?: number; back?: number }) {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
-  const front = COOK_TABLE.lay[1] - 0.075
   const top = -0.3, bottom = floor + CUBBY.plinth
-  const H = top - bottom, W = (a1 - a0) / 2 - 0.006
+  const H = top - bottom, span = a1 - a0
+  const leaves = hinge === 'both' ? [-1, 1] : [hinge === 'low' ? -1 : 1]
+  const W = span / leaves.length - 0.006
   const mid = new THREE.Vector3().addScaledVector(ALONG, (a0 + a1) / 2).addScaledVector(LAY, front)
   const doors = useRef<(THREE.Group | null)[]>([])
   const frame = useRef<THREE.Group>(null)
   const st = useRef({ k: 0, kept: false, hoverUntil: 0 })
   const geo = useMemo(() => panelBox(W, H, 0.025, 0.45), [W, H])
-  // (the cubby's opening, in the doors' own frame: while the pointer's over it, they stay open, so what's inside can be reached and taken)
-  const inside = useMemo(() => new THREE.Box3(new THREE.Vector3(-(a1 - a0) / 2, bottom, CUBBY.lay[0] - front), new THREE.Vector3((a1 - a0) / 2, top, 0.06)), [a0, a1, bottom, top, front])
+  // (the cupboard's opening, in the doors' own frame: while the pointer's over it, they stay open, so what's inside can be reached and taken)
+  const inside = useMemo(() => new THREE.Box3(new THREE.Vector3(-span / 2, bottom, back - front), new THREE.Vector3(span / 2, top, 0.06)), [span, bottom, top, front, back])
   const ray = useMemo(() => new THREE.Raycaster(), [])
   const inv = useMemo(() => new THREE.Matrix4(), [])
   useFrame((state, dt) => {
@@ -946,9 +952,9 @@ function CubbyDoors({ along: [a0, a1] }: { along: [number, number] }) {
     }
     const want = s.kept || performance.now() < s.hoverUntil ? 1 : 0
     s.k += (want - s.k) * Math.min(1, Math.min(dt, 0.1) * 5)
-    // (each door about its hinge at the outer edge, its free edge swinging out toward the cook, a little past square)
+    // (each door about its hinge at its outer edge, its free edge swinging out toward the cook, a little past square)
     const e = s.k * s.k * (3 - 2 * s.k)
-    doors.current.forEach((d, i) => { if (d) d.rotation.y = (i === 0 ? -1 : 1) * e * 1.75 })
+    doors.current.forEach((d, i) => { if (d) d.rotation.y = leaves[i] * e * 1.75 })
   })
   const tip = () => setTip({ title: '櫃門', hint: st.current.kept ? '點一下關上' : '點一下打開' })
   const over = (e: Parameters<typeof handOver.onPointerOver>[0]) => {
@@ -956,33 +962,36 @@ function CubbyDoors({ along: [a0, a1] }: { along: [number, number] }) {
     st.current.hoverUntil = performance.now() + 2500
     tip()
   }
-  const hinge = (a1 - a0) / 2
   return (
     <group ref={frame} position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
-      {[0, 1].map((i) => {
-        const sd = i === 0 ? -1 : 1
-        return (
-          <group key={i} ref={(g) => { doors.current[i] = g }} position={[sd * hinge, 0, 0.0125]}
-            onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.kept = !st.current.kept; tip() }}
-            onPointerOver={over} onPointerMove={() => { st.current.hoverUntil = performance.now() + 2500 }} onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
-            <mesh geometry={geo} position={[-sd * (W / 2 + 0.003), bottom + H / 2, 0]}>
-              <meshToonMaterial color="#ffffff" map={COOK_PANEL_WOOD} />
+      {/* (under the hearth the cupboard's only a shallow one: its inside dark, seen with the doors open) */}
+      {hinge === 'both' && (
+        <mesh position={[0, bottom + H / 2, 0.001]}>
+          <planeGeometry args={[span, H]} />
+          <meshBasicMaterial color="#1c130c" />
+        </mesh>
+      )}
+      {leaves.map((sd, i) => (
+        <group key={i} ref={(g) => { doors.current[i] = g }} position={[sd * span / 2, 0, 0.0125]}
+          onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.kept = !st.current.kept; tip() }}
+          onPointerOver={over} onPointerMove={() => { st.current.hoverUntil = performance.now() + 2500 }} onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
+          <mesh geometry={geo} position={[-sd * (W / 2 + 0.003), bottom + H / 2, 0]}>
+            <meshToonMaterial color="#f2e2cf" map={COOK_TABLE_WOOD} />
+          </mesh>
+          {/* (the pull, a short dark bar standing near the free edge) */}
+          <mesh position={[-sd * (W - 0.07), bottom + H * 0.55, 0.03]}>
+            <boxGeometry args={[0.025, 0.16, 0.025]} />
+            <meshToonMaterial color="#1e140d" />
+          </mesh>
+          {/* (two hinges on the outer edge) */}
+          {[0.18, 0.82].map((f) => (
+            <mesh key={f} position={[-sd * 0.004, bottom + H * f, 0.014]}>
+              <boxGeometry args={[0.02, 0.07, 0.008]} />
+              <meshToonMaterial color="#5a4630" />
             </mesh>
-            {/* (the pull, a short dark bar standing near the free edge) */}
-            <mesh position={[-sd * (W - 0.07), bottom + H * 0.55, 0.03]}>
-              <boxGeometry args={[0.025, 0.16, 0.025]} />
-              <meshToonMaterial color="#1e140d" />
-            </mesh>
-            {/* (two hinges on the outer edge) */}
-            {[0.18, 0.82].map((f) => (
-              <mesh key={f} position={[-sd * 0.004, bottom + H * f, 0.014]}>
-                <boxGeometry args={[0.02, 0.07, 0.008]} />
-                <meshToonMaterial color="#5a4630" />
-              </mesh>
-            ))}
-          </group>
-        )
-      })}
+          ))}
+        </group>
+      ))}
     </group>
   )
 }
@@ -2714,6 +2723,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const id = o.userData.itemId as string | undefined
       if (id && roast.drinks?.includes(id) && o.visible && o.scale.x > 0.01) others.push({ p: o.position.clone(), r: id === 'Sake' ? 0.22 : 0.19 })
     })
+    // (what's kept in the cubbies under the top isn't in the way of anything on it)
+    for (let k = others.length - 1; k >= 0; k--) if (others[k].p.y < -0.1) others.splice(k, 1)
     for (let i = 0; i < 8; i++) {
       // (nothing on the table's drawn-in end hangs over the side counter's lip: kept a plank in from it)
       // (the seasoning box, with its pots, reaches further than its round footprint: held a little further in)
@@ -2728,8 +2739,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (across > acrossMax) at.addScaledVector(LAY, acrossMax - across)
       else if (across < acrossMin) at.addScaledVector(LAY, acrossMin - across)
       // (kept off the square hearth: a round thing by its reach, the tray (a long board, square to the table) by its whole length and width)
+      // (the tasting bowl by its whole rim, as where it's drawn is worked out: else the two disagree and it creeps a little each time)
       if (key === 'tray') clearOfHearth(at, 0.04, TRAY_W, TRAY_D)
-      else clearOfHearth(at, r)
+      else clearOfHearth(at, key === 'bowl-0' ? BOWL_R : r)
       // (the tray is long: each of its circles is pushed clear, carrying the whole tray)
       for (const own of circlesOf(key, at)) {
         for (const o of others) {

@@ -3032,7 +3032,7 @@ function Inked({ geometry, color, map, grow = 1.04, side, ...rest }: { geometry:
 }
 const BARRELS_URL = import.meta.env.BASE_URL + 'models/komodaru.glb'
 /** a stack of straw-wrapped sake barrels (菰樽, blender/komodaru.py: two on the floor, one on them), toon-shaded and inked, stood on the
- * floor, ~0.9 tall; `part` turns each stack its own way so two never look alike */
+ * floor, ~1.1 tall; `part` turns each stack its own way so two never look alike */
 function SakeStack({ part }: { part: number }) {
   const gltf = useGLTF(BARRELS_URL) as unknown as { scene: THREE.Group }
   const stack = useMemo(() => {
@@ -3048,16 +3048,14 @@ function SakeStack({ part }: { part: number }) {
     inkModel(root, (m) => /Ink|Red|Label/.test(m.name), { width: 0.0018, weld: true })
     const box = new THREE.Box3().setFromObject(root)
     const size = box.getSize(new THREE.Vector3())
-    const k = 0.9 / (size.y || 1)
+    const k = 1.1 / (size.y || 1)
     const c = box.getCenter(new THREE.Vector3())
     const out = new THREE.Group()
     root.position.set(-c.x, -box.min.y, -c.z)
     out.add(root)
     out.scale.setScalar(k)
-    // (both stacks stand on the one spot: set apart along the wall, the first a little this way and the second that, their marks turned to
-    // the room, each a touch differently)
+    // (its marks turned to the room)
     out.rotation.y = part ? -0.95 : -0.62
-    out.position.set(part ? 0.42 : -0.42, 0, part ? 0.43 : -0.43)
     return out
   }, [gltf, part])
   return <primitive object={stack} />
@@ -3373,13 +3371,12 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
     // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
     <>
       <Movable id="speaker" label="音箱" baseTurn={[0, 45, 0]}><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
-      {[0, 1].map((part) => (
-        <Movable key={part} id={part ? 'sake2' : 'sake'} label={part ? '餐盤堆' : '酒樽'}><StaticBatch key={lang}>
-          <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
-            <group rotation-y={Math.PI / 2}><SakeStack part={part} /></group>
-          </group>
-        </StaticBatch></Movable>
-      ))}
+      {/* (one stack, standing where the two used to) */}
+      <Movable id="sake" label="酒樽"><StaticBatch key={lang}>
+        <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
+          <group rotation-y={Math.PI / 2}><SakeStack part={0} /></group>
+        </group>
+      </StaticBatch></Movable>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
       <Movable id="willow" label="柳樹"><StaticBatch key={lang}>

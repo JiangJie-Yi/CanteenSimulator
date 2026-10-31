@@ -122,7 +122,6 @@ export const BASES: Record<string, V3> = {
   speaker: [0.3044, 0.518, 0.1309],
   chochin: [0, 0.25, 0],
   sake: [0.084, 0, 0.118],
-  sake2: [0.084, 0, 0.118],
   // (the charcoal basket: moved by [0.273, 0.125, 0.082] in the room's frame, taken into the parent's units; its 1.75 size and 44° turn are Decor's)
   crate: [-0.0941, 0.125, -0.2691],
   // (the lantern: moved by [-0.083, 0, -0.651] in the room's frame, taken into this parent's units; its 12° turn is Decor's)
