@@ -1294,9 +1294,13 @@ const BAR_WOOD = (() => {
 function BarTop() {
   const geo = useMemo(() => barTopShape(0), [])
   const ink = useMemo(() => barTopShape(0.01), [])
+  // (a core of dark wood inside the plank, a little in from its faces: where the long top's triangles meet, a hair's crack between
+  // them would let the cove light under the bar show through as a bright line; this keeps it shut)
+  const core = useMemo(() => barTopShape(-0.02).translate(0, -BAR_TOP, 0).scale(1, 0.5, 1).translate(0, BAR_TOP + 0.004, 0), [])
   return (
     <group rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
       <mesh geometry={geo} castShadow receiveShadow><meshToonMaterial color="#ffffff" map={BAR_WOOD} /></mesh>
+      <mesh geometry={core}><meshBasicMaterial color="#5a3c24" side={THREE.DoubleSide} /></mesh>
       <mesh geometry={ink}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
     </group>
   )

@@ -722,20 +722,33 @@ function Framed({ art }: { art: ArtKey }) {
   )
 }
 
-/** the round window's paper: lit warm from behind, brightest in the middle, the shadows of bamboo outside falling on it */
-const ROUND_PAPER = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = c.height = 512
-  const g = c.getContext('2d')!
-  const gr = g.createRadialGradient(256, 236, 20, 256, 256, 280)
-  gr.addColorStop(0, '#fff6e2'); gr.addColorStop(0.6, '#f6dfb4'); gr.addColorStop(1, '#d9a868')
-  g.fillStyle = gr; g.fillRect(0, 0, 512, 512)
+/**
+ * The round window's paper, as the light outside falls on it: by day bright and cool, the bamboo's shadows sharp on it in the sun; by
+ * night dark blue, a street lantern's warm glow off to one side and the moon's paler one high up, the bamboo only darker against it.
+ * Drawn again (the one canvas) whenever the room turns from day to night (data-theme on the page).
+ */
+function drawRoundPaper(g: CanvasRenderingContext2D, night: boolean) {
+  g.clearRect(0, 0, 512, 512)
+  if (night) {
+    const gr = g.createRadialGradient(256, 256, 30, 256, 256, 300)
+    gr.addColorStop(0, '#3a4766'); gr.addColorStop(0.7, '#262f4a'); gr.addColorStop(1, '#151a2c')
+    g.fillStyle = gr; g.fillRect(0, 0, 512, 512)
+    // (a lantern's warm glow low on the right, the moon's high on the left)
+    for (const [x, y, r, c] of [[380, 360, 210, 'rgba(255,170,80,0.55)'], [150, 120, 120, 'rgba(220,230,255,0.35)']] as [number, number, number, string][]) {
+      const l = g.createRadialGradient(x, y, 0, x, y, r)
+      l.addColorStop(0, c); l.addColorStop(1, 'rgba(0,0,0,0)')
+      g.fillStyle = l; g.fillRect(0, 0, 512, 512)
+    }
+  } else {
+    const gr = g.createRadialGradient(256, 220, 20, 256, 256, 290)
+    gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.65, '#f7f4ea'); gr.addColorStop(1, '#ddd6c2')
+    g.fillStyle = gr; g.fillRect(0, 0, 512, 512)
+  }
   // (the fibres of the washi)
-  g.strokeStyle = 'rgba(160,120,70,0.12)'; g.lineWidth = 1
+  g.strokeStyle = night ? 'rgba(200,210,240,0.08)' : 'rgba(150,130,90,0.12)'; g.lineWidth = 1
   for (let k = 0; k < 160; k++) { const x = (k * 97) % 512, y = (k * 233) % 512; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 14, y + (k % 5) - 2); g.stroke() }
-  // (bamboo outside: soft grey-green shadows of culms and leaves)
-  g.fillStyle = 'rgba(70,80,50,0.28)'
+  // (bamboo outside: culms and leaves, sharp grey-green shadows in the sun, dark shapes at night)
+  g.fillStyle = night ? 'rgba(8,10,20,0.6)' : 'rgba(60,75,45,0.38)'
   for (const [x, w, lean] of [[120, 16, 0.04], [190, 12, -0.03], [360, 18, 0.02], [420, 11, -0.05]] as [number, number, number][]) {
     g.save(); g.translate(x, 512); g.rotate(lean); g.fillRect(-w / 2, -520, w, 520)
     for (let y = 60; y < 520; y += 95) g.fillRect(-w / 2 - 2, -y, w + 4, 3)
@@ -745,13 +758,22 @@ const ROUND_PAPER = (() => {
     const x = 90 + (k * 53) % 360, y = 60 + (k * 71) % 230, a = (k % 7) * 0.5 - 1.4
     g.save(); g.translate(x, y); g.rotate(a); g.beginPath(); g.ellipse(26, 0, 30, 6, 0, 0, Math.PI * 2); g.fill(); g.restore()
   }
+}
+const ROUND_PAPER = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 512
+  const g = c.getContext('2d')!
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
+  const draw = () => { drawRoundPaper(g, document.documentElement.dataset.theme === 'dark'); t.needsUpdate = true }
+  draw()
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
   return t
 })()
 /**
  * A round window (丸窓) let into the plaster: a deep reveal of wood round it, a thick turned frame of warm keyaki, and inside, a light
- * lattice over washi lit from outside, bamboo's shadows on it
+ * lattice over washi lit from outside (day or night: ROUND_PAPER), bamboo's shadows on it; hung lower than before, its frame just clear of the rail over the wainscot
  */
 /** where along the back wall the second round window goes (the wall's own frame) */
 const ROUND_AT = -1.36
@@ -1827,7 +1849,7 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
         {/* (everything below is its own piece in a batch of its own, so each can be moved by hand when the shop's shut: key G) */}
         {art.filter((a) => a.nobori === undefined).map((a) => (
           <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`${a.kanban !== undefined ? '木牌' : a.round ? '圓窗' : a.scroll ? '掛軸' : '畫'}（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><StaticBatch>
-            <group position={[0, a.round ? 1.55 : a.scroll ? 1.42 : 1.5, a.z]}>
+            <group position={[0, a.round ? 1.4 : a.scroll ? 1.42 : 1.5, a.z]}>
               {a.kanban !== undefined ? <Kanban i={a.kanban} /> : a.round ? <RoundWindow /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
             </group>
           </StaticBatch></Movable>
