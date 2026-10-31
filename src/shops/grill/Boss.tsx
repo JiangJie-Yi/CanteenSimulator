@@ -6,7 +6,7 @@ import { inkModel } from '@/scene/inkHull'
 import { airbrush, gradientMap } from '@/scene/Person3D'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
-import { bossLineText, bossSituation, nextBossLine, type BossSituation } from '@/data/bossLines'
+import { bossLineText, bossSituation, nextBossLine, tasteLineText, type BossSituation } from '@/data/bossLines'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -37,6 +37,10 @@ const WALK_SPEED = 0.9
 const RUN_SPEED = 2.4
 
 /** `to`: the far end of his walk, in the frame he stands in (x, z), from his place at its origin, facing +z */
+/** a taste he's been asked for (Roasting, as the owner clicks something in the tasting bowl): where it is (world), and whether he's there
+ * to eat it yet; cleared when it's eaten */
+export const BOSS_TASTE = { at: null as THREE.Vector3 | null, arrived: false, since: 0 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossTaste?: typeof BOSS_TASTE }).__bossTaste = BOSS_TASTE
 /** `to`: the far end of his walk; `open`: the shop's open (his chef has the grill, he stays put); he mutters in `lang` */
 export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?: [number, number]; open?: boolean; lang?: Lang; children?: ReactNode }) {
   // ---- muttering to himself, always: a line every few seconds, by day or night, open or shut (data/bossLines), never the same twice running
@@ -202,9 +206,36 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     const ph = ROUNDS[s.phase % ROUNDS.length]
     s.t += edit ? 0 : dt
     // (where he's going: the far end on the walk out, home on the run back; what he's doing when he's there)
-    let act = ph.act
+    let act: Phase['act'] | 'taste' = ph.act
     let speed = 0
-    if (act === 'walk' || act === 'run') {
+    // (asked to taste: down his aisle to where it passes nearest the bowl, turned to it, and there he eats it; then back to his round)
+    const ask = !edit && BOSS_TASTE.at && m.parent ? m.parent.worldToLocal(BOSS_TASTE.at.clone()) : null
+    if (ask) {
+      const len = Math.hypot(to[0], to[1]) || 1
+      const ux = to[0] / len, uz = to[1] / len
+      const k = Math.max(-0.4, Math.min(len, ask.x * ux + ask.z * uz))
+      const gx = ux * k, gz = uz * k
+      const dx = gx - s.x, dz = gz - s.z
+      const d = Math.hypot(dx, dz)
+      if (d > 0.03) {
+        speed = RUN_SPEED
+        const stepL = Math.min(d, speed * dt)
+        s.x += (dx / d) * stepL; s.z += (dz / d) * stepL
+        s.stride += stepL
+        turnTo(s, Math.atan2(dx, dz), dt * 9)
+        BOSS_TASTE.arrived = false
+      } else {
+        turnTo(s, Math.atan2(ask.x - s.x, ask.z - s.z), dt * 7)
+        if (!BOSS_TASTE.arrived) { BOSS_TASTE.arrived = true; BOSS_TASTE.since = T; setSay({ text: tasteLineText(Math.random(), lang), key: Date.now() }) }
+        // (never left standing there: whatever it was is gone by now)
+        if (T - BOSS_TASTE.since > 10) { BOSS_TASTE.at = null; BOSS_TASTE.arrived = false }
+        act = 'taste'
+      }
+      s.t = 0
+      // (and when he's done, he runs back to his place and starts his round again from there)
+      const runIx = ROUNDS.findIndex((x) => x.act === 'run')
+      s.phase = runIx >= 0 ? runIx : 0
+    } else if (act === 'walk' || act === 'run') {
       const [gx, gz] = act === 'walk' ? to : [0, 0]
       const dx = gx - s.x, dz = gz - s.z
       const d = Math.hypot(dx, dz)
@@ -266,6 +297,11 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     } else if (act === 'fan') {
       R.set(-0.06, 0.18, 0.3)
       L.set(0.08, 0.06 + Math.sin(T * 1.6) * 0.01, 0.2)
+    } else if (act === 'taste') {
+      // (a piece held up to his mouth in the right hand, bitten and chewed, the left on his belly)
+      const chew = Math.max(0, Math.sin((T - BOSS_TASTE.since) * 7))
+      R.set(-0.04, 0.3 + chew * 0.03, 0.18)
+      L.set(0.04, 0.02, 0.1)
     } else if (act === 'wave') {
       const w = Math.sin(s.t * 9)
       R.set(0.02 + w * 0.04, 0.32, 0.06)
@@ -292,7 +328,8 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
 
     // ---- his mouth: while a line's up over his head, it flaps open and shut as he says it, in syllables; the rest of the time his smile
     const talking = !!sayRef.current
-    const gape = talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2
+    const munching = act === 'taste'
+    const gape = (talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2) || (munching && Math.sin((T - BOSS_TASTE.since) * 7) > 0.3)
     if (parts.smile) parts.smile.visible = !gape
     for (const o of parts.talk) {
       o.visible = gape

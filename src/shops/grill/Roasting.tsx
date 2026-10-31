@@ -31,7 +31,7 @@ import { COAL_BRIDGE, SHRINE_FLOWERS, WC_GRUMBLE } from './bar'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
 import { flowerBuffs } from '@/game/shrineFlowers'
-import { Boss } from './Boss'
+import { Boss, BOSS_TASTE } from './Boss'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
 import { ashMaterial, charcoalMaterial, useBinchotan } from './binchotanModel'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
@@ -1941,6 +1941,10 @@ type Piece = {
   stickOnly: boolean
   /** grill-net items: which spot on the net it has (null: waiting its turn, hidden and not cooking) */
   netSpot: number | null
+  /** when the owner asked to taste it (performance.now()), the boss on his way to eat it; 0 if not */
+  awaitBoss: number
+  /** it's the boss eating it: carried from the bowl to his hand at his mouth */
+  byBoss?: boolean
   /** once served: the plate, dish or basket it's on (plate-n, dish-n, basket-n), and where on it */
   container: string | null
   local: THREE.Vector3
@@ -2110,6 +2114,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
   const { scene } = useGLTF(url)
+  /** the whole room's scene (the boss is in it, not in the model) */
+  const room = useThree((st) => st.scene)
   const menuIds = useMemo(() => new Set(itemIds), [itemIds])
   const root = scene.children[0]
   // the water bucket's two hoops, made as flat bands (片) rather than round rods: the model's hoops are found by their material and each ring is
@@ -2210,7 +2216,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         progress: 0, collected: false,
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
         toQ: new THREE.Quaternion(), mats, looks, bites: newBites(), sticks: [], food: [], puffs: [], stickOnly: false,
-        netSpot: null, container: null, local: new THREE.Vector3(), carried: false, trash: -1,
+        netSpot: null, awaitBoss: 0, container: null, local: new THREE.Vector3(), carried: false, trash: -1,
         dabs: { salt: 0, soy: 0, milk: 0, peanut: 0, miso: 0, wasabi: 0, shichimi: 0, yuzu: 0, lemon: 0, water: 0 }, steps: [], staged: false, stagedAt: 0, fresh: false, wasPresent: false, homeFlight: 1,
         unwrapped: false, unwrapT: 0, chefSeasoned: false,
         trashFrom: new THREE.Vector3(),
@@ -2532,7 +2538,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     COAL_BRIDGE.place = () => (fire && fire.current >= 1 - 1e-6 ? 0 : dropCoals())
     return () => { COAL_BRIDGE.place = null }
   })
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dropCoals: dropCoals, __fire: fire, __coals: coals })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dropCoals: dropCoals, __fire: fire, __coals: coals, __pieces: pieces })
   const [shards, setShards] = useState<{ id: number; x: number; y: number; z: number; s: number; r: number; t: number }[]>([])
   /** the kitchen's floor, where a dish let go off the table lands (the scene's y) */
   const FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP
@@ -2893,9 +2899,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       onNotice?.('burnt')
       return
     }
+    // (tasting by hand: the boss goes over to it and eats it there, one at a time; at the bar the customers eat for themselves)
+    if (space !== 'open') {
+      if (BOSS_TASTE.at || pieces.current.some((q) => q.awaitBoss)) return
+      p.awaitBoss = performance.now()
+      BOSS_TASTE.at = p.node.getWorldPosition(new THREE.Vector3())
+      BOSS_TASTE.arrived = false
+      return
+    }
     p.eat = 0.0001
   }
 
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __eat: eat, __collect: collect, __times: roast.times })
   /**
    * Take the next bite out of a piece: working in from the far end of the food along its longest side, each bite
    * a ball a bit wider than the food is thick, off-centre to alternate sides, so what's left looks gnawed.
@@ -4743,6 +4758,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // being eaten, a mouthful at a time: on each bite the piece is lifted a little as if picked up, a chunk with
       // tooth-marked edges disappears from the end, and it settles back while it's chewed (阿姆阿姆). On a skewer
       // only the food goes and the bare stick is left lying on the plate
+      // (the boss come over to taste it: the bites begin; if he can't get there, it's eaten anyway after a while)
+      if (p.awaitBoss && (BOSS_TASTE.arrived || performance.now() - p.awaitBoss > 6000)) {
+        p.byBoss = BOSS_TASTE.arrived
+        p.awaitBoss = 0
+        p.eat = 0.0001
+      }
       if (p.eat > 0 && !p.eaten && !p.stickOnly) {
         p.eat = Math.min(1, p.eat + dt / EAT_SECONDS)
         const phase = p.eat * BITES_PER_PIECE
@@ -4755,7 +4776,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.node.position.y += 0.06 * lift
           p.node.rotateOnWorldAxis(STACK_DIR, -0.12 * lift)
         }
+        // (the boss's: up out of the bowl into his hand, held at his mouth while he eats it)
+        const hand = p.byBoss ? room.getObjectByName('BossHandR') : null
+        if (hand && p.node.parent) {
+          const to = p.node.parent.worldToLocal(hand.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0)))
+          p.node.position.lerp(to, THREE.MathUtils.smoothstep(p.eat, 0, 0.15))
+        }
         if (p.eat >= 1) {
+          // (he's had it: off back to his round)
+          if (!p.node.userData.byGuest) BOSS_TASTE.at = null
+          p.byBoss = false
           // (what an AI customer eats fills their stomach, not yours)
           if (!p.node.userData.byGuest) onEat?.(p.id, tasteOf(p), { doneness: p.progress / roast.times[p.id], dabs: { ...p.dabs }, steps: [...p.steps] })
           if (p.sticks.length) {

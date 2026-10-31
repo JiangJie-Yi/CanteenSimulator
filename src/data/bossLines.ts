@@ -73,3 +73,14 @@ export const bossLineText = (s: BossSituation, i: number, lang: Lang) => {
   const l = BOSS_LINES[s][i]
   return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
 }
+
+/** what he says as he comes over to taste something from the tasting bowl */
+export const TASTE_LINES: Line[] = [
+  { zh: '我嚐嚐看～', ja: 'どれどれ、味見～', en: 'Let me taste…' },
+  { zh: '來，試吃一口！', ja: '一口いただき！', en: 'One bite to try!' },
+  { zh: '嗯……這火候如何呢？', ja: 'うむ……焼き加減はどうかな？', en: "Hm… how's it done?" },
+]
+export const tasteLineText = (r: number, lang: Lang) => {
+  const l = TASTE_LINES[Math.floor(r * TASTE_LINES.length) % TASTE_LINES.length]
+  return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
+}
