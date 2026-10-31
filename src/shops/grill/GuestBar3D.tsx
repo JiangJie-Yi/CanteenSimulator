@@ -25,7 +25,7 @@ import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProp
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
-import { StoolModel } from './BarFurnish'
+import { StoolModel, TillStoolModel } from './BarFurnish'
 
 /** the boxes on the till's low shelf, each its own piece, and its name in the developer panel */
 const TILL_BOXES = [['bags', '紙袋'], ['napkins', '紙巾'], ['rolls', '收銀紙捲'], ['coasters', '杯墊'], ['chopsticks', '割箸']] as const
@@ -506,6 +506,14 @@ function Chochin({ mark }: { mark: string }) {
 export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; top: number; lang: Lang }) {
   return (
     <>
+      {/* (two stools behind it, tucked in under the top: the cashier's taller one at the register, just in front of where they stand, and a
+          helper's lower one along from it, behind the tablet) */}
+      <Movable id="till-stool-hi" label="收銀高腳凳"><StaticBatch>
+        <group position={at} rotation-y={yaw}><group position={[0.3, 0, 0.56]} rotation-y={0.3} scale={PEOPLE_SCALE}><TillStoolModel which="High" /></group></group>
+      </StaticBatch></Movable>
+      <Movable id="till-stool-lo" label="收銀矮凳"><StaticBatch>
+        <group position={at} rotation-y={yaw}><group position={[-0.3, 0, 0.56]} rotation-y={-0.4} scale={PEOPLE_SCALE}><TillStoolModel which="Low" /></group></group>
+      </StaticBatch></Movable>
       <Movable id="till-counter" label="收銀櫃檯"><StaticBatch>
       <group position={at} rotation-y={yaw}>
       {/* (local x along the bar, +z toward the cashier, behind it) */}
@@ -2221,15 +2229,18 @@ function Say({ text }: { text: string }) {
   return <span key={i} className="g3-bubble g3-say">{chunks[i]}{i < chunks.length - 1 ? '…' : ''}</span>
 }
 
+/** how much lower the stool's seat is than the one the old figures (guests.glb) were made to sit on */
+const OLD_STOOL_DROP = 0.343 - FOLK_SEAT
 /** one customer's figure, moved by the bar's clock each frame (read from the ref: nothing re-renders for it) */
 function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number
   guest?: GuestView }) {
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
   const Figure = FOLK_GUESTS ? FolkFigure : Person
-  // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them)
-  return <Suspense fallback={null}><Figure id={s.id} eating={eating()} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
+  // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them; the old figures, made to sit on
+  // the old, taller stool, sat down by the difference)
+  return <Suspense fallback={null}><group position-y={!FOLK_GUESTS && s.phase === 'sit' ? -OLD_STOOL_DROP : 0}><Figure id={s.id} eating={eating()} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined} fit={FOLK_FIT}
-    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></Suspense>
+    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></group></Suspense>
 }
 
 // (drawn again only when their own props change, not each time the page above them redraws: while the shop's open that's many times a second)

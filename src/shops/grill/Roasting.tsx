@@ -735,7 +735,7 @@ const floorAt = (v: THREE.Vector3) => (inKitchen(GRILL_COUNTERS, toBar(v)) ? GRI
 function crewWayOut(role: Role, at: THREE.Vector3) {
   const end = (lay: number) => new THREE.Vector3().addScaledVector(ALONG, 2.95).addScaledVector(LAY, lay)
   const via = role === 'chef' ? [end(2.62), end(-0.8)] : role === 'sous' ? [end(1.3), end(-0.8)]
-    : role === 'cashier' ? [new THREE.Vector3().addScaledVector(ALONG, 5.35).addScaledVector(LAY, -0.5)] : []
+    : role === 'cashier' ? [new THREE.Vector3().addScaledVector(ALONG, 5.35).addScaledVector(LAY, -0.3)] : []
   return [at.clone(), ...via, ...staffWayOut(GRILL_COUNTERS).map(fromBar)].map((v) => v.setY(floorAt(v)))
 }
 /** one of the staff at their place; once the shop's shut and empty (SHOP.leaving) they walk their way out (`way`) and are gone */

@@ -4,10 +4,11 @@ import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 
 /**
- * The bar stool and the potted bamboo from blender/barfurnish.py: drawn in the room's toon light, with the room's ink line round them;
- * the stool's brass caps and the pot's glaze keep a little gloss.
+ * The bar stool and the till's two (blender/stools.py) and the potted bamboo (blender/barfurnish.py): drawn in the room's toon light, with
+ * the room's ink line round them; the pot's glaze keeps a little gloss.
  */
 const STOOL_URL = import.meta.env.BASE_URL + 'models/stool.glb'
+const TILLSTOOL_URL = import.meta.env.BASE_URL + 'models/tillstool.glb'
 const BAMBOO_URL = import.meta.env.BASE_URL + 'models/bamboopot.glb'
 const TOILET_URL = import.meta.env.BASE_URL + 'models/toilet.glb'
 const WASH_URL = import.meta.env.BASE_URL + 'models/washstand.glb'
@@ -46,6 +47,16 @@ export function StoolModel() {
   const obj = useMemo(() => toonOf(STOOL_URL, gltf.scene), [gltf])
   return <primitive object={obj} />
 }
+/** one of the till's two stools (blender/stools.py): the cashier's taller (`High`), a helper's lower (`Low`), each stood at its own origin */
+export function TillStoolModel({ which }: { which: 'High' | 'Low' }) {
+  const gltf = useGLTF(TILLSTOOL_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const one = toonOf(TILLSTOOL_URL, gltf.scene).getObjectByName(`TillStool${which}`)!
+    one.position.set(0, 0, 0)
+    return one
+  }, [gltf, which])
+  return <primitive object={obj} />
+}
 export function BambooModel() {
   const gltf = useGLTF(BAMBOO_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => toonOf(BAMBOO_URL, gltf.scene), [gltf])
@@ -67,4 +78,5 @@ export function WashstandModel() {
 useGLTF.preload(TOILET_URL)
 useGLTF.preload(WASH_URL)
 useGLTF.preload(STOOL_URL)
+useGLTF.preload(TILLSTOOL_URL)
 useGLTF.preload(BAMBOO_URL)

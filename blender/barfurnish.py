@@ -1,8 +1,5 @@
-"""The customers' side of the bar, in finer shape:
+"""The customers' side of the bar, in finer shape (the stools are blender/stools.py's):
 
-- stool.glb, node "Stool": a round bar stool (丸椅子) 35 cm to its cushion. A thick seat of pale ash with its edge turned round, an indigo
-  cushion on it, piped round its rim and buttoned in the middle (its cloth a fine weave); four round legs tapering to the floor and splayed
-  out, each with a brass foot cap; a ring of rails between them low down for the feet, and a second, higher, under the seat.
 - bamboopot.glb, node "PottedBamboo": bamboo in a glazed pot, about 1.3 m: an indigo pot with the glaze running thick toward its foot, a
   pale rim where the glaze stops, soil topped with moss and pale pebbles; five culms of different heights with their nodes, a slight lean,
   side branches near the top and clusters of narrow leaves drooping off them.
@@ -98,72 +95,6 @@ def rod(name, a, b, r0, r1, segs=12):
     bpy.ops.object.transform_apply(rotation=True)
     o.name = name
     return o
-
-
-# =====================================================================
-# The stool
-# =====================================================================
-def stool():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    seed(11)
-    N = 256
-    u, v = grid01(N)
-    ash = mix((0.8, 0.62, 0.42), (0.7, 0.52, 0.33), smooth(0.35, 0.85, fbm(N, 3, 40, 4)))
-    ash = mix(ash, (0.52, 0.36, 0.22), smooth(0.86, 1.0, np.sin((u * 30 + fbm(N, 3, 3, 3) * 3) * math.pi * 2) * 0.5 + 0.5) * 0.35)
-    cloth = mix((0.1, 0.16, 0.32), (0.14, 0.21, 0.4), ((np.sin(u * math.pi * 2 * 90) * np.sin(v * math.pi * 2 * 90)) > 0).astype(np.float32) * 0.5 + fbm(N, 30, 30, 2) * 0.3)
-    M = {"wood": pbr("StoolAsh", (1, 1, 1), tex=image("stoolash", ash), rough=0.45, coat=0.3),
-         "dark": pbr("StoolRail", lin("#7a4e2a"), rough=0.5),
-         "cloth": pbr("StoolCloth", (1, 1, 1), tex=image("stoolcloth", cloth), rough=0.9),
-         "pipe": pbr("StoolPiping", lin("#d8c8a0"), rough=0.8),
-         "brass": pbr("StoolBrass", lin("#c9a04a"), rough=0.3, metal=1.0)}
-    parts = []
-    SEAT_Y = 0.305
-    # (the seat: a thick disc, its top edge rolled round, its underside chamfered)
-    seat = lathe("StoolSeat", [(0.0, SEAT_Y), (0.098, SEAT_Y), (0.106, SEAT_Y + 0.006), (0.116, SEAT_Y + 0.016), (0.118, SEAT_Y + 0.026),
-                               (0.114, SEAT_Y + 0.034), (0.104, SEAT_Y + 0.038), (0.0, SEAT_Y + 0.038)], 48)
-    fin(seat, "StoolSeat", M["wood"], parts)
-    # (the cushion: a soft pad, domed, its middle drawn down by the button)
-    top = SEAT_Y + 0.038
-    prof = [(0.0, top)]
-    for i in range(1, 13):
-        t = i / 12
-        r = 0.101 * t
-        h = 0.022 * math.sin(math.acos(min(1, (t - 0.0) ** 3))) - 0.006 * math.exp(-(t / 0.15) ** 2)
-        prof.append((r, top + max(0.002, h)))
-    prof.append((0.103, top + 0.004))
-    prof.append((0.1, top))
-    cush = lathe("StoolCushion", list(reversed(prof)), 48)
-    fin(cush, "StoolCushion", M["cloth"], parts)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.1, minor_radius=0.0035, major_segments=48, minor_segments=6, location=P(0, top + 0.008, 0))
-    fin(active(), "StoolPiping", M["pipe"], parts)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.006, segments=12, ring_count=8, location=P(0, top + 0.012, 0))
-    b = active(); b.scale = (1, 1, 0.5); bpy.ops.object.transform_apply(scale=True)
-    fin(b, "StoolButton", M["pipe"], parts)
-    # (the legs: round, tapering, splayed out, each with a brass cap at its foot)
-    legs = []
-    for k in range(4):
-        a = k * math.pi / 2 + math.pi / 4
-        top_ = (math.cos(a) * 0.072, SEAT_Y + 0.002, math.sin(a) * 0.072)
-        foot = (math.cos(a) * 0.112, 0.012, math.sin(a) * 0.112)
-        legs.append((top_, foot))
-        fin(rod(f"StoolLeg{k}", foot, top_, 0.011, 0.014, 14), f"StoolLeg{k}", M["wood"], parts)
-        bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.0118, depth=0.014, location=P(foot[0], 0.007, foot[2]))
-        fin(active(), f"StoolFoot{k}", M["brass"], parts)
-    # (the rails between them: one ring low for the feet, one high under the seat)
-    for lvl, y in (("Low", 0.1), ("High", 0.255)):
-        for k in range(4):
-            (ta, fa), (tb, fb) = legs[k], legs[(k + 1) % 4]
-            def at(t_, f_, yy):
-                s = (yy - f_[1]) / (t_[1] - f_[1])
-                return (f_[0] + (t_[0] - f_[0]) * s, yy, f_[2] + (t_[2] - f_[2]) * s)
-            fin(rod(f"StoolRail{lvl}{k}", at(ta, fa, y), at(tb, fb, y), 0.0075 if lvl == "Low" else 0.006, 0.0075 if lvl == "Low" else 0.006, 10),
-                f"StoolRail{lvl}{k}", M["dark"], parts)
-    root = bpy.data.objects.new("Stool", None)
-    bpy.context.collection.objects.link(root)
-    for o in parts:
-        o.parent = root
-    export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "stool.glb"), os.path.join(PROJECT, "blender", "stool.blend"), None)
-    print("STOOL_DONE", sum(len(o.data.polygons) for o in parts))
 
 
 # =====================================================================
@@ -291,5 +222,4 @@ def bamboo():
     print("BAMBOO_DONE", sum(len(o.data.polygons) for o in parts))
 
 
-stool()
 bamboo()
