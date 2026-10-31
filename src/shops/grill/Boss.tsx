@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
+import { mergeByMaterial } from '@/scene/StaticBatch'
 import { airbrush, gradientMap } from '@/scene/Person3D'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
@@ -92,6 +93,8 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
         m.receiveShadow = true
       })
       inkModel(r, (m) => UNINKED.test(m.name), { width: 0.006, weld: true })
+      // (his body's parts merged by material, a handful of draws; what moves on its own (his hands and what they hold, his eyes, his mouth) kept apart)
+      mergeByMaterial(r, (o) => /^Boss(Hand|Tongs|Fan|Eye|Mouth)/.test(o.name))
       made = r
     }
     return made

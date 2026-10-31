@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { StaticBatch } from '@/scene/StaticBatch'
+import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import type { Lang } from '@/data/i18n'
 import { openRegisterManual } from '@/ui/RegisterManual'
 import { tipOver } from './bar'
@@ -61,7 +61,8 @@ function piecesOf(gltf: { scene: THREE.Group }) {
 /** one piece of the shelf's things: a box, or the manual (which opens when it's clicked) */
 export function TillBoxes({ part, lang }: { part: TillPart; lang: Lang }) {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => piecesOf(gltf)[part], [gltf, part])
+  // (each piece drawn a few parts at a time)
+  const obj = useMemo(() => mergeByMaterial(piecesOf(gltf)[part]), [gltf, part])
   if (part !== 'manual') return <StaticBatch><primitive object={obj} /></StaticBatch>
   const tip = lang === 'ja' ? tipOver('レジスター取扱説明書', 'クリックで読む') : tipOver('收銀機操作說明書', '點一下翻閱')
   return (

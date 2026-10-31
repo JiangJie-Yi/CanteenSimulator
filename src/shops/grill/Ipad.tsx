@@ -3,6 +3,7 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
+import { mergeByMaterial } from '@/scene/StaticBatch'
 import { TILL_STATE, tipOver } from './bar'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
@@ -318,6 +319,8 @@ export function IpadModel({ lang = 'zh' }: { lang?: Lang }) {
       glare.raycast = () => {}
       s.add(glare)
     }
+    // (the case, the stand and the cable drawn a few parts at a time; the screen, drawn on as the till's worked, on its own)
+    mergeByMaterial(r, (o) => o.name === 'IpadScreen')
     return r
   }, [gltf])
   // (what's on the screen follows the till: asleep, the order screen, or a card being taken)

@@ -2483,6 +2483,10 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
   const seen = useRef(-1)
   const objs = useRef(new Map<string, THREE.Group>())
   const dragKey = useRef<string | null>(null)
+  // (the bottles on the shelves are drawn in one batch with the ranks behind them; each place is pointed at by an unseen stand-in, lit
+  // round when the pointer's on it, and the bottle that's picked up drawn on its own while it's carried)
+  const [lifted, setLifted] = useState<string | null>(null)
+  const [hover, setHover] = useState<string | null>(null)
   const shelves = FRIDGE_UNITS[n].shelves
   const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.16)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
@@ -2550,6 +2554,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
     const at = new THREE.Vector3()
     let onTable: THREE.Vector3 | null = null
     dragKey.current = key
+    if (from.kind === 'slot') setLifted(key)
     const move = (e: PointerEvent) => {
       const rect = gl.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1), camera)
@@ -2576,6 +2581,7 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       document.body.classList.remove('is-carrying')
       if (controls) controls.enabled = true
       dragKey.current = null
+      setLifted(null)
       grp.quaternion.identity()
       if (onTable) {
         const w: [number, number, number] = [onTable.x, onTable.y, onTable.z]
@@ -2640,23 +2646,27 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
         <group key={`${r}-${k}`} ref={reg(`${r}-${k}`)}
           position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin({ kind: 'slot', r, k }, ev)}
-          onPointerOver={(ev) => { if (doorOpen()) { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject) } setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
-          onPointerOut={(ev) => { document.body.style.cursor = ''; glowLeave(ev.eventObject); setTip(null) }}>
-          <DrinkBottle id={id} lit />
+          onPointerOver={(ev) => { ev.stopPropagation(); if (doorOpen()) { document.body.style.cursor = 'grab'; setHover(`${r}-${k}`) } setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
+          onPointerOut={() => { document.body.style.cursor = ''; setHover((h) => (h === `${r}-${k}` ? null : h)); setTip(null) }}>
+          {/* (what the pointer finds: the bottle's size, unseen) */}
+          <mesh position-y={0.11} visible={false}><boxGeometry args={[shelves[r].pitch * 0.9, 0.22, 0.06]} /></mesh>
+          {lifted === `${r}-${k}` ? <DrinkBottle id={id} lit /> : hover === `${r}-${k}` && (
+            <mesh position-y={0.11}><cylinderGeometry args={[0.036, 0.036, 0.25, 16, 1, true]} /><primitive object={BOTTLE_HALO} attach="material" /></mesh>
+          )}
         </group>
       )))}
-      {/* (and ranks behind each, packed shoulder to shoulder back to the fridge's back wall, as a shop's shelves are: one batch, redrawn
-          as the stock changes; a hair of play in each so the rows aren't ruled) */}
-      <StaticBatch key={`ranks${FRIDGE_STOCK.ver}`}>
+      {/* (the front bottles and the ranks behind each, packed shoulder to shoulder back to the fridge's back wall, as a shop's shelves are:
+          one batch, redrawn as the stock changes (and without the one being carried); a hair of play in each so the rows aren't ruled) */}
+      <StaticBatch key={`ranks${FRIDGE_STOCK.ver}-${lifted}`}>
         {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => {
           if (!id) return null
           const sp = slotAt(r, k), step = shelves[r].pitch * 1.02
           const ranks = Math.max(1, Math.floor(RANK_DEPTH / step))
-          return Array.from({ length: ranks }, (_, j) => (
+          return [...(lifted === `${r}-${k}` ? [] : [<group key={`f${r}-${k}`} position={sp.toArray()}><DrinkBottle id={id} lit /></group>]), ...Array.from({ length: ranks }, (_, j) => (
             <group key={`b${r}-${k}-${j}`} position={[sp.x + (((k * 7 + j * 3) % 5) - 2) * 0.003, sp.y, sp.z - step * (j + 1)]} rotation-y={((k + j) % 3 - 1) * 0.25}>
               <DrinkBottle id={id} lit />
             </group>
-          ))
+          ))]
         }))}
       </StaticBatch>
       {/* (what's been taken out, stood on the floor before the fridge) */}
@@ -2671,6 +2681,8 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
 }
 /** how far back behind the front rank the shelves are filled */
 const RANK_DEPTH = 0.42
+/** the soft light round a bottle the pointer's on */
+const BOTTLE_HALO = new THREE.MeshBasicMaterial({ color: '#fff0c0', transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
 /** a drink's name, for its tag */
 const drinkName = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? '飲料'
 /** a bottle of one of the drinks, standing (its foot at the origin): its glass or can, its label printed round it,
@@ -3390,6 +3402,8 @@ function WallSpeaker() {
       m.castShadow = SPEAKER_INKED.test(m.name)
     })
     inkModel(root, (m) => !SPEAKER_INKED.test(m.name), { width: 0.004, weld: true })
+    // (drawn a few parts at a time; the arm and its bracket, which reach back to the corner wherever it's put, on their own)
+    mergeByMaterial(root, (o) => /^Speaker(Arm|Mount)/.test(o.name))
     return { root, led: led as THREE.MeshBasicMaterial | null, toon: [...toon.values()] }
   }, [gltf])
   useEffect(() => { model.led?.color.set(off ? '#d02a2a' : '#3ddc6a') }, [model, off])

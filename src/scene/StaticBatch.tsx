@@ -74,12 +74,16 @@ export function StaticBatch({ children }: { children: ReactNode }) {
       o.add(mesh)
     }
     h.visible = false
+    // (the originals, hidden, aren't drawn; nor need their places be worked out again every frame: thousands of them, in all the batches)
+    const own = h.updateMatrixWorld
+    h.updateMatrixWorld = () => {}
     return () => {
       for (const m of made) {
         m.removeFromParent()
         m.geometry.dispose()
       }
       h.visible = true
+      h.updateMatrixWorld = own
     }
   }, [])
   return (
@@ -95,12 +99,15 @@ export function StaticBatch({ children }: { children: ReactNode }) {
  * draws instead of hundreds. Unlike StaticBatch the merged meshes are ordinary ones under the model's root: it can still be pointed at,
  * moved and lit up as a whole. For a model whose parts never move on their own; skinned, instanced and multi-material meshes are left be.
  */
-export function mergeByMaterial(root: THREE.Object3D) {
+export function mergeByMaterial(root: THREE.Object3D, keep: (o: THREE.Object3D) => boolean = () => false) {
   root.updateWorldMatrix(true, true)
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert()
   const groups = new Map<THREE.Material, { geos: THREE.BufferGeometry[]; meshes: THREE.Mesh[] }>()
+  // (`keep`: the parts that move on their own (a hand, an eye that blinks), left out of it with all that's under them)
+  const kept = (o: THREE.Object3D) => { for (let q: THREE.Object3D | null = o; q && q !== root; q = q.parent) if (keep(q)) return true; return false }
   root.traverse((m) => {
     if (!(m instanceof THREE.Mesh) || m instanceof THREE.SkinnedMesh || m instanceof THREE.InstancedMesh || Array.isArray(m.material) || !m.visible) return
+    if (kept(m)) return
     const g = groups.get(m.material) ?? { geos: [], meshes: [] }
     g.geos.push(bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)))
     g.meshes.push(m)

@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
+import { mergeByMaterial } from '@/scene/StaticBatch'
 import { setTip } from '@/scene/hoverTip'
 import { DEPTS, newRegister, pressKey, REG_MODES, REG_TAG_TEXT, regFigure, setMode, settle, turnDrawerKey, type Receipt, type RegKey } from '@/game/register'
 import { keyHelp } from '@/data/registerKeys'
@@ -81,6 +82,8 @@ export function useRegisterModel() {
   })
   inkModel(root, (m) => REG_UNINKED.test(m.name), { width: 0.0022, weld: true })
   const get = (n: string) => root.getObjectByName(n)!
+  // (the body never moves: its parts drawn a few at a time; the keys, the drawer and the locks, which do, as they are)
+  mergeByMaterial(get('RegBody'))
   // (the body's own surfaces, not their ink lines: what stands in front of the drawer, the keys and the keys' locks when seen from the side or behind)
   const solid: THREE.Mesh[] = []
   get('RegBody').traverse((o) => {

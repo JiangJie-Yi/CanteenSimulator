@@ -6,7 +6,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObj
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { mergeByMaterial } from '@/scene/StaticBatch'
+import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
@@ -171,11 +171,13 @@ function Crate() {
     return out
   }, [stickGeos])
   const weave = BASKET_WEAVE
-  // (as many shown as are left in it: the last ones in the list (the front rows) go first)
-  const stickRefs = useRef<(THREE.Group | null)[]>([])
-  useFrame(() => { stickRefs.current.forEach((g, i) => { if (g) g.visible = i < CRATE.left }) })
+  // (as many shown as are left in it: the last ones in the list (the front rows) go first; the basket and its sticks drawn as one batch
+  // each, the sticks' made again only when one's taken)
+  const [left, setLeft] = useState(CRATE.left)
+  useFrame(() => { if (CRATE.left !== left) setLeft(CRATE.left) })
   return (
     <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35}>
+      <StaticBatch>
       <Inked geometry={geo.side} map={weave} position={[0, H / 2, D / 2 - T / 2]}>
         {/* the tag faces out of the front */}
         <mesh geometry={geo.label} position={[0.09, 0, T / 2 + 0.002]}>
@@ -193,12 +195,15 @@ function Crate() {
       <mesh geometry={geo.floor} position={[0, T / 2, 0]} receiveShadow>
         <meshToonMaterial map={weave} />
       </mesh>
+      </StaticBatch>
       <group userData={{ decor: 'charcoal' }}>
-        {sticks.map((s, i) => (
-          <group key={i} ref={(g) => { stickRefs.current[i] = g }}>
-            <Inked geometry={stickGeos[s.g].geo} map={bin.face ?? undefined} grow={1.07} sideOnly position={s.p} rotation={s.r} />
-          </group>
-        ))}
+        {/* (what the pointer finds: the sticks' block, unseen; the sticks themselves are merged and take no pointing) */}
+        <mesh position={[0, T + 0.15, 0]} visible={false}><boxGeometry args={[W - 2 * T, 0.3, D - 2 * T]} /></mesh>
+        <StaticBatch key={left}>
+          {sticks.slice(0, left).map((s, i) => (
+            <Inked key={i} geometry={stickGeos[s.g].geo} map={bin.face ?? undefined} grow={1.07} sideOnly position={s.p} rotation={s.r} />
+          ))}
+        </StaticBatch>
       </group>
     </group>
   )
@@ -438,6 +443,8 @@ function useRiceTub() {
     inkModel(root, (m) => /Rivet|Cord|Gap|Floor|Mound|Paddle|Hoop/.test(m.name), { width: 0.0016, weld: true })
     const get = (n: string) => { const o = root.getObjectByName(n)!; o.removeFromParent(); return o }
     riceParts = { body: get('RiceTubBody'), lid: get('RiceTubLid'), rice: get('RiceTubRice') }
+    // (each of the three, which move only as a whole (the lid lifted off), drawn a few parts at a time)
+    for (const part of Object.values(riceParts)) mergeByMaterial(part)
     return riceParts
   }, [gltf])
 }
@@ -450,15 +457,19 @@ function RiceTub() {
   const standGltf = useGLTF(RICESTAND_URL) as unknown as { scene: THREE.Group }
   const stand = useMemo(() => {
     const r = standGltf.scene.clone(true)
+    const made = new Map<THREE.Material, THREE.Material>()
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
-      m.material = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+      let t = made.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null }); made.set(src, t) }
+      m.material = t
       m.castShadow = true
       m.receiveShadow = true
     })
     inkModel(r, () => false, { width: 0.0016, weld: true })
+    mergeByMaterial(r)
     return r
   }, [standGltf])
   const [x, z] = DECOR.rice.at
@@ -558,20 +569,27 @@ function IngredientFridge() {
   const fz = useGLTF(FREEZER_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const root = fz.scene.clone(true)
+    const made = new Map<THREE.Material, THREE.Material>()
     root.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
-      // (in the room's toon light: each part its own colour, the steel and the ice keeping a little gloss)
+      // (in the room's toon light: each part its own colour, the steel and the ice keeping a little gloss; one finish for each of the model's
+      // materials, shared, so the parts can be merged)
       const src = m.material as THREE.MeshStandardMaterial
       const glossy = /Steel|Ice|Film|Wire|Plate/.test(src.name)
+      const had = made.get(src)
+      if (had) { m.material = had; m.castShadow = !/Goods/.test(m.name); return }
       m.material = glossy
         ? new THREE.MeshPhysicalMaterial({ color: src.color, metalness: src.metalness, roughness: Math.max(0.15, src.roughness), clearcoat: 0.6,
           transparent: /Ice|Film/.test(src.name), opacity: /Ice/.test(src.name) ? 0.22 : /Film/.test(src.name) ? 0.35 : 1 })
         : /Lcd|Lamp/.test(src.name) ? new THREE.MeshBasicMaterial({ color: src.emissive.clone().multiplyScalar(1.4), toneMapped: false })
           : new THREE.MeshToonMaterial({ color: src.color })
+      made.set(src, m.material as THREE.Material)
       m.castShadow = !/Goods/.test(m.name)
     })
-    // (no ink lines round it: plain and clean, as an appliance looks)
+    // (no ink lines round it: plain and clean, as an appliance looks; the body and what's in it drawn a few parts at a time, the lid (which
+    // swings up) on its own)
+    mergeByMaterial(root, (o) => /^FreezerLid/.test(o.name))
     return root
   }, [fz])
   // (its lid, looked up in the model as drawn)
@@ -691,17 +709,25 @@ function KnifeSet() {
   const gltf = useGLTF(KNIVES_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
     const r = gltf.scene.clone(true)
+    const made = new Map<THREE.Material, THREE.Material>()
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
-      m.material = /Steel/.test(src.name)
-        ? new THREE.MeshStandardMaterial({ color: '#ffffff', map: src.map, metalness: 0.55, roughness: 0.3 })
-        : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+      let t = made.get(src)
+      if (!t) {
+        t = /Steel/.test(src.name)
+          ? new THREE.MeshStandardMaterial({ color: '#ffffff', map: src.map, metalness: 0.55, roughness: 0.3 })
+          : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+        made.set(src, t)
+      }
+      m.material = t
       m.castShadow = true
       m.receiveShadow = true
     })
     inkModel(r, (m) => /Mark|Sign|Cloth|Neck/.test(m.name), { width: 0.0012, weld: true })
+    // (the set never moves: drawn a few parts at a time)
+    mergeByMaterial(r)
     return r
   }, [gltf])
   // (behind the hearth, on the strip of table toward the bar: the front's taken by the fan, the plate and the tasting bowl)
