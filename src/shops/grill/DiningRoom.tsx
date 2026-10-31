@@ -2679,8 +2679,9 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
     </group>
   )
 }
-/** how far back behind the front rank the shelves are filled */
-const RANK_DEPTH = 0.42
+/** how far back behind the front rank the shelves are filled: one rank more behind each, enough for the shelf to read full through the
+ * glass (all the way back it was six hundred bottles a fridge) */
+const RANK_DEPTH = 0.12
 /** the soft light round a bottle the pointer's on */
 const BOTTLE_HALO = new THREE.MeshBasicMaterial({ color: '#fff0c0', transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
 /** a drink's name, for its tag */
@@ -2767,7 +2768,8 @@ function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: b
   )
 }
 /** a bottle turned from its profile: the points of (radius, height) from its foot up to its mouth */
-const bottleBody = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 32)
+// (16 round: a bottle a few centimetres across is round enough at that, and there are hundreds of them)
+const bottleBody = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 16)
 /** what's in a bottle: its inside (the profile drawn in by the glass's thickness) filled to `fill` of the way up, a flat top there */
 function liquidOf(pts: [number, number][], fill: number) {
   const top = pts[pts.length - 1][1] * fill
@@ -2784,12 +2786,12 @@ function liquidOf(pts: [number, number][], fill: number) {
 }
 /** a screw cap: a short cylinder, its side finely ribbed for the fingers */
 function ribbedCap(r: number, h: number) {
-  const g = new THREE.CylinderGeometry(r, r, h, 48, 1)
+  const g = new THREE.CylinderGeometry(r, r, h, 24, 1)
   const pos = g.attributes.position
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i), d = Math.hypot(x, z)
     if (d < r * 0.99) continue
-    const a = Math.atan2(z, x), k = 1 + 0.04 * (Math.cos(a * 24) > 0 ? 1 : 0)
+    const a = Math.atan2(z, x), k = 1 + 0.04 * (Math.cos(a * 12) > 0 ? 1 : 0)
     pos.setX(i, x * k); pos.setZ(i, z * k)
   }
   g.computeVertexNormals()
@@ -2802,23 +2804,23 @@ const RAMUNE_PTS: [number, number][] = [[0, 0], [0.021, 0], [0.0245, 0.004], [0.
 const BOTTLE_SHAPE = {
   // a brown long-necked beer bottle, a gold foil at its neck
   beer: { body: bottleBody([[0, 0], [0.024, 0], [0.0275, 0.005], [0.0275, 0.12], [0.0235, 0.145], [0.0145, 0.17], [0.0125, 0.2],
-    [0.0135, 0.206], [0.0135, 0.21], [0, 0.21]]), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 32, 1, true), labelY: 0.065,
+    [0.0135, 0.206], [0.0135, 0.21], [0, 0.21]]), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 16, 1, true), labelY: 0.065,
     cap: new THREE.CylinderGeometry(0.0145, 0.0145, 0.008, 24), capY: 0.213, foil: new THREE.CylinderGeometry(0.0138, 0.0155, 0.04, 9), foilY: 0.18 },
   // the glass milk bottle: a wide mouth, a paper cap pressed down over it, a paper label round its middle
   milk: { body: bottleBody([[0, 0], [0.02, 0], [0.0225, 0.005], [0.0225, 0.085], [0.02, 0.098], [0.0175, 0.106], [0.0175, 0.118], [0, 0.118]]),
-    label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 32, 1, true), labelY: 0.05,
+    label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 16, 1, true), labelY: 0.05,
     cap: new THREE.CylinderGeometry(0.0195, 0.0195, 0.006, 9), capY: 0.121, foil: new THREE.CylinderGeometry(0.0182, 0.0188, 0.014, 9) as THREE.BufferGeometry | null, foilY: 0.112 },
   // the 500 ml plastic bottle: a ribbed foot, a label round its middle, a coloured cap
   pet500: { body: bottleBody([[0, 0], [0.019, 0], [0.0235, 0.006], [0.0235, 0.1], [0.021, 0.125], [0.0135, 0.145], [0.0105, 0.152],
-    [0.0105, 0.158], [0, 0.158]]), label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 32, 1, true), labelY: 0.07,
+    [0.0105, 0.158], [0, 0.158]]), label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 16, 1, true), labelY: 0.07,
     cap: ribbedCap(0.0118, 0.012), capY: 0.164, foil: null as THREE.BufferGeometry | null, foilY: 0 },
   // a clear slim sake bottle with a round shoulder, a paper collar under the red cap
   sake: { body: bottleBody([[0, 0], [0.022, 0], [0.0245, 0.004], [0.0245, 0.12], [0.0225, 0.15], [0.014, 0.178], [0.0105, 0.2],
-    [0.0115, 0.206], [0, 0.206]]), label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 32, 1, true), labelY: 0.07,
+    [0.0115, 0.206], [0, 0.206]]), label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 16, 1, true), labelY: 0.07,
     cap: ribbedCap(0.0125, 0.014), capY: 0.21, foil: new THREE.CylinderGeometry(0.0112, 0.0125, 0.012, 9), foilY: 0.196 },
   // the big plastic tea bottle: wide, a ribbed foot, a green label round its middle
   pet: { body: bottleBody([[0, 0], [0.026, 0], [0.032, 0.008], [0.032, 0.012], [0.0305, 0.02], [0.032, 0.028], [0.032, 0.17],
-    [0.028, 0.2], [0.017, 0.225], [0.0135, 0.236], [0.0135, 0.246], [0, 0.246]]), label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 32, 1, true),
+    [0.028, 0.2], [0.017, 0.225], [0.0135, 0.236], [0.0135, 0.246], [0, 0.246]]), label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 16, 1, true),
     labelY: 0.1, cap: ribbedCap(0.0145, 0.014), capY: 0.252, foil: null as THREE.BufferGeometry | null, foilY: 0 },
 }
 /** what's in each shaped bottle, and how full: the tea and the sports drink near the top, the sake a little lower, the milk to the neck */
@@ -2835,10 +2837,10 @@ const BOTTLE_GEO = {
   neck: new THREE.CylinderGeometry(0.012, 0.026, 0.04, 8),
   cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 8),
   can: bottleBody([[0, 0], [0.0168, 0], [0.0198, 0.004], [0.0212, 0.011], [0.0212, 0.078], [0.0202, 0.084], [0.0184, 0.0885], [0.0178, 0.09], [0, 0.09]]),
-  canLabel: new THREE.CylinderGeometry(0.0215, 0.0215, 0.07, 32, 1, true),
-  canTop: new THREE.CylinderGeometry(0.0172, 0.0178, 0.004, 32),
+  canLabel: new THREE.CylinderGeometry(0.0215, 0.0215, 0.07, 16, 1, true),
+  canTop: new THREE.CylinderGeometry(0.0172, 0.0178, 0.004, 16),
   canTab: new THREE.CylinderGeometry(0.0062, 0.0062, 0.0014, 8),
-  canRim: new THREE.CylinderGeometry(0.0182, 0.0182, 0.0026, 32, 1, true),
+  canRim: new THREE.CylinderGeometry(0.0182, 0.0182, 0.0026, 16, 1, true),
   small: new THREE.LatheGeometry([[0, 0], [0.016, 0], [0.017, 0.02], [0.013, 0.036], [0.016, 0.056], [0.015, 0.072], [0, 0.072]]
     .map(([x, y]) => new THREE.Vector2(x, y - 0.036)), 28),
   smallTop: new THREE.CylinderGeometry(0.0155, 0.0155, 0.004, 28),
@@ -2847,7 +2849,7 @@ const BOTTLE_GEO = {
   ramuneDrink: liquidOf(RAMUNE_PTS, 0.62),
   marble: new THREE.SphereGeometry(0.0108, 20, 14),
   ramuneCap: new THREE.CylinderGeometry(0.0128, 0.0135, 0.014, 28),
-  ramuneLabel: new THREE.CylinderGeometry(0.0252, 0.0252, 0.05, 32, 1, true),
+  ramuneLabel: new THREE.CylinderGeometry(0.0252, 0.0252, 0.05, 16, 1, true),
 }
 /**
  * Each drink's label, drawn round it twice (it reads from either side), in the manner of what's on a Japanese shop's shelf (no maker's
