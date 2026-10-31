@@ -56,6 +56,16 @@ def active():
     return bpy.context.view_layer.objects.active
 
 
+# (the figure is small on screen: every ball made with about 6 in 10 of the segments asked for, never fewer than 8 round and 5 down)
+LOD = 0.62
+
+
+def uv_sphere(**kw):
+    kw["segments"] = max(8, round(kw.get("segments", 32) * LOD))
+    kw["ring_count"] = max(5, round(kw.get("ring_count", 16) * LOD))
+    return bpy.ops.mesh.primitive_uv_sphere_add(**kw)
+
+
 bpy.ops.wm.read_factory_settings(use_empty=True)
 M = {
     "skin": pbr("BossSkin", lin("#d99a68"), rough=0.6),
@@ -102,7 +112,25 @@ _tgCap = _tg.copy()
 M["tenugui"] = pbr("BossTenugui", (1, 1, 1), tex=image("boss_tenugui", _tg.astype(np.float32)), rough=0.8)
 # (the kappōgi's cotton: white with its weave, a faint shade down the folds)
 COAT = {"server": (0.2, 0.25, 0.4), "serverF": (0.42, 0.14, 0.24), "stock": (0.42, 0.44, 0.3)}.get(CREW, (0.96, 0.94, 0.9))
-_ct = _weave(COAT, 0.06) * (1 - 0.05 * (0.5 + 0.5 * np.sin(_u * 2 * np.pi * 9)))[..., None]
+_ct = _weave(COAT, 0.06)
+if CREW == "serverF":
+    _fu, _fv = grid01(256)
+    for k in range(0, 9):
+        for j in range(0, 9):
+            cu, cv = (k + 0.5 * (j % 2)) / 9, (j + 0.3) / 9
+            du = (_fu - cu + 0.5) % 1.0 - 0.5
+            dv = _fv - cv
+            a = np.arctan2(dv, du)
+            rr = np.hypot(du, dv)
+            petal = rr < 0.026 * (0.72 + 0.28 * np.abs(np.cos(2.5 * a)))
+            _ct[petal] = (0.95, 0.78, 0.82)
+            _ct[rr < 0.008] = (0.9, 0.7, 0.3)
+if CREW == "server":
+    _fu, _fv = grid01(256)
+    st = ((np.abs(((_fu * 20) % 1.0) - 0.5) < 0.04) & (((_fv * 60) % 1.0) < 0.6)) | ((np.abs(((_fv * 20) % 1.0) - 0.5) < 0.04) & (((_fu * 60) % 1.0) < 0.6))
+    _ct[st] = _ct[st] * 0.55 + np.array([0.75, 0.78, 0.86], np.float32) * 0.45
+# (a faint shade down the folds)
+_ct = _ct * (1 - 0.05 * (0.5 + 0.5 * np.sin(_u * 2 * np.pi * 9)))[..., None]
 M["coat"] = pbr("BossCoat", (1, 1, 1), tex=image(f"{CREW or 'boss'}_cotton", _ct.astype(np.float32)), rough=0.75)
 if CREW:
     # (the cap's tenugui white, a band's white; the collar a shade of the coat, the kimono's white)
@@ -118,7 +146,8 @@ M["pants"] = pbr("BossPants", (1, 1, 1), tex=image(f"{CREW or 'boss'}_indigo", _
 M["apron"] = pbr("BossApron", (1, 1, 1), tex=image(f"{CREW or 'boss'}_navy", _weave(APRON, 0.12, 128)), rough=0.85)
 # (hair: brown with strands combed down from the crown, lighter and darker by turns)
 _hs = 0.75 + 0.25 * np.sin(_u * 2 * np.pi * 60 + np.sin(_u * 2 * np.pi * 7) * 2) * (0.6 + 0.4 * _grain)
-M["hair"] = pbr("CrewHair" if CREW else "BossHair", (1, 1, 1), tex=image(f"{CREW or 'boss'}_hair", (np.array([0.36, 0.23, 0.16] if not CREW else [0.92, 0.92, 0.92], np.float32)[None, None, :] * _hs[..., None]).astype(np.float32)), rough=0.6)
+M["hair"] = (pbr("CrewHair", lin("#3a2a20"), rough=0.5) if CREW else
+             pbr("BossHair", (1, 1, 1), tex=image("boss_hair", (np.array([0.36, 0.23, 0.16], np.float32)[None, None, :] * _hs[..., None]).astype(np.float32)), rough=0.6))
 # (the cook's trousers: a small grey-and-charcoal check, its squares square round the body)
 _n = 512
 _u, _v = grid01(_n)
@@ -139,7 +168,10 @@ def fin(o, name, mat, smooth=True):
 
 def tube(name, pts, r, mat, cyclic=False):
     """a round tube through points given in three's frame"""
-    cd = bpy.data.curves.new(name, "CURVE"); cd.dimensions = "3D"; cd.bevel_depth = r; cd.bevel_resolution = 3
+    cd = bpy.data.curves.new(name, "CURVE"); cd.dimensions = "3D"; cd.bevel_depth = r; cd.bevel_resolution = 1 if r < 0.012 else 2
+    # (a long closed loop needs no more than every other point to stay round)
+    if cyclic and len(pts) > 24:
+        pts = pts[::2]
     sp = cd.splines.new("POLY"); sp.points.add(len(pts) - 1); sp.use_cyclic_u = cyclic
     for spt, q in zip(sp.points, pts):
         spt.co = (*P(*q), 1)
@@ -202,6 +234,7 @@ def on_body(x, y, out=0.0):
 
 
 def lathe(name, profile, mat, seg=48, a0=0.0, a1=2 * math.pi):
+    seg = max(12, round(seg * 0.67))
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     full = abs(a1 - a0 - 2 * math.pi) < 1e-6
@@ -239,7 +272,7 @@ lathe("BossBody", [(y, r + (0.006 if y < HEM + 0.04 else 0.0)) for (y, r) in PRO
 # ---- the head: a big ball, set down on the body
 C = Vector((0.0, 0.68 + DY, 0.0))
 R = 0.27
-bpy.ops.mesh.primitive_uv_sphere_add(radius=R, segments=48, ring_count=24, location=P(*C))
+uv_sphere(radius=R, segments=48, ring_count=24, location=P(*C))
 head = fin(active(), "BossHead", M["skin"])
 
 
@@ -258,7 +291,7 @@ def head_at(a, e, out=0.0):
 
 # (his hair: only what shows under the tenugui, short at the sides and the nape; a light shell, its strands painted)
 HT = 0.012
-bpy.ops.mesh.primitive_uv_sphere_add(radius=R + HT, segments=64, ring_count=32, location=P(*C))
+uv_sphere(radius=R + HT, segments=64, ring_count=32, location=P(*C))
 hair = active()
 bm = bmesh.new(); bm.from_mesh(hair.data)
 # (cut clean with planes, not face by face, so its edges are smooth lines: off in front of the ears, off under the tenugui's edge, and a
@@ -273,16 +306,41 @@ bm.to_mesh(hair.data); bm.free()
 fin(hair, "BossHair", M["hair"])
 if WEAR in ("band", "bun"):
     # (the crown's hair standing a little fuller than the shell round the sides: its edge just over the brows in front, down to the nape behind)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=R + HT * 2.2, segments=48, ring_count=24, location=P(*C))
+    uv_sphere(radius=R + HT * 1.3, segments=48, ring_count=24, location=P(*C))
     top = active()
     bm = bmesh.new(); bm.from_mesh(top.data)
-    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=Vector(P(0, 0.01, 0)), plane_no=Vector(P(0, -1, 0.4)).normalized(), clear_outer=True)
+    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=Vector(P(0, -0.03 if FEMALE else 0.01, 0)),
+                           plane_no=Vector(P(0, -1, 0.47 if FEMALE else 0.4)).normalized(), clear_outer=True)
     bm.to_mesh(top.data); bm.free()
     fin(top, "BossHairTop", M["hair"])
+def tuft(name, at, d, r, ln, flat=1.0):
+    """a lock of hair: a soft cone from `at` out along `d`, `r` across at its root, `ln` long, flattened across by `flat`"""
+    d = d.normalized()
+    uv_sphere(radius=1, segments=14, ring_count=8, location=(0, 0, 0))
+    o = active()
+    for v in o.data.vertices:
+        x, y, z = v.co.x, v.co.z, -v.co.y            # three frame, the lock along +y
+        t = (y + 1) / 2                               # 0 at the root, 1 at the tip
+        w = r * (1 - t) ** 0.8 + 0.002
+        v.co = Vector(P(x * w, t * ln, z * w * flat))
+    o.rotation_mode = "QUATERNION"
+    o.rotation_quaternion = Vector(P(*d)).to_track_quat("Z", "Y")
+    o.location = P(*at)
+    return fin(o, name, M["hair"])
+
+
+if CREW == "server":
+    # (a lock standing up on his crown, curling forward (アホ毛))
+    tuft("BossHairAhoge", head_at(0.0, 1.3, -0.006), Vector((0.1, 1, 0.75)), 0.034, 0.1, 0.45)
 if FEMALE:
-    # (her hair put up: a round bun at the back of the crown; a lacquered comb across it out front)
-    bq = head_at(math.pi, 0.62, 0.05)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.085, segments=24, ring_count=14, location=P(*bq))
+    # (a lock down in front of each ear, framing her face)
+    for sd in (-1, 1):
+        root_ = head_at(sd * 1.22, 0.3, 0.006)
+        tuft(f"BossHairSide{sd}", root_, Vector((sd * 0.08, -1, 0.12)), 0.03, 0.13, 0.5)
+if FEMALE:
+    # (her hair put up: a round bun, high at the back of the crown for the kimono, low under the cap for a cook; a lacquered comb in it)
+    bq = head_at(math.pi, 0.62, 0.05) if CREW == "serverF" else head_at(math.pi, -0.05, 0.03)
+    uv_sphere(radius=0.085, segments=24, ring_count=14, location=P(*bq))
     o = active(); o.scale = (1.1, 0.9, 0.85)
     fin(o, "BossHairBun", M["hair"])
     if CREW == "serverF":
@@ -296,7 +354,7 @@ if FEMALE:
 # (sideburns down in front of the ears)
 for sd in (-1, 1):
     q = head_at(sd * math.radians(76), -0.05, 0.004)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=10, ring_count=6, location=P(*q))
+    uv_sphere(radius=1, segments=10, ring_count=6, location=P(*q))
     o = active(); o.scale = (0.016, 0.02, 0.045)
     fin(o, f"BossSideburn{sd}", M["hair"])
 
@@ -306,15 +364,18 @@ for sd in (-1, 1):
     ex = sd * 0.09
     # (eyes: big dark ovals with two glints)
     p, n = on_head(ex, EY, 0.0)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=18, ring_count=10, location=P(*p))
-    o = active(); o.scale = (0.016, 0.01, 0.021)
+    uv_sphere(radius=1, segments=18, ring_count=10, location=P(*p))
+    o = active(); o.scale = (0.016, 0.01, 0.021) if not CREW else (0.018, 0.01, 0.025)
     o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
     fin(o, f"BossEye{sd}", M["dark"])
+    if FEMALE:
+        # (lashes: a little flick off the eye's outer top)
+        tube(f"BossEyeLash{sd}", [on_head(ex + sd * (0.008 + 0.016 * u), EY + 0.021 + 0.004 * u * u - 0.004 * u, 0.004)[0] for u in (0, 0.5, 1)], 0.0035, M["dark"])
     p, n = on_head(ex + 0.006, EY + 0.008, 0.007)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0055, segments=10, ring_count=6, location=P(*p))
+    uv_sphere(radius=0.0055, segments=10, ring_count=6, location=P(*p))
     fin(active(), f"BossEyeShine{sd}", M["white"])
     p, n = on_head(ex - 0.005, EY - 0.009, 0.007)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0025, segments=8, ring_count=5, location=P(*p))
+    uv_sphere(radius=0.0025, segments=8, ring_count=5, location=P(*p))
     fin(active(), f"BossEyeShineB{sd}", M["white"])
     # (the glasses: a round-cornered frame round each eye, standing a little off the face)
     ring = []
@@ -332,28 +393,36 @@ for sd in (-1, 1):
         arm.append(head_at(sd * (a_out + (math.radians(84) - a_out) * k / 6), math.asin((EY + 0.012) / R), 0.012 + 0.01 * (1 - k / 6)))
     tube(f"BossGlassArm{sd}", arm, 0.0045, M["frame"])
     # (brows: arched and kind, over the frames)
-    tube(f"BossBrow{sd}", [on_head(ex + 0.028 * (2 * u - 1), EY + 0.078 + 0.01 * (1 - (2 * u - 1) ** 2), 0.006)[0]
-                           for u in [k / 8 for k in range(9)]], 0.011, M["brow"])
+    if not CREW:
+        tube(f"BossBrow{sd}", [on_head(ex + 0.028 * (2 * u - 1), EY + 0.078 + 0.01 * (1 - (2 * u - 1) ** 2), 0.006)[0]
+                               for u in [k / 8 for k in range(9)]], 0.011, M["brow"])
+    else:
+        tube(f"BossBrow{sd}", [on_head(ex + 0.02 * (2 * u - 1), EY + 0.068 + 0.008 * (1 - (2 * u - 1) ** 2) - sd * 0.0 * u, 0.004)[0]
+                               for u in [k / 6 for k in range(7)]], 0.0065, M["brow"])
 # (the bridge between the frames)
 tube("BossGlassBridge", [on_head(x, EY + 0.012 + 0.006 * (1 - (x / 0.033) ** 2), 0.024)[0] for x in (-0.033, -0.017, 0, 0.017, 0.033)], 0.005, M["frame"])
 # (a round nose)
-p, n = on_head(0.0, -0.04, 0.012)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.042, segments=16, ring_count=8, location=P(*p))
+p, n = on_head(0.0, -0.04, 0.012) if not CREW else on_head(0.0, -0.035, 0.002)
+uv_sphere(radius=0.042 if not CREW else 0.022, segments=16, ring_count=8, location=P(*p))
 fin(active(), "BossNose", M["skin"])
 # (a moustache: two soft brown wings either side under the nose)
 for sd in ((-1, 1) if not CREW else ()):
     tube(f"BossMoustache{sd}", [on_head(sd * (0.012 + 0.036 * u), -0.088 + 0.008 * math.sin(math.pi * u) - 0.01 * u * u, 0.006)[0]
                                 for u in [k / 8 for k in range(9)]], 0.0095, M["hair"])
 # (a smile under it)
-tube("BossMouth", [on_head(0.022 * (2 * u - 1), -0.118 - 0.01 * (1 - (2 * u - 1) ** 2), 0.003)[0] for u in [k / 10 for k in range(11)]], 0.0055, M["mouth"])
+if CREW:
+    M["mouth"] = pbr("BossMouth", lin("#b8483e" if FEMALE else "#6a2a20"), rough=0.6)
+    tube("BossMouth", [on_head(0.017 * (2 * u - 1), -0.092 - 0.009 * (1 - (2 * u - 1) ** 2), 0.003)[0] for u in [k / 8 for k in range(9)]], 0.005, M["mouth"])
+else:
+    tube("BossMouth", [on_head(0.022 * (2 * u - 1), -0.118 - 0.01 * (1 - (2 * u - 1) ** 2), 0.003)[0] for u in [k / 10 for k in range(11)]], 0.0055, M["mouth"])
 # (his mouth open, as he talks: a dark rounded opening, its tongue showing at the bottom; the game shows it in turn with the smile)
 p, n = on_head(0.0, -0.122, -0.002)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=20, ring_count=10, location=P(*p))
+uv_sphere(radius=1, segments=20, ring_count=10, location=P(*p))
 o = active(); o.scale = (0.026, 0.008, 0.02)
 o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
 fin(o, "BossMouthOpen", M["mouth"])
 p, n = on_head(0.0, -0.132, 0.002)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*p))
+uv_sphere(radius=1, segments=14, ring_count=8, location=P(*p))
 o = active(); o.scale = (0.016, 0.006, 0.008)
 o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
 fin(o, "BossMouthTongue", M["cheek"])
@@ -361,13 +430,13 @@ if CREW:
     # (a soft blush on each cheek)
     for sd in (-1, 1):
         p, n = on_head(sd * 0.135, -0.055, 0.0)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*p))
+        uv_sphere(radius=1, segments=14, ring_count=8, location=P(*p))
         o = active(); o.scale = (0.03, 0.006, 0.018)
         o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
         fin(o, f"BossCheek{sd}", M["cheek"])
 # (ears)
 for sd in (-1, 1):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.048, segments=16, ring_count=8, location=P(sd * (R + 0.006), C.y - 0.005, -0.015))
+    uv_sphere(radius=0.048, segments=16, ring_count=8, location=P(sd * (R + 0.006), C.y - 0.005, -0.015))
     e = active(); e.scale = (0.45, 0.85, 0.95)
     fin(e, f"BossEar{sd}", M["skin"])
 
@@ -375,7 +444,7 @@ for sd in (-1, 1):
 # its two corners sticking out
 BE = math.asin(0.12 / R)
 CAPPED = WEAR in ("boss", "cap")
-bpy.ops.mesh.primitive_uv_sphere_add(radius=R + 0.02, segments=32, ring_count=16, location=P(*C))
+uv_sphere(radius=R + 0.02, segments=32, ring_count=16, location=P(*C))
 cap = active()
 bm = bmesh.new(); bm.from_mesh(cap.data)
 gone = []
@@ -436,12 +505,12 @@ for i in range(40):
     a = 2 * math.pi * i / 40
     zc = math.cos(a)
     e = math.asin(max(-0.9, ((R + 0.02) * math.sin(BE) - 0.07 * max(0.0, -zc)) / (R + 0.02))) if CAPPED else HB - 0.12 * max(0.0, -zc)
-    roll.append(head_at(a, e, 0.022 if CAPPED else 0.016))
+    roll.append(head_at(a, e, 0.022 if CAPPED else 0.023))
 if WEAR != "bun":
     tube("BossTenuguiRoll", roll, 0.013 if CAPPED else 0.017, M["tenugui"], cyclic=True)
 # (the knot at the back, and its two corners: flat flaps of the cloth, hanging and flaring out)
-kp = head_at(math.pi, 0.14 if CAPPED else HB - 0.12, 0.035)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.034, segments=16, ring_count=10, location=P(*kp))
+kp = head_at(math.pi, 0.14 if CAPPED else HB - 0.12, 0.035 if CAPPED else 0.05)
+uv_sphere(radius=0.034, segments=16, ring_count=10, location=P(*kp))
 k_ = active(); k_.scale = (1.35, 0.95, 0.85)
 fin(k_, "BossKnot", M["tenugui"])
 for k, sd in enumerate((-1, 1)):
@@ -484,6 +553,13 @@ if CREW == "serverF":
     M["obi"] = pbr("CrewObi", lin("#d8a840"), rough=0.5)
     lathe("BossObi", [(BELT - 0.06, rb(BELT - 0.06) + 0.004), (BELT - 0.055, rb(BELT - 0.055) + 0.014), (BELT + 0.055, rb(BELT + 0.055) + 0.014),
                       (BELT + 0.06, rb(BELT + 0.06) + 0.004)], M["obi"], seg=64)
+    M["obijime"] = pbr("CrewObijime", lin("#c8302a"), rough=0.5)
+    tube("BossObiCord", [Vector((math.sin(2 * math.pi * i / 40) * (rb(BELT) + 0.017), BELT, math.cos(2 * math.pi * i / 40) * (rb(BELT) + 0.017))) for i in range(40)],
+         0.006, M["obijime"], cyclic=True)
+    # (the taiko knot: a rounded block on her back, a fold over its top)
+    uv_sphere(radius=1, segments=20, ring_count=12, location=P(0, BELT + 0.03, -(rb(BELT) + 0.035)))
+    o = active(); o.scale = (0.12, 0.035, 0.085)
+    fin(o, "BossObiKnot", M["obi"])
 # (the apron (前掛け): navy, from the cord down over his front nearly to the ground, a little proud of him; 聞野 on it in white)
 AP = [(y, rb(y) + 0.012) for y in (0.04, 0.08, 0.13, 0.19, 0.25, BELT - 0.004)]
 if CREW == "server":
@@ -500,6 +576,7 @@ JP = bpy.data.fonts.load("C:/Windows/Fonts/YuGothB.ttc") if os.path.exists("C:/W
 if JP:
     tx.data.font = JP
 tx.data.size = 0.075
+tx.data.resolution_u = 3
 tx.data.align_x = "CENTER"; tx.data.align_y = "CENTER"
 tx.rotation_euler = (math.pi / 2, 0, 0)
 bpy.ops.object.convert(target="MESH")
@@ -522,13 +599,13 @@ M["pink"] = pbr("BossEraser", lin("#ec8a9a"), rough=0.7)
 _before_bits = len(parts)
 # (a little gold fish pinned on his chest, his left)
 fp = on_body(0.12, 0.33 * BH + 0.06, 0.012)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*fp))
+uv_sphere(radius=1, segments=14, ring_count=8, location=P(*fp))
 o = active(); o.scale = (0.028, 0.008, 0.016)
 fin(o, "BossPinFish", M["gold"])
 bpy.ops.mesh.primitive_cone_add(vertices=3, radius1=0.016, radius2=0.0, depth=0.02, location=P(*(fp + Vector((0.032, 0, 0)))))
 o = active(); o.rotation_euler = (0, math.pi / 2, 0); o.scale = (1, 0.4, 1)
 fin(o, "BossPinTail", M["gold"], smooth=False)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.003, segments=8, ring_count=5, location=P(*(fp + Vector((-0.015, 0.004, 0.008)))))
+uv_sphere(radius=0.003, segments=8, ring_count=5, location=P(*(fp + Vector((-0.015, 0.004, 0.008)))))
 fin(active(), "BossPinEye", M["dark"])
 # (a hand towel (手拭い) tucked under the cord at his right, hanging down, two blue stripes across it)
 ta = math.radians(-62)
@@ -561,12 +638,22 @@ if CREW:
     for o in [x for x in parts[_before_bits:] if x.name.startswith(("BossPin", "BossPencil")) or (CREW not in ("chef", "chefF", "stock") and x.name.startswith("BossTowel"))]:
         parts.remove(o); bpy.data.objects.remove(o)
 
+if CREW == "stock":
+    # (a towel round his neck, its two ends down his front)
+    M["towel"] = pbr("BossTowel", lin("#f4f1e8"), rough=0.8)
+    NY = 0.575
+    tube("BossNeckTowel", [Vector((math.sin(2 * math.pi * i / 24) * 0.172, NY + 0.015 * math.cos(2 * math.pi * i / 24), math.cos(2 * math.pi * i / 24) * 0.172)) for i in range(24)],
+         0.022, M["towel"], cyclic=True)
+    for sd in (-1, 1):
+        pts = [on_body(sd * (0.075 + 0.01 * u), NY - 0.01 - 0.15 * u, 0.012) for u in (0, 0.33, 0.66, 1)]
+        ribbon(f"BossNeckTowelEnd{sd}", pts, [body_out(q) for q in pts], 0.05, 0.008, M["towel"])
+
 # ---- hands: floating mittens as Overcooked's, a plump rounded paddle (the fingers together, curled a little) and a thumb of its own,
 # hanging at his sides; each its own node so the game can swing them, raise them, hold things in them
 hands = {}
 HAND_AT = {-1: Vector((-0.31, 0.26, 0.05)), 1: Vector((0.31, 0.26, 0.05))}
 for sd, at in HAND_AT.items():
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=20, ring_count=12, location=(0, 0, 0))
+    uv_sphere(radius=1, segments=20, ring_count=12, location=(0, 0, 0))
     h = active()
     # (the paddle: wider than thick, longest down the fingers; the finger end fuller, curled in toward the palm)
     for v in h.data.vertices:
@@ -577,12 +664,14 @@ for sd, at in HAND_AT.items():
         v.co += Vector(P(0, 0, cz))
     h.location = P(*at)
     h.rotation_euler = (0, -sd * 0.25, 0)
-    hn = fin(h, f"BossHand{'L' if sd < 0 else 'R'}Mitt", M["skin"])
+    if CREW == "stock" and "glove" not in M:
+        M["glove"] = pbr("CrewGlove", lin("#e6e1d2"), rough=0.9)
+    hn = fin(h, f"BossHand{'L' if sd < 0 else 'R'}Mitt", M["glove"] if CREW == "stock" else M["skin"])
     # (the thumb: a short rounded stub out from the side of the palm, toward the front)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*(at + Vector((-sd * 0.036, 0.014, 0.024)))))
+    uv_sphere(radius=1, segments=14, ring_count=8, location=P(*(at + Vector((-sd * 0.036, 0.014, 0.024)))))
     th = active(); th.scale = (0.019, 0.019, 0.03)
     th.rotation_euler = (0.5, 0, -sd * 0.6)
-    th = fin(th, f"BossHand{'L' if sd < 0 else 'R'}Thumb", M["skin"])
+    th = fin(th, f"BossHand{'L' if sd < 0 else 'R'}Thumb", M["glove"] if CREW == "stock" else M["skin"])
     e = bpy.data.objects.new(f"BossHand{'L' if sd < 0 else 'R'}", None)
     bpy.context.collection.objects.link(e)
     bpy.context.view_layer.update()
