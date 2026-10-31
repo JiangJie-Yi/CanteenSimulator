@@ -2470,7 +2470,10 @@ const COVE_WASH = (() => {
   g.fillRect(0, 0, 64, 8)
   return new THREE.CanvasTexture(c)
 })()
-export function DrinkFridge({ n = 0 }: { n?: number }) {
+// (the fridge, its door and its stock each drawn again only when its own props change: with eighty-odd bottles apiece they were redrawn every
+// time the room above them was, several times a second while the shop's open)
+export const DrinkFridge = memo(DrinkFridgeImpl)
+function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
   const { W, H, D } = FRIDGE
   const { body } = useFreezer(n)
   return (
@@ -2507,7 +2510,8 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
  * open (out into the room) when someone's at the fridge or when it's clicked, and shutting after; while it's open the cold
  * pours out of it in a low white mist.
  */
-export function FridgeDoor({ n = 0 }: { n?: number }) {
+export const FridgeDoor = memo(FridgeDoorImpl)
+function FridgeDoorImpl({ n = 0 }: { n?: number }) {
   const { W, D } = FRIDGE
   const { door, doorRoot } = useFreezer(n)
   const open = useRef(0)
@@ -2538,7 +2542,8 @@ export function FridgeDoor({ n = 0 }: { n?: number }) {
  * with the door open: to another place (an empty one, or swapping with the drink there), or right out onto the floor
  * before the fridge, and back in again later.
  */
-export function FridgeStock({ n = 0 }: { n?: number }) {
+export const FridgeStock = memo(FridgeStockImpl)
+function FridgeStockImpl({ n = 0 }: { n?: number }) {
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster, scene } = useThree()
   const controls = useThree((st) => st.controls) as unknown as { enabled: boolean } | null
@@ -2758,7 +2763,8 @@ const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.2, sake: 1.12, oolong: 1.
   cola: 1.3, yakult: 1.12, sports: 1.3, milk: 1.1, chuhai: 1.36 }
 /** (`lit`: standing in a fridge, in its cove lights' wash: lifted by a soft glow of its own, which can't leak out through the cabinet as a lamp's light would) */
 /** (`wet`: out of the fridge, misted over with beads of condensation, a few run down) */
-export function DrinkBottle({ id, lit = false, wet = false }: { id: DrinkId; lit?: boolean; wet?: boolean }) {
+export const DrinkBottle = memo(DrinkBottleImpl)
+function DrinkBottleImpl({ id, lit = false, wet = false }: { id: DrinkId; lit?: boolean; wet?: boolean }) {
   return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} lit={lit} wet={wet} /></group>
 }
 /** each drink's look with a gentle glow, for those standing in a fridge */

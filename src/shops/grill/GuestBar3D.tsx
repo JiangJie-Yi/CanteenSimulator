@@ -162,7 +162,9 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
  * as a trip carries) and goes back to the crates.
  */
 const STOCK_CARRY = 8
-function Stocker({ counters, fridges, who }: { counters: Counter[]; fridges: NonNullable<ReturnType<typeof fridgesOf>>; who: { id: string; look: StaffLook } }) {
+// (he walks by his own frame loop: drawn again only if he or the room changes, not with every redraw of the bar)
+const Stocker = memo(StockerImpl, (a, b) => a.counters === b.counters && a.fridges === b.fridges && a.who.id === b.who.id && a.who.look === b.who.look)
+function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges: NonNullable<ReturnType<typeof fridgesOf>>; who: { id: string; look: StaffLook } }) {
   const g = useRef<THREE.Group>(null)
   const box = useRef<THREE.Mesh>(null)
   const c1 = counters[1]
@@ -227,7 +229,10 @@ function Stocker({ counters, fridges, who }: { counters: Counter[]; fridges: Non
 /**
  * The way in: a noren hanging just past the end of the bar, three panels that sway a little.
  */
-export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
+// (drawn again only if the door's place or the shop's mark changes: the bar above it redraws several times a second while the shop's open, and
+// the way in is a dozen pieces, each in edit mode's wrapper)
+export const Entrance = memo(EntranceImpl, (a, b) => a.mark === b.mark && a.at.equals(b.at))
+function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const lantern = mark === '聞野' ? '燒' : mark
   // (the grill's noren reads 烤魚, the shop's trade, with a fish on it; the other shops' name their own)
   const tex = useMemo(() => crestNorenTexture(mark), [mark])
@@ -530,7 +535,9 @@ function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream
 /** where the cashier's chair stands behind the till (its frame: x along the bar, +z behind it), and its seat's height (the model's) */
 const TILL_CHAIR: [number, number, number] = [0.05, 0, 0.64]
 const TILL_SEAT = 0.452
-export function Register({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; top: number; lang: Lang }) {
+// (the till and all on and about it, some thirty pieces: likewise drawn again only for its own changes)
+export const Register = memo(RegisterImpl, (a, b) => a.yaw === b.yaw && a.top === b.top && a.lang === b.lang && a.at.equals(b.at))
+function RegisterImpl({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; top: number; lang: Lang }) {
   return (
     <>
       {/* (two seats of their own behind it (blender/tillstools.py), clear of its back: the cashier's walnut chair squarely behind the
@@ -2149,13 +2156,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       )}
       {/* (each stool its own Movable, so each can be moved, turned and made larger or smaller by hand when the shop's shut: only the stool's look; where its guest
           sits and the way to it stay as they are, so no one is put out of a seat) */}
-      {seats.map((st, n) => (
-        <Movable key={`${seats.length}-${n}`} id={`stool${n}`} label={`座位 ${n + 1}`}>
-          <StaticBatch>
-            <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><StoolModel /></group>
-          </StaticBatch>
-        </Movable>
-      ))}
+      <Stools seats={seats} />
       {/* their shoes, left in pairs on the genkan's stone by the step, a pair for each of them inside */}
       {given && (() => {
         const c0 = counters[0]
@@ -2246,8 +2247,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             {/* (a soft shadow under them, sat or walking) */}
             <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>
-              <PersonClock s={s} eating={() => s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'} clock={clock}
-                talk={talkSide(s)} guest={g} />
+              <PersonClock s={s} phase={s.phase} drink={s.drink} eating={s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'}
+                clock={clock} talk={talkSide(s)} guest={g} />
             </group>
             {/* (their label just over their head: a figure in the boss's style is shorter than the old ones, and sits up on the seat) */}
             <Html position={[0, FOLK_GUESTS ? ((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.15 : 1.05 * PEOPLE_SCALE, 0]}
@@ -2267,6 +2268,23 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   )
 }
 
+/** the stools, each its own piece for edit mode: drawn again only if the seats change */
+const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsOf> }) {
+  return (
+    <>
+      {/* (each stool its own Movable, so each can be moved, turned and made larger or smaller by hand when the shop's shut: only the stool's look; where its guest
+          sits and the way to it stay as they are, so no one is put out of a seat) */}
+      {seats.map((st, n) => (
+        <Movable key={`${seats.length}-${n}`} id={`stool${n}`} label={`座位 ${n + 1}`}>
+          <StaticBatch>
+            <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><StoolModel /></group>
+          </StaticBatch>
+        </Movable>
+      ))}
+    </>
+  )
+})
+
 /** a short line at a time, so a long one says itself in turn over their head rather than in a tall thin column */
 function Say({ text }: { text: string }) {
   const chunks = useMemo(() => sayChunks(text), [text])
@@ -2282,13 +2300,16 @@ function Say({ text }: { text: string }) {
 /** how much lower the stool's seat is than the one the old figures (guests.glb) were made to sit on */
 const OLD_STOOL_DROP = 0.343 - FOLK_SEAT
 /** one customer's figure, moved by the bar's clock each frame (read from the ref: nothing re-renders for it) */
-function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () => boolean; clock: { current: number }; talk: number
-  guest?: GuestView }) {
+// (drawn again only when what's shown of them changes (their phase, eating or not, the drink in hand, who they turn to, how they're
+// getting on), not each time the bar above them redraws, several times a second; `phase` and `drink` are passed only so it notices them)
+const PersonClock = memo(PersonClockImpl)
+function PersonClockImpl({ s, eating, clock, talk, guest }: { s: Shown; phase: string; drink?: string; eating: boolean; clock: { current: number }
+  talk: number; guest?: GuestView }) {
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
   const Figure = FOLK_GUESTS ? FolkFigure : Person
   // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them; the old figures, made to sit on
   // the old, taller stool, sat down by the difference)
-  return <Suspense fallback={null}><group position-y={!FOLK_GUESTS && s.phase === 'sit' ? -OLD_STOOL_DROP : 0}><Figure id={s.id} eating={eating()} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
+  return <Suspense fallback={null}><group position-y={!FOLK_GUESTS && s.phase === 'sit' ? -OLD_STOOL_DROP : 0}><Figure id={s.id} eating={eating} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined} fit={FOLK_FIT}
     held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></group></Suspense>
 }

@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { memo, useId } from 'react'
 
 /*
  * A food's picture for the pantry: a hand-inked illustration in SVG, drawn the way the workers' faces are (ui/Avatar). Flat colours,
@@ -454,7 +454,10 @@ const OTHER = new Set(['Asparagus', 'BloodCake', 'GrilledCorn', 'GrilledShiitake
 export const hasFoodArt = (id: string) => id in FISH || OTHER.has(id)
 
 /** `band`: drawn across the top of a card (no round tile, the food cropped close to fill the band; the card's band behind it) */
-export function FoodArt({ id, store, size = 34, band = false }: { id: string; store: string; size?: number; band?: boolean }) {
+// (drawn again only when its own props change: the menu's strips are redrawn with the app, several times a second while the shop's open, and
+// each fish's outline is worked out afresh in a drawing)
+export const FoodArt = memo(FoodArtImpl)
+function FoodArtImpl({ id, store, size = 34, band = false }: { id: string; store: string; size?: number; band?: boolean }) {
   const u = `fa${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const f = FISH[id]
   const [g0, g1] = ground(store)
