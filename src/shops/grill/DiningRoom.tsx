@@ -1,7 +1,7 @@
 import { blessingChime, shrineDoor } from './shrineSound'
 import { BambooModel, WashstandModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPaper, WcRemote } from './Restroom'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -1754,7 +1754,7 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
  * One counter's stretch of the room: the wall behind its aisle (from/to along it, in the counter's own frame), and
  * pendant lamps over it.
  */
-export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, clear = [], corner = false }: { c: Counter; from: number; to: number; far: number
+function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, clear = [], corner = false }: { c: Counter; from: number; to: number; far: number
   /** the first of the room's two walls, whose start is the corner they meet in: its thickness runs on to close the corner */
   corner?: boolean
   /** stretches of it (along it) where something stands against it: nothing hung there, no post */
@@ -3444,7 +3444,7 @@ function WallSpeaker() {
 }
 useGLTF.preload(SPEAKER_URL)
 
-export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang?: Lang }) {
+function ShopPropsImpl({ counters, lang = 'zh' }: { counters: Counter[]; lang?: Lang }) {
   const c0 = counters[0]
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, along).addScaledVector(c0.lay, lay)
   // (their fronts toward the room's open side, where the camera is)
@@ -3504,3 +3504,7 @@ export function ShopProps({ counters, lang = 'zh' }: { counters: Counter[]; lang
     </>
   )
 }
+
+// (drawn again only when their own props change, not each time the page above them redraws: while the shop's open that's many times a second)
+export const ShopProps = memo(ShopPropsImpl)
+export const DiningWall = memo(DiningWallImpl)

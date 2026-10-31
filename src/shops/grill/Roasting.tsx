@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -674,7 +674,7 @@ const TRAY_WOOD = (() => {
  * a dark base, a raised lip on the customers' side, and a little plate with chopsticks on a rest at every seat —
  * the chef serves each piece onto it straight off the grill.
  */
-function Bar() {
+function BarImpl() {
   // (where the second counter butts against the first, the first's lip stops short of it, so nothing runs through)
   // (and a way through for the staff at the outer end of each: the first counter's far end by the till, the side
   // counter's near end)
@@ -817,7 +817,7 @@ const KITCHEN_FLOOR = (() => {
   const lay1 = c1 ? toGrillScene(c1.at.clone().addScaledVector(c1.along, -c1.length / 2 - 0.35)).dot(LAY) : COOK_TABLE.lay[1] + 0.9
   return { lay: [lay0, lay1], along: [along0, along1] }
 })()
-function CookTable({ floor = true }: { floor?: boolean }) {
+function CookTableImpl({ floor = true }: { floor?: boolean }) {
   // (and under it all the kitchen's floor, from the bar's cook's edges to the front, and on past the table's
   // right-hand end where the other cooks stand)
   const W = KITCHEN_FLOOR.along[1] - KITCHEN_FLOOR.along[0], D = KITCHEN_FLOOR.lay[1] - KITCHEN_FLOOR.lay[0]
@@ -1034,7 +1034,7 @@ const GATE_SWING = 4
  * wood so it reads as the bar run on, hung on brass hinges on the base's end. It stands shut, flush with the bar, and
  * swings in toward the kitchen when one of the staff comes up to it (SERVICE.walkers), shutting again behind them.
  */
-function BarGate({ c, gate }: { c: Counter; gate: Gate }) {
+function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
   const end = gate.end
   // (the hinge: the inner edge of the gap, on the base's line; the leaf reaches from it across the doorway)
@@ -1413,7 +1413,7 @@ const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042,
  * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
  * and that end of the top too: the staff's way between the kitchen and the floor, shut by a little swing door (BarGate).
  */
-function BarCounter({ c, trim = 0, gate, noTop = false, butt = false }: { c: Counter; trim?: number; gate?: Gate
+function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c: Counter; trim?: number; gate?: Gate
   /** its far end runs into the first counter's side (its lip runs on into the first one's, so they meet with no gap) */
   butt?: boolean
   /** its top drawn with the others' as one piece (BarTop), not its own */
@@ -5127,3 +5127,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     </>
   )
 }
+
+// (drawn again only when their own props change, not each time the page above them redraws: while the shop's open that's many times a second)
+const Bar = memo(BarImpl)
+const CookTable = memo(CookTableImpl)
+const BarCounter = memo(BarCounterImpl)
+const BarGate = memo(BarGateImpl)

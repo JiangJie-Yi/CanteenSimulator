@@ -2,7 +2,7 @@
 // charcoal), a paper fan by the seasonings (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
 // glowing behind the stones, which can be moved about like the dishes. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
 // them like anything else (DECOR is their footprint, for its settle()).
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -735,7 +735,7 @@ function KnifeSet() {
   return <group position={[p.x, 0.002, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} scale={1.6}><primitive object={obj} /></group>
 }
 useGLTF.preload(KNIVES_URL)
-export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
+function DecorImpl({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
     <>
       <Movable id="crate" label="備長炭籃" baseScale={1.75} baseTurn={[0, 44, 0]}><Crate /></Movable>
@@ -748,3 +748,6 @@ export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [
     </>
   )
 }
+
+// (drawn again only when their own props change, not each time the page above them redraws: while the shop's open that's many times a second)
+export const Decor = memo(DecorImpl, (a, b) => a.held === b.held && a.lanternAt.every((v, i) => v === b.lanternAt[i]))

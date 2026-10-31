@@ -38,6 +38,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `node tests/e2e/look.mjs` | 開店後近拍吧台客人（`OUT=<資料夾>`），看人物造型用 |
 | `node tests/e2e/paths.mjs [url]` | 客人動線檢查：開店後每 0.3 秒量每位走動中的客人四周（膝、胸高度），報告撞到的擺設；坐上自己的椅子不算（`WATCH=<ms>` 觀察時間） |
 | `node tests/e2e/clips.mjs [url]` | 穿模檢查：量場景裡每個實心網格，不同擺設（`Movable` 的 id，群組上有 `userData.editId`）的包圍盒重疊時，取一邊的頂點檢查是否埋進另一邊超過 `TOL`（預設 1.5 公分），列出最嚴重的配對（`TOP`、`OUT=<json>`）。模型不是封閉網格（飲料櫃）、本來就插進孔裡的線（收銀台的機器）會誤報 |
+| `node tests/e2e/perf.mjs [free\|grill]` | 效能量測：用這台電腦的真顯示卡（headless Chrome＋ANGLE D3D11，不是軟體 GL）量每秒畫面數、慢的那幾格、每格的繪製次數與三角面、renderer 每格花的時間；`OPEN=<毫秒>` 先開店讓客人進來、`BY=1` 每件擺設各畫幾次、`SUBS=1` 每個 useFrame 的時間、`PROF=1` CPU 剖析、`WHO=1` 誰在呼叫 renderer（多出來的整場重畫會在這裡出現）。頁面加 `?pace=0`，量的時候不會自動降畫質 |
 | `npm run build` | 型別檢查＋建置 |
 | `npm run lint` | oxlint |
 
@@ -117,7 +118,8 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 收銀櫃檯本體（`blender/tillcounter.py` → `tillcounter.glb`，`TillCounter.tsx`）：深色木櫃；客人側正面是鬆散不規則的綠竹（每根粗細、傾斜、彎度、竹節、色調（`TillBamboo0`～`4`，`TillCounter.tsx` 的 `BAMBOO_SHADES`）都不同，竹節是一圈細深線加淺色唇，上下兩根橫竹用黑繩綁），後面一片暖光面 `TillBambooGlow` 從竹縫透出；側面圓窗是紙燈（窗紙 `TillWindowPaper` 內退、由裡發光，窗框、內襯、格子是淺色櫸木）；白色大理石檯面（亮面）；隔板是胡桃木立格子（底下深銅色踢腳、上下橫框、立柱、壓頂，格子後面是淺色檜木板，兩個開口端是帶圓頂的圓柱；踢腳、橫框、壓頂沿一條帶圓角的路徑一體成型 `sweep`，轉角是圓柱，沒有接縫），客人側左端（服務鈴那頭）留空，招財貓那端一路延伸到收銀員側邊緣。
 - 收銀櫃上的小東西（`blender/tilldesk.py` → `tilldesk.glb`，`shops/grill/TillDesk.tsx`）：筆筒 `TillPens`、明細印表機 `TillPrinter`、刷卡機 `TillCardReader`（桌上型：斜面機身、灰色液晶、導覽鍵、橡膠數字鍵、紅黃綠鍵、內建出單機，前端插著一張卡）、服務鈴 `TillBell`、胡桃木台座 `TillMat`（15 cm 高，正面兩個抽屜、黃銅把手）、找零盤（カルトン）`TillTray`、招財貓石座 `TillCatStand`，各自一個 Movable；服務鈴可以按（`TillBellLive`：按壓桿 `TillBellPlunger` 下壓、叮一聲）。放在台座上的（平板、筆筒、印表機、刷卡機）在 `edit.ts` 的 `BASES` 裡 y 墊高 0.15；它們的線各自收進身後桌墊上的小孔（模型的一部分，跟著移動），平板的線藏在支架裡，收銀機的電源線從機身背後收進機身下的走線孔。**編輯面板顯示的是房間座標，`BASES` 存的是父層座標，寫預設前要用 `fromRoom(id, v)` 換算。**
 - 客人（十五種 Q 版角色、每種有幾種髮型隨機搭配、共用一副骨架，動作 Sit／Eat／Walk；出現比例是 `data/guests.ts` 的 `weight`）由 `blender/guests.py` 產生 `public/models/guests.glb`，`scene/Person3D.tsx` 載入後依客人換膚色、髮色、衣服顏色與花紋。手機不跑 3D 吧台，所以沒有 lite 版。
-  - 店員（`chef`、`staffM`、`staffF`，`guests.py` 的 `legless`）跟老闆同款：沒有腿和鞋、圓潤的下半身底部收圓（身體只綁軀幹骨頭，`legs_to_hips`）；客人保留短腿（要坐吧台高腳椅）。
+  - 店員（二廚、三廚、外場、收銀、倉儲）不用 guests.glb：是老闆的同一個 Blender 腳本換裝（`CREW=<款式> blender … --python blender/boss.py` → `public/models/crew_<款式>.glb`：`chef` 白割烹著＋白頭巾帽＋深藍圍裙、`chefF` 女廚師（低髮髻）、`server` 靛藍作務衣（刺子格紋）＋白鉢卷＋短圍裙、`serverF` 紫紅和服（梅花紋）＋金腰帶（背後太鼓結、紅帶締）＋高髮髻與紅梳、`stock` 卡其工作服＋白鉢卷＋脖子上的毛巾＋工作手套），節點名稱與老闆相同（`BossHandL` 等）。年輕的臉：小鼻子、眼睛稍大、細短的眉、腮紅；女性有睫毛、玫瑰色的嘴、齊瀏海與鬢角。遊戲裡是 `scene/StaffFigure.tsx`：膚色、髮色、眼鏡照辦公室頭像（同一個 id 雜湊；`CrewSkin`、`CrewHair` 兩個材質由遊戲上色），每款只建一次（身體依材質合併、眼睛、眼鏡、兩手各自一組，描一次線），再複製；走路像老闆一樣搖擺，外場端托盤、倉儲拿板夾、廚師偶爾搧火（`TRAY_AT` 是托盤／板夾在手上的位置）。客人仍用 guests.glb、保留短腿（要坐吧台高腳椅）。
+  - 老闆與店員的面數：`boss.py` 每顆球、每條管、每個車削體都只用約 6 成的段數（`LOD`、`uv_sphere`），老闆 18,800 → 8,600 個三角面，店員各約 8,000。
   - 頭髮：`cap()` 預設把髮殼鋪成貼著頭的網格（每一欄從頭頂到 keep() 的髮際線），髮際線是平順的線，不是沿頭部網格的鋸齒；頭巾、帽緣用 `surf_ring` 沿頭型繞一圈。身上不同顏色的交界由 `smooth_seams` 拉平，脖子處加一圈同色的滾邊。頭飾的三角面預算在檔尾 `BUDGET`（太低會被減面成碎片）。
   - 預覽單一角色的頭部特寫：`PREVIEW_KIND="chef,crop;staffF,bun" PREVIEW_YAW="25;160" blender -b --factory-startup --python blender/guests.py -- <輸出專案路徑> <圖檔.png>`（每個角色每個角度一張；輸出專案路徑可指到暫存資料夾，避免動到正式的 glb）。
 
@@ -149,7 +151,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **廁所**（`shops/grill/Restroom.tsx`，規則在 `game/restroom.ts`，BDD `restroom`）：每間有清潔度與衛生紙（`TOILETS[who].room`）；客人用一次變髒一點、用掉一捲的 1/5，髒（`DIRTY_AT`）或沒紙時會抱怨，之後吃的東西評分扣分（`WC_GRUMBLE`，Roasting 讀）；開店前店員會打掃，衛生紙不會自己補。點馬桶：不乾淨就用馬桶刷打掃（刷子從角落的筒子飛過去刷、刷完發亮），乾淨就沖水（水漩下去、水箱上的洗手龍頭流水）；點衛生紙架換新捲（捲越用越細，新捲的紙頭摺成三角）；牆上有免治遙控器（點一下溫水噴一下）、沖水鈕、音姬（流水與鳥叫，女廁有人進去會自己播）。一間一次只進一位（有人在去、在裡面、在出來時，下一位等）；有人在裡面時門關著、門上小窗顯示「使用中」，點門會敲門；沒人時「空き」。進門時馬桶蓋自動掀起，燈是感應式（有人或門開才亮）；髒了地上有污漬、馬桶裡有黃圈，很髒有蒼蠅。聲音都是 WebAudio 即時合成（`restroomSound.ts`）。
 - **供花**（神棚兩側花瓶，點一下換花，存在 localStorage `jgs-shrine-flowers-1`）：三組花各有加持（`game/shrineFlowers.ts`，BDD `shrine-flowers`）：榊與小菊＝平安（客人耐心較長）、白金菊（`shrinevase.py` 變體 0：輪菊、糸菊、小菊）＝金運（更常拿飲料）、紅粉花（變體 1：芍藥、紅椿、桔梗、霞草）＝良緣（情侶較常來）；兩瓶同一種加倍。神棚門聲（`shrineSound.ts`）是黏滑摩擦合成的吱呀聲＋檜木共鳴＋門扣與門片碰撞聲。
 - **炭火的聲音**（`shops/grill/fireAmbience.ts`，WebAudio 即時合成）：炭的劈啪聲隨火力、烤物的滋滋聲隨火上的數量（`game/fireSound.ts`，BDD `fire-sound`）；鏡頭離火越遠越小聲；營業時另有客人的人聲（`crowdAmbience`，隨在座人數 `murmur`）；玩家第一次點擊後才開始（瀏覽器規定）。
-- 太陽光（App 的 directionalLight）會投影，影子涵蓋整間店；陰影圖每 3 格重畫一次（`ShadowPacer`）。
+- 太陽光（App 的 directionalLight）會投影，影子涵蓋整間店；陰影圖每 3 格重畫一次（`ShadowPacer`）；只有夠大的東西會投影（包圍球半徑 ≥ `CASTER_R` 0.3，`ShadowPacer` 每 1.5 秒把新出現的小網格設成不投影：盤子、瓶子、杯子這類小東西不進陰影圖）。
 - **門簾**：入口的是米白棉布、深褐菱形家紋（中間「聞」）與一行 KIKUNO · YAKIZAKANA（`GuestBar3D.tsx` 的 `crestNorenTexture`，左右翻轉畫，從店內讀起來是正的），原木橫桿（`NorenModel` 的 `pole="wood"`，沒有吊線），寬同門口、加長 `NOREN_BIG`；舊的藍色「烤魚」門簾掛在員工出入口（`StaffNoren`：深色門洞＋木框，位置 `bar.ts` 的 `STAFF_DOOR`，地墊與員工下班的出口跟著它）。
 - 場景外的背景是深藍 `#0d1c33`（CSS 變數 `--scene-bg`，開發者面板「背景色」可改，存 localStorage `jgs-scene-bg`，`edit.ts` 的 `setBackdrop`），白天晚上一樣，中心較亮往外變暗的放射漸層（`index.css` 的 `.canvas-layer`），畫面四周有暗角（`.canvas-layer::after`，夜晚較深）；整間店底下有一片柔和的落地陰影（GuestBar3D 的 `GROUND_SHADOW`）。吊燈、燈串的光暈與桌面光圈白天淡、夜晚亮且多一圈大光暈（DiningRoom 的 `nightGlow`，跟著 data-theme）。
 - 開店（載入）時的起始視角是 1 自由視角（總覽，App 的 `view` 初始值 `free`）；e2e 會先切到 2 火烤灶台再補貨。
@@ -164,7 +166,12 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **自動營運的營業套路**（`game/flow.ts`，BDD `flow`）：每次開店抽一種（平日、午餐尖峰、晚餐尖峰、雨天、祭典、觀光團、熟客日），各自的來客節奏、結伴比例、點單量不同，開店時主廚會說。
 - **身高**：老闆（`BOSS_SCALE`）約 1.83 高，廚師與店員（Roasting 的 `CHEF_SCALE`、GuestBar3D 的 `STAFF_SCALE`）縮到跟老闆一樣；客人仍是原尺寸（吧台、椅子照他們做）。廚房地板是比客席高一階的高台（`bar.ts` 的 `KITCHEN_DROP` 為負 = 高台，GuestBar3D 的 `KitchenDais`：閘門與末端各一階踏板；服務生走上高台時跟著升高），灶台桌面約在老闆腰部；桌下櫃子的層板 `CUBBY_SHELF_Y` 跟著地板。
 - 店面沿吧台縮短了 `BAR_TRIM`（`bar.ts`）；玄關 `GENKAN.along` 往吧台拉長。
-- 桌機（非觸控）一律最高畫質（`scene/quality.ts`），只有手機才判斷降級；卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps；右上角 ×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
+- **效能（改東西時要守的）**：
+  - **不要用 transmission（透光）材質**：場景裡只要有一個，three.js 就會每一格把整個房間先畫進一張圖再畫一次（曾經一顆冷凍櫃燈泡就多了 2,500 次繪製，畫面從 60 掉到 19）。玻璃感用 clearcoat、反光點、透明度做。
+  - drei 的 `<Environment>`（`IndoorHDRI`）要 `memo`：它的 children 一換就重算整個環境貼圖（6 個方向畫一次房間＋60 次模糊），開店時上層一秒重畫很多次。同理，不常變的大場景元件（`ShopProps`、`DiningWall`、`Decor`、`Bar`、`CookTable`、`BarCounter`、`BarGate`、`DiningFloor`、`RoomFloor`）都包了 `memo`；新加的、會被常重畫的父層包住的大元件也要包。
+  - 用 `StaticBatch` 或 `mergeByMaterial(root, keep)`（`scene/StaticBatch.tsx`）把不會動的零件依材質合併成少數幾次繪製；`keep` 留下自己會動的部分（手、眼、嘴、蓋子、按鍵、抽屜、螢幕…）。模型的材質要依來源材質共用一份（用 Map），不然每個零件一個材質就合併不起來。合併後的網格不能被指到：要能點的東西放一個 `visible={false}` 的感應方塊（r3f 的射線不管 visible），例如飲料櫃的瓶子、炭籃的炭、碗盤櫃。`StaticBatch` 藏起來的原物件不再每格更新矩陣。
+  - 目前（Intel Arc B580，1920×1080，最高畫質）：閉店總覽約 1,700 次繪製、60 fps；火烤灶台 840 次、60 fps；開店總覽約 2,200 次、約 45 fps（dev 模式）。
+- 桌機（非觸控）一律最高畫質（`scene/quality.ts`），只有手機才判斷降級；卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps（載入後 10 秒才開始判斷、看一段時間裡中位數的那一格，偶爾的頓一下不算；降到 1 倍解析度後會一直維持；網址加 `?pace=0` 就不會降）；右上角 ×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
 
 **開發用（只在 dev）**：瀏覽器 console 可用 `__gl`（renderer，看 draw calls）、`__scene`、`__cam` 與 `__ctl`（設定視角：`__ctl.target.set(...)`、`__cam.position.set(...)`）、`__service`、`__toilets`（例如 `__toilets.m.open = true`）。場景裡名稱 `look-*` 的群組（`look-altar`、`look-fridge`、`look-door`、`look-wc-m`…）方便用 `__scene.getObjectByName` 找位置截圖。
 

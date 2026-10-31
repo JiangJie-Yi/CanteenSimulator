@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -1099,7 +1099,7 @@ const REG_GEO = {
  * The customers' side of the shop floored in wide old boards: one even rectangle under the whole bar, the row of
  * stools and the way along behind them to the noren, its boards running the length of the bar.
  */
-function DiningFloor({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR, wall = true, bare = false }: { c: Counter; from: number; to: number; near?: number
+function DiningFloorImpl({ c, from, to, near = FLOOR_NEAR, far = FLOOR_FAR, wall = true, bare = false }: { c: Counter; from: number; to: number; near?: number
   far?: number
   /** a dark edging board along its far side, where it meets the wall */
   wall?: boolean
@@ -1344,7 +1344,7 @@ const GROUND_SHADOW = (() => {
   t.colorSpace = THREE.SRGBColorSpace
   return t
 })()
-function RoomFloor({ counters, drop }: { counters: Counter[]; drop: number }) {
+function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }) {
   const c = counters[0]
   const { along: [a0, a1], lay: [l0, l1] } = useMemo(() => roomOf(counters), [counters])
   const kitchen = useMemo(() => kitchenOf(counters), [counters])
@@ -2404,3 +2404,7 @@ function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () =
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined}
     held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} />
 }
+
+// (drawn again only when their own props change, not each time the page above them redraws: while the shop's open that's many times a second)
+const DiningFloor = memo(DiningFloorImpl)
+const RoomFloor = memo(RoomFloorImpl)

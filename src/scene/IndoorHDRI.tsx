@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Environment, Lightformer } from '@react-three/drei'
 
 /**
@@ -40,12 +40,15 @@ function useHdriFile(when: 'day' | 'night') {
   return file
 }
 
-export function IndoorHDRI({ intensity = 0.5, night = false }: { intensity?: number; night?: boolean }) {
+/** (memo: drawn again only when the time of day or the strength changes. Its Environment renders its room into a cube and blurs it every time
+ * its children are new, and the page above redraws many times a second while the shop's open: that was six views of the room and sixty
+ * blur passes, two or three times a second) */
+export const IndoorHDRI = memo(function IndoorHDRI({ intensity = 0.5, night = false }: { intensity?: number; night?: boolean }) {
   const file = useHdriFile(night ? 'night' : 'day')
   // (a real HDRI photograph, if one's there, lights the glossy things; otherwise the room's own made-up one below)
   if (file) return <Environment key={file} files={file} environmentIntensity={intensity * REAL_GAIN[night ? 'night' : 'day']} background={false} />
   return <IndoorMock intensity={intensity} night={night} />
-}
+})
 function IndoorMock({ intensity, night }: { intensity: number; night: boolean }) {
   // (day: bright daylight through the window, a pale shell, the lamps a lighter touch; night: a dim moonlit blue window, a dark shell, the lamps
   // and the lantern warm and strong, so the glossy things pick up a different room as the day turns. Keyed, so it's rendered afresh on a switch.)

@@ -7,6 +7,7 @@ import { TAKE } from '@/game/plates'
 import { PLATE_RACK, tipOver } from './bar'
 import { getEdit } from './edit'
 import { wareGeometry } from './ware'
+import { StaticBatch } from '@/scene/StaticBatch'
 import { DESIGN_COUNT, wareDesign } from './wareDesigns'
 
 // (a big one: wide and tall, four shelves, to hold a busy night's plates and bowls)
@@ -227,42 +228,46 @@ export function PlateRack() {
   const tip = tipOver('碗盤櫃', `點一下拿一疊盤子到出餐口（櫃裡還有 ${count} 個）`)
   return (
     <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; PLATE_RACK.want += TAKE }} {...tip}>
+      {/* (what's clicked: the whole rack, unseen; its wood is merged, a few draws, and takes no pointing) */}
+      <mesh position={[0, H / 2, 0]} visible={false}><boxGeometry args={[W, H, D]} /></mesh>
+      <StaticBatch>
       {post(-W / 2, -D / 2)}{post(W / 2, -D / 2)}{post(-W / 2, D / 2)}{post(W / 2, D / 2)}
-      {/* (the shelves, their front edges a darker lip) */}
-      {SHELVES.map((y) => (
-        <group key={y}>
-          <mesh position={[0, y, 0]} castShadow receiveShadow><boxGeometry args={[W, 0.035, D]} /><meshToonMaterial map={wood(w.light, 2, 1)} /></mesh>
-          <mesh position={[0, y, D / 2 - 0.005]}><boxGeometry args={[W, 0.045, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
-        </group>
-      ))}
-      {/* (the crown: a cornice over the top, stepped, and a kick board at the foot) */}
-      <mesh position={[0, H - 0.02, 0]} castShadow><boxGeometry args={[W + 0.06, 0.05, D + 0.06]} /><meshToonMaterial map={wood(w.dark, 2, 0.4)} /></mesh>
-      <mesh position={[0, H + 0.025, 0.01]} castShadow><boxGeometry args={[W + 0.12, 0.04, D + 0.1]} /><meshToonMaterial map={wood(w.dark, 2, 0.4)} /></mesh>
-      <mesh position={[0, 0.05, D / 2 - 0.02]}><boxGeometry args={[W - 0.06, 0.1, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.3)} /></mesh>
-      {/* (a low lip along the front of each shelf, so nothing slides off, kept low so it hides nothing that stands on it) */}
-      {SHELVES.map((y) => (
-        <mesh key={`r${y}`} position={[0, y + 0.03, D / 2 - 0.012]}><boxGeometry args={[W - 0.06, 0.03, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
-      ))}
-      {/* (the lowest shelf's slots: a dowel either side of each plate, a row at the front and one at the back, set in a rail along the foot) */}
-      {[-1, 1].flatMap((zs) => Array.from({ length: SLOTS + 1 }, (_, k) => (
-        <mesh key={`d${zs}${k}`} position={[slotX(k) - SLOT / 2, SHELVES[0] + 0.0175 + 0.07, zs * 0.12]} castShadow>
-          <cylinderGeometry args={[0.006, 0.007, 0.14, 8]} /><meshToonMaterial color="#5a3a1e" />
-        </mesh>
-      )))}
-      {[-1, 1].map((zs) => (
-        <mesh key={`dr${zs}`} position={[0, SHELVES[0] + 0.0175 + 0.008, zs * 0.12]}><boxGeometry args={[SLOTS * SLOT + 0.02, 0.016, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
-      ))}
-      {/* (the third shelf's show: a rail behind for the plates to lean on, a groove strip in front to hold their feet) */}
-      <mesh position={[0, SHELVES[2] + 0.25, -0.17]}><boxGeometry args={[W - 0.06, 0.03, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
-      <mesh position={[0, SHELVES[2] + 0.0175 + 0.008, 0.06]}><boxGeometry args={[W - 0.06, 0.016, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
-      {/* (the sides: a frame with three rails across) */}
-      {[-1, 1].flatMap((sd) => [0.36, 0.8, 1.25, 1.8].map((y) => (
-        <mesh key={`s${sd}${y}`} position={[sd * W / 2, y, 0]}><boxGeometry args={[0.03, 0.03, D - 0.04]} /><meshToonMaterial map={wood(w.dark, 1, 0.2)} /></mesh>
-      )))}
-      {/* (the back, in tongue-and-groove boards, a dark line between each) */}
-      {Array.from({ length: 12 }, (_, k) => (
-        <mesh key={`b${k}`} position={[-W / 2 + 0.08 + k * ((W - 0.16) / 11), H / 2, -D / 2 + 0.01]} rotation-z={Math.PI / 2}><boxGeometry args={[H - 0.1, 0.152, 0.015]} /><meshToonMaterial map={wood(w.back, 1.5, 0.4)} /></mesh>
-      ))}
+        {/* (the shelves, their front edges a darker lip) */}
+        {SHELVES.map((y) => (
+          <group key={y}>
+            <mesh position={[0, y, 0]} castShadow receiveShadow><boxGeometry args={[W, 0.035, D]} /><meshToonMaterial map={wood(w.light, 2, 1)} /></mesh>
+            <mesh position={[0, y, D / 2 - 0.005]}><boxGeometry args={[W, 0.045, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+          </group>
+        ))}
+        {/* (the crown: a cornice over the top, stepped, and a kick board at the foot) */}
+        <mesh position={[0, H - 0.02, 0]} castShadow><boxGeometry args={[W + 0.06, 0.05, D + 0.06]} /><meshToonMaterial map={wood(w.dark, 2, 0.4)} /></mesh>
+        <mesh position={[0, H + 0.025, 0.01]} castShadow><boxGeometry args={[W + 0.12, 0.04, D + 0.1]} /><meshToonMaterial map={wood(w.dark, 2, 0.4)} /></mesh>
+        <mesh position={[0, 0.05, D / 2 - 0.02]}><boxGeometry args={[W - 0.06, 0.1, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.3)} /></mesh>
+        {/* (a low lip along the front of each shelf, so nothing slides off, kept low so it hides nothing that stands on it) */}
+        {SHELVES.map((y) => (
+          <mesh key={`r${y}`} position={[0, y + 0.03, D / 2 - 0.012]}><boxGeometry args={[W - 0.06, 0.03, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+        ))}
+        {/* (the lowest shelf's slots: a dowel either side of each plate, a row at the front and one at the back, set in a rail along the foot) */}
+        {[-1, 1].flatMap((zs) => Array.from({ length: SLOTS + 1 }, (_, k) => (
+          <mesh key={`d${zs}${k}`} position={[slotX(k) - SLOT / 2, SHELVES[0] + 0.0175 + 0.07, zs * 0.12]} castShadow>
+            <cylinderGeometry args={[0.006, 0.007, 0.14, 8]} /><meshToonMaterial color="#5a3a1e" />
+          </mesh>
+        )))}
+        {[-1, 1].map((zs) => (
+          <mesh key={`dr${zs}`} position={[0, SHELVES[0] + 0.0175 + 0.008, zs * 0.12]}><boxGeometry args={[SLOTS * SLOT + 0.02, 0.016, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+        ))}
+        {/* (the third shelf's show: a rail behind for the plates to lean on, a groove strip in front to hold their feet) */}
+        <mesh position={[0, SHELVES[2] + 0.25, -0.17]}><boxGeometry args={[W - 0.06, 0.03, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+        <mesh position={[0, SHELVES[2] + 0.0175 + 0.008, 0.06]}><boxGeometry args={[W - 0.06, 0.016, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+        {/* (the sides: a frame with three rails across) */}
+        {[-1, 1].flatMap((sd) => [0.36, 0.8, 1.25, 1.8].map((y) => (
+          <mesh key={`s${sd}${y}`} position={[sd * W / 2, y, 0]}><boxGeometry args={[0.03, 0.03, D - 0.04]} /><meshToonMaterial map={wood(w.dark, 1, 0.2)} /></mesh>
+        )))}
+        {/* (the back, in tongue-and-groove boards, a dark line between each) */}
+        {Array.from({ length: 12 }, (_, k) => (
+          <mesh key={`b${k}`} position={[-W / 2 + 0.08 + k * ((W - 0.16) / 11), H / 2, -D / 2 + 0.01]} rotation-z={Math.PI / 2}><boxGeometry args={[H - 0.1, 0.152, 0.015]} /><meshToonMaterial map={wood(w.back, 1.5, 0.4)} /></mesh>
+        ))}
+      </StaticBatch>
       {byDesign.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
       <Bowls />
     </group>
