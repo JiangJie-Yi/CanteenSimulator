@@ -157,6 +157,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 飲料櫃每格從前排往後一路排滿（`RANK_DEPTH`，後排合併成一批 `StaticBatch`）；拿出冰箱的飲料（地上、桌上、客人面前、手上）有凝結水珠（`DrinkBottle` 的 `wet`，櫃內的沒有）。
 - **碗盤櫃是盤子的來源**（`game/plates.ts`，BDD `plates`）：大容量，滿的時候 50 個（`RACK_FULL`；下層插盤架 22、第三層展示 4、頂層 4 疊各 6，第二層倒扣的碗是裝飾）；盤子照實際擺法放，不互相穿透；櫃上顯示幾個就是幾個；點一下搬一疊到出餐口（最多 12 個），出餐口空了服務生自己去拿，洗好放不下的回到櫃上。
 - **自動營運的營業套路**（`game/flow.ts`，BDD `flow`）：每次開店抽一種（平日、午餐尖峰、晚餐尖峰、雨天、祭典、觀光團、熟客日），各自的來客節奏、結伴比例、點單量不同，開店時主廚會說。
+- **身高**：老闆（`BOSS_SCALE`）約 1.83 高，廚師與店員（Roasting 的 `CHEF_SCALE`、GuestBar3D 的 `STAFF_SCALE`）縮到跟老闆一樣；客人仍是原尺寸（吧台、椅子照他們做）。廚房地板是比客席高一階的高台（`bar.ts` 的 `KITCHEN_DROP` 為負 = 高台，GuestBar3D 的 `KitchenDais`：閘門與末端各一階踏板；服務生走上高台時跟著升高），灶台桌面約在老闆腰部；桌下櫃子的層板 `CUBBY_SHELF_Y` 跟著地板。
 - 店面沿吧台縮短了 `BAR_TRIM`（`bar.ts`）；玄關 `GENKAN.along` 往吧台拉長。
 - 桌機（非觸控）一律最高畫質（`scene/quality.ts`），只有手機才判斷降級；卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps；右上角 ×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
 

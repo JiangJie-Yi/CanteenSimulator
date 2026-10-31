@@ -83,6 +83,9 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
 
 /** the customers (and their stools) at life size beside the bar, which is drawn to match them */
 const PEOPLE_SCALE = 1.3
+/** the staff (the servers) drawn the boss's height, a head shorter than the customers: the boss (Roasting's BOSS_SCALE) is 0.95 tall at 1.68,
+ * a figure here 0.97 tall at this and the shop's own scale of 2 */
+const STAFF_SCALE = (1.05 * 0.8 * 2 * 0.95) / (0.97 * 2)
 
 /**
  * The way in's noren, in the manner of a modern shop's: unbleached cotton, plain, the shop's crest large in dark brown across the middle
@@ -405,7 +408,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <group position-x={DX}>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
-      <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 + 0.05) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
+      <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_BIG + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
@@ -1183,6 +1186,28 @@ function timberBox(w: number, h: number, d: number) {
   return g
 }
 /**
+ * The kitchen raised a step above the customers' floor (a dais, as a robatayaki's cooks stand on: so the cook's table comes to their
+ * waist): its boards laid on a solid timber platform, its edges faced in the bar's dark wood, a single step of raw timber at each gate
+ * and right across its end, up from the customers' floor.
+ */
+function KitchenDais({ counters, rise }: { counters: Counter[]; rise: number }) {
+  const k = useMemo(() => kitchenOf(counters), [counters])
+  const gates = useMemo(() => kitchenGatesOf(counters), [counters])
+  const [kx0, kx1] = k.along, [ky0, ky1] = k.lay
+  const S = 0.17
+  // (in the floor's frame: x is minus lay, z is along)
+  return (
+    <>
+      <mesh position={[-(ky0 + ky1) / 2, rise / 2, (kx0 + kx1) / 2]} geometry={timberBox(ky1 - ky0, rise, kx1 - kx0)} material={BASE_TIMBER[1]} receiveShadow />
+      <FloorPiece w={ky1 - ky0} l={kx1 - kx0} tint="#d2c4b2" position={[-(ky0 + ky1) / 2, rise + 0.004, (kx0 + kx1) / 2]} />
+      {/* (the steps: half its height, outside its edge at the first counter's gate, at the side counter's, and along its open end) */}
+      <mesh position={[-(ky0 - S / 2), rise / 4, (gates.first[0] + gates.first[1]) / 2]} geometry={timberBox(S, rise / 2, gates.first[1] - gates.first[0] + 0.2)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />
+      {gates.side && <mesh position={[-(gates.side[0] + gates.side[1]) / 2, rise / 4, kx0 - S / 2]} geometry={timberBox(gates.side[1] - gates.side[0] + 0.2, rise / 2, S)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />}
+      <mesh position={[-(ky0 + ky1) / 2, rise / 4, kx1 + S / 2]} geometry={timberBox(ky1 - ky0, rise / 2, S)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />
+    </>
+  )
+}
+/**
  * The kitchen, sunk below the customers' floor: its own floor lower down, a riser of the bar's dark wood round its
  * edges (the counters' bases run on down into it), and at each gate two steps to tread on, down from the customers' floor.
  */
@@ -1252,14 +1277,14 @@ function RoomFloor({ counters, drop }: { counters: Counter[]; drop: number }) {
     <group position={c.at} rotation-y={Math.atan2(c.along.x, c.along.z)}>
       {piece([a0, g0], [l0, l1], 'a')}
       {piece([g0, a1], [gl, l1], 'b')}
-      <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={drop} />
+      <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={Math.max(drop, D + 0.02)} />
       {/* (and a solid fill under the customers' boards, down to the base, round the kitchen's well) */}
-      {[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => minus(al as [number, number], ly as [number, number], kitchen).map(([a, l], i) => (
+      {drop > 0 && [[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => minus(al as [number, number], ly as [number, number], kitchen).map(([a, l], i) => (
         // (its sides, showing as the step down into the kitchen, in the base's dark timber boards)
         <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, -(drop + 0.006) / 2 - 0.004, (a[0] + a[1]) / 2]}
           geometry={timberBox(l[1] - l[0], drop - 0.002, a[1] - a[0])} material={BASE_TIMBER[1]} />
       )))}
-      <KitchenPit counters={counters} drop={drop} />
+      {drop > 0 ? <KitchenPit counters={counters} drop={drop} /> : <KitchenDais counters={counters} rise={-drop} />}
       {/* the genkan: its stone, the step's riser round its two inner sides, and the polished kamachi on the edge */}
       <mesh position={[-(l0 + gl) / 2, -D + 0.004, (g0 + a1) / 2]} rotation-x={-Math.PI / 2} receiveShadow>
         <planeGeometry args={[gl - l0, a1 - g0]} />
@@ -1546,6 +1571,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const waiters = useRef<{ phase: 'idle' | 'fetch' | 'pickup' | 'go' | 'set' | 'back'; t: number; seat: number; keys: string[]; run: number | null
     path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number }[]>([])
   const waiterObjs = useRef<(THREE.Group | null)[]>([])
+  const kitchen = useMemo(() => kitchenOf(counters), [counters])
   const [moving, setMoving] = useState<boolean[]>([])
   useEffect(() => {
     waiters.current = servers.slice(0, homes.length).map((_, i) => ({ phase: 'idle', t: 0, seat: -1, keys: [], run: null, path: [], len: 0,
@@ -1915,7 +1941,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const sitting = (n: number) => shownRef.current.some((x) => x.seat === n && (x.phase === 'sit' || x.phase.startsWith('wc')))
     waiters.current.forEach((w, wi) => {
       const home = homes[wi]
-      const trayAt = () => w.pos.clone().add(new THREE.Vector3(0, 0.548, 0.18).multiplyScalar(PEOPLE_SCALE)
+      const trayAt = () => w.pos.clone().add(new THREE.Vector3(0, 0.548, 0.18).multiplyScalar(STAFF_SCALE)
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), w.yaw))
       const run = () => runs.current.find((x) => x.key === w.run)
       const setMove = (on: boolean) => setMoving((m) => { const n = [...m]; n[wi] = on; return n })
@@ -2057,6 +2083,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.visible = true
         o.position.copy(w.pos)
         o.rotation.y = w.yaw
+      }
+      // (up on the kitchen's dais while they're over it)
+      if (o && KITCHEN_DROP < 0) {
+        const d = w.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
+        if (a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]) o.position.y += -KITCHEN_DROP / scale
       }
     })
     SERVICE.walkers = waiters.current.map((w) => w.pos)
@@ -2234,7 +2265,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       ))}
       <Later stage={3}>
       {servers.slice(0, homes.length).map((w, i) => (
-        <group key={w.id} ref={(o) => { waiterObjs.current[i] = o }} position={homes[i].at} rotation-y={homes[i].yaw} scale={PEOPLE_SCALE}>
+        <group key={w.id} ref={(o) => { waiterObjs.current[i] = o }} position={homes[i].at} rotation-y={homes[i].yaw} scale={STAFF_SCALE}>
           <BlobShadow r={0.17} />
           <StaffFigure id={w.id} role="server" look={w.look} moving={!!moving[i]} />
         </group>

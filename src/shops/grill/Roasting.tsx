@@ -699,8 +699,8 @@ function Bar() {
 // (the fire in the middle across it, the cook's whole side open: the front face is a straight run the cook stands along, the
 // cubby for the plates cut into it under the top)
 const COOK_TABLE = { lay: [-2.1, 2.1], along: [-2.4 + 2 * SIDE_PULL, 3.1] }
-/** the cook, as big as the customers at the bar */
-const CHEF_SCALE = 1.3 * GRILL_SCALE
+/** the cooks the boss's height (BOSS_SCALE, his figure 0.95 tall; theirs 0.97) */
+const CHEF_SCALE = 1.05 * 0.8 * GRILL_SCALE * 0.98
 /** the table as boxes (lay from–to, along from–to): all of it behind the cubby, and the front either side of it */
 /** (and the notch's: its back wall, and the wall between it and the cubby) */
 const COOK_TABLE_PARTS: [number, number, number, number][] = [

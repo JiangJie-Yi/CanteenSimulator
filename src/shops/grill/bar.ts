@@ -349,10 +349,10 @@ export const WC_GRUMBLE = new Map<number, number>()
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __toilets?: typeof TOILETS }).__toilets = TOILETS
 
 /**
- * How far the kitchen's floor lies below the customers' (in the scene's own units): the cooks stand lower, so the bar is
- * at a seated customer's elbow and the cook looks over it; a step or two at each gate, and risers down the rest.
+ * How far the kitchen's floor lies below the customers' (in the scene's own units): less than 0, it's raised above it, a dais the
+ * cooks stand on, so the cook's table comes to their waist (they're the boss's height); a step up at each gate and across its end.
  */
-export const KITCHEN_DROP = 0.22
+export const KITCHEN_DROP = -0.16
 /**
  * The sunken kitchen inside the counters, in the first counter's frame (along it, and lay from its middle): from the
  * side counter's cook's face to a little past the first counter's far end, and from the first counter's cook's face
@@ -572,7 +572,7 @@ export const CUBBY = { along: [1.36, 3.0], lay: [0.95, 2.1], plinth: 0.1, shelfA
 export const COOK_NOTCH = { along: [-0.04, 1.26], lay: [1.26, 2.1] }
 /** the cubby's floor and shelf surfaces, in the scene: the table's top is y = 0 */
 export const CUBBY_FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP + CUBBY.plinth
-export const CUBBY_SHELF_Y = -0.76
+export const CUBBY_SHELF_Y = CUBBY_FLOOR_Y + 0.3
 /** a place in the cubby (along, lay, and which tier it is on), in the scene */
 export const cubbyAt = (along: number, lay: number, tier: 'floor' | 'shelf') =>
   new THREE.Vector3().addScaledVector(ALONG, along).addScaledVector(LAY, lay).setY(tier === 'floor' ? CUBBY_FLOOR_Y : CUBBY_SHELF_Y)
