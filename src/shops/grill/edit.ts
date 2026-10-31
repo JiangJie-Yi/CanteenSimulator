@@ -498,6 +498,10 @@ let showRows: (() => void) | null = null
 /** the Render section brought up to date with what's chosen */
 let renderView: (() => void) | null = null
 let summary: HTMLDivElement | null = null
+/** the whole scene's triangles, as SceneTally last counted them, and the line that shows them */
+let sceneTris = 0
+let trisLine: HTMLDivElement | null = null
+export function setSceneTris(n: number) { if (n === sceneTris) return; sceneTris = n; if (trisLine) trisLine.textContent = T().sceneTris(n) }
 let built = ''
 
 /** the panel's look: after Blender's dark interface (grey panels, a darker header bar, blue for what's active, red/green/blue axis stripes) */
@@ -542,6 +546,7 @@ const PANEL_CSS = `
 .be-sec.shut > .be-sc { display:none }
 .be-sc { padding:6px 8px 8px; background:#2b2b2b }
 .be-sum { color:#9ab0c8; font-size:11px; margin-bottom:5px }
+.be-tris { margin-top:-3px; color:#e0b860 }
 .be-find { width:100%; background:#1d1d1d; color:#d6d6d6; border:1px solid #3a3a3a; border-radius:4px; padding:3px 7px; font:inherit; margin-bottom:5px }
 .be-list { max-height:150px; overflow:auto; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a; background:#242424; border-radius:4px; padding:2px }
 .be-row { padding:2px 8px 2px 18px; border-radius:3px; cursor:pointer; white-space:nowrap; position:relative }
@@ -695,6 +700,9 @@ function panel() {
     const out = section(T().outliner)
     summary = h('div', 'be-sum') as HTMLDivElement
     out.appendChild(summary)
+    trisLine = h('div', 'be-sum be-tris', T().sceneTris(sceneTris)) as HTMLDivElement
+    trisLine.title = T().sceneTrisTip
+    out.appendChild(trisLine)
     const find = h('input', 'be-find') as HTMLInputElement
     find.placeholder = T().find
     const list = h('div', 'be-list')

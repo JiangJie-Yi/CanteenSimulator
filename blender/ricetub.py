@@ -114,7 +114,7 @@ for k in range(NS):
     a0, a1 = 2 * math.pi * k / NS + 0.004, 2 * math.pi * (k + 1) / NS - 0.004
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    cols = 4
+    cols = 3
     rows = []
     for (y, r) in ((0.0, R0), (H, R1)):
         for side, dr in (("out", 0.0), ("in", -0.014)):
@@ -143,19 +143,19 @@ for k in range(NS):
     bm.free()
     o = bpy.data.objects.new(f"RiceStave{k}", me)
     bpy.context.collection.objects.link(o)
-    m_ = o.modifiers.new("b", "BEVEL"); m_.width = 0.0022; m_.segments = 2
+    m_ = o.modifiers.new("b", "BEVEL"); m_.width = 0.0022; m_.segments = 1
     bpy.context.view_layer.objects.active = o
     bpy.ops.object.modifier_apply(modifier="b")
     fin(o, f"RiceStave{k}", M["saw"][rng.randrange(3)], body)
 # (the dark wall behind the staves' gaps, and the floor)
-bpy.ops.mesh.primitive_cone_add(vertices=56, radius1=R0 - 0.004, radius2=R1 - 0.004, depth=H - 0.004, location=P(0, H / 2, 0), end_fill_type="NOTHING")
+bpy.ops.mesh.primitive_cone_add(vertices=28, radius1=R0 - 0.004, radius2=R1 - 0.004, depth=H - 0.004, location=P(0, H / 2, 0), end_fill_type="NOTHING")
 fin(active(), "RiceGapWall", M["gap"], body)
-bpy.ops.mesh.primitive_cylinder_add(vertices=40, radius=R0 - 0.014, depth=0.02, location=P(0, 0.018, 0))
+bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=R0 - 0.014, depth=0.02, location=P(0, 0.018, 0))
 fin(active(), "RiceFloor", M["inside"], body)
 # (the copper hoops: flat bands following the wall's taper, each with a lap and two rivets)
 for (y, w) in ((0.07, 0.045), (0.2, 0.03), (0.3, 0.03)):
     r = R0 + (R1 - R0) * (y / H) + 0.004
-    bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=r, depth=w, location=P(0, y, 0), end_fill_type="NOTHING")
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=r, depth=w, location=P(0, y, 0), end_fill_type="NOTHING")
     hp = active()
     sol = hp.modifiers.new("s", "SOLIDIFY"); sol.thickness = 0.003; sol.offset = 1
     bpy.context.view_layer.objects.active = hp
@@ -163,7 +163,7 @@ for (y, w) in ((0.07, 0.045), (0.2, 0.03), (0.3, 0.03)):
     fin(hp, f"RiceHoop{int(y * 100)}", M["copper"], body)
     a = 0.5
     for dy in (-w * 0.25, w * 0.25):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.004, segments=8, ring_count=5, location=P((r + 0.004) * math.cos(a), y + dy, (r + 0.004) * math.sin(a)))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.004, segments=6, ring_count=4, location=P((r + 0.004) * math.cos(a), y + dy, (r + 0.004) * math.sin(a)))
         fin(active(), f"RiceRivet{int(y * 100)}{dy > 0}", M["rivet"], body)
 # (the ears: a block of the wood either side, a hole through it, a loop of cord)
 for sd in (-1, 1):
@@ -174,14 +174,14 @@ for sd in (-1, 1):
     bpy.context.view_layer.objects.active = e
     bpy.ops.object.modifier_apply(modifier="b")
     fin(e, f"RiceEar{sd}", M["saw"][0], body)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.0045, major_segments=16, minor_segments=6, location=P(sd * (R1 + 0.04), 0.36, 0), rotation=(math.pi / 2, 0, 0))
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.0045, major_segments=10, minor_segments=4, location=P(sd * (R1 + 0.04), 0.36, 0), rotation=(math.pi / 2, 0, 0))
     fin(active(), f"RiceCord{sd}", M["cord"], body)
 # (the rim's lip, eased)
-bpy.ops.mesh.primitive_torus_add(major_radius=R1 - 0.005, minor_radius=0.008, major_segments=56, minor_segments=8, location=P(0, H - 0.002, 0))
+bpy.ops.mesh.primitive_torus_add(major_radius=R1 - 0.005, minor_radius=0.008, major_segments=32, minor_segments=6, location=P(0, H - 0.002, 0))
 fin(active(), "RiceRim", M["saw"][1], body)
 
 # ---- the lid: its origin at its underside
-bpy.ops.mesh.primitive_cylinder_add(vertices=56, radius=0.285, depth=0.032, location=P(0, 0.016, 0))
+bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.285, depth=0.032, location=P(0, 0.016, 0))
 lid = active()
 m_ = lid.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 3
 bpy.context.view_layer.objects.active = lid
@@ -210,7 +210,7 @@ RTOP = H - 0.045
 RIN = R0 + (R1 - R0) * (RTOP / H) - 0.006
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
-NR, NA = 18, 64
+NR, NA = 9, 32
 rings = []
 centre = bm.verts.new(P(0, RTOP + 0.022, 0))
 for i in range(1, NR + 1):

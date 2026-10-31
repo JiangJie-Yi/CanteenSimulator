@@ -85,7 +85,7 @@ def radius_at(z):
 
 
 def tube(name, pts, r, mat, cyclic=False):
-    cd = bpy.data.curves.new(name, "CURVE"); cd.dimensions = "3D"; cd.bevel_depth = r; cd.bevel_resolution = 3
+    cd = bpy.data.curves.new(name, "CURVE"); cd.dimensions = "3D"; cd.bevel_depth = r; cd.bevel_resolution = 1
     sp = cd.splines.new("POLY"); sp.points.add(len(pts) - 1); sp.use_cyclic_u = cyclic
     for spt, q in zip(sp.points, pts):
         spt.co = (*q, 1)
@@ -121,7 +121,7 @@ def wrap_text(text, size, z, mat, name, spread=1.0):
     tx.data.align_x = "CENTER"; tx.data.align_y = "CENTER"
     # (printed flat, its curves at a modest resolution: seen at a few metres a brushed character needs no more)
     tx.data.extrude = 0.0
-    tx.data.resolution_u = 3
+    tx.data.resolution_u = 2
     bpy.ops.object.convert(target="MESH")
     o = active()
     # (the text lies in x-y; stood up on the barrel's front (+y out of it), x bent round the barrel)
@@ -141,7 +141,7 @@ def barrel(at, turn, k):
     # (the body: the straw mat round it, its rows running round; a little uneven, as a mat is)
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    NA, NZ = 64, 24
+    NA, NZ = 32, 10
     rings = []
     for j in range(NZ + 1):
         z = HT * j / NZ
@@ -170,8 +170,8 @@ def barrel(at, turn, k):
     o = bpy.data.objects.new(f"KomoBody{k}", me); bpy.context.collection.objects.link(o)
     fin(o, f"KomoBody{k}", M["straw"])
     # (the straw's ends standing up round the lid's rim, a ragged fringe)
-    for i in range(48):
-        a = 2 * math.pi * i / 48 + random.uniform(-0.03, 0.03)
+    for i in range(28):
+        a = 2 * math.pi * i / 28 + random.uniform(-0.03, 0.03)
         r0 = radius_at(HT) - 0.01
         p0 = Vector((math.cos(a) * r0, math.sin(a) * r0, HT - 0.005))
         p1 = p0 + Vector((math.cos(a) * 0.01, math.sin(a) * 0.01, random.uniform(0.025, 0.045)))
@@ -180,22 +180,22 @@ def barrel(at, turn, k):
         fin(f_, f"KomoFringe{k}_{i}", M["lid"], smooth=False)
     # (the ropes: two bands round it, near the top and near the foot; eight running up between them over the side; a ring round the lid)
     for zb in (0.07, HT - 0.06):
-        tube(f"KomoBand{k}{int(zb * 100)}", [Vector((math.cos(2 * math.pi * i / 48) * (radius_at(zb) + 0.012), math.sin(2 * math.pi * i / 48) * (radius_at(zb) + 0.012), zb)) for i in range(48)],
+        tube(f"KomoBand{k}{int(zb * 100)}", [Vector((math.cos(2 * math.pi * i / 24) * (radius_at(zb) + 0.012), math.sin(2 * math.pi * i / 24) * (radius_at(zb) + 0.012), zb)) for i in range(24)],
              0.011, M["rope"], cyclic=True)
     for i in range(8):
         a = 2 * math.pi * (i + 0.5) / 8
         if abs(math.atan2(math.sin(a + math.pi / 2), math.cos(a + math.pi / 2))) < 0.5:
             continue  # (none across the brewer's mark on the front)
-        pts = [Vector((math.cos(a) * (radius_at(z) + 0.01), math.sin(a) * (radius_at(z) + 0.01), z)) for z in np.linspace(0.07, HT - 0.06, 8)]
+        pts = [Vector((math.cos(a) * (radius_at(z) + 0.01), math.sin(a) * (radius_at(z) + 0.01), z)) for z in np.linspace(0.07, HT - 0.06, 5)]
         tube(f"KomoUp{k}{i}", pts, 0.008, M["rope"])
-    tube(f"KomoLidRing{k}", [Vector((math.cos(2 * math.pi * i / 40) * (radius_at(HT) - 0.03), math.sin(2 * math.pi * i / 40) * (radius_at(HT) - 0.03), HT + 0.012)) for i in range(40)],
+    tube(f"KomoLidRing{k}", [Vector((math.cos(2 * math.pi * i / 20) * (radius_at(HT) - 0.03), math.sin(2 * math.pi * i / 20) * (radius_at(HT) - 0.03), HT + 0.012)) for i in range(20)],
          0.01, M["rope"], cyclic=True)
     # (the rope tied off over the lid: a loop either side of a knot, its two ends hanging down the side)
     kn = Vector((0.05, -0.05, HT + 0.04))
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.022, segments=12, ring_count=8, location=kn)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.022, segments=8, ring_count=6, location=kn)
     fin(active(), f"KomoKnot{k}", M["rope"])
     for sd in (-1, 1):
-        loop = [kn + Vector((sd * 0.07 * math.sin(math.pi * t), -0.03 * math.sin(2 * math.pi * t), 0.02 * math.sin(math.pi * t))) for t in np.linspace(0, 1, 10)]
+        loop = [kn + Vector((sd * 0.07 * math.sin(math.pi * t), -0.03 * math.sin(2 * math.pi * t), 0.02 * math.sin(math.pi * t))) for t in np.linspace(0, 1, 7)]
         tube(f"KomoLoop{k}{sd}", loop, 0.008, M["rope"])
     for sd, ln in ((-1, 0.22), (1, 0.16)):
         a = -math.pi / 2 + sd * 0.45
@@ -203,7 +203,7 @@ def barrel(at, turn, k):
         end.append(Vector((math.cos(a) * (radius_at(HT - ln) + 0.025), math.sin(a) * (radius_at(HT - ln) + 0.025), HT - ln)))
         tube(f"KomoEnd{k}{sd}", end, 0.008, M["rope"])
         # (its frayed tassel)
-        for t in range(5):
+        for t in range(3):
             tip = end[-1] + Vector((random.uniform(-0.015, 0.015), random.uniform(-0.015, 0.015), -random.uniform(0.03, 0.05)))
             tube(f"KomoFray{k}{sd}{t}", [end[-1], tip], 0.002, M["lid"])
     # (the front: a pale paper-coloured label patch printed on the straw, the brewer's name big in brushed ink, a red seal, small lines)
@@ -211,7 +211,7 @@ def barrel(at, turn, k):
     bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 0, 0))
     pl = active()
     bm = bmesh.new(); bm.from_mesh(pl.data)
-    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=12, use_grid_fill=True)
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=6, use_grid_fill=True)
     bm.to_mesh(pl.data); bm.free()
     for vt in pl.data.vertices:
         x, y = vt.co.x * 0.22, vt.co.y * 0.3
@@ -222,7 +222,7 @@ def barrel(at, turn, k):
     fin(pl, f"KomoLabel{k}", M["label"])
     wrap_text(names[0], 0.12, HT * 0.58, M["ink"], f"KomoMark{k}a")
     wrap_text(names[1], 0.075, HT * 0.36, M["ink"], f"KomoMark{k}b")
-    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.022, depth=0.002, location=(0.075, -(radius_at(HT * 0.7) + 0.004), HT * 0.7), rotation=(math.pi / 2, 0, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.022, depth=0.002, location=(0.075, -(radius_at(HT * 0.7) + 0.004), HT * 0.7), rotation=(math.pi / 2, 0, 0))
     seal = active(); seal.rotation_euler.z = -0.3
     fin(seal, f"KomoSeal{k}", M["red"], smooth=False)
     for dz in (-0.12, 0.12):

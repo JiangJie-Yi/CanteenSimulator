@@ -173,10 +173,11 @@ def apron(name, length, at, turn):
     cd.fill_mode = "BOTH"
     cd.extrude = 0.012
     cd.bevel_depth = 0.003
+    cd.bevel_resolution = 0
     sp = cd.splines.new("POLY")
     pts = [(-length / 2, 0), (length / 2, 0), (length / 2, -APRON_H)]
     # (the lower edge: straight for a hand's width from each leg, then a shallow cloud: two small lobes rising to a broad arch)
-    n = 40
+    n = 18
     edge = []
     for i in range(n + 1):
         x = length / 2 - 0.1 - (length - 0.2) * i / n
@@ -222,14 +223,14 @@ NS = 13
 for i in range(NS):
     z = -RAIL_IN + 0.03 + (2 * RAIL_IN - 0.06) * i / (NS - 1)
     L_ = 2 * LX + 0.03
-    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.021, depth=L_, location=P(0, SHELF_Y + 0.006, z), rotation=(0, math.pi / 2, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.021, depth=L_, location=P(0, SHELF_Y + 0.006, z), rotation=(0, math.pi / 2, 0))
     o = act(); o.name = "StandSlat"; o.data.materials.append(M["bamboo"])
     for p in o.data.polygons:
         p.use_smooth = True
     parts.append(o)
     # (two nodes along each, staggered slat to slat)
     for xn in ((-0.25, 0.3) if i % 2 else (-0.4, 0.12)):
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.021, minor_radius=0.004, major_segments=12, minor_segments=4,
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.021, minor_radius=0.004, major_segments=8, minor_segments=3,
                                          location=P(xn * L_ / 1.2, SHELF_Y + 0.006, z), rotation=(0, math.pi / 2, 0))
         o = act(); o.name = "StandSlatNode"; o.data.materials.append(M["node"])
         parts.append(o)

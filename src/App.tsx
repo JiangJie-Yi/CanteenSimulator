@@ -28,6 +28,7 @@ import { Crash } from '@/ui/Crash'
 import { OpeningSpot } from '@/scene/OpeningSpot'
 import { OccluderFade } from '@/scene/OccluderFade'
 import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
+import { SceneTally } from '@/shops/grill/SceneTally'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
@@ -891,6 +892,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       <OccluderFade target={() => controls.current?.target} />
       {/* (how each piece is drawn, as set piece by piece in developer mode's Render section) */}
       <RenderPrefsApply />
+      <SceneTally />
       {/* (edit mode: the views marked where they look, numbered, as Sketchfab's annotations; camera 1 itself isn't placed by hand any more) */}
       {/* (the views: their numbered spots in the room while the view menu's open; in edit mode each view's camera, to be placed by hand) */}
       {pins && !editing && <ViewMarkers lang={lang} onPick={onView} />}
