@@ -2334,7 +2334,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
 
   /** the tray where ordered food waits raw: where it is, and the n-th spot on it */
-  const trayAt = () => new THREE.Vector3(...(roast.tray ?? [0, 0, 0])).add(nudge('tray'))
+  // (where each thing stands, kept off the hearth's frame as it's dragged and as it's first set out: the hearth grew, and things set out
+  // round the old one would sit on its frame)
+  const trayAt = () => { const v = new THREE.Vector3(...(roast.tray ?? [0, 0, 0])).add(nudge('tray')); clearOfHearth(v, 0.04, TRAY_W, TRAY_D); return v }
   // skewers lie along the tray's long side, in rows from back to front, a second layer across the first when full
   /** loose food (potatoes, rice balls, mochi) waits in a row along the back of the tray, clear of the sticks */
   const trayLooseSpot = (n: number) => trayAt()
@@ -2394,7 +2396,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const lap = Math.floor(m / order.length)
     const a = a0 + order[m % order.length] * step + lap * step / 2
     const r = r0 + lap * PLATE_STEP
-    return onSpares(`plate-${n}`, new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r))
+    const v = new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r)
+    clearOfHearth(v, PLATE_R)
+    return onSpares(`plate-${n}`, v)
   }
   const boxPlaced = useRef(false)
   const [plateCount, setPlateCount] = useState(1)
@@ -2566,7 +2570,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.y = 0
     return p
   }
-  const bowlAt = () => new THREE.Vector3(...BOWL_TOP).add(nudge('bowl-0'))
+  const bowlAt = () => { const v = new THREE.Vector3(...BOWL_TOP).add(nudge('bowl-0')); clearOfHearth(v, BOWL_R); return v }
   const basketAt = (n: number) => {
     // (the first lives in the left cubby, on its shelf; more, as they're needed, stand on the table's top in a row)
     const [x, y, z] = n === 0 ? roast.basket!.at : BASKET_TOP

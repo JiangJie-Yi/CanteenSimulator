@@ -5,7 +5,8 @@
 // their surfaces and aren't counted.
 //
 //   npm run dev          (in another terminal)
-//   node tests/e2e/clips.mjs [url]        (TOL=<m> how deep counts, default 0.015; TOP=<n> how many to list; OUT=<file> a JSON of all)
+//   node tests/e2e/clips.mjs [url]        (TOL=<m> how deep counts, default 0.015; TOP=<n> how many to list; OUT=<file> a JSON of all;
+//                                          BY=name each thing by its own name; NEAR=x,y,z,r only what's within r of a point)
 import { chromium } from 'playwright-core'
 import { writeFileSync } from 'node:fs'
 
@@ -18,7 +19,7 @@ await page.goto(URL + (URL.includes('?') ? '&' : '?') + 'q=low', { timeout: 6000
 await page.waitForFunction(() => window.__scene && window.__scene.getObjectByName('FirePit'), null, { timeout: 120000 })
 await page.waitForTimeout(12000)
 
-const found = await page.evaluate(({ TOL }) => {
+const found = await page.evaluate(({ TOL, BY, NEAR }) => {
   const s = window.__scene
   const V = s.position.constructor
   const { Box3: Box, Raycaster: Ray } = window.__THREE
@@ -31,7 +32,14 @@ const found = await page.evaluate(({ TOL }) => {
     return `${n.join(' < ') || o.type}${piece ? ` [${piece}]` : ''}`
   }
   /** the piece it belongs to: its highest ancestor below the scene that has a name, or its Movable's id */
-  const pieceOf = (o) => { let top = o; for (let p = o; p && p.parent; p = p.parent) { if (p.userData?.editId || p.userData?.movable) return p.userData.editId ?? p.uuid; if (p.parent === s) top = p } return top.uuid }
+  const pieceOf = (o) => {
+    // (BY=name: each thing by its own nearest name, for what isn't a Movable piece of its own (the cook's table's things))
+    if (BY === 'name') { for (let p = o; p; p = p.parent) if (p.name && !/^(Scene|root|GLTF)/.test(p.name)) return p.name; return o.uuid }
+    let top = o
+    for (let p = o; p && p.parent; p = p.parent) { if (p.userData?.editId || p.userData?.movable) return p.userData.editId ?? p.uuid; if (p.parent === s) top = p }
+    return top.uuid
+  }
+  const inBox = (b) => !NEAR || (b.max.x > NEAR[0] - NEAR[3] && b.min.x < NEAR[0] + NEAR[3] && b.max.z > NEAR[2] - NEAR[3] && b.min.z < NEAR[2] + NEAR[3] && b.max.y > NEAR[1] - NEAR[3] && b.min.y < NEAR[1] + NEAR[3])
   const solid = []
   s.traverse((o) => {
     if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !o.visible) return
@@ -45,6 +53,7 @@ const found = await page.evaluate(({ TOL }) => {
     const b = new Box().setFromObject(o)
     const sz = b.getSize(new V())
     if (Math.min(sz.x, sz.y, sz.z) < 0.004 || Math.max(sz.x, sz.y, sz.z) > 6) return
+    if (!inBox(b)) return
     solid.push({ o, b, piece: pieceOf(o) })
   })
   const ray = new Ray()
@@ -82,7 +91,7 @@ const found = await page.evaluate(({ TOL }) => {
     if (buried >= 3) out.push({ a: where(A.o), b: where(B.o), buried, sampled: Math.ceil(pos.count / step), at: A.b.getCenter(new V()).toArray().map((v) => +v.toFixed(2)) })
   }
   return { meshes: solid.length, out: out.sort((x, y) => y.buried - x.buried) }
-}, { TOL })
+}, { TOL, BY: process.env.BY ?? '', NEAR: process.env.NEAR ? process.env.NEAR.split(',').map(Number) : null })
 
 console.log(`${found.meshes} solid meshes checked; ${found.out.length} pairs run into each other (deeper than ${TOL} m)`)
 for (const r of found.out.slice(0, TOP)) console.log(`  ${r.buried}/${r.sampled}  ${r.a}   ⟶ in ⟶   ${r.b}   @ ${r.at.join(', ')}`)
