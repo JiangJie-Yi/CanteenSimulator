@@ -2366,41 +2366,238 @@ M.update({
 })
 
 
+# ---- the seasoning pots: each turned on the wheel and glazed (the foot ring left bare, the lip rolled, the glaze thin and breaking over
+# it, pooled deep inside, run in drips down the outside), its own glaze in its own picture; and what's in each, seen from above
+def lathe(name, pts, seg=28, planar=0.0, split=None):
+    """Spin a section (r, z) round the z axis into a mesh (a point on the axis becomes the pole of a fan). Each loop gets u round it and v
+    along the section by length; or, with `planar` the radius, u and v laid on from above (for a surface seen from overhead). Faces from the
+    section's point `split` on get the second material."""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new("UVMap")
+    L = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        L.append(L[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
+    vs = [l_ / L[-1] for l_ in L]
+    rings = []
+    for (r, z) in pts:
+        if r < 1e-6:
+            rings.append([bm.verts.new((0.0, 0.0, z))])
+        else:
+            rings.append([bm.verts.new((r * math.cos(2 * math.pi * k / seg), r * math.sin(2 * math.pi * k / seg), z)) for k in range(seg)])
+    for i in range(len(pts) - 1):
+        A, B = rings[i], rings[i + 1]
+        for k in range(seg):
+            k2 = (k + 1) % seg
+            u0, u1 = k / seg, (k + 1) / seg
+            if len(A) == 1:
+                vv, uv = (A[0], B[k], B[k2]), (((u0 + u1) / 2, vs[i]), (u0, vs[i + 1]), (u1, vs[i + 1]))
+            elif len(B) == 1:
+                vv, uv = (A[k], A[k2], B[0]), ((u0, vs[i]), (u1, vs[i]), ((u0 + u1) / 2, vs[i + 1]))
+            else:
+                vv, uv = (A[k], A[k2], B[k2], B[k]), ((u0, vs[i]), (u1, vs[i]), (u1, vs[i + 1]), (u0, vs[i + 1]))
+            f = bm.faces.new(vv)
+            f.material_index = 1 if split is not None and i >= split else 0
+            for loop, t in zip(f.loops, uv):
+                loop[uvl].uv = (0.5 + loop.vert.co.x / (2 * planar), 0.5 + loop.vert.co.y / (2 * planar)) if planar else t
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    return o, vs
+
+
+def pot_section(radius, depth, belly):
+    """A pot's section from the middle of its underside, out round its foot ring, up its side, over its rolled lip and down inside to the
+    middle of its floor; and the indices along it of the foot ring's top, the lip's start, the inside's start and the floor's edge."""
+    W, LIP, HF = 0.0075, 0.0022, 0.009
+    rf = radius * 0.6
+
+    def body(t):
+        return radius * (0.82 + belly * math.sin(t * math.pi * 0.85))
+    pts = [(0.0, 0.003), (rf - 0.006, 0.003), (rf - 0.0045, 0.0), (rf, 0.0), (rf + 0.001, HF * 0.7)]
+    i_foot = len(pts) - 1
+    K = 10
+    outer = []
+    for k in range(K + 1):
+        t = k / K
+        e = 1 - (1 - min(1.0, t / 0.32)) ** 2.4
+        outer.append((rf + 0.002 + (body(t) - rf - 0.002) * e, HF + t * (depth - HF)))
+    pts += outer[:-1]
+    rr = outer[-1][0]
+    i_lip = len(pts)
+    pts += [(rr + LIP, depth - 0.003), (rr + LIP * 0.4, depth + 0.0012), (rr - W * 0.5, depth + 0.0016), (rr - W, depth - 0.002)]
+    i_in = len(pts) - 1
+    for k in range(K - 1, 1, -1):
+        r, z = outer[k]
+        pts.append((r - W, z))
+    i_floor = len(pts) - 1
+    r2 = outer[2][0] - W
+    pts += [(r2 * 0.7, HF + W + 0.0015), (r2 * 0.35, HF + W + 0.0003), (0.0, HF + W)]
+    return pts, i_foot, i_lip, i_in, i_floor
+
+
+def pot_inner_r(radius, depth, belly, z):
+    """how far out a pot's inside wall is at height z (so what's in it meets the wall)"""
+    W, HF = 0.0075, 0.009
+    rf = radius * 0.6
+    t = min(1.0, max(0.0, (z - HF) / (depth - HF)))
+    e = 1 - (1 - min(1.0, t / 0.32)) ** 2.4
+    return rf + 0.002 + (radius * (0.82 + belly * math.sin(t * math.pi * 0.85)) - rf - 0.002) * e - W
+
+
+def srgb(c):
+    return np.array(c, np.float32)
+
+
+GLAZES = {
+    # (deep cobalt (瑠璃): thin and brown over the lip, pooled near black inside, runs down the side; a little iron speckle)
+    "ruri": dict(glaze=(0.16, 0.23, 0.45), deep=(0.07, 0.1, 0.24), brk=(0.52, 0.4, 0.3), clay=(0.66, 0.53, 0.4), drips=7, speck=0.012),
+    # (tenmoku: black-brown, rust where it thins over the lip, fine streaks of hare's fur running down)
+    "tenmoku": dict(glaze=(0.2, 0.11, 0.06), deep=(0.09, 0.05, 0.03), brk=(0.62, 0.33, 0.13), clay=(0.56, 0.43, 0.32), drips=4, speck=0.004, fur=True),
+    # (shino: thick milky white, warm blush where it thins, pinholes)
+    "shino": dict(glaze=(0.95, 0.92, 0.86), deep=(0.88, 0.84, 0.77), brk=(0.9, 0.66, 0.48), clay=(0.74, 0.58, 0.44), drips=0, speck=0.006, blush=True),
+    # (white porcelain painted in cobalt (染付): a line round the lip in and out, two round the floor's edge)
+    "sometsuke": dict(glaze=(0.96, 0.96, 0.94), deep=(0.9, 0.91, 0.92), brk=(0.96, 0.96, 0.94), clay=(0.88, 0.84, 0.76), drips=0, speck=0.0, lines=True),
+    # (turned wood, oiled: the rings round it, darker at the lip)
+    "wood": dict(glaze=(0.6, 0.4, 0.23), deep=(0.45, 0.29, 0.15), brk=(0.4, 0.25, 0.13), clay=(0.6, 0.4, 0.23), drips=0, speck=0.0, wood=True),
+}
+
+
+def glaze_picture(name, look, vs, i_foot, i_lip, i_in, i_floor, seed_):
+    """The pot's own picture over its (u round, v along the section) map: bare clay below the glaze's edge, the glaze over the rest"""
+    g = GLAZES[look]
+    r_ = np.random.default_rng(seed_)
+    H, Wd = 128, 256
+    u = np.tile((np.arange(Wd) + 0.5) / Wd, (H, 1))
+    v = np.tile(((np.arange(H) + 0.5) / H)[:, None], (1, Wd))
+    vf, vl0, vl1, vfl = vs[i_foot], vs[i_lip], vs[i_in], vs[i_floor]
+    vlip = (vl0 + vl1) / 2
+    mot = fbm(256, 4, 4, 4)[:H, :]
+    col = mix(srgb(g["glaze"]), srgb(g["deep"]), smooth(0.35, 0.8, mot) * 0.35)
+    # (deeper where it pools: inside toward the floor, and in the floor's hollow)
+    col = mix(col, srgb(g["deep"]), smooth(vfl - 0.12, vfl + 0.04, v) * 0.75)
+    # (where it thins over the lip, breaking to the clay's colour)
+    col = mix(col, srgb(g["brk"]), np.exp(-((v - vlip) / max(0.006, (vl1 - vl0) * 0.35)) ** 2) * 0.85)
+    # (its runs down the outside from the lip: a little darker, ending in a bead)
+    vg = vf + 0.03
+    for _ in range(g["drips"]):
+        u0, w, end = r_.random(), 0.006 + 0.01 * r_.random(), vg + 0.04 + (vl0 - vg) * 0.6 * r_.random()
+        du = np.abs((u - u0 + 0.5) % 1.0 - 0.5)
+        run = smooth(w, w * 0.4, du) * smooth(end - 0.01, end + 0.01, v) * (v < vl0)
+        bead = smooth(w * 1.6, w * 0.6, np.sqrt(du ** 2 + ((v - end) * 1.5) ** 2))
+        col = mix(col, srgb(g["deep"]), np.clip(run * 0.45 + bead * 0.55, 0, 1) * (v < vl0))
+    if g.get("fur"):
+        fur = vnoise(256, 160, 6)[:H, :]
+        col = mix(col, srgb(g["brk"]), smooth(0.62, 0.9, fur) * 0.35 * (v > vg) * (v < vl0))
+    if g.get("blush"):
+        bl = fbm(256, 3, 3, 3)[:H, :]
+        col = mix(col, srgb(g["brk"]), smooth(0.62, 0.85, bl) * 0.45 * (v > vg))
+    if g.get("wood"):
+        rings = np.sin((v * 38 + fbm(256, 2, 6, 3)[:H, :] * 1.2) * 2 * math.pi)
+        col = mix(col, srgb(g["deep"]), smooth(0.55, 0.95, rings) * 0.45)
+    if g.get("lines"):
+        blue = srgb((0.16, 0.27, 0.6))
+        for c_, w_ in ((vl0 - 0.012, 0.004), (vl1 + 0.012, 0.004), (vfl - 0.02, 0.0035), (vfl - 0.035, 0.0025)):
+            col = mix(col, blue, smooth(w_, w_ * 0.4, np.abs(v - c_)) * 0.9)
+    if g["speck"]:
+        sp = r_.random((H, Wd))
+        col = mix(col, col * np.float32(0.45), (sp < g["speck"]).astype(np.float32) * 0.8 * (v > vg))
+    # (the glaze's edge: a fat rolled line where it stopped, the clay bare and gritty below it)
+    edge = np.exp(-((v - vg) / 0.008) ** 2)
+    col = mix(col, srgb(g["deep"]), edge * 0.5 * (look != "wood"))
+    clay = mix(srgb(g["clay"]), srgb(g["clay"]) * np.float32(0.8), (r_.random((H, Wd)) < 0.08).astype(np.float32))
+    col = mix(col, clay, smooth(vg + 0.004, vg - 0.004, v) if look != "wood" else np.zeros_like(v))
+    return image("T_" + name + "Glaze", np.clip(col, 0, 1))
+
+
+FILLS = {
+    # (coarse salt: white, its crystals catching the light, a grey grain here and there)
+    "salt": dict(base=(0.95, 0.95, 0.93), specks=[((0.7, 0.71, 0.72), 0.05), ((1.0, 1.0, 1.0), 0.1)], bump=4.0),
+    # (soy: near black, a soft window of light across it and its edge lit where it creeps up the wall)
+    "soy": dict(base=(0.16, 0.08, 0.04), shine=(0.75, 0.6, 0.48), liquid=True),
+    # (condensed milk: cream, glossy, a fold of it laid over itself)
+    "milk": dict(base=(0.98, 0.93, 0.8), shine=(1.0, 1.0, 0.97), swirl=(0.88, 0.8, 0.62), liquid=True),
+    "peanut": dict(base=(0.84, 0.64, 0.4), specks=[((0.66, 0.46, 0.25), 0.12), ((0.94, 0.8, 0.58), 0.1)], bump=2.0),
+    "miso": dict(base=(0.66, 0.43, 0.2), swirl=(0.5, 0.3, 0.13), shine=(0.86, 0.66, 0.42), bump=3.0),
+    "wasabi": dict(base=(0.58, 0.74, 0.34), specks=[((0.44, 0.6, 0.22), 0.18), ((0.76, 0.88, 0.52), 0.12)], bump=3.5),
+    # (shichimi: the chilli's red, and the other six in it: black and white sesame, sansho green, orange peel, hemp, nori)
+    "shichimi": dict(base=(0.78, 0.26, 0.1), specks=[((0.12, 0.08, 0.06), 0.05), ((0.95, 0.9, 0.78), 0.04), ((0.42, 0.55, 0.18), 0.04),
+                                                      ((0.98, 0.6, 0.18), 0.05), ((0.55, 0.12, 0.05), 0.1)], bump=2.5),
+    "yuzu": dict(base=(0.7, 0.74, 0.3), specks=[((0.38, 0.48, 0.12), 0.12), ((0.9, 0.86, 0.3), 0.08)], bump=2.5),
+}
+
+
+def fill_picture(kind, seed_):
+    """What's in a pot, seen from above (laid on by `lathe(planar=...)`): its colour, its grains, its shine; and a bump for its grain"""
+    f = FILLS[kind]
+    r_ = np.random.default_rng(seed_)
+    N_ = 128
+    u, v = grid01(N_)
+    x, y = u - 0.5, v - 0.5
+    rad = np.sqrt(x * x + y * y) * 2
+    col = np.broadcast_to(srgb(f["base"]), (N_, N_, 3)).copy()
+    col = col * (0.94 + 0.1 * fbm(N_, 4, 4, 3))[..., None]
+    h = np.zeros((N_, N_), np.float32)
+    for c_, frac in f.get("specks", []):
+        sp = r_.random((N_, N_)) < frac
+        col[sp] = srgb(c_)
+        h = h + sp.astype(np.float32) * (0.5 + 0.5 * r_.random((N_, N_)).astype(np.float32))
+    if "swirl" in f:
+        ang = np.arctan2(y, x)
+        sw = np.sin(ang * 1 + rad * 9.0)
+        col = mix(col, srgb(f["swirl"]), smooth(0.7, 0.95, sw) * 0.6)
+        h = h + smooth(0.5, 1.0, sw) * 0.8
+    if "shine" in f:
+        # (a window of light on it, from the upper left, and the edge where it meets the wall lit)
+        win = np.exp(-(((x + 0.16) / 0.13) ** 2 + ((y - 0.17) / 0.07) ** 2))
+        col = mix(col, srgb(f["shine"]), win * (0.75 if f.get("liquid") else 0.45))
+        if f.get("liquid"):
+            col = mix(col, srgb(f["shine"]), smooth(0.86, 0.98, rad) * 0.35)
+    tex = image("T_Fill_" + kind, np.clip(col, 0, 1))
+    nrm = image("T_Fill_" + kind + "_N", to_normal(h + fbm(N_, 16, 16, 2) * 0.3, f["bump"]), data=True) if f.get("bump") else None
+    return tex, nrm
+
+
+_glaze_mats = {}
+
+
 def open_pot(x, y, radius, depth, mat, belly=0.3, name="Pot"):
-    """A bellied pot open at the top, with real wall thickness (applied, so it survives joining)."""
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=radius, depth=depth, location=(x, y, depth / 2))
-    pot = active()
-    bm = bmesh.new()
-    bm.from_mesh(pot.data)
-    for vtx in bm.verts:
-        t = (vtx.co.z + depth / 2) / depth
-        k = 0.82 + belly * math.sin(t * math.pi * 0.85)
-        vtx.co.x *= k
-        vtx.co.y *= k
-    bm.normal_update()
-    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.9], context="FACES")
-    bm.to_mesh(pot.data)
-    bm.free()
-    s = pot.modifiers.new("Solidify", "SOLIDIFY")
-    s.thickness = 0.01
-    bpy.ops.object.select_all(action="DESELECT")
-    pot.select_set(True)
-    bpy.context.view_layer.objects.active = pot
-    bpy.ops.object.modifier_apply(modifier="Solidify")
-    return finish(pot, name, mat)
+    """A pot turned on the wheel, open at the top, its walls with real thickness, in its own glazed picture (the look by `mat`'s name)"""
+    pts, i_foot, i_lip, i_in, i_floor = pot_section(radius, depth, belly)
+    # (the outside ends at the top of the lip: past it the faces turn in toward the middle, and the game's ink line round them would show as
+    # an arc across what's in the pot)
+    pot, vs = lathe(name, pts, split=i_lip + 1)
+    look = {"SaltPotGlaze": "ruri", "SoyPotGlaze": "tenmoku", "MilkJarGlaze": "shino", "SmallWhiteDish": "sometsuke"}.get(mat.name, "wood")
+    tex = glaze_picture(name, look, vs, i_foot, i_lip, i_in, i_floor, sum(map(ord, name)))
+    m = pbr(name + "Glaze", tex=tex, rough=0.35 if look != "wood" else 0.6, coat=0.4 if look != "wood" else 0.0)
+    # (its inside the same glaze, a material of its own so the game draws no ink line round it: a line round the inside wall would show as
+    # a black arc across what's in it)
+    m_in = pbr("PotInside" + name, tex=tex, rough=0.35 if look != "wood" else 0.6)
+    pot.location = (x, y, 0.0)
+    finish(pot, name, m)
+    pot.data.materials.append(m_in)
+    return pot
 
 
-def filling(x, y, z, radius, height, mat, rough=0.06):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(x, y, z))
-    o = active()
-    o.scale = (radius, radius, height)
-    bm = bmesh.new()
-    bm.from_mesh(o.data)
-    for vtx in bm.verts:
-        vtx.co *= random.uniform(1 - rough, 1 + rough)
-    bm.to_mesh(o.data)
-    bm.free()
-    return finish(o, "Filling", mat, smooth_shade=rough < 0.03)
+def filling(x, y, z, radius, height, mat, rough=0.06, kind=None):
+    """What's in a pot: a soft mound (a powder, a paste) or a level surface creeping up the wall (a sauce), its picture laid on from above"""
+    liquid = kind in ("soy", "milk")
+    K = 8
+    pts = []
+    for k in range(K + 1):
+        rr = radius * k / K
+        zz = height * 0.25 + height * 0.75 * (rr / radius) ** 6 if liquid else height * (1 - (rr / radius) ** 2) ** 0.8
+        pts.append((rr, zz))
+    pts.append((radius * 0.98, -0.006))
+    pts.append((0.0, -0.006))
+    o, _ = lathe("Filling", pts, seg=24, planar=radius)
+    if kind:
+        tex, nrm = fill_picture(kind, sum(map(ord, kind)) * 7)
+        mat = pbr("Fill" + kind.capitalize(), tex=tex, nrm=nrm, rough=0.15 if liquid else 0.8)
+    o.location = (x, y, z)
+    return finish(o, "Filling", mat)
 
 
 def stick_between(p0, p1, radius, mat, name):
@@ -2535,6 +2732,8 @@ def spoon_head(kind, at):
 
 
 lean = out * 0.09 + Vector((0, 0, 0.21))
+# (each handle resting a little to one side or the other on its pot's lip, not all standing to attention)
+SIDE = {"SoyPot": -0.035, "MilkJar": 0.03, "PeanutBowl": -0.04, "MisoPot": 0.035, "WasabiDish": -0.03, "ShichimiBowl": 0.03, "YuzuJar": -0.035}
 # (where each stands along the ledge: the row's widths laid end to end from its left, a little room between)
 ROW = (("SaltPot", 0.17), ("SoyPot", 0.16), ("MilkJar", 0.14), ("PeanutBowl", 0.205), ("MisoPot", 0.14), ("WasabiDish", 0.15),
        ("ShichimiBowl", 0.135), ("YuzuJar", 0.12), ("LemonDish", 0.17))
@@ -2553,7 +2752,8 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
     c = in_box(ROW_AT[name])
     rad, depth = rad * POT_K, depth * POT_K
     pot = open_pot(c.x, c.y, rad, depth, glaze, belly=belly, name=name)
-    fl = filling(c.x, c.y, depth * 0.85, rad * 0.9, fill_h, fill, rough=rough)
+    fl = filling(c.x, c.y, depth * 0.85, pot_inner_r(rad, depth, belly, depth * 0.85) - 0.0015, fill_h, fill, rough=rough,
+                 kind={"SaltPot": "salt", "SoyPot": "soy", "MilkJar": "milk", "PeanutBowl": "peanut"}[name])
     for o in (pot, fl):
         o.location.z += BOX_Z
     centre_origin(join([pot, fl], name), (c.x, c.y, 0.0))
@@ -2565,10 +2765,10 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
         tuft.scale = (0.022, 0.016, 0.04)
         bristle = M["bristle"] if name == "SoyPot" else M.setdefault(
             "bristle_pale", pbr("BrushBristlePale", (0.86, 0.8, 0.66), rough=0.7))
-        utensil("SoyBrush" if name == "SoyPot" else "MilkBrush", head, head + lean + out * 0.02,
+        utensil("SoyBrush" if name == "SoyPot" else "MilkBrush", head, head + lean + out * 0.02 + tang * SIDE[name],
                 finish(tuft, "BrushBristles", bristle), 0.008)
     elif name == "PeanutBowl":
-        utensil("PeanutSpoon", head, head + lean, spoon_bowl(head, 0.03))
+        utensil("PeanutSpoon", head, head + lean + tang * SIDE[name], spoon_bowl(head, 0.03))
     else:
         # salt is taken by the pinch, by hand: just a marker where the fingers dip in (the web app draws the hand)
         bpy.ops.mesh.primitive_uv_sphere_add(radius=0.012, segments=8, ring_count=4, location=head)
@@ -2597,19 +2797,21 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough, tool in pots2:
     c = in_box(ROW_AT[name])
     rad, depth = rad * POT_K, depth * POT_K
     pot = open_pot(c.x, c.y, rad, depth, glaze, belly=belly, name=name)
-    fl = filling(c.x, c.y, depth * 0.8, rad * 0.88, fill_h, fill, rough=rough)
+    fl = filling(c.x, c.y, depth * 0.8, pot_inner_r(rad, depth, belly, depth * 0.8) - 0.0015, fill_h, fill, rough=rough,
+                 kind={"MisoPot": "miso", "WasabiDish": "wasabi", "ShichimiBowl": "shichimi", "YuzuJar": "yuzu"}[name])
     for o in (pot, fl):
         o.location.z += BOX_Z
     centre_origin(join([pot, fl], name), (c.x, c.y, 0.0))
     head = Vector((c.x, c.y, BOX_Z + depth * 0.7))
     kind = {"MisoSpoon": "miso", "WasabiSpoon": "wasabi", "ShichimiSpoon": "shichimi"}.get(tool, "yuzu")
     obj, mat, thick = spoon_head(kind, head)
-    utensil(tool, head, head + out * 0.08 + Vector((0, 0, 0.18 if kind != "shichimi" else 0.15)), obj, thick, mat)
+    utensil(tool, head, head + out * 0.08 + tang * SIDE[name] + Vector((0, 0, 0.18 if kind != "shichimi" else 0.15)), obj, thick, mat)
 
 # the lemon: a little dish of wedges; the one on top is what's picked up and squeezed
 c = in_box(ROW_AT["LemonDish"])
-bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.082 * POT_K, depth=0.014, location=(c.x, c.y, BOX_Z + 0.007))
-dish_l = finish(active(), "LemonDish", M["white_dish"])
+# (a little porcelain dish, turned like the pots: a foot ring, a shallow well, a cobalt line round its lip)
+dish_l = open_pot(c.x, c.y, 0.082 * POT_K, 0.024, M["white_dish"], belly=0.45, name="LemonDish")
+dish_l.location.z += BOX_Z
 centre_origin(dish_l, (c.x, c.y, 0.0))
 
 

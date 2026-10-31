@@ -11,7 +11,9 @@ const OUTLINE_WIDTH = 0.007
 const NO_OUTLINE = new Set(['FirePit', 'Charcoal', 'GrillNet', 'AshLump', 'CoalChunk', 'CoalStick'])
 /** parts too fine for an ink line (a shrimp's legs and feelers would come out as heavy black wire) */
 // (and the fish's eyes: an outline as thick as on the body would be a black ring as wide as the eye itself)
-const NO_OUTLINE_MATERIALS = new Set(['ShrimpLeg', 'FishEye', 'FishPupil'])
+// (and what's in the seasoning pots: its edge against the pot's wall would be inked as a black arc across the inside)
+const NO_OUTLINE_MATERIALS = new Set(['ShrimpLeg', 'FishEye', 'FishPupil', 'FillSalt', 'FillSoy', 'FillMilk', 'FillPeanut', 'FillMiso', 'FillWasabi',
+  'FillShichimi', 'FillYuzu'])
 // flat ground pieces: they catch shadows but shouldn't throw any
 const NO_CAST = new Set(['FirePit'])
 
@@ -319,7 +321,9 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
       // multi-material objects load as a group of meshes; use the group's name for the type
       const owner = mesh.parent && mesh.parent !== scene && !mesh.name ? mesh.parent : mesh
       const type = baseName(owner.name.replace(/_\d+$/, ''))
-      if (!NO_OUTLINE.has(type) && !NO_OUTLINE_MATERIALS.has((mesh.material as THREE.Material).name) &&
+      const matName = (mesh.material as THREE.Material).name
+      // (nor the inside of a seasoning pot: its line would cross what's in it)
+      if (!NO_OUTLINE.has(type) && !NO_OUTLINE_MATERIALS.has(matName) && !matName.startsWith('PotInside') &&
         !mesh.children.some((c) => c.name.endsWith('_outline'))) {
         mesh.add(makeOutline(mesh))
       }
