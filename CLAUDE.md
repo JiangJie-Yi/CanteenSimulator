@@ -39,6 +39,8 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `node tests/e2e/paths.mjs [url]` | 客人動線檢查：開店後每 0.3 秒量每位走動中的客人四周（膝、胸高度），報告撞到的擺設；坐上自己的椅子不算（`WATCH=<ms>` 觀察時間） |
 | `node tests/e2e/clips.mjs [url]` | 穿模檢查：量場景裡每個實心網格，不同擺設（`Movable` 的 id，群組上有 `userData.editId`）的包圍盒重疊時，取一邊的頂點檢查是否埋進另一邊超過 `TOL`（預設 1.5 公分），列出最嚴重的配對（`TOP`、`OUT=<json>`）。模型不是封閉網格（飲料櫃）、本來就插進孔裡的線（收銀台的機器）會誤報 |
 | `node tests/e2e/perf.mjs [free\|grill]` | 效能量測：用這台電腦的真顯示卡（headless Chrome＋ANGLE D3D11，不是軟體 GL）量每秒畫面數、慢的那幾格、每格的繪製次數與三角面、renderer 每格花的時間；`OPEN=<毫秒>` 先開店讓客人進來、`BY=1` 每件擺設各畫幾次、`SUBS=1` 每個 useFrame 的時間、`PROF=1` CPU 剖析、`WHO=1` 誰在呼叫 renderer（多出來的整場重畫會在這裡出現）。頁面加 `?pace=0`，量的時候不會自動降畫質 |
+| `node tests/e2e/alloc.mjs` | 開店時誰在製造垃圾（記憶體配置取樣）：開店、全員到齊、×2，跑 `WARM`（預設 60 秒）後取樣 `SPAN`（預設 30 秒），列出每秒配置幾 MB 與配置最多的函式（含呼叫者）。`BASE=http://localhost:4173`（`npx vite preview`）量正式版：dev 模式光 JSX 就多好幾倍 |
+| `node tests/e2e/soak.mjs` | 長時間營業會不會越來越卡：開店後每 `SAMPLE`（預設 60 秒）記一行 JSON：回收後的 JS heap、array buffer、FPS、最差的一格、繪製次數、三角面、GPU 的幾何／貼圖／程式數（`MINUTES` 預設 20）；每個數字都應該持平。`BASE=` 同上量正式版 |
 | `npm run build` | 型別檢查＋建置 |
 | `npm run lint` | oxlint |
 
@@ -197,6 +199,10 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
   - **不要用 transmission（透光）材質**：場景裡只要有一個，three.js 就會每一格把整個房間先畫進一張圖再畫一次（曾經一顆冷凍櫃燈泡就多了 2,500 次繪製，畫面從 60 掉到 19）。玻璃感用 clearcoat、反光點、透明度做。
   - drei 的 `<Environment>`（`IndoorHDRI`）要 `memo`：它的 children 一換就重算整個環境貼圖（6 個方向畫一次房間＋60 次模糊），開店時上層一秒重畫很多次。同理，不常變的大場景元件（`ShopProps`、`DiningWall`、`Decor`、`Bar`、`CookTable`、`BarCounter`、`BarGate`、`DiningFloor`、`RoomFloor`）都包了 `memo`；新加的、會被常重畫的父層包住的大元件也要包。
   - 用 `StaticBatch` 或 `mergeByMaterial(root, keep)`（`scene/StaticBatch.tsx`）把不會動的零件依材質合併成少數幾次繪製；`keep` 留下自己會動的部分（手、眼、嘴、蓋子、按鍵、抽屜、螢幕…）。模型的材質要依來源材質共用一份（用 Map），不然每個零件一個材質就合併不起來。合併後的網格不能被指到：要能點的東西放一個 `visible={false}` 的感應方塊（r3f 的射線不管 visible），例如飲料櫃的瓶子、炭籃的炭、碗盤櫃。`StaticBatch` 藏起來的原物件不再每格更新矩陣。
+  - **常被重畫的父層底下，重的子元件一定要 memo**：開店時 App 每秒重畫約 6 次、`GuestBar3D` 與 `Roasting` 約 7 次（計時器、客人狀態、盤子），子元件跟著重畫。以前飲料櫃每秒重畫一千多支瓶子、`Movable` 每秒六百多次，開店時每秒製造 126 MB 垃圾（`alloc.mjs`）；現在 `DrinkFridge`／`FridgeStock`／`FridgeDoor`／`DrinkBottle`、`Entrance`、`Register`、`Stools`、`Fridges`、`Stocker`、`PersonClock`（傳 `phase`、`drink`、`eating` 讓它知道何時要重畫）、`FoodArt`、`FishSign`、`ViewCams`（姿勢經 ref 讀最新的）、`EditProxy`、`BossSpot` 都 memo，開店時每秒 0 次 `Movable` 重畫。傳給 memo 元件的 props 要穩定：陣列用 `useMemo`（`fridgeClear`），物件裡的 callback 用 ref 轉呼叫（App 的 `incenseProp`），向量用 `equals` 比較。
+  - **透明又雙面的材質一律單次繪製**（App 的 `ShadowPacer` 每 1.5 秒掃一次設 `forceSinglePass`）：three 會把它們畫兩次（背面、正面），每次之前都設 `needsUpdate`，每格為每個這種材質重算一次著色程式的參數（旗幟、光暈、玻璃、火爐邊緣，每格四十幾次）。這裡都是布、光暈、玻璃片，一次畫看起來一樣。
+  - **每格跑的迴圈不要 new 東西**：`alongPath` 只為最後那段建向量；玄關台階的位置每條路線只找一次（`stepAt` 的 `WeakMap`，以前每位走動的客人每格沿路試走一百步）；群組變換用模組層的暫存矩陣（`Movable.tsx` 的 `GT`）。剩下的配置大多是 three 呼叫 GL 時的（每次繪製上傳矩陣），隨繪製次數。
+  - 正式版開店 25 分鐘：回收後 JS heap 約 76 MB、array buffer（幾何資料）約 206 MB，都持平（`soak.mjs`）。
   - 目前（Intel Arc B580，1920×1080，最高畫質）：閉店總覽約 1,700 次繪製、60 fps；火烤灶台 840 次、60 fps；開店總覽約 2,200 次、約 45 fps（dev 模式）。
 - 桌機（非觸控）一律最高畫質（`scene/quality.ts`），只有手機才判斷降級；卡頓時 `scene/FramePacer.tsx` 會自動降解析度，再不行就鎖 30fps（載入後 10 秒才開始判斷、看一段時間裡中位數的那一格，偶爾的頓一下不算；降到 1 倍解析度後會一直維持；網址加 `?pace=0` 就不會降）；右上角一排圓鈕（由左到右：經營（店面小圖）、自動營運（自，亮燈＝開）、×2 遊戲倍速、開店／閉店、語言、日夜；窄於 900px 時經營與自動營運仍是左上的長鈕），現金單獨顯示在這一排的最左邊（`money-chip`，研製時在冷藏櫃小圖示左邊（App 的 `has-fridge`），點一下開帳簿）；右邊的面板（食材櫃、經營、飲料庫存）都停靠在畫面右側同一個位置，旁邊直立大字標題（食材／經營 OFFICE／飲料 DRINKS，`.dock-title`），一次只開一個（開一個就關掉其他的，App 的三個 effect）；×2 是遊戲倍速（`scene/speed.ts` 的 `GAME_SPEED`：3D 時鐘由 FramePacer 手動推進，App 的計時器也乘上它）。
 
