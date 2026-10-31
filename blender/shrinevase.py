@@ -2,10 +2,12 @@
 shoulder and a fine line at its foot, holding a spray of sakaki (glossy dark leaves, veined, on branching stems) with a few small chrysanthemums
 (white and yellow, petals in layers). About 18 cm tall in the shrine's units, standing on y = 0, its middle at x = z = 0.
 
-Writes public/models/shrinevase.glb and blender/shrinevase.blend; its root node is "ShrineVase".
+Three arrangements, by the variant given: 2 the plain one, sakaki with a few small chrysanthemums (public/models/shrinevase.glb, root
+"ShrineVase"); 0 white and gold chrysanthemums (shrinevase0.glb, "ShrineVase0"); 1 pink, crimson and violet blooms (shrinevase1.glb,
+"ShrineVase1"). Every stem a soft curve: rising from the water near upright, leaning out, meeting its flower from under it.
 
 Run:
-    blender -b --factory-startup --python blender/shrinevase.py -- <project path> [preview.png]
+    blender -b --factory-startup --python blender/shrinevase.py -- <project path> [preview.png] [variant]
 """
 import math
 import os
@@ -181,8 +183,9 @@ for s in range(NST):
     sp.use_endpoint_u = True
     sp.order_u = 4
     cu.bevel_depth = 0.0012
-    cu.bevel_resolution = 1
-    cu.taper_radius_mode = "MULTIPLY"
+    # (a twig a millimetre thick: six sides, three steps a span, are round and smooth enough)
+    cu.bevel_resolution = 0
+    cu.resolution_u = 3
     o = bpy.data.objects.new(f"stem{s}", cu)
     bpy.context.collection.objects.link(o)
     stems.append(o)
@@ -250,16 +253,32 @@ def petal(b, a, r0, L, W, elev, curl, cup, shape, nt=7, ns=5):
 
 
 def stalk(name, at):
+    """a stem from the water to the flower, the way a cut stem stands in a vase: rising near upright out of the mouth, then leaning out
+    and curving over to the bloom, which it meets from under it (the further out the flower, the more it gives); wandering a little to
+    one side; thinning toward the flower"""
     cu = bpy.data.curves.new(name + "Stalk", "CURVE"); cu.dimensions = "3D"
-    # (a soft arc from the mouth, up and over to the flower, not a straight stick)
-    sp = cu.splines.new("NURBS"); sp.points.add(6)
     span = at - MOUTH
-    for k in range(7):
-        t = k / 6
-        q = MOUTH + span * t + Vector((0, 0, 0.01 * math.sin(math.pi * t) - 0.004 * t * t))
+    out = Vector((span.x, span.y, 0))
+    reach = out.length
+    out = out.normalized() if reach > 1e-6 else Vector((1, 0, 0))
+    side = Vector((-out.y, out.x, 0))
+    h = span.z
+    wob = random.uniform(-1, 1) * 0.008
+    # (a cubic through: the mouth; up from it; in under the bloom, from inside; the bloom)
+    p0, p3 = MOUTH, at
+    p1 = MOUTH + Vector((0, 0, h * 0.6)) + out * reach * 0.08 + side * wob
+    p2 = at - out * reach * (0.3 + 0.25 * min(1.0, reach / 0.06)) - Vector((0, 0, h * 0.18)) + side * wob * 0.6
+    sp = cu.splines.new("NURBS"); sp.points.add(7)
+    for k in range(8):
+        t = k / 7
+        q = p0 * (1 - t) ** 3 + p1 * 3 * (1 - t) ** 2 * t + p2 * 3 * (1 - t) * t * t + p3 * t ** 3
         sp.points[k].co = (*q, 1)
+        sp.points[k].radius = 1.3 - 0.6 * t
     sp.use_endpoint_u = True; sp.order_u = 4
     cu.bevel_depth = 0.0011
+    # (a stem a millimetre thick: four sides and two steps a span are round and smooth enough)
+    cu.bevel_resolution = 0
+    cu.resolution_u = 2
     o = bpy.data.objects.new(name + "Stalk", cu); bpy.context.collection.objects.link(o)
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
     bpy.ops.object.convert(target="MESH")
@@ -321,7 +340,18 @@ M["gold"] = pbr("VaseMumGold", lin("#e0a020"), rough=0.55)
 M["green"] = pbr("VaseMumGreen", lin("#b8c860"), rough=0.6)
 M["peony"] = pbr("VaseMumPeony", lin("#f4a6bc"), rough=0.55)
 M["blush"] = pbr("VaseMumBlush", lin("#fbd6de"), rough=0.55)
-if VARIANT == 0:
+if VARIANT == 2:
+    # 平安 (the plain one, shrinevase.glb): the sakaki itself, with a few small single chrysanthemums (小菊) among its leaves, white and
+    # yellow round green and golden hearts
+    def SINGLE(r):
+        return [(16, r * 0.25, r * 0.8, r * 0.26, 0.12, -0.15, 0.25, "narrow")]
+
+    for i in range(5):
+        at, face = spot(i, 5, 0.025, 0.06, 0.15, 0.175)
+        c = ("white", "yellow")[i % 2]
+        bloom(f"VaseMumSmall{i}", at, face, SINGLE(0.016), M[c], heart=(M["green"] if c == "white" else M["heart"], 0.0045, 0.001))
+    NBUD, BUDMAT = 3, ["bud"]
+elif VARIANT == 0:
     # 金運: white and gold chrysanthemums in three kinds: big incurved ball blooms (輪菊) heaped at the top, gold spider mums (糸菊) with long
     # thread petals curling at their ends, and a scatter of small single spray mums (小菊) round them, white and yellow with green hearts
     def BALL(r):
@@ -386,11 +416,18 @@ else:
             twigs.append((MOUTH, mid, end) if f == 0 else (mid, end))
             for d_ in range(3):
                 dots.append(end + Vector((random.uniform(-0.004, 0.004), random.uniform(-0.004, 0.004), random.uniform(-0.003, 0.003))))
-    cu = bpy.data.curves.new("VaseBreathTwigs", "CURVE"); cu.dimensions = "3D"; cu.bevel_depth = 0.0005
+    cu = bpy.data.curves.new("VaseBreathTwigs", "CURVE"); cu.dimensions = "3D"; cu.bevel_depth = 0.0005; cu.bevel_resolution = 0; cu.resolution_u = 2
     for tw in twigs:
-        sp = cu.splines.new("POLY"); sp.points.add(len(tw) - 1)
-        for k, q in enumerate(tw):
+        # (each twig bowed a little between its points, up and to a side, not ruled straight)
+        pts = [tw[0]]
+        for a, b in zip(tw, tw[1:]):
+            d = b - a
+            bow = Vector((-d.y, d.x, 0)).normalized() * d.length * random.uniform(-0.18, 0.18) + Vector((0, 0, d.length * 0.12))
+            pts += [a + d * 0.5 + bow, b]
+        sp = cu.splines.new("NURBS"); sp.points.add(len(pts) - 1)
+        for k, q in enumerate(pts):
             sp.points[k].co = (*q, 1)
+        sp.use_endpoint_u = True; sp.order_u = 3
     o = bpy.data.objects.new("VaseBreathTwigs", cu); bpy.context.collection.objects.link(o)
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
     bpy.ops.object.convert(target="MESH")
@@ -410,7 +447,9 @@ for i in range(NBUD):
     bd = active(); bd.scale = (1, 1, 1.4)
     fin(bd, f"VaseBud{i}", M[BUDMAT[i % len(BUDMAT)]])
     stalk(f"VaseBud{i}", at)
-root = bpy.data.objects.new(f"ShrineVase{VARIANT}", None)
+# (the plain one keeps its old file and root name)
+NAME = "shrinevase" if VARIANT == 2 else f"shrinevase{VARIANT}"
+root = bpy.data.objects.new("ShrineVase" if VARIANT == 2 else f"ShrineVase{VARIANT}", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
     o.parent = root
@@ -431,5 +470,5 @@ if PREVIEW:
     w.node_tree.nodes["Background"].inputs[0].default_value = (0.45, 0.45, 0.45, 1)
     bpy.context.scene.world = w
 os.makedirs(os.path.join(PROJECT, "public", "models"), exist_ok=True)
-export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", f"shrinevase{VARIANT}.glb"), os.path.join(PROJECT, "blender", f"shrinevase{VARIANT}.blend"), PREVIEW)
+export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", f"{NAME}.glb"), os.path.join(PROJECT, "blender", f"{NAME}.blend"), PREVIEW)
 print("SHRINEVASE_DONE", len(parts), "parts", sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in parts), "tris")
