@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { mergeByMaterial } from '@/scene/StaticBatch'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { TILL_STATE, yen } from './bar'
@@ -216,7 +217,13 @@ function slide(closing: boolean) {
  */
 export function TillMatLive({ tip, editing }: { tip: (open: boolean) => Record<string, unknown>; editing: () => boolean }) {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const mat = useMemo(() => piecesOf(gltf.scene).TillMat, [gltf])
+  const mat = useMemo(() => {
+    const m = piecesOf(gltf.scene).TillMat
+    // (the stand itself, which never moves, folded into a mesh or two per material (its ink lines too); the two drawers, which slide out,
+    // left as they are)
+    if (!m.userData.folded) { mergeByMaterial(m, (o) => /^DeskMatDrawer/.test(o.name)); m.userData.folded = true }
+    return m
+  }, [gltf])
   const drawers = useMemo(() => [0, 1].map((k) => mat.getObjectByName(`DeskMatDrawer${k}`)!), [mat])
   const open = useRef([false, false])
   const at = useRef([0, 0])
