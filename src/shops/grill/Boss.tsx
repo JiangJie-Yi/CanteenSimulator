@@ -7,7 +7,7 @@ import { mergeByMaterial } from '@/scene/StaticBatch'
 import { airbrush, gradientMap } from '@/scene/Person3D'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
-import { bossLineText, bossSituation, drinkLineText, nextBossLine, tasteLineText, type BossSituation } from '@/data/bossLines'
+import { bossLineText, bossSituation, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
 import { DrinkBottle } from './DiningRoom'
 import { FRIDGE_STOCK, type DrinkId } from './bar'
 
@@ -42,7 +42,11 @@ const RUN_SPEED = 2.4
 /** `to`: the far end of his walk, in the frame he stands in (x, z), from his place at its origin, facing +z */
 /** a taste he's been asked for (Roasting, as the owner clicks something in the tasting bowl): where it is (world), and whether he's there
  * to eat it yet; cleared when it's eaten */
-export const BOSS_TASTE = { at: null as THREE.Vector3 | null, arrived: false, since: 0 }
+export const BOSS_TASTE = { at: null as THREE.Vector3 | null, arrived: false, since: 0,
+  /** he's biting into it now (Roasting, from the first bite): he says so, munching */
+  chewing: false,
+  /** its 美味 once he's swallowed it (Roasting): he says what he thinks of it, and it's cleared */
+  verdict: null as number | null }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossTaste?: typeof BOSS_TASTE }).__bossTaste = BOSS_TASTE
 /** a drink set down on a table near him (DiningRoom's FridgeStock, as it's let go there): where it stands (world) and which it is (the drink out of the
  * fridge, taken off the table as he picks it up); he goes over, drinks it and says so; cleared when it's drunk */
@@ -52,6 +56,8 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?: [number, number]; open?: boolean; lang?: Lang; children?: ReactNode }) {
   // ---- muttering to himself, always: a line every few seconds, by day or night, open or shut (data/bossLines), never the same twice running
   const [say, setSay] = useState<{ text: string; key: number } | null>(null)
+  /** (he's said he's munching, this taste) */
+  const chewSaid = useRef(false)
   // (a drink he's been handed, in his hand while he drinks it)
   const [drinkId, setDrinkId] = useState<DrinkId | null>(null)
   const drinkRef = useRef<THREE.Group>(null)
@@ -199,6 +205,12 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     const ph = ROUNDS[s.phase % ROUNDS.length]
     s.t += edit ? 0 : dt
     // (where he's going: the far end on the walk out, home on the run back; what he's doing when he's there)
+    // (swallowed: what he thinks of it, said as he turns back)
+    if (BOSS_TASTE.verdict !== null) {
+      setSay({ text: verdictLineText(tasteVerdict(BOSS_TASTE.verdict), Math.random(), lang), key: Date.now() })
+      BOSS_TASTE.verdict = null
+      chewSaid.current = false
+    }
     let act: Phase['act'] | 'taste' | 'drink' = ph.act
     let speed = 0
     // (asked to taste: down his aisle to where it passes nearest the bowl, turned to it, and there he eats it; then back to his round)
@@ -235,7 +247,9 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
         act = 'drink'
       } else {
         turnTo(s, Math.atan2(ask.x - s.x, ask.z - s.z), dt * 7)
-        if (!BOSS_TASTE.arrived) { BOSS_TASTE.arrived = true; BOSS_TASTE.since = T; setSay({ text: tasteLineText(Math.random(), lang), key: Date.now() }) }
+        if (!BOSS_TASTE.arrived) { BOSS_TASTE.arrived = true; BOSS_TASTE.since = T; BOSS_TASTE.chewing = false; setSay({ text: tasteLineText(Math.random(), lang), key: Date.now() }) }
+        // (once he bites in, what he says turns to munching)
+        if (BOSS_TASTE.chewing && !chewSaid.current) { chewSaid.current = true; setSay({ text: munchLineText(Math.random(), lang), key: Date.now() }) }
         // (never left standing there: whatever it was is gone by now)
         if (T - BOSS_TASTE.since > 10) { BOSS_TASTE.at = null; BOSS_TASTE.arrived = false }
         act = 'taste'

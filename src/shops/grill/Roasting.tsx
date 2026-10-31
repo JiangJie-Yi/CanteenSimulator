@@ -22,6 +22,7 @@ import { Steam } from '@/scene/Steam'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { QUALITY } from '@/scene/quality'
 import { seasonSound, sprinkleTick } from './seasonSound'
+import { biteSound, chewSound } from './chewSound'
 import { comesIn, patienceIn, roomMood } from '@/game/roomLights'
 import { getLights } from '@/scene/lightsStore'
 import { kindOf, type GuestKind } from '@/data/guests'
@@ -2138,6 +2139,8 @@ type Piece = {
   flight: number
   /** (served by a server) out at the pass, or on its way: it goes on to the customer's plate when it's set down */
   via?: 'pass'
+  /** (the owner tasting it: time since his last munch) */
+  chewAt?: number
   /** which of the pass tray's places it's put out on */
   passAt?: number
   /** drawn at the bar's size: it's been out on it (at the pass), so it doesn't grow back on the last hop */
@@ -5156,7 +5159,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.eat = Math.min(1, p.eat + dt / EAT_SECONDS)
         const phase = p.eat * BITES_PER_PIECE
         const wanted = Math.min(BITES_PER_PIECE, Math.floor(phase + 0.35))
-        while (p.bites.uBiteCount.value < wanted) takeBite(p)
+        while (p.bites.uBiteCount.value < wanted) {
+          takeBite(p)
+          // (the owner's own taste: each bite crunches, and he's chewing)
+          if (p.byBoss) { biteSound(); BOSS_TASTE.chewing = true }
+        }
+        // (and between bites the soft munching)
+        if (p.byBoss) {
+          p.chewAt = (p.chewAt ?? 0) + dt
+          if (p.chewAt > 0.24 + Math.random() * 0.08) { p.chewAt = 0; chewSound() }
+        }
         // (only what's eaten off your own plate hops up to be bitten: at the bar it's the customer you see eating, so
         // the piece just lies there getting smaller)
         if (!p.body?.live && p.container !== 'bar') {
@@ -5171,7 +5183,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.node.position.lerp(to, THREE.MathUtils.smoothstep(p.eat, 0, 0.15))
         }
         if (p.eat >= 1) {
-          // (he's had it: off back to his round)
+          // (he's had it: what he thinks of it, then off back to his round)
+          if (p.byBoss) { BOSS_TASTE.verdict = tasteOf(p); BOSS_TASTE.chewing = false }
           if (!p.node.userData.byGuest) BOSS_TASTE.at = null
           p.byBoss = false
           // (what an AI customer eats fills their stomach, not yours)

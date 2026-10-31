@@ -87,7 +87,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **Esc** 關掉目前開著的介面（由上而下：辦公室、看板、工具選單、食材櫃、視角選單；開發者模式與收銀機說明書自己處理）。
 - **帳本**是「經營」（`ui/Office.tsx`）的第三個頁籤「帳簿」（現金、開業費用、採買、收銀機取款、供品、營業額、食材、燃料、人事、利潤、利潤率）；右上角沒有「帳」按鈕。
 - 客人看板（掌廚、來客、在座、最近四位的心情，`guest-board`）只在手機版顯示；電腦上客人就在 3D 吧台。
-- **試吃**：研製時點試吃碗裡烤好的東西，老闆會沿他的走道走到最靠近碗的地方、轉向它、說一句（`data/bossLines.ts` 的 `TASTE_LINES`），把它拿到嘴邊吃完，再跑回原本的作息（`Boss.tsx` 的 `BOSS_TASTE`；Roasting 的 `awaitBoss`、`byBoss`）。一次一份。
+- **試吃**：研製時點試吃碗裡烤好的東西，老闆會沿他的走道走到最靠近碗的地方、轉向它、說一句（`data/bossLines.ts` 的 `TASTE_LINES`），把它拿到嘴邊吃完，再跑回原本的作息（`Boss.tsx` 的 `BOSS_TASTE`；Roasting 的 `awaitBoss`、`byBoss`）。一次一份。每咬一口有咔滋聲、咬與咬之間有咀嚼聲（`shops/grill/chewSound.ts`，WebAudio 即時合成），咬下第一口時台詞換成嚼東西的（`MUNCH_LINES`，`BOSS_TASTE.chewing`），吃完依美味給評語（`tasteVerdict`：80 以上很好吃、60 好吃、35 普通、以下難吃；`VERDICT_LINES`，`BOSS_TASTE.verdict`；BDD `boss-taste`）。
 - 廚師只是偶爾搧火：一段時間拿著扇子搧，再放下站著（`Person3D.tsx` 的 `fanning`），每人錯開。
 - 老闆擋住鏡頭看的東西時會變淡（只在他真的蓋住畫面中央附近時），用 `alphaHash` 抖動透明，不會變黑或透出身體內部。
 - 灶台桌上只有試吃碗（碗公）是常駐的碗盤：沒有備用盤疊（Roasting 的 `SPARES` 空的）；盤子（`plate-n`）、小碟（`dish-n`）、飯糰的小碟（`rawdish`）都在桌面上，只有裝著東西時才出現（`WhenHeld`）；飯桶台的下層不再放碗。

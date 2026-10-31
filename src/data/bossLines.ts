@@ -85,6 +85,45 @@ export const tasteLineText = (r: number, lang: Lang) => {
   return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
 }
 
+/** what he says while he chews it (the bites crunching, his cheeks going) */
+export const MUNCH_LINES: Line[] = [
+  { zh: '（嚼嚼）嗯……', ja: '（もぐもぐ）うむ……', en: '*munch munch* hm…' },
+  { zh: '咔滋……唔……', ja: 'カリッ……んー……', en: '*crunch*… mm…' },
+  { zh: '（嚼）……嗯嗯。', ja: '（もぐ）……ふむふむ。', en: '*chew*… mm-hm.' },
+]
+export const munchLineText = (r: number, lang: Lang) => {
+  const l = MUNCH_LINES[Math.floor(r * MUNCH_LINES.length) % MUNCH_LINES.length]
+  return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
+}
+
+/** how he finds what he's tasted, by its 美味 (0..100): very good from 80, good from 60, so-so from 35, else bad */
+export type TasteVerdict = 'great' | 'good' | 'meh' | 'bad'
+export const tasteVerdict = (taste: number): TasteVerdict => (taste >= 80 ? 'great' : taste >= 60 ? 'good' : taste >= 35 ? 'meh' : 'bad')
+/** what he says once he's swallowed it */
+export const VERDICT_LINES: Record<TasteVerdict, Line[]> = {
+  great: [
+    { zh: '好吃！就是這個味道！', ja: 'うまい！これだよ、これ！', en: "Delicious! That's the one!" },
+    { zh: '完美，可以上菜單了！', ja: '完璧だ、品書きに載せられる！', en: 'Perfect. Menu-worthy!' },
+  ],
+  good: [
+    { zh: '嗯，不錯吃。', ja: 'うん、悪くない。', en: 'Mm, not bad at all.' },
+    { zh: '好吃，再調一下會更好。', ja: 'うまい、もう一工夫でもっと良くなる。', en: 'Good. A tweak and it’s great.' },
+  ],
+  meh: [
+    { zh: '普通……還差一點。', ja: 'まあまあ……もう一歩だな。', en: 'So-so… not quite there.' },
+    { zh: '嗯……味道有點淡。', ja: 'うーん……ちょっと物足りない。', en: 'Hm… a bit flat.' },
+  ],
+  bad: [
+    { zh: '不行，這個不能端給客人。', ja: 'だめだ、これは客に出せん。', en: "No. Can't serve this." },
+    { zh: '唔……烤壞了吧。', ja: 'うっ……焼き損じたな。', en: 'Ugh… that one went wrong.' },
+  ],
+}
+export const verdictLineText = (v: TasteVerdict, r: number, lang: Lang) => {
+  const ls = VERDICT_LINES[v]
+  const l = ls[Math.floor(r * ls.length) % ls.length]
+  return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
+}
+
 /** what he says as he drinks what he's been handed */
 export const DRINK_LINES: Line[] = [
   { zh: '噗哈～冰得剛好！', ja: 'ぷはーっ、よく冷えてる！', en: 'Ahh, nice and cold!' },
