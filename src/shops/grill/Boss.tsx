@@ -122,45 +122,26 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
   // ---- out of the way of the camera: standing between it and what it's on (the grill, from camera 1 right behind him), he fades to a ghost
   // of himself, as a game's characters do; his own materials, so nothing else fades with him
   const ghost = useRef(1)
-  const { mats, inks, twins, bodies } = useMemo(() => {
+  const { mats, inks } = useMemo(() => {
     const set = new Set<THREE.Material>()
     const ink: THREE.Object3D[] = []
-    const meshes: THREE.Mesh[] = []
     root.traverse((o) => {
       const m = (o as THREE.Mesh).material
       if (!m) return
       // (the ink line round him is drawn on its own back faces: it goes while he's faded, or it would hang there as a dark ring)
       if (/outline/i.test(o.name) || (!Array.isArray(m) && m.side === THREE.BackSide)) { ink.push(o); return }
-      if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh)
       for (const x of Array.isArray(m) ? m : [m]) set.add(x)
     })
-    // (a ghost seen through itself is a jumble: from above, his face through his hair, his apron's far side through its near one. So each
-    // part has a twin that draws only depth, just before the faded parts, and the ghost shows only his nearest surface, as one figure)
-    const depth = new THREE.MeshBasicMaterial({ colorWrite: false, transparent: true, depthWrite: true })
-    const tw: THREE.Mesh[] = []
-    for (const o of meshes) {
-      if (o.userData.depthTwin) continue
-      let t: THREE.Mesh
-      if ((o as THREE.SkinnedMesh).isSkinnedMesh) {
-        const s = o as THREE.SkinnedMesh
-        const k = new THREE.SkinnedMesh(s.geometry, depth)
-        k.bind(s.skeleton, s.bindMatrix)
-        t = k
-      } else t = new THREE.Mesh(o.geometry, depth)
-      t.userData.depthTwin = true
-      t.raycast = () => {}
-      t.renderOrder = 1
-      t.visible = false
-      t.frustumCulled = o.frustumCulled
-      o.add(t)
-      tw.push(t)
-    }
-    return { mats: [...set], inks: ink, twins: tw, bodies: meshes }
+    return { mats: [...set], inks: ink }
   }, [root])
   const controls = useThree((s) => s.controls) as unknown as { target?: THREE.Vector3 } | null
-  useFrame(({ camera: cam }, dt) => {
+  const fadeClock = useRef(0)
+  useFrame(({ camera: cam, clock }) => {
     const m = mover.current
     if (!m) return
+    // (the step from the clock itself, as for his walk: the frame's delta runs short while the frames are paced)
+    const dt = Math.min(Math.max(0, clock.elapsedTime - fadeClock.current), 0.1)
+    fadeClock.current = clock.elapsedTime
     // (his head: what shows first at the foot of the picture)
     const at = m.localToWorld(new THREE.Vector3(0, 0.8, 0))
     const fwd = cam.getWorldDirection(new THREE.Vector3())
@@ -180,13 +161,11 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     const k = ghost.current
     for (const o of inks) o.visible = k > 0.95
     const faded = k < 0.99
-    for (const t of twins) t.visible = faded
-    for (const o of bodies) o.renderOrder = faded ? 2 : 0
+    // (faded by hashing, not blending: each pixel of him drawn or not by a fine dither as faint as he is, his nearest surface still hiding his
+    // far side, so he's one see-through figure whatever's drawn first; blended, he went to a jumble or to black)
     for (const x of mats) {
-      const on = faded
-      if (x.transparent !== on) { x.transparent = on; x.needsUpdate = true }
+      if (x.alphaHash !== faded) { x.alphaHash = faded; x.needsUpdate = true }
       x.opacity = k
-      x.depthWrite = !on
     }
   })
   useFrame(({ clock }) => {

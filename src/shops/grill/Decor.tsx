@@ -507,16 +507,44 @@ function RiceTub() {
 export const FRIDGE_KICK = { at: -1e9 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridgeKick?: typeof FRIDGE_KICK }).__fridgeKick = FRIDGE_KICK
 const CUTFISH_URL = import.meta.env.BASE_URL + 'models/cut_fish.glb'
+/** the freezer's lid, opened by hand (a click): it stays up till it's clicked shut */
+export const FREEZER = { open: false }
+const FREEZER_URL = import.meta.env.BASE_URL + 'models/freezer.glb'
+useGLTF.preload(FREEZER_URL)
 /**
- * The ingredient freezer: a wide chest freezer lying along the kitchen's back wall by the staff door, pale blue-white on a dark plinth, its
- * hinged lid on the back edge with a chrome handle, a compressor housing at its right end (vent louvres, a dial and a red lamp), and a plate
- * on its front that says 食材. Its lid swings up for a moment each time something is brought out of it for an order, a cool light spilling
- * out over the frozen packs inside, and on the housing's top lies the cut fish (the downloaded hand-painted model, kept in its own colours).
+ * The ingredient freezer (blender/freezer.py): a wide chest freezer along the kitchen's back wall by the staff door, pale blue-white on a
+ * dark plinth, its compressor housing at the right end (louvres, a little display, the red lamp, a dial), the lid hinged on its back edge.
+ * Inside, as a fish shop's freezer is: whole fish glazed in ice, vacuum-packed fillets, a styrofoam fish box, the saury in a wire basket,
+ * ice and frost. Its lid swings up for a moment each time something's taken out for an order, a cool light spilling out over what's in it,
+ * and it can be opened by hand, a click (and shut again with another); on the housing's top lies the cut fish (the downloaded hand-painted
+ * model, kept in its own colours).
  */
 function IngredientFridge() {
-  const lid = useRef<THREE.Group>(null)
+  const lid = useRef<THREE.Object3D | null>(null)
   const light = useRef<THREE.PointLight>(null)
   const gltf = useGLTF(CUTFISH_URL) as unknown as { scene: THREE.Group }
+  const fz = useGLTF(FREEZER_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const root = fz.scene.clone(true)
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      // (in the room's toon light: each part its own colour, the steel and the ice keeping a little gloss)
+      const src = m.material as THREE.MeshStandardMaterial
+      const glossy = /Steel|Ice|Film|Wire|Plate/.test(src.name)
+      m.material = glossy
+        ? new THREE.MeshPhysicalMaterial({ color: src.color, metalness: src.metalness, roughness: Math.max(0.15, src.roughness), clearcoat: 0.6,
+          transparent: /Ice|Film/.test(src.name), opacity: /Ice/.test(src.name) ? 0.55 : /Film/.test(src.name) ? 0.35 : 1 })
+        : /Lcd|Lamp/.test(src.name) ? new THREE.MeshBasicMaterial({ color: src.emissive.clone().multiplyScalar(1.4), toneMapped: false })
+          : new THREE.MeshToonMaterial({ color: src.color })
+      m.castShadow = !/Goods/.test(m.name)
+    })
+    inkModel(root.getObjectByName('FreezerBody') as THREE.Mesh)
+    inkModel(root.getObjectByName('FreezerLid') as THREE.Mesh)
+    return root
+  }, [fz])
+  // (its lid, looked up in the model as drawn)
+  lid.current = model.getObjectByName('FreezerLid') ?? null
   const fish = useMemo(() => {
     const root = gltf.scene.clone(true)
     root.traverse((o) => {
@@ -537,65 +565,18 @@ function IngredientFridge() {
     return wrap
   }, [gltf])
   useFrame(() => {
-    const open = performance.now() - FRIDGE_KICK.at < 1800 ? 1 : 0
+    const open = FREEZER.open || performance.now() - FRIDGE_KICK.at < 1800 ? 1 : 0
     // (the lid hinged on its back edge, swinging up and over)
     if (lid.current) lid.current.rotation.x += ((-open * 1.85) - lid.current.rotation.x) * 0.1
     if (light.current) light.current.intensity += (open * 1.1 - light.current.intensity) * 0.12
   })
-  // (its size: along the wall, deep, and tall as a worktop; the compressor housing takes the right-hand end)
-  const W = 1.5, D = 0.74, H = 0.86, HOUSE = 0.34, PLINTH = 0.1, WALL = 0.05, LID = 0.09
-  const BODY = '#dce9f1', DARK = '#46576a', INNER = '#eef6fb'
-  const STEEL = '#cdd5db'
-  const LW = W - HOUSE
-  // (the frozen packs inside: blocks and trays in cool whites and blues, heaped in the cavity)
-  const packs = useMemo(() => {
-    let seed = 5
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    const tones = ['#f2f8fc', '#cfe3f1', '#e4eef6', '#bcd6ea', '#f8fbfd']
-    return Array.from({ length: 16 }, (_, i) => ({
-      p: [(rnd() - 0.5) * (LW - 0.3), PLINTH + 0.1 + Math.floor(i / 8) * 0.07 + 0.03, (rnd() - 0.5) * (D - 0.25)] as [number, number, number],
-      s: [0.14 + rnd() * 0.12, 0.06 + rnd() * 0.03, 0.12 + rnd() * 0.08] as [number, number, number], r: (rnd() - 0.5) * 0.5, c: tones[i % tones.length],
-    }))
-  }, [LW])
+  const W = 1.5, H = 0.86, HOUSE = 0.34
   return (
     <group>
-      {/* the plinth, and the cabinet's four walls and floor round the cavity */}
-      <mesh position={[0, PLINTH / 2, 0]}><boxGeometry args={[W - 0.04, PLINTH, D - 0.04]} /><meshToonMaterial color={DARK} /></mesh>
-      <mesh position={[-HOUSE / 2, PLINTH + 0.03, 0]}><boxGeometry args={[LW - 0.02, 0.06, D - 0.02]} /><meshToonMaterial color={INNER} /></mesh>
-      {/* (front and back walls, left end, and the wall between the cavity and the housing) */}
-      <mesh position={[-HOUSE / 2, (H - LID + PLINTH) / 2, D / 2 - WALL / 2]} castShadow><boxGeometry args={[LW, H - LID - PLINTH, WALL]} /><meshToonMaterial color={BODY} /></mesh>
-      <mesh position={[-HOUSE / 2, (H - LID + PLINTH) / 2, -D / 2 + WALL / 2]}><boxGeometry args={[LW, H - LID - PLINTH, WALL]} /><meshToonMaterial color={BODY} /></mesh>
-      <mesh position={[-W / 2 + WALL / 2, (H - LID + PLINTH) / 2, 0]} castShadow><boxGeometry args={[WALL, H - LID - PLINTH, D]} /><meshToonMaterial color={BODY} /></mesh>
-      <mesh position={[W / 2 - HOUSE, (H - LID + PLINTH) / 2, 0]}><boxGeometry args={[WALL, H - LID - PLINTH, D]} /><meshToonMaterial color={INNER} /></mesh>
-      {/* (the inside faces, paler, seen when the lid is up) */}
-      <mesh position={[-HOUSE / 2, (H - LID + PLINTH) / 2, D / 2 - WALL - 0.002]} rotation-y={Math.PI}><planeGeometry args={[LW - 0.1, H - LID - PLINTH]} /><meshToonMaterial color={INNER} /></mesh>
-      <mesh position={[-HOUSE / 2, (H - LID + PLINTH) / 2, -D / 2 + WALL + 0.002]}><planeGeometry args={[LW - 0.1, H - LID - PLINTH]} /><meshToonMaterial color={INNER} /></mesh>
-      {/* (the frozen packs) */}
-      <group position={[-HOUSE / 2, 0, 0]}>
-        {packs.map((k, i) => <mesh key={i} position={k.p} rotation-y={k.r}><boxGeometry args={k.s} /><meshToonMaterial color={k.c} /></mesh>)}
-      </group>
-      {/* the chrome rim all round the opening, and the gasket's dark line inside it */}
-      <mesh position={[-HOUSE / 2, H - LID - 0.006, 0]}><boxGeometry args={[LW + 0.03, 0.012, D + 0.03]} /><meshToonMaterial color={STEEL} /></mesh>
-      {/* the compressor housing at the right end: a solid block, a top of its own, louvres, a dial and a lamp on its front */}
-      <mesh position={[W / 2 - HOUSE / 2, (H + PLINTH) / 2, 0]} castShadow><boxGeometry args={[HOUSE, H - PLINTH, D]} /><meshToonMaterial color={BODY} /></mesh>
-      <mesh position={[W / 2 - HOUSE / 2, H + 0.006, 0]}><boxGeometry args={[HOUSE + 0.02, 0.014, D + 0.02]} /><meshToonMaterial color={STEEL} /></mesh>
-      {[0, 1, 2, 3, 4, 5].map((k) => <mesh key={k} position={[W / 2 - HOUSE / 2, 0.22 + k * 0.034, D / 2 + 0.003]}><boxGeometry args={[0.22, 0.012, 0.006]} /><meshToonMaterial color={DARK} /></mesh>)}
-      <mesh position={[W / 2 - HOUSE / 2 + 0.07, 0.58, D / 2 + 0.012]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.026, 0.028, 0.02, 16]} /><meshToonMaterial color="#2c3640" /></mesh>
-      <mesh position={[W / 2 - HOUSE / 2 + 0.07, 0.58, D / 2 + 0.023]}><boxGeometry args={[0.004, 0.034, 0.002]} /><meshBasicMaterial color="#f4f1e6" /></mesh>
-      <mesh position={[W / 2 - HOUSE / 2 - 0.07, 0.58, D / 2 + 0.008]}><sphereGeometry args={[0.011, 10, 8]} /><meshBasicMaterial color="#ff4a3a" toneMapped={false} /></mesh>
-      {/* the lid, hinged along its back edge: a thick slab with a chrome handle at the front and a lock, its underside's gasket dark */}
-      <group ref={lid} position={[-HOUSE / 2, H - LID, -D / 2]}>
-        <mesh position={[0, LID / 2, D / 2]} castShadow><boxGeometry args={[LW, LID, D]} /><meshToonMaterial color="#eaf3f9" /></mesh>
-        <mesh position={[0, LID / 2 - 0.02, D / 2]}><boxGeometry args={[LW + 0.012, 0.012, D + 0.012]} /><meshToonMaterial color={STEEL} /></mesh>
-        {/* (the underside: a pale liner with the gasket's dark line all round its edge) */}
-        <mesh position={[0, 0.003, D / 2]}><boxGeometry args={[LW - 0.06, 0.006, D - 0.06]} /><meshToonMaterial color="#e4eef5" /></mesh>
-        {[-1, 1].map((sd) => <mesh key={`a${sd}`} position={[0, 0.0045, D / 2 + sd * (D / 2 - 0.045)]}><boxGeometry args={[LW - 0.06, 0.008, 0.016]} /><meshToonMaterial color="#2a3138" /></mesh>)}
-        {[-1, 1].map((sd) => <mesh key={`b${sd}`} position={[sd * (LW / 2 - 0.045), 0.0045, D / 2]}><boxGeometry args={[0.016, 0.008, D - 0.06]} /><meshToonMaterial color="#2a3138" /></mesh>)}
-        <mesh position={[0, LID * 0.62, D - 0.03]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.011, 0.011, 0.5, 10]} /><meshToonMaterial color={STEEL} /></mesh>
-        {[-0.22, 0.22].map((x) => <mesh key={x} position={[x, LID * 0.62, D - 0.014]}><boxGeometry args={[0.02, 0.03, 0.028]} /><meshToonMaterial color={STEEL} /></mesh>)}
-        <mesh position={[LW / 2 - 0.1, LID * 0.5, D + 0.002]}><boxGeometry args={[0.03, 0.03, 0.006]} /><meshToonMaterial color="#8a8e92" /></mesh>
-        {/* (the two hinges at the back) */}
-        {[-LW / 2 + 0.16, LW / 2 - 0.16].map((x) => <mesh key={x} position={[x, LID / 2, -0.004]}><boxGeometry args={[0.1, 0.05, 0.012]} /><meshToonMaterial color="#8a8e92" /></mesh>)}
+      <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; FREEZER.open = !FREEZER.open; setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開' }) }}
+        onPointerOver={(e) => { e.stopPropagation(); glowOnly(e.eventObject); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開看看' }) }}
+        onPointerOut={(e) => { glowLeave(e.eventObject); setTip(null) }}>
+        <primitive object={model} />
       </group>
       <pointLight ref={light} position={[-HOUSE / 2, H - 0.12, 0.15]} color="#cfe9ff" intensity={0} distance={2.4} decay={1.6} />
       {/* the cut fish on the housing's top, laid across it */}

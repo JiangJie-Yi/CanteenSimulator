@@ -778,12 +778,21 @@ for k in range(4):
     bm_.to_mesh(o.data); bm_.free()
     bars.append(finish(o, f"Robuchi{k}", M["robuchi"]))
 # (the brass: an L-shaped plate over each corner, and a fine inlaid line round the inner edge's top)
+# (each corner capped whole, as an irori's 隅金具 is: an L over the top the bars' full width, the plate folded down both outer faces to the
+# foot, and a rounded edge where they meet at the corner)
+CL = 0.22
 for k in range(4):
     sx, sy = (1 if k in (1, 2) else -1), (1 if k >= 2 else -1)
-    for (w, d, cx, cy) in ((0.2, 0.05, OUT - 0.1, OUT - 0.025), (0.05, 0.2, OUT - 0.025, OUT - 0.1)):
+    for (w, d, cx, cy) in ((CL, IRORI_W, OUT - CL / 2, OUT - IRORI_W / 2), (IRORI_W, CL, OUT - IRORI_W / 2, OUT - CL / 2)):
         bpy.ops.mesh.primitive_cube_add(size=1, location=(sx * cx, sy * cy, IRORI_H + 0.002))
         o = active(); o.scale = (w, d, 0.006)
         bars.append(finish(o, f"RobuchiBrassCorner{k}", M["brass"], smooth_shade=False))
+    for (w, d, cx, cy) in ((CL, 0.006, OUT - CL / 2, OUT + 0.002), (0.006, CL, OUT + 0.002, OUT - CL / 2)):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(sx * cx, sy * cy, IRORI_H / 2 + 0.002))
+        o = active(); o.scale = (w, d, IRORI_H + 0.01)
+        bars.append(finish(o, f"RobuchiBrassSide{k}", M["brass"], smooth_shade=False))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.008, depth=IRORI_H + 0.012, location=(sx * (OUT + 0.002), sy * (OUT + 0.002), IRORI_H / 2 + 0.002))
+    bars.append(finish(active(), f"RobuchiBrassEdge{k}", M["brass"]))
 for k in range(4):
     a_ = k * math.pi / 2
     ca, sa = math.cos(a_), math.sin(a_)
