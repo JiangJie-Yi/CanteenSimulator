@@ -6,7 +6,9 @@ import { inkModel } from '@/scene/inkHull'
 import { airbrush, gradientMap } from '@/scene/Person3D'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
-import { bossLineText, bossSituation, nextBossLine, tasteLineText, type BossSituation } from '@/data/bossLines'
+import { bossLineText, bossSituation, drinkLineText, nextBossLine, tasteLineText, type BossSituation } from '@/data/bossLines'
+import { DrinkBottle } from './DiningRoom'
+import { FRIDGE_STOCK, type DrinkId } from './bar'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -41,10 +43,17 @@ const RUN_SPEED = 2.4
  * to eat it yet; cleared when it's eaten */
 export const BOSS_TASTE = { at: null as THREE.Vector3 | null, arrived: false, since: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossTaste?: typeof BOSS_TASTE }).__bossTaste = BOSS_TASTE
+/** a drink set down on a table near him (DiningRoom's FridgeStock, as it's let go there): where it stands (world) and which it is (the drink out of the
+ * fridge, taken off the table as he picks it up); he goes over, drinks it and says so; cleared when it's drunk */
+export const BOSS_DRINK = { at: null as THREE.Vector3 | null, id: null as DrinkId | null, item: null as unknown, arrived: false, since: 0 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossDrink?: typeof BOSS_DRINK }).__bossDrink = BOSS_DRINK
 /** `to`: the far end of his walk; `open`: the shop's open (his chef has the grill, he stays put); he mutters in `lang` */
 export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?: [number, number]; open?: boolean; lang?: Lang; children?: ReactNode }) {
   // ---- muttering to himself, always: a line every few seconds, by day or night, open or shut (data/bossLines), never the same twice running
   const [say, setSay] = useState<{ text: string; key: number } | null>(null)
+  // (a drink he's been handed, in his hand while he drinks it)
+  const [drinkId, setDrinkId] = useState<DrinkId | null>(null)
+  const drinkRef = useRef<THREE.Group>(null)
   useEffect(() => {
     let last: { s: BossSituation; i: number } | null = null
     let n = 0
@@ -187,10 +196,13 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     const ph = ROUNDS[s.phase % ROUNDS.length]
     s.t += edit ? 0 : dt
     // (where he's going: the far end on the walk out, home on the run back; what he's doing when he's there)
-    let act: Phase['act'] | 'taste' = ph.act
+    let act: Phase['act'] | 'taste' | 'drink' = ph.act
     let speed = 0
     // (asked to taste: down his aisle to where it passes nearest the bowl, turned to it, and there he eats it; then back to his round)
-    const ask = !edit && BOSS_TASTE.at && m.parent ? m.parent.worldToLocal(BOSS_TASTE.at.clone()) : null
+    // (or handed a drink: the same, and he drinks it)
+    const drinking = !BOSS_TASTE.at && !!BOSS_DRINK.at
+    const want = BOSS_TASTE.at ?? BOSS_DRINK.at
+    const ask = !edit && want && m.parent ? m.parent.worldToLocal(want.clone()) : null
     if (ask) {
       const len = Math.hypot(to[0], to[1]) || 1
       const ux = to[0] / len, uz = to[1] / len
@@ -204,7 +216,20 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
         s.x += (dx / d) * stepL; s.z += (dz / d) * stepL
         s.stride += stepL
         turnTo(s, Math.atan2(dx, dz), dt * 9)
-        BOSS_TASTE.arrived = false
+        if (drinking) BOSS_DRINK.arrived = false
+        else BOSS_TASTE.arrived = false
+      } else if (drinking) {
+        turnTo(s, Math.atan2(ask.x - s.x, ask.z - s.z), dt * 7)
+        if (!BOSS_DRINK.arrived) {
+          // (he picks it up off the table: it's in his hand now)
+          BOSS_DRINK.arrived = true; BOSS_DRINK.since = T
+          const i = FRIDGE_STOCK.out.indexOf(BOSS_DRINK.item as (typeof FRIDGE_STOCK.out)[number])
+          if (i >= 0) { FRIDGE_STOCK.out.splice(i, 1); FRIDGE_STOCK.ver++ }
+          setDrinkId(BOSS_DRINK.id)
+        }
+        if (T - BOSS_DRINK.since > 1.6 && T - BOSS_DRINK.since - dt <= 1.6) setSay({ text: drinkLineText(Math.random(), lang), key: Date.now() })
+        if (T - BOSS_DRINK.since > 4.2) { BOSS_DRINK.at = null; BOSS_DRINK.id = null; BOSS_DRINK.item = null; BOSS_DRINK.arrived = false; setDrinkId(null) }
+        act = 'drink'
       } else {
         turnTo(s, Math.atan2(ask.x - s.x, ask.z - s.z), dt * 7)
         if (!BOSS_TASTE.arrived) { BOSS_TASTE.arrived = true; BOSS_TASTE.since = T; setSay({ text: tasteLineText(Math.random(), lang), key: Date.now() }) }
@@ -283,6 +308,12 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
       const chew = Math.max(0, Math.sin((T - BOSS_TASTE.since) * 7))
       R.set(-0.04, 0.3 + chew * 0.03, 0.18)
       L.set(0.04, 0.02, 0.1)
+    } else if (act === 'drink') {
+      // (the bottle up to his mouth in the right hand, tipped up as he drinks, then down with a sigh; the left on his belly)
+      const u = T - BOSS_DRINK.since
+      const up = Math.min(1, u / 0.4) * (1 - Math.max(0, Math.min(1, (u - 3.4) / 0.6)))
+      R.set(-0.05, 0.12 + up * 0.2, 0.2 - up * 0.04)
+      L.set(0.04, 0.02, 0.1)
     } else if (act === 'wave') {
       const w = Math.sin(s.t * 9)
       R.set(0.02 + w * 0.04, 0.32, 0.06)
@@ -295,6 +326,16 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     if (parts.handL) parts.handL.position.lerp(L, Math.min(1, dt * 12))
     // ---- what's in his hand: the tongs at the fire, the fan down the aisle; held at the right hand, swinging with it
     const hand = REST.R.clone().add(parts.handR?.position ?? new THREE.Vector3())
+    // (the drink in his hand, tipped up to his mouth as he drinks)
+    if (drinkRef.current) {
+      drinkRef.current.visible = act === 'drink'
+      if (act === 'drink') {
+        const u = T - BOSS_DRINK.since
+        const up = Math.min(1, u / 0.4) * (1 - Math.max(0, Math.min(1, (u - 3.4) / 0.6)))
+        drinkRef.current.position.copy(hand).add(new THREE.Vector3(0, -0.04, 0.02))
+        drinkRef.current.rotation.x = -up * 1.9
+      }
+    }
     if (parts.tongs) {
       parts.tongs.visible = act === 'tongs'
       parts.tongs.position.copy(hand).add(new THREE.Vector3(-0.02, 0.0, 0.02))
@@ -339,7 +380,9 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
           <span key={say.key} className="g3-bubble g3-say boss-say">{say.text}</span>
         </Html>
       )}
-      <group ref={body}><primitive object={root} /></group>
+      <group ref={body}><primitive object={root} />
+        <group ref={drinkRef} visible={false}>{drinkId && <DrinkBottle id={drinkId} wet />}</group>
+      </group>
     </group>
   )
 }

@@ -13,6 +13,7 @@ import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { StaffNoren } from './GuestBar3D'
+import { BOSS_DRINK } from './Boss'
 import { fridgesOf, farOf, STAFF_DOOR, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, restockDrink, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
@@ -2476,7 +2477,7 @@ export function FridgeDoor({ n = 0 }: { n?: number }) {
  */
 export function FridgeStock({ n = 0 }: { n?: number }) {
   const root = useRef<THREE.Group>(null)
-  const { camera, gl, raycaster } = useThree()
+  const { camera, gl, raycaster, scene } = useThree()
   const controls = useThree((st) => st.controls) as unknown as { enabled: boolean } | null
   const [, setVer] = useState(0)
   const seen = useRef(-1)
@@ -2587,6 +2588,12 @@ export function FridgeStock({ n = 0 }: { n?: number }) {
         grp.position.set(0, 0, 0)
         if (from.kind === 'slot') pullOut(n, [from.r, from.k], 0, 0.5, w)
         else moveOut(from.i, w)
+        // (set down near the boss: it's for him, and he comes over and drinks it)
+        const boss = scene.getObjectByName('BossFollow')
+        const item = from.kind === 'slot' ? FRIDGE_STOCK.out[FRIDGE_STOCK.out.length - 1] : FRIDGE_STOCK.out[from.i]
+        if (boss && item && !BOSS_DRINK.at && boss.getWorldPosition(new THREE.Vector3()).setY(onTable.y).distanceTo(onTable) < 3) {
+          BOSS_DRINK.at = onTable.clone(); BOSS_DRINK.id = item.id; BOSS_DRINK.item = item; BOSS_DRINK.arrived = false
+        }
         return
       }
       const px = grp.position.x, py = grp.position.y

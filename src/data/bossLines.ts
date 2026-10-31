@@ -84,3 +84,14 @@ export const tasteLineText = (r: number, lang: Lang) => {
   const l = TASTE_LINES[Math.floor(r * TASTE_LINES.length) % TASTE_LINES.length]
   return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
 }
+
+/** what he says as he drinks what he's been handed */
+export const DRINK_LINES: Line[] = [
+  { zh: '噗哈～冰得剛好！', ja: 'ぷはーっ、よく冷えてる！', en: 'Ahh, nice and cold!' },
+  { zh: '謝啦，正渴呢！', ja: 'ありがとよ、ちょうど喉が渇いてた！', en: 'Thanks, I was parched!' },
+  { zh: '工作中來一口，最棒了。', ja: '仕事中の一杯、最高だね。', en: 'A sip on the job — the best.' },
+]
+export const drinkLineText = (r: number, lang: Lang) => {
+  const l = DRINK_LINES[Math.floor(r * DRINK_LINES.length) % DRINK_LINES.length]
+  return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
+}

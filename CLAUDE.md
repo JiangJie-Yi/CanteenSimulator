@@ -153,6 +153,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **門簾**：入口的是米白棉布、深褐菱形家紋（中間「聞」）與一行 KIKUNO · YAKIZAKANA（`GuestBar3D.tsx` 的 `crestNorenTexture`，左右翻轉畫，從店內讀起來是正的），原木橫桿（`NorenModel` 的 `pole="wood"`，沒有吊線），寬同門口、加長 `NOREN_BIG`；舊的藍色「烤魚」門簾掛在員工出入口（`StaffNoren`：深色門洞＋木框，位置 `bar.ts` 的 `STAFF_DOOR`，地墊與員工下班的出口跟著它）。
 - 場景外的背景是深藍 `#0d1c33`（CSS 變數 `--scene-bg`，開發者面板「背景色」可改，存 localStorage `jgs-scene-bg`，`edit.ts` 的 `setBackdrop`），白天晚上一樣，中心較亮往外變暗的放射漸層（`index.css` 的 `.canvas-layer`），畫面四周有暗角（`.canvas-layer::after`，夜晚較深）；整間店底下有一片柔和的落地陰影（GuestBar3D 的 `GROUND_SHADOW`）。吊燈、燈串的光暈與桌面光圈白天淡、夜晚亮且多一圈大光暈（DiningRoom 的 `nightGlow`，跟著 data-theme）。
 - 開店（載入）時的起始視角是 1 自由視角（總覽，App 的 `view` 初始值 `free`）；e2e 會先切到 2 火烤灶台再補貨。
+- 把飲料從飲料櫃拖到老闆附近（3 以內）的桌上放下，老闆會走過去拿起來喝、說一句話（`Boss.tsx` 的 `BOSS_DRINK`，台詞 `data/bossLines.ts` 的 `DRINK_LINES`；dev 時 `__bossDrink`）。
 - 供清酒（點門口神棚前的酒瓶）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`；名稱沿用舊的點香）。
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。
 - **擋住視線的吊掛物會變淡**：`scene/OccluderFade.tsx` 每幾格從鏡頭朝看的目標（`__ctl.target` 在畫面上的位置，周圍一圈）打射線，標了 `userData.fade` 的群組（門簾、紅燈籠、旗幟串、幟旗、燈串、吊燈）擋在中間就淡到 18%，移開就恢復（各自複製材質，不影響共用同一材質的東西）。新的吊掛擺設要會變淡，就在它的群組加 `userData={{ fade: true }}`。
