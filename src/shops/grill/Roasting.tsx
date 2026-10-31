@@ -876,6 +876,8 @@ function woodTex(file: string, w: number, h: number) {
 const COOK_TABLE_WOOD = woodTex('keyaki_top.jpg', 1.6, 1.6)
 /** its body: cedar boards standing in framed panels, a panel every 0.6 across, one the body's height */
 const COOK_PANEL_WOOD = woodTex('cedar_panel.jpg', 1, 1)
+/** below its top: honed white marble with soft grey veining (blender/marbletex.py), a tile 1.2 across */
+const COOK_MARBLE = woodTex('marble_panel.jpg', 1, 1)
 /** a box whose sides carry the panel texture at its true size: each side's u stretched to how wide it is (a panel every `tile` across), v
  * the whole height */
 function panelBox(w: number, h: number, d: number, tile = 0.6) {
@@ -1079,16 +1081,16 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
         <group key={i} ref={(g) => { doors.current[i] = g }} position={[sd * span / 2, 0, 0.0125]}
           onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.kept = !st.current.kept; tip() }}
           onPointerOver={over} onPointerMove={() => { st.current.hoverUntil = performance.now() + 2500 }} onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
-          {/* (a frame-and-panel door in the body's own cedar, a shade lighter: its stiles and rails standing a little proud of the panel
-              set in them, so it reads as joinery of a piece with the table rather than a board stuck on) */}
+          {/* (a frame-and-panel door: a panel of the body's white marble set in a frame of dark cedar, its stiles and rails standing a little
+              proud of it, so it reads as joinery of a piece with the table rather than a board stuck on) */}
           <group position={[-sd * (W / 2 + 0.003), bottom + H / 2, 0]}>
             <mesh geometry={geo} scale={[1, 1, 0.7]}>
-              <meshToonMaterial color="#efe0cc" map={COOK_PANEL_WOOD} />
+              <meshToonMaterial color="#ffffff" map={COOK_MARBLE} />
             </mesh>
             {[-1, 1].map((e) => (
               <group key={e}>
-                <mesh position={[e * (W / 2 - 0.03), 0, 0.006]}><boxGeometry args={[0.06, H, 0.02]} /><meshToonMaterial color="#d9c3a6" map={COOK_PANEL_WOOD} /></mesh>
-                <mesh position={[0, e * (H / 2 - 0.03), 0.006]}><boxGeometry args={[W - 0.12, 0.06, 0.02]} /><meshToonMaterial color="#d9c3a6" map={COOK_PANEL_WOOD} /></mesh>
+                <mesh position={[e * (W / 2 - 0.03), 0, 0.006]}><boxGeometry args={[0.06, H, 0.02]} /><meshToonMaterial color="#7a5638" map={COOK_PANEL_WOOD} /></mesh>
+                <mesh position={[0, e * (H / 2 - 0.03), 0.006]}><boxGeometry args={[W - 0.12, 0.06, 0.02]} /><meshToonMaterial color="#7a5638" map={COOK_PANEL_WOOD} /></mesh>
               </group>
             ))}
           </group>
@@ -1112,9 +1114,9 @@ function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [num
   // (the top is one piece over all of them: CookTableTop)
   return (
     <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
-      {/* the body, set back a little under the top: cedar boards in framed panels, a dark kick at its foot */}
-      <mesh position-y={(floor - 0.08) / 2} geometry={useMemo(() => panelBox(W - 0.12, -floor - 0.08, D - 0.12), [W, D, floor])}>
-        <meshToonMaterial color="#ffffff" map={COOK_PANEL_WOOD} />
+      {/* the body, set back a little under the top: clad in honed white marble, a dark kick at its foot */}
+      <mesh position-y={(floor - 0.08) / 2} geometry={useMemo(() => panelBox(W - 0.12, -floor - 0.08, D - 0.12, 1.2), [W, D, floor])}>
+        <meshToonMaterial color="#ffffff" map={COOK_MARBLE} />
       </mesh>
       <mesh position-y={floor + 0.05}>
         <boxGeometry args={[W - 0.1, 0.1, D - 0.1]} />
