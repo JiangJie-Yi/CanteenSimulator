@@ -930,10 +930,20 @@ function CubbyDoors({ along: [a0, a1] }: { along: [number, number] }) {
   const H = top - bottom, W = (a1 - a0) / 2 - 0.006
   const mid = new THREE.Vector3().addScaledVector(ALONG, (a0 + a1) / 2).addScaledVector(LAY, front)
   const doors = useRef<(THREE.Group | null)[]>([])
+  const frame = useRef<THREE.Group>(null)
   const st = useRef({ k: 0, kept: false, hoverUntil: 0 })
   const geo = useMemo(() => panelBox(W, H, 0.025, 0.45), [W, H])
-  useFrame((_, dt) => {
+  // (the cubby's opening, in the doors' own frame: while the pointer's over it, they stay open, so what's inside can be reached and taken)
+  const inside = useMemo(() => new THREE.Box3(new THREE.Vector3(-(a1 - a0) / 2, bottom, CUBBY.lay[0] - front), new THREE.Vector3((a1 - a0) / 2, top, 0.06)), [a0, a1, bottom, top, front])
+  const ray = useMemo(() => new THREE.Raycaster(), [])
+  const inv = useMemo(() => new THREE.Matrix4(), [])
+  useFrame((state, dt) => {
     const s = st.current
+    if (frame.current && s.k > 0.3 && !getEdit().on) {
+      ray.setFromCamera(state.pointer, state.camera)
+      ray.ray.applyMatrix4(inv.copy(frame.current.matrixWorld).invert())
+      if (ray.ray.intersectsBox(inside)) s.hoverUntil = Math.max(s.hoverUntil, performance.now() + 800)
+    }
     const want = s.kept || performance.now() < s.hoverUntil ? 1 : 0
     s.k += (want - s.k) * Math.min(1, Math.min(dt, 0.1) * 5)
     // (each door about its hinge at the outer edge, its free edge swinging out toward the cook, a little past square)
@@ -948,7 +958,7 @@ function CubbyDoors({ along: [a0, a1] }: { along: [number, number] }) {
   }
   const hinge = (a1 - a0) / 2
   return (
-    <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+    <group ref={frame} position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
       {[0, 1].map((i) => {
         const sd = i === 0 ? -1 : 1
         return (

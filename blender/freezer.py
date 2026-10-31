@@ -2,11 +2,12 @@
 
 - freezer.glb, nodes (kept plain: only what says "freezer", nothing fussy):
   - "FreezerBody": the cabinet in pale blue-white enamel with soft rounded corners on a dark plinth, the compressor housing at the right
-    end (a louvred grille and a red power lamp), a chrome rim round the opening; the cavity inside lined pale.
+    end (a louvred grille, the temperature display reading -20 and a red power lamp), a chrome rim round the opening; the cavity inside lined pale.
   - "FreezerLid": the lid, its origin on the hinge along the back edge, made shut (the game swings it up): a thick slab, a chrome handle,
     the grey gasket round its underside, two hinges.
-  - "FreezerGoods": what's in it, the shop's own fish laid out neatly on a bed of ice: whole fish glazed in ice in rows (mackerel, horse
-    mackerel, ayu, saury) and vacuum-packed salmon and yellowtail fillets.
+  - "FreezerGoods": what's in it, as a fish shop's freezer holds: a wire basket hung on the rim with saury frozen in a bundle; whole fish
+    glazed in ice laid side by side (mackerel, horse mackerel, ayu); vacuum-packed salmon and yellowtail fillets, flat under their film;
+    a white styrofoam fish box with its lid ajar and a label; blocks of ice; the stock packed in below, so it looks half full.
 
 Run:
     blender -b --factory-startup --python blender/freezer.py -- <project path>
@@ -122,7 +123,10 @@ HX = W / 2 - HOUSE / 2
 box("FzHouseTop", (HOUSE + 0.01, 0.012, D + 0.01), (HX, H + 0.006, 0), M["steel"], 0.004, 2, body)
 for k in range(5):
     box("FzLouvre", (0.2, 0.012, 0.006), (HX, 0.22 + k * 0.036, D / 2 + 0.003), M["gasket"], 0.002, 1, body)
-bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.011, location=P(HX, 0.6, D / 2 + 0.004))
+# (the temperature display, reading -20, in its dark frame)
+box("FzDisplay", (0.11, 0.045, 0.006), (HX - 0.03, 0.62, D / 2 + 0.004), M["lcd"], 0.003, 1, body)
+box("FzDisplayFrame", (0.125, 0.06, 0.004), (HX - 0.03, 0.62, D / 2 + 0.001), M["gasket"], 0.003, 1, body)
+bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.011, location=P(HX + 0.07, 0.62, D / 2 + 0.004))
 o = act(); o.name = "FzLampMesh"; o.data.materials.append(M["lamp"]); body.append(o)
 
 # ---------------------------------------------------------------- the lid, hinged on its back edge
@@ -143,8 +147,15 @@ for x in (-LW / 2 + 0.16, LW / 2 - 0.16):
 # ---------------------------------------------------------------- what's in it
 goods = []
 FL0 = PLINTH + 0.05         # (the cavity's floor)
-FL = FL0 + 0.3               # (where the fish lie: on a bed of crushed ice, the freezer half full)
-box("FzIceBed", (LW - 2 * WALL - 0.01, FL - FL0, D - 2 * WALL - 0.01), (CX, (FL + FL0) / 2, 0), M["frost"], 0.01, 2, goods)
+FL = FL0 + 0.34              # (where today's things lie: on the stock packed below them, the freezer half full)
+# (the stock packed in below: a layer of white fish boxes side by side, each with its red-lettered label, filling the floor)
+for i in range(4):
+    for j in range(2):
+        bx = CX - LW / 2 + WALL + 0.14 + i * (LW - 2 * WALL - 0.1) / 4
+        bz = -D / 2 + WALL + 0.16 + j * 0.3
+        box(f"FzStock{i}{j}", ((LW - 2 * WALL - 0.12) / 4 - 0.01, 0.33, 0.29), (bx + 0.03, FL0 + 0.165, bz), M["styro"], 0.01, 2, goods)
+        box(f"FzStockLabel{i}{j}", (0.12, 0.003, 0.07), (bx + 0.03, FL0 + 0.332, bz), M["label"], 0, 1, goods)
+        box(f"FzStockInk{i}{j}", (0.08, 0.004, 0.018), (bx + 0.03, FL0 + 0.333, bz - 0.01), M["labelInk"], 0, 1, goods)
 
 
 def fish(name, at, length, depth, mat, turn=0.0):
@@ -180,18 +191,47 @@ def fish(name, at, length, depth, mat, turn=0.0):
     goods.append(g)
 
 
-# (whole fish in neat rows across the ice, heads one way: mackerel, horse mackerel, ayu at the back, the saury at the front)
-x0 = CX - LW / 2 + WALL + 0.2
-rows = ((M["mackerel"], 0.3, 0.08), (M["mackerel"], 0.3, 0.08), (M["aji"], 0.25, 0.07), (M["ayu"], 0.22, 0.06), (M["ayu"], 0.22, 0.06))
-for k, (mat, ln, dp) in enumerate(rows):
-    fish(f"FzFish{k}", (x0, FL + 0.002, -D / 2 + WALL + 0.07 + k * 0.095), ln, dp, mat, 0.0)
-for k in range(4):
-    fish(f"FzSaury{k}", (x0 + 0.38, FL + 0.002, -D / 2 + WALL + 0.07 + k * 0.12), 0.34, 0.045, M["saury"], 0.0)
-# (vacuum-packed fillets, flat under their film, squared up at the right)
-for k, mat in enumerate((M["salmon"], M["salmon"], M["buri"])):
-    at = (CX + LW / 2 - WALL - 0.13, FL + 0.012, -D / 2 + WALL + 0.1 + k * 0.15)
-    box(f"FzFillet{k}", (0.15, 0.02, 0.09), at, mat, 0.008, 2, goods)
-    box(f"FzFilm{k}", (0.18, 0.024, 0.12), at, M["film"], 0.006, 2, goods)
+# (whole fish side by side on the floor at the left: mackerel, horse mackerel, ayu)
+x0 = CX - LW / 2 + WALL + 0.19
+for k, (mat, ln, dp) in enumerate(((M["mackerel"], 0.3, 0.08), (M["mackerel"], 0.29, 0.08), (M["aji"], 0.24, 0.07), (M["aji"], 0.25, 0.07), (M["ayu"], 0.22, 0.06))):
+    fish(f"FzFish{k}", (x0 + 0.02 * (k % 2), FL + 0.002 + (k // 3) * 0.05, -D / 2 + WALL + 0.09 + (k % 3) * 0.1), ln, dp, mat, random.uniform(-0.08, 0.08))
+# (vacuum-packed fillets, flat under their film, in the middle)
+for k, mat in enumerate((M["salmon"], M["salmon"], M["buri"], M["buri"])):
+    at = (CX + 0.02 + (k % 2) * 0.17, FL + 0.012 + (k // 2) * 0.026, 0.02 + (k % 2) * 0.03)
+    box(f"FzFillet{k}", (0.15, 0.02, 0.09), at, mat, 0.008, 2, goods).rotation_euler.z = random.uniform(-0.2, 0.2)
+    box(f"FzFilm{k}", (0.18, 0.024, 0.12), at, M["film"], 0.006, 2, goods).rotation_euler.z = goods[-2].rotation_euler.z
+# (a styrofoam fish box at the right of the cavity, its lid set ajar, a red-lettered label)
+SBX = W / 2 - HOUSE - WALL - 0.17
+box("FzStyroBox", (0.3, 0.16, 0.4), (SBX, FL + 0.08, 0.03), M["styro"], 0.01, 2, goods)
+lidb = box("FzStyroLid", (0.31, 0.03, 0.41), (SBX - 0.02, FL + 0.175, 0.05), M["styro"], 0.008, 2, goods)
+lidb.rotation_euler = (0.06, 0, 0.12)
+box("FzStyroLabel", (0.14, 0.003, 0.08), (SBX - 0.02, FL + 0.192, 0.06), M["label"], 0, 1, goods).rotation_euler = (0.06, 0, 0.12)
+box("FzStyroLabelInk", (0.1, 0.004, 0.02), (SBX - 0.02, FL + 0.193, 0.05), M["labelInk"], 0, 1, goods).rotation_euler = (0.06, 0, 0.12)
+# (a wire basket hung on the front rim, the saury frozen in a bundle in it)
+BX, BZ, BY = CX - 0.12, D / 2 - WALL - 0.13, H - LID - 0.2
+for (a, b) in (((-0.18, 0, -0.1), (0.18, 0, -0.1)), ((-0.18, 0, 0.1), (0.18, 0, 0.1)), ((-0.18, 0, -0.1), (-0.18, 0, 0.1)), ((0.18, 0, -0.1), (0.18, 0, 0.1))):
+    for yy in (0.0, 0.16):
+        pa, pb = Vector((BX + a[0], BY + yy, BZ + a[2])), Vector((BX + b[0], BY + yy, BZ + b[2]))
+        mid = (pa + pb) / 2
+        dd = pb - pa
+        bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.003, depth=dd.length, location=P(*mid))
+        o = act(); o.name = "FzWire"; o.data.materials.append(M["wire"])
+        o.rotation_euler = (0, math.pi / 2, 0) if abs(dd.x) > abs(dd.z) else (math.pi / 2, 0, 0)
+        goods.append(o)
+for k in range(9):
+    x = BX - 0.16 + k * 0.04
+    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.0025, depth=0.2, location=P(x, BY, BZ), rotation=(math.pi / 2, 0, 0))
+    o = act(); o.name = "FzWire"; o.data.materials.append(M["wire"]); goods.append(o)
+for (sx, sz) in ((-0.18, -0.1), (0.18, -0.1), (-0.18, 0.1), (0.18, 0.1)):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.003, depth=0.16, location=P(BX + sx, BY + 0.08, BZ + sz))
+    o = act(); o.name = "FzWire"; o.data.materials.append(M["wire"]); goods.append(o)
+for k in range(5):
+    fish(f"FzSaury{k}", (BX - 0.02 + k * 0.012, BY + 0.01 + k * 0.012, BZ - 0.06 + k * 0.03), 0.34, 0.045, M["saury"], random.uniform(-0.04, 0.04))
+# (blocks of ice and a scatter of frost over it all)
+for k in range(10):
+    at = (CX - LW / 2 + WALL + 0.08 + random.random() * (LW - 2 * WALL - 0.16), FL + 0.02, random.uniform(-D / 2 + WALL + 0.09, D / 2 - WALL - 0.09))
+    s = random.uniform(0.02, 0.035)
+    box("FzIceCube", (s, s, s), at, M["ice"], 0.004, 1, goods).rotation_euler = (random.random(), random.random(), random.random())
 
 # ---------------------------------------------------------------- joined into its three nodes and exported
 def join(objs, name, origin=None):

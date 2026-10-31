@@ -506,22 +506,33 @@ function RiceTub() {
 /** when something was last taken out of the ingredient fridge (Roasting sets it as an order is brought out raw to the tray) */
 export const FRIDGE_KICK = { at: -1e9 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridgeKick?: typeof FRIDGE_KICK }).__fridgeKick = FRIDGE_KICK
-const CUTFISH_URL = import.meta.env.BASE_URL + 'models/cut_fish.glb'
 /** the freezer's lid, opened by hand (a click): it stays up till it's clicked shut */
 export const FREEZER = { open: false }
 const FREEZER_URL = import.meta.env.BASE_URL + 'models/freezer.glb'
+/** the freezer's display: -20 °C in green on its dark glass */
+const TEMP_TEX = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 256; c.height = 96
+  const g = c.getContext('2d')!
+  g.fillStyle = '#0e1a14'; g.fillRect(0, 0, 256, 96)
+  g.fillStyle = '#5affb0'; g.font = 'bold 72px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText('-20℃', 128, 52)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
 useGLTF.preload(FREEZER_URL)
 /**
  * The ingredient freezer (blender/freezer.py): a wide chest freezer along the kitchen's back wall by the staff door, pale blue-white on a
- * dark plinth, its compressor housing at the right end (louvres and the red lamp), the lid hinged on its back edge. Inside, only the
- * shop's own fish laid in rows on a bed of ice, glazed, and vacuum-packed fillets. Its lid swings up for a moment each time something's taken out for an order, a cool light spilling out over what's in it,
- * and it can be opened by hand, a click (and shut again with another); on the housing's top lies the cut fish (the downloaded hand-painted
- * model, kept in its own colours).
+ * dark plinth, its compressor housing at the right end (louvres, the temperature display and the red lamp), the lid hinged on its back
+ * edge, no ink lines round it. Inside, as a fish shop's freezer: whole fish glazed in ice, vacuum-packed fillets, a styrofoam fish box,
+ * the saury in a wire basket, blocks of ice, the stock packed below. Its lid swings up for a moment each time something's taken out for an order, a cool light spilling out over what's in it,
+ * and it can be opened by hand, a click (and shut again with another). Its display shows the temperature.
  */
 function IngredientFridge() {
   const lid = useRef<THREE.Object3D | null>(null)
   const light = useRef<THREE.PointLight>(null)
-  const gltf = useGLTF(CUTFISH_URL) as unknown as { scene: THREE.Group }
   const fz = useGLTF(FREEZER_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const root = fz.scene.clone(true)
@@ -543,25 +554,6 @@ function IngredientFridge() {
   }, [fz])
   // (its lid, looked up in the model as drawn)
   lid.current = model.getObjectByName('FreezerLid') ?? null
-  const fish = useMemo(() => {
-    const root = gltf.scene.clone(true)
-    root.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      // (its painted colours as they are: the map straight into a toon material, no tint, so its soft airbrushed shading survives)
-      m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null })
-      m.castShadow = true
-    })
-    const b = new THREE.Box3().setFromObject(root)
-    const d = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3())
-    const k = 0.5 / Math.max(d.x, d.z)
-    const wrap = new THREE.Group()
-    root.position.set(-c.x, -b.min.y, -c.z)
-    wrap.add(root)
-    wrap.scale.setScalar(k)
-    return wrap
-  }, [gltf])
   useFrame(() => {
     const open = FREEZER.open || performance.now() - FRIDGE_KICK.at < 1800 ? 1 : 0
     // (the lid hinged on its back edge, swinging up and over)
@@ -577,8 +569,11 @@ function IngredientFridge() {
         <primitive object={model} />
       </group>
       <pointLight ref={light} position={[-HOUSE / 2, H - 0.12, 0.15]} color="#cfe9ff" intensity={0} distance={2.4} decay={1.6} />
-      {/* the cut fish on the housing's top, laid across it */}
-      <group position={[W / 2 - HOUSE / 2, H + 0.014, 0]} rotation-y={Math.PI / 2 + 0.2}><primitive object={fish} /></group>
+      {/* the temperature on the housing's display, in green segments: -20 °C, a degree warmer while the lid's up */}
+      <mesh position={[W / 2 - HOUSE / 2 - 0.03, 0.62, 0.74 / 2 + 0.009]}>
+        <planeGeometry args={[0.1, 0.038]} />
+        <meshBasicMaterial map={TEMP_TEX} transparent toneMapped={false} />
+      </mesh>
     </group>
   )
 }
@@ -596,27 +591,6 @@ function RackAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, RACK_AT.along).addScaledVector(LAY, RACK_AT.lay)
   return <Movable id="platerack" label="碗盤櫃架" baseScale={1.03}><group name="look-back" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack /></group></Movable>
-}
-/** the cut fish on its board (the downloaded hand-painted model), its colours as they are, at `width` across */
-function useCutFish(width: number) {
-  const gltf = useGLTF(CUTFISH_URL) as unknown as { scene: THREE.Group }
-  return useMemo(() => {
-    const root = gltf.scene.clone(true)
-    root.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null })
-      m.castShadow = true
-    })
-    const b = new THREE.Box3().setFromObject(root)
-    const d = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3())
-    const wrap = new THREE.Group()
-    root.position.set(-c.x, -b.min.y, -c.z)
-    wrap.add(root)
-    wrap.scale.setScalar(width / Math.max(d.x, d.z))
-    return wrap
-  }, [gltf, width])
 }
 const KNIVES_URL = import.meta.env.BASE_URL + 'models/knives.glb'
 /** the cook's knives on their folded cloth (blender/knives.py), laid along the table behind the hearth */
@@ -642,12 +616,6 @@ function KnifeSet() {
   return <group position={[p.x, 0.002, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} scale={1.6}><primitive object={obj} /></group>
 }
 useGLTF.preload(KNIVES_URL)
-/** a fish being cut on its own board, at the table's back corner by the lantern: as the one on the freezer, a size bigger */
-function CutFishBoard() {
-  const fish = useCutFish(0.95)
-  const p = new THREE.Vector3().addScaledVector(ALONG, -2.2).addScaledVector(LAY, -0.45)
-  return <group position={[p.x, 0.002, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x) + 0.35}><primitive object={fish} /></group>
-}
 export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [number, number, number] }) {
   return (
     <>
@@ -657,7 +625,6 @@ export function Decor({ held, lanternAt }: { held: RefObject<Held>; lanternAt: [
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
-      <Movable id="cutfish" label="切魚砧板"><CutFishBoard /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /></group>
     </>
   )
