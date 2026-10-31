@@ -1078,19 +1078,6 @@ const wcSign = (who: 'm' | 'f') => canvasTex(160, 96, (g) => {
   brushText(g, who === 'm' ? '男廁 · MEN' : '女廁 · WOMEN', 104, 80, 14, { fill: '#1d140c', weight: 'normal' })
 })
 const WC_SIGNS = { m: wcSign('m'), f: wcSign('f') }
-/** shoji paper, faintly fibred */
-const SHOJI = canvasTex(64, 64, (g) => {
-  g.fillStyle = '#f4ecd8'
-  g.fillRect(0, 0, 64, 64)
-  g.strokeStyle = 'rgba(150,120,80,0.12)'
-  for (let k = 0; k < 30; k++) {
-    g.beginPath()
-    const x = (k * 37) % 64, y = (k * 23) % 64
-    g.moveTo(x, y)
-    g.lineTo(x + 6, y + 3)
-    g.stroke()
-  }
-})
 
 /**
  * The way through to the toilet: one sliding door (引き戸) in a dark wooden frame, shut, wood below and shoji paper on
@@ -1317,9 +1304,33 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
     </group>
   )
 }
+const WCDOOR_URL = import.meta.env.BASE_URL + 'models/wcdoor.glb'
+/** the toilets' doors (blender/wcdoor.py): the sliding panel, a waist-high board shoji in cedar, and the doorway's frame, in the room's toon
+ * light; a fresh copy of either at each call (each door slides on its own) */
+function useWcDoor() {
+  const gltf = useGLTF(WCDOOR_URL) as unknown as { scene: THREE.Group }
+  return useMemo(() => {
+    const toon = new Map<THREE.Material, THREE.Material>()
+    const conv = (root: THREE.Object3D) => {
+      root.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh) return
+        const src = m.material as THREE.MeshStandardMaterial
+        let t = toon.get(src)
+        // (the paper seen from both sides: from in the toilet too)
+        if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: src.name === 'WcDoorPaper' ? THREE.DoubleSide : THREE.FrontSide }); toon.set(src, t) }
+        m.material = t
+      })
+      return root
+    }
+    return { panel: () => conv(gltf.scene.getObjectByName('WcDoorPanel')!.clone(true)), frame: () => conv(gltf.scene.getObjectByName('WcDoorFrame')!.clone(true)) }
+  }, [gltf])
+}
+useGLTF.preload(WCDOOR_URL)
 /**
- * A toilet's door itself: one whole sliding panel, wood below, shoji paper on a lattice above. It slides aside into
- * the wall when someone goes in or comes out, or when it's clicked (and back again with another click).
+ * A toilet's door itself: one whole sliding panel (blender/wcdoor.py), figured cedar below, washi on close-set kumiko above, the lock's little
+ * brass plate and a sunk pull by its free edge. It slides aside into the wall when someone goes in or comes out, or when it's clicked (and
+ * back again with another click).
  */
 function LockWindow({ who }: { who: 'm' | 'f' }) {
   const m = useRef<THREE.MeshBasicMaterial>(null)
@@ -1335,8 +1346,10 @@ function LockWindow({ who }: { who: 'm' | 'f' }) {
   )
 }
 function ToiletPanel({ who }: { who: 'm' | 'f' }) {
-  const W = WC_W, H = WC_H
+  const H = WC_H
   const g = useRef<THREE.Group>(null)
+  const door = useWcDoor()
+  const panel = useMemo(() => door.panel(), [door])
   const k = useRef(0)
   // (the men's slides off one way, the women's the other, away from each other)
   const away = who === 'm' ? -1 : 1
@@ -1356,21 +1369,9 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     <group ref={g} onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; doorClick(who, Math.max(0, 1 - ev.distance / 8)) }}
       {...tipOver('廁所門', '點一下開關（有人時會敲門）')}>
       <group position={[-0.03, H / 2, 0]}>
-        <mesh position-y={0.2} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[W - 0.02, H - 0.44]} />
-          <meshToonMaterial color="#ffffff" map={SHOJI} />
-        </mesh>
-        <Box size={[0.02, 0.4, W - 0.02]} color="#6a4428" position={[-0.002, -H / 2 + 0.2, 0]} />
-        {[-1, 1].map((sd) => <Box key={sd} size={[0.024, H - 0.02, 0.03]} color="#5a3a22" position={[-0.006, 0, sd * (W / 2 - 0.025)]} />)}
-        {[-0.5, -0.17, 0.17, 0.5].map((k) => <Box key={k} size={[0.016, H - 0.46, 0.014]} color="#5a3a22" position={[-0.008, 0.2, k * (W - 0.06) / 1.1]} />)}
-        {[0, 1, 2, 3, 4].map((k) => <Box key={k} size={[0.016, 0.018, W - 0.04]} color="#5a3a22" position={[-0.008, -H / 2 + 0.41 + k * (H - 0.46) / 4, 0]} />)}
-        {/* the lock's little window over the hand-hold: 使用中 in red while someone's in, 空き in blue */}
+        <primitive object={panel} position-y={-H / 2} />
+        {/* the lock's little window on its brass plate, over the pull: 使用中 in red while someone's in, 空き in blue */}
         <LockWindow who={who} />
-        {/* the hand-hold, sunk in the wood */}
-        <mesh position={[-0.014, -0.1, W / 2 - 0.09]} rotation-z={Math.PI / 2}>
-          <cylinderGeometry args={[0.02, 0.02, 0.006, 12]} />
-          <meshToonMaterial color="#2a1a10" />
-        </mesh>
       </group>
     </group>
   )
@@ -1410,12 +1411,12 @@ function ToiletHit({ who }: { who: 'm' | 'f' }) {
 }
 function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   const W = WC_W, H = WC_H
+  const door = useWcDoor()
+  const frame = useMemo(() => door.frame(), [door])
   return (
     <group>
-      {/* the frame round the opening */}
-      {[-1, 1].map((sd) => <Box key={sd} size={[0.06, H + 0.06, 0.06]} color="#3a2416" position={[-0.03, H / 2, sd * (W / 2 + 0.03)]} />)}
-      <Box size={[0.07, 0.07, W + 0.12]} color="#3a2416" position={[-0.035, H + 0.035, 0]} />
-      <Box size={[0.05, 0.025, W + 0.12]} color="#3a2416" position={[-0.03, 0.012, 0]} />
+      {/* the frame round the opening: dark cedar posts, the head over them and the sill (blender/wcdoor.py) */}
+      <primitive object={frame} />
       {/* (the sliding panel: ToiletPanel, not merged) and the little room behind it */}
       <WcRoom w={W} h={H} who={who} />
       {/* the short noren, and the plaque over it */}
