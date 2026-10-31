@@ -276,6 +276,8 @@ export const stepScale = (v: V3, dir: 1 | -1, axis: 0 | 1 | 2 | null): V3 =>
 const KEY_GZ = 'jgs-edit-gizmo-size'
 /** how tall the panel's been dragged to */
 const KEY_PH = 'jgs-edit-panel-h'
+/** where the panel was dragged to (its left edge and its bottom's distance from the window's), kept for next time */
+const KEY_PPOS = 'jgs-edit-panel-pos'
 export const GIZMO = { size: (() => { try { return Number(localStorage.getItem(KEY_GZ)) || 0.6 } catch { return 0.6 } })() }
 export function setGizmoSize(dir: 1 | -1) {
   GIZMO.size = Math.max(0.25, Math.min(2, Math.round(GIZMO.size * (dir > 0 ? 1.15 : 1 / 1.15) * 100) / 100))
@@ -612,6 +614,29 @@ function panel() {
     closeB.title = T().close
     closeB.onclick = (e) => { e.stopPropagation(); toggleEdit() }
     head.append(minB, closeB)
+    // (the title bar drags the whole panel about the window, as a window's does; kept inside the window, and where it's left kept)
+    const place = (x: number, b: number) => {
+      const w = panel.offsetWidth || 292, hh = panel.offsetHeight || 200
+      panel.style.left = `${Math.max(0, Math.min(window.innerWidth - w, x))}px`
+      panel.style.bottom = `${Math.max(0, Math.min(window.innerHeight - Math.min(hh, 40), b))}px`
+    }
+    try {
+      const kept = JSON.parse(localStorage.getItem(KEY_PPOS) ?? 'null')
+      if (Array.isArray(kept) && kept.length === 2) requestAnimationFrame(() => place(kept[0], kept[1]))
+    } catch { /* (none kept) */ }
+    head.style.cursor = 'move'
+    head.onpointerdown = (e) => {
+      if ((e.target as HTMLElement).closest('button')) return
+      e.preventDefault(); e.stopPropagation()
+      const r = panel.getBoundingClientRect()
+      const dx = e.clientX - r.left, db = (window.innerHeight - e.clientY) - (window.innerHeight - r.bottom)
+      head.setPointerCapture(e.pointerId)
+      head.onpointermove = (m) => place(m.clientX - dx, window.innerHeight - m.clientY - db)
+      head.onpointerup = () => {
+        head.onpointermove = null; head.onpointerup = null
+        try { localStorage.setItem(KEY_PPOS, JSON.stringify([parseFloat(panel.style.left), parseFloat(panel.style.bottom)])) } catch { /* (not kept) */ }
+      }
+    }
     const body = h('div', 'be-body')
     const section = (title: string) => {
       const sec = h('div', 'be-sec'), st = h('div', 'be-st', title), sc = h('div', 'be-sc')

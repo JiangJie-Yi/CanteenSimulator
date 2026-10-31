@@ -75,6 +75,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **+ / −**：按 X、Y、Z 選軸（再按一次取消），+ 或 − 縮放選到的軸（沒選就三軸一起）；縮放區每軸旁也有 −、+ 按鈕。
 - **群組**：清單裡 Ctrl／Shift 點選多件 → 「成組」；群組可一起位移、繞垂直軸轉、整體縮放（轉動中心是成員的中間）。「解散」「改名」「復原」都能用。沒有中心點的東西（閘門）不能成組。預設群組在 `edit.ts` 的 `DEFAULT_GROUPS`（門口招財貓台＋四隻貓 `grp-doorcats`、小神龕的供桌＋供品 `grp-altar`）；解散後記在 localStorage，不會再自動出現。場景裡點到群組成員會選到整個群組（一起移動、旋轉、縮放），按住 Alt 點才單選那一件。選到群組時，群組中心會出現自己的移動箭頭／旋轉環／縮放把手（`Movable.tsx` 的 `GroupGizmo`，房間軸），旋轉 X、Y、Z 三軸都能調（`Group.r`）。
 - **座標歸零**（面板下方按鈕，像 Maya 的 Freeze Transformations）：把選到的物件或群組現在的位置、旋轉、大小當成新的 0／1，物件不動，之後面板從這裡算（`edit.ts` 的 `freezeSelected`、`zeroOf`，存在 localStorage `jgs-edit-frozen-1`；「全部還原」會一起清掉）。BDD：`tests/bdd/edit-freeze.test.ts`。
+- 面板的標題列可以拖曳移動（位置存在 localStorage `jgs-edit-panel-pos`）。
 - 進開發者模式會自動收起選單，離開後還原；選單收放或離開開發者模式不會讓鏡頭重新歸位（只有換菜、重設視角、總覽、視窗大小改變、進開發者模式才會；進開發者模式一律切到自由視角）。
 
 ## 廚房三種模式（`game/mode.ts`）
