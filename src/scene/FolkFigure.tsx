@@ -46,7 +46,9 @@ const ON_HEAD = new Set(['glasses', 'moustache', 'phones', 'sunhat', 'schoolhat'
 const NECK = new THREE.Vector3(0, 0.56, 0)
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
 /** the stool's seat, in the customers' frame (blender/barfurnish.py: SEAT_Y and the cushion) */
-const SEAT = 0.343
+export const SEAT = 0.343
+/** how tall the figure stands, to the top of its head (blender/folk.py: the head's top), in its own frame */
+export const FOLK_HEIGHT = 1.07
 /** parts with no ink line round them (by their material: the face's picture, the glasses' frames, gold, the little red ties and flowers) */
 const UNINKED = /FolkFace|FolkFrame|FolkGold|FolkRed/
 

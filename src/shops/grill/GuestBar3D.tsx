@@ -9,7 +9,7 @@ import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
 import { Person } from '@/scene/Person3D'
-import { FolkFigure } from '@/scene/FolkFigure'
+import { FOLK_HEIGHT, FolkFigure, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
@@ -2373,7 +2373,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               <PersonClock s={s} eating={() => s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'} clock={clock}
                 talk={talkSide(s)} guest={g} />
             </group>
-            <Html position={[0, 1.05 * PEOPLE_SCALE, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+            {/* (their label just over their head: a figure in the boss's style is shorter than the old ones, and sits up on the seat) */}
+            <Html position={[0, FOLK_GUESTS ? ((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.15 : 1.05 * PEOPLE_SCALE, 0]}
+              center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
               <div className="g3-label" ref={(el) => { if (el) labels.current.set(s.id, el); else labels.current.delete(s.id) }}>
                 {speech[s.id] ? <Say key={speech[s.id].key} text={speech[s.id].text} />
                   : g && !walking && g.state === 'waiting' && g.rating === null && <span className="g3-bubble">…</span>}

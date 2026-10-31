@@ -340,6 +340,10 @@ function OtherArt({ id }: { id: string }) {
   }
 }
 
+/** the foods there's a picture of (the rest are drawn as a plain round) */
+const OTHER = new Set(['Asparagus', 'BloodCake', 'GrilledCorn', 'GrilledShiitake', 'KingOyster', 'MisoSoup', 'NetMochi', 'Okra', 'Onigiri', 'PorkBelly', 'Potato', 'Sake', 'Sausage', 'Scallop', 'Shishito', 'ShrimpSkewer', 'Squid', 'SweetPotato', 'Yakitori'])
+export const hasFoodArt = (id: string) => id in FISH || OTHER.has(id)
+
 /** `band`: drawn across the top of a card (no round tile, the food cropped close to fill the band; the card's band behind it) */
 export function FoodArt({ id, store, size = 34, band = false }: { id: string; store: string; size?: number; band?: boolean }) {
   const u = `fa${useId().replace(/[^a-zA-Z0-9]/g, '')}`

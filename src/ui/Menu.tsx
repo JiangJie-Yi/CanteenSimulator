@@ -7,7 +7,7 @@ import { STORAGES, storageName, storageOf } from '@/data/storage'
 import { Icon, iconFor } from './Icon'
 import { tl } from '@/data/i18n'
 import { freshGrade } from '@/game/freshness'
-import { FoodArt } from './FoodArt'
+import { FoodArt, hasFoodArt } from './FoodArt'
 
 export type Restock = 'avg' | 'each' | 'full'
 
@@ -54,7 +54,7 @@ function tagFit(name: string, en: string | undefined, price: string, stamp: bool
   const rows = twoCol && name.length > TWO_COL_FROM ? Math.ceil(name.length / 2) : name.length
   const enLen = en ? (twoCol && en.length > 18 ? Math.ceil(en.length / 2) + 2 : en.length) : 0
   const parts = [
-    1.4,                                  // icon (or the 選 stamp in its place)
+    2.0,                                  // the food's picture (or the 選 stamp in its place)
     rows * 1.3 * 1.12,                    // name: 1.3em glyphs + 0.12em letter-spacing
     enLen * 0.56 * 0.6,                   // English, set sideways: ~0.6em per Latin letter at 0.56em
     price.length * 0.82 * 1.12,           // price in kanji numerals
@@ -77,6 +77,16 @@ let foodsFont: { font: number; rows: number } | null = null
  * Izakaya-style wall menu: vertical wooden tags, a red stamp marks what's been ordered.
  * Click a tag to add a portion, right-click (or press - / Delete on it) to take one away.
  */
+/** the set meals drawn with their fish */
+const SET_ART: Record<string, string> = { ayu: 'ExtraFish', saury: 'Saury', mackerel: 'Mackerel', 'set-ayu': 'ExtraFish', 'set-saury': 'Saury', 'set-mackerel': 'Mackerel' }
+/** a dish's picture on its strip: the food it's made from, inked and coloured as the pantry's cards have it (ui/FoodArt); the line icon for
+ * anything without one */
+function StripArt({ id, icon }: { id: string; icon: string }) {
+  // (a dish worked out in the notebook goes by the food it's made from: its icon's name is that food's)
+  const art = [SET_ART[id], id, SET_ART[icon], icon].find((k) => k && hasFoodArt(k))
+  if (!art) return <Icon name={icon} />
+  return <span className="icon strip-art" aria-hidden="true"><FoodArt id={art} store={storageOf(art)} band /></span>
+}
 /** (a dish on the menu is drawn with the icon of the food it's made from) */
 const iconOf = (x: object) => (x as { icon?: string }).icon
 
@@ -209,7 +219,7 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
         onPointerLeave={hasSet ? () => setPeek(null) : undefined}
         onFocus={hasSet ? () => setPeek(x.id) : undefined}
         onBlur={hasSet ? () => setPeek(null) : undefined}>
-        <Icon name={icon} />
+        <StripArt id={x.id} icon={icon} />
         <span className="strip-name">{name}</span>
         {x.en && <span className="strip-en" lang="en">{x.en}</span>}
         {!research && <span className="strip-price">{price}</span>}

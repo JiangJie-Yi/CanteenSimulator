@@ -1651,6 +1651,21 @@ button {
   height: 1.4em;
 }
 
+/* the dish's picture: the food itself, coloured, as wide as the strip allows */
+.menu .strip .strip-art {
+  width: 2.7em;
+  height: 2em;
+  display: block;
+  margin: -0.1em -0.25em 0;
+}
+.strip .strip-art svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 0.4)) drop-shadow(0 1px 1.5px rgb(60 40 20 / 0.25));
+}
+
 .menu .strip-name {
   font-size: 1.3em;
 }
