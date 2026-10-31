@@ -742,7 +742,7 @@ function Framed({ art }: { art: ArtKey }) {
 }
 
 /**
- * The round window's paper, as the light outside falls on it: by day bright and cool, the bamboo's shadows sharp on it in the sun; by
+ * The round window's paper, as the light outside falls on it: by day the sky's cool blue through it, the bamboo's shadows sharp on it; by
  * night dark blue, a street lantern's warm glow off to one side and the moon's paler one high up, the bamboo only darker against it.
  * Drawn again (the one canvas) whenever the room turns from day to night (data-theme on the page).
  */
@@ -759,15 +759,16 @@ function drawRoundPaper(g: CanvasRenderingContext2D, night: boolean) {
       g.fillStyle = l; g.fillRect(0, 0, 512, 512)
     }
   } else {
-    const gr = g.createRadialGradient(256, 220, 20, 256, 256, 290)
-    gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.65, '#f7f4ea'); gr.addColorStop(1, '#ddd6c2')
+    // (the sky's cool light through the paper: near white where the sun's behind it, sky blue toward the rim)
+    const gr = g.createRadialGradient(256, 210, 20, 256, 256, 300)
+    gr.addColorStop(0, '#f6fbff'); gr.addColorStop(0.55, '#d6eaff'); gr.addColorStop(1, '#9cc3f0')
     g.fillStyle = gr; g.fillRect(0, 0, 512, 512)
   }
   // (the fibres of the washi)
-  g.strokeStyle = night ? 'rgba(200,210,240,0.08)' : 'rgba(150,130,90,0.12)'; g.lineWidth = 1
+  g.strokeStyle = night ? 'rgba(200,210,240,0.08)' : 'rgba(110,140,190,0.13)'; g.lineWidth = 1
   for (let k = 0; k < 160; k++) { const x = (k * 97) % 512, y = (k * 233) % 512; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 14, y + (k % 5) - 2); g.stroke() }
   // (bamboo outside: culms and leaves, sharp grey-green shadows in the sun, dark shapes at night)
-  g.fillStyle = night ? 'rgba(8,10,20,0.6)' : 'rgba(60,75,45,0.38)'
+  g.fillStyle = night ? 'rgba(8,10,20,0.6)' : 'rgba(55,80,120,0.34)'
   for (const [x, w, lean] of [[120, 16, 0.04], [190, 12, -0.03], [360, 18, 0.02], [420, 11, -0.05]] as [number, number, number][]) {
     g.save(); g.translate(x, 512); g.rotate(lean); g.fillRect(-w / 2, -520, w, 520)
     for (let y = 60; y < 520; y += 95) g.fillRect(-w / 2 - 2, -y, w + 4, 3)
@@ -796,11 +797,60 @@ const ROUND_PAPER = (() => {
  */
 /** where along the back wall the second round window goes (the wall's own frame) */
 const ROUND_AT = -1.36
+/** the daylight that comes in through it (by day only, gone at night): a cool glow round it on the plaster, and a faint shaft of it slanting
+ * down into the room, soft at its edges and fading as it goes */
+const DAYLIGHT = (() => {
+  if (typeof document === 'undefined') return { halo: null, beam: null }
+  const tex = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
+  const halo = document.createElement('canvas')
+  halo.width = halo.height = 128
+  const h = halo.getContext('2d')!
+  // (a ring: clear over the window itself, so its paper keeps its own blue, brightest just outside the frame, fading out over the plaster)
+  const gr = h.createRadialGradient(64, 64, 0, 64, 64, 64)
+  gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(0.56, 'rgba(255,255,255,0.85)')
+  gr.addColorStop(0.72, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)')
+  h.fillStyle = gr; h.fillRect(0, 0, 128, 128)
+  // (the shaft: across it soft at both edges, along it brightest at the window (the picture's top) and gone by its far end)
+  const beam = document.createElement('canvas')
+  beam.width = 64; beam.height = 256
+  const b = beam.getContext('2d')!
+  for (let y = 0; y < 256; y++) {
+    const row = b.createLinearGradient(0, 0, 64, 0), k = Math.pow(1 - y / 255, 1.7)
+    row.addColorStop(0, 'rgba(255,255,255,0)'); row.addColorStop(0.5, `rgba(255,255,255,${k})`); row.addColorStop(1, 'rgba(255,255,255,0)')
+    b.fillStyle = row; b.fillRect(0, y, 64, 1)
+  }
+  return { halo: tex(halo), beam: tex(beam) }
+})()
+const WINDOW_HALO = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.halo, color: '#8fc4ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  toneMapped: false }), 0.8, 0)
+const SUNBEAM = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, color: '#78b2ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  toneMapped: false, side: THREE.DoubleSide }), 0.55, 0)
+/** the shaft's two crossed sheets, in the window's frame (the room toward -x): from the window's face, slanting down and in */
+const SUNBEAM_GEO = (() => {
+  const R = 0.4, L = 2.3, tilt = 0.62
+  const d = new THREE.Vector3(-Math.cos(tilt), -Math.sin(tilt), 0)
+  const up = new THREE.Vector3(-Math.sin(tilt), Math.cos(tilt), 0)
+  const at = new THREE.Vector3(-0.07, 0, 0)
+  const sheet = (side: THREE.Vector3, w0: number, w1: number) => {
+    const far = at.clone().addScaledVector(d, L)
+    const v = [at.clone().addScaledVector(side, -w0), at.clone().addScaledVector(side, w0), far.clone().addScaledVector(side, w1), far.clone().addScaledVector(side, -w1)]
+    return { pos: v.flatMap((p) => [p.x, p.y, p.z]), uv: [0, 1, 1, 1, 1, 0, 0, 0] }
+  }
+  const a = sheet(new THREE.Vector3(0, 0, 1), R * 0.8, R * 1.15), b = sheet(up, R * 0.7, R * 1.0)
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute([...a.pos, ...b.pos], 3))
+  g.setAttribute('uv', new THREE.Float32BufferAttribute([...a.uv, ...b.uv], 2))
+  g.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7])
+  return g
+})()
 function RoundWindow() {
   const R = 0.4
   const lat = [-0.2, 0, 0.2]
   return (
-    <group>
+    <group name="RoundWindow">
+      {/* (by day: the sky's light glowing round it on the plaster, and slanting in) */}
+      <mesh position-x={-0.075} rotation-y={-Math.PI / 2} material={WINDOW_HALO} renderOrder={2}><planeGeometry args={[R * 4.2, R * 4.2]} /></mesh>
+      <mesh geometry={SUNBEAM_GEO} material={SUNBEAM} renderOrder={2} />
       {/* (the reveal, the wall's thickness lined in wood) */}
       <mesh position-x={-0.03} rotation-z={Math.PI / 2}>
         <cylinderGeometry args={[R + 0.004, R + 0.004, 0.06, 64, 1, true]} />
