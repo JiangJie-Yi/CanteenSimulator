@@ -567,7 +567,9 @@ export const GRILL_OFFSET = GRILL_PIVOT.clone().multiplyScalar(1 - GRILL_SCALE).
  */
 /** the second cubby, at the table's left: the trash bin on its floor, the basket on its shelf */
 export const CUBBY2 = { along: [-1.5, -0.35], lay: [0.95, 2.1] }
-export const CUBBY = { along: [0.55, 3.0], lay: [0.95, 2.1], plinth: 0.1, shelfAlong: 1.85, shelfThick: 0.04 }
+export const CUBBY = { along: [1.09, 3.0], lay: [0.95, 2.1], plinth: 0.1, shelfAlong: 2.45, shelfThick: 0.04 }
+/** the notch cut into the cook's table's front under the hearth (along from–to, lay from–to): somewhere to stand right up at the fire */
+export const COOK_NOTCH = { along: [0.0, 0.98], lay: [1.35, 2.1] }
 /** the cubby's floor and shelf surfaces, in the scene: the table's top is y = 0 */
 export const CUBBY_FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP + CUBBY.plinth
 export const CUBBY_SHELF_Y = -0.76
@@ -578,8 +580,8 @@ export const PLATE_STACKS = (() => {
   // (in the bar's own frame: where those places are, under the table's top, to the left in the cubby)
   const at = (along: number) => cubbyAt(along, 1.5, 'floor').sub(GRILL_OFFSET).multiplyScalar(1 / GRILL_SCALE)
   // (a plate is 0.26 across its radius in the scene: the two stacks stand more than a diameter apart, so the plates of one never run into the other's,
-  // the dirty one still clear of the shelf over the cubby's right-hand part, which starts at along 1.85)
-  return { clean: at(0.93), dirty: at(1.5) }
+  // the dirty one still clear of the shelf over the cubby's right-hand part, which starts at along 2.55)
+  return { clean: at(1.45), dirty: at(2.05) }
 })()
 /** the height of the cubby's floor, in the bar's own frame, for the stacks of plates standing on it */
 export const PLATE_STACK_Y = (CUBBY_FLOOR_Y - GRILL_OFFSET.y) / GRILL_SCALE

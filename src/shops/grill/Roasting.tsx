@@ -40,7 +40,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, type Counter } from './bar'
+import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -693,11 +693,14 @@ const COOK_TABLE = { lay: [-2.1, 2.1], along: [-2.4 + 2 * SIDE_PULL, 3.1] }
 /** the cook, as big as the customers at the bar */
 const CHEF_SCALE = 1.3 * GRILL_SCALE
 /** the table as boxes (lay from–to, along from–to): all of it behind the cubby, and the front either side of it */
+/** (and the notch's: its back wall, and the wall between it and the cubby) */
 const COOK_TABLE_PARTS: [number, number, number, number][] = [
   [COOK_TABLE.lay[0], CUBBY.lay[0], COOK_TABLE.along[0], COOK_TABLE.along[1]],
   [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_TABLE.along[0], CUBBY2.along[0]],
-  [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY2.along[1], CUBBY.along[0]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY2.along[1], COOK_NOTCH.along[0]],
   [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY.along[1], COOK_TABLE.along[1]],
+  [CUBBY.lay[0], COOK_NOTCH.lay[0], COOK_NOTCH.along[0], COOK_NOTCH.along[1]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_NOTCH.along[1], CUBBY.along[0]],
 ]
 export type CrewMember = { id: string; role: Role; look: Look }
 /**
@@ -815,7 +818,7 @@ function CookTable({ floor = true }: { floor?: boolean }) {
     <>
       {/* (set back under the top on their outer faces only: where they meet, they run into each other, no gap) */}
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]}
-        inset={i === 0 ? [0.06, -0.01, 0.06, 0.06] : i === 1 ? [-0.01, 0.06, 0.06, -0.01] : i === 2 ? [-0.01, 0.06, -0.01, -0.01] : [-0.01, 0.06, -0.01, 0.06]} />)}
+        inset={[[0.06, -0.01, 0.06, 0.06], [-0.01, 0.06, 0.06, -0.01], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, -0.01], [-0.01, 0.06, 0.06, -0.01]][i] as [number, number, number, number]} />)}
       <CubbyFrame />
       <CookTableTop />
       {/* (the same boards as the customers', laid the same way; with the shop open and the room drawn, its one floor
@@ -851,9 +854,11 @@ function roundedShape(pts: [number, number][], radii: number[]) {
 function tableTopGeometry(grow: number, thick: number) {
   const { along: [a0, a1], lay: [l0, l1] } = COOK_TABLE
   const i = 0.025 - grow
-  const pts: [number, number][] = [[a0 + i, l0 + i], [a1 - i, l0 + i], [a1 - i, l1 - i], [a0 + i, l1 - i]]
+  const { along: [n0, n1], lay: [nl] } = COOK_NOTCH
+  // (the notch under the hearth cut in from its front: the outline runs in round it)
+  const pts: [number, number][] = [[a0 + i, l0 + i], [a1 - i, l0 + i], [a1 - i, l1 - i], [n1 + i, l1 - i], [n1 + i, nl + i], [n0 - i, nl + i], [n0 - i, l1 - i], [a0 + i, l1 - i]]
   // (its corners rounded off, as a planed top would be; the outline, grown out, keeps to the same curves)
-  const sh = roundedShape(pts, [0.16, 0.16, 0.16, 0.16].map((r) => r + grow))
+  const sh = roundedShape(pts, [0.16, 0.16, 0.16, 0.04, 0.1, 0.1, 0.04, 0.16].map((r) => r + grow))
   const g = new THREE.ExtrudeGeometry(sh, { depth: 0.08 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: 0.025 + grow * 0.6,
     bevelSegments: 3, curveSegments: 6 })
   g.rotateX(Math.PI / 2)
@@ -2550,7 +2555,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** whether a place (the scene's x, z) is off the cook's table (past its edges, less the thing's own radius) */
   const outsideTable = (at: THREE.Vector3, r: number) => {
     const a = at.dot(ALONG) + FIRE_SHIFT.dot(ALONG), l = at.dot(LAY) + FIRE_SHIFT.dot(LAY)
-    return a < COOK_TABLE.along[0] - 0.05 || a > COOK_TABLE.along[1] + 0.05 || l < COOK_TABLE.lay[0] - 0.05 || l > COOK_TABLE.lay[1] + 0.05 - 0 * r
+    // (and over the notch cut into its front: nothing to stand on there)
+    const inNotch = a > COOK_NOTCH.along[0] + 0.05 && a < COOK_NOTCH.along[1] - 0.05 && l > COOK_NOTCH.lay[0] + 0.05
+    return inNotch || a < COOK_TABLE.along[0] - 0.05 || a > COOK_TABLE.along[1] + 0.05 || l < COOK_TABLE.lay[0] - 0.05 || l > COOK_TABLE.lay[1] + 0.05 - 0 * r
   }
   /** a container at home, moved by its nudge — lifted onto its stack of spares while it's still standing over it */
   function onSpares(key: string, home: THREE.Vector3) {
