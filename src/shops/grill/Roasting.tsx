@@ -8,7 +8,7 @@ import { StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
 import { FLOWS, flowOf, wantOf, type FlowKind } from '@/game/flow'
-import { COAL_MAX, COAL_PER_ADD, crumble, placeStick, restOf, roomFor, surfaceY, type Lay, throwForce } from '@/game/coalPile'
+import { COAL_MAX, COAL_PER_ADD, crumble, standStick, roomFor, surfaceY, type Lay, throwForce } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -27,7 +27,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, SHRINE_FLOWERS } from './bar'
+import { COAL_BRIDGE, SHRINE_FLOWERS, WC_GRUMBLE } from './bar'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
 import { flowerBuffs } from '@/game/shrineFlowers'
@@ -567,7 +567,7 @@ const PIT_PARTS = /^(FirePit|Stone|Robuchi|Charcoal|BinchotanHeap)/
 const RING_CLEAR = 1.15 * PIT_SCALE
 /** the square hearth's frame (炉縁, blender/grilledfish.py IRORI_IN + IRORI_W), its outer half-width as drawn: square to the table, along
  * ALONG and LAY; nothing is set down on it or inside it (sized so the table's front row of plates, bowls and the board stand clear of it) */
-const HEARTH_HALF = (0.7 + 0.13) * PIT_SCALE
+const HEARTH_HALF = (0.8 + 0.13) * PIT_SCALE
 /** a thing at `at` (from the fire's middle) of reach `r`, or a w x d board turned to the table, moved out of the square hearth the short way */
 function clearOfHearth(at: THREE.Vector3, r: number, w = 0, d = 0) {
   const u = at.dot(ALONG), v = at.dot(LAY)
@@ -1470,89 +1470,30 @@ function EditProxy({ id, label, at, size, yaw }: { id: string; label: string; at
 }
 
 /**
- * The big chopping board's wood, after the board the cut fish lies on: a warm orange-brown, four broad planks along its length each its own
- * shade, lighter down its middle, a dark groove between them with a lit lip, soft long grain and a knot or two; painted, not photographic.
- * Mapped as the tray's (one texture across 1.6 x 1.6).
+ * The big chopping board (blender/cutboard.py): thick warm wood, four planks edge-glued along its length, its corners rounded and edges
+ * eased, the knife's fine scratches over its middle; drawn in the room's toon light, with the ink line round it.
  */
-const BOARD_WOOD = (() => {
-  if (typeof document === 'undefined') return null
-  const S = 1024
-  const c = document.createElement('canvas')
-  c.width = c.height = S
-  const g = c.getContext('2d')!
-  let seed = 41
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  const planks = 4, ph = S / planks
-  const tones = ['#b9692f', '#c4763a', '#ad5f2a', '#bf7036']
-  for (let b = 0; b < planks; b++) {
-    const y0 = b * ph
-    const grad = g.createLinearGradient(0, y0, 0, y0 + ph)
-    grad.addColorStop(0, '#8f4a1e'); grad.addColorStop(0.18, tones[b]); grad.addColorStop(0.5, tones[b]); grad.addColorStop(0.82, tones[b]); grad.addColorStop(1, '#8f4a1e')
-    g.fillStyle = grad
-    g.fillRect(0, y0, S, ph)
-    // (long soft grain, wavering a little)
-    for (let k = 0; k < 22; k++) {
-      const yy = y0 + 10 + rnd() * (ph - 20)
-      g.strokeStyle = `rgba(110, 50, 18, ${0.12 + rnd() * 0.18})`
-      g.lineWidth = 1 + rnd() * 2.5
-      g.beginPath()
-      for (let x = 0; x <= S; x += 16) { const y = yy + Math.sin(x * 0.004 + k) * 6 + Math.sin(x * 0.017 + b) * 2; if (x) g.lineTo(x, y); else g.moveTo(x, y) }
-      g.stroke()
-    }
-    // (a knot)
-    if (rnd() < 0.7) {
-      const kx = rnd() * S, ky = y0 + ph * (0.3 + rnd() * 0.4)
-      g.fillStyle = 'rgba(105, 48, 16, 0.6)'; g.beginPath(); g.ellipse(kx, ky, 14, 9, 0, 0, Math.PI * 2); g.fill()
-      g.strokeStyle = 'rgba(105, 48, 16, 0.3)'; g.lineWidth = 2
-      for (const r of [22, 32]) { g.beginPath(); g.ellipse(kx, ky, r * 1.5, r * 0.7, 0, 0, Math.PI * 2); g.stroke() }
-    }
-    // (the groove to the next plank, its lower lip catching the light)
-    g.fillStyle = '#4a200c'; g.fillRect(0, y0 + ph - 5, S, 7)
-    g.fillStyle = 'rgba(255, 210, 160, 0.35)'; g.fillRect(0, y0 + ph + 2, S, 3)
-  }
-  // (knife marks, faint, across the planks)
-  for (let i = 0; i < 70; i++) {
-    const x = rnd() * S, y = rnd() * S, l = 20 + rnd() * 70, a = (rnd() - 0.5) * 1.2
-    g.strokeStyle = `rgba(80, 36, 12, ${0.08 + rnd() * 0.12})`; g.lineWidth = 1
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke()
-  }
-  const t = new THREE.CanvasTexture(forPhone(c))
-  t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set(1 / 1.6, 1 / 1.6)
-  t.anisotropy = 8
-  return t
-})()
+const CUTBOARD_URL = import.meta.env.BASE_URL + 'models/cutboard.glb'
+useGLTF.preload(CUTBOARD_URL)
 /** A shallow wooden tray (盛り板) where ordered food waits raw, to be carried onto the fire. */
 function Tray({ position, container }: { position: [number, number, number]; container: string }) {
-  const geometry = useMemo(() => {
-    // a low board with a lip all round
-    const shape = new THREE.Shape()
-    const w = TRAY_W / 2
-    const d = TRAY_D / 2
-    const r = 0.1
-    shape.moveTo(-w + r, -d)
-    shape.lineTo(w - r, -d)
-    shape.quadraticCurveTo(w, -d, w, -d + r)
-    shape.lineTo(w, d - r)
-    shape.quadraticCurveTo(w, d, w - r, d)
-    shape.lineTo(-w + r, d)
-    shape.quadraticCurveTo(-w, d, -w, d - r)
-    shape.lineTo(-w, -d + r)
-    shape.quadraticCurveTo(-w, -d, -w + r, -d)
-    const g = new THREE.ExtrudeGeometry(shape, { depth: 0.035, bevelEnabled: true, bevelSize: 0.012, bevelThickness: 0.01,
-      bevelSegments: 2 })
-    g.rotateX(-Math.PI / 2)
-    return g
-  }, [])
+  const gltf = useGLTF(CUTBOARD_URL) as unknown as { scene: THREE.Group }
+  const { geometry, map } = useMemo(() => {
+    gltf.scene.updateMatrixWorld(true)
+    const m = gltf.scene.getObjectByName('CutBoard') as THREE.Mesh
+    const g = m.geometry.clone().applyMatrix4(m.matrixWorld)
+    const map = (m.material as THREE.MeshStandardMaterial).map
+    if (map) map.anisotropy = 8
+    return { geometry: g, map }
+  }, [gltf])
   // in front of the fire, its long side running across the screen
   const yaw = Math.atan2(-STACK_DIR.z, STACK_DIR.x)
   return (
     <group position={position} rotation-y={yaw} userData={{ container }}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={BOARD_WOOD} />
+        <meshToonMaterial color="#ffffff" map={map} />
       </mesh>
-      <mesh geometry={geometry} scale={[1.02, 1.1, 1.02]}>
+      <mesh geometry={geometry} scale={[1.012, 1.08, 1.02]}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
     </group>
@@ -2486,16 +2427,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     if (sparkPts.current.length > SPARKS * 2) sparkPts.current.splice(0, sparkPts.current.length - SPARKS * 2)
   }
-  /** works out where every stick on the bed lies, bottom up (the oldest lowest), each on the bed or across those beneath it */
+  /** each stick's pose as it stands in the bundle (game/coalPile's standStick: upright, its foot on the bed, leaning in) */
   const restack = () => {
-    const below: Lay[] = []
     for (const c of coals.current) {
       if (!c || c.gone || c.dying) continue
-      const r = restOf(c.tx, c.tz, c.yaw, below, PIT_LIFT)
-      c.top = r.y
-      c.slope = r.slope
-      c.qEnd.setFromUnitVectors(UP_AXIS, new THREE.Vector3(Math.cos(c.yaw), r.slope, Math.sin(c.yaw)).normalize())
-      below.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: r.y, slope: r.slope })
+      c.qEnd.setFromUnitVectors(UP_AXIS, new THREE.Vector3(Math.cos(c.yaw), c.slope, Math.sin(c.yaw)).normalize())
     }
   }
   /** a stick that has burnt down to ash: the only kind that's cleared to make room (a burning one isn't pushed out by new charcoal) */
@@ -2511,7 +2447,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (!roomForCoal()) return false
     const lying: Lay[] = []
     for (const c of coals.current) if (c && !c.gone && !c.dying) lying.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope })
-    return !!placeStick(lying) || coals.current.some((c) => c && !c.gone && !c.dying && ashedOut(c))
+    return !!standStick(lying, Math.random, PIT_LIFT) || coals.current.some((c) => c && !c.gone && !c.dying && ashedOut(c))
   }
   /** charcoal onto the fire: a load (the chef, the button), or `count` sticks (one, dragged from the crate by hand) */
   const dropCoals = (from?: { x: number; y: number; z: number }, count?: number, force = 0) => {
@@ -2530,21 +2466,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (const c of coals.current) if (c && !c.gone && !c.dying) lying.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope })
     let placed = 0
     for (let k = 0; k < n; k++) {
-      // (each lands at its own place on the heap, one after another; one that lands by another lies across it. A heap only goes so deep: when
-      // there's no room left, the oldest stick burns out to make some, and when even that leaves none, the rest stay in the crate)
-      let spot = placeStick(lying)
+      // (each stood in its own place in the bundle, one after another, from the middle out, as charcoal's built round a robatayaki's fire;
+      // when every place is taken, the oldest stick that's burnt to ash is cleared to make one, and when even that leaves none, the rest stay
+      // in the crate)
+      let spot = standStick(lying, Math.random, PIT_LIFT)
       for (let tries = 0; !spot && tries < 3; tries++) {
         const oldest = coals.current.find((c) => c && !c.gone && !c.dying && ashedOut(c))
         if (!oldest) break
         oldest.dying = true
         const at = lying.findIndex((l) => l.x === oldest.tx && l.z === oldest.tz)
         if (at >= 0) lying.splice(at, 1)
-        spot = placeStick(lying)
+        spot = standStick(lying, Math.random, PIT_LIFT)
       }
       if (!spot) break
       const { x: tx, z: tz, yaw, rest } = spot
-      // (it lands where it was let go, then slides to where it settles)
-      const ly = restOf(spot.from.x, spot.from.z, yaw, lying).y
+      // (stood straight into its place in the bundle)
+      const ly = rest.y
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
       // (the charcoal as it came from the crate; the cracks light up only as it heats (the emissive map))
       const mat = charcoalMaterial(bin)
@@ -3379,7 +3316,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const asOrdered = !dish.want || dish.want.dabs.slice().sort().join() ===
         Object.entries(dish.dabs).filter(([k, n]) => n > 0 && k !== 'water').map(([k]) => k).sort().join()
       // (and as fresh as what it was made from: a tired fish tastes of it)
-      const taste = Math.max(0, tasteOf(dish) * freshFactor(PANTRY.fresh[dish.id] ?? 100) - (asOrdered ? 0 : 15))
+      // (and as they're feeling: a dirty toilet, or one with no paper, sours what they eat after it)
+      const taste = Math.max(0, tasteOf(dish) * freshFactor(PANTRY.fresh[dish.id] ?? 100) - (asOrdered ? 0 : 15) - (WC_GRUMBLE.get(g.id) ?? 0))
       dish.node.userData.byGuest = true
       eat(dish)
       g.eaten.push(taste)

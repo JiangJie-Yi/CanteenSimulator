@@ -41,7 +41,9 @@ import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
-import { SHRINE_FLOWERS, PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { LINES } from '@/data/lines'
+import { looksOf, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
+import { SHRINE_FLOWERS, PLATE_STACK_Y, staffDoorAt, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, FRIDGE, FRIDGE_STATE, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
 
@@ -1277,6 +1279,8 @@ const WC_STAY = 6
 const DRINK_RATE = 1 / 70
 /** (in development, `__drinkRate` in the console makes them thirstier, for watching it) */
 const drinkRate = () => (import.meta.env.DEV ? (window as unknown as { __drinkRate?: number }).__drinkRate : undefined) ?? DRINK_RATE
+/** (and `__wcRate` readier for the toilet) */
+const wcRate = () => (import.meta.env.DEV ? (window as unknown as { __wcRate?: number }).__wcRate : undefined) ?? WC_RATE
 const DRINK_STAY = 2.25
 
 /** a plate on its way to a seat ('serve'), set at it ('set'), or being cleared away ('clear', after a pause) */
@@ -1323,12 +1327,14 @@ function Plate({ dirty = false, design = 0 }: { dirty?: boolean; design?: number
 }
 
 export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
-  speech = {}, servers = [], incense, onDrink, open = true }:
+  speech = {}, servers = [], incense, onDrink, onSay, open = true }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
     /** what's dyed on the noren at the door (its first character in the middle) */
     mark?: string
+    /** a guest's word (what they made of the toilet) */
+    onSay?: (who: 'chef' | 'guest', text: string) => void
     /** the height of the bar top, where the plates go */
     top?: number
     /** draw the customers themselves (a phone shows them in 2D instead; the plates still come and go) */
@@ -1526,8 +1532,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SEATS_TAKEN.clear()
     PLATES_SET.clear()
     for (const f of FRIDGE_STATE) f.passing = 0
-    TOILETS.m.passing = 0
-    TOILETS.f.passing = 0
+    // (the toilets swept before the day, nobody in them; the paper as it was left)
+    for (const w of [TOILETS.m, TOILETS.f]) { w.passing = 0; w.inside = 0; w.room = openRoom(w.room) }
+    WC_GRUMBLE.clear()
     redraw()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -1606,7 +1613,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.wc = { who: 'drink', path, len: pathLength(path), unit: fr.n, pick }
           s.phase = 'wcGo'
           s.t = 0
-        } else if (wcs && guest?.state === 'waiting' && Math.random() < WC_RATE * Math.min(dt, 0.1)) {
+        } else if (wcs && guest?.state === 'waiting' && Math.random() < wcRate() * Math.min(dt, 0.1)) {
           const who = HER.has(kindOf(s.id).kind) ? 'f' : 'm'
           const w = wcs[who]
           const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
@@ -1630,6 +1637,19 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (at the fridge: facing it, choosing; then their drink in hand, back to their stool)
         if (s.wc?.who === 'drink' && g && fridges) g.rotation.y = fridges[s.wc.unit ?? 0].yaw + Math.PI
         if (s.t > (s.wc?.who === 'drink' ? DRINK_STAY : WC_STAY)) {
+          // (out of the toilet: it flushes behind them, and they say what they thought of it, if it's worth saying)
+          if (s.wc && s.wc.who !== 'drink') {
+            const t = TOILETS[s.wc.who]
+            const was = looksOf(t.room)
+            const u = visitRoom(t.room)
+            t.room = u.room
+            t.flushAt = performance.now()
+            if (u.complaint) WC_GRUMBLE.set(s.id, Math.max(WC_GRUMBLE.get(s.id) ?? 0, penaltyOf(u.complaint)))
+            const L = LINES[lang]
+            if (u.complaint === 'paper') onSay?.('guest', L.wcPaper(s.id))
+            else if (u.complaint === 'dirty') onSay?.('guest', L.wcDirty(s.id))
+            else if (was === 'fresh' && Math.random() < 0.3) onSay?.('guest', L.wcNice(s.id))
+          }
           if (s.wc?.who === 'drink' && !s.drink) {
             s.drink = s.wc.pick ?? drinkFor(kindOf(s.id).kind, s.id)
             takeDrink(s.drink)
@@ -1746,8 +1766,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     // the toilets' doors open for whoever's going through them just now
     if (wcs) for (const who of ['m', 'f'] as const) {
-      TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack' || x.phase === 'wcIn')
+      // (and shut behind them while they're in: locked, its window showing 使用中)
+      TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack')
         && (groups.current.get(x.id)?.position.distanceTo(wcs[who].front) ?? 9) < 0.9).length
+      TOILETS[who].inside = shown.filter((x) => x.wc?.who === who && x.phase === 'wcIn').length
     }
     if (done.length) setShown((cur) => cur.filter((x) => !done.includes(x.id)))
     done = []

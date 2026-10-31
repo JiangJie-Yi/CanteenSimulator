@@ -382,7 +382,7 @@ M = {
     "ember": pbr("Ember", tex=TEX["ember"], nrm=TEX["ember_n"], rough=0.9, emit_tex=TEX["ember_e"], emit_strength=6.0),
     "stone": pbr("Stone", tex=TEX["stone"], nrm=TEX["stone_n"], rough=0.8),
     "pit": pbr("FirePit", tex=TEX["pit"], nrm=TEX["pit_n"], rough=0.95, blend=True),
-    "stick": pbr("BambooSkewer", tex=TEX["bamboo"], rough=0.6),
+    "stick": pbr("BambooSkewer", (0.3, 0.31, 0.33), rough=0.35, metal=0.85),
     "fish": pbr("Ayu", tex=TEX["fish"], nrm=TEX["fish_n"], rough=0.4, coat=0.3),
     "salt": pbr("SaltCrust", (0.97, 0.97, 0.95), rough=0.8),
     "saury": pbr("Saury", tex=TEX["saury"], nrm=TEX["fish_n"], rough=0.3, coat=0.4),
@@ -453,10 +453,10 @@ def centre_origin(o, at=(0.0, 0.0, 0.0)):
 
 # ground disc reaching well past the stone ring; its texture fades the edge out (see T_FirePit)
 PIT_R = 1.55
-SALT_R = 0.86
+SALT_R = 0.96
 SALT_H = 0.07          # (a thick bed: the salt piled well up inside the stones, full out toward them)
 # the hearth's frame (炉縁): its inner half-width and its bars' width and height
-IRORI_IN = 0.7
+IRORI_IN = 0.8
 IRORI_W = 0.13
 IRORI_H = 0.15
 
@@ -533,15 +533,18 @@ def charcoal_tube(radius, inner, length):
 
 sticks = []
 for i in range(24):
-    a = random.uniform(0, 2 * math.pi)
-    r = math.sqrt(random.uniform(0, 1)) * 0.34
+    # (the hearth is square, and the charcoal laid in it a square bed: the sticks side by side along one side or the other, crossing
+    # layer on layer, the middle heaped highest)
+    sx_, sy_ = random.uniform(-0.3, 0.3), random.uniform(-0.3, 0.3)
+    a = math.atan2(sy_, sx_)
+    r = max(abs(sx_), abs(sy_)) * 0.34 / 0.3
     length = random.uniform(0.2, 0.4)
     radius = random.uniform(0.03, 0.05)
     lift = max(0.0, 0.12 * (1 - r / 0.4)) * random.uniform(0.4, 1.0)     # mounded in the middle
     # big chunky lengths, some of them hollow down the middle
     o = charcoal_tube(radius, radius * random.uniform(0.35, 0.5) if random.random() < 0.4 else 0.0, length)
-    o.location = (r * math.cos(a), r * math.sin(a), radius + lift + salt_height(r * math.cos(a), r * math.sin(a)))
-    o.rotation_euler = (math.radians(90) + random.uniform(-0.35, 0.35), 0, random.uniform(0, math.pi))
+    o.location = (sx_, sy_, radius + lift + salt_height(sx_, sy_))
+    o.rotation_euler = (math.radians(90) + random.uniform(-0.2, 0.2), 0, (i % 2) * math.pi / 2 + random.uniform(-0.08, 0.08))
     # the ones down in the middle of the heap glow; the outer ones are grey white charcoal
     sticks.append(finish(o, "Binchotan", M["ember"] if r < 0.12 or random.random() < 0.15 else M["binchotan"],
                          smooth_shade=False))
@@ -573,13 +576,13 @@ join(grains, "SaltGrains")
 # a thick bed of glowing charcoal, heaped higher in the middle; joined into one mesh to keep draw calls low
 coals = []
 for _ in range(30):
-    a = random.uniform(0, 2 * math.pi)
-    r = math.sqrt(random.uniform(0, 1)) * 0.44
+    # (over the same square bed)
+    cx_, cy_ = random.uniform(-0.4, 0.4), random.uniform(-0.4, 0.4)
+    r = max(abs(cx_), abs(cy_)) * 0.44 / 0.4
     s = random.uniform(0.05, 0.1)
     heap = max(0.0, 0.08 * (1 - r / 0.44)) * random.uniform(0.3, 1.0)
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=1,
-                                          location=(r * math.cos(a), r * math.sin(a),
-                                                    s * 0.45 + heap + salt_height(r * math.cos(a), r * math.sin(a))),
+                                          location=(cx_, cy_, s * 0.45 + heap + salt_height(cx_, cy_)),
                                           rotation=(random.uniform(0, 3), random.uniform(0, 3), random.uniform(0, 3)))
     o = active()
     o.scale = (s * random.uniform(0.8, 1.3), s * random.uniform(0.8, 1.3), s * random.uniform(0.6, 0.9))
@@ -681,11 +684,22 @@ for i, half in enumerate(sizes):
 # (the hearth is square now: its stones, the same ones, set round a square inside the frame (between the sticks' feet and it), evenly along
 # its four sides, each turned square to its side with its sooted face still to the fire, a touch askew; smaller, a little flattened, as
 # rough-cut blocks, sitting down into the salt)
-STONE_SQ = 0.635
+STONE_SQ = IRORI_IN - 0.085
 _st = sorted([o for o in bpy.data.objects if o.name.startswith("Stone")], key=lambda o: math.atan2(o.location.y, o.location.x))
+# (as many again as the square's sides need to be closed shoulder to shoulder all the way round, corners and all: copies of the ring's,
+# each its own shape again, turned over and stretched a little differently)
 _per = 8 * STONE_SQ
+_want = int(_per / 0.16) + 1
+for _k in range(max(0, _want - len(_st))):
+    src = _st[_k % len(_st)]
+    c = src.copy()
+    c.data = src.data.copy()
+    bpy.context.collection.objects.link(c)
+    c.scale = (src.scale.x * random.uniform(0.9, 1.1), src.scale.y * random.uniform(0.85, 1.1), src.scale.z * random.uniform(0.85, 1.15))
+    _st.append(c)
+random.shuffle(_st)
 for i, o in enumerate(_st):
-    d = (i + 0.5) / len(_st) * _per
+    d = (i + random.uniform(0.35, 0.65)) / len(_st) * _per
     side, t = int(d // (2 * STONE_SQ)), d % (2 * STONE_SQ) - STONE_SQ
     # (the point along the square's side, and the way in from it)
     px, py, nx, ny = ((STONE_SQ, t, -1, 0), (-t, STONE_SQ, 0, -1), (-STONE_SQ, -t, 1, 0), (t, -STONE_SQ, 0, 1))[side]
@@ -695,7 +709,8 @@ for i, o in enumerate(_st):
     o.location.z *= 0.5
     o.rotation_euler.z += math.atan2(-ny, -nx) - a0 + random.uniform(-0.12, 0.12)
     # (thickened across, so each is a squarish block rather than a slab on end)
-    o.scale = (o.scale.x * 0.95, o.scale.y * 0.42, o.scale.z * 0.4)
+    # (as wide along the side as the step to the next, so they close up; thick across, and low)
+    o.scale = (o.scale.x * 1.3, _per / len(_st) / 2 / 0.8 * random.uniform(1.0, 1.12), min(o.scale.z * 0.45, 0.105 * random.uniform(0.85, 1.15)))
 # (then each measured as it now stands, and any that reaches past the frame's inner edge moved in until it's clear by a hair)
 bpy.context.view_layer.update()
 for o in _st:
@@ -707,6 +722,11 @@ for o in _st:
             o.location[ax] -= hi - lim
         if lo < -lim:
             o.location[ax] += -lim - lo
+# (the stones are set aside for now: the square frame holds the bed on its own; STONES = True brings them back)
+STONES = False
+if not STONES:
+    for o in _st:
+        bpy.data.objects.remove(o, do_unlink=True)
 # ---- the hearth's frame (炉縁): four thick bars of dark keyaki, lacquered, round the square bed, their corners mitred, each a soft bevel;
 # a brass plate wrapped over each corner (隅金具), a fine brass line inlaid round the inner edge
 _ku, _kv = grid01(1024)
@@ -778,18 +798,35 @@ join(bars, "Robuchi")
 # Items are modelled along local +X (the skewer axis), then placed on the stick.
 # =====================================================================
 
+STICK_SQ = 0.66           # (the hearth is square: the feet stand in a row along each side, this far in from the middle)
+
+
+def stick_side(angle_deg):
+    """Which side of the square a skewer at this angle stands on: its way out (the side's normal) and along (the side's tangent).
+    Kept clear of the corners, so each one's side is plain (the game finds it again the same way, from where the food is)."""
+    a = math.radians(angle_deg)
+    c, s_ = math.cos(a), math.sin(a)
+    return (Vector((math.copysign(1, c), 0, 0)), Vector((0, 1, 0))) if abs(c) >= abs(s_) else (Vector((0, math.copysign(1, s_), 0)), Vector((1, 0, 0)))
+
+
 def stick_frame(angle_deg, along, var=(0.0, 0.0, 0.0)):
     """Matrix for a point `along` (0 = foot, 1 = tip) on the skewer at this angle.
-    Local X runs up the stick, local Y points out of the fire circle, local Z completes the frame.
-    `var` = (tip radius offset, tip height offset, sideways lean in radians) so no two sticks are planted alike."""
+    The skewers stand in rows along the square hearth's four sides, as round an irori: each foot where the line out at its angle meets the
+    row (never right in a corner), each leaning straight in over the coals, the rows' tips drawn in a little toward the middle.
+    Local X runs up the stick, local Y points out of the fire (the side's way out), local Z completes the frame.
+    `var` = (tip in/out offset, tip height offset, sideways lean in radians) so no two sticks are planted alike."""
     a = math.radians(angle_deg)
     dr, dz, lean = var
-    # planted in the salt bed: the foot sits on its surface (it mounds up toward the middle)
-    fx, fy = STICK_FOOT_R * math.cos(a), STICK_FOOT_R * math.sin(a)
-    foot = Vector((fx, fy, salt_height(fx, fy) - 0.003))
-    tip = Vector(((STICK_TOP_R + dr) * math.cos(a + lean), (STICK_TOP_R + dr) * math.sin(a + lean), STICK_TOP_Z + dz))
+    out, side = stick_side(angle_deg)
+    # (where the line out at this angle meets its row, held back from the corners)
+    c, s_ = math.cos(a), math.sin(a)
+    t = (s_ if abs(c) >= abs(s_) else c) / max(abs(c), abs(s_)) * STICK_SQ
+    t = max(-STICK_SQ * 0.82, min(STICK_SQ * 0.82, t))
+    fxy = out * STICK_SQ + side * t
+    foot = Vector((fxy.x, fxy.y, salt_height(fxy.x, fxy.y) - 0.003))
+    txy = out * (STICK_TOP_R + dr) + side * (t * 0.6 + lean * 0.5)
+    tip = Vector((txy.x, txy.y, STICK_TOP_Z + dz))
     x = (tip - foot).normalized()
-    out = Vector((math.cos(a), math.sin(a), 0))
     y = (out - x * out.dot(x)).normalized()
     z = x.cross(y)
     m = Matrix((x, y, z)).transposed().to_4x4()
@@ -919,41 +956,68 @@ def tilted(outline, angle):
     return [(x * c - z * s, x * s + z * c) for x, z in outline]
 
 
+def spiny(x0, x1, height, n, ragged=0.25):
+    """Outline (x, z) of a spiny fin standing up from z=0 between x1 (front) and x0 (back): n spines, each a sharp point, the membrane
+    between them dipping, the tallest a little behind the front; ragged, as a fin is once it's been salted and grilled."""
+    pts = [(x1, 0.0)]
+    for k in range(n + 1):
+        t = k / n
+        x = x1 + (x0 - x1) * t
+        h = height * (0.55 + 0.45 * math.sin(min(1.0, t * 1.6 + 0.15) * math.pi * 0.95)) * random.uniform(1 - ragged, 1.0)
+        pts.append((x - (x1 - x0) / n * 0.25, h))
+        if k < n:
+            pts.append((x + (x0 - x1) / n * 0.5, h * random.uniform(0.45, 0.6)))
+    pts.append((x0, 0.0))
+    return pts
+
+
+def fan(length, spread, n, ragged=0.2):
+    """Outline (x, z) of a fan fin from its root at the origin, opening back toward -x through `spread` radians: n rays, ragged tips."""
+    pts = [(0.0, 0.0)]
+    for k in range(n + 1):
+        a = math.pi + spread * (k / n - 0.5)
+        r = length * random.uniform(1 - ragged, 1.0) * (0.75 + 0.25 * math.sin(k / n * math.pi))
+        pts.append((r * math.cos(a), r * math.sin(a)))
+        if k < n:
+            a2 = math.pi + spread * ((k + 0.5) / n - 0.5)
+            pts.append((r * 0.8 * math.cos(a2), r * 0.8 * math.sin(a2)))
+    return pts
+
+
 def fish(species="ayu"):
-    """A grilled fish along local X (head at +X), threaded the 踊り串 way: the body waves in a big S up the
-    skewer, as if it were still swimming, so the stick weaves in and out of it."""
+    """A whole salt-grilled fish (塩焼き) as it hangs round the fire at a robatayaki: built along local X with its head at -X (down the
+    skewer, its open mouth toward the coals, the tail up at the top), the body nearly straight with just a little swim left in it.
+    A deep, laterally flat body with a rounded forehead, a narrow root to the tail; big round eyes gone white in the heat with a dark
+    pupil, the gill cover's edge, an open mouth; and the fins dressed with salt (化粧塩) the way they're done so they don't burn: the
+    dorsal standing in a ragged crest of spines, the pectorals fanned out behind the gills, a small pelvic and anal fin, the tail spread."""
     sp = SPECIES[species]
     L, W, D = sp["length"], sp["width"], sp["depth"]
-    bend = lambda x: 0.012 * math.sin(x * math.pi / L)        # noqa: E731  a little sideways sway
-    sway = sp.get("wave", 1.0)
-    wave = lambda x: 0.95 * D * sway * math.sin(x * math.pi / L)      # noqa: E731  the S, seen from the side
+    bend = lambda x: 0.006 * math.sin(x * math.pi / L)        # noqa: E731  a little sideways sway
+    sway = sp.get("wave", 1.0) * 0.32
+    wave = lambda x: 0.95 * D * sway * math.sin(x * math.pi / L)      # noqa: E731  the gentle curve, seen from the side
     slope = lambda x: math.atan(0.95 * D * sway * math.pi / L * math.cos(x * math.pi / L))   # noqa: E731
-    opened = sp.get("opened", True)
     bm = bmesh.new()
     bm.loops.layers.uv.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=32, radius=1, calc_uvs=True)
+    bmesh.ops.create_uvsphere(bm, u_segments=56, v_segments=40, radius=1, calc_uvs=True)
     for vtx in bm.verts:
         # turn the sphere so its poles are the tail (-X) and the head (+X): its UVs then run along the fish
-        # (v tail → head) and round it (u), which is how the skin textures are painted
         ox, oy, oz = vtx.co
         vtx.co = Vector((oz, oy, -ox))
-        # the belly cut open from the vent to behind the gills: a groove pressed up along the underside, with
-        # its lips pushed apart
-        x, y, z = vtx.co
-        open_along = smooth(-0.32, -0.22, np.float32(x)) * smooth(0.5, 0.4, np.float32(x)) * (z < -0.4)
-        if opened and open_along > 0:
-            vtx.co.z += 0.55 * math.exp(-(y / 0.3) ** 2) * open_along      # the emptied cavity, deep
-            vtx.co.y *= 1 + 0.3 * math.exp(-((abs(y) - 0.32) / 0.14) ** 2) * open_along
+    prof = lambda x: 1 - 0.8 * smooth(0.05, -0.92, np.float32(x)) ** 1.3   # noqa: E731  (deep through the shoulders, pinched to the tail's root)
     for vtx in bm.verts:
-        x = vtx.co.x
+        x, y, z = vtx.co
         # (a roe-filled belly bulges below, through the middle of the body)
-        if sp.get("belly") and vtx.co.z < 0:
-            vtx.co.z *= 1 + sp["belly"] * math.exp(-((x + 0.05) / 0.4) ** 2)
-        taper = 1 + min(0, x) * 0.82                       # narrowing into the tail root (-X)
-        head = 1 - max(0, x - 0.55) * sp["snout"]          # snout: pointed for saury, blunter for ayu
-        vtx.co.y *= W * taper * head
-        vtx.co.z *= D * taper * head
-        vtx.co.x *= L
+        if sp.get("belly") and z < 0:
+            z *= 1 + sp["belly"] * math.exp(-((x + 0.05) / 0.4) ** 2)
+        # (the head: the forehead rounding up over the eyes, the jaw straighter beneath, the snout drawn to a point at its own rate)
+        head = 1 - max(0, x - 0.55) * sp["snout"]
+        if z > 0:
+            z *= 1 + 0.22 * float(smooth(0.2, 0.75, np.float32(x))) * float(smooth(1.0, 0.85, np.float32(x)))
+        else:
+            z *= 1 - 0.12 * float(smooth(0.45, 0.9, np.float32(x)))
+        k = float(prof(x))
+        # (flat-sided, as a fish is: fuller toward the back than at the belly's edge)
+        vtx.co = Vector((x * L, y * W * k * head * (1 - 0.18 * max(0.0, -z)), z * D * k * head))
         vtx.co.y += bend(vtx.co.x)
         vtx.co.z += wave(vtx.co.x)
     me = bpy.data.meshes.new("FishBody")
@@ -963,92 +1027,72 @@ def fish(species="ayu"):
     bpy.context.collection.objects.link(body)
     finish(body, "FishBody", M[sp["body"]])
     parts = [body]
+    depth_at = lambda x: D * float(prof(x / L)) * math.sqrt(max(0.0, 1 - (x / L) ** 2))   # noqa: E731
+    width_at = lambda x: W * float(prof(x / L)) * math.sqrt(max(0.0, 1 - (x / L) ** 2))   # noqa: E731
+    salt = M[sp["fin"]]
 
-    # forked tail, rooted just inside the narrow end of the body and flicked along the line of the S
+    # the tail, spread wide and thick with salt, rooted inside the narrow end
     tail_len, tail_h = sp["tail"]
-    root_x = -L * 0.93
-    parts.append(flat_fin("TailFin", tilted(forked_tail(tail_len, tail_h, D * 0.16), slope(root_x)), 0.006,
-                          M[sp["fin"]], at=(root_x, bend(root_x), wave(root_x))))
-
-    # dorsal fin: a low swept-back sail; a small anal fin underneath; both ride the curve of the back
-    dx = L * 0.05
-    parts.append(flat_fin("DorsalFin", tilted([(L * 0.12, 0), (L * 0.02, D * 0.75), (-L * 0.12, D * 0.55),
-                                               (-L * 0.2, 0)], slope(dx)), 0.005, M[sp["fin"]],
-                          at=(dx, bend(dx), D * 0.82 + wave(dx))))
+    root_x = -L * 0.9
+    parts.append(flat_fin("TailFin", tilted(forked_tail(tail_len * 1.2, tail_h * 1.25, D * 0.17), slope(root_x)), 0.009,
+                          salt, at=(root_x, bend(root_x), wave(root_x))))
+    # the dorsal: a crest of salted spines along the back; the anal fin under the rear half; both following the curve
+    dx = 0.0
+    parts.append(flat_fin("DorsalFin", tilted(spiny(-L * 0.62, L * 0.32, D * 0.95, 9), slope(dx)), 0.006, salt,
+                          at=(dx, bend(dx), depth_at(dx) * 0.86 + wave(dx))))
     ax = -L * 0.45
-    parts.append(flat_fin("AnalFin", tilted([(L * 0.1, 0), (-L * 0.08, -D * 0.45), (-L * 0.16, 0)], slope(ax)),
-                          0.005, M[sp["fin"]], at=(ax, bend(ax), -D * 0.55 + wave(ax))))
-
-    # eyes on both sides of the head
-    ex = L * 0.73
-    er = (0.014 + D * 0.03) * sp.get("eye", 1.0)
-    ez = wave(ex)
+    parts.append(flat_fin("AnalFin", [(x, -z) for x, z in tilted(spiny(-L * 0.22, L * 0.12, D * 0.5, 5), -slope(ax))], 0.005, salt,
+                          at=(ax, bend(ax), -depth_at(ax) * 0.8 + wave(ax))))
+    # the pectorals fanned out behind the gill covers, and the small pelvic fins under them, both sides, standing a little off the body
+    px = L * 0.42
     for side in (-1, 1):
-        # (the white stands out of the head a little, so a ring of it shows round the black)
-        ey = bend(ex) + side * (W * 0.5 + er * 0.35)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=16, ring_count=10, location=(ex, ey, D * 0.25 + ez))
-        active().scale = (1, 0.6, 1)
-        parts.append(finish(active(), "Eye", M["eye"]))
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.5, segments=12, ring_count=8,
-                                             location=(ex + 0.002, ey + side * er * 0.42, D * 0.255 + ez))
-        active().scale = (1, 0.4, 1)
-        parts.append(finish(active(), "Pupil", M["pupil"]))
+        o = flat_fin("PectoralFin", fan(D * 0.75, 1.1, 9), 0.005, salt, at=(0, 0, 0))
+        o.rotation_euler = (side * 0.35, 0, 0)
+        o.location = (px, bend(px) + side * (width_at(px) * 0.85), -depth_at(px) * 0.15 + wave(px))
+        parts.append(o)
+        q = flat_fin("PelvicFin", fan(D * 0.45, 0.7, 5), 0.004, salt, at=(0, 0, 0))
+        q.rotation_euler = (side * 0.5, 0.5, 0)
+        q.location = (L * 0.3, bend(L * 0.3) + side * width_at(L * 0.3) * 0.4, -depth_at(L * 0.3) * 0.85 + wave(L * 0.3))
+        parts.append(q)
 
-    # the horse mackerel's scutes: a row of small hard plates along the rear half of the lateral line, both sides
+    # the eyes: big and round, gone white in the heat round a dark pupil, set into the head (not standing off it)
+    ex = L * 0.74
+    er = (0.016 + D * 0.04) * sp.get("eye", 1.0)
+    ez = wave(ex) + depth_at(ex) * 0.22
+    for side in (-1, 1):
+        ey = bend(ex) + side * (width_at(ex) * 0.86)
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=20, ring_count=12, location=(ex, ey, ez))
+        active().scale = (1, 0.38, 1)
+        parts.append(finish(active(), "Eye", M["eye"]))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.42, segments=14, ring_count=8, location=(ex, ey + side * er * 0.3, ez))
+        active().scale = (1, 0.3, 1)
+        parts.append(finish(active(), "Pupil", M["pupil"]))
+        # (the gill cover's edge: a dark arc from the nape down behind the eye to the throat)
+        gx = L * 0.5
+        # (laid on the head's own curve: as wide there as the body is at that height)
+        arc = [(gx + L * 0.06 * math.cos(t), bend(gx) + side * (width_at(gx + L * 0.06 * math.cos(t)) * math.sqrt(max(0.0, 1 - (0.8 * math.sin(t)) ** 2)) + 0.0012),
+                wave(gx) + depth_at(gx) * 0.8 * math.sin(t)) for t in (1.15, 0.8, 0.4, 0.0, -0.4, -0.8, -1.1)]
+        parts.append(tube(arc, 0.0022 + D * 0.012, (0.0022 + D * 0.012) * 0.6, M["pupil"], "Gill", 6))
+    # the mouth, open toward the coals: a dark gape at the snout's tip, its lower jaw jutting a little
+    mx = L * 0.97
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=D * 0.16, segments=16, ring_count=10, location=(mx, bend(mx), wave(mx) - depth_at(L * 0.9) * 0.15))
+    active().scale = (0.7, max(0.4, W / D * 1.1), 1)
+    parts.append(finish(active(), "Mouth", M["pupil"]))
+
+    # the horse mackerel's scutes: a row of small hard plates along the rear half of the lateral line, both sides, lying flat on it
     if sp.get("scutes"):
         for k in range(13):
             sx = -L * 0.82 + k * L * 0.055
-            taper = 1 + min(0.0, sx / L) * 0.82
             for side in (-1, 1):
-                bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0065, segments=8, ring_count=6,
-                                                     location=(sx, bend(sx) + side * W * taper * 0.97, wave(sx) + D * 0.05 * taper))
+                bpy.ops.mesh.primitive_uv_sphere_add(radius=0.006, segments=8, ring_count=6,
+                                                     location=(sx, bend(sx) + side * width_at(sx) * 0.97, wave(sx) + depth_at(sx) * 0.05))
                 sc = active()
-                sc.scale = (1.3, 0.35, 0.8)
+                sc.scale = (1.4, 0.18, 0.6)
                 parts.append(finish(sc, "Scute", M["scute"]))
-
-    if not opened:
-        return parts
-    # the belly walls either side of the cut, turned out like the covers of a book: each hinged along its lip of
-    # the cut, folded outward and curling back as it goes, so the cooked flesh and rib bones inside face out
-    x0, x1 = -0.27, 0.45                                   # (the same stretch as the cut, in the sphere's -1..1)
-    nu, nv = 28, 7
-    for sd in (-1, 1):
-        bm = bmesh.new()
-        uvl = bm.loops.layers.uv.new()
-        grid = []
-        for i in range(nu + 1):
-            xn = x0 + (x1 - x0) * i / nu
-            X = xn * L
-            taper = 1 + min(0, X) * 0.82
-            head = 1 - max(0, X - 0.55) * sp["snout"]
-            rho = math.sqrt(max(0.0, 1 - xn * xn))
-            # the lip of the cut, a little up into the belly's curve
-            hinge = Vector((X, sd * 0.4 * rho * W * taper * head + bend(X), -0.9 * rho * D * taper * head + wave(X)))
-            span = math.sin(math.pi * i / nu) ** 0.7        # widest in the middle, closing to nothing at each end
-            width = 0.62 * D * taper * head * rho * span
-            p = hinge.copy()
-            col = [bm.verts.new(p)]
-            for j in range(nv):
-                a = (j + 0.5) / nv
-                th = math.radians(92 + 42 * a + 6 * math.sin(i * 0.9))   # folded right out, curling back at the edge
-                p = p + Vector((0, sd * math.sin(th), -math.cos(th))) * (width / nv)
-                col.append(bm.verts.new(p))
-            grid.append(col)
-        for i in range(nu):
-            for j in range(nv):
-                fc = bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
-                for l, (uu, vv) in zip(fc.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
-                    l[uvl].uv = (uu / nu, vv / nv)
-        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
-        me = bpy.data.meshes.new("BellyFlap")
-        bm.to_mesh(me)
-        bm.free()
-        flap = bpy.data.objects.new("BellyFlap", me)
-        bpy.context.collection.objects.link(flap)
-        sm = flap.modifiers.new("Solidify", "SOLIDIFY")
-        sm.thickness = 0.0045
-        sm.offset = 0
-        parts.append(finish(flap, "BellyFlap", M["fish_flesh"]))
+    # (head down the skewer, toward the fire: the whole fish turned end for end about its middle)
+    turn = Matrix.Rotation(math.pi, 4, "Z")
+    for o in parts:
+        o.matrix_world = turn @ o.matrix_world
     return parts
 
 
@@ -1428,7 +1472,7 @@ def onigiri():
     return [rice, finish(n, "Nori", M["nori"], smooth_shade=False)]
 
 
-def shrimp_body(cx, R, size, name, flip=1):
+def shrimp_body(cx, R, size, name, flip=1, straight=0.0):
     """One whole salt-grilled shrimp curled the way it cooks, skewered through the head and the tail so the body
     hangs in a U below the stick (in the stick's X/Z plane, so it's seen in profile from outside the fire).
     Returns its parts: the segmented shell, tail fan, rostrum, eyes, antennae, walking legs and swimmerets."""
@@ -1439,6 +1483,11 @@ def shrimp_body(cx, R, size, name, flip=1):
 
     def frame(s):
         """spine point, direction of travel (head -> tail), outward normal (the back) at s in 0..1"""
+        if straight:
+            # (skewered straight from head to tail, the head down the stick at -X, the back to +Z, bowed just a little)
+            p = Vector((cx - straight / 2 + straight * s, 0, 0.012 * size * math.sin(math.pi * s)))
+            t = Vector((1, 0, 0.012 * size * math.pi / straight * math.cos(math.pi * s))).normalized()
+            return p, t, Vector((-t.z, 0, t.x))
         th = th0 + (th1 - th0) * s
         p = centre + Vector((R * math.cos(th), 0, flip * R * math.sin(th)))
         t = Vector((-math.sin(th), 0, flip * math.cos(th)))
@@ -1536,6 +1585,10 @@ def shrimp_body(cx, R, size, name, flip=1):
         pts = []
         for k in range(14):
             a = k / 13
+            if straight:
+                # (hanging head down: the feelers trail on down toward the coals, splaying and curling out)
+                pts.append(h + Vector((-(0.02 + 0.2 * a) * size, sd * (0.01 + 0.05 * a ** 1.4) * size, (0.03 * a - 0.07 * a * a) * size)))
+                continue
             ang = math.pi - a * 2.3
             rr = R * (1.25 + 0.5 * a)
             pts.append(Vector((cx + rr * math.cos(ang) - (1 - a) * 0.02, sd * (0.012 + 0.07 * a ** 1.5),
@@ -1567,11 +1620,10 @@ def shrimp_body(cx, R, size, name, flip=1):
 
 
 def shrimp_pair():
-    """Two shrimp on one stick, each curled and skewered through head and tail; one a little bigger, and turned
-    the other way up, as they come off a real grill."""
-    k = 1.5                    # big tiger prawns: each about a third of the stick, like the real thing
-    return (shrimp_body(-0.072 * k, 0.06 * k, k * random.uniform(0.95, 1.08), "ShrimpA", flip=1) +
-            shrimp_body(0.072 * k, 0.058 * k, k * random.uniform(0.9, 1.02), "ShrimpB", flip=-1))
+    """One big tiger prawn on its skewer the robatayaki way: run straight through from head to tail, hung head down toward the coals, its
+    legs and long feelers trailing (the name kept: the menu and the game know it by it)."""
+    k = 1.7
+    return shrimp_body(0.0, 0.06 * k, k * random.uniform(0.97, 1.05), "ShrimpA", straight=0.2 * k)
 
 def sausage():
     """A plump link with rounded ends, curved like a real sausage. Built along local Z, then laid along X."""

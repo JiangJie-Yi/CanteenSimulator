@@ -13,7 +13,7 @@ const TOILET_URL = import.meta.env.BASE_URL + 'models/toilet.glb'
 const WASH_URL = import.meta.env.BASE_URL + 'models/washstand.glb'
 const GLOSSY = new Set(['StoolBrass', 'PotGlaze', 'WcChina', 'WcIvory', 'WcChrome', 'WcWater', 'WashBrass', 'WashMirror', 'WashWater'])
 /** parts too thin or small for an ink line */
-const UNINKED = /(Piping|Button|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring)/
+const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring)/
 
 const made = new Map<string, THREE.Object3D>()
 function toonOf(url: string, scene: THREE.Group) {
@@ -52,6 +52,7 @@ export function BambooModel() {
   return <primitive object={obj} />
 }
 /** the toilet and its washlet (blender/wc.py), facing -x */
+export { toonOf }
 export function ToiletModel() {
   const gltf = useGLTF(TOILET_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => toonOf(TOILET_URL, gltf.scene), [gltf])

@@ -1,5 +1,6 @@
 import { blessingChime, shrineDoor } from './shrineSound'
-import { BambooModel, ToiletModel, WashstandModel } from './BarFurnish'
+import { BambooModel, WashstandModel } from './BarFurnish'
+import { doorClick, LOCK_TEX, ToiletLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPaper, WcRemote } from './Restroom'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -1050,7 +1051,6 @@ const WC_GEO = {
   seat: new THREE.TorusGeometry(0.1, 0.022, 8, 20),
   tank: new THREE.BoxGeometry(0.12, 0.3, 0.32),
   basin: new THREE.CylinderGeometry(0.09, 0.065, 0.06, 18),
-  roll: new THREE.CylinderGeometry(0.04, 0.04, 0.09, 12),
   pot: new THREE.CylinderGeometry(0.03, 0.026, 0.1, 10),
   leaf: new THREE.ConeGeometry(0.02, 0.12, 4),
   lamp: new THREE.SphereGeometry(0.06, 12, 8),
@@ -1063,6 +1063,17 @@ const WC_GEO = {
  * in a wooden frame and an indigo hand towel on a rod; the paper in a wooden holder; a bamboo vase of camellia on the
  * cistern, the お手洗い plaque, and a paper lamp lit overhead.
  */
+/** the room's paper lamp, on its sensor */
+function WcLamp({ who, at }: { who: 'm' | 'f'; at: [number, number, number] }) {
+  const m = useRef<THREE.MeshBasicMaterial>(null)
+  const k = useRef(0.4)
+  useFrame(() => {
+    const t = TOILETS[who]
+    k.current += ((t.inside > 0 || t.passing > 0 || t.open ? 1 : 0.4) - k.current) * 0.08
+    m.current?.color.set('#fff1cc').multiplyScalar(k.current)
+  })
+  return <mesh geometry={WC_GEO.lamp} position={at}><meshBasicMaterial ref={m} color="#fff1cc" toneMapped={false} /></mesh>
+}
 function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
   const D = 0.9
   const floor = useMemo(() => {
@@ -1122,10 +1133,26 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <mesh position={[D / 2, top, 0]} rotation-x={Math.PI / 2}><planeGeometry args={[D, w]} /><meshToonMaterial color="#3a2416" /></mesh>
       {[0.25, 0.7].map((x) => <mesh key={x} position={[x, top - 0.03, 0]}><boxGeometry args={[0.06, 0.06, w]} /><meshToonMaterial color="#241408" /></mesh>)}
       </StaticBatch>
-      <Movable id={`wc-${who}-toilet`} label={`馬桶（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      {/* the toilet with its washlet, facing the door, its cistern to the back wall (blender/wc.py) */}
-      <group position={[D - 0.4, 0, 0]}><ToiletModel /></group>
-      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-toilet`} label={`馬桶（${who === 'm' ? '男廁' : '女廁'}）`}>
+      {/* the toilet with its washlet, facing the door, its cistern to the back wall (blender/wc.py; Restroom: its lid, flush, scrubbing) */}
+      <ToiletLive who={who} at={[D - 0.4, 0, 0]} />
+      </Movable>
+      {/* (marks on the duckboard as it gets dirty) */}
+      <WcMarks who={who} at={[D - 0.7, 0.032, 0]} size={[0.42, 0.46]} />
+      <Movable id={`wc-${who}-remote`} label={`免治馬桶遙控器（${who === 'm' ? '男廁' : '女廁'}）`}>
+        <group position={[D - 0.36, 0.86, w / 2]} rotation-y={Math.PI}><WcRemote who={who} /></group>
+      </Movable>
+      <Movable id={`wc-${who}-oto`} label={`音姬（${who === 'm' ? '男廁' : '女廁'}）`}>
+        <group position={[D, 1.0, w / 2 - 0.12]} rotation-y={-Math.PI / 2}><WcOtohime who={who} /></group>
+      </Movable>
+      <Movable id={`wc-${who}-brush`} label={`馬桶刷（${who === 'm' ? '男廁' : '女廁'}）`}>
+        <WcBrush who={who} at={[D - 0.08, 0, -w / 2 + 0.08]} bowl={[D - 0.43, 0.31, 0]} />
+      </Movable>
+      {who === 'f' && (
+        <Movable id="wc-f-bin" label="生理用品垃圾桶（女廁）">
+          <group position={[D - 0.1, 0, w / 2 - 0.1]} rotation-y={Math.PI}><WcBin /></group>
+        </Movable>
+      )}
       <Movable id={`wc-${who}-vase`} label={`竹花瓶（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* (on the hand-wash counter, beside the bowl) */}
       <group position={[D * 0.45 - 0.26, 0.06, -w / 2 + 0.01]}>
@@ -1155,7 +1182,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       {/* (a pair of toilet slippers: rounded soles, a cloth band over the toes, the toilet's own colour, set side by side toes out) */}
       {[-1, 1].map((sd) => (
-        <group key={sd} position={[0.09, 0, sd * 0.055]} rotation-y={sd * 0.06}>
+        <group key={sd} position={[0.09, 0.03, sd * 0.055]} rotation-y={sd * 0.06}>
           <mesh position-y={0.008} scale={[0.13, 0.016, 0.046]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color="#e8dcc4" /></mesh>
           <mesh position-y={0.017} scale={[0.125, 0.004, 0.042]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color={accent} /></mesh>
           <mesh position={[-0.055, 0.024, 0]} rotation-x={Math.PI / 2} scale={[1, 1, 0.8]}><torusGeometry args={[0.04, 0.016, 6, 16, Math.PI]} /><meshToonMaterial color={accent} /></mesh>
@@ -1168,20 +1195,15 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <group position={[D * 0.45, 0, -w / 2]} rotation-y={Math.PI / 2}><WashstandModel /></group>
       <mesh position={[D * 0.45 + 0.26, 0.86, -w / 2 + 0.035]}><planeGeometry args={[0.1, 0.2]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI} side={THREE.DoubleSide} /></mesh>
       </StaticBatch></Movable>
-      <Movable id={`wc-${who}-paper`} label={`衛生紙架（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      {/* the paper, in a wooden holder on the other wall, and the plaque over it */}
-      <group position={[D - 0.3, 0.55, w / 2 - 0.05]}>
-        <mesh position={[0, 0, 0.03]}><boxGeometry args={[0.14, 0.12, 0.012]} /><meshToonMaterial color="#8a5a30" /></mesh>
-        <mesh geometry={WC_GEO.roll} position={[0, 0, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#fafaf6" /></mesh>
-        {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.06, 0, 0]}><boxGeometry args={[0.012, 0.1, 0.07]} /><meshToonMaterial color="#8a5a30" /></mesh>)}
-      </group>
-      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-paper`} label={`衛生紙架（${who === 'm' ? '男廁' : '女廁'}）`}>
+      {/* the paper, on its walnut holder on the other wall (Restroom: thinning with use, a new roll at a click) */}
+      <group position={[D - 0.36, 0.6, w / 2]} rotation-y={Math.PI}><WcPaper who={who} /></group>
+      </Movable>
       <Movable id={`wc-${who}-plaque`} label={`廁所牌（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
       <mesh position={[D * 0.45, 1.5, w / 2 - 0.006]} rotation-y={Math.PI}><planeGeometry args={[0.3, 0.12]} /><meshToonMaterial color="#ffffff" map={WC_PLAQUE} /></mesh>
       </StaticBatch></Movable>
-      <Movable id={`wc-${who}-lamp`} label={`紙燈（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      {/* a paper lamp, lit, overhead, in a wooden cage */}
-      <mesh geometry={WC_GEO.lamp} position={[D / 2, h + 0.1, 0]}><meshBasicMaterial color="#fff1cc" toneMapped={false} /></mesh>
+      <Movable id={`wc-${who}-lamp`} label={`紙燈（${who === 'm' ? '男廁' : '女廁'}）`}><WcLamp who={who} at={[D / 2, h + 0.1, 0]} /><StaticBatch>
+      {/* a paper lamp overhead, in a wooden cage: on a motion sensor, bright while someone's in or the door's open, dim otherwise */}
       <mesh position={[D / 2, h + 0.1, 0]}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
       </StaticBatch></Movable>
     </group>
@@ -1191,6 +1213,19 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
  * A toilet's door itself: one whole sliding panel, wood below, shoji paper on a lattice above. It slides aside into
  * the wall when someone goes in or comes out, or when it's clicked (and back again with another click).
  */
+function LockWindow({ who }: { who: 'm' | 'f' }) {
+  const m = useRef<THREE.MeshBasicMaterial>(null)
+  useFrame(() => {
+    const want = TOILETS[who].inside > 0 ? LOCK_TEX.in : LOCK_TEX.free
+    if (m.current && m.current.map !== want) { m.current.map = want; m.current.needsUpdate = true }
+  })
+  return (
+    <mesh position={[-0.0135, 0.02, WC_W / 2 - 0.09]} rotation-y={-Math.PI / 2}>
+      <planeGeometry args={[0.07, 0.035]} />
+      <meshBasicMaterial ref={m} map={LOCK_TEX.free} />
+    </mesh>
+  )
+}
 function ToiletPanel({ who }: { who: 'm' | 'f' }) {
   const W = WC_W, H = WC_H
   const g = useRef<THREE.Group>(null)
@@ -1210,8 +1245,8 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     }
   })
   return (
-    <group ref={g} onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; TOILETS[who].open = !TOILETS[who].open }}
-      {...tipOver('廁所門', '點一下開關')}>
+    <group ref={g} onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; doorClick(who, Math.max(0, 1 - ev.distance / 8)) }}
+      {...tipOver('廁所門', '點一下開關（有人時會敲門）')}>
       <group position={[-0.03, H / 2, 0]}>
         <mesh position-y={0.2} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[W - 0.02, H - 0.44]} />
@@ -1221,6 +1256,8 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
         {[-1, 1].map((sd) => <Box key={sd} size={[0.024, H - 0.02, 0.03]} color="#5a3a22" position={[-0.006, 0, sd * (W / 2 - 0.025)]} />)}
         {[-0.5, -0.17, 0.17, 0.5].map((k) => <Box key={k} size={[0.016, H - 0.46, 0.014]} color="#5a3a22" position={[-0.008, 0.2, k * (W - 0.06) / 1.1]} />)}
         {[0, 1, 2, 3, 4].map((k) => <Box key={k} size={[0.016, 0.018, W - 0.04]} color="#5a3a22" position={[-0.008, -H / 2 + 0.41 + k * (H - 0.46) / 4, 0]} />)}
+        {/* the lock's little window over the hand-hold: 使用中 in red while someone's in, 空き in blue */}
+        <LockWindow who={who} />
         {/* the hand-hold, sunk in the wood */}
         <mesh position={[-0.014, -0.1, W / 2 - 0.09]} rotation-z={Math.PI / 2}>
           <cylinderGeometry args={[0.02, 0.02, 0.006, 12]} />
@@ -1238,14 +1275,14 @@ function ToiletHit({ who }: { who: 'm' | 'f' }) {
   const W = WC_W, H = WC_H
   return (
       <mesh position={[-0.16, (H + 0.3) / 2, 0]} rotation-y={-Math.PI / 2}
-        onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; TOILETS[who].open = !TOILETS[who].open }}
+        onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; doorClick(who, Math.max(0, 1 - ev.distance / 8)) }}
         onPointerOver={(ev) => {
           ev.stopPropagation()
           // (the sliding panel lights up, not the plane)
           let top: THREE.Object3D | null = ev.eventObject
           while (top && !top.getObjectByName(`look-wc-${who}`)) top = top.parent
           glowOnly(top?.getObjectByName(`look-wc-${who}`))
-          setTip({ title: '廁所門', hint: '點一下開關' })
+          setTip({ title: '廁所門', hint: TOILETS[who].inside > 0 ? '使用中：點一下敲門' : '點一下開關' })
           POINTER_HINT.hand++
           const el = ev.nativeEvent.target as HTMLElement | null
           if (el?.style) el.style.cursor = 'pointer'

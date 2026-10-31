@@ -4,6 +4,7 @@ import { setTip } from '@/scene/hoverTip'
 import { openingFloat, type DrawerCash } from '@/game/till'
 import { RACK_FULL } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
+import { freshRoom } from '@/game/restroom'
 
 /*
  * Where the customers sit: one or more counters, each a straight run of stools. A counter is given by its middle
@@ -337,8 +338,13 @@ export const drinkFor = (kind: string, id: number): DrinkId => {
   return of(['beer', 'highball', 'sake', 'beerCan', 'oolong', 'coffee', 'cola'])
 }
 
-/** the toilets' doors: how many are going through each just now (GuestBar3D), and whether the player's opened it */
-export const TOILETS = { m: { passing: 0, open: false }, f: { passing: 0, open: false } }
+/** each toilet: how many are going through its door just now and whether someone's inside, locked (GuestBar3D); whether the player's
+ * opened it; its upkeep (game/restroom: how clean, how much paper); and when it last flushed, was scrubbed, played its Otohime, or was
+ * knocked at (performance.now() ms, for the room's animations and sounds) */
+const wcOf = () => ({ passing: 0, inside: 0, open: false, room: freshRoom(), flushAt: -1e9, scrubAt: -1e9, otoAt: -1e9, knockAt: -1e9, rollAt: -1e9, washAt: -1e9 })
+export const TOILETS = { m: wcOf(), f: wcOf() }
+/** points off the taste of what each guest eats, for what they found in the toilet (Roasting reads it) */
+export const WC_GRUMBLE = new Map<number, number>()
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __toilets?: typeof TOILETS }).__toilets = TOILETS
 
 /**

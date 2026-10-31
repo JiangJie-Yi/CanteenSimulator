@@ -9,7 +9,7 @@ export const STICK_HALF = 0.15
 export const STICK_R = 0.032
 /** the salt's mound, fitted to the fire pit's mesh as it is (its height in the middle, how far it reaches, how full its shoulder): there's
  * no heap on it any more, so nothing is raised over the middle and nothing lies in the air there */
-const SALT_TOP = 0.212, SALT_REACH = 1.03, SALT_FULL = 0.75
+const SALT_TOP = 0.212, SALT_REACH = 1.15, SALT_FULL = 0.85
 
 /** the height of the bed's surface at a place in plan */
 export function surfaceY(x: number, z: number, lift = 0) {
@@ -189,4 +189,39 @@ export function crumble(l: Lay, below: Lay[], rnd: () => number = Math.random, l
 export function throwForce(speed: number, stillFor: number) {
   if (stillFor > 120 || !(speed > 0)) return 0
   return Math.min(1, speed / 3.5)
+}
+
+/** the standing bundle's slots: a square of 7 × 7 places this far apart, the feet set in them */
+export const STAND_STEP = 0.085
+const STAND_N = 7
+/**
+ * The next stick stood up in the bundle, the way charcoal's built round a robatayaki's fish: upright, its foot on the bed in the square of
+ * slots, the free one nearest the middle taken (so the bundle grows outward), leaning in toward the middle a little, the outer ones more, so
+ * the whole leans together. Returns its middle (as a Lay's: the way it leans as yaw, how steeply it rises along it as slope), or null when
+ * every slot's taken.
+ */
+export function standStick(stood: Lay[], rnd: () => number = Math.random, lift = 0) {
+  const feet = stood.map((l) => {
+    const k = 1 / Math.hypot(1, l.slope)
+    return { x: l.x - Math.cos(l.yaw) * STICK_HALF * k, z: l.z - Math.sin(l.yaw) * STICK_HALF * k }
+  })
+  const free: { x: number; z: number; d: number }[] = []
+  for (let i = 0; i < STAND_N; i++) for (let j = 0; j < STAND_N; j++) {
+    const x = (i - (STAND_N - 1) / 2) * STAND_STEP, z = (j - (STAND_N - 1) / 2) * STAND_STEP
+    if (feet.some((f) => Math.hypot(f.x - x, f.z - z) < STAND_STEP * 0.6)) continue
+    free.push({ x, z, d: Math.max(Math.abs(x), Math.abs(z)) + Math.hypot(x, z) * 0.1 + rnd() * 0.02 })
+  }
+  if (!free.length) return null
+  free.sort((a, b) => a.d - b.d)
+  const s = free[0]
+  const fx = s.x + (rnd() - 0.5) * 0.008, fz = s.z + (rnd() - 0.5) * 0.008
+  const r = Math.hypot(fx, fz)
+  // (the middle ones nearly upright, leaning in more toward the bundle's edge, up to ten degrees or so; neighbours near alike, so they lean
+  // together onto the middle and don't cross)
+  const lean = ((1.5 + 9 * Math.min(1, r / 0.32) + (rnd() - 0.5) * 1.5) * Math.PI) / 180
+  const yaw = r > 0.02 ? Math.atan2(-fz, -fx) + (rnd() - 0.5) * 0.15 : rnd() * Math.PI * 2
+  const c = Math.sin(lean), up = Math.cos(lean)
+  const x = fx + Math.cos(yaw) * STICK_HALF * c, z = fz + Math.sin(yaw) * STICK_HALF * c
+  const y = surfaceY(fx, fz, lift) + STICK_HALF * up
+  return { x, z, from: { x, z }, yaw, rest: { y, slope: up / c } }
 }

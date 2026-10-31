@@ -794,7 +794,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
                   mark={dish.roast ? '聞野' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(1.95)}
-                  incense={dish.roast ? incense : undefined} onDrink={onDrink} /></group>
+                  incense={dish.roast ? incense : undefined} onDrink={onDrink} onSay={onSay} /></group>
               )}
           </group>
         )

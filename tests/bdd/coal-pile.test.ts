@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { afterCharcoal, canAddCharcoal } from '@/game/economy'
-import { CHUNK_R, COAL_MAX, COAL_PER_ADD, crumble, MAX_LAYERS, placeStick, roomFor, STICK_HALF, STICK_R, surfaceY, throwForce, type Lay } from '@/game/coalPile'
+import { CHUNK_R, COAL_MAX, COAL_PER_ADD, crumble, MAX_LAYERS, placeStick, roomFor, standStick, STICK_HALF, STICK_R, surfaceY, throwForce, type Lay } from '@/game/coalPile'
 
 const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 const lay = (s: NonNullable<ReturnType<typeof placeStick>>): Lay => ({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
@@ -145,9 +145,47 @@ feature('丟炭的力道', () => {
 feature('炭貼著鹽床，不會浮空', () => {
   scenario('鹽床的高度和模型量到的一致（中央沒有多出來的隆起）', ({ given, then }) => {
     // (the salt as the fire pit's mesh has it, measured in the scene: radius → height of its top)
-    given('模型實測的鹽床高度', (w) => { w.measured = [[0, 0.209], [0.2, 0.207], [0.4, 0.189], [0.5, 0.17], [0.7, 0.13], [0.9, 0.071]] })
+    given('模型實測的鹽床高度', (w) => { w.measured = [[0, 0.208], [0.234, 0.208], [0.468, 0.174], [0.585, 0.163], [0.819, 0.11], [1.053, 0.039]] })
     then('每一處都在 1.5 公分以內', (w) => {
       for (const [r, y] of w.measured as [number, number][]) expect(Math.abs(surfaceY(r, 0) - y)).toBeLessThan(0.015)
+    })
+  })
+})
+
+feature('炭立著靠成一束（像爐端燒的炭火）', () => {
+  scenario('一根根放上去的炭都立著，腳貼著炭床，往中間靠，排成方形的一束', ({ given, when, then, and }) => {
+    given('空的炭床', (w) => { w.stood = [] as Lay[] })
+    when('立上三十根炭', (w) => {
+      let seed = 9
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+      for (let i = 0; i < 30; i++) {
+        const s = standStick(w.stood, rnd)
+        if (!s) break
+        w.stood.push({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
+      }
+    })
+    then('三十根都立得上去', (w) => { expect(w.stood.length).toBe(30) })
+    and('每一根都是立著的（離垂直不超過 25°）', (w) => {
+      for (const l of w.stood as Lay[]) expect(Math.atan(1 / l.slope)).toBeLessThan((25 * Math.PI) / 180)
+    })
+    and('每一根的腳都踩在炭床上（不浮空、不陷進去）', (w) => {
+      for (const l of w.stood as Lay[]) {
+        const k = 1 / Math.hypot(1, l.slope)
+        const foot = { x: l.x - Math.cos(l.yaw) * STICK_HALF * k, z: l.z - Math.sin(l.yaw) * STICK_HALF * k, y: l.y - l.slope * STICK_HALF * k }
+        expect(Math.abs(foot.y - surfaceY(foot.x, foot.z))).toBeLessThan(0.02)
+      }
+    })
+    and('外圈的往中間靠（頂端比腳更靠近中央）', (w) => {
+      for (const l of w.stood as Lay[]) {
+        if (Math.hypot(l.x, l.z) < 0.08) continue
+        const top = { x: l.x + Math.cos(l.yaw) * 0.1, z: l.z + Math.sin(l.yaw) * 0.1 }
+        expect(Math.hypot(top.x, top.z)).toBeLessThan(Math.hypot(l.x, l.z))
+      }
+    })
+    and('排成方形：腳都在方形範圍內，彼此不重疊', (w) => {
+      const ls = w.stood as Lay[]
+      for (const l of ls) { expect(Math.abs(l.x)).toBeLessThan(0.3); expect(Math.abs(l.z)).toBeLessThan(0.3) }
+      for (let i = 0; i < ls.length; i++) for (let j = i + 1; j < ls.length; j++) expect(Math.hypot(ls[i].x - ls[j].x, ls[i].z - ls[j].z)).toBeGreaterThan(STICK_R * 1.8)
     })
   })
 })
