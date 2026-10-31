@@ -249,7 +249,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (in edit mode the cats' stand, the shoe cupboard and the like can each be moved: each its own batch inside its own Movable) */}
       <Movable id="doorcats" label="門口招財貓台"><StaticBatch>
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
-      <group position={[0.4, 0, -0.92]}>
+      <group position={[0.4, 0, CAT_STAND_Z]}>
         {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower) */}
         {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7]].map(([x, d, h, l], i) => (
           <group key={i}>
@@ -262,7 +262,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       </group>
       </StaticBatch></Movable>
       {/* (each cat its own piece in edit mode, on the stand's frame) */}
-      <group position={[0.4, 0, -0.92]}>
+      <group position={[0.4, 0, CAT_STAND_Z]}>
         {DOOR_CATS.map((k, i) => (
           <Movable key={i} id={`doorcat${i}`} label={`招財貓 ${i + 1}`}><StaticBatch>
             <group position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
@@ -270,7 +270,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
         ))}
       </group>
       {/* a samurai helmet (兜) on its stand, set out on top of the shoe cupboard as a decoration, facing into the room */}
-      <Movable id="kabuto" label="武士頭盔"><group position={[0.34, -GENKAN.depth + 0.87, -0.33]} rotation-y={Math.PI / 2} scale={0.82}><Kabuto /></group></Movable>
+      <Movable id="kabuto" label="武士頭盔"><group position={[0.34, -GENKAN.depth + 0.87, SHOE_CAB_Z - 0.09]} rotation-y={Math.PI / 2} scale={0.82}><Kabuto /></group></Movable>
       <Movable id="genkan" label="玄關地墊"><StaticBatch>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       {/* the coir mat lying on the genkan's stone, just inside */}
@@ -282,7 +282,7 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <Movable id="shoecab" label="鞋櫃"><StaticBatch>
       {/* the shoe cupboard (下駄箱) against the wall in the genkan: dark wood, its doors in a grid of small panels, a
           vase of a sprig on top */}
-      <group position={[0.34, -GENKAN.depth, -0.24]}>
+      <group position={[0.34, -GENKAN.depth, SHOE_CAB_Z]}>
         <Part geo={REG_GEO.round} color="#4a2e1c" outline={1.02} position={[0, 0.42, 0]} scale={[0.3, 0.84, 0.42]} />
         {/* (its plinth, set back a little, dark) */}
         <mesh position={[0.01, 0.025, 0]}><boxGeometry args={[0.29, 0.05, 0.41]} /><meshToonMaterial color="#24160c" /></mesh>
@@ -922,6 +922,12 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
   )
 }
 
+/**
+ * Along the wall from the way in (the entrance's frame, z toward the door): the cats' stand on the room's boards past the genkan's step,
+ * clear of the door and under the altar's shelf; the shoe cupboard down on the genkan's stone, its end against the step, the helmet on it
+ * (both moved along away from the door, the owner's wish, the doorway and the till's end left open)
+ */
+const CAT_STAND_Z = -1.92, SHOE_CAB_Z = -0.62
 /**
  * The cats at the door, on their stand just inside it against the wall (the entrance's +x side; the till is on the
  * other), facing across the way in at those coming through

@@ -976,44 +976,18 @@ function Scroll({ art }: { art: ArtKey }) {
   )
 }
 
-/** the plaster: a warm earthen wall (聚楽壁) of cream clay, mottled, its fine sand in it, the trowel's long strokes faint across it and
- * short chopped straw showing here and there */
-const PLASTER = (() => {
+/** a picture from public/textures, laid to repeat (its tiling set where it's used) */
+function fileTex(file: string) {
   if (typeof document === 'undefined') return null
-  const S = 512
-  const c = document.createElement('canvas')
-  c.width = c.height = S
-  const g = c.getContext('2d')!
-  g.fillStyle = '#efe3cb'
-  g.fillRect(0, 0, S, S)
-  let seed = 7
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  for (let k = 0; k < 900; k++) {
-    g.fillStyle = `rgba(${rnd() < 0.5 ? '150,120,80' : '255,250,235'},${0.04 + rnd() * 0.07})`
-    g.beginPath()
-    g.arc(rnd() * S, rnd() * S, 6 + rnd() * 26, 0, Math.PI * 2)
-    g.fill()
-  }
-  // (the trowel: long shallow arcs, a shade lighter and darker along their edges)
-  for (let k = 0; k < 40; k++) {
-    const x = rnd() * S, y = rnd() * S, r = 80 + rnd() * 160, a = rnd() * 6.28
-    g.strokeStyle = `rgba(${rnd() < 0.5 ? '120,95,60' : '255,248,230'},0.07)`
-    g.lineWidth = 6 + rnd() * 10
-    g.beginPath(); g.arc(x, y, r, a, a + 0.5 + rnd() * 0.6); g.stroke()
-  }
-  // (sand: fine grains)
-  for (let k = 0; k < 9000; k++) { g.fillStyle = rnd() < 0.5 ? 'rgba(90,70,40,0.18)' : 'rgba(255,255,245,0.25)'; g.fillRect(rnd() * S, rnd() * S, 1, 1) }
-  // (chopped straw)
-  for (let k = 0; k < 120; k++) {
-    const x = rnd() * S, y = rnd() * S, a = rnd() * 6.28, l = 4 + rnd() * 9
-    g.strokeStyle = 'rgba(176,138,74,0.55)'; g.lineWidth = 0.9
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke()
-  }
-  const t = new THREE.CanvasTexture(c)
+  const t = new THREE.TextureLoader().load(import.meta.env.BASE_URL + 'textures/' + file)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.anisotropy = 8
   return t
-})()
+}
+/** the plaster: a warm earthen wall (聚楽壁) of cream clay, mottled, its fine sand in it, the trowel's long sweeps faint across it, chopped straw
+ * here and there (blender/walltex.py: tileable, so no seam where one tile meets the next, as the old drawn one had); a tile every 1.2 */
+const PLASTER = fileTex('plaster_wall.jpg')
 
 function Box({ size, color, ...rest }: { size: [number, number, number]; color: string } & Record<string, unknown>) {
   return (
@@ -1028,41 +1002,9 @@ function Box({ size, color, ...rest }: { size: [number, number, number]; color: 
 const WC_H = 1.85
 /** a stretch of the wall (the wall's own frame: z along it, y up), plaster or the dark wainscot, the plaster's
  * pattern laid from the wall's own z so stretches side by side run on into each other */
-/** upright boards of warm brown wood, each with its own tone and grain, for the wall's foot (the wainscot) */
-const WALL_BOARDS = canvasTex(512, 512, (g) => {
-  g.setTransform(4, 0, 0, 4, 0, 0)
-  g.fillStyle = '#6a4a2e'
-  g.fillRect(0, 0, 128, 128)
-  const tones = ['#6e4c30', '#5f4128', '#76553a', '#684830', '#6a4a2c', '#5a3e26', '#74523a', '#644530']
-  for (let i = 0; i < 8; i++) {
-    g.fillStyle = tones[i]
-    g.fillRect(i * 16 + 1, 0, 14, 128)
-    g.strokeStyle = 'rgba(30,14,4,0.35)'
-    g.lineWidth = 1
-    for (let k = 0; k < 7; k++) {
-      g.beginPath()
-      g.moveTo(i * 16 + 2 + k * 2, 0)
-      g.bezierCurveTo(i * 16 + 1 + k * 2, 40, i * 16 + 4 + k * 2, 90, i * 16 + 2 + k * 2, 128)
-      g.stroke()
-    }
-    g.strokeStyle = 'rgba(255,220,170,0.1)'
-    for (let k = 0; k < 3; k++) {
-      g.beginPath()
-      g.moveTo(i * 16 + 4 + k * 4, 0)
-      g.lineTo(i * 16 + 5 + k * 4, 128)
-      g.stroke()
-    }
-    // (a knot now and then)
-    if (i % 3 === 1) {
-      g.fillStyle = 'rgba(40,20,8,0.55)'
-      g.beginPath()
-      g.ellipse(i * 16 + 8, 30 + i * 9, 3, 5, 0, 0, Math.PI * 2)
-      g.fill()
-    }
-  }
-  g.fillStyle = 'rgba(0,0,0,0.5)'
-  for (let i = 0; i < 8; i++) g.fillRect(i * 16, 0, 1.2, 128)
-}, true)
+/** upright boards of warm brown wood for the wall's foot (the wainscot), twelve to a tile 1.44 across and the wainscot's height, each its own
+ * tone, most flat-sawn and some quarter-sawn, a knot here and there, a V-groove between (blender/walltex.py) */
+const WALL_BOARDS = fileTex('wainscot_boards.jpg')
 function WallPiece({ z0, z1, y0, y1, plaster = false }: { z0: number; z1: number; y0: number; y1: number; plaster?: boolean }) {
   const map = useMemo(() => {
     const src = plaster ? PLASTER : WALL_BOARDS
@@ -1072,9 +1014,9 @@ function WallPiece({ z0, z1, y0, y1, plaster = false }: { z0: number; z1: number
       t.repeat.set((z1 - z0) / 1.2, (y1 - y0) / 1.2)
       t.offset.set(-z1 / 1.2, y0 / 1.2)
     } else {
-      // (boards a hand's width across, running up)
-      t.repeat.set((z1 - z0) / 0.64, (y1 - y0) / 0.9)
-      t.offset.set(-z1 / 0.64, 0)
+      // (boards twelve centimetres across, running up the wainscot's whole height in one)
+      t.repeat.set((z1 - z0) / 1.44, (y1 - y0) / WAINSCOT)
+      t.offset.set(-z1 / 1.44, y0 / WAINSCOT)
     }
     t.needsUpdate = true
     return t
@@ -1883,8 +1825,9 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
   // (pictures along the wall, a print then a scroll in turn, about a metre apart, leaving the shelf's stretch clear)
   // (the shelf in the far third of the wall, or the near one if the door's in the far one)
   const shelfZ0 = door !== undefined && Math.abs(door - (mid + l * 0.3)) < 1.3 ? mid - l * 0.3 : mid + l * 0.3
-  // (moved along the wall away from the door, the owner's wish: more room round it)
-  const shelfZ = shelfZ0 + (door !== undefined ? Math.sign(shelfZ0 - door) || 1 : 1) * 0.35
+  // (moved along the wall away from the toilets' door, the owner's wish: more room round it; on the back wall only a little toward the way
+  // in, the lucky cats and the shoe cupboard under it moved along with it, clear of the door)
+  const shelfZ = shelfZ0 + (door !== undefined ? Math.sign(shelfZ0 - door) || 1 : 1) * (door !== undefined ? 0.35 : 0.05)
   // (the wall with the toilets has the fridge and the doors' sliding along it: no shelf there)
   const shelf = door === undefined
   const isClear = (z: number, pad: number) => clear.every(([a, b]) => z < a - pad || z > b + pad)
@@ -1912,6 +1855,11 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
         // (and a big signboard every fifth, between)
         kanban: z !== extra && k % 5 === 3 && k % 3 !== 2 ? Math.floor(k / 5 + start) % KANBAN_LOOKS.length : undefined }))
   }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear])
+  // (the light switch: halfway between the round window short of the shelf and the next picture toward it; by the door if there's none)
+  const switchZ = useMemo(() => {
+    const i = art.reduce((k, a, j) => (a.round && a.z < shelfZ ? j : k), -1)
+    return i >= 0 && i + 1 < art.length && art[i + 1].z < shelfZ ? (art[i].z + art[i + 1].z) / 2 : to - 0.16
+  }, [art, shelfZ, to])
   const frieze = useMemo(() => {
     if (!SEIGAIHA) return null
     const t = SEIGAIHA.clone()
@@ -1988,8 +1936,8 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
         ))}
         {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
         {altar && <Movable id="exitsign" label="逃生出口燈"><group name="look-exit" position={[-0.045, 2.08, to - 0.62]} rotation-y={-Math.PI / 2}><ExitSign /></group></Movable>}
-        {/* (the light switch by the door, at hand height near the wall's end) */}
-        {altar && <Movable id="lightswitch" label="電燈開關"><group position={[-0.002, 1.12, to - 0.16]}><LightSwitch /></group></Movable>}
+        {/* (the light switch at hand height on the plaster between the round window and the picture after it, the owner's place for it) */}
+        {altar && <Movable id="lightswitch" label="電燈開關"><group position={[-0.002, 1.12, switchZ]}><LightSwitch /></group></Movable>}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
           {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
           {[-0.35, 0.35].map((z) => (
