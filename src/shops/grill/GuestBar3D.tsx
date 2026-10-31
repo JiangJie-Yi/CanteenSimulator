@@ -8,7 +8,8 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
-import { Person, StaffFigure } from '@/scene/Person3D'
+import { Person } from '@/scene/Person3D'
+import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { brushText, followSign, signTexture } from '@/scene/signFont'
@@ -378,8 +379,8 @@ function Stocker({ counters, fridges }: { counters: Counter[]; fridges: NonNulla
     <group ref={g} position={home} scale={STAFF_SCALE}>
       <BlobShadow r={0.17} />
       <StaffFigure id="stocker" role="stock" look={{ female: false, age: 'middle' }} moving={moving} />
-      <mesh ref={box} position={[0, 0.48, 0.17]} visible={false}>
-        <boxGeometry args={[0.2, 0.12, 0.14]} />
+      <mesh ref={box} position={[0, HELD_AT[1] + 0.06, HELD_AT[2]]} visible={false}>
+        <boxGeometry args={[0.22, 0.13, 0.16]} />
         <meshToonMaterial color="#b98a52" />
       </mesh>
     </group>
@@ -2026,7 +2027,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const sitting = (n: number) => shownRef.current.some((x) => x.seat === n && (x.phase === 'sit' || x.phase.startsWith('wc')))
     waiters.current.forEach((w, wi) => {
       const home = homes[wi]
-      const trayAt = () => w.pos.clone().add(new THREE.Vector3(0, 0.548, 0.18).multiplyScalar(STAFF_SCALE)
+      const trayAt = () => w.pos.clone().add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE)
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), w.yaw))
       const run = () => runs.current.find((x) => x.key === w.run)
       const setMove = (on: boolean) => setMoving((m) => { const n = [...m]; n[wi] = on; return n })

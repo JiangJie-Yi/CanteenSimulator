@@ -13,6 +13,15 @@ textures (the tenugui's fish, the cotton's weave, the indigo's dye, the hair's s
 
 Run:
     blender -b --factory-startup --python blender/boss.py -- <project path> [preview.png]
+
+The staff are made by the same script, the boss's figure dressed for their job: CREW=<variant> writes crew_<variant>.glb (the same node
+names, so the game moves them as it moves him), no moustache, pencil or gold pin:
+- chef: a cook in the white kappōgi and a white tenugui cap, the navy apron with 聞野 and a towel at the cord
+- chefF: the same for a woman, her hair in a bun at the back
+- server: an indigo samue, a white hachimaki round the head (its knot and ends at the back), the hair over the crown, a short dark apron
+- serverF: a kimono of deep plum with a gold obi, the hair put up in a bun with a red comb, no apron
+- stock: work clothes of khaki green, a white hachimaki, no apron
+Hair and skin are painted light (CrewHair, CrewSkin) for the game to tint per person; the glasses are kept for it to show or hide.
 """
 import math
 import os
@@ -29,6 +38,9 @@ from common import *  # noqa: E402,F403
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREVIEW = argv[1] if len(argv) > 1 else None
+CREW = os.environ.get("CREW")
+WEAR = {None: "boss", "chef": "cap", "chefF": "cap", "server": "band", "serverF": "bun", "stock": "band"}[CREW]
+FEMALE = CREW in ("chefF", "serverF")
 
 
 def P(x, y, z):
@@ -89,14 +101,24 @@ _tgCap = _tg.copy()
 # (plain indigo for the roll and the knot; the cap's own cloth, with the fish pressed on it, is made once its front is found)
 M["tenugui"] = pbr("BossTenugui", (1, 1, 1), tex=image("boss_tenugui", _tg.astype(np.float32)), rough=0.8)
 # (the kappōgi's cotton: white with its weave, a faint shade down the folds)
-_ct = _weave((0.96, 0.94, 0.9), 0.06) * (1 - 0.05 * (0.5 + 0.5 * np.sin(_u * 2 * np.pi * 9)))[..., None]
-M["coat"] = pbr("BossCoat", (1, 1, 1), tex=image("boss_cotton", _ct.astype(np.float32)), rough=0.75)
+COAT = {"server": (0.2, 0.25, 0.4), "serverF": (0.42, 0.14, 0.24), "stock": (0.42, 0.44, 0.3)}.get(CREW, (0.96, 0.94, 0.9))
+_ct = _weave(COAT, 0.06) * (1 - 0.05 * (0.5 + 0.5 * np.sin(_u * 2 * np.pi * 9)))[..., None]
+M["coat"] = pbr("BossCoat", (1, 1, 1), tex=image(f"{CREW or 'boss'}_cotton", _ct.astype(np.float32)), rough=0.75)
+if CREW:
+    # (the cap's tenugui white, a band's white; the collar a shade of the coat, the kimono's white)
+    _tg = _weave((0.95, 0.94, 0.9), 0.06)
+    _tgCap = _tg.copy()
+    M["tenugui"] = pbr("BossTenugui", (1, 1, 1), tex=image(f"{CREW}_tenugui", _tg.astype(np.float32)), rough=0.8)
+    M["collar"] = pbr("BossCollar", lin({"serverF": "#f4efe2", "server": "#2a3350", "stock": "#5a5c40"}.get(CREW, "#d8cfbd")), rough=0.7)
+    M["skin"] = pbr("CrewSkin", lin("#f0d8c4"), rough=0.6)
 # (indigo cloth for the trousers and a deeper navy for the apron, both dyed a touch unevenly)
-M["pants"] = pbr("BossPants", (1, 1, 1), tex=image("boss_indigo", _weave((0.2, 0.25, 0.4), 0.1)), rough=0.85)
-M["apron"] = pbr("BossApron", (1, 1, 1), tex=image("boss_navy", _weave((0.12, 0.16, 0.28), 0.12, 128)), rough=0.85)
+PANTS = {"server": (0.17, 0.21, 0.35), "serverF": (0.36, 0.11, 0.2), "stock": (0.2, 0.2, 0.18)}.get(CREW, (0.2, 0.25, 0.4))
+APRON = {"server": (0.16, 0.1, 0.07)}.get(CREW, (0.12, 0.16, 0.28))
+M["pants"] = pbr("BossPants", (1, 1, 1), tex=image(f"{CREW or 'boss'}_indigo", _weave(PANTS, 0.1)), rough=0.85)
+M["apron"] = pbr("BossApron", (1, 1, 1), tex=image(f"{CREW or 'boss'}_navy", _weave(APRON, 0.12, 128)), rough=0.85)
 # (hair: brown with strands combed down from the crown, lighter and darker by turns)
 _hs = 0.75 + 0.25 * np.sin(_u * 2 * np.pi * 60 + np.sin(_u * 2 * np.pi * 7) * 2) * (0.6 + 0.4 * _grain)
-M["hair"] = pbr("BossHair", (1, 1, 1), tex=image("boss_hair", (np.array([0.36, 0.23, 0.16], np.float32)[None, None, :] * _hs[..., None]).astype(np.float32)), rough=0.6)
+M["hair"] = pbr("CrewHair" if CREW else "BossHair", (1, 1, 1), tex=image(f"{CREW or 'boss'}_hair", (np.array([0.36, 0.23, 0.16] if not CREW else [0.92, 0.92, 0.92], np.float32)[None, None, :] * _hs[..., None]).astype(np.float32)), rough=0.6)
 # (the cook's trousers: a small grey-and-charcoal check, its squares square round the body)
 _n = 512
 _u, _v = grid01(_n)
@@ -243,12 +265,34 @@ bm = bmesh.new(); bm.from_mesh(hair.data)
 # nape line, higher at the sides than at the back)
 
 for co, no in ((Vector(P(0, 0, 0.055)), Vector(P(0, 0, 1))),                     # (nothing in front of the ears)
-               (Vector(P(0, 0.17, 0)), Vector(P(0, 1, 0))),                      # (nothing over the crown: the tenugui's there)
-               (Vector(P(0, -0.15, -R)), Vector(P(0, -1, 0.4)).normalized())):  # (the nape, rising toward the ears)
+               *([(Vector(P(0, 0.17, 0)), Vector(P(0, 1, 0)))] if WEAR in ("boss", "cap") else []),  # (nothing over the crown: the tenugui's there)
+               (Vector(P(0, -0.15 if not FEMALE else -0.2, -R)), Vector(P(0, -1, 0.4)).normalized())):  # (the nape, rising toward the ears)
     geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
     bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no, clear_outer=True)  # (the shell's own frame: its middle at the head's)
 bm.to_mesh(hair.data); bm.free()
 fin(hair, "BossHair", M["hair"])
+if WEAR in ("band", "bun"):
+    # (the crown's hair standing a little fuller than the shell round the sides: its edge just over the brows in front, down to the nape behind)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=R + HT * 2.2, segments=48, ring_count=24, location=P(*C))
+    top = active()
+    bm = bmesh.new(); bm.from_mesh(top.data)
+    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=Vector(P(0, 0.01, 0)), plane_no=Vector(P(0, -1, 0.4)).normalized(), clear_outer=True)
+    bm.to_mesh(top.data); bm.free()
+    fin(top, "BossHairTop", M["hair"])
+if FEMALE:
+    # (her hair put up: a round bun at the back of the crown; a lacquered comb across it out front)
+    bq = head_at(math.pi, 0.62, 0.05)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.085, segments=24, ring_count=14, location=P(*bq))
+    o = active(); o.scale = (1.1, 0.9, 0.85)
+    fin(o, "BossHairBun", M["hair"])
+    if CREW == "serverF":
+        cq = head_at(math.pi, 0.86, 0.06)
+        bpy.ops.mesh.primitive_cube_add(size=1, location=P(*cq))
+        o = active(); o.scale = (0.12, 0.022, 0.03); o.rotation_euler = (0.5, 0, 0)
+        bpy.ops.object.transform_apply(scale=True)
+        bv = o.modifiers.new("b", "BEVEL"); bv.width = 0.008; bv.segments = 3
+        bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="b")
+        fin(o, "BossComb", pbr("CrewComb", lin("#b8261c"), rough=0.3))
 # (sideburns down in front of the ears)
 for sd in (-1, 1):
     q = head_at(sd * math.radians(76), -0.05, 0.004)
@@ -297,7 +341,7 @@ p, n = on_head(0.0, -0.04, 0.012)
 bpy.ops.mesh.primitive_uv_sphere_add(radius=0.042, segments=16, ring_count=8, location=P(*p))
 fin(active(), "BossNose", M["skin"])
 # (a moustache: two soft brown wings either side under the nose)
-for sd in (-1, 1):
+for sd in ((-1, 1) if not CREW else ()):
     tube(f"BossMoustache{sd}", [on_head(sd * (0.012 + 0.036 * u), -0.088 + 0.008 * math.sin(math.pi * u) - 0.01 * u * u, 0.006)[0]
                                 for u in [k / 8 for k in range(9)]], 0.0095, M["hair"])
 # (a smile under it)
@@ -313,6 +357,14 @@ bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, locati
 o = active(); o.scale = (0.016, 0.006, 0.008)
 o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
 fin(o, "BossMouthTongue", M["cheek"])
+if CREW:
+    # (a soft blush on each cheek)
+    for sd in (-1, 1):
+        p, n = on_head(sd * 0.135, -0.055, 0.0)
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*p))
+        o = active(); o.scale = (0.03, 0.006, 0.018)
+        o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
+        fin(o, f"BossCheek{sd}", M["cheek"])
 # (ears)
 for sd in (-1, 1):
     bpy.ops.mesh.primitive_uv_sphere_add(radius=0.048, segments=16, ring_count=8, location=P(sd * (R + 0.006), C.y - 0.005, -0.015))
@@ -322,6 +374,7 @@ for sd in (-1, 1):
 # ---- the tenugui: indigo with a white fish pressed on the front (押花), wrapped over the crown like a cap down to the brow, its front edge rolled, knotted at the back with
 # its two corners sticking out
 BE = math.asin(0.12 / R)
+CAPPED = WEAR in ("boss", "cap")
 bpy.ops.mesh.primitive_uv_sphere_add(radius=R + 0.02, segments=32, ring_count=16, location=P(*C))
 cap = active()
 bm = bmesh.new(); bm.from_mesh(cap.data)
@@ -367,22 +420,27 @@ lat = (v0 - 0.5) * math.pi
 _fu, _fv = grid01(512)
 fx = ((_fu - u0 + 0.5) % 1.0 - 0.5) * 2 * math.pi * math.cos(lat) / 0.75
 fy = (_fv - v0) * math.pi / 0.75
-mask = fish_mask(-fx, fy)
+mask = fish_mask(-fx, fy) * (0.0 if CREW else 1.0)
 # (soft at its edge, as a print on cloth)
 mask = 0.25 * mask + 0.75 * np.clip((mask + np.roll(mask, 1, 0) + np.roll(mask, -1, 0) + np.roll(mask, 1, 1) + np.roll(mask, -1, 1)) / 5, 0, 1)
 _cap = np.repeat(np.repeat(_tgCap, 2, 0), 2, 1) * (1 - mask[..., None]) + np.array([0.94, 0.92, 0.86], np.float32) * mask[..., None]
 M["tenuguiCap"] = pbr("BossTenuguiFish", (1, 1, 1), tex=image("boss_tenugui_fish", _cap.astype(np.float32)), rough=0.8)
 fin(cap, "BossTenugui", M["tenuguiCap"])
-# (its rolled front edge: a soft roll round where it ends)
+if not CAPPED:
+    parts.remove(cap)
+    bpy.data.objects.remove(cap)
+# (its rolled front edge: a soft roll round where it ends; a hachimaki is that roll alone, a twisted white band round the brow, lower behind)
+HB = math.asin(0.105 / R)
 roll = []
 for i in range(40):
     a = 2 * math.pi * i / 40
     zc = math.cos(a)
-    e = math.asin(max(-0.9, ((R + 0.02) * math.sin(BE) - 0.07 * max(0.0, -zc)) / (R + 0.02)))
-    roll.append(head_at(a, e, 0.022))
-tube("BossTenuguiRoll", roll, 0.013, M["tenugui"], cyclic=True)
+    e = math.asin(max(-0.9, ((R + 0.02) * math.sin(BE) - 0.07 * max(0.0, -zc)) / (R + 0.02))) if CAPPED else HB - 0.12 * max(0.0, -zc)
+    roll.append(head_at(a, e, 0.022 if CAPPED else 0.016))
+if WEAR != "bun":
+    tube("BossTenuguiRoll", roll, 0.013 if CAPPED else 0.017, M["tenugui"], cyclic=True)
 # (the knot at the back, and its two corners: flat flaps of the cloth, hanging and flaring out)
-kp = head_at(math.pi, 0.14, 0.035)
+kp = head_at(math.pi, 0.14 if CAPPED else HB - 0.12, 0.035)
 bpy.ops.mesh.primitive_uv_sphere_add(radius=0.034, segments=16, ring_count=10, location=P(*kp))
 k_ = active(); k_.scale = (1.35, 0.95, 0.85)
 fin(k_, "BossKnot", M["tenugui"])
@@ -392,7 +450,10 @@ for k, sd in enumerate((-1, 1)):
         t = i / 6
         q = kp + Vector((sd * (0.02 + 0.07 * t), -0.02 - 0.09 * t * t, -0.025 - 0.02 * t))
         pts.append(q); outs.append(Vector((sd * 0.3, 0.1, -1)))
-    o = ribbon(f"BossKnotEnd{k}", pts, outs, 0.045, 0.006, M["tenugui"])
+    o = ribbon(f"BossKnotEnd{k}", pts, outs, 0.045 if CAPPED else 0.032, 0.006, M["tenugui"])
+if WEAR == "bun":
+    for o in [x for x in parts if x.name.startswith("BossKnot")]:
+        parts.remove(o); bpy.data.objects.remove(o)
 
 # ---- the kappōgi's collar: wide flat bands crossed left over right on the chest, lying on it; the indigo under-collar at the neck
 def body_out(q):
@@ -418,8 +479,16 @@ for sd in (-1, 1):
     tube(f"BossCordBow{sd}", [bc + side_ * sd * 0.03 * math.sin(math.pi * u) + Vector((0, 0.022 * math.sin(2 * math.pi * u), 0)) * sd
                               for u in [k / 12 for k in range(13)]], 0.007, M["cord"])
     tube(f"BossCordTail{sd}", [bc + side_ * sd * 0.012 * u + Vector((0, -0.05 * u, 0.01 * u)) for u in (0, 0.5, 1)], 0.006, M["cord"])
+if CREW == "serverF":
+    # (the kimono's obi: a wide gold band round the waist, a little proud)
+    M["obi"] = pbr("CrewObi", lin("#d8a840"), rough=0.5)
+    lathe("BossObi", [(BELT - 0.06, rb(BELT - 0.06) + 0.004), (BELT - 0.055, rb(BELT - 0.055) + 0.014), (BELT + 0.055, rb(BELT + 0.055) + 0.014),
+                      (BELT + 0.06, rb(BELT + 0.06) + 0.004)], M["obi"], seg=64)
 # (the apron (前掛け): navy, from the cord down over his front nearly to the ground, a little proud of him; 聞野 on it in white)
 AP = [(y, rb(y) + 0.012) for y in (0.04, 0.08, 0.13, 0.19, 0.25, BELT - 0.004)]
+if CREW == "server":
+    # (shorter: to the knee, as a server's is)
+    AP = [(y, rb(y) + 0.012) for y in (0.09, 0.13, 0.19, 0.25, BELT - 0.004)]
 ap = lathe("BossApron", AP, M["apron"], seg=20, a0=-math.radians(68), a1=math.radians(68))
 so = ap.modifiers.new("t", "SOLIDIFY"); so.thickness = 0.005
 bpy.context.view_layer.objects.active = ap
@@ -437,6 +506,12 @@ bpy.ops.object.convert(target="MESH")
 tx = active()
 tx.location = P(*on_body(0, 0.15, 0.019))
 fin(tx, "BossPrint", M["print"], smooth=False)
+if CREW in ("serverF", "stock"):
+    for o in [x for x in parts if x.name in ("BossApron", "BossPrint")]:
+        parts.remove(o); bpy.data.objects.remove(o)
+if CREW == "serverF":
+    for o in [x for x in parts if x.name.startswith("BossCord")]:
+        parts.remove(o); bpy.data.objects.remove(o)
 
 # ---- the little things about him
 M["gold"] = pbr("BossGold", lin("#e0b040"), rough=0.3, metal=1.0) if "metal" in pbr.__code__.co_varnames else pbr("BossGold", lin("#e0b040"), rough=0.3)
@@ -444,6 +519,7 @@ M["towel"] = pbr("BossTowel", lin("#f4f1e8"), rough=0.8)
 M["blue"] = pbr("BossTowelBlue", lin("#2c4a8a"), rough=0.8)
 M["pencil"] = pbr("BossPencil", lin("#f2c230"), rough=0.6)
 M["pink"] = pbr("BossEraser", lin("#ec8a9a"), rough=0.7)
+_before_bits = len(parts)
 # (a little gold fish pinned on his chest, his left)
 fp = on_body(0.12, 0.33 * BH + 0.06, 0.012)
 bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(*fp))
@@ -480,6 +556,10 @@ fin(o, "BossPencilEraser", M["pink"])
 bpy.ops.mesh.primitive_cone_add(vertices=6, radius1=0.007, radius2=0.0, depth=0.022, location=P(*(ep - d * 0.066)))
 o = active(); o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*(-d))).to_track_quat("Z", "Y")
 fin(o, "BossPencilTip", M["towel"], smooth=False)
+
+if CREW:
+    for o in [x for x in parts[_before_bits:] if x.name.startswith(("BossPin", "BossPencil")) or (CREW not in ("chef", "chefF", "stock") and x.name.startswith("BossTowel"))]:
+        parts.remove(o); bpy.data.objects.remove(o)
 
 # ---- hands: floating mittens as Overcooked's, a plump rounded paddle (the fingers together, curled a little) and a thumb of its own,
 # hanging at his sides; each its own node so the game can swing them, raise them, hold things in them
@@ -535,7 +615,7 @@ tube("BossFanRim", [Vector((math.sin(2 * math.pi * i / 40) * 0.07, 0.1 + math.co
      0.002, M["red"], cyclic=True).parent = fan
 props.append(fan)
 
-root = bpy.data.objects.new("Boss", None)
+root = bpy.data.objects.new("Crew" if CREW else "Boss", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
     if o.parent is None:
@@ -558,5 +638,6 @@ if PREVIEW:
     w = bpy.data.worlds.new("W"); w.use_nodes = True
     w.node_tree.nodes["Background"].inputs[0].default_value = (0.5, 0.5, 0.5, 1)
     bpy.context.scene.world = w
-export_dish(root, parts + list(hands.values()) + props + [root], os.path.join(PROJECT, "public", "models", "boss.glb"), os.path.join(PROJECT, "blender", "boss.blend"), PREVIEW)
+OUT = f"crew_{CREW}" if CREW else "boss"
+export_dish(root, parts + list(hands.values()) + props + [root], os.path.join(PROJECT, "public", "models", f"{OUT}.glb"), os.path.join(PROJECT, "blender", f"{OUT}.blend"), PREVIEW)
 print("BOSS_DONE", sum(len(o.data.polygons) for o in parts))

@@ -15,13 +15,13 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 const ATTRS = ['position', 'normal', 'uv'] as const
 
 /** what decides whether two meshes can be drawn as one */
-function keyOf(m: THREE.Material) {
+export function keyOf(m: THREE.Material) {
   const x = m as THREE.Material & { color?: THREE.Color; map?: THREE.Texture | null; toneMapped?: boolean }
   return [m.type, x.color?.getHexString(), x.map?.uuid, m.side, m.transparent, m.opacity, m.blending, m.depthWrite, x.toneMapped].join('|')
 }
 
 /** the geometry, its own copy, with just what every merged mesh has (and unindexed, so any can go with any) */
-function bakeable(g: THREE.BufferGeometry, m: THREE.Matrix4) {
+export function bakeable(g: THREE.BufferGeometry, m: THREE.Matrix4) {
   const src = g.index ? g.toNonIndexed() : g
   const out = new THREE.BufferGeometry()
   const n = src.attributes.position.count
