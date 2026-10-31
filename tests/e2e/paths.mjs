@@ -68,7 +68,8 @@ for (let t = 0; t < WATCH; t += 300) {
       if (m && !Array.isArray(m) && m.side !== THREE.DoubleSide) { restore.push([m, 'side', m.side]); m.side = THREE.DoubleSide }
     })
     const people = new Set([...groups.values()])
-    const isPerson = (o) => { for (let p = o; p; p = p.parent) if (people.has(p) || /^(Boss|guest|staff)/i.test(p.name)) return true; return false }
+    // (the people: customers, the boss, the staff (their figures marked by their job), who pass one another as people do)
+    const isPerson = (o) => { for (let p = o; p; p = p.parent) if (people.has(p) || p.userData?.staffRole || /^(Boss|guest|staff)/i.test(p.name)) return true; return false }
     const ignore = (o) => {
       const m = o.material
       if (!o.visible || !m || m.visible === false || (m.transparent && m.opacity < 0.3) || m.colorWrite === false) return true
