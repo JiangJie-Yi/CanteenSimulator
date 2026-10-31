@@ -127,6 +127,12 @@ dirt = mix(dirt, (0.25, 0.18, 0.12), (vnoise(N, 90, 90) > 0.8).astype(np.float32
 grit = vnoise(N, 260, 260)
 salt = mix((0.86, 0.86, 0.84), (0.98, 0.98, 0.96), np.clip(grit * 0.6 + fbm(N, 12, 12) * 0.5, 0, 1))
 salt = mix(salt, (0.72, 0.71, 0.69), smooth(0.2, 0.05, rad) * 0.35)
+# (the coarse grains painted in, rather than modelled one by one: bright crystal flecks catching the light, each with a soft grey
+# shadow just under it, scattered thick over the whole bed)
+flecks = (vnoise(N, 420, 420) > 0.78).astype(np.float32)
+fleck_shadow = (np.roll(np.roll(flecks, 2, axis=0), -1, axis=1) * (1 - flecks))
+salt = mix(salt, (0.62, 0.62, 0.6), fleck_shadow * 0.55)
+salt = mix(salt, (1.0, 1.0, 0.99), flecks * 0.9)
 # (the hearth is square (囲炉裏): the salt laid square across it, a margin of grey ash out to the frame, wobbling a little; no fade, the
 # frame closes it)
 sqd = np.maximum(np.abs(u - 0.5), np.abs(v - 0.5)) * 2
@@ -134,7 +140,7 @@ ash = mix((0.4, 0.38, 0.36), (0.55, 0.53, 0.5), fbm(N, 14, 14))
 ground = mix(salt, ash, smooth(0.57, 0.66, sqd + wobble * 0.15))
 alpha = np.ones_like(sqd)
 TEX["pit"] = image("T_FirePit", ground, alpha=alpha)
-TEX["pit_n"] = image("T_FirePit_N", to_normal(fbm(N, 24, 24) * 0.5 + grit * 0.5, 1.5), data=True)
+TEX["pit_n"] = image("T_FirePit_N", to_normal(fbm(N, 24, 24) * 0.4 + grit * 0.3 + flecks * 0.6, 2.2), data=True)
 
 # fish skins. The body's UVs run along the fish (see fish()): u goes round the body (0.5 = the belly line,
 # 0 and 1 = the top of the back), v runs from the tail (0) to the head (1). t: 0 on the belly .. 1 along the back.
@@ -469,11 +475,12 @@ def salt_height(x, y):
     return SALT_H * (1 - r * r) ** 0.9 + 0.004 * math.sin(x * 23 + y * 7) * math.sin(y * 19 - x * 5) * (1 - r)
 
 
-# a square grid, fine enough for the salt to mound up in the middle, reaching in under the hearth's frame (the game draws it 0.9 the size)
+# a square grid, just fine enough for the salt to mound up gently in the middle (smooth-shaded; its grain is all in the texture), reaching
+# in under the hearth's frame (the game draws it 0.9 the size)
 BED_HALF = (IRORI_IN + 0.04) / 0.9
 bm = bmesh.new()
 uv = bm.loops.layers.uv.verify()
-NG = 64
+NG = 14
 grid = [[bm.verts.new((BED_HALF * (2 * i / NG - 1), BED_HALF * (2 * j / NG - 1),
                        0.004 + salt_height(BED_HALF * (2 * i / NG - 1), BED_HALF * (2 * j / NG - 1)))) for j in range(NG + 1)]
         for i in range(NG + 1)]
@@ -550,27 +557,7 @@ for i in range(24):
                          smooth_shade=False))
 centre_origin(join(sticks, "BinchotanHeap"))
 
-# coarse salt: grains strewn over the ash around the skewer feet, and a few little heaps of it
-grains = []
-for _ in range(1800):
-    a = random.uniform(0, 2 * math.pi)
-    r = math.sqrt(random.uniform(0.1, 1.0)) * 0.86   # salt laid right across the ash bed
-    s = random.uniform(0.006, 0.012)
-    # lying flat on the ash (only spun about the vertical), a hair above it: a level, even crust of salt
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(r * math.cos(a), r * math.sin(a),
-                                                      0.0065 + salt_height(r * math.cos(a), r * math.sin(a))),
-                                    rotation=(0, 0, random.uniform(0, math.pi)))
-    o = active()
-    o.scale = (s, s * random.uniform(0.7, 1.2), 0.003)
-    # only its top shows (it lies on the ash): keep that face and drop the rest, a sixth of the vertices
-    bm = bmesh.new()
-    bm.from_mesh(o.data)
-    bm.normal_update()
-    bmesh.ops.delete(bm, geom=[fc for fc in bm.faces if fc.normal.z < 0.9], context="FACES")
-    bm.to_mesh(o.data)
-    bm.free()
-    grains.append(finish(o, "Grain", M["salt"], smooth_shade=False))
-join(grains, "SaltGrains")
+# (the coarse salt's grains are painted into the bed's texture: T_FirePit, its flecks)
 
 
 # a thick bed of glowing charcoal, heaped higher in the middle; joined into one mesh to keep draw calls low

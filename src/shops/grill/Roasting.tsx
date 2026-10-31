@@ -426,7 +426,7 @@ function scorchEarth(mesh: THREE.Mesh) {
       // (the salt fills the ring right out under the stones, pure salt to r = 0.58 whatever tone the model's earth had; past it the earth goes
       // darker and redder-brown toward the rim, the way fired ground does, multiplied in as a stain, and never over the salt)
       const k = Math.min(1, Math.max(0, (r - 0.66) / 0.3))
-      const grainS = 0.95 + 0.05 * ((px.data[i] + px.data[i + 1] + px.data[i + 2]) / 765)
+      const grainS = 0.84 + 0.16 * ((px.data[i] + px.data[i + 1] + px.data[i + 2]) / 765)
       const saltness = 1 - Math.min(1, Math.max(0, (r - 0.58) / 0.08))
       const mul = 1 - k
       const er = px.data[i] * (mul + k * (px.data[i] / 255) * 0.75), eg = px.data[i + 1] * (mul + k * (px.data[i + 1] / 255) * 0.65), eb = px.data[i + 2] * (mul + k * (px.data[i + 2] / 255) * 0.6)
