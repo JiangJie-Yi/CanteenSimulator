@@ -4,7 +4,7 @@
 // customer and place, with what they walked into.
 //
 //   npm run dev          (in another terminal)
-//   node tests/e2e/paths.mjs [url]        (WATCH=<ms> how long to watch, default 120000; SHOT=<dir> pictures of each clash)
+//   node tests/e2e/paths.mjs [url]        (WATCH=<ms> how long to watch, default 120000; SHOT=<dir> pictures of each clash; WC=<rate> more toilet trips)
 import { chromium } from 'playwright-core'
 
 const URL = process.argv[2] ?? 'http://localhost:5173/JapaneseGrillSimulator/'
@@ -43,7 +43,7 @@ for (let guard = 0; guard < 60 && (await publish.count()); guard++) { await publ
 await page.locator('.ofc-close').click()
 await page.locator('.ai-toggle').click()
 // (thirstier and readier for the toilet than usual, so the side trips are walked while we watch)
-await page.evaluate(() => { window.__drinkRate = 0.08 })
+await page.evaluate((wc) => { window.__drinkRate = 0.08; if (wc) window.__wcRate = wc }, Number(process.env.WC ?? 0))
 
 const clashes = new Map()
 let samples = 0

@@ -39,7 +39,7 @@ seed(44)
 
 STONE_R = 0.9
 STICK_FOOT_R = 0.74        # planted inside the stones (clear of them, so no stick runs through a stone)…
-STICK_TOP_R = 0.3         # …and every one leaning in over the coals
+STICK_TOP_R = 0.42        # …and every one leaning in over the coals
 STICK_TOP_Z = 1.15
 
 
@@ -798,33 +798,56 @@ join(bars, "Robuchi")
 # Items are modelled along local +X (the skewer axis), then placed on the stick.
 # =====================================================================
 
-STICK_SQ = 0.66           # (the hearth is square: the feet stand in a row along each side, this far in from the middle)
+STICK_SQ = 0.76           # (the hearth is square: the feet stand round it in a squared ring this far out, its corners rounded)
+STICK_P = 4.0             # (how square the ring: a superellipse, |x|^p + |y|^p = r^p; straight rows along the sides, turning round each corner)
 
 
-def stick_side(angle_deg):
-    """Which side of the square a skewer at this angle stands on: its way out (the side's normal) and along (the side's tangent).
-    Kept clear of the corners, so each one's side is plain (the game finds it again the same way, from where the food is)."""
-    a = math.radians(angle_deg)
-    c, s_ = math.cos(a), math.sin(a)
-    return (Vector((math.copysign(1, c), 0, 0)), Vector((0, 1, 0))) if abs(c) >= abs(s_) else (Vector((0, math.copysign(1, s_), 0)), Vector((1, 0, 0)))
+def ring_at(theta, sq=STICK_SQ):
+    """The squared ring at parameter theta: the foot's place, and its way out (the ring's normal, so along the sides the skewers stand in
+    parallel rows, and round the corners they turn, as round a circle, rather than leaning into each other)"""
+    c, s_ = math.cos(theta), math.sin(theta)
+    e = 2 / STICK_P
+    x, y = sq * math.copysign(abs(c) ** e, c), sq * math.copysign(abs(s_) ** e, s_)
+    n = Vector((math.copysign(abs(x) ** (STICK_P - 1), x), math.copysign(abs(y) ** (STICK_P - 1), y), 0))
+    if n.length < 1e-9:
+        n = Vector((c, s_, 0))
+    return Vector((x, y, 0)), n.normalized()
+
+
+def ring_table(sq=STICK_SQ, n=4000):
+    """the ring's length from theta 0, at n steps round: to place things along it by distance"""
+    pts = [ring_at(2 * math.pi * k / n, sq)[0] for k in range(n + 1)]
+    acc = [0.0]
+    for k in range(n):
+        acc.append(acc[-1] + (pts[k + 1] - pts[k]).length)
+    return acc
+
+
+def theta_at(dist, acc):
+    """the parameter at a distance along the ring"""
+    per = acc[-1]
+    d = dist % per
+    lo, hi = 0, len(acc) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if acc[mid] <= d:
+            lo = mid
+        else:
+            hi = mid
+    f = (d - acc[lo]) / max(1e-9, acc[hi] - acc[lo])
+    return 2 * math.pi * (lo + f) / (len(acc) - 1)
 
 
 def stick_frame(angle_deg, along, var=(0.0, 0.0, 0.0)):
-    """Matrix for a point `along` (0 = foot, 1 = tip) on the skewer at this angle.
-    The skewers stand in rows along the square hearth's four sides, as round an irori: each foot where the line out at its angle meets the
-    row (never right in a corner), each leaning straight in over the coals, the rows' tips drawn in a little toward the middle.
-    Local X runs up the stick, local Y points out of the fire (the side's way out), local Z completes the frame.
-    `var` = (tip in/out offset, tip height offset, sideways lean in radians) so no two sticks are planted alike."""
-    a = math.radians(angle_deg)
-    dr, dz, lean = var
-    out, side = stick_side(angle_deg)
-    # (where the line out at this angle meets its row, held back from the corners)
-    c, s_ = math.cos(a), math.sin(a)
-    t = (s_ if abs(c) >= abs(s_) else c) / max(abs(c), abs(s_)) * STICK_SQ
-    t = max(-STICK_SQ * 0.82, min(STICK_SQ * 0.82, t))
-    fxy = out * STICK_SQ + side * t
+    """Matrix for a point `along` (0 = foot, 1 = tip) on the skewer at ring parameter angle_deg (degrees).
+    The skewers stand round the square hearth in a squared ring, each leaning straight in over the coals along the ring's normal.
+    Local X runs up the stick, local Y points out of the fire, local Z completes the frame (across the row).
+    `var` = (tip in/out offset, tip height offset, unused) so no two sticks are planted alike."""
+    dr, dz, _ = var
+    fxy, out = ring_at(math.radians(angle_deg))
     foot = Vector((fxy.x, fxy.y, salt_height(fxy.x, fxy.y) - 0.003))
-    txy = out * (STICK_TOP_R + dr) + side * (t * 0.6 + lean * 0.5)
+    inward = fxy.dot(out) - STICK_TOP_R - dr
+    txy = fxy - out * inward
     tip = Vector((txy.x, txy.y, STICK_TOP_Z + dz))
     x = (tip - foot).normalized()
     y = (out - x * out.dot(x)).normalized()
@@ -877,19 +900,140 @@ def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
     shaft.matrix_world = Matrix.Translation(foot) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4()
     return finish(shaft, name, M["stick"])
 
+PENDING = []
+
+
 def place(objs, angle_deg, along, name, stick=True):
-    """Join the parts, move them onto the skewer and (optionally) add the stick into the same object."""
+    """Join the parts and set them by to go on a skewer: where round the fire is worked out once all of them are made (settle_skewers),
+    so each takes as much of the row as it's wide, none crowding the next."""
     o = join(objs, name)
-    # each skewer is pushed into the ash a little differently: leaning, higher or lower, longer or shorter
-    var = (random.uniform(-0.05, 0.05), random.uniform(-0.12, 0.08), random.uniform(-0.12, 0.12))
-    # and the food sits higher or lower on its stick than its neighbours'
-    along += random.uniform(-0.07, 0.07)
-    m, _, _ = stick_frame(angle_deg, along, var)
-    o.matrix_world = m @ o.matrix_world
-    if stick:
-        # joined into the item, which keeps its origin on the stick so the web pop-in scales from there
-        o = join([o, skewer_stick(angle_deg, name + "Stick", var, random.uniform(-0.05, 0.3))], name)
+    PENDING.append((o, angle_deg, along, name, stick))
     return o
+
+
+def settle_skewers():
+    """Every skewer onto its place round the squared ring, in the order they had round the fire, each set by trying: from just past the
+    last one, along the ring a centimetre at a time until it runs into none of those already set (their meshes tested, not guessed at
+    from their sizes); then the whole ring's spare length shared out between them, and each one tried again where that puts it.
+    Neighbours a little higher and lower on their sticks by turns."""
+    from mathutils.bvhtree import BVHTree
+    items = sorted(PENDING, key=lambda p: p[1] % 360)
+    # (each one's modifiers applied first, a fin's thickness, a bevel: so the shape tested is the shape that's kept, joining its stick later
+    # changing nothing)
+    for o, *_ in items:
+        if o.modifiers:
+            bpy.ops.object.select_all(action="DESELECT")
+            o.select_set(True)
+            bpy.context.view_layer.objects.active = o
+            bpy.ops.object.convert(target="MESH")
+    acc = ring_table()
+    per = acc[-1]
+    base = {id(o): o.matrix_world.copy() for o, *_ in items}
+    plan = []
+    for k, (o, _a, along, name, stick) in enumerate(items):
+        var = (random.uniform(-0.04, 0.04), random.uniform(-0.12, 0.08), 0.0)
+        plan.append((o, along + (0.06 if k % 2 else -0.05) + random.uniform(-0.02, 0.02), name, stick, var))
+
+    def put(o, a2, var, pos):
+        ang = math.degrees(theta_at(pos, acc))
+        m, _, _ = stick_frame(ang, a2, var)
+        o.matrix_world = m @ base[id(o)]
+        return ang
+
+    # (each one's shape as it's drawn, its modifiers (a fin's thickness, a bevel) and all, in its own frame: taken once, then only moved)
+    dg = bpy.context.evaluated_depsgraph_get()
+    shapes = {}
+    for o, *_ in items:
+        e = o.evaluated_get(dg)
+        me = e.to_mesh()
+        shapes[id(o)] = ([v.co.copy() for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
+        e.to_mesh_clear()
+
+    def tree(o):
+        mw = o.matrix_world
+        vs, ps = shapes[id(o)]
+        return BVHTree.FromPolygons([mw @ v for v in vs], ps)
+
+    def stick_of(ang, var):
+        _, foot, tip = stick_frame(ang, 0, var)
+        return foot, tip + (tip - foot).normalized() * 0.2
+
+    def hits(seg, t):
+        # (the stick as it is, round: any of the food within its thickness and a hair, anywhere along it)
+        a, b = seg
+        return any(t.find_nearest(a.lerp(b, k / 59), 0.02)[0] is not None for k in range(60))
+
+    def apart(s1, s2):
+        # (two sticks: the nearest their axes come, kept wider than two sticks' thickness)
+        p1, q1 = s1
+        p2, q2 = s2
+        d1, d2, r = q1 - p1, q2 - p2, p1 - p2
+        a_, e_, f_ = d1.dot(d1), d2.dot(d2), d2.dot(r)
+        c_, b_ = d1.dot(r), d1.dot(d2)
+        den = a_ * e_ - b_ * b_
+        u = min(1.0, max(0.0, (b_ * f_ - c_ * e_) / den)) if den > 1e-12 else 0.0
+        v = (b_ * u + f_) / e_
+        if v < 0:
+            v, u = 0.0, min(1.0, max(0.0, -c_ / a_))
+        elif v > 1:
+            v, u = 1.0, min(1.0, max(0.0, (b_ - c_) / a_))
+        return ((p1 + d1 * u) - (p2 + d2 * v)).length > 0.035
+
+    def clear(t, seg, others):
+        # (its food clear of theirs, its stick clear of their food and their sticks, their sticks clear of its food)
+        return all(not t.overlap(u) and not hits(seg, u) and not hits(s2, t) and apart(seg, s2) for u, s2 in others)
+
+    def lay(spread):
+        pos = (items[0][1] % 360) / 360 * per
+        done, where = [], []
+        for k, (o, a2, name, stick, var) in enumerate(plan):
+            for tries in range(200):
+                ang = put(o, a2, var, pos)
+                t = tree(o)
+                seg = stick_of(ang, var)
+                if clear(t, seg, done):
+                    break
+                pos += 0.01
+            else:
+                print("SKEWER_STUCK", name)
+            done.append((t, seg))
+            where.append(pos)
+            pos += 0.02 + spread
+        return where, pos - where[0]
+
+    where, used = lay(0.0)
+    spread = max(0.0, (per - used) / len(plan) * 0.9)
+    where, used = lay(spread)
+    angs = [put(o, a2, var, pos) for (o, a2, name, stick, var), pos in zip(plan, where)]
+    pre = [(name, tree(o)) for (o, a2, name, stick, var) in plan]
+    for i, (na, ta) in enumerate(pre):
+        for nb, tb in pre[i + 1:]:
+            n = len(ta.overlap(tb))
+            if n:
+                print("SKEWER_PRECLASH", na, nb, n)
+    for (o, a2, name, stick, var), pos, ang in zip(plan, where, angs):
+        if stick:
+            # joined into the item, which keeps its origin on the stick so the web pop-in scales from there
+            join([o, skewer_stick(ang, name + "Stick", var, random.uniform(-0.05, 0.12))], name)
+    # (and checked as they now stand, sticks and all)
+    bpy.context.view_layer.update()
+    dg2 = bpy.context.evaluated_depsgraph_get()
+    fin_trees = {}
+    for (o, a2, name, stick, var) in plan:
+        ob = bpy.data.objects.get(name)
+        if not ob:
+            continue
+        e = ob.evaluated_get(dg2)
+        me = e.to_mesh()
+        fin_trees[name] = BVHTree.FromPolygons([ob.matrix_world @ v.co for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
+        e.to_mesh_clear()
+    ns = list(fin_trees)
+    for i, a_ in enumerate(ns):
+        for b_ in ns[i + 1:]:
+            n = len(fin_trees[a_].overlap(fin_trees[b_]))
+            if n:
+                print("SKEWER_CLASH", a_, b_, n)
+    print("SKEWERS", len(plan), "ring", round(per, 2), "used", round(used, 2), "spread", round(spread, 3))
 
 
 def flat_fin(name, outline, thickness, mat, at=(0, 0, 0)):
@@ -1998,6 +2142,7 @@ place(shiitake_halves(), 128, 0.6, "GrilledShiitake")
 # (the yaki onigiri isn't skewered: it's toasted on the grill net with the mochi, see below)
 place(shrimp_pair(), 200, 0.6, "ShrimpSkewer")
 place(sausage(), -150, 0.6, "Sausage")
+settle_skewers()
 
 
 # potatoes and sweet potatoes nestled in the ash at the front edge of the fire (no skewer), roasted in foil.
@@ -2622,7 +2767,7 @@ finish(mochi_o, "NetMochi", M["netmochi"])
 # the yaki onigiri lies flat on the net beside it, a nori band round its base
 oni = join(onigiri(), "Onigiri")
 oni.rotation_euler = (math.radians(90), 0, random.uniform(0, math.pi))
-oni.location = (0.1, -0.07, NET_Z + 0.04)
+oni.location = (0.1, -0.07, NET_Z + 0.052)          # (resting on the wires, not sunk through them)
 
 mochi_o.shape_key_add(name="Basis")
 puffed = mochi_o.shape_key_add(name="Puffed")

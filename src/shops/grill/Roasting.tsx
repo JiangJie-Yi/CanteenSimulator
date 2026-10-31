@@ -1568,8 +1568,8 @@ const TOOL_NAMES: Record<Seasoning, string> = { salt: '鹽', soy: '醬油', milk
 const FIRE_SKEWERS = 16
 
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
-const STICK_FOOT_R = 0.74
-const STICK_TOP_R = 0.3
+const STICK_FOOT_R = 0.76
+const STICK_TOP_R = 0.42
 const STICK_TOP_Y = 1.15
 const LAYER_HEIGHT = 0.1
 const CHAR_COLOR = new THREE.Color(0.045, 0.035, 0.03)

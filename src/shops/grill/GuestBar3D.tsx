@@ -1627,7 +1627,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       } else if (s.phase === 'wcGo' || s.phase === 'wcBack') {
         // to the door, which slides open as they come up to it, in, and later back out to their stool
         const w = s.wc!
-        const d = Math.min(w.len, s.t * SPEED * walkSpeedOf(kindOf(s.id).kind))
+        // (out of a toilet they wait a moment first, for its door to slide open in front of them)
+        const wait = s.phase === 'wcBack' && w.who !== 'drink' ? 0.6 : 0
+        const d = Math.min(w.len, Math.max(0, s.t - wait) * SPEED * walkSpeedOf(kindOf(s.id).kind))
         const { p, dir } = alongPath(w.path, s.phase === 'wcGo' ? d : w.len - d)
         g?.position.copy(p)
         if (g) g.rotation.y = s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z)
@@ -1770,7 +1772,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (wcs) for (const who of ['m', 'f'] as const) {
       // (and shut behind them while they're in: locked, its window showing 使用中)
       TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack')
-        && (groups.current.get(x.id)?.position.distanceTo(wcs[who].front) ?? 9) < 0.9).length
+        && (groups.current.get(x.id)?.position.distanceTo(wcs[who].front) ?? 9) < 1.3).length
       TOILETS[who].inside = shown.filter((x) => x.wc?.who === who && x.phase === 'wcIn').length
     }
     if (done.length) setShown((cur) => cur.filter((x) => !done.includes(x.id)))
