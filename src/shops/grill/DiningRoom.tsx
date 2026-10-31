@@ -554,8 +554,8 @@ function Nobori({ i }: { i: number }) {
  * The banners strung overhead as an izakaya hangs them: a rope along the wall's aisle, a close row of narrow banners of every
  * colour hung from it, each swinging a little on its own.
  */
-/** `start`, `step`: which cloths it takes in turn (two strings taking every other one, offset by one, never show the same cloth side by side) */
-function BannerRow({ zs, start = 0, step = 1, x0 = 0, x1 = 0 }: { zs: number[]; start?: number; step?: number; x0?: number; x1?: number }) {
+/** `start`, `step`: which cloths it takes in turn */
+function BannerRow({ zs, start = 0, step = 1 }: { zs: number[]; start?: number; step?: number }) {
   const refs = useRef<(THREE.Group | null)[]>([])
   // (the same every time: a mix of cloths and lengths, a wide banner every so often taking three places)
   const items = useMemo(() => {
@@ -566,7 +566,7 @@ function BannerRow({ zs, start = 0, step = 1, x0 = 0, x1 = 0 }: { zs: number[]; 
         k += 2
       } else {
         const look = (start + k * step) % NOBORI_LOOKS.length
-        out.push({ z: zs[k], look, len: 0.36 + 0.09 * ((k * 7) % 4), w: NOBORI_LOOKS[look].shape === 'rect' ? 0.15 : 0.17, wide: false })
+        out.push({ z: zs[k], look, len: 0.34 + 0.05 * Math.abs(((k % 4) - 1.5)), w: NOBORI_LOOKS[look].shape === 'rect' ? 0.15 : 0.17, wide: false })
       }
     }
     return out
@@ -579,37 +579,37 @@ function BannerRow({ zs, start = 0, step = 1, x0 = 0, x1 = 0 }: { zs: number[]; 
       g.rotation.z = Math.sin(t * 0.7 + i) * 0.04
     })
   })
-  const z0 = zs[0], z1 = zs[zs.length - 1]
-  // (the rope runs from x0 at the first place to x1 at the last: a slant gives a string that crosses another)
-  const xAt = (z: number) => (z1 > z0 ? x0 + ((x1 - x0) * (z - z0)) / (z1 - z0) : x0)
-  const yaw = Math.atan2(x1 - x0, z1 - z0)
+  const z0 = zs[0] - 0.12, z1 = zs[zs.length - 1] + 0.12
+  // (the rope swags between pegs about a metre apart, dipping a little in each span; the cloths hang from it where it is)
+  const spans = Math.max(1, Math.round((z1 - z0) / 1.1)), span = (z1 - z0) / spans, SAG = 0.06
+  const sagAt = (z: number) => { const t = ((z - z0) / span) % 1; return -SAG * 4 * t * (1 - t) }
+  const rope = useMemo(() => {
+    const pts: THREE.Vector3[] = []
+    for (let k = 0; k <= spans * 16; k++) { const z = z0 + (k / 16) * span; pts.push(new THREE.Vector3(0, k % 16 === 0 ? 0 : sagAt(z), z)) }
+    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), spans * 16, 0.005, 5)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [z0, z1])
   return (
     <group>
-      <group position={[(x0 + x1) / 2, 0, (z0 + z1) / 2]} rotation-y={yaw}>
-        <mesh rotation-x={Math.PI / 2}>
-          <cylinderGeometry args={[0.004, 0.004, Math.hypot(x1 - x0, z1 - z0) + 0.3, 5]} /><meshBasicMaterial color="#2a1a10" />
-        </mesh>
-      </group>
+      <mesh geometry={rope}><meshToonMaterial color="#3a2414" /></mesh>
+      {/* (a brass peg at each end of each span) */}
+      {Array.from({ length: spans + 1 }, (_, k) => (
+        <mesh key={`p${k}`} position={[0, 0, z0 + k * span]}><sphereGeometry args={[0.012, 8, 6]} /><meshToonMaterial color="#c8a050" /></mesh>
+      ))}
       {items.map((it, i) => (
-        <group key={i} position={[xAt(it.z), 0, it.z]} ref={(g) => { refs.current[i] = g }}>
+        <group key={i} position={[0, sagAt(it.z), it.z]} ref={(g) => { refs.current[i] = g }}>
           {it.wide ? (
             <>
-              {[-1, 1].map((sd) => (
-                <mesh key={sd} position={[0, -0.05, sd * (it.w / 2 - 0.03)]}><cylinderGeometry args={[0.0025, 0.0025, 0.1, 4]} /><meshBasicMaterial color="#2a1a10" /></mesh>
-              ))}
-              <mesh position={[0, -0.1 - it.len / 2, 0]} rotation-y={-Math.PI / 2}>
+              <mesh position={[0, -0.02 - it.len / 2, 0]} rotation-y={-Math.PI / 2}>
                 <planeGeometry args={[it.w, it.len]} /><meshToonMaterial color="#ffffff" map={hbannerTex(it.look)} side={THREE.DoubleSide} />
               </mesh>
-              <mesh position={[0, -0.1 - it.len, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.004, 0.004, it.w, 5]} /><meshToonMaterial color="#2a1a10" /></mesh>
+              <mesh position={[0, -0.02 - it.len, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.004, 0.004, it.w, 5]} /><meshToonMaterial color="#3a2414" /></mesh>
             </>
           ) : (
             <>
-              <mesh position={[0, -0.01, 0]}><boxGeometry args={[0.012, 0.02, it.w + 0.02]} /><meshToonMaterial color="#e8dcc0" /></mesh>
-              {[-1, 1].map((sd) => (
-                <mesh key={sd} position={[0, -0.03, sd * (it.w / 2 + 0.012)]}><cylinderGeometry args={[0.004, 0.004, 0.05, 5]} /><meshToonMaterial color="#c8a050" /></mesh>
-              ))}
-              <mesh position={[0, -it.len - 0.035, 0]}><cylinderGeometry args={[0.003, 0.003, 0.012, 4]} /><meshToonMaterial color="#c8a050" /></mesh>
-              <mesh position={[0, -it.len / 2 - 0.02, 0]} rotation-y={-Math.PI / 2} geometry={CLOTH_GEO} scale={[it.w, it.len, 1]}>
+              {/* (the cloth's sleeve over the rope) */}
+              <mesh position={[0, -0.008, 0]}><boxGeometry args={[0.014, 0.022, it.w + 0.01]} /><meshToonMaterial color="#e8dcc0" /></mesh>
+              <mesh position={[0, -it.len / 2 - 0.015, 0]} rotation-y={-Math.PI / 2} geometry={CLOTH_GEO} scale={[it.w, it.len, 1]}>
                 <meshToonMaterial color="#ffffff" map={noboriTex(it.look)} side={THREE.DoubleSide} transparent alphaTest={0.4} />
               </mesh>
             </>
@@ -1902,9 +1902,8 @@ export function DiningWall({ c, from, to, far, lamps, top, door, altar = false, 
           }
           return zs.length > 1 ? (
             <>
-              {/* (two strings: one along the wall, one slanting out over the aisle; each takes every other cloth, so none repeats beside another) */}
-              <Movable id={`banners${from.toFixed(1)}a`} label={`旗幟串 1（${from.toFixed(0)}）`}><group position={[0, 2.22, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 2 === 0)} start={0} step={2} x0={-0.3} x1={-0.3} /></group></Movable>
-              <Movable id={`banners${from.toFixed(1)}b`} label={`旗幟串 2（${from.toFixed(0)}）`}><group position={[0, 2.0, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 2 === 1)} start={1} step={2} x0={-0.5} x1={-1.2} /></group></Movable>
+              {/* (one string along the wall, swagged between its pegs, a cloth every other place) */}
+              <Movable id={`banners${from.toFixed(1)}a`} label={`旗幟串 1（${from.toFixed(0)}）`}><group position={[-0.3, 2.22, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 2 === 0)} /></group></Movable>
             </>
           ) : null
         })()}

@@ -200,12 +200,35 @@ function usePhone() {
   return phone
 }
 
-/** the shadow maps drawn again only every third frame: the sun's covers the whole shop, and redrawn every frame it would cost as much as the room */
+/** how big (its bounding sphere's radius, in the world) a piece must be to cast a shadow: the plates, bottles, cups and little things on
+ * the tables cast none (too small to show in a map spanning the shop), so the shadow maps draw a fraction of the meshes (three's shadow pass
+ * tests layers against the view's camera, not the light's, so this is done by castShadow) */
+const CASTER_R = 0.3
+
 function ShadowPacer() {
   const gl = useThree((st) => st.gl)
+  const scene = useThree((st) => st.scene)
   const n = useRef(0)
+  const seen = useRef(-1)
   useEffect(() => { gl.shadowMap.autoUpdate = false; gl.shadowMap.needsUpdate = true; return () => { gl.shadowMap.autoUpdate = true } }, [gl])
-  useFrame(() => { if (++n.current % 3 === 0) gl.shadowMap.needsUpdate = true })
+  useFrame(({ clock }) => {
+    // (once a second and a half)
+    if (clock.elapsedTime - seen.current > 1.5) {
+      seen.current = clock.elapsedTime
+      const v = new THREE.Vector3()
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh || m.userData.sunSeen === m.geometry) return
+        m.userData.sunSeen = m.geometry
+        const g = m.geometry
+        if (!g.boundingSphere) g.computeBoundingSphere()
+        m.getWorldScale(v)
+        const r = (g.boundingSphere?.radius ?? 0) * Math.max(v.x, v.y, v.z)
+        if (r < CASTER_R) m.castShadow = false
+      })
+    }
+    if (++n.current % 3 === 0) gl.shadowMap.needsUpdate = true
+  })
   return null
 }
 function useTheme(): [Theme, () => void] {
