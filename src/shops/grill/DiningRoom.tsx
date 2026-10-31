@@ -1710,7 +1710,9 @@ const LANTERN_SKIN = signTexture(128, 256, (g) => {
 })
 const PENDANT_GLOW = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffcf90' }), 0.35, 0.75)
 const PENDANT_BLOOM = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffb870' }), 0, 0.28)
-const PENDANT_POOL = nightGlow(new THREE.MeshBasicMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }), 0.18, 0.42)
+// (pulled toward the camera in depth so it never fights the bar's top under it, seen from far off)
+const PENDANT_POOL = nightGlow(new THREE.MeshBasicMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+  polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), 0.18, 0.42)
 function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
   return (
     <group position={[0, WALL_H, z]}>

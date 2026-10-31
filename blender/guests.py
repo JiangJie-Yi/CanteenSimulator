@@ -132,6 +132,13 @@ mat("WorkDark", srgb("#5f5230"))
 # =====================================================================
 
 HC = Vector((0, 0, 0.835))        # the middle of the head
+# (the staff made as the boss is: a round body with no legs or feet, floating mitten hands (the customers keep their short legs: they sit
+# up on the bar's stools); the leg bones stay, unused by them)
+LEGLESS = False
+
+
+def legless(kind):
+    return STYLE[kind].get("staff", False) or kind == "chef"
 HEAD_R = 0.158   # (a big round head sat straight on the body, as Overcooked's cooks have)
 
 HREF = lambda p: HC                     # noqa: E731
@@ -458,7 +465,9 @@ def body(kind):
     # (a round body like an egg, its widest low, rising straight into the head: no waist to speak of, no neck showing)
     # (a round bean of a body from nearly the floor up into the head, widest low: the legs are inside it, only the feet showing; no neck)
     # (the skin's radii shrink as it's smoothed: set a third larger than they'll show)
-    seat = v((0, 0, 0.16), 0.17 * hi)
+    # (as the boss is made (boss.py): no legs and no feet, the plump body rounding off underneath, just clear of the floor)
+    LEGLESS = legless(kind)
+    seat = v((0, 0, 0.16 if not LEGLESS else 0.15), 0.17 * hi)
     pelvis = v((0, 0, 0.29), 0.19 * hi)
     waist = v((0, 0, 0.43), 0.185 * wa)
     chest = v((0, 0, 0.55), 0.16 * (sh * 0.5 + wa * 0.5))
@@ -468,7 +477,11 @@ def body(kind):
     neck0 = v((0, 0, 0.69), 0.11)
     neck1 = v((0, 0, 0.73), 0.11)
     edges += [(seat, pelvis), (pelvis, waist), (waist, chest), (chest, top), (top, neck0), (neck0, neck1)]
-    for sd in (1, -1):
+    if LEGLESS:
+        # (its underside rounded off, as the boss's is: a smaller round under the seat)
+        under = v((0, 0, 0.085), 0.12 * hi)
+        edges.append((under, seat))
+    for sd in (() if LEGLESS else (1, -1)):
         # (as Overcooked's cooks: no arms; the hands are their own floating mittens (hands(), below), not part of the body)
         bg = st.get("baggy", 1.0)
         # (short, stout legs: what shows under the round body is a thick stub and a big round shoe)
@@ -493,6 +506,25 @@ def body(kind):
     sub.levels = 2
     o = evaluated_copy(o, f"{kind}.body")
 
+    if LEGLESS:
+        # (the lower body turned on a round profile, as the boss's: widest a little below the waist, rounding off underneath to just
+        # clear of the floor; blended into the body as it was above the waist)
+        zc, hz, R = 0.31, 0.25, 0.205 * hi
+        for vt in o.data.vertices:
+            p = vt.co
+            if p.z > 0.47:
+                continue
+            k = 1.0 if p.z < 0.36 else 1 - smoothstep(0.36, 0.47, p.z)
+            q = max(0.0, 1 - ((min(p.z, zc) - zc) / hz) ** 2)
+            r = R * q ** 0.5 if p.z < zc else R * (1 - 0.18 * smoothstep(zc, 0.47, p.z))
+            d = Vector((p.x, p.y))
+            if d.length < 1e-6:
+                continue
+            want = d.normalized() * r
+            p.x += (want.x - p.x) * k
+            p.y += (want.y * 0.92 - p.y) * k
+            if p.z < zc - hz + 0.01:
+                p.z = zc - hz + 0.01
     # shape it: a torso flatter front to back, a bit of chest, a belly, a seat; flat hands; shoes longer and lower
     for vt in o.data.vertices:
         p = vt.co
@@ -543,6 +575,8 @@ def body_mat(name, t, p, st, kind):
         return "Shirt" if st.get("vest") else "Top"
     if name.startswith("clavicle"):
         return "Shirt" if st.get("vest") and abs(p.x) > 0.07 else "Top"
+    if legless(kind) and name.startswith(("thigh", "shin", "foot")):
+        name = "hips"
     if name.startswith("foot"):
         return "Sole" if p.z < 0.018 else "Shoes"
     if name.startswith(("thigh", "shin")):
@@ -1937,7 +1971,9 @@ def clothes(kind, bd, hd, surf):
     # hems and cuffs: a rolled edge at each sleeve and trouser end
     hb = bmesh.new()
     for sd in (1, -1):
-        # (no sleeves' cuffs: there are no arms, only the floating hands)
+        # (no sleeves' cuffs: there are no arms, only the floating hands; and no trousers' or socks' either, with no legs)
+        if legless(kind):
+            continue
         if st["legs"] == "shorts":
             a, b2 = BONE[f"thigh.{'L' if sd > 0 else 'R'}"]
             cpt = a + (b2 - a) * 0.72
@@ -2060,8 +2096,25 @@ def weights_rigid(o, bone):
     g.add([v.index for v in o.data.vertices], 1.0, "REPLACE")
 
 
-def weights_skirt(o, top, hem):
+def legs_to_hips(o):
+    """with no legs, nothing of the body follows the leg bones: what they held is the hips' (the round body moves as one, as the boss's)"""
+    hips = o.vertex_groups.get("hips") or o.vertex_groups.new(name="hips")
+    legs = [g for g in o.vertex_groups if g.name.startswith(("thigh", "shin", "foot"))]
+    idx = {g.index for g in legs}
+    for vt in o.data.vertices:
+        w = sum(e.weight for e in vt.groups if e.group in idx)
+        if w > 0:
+            have = next((e.weight for e in vt.groups if e.group == hips.index), 0.0)
+            hips.add([vt.index], have + w, "REPLACE")
+    for g in legs:
+        o.vertex_groups.remove(g)
+
+
+def weights_skirt(o, top, hem, rigid=False):
     """a skirt or robe: the hips at the waist, then more and more the thigh (and the shin, lower) on its side"""
+    if rigid:
+        weights_rigid(o, "hips")
+        return
     gs = {n: o.vertex_groups.new(name=n) for n in ("hips", "thigh.L", "thigh.R", "shin.L", "shin.R")}
     for vt in o.data.vertices:
         p = vt.co
@@ -2181,6 +2234,8 @@ for kind in KINDS:
         from_bm(f"{kind}.band", hb, [MATS["Collar"], MATS["Button"]], HREF)
     # skin them all to the rig: the body by heat, the head and all on it rigidly, garments by their own rules
     auto_weights(bd, rig)
+    if legless(kind):
+        legs_to_hips(bd)
     # (the floating hands: a round mitten on each hand bone, a stub of a thumb toward the front, each held rigidly by its own bone)
     for s_, sd in (("L", 1), ("R", -1)):
         hb_ = bmesh.new()
@@ -2204,7 +2259,7 @@ for kind in KINDS:
             copy_weights(bd, o)
         elif part in ("skirt", "robe", "hem", "apron"):
             top = 0.48 if part == "robe" else 0.475
-            weights_skirt(o, top, 0.1)
+            weights_skirt(o, top, 0.1, rigid=legless(kind))
         elif part == "cuffs":
             weights_by_bones(o, allowed=[n for n in BONE if n.startswith(("upperarm", "forearm", "hand", "thigh", "shin", "foot"))])
         else:
