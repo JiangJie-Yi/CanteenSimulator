@@ -152,8 +152,8 @@ feature('炭貼著鹽床，不會浮空', () => {
   })
 })
 
-feature('炭立著靠成一束（像爐端燒的炭火）', () => {
-  scenario('一根根放上去的炭都立著，腳貼著炭床，往中間靠，排成方形的一束', ({ given, when, then, and }) => {
+feature('炭立著圍成一圈靠在一起（像爐端燒的炭火）', () => {
+  scenario('一根根放上去的炭都立著，腳貼著炭床，往中間靠，一圈圈由內往外圍', ({ given, when, then, and }) => {
     given('空的炭床', (w) => { w.stood = [] as Lay[] })
     when('立上三十根炭', (w) => {
       let seed = 9
@@ -165,8 +165,8 @@ feature('炭立著靠成一束（像爐端燒的炭火）', () => {
       }
     })
     then('三十根都立得上去', (w) => { expect(w.stood.length).toBe(30) })
-    and('每一根都是立著的（離垂直不超過 25°）', (w) => {
-      for (const l of w.stood as Lay[]) expect(Math.atan(1 / l.slope)).toBeLessThan((25 * Math.PI) / 180)
+    and('每一根都是立著的（離垂直不超過 30°）', (w) => {
+      for (const l of w.stood as Lay[]) expect(Math.atan(1 / l.slope)).toBeLessThan((30 * Math.PI) / 180)
     })
     and('每一根的腳都踩在炭床上（不浮空、不陷進去）', (w) => {
       for (const l of w.stood as Lay[]) {
@@ -175,16 +175,16 @@ feature('炭立著靠成一束（像爐端燒的炭火）', () => {
         expect(Math.abs(foot.y - surfaceY(foot.x, foot.z))).toBeLessThan(0.02)
       }
     })
-    and('外圈的往中間靠（頂端比腳更靠近中央）', (w) => {
+    and('每一根都往中間靠（頂端比腳更靠近中央）', (w) => {
       for (const l of w.stood as Lay[]) {
-        if (Math.hypot(l.x, l.z) < 0.08) continue
+        if (Math.hypot(l.x, l.z) < 0.03) continue
         const top = { x: l.x + Math.cos(l.yaw) * 0.1, z: l.z + Math.sin(l.yaw) * 0.1 }
         expect(Math.hypot(top.x, top.z)).toBeLessThan(Math.hypot(l.x, l.z))
       }
     })
-    and('排成方形：腳都在方形範圍內，彼此不重疊', (w) => {
+    and('圍在火的中央：腳都在火床中間，彼此不重疊', (w) => {
       const ls = w.stood as Lay[]
-      for (const l of ls) { expect(Math.abs(l.x)).toBeLessThan(0.3); expect(Math.abs(l.z)).toBeLessThan(0.3) }
+      for (const l of ls) expect(Math.hypot(l.x, l.z)).toBeLessThan(0.42)
       for (let i = 0; i < ls.length; i++) for (let j = i + 1; j < ls.length; j++) expect(Math.hypot(ls[i].x - ls[j].x, ls[i].z - ls[j].z)).toBeGreaterThan(STICK_R * 1.8)
     })
   })

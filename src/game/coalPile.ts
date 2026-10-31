@@ -191,37 +191,42 @@ export function throwForce(speed: number, stillFor: number) {
   return Math.min(1, speed / 3.5)
 }
 
-/** the standing bundle's slots: a square of 7 × 7 places this far apart, the feet set in them */
-export const STAND_STEP = 0.085
-const STAND_N = 7
+/** the standing charcoal's places: rings round the middle of the fire (their radii, and how many each holds), the inner filled first */
+export const STAND_RINGS: [number, number][] = [[0.09, 6], [0.19, 10], [0.29, 14], [0.39, 18]]
+/** how far in each one's top comes, of where its foot is: they lean in together, their tops gathering over the fire */
+const STAND_TOP = 0.6
 /**
- * The next stick stood up in the bundle, the way charcoal's built round a robatayaki's fish: upright, its foot on the bed in the square of
- * slots, the free one nearest the middle taken (so the bundle grows outward), leaning in toward the middle a little, the outer ones more, so
- * the whole leans together. Returns its middle (as a Lay's: the way it leans as yaw, how steeply it rises along it as slope), or null when
- * every slot's taken.
+ * The next stick stood up round the fire, the way charcoal's built at a robatayaki: upright pieces in rings round the middle, each leaning in
+ * so its top comes in toward the others' (the outer rings more), like the sticks of a fire laid in a cone, the flames coming up between
+ * them; the inner rings filled first, each ring's places set between the last ring's. Returns its middle (as a Lay's: the way it leans as
+ * yaw, how steeply it rises along it as slope), or null when every place is taken.
  */
 export function standStick(stood: Lay[], rnd: () => number = Math.random, lift = 0) {
   const feet = stood.map((l) => {
     const k = 1 / Math.hypot(1, l.slope)
     return { x: l.x - Math.cos(l.yaw) * STICK_HALF * k, z: l.z - Math.sin(l.yaw) * STICK_HALF * k }
   })
-  const free: { x: number; z: number; d: number }[] = []
-  for (let i = 0; i < STAND_N; i++) for (let j = 0; j < STAND_N; j++) {
-    const x = (i - (STAND_N - 1) / 2) * STAND_STEP, z = (j - (STAND_N - 1) / 2) * STAND_STEP
-    if (feet.some((f) => Math.hypot(f.x - x, f.z - z) < STAND_STEP * 0.6)) continue
-    free.push({ x, z, d: Math.max(Math.abs(x), Math.abs(z)) + Math.hypot(x, z) * 0.1 + rnd() * 0.02 })
+  for (let r = 0; r < STAND_RINGS.length; r++) {
+    const [rad, n] = STAND_RINGS[r]
+    // (each ring turned half a place from the last, so the pieces stand staggered, not in lines)
+    const free: number[] = []
+    for (let i = 0; i < n; i++) {
+      const a = ((i + (r % 2) * 0.5) / n) * Math.PI * 2
+      const x = Math.cos(a) * rad, z = Math.sin(a) * rad
+      if (!feet.some((f) => Math.hypot(f.x - x, f.z - z) < (Math.PI * 2 * rad) / n * 0.5)) free.push(a)
+    }
+    if (!free.length) continue
+    const a = free[Math.floor(rnd() * free.length)] + (rnd() - 0.5) * 0.08
+    const fr = rad + (rnd() - 0.5) * 0.01
+    const fx = Math.cos(a) * fr, fz = Math.sin(a) * fr
+    // (leaning in: its top a little in from over its foot, the length of a stick up)
+    const inward = fr * (1 - STAND_TOP)
+    const lean = Math.atan2(inward, STICK_HALF * 2)
+    const yaw = a + Math.PI + (rnd() - 0.5) * 0.12
+    const c = Math.sin(lean), up = Math.cos(lean)
+    const x = fx + Math.cos(yaw) * STICK_HALF * c, z = fz + Math.sin(yaw) * STICK_HALF * c
+    const y = surfaceY(fx, fz, lift) + STICK_HALF * up
+    return { x, z, from: { x, z }, yaw, rest: { y, slope: up / c } }
   }
-  if (!free.length) return null
-  free.sort((a, b) => a.d - b.d)
-  const s = free[0]
-  const fx = s.x + (rnd() - 0.5) * 0.008, fz = s.z + (rnd() - 0.5) * 0.008
-  const r = Math.hypot(fx, fz)
-  // (the middle ones nearly upright, leaning in more toward the bundle's edge, up to ten degrees or so; neighbours near alike, so they lean
-  // together onto the middle and don't cross)
-  const lean = ((1.5 + 9 * Math.min(1, r / 0.32) + (rnd() - 0.5) * 1.5) * Math.PI) / 180
-  const yaw = r > 0.02 ? Math.atan2(-fz, -fx) + (rnd() - 0.5) * 0.15 : rnd() * Math.PI * 2
-  const c = Math.sin(lean), up = Math.cos(lean)
-  const x = fx + Math.cos(yaw) * STICK_HALF * c, z = fz + Math.sin(yaw) * STICK_HALF * c
-  const y = surfaceY(fx, fz, lift) + STICK_HALF * up
-  return { x, z, from: { x, z }, yaw, rest: { y, slope: up / c } }
+  return null
 }

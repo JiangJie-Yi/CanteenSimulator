@@ -1595,8 +1595,6 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase
           {/* (a cup with a wall of its own: a thick rim, a foot ring, a floor, the sake poured in is seen in it) */}
           <mesh geometry={SAKE_CUP} position-y={-0.0125}><meshToonMaterial color="#f4f1ea" /></mesh>
           <mesh geometry={SAKE_CUP} position-y={-0.0125} scale={[1.05, 1.03, 1.05]}><meshBasicMaterial color="#5a4a3a" side={THREE.BackSide} /></mesh>
-          {/* (a soft shadow under it on the stand) */}
-          <group position-y={-0.0125}><ContactShadow r={0.02} y={0.0004} /></group>
         </group>
       ))}
     </group>

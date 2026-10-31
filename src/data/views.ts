@@ -38,7 +38,7 @@ export const VIEW_SPOTS: ViewSpot[] = [
     about: { zh: '神棚與供桌：點御神酒供酒，可招來更多客人', ja: '神棚と供え台：御神酒を供えると客が増える', en: 'The household shrine: offer sake to bring more customers' } },
   { id: 'drinks', zh: '飲品櫃', ja: '飲み物', en: 'Drinks', anchor: 'look-fridge', back: 6.2, up: 1.6, from: [0.808, -0.589], shift: [0.53, 0.72],
     about: { zh: '飲料冷藏櫃：客人自己拿飲料', ja: '飲み物の冷蔵庫：客がセルフで取る', en: 'The drinks fridge: customers help themselves' } },
-  { id: 'toilet', zh: '廁所', ja: 'お手洗い', en: 'Toilets', anchor: 'look-wc-m', back: 4.6, up: 1.7, from: [0.808, -0.589], shift: [-0.55, -0.76],
+  { id: 'toilet', zh: '廁所', ja: 'お手洗い', en: 'Toilets', anchor: 'look-wc-m', back: 5.8, up: 2.3, from: [0.808, -0.589], shift: [-0.55, -0.76],
     about: { zh: '男女廁所的拉門與洗手台', ja: '男女のお手洗いの引き戸と手洗い', en: 'The toilets: sliding doors and wash basins' } },
   { id: 'back', zh: '後台區', ja: '裏方', en: 'Back room', anchor: 'look-back', back: 3.2, up: 1.4, faceOn: true,
     about: { zh: '後場：碗盤櫃架、飯桶與作業台', ja: '裏方：食器棚、飯びつと作業台', en: 'Behind the scenes: dish rack, rice tub, work table' } },

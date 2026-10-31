@@ -168,7 +168,10 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     const ndc = at.clone().project(cam)
     const inView = Math.abs(ndc.x) < 1.1 && ndc.y > -1.3 && ndc.y < 1.05 && ndc.z < 1
     const lookedAt = tgt ? tgt.distanceTo(m.getWorldPosition(new THREE.Vector3())) < 1.6 : false
-    const want = !getEdit().on && !lookedAt && inView && along > 0 && along < lookD - 1.2 ? 0.22 : 1
+    // (and only when he's actually over it in the picture: near where the camera's looking on screen, not merely somewhere in front of it,
+    // standing off to one side, which is no reason to turn him to a ghost)
+    const over = tgt ? Math.hypot(...(() => { const a = tgt.clone().project(cam); const b = m.localToWorld(new THREE.Vector3(0, 0.45, 0)).project(cam); return [a.x - b.x, a.y - b.y] })()) < 0.45 : true
+    const want = !getEdit().on && !lookedAt && inView && over && along > 0 && along < lookD - 1.2 ? 0.35 : 1
     ghost.current += (want - ghost.current) * Math.min(1, Math.min(dt, 0.1) * 6)
     const k = ghost.current
     for (const o of inks) o.visible = k > 0.95

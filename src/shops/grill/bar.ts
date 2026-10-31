@@ -147,7 +147,7 @@ export function toiletsOf(cs: Counter[]) {
     const z = door + k * (WC_W / 2 + 0.06)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
     // (inside: just past the door, on the duckboard, clear of the toilet: once in, the door shuts on them)
-    return { z, front: at(farOf(c) + 0.45), aisle: at(-AISLE), inside: at(farOf(c) - 0.18) }
+    return { z, front: at(farOf(c) + 0.45), aisle: at(-AISLE), inside: at(farOf(c) - 0.06) }
   }
   return { door, m: one(-1), f: one(1) }
 }

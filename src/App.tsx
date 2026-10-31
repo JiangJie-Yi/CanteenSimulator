@@ -810,7 +810,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
                 : QUALITY.lite ? <Suspense fallback={models(liteUrl(dish.model))}>{models(dish.model)}</Suspense>
                   : models(dish.model)}
               {/* toon ramps blow out easily, so the firelight stays modest */}
-              {dish.heat === 'fire' && <group position={dish.roast ? [FIRE_SHIFT.x, PIT_LIFT, FIRE_SHIFT.z] : undefined}><Fire width={0.6} height={0.42} baseIntensity={look.fire} level={fire} /></group>}
+              {/* (the flames from the salt bed's surface up through the charcoal stood round them, licking out over its top) */}
+              {dish.heat === 'fire' && <group position={dish.roast ? [FIRE_SHIFT.x, PIT_LIFT + 0.19, FIRE_SHIFT.z] : undefined}><Fire width={0.5} height={0.75} baseIntensity={look.fire} level={fire} /></group>}
               <group position={dish.roast ? [FIRE_SHIFT.x, PIT_LIFT, FIRE_SHIFT.z] : undefined}>
               {dish.smoke && (
                 // same white puffs as the soup steam, just taller and slower
