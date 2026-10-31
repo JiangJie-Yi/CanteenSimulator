@@ -778,21 +778,31 @@ for k in range(4):
     bm_.to_mesh(o.data); bm_.free()
     bars.append(finish(o, f"Robuchi{k}", M["robuchi"]))
 # (the brass: an L-shaped plate over each corner, and a fine inlaid line round the inner edge's top)
-# (each corner capped whole, as an irori's 隅金具 is: an L over the top the bars' full width, the plate folded down both outer faces to the
-# foot, and a rounded edge where they meet at the corner)
-CL = 0.22
+# (each corner capped whole, as an irori's 隅金具 is: one cast sleeve of brass, L-shaped in plan, wrapped over the corner's top and down
+# both its outer faces to the foot, a hair proud of the wood all round and its edges eased, so it reads as one piece with no seams;
+# its inner edges sunk just inside the wood)
+CL, BT = 0.22, 0.006
 for k in range(4):
     sx, sy = (1 if k in (1, 2) else -1), (1 if k >= 2 else -1)
-    for (w, d, cx, cy) in ((CL, IRORI_W, OUT - CL / 2, OUT - IRORI_W / 2), (IRORI_W, CL, OUT - IRORI_W / 2, OUT - CL / 2)):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=(sx * cx, sy * cy, IRORI_H + 0.002))
-        o = active(); o.scale = (w, d, 0.006)
-        bars.append(finish(o, f"RobuchiBrassCorner{k}", M["brass"], smooth_shade=False))
-    for (w, d, cx, cy) in ((CL, 0.006, OUT - CL / 2, OUT + 0.002), (0.006, CL, OUT + 0.002, OUT - CL / 2)):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=(sx * cx, sy * cy, IRORI_H / 2 + 0.002))
-        o = active(); o.scale = (w, d, IRORI_H + 0.01)
-        bars.append(finish(o, f"RobuchiBrassSide{k}", M["brass"], smooth_shade=False))
-    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.008, depth=IRORI_H + 0.012, location=(sx * (OUT + 0.002), sy * (OUT + 0.002), IRORI_H / 2 + 0.002))
-    bars.append(finish(active(), f"RobuchiBrassEdge{k}", M["brass"]))
+    i_ = IRORI_IN + 0.004
+    plan = [(OUT - CL, OUT + BT), (OUT + BT, OUT + BT), (OUT + BT, OUT - CL), (i_, OUT - CL), (i_, i_), (OUT - CL, i_)]
+    bm_ = bmesh.new()
+    lo = [bm_.verts.new((sx * x, sy * y, -0.001)) for x, y in plan]
+    hi = [bm_.verts.new((sx * x, sy * y, IRORI_H + BT)) for x, y in plan]
+    bm_.faces.new(hi)
+    bm_.faces.new(lo[::-1])
+    for i in range(len(plan)):
+        bm_.faces.new((lo[i], lo[(i + 1) % len(plan)], hi[(i + 1) % len(plan)], hi[i]))
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me_ = bpy.data.meshes.new(f"RobuchiBrassCorner{k}")
+    bm_.to_mesh(me_); bm_.free()
+    o = bpy.data.objects.new(f"RobuchiBrassCorner{k}", me_)
+    bpy.context.collection.objects.link(o)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True)
+    bevel(o, 0.004, 2, angle=False)
+    bpy.ops.object.modifier_apply(modifier="Bevel")
+    bars.append(finish(o, f"RobuchiBrassCorner{k}", M["brass"], smooth_shade=False))
 for k in range(4):
     a_ = k * math.pi / 2
     ca, sa = math.cos(a_), math.sin(a_)

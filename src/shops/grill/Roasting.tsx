@@ -40,7 +40,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { ALONG, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { ALONG, handOver, FLOOR_NEAR, staffDoorAt, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -570,11 +570,18 @@ const RING_CLEAR = 1.15 * PIT_SCALE
 const HEARTH_HALF = (0.8 + 0.13) * PIT_SCALE
 /** a thing at `at` (from the fire's middle) of reach `r`, or a w x d board turned to the table, moved out of the square hearth the short way */
 function clearOfHearth(at: THREE.Vector3, r: number, w = 0, d = 0) {
-  const u = at.dot(ALONG), v = at.dot(LAY)
-  const hu = HEARTH_HALF + r + w / 2, hv = HEARTH_HALF + r + d / 2
-  if (Math.abs(u) >= hu || Math.abs(v) >= hv) return
-  if (hu - Math.abs(u) < hv - Math.abs(v)) at.addScaledVector(ALONG, Math.sign(u || 1) * hu - u)
-  else at.addScaledVector(LAY, Math.sign(v || 1) * hv - v)
+  for (let k = 0; k < 2; k++) {
+    const u = at.dot(ALONG), v = at.dot(LAY)
+    const hu = HEARTH_HALF + r + w / 2, hv = HEARTH_HALF + r + d / 2
+    if (Math.abs(u) < hu && Math.abs(v) < hv) {
+      if (hu - Math.abs(u) < hv - Math.abs(v)) at.addScaledVector(ALONG, Math.sign(u || 1) * hu - u)
+      else at.addScaledVector(LAY, Math.sign(v || 1) * hv - v)
+    }
+    // (nor over the notch cut into the table's front: moved along to its nearer side, where there's table under it)
+    const a = at.dot(ALONG) + FIRE_SHIFT.dot(ALONG), l = at.dot(LAY) + FIRE_SHIFT.dot(LAY)
+    const [n0, n1] = COOK_NOTCH.along, ha = r + w / 2
+    if (l + r + d / 2 > COOK_NOTCH.lay[0] && a + ha > n0 && a - ha < n1) at.addScaledVector(ALONG, a - n0 < n1 - a ? n0 - ha - a : n1 + ha - a)
+  }
 }
 
 /**
@@ -820,6 +827,8 @@ function CookTable({ floor = true }: { floor?: boolean }) {
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]}
         inset={[[0.06, -0.01, 0.06, 0.06], [-0.01, 0.06, 0.06, -0.01], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, -0.01], [-0.01, 0.06, 0.06, -0.01]][i] as [number, number, number, number]} />)}
       <CubbyFrame />
+      <CubbyDoors along={CUBBY2.along as [number, number]} />
+      <CubbyDoors along={CUBBY.along as [number, number]} />
       <CookTableTop />
       {/* (the same boards as the customers', laid the same way; with the shop open and the room drawn, its one floor
           runs under the kitchen too) */}
@@ -907,6 +916,64 @@ function CubbyFrame() {
       <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color={CUBBY_WOOD} />
       <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[CUBBY_SHELF_Y - CUBBY.shelfThick, CUBBY_SHELF_Y]} color={CUBBY_WOOD} />
     </>
+  )
+}
+/**
+ * A cubby's doors (開き戸): two panels of the body's cedar, each hung on hinges at the cubby's outer edge, a small dark pull near
+ * where they meet. Shut, they close it off; pointed at they swing open outward so what's in it shows (shutting again a moment after
+ * the pointer's gone), and a click keeps them open (another shuts them).
+ */
+function CubbyDoors({ along: [a0, a1] }: { along: [number, number] }) {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const front = COOK_TABLE.lay[1] - 0.075
+  const top = -0.3, bottom = floor + CUBBY.plinth
+  const H = top - bottom, W = (a1 - a0) / 2 - 0.006
+  const mid = new THREE.Vector3().addScaledVector(ALONG, (a0 + a1) / 2).addScaledVector(LAY, front)
+  const doors = useRef<(THREE.Group | null)[]>([])
+  const st = useRef({ k: 0, kept: false, hoverUntil: 0 })
+  const geo = useMemo(() => panelBox(W, H, 0.025, 0.45), [W, H])
+  useFrame((_, dt) => {
+    const s = st.current
+    const want = s.kept || performance.now() < s.hoverUntil ? 1 : 0
+    s.k += (want - s.k) * Math.min(1, Math.min(dt, 0.1) * 5)
+    // (each door about its hinge at the outer edge, its free edge swinging out toward the cook, a little past square)
+    const e = s.k * s.k * (3 - 2 * s.k)
+    doors.current.forEach((d, i) => { if (d) d.rotation.y = (i === 0 ? -1 : 1) * e * 1.75 })
+  })
+  const tip = () => setTip({ title: '櫃門', hint: st.current.kept ? '點一下關上' : '點一下打開' })
+  const over = (e: Parameters<typeof handOver.onPointerOver>[0]) => {
+    handOver.onPointerOver(e)
+    st.current.hoverUntil = performance.now() + 2500
+    tip()
+  }
+  const hinge = (a1 - a0) / 2
+  return (
+    <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+      {[0, 1].map((i) => {
+        const sd = i === 0 ? -1 : 1
+        return (
+          <group key={i} ref={(g) => { doors.current[i] = g }} position={[sd * hinge, 0, 0.0125]}
+            onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.kept = !st.current.kept; tip() }}
+            onPointerOver={over} onPointerMove={() => { st.current.hoverUntil = performance.now() + 2500 }} onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
+            <mesh geometry={geo} position={[-sd * (W / 2 + 0.003), bottom + H / 2, 0]}>
+              <meshToonMaterial color="#ffffff" map={COOK_PANEL_WOOD} />
+            </mesh>
+            {/* (the pull, a short dark bar standing near the free edge) */}
+            <mesh position={[-sd * (W - 0.07), bottom + H * 0.55, 0.03]}>
+              <boxGeometry args={[0.025, 0.16, 0.025]} />
+              <meshToonMaterial color="#1e140d" />
+            </mesh>
+            {/* (two hinges on the outer edge) */}
+            {[0.18, 0.82].map((f) => (
+              <mesh key={f} position={[-sd * 0.004, bottom + H * f, 0.014]}>
+                <boxGeometry args={[0.02, 0.07, 0.008]} />
+                <meshToonMaterial color="#5a4630" />
+              </mesh>
+            ))}
+          </group>
+        )
+      })}
+    </group>
   )
 }
 function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [number, number]; along: [number, number]

@@ -513,9 +513,8 @@ const FREEZER_URL = import.meta.env.BASE_URL + 'models/freezer.glb'
 useGLTF.preload(FREEZER_URL)
 /**
  * The ingredient freezer (blender/freezer.py): a wide chest freezer along the kitchen's back wall by the staff door, pale blue-white on a
- * dark plinth, its compressor housing at the right end (louvres, a little display, the red lamp, a dial), the lid hinged on its back edge.
- * Inside, as a fish shop's freezer is: whole fish glazed in ice, vacuum-packed fillets, a styrofoam fish box, the saury in a wire basket,
- * ice and frost. Its lid swings up for a moment each time something's taken out for an order, a cool light spilling out over what's in it,
+ * dark plinth, its compressor housing at the right end (louvres and the red lamp), the lid hinged on its back edge. Inside, only the
+ * shop's own fish laid in rows on a bed of ice, glazed, and vacuum-packed fillets. Its lid swings up for a moment each time something's taken out for an order, a cool light spilling out over what's in it,
  * and it can be opened by hand, a click (and shut again with another); on the housing's top lies the cut fish (the downloaded hand-painted
  * model, kept in its own colours).
  */
@@ -534,13 +533,12 @@ function IngredientFridge() {
       const glossy = /Steel|Ice|Film|Wire|Plate/.test(src.name)
       m.material = glossy
         ? new THREE.MeshPhysicalMaterial({ color: src.color, metalness: src.metalness, roughness: Math.max(0.15, src.roughness), clearcoat: 0.6,
-          transparent: /Ice|Film/.test(src.name), opacity: /Ice/.test(src.name) ? 0.55 : /Film/.test(src.name) ? 0.35 : 1 })
+          transparent: /Ice|Film/.test(src.name), opacity: /Ice/.test(src.name) ? 0.22 : /Film/.test(src.name) ? 0.35 : 1 })
         : /Lcd|Lamp/.test(src.name) ? new THREE.MeshBasicMaterial({ color: src.emissive.clone().multiplyScalar(1.4), toneMapped: false })
           : new THREE.MeshToonMaterial({ color: src.color })
       m.castShadow = !/Goods/.test(m.name)
     })
-    inkModel(root.getObjectByName('FreezerBody') as THREE.Mesh)
-    inkModel(root.getObjectByName('FreezerLid') as THREE.Mesh)
+    // (no ink lines round it: plain and clean, as an appliance looks)
     return root
   }, [fz])
   // (its lid, looked up in the model as drawn)
@@ -568,7 +566,7 @@ function IngredientFridge() {
     const open = FREEZER.open || performance.now() - FRIDGE_KICK.at < 1800 ? 1 : 0
     // (the lid hinged on its back edge, swinging up and over)
     if (lid.current) lid.current.rotation.x += ((-open * 1.85) - lid.current.rotation.x) * 0.1
-    if (light.current) light.current.intensity += (open * 1.1 - light.current.intensity) * 0.12
+    if (light.current) light.current.intensity += (open * 0.45 - light.current.intensity) * 0.12
   })
   const W = 1.5, H = 0.86, HOUSE = 0.34
   return (
