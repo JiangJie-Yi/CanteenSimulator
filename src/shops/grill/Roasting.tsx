@@ -44,7 +44,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { PASS_ALONG, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -1393,7 +1393,8 @@ function BarTop() {
   const ink = useMemo(() => barTopShape(0.01), [])
   // (a core of dark wood inside the plank, a little in from its faces: where the long top's triangles meet, a hair's crack between
   // them would let the cove light under the bar show through as a bright line; this keeps it shut)
-  const core = useMemo(() => barTopShape(-0.02).translate(0, -BAR_TOP, 0).scale(1, 0.5, 1).translate(0, BAR_TOP + 0.004, 0), [])
+  // (its top a little under the plank's: it came 4 mm out over it, a dark brown slab lying all along the bar top inside its pale rim)
+  const core = useMemo(() => barTopShape(-0.02).translate(0, -BAR_TOP, 0).scale(1, 0.5, 1).translate(0, BAR_TOP - 0.012, 0), [])
   return (
     <group rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
       <mesh geometry={geo} castShadow receiveShadow><meshToonMaterial color="#ffffff" map={BAR_WOOD} /></mesh>
@@ -1498,8 +1499,6 @@ const LIP_H = 0.15
 const LIP_JOIN = 0.29
 /** a unit slab with rounded edges (scaled to each top), its grain still running the long way */
 const ROUNDED_SLAB = new RoundedBoxGeometry(1, 1, 1, 3, 0.08)
-const SAUCE_DISH_GEO = wareGeometry([[0, 0], [0.028, 0], [0.034, 0.004], [0.042, 0.016], [0.045, 0.02], [0.043, 0.021],
-  [0.036, 0.012], [0.026, 0.006], [0, 0.006]], 0.045)
 /**
  * One counter of the bar: a long plank of pale hinoki with rounded edges on a dark base, a raised lip on the cook's
  * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
@@ -1534,9 +1533,11 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
       <mesh position={[baseX, BAR_TOP - 0.068, -0.27]} rotation-x={Math.PI / 2}>
         <planeGeometry args={[baseL, 0.03]} /><meshBasicMaterial color="#ffcf88" toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[baseX, (BAR_TOP - 0.06) * 0.62, -0.1215]} rotation-y={Math.PI}>
+      {/* (held well off the base's face and drawn over it: a hair's breadth off, it fought the face for the same depth and flickered) */}
+      <mesh position={[baseX, (BAR_TOP - 0.06) * 0.62, -0.127]} rotation-y={Math.PI}>
         <planeGeometry args={[baseL, (BAR_TOP - 0.06) * 0.76]} />
-        <meshBasicMaterial map={COVE_GLOW} transparent depthWrite={false} toneMapped={false} />
+        {/* (laid on as light, added to the boards under it, not painted over them: their grain shows through the glow) */}
+        <meshBasicMaterial map={COVE_GLOW} transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
       </mesh>
       {/* the foot rail: a log of raw timber along the base's front at the height of a sitting customer's soles, held out from
           the base on wooden brackets, so their feet rest on something */}
@@ -1576,10 +1577,11 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
           </group>
         )
       })()}
-      {/* the base stands back on the cook's side, so the customers' knees go under the top */}
-      <mesh position={[baseX, (BAR_TOP - 0.06) / 2, 0.08]} castShadow>
-        <boxGeometry args={[baseL, BAR_TOP - 0.06, 0.4]} />
-        <meshToonMaterial color="#3a2a1e" />
+      {/* the base stands back on the cook's side, so the customers' knees go under the top: dark cedar boards standing in a frame, their
+          grain at one scale along it (the table's own panelling, darker), the cove light washing down them */}
+      {/* (it stands in the top's shadow, lit by nothing but the cove light: its boards glow a little with it, grain and all, or they'd be black) */}
+      <mesh position={[baseX, (BAR_TOP - 0.06) / 2, 0.08]} castShadow geometry={panelBox(baseL, BAR_TOP - 0.06, 0.4, 0.55)}>
+        <meshToonMaterial color="#6a4a32" map={COOK_PANEL_WOOD} emissive="#7a5232" emissiveMap={COOK_PANEL_WOOD} emissiveIntensity={0.55} />
       </mesh>
       {/* the raised lip on the cook's side, the step the food is handed over */}
       {/* (stopping short of where the other counter butts on, and of the gate's flap) */}
@@ -1604,66 +1606,63 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
         const x = (n - (c.seats - 1) / 2) * (L / c.seats) + (c.shift ?? 0)
         return (
           <group key={n} position={[x, BAR_TOP, 0]}>
-            {/* (each customer's plate is set down and cleared away by GuestBar3D) beyond it, toward the cook (clear of
-                the customer's hands, resting in front of it), chopsticks across on their rest, tips to the left; to the
-                left a little dish of sauce */}
-            <mesh position={[0.08, 0.012, 0.19]}>
-              <boxGeometry args={[0.03, 0.02, 0.04]} />
-              <meshToonMaterial color="#8a5a30" />
-            </mesh>
-            {[-0.012, 0.012].map((dz) => (
-              <mesh key={dz} position={[0.0, 0.027, 0.19 + dz * 0.7]} rotation-z={Math.PI / 2}>
-                <cylinderGeometry args={[0.003, 0.0045, 0.2, 5]} />
-                <meshToonMaterial color="#5a3a20" />
-              </mesh>
+            {/* (each customer's plate is set down in the middle of their place and cleared away by GuestBar3D) in front of it, nearest them,
+                the pair of chopsticks laid across, their tips to the customer's left (+x) up on the rest; beyond the plate the little soy dish
+                (on the right instead at a seat where it'd be off the top, by the gate) */}
+            <group position={[SETTING.restX, 0, SETTING.chopZ]}><BarPiece name="BarHashioki" /></group>
+            {[-1, 1].map((sd) => (
+              <group key={sd} position={[-SETTING.chopL / 2, 0.0015, SETTING.chopZ + sd * 0.0075]} rotation-y={sd * 0.012} rotation-z={SETTING.chopTilt}>
+                <BarPiece name="BarChopstick" />
+              </group>
             ))}
-            {/* (on the right instead at a seat where the left would be off the top, by the gate) */}
-            <group position={[sauceSide(c, gate, x), 0.002, 0.13]}>
-              <mesh geometry={SAUCE_DISH_GEO} castShadow>
-                <meshToonMaterial color="#ffffff" map={wareDesign(n)} />
-              </mesh>
-              <mesh geometry={SAUCE_DISH_GEO} scale={[1.06, 1.15, 1.06]}>
-                <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-              </mesh>
+            <group position={[sauceSide(c, gate, x), 0.001, 0.13]}>
+              <BarPiece name="BarSoyDish" design={n} />
               {/* (empty till someone sits down there: GuestBar3D pours them their soy) */}
             </group>
           </group>
         )
       })}
-      {/* a box of tissues between each pair of seats, back by the lip clear of their plates */}
-      {Array.from({ length: Math.floor(c.seats / 2) }, (_, k) => (
-        <group key={k} position={[(2 * k + 1 - c.seats / 2) * (L / c.seats) + (c.shift ?? 0), BAR_TOP, 0.2]}><TissueBox /></group>
-      ))}
+      {/* a box of tissues between each pair of seats, back by the lip clear of their plates (none where the pass's tray stands) */}
+      {Array.from({ length: Math.floor(c.seats / 2) }, (_, k) => (2 * k + 1 - c.seats / 2) * (L / c.seats) + (c.shift ?? 0))
+        .filter((tx) => c !== GRILL_COUNTERS[0] || Math.abs(tx - (-c.length / 2 + PASS_ALONG)) > 0.3)
+        .map((tx) => <group key={tx} position={[tx, BAR_TOP, 0.18]}><BarPiece name="BarTissue" /></group>)}
     </group>
   )
 }
 
-/** a box of tissues in a wooden case, one pulled up out of the slot on top */
-function TissueBox() {
-  return (
-    <group>
-      <mesh position-y={0.028} castShadow>
-        <boxGeometry args={[0.13, 0.056, 0.07]} />
-        <meshToonMaterial color="#6a4428" />
-      </mesh>
-      <mesh position-y={0.028} scale={[1.05, 1.1, 1.08]}>
-        <boxGeometry args={[0.13, 0.056, 0.07]} />
-        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-      </mesh>
-      {/* the slot, and the tissue puffed up out of it */}
-      <mesh position-y={0.0565} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[0.08, 0.016]} />
-        <meshBasicMaterial color="#2a1a10" />
-      </mesh>
-      {[-0.012, 0.01].map((x, i) => (
-        <mesh key={x} position={[x, 0.082, 0]} rotation={[0, i ? 0.3 : -0.2, i ? -0.25 : 0.2]} scale={[1, 1, 0.25]}>
-          <coneGeometry args={[0.03, 0.056, 6, 1, true]} />
-          <meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} />
-        </mesh>
-      ))}
-    </group>
-  )
+/** where a place's chopsticks lie (across it, nearest the customer), how long they are, how far along their rest stands under their tips, and the
+ * slope they lie at from the table up onto it */
+const SETTING = { chopZ: -0.19, chopL: 0.22, restX: 0.088, chopTilt: Math.atan2(0.0105, 0.19) }
+const SETTING_URL = import.meta.env.BASE_URL + 'models/barsetting.glb'
+const settingPieces = new Map<string, THREE.Object3D>()
+/** one of a place's things (blender/barsetting.py): the soy dish (in the plates' design `design`), a chopstick, the rest, the tissues */
+function BarPiece({ name, design }: { name: string; design?: number }) {
+  const gltf = useGLTF(SETTING_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const key = `${name}|${design ?? ''}`
+    let base = settingPieces.get(key)
+    if (!base) {
+      const src = gltf.scene.getObjectByName(name)!
+      base = src.clone(true)
+      base.position.set(0, 0, 0)
+      base.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh) return
+        const was = m.material as THREE.MeshStandardMaterial
+        m.material = new THREE.MeshToonMaterial({ color: was.color.clone(), map: design !== undefined && /Dish/.test(was.name) ? wareDesign(design) : was.map,
+          side: /Paper/.test(was.name) ? THREE.DoubleSide : THREE.FrontSide })
+        m.castShadow = /Tissue/.test(name)
+        m.receiveShadow = true
+      })
+      inkModel(base, (m) => /Slot|Sheet/.test(m.name), { width: 0.0008, weld: true })
+      settingPieces.set(key, base)
+    }
+    return base.clone(true)
+  }, [gltf, name, design])
+  return <primitive object={obj} />
 }
+useGLTF.preload(SETTING_URL)
+
 
 /**
  * What edit mode shows for a piece that is moved by the table's nudge rather than by wrapping it: a block of its size that is never drawn, standing
