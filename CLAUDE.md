@@ -81,6 +81,10 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 - **三個視角**：攝影機 1＝研製（鎖定）、攝影機 2＝開發者模式（總覽、自由拖）、攝影機 3＝自由視角（閉店預設）。
 - **研製＝火烤灶台視角**：閉店時鏡頭在視角 2（火烤灶台）就是研製模式（`App.tsx` 的 `research = !ai && view === 'grill'`），換到其他視角就離開；營業時沒有研製。研製時右上角（編輯鈕左邊）有一個冷藏櫃小圖示（`fridge-toggle`），點一下開關右側的食材櫃（`ui/Menu.tsx` 的 `chiller`）。食材櫃分三區：冷凍、冷藏、常溫（`data/storage.ts` 的 `storageOf`；清酒、馬鈴薯、地瓜是常溫），底部是試做數量、全部放回，與三個補貨鍵：補到平均（`averageOrder`）、各補 5（`eachOrder`）、補滿（`topUpOrder`，補到 `PAR`）；BDD `tests/bdd/fridge.test.ts`。沒有手動烤魚。**研製**：視角固定在**攝影機 1**，手動夾食物、調味、看每塊的烤魚進度（`roast-tag`）。**營業**（店開著）：廚房自己烤（AI 主廚永遠工作，雇的員工一起），沒有手動烤魚與調味、沒有進度標籤、沒有食材櫃。規則都在 `game/mode.ts`（`modeOf(shopOpen, research)`、`canCookByHand`、`showsProgress`、`showsStockFridge`、`holdsCameraOne`；BDD 情境 `tests/bdd/mode.test.ts`）。
+- **Esc** 關掉目前開著的介面（由上而下：辦公室、帳本、看板、工具選單、食材櫃、視角選單；開發者模式與收銀機說明書自己處理）。
+- **試吃**：研製時點試吃碗裡烤好的東西，老闆會沿他的走道走到最靠近碗的地方、轉向它、說一句（`data/bossLines.ts` 的 `TASTE_LINES`），把它拿到嘴邊吃完，再跑回原本的作息（`Boss.tsx` 的 `BOSS_TASTE`；Roasting 的 `awaitBoss`、`byBoss`）。一次一份。
+- 廚師只是偶爾搧火：一段時間拿著扇子搧，再放下站著（`Person3D.tsx` 的 `fanning`），每人錯開。
+- 老闆擋住鏡頭看的東西時會變淡（只在他真的蓋住畫面中央附近時），用 `alphaHash` 抖動透明，不會變黑或透出身體內部。
 - 研製時：點冷藏櫃拿的食材**直接出現在大砧板（`tray`）上**（`Piece.fresh`，不從火堆滑過去）；烤好夾起的食物**一律放進桌上的試吃碗**（`bowl-0`、`TasteBowl`、`inBowl`，排法同盤子）。
 - **攝影機 1**：該道菜的 home 視角（`App.tsx` 的 home），研製時鎖在這裡；開發者模式不再能調整它（`scene/camera1.ts` 的偏移仍會讀，但沒有編輯介面）。dev 時 `window.__freeCam = true` 可以解鎖視角做截圖。
 - **視角選單**（左下眼睛鈕）：`data/views.ts` 的 `VIEW_SPOTS`，依序 1 自由視角、2 火烤灶台、3 櫃檯、4 玄關、5 小神龕、6 飲品櫃、7 廁所、8 後台區、9 老闆（`follow`：老闆的第一人稱、廣角 `WIDE_FOV`，跟著他走，閉店時才有）；各區看向一個具名群組（`TillMarble`、`look-door`、`look-altar`、`look-fridge`、`look-wc-m`、`look-back`），預設鏡頭從房間剖開的那一側（總覽的方向）、往後 `back`、往上 `up` 看過去（`App.tsx` 的 `poseOf`）；`from` 可指定別的方向、`shift` 把看的點往房內移（玄關在剖開的牆邊，用這兩個避免拍到外面的空白）；老闆視角從他眼睛的高度看著火爐。打開選單時場景裡同時標出編號圈圈（`ViewMarkers`，像 Sketchfab 的註記，點一下飛過去）。**除了 1 自由視角，其他視角都鎖定**（不能轉、平移、縮放；App 的 `spotLock`；研製的火烤灶台另由 `lockView` 鎖在攝影機 1），開發者模式不鎖。鎖定的視角都有四周模糊＋昏暗的鏡頭效果（CSS 疊層 `.grill-focus`，研製時焦點在火上，其他視角 `is-centered` 在畫面中央），自由視角、老闆視角與開發者模式沒有。開發者模式下每個視角是一台攝影機（`ViewCams`，Movable id `viewcam-<id>`），可調位置與旋轉；調過的視角就從那台攝影機的位置、朝它指的方向看（`viewCamPlaced`）。
