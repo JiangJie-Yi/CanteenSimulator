@@ -372,8 +372,8 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
       const tall = (r: number) => (h - (r - 1) * gy) / (r * 15.5)
       while (best.rows > 1 && tall(best.rows) < best.font - 0.01) best = { ...best, rows: best.rows - 1 }
       if (tall(best.rows) < best.font) best = { ...best, font: tall(best.rows) }
-      // (one row only: what doesn't fit across slides sideways, by drag or wheel)
-      best = { ...best, rows: 1, font: Math.min(16, tall(1)) }
+      // (one row only: what doesn't fit across slides sideways, by drag or wheel; the open shop's board bigger, to be read across the room)
+      best = { ...best, rows: 1, font: Math.min(locked ? 23 : 16, tall(1)) }
       const next = best.font >= 10 ? { font: Math.floor(best.font * 10) / 10, rows: best.rows }
         : { font: Math.max(10, Math.min(16, h / 15.5)), rows: 1 }
       if (research) foodsFont = next
@@ -387,7 +387,7 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
       ro.disconnect()
       wide.removeEventListener('change', measure)
     }
-  }, [tagCount, baseCount, likeTags, likeBases, research])
+  }, [tagCount, baseCount, likeTags, likeBases, research, locked])
 
   return (
     <aside ref={aside} style={fit ? ({ '--tag-font': `${fit.font}px`, '--tag-rows': fit.rows } as CSSProperties) : undefined}
