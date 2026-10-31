@@ -211,8 +211,8 @@ export const DISHES: Dish[] = [
       // everything you eat from in a row along the front (toward the camera): the side dish, the miso soup, the
       // plate and the basket, left to right; the tray of raw skewers on the right; box, bucket and bin on the left
       // (the plates and dishes all on the right of the fire as the camera sees it; the raw tray front and centre)
-      // (the plates and dishes are kept in the cubby under the cook's table: the big plate on its floor, the side dishes on its
-      // shelf over it; Roasting's plateAt and dishAt put the ones past the first back on the table's top, where this was)
+      // (no plates kept at the table: they're all in the dish cabinet, but for the tasting bowl; Roasting's plateAt and dishAt set one out on
+      // the table's top only while something's on it. This is where the first plate used to stand)
       plate: [2.333, -1.26, 0.224],
       // (on the table's top at its left end, clear of the hearth, behind the bin)
       basket: { at: [-1.821, 0, 0.768], capacity: 20 },
@@ -238,7 +238,7 @@ export const DISHES: Dish[] = [
       tray: [-0.31, 0.0, 2.16],
       // the rice balls come out on their own little dish, just past the front end of the tray
       // (beside the front end of the tray, between it and the basket: the prep side, all on the right)
-      rawDish: { at: [2.573, -0.74, 0.044], items: ['Onigiri'] },
+      rawDish: { at: [2.3, 0, -0.62], items: ['Onigiri'] },
     },
     layout: {
       mode: 'ring',

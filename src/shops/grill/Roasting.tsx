@@ -184,6 +184,13 @@ const CONTAINER_TIP = (key: string) => {
 /** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates) */
 const BOWL_TOP: [number, number, number] = [1.95, 0, 1.0]
 const BOWL_R = 0.52
+/** something on the table drawn only while `holds` says it holds something (a plate, a side dish: brought from the dish cabinet when it's
+ * wanted), looked at every frame, drawn again only when that changes */
+function WhenHeld({ holds, children }: { holds: () => boolean; children: React.ReactNode }) {
+  const [on, setOn] = useState(false)
+  useFrame(() => { const h = holds(); if (h !== on) setOn(h) })
+  return on ? <>{children}</> : null
+}
 /** how much room the bowl takes when the table's pieces are pushed clear of each other (less than it is: it sits among them) */
 const BOWL_PUSH = 0.3
 /** the bowl's rim above its foot: what's laid across it rests at this height */
@@ -195,15 +202,11 @@ const EDIT_PIECES: Record<string, string> = { tray: 'cutboard', box: 'seasoning'
 const DRAG_PIECES = false
 /** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
 const PLATE_TOP: [number, number, number] = [1.45, 0.02, -1.24]
-/** what lives in the cubby under the table: kept there, not carried about (it's under the top, not on it) */
-const CUBBY_KEYS = new Set(['plate-0', 'dish-0', 'rawdish'])
 /**
- * Spare plates and dishes stacked where the first of each stands, as they are in a shop: the one in use sits on top
- * of the stack, and taken off it (dragged away), it leaves the rest standing. How many under each, and how high each
- * one stacks.
+ * Spare plates and dishes stacked where the first of each stands: none any more. The plates and bowls are all kept in the dish cabinet
+ * (PlateRack), but for the tasting bowl on the table; a plate or a side dish is on the table only while something's on it.
  */
-const SPARES: Record<string, { n: number; step: number }> = { 'plate-0': { n: 3, step: 0.075 }, 'dish-0': { n: 3, step: 0.05 },
-  rawdish: { n: 2, step: 0.05 } }
+const SPARES: Record<string, { n: number; step: number }> = {}
 /** seconds to eat one piece: a few bites, each taking a chunk out and chewed before the next */
 const EAT_SECONDS = 3
 const BITES_PER_PIECE = 4
@@ -2520,10 +2523,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const holds = (k: string) => pieces.current.some((q) => q.container === k && present(q) && !q.eaten)
 
   const plateAt = (n: number) => {
-    // (the first plate is the one in the cubby; the rest, as more are needed, go round the fire on the table's top)
-    if (n === 0) return onSpares('plate-0', new THREE.Vector3(...roast.plate))
+    // (as many as are needed go round the fire on the table's top, the first where the others start)
     const [x, y, z] = PLATE_TOP
-    const m = n - 1
+    const m = n
     const r0 = Math.hypot(x, z)
     const a0 = Math.atan2(z, x)
     const step = 2 * Math.asin(Math.min(1, (PLATE_STEP / 2) / r0))     // angle between neighbouring plates
@@ -2824,8 +2826,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // onigiri and mochi off the grill net go on little side dishes of their own
   const onDish = (p: Piece) => !inBowl(p) && space !== 'open' && !!roast.dish && !!roast.net?.includes(p.id)
   const dishAt = (n: number) => {
-    // (the first is in the cubby, on its shelf; the rest, as more are needed, in a row on the table's top)
-    const [x, y, z] = n === 0 ? roast.dish!.at : DISH_TOP
+    // (as many as are needed in a row on the table's top)
+    const [x, y, z] = DISH_TOP
     return onSpares(`dish-${n}`, new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -Math.max(0, n - 1) * DISH_STEP))
   }
   const [dishCount, setDishCount] = useState(1)
@@ -2846,7 +2848,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (let pass = 0; pass < 3; pass++) {
       for (const key of containerKeys()) {
         // (a stack stays where it was put; what's kept in the cubby under the table stays there till it's taken out)
-        if (stackOn.current.has(key) || CUBBY_KEYS.has(key) || key === 'bin' || key === 'tray' || outsideTable(containerAt(key), footprint(key))) continue
+        if (stackOn.current.has(key) || key === 'bin' || key === 'tray' || outsideTable(containerAt(key), footprint(key))) continue
         const at = containerAt(key)
         const ok = settle(key, at.clone())
         const shift = ok.sub(at)
@@ -4047,7 +4049,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       carriedOut.current = out
       if (carriedOut.current) next.y = LIFT - base.y
       // (taken out of the cubby, it comes up onto the table's top)
-      if (!carriedOut.current && CUBBY_KEYS.has(s.key)) next.y = (s.key === 'plate-0' ? PLATE_TOP[1] : DISH_TOP[1]) - base.y
       moved.current.set(s.key, next)
       if (carriers[s.key]) {
         // the box carries its pots and utensils with it, the bucket its dipper
@@ -5036,13 +5037,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   return (
     <>
       {Array.from({ length: plateCount }, (_, n) => (
-        <Plate key={n} container={`plate-${n}`} position={plateAt(n).toArray() as [number, number, number]} />
+        <WhenHeld key={n} holds={() => holds(`plate-${n}`)}><Plate container={`plate-${n}`} position={plateAt(n).toArray() as [number, number, number]} /></WhenHeld>
       ))}
       {roast.basket && Array.from({ length: basketCount }, (_, n) => (
         <Basket key={n} container={`basket-${n}`} position={basketAt(n).toArray() as [number, number, number]} />
       ))}
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
-        <SideDish key={n} container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} />
+        <WhenHeld key={n} holds={() => holds(`dish-${n}`)}><SideDish container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} /></WhenHeld>
       ))}
       {Object.entries(SPARES).map(([k, sp]) => {
         const h = spareHome(k)
@@ -5105,7 +5106,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       </group>
       {bar && <Bar />}
       </group>
-      {roast.rawDish && <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />}
+      {/* (the rice balls' own little dish, set out while some wait raw on it) */}
+      {roast.rawDish && (
+        <WhenHeld holds={() => holds('rawdish') || pieces.current.some((q) => q.staged && !!roast.rawDish?.items.includes(q.id) && present(q))}>
+          <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />
+        </WhenHeld>
+      )}
       {roast.trash && <TrashBin container="trash" contents={trashed}
         position={containerAt('trash').toArray() as [number, number, number]} />}
       {fireHint > 0 && (

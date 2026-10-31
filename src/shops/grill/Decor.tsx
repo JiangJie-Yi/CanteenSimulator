@@ -374,46 +374,10 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
 const RICE_SCALE = 2.0
 /** the side table it stands on: its top's height (the cook's table's top is the scene's y = 0), and its size */
 const SIDE_TOP = -0.3
-/** a flat band of metal round the tub (a strip, not a rod): a lathe of a thin rectangle, its upper edge a little proud */
-const flatBand = (R: number, h: number, t = 0.007) => new THREE.LatheGeometry([[R - t, -h / 2], [R, -h / 2], [R + 0.0025, 0], [R, h / 2], [R - t, h / 2], [R - t, -h / 2]].map(([x, y]) => new THREE.Vector2(x, y)), 72)
-/** the tub's radius at a height up it (it widens toward the rim): what a hoop must stand clear of to lie on the staves, not sink in them */
-const tubR = (y: number) => 0.255 + 0.015 * (y / 0.42)
-/** a lug on the tub's side to lift it by: a rounded plate of wood with a hole through it */
-const EAR = (() => {
-  const sh = new THREE.Shape()
-  const w = 0.05, h = 0.06, r = 0.022
-  sh.moveTo(-w, -h + r); sh.lineTo(-w, h - r); sh.quadraticCurveTo(-w, h, -w + r, h); sh.lineTo(w - r, h); sh.quadraticCurveTo(w, h, w, h - r)
-  sh.lineTo(w, -h + r); sh.quadraticCurveTo(w, -h, w - r, -h); sh.lineTo(-w + r, -h); sh.quadraticCurveTo(-w, -h, -w, -h + r)
-  const hole = new THREE.Path()
-  hole.absarc(0.012, 0.012, 0.017, 0, Math.PI * 2, true)
-  sh.holes.push(hole)
-  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: true, bevelSize: 0.005, bevelThickness: 0.004, bevelSegments: 2, curveSegments: 10 })
-  g.translate(0, 0, -0.015)
-  return g
-})()
-const RICE_GEO = {
-  tub: new THREE.CylinderGeometry(0.27, 0.255, 0.42, 48, 1, true),
-  lidTop: new THREE.CylinderGeometry(0.255, 0.285, 0.035, 32),
-  ear: EAR,
-  band: flatBand(tubR(0.3) + 0.0035, 0.03),
-  band2: flatBand(tubR(0.2) + 0.0035, 0.03),
-  bandWide: flatBand(tubR(0.07) + 0.0035, 0.045),
-  lap: new THREE.BoxGeometry(0.004, 1, 0.035),
-  floor: new THREE.CircleGeometry(0.25, 28),
-  hoop: new THREE.TorusGeometry(0.272, 0.012, 6, 32),
-  grain: new THREE.SphereGeometry(1, 7, 5),
-  rice: new THREE.SphereGeometry(0.255, 24, 10, 0, Math.PI * 2, 0, Math.PI * 0.32),
-  cylRice: new THREE.CylinderGeometry(0.258, 0.248, 0.44, 28, 1, false),
-  lid: new THREE.CylinderGeometry(0.29, 0.29, 0.03, 28),
-  paddle: new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6),
-  blade: new THREE.SphereGeometry(0.06, 12, 8),
-  slab: new THREE.BoxGeometry(1, 1, 1),
-  bowl: new THREE.SphereGeometry(0.11, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
-}
 /**
  * The rice the rice balls are shaped from (おひつ): a big round tub of pale sawara bound with copper hoops, heaped with
- * steaming white rice, the wooden paddle (しゃもじ) stood in it, on a stand of its own (飯台, blender/ricestand.py); its lid and
- * a stack of rice bowls on the shelf under it.
+ * steaming white rice, the wooden paddle (しゃもじ) stood in it, on a stand of its own (飯台, blender/ricestand.py), and its lid (the rice
+ * bowls are kept in the dish cabinet with the rest).
  */
 /** the rice tub's model (blender/ricetub.py) cut into its body, its lid (lifted off) and the rice with its paddle (shown with the lid off),
  * in the room's toon light, the copper keeping a little shine */
@@ -485,19 +449,12 @@ function RiceTub() {
     lid.current.position.set(-0.32 * k, 0.42 - 0.1585 * k + Math.sin(k * Math.PI) * 0.22, 0)
     lid.current.rotation.z = k * 1.36
   })
-  const g = RICE_GEO
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   return (
     <group position={[x, 0, z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
       {/* the stand (blender/ricestand.py): a hinoki top in a raised walnut border, tapered legs splayed a little, walnut aprons with a
           cloud-shaped arch cut from them, a shelf of bamboo slats low down; drawn its own height from the floor up to the top */}
       <primitive object={stand} position-y={floor} scale={[1, (SIDE_TOP - floor) / 1.08, 1]} />
-      {/* on the shelf: the rice bowls, stacked upside down */}
-      {[0, 1, 2].map((k) => (
-        <mesh key={k} geometry={g.bowl} position={[0.5, floor + 0.3 + k * 0.07, 0.35]} rotation-x={Math.PI} scale={[1.6, 1.4, 1.6]}>
-          <meshToonMaterial color="#e8e2d2" />
-        </mesh>
-      ))}
       <group position-y={SIDE_TOP} scale={RICE_SCALE}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v) }}
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; glowOnly(e.eventObject); setTip({ title: '飯桶', hint: open ? '點一下蓋上蓋子' : '點一下掀開蓋子' }) }}
