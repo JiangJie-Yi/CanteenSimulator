@@ -393,8 +393,8 @@ export const PLUM_WARE = wareTexture('plum')
 
 /** Lathe geometry for ware, with UVs projected straight down so a painted picture lies flat in the well. */
 export function wareGeometry(profile: [number, number][], R: number) {
-  // (40 round: a plate the size of a hand stays round at any distance the camera comes to it)
-  const g = new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 40)
+  // (24 round, shaded smooth: low in faces, its light still round; only its outline, close to, shows the sides)
+  const g = new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 24)
   const pos = g.attributes.position
   const uv = g.attributes.uv
   for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / (2 * R) + 0.5, 0.5 - pos.getZ(i) / (2 * R))

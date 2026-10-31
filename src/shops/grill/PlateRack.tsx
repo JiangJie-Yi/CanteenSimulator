@@ -22,10 +22,10 @@ const WOOD_DARK = '#7d5430'
 function plateProfile(R: number): [number, number][] {
   const pts: [number, number][] = [[0, 0.018], [0.3, 0.018], [0.33, 0.004], [0.36, 0], [0.42, 0], [0.45, 0.012], [0.5, 0.02]]
   // (the underside of the rim, sweeping up and out)
-  for (let k = 1; k <= 8; k++) { const t = k / 8; pts.push([0.5 + 0.48 * t, 0.02 + 0.13 * t ** 1.8]) }
+  for (let k = 1; k <= 4; k++) { const t = k / 4; pts.push([0.5 + 0.48 * t, 0.02 + 0.13 * t ** 1.8]) }
   // (the lip, rounded over, and the top of the rim back in)
   pts.push([0.995, 0.162], [0.99, 0.172], [0.975, 0.172])
-  for (let k = 8; k >= 1; k--) { const t = k / 8; pts.push([0.5 + 0.46 * t, 0.045 + 0.12 * t ** 1.8]) }
+  for (let k = 4; k >= 1; k--) { const t = k / 4; pts.push([0.5 + 0.46 * t, 0.045 + 0.12 * t ** 1.8]) }
   pts.push([0.45, 0.042], [0, 0.04])
   return pts.map(([x, y]) => [x * R, y * R])
 }
@@ -33,9 +33,9 @@ const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R)
 /** a rice bowl's section (茶碗) in its radius: a small foot ring, the body rounding up from it to the rim, a fine lip, the inside following */
 function bowlProfile(R: number): [number, number][] {
   const pts: [number, number][] = [[0, 0.1], [0.3, 0.1], [0.32, 0.02], [0.35, 0], [0.42, 0], [0.44, 0.08]]
-  for (let k = 1; k <= 12; k++) { const t = k / 12; pts.push([0.44 + 0.56 * Math.sin((t * Math.PI) / 2), 0.1 + 0.85 * (1 - Math.cos((t * Math.PI) / 2))]) }
+  for (let k = 1; k <= 6; k++) { const t = k / 6; pts.push([0.44 + 0.56 * Math.sin((t * Math.PI) / 2), 0.1 + 0.85 * (1 - Math.cos((t * Math.PI) / 2))]) }
   pts.push([0.99, 0.965], [0.96, 0.965])
-  for (let k = 12; k >= 1; k--) { const t = k / 12; pts.push([0.4 + 0.56 * Math.sin((t * Math.PI) / 2), 0.17 + 0.78 * (1 - Math.cos((t * Math.PI) / 2))]) }
+  for (let k = 6; k >= 1; k--) { const t = k / 6; pts.push([0.4 + 0.56 * Math.sin((t * Math.PI) / 2), 0.17 + 0.78 * (1 - Math.cos((t * Math.PI) / 2))]) }
   pts.push([0, 0.17])
   return pts.map(([x, y]) => [x * R, y * R])
 }

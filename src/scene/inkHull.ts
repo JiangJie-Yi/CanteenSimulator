@@ -18,6 +18,9 @@ const HULL = new THREE.ShaderMaterial({
 /** the hull's material for a line of the given width (in the model's own units), kept once each */
 const HULLS = new Map<number, THREE.ShaderMaterial>([[0.012, HULL]])
 const HULL_MATS = new Set<THREE.Material>([HULL])
+/** an ink line's material: one of the hulls made here, or any back-faced flat colour or shader drawn round a model as one (the inked
+ * pieces made by hand, as Decor's) */
+export const isInk = (m: THREE.Material) => HULL_MATS.has(m) || (m.side === THREE.BackSide && (m.type === 'MeshBasicMaterial' || m.type === 'ShaderMaterial'))
 const hullOf = (width: number) => {
   let h = HULLS.get(width)
   if (!h) {

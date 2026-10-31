@@ -3,6 +3,8 @@
 // staff are walking about. Here: the state, the key, the panel at the screen's corner, and the list of what can be moved.
 
 import { useSyncExternalStore } from 'react'
+import { clearAllRenderPrefs, clearRenderPref, onRenderPrefs, renderPrefOf, setRenderPref } from './renderPrefs'
+import { RENDER_DEFAULT, type RenderPref } from '@/game/renderPrefs'
 import { EDIT_TEXT, pieceName } from '@/data/editText'
 import type { Lang } from '@/data/i18n'
 import { glowOnly, HOVER } from '@/scene/hoverGlow'
@@ -255,6 +257,8 @@ export function resetAll() {
   saveFrozen()
   beginChange(); state.offsets = {}; state.rotations = {}; state.scales = {}
   state.groups = Object.fromEntries(Object.entries(state.groups).map(([k, g]) => [k, { ...g, t: [0, 0, 0] as V3, yaw: 0, s: 1, r: [0, 0, 0] as V3 }]))
+  // (and how every piece is drawn, back as made)
+  clearAllRenderPrefs()
   save(); emit()
 }
 export const select = (id: string | null) => { state.selected = id; emit() }
@@ -482,6 +486,8 @@ let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
 let spaceButton: HTMLButtonElement | null = null, pivotButton: HTMLButtonElement | null = null
 let rows = new Map<string, HTMLDivElement>()
+/** the Render section brought up to date with what's chosen */
+let renderView: (() => void) | null = null
 let summary: HTMLDivElement | null = null
 let built = ''
 
@@ -554,6 +560,12 @@ const PANEL_CSS = `
 .be-foot button:hover { background:#5c5c5c }
 .be-foot .warn { background:#6b3030 } .be-foot .warn:hover { background:#853a3a }
 .be-foot .ok { background:#4772b3; color:#fff; font-weight:600; margin-left:auto } .be-foot .ok:hover { background:#5a87cc }
+.be-rrow { display:flex; align-items:center; gap:4px; padding:3px 8px; flex-wrap:wrap }
+.be-rl { width:72px; color:#bdbdbd; flex:none }
+.be-chip { padding:2px 7px; border:1px solid #555; background:#2c2c2c; color:#ddd; border-radius:3px; cursor:pointer; font:inherit }
+.be-chip.on { background:#4772b3; border-color:#5a86c8; color:#fff }
+.be-chip:disabled, .be-btn:disabled { opacity:.4; cursor:default }
+.be-note { padding:4px 8px; color:#9a9a9a; font-size:11px }
 .be-color { width:44px; height:24px; padding:0; border:1px solid #555; background:#2a2a2a; vertical-align:middle; margin-right:8px; cursor:pointer; }
 .be-btn { background:#3d3d3d; color:#d6d6d6; border:1px solid #555; border-radius:3px; padding:3px 10px; font-size:12px; cursor:pointer; }
 .be-btn:hover { background:#4a4a4a; }
@@ -761,6 +773,45 @@ function panel() {
     group(T().scale, '0.05', readScale, (id, v) => { const z = zeroOf(id).s; scaleTo(id, [v[0] * z[0], v[1] * z[1], v[2] * z[2]]) }, [1, 1, 1], true)
     // (the keys, as in Maya, at a glance)
     tr.appendChild(h('div', 'be-keys', T().hotkeys))
+    // Render: how the chosen piece is drawn (its shading, its material, its outline, its shadows), for it alone (a group: each of its members)
+    const rs = section(T().render)
+    rs.title = T().renderTip
+    const rsNote = h('div', 'be-note', T().renderNone)
+    rs.appendChild(rsNote)
+    const targets = () => { const id = state.selected; return !id ? [] : state.groups[id] ? state.groups[id].members : [id] }
+    type Opt = { label: string; key: keyof RenderPref; choices: [string, RenderPref[keyof RenderPref]][] }
+    const opts: Opt[] = [
+      { label: T().shade, key: 'shade', choices: [[T().shadeSmooth, 'smooth'], [T().shadeFlat, 'flat']] },
+      { label: T().look, key: 'look', choices: [[T().lookKeep, 'keep'], [T().lookToon, 'toon'], [T().lookReal, 'real'], [T().lookUnlit, 'unlit']] },
+      { label: T().ink, key: 'ink', choices: [[T().on, true], [T().off, false]] },
+      { label: T().cast, key: 'cast', choices: [[T().on, true], [T().off, false]] },
+      { label: T().receive, key: 'receive', choices: [[T().on, true], [T().off, false]] },
+    ]
+    const chips: { key: keyof RenderPref; value: RenderPref[keyof RenderPref]; el: HTMLButtonElement }[] = []
+    for (const o of opts) {
+      const row = h('div', 'be-rrow')
+      row.appendChild(h('span', 'be-rl', o.label))
+      for (const [text, value] of o.choices) {
+        const b = h('button', 'be-chip', text) as HTMLButtonElement
+        b.onclick = () => { for (const id of targets()) setRenderPref(id, { [o.key]: value } as RenderPref) }
+        row.appendChild(b)
+        chips.push({ key: o.key, value, el: b })
+      }
+      rs.appendChild(row)
+    }
+    const rReset = h('button', 'be-btn', T().renderReset) as HTMLButtonElement
+    rReset.onclick = () => { for (const id of targets()) clearRenderPref(id) }
+    rs.appendChild(rReset)
+    renderView = () => {
+      const ids = targets()
+      const p = ids.length ? renderPrefOf(ids[0]) : {}
+      rsNote.style.display = ids.length ? 'none' : ''
+      rReset.disabled = !ids.length
+      for (const c of chips) {
+        c.el.disabled = !ids.length
+        c.el.classList.toggle('on', !!ids.length && (p[c.key] ?? RENDER_DEFAULT[c.key]) === c.value)
+      }
+    }
     const foot = h('div', 'be-foot')
     const mk = (text: string, title: string, fn: () => void, cls = '') => {
       const b = h('button', cls, text) as HTMLButtonElement
@@ -800,6 +851,7 @@ function panel() {
     summary.textContent = T().summary(pieces.length, moved, Object.keys(state.groups).length)
   }
   el?.querySelectorAll('.be-grp:last-of-type .be-f').forEach((f, k) => f.classList.toggle('axon', scaleAxis === k))
+  renderView?.()
   if (info) {
     const id = state.selected
     const r = id ? registry.get(id) : null
@@ -814,6 +866,9 @@ function panel() {
     })
   }
 }
+
+// (the Render section follows its settings as they change)
+onRenderPrefs(() => { if (state.on) panel() })
 
 // ---- the key (once, whichever pieces are mounted)
 if (typeof window !== 'undefined') {

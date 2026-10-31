@@ -396,3 +396,5 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   )
 }
 useGLTF.preload(URL)
+// (and the pictures, from the start: a customer coming in never waits on them, so never holds up what's drawn round them)
+if (typeof window !== 'undefined') useLoader.preload(THREE.TextureLoader, PICTURE_URLS)

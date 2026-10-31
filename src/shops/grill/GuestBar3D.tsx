@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -2406,9 +2406,10 @@ function PersonClock({ s, eating, clock, talk, guest }: { s: Shown; eating: () =
   guest?: GuestView }) {
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
   const Figure = FOLK_GUESTS ? FolkFigure : Person
-  return <Figure id={s.id} eating={eating()} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
+  // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them)
+  return <Suspense fallback={null}><Figure id={s.id} eating={eating()} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined} fit={FOLK_FIT}
-    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} />
+    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></Suspense>
 }
 
 // (drawn again only when their own props change, not each time the page above them redraws: while the shop's open that's many times a second)
