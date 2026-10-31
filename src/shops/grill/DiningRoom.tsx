@@ -1984,6 +1984,8 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
           {a.round && <group position={[0, 1.4, a.z]}><WindowDust /></group>}
           </Movable>
         ))}
+        {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
+        {altar && <Movable id="exitsign" label="逃生出口燈"><group name="look-exit" position={[-0.045, 2.08, to - 0.62]} rotation-y={-Math.PI / 2}><ExitSign /></group></Movable>}
         {/* (the light switch by the door, at hand height near the wall's end) */}
         {altar && <Movable id="lightswitch" label="電燈開關"><group position={[-0.002, 1.12, to - 0.16]}><LightSwitch /></group></Movable>}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
@@ -3566,6 +3568,93 @@ function WallSpeaker() {
   )
 }
 useGLTF.preload(SPEAKER_URL)
+
+const EXIT_URL = import.meta.env.BASE_URL + 'models/exitsign.glb'
+/** the language on screen (App sets the page's lang), followed as it's switched */
+function useDocLang() {
+  const read = () => (typeof document === 'undefined' ? 'zh-Hant' : document.documentElement.lang || 'zh-Hant')
+  const [lang, setLang] = useState(read)
+  useEffect(() => {
+    const mo = new MutationObserver(() => setLang(read()))
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
+    return () => mo.disconnect()
+  }, [])
+  return lang
+}
+/** the exit sign's face: green, lit; a doorway and the running figure making for it, the arrow toward it, the words in the language on screen */
+const exitFace = (lang: string) => {
+  const words = lang === 'ja' ? '非常口' : lang === 'en' ? 'EXIT' : '緊急出口'
+  return canvasTex(768, 280, (g) => {
+    const grad = g.createLinearGradient(0, 0, 0, 280)
+    grad.addColorStop(0, '#1aa552'); grad.addColorStop(1, '#0b7f39')
+    g.fillStyle = grad; g.fillRect(0, 0, 768, 280)
+    g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 6; g.strokeRect(14, 14, 740, 252)
+    // (all of it running one way, toward the way out: the figure making for an open doorway ahead of it, then the arrow on past it)
+    g.fillStyle = '#ffffff'
+    g.fillRect(196, 44, 14, 192); g.fillRect(196, 44, 118, 14); g.fillRect(300, 44, 14, 192)
+    g.fillStyle = '#0d8a40'; g.fillRect(210, 58, 90, 178)
+    // (the running figure, white: head, a leaning trunk, arms and legs in long strides, its leading hand reaching into the doorway)
+    g.strokeStyle = '#ffffff'; g.fillStyle = '#ffffff'; g.lineCap = 'round'; g.lineJoin = 'round'
+    g.beginPath(); g.arc(150, 82, 19, 0, Math.PI * 2); g.fill()
+    g.lineWidth = 26
+    g.beginPath(); g.moveTo(134, 112); g.lineTo(114, 168); g.stroke()
+    g.lineWidth = 18
+    g.beginPath(); g.moveTo(131, 120); g.lineTo(166, 140); g.lineTo(206, 126); g.stroke()
+    g.beginPath(); g.moveTo(131, 120); g.lineTo(104, 128); g.lineTo(86, 154); g.stroke()
+    g.beginPath(); g.moveTo(114, 168); g.lineTo(144, 196); g.lineTo(136, 236); g.stroke()
+    g.beginPath(); g.moveTo(114, 168); g.lineTo(86, 196); g.lineTo(50, 200); g.stroke()
+    // (the arrow on toward the door)
+    g.beginPath(); g.moveTo(340, 140); g.lineTo(404, 140); g.lineWidth = 22; g.stroke()
+    g.beginPath(); g.moveTo(436, 140); g.lineTo(398, 108); g.lineTo(398, 172); g.closePath(); g.fill()
+    // (the words)
+    g.textAlign = 'center'; g.textBaseline = 'middle'
+    g.font = lang === 'en' ? '900 120px "Arial Black", Arial, sans-serif' : '900 104px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif'
+    g.fillText(words, 600, 146, 300)
+  })
+}
+/**
+ * The emergency exit sign on the wall by the way out (blender/exitsign.py): its white housing in the room's toon light, its face lit
+ * (unshaded: an exit sign stays lit whatever the room's lights), the words in the language on screen
+ */
+function ExitSign() {
+  const lang = useDocLang()
+  const gltf = useGLTF(EXIT_URL) as unknown as { scene: THREE.Group }
+  const face = useMemo(() => new THREE.MeshBasicMaterial({ toneMapped: false }), [])
+  useEffect(() => {
+    const t = exitFace(lang)
+    if (!t) return
+    t.flipY = false
+    face.map = t
+    face.color.set('#ffffff').multiplyScalar(1.15)
+    face.needsUpdate = true
+    return () => t.dispose()
+  }, [lang, face])
+  const model = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    const toon = new Map<THREE.Material, THREE.Material>()
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      if (src.name === 'ExitFaceLit') { m.material = face; return }
+      let t = toon.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone() }); toon.set(src, t) }
+      m.material = t
+    })
+    inkModel(root, (m) => /Face/.test(m.name), { width: 0.0012, weld: true })
+    return root
+  }, [gltf, face])
+  return (
+    <group>
+      <primitive object={model} />
+      {/* (its glow on the wall round it, faint) */}
+      <sprite scale={[0.62, 0.3, 1]} position={[0, 0, 0.03]}>
+        <spriteMaterial map={GLOW} color="#36d17a" transparent opacity={0.22} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </sprite>
+    </group>
+  )
+}
+useGLTF.preload(EXIT_URL)
 
 const SWITCH_URL = import.meta.env.BASE_URL + 'models/lightswitch.glb'
 /**
