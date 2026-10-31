@@ -119,6 +119,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 ## 3D 模型
 
+- **減面（不影響畫面）**：`blender/optimize_glb.py -- <輸入.glb> <輸出.glb> '{"名稱正規式": 保留比例}'`：先合併同平面的面（看不出差別），再把超過 1500 面的零件減到比例（最少留 600 面），保留 UV 與材質邊界；貼圖以品質 95 重存。**每個減過的模型都要近拍前後對照**，看得出差別就不用。目前用過：`kamidana.glb`（6.7 萬 → 3.2 萬）、`freezer.glb`（1.45 萬 → 5.7 千）、`speaker.glb`（2.07 萬 → 1.41 萬），規則都是 `{".*": 0.35}`；**重新跑這三個的產生腳本後要再跑一次減面**。試過但退回的：菰樽（繩子變扁、桶身出現接縫）、武士頭盔（筋紋變淡）、招財樹與元寶（看不出省多少，留原樣）。
 - 模型由 `blender/*.py`（Blender 5.2）產生，輸出到 `public/models/*.glb`；手機版用 `blender/make_lite.py` 產生 `*-lite.glb`。兩個版本都要更新。
 - 執行：`"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup --python blender/grilledfish.py -- <專案路徑>`
 - 下載來的模型（魚、冰箱、招財貓）貼圖用 `blender/shrink_textures.py -- <檔案.glb>…` 縮到 1024 px 並轉 JPEG（只換圖，網格不動）；新加入的外部模型也要跑一次。
