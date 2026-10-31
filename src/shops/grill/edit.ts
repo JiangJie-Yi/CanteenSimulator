@@ -134,6 +134,8 @@ export const BASES: Record<string, V3> = {
   lantern: [-0.478, 0, 0.4497],
   // (the dish rack: moved by [-0.871, 0, -2.135] in the room's frame, taken into this parent's units; its 1.03 size is Decor's)
   platerack: [-1.2158, 0, 1.9593],
+  // (the second of the two low racks: where the first is set, beside it)
+  platerack2: [-1.2158, 0, 1.9593],
   // (the till's things, where the owner set them in the edit panel (the room's frame: register X 0.025 Z 0.28, tablet Z -0.641, pens X 0.159
   // Z 0.512, printer X 0.03, bell X 0.286, cat X 0.06 Z -0.014), taken into each one's parent's own units; the tablet, pens, printer and
   // card reader raised 0.15 onto the hinoki stand)

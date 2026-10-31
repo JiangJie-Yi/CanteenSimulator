@@ -256,6 +256,10 @@ export const DRINK_PANEL = { open: false }
 const drinkPanelSubs = new Set<() => void>()
 export function setDrinkPanel(open: boolean) { if (DRINK_PANEL.open === open) return; DRINK_PANEL.open = open; drinkPanelSubs.forEach((f) => f()) }
 export const onDrinkPanel = (f: () => void) => { drinkPanelSubs.add(f); return () => { drinkPanelSubs.delete(f) } }
+/** the ingredients' freezer clicked open (Decor): App takes the camera to the grill and opens the pantry's panel there, while the shop's shut */
+const pantryAsks = new Set<() => void>()
+export function askPantry() { pantryAsks.forEach((f) => f()) }
+export const onPantryAsk = (f: () => void) => { pantryAsks.add(f); return () => { pantryAsks.delete(f) } }
 /** a customer takes a drink: the last place holding one of that kind is emptied (any kind at all if it's run out) */
 export function takeDrink(id: DrinkId) {
   const home = fridgeUnitOf(id)

@@ -12,7 +12,7 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ALONG, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver } from './bar'
+import { ALONG, askPantry, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver } from './bar'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
@@ -594,8 +594,9 @@ function IngredientFridge() {
   const W = 1.5, H = 0.86, HOUSE = 0.34
   return (
     <group>
-      <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; FREEZER.open = !FREEZER.open; setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開' }) }}
-        onPointerOver={(e) => { e.stopPropagation(); glowOnly(e.eventObject); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開看看' }) }}
+      {/* (clicked open, the pantry's panel comes up with it, at the grill (App: askPantry)) */}
+      <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; FREEZER.open = !FREEZER.open; if (FREEZER.open) askPantry(); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開' }) }}
+        onPointerOver={(e) => { e.stopPropagation(); glowOnly(e.eventObject); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開食材櫃' }) }}
         onPointerOut={(e) => { glowLeave(e.eventObject); setTip(null) }}>
         <primitive object={model} />
       </group>
@@ -658,19 +659,27 @@ function IngredientFridge() {
   )
 }
 /** where it stands on the kitchen floor (along the first counter, across it): lying along the back wall, just to the cooks' side of the staff door, its back to the wall */
-const FRIDGE_AT = { along: 3.4, lay: 5.05 }
+const FRIDGE_AT = { along: 3.75, lay: 5.05 }
 function FridgeAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, FRIDGE_AT.along).addScaledVector(LAY, FRIDGE_AT.lay)
   // (its front, local +z, toward the room, and its length along the wall: local x runs along the first counter)
   return <Movable id="freezer" label="冷藏櫃" baseScale={1.6} ground={floor}><group name="look-freezer" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><IngredientFridge /></group></Movable>
 }
-// (set clear of the freezer by it, now the rack is wide)
-const RACK_AT = { along: 1.12, lay: 5.05 }
+// (two low racks side by side where the one tall cabinet stood, each half its width: their middles this far either side of where its was)
+const RACK_AT = { along: 1.12, lay: 5.05, apart: 0.62 }
 function RackAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
-  const p = new THREE.Vector3().addScaledVector(ALONG, RACK_AT.along).addScaledVector(LAY, RACK_AT.lay)
-  return <Movable id="platerack" label="碗盤櫃架" baseScale={1.12} ground={floor}><group name="look-back" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack /></group></Movable>
+  const at = (k: number) => new THREE.Vector3().addScaledVector(ALONG, RACK_AT.along + k * RACK_AT.apart).addScaledVector(LAY, RACK_AT.lay)
+  const p = at(-1), q = at(1)
+  return (
+    <>
+      {/* (what the back room's view looks at: between the two, facing out with them) */}
+      <group name="look-back" position={[(p.x + q.x) / 2, floor, (p.z + q.z) / 2]} rotation-y={Math.atan2(-LAY.x, -LAY.z)} />
+      <Movable id="platerack" label="碗盤架 1" baseScale={1.12} ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack part={0} /></group></Movable>
+      <Movable id="platerack2" label="碗盤架 2" baseScale={1.12} ground={floor}><group position={[q.x, floor, q.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack part={1} /></group></Movable>
+    </>
+  )
 }
 const KNIVES_URL = import.meta.env.BASE_URL + 'models/knives.glb'
 /** the cook's knives on their folded cloth (blender/knives.py), laid along the table behind the hearth */

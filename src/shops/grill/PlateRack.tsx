@@ -1,6 +1,7 @@
-// The dish rack (碗盤櫃架): a wooden stand against the kitchen's wall with the customers' plates on it, standing on their edges along the
-// shelves, and in piles on the top one, the whole of it standing on a low cupboard (blender/platecabinet.py: two drawers, two sliding
-// doors). Each plate has one of the designs of wareDesigns.ts; every design is drawn as one instanced mesh.
+// The dish racks (碗盤架): two low wooden stands side by side against the kitchen's wall with the customers' plates on them, standing on
+// their edges in the slots along the lower shelf and in piles on the upper, each on a low cupboard of its own (blender/platecabinet.py: two
+// drawers, two sliding doors); low enough that the kitchen's seen over them (the one tall cabinet stood in the way of the view). Each plate has
+// one of the designs of wareDesigns.ts; every design is drawn as one instanced mesh.
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
@@ -12,10 +13,12 @@ import { wareGeometry } from './ware'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { DESIGN_COUNT, wareDesign } from './wareDesigns'
 
-// (a big one: wide and tall, four shelves, to hold a busy night's plates and bowls)
-const W = 1.9, H = 2.15, D = 0.44
+// (each of the two: a metre across, two shelves, its 25 plates; low)
+const W = 0.95, H = 0.86, D = 0.44
 /** the cupboard it stands on (blender/platecabinet.py), its height: the rack's shelves start on its top */
-const CAB = 0.7
+const CAB = 0.56
+/** how many plates each rack holds: the shop's (game/plates RACK_FULL) are shared between the two */
+export const PER_RACK = 25
 const CABINET_URL = import.meta.env.BASE_URL + 'models/platecabinet.glb'
 /** the cupboard under the rack, in the room's toon light, its wood merged with the rack's */
 function CabinetBase() {
@@ -39,7 +42,7 @@ function CabinetBase() {
 }
 useGLTF.preload(CABINET_URL)
 const PLATE_R = 0.17
-const SHELVES = [0.12, 0.6, 1.0, 1.5]
+const SHELVES = [0.1, 0.5]
 const WOOD = '#a9774a'
 const WOOD_DARK = '#7d5430'
 
@@ -56,74 +59,24 @@ function plateProfile(R: number): [number, number][] {
   return pts.map(([x, y]) => [x * R, y * R])
 }
 const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R)
-/** a rice bowl's section (茶碗) in its radius: a small foot ring, the body rounding up from it to the rim, a fine lip, the inside following */
-function bowlProfile(R: number): [number, number][] {
-  const pts: [number, number][] = [[0, 0.1], [0.3, 0.1], [0.32, 0.02], [0.35, 0], [0.42, 0], [0.44, 0.08]]
-  for (let k = 1; k <= 6; k++) { const t = k / 6; pts.push([0.44 + 0.56 * Math.sin((t * Math.PI) / 2), 0.1 + 0.85 * (1 - Math.cos((t * Math.PI) / 2))]) }
-  pts.push([0.99, 0.965], [0.96, 0.965])
-  for (let k = 6; k >= 1; k--) { const t = k / 6; pts.push([0.4 + 0.56 * Math.sin((t * Math.PI) / 2), 0.17 + 0.78 * (1 - Math.cos((t * Math.PI) / 2))]) }
-  pts.push([0, 0.17])
-  return pts.map(([x, y]) => [x * R, y * R])
-}
-
 type Spot = { m: THREE.Matrix4; design: number }
 
 /** how far each plate in a pile stands above the one under it: they nest, foot in the one below's well (the plate's well sits 0.04 R up,
  * its foot 0.02 R into the one below) */
 const NEST = 0.045 * PLATE_R
 /** the slots on the lowest shelf: how far apart the plates stand in them, and how many */
-const SLOT = 0.075, SLOTS = 22
+const SLOT = 0.075, SLOTS = 11
 const slotX = (k: number) => -((SLOTS - 1) * SLOT) / 2 + k * SLOT
 /** where the four show plates stand on the third shelf, and the four piles on the top one */
-const SHOW_X = [-0.66, -0.22, 0.22, 0.66]
+const PILE_X = [-0.22, 0.22]
 /** the bowls on the second shelf: piles turned over, as bowls are put away */
-const BOWL_R = 0.1
-const BOWL_X = [-0.72, -0.36, 0, 0.36, 0.72]
-const BOWL_GEO = (() => {
-  const g = wareGeometry(bowlProfile(BOWL_R), BOWL_R)
-  // (its picture wrapped round it, as a bowl's is painted: u round the bowl, v up from the foot to the rim)
-  const pos = g.attributes.position, uv = g.attributes.uv
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
-    uv.setXY(i, Math.atan2(z, x) / (2 * Math.PI) + 0.5, y / (0.965 * BOWL_R))
-  }
-  uv.needsUpdate = true
-  return g
-})()
-const bowlArt = new Map<number, THREE.Texture | null>()
-/** a bowl's own picture from a plate's design: a square of the design's middle repeated four times round, a cobalt line at the rim and a
- * band above the foot, the glaze's white between */
-function bowlDesign(n: number) {
-  const i = ((n % DESIGN_COUNT) + DESIGN_COUNT) % DESIGN_COUNT
-  if (bowlArt.has(i)) return bowlArt.get(i)!
-  const src = wareDesign(i)?.image as HTMLCanvasElement | undefined
-  if (!src || typeof document === 'undefined') { bowlArt.set(i, null); return null }
-  const c = document.createElement('canvas')
-  c.width = 1024; c.height = 256
-  const g = c.getContext('2d')!
-  g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, 1024, 256)
-  const S = src.width, cut = S * 0.36
-  for (let k = 0; k < 4; k++) g.drawImage(src, S / 2 - cut / 2, S / 2 - cut / 2, cut, cut, k * 256, 40, 256, 176)
-  // (the foot: bare clay under a cobalt band; the rim's fine double line, the lip itself a warm brown as the plates')
-  g.fillStyle = '#c9b89a'; g.fillRect(0, 0, 1024, 26)
-  g.fillStyle = '#1f3a7a'; g.fillRect(0, 26, 1024, 14)
-  g.fillStyle = '#1f3a7a'; g.fillRect(0, 222, 1024, 6); g.fillRect(0, 234, 1024, 3)
-  g.fillStyle = '#6a4a2e'; g.fillRect(0, 248, 1024, 8)
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = THREE.RepeatWrapping
-  t.anisotropy = 4
-  bowlArt.set(i, t)
-  return t
-}
-
 /** every plate on the rack: where it is, and which design. Set as they'd really stand, none through another: on the lowest shelf each stands
  * on its edge in its slot between the dowels, its face to the side, leaning back a touch; on the middle one three show their faces, leaning
  * against the back rail, well apart; on the top, three piles, each plate nested in the one under it, a little off true */
-function platesOf() {
+function platesOf(part: number) {
   const out: Spot[] = []
   const q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1)
-  let n = 0
+  let n = part * 3
   const shelfTop = (y: number) => y + 0.0175
   // (in the slots: turned on edge, face to the side (about z), leaning 8° toward the next; resting on its rim)
   const lean = 0.14
@@ -133,50 +86,18 @@ function platesOf() {
     p.set(slotX(k), shelfTop(SHELVES[0]) + PLATE_R * Math.cos(lean) + 0.002, 0)
     out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: n++ })
   }
-  // (on show: face front, leaning back against the rail behind, its foot in the groove in front)
-  const back = 0.2
-  for (const [k, x] of SHOW_X.entries()) {
-    e.set(Math.PI / 2 - back, 0, 0)
-    q.setFromEuler(e)
-    p.set(x, shelfTop(SHELVES[2]) + PLATE_R * Math.cos(back) + 0.004, -0.02)
-    out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 2 })
-  }
-  // (the piles: nested, each turned and set a hair off the one under it)
-  for (const [k, x] of SHOW_X.entries()) {
-    for (let j = 0; j < 6; j++) {
-      e.set(0, k * 1.3 + j * 0.7, 0)
+  // (the piles on the upper shelf: nested, each turned and set a hair off the one under it)
+  for (const [k, x] of PILE_X.entries()) {
+    for (let j = 0; j < 7; j++) {
+      e.set(0, k * 1.3 + j * 0.7 + part, 0)
       q.setFromEuler(e)
-      p.set(x + Math.sin(j * 2.1 + k) * 0.004, shelfTop(SHELVES[3]) + j * NEST, Math.cos(j * 1.7 + k) * 0.004)
-      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 1 })
+      p.set(x + Math.sin(j * 2.1 + k) * 0.004, shelfTop(SHELVES[1]) + j * NEST, Math.cos(j * 1.7 + k) * 0.004)
+      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 1 + part * 2 })
     }
   }
   return out
 }
 
-/** the bowls' piles: each turned over, its foot up, nested in the one under it, a little off true */
-function bowlsOf() {
-  const out: Spot[] = []
-  const q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1)
-  for (const [k, x] of BOWL_X.entries()) {
-    const n = 3 + ((k * 2) % 3)
-    for (let j = 0; j < n; j++) {
-      e.set(Math.PI, k * 0.9 + j * 0.6, 0)
-      q.setFromEuler(e)
-      // (turned over its rim rests on the shelf: its height above it, then each one up by the nest)
-      p.set(x + Math.sin(j * 1.9 + k) * 0.003, SHELVES[1] + 0.0175 + 0.965 * BOWL_R + j * 0.17 * BOWL_R, Math.cos(j * 1.3 + k) * 0.003 - 0.03)
-      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k })
-    }
-  }
-  return out
-}
-function Bowls() {
-  const byDesign = useMemo(() => {
-    const out: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
-    for (const sp of bowlsOf()) out[sp.design % DESIGN_COUNT].push(sp.m)
-    return out
-  }, [])
-  return <>{byDesign.map((list, i) => <Plates key={`bowl${i}`} design={i} list={list} geo={BOWL_GEO} ink={false} map={bowlDesign(i)} />)}</>
-}
 function Plates({ design, list, geo = GEO, ink: inked = true, map }: { design: number; list: Matrix4List; geo?: THREE.BufferGeometry; ink?: boolean; map?: THREE.Texture | null }) {
   const ref = useRef<THREE.InstancedMesh>(null)
   const ink = useRef<THREE.InstancedMesh>(null)
@@ -226,20 +147,19 @@ let woods: { light: THREE.Texture; dark: THREE.Texture; back: THREE.Texture } | 
 const TILED = new Map<string, THREE.Texture>()
 const woodsOf = () => (woods ??= { light: grain(WOOD, '#6a4426'), dark: grain(WOOD_DARK, '#4a2e16'), back: grain('#8b5e38', '#5a3a1e') })
 
-/** the stand and its plates, origin at the middle of its foot, its front toward +z. The plates on it are the shop's supply (game/plates):
- * as many show as are on it (the piles on top go first), and clicked, a stack's worth is carried over to the pass for the customers */
-export function PlateRack() {
-  const all = useMemo(() => {
-    // (the standing ones first, the piles on top last: the piles are taken first)
-    return platesOf()
-  }, [])
+/** one of the two racks (`part` 0 or 1) and its plates, origin at the middle of its foot, its front toward +z. The plates on them are the
+ * shop's supply (game/plates): the first rack shows the first 25 of what's there, the second the rest (so the second empties first; on each
+ * the piles on top go before the standing ones); clicked, either sends a stack's worth over to the pass for the customers */
+export function PlateRack({ part = 0 }: { part?: number }) {
+  const all = useMemo(() => platesOf(part), [part])
   const [count, setCount] = useState(PLATE_RACK.n)
   useFrame(() => { if (PLATE_RACK.n !== count) setCount(PLATE_RACK.n) })
   const byDesign = useMemo(() => {
     const out: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
-    for (const sp of all.slice(0, Math.max(0, Math.min(all.length, count)))) out[sp.design % DESIGN_COUNT].push(sp.m)
+    const mine = Math.max(0, Math.min(PER_RACK, count - part * PER_RACK))
+    for (const sp of all.slice(0, mine)) out[sp.design % DESIGN_COUNT].push(sp.m)
     return out
-  }, [all, count])
+  }, [all, count, part])
   const w = woodsOf()
   const wood = (tex: THREE.Texture, rx: number, ry: number) => {
     // (each tiling made once and kept)
@@ -251,7 +171,7 @@ export function PlateRack() {
   const post = (x: number, z: number) => (
     <mesh key={`${x}${z}`} position={[x, H / 2, z]} rotation-z={Math.PI / 2} castShadow><boxGeometry args={[H, 0.06, 0.06]} /><meshToonMaterial map={wood(w.dark, 2, 0.3)} /></mesh>
   )
-  const tip = tipOver('碗盤櫃', `點一下拿一疊盤子到出餐口（櫃裡還有 ${count} 個）`)
+  const tip = tipOver('碗盤架', `點一下拿一疊盤子到出餐口（架上還有 ${count} 個）`)
   return (
     <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; PLATE_RACK.want += TAKE }} {...tip}>
       {/* (what's clicked: the whole rack and its cupboard, unseen; its wood is merged, a few draws, and takes no pointing) */}
@@ -285,22 +205,18 @@ export function PlateRack() {
         {[-1, 1].map((zs) => (
           <mesh key={`dr${zs}`} position={[0, SHELVES[0] + 0.0175 + 0.008, zs * 0.12]}><boxGeometry args={[SLOTS * SLOT + 0.02, 0.016, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
         ))}
-        {/* (the third shelf's show: a rail behind for the plates to lean on, a groove strip in front to hold their feet) */}
-        <mesh position={[0, SHELVES[2] + 0.25, -0.17]}><boxGeometry args={[W - 0.06, 0.03, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
-        <mesh position={[0, SHELVES[2] + 0.0175 + 0.008, 0.06]}><boxGeometry args={[W - 0.06, 0.016, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
         {/* (the sides: a frame with three rails across) */}
-        {[-1, 1].flatMap((sd) => [0.36, 0.8, 1.25, 1.8].map((y) => (
+        {[-1, 1].flatMap((sd) => [0.32, 0.7].map((y) => (
           <mesh key={`s${sd}${y}`} position={[sd * W / 2, y, 0]}><boxGeometry args={[0.03, 0.03, D - 0.04]} /><meshToonMaterial map={wood(w.dark, 1, 0.2)} /></mesh>
         )))}
         {/* (the back, in tongue-and-groove boards, a dark line between each) */}
-        {Array.from({ length: 12 }, (_, k) => (
-          <mesh key={`b${k}`} position={[-W / 2 + 0.08 + k * ((W - 0.16) / 11), H / 2, -D / 2 + 0.01]} rotation-z={Math.PI / 2}><boxGeometry args={[H - 0.1, 0.152, 0.015]} /><meshToonMaterial map={wood(w.back, 1.5, 0.4)} /></mesh>
+        {Array.from({ length: 6 }, (_, k) => (
+          <mesh key={`b${k}`} position={[-W / 2 + 0.08 + k * ((W - 0.16) / 5), H / 2, -D / 2 + 0.01]} rotation-z={Math.PI / 2}><boxGeometry args={[H - 0.1, 0.152, 0.015]} /><meshToonMaterial map={wood(w.back, 1, 0.4)} /></mesh>
         ))}
       </group>
       </StaticBatch>
       <group position-y={CAB}>
         {byDesign.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
-        <Bowls />
       </group>
     </group>
   )

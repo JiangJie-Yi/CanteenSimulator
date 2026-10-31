@@ -4,8 +4,8 @@ chopsticks and the cloths), each with a small brass pull; below them a pair of s
 panels flat-sawn with their figure, each with a sunk oval pull. The grain runs along every member (its own UVs), the panels' figure laid
 once over each.
 
-The game's frame: y up, its front toward +z, the middle of its foot at the origin; 1.96 wide, 0.70 tall, 0.50 deep (the rack's own size
-and a little over).
+The game's frame: y up, its front toward +z, the middle of its foot at the origin; 1.0 wide, 0.56 tall, 0.50 deep (one of the two low
+racks' own size and a little over: the shop's plates are kept on two of them side by side, low enough to see the kitchen over).
 
 Run:
     blender -b --factory-startup --python blender/platecabinet.py -- <project path> [preview.png]
@@ -26,7 +26,7 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
-CW, CH, CD = 1.96, 0.70, 0.50
+CW, CH, CD = 1.0, 0.56, 0.50
 TILE = 0.5
 
 

@@ -900,6 +900,8 @@ function RoundWindow() {
   const lat = [-0.2, 0, 0.2]
   return (
     <group name="RoundWindow">
+      {/* (what the window view (data/views) looks at: its middle, its +z turned to face into the room) */}
+      <group name="look-window" rotation-y={-Math.PI / 2} />
       {/* (by day: the sky's light glowing round it on the plaster, and slanting in) */}
       <mesh position-x={-0.075} rotation-y={-Math.PI / 2} material={WINDOW_HALO} renderOrder={2}><planeGeometry args={[R * 4.2, R * 4.2]} /></mesh>
       <mesh geometry={SUNBEAM_GEO} material={SUNBEAM} renderOrder={2} />

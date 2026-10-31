@@ -3,7 +3,7 @@
 // the whole shop's have their own framing).
 import type { Lang } from './i18n'
 
-export type ViewId = 'free' | 'grill' | 'till' | 'genkan' | 'altar' | 'drinks' | 'toilet' | 'back' | 'boss'
+export type ViewId = 'free' | 'grill' | 'till' | 'genkan' | 'altar' | 'drinks' | 'toilet' | 'back' | 'window' | 'boss'
 export type ViewSpot = {
   id: ViewId
   zh: string
@@ -40,8 +40,10 @@ export const VIEW_SPOTS: ViewSpot[] = [
     about: { zh: '飲料冷藏櫃：客人自己拿飲料', ja: '飲み物の冷蔵庫：客がセルフで取る', en: 'The drinks fridge: customers help themselves' } },
   { id: 'toilet', zh: '廁所', ja: 'お手洗い', en: 'Toilets', anchor: 'look-wc-m', back: 5.8, up: 2.3, from: [0.808, -0.589], shift: [-0.55, -0.76],
     about: { zh: '男女廁所的拉門與洗手台', ja: '男女のお手洗いの引き戸と手洗い', en: 'The toilets: sliding doors and wash basins' } },
-  { id: 'back', zh: '後台區', ja: '裏方', en: 'Back room', anchor: 'look-back', back: 3.2, up: 1.4, faceOn: true,
-    about: { zh: '後場：碗盤櫃架、飯桶與作業台', ja: '裏方：食器棚、飯びつと作業台', en: 'Behind the scenes: dish rack, rice tub, work table' } },
+  { id: 'back', zh: '後台區', ja: '裏方', en: 'Back room', anchor: 'look-back', back: 4.4, up: 1.5, faceOn: true,
+    about: { zh: '後場：碗盤架、飯桶與作業台', ja: '裏方：食器ラック、飯びつと作業台', en: 'Behind the scenes: dish racks, rice tub, work table' } },
+  { id: 'window', zh: '窗口', ja: '丸窓', en: 'Window', anchor: 'look-window', back: 4.6, up: 0.6, faceOn: true,
+    about: { zh: '牆上的圓窗：白天是竹影，夜晚有月光與飄浮的塵埃', ja: '丸窓：昼は竹の影、夜は月明かりと舞う塵', en: 'The round window: bamboo shadows by day, moonlight and drifting dust by night' } },
   { id: 'boss', zh: '老闆', ja: '店主', en: 'Owner', anchor: 'BossFollow', follow: true,
     about: { zh: '老闆的第一人稱廣角視角（閉店時）', ja: '店主の目線、広角（閉店中）', en: "The owner's own eyes, wide (while closed)" } },
 ]

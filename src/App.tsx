@@ -36,7 +36,7 @@ import { setStudioLight } from '@/scene/studio'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
-import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
+import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
 import { offsetOf, positionOf, rotationOf, setEditLang, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { cameraOneOf } from '@/scene/camera1'
@@ -522,8 +522,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   const dim = roomDim(lights.on, theme === 'dark')
   // (the polished metal's reflections as bright as the room: no gold or brass shining in the dark)
   useEffect(() => setStudioLight(studioLight(lights.on, theme === 'dark')), [lights.on, theme])
-  // (by night the key light is the moon's, in through the round window: its shadows fall away from the window; by day the sun's, over the
-  // open side as ever)
+  // (the key light, the sun's by day and the moon's by night, in through the round window: its shadows fall away from the window, the same way
+  // by day as by night)
   const keyLight = useRef<THREE.DirectionalLight>(null)
   const scene3 = useThree((s) => s.scene)
   const moonAt = useRef(0)
@@ -534,7 +534,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     // (how dark its shadows fall: by night with the room's lamps on they fill the shadows in, faint and soft; with them off the moon's are plain;
     // by day the sun's as ever)
     k.shadow.intensity = theme === 'dark' ? (lights.on ? 0.28 : 0.75) : 1
-    const w = theme === 'dark' ? scene3.getObjectByName('RoundWindow') : undefined
+    // (by day the sun's in through the same window: the shadows fall the same way by day as by night)
+    const w = scene3.getObjectByName('RoundWindow')
     if (!w) {
       k.position.set(9, 16, 7)
       return
@@ -1016,6 +1017,15 @@ export default function App() {
   const hudRows = (showFire ? 1 : 0) + (showFull ? 1 : 0)
   // (the ingredients' panel, opened and shut by the fridge button, while researching)
   const [fridgeOpen, setFridgeOpen] = useState(false)
+  // (the freezer clicked open in the room: while the shop's shut, to the grill with the pantry's panel open)
+  const openRef = useRef(false)
+  openRef.current = ai
+  useEffect(() => onPantryAsk(() => {
+    if (openRef.current) return
+    setView('grill')
+    setResetView((n) => n + 1)
+    setFridgeOpen(true)
+  }), [])
   // (the panels docked at the right, the pantry, the office and the drinks' stock, open one at a time: opening one shuts the others)
   const drinksOpen = useSyncExternalStore(onDrinkPanel, () => DRINK_PANEL.open)
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
