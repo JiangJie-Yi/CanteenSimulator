@@ -1071,6 +1071,11 @@ export default function App() {
     window.setTimeout(() => setBlessed(false), INCENSE_MS)
     say(tl(lang, '供了一杯清酒（花費 NT$1,000）：這三分鐘客人會變多，也點得比較多', 'お神酒をお供えしました（NT$1,000）：三分間、お客さんが増えて、よく注文してくれます', 'Sake offered (NT$1,000): for three minutes more customers come, and order more'))
   }
+  // (the altar's offering as the room is given it: the same object until it's lit again, its handler always the latest (it reads the cash),
+  // so the wall it hangs on isn't drawn again with every redraw of the app)
+  const lightRef = useRef(lightIncense)
+  lightRef.current = lightIncense
+  const incenseProp = useMemo(() => ({ litAt: incenseAt, onLight: () => lightRef.current() }), [incenseAt])
   const space: 'closed' | 'open' = ai ? 'open' : 'closed'
   // (opening is the start of a new day)
   useEffect(() => {
@@ -2096,7 +2101,7 @@ export default function App() {
             onEat={onEat} onNotice={sceneNotice}
             resetView={resetView} pins={viewMenu} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1); setViewMenu(false) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
-            incense={{ litAt: incenseAt, onLight: lightIncense }} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
+            incense={incenseProp} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests}
             phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />

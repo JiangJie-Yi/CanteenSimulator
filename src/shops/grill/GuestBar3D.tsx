@@ -1442,6 +1442,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const seats = useMemo(() => seatsOf(counters), [counters])
   const wcs = useMemo(() => (given ? toiletsOf(counters) : null), [counters, given])
   const fridges = useMemo(() => (given ? fridgesOf(counters) : null), [counters, given])
+  // (the stretches of the side wall kept clear for the fridges: one array, so the wall (memo'd) isn't drawn again with every redraw here)
+  const fridgeClear = useMemo(() => (fridges ? fridges.map((f) => [f.z - FRIDGE.W / 2 - 0.1, f.z + FRIDGE.W / 2 + 0.1] as [number, number]) : undefined), [fridges])
   /** a couple sat side by side turn to talk: the one at the next stool along is on the left (+1), the one before on
    * the right (-1); 0 while the other isn't sat there yet (or has gone) */
   const talkSide = (s: Shown) => {
@@ -2143,7 +2145,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
             {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lamps={2} top={top} door={wcs?.door ?? (meet + corner) / 2}
-              clear={fridges ? fridges.map((f) => [f.z - FRIDGE.W / 2 - 0.1, f.z + FRIDGE.W / 2 + 0.1] as [number, number]) : undefined} />}
+              clear={fridgeClear} />}
           </group>
         )
       })}
