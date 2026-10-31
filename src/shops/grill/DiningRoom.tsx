@@ -9,7 +9,6 @@ import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
-import { QUALITY } from '@/scene/quality'
 import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
@@ -832,17 +831,52 @@ const DAYLIGHT = (() => {
   beam.width = 64; beam.height = 256
   const b = beam.getContext('2d')!
   for (let y = 0; y < 256; y++) {
-    const row = b.createLinearGradient(0, 0, 64, 0), k = Math.pow(1 - y / 255, 1.7)
+    // (fading in over its first stretch from the window too: the sheets' start at the frame showed as a hard edge)
+    const t = y / 255, k = Math.pow(1 - t, 1.7) * Math.min(1, t / 0.2) ** 1.5
+    const row = b.createLinearGradient(0, 0, 64, 0)
     row.addColorStop(0, 'rgba(255,255,255,0)'); row.addColorStop(0.5, `rgba(255,255,255,${k})`); row.addColorStop(1, 'rgba(255,255,255,0)')
     b.fillStyle = row; b.fillRect(0, y, 64, 1)
   }
   return { halo: tex(halo), beam: tex(beam) }
 })()
+// (only by night: the moon's faint blue glow round the window and its shaft slanting in, dust drifting in it (WindowDust); by day none)
 const WINDOW_HALO = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.halo, color: '#8fc4ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false }), 0.8, 0.2, false)
-// (by night the moon's: fainter, and it's what lights the room with the lamps out, the shadows falling away from the window (App's key light))
+  toneMapped: false }), 0, 0.22, false)
 const SUNBEAM = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, color: '#78b2ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false, side: THREE.DoubleSide }), 0.55, 0.16, false)
+  toneMapped: false, side: THREE.DoubleSide }), 0, 0.15, false)
+/** the dust in the moon's shaft by night: specks drifting slowly down it and about, catching its light (in the window's frame, as the shaft) */
+const DUST_N = 46
+function WindowDust() {
+  const pts = useRef<THREE.Points>(null)
+  const { geo, seeds } = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(DUST_N * 3), 3))
+    return { geo: g, seeds: Array.from({ length: DUST_N }, () => [Math.random(), Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 6.28, 0.6 + Math.random() * 0.8]) }
+  }, [])
+  const mat = useMemo(() => new THREE.PointsMaterial({ color: '#cfe4ff', size: 0.018, sizeAttenuation: true, transparent: true, opacity: 0.55, depthWrite: false,
+    blending: THREE.AdditiveBlending, toneMapped: false }), [])
+  useFrame(({ clock }) => {
+    const o = pts.current
+    if (!o) return
+    o.visible = isNight()
+    if (!o.visible) return
+    const t = clock.elapsedTime, a = geo.attributes.position as THREE.BufferAttribute
+    const tilt = 0.62, R = 0.4
+    for (let i = 0; i < DUST_N; i++) {
+      const [u0, sx, sz, ph, sp] = seeds[i]
+      // (along the shaft, slowly on down it and round again; across it, a lazy wander)
+      const u = (u0 + t * 0.012 * sp) % 1, L = 0.2 + u * 1.9
+      const w = R * (0.7 + u * 0.4)
+      const x = -0.07 - Math.cos(tilt) * L + Math.sin(tilt) * sx * w * 0.6 + Math.sin(t * 0.3 * sp + ph) * 0.03
+      const y = -Math.sin(tilt) * L - Math.cos(tilt) * sx * w * 0.6 + Math.cos(t * 0.23 * sp + ph) * 0.03
+      a.setXYZ(i, x, y, sz * w * 0.8 + Math.sin(t * 0.17 + ph) * 0.04)
+    }
+    a.needsUpdate = true
+    // (each speck fading in and out of the light: the whole lot's opacity breathing a little)
+    mat.opacity = 0.42 + Math.sin(t * 0.5) * 0.08
+  })
+  return <points ref={pts} geometry={geo} material={mat} frustumCulled={false} renderOrder={3} />
+}
 /** the shaft's two crossed sheets, in the window's frame (the room toward -x): from the window's face, slanting down and in */
 const SUNBEAM_GEO = (() => {
   const R = 0.4, L = 2.3, tilt = 0.62
@@ -1792,6 +1826,7 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
         <meshBasicMaterial color={INK} />
       </mesh>
       {/* (a paper lantern: the oval of ribbed washi, a pale wooden ring at each end, a little ring at the top for the cord) */}
+      {/* (a lamp casts no shadow: the moon threw the lit lanterns' onto the floor, well away under them) */}
       <group position-y={-drop - 0.13}>
         <mesh geometry={LANTERN_GEO} material={LANTERN_SHADE} />
         <mesh geometry={LANTERN_GEO} scale={1.035}>
@@ -1944,7 +1979,10 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
             <group position={[0, a.round ? 1.4 : a.scroll ? 1.42 : 1.5, a.z]}>
               {a.kanban !== undefined ? <Kanban i={a.kanban} /> : a.round ? <RoundWindow /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
             </group>
-          </StaticBatch></Movable>
+          </StaticBatch>
+          {/* (the moon's dust in its shaft by night, outside the batch: it drifts, and a batch's pieces stand still) */}
+          {a.round && <group position={[0, 1.4, a.z]}><WindowDust /></group>}
+          </Movable>
         ))}
         {/* (the light switch by the door, at hand height near the wall's end) */}
         {altar && <Movable id="lightswitch" label="電燈開關"><group position={[-0.002, 1.12, to - 0.16]}><LightSwitch /></group></Movable>}
@@ -2486,9 +2524,6 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
   return (
     <group>
       <primitive object={body} />
-      {/* (the fridges' own light inside, always on: it lights the drinks whatever the room's light, and shows the more with the lamps out; one
-          light for the pair, between them (the second stands along its -x), so the scene carries one light more, not two) */}
-      {QUALITY.tier === 'high' && n === 0 && <pointLight position={[-(W + 0.08) / 2, H * 0.55, D * 0.1]} color="#eaf4ff" intensity={1.1} distance={H * 1.25} decay={1.4} />}
       {/* the cove lights (槽燈): a narrow slot let into each inner side, a thin line of white light deep in it, and
           the light washing softly along the wall, shelf and drinks beside it (up each side only) */}
       {[-1, 1].map((sd) => (
@@ -3344,7 +3379,9 @@ function BackStockHit({ size = [0.42, 0.62, 0.34] }: { size?: [number, number, n
   )
 }
 /** how far along from the crates the cartons stand (the crates' own frame) */
-const CARTONS_X = -0.56
+/** where the cartons stand by the crates (the crates' own frame): turned end on, close beside them and running out from the wall, so they
+ * keep to the floor (laid along the wall they ran on past the wall's end and the floor's edge) */
+const CARTONS_AT: [number, number, number] = [-0.36, 0, 0.17]
 function BottleCrates() {
   const W = 0.36, D = 0.29, H = 0.2
   const cols = 5, rows = 4
@@ -3617,13 +3654,13 @@ function ShopPropsImpl({ counters, lang = 'zh' }: { counters: Counter[]; lang?: 
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <BottleCrates />
           {/* (and beside them the cartons of canned drinks) */}
-          <group position={[CARTONS_X, 0, 0.03]} rotation-y={0.05}><DrinkCartons /></group>
+          <group position={CARTONS_AT} rotation-y={Math.PI / 2 + 0.04}><DrinkCartons /></group>
         </group>
       </StaticBatch>
         {/* (the back stock: pointed at, what's running low; a click opens the drinks' stock) */}
-        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
+        <group name="look-crates" position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <BackStockHit />
-          <group position={[CARTONS_X, 0, 0.03]}><BackStockHit size={[0.66, 0.46, 0.24]} /></group>
+          <group position={CARTONS_AT} rotation-y={Math.PI / 2}><BackStockHit size={[0.66, 0.46, 0.24]} /></group>
         </group>
       </Movable>}
     </>

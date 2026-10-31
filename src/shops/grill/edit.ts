@@ -120,7 +120,8 @@ export const BASES: Record<string, V3> = {
   gate0: [0, 0, 0.17],
   // (the owner's settled spot: moved by [0.2, 0.19, 0.47] in the room's frame from [-1.508, 0, 1.974], taken into this parent's own units)
   // (moved on by [0, 0, 0.341] in the room's frame, taken into this parent's units)
-  freezer: [-0.9694, 0.19, 1.3355],
+  // (no lift: sized about its foot it stands on the dais (Movable's ground); the 0.19 made up for its sinking when it was sized about its middle)
+  freezer: [-0.9694, 0, 1.3355],
   // (moved on by X 0.215 in the room's frame, taken into this parent's units)
   willow: [0.2534, 0, 0.0272],
   // (the speaker set at X -0.285 Y 0.518 Z 0.169, the red lantern raised 0.25, in the room's frame)

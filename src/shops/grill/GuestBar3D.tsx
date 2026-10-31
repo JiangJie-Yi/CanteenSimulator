@@ -4,6 +4,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { FloorPiece } from '@/scene/FloorPiece'
+import { QUALITY } from '@/scene/quality'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
@@ -977,13 +978,14 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   /** how far down the genkan's stone lies */
   step: number; drop: number }) {
   const top = -drop - 0.003
-  // (each piece of the base is cut exactly to the room's own outline: the floor's pieces and the genkan's corner, no more)
+  // (each piece of the base is cut exactly to the room's own outline: the floor's pieces and the genkan's corner, no more; its sides take no
+  // shadow: what stands by the floor's edge threw its shadow out onto the plinth's face, hanging there below the floor)
   const layers = (al: [number, number], ly: [number, number], key: string) => {
     const cx = -(ly[0] + ly[1]) / 2, cz = (al[0] + al[1]) / 2
     const W = ly[1] - ly[0], L = al[1] - al[0]
     // (its rim board, its dark body in boards laid the long way, its toe board: each in timber, the grain running along it)
     return [[top, 0.06], [top - 0.06, 0.22], [top - 0.28, 0.05]].map(([y0, h], i) => (
-      <mesh key={`${key}${i}`} position={[cx, (y0 as number) - (h as number) / 2, cz]} receiveShadow geometry={timberBox(W, h as number, L)}
+      <mesh key={`${key}${i}`} position={[cx, (y0 as number) - (h as number) / 2, cz]} geometry={timberBox(W, h as number, L)}
         material={BASE_TIMBER[i]} />
     ))
   }
@@ -1186,7 +1188,7 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
     <FloorPiece key={`${k}${i}`} w={l[1] - l[0]} l={a[1] - a[0]} position={[-(l[0] + l[1]) / 2, 0.004, (a[0] + a[1]) / 2]} />
   ))
   return (
-    <group position={c.at} rotation-y={Math.atan2(c.along.x, c.along.z)}>
+    <group name="room-floor" position={c.at} rotation-y={Math.atan2(c.along.x, c.along.z)}>
       {piece([a0, g0], [l0, l1], 'a')}
       {piece([g0, a1], [gl, l1], 'b')}
       <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={baseDrop} />
@@ -1200,7 +1202,7 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
       {[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => (drop > 0 ? minus(al as [number, number], ly as [number, number], kitchen)
         : [[al, ly] as [[number, number], [number, number]]]).map(([a, l], i) => (
         // (its sides, showing as the step down into the kitchen, in the base's dark timber boards)
-        <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, 0.001 - (baseDrop + 0.004) / 2, (a[0] + a[1]) / 2]} receiveShadow
+        <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, 0.001 - (baseDrop + 0.004) / 2, (a[0] + a[1]) / 2]}
           geometry={timberBox(l[1] - l[0], baseDrop + 0.004, a[1] - a[0])} material={BASE_TIMBER[1]} />
       )))}
       {drop > 0 ? <KitchenPit counters={counters} drop={drop} /> : <KitchenDais counters={counters} rise={-drop} />}
@@ -2142,6 +2144,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           )
         })
       })()}
+      {/* (the fridges' own light inside, always on: it lights the drinks whatever the room's light, and shows the more with the lamps out; one
+          for the pair, between them, and here from the first, not with the fridges as they come in later: a light added to the scene has every
+          material in it made again, a stall) */}
+      {fridges && QUALITY.tier === 'high' && (
+        <pointLight position={fridges[0].at.clone().lerp(fridges[1].at, 0.5).setY(FRIDGE.H * 0.55)} color="#eaf4ff" intensity={1.1} distance={FRIDGE.H * 2.4} decay={1.4} />
+      )}
       {fridges && <Later stage={2}>{fridges.map((f) => (
         <Movable key={f.n} id={`drinkfridge${f.n}`} label={`飲料櫃 ${f.n + 1}`}><group name={f.n ? 'look-fridge-b' : 'look-fridge'} position={f.at} rotation-y={f.yaw}><DrinkFridge n={f.n} /><FridgeStock n={f.n} /><FridgeDoor n={f.n} /></group></Movable>
       ))}</Later>}

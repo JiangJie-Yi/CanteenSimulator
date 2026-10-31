@@ -496,7 +496,11 @@ export function AxisGizmo({ id, at, theta = 0, own, pivotGroup, tilt }: { id: st
 /** the Movable a piece sits inside, if any: the outliner lists it under that one */
 const ParentPiece = createContext<string | null>(null)
 
-export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 0] }: { id: string; label: string; children: ReactNode; baseScale?: number; baseTurn?: V3 }) {
+export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 0], ground }: { id: string; label: string; children: ReactNode; baseScale?: number; baseTurn?: V3
+  /** it stands on the floor, this high in its own frame: sized about the middle of its foot there, not about its own middle, so made bigger
+   * it grows up from the floor and doesn't sink into it (the dish cabinet's and the freezer's feet went down through the kitchen's dais and
+   * out past its edge) */
+  ground?: number }) {
   const g = useRef<THREE.Group>(null)
   /** the group this piece is in lays its transform here, outside the piece's own place */
   const gw = useRef<THREE.Group>(null)
@@ -510,6 +514,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   const [box, setBox] = useState<{ c: V3; s: V3; yaw: number; theta: number } | null>(null)
   // (the piece's middle, in the frame of its own group as it stands untouched: what it turns and scales about; measured once it has been drawn)
   const [mid, setMid] = useState<V3>([0, 0, 0])
+  /** the point it's turned and sized about: its middle, or (standing on the floor) the middle of its foot */
+  const footOf = (m: { c: V3; s: V3 }): V3 => (ground !== undefined ? [m.c[0], ground, m.c[2]] : m.c)
   const inner = useRef<THREE.Group>(null)
   // (the turn from the room's frame into the parent's, about the vertical; found once the piece is in place)
   const [thetaRoom, setTheta] = useState(0)
@@ -660,7 +666,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     let tries = 0
     const t = window.setInterval(() => {
       const m = measure()
-      if (m || ++tries > 80) { if (m) setMid(m.c); setInYaw(contentYaw()); setReady(true); window.clearInterval(t) }
+      if (m || ++tries > 80) { if (m) setMid(footOf(m)); setInYaw(contentYaw()); setReady(true); window.clearInterval(t) }
     }, 100)
     return () => window.clearInterval(t)
   }, [])
@@ -688,7 +694,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     }
     countIt()
     setBox(first)
-    const t = window.setTimeout(() => { const m = measure('whole'), n = measure(); if (m) { setBox(m); setFrame(id, m.theta, ownYaw); setTheta(m.theta) } if (n) setMid(n.c); countIt() }, 300)
+    const t = window.setTimeout(() => { const m = measure('whole'), n = measure(); if (m) { setBox(m); setFrame(id, m.theta, ownYaw); setTheta(m.theta) } if (n) setMid(footOf(n)); countIt() }, 300)
     return () => window.clearTimeout(t)
   }, [on])
 

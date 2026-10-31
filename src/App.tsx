@@ -531,15 +531,18 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     const k = keyLight.current
     if (!k || st.clock.elapsedTime - moonAt.current < 0.5) return
     moonAt.current = st.clock.elapsedTime
+    // (how dark its shadows fall: by night with the room's lamps on they fill the shadows in, faint and soft; with them off the moon's are plain;
+    // by day the sun's as ever)
+    k.shadow.intensity = theme === 'dark' ? (lights.on ? 0.28 : 0.75) : 1
     const w = theme === 'dark' ? scene3.getObjectByName('RoundWindow') : undefined
     if (!w) {
       k.position.set(9, 16, 7)
       return
     }
     w.updateWorldMatrix(true, false)
-    // (the window's room is toward its -x: the moon's out past its +x, high)
+    // (the window's room is toward its -x: the moon's out past its +x, high up (steep: the shadows short, close under what casts them))
     const out = new THREE.Vector3(1, 0, 0).transformDirection(w.matrixWorld).setY(0).normalize()
-    k.position.copy(out.multiplyScalar(11)).setY(14)
+    k.position.copy(out.multiplyScalar(6)).setY(18)
   })
 
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
@@ -2030,7 +2033,9 @@ export default function App() {
       {glLost && (
         <div className="crash is-inline" role="alert">
           <b>3D 畫面中斷了</b>
-          <p>手機的顯示記憶體不足，瀏覽器把 3D 畫面關掉了。可以先關掉其他分頁或 App 再重新載入。</p>
+          {/* (the browser's asked to give it back (the lost event's default prevented): most often it does in a moment, and the view comes back by
+              itself, the game going on; else a reload brings it back, the shop's money, stock and staff as they were) */}
+          <p>{phone ? '手機的顯示記憶體不足，瀏覽器把 3D 畫面關掉了。' : '顯示卡記憶體不足或驅動程式重設，瀏覽器暫停了 3D 畫面。'}正在嘗試自動恢復……若幾秒後沒有回來，可以按重新載入（錢、庫存、員工都會保留）。</p>
           <button type="button" onClick={() => window.location.replace(window.location.pathname + '?v=' + Date.now())}>重新載入</button>
         </div>
       )}
