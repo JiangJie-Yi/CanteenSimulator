@@ -674,21 +674,28 @@ export function StaffFigure({ id, role, look: who, moving = false }: { id: strin
   const r = useRigged(1000 + seed, kind, glasses, false, { look, style, show })
   const fan = useRef<THREE.Group>(null)
   const clock = useRef(0)
-  const action = moving ? 'Carry' : cook ? 'Cook' : role === 'cashier' ? 'Stand' : 'Hold'
+  // (a cook fans the fire only now and then: a spell of it, the fan in hand, then it's put down and they stand easy a while; each to their
+  // own times, so they don't all fan together)
+  const [fanning, setFanning] = useState(false)
+  const action = moving ? 'Carry' : cook && fanning ? 'Cook' : role === 'cashier' || cook ? 'Stand' : 'Hold'
   useEffect(() => {
     const a = r.actions[action]
     if (!a) return
-    a.reset().play()
+    a.reset().fadeIn(0.3).play()
     // (each a little out of step with the others)
     a.time = (seed * 0.61) % a.getClip().duration
     const f = fan.current
     if (f && r.handL) r.handL.add(f)
-    return () => { f?.removeFromParent(); a.stop() }
+    return () => { f?.removeFromParent(); a.fadeOut(0.3) }
   }, [r, action, seed])
   useFrame((_, delta) => {
     const dt = Math.min(0.1, delta)
     clock.current += dt
     r.mixer.update(dt)
+    if (cook) {
+      const f = (clock.current + seed * 3.7) % 17 < 6
+      if (f !== fanning) setFanning(f)
+    }
     const blink = (clock.current + seed * 0.9) % 3.6 < 0.12
     for (const o of r.eyes) o.visible = !blink
     for (const o of r.shut) o.visible = blink
@@ -697,7 +704,7 @@ export function StaffFigure({ id, role, look: who, moving = false }: { id: strin
     <group userData={{ staffRole: role }}>
       <primitive object={r.root} />
       {/* the uchiwa: a round paper fan on a bamboo handle, along the hand from the fist */}
-      <group ref={fan} position={[0, 0.03, 0]} visible={cook}>
+      <group ref={fan} position={[0, 0.03, 0]} visible={cook && fanning && !moving}>
         <mesh position-y={0.03}>
           <cylinderGeometry args={[0.003, 0.003, 0.07, 5]} />
           <meshToonMaterial color="#c9a46a" gradientMap={gradientMap} />
