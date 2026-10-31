@@ -1,7 +1,9 @@
 // The dish rack (碗盤櫃架): a wooden stand against the kitchen's wall with the customers' plates on it, standing on their edges along the
-// shelves, and in piles on the top one. Each plate has one of the designs of wareDesigns.ts; every design is drawn as one instanced mesh.
+// shelves, and in piles on the top one, the whole of it standing on a low cupboard (blender/platecabinet.py: two drawers, two sliding
+// doors). Each plate has one of the designs of wareDesigns.ts; every design is drawn as one instanced mesh.
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { TAKE } from '@/game/plates'
 import { PLATE_RACK, tipOver } from './bar'
@@ -12,6 +14,30 @@ import { DESIGN_COUNT, wareDesign } from './wareDesigns'
 
 // (a big one: wide and tall, four shelves, to hold a busy night's plates and bowls)
 const W = 1.9, H = 2.15, D = 0.44
+/** the cupboard it stands on (blender/platecabinet.py), its height: the rack's shelves start on its top */
+const CAB = 0.7
+const CABINET_URL = import.meta.env.BASE_URL + 'models/platecabinet.glb'
+/** the cupboard under the rack, in the room's toon light, its wood merged with the rack's */
+function CabinetBase() {
+  const gltf = useGLTF(CABINET_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    const toon = new Map<THREE.Material, THREE.Material>()
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = toon.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map }); toon.set(src, t) }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    return root
+  }, [gltf])
+  return <primitive object={obj} />
+}
+useGLTF.preload(CABINET_URL)
 const PLATE_R = 0.17
 const SHELVES = [0.12, 0.6, 1.0, 1.5]
 const WOOD = '#a9774a'
@@ -228,9 +254,12 @@ export function PlateRack() {
   const tip = tipOver('碗盤櫃', `點一下拿一疊盤子到出餐口（櫃裡還有 ${count} 個）`)
   return (
     <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; PLATE_RACK.want += TAKE }} {...tip}>
-      {/* (what's clicked: the whole rack, unseen; its wood is merged, a few draws, and takes no pointing) */}
-      <mesh position={[0, H / 2, 0]} visible={false}><boxGeometry args={[W, H, D]} /></mesh>
+      {/* (what's clicked: the whole rack and its cupboard, unseen; its wood is merged, a few draws, and takes no pointing) */}
+      <mesh position={[0, (H + CAB) / 2, 0.02]} visible={false}><boxGeometry args={[W + 0.06, H + CAB, D + 0.08]} /></mesh>
       <StaticBatch>
+      <CabinetBase />
+      {/* (the rack itself, up on the cupboard's top) */}
+      <group position-y={CAB}>
       {post(-W / 2, -D / 2)}{post(W / 2, -D / 2)}{post(-W / 2, D / 2)}{post(W / 2, D / 2)}
         {/* (the shelves, their front edges a darker lip) */}
         {SHELVES.map((y) => (
@@ -267,9 +296,12 @@ export function PlateRack() {
         {Array.from({ length: 12 }, (_, k) => (
           <mesh key={`b${k}`} position={[-W / 2 + 0.08 + k * ((W - 0.16) / 11), H / 2, -D / 2 + 0.01]} rotation-z={Math.PI / 2}><boxGeometry args={[H - 0.1, 0.152, 0.015]} /><meshToonMaterial map={wood(w.back, 1.5, 0.4)} /></mesh>
         ))}
+      </group>
       </StaticBatch>
-      {byDesign.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
-      <Bowls />
+      <group position-y={CAB}>
+        {byDesign.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
+        <Bowls />
+      </group>
     </group>
   )
 }
