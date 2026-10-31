@@ -71,7 +71,7 @@ export type Grill2DProps = {
   onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull') => void
   ai?: boolean
   research?: boolean
-  onOrder?: (id: string, guest?: number) => boolean
+  onOrder?: (id: string, guest?: number, reuse?: boolean) => boolean
   onAddCharcoal?: () => boolean
   onSay?: (who: 'chef' | 'guest', text: string) => void
   space?: 'closed' | 'open'
@@ -79,7 +79,7 @@ export type Grill2DProps = {
   names?: Record<string, string>
   onWalkOut?: (ids: string[], guest: number) => void
   entries?: { key: string; name: string; parts: { id: string; dabs: string[]; name: string }[] }[]
-  onOrderEntry?: (key: string, guest: number) => boolean
+  onOrderEntry?: (key: string, guest: number, reuse?: Record<string, number>) => boolean
   crowd?: number
   blessed?: boolean
   onDrink?: (guest: number, drink: DrinkId) => void

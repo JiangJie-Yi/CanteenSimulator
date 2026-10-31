@@ -306,7 +306,7 @@ type SceneProps = {
   ai: boolean
   /** the shop's shut and being worked by hand (研製料理) */
   research: boolean
-  onOrder: (id: string, guest?: number) => boolean
+  onOrder: (id: string, guest?: number, reuse?: boolean) => boolean
   onAddCharcoal: (sticks?: number, byHand?: boolean) => boolean
   onSay: (who: 'chef' | 'guest', text: string) => void
   /** bumped by the 視角 button: glide back to the home view */
@@ -325,7 +325,7 @@ type SceneProps = {
   onWalkOut: (ids: string[], dish: DishInfo, guest?: number) => void
   /** (shop open) what's on each shop's menu, and a customer ordering one of them */
   entriesOf: (dishId: string) => Entry[]
-  onOrderEntry: (key: string, guest: number) => boolean
+  onOrderEntry: (key: string, guest: number, reuse?: Record<string, number>) => boolean
   onGuests: (dishId: string, g: GuestView[]) => void
   spotOn: boolean
   guestsBy: Record<string, GuestView[]>
@@ -1542,8 +1542,8 @@ export default function App() {
   const flatGrill = smallScreen && !!dish.roast
   const sceneOffFire = (n: number, loose: number) => { setOffFire(n); setLoose(loose) }
   const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
-  const sceneOrder = (id: string, guest?: number) => {
-    const ok = changeQty(id, 1)
+  const sceneOrder = (id: string, guest?: number, reuse = false) => {
+    const ok = changeQty(id, 1, reuse)
     // a customer's order is written onto the menu below, so you see it come in
     if (ok && guest) {
       const key = ++feedSeq.current
@@ -1869,7 +1869,9 @@ export default function App() {
     return total - offFire
   }
 
-  const changeQty = (id: string, delta: number): boolean => {
+  /** `reuse`: the portion's one already put out and eaten, made again (the open shop's kitchen reuses them): paid for and taken from stock
+   * as ever, the order's count left as it is */
+  const changeQty = (id: string, delta: number, reuse = false): boolean => {
     const isBase = dish.bases.some((b) => b.id === id)
     // what it sells for and what its ingredients cost (a set is priced as a whole)
     const priced = isBase ? dish.bases.find((b) => b.id === id)! : dish.items.find((i) => i.id === id)
@@ -1918,13 +1920,14 @@ export default function App() {
     // some things only fit so many at once
     const item = dish.items.find((i) => i.id === id)
     const max = item?.max ?? MAX_PORTIONS
-    if (delta > 0 && (orders[dish.id][id] ?? 0) >= max) {
+    if (delta > 0 && !reuse && (orders[dish.id][id] ?? 0) >= max) {
       say(UI[lang].itemFull(item ? nameIn(lang, item) : id, max))
       return false
     }
     if (delta < 0 && !(orders[dish.id][id] ?? 0)) return false
     if (!take(id, delta)) return false
     sell(delta)
+    if (reuse) return true
     setOrders((all) => {
       const qty = Math.min(max, Math.max(0, (all[dish.id][id] ?? 0) + delta))
       return { ...all, [dish.id]: { ...all[dish.id], [id]: qty } }
@@ -1944,7 +1947,8 @@ export default function App() {
    * A customer orders a dish off the menu: its parts come out of stock, it's paid at the menu's price, its cost is
    * the food and the seasonings, and its food is put out to be cooked. False if it can't be had now.
    */
-  const orderEntry = (e: Entry, guest: number): boolean => {
+  /** `reuse`: how many of each of its parts the kitchen makes from portions already put out and eaten (no new ones put out for those) */
+  const orderEntry = (e: Entry, guest: number, reuse: Record<string, number> = {}): boolean => {
     const d = DISHES.find((x) => x.id === e.shop)!
     const need = needOf(e)
     if (!canServe(e, stockRef.current)) return false
@@ -1963,7 +1967,7 @@ export default function App() {
     book('food', entryCost(e))
     setOrdersBy((b) => {
       const cur = { ...b.open[d.id] }
-      for (const [k, q] of Object.entries(partsOf(e))) cur[k] = (cur[k] ?? 0) + q
+      for (const [k, q] of Object.entries(partsOf(e))) cur[k] = (cur[k] ?? 0) + Math.max(0, q - (reuse[k] ?? 0))
       return { ...b, open: { ...b.open, [d.id]: cur } }
     })
     const bill = ((bills.current[d.id] ??= {})[guest] ??= { paid: 0, parts: 0 })
@@ -1989,9 +1993,9 @@ export default function App() {
   const onDrink = useCallback((guest: number, id: DrinkId) => sellDrinkRef.current(guest, id), [])
   const orderEntryRef = useRef(orderEntry)
   orderEntryRef.current = orderEntry
-  const onOrderEntry = useCallback((key: string, guest: number) => {
+  const onOrderEntry = useCallback((key: string, guest: number, reuse?: Record<string, number>) => {
     const e = Object.values(menuByRef.current).flat().find((x) => x.key === key)
-    return !!e && orderEntryRef.current(e, guest)
+    return !!e && orderEntryRef.current(e, guest, reuse)
   }, [])
   return (
     <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}${hand && !!dish.roast && !editOn ? ' has-fridge' : ''} hud-rows-${hudRows}`} ref={appRef}>

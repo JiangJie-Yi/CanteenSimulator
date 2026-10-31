@@ -6,7 +6,9 @@ import * as THREE from 'three'
  * Hangings that get in the way fade: a group marked `userData.fade` (the noren, the red lantern, the banners and flags, the lamps) that stands
  * between the camera and what it's looking at (the orbit's target, and a little round it) turns see-through, and comes back once it's out of the
  * way. Rays are cast at the group's own meshes (a batch's hidden originals included, since its merged copy can't be hit); what's drawn
- * (the merged copy, the ink lines) is what fades, each mesh on its own copy of its material so nothing else that shares it fades too.
+ * (the merged copy, the ink lines) is what fades, each mesh on its own copy of its material so nothing else that shares it fades too. The
+ * copy follows its original while it's faded (a lamp's shade going dark with the wall switch), and once the hanging's whole again it's back
+ * on its original (before, it kept the copy for good, and with it the colour it had then: a lamp once faded stayed lit with the lights off).
  */
 const FADED = 0.18
 /** the rays: a grid round where what's looked at is on the screen (in the screen's -1..1, about a third of it across) */
@@ -40,25 +42,38 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
   }
 
   const setOpacity = (f: Fader, k: number) => {
+    const faded = k < 0.999
     for (const m of f.drawn) {
-      const mats = Array.isArray(m.material) ? m.material : [m.material]
-      const next = mats.map((mat) => {
+      const orig = m.userData.fadeOrig as THREE.Material | THREE.Material[] | undefined
+      // (whole again: back on its own material, which everything that changes it (the wall switch) changes for it as well)
+      if (!faded) {
+        if (orig) {
+          m.material = orig
+          delete m.userData.fadeOrig
+        }
+        continue
+      }
+      if (!orig) m.userData.fadeOrig = m.material
+      const src = m.userData.fadeOrig as THREE.Material | THREE.Material[]
+      const next = (Array.isArray(src) ? src : [src]).map((mat) => {
         let c = f.own.get(mat)
         if (!c) {
           // (its own copy, remembering how it was, so the original stays as it is for everything else)
           c = mat.clone()
-          c.userData.base = { opacity: mat.opacity, transparent: mat.transparent, depthWrite: mat.depthWrite }
+          c.userData.base = { opacity: mat.opacity }
           f.own.set(mat, c)
-          f.own.set(c, c)
         }
-        const base = c.userData.base as { opacity: number; transparent: boolean; depthWrite: boolean }
-        const faded = k < 0.999
-        c.transparent = faded || base.transparent
-        c.depthWrite = faded ? false : base.depthWrite
-        c.opacity = base.opacity * k
+        // (as its original is now: a lamp's shade lit or dark, its picture)
+        const from = mat as THREE.MeshBasicMaterial & { emissive?: THREE.Color }, to = c as THREE.MeshBasicMaterial & { emissive?: THREE.Color }
+        if (from.color && to.color) to.color.copy(from.color)
+        if (from.emissive && to.emissive) to.emissive.copy(from.emissive)
+        if ('map' in from) to.map = from.map
+        c.transparent = true
+        c.depthWrite = false
+        c.opacity = (c.userData.base as { opacity: number }).opacity * k
         return c
       })
-      m.material = Array.isArray(m.material) ? next : next[0]
+      m.material = Array.isArray(src) ? next : next[0]
     }
   }
 
@@ -84,9 +99,11 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
       for (const f of faders.current) f.want = hits.has(f) ? FADED : 1
     }
     for (const f of faders.current) {
-      if (Math.abs(f.k - f.want) < 0.002) continue
-      f.k += (f.want - f.k) * Math.min(1, dt * 8)
-      if (Math.abs(f.k - f.want) < 0.01) f.k = f.want
+      if (Math.abs(f.k - f.want) >= 0.002) {
+        f.k += (f.want - f.k) * Math.min(1, dt * 8)
+        if (Math.abs(f.k - f.want) < 0.01) f.k = f.want
+      } else if (f.k >= 0.999 && !f.drawn.some((m) => m.userData.fadeOrig)) continue
+      // (faded, it's kept in step with its originals every frame: they can change under it)
       setOpacity(f, f.k)
     }
   })

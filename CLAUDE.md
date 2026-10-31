@@ -167,7 +167,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 把飲料從飲料櫃拖到老闆附近（3 以內）的桌上放下，老闆會走過去拿起來喝、說一句話（`Boss.tsx` 的 `BOSS_DRINK`，台詞 `data/bossLines.ts` 的 `DRINK_LINES`；dev 時 `__bossDrink`）。
 - 供清酒（點門口神棚前的酒瓶）：60 秒內來客變多、每人點得較多（`App.tsx` 的 `lightIncense`、Roasting 的 `blessed`；名稱沿用舊的點香）。
 - 招牌字：`scene/signFont.ts`（Zen Antique，字體載入後貼圖會重畫；新增招牌用到的字要同步加到 index.html 的字體請求）。
-- **擋住視線的吊掛物會變淡**：`scene/OccluderFade.tsx` 每幾格從鏡頭朝看的目標（`__ctl.target` 在畫面上的位置，周圍一圈）打射線，標了 `userData.fade` 的群組（門簾、紅燈籠、旗幟串、幟旗、燈串、吊燈）擋在中間就淡到 18%，移開就恢復（各自複製材質，不影響共用同一材質的東西）。新的吊掛擺設要會變淡，就在它的群組加 `userData={{ fade: true }}`。
+- **擋住視線的吊掛物會變淡**：`scene/OccluderFade.tsx` 每幾格從鏡頭朝看的目標（`__ctl.target` 在畫面上的位置，周圍一圈）打射線，標了 `userData.fade` 的群組（門簾、紅燈籠、旗幟串、幟旗、燈串、吊燈）擋在中間就淡到 18%，移開就恢復（各自複製材質，不影響共用同一材質的東西）。新的吊掛擺設要會變淡，就在它的群組加 `userData={{ fade: true }}`。淡化時用的是材質複本，每格跟著原材質同步（顏色、貼圖：電燈開關讓燈罩變暗也跟著變），恢復後換回原材質（以前會一直留著複本，關燈後被淡化過的燈籠還亮著）。
 - **收銀抽屜的錢**（`game/till.ts` 的 `openingFloat`／`deposit`／`takeOut`，BDD `till`）：付現的客人把帳單放進抽屜；抽屜開著時老闆點紙鈔格或硬幣格把整格拿走，加進現金（帳本的「收銀機取款」，`ledger.till`）。
 - **飲料後場庫存**（`game/drinkStock.ts`，BDD `drink-stock`）：**新開的店飲料櫃是空的**（`emptyFridge`），要自己從後場補；後場（飲料櫃旁的紅色酒箱與一疊印著飲料的紙箱 `blender/drinkcartons.py` → `drinkcartons.glb`，罐裝的五種：ビール、お茶、コーラ、ハイボール、チューハイ，印刷由遊戲畫 `cartonPrint`；`bar.ts` 的 `DRINK_BACK`，開始各兩箱）。點酒箱或紙箱打開**飲料庫存**（`shops/grill/DrinkStockPanel.tsx`，樣子照食材櫃：飲料、酒類兩區，每種飲料顯示櫃中幾瓶／幾個位置、後場幾瓶、一箱幾瓶，按鈕「訂一箱」（從現金扣進價 `SHOP_PURSE`，記在帳本的採買）與「補」（從後場補進櫃，`fillFromBack`）；下方「全部補滿（從後場）」「缺的各訂一箱」；Esc 或 × 關）。雇了倉儲時，店員（GuestBar3D 的 `Stocker`）在櫃裡缺 3 格以上時也會自己搬（一趟最多 `STOCK_CARRY`）。櫃子與後場存在 localStorage `jgs-drinks-1`（`readDrinks`／`writeDrinks`，櫃子的形狀不合就當新店；「重新開始遊戲」會清掉）。
 - 飲料櫃每格是前排加後面一排（`RANK_DEPTH`，每台約 80 瓶；瓶子 16 段車削；前排與後排合併成一批 `StaticBatch`，每格一個看不見的感應方塊給滑鼠指，指到的瓶子周圍亮一圈 `BOTTLE_HALO`，拿起來的那瓶單獨畫）；拿出冰箱的飲料（地上、桌上、客人面前、手上）有凝結水珠（`DrinkBottle` 的 `wet`，櫃內的沒有）。
@@ -178,6 +178,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **底座**（GuestBar3D 的 `ShopBase`）：地板下一路實心到底座（`RoomFloorImpl` 的填充，高 `baseDrop`；廚房是高台或下沉都會填，高台時連廚房底下也填），地板邊緣看不到空隙；底座三層（淺色邊板、深色本體、踢腳）。
 - 店面沿吧台縮短了 `BAR_TRIM`（`bar.ts`）；玄關 `GENKAN.along` 往吧台拉長。
 - **效能（改東西時要守的）**：
+  - **營業時食物模型要回收**：每點一份，`Dish` 就複製一份食物模型（`addCopy`），吃完只是藏起來（`present` 看的是 `copy < 數量`，營業的點單數只增不減）；以前整天下來越堆越多，每格都要算、矩陣都要更新，玩久了越來越卡。現在新點單先找同一種已吃完、清掉的那份（Roasting 的 `recyclable`），重設後當新的上砧板（`revive`），App 的點單只收錢扣庫存、不增加數量（`onOrder(id, guest, reuse)`、`onOrderEntry(key, guest, reuse)`）；模型數停在同時在用的份量。
   - **不要用 transmission（透光）材質**：場景裡只要有一個，three.js 就會每一格把整個房間先畫進一張圖再畫一次（曾經一顆冷凍櫃燈泡就多了 2,500 次繪製，畫面從 60 掉到 19）。玻璃感用 clearcoat、反光點、透明度做。
   - drei 的 `<Environment>`（`IndoorHDRI`）要 `memo`：它的 children 一換就重算整個環境貼圖（6 個方向畫一次房間＋60 次模糊），開店時上層一秒重畫很多次。同理，不常變的大場景元件（`ShopProps`、`DiningWall`、`Decor`、`Bar`、`CookTable`、`BarCounter`、`BarGate`、`DiningFloor`、`RoomFloor`）都包了 `memo`；新加的、會被常重畫的父層包住的大元件也要包。
   - 用 `StaticBatch` 或 `mergeByMaterial(root, keep)`（`scene/StaticBatch.tsx`）把不會動的零件依材質合併成少數幾次繪製；`keep` 留下自己會動的部分（手、眼、嘴、蓋子、按鍵、抽屜、螢幕…）。模型的材質要依來源材質共用一份（用 Map），不然每個零件一個材質就合併不起來。合併後的網格不能被指到：要能點的東西放一個 `visible={false}` 的感應方塊（r3f 的射線不管 visible），例如飲料櫃的瓶子、炭籃的炭、碗盤櫃。`StaticBatch` 藏起來的原物件不再每格更新矩陣。

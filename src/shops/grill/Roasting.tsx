@@ -2254,7 +2254,8 @@ type RoastingProps = {
   research?: boolean
   /** the AI customers order from the menu, and the chef adds charcoal, through the app */
   /** order something; false if it couldn't be (the fire or the basket is full) */
-  onOrder?: (id: string, guest?: number) => boolean
+  /** `reuse`: made from a portion already put out and eaten (Roasting's revived it): paid for, but no new portion put out */
+  onOrder?: (id: string, guest?: number, reuse?: boolean) => boolean
   onAddCharcoal?: (sticks?: number, byHand?: boolean) => boolean
   /** something the chef or a customer says */
   onSay?: (who: 'chef' | 'guest', text: string) => void
@@ -2273,7 +2274,7 @@ type RoastingProps = {
   /** (shop open) what's on the menu, each dish's parts (a food and what goes on it); customers order from this */
   entries?: { key: string; name: string; parts: { id: string; dabs: string[]; name: string }[] }[]
   /** a customer orders this dish off the menu: false if it can't be had (out of stock, the fire's full) */
-  onOrderEntry?: (key: string, guest: number) => boolean
+  onOrderEntry?: (key: string, guest: number, reuse?: Record<string, number>) => boolean
   /** how slowly customers come in (no cashier: fewer) */
   crowd?: number
   /** the incense is burning: each customer orders a little more */
@@ -3241,6 +3242,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.node.quaternion.copy(p.homeQ)
     p.node.position.copy(p.homeP)
   }
+  /** a portion of `id` the open shop's kitchen can make a new order from: put out before, eaten (or binned) and cleared away, and out of
+   * everyone's hands (not `taken` already for this order) */
+  const recyclable = (id: string, taken: Set<Piece>) => pieces.current.find((q) => q.id === id && menuIds.has(q.id) && present(q) && q.eaten &&
+    q.trash < 0 && !q.carried && !q.via && !taken.has(q) && !SERVICE.waiting.has(q.key) && !SERVICE.carried.has(q.key) && !SERVICE.claimed.has(q.key))
+  /** made again: back as it was before it was ever cooked, to be brought out raw on the tray as the order's (next frame: present, not yet seen) */
+  const revive = (p: Piece) => {
+    fresh(p)
+    p.via = undefined
+    p.small = false
+    SERVICE.delivered.delete(p.key)
+    for (const { mat, foil } of p.mats) {
+      if (foil || mat.side === THREE.FrontSide) continue
+      mat.side = THREE.FrontSide
+      mat.needsUpdate = true
+    }
+  }
   const load = (snap: Snap | undefined) => {
     for (const p of pieces.current) {
       const r = snap?.pieces.get(p.key)
@@ -3483,7 +3500,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             const e = entries[Math.floor(Math.random() * entries.length)]
             if (!e || !e.parts.every((pt) => pt.id in roast.times)) continue
             wants.current.push(...e.parts)
-            if (onOrderEntry?.(e.key, id)) {
+            // (its parts made from portions already used and cleared, where there are any)
+            const again: Piece[] = []
+            for (const pt of e.parts) {
+              const q = recyclable(pt.id, new Set(again))
+              if (q) again.push(q)
+            }
+            const reuse: Record<string, number> = {}
+            for (const q of again) reuse[q.id] = (reuse[q.id] ?? 0) + 1
+            if (onOrderEntry?.(e.key, id, reuse)) {
+              for (const q of again) revive(q)
               orders.push(...e.parts.map((pt) => pt.id))
               said.push(e.name)
             } else {
@@ -3492,7 +3518,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             continue
           }
           const pick = itemIds.filter((x) => x in roast.times)[Math.floor(Math.random() * itemIds.filter((x) => x in roast.times).length)]
-          if (pick && onOrder(pick, id)) {
+          const again = pick ? recyclable(pick, new Set()) : undefined
+          if (pick && onOrder(pick, id, !!again)) {
+            if (again) revive(again)
             orders.push(pick)
             said.push(nameOf(pick))
           }
