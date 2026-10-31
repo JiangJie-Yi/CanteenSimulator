@@ -38,19 +38,29 @@ def active():
 
 # (the blade's steel: brushed along its length, brighter toward the ground edge, the spine darker; the cloth's indigo with its weave and a
 # white line near each end)
-N = 256
+N = 512
 u, v = grid01(N)
-brush = 0.85 + 0.15 * fbm(N, 2, 60, 3)
-steel = np.stack([0.8 * brush, 0.82 * brush, 0.85 * brush], -1) * (0.85 + 0.25 * (1 - v[..., None]) ** 2)
+# (the steel, laid out with u along the blade and v across it from the edge (0) to the spine (1): the bevel by the edge polished bright,
+# its border with the body a soft wavy hamon; the body brushed along its length; darker toward the spine, which is left as forged)
+brush = 0.88 + 0.12 * fbm(N, 2, 90, 3)
+hamon = 0.3 + 0.025 * np.sin(u * 2 * np.pi * 9 + fbm(N, 6, 2, 3) * 3) + 0.01 * np.sin(u * 2 * np.pi * 31)
+edge_band = smooth(hamon + 0.02, hamon - 0.02, v)
+body = np.stack([0.66 * brush, 0.68 * brush, 0.71 * brush], -1)
+steel = mix(body, (0.93, 0.94, 0.96), edge_band * 0.9)
+steel = mix(steel, (0.26, 0.26, 0.28), smooth(0.8, 0.98, v) * 0.75)
+steel = mix(steel, (0.98, 0.98, 1.0), smooth(0.03, 0.0, v) * 0.6)
 steel = np.clip(steel, 0, 1).astype(np.float32)
 weave = 0.9 + 0.1 * (np.sin(u * 2 * np.pi * 80) * np.sin(v * 2 * np.pi * 80) * 0.5 + 0.5)
 cloth = np.stack([0.16 * weave, 0.22 * weave, 0.4 * weave], -1)
 for y0 in (0.08, 0.92):
     cloth[np.abs(u - y0) < 0.012] = (0.92, 0.9, 0.84)
+# (the handle's ho wood: pale greenish cream, fine straight grain along it)
+hgrain = np.sin((v + (fbm(N, 2, 8, 3) - 0.5) * 0.04) * 2 * np.pi * 40) * 0.5 + 0.5
+handle_wood = mix((0.82, 0.76, 0.6), (0.7, 0.63, 0.47), smooth(0.6, 1.0, hgrain) * 0.5).astype(np.float32)
 M = {
     "steel": pbr("KnifeSteel", (1, 1, 1), tex=image("knife_steel", steel), rough=0.3, metal=0.6),
     "spine": pbr("KnifeSpine", lin("#4a4c50"), rough=0.4, metal=0.8),
-    "handle": pbr("KnifeHandle", lin("#d8c49a"), rough=0.55),
+    "handle": pbr("KnifeHandle", (1, 1, 1), tex=image("knife_handle", handle_wood), rough=0.55),
     "horn": pbr("KnifeHorn", lin("#16120f"), rough=0.3),
     "cloth": pbr("KnifeCloth", (1, 1, 1), tex=image("knife_cloth", cloth.astype(np.float32)), rough=0.85),
     "mark": pbr("KnifeMark", lin("#2a2420"), rough=0.5),
@@ -68,74 +78,113 @@ def fin(o, name, mat, smooth=True):
     return o
 
 
-def blade(name, outline, thick, at_y):
-    """a blade from its outline (x along it, y across it, the edge at y = 0), lying flat: thick along the spine, ground thin to the edge"""
+def interp(pts, x):
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if x <= x1:
+            t = 0 if x1 == x0 else (x - x0) / (x1 - x0)
+            t = t * t * (3 - 2 * t) if len(pts) > 2 else t
+            return y0 + (y1 - y0) * t
+    return pts[-1][1]
+
+
+def blade(name, edge, spine, length, thick, at_y):
+    """a blade from its edge and spine lines (y across it at each x along it), lying flat: a grid of three rows across, the edge, the
+    bevel's line (shinogi) a third of the way up and the spine, so the polished bevel shows as its own face; thin at the edge, full at the
+    bevel's line and the spine, thinning toward the tip; a short neck (machi) running back into the handle"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    top, bot = [], []
-    ys = [p[1] for p in outline]
-    ymax = max(ys) or 1
-    for (x, y) in outline:
-        t = thick * (0.15 + 0.85 * (max(0.0, y) / ymax) ** 0.6)
-        top.append(bm.verts.new((x, y + at_y, 0.012 + t / 2)))
-        bot.append(bm.verts.new((x, y + at_y, 0.012 - t / 2)))
-    xs = [p[0] for p in outline]
-    x0, x1 = min(xs), max(xs)
-    for ring, flip in ((top, False), (bot, True)):
-        f = bm.faces.new(ring[::-1] if flip else ring)
-        for l in f.loops:
-            l[uvl].uv = ((l.vert.co.x - x0) / (x1 - x0), (l.vert.co.y - at_y) / ymax)
-    n = len(outline)
-    for i in range(n):
-        j = (i + 1) % n
-        bm.faces.new((top[i], top[j], bot[j], bot[i]))
+    NX, rows = 48, (0.0, 0.33, 1.0)
+    grid = []
+    for i in range(NX + 1):
+        x = length * i / NX
+        e, s_ = interp(edge, x), interp(spine, x)
+        taper = 1 - 0.65 * (x / length) ** 2
+        col = []
+        for j, f in enumerate(rows):
+            y = e + (s_ - e) * f
+            t = thick * taper * (0.06 if j == 0 else (0.92 if j == 1 else 1.0))
+            col.append((bm.verts.new((x, y + at_y, 0.012 + t / 2)), bm.verts.new((x, y + at_y, 0.012 - t / 2)), f))
+        grid.append(col)
+
+    def face(vs, uvs):
+        if len(set(vs)) < 3:
+            return
+        try:
+            fc = bm.faces.new(vs)
+        except ValueError:
+            return
+        for l, uv in zip(fc.loops, uvs):
+            l[uvl].uv = uv
+    for i in range(NX):
+        u0, u1 = i / NX, (i + 1) / NX
+        for j in range(len(rows) - 1):
+            a, b_, c, d = grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]
+            face((a[0], b_[0], c[0], d[0]), ((u0, a[2]), (u1, b_[2]), (u1, c[2]), (u0, d[2])))
+            face((d[1], c[1], b_[1], a[1]), ((u0, d[2]), (u1, c[2]), (u1, b_[2]), (u0, a[2])))
+        for j in (0, len(rows) - 1):
+            a, b_ = grid[i][j], grid[i + 1][j]
+            face((a[0], a[1], b_[1], b_[0]), ((u0, rows[j]), (u0, rows[j]), (u1, rows[j]), (u1, rows[j])))
+    for i in (0, NX):
+        col = grid[i]
+        for j in range(len(rows) - 1):
+            face((col[j][0], col[j + 1][0], col[j + 1][1], col[j][1]), ((i / NX, rows[j]),) * 2 + ((i / NX, rows[j + 1]),) * 2)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o)
-    return fin(o, name, M["steel"], smooth=False)
+    fin(o, name, M["steel"], smooth=False)
+    # (the neck: a short square of the spine's steel from the heel back into the ferrule)
+    w = interp(spine, 0) - interp(edge, 0)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(-0.012, at_y + interp(edge, 0) + w * 0.62, 0.012))
+    nk = active(); nk.scale = (0.026, w * 0.28, thick * 0.9)
+    fin(nk, name + "Neck", M["spine"], smooth=False)
 
 
 def handle(name, x0, length, r, at_y):
-    """an octagonal wa-handle from x0 back along -x, its horn ferrule at the blade end"""
-    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=r, depth=length, location=(x0 - length / 2 - 0.03, at_y, 0.012 + r * 0.3),
-                                        rotation=(0, math.pi / 2, 0))
-    o = active(); o.scale = (1, 1, 0.8)
+    """an octagonal wa-handle of ho wood from x0 back along -x, tapering a little toward its butt, its edges eased, a buffalo-horn ferrule
+    at the blade end"""
+    FER = 0.03
+    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=r * 0.9, radius2=r, depth=length, location=(x0 - FER - length / 2 - 0.02, at_y, 0.012 + r * 0.25),
+                                    rotation=(0, math.pi / 2, 0))
+    o = active(); o.scale = (0.82, 1, 1)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bevel(o, 0.0012, 2, angle=False)
+    bpy.ops.object.modifier_apply(modifier="Bevel")
+    # (the grain along it: u round it, v along it)
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    uvl = bm.loops.layers.uv.verify()
+    for f in bm.faces:
+        for l in f.loops:
+            c = l.vert.co
+            l[uvl].uv = (math.atan2(c.z, c.y) / (2 * math.pi) + 0.5, c.x * 4)
+    bm.to_mesh(o.data); bm.free()
     fin(o, name, M["handle"], smooth=False)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=r * 1.04, depth=0.03, location=(x0 - 0.015, at_y, 0.012 + r * 0.3),
-                                        rotation=(0, math.pi / 2, 0))
-    o = active(); o.scale = (1, 1, 0.8)
+    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=r * 1.02, radius2=r * 1.06, depth=FER, location=(x0 - FER / 2 - 0.02, at_y, 0.012 + r * 0.25),
+                                    rotation=(0, math.pi / 2, 0))
+    o = active(); o.scale = (0.82, 1, 1)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bevel(o, 0.001, 2, angle=False)
+    bpy.ops.object.modifier_apply(modifier="Bevel")
     fin(o, name + "Ferrule", M["horn"], smooth=False)
 
 
-def smooth_outline(pts, n=40):
-    """a closed outline from a few points, rounded through them"""
-    out = []
-    m = len(pts)
-    for i in range(m):
-        p0, p1, p2, p3 = (Vector(pts[(i + k - 1) % m]) for k in range(4))
-        for s in range(n // m):
-            t = s / (n // m)
-            q = 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3)
-            out.append((q.x, max(0.0, q.y)))
-    return out
-
-
-# (yanagiba: long, slender, its edge straight to a fine point curving up to the spine)
-yan = [(0, 0), (0.12, 0), (0.24, 0.001), (0.29, 0.012), (0.27, 0.03), (0.12, 0.034), (0.0, 0.034)]
-blade("KnifeYanagiba", yan, 0.004, -0.11)
-handle("KnifeYanagibaHandle", 0.0, 0.14, 0.013, -0.11 + 0.017)
-# (deba: short and broad, a strong curved belly, a thick spine)
-deb = [(0, 0), (0.06, -0.002), (0.13, 0.006), (0.165, 0.024), (0.16, 0.05), (0.07, 0.054), (0.0, 0.052)]
-blade("KnifeDeba", deb, 0.008, 0.0)
-handle("KnifeDebaHandle", 0.0, 0.12, 0.016, 0.026)
-# (nakiri: a straight-edged rectangle with its corners just eased)
-nak = [(0, 0), (0.16, 0), (0.168, 0.006), (0.168, 0.046), (0.16, 0.05), (0.0, 0.05)]
-blade("KnifeNakiri", nak, 0.003, 0.1)
-handle("KnifeNakiriHandle", 0.0, 0.12, 0.013, 0.125)
-# (each maker's little mark stamped near the heel)
-for i, y in enumerate((-0.11 + 0.02, 0.03, 0.125)):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.004, depth=0.0006, location=(0.03, y, 0.0165))
+# (yanagiba: long and slender, its edge straight, sweeping up into a fine point near the spine)
+blade("KnifeYanagiba", [(0, 0), (0.2, 0.0), (0.28, 0.01), (0.29, 0.016)], [(0, 0.033), (0.2, 0.033), (0.27, 0.026), (0.29, 0.016)], 0.29, 0.0042, -0.11)
+handle("KnifeYanagibaHandle", 0.0, 0.14, 0.0125, -0.11 + 0.02)
+# (deba: short and broad, a strong curved belly rising to its point, a thick spine)
+blade("KnifeDeba", [(0, 0), (0.07, -0.001), (0.12, 0.004), (0.152, 0.016), (0.168, 0.034)], [(0, 0.052), (0.08, 0.054), (0.14, 0.05), (0.168, 0.034)], 0.168, 0.008, 0.0)
+handle("KnifeDebaHandle", 0.0, 0.12, 0.016, 0.028)
+# (nakiri: a straight edge and spine, its square end just eased)
+blade("KnifeNakiri", [(0, 0), (0.16, 0.0), (0.168, 0.006)], [(0, 0.05), (0.16, 0.05), (0.168, 0.044)], 0.168, 0.0032, 0.1)
+handle("KnifeNakiriHandle", 0.0, 0.12, 0.013, 0.127)
+# (each maker's mark stamped near the heel: a small round seal and a short line of signature beside it)
+for i, (y, th) in enumerate(((-0.11 + 0.02, 0.0042), (0.026, 0.008), (0.125, 0.0032))):
+    zt = 0.012 + th / 2 + 0.0002
+    bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.0042, depth=0.0006, location=(0.028, y + 0.002, zt))
     fin(active(), f"KnifeMark{i}", M["mark"], smooth=False)
+    for k in range(3):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(0.04 + k * 0.006, y + 0.002, zt))
+        o = active(); o.scale = (0.0035, 0.0012, 0.0005)
+        fin(o, f"KnifeSign{i}{k}", M["mark"], smooth=False)
 # ---- the cloth under them: folded in three, its layers stepping up a little, a soft fold at each side
 for k, (w, h) in enumerate(((0.62, 0.003), (0.6, 0.0065), (0.58, 0.01))):
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0.0, 0.01, h / 2 if k == 0 else 0.003 * k + 0.0015))

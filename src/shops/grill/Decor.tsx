@@ -699,7 +699,7 @@ function KnifeSet() {
       m.castShadow = true
       m.receiveShadow = true
     })
-    inkModel(r, (m) => /Mark|Cloth/.test(m.name), { width: 0.0012, weld: true })
+    inkModel(r, (m) => /Mark|Sign|Cloth|Neck/.test(m.name), { width: 0.0012, weld: true })
     return r
   }, [gltf])
   // (behind the hearth, on the strip of table toward the bar: the front's taken by the fan, the plate and the tasting bowl)
