@@ -51,14 +51,16 @@ const WOOD_DARK = '#7d5430'
 function plateProfile(R: number): [number, number][] {
   const pts: [number, number][] = [[0, 0.018], [0.3, 0.018], [0.33, 0.004], [0.36, 0], [0.42, 0], [0.45, 0.012], [0.5, 0.02]]
   // (the underside of the rim, sweeping up and out)
-  for (let k = 1; k <= 4; k++) { const t = k / 4; pts.push([0.5 + 0.48 * t, 0.02 + 0.13 * t ** 1.8]) }
+  for (let k = 1; k <= 3; k++) { const t = k / 3; pts.push([0.5 + 0.48 * t, 0.02 + 0.13 * t ** 1.8]) }
   // (the lip, rounded over, and the top of the rim back in)
   pts.push([0.995, 0.162], [0.99, 0.172], [0.975, 0.172])
-  for (let k = 4; k >= 1; k--) { const t = k / 4; pts.push([0.5 + 0.46 * t, 0.045 + 0.12 * t ** 1.8]) }
+  for (let k = 3; k >= 1; k--) { const t = k / 3; pts.push([0.5 + 0.46 * t, 0.045 + 0.12 * t ** 1.8]) }
   pts.push([0.45, 0.042], [0, 0.04])
   return pts.map(([x, y]) => [x * R, y * R])
 }
-const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R)
+// (twenty round and three steps up each side of the rim: fifty of them stand in the racks, each inked, and they're seen from across the
+// kitchen, stood on edge or stacked; a quarter fewer faces than the plates on the bar, which are looked down on close to)
+const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R, 20)
 type Spot = { m: THREE.Matrix4; design: number }
 
 /** how far each plate in a pile stands above the one under it: they nest, foot in the one below's well (the plate's well sits 0.04 R up,

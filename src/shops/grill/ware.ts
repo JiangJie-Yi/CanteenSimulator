@@ -392,9 +392,9 @@ export const BAMBOO_WARE = wareTexture('bamboo')
 export const PLUM_WARE = wareTexture('plum')
 
 /** Lathe geometry for ware, with UVs projected straight down so a painted picture lies flat in the well. */
-export function wareGeometry(profile: [number, number][], R: number) {
+export function wareGeometry(profile: [number, number][], R: number, round = 24) {
   // (24 round, shaded smooth: low in faces, its light still round; only its outline, close to, shows the sides)
-  const g = new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 24)
+  const g = new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), round)
   const pos = g.attributes.position
   const uv = g.attributes.uv
   for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / (2 * R) + 0.5, 0.5 - pos.getZ(i) / (2 * R))
