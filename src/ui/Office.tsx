@@ -47,7 +47,7 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
  * two cooks, someone on the floor and at the till — each filled with a face, or open, with the people who could
  * fill it. (Buying in is done on the 試做 board itself, tag by tag.)
  */
-export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false }: Props) {
+export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -61,15 +61,15 @@ export function Office({ dish, lang, cash, hired, onHire, onFire, onClose, onRes
   // (put on the page itself, over the menu and everything else)
   return createPortal(
     <>
-    <h2 className="dock-title" aria-hidden="true">{t('經營', '経営')}<small lang="en">OFFICE</small></h2>
+    <h2 className="dock-title" aria-hidden="true">{lang === 'en' ? 'Office' : t('經營', '経営')}<small lang="en">OFFICE</small></h2>
     <section className="office" aria-label={t('經營', '事務所')} style={drag.move}>
       <header {...drag.handle}>
         <div className="ofc-tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('廚房', '厨房')}</button>
-          <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{t('人事', '人事')}</button>
+          {/* (the books first: the cash button top right opens them; the cash itself shows there, not again here) */}
           <button type="button" role="tab" aria-selected={tab === 'ledger'} onClick={() => onTab('ledger')}>{t('帳簿', '帳簿')}</button>
+          <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{t('人事', '人事')}</button>
+          <button type="button" role="tab" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('廚房', '厨房')}</button>
         </div>
-        <span className={`ofc-cash${cash < 0 ? ' is-low' : ''}`}>{t('現金', '現金')} <b className="money">{money(cash)}</b></span>
         {/* every open job filled at once, by who's the best value for their pay */}
         <button type="button" className="ofc-reset ofc-autohire" disabled={!pickHires(people, roles, hired).length}
           onClick={() => { onTab('staff'); for (const w of pickHires(people, roles, hired)) onHire(w) }}

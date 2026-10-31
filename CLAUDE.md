@@ -103,6 +103,8 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **牆角喇叭**（`DiningRoom.tsx` 的 `WallSpeaker`）是音樂唯一的開關：點一下開、再點一下關，預設關（`ui/bgmStore.ts`，`ui/Bgm.tsx` 負責播放，音量固定）；hover 會發亮並出現「音箱／點一下開啟（關閉）音樂」標籤，開著時飄出音符（`MusicNotes`）。沒有任何音樂的 2D 介面或按鈕。
 - **客人的盤子**：`shops/grill/wareDesigns.ts` 五款花色（唐草、青海波、鯉魚、梅花藍底、風車）依盤子輪流用；竹、梅仍是 `ware.ts` 的大盤與小碟。`PlateRack.tsx` 是碗盤櫃架（Decor 裡的 `RackAt`）。
 - **開發者模式左下角**有世界座標小圖（`App.tsx` 的 `AxisWidget`）：X 沿吧台、Y 向上、Z 橫過吧台，隨鏡頭轉。
+- **右上角（寬螢幕）**：沒有「經營」按鈕；金額是一塊毛玻璃（`.money-chip`），點它打開經營視窗，頁籤依序 帳簿、人事、廚房（視窗標題列不再重複顯示現金）；手機仍用經營按鈕。e2e 從 `.money-chip` 進經營，廚房是第 3 個頁籤。**英文介面**：字型 Cormorant Garamond（`html[lang='en']` 換掉 `--brush`），右側直式標題只留一個（不再加小字的英文）。
+- **牆角喇叭的外觀**：機身、網罩、支臂改成炭灰色（模型原本近黑，卡通光影下變成一塊沒有形狀的黑洞），整體 0.82 倍。
 - **介面風格**：木紋深色外框與標題列、半透明淺色面板（`index.css` 末尾的 `--grain-dark`、`--grain-light`）；只是按的東西（食材卡、補貨鈕）用半透明玻璃，不用木色。
 - **HDRI**：`scene/IndoorHDRI.tsx` 在 `public/hdris/` 找真的 HDRI（夜晚 `grill_night_1k.exr`、`night.exr`、`night.hdr`；白天 `grill_day_1k.exr`、`day.exr`、`day.hdr`，.exr 或 .hdr 都可以），沒有就用內建的假 HDRI。**BGM**：`ui/Bgm.tsx` 播 `public/music/IzakayaNight.mp3`。
 

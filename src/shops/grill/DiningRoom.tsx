@@ -3512,7 +3512,12 @@ function WallSpeaker() {
       if (!t) {
         // (the grille's holes are cut by its alpha: tested, not blended, so what's behind shows sharp and sorts right)
         const grille = src.name === 'SpeakerGrille'
-        t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, alphaTest: grille ? 0.5 : 0, side: grille ? THREE.DoubleSide : THREE.FrontSide })
+        // (the cabinet, its grille and its arm a charcoal grey, not the model's near-black: in the toon light that came out a flat black slab,
+        // a hole in the picture, with nothing of its shape or its grille to show what it was)
+        const lift = /^Speaker(Grille|Frame|Steel)$/.test(src.name) ? 2.6 : 1
+        const shell = src.name === 'SpeakerABS' || src.name === 'SpeakerBaffle'
+        t = new THREE.MeshToonMaterial({ color: shell ? new THREE.Color(src.name === 'SpeakerABS' ? '#45484e' : '#2c2e32') : src.color.clone().multiplyScalar(lift),
+          map: shell ? null : src.map, alphaTest: grille ? 0.5 : 0, side: grille ? THREE.DoubleSide : THREE.FrontSide })
         t.name = src.name
         toon.set(src, t)
       }
@@ -3634,7 +3639,7 @@ function ShopPropsImpl({ counters, lang = 'zh' }: { counters: Counter[]; lang?: 
   return (
     // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
     <>
-      <Movable id="speaker" label="音箱" baseTurn={[0, 45, 0]}><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
+      <Movable id="speaker" label="音箱" baseTurn={[0, 45, 0]} baseScale={0.82}><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
       {/* (one stack, standing where the two used to) */}
       <Movable id="sake" label="酒樽"><StaticBatch key={lang}>
         <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
