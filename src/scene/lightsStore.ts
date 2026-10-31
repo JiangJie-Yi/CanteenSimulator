@@ -13,3 +13,5 @@ export function pressLightSwitch() {
 }
 export const onLights = (f: () => void) => { subs.add(f); return () => { subs.delete(f) } }
 export const useLights = () => useSyncExternalStore(onLights, getLights)
+// (in development, to be pressed from the console or a test: the app's own copy of the switch)
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __lights?: unknown }).__lights = { get: getLights, press: pressLightSwitch }

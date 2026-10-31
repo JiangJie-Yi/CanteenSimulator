@@ -43,6 +43,9 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3'] },
   // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
   'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'] },
+  // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
+  'grp-till': { zh: '收銀櫃組', ja: 'レジ一式', members: ['till-counter', 'till-register', 'till-card', 'till-printer', 'till-tray', 'till-pens', 'till-bell',
+    'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-cashbox', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
 }
 const unsettled = new Set<string>()
 /** the default groups the owner has broken up: not made again */

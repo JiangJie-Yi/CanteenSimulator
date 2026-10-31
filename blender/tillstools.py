@@ -107,6 +107,20 @@ def rush(N=512):
     return col
 
 
+def kumiko(W=256, H=128, cols=4, rows=2, half=3.2):
+    """the kumiko panel (角麻の葉): `cols` x `rows` squares each crossed corner to corner, its strips `half` px either side of their line,
+    pale hinoki shaded a touch at their crossings; returned with its alpha (the gaps clear)"""
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32) + 0.5
+    cw, ch = W / cols, H / rows
+    fx, fy = (xx % cw) / cw, (yy % ch) / ch
+    d = np.minimum.reduce([np.minimum(xx % cw, cw - xx % cw), np.minimum(yy % ch, ch - yy % ch),
+                           np.abs(fx - fy) * min(cw, ch) / math.sqrt(2), np.abs(fx + fy - 1) * min(cw, ch) / math.sqrt(2)])
+    alpha = np.clip((half + 0.8 - d) / 1.6, 0, 1)
+    col = np.broadcast_to(np.array((0.9, 0.8, 0.62), np.float32), (H, W, 3)).copy()
+    col *= (0.86 + 0.14 * np.clip(d / half, 0, 1))[..., None]
+    return col, alpha
+
+
 def hinoki(N=256):
     """the kumiko's pale hinoki: a warm cream, the faintest straight grain"""
     seed(7)
@@ -264,18 +278,18 @@ def seat_and_legs(name, M, parts, H, W, D, splay, rails):
         L = math.hypot(dx, dz)
         ux, uz = dx / L, dz / L
         fin(beam(f"{name}Frame{k}", (a[0] - ux * ext, y0 + th / 2, a[1] - uz * ext), (b[0] + ux * ext, y0 + th / 2, b[1] + uz * ext), fw, th,
-                 up=(0, 1, 0), bevel=0.007, segs=2), M["walnutf"], parts)
+                 up=(0, 1, 0), bevel=0.007, segs=1), M["walnutf"], parts)
     # (the rush, set in the frame, domed up a little above it)
-    fin(seat_panel(f"{name}Rush", 0, 0, W - fw * 1.4, D - fw * 1.4, H - 0.004, 0.014), M["rush"], parts)
+    fin(seat_panel(f"{name}Rush", 0, 0, W - fw * 1.4, D - fw * 1.4, H - 0.004, 0.014, n=4), M["rush"], parts)
     # (the legs: square, tapering, splayed a touch outward at the floor)
     tops = []
     for k, (sx, sz) in enumerate(((-1, -1), (1, -1), (1, 1), (-1, 1))):
         t_ = (sx * (W / 2 - 0.028), y0, sz * (D / 2 - 0.028))
         f_ = (sx * (W / 2 - 0.028 + splay), 0.022, sz * (D / 2 - 0.028 + splay))
         tops.append(t_)
-        fin(beam(f"{name}Leg{k}", t_, f_, 0.034, 0.034, up=(0, 0, 1) if abs(sz) else (1, 0, 0), wb=0.026, db=0.026, bevel=0.005, segs=1),
+        fin(beam(f"{name}Leg{k}", t_, f_, 0.034, 0.034, up=(0, 0, 1) if abs(sz) else (1, 0, 0), wb=0.026, db=0.026),
             M["walnut"], parts)
-        fin(shoe(f"{name}Shoe{k}", (f_[0], 0, f_[2]), 0.018, 0.024), M["brass"], parts)
+        fin(shoe(f"{name}Shoe{k}", (f_[0], 0, f_[2]), 0.018, 0.024, segs=6), M["brass"], parts)
     # (the rails between the legs, where the legs are at each height)
     def leg_at(k, y):
         tx, ty, tz = tops[k]
@@ -286,7 +300,7 @@ def seat_and_legs(name, M, parts, H, W, D, splay, rails):
     for nm, (k1, k2), y, w_, d_ in (("Foot", (0, 1), yf, 0.026, 0.03), ("SideL", (0, 3), ys, 0.02, 0.022), ("SideR", (1, 2), ys, 0.02, 0.022),
                                   ("Back", (3, 2), yb, 0.02, 0.022)):
         a, b = leg_at(k1, y), leg_at(k2, y)
-        fin(beam(f"{name}Rail{nm}", a, b, w_, d_, up=(0, 1, 0), bevel=0.004, segs=1), M["walnut"], parts)
+        fin(beam(f"{name}Rail{nm}", a, b, w_, d_, up=(0, 1, 0)), M["walnut"], parts)
         if nm == "Foot":
             # (its top faced in brass, where the heels rest)
             fin(beam(f"{name}FootBrass", (a[0], y + d_ / 2 + 0.002, a[2]), (b[0], y + d_ / 2 + 0.002, b[2]), w_ + 0.004, 0.004), M["brass"], parts)
@@ -304,17 +318,17 @@ def chair(name, M, H=0.44, W=0.32, D=0.3):
         a = (tx, ty, tz)
         b = (tx, top_y, tz + rake)
         posts.append((a, b))
-        fin(beam(f"{name}Post{k}", a, b, 0.03, 0.03, up=(0, 0, 1), wb=0.026, db=0.026, bevel=0.005), M["walnut"], parts)
+        fin(beam(f"{name}Post{k}", a, b, 0.03, 0.03, up=(0, 0, 1), wb=0.026, db=0.026), M["walnut"], parts)
     (l0, l1), (r0, r1) = posts
     # (the crest rail: across the posts' tops, bowed back away from the sitter, a little past each post)
-    n = 9
+    n = 6
     pts = []
     for i in range(n + 1):
         t = i / n
         x = l1[0] - 0.018 + (r1[0] - l1[0] + 0.036) * t
         z = l1[2] + 0.028 * math.sin(math.pi * t)
         pts.append((x, top_y - 0.03, z))
-    fin(sweep(f"{name}Crest", pts, 0.026, 0.06, bevel=0.008, segs=2), M["walnutf"], parts)
+    fin(sweep(f"{name}Crest", pts, 0.026, 0.06, bevel=0.008, segs=1), M["walnutf"], parts)
     # (the kumiko panel between the posts, under the crest rail: a walnut frame, and in it a grid of squares in pale hinoki, each crossed)
     def post_at(p, y):
         (ax, ay, az), (bx, by, bz) = p
@@ -326,24 +340,14 @@ def chair(name, M, H=0.44, W=0.32, D=0.3):
     def zat(y):
         return post_at(posts[0], y)[2]
     for nm, y in (("Bottom", py0 - 0.008), ("Top", py1 + 0.008)):
-        fin(beam(f"{name}Panel{nm}", (xl, y, zat(y)), (xr, y, zat(y)), 0.018, 0.016, up=(0, 1, 0), bevel=0.003), M["walnut"], parts)
-    cols, rows = 4, 2
-    cw, ch = (xr - xl) / cols, (py1 - py0) / rows
-    bars = []
-    for i in range(1, cols):
-        x = xl + i * cw
-        bars.append(((x, py0, zat(py0)), (x, py1, zat(py1))))
-    for j in range(1, rows):
-        y = py0 + j * ch
-        bars.append(((xl, y, zat(y)), (xr, y, zat(y))))
-    for i in range(cols):
-        for j in range(rows):
-            xa, xb = xl + i * cw, xl + (i + 1) * cw
-            ya, yb = py0 + j * ch, py0 + (j + 1) * ch
-            bars.append(((xa, ya, zat(ya)), (xb, yb, zat(yb))))
-            bars.append(((xb, ya, zat(ya)), (xa, yb, zat(yb))))
-    for k, (a, b) in enumerate(bars):
-        fin(beam(f"{name}Kumiko{k}", a, b, 0.006, 0.012, up=(0, 0, 1)), M["hinoki"], parts)
+        fin(beam(f"{name}Panel{nm}", (xl, y, zat(y)), (xr, y, zat(y)), 0.018, 0.016, up=(0, 1, 0)), M["walnut"], parts)
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    vs = [bm.verts.new(P(*c)) for c in ((xl, py0, zat(py0)), (xr, py0, zat(py0)), (xr, py1, zat(py1)), (xl, py1, zat(py1)))]
+    f = bm.faces.new(vs)
+    for lp, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+        lp[uvl].uv = uv
+    fin(mesh_obj(f"{name}Kumiko", bm), M["kumiko"], parts)
     root = bpy.data.objects.new(name, None)
     bpy.context.collection.objects.link(root)
     for o in parts:
@@ -362,10 +366,13 @@ def stool(name, M, H=0.34, W=0.29, D=0.27):
 
 
 def materials():
+    global KUMIKO
+    KUMIKO = kumiko()
     return {"walnut": pbr("TillWalnut", (1, 1, 1), tex=image("tillwalnut", walnut()), rough=0.45, coat=0.3),
             "walnutf": pbr("TillWalnutFlat", (1, 1, 1), tex=image("tillwalnutflat", walnut(flat=True)), rough=0.45, coat=0.3),
             "rush": pbr("TillRush", (1, 1, 1), tex=image("tillrush", rush()), rough=0.85),
             "hinoki": pbr("TillHinoki", (1, 1, 1), tex=image("tillhinoki", hinoki()), rough=0.6),
+            "kumiko": pbr("TillKumiko", (1, 1, 1), tex=image("tillkumiko", KUMIKO[0], alpha=KUMIKO[1]), rough=0.6, blend=True),
             "brass": pbr("StoolBrass", (0.78, 0.6, 0.3), rough=0.3, metal=1.0)}
 
 

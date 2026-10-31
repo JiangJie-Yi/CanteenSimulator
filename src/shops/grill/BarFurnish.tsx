@@ -30,7 +30,10 @@ function toonOf(url: string, scene: THREE.Group) {
     if (!t) {
       t = GLOSSY.has(src.name)
         ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, metalness: src.metalness, roughness: Math.max(0.2, src.roughness), clearcoat: 0.5 })
-        : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: /Leaves/.test(m.name) ? THREE.DoubleSide : THREE.FrontSide })
+        // (the chair back's kumiko: one picture, its gaps cut out by its alpha (tested, not blended), seen from either side)
+        : src.name === 'TillKumiko'
+          ? new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, alphaTest: 0.5, side: THREE.DoubleSide })
+          : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: /Leaves/.test(m.name) ? THREE.DoubleSide : THREE.FrontSide })
       mats.set(src, t)
     }
     m.material = t

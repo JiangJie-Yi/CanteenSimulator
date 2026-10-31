@@ -22,6 +22,8 @@ import { Steam } from '@/scene/Steam'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { QUALITY } from '@/scene/quality'
 import { seasonSound, sprinkleTick } from './seasonSound'
+import { comesIn, patienceIn, roomMood } from '@/game/roomLights'
+import { getLights } from '@/scene/lightsStore'
 import { kindOf, type GuestKind } from '@/data/guests'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
@@ -3369,6 +3371,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }, [ai])
   const chefClock = useRef(0)
   const guests = useRef<Guest[]>([])
+  /** the customers who've said how dark it is (once each) */
+  const darkSaid = useRef(new Set<number>())
   /** what's been ordered off the menu and not yet brought out: each food, as which dish */
   const wants = useRef<{ id: string; dabs: string[]; name: string }[]>([])
   const nameOfP = (p: Piece) => p.want?.name ?? nameOf(p.id)
@@ -3539,7 +3543,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (how far into the session it is, a session being some minutes of the shop's clock, and so how busy the day's pattern runs just now)
     const dayK = (now - openedAt.current) / SESSION_LEN
     const fl = FLOWS[flow.current]
-    if (onOrder && !SHOP.closing && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK)) {
+    // (the room's light: nobody comes into a dark shop, those in it say so once, and wait less long in a dim one, much less in the dark)
+    const mood = roomMood(getLights().on, typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark')
+    if (mood !== 'lit') {
+      for (const g of seated) {
+        if (darkSaid.current.has(g.id)) continue
+        darkSaid.current.add(g.id)
+        onSay?.('guest', L().dark(g.id))
+        break
+      }
+    }
+    if (onOrder && !SHOP.closing && comesIn(mood) && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK)) {
       guestClock.current = 0
       // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
       const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
@@ -3618,12 +3632,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     // someone kept waiting too long goes
     for (const g of seated) {
-      if (g.eaten.length === 0 && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience) {
+      if (g.eaten.length === 0 && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood)) {
         g.state = 'angry'
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
         onWalkOut?.(owed, g.id)
-        onSay?.('guest', L().angry(g.id))
+        onSay?.('guest', mood === 'dark' ? L().darkGone(g.id) : L().angry(g.id))
         report()
       }
     }

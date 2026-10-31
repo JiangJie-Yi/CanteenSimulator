@@ -2,6 +2,7 @@
 // charcoal), a paper fan by the seasonings (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
 // glowing behind the stones, which can be moved about like the dishes. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
 // them like anything else (DECOR is their footprint, for its settle()).
+import { getLights } from '@/scene/lightsStore'
 import { memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
@@ -301,7 +302,14 @@ function Lantern({ at }: { at: [number, number, number] }) {
       halo.current.scale.setScalar(0.95 + (f0 - 0.88) * 0.6)
     }
     if (flame.current) flame.current.scale.setScalar(0.22 * (0.9 + (f0 - 0.88) * 1.8) * Math.max(0.05, k))
-    if (lamp.current) lamp.current.intensity = 0.7 * f
+    // (with the room's lights out it's the light the cook works by: brighter, reaching further, the more so by night)
+    const night = typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark'
+    const boost = getLights().on ? 1 : night ? 3.2 : 1.8
+    if (lamp.current) {
+      lamp.current.intensity = 0.7 * f * boost
+      lamp.current.distance = boost > 1 ? 3.2 : 1.8
+    }
+    if (halo.current && boost > 1) halo.current.scale.multiplyScalar(1 + (boost - 1) * 0.35)
   })
   // (the lantern itself, from Blender (blender/andon.py): on its four dark legs, its shade panelled in kumiko, its washi drawn lit (unshaded, the same by day or
   // night, brightening and dimming with the flame))

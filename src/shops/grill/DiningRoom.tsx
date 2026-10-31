@@ -9,6 +9,7 @@ import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
+import { QUALITY } from '@/scene/quality'
 import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
@@ -838,9 +839,10 @@ const DAYLIGHT = (() => {
   return { halo: tex(halo), beam: tex(beam) }
 })()
 const WINDOW_HALO = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.halo, color: '#8fc4ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false }), 0.8, 0, false)
+  toneMapped: false }), 0.8, 0.2, false)
+// (by night the moon's: fainter, and it's what lights the room with the lamps out, the shadows falling away from the window (App's key light))
 const SUNBEAM = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, color: '#78b2ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false, side: THREE.DoubleSide }), 0.55, 0, false)
+  toneMapped: false, side: THREE.DoubleSide }), 0.55, 0.16, false)
 /** the shaft's two crossed sheets, in the window's frame (the room toward -x): from the window's face, slanting down and in */
 const SUNBEAM_GEO = (() => {
   const R = 0.4, L = 2.3, tilt = 0.62
@@ -2427,7 +2429,11 @@ function useFreezer(n: number) {
       const m = o as THREE.Mesh
       if (m.isMesh) {
         m.material = Array.isArray(m.material) ? m.material.map(conv) : conv(m.material)
-        m.castShadow = true
+        // (the glass neither casts a shadow nor takes one: the door's pane, swung open, threw a solid one across the floor and the cabinet's
+        // side, and shadows lay on the glass itself, hanging in the air)
+        const glass = (Array.isArray(m.material) ? m.material : [m.material]).some((x) => x.transparent)
+        m.castShadow = !glass
+        m.receiveShadow = !glass
       }
     })
     inkModel(root, (m) => !!(m.material as THREE.Material).transparent)
@@ -2480,6 +2486,9 @@ export function DrinkFridge({ n = 0 }: { n?: number }) {
   return (
     <group>
       <primitive object={body} />
+      {/* (the fridges' own light inside, always on: it lights the drinks whatever the room's light, and shows the more with the lamps out; one
+          light for the pair, between them (the second stands along its -x), so the scene carries one light more, not two) */}
+      {QUALITY.tier === 'high' && n === 0 && <pointLight position={[-(W + 0.08) / 2, H * 0.55, D * 0.1]} color="#eaf4ff" intensity={1.1} distance={H * 1.25} decay={1.4} />}
       {/* the cove lights (槽燈): a narrow slot let into each inner side, a thin line of white light deep in it, and
           the light washing softly along the wall, shelf and drinks beside it (up each side only) */}
       {[-1, 1].map((sd) => (

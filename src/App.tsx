@@ -31,7 +31,8 @@ import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
 import { DrinkStockPanel } from '@/shops/grill/DrinkStockPanel'
 import { useLights } from '@/scene/lightsStore'
-import { lampGlow, roomDim } from '@/game/roomLights'
+import { lampGlow, roomDim, studioLight } from '@/game/roomLights'
+import { setStudioLight } from '@/scene/studio'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
@@ -519,6 +520,27 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   // to little by night (the night's key light, standing for the moon, with it: the fire then carries the room); the day's sun is as it was)
   const lights = useLights()
   const dim = roomDim(lights.on, theme === 'dark')
+  // (the polished metal's reflections as bright as the room: no gold or brass shining in the dark)
+  useEffect(() => setStudioLight(studioLight(lights.on, theme === 'dark')), [lights.on, theme])
+  // (by night the key light is the moon's, in through the round window: its shadows fall away from the window; by day the sun's, over the
+  // open side as ever)
+  const keyLight = useRef<THREE.DirectionalLight>(null)
+  const scene3 = useThree((s) => s.scene)
+  const moonAt = useRef(0)
+  useFrame((st) => {
+    const k = keyLight.current
+    if (!k || st.clock.elapsedTime - moonAt.current < 0.5) return
+    moonAt.current = st.clock.elapsedTime
+    const w = theme === 'dark' ? scene3.getObjectByName('RoundWindow') : undefined
+    if (!w) {
+      k.position.set(9, 16, 7)
+      return
+    }
+    w.updateWorldMatrix(true, false)
+    // (the window's room is toward its -x: the moon's out past its +x, high)
+    const out = new THREE.Vector3(1, 0, 0).transformDirection(w.matrixWorld).setY(0).normalize()
+    k.position.copy(out.multiplyScalar(11)).setY(14)
+  })
 
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
   const grillSmoke = useRef(0)
@@ -793,7 +815,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     <>
       {/* (the sun casts the room's shadows, the figures' and the furniture's on the floor: from high over the open side, its shadow camera
           spanning the whole shop; redrawn every third frame (ShadowPacer), the shadows moving a little behind what casts them) */}
-      <directionalLight position={[9, 16, 7]} intensity={look.sunIntensity * (theme === 'dark' ? dim : 1)} color={look.sun} castShadow={QUALITY.shadows}
+      <directionalLight ref={keyLight} position={[9, 16, 7]} intensity={look.sunIntensity * (theme === 'dark' ? dim : 1)} color={look.sun} castShadow={QUALITY.shadows}
         shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04}
         shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
       <ShadowPacer />
@@ -820,11 +842,15 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
 
       <OpeningSpot on={spotOn} focusY={DISHES[active].focusY} />
 
-      {/* invisible floor that only shows the spot's shadow, so there's still no background */}
-      <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
-        <planeGeometry args={[30, 30]} />
-        <shadowMaterial ref={floor} color={look.shadow} transparent opacity={look.shadowOpacity} />
-      </mesh>
+      {/* invisible floor that only shows the spot's shadow, so there's still no background (not for a shop with its own room: it stood at
+          the cook's table's height across the whole scene, and the night's light from the window threw the room's shadow onto it, out past
+          the shop in mid-air) */}
+      {!DISHES[active].roast && (
+        <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
+          <planeGeometry args={[30, 30]} />
+          <shadowMaterial ref={floor} color={look.shadow} transparent opacity={look.shadowOpacity} />
+        </mesh>
+      )}
 
       {DISHES.map((dish, i) => {
         const base = orderedBase(dish, orders[dish.id])
