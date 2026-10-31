@@ -1,8 +1,8 @@
 """The entrance's lantern and curtain, in finer shape (their pictures, the shop's name and crest, are still painted by the game):
 
-- chochin.glb, node "Chochin": a red paper lantern (赤提灯) 42 cm tall, its paper swelling between the bamboo ribs it's wound on (ChochinSkin,
-  UVs once round it, bottom to top), black lacquered caps top and bottom each with a gold band, a wire bail to hang it by, a red tassel under it.
-  Its middle at the origin.
+- chochin.glb, node "Chochin": a long paper lantern (長提灯) 62 cm tall, nearly a cylinder (ChochinSkin, UVs once round it, bottom to top;
+  its ribs painted by the game), black lacquered caps top and bottom each with a gold band, a cord loop to hang it by. Its middle at the
+  origin.
 - noren.glb, node "Noren": the curtain's lacquered rod with brass end caps (NorenRod), and three cloth panels (NorenPanel0..2), each hung from its
   top edge at its own origin (the game swings them about it), soft folds running down it and growing toward the hem, a turned hem, and the cloth
   tabs (乳) looping over the rod. Each panel's UVs 0..1 over it.
@@ -69,39 +69,35 @@ def grid_mesh(name, nu, nv, at):
 
 
 def lantern():
+    """a long lantern (長提灯): a tall paper cylinder barely swelling at its middle, 62 cm tall and 23 across, black lacquered caps top and
+    bottom each with a gold band, a cord loop over the top. Its ribs and their shading are painted (the game's picture), not modelled: a
+    smooth body of few faces"""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     M = {"paper": pbr("ChochinPaper", lin("#e03a2c"), rough=0.8), "lacquer": pbr("ChochinLacquer", lin("#140a06"), rough=0.3, coat=0.5),
          "gold": pbr("ChochinGold", lin("#d6a84a"), rough=0.3, metal=1.0), "red": pbr("ChochinTassel", lin("#b8241a"), rough=0.7)}
     parts = []
-    RIBS = 15
+    H, R = 0.62, 0.115
 
     def skin(u, v):
-        y = v * 0.42 - 0.21
-        # (plump: swelling out fast from the caps to a full round belly, nearly a ball)
-        base = 0.074 + 0.15 * math.sin(math.pi * v) ** 0.6
-        # (the paper bellying out a little between each pair of ribs)
-        r = base * (1 + 0.035 * abs(math.sin(math.pi * v * RIBS)))
+        y = v * H - H / 2
+        # (nearly straight, swelling a little at its middle, drawn in a touch toward each cap)
+        r = R * (0.84 + 0.16 * math.sin(math.pi * v) ** 0.45)
         a = 2 * math.pi * u
         # (the picture turned to read upright from outside: glTF's textures run top-down)
         return P(r * math.cos(a), y, r * math.sin(a)), (1 - u, 1 - v)
-    fin(grid_mesh("ChochinSkin", 48, RIBS * 4, skin), "ChochinSkin", M["paper"], parts)
-    for sd, y in ((1, 0.215), (-1, -0.215)):
-        bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.077, depth=0.038, location=P(0, y, 0))
+    fin(grid_mesh("ChochinSkin", 32, 16, skin), "ChochinSkin", M["paper"], parts)
+    for sd, y in ((1, H / 2 + 0.006), (-1, -H / 2 - 0.006)):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=R * 0.86, depth=0.045, location=P(0, y, 0))
         c = active()
-        bv = c.modifiers.new("b", "BEVEL"); bv.width = 0.004; bv.segments = 2
+        bv = c.modifiers.new("b", "BEVEL"); bv.width = 0.005; bv.segments = 2
         bpy.ops.object.modifier_apply(modifier="b")
         fin(c, f"ChochinCap{'Top' if sd > 0 else 'Bottom'}", M["lacquer"], parts)
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.078, minor_radius=0.0028, major_segments=40, minor_segments=6, location=P(0, y - sd * 0.012, 0))
+        bpy.ops.mesh.primitive_torus_add(major_radius=R * 0.87, minor_radius=0.003, major_segments=32, minor_segments=6, location=P(0, y - sd * 0.014, 0))
         fin(active(), f"ChochinBand{'Top' if sd > 0 else 'Bottom'}", M["gold"], parts)
-    # (the bail: a wire loop over the top cap)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.03, minor_radius=0.0022, major_segments=24, minor_segments=6, location=P(0, 0.262, 0),
+    # (the cord loop over the top cap)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.026, minor_radius=0.0025, major_segments=20, minor_segments=6, location=P(0, H / 2 + 0.05, 0),
                                      rotation=(math.pi / 2, 0, 0))
     fin(active(), "ChochinBail", M["gold"], parts)
-    # (the tassel: a knot and a fall of red cord)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.012, segments=12, ring_count=8, location=P(0, -0.245, 0))
-    fin(active(), "ChochinTasselKnot", M["red"], parts)
-    bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.016, radius2=0.006, depth=0.07, location=P(0, -0.29, 0))
-    fin(active(), "ChochinTassel", M["red"], parts)
     root = bpy.data.objects.new("Chochin", None)
     bpy.context.collection.objects.link(root)
     for o in parts:

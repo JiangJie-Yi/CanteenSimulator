@@ -316,6 +316,8 @@ export function Entrance({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
       <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
+      {/* (and the grill's own, cream, 炭火焼 on it, hung on the doorway's other side) */}
+      <Movable id="chochin2" label="燒烤燈籠" baseTurn={[0, 45, 0]}><group position={[(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} style="cream" /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
@@ -402,30 +404,50 @@ const DOORMAT = (() => signTexture(512, 280, (g) => {
   brushText(g, 'いらっしゃいませ', 128, 66, 24, { fill: '#2e1c0e', shadow: 'rgba(255,230,180,0.35)', spacing: 2 })
 }))()
 
-/** the red paper lantern's skin: red washi with its ribs, and the shop's name brushed down it in black */
-const chochinTexture = (mark: string) => signTexture(512, 256, (g) => {
-  const grad = g.createLinearGradient(0, 0, 0, 256)
-  grad.addColorStop(0, '#8a1810')
-  grad.addColorStop(0.5, '#e03a2c')
-  grad.addColorStop(1, '#8a1810')
+/**
+ * A long lantern's skin (長提灯), its picture once round it: the washi lit from inside, the bamboo ribs it's wound on painted in (each a fine
+ * dark line, the paper between them bellying a little, lit at its crown), its ends darker under the caps; and down its front and again round
+ * its back the words in big brushed characters. `red`: the red one, the shop's mark in black edged with gold; `cream`: the grill's, cream
+ * paper, 炭火焼 in black with a red band top and bottom.
+ */
+const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTexture(512, 512, (g) => {
+  const cream = style === 'cream'
+  const grad = g.createLinearGradient(0, 0, 512, 0)
+  // (brightest down the middle of each face, where the lamp's behind it)
+  const [deep, mid] = cream ? ['#cbb894', '#fbf1d8'] : ['#8a1810', '#e8402e']
+  for (const [k, c] of [[0, deep], [0.25, mid], [0.5, deep], [0.75, mid], [1, deep]] as [number, string][]) grad.addColorStop(k, c)
   g.fillStyle = grad
-  g.fillRect(0, 0, 512, 256)
-  // the bamboo ribs it's wound on
-  g.strokeStyle = 'rgba(70,10,5,0.4)'
-  g.lineWidth = 2
-  for (let y = 8; y < 256; y += 14) {
-    g.beginPath()
-    g.moveTo(0, y)
-    g.lineTo(512, y)
-    g.stroke()
+  g.fillRect(0, 0, 512, 512)
+  // (the ribs: a fine dark line each, the paper just above and below it a shade darker, between them a soft light)
+  const RIBS = 26
+  for (let k = 0; k <= RIBS; k++) {
+    const y = (k / RIBS) * 512
+    const band = g.createLinearGradient(0, y - 512 / RIBS / 2, 0, y + 512 / RIBS / 2)
+    band.addColorStop(0, 'rgba(255,240,210,0)')
+    band.addColorStop(0.5, cream ? 'rgba(90,60,30,0.16)' : 'rgba(60,8,4,0.22)')
+    band.addColorStop(1, 'rgba(255,240,210,0)')
+    g.fillStyle = band
+    g.fillRect(0, y - 512 / RIBS / 2, 512, 512 / RIBS)
+    g.fillStyle = cream ? 'rgba(80,50,25,0.45)' : 'rgba(50,6,3,0.5)'
+    g.fillRect(0, y - 0.9, 512, 1.8)
   }
-  // the name, down the side facing out (and again round the back): a signwriter's black, edged in gold leaf, with a
-  // glow of the lamp behind it
-  const chars = [...mark]
-  // (one character, as on most: big, filling the lantern's face)
-  const size = chars.length === 1 ? 168 : 104
+  // (darker at the ends, under the caps)
+  const ends = g.createLinearGradient(0, 0, 0, 512)
+  ends.addColorStop(0, 'rgba(20,6,2,0.45)'); ends.addColorStop(0.1, 'rgba(20,6,2,0)'); ends.addColorStop(0.9, 'rgba(20,6,2,0)'); ends.addColorStop(1, 'rgba(20,6,2,0.45)')
+  g.fillStyle = ends
+  g.fillRect(0, 0, 512, 512)
+  if (cream) {
+    // (the grill's: a red band round it near each end)
+    for (const y of [56, 440]) { g.fillStyle = '#b8261c'; g.fillRect(0, y, 512, 16) }
+  }
+  // (the words, down the front and again round the back)
+  const chars = [...(cream ? '炭火焼' : mark)]
+  const size = chars.length === 1 ? 230 : chars.length === 2 ? 168 : 124
+  const gap = chars.length === 1 ? 0 : size * 1.02
   for (const u of [128, 384]) chars.forEach((ch, i) =>
-    brushText(g, ch, u, 128 + (i - (chars.length - 1) / 2) * 100, size, { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' }))
+    brushText(g, ch, u, 256 + (i - (chars.length - 1) / 2) * gap, size, cream
+      ? { fill: '#160a06', shadow: 'rgba(255,200,120,0.3)' }
+      : { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' }))
 })
 const CHOCHIN_GLOW = (() => {
   if (typeof document === 'undefined') return null
@@ -449,8 +471,8 @@ useGLTF.preload(NOREN_URL)
  * A red paper lantern (赤提灯) hung at the door on a little arm off a post, the shop's name on it, lit from inside:
  * it sways a touch and its glow breathes like the flame in it.
  */
-function Chochin({ mark }: { mark: string }) {
-  const tex = useMemo(() => chochinTexture(mark), [mark])
+function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream' }) {
+  const tex = useMemo(() => chochinTexture(mark, style), [mark, style])
   const hang = useRef<THREE.Group>(null)
   const skin = useRef<THREE.MeshBasicMaterial>(null)
   // (blender/genkan.py's lantern: its paper lit from within and painted with the name, its caps lacquer, its bands and bail gold)
@@ -468,7 +490,7 @@ function Chochin({ mark }: { mark: string }) {
       } else m.material = src.name === 'ChochinGold' ? new THREE.MeshStandardMaterial({ color: '#d6a84a', metalness: 1, roughness: 0.3 })
         : new THREE.MeshToonMaterial({ color: src.color.clone() })
     })
-    inkModel(r, (m) => /Skin|Band|Bail|Tassel/.test(m.name), { width: 0.0015, weld: true })
+    inkModel(r, (m) => /Band|Bail|Tassel/.test(m.name), { width: 0.0015, weld: true })
     return r
   }, [gltf, tex])
   const halo = useRef<THREE.Sprite>(null)
@@ -487,9 +509,10 @@ function Chochin({ mark }: { mark: string }) {
           <cylinderGeometry args={[0.003, 0.003, 0.15, 4]} />
           <meshBasicMaterial color="#1a0d08" />
         </mesh>
-        <group position-y={-0.36}>
+        {/* (the long lantern's middle: its cord, then half its height under it) */}
+        <group position-y={-0.5}>
           <primitive object={model} />
-          <sprite ref={halo} scale={0.9}>
+          <sprite ref={halo} scale={[0.9, 1.25, 1]}>
             <spriteMaterial map={CHOCHIN_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.5} />
           </sprite>
         </group>
