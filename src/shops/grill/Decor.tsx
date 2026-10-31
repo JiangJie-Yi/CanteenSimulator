@@ -558,11 +558,13 @@ function IngredientFridge() {
     })
     // (no ink lines round it: plain and clean, as an appliance looks; the body and what's in it drawn a few parts at a time, the lid (which
     // swings up) on its own)
-    mergeByMaterial(root, (o) => /^FreezerLid/.test(o.name))
+    // (what's in it kept apart too: drawn only while the lid's up, some thirty draws saved the rest of the time)
+    mergeByMaterial(root, (o) => /^FreezerLid|^FreezerGoods/.test(o.name))
     return root
   }, [fz])
-  // (its lid, looked up in the model as drawn)
+  // (its lid and what's in it, looked up in the model as drawn)
   lid.current = model.getObjectByName('FreezerLid') ?? null
+  const goods = model.getObjectByName('FreezerGoods') ?? null
   // (the display's own canvas, drawn again whenever what it shows changes)
   const temp = useMemo(() => {
     const c = document.createElement('canvas')
@@ -589,6 +591,8 @@ function IngredientFridge() {
     if (knobCap.current) knobCap.current.rotation.z += (knobTurn(FREEZER_TEMP.set) - knobCap.current.rotation.z) * Math.min(1, dt * 12)
     // (the lid hinged on its back edge, swinging up and over)
     if (lid.current) lid.current.rotation.x += ((-open * 1.85) - lid.current.rotation.x) * 0.1
+    // (shut, nothing inside can be seen: not drawn)
+    if (goods) goods.visible = !lid.current || lid.current.rotation.x < -0.02
     if (light.current) light.current.intensity += (open * 0.45 - light.current.intensity) * 0.12
   })
   const W = 1.5, H = 0.86, HOUSE = 0.34
@@ -620,6 +624,8 @@ function IngredientFridge() {
             <meshStandardMaterial color="#c9d0d6" metalness={0.85} roughness={0.25} />
           </mesh>
           <group ref={knobCap}>
+            {/* (its cap, sixteen ridges and mark drawn as three: they turn together, as one) */}
+            <StaticBatch>
             <mesh rotation-x={Math.PI / 2} position-z={0.016}>
               <cylinderGeometry args={[0.018, 0.02, 0.018, 24]} />
               <meshStandardMaterial color="#22272c" metalness={0.1} roughness={0.45} />
@@ -632,6 +638,7 @@ function IngredientFridge() {
             ))}
             {/* (the white mark on its face) */}
             <mesh position={[0, 0.011, 0.0255]}><boxGeometry args={[0.003, 0.012, 0.001]} /><meshBasicMaterial color="#f4f4ee" /></mesh>
+            </StaticBatch>
           </group>
         </group>
         {/* (the scale round it: a dot at each end and the middle, blue for cold, red for warm) */}

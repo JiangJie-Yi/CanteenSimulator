@@ -1251,6 +1251,8 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
           onPointerOver={editing ? (e: { stopPropagation: () => void }) => { e.stopPropagation(); setHover(true) } : undefined} onPointerOut={editing ? () => setHover(false) : undefined}>
         {editing && <group ref={gizmoFrame}><AxisGizmo id={`gate${idx}`} at={[end * G / 2, H / 2, 0]} theta={space === 'world' ? gateWorld : 0} /></group>}
         <group ref={leaf} name="gate-leaf">
+          {/* (its frame, panels, joints and hinge leaves, some forty parts, drawn as a handful: they swing together, as one) */}
+          <StaticBatch>
           <group position-x={end * (G / 2 - 0.005)}>
             {/* a framed door of planed wood: two stiles and three rails with rounded edges, the grain running up the
                 stiles and across the rails, and a recessed board panel of upright planks between them */}
@@ -1266,6 +1268,7 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
               </group>
             )))}
           </group>
+          </StaticBatch>
         </group>
         {/* the hinges, top and bottom (they go with the door when it's moved by hand, so they're in its group): a brass knuckle on the hinge's line, a leaf screwed to the base's end and one to
             the door's stile (that one turns with it: GateHingeLeaf) */}
