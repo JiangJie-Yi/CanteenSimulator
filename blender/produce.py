@@ -19,6 +19,7 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import *  # noqa: E402,F403
+from tubers import potato, potato_skin, sweet_potato, sweet_potato_skin  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,11 +60,13 @@ def burlap(name, band=None):
     return pbr(name, (1, 1, 1), tex=image(name, col), rough=0.95)
 
 
+# (the potatoes' and sweet potatoes' own skins, as dug: blender/tubers.py)
+POTATO_SKIN, SWEET_SKIN = potato_skin(512), sweet_potato_skin(512)
 M = {
     "sackP": burlap("ProduceSackPotato"),
     "sackS": burlap("ProduceSackSweet", band="#b8322a"),
-    "potato": pbr("ProducePotato", tuple(lin("#c9a464")), rough=0.85),
-    "sweet": pbr("ProduceSweetPotato", tuple(lin("#8e2f4c")), rough=0.6),
+    "potato": pbr("ProducePotato", (1, 1, 1), tex=image("produce_potato", POTATO_SKIN[0]), nrm=image("produce_potato_n", POTATO_SKIN[1], data=True), rough=0.85),
+    "sweet": pbr("ProduceSweetPotato", (1, 1, 1), tex=image("produce_sweet", SWEET_SKIN[0]), nrm=image("produce_sweet_n", SWEET_SKIN[1], data=True), rough=0.55),
     "tie": pbr("ProduceTwine", tuple(lin("#a88a5a")), rough=0.9),
 }
 parts = []
@@ -148,31 +151,15 @@ def sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=20, rings=9):
 
 
 def tuber(name, x, y, z, size, kind, rot=(0.0, 0.0, 0.0)):
-    """a potato (lumpy, round-oval) or a sweet potato (long, tapered at both ends, a little bent)"""
+    """a potato or a sweet potato (blender/tubers.py: as they come out of the ground), its middle at (x, y, z), `size` as the old round ones
+    were (a potato about twice it long, a sweet potato about four times), turned by `rot`"""
+    seed_ = sum(ord(c) for c in name)
     if kind == "potato":
-        bpy.ops.mesh.primitive_uv_sphere_add(segments=10, ring_count=7, radius=1, location=P(x, y, z))
-        o = active()
-        o.scale = (size * 1.15, size * 0.95, size * 0.85)
+        o = potato(name, M["potato"], size=size * 2.1, seed=seed_)
     else:
-        bpy.ops.mesh.primitive_uv_sphere_add(segments=10, ring_count=8, radius=1, location=P(x, y, z))
-        o = active()
-        o.scale = (size * 2.1, size * 0.85, size * 0.8)
-    apply_scale(o)
-    me = o.data
-    for vv in me.vertices:
-        if kind == "potato":
-            k = 1 + 0.08 * math.sin(vv.co.x * 41 + vv.co.y * 17) * math.cos(vv.co.z * 33)
-        else:
-            t = vv.co.x / (size * 2.1)
-            k = 1 - 0.55 * abs(t) ** 2.2
-            vv.co.z += size * 0.25 * (1 - t * t)
-        vv.co.y *= k
-        vv.co.z *= k if kind == "potato" else 1
+        o = sweet_potato(name, M["sweet"], length=size * 4.3, girth=size * 1.8, bend=0.1, seed=seed_)
+    o.location = P(x, y, z)
     o.rotation_euler = rot
-    o.name = name
-    o.data.materials.append(M["potato" if kind == "potato" else "sweet"])
-    for p in o.data.polygons:
-        p.use_smooth = True
     parts.append(o)
     return o
 

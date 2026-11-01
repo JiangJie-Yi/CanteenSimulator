@@ -27,6 +27,7 @@ from mathutils import Matrix, Vector
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (active, apply_scale, bevel, cyl_uv, export_dish, fbm, finish, grid01, image, join,  # noqa: E402
                     leaf, mix, pbr, seed, smooth, to_normal, vnoise)
+from tubers import potato, potato_skin, sweet_potato, sweet_potato_skin  # noqa: E402
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -344,13 +345,13 @@ TEX["sausage"] = image("T_Sausage", mix(mix((0.62, 0.14, 0.1), (0.78, 0.24, 0.16
 N = 256
 char = smooth(0.6, 0.78, fbm(N, 5, 5))
 eyes = (vnoise(N, 14, 14) > 0.86).astype(np.float32)
-potato = mix(mix((0.62, 0.45, 0.26), (0.76, 0.6, 0.38), fbm(N, 8, 8)), (0.35, 0.24, 0.13), eyes * 0.8)
-TEX["potato"] = image("T_Potato", mix(potato, (0.12, 0.08, 0.05), char * 0.85))
-TEX["potato_n"] = image("T_Potato_N", to_normal(fbm(N, 16, 16) * 0.5 - eyes * 0.5, 2.0), data=True)
-streaks = vnoise(N, 64, 4)
-sweet = mix((0.46, 0.14, 0.18), (0.62, 0.24, 0.26), streaks)
-TEX["sweetpotato"] = image("T_SweetPotato", mix(sweet, (0.1, 0.05, 0.05), char * 0.85))
-TEX["sweetpotato_n"] = image("T_SweetPotato_N", to_normal(streaks * 0.6, 2.0), data=True)
+# (their skins as dug (blender/tubers.py, after photoscans of real ones), charred where the embers caught them)
+potato_rgb, potato_n = potato_skin(N)
+TEX["potato"] = image("T_Potato", mix(potato_rgb, (0.12, 0.08, 0.05), char * 0.85))
+TEX["potato_n"] = image("T_Potato_N", potato_n, data=True)
+sweet_rgb, sweet_n = sweet_potato_skin(N)
+TEX["sweetpotato"] = image("T_SweetPotato", mix(sweet_rgb, (0.1, 0.05, 0.05), char * 0.85))
+TEX["sweetpotato_n"] = image("T_SweetPotato_N", sweet_n, data=True)
 
 # salt-grilled shrimp shell (u: head 0 .. tail 1 along the body, v: around, the back at v = 0/1, the belly at 0.5).
 # Cooked shell: deep orange-red over the back fading to pale coral and cream underneath, the six tail segments each
@@ -2219,24 +2220,12 @@ def piece(src, name, mat, keep, cut=CUT):
 
 def roast_in_ash(name, mat, top_mat, flesh_mat, angle_deg, r, size, bend=0.0):
     a = math.radians(angle_deg)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=32, ring_count=16,
-                                         location=(r * math.cos(a), r * math.sin(a),
-                                                   size[2] * 0.7 + salt_height(r * math.cos(a), r * math.sin(a))),
-                                         rotation=(0, 0, a + math.pi / 2 + random.uniform(-0.4, 0.4)))
-    whole = active()
-    bm = bmesh.new()
-    bm.from_mesh(whole.data)
-    for vtx in bm.verts:
-        x = vtx.co.x
-        # lumpy, and for sweet potatoes tapered at both ends with a gentle curve
-        vtx.co *= random.uniform(0.95, 1.05)
-        if bend:
-            taper = 1 - 0.55 * x * x
-            vtx.co.y *= taper
-            vtx.co.z *= taper
-            vtx.co.y += bend * (1 - x * x)
-    bm.to_mesh(whole.data)
-    bm.free()
+    # (the whole tuber as dug (blender/tubers.py), two across, then sized: a potato knobbly with its eyes sunk in, a sweet potato a long
+    # spindle, blunt at the stem and tailing off at the root, a little bent)
+    whole = (sweet_potato(name + "Whole", mat, length=2.0, girth=2.0, bend=bend * 0.4, seed=7, rings=20, around=16) if bend
+             else potato(name + "Whole", mat, size=2.0, seed=3, seg=24, rings=14))
+    whole.location = (r * math.cos(a), r * math.sin(a), size[2] * 0.7 + salt_height(r * math.cos(a), r * math.sin(a)))
+    whole.rotation_euler = (0, 0, a + math.pi / 2 + random.uniform(-0.4, 0.4))
     whole.scale = size
 
     skin = piece(whole, name, mat, "below")
