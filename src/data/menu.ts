@@ -203,8 +203,10 @@ export const DISHES: Dish[] = [
       net: ['NetMochi', 'Onigiri'],
       faceCamera: ['ShrimpSkewer'],
       drinks: ['MisoSoup', 'Sake'],
-      // the net's three spots (x, z); the model's mochi sits on the first, its onigiri on the second
-      netSpots: [[-0.15, 0.0], [0.135, 0.095], [0.08, -0.15]],
+      // the net's three spots (x, z); the model's mochi sits on the first, its onigiri on the second. In a row across the net as the grill's
+      // camera sees it (its across is (0.84, -0.55) in the model's x and z), 0.22 apart: two of them stood nearly one behind the other, and
+      // two rice balls there (each standing, 20 cm across) looked piled one on the other (the owner: they can't be stacked like this)
+      netSpots: [[-0.173, 0.138], [-0.016, -0.025], [0.195, -0.104]],
       // just outside the stones, to the upper right of the fire as the camera sees it
       // (kept clear of the corn skewer at -55°, which used to stand right in front of it)
       // plates and dishes on the right of the fire as the camera sees it, the box and the bucket on the left
