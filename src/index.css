@@ -6890,3 +6890,18 @@ html[lang='en'] .menu-title-en { display: none; }
   border-top: 2px solid #9fb7c8;
   background: linear-gradient(180deg, #cdd5db, #b9c5cf);
 }
+
+/* ---- the day turned to night (or back) as a dissolve (App's switchTheme, the owner's: ease-in-out, 0.65 s): the page as it was held as a
+   picture and faded into the page as it is now, the room and the panels together ---- */
+html.theme-fading::view-transition-old(root),
+html.theme-fading::view-transition-new(root) {
+  animation-duration: 0.65s;
+  animation-timing-function: ease-in-out;
+}
+
+/* (asked for from the room (the sake barrels: the sake), a card in the stock is brought into view and lit a moment) */
+.stock-panel .is-focus { animation: stock-focus 1.8s ease-in-out; }
+@keyframes stock-focus {
+  0%, 100% { box-shadow: none; }
+  20%, 65% { box-shadow: 0 0 0 3px #ffd36b, 0 0 18px 4px rgba(255, 211, 107, 0.6); }
+}

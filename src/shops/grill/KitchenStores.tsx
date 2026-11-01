@@ -18,6 +18,9 @@ const PRODUCE_URL = import.meta.env.BASE_URL + 'models/produce.glb'
 const METAL = /^Stock(Cap|Iron|Steel|FoilEnd|OilTin)$/
 /** what's seen from inside as well as out: the sacks, open at the mouth */
 const OPEN = /^(ProduceSack|CharcoalSack)/
+/** what's baked (the tubers: blender/produce.py bakes a detailed twin onto each coarse one), its normal map kept, so the room's light shades
+ * it as if it were round */
+const BAKED = /^ProduceTuber/
 /** too small or too fine for an ink line (the skewers, their ties, the labels and the marks on things) */
 const UNINKED = /Skewer|Label|Mark|Spice\d|SpiceCap|FoilRoll|Lemon\d/
 
@@ -40,7 +43,10 @@ function partOf(scene: THREE.Group, node: string, width: number, keep?: (o: THRE
           const g = new THREE.MeshStandardMaterial({ color: sm.color.clone(), metalness: 0.8, roughness: Math.max(0.25, sm.roughness), envMapIntensity: 0.8 })
           reflectStudio(g)
           t = g
-        } else t = new THREE.MeshToonMaterial({ color: sm.color.clone(), map: sm.map ?? null, side: OPEN.test(sm.name) ? THREE.DoubleSide : THREE.FrontSide })
+        } else {
+          t = new THREE.MeshToonMaterial({ color: sm.color.clone(), map: sm.map ?? null, side: OPEN.test(sm.name) ? THREE.DoubleSide : THREE.FrontSide })
+          if (BAKED.test(sm.name) && sm.normalMap) Object.assign(t, { normalMap: sm.normalMap, normalScale: sm.normalScale.clone() })
+        }
         t.name = sm.name
         mats.set(s, t)
       }
@@ -63,7 +69,10 @@ export function CubbyStock({ which }: { which: 'right' | 'left' }) {
   return <primitive object={obj} />
 }
 
-/** the sacks of potatoes and sweet potatoes, their backs to the bar, along it */
+/**
+ * The sacks of potatoes and sweet potatoes, their backs to the bar, along it: what's kept at room temperature, so pointed at they light and
+ * say how many there are, and clicked the stock opens on its larder's tab (the owner's).
+ */
 export function ProduceSacks() {
   const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
@@ -71,7 +80,18 @@ export function ProduceSacks() {
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
     return r
   }, [gltf])
-  return <primitive object={obj} />
+  const says = () => {
+    const p = SUPPLIES.has('Potato'), s = SUPPLIES.has('SweetPotato')
+    return p < 0 ? '點一下看常溫區的庫存' : `馬鈴薯 ${p}・地瓜 ${s}・點一下看常溫區的庫存`
+  }
+  return (
+    // (handlers on a group round it: a primitive's own aren't attached)
+    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('地瓜馬鈴薯', says()).onPointerOver(e) }}
+      onPointerOut={(e) => { if (getEdit().on) return; tipOver('地瓜馬鈴薯', '').onPointerOut(e) }}
+      onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('ambient', 'sack') }}>
+      <primitive object={obj} />
+    </group>
+  )
 }
 /** how many sticks the sack shows full (two sacks' worth and over: all of them) */
 const STICKS_SHOWN = 14

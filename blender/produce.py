@@ -22,6 +22,7 @@ import bmesh
 import bpy
 import numpy as np
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import *  # noqa: E402,F403
@@ -116,7 +117,7 @@ def mesh_object(name, bm, mat):
     return o
 
 
-def sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 2, salt=0):
+def sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 2, salt=0, inside=True):
     """a sack standing full, after the photoscan: a soft barrel from its slumped foot up to its mouth, shallow creases round the upper part
     where it was gathered (deeper on some sides than others), lumpy up top with what's in it; the cloth's edge at the mouth folded in over
     what's heaped there; a dark floor just inside, under what's heaped (no looking down into an empty sack); and a seam down the front (at
@@ -124,7 +125,7 @@ def sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 2, sa
     rnd = __import__("random").Random(salt + int(cx * 1000))
     ph = [rnd.uniform(0, 6.3) for _ in range(6)]
     # (heights up it: dense where the creases are, a fold at each)
-    ts = [0.0, 0.03, 0.1, 0.2, 0.3, 0.4, 0.48, 0.53, 0.56, 0.6, 0.66, 0.7, 0.73, 0.78, 0.82, 0.85, 0.9, 0.95, 1.0]
+    ts = [0.0, 0.04, 0.16, 0.32, 0.47, 0.53, 0.58, 0.67, 0.72, 0.8, 0.85, 0.92, 1.0]
     CREASES = ((0.555, 0.045), (0.705, 0.035), (0.835, 0.03))
 
     def radius(t, a):
@@ -151,7 +152,7 @@ def sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 2, sa
         rows.append((row, t))
     # (the mouth: the cloth's edge rising a little, then folded in and down over what's heaped there)
     top_r = [radius(1.0, 2 * math.pi * jn / seg) for jn in range(seg)]
-    for (rf, dy, tv) in ((0.99, 0.016, 1.03), (0.9, 0.028, 1.06), (0.78, 0.022, 1.09), (0.7, 0.008, 1.12)):
+    for (rf, dy, tv) in ((0.97, 0.02, 1.04), (0.82, 0.026, 1.08), (0.7, 0.01, 1.12)):
         row = []
         for jn in range(seg):
             a = 2 * math.pi * jn / seg
@@ -172,8 +173,11 @@ def sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 2, sa
     for jn in range(seg):
         bm.faces.new((rows[0][0][jn], rows[0][0][(jn + 1) % seg], c))
     o = mesh_object(name, bm, mat)
-    # ---- the dark floor just inside the mouth, under what's heaped there ----
+    # ---- the dark floor just inside the mouth, under what's heaped there (none where a heap fills it) ----
     bm = bmesh.new()
+    if not inside:
+        bm.free()
+        return seam_of(name, cx, cz, h, r, mat, lean, front, ts, radius, ph, o)
     ring = [bm.verts.new(P(cx + top_r[jn] * 0.86 * math.cos(2 * math.pi * jn / seg) + dx * h, h - 0.012,
                            cz + top_r[jn] * 0.86 * math.sin(2 * math.pi * jn / seg) + dz * h)) for jn in range(seg)]
     bm.faces.new(ring)
@@ -182,7 +186,12 @@ def sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 2, sa
         if fc.normal.z < 0:
             fc.normal_flip()
     mesh_object(name + "Inside", bm, "inside")
-    # ---- the seam: a flap of the cloth standing proud down the front, from near the foot to the mouth ----
+    return seam_of(name, cx, cz, h, r, mat, lean, front, ts, radius, ph, o)
+
+
+def seam_of(name, cx, cz, h, r, mat, lean, front, ts, radius, ph, o):
+    """the seam: a flap of the cloth standing proud down the front, from near the foot to the mouth"""
+    dx, dz = lean
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new()
     W, out = 0.012, 0.007
@@ -212,16 +221,111 @@ def sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 2, sa
     return o
 
 
+# ---- the tubers, as the Ebisu and the lucky cats are made (the owner's): a clean, coarse grid of quads with what a detailed one looks like baked
+# onto it. (The real tubers were too many triangles; a picture painted for the heap, and then a shell laid over it with the heap baked on,
+# didn't look right: a heap of potatoes is its potatoes' outlines.) A few of each kind are made twice from one seed, at full detail and as a
+# coarse grid (the same shape, unwrapped the same way); the detailed one's skin and shape are baked onto the coarse one's own cell of a shared
+# picture (its colour, and a normal map, so the room's light shades it as if it were round and shows its eyes and creases), and every tuber
+# in the heaps and on the floor is one of these, turned and sized its own way.
+TUBER_CELL = 256
+TEMPLATES = [("potato", 11), ("potato", 23), ("potato", 37), ("potato", 41), ("sweet", 5), ("sweet", 17), ("sweet", 29)]
+POTATO_SIZE, SWEET_SIZE = 0.057, 0.05
+
+
+def to_srgb(c):
+    """linear light (as Cycles bakes it) to the sRGB an 8-bit picture holds (as the skins it was baked from were painted)"""
+    c = np.clip(c, 0, 1)
+    return np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(c, 1 / 2.4) - 0.055).astype(np.float32)
+
+
+def tuber_pair(kind, seed_, k):
+    """a tuber twice from one seed: at full detail, and as a coarse grid of quads (12 round and 8 from pole to pole, a potato; 10 round and 10
+    along, a sweet potato: coarser and their outlines showed corners close up); set apart from the others while they're baked"""
+    out = []
+    for detail in (True, False):
+        name = f"Tuber{kind}{seed_}{'Hi' if detail else ''}"
+        if kind == "potato":
+            o = potato(name, M["potato"], size=POTATO_SIZE * 2.1, seed=seed_, seg=28 if detail else 12, rings=18 if detail else 8)
+        else:
+            o = sweet_potato(name, M["sweet"], length=SWEET_SIZE * 4.3, girth=SWEET_SIZE * 1.8, bend=0.1, seed=seed_,
+                             rings=28 if detail else 10, around=18 if detail else 10)
+        o.location = (k * 0.5, 3.0, 0.0)
+        out.append(o)
+    return out
+
+
+def bake_tubers():
+    """each template's detailed twin baked onto it (Cycles, selected to active): its colour and its normal map, in its cell of one picture"""
+    sc = bpy.context.scene
+    sc.render.engine = "CYCLES"
+    sc.cycles.device = "CPU"
+    try:
+        sc.cycles.use_denoising = False
+    except AttributeError:
+        pass
+    W, H = TUBER_CELL * 4, TUBER_CELL * 2
+    col_img = bpy.data.images.new("TuberBakeColour", W, H, float_buffer=True)
+    nrm_img = bpy.data.images.new("TuberBakeNormal", W, H, float_buffer=True)
+    nrm_img.colorspace_settings.name = "Non-Color"
+    bake = bpy.data.materials.new("TuberBake")
+    bake.use_nodes = True
+    node = bake.node_tree.nodes.new("ShaderNodeTexImage")
+    bake.node_tree.nodes.active = node
+    lows = {}
+    for k, (kind, seed_) in enumerate(TEMPLATES):
+        hi, lo = tuber_pair(kind, seed_, k)
+        cx, cy = k % 4, k // 4
+        for d in lo.data.uv_layers.active.data:
+            d.uv = ((cx + 0.03 + d.uv.x * 0.94) / 4, (cy + 0.03 + d.uv.y * 0.94) / 2)
+        lo.data.materials.clear()
+        lo.data.materials.append(bake)
+        bpy.context.view_layer.update()
+        for img, kind_, kw in ((col_img, "DIFFUSE", {"pass_filter": {"COLOR"}}), (nrm_img, "NORMAL", {"normal_space": "TANGENT"})):
+            node.image = img
+            bpy.ops.object.select_all(action="DESELECT")
+            hi.select_set(True)
+            lo.select_set(True)
+            bpy.context.view_layer.objects.active = lo
+            sc.cycles.samples = 4
+            bpy.ops.object.bake(type=kind_, use_selected_to_active=True, cage_extrusion=0.005, max_ray_distance=0.02, margin=6,
+                                margin_type="EXTEND", use_clear=(k == 0), **kw)
+        me = hi.data
+        bpy.data.objects.remove(hi, do_unlink=True)
+        bpy.data.meshes.remove(me)
+        lows[(kind, seed_)] = lo
+    col = to_srgb(np.array(col_img.pixels[:], np.float32).reshape(H, W, 4)[..., :3])
+    nrm = np.array(nrm_img.pixels[:], np.float32).reshape(H, W, 4)[..., :3].copy()
+    if os.environ.get("TUBER_DEBUG"):
+        for nm, img in (("col", col_img), ("nrm", nrm_img)):
+            img.filepath_raw = os.path.join(os.environ["TUBER_DEBUG"], f"tuber_{nm}.png")
+            img.file_format = "PNG"
+            img.save()
+    bpy.data.images.remove(col_img)
+    bpy.data.images.remove(nrm_img)
+    mat = pbr("ProduceTuber", (1, 1, 1), tex=image("produce_tuber", col), nrm=image("produce_tuber_n", nrm, data=True), rough=0.8)
+    for lo in lows.values():
+        lo.data.materials.clear()
+        lo.data.materials.append(mat)
+    bpy.data.materials.remove(bake)
+    print("TUBER_TRIS", {f"{k}{s_}": sum(len(p.vertices) - 2 for p in lo.data.polygons) for (k, s_), lo in lows.items()})
+    return lows
+
+
+LOWS = bake_tubers()
+PLACED = {"potato": 0, "sweet": 0}
+
+
 def tuber(name, x, y, z, size, kind, rot=(0.0, 0.0, 0.0)):
-    """a potato or a sweet potato (blender/tubers.py: as they come out of the ground), its middle at (x, y, z), `size` as the old round ones
-    were (a potato about twice it long, a sweet potato about four times), turned by `rot`"""
-    seed_ = sum(ord(c) for c in name)
-    if kind == "potato":
-        o = potato(name, M["potato"], size=size * 2.1, seed=seed_)
-    else:
-        o = sweet_potato(name, M["sweet"], length=size * 4.3, girth=size * 1.8, bend=0.1, seed=seed_)
+    """a potato or a sweet potato: one of the baked ones (each kind's in turn), its middle at (x, y, z), `size` as the old round ones were (a
+    potato about twice it long, a sweet potato about four times), turned by `rot`"""
+    ts = [t for t in TEMPLATES if t[0] == kind]
+    t = ts[PLACED[kind] % len(ts)]
+    PLACED[kind] += 1
+    o = bpy.data.objects.new(name, LOWS[t].data)
+    bpy.context.collection.objects.link(o)
     o.location = P(x, y, z)
     o.rotation_euler = rot
+    o.scale = [size / (POTATO_SIZE if kind == "potato" else SWEET_SIZE)] * 3
     parts.append(o)
     return o
 
@@ -254,12 +358,14 @@ tuber("ProduceLoose0", -0.2, 0.045, 0.27, 0.055, "potato", rot=(0.3, 0.2, 0.9))
 tuber("ProduceLoose1", 0.25, 0.045, 0.3, 0.05, "potato", rot=(1.1, 0.0, 0.2))
 tuber("ProduceLoose2", 0.06, 0.04, 0.33, 0.05, "sweet", rot=(0.0, 0.0, 0.7))
 sack_parts = list(parts)
+for lo in LOWS.values():
+    bpy.data.objects.remove(lo, do_unlink=True)
 
 
 def stick(name, x, y0, z, length, rad, tilt, spin):
     """a stick of binchotan standing up out of the sack: knobbly, a few flat facets and cracks, its top end cut"""
     bm = bmesh.new()
-    segs, n = 7, 4
+    segs, n = 6, 3
     rnd = __import__("random").Random(name)
     rows = []
     for k in range(n + 1):

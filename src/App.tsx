@@ -1,4 +1,5 @@
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
+import { flushSync } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { IndoorHDRI } from '@/scene/IndoorHDRI'
 import { FpsMeter } from '@/scene/FpsMeter'
@@ -1078,10 +1079,13 @@ export default function App() {
   // (the freezer, or a fridge under the cook table, clicked open in the room: the panel opens on its tab, the camera staying where it is (the
   // owner's); the panel shut, what opened it shuts with it, and it shut, the panel shuts too)
   const opener = useRef<(() => void) | null>(null)
-  useEffect(() => onPantryAsk((tab, _from, close) => {
+  // (and asked for one thing in particular (the sake barrels clicked: the sake), it's brought into view in the panel and lit a moment)
+  const [stockFocus, setStockFocus] = useState<{ id: string; n: number } | null>(null)
+  useEffect(() => onPantryAsk((tab, _from, close, focus) => {
     opener.current = close ?? null
     setStockTab(tab as StockTab)
     setFridgeOpen(true)
+    if (focus) setStockFocus({ id: focus, n: performance.now() })
   }), [])
   useEffect(() => {
     if (fridgeOpen || !opener.current) return
@@ -1601,6 +1605,23 @@ export default function App() {
     window.setTimeout(() => setChat((all) => all.filter((m) => m.id !== id)), 6000)
   }, [])
   const [theme, toggleTheme] = useTheme()
+  /**
+   * The day turned to night (or back) as a dissolve, not a cut (the owner's: ease-in-out, 0.65 s): the browser holds a picture of the page as
+   * it is (the room and the panels alike), the change is made under it, and the one fades into the other (a view transition; index.css's
+   * `theme-fading`). A browser without them, or one set to reduce motion, just changes.
+   */
+  const switchTheme = () => {
+    const root = document.documentElement
+    if (!('startViewTransition' in document) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      toggleTheme()
+      return
+    }
+    root.classList.add('theme-fading')
+    const done = () => root.classList.remove('theme-fading')
+    const t = document.startViewTransition(() => flushSync(toggleTheme))
+    t.ready.catch(() => {})
+    t.finished.then(done, done)
+  }
   // the menu can be folded away to give the food the whole screen
   const [menuFolded, setMenuFolded] = useState(false)
   // (in edit mode the menu is folded away first, to leave the room in view; it comes back as it was when editing ends)
@@ -1804,6 +1825,7 @@ export default function App() {
       say(text)
     }
     SUPPLIES.coal = () => stockRef.current[CHARCOAL] ?? 0
+    SUPPLIES.has = (id: string) => stockRef.current[id] ?? 0
     SUPPLIES.refillCrate = (cap: number) => {
       const r = crateRefill(stockRef.current[CHARCOAL] ?? 0, cap)
       if (r.crate) shiftStockRef.current({ [CHARCOAL]: -r.crate })
@@ -1819,7 +1841,7 @@ export default function App() {
       shiftStockRef.current({ [seasonId(k as Seasoning)]: -1 })
       return true
     }
-    return () => { SUPPLIES.coal = () => Infinity; SUPPLIES.refillCrate = (cap: number) => cap; SUPPLIES.dab = () => true }
+    return () => { SUPPLIES.coal = () => Infinity; SUPPLIES.refillCrate = (cap: number) => cap; SUPPLIES.dab = () => true; SUPPLIES.has = () => -1 }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // the stock keeper (倉儲) at each shop goes round now and then and orders in whatever its menu is running low on:
@@ -2537,7 +2559,7 @@ export default function App() {
       </>)}
       {/* (the stock: everything kept, at any time, from the little fridge top right; researching, its foods are taken out to try from it) */}
       {fridgeOpen && !editOn && !!dish.roast && (
-        <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} cash={cash}
+        <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} cash={cash} focus={stockFocus}
           unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id) ?? { price: 0 })}
           research={hand} quantities={orders[dish.id] ?? {}} onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)} onClear={putAllBack}
           onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)}
@@ -2635,7 +2657,7 @@ export default function App() {
         aria-pressed={speed > 1} title={tl(lang, '快速 ×2', '早送り ×2', 'Fast ×2')}>
         {speed > 1 ? '×2' : '▶▶'}
       </button>
-      <button type="button" className="theme-toggle" onClick={toggleTheme}
+      <button type="button" className="theme-toggle" onClick={switchTheme}
         aria-label={theme === 'light' ? '切換成深色模式' : '切換成淺色模式'}>
         {theme === 'light' ? '夜' : '晝'}
       </button>

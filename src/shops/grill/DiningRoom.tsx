@@ -14,7 +14,7 @@ import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { BOSS_DRINK } from './Boss'
 import { CASE_SIZE } from '@/game/drinkStock'
-import { fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
+import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -3470,6 +3470,25 @@ function BackStockHit({ size = [0.42, 0.62, 0.34], lit }: { size?: [number, numb
     </mesh>
   )
 }
+/** an unseen box over the sake barrels: the sake's stock (kept at room temperature); pointed at, it says how much there is and lights them
+ * (`lit`: the barrels as drawn), a click opens the stock on its larder's tab, at the sake (the owner's) */
+function SakeHit({ lit }: { lit: () => THREE.Object3D | null }) {
+  const hint = () => {
+    const n = SUPPLIES.has('Sake')
+    return n < 0 ? '點一下看常溫區的清酒' : `清酒 ${n}・點一下看常溫區的庫存`
+  }
+  return (
+    <mesh position={[0, SAKE_HIT[1] / 2, 0]}
+      onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('ambient', 'sack', undefined, 'Sake') }}
+      onPointerOver={(e) => { if (getEdit().on) return; handOver.onPointerOver({ ...e, eventObject: lit() ?? e.eventObject }); setTip({ title: '菰樽（清酒）', hint: hint() }) }}
+      onPointerOut={(e) => { handOver.onPointerOut({ ...e, eventObject: lit() ?? e.eventObject }); setTip(null) }}>
+      <boxGeometry args={SAKE_HIT} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
+  )
+}
+/** the stack's size (in the frame it's turned in): the box pointed at over it */
+const SAKE_HIT: [number, number, number] = [0.9, 1.1, 0.76]
 /** how far along from the crates the cartons stand (the crates' own frame) */
 /** where the cartons stand by the crates (the crates' own frame): turned end on, close beside them and running out from the wall, so they
  * keep to the floor (laid along the wall they ran on past the wall's end and the floor's edge) */
@@ -3847,6 +3866,9 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   // (the drinks' stock as drawn, the crates and the cartons: what lights up when the unseen box over them is pointed at)
   const stock = useRef<THREE.Group>(null)
   const stockLit = () => stock.current
+  // (and the sake barrels, as drawn: the sake's stock)
+  const sake = useRef<THREE.Group>(null)
+  const sakeLit = () => sake.current
   const c1 = counters[1]
   // (the corner where the room's two walls meet: the plant stands in it, a little in from both)
   const cornerAt = useMemo(() => {
@@ -3873,11 +3895,13 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
     <>
       <Movable id="speaker" label="音箱" baseTurn={[0, 45, 0]} baseScale={0.82}><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
       {/* (one stack, standing where the two used to) */}
-      <Movable id="sake" label="酒樽"><StaticBatch>
+      <Movable id="sake" label="酒樽"><group ref={sake}><StaticBatch>
         <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
           <group rotation-y={Math.PI / 2}><SakeStack part={0} /></group>
         </group>
-      </StaticBatch></Movable>
+      </StaticBatch></group>
+        <group position={at(3.55, 3.6)} rotation-y={face + 0.3}><group rotation-y={Math.PI / 2}><SakeHit lit={sakeLit} /></group></group>
+      </Movable>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
       <Movable id="willow" label="柳樹"><StaticBatch>

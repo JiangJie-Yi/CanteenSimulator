@@ -1061,11 +1061,9 @@ function CubbyFrame() {
     <>
       <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[-0.3, -0.08]} color={CUBBY_WOOD} />
       <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color={CUBBY_WOOD} />
-      <Block along={[CUBBY.shelfAlong, CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[CUBBY_SHELF_Y - CUBBY.shelfThick, CUBBY_SHELF_Y]} color={CUBBY_WOOD} />
       {/* (and the second, on the left: the same header, floor and a shelf the whole way across) */}
       <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[-0.3, -0.08]} color={CUBBY_WOOD} />
       <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color={CUBBY_WOOD} />
-      <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[CUBBY_SHELF_Y - CUBBY.shelfThick, CUBBY_SHELF_Y]} color={CUBBY_WOOD} />
     </>
   )
 }
@@ -1079,6 +1077,31 @@ function CubbyFrame() {
 // (the cupboards are fridges (the owner's): a cold white light in them, not a warm one)
 const STRIP_OFF = new THREE.Color('#4a5058')
 const STRIP_ON = new THREE.Color('#eef7ff')
+/** a wire rack (a fridge's shelf, as the drinks fridges' are): a frame of round rod round it and thin wires across it from front to back,
+ * `w` along x and `d` along z, its top at y 0; made once for each size */
+const racks = new Map<string, THREE.BufferGeometry>()
+function wireRack(w: number, d: number) {
+  const key = `${w.toFixed(3)}x${d.toFixed(3)}`
+  let g = racks.get(key)
+  if (g) return g
+  const parts: THREE.BufferGeometry[] = []
+  const rod = (len: number, r: number, along: 'x' | 'z', x: number, z: number) => {
+    const c = new THREE.CylinderGeometry(r, r, len, 6, 1, true)
+    c.rotateZ(along === 'x' ? Math.PI / 2 : 0)
+    if (along === 'z') c.rotateX(Math.PI / 2)
+    c.translate(x, -r, z)
+    parts.push(c)
+  }
+  rod(w, 0.005, 'x', 0, -d / 2); rod(w, 0.005, 'x', 0, d / 2)
+  rod(d, 0.005, 'z', -w / 2, 0); rod(d, 0.005, 'z', w / 2, 0)
+  const n = Math.max(2, Math.round(w / 0.035))
+  for (let i = 1; i < n; i++) rod(d, 0.0025, 'z', -w / 2 + (w * i) / n, 0)
+  rod(w, 0.0035, 'x', 0, 0)
+  g = mergeGeometries(parts)!
+  parts.forEach((q) => q.dispose())
+  racks.set(key, g)
+  return g
+}
 /** a fridge's white lining, its walls, ceiling, floor and shelf */
 const FRIDGE_LINING = '#e3e9ee'
 /** what a fridge's display says: its temperature */
@@ -1179,11 +1202,13 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
     // (each door about its hinge at its outer edge, its free edge swinging out toward the cook, a little past square)
     const e = s.k * s.k * (3 - 2 * s.k)
     doors.current.forEach((d, i) => { if (d) d.rotation.y = leaves[i] * e * LEAF_SWING })
-    if (lamp.current) lamp.current.intensity = e * CUBBY_LAMP
-    strip.current?.color.lerpColors(STRIP_OFF, STRIP_ON, Math.min(1, e * 1.5))
+    // (glass-fronted, its light's always on, a little brighter with its doors open)
+    if (lamp.current) lamp.current.intensity = (0.55 + 0.45 * e) * CUBBY_LAMP
+    strip.current?.color.copy(STRIP_ON)
     cold.current = e
   })
-  const tip = () => setTip({ title: '櫃門', hint: st.current.blocked ? '前面有人，打不開' : st.current.kept ? '點一下關上' : '點一下打開' })
+  // (a fridge's: 冷藏櫃門, the owner's name for them)
+  const tip = () => setTip({ title: lit ? '冷藏櫃門' : '櫃門', hint: st.current.blocked ? '前面有人，打不開' : st.current.kept ? '點一下關上' : '點一下打開' })
   const over = (e: Parameters<typeof handOver.onPointerOver>[0]) => {
     handOver.onPointerOver(e)
     tip()
@@ -1214,12 +1239,15 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
             ))}
             <mesh position={[0, top - 0.005, (back - front) / 2 - 0.01]}><boxGeometry args={[span - 0.01, 0.008, front - back - 0.03]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
             <mesh position={[0, bottom + 0.003, (back - front) / 2]}><boxGeometry args={[span - 0.01, 0.006, front - back - 0.01]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
-            {/* (the shelf: the right-hand one over its right-hand part, the left-hand one the whole way) */}
-            {(() => {
-              const s0 = side === 'right' ? CUBBY.shelfAlong - (a0 + a1) / 2 : -span / 2, s1 = span / 2
-              return <mesh position={[(s0 + s1) / 2, CUBBY_SHELF_Y - CUBBY.shelfThick / 2, (back - front) / 2]}><boxGeometry args={[s1 - s0 - 0.01, CUBBY.shelfThick + 0.004, front - back - 0.02]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
-            })()}
           </StaticBatch>
+          {/* (the shelf a white wire rack, as the drinks fridges' are (the owner's): the right-hand one over its right-hand part, the left-hand
+              one the whole way) */}
+          {(() => {
+            const s0 = side === 'right' ? CUBBY.shelfAlong - (a0 + a1) / 2 : -span / 2, s1 = span / 2
+            return <mesh position={[(s0 + s1) / 2, CUBBY_SHELF_Y - 0.006, (back - front) / 2]} geometry={wireRack(s1 - s0 - 0.02, front - back - 0.04)}>
+              <meshToonMaterial color="#eef2f5" />
+            </mesh>
+          })()}
           {/* (its display, on the header above its doors: what it's keeping at) */}
           {FRIDGE_READOUT && (
             <mesh position={[span / 2 - 0.16, -0.19, 0.0515]}>
@@ -1247,9 +1275,17 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
           {/* (a frame-and-panel door: a panel of the body's white marble set in a frame of dark cedar, its stiles and rails standing a little
               proud of it, so it reads as joinery of a piece with the table rather than a board stuck on) */}
           <group position={[-sd * (W / 2 + 0.003), bottom + H / 2, 0]}>
-            <mesh geometry={geo} scale={[1, 1, 0.7]}>
-              <meshToonMaterial color="#ffffff" map={COOK_MARBLE} />
-            </mesh>
+            {lit ? (
+              // (a fridge's door: a pane of glass in the frame, a pale cold tint, a gleam of the room in it; what's inside seen through it)
+              <mesh scale={[W - 0.1, H - 0.1, 1]}>
+                <planeGeometry args={[1, 1]} />
+                <meshStandardMaterial color="#dff1fb" transparent opacity={0.2} roughness={0.06} metalness={0.2} depthWrite={false} />
+              </mesh>
+            ) : (
+              <mesh geometry={geo} scale={[1, 1, 0.7]}>
+                <meshToonMaterial color="#ffffff" map={COOK_MARBLE} />
+              </mesh>
+            )}
             {/* (the frame's four pieces drawn as one: they swing as one) */}
             <StaticBatch>
             {[-1, 1].map((e) => (
@@ -1857,15 +1893,17 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
   useFrame((_, dt) => {
     const s = st.current
     if (s.open && SEATS_TAKEN.has(seat)) { s.open = false; drawerSound(true) }
-    // (a tissue pulled: drawn up out of the slot, drifting off toward whoever pulled it, and fading away)
+    // (a tissue pulled: drawn out of the slot toward whoever pulled it, low, and only once it's clear of the counter's edge over the drawer
+    // up and away, fading (it rose straight up through the counter's top))
     const g = sheet.current
     if (g && s.pulled >= 0) {
       s.pulled += dt
       const k = s.pulled / TISSUE_FLY
       if (k >= 1) { s.pulled = -1; g.visible = false } else {
         g.visible = true
-        const up = THREE.MathUtils.smootherstep(k, 0, 0.45)
-        g.position.set(Math.sin(k * 5) * 0.012, 0.03 + up * 0.2 + k * 0.05, -k * 0.18)
+        const out = 0.16 * THREE.MathUtils.smoothstep(k, 0, 0.35) + 0.08 * k
+        const up = THREE.MathUtils.smootherstep(k, 0.3, 0.75)
+        g.position.set(Math.sin(k * 5) * 0.012, 0.02 + up * 0.22 + k * 0.03, -out)
         g.rotation.set(-0.25 * k, Math.sin(k * 3) * 0.3, Math.sin(k * 6) * 0.12)
         g.scale.setScalar(0.35 + 0.65 * THREE.MathUtils.smoothstep(k, 0, 0.3))
         const fade = 1 - THREE.MathUtils.smoothstep(k, 0.6, 1)

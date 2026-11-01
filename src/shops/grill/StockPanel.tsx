@@ -9,7 +9,7 @@ import { freshGrade } from '@/game/freshness'
 import { CHARCOAL, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
 import { FoodArt } from '@/ui/FoodArt'
 import type { Restock } from '@/ui/Menu'
-import { CRATE } from './Decor'
+import { CRATE, FREEZER_TEMP } from './Decor'
 import { DrinkStockBody } from './DrinkStockPanel'
 
 /** the stock panel's tabs: the freezer, the fridge (the cupboards' under the cook table), the larder at room temperature, the drinks, and what
@@ -68,6 +68,8 @@ type Props = {
   lang: Lang
   tab: StockTab
   onTab: (t: StockTab) => void
+  /** one thing asked for from the room (the sake barrels: the sake), brought into view and lit a moment; `n` new each time it's asked */
+  focus?: { id: string; n: number } | null
   /** the shop's foods (the researching board's: its bases and items) */
   dish: Dish
   stock: Record<string, number>
@@ -104,6 +106,19 @@ export function StockPanel(p: Props) {
     return () => window.clearInterval(t)
   }, [])
   const foods = [...p.dish.bases.filter((b) => !b.includes), ...p.dish.items]
+  useEffect(() => {
+    if (!p.focus) return
+    const id = p.focus.id
+    const t = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`.stock-panel [data-id="${id}"]`)
+      if (!el) return
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.classList.remove('is-focus')
+      void el.offsetWidth
+      el.classList.add('is-focus')
+    }, 80)
+    return () => window.clearTimeout(t)
+  }, [p.focus, tab])
   /** how many in a tab are out (or spoiled): a red mark on the tab */
   const warn = (t: StockTab) => {
     if (t === 'supplies') return (p.stock[CHARCOAL] ?? 0) + CRATE.left <= 0 ? 1 : 0
@@ -225,7 +240,9 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
     <>
       <div className="chiller-scroll">
         <section className={`chiller-zone is-${zone}`}>
-          <h3 className="chiller-zone-head"><span>{storageName(st, lang)}</span><i aria-hidden="true">{st.temp}</i></h3>
+          {/* (the freezer's own temperature as it is now, its thermostat's and its lid's (it warms with the lid up); the fridges' as their
+              displays have it) */}
+          <h3 className="chiller-zone-head"><span>{storageName(st, lang)}</span><i aria-hidden="true">{zone === 'frozen' ? `${FREEZER_TEMP.now < 0 ? '−' : ''}${Math.abs(Math.round(FREEZER_TEMP.now))}℃` : zone === 'chilled' ? '3℃' : st.temp}</i></h3>
           {goods.length > 0 && <div className="chiller-bins">{goods.map(bin)}</div>}
         </section>
         {seasonings.length > 0 && (

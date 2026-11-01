@@ -652,13 +652,13 @@ function IngredientFridge() {
         <planeGeometry args={[0.1, 0.038]} />
         <meshBasicMaterial map={temp.tex} toneMapped={false} />
       </mesh>
-      {/* the thermostat: a knob under the display, its white mark pointing to the setting; a click on its left turns it colder, on
-          its right warmer (a degree a time), and the wheel turns it too */}
+      {/* the thermostat: a knob under the display, its white mark pointing to the setting; the left button turns it colder, the right
+          warmer, a degree a time (the owner's: no wheel, nor which half of it's clicked) */}
       <group name="FreezerKnob" position={[W / 2 - HOUSE / 2 - 0.03, 0.562, 0.74 / 2 + 0.004]}>
         <group ref={knob}
-          onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; press(e.point.clone().sub(e.eventObject.getWorldPosition(new THREE.Vector3())).dot(new THREE.Vector3(1, 0, 0).applyQuaternion(e.eventObject.getWorldQuaternion(new THREE.Quaternion()))) < 0 ? -1 : 1) }}
-          onWheel={(e) => { e.stopPropagation(); if (getEdit().on) return; press(e.deltaY > 0 ? -1 : 1) }}
-          onPointerOver={(e) => { e.stopPropagation(); handOver.onPointerOver(e); setTip({ title: '溫控旋鈕', hint: `點左邊調冷、右邊調暖（或滾輪），${FREEZER_MIN}～${FREEZER_MAX}℃` }) }}
+          onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; press(-1) }}
+          onContextMenu={(e) => { e.stopPropagation(); e.nativeEvent.preventDefault(); if (getEdit().on) return; press(1) }}
+          onPointerOver={(e) => { e.stopPropagation(); handOver.onPointerOver(e); setTip({ title: '溫控旋鈕', hint: `左鍵調冷、右鍵調暖，${FREEZER_MIN}～${FREEZER_MAX}℃` }) }}
           onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
           {/* (its skirt, chrome, and the black cap with ridges round it) */}
           <mesh rotation-x={Math.PI / 2} position-z={0.004}>

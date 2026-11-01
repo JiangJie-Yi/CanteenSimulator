@@ -282,9 +282,9 @@ export const onDrinkPanel = (f: () => void) => { drinkPanelSubs.add(f); return (
 /** the ingredients' freezer clicked open (Decor): App takes the camera to the grill and opens the pantry's panel there, while the shop's shut */
 /** the stock panel asked for from the room, on a tab: by the freezer opened, a fridge's doors under the cook table opened, the charcoal's sack
  * clicked; `close`, how what asked is shut again when the panel's shut (the freezer's lid, the fridge's doors) */
-type PantryAsk = (tab: string, from: 'freezer' | 'sack' | 'cubby', close?: () => void) => void
+type PantryAsk = (tab: string, from: 'freezer' | 'sack' | 'cubby', close?: () => void, focus?: string) => void
 const pantryAsks = new Set<PantryAsk>()
-export function askPantry(tab: string = 'frozen', from: 'freezer' | 'sack' | 'cubby' = 'freezer', close?: () => void) { pantryAsks.forEach((f) => f(tab, from, close)) }
+export function askPantry(tab: string = 'frozen', from: 'freezer' | 'sack' | 'cubby' = 'freezer', close?: () => void, focus?: string) { pantryAsks.forEach((f) => f(tab, from, close, focus)) }
 export const onPantryAsk = (f: PantryAsk) => { pantryAsks.add(f); return () => { pantryAsks.delete(f) } }
 /** the freezer's lid (or a fridge's doors) shut in the room: the stock panel it opened shuts with it (the owner's) */
 const pantryShuts = new Set<() => void>()
@@ -482,8 +482,10 @@ export const COAL_BRIDGE: { place: (() => number) | null } = { place: null }
  * table refilled from it (how many went in), and a dab of a seasoning taken from stock (false: there's none left, it doesn't go on). App sets
  * them; until it does, there's no end to any of it.
  */
-export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => number; dab: (k: string) => boolean } = {
+export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => number; dab: (k: string) => boolean; has: (id: string) => number } = {
   coal: () => Infinity, refillCrate: (cap) => cap, dab: () => true,
+  // (how many of a food there are in stock, for what's said of it in the room; -1, not known: no shop's running)
+  has: () => -1,
 }
 export const billOf = (items: number, drink?: DrinkId) => Math.max(1, items) * 380 + (drink ? 320 : 0)
 /** the figures on the register's displays: a number with its thousands comma */
