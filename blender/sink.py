@@ -256,8 +256,10 @@ for x_ in (-W / 2 + 0.01, MID - 0.02, W / 2 - 0.05):
     box(f"SinkStile{x_:+.2f}", x_, x_ + 0.04, 0.08, H - TT, FRONT - 0.012, FRONT + 0.008, "sugi", bev=0.002, tile=0.6)
 box("SinkRailTop", -W / 2 + 0.01, W / 2 - 0.01, H - TT - 0.045, H - TT, FRONT - 0.012, FRONT + 0.008, "sugi", bev=0.002, tile=0.6)
 box("SinkRailFoot", -W / 2 + 0.01, W / 2 - 0.01, 0.08, 0.12, FRONT - 0.012, FRONT + 0.008, "sugi", bev=0.002, tile=0.6)
-# (under the basin: the opening's inside dark, a noren hung across it on a bamboo rod: two panels, a little wavy, split down the middle)
-box("SinkHollow", -W / 2 + 0.05, MID - 0.02, 0.12, H - TT - 0.045, FRONT - 0.2, FRONT - 0.19, "kick")
+# (under the basin: the opening's inside dark, a noren hung across it on a bamboo rod: two panels, a little wavy, split down the middle.
+# The dark is a thin board on the body's face, behind the noren and inside the frame: it stood 0.19 back once, up through the basin's floor,
+# a black band across the basin)
+box("SinkHollow", -W / 2 + 0.05, MID - 0.02, 0.12, H - TT - 0.045, BZ1 + 0.001, BZ1 + 0.004, "kick")
 rod_y = H - TT - 0.06
 tube("SinkNorenRod", [(-W / 2 + 0.03, rod_y, FRONT + 0.02), (MID + 0.0, rod_y, FRONT + 0.02)], 0.008, "rod", res=2, sides=8)
 for k, (a, b) in enumerate(((-W / 2 + 0.06, -0.39), (-0.375, MID - 0.03))):

@@ -6757,8 +6757,9 @@ html[lang='en'] .heat-label { font-size: 13px; }
    (the small capitals under them said the same again) ---- */
 html[lang='en'] { --brush: 'LXGW WenKai TC', 'Noto Serif TC', serif; --sans: 'LXGW WenKai TC'; }
 html[lang='en'] :is(.brand-sub, .welcome-card h2, .welcome-card .welcome-go, .unopened-hint b, .loading-board small) { font-family: var(--brush); }
-/* (the grill's sign: its English under the name small and only a little spaced, the brush face's Latin being wider than the old serif's) */
-html[lang='en'] .brand-grilledfish .brand-sub { font-size: 0.33em; letter-spacing: 0.08em; margin-right: -0.08em; }
+/* (the grill's sign: its English under the name small and only a little spaced, the brush face's Latin being wider than the old serif's;
+   smaller still, as the owner asked: at 0.33em it ran down onto the fish's lower edge and out toward its tail) */
+html[lang='en'] .brand-grilledfish .brand-sub { font-size: 0.27em; letter-spacing: 0.06em; margin-right: -0.06em; }
 html[lang='en'] .dock-title small { display: none; }
 html[lang='en'] .dock-title { font-weight: 600; letter-spacing: 0.16em; font-size: 42px; }
 html[lang='en'] .menu-title-en { display: none; }
