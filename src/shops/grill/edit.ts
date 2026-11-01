@@ -108,6 +108,14 @@ const emit = () => {
 const POINTER_RESET = () => { if (typeof document === 'undefined') return; document.body.style.cursor = ''; document.querySelectorAll('canvas').forEach((c) => { c.style.cursor = '' }) }
 export const getEdit = () => state
 export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f) }, () => state)
+/** the piece (or group) whose row in the list the pointer is over: lit in the scene as it would be pointed at there (each piece listens for its own
+ * yes or no, so only the one or two that change are drawn again) */
+let listHot: string | null = null
+const hotSubs = new Set<() => void>()
+export function setListHot(id: string | null) { if (listHot === id) return; listHot = id; hotSubs.forEach((f) => f()) }
+const hotSub = (f: () => void) => { hotSubs.add(f); return () => { hotSubs.delete(f) } }
+export const useListHot = (id: string) =>
+  useSyncExternalStore(hotSub, () => !!listHot && (listHot === id || (listHot in state.groups && state.groups[listHot].members.includes(id))))
 /**
  * Where each piece stands to begin with: the places the owner has settled on by hand (as X, Y, Z in the piece's parent's own units). The
  * offset shown and typed in edit mode is from here, so every piece starts at 0, 0, 0, its own centre.
@@ -603,7 +611,7 @@ const TOOL_ICONS: Record<Tool, string> = {
 }
 function panel() {
   if (typeof document === 'undefined') return
-  if (!state.on) { el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; return }
+  if (!state.on) { el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; setListHot(null); return }
   if (!document.getElementById('be-style')) {
     const st = document.createElement('style')
     st.id = 'be-style'
@@ -728,6 +736,9 @@ function panel() {
         state.picked = []
         select(id)
       }
+      // (the row under the pointer lights its piece in the scene, or every piece of its group, to find it there before it's chosen)
+      row.onmouseenter = () => setListHot(id)
+      row.onmouseleave = () => setListHot(null)
       list.appendChild(row)
       rows.set(id, row as HTMLDivElement)
       rowTab.set(id, building)

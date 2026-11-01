@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, FIXED_SIZE, getEdit, GIZMO, groupOf, setStats, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, FIXED_SIZE, getEdit, GIZMO, groupOf, setStats, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, useListHot, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -748,7 +748,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   }
 
   const [hover, setHover] = useState(false)
-  useEditBox(inner, on, selected === id || isPicked(id) ? 'chosen' : hover ? 'hover' : 'idle', ready)
+  const listed = useListHot(id)
+  useEditBox(inner, on, selected === id || isPicked(id) ? 'chosen' : hover || listed ? 'hover' : 'idle', ready)
   useEffect(() => { if (!on) setHover(false) }, [on])
 
   return (
