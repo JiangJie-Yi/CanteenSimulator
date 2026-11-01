@@ -5,6 +5,7 @@ import { useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
+import { mergeByMaterial } from '@/scene/StaticBatch'
 import { brushText, SIGN_FONT, signTexture } from '@/scene/signFont'
 import { tipOver } from './bar'
 import { getEdit } from './edit'
@@ -139,6 +140,8 @@ export function Omamori() {
       m.receiveShadow = true
     })
     inkModel(r, (m) => !/Pouch/.test(m.name), { width: 0.0006, weld: true })
+    // (folded together by material: its cord's loops and ends were each a draw)
+    mergeByMaterial(r)
     return r
   }, [gltf])
   return (

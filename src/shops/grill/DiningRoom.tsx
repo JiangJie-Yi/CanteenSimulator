@@ -1150,17 +1150,21 @@ function RoundShoji() {
     }
   }, [inv, R])
   useEffect(() => () => { round.paper.dispose(); round.wood.dispose(); round.passer.dispose() }, [round])
-  // (each half's lattice: its outer upright, the three bars across from the middle out to the round, an upright at its inner edge)
+  // (each half's lattice, one mesh: its outer upright, the three bars across from the middle out to the round, an upright at its inner edge)
   const bars = useMemo(() => [-1, 1].map((sd) => {
-    const out: { p: [number, number, number]; s: [number, number, number] }[] = []
-    out.push({ p: [-0.012, 0, sd * 0.2], s: [0.018, 2 * Math.sqrt(R * R - 0.04), 0.016] })
-    out.push({ p: [-0.012, 0, sd * 0.008], s: [0.018, 2 * R, 0.016] })
+    const out: THREE.BufferGeometry[] = []
+    const bar = (p: [number, number, number], sz: [number, number, number]) => { const g = new THREE.BoxGeometry(...sz); g.translate(...p); out.push(g) }
+    bar([-0.012, 0, sd * 0.2], [0.018, 2 * Math.sqrt(R * R - 0.04), 0.016])
+    bar([-0.012, 0, sd * 0.008], [0.018, 2 * R, 0.016])
     for (const y of [-0.2, 0, 0.2]) {
       const half = Math.sqrt(R * R - y * y)
-      out.push({ p: [-0.012, y, sd * half / 2], s: [0.018, 0.016, half] })
+      bar([-0.012, y, sd * half / 2], [0.018, 0.016, half])
     }
-    return out
+    const g = mergeGeometries(out)!
+    out.forEach((q) => q.dispose())
+    return g
   }), [R])
+  useEffect(() => () => { bars.forEach((g) => g.dispose()) }, [bars])
   useFrame((_, dt) => {
     const w = win.current
     const s = st.current
@@ -1181,11 +1185,10 @@ function RoundShoji() {
         s.walk += Math.min(dt, 0.1) / 5.5
         if (s.walk >= 1 || s.k > 0.05) { s.walk = -1; s.next = 20 + Math.random() * 25 }
       }
-      m.visible = s.walk >= 0
       if (s.walk >= 0) {
         m.position.z = s.dir * (-R - 0.2 + s.walk * (2 * R + 0.4))
         m.position.y = -0.02 + Math.abs(Math.sin(s.walk * Math.PI * 9)) * 0.012
-      }
+      } else m.position.z = 2 * R
     }
   })
   const says = () => (st.current.open ? '點一下關上' : '點一下打開（左右拉開）')
@@ -1204,14 +1207,12 @@ function RoundShoji() {
             <mesh position-x={-0.004} rotation-y={-Math.PI / 2} material={round.paper}>
               <circleGeometry args={[R, 48, i ? -Math.PI / 2 : Math.PI / 2, Math.PI]} />
             </mesh>
-            {bars[i].map((b, k) => (
-              <mesh key={k} position={b.p} material={round.wood}><boxGeometry args={b.s} /></mesh>
-            ))}
+            <mesh geometry={bars[i]} material={round.wood} />
           </group>
         ))}
       </group>
       {/* (a passer-by's shadow outside, on the paper) */}
-      <mesh ref={passer} name="round-passer" position-x={-0.0045} rotation-y={-Math.PI / 2} material={round.passer} visible={false} renderOrder={3}>
+      <mesh ref={passer} name="round-passer" position={[-0.0045, 0, 2 * R]} rotation-y={-Math.PI / 2} material={round.passer} renderOrder={3}>
         <planeGeometry args={[0.28, 0.56]} />
       </mesh>
     </group>
@@ -1816,6 +1817,8 @@ function CornerSupplies() {
       m.receiveShadow = true
     })
     inkModel(r, (m) => /Strand|Core|Bail|Label|Tape/.test(m.name), { width: 0.002, weld: true })
+    // (folded together by material: seventy small parts and their ink lines were each a draw of their own)
+    mergeByMaterial(r)
     return r
   }, [gltf])
   const says = () => { const n = SUPPLIES.has(TISSUE); return n < 0 ? '衛生紙與清潔用品・點一下看耗材' : `衛生紙備品 ${n} 盒・點一下看耗材` }
