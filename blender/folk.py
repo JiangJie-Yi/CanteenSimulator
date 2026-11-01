@@ -336,12 +336,69 @@ ties = [sphere(f"tie{sd}", head_at(sd * 1.35, 0.42, 0.012), 0.022, M["red"], seg
 style("twin", [back_shell(), crown(fringe=True)] + twin + ties)
 pony = tuft("pony", head_at(math.pi, 0.45, 0.02), Vector((0, -1, -0.35)), 0.06, 0.32, M["hair"], 0.75)
 style("pony", [back_shell(), crown(fringe=True), pony, sphere("ponytie", head_at(math.pi, 0.45, 0.03), 0.024, M["red"], seg=8, rings=6)])
-# (a perm: soft curls packed over the crown and down the back)
-curls = []
-for k, (a, e) in enumerate([(0, 0.9), (0.6, 0.8), (-0.6, 0.8), (1.2, 0.55), (-1.2, 0.55), (1.8, 0.4), (-1.8, 0.4), (2.5, 0.45), (-2.5, 0.45),
-                            (math.pi, 0.5), (0.3, 1.3), (-0.3, 1.3), (2.6, 1.0), (-2.6, 1.0), (math.pi, 1.0), (1.5, 1.05), (-1.5, 1.05)]):
-    curls.append(sphere(f"curl{k}", head_at(a, e, 0.006), 0.06, M["hair"], seg=8, rings=6))
-style("perm", [back_shell()] + curls)
+def perm_shell(name="perm"):
+    """a grandmother's perm (the owner: seventeen balls stuck on, each inked round, looked odd): one soft, full shell over the crown, the
+    sides and the back, as a set perm sits, cut by one tilted plane, so its edge is a smooth line from over the brows in front, past the
+    ears' tops, down to the nape; the curls only bumps in its surface (many, small, packed), so its outline is scalloped and its ink goes
+    round the whole of it, not round each curl"""
+    rnd = __import__("random").Random(11)
+    curls = []
+    n = 62
+    for k in range(n):
+        y = 1 - 2 * (k + 0.5) / n
+        rr = math.sqrt(max(0.0, 1 - y * y))
+        t = k * math.pi * (3 - math.sqrt(5))
+        curls.append((Vector((rr * math.sin(t), y, rr * math.cos(t))), rnd.uniform(0.85, 1.15)))
+    cut_n = Vector((0, -1, 0.55)).normalized()
+    bm = bmesh.new()
+    seg, rings = 64, 36
+    grid = []
+    for i in range(rings + 1):
+        th = math.pi * i / rings
+        row = []
+        for j in range(seg):
+            ph = 2 * math.pi * j / seg
+            d = Vector((math.sin(th) * math.sin(ph), math.cos(th), math.sin(th) * math.cos(ph)))
+            bump = 0.0
+            for c, k in curls:
+                cs = d.dot(c)
+                # (each curl a round cap, as a ball pressed into the mass: deep enough between them that each one shows)
+                a = math.acos(max(-1.0, min(1.0, cs)))
+                W = 0.29 * k
+                if a < W:
+                    bump = max(bump, 0.052 * k * math.sqrt(1 - (a / W) ** 2))
+            # (fuller over the crown and the sides than at the nape: a set perm's round shape; and drawn in to the scalp at its edge, so it
+            # sits on the head there and doesn't stand off it like a cap)
+            full = 0.016 + 0.012 * max(0.0, d.y + 0.2)
+            edge = max(0.0, -(d * R - Vector((0, -0.06, 0))).dot(cut_n))
+            hug = min(1.0, edge / 0.09) ** 0.7
+            row.append(bm.verts.new(P(*(C + d * (R + 0.004 + (full + bump) * hug)))))
+            if i in (0, rings):
+                break
+        grid.append(row)
+    for i in range(rings):
+        for j in range(seg):
+            j2 = (j + 1) % seg
+            a_, b_ = grid[i], grid[i + 1]
+            if i == 0:
+                bm.faces.new((a_[0], b_[j], b_[j2]))
+            elif i == rings - 1:
+                bm.faces.new((a_[j], b_[0], a_[j2]))
+            else:
+                bm.faces.new((a_[j], b_[j], b_[j2], a_[j2]))
+    # (one tilted plane: over the brows in front (0.09 up), the ears' tops at the sides (-0.06), the nape behind (-0.21))
+    geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=Vector(P(*(C + Vector((0, -0.06, 0))))), plane_no=Vector(P(0, -1, 0.55)).normalized(), clear_outer=True)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    return fin(o, name, M["hair"])
+
+
+style("perm", [perm_shell()])
 # (bald on top: a ring of hair round the back and the sides only)
 ring = lathe("baldring", [(C.y + 0.07, R + 0.008), (C.y + 0.03, R + 0.016), (C.y - 0.06, R + 0.014), (C.y - 0.11, R - 0.01)],
              M["hair"], seg=16, a0=math.pi * 0.4, a1=math.pi * 1.6, solid=0.012)

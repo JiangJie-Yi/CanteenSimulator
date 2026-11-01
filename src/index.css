@@ -5750,10 +5750,13 @@ button {
   bottom: auto;
 }
 
-/* edit mode (G) is for arranging the scene alone: the game's own controls are shut while it's on */
-.app.is-editing :is(.menu, .menu-backing, .menu-fold, .tools-toggle, .ai-toggle, .speed-toggle, .office-toggle, .auto-toggle) {
+/* edit mode (G) is for arranging the scene alone: the game's own controls are shut while it's on, and greyed (the owner's: the cash, the
+   stock's fridge, auto, ×2 and open/shut along the top too; the language and day/night stay) */
+.app.is-editing :is(.menu, .menu-backing, .menu-fold, .tools-toggle, .ai-toggle, .speed-toggle, .office-toggle, .auto-toggle),
+body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-toggle, .auto-toggle, .office-toggle) {
   pointer-events: none;
   opacity: 0.4;
+  filter: grayscale(1);
 }
 
 /* (the views' menu stays usable: developer mode places each view's camera, and flies to them) */
