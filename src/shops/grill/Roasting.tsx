@@ -1539,9 +1539,11 @@ const COVE_GLOW = (() => {
   c.height = 64
   const g = c.getContext('2d')!
   const grad = g.createLinearGradient(0, 0, 0, 64)
-  grad.addColorStop(0, 'rgba(255,200,120,0.6)')
-  grad.addColorStop(0.5, 'rgba(255,190,110,0.22)')
-  grad.addColorStop(1, 'rgba(255,190,110,0)')
+  // (faint, and mostly near the top: laid on as light it adds the same to dark grain and light alike, so much of it washed the boards' grain
+  // out to one flat colour)
+  grad.addColorStop(0, 'rgba(255,205,135,0.3)')
+  grad.addColorStop(0.3, 'rgba(255,195,120,0.1)')
+  grad.addColorStop(0.65, 'rgba(255,190,110,0)')
   g.fillStyle = grad
   g.fillRect(0, 0, 8, 64)
   return new THREE.CanvasTexture(c)
@@ -1657,9 +1659,14 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
           </mesh>
         </>
       )}
-      {/* the cove light: a warm strip hidden under the top's front edge, its glow washing down the base toward the floor */}
-      <mesh position={[baseX, BAR_TOP - 0.068, -0.27]} rotation-x={Math.PI / 2}>
-        <planeGeometry args={[baseL, 0.03]} /><meshBasicMaterial color="#ffcf88" toneMapped={false} side={THREE.DoubleSide} />
+      {/* the cove light: a warm strip tucked into the inside corner where the top's underside meets the base, behind a little lip of the
+          base's dark wood, so it's the base it lights and not the strip that's seen; its glow washing a little way down the base (it was
+          out under the top's front edge, a bright bar in plain sight) */}
+      <mesh name="bar-cove" position={[baseX, BAR_TOP - 0.066, -0.132]} rotation-x={Math.PI / 2}>
+        <planeGeometry args={[baseL, 0.012]} /><meshBasicMaterial color="#ffcf88" toneMapped={false} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[baseX, BAR_TOP - 0.074, -0.142]}>
+        <boxGeometry args={[baseL, 0.022, 0.006]} /><meshToonMaterial color="#3a281a" />
       </mesh>
       {/* (held well off the base's face and drawn over it: a hair's breadth off, it fought the face for the same depth and flickered) */}
       <mesh position={[baseX, (BAR_TOP - 0.06) * 0.62, -0.127]} rotation-y={Math.PI}>
@@ -1709,7 +1716,7 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
           grain at one scale along it (the table's own panelling, darker), the cove light washing down them */}
       {/* (it stands in the top's shadow, lit by nothing but the cove light: its boards glow a little with it, grain and all, or they'd be black) */}
       <mesh position={[baseX, (BAR_TOP - 0.06) / 2, 0.08]} castShadow geometry={panelBox(baseL, BAR_TOP - 0.06, 0.4, 0.55)}>
-        <meshToonMaterial color="#6a4a32" map={COOK_PANEL_WOOD} emissive="#7a5232" emissiveMap={COOK_PANEL_WOOD} emissiveIntensity={0.55} />
+        <meshToonMaterial color="#6a4a32" map={COOK_PANEL_WOOD} emissive="#7a5232" emissiveMap={COOK_PANEL_WOOD} emissiveIntensity={0.5} />
       </mesh>
       {/* the raised lip on the cook's side, the step the food is handed over */}
       {/* (stopping short of where the other counter butts on, and of the gate's flap) */}
