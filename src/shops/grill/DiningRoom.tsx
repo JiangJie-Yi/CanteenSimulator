@@ -68,6 +68,58 @@ function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => 
   return signTexture(w, h, (g) => draw(g), repeat)
 }
 
+/** a paper's grain: a tile of fine speckle with short fibres in it, near white, multiplied over a picture (made once) */
+let grainTile: HTMLCanvasElement | null = null
+function grain() {
+  if (grainTile) return grainTile
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')!
+  const im = g.createImageData(256, 256)
+  let sd = 7
+  const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647
+  for (let i = 0; i < 256 * 256; i++) {
+    const v = 236 + rnd() * 19
+    im.data[i * 4] = v; im.data[i * 4 + 1] = v - 3; im.data[i * 4 + 2] = v - 10; im.data[i * 4 + 3] = 255
+  }
+  g.putImageData(im, 0, 0)
+  for (let k = 0; k < 260; k++) {
+    g.strokeStyle = rnd() < 0.55 ? 'rgba(120,96,64,0.16)' : 'rgba(255,250,236,0.4)'
+    g.lineWidth = 0.6
+    const x = rnd() * 256, y = rnd() * 256, a = rnd() * Math.PI
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); g.stroke()
+  }
+  grainTile = c
+  return c
+}
+/**
+ * A picture on the walls, painted finer: drawn at its own size `w`×`h` but onto a canvas about 770 (a print) or 400 (a scroll) across, the
+ * drawing scaled up, then the paper multiplied over it (its grain and fibres) and its edges aged a shade (a woodblock print's paper, a scroll's
+ * silk)
+ */
+function artTex(kind: 'print' | 'scroll', w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
+  const k = Math.max(1, Math.round(((kind === 'print' ? 770 : 400) / w) * 2) / 2)
+  const W = Math.round(w * k), H = Math.round(h * k)
+  const tex = signTexture(W, H, (g) => {
+    g.save()
+    g.scale(k, k)
+    draw(g)
+    g.restore()
+    g.save()
+    g.globalCompositeOperation = 'multiply'
+    g.fillStyle = g.createPattern(grain(), 'repeat')!
+    g.fillRect(0, 0, W, H)
+    const v = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.32, W / 2, H / 2, Math.max(W, H) * 0.72)
+    v.addColorStop(0, 'rgb(255,255,255)')
+    v.addColorStop(1, kind === 'print' ? 'rgb(222,206,180)' : 'rgb(228,216,194)')
+    g.fillStyle = v
+    g.fillRect(0, 0, W, H)
+    g.restore()
+  })
+  if (tex) tex.anisotropy = 4
+  return tex
+}
+
 /** a red seal stamped in a corner */
 const seal = (g: CanvasRenderingContext2D, x: number, y: number, s: number) => {
   g.fillStyle = '#b8261c'
@@ -103,7 +155,7 @@ const SEIGAIHA = canvasTex(64 * 8, 32 * 8, (g) => {
 /** the pictures on the wall, each drawn here (no outside pictures): prints in frames and hanging scrolls */
 const ART = {
   // Fuji under a red sun, bands of cloud across it
-  fuji: canvasTex(256, 180, (g) => {
+  fuji: artTex('print', 256, 180, (g) => {
     const sky = g.createLinearGradient(0, 0, 0, 180)
     sky.addColorStop(0, '#e8c99a')
     sky.addColorStop(1, '#f3e6c8')
@@ -122,7 +174,7 @@ const ART = {
     seal(g, 14, 14, 16)
   }),
   // a great wave curling over, its crest breaking into claws of foam
-  wave: canvasTex(256, 180, (g) => {
+  wave: artTex('print', 256, 180, (g) => {
     g.fillStyle = '#efe2c4'
     g.fillRect(0, 0, 256, 180)
     g.fillStyle = '#25406a'
@@ -141,28 +193,86 @@ const ART = {
     seal(g, 226, 14, 16)
   }),
   // two koi, red and white, in dark water, rings spreading
-  koi: canvasTex(256, 180, (g) => {
-    g.fillStyle = '#1f3440'
+  // (the koi, painted richer (the owner: the pictures' quality raised): deep water lit from above, two kohaku and a yamabuki gold one
+  // gliding round each other, each with its fins, its scales catching the light and its own patches; lotus pads floating, rings spreading)
+  koi: artTex('print', 256, 180, (g) => {
+    const wat = g.createRadialGradient(150, 70, 10, 128, 90, 190)
+    wat.addColorStop(0, '#2c5a66'); wat.addColorStop(0.55, '#173a46'); wat.addColorStop(1, '#0b1f28')
+    g.fillStyle = wat
     g.fillRect(0, 0, 256, 180)
-    g.strokeStyle = 'rgba(200,230,240,0.25)'
-    g.lineWidth = 2
-    for (const [x, y] of [[60, 50], [190, 130]]) for (let r = 10; r < 50; r += 12) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke() }
-    const fish = (x: number, y: number, a: number, spots: string) => {
+    // (light through the water: soft wavering bands)
+    g.globalAlpha = 0.12
+    g.strokeStyle = '#bfe6ee'
+    g.lineWidth = 1.2
+    for (let k = 0; k < 14; k++) {
+      g.beginPath()
+      for (let x = 0; x <= 256; x += 8) g.lineTo(x, 12 + k * 12 + Math.sin(x * 0.06 + k) * 3)
+      g.stroke()
+    }
+    g.globalAlpha = 1
+    // (rings spreading where something touched the surface)
+    g.strokeStyle = 'rgba(205,235,242,0.32)'
+    g.lineWidth = 0.9
+    for (const [x, y] of [[62, 46], [204, 140]]) for (let r = 6; r < 40; r += 8) { g.beginPath(); g.ellipse(x, y, r, r * 0.8, 0, 0, Math.PI * 2); g.stroke() }
+    const fish = (x: number, y: number, a: number, body: string, patch: string | null, len = 40) => {
       g.save(); g.translate(x, y); g.rotate(a)
-      g.fillStyle = '#f6f0e4'
-      g.beginPath(); g.ellipse(0, 0, 34, 12, 0, 0, Math.PI * 2); g.fill()
-      g.beginPath(); g.moveTo(-30, 0); g.lineTo(-52, -12); g.lineTo(-48, 0); g.lineTo(-52, 12); g.fill()
-      g.fillStyle = spots
-      g.beginPath(); g.ellipse(8, -2, 14, 8, 0.3, 0, Math.PI * 2); g.fill()
-      g.beginPath(); g.ellipse(-14, 3, 9, 6, 0, 0, Math.PI * 2); g.fill()
+      const w = len * 0.3
+      // (its shadow on the water below)
+      g.fillStyle = 'rgba(0,0,0,0.25)'
+      g.beginPath(); g.ellipse(4, 6, len * 0.55, w * 0.6, 0, 0, Math.PI * 2); g.fill()
+      // (the fins: a pair either side behind the head, the tail fanned)
+      g.fillStyle = 'rgba(250,244,230,0.75)'
+      for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(len * 0.22, sd * w * 0.5); g.quadraticCurveTo(len * 0.12, sd * w * 1.5, len * 0.02, sd * w * 1.2); g.lineTo(len * 0.14, sd * w * 0.4); g.fill() }
+      g.beginPath(); g.moveTo(-len * 0.42, 0); g.quadraticCurveTo(-len * 0.62, -w * 1.2, -len * 0.75, -w * 1.1); g.quadraticCurveTo(-len * 0.66, 0, -len * 0.75, w * 1.1)
+      g.quadraticCurveTo(-len * 0.62, w * 1.2, -len * 0.42, 0); g.fill()
+      // (the body: full at the shoulders, narrowing to the tail)
+      g.fillStyle = body
+      g.beginPath(); g.moveTo(len * 0.5, 0)
+      g.bezierCurveTo(len * 0.45, -w, len * 0.05, -w * 1.05, -len * 0.45, -w * 0.25)
+      g.lineTo(-len * 0.45, w * 0.25)
+      g.bezierCurveTo(len * 0.05, w * 1.05, len * 0.45, w, len * 0.5, 0)
+      g.fill()
+      g.save(); g.clip()
+      if (patch) {
+        g.fillStyle = patch
+        g.beginPath(); g.ellipse(len * 0.22, -w * 0.2, len * 0.18, w * 0.75, 0.2, 0, Math.PI * 2); g.fill()
+        g.beginPath(); g.ellipse(-len * 0.12, w * 0.25, len * 0.15, w * 0.6, -0.2, 0, Math.PI * 2); g.fill()
+      }
+      // (scales: rows of little arcs catching the light)
+      g.strokeStyle = 'rgba(255,255,255,0.28)'
+      g.lineWidth = 0.6
+      for (let sx = -len * 0.35; sx < len * 0.35; sx += 3.2) for (let sy = -w; sy < w; sy += 3) { g.beginPath(); g.arc(sx + ((sy / 3) % 2) * 1.6, sy, 1.6, -1.1, 1.1); g.stroke() }
+      // (the back's sheen)
+      const sh = g.createLinearGradient(0, -w, 0, w)
+      sh.addColorStop(0, 'rgba(255,255,255,0.35)'); sh.addColorStop(0.5, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.15)')
+      g.fillStyle = sh; g.fillRect(-len, -w, len * 2, w * 2)
+      g.restore()
+      // (its eye)
+      g.fillStyle = '#1a1210'
+      g.beginPath(); g.arc(len * 0.36, -w * 0.32, 1.1, 0, Math.PI * 2); g.fill()
       g.restore()
     }
-    fish(110, 70, 0.4, '#d8432a')
-    fish(150, 120, -2.6, '#e8902a')
+    fish(112, 74, 0.45, '#f6f0e4', '#d43a22', 44)
+    fish(160, 118, -2.5, '#f2ebdd', '#e2542a', 40)
+    fish(70, 120, -0.9, '#e8b83a', null, 34)
+    // (lotus pads afloat, one in bud)
+    const pad = (x: number, y: number, r: number, a: number) => {
+      g.save(); g.translate(x, y); g.rotate(a)
+      g.fillStyle = '#3f7a3a'
+      g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, r, 0.25, Math.PI * 2 - 0.05); g.closePath(); g.fill()
+      g.strokeStyle = 'rgba(160,210,120,0.6)'; g.lineWidth = 0.7
+      for (let k = 0; k < 7; k++) { const t = 0.3 + k * 0.85; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(t) * r * 0.9, Math.sin(t) * r * 0.9); g.stroke() }
+      g.restore()
+    }
+    pad(214, 40, 16, 0.3)
+    pad(30, 158, 13, 2.1)
+    pad(232, 70, 9, 4)
+    g.fillStyle = '#f0a8b8'
+    g.beginPath(); g.ellipse(206, 52, 3.6, 5.5, 0.2, 0, Math.PI * 2); g.fill()
     seal(g, 14, 150, 16)
   }),
   // calligraphy: 一期一會 brushed down the paper
-  calligraphy: canvasTex(96, 256, (g) => {
+  calligraphy: artTex('scroll', 96, 256, (g) => {
     g.fillStyle = '#f4ead4'
     g.fillRect(0, 0, 96, 256)
     g.fillStyle = '#1a120c'
@@ -173,7 +283,7 @@ const ART = {
     seal(g, 56, 226, 18)
   }),
   // a branch of plum in blossom, in ink with pink flowers
-  plum: canvasTex(96, 256, (g) => {
+  plum: artTex('scroll', 96, 256, (g) => {
     g.fillStyle = '#f4ead4'
     g.fillRect(0, 0, 96, 256)
     g.strokeStyle = '#2a1d16'
@@ -191,7 +301,7 @@ const ART = {
   }),
   // ---- ukiyo-e, as a woodblock print has them: flat colours, a bokashi graded across the sky, a black key line, a title cartouche, the seal
   // a red Fuji in the clear south wind: the cone in rust red streaked with snow, dark forest at its foot, a blue sky with rows of mackerel cloud
-  akaFuji: canvasTex(512, 360, (g) => {
+  akaFuji: artTex('print', 512, 360, (g) => {
     const sky = g.createLinearGradient(0, 0, 0, 360)
     sky.addColorStop(0, '#1c3c78'); sky.addColorStop(0.45, '#5a86b8'); sky.addColorStop(0.7, '#d8e2e0'); sky.addColorStop(1, '#efe4c8')
     g.fillStyle = sky; g.fillRect(0, 0, 512, 360)
@@ -219,7 +329,7 @@ const ART = {
     seal(g, 464, 24, 24)
   }),
   // rain on a great bridge: driving lines of rain over all, a dark sky graded down, people under umbrellas hurrying across, the far bank in grey
-  rainBridge: canvasTex(512, 360, (g) => {
+  rainBridge: artTex('print', 512, 360, (g) => {
     const sky = g.createLinearGradient(0, 0, 0, 360)
     sky.addColorStop(0, '#1a1c20'); sky.addColorStop(0.3, '#5a6066'); sky.addColorStop(0.6, '#c8cabe'); sky.addColorStop(1, '#6a8a9a')
     g.fillStyle = sky; g.fillRect(0, 0, 512, 360)
@@ -246,7 +356,7 @@ const ART = {
   }),
   // a kabuki actor's head and shoulders (yakusha-e): a white face with red kumadori lines, the brows drawn up, eyes crossed in a glare, a black
   // topknot wig, a robe of bold checks, on a dark mica ground
-  kabuki: canvasTex(200, 476, (g) => {
+  kabuki: artTex('scroll', 200, 476, (g) => {
     const bg = g.createLinearGradient(0, 0, 0, 476)
     bg.addColorStop(0, '#3a3438'); bg.addColorStop(1, '#5a5254')
     g.fillStyle = bg; g.fillRect(0, 0, 200, 476)
@@ -275,7 +385,7 @@ const ART = {
     seal(g, 14, 14, 26)
   }),
   // a beauty (bijin-ga): her hair dressed high with combs and pins, a fan in her hand, a kimono of blue waves over red, on a pale ground
-  bijin: canvasTex(200, 476, (g) => {
+  bijin: artTex('scroll', 200, 476, (g) => {
     g.fillStyle = '#f0e6d0'; g.fillRect(0, 0, 200, 476)
     g.fillStyle = 'rgba(160,130,90,0.12)'; for (let k = 0; k < 120; k++) g.fillRect((k * 41) % 200, (k * 67) % 476, 18, 1)
     g.fillStyle = '#1a1210'
@@ -304,6 +414,31 @@ const ART = {
   }),
 }
 type ArtKey = keyof typeof ART
+/** a scroll's mounting: the dark silk of its top and foot (a fine weave, a soft sheen down it), and the brocade band round its picture (gold
+ * flowers in a lattice of diamonds, 花菱, on olive) */
+const SCROLL_SILK = canvasTex(128, 384, (g) => {
+  const gr = g.createLinearGradient(0, 0, 128, 0)
+  gr.addColorStop(0, '#2c2420'); gr.addColorStop(0.5, '#3c312a'); gr.addColorStop(1, '#2a221e')
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 384)
+  g.globalAlpha = 0.18
+  for (let y = 0; y < 384; y += 2) { g.fillStyle = y % 4 ? '#000' : '#6a5a4a'; g.fillRect(0, y, 128, 1) }
+  g.globalAlpha = 1
+})
+const SCROLL_BROCADE = canvasTex(256, 512, (g) => {
+  g.fillStyle = '#5e5530'; g.fillRect(0, 0, 256, 512)
+  g.strokeStyle = 'rgba(214,178,92,0.55)'; g.lineWidth = 1.2
+  for (let k = -512; k < 512; k += 24) {
+    g.beginPath(); g.moveTo(k, 0); g.lineTo(k + 512, 512); g.stroke()
+    g.beginPath(); g.moveTo(k + 512, 0); g.lineTo(k, 512); g.stroke()
+  }
+  g.fillStyle = 'rgba(232,196,110,0.85)'
+  for (let y = 12; y < 512; y += 24) for (let x = (y / 24) % 2 ? 12 : 0; x < 256; x += 24) {
+    for (let p = 0; p < 4; p++) {
+      const a = (p * Math.PI) / 2
+      g.beginPath(); g.ellipse(x + Math.cos(a) * 3.2, y + Math.sin(a) * 3.2, 2.6, 1.5, a, 0, Math.PI * 2); g.fill()
+    }
+  }
+})
 // (the woodblock prints in turn with the others along the walls)
 const PRINTS: ArtKey[] = ['akaFuji', 'fuji', 'rainBridge', 'wave', 'koi']
 const SCROLLS: ArtKey[] = ['calligraphy', 'kabuki', 'plum', 'bijin']
@@ -736,14 +871,38 @@ function Kanban({ i }: { i: number }) {
 
 /** a print behind glass in a thin dark frame */
 function Framed({ art }: { art: ArtKey }) {
-  const W = 0.5, H = 0.36
+  const W = 0.5, H = 0.36, M = 0.045, F = 0.032
+  const OW = W + 2 * M, OH = H + 2 * M
   return (
     <group>
-      <mesh position-x={-0.012}>
-        <boxGeometry args={[0.02, H + 0.05, W + 0.05]} />
-        <meshToonMaterial color="#2e1d12" />
+      {/* (the backing board) */}
+      <mesh position-x={-0.008}>
+        <boxGeometry args={[0.012, OH + 2 * F, OW + 2 * F]} />
+        <meshToonMaterial color="#24160d" />
       </mesh>
-      <mesh position-x={-0.024} rotation-y={-Math.PI / 2}>
+      {/* (the frame's four sides: a dark moulding with a lighter bead along its inner edge) */}
+      {([[0, OH / 2 + F / 2, OW + 2 * F, F], [0, -OH / 2 - F / 2, OW + 2 * F, F], [OW / 2 + F / 2, 0, F, OH], [-OW / 2 - F / 2, 0, F, OH]] as const).map(([z, y, w, h], i) => (
+        <group key={i}>
+          <mesh position={[-0.026, y, z]}>
+            <boxGeometry args={[0.024, h, w]} />
+            <meshToonMaterial color="#3a2416" />
+          </mesh>
+          <mesh position={[-0.039, y, z]} scale={[1, h > w ? 1 : 0.3, h > w ? 0.3 : 1]}>
+            <boxGeometry args={[0.004, h, w]} />
+            <meshToonMaterial color="#7a5434" />
+          </mesh>
+        </group>
+      ))}
+      {/* (the cream mat round the print, and the gold lip at its edge) */}
+      <mesh position-x={-0.0155} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[OW, OH]} />
+        <meshToonMaterial color="#efe5cf" />
+      </mesh>
+      <mesh position-x={-0.0165} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[W + 0.012, H + 0.012]} />
+        <meshToonMaterial color="#c9a24a" />
+      </mesh>
+      <mesh position-x={-0.0172} rotation-y={-Math.PI / 2}>
         <planeGeometry args={[W, H]} />
         <meshToonMaterial color="#ffffff" map={ART[art]} />
       </mesh>
@@ -998,20 +1157,34 @@ function Scroll({ art }: { art: ArtKey }) {
   const W = 0.26, H = 0.62
   return (
     <group>
-      <mesh position-x={-0.006} rotation-y={-Math.PI / 2}>
-        <planeGeometry args={[W + 0.06, H + 0.26]} />
-        <meshToonMaterial color="#6a4a3a" />
+      {/* (the dark silk above and below the picture, the whole length) */}
+      <mesh position-x={-0.005} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[W + 0.08, H + 0.3]} />
+        <meshToonMaterial color="#ffffff" map={SCROLL_SILK} />
       </mesh>
+      {/* (the brocade band round the picture) */}
+      <mesh position-x={-0.006} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[W + 0.05, H + 0.1]} />
+        <meshToonMaterial color="#ffffff" map={SCROLL_BROCADE} />
+      </mesh>
+      {/* (the gold strips over and under the picture) */}
       {[1, -1].map((s) => (
-        <mesh key={s} position={[-0.007, s * (H / 2 + 0.06), 0]} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[W + 0.06, 0.03]} />
-          <meshToonMaterial color="#b0904a" />
+        <mesh key={s} position={[-0.007, s * (H / 2 + 0.012), 0]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[W, 0.022]} />
+          <meshToonMaterial color="#c9a24a" />
         </mesh>
       ))}
       <mesh position-x={-0.008} rotation-y={-Math.PI / 2}>
         <planeGeometry args={[W, H]} />
         <meshToonMaterial color="#ffffff" map={ART[art]} />
       </mesh>
+      {/* (the roller's knob ends, pale, lacquered) */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[-0.014, -H / 2 - 0.14, s * (W / 2 + 0.07)]} rotation-x={Math.PI / 2}>
+          <cylinderGeometry args={[0.015, 0.013, 0.03, 10]} />
+          <meshToonMaterial color="#e8dcc4" />
+        </mesh>
+      ))}
       {/* the rod at the foot with its knobs, and the thin one at the top */}
       <mesh position={[-0.014, -H / 2 - 0.14, 0]} rotation-x={Math.PI / 2}>
         <cylinderGeometry args={[0.011, 0.011, W + 0.12, 8]} />
@@ -1408,6 +1581,112 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
         {/* the lock's little window on its brass plate, over the pull: 使用中 in red while someone's in, 空き in blue */}
         <LockWindow who={who} />
       </group>
+    </group>
+  )
+}
+/** the staff's door, its width along the wall (narrower than the toilets') */
+const STAFF_W = 0.66
+/**
+ * Behind the staff's door, painted on the wall inside its frame (the owner's: the stair done as a picture, nothing built behind the wall):
+ * a narrow wooden stair going up between plaster walls, its treads closing up as they rise, their nosings catching the light, a handrail
+ * up the right, warm light from the landing at the top, 2F on a little plate there
+ */
+const STAFF_STAIRS = canvasTex(512, 1440, (g) => {
+  // (drawn at twice its laid-out size, for its edges up close)
+  g.scale(2, 2)
+  const W = 256, H = 720, cx = W / 2, top = 70
+  g.fillStyle = '#2a1e16'; g.fillRect(0, 0, W, H)
+  // (the walls either side, plaster, darker toward the foot)
+  for (const sd of [-1, 1]) {
+    const gr = g.createLinearGradient(0, 0, 0, H)
+    gr.addColorStop(0, '#e6d8bc'); gr.addColorStop(1, '#6a5a46')
+    g.fillStyle = gr
+    g.beginPath()
+    g.moveTo(cx + sd * W * 0.5, H); g.lineTo(cx + sd * W * 0.5, 0); g.lineTo(cx + sd * W * 0.2, top); g.lineTo(cx + sd * W * 0.2, top + 40); g.lineTo(cx + sd * W * 0.36, H)
+    g.closePath(); g.fill()
+  }
+  // (the landing's light at the top)
+  const lt = g.createRadialGradient(cx, top + 10, 4, cx, top + 10, 140)
+  lt.addColorStop(0, 'rgba(255,214,150,0.95)'); lt.addColorStop(1, 'rgba(255,214,150,0)')
+  g.fillStyle = '#f2d9a8'; g.fillRect(cx - W * 0.2, 0, W * 0.4, top + 40)
+  g.fillStyle = lt; g.fillRect(0, 0, W, 260)
+  // (the treads: closing up as they rise, each a riser in shadow and a tread in light with a bright nosing)
+  const n = 16
+  for (let k = 0; k < n; k++) {
+    const t0 = k / n, t1 = (k + 1) / n
+    const y0 = H - (H - top - 40) * Math.pow(t0, 0.82), y1 = H - (H - top - 40) * Math.pow(t1, 0.82)
+    const half = (t: number) => W * (0.36 - 0.16 * Math.pow(t, 0.82))
+    const ym = y0 + (y1 - y0) * 0.55
+    // (riser)
+    g.fillStyle = `rgb(${70 + k * 4},${46 + k * 3},${30 + k * 2})`
+    g.beginPath(); g.moveTo(cx - half(t0), y0); g.lineTo(cx + half(t0), y0); g.lineTo(cx + half(t0), ym); g.lineTo(cx - half(t0), ym); g.closePath(); g.fill()
+    // (tread)
+    g.fillStyle = `rgb(${150 + k * 5},${106 + k * 4},${66 + k * 3})`
+    g.beginPath(); g.moveTo(cx - half(t0), ym); g.lineTo(cx + half(t0), ym); g.lineTo(cx + half(t1), y1); g.lineTo(cx - half(t1), y1); g.closePath(); g.fill()
+    g.strokeStyle = 'rgba(255,230,180,0.75)'; g.lineWidth = 2
+    g.beginPath(); g.moveTo(cx - half(t0), ym); g.lineTo(cx + half(t0), ym); g.stroke()
+  }
+  // (the handrail up the right wall)
+  g.strokeStyle = '#3a2416'; g.lineWidth = 7
+  g.beginPath(); g.moveTo(W * 0.9, H * 0.62); g.lineTo(W * 0.66, top + 60); g.stroke()
+  g.strokeStyle = 'rgba(255,220,170,0.5)'; g.lineWidth = 2
+  g.beginPath(); g.moveTo(W * 0.9, H * 0.62 - 4); g.lineTo(W * 0.66, top + 56); g.stroke()
+  // (2F on a plate at the landing)
+  g.fillStyle = '#3a2416'; g.fillRect(cx - 18, top - 34, 36, 22)
+  g.fillStyle = '#f4e6c8'; g.font = 'bold 16px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('2F', cx, top - 23)
+  // (and the shadow of the doorway's edge over the foot)
+  const sh = g.createLinearGradient(0, H * 0.7, 0, H)
+  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.45)')
+  g.fillStyle = sh; g.fillRect(0, 0, W, H)
+})
+/** the plaque over the staff's door: 員工專用 in cream on dark wood, STAFF ONLY under it */
+const STAFF_SIGN = canvasTex(336, 128, (g) => {
+  g.fillStyle = '#3a2416'; g.fillRect(0, 0, 336, 128)
+  g.strokeStyle = '#7a5434'; g.lineWidth = 6; g.strokeRect(6, 6, 324, 116)
+  brushText(g, '員工專用', 168, 54, 52, { fill: '#f2e4c4', shadow: 'rgba(0,0,0,0.5)', spacing: 6 })
+  g.fillStyle = '#d8c49a'; g.font = '600 18px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  ;(g as unknown as { letterSpacing: string }).letterSpacing = '4px'
+  g.fillText('STAFF ONLY', 168, 102)
+})
+/**
+ * The staff's door (the owner's: in the side wall by the corner, where the koi print hung; a sliding door like the toilets'): the toilets'
+ * door narrowed, its dark cedar frame on the plaster, the stair painted on the wall inside it, a plaque over it; clicked it slides aside
+ * toward the corner (behind the bamboo's pot) and back again.
+ */
+function StaffDoor() {
+  const door = useWcDoor()
+  const frame = useMemo(() => door.frame(), [door])
+  const panel = useMemo(() => door.panel(), [door])
+  const g = useRef<THREE.Group>(null)
+  const st = useRef({ open: false, k: 0 })
+  const narrow = STAFF_W / WC_W
+  useFrame((_, dt) => {
+    const s = st.current
+    const want = s.open ? 1 : 0
+    s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.8)
+    const ss = (a: number, b: number) => { const t = Math.min(1, Math.max(0, (s.k - a) / (b - a))); return t * t * (3 - 2 * t) }
+    if (g.current) {
+      g.current.position.x = -0.065 * ss(0, 0.25)
+      g.current.position.z = -ss(0.2, 1) * (STAFF_W - 0.06)
+    }
+  })
+  const says = () => (st.current.open ? '點一下關上（樓上是員工休息室）' : '點一下打開（樓上是員工休息室）')
+  return (
+    <group>
+      <group scale={[1, 1, narrow]}><primitive object={frame} /></group>
+      <mesh position={[-0.004, WC_H / 2, 0]} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[STAFF_W - 0.05, WC_H - 0.02]} />
+        <meshBasicMaterial color="#ffffff" map={STAFF_STAIRS} />
+      </mesh>
+      <group ref={g} onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; st.current.open = !st.current.open; setTip({ title: '員工專用門', hint: says() }) }}
+        onPointerOver={(ev) => { if (getEdit().on) return; tipOver('員工專用門', says()).onPointerOver(ev) }}
+        onPointerOut={(ev) => { tipOver('員工專用門', '').onPointerOut(ev) }}>
+        <group position={[-0.03, 0, 0]} scale={[1, 1, narrow]}><primitive object={panel} /></group>
+      </group>
+      <mesh position={[-0.075, WC_H + 0.15, 0]} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[0.42, 0.16]} />
+        <meshToonMaterial color="#ffffff" map={STAFF_SIGN} />
+      </mesh>
     </group>
   )
 }
@@ -1920,7 +2199,11 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
  * One counter's stretch of the room: the wall behind its aisle (from/to along it, in the counter's own frame), and
  * pendant lamps over it.
  */
-function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, clear = [], corner = false }: { c: Counter; from: number; to: number; far: number
+function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, clear = [], corner = false, hang = [], staffDoor }: { c: Counter; from: number; to: number; far: number
+  /** prints hung here as well, where asked (along it) */
+  hang?: { z: number; print: ArtKey }[]
+  /** a staff-only door here (its middle, along it): nothing hung over it */
+  staffDoor?: number
   /** the first of the room's two walls, whose start is the corner they meet in: its thickness runs on to close the corner */
   corner?: boolean
   /** stretches of it (along it) where something stands against it: nothing hung there, no post */
@@ -1974,7 +2257,11 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
         nobori: z !== extra && k % 3 === 2 && isClear(z, 0.9) ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined,
         // (and a big signboard every fifth, between)
         kanban: z !== extra && k % 5 === 3 && k % 3 !== 2 ? Math.floor(k / 5 + start) % KANBAN_LOOKS.length : undefined }))
-  }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear])
+      // (nothing where the staff's door is: taken out after the rest are given theirs, so they keep what they were)
+      .filter((a) => staffDoor === undefined || Math.abs(a.z - staffDoor) > STAFF_W / 2 + 0.3)
+      .concat(hang.map((h) => ({ z: h.z, scroll: undefined, print: h.print, round: false, nobori: undefined, kanban: undefined })))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear, staffDoor, hang.map((h) => `${h.z}${h.print}`).join()])
   // (the light switch: halfway between the round window short of the shelf and the next picture toward it; by the door if there's none)
   const switchZ = useMemo(() => {
     const i = art.reduce((k, a, j) => (a.round && a.z < shelfZ ? j : k), -1)
@@ -2030,9 +2317,12 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
         {/* the rail over the wainscot and the beam along the top */}
         {/* (the rail broken where the toilets' doorways are) */}
         {/* (stopping short of the doorways' frames, and not across the little strip between the two doors) */}
-        {spans.filter(([a, b, y0]) => y0 < WAINSCOT && b - a > 0.3).map(([z0, z1]) => {
+        {spans.filter(([a, b, y0]) => y0 < WAINSCOT && b - a > 0.3).flatMap(([z0, z1]) => {
           const a = door !== undefined && z0 !== from ? z0 + 0.09 : z0, b = door !== undefined && z1 !== to ? z1 - 0.09 : z1
-          return <Box key={z0} size={[0.05, 0.05, b - a]} color="#3a2416" position={[-0.02, WAINSCOT, (a + b) / 2]} />
+          // (and broken at the staff's door, short of its frame either side)
+          const cut = staffDoor === undefined ? null : [staffDoor - STAFF_W / 2 - 0.07, staffDoor + STAFF_W / 2 + 0.07]
+          const runs = cut && cut[0] < b && cut[1] > a ? [[a, cut[0]], [cut[1], b]].filter(([p, q]) => q - p > 0.02) : [[a, b]]
+          return runs.map(([p, q]) => <Box key={`${z0}|${p}`} size={[0.05, 0.05, q - p]} color="#3a2416" position={[-0.02, WAINSCOT, (p + q) / 2]} />)
         })}
         <Box size={[0.08, 0.1, l]} color="#3a2416" position={[-0.03, WALL_H - 0.05, mid]} />
         {/* (no upright posts: nothing stands in the way of the banners strung along it) */}
@@ -2054,6 +2344,8 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
           {a.round && <group position={[0, 1.4, a.z]}><WindowDust /></group>}
           </Movable>
         ))}
+        {/* (the staff's door, where asked: up the stairs behind it, 員工專用) */}
+        {staffDoor !== undefined && <Movable id="staffdoor" label="員工專用門"><group position={[0, 0, staffDoor]}><StaffDoor /></group></Movable>}
         {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
         {altar && <Movable id="exitsign" label="逃生出口燈"><group name="look-exit" position={[-0.045, 2.08, to - 0.62]} rotation-y={-Math.PI / 2}><ExitSign /></group></Movable>}
         {/* (the light switch at hand height on the plaster between the round window and the picture after it, the owner's place for it) */}

@@ -119,6 +119,19 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     </group>
   )
 }
+/** the staff's door, along the first counter's wall: where the koi print hung, a little along from the bamboo in the corner (the owner's) */
+const STAFF_DOOR_AT = -3.55
+/** the koi print, moved (the owner's): on the toilets' wall past the drinks fridges, on the plain plaster there; once only, the same array
+ * each time (the wall's memo compares it) */
+const koiHangs = new Map<string, { z: number; print: 'koi' }[]>()
+function koiHang(clear: [number, number][], from: number) {
+  const lo = clear.length ? Math.min(...clear.map((r) => r[0])) : from + 1
+  const z = Math.max(from + 0.4, lo - 0.55)
+  const key = z.toFixed(3)
+  let v = koiHangs.get(key)
+  if (!v) { v = [{ z, print: 'koi' }]; koiHangs.set(key, v) }
+  return v
+}
 /** a customer in the boss's style, drawn in the customers' frame (PEOPLE_SCALE): the staff's size */
 const FOLK_FIT = STAFF_SCALE / PEOPLE_SCALE
 
@@ -2487,7 +2500,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} drop={KITCHEN_DROP / scale} />}
               {given && <Later stage={2}><ShopProps counters={counters} /></Later>}
-              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} altar={incense ?? true} corner />}
+              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} altar={incense ?? true} corner
+                staffDoor={STAFF_DOOR_AT} />}
             </group>
           )
         }
@@ -2499,7 +2513,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
             {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lamps={2} top={top} door={wcs?.door ?? (meet + corner) / 2}
-              clear={fridgeClear} />}
+              clear={fridgeClear} hang={koiHang(fridgeClear ?? [], -c.length / 2 - 0.35)} />}
           </group>
         )
       })}
