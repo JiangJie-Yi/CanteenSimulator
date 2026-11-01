@@ -777,13 +777,74 @@ function drawRoundPaper(g: CanvasRenderingContext2D, night: boolean) {
   // (the fibres of the washi)
   g.strokeStyle = night ? 'rgba(200,210,240,0.08)' : 'rgba(110,140,190,0.13)'; g.lineWidth = 1
   for (let k = 0; k < 160; k++) { const x = (k * 97) % 512, y = (k * 233) % 512; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 14, y + (k % 5) - 2); g.stroke() }
-  // (and its longer fibres and the odd thicker one, as handmade paper has; no bamboo's shadows on it: there's none outside)
+  // (and its longer fibres and the odd thicker one, as handmade paper has; by night the moon throws the shadows of the bamboo outside on it,
+  // by day none)
   g.strokeStyle = night ? 'rgba(220,228,250,0.06)' : 'rgba(255,255,255,0.5)'
   for (let k = 0; k < 60; k++) {
     const x = (k * 151) % 512, y = (k * 89) % 512, a = (k * 0.71) % Math.PI
     g.lineWidth = k % 9 ? 0.8 : 1.6
     g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a) * 18 + 6, y + Math.sin(a) * 18 - 4, x + Math.cos(a) * 34, y + Math.sin(a) * 34); g.stroke()
   }
+  if (night) bambooShadows(g)
+}
+/**
+ * The moon's shadows of bamboo outside on the round window's paper (512 x 512): two culms far off, thin and soft, two nearer, fuller and
+ * sharper, each tapering, its nodes ridged, and from some nodes a slender branch with a spray of narrow pointed leaves drooping from its end;
+ * and a few sprays hanging in from above
+ */
+function bambooShadows(g: CanvasRenderingContext2D) {
+  const rnd = seeded(5)
+  const leaf = (len: number, wid: number) => {
+    g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(wid, len * 0.34, 0, len); g.quadraticCurveTo(-wid * 0.8, len * 0.34, 0, 0); g.fill()
+  }
+  const spray = (n: number, side: number, size: number) => {
+    for (let k = 0; k < n; k++) {
+      g.save()
+      g.rotate(side * (0.35 + k * 0.32) + (rnd() - 0.5) * 0.25)
+      leaf(size * (0.75 + rnd() * 0.45), size * 0.13)
+      g.restore()
+    }
+  }
+  const culm = (x: number, w: number, lean: number, blur: number, alpha: number) => {
+    g.save()
+    g.filter = `blur(${blur}px)`
+    g.fillStyle = `rgba(6,10,24,${alpha})`
+    g.strokeStyle = `rgba(6,10,24,${alpha})`
+    g.translate(x, 540)
+    g.rotate(lean)
+    g.beginPath(); g.moveTo(-w / 2, 0); g.lineTo(-w * 0.4, -620); g.lineTo(w * 0.4, -620); g.lineTo(w / 2, 0); g.fill()
+    for (let y = 30 + rnd() * 40; y < 600; y += 74 + rnd() * 26) {
+      // (a node: the culm's ridge across it, a little proud each side)
+      g.fillRect(-w * 0.62, -y - 1.6, w * 1.24, 3.4)
+      if (rnd() < 0.6) {
+        const side = rnd() < 0.5 ? -1 : 1, bl = 30 + rnd() * 46
+        g.save()
+        g.translate(side * w * 0.4, -y)
+        g.rotate(side * (0.75 + rnd() * 0.35))
+        g.lineWidth = Math.max(1, w * 0.12)
+        g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(side * 4, -bl * 0.5, 0, -bl); g.stroke()
+        g.translate(0, -bl)
+        // (the leaves droop from the branch's end, fanned to the outside)
+        g.rotate(Math.PI - side * 0.5)
+        spray(3 + Math.floor(rnd() * 4), side, 30 + w * 1.2)
+        g.restore()
+      }
+    }
+    g.restore()
+  }
+  culm(146, 11, 0.05, 2.4, 0.26)
+  culm(214, 8, -0.035, 2.6, 0.22)
+  culm(366, 17, 0.03, 0.9, 0.46)
+  culm(434, 12, -0.06, 1.1, 0.4)
+  // (sprays hanging in from above, out of the frame)
+  g.save()
+  g.filter = 'blur(1.4px)'
+  g.fillStyle = 'rgba(6,10,24,0.34)'
+  for (const [x, y, side] of [[290, -8, 1], [120, 4, -1], [470, 20, -1]] as [number, number, number][]) {
+    g.save(); g.translate(x, y); g.rotate(Math.PI * 0.08 * side); spray(5, side, 46); g.restore()
+  }
+  g.restore()
+  g.filter = 'none'
 }
 const ROUND_PAPER = (() => {
   if (typeof document === 'undefined') return null
@@ -1729,51 +1790,159 @@ const LANTERN_GEO = (() => {
   }
   return new THREE.LatheGeometry(pts, 28)
 })()
-/** thin washi in fine horizontal ribs, lit from within: bright cream in the middle of the belly, warmer toward its ends, a faint seam between each of the panels */
-const LANTERN_SKIN = signTexture(128, 256, (g) => {
-  const grad = g.createLinearGradient(0, 0, 0, 256)
-  grad.addColorStop(0, '#f2b878')
-  grad.addColorStop(0.22, '#ffe2b0')
-  grad.addColorStop(0.5, '#fff6e0')
-  grad.addColorStop(0.78, '#ffe2b0')
-  grad.addColorStop(1, '#f2b878')
+/** a little seeded stream of numbers, the same pictures every time */
+function seeded(seed: number) {
+  let n = seed
+  return () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646 }
+}
+/** a point on a cubic curve */
+const onCurve = (t: number, a: number, b: number, c: number, d: number) => {
+  const m = 1 - t
+  return m * m * m * a + 3 * m * m * t * b + 3 * m * t * t * c + t * t * t * d
+}
+/**
+ * A sea bream painted in sumi on a lantern's paper (its middle at cx, cy, `len` long, swimming toward -x, or +x if `dir` is -1): an ink wash
+ * darkest along its back, a wash of vermilion over it, rows of scales, its gill, eye and mouth, a forked tail, the dorsal fin's spines; on a
+ * lit lantern the ink a little fainter and warmer, the light through it
+ */
+function sumiFish(g: CanvasRenderingContext2D, cx: number, cy: number, len: number, dir: number, lit: boolean) {
+  const L = len, ink = (a: number) => (lit ? `rgba(46,26,14,${a * 0.75})` : `rgba(28,26,26,${a})`)
+  const back: [number, number][] = [[-0.5, 0], [-0.42, -0.2], [-0.1, -0.25], [0.12, -0.15]]
+  g.save()
+  g.translate(cx, cy)
+  g.scale(dir, 1)
+  const body = new Path2D()
+  body.moveTo(-L * 0.5, 0)
+  body.bezierCurveTo(-L * 0.42, -L * 0.2, -L * 0.1, -L * 0.25, L * 0.12, -L * 0.15)
+  body.bezierCurveTo(L * 0.22, -L * 0.1, L * 0.28, -L * 0.05, L * 0.31, -L * 0.035)
+  body.lineTo(L * 0.31, L * 0.035)
+  body.bezierCurveTo(L * 0.22, L * 0.08, -L * 0.08, L * 0.16, -L * 0.38, L * 0.07)
+  body.quadraticCurveTo(-L * 0.47, L * 0.04, -L * 0.5, 0)
+  const wash = g.createLinearGradient(0, -L * 0.24, 0, L * 0.15)
+  wash.addColorStop(0, ink(0.8)); wash.addColorStop(0.5, ink(0.32)); wash.addColorStop(1, ink(0.08))
+  g.fillStyle = wash
+  g.fill(body)
+  g.save()
+  g.clip(body)
+  // (the vermilion over its back, fading toward the belly)
+  const red = g.createLinearGradient(0, -L * 0.26, 0, L * 0.06)
+  red.addColorStop(0, `rgba(205,52,30,${lit ? 0.6 : 0.5})`); red.addColorStop(1, 'rgba(205,52,30,0)')
+  g.fillStyle = red
+  g.fillRect(-L * 0.6, -L * 0.3, L * 1.2, L * 0.42)
+  // (its scales, rows of little arcs, offset row to row)
+  g.strokeStyle = ink(0.32)
+  g.lineWidth = 1
+  for (let r = 0; r < 4; r++) {
+    for (let k = 0; k < 9; k++) {
+      const x = -L * 0.2 + k * L * 0.054 + (r % 2) * L * 0.027, y = -L * 0.13 + r * L * 0.052
+      g.beginPath(); g.arc(x, y, L * 0.024, -Math.PI / 2, Math.PI / 2); g.stroke()
+    }
+  }
+  g.restore()
+  g.lineCap = 'round'
+  g.lineJoin = 'round'
+  // (the back in one firm stroke of the brush, the belly lighter)
+  g.strokeStyle = ink(0.9)
+  g.lineWidth = Math.max(1.6, L * 0.014)
+  g.beginPath()
+  g.moveTo(-L * 0.5, 0)
+  g.bezierCurveTo(-L * 0.42, -L * 0.2, -L * 0.1, -L * 0.25, L * 0.12, -L * 0.15)
+  g.bezierCurveTo(L * 0.22, -L * 0.1, L * 0.28, -L * 0.05, L * 0.31, -L * 0.035)
+  g.stroke()
+  g.strokeStyle = ink(0.5)
+  g.lineWidth = Math.max(1, L * 0.008)
+  g.beginPath()
+  g.moveTo(L * 0.31, L * 0.035)
+  g.bezierCurveTo(L * 0.22, L * 0.08, -L * 0.08, L * 0.16, -L * 0.38, L * 0.07)
+  g.quadraticCurveTo(-L * 0.47, L * 0.04, -L * 0.5, 0)
+  g.stroke()
+  // (the gill's sweep, the mouth, the eye)
+  g.strokeStyle = ink(0.8)
+  g.lineWidth = Math.max(1.2, L * 0.01)
+  g.beginPath(); g.arc(-L * 0.29, -L * 0.03, L * 0.12, -1.0, 1.05); g.stroke()
+  g.beginPath(); g.moveTo(-L * 0.5, 0); g.lineTo(-L * 0.44, L * 0.012); g.stroke()
+  g.fillStyle = ink(0.95)
+  g.beginPath(); g.arc(-L * 0.405, -L * 0.065, L * 0.021, 0, Math.PI * 2); g.fill()
+  g.fillStyle = lit ? 'rgba(255,240,210,0.9)' : 'rgba(245,240,230,0.95)'
+  g.beginPath(); g.arc(-L * 0.41, -L * 0.07, L * 0.007, 0, Math.PI * 2); g.fill()
+  // (the forked tail, its rays)
+  const tail = new Path2D()
+  tail.moveTo(L * 0.3, 0)
+  tail.quadraticCurveTo(L * 0.4, -L * 0.05, L * 0.52, -L * 0.17)
+  tail.quadraticCurveTo(L * 0.46, -L * 0.04, L * 0.48, 0)
+  tail.quadraticCurveTo(L * 0.46, L * 0.04, L * 0.52, L * 0.16)
+  tail.quadraticCurveTo(L * 0.4, L * 0.05, L * 0.3, 0)
+  g.fillStyle = ink(0.55)
+  g.fill(tail)
+  g.strokeStyle = ink(0.4)
+  g.lineWidth = 0.9
+  for (let k = -3; k <= 3; k++) { g.beginPath(); g.moveTo(L * 0.31, 0); g.lineTo(L * 0.47, k * L * 0.045); g.stroke() }
+  // (the dorsal fin: its spines up off the back)
+  g.strokeStyle = ink(0.75)
+  g.lineWidth = Math.max(1, L * 0.007)
+  for (let k = 0; k < 10; k++) {
+    const t = 0.42 + k * 0.055
+    const x = onCurve(t, back[0][0], back[1][0], back[2][0], back[3][0]) * L, y = onCurve(t, back[0][1], back[1][1], back[2][1], back[3][1]) * L
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + L * 0.02, y - L * (0.07 - k * 0.003)); g.stroke()
+  }
+  // (a pectoral fin, a small fan behind the gill)
+  g.fillStyle = ink(0.35)
+  g.beginPath(); g.moveTo(-L * 0.22, L * 0.03); g.quadraticCurveTo(-L * 0.12, L * 0.02, -L * 0.08, L * 0.09); g.quadraticCurveTo(-L * 0.15, L * 0.08, -L * 0.22, L * 0.03); g.fill()
+  g.restore()
+}
+/**
+ * A lantern's paper (u round it, v up it: 1024 x 300, about as many pixels to the inch round its belly as up it, so what's painted on it
+ * keeps its shape there). `lit`: glowing from within, warm, brightest in the middle of its belly; unlit, plain washi, a little cream (only
+ * a little). Its bamboo ribs and the seams between its panels, the paper's fibres here and there, and two sea bream painted in sumi
+ * swimming round it, one each way.
+ */
+function lanternPaper(g: CanvasRenderingContext2D, lit: boolean) {
+  const W = 1024, H = 300
+  const grad = g.createLinearGradient(0, 0, 0, H)
+  for (const [t, c] of (lit ? [[0, '#f2b878'], [0.22, '#ffe2b0'], [0.5, '#fff6e0'], [0.78, '#ffe2b0'], [1, '#f2b878']]
+    : [[0, '#e0d9cb'], [0.28, '#f1ebdf'], [0.52, '#f7f2e8'], [0.76, '#efe9dc'], [1, '#dcd5c6']]) as [number, string][]) grad.addColorStop(t, c)
   g.fillStyle = grad
-  g.fillRect(0, 0, 128, 256)
-  // (the bamboo ribs it's wound on: a fine line every few pixels, a shade darker, with a pale one beside it)
-  for (let y = 2; y < 256; y += 5) {
-    g.fillStyle = 'rgba(190,130,70,0.22)'
-    g.fillRect(0, y, 128, 1.3)
-    g.fillStyle = 'rgba(255,255,255,0.18)'
-    g.fillRect(0, y + 1.5, 128, 1)
+  g.fillRect(0, 0, W, H)
+  const rnd = seeded(lit ? 11 : 29)
+  // (the washi's own clouding and its long kozo fibres, a little lighter and darker than the sheet)
+  for (let k = 0; k < 26; k++) {
+    const x = rnd() * W, y = rnd() * H, r = 20 + rnd() * 60
+    const cl = g.createRadialGradient(x, y, 0, x, y, r)
+    cl.addColorStop(0, lit ? 'rgba(255,250,235,0.16)' : 'rgba(255,255,255,0.22)'); cl.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = cl
+    g.fillRect(x - r, y - r, r * 2, r * 2)
+  }
+  g.lineCap = 'round'
+  for (let k = 0; k < 360; k++) {
+    const x = rnd() * W, y = rnd() * H, a = rnd() * Math.PI, l = 8 + rnd() * 26, bend = (rnd() - 0.5) * 10
+    g.strokeStyle = k % 3 ? (lit ? 'rgba(255,248,230,0.28)' : 'rgba(255,255,255,0.45)') : (lit ? 'rgba(170,110,60,0.12)' : 'rgba(150,140,120,0.16)')
+    g.lineWidth = 0.6 + rnd() * 0.7
+    g.beginPath(); g.moveTo(x, y)
+    g.quadraticCurveTo(x + Math.cos(a) * l / 2 - Math.sin(a) * bend, y + Math.sin(a) * l / 2 + Math.cos(a) * bend, x + Math.cos(a) * l, y + Math.sin(a) * l)
+    g.stroke()
+  }
+  // (the bamboo ribs it's wound on: a fine line every few pixels, a shade darker, a pale one beside it)
+  for (let y = 3; y < H; y += 6.6) {
+    g.fillStyle = lit ? 'rgba(190,130,70,0.22)' : 'rgba(120,112,98,0.2)'
+    g.fillRect(0, y, W, 1.5)
+    g.fillStyle = lit ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.35)'
+    g.fillRect(0, y + 1.8, W, 1)
   }
   // (the seams between its panels)
-  g.fillStyle = 'rgba(200,140,80,0.16)'
-  for (let x = 0; x < 128; x += 16) g.fillRect(x, 0, 1.4, 256)
-})
+  g.fillStyle = lit ? 'rgba(200,140,80,0.16)' : 'rgba(120,110,95,0.14)'
+  for (let x = 0; x < W; x += 128) g.fillRect(x, 0, 1.6, H)
+  // (the two fish, round its belly, swimming opposite ways)
+  sumiFish(g, W * 0.27, H * 0.52, 210, 1, lit)
+  sumiFish(g, W * 0.77, H * 0.5, 190, -1, lit)
+}
+const LANTERN_SKIN = signTexture(1024, 300, (g) => lanternPaper(g, true))
 const PENDANT_GLOW = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffcf90' }), 0.35, 0.75)
 const PENDANT_BLOOM = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffb870' }), 0, 0.28)
 // (pulled toward the camera in depth so it never fights the bar's top under it, seen from far off)
 const PENDANT_POOL = nightGlow(new THREE.MeshBasicMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
   polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), 0.18, 0.42)
-/** and the same paper with no light in it: plain washi, grey-white, its ribs and seams a shade darker, a little shadowed toward its ends */
-const LANTERN_SKIN_OFF = signTexture(128, 256, (g) => {
-  const grad = g.createLinearGradient(0, 0, 0, 256)
-  grad.addColorStop(0, '#d9d8d4')
-  grad.addColorStop(0.3, '#f4f3f0')
-  grad.addColorStop(0.55, '#fbfbf9')
-  grad.addColorStop(0.8, '#f0efec')
-  grad.addColorStop(1, '#d4d3cf')
-  g.fillStyle = grad
-  g.fillRect(0, 0, 128, 256)
-  for (let y = 2; y < 256; y += 5) {
-    g.fillStyle = 'rgba(120,120,118,0.2)'
-    g.fillRect(0, y, 128, 1.3)
-    g.fillStyle = 'rgba(255,255,255,0.3)'
-    g.fillRect(0, y + 1.5, 128, 1)
-  }
-  g.fillStyle = 'rgba(110,110,108,0.14)'
-  for (let x = 0; x < 128; x += 16) g.fillRect(x, 0, 1.4, 256)
-})
+/** and the same paper with no light in it: plain washi, a little cream, its fibres and its fish */
+const LANTERN_SKIN_OFF = signTexture(1024, 300, (g) => lanternPaper(g, false))
 const LANTERN_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: LANTERN_SKIN, toneMapped: false, side: THREE.DoubleSide }), { offMap: LANTERN_SKIN_OFF })
 function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
   return (
