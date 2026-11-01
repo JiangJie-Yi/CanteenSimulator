@@ -48,7 +48,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { PASS_ALONG, SHRINE_FLOWERS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { SICK, PASS_ALONG, SHRINE_FLOWERS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -1789,7 +1789,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.wc = { who: 'drink', path, len: pathLength(path), unit: fr.n, pick }
           s.phase = 'wcGo'
           s.t = 0
-        } else if (wcs && guest?.state === 'waiting' && Math.random() < wcRate() * Math.min(dt, 0.1)
+        } else if (wcs && (SICK.has(s.id) || guest?.state === 'waiting' && Math.random() < wcRate() * Math.min(dt, 0.1))
           // (one at a time: a toilet someone's on their way to, in, or coming out of is left till they're done)
           && !shown.some((x) => x !== s && x.wc?.who === (HER.has(kindOf(s.id).kind) ? 'f' : 'm') && x.phase.startsWith('wc'))) {
           const who = HER.has(kindOf(s.id).kind) ? 'f' : 'm'
@@ -1810,6 +1810,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         g?.position.copy(p)
         if (g) g.rotation.y = s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z)
         if (d >= w.len) {
+          if (s.phase === 'wcGo') SICK.delete(s.id)
           s.phase = s.phase === 'wcGo' ? 'wcIn' : s.leaving ? 'leave' : 'sit'
           s.t = 0
         }

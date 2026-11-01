@@ -55,6 +55,8 @@ export const PLATES_SET = new Set<number>()
  * still getting up and going. Nobody new is given one of these, though the shop's done with whoever had it.
  */
 export const SEATS_TAKEN = new Set<number>()
+/** the customers whose stomachs something spoiled has upset (game/freshness sickChance): off to the toilet as soon as they can be */
+export const SICK = new Set<number>()
 /**
  * The people about the kitchen (the owner, the cooks, the servers), each figure put in by its own while it's drawn and taken out when it
  * goes: the cook's table's cupboard doors don't swing into anyone stood or passing in front of them (read from their world matrices).

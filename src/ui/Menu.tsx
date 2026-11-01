@@ -291,10 +291,12 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
           const f = Math.round(fresh?.[x.id] ?? 100)
           const grade = freshGrade(f)
           return (
-            <span className={`chiller-fresh is-${grade}`} aria-hidden="true" title={tl(lang, `鮮度 ${f}%：越不新鮮，做出來越不好吃`, `鮮度 ${f}%：鮮度が落ちると味も落ちる`, `Freshness ${f}%: the staler, the less tasty`)}>
+            <span className={`chiller-fresh is-${grade}`} aria-hidden="true" title={grade === 'spoiled'
+              ? tl(lang, `鮮度 ${f}%：已經壞了，不可食用（做出來很難吃，客人吃了容易拉肚子）`, `鮮度 ${f}%：傷んでいて食べられない（まずく、客がお腹を壊しやすい）`, `Freshness ${f}%: spoiled, not fit to eat (it tastes bad, and may well upset a customer's stomach)`)
+              : tl(lang, `鮮度 ${f}%：越不新鮮，做出來越不好吃`, `鮮度 ${f}%：鮮度が落ちると味も落ちる`, `Freshness ${f}%: the staler, the less tasty`)}>
               <svg viewBox="0 0 16 16"><path d="M13.5 2.5C7 2.5 3 5.5 3 10c0 1.3.4 2.4 1 3.2C5 9.5 7.5 7 11 5.5 8 7.5 6 10 5.2 13.6 6 14 7 14 8 14c4 0 5.5-4.5 5.5-11.5z" /></svg>
               <span className="chiller-fresh-bar"><i style={{ width: `${f}%` }} /></span>
-              <em>{f}%</em>
+              <em>{grade === 'spoiled' ? tl(lang, '不可食用', '食用不可', 'Spoiled') : `${f}%`}</em>
             </span>
           )
         })()}

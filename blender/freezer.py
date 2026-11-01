@@ -2,7 +2,7 @@
 
 - freezer.glb, nodes (kept plain: only what says "freezer", nothing fussy):
   - "FreezerBody": the cabinet in pale blue-white enamel with soft rounded corners on a dark plinth, the compressor housing at the right
-    end (a louvred grille, the temperature display reading -20 and a red power lamp), a chrome rim round the opening; the cavity inside lined pale.
+    end (its top the enamel, no plate; a louvred grille, the temperature display reading -20 and a red power lamp), a chrome rim round the opening; the cavity inside lined pale.
   - "FreezerLid": the lid, its origin on the hinge along the back edge, made shut (the game swings it up): a thick slab, a chrome handle,
     the grey gasket round its underside, two hinges.
   - "FreezerGoods": what's in it, as a fish shop's freezer holds: a wire basket hung on the rim with saury frozen in a bundle; whole fish
@@ -140,9 +140,9 @@ bpy.context.view_layer.objects.active = o
 m_ = o.modifiers.new("b", "BEVEL"); m_.width = 0.002; m_.segments = 2
 bpy.ops.object.modifier_apply(modifier="b")
 body.append(o)
-# (the housing: its top capped in steel, a louvred grille low on its face, the red lamp above)
+# (the housing: a louvred grille low on its face, the red lamp above; its top the cabinet's own enamel (it was capped in a steel plate, which
+# the owner didn't want))
 HX = W / 2 - HOUSE / 2
-box("FzHouseTop", (HOUSE + 0.01, 0.012, D + 0.01), (HX, H + 0.006, 0), M["steel"], 0.004, 2, body)
 for k in range(5):
     box("FzLouvre", (0.2, 0.012, 0.006), (HX, 0.22 + k * 0.036, D / 2 + 0.003), M["gasket"], 0.002, 1, body)
 # (the temperature display, reading -20, in its dark frame)

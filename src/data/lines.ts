@@ -19,6 +19,7 @@ const ZH = {
   dark: (id: number) => `#${id} 好暗喔……燈怎麼關了？`,
   darkGone: (id: number) => `#${id} 黑漆漆的，看不到在吃什麼，走了！`,
   verdict: (id: number, n: string, stars: number) => `#${id} ${n}${['不太行…', '還可以', '不錯吃', '好吃！', '太好吃了！'][stars - 1]}`,
+  sick: (id: number, n: string) => `#${id} 這${n}怪怪的…肚子好痛，廁所在哪！`,
   trial: (who: string, names: string[]) => `${who}試做了：${names.join('、')}，記在試菜紀錄了`,
   trialNone: (who: string) => `${who}：沒有材料可以試，先進貨吧`,
 }
@@ -40,6 +41,7 @@ const JA: typeof ZH = {
   dark: (id) => `#${id} 暗いなあ……電気消えてる？`,
   darkGone: (id) => `#${id} 真っ暗で何も見えない、帰る！`,
   verdict: (id, n, stars) => `#${id} ${n}、${['いまいち…', 'まあまあ', 'おいしい', 'うまい！', '最高にうまい！'][stars - 1]}`,
+  sick: (id, n) => `#${id} この${n}、なんか変…お腹が痛い、トイレどこ！`,
   trial: (who, names) => `${who}が試作：${names.join('、')}（ノートに記録）`,
   trialNone: (who) => `${who}：材料がありません。先に仕入れを`,
 }
@@ -61,6 +63,7 @@ const EN: typeof ZH = {
   dark: (id) => `#${id} It's so dark... are the lights off?`,
   darkGone: (id) => `#${id} Can't see a thing in here. I'm off!`,
   verdict: (id, n, stars) => `#${id} ${n}: ${['not great...', 'okay', 'tasty', 'delicious!', 'amazing!'][stars - 1]}`,
+  sick: (id, n) => `#${id} That ${n} tasted off... my stomach! Where's the toilet?`,
   trial: (who, names) => `${who} tried out: ${names.join(', ')} (in the tasting notes)`,
   trialNone: (who) => `${who}: nothing to try with, stock up first`,
 }

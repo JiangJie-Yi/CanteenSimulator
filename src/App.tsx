@@ -67,6 +67,7 @@ import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
 import { tl } from '@/data/i18n'
 import { ageFresh, blendFresh } from '@/game/freshness'
+import { FREEZER_TEMP } from '@/shops/grill/Decor'
 
 // distance between dishes on the carousel
 const SPACING = 6
@@ -1212,7 +1213,8 @@ export default function App() {
     // (every few seconds: a game-minute is a second of play, sped up with the game)
     const t = window.setInterval(() => {
       const mins = 5 * GAME_SPEED.value
-      setFresh((f) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, (stockWas.current[k] ?? 0) > 0 ? ageFresh(k, v, mins / 6) : v])))
+      // (the frozen at the freezer's own temperature, as its thermostat's set and as its lid's been left up: game/freshness frozenRate)
+      setFresh((f) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, (stockWas.current[k] ?? 0) > 0 ? ageFresh(k, v, mins / 6, FREEZER_TEMP.now) : v])))
     }, 5000)
     return () => window.clearInterval(t)
   }, [])
@@ -1276,6 +1278,22 @@ export default function App() {
     window.addEventListener('scene-blank-click', blank)
     return () => window.removeEventListener('scene-blank-click', blank)
   }, [office, fridgeOpen, drinksOpen])
+  // (the number keys choose a view, as the eye's list numbers them: 1 the overview ... 9 the window, 0 the owner's own eyes; not in edit mode,
+  // which has keys of its own (4, 5), nor while something's being typed)
+  useEffect(() => {
+    if (editOn) return
+    const key = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !/^[0-9]$/.test(e.key)) return
+      const t = e.target
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return
+      const v = VIEW_SPOTS[e.key === '0' ? 9 : +e.key - 1]
+      if (!v) return
+      e.preventDefault()
+      setView(v.id); setResetView((n) => n + 1); setViewMenu(false)
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [editOn])
   // (the views' menu folds away at a click anywhere else: not at its own button, its list or the numbered pins it puts in the scene,
   // nor at the end of a drag that turned the view)
   useEffect(() => {

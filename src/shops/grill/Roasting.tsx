@@ -48,8 +48,8 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
-import { freshFactor } from '@/game/freshness'
+import { SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { freshFactor, sickChance } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
 
@@ -1065,9 +1065,8 @@ function CubbyFrame() {
 /**
  * A cupboard's doors (開き戸) in the table's front, frame-and-panel in the body's own cedar a shade lighter: one leaf hung at its outer
  * end (`hinge` 'low' or 'high' along the table) or a pair hung at both ends meeting in the middle ('both'), a small oval pull let in
- * near each free edge. Shut, they close it off; pointed at they swing open outward so what's in it shows (shutting again a moment after
- * the pointer's gone; kept open while the pointer's inside, so what's there can be taken), and a click keeps them open (another shuts
- * them). `front`: the face they hang on (lay); `back`: how far in the cupboard goes (lay), its inside dark. `lit`: a strip of warm
+ * near each free edge. Shut, they close it off; a click swings them open outward so what's in it shows, another shuts them (the owner's:
+ * pointed at, they lit up and swung open of themselves, and stayed open while the pointer was inside). `front`: the face they hang on (lay); `back`: how far in the cupboard goes (lay), its inside dark. `lit`: a strip of warm
  * light under its header inside, coming on as the doors open (and off as they shut, so none leaks out through them), lighting what's in it.
  */
 const STRIP_OFF = new THREE.Color('#5a4a38')
@@ -1108,7 +1107,7 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
   const mid = new THREE.Vector3().addScaledVector(ALONG, (a0 + a1) / 2).addScaledVector(LAY, front)
   const doors = useRef<(THREE.Group | null)[]>([])
   const frame = useRef<THREE.Group>(null)
-  const st = useRef({ k: 0, kept: false, hoverUntil: 0, blocked: false })
+  const st = useRef({ k: 0, kept: false, blocked: false })
   const lamp = useRef<THREE.SpotLight>(null)
   // (where the cupboard's lamp shines: straight down, onto its floor)
   const lampAim = useMemo(() => new THREE.Object3D(), [])
@@ -1116,9 +1115,6 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
   const side = a0 < COOK_NOTCH.along[0] ? 'left' : 'right'
   if (import.meta.env?.DEV && typeof window !== 'undefined') ((window as unknown as { __cubbies?: Record<string, typeof st> }).__cubbies ??= {})[side] = st
   const geo = useMemo(() => panelBox(W, H, 0.025, 0.45), [W, H])
-  // (the cupboard's opening, in the doors' own frame: while the pointer's over it, they stay open, so what's inside can be reached and taken)
-  const inside = useMemo(() => new THREE.Box3(new THREE.Vector3(-span / 2, bottom, back - front), new THREE.Vector3(span / 2, top, 0.06)), [span, bottom, top, front, back])
-  const ray = useMemo(() => new THREE.Raycaster(), [])
   const inv = useMemo(() => new THREE.Matrix4(), [])
   const who = useMemo(() => new THREE.Vector3(), [])
   const seen = useMemo(() => new Map<THREE.Object3D, THREE.Vector3>(), [])
@@ -1128,9 +1124,9 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
     for (const sd of leaves) if (fromSwing((x - sd * span / 2) * -sd, z, W) < DOOR_ROOM) return true
     return false
   }
-  useFrame((state, dt) => {
+  useFrame((_, dt) => {
     const s = st.current
-    if (frame.current && (s.k > 0.01 || s.kept || performance.now() < s.hoverUntil)) {
+    if (frame.current && (s.k > 0.01 || s.kept)) {
       inv.copy(frame.current.matrixWorld).invert()
       // (anyone stood or passing in front, where the doors swing, where they are or where they'll be a moment on at the pace they're going:
       // the doors don't open into them, and swing shut if they're open, opening again once they're by if they'd been left open)
@@ -1152,12 +1148,7 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
       s.blocked = false
       seen.clear()
     }
-    if (frame.current && s.k > 0.3 && !getEdit().on) {
-      ray.setFromCamera(state.pointer, state.camera)
-      ray.ray.applyMatrix4(inv)
-      if (ray.ray.intersectsBox(inside)) s.hoverUntil = Math.max(s.hoverUntil, performance.now() + 800)
-    }
-    const want = !s.blocked && (s.kept || performance.now() < s.hoverUntil) ? 1 : 0
+    const want = !s.blocked && s.kept ? 1 : 0
     s.k += (want - s.k) * Math.min(1, Math.min(dt, 0.1) * (s.blocked ? 16 : 5))
     // (each door about its hinge at its outer edge, its free edge swinging out toward the cook, a little past square)
     const e = s.k * s.k * (3 - 2 * s.k)
@@ -1168,7 +1159,6 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
   const tip = () => setTip({ title: '櫃門', hint: st.current.blocked ? '前面有人，打不開' : st.current.kept ? '點一下關上' : '點一下打開' })
   const over = (e: Parameters<typeof handOver.onPointerOver>[0]) => {
     handOver.onPointerOver(e)
-    st.current.hoverUntil = performance.now() + 2500
     tip()
   }
   return (
@@ -1194,7 +1184,7 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
       {leaves.map((sd, i) => (
         <group key={i} ref={(g) => { doors.current[i] = g }} position={[sd * span / 2, 0, 0.0125]}
           onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.kept = !st.current.kept; tip() }}
-          onPointerOver={over} onPointerMove={() => { st.current.hoverUntil = performance.now() + 2500 }} onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
+          onPointerOver={over} onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
           {/* (a frame-and-panel door: a panel of the body's white marble set in a frame of dark cedar, its stiles and rails standing a little
               proud of it, so it reads as joinery of a piece with the table rather than a board stuck on) */}
           <group position={[-sd * (W / 2 + 0.003), bottom + H / 2, 0]}>
@@ -3797,7 +3787,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         Object.entries(dish.dabs).filter(([k, n]) => n > 0 && k !== 'water').map(([k]) => k).sort().join()
       // (and as fresh as what it was made from: a tired fish tastes of it)
       // (and as they're feeling: a dirty toilet, or one with no paper, sours what they eat after it)
-      const taste = Math.max(0, tasteOf(dish) * freshFactor(PANTRY.fresh[dish.id] ?? 100) - (asOrdered ? 0 : 15) - (WC_GRUMBLE.get(g.id) ?? 0))
+      const fresh = PANTRY.fresh[dish.id] ?? 100
+      const taste = Math.max(0, tasteOf(dish) * freshFactor(fresh) - (asOrdered ? 0 : 15) - (WC_GRUMBLE.get(g.id) ?? 0))
+      // (made with what wasn't fit to eat: likely as not it upsets their stomach, and they're off to the toilet)
+      const sick = Math.random() < sickChance(fresh)
       dish.node.userData.byGuest = true
       eat(dish)
       g.eaten.push(taste)
@@ -3805,7 +3798,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
       const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
       window.setTimeout(() => {
-        onSay?.('guest', L().verdict(g.id, nameOfP(dish), stars))
+        if (sick) SICK.add(g.id)
+        onSay?.('guest', sick ? L().sick(g.id, nameOfP(dish)) : L().verdict(g.id, nameOfP(dish), stars))
         report()
       }, EAT_SECONDS * 1000)
       return

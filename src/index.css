@@ -6474,6 +6474,9 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .chiller-fresh.is-fresh { color: #2f9a5c; }
 .chiller-fresh.is-good { color: #c98a1e; }
 .chiller-fresh.is-tired { color: #c0463a; }
+/* (spoiled: not fit to eat, said in words on a dark red) */
+.chiller-fresh.is-spoiled { color: #8e1b12; }
+.chiller-fresh.is-spoiled em { min-width: 0; padding: 0 4px; border-radius: 3px; background: #8e1b12; color: #fff; font-size: 10px; }
 
 
 
@@ -6827,3 +6830,15 @@ html[lang='en'] .menu-title-en { display: none; }
 }
 .chiller-head > b { font-size: 16px; letter-spacing: 0.3em; }
 .chiller-head .panel-x { margin-left: auto; }
+
+/* the menu's fold tab (wide screens): frosted glass, as the money chip is (the owner's: it was a dark, nearly solid tab with gold edges);
+   its gold chevron kept */
+@media (min-width: 901px) and (min-height: 521px) {
+  .menu-fold {
+    background: linear-gradient(180deg, rgb(46 38 30 / 0.34), rgb(22 18 14 / 0.22));
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    backdrop-filter: blur(12px) saturate(1.4);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.28), 0 6px 18px -8px rgb(0 0 0 / 0.5);
+  }
+  .menu-fold:hover { background: linear-gradient(180deg, rgb(56 46 36 / 0.46), rgb(28 22 18 / 0.32)); filter: none; }
+}
