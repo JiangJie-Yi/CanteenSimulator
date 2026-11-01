@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { comesIn, LIGHTS_DEFAULT, lampGlow, patienceIn, readLights, roomDim, roomMood, studioLight, switchLights, writeLights } from '@/game/roomLights'
+import { comesIn, LIGHTS_DEFAULT, lampGlow, patienceIn, readLights, roomDim, roomMood, SHADOW_SOFT, shadowDepth, studioLight, switchLights, writeLights } from '@/game/roomLights'
 
 feature('牆上的電燈開關', () => {
   scenario('一開店燈是開著的', ({ given, then }) => {
@@ -60,5 +60,13 @@ feature('牆上的電燈開關', () => {
     then('白天開燈照原本的反光', (w) => { expect(w.k[0]).toBe(1) })
     and('晚上比白天暗，關燈更暗', (w) => { expect(w.k[1]).toBeLessThan(1); expect(w.k[2]).toBeLessThan(1); expect(w.k[3]).toBeLessThan(w.k[1]); expect(w.k[3]).toBeLessThan(w.k[2]) })
     and('晚上關燈只剩一點點', (w) => { expect(w.k[3]).toBeLessThan(0.2) })
+  })
+
+  scenario('白天的影子柔和：邊緣是糊的、也不會黑到底', ({ given, then, and }) => {
+    given('白天與晚上、開燈與關燈', (w) => { w.d = [shadowDepth(true, false), shadowDepth(false, false), shadowDepth(true, true), shadowDepth(false, true)] })
+    then('白天開燈的影子淡淡的，透得出底下的東西', (w) => { expect(w.d[0]).toBeLessThan(0.7) })
+    and('白天關燈少了燈光補，影子深一點，但還是不全黑', (w) => { expect(w.d[1]).toBeGreaterThan(w.d[0]); expect(w.d[1]).toBeLessThan(1) })
+    and('晚上開著燈，影子幾乎被燈補亮；關燈後月光的影子才明顯', (w) => { expect(w.d[2]).toBeLessThan(w.d[0]); expect(w.d[3]).toBeGreaterThan(w.d[2]) })
+    and('影子的邊緣糊開幾格，不是一刀切的硬邊', () => { expect(SHADOW_SOFT).toBeGreaterThan(2) })
   })
 })

@@ -29,6 +29,14 @@ export const patienceIn = (m: RoomMood) => (m === 'dark' ? 0.35 : m === 'dim' ? 
 /** how much of the bright studio polished metal reflects (scene/studio): all of it by day with the lights on, less by night, little with the
  * lights off, hardly any by night with them off (else the gold and brass shone in the dark with nothing to shine with) */
 export const studioLight = (on: boolean, night: boolean) => (on ? (night ? 0.6 : 1) : night ? 0.1 : 0.5)
+/**
+ * How dark the key light's shadows fall (1: black where its light's cut off). By day the room's full of light, the sky's through the windows
+ * and the lamps' besides, so the sun's shadows are light, what's in them still showing (black, they looked cut out of the picture); with the
+ * lamps off a little deeper. By night the lamps fill the moon's shadows in, faint; with them off the moon's are plain.
+ */
+export const shadowDepth = (on: boolean, night: boolean) => (night ? (on ? 0.28 : 0.75) : on ? 0.62 : 0.72)
+/** how far the shadows' edges blur (in the shadow map's texels, about 1.4 cm each across the shop): soft, as light falls indoors */
+export const SHADOW_SOFT = 5
 
 export const writeLights = (s: RoomLights) => JSON.stringify(s)
 

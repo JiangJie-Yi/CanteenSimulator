@@ -31,7 +31,7 @@ import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
 import { DrinkStockPanel } from '@/shops/grill/DrinkStockPanel'
 import { useLights } from '@/scene/lightsStore'
-import { lampGlow, roomDim, studioLight } from '@/game/roomLights'
+import { lampGlow, roomDim, SHADOW_SOFT, shadowDepth, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
@@ -554,9 +554,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     const k = keyLight.current
     if (!k || st.clock.elapsedTime - moonAt.current < 0.5) return
     moonAt.current = st.clock.elapsedTime
-    // (how dark its shadows fall: by night with the room's lamps on they fill the shadows in, faint and soft; with them off the moon's are plain;
-    // by day the sun's as ever)
-    k.shadow.intensity = theme === 'dark' ? (lights.on ? 0.28 : 0.75) : 1
+    // (how dark its shadows fall: light by day, faint by night with the lamps on, plain under the moon with them off)
+    k.shadow.intensity = shadowDepth(lights.on, theme === 'dark')
     // (by day the sun's in through the same window: the shadows fall the same way by day as by night)
     const w = scene3.getObjectByName('RoundWindow')
     if (!w) {
@@ -843,7 +842,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       {/* (the sun casts the room's shadows, the figures' and the furniture's on the floor: from high over the open side, its shadow camera
           spanning the whole shop; redrawn every third frame (ShadowPacer), the shadows moving a little behind what casts them) */}
       <directionalLight ref={keyLight} position={[9, 16, 7]} intensity={look.sunIntensity * (theme === 'dark' ? dim : 1)} color={look.sun} castShadow={QUALITY.shadows}
-        shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04}
+        shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04} shadow-radius={SHADOW_SOFT}
         shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
       <ShadowPacer />
       <hemisphereLight args={[look.sky, look.ground, look.hemi * dim]} />
