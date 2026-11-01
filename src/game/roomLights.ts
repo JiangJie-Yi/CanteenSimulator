@@ -34,9 +34,22 @@ export const studioLight = (on: boolean, night: boolean) => (on ? (night ? 0.6 :
  * and the lamps' besides, so the sun's shadows are light, what's in them still showing (black, they looked cut out of the picture); with the
  * lamps off a little deeper. By night the lamps fill the moon's shadows in, faint; with them off the moon's are plain.
  */
-export const shadowDepth = (on: boolean, night: boolean) => (night ? (on ? 0.28 : 0.75) : on ? 0.62 : 0.72)
-/** how far the shadows' edges blur (in the shadow map's texels, about 1.4 cm each across the shop): soft, as light falls indoors */
-export const SHADOW_SOFT = 5
+export const shadowDepth = (on: boolean, night: boolean) => (night ? (on ? 0.28 : 0.75) : on ? 0.5 : 0.62)
+/** how far the shadows' edges blur (in the shadow map's texels, about 1.4 cm each across the shop): soft, as light falls indoors; by day
+ * softer still, the noon sun's shadows no more than a soft darkening under things */
+export const shadowSoft = (night: boolean) => (night ? 5 : 8)
+/**
+ * Where the key light shines from (a unit vector toward it). By day the sun at noon, straight overhead (90 degrees): every shadow falls
+ * right under what casts it, none thrown across the room. By night the moon, high up out past the round window (`window`: which way the
+ * window faces out, level; none found, straight down too), its shadows short and falling away from the window.
+ */
+export function keyLightFrom(night: boolean, window: [number, number] | null): [number, number, number] {
+  if (!night || !window) return [0, 1, 0]
+  const l = Math.hypot(window[0], window[1]) || 1
+  const v = [(window[0] / l) * 6, 18, (window[1] / l) * 6]
+  const n = Math.hypot(v[0], v[1], v[2])
+  return [v[0] / n, v[1] / n, v[2] / n]
+}
 /**
  * What a lamp looks like switched off, its paper or frosted glass (a colour laid over a plain paper picture): grey-white in the daylight by day,
  * a dim grey by night; never the warm yellow of its light (once its lit picture was only darkened, and stayed yellow).

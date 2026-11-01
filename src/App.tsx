@@ -31,7 +31,7 @@ import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
 import { DrinkStockPanel } from '@/shops/grill/DrinkStockPanel'
 import { useLights } from '@/scene/lightsStore'
-import { lampGlow, roomDim, SHADOW_SOFT, shadowDepth, studioLight } from '@/game/roomLights'
+import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
@@ -545,8 +545,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   const dim = roomDim(lights.on, theme === 'dark')
   // (the polished metal's reflections as bright as the room: no gold or brass shining in the dark)
   useEffect(() => setStudioLight(studioLight(lights.on, theme === 'dark')), [lights.on, theme])
-  // (the key light, the sun's by day and the moon's by night, in through the round window: its shadows fall away from the window, the same way
-  // by day as by night)
+  // (the key light: by day the noon sun, straight overhead, its shadows right under what casts them; by night the moon, in through the round
+  // window, its shadows falling away from it: game/roomLights' keyLightFrom)
   const keyLight = useRef<THREE.DirectionalLight>(null)
   const scene3 = useThree((s) => s.scene)
   const moonAt = useRef(0)
@@ -554,18 +554,20 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     const k = keyLight.current
     if (!k || st.clock.elapsedTime - moonAt.current < 0.5) return
     moonAt.current = st.clock.elapsedTime
-    // (how dark its shadows fall: light by day, faint by night with the lamps on, plain under the moon with them off)
-    k.shadow.intensity = shadowDepth(lights.on, theme === 'dark')
-    // (by day the sun's in through the same window: the shadows fall the same way by day as by night)
-    const w = scene3.getObjectByName('RoundWindow')
-    if (!w) {
-      k.position.set(9, 16, 7)
-      return
+    // (how dark its shadows fall and how soft: light and soft by day, faint by night with the lamps on, plain under the moon with them off)
+    const night = theme === 'dark'
+    k.shadow.intensity = shadowDepth(lights.on, night)
+    k.shadow.radius = shadowSoft(night)
+    // (by day the noon sun, straight overhead; by night the moon, high out past the round window: the window's room is toward its -x)
+    const w = night ? scene3.getObjectByName('RoundWindow') : null
+    let out: [number, number] | null = null
+    if (w) {
+      w.updateWorldMatrix(true, false)
+      const o = new THREE.Vector3(1, 0, 0).transformDirection(w.matrixWorld)
+      out = [o.x, o.z]
     }
-    w.updateWorldMatrix(true, false)
-    // (the window's room is toward its -x: the moon's out past its +x, high up (steep: the shadows short, close under what casts them))
-    const out = new THREE.Vector3(1, 0, 0).transformDirection(w.matrixWorld).setY(0).normalize()
-    k.position.copy(out.multiplyScalar(6)).setY(18)
+    const [x, y, z] = keyLightFrom(night, out)
+    k.position.set(x * 19, y * 19, z * 19)
   })
 
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
@@ -842,7 +844,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       {/* (the sun casts the room's shadows, the figures' and the furniture's on the floor: from high over the open side, its shadow camera
           spanning the whole shop; redrawn every third frame (ShadowPacer), the shadows moving a little behind what casts them) */}
       <directionalLight ref={keyLight} position={[9, 16, 7]} intensity={look.sunIntensity * (theme === 'dark' ? dim : 1)} color={look.sun} castShadow={QUALITY.shadows}
-        shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04} shadow-radius={SHADOW_SOFT}
+        shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04} shadow-radius={shadowSoft(theme === 'dark')}
         shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
       <ShadowPacer />
       <hemisphereLight args={[look.sky, look.ground, look.hemi * dim]} />

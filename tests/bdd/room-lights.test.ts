@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { comesIn, LIGHTS_DEFAULT, lampGlow, patienceIn, readLights, roomDim, roomMood, SHADOW_SOFT, shadowDepth, studioLight, switchLights, unlitShade, writeLights } from '@/game/roomLights'
+import { comesIn, LIGHTS_DEFAULT, lampGlow, patienceIn, readLights, roomDim, roomMood, keyLightFrom, shadowDepth, shadowSoft, studioLight, switchLights, unlitShade, writeLights } from '@/game/roomLights'
 
 feature('牆上的電燈開關', () => {
   scenario('一開店燈是開著的', ({ given, then }) => {
@@ -64,10 +64,21 @@ feature('牆上的電燈開關', () => {
 
   scenario('白天的影子柔和：邊緣是糊的、也不會黑到底', ({ given, then, and }) => {
     given('白天與晚上、開燈與關燈', (w) => { w.d = [shadowDepth(true, false), shadowDepth(false, false), shadowDepth(true, true), shadowDepth(false, true)] })
-    then('白天開燈的影子淡淡的，透得出底下的東西', (w) => { expect(w.d[0]).toBeLessThan(0.7) })
-    and('白天關燈少了燈光補，影子深一點，但還是不全黑', (w) => { expect(w.d[1]).toBeGreaterThan(w.d[0]); expect(w.d[1]).toBeLessThan(1) })
+    then('白天開燈的影子淡淡的，透得出底下的東西', (w) => { expect(w.d[0]).toBeLessThan(0.6) })
+    and('白天關燈少了燈光補，影子深一點，但還是不全黑', (w) => { expect(w.d[1]).toBeGreaterThan(w.d[0]); expect(w.d[1]).toBeLessThan(0.8) })
     and('晚上開著燈，影子幾乎被燈補亮；關燈後月光的影子才明顯', (w) => { expect(w.d[2]).toBeLessThan(w.d[0]); expect(w.d[3]).toBeGreaterThan(w.d[2]) })
-    and('影子的邊緣糊開幾格，不是一刀切的硬邊', () => { expect(SHADOW_SOFT).toBeGreaterThan(2) })
+    and('影子的邊緣糊開幾格，不是一刀切的硬邊；白天糊得更開', () => { expect(shadowSoft(true)).toBeGreaterThan(2); expect(shadowSoft(false)).toBeGreaterThan(shadowSoft(true)) })
+  })
+
+  scenario('白天是日正當中：光從正上方照下來，影子落在東西正下方', ({ given, then, and }) => {
+    given('圓窗朝外的方向', (w) => { w.window = [0.6, -0.8] as [number, number] })
+    then('白天的光從正上方來（90 度），不管窗在哪', (w) => { expect(keyLightFrom(false, w.window)).toEqual([0, 1, 0]); expect(keyLightFrom(false, null)).toEqual([0, 1, 0]) })
+    and('晚上的月光從圓窗外的高處斜斜照進來', (w) => {
+      const [x, y, z] = keyLightFrom(true, w.window)
+      expect(Math.hypot(x, y, z)).toBeCloseTo(1, 5)
+      expect(y).toBeGreaterThan(0.8)
+      expect(x * w.window[0] + z * w.window[1]).toBeGreaterThan(0.1)
+    })
   })
 
   scenario('關了的燈是灰白的紙與玻璃，不再是點亮時的黃', ({ given, then, and }) => {
