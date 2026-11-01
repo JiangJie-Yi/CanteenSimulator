@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { reflectStudio } from '@/scene/studio'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
@@ -36,6 +37,8 @@ function toonOf(url: string, scene: THREE.Group) {
           : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: /Leaves/.test(m.name) ? THREE.DoubleSide : THREE.FrontSide })
       mats.set(src, t)
     }
+    // (chrome real metal, the studio in it: with nothing to reflect it drew black (the cistern's spout, the owner saw))
+    if (/Chrome/.test(src.name) && (t as THREE.MeshStandardMaterial).metalness > 0.5) reflectStudio(t as THREE.MeshStandardMaterial)
     m.material = t
     m.castShadow = !UNINKED.test(m.name)
     m.receiveShadow = true

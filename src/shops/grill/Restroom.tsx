@@ -251,9 +251,9 @@ export function ToiletLive({ who, at }: { who: Who; at: [number, number, number]
         <circleGeometry args={[0.07, 24]} />
         <meshBasicMaterial map={SWIRL} transparent depthWrite={false} color="#2f7fb0" polygonOffset polygonOffsetFactor={-2} />
       </mesh>
-      {/* the cistern's tap running */}
-      <mesh ref={tap} position={[0.3, 0.86, 0]} visible={false}>
-        <cylinderGeometry args={[0.0035, 0.0045, 0.09, 8]} />
+      {/* the cistern's tap running: from the spout's nozzle down into the basin */}
+      <mesh ref={tap} position={[0.295, 0.811, 0]} visible={false}>
+        <cylinderGeometry args={[0.0035, 0.0045, 0.082, 8]} />
         <meshBasicMaterial color="#cfeaf6" transparent opacity={0.7} />
       </mesh>
       {/* the ring that gathers in the bowl */}

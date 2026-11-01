@@ -182,7 +182,8 @@ kw, kd = 0.011, 0.016
 for k in range(1, 4):
     z = z0 + SW + (DW - 2 * SW) * k / 4
     beam(f"WcKumikoV{k}", (-kd / 2 - 0.002, kd / 2 - 0.002), (y_waist1, y_head), (z - kw / 2, z + kw / 2), M["cedar"], pp)
-NR = 9
+# (four rows across, evenly spaced: half what there were (the owner's))
+NR = 5
 for k in range(1, NR):
     y = y_waist1 + (y_head - y_waist1) * k / NR
     beam(f"WcKumikoH{k}", (-kd / 2 - 0.002, kd / 2 - 0.002), (y - kw / 2, y + kw / 2), (z0 + SW, z1 - SW), M["cedar"], pp)

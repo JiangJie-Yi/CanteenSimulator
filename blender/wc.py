@@ -90,9 +90,10 @@ def rbox(name, size, at, bev=0.01, segs=3):
     return o
 
 
-def tube(name, pts, r):
+def tube(name, pts, r, caps=False):
     cd = bpy.data.curves.new(name, "CURVE")
     cd.dimensions = "3D"; cd.bevel_depth = r; cd.bevel_resolution = 3; cd.resolution_u = 10
+    cd.use_fill_caps = caps
     sp = cd.splines.new("BEZIER")
     sp.bezier_points.add(len(pts) - 1)
     for bp, p in zip(sp.bezier_points, pts):
@@ -160,7 +161,16 @@ def toilet():
     fin(rbox("WcTank", (0.17, 0.34, 0.44), (0.305, 0.58, 0), 0.04, 5), "WcTank", M["china"], parts)
     basin = lathe_oval("WcTankBasin", [(0.0, 0.748), (0.15, 0.748), (0.205, 0.765), (0.212, 0.782), (0.196, 0.788), (0.15, 0.772), (0.0, 0.766)], 0.42, 1.0, 40, 0.3, 0)
     fin(basin, "WcTankBasin", M["china"], parts)
-    fin(tube("WcSpout", [(0.365, 0.78, 0.0), (0.365, 0.85, 0.0), (0.34, 0.885, 0.0), (0.3, 0.86, 0.0)], 0.0095), "WcSpout", M["chrome"], parts)
+    # (the spout: a round foot on the basin's back, a gooseneck rising and curving over in one smooth bend (its ends closed: an open pipe
+    # end showed as a ring), a nozzle at its tip, its dark outlet underneath, over the basin's middle; the game's water runs from SPOUT_TIP)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.017, depth=0.012, location=P(0.372, 0.778, 0))
+    fin(active(), "WcSpoutFoot", M["chrome"], parts)
+    fin(tube("WcSpout", [(0.372, 0.78, 0.0), (0.372, 0.832, 0.0), (0.364, 0.868, 0.0), (0.338, 0.888, 0.0), (0.31, 0.882, 0.0),
+                         (0.297, 0.868, 0.0)], 0.0105, caps=True), "WcSpout", M["chrome"], parts)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.0125, depth=0.016, location=P(0.295, 0.861, 0))
+    fin(active(), "WcSpoutTip", M["chrome"], parts)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.008, depth=0.002, location=P(0.295, 0.8525, 0))
+    fin(active(), "WcSpoutOutlet", M["panel"], parts)
     fin(rbox("WcLever", (0.07, 0.014, 0.016), (0.25, 0.7, -0.225), 0.005, 2), "WcLever", M["chrome"], parts)
     bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.016, depth=0.012, location=P(0.29, 0.7, -0.222))
     fin(active(), "WcLeverRose", M["chrome"], parts)
