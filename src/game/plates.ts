@@ -16,3 +16,24 @@ export const washNow = (dirty: number, rack: number, washing: boolean) => !washi
 /** the racks' count once the washed plates are put back: as many as there's room for */
 export const putBack = (rack: number, washed: number, full = RACK_FULL) => Math.min(full, rack + washed)
 
+
+/** how many washed plates one person carries back to the racks at a time (a stack on the tray) */
+export const CARRY_CLEAN = 5
+/** what a free server does next (or the owner, with no server: nobody's plates fly) */
+export type Chore = 'serve' | 'clear' | 'restock' | null
+/**
+ * What a free server does next. Food out at the pass for a seated customer comes first (`serve`: 'ready' when they've a plate already,
+ * 'plate' when one's to be fetched off the racks on the way); if the racks are bare and washed plates are stacked by the sink, those go back
+ * first; then a plate left dirty at a seat is cleared to the sink; then, with nothing else to do, the washed plates go back to the racks.
+ */
+export function nextChore({ serve, dirty, clean, rack }: { serve: 'ready' | 'plate' | null; dirty: number; clean: number; rack: number }): Chore {
+  if (serve === 'ready' || (serve === 'plate' && rack > 0)) return 'serve'
+  if (rack === 0 && clean > 0) return 'restock'
+  if (dirty > 0) return 'clear'
+  if (clean > 0) return 'restock'
+  return null
+}
+/** how many of the washed plates stacked by the sink one trip takes back */
+export const carryClean = (clean: number) => Math.max(0, Math.min(CARRY_CLEAN, clean))
+/** a plate washed: off the dirty stack in the sink onto the washed stack beside it (nobody's carried it back yet) */
+export const washOne = (dirty: number, clean: number) => (dirty > 0 ? { dirty: dirty - 1, clean: clean + 1 } : { dirty, clean })

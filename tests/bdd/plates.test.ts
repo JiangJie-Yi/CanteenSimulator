@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { RACK_FULL, WASH_AT, putBack, takePlate, washNow } from '@/game/plates'
+import { CARRY_CLEAN, RACK_FULL, WASH_AT, carryClean, nextChore, putBack, takePlate, washNow, washOne } from '@/game/plates'
 import { kitchenPath, type Rect } from '@/game/kitchenPath'
 
 feature('碗盤統一放在碗盤櫃：上菜從碗盤櫃拿，吃完在流理台洗好放回去', () => {
@@ -29,6 +29,30 @@ feature('碗盤統一放在碗盤櫃：上菜從碗盤櫃拿，吃完在流理�
   scenario('洗好的盤子放回碗盤櫃，最多放到滿', ({ then, and }) => {
     then('碗盤櫃 40 個，洗好 6 個：變 46 個', () => { expect(putBack(40, 6)).toBe(46) })
     and(`碗盤櫃 48 個，洗好 6 個：最多 ${RACK_FULL} 個`, () => { expect(putBack(48, 6)).toBe(RACK_FULL) })
+  })
+})
+
+feature('盤子都是人拿的，不會自己飛：送菜、收盤、洗好的拿回碗盤櫃', () => {
+  scenario('菜做好了、客人在等：先送菜', ({ then, and }) => {
+    then('客人已經有盤子：去送', () => { expect(nextChore({ serve: 'ready', dirty: 3, clean: 8, rack: 20 })).toBe('serve') })
+    and('客人還沒有盤子、碗盤櫃有：順路拿一個去送', () => { expect(nextChore({ serve: 'plate', dirty: 0, clean: 0, rack: 5 })).toBe('serve') })
+  })
+  scenario('要盤子但碗盤櫃空了：先把流理台旁洗好的拿回碗盤櫃', ({ then }) => {
+    then('碗盤櫃 0 個、洗好的有 4 個', () => { expect(nextChore({ serve: 'plate', dirty: 2, clean: 4, rack: 0 })).toBe('restock') })
+  })
+  scenario('沒有菜要送：把客人留下的髒盤子收到流理台', ({ then }) => {
+    then('座位上有 2 個髒盤子', () => { expect(nextChore({ serve: null, dirty: 2, clean: 3, rack: 30 })).toBe('clear') })
+  })
+  scenario(`都沒事時把洗好的盤子拿回碗盤櫃，一次最多 ${CARRY_CLEAN} 個`, ({ then, and }) => {
+    then('洗好的有 7 個：去拿', () => { expect(nextChore({ serve: null, dirty: 0, clean: 7, rack: 30 })).toBe('restock') })
+    and(`一趟拿 ${CARRY_CLEAN} 個，剩下的下一趟`, () => { expect(carryClean(7)).toBe(CARRY_CLEAN); expect(carryClean(2)).toBe(2) })
+  })
+  scenario('什麼事都沒有就休息', ({ then }) => {
+    then('沒菜、沒髒盤、沒洗好的', () => { expect(nextChore({ serve: null, dirty: 0, clean: 0, rack: 50 })).toBeNull() })
+  })
+  scenario('洗好的盤子先疊在流理台旁，等人拿回去', ({ then, and }) => {
+    then('洗一個：髒的少一個、洗好的多一個', () => { expect(washOne(3, 1)).toEqual({ dirty: 2, clean: 2 }) })
+    and('沒有髒的就不變', () => { expect(washOne(0, 4)).toEqual({ dirty: 0, clean: 4 }) })
   })
 })
 

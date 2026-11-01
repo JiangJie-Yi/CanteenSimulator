@@ -31,14 +31,13 @@ import { OccluderFade } from '@/scene/OccluderFade'
 import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
 import { StockPanel, type StockTab } from '@/shops/grill/StockPanel'
-import { FREEZER } from '@/shops/grill/Decor'
 import { useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
-import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
+import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
 import { offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import type { ViewCam } from '@/game/editGroups'
@@ -1076,19 +1075,21 @@ export default function App() {
   // (the stock panel (庫存), opened and shut by the little fridge top right at any time, on one of its tabs)
   const [fridgeOpen, setFridgeOpen] = useState(false)
   const [stockTab, setStockTab] = useState<StockTab>('frozen')
-  // (the freezer clicked open in the room: the panel opens on the freezer's tab, the camera staying where it is (the owner's); the panel shut,
-  // the freezer's lid shuts with it)
-  const byFreezer = useRef(false)
-  useEffect(() => onPantryAsk((tab, from) => {
-    byFreezer.current = from === 'freezer'
+  // (the freezer, or a fridge under the cook table, clicked open in the room: the panel opens on its tab, the camera staying where it is (the
+  // owner's); the panel shut, what opened it shuts with it, and it shut, the panel shuts too)
+  const opener = useRef<(() => void) | null>(null)
+  useEffect(() => onPantryAsk((tab, _from, close) => {
+    opener.current = close ?? null
     setStockTab(tab as StockTab)
     setFridgeOpen(true)
   }), [])
   useEffect(() => {
-    if (fridgeOpen || !byFreezer.current) return
-    byFreezer.current = false
-    FREEZER.open = false
+    if (fridgeOpen || !opener.current) return
+    const close = opener.current
+    opener.current = null
+    close()
   }, [fridgeOpen])
+  useEffect(() => onPantryShut(() => { if (opener.current) { opener.current = null; setFridgeOpen(false) } }), [])
   // (the panels docked at the right, the pantry, the office and the drinks' stock, open one at a time: opening one shuts the others)
   const drinksOpen = useSyncExternalStore(onDrinkPanel, () => DRINK_PANEL.open)
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
@@ -2309,7 +2310,7 @@ export default function App() {
             a click on it opens the books) */}
         <button type="button" className="money-chip" onClick={() => setOffice('ledger')}
           title={tl(lang, '現金（點一下看帳簿）', '現金（クリックで帳簿）', 'Cash (click for the ledger)')}>
-          <b className="money">NT${Math.round(cash).toLocaleString()}</b>
+          <b className="money"><small className="money-cur">NT$</small>{Math.round(cash).toLocaleString()}</b>
         </button>
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
           aria-label={tl(lang, '經營', '経営', 'Office')} title={tl(lang, '經營（廚房・人事・帳簿）', '開発ノート・人事・帳簿', 'Office (kitchen · staff · ledger)')}>

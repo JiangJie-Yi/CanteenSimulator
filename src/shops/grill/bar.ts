@@ -280,9 +280,16 @@ const drinkPanelSubs = new Set<() => void>()
 export function setDrinkPanel(open: boolean) { if (DRINK_PANEL.open === open) return; DRINK_PANEL.open = open; drinkPanelSubs.forEach((f) => f()) }
 export const onDrinkPanel = (f: () => void) => { drinkPanelSubs.add(f); return () => { drinkPanelSubs.delete(f) } }
 /** the ingredients' freezer clicked open (Decor): App takes the camera to the grill and opens the pantry's panel there, while the shop's shut */
-const pantryAsks = new Set<(tab: string, from: 'freezer' | 'sack') => void>()
-export function askPantry(tab: string = 'frozen', from: 'freezer' | 'sack' = 'freezer') { pantryAsks.forEach((f) => f(tab, from)) }
-export const onPantryAsk = (f: (tab: string, from: 'freezer' | 'sack') => void) => { pantryAsks.add(f); return () => { pantryAsks.delete(f) } }
+/** the stock panel asked for from the room, on a tab: by the freezer opened, a fridge's doors under the cook table opened, the charcoal's sack
+ * clicked; `close`, how what asked is shut again when the panel's shut (the freezer's lid, the fridge's doors) */
+type PantryAsk = (tab: string, from: 'freezer' | 'sack' | 'cubby', close?: () => void) => void
+const pantryAsks = new Set<PantryAsk>()
+export function askPantry(tab: string = 'frozen', from: 'freezer' | 'sack' | 'cubby' = 'freezer', close?: () => void) { pantryAsks.forEach((f) => f(tab, from, close)) }
+export const onPantryAsk = (f: PantryAsk) => { pantryAsks.add(f); return () => { pantryAsks.delete(f) } }
+/** the freezer's lid (or a fridge's doors) shut in the room: the stock panel it opened shuts with it (the owner's) */
+const pantryShuts = new Set<() => void>()
+export function shutPantry() { pantryShuts.forEach((f) => f()) }
+export const onPantryShut = (f: () => void) => { pantryShuts.add(f); return () => { pantryShuts.delete(f) } }
 /** a customer takes a drink: the last place holding one of that kind is emptied (any kind at all if it's run out) */
 export function takeDrink(id: DrinkId) {
   const home = fridgeUnitOf(id)
@@ -464,7 +471,8 @@ export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void)
 /** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
 export const PLATE_RACK = { n: RACK_FULL }
 /** the kitchen's sink (Sink.tsx): whether the dirty plates are being washed in it just now (the tap runs) */
-export const SINK = { washing: false }
+/** the sink: its plates being washed (the tap runs); and its tap turned on by hand (the owner's: its handle's to be turned) */
+export const SINK = { washing: false, tap: false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plates: PLATE_RACK, __sink: SINK })
 /** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
  * (none when the bed is full); the scene sets it while it's showing */

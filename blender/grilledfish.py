@@ -783,21 +783,23 @@ for k in range(4):
             f.material_index = 1
     bars.append(o)
 # (the brass: an L-shaped plate over each corner, and a fine inlaid line round the inner edge's top)
-# (each corner capped whole, as an irori's 隅金具 is: one cast sleeve of brass, L-shaped in plan, wrapped over the corner's top and down
-# both its outer faces to the foot, a hair proud of the wood all round and its edges eased, so it reads as one piece with no seams;
-# its inner edges sunk just inside the wood)
+# (each corner capped, as an irori's 隅金具 is: a cast cap of brass, L-shaped in plan, over the corner's top and a little way down both its
+# outer faces, and a band of the same round its foot; between them the frame's own wood shows (the owner's: the sleeve went all the way
+# down, a block of brass). A hair proud of the wood all round, their edges eased; their inner edges sunk just inside the wood)
 CL, BT = 0.22, 0.006
+CAP_DOWN, FOOT_UP = 0.38, 0.2     # (how far down the cap comes, and how far up the foot's band, as shares of the frame's height)
 for k in range(4):
     sx, sy = (1 if k in (1, 2) else -1), (1 if k >= 2 else -1)
     i_ = IRORI_IN + 0.004
     plan = [(OUT - CL, OUT + BT), (OUT + BT, OUT + BT), (OUT + BT, OUT - CL), (i_, OUT - CL), (i_, i_), (OUT - CL, i_)]
     bm_ = bmesh.new()
-    lo = [bm_.verts.new((sx * x, sy * y, -0.001)) for x, y in plan]
-    hi = [bm_.verts.new((sx * x, sy * y, IRORI_H + BT)) for x, y in plan]
-    bm_.faces.new(hi)
-    bm_.faces.new(lo[::-1])
-    for i in range(len(plan)):
-        bm_.faces.new((lo[i], lo[(i + 1) % len(plan)], hi[(i + 1) % len(plan)], hi[i]))
+    for (z0, z1) in ((IRORI_H * (1 - CAP_DOWN), IRORI_H + BT), (-0.001, IRORI_H * FOOT_UP)):
+        lo = [bm_.verts.new((sx * x, sy * y, z0)) for x, y in plan]
+        hi = [bm_.verts.new((sx * x, sy * y, z1)) for x, y in plan]
+        bm_.faces.new(hi)
+        bm_.faces.new(lo[::-1])
+        for i in range(len(plan)):
+            bm_.faces.new((lo[i], lo[(i + 1) % len(plan)], hi[(i + 1) % len(plan)], hi[i]))
     bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
     me_ = bpy.data.meshes.new(f"RobuchiBrassCorner{k}")
     bm_.to_mesh(me_); bm_.free()

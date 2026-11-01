@@ -11,11 +11,18 @@
 - On the counter: a draining basket of woven bamboo with three plates standing in it and a bowl upside down; a palm-fibre scrubber
   (棕櫚たわし) and a bar of soap each on its little dish; a hinoki hand pail with copper hoops at the far end.
 
-The game's frame, its own size in metres (the room's units): y up, 1.55 across (x), 0.62 deep (z), the counter's top 0.86 up; its front
-(the side the washer stands at) toward +z, the middle of its foot at the origin.
+The game's frame, its own size in metres (the room's units): y up, 1.55 across (x), 0.85 deep (z: the owner's, deeper than it was), the
+counter's top 0.86 up; its front (the side the washer stands at) toward +z, the middle of its foot at the origin.
+
+What stands on it is in sets of its own under the root, for the game to place each as a piece of its own (the owner's: they're split off):
+SinkBasketSet (the draining basket, its plates and bowl), SinkScrubSet (the palm scrubber on its dish), SinkSoapSet, SinkPailSet, SinkTowelSet
+(the bar across the doors and the cloth on it); the tap stays with the sink, its handle (SinkTapHandle: the stem, the cross and its knobs,
+the cap) a set of its own, turned by the game as the water's turned on and off.
 
 Nodes the game finds: SinkSpoutTip (where the water comes out), SinkBasinFloor (the middle of the basin's floor: the dirty plates are set
-down there), SinkRackSlot0..2 (where a washed plate stands in the basket).
+down there), SinkCleanStack (on the counter in front of the basket: where the washed plates are stacked till someone takes them back to the
+racks), SinkFront (on the floor in front of the basin: where whoever's taking plates to or from it stands), SinkRackSlot0..2 (where a washed
+plate stands in the basket).
 
 Run:
     blender -b --factory-startup --python blender/sink.py -- <project path> [preview.png]
@@ -37,10 +44,10 @@ PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(_
 PREVIEW = argv[1] if len(argv) > 1 else None
 seed(23)
 
-W, D, H = 1.55, 0.62, 0.86      # across, deep, the counter's top
+W, D, H = 1.55, 0.85, 0.86      # across, deep (0.62 once), the counter's top
 TT = 0.05                       # the counter's thickness
 FRONT = D / 2 - 0.04            # the cabinet's face (the top overhangs it)
-BASIN = (-0.71, -0.09, -0.2, 0.2)   # its opening: x from, x to, z from (back), z to (front)
+BASIN = (-0.71, -0.09, -0.28, 0.28)   # its opening: x from, x to, z from (back), z to (front)
 BASIN_FLOOR = H - 0.22
 UP = 0.07                       # the upstand along the back
 
@@ -339,7 +346,8 @@ tz = -D / 2 + 0.07
 cyl("SinkTapFoot", tx, H, H + 0.015, tz, 0.028, "brass", seg=20)
 cyl("SinkTapRiser", tx, H + 0.015, H + 0.26, tz, 0.013, "brass", seg=16)
 # (the spout: up over and down toward the basin's middle)
-spout = [(tx, H + 0.24, tz), (tx, H + 0.29, tz + 0.06), (tx, H + 0.25, tz + 0.17), (tx, H + 0.2, tz + 0.21)]
+mz = (BASIN[2] + BASIN[3]) / 2 - 0.02
+spout = [(tx, H + 0.24, tz), (tx, H + 0.3, tz + (mz - tz) * 0.3), (tx, H + 0.27, tz + (mz - tz) * 0.8), (tx, H + 0.2, mz)]
 tube("SinkTapSpout", spout, 0.011, "brass", res=8, sides=12)
 mouth = spout[-1]
 cyl("SinkTapMouth", tx, mouth[1] - 0.02, mouth[1], mouth[2], 0.0125, "brass", seg=16)
@@ -370,7 +378,7 @@ cyl("SinkTapString", tx, mouth[1] - 0.022, mouth[1] - 0.016, mouth[2], 0.0135, "
 
 # ---------------------------------------------------------------------------------------------------- on the counter
 # (the draining basket: woven bamboo, a rim of split cane, standing on the draining part)
-bx0, bx1, bz0, bz1 = 0.04, 0.5, -0.17, 0.13
+bx0, bx1, bz0, bz1 = 0.04, 0.5, -0.34, 0.02
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
 y0_, y1_ = H + 0.012, H + 0.13
@@ -415,7 +423,7 @@ for k in range(3):
     finish(active(), f"SinkRackPlateRim{k}", M["rim"])
     parts.append(active())
     empty(f"SinkRackSlot{k}", px, py, pz)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=20, ring_count=10, location=P(0.4, H + 0.012, 0.0))
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=20, ring_count=10, location=P(0.42, H + 0.018, (bz0 + bz1) / 2 + 0.07))
 bowl = active()
 bowl.scale = (0.075, 0.075, 0.055)
 apply_scale(bowl)
@@ -455,11 +463,39 @@ for y_ in (H + 0.03, H + 0.12):
     cyl(f"SinkPailHoop{y_:.2f}", pxp, y_, y_ + 0.012, pzp, 0.088 + (y_ - H) * 0.065 + 0.002, "copper", seg=24)
 box("SinkPailHandle", pxp - 0.012, pxp + 0.012, H + 0.1, H + 0.26, pzp - 0.095, pzp - 0.08, "hinoki", bev=0.003)
 
+# (where the washed plates are stacked, and where whoever brings or takes them stands)
+empty("SinkCleanStack", 0.27, H + 0.012, 0.26)
+empty("SinkFront", (x0 + x1) / 2, 0.0, D / 2 + 0.45)
+
 # ---------------------------------------------------------------------------------------------------- out
 root = bpy.data.objects.new("Sink", None)
 bpy.context.collection.objects.link(root)
+# (what stands on it in sets of its own, each a piece the game places by itself; the tap's handle a set, to be turned)
+SETS = (("SinkBasketSet", ("SinkBasket", "SinkRackPlate", "SinkRackBowl", "SinkRackSlot")),
+        ("SinkScrubSet", ("SinkDish0", "SinkPalm")),
+        ("SinkSoapSet", ("SinkDish1", "SinkSoap")),
+        ("SinkPailSet", ("SinkPail",)),
+        ("SinkTowelSet", ("SinkTowel",)),
+        ("SinkTapHandle", ("SinkTapStem", "SinkTapArm", "SinkTapKnob", "SinkTapCap")))
+holder = {}
+for set_name, prefixes in SETS:
+    e = bpy.data.objects.new(set_name, None)
+    bpy.context.collection.objects.link(e)
+    e.parent = root
+    holder[set_name] = (e, prefixes)
+# (the handle turns about the tap's own upright)
+holder["SinkTapHandle"][0].location = P(tx, H + 0.285, tz)
+# (the holders' own places taken in before what's in them is hung on them, so nothing moves)
+bpy.context.view_layer.update()
 for o in parts:
-    o.parent = root
+    home = next((e for (e, prefixes) in holder.values() if o.name.startswith(prefixes)), None)
+    if home is None:
+        o.parent = root
+    else:
+        mw = o.matrix_world.copy()
+        o.parent = home
+        o.matrix_parent_inverse = home.matrix_world.inverted()
+        o.matrix_world = mw
 tris = 0
 for o in parts:
     if o.type == "MESH":
@@ -483,5 +519,5 @@ if PREVIEW:
     w.use_nodes = True
     w.node_tree.nodes["Background"].inputs[0].default_value = (0.55, 0.55, 0.55, 1)
     bpy.context.scene.world = w
-export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "sink.glb"), os.path.join(PROJECT, "blender", "sink.blend"), PREVIEW)
+export_dish(root, parts + [root] + [e for (e, _) in holder.values()], os.path.join(PROJECT, "public", "models", "sink.glb"), os.path.join(PROJECT, "blender", "sink.blend"), PREVIEW)
 print("SINK_DONE")

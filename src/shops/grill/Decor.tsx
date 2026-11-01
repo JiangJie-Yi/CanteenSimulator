@@ -4,7 +4,7 @@
 // them like anything else (DECOR is their footprint, for its settle()).
 import { getLights } from '@/scene/lightsStore'
 import { memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
@@ -12,12 +12,12 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ALONG, askPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, SUPPLIES, tipOver } from './bar'
+import { ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, SUPPLIES, tipOver } from './bar'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { PlateRack } from './PlateRack'
-import { SinkModel } from './Sink'
+import { SINK_SETS, SinkModel, SinkPart } from './Sink'
 import { CharcoalSack, ProduceSacks } from './KitchenStores'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
@@ -228,8 +228,15 @@ function Crate() {
 /** A round paper fan (団扇) lying by the seasoning boxes; picked up, it's held upright and swings as it's waved. */
 /** the fan hung on its hook: handle up, its paper toward the cook (turned up off the table, then round to face along the table's lay) */
 const FAN_HUNG = new THREE.Euler(-Math.PI / 2, Math.atan2(-LAY.x, -LAY.z), 0, 'YXZ')
+/** how far below the end of its hook's peg the hung fan's middle hangs (the world's units) */
+const FAN_BELOW_PEG = 0.477
 function Fan({ held, at }: { held: RefObject<Held>; at: [number, number, number] }) {
   const g = useRef<THREE.Group>(null)
+  // (its hook, on the seasonings' ledge: it hangs from the hook wherever the hook is, so it's never left in the air when the ledge, or the
+  // fan, has been moved by hand in edit mode; the peg's end the hook's furthest point to the left along the table)
+  const scene = useThree((st) => st.scene)
+  const hook = useRef<{ mesh: THREE.Mesh; i: number } | null>(null)
+  const peg = useMemo(() => new THREE.Vector3(), [])
   const swing = useRef(0)
   const last = useRef(0)
   const beat = useRef(0)
@@ -250,7 +257,24 @@ function Fan({ held, at }: { held: RefObject<Held>; at: [number, number, number]
       o.rotation.set(1.45 + Math.sin(phase.current) * 0.35 * beat.current, -0.6, swing.current, 'XYZ')
     } else {
       // (back on its hook)
-      o.position.set(at[0], at[1], at[2])
+      let k = hook.current
+      if (!k || !k.mesh.parent) {
+        const mesh = scene.getObjectByName('FanHook') as THREE.Mesh | undefined
+        k = null
+        if (mesh?.isMesh) {
+          const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute
+          mesh.updateWorldMatrix(true, false)
+          let best = 0, bd = Infinity
+          for (let i = 0; i < pos.count; i++) { const d = peg.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).dot(ALONG); if (d < bd) { bd = d; best = i } }
+          k = { mesh, i: best }
+        }
+        hook.current = k
+      }
+      if (k && o.parent) {
+        peg.fromBufferAttribute(k.mesh.geometry.getAttribute('position') as THREE.BufferAttribute, k.i).applyMatrix4(k.mesh.matrixWorld)
+        peg.y -= FAN_BELOW_PEG
+        o.position.copy(o.parent.worldToLocal(peg))
+      } else o.position.set(at[0], at[1], at[2])
       o.rotation.copy(FAN_HUNG)
     }
   })
@@ -617,7 +641,7 @@ function IngredientFridge() {
   return (
     <group>
       {/* (clicked open, the pantry's panel comes up with it, at the grill (App: askPantry)) */}
-      <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; FREEZER.open = !FREEZER.open; if (FREEZER.open) askPantry(); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開' }) }}
+      <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; FREEZER.open = !FREEZER.open; if (FREEZER.open) askPantry('frozen', 'freezer', () => { FREEZER.open = false }); else shutPantry(); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開' }) }}
         onPointerOver={(e) => { e.stopPropagation(); glowOnly(e.eventObject); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開食材櫃' }) }}
         onPointerOut={(e) => { glowLeave(e.eventObject); setTip(null) }}>
         <primitive object={model} />
@@ -684,7 +708,8 @@ function IngredientFridge() {
   )
 }
 /** where it stands on the kitchen floor (along the first counter, across it): lying along the back wall, just to the cooks' side of the staff door, its back to the wall */
-const FRIDGE_AT = { along: 3.75, lay: 5.05 }
+// (moved 0.75 further from the sink, which is a quarter as big again and wider)
+const FRIDGE_AT = { along: 3.0, lay: 5.05 }
 function FridgeAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, FRIDGE_AT.along).addScaledVector(LAY, FRIDGE_AT.lay)
@@ -708,11 +733,19 @@ function RackAt() {
 }
 /** where the sink stands: on the back wall past the freezer, its back to the wall, its front toward the cook's table (along and lay as the
  * freezer's); drawn a little over its own size (blender/sink.py, in metres) to the kitchen's, its deck level with the cook's table */
-const SINK_AT = { along: 4.41, lay: 5.85, scale: 1.15 }
+// (1.25 times as big as it was (the owner's), and deeper: drawn forward by as much as it's grown deeper, its back still at the wall)
+const SINK_AT = { along: 4.3, lay: 5.68, scale: 1.15 * 1.25 }
 function SinkAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, SINK_AT.along).addScaledVector(LAY, SINK_AT.lay)
-  return <Movable id="sink" label="流理台" baseScale={SINK_AT.scale} ground={floor}><group name="look-sink" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><SinkModel /></group></Movable>
+  const place = { position: [p.x, floor, p.z] as [number, number, number], 'rotation-y': Math.atan2(-LAY.x, -LAY.z), scale: SINK_AT.scale }
+  return (
+    <>
+      <Movable id="sink" label="流理台" ground={floor}><group name="look-sink" {...place}><SinkModel /></group></Movable>
+      {/* (what stands on it, each a piece of its own, where it stands on it) */}
+      {SINK_SETS.map((set) => <Movable key={set.id} id={set.id} label={set.label}><group {...place}><SinkPart node={set.node} /></group></Movable>)}
+    </>
+  )
 }
 /** where the sacks of potatoes and sweet potatoes stand: on the kitchen's floor against the side counter's kitchen face, between its gate
  * and the cook's table, their mouths toward the kitchen (along and lay as the freezer's); far enough toward the gate that the left-hand

@@ -51,7 +51,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -1235,7 +1235,14 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
       )}
       {leaves.map((sd, i) => (
         <group key={i} ref={(g) => { doors.current[i] = g }} position={[sd * span / 2, 0, 0.0125]}
-          onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.kept = !st.current.kept; tip() }}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (getEdit().on) return
+            st.current.kept = !st.current.kept
+            // (a fridge: opened, the stock panel comes up on its tab; shut, it goes (the owner's))
+            if (lit) { if (st.current.kept) askPantry('chilled', 'cubby', () => { st.current.kept = false }); else shutPantry() }
+            tip()
+          }}
           onPointerOver={over} onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
           {/* (a frame-and-panel door: a panel of the body's white marble set in a frame of dark cedar, its stiles and rails standing a little
               proud of it, so it reads as joinery of a piece with the table rather than a board stuck on) */}

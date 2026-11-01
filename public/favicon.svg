@@ -1,13 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- 食堂模擬器: a steaming bowl with chopsticks resting across it, on a vermilion seal -->
-  <rect x="2" y="2" width="60" height="60" rx="14" fill="#b4302a"/>
-  <rect x="5" y="5" width="54" height="54" rx="11" fill="none" stroke="#f2e3c2" stroke-width="2"/>
-  <path d="M22 22c-3-4 3-6 0-10M32 21c-3-4 3-6 0-10M42 22c-3-4 3-6 0-10" fill="none" stroke="#f2e3c2"
-    stroke-width="2.6" stroke-linecap="round"/>
-  <path d="M10 30l44-8" stroke="#3b2a20" stroke-width="2.8" stroke-linecap="round"/>
-  <path d="M12 33l42-5" stroke="#5a3a20" stroke-width="2.4" stroke-linecap="round"/>
-  <path d="M11 34h42c0 11-9 19-21 19S11 45 11 34z" fill="#f6efe0" stroke="#3b2a20" stroke-width="2.4"
-    stroke-linejoin="round"/>
-  <path d="M15 40h34" stroke="#2c4c8c" stroke-width="2.2"/>
-  <path d="M26 53h12" stroke="#3b2a20" stroke-width="3" stroke-linecap="round"/>
+  <!-- 日式烤魚: a grilled fish, big and bold enough to read in a browser's tab: a golden fish with two charred stripes and a white eye, on a
+       vermilion tile -->
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="#b8321e"/>
+  <path d="M5 32 C 11 17, 33 13, 46 25 L 60 15 C 57 25, 57 39, 60 49 L 46 39 C 33 51, 11 47, 5 32 Z"
+    fill="#f2b24f" stroke="#2a1408" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M7 34 C 14 41, 30 45, 44 37" fill="none" stroke="#fbe2a8" stroke-width="3" stroke-linecap="round"/>
+  <path d="M24 21 L 20 43 M35 21 L 31 44" stroke="#5a2408" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="14" cy="29" r="4.6" fill="#ffffff" stroke="#2a1408" stroke-width="2"/>
+  <circle cx="14.6" cy="29" r="2" fill="#2a1408"/>
 </svg>
