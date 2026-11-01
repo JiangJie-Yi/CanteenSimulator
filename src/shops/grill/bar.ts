@@ -1,4 +1,7 @@
 import * as THREE from 'three'
+import type { Gripe } from '@/game/reputation'
+import { BOX_SHEETS } from '@/game/tissues'
+import type { Use } from '@/game/utilities'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 import { openingFloat, type DrawerCash } from '@/game/till'
@@ -83,6 +86,32 @@ export const KITCHEN_FOLK = new Set<THREE.Object3D>()
  */
 /** how fresh each food in the pantry is just now (0..100, game/freshness), kept by the App, read when a dish is tasted */
 export const PANTRY = { fresh: {} as Record<string, number> }
+/** water (and the power heating it) used about the shop since App last metered it (game/utilities' uses: a plate washed, a flush, the
+ * washlet, hands washed, the dipper...): App drains it every second into the month's meter */
+export const UTILITY: { uses: Partial<Record<Use, number>> } = { uses: {} }
+export const meterWater = (u: Use, n = 1) => { UTILITY.uses[u] = (UTILITY.uses[u] ?? 0) + n }
+/** the cook table's fridges' doors open (for what they draw open) */
+export const CUBBY_OPEN = { left: false, right: false }
+export const TISSUES_KEY = 'jgs-tissues-1'
+/** each place's box of tissues (sheets left; game/tissues): a customer takes a few as they finish, the owner one at a time from the
+ * drawer; swapped for a full box from the spares before each opening (App); kept in the browser */
+export const TISSUES: { boxes: number[] } = { boxes: (() => {
+  try { const v = JSON.parse(localStorage.getItem(TISSUES_KEY) ?? 'null'); if (Array.isArray(v) && v.every((n) => typeof n === 'number')) return v as number[] } catch { /* (none kept) */ }
+  return []
+})() }
+/** a place's box (full, for a place never seen before) */
+export const tissuesAt = (seat: number) => TISSUES.boxes[seat] ?? BOX_SHEETS
+export function setTissues(seat: number, sheets: number) {
+  while (TISSUES.boxes.length <= seat) TISSUES.boxes.push(BOX_SHEETS)
+  TISSUES.boxes[seat] = sheets
+  try { localStorage.setItem(TISSUES_KEY, JSON.stringify(TISSUES.boxes)) } catch { /* (not kept) */ }
+}
+/** what's put each customer out while they're here (game/reputation's gripes), for their visit's score as they go (Roasting) */
+export const GRIPES = new Map<number, Set<Gripe>>()
+export const gripe = (id: number, g: Gripe) => { const s = GRIPES.get(id) ?? new Set<Gripe>(); s.add(g); GRIPES.set(id, s) }
+/** the owner out on the floor serving (no server hired: he carries the plates, clears them and takes the washed ones back himself, the
+ * owner's: nothing flies): GuestBar3D walks a figure of him; Roasting's, at his place in the kitchen, is hidden meanwhile */
+export const OWNER_OUT = { on: false }
 export const SERVICE = {
   /** how many servers there are to carry (GuestBar3D says): none, and the cook hands it over the bar himself */
   servers: 0,
@@ -530,6 +559,9 @@ export function roomOf(cs: Counter[]) {
 
 export const LAY = new THREE.Vector3(0.59, 0, 0.81)
 export const ALONG = new THREE.Vector3(0.81, 0, -0.59)
+/** where the owner stands while the shop's open (Roasting's frame: along the aisle in front of the cook table), and the way he faces there */
+export const OWNER_SPOT = new THREE.Vector3().addScaledVector(LAY, 2.62).addScaledVector(ALONG, 1.2)
+export const OWNER_YAW = (() => { const v = new THREE.Vector3().addScaledVector(LAY, 2.0).addScaledVector(ALONG, -0.4); return Math.atan2(-v.x, -v.z) })()
 
 /** how far apart the grill's stools stand, along both its counters: the seats spaced evenly the shop over (the side counter's were 0.91 apart,
  * the long one's 0.75) */

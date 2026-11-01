@@ -1,4 +1,5 @@
 import { expect } from 'vitest'
+import { TISSUE, TISSUE_PACK } from '@/game/tissues'
 import { feature, scenario } from './bdd'
 import { DISHES } from '@/data/menu'
 import { PAR, REORDER_AT, restockOrder, topUpOrder, goodsOf, costOf, type Stock } from '@/game/economy'
@@ -20,9 +21,15 @@ feature('倉儲自動補貨', () => {
   })
 
   scenario('庫存還夠的品項不補', ({ given, when, then }) => {
-    given('庫存高於補貨門檻（木炭也還夠）', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100 } as Stock })
+    given('庫存高於補貨門檻（木炭、衛生紙也還夠）', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [TISSUE]: 10 } as Stock })
     when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
     then('什麼都不買', (w) => { expect(w.o.buy).toEqual({}); expect(w.o.cost).toBe(0) })
+  })
+
+  scenario('衛生紙備品少於 4 盒時叫一組（5 盒）', ({ given, when, then }) => {
+    given('食材、木炭都夠，衛生紙備品只剩 2 盒', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [TISSUE]: 2 } as Stock })
+    when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
+    then('只叫一組衛生紙', (w) => { expect(w.o.buy).toEqual({ [TISSUE]: TISSUE_PACK.boxes }) })
   })
 
   scenario('錢不夠時不會下超過現金的單', ({ given, when, then }) => {

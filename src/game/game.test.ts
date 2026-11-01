@@ -1,4 +1,5 @@
 // The rules of the game, checked on their own (npm test). Each block guards one module in src/game or src/data.
+import { TISSUE } from '@/game/tissues'
 import { describe, expect, it } from 'vitest'
 import { DISHES } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPrice, type Entry } from '@/data/recipes'
@@ -187,7 +188,7 @@ describe('game/economy: the stock keeper', () => {
   const menu = [entry('grilledfish', ['Saury']), entry('grilledfish', ['GrilledCorn'])]
   it('tops up only what the menu uses and is running low, back to PAR', () => {
     // (the charcoal's sack full enough: it isn't what's tested here)
-    const { buy, cost } = restockOrder(grill, menu, { Saury: 2, GrilledCorn: REORDER_AT + 1, Salmon: 0, charcoal: 100 }, 1e6, 60)
+    const { buy, cost } = restockOrder(grill, menu, { Saury: 2, GrilledCorn: REORDER_AT + 1, Salmon: 0, charcoal: 100, [TISSUE]: 10 }, 1e6, 60)
     expect(buy).toEqual({ Saury: PAR - 2 })
     expect(cost).toBe(costOf(grill.items.find((x) => x.id === 'Saury')!) * (PAR - 2))
   })

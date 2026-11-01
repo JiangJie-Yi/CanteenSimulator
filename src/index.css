@@ -6932,3 +6932,52 @@ html.theme-fading::view-transition-new(root) {
 .char-view-group h4 { margin: 8px 0 5px; font-size: 11px; font-weight: 600; color: #9a9a9a; letter-spacing: 0.04em; }
 .char-view-group { display: flex; flex-wrap: wrap; gap: 5px; }
 .char-view-group h4 { flex-basis: 100%; }
+
+/* ---- the month's water and power in the stock's title bar (StockPanel's MeterChip, the owner's): a chip, and what's behind it ---- */
+.stock-meter-wrap { position: relative; flex: 1; min-width: 0; display: flex; justify-content: center; }
+.stock-meter {
+  display: inline-flex; align-items: baseline; gap: 8px; padding: 3px 10px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22); color: #e9e4da; font: 600 12px/1.3 var(--sans, sans-serif); cursor: pointer; white-space: nowrap;
+}
+.stock-meter i { font-style: normal; color: #b8b0a2; font-weight: 500; }
+.stock-meter b { color: #4fff85; }
+.stock-meter:hover, .stock-meter.is-open { background: rgba(0, 0, 0, 0.36); }
+.stock-meter-detail {
+  position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 5; width: min(360px, 80vw); max-height: 60vh; overflow-y: auto;
+  padding: 12px 14px; border-radius: 10px; background: rgba(28, 24, 20, 0.96); color: #ece6db; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  font: 13px/1.5 var(--sans, sans-serif); text-align: left;
+}
+.stock-meter-detail h4 { margin: 0 0 6px; font-size: 13px; }
+.stock-meter-detail h5 { margin: 10px 0 4px; font-size: 12px; color: #c8bfae; }
+.stock-meter-detail ul { list-style: none; margin: 0; padding: 0; }
+.stock-meter-detail li { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; border-bottom: 1px dotted rgba(255, 255, 255, 0.1); }
+.stock-meter-detail li b { font-variant-numeric: tabular-nums; font-weight: 600; }
+.stock-meter-sum { margin: 0; color: #4fff85; font-weight: 600; }
+.stock-meter-note { margin: 10px 0 0; font-size: 11px; color: #a89f90; }
+
+/* ---- the shop's rating (ui/Reputation.tsx, the owner's: from the shop's sign): its stars, its three sides, what the latest said ---- */
+.rep-card {
+  position: fixed; left: 18px; top: 112px; z-index: 60; width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 140px); overflow-y: auto;
+  border-radius: 12px; background: rgba(250, 245, 236, 0.97); color: #2a2018; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
+  font: 14px/1.5 var(--sans, sans-serif);
+}
+.rep-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--grain-dark, #3a2a1e); color: #f4ead8; border-radius: 12px 12px 0 0; }
+.rep-head b { font-family: var(--brush, inherit); font-size: 17px; letter-spacing: 0.08em; }
+.rep-empty { margin: 0; padding: 18px 16px; color: #6a5a48; }
+.rep-score { display: flex; align-items: baseline; gap: 10px; padding: 14px 16px 6px; }
+.rep-score strong { font-size: 40px; line-height: 1; color: #c8521e; font-variant-numeric: tabular-nums; }
+.rep-score small { color: #7a6a58; }
+.rep-stars { position: relative; display: inline-block; font-size: 13px; letter-spacing: 1px; line-height: 1; }
+.rep-stars.is-big { font-size: 22px; }
+.rep-stars-base { color: #d9cfbf; }
+.rep-stars-fill { position: absolute; left: 0; top: 0; overflow: hidden; white-space: nowrap; color: #f0a020; }
+.rep-parts { list-style: none; margin: 0; padding: 4px 16px 10px; }
+.rep-parts li { display: grid; grid-template-columns: 4.5em auto 1fr; align-items: center; gap: 8px; padding: 2px 0; }
+.rep-parts li b { justify-self: end; font-variant-numeric: tabular-nums; }
+.rep-recent-head { margin: 0; padding: 6px 16px 4px; font-size: 13px; color: #6a5a48; border-top: 1px solid rgba(60, 40, 20, 0.12); }
+.rep-recent { list-style: none; margin: 0; padding: 0 16px 6px; }
+.rep-recent li { display: flex; flex-direction: column; padding: 5px 0; border-bottom: 1px dotted rgba(60, 40, 20, 0.15); }
+.rep-who { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+.rep-said { color: #4a3a2a; }
+.rep-note { margin: 0; padding: 8px 16px 14px; font-size: 11px; color: #8a7a68; }
+.tissue-icon { font-size: 18px; line-height: 1; }

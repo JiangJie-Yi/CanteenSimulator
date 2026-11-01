@@ -6,7 +6,7 @@ import { setTip } from '@/scene/hoverTip'
 import { cleanRoom, FLIES_AT, DIRTY_AT, newRoll, ROLL_USES } from '@/game/restroom'
 import { mergeByMaterial } from '@/scene/StaticBatch'
 import { toonOf } from './BarFurnish'
-import { handOver, TOILETS } from './bar'
+import { handOver, TOILETS, meterWater } from './bar'
 import { getEdit } from './edit'
 import { flushSound, knockSound, otohimeNear, otohimeSound, rollSound, scrubSound } from './restroomSound'
 
@@ -149,7 +149,7 @@ export function ToiletLive({ who, at }: { who: Who; at: [number, number, number]
   const spray = useRef<THREE.InstancedMesh>(null)
   const stars = useRef<THREE.Group>(null)
   const flies = useRef<THREE.Group>(null)
-  const st = useRef({ lid: 0, water: parts.water.position.y, lastIn: 0 })
+  const st = useRef({ lid: 0, water: parts.water.position.y, lastIn: 0 , lastWash: -1e9})
   const dummy = useMemo(() => new THREE.Object3D(), [])
   useFrame(({ camera, clock }) => {
     const t = TOILETS[who]
@@ -220,7 +220,14 @@ export function ToiletLive({ who, at }: { who: Who; at: [number, number, number]
       })
     }
     // (the flush, heard: when a guest goes out, it flushed behind them)
-    if (t.flushAt > s.lastIn) { s.lastIn = t.flushAt; if (T - t.flushAt < 200) flushSound(nearOf(parts.root, camera)) }
+    if (t.flushAt > s.lastIn) {
+      s.lastIn = t.flushAt
+      if (T - t.flushAt < 200) flushSound(nearOf(parts.root, camera))
+      // (metered: the cistern refilled, through the tap on its lid where hands are washed)
+      meterWater('flush')
+      meterWater('handwash')
+    }
+    if (t.washAt > s.lastWash) { s.lastWash = t.washAt; meterWater('washlet') }
   })
   const isArm = (o: THREE.Object3D) => o.name.startsWith('WcArm')
   const over = (e: Parameters<typeof handOver.onPointerOver>[0] & { object: THREE.Object3D }) => {

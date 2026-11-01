@@ -1,4 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import type { Gripe, Visit } from '@/game/reputation'
 import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -51,7 +52,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -89,7 +90,9 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
   /** the one they came in with (a couple, sat side by side) */
   partner?: number
   /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
-  leftAt?: number; cleared?: boolean }
+  leftAt?: number; cleared?: boolean
+  /** (shop clock) when they ate their first piece: how long they waited for it */
+  firstAte?: number }
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
 const MAX_SEATED = GRILL_SEATS.length
 /** who can come in as a couple: him, and her */
@@ -1203,6 +1206,7 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
     }
     const want = !s.blocked && s.kept ? 1 : 0
     s.k += (want - s.k) * Math.min(1, Math.min(dt, 0.1) * (s.blocked ? 16 : 5))
+    CUBBY_OPEN[side] = s.k > 0.05
     // (each door about its hinge at its outer edge, its free edge swinging out toward the cook, a little past square)
     const e = s.k * s.k * (3 - 2 * s.k)
     doors.current.forEach((d, i) => { if (d) d.rotation.y = leaves[i] * e * LEAF_SWING })
@@ -2574,6 +2578,8 @@ type RoastingProps = {
   names?: Record<string, string>
   /** a customer walked out: what they'd ordered and not eaten (to be refunded) */
   onWalkOut?: (ids: string[], guest: number) => void
+  /** a customer's visit, scored as they go (game/reputation): App keeps them for the shop's rating */
+  onVisit?: (v: Visit) => void
   /** (shop open) what's on the menu, each dish's parts (a food and what goes on it); customers order from this */
   entries?: { key: string; name: string; parts: { id: string; dabs: string[]; name: string }[] }[]
   /** a customer orders this dish off the menu: false if it can't be had (out of stock, the fire's full) */
@@ -2608,7 +2614,7 @@ const SESSION_LEN = 420
 
 export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, research = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
-  locked = false, notes = {}, crowd = 1, blessed = false, onDrink, onWalkOut, lang = 'zh', names = {}, crew = [], bar = true,
+  locked = false, notes = {}, crowd = 1, blessed = false, onDrink, onWalkOut, onVisit, lang = 'zh', names = {}, crew = [], bar = true,
   entries, onOrderEntry }: RoastingProps) {
   const L = () => LINES[lang]
   const nameOf = (id: string) => names[id] ?? roast.names[id] ?? id
@@ -2887,10 +2893,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** whether anything is lying on (or in) this container */
   const holds = (k: string) => pieces.current.some((q) => q.container === k && present(q) && !q.eaten)
 
-  const plateAt = (n: number) => {
+  const plateAt = (n: number) => onSpares(`plate-${n}`, clearSpot('plate', n, PLATE_R, (m) => {
     // (as many as are needed go round the fire on the table's top, the first where the others start)
     const [x, y, z] = PLATE_TOP
-    const m = n
     const r0 = Math.hypot(x, z)
     const a0 = Math.atan2(z, x)
     const step = 2 * Math.asin(Math.min(1, (PLATE_STEP / 2) / r0))     // angle between neighbouring plates
@@ -2900,7 +2905,41 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const r = r0 + lap * PLATE_STEP
     const v = new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r)
     clearOfHearth(v, PLATE_R)
-    return onSpares(`plate-${n}`, v)
+    return v
+  }))
+  /**
+   * Where the n-th of a row of spots (`spot(m)`, the m-th of them) is that's clear of all that stands on the table and on it, not off its
+   * edge: a plate or a dish set out goes there (the owner saw grilled food on a plate half under the bucket: the plates went round the fire
+   * one after another whatever stood there). Worked out again only every half second (nothing on the table moves faster).
+   */
+  const spotCache = useRef(new Map<string, { t: number; v: THREE.Vector3 }>())
+  const clearSpot = (kind: string, n: number, r: number, spot: (m: number) => THREE.Vector3) => {
+    const key = `${kind}-${n}`, now = performance.now()
+    const hit = spotCache.current.get(key)
+    if (hit && now - hit.t < 500) return hit.v.clone()
+    const things = standing()
+    const a0 = COOK_TABLE.along[0] - FIRE_SHIFT.dot(ALONG) + r + 0.16, a1 = COOK_TABLE.along[1] - FIRE_SHIFT.dot(ALONG) - r - 0.16
+    const l0 = COOK_TABLE.lay[0] - FIRE_SHIFT.dot(LAY) + r + 0.16, l1 = COOK_TABLE.lay[1] - FIRE_SHIFT.dot(LAY) - r - 0.16
+    let free = -1, v = spot(n)
+    for (let m = 0; m < 48; m++) {
+      const c = spot(m)
+      const a = c.dot(ALONG), l = c.dot(LAY)
+      if (a < a0 || a > a1 || l < l0 || l > l1) continue
+      if (things.some((t) => Math.hypot(t.p.x - c.x, t.p.z - c.z) < t.r + r * 0.85)) continue
+      if (++free === n) { v = c; break }
+    }
+    spotCache.current.set(key, { t: now, v })
+    return v.clone()
+  }
+  /** what stands on the table that a plate or a dish set out mustn't go under or into: the bucket, the bin, the tray, the lantern, the
+   * baskets, the rice balls' dish, the tasting bowl, the crate (round footprints) */
+  const standing = () => {
+    const out: { p: THREE.Vector3; r: number }[] = []
+    const keys = ['tray', 'lantern', 'bowl-0', ...(carriers.bin ? ['bin'] : []), ...(roast.trash ? ['trash'] : []), ...(roast.rawDish ? ['rawdish'] : []),
+      ...(roast.basket ? Array.from({ length: basketCount }, (_, n) => `basket-${n}`) : [])]
+    for (const k of keys) out.push(...circlesOf(k, containerAt(k)))
+    out.push({ p: new THREE.Vector3(DECOR.crate.at[0], 0, DECOR.crate.at[1]), r: DECOR.crate.r })
+    return out
   }
   const boxPlaced = useRef(false)
   const [plateCount, setPlateCount] = useState(1)
@@ -3199,9 +3238,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // onigiri and mochi off the grill net go on little side dishes of their own
   const onDish = (p: Piece) => !inBowl(p) && space !== 'open' && !!roast.dish && !!roast.net?.includes(p.id)
   const dishAt = (n: number) => {
-    // (as many as are needed in a row on the table's top)
+    // (as many as are needed in a row on the table's top, clear of what stands there)
     const [x, y, z] = DISH_TOP
-    return onSpares(`dish-${n}`, new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -Math.max(0, n - 1) * DISH_STEP))
+    return onSpares(`dish-${n}`, clearSpot('dish', n, DISH_R, (m) => new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -Math.max(0, m - 1) * DISH_STEP)))
   }
   const [dishCount, setDishCount] = useState(1)
   // nothing on the table overlaps: every plate, dish, basket, box, bucket, bin and tray is pushed clear of the
@@ -3881,6 +3920,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             const reuse: Record<string, number> = {}
             for (const q of again) reuse[q.id] = (reuse[q.id] ?? 0) + 1
             if (onOrderEntry?.(e.key, id, reuse)) {
+              // (its prep: rice washed and cooked, the soup, what's rinsed)
+              meterWater('cooking', e.parts.length)
               for (const q of again) revive(q)
               orders.push(...e.parts.map((pt) => pt.id))
               said.push(e.name)
@@ -3905,6 +3946,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           onSay?.('guest', L().order(id, said))
         } else {
           onSay?.('guest', L().nothing(id))
+          // (came in and found nothing they could have: a visit of its own, and not a happy one)
+          onVisit?.({ id, taste: null, waited: 0, walkedOut: true, gripes: ['nothing'] })
         }
       }
       // (a couple only if both of them stayed: one who found nothing to order went, and the other sits alone)
@@ -3921,6 +3964,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (const g of seated) {
       if (g.eaten.length === 0 && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood)) {
         g.state = 'angry'
+        if (mood === 'dark') gripe(g.id, 'dark')
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
         onWalkOut?.(owed, g.id)
@@ -3937,6 +3981,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       g.leftAt ??= now
       if (now - g.leftAt < 1.6) continue
       g.cleared = true
+      // (their visit, scored: the food, the wait for it, what put them out (the tissues, the toilet, the dark, their stomach))
+      const gr = GRIPES.get(g.id) ?? new Set<Gripe>()
+      if (SICK.has(g.id)) gr.add('sick')
+      if (WC_GRUMBLE.has(g.id)) gr.add('toilet')
+      const waited = (g.firstAte ?? now) - g.since
+      if (waited > 180) gr.add('wait')
+      onVisit?.({ id: g.id, taste: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, waited, walkedOut: g.state === 'angry', gripes: [...gr] })
+      GRIPES.delete(g.id)
       for (const p of pieces.current) {
         if (p.guest !== g.id || p.container !== 'bar') continue
         p.eaten = true
@@ -3967,6 +4019,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const sick = Math.random() < sickChance(fresh)
       dish.node.userData.byGuest = true
       eat(dish)
+      g.firstAte ??= now
       g.eaten.push(taste)
       g.ate.push(dish.id)
       g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
@@ -4166,6 +4219,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const before = tasteOf(p)
     p.dabs[kind]++
     if (kind === 'water') {
+      meterWater('dipper')
       // a splash of water cools it (it stops short of charring for a while) — and leaves it soggy
       p.progress = Math.max(0, p.progress - roast.times[p.id] * 0.15)
     } else {
@@ -4409,6 +4463,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       } else if (overCoals && scooped) {
         // water thrown on the coals: they hiss and steam, and the fire drops right down
         if (fire) fire.current = Math.max(0, fire.current - 0.3)
+        meterWater('dipper')
         setWisps((all) => [...all.filter((w) => w.key !== 'douse'), { key: 'douse', at: [0, 0.15, 0] }])
       }
       // (scooped, it's always poured out where it's let go: on the food, the coals, or just the table)

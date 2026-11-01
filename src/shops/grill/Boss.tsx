@@ -9,7 +9,7 @@ import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
 import { bossLineText, bossSituation, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
 import { DrinkBottle } from './DiningRoom'
-import { FRIDGE_STOCK, KITCHEN_FOLK, type DrinkId } from './bar'
+import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_OUT, type DrinkId } from './bar'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -183,6 +183,8 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
   useFrame(({ camera: cam, clock }) => {
     const m = mover.current
     if (!m) return
+    // (out on the floor serving, drawn there by GuestBar3D: not here at his place meanwhile)
+    m.visible = !OWNER_OUT.on
     // (the step from the clock itself, as for his walk: the frame's delta runs short while the frames are paced)
     const dt = Math.min(Math.max(0, clock.elapsedTime - fadeClock.current), 0.1)
     fadeClock.current = clock.elapsedTime

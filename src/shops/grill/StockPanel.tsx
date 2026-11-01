@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { BOX_LOW, BOX_SHEETS, TISSUE, TISSUE_PACK } from '@/game/tissues'
+import { LOADS, USES, POWER_TIERS, WATER_TIERS, WATER_BASE, BILL_DAYS, type Meter, type Use } from '@/game/utilities'
 import { createPortal } from 'react-dom'
 import { nameIn, tl, type Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
@@ -10,6 +12,7 @@ import { CHARCOAL, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } fr
 import { FoodArt } from '@/ui/FoodArt'
 import type { Restock } from '@/ui/Menu'
 import { CRATE, FREEZER_TEMP } from './Decor'
+import { GRILL_SEATS, tissuesAt } from './bar'
 import { DrinkStockBody } from './DrinkStockPanel'
 
 /** the stock panel's tabs: the freezer, the fridge (the cupboards' under the cook table), the larder at room temperature, the drinks, and what
@@ -70,6 +73,8 @@ type Props = {
   onTab: (t: StockTab) => void
   /** one thing asked for from the room (the sake barrels: the sake), brought into view and lit a moment; `n` new each time it's asked */
   focus?: { id: string; n: number } | null
+  /** the water and power so far this month (game/utilities), shown in the title bar */
+  meter?: Meter
   /** the shop's foods (the researching board's: its bases and items) */
   dish: Dish
   stock: Record<string, number>
@@ -87,6 +92,8 @@ type Props = {
   onRestock: (how: Restock) => void
   restockCost: Record<Restock, number>
   onBuyCharcoal: (sacks: number) => void
+  /** packs of tissue boxes bought (game/tissues) */
+  onBuyTissues: (packs: number) => void
   onClose: () => void
 }
 
@@ -133,6 +140,7 @@ export function StockPanel(p: Props) {
       <section className="drink-stock stock-panel" role="dialog" aria-label={tl(lang, '庫存', '在庫', 'Stock')}>
         <header className="drink-stock-head">
           <b>{tl(lang, '庫存', '在庫', 'Stock')}</b>
+          {p.meter && <MeterChip lang={lang} meter={p.meter} />}
           <span className="drink-stock-cash">{tl(lang, '現金', '現金', 'Cash')} <b className="money">NT${Math.round(cash).toLocaleString()}</b></span>
           <button type="button" className="panel-x" onClick={onClose} aria-label={tl(lang, '關閉', '閉じる', 'Close')}>×</button>
         </header>
@@ -305,7 +313,86 @@ function Supplies(p: Props) {
           </div>
           <p className="stock-note">{tl(lang, '桌上的炭箱用完，會從地上的麻袋補滿；麻袋空了就沒有炭可加。', '卓上の炭箱が空になると床の袋から補充。袋が空なら炭は足せない。', 'When the crate on the table runs out it’s filled from the sack on the floor; with the sack empty there’s no charcoal to add.')}</p>
         </section>
+        <TissueZone {...p} />
       </div>
     </>
+  )
+}
+
+/**
+ * The month's water and power in the stock's title bar (the owner's: what keeping the shop going costs, laid out): its day of the month,
+ * the kWh and the 度 of water so far and what they've cost; clicked, what drew the power and what used the water, and the tariffs.
+ */
+function MeterChip({ lang, meter: m }: { lang: Lang; meter: Meter }) {
+  const [open, setOpen] = useState(false)
+  const name = (id: string) => {
+    if (id.startsWith('heat:')) { const u = USES[id.slice(5) as Use]; return tl(lang, `${u.zh}・加熱`, `${u.ja}・加熱`, `${u.en}, heating`) }
+    const l = LOADS.find((x) => x.id === id)
+    return l ? tl(lang, l.zh, l.ja, l.en) : id
+  }
+  const power = Object.entries(m.power).sort((a, b) => b[1] - a[1])
+  const water = Object.entries(m.water).sort((a, b) => b[1] - a[1]) as [Use, number][]
+  const tiers = (t: { upTo: number; rate: number }[], unit: string) => t.map((x, i) => `${i ? t[i - 1].upTo + 1 : 1}${x.upTo === Infinity ? '+' : `–${x.upTo}`} ${unit} ${x.rate}`).join('・')
+  return (
+    <span className="stock-meter-wrap">
+      <button type="button" className={`stock-meter${open ? ' is-open' : ''}`} onClick={() => setOpen((v) => !v)} aria-expanded={open}
+        title={tl(lang, '水電（這個月）', '水道光熱費（今月）', 'Water and power (this month)')}>
+        <i>{tl(lang, `第 ${Math.max(1, m.day)} 天`, `${Math.max(1, m.day)} 日目`, `Day ${Math.max(1, m.day)}`)}</i>
+        <span>⚡{m.kwh.toFixed(1)}</span>
+        <span>💧{(m.m3 * 1000).toFixed(0)}L</span>
+        <b>NT${m.cost.toFixed(0)}</b>
+      </button>
+      {open && (
+        <div className="stock-meter-detail" role="dialog">
+          <h4>{tl(lang, `這個月的水電（${BILL_DAYS} 個營業日一期，第 ${Math.max(1, m.day)} 天）`, `今月の水道光熱費（${BILL_DAYS} 営業日で一期、${Math.max(1, m.day)} 日目）`, `This month's water and power (${BILL_DAYS} opening days a bill; day ${Math.max(1, m.day)})`)}</h4>
+          <p className="stock-meter-sum">{tl(lang, `用電 ${m.kwh.toFixed(2)} 度・用水 ${m.m3.toFixed(3)} 度（${(m.m3 * 1000).toFixed(0)} 公升）・共 NT$${m.cost.toFixed(1)}`,
+            `電気 ${m.kwh.toFixed(2)} kWh・水 ${m.m3.toFixed(3)} m³（${(m.m3 * 1000).toFixed(0)} L）・計 NT$${m.cost.toFixed(1)}`,
+            `${m.kwh.toFixed(2)} kWh・${m.m3.toFixed(3)} m³ (${(m.m3 * 1000).toFixed(0)} L)・NT$${m.cost.toFixed(1)} in all`)}</p>
+          <h5>{tl(lang, '用電（度）', '電気（kWh）', 'Power (kWh)')}</h5>
+          <ul>{power.length ? power.map(([id, k]) => <li key={id}><span>{name(id)}</span><b>{k.toFixed(3)}</b></li>) : <li><span>—</span></li>}</ul>
+          <h5>{tl(lang, '用水（公升）', '水（L）', 'Water (litres)')}</h5>
+          <ul>{water.length ? water.map(([u, l]) => <li key={u}><span>{tl(lang, USES[u].zh, USES[u].ja, USES[u].en)}</span><b>{l.toFixed(1)}</b></li>) : <li><span>—</span></li>}</ul>
+          <p className="stock-meter-note">{tl(lang,
+            `電費：台電表燈營業用（非夏月）累進 ${tiers(POWER_TIERS, '度')} 元。水費：台水累進 ${tiers(WATER_TIERS, '度')} 元，水表基本費每期 ${WATER_BASE} 元。沒有瓦斯（全靠炭火）。`,
+            `電気：台電の従量制（営業用・夏季以外）${tiers(POWER_TIERS, 'kWh')} 元。水道：台水 ${tiers(WATER_TIERS, 'm³')} 元、基本料金 ${WATER_BASE} 元／期。ガスなし（炭火のみ）。`,
+            `Power: Taipower commercial, non-summer, tiered ${tiers(POWER_TIERS, 'kWh')} NT$. Water: Taiwan Water ${tiers(WATER_TIERS, 'm³')} NT$, a ${WATER_BASE} NT$ meter charge a bill. No gas (it's all charcoal).`)}</p>
+        </div>
+      )}
+    </span>
+  )
+}
+
+/** the tissues (game/tissues, the owner's: two hundred to a box, one box in each place's drawer, a consumable): the spare boxes in stock,
+ * each place's box as it is now, and packs of five to buy */
+function TissueZone(p: Props) {
+  const { lang, stock, cash } = p
+  const spares = stock[TISSUE] ?? 0
+  const boxes = Array.from({ length: GRILL_SEATS.length }, (_, i) => tissuesAt(i))
+  const empty = boxes.filter((n) => n <= 0).length, low = boxes.filter((n) => n > 0 && n < BOX_LOW).length
+  const sheets = boxes.reduce((a, b) => a + b, 0)
+  return (
+    <section className="chiller-zone is-supplies">
+      <h3 className="chiller-zone-head"><span>{tl(lang, '衛生紙', 'ティッシュ', 'Tissues')}</span><i aria-hidden="true">{tl(lang, '耗材', '消耗品', 'consumable')}</i></h3>
+      <div className="chiller-bins">
+        <div className={`chiller-bin season-bin supply-bin is-still${empty ? ' is-out' : ''}`}>
+          <span className="chiller-bin-head"><span className="tissue-icon" aria-hidden="true">🧻</span><span className="chiller-bin-name">{supplyName(TISSUE, lang)}</span></span>
+          <span className="drink-bin-sub">{tl(lang, `一盒 ${BOX_SHEETS} 抽・一組 ${TISSUE_PACK.boxes} 盒 NT$${TISSUE_PACK.cost}`, `1箱 ${BOX_SHEETS}枚・${TISSUE_PACK.boxes}箱 NT$${TISSUE_PACK.cost}`, `${BOX_SHEETS} a box, ${TISSUE_PACK.boxes} boxes NT$${TISSUE_PACK.cost}`)}</span>
+          <span className={`chiller-level${empty ? ' is-zero' : low ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (sheets / (boxes.length * BOX_SHEETS || 1)) * 100)}%` }} /></span>
+          <span className="chiller-bin-info" aria-hidden="true">
+            <b className={spares <= 0 ? 'is-zero' : ''}>{tl(lang, '備品', '予備', 'Spare')} <em>{spares}</em></b>
+            <small>{tl(lang, `座位 ${boxes.length} 盒：空 ${empty}・快沒 ${low}`, `席 ${boxes.length}箱：空 ${empty}・残少 ${low}`, `${boxes.length} at places: ${empty} empty, ${low} low`)}</small>
+          </span>
+          <span className="chiller-buy season-buy">
+            <span role="button" tabIndex={0} className={`chiller-btn${cash >= TISSUE_PACK.cost ? '' : ' is-off'}`} onClick={() => cash >= TISSUE_PACK.cost && p.onBuyTissues(1)}
+              title={tl(lang, `訂一組（${TISSUE_PACK.boxes} 盒，NT$${TISSUE_PACK.cost}）`, '1組注文', 'Order a pack')}>{tl(lang, '訂一組', '1組', '+1 pack')}</span>
+            <span role="button" tabIndex={0} className={`chiller-btn chiller-fill${cash >= 2 * TISSUE_PACK.cost ? '' : ' is-off'}`} onClick={() => cash >= 2 * TISSUE_PACK.cost && p.onBuyTissues(2)}
+              title={tl(lang, `訂兩組（NT$${2 * TISSUE_PACK.cost}）`, '2組注文', 'Order two packs')}>{tl(lang, '兩組', '2組', '+2')}</span>
+          </span>
+        </div>
+      </div>
+      <p className="stock-note">{tl(lang, '每個座位的抽屜一盒；客人吃完會抽幾張，盒子空了客人會不滿（影響店家評價）。開店前空的（或快空的）會用備品換新盒。',
+        '各席の引き出しに1箱。食べ終わると数枚使う。空だとお客さんの評価が下がる。開店前に空（残り少ない）箱を予備と交換。',
+        'A box in each place’s drawer; customers take a few as they finish, and an empty one costs the shop its rating. Before opening, empty (or nearly empty) boxes are swapped from the spares.')}</p>
+    </section>
   )
 }

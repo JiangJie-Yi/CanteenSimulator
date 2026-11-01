@@ -31,9 +31,10 @@ import { OpeningSpot } from '@/scene/OpeningSpot'
 import { OccluderFade } from '@/scene/OccluderFade'
 import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
+import { Reputation } from '@/ui/Reputation'
 import { CharacterViewer } from '@/shops/grill/CharacterViewer'
 import { StockPanel, type StockTab } from '@/shops/grill/StockPanel'
-import { useLights } from '@/scene/lightsStore'
+import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer } from '@/scene/FramePacer'
@@ -53,7 +54,11 @@ import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { FIRE_SHIFT, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, SUPPLIES } from '@/shops/grill/bar'
+import { CUBBY_OPEN, FIRE_SHIFT, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, TISSUES_KEY, tissuesAt, UTILITY } from '@/shops/grill/bar'
+import { getBgmOff } from '@/ui/bgmStore'
+import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
+import { keepVisits, rateShop, type Visit } from '@/game/reputation'
+import { refillBoxes, TISSUE, tissueOrder } from '@/game/tissues'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
@@ -70,7 +75,7 @@ import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
 import { tl } from '@/data/i18n'
 import { ageFresh, blendFresh } from '@/game/freshness'
-import { FREEZER_TEMP } from '@/shops/grill/Decor'
+import { FREEZER, FREEZER_TEMP } from '@/shops/grill/Decor'
 
 // distance between dishes on the carousel
 const SPACING = 6
@@ -79,7 +84,7 @@ const FIRE_CAPACITY = 16
 const SAVE_KEY = 'canteen-save'
 /** the game as it was the moment its 3D view was lost, kept for the page brought back (this tab only, read once) */
 const RESUME_KEY = 'jgs-resume-1'
-type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number }
+type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; utility?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
   fresh?: Record<string, number>
   /** (kept across a lost 3D view only) the menus put out, the time of day, the language, and the people who'd applied for the jobs (made at
@@ -265,6 +270,10 @@ function ShadowPacer() {
   })
   return null
 }
+/** the water and power meter, the month so far (game/utilities), kept in the browser; cleared with a fresh start */
+const METER_KEY = 'jgs-utilities-1'
+/** the customers' visits (game/reputation), kept in the browser; cleared with a fresh start */
+const VISITS_KEY = 'jgs-reputation-1'
 function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
     // (not remembered: every visit starts from the system preference; a page brought back after its 3D view was lost, as it was)
@@ -349,6 +358,8 @@ type SceneProps = {
   crowdOf: (dishId: string) => number
   crewOf: (dishId: string) => CrewMember[]
   onWalkOut: (ids: string[], dish: DishInfo, guest?: number) => void
+  /** a customer's visit scored as they go (game/reputation): for the shop's rating */
+  onVisit: (v: Visit) => void
   /** (shop open) what's on each shop's menu, and a customer ordering one of them */
   entriesOf: (dishId: string) => Entry[]
   onOrderEntry: (key: string, guest: number, reuse?: Record<string, number>) => boolean
@@ -498,7 +509,7 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
   )
 }
 
-function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
+function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -932,7 +943,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} research={research} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)} blessed={blessed} onDrink={onDrink}
                   crew={crewOf(dish.id)} bar={!phone}
-                  onWalkOut={(ids, g) => onWalkOut(ids, dish, g)} lang={lang}
+                  onWalkOut={(ids, g) => onWalkOut(ids, dish, g)} onVisit={onVisit} lang={lang}
                   entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
                   names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))}
                   space={ai ? 'open' : 'closed'} locked={editing}
@@ -1200,9 +1211,28 @@ export default function App() {
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
   // (a new game starts with the grill already set up: its opening cost is already paid)
-  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
+  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0, utility: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
+  // the water and power: the month so far on the meter (game/utilities), kept in the browser; shown in the stock panel every few seconds
+  const meterRef = useRef<Meter>((() => {
+    try { const v = JSON.parse(localStorage.getItem(METER_KEY) ?? 'null'); if (v && typeof v.kwh === 'number' && typeof v.day === 'number') return v as Meter } catch { /* (none kept) */ }
+    return freshMeter()
+  })())
+  const [meterShown, setMeterShown] = useState<Meter>(meterRef.current)
+  // the customers' visits, scored as they went (game/reputation): the shop's rating, shown from its sign (the owner's); kept in the browser
+  const [shopVisits, setShopVisits] = useState<Visit[]>(() => {
+    try { const v = JSON.parse(localStorage.getItem(VISITS_KEY) ?? 'null'); if (Array.isArray(v)) return v as Visit[] } catch { /* (none kept) */ }
+    return []
+  })
+  const addVisit = useCallback((v: Visit) => setShopVisits((vs) => {
+    const next = keepVisits([...vs, v])
+    try { localStorage.setItem(VISITS_KEY, JSON.stringify(next)) } catch { /* (not kept) */ }
+    return next
+  }), [])
+  const shopRating = useMemo(() => rateShop(shopVisits), [shopVisits])
+  const [showRating, setShowRating] = useState(false)
+  const meterTick = useRef(0)
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
-  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.setup ?? 0) - (ledger.offering ?? 0) + (ledger.till ?? 0)
+  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.utility ?? 0) - (ledger.setup ?? 0) - (ledger.offering ?? 0) + (ledger.till ?? 0)
   // (the room's own purchases (a case of drinks from the crates) paid from the same cash, into what's bought)
   const cashNow = useRef(cash)
   cashNow.current = cash
@@ -1574,6 +1604,13 @@ export default function App() {
     })
   }
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
+  /** packs of tissue boxes bought in (the stock's supplies), paid as purchasing */
+  const buyTissues = (packs: number) => {
+    const o = tissueOrder(packs)
+    if (o.cost > cash) return
+    book('bought', o.cost)
+    shiftStock({ [TISSUE]: o.boxes })
+  }
   /** sacks of binchotan bought in (the stock's supplies), paid as fuel */
   const buyCharcoal = (sacks: number) => {
     const o = charcoalOrder(sacks)
@@ -1908,9 +1945,37 @@ export default function App() {
       })
       // (and the chef's wage, by the second while the shop's open: in the same tick, so the two are one redraw of the page, not two)
       if (aiRef.current.ai) book('wage', aiRef.current.wage / 3600 * GAME_SPEED.value)
+      // (and the water and power (the owner's: what keeping it going costs), metered by the second against the month)
+      const k = GAME_SPEED.value
+      const uses = UTILITY.uses
+      UTILITY.uses = {}
+      // (the sink's tap left running: a minute's worth a minute)
+      if (SINK.tap) uses.tap = (uses.tap ?? 0) + k / 60
+      const m = meterAdd(meterRef.current, energyOver(k, { open: aiRef.current.ai, lights: getLights().on, fire: fire.current > 0, music: !getBgmOff(),
+        freezerSet: FREEZER_TEMP.set, freezerOpen: FREEZER.open, fridgeOpen: CUBBY_OPEN.left || CUBBY_OPEN.right }), uses)
+      meterRef.current = m.meter
+      if (m.cost > 0) book('utility', m.cost)
+      meterTick.current++
+      if (meterTick.current % 5 === 0) setMeterShown(m.meter)
+      if (meterTick.current % 15 === 0) { try { localStorage.setItem(METER_KEY, JSON.stringify(m.meter)) } catch { /* (not kept) */ } }
     }, 1000)
     return () => window.clearInterval(id)
   }, [])
+  // (a new opening day each time the shop opens: the month's next day (the water meter's basic charge on its first), the floors mopped)
+  useEffect(() => {
+    if (!ai) return
+    const d = nextDay(meterRef.current)
+    meterRef.current = d.meter
+    if (d.charge) book('utility', d.charge)
+    UTILITY.uses.mop = (UTILITY.uses.mop ?? 0) + 1
+    setMeterShown(d.meter)
+    const boxes = Array.from({ length: GRILL_SEATS.length }, (_, i) => tissuesAt(i))
+    const spares = stockRef.current[TISSUE] ?? 0
+    const t = refillBoxes(boxes, spares)
+    t.boxes.forEach((n, i) => { if (n !== boxes[i]) setTissues(i, n) })
+    if (t.spares !== spares) shiftStockRef.current({ [TISSUE]: t.spares - spares })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ai])
 
   // touch gestures over the 3D view (not on the menu or a button):
   //  - one finger flicked left or right switches dishes
@@ -2304,7 +2369,7 @@ export default function App() {
             onEat={onEat} onNotice={sceneNotice}
             resetView={resetView} pins={viewMenu} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1); setViewMenu(false) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
-            incense={incenseProp} onDrink={onDrink} onWalkOut={refund} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
+            incense={incenseProp} onDrink={onDrink} onWalkOut={refund} onVisit={addVisit} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests}
             phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />
@@ -2324,7 +2389,9 @@ export default function App() {
               cashier: staffOf(dish.id, 'cashier').length, server: staffOf(dish.id, 'server').length }} /> : undefined} />
         )}
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
- />
+          onClick={editOn ? undefined : () => setShowRating((v) => !v)} />
+        {/* (the shop's rating, from its sign (the owner's): every customer's satisfaction made into its stars) */}
+        {showRating && !editOn && <Reputation lang={lang} rating={shopRating} visits={shopVisits} onClose={() => setShowRating(false)} />}
         {/* (the fire is the grill's own (research, at the grill's view); how full is the owner's own, on his view: the rest of the time they're
             out of the way, and the buttons under them move up into the room left) */}
         {showFire && <FireControl level={fireLevel} onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
@@ -2368,12 +2435,12 @@ export default function App() {
                 <p><span>{tl(lang, '採買支出', '仕入れ', 'Purchasing')}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '收銀機取款', 'レジから取り出し', 'Taken from till')}</span><b className="money">+{Math.round(ledger.till ?? 0).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '供品費用', 'お供え', 'Offerings')}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
-                {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['wage', -ledger.wage]] as const)
+                {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['utility', -(ledger.utility ?? 0)], ['wage', -ledger.wage]] as const)
                   .map(([k, v]) => (
-                    <p key={k}><span>{UI[lang][k]}</span><b className="money">{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : 1)}</b></p>
+                    <p key={k}><span>{UI[lang][k]}</span><b className="money">{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : k === 'utility' ? 2 : 1)}</b></p>
                   ))}
                 {(() => {
-                  const profit = ledger.revenue - ledger.food - ledger.fuel - ledger.wage
+                  const profit = ledger.revenue - ledger.food - ledger.fuel - ledger.wage - (ledger.utility ?? 0)
                   return (
                     <>
                       <p className={`ledger-profit${profit < 0 ? ' is-loss' : ''}`}><span>{UI[lang].profit}</span>
@@ -2403,10 +2470,13 @@ export default function App() {
               try {
                 localStorage.removeItem(SAVE_KEY)
                 localStorage.removeItem(DRINKS_KEY)
+                localStorage.removeItem(METER_KEY)
+                localStorage.removeItem(VISITS_KEY)
+                localStorage.removeItem(TISSUES_KEY)
               } catch {
                 // storage blocked
               }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0, utility: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}
@@ -2562,12 +2632,12 @@ export default function App() {
       {editOn && !phone && <CharacterViewer lang={lang} />}
       {/* (the stock: everything kept, at any time, from the little fridge top right; researching, its foods are taken out to try from it) */}
       {fridgeOpen && !editOn && !!dish.roast && (
-        <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} cash={cash} focus={stockFocus}
+        <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} cash={cash} focus={stockFocus} meter={meterShown}
           unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id) ?? { price: 0 })}
           research={hand} quantities={orders[dish.id] ?? {}} onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)} onClear={putAllBack}
           onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)}
           restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
-          onBuyCharcoal={buyCharcoal} onClose={() => setFridgeOpen(false)} />
+          onBuyCharcoal={buyCharcoal} onBuyTissues={buyTissues} onClose={() => setFridgeOpen(false)} />
       )}
       {/* (the fold tab only for the open shop's menu: researching, the fridge button opens and shuts the panel) */}
       {ai && (
