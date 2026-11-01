@@ -90,9 +90,9 @@ def rbox(name, size, at, bev=0.01, segs=3):
     return o
 
 
-def tube(name, pts, r, caps=False):
+def tube(name, pts, r, caps=False, res=3, ru=10):
     cd = bpy.data.curves.new(name, "CURVE")
-    cd.dimensions = "3D"; cd.bevel_depth = r; cd.bevel_resolution = 3; cd.resolution_u = 10
+    cd.dimensions = "3D"; cd.bevel_depth = r; cd.bevel_resolution = res; cd.resolution_u = ru
     cd.use_fill_caps = caps
     sp = cd.splines.new("BEZIER")
     sp.bezier_points.add(len(pts) - 1)
@@ -124,23 +124,23 @@ def toilet():
     # (one glazed piece from the floor to the rim: a skirt hiding the trap, swelling to an oval bowl, over the rim and down into its well)
     body = lathe_oval("WcBowl", [(0.128, 0.0), (0.136, 0.006), (0.137, 0.03), (0.131, 0.12), (0.134, 0.2), (0.152, 0.285), (0.174, 0.35),
                                  (0.186, 0.38), (0.188, 0.391), (0.18, 0.397), (0.164, 0.395), (0.146, 0.372), (0.112, 0.33), (0.07, 0.298),
-                                 (0.03, 0.288), (0.0, 0.286)], SX, 1.0, 56, BX, 0)
+                                 (0.03, 0.288), (0.0, 0.286)], SX, 1.0, 40, BX, 0)
     fin(body, "WcBowl", M["china"], parts)
     # (its back running on into the cistern's foot, all one glaze: a rounded block under the seat's hinge)
-    fin(rbox("WcNeck", (0.24, 0.34, 0.27), (0.215, 0.17, 0), 0.06, 5), "WcNeck", M["china"], parts)
+    fin(rbox("WcNeck", (0.24, 0.34, 0.27), (0.215, 0.17, 0), 0.06, 3), "WcNeck", M["china"], parts)
     # (the water in the well: its own node, to swirl when it's flushed)
     w = lathe_oval("WcWater", [(0.0, 0.0), (0.068, 0.0), (0.0, 0.0001)], 1.22, 1.0, 32, 0, 0)
     w.location = P(BX - 0.005, 0.297, 0)
     fin(w, "WcWater", M["water"], parts)
     # (the washlet: its body behind the seat, rounded, a seam line round it, the blue power lamp on its side, the wand's grey shutter under its lip)
-    fin(rbox("WcWashlet", (0.17, 0.1, 0.4), (0.225, 0.447, 0), 0.04, 5), "WcWashlet", M["ivory"], parts)
+    fin(rbox("WcWashlet", (0.17, 0.1, 0.4), (0.225, 0.447, 0), 0.04, 3), "WcWashlet", M["ivory"], parts)
     fin(rbox("WcWashletSeam", (0.172, 0.008, 0.402), (0.225, 0.425, 0), 0.003, 2), "WcWashletSeam", M["seam"], parts)
     fin(rbox("WcNozzle", (0.03, 0.012, 0.05), (0.15, 0.405, 0), 0.005, 2), "WcNozzle", M["nozzle"], parts)
     bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.006, location=P(0.2, 0.465, 0.201))
     fin(active(), "WcPowerLamp", M["lamp"], parts)
     # (the washlet's own control arm along the seat's right side: a long rounded panel, its keys on top (おしり blue, ビデ pink, the big
     # orange 止, the dryer and the deodoriser grey, a little lit screen), so it reads at a glance as a 免治便座)
-    fin(rbox("WcArm", (0.3, 0.06, 0.08), (0.06, 0.45, 0.235), 0.022, 4), "WcArm", M["ivory"], parts)
+    fin(rbox("WcArm", (0.3, 0.06, 0.08), (0.06, 0.45, 0.235), 0.022, 3), "WcArm", M["ivory"], parts)
     fin(rbox("WcArmFace", (0.25, 0.006, 0.058), (0.05, 0.481, 0.235), 0.004, 2), "WcArmFace", M["panel"], parts)
     fin(rbox("WcArmScreen", (0.05, 0.003, 0.03), (0.14, 0.485, 0.235), 0.002, 1), "WcArmScreen", M["lamp"], parts)
     for k, mat in enumerate(("stop", "blue", "pink", "grey", "grey")):
@@ -150,23 +150,23 @@ def toilet():
     bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.007, depth=0.12, location=P(0.16, 0.402, 0), rotation=(0, math.pi / 2, 0))
     fin(active(), "WcWand", M["nozzle"], parts)
     # (the seat: a soft ring on the rim)
-    seat = lathe_oval("WcSeat", [(0.112, 0.399), (0.184, 0.399), (0.192, 0.41), (0.184, 0.422), (0.118, 0.422), (0.108, 0.41), (0.112, 0.399)], SX * 0.985, 1.0, 56, BX, 0, cap=False)
+    seat = lathe_oval("WcSeat", [(0.112, 0.399), (0.184, 0.399), (0.192, 0.41), (0.184, 0.422), (0.118, 0.422), (0.108, 0.41), (0.112, 0.399)], SX * 0.985, 1.0, 40, BX, 0, cap=False)
     fin(seat, "WcSeat", M["ivory"], parts)
     # (the lid: a gently domed oval, made closed and hinged on the washlet's front edge, its node's origin on the hinge, so the game lifts it)
     HX, HY = 0.16, 0.432
-    lid = lathe_oval("WcLid", [(0.0, -0.008), (0.19, -0.008), (0.197, 0.002), (0.188, 0.016), (0.12, 0.026), (0.0, 0.03)], SX * 0.98, 1.0, 56, BX - HX, 0)
+    lid = lathe_oval("WcLid", [(0.0, -0.008), (0.19, -0.008), (0.197, 0.002), (0.188, 0.016), (0.12, 0.026), (0.0, 0.03)], SX * 0.98, 1.0, 40, BX - HX, 0)
     lid.location = P(HX, HY, 0)
     fin(lid, "WcLid", M["ivory"], parts)
     # (the cistern behind: a rounded tank, the hand-wash basin on its lid (手洗い付き), its spout curving over, the lever on its left side)
-    fin(rbox("WcTank", (0.17, 0.34, 0.44), (0.305, 0.58, 0), 0.04, 5), "WcTank", M["china"], parts)
-    basin = lathe_oval("WcTankBasin", [(0.0, 0.748), (0.15, 0.748), (0.205, 0.765), (0.212, 0.782), (0.196, 0.788), (0.15, 0.772), (0.0, 0.766)], 0.42, 1.0, 40, 0.3, 0)
+    fin(rbox("WcTank", (0.17, 0.34, 0.44), (0.305, 0.58, 0), 0.04, 3), "WcTank", M["china"], parts)
+    basin = lathe_oval("WcTankBasin", [(0.0, 0.748), (0.15, 0.748), (0.205, 0.765), (0.212, 0.782), (0.196, 0.788), (0.15, 0.772), (0.0, 0.766)], 0.42, 1.0, 32, 0.3, 0)
     fin(basin, "WcTankBasin", M["china"], parts)
     # (the spout: a round foot on the basin's back, a gooseneck rising and curving over in one smooth bend (its ends closed: an open pipe
     # end showed as a ring), a nozzle at its tip, its dark outlet underneath, over the basin's middle; the game's water runs from SPOUT_TIP)
     bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.017, depth=0.012, location=P(0.372, 0.778, 0))
     fin(active(), "WcSpoutFoot", M["chrome"], parts)
     fin(tube("WcSpout", [(0.372, 0.78, 0.0), (0.372, 0.832, 0.0), (0.364, 0.868, 0.0), (0.338, 0.888, 0.0), (0.31, 0.882, 0.0),
-                         (0.297, 0.868, 0.0)], 0.0105, caps=True), "WcSpout", M["chrome"], parts)
+                         (0.297, 0.868, 0.0)], 0.0105, caps=True, res=2, ru=5), "WcSpout", M["chrome"], parts)
     bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.0125, depth=0.016, location=P(0.295, 0.861, 0))
     fin(active(), "WcSpoutTip", M["chrome"], parts)
     bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.008, depth=0.002, location=P(0.295, 0.8525, 0))
@@ -346,6 +346,10 @@ def washstand():
     print("WASH_DONE", sum(len(o.data.polygons) for o in parts))
 
 
-toilet()
-bits()
-washstand()
+ONLY = os.environ.get("WC_ONLY", "toilet,bits,washstand")
+if "toilet" in ONLY:
+    toilet()
+if "bits" in ONLY:
+    bits()
+if "washstand" in ONLY:
+    washstand()

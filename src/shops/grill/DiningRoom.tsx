@@ -2307,14 +2307,17 @@ const GLOW = (() => {
 /** the paper lantern's body: a round ball, a circle in section, drawn in to the wooden rings at its two ends, turned on a lathe */
 const LANTERN_R = 0.125
 const LANTERN_END = Math.sqrt(LANTERN_R ** 2 - 0.05 ** 2)
-const LANTERN_GEO = (() => {
-  const pts: THREE.Vector2[] = []
-  for (let i = 0; i <= 24; i++) {
-    const y = -LANTERN_END + (2 * LANTERN_END * i) / 24
-    pts.push(new THREE.Vector2(Math.sqrt(Math.max(0, LANTERN_R ** 2 - y * y)), y))
+/** a ball's band turned (a paper lantern's body): from `end` below its middle to `end` above, its points evenly round the curve (they were
+ * evenly up its height, crowded across the flat middle and few where it rounds in to its rings: twice the faces for a coarser outline) */
+function ballLathe(R: number, end: number, bands: number, round: number) {
+  const top = Math.asin(Math.min(1, end / R)), pts: THREE.Vector2[] = []
+  for (let i = 0; i <= bands; i++) {
+    const a = -top + (2 * top * i) / bands
+    pts.push(new THREE.Vector2(R * Math.cos(a), R * Math.sin(a)))
   }
-  return new THREE.LatheGeometry(pts, 28)
-})()
+  return new THREE.LatheGeometry(pts, round)
+}
+const LANTERN_GEO = ballLathe(LANTERN_R, LANTERN_END, 12, 24)
 /** a little seeded stream of numbers, the same pictures every time */
 function seeded(seed: number) {
   let n = seed
@@ -2434,10 +2437,10 @@ function fishPaper(g: CanvasRenderingContext2D, lit: boolean) {
   for (const cx of [W * 0.25, W * 0.75]) {
     g.strokeStyle = lit ? 'rgba(150,32,20,0.65)' : 'rgba(90,50,40,0.6)'
     g.lineWidth = 4
-    g.beginPath(); g.arc(cx, H * 0.96, 70, -Math.PI * 0.82, -Math.PI * 0.18); g.stroke()
-    g.fillStyle = '#fff6e6'; g.beginPath(); g.arc(cx, H * 0.89, 17, 0, Math.PI * 2); g.fill()
-    g.fillStyle = '#1a1210'; g.beginPath(); g.arc(cx, H * 0.89, 10, 0, Math.PI * 2); g.fill()
-    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(cx + 4, H * 0.875, 3.5, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.arc(cx, H * 0.93, 70, -Math.PI * 0.82, -Math.PI * 0.18); g.stroke()
+    g.fillStyle = '#fff6e6'; g.beginPath(); g.arc(cx, H * 0.85, 17, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#1a1210'; g.beginPath(); g.arc(cx, H * 0.85, 10, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(cx + 4, H * 0.835, 3.5, 0, Math.PI * 2); g.fill()
   }
   g.fillStyle = lit ? 'rgba(150,32,20,0.7)' : 'rgba(90,50,40,0.6)'
   g.fillRect(0, H * 0.985, W, H * 0.015)
@@ -2454,14 +2457,7 @@ const LANTERN_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', ma
 /** the round lantern (日式烤魚 on it): rounder and a little bigger, drawn in to its rings */
 const ROUND_LANTERN_R = 0.15
 const ROUND_LANTERN_END = Math.sqrt(ROUND_LANTERN_R ** 2 - 0.06 ** 2)
-const ROUND_LANTERN_GEO = (() => {
-  const pts: THREE.Vector2[] = []
-  for (let i = 0; i <= 24; i++) {
-    const y = -ROUND_LANTERN_END + (2 * ROUND_LANTERN_END * i) / 24
-    pts.push(new THREE.Vector2(Math.sqrt(Math.max(0, ROUND_LANTERN_R ** 2 - y * y)), y))
-  }
-  return new THREE.LatheGeometry(pts, 32)
-})()
+const ROUND_LANTERN_GEO = ballLathe(ROUND_LANTERN_R, ROUND_LANTERN_END, 12, 24)
 const ROUND_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: signTexture(1024, 300, (g) => roundPaper(g, true)), toneMapped: false, side: THREE.DoubleSide }),
   { offMap: signTexture(1024, 300, (g) => roundPaper(g, false)) })
 /** the fish lantern's body: turned along its length, a blunt head (its mouth a little round), deep and full to past its middle as a sea
@@ -2476,9 +2472,9 @@ const fishR = (t: number) => t < 0.36 ? 0.034 + 0.07 * Math.pow(Math.sin((Math.P
 const fishZ = (t: number) => -FISH_LEN / 2 + FISH_LEN * t + FISH_Z0
 const FISH_GEO = (() => {
   const pts: THREE.Vector2[] = [new THREE.Vector2(0, -FISH_LEN / 2)]
-  for (let i = 0; i <= 28; i++) pts.push(new THREE.Vector2(fishR(i / 28), -FISH_LEN / 2 + (FISH_LEN * i) / 28))
+  for (let i = 0; i <= 16; i++) pts.push(new THREE.Vector2(fishR(i / 16), -FISH_LEN / 2 + (FISH_LEN * i) / 16))
   pts.push(new THREE.Vector2(0, FISH_LEN / 2))
-  const g = new THREE.LatheGeometry(pts, 24)
+  const g = new THREE.LatheGeometry(pts, 16)
   // (laid along z, its back up: the lathe's axis turned from y to z, which turns the paper's u 0 straight down and u 0.5 up)
   g.rotateX(Math.PI / 2)
   g.scale(0.7, FISH_DEEP, 1)
