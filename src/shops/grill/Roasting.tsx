@@ -1065,6 +1065,8 @@ function CubbyFrame() {
  */
 const STRIP_OFF = new THREE.Color('#5a4a38')
 const STRIP_ON = new THREE.Color('#fff0cc')
+/** how bright a cupboard's lamp is, its doors open */
+const CUBBY_LAMP = 3.2
 /** how far a leaf swings open (a little past square) */
 const LEAF_SWING = 1.75
 /** how near someone's middle may come to where a cupboard's doors swing (a body's half-width and a little), and how far ahead of a walker
@@ -1100,7 +1102,9 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
   const doors = useRef<(THREE.Group | null)[]>([])
   const frame = useRef<THREE.Group>(null)
   const st = useRef({ k: 0, kept: false, hoverUntil: 0, blocked: false })
-  const lamp = useRef<THREE.PointLight>(null)
+  const lamp = useRef<THREE.SpotLight>(null)
+  // (where the cupboard's lamp shines: straight down, onto its floor)
+  const lampAim = useMemo(() => new THREE.Object3D(), [])
   const strip = useRef<THREE.MeshBasicMaterial>(null)
   const side = a0 < COOK_NOTCH.along[0] ? 'left' : 'right'
   if (import.meta.env?.DEV && typeof window !== 'undefined') ((window as unknown as { __cubbies?: Record<string, typeof st> }).__cubbies ??= {})[side] = st
@@ -1151,7 +1155,7 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
     // (each door about its hinge at its outer edge, its free edge swinging out toward the cook, a little past square)
     const e = s.k * s.k * (3 - 2 * s.k)
     doors.current.forEach((d, i) => { if (d) d.rotation.y = leaves[i] * e * LEAF_SWING })
-    if (lamp.current) lamp.current.intensity = e * 1.6
+    if (lamp.current) lamp.current.intensity = e * CUBBY_LAMP
     strip.current?.color.lerpColors(STRIP_OFF, STRIP_ON, Math.min(1, e * 1.5))
   })
   const tip = () => setTip({ title: '櫃門', hint: st.current.blocked ? '前面有人，打不開' : st.current.kept ? '點一下關上' : '點一下打開' })
@@ -1168,7 +1172,16 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
             <boxGeometry args={[span - 0.12, 0.012, 0.022]} />
             <meshBasicMaterial ref={strip} color={STRIP_OFF} toneMapped={false} />
           </mesh>
-          {QUALITY.tier === 'high' && <pointLight ref={lamp} position={[0, top - 0.05, (back - front) * 0.35]} color="#ffd8a0" intensity={0} distance={1.4} decay={2} />}
+          {/* (shining down only, a wide cone from just under its top, and no further than its floor: a lamp in all directions lit the
+              table's top above it as well (no shadows, and the toon light lights even what faces away a little), the top and the plate on it
+              glowing as the doors opened) */}
+          {QUALITY.tier === 'high' && (
+            <>
+              <primitive object={lampAim} position={[0, bottom, (back - front) * 0.4]} />
+              <spotLight ref={lamp} position={[0, top - 0.03, (back - front) * 0.4]} target={lampAim} color="#ffd8a0" intensity={0}
+                angle={1.25} penumbra={0.55} distance={(top - bottom) * 1.8} decay={1.6} />
+            </>
+          )}
         </>
       )}
       {leaves.map((sd, i) => (
