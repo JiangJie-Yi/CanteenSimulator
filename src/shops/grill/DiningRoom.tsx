@@ -2054,8 +2054,9 @@ const AURA = canvasTex(128, 128, (g) => {
   }
   g.putImageData(img, 0, 0)
 })
-/** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015) */
-const CUPS_SHIFT = -0.015
+/** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015), and back 0.02
+ * toward the shrine's steps with the shallower table (TABLE_DEEP) */
+const CUPS_SHIFT = 0.005
 /** where the Ebisu's feet are, on his pedestal (the ring of light spreads out from there) */
 // (where the shrine's back stands, ALTAR_D / 2, and the Ebisu brought back toward it with the shrine's shallower depth)
 const EBISU_FEET: [number, number, number] = [0.29 + (0.145 - 0.29) * SHRINE_DEEP, 0.077, 0]
@@ -2065,6 +2066,11 @@ const CUPS_FX = 0.29 - 0.375 + CUPS_SHIFT
 /** the whole shrine area drawn a size larger, its back still against the wall */
 const ALTAR_SCALE = 1.2
 const ALTAR_D = 0.58
+/** the offering table drawn shallower than it was modelled (ALTAR_D), its back still to the wall: the owner's, a little less deep (0.53);
+ * what's on it brought back to fit, the cups, the flask, the oranges (a little smaller) and the sutra */
+const TABLE_DEEP = 0.53 / ALTAR_D
+/** where the flask stands, by the cups' stand (back 0.02 with them) */
+const FLASK_X = -0.04
 /** and its height: up over the beckoning cats' stand below it, by the door */
 const ALTAR_Y = 1.42
 /** how long the sake offered stands there, and the extra custom it brings (ms) */
@@ -2072,11 +2078,11 @@ const INCENSE_MS = 180000
 /** the small shrine's offering table (blender/kamidana.py's KamiTable): three keyaki boards, a dark lip with a gold line inside it, gold front
  * corners, the arched apron below; in the altar's own frame (its top's surface at y = 0, its front at x = -D/2) */
 function AltarTable() {
-  return <KamidanaModel part="table" />
+  return <group position-x={(ALTAR_D / 2) * (1 - TABLE_DEEP)} scale-x={TABLE_DEEP}><KamidanaModel part="table" /></group>
 }
 function Sutra() {
   return (
-    <group position={[-0.12, 0.001, -0.34]} rotation-y={-Math.PI / 2}><KamidanaModel part="sutra" /></group>
+    <group position={[-0.105, 0.001, -0.34]} rotation-y={-Math.PI / 2}><KamidanaModel part="sutra" /></group>
   )
 }
 function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
@@ -2255,7 +2261,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
     }
     const CUP_X = ALTAR_D / 2 - 0.375 + CUPS_SHIFT + cupsOff.x, CUP_TOP = 0.05 + cupsOff.y, POUR_Y = 0.085 + cupsOff.y
     const cupZ = [-0.1125, 0, 0.1125].map((z) => z + cupsOff.z)
-    const rest = { x: -0.06, y: 0, z: 0.3 }
+    const rest = { x: FLASK_X, y: 0, z: 0.3 }
     const f = flaskRef.current
     // (one cup after another: 1.1 s each from 0.7 s in, the first quarter second gliding over from the last cup, tipped back a little so
     // nothing spills between, then pouring; all of it eased, nothing jumps)
@@ -2376,9 +2382,9 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       {/* the offering of sake (御神酒): a pair of white flasks either side of the oranges, and a flat cup before them that the
           sake's poured into: only the shrine itself is clicked, to make the offering */}
       <Movable id="sutra" label="經書"><group {...nameOnly('經書', '般若心經，供在神前')}><Sutra /></group></Movable>
-      <Movable id="flask" label="御神酒壺"><group ref={flaskRef} position={[-0.06, 0, 0.3]}>{flask(0, 'f')}</group>
+      <Movable id="flask" label="御神酒壺"><group ref={flaskRef} position={[FLASK_X, 0, 0.3]}>{flask(0, 'f')}</group>
         {/* (its shadow stays on the stand where it stood: fading and spreading as it's lifted off, not carried up with it) */}
-        <group ref={flaskShadow} position={[-0.06, 0, 0.3]}><ContactShadow r={0.055} /></group></Movable>
+        <group ref={flaskShadow} position={[FLASK_X, 0, 0.3]}><ContactShadow r={0.055} /></group></Movable>
       {/* (the clear sake: a thin stream down into the cup, and the cups, each filling with it) */}
       <mesh ref={streamRef} visible={false}>
         <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} /><meshBasicMaterial color="#e6f4ff" transparent opacity={0.55} depthWrite={false} />
@@ -2389,8 +2395,9 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
         </mesh>
       ))}
       {/* the oranges on their dish, a leaf on the top one */}
-      {/* (in front of the cups' stand, a little smaller: where the owner set it in the edit panel (X −0.010, Z −0.203)) */}
-      <Movable id="oranges" label="橘子盤"><group name="look-oranges" position={[-0.216, 0, 0.002]} scale={0.8} {...nameOnly('椪柑', '供品，圓滿吉祥')}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group></Movable>
+      {/* (in front of the cups' stand, a little smaller: where the owner set it in the edit panel (X −0.010, Z −0.203); brought back and made
+          a touch smaller with the shallower table) */}
+      <Movable id="oranges" label="橘子盤"><group name="look-oranges" position={[-0.176, 0, 0.002]} scale={0.76} {...nameOnly('椪柑', '供品，圓滿吉祥')}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group></Movable>
     </group>
   )
 }
