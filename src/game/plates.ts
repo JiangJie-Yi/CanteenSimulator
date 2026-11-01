@@ -1,20 +1,18 @@
-// The plates' supply: the dish rack holds the shop's plates; the clean stack at the pass is filled from it, a stack's worth at a time
-// (by the owner's click, or by a server when the stack runs out), and washed plates go back onto the stack while there's room, the rest
-// back on the rack.
+// The plates: all of them kept on the dish racks (碗盤櫃). A plate for a customer is taken off the racks (by a server who walks there for
+// it, or sent over when there's none); once they've eaten it goes to the sink, and the dirty ones are washed there a batch at a time and put
+// back on the racks.
 
-/** how many plates the rack holds when full */
+/** how many plates the racks hold when full (and how many the shop has) */
 export const RACK_FULL = 50
-/** how many the clean stack at the pass holds */
-export const CLEAN_CAP = 12
-/** how many are carried over from the rack at once */
-export const TAKE = 6
+/** the dirty plates at the sink are washed once there are this many (or straight away when the racks have run out) */
+export const WASH_AT = 5
 
-/** how many plates come off the rack onto the clean stack: up to `want`, no more than the rack has or the stack has room for */
-export const fromRack = (rack: number, clean: number, want = TAKE, cap = CLEAN_CAP) => Math.max(0, Math.min(want, rack, cap - clean))
+/** a plate off the racks, if there's one left: the racks' count after, and whether one was got */
+export const takePlate = (rack: number) => (rack > 0 ? { rack: rack - 1, got: true } : { rack, got: false })
 
-/** where washed plates go: onto the clean stack while there's room, the rest back on the rack (as many as it has room for) */
-export function putAway(rack: number, clean: number, washed: number, cap = CLEAN_CAP, full = RACK_FULL) {
-  const toStack = Math.max(0, Math.min(washed, cap - clean))
-  const toRack = Math.max(0, Math.min(washed - toStack, full - rack))
-  return { toStack, toRack }
-}
+/** whether the sink's dirty plates are washed now: a batch of them, or any at all once the racks are bare; never twice at once */
+export const washNow = (dirty: number, rack: number, washing: boolean) => !washing && dirty > 0 && (dirty >= WASH_AT || rack === 0)
+
+/** the racks' count once the washed plates are put back: as many as there's room for */
+export const putBack = (rack: number, washed: number, full = RACK_FULL) => Math.min(full, rack + washed)
+

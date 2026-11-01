@@ -947,6 +947,9 @@ function CookTableImpl({ floor = true }: { floor?: boolean }) {
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]}
         inset={[[0.06, -0.01, 0.06, 0.06], [-0.01, 0.06, 0.06, -0.01], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, -0.01], [-0.01, 0.06, 0.06, -0.01]][i] as [number, number, number, number]} />)}
       <CubbyFrame />
+      {/* (its far corners, marked for the servers' way round it to the dish racks: GuestBar3D) */}
+      <group name="cook-table-c0" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[0]).addScaledVector(LAY, COOK_TABLE.lay[0])} />
+      <group name="cook-table-c1" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[1]).addScaledVector(LAY, COOK_TABLE.lay[1])} />
       {/* (the cubbies either side a door each, hung at the table's ends; under the hearth, at the back of the notch, a pair) */}
       <CubbyDoors along={CUBBY2.along as [number, number]} hinge="low" lit />
       <CubbyDoors along={CUBBY.along as [number, number]} hinge="high" lit />

@@ -17,6 +17,7 @@ import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { PlateRack } from './PlateRack'
+import { SinkModel } from './Sink'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
@@ -688,6 +689,14 @@ function RackAt() {
     </>
   )
 }
+/** where the sink stands: on the back wall past the freezer, its back to the wall, its front toward the cook's table (along and lay as the
+ * freezer's); drawn a little over its own size (blender/sink.py, in metres) to the kitchen's, its deck level with the cook's table */
+const SINK_AT = { along: 4.15, lay: 5.85, scale: 1.15 }
+function SinkAt() {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const p = new THREE.Vector3().addScaledVector(ALONG, SINK_AT.along).addScaledVector(LAY, SINK_AT.lay)
+  return <Movable id="sink" label="流理台" baseScale={SINK_AT.scale} ground={floor}><group name="look-sink" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><SinkModel /></group></Movable>
+}
 const KNIVES_URL = import.meta.env.BASE_URL + 'models/knives.glb'
 /** the cook's knives on their folded cloth (blender/knives.py), laid along the table behind the hearth */
 /** the knife board (blender/knives.py) on the hearth frame's right-hand face: how far along that face is, where along the side its middle is,
@@ -733,7 +742,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
-      <group position={[0, 0, 0]}><FridgeAt /><RackAt /></group>
+      <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /></group>
     </>
   )
 }

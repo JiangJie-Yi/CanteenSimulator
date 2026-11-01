@@ -438,8 +438,11 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * compartment's worth out by clicking it, and `onTake` (set by App) puts it to the shop's cash
  */
 export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void) | null } = { drawer: openingFloat(), onTake: null }
-/** the dish rack's plates (game/plates): how many are on it, and how many the owner has asked to be taken over to the pass (a click) */
-export const PLATE_RACK = { n: RACK_FULL, want: 0 }
+/** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
+export const PLATE_RACK = { n: RACK_FULL }
+/** the kitchen's sink (Sink.tsx): whether the dirty plates are being washed in it just now (the tap runs) */
+export const SINK = { washing: false }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plates: PLATE_RACK, __sink: SINK })
 /** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
  * (none when the bed is full); the scene sets it while it's showing */
 export const COAL_BRIDGE: { place: (() => number) | null } = { place: null }
@@ -598,13 +601,8 @@ const GRILL_PIVOT = new THREE.Vector3().addScaledVector(LAY, -2.14).addScaledVec
 /** where the scaled bar's group goes (with scale GRILL_SCALE) */
 export const GRILL_OFFSET = GRILL_PIVOT.clone().multiplyScalar(1 - GRILL_SCALE).setY(GRILL_BAR_RISE - GRILL_BAR_TOP * GRILL_SCALE)
 /**
- * Where the customers' plates are kept (the bar's frame, on the cook's table, inside, by the pass): the clean stack
- * and the dirty one beside it, back from the bar where the customers can't reach; and the height of that table's top.
- */
-/**
  * The cubby cut into the cook's table under its top, in its front face (the cook's side): open to the front, a low plinth
- * at its foot and one shelf over its right-hand part. Where the plates and dishes are kept: the customers' clean and dirty
- * stacks on its floor to the left, the cook's big plate on its floor to the right with the side dishes on the shelf over it.
+ * at its foot and one shelf over its right-hand part (the customers' plates aren't kept here any more: all of them are on the dish racks).
  * (along and lay in the first counter's frame, from the table's own sizes in Roasting; heights in the scene.)
  */
 /** the second cubby, at the table's left: the trash bin on its floor, the basket on its shelf */
@@ -618,15 +616,6 @@ export const CUBBY_SHELF_Y = CUBBY_FLOOR_Y + 0.3
 /** a place in the cubby (along, lay, and which tier it is on), in the scene */
 export const cubbyAt = (along: number, lay: number, tier: 'floor' | 'shelf') =>
   new THREE.Vector3().addScaledVector(ALONG, along).addScaledVector(LAY, lay).setY(tier === 'floor' ? CUBBY_FLOOR_Y : CUBBY_SHELF_Y)
-export const PLATE_STACKS = (() => {
-  // (in the bar's own frame: where those places are, under the table's top, to the left in the cubby)
-  const at = (along: number) => cubbyAt(along, 1.5, 'floor').sub(GRILL_OFFSET).multiplyScalar(1 / GRILL_SCALE)
-  // (a plate is 0.26 across its radius in the scene: the two stacks stand more than a diameter apart, so the plates of one never run into the other's,
-  // the dirty one still clear of the shelf over the cubby's right-hand part, which starts at along 2.5)
-  return { clean: at(1.66), dirty: at(2.22) }
-})()
-/** the height of the cubby's floor, in the bar's own frame, for the stacks of plates standing on it */
-export const PLATE_STACK_Y = (CUBBY_FLOOR_Y - GRILL_OFFSET.y) / GRILL_SCALE
 /** a point given in the bar's own sizes, where it is in the scene as drawn */
 export const toGrillScene = (v: THREE.Vector3) => v.clone().multiplyScalar(GRILL_SCALE).add(GRILL_OFFSET)
 

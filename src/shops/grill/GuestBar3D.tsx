@@ -1,5 +1,5 @@
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { StaticBatch } from '@/scene/StaticBatch'
@@ -38,7 +38,9 @@ import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { takeOut, type Denom } from '@/game/till'
-import { fromRack, putAway, TAKE } from '@/game/plates'
+import { putBack, RACK_FULL, takePlate, washNow } from '@/game/plates'
+import { kitchenPath, type Rect } from '@/game/kitchenPath'
+import { PER_RACK } from './PlateRack'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
@@ -46,7 +48,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { PASS_ALONG, SHRINE_FLOWERS, PLATE_STACK_Y, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, PLATE_STACKS, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { PASS_ALONG, SHRINE_FLOWERS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -1366,18 +1368,27 @@ const drinkRate = () => (import.meta.env.DEV ? (window as unknown as { __drinkRa
 const wcRate = () => (import.meta.env.DEV ? (window as unknown as { __wcRate?: number }).__wcRate : undefined) ?? WC_RATE
 const DRINK_STAY = 2.25
 
-/** a plate on its way to a seat ('serve'), set at it ('set'), or being cleared away ('clear', after a pause) */
-type PlateRun = { key: number; seat: number; guest: number; phase: 'serve' | 'carry' | 'set' | 'clear'; t: number; from: THREE.Vector3
-  /** (clearing) its place on the dirty stack, taken when it sets off, so two cleared at once don't aim for the same one */
+/** a plate off the racks on its way to a seat ('serve'), carried there by a server ('carry'), set at it ('set'), cleared away to the sink
+ * ('clear', after a pause), or washed and on its way back to the racks ('home') */
+type PlateRun = { key: number; seat: number; guest: number; phase: 'serve' | 'carry' | 'set' | 'clear' | 'home'; t: number; from: THREE.Vector3
+  /** (clearing) its place on the dirty stack in the sink, taken when it sets off, so two cleared at once don't aim for the same one; (going
+   * home) where on the racks it goes */
   to?: THREE.Vector3 }
 const STACK_GAP = 0.026
-const CLEAN_START = 8
-/** the dirty stack goes to be washed once it's this high (and nothing's on its way to it) */
-const WASH_AT = 5
 const SERVE_S = 0.55
 const CLEAR_S = 0.6
 const CLEAR_DELAY = 1.0
-const WASH_S = 0.9
+/** a plate's flight takes at least this long a unit of its way (the bar's): from the racks, or to the sink, it's across the room */
+const FLY_PER = 0.3
+const HOME_S = 0.8
+/** a plate's size in the sink, against its own */
+const IN_SINK = 0.78
+/** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
+const WASH_EACH = 0.5
+/** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
+const KITCHEN_BLOCKS = new Set(['ricetub', 'freezer', 'platerack', 'platerack2', 'sink'])
+/** how much room is left round each of them for a server to pass (the bar's units) */
+const PASS_ROOM = 0.13
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
 const PLATE_R = 0.13
 const PLATE_GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 0.038], [0.49, 0.042], [0.44, 0.026],
@@ -1545,7 +1556,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const turn = st.counter === h.counter ? [] : [aisleCorner(counters[st.counter === 0 ? h.counter : st.counter])]
     return [...h.way.map((v) => v.clone()), ...turn, st.aisle.clone(), besideSeat(n)]
   }
-  const waiters = useRef<{ phase: 'idle' | 'fetch' | 'pickup' | 'go' | 'set' | 'back'; t: number; seat: number; keys: string[]; run: number | null
+  const waiters = useRef<{ phase: 'idle' | 'plate' | 'grab' | 'fetch' | 'pickup' | 'go' | 'set' | 'back'; t: number; seat: number; keys: string[]; run: number | null
+    /** (a plate first) the rack they went to, their way there from home, and where home is along their way on to the pass */
+    rack?: number; toRack?: THREE.Vector3[]; fromHome?: number
     path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number
     /** their way home once the shop's shut, and how far along it they are */
     out?: { way: THREE.Vector3[]; len: number; d: number } }[]>([])
@@ -1563,12 +1576,73 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   }, [servers.length, homes])
   /** a point in the bar's frame, in the shop's (where Roasting has the food) */
   const toShop = (v: THREE.Vector3) => v.clone().multiplyScalar(scale).add(offset ?? new THREE.Vector3())
-  // (the shop laid out in full keeps its plates inside, on the cook's table by the pass: they're handed over the bar)
-  const cleanAt = (k: number) => (given ? PLATE_STACKS.clean.clone().setY(PLATE_STACK_Y + k * STACK_GAP)
-    : counters[0].at.clone().addScaledVector(ALONG, -counters[0].length / 2 + 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP))
-  // (in from the first counter's far end, clear of the staff's gate there)
-  const dirtyAt = (k: number) => (given ? PLATE_STACKS.dirty.clone().setY(PLATE_STACK_Y + k * STACK_GAP)
-    : counters[0].at.clone().addScaledVector(ALONG, counters[0].length / 2 - 0.25).addScaledVector(LAY, 0.11).setY(top + k * STACK_GAP))
+  // where the plates are kept (the dish racks, game/plates) and washed (the sink): found in the room and taken into the bar's own frame each
+  // time, as they can be moved by hand in edit mode (a bar on its own, with no room round it, has them at its two ends)
+  const frame = useRef<THREE.Group>(null)
+  const scene = useThree((st) => st.scene)
+  const marks = useRef(new Map<string, THREE.Object3D | null>())
+  const markOf = (name: string) => {
+    let o = marks.current.get(name)
+    if (o === undefined || (o && !o.parent)) { o = scene.getObjectByName(name) ?? null; marks.current.set(name, o) }
+    return o
+  }
+  const inBar = (name: string, or: THREE.Vector3) => {
+    const o = markOf(name), f = frame.current
+    if (!o || !f) return or.clone()
+    f.updateWorldMatrix(true, false)
+    return f.worldToLocal(o.getWorldPosition(new THREE.Vector3()))
+  }
+  const endOf = (sd: number) => counters[0].at.clone().addScaledVector(ALONG, sd * (counters[0].length / 2 - 0.25)).addScaledVector(LAY, 0.11).setY(top)
+  /** where a plate's lifted off rack `i`, and where a server stands for it */
+  const rackTop = (i: number) => inBar(`rack-top-${i}`, endOf(-1))
+  const rackFront = (i: number) => inBar(`rack-front-${i}`, endOf(-1)).setY(0)
+  /** the rack a plate comes off now, and goes back onto: the count is shown across the two, the second's emptying first */
+  const rackNow = (n = PLATE_RACK.n) => (n > PER_RACK ? 1 : 0)
+  /** the k-th plate up the dirty stack in the sink's basin (they're stacked there a little smaller: the customers' plates are drawn big, the
+   * basin's a real sink's size) */
+  const dirtyAt = (k: number) => inBar('SinkBasinFloor', endOf(1)).add(new THREE.Vector3(0, 0.004 + k * STACK_GAP * IN_SINK, 0))
+  /** a place in the bar's frame as the first counter's (along it, across it): the kitchen's floor and all that stands on it lie square there */
+  const flat = (v: THREE.Vector3): [number, number] => { const c0 = counters[0], d = v.clone().sub(c0.at); return [d.dot(c0.along), d.dot(c0.lay)] }
+  /** what stands on the kitchen's floor, as rectangles in that frame, each grown by room to pass: the cook's table, the rice tub, the freezer,
+   * the racks and the sink, from where their shapes really reach (worked out once a day: nothing's moved while the shop's open) */
+  const blocksMade = useRef<Rect[] | null>(null)
+  const kitchenBlocks = (): Rect[] => {
+    const f = frame.current
+    if (blocksMade.current) return blocksMade.current
+    if (!f) return []
+    f.updateWorldMatrix(true, false)
+    const toBar = new THREE.Matrix4().copy(f.matrixWorld).invert()
+    const out: Rect[] = []
+    const grown = (fl: [number, number][]) => out.push({ x0: Math.min(...fl.map((q) => q[0])) - PASS_ROOM, z0: Math.min(...fl.map((q) => q[1])) - PASS_ROOM,
+      x1: Math.max(...fl.map((q) => q[0])) + PASS_ROOM, z1: Math.max(...fl.map((q) => q[1])) + PASS_ROOM })
+    const v = new THREE.Vector3(), m4 = new THREE.Matrix4()
+    scene.traverse((o) => {
+      if (!KITCHEN_BLOCKS.has(o.userData?.editId)) return
+      let a0 = Infinity, a1 = -Infinity, l0 = Infinity, l1 = -Infinity
+      o.updateWorldMatrix(true, true)
+      o.traverse((q) => {
+        const pos = (q as THREE.Mesh).isMesh ? (q as THREE.Mesh).geometry.attributes.position : null
+        if (!pos) return
+        m4.multiplyMatrices(toBar, q.matrixWorld)
+        for (let i = 0; i < pos.count; i += 3) {
+          const [a, l] = flat(v.fromBufferAttribute(pos, i).applyMatrix4(m4))
+          a0 = Math.min(a0, a); a1 = Math.max(a1, a); l0 = Math.min(l0, l); l1 = Math.max(l1, l)
+        }
+      })
+      if (a0 < a1) grown([[a0, l0], [a1, l1]])
+    })
+    const t0 = markOf('cook-table-c0'), t1 = markOf('cook-table-c1')
+    if (t0 && t1) grown([flat(f.worldToLocal(t0.getWorldPosition(new THREE.Vector3()))), flat(f.worldToLocal(t1.getWorldPosition(new THREE.Vector3())))])
+    blocksMade.current = out
+    return out
+  }
+  /** a server's way across the kitchen's floor, round the cook's table and all that stands on it (game/kitchenPath) */
+  const kitchenRoute = (from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3[] => {
+    const c0 = counters[0], k = kitchenOf(counters)
+    const back = ([a, l]: [number, number]) => c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(0)
+    const way = kitchenPath(flat(from), flat(to), { x0: k.along[0], z0: k.lay[0], x1: k.along[1], z1: k.lay[1] }, kitchenBlocks())
+    return way ? way.map(back) : [from.clone().setY(0), to.clone().setY(0)]
+  }
 
   // the plates: those out at the seats (or on their way), and the two stacks
   const [, setTick] = useState(0)
@@ -1576,24 +1650,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const runs = useRef<PlateRun[]>([])
   const runSeq = useRef(0)
   const runObjs = useRef(new Map<number, THREE.Group>())
-  /** when each clean plate (bottom up) came back to the stack: it drops onto it */
-  const clean = useRef<number[]>(Array.from({ length: CLEAN_START }, () => -9))
-  const cleanObjs = useRef<(THREE.Group | null)[]>([])
+  /** the dirty plates in the sink, and the washing (time since the last plate came out; null while the tap's off) */
   const dirty = useRef(0)
-  const dirtyStack = useRef<THREE.Group>(null)
   const wash = useRef<number | null>(null)
-  /** customers sat down waiting for a plate: there wasn't a clean one on the stack (they're being washed) */
+  /** customers sat down waiting for a plate: the racks were bare (they're being washed) */
   const waiting = useRef<{ seat: number; guest: number }[]>([])
+  /** (no servers) a plate sent over from the racks to the seat, if there's one on them */
   const serve = (seat: number, guest: number) => {
-    // only a plate that's actually on the stack (not one still on its way back from the wash)
-    const top = clean.current[clean.current.length - 1]
-    if (top === undefined || clock.current < top + 0.25) {
+    const ri = rackNow()
+    const r = takePlate(PLATE_RACK.n)
+    if (!r.got) {
       waiting.current.push({ seat, guest })
       return
     }
-    const from = cleanAt(clean.current.length - 1)
-    clean.current = clean.current.slice(0, -1)
-    runs.current.push({ key: ++runSeq.current, seat, guest, phase: 'serve', t: 0, from })
+    PLATE_RACK.n = r.rack
+    runs.current.push({ key: ++runSeq.current, seat, guest, phase: 'serve', t: 0, from: rackTop(ri) })
     redraw()
   }
   /** this customer's plate is cleared away (after a moment); one still waiting for a plate needn't get one */
@@ -1612,6 +1683,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __dirty: dirty })
 
   shownRef.current = shown
   // closing the shop empties the room at once: nobody at the stools, no plates out or being carried, the stacks as at the start
@@ -1621,9 +1693,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     runs.current = []
     runObjs.current.clear()
     waiting.current = []
-    clean.current = Array.from({ length: CLEAN_START }, () => -9)
+    // (the kitchen's floor looked at again tomorrow: things may be moved about in the meantime)
+    blocksMade.current = null
+    // (every plate washed and back on the racks for the next day)
+    PLATE_RACK.n = RACK_FULL
     dirty.current = 0
     wash.current = null
+    SINK.washing = false
     waiters.current = waiters.current.map((w, i) => ({ phase: 'idle', t: 0, seat: -1, keys: [], run: null, path: [], len: 0,
       pos: homes[i]?.at.clone() ?? w.pos, yaw: homes[i]?.yaw ?? w.yaw }))
     SERVICE.waiting.clear()
@@ -1883,20 +1959,19 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     done = []
 
-    // anyone who sat down while the stack was empty gets a plate as soon as there's one back on it
-    const top = clean.current[clean.current.length - 1]
-    if (waiting.current.length && top !== undefined && clock.current >= top + 0.25) {
+    // anyone who sat down while the racks were bare gets a plate as soon as one's back on them
+    if (waiting.current.length && PLATE_RACK.n > 0) {
       const w = waiting.current.shift()!
       serve(w.seat, w.guest)
     }
 
     // the plates on the move: lifted off the stack in an arc to the seat, and cleared away to the dirty stack
     const step = Math.min(dt, 0.1)
-    let finished = 0
+    let finished = 0, homed = 0
     for (const r of runs.current) {
       r.t += step
       const o = runObjs.current.get(r.key)
-      if (r.phase === 'set' || r.phase === 'clear' && r.t < 0 || r.phase === 'carry') {
+      if (r.phase === 'set' || (r.phase === 'clear' || r.phase === 'home') && r.t < 0 || r.phase === 'carry') {
         if (r.phase === 'set') o?.position.copy(plateAt(r.seat))
         continue
       }
@@ -1906,17 +1981,27 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const flying = runs.current.filter((x) => x !== r && x.phase === 'clear' && x.to && x.t !== Infinity).length
         r.to = dirtyAt(dirty.current + flying)
       }
-      const to = r.phase === 'clear' ? r.to! : plateAt(r.seat)
-      const k = Math.min(1, r.t / (r.phase === 'serve' ? SERVE_S : CLEAR_S))
+      const to = r.phase === 'clear' || r.phase === 'home' ? r.to! : plateAt(r.seat)
+      // (the longer its way, the longer its flight and the higher its arc)
+      const far = r.from.distanceTo(to)
+      const k = Math.min(1, r.t / Math.max(r.phase === 'serve' ? SERVE_S : r.phase === 'home' ? HOME_S : CLEAR_S, far * FLY_PER))
       const e = k * k * (3 - 2 * k)
       if (o) {
         o.position.lerpVectors(r.from, to, e)
-        o.position.y += Math.sin(Math.PI * k) * 0.22
+        o.position.y += Math.sin(Math.PI * k) * (0.22 + far * 0.12)
         o.rotation.z = Math.sin(Math.PI * k) * 0.12
+        // (down to its size in the sink as it goes into it, and back up as it comes out)
+        if (r.phase === 'clear') o.scale.setScalar(1 - (1 - IN_SINK) * e)
+        else if (r.phase === 'home') o.scale.setScalar(IN_SINK + (1 - IN_SINK) * e)
       }
       if (k >= 1) {
         if (r.phase === 'serve') r.phase = 'set'
-        else {
+        else if (r.phase === 'home') {
+          // (washed, back on the racks)
+          r.t = Infinity
+          PLATE_RACK.n = putBack(PLATE_RACK.n, 1)
+          homed++
+        } else {
           r.t = Infinity
           finished++
         }
@@ -1933,26 +2018,37 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const setMove = (on: boolean) => setMoving((m) => { if (!!m[wi] === on) return m; const n = [...m]; n[wi] = on; return n })
       w.t += step
       // (the customer gone meanwhile: what was being carried to them is taken away, and the server goes back)
-      if ((w.phase === 'fetch' || w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') && !sitting(w.seat)) {
+      if ((w.phase === 'plate' || w.phase === 'grab' || w.phase === 'fetch' || w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') && !sitting(w.seat)) {
         for (const k of w.keys) {
           SERVICE.carried.delete(k)
           SERVICE.claimed.delete(k)
         }
         w.keys = []
         const r = run()
-        if (r && r.phase === 'carry') { r.phase = 'clear'; r.t = 0 }
+        // (a plate not yet taken off the racks stays there; one taken goes to the sink, as what's cleared does)
+        if (r && r.phase === 'carry') {
+          if (w.phase === 'plate') {
+            runs.current = runs.current.filter((x) => x !== r)
+            PLATE_RACK.n = putBack(PLATE_RACK.n, 1)
+            redraw()
+          } else { r.phase = 'clear'; r.t = 0 }
+        }
         w.run = null
         // (back over the corners already passed, from where they are: none still ahead of them; from the pass or
-        // beyond, the way they came out to it first)
+        // beyond, the way they came out to it first; still in the kitchen, from the racks, home across it)
         const walked = w.phase === 'go' || w.phase === 'fetch' ? Math.min(w.len, w.t * SERVER_SPEED) : w.len
+        const homeAt = (w.fromHome ?? 0)
+        let toHome = 0
+        for (let i = 1; i <= homeAt && i < w.path.length; i++) toHome += w.path[i].distanceTo(w.path[i - 1])
         const passed: THREE.Vector3[] = []
         for (let i = 1, at = 0; i < w.path.length - 1; i++) {
           at += w.path[i].distanceTo(w.path[i - 1])
-          if (at < walked) passed.push(w.path[i])
+          if (at < walked && (w.phase !== 'fetch' || i > homeAt)) passed.push(w.path[i])
         }
-        w.path = w.phase === 'set' ? backPath(wi, w.seat).slice(0, -1).concat(w.pos.clone())
-          : w.phase === 'fetch' ? [home.at.clone(), ...passed, w.pos.clone()]
-            : [...fetchPath(wi), ...(w.phase === 'go' ? passed : []), w.pos.clone()]
+        w.path = w.phase === 'plate' || w.phase === 'grab' || (w.phase === 'fetch' && walked < toHome) ? kitchenRoute(home.at, w.pos)
+          : w.phase === 'set' ? backPath(wi, w.seat).slice(0, -1).concat(w.pos.clone())
+            : w.phase === 'fetch' ? [home.at.clone(), ...passed, w.pos.clone()]
+              : [...fetchPath(wi), ...(w.phase === 'go' ? passed : []), w.pos.clone()]
         w.len = pathLength(w.path)
         w.phase = 'back'
         w.t = 0
@@ -1962,7 +2058,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (w.phase === 'idle') {
         const job = [...SERVICE.waiting.entries()].find(([, n]) => sitting(n))
         const needPlate = job && !runs.current.some((r) => r.seat === job[1] && (r.phase === 'set' || r.phase === 'carry' || r.phase === 'serve'))
-        if (job && (!needPlate || clean.current.length > 0)) {
+        if (job && (!needPlate || PLATE_RACK.n > 0)) {
           w.seat = job[1]
           w.keys = [...SERVICE.waiting.entries()].filter(([, n]) => n === job[1]).map(([k]) => k)
           for (const k of w.keys) {
@@ -1971,21 +2067,50 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
           w.run = null
           if (needPlate) {
-            const from = cleanAt(clean.current.length - 1)
-            clean.current = clean.current.slice(0, -1)
+            // (a plate first: across the kitchen to the racks for one, round what stands on its floor)
+            const ri = rackNow()
+            PLATE_RACK.n = takePlate(PLATE_RACK.n).rack
             const key = ++runSeq.current
             const g = shownRef.current.find((x) => x.seat === w.seat && x.phase === 'sit')
-            runs.current.push({ key, seat: w.seat, guest: g?.id ?? -1, phase: 'carry', t: 0, from })
+            runs.current.push({ key, seat: w.seat, guest: g?.id ?? -1, phase: 'carry', t: 0, from: rackTop(ri) })
             w.run = key
+            w.rack = ri
+            w.toRack = kitchenRoute(home.at, rackFront(ri))
+            w.path = w.toRack.map((v) => v.clone())
+            w.phase = 'plate'
             redraw()
+          } else {
+            // (out to the pass for it)
+            w.path = fetchPath(wi)
+            w.fromHome = 0
+            w.phase = 'fetch'
           }
-          // (out to the pass for it)
-          w.path = fetchPath(wi)
           w.len = pathLength(w.path)
-          w.phase = 'fetch'
           w.t = 0
           setMove(true)
         }
+      } else if (w.phase === 'plate') {
+        const d = Math.min(w.len, w.t * SERVER_SPEED)
+        const { p, dir } = alongPath(w.path, d)
+        w.pos.copy(p)
+        if (dir.x || dir.z) w.yaw = Math.atan2(dir.x, dir.z)
+        if (d >= w.len) {
+          w.phase = 'grab'
+          w.t = 0
+          const at = rackTop(w.rack ?? 0)
+          w.yaw = Math.atan2(at.x - w.pos.x, at.z - w.pos.z)
+          setMove(false)
+        }
+      } else if (w.phase === 'grab' && w.t > 0.5) {
+        // (the plate on the tray: back across the kitchen the way they came, then out through their gate to the pass)
+        const back = (w.toRack ?? [home.at.clone(), w.pos.clone()]).map((v) => v.clone()).reverse()
+        back[0] = w.pos.clone()
+        w.fromHome = back.length - 1
+        w.path = [...back, ...fetchPath(wi).slice(1)]
+        w.len = pathLength(w.path)
+        w.phase = 'fetch'
+        w.t = 0
+        setMove(true)
       } else if (w.phase === 'fetch') {
         const d = Math.min(w.len, w.t * SERVER_SPEED)
         const { p, dir } = alongPath(w.path, d)
@@ -2046,11 +2171,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const plateTo = w.seat >= 0 ? plateAt(w.seat) : tray
       const hold = tray.clone().lerp(plateTo, k * k * (3 - 2 * k))
       hold.y += Math.sin(Math.PI * k) * 0.04
-      if (w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') {
+      if (w.phase === 'grab' || w.phase === 'fetch' || w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') {
         const r = run()
         const pr = runObjs.current.get(w.run ?? -1)
-        if (pr && r?.phase === 'carry') pr.position.copy(w.phase === 'pickup' ? cleanAt(clean.current.length).lerp(tray, Math.min(1, w.t / 0.4)) : hold.clone().setY(hold.y + 0.006))
-        w.keys.forEach((key, i) => SERVICE.carried.set(key, toShop(hold.clone().add(new THREE.Vector3((i % 3 - 1) * 0.05, 0.035 + Math.floor(i / 3) * 0.03, 0)))))
+        // (the plate lifted off the rack onto the tray, then carried on it)
+        if (pr && r?.phase === 'carry') pr.position.copy(w.phase === 'grab' ? rackTop(w.rack ?? 0).lerp(tray, Math.min(1, w.t / 0.4)) : hold.clone().setY(hold.y + 0.006))
+        if (w.phase !== 'grab' && w.phase !== 'fetch') w.keys.forEach((key, i) => SERVICE.carried.set(key, toShop(hold.clone().add(new THREE.Vector3((i % 3 - 1) * 0.05, 0.035 + Math.floor(i / 3) * 0.03, 0)))))
       }
       const o = waiterObjs.current[wi]
       if (o && SHOP.leaving) {
@@ -2085,60 +2211,30 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (which seats have their plate down, for what's being served to them)
     PLATES_SET.clear()
     for (const r of runs.current) if (r.phase === 'set' || r.phase === 'clear' && r.t < 0) PLATES_SET.add(r.seat)
-    if (finished) {
+    if (finished || homed) {
       runs.current = runs.current.filter((r) => r.t !== Infinity)
       dirty.current += finished
       redraw()
     }
-    // the dirty stack, once it's grown, goes back to be washed (toward the kitchen and down out of sight); it comes
-    // back clean, one plate at a time, onto the clean stack
-    // (and straight away when the clean stack has run out)
-    if (wash.current === null && (dirty.current >= WASH_AT || dirty.current > 0 && !clean.current.length) &&
-      !runs.current.some((r) => r.phase === 'clear' && r.t >= 0)) wash.current = 0
+    // the dirty plates in the sink are washed a batch at a time (or straight away once the racks are bare), the tap running: one by one off
+    // the top of the stack, lifted out and back onto the racks
+    if (washNow(dirty.current, PLATE_RACK.n, wash.current !== null) && !runs.current.some((r) => r.phase === 'clear' && r.t >= 0)) wash.current = 0
     if (wash.current !== null) {
       wash.current += step
-      const k = Math.min(1, wash.current / WASH_S)
-      const e = k * k * (3 - 2 * k)
-      dirtyStack.current?.position.set(0, -0.5 * e, 0).addScaledVector(LAY, 0.7 * e)
-      if (k >= 1) {
-        const n = dirty.current
-        dirty.current = 0
-        wash.current = null
-        dirtyStack.current?.position.set(0, 0, 0)
-        const now = clock.current
-        // (onto the clean stack while there's room; the rest back on the dish rack)
-        const { toStack, toRack } = putAway(PLATE_RACK.n, clean.current.length, n)
-        PLATE_RACK.n += toRack
-        clean.current = [...clean.current, ...Array.from({ length: toStack }, (_, i) => now + 1.2 + i * 0.35)]
+      if (wash.current >= WASH_EACH && dirty.current > 0) {
+        wash.current = 0
+        dirty.current -= 1
+        const going = runs.current.filter((r) => r.phase === 'home').length
+        runs.current.push({ key: ++runSeq.current, seat: -1, guest: -1, phase: 'home', t: 0, from: dirtyAt(dirty.current), to: rackTop(rackNow(PLATE_RACK.n + going + 1)) })
         redraw()
       }
+      if (dirty.current === 0) wash.current = null
     }
-    // plates fetched from the dish rack: a stack's worth when the owner clicks it, or when the pass has run out and none are being washed
-    {
-      const short = !clean.current.length && dirty.current === 0 && wash.current === null
-      if (PLATE_RACK.want > 0 || short) {
-        const n = fromRack(PLATE_RACK.n, clean.current.length, PLATE_RACK.want > 0 ? PLATE_RACK.want : TAKE)
-        PLATE_RACK.want = 0
-        if (n) {
-          PLATE_RACK.n -= n
-          const now = clock.current
-          clean.current = [...clean.current, ...Array.from({ length: n }, (_, i) => now + 0.6 + i * 0.25)]
-          redraw()
-        }
-      }
-    }
-    // clean plates coming back drop onto the stack
-    clean.current.forEach((born, i) => {
-      const o = cleanObjs.current[i]
-      if (!o) return
-      const k = Math.max(0, Math.min(1, (clock.current - born) / 0.25))
-      o.visible = clock.current >= born
-      o.position.copy(cleanAt(i)).y += (1 - k * k) * 0.3
-    })
+    SINK.washing = wash.current !== null
   })
 
   return (
-    <group name="bar-frame" scale={scale} position={offset}>
+    <group ref={frame} name="bar-frame" scale={scale} position={offset}>
       {drawCounter && <group position={at}><Counter length={length} /></group>}
       {counters.map((c, i) => {
         // the first counter's floor runs on past its end to the door, and back to meet the others' aisles; each other
@@ -2229,17 +2325,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           </group>
         )
       })}
-      {/* the clean stack, the dirty one, and the plates out at the seats */}
-      {clean.current.map((_, i) => (
-        <group key={`c${i}`} ref={(o) => { cleanObjs.current[i] = o; if (o && !o.userData.placed) { o.userData.placed = true; o.position.copy(cleanAt(i)) } }}>
-          <Plate design={i} />
-        </group>
+      {/* the dirty plates waiting in the sink, and the plates out: on their way to a seat, at it, cleared away, washed and going back */}
+      {Array.from({ length: dirty.current }, (_, i) => (
+        <group key={`d${i}`} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}><Plate dirty design={i} /></group>
       ))}
-      <group ref={dirtyStack}>
-        {Array.from({ length: dirty.current }, (_, i) => (
-          <group key={`d${i}`} position={dirtyAt(i)} rotation-y={i * 0.9}><Plate dirty design={i} /></group>
-        ))}
-      </group>
       {runs.current.map((r) => (
         <group key={r.key} ref={(o) => {
           if (!o) return void runObjs.current.delete(r.key)

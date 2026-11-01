@@ -6,9 +6,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { TAKE } from '@/game/plates'
-import { PLATE_RACK, tipOver } from './bar'
-import { getEdit } from './edit'
+import { PLATE_RACK } from './bar'
 import { wareGeometry } from './ware'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { DESIGN_COUNT, wareDesign } from './wareDesigns'
@@ -149,9 +147,10 @@ let woods: { light: THREE.Texture; dark: THREE.Texture; back: THREE.Texture } | 
 const TILED = new Map<string, THREE.Texture>()
 const woodsOf = () => (woods ??= { light: grain(WOOD, '#6a4426'), dark: grain(WOOD_DARK, '#4a2e16'), back: grain('#8b5e38', '#5a3a1e') })
 
-/** one of the two racks (`part` 0 or 1) and its plates, origin at the middle of its foot, its front toward +z. The plates on them are the
- * shop's supply (game/plates): the first rack shows the first 25 of what's there, the second the rest (so the second empties first; on each
- * the piles on top go before the standing ones); clicked, either sends a stack's worth over to the pass for the customers */
+/** one of the two racks (`part` 0 or 1) and its plates, origin at the middle of its foot, its front toward +z. The plates on them are all
+ * the shop's (game/plates): the first rack shows the first 25 of what's there, the second the rest (so the second empties first; on each
+ * the piles on top go before the standing ones). A server comes to the front of it for a plate before each customer's first dish
+ * (`rack-front-<part>`, where they stand; `rack-top-<part>`, where the plate's taken from), and the washed ones come back onto it from the sink */
 export function PlateRack({ part = 0 }: { part?: number }) {
   const all = useMemo(() => platesOf(part), [part])
   const [count, setCount] = useState(PLATE_RACK.n)
@@ -173,11 +172,13 @@ export function PlateRack({ part = 0 }: { part?: number }) {
   const post = (x: number, z: number) => (
     <mesh key={`${x}${z}`} position={[x, H / 2, z]} rotation-z={Math.PI / 2} castShadow><boxGeometry args={[H, 0.06, 0.06]} /><meshToonMaterial map={wood(w.dark, 2, 0.3)} /></mesh>
   )
-  const tip = tipOver('碗盤架', `點一下拿一疊盤子到出餐口（架上還有 ${count} 個）`)
   return (
-    <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; PLATE_RACK.want += TAKE }} {...tip}>
-      {/* (what's clicked: the whole rack and its cupboard, unseen; its wood is merged, a few draws, and takes no pointing) */}
+    <group>
+      {/* (what the editor's pointer finds: the whole rack and its cupboard, unseen; its wood is merged, a few draws, and takes no pointing) */}
       <mesh position={[0, (H + CAB) / 2, 0.02]} visible={false}><boxGeometry args={[W + 0.06, H + CAB, D + 0.08]} /></mesh>
+      {/* (where a server stands for a plate, and where it's lifted off) */}
+      <group name={`rack-front-${part}`} position={[0, 0, D / 2 + 0.5]} />
+      <group name={`rack-top-${part}`} position={[0, CAB + SHELVES[1] + 0.12, 0.04]} />
       <StaticBatch>
       <CabinetBase />
       {/* (the rack itself, up on the cupboard's top) */}
