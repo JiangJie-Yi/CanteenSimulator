@@ -3334,14 +3334,6 @@ button {
   color: #c4442f;
 }
 
-.ofc-close {
-  border: none;
-  background: none;
-  font-size: 22px;
-  cursor: pointer;
-  color: inherit;
-}
-
 .ofc-list {
   margin: 0;
   padding: 6px 12px 12px;
@@ -4567,14 +4559,6 @@ button {
   color: #f2cf7a;
   font-variant-numeric: tabular-nums;
 }
-.office > header .ofc-reset {
-  color: #f6ecd8;
-  background: transparent;
-  border-color: rgba(246, 236, 216, 0.45);
-}
-.office > header .ofc-close {
-  color: #f6ecd8;
-}
 .ofc-team {
   gap: 10px;
   padding: 12px 14px 4px;
@@ -5117,10 +5101,6 @@ button {
   font-size: 12px;
   text-decoration: underline;
   cursor: pointer;
-}
-.office > header .ofc-autohire:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 /* a tried dish written out as a recipe: numbered steps in a soft card, and a tip when the timing was off */
 .nb-recipe {
@@ -6251,7 +6231,6 @@ button {
   font-weight: 700;
   letter-spacing: 0.08em;
 }
-.reg-manual > header button,
 .reg-manual > footer button {
   border: 0;
   background: transparent;
@@ -6673,18 +6652,6 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .drink-stock-head > b { font-size: 16px; letter-spacing: 0.3em; }
 .drink-stock-cash { margin-left: auto; font-weight: 700; }
 .drink-stock-cash .money { color: #a6ecb4 !important; }
-.drink-stock-close {
-  width: 30px;
-  height: 30px;
-  border: 1.5px solid rgb(234 243 249 / 0.5);
-  border-radius: 50%;
-  background: transparent;
-  color: #eaf3f9;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-.drink-stock-close:hover { background: rgb(255 255 255 / 0.12); }
 .drink-stock .chiller-bins { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
 .chiller-zone.is-drinks-alcohol .chiller-zone-head { background: linear-gradient(180deg, #8a3a30, #6e2c24); }
 .chiller-zone.is-drinks-alcohol .chiller-zone-head i { color: #ffc9a0; text-shadow: 0 0 6px #ff9a5a; }
@@ -6796,3 +6763,66 @@ html[lang='en'] .dock-title small { display: none; }
 html[lang='en'] .dock-title { font-weight: 600; letter-spacing: 0.16em; font-size: 42px; }
 html[lang='en'] .menu-title-en { display: none; }
 
+/* every panel's close (the office, the pantry, the drinks' stock, the register's manual): one round button outlined in its header's own
+   colour, the × drawn as two strokes (the font's × sits differently in every face, and differently from panel to panel) */
+.panel-x {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1.5px solid color-mix(in srgb, currentColor 55%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 0;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+.panel-x::before,
+.panel-x::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 2px;
+  margin: -1px 0 0 -6.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+.panel-x::after { transform: rotate(-45deg); }
+.panel-x:hover { background: color-mix(in srgb, currentColor 16%, transparent); border-color: currentColor; }
+.panel-x:active { transform: scale(0.92); }
+.panel-x:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.office > header .panel-x { margin-left: auto; }
+/* the staff tab's foot of the team: what the staff costs, and every open job filled at once */
+.office .ofc-wages { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ofc-hireall {
+  flex: none;
+  padding: 4px 12px;
+  border: 1.5px solid #a8352a;
+  border-radius: 8px;
+  background: #c4442f;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ofc-hireall:hover:not(:disabled) { background: #a8352a; }
+.ofc-hireall:disabled { opacity: 0.4; cursor: default; }
+/* the pantry's header: its name and its ×, as the drinks' stock has them */
+.chiller-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px 7px 16px;
+  background: linear-gradient(180deg, #4a5b6e, #3a4858);
+  color: #eaf3f9;
+  font-family: var(--brush);
+}
+.chiller-head > b { font-size: 16px; letter-spacing: 0.3em; }
+.chiller-head .panel-x { margin-left: auto; }

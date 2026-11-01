@@ -88,7 +88,7 @@ for (const [i, shop] of SHOPS.entries()) {
       await publish.first().click()
       await page.waitForTimeout(50)
     }
-    await page.locator('.ofc-close').click()
+    await page.locator('.office .panel-x').click()
     // open for business
     await page.locator('.ai-toggle').click()
     await page.waitForTimeout(500)

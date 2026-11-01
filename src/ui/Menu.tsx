@@ -42,6 +42,8 @@ type MenuProps = {
   /** (the menu, open) size its tags as the board of the shop's foods is sized: this many tags, this many sets */
   layoutLike?: { tags: number; bases: number }
   cash?: number
+  /** (the pantry) shut it: its × */
+  onClose?: () => void
 }
 
 /**
@@ -94,7 +96,7 @@ const iconOf = (x: object) => (x as { icon?: string }).icon
 
 
 export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, feed = [], locked = false, open = false, stock, research = false, unitCost, onBuy, onRestock, restockCost, days, layoutLike,
-  cash = Infinity }: MenuProps) {
+  cash = Infinity, onClose }: MenuProps) {
   const t = UI[lang]
   const ordered = dish.bases.filter((b) => (quantities[b.id] ?? 0) > 0)
   const count = [...dish.bases, ...dish.items].reduce((n, x) => n + (quantities[x.id] ?? 0), 0)
@@ -400,6 +402,13 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
       {research && onBuy ? (
         <div className="strips-frame">
           <div className="chiller" role="group" aria-label={tl(lang, '食材櫃', '食材庫', 'Pantry')}>
+            {/* (its name and its ×, as the drinks' stock has them) */}
+            {onClose && (
+              <header className="chiller-head">
+                <b>{tl(lang, '食材櫃', '食材庫', 'Pantry')}</b>
+                <button type="button" className="panel-x" onClick={onClose} aria-label={tl(lang, '關閉', '閉じる', 'Close')}>×</button>
+              </header>
+            )}
             {/* (in three: the freezer, the fridge, and the larder at room temperature) */}
             <div className="chiller-scroll">
               {STORAGES.map((st) => {

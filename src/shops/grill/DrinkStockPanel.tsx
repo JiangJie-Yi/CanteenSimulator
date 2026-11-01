@@ -96,7 +96,7 @@ export function DrinkStockPanel({ lang }: { lang: Lang }) {
       <header className="drink-stock-head">
         <b>{tl(lang, '飲料庫存', 'ドリンク在庫', 'Drinks stock')}</b>
         <span className="drink-stock-cash">{tl(lang, '現金', '現金', 'Cash')} <b className="money">NT${Math.round(cash).toLocaleString()}</b></span>
-        <button type="button" className="drink-stock-close" onClick={() => setDrinkPanel(false)} aria-label="close">×</button>
+        <button type="button" className="panel-x" onClick={() => setDrinkPanel(false)} aria-label={tl(lang, '關閉', '閉じる', 'Close')}>×</button>
       </header>
       <div className="chiller-scroll">
         {FRIDGE_UNITS.map((unit, u) => (

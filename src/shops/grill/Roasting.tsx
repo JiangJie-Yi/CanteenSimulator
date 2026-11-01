@@ -914,8 +914,9 @@ function woodTex(file: string, w: number, h: number) {
 const COOK_TABLE_WOOD = woodTex('keyaki_top.jpg', 1.6, 1.6)
 /** its body: cedar boards standing in framed panels, a panel every 0.6 across, one the body's height */
 const COOK_PANEL_WOOD = woodTex('cedar_panel.jpg', 1, 1)
-/** below its top: honed near-black marble, smoky veining with fine pale threads and the odd gold one (blender/marbletex.py), a tile 1.2 across */
-const COOK_MARBLE = woodTex('marble_panel_dark.jpg', 1, 1)
+/** below its top: honed white marble with soft grey veining (blender/marbletex.py), a tile 1.2 across (the owner had it dark a while, and
+ * wanted it white again: marble_panel_dark.jpg is still made) */
+const COOK_MARBLE = woodTex('marble_panel.jpg', 1, 1)
 /** a box whose sides carry the panel texture at its true size: each side's u stretched to how wide it is (a panel every `tile` across), v
  * the whole height */
 function panelBox(w: number, h: number, d: number, tile = 0.6) {

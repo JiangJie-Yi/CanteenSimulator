@@ -8,8 +8,8 @@ export type Stock = Record<string, number>
 /** the money the business starts with */
 export const CAPITAL = 300000
 /** what it costs to open one shop */
-// (the first takes less than half the capital: what's left buys stock, and a little earned opens the second)
-export const SHOP_COST = 120000
+// (a third of the capital: the shop opens with NT$200,000 in hand, as the owner set it, to buy its stock with)
+export const SHOP_COST = 100000
 /** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
 export const CHARCOAL_COST = 18
 /** how much one load of charcoal raises the fire (0..1), and whether more can go on: at 100% the bed is full, so no more is added (nor paid for) */

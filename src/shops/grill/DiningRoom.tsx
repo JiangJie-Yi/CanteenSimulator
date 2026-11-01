@@ -1795,106 +1795,45 @@ function seeded(seed: number) {
   let n = seed
   return () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646 }
 }
-/** a point on a cubic curve */
-const onCurve = (t: number, a: number, b: number, c: number, d: number) => {
-  const m = 1 - t
-  return m * m * m * a + 3 * m * m * t * b + 3 * m * t * t * c + t * t * t * d
-}
 /**
- * A sea bream painted in sumi on a lantern's paper (its middle at cx, cy, `len` long, swimming toward -x, or +x if `dir` is -1): an ink wash
- * darkest along its back, a wash of vermilion over it, rows of scales, its gill, eye and mouth, a forked tail, the dorsal fin's spines; on a
- * lit lantern the ink a little fainter and warmer, the light through it
+ * A band of seigaiha (青海波) round a lantern's paper, from y0 down to y1: rows of fans of concentric arcs, each row half a fan along and a
+ * little lower than the one before, each fan over the ones behind it. Painted on a sheet of its own, each fan rubbing out what's behind it
+ * before its arcs are drawn, so between the lines the paper itself shows (its glow, its fibres); in indigo, a fine line along each edge of the
+ * band. On a lit lantern the ink is the light coming through it, a little warmer and fainter.
  */
-function sumiFish(g: CanvasRenderingContext2D, cx: number, cy: number, len: number, dir: number, lit: boolean) {
-  const L = len, ink = (a: number) => (lit ? `rgba(46,26,14,${a * 0.75})` : `rgba(28,26,26,${a})`)
-  const back: [number, number][] = [[-0.5, 0], [-0.42, -0.2], [-0.1, -0.25], [0.12, -0.15]]
-  g.save()
-  g.translate(cx, cy)
-  g.scale(dir, 1)
-  const body = new Path2D()
-  body.moveTo(-L * 0.5, 0)
-  body.bezierCurveTo(-L * 0.42, -L * 0.2, -L * 0.1, -L * 0.25, L * 0.12, -L * 0.15)
-  body.bezierCurveTo(L * 0.22, -L * 0.1, L * 0.28, -L * 0.05, L * 0.31, -L * 0.035)
-  body.lineTo(L * 0.31, L * 0.035)
-  body.bezierCurveTo(L * 0.22, L * 0.08, -L * 0.08, L * 0.16, -L * 0.38, L * 0.07)
-  body.quadraticCurveTo(-L * 0.47, L * 0.04, -L * 0.5, 0)
-  const wash = g.createLinearGradient(0, -L * 0.24, 0, L * 0.15)
-  wash.addColorStop(0, ink(0.8)); wash.addColorStop(0.5, ink(0.32)); wash.addColorStop(1, ink(0.08))
-  g.fillStyle = wash
-  g.fill(body)
-  g.save()
-  g.clip(body)
-  // (the vermilion over its back, fading toward the belly)
-  const red = g.createLinearGradient(0, -L * 0.26, 0, L * 0.06)
-  red.addColorStop(0, `rgba(205,52,30,${lit ? 0.6 : 0.5})`); red.addColorStop(1, 'rgba(205,52,30,0)')
-  g.fillStyle = red
-  g.fillRect(-L * 0.6, -L * 0.3, L * 1.2, L * 0.42)
-  // (its scales, rows of little arcs, offset row to row)
-  g.strokeStyle = ink(0.32)
-  g.lineWidth = 1
-  for (let r = 0; r < 4; r++) {
-    for (let k = 0; k < 9; k++) {
-      const x = -L * 0.2 + k * L * 0.054 + (r % 2) * L * 0.027, y = -L * 0.13 + r * L * 0.052
-      g.beginPath(); g.arc(x, y, L * 0.024, -Math.PI / 2, Math.PI / 2); g.stroke()
+function waveBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number, lit: boolean) {
+  const R = 19, RINGS = [1, 0.76, 0.52, 0.28]
+  const h = Math.ceil(y1 - y0)
+  const sheet = document.createElement('canvas')
+  sheet.width = W; sheet.height = h
+  const s = sheet.getContext('2d')
+  if (!s) return
+  const ink = lit ? 'rgba(52,58,88,0.5)' : 'rgba(34,58,96,0.72)'
+  s.lineWidth = 2.2
+  s.strokeStyle = ink
+  // (rows from the top down, each over the last; the fans just past either end too, so the band runs on round the lantern without a seam:
+  // its width is a whole number of fans)
+  const step = W / Math.round(W / (2 * R))
+  for (let row = 0, y = R * 0.55; y < h + R; row++, y += R * 0.55) {
+    for (let x = (row % 2 ? step / 2 : 0) - step; x < W + step; x += step) {
+      s.save()
+      s.globalCompositeOperation = 'destination-out'
+      s.beginPath(); s.arc(x, y, R, Math.PI, 0); s.closePath(); s.fill()
+      s.restore()
+      for (const k of RINGS) { s.beginPath(); s.arc(x, y, R * k - 1.1, Math.PI, 0); s.stroke() }
     }
   }
-  g.restore()
-  g.lineCap = 'round'
-  g.lineJoin = 'round'
-  // (the back in one firm stroke of the brush, the belly lighter)
-  g.strokeStyle = ink(0.9)
-  g.lineWidth = Math.max(1.6, L * 0.014)
-  g.beginPath()
-  g.moveTo(-L * 0.5, 0)
-  g.bezierCurveTo(-L * 0.42, -L * 0.2, -L * 0.1, -L * 0.25, L * 0.12, -L * 0.15)
-  g.bezierCurveTo(L * 0.22, -L * 0.1, L * 0.28, -L * 0.05, L * 0.31, -L * 0.035)
-  g.stroke()
-  g.strokeStyle = ink(0.5)
-  g.lineWidth = Math.max(1, L * 0.008)
-  g.beginPath()
-  g.moveTo(L * 0.31, L * 0.035)
-  g.bezierCurveTo(L * 0.22, L * 0.08, -L * 0.08, L * 0.16, -L * 0.38, L * 0.07)
-  g.quadraticCurveTo(-L * 0.47, L * 0.04, -L * 0.5, 0)
-  g.stroke()
-  // (the gill's sweep, the mouth, the eye)
-  g.strokeStyle = ink(0.8)
-  g.lineWidth = Math.max(1.2, L * 0.01)
-  g.beginPath(); g.arc(-L * 0.29, -L * 0.03, L * 0.12, -1.0, 1.05); g.stroke()
-  g.beginPath(); g.moveTo(-L * 0.5, 0); g.lineTo(-L * 0.44, L * 0.012); g.stroke()
-  g.fillStyle = ink(0.95)
-  g.beginPath(); g.arc(-L * 0.405, -L * 0.065, L * 0.021, 0, Math.PI * 2); g.fill()
-  g.fillStyle = lit ? 'rgba(255,240,210,0.9)' : 'rgba(245,240,230,0.95)'
-  g.beginPath(); g.arc(-L * 0.41, -L * 0.07, L * 0.007, 0, Math.PI * 2); g.fill()
-  // (the forked tail, its rays)
-  const tail = new Path2D()
-  tail.moveTo(L * 0.3, 0)
-  tail.quadraticCurveTo(L * 0.4, -L * 0.05, L * 0.52, -L * 0.17)
-  tail.quadraticCurveTo(L * 0.46, -L * 0.04, L * 0.48, 0)
-  tail.quadraticCurveTo(L * 0.46, L * 0.04, L * 0.52, L * 0.16)
-  tail.quadraticCurveTo(L * 0.4, L * 0.05, L * 0.3, 0)
-  g.fillStyle = ink(0.55)
-  g.fill(tail)
-  g.strokeStyle = ink(0.4)
-  g.lineWidth = 0.9
-  for (let k = -3; k <= 3; k++) { g.beginPath(); g.moveTo(L * 0.31, 0); g.lineTo(L * 0.47, k * L * 0.045); g.stroke() }
-  // (the dorsal fin: its spines up off the back)
-  g.strokeStyle = ink(0.75)
-  g.lineWidth = Math.max(1, L * 0.007)
-  for (let k = 0; k < 10; k++) {
-    const t = 0.42 + k * 0.055
-    const x = onCurve(t, back[0][0], back[1][0], back[2][0], back[3][0]) * L, y = onCurve(t, back[0][1], back[1][1], back[2][1], back[3][1]) * L
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x + L * 0.02, y - L * (0.07 - k * 0.003)); g.stroke()
-  }
-  // (a pectoral fin, a small fan behind the gill)
-  g.fillStyle = ink(0.35)
-  g.beginPath(); g.moveTo(-L * 0.22, L * 0.03); g.quadraticCurveTo(-L * 0.12, L * 0.02, -L * 0.08, L * 0.09); g.quadraticCurveTo(-L * 0.15, L * 0.08, -L * 0.22, L * 0.03); g.fill()
-  g.restore()
+  g.drawImage(sheet, 0, y0)
+  // (a fine line along either edge)
+  g.fillStyle = ink
+  g.fillRect(0, y0 - 4, W, 2)
+  g.fillRect(0, y1 + 2, W, 2)
 }
 /**
  * A lantern's paper (u round it, v up it: 1024 x 300, about as many pixels to the inch round its belly as up it, so what's painted on it
  * keeps its shape there). `lit`: glowing from within, warm, brightest in the middle of its belly; unlit, plain washi, a little cream (only
- * a little). Its bamboo ribs and the seams between its panels, the paper's fibres here and there, and two sea bream painted in sumi
- * swimming round it, one each way.
+ * a little). Its bamboo ribs and the seams between its panels, the paper's fibres here and there, and a band of seigaiha waves round its
+ * lower belly (the owner's: it had two sea bream painted on it, which looked odd).
  */
 function lanternPaper(g: CanvasRenderingContext2D, lit: boolean) {
   const W = 1024, H = 300
@@ -1931,9 +1870,8 @@ function lanternPaper(g: CanvasRenderingContext2D, lit: boolean) {
   // (the seams between its panels)
   g.fillStyle = lit ? 'rgba(200,140,80,0.16)' : 'rgba(120,110,95,0.14)'
   for (let x = 0; x < W; x += 128) g.fillRect(x, 0, 1.6, H)
-  // (the two fish, round its belly, swimming opposite ways)
-  sumiFish(g, W * 0.27, H * 0.52, 210, 1, lit)
-  sumiFish(g, W * 0.77, H * 0.5, 190, -1, lit)
+  // (the waves, round its lower belly)
+  waveBand(g, W, H * 0.6, H * 0.8, lit)
 }
 const LANTERN_SKIN = signTexture(1024, 300, (g) => lanternPaper(g, true))
 const PENDANT_GLOW = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffcf90' }), 0.35, 0.75)
@@ -1941,7 +1879,7 @@ const PENDANT_BLOOM = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparen
 // (pulled toward the camera in depth so it never fights the bar's top under it, seen from far off)
 const PENDANT_POOL = nightGlow(new THREE.MeshBasicMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
   polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), 0.18, 0.42)
-/** and the same paper with no light in it: plain washi, a little cream, its fibres and its fish */
+/** and the same paper with no light in it: plain washi, a little cream, its fibres and its waves */
 const LANTERN_SKIN_OFF = signTexture(1024, 300, (g) => lanternPaper(g, false))
 const LANTERN_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: LANTERN_SKIN, toneMapped: false, side: THREE.DoubleSide }), { offMap: LANTERN_SKIN_OFF })
 function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
@@ -3733,44 +3671,80 @@ function useDocLang() {
   return lang
 }
 /** the exit sign's face, as Taiwan's edge-lit ones: green, lit; EXIT spaced out on the left, in the middle a white doorway with the running
- * figure leaving by it, on the right the words in the language on screen */
+ * figure leaving by it, on the right the words in the language on screen. The three laid out evenly: each measured, the same margin at either
+ * end and the same gap between them, each centred on the pane's middle by its own letters' height (the words were set low, and crowded
+ * against the doorway's step while EXIT stood far off); words too long for their room set smaller */
 const exitFace = (lang: string) => {
   const words = lang === 'ja' ? '非常口' : lang === 'en' ? 'WAY OUT' : '緊急出口'
   return canvasTex(1024, 378, (g) => {
-    const grad = g.createLinearGradient(0, 0, 0, 378)
-    grad.addColorStop(0, '#22b25f'); grad.addColorStop(1, '#13914a')
-    g.fillStyle = grad; g.fillRect(0, 0, 1024, 378)
-    // (the light from the pane's top edge, a little brighter there)
-    const edge = g.createLinearGradient(0, 0, 0, 60)
-    edge.addColorStop(0, 'rgba(255,255,255,0.22)'); edge.addColorStop(1, 'rgba(255,255,255,0)')
-    g.fillStyle = edge; g.fillRect(0, 0, 1024, 60)
+    const W = 1024, H = 378, MID = H / 2
+    // (the ground: a bright green, a little brighter toward the top edge where the light comes in)
+    const grad = g.createLinearGradient(0, 0, 0, H)
+    grad.addColorStop(0, '#36dc7c'); grad.addColorStop(1, '#1cb75f')
+    g.fillStyle = grad; g.fillRect(0, 0, W, H)
+    const edge = g.createLinearGradient(0, 0, 0, 70)
+    edge.addColorStop(0, 'rgba(255,255,255,0.32)'); edge.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = edge; g.fillRect(0, 0, W, 70)
     g.fillStyle = '#ffffff'; g.strokeStyle = '#ffffff'; g.lineCap = 'round'; g.lineJoin = 'round'
-    g.textBaseline = 'middle'
-    // (EXIT, wide and spaced)
-    g.font = '600 92px "Arial", "Helvetica", sans-serif'
-    g.textAlign = 'center'
-    'EXIT'.split('').forEach((ch, k) => g.fillText(ch, 70 + k * 62, 214))
-    // (the doorway: a white frame, open, the green showing through it)
-    g.fillRect(452, 70, 150, 236)
-    g.fillStyle = '#16a052'; g.fillRect(470, 88, 114, 218)
-    // (the figure, white, running out through it to the right: head, a leaning trunk, its arms and legs in long strides)
+    g.textBaseline = 'alphabetic'; g.textAlign = 'left'
+    // (the parts measured: EXIT's letters with a space between each, the doorway with its step, the words)
+    const EXIT_FONT = '600 92px "Arial", "Helvetica", sans-serif', TRACK = 22
+    g.font = EXIT_FONT
+    const letters = 'EXIT'.split('').map((ch) => ({ ch, w: g.measureText(ch).width }))
+    const wExit = letters.reduce((a, l) => a + l.w, 0) + TRACK * (letters.length - 1)
+    const exitM = g.measureText('EXIT')
+    const DOOR = 150, STEP = 60, wDoor = DOOR + STEP
+    const MARGIN = 64, MIN_GAP = 56
+    let size = lang === 'en' ? 76 : 96
+    const wordFont = (px: number) => (lang === 'en' ? `700 ${px}px "Arial", "Helvetica", sans-serif` : `700 ${px}px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif`)
+    g.font = wordFont(size)
+    let wWords = g.measureText(words).width
+    const room = W - 2 * MARGIN - wExit - wDoor - 2 * MIN_GAP
+    if (wWords > room) { size = Math.floor((size * room) / wWords); g.font = wordFont(size); wWords = g.measureText(words).width }
+    const gap = (W - 2 * MARGIN - wExit - wDoor - wWords) / 2
+    // (each line of letters set so the middle of its own glyphs is the pane's middle)
+    const centred = (m: TextMetrics) => MID + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2
+    g.font = EXIT_FONT
+    let x = MARGIN
+    const yExit = centred(exitM)
+    for (const l of letters) { g.fillText(l.ch, x, yExit); x += l.w + TRACK }
+    // (the doorway: a white frame, open, the green showing through it, the figure running out through it to the right, the step beyond)
+    const x0 = MARGIN + wExit + gap, top = MID - 118, foot = MID + 118
+    g.fillRect(x0, top, DOOR, foot - top)
+    g.fillStyle = grad; g.fillRect(x0 + 18, top + 18, DOOR - 36, foot - top - 18)
     g.fillStyle = '#ffffff'
-    g.beginPath(); g.arc(548, 112, 21, 0, Math.PI * 2); g.fill()
+    const fx = (dx: number) => x0 + dx, fy = (dy: number) => top + dy
+    g.beginPath(); g.arc(fx(96), fy(42), 21, 0, Math.PI * 2); g.fill()
     g.lineWidth = 30
-    g.beginPath(); g.moveTo(532, 146); g.lineTo(512, 206); g.stroke()
+    g.beginPath(); g.moveTo(fx(80), fy(76)); g.lineTo(fx(60), fy(136)); g.stroke()
     g.lineWidth = 20
-    g.beginPath(); g.moveTo(530, 152); g.lineTo(566, 176); g.lineTo(600, 162); g.stroke()
-    g.beginPath(); g.moveTo(530, 152); g.lineTo(500, 160); g.lineTo(482, 190); g.stroke()
-    g.beginPath(); g.moveTo(512, 206); g.lineTo(546, 238); g.lineTo(540, 282); g.stroke()
-    g.beginPath(); g.moveTo(512, 206); g.lineTo(484, 238); g.lineTo(450, 244); g.stroke()
-    // (and the step out over the threshold: a white bar along the doorway's foot to the right, the way out)
-    g.fillRect(452, 296, 210, 12)
+    g.beginPath(); g.moveTo(fx(78), fy(82)); g.lineTo(fx(114), fy(106)); g.lineTo(fx(148), fy(92)); g.stroke()
+    g.beginPath(); g.moveTo(fx(78), fy(82)); g.lineTo(fx(48), fy(90)); g.lineTo(fx(30), fy(120)); g.stroke()
+    g.beginPath(); g.moveTo(fx(60), fy(136)); g.lineTo(fx(94), fy(168)); g.lineTo(fx(88), fy(212)); g.stroke()
+    g.beginPath(); g.moveTo(fx(60), fy(136)); g.lineTo(fx(32), fy(168)); g.lineTo(fx(-2), fy(174)); g.stroke()
+    g.fillRect(x0, foot - 10, wDoor, 12)
     // (the words)
-    g.textAlign = 'center'
-    g.font = lang === 'en' ? '700 76px "Arial", "Helvetica", sans-serif' : '700 96px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif'
-    g.fillText(words, 830, 214, 330)
+    g.font = wordFont(size)
+    g.fillText(words, x0 + wDoor + gap, centred(g.measureText(words)))
   })
 }
+/** a soft glow the shape of a lit panel: a rectangle (iw x ih) on a w x h sheet, blurred `blur` px all round (the blur of a shadow cast from
+ * off the sheet: canvas filters aren't in every browser) */
+function softRect(w: number, h: number, iw: number, ih: number, blur: number) {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = w; c.height = h
+  const g = c.getContext('2d')!
+  g.shadowColor = '#ffffff'; g.shadowBlur = blur; g.shadowOffsetX = w * 2
+  g.fillStyle = '#ffffff'
+  g.fillRect((w - iw) / 2 - w * 2, (h - ih) / 2, iw, ih)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+/** the exit sign's light round its pane (0.42 x 0.156 in its frame, on a sheet 0.62 x 0.35), and the wider light it throws on the wall behind */
+const EXIT_HALO = softRect(320, 180, 216, 80, 26)
+const EXIT_SPILL = softRect(256, 160, 110, 50, 40)
 /**
  * The emergency exit sign on the wall by the way out (blender/exitsign.py): an aluminium housing along the top, an acrylic pane hanging from
  * it lit from its edge, its face (both sides) lit whatever the room's lights, the words in the language on screen
@@ -3791,7 +3765,7 @@ function ExitSign() {
     const root = gltf.scene.clone(true)
     const alu = new THREE.MeshStandardMaterial({ color: '#c9cdd2', metalness: 1, roughness: 0.34 })
     reflectStudio(alu)
-    const edge = new THREE.MeshBasicMaterial({ color: '#b8f5cf', toneMapped: false, transparent: true, opacity: 0.8 })
+    const edge = new THREE.MeshBasicMaterial({ color: '#dcffe9', toneMapped: false, transparent: true, opacity: 0.95 })
     root.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
@@ -3804,10 +3778,16 @@ function ExitSign() {
   return (
     <group>
       <primitive object={model} />
-      {/* (its glow on the wall round it, faint) */}
-      <sprite scale={[0.66, 0.32, 1]} position={[0, 0, -0.01]}>
-        <spriteMaterial map={GLOW} color="#36d17a" transparent opacity={0.2} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </sprite>
+      {/* (its light: a green edge all round the pane, from a glow its own shape just behind it, and the light it throws on the wave frieze
+          behind (its face 0.038 in front of it), wider and fainter; it was a round glow, orange-tinted, its bright middle hidden by the pane) */}
+      <mesh position={[0, 0, -0.012]}>
+        <planeGeometry args={[0.62, 0.35]} />
+        <meshBasicMaterial map={EXIT_HALO} color="#6dffad" transparent opacity={0.9} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
+      <mesh position={[0, -0.02, -0.036]}>
+        <planeGeometry args={[1.2, 0.75]} />
+        <meshBasicMaterial map={EXIT_SPILL} color="#3ee58a" transparent opacity={0.45} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
     </group>
   )
 }

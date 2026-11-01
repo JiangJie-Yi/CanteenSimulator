@@ -1267,6 +1267,15 @@ export default function App() {
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [office, boardsOpen, toolsOpen, fridgeOpen, viewMenu, editOn])
+  // (the panels docked at the right (the office, the pantry, the drinks' stock) fold away at a click on the 3D view that lands on nothing that
+  // can be clicked (a wall, the floor): not at a drag that turns the view, nor at a click on something that does something there (the
+  // grill's food and tools while cooking, the freezer, the speaker), which goes on as it did)
+  useEffect(() => {
+    if (!office && !fridgeOpen && !drinksOpen) return
+    const blank = () => { setOffice(null); setFridgeOpen(false); setDrinkPanel(false) }
+    window.addEventListener('scene-blank-click', blank)
+    return () => window.removeEventListener('scene-blank-click', blank)
+  }, [office, fridgeOpen, drinksOpen])
   // (the views' menu folds away at a click anywhere else: not at its own button, its list or the numbered pins it puts in the scene,
   // nor at the end of a drag that turned the view)
   useEffect(() => {
@@ -2134,6 +2143,7 @@ export default function App() {
           // (a screen at its plain resolution (devicePixelRatio 1, as most desktops) is drawn a little finer than it shows, then scaled down:
           // with the antialiasing that keeps edges from stepping; the frame pacer drops it to 1 if the frames can't keep up)
           dpr={typeof window === 'undefined' ? 1 : Math.min(QUALITY.dpr, Math.max(window.devicePixelRatio || 1, phone ? 1 : 1.5))}
+          onPointerMissed={() => window.dispatchEvent(new Event('scene-blank-click'))}
           onCreated={({ gl, camera, scene, get }) => {
             // (in development, the renderer's counts are to hand for checking how heavy a view is; and the canvas's state (its frame
             // callbacks), for timing them)
@@ -2414,7 +2424,7 @@ export default function App() {
       <Menu key={dish.id + (hand ? '' : '-menu')} dish={hand ? researchDish(dish) : menuDish(dish)} research={hand} open={ai}
         layoutLike={!hand ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })} days={days}
-        onBuy={!hand ? undefined : (id, n) => buyIn(dish, id, n)} onRestock={!hand ? undefined : (how) => restock(dish, how)}
+        onBuy={!hand ? undefined : (id, n) => buyIn(dish, id, n)} onRestock={!hand ? undefined : (how) => restock(dish, how)} onClose={hand ? () => setFridgeOpen(false) : undefined}
         restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
          lang={lang} quantities={hand ? orders[dish.id] : entryCount}
         feed={feed} locked={!hand} stock={hand ? stock : entryStock(dish)} fresh={fresh}

@@ -44,7 +44,7 @@ if (process.env.OPEN) {
   await p.locator('.nb-views button').nth(0).click()
   const publish = p.locator('.nb-embedded .nb-publish button:not(.nb-off)')
   for (let guard = 0; guard < 60 && (await publish.count()); guard++) { await publish.first().click(); await p.waitForTimeout(50) }
-  await p.locator('.ofc-close').click()
+  await p.locator('.office .panel-x').click()
   await p.locator('.ai-toggle').click()
   await p.waitForTimeout(+process.env.OPEN)
   await p.locator('.view-reset').click()

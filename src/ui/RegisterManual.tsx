@@ -70,7 +70,7 @@ export function RegisterManual({ lang }: { lang: Lang }) {
       <div className="reg-manual" role="dialog" aria-label={tl(lang, '收銀機操作說明書', 'レジスター取扱説明書', 'Register manual')} onClick={(e) => e.stopPropagation()}>
         <header>
           <span>{tl(lang, '收銀機操作說明書', 'レジスター 取扱説明書', 'Register manual')}</span>
-          <button type="button" onClick={() => set(false)} aria-label={tl(lang, '關閉', '閉じる', 'Close')}>×</button>
+          <button type="button" className="panel-x" onClick={() => set(false)} aria-label={tl(lang, '關閉', '閉じる', 'Close')}>×</button>
         </header>
         <h3>{p.title[lang] ?? p.title.zh}</h3>
         <dl>

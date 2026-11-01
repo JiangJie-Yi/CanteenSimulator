@@ -2,9 +2,15 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { DISHES } from '@/data/menu'
 import { suggestPrice, MENU_MAX, MENU_MIN } from '@/data/recipes'
-import { buyAllCost, costOf, goodsOf, supplierDiscount } from '@/game/economy'
+import { buyAllCost, CAPITAL, costOf, goodsOf, SHOP_COST, supplierDiscount } from '@/game/economy'
 
 feature('成本與定價', () => {
+  scenario('開店後老闆手上有 NT$200,000', ({ given, when, then }) => {
+    given('一開始的資本', (w) => { w.cash = CAPITAL })
+    when('付掉開業費用', (w) => { w.cash -= SHOP_COST })
+    then('剩下二十萬', (w) => { expect(w.cash).toBe(200000) })
+  })
+
   scenario('建議售價永遠比成本高，而且是 5 元的倍數', ({ when, then }) => {
     when('對各種成本求建議售價', (w) => { w.rows = [1, 7, 33, 80, 150, 400].map((c) => [c, suggestPrice(c)]) })
     then('售價大於成本、是 5 的倍數、至少 10 元', (w) => {

@@ -54,7 +54,8 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
   // (English for what has it; the rest falls back to the Chinese)
   const EN: Record<string, string> = { 一鍵徵人: 'Hire all', 人事: 'Staff', '大廚（你）': 'Head chef (you)', 女: 'F', 廚房: 'Kitchen', 手藝: 'Skill', 歲: 'yrs',
     每個空缺各雇一位最划算的人: 'Fill every opening with the best-value hire', '營業中不能解雇，請先閉店': 'Can’t dismiss while open: close first', 現金: 'Cash',
-    男: 'M', 精神: 'Spirit', 經營: 'Office', 帳簿: 'Ledger', 老闆: 'Owner', 解雇: 'Dismiss', 速度: 'Speed', 重新開始遊戲: 'Start over', 雇用: 'Hire', 體力: 'Stamina', 點我徵人: 'Hiring' }
+    男: 'M', 精神: 'Spirit', 經營: 'Office', 帳簿: 'Ledger', 老闆: 'Owner', 解雇: 'Dismiss', 速度: 'Speed', 重新開始遊戲: 'Start over', 雇用: 'Hire', 體力: 'Stamina', 點我徵人: 'Hiring',
+    關閉: 'Close' }
   const t = (zh: string, jp: string) => (ja ? jp : lang === 'en' ? EN[zh] ?? zh : zh)
   const drag = useDrag('office')
   const wages = people.filter((w) => hired[w.id]).reduce((s, w) => s + w.wage, 0)
@@ -70,11 +71,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
           <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{t('人事', '人事')}</button>
           <button type="button" role="tab" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('廚房', '厨房')}</button>
         </div>
-        {/* every open job filled at once, by who's the best value for their pay */}
-        <button type="button" className="ofc-reset ofc-autohire" disabled={!pickHires(people, roles, hired).length}
-          onClick={() => { onTab('staff'); for (const w of pickHires(people, roles, hired)) onHire(w) }}
-          title={t('每個空缺各雇一位最划算的人', '空いている枠に一番お得な人を雇う')}>{t('一鍵徵人', 'おまかせ採用')}</button>
-        <button type="button" className="ofc-close" onClick={onClose} aria-label="close">×</button>
+        <button type="button" className="panel-x" onClick={onClose} aria-label={t('關閉', '閉じる')}>×</button>
       </header>
       {tab === 'book' ? book : tab === 'ledger' ? <div className="ofc-ledger ledger">{ledger}</div> : (
         <div className="ofc-staff">
@@ -107,7 +104,13 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
               })
             })}
           </div>
-          <p className="ofc-wages">{t(`人事成本 ${money(wages)}/小時（營業時才計薪）`, `人件費 ${money(wages)}/時（営業中のみ）`)}</p>
+          <div className="ofc-wages">
+            <span>{t(`人事成本 ${money(wages)}/小時（營業時才計薪）`, `人件費 ${money(wages)}/時（営業中のみ）`)}</span>
+            {/* every open job filled at once, by who's the best value for their pay */}
+            <button type="button" className="ofc-hireall" disabled={!pickHires(people, roles, hired).length}
+              onClick={() => { for (const w of pickHires(people, roles, hired)) onHire(w) }}
+              title={t('每個空缺各雇一位最划算的人', '空いている枠に一番お得な人を雇う')}>{t('一鍵徵人', 'おまかせ採用')}</button>
+          </div>
           {roles.map((r) => {
             const mine = people.filter((w) => w.role === r.role && hired[w.id])
             const open = people.filter((w) => w.role === r.role && !hired[w.id])

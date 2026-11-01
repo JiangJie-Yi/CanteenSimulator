@@ -46,7 +46,7 @@ await page.waitForTimeout(900)
 await page.locator('.nb-views button').nth(0).click()
 const publish = page.locator('.nb-embedded .nb-publish button:not(.nb-off)')
 for (let guard = 0; guard < 60 && (await publish.count()); guard++) { await publish.first().click(); await page.waitForTimeout(50) }
-await page.locator('.ofc-close').click()
+await page.locator('.office .panel-x').click()
 await page.locator('.ai-toggle').click()
 // (thirstier and readier for the toilet than usual, so the side trips are walked while we watch)
 await page.evaluate(() => { window.__drinkRate = 0.08 })
