@@ -2654,7 +2654,7 @@ const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsO
       {seats.map((st, n) => (
         <Movable key={`${seats.length}-${n}`} id={`stool${n}`} label={`座位 ${n + 1}`}>
           <StaticBatch>
-            <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><StoolModel /></group>
+            <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><StoolModel red={n % 2 === 1} /></group>
           </StaticBatch>
         </Movable>
       ))}

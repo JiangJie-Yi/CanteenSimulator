@@ -44,48 +44,95 @@ def lin(hexs):
 # =====================================================================
 # The oak: two boards side by side, their grain running along v
 # =====================================================================
-def oak(N=512, straight=False):
-    """`straight`: quarter-sawn, as the legs and the ring are turned from, the late wood in long lines down it; else flat-sawn, as the
-    seat's boards, the late wood in soft arches"""
-    seed(31)
+def oak(N=1024, straight=False):
+    """oak as boards really are (the owner: more natural, irregular): growth rings of uneven widths, wandering where the tree grew as it
+    would, each ring's late wood a darker band of its own width; the colour drifting along each board; open pores in streaks; oak's
+    silvery rays across the grain; on the seat's boards a small pin knot, the rings bending round it. `straight`: quarter-sawn, as the legs
+    and the ring are turned from (the rings in long wandering lines down it, the rays' flecks plainer); else flat-sawn (soft arches,
+    cathedrals). Every frequency a whole number of times round the picture, so it repeats without a seam"""
+    seed(31 if straight else 47)
     u, v = grid01(N)
     boards = 2
     bk = np.clip(np.floor(u * boards), 0, boards - 1)
     bu = u * boards - bk                                    # (0..1 across each board)
-    tones = np.array([(0.80, 0.61, 0.41), (0.76, 0.565, 0.37)], np.float32)
+    tones = np.array([(0.78, 0.59, 0.39), (0.72, 0.535, 0.345)], np.float32)
     base = tones[bk.astype(int)]
-    wob = fbm(N, 3, 2, 4) - 0.5
-    # (the late wood: rings of the log cut through at a slant, nested arches along the board whose crowns wander; periodic in v so the
-    # picture repeats down a leg without a seam)
-    centre = 0.5 + 0.1 * np.sin(2 * math.pi * (v + bk * 0.37)) + wob * 0.08
+    w1 = fbm(N, 3, 2, 5) - 0.5                              # (the wood's own slow wandering)
+    w2 = (fbm(N, 9, 4, 4) - 0.5) * 0.55                     # (and its smaller waver)
     if straight:
-        ring = bu * 7.0 + 0.12 * np.sin(2 * math.pi * (v + bk * 0.3)) + wob * 0.35
+        ring = bu * 8.0 + w1 * 1.6 + w2 * 0.45 + 0.2 * np.sin(2 * math.pi * (v + bk * 0.3))
     else:
-        ring = ((bu - centre) * 2.0) ** 2 * 3.2 + 0.18 * np.sin(2 * math.pi * (v + bk * 0.21)) + wob * 0.3
-    late = smooth(0.62, 0.97, np.sin(2 * math.pi * ring * 2.6))
-    col = mix(base, base * np.float32(0.7), late * 0.6)
-    # (fine straight lines between the arches, where the grain runs nearly along)
-    fine = np.sin(2 * math.pi * (bu * 34 + wob * 5 + fbm(N, 6, 2, 3) * 1.2))
-    col = mix(col, base * np.float32(0.8), smooth(0.78, 1.0, fine) * 0.32)
-    # (open pores in short streaks along the grain, and a soft silvery fleck across it)
-    pores = smooth(0.8, 0.93, vnoise(N, 90, 9)) * smooth(0.35, 0.8, vnoise(N, 20, 6))
-    col = mix(col, col * np.float32(0.6), pores * 0.55)
-    fleck = smooth(0.84, 0.96, vnoise(N, 12, 70)) * smooth(0.5, 0.9, fbm(N, 6, 6, 3))
-    col = mix(col, col * np.float32(1.1), fleck * 0.3)
-    # (long soft streaks of lighter and darker along each board, and the glue line between them a hairline)
-    col = col * (0.92 + 0.16 * fbm(N, 8, 2, 3))[..., None]
+        centre = 0.5 + 0.13 * np.sin(2 * math.pi * (v + bk * 0.37)) + w1 * 0.16
+        d = np.abs(bu - centre) * 2.0
+        # (the cathedral: the rings' crowns rising and falling along the board)
+        ring = (d ** 1.5) * 6.5 + 1.7 * np.sin(2 * math.pi * v + bk * 2.1) * (0.75 + w1) + w2 * 0.9
+        # (a pin knot on each board, the rings bent round it)
+        for b, (ku, kv) in enumerate([(0.32, 0.44), (0.66, 0.62)]):
+            kx = (bu - ku) * 1.0
+            ky = (v - kv) * 2.2
+            r2 = kx * kx + ky * ky
+            on = (bk == b)
+            ring = ring + np.where(on, 1.6 * np.exp(-r2 / 0.003), 0.0)
+            knot = np.where(on, smooth(0.0009, 0.0002, r2), 0.0)
+            base = mix(base, np.float32(0.42) * base, knot * 0.8)
+    # (each ring its own width: the ring count drawn through a slow uneven step)
+    f = np.mod(ring + 0.32 * np.sin(ring * 1.9 + 1.3) + 0.16 * np.sin(ring * 0.7), 1.0)
+    late = smooth(0.74, 0.88, f) * (1 - smooth(0.96, 1.0, f))
+    col = mix(base, base * np.float32(0.76), late * (0.5 + 0.3 * fbm(N, 6, 3, 3)))
+    # (the finest grain: hairlines between the rings, broken)
+    fine = np.sin(2 * math.pi * (ring * 6.0 + w2 * 2.0))
+    col = mix(col, base * np.float32(0.82), smooth(0.86, 1.0, fine) * 0.22 * smooth(0.3, 0.7, fbm(N, 12, 6, 3)))
+    # (open pores in short streaks along the grain)
+    pores = smooth(0.82, 0.94, vnoise(N, 110, 9)) * smooth(0.4, 0.8, vnoise(N, 24, 6))
+    col = mix(col, col * np.float32(0.58), pores * 0.5)
+    # (oak's rays, the silver flake: short pale lenses across the grain, plainer on the quarter-sawn)
+    rays = smooth(0.86 if straight else 0.9, 0.97, vnoise(N, 14 if straight else 22, 64)) * smooth(0.45, 0.85, fbm(N, 7, 7, 3))
+    col = mix(col, col * np.float32(1.16), rays * (0.45 if straight else 0.25))
+    # (the colour drifting along each board: warmer, cooler, a darker streak here and there)
+    drift = fbm(N, 2, 3, 3)
+    col = col * (0.9 + 0.18 * drift)[..., None]
+    col = mix(col, col * np.float32(0.86) * np.array([1.04, 0.98, 0.92], np.float32), smooth(0.62, 0.8, fbm(N, 3, 8, 3)) * 0.4)
+    # (and the glue line between the boards a hairline)
     edge = np.minimum(bu, 1 - bu)
-    col = mix(col, (0.36, 0.22, 0.12), smooth(0.006, 0.0, edge) * 0.7)
-    return col
+    col = mix(col, (0.36, 0.22, 0.12), smooth(0.004, 0.0, edge) * 0.7)
+    return np.clip(col, 0, 1)
 
 
-def cloth():
-    """the cushion's cover: indigo, a fine plain weave, a little uneven"""
-    seed(5)
-    N = 256
+def cloth(kind="blue", N=512):
+    """the cushion's cover: a fine plain weave, a little uneven, a pattern pressed into it (押し模様), tone on tone, after the owner's
+    reference patterns: the blue with waves (青海波: rows of nested arcs, each lower row in front), the red with interlocking circles (七宝);
+    lit from above, the pressed lines catch the light along their tops and shade along their feet"""
+    seed(5 if kind == "blue" else 9)
     u, v = grid01(N)
-    weave = ((np.sin(u * math.pi * 2 * 90) * np.sin(v * math.pi * 2 * 90)) > 0).astype(np.float32)
-    return mix((0.1, 0.16, 0.32), (0.15, 0.22, 0.41), weave * 0.45 + fbm(N, 30, 30, 2) * 0.35)
+    weave = ((np.sin(u * math.pi * 2 * 150) * np.sin(v * math.pi * 2 * 150)) > 0).astype(np.float32)
+    dark, light = ((0.09, 0.15, 0.31), (0.14, 0.21, 0.4)) if kind == "blue" else ((0.36, 0.04, 0.07), (0.5, 0.07, 0.11))
+    col = mix(dark, light, weave * 0.42 + fbm(N, 30, 30, 2) * 0.33)
+    h = np.zeros_like(u)
+    if kind == "blue":
+        R, rows = 0.075, 16
+        for j in range(rows, -2, -1):
+            cy = j * R * 0.62
+            for i in range(-1, int(1 / (2 * R)) + 3):
+                cx = i * 2 * R + (j % 2) * R
+                d = np.hypot(u - cx, v - cy)
+                inside = (d < R) & (v >= cy)
+                lines = np.zeros_like(u)
+                for k in (1.0, 0.72, 0.46, 0.22):
+                    lines = np.maximum(lines, smooth(0.008, 0.002, np.abs(d - R * k)))
+                h = np.where(inside, lines, h)
+    else:
+        r = 0.07
+        lines = np.zeros_like(u)
+        for i in range(-1, int(1 / r) + 2):
+            for j in range(-1, int(1 / r) + 2):
+                d = np.hypot(u - i * r, v - j * r)
+                lines = np.maximum(lines, smooth(0.007, 0.0018, np.abs(d - r * 0.7071)))
+        h = lines
+    # (pressed: the raised lines a shade lighter, a highlight along their tops and a shadow along their feet)
+    up = np.roll(h, 1, axis=0)
+    down = np.roll(h, -1, axis=0)
+    col = col * (1 + 0.1 * h + 0.22 * (h - up) - 0.14 * (h - down))[..., None]
+    return np.clip(col, 0, 1)
 
 
 # =====================================================================
@@ -223,18 +270,16 @@ def stool(name, M, seat_top=0.29, R=0.128, rings_at=(0.1,), splay=0.05):
         cp.append((cr * t, top + max(0.004, h)))
     cp.append((cr + 0.004, top + 0.006))
     cp.append((cr, top))
-    cush = lathe(f"{name}Cushion", list(reversed(cp)), 24, "flat")
-    fin(cush, M["cloth"], parts)
-    bpy.ops.mesh.primitive_torus_add(major_radius=cr + 0.001, minor_radius=0.0045, major_segments=24, minor_segments=6, location=P(0, top + 0.009, 0))
-    p = bpy.context.view_layer.objects.active
-    p.name = f"{name}Piping"
-    fin(p, M["pipe"], parts)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=10, ring_count=6, location=P(0, top + 0.033, 0))
-    b = bpy.context.view_layer.objects.active
-    b.name = f"{name}Button"
-    b.scale = (1, 1, 0.5)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    fin(b, M["pipe"], parts)
+    # (two cushions, blue and red (the owner's): the game keeps one on each stool; no piping round the rim, its button covered in the cloth)
+    for tag, mat in (("", "cloth"), ("Red", "clothRed")):
+        cush = lathe(f"{name}Cushion{tag}", list(reversed(cp)), 24, "flat")
+        fin(cush, M[mat], parts)
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=10, ring_count=6, location=P(0, top + 0.033, 0))
+        b = bpy.context.view_layer.objects.active
+        b.name = f"{name}Button{tag}"
+        b.scale = (1, 1, 0.5)
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        fin(b, M["button" if not tag else "buttonRed"], parts)
     # (the legs: stout, splayed, tapering a little to a rounded foot)
     r_top, r_foot = R * 0.58, R * 0.58 + splay
     legs = []
@@ -258,8 +303,10 @@ def stool(name, M, seat_top=0.29, R=0.128, rings_at=(0.1,), splay=0.05):
 def materials():
     return {"oak": pbr("StoolOak", (1, 1, 1), tex=image("stooloak", oak()), rough=0.5, coat=0.25),
             "oakl": pbr("StoolOakLeg", (1, 1, 1), tex=image("stooloakleg", oak(straight=True)), rough=0.5, coat=0.25),
-            "cloth": pbr("StoolCloth", (1, 1, 1), tex=image("stoolcloth", cloth()), rough=0.9),
-            "pipe": pbr("StoolPiping", lin("#d8c8a0"), rough=0.8)}
+            "cloth": pbr("StoolCloth", (1, 1, 1), tex=image("stoolcloth", cloth("blue")), rough=0.9),
+            "clothRed": pbr("StoolClothRed", (1, 1, 1), tex=image("stoolclothred", cloth("red")), rough=0.9),
+            "button": pbr("StoolButton", lin("#1c2a4e"), rough=0.8),
+            "buttonRed": pbr("StoolButtonRed", lin("#6a1018"), rough=0.8)}
 
 
 def preview_rig(at_y, dist):

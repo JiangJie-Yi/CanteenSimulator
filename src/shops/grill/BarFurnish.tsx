@@ -48,9 +48,17 @@ function toonOf(url: string, scene: THREE.Group) {
   return root.clone(true)
 }
 
-export function StoolModel() {
+/** a customer's stool, its cushion blue or (`red`) red (the owner's: the places' cushions in the two, by turns) */
+export function StoolModel({ red = false }: { red?: boolean }) {
   const gltf = useGLTF(STOOL_URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => toonOf(STOOL_URL, gltf.scene), [gltf])
+  const obj = useMemo(() => {
+    const r = toonOf(STOOL_URL, gltf.scene)
+    // (the other colour's cushion and button taken off, before the stool's batched)
+    const drop: THREE.Object3D[] = []
+    r.traverse((o) => { if (/^Stool(Cushion|Button)/.test(o.name) && /Red$/.test(o.name) !== red) drop.push(o) })
+    for (const o of drop) o.parent?.remove(o)
+    return r
+  }, [gltf, red])
   return <primitive object={obj} />
 }
 /** one of the till's two seats (blender/tillstools.py): the cashier's walnut chair with its kumiko back (`High`), a helper's stool of the same
