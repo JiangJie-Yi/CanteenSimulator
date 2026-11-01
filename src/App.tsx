@@ -55,6 +55,7 @@ import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
 import { effective, restPerMin, ROLES, tirePerMin, type Role } from '@/data/staff'
 import { CANDIDATES, pickHires } from '@/game/hiring'
+import { keptForResume, resumeFrom } from '@/game/resume'
 import { Office, type OfficeTab } from '@/ui/Office'
 import { Welcome } from '@/ui/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
@@ -71,19 +72,34 @@ const SPACING = 6
 /** most items that fit around the charcoal at once */
 const FIRE_CAPACITY = 16
 const SAVE_KEY = 'canteen-save'
+/** the game as it was the moment its 3D view was lost, kept for the page brought back (this tab only, read once) */
+const RESUME_KEY = 'jgs-resume-1'
 type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
-  fresh?: Record<string, number> }
-// Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff).
+  fresh?: Record<string, number>
+  /** (kept across a lost 3D view only) the menus put out, the time of day, the language, and the people who'd applied for the jobs (made at
+   * random each visit: the staff taken on are some of them) */
+  menuBy?: Record<string, Entry[]>; theme?: Theme; lang?: Lang; candidates?: typeof CANDIDATES }
+// Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff). The one exception is a page
+// brought back because its 3D view was lost (game/resume): it goes on from where it was, once.
 // (Any save left by an older version is cleared.)
 const SAVED: Saved | null = (() => {
+  let back: Saved | null = null
+  try {
+    back = resumeFrom<Saved>(sessionStorage.getItem(RESUME_KEY), Date.now())
+    sessionStorage.removeItem(RESUME_KEY)
+  } catch {
+    // storage blocked
+  }
   try {
     for (const k of [SAVE_KEY, 'canteen-theme', 'canteen-lang', 'canteen-pos-guests', 'canteen-pos-ledger', 'canteen-pos-chat',
       'canteen-pos-office', 'canteen-pos-notebook']) localStorage.removeItem(k)
   } catch {
     // storage blocked
   }
-  return null
+  // (the same applicants as before, so the staff taken on are still among them)
+  if (back?.candidates) for (const [shop, ws] of Object.entries(back.candidates)) CANDIDATES[shop] = ws
+  return back
 })()
 
 /**
@@ -246,11 +262,8 @@ function ShadowPacer() {
 }
 function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      // (not remembered: every visit starts from the system preference)
-    } catch {
-      // nothing
-    }
+    // (not remembered: every visit starts from the system preference; a page brought back after its 3D view was lost, as it was)
+    if (SAVED?.theme) return SAVED.theme
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   })
   useEffect(() => {
@@ -1237,7 +1250,7 @@ export default function App() {
     return () => { window.removeEventListener('pointerdown', onDown, true); window.removeEventListener('pointerup', onUp, true) }
   }, [viewMenu])
   // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
-  const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>({})
+  const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>(() => SAVED?.menuBy ?? {})
   const menuByRef = useRef(menuBy)
   menuByRef.current = menuBy
   const entriesOf = (id: string) => menuBy[id] ?? []
@@ -1514,14 +1527,18 @@ export default function App() {
   const phone = usePhone()
   const smallScreen = useMedia(SMALL_SCREEN_QUERY)
   phoneRef.current = phone
-  const [lang, setLang] = useState<Lang>(() => {
-    try {
-      return 'zh'
-    } catch {
-      return 'zh'
-    }
-  })
+  const [lang, setLang] = useState<Lang>(() => SAVED?.lang ?? 'zh')
   langRef.current = lang
+  // (what's kept if the 3D view is lost: read from here the moment it happens)
+  const resumeRef = useRef<() => Omit<Saved, 'v'>>(() => ({ ledger, stock, hired, notes, owner, opened, fresh }))
+  resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, menuBy, theme, lang, candidates: CANDIDATES })
+  const lostTimer = useRef(0)
+  // (brought back after it was lost: said so, once)
+  useEffect(() => {
+    if (SAVED) window.setTimeout(() => say(tl(SAVED.lang ?? 'zh', '3D 畫面中斷後重新載入了，接著剛才的進度', '3D 画面が途切れたので読み込み直しました。続きからです',
+      'The 3D view was reloaded after it dropped out: carrying on where you were')), 1500)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // (the edit mode's panel speaks the game's language)
   useEffect(() => setEditLang(lang), [lang])
   // (the page's language, for the styles that set English across where Chinese and Japanese stand upright)
@@ -2056,7 +2073,7 @@ export default function App() {
           <b>3D 畫面中斷了</b>
           {/* (the browser's asked to give it back (the lost event's default prevented): most often it does in a moment, and the view comes back by
               itself, the game going on; else a reload brings it back, the shop's money, stock and staff as they were) */}
-          <p>{phone ? '手機的顯示記憶體不足，瀏覽器把 3D 畫面關掉了。' : '顯示卡記憶體不足或驅動程式重設，瀏覽器暫停了 3D 畫面。'}正在嘗試自動恢復……若幾秒後沒有回來，可以按重新載入（錢、庫存、員工都會保留）。</p>
+          <p>{phone ? '手機的顯示記憶體不足，瀏覽器把 3D 畫面關掉了。' : '顯示卡記憶體不足或驅動程式重設，瀏覽器暫停了 3D 畫面。'}正在自動恢復……幾秒內沒有回來就會自動重新載入，接著現在的進度（錢、庫存、員工、菜單都會保留）。</p>
           <button type="button" onClick={() => window.location.replace(window.location.pathname + '?v=' + Date.now())}>重新載入</button>
         </div>
       )}
@@ -2094,8 +2111,17 @@ export default function App() {
               e.preventDefault()
               stepDown()                 // (and start lighter next time)
               setGlLost(true)
+              // (the game as it is now, kept: if the browser doesn't give the view back in a few seconds the page is brought back, and goes on
+              // from here (game/resume))
+              try { sessionStorage.setItem(RESUME_KEY, keptForResume(resumeRef.current(), Date.now())) } catch { /* (not kept) */ }
+              window.clearTimeout(lostTimer.current)
+              lostTimer.current = window.setTimeout(() => window.location.replace(window.location.pathname + '?v=' + Date.now()), 4000)
             })
-            gl.domElement.addEventListener('webglcontextrestored', () => setGlLost(false))
+            gl.domElement.addEventListener('webglcontextrestored', () => {
+              window.clearTimeout(lostTimer.current)
+              try { sessionStorage.removeItem(RESUME_KEY) } catch { /* (nothing kept) */ }
+              setGlLost(false)
+            })
           }}
           camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
           gl={makeRenderer}

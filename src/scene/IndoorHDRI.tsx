@@ -1,5 +1,7 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, Suspense, useEffect, useMemo, useState } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Environment, Lightformer } from '@react-three/drei'
+import * as THREE from 'three'
 
 /**
  * A mock indoor HDRI (made on the spot, nothing fetched): a small room of soft light panels, rendered once to the scene's
@@ -42,21 +44,34 @@ function useHdriFile(when: 'day' | 'night') {
 
 /** (memo: drawn again only when the time of day or the strength changes. Its Environment renders its room into a cube and blurs it every time
  * its children are new, and the page above redraws many times a second while the shop's open: that was six views of the room and sixty
- * blur passes, two or three times a second) */
+ * blur passes, two or three times a second)
+ * (Both rooms, the day's and the night's, are made once and kept, each lighting a scene of its own that's never drawn; the time of day only
+ * swaps which of them the shop's scene takes. Made afresh at every switch, each switch left its blurred copy behind on the graphics card.) */
 export const IndoorHDRI = memo(function IndoorHDRI({ intensity = 0.5, night = false }: { intensity?: number; night?: boolean }) {
-  const file = useHdriFile(night ? 'night' : 'day')
+  const dayFile = useHdriFile('day'), nightFile = useHdriFile('night')
+  const sinks = useMemo(() => ({ day: new THREE.Scene(), night: new THREE.Scene() }), [])
+  const scene = useThree((s) => s.scene)
+  // (the shop's scene lit by the one for the time of day, once it's there: a photograph is still loading a moment)
+  useFrame(() => {
+    const from = night ? sinks.night : sinks.day
+    if (from.environment && scene.environment !== from.environment) scene.environment = from.environment
+    if (from.environment && scene.environmentIntensity !== from.environmentIntensity) scene.environmentIntensity = from.environmentIntensity
+  })
+  useEffect(() => () => { scene.environment = null }, [scene])
   // (a real HDRI photograph, if one's there, lights the glossy things; otherwise the room's own made-up one below)
-  if (file) return <Environment key={file} files={file} environmentIntensity={intensity * REAL_GAIN[night ? 'night' : 'day']} background={false} />
-  return <IndoorMock intensity={intensity} night={night} />
+  const room = (when: 'day' | 'night', file: string | null) => file
+    ? <Suspense fallback={null}><Environment key={file} files={file} scene={sinks[when]} environmentIntensity={intensity * REAL_GAIN[when]} background={false} /></Suspense>
+    : <IndoorMock intensity={intensity} night={when === 'night'} scene={sinks[when]} />
+  return <>{room('day', dayFile)}{room('night', nightFile)}</>
 })
-function IndoorMock({ intensity, night }: { intensity: number; night: boolean }) {
+function IndoorMock({ intensity, night, scene }: { intensity: number; night: boolean; scene: THREE.Scene }) {
   // (day: bright daylight through the window, a pale shell, the lamps a lighter touch; night: a dim moonlit blue window, a dark shell, the lamps
-  // and the lantern warm and strong, so the glossy things pick up a different room as the day turns. Keyed, so it's rendered afresh on a switch.)
+  // and the lantern warm and strong, so the glossy things pick up a different room as the day turns; each made once and kept.)
   const L = night
     ? { shell: '#120d12', lamp: 6.5, lampC: '#ffb866', win: 0.9, winC: '#5f78c8', bounce: 0.8, bounceC: '#d98a4e', floor: 0.7, lantern: 6, sky: 0 }
     : { shell: '#3a3430', lamp: 3.2, lampC: '#ffe2b4', win: 6, winC: '#e8f1ff', bounce: 1.8, bounceC: '#ffdcae', floor: 1.1, lantern: 2.2, sky: 1.6 }
   return (
-    <Environment key={night ? 'night' : 'day'} resolution={256} frames={1} environmentIntensity={intensity} background={false}>
+    <Environment resolution={256} frames={1} environmentIntensity={intensity} background={false} scene={scene}>
       {/* the room's shell, so the panels read against it */}
       <color attach="background" args={[L.shell]} />
       {/* ceiling: a pair of long lamps */}
