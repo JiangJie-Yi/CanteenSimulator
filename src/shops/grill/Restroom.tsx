@@ -137,6 +137,9 @@ export function ToiletLive({ who, at }: { who: Who; at: [number, number, number]
     bowl.material = (bowl.material as THREE.Material).clone()
     ;(bowl.material as THREE.Material).side = THREE.DoubleSide
     lit(root.getObjectByName('WcArmScreen') as THREE.Mesh, '#9fe0ff')
+    // (what never moves on its own folded together by material, its ink lines into one: some thirty draws to under twenty; the lid, the water
+    // and the washlet's wand, which do, kept as they are)
+    mergeByMaterial(root, (o) => /^Wc(Lid|Water|Wand)$/.test(o.name))
     const wand = root.getObjectByName('WcWand')
     return { root, lid: root.getObjectByName('WcLid')!, water, wand, wandX: wand?.position.x ?? 0.16 }
   }, [gltf])
