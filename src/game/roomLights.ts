@@ -37,6 +37,11 @@ export const studioLight = (on: boolean, night: boolean) => (on ? (night ? 0.6 :
 export const shadowDepth = (on: boolean, night: boolean) => (night ? (on ? 0.28 : 0.75) : on ? 0.62 : 0.72)
 /** how far the shadows' edges blur (in the shadow map's texels, about 1.4 cm each across the shop): soft, as light falls indoors */
 export const SHADOW_SOFT = 5
+/**
+ * What a lamp looks like switched off, its paper or frosted glass (a colour laid over a plain paper picture): grey-white in the daylight by day,
+ * a dim grey by night; never the warm yellow of its light (once its lit picture was only darkened, and stayed yellow).
+ */
+export const unlitShade = (night: boolean) => (night ? '#58585b' : '#d4d2cd')
 
 export const writeLights = (s: RoomLights) => JSON.stringify(s)
 

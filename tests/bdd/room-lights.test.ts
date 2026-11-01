@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { comesIn, LIGHTS_DEFAULT, lampGlow, patienceIn, readLights, roomDim, roomMood, SHADOW_SOFT, shadowDepth, studioLight, switchLights, writeLights } from '@/game/roomLights'
+import { comesIn, LIGHTS_DEFAULT, lampGlow, patienceIn, readLights, roomDim, roomMood, SHADOW_SOFT, shadowDepth, studioLight, switchLights, unlitShade, writeLights } from '@/game/roomLights'
 
 feature('牆上的電燈開關', () => {
   scenario('一開店燈是開著的', ({ given, then }) => {
@@ -69,4 +69,15 @@ feature('牆上的電燈開關', () => {
     and('晚上開著燈，影子幾乎被燈補亮；關燈後月光的影子才明顯', (w) => { expect(w.d[2]).toBeLessThan(w.d[0]); expect(w.d[3]).toBeGreaterThan(w.d[2]) })
     and('影子的邊緣糊開幾格，不是一刀切的硬邊', () => { expect(SHADOW_SOFT).toBeGreaterThan(2) })
   })
+
+  scenario('關了的燈是灰白的紙與玻璃，不再是點亮時的黃', ({ given, then, and }) => {
+    given('白天與晚上熄了燈的燈罩', (w) => { w.day = rgbOf(unlitShade(false)); w.night = rgbOf(unlitShade(true)) })
+    then('紅綠藍幾乎一樣：灰白，不偏黃', (w) => {
+      for (const c of [w.day, w.night]) { expect(Math.max(...c) - Math.min(...c)).toBeLessThan(0.05); expect(c[0] - c[2]).toBeLessThan(0.03) }
+    })
+    and('白天看得出是白紙，晚上暗下來，但還看得到', (w) => { expect(w.day[0]).toBeGreaterThan(0.7); expect(w.night[0]).toBeLessThan(w.day[0]); expect(w.night[0]).toBeGreaterThan(0.15) })
+  })
 })
+
+/** a colour's red, green and blue, 0 to 1 */
+const rgbOf = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)

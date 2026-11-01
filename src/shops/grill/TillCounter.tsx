@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
+import { lampLit } from './lampShades'
 
 /**
  * The till counter, from blender/tillcounter.py, in the till's own frame (built for a top at TILL_TOP; another height stretches the body to
@@ -15,6 +16,27 @@ const UNINKED = /^(TillWindowPaper|TillWindowSleeve|TillBambooGlow|TillLattice|T
 /** the bamboo's shades, culm to culm: a fresh green, a yellower one, a deeper one… (laid over the one skin) */
 const BAMBOO_SHADES = ['#ffffff', '#f2f5c8', '#d6e6b4', '#fff2bf', '#c4d6a8']
 
+/** the window's paper with no light behind it: plain washi, grey-white, a few long fibres in it */
+function plainPaper() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  g.fillStyle = '#f2f1ee'
+  g.fillRect(0, 0, 128, 128)
+  for (let k = 0; k < 70; k++) {
+    const x = (k * 53) % 128, y = (k * 97) % 128, a = (k * 2.39) % Math.PI
+    g.strokeStyle = k % 3 ? 'rgba(255,255,255,0.5)' : 'rgba(150,150,146,0.25)'
+    g.lineWidth = 0.8
+    g.beginPath()
+    g.moveTo(x, y)
+    g.lineTo(x + Math.cos(a) * 14, y + Math.sin(a) * 14)
+    g.stroke()
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+
 function finishOf(src: THREE.MeshStandardMaterial): THREE.Material {
   const shade = /^TillBamboo(\d)$/.exec(src.name)
   if (shade) return new THREE.MeshPhysicalMaterial({ map: src.map, color: BAMBOO_SHADES[+shade[1]], roughness: 0.35, clearcoat: 0.4, clearcoatRoughness: 0.3 })
@@ -26,11 +48,12 @@ function finishOf(src: THREE.MeshStandardMaterial): THREE.Material {
       // (green bamboo's waxy skin: a soft sheen)
       return new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.35, clearcoat: 0.4, clearcoatRoughness: 0.3 })
     case 'TillWindowPaper':
-      // (the window's paper, lit from within like a lantern: brightest where the lamp is, its fibres showing)
-      return new THREE.MeshBasicMaterial({ map: src.map, color: new THREE.Color(1.25, 1.15, 1.05), toneMapped: false })
+      // (the window's paper, lit from within like a lantern: brightest where the lamp is, its fibres showing; with the room's lights off,
+      // plain grey-white paper)
+      return lampLit(new THREE.MeshBasicMaterial({ map: src.map, color: new THREE.Color(1.25, 1.15, 1.05), toneMapped: false }), { offMap: plainPaper() })
     case 'TillBambooGlow':
-      // (the warm light behind the bamboo, showing between the culms)
-      return new THREE.MeshBasicMaterial({ map: src.map, color: new THREE.Color(1.1, 1.05, 1), toneMapped: false })
+      // (the warm light behind the bamboo, showing between the culms; off with the room's lights, the wall behind them dark)
+      return lampLit(new THREE.MeshBasicMaterial({ map: src.map, color: new THREE.Color(1.1, 1.05, 1), toneMapped: false }), { dim: 0.14 })
     case 'TillShieldWalnut':
       // (oiled walnut: a soft sheen)
       return new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.35 })

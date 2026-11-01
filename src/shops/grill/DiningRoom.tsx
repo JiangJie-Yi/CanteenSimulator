@@ -22,6 +22,7 @@ import { setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
 import { lampGlow } from '@/game/roomLights'
+import { lampLit } from './lampShades'
 
 /**
  * The lamps' painted light (their halos and the pools they throw) by the time of day: faint by day, when the room's lit anyway; full and
@@ -35,16 +36,9 @@ function nightGlow<M extends THREE.Material>(m: M, day: number, night: number, l
   m.opacity = (isNight() ? night : day) * (lamp ? lampGlow(getLights().on) : 1)
   return m
 }
-/** the lamps themselves, lit or not: the paper pendants' shades and the string of bulbs, dull paper and glass with the switch off */
-const LAMP_SHADES: { m: THREE.MeshBasicMaterial; lit: THREE.Color; day: THREE.Color; night: THREE.Color }[] = []
-function lampLit(m: THREE.MeshBasicMaterial, day: string, night: string) {
-  LAMP_SHADES.push({ m, lit: m.color.clone(), day: new THREE.Color(day), night: new THREE.Color(night) })
-  return m
-}
 function lightsNow() {
   const n = isNight(), on = getLights().on
   for (const g of NIGHT_GLOWS) g.m.opacity = (n ? g.night : g.day) * (g.lamp ? lampGlow(on) : 1)
-  for (const s of LAMP_SHADES) s.m.color.copy(on ? s.lit : n ? s.night : s.day)
 }
 if (typeof document !== 'undefined') {
   new MutationObserver(lightsNow).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
@@ -636,8 +630,9 @@ function BannerRow({ zs, start = 0, step = 1 }: { zs: number[]; start?: number; 
  * A string of little warm bulbs swagged along a wall's top under the frieze: a thin wire looped between brass pegs, a bulb every hand's width
  * along each loop, and a small glowing paper globe at each peg. Light is painted (emissive bulbs, a soft halo), none cast.
  */
-const FESTOON_BULB = lampLit(new THREE.MeshBasicMaterial({ toneMapped: false }), '#6a6258', '#2c2824')
-const FESTOON_GLOBE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffd9a0', toneMapped: false }), '#b8a68a', '#3a332a')
+// (switched off, grey: a bulb's clear glass darker than a globe's frosted)
+const FESTOON_BULB = lampLit(new THREE.MeshBasicMaterial({ toneMapped: false }), { dim: 0.5 })
+const FESTOON_GLOBE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffd9a0', toneMapped: false }), { dim: 0.92 })
 const FESTOON_HALO = nightGlow(new THREE.MeshBasicMaterial({ color: '#ffc060', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }), 0.1, 0.32)
 function Festoon({ l, mid }: { l: number; mid: number }) {
   const built = useMemo(() => {
@@ -1760,7 +1755,26 @@ const PENDANT_BLOOM = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparen
 // (pulled toward the camera in depth so it never fights the bar's top under it, seen from far off)
 const PENDANT_POOL = nightGlow(new THREE.MeshBasicMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
   polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), 0.18, 0.42)
-const LANTERN_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: LANTERN_SKIN, toneMapped: false, side: THREE.DoubleSide }), '#b4ab9c', '#3c362e')
+/** and the same paper with no light in it: plain washi, grey-white, its ribs and seams a shade darker, a little shadowed toward its ends */
+const LANTERN_SKIN_OFF = signTexture(128, 256, (g) => {
+  const grad = g.createLinearGradient(0, 0, 0, 256)
+  grad.addColorStop(0, '#d9d8d4')
+  grad.addColorStop(0.3, '#f4f3f0')
+  grad.addColorStop(0.55, '#fbfbf9')
+  grad.addColorStop(0.8, '#f0efec')
+  grad.addColorStop(1, '#d4d3cf')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 128, 256)
+  for (let y = 2; y < 256; y += 5) {
+    g.fillStyle = 'rgba(120,120,118,0.2)'
+    g.fillRect(0, y, 128, 1.3)
+    g.fillStyle = 'rgba(255,255,255,0.3)'
+    g.fillRect(0, y + 1.5, 128, 1)
+  }
+  g.fillStyle = 'rgba(110,110,108,0.14)'
+  for (let x = 0; x < 128; x += 16) g.fillRect(x, 0, 1.4, 256)
+})
+const LANTERN_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: LANTERN_SKIN, toneMapped: false, side: THREE.DoubleSide }), { offMap: LANTERN_SKIN_OFF })
 function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
   return (
     <group position={[0, WALL_H, z]}>
