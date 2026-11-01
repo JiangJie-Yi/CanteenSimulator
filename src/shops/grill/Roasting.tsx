@@ -4,7 +4,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { StaticBatch } from '@/scene/StaticBatch'
+import { colourVertices, StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
 import { FLOWS, flowOf, wantOf, type FlowKind } from '@/game/flow'
@@ -357,6 +357,32 @@ function TrashBinImpl({ position, container, contents = 0 }: { position: [number
   }, [R])
   const shown = Math.min(contents, heap.length)
   const level = (n: number) => Math.min(TRASH_H - 0.03, 0.17 + n * 0.008)
+  // (the heap one mesh, each thing's colour carried by its vertices, in the order they go in: as many drawn as are in (its draw range), one
+  // draw where there were two dozen)
+  const heapGeo = useMemo(() => {
+    const parts: THREE.BufferGeometry[] = []
+    const ends: number[] = []
+    let n = 0
+    heap.forEach((h, i) => {
+      const y = level(i + 1) - 0.02
+      const src = h.kind === 'stick' ? new THREE.CylinderGeometry(0.005, 0.004, 0.32, 5) : h.geo!
+      const g = src.index ? src.toNonIndexed() : src.clone()
+      if (src !== h.geo) src.dispose()
+      const rot = h.kind === 'stick' ? new THREE.Euler(h.tilt, h.rot[1], h.tilt * 0.6) : new THREE.Euler(...h.rot)
+      g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(h.x, h.kind === 'stick' ? y + 0.08 : y, h.z), new THREE.Quaternion().setFromEuler(rot),
+        new THREE.Vector3(1, 1, 1)))
+      g.deleteAttribute('uv')
+      colourVertices(g, new THREE.Color(h.kind === 'stick' ? '#c9a46a' : h.kind === 'paper' ? h.shade : '#2a1d14'))
+      parts.push(g)
+      ends.push(n += g.attributes.position.count)
+    })
+    const geo = mergeGeometries(parts)!
+    for (const g of parts) g.dispose()
+    return { geo, ends }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heap])
+  useEffect(() => () => heapGeo.geo.dispose(), [heapGeo])
+  heapGeo.geo.setDrawRange(0, shown ? heapGeo.ends[shown - 1] : 0)
   const face = Math.atan2(LAY_DIR.x, LAY_DIR.z)
   const fr = R * 1.04 + 0.004
   return (
@@ -391,22 +417,9 @@ function TrashBinImpl({ position, container, contents = 0 }: { position: [number
         <planeGeometry args={[0.09, 0.17]} />
         <meshToonMaterial map={TRASH_LABEL} />
       </mesh>
-      {heap.slice(0, shown).map((h, i) => {
-        const y = level(i + 1) - 0.02
-        if (h.kind === 'stick') {
-          return (
-            <mesh key={i} position={[h.x, y + 0.08, h.z]} rotation={[h.tilt, h.rot[1], h.tilt * 0.6]}>
-              <cylinderGeometry args={[0.005, 0.004, 0.32, 5]} />
-              <meshToonMaterial color="#c9a46a" />
-            </mesh>
-          )
-        }
-        return (
-          <mesh key={i} geometry={h.geo!} position={[h.x, y, h.z]} rotation={h.rot}>
-            <meshToonMaterial color={h.kind === 'paper' ? h.shade : '#2a1d14'} />
-          </mesh>
-        )
-      })}
+      <mesh geometry={heapGeo.geo} visible={shown > 0}>
+        <meshToonMaterial vertexColors />
+      </mesh>
     </group>
   )
 }
@@ -1105,12 +1118,15 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
             <mesh geometry={geo} scale={[1, 1, 0.7]}>
               <meshToonMaterial color="#ffffff" map={COOK_MARBLE} />
             </mesh>
+            {/* (the frame's four pieces drawn as one: they swing as one) */}
+            <StaticBatch>
             {[-1, 1].map((e) => (
               <group key={e}>
                 <mesh position={[e * (W / 2 - 0.03), 0, 0.006]}><boxGeometry args={[0.06, H, 0.02]} /><meshToonMaterial color="#7a5638" map={COOK_PANEL_WOOD} /></mesh>
                 <mesh position={[0, e * (H / 2 - 0.03), 0.006]}><boxGeometry args={[W - 0.12, 0.06, 0.02]} /><meshToonMaterial color="#7a5638" map={COOK_PANEL_WOOD} /></mesh>
               </group>
             ))}
+            </StaticBatch>
           </group>
           {/* (the pull: a small oval let into the stile near the free edge, dark inside) */}
           <mesh position={[-sd * (W - 0.032), bottom + H * 0.55, 0.0172]} scale={[0.6, 1, 1]}>
@@ -1276,6 +1292,8 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
         </group>
         {/* the hinges, top and bottom (they go with the door when it's moved by hand, so they're in its group): a brass knuckle on the hinge's line, a leaf screwed to the base's end and one to
             the door's stile (that one turns with it: GateHingeLeaf) */}
+        {/* (some thirty parts, drawn as four: they never move apart) */}
+        <StaticBatch>
         {[0.16, BAR_TOP - 0.16].map((y) => (
           <group key={y} position-y={y}>
             <mesh geometry={HINGE_GEO.knuckle}><meshToonMaterial color="#c8a050" /></mesh>
@@ -1292,6 +1310,7 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
             ))}
           </group>
         ))}
+        </StaticBatch>
         </group>
         {/* the door's post (柱): a jamb of pale planed wood standing up the base's end, its face rounded, the hinges on it,
             set apart from the dark base so the gate reads as a door hung on a post; and a thin dark shadow line down the
