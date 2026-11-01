@@ -18,7 +18,7 @@ Every part's own place; the game shows the ones each customer has.
 
 Run:
     blender -b --factory-startup --python blender/folk.py -- <project path> [preview.png]
-    (PREVIEW_SHOW="hair_twin,acc_phones" picks the parts shown in the preview)
+    (PREVIEW_SHOW="hair_twin,acc_phones" picks the parts shown in the preview; PREVIEW_CAM and PREVIEW_AT where it's seen from and looks)
 """
 import math
 import os
@@ -350,11 +350,47 @@ style("bald", [ring])
 quiff = [tuft("quiff0", head_at(0.0, 0.95, -0.01), Vector((0, 0.35, 1.0)), 0.1, 0.17, M["hair"], 0.8, seg=10, rings=8),
          tuft("quiff1", head_at(0.0, 1.25, -0.01), Vector((0, 0.6, 1.0)), 0.08, 0.13, M["hair"], 0.8)]
 style("pomp", [back_shell(), crown()] + quiff)
-spikes = []
-for k, (a, e) in enumerate([(0, 1.25), (0.55, 1.1), (-0.55, 1.1), (1.1, 0.9), (-1.1, 0.9), (2.0, 0.95), (-2.0, 0.95), (math.pi, 1.05), (0.0, 0.9)]):
-    root = head_at(a, e, -0.006)
-    out = (root - C).normalized()
-    spikes.append(tuft(f"spike{k}", root, out + Vector((0, 0.3, 0)), 0.045, 0.085, M["hair"], 0.7))
+def clump(name, frm, to, r, flat=0.5, n=5, m=5):
+    """a clump of hair combed along the head: from `frm` (bearing, elevation), its root a little under the hair's face, round the head to
+    `to` (bearing, elevation, how far off the head its point stands), lifting off it and narrowing to that point; `r` its half-width at the
+    root, `flat` its thickness against its width"""
+    n0 = (head_at(*frm) - C).normalized()
+    n1 = (head_at(to[0], to[1]) - C).normalized()
+    ang = n0.angle(n1)
+
+    def round_to(t):
+        return n0 if ang < 1e-4 else (n0 * math.sin((1 - t) * ang) + n1 * math.sin(t * ang)) / math.sin(ang)
+    way = [(C + round_to(i / n) * (R + HT * 0.4 + to[2] * (i / n) ** 2), round_to(i / n)) for i in range(n + 1)]
+    bm = bmesh.new()
+    rings = []
+    for i in range(n):
+        p, out = way[i]
+        across = (way[i + 1][0] - p).normalized().cross(out).normalized()
+        # (swelling out of the hair from a narrow root, so it rises from it with no edge, then narrowing to its point)
+        w = r * max(0.2, min(1.0, (i / n / 0.3) ** 0.6)) * (1 - i / n) ** 0.75
+        rings.append([bm.verts.new(P(*(p + across * math.cos(2 * math.pi * j / m) * w + out * math.sin(2 * math.pi * j / m) * w * flat))) for j in range(m)])
+    tip = bm.verts.new(P(*way[n][0]))
+    for i in range(n - 1):
+        for j in range(m):
+            bm.faces.new((rings[i][j], rings[i][(j + 1) % m], rings[i + 1][(j + 1) % m], rings[i + 1][j]))
+    for j in range(m):
+        bm.faces.new((rings[-1][j], rings[-1][(j + 1) % m], tip))
+    bm.faces.new(rings[0][::-1])
+    return from_bm(name, bm, M["hair"])
+
+
+# (spiky: a schoolboy's cut in clumps combed round the head from the crown, each lifting off it to a point at its end: a fringe of points over
+# the brow, one at each temple and over each ear, the back's down to a ragged nape, and a few standing up off the top and the crown; once a
+# ring of cones stood straight out of a smooth cap, a hedgehog's)
+SPIKY = (
+    [((ar, 1.3), (at, 0.3, 0.035), 0.085) for ar, at in ((-0.7, -0.48), (-0.2, -0.12), (0.3, 0.24), (0.8, 0.6))]
+    + [((sd * 0.9, 1.15), (sd * 1.12, 0.22, 0.03), 0.08) for sd in (-1, 1)]
+    + [((sd * 1.6, 1.1), (sd * 1.62, 0.2, 0.03), 0.08) for sd in (-1, 1)]
+    + [((math.pi + d * 0.5, 1.25), (math.pi + d, -0.3, 0.035), 0.085) for d in (-1.0, -0.35, 0.3, 0.95)]
+    + [((math.pi + d, 1.4), (math.pi + d * 1.5, 0.95, 0.13), 0.075) for d in (-0.35, 0.3)]
+    + [((sd * 0.3, 1.0), (math.pi - sd * 0.5, 1.3, 0.11), 0.075) for sd in (-1, 1)]
+)
+spikes = [clump(f"spike{k}", frm, to, r) for k, (frm, to, r) in enumerate(SPIKY)]
 style("spiky", [back_shell(), crown()] + spikes)
 style("kid", [back_shell(), crown(fringe=True), tuft("ahoge", head_at(0.0, 1.3, -0.006), Vector((0.1, 1, 0.75)), 0.032, 0.1, M["hair"], 0.45)])
 # (gyaru: long, a curl or two at each side)
@@ -797,7 +833,7 @@ if PREVIEW:
     bpy.context.collection.objects.link(cam)
     cam.location = P(*map(float, os.environ.get("PREVIEW_CAM", "0.7,1.1,1.9").split(",")))
     cam.rotation_mode = "QUATERNION"
-    cam.rotation_quaternion = (Vector(P(0, 0.5, 0)) - cam.location).to_track_quat("-Z", "Y")
+    cam.rotation_quaternion = (Vector(P(*map(float, os.environ.get("PREVIEW_AT", "0,0.5,0").split(",")))) - cam.location).to_track_quat("-Z", "Y")
     cam.data.lens = 42
     bpy.context.scene.camera = cam
     sun_ = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))

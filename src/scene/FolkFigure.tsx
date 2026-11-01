@@ -54,6 +54,9 @@ const UNINKED = /FolkFace|FolkFrame|FolkGold|FolkRed/
 /** the materials kept as themselves: each customer's own skin and hair, the outfit's and the face's pictures, the knit's pattern, the gold */
 const PAINTED = new Set(['FolkSkin', 'FolkHair', 'FolkBody', 'FolkFace', 'FolkKnit', 'FolkGold'])
 
+/** in development, ?hair=<style> puts every customer in that hairstyle, to look at it */
+const FORCE_HAIR = import.meta.env.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search).get('hair') : null
+
 export type FolkSpec = { kind: GuestKind; hair: string; acc: string[]; face: FaceType; outfit: string; size: number; skin: string; hairColor: string
   top: string; briefcase: boolean }
 /** how this customer looks: their kind's hair and things, their colours */
@@ -61,7 +64,7 @@ export function folkSpec(id: number): FolkSpec {
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
   const hairs = HAIR[kind]
-  const hair = hairs[Math.floor(hash(id, 31) * hairs.length) % hairs.length]
+  const hair = FORCE_HAIR ?? hairs[Math.floor(hash(id, 31) * hairs.length) % hairs.length]
   const acc = [...(ACC[kind] ?? [])]
   // (glasses and headphones as the old figures had them)
   if (kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0) || (kind === 'civilServant' && id % 2 === 1)) acc.push('glasses')
