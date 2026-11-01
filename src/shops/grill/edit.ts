@@ -23,9 +23,9 @@ export function setEditLang(l: Lang) {
   panel()
 }
 // (the keys count up whenever more places are settled into the defaults below: what was kept under the old ones isn't carried over, or it would count twice)
-const KEY = 'jgs-edit-offsets-13'
-const KEY_R = 'jgs-edit-rotations-10'
-const KEY_S = 'jgs-edit-scales-10'
+const KEY = 'jgs-edit-offsets-14'
+const KEY_R = 'jgs-edit-rotations-11'
+const KEY_S = 'jgs-edit-scales-11'
 const KEY_G = 'jgs-edit-groups-2'
 const KEY_P = 'jgs-edit-pivots-2'
 const load = (key: string): Record<string, V3> => {
@@ -146,6 +146,10 @@ export const BASES: Record<string, V3> = {
   // (the shrine's oranges and its cups' stand set by hand at X 0.027 and X 0.050 in the room's frame)
   oranges: [0.0275, 0, 0],
   shrinecups: [0.0502, 0, 0],
+  // (the sutra moved Z -0.030 and both vases X 0.07 along their own axes (the shelf's: X back toward the wall, Z along it), as the owner set them)
+  sutra: [0, 0, -0.03],
+  'vase-1': [0.07, 0, 0],
+  vase1: [0.07, 0, 0],
   gate1: [0, 0, 0.16],
   gate0: [0, 0, 0.17],
   // (the owner's settled spot: moved by [0.2, 0.19, 0.47] in the room's frame from [-1.508, 0, 1.974], taken into this parent's own units)
@@ -281,6 +285,9 @@ export function moveTo(id: string, v: V3) {
   else state.offsets = { ...state.offsets, [id]: v }
   state.selected = id; emit()
 }
+/** a piece's place put right to where it's ended up (the cook table's nudged things, pushed clear of what they'd go through): its box and handles
+ * go with it, and what's selected stays as it was */
+export function settleOffset(id: string, v: V3) { state.offsets = { ...state.offsets, [id]: v }; emit() }
 export function turnTo(id: string, v: V3) {
   if (state.groups[id]) state.groups = { ...state.groups, [id]: { ...state.groups[id], yaw: v[1], r: v } }
   else state.rotations = { ...state.rotations, [id]: v }
@@ -337,6 +344,8 @@ export function setBackdrop(c: string) {
 if (typeof document !== 'undefined') document.documentElement.style.setProperty('--scene-bg', backdropColor())
 /** where the panel was dragged to (its left edge and its bottom's distance from the window's), kept for next time */
 const KEY_PPOS = 'jgs-edit-panel-pos'
+/** how tall the list is (dragged by the grip under it) */
+const KEY_LH = 'jgs-edit-list-h'
 export const GIZMO = { size: (() => { try { return Number(localStorage.getItem(KEY_GZ)) || 0.6 } catch { return 0.6 } })() }
 export function setGizmoSize(dir: 1 | -1) {
   GIZMO.size = Math.max(0.25, Math.min(2, Math.round(GIZMO.size * (dir > 0 ? 1.15 : 1 / 1.15) * 100) / 100))
@@ -440,19 +449,6 @@ export const groupTransformOf = (piece: string): Group[] | null => {
 }
 /** the transforms of the groups a group is in (the one holding it first): what its own handles stand in */
 export const outerTransformOf = (gid: string): Group[] => chainOf(state.groups, gid).map((g) => state.groups[g])
-/** how far above the middle of what a group holds its tag in the room floats */
-const TAG_LIFT = 1.1
-/** the groups at the top (a view's area, one of the owner's) as their tags in the room show them: the name, where (above the middle of what it
- * holds, moved as the group is), and the number of the view whose area it is (none for the others); not until its middle has been found, nor for
- * one that runs across the room (the stools: their middle is over the kitchen, nowhere they are) */
-export function groupTags(): { id: string; name: string; at: V3; area: number | null }[] {
-  return Object.keys(state.groups).filter((gid) => !groupOf(gid) && !unsettled.has(gid) && !DEFAULT_GROUPS[gid]?.spans).map((gid) => {
-    const g = state.groups[gid]
-    const n = VIEW_SPOTS.findIndex((v) => AREA + v.id === gid)
-    return { id: gid, name: pieceName(g.name, lang), at: [g.pivot[0] + g.t[0], g.pivot[1] + g.t[1] + TAG_LIFT, g.pivot[2] + g.t[2]] as V3, area: n >= 0 ? n + 1 : null }
-  })
-}
-
 // ---- the views' areas: each view's camera stands somewhere and looks at a part of the shop; what it has in sight, and is nearest the point it
 // looks at, is its area, a group of its own (火烤灶台區, 玄關區…), made the first time edit mode opens. The groups the shop has (the till's, the
 // shrine's…) go into an area whole; only pieces new to the shop are put in an area later, so whatever the owner takes out of one stays out.
@@ -634,7 +630,7 @@ let built = ''
 
 /** the panel's look: after Blender's dark interface (grey panels, a darker header bar, blue for what's active, red/green/blue axis stripes) */
 const PANEL_CSS = `
-.be { position:fixed; left:12px; bottom:92px; z-index:9999; width:292px; max-height:70vh; display:flex; background:#303030; color:#d6d6d6;
+.be { position:fixed; left:12px; bottom:92px; z-index:9999; width:292px; max-height:calc(100vh - 110px); display:flex; background:#303030; color:#d6d6d6;
   font:11.5px/1.35 "Inter","Segoe UI","Noto Sans TC",sans-serif; border:1px solid #1a1a1a; border-radius:6px; box-shadow:0 6px 22px rgba(0,0,0,.55); overflow:hidden; user-select:none }
 .be * { box-sizing:border-box }
 .be-keys { margin:6px 0 2px; padding:5px 7px; border-radius:4px; background:#262626; color:#9a9a9a; font:10.5px/1.6 monospace; white-space:pre-line }
@@ -676,7 +672,10 @@ const PANEL_CSS = `
 .be-sum { color:#9ab0c8; font-size:11px; margin-bottom:5px }
 .be-tris { margin-top:-3px; color:#e0b860 }
 .be-find { width:100%; background:#1d1d1d; color:#d6d6d6; border:1px solid #3a3a3a; border-radius:4px; padding:3px 7px; font:inherit; margin-bottom:5px }
-.be-list { max-height:150px; overflow:auto; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a; background:#242424; border-radius:4px; padding:2px }
+.be-list { height:320px; min-height:90px; overflow:auto; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a; background:#242424; border-radius:4px; padding:2px }
+.be-lgrip { position:relative; height:10px; cursor:ns-resize; margin-top:1px }
+.be-lgrip::after { content:''; position:absolute; left:50%; top:3px; width:44px; height:4px; margin-left:-22px; border-radius:2px; background:#5a5a5a }
+.be-lgrip:hover::after { background:#e08a2c }
 .be-row { padding:2px 8px 2px 18px; border-radius:3px; cursor:pointer; white-space:nowrap; position:relative }
 .be-row::before { content:''; position:absolute; left:7px; top:50%; width:6px; height:6px; margin-top:-3px; border:1px solid #e0a030; border-radius:1px }
 .be-row:hover { background:#3a3a3a }
@@ -924,6 +923,23 @@ function panel() {
     }
     find.oninput = () => showRows?.()
     out.append(find, tabs, list)
+    // (the list taller or shorter by the grip under it, to see more of it at once; the height kept for next time)
+    const lgrip = h('div', 'be-lgrip')
+    lgrip.title = T().resize
+    const keptLH = Number(localStorage.getItem(KEY_LH) ?? 0)
+    const fitL = (px: number) => Math.max(90, Math.min(window.innerHeight - 260, px))
+    if (keptLH > 0) list.style.height = `${fitL(keptLH)}px`
+    lgrip.onpointerdown = (e) => {
+      e.preventDefault(); e.stopPropagation()
+      const y0 = e.clientY, h0 = list.offsetHeight
+      lgrip.setPointerCapture(e.pointerId)
+      lgrip.onpointermove = (m) => { list.style.height = `${fitL(h0 + (m.clientY - y0))}px` }
+      lgrip.onpointerup = () => {
+        lgrip.onpointermove = null; lgrip.onpointerup = null
+        try { localStorage.setItem(KEY_LH, String(list.offsetHeight)) } catch { /* (not kept) */ }
+      }
+    }
+    out.appendChild(lgrip)
     // Transform: what's chosen, then Location, Rotation, Scale each as X / Y / Z stacked, a reset beside each
     const tr = section(T().transform)
     // (which axes the handles and the place fields go by, always in sight, a click switches them)

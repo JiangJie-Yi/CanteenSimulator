@@ -38,7 +38,7 @@ import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
 import { offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
-import { GroupGizmo, GroupTags, Movable, WireView } from '@/shops/grill/Movable'
+import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import type { ViewCam } from '@/game/editGroups'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
@@ -992,7 +992,6 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       <ViewCams editing={editing} lang={lang} pose={poseOf} />
       {/* (a group picked in developer mode: its own handles, to move, turn and size it as one) */}
       <GroupGizmo />
-      <GroupTags />
       {/* (developer mode's wireframe, 4 / 5) */}
       <WireView />
       <FocusTracker />

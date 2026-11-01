@@ -8,10 +8,18 @@
 - "BarTissue": a box of tissues in a walnut case, 24 x 12 cm and 7.5 high, its edges rounded, a slot along its top and a tissue puffed up out
   of it.
 - "BarDrawerCase", "BarDrawer", "BarTissueLow": each place's drawer under the top on the customers' side (the owner's: a box of tissues to
-  each place, in its own drawer): a walnut case open at the front hanging under the top, 34 cm across, 12.5 deep (down) and 26 back; the
-  drawer that runs in it, its front a little proud, a brass bar pull; and the box of tissues that lives in it, its tissue only just pulled up
-  (a full puff would be squashed under the top). The case's and the drawer's origin is the middle of the case's front edge along its top
-  (the top's underside): the case runs back into +z and down, the drawer slides out toward -z.
+  each place, in its own drawer): a walnut case open at the front hanging under the top, 17 cm across (the owner's: half what it was), 12.5
+  deep (down) and 26 back; the drawer that runs in it, its front a little proud, a brass bar pull; and the box of tissues that lives in it,
+  a compact one lying lengthways in the drawer, its tissue only just pulled up (a full puff would be squashed under the top). The case's and
+  the drawer's origin is the middle of the case's front edge along its top (the top's underside): the case runs back into +z and down, the
+  drawer slides out toward -z.
+- "BarTissuePull": a tissue as it's pulled out of the box: a soft sheet hanging from where it's held (its top edge at the origin).
+- "BarWalnutSwatch0".."3": four little hidden squares, each in one of the walnut's four boards (BarWalnut0..3: chocolate cathedral figure, a
+  darker straight-grained one, a warmer one with a pale streak of sapwood, a cooler wavy one), for the game to give each place's drawer
+  its own.
+- "BarCondiments": what each two places share at the back between them: a soy-sauce pot (醤油差し: white porcelain, an indigo band of waves,
+  a little spout and a lidded top with a knob) and a pot of wasabi (山葵: a lidded celadon jar, a wooden spoon from under its lid), on a
+  little black-lacquered tray.
 
 Each piece stands at its own origin (on y = 0, its middle over the origin; the chopstick and the rest lie along x). Low in triangles.
 
@@ -75,18 +83,61 @@ def lacquer(W=32, H=256):
     return col
 
 
-def walnut(N=256):
-    """the tissue case's walnut: deep brown, long fine grain along u"""
-    seed(9)
+WALNUTS = (
+    # (its two browns (the board's streaks wander between them); how far the pith was below the face (0: quartered, straight stripes), how
+    # much the log tapered (how tall the arches), how many rings across, how much darker the late wood, a pale streak of sapwood, a dark
+    # mineral streak)
+    dict(base=(0.37, 0.24, 0.155), alt=(0.31, 0.205, 0.15), d=0.14, taper=0.24, rings=36, late=0.2, sap=0.0, streak=0.0),
+    dict(base=(0.285, 0.185, 0.125), alt=(0.25, 0.165, 0.13), d=0.0, taper=0.0, rings=48, late=0.2, sap=0.0, streak=0.0),
+    dict(base=(0.41, 0.27, 0.165), alt=(0.37, 0.245, 0.16), d=0.09, taper=0.3, rings=30, late=0.18, sap=1.0, streak=0.0),
+    dict(base=(0.34, 0.23, 0.175), alt=(0.29, 0.205, 0.175), d=0.2, taper=0.17, rings=40, late=0.17, sap=0.0, streak=1.0),
+)
+
+
+def walnut(variant=0, N=512):
+    """a board of walnut, its grain along u, drawn as the wood is: the growth rings where the face cuts them, long narrow arches up the
+    board where it's flat-sawn (the log's taper: each arch's peak toward +u), straight stripes where it's quartered; each ring's late wood
+    a little darker, soft-edged, the rings' spacing uneven; the colour drifting in long streaks along the grain between two browns; the
+    open pores as fine dark flecks drawn out along it, and a silky sheen of fibre; in one a pale streak of sapwood along an edge, in
+    another a dark mineral streak"""
+    w = WALNUTS[variant]
+    seed(31 + variant * 7)
     u, v = grid01(N)
-    base = np.array((0.38, 0.25, 0.17), np.float32)
-    wob = fbm(N, 3, 2, 4) - 0.5
-    ring = v * 10 + 0.15 * np.sin(2 * math.pi * u) + wob * 0.3
-    late = smooth(0.55, 0.98, np.sin(2 * math.pi * ring * 2))
-    col = mix(base, base * np.float32(0.65), late * 0.6)
-    fine = np.sin(2 * math.pi * (v * 50 + wob * 4))
-    col = mix(col, base * np.float32(0.8), smooth(0.75, 1.0, fine) * 0.3)
-    return col * (0.9 + 0.18 * fbm(N, 6, 2, 3))[..., None]
+    wob = fbm(N, 2, 3, 4) - 0.5
+    # (the rings: the distance from the pith, the pith wandering a little under the board, less the taper along it)
+    vc = 0.5 + 0.16 * np.sin(2 * math.pi * (u * 0.45 + 0.21 * variant)) + wob * 0.07
+    if w["d"] > 0:
+        ring = (np.sqrt((v - vc) ** 2 + w["d"] ** 2) - w["taper"] * u) * w["rings"]
+    else:
+        ring = (v + wob * 0.05 + 0.012 * np.sin(2 * math.pi * u)) * w["rings"]
+    # (rings unevenly wide: good years and lean ones)
+    ring = ring + (fbm(N, 2, 7, 3) - 0.5) * 1.6
+    ph = ring - np.floor(ring)
+    late = smooth(0.5, 0.78, ph) * (1 - smooth(0.86, 1.0, ph))
+    # (the colour drifting along the grain: long streaks across, between the board's two browns)
+    seed(53 + variant)
+    drift = smooth(0.25, 0.75, vnoise(N, 2, 9) * 0.65 + vnoise(N, 3, 23) * 0.35)
+    col = mix(np.array(w["base"], np.float32), np.array(w["alt"], np.float32), drift)
+    col = col * (1 - late * w["late"])[..., None]
+    # (the pores: fine dark flecks, long along the grain, a few more in the late wood)
+    seed(77 + variant)
+    pore = vnoise(N, 12, 190) * vnoise(N, 40, 270)
+    flecks = smooth(0.36, 0.56, pore) * (0.6 + 0.4 * late)
+    col = col * (1 - flecks * 0.3)[..., None]
+    # (and a silky sheen of fibre along it)
+    fibre = vnoise(N, 5, 310)
+    col = col * (0.96 + 0.08 * fibre)[..., None]
+    if w["sap"]:
+        # (the sapwood: a creamy streak along one edge, its border soft and wandering)
+        edge = 0.14 + 0.035 * np.sin(2 * math.pi * u * 1.3) + wob * 0.05
+        sap = smooth(edge + 0.012, edge - 0.025, v)
+        cream = np.array((0.64, 0.5, 0.36), np.float32) * (0.94 + 0.1 * fibre)[..., None]
+        col = mix(col, cream * (1 - late * 0.12)[..., None], sap * 0.9)
+    if w["streak"]:
+        # (a dark mineral streak along the grain, fading in and out)
+        line = smooth(0.03, 0.0, np.abs(v - (0.68 + 0.02 * np.sin(2 * math.pi * u)) - wob * 0.03)) * smooth(0.1, 0.4, u) * smooth(0.95, 0.7, u)
+        col = col * (1 - line * 0.35)[..., None]
+    return np.clip(col, 0, 1)
 
 
 def glaze(N=64):
@@ -244,7 +295,7 @@ def tissue_case(name, W=0.24, H=0.075, D=0.12, r=0.008):
     return o
 
 
-def tissue_sheet(name, h=0.045, fan=0.05):
+def tissue_sheet(name, h=0.045, fan=0.05, y0=0.075):
     """the tissue pulled up out of the slot: a soft sheet, its foot in the slot, its top fanned and folded over (`h` how far up it stands)"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
@@ -257,7 +308,7 @@ def tissue_sheet(name, h=0.045, fan=0.05):
             s = i / nu - 0.5
             w = 0.05 + fan * t
             x = s * w * 2
-            y = 0.075 + t * h - (s * 2) ** 2 * 0.012 * t * h / 0.045
+            y = y0 + t * h - (s * 2) ** 2 * 0.012 * t * h / 0.045
             z = 0.012 * math.sin(math.pi * t) * (1 - abs(s)) - 0.008 * t * t + 0.004 * math.sin(s * 6 + t * 3)
             row.append(bm.verts.new(P(x, y, z)))
         vs.append(row)
@@ -313,7 +364,7 @@ def joined(name, objs):
 
 # (each place's drawer: its case's outside, the drawer's front and box, in the game's frame from the middle of the case's front edge along the
 # top's underside: x across, y up (all below 0), z back toward the cook)
-DW, DH, DD, DT = 0.34, 0.125, 0.26, 0.012
+DW, DH, DD, DT = 0.17, 0.125, 0.26, 0.012
 
 
 def drawer_case(name):
@@ -328,27 +379,212 @@ def drawer_body(name):
     """the drawer: its front (2 mm proud of the case), and the box behind it: a bottom, two sides, a back"""
     fy0, fy1 = -DH + 0.014, -0.014
     by0 = -DH + DT + 0.002
-    ix = 0.14
-    return joined(name, [board(f"{name}Front", -0.156, 0.156, fy0, fy1, -0.002, 0.014, ease=0.002),
+    fx = DW / 2 - DT - 0.002
+    ix = fx - 0.008
+    return joined(name, [board(f"{name}Front", -fx, fx, fy0, fy1, -0.002, 0.014, ease=0.002),
                          board(f"{name}Bottom", -ix - 0.006, ix + 0.006, by0, by0 + 0.006, 0.014, 0.236, ease=0),
                          board(f"{name}L", -ix - 0.006, -ix, by0, -0.035, 0.014, 0.236, ease=0),
                          board(f"{name}R", ix, ix + 0.006, by0, -0.035, 0.014, 0.236, ease=0),
                          board(f"{name}Back", -ix, ix, by0, -0.035, 0.23, 0.236, ease=0)])
 
 
-def drawer_pull(name, segs=8):
+def drawer_pull(name, segs=10):
     """a little brass bar pull on two posts, across the front's middle"""
     cy, z = -DH / 2, -0.002
-    bpy.ops.mesh.primitive_cylinder_add(vertices=segs, radius=0.0042, depth=0.07, location=P(0, cy, z - 0.013), rotation=(0, math.pi / 2, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=segs, radius=0.0042, depth=0.056, location=P(0, cy, z - 0.013), rotation=(0, math.pi / 2, 0))
     bar = bpy.context.view_layer.objects.active
     posts = []
-    for sx in (-0.028, 0.028):
+    for sx in (-0.021, 0.021):
         bpy.ops.mesh.primitive_cylinder_add(vertices=segs, radius=0.003, depth=0.013, location=P(sx, cy, z - 0.0065), rotation=(math.pi / 2, 0, 0))
         posts.append(bpy.context.view_layer.objects.active)
     o = joined(name, [bar] + posts)
     for f in o.data.polygons:
         f.use_smooth = True
     return o
+
+
+def tissue_pull(name):
+    """a tissue as it's pulled out: a soft sheet hanging from where it's held (its top edge's middle at the origin), its corners falling
+    away, a crease or two down it"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    nu, nv = 6, 7
+    W, H = 0.14, 0.17
+    vs = []
+    for j in range(nv + 1):
+        t = j / nv
+        row = []
+        for i in range(nu + 1):
+            s_ = i / nu - 0.5
+            # (narrower where it's held, spreading below; folds across; its lower corners curling back)
+            w = W * (0.35 + 0.65 * min(1.0, t * 1.6))
+            x = s_ * w
+            y = -t * H + 0.01 * math.sin(s_ * 9 + t * 2) * t
+            z = 0.012 * math.sin(math.pi * s_ * 2 + t * 4) * t + 0.02 * t * t * abs(s_) * 2 - 0.008 * t
+            row.append(bm.verts.new(P(x, y, z)))
+        vs.append(row)
+    for j in range(nv):
+        for i in range(nu):
+            f = bm.faces.new((vs[j][i], vs[j][i + 1], vs[j + 1][i + 1], vs[j + 1][i]))
+            for lp, (ii, jj) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
+                lp[uvl].uv = (ii / nu, jj / nv)
+    return mesh_obj(name, bm)
+
+
+def lathe(name, prof, segs=24, v_of=None):
+    """turned: the profile (radius, height) round the y axis, from the middle of its underside out and up; its picture wrapped round it (u
+    the way round, v from v_of(height), else its height over the profile's)"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    top = max(y for _, y in prof) or 1.0
+    rings = []
+    for (r, y) in prof:
+        rings.append([bm.verts.new(P(r * math.cos(2 * math.pi * j / segs), y, r * math.sin(2 * math.pi * j / segs))) if r > 1e-6 else None
+                      for j in range(segs)])
+    centre = {i: bm.verts.new(P(0, y, 0)) for i, (r, y) in enumerate(prof) if r <= 1e-6}
+    for i in range(len(prof) - 1):
+        for j in range(segs):
+            j2 = (j + 1) % segs
+            a = rings[i][j] or centre[i]
+            b = rings[i][j2] or centre[i]
+            c = rings[i + 1][j2] or centre[i + 1]
+            d = rings[i + 1][j] or centre[i + 1]
+            uniq = []
+            for vv in (a, b, c, d):
+                if vv not in uniq:
+                    uniq.append(vv)
+            if len(uniq) < 3:
+                continue
+            f = bm.faces.new(uniq)
+            for lp in f.loops:
+                co = lp.vert.co
+                ang = (math.atan2(-co.y, co.x) / (2 * math.pi)) % 1.0
+                lp[uvl].uv = (ang, v_of(co.z) if v_of else co.z / top)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return mesh_obj(name, bm)
+
+
+def tube(name, a, b, r0, r1, segs=10):
+    """a tapered tube from a to b (the game's frame), its ends closed"""
+    a, b = Vector(a), Vector(b)
+    ax = (b - a).normalized()
+    side = ax.cross(Vector((0, 1, 0)))
+    if side.length < 1e-4:
+        side = ax.cross(Vector((1, 0, 0)))
+    side.normalize()
+    up = side.cross(ax).normalized()
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    rings = []
+    for t, r in ((0.0, r0), (1.0, r1)):
+        c = a.lerp(b, t)
+        rings.append([bm.verts.new(P(*(c + side * (r * math.cos(2 * math.pi * j / segs)) + up * (r * math.sin(2 * math.pi * j / segs)))))
+                      for j in range(segs)])
+    for j in range(segs):
+        j2 = (j + 1) % segs
+        f = bm.faces.new((rings[0][j], rings[0][j2], rings[1][j2], rings[1][j]))
+        for lp in f.loops:
+            lp[uvl].uv = (0.5, 0.97)
+    for ring, rev in ((rings[0], True), (rings[1], False)):
+        f = bm.faces.new(list(reversed(ring)) if rev else ring)
+        for lp in f.loops:
+            lp[uvl].uv = (0.5, 0.97)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return mesh_obj(name, bm)
+
+
+def seigaiha(x, y, line=0.05):
+    """the blue waves (青海波), as lines: rows of fans, each of nested arcs, the rows half a fan apart and each lower row in front of the
+    one above; x, y in fans (a fan's radius 1, rows half a radius apart, y up). How strongly each point is on a line, 0..1"""
+    best = np.full(x.shape, 9.0, np.float32)
+    base = np.floor(y * 2)
+    # (the rows whose fans can reach here: the lowest last, as it's in front)
+    for k in (0, 1, 2):
+        j = base - k
+        off = np.mod(j, 2)
+        cx = np.round((x - off) / 2) * 2 + off
+        cy = j * 0.5
+        d = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+        mine = (d < 1.0) & (y >= cy - 0.02)
+        best = np.where(mine, d, best)
+    rings = np.zeros(x.shape, np.float32)
+    for r in (0.28, 0.52, 0.76, 0.98):
+        rings = np.maximum(rings, smooth(line, 0.0, np.abs(best - r)))
+    return rings * (best < 1.5)
+
+
+def shoyu_glaze(N=512):
+    """the soy pot's glaze, wrapped round it (u round, v up its height): white porcelain, a band of indigo waves (seigaiha) round its belly
+    between two fine lines, its neck, lid and spout (the top of the picture) a deeper indigo"""
+    u, v = grid01(N)
+    col = np.broadcast_to(np.array((0.95, 0.95, 0.93), np.float32), (N, N, 3)).copy()
+    ind = np.array((0.14, 0.22, 0.5), np.float32)
+    lo, hi = 0.3, 0.62
+    band = ((v > lo) & (v < hi)).astype(np.float32)
+    m = seigaiha(u * 14, (v - lo) / (hi - lo) * 3.2, 0.07) * band
+    m = np.maximum(m, smooth(0.006, 0.0, np.abs(v - lo + 0.008)) + smooth(0.006, 0.0, np.abs(v - hi - 0.008)))
+    m = np.maximum(m, smooth(0.84, 0.88, v))
+    return mix(col, ind, np.clip(m, 0, 1) * 0.92)
+
+
+def celadon(N=64):
+    """the wasabi jar's pale green glaze, a little deeper where it pools"""
+    seed(12)
+    n = fbm(N, 4, 4, 3)
+    return mix((0.55, 0.68, 0.58), (0.68, 0.79, 0.68), n * 0.7)
+
+
+def condiments(name, M, ps):
+    """the soy pot and the wasabi on their tray (its middle at the origin; the soy toward +x, the spouts toward the places, -z)"""
+    out = []
+    # (the tray: black lacquer, its corners eased)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, 0.006, 0))
+    tr = bpy.context.view_layer.objects.active
+    tr.name = f"{name}Tray"
+    tr.scale = (0.15, 0.08, 0.012)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
+    mod = tr.modifiers.new("ease", "BEVEL")
+    mod.width = 0.004
+    mod.segments = 2
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    out.append(fin(tr, M["tray"], ps))
+    # (the soy pot: a squat round body narrowing to a short neck, a lid with a knob; the spout off its shoulder, toward the places)
+    sx = 0.032
+    top = 0.096
+
+    def up_to(y):
+        return y / top
+    body = lathe(f"{name}Shoyu", [(0.0, 0.012), (0.02, 0.012), (0.022, 0.0135), (0.026, 0.024), (0.0275, 0.04), (0.025, 0.056),
+                                  (0.017, 0.066), (0.0135, 0.071), (0.0135, 0.075), (0.0, 0.075)], segs=20, v_of=up_to)
+    lid = lathe(f"{name}ShoyuLid", [(0.0, 0.074), (0.0158, 0.074), (0.0158, 0.078), (0.012, 0.083), (0.005, 0.085), (0.0042, 0.09),
+                                    (0.0055, 0.094), (0.0, top)], segs=16, v_of=up_to)
+    spout = tube(f"{name}ShoyuSpout", (0, 0.05, -0.02), (0, 0.066, -0.036), 0.0058, 0.0032, segs=10)
+    for o in (body, lid, spout):
+        o.location = P(sx, 0, 0)
+        out.append(fin(o, M["shoyu"], ps))
+    # (the wasabi: a little lidded jar, a wooden spoon's handle out from under its lid)
+    wx = -0.036
+    jar = lathe(f"{name}Wasabi", [(0.0, 0.012), (0.014, 0.012), (0.016, 0.014), (0.0195, 0.024), (0.019, 0.04), (0.0168, 0.044),
+                                  (0.0, 0.044)], segs=18)
+    jl = lathe(f"{name}WasabiLid", [(0.0, 0.0435), (0.0182, 0.0435), (0.0175, 0.047), (0.012, 0.0505), (0.0045, 0.051), (0.0045, 0.055),
+                                    (0.0, 0.056)], segs=18)
+    for o in (jar, jl):
+        o.location = P(wx, 0, 0)
+        out.append(fin(o, M["celadon"], ps))
+    spoon = tube(f"{name}WasabiSpoon", (wx + 0.004, 0.046, -0.006), (wx + 0.016, 0.052, -0.027), 0.0019, 0.0015, segs=6)
+    out.append(fin(spoon, M["spoon"], ps))
+    return out
+
+
+def swatch(name):
+    """a little square (the walnut's boards are kept on these, for the game to take)"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    vs = [bm.verts.new(P(x, 0, z)) for (x, z) in ((0, 0), (0.01, 0), (0.01, 0.01), (0, 0.01))]
+    f = bm.faces.new(vs)
+    for lp, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+        lp[uvl].uv = uv
+    return mesh_obj(name, bm, smooth_shade=False)
 
 
 def slot(name, W=0.13, D=0.014, y=0.0752):
@@ -374,7 +610,12 @@ M = {
     "dish": pbr("BarDishGlaze", (1, 1, 1), tex=image("bardish", sometsuke()), rough=0.25, coat=0.4),
     "lacquer": pbr("BarChopLacquer", (1, 1, 1), tex=image("barchop", lacquer()), rough=0.3, coat=0.5),
     "rest": pbr("BarRestGlaze", (1, 1, 1), tex=image("barrest", glaze()), rough=0.2, coat=0.5),
-    "walnut": pbr("BarTissueWalnut", (1, 1, 1), tex=image("bartissuewood", walnut()), rough=0.45, coat=0.2),
+    "walnut": pbr("BarTissueWalnut", (1, 1, 1), tex=image("bartissuewood", walnut(0)), rough=0.45, coat=0.2),
+    **{f"walnut{k}": pbr(f"BarWalnut{k}", (1, 1, 1), tex=image(f"barwalnut{k}", walnut(k)), rough=0.45, coat=0.2) for k in range(4)},
+    "tray": pbr("BarCondTray", (0.06, 0.045, 0.04), rough=0.25, coat=0.6),
+    "shoyu": pbr("BarShoyuGlaze", (1, 1, 1), tex=image("barshoyu", shoyu_glaze()), rough=0.2, coat=0.5),
+    "celadon": pbr("BarWasabiGlaze", (1, 1, 1), tex=image("barwasabi", celadon()), rough=0.2, coat=0.5),
+    "spoon": pbr("BarWasabiSpoon", (0.72, 0.56, 0.36), rough=0.6),
     "paper": pbr("BarTissuePaper", (0.97, 0.96, 0.94), rough=0.9),
     "slot": pbr("BarTissueSlot", (0.05, 0.04, 0.03), rough=0.9),
     "brass": pbr("BarDrawerBrass", (0.78, 0.6, 0.3), rough=0.35, metal=0.8),
@@ -386,10 +627,15 @@ for name, build, offset in (
         ("BarHashioki", lambda ps: [fin(hashioki("BarHashiokiBody"), M["rest"], ps)], (0.45, 0, 0)),
         ("BarTissue", lambda ps: [fin(tissue_case("BarTissueCase"), M["walnut"], ps), fin(slot("BarTissueSlot"), M["slot"], ps),
                                   fin(tissue_sheet("BarTissueSheet"), M["paper"], ps)], (0.7, 0, 0)),
-        ("BarTissueLow", lambda ps: [fin(tissue_case("BarTissueLowCase"), M["walnut"], ps), fin(slot("BarTissueLowSlot"), M["slot"], ps),
-                                     fin(tissue_sheet("BarTissueLowSheet", h=0.012, fan=0.03), M["paper"], ps)], (0.7, 0, 0.3)),
+        ("BarTissueLow", lambda ps: [fin(tissue_case("BarTissueLowCase", W=0.2, H=0.06, D=0.11), M["walnut"], ps),
+                                     fin(slot("BarTissueLowSlot", W=0.1, y=0.0602), M["slot"], ps),
+                                     fin(tissue_sheet("BarTissueLowSheet", h=0.01, fan=0.02, y0=0.06), M["paper"], ps)], (0.7, 0, 0.3)),
+        ("BarTissuePull", lambda ps: [fin(tissue_pull("BarTissuePullSheet"), M["paper"], ps)], (0.95, 0.2, 0.3)),
         ("BarDrawerCase", lambda ps: [fin(drawer_case("BarDrawerCaseBody"), M["walnut"], ps)], (0.1, 0.2, 0.3)),
-        ("BarDrawer", lambda ps: [fin(drawer_body("BarDrawerBody"), M["walnut"], ps), fin(drawer_pull("BarDrawerPull"), M["brass"], ps)], (0.5, 0.2, 0.3))):
+        ("BarDrawer", lambda ps: [fin(drawer_body("BarDrawerBody"), M["walnut"], ps), fin(drawer_pull("BarDrawerPull"), M["brass"], ps)], (0.5, 0.2, 0.3)),
+        ("BarCondiments", lambda ps: condiments("BarCond", M, ps), (0.3, 0, -0.3)),
+        *[(f"BarWalnutSwatch{k}", (lambda k: lambda ps: [fin(swatch(f"BarWalnutSwatchMesh{k}"), M[f"walnut{k}"], ps)])(k), (1.2 + 0.05 * k, 0, 0))
+          for k in range(4)]):
     parts = []
     build(parts)
     root = bpy.data.objects.new(name, None)
@@ -397,6 +643,9 @@ for name, build, offset in (
     for o in parts:
         o.parent = root
     root.location = P(*offset)
+    if name == "BarTissueLow":
+        # (lengthways in the drawer: its long side front to back)
+        root.rotation_euler = (0, 0, math.pi / 2)
     roots.append(root)
     allparts += parts
     print(name, tris(parts))

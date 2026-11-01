@@ -4,6 +4,7 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { CopyLayout } from '@/data/menu'
+import { reflectStudio, useStudio } from './studio'
 
 const INK = new THREE.Color('#3b2a20')
 const OUTLINE_WIDTH = 0.007
@@ -110,6 +111,18 @@ function toToon(src: THREE.MeshStandardMaterial): THREE.MeshToonMaterial {
   return toon
 }
 
+/** what's real metal in a model (the hearth's brass sleeves over its corners and the line inlaid round it): polished, the studio reflected in
+ * it, so it reads as brass, not as a flat yellow block, as it did drawn in the toon light */
+const REAL_METAL = new Set(['RobuchiBrass'])
+function toMetal(src: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+  // (a deep polished brass: the model's pale yellow showed the studio's white walls as a flat cream)
+  const metal = new THREE.MeshStandardMaterial({ name: src.name, color: new THREE.Color('#c99a40'), map: src.map,
+    metalness: 1, roughness: 0.2, envMapIntensity: 1.1 })
+  metal.userData.made = true
+  reflectStudio(metal)
+  return metal
+}
+
 const worldScale = new THREE.Vector3()
 
 /**
@@ -179,6 +192,8 @@ type DishProps = ThreeElements['group'] & {
 export function Dish({ url, itemIds, quantities, hidden, layout, instant = false,
   ...props }: DishProps) {
   const { scene } = useGLTF(url)
+  // (the studio its real metal reflects)
+  useStudio()
   const ids = useMemo(() => new Set(itemIds), [itemIds])
 
   // menu-item nodes grouped by id, with their authored transform and animation state. The model has one
@@ -305,7 +320,7 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
 
   useEffect(() => {
     scene.updateMatrixWorld(true)
-    const toonCache = new Map<string, THREE.MeshToonMaterial>()
+    const toonCache = new Map<string, THREE.Material>()
     const meshes: THREE.Mesh[] = []
     scene.traverse((obj) => {
       if (obj instanceof THREE.Mesh && !obj.name.endsWith('_outline')) meshes.push(obj)
@@ -314,8 +329,9 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
       mesh.castShadow = !NO_CAST.has(baseName(mesh.name))
       mesh.receiveShadow = true
       const src = mesh.material as THREE.MeshStandardMaterial
-      if (!(src instanceof THREE.MeshToonMaterial)) {
-        if (!toonCache.has(src.uuid)) toonCache.set(src.uuid, toToon(src))
+      // (the scene's kept across remounts: what's been made over already isn't made over again)
+      if (!(src instanceof THREE.MeshToonMaterial) && !src.userData.made) {
+        if (!toonCache.has(src.uuid)) toonCache.set(src.uuid, REAL_METAL.has(src.name) ? toMetal(src) : toToon(src))
         mesh.material = toonCache.get(src.uuid)!
       }
       // multi-material objects load as a group of meshes; use the group's name for the type

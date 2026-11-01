@@ -41,14 +41,16 @@ import { flowerBuffs } from '@/game/shrineFlowers'
 import { Boss, BOSS_TASTE } from './Boss'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
 import { ashMaterial, charcoalMaterial, useBinchotan } from './binchotanModel'
-import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, settleOffset, useEdit, type V3 } from './edit'
 import { setTip } from '@/scene/hoverTip'
 import { slide as drawerSound } from './TillDesk'
+import { tissuePull } from './paperSound'
+import { reflectStudio, useStudio } from '@/scene/studio'
 import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -1744,31 +1746,36 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
         const x = seatAlong(c, n)
         return (
           <group key={n} position={[x, BAR_TOP, 0]}>
-            {/* (the case its drawer runs in, under the top's edge on the customer's side: BarDrawers draws the drawer) */}
-            <group position={[0, -0.06, DRAWER.z]}><BarPiece name="BarDrawerCase" /></group>
-            {/* (each customer's plate is set down in the middle of their place and cleared away by GuestBar3D) in front of it, nearest them,
-                the pair of chopsticks laid across, their tips to the customer's left (+x) up on the rest; beyond the plate the little soy dish
-                (on the right instead at a seat where it'd be off the top, by the gate) */}
-            <group position={[SETTING.restX, 0, SETTING.chopZ]}><BarPiece name="BarHashioki" /></group>
+            {/* (the case its drawer runs in, under the top's edge on the customer's side, to their right: BarDrawers draws the drawer) */}
+            <group position={[DRAWER.x, -0.06, DRAWER.z]}><BarPiece name="BarDrawerCase" grain={n} /></group>
+            {/* (each customer's plate is set down a little back of the middle of their place and cleared away by GuestBar3D) in front of it,
+                nearest them, the pair of chopsticks laid across, their tips to the customer's left (+x) up on the rest, which lies across
+                them; behind on the left the little soy dish (on the right instead at a seat where it'd be off the top, by the gate) */}
+            <group position={[SETTING.restX, 0, PLACE.chop]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group>
             {[-1, 1].map((sd) => (
-              <group key={sd} position={[-SETTING.chopL / 2, 0.0015, SETTING.chopZ + sd * 0.0075]} rotation-y={sd * 0.012} rotation-z={SETTING.chopTilt}>
+              <group key={sd} position={[-SETTING.chopL / 2, 0.0015, PLACE.chop + sd * 0.0075]} rotation-y={sd * 0.012} rotation-z={SETTING.chopTilt}>
                 <BarPiece name="BarChopstick" />
               </group>
             ))}
-            <group position={[sauceSide(c, gate, x), 0.001, 0.13]}>
+            <group position={[sauceSide(c, gate, x), 0.001, PLACE.sauce[1]]}>
               <BarPiece name="BarSoyDish" design={n} />
               {/* (empty till someone sits down there: GuestBar3D pours them their soy) */}
             </group>
           </group>
         )
       })}
+      {/* the soy pot and the wasabi that each two places share, at the back between them */}
+      {sharedAlong(c).map((x, k) => (
+        <group key={`shared${k}`} position={[x, BAR_TOP + 0.001, PLACE.shared]}><BarPiece name="BarCondiments" /></group>
+      ))}
     </group>
   )
 }
 
-/** each place's drawer under the top: where its case's front edge stands (just behind the top's rounded edge, on the customers' side), how far
- * the drawer slides out, and where its box of tissues sits in it */
-const DRAWER = { z: -0.296, out: 0.15, tissue: [0, -0.105, 0.122] as [number, number, number] }
+/** each place's drawer under the top: where it is along the place (to the customer's right: the owner's, half as wide as it was and moved over),
+ * where its case's front edge stands (just behind the top's rounded edge, on the customers' side), how far the drawer slides out, and where its
+ * box of tissues sits in it (lengthways) */
+const DRAWER = { x: -0.17, z: -0.296, out: 0.15, tissue: [0, -0.105, 0.122] as [number, number, number] }
 /**
  * Each place's drawer, a box of tissues in it (the owner's: one to each place, in its own drawer; they were a box between every two places,
  * on the top): pointed at, it lights up and says so; a click slides it out toward the customer, another back in, with the runners' rumble. Its
@@ -1778,19 +1785,36 @@ const DRAWER = { z: -0.296, out: 0.15, tissue: [0, -0.105, 0.122] as [number, nu
 const BarDrawers = memo(function BarDrawers({ c, first }: { c: Counter; first: number }) {
   return (
     <group position={c.at} rotation-y={Math.atan2(-c.along.z, c.along.x)}>
-      {Array.from({ length: c.seats }, (_, n) => <BarDrawer key={n} x={seatAlong(c, n)} seat={first + n} />)}
+      {Array.from({ length: c.seats }, (_, n) => <BarDrawer key={n} x={seatAlong(c, n) + DRAWER.x} seat={first + n} grain={n} />)}
     </group>
   )
 })
-/** a place's drawer (its seat's number among all the bars': while someone sits there it's pushed home and stays shut, or it'd go into them) */
-function BarDrawer({ x, seat }: { x: number; seat: number }) {
+/** a place's drawer (its seat's number among all the bars': while someone sits there it's pushed home and stays shut, or it'd go into them; and
+ * which of the walnut's boards it's made of) */
+function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number }) {
   const slider = useRef<THREE.Group>(null)
   const inside = useRef<THREE.Group>(null)
-  const st = useRef({ open: false, at: 0 })
-  const says = () => (st.current.open ? '裡面一盒衛生紙・點一下推回去' : '一個座位一盒衛生紙・點一下拉開')
+  const sheet = useRef<THREE.Group>(null)
+  const st = useRef({ open: false, at: 0, pulled: -1 })
+  const says = () => (st.current.open ? '裡面一盒衛生紙・點衛生紙抽一張・點抽屜推回去' : '一個座位一盒衛生紙・點一下拉開')
   useFrame((_, dt) => {
     const s = st.current
     if (s.open && SEATS_TAKEN.has(seat)) { s.open = false; drawerSound(true) }
+    // (a tissue pulled: drawn up out of the slot, drifting off toward whoever pulled it, and fading away)
+    const g = sheet.current
+    if (g && s.pulled >= 0) {
+      s.pulled += dt
+      const k = s.pulled / TISSUE_FLY
+      if (k >= 1) { s.pulled = -1; g.visible = false } else {
+        g.visible = true
+        const up = THREE.MathUtils.smootherstep(k, 0, 0.45)
+        g.position.set(Math.sin(k * 5) * 0.012, 0.03 + up * 0.2 + k * 0.05, -k * 0.18)
+        g.rotation.set(-0.25 * k, Math.sin(k * 3) * 0.3, Math.sin(k * 6) * 0.12)
+        g.scale.setScalar(0.35 + 0.65 * THREE.MathUtils.smoothstep(k, 0, 0.3))
+        const fade = 1 - THREE.MathUtils.smoothstep(k, 0.6, 1)
+        g.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m) m.opacity = fade })
+      }
+    }
     const want = s.open ? 1 : 0
     if (Math.abs(want - s.at) < 1e-4) return
     s.at = Math.abs(want - s.at) < 0.002 ? want : s.at + (want - s.at) * Math.min(1, dt * 7)
@@ -1811,8 +1835,20 @@ function BarDrawer({ x, seat }: { x: number; seat: number }) {
           drawerSound(!st.current.open)
           setTip({ title: '抽屜', hint: says() })
         }}>
-        <BarPiece name="BarDrawer" />
-        <group ref={inside} position={DRAWER.tissue} visible={false}><BarPiece name="BarTissueLow" /></group>
+        <BarPiece name="BarDrawer" grain={grain} />
+        <group ref={inside} position={DRAWER.tissue} visible={false}>
+          {/* (the box itself: a click on it pulls a tissue) */}
+          <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; tipOver('衛生紙', '點一下抽一張').onPointerOver(e) }}
+            onPointerOut={(e) => { if (getEdit().on) return; tipOver('衛生紙', '').onPointerOut(e) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (getEdit().on || !st.current.open) return
+              if (st.current.pulled < 0) { st.current.pulled = 0; tissuePull() }
+            }}>
+            <BarPiece name="BarTissueLow" />
+          </group>
+          <group ref={sheet} visible={false}><BarPiece name="BarTissuePull" fade /></group>
+        </group>
       </group>
     </group>
   )
@@ -1820,33 +1856,66 @@ function BarDrawer({ x, seat }: { x: number; seat: number }) {
 
 /** where a place's chopsticks lie (across it, nearest the customer), how long they are, how far along their rest stands under their tips, and the
  * slope they lie at from the table up onto it */
-const SETTING = { chopZ: -0.19, chopL: 0.22, restX: 0.088, chopTilt: Math.atan2(0.0105, 0.19) }
+// (the rest lies across the chopsticks now (the owner's): they cross its drawn-in waist, lower than its ends, so they slope less)
+const SETTING = { chopL: 0.22, restX: 0.088, chopTilt: Math.atan2(0.0075, 0.198) }
+/** how long a pulled tissue takes to drift off and fade */
+const TISSUE_FLY = 1.6
 const SETTING_URL = import.meta.env.BASE_URL + 'models/barsetting.glb'
 const settingPieces = new Map<string, THREE.Object3D>()
-/** one of a place's things (blender/barsetting.py): the soy dish (in the plates' design `design`), a chopstick, the rest, the tissues */
-function BarPiece({ name, design }: { name: string; design?: number }) {
+/** the polished brass of the drawers' pulls (real metal, the studio in it), made once */
+let barBrass: THREE.MeshStandardMaterial | null = null
+const barBrassOf = () => {
+  if (!barBrass) {
+    barBrass = new THREE.MeshStandardMaterial({ color: '#c99a40', metalness: 1, roughness: 0.22, envMapIntensity: 1.1 })
+    reflectStudio(barBrass)
+  }
+  return barBrass
+}
+/**
+ * One of a place's things (blender/barsetting.py): the soy dish (in the plates' design `design`), a chopstick, the rest, the tissues, the
+ * drawer and its case (in the walnut's board `grain`, one of four: the places' drawers aren't all cut from one), the shared soy pot and wasabi.
+ * `fade`: its own materials, to be faded out (a pulled tissue).
+ */
+function BarPiece({ name, design, grain, fade }: { name: string; design?: number; grain?: number; fade?: boolean }) {
+  useStudio()
   const gltf = useGLTF(SETTING_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
-    const key = `${name}|${design ?? ''}`
+    const board = grain === undefined ? undefined : grain % 4
+    const key = `${name}|${design ?? ''}|${board ?? ''}`
     let base = settingPieces.get(key)
     if (!base) {
       const src = gltf.scene.getObjectByName(name)!
+      // (the board: the picture on its swatch)
+      const swatch = board === undefined ? null
+        : ((gltf.scene.getObjectByName(`BarWalnutSwatchMesh${board}`) as THREE.Mesh | undefined)?.material as THREE.MeshStandardMaterial | undefined)?.map ?? null
       base = src.clone(true)
       base.position.set(0, 0, 0)
       base.traverse((o) => {
         const m = o as THREE.Mesh
         if (!m.isMesh) return
         const was = m.material as THREE.MeshStandardMaterial
-        m.material = new THREE.MeshToonMaterial({ color: was.color.clone(), map: design !== undefined && /Dish/.test(was.name) ? wareDesign(design) : was.map,
-          side: /Paper/.test(was.name) ? THREE.DoubleSide : THREE.FrontSide })
+        m.material = /Brass/.test(was.name) ? barBrassOf()
+          : new THREE.MeshToonMaterial({ color: was.color.clone(),
+            map: design !== undefined && /Dish/.test(was.name) ? wareDesign(design) : swatch && /Walnut/.test(was.name) ? swatch : was.map,
+            side: /Paper/.test(was.name) ? THREE.DoubleSide : THREE.FrontSide })
         m.castShadow = /Tissue/.test(name)
         m.receiveShadow = true
       })
-      inkModel(base, (m) => /Slot|Sheet/.test(m.name), { width: 0.0008, weld: true })
+      inkModel(base, (m) => /Slot|Sheet|Spoon/.test(m.name), { width: 0.0008, weld: true })
       settingPieces.set(key, base)
     }
-    return base.clone(true)
-  }, [gltf, name, design])
+    const made = base.clone(true)
+    // (to fade: its own materials, see-through)
+    if (fade) made.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (m.isMesh) { const t = (m.material as THREE.Material).clone(); t.transparent = true; t.depthWrite = false; m.material = t }
+    })
+    return made
+  }, [gltf, name, design, grain, fade])
+  // (a faded copy's materials are its own: let go of with it)
+  useEffect(() => () => {
+    if (fade) obj.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) (m.material as THREE.Material).dispose() })
+  }, [obj, fade])
   return <primitive object={obj} />
 }
 useGLTF.preload(SETTING_URL)
@@ -3896,8 +3965,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const here = containerAt(key)
       const clear = settle(key, here.clone())
       clear.y = here.y
-      next.add(clear.sub(here))
+      const push = clear.sub(here)
+      next.add(push)
       moved.current.set(key, next)
+      // (and the edit's place goes where it's ended up, so its box and handles stay on it, not where it couldn't go)
+      if (push.lengthSq() > 1e-8) {
+        const o = offsetOf(id)
+        editSeen.current[key] = at.clone().add(push)
+        settleOffset(id, [o[0] + push.x, o[1] + push.y, o[2] + push.z])
+      }
       for (const b of carriers[key] ?? []) b.node.position.copy(b.home).add(next)
       for (const t of tools) {
         if (carrierOf(t.node.name) !== key) continue

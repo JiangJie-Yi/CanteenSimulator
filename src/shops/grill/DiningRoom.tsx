@@ -1665,8 +1665,8 @@ function nameOnly(title: string, hint: string) {
     onPointerOut: () => setTip(null),
   }
 }
-/** the shrine drawn wider than it was modelled, across its front (along z): the owner's 1.25 */
-const SHRINE_WIDE = 1.25
+/** the shrine drawn wider than it was modelled, across its front (along z): the owner's 1.1 (it was 1.25, too wide for its height) */
+const SHRINE_WIDE = 1.1
 /** and a little shallower front to back, its back still to the wall (the offerings' shelf in front of it as it was) */
 const SHRINE_DEEP = 0.8
 function ShrineDoors() {

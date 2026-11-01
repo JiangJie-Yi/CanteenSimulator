@@ -21,6 +21,8 @@ export type Counter = { at: THREE.Vector3; along: THREE.Vector3; lay: THREE.Vect
   /** how far behind its middle line its wall stands (FLOOR_FAR unless it's further back, to make room by it) */
   far?: number }
 export type Seat = {
+  /** the place's middle on the counter's line (y 0): what's laid there goes by it (PLACE) */
+  mid: THREE.Vector3
   /** on the counter top (y 0: set the top's height yourself): where the plate goes */
   plate: THREE.Vector3
   /** the stool, on the floor */
@@ -38,6 +40,16 @@ export type Seat = {
  * went into the top's edge) */
 export const SIT_BACK = 0.58
 export const AISLE = 1.15
+/**
+ * Where each thing at a place stands, from the place's middle on the counter's line (along: + toward the customer's left as they sit;
+ * lay: + toward the cook): the plate a little back from the middle, the chopsticks across before it, the soy dish behind on the left
+ * (the owner's), what they drink behind on the right, and the soy bottle and wasabi that each two places share, at the back between them.
+ */
+export const PLACE = { plate: 0.04, chop: -0.135, sauce: [0.21, 0.13] as const, drink: [-0.2, 0.08] as const, shared: 0.17 }
+/** along the counter, from its middle: where each pair of places' soy bottle and wasabi stand (between the two; an odd last place has its
+ * own, on its right) */
+export const sharedAlong = (c: Counter) => Array.from({ length: Math.ceil(c.seats / 2) }, (_, k) =>
+  2 * k + 1 < c.seats ? (seatAlong(c, 2 * k) + seatAlong(c, 2 * k + 1)) / 2 : seatAlong(c, 2 * k) - 0.31)
 /** the customers' floor runs from this far toward the cook from a counter's middle line (under the bar, up to its
  * cook's edge's reach) back to the wall behind the aisle; the kitchen's floor starts where it stops */
 export const FLOOR_NEAR = 0.42
@@ -105,12 +117,12 @@ export function gateOf(c: Counter, g: Gate) {
   return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, 0.08) }
 }
 /**
- * The little dish of sauce at a seat (the bar's frame, on its top): to the customer's left of their place, or their
+ * The little dish of sauce at a seat (the bar's frame, on its top): to the customer's left of their place (+ along: the owner's), or their
  * right at a seat where the left would be off the top, by a gate. Its offset along the counter, given its seat's.
  */
 export function sauceSide(c: Counter, gate: { end: 1 | -1; w: number; shift?: number } | undefined, x: number) {
-  const topX0 = -(c.length + 0.3) / 2 + (gate && gate.end < 0 ? gateCut(gate) : 0)
-  return x - 0.2 - 0.06 < topX0 ? 0.2 : -0.2
+  const topX1 = (c.length + 0.3) / 2 - (gate && gate.end > 0 ? gateCut(gate) : 0)
+  return x + PLACE.sauce[0] + 0.06 > topX1 ? -PLACE.sauce[0] : PLACE.sauce[0]
 }
 /** things in the room that can be clicked (the toilets' doors, the altar's incense): how many are under the pointer */
 export const POINTER_HINT = { hand: 0 }
@@ -508,11 +520,12 @@ export const seatAlong = (c: Counter, n: number) => (n - (c.seats - 1) / 2) * (c
 
 export function seatsOf(cs: Counter[]): Seat[] {
   return cs.flatMap((c, ci) => Array.from({ length: c.seats }, (_, n) => {
-    const plate = c.at.clone().addScaledVector(c.along, seatAlong(c, n))
+    const mid = c.at.clone().addScaledVector(c.along, seatAlong(c, n))
     return {
-      plate,
-      stool: plate.clone().addScaledVector(c.lay, -SIT_BACK),
-      aisle: plate.clone().addScaledVector(c.lay, -AISLE),
+      mid,
+      plate: mid.clone().addScaledVector(c.lay, PLACE.plate),
+      stool: mid.clone().addScaledVector(c.lay, -SIT_BACK),
+      aisle: mid.clone().addScaledVector(c.lay, -AISLE),
       yaw: Math.atan2(c.lay.x, c.lay.z),
       along: c.along,
       lay: c.lay,

@@ -5,11 +5,10 @@
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { ALONG } from './bar'
 import { holdVeil } from '@/scene/Later'
-import { beginChange, clickPick, commitOffsets, FIXED_SIZE, getEdit, GIZMO, groupTags, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setListHot, setPivot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
+import { beginChange, clickPick, commitOffsets, FIXED_SIZE, getEdit, GIZMO, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -161,40 +160,6 @@ export function GroupGizmo() {
         <AxisGizmo id={selected} at={[g.pivot[0] + g.t[0], g.pivot[1] + g.t[1], g.pivot[2] + g.t[2]]} theta={0} />
       </group>
     </group>
-  )
-}
-
-/** in edit mode, each view's area (and each other group at the top) named where it is in the room: a tag at its middle, a little above it; the
- * pointer over it lights all it holds, a click picks it whole */
-export function GroupTags() {
-  const { on, selected } = useEdit()
-  if (!on) return null
-  return (
-    <>
-      {groupTags().map(({ id, name, at, area }) => (
-        <Html key={id} position={at} center zIndexRange={[30, 0]}>
-          <GroupTag id={id} name={name} area={area} on={selected === id} />
-        </Html>
-      ))}
-    </>
-  )
-}
-function GroupTag({ id, name, area, on }: { id: string; name: string; area: number | null; on: boolean }) {
-  const el = useRef<HTMLButtonElement>(null)
-  // (listened for on the tag itself and stopped there: edit mode swallows clicks on the 3D view, and a press left to go on would reach the
-  // scene behind it and pick the piece there)
-  useEffect(() => {
-    const b = el.current
-    if (!b) return
-    b.onpointerdown = (e) => { e.stopPropagation(); select(id) }
-    b.onpointerenter = () => setListHot(id)
-    b.onpointerleave = () => setListHot(null)
-    return () => { b.onpointerdown = null; b.onpointerenter = null; b.onpointerleave = null }
-  }, [id])
-  return (
-    <button ref={el} type="button" className={`group-tag${area !== null ? ' is-area' : ''}${on ? ' is-on' : ''}`}>
-      {area !== null ? <i>{area}</i> : <i>▣</i>}{name}
-    </button>
   )
 }
 
