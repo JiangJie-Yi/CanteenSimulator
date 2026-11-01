@@ -4,9 +4,9 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
-import { inkModel } from './inkHull'
+import { inkTogether } from './inkHull'
 import { Briefcase, airbrush, gradientMap, hash, lookOf } from './Person3D'
-import { bakeable } from './StaticBatch'
+import { bakeable, colourVertices } from './StaticBatch'
 import { cloth } from './patterns'
 import type { Mood } from './people'
 
@@ -51,6 +51,8 @@ export const SEAT = 0.31
 export const FOLK_HEIGHT = 1.07
 /** parts with no ink line round them (by their material: the face's picture, the glasses' frames, gold, the little red ties and flowers) */
 const UNINKED = /FolkFace|FolkFrame|FolkGold|FolkRed/
+/** the materials kept as themselves: each customer's own skin and hair, the outfit's and the face's pictures, the knit's pattern, the gold */
+const PAINTED = new Set(['FolkSkin', 'FolkHair', 'FolkBody', 'FolkFace', 'FolkKnit', 'FolkGold'])
 
 export type FolkSpec = { kind: GuestKind; hair: string; acc: string[]; face: FaceType; outfit: string; size: number; skin: string; hairColor: string
   top: string; briefcase: boolean }
@@ -110,20 +112,24 @@ function template(scene: THREE.Group, hair: string, acc: string[]): Template {
     || n === `Folk_hair_${hair}` || acc.some((a) => n === `Folk_acc_${a}`)
   const partOf = (n: string) => n === 'FolkHandL' ? 'handL' : n === 'FolkHandR' ? 'handR'
     : n === 'FolkHead' || n === 'FolkFace' || n.startsWith('Folk_hair_') || (n.startsWith('Folk_acc_') && ON_HEAD.has(n.slice(9))) ? 'head' : 'body'
-  // (one material for each of the model's, by name: the game's toon paint)
+  // (one material for each of the model's, by name: the game's toon paint; every plain-coloured one (no picture, not each customer's own
+  // colour, not metal) the one material FolkPlain, its colour carried by the vertices, so all of them are one draw)
   const mats = new Map<string, THREE.Material>()
   const matOf = (src: THREE.MeshStandardMaterial) => {
-    let m = mats.get(src.name)
+    const name = PAINTED.has(src.name) ? src.name : 'FolkPlain'
+    let m = mats.get(name)
     if (!m) {
       if (src.name === 'FolkFace') m = new THREE.MeshToonMaterial({ gradientMap, transparent: true, alphaTest: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })
       else if (src.name === 'FolkGold') m = new THREE.MeshStandardMaterial({ color: '#e0b040', metalness: 1, roughness: 0.3 })
+      else if (name === 'FolkPlain') m = airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap }))
       else m = airbrush(new THREE.MeshToonMaterial({ color: src.color.clone(), gradientMap }))
-      m.name = src.name
-      mats.set(src.name, m)
+      m.name = name
+      mats.set(name, m)
     }
     return m
   }
-  const groups = new Map<string, Map<THREE.Material, THREE.BufferGeometry[]>>()
+  // (by part, by material, inked or not: the frame of the glasses and the red of a cap go uninked, merged apart from the rest)
+  const groups = new Map<string, Map<string, { mat: THREE.Material; inked: boolean; geos: THREE.BufferGeometry[] }>>()
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh) return
@@ -132,11 +138,16 @@ function template(scene: THREE.Group, hair: string, acc: string[]): Template {
     const n = named.replace(/_\d+$/, '')
     if (!keep(n)) return
     const part = partOf(n)
-    const mat = matOf(mesh.material as THREE.MeshStandardMaterial)
-    const byMat = groups.get(part) ?? new Map<THREE.Material, THREE.BufferGeometry[]>()
-    const list = byMat.get(mat) ?? []
-    list.push(bakeable(mesh.geometry, new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld)))
-    byMat.set(mat, list)
+    const src = mesh.material as THREE.MeshStandardMaterial
+    const mat = matOf(src)
+    const inked = !UNINKED.test(src.name) && !UNINKED.test(named)
+    const byMat = groups.get(part) ?? new Map<string, { mat: THREE.Material; inked: boolean; geos: THREE.BufferGeometry[] }>()
+    const key = `${mat.uuid}|${inked}`
+    const g = byMat.get(key) ?? { mat, inked, geos: [] }
+    const geo = bakeable(mesh.geometry, new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld))
+    if (mat.name === 'FolkPlain') colourVertices(geo, src.color)
+    g.geos.push(geo)
+    byMat.set(key, g)
     groups.set(part, byMat)
   })
   const root = new THREE.Group()
@@ -147,7 +158,8 @@ function template(scene: THREE.Group, hair: string, acc: string[]): Template {
     const g = new THREE.Group()
     g.name = part
     const at = part === 'handL' ? REST.L : part === 'handR' ? REST.R : part === 'head' ? NECK : null
-    for (const [mat, geos] of byMat) {
+    const inkedHere: THREE.Mesh[] = []
+    for (const { mat, inked, geos } of byMat.values()) {
       const geo = mergeGeometries(geos)
       for (const x of geos) x.dispose()
       if (!geo) continue
@@ -159,12 +171,15 @@ function template(scene: THREE.Group, hair: string, acc: string[]): Template {
       // and streaks; its toon light shades it)
       mesh.receiveShadow = part !== 'head'
       g.add(mesh)
+      if (inked) inkedHere.push(mesh)
     }
+    // (one ink line round the whole part, whatever it's painted with)
+    const hull = inkTogether(inkedHere, { width: 0.006, weld: true })
+    if (hull) g.add(hull)
     if (at) g.position.copy(at)
     // (the head and the hands ride on the body: they bob and rock with it)
     if (part === 'body') { for (const c of [...g.children]) body.add(c) } else body.add(g)
   }
-  inkModel(root, (m) => UNINKED.test(m.name) || UNINKED.test(m.parent?.name ?? ''), { width: 0.006, weld: true })
   const t = { root, mats }
   templates.set(key, t)
   return t

@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { mergeByMaterial } from '@/scene/StaticBatch'
+import { colourVertices, mergeByMaterial } from '@/scene/StaticBatch'
 import { airbrush, gradientMap } from '@/scene/Person3D'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
@@ -91,9 +91,7 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
         const src = m.material as THREE.MeshStandardMaterial
         if (!src.map && !src.transparent && src.opacity === 1 && !/White|Dark/.test(src.name)) {
           m.geometry = m.geometry.clone()
-          const n = m.geometry.attributes.position.count, c = new Float32Array(n * 3)
-          for (let i = 0; i < n; i++) { c[i * 3] = src.color.r; c[i * 3 + 1] = src.color.g; c[i * 3 + 2] = src.color.b }
-          m.geometry.setAttribute('color', new THREE.BufferAttribute(c, 3))
+          colourVertices(m.geometry, src.color)
           m.material = plain
           m.castShadow = !UNINKED.test(m.name)
           m.receiveShadow = true

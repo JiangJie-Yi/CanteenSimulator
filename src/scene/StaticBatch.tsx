@@ -21,6 +21,14 @@ export function keyOf(m: THREE.Material) {
 }
 
 /** the geometry, its own copy, with just what every merged mesh has (and unindexed, so any can go with any) */
+/** a geometry's every vertex given one colour (as a material has it: linear), for a material many plain-coloured pieces share (`vertexColors`):
+ * merged, they're one draw */
+export function colourVertices(g: THREE.BufferGeometry, c: THREE.Color) {
+  const n = g.attributes.position.count, a = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b }
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3))
+}
+
 export function bakeable(g: THREE.BufferGeometry, m: THREE.Matrix4) {
   const src = g.index ? g.toNonIndexed() : g
   const out = new THREE.BufferGeometry()

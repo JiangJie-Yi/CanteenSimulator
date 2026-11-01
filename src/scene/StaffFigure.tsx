@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Look as StaffLook, Role } from '@/data/staff'
 import { inkTogether } from './inkHull'
 import { airbrush, gradientMap } from './Person3D'
-import { bakeable, keyOf } from './StaticBatch'
+import { bakeable, colourVertices, keyOf } from './StaticBatch'
 
 /*
  * The staff, made as the boss is (blender/boss.py with CREW=<variant>): an Overcooked cook's big round head on a short plump body rounding
@@ -50,13 +50,6 @@ function partOf(o: THREE.Object3D): 'handL' | 'handR' | 'fan' | 'eyes' | 'glasse
     if (/^BossEye/.test(n)) return 'eyes'
   }
   return 'body'
-}
-
-/** a geometry's every vertex given the colour (as the material has it: linear), for the one material all plain pieces share */
-function colourVertices(g: THREE.BufferGeometry, c: THREE.Color) {
-  const n = g.attributes.position.count, a = new Float32Array(n * 3)
-  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b }
-  g.setAttribute('color', new THREE.BufferAttribute(a, 3))
 }
 
 /** the variant's figure, built once: its materials the people's soft paint, its parts merged, inked */
