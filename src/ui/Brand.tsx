@@ -62,7 +62,18 @@ export function Brand({ night, lang, shop = 'grilledfish', dark = false, ignite 
         <span className="brand-main">{main}</span>
         <span className="brand-sub">{sub}</span>
       </span>
-      {night && <span key="night" className="brand-late" aria-hidden="true">深夜</span>}
+      {night && (
+        <>
+          {/* (the stamp's ink: its edges roughened as a seal pressed onto paper leaves them) */}
+          <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+            <filter id="brand-ink" x="-10%" y="-10%" width="120%" height="120%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="7" result="n" />
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="1.3" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+          </svg>
+          <span key="night" className="brand-late" aria-hidden="true">深夜</span>
+        </>
+      )}
     </h1>
   )
 }
