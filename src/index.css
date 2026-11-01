@@ -1721,14 +1721,15 @@ button {
 /* side by side (desktop and tablets): the stage always keeps at least half the width; the menu shrinks its tags
    to fit the other half (10 tag columns of 2.7em, plus gaps, the title and padding) */
 @media (min-width: 901px) and (min-height: 521px) {
-  /* side by side: the food gets 60% of the width, the menu 40% (tags shrink to fit it); folded away, the food
-     gets it all */
+  /* side by side: the food gets 60% of the width, the menu 40% (tags shrink to fit it). Folded away by its tab, the menu only slides off and
+     the stage keeps its 60%, so the picture stays just where it was (the owner's: the view is framed on the stage, and the stage widening
+     slid the whole room 20% across); edit mode and a shop not yet opened give the stage the whole width */
   .app {
     grid-template-columns: 60% 40%;
     transition: grid-template-columns 360ms ease;
   }
 
-  .app.menu-folded {
+  .app.menu-folded:is(.is-editing, .is-unopened) {
     grid-template-columns: 100% 0%;
   }
 
@@ -6844,13 +6845,13 @@ html[lang='en'] .menu-title-en { display: none; }
 .chiller-head .panel-x { margin-left: auto; }
 
 /* the menu's fold tab (wide screens): frosted glass, as the money chip is (the owner's: it was a dark, nearly solid tab with gold edges);
-   its gold chevron kept */
+   its gold chevron kept, no rim round it (the owner's: the fine pale line round its edge taken off) */
 @media (min-width: 901px) and (min-height: 521px) {
   .menu-fold {
     background: linear-gradient(180deg, rgb(46 38 30 / 0.34), rgb(22 18 14 / 0.22));
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     backdrop-filter: blur(12px) saturate(1.4);
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.28), 0 6px 18px -8px rgb(0 0 0 / 0.5);
+    box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.5);
   }
   .menu-fold:hover { background: linear-gradient(180deg, rgb(56 46 36 / 0.46), rgb(28 22 18 / 0.32)); filter: none; }
 }
