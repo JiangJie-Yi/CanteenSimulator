@@ -1,6 +1,7 @@
-// The kitchen's sink (blender/sink.py): a shop kitchen's stainless sink against the back wall past the freezer, its basin, its draining
-// board and dish rack, its gooseneck tap. The customers' dirty plates are washed in it: GuestBar3D sets SINK.washing while they are, and
-// the tap runs into the basin.
+// The kitchen's sink (blender/sink.py): a Japanese one, as an old shop's kitchen has it, against the back past the freezer: its counter
+// and deep basin of terrazzo, its dark sugi cabinet with an indigo noren under the basin and slatted sliding doors, a brass tap with a
+// cloth bag tied over its mouth, a bamboo draining basket of plates, a hinoki pail. The customers' dirty plates are washed in it:
+// GuestBar3D sets SINK.washing while they are, and the tap runs into the basin.
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
@@ -11,10 +12,12 @@ import { reflectStudio, useStudio } from '@/scene/studio'
 import { SINK } from './bar'
 
 const URL = import.meta.env.BASE_URL + 'models/sink.glb'
-/** the stainless and chrome: real metal, reflecting the studio (it only reads as steel by what it reflects) */
-const METAL = /^Sink(Steel|Basin|Wire|Handle)$/
-/** the dish rack's wires: too fine for an ink line */
-const FINE = /^SinkRack(Ring|Post|Bar|Tine)/
+/** the brass and the copper: real metal, reflecting the studio (it only reads as metal by what it reflects) */
+const METAL = /^Sink(Brass|Copper)$/
+/** too fine for an ink line, or cloth: the tap's arms and knobs, its bag and string, the rods, rims and pegs, the plates' rims, the slats */
+const FINE = /^Sink(Tap(Arm|Knob|String|Bag|Cap|Stem)|BasketRim|BasketFoot|NorenRod|Noren\d|Towel|Pull|RackPlateRim|DrainHole|Slat|PailWater)/
+/** cloth, seen from either side */
+const CLOTH = /^Sink(Noren|Cloth)$/
 
 const WATER = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent: true, opacity: 0.6, depthWrite: false, toneMapped: false })
 const SPLASH = new THREE.MeshBasicMaterial({ color: '#e8f6fc', transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
@@ -35,7 +38,7 @@ export function SinkModel() {
           const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.85, roughness: Math.max(0.22, src.roughness), envMapIntensity: 0.9 })
           reflectStudio(g)
           t = g
-        } else t = new THREE.MeshToonMaterial({ color: src.color.clone() })
+        } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, side: CLOTH.test(src.name) ? THREE.DoubleSide : THREE.FrontSide })
         t.name = src.name
         mats.set(src, t)
       }

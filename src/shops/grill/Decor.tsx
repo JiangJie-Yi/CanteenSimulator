@@ -693,7 +693,7 @@ function RackAt() {
 }
 /** where the sink stands: on the back wall past the freezer, its back to the wall, its front toward the cook's table (along and lay as the
  * freezer's); drawn a little over its own size (blender/sink.py, in metres) to the kitchen's, its deck level with the cook's table */
-const SINK_AT = { along: 4.15, lay: 5.85, scale: 1.15 }
+const SINK_AT = { along: 4.41, lay: 5.85, scale: 1.15 }
 function SinkAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, SINK_AT.along).addScaledVector(LAY, SINK_AT.lay)

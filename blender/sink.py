@@ -1,12 +1,21 @@
-"""The kitchen's sink (流し台): sink.glb, node "Sink". A shop kitchen's stainless sink on four square legs with a shelf under it: one deep
-basin to the left, a ribbed draining board to the right with a wire dish rack on it (three plates standing in it, a bowl upside down), a
-splashback along the back, a gooseneck tap over the basin with its two handles, a sponge on the deck and a bottle of washing-up liquid.
+"""The kitchen's sink (流し台), Japanese, as an old shop's kitchen has it: sink.glb, node "Sink".
 
-The game's frame, its own size in metres (the room's units): y up, 1.1 across (x), 0.6 deep (z), its deck 0.85 up; its front (the side
-the washer stands at) toward +z, the middle of its foot at the origin.
+- The counter and its basin of terrazzo (人研ぎ: grey-white cement ground smooth, chips of black, grey, white and rust stone in it), a deep
+  basin to the left with its corners rounded and a brass drain, a draining part to the right, a low upstand along the back (low, so the
+  basin's seen over it from the room's open side).
+- The cabinet under it of dark-stained sugi, its frame and panels: under the basin an opening hung with a noren of indigo cotton, a band of
+  white waves across its foot, on a bamboo rod; to the right a pair of sliding doors of vertical slats over a board, each with its sunk
+  pull; a wooden bar across the front with a cloth hung on it; a dark kick at its foot.
+- A brass tap standing up behind the basin, its spout curving over it, a cross handle on top, a little bag of white cloth tied over its
+  mouth (a filter, as kitchens tie on).
+- On the counter: a draining basket of woven bamboo with three plates standing in it and a bowl upside down; a palm-fibre scrubber
+  (棕櫚たわし) and a bar of soap each on its little dish; a hinoki hand pail with copper hoops at the far end.
+
+The game's frame, its own size in metres (the room's units): y up, 1.55 across (x), 0.62 deep (z), the counter's top 0.86 up; its front
+(the side the washer stands at) toward +z, the middle of its foot at the origin.
 
 Nodes the game finds: SinkSpoutTip (where the water comes out), SinkBasinFloor (the middle of the basin's floor: the dirty plates are set
-down there), SinkRackSlot0..2 (where a washed plate stands in the rack).
+down there), SinkRackSlot0..2 (where a washed plate stands in the basket).
 
 Run:
     blender -b --factory-startup --python blender/sink.py -- <project path> [preview.png]
@@ -17,6 +26,7 @@ import sys
 
 import bmesh
 import bpy
+import numpy as np
 from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,12 +35,14 @@ from common import *  # noqa: E402,F403
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREVIEW = argv[1] if len(argv) > 1 else None
+seed(23)
 
-W, D, H = 1.1, 0.6, 0.85        # across, deep, the deck's top
-T = 0.03                        # the deck's thickness
-BASIN = (-0.47, -0.03, -0.17, 0.19)   # its opening: x from, x to, z from (back), z to (front)
-BASIN_DEEP = 0.25
-SPLASH = 0.16                   # the splashback's height over the deck
+W, D, H = 1.55, 0.62, 0.86      # across, deep, the counter's top
+TT = 0.05                       # the counter's thickness
+FRONT = D / 2 - 0.04            # the cabinet's face (the top overhangs it)
+BASIN = (-0.71, -0.09, -0.2, 0.2)   # its opening: x from, x to, z from (back), z to (front)
+BASIN_FLOOR = H - 0.22
+UP = 0.07                       # the upstand along the back
 
 
 def P(x, y, z):
@@ -44,25 +56,97 @@ def lin(hexs):
 
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
+
+# ---------------------------------------------------------------------------------------------------- pictures
+N = 512
+u, v = grid01(N)
+# (terrazzo: a grey-white ground, clouded, and in it chips of stone, black, mid grey, white and a few rust, at a few sizes)
+ground = mix((0.8, 0.79, 0.76), (0.72, 0.71, 0.68), fbm(N, 6, 6, 4))
+terr = ground.copy()
+for cells, thr, col, k in ((90, 0.9, (0.18, 0.18, 0.19), 0.95), (140, 0.88, (0.5, 0.5, 0.5), 0.8), (110, 0.9, (0.96, 0.95, 0.93), 0.9),
+                           (60, 0.95, (0.58, 0.38, 0.28), 0.85), (220, 0.86, (0.35, 0.35, 0.36), 0.7)):
+    chip = smooth(thr, thr + 0.03, vnoise(N, cells, cells))
+    terr = mix(terr, col, chip * k)
+terr = terr * (0.96 + 0.06 * fbm(N, 64, 64, 2))[..., None]
+terr_wet = terr * 0.86
+# (the cabinet's sugi, stained dark: its grain running up it, a board's edge now and then)
+grain = np.sin((u * 34 + (fbm(N, 2, 5, 4) - 0.5) * 0.9 + (fbm(N, 6, 2, 3) - 0.5) * 0.25) * 2 * math.pi) * 0.5 + 0.5
+sugi = mix((0.34, 0.22, 0.14), (0.25, 0.155, 0.095), smooth(0.6, 1.0, grain) * 0.6)
+sugi = sugi * (0.94 + 0.08 * fbm(N, 3, 12, 4))[..., None]
+# (the indigo noren: aizome cotton, its weave, deeper and paler patches of the dye, a band of white waves (seigaiha) across its foot)
+weave = 0.92 + 0.08 * (np.sin(u * 2 * math.pi * 120) * np.sin(v * 2 * math.pi * 120) * 0.5 + 0.5)
+indigo = mix((0.12, 0.17, 0.33), (0.18, 0.25, 0.44), fbm(N, 5, 5, 4)) * weave[..., None]
+wv = np.zeros((N, N), np.float32)
+for row in range(3):
+    cy = 0.06 + row * 0.055
+    for k in range(-1, 9):
+        cx = (k + (row % 2) * 0.5) / 8
+        dist = np.hypot((u - cx) * 1.0, (v - cy) * 1.0)
+        for rr in (0.05, 0.035, 0.02):
+            wv = np.maximum(wv, smooth(0.004, 0.0, np.abs(dist - rr)) * (v > cy))
+indigo = mix(indigo, (0.93, 0.93, 0.9), wv * 0.92)
+indigo = mix(indigo, (0.93, 0.93, 0.9), smooth(0.006, 0.0, np.abs(v - 0.24)) * 0.9)
+# (woven bamboo: strips over and under, each strip its own shade, a gap between them)
+strips = 14
+su, sv = np.floor(u * strips), np.floor(v * strips)
+over = (su + sv) % 2
+shade = 0.85 + 0.15 * np.sin(su * 7.1) * np.cos(sv * 3.3)
+fu, fv = (u * strips) % 1, (v * strips) % 1
+gap = smooth(0.0, 0.08, np.minimum(fu, 1 - fu)) * smooth(0.0, 0.08, np.minimum(fv, 1 - fv))
+bamboo = np.stack([0.78 * shade, 0.64 * shade, 0.38 * shade], -1) * (0.55 + 0.45 * gap)[..., None]
+bamboo = mix(bamboo, (0.68, 0.53, 0.3), (over * 0.25).astype(np.float32))
+# (hinoki for the pail: pale, a fine straight grain)
+hin = mix((0.86, 0.74, 0.55), (0.76, 0.62, 0.42), smooth(0.6, 1.0, np.sin((u * 40 + fbm(N, 2, 4, 3)) * 2 * math.pi) * 0.5 + 0.5) * 0.6)
+# (palm fibre: brown, coarse, its fibres all one way)
+palm = mix((0.36, 0.22, 0.12), (0.52, 0.34, 0.18), vnoise(N, 4, 180)) * (0.85 + 0.15 * vnoise(N, 3, 400))[..., None]
+# (the cloth on the bar: white cotton, a blue line at each end)
+cloth = np.ones((N, N, 3), np.float32) * np.array((0.93, 0.92, 0.88), np.float32) * weave[..., None]
+cloth = mix(cloth, (0.2, 0.3, 0.55), ((np.abs(v - 0.1) < 0.02) | (np.abs(v - 0.9) < 0.02)).astype(np.float32))
+
 M = {
-    "steel": pbr("SinkSteel", lin("#c9cdd2"), rough=0.32, metal=1.0),
-    "basin": pbr("SinkBasin", lin("#a9afb6"), rough=0.38, metal=1.0),
-    "drain": pbr("SinkDrain", lin("#2b2d31"), rough=0.5, metal=0.6),
-    "wire": pbr("SinkWire", lin("#dfe3e8"), rough=0.18, metal=1.0),
-    "rubber": pbr("SinkRubber", lin("#2a2a2c"), rough=0.8),
+    "terrazzo": pbr("SinkTerrazzo", (1, 1, 1), tex=image("sink_terrazzo", np.clip(terr, 0, 1).astype(np.float32)), rough=0.35, coat=0.2),
+    "basin": pbr("SinkTerrazzoWet", (1, 1, 1), tex=image("sink_terrazzo_wet", np.clip(terr_wet, 0, 1).astype(np.float32)), rough=0.2, coat=0.5),
+    "sugi": pbr("SinkSugi", (1, 1, 1), tex=image("sink_sugi", np.clip(sugi, 0, 1).astype(np.float32)), rough=0.5),
+    "kick": pbr("SinkKick", lin("#1a120c"), rough=0.6),
+    "noren": pbr("SinkNoren", (1, 1, 1), tex=image("sink_noren", np.clip(indigo, 0, 1).astype(np.float32)), rough=0.9),
+    "bamboo": pbr("SinkBamboo", (1, 1, 1), tex=image("sink_bamboo", np.clip(bamboo, 0, 1).astype(np.float32)), rough=0.6),
+    "rod": pbr("SinkRod", lin("#b8a066"), rough=0.4),
+    "brass": pbr("SinkBrass", lin("#c9a14a"), rough=0.25, metal=1.0),
+    "copper": pbr("SinkCopper", lin("#b8734a"), rough=0.3, metal=1.0),
+    "drain": pbr("SinkDrain", lin("#2b2620"), rough=0.6),
+    "bag": pbr("SinkBag", lin("#f2f0ea"), rough=0.9),
     "plate": pbr("SinkPlate", lin("#f4f1ea"), rough=0.3),
     "rim": pbr("SinkPlateRim", lin("#2c4f8a"), rough=0.3),
-    "sponge": pbr("SinkSponge", lin("#f2c230"), rough=0.9),
-    "scour": pbr("SinkScour", lin("#2f7a3a"), rough=0.95),
-    "bottle": pbr("SinkBottle", lin("#46a356"), rough=0.2),
-    "cap": pbr("SinkCap", lin("#f2f2f0"), rough=0.4),
-    "handle": pbr("SinkHandle", lin("#e9edf1"), rough=0.15, metal=1.0),
+    "palm": pbr("SinkPalm", (1, 1, 1), tex=image("sink_palm", np.clip(palm, 0, 1).astype(np.float32)), rough=0.95),
+    "soap": pbr("SinkSoap", lin("#f3efe2"), rough=0.5),
+    "dish": pbr("SinkDish", lin("#9fc2b0"), rough=0.2, coat=0.6),
+    "hinoki": pbr("SinkHinoki", (1, 1, 1), tex=image("sink_hinoki", np.clip(hin, 0, 1).astype(np.float32)), rough=0.55),
+    "cloth": pbr("SinkCloth", (1, 1, 1), tex=image("sink_cloth", np.clip(cloth, 0, 1).astype(np.float32)), rough=0.9),
 }
 parts = []
 
 
-def box(name, x0, x1, y0, y1, z0, z1, mat, bev=0.0, seg=2):
-    """a box from its extents (the game's frame); bevelled along its edges if bev"""
+def box_uv(o, tile=0.5):
+    """lay every face's picture flat on it at its true size (a picture every `tile` across), from whichever side it faces"""
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    uvl = bm.loops.layers.uv.verify()
+    for f in bm.faces:
+        n = f.normal
+        for loop in f.loops:
+            c = o.matrix_world @ loop.vert.co
+            if abs(n.z) >= max(abs(n.x), abs(n.y)):
+                loop[uvl].uv = (c.x / tile, c.y / tile)
+            elif abs(n.x) >= abs(n.y):
+                loop[uvl].uv = (c.y / tile, c.z / tile)
+            else:
+                loop[uvl].uv = (c.x / tile, c.z / tile)
+    bm.to_mesh(o.data)
+    bm.free()
+
+
+def box(name, x0, x1, y0, y1, z0, z1, mat, bev=0.0, seg=2, tile=0.5):
+    """a box from its extents (the game's frame), its picture laid at its true size; bevelled along its edges if bev"""
     bpy.ops.mesh.primitive_cube_add(size=1, location=P((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
     o = active()
     o.scale = (x1 - x0, z1 - z0, y1 - y0)
@@ -72,29 +156,25 @@ def box(name, x0, x1, y0, y1, z0, z1, mat, bev=0.0, seg=2):
         b.limit_method = "NONE"
         bpy.context.view_layer.objects.active = o
         bpy.ops.object.modifier_apply(modifier=b.name)
-    finish(o, name, M[mat], smooth_shade=bool(bev))
+    box_uv(o, tile)
+    finish(o, name, M[mat], smooth_shade=False)
     parts.append(o)
     return o
 
 
-def cyl(name, x, y0, y1, z, r, mat, seg=12, axis="y"):
-    """a cylinder from y0 to y1 at (x, z) (or along x / z: then y0, y1 run that way and (x, z) is the other two)"""
-    if axis == "y":
-        loc, rot, depth = P(x, (y0 + y1) / 2, z), (0, 0, 0), y1 - y0
-    elif axis == "x":
-        loc, rot, depth = P((y0 + y1) / 2, x, z), (0, math.pi / 2, 0), y1 - y0
-    else:
-        loc, rot, depth = P(x, z, (y0 + y1) / 2), (math.pi / 2, 0, 0), y1 - y0
-    bpy.ops.mesh.primitive_cylinder_add(vertices=seg, radius=r, depth=depth, location=loc, rotation=rot)
+def cyl(name, x, y0, y1, z, r, mat, seg=16, r1=None):
+    """an upright cylinder from y0 to y1 at (x, z), r across (and r1 at its top, if given)"""
+    bpy.ops.mesh.primitive_cone_add(vertices=seg, radius1=r, radius2=r if r1 is None else r1, depth=y1 - y0, location=P(x, (y0 + y1) / 2, z))
     o = active()
+    cyl_uv(o)
     finish(o, name, M[mat])
     for p in o.data.polygons:
-        p.use_smooth = abs(p.normal.dot(Vector((0, 0, 1) if axis == "y" else (1, 0, 0) if axis == "x" else (0, 1, 0)))) < 0.9
+        p.use_smooth = abs(p.normal.z) < 0.9
     parts.append(o)
     return o
 
 
-def tube(name, pts, r, mat, res=4, sides=8):
+def tube(name, pts, r, mat, res=6, sides=10):
     """a round rod along the points (the game's frame), as a curve made a mesh"""
     cu = bpy.data.curves.new(name, "CURVE")
     cu.dimensions = "3D"
@@ -121,216 +201,285 @@ def tube(name, pts, r, mat, res=4, sides=8):
     return o
 
 
-def lathe(name, prof, mat_of, seg=20, at=(0, 0, 0), tilt=(0, 0, 0)):
-    """a turned shape from its profile (radius, height) pairs, each band its own material (mat_of(i) for the band from point i)"""
-    bm = bmesh.new()
-    rings = []
-    for (r, y) in prof:
-        if r < 1e-5:
-            rings.append([bm.verts.new((0, 0, y))])
-        else:
-            rings.append([bm.verts.new((r * math.cos(2 * math.pi * k / seg), r * math.sin(2 * math.pi * k / seg), y)) for k in range(seg)])
-    mats_used = []
-    for i in range(len(rings) - 1):
-        a, b = rings[i], rings[i + 1]
-        mname = mat_of(i)
-        if mname not in mats_used:
-            mats_used.append(mname)
-        mi = mats_used.index(mname)
-        for k in range(seg):
-            k2 = (k + 1) % seg
-            if len(a) == 1:
-                f = bm.faces.new((a[0], b[k], b[k2]))
-            elif len(b) == 1:
-                f = bm.faces.new((a[k], b[0], a[k2]))
-            else:
-                f = bm.faces.new((a[k], b[k], b[k2], a[k2]))
-            f.material_index = mi
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
-    o = bpy.data.objects.new(name, me)
-    bpy.context.collection.objects.link(o)
-    for mname in mats_used:
-        o.data.materials.append(M[mname])
-    for p in o.data.polygons:
-        p.use_smooth = True
-    o.rotation_euler = tilt
-    o.location = P(*at)
-    parts.append(o)
-    return o
-
-
 def empty(name, x, y, z):
     e = bpy.data.objects.new(name, None)
-    e.location = P(x, y, z)
     bpy.context.collection.objects.link(e)
+    e.location = P(x, y, z)
     parts.append(e)
     return e
 
 
-# ---- the stand: four square legs on rubber feet, a shelf low between them ----
-LEG = 0.04
-for sx in (-1, 1):
-    for sz in (-1, 1):
-        x, z = sx * (W / 2 - 0.05), sz * (D / 2 - 0.06)
-        box(f"SinkLeg{sx}{sz}", x - LEG / 2, x + LEG / 2, 0.025, H - T, z - LEG / 2, z + LEG / 2, "steel", bev=0.006, seg=2)
-        cyl(f"SinkFoot{sx}{sz}", x, 0.0, 0.03, z, 0.022, "rubber", seg=10)
-box("SinkShelf", -W / 2 + 0.06, W / 2 - 0.06, 0.15, 0.17, -D / 2 + 0.07, D / 2 - 0.07, "steel", bev=0.004, seg=1)
-# (the shelf's rim turned down along its front and back)
-for sz in (-1, 1):
-    box(f"SinkShelfRim{sz}", -W / 2 + 0.06, W / 2 - 0.06, 0.13, 0.17, sz * (D / 2 - 0.07) - 0.006, sz * (D / 2 - 0.07) + 0.006, "steel")
-
-# ---- the deck, round its basin: the strips before, behind and either side, the draining board to the right ----
-bx0, bx1, bz0, bz1 = BASIN
-y0, y1 = H - T, H
-box("SinkDeckFront", -W / 2, W / 2, y0, y1, bz1, D / 2 - 0.02, "steel")
-box("SinkDeckBack", -W / 2, W / 2, y0, y1, -D / 2, bz0, "steel")
-box("SinkDeckLeft", -W / 2, bx0, y0, y1, bz0, bz1, "steel")
-box("SinkDeckRight", bx1, W / 2, y0, y1, bz0, bz1, "steel")
-# (its front edge rolled over, a bull nose the length of it)
-cyl("SinkNose", 0, -W / 2, W / 2, D / 2 - 0.02, 0.02, "steel", seg=12, axis="x").location = P(0, H - 0.02, D / 2 - 0.02)
-# (the draining board's ribs, raised a little, running toward the basin)
-for k in range(7):
-    z = bz0 + 0.04 + k * (bz1 - bz0 - 0.08) / 6
-    box(f"SinkRib{k}", bx1 + 0.06, W / 2 - 0.05, H, H + 0.004, z - 0.004, z + 0.004, "steel", bev=0.002, seg=1)
-# (the splashback up the back, a lip turned over its top)
-box("SinkSplash", -W / 2, W / 2, H, H + SPLASH, -D / 2, -D / 2 + 0.02, "steel")
-box("SinkSplashLip", -W / 2, W / 2, H + SPLASH - 0.012, H + SPLASH, -D / 2, -D / 2 + 0.045, "steel", bev=0.004, seg=2)
-# (the deck's sides closed, a skirt down its front)
-box("SinkSkirt", -W / 2, W / 2, H - 0.11, H - T, D / 2 - 0.035, D / 2 - 0.025, "steel")
-
-# ---- the basin: its walls down from the opening's edge to a floor, the corners rounded; a drain in the floor ----
+# ---------------------------------------------------------------------------------------------------- the counter and its basin
+x0, x1, zb, zf = BASIN
+# (the top round the basin's opening: behind it, in front of it, to its left, and the draining part to its right; the front edge rounded)
+box("SinkTopBack", -W / 2, W / 2, H - TT, H, -D / 2, zb, "terrazzo", bev=0.004)
+box("SinkTopFront", -W / 2, W / 2, H - TT, H, zf, D / 2, "terrazzo", bev=0.012, seg=3)
+box("SinkTopLeft", -W / 2, x0, H - TT, H, zb - 0.001, zf + 0.001, "terrazzo", bev=0.003)
+box("SinkTopRight", x1, W / 2, H - TT, H, zb - 0.001, zf + 0.001, "terrazzo", bev=0.003)
+# (the basin: its walls and floor, seen from inside, its upright corners rounded; a lip round its mouth)
+bpy.ops.mesh.primitive_cube_add(size=1, location=P((x0 + x1) / 2, (BASIN_FLOOR + H - 0.002) / 2, (zb + zf) / 2))
+bas = active()
+bas.scale = (x1 - x0, zf - zb, H - 0.002 - BASIN_FLOOR)
+apply_scale(bas)
 bm = bmesh.new()
-cr, n = 0.03, 4
+bm.from_mesh(bas.data)
+bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.9], context="FACES")
+bmesh.ops.bevel(bm, geom=[e for e in bm.edges if abs((e.verts[0].co - e.verts[1].co).normalized().z) > 0.9], offset=0.05, segments=4,
+                affect="EDGES", profile=0.5)
+bmesh.ops.bevel(bm, geom=[e for e in bm.edges if not e.is_boundary and abs((e.verts[0].co - e.verts[1].co).normalized().z) < 0.1
+                          and min(v_.co.z for v_ in e.verts) < bas.dimensions.z * -0.49], offset=0.025, segments=3, affect="EDGES", profile=0.5)
+bmesh.ops.reverse_faces(bm, faces=bm.faces)
+bm.to_mesh(bas.data)
+bm.free()
+box_uv(bas, 0.5)
+finish(bas, "SinkBasin", M["basin"])
+parts.append(bas)
+# (its drain: a brass ring and a dark grate)
+cyl("SinkDrainRing", (x0 + x1) / 2, BASIN_FLOOR, BASIN_FLOOR + 0.004, (zb + zf) / 2, 0.035, "brass", seg=20)
+cyl("SinkDrainHole", (x0 + x1) / 2, BASIN_FLOOR + 0.004, BASIN_FLOOR + 0.0045, (zb + zf) / 2, 0.026, "drain", seg=20)
+empty("SinkBasinFloor", (x0 + x1) / 2, BASIN_FLOOR + 0.005, (zb + zf) / 2 + 0.03)
+# (the low upstand along the back)
+box("SinkUpstand", -W / 2, W / 2, H, H + UP, -D / 2, -D / 2 + 0.04, "terrazzo", bev=0.008, seg=3)
 
-
-def rrect(y, inset):
-    pts = []
-    hx, hz = (bx1 - bx0) / 2 - inset, (bz1 - bz0) / 2 - inset
-    cx, cz = (bx0 + bx1) / 2, (bz0 + bz1) / 2
-    r = cr
-    for qx, qz, a0 in ((hx - r, hz - r, 0.0), (-(hx - r), hz - r, 0.5 * math.pi), (-(hx - r), -(hz - r), math.pi), (hx - r, -(hz - r), 1.5 * math.pi)):
-        for k in range(n + 1):
-            a = a0 + 0.5 * math.pi * k / n
-            pts.append(bm.verts.new(P(cx + qx + r * math.cos(a), y, cz + qz + r * math.sin(a))))
-    return pts
-
-
-top = rrect(H, 0.0)
-lip = rrect(H - 0.012, 0.0)
-low = rrect(H - BASIN_DEEP + 0.03, 0.01)
-bot = rrect(H - BASIN_DEEP, 0.03)
-for ra, rb in ((top, lip), (lip, low), (low, bot)):
-    m = len(ra)
-    for k in range(m):
-        k2 = (k + 1) % m
-        bm.faces.new((ra[k], ra[k2], rb[k2], rb[k]))
-c = bm.verts.new(P((bx0 + bx1) / 2, H - BASIN_DEEP, (bz0 + bz1) / 2))
-m = len(bot)
-for k in range(m):
-    bm.faces.new((bot[k], bot[(k + 1) % m], c))
-# (seen from above, from inside: every face turned to face the basin's middle)
-inside = P((bx0 + bx1) / 2, H - BASIN_DEEP / 2, (bz0 + bz1) / 2)
-bm.normal_update()
-for f in bm.faces:
-    if (f.calc_center_median() - inside).dot(f.normal) > 0:
-        f.normal_flip()
-me = bpy.data.meshes.new("SinkBasin")
+# ---------------------------------------------------------------------------------------------------- the cabinet
+# (the body round the basin: under it, and in front, behind and either side of it up to the top, so the basin's hollow stays open)
+BZ0, BZ1, BY = -D / 2 + 0.02, FRONT - 0.012, BASIN_FLOOR - 0.012
+box("SinkBody", -W / 2 + 0.01, W / 2 - 0.01, 0.08, BY, BZ0, BZ1, "sugi", tile=0.6)
+box("SinkBodyFront", -W / 2 + 0.01, W / 2 - 0.01, BY, H - TT, zf + 0.006, BZ1, "sugi", tile=0.6)
+box("SinkBodyBack", -W / 2 + 0.01, W / 2 - 0.01, BY, H - TT, BZ0, zb - 0.006, "sugi", tile=0.6)
+box("SinkBodyLeft", -W / 2 + 0.01, x0 - 0.006, BY, H - TT, zb - 0.006, zf + 0.006, "sugi", tile=0.6)
+box("SinkBodyRight", x1 + 0.006, W / 2 - 0.01, BY, H - TT, zb - 0.006, zf + 0.006, "sugi", tile=0.6)
+box("SinkKick", -W / 2 + 0.03, W / 2 - 0.03, 0.0, 0.08, -D / 2 + 0.04, FRONT - 0.06, "kick")
+# (the front's frame: stiles at both ends and in the middle, a rail under the top and one at the foot)
+MID = -0.02
+for x_ in (-W / 2 + 0.01, MID - 0.02, W / 2 - 0.05):
+    box(f"SinkStile{x_:+.2f}", x_, x_ + 0.04, 0.08, H - TT, FRONT - 0.012, FRONT + 0.008, "sugi", bev=0.002, tile=0.6)
+box("SinkRailTop", -W / 2 + 0.01, W / 2 - 0.01, H - TT - 0.045, H - TT, FRONT - 0.012, FRONT + 0.008, "sugi", bev=0.002, tile=0.6)
+box("SinkRailFoot", -W / 2 + 0.01, W / 2 - 0.01, 0.08, 0.12, FRONT - 0.012, FRONT + 0.008, "sugi", bev=0.002, tile=0.6)
+# (under the basin: the opening's inside dark, a noren hung across it on a bamboo rod: two panels, a little wavy, split down the middle)
+box("SinkHollow", -W / 2 + 0.05, MID - 0.02, 0.12, H - TT - 0.045, FRONT - 0.2, FRONT - 0.19, "kick")
+rod_y = H - TT - 0.06
+tube("SinkNorenRod", [(-W / 2 + 0.03, rod_y, FRONT + 0.02), (MID + 0.0, rod_y, FRONT + 0.02)], 0.008, "rod", res=2, sides=8)
+for k, (a, b) in enumerate(((-W / 2 + 0.06, -0.39), (-0.375, MID - 0.03))):
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    NX, NY = 12, 6
+    top_, bot_ = rod_y - 0.004, 0.14
+    grid = [[bm.verts.new(P(a + (b - a) * i / NX, top_ + (bot_ - top_) * j / NY, FRONT + 0.022 + 0.008 * math.sin(i / NX * math.pi * 3 + k) * (j / NY)))
+             for i in range(NX + 1)] for j in range(NY + 1)]
+    for j in range(NY):
+        for i in range(NX):
+            f = bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+            for loop, (ii, jj) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
+                loop[uvl].uv = ((a + (b - a) * ii / NX + W / 2) / 0.8, 1 - jj / NY)
+    me = bpy.data.meshes.new(f"SinkNoren{k}")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(f"SinkNoren{k}", me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(M["noren"])
+    for p in o.data.polygons:
+        p.use_smooth = True
+    parts.append(o)
+# (to the right: a pair of sliding doors, one a little in front of the other, each a frame of vertical slats over a board, a sunk pull)
+for k, (a, b, dz) in enumerate(((MID + 0.02, 0.38, 0.0), (0.34, W / 2 - 0.05, 0.012))):
+    zf_ = FRONT + 0.006 + dz
+    box(f"SinkDoorBoard{k}", a + 0.01, b - 0.01, 0.13, H - TT - 0.05, zf_ - 0.008, zf_, "sugi", tile=0.6)
+    for x_ in (a, b - 0.03):
+        box(f"SinkDoorStile{k}{x_:+.2f}", x_, x_ + 0.03, 0.12, H - TT - 0.045, zf_, zf_ + 0.016, "sugi", bev=0.002, tile=0.6)
+    for y_ in (0.12, H - TT - 0.075):
+        box(f"SinkDoorRail{k}{y_:.2f}", a, b, y_, y_ + 0.03, zf_, zf_ + 0.016, "sugi", bev=0.002, tile=0.6)
+    n_sl = int((b - a - 0.06) / 0.034)
+    for s_ in range(n_sl):
+        xs = a + 0.03 + (b - a - 0.06) * (s_ + 0.5) / n_sl
+        box(f"SinkSlat{k}{s_}", xs - 0.006, xs + 0.006, 0.15, H - TT - 0.075, zf_ + 0.002, zf_ + 0.012, "sugi", tile=0.6)
+    # (its pull: a dark oval let into the stile by the meeting edge)
+    px = b - 0.015 if k == 0 else a + 0.015
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.012, depth=0.004, location=P(px, 0.5, zf_ + 0.0165), rotation=(math.pi / 2, 0, 0))
+    o = active()
+    o.scale = (0.6, 1.0, 1.0)
+    apply_scale(o)
+    finish(o, f"SinkPull{k}", M["kick"])
+    parts.append(o)
+# (a wooden bar across the doors' tops, a cloth hung over it)
+tube("SinkTowelBar", [(0.08, H - TT - 0.03, FRONT + 0.05), (0.62, H - TT - 0.03, FRONT + 0.05)], 0.008, "rod", res=2, sides=8)
+for x_ in (0.08, 0.62):
+    box(f"SinkTowelPeg{x_:.2f}", x_ - 0.008, x_ + 0.008, H - TT - 0.04, H - TT - 0.02, FRONT + 0.008, FRONT + 0.05, "sugi")
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+cl = []
+for j in range(9):
+    t = j / 8
+    if t < 0.5:
+        a_ = math.pi * t / 0.5
+        y_, z_ = H - TT - 0.03 + 0.012 * math.sin(a_), FRONT + 0.05 + 0.012 * math.cos(a_)
+    else:
+        y_, z_ = H - TT - 0.03 - (t - 0.5) * 0.36, FRONT + 0.05 + (0.012 if j % 2 else 0.016) * (1 if t > 0.5 else -1)
+    cl.append([bm.verts.new(P(0.2 + 0.24 * i / 4, y_, z_ + 0.004 * math.sin(i * 1.7 + j))) for i in range(5)])
+for j in range(8):
+    for i in range(4):
+        f = bm.faces.new((cl[j][i], cl[j][i + 1], cl[j + 1][i + 1], cl[j + 1][i]))
+        for loop, (ii, jj) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
+            loop[uvl].uv = (ii / 4, jj / 8)
+me = bpy.data.meshes.new("SinkTowel")
 bm.to_mesh(me)
 bm.free()
-basin = bpy.data.objects.new("SinkBasin", me)
-bpy.context.collection.objects.link(basin)
-basin.data.materials.append(M["basin"])
-for p in basin.data.polygons:
+o = bpy.data.objects.new("SinkTowel", me)
+bpy.context.collection.objects.link(o)
+o.data.materials.append(M["cloth"])
+for p in o.data.polygons:
     p.use_smooth = True
-parts.append(basin)
-cyl("SinkDrainPlate", (bx0 + bx1) / 2, H - BASIN_DEEP + 0.0005, H - BASIN_DEEP + 0.004, (bz0 + bz1) / 2, 0.045, "drain", seg=20)
-cyl("SinkDrainRing", (bx0 + bx1) / 2, H - BASIN_DEEP + 0.004, H - BASIN_DEEP + 0.006, (bz0 + bz1) / 2, 0.05, "wire", seg=20)
-empty("SinkBasinFloor", (bx0 + bx1) / 2, H - BASIN_DEEP + 0.006, (bz0 + bz1) / 2)
+parts.append(o)
 
-# ---- the tap: a pillar on the deck behind the basin, a gooseneck over it, a handle either side ----
-TX, TZ = (bx0 + bx1) / 2, -D / 2 + 0.085
-cyl("SinkTapBase", TX, H, H + 0.03, TZ, 0.028, "handle", seg=16)
-cyl("SinkTapPillar", TX, H + 0.03, H + 0.24, TZ, 0.014, "handle", seg=12)
-neck = tube("SinkTapNeck", [(TX, H + 0.235, TZ), (TX, H + 0.33, TZ + 0.05), (TX, H + 0.31, TZ + 0.17), (TX, H + 0.25, TZ + 0.2)], 0.012, "handle", res=6, sides=8)
-cyl("SinkTapNozzle", TX, H + 0.225, H + 0.255, TZ + 0.2, 0.014, "handle", seg=12)
-empty("SinkSpoutTip", TX, H + 0.224, TZ + 0.2)
-for sx in (-1, 1):
-    hx = TX + sx * 0.1
-    cyl(f"SinkValve{sx}", hx, H, H + 0.05, TZ, 0.016, "handle", seg=12)
-    # (a cross handle on each: four short spokes and a cap, red or blue on it)
-    for a in range(4):
-        ang = a * math.pi / 2 + math.pi / 4
-        p0 = (hx, H + 0.055, TZ)
-        p1 = (hx + 0.035 * math.cos(ang), H + 0.058, TZ + 0.035 * math.sin(ang))
-        tube(f"SinkSpoke{sx}{a}", [p0, p1], 0.005, "handle", res=1, sides=6)
-    cap = cyl(f"SinkValveCap{sx}", hx, H + 0.05, H + 0.065, TZ, 0.012, "handle", seg=12)
-dot_r = pbr("SinkHot", lin("#c4302a"), rough=0.3)
-dot_b = pbr("SinkCold", lin("#2a6ab0"), rough=0.3)
-for sx, mat in ((-1, dot_r), (1, dot_b)):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.007, depth=0.003, location=P(TX + sx * 0.1, H + 0.0665, TZ))
+# ---------------------------------------------------------------------------------------------------- the tap
+tx = (x0 + x1) / 2
+tz = -D / 2 + 0.07
+cyl("SinkTapFoot", tx, H, H + 0.015, tz, 0.028, "brass", seg=20)
+cyl("SinkTapRiser", tx, H + 0.015, H + 0.26, tz, 0.013, "brass", seg=16)
+# (the spout: up over and down toward the basin's middle)
+spout = [(tx, H + 0.24, tz), (tx, H + 0.29, tz + 0.06), (tx, H + 0.25, tz + 0.17), (tx, H + 0.2, tz + 0.21)]
+tube("SinkTapSpout", spout, 0.011, "brass", res=8, sides=12)
+mouth = spout[-1]
+cyl("SinkTapMouth", tx, mouth[1] - 0.02, mouth[1], mouth[2], 0.0125, "brass", seg=16)
+empty("SinkSpoutTip", tx, mouth[1] - 0.06, mouth[2])
+# (the cross handle on top, its four arms and a cap)
+cyl("SinkTapStem", tx, H + 0.26, H + 0.29, tz, 0.009, "brass", seg=12)
+for a_ in range(4):
+    ang = math.pi / 4 + a_ * math.pi / 2
+    tube(f"SinkTapArm{a_}", [(tx, H + 0.285, tz), (tx + 0.045 * math.cos(ang), H + 0.29, tz + 0.045 * math.sin(ang))], 0.005, "brass", res=1, sides=8)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=10, ring_count=6, location=P(tx + 0.045 * math.cos(ang), H + 0.29, tz + 0.045 * math.sin(ang)))
+    finish(active(), f"SinkTapKnob{a_}", M["brass"])
+    parts.append(active())
+cyl("SinkTapCap", tx, H + 0.29, H + 0.3, tz, 0.012, "brass", seg=12, r1=0.006)
+# (a little bag of white cloth tied over its mouth, a string round its neck)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=8, location=P(tx, mouth[1] - 0.045, mouth[2]))
+bag = active()
+bag.scale = (0.022, 0.022, 0.035)
+apply_scale(bag)
+bm = bmesh.new()
+bm.from_mesh(bag.data)
+for vtx in bm.verts:
+    vtx.co.x += 0.002 * math.sin(vtx.co.z * 300)
+bm.to_mesh(bag.data)
+bm.free()
+finish(bag, "SinkTapBag", M["bag"])
+parts.append(bag)
+cyl("SinkTapString", tx, mouth[1] - 0.022, mouth[1] - 0.016, mouth[2], 0.0135, "rod", seg=12)
+
+# ---------------------------------------------------------------------------------------------------- on the counter
+# (the draining basket: woven bamboo, a rim of split cane, standing on the draining part)
+bx0, bx1, bz0, bz1 = 0.04, 0.5, -0.17, 0.13
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+y0_, y1_ = H + 0.012, H + 0.13
+corners = [(bx0, bz0), (bx1, bz0), (bx1, bz1), (bx0, bz1)]
+lo = [bm.verts.new(P(x_, y0_, z_)) for x_, z_ in corners]
+hi = [bm.verts.new(P(x_ + (0.012 if x_ > 0.25 else -0.012), y1_, z_ + (0.012 if z_ > 0 else -0.012))) for x_, z_ in corners]
+fb = bm.faces.new(lo[::-1])
+for loop in fb.loops:
+    loop[uvl].uv = ((loop.vert.co.x + 1) * 2, (loop.vert.co.y + 1) * 2)
+for i in range(4):
+    j = (i + 1) % 4
+    f = bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    L_ = (Vector(corners[j]) - Vector(corners[i])).length
+    for loop, uv in zip(f.loops, ((0, 0), (L_ * 3, 0), (L_ * 3, 0.36), (0, 0.36))):
+        loop[uvl].uv = uv
+me = bpy.data.meshes.new("SinkBasket")
+bm.to_mesh(me)
+bm.free()
+basket = bpy.data.objects.new("SinkBasket", me)
+bpy.context.collection.objects.link(basket)
+basket.data.materials.append(M["bamboo"])
+sol = basket.modifiers.new("s", "SOLIDIFY")
+sol.thickness = 0.006
+bpy.context.view_layer.objects.active = basket
+bpy.ops.object.modifier_apply(modifier="s")
+parts.append(basket)
+rim = [(x_ + (0.012 if x_ > 0.25 else -0.012), y1_, z_ + (0.012 if z_ > 0 else -0.012)) for x_, z_ in corners]
+tube("SinkBasketRim", rim + [rim[0]], 0.006, "rod", res=2, sides=8)
+# (feet: two little bamboo runners under it)
+for z_ in (bz0 + 0.04, bz1 - 0.04):
+    tube(f"SinkBasketFoot{z_:+.2f}", [(bx0 + 0.02, H + 0.006, z_), (bx1 - 0.02, H + 0.006, z_)], 0.006, "rod", res=1, sides=8)
+# (three plates standing in it, edge on, and a bowl upside down beside them)
+for k in range(3):
+    px = 0.12 + k * 0.06
+    py, pz = H + 0.012 + 0.11, (bz0 + bz1) / 2 - 0.02
+    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.11, depth=0.012, location=P(px, py, pz), rotation=(0, math.pi / 2, 0))
     o = active()
-    o.name = f"SinkValveDot{sx}"
-    o.data.materials.append(mat)
+    o.rotation_euler = (0, math.pi / 2 + 0.12, 0)
+    finish(o, f"SinkRackPlate{k}", M["plate"])
     parts.append(o)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.106, minor_radius=0.004, major_segments=28, minor_segments=6, location=P(px, py, pz), rotation=(0, math.pi / 2 + 0.12, 0))
+    finish(active(), f"SinkRackPlateRim{k}", M["rim"])
+    parts.append(active())
+    empty(f"SinkRackSlot{k}", px, py, pz)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=20, ring_count=10, location=P(0.4, H + 0.012, 0.0))
+bowl = active()
+bowl.scale = (0.075, 0.075, 0.055)
+apply_scale(bowl)
+bm = bmesh.new()
+bm.from_mesh(bowl.data)
+bmesh.ops.delete(bm, geom=[v_ for v_ in bm.verts if v_.co.z < -0.001], context="VERTS")
+bm.to_mesh(bowl.data)
+bm.free()
+sol = bowl.modifiers.new("s", "SOLIDIFY")
+sol.thickness = 0.004
+bpy.context.view_layer.objects.active = bowl
+bpy.ops.object.modifier_apply(modifier="s")
+finish(bowl, "SinkRackBowl", M["plate"])
+parts.append(bowl)
+# (by the basin's front right corner: the palm scrubber on its dish, the soap on its)
+cyl("SinkDish0", -0.02, H, H + 0.01, 0.2, 0.05, "dish", seg=20, r1=0.055)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(-0.02, H + 0.035, 0.2))
+palm = active()
+palm.scale = (0.055, 0.035, 0.03)
+apply_scale(palm)
+bm = bmesh.new()
+bm.from_mesh(palm.data)
+for vtx in bm.verts:
+    vtx.co *= 1 + 0.08 * math.sin(vtx.co.x * 260) * math.cos(vtx.co.y * 310)
+bm.to_mesh(palm.data)
+bm.free()
+cyl_uv(palm)
+finish(palm, "SinkPalm", M["palm"])
+parts.append(palm)
+cyl("SinkDish1", -0.02, H, H + 0.01, 0.07, 0.045, "dish", seg=20, r1=0.05)
+box("SinkSoap", -0.055, 0.015, H + 0.01, H + 0.035, 0.05, 0.095, "soap", bev=0.008, seg=3)
+# (the hinoki hand pail at the far end: staves, two copper hoops, its upright handle board)
+pxp, pzp = 0.64, 0.02
+cyl("SinkPail", pxp, H, H + 0.15, pzp, 0.085, "hinoki", seg=24, r1=0.095)
+cyl("SinkPailWater", pxp, H + 0.12, H + 0.121, pzp, 0.088, "basin", seg=24)
+for y_ in (H + 0.03, H + 0.12):
+    cyl(f"SinkPailHoop{y_:.2f}", pxp, y_, y_ + 0.012, pzp, 0.088 + (y_ - H) * 0.065 + 0.002, "copper", seg=24)
+box("SinkPailHandle", pxp - 0.012, pxp + 0.012, H + 0.1, H + 0.26, pzp - 0.095, pzp - 0.08, "hinoki", bev=0.003)
 
-# ---- the dish rack on the draining board: a wire basket, plates standing in it, a bowl upside down ----
-RX0, RX1, RZ0, RZ1 = bx1 + 0.08, W / 2 - 0.04, bz0 + 0.02, bz1 - 0.01
-RY = H + 0.012
-RH = 0.1
-for y in (RY, RY + RH):
-    tube(f"SinkRackRing{int(y * 1000)}", [(RX0, y, RZ0), (RX1, y, RZ0), (RX1, y, RZ1), (RX0, y, RZ1), (RX0, y, RZ0)], 0.003, "wire", res=1, sides=5)
-for k in range(6):
-    x = RX0 + (RX1 - RX0) * k / 5
-    for z in (RZ0, RZ1):
-        tube(f"SinkRackPost{k}{int(z * 100)}", [(x, RY, z), (x, RY + RH, z)], 0.0025, "wire", res=1, sides=5)
-# (the floor's bars across, and the low comb the plates stand in)
-for k in range(9):
-    z = RZ0 + (RZ1 - RZ0) * (k + 0.5) / 9
-    tube(f"SinkRackBar{k}", [(RX0, RY, z), (RX1, RY, z)], 0.0022, "wire", res=1, sides=5)
-for k in range(7):
-    x = RX0 + 0.05 + k * 0.035
-    tube(f"SinkRackTine{k}", [(x, RY, RZ0 + 0.06), (x, RY + 0.06, RZ0 + 0.06), (x, RY + 0.06, RZ1 - 0.05), (x, RY, RZ1 - 0.05)], 0.0022, "wire", res=1, sides=5)
-
-PLATE = [(0.0, 0.0), (0.06, 0.0), (0.075, 0.006), (0.105, 0.016), (0.12, 0.024), (0.115, 0.028), (0.1, 0.02), (0.07, 0.012), (0.0, 0.012)]
-for i in range(3):
-    x = RX0 + 0.065 + i * 0.07
-    o = lathe(f"SinkRackPlate{i}", PLATE, lambda b: "rim" if b in (3, 4, 5) else "plate", seg=20, at=(x, RY + 0.125, (RZ0 + RZ1) / 2 + 0.01),
-              tilt=(math.radians(84), 0, math.radians(90 + 6 - i * 4)))
-    empty(f"SinkRackSlot{i}", x, RY + 0.125, (RZ0 + RZ1) / 2 + 0.01)
-BOWL = [(0.0, 0.0), (0.035, 0.0), (0.04, 0.006), (0.07, 0.03), (0.082, 0.062), (0.079, 0.064), (0.066, 0.034), (0.034, 0.01), (0.0, 0.01)]
-lathe("SinkRackBowl", BOWL, lambda b: "rim" if b in (3, 4) else "plate", seg=18, at=(RX1 - 0.09, RY + 0.075, (RZ0 + RZ1) / 2 + 0.03),
-      tilt=(math.pi, 0, 0))
-
-# ---- a sponge on the deck by the basin's back corner, and the washing-up liquid at the back on the right ----
-box("SinkSponge", bx0 + 0.02, bx0 + 0.11, H, H + 0.026, -D / 2 + 0.035, -D / 2 + 0.095, "sponge", bev=0.006, seg=2)
-box("SinkScourPad", bx0 + 0.02, bx0 + 0.11, H + 0.026, H + 0.034, -D / 2 + 0.035, -D / 2 + 0.095, "scour", bev=0.003, seg=1)
-BOTTLE = [(0.0, 0.0), (0.03, 0.0), (0.034, 0.008), (0.034, 0.13), (0.026, 0.16), (0.014, 0.175), (0.012, 0.19), (0.0, 0.19)]
-lathe("SinkBottle", BOTTLE, lambda b: "cap" if b >= 5 else "bottle", seg=16, at=(W / 2 - 0.07, H, -D / 2 + 0.06))
-
-# ---- put together under one root, the deck's steel joined into one mesh ----
+# ---------------------------------------------------------------------------------------------------- out
 root = bpy.data.objects.new("Sink", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
     o.parent = root
-meshes = [o for o in parts if o.type == "MESH"]
-print("SINK_TRIS", sum(len(p.vertices) - 2 for o in meshes for p in o.data.polygons))
+tris = 0
+for o in parts:
+    if o.type == "MESH":
+        o.data.calc_loop_triangles()
+        tris += len(o.data.loop_triangles)
+print("SINK_TRIS", tris)
 if PREVIEW:
-    target = P(0, 0.75, 0)
-    cam = bpy.data.objects.new("PreviewCam", bpy.data.cameras.new("PreviewCam"))
+    at = P(-0.1, H * 0.7, 0)
+    cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = P(0.9, 1.7, 1.6)
-    cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+    cam.location = P(*map(float, os.environ.get("PREVIEW_CAM", "0.9,1.55,2.0").split(",")))
+    cam.rotation_mode = "QUATERNION"
+    cam.rotation_quaternion = (at - cam.location).to_track_quat("-Z", "Y")
+    cam.data.lens = 40
     bpy.context.scene.camera = cam
-    lt = bpy.data.objects.new("Key", bpy.data.lights.new("Key", "SUN"))
-    lt.data.energy = 4
-    bpy.context.collection.objects.link(lt)
-    lt.location = P(1, 2, 1.5)
-    lt.rotation_euler = (target - lt.location).to_track_quat("-Z", "Y").to_euler()
-    world = bpy.data.worlds.new("PreviewWorld")
-    world.color = (0.5, 0.48, 0.46)
-    bpy.context.scene.world = world
+    sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
+    sun.data.energy = 3.5
+    sun.rotation_euler = (0.8, 0.2, 0.6)
+    bpy.context.collection.objects.link(sun)
+    w = bpy.data.worlds.new("W")
+    w.use_nodes = True
+    w.node_tree.nodes["Background"].inputs[0].default_value = (0.55, 0.55, 0.55, 1)
+    bpy.context.scene.world = w
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "sink.glb"), os.path.join(PROJECT, "blender", "sink.blend"), PREVIEW)
 print("SINK_DONE")
