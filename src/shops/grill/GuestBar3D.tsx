@@ -14,6 +14,7 @@ import { Person } from '@/scene/Person3D'
 import { FOLK_HEIGHT, FolkFigure, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
+import { Omamori } from './Omamori'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { brushText, followSign, signTexture } from '@/scene/signFont'
@@ -632,6 +633,12 @@ function RegisterImpl({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
       <group position={[-0.52, top, 0.12]}><TillDeskPiece name="TillPens" /></group>
       </group>
       </StaticBatch></Movable>
+      <Movable id="till-omamori" label="御守">
+      <group position={at} rotation-y={yaw}>
+      {/* an omamori, 開運招福 (the owner's, after their picture; blender/omamori.py): on the desk mat, leaning back on the pen cup */}
+      <group position={[-0.46, top + 0.002, 0.16]} rotation={[-0.2, -0.35, 0]}><Omamori /></group>
+      </group>
+      </Movable>
       <Movable id="till-bell" label="服務鈴" baseTurn={[0, 25, 0]}>
       <group position={at} rotation-y={yaw}>
       {/* the service bell (blender/tilldesk.py): rung with a click */}

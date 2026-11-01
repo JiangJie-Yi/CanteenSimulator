@@ -177,6 +177,8 @@ export const BASES: Record<string, V3> = {
   'till-register': [0.2116, 0, -0.1851],
   'till-ipad': [-0.5181, 0.15, 0.3774],
   'till-pens': [0.3202, 0.15, -0.43],
+  // (on the mat beside the pen cup, as the pens are)
+  'till-omamori': [0.3202, 0.15, -0.43],
   'till-printer': [-0.0059, 0.15, -0.008],
   'till-card': [0, 0.15, 0],
   // (the bell moved on by X 0.012 Z -0.031, the printer by X -0.02, in the room's frame)
