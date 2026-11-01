@@ -437,7 +437,17 @@ function TrashBinImpl({ position, container, contents = 0 }: { position: [number
 }
 
 const PASS_TRAY_URL = import.meta.env.BASE_URL + 'models/passtray.glb'
-/** the pass's tray (blender/passtray.py): black lacquer, its inside vermilion, a gold line along its lip, on two runners; in the room's toon light */
+/** the pass's shelf on the lip between the first two places, in the scene: where the bar's frame has it (along and across the first counter
+ * on its unit directions, as the bar's drawn), its turn the bar's */
+const PASS_SHELF_AT = (() => {
+  const c0 = GRILL_COUNTERS[0]
+  const p = c0.at.clone().addScaledVector(c0.along.clone().normalize(), -c0.length / 2 + PASS_ALONG).addScaledVector(c0.lay.clone().normalize(), PASS_LAY)
+  return toGrillScene(p).setY((BAR_TOP + LIP_H + PASS_SHELF.t / 2) * GRILL_SCALE + GRILL_OFFSET.y)
+})()
+const PASS_SHELF_YAW = Math.atan2(-GRILL_COUNTERS[0].along.z, GRILL_COUNTERS[0].along.x)
+/** the pass's tray (blender/passtray.py): black lacquer, its inside vermilion, a gold line along its lip, on two runners; in the room's toon light.
+ * Its shelf, a board of the lip's wood, with it: both only while the shop's open (the owner, seeing the bare board on the lip with the shop
+ * shut, asked what it was; it's there to hold the tray) */
 const PassTray = memo(PassTrayImpl)
 function PassTrayImpl() {
   const at = PASS_SCENE.clone().setY(PASS_SCENE.y - 0.04)
@@ -464,7 +474,15 @@ function PassTrayImpl() {
     inkModel(r, () => false, { width: 0.002, weld: true })
     return r
   }, [gltf])
-  return <group position={at} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><primitive object={obj} /></group>
+  return (
+    <>
+      <group position={PASS_SHELF_AT} rotation-y={PASS_SHELF_YAW} scale={GRILL_SCALE}>
+        <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len, PASS_SHELF.t, PASS_SHELF.deep]} castShadow receiveShadow><meshToonMaterial color="#ffffff" map={TRAY_WOOD} /></mesh>
+        <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len * 1.01, PASS_SHELF.t * 1.25, PASS_SHELF.deep * 1.03]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+      </group>
+      <group position={at} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><primitive object={obj} /></group>
+    </>
+  )
 }
 useGLTF.preload(PASS_TRAY_URL)
 
@@ -1836,13 +1854,7 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
           </group>
         )
       })()}
-      {/* the pass's shelf, on the lip between the first two places: a board of the lip's wood, the tray stood on it (PassTray) */}
-      {c === GRILL_COUNTERS[0] && (
-        <group position={[-L / 2 + PASS_ALONG, BAR_TOP + LIP_H + PASS_SHELF.t / 2, PASS_LAY]}>
-          <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len, PASS_SHELF.t, PASS_SHELF.deep]} castShadow><meshToonMaterial color="#ffffff" map={TRAY_WOOD} /></mesh>
-          <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len * 1.01, PASS_SHELF.t * 1.25, PASS_SHELF.deep * 1.03]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
-        </group>
-      )}
+      {/* (the pass's shelf is drawn with its tray, while the shop's open: PassTray) */}
       {Array.from({ length: c.seats }, (_, n) => {
         const x = seatAlong(c, n)
         return (

@@ -536,8 +536,8 @@ export const PASS_ALONG = 0.65
 /** and across it: up on a shelf over the raised lip on the cook's side (a 付け台), above the places, not down among their plates and soy dishes
  * (between two places evenly spaced there was no room for the tray: it lay under the next place's soy dish, and its plate went into it) */
 export const PASS_LAY = 0.28
+/** (the tray centred on its shelf: it stood 0.14 further in, over the cook table's edge, and the lantern there stood in it) */
 export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + PASS_ALONG).addScaledVector(cs[0].lay, PASS_LAY)
-  .addScaledVector(cs[0].lay, 0.14)
 
 /**
  * The whole shop's floor as one rectangle, in the first counter's frame (along it and across it, lay, from its middle):
