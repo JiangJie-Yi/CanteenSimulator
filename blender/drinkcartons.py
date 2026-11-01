@@ -1,9 +1,11 @@
 """Cardboard cases of drinks (段ボール), stacked by the crates at the back of the drinks: drinkcartons.glb, node "DrinkCartons".
 
-Five cases: two side by side on the floor, two on them a little askew, one on top turned across. Each a box of kraft board, bulging a hair, its
+Nine cases (the owner: bigger cases, more of them, stacked up high): two side by side to a layer, four layers each a little askew on the
+last, one on top turned across, about 1.1 tall. Each a box of kraft board, bulging a hair, its
 top flaps shut under a strip of brown tape running over and down the ends, its edges eased; its long sides and one end printed (material
 "CartonPrint<k>", the picture laid once over each printed face: the game draws each its own drink's print on it), the rest plain board
-("CartonKraft"). The game's frame: y up, the stack standing on y = 0, its middle at the origin; each case 0.30 long, 0.14 tall, 0.20 deep.
+("CartonKraft"). The game's frame: y up, the stack standing on y = 0, its middle at the origin; each case 0.40 long, 0.21 tall, 0.28 deep
+(a case of 24 cans; they were 0.30 x 0.14 x 0.20). The five prints shared round the nine (CartonPrint0..4).
 
 Run:
     blender -b --factory-startup --python blender/drinkcartons.py -- <project path> [preview.png]
@@ -24,7 +26,7 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
-L, H, D = 0.30, 0.14, 0.20
+L, H, D = 0.40, 0.21, 0.28
 
 
 def P(x, y, z):
@@ -54,8 +56,8 @@ PRINTS = [pbr(f"CartonPrint{k}", (1, 1, 1), tex=image(f"cartonprint{k}", kraft()
 parts = []
 
 
-def carton(k, at, turn):
-    """one case, its print material k, standing at `at` (its foot's middle, the game's frame), turned `turn` about the upright"""
+def carton(idx, k, at, turn):
+    """one case (the idx-th), its print material k, standing at `at` (its foot's middle, the game's frame), turned `turn` about the upright"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     n = 4                                                  # (each face in n x n, so it can bulge)
@@ -95,10 +97,10 @@ def carton(k, at, turn):
                         lp[uvl].uv = (uu, vv)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    me = bpy.data.meshes.new(f"Carton{k}")
+    me = bpy.data.meshes.new(f"Carton{idx}")
     bm.to_mesh(me)
     bm.free()
-    o = bpy.data.objects.new(f"Carton{k}", me)
+    o = bpy.data.objects.new(f"Carton{idx}", me)
     bpy.context.collection.objects.link(o)
     o.data.materials.append(M["kraft"])
     o.data.materials.append(PRINTS[k])
@@ -123,12 +125,15 @@ def carton(k, at, turn):
     return o
 
 
-# (two on the floor side by side; two on them, a little askew; one on top, turned across)
-carton(0, (-0.155, 0.0, 0.0), 0.02)
-carton(1, (0.155, 0.0, 0.01), -0.03)
-carton(2, (-0.14, H + 0.012, 0.005), 0.06)
-carton(3, (0.16, H + 0.012, -0.01), -0.05)
-carton(4, (0.0, 2 * H + 0.024, 0.0), math.pi / 2 + 0.08)
+# (two to a layer side by side, four layers, each case a little askew on the one below; one on top, turned across)
+LAYOUT = [(-0.205, 0.0, 0.0, 0.02), (0.205, 0.0, 0.01, -0.03),
+          (-0.195, 1, 0.006, 0.05), (0.21, 1, -0.008, -0.04),
+          (-0.2, 2, -0.004, -0.03), (0.2, 2, 0.008, 0.045),
+          (-0.19, 3, 0.006, 0.04), (0.205, 3, -0.006, -0.05),
+          (0.0, 4, 0.0, math.pi / 2 + 0.08)]
+PRINT_OF = [0, 1, 2, 3, 4, 2, 0, 3, 1]
+for i, (x, layer, z, turn) in enumerate(LAYOUT):
+    carton(i, PRINT_OF[i], (x, layer * (H + 0.012), z), turn)
 root = bpy.data.objects.new("DrinkCartons", None)
 bpy.context.collection.objects.link(root)
 bpy.context.view_layer.update()

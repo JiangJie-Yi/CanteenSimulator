@@ -4177,6 +4177,8 @@ function DrinkCartons() {
       m.receiveShadow = true
     })
     inkModel(root, (m) => /Tape/.test((m.material as THREE.Material).name ?? ''), { width: 0.0012, weld: true })
+    // (nine cases now, each its board, its print and three strips of tape: folded together by material, a handful of draws for the stack)
+    mergeByMaterial(root)
     return root
   }, [gltf])
   return <primitive object={obj} />
@@ -4221,7 +4223,8 @@ const SAKE_HIT: [number, number, number] = [0.9, 1.1, 0.76]
 /** how far along from the crates the cartons stand (the crates' own frame) */
 /** where the cartons stand by the crates (the crates' own frame): turned end on, close beside them and running out from the wall, so they
  * keep to the floor (laid along the wall they ran on past the wall's end and the floor's edge) */
-const CARTONS_AT: [number, number, number] = [-0.36, 0, 0.17]
+/** (the stack bigger now (nine cases, 0.83 by 0.42, 1.1 high): drawn 0.08 further from the crates, which it ran 6 cm into) */
+const CARTONS_AT: [number, number, number] = [-0.44, 0, 0.173]
 function BottleCrates() {
   const W = 0.36, D = 0.29, H = 0.2
   const cols = 5, rows = 4
@@ -4664,7 +4667,7 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
         {/* (the back stock: pointed at, what's running low; a click opens the drinks' stock) */}
         <group name="look-crates" position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <BackStockHit lit={stockLit} />
-          <group position={CARTONS_AT} rotation-y={Math.PI / 2}><BackStockHit size={[0.66, 0.46, 0.24]} lit={stockLit} /></group>
+          <group position={CARTONS_AT} rotation-y={Math.PI / 2}><BackStockHit size={[0.86, 1.16, 0.32]} lit={stockLit} /></group>
         </group>
       </Movable>}
     </>
