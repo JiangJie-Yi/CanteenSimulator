@@ -2731,9 +2731,19 @@ def spoon_head(kind, at):
     return finish(o, "SpoonSteelBowl", M["spoon_steel"]), M["spoon_steel"], 0.0032
 
 
-lean = out * 0.09 + Vector((0, 0, 0.21))
 # (each handle resting a little to one side or the other on its pot's lip, not all standing to attention)
 SIDE = {"SoyPot": -0.035, "MilkJar": 0.03, "PeanutBowl": -0.04, "MisoPot": 0.035, "WasabiDish": -0.03, "ShichimiBowl": 0.03, "YuzuJar": -0.035}
+# (and each its own length, as they are: how far its handle rises from its head, and how far it leans out over the rim. The soy's
+# basting brush long, standing tall in its deep pot; the milk's brush a little shorter; the miso's paddle middling; the little ones
+# short and lying lower, resting on the lip: the peanut's wooden spoon, the shichimi's bamboo scoop, the yuzu kosho's steel spoon, and
+# shortest the wasabi's porcelain spoon, almost lying across its shallow dish. Once all of them stood the same height, a row of sticks)
+REACH = {"SoyPot": (0.25, 0.1), "MilkJar": (0.19, 0.11), "PeanutBowl": (0.11, 0.12), "MisoPot": (0.15, 0.09), "WasabiDish": (0.055, 0.09),
+         "ShichimiBowl": (0.1, 0.085), "YuzuJar": (0.12, 0.075)}
+
+
+def handle_tip(name, head):
+    rise, lean_out = REACH[name]
+    return head + out * lean_out + tang * SIDE[name] + Vector((0, 0, rise))
 # (where each stands along the ledge: the row's widths laid end to end from its left, a little room between)
 ROW = (("SaltPot", 0.17), ("SoyPot", 0.16), ("MilkJar", 0.14), ("PeanutBowl", 0.205), ("MisoPot", 0.14), ("WasabiDish", 0.15),
        ("ShichimiBowl", 0.135), ("YuzuJar", 0.12), ("LemonDish", 0.17))
@@ -2765,10 +2775,9 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
         tuft.scale = (0.022, 0.016, 0.04)
         bristle = M["bristle"] if name == "SoyPot" else M.setdefault(
             "bristle_pale", pbr("BrushBristlePale", (0.86, 0.8, 0.66), rough=0.7))
-        utensil("SoyBrush" if name == "SoyPot" else "MilkBrush", head, head + lean + out * 0.02 + tang * SIDE[name],
-                finish(tuft, "BrushBristles", bristle), 0.008)
+        utensil("SoyBrush" if name == "SoyPot" else "MilkBrush", head, handle_tip(name, head), finish(tuft, "BrushBristles", bristle), 0.008)
     elif name == "PeanutBowl":
-        utensil("PeanutSpoon", head, head + lean + tang * SIDE[name], spoon_bowl(head, 0.03))
+        utensil("PeanutSpoon", head, handle_tip(name, head), spoon_bowl(head, 0.03))
     else:
         # salt is taken by the pinch, by hand: just a marker where the fingers dip in (the web app draws the hand)
         bpy.ops.mesh.primitive_uv_sphere_add(radius=0.012, segments=8, ring_count=4, location=head)
@@ -2805,7 +2814,7 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough, tool in pots2:
     head = Vector((c.x, c.y, BOX_Z + depth * 0.7))
     kind = {"MisoSpoon": "miso", "WasabiSpoon": "wasabi", "ShichimiSpoon": "shichimi"}.get(tool, "yuzu")
     obj, mat, thick = spoon_head(kind, head)
-    utensil(tool, head, head + out * 0.08 + tang * SIDE[name] + Vector((0, 0, 0.18 if kind != "shichimi" else 0.15)), obj, thick, mat)
+    utensil(tool, head, handle_tip(name, head), obj, thick, mat)
 
 # the lemon: a little dish of wedges; the one on top is what's picked up and squeezed
 c = in_box(ROW_AT["LemonDish"])
