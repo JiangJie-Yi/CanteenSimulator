@@ -1,16 +1,55 @@
 // The customers' plates: five more painted designs besides the bamboo and plum of ware.ts, each drawn top-down for a plate's lathe
-// shape (wareGeometry): 唐草 (vine scroll) in indigo on white, 青海波 (deep-blue waves), 鯉 (a carp on speckled cream), 梅花 (white blossoms on
-// blue) and a 風車 (pinwheel of patterns). Drawn on first use, one canvas each.
+// shape (wareGeometry): 唐草 (vine scroll) in indigo on white, 荒波 (a rough sea in fine cobalt lines on white), 鯉 (a carp on speckled
+// cream), 波の縁 (a ring of breaking waves round a calm middle, in fine lines) and a 風車 (pinwheel of patterns). The two wave ones after the
+// owner's reference (blue line drawings of waves, 染付): they were 青海波 and 梅花, both a solid blue. Drawn on first use, one canvas each.
 import * as THREE from 'three'
 import { forPhone } from './ware'
 
 const INK = '#1f3b7a'
+/** the blue of 染付's fine line drawings, a cobalt a little brighter than the indigo */
+const COBALT = '#2a52a3'
 const LIP = 'rgba(96, 56, 34, 0.9)'
 
 type Paint = (g: CanvasRenderingContext2D, S: number, rnd: () => number) => void
 
 /** a seeded random sequence, so each design is the same every time */
 const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+
+/** a wave's crest in fine lines, as 染付 draws the sea: nested arcs swelling up from its foot and rolling over, each a little inside the
+ * last, a curl turning in at its tip and a few drops of spray off it; `r` its size, `dir` 1 rolling right, -1 left */
+function crest(g: CanvasRenderingContext2D, x: number, y: number, r: number, dir: number, rnd: () => number, lines = 6, ground = '#f7f6f1') {
+  g.save()
+  g.translate(x, y)
+  g.scale(dir, 1)
+  // (the wave's body: a swell rising from its foot at the back, its face rolling over at the front to the curl; filled with the glaze
+  // first, so a wave in front hides the lines of the ones behind it)
+  const body = (k: number) => {
+    const q = 1 - k * 0.12
+    g.beginPath()
+    g.moveTo(-r * 1.5 * q, r * 0.35)
+    g.bezierCurveTo(-r * 1.2 * q, -r * 0.55 * q, -r * 0.2 * q, -r * 1.25 * q, r * 0.55 * q, -r * 1.1 * q)
+    g.bezierCurveTo(r * 1.05 * q, -r * 1.0 * q, r * 1.25 * q, -r * 0.55 * q, r * 1.05 * q, -r * 0.2 * q)
+  }
+  body(0)
+  g.lineTo(r * 1.05, r * 0.35)
+  g.closePath()
+  g.save(); g.fillStyle = ground; g.fill(); g.restore()
+  for (let k = 0; k < lines; k++) { body(k); g.stroke() }
+  // (the curl: a spiral turning in under the lip of its face)
+  g.beginPath()
+  for (let t = 0; t <= 1.0001; t += 0.04) {
+    const a = -1.2 + t * Math.PI * 1.9, rad = r * 0.42 * (1 - t * 0.8)
+    const px = r * 0.72 + Math.cos(a) * rad, py = -r * 0.62 + Math.sin(a) * rad
+    if (t === 0) g.moveTo(px, py); else g.lineTo(px, py)
+  }
+  g.stroke()
+  for (let k = 0; k < 5; k++) {
+    g.beginPath()
+    g.arc(r * (1.25 + rnd() * 0.45), -r * (0.75 + rnd() * 0.55), r * (0.03 + rnd() * 0.03), 0, Math.PI * 2)
+    g.fill()
+  }
+  g.restore()
+}
 
 /** a blossom of five round petals, outlined, in the colours given */
 function blossom(g: CanvasRenderingContext2D, x: number, y: number, r: number, rot: number, fill: string, line: string, centre: string) {
@@ -68,24 +107,33 @@ const DESIGNS: Paint[] = [
     g.lineWidth = S * 0.012
     g.beginPath(); g.arc(S / 2, S / 2, S * 0.468, 0, Math.PI * 2); g.stroke()
   },
-  // 青海波: deep blue waves, rows of rolling crests drawn in white lines
-  (g, S) => {
-    g.fillStyle = '#2b4c97'
+  // 荒波: a rough sea in fine cobalt lines on a white glaze, row on row of crests rolling over, each row's swell lines running between them
+  (g, S, rnd) => {
+    g.fillStyle = '#f7f6f1'
     g.fillRect(0, 0, S, S)
-    g.strokeStyle = '#e9eef7'
-    const row = S * 0.075
-    for (let r = -1; r < 26; r++) {
-      for (let c = -1; c < 11; c++) {
-        const x = c * S * 0.105 + (r % 2 ? S * 0.0525 : 0)
-        const y = r * row * 0.62
-        for (let q = 5; q >= 1; q--) {
-          g.lineWidth = S * (q === 5 ? 0.0045 : 0.003)
-          g.beginPath()
-          g.arc(x, y + row, q * S * 0.0105, Math.PI, Math.PI * 2)
-          g.stroke()
+    g.strokeStyle = COBALT
+    g.fillStyle = COBALT
+    g.lineWidth = S * 0.0026
+    g.lineCap = 'round'
+    const row = S * 0.13
+    for (let r = 0, y = S * 0.1; y < S * 1.05; r++, y += row) {
+      // (the swell under the crests: long wavy lines across)
+      for (let k = 0; k < 4; k++) {
+        g.beginPath()
+        for (let x = 0; x <= S; x += S * 0.01) {
+          const yy = y + row * 0.18 + k * S * 0.012 + Math.sin((x / S) * Math.PI * 6 + r * 1.3) * S * 0.012
+          if (x === 0) g.moveTo(x, yy); else g.lineTo(x, yy)
         }
+        g.stroke()
+      }
+      for (let x = (r % 2 ? S * 0.12 : 0) - S * 0.05; x < S * 1.1; x += S * 0.24) {
+        crest(g, x + rnd() * S * 0.03, y + row * 0.15 + rnd() * S * 0.015, S * (0.065 + rnd() * 0.012), r % 2 ? -1 : 1, rnd, 7)
       }
     }
+    g.lineWidth = S * 0.009
+    g.beginPath(); g.arc(S / 2, S / 2, S * 0.468, 0, Math.PI * 2); g.stroke()
+    g.lineWidth = S * 0.003
+    g.beginPath(); g.arc(S / 2, S / 2, S * 0.448, 0, Math.PI * 2); g.stroke()
   },
   // 鯉: speckled cream, a carp in indigo, a rim of wave scrolls
   (g, S, rnd) => {
@@ -143,18 +191,44 @@ const DESIGNS: Paint[] = [
     g.beginPath(); g.arc(-S * 0.155, -S * 0.012, S * 0.005, 0, Math.PI * 2); g.fill()
     g.restore()
   },
-  // 梅花: white blossoms scattered over a mid blue, a few dark ones among them
+  // 波の縁: white, a ring of breaking waves in fine cobalt lines round the rim between two lines, a calm middle with a few long swells and
+  // one wave rolling over in it
   (g, S, rnd) => {
-    g.fillStyle = '#58719e'
+    g.fillStyle = '#f8f7f2'
     g.fillRect(0, 0, S, S)
-    for (let i = 0; i < 150; i++) {
-      const x = rnd() * S, y = rnd() * S
-      const white = rnd() < 0.8
-      blossom(g, x, y, S * (0.03 + rnd() * 0.03), rnd() * 6, white ? '#f4f6fa' : '#3e5887', '#26407a', white ? '#9fb2d4' : '#cfd9ea')
+    const c = S / 2
+    g.strokeStyle = COBALT
+    g.fillStyle = COBALT
+    g.lineCap = 'round'
+    g.lineWidth = S * 0.008
+    g.beginPath(); g.arc(c, c, S * 0.47, 0, Math.PI * 2); g.stroke()
+    g.lineWidth = S * 0.0035
+    g.beginPath(); g.arc(c, c, S * 0.33, 0, Math.PI * 2); g.stroke()
+    g.beginPath(); g.arc(c, c, S * 0.318, 0, Math.PI * 2); g.stroke()
+    // (the ring: crests stood round it, each upright to the rim, rolling the same way round)
+    g.lineWidth = S * 0.0026
+    const N = 16
+    for (let k = 0; k < N; k++) {
+      const a = (k / N) * Math.PI * 2
+      g.save()
+      g.translate(c + Math.cos(a) * S * 0.39, c + Math.sin(a) * S * 0.39)
+      g.rotate(a + Math.PI / 2)
+      crest(g, -S * 0.01, S * 0.04, S * 0.045, 1, rnd, 5, '#f8f7f2')
+      g.restore()
     }
-    g.strokeStyle = '#f4f6fa'
-    g.lineWidth = S * 0.01
-    g.beginPath(); g.arc(S / 2, S / 2, S * 0.47, 0, Math.PI * 2); g.stroke()
+    // (the middle: long swells, and one wave rolling over across them)
+    g.save()
+    g.beginPath(); g.arc(c, c, S * 0.31, 0, Math.PI * 2); g.clip()
+    for (let k = 0; k < 9; k++) {
+      g.beginPath()
+      for (let x = 0; x <= S; x += S * 0.01) {
+        const yy = c + S * 0.04 + k * S * 0.026 + Math.sin((x / S) * Math.PI * 4 + k * 0.5) * S * 0.014
+        if (x === 0) g.moveTo(x, yy); else g.lineTo(x, yy)
+      }
+      g.stroke()
+    }
+    crest(g, c - S * 0.04, c + S * 0.06, S * 0.13, 1, rnd, 8, '#f8f7f2')
+    g.restore()
   },
   // 風車: a rim of scrolling leaves round a pinwheel of six fields, alternately waves, cross-hatching and fine scales
   (g, S, rnd) => {
