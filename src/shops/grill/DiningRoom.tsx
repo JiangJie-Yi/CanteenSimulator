@@ -1,4 +1,5 @@
 import { blessingChime, shrineDoor } from './shrineSound'
+import { TISSUE } from '@/game/tissues'
 import { BambooModel, WashstandModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPaper, WcRemote } from './Restroom'
 import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
@@ -1584,6 +1585,84 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     </group>
   )
 }
+const SUPPLIES_URL = import.meta.env.BASE_URL + 'models/supplies.glb'
+useGLTF.preload(SUPPLIES_URL)
+/** the cartons' print (blender/supplies.py's SupplyCartonPrint): two cells, one for each carton; in each a long side's print (衛生紙, 200抽 ×
+ * 5盒, a box of tissues drawn), an end's (衛生紙, this way up), and the plain board of the top along the cell's foot */
+const CARTON_PRINT = canvasTex(1024, 512, (g) => {
+  const cw = 256, ch = 256
+  for (let cell = 0; cell < 2; cell++) {
+    const x0 = cell * cw, y0 = 512 - ch
+    // (the board: kraft brown, its fluting showing faintly, darker at the edges)
+    g.fillStyle = '#c29a66'; g.fillRect(x0, y0, cw, ch)
+    g.globalAlpha = 0.1
+    g.fillStyle = '#6a4a26'
+    for (let k = 0; k < cw; k += 4) g.fillRect(x0 + k, y0, 1, ch)
+    g.globalAlpha = 1
+    const side = (x: number, w: number, big: boolean) => {
+      // (the print, in navy: the word, what's in it, a box of tissues)
+      const top = y0 + ch * 0.0, h = ch * 0.7
+      g.strokeStyle = '#1e3a6a'; g.lineWidth = 3
+      g.strokeRect(x + 8, top + 8, w - 16, h - 16)
+      if (big) {
+        brushText(g, '衛生紙', x + w * 0.42, top + h * 0.38, 40, { fill: '#1e3a6a', spacing: 2 })
+        g.fillStyle = '#1e3a6a'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+        g.fillText('200抽 × 5盒', x + w * 0.42, top + h * 0.68)
+        // (a box of tissues, a tissue standing up out of it)
+        g.fillStyle = '#ffffff'; g.fillRect(x + w * 0.74, top + h * 0.42, w * 0.18, h * 0.22)
+        g.strokeRect(x + w * 0.74, top + h * 0.42, w * 0.18, h * 0.22)
+        g.beginPath(); g.moveTo(x + w * 0.78, top + h * 0.42); g.quadraticCurveTo(x + w * 0.83, top + h * 0.2, x + w * 0.88, top + h * 0.42); g.fill(); g.stroke()
+      } else {
+        brushText(g, '衛生紙', x + w / 2, top + h * 0.35, 26, { fill: '#1e3a6a' })
+        // (this way up: two arrows)
+        g.fillStyle = '#1e3a6a'
+        for (const ax of [x + w * 0.38, x + w * 0.62]) {
+          g.beginPath(); g.moveTo(ax, top + h * 0.56); g.lineTo(ax - 9, top + h * 0.7); g.lineTo(ax + 9, top + h * 0.7); g.closePath(); g.fill()
+          g.fillRect(ax - 3, top + h * 0.7, 6, 14)
+        }
+      }
+    }
+    side(x0, cw * 0.5, true)
+    side(x0 + cw * 0.5, cw * 0.5, false)
+  }
+})
+/**
+ * The supplies in the corner by the drinks fridge (the owner's: tissue cartons and cleaning things, for the toilets and about the shop;
+ * blender/supplies.py): the cartons of spare tissue boxes (the stock's), a pack of toilet rolls, a bucket and mop, a broom, sprays and
+ * detergent. Pointed at, the cartons say how many spare boxes there are; clicked, the stock opens on its supplies.
+ */
+function CornerSupplies() {
+  const gltf = useGLTF(SUPPLIES_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.getObjectByName('CornerSupplies')!.clone(true)
+    r.position.set(0, 0, 0)
+    const mats = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = mats.get(src)
+      if (!t) {
+        t = new THREE.MeshToonMaterial({ color: src.name === 'SupplyCartonPrint' ? '#ffffff' : src.color.clone(), map: src.name === 'SupplyCartonPrint' ? CARTON_PRINT : null })
+        if (src.name === 'SupplyCartonPrint' && CARTON_PRINT) CARTON_PRINT.flipY = false
+        mats.set(src, t)
+      }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, (m) => /Strand|Core|Bail|Label|Tape/.test(m.name), { width: 0.002, weld: true })
+    return r
+  }, [gltf])
+  const says = () => { const n = SUPPLIES.has(TISSUE); return n < 0 ? '衛生紙與清潔用品・點一下看耗材' : `衛生紙備品 ${n} 盒・點一下看耗材` }
+  return (
+    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('衛生紙與清潔用品', says()).onPointerOver(e) }}
+      onPointerOut={(e) => { tipOver('衛生紙與清潔用品', '').onPointerOut(e) }}
+      onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('supplies', 'sack') }}>
+      <primitive object={obj} />
+    </group>
+  )
+}
 /** the staff's door, its width along the wall (narrower than the toilets') */
 const STAFF_W = 0.66
 /**
@@ -2262,6 +2341,17 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
       .concat(hang.map((h) => ({ z: h.z, scroll: undefined, print: h.print, round: false, nobori: undefined, kanban: undefined })))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear, staffDoor, hang.map((h) => `${h.z}${h.print}`).join()])
+  // (the supplies' place: the gap between the drinks fridges and the toilets' doorway on this wall; shrunk only if it's narrower than
+  // the stack, about 0.55 across)
+  const supplies = useMemo(() => {
+    if (door === undefined || !clear.length) return null
+    const g0 = door - WC_W - 0.12, g1 = door + WC_W + 0.12
+    const below = clear.filter((r) => r[1] <= g0), above = clear.filter((r) => r[0] >= g1)
+    const span = below.length ? [Math.max(...below.map((r) => r[1])), g0] : above.length ? [g1, Math.min(...above.map((r) => r[0]))] : null
+    if (!span || span[1] - span[0] < 0.35) return null
+    const w = span[1] - span[0] - 0.08
+    return { z: (span[0] + span[1]) / 2, k: Math.min(1, w / 0.56) }
+  }, [door, clear])
   // (the light switch: halfway between the round window short of the shelf and the next picture toward it; by the door if there's none)
   const switchZ = useMemo(() => {
     const i = art.reduce((k, a, j) => (a.round && a.z < shelfZ ? j : k), -1)
@@ -2344,6 +2434,8 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
           {a.round && <group position={[0, 1.4, a.z]}><WindowDust /></group>}
           </Movable>
         ))}
+        {/* (the supplies in the corner between the drinks fridges and the toilets' doorway) */}
+        {supplies && <Movable id="supplies" label="衛生紙與清潔用品"><group position={[-0.02, 0, supplies.z]} rotation-y={-Math.PI / 2} scale={supplies.k}><CornerSupplies /></group></Movable>}
         {/* (the staff's door, where asked: up the stairs behind it, 員工專用) */}
         {staffDoor !== undefined && <Movable id="staffdoor" label="員工專用門"><group position={[0, 0, staffDoor]}><StaffDoor /></group></Movable>}
         {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
