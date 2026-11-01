@@ -6775,10 +6775,14 @@ html[lang='en'] .heat-label { font-size: 13px; }
   .money-chip:hover { background: linear-gradient(180deg, rgb(56 46 36 / 0.55), rgb(28 22 18 / 0.42)); }
 }
 
-/* ---- the interface in English: set in Cormorant Garamond (the brush face's Latin is plain), a touch larger for its smaller x-height; the
-   docked panels' upright names once only (the small capitals under them said the same again) ---- */
-html[lang='en'] { --brush: 'Cormorant Garamond', 'LXGW WenKai TC', 'Noto Serif TC', serif; }
-html[lang='en'] body { font-size: 1.04em; }
+/* ---- the interface in English: all of it set in LXGW WenKai TC, as the owner chose (once Cormorant Garamond), its plain labels too (what
+   was the system's sans) and the titles set in Zen Antique that read in English there (its few Latin letters, loaded for the signs, beside
+   the brush face's for the rest, made a mix); the shop's own name and 深夜 keep their sign face. The docked panels' upright names once only
+   (the small capitals under them said the same again) ---- */
+html[lang='en'] { --brush: 'LXGW WenKai TC', 'Noto Serif TC', serif; --sans: 'LXGW WenKai TC'; }
+html[lang='en'] :is(.brand-sub, .welcome-card h2, .welcome-card .welcome-go, .unopened-hint b, .loading-board small) { font-family: var(--brush); }
+/* (the grill's sign: its English under the name small and only a little spaced, the brush face's Latin being wider than the old serif's) */
+html[lang='en'] .brand-grilledfish .brand-sub { font-size: 0.33em; letter-spacing: 0.08em; margin-right: -0.08em; }
 html[lang='en'] .dock-title small { display: none; }
 html[lang='en'] .dock-title { font-weight: 600; letter-spacing: 0.16em; font-size: 42px; }
 html[lang='en'] .menu-title-en { display: none; }
