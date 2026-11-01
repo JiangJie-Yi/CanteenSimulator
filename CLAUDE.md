@@ -92,7 +92,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - 客人看板（掌廚、來客、在座、最近四位的心情，`guest-board`）只在手機版顯示；電腦上客人就在 3D 吧台。
 - **試吃**：研製時點試吃碗裡烤好的東西，老闆會沿他的走道走到最靠近碗的地方、轉向它、說一句（`data/bossLines.ts` 的 `TASTE_LINES`），把它拿到嘴邊吃完，再跑回原本的作息（`Boss.tsx` 的 `BOSS_TASTE`；Roasting 的 `awaitBoss`、`byBoss`）。一次一份。每咬一口有咔滋聲、咬與咬之間有咀嚼聲（`shops/grill/chewSound.ts`，WebAudio 即時合成），咬下第一口時台詞換成嚼東西的（`MUNCH_LINES`，`BOSS_TASTE.chewing`），吃完依美味給評語（`tasteVerdict`：80 以上很好吃、60 好吃、35 普通、以下難吃；`VERDICT_LINES`，`BOSS_TASTE.verdict`；BDD `boss-taste`）。
 - 廚師只是偶爾搧火：一段時間拿著扇子搧，再放下站著（`Person3D.tsx` 的 `fanning`），每人錯開。
-- 老闆擋住鏡頭看的東西時會變淡（只在他真的蓋住畫面中央附近時），用 `alphaHash` 抖動透明，不會變黑或透出身體內部。
+- 老闆擋住鏡頭看的東西時會變淡（只在他真的蓋住畫面中央附近時；或他就在鏡頭前 `BOSS_CLOSE`（2.6）以內、在畫面裡任何地方：後台區視角他走過時，臉佔掉三分之一個畫面），用 `alphaHash` 抖動透明，不會變黑或透出身體內部。
 - 灶台桌上只有試吃碗（碗公）是常駐的碗盤：沒有備用盤疊（Roasting 的 `SPARES` 空的）；盤子（`plate-n`）、小碟（`dish-n`）、飯糰的小碟（`rawdish`）都在桌面上，只有裝著東西時才出現（`WhenHeld`）；飯桶台的下層不再放碗。
 - 研製時：點冷藏櫃拿的食材**直接出現在大砧板（`tray`）上**（`Piece.fresh`，不從火堆滑過去）；砧板最多放兩層：下層 5 支、上層 4 支卡在縫裡（Roasting 的 `TRAY_ROWS`、`TRAY_CAP`），散裝的一排 7 個（`LOOSE_CAP`），多的先留在冷藏櫃（不顯示），砧板空出位置才拿出來，砧板角落標「+n 冷藏」（`tray-more`）。
 - **調味的手感**：拿著調味停在食物上方就會一直撒（`toolAction`：鹽用手指搓、粉類抖湯匙、醬料刷子來回刷、醬類點上去、檸檬擠），顆粒依速度均勻落下；停在一塊上 `DAB_FIRST`（0.25 秒）就調一次，之後每 `DAB_EVERY`（0.7 秒）一次（換到別塊也不會更快）；每調一次：食物彈一下（`BOUNCE`）、地上擴散一圈調味顏色的光圈（`RINGS`）、一個聲音（`seasonSound.ts`：粉類沙沙聲、醬類濕的一點、檸檬擠汁；撒粉時還有細碎的顆粒聲 `sprinkleTick`），跳出「美味 ±n」；放開時這塊若已經調過就不再加。烤好夾起的食物**一律放進桌上的試吃碗**（`bowl-0`、`TasteBowl`、`inBowl`，排法同盤子）。

@@ -37,6 +37,8 @@ const ROUND: Phase[] = [
 /** and while the shop's open, out of his chef's way: a wave now and then, keeping an eye */
 const ROUND_OPEN: Phase[] = [{ act: 'idle', len: 6 }, { act: 'wave', len: 3 }]
 const WALK_SPEED = 0.9
+/** how near the camera he may come, anywhere in the picture, before he fades (while it's looking past him at something else) */
+const BOSS_CLOSE = 2.6
 const RUN_SPEED = 2.4
 
 /** `to`: the far end of his walk, in the frame he stands in (x, z), from his place at its origin, facing +z */
@@ -192,7 +194,10 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     const over = tgt ? Math.hypot(...(() => { const a = tgt.clone().project(cam); const b = m.localToWorld(new THREE.Vector3(0, 0.45, 0)).project(cam); return [a.x - b.x, a.y - b.y] })()) < 0.45 : true
     // (and only from close by, the grill's own views: from a view of the whole room (far back) he's just one of the things in it)
     const near = lookD < 9
-    const want = !getEdit().on && near && !lookedAt && inView && over && along > 0 && along < lookD - 1.2 ? 0.35 : 1
+    // (or right by the camera anywhere in the picture, while it looks past him at something else: the back room's view had his face filling
+    // a third of it as he went by)
+    const close = inView && along > 0 && along < BOSS_CLOSE
+    const want = !getEdit().on && !lookedAt && ((near && inView && over && along > 0 && along < lookD - 1.2) || close) ? 0.35 : 1
     ghost.current += (want - ghost.current) * Math.min(1, Math.min(dt, 0.1) * 6)
     const k = ghost.current
     for (const o of inks) o.visible = k > 0.95
