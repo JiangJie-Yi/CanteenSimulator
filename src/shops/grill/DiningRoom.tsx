@@ -2604,8 +2604,9 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
   hang?: { z: number; print: ArtKey }[]
   /** a staff-only door here (its middle, along it): nothing hung over it */
   staffDoor?: number
-  /** the first of the room's two walls, whose start is the corner they meet in: its thickness runs on to close the corner */
-  corner?: boolean
+  /** the first of the room's two walls, whose start is the corner they meet in: its thickness runs on to close the corner, to where the other
+   * wall's face truly is (along it) if given (its start, a hair beyond, is where its pictures and lamps are laid out from) */
+  corner?: boolean | number
   /** stretches of it (along it) where something stands against it: nothing hung there, no post */
   clear?: [number, number][]
   /** its shelf an altar instead (by the door): a command flag in the censer, and incense (lit when, and lighting more) */
@@ -2617,6 +2618,7 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
   door?: number
   }) {
   const yaw = Math.atan2(c.along.x, c.along.z)
+  const meetAt = typeof corner === 'number' ? corner : from
   const l = to - from
   const mid = (from + to) / 2
   // the wall's stretches: whole, or with the toilets' doorways left open (as high as their frames' lintel)
@@ -2705,7 +2707,7 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
         {/* (down through the base's own thickness too, which stops at the room's outline, short of the wall's) */}
         {spans.map(([z0, z1, y0]) => {
           const lo = y0 > 0 ? y0 : -BASE_DEPTH
-          const z0e = corner && z0 === from ? z0 - WALL_T - 0.012 : z0
+          const z0e = corner !== false && z0 === from ? meetAt - WALL_T - 0.012 : z0
           return (
             <mesh key={`t${z0}|${y0}`} position={[WALL_T / 2 + 0.012, (lo + WALL_H) / 2, (z0e + z1) / 2]}>
               <boxGeometry args={[WALL_T, WALL_H - lo, z1 - z0e]} /><meshToonMaterial color="#3d2414" />
@@ -2714,8 +2716,8 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
         })}
         {/* (at the corner, the sliver between this wall's face and its slab where the other wall's slab ends: filled, so the two walls' tops
             meet without a slot) */}
-        {corner && (
-          <mesh position={[0.006, (WALL_H - BASE_DEPTH) / 2, from - 0.012 - WALL_T / 2]}>
+        {corner !== false && (
+          <mesh position={[0.006, (WALL_H - BASE_DEPTH) / 2, meetAt - 0.012 - WALL_T / 2]}>
             <boxGeometry args={[0.014, WALL_H + BASE_DEPTH, WALL_T + 0.002]} /><meshToonMaterial color="#3d2414" />
           </mesh>
         )}
@@ -4347,10 +4349,13 @@ function WallSpeaker() {
     return { root, led: led as THREE.MeshBasicMaterial | null, toon: [...toon.values()] }
   }, [gltf])
   useEffect(() => { model.led?.color.set(off ? '#d02a2a' : '#3ddc6a') }, [model, off])
-  // (the arm reaches back to the room's corner and the bracket sits in it: found by a ray from the arm's joint straight back, every half second,
-  // so it still fits wherever the speaker's been moved to)
+  // (the arm reaches back to the room's corner and the bracket sits in it: found by a ray from the arm's joint straight back, so it still fits
+  // wherever the speaker's been moved to. Looked for every half second only until two looks agree, and again once it's moved: asked all the
+  // time, the ray caught whatever passed behind it (the notes it plays drifting by among them) and the arm went in and out, on and on)
   const { scene: room, camera } = useThree()
+  const outer = useRef<THREE.Group>(null)
   const reachAt = useRef(0)
+  const found = useRef({ at: new THREE.Vector3(Infinity, 0, 0), dir: new THREE.Vector3(), len: -1, sure: false })
   useFrame((st) => {
     if (st.clock.elapsedTime - reachAt.current < 0.5) return
     reachAt.current = st.clock.elapsedTime
@@ -4359,22 +4364,33 @@ function WallSpeaker() {
     reach.updateWorldMatrix(true, false)
     const from = reach.getWorldPosition(new THREE.Vector3())
     const back = new THREE.Vector3(0, 0, -1).transformDirection(reach.matrixWorld)
+    const f = found.current
+    const still = from.distanceToSquared(f.at) < 1e-6 && back.dot(f.dir) > 0.99999
+    if (still && f.sure) return
     const ray = new THREE.Raycaster(from, back, 0.03, 2)
     ray.camera = camera
     ray.params.Line = { threshold: 0 }
     ray.params.Points = { threshold: 0 }
-    const mine = (o: THREE.Object3D | null) => { for (; o; o = o.parent) if (o === model.root || o.userData.fade || o.userData.editHandle) return true; return false }
+    const mine = (o: THREE.Object3D | null) => {
+      for (; o; o = o.parent) if (o === model.root || o === outer.current || o.userData.fade || o.userData.editHandle) return true
+      return false
+    }
     const hit = ray.intersectObjects(room.children, true).find((h) => (h.object as THREE.Mesh).isMesh && !mine(h.object))
     if (!hit) return
-    const k = reach.getWorldScale(new THREE.Vector3()).z || 1
+    // (the distance in the arm's own units: by its parent's scale, not its own, which is the stretch itself: by its own, each look undid the
+    // last, the arm long, then short, then long again every half second)
+    const k = (reach.parent ?? reach).getWorldScale(new THREE.Vector3()).z || 1
     const len = Math.max(0.05, hit.distance / k)
+    // (sure once the same wall's found twice from the same place)
+    f.sure = still && Math.abs(len - f.len) < 0.002
+    f.at.copy(from); f.dir.copy(back); f.len = len
     reach.scale.z = len / SPEAKER_ARM
     mount.position.z = reach.position.z - len
   })
   // (pointed at, it lifts a little out of the dark, to say it can be clicked)
   useEffect(() => { for (const t of model.toon) t.emissive.set(lit ? '#2a2a30' : '#000000') }, [model, lit])
   return (
-    <group name="look-speaker" onClick={press} onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setLit(true); handOver.onPointerOver(e as never); tag() }}
+    <group ref={outer} name="look-speaker" onClick={press} onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setLit(true); handOver.onPointerOver(e as never); tag() }}
       onPointerOut={(e: { stopPropagation: () => void }) => { setLit(false); handOver.onPointerOut(e as never); setTip(null) }} >
       <MusicNotes playing={!off} />
       {/* (the handlers on a group round it: a primitive's own aren't attached) */}

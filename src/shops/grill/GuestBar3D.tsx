@@ -2490,9 +2490,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // the first counter's floor runs on past its end to the door, and back to meet the others' aisles; each other
         // one's runs up to the first one's
         const c0 = counters[0]
+        // (the walls' corner reckoned on unit directions, as the walls stand (on their yaw): the counters' along and lay are a shade over
+        // unit length, and reckoned with them the two walls missed each other by a centimetre and more, a step across their tops at the
+        // corner and a slot down its inside)
+        const unit = (v: THREE.Vector3) => v.clone().normalize()
         if (i === 0) {
           const back = Math.min(-c.length / 2 - 0.35, ...counters.slice(1).map((o) =>
             o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c.at).dot(c.along)))
+          const wallBack = Math.min(-c.length / 2 - 0.35, ...counters.slice(1).map((o) =>
+            o.at.clone().addScaledVector(unit(o.lay), farOf(o)).sub(c.at).dot(unit(c.along))))
           return (
             <group key={i}>
               <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} bare={!!given} />
@@ -2500,14 +2506,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} drop={KITCHEN_DROP / scale} />}
               {given && <Later stage={2}><ShopProps counters={counters} /></Later>}
-              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} altar={incense ?? true} corner
+              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} altar={incense ?? true} corner={wallBack}
                 staffDoor={STAFF_DOOR_AT} />}
             </group>
           )
         }
         const meet = c0.at.clone().addScaledVector(c0.lay, FLOOR_NEAR).sub(c.at).dot(c.along)
         // (where its wall's line reaches the first counter's wall)
-        const corner = (FLOOR_FAR - c.at.clone().sub(c0.at).dot(c0.lay)) / c.along.dot(c0.lay)
+        const corner = (FLOOR_FAR - c.at.clone().sub(c0.at).dot(unit(c0.lay))) / unit(c.along).dot(unit(c0.lay))
         return (
           <group key={i}>
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} />
