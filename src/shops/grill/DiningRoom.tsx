@@ -1766,7 +1766,7 @@ const CARTON_PRINT = canvasTex(1024, 512, (g) => {
     g.globalAlpha = 1
     const side = (x: number, w: number, big: boolean) => {
       // (the print, in navy: the word, what's in it, a box of tissues)
-      const top = y0 + ch * 0.0, h = ch * 0.7
+      const top = y0, h = ch * 0.7
       g.strokeStyle = '#1e3a6a'; g.lineWidth = 3
       g.strokeRect(x + 8, top + 8, w - 16, h - 16)
       if (big) {
@@ -2360,7 +2360,7 @@ function waveBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number
  * a little). Its bamboo ribs and the seams between its panels, the paper's fibres here and there, and a band of seigaiha waves round its
  * lower belly (the owner's: it had two sea bream painted on it, which looked odd).
  */
-function lanternPaper(g: CanvasRenderingContext2D, lit: boolean) {
+function lanternPaper(g: CanvasRenderingContext2D, lit: boolean, waves = true) {
   const W = 1024, H = 300
   const grad = g.createLinearGradient(0, 0, 0, H)
   for (const [t, c] of (lit ? [[0, '#f2b878'], [0.22, '#ffe2b0'], [0.5, '#fff6e0'], [0.78, '#ffe2b0'], [1, '#f2b878']]
@@ -2396,7 +2396,51 @@ function lanternPaper(g: CanvasRenderingContext2D, lit: boolean) {
   g.fillStyle = lit ? 'rgba(200,140,80,0.16)' : 'rgba(120,110,95,0.14)'
   for (let x = 0; x < W; x += 128) g.fillRect(x, 0, 1.6, H)
   // (the waves, round its lower belly)
-  waveBand(g, W, H * 0.6, H * 0.8, lit)
+  if (waves) waveBand(g, W, H * 0.6, H * 0.8, lit)
+}
+/** the round lantern's paper (the owner's: a round one with 日式烤魚 on it): the same washi, a band of vermilion near each end, the words
+ * twice round it (a side each), in the signs' brush lettering */
+function roundPaper(g: CanvasRenderingContext2D, lit: boolean) {
+  lanternPaper(g, lit, false)
+  const W = 1024, H = 300
+  g.fillStyle = lit ? '#d0392a' : '#9a3a30'
+  g.fillRect(0, H * 0.07, W, H * 0.07); g.fillRect(0, H * 0.86, W, H * 0.07)
+  for (const x of [W * 0.25, W * 0.75]) brushText(g, '日式烤魚', x, H * 0.5, H * 0.27, { fill: lit ? '#b8261c' : '#8a2a22', spacing: 6 })
+}
+/** the fish lantern's paper (the owner's: a lantern made a fish, a sea bream). Round it (u) from the belly (u 0, straight down) up a flank
+ * (u 0.25) to the back (u 0.5) and down the other flank; along it (v, the canvas's foot the head, its top the tail). A red back fading to a
+ * pale belly, scales in rows down the flanks, the gill's curve, an eye on each flank */
+function fishPaper(g: CanvasRenderingContext2D, lit: boolean) {
+  const W = 1024, H = 300
+  for (let x = 0; x < W; x += 2) {
+    const back = 0.5 - 0.5 * Math.cos((x / W) * Math.PI * 2)
+    const k = Math.pow(back, 0.8)
+    const r = lit ? [255 - 20 * k, 236 - 146 * k, 222 - 164 * k] : [214 - 30 * k, 206 - 96 * k, 198 - 96 * k]
+    g.fillStyle = `rgb(${r.map((c) => Math.round(c)).join(',')})`
+    g.fillRect(x, 0, 2, H)
+  }
+  // (scales: rows of little arcs from behind the gill to the tail, on the back and flanks, not the belly)
+  g.strokeStyle = lit ? 'rgba(160,40,22,0.32)' : 'rgba(100,56,46,0.3)'
+  g.lineWidth = 2
+  let row = 0
+  for (let y = H * 0.12; y < H * 0.74; y += 16, row++) {
+    for (let x = (row % 2) * 13; x < W; x += 26) {
+      const back = 0.5 - 0.5 * Math.cos((x / W) * Math.PI * 2)
+      if (back < 0.3) continue
+      g.beginPath(); g.arc(x, y, 11, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke()
+    }
+  }
+  // (the gill's curve behind each eye, the eye itself, a glint in it; a lip line where the mouth is)
+  for (const cx of [W * 0.25, W * 0.75]) {
+    g.strokeStyle = lit ? 'rgba(150,32,20,0.65)' : 'rgba(90,50,40,0.6)'
+    g.lineWidth = 4
+    g.beginPath(); g.arc(cx, H * 0.96, 70, -Math.PI * 0.82, -Math.PI * 0.18); g.stroke()
+    g.fillStyle = '#fff6e6'; g.beginPath(); g.arc(cx, H * 0.89, 17, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#1a1210'; g.beginPath(); g.arc(cx, H * 0.89, 10, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(cx + 4, H * 0.875, 3.5, 0, Math.PI * 2); g.fill()
+  }
+  g.fillStyle = lit ? 'rgba(150,32,20,0.7)' : 'rgba(90,50,40,0.6)'
+  g.fillRect(0, H * 0.985, W, H * 0.015)
 }
 const LANTERN_SKIN = signTexture(1024, 300, (g) => lanternPaper(g, true))
 const PENDANT_GLOW = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffcf90' }), 0.35, 0.75)
@@ -2407,7 +2451,96 @@ const PENDANT_POOL = nightGlow(new THREE.MeshBasicMaterial({ map: GLOW, transpar
 /** and the same paper with no light in it: plain washi, a little cream, its fibres and its waves */
 const LANTERN_SKIN_OFF = signTexture(1024, 300, (g) => lanternPaper(g, false))
 const LANTERN_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: LANTERN_SKIN, toneMapped: false, side: THREE.DoubleSide }), { offMap: LANTERN_SKIN_OFF })
-function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
+/** the round lantern (日式烤魚 on it): rounder and a little bigger, drawn in to its rings */
+const ROUND_LANTERN_R = 0.15
+const ROUND_LANTERN_END = Math.sqrt(ROUND_LANTERN_R ** 2 - 0.06 ** 2)
+const ROUND_LANTERN_GEO = (() => {
+  const pts: THREE.Vector2[] = []
+  for (let i = 0; i <= 24; i++) {
+    const y = -ROUND_LANTERN_END + (2 * ROUND_LANTERN_END * i) / 24
+    pts.push(new THREE.Vector2(Math.sqrt(Math.max(0, ROUND_LANTERN_R ** 2 - y * y)), y))
+  }
+  return new THREE.LatheGeometry(pts, 32)
+})()
+const ROUND_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: signTexture(1024, 300, (g) => roundPaper(g, true)), toneMapped: false, side: THREE.DoubleSide }),
+  { offMap: signTexture(1024, 300, (g) => roundPaper(g, false)) })
+/** the fish lantern's body: turned along its length, a blunt head (its mouth a little round), deep and full to past its middle as a sea
+ * bream is, narrowing late to the root of its tail. `fishR` its radius from the head (t 0) to the tail (t 1). Laid along z (head at -z),
+ * its back up, flattened side to side and deeper than wide (`FISH_DEEP`), set back along z (`FISH_Z0`) so it hangs from its shoulders */
+const FISH_LEN = 0.42
+const FISH_DEEP = 1.12
+const FISH_Z0 = 0.07
+const fishR = (t: number) => t < 0.36 ? 0.034 + 0.07 * Math.pow(Math.sin((Math.PI / 2) * (t / 0.36)), 0.7)
+  : t < 0.9 ? 0.104 - 0.076 * THREE.MathUtils.smoothstep((t - 0.36) / 0.54, 0, 1)
+    : 0.028 - 0.006 * ((t - 0.9) / 0.1)
+const fishZ = (t: number) => -FISH_LEN / 2 + FISH_LEN * t + FISH_Z0
+const FISH_GEO = (() => {
+  const pts: THREE.Vector2[] = [new THREE.Vector2(0, -FISH_LEN / 2)]
+  for (let i = 0; i <= 28; i++) pts.push(new THREE.Vector2(fishR(i / 28), -FISH_LEN / 2 + (FISH_LEN * i) / 28))
+  pts.push(new THREE.Vector2(0, FISH_LEN / 2))
+  const g = new THREE.LatheGeometry(pts, 24)
+  // (laid along z, its back up: the lathe's axis turned from y to z, which turns the paper's u 0 straight down and u 0.5 up)
+  g.rotateX(Math.PI / 2)
+  g.scale(0.7, FISH_DEEP, 1)
+  g.translate(0, 0, FISH_Z0)
+  return g
+})()
+const FISH_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: signTexture(1024, 300, (g) => fishPaper(g, true)), toneMapped: false, side: THREE.DoubleSide }),
+  { offMap: signTexture(1024, 300, (g) => fishPaper(g, false)) })
+/** where the fish hangs from: its back, a little behind its head, at the cord */
+const FISH_HANG = FISH_DEEP * fishR((FISH_LEN / 2 - FISH_Z0) / FISH_LEN)
+/** the fish lantern's fins, one mesh (one draw): its tail fanned and forked, the long spiny fin along its back, a small one under its tail;
+ * each deeper red at its root, paler toward its edge (colour in the vertices), the same lit paper as the body */
+const FISH_FIN = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', vertexColors: true, toneMapped: false, side: THREE.DoubleSide }))
+const FISH_FIN_GEO = (() => {
+  const root = new THREE.Color('#e4483a'), edge = new THREE.Color('#ffc48c'), c = new THREE.Color()
+  // (a fin from its outline, drawn where it is: x along the fish (z), y up; coloured by how far a point is from its root)
+  const fin = (sh: THREE.Shape, far: (z: number, y: number) => number) => {
+    const g = new THREE.ShapeGeometry(sh, 6)
+    const pos = g.attributes.position as THREE.BufferAttribute
+    const col = new Float32Array(pos.count * 3)
+    for (let v = 0; v < pos.count; v++) {
+      c.copy(root).lerp(edge, THREE.MathUtils.clamp(far(pos.getX(v), pos.getY(v)), 0, 1))
+      col.set([c.r, c.g, c.b], v * 3)
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3))
+    // (turned into the plane of its length and height: x runs along z)
+    g.rotateY(-Math.PI / 2)
+    return g
+  }
+  const tOf = (z: number) => THREE.MathUtils.clamp((z - FISH_Z0 + FISH_LEN / 2) / FISH_LEN, 0, 1)
+  // (a fin along its back (side 1) or belly (-1) from t0 to t1: its root sunk a little into the body, following its curve; n spines,
+  // each leaning back to a point with a dip of webbing to the next, lower toward the tail)
+  const edgeFin = (t0: number, t1: number, n: number, side: 1 | -1, h0: number, h1: number) => {
+    const at = (t: number) => side * (FISH_DEEP * fishR(t) - 0.006)
+    const sh = new THREE.Shape()
+    sh.moveTo(fishZ(t0), at(t0))
+    for (let k = 0; k < n; k++) {
+      const t = t0 + ((t1 - t0) * (k + 0.55)) / n, h = h0 + ((h1 - h0) * k) / Math.max(1, n - 1)
+      sh.lineTo(fishZ(t) + 0.01, at(t) + side * h)
+      const tv = t0 + ((t1 - t0) * (k + 1)) / n
+      if (k < n - 1) sh.lineTo(fishZ(tv), at(tv) + side * h * 0.55)
+    }
+    sh.lineTo(fishZ(t1), at(t1))
+    for (let k = 6; k >= 0; k--) { const t = t0 + ((t1 - t0) * k) / 6; sh.lineTo(fishZ(t), at(t)) }
+    return fin(sh, (z, y) => side * (y - at(tOf(z))) / h0)
+  }
+  const z1 = fishZ(1) - 0.012
+  const tail = new THREE.Shape()
+  tail.moveTo(z1, 0.026); tail.quadraticCurveTo(z1 + 0.06, 0.05, z1 + 0.135, 0.125); tail.quadraticCurveTo(z1 + 0.1, 0.05, z1 + 0.088, 0.0)
+  tail.quadraticCurveTo(z1 + 0.1, -0.05, z1 + 0.135, -0.125); tail.quadraticCurveTo(z1 + 0.06, -0.05, z1, -0.026); tail.closePath()
+  const parts = [
+    fin(tail, (z) => (z - z1) / 0.12),
+    edgeFin(0.36, 0.84, 8, 1, 0.056, 0.03),
+    edgeFin(0.7, 0.86, 4, -1, 0.034, 0.022),
+  ]
+  const g = mergeGeometries(parts)!
+  parts.forEach((q) => q.dispose())
+  return g
+})()
+/** a pendant lamp; `style`: 0 the oval washi lantern with its waves, 1 the round one with 日式烤魚 on it, 2 the fish (the owner's: two or
+ * three kinds of lantern, a fish among them) */
+function Pendant({ z, drop, pool, style = 0 }: { z: number; drop: number; pool: number; style?: number }) {
   return (
     <group position={[0, WALL_H, z]}>
       <mesh position-y={-drop / 2}>
@@ -2416,18 +2549,43 @@ function Pendant({ z, drop, pool }: { z: number; drop: number; pool: number }) {
       </mesh>
       {/* (a paper lantern: the oval of ribbed washi, a pale wooden ring at each end, a little ring at the top for the cord) */}
       {/* (a lamp casts no shadow: the moon threw the lit lanterns' onto the floor, well away under them) */}
-      <group position-y={-drop - 0.13}>
-        <mesh geometry={LANTERN_GEO} material={LANTERN_SHADE} />
-        <mesh geometry={LANTERN_GEO} scale={1.035}>
-          <meshBasicMaterial color={INK} side={THREE.BackSide} />
-        </mesh>
-        {[LANTERN_END + 0.004, -LANTERN_END - 0.004].map((y) => (
-          <mesh key={y} position-y={y}>
-            <cylinderGeometry args={[0.056, 0.056, 0.024, 16]} />
-            <meshToonMaterial color="#cdb083" />
+      <group position-y={-drop - (style === 1 ? 0.18 : style === 2 ? FISH_HANG + 0.016 : 0.13)}>
+        {style === 0 && (<>
+          <mesh geometry={LANTERN_GEO} material={LANTERN_SHADE} />
+          <mesh geometry={LANTERN_GEO} scale={1.035}>
+            <meshBasicMaterial color={INK} side={THREE.BackSide} />
           </mesh>
-        ))}
-        <mesh position-y={LANTERN_END + 0.028} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 5, 12]} /><meshToonMaterial color="#8a6a3a" /></mesh>
+          {[LANTERN_END + 0.004, -LANTERN_END - 0.004].map((y) => (
+            <mesh key={y} position-y={y}>
+              <cylinderGeometry args={[0.056, 0.056, 0.024, 16]} />
+              <meshToonMaterial color="#cdb083" />
+            </mesh>
+          ))}
+          <mesh position-y={LANTERN_END + 0.028} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 5, 12]} /><meshToonMaterial color="#8a6a3a" /></mesh>
+        </>)}
+        {style === 1 && (<>
+          {/* (the round one: its paper with 日式烤魚 round it, black-lacquered rings at its ends) */}
+          <mesh geometry={ROUND_LANTERN_GEO} material={ROUND_SHADE} />
+          <mesh geometry={ROUND_LANTERN_GEO} scale={1.03}>
+            <meshBasicMaterial color={INK} side={THREE.BackSide} />
+          </mesh>
+          {[ROUND_LANTERN_END + 0.006, -ROUND_LANTERN_END - 0.006].map((y) => (
+            <mesh key={y} position-y={y}>
+              <cylinderGeometry args={[0.068, 0.068, 0.03, 18]} />
+              <meshToonMaterial color="#1c1412" />
+            </mesh>
+          ))}
+          <mesh position-y={ROUND_LANTERN_END + 0.034} rotation-x={Math.PI / 2}><torusGeometry args={[0.013, 0.003, 5, 12]} /><meshToonMaterial color="#8a6a3a" /></mesh>
+        </>)}
+        {style === 2 && (<>
+          {/* (the fish: hung by its back, lying along the bar, its tail and its fin of the same lit paper) */}
+          <mesh geometry={FISH_GEO} material={FISH_SHADE} />
+          <mesh geometry={FISH_GEO} scale={1.03}>
+            <meshBasicMaterial color={INK} side={THREE.BackSide} />
+          </mesh>
+          <mesh geometry={FISH_FIN_GEO} material={FISH_FIN} />
+          <mesh position-y={FISH_HANG + 0.008} rotation-x={Math.PI / 2}><torusGeometry args={[0.011, 0.0025, 5, 12]} /><meshToonMaterial color="#8a6a3a" /></mesh>
+        </>)}
         <sprite scale={0.85} material={PENDANT_GLOW} />
         {/* (and by night a wide soft bloom round it) */}
         <sprite scale={2.2} material={PENDANT_BLOOM} />
@@ -2656,7 +2814,8 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
       {/* pendant lamps over the bar's customer side, low */}
       {Array.from({ length: lamps }, (_, i) => {
         const z = (i - (lamps - 1) / 2) * (c.length / lamps)
-        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05} userData={{ fade: true }}><Pendant z={z} drop={0.25} pool={top} /></group></Movable>
+        // (three kinds in turn (the owner's): the oval washi one, the round one with 日式烤魚 on it, the fish)
+        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05} userData={{ fade: true }}><Pendant z={z} drop={0.25} pool={top} style={(i + (lamps === 2 ? 1 : 0)) % 3} /></group></Movable>
       })}
     </group>
   )
