@@ -21,6 +21,7 @@ import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
 import { sameProps } from '@/scene/sameProps'
 import { StaffFigure } from '@/scene/StaffFigure'
+import { CubbyStock } from './KitchenStores'
 import { QUALITY } from '@/scene/quality'
 import { seasonSound, sprinkleTick } from './seasonSound'
 import { biteSound, chewSound } from './chewSound'
@@ -46,7 +47,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { PASS_ALONG, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { PASS_ALONG, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -822,6 +823,12 @@ function CrewWalk({ at, yaw, way, seat, children }: { at: THREE.Vector3; yaw: nu
   const path = useRef<{ way: THREE.Vector3[]; len: number } | null>(null)
   const scene = useThree((s) => s.scene)
   const mark = useRef<THREE.Object3D | null>(null)
+  useEffect(() => {
+    const o = g.current
+    if (!o) return
+    KITCHEN_FOLK.add(o)
+    return () => { KITCHEN_FOLK.delete(o) }
+  }, [])
   useFrame((_, dt) => {
     const o = g.current
     if (!o) return
@@ -935,6 +942,19 @@ const KITCHEN_FLOOR = (() => {
   const lay1 = c1 ? toGrillScene(c1.at.clone().addScaledVector(c1.along, -c1.length / 2 - 0.35)).dot(LAY) : COOK_TABLE.lay[1] + 0.9
   return { lay: [lay0, lay1], along: [along0, along1] }
 })()
+/** the back of the notch under the hearth, where the cook stands: a face of the table's marble, the knives hung on it (no cupboard there) */
+function NotchFace() {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const top = -0.3, bottom = floor + CUBBY.plinth
+  const W = COOK_NOTCH.along[1] - COOK_NOTCH.along[0] - 0.006, H = top - bottom
+  const geo = useMemo(() => panelBox(W, H, 0.03, 0.45), [W, H])
+  const at = new THREE.Vector3().addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2).addScaledVector(LAY, COOK_NOTCH.lay[0] - 0.04)
+  return (
+    <mesh geometry={geo} position={[at.x, bottom + H / 2, at.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} receiveShadow>
+      <meshToonMaterial color="#ffffff" map={COOK_MARBLE} />
+    </mesh>
+  )
+}
 function CookTableImpl({ floor = true }: { floor?: boolean }) {
   // (and under it all the kitchen's floor, from the bar's cook's edges to the front, and on past the table's
   // right-hand end where the other cooks stand)
@@ -950,10 +970,16 @@ function CookTableImpl({ floor = true }: { floor?: boolean }) {
       {/* (its far corners, marked for the servers' way round it to the dish racks: GuestBar3D) */}
       <group name="cook-table-c0" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[0]).addScaledVector(LAY, COOK_TABLE.lay[0])} />
       <group name="cook-table-c1" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[1]).addScaledVector(LAY, COOK_TABLE.lay[1])} />
-      {/* (the cubbies either side a door each, hung at the table's ends; under the hearth, at the back of the notch, a pair) */}
-      <CubbyDoors along={CUBBY2.along as [number, number]} hinge="low" lit />
-      <CubbyDoors along={CUBBY.along as [number, number]} hinge="high" lit />
-      <CubbyDoors along={COOK_NOTCH.along as [number, number]} hinge="both" front={COOK_NOTCH.lay[0] - 0.06} back={COOK_NOTCH.lay[0] - 0.36} />
+      {/* (the cubbies either side a pair of doors each, opening out to the left and the right; under the hearth, at the back of the notch,
+          no doors: a plain marble face, the cook's knives hung on it (Decor's KnifeSet) */}
+      <CubbyDoors along={CUBBY2.along as [number, number]} hinge="both" lit />
+      <CubbyDoors along={CUBBY.along as [number, number]} hinge="both" lit />
+      <NotchFace />
+      {/* (what's kept in them: the grill's own stores, no plates (blender/cubbystock.py)) */}
+      {([['right', CUBBY.along], ['left', CUBBY2.along]] as const).map(([which, al]) => {
+        const at = new THREE.Vector3().addScaledVector(ALONG, (al[0] + al[1]) / 2).addScaledVector(LAY, (CUBBY.lay[0] + COOK_TABLE.lay[1] - 0.06) / 2)
+        return <group key={which} position={[at.x, CUBBY_FLOOR_Y, at.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}><CubbyStock which={which} /></group>
+      })}
       <CookTableTop />
       {/* (the same boards as the customers', laid the same way; with the shop open and the room drawn, its one floor
           runs under the kitchen too) */}
@@ -1053,6 +1079,30 @@ function CubbyFrame() {
  */
 const STRIP_OFF = new THREE.Color('#5a4a38')
 const STRIP_ON = new THREE.Color('#fff0cc')
+/** how far a leaf swings open (a little past square) */
+const LEAF_SWING = 1.75
+/** how near someone's middle may come to where a cupboard's doors swing (a body's half-width and a little), and how far ahead of a walker
+ * that's looked for (seconds of their way: the doors swing shut in less) */
+const DOOR_ROOM = 0.35
+const DOOR_AHEAD = 0.2
+/** and no further ahead than this (a run's pace would look past where they stop: the owner, back at his place by the left-hand cupboard) */
+const DOOR_AHEAD_MAX = 0.12
+/**
+ * How far a point (x, z, in a leaf's own terms: its hinge at the origin, the leaf shut along +x, swinging out toward +z) is from all the
+ * places the leaf passes through as it opens, its width `w` swung through LEAF_SWING.
+ */
+function fromSwing(x: number, z: number, w: number) {
+  const a = Math.atan2(z, x)
+  if (a >= 0 && a <= LEAF_SWING) return Math.max(0, Math.hypot(x, z) - w)
+  // (outside the sweep: to the nearer of its edges, the leaf shut and the leaf open)
+  return Math.min(fromLeaf(x, z, w, 1, 0), fromLeaf(x, z, w, SWUNG_X, SWUNG_Z))
+}
+const SWUNG_X = Math.cos(LEAF_SWING), SWUNG_Z = Math.sin(LEAF_SWING)
+/** how far (x, z) is from a leaf `w` long lying from the origin along the unit (cx, cz) */
+function fromLeaf(x: number, z: number, w: number, cx: number, cz: number) {
+  const t = Math.min(w, Math.max(0, x * cx + z * cz))
+  return Math.hypot(x - t * cx, z - t * cz)
+}
 function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, back = CUBBY.lay[0], lit = false }: { along: [number, number]
   hinge: 'low' | 'high' | 'both'; front?: number; back?: number; lit?: boolean }) {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
@@ -1063,31 +1113,62 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
   const mid = new THREE.Vector3().addScaledVector(ALONG, (a0 + a1) / 2).addScaledVector(LAY, front)
   const doors = useRef<(THREE.Group | null)[]>([])
   const frame = useRef<THREE.Group>(null)
-  const st = useRef({ k: 0, kept: false, hoverUntil: 0 })
+  const st = useRef({ k: 0, kept: false, hoverUntil: 0, blocked: false })
   const lamp = useRef<THREE.PointLight>(null)
   const strip = useRef<THREE.MeshBasicMaterial>(null)
-  if (import.meta.env?.DEV && typeof window !== 'undefined') ((window as unknown as { __cubbies?: Record<string, typeof st> }).__cubbies ??= {})[hinge] = st
+  const side = a0 < COOK_NOTCH.along[0] ? 'left' : 'right'
+  if (import.meta.env?.DEV && typeof window !== 'undefined') ((window as unknown as { __cubbies?: Record<string, typeof st> }).__cubbies ??= {})[side] = st
   const geo = useMemo(() => panelBox(W, H, 0.025, 0.45), [W, H])
   // (the cupboard's opening, in the doors' own frame: while the pointer's over it, they stay open, so what's inside can be reached and taken)
   const inside = useMemo(() => new THREE.Box3(new THREE.Vector3(-span / 2, bottom, back - front), new THREE.Vector3(span / 2, top, 0.06)), [span, bottom, top, front, back])
   const ray = useMemo(() => new THREE.Raycaster(), [])
   const inv = useMemo(() => new THREE.Matrix4(), [])
+  const who = useMemo(() => new THREE.Vector3(), [])
+  const seen = useMemo(() => new Map<THREE.Object3D, THREE.Vector3>(), [])
+  /** whether (x, z), in the doors' frame, is too near where either leaf swings (each in its own terms: hinged at its end of the opening, shut
+   * toward the middle) */
+  const inSwing = (x: number, z: number) => {
+    for (const sd of leaves) if (fromSwing((x - sd * span / 2) * -sd, z, W) < DOOR_ROOM) return true
+    return false
+  }
   useFrame((state, dt) => {
     const s = st.current
+    if (frame.current && (s.k > 0.01 || s.kept || performance.now() < s.hoverUntil)) {
+      inv.copy(frame.current.matrixWorld).invert()
+      // (anyone stood or passing in front, where the doors swing, where they are or where they'll be a moment on at the pace they're going:
+      // the doors don't open into them, and swing shut if they're open, opening again once they're by if they'd been left open)
+      s.blocked = false
+      for (const f of KITCHEN_FOLK) {
+        if (!f.visible) continue
+        who.setFromMatrixPosition(f.matrixWorld).applyMatrix4(inv)
+        let last = seen.get(f)
+        if (!last) seen.set(f, (last = who.clone()))
+        const step = dt > 0 ? DOOR_AHEAD / Math.max(dt, 1 / 120) : 0
+        const vx = (who.x - last.x) * step, vz = (who.z - last.z) * step
+        const cut = Math.min(1, DOOR_AHEAD_MAX / Math.max(1e-6, Math.hypot(vx, vz)))
+        const ax = who.x + vx * cut, az = who.z + vz * cut
+        last.copy(who)
+        if (inSwing(who.x, who.z) || inSwing(ax, az)) s.blocked = true
+      }
+      for (const f of seen.keys()) if (!KITCHEN_FOLK.has(f)) seen.delete(f)
+    } else {
+      s.blocked = false
+      seen.clear()
+    }
     if (frame.current && s.k > 0.3 && !getEdit().on) {
       ray.setFromCamera(state.pointer, state.camera)
-      ray.ray.applyMatrix4(inv.copy(frame.current.matrixWorld).invert())
+      ray.ray.applyMatrix4(inv)
       if (ray.ray.intersectsBox(inside)) s.hoverUntil = Math.max(s.hoverUntil, performance.now() + 800)
     }
-    const want = s.kept || performance.now() < s.hoverUntil ? 1 : 0
-    s.k += (want - s.k) * Math.min(1, Math.min(dt, 0.1) * 5)
+    const want = !s.blocked && (s.kept || performance.now() < s.hoverUntil) ? 1 : 0
+    s.k += (want - s.k) * Math.min(1, Math.min(dt, 0.1) * (s.blocked ? 16 : 5))
     // (each door about its hinge at its outer edge, its free edge swinging out toward the cook, a little past square)
     const e = s.k * s.k * (3 - 2 * s.k)
-    doors.current.forEach((d, i) => { if (d) d.rotation.y = leaves[i] * e * 1.75 })
+    doors.current.forEach((d, i) => { if (d) d.rotation.y = leaves[i] * e * LEAF_SWING })
     if (lamp.current) lamp.current.intensity = e * 1.6
     strip.current?.color.lerpColors(STRIP_OFF, STRIP_ON, Math.min(1, e * 1.5))
   })
-  const tip = () => setTip({ title: '櫃門', hint: st.current.kept ? '點一下關上' : '點一下打開' })
+  const tip = () => setTip({ title: '櫃門', hint: st.current.blocked ? '前面有人，打不開' : st.current.kept ? '點一下關上' : '點一下打開' })
   const over = (e: Parameters<typeof handOver.onPointerOver>[0]) => {
     handOver.onPointerOver(e)
     st.current.hoverUntil = performance.now() + 2500
@@ -1097,19 +1178,12 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
     <group ref={frame} position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
       {lit && (
         <>
-          <mesh name={`CubbyStrip-${hinge}`} position={[0, top - 0.007, -0.045]}>
+          <mesh name={`CubbyStrip-${side}`} position={[0, top - 0.007, -0.045]}>
             <boxGeometry args={[span - 0.12, 0.012, 0.022]} />
             <meshBasicMaterial ref={strip} color={STRIP_OFF} toneMapped={false} />
           </mesh>
           {QUALITY.tier === 'high' && <pointLight ref={lamp} position={[0, top - 0.05, (back - front) * 0.35]} color="#ffd8a0" intensity={0} distance={1.4} decay={2} />}
         </>
-      )}
-      {/* (under the hearth the cupboard's only a shallow one: its inside dark, seen with the doors open) */}
-      {hinge === 'both' && (
-        <mesh position={[0, bottom + H / 2, 0.001]}>
-          <planeGeometry args={[span, H]} />
-          <meshBasicMaterial color="#1c130c" />
-        </mesh>
       )}
       {leaves.map((sd, i) => (
         <group key={i} ref={(g) => { doors.current[i] = g }} position={[sd * span / 2, 0, 0.0125]}

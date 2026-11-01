@@ -52,6 +52,11 @@ export const PLATES_SET = new Set<number>()
  * still getting up and going. Nobody new is given one of these, though the shop's done with whoever had it.
  */
 export const SEATS_TAKEN = new Set<number>()
+/**
+ * The people about the kitchen (the owner, the cooks, the servers), each figure put in by its own while it's drawn and taken out when it
+ * goes: the cook's table's cupboard doors don't swing into anyone stood or passing in front of them (read from their world matrices).
+ */
+export const KITCHEN_FOLK = new Set<THREE.Object3D>()
 
 /**
  * Serving through the pass, when there's a server on the floor: what's grilled is put out at the pass (the end of the

@@ -12,12 +12,13 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ALONG, askPantry, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver } from './bar'
+import { ALONG, askPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver } from './bar'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { PlateRack } from './PlateRack'
 import { SinkModel } from './Sink'
+import { ProduceSacks } from './KitchenStores'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
@@ -697,11 +698,20 @@ function SinkAt() {
   const p = new THREE.Vector3().addScaledVector(ALONG, SINK_AT.along).addScaledVector(LAY, SINK_AT.lay)
   return <Movable id="sink" label="流理台" baseScale={SINK_AT.scale} ground={floor}><group name="look-sink" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><SinkModel /></group></Movable>
 }
+/** where the sacks of potatoes and sweet potatoes stand: on the kitchen's floor against the side counter's kitchen face, between its gate
+ * and the cook's table, their mouths toward the kitchen (along and lay as the freezer's); far enough toward the gate that the left-hand
+ * cupboard's doors swing open clear of them */
+const SACKS_AT = { along: -2.36, lay: 3.42 }
+function SacksAt() {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const p = new THREE.Vector3().addScaledVector(ALONG, SACKS_AT.along).addScaledVector(LAY, SACKS_AT.lay)
+  return <Movable id="produce" label="地瓜馬鈴薯" ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><ProduceSacks /></group></Movable>
+}
 const KNIVES_URL = import.meta.env.BASE_URL + 'models/knives.glb'
 /** the cook's knives on their folded cloth (blender/knives.py), laid along the table behind the hearth */
 /** the knife board (blender/knives.py) on the hearth frame's right-hand face: how far along that face is, where along the side its middle is,
  * how high it's hung, and its size (the model's real size, drawn up a little to the hearth's) */
-const KNIFE_BOARD = { face: 1.402, lay: 0.68, y: 0.025, scale: 1.3 }
+const KNIFE_BOARD = { y: -0.5, scale: 1.3 }
 function KnifeSet() {
   const gltf = useGLTF(KNIVES_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
@@ -727,10 +737,11 @@ function KnifeSet() {
     mergeByMaterial(r)
     return r
   }, [gltf])
-  // (hung on the hearth frame's right-hand side, its front half (the bucket's by its back half), the board's back to the frame's face: turned to
-  // face out along the table, the knives' handles toward the cook; the board's middle KNIFE_BOARD.lay along the side)
-  const p = new THREE.Vector3().addScaledVector(ALONG, KNIFE_BOARD.face).addScaledVector(LAY, KNIFE_BOARD.lay + 0.06 * KNIFE_BOARD.scale)
-  return <group position={[p.x, KNIFE_BOARD.y, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)} scale={KNIFE_BOARD.scale}><primitive object={obj} /></group>
+  // (hung on the marble face at the back of the notch under the hearth, where its cupboard was, facing the cook who stands there: the board's
+  // back to the face, its middle the notch's; in the fire's frame, FIRE_SHIFT back along from the table's)
+  const p = new THREE.Vector3().addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
+    .addScaledVector(LAY, COOK_NOTCH.lay[0] - 0.04 + 0.016)
+  return <group position={[p.x, KNIFE_BOARD.y, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} scale={KNIFE_BOARD.scale}><primitive object={obj} /></group>
 }
 useGLTF.preload(KNIVES_URL)
 function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternAt: [number, number, number]; fanAt: [number, number, number] }) {
@@ -742,7 +753,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
-      <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /></group>
+      <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /></group>
     </>
   )
 }

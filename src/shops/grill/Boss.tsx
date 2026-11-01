@@ -9,7 +9,7 @@ import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
 import { bossLineText, bossSituation, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
 import { DrinkBottle } from './DiningRoom'
-import { FRIDGE_STOCK, type DrinkId } from './bar'
+import { FRIDGE_STOCK, KITCHEN_FOLK, type DrinkId } from './bar'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -116,6 +116,12 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     return made
   }, [gltf])
   const mover = useRef<THREE.Group>(null)
+  useEffect(() => {
+    const m = mover.current
+    if (!m) return
+    KITCHEN_FOLK.add(m)
+    return () => { KITCHEN_FOLK.delete(m) }
+  }, [])
   const body = useRef<THREE.Group>(null)
   const parts = useMemo(() => ({
     handR: root.getObjectByName('BossHandR'),
