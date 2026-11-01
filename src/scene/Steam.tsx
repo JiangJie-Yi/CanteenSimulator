@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { memo, useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
 import { snoise as noise } from '@/scene/shaders/noise'
+import { sameProps } from './sameProps'
 
 const vertexShader = /* glsl */ `
 uniform float uTime;
@@ -63,7 +64,9 @@ type SteamProps = ThreeElements['group'] & {
 }
 
 /** Rising steam (or smoke) built from a few crossed, noise-animated planes. */
-export function Steam({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, color = '#ffffff', shade = '#e6f0fc',
+// (drawn again only when its props change: a position handed down as a new [x, y, z] with the same numbers is the same place)
+export const Steam = memo(SteamImpl, sameProps)
+function SteamImpl({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, color = '#ffffff', shade = '#e6f0fc',
   speed = 0.07, level, ...props }: SteamProps) {
   const geometry = useMemo(() => {
     const g = new THREE.PlaneGeometry(width, height, 8, 28)

@@ -1701,7 +1701,7 @@ export default function App() {
     // (everything it reads is in restockRef; book and talk only set state)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  // tiredness: the open shop's staff tire as they work (the less stamina, the faster), everyone else rests
+  // tiredness: the open shop's staff tire as they work (the less stamina, the faster), everyone else rests; and wages
   useEffect(() => {
     const id = window.setInterval(() => {
       setHired((h) => {
@@ -1720,11 +1720,7 @@ export default function App() {
         }
         return changed ? next : h
       })
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [])
-  useEffect(() => {
-    const id = window.setInterval(() => {
+      // (and the chef's wage, by the second while the shop's open: in the same tick, so the two are one redraw of the page, not two)
       if (aiRef.current.ai) book('wage', aiRef.current.wage / 3600 * GAME_SPEED.value)
     }, 1000)
     return () => window.clearInterval(id)
@@ -2236,7 +2232,7 @@ export default function App() {
                 const avg = rated.length ? rated.reduce((n, g) => n + (g.rating ?? 0), 0) / rated.length : null
                 return (
                   <span className="chip-part">
-                    {avg !== null && <MoodFace guest={{ id: 0, state: 'done', rating: avg, items: 0, ate: [] }} />}
+                    {avg !== null && <MoodFace guest={{ state: 'done', rating: avg }} />}
                     {tl(lang, '客', '客', 'Guests')} {here.length}/{visits}
                   </span>
                 )

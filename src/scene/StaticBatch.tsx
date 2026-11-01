@@ -29,10 +29,13 @@ export function bakeable(g: THREE.BufferGeometry, m: THREE.Matrix4) {
     const at = src.attributes[a]
     out.setAttribute(a, at ? at.clone() : new THREE.BufferAttribute(new Float32Array(n * (a === 'uv' ? 2 : 3)), a === 'uv' ? 2 : 3))
   }
+  // (and its colours, where they're carried by its vertices: a material shared by pieces of many colours)
+  const has = src.attributes.color ? [...ATTRS, 'color'] : ATTRS
+  if (src.attributes.color) out.setAttribute('color', src.attributes.color.clone())
   out.applyMatrix4(m)
   // (a mirroring transform turns the faces inside out: wind them back)
   if (m.determinant() < 0) {
-    for (const a of ATTRS) {
+    for (const a of has) {
       const arr = out.attributes[a].array as Float32Array
       const w = out.attributes[a].itemSize
       for (let i = 0; i < n; i += 3) for (let k = 0; k < w; k++) [arr[(i + 1) * w + k], arr[(i + 2) * w + k]] = [arr[(i + 2) * w + k], arr[(i + 1) * w + k]]

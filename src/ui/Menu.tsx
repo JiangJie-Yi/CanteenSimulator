@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent,
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent,
   type PointerEvent as ReactPointerEvent } from 'react'
 import { nameIn, UI, type Lang } from '@/data/i18n'
 import { toChineseNumber, type Dish } from '@/data/menu'
@@ -81,7 +81,9 @@ let foodsFont: { font: number; rows: number } | null = null
 const SET_ART: Record<string, string> = { ayu: 'ExtraFish', saury: 'Saury', mackerel: 'Mackerel', 'set-ayu': 'ExtraFish', 'set-saury': 'Saury', 'set-mackerel': 'Mackerel' }
 /** a dish's picture on its strip: the food it's made from, inked and coloured as the pantry's cards have it (ui/FoodArt); the line icon for
  * anything without one */
-function StripArt({ id, icon }: { id: string; icon: string }) {
+// (drawn again only when its food changes, not with every redraw of the menu: while the shop's open the page above redraws every second or so)
+const StripArt = memo(StripArtImpl)
+function StripArtImpl({ id, icon }: { id: string; icon: string }) {
   // (a dish worked out in the notebook goes by the food it's made from: its icon's name is that food's)
   const art = [SET_ART[id], id, SET_ART[icon], icon].find((k) => k && hasFoodArt(k))
   if (!art) return <Icon name={icon} />

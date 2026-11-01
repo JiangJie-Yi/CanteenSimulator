@@ -19,6 +19,7 @@ import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
 import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
+import { sameProps } from '@/scene/sameProps'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { QUALITY } from '@/scene/quality'
 import { seasonSound, sprinkleTick } from './seasonSound'
@@ -318,7 +319,8 @@ const TRASH_LABEL = signTexture(96, 180, (g) => {
   brushText(g, '屑', 48, 160, 18, { fill: '#f3ecd9' })
 })
 
-function TrashBin({ position, container, contents = 0 }: { position: [number, number, number]; container: string; contents?: number }) {
+const TrashBin = memo(TrashBinImpl, sameProps)
+function TrashBinImpl({ position, container, contents = 0 }: { position: [number, number, number]; container: string; contents?: number }) {
   const R = TRASH_R
   // a Japanese waste basket (屑籠): split bamboo woven in a twill (網代編み) round a slightly flaring body, its rim
   // and foot bound in dark rattan, a strip of washi on the front with ごみ brushed on it; open-topped, so the
@@ -411,7 +413,8 @@ function TrashBin({ position, container, contents = 0 }: { position: [number, nu
 
 const PASS_TRAY_URL = import.meta.env.BASE_URL + 'models/passtray.glb'
 /** the pass's tray (blender/passtray.py): black lacquer, its inside vermilion, a gold line along its lip, on two runners; in the room's toon light */
-function PassTray() {
+const PassTray = memo(PassTrayImpl)
+function PassTrayImpl() {
   const at = PASS_SCENE.clone().setY(PASS_SCENE.y - 0.04)
   const gltf = useGLTF(PASS_TRAY_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
@@ -527,7 +530,8 @@ const EMBER_GLOW = (() => {
  * none in the air), some with a faint red in them while the fire's up (what's left of burnt sticks: not a blaze), and a pool of orange light on
  * the salt.
  */
-function EmberBed({ fuel }: { fuel: { current: number } }) {
+const EmberBed = memo(EmberBedImpl)
+function EmberBedImpl({ fuel }: { fuel: { current: number } }) {
   const lumps = useMemo(() => {
     let seed = 23
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -1730,7 +1734,8 @@ const BossSpot = memo(function BossSpot({ open, lang }: { open: boolean; lang: L
 const CUTBOARD_URL = import.meta.env.BASE_URL + 'models/cutboard.glb'
 useGLTF.preload(CUTBOARD_URL)
 /** A shallow wooden tray (盛り板) where ordered food waits raw, to be carried onto the fire. */
-function Tray({ position, container }: { position: [number, number, number]; container: string }) {
+const Tray = memo(TrayImpl, sameProps)
+function TrayImpl({ position, container }: { position: [number, number, number]; container: string }) {
   const gltf = useGLTF(CUTBOARD_URL) as unknown as { scene: THREE.Group }
   const { geometry, map } = useMemo(() => {
     gltf.scene.updateMatrixWorld(true)
@@ -1845,7 +1850,8 @@ const wareOnce = (key: string, make: () => THREE.BufferGeometry) => {
   return g
 }
 /** A small round side dish (小皿) for onigiri and mochi, of the same set as the plates (plum blossom), inked. */
-function SideDish({ position, container }: { position: [number, number, number]; container: string }) {
+const SideDish = memo(SideDishImpl, sameProps)
+function SideDishImpl({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = wareOnce('dish', () => {
     const R = DISH_R
     return wareGeometry([[0, 0], [R * 0.55, 0], [R * 0.62, 0.012], [R * 0.85, 0.03], [R, 0.05], [R * 0.97, 0.056],
@@ -1864,7 +1870,8 @@ function SideDish({ position, container }: { position: [number, number, number];
 }
 
 /** The tasting bowl (試食碗): a deep round bowl of the same plum-blossom ware, where whatever's cooked by hand to try is put. */
-function TasteBowl({ position, container }: { position: [number, number, number]; container: string }) {
+const TasteBowl = memo(TasteBowlImpl, sameProps)
+function TasteBowlImpl({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = wareOnce('bowl', () => {
     const R = BOWL_R
     return wareGeometry([[0, 0], [R * 0.4, 0], [R * 0.46, 0.012], [R * 0.7, 0.04], [R * 0.92, 0.1], [R, 0.15], [R * 0.98, 0.158],
@@ -1887,7 +1894,8 @@ const ZARU_URL = import.meta.env.BASE_URL + 'models/zaru.glb'
 let zaruBase: THREE.Object3D | null = null
 /** The woven bamboo basket (竹ざる) the foil-roasted potatoes are served into (blender/zaru.py): a plain weave of split bamboo, a rolled rim
  * bound with cane. */
-function Basket({ position, container }: { position: [number, number, number]; container: string }) {
+const Basket = memo(BasketImpl, sameProps)
+function BasketImpl({ position, container }: { position: [number, number, number]; container: string }) {
   const gltf = useGLTF(ZARU_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
     if (!zaruBase) {
@@ -2156,7 +2164,8 @@ type TagState = { stage: (typeof ROAST_STAGES)[number]['key']; label: string; pc
 const stageOf = (r: number) => ROAST_STAGES.find((s) => r < s.until)!
 
 /** Plate the roasted pieces are served onto: a shallow cream dish with a blue rim line and an ink outline. */
-function Plate({ position, container }: { position: [number, number, number]; container: string }) {
+const Plate = memo(PlateImpl, sameProps)
+function PlateImpl({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = wareOnce('plate', () => {
     // profile drawn for a 0.5 radius plate, scaled up to PLATE_R
     const k = PLATE_R / 0.5
@@ -5221,6 +5230,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (off * 1000 + loose !== lastOff.current) {
       lastOff.current = off * 1000 + loose
       onOffFire?.(off, loose)
+    }
+    // (the progress tags worked out only while they're shown (by hand at the fire): with the shop open they aren't, and each piece passing a
+    // step redrew the whole kitchen, several times a second, for tags nobody saw)
+    if (!active || !showsProgress(modeOf(ai, research))) {
+      if (lastTags.current !== '[]') {
+        lastTags.current = '[]'
+        setTags([])
+      }
+      return
     }
     const next: { key: string; id: string; name?: string; state: TagState }[] = []
     for (const p of pieces.current) {

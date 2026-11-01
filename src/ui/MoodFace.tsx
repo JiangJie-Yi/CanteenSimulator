@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { GuestView } from '@/game/types'
 
 /**
@@ -6,7 +7,9 @@ import type { GuestView } from '@/game/types'
  * and cross. The face is coloured from warm yellow (happy) to grey-blue (unhappy).
  */
 
-export function MoodFace({ guest }: { guest: GuestView }) {
+// (drawn again only when the face would change: its rating, or walking out in a temper; a new copy of the guest with the same two is the same face)
+export const MoodFace = memo(MoodFaceImpl, (a, b) => a.guest.rating === b.guest.rating && a.guest.state === b.guest.state)
+function MoodFaceImpl({ guest }: { guest: Pick<GuestView, 'rating' | 'state'> }) {
   const r = guest.rating
   const mood = guest.state === 'angry' ? 'angry'
     : r === null ? 'wait'

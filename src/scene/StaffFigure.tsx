@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Look as StaffLook, Role } from '@/data/staff'
-import { inkModel } from './inkHull'
+import { inkTogether } from './inkHull'
 import { airbrush, gradientMap } from './Person3D'
 import { bakeable, keyOf } from './StaticBatch'
 
@@ -15,7 +15,9 @@ import { bakeable, keyOf } from './StaticBatch'
  * clothes. Skin and hair as their pictures in the office have them (ui/Avatar.tsx, the same hash of their id), glasses on the same ones.
  *
  * Each figure is drawn in a handful of meshes: the body's parts merged by material, the eyes, the glasses and each hand on their own (they
- * move or come and go); inked once per variant, then copied.
+ * move or come and go); inked once per variant, then copied. Every plain-coloured piece (no picture on it: the cord, the collar, the brows,
+ * the towel...) is one material with its colour carried by its vertices, so they're a single draw; the skin and hair (each person's own)
+ * and the printed cloth keep theirs. Each part's ink is one line round all of it.
  */
 type Variant = 'chef' | 'chefF' | 'server' | 'serverF' | 'stock'
 const url = (v: Variant) => import.meta.env.BASE_URL + `models/crew_${v}.glb`
@@ -50,12 +52,22 @@ function partOf(o: THREE.Object3D): 'handL' | 'handR' | 'fan' | 'eyes' | 'glasse
   return 'body'
 }
 
+/** a geometry's every vertex given the colour (as the material has it: linear), for the one material all plain pieces share */
+function colourVertices(g: THREE.BufferGeometry, c: THREE.Color) {
+  const n = g.attributes.position.count, a = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b }
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3))
+}
+
 /** the variant's figure, built once: its materials the people's soft paint, its parts merged, inked */
 function build(scene: THREE.Group): Built {
   scene.updateWorldMatrix(true, true)
   const inv = new THREE.Matrix4().copy(scene.matrixWorld).invert()
   const mats = new Map<THREE.Material, THREE.Material>()
   let skin: THREE.MeshToonMaterial | null = null, hair: THREE.MeshToonMaterial | null = null
+  // (the plain pieces' one material each way they're painted: soft toon, and flat for the eyes' whites and darks)
+  const plainToon = airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap }))
+  const plainFlat = new THREE.MeshBasicMaterial({ color: '#ffffff', vertexColors: true })
   const paint = (src: THREE.MeshStandardMaterial) => {
     let t = mats.get(src)
     if (!t) {
@@ -75,12 +87,17 @@ function build(scene: THREE.Group): Built {
     if (!m.isMesh || Array.isArray(m.material)) return
     const part = partOf(m)
     if (part === 'drop') return
-    const mat = paint(m.material as THREE.MeshStandardMaterial)
+    const src = m.material as THREE.MeshStandardMaterial
+    const mat = paint(src)
     const inked = !UNINKED.test(m.name)
-    const key = `${keyOf(mat)}|${mat.uuid}|${inked}`
+    const plain = !src.map && !src.transparent && src.opacity === 1 && mat !== skin && mat !== hair
+    const use = plain ? (mat instanceof THREE.MeshBasicMaterial ? plainFlat : plainToon) : mat
+    const key = `${keyOf(use)}|${use.uuid}|${inked}`
     const byMat = parts.get(part) ?? new Map()
-    const g = byMat.get(key) ?? { mat, inked, geos: [] }
-    g.geos.push(bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)))
+    const g = byMat.get(key) ?? { mat: use, inked, geos: [] }
+    const geo = bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld))
+    if (plain) colourVertices(geo, (mat as THREE.MeshToonMaterial | THREE.MeshBasicMaterial).color)
+    g.geos.push(geo)
     byMat.set(key, g)
     parts.set(part, byMat)
   })
@@ -107,9 +124,11 @@ function build(scene: THREE.Group): Built {
       holder.add(mesh)
     }
     if (at) holder.position.copy(at)
+    // (one ink line round the whole part, whatever it's painted with)
+    const hull = inkTogether(holder.children.filter((o) => !o.userData.uninked) as THREE.Mesh[], { width: 0.006, weld: true })
+    if (hull) holder.add(hull)
     root.add(holder)
   }
-  inkModel(root, (m) => !!m.userData.uninked, { width: 0.006, weld: true })
   return { root, skin: skin!, hair: hair! }
 }
 
@@ -118,7 +137,9 @@ function build(scene: THREE.Group): Built {
  * hands, the cashier with their hands together, the stock keeper with his clipboard; `moving`: walking somewhere (a server carrying a
  * plate, the stock keeper a case). Faces +z, stands on y 0.
  */
-export function StaffFigure({ id, role, look: who, moving = false, seated = false }: { id: string; role: Role; look: StaffLook; moving?: boolean
+// (drawn again only when its own props change: the staff stand in parents that redraw several times a second, and they move by their own frames)
+export const StaffFigure = memo(StaffFigureImpl)
+function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }: { id: string; role: Role; look: StaffLook; moving?: boolean
   /** sat (the cashier on the till's chair): leaning in a little, the hands up on the counter in front, now and then tapping at the keys */
   seated?: boolean }) {
   const h = avHash(id)

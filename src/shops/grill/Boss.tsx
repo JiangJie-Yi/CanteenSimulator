@@ -83,10 +83,22 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     if (!made) {
       const r = gltf.scene.clone(true)
       const mats = new Map<THREE.Material, THREE.Material>()
+      // (every plain-coloured piece of him (no picture on it) one material, its colour carried by its vertices: merged below, they're one draw)
+      const plain = airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap }))
       r.traverse((o) => {
         const m = o as THREE.Mesh
         if (!m.isMesh) return
         const src = m.material as THREE.MeshStandardMaterial
+        if (!src.map && !src.transparent && src.opacity === 1 && !/White|Dark/.test(src.name)) {
+          m.geometry = m.geometry.clone()
+          const n = m.geometry.attributes.position.count, c = new Float32Array(n * 3)
+          for (let i = 0; i < n; i++) { c[i * 3] = src.color.r; c[i * 3 + 1] = src.color.g; c[i * 3 + 2] = src.color.b }
+          m.geometry.setAttribute('color', new THREE.BufferAttribute(c, 3))
+          m.material = plain
+          m.castShadow = !UNINKED.test(m.name)
+          m.receiveShadow = true
+          return
+        }
         let t = mats.get(src)
         if (!t) {
           t = /White|Dark/.test(src.name)

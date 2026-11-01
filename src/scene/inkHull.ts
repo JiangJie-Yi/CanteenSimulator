@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 /** the shop's ink: a dark line round every object, drawn as its back faces pushed out a little along their normals */
 const HULL = new THREE.ShaderMaterial({
@@ -40,6 +40,30 @@ function welded(g: THREE.BufferGeometry) {
   const w = mergeVertices(p, 1e-5)
   w.computeVertexNormals()
   return w
+}
+
+/**
+ * One ink line round several meshes that move together (a figure's body, whatever its materials; each at rest in the same frame): their
+ * shapes put together and drawn as a single hull, one draw where each had its own. Null if there's nothing to ink.
+ */
+export function inkTogether(meshes: THREE.Mesh[], { width = 0.012, weld = false } = {}): THREE.Mesh | null {
+  // (just where each is and, unwelded, which way it faces: the materials' own attributes needn't match)
+  const shapes = meshes.map((m) => {
+    const p = new THREE.BufferGeometry()
+    p.setAttribute('position', m.geometry.attributes.position)
+    if (!weld) p.setAttribute('normal', m.geometry.attributes.normal)
+    if (m.geometry.index) p.setIndex(m.geometry.index)
+    return m.geometry.index ? p.toNonIndexed() : p
+  })
+  if (!shapes.length) return null
+  const all = shapes.length === 1 ? shapes[0] : mergeGeometries(shapes)
+  if (!all) return null
+  const geo = weld ? welded(all) : all
+  const hull = new THREE.Mesh(geo, hullOf(width))
+  hull.raycast = () => {}
+  hull.userData.inked = true
+  for (const m of meshes) m.userData.inked = true
+  return hull
 }
 
 /**

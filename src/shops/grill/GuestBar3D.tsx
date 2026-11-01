@@ -1,4 +1,4 @@
-import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -1378,8 +1378,9 @@ const PLATE_GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], 
 const SMEAR_GEO = new THREE.CircleGeometry(0.058, 18)
 const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.18, 5)
 
-/** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and a used stick) */
-function Plate({ dirty = false, design = 0 }: { dirty?: boolean; design?: number }) {
+/** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and a used stick); drawn again only when it gets dirty */
+const Plate = memo(PlateImpl)
+function PlateImpl({ dirty = false, design = 0 }: { dirty?: boolean; design?: number }) {
   return (
     <group>
       <mesh geometry={PLATE_GEO} castShadow receiveShadow>
@@ -1602,6 +1603,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   useEffect(() => { setLocked(open) }, [open])
   /** each shown guest's name tag, faded with them as they go out of the door */
   const labels = useRef(new Map<number, HTMLElement>())
+  const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
 
   shownRef.current = shown
@@ -1634,8 +1636,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const s = shownRef.current.find((x) => x.id === g.id)
       if (s && g.state !== 'waiting' && g.state !== 'eating' && s.phase !== 'leave') clear(g.id)
     }
+    // (the same list back when nobody comes or goes: then the bar isn't drawn again for it)
     setShown((cur) => {
-      let next = [...cur]
+      let next = cur
       for (const g of guests) {
         const s = next.find((x) => x.id === g.id)
         const seated = g.state === 'waiting' || g.state === 'eating'
@@ -1643,7 +1646,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const taken = new Set(next.map((x) => x.seat))
           // (the shop may have given them a stool already: it only does once the last one there has gone)
           const seat = g.seat !== undefined ? g.seat : Array.from({ length: seats.length }, (_, i) => i).find((i) => !taken.has(i))
-          if (seat !== undefined) next.push({ id: g.id, seat, phase: 'enter', t: 0 })
+          if (seat !== undefined) next = [...next, { id: g.id, seat, phase: 'enter', t: 0 }]
         } else if (s && !seated && s.phase !== 'leave' && !s.leaving) {
           // (away at the toilet: they go once they're back at their stool)
           next = next.map((x) => (x.id === g.id ? (x.phase.startsWith('wc') ? { ...x, leaving: true } : { ...x, phase: 'leave', t: 0 }) : x))
@@ -1865,7 +1868,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         && (groups.current.get(x.id)?.position.distanceTo(wcs[who].front) ?? 9) < 1.3).length
       TOILETS[who].inside = shown.filter((x) => x.wc?.who === who && x.phase === 'wcIn').length
     }
-    if (done.length) setShown((cur) => cur.filter((x) => !done.includes(x.id)))
+    // (the ids held as they are now: the update may run later, once `done` below is a new empty list, and then it took nobody out; those out of
+    // the door stayed listed, holding their stool's number, asking every frame to be taken out and drawing the bar again each time)
+    if (done.length) {
+      const gone = done
+      setShown((cur) => { const next = cur.filter((x) => !gone.includes(x.id)); return next.length === cur.length ? cur : next })
+    }
     done = []
 
     // anyone who sat down while the stack was empty gets a plate as soon as there's one back on it
@@ -1915,7 +1923,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const trayAt = () => w.pos.clone().add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE)
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), w.yaw))
       const run = () => runs.current.find((x) => x.key === w.run)
-      const setMove = (on: boolean) => setMoving((m) => { const n = [...m]; n[wi] = on; return n })
+      const setMove = (on: boolean) => setMoving((m) => { if (!!m[wi] === on) return m; const n = [...m]; n[wi] = on; return n })
       w.t += step
       // (the customer gone meanwhile: what was being carried to them is taken away, and the server goes back)
       if ((w.phase === 'fetch' || w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') && !sitting(w.seat)) {
@@ -2254,18 +2262,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>
               <PersonClock s={s} phase={s.phase} drink={s.drink} eating={s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'}
-                clock={clock} talk={talkSide(s)} guest={g} />
+                clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} />
             </group>
             {/* (their label just over their head: a figure in the boss's style is shorter than the old ones, and sits up on the seat) */}
-            <Html position={[0, FOLK_GUESTS ? ((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.15 : 1.05 * PEOPLE_SCALE, 0]}
-              center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
-              <div className="g3-label" ref={(el) => { if (el) labels.current.set(s.id, el); else labels.current.delete(s.id) }}>
-                {speech[s.id] ? <Say key={speech[s.id].key} text={speech[s.id].text} />
-                  : g && !walking && g.state === 'waiting' && g.rating === null && <span className="g3-bubble">…</span>}
-                {g && g.rating !== null && <MoodFace guest={g} />}
-                <span>{g?.partner !== undefined && <i className="g3-heart">♥</i>}{guestLabel(s.id, lang)}</span>
-              </div>
-            </Html>
+            <GuestLabel id={s.id} y={FOLK_GUESTS ? ((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.15 : 1.05 * PEOPLE_SCALE}
+              say={speech[s.id]} dots={!!g && !walking && g.state === 'waiting' && g.rating === null} rating={g?.rating ?? null} angry={g?.state === 'angry'}
+              partner={g?.partner !== undefined} name={guestLabel(s.id, lang)} onEl={labelEl} />
           </group>
         )
       })}
@@ -2314,19 +2316,39 @@ function Say({ text }: { text: string }) {
   return <span key={i} className="g3-bubble g3-say">{chunks[i]}{i < chunks.length - 1 ? '…' : ''}</span>
 }
 
+const LABEL_STYLE = { pointerEvents: 'none' } as const
+const LABEL_Z = [20, 10]
+/** one customer's label over their head (what they're saying, or the dots while they wait; their face once they've eaten; their number): drawn
+ * again only when one of those changes. Each is a page of its own (drei's Html renders its children into a root of their own), so drawn again
+ * with every redraw of the bar, several times a second, every label was laid out again each time */
+const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, partner, name, onEl }: { id: number; y: number
+  say?: { key: number; text: string }; dots: boolean; rating: number | null; angry: boolean; partner: boolean; name: string
+  onEl: (id: number, el: HTMLElement | null) => void }) {
+  const at = useMemo(() => [0, y, 0] as [number, number, number], [y])
+  return (
+    <Html position={at} center zIndexRange={LABEL_Z} style={LABEL_STYLE}>
+      <div className="g3-label" ref={(el) => onEl(id, el)}>
+        {say ? <Say key={say.key} text={say.text} /> : dots && <span className="g3-bubble">…</span>}
+        {rating !== null && <MoodFace guest={{ rating, state: angry ? 'angry' : 'done' }} />}
+        <span>{partner && <i className="g3-heart">♥</i>}{name}</span>
+      </div>
+    </Html>
+  )
+})
+
 /** how much lower the stool's seat is than the one the old figures (guests.glb) were made to sit on */
 const OLD_STOOL_DROP = 0.343 - FOLK_SEAT
 /** one customer's figure, moved by the bar's clock each frame (read from the ref: nothing re-renders for it) */
 // (drawn again only when what's shown of them changes (their phase, eating or not, the drink in hand, who they turn to, how they're
 // getting on), not each time the bar above them redraws, several times a second; `phase` and `drink` are passed only so it notices them)
 const PersonClock = memo(PersonClockImpl)
-function PersonClockImpl({ s, eating, clock, talk, guest }: { s: Shown; phase: string; drink?: string; eating: boolean; clock: { current: number }
-  talk: number; guest?: GuestView }) {
+function PersonClockImpl({ s, eating, clock, talk, mood }: { s: Shown; phase: string; drink?: string; eating: boolean; clock: { current: number }
+  talk: number; mood: ReturnType<typeof moodOf> }) {
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
   const Figure = FOLK_GUESTS ? FolkFigure : Person
   // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them; the old figures, made to sit on
   // the old, taller stool, sat down by the difference)
-  return <Suspense fallback={null}><group position-y={!FOLK_GUESTS && s.phase === 'sit' ? -OLD_STOOL_DROP : 0}><Figure id={s.id} eating={eating} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={guest ? moodOf(guest) : null}
+  return <Suspense fallback={null}><group position-y={!FOLK_GUESTS && s.phase === 'sit' ? -OLD_STOOL_DROP : 0}><Figure id={s.id} eating={eating} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined} fit={FOLK_FIT}
     held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></group></Suspense>
 }

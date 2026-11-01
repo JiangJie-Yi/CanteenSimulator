@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import * as THREE from 'three'
 
 /** a soft round shadow, black in the middle and fading out: one texture for all */
@@ -21,6 +22,7 @@ const MAT = new THREE.MeshBasicMaterial({ map: BLOB, transparent: true, depthWri
  * A cheap round shadow on the floor under someone (their feet at the origin): a single see-through quad, no
  * shadow map. `r` is its radius; it is black but see-through, so the feet read as standing on the floor.
  */
-export function BlobShadow({ r = 0.2 }: { r?: number }) {
+// (drawn again only if its size changes: it stands under everyone, whose parents redraw often)
+export const BlobShadow = memo(function BlobShadow({ r = 0.2 }: { r?: number }) {
   return <mesh geometry={GEO} material={MAT} rotation-x={-Math.PI / 2} position-y={0.008} scale={[r * 2, r * 2, 1]} renderOrder={-1} />
-}
+})
