@@ -37,8 +37,9 @@ import { FramePacer } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
-import { offsetOf, positionOf, rotationOf, setEditLang, useEdit, type V3 } from '@/shops/grill/edit'
-import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
+import { offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
+import { GroupGizmo, GroupTags, Movable, WireView } from '@/shops/grill/Movable'
+import type { ViewCam } from '@/game/editGroups'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
@@ -646,6 +647,36 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       : OVERVIEW_POSITION.clone().sub(OVERVIEW_TARGET).setY(0).normalize()
     return { pos: at.clone().addScaledVector(fromOpen, spot.back ?? 2).add(new THREE.Vector3(0, spot.up ?? 1.4, 0)), target: at }
   }
+  // (where each view's camera stands and what it looks at, for edit mode to make what it has in sight its area: from the camera placed by hand,
+  // if it has been, as the view itself goes; none while any view's part of the room is still loading)
+  const poseNow = useRef(poseOf)
+  poseNow.current = poseOf
+  useEffect(() => {
+    setViewCams(() => {
+      const cams: ViewCam[] = []
+      for (const v of VIEW_SPOTS) {
+        if (v.id === 'free' || v.follow) continue
+        const def = poseNow.current(v.id)
+        if (!def) return null
+        const eye = def.pos.clone(), target = def.target.clone()
+        const cam = scene.getObjectByName(`viewcam-${v.id}`)
+        // (what it's a view of: the part of the room it's named for (its frame may be moved off it, into the room); a camera placed by hand,
+        // what it now looks at)
+        const anchor = v.anchor ? scene.getObjectByName(v.anchor) : null
+        let subject = anchor ? anchor.getWorldPosition(new THREE.Vector3()) : target.clone()
+        if (cam && viewCamPlaced(v.id)) {
+          cam.updateWorldMatrix(true, false)
+          cam.getWorldPosition(eye)
+          target.copy(eye).addScaledVector(new THREE.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new THREE.Quaternion())), def.pos.distanceTo(def.target))
+          subject = target.clone()
+        }
+        // (a 16:9 frame, whatever the window's shape: the areas are the shop's, not the window's)
+        cams.push({ id: v.id, eye: eye.toArray(), target: target.toArray(), subject: subject.toArray(), fov: (camera as THREE.PerspectiveCamera).fov ?? 40, aspect: 16 / 9 })
+      }
+      return cams
+    })
+    return () => setViewCams(null)
+  }, [scene, camera])
   useEffect(() => {
     const was = homedFor.current
     homedFor.current = { active, resetView, view, w: size.width, h: size.height, camTry }
@@ -960,6 +991,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
       <ViewCams editing={editing} lang={lang} pose={poseOf} />
       {/* (a group picked in developer mode: its own handles, to move, turn and size it as one) */}
       <GroupGizmo />
+      <GroupTags />
       {/* (developer mode's wireframe, 4 / 5) */}
       <WireView />
       <FocusTracker />

@@ -7,6 +7,8 @@ import { clearAllRenderPrefs, clearRenderPref, onRenderPrefs, renderPrefOf, setR
 import { RENDER_DEFAULT, type RenderPref } from '@/game/renderPrefs'
 import { EDIT_TEXT, pieceName } from '@/data/editText'
 import type { Lang } from '@/data/i18n'
+import { VIEW_SPOTS } from '@/data/views'
+import { areasOf, chainOf, isStill, leavesOf, parentOf, undoGroup, within, type ViewCam } from '@/game/editGroups'
 import { glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 
@@ -38,40 +40,60 @@ export type Tool = 'select' | 'move' | 'rotate' | 'scale'
  */
 export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: number; s: number; r?: V3 }
 /** groups the shop comes with (the owner's own are added to them): the door's cat stand with its four cats; their pivot is found the first time
- * edit mode opens, once the pieces have been measured */
-const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[] }> = {
+ * edit mode opens, once the pieces have been measured. `spans`: it runs across the room, in no one view's area (see groupByViews) */
+const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]; spans?: boolean }> = {
   'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3'] },
   // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
   'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
   'grp-till': { zh: '收銀櫃組', ja: 'レジ一式', members: ['till-counter', 'till-register', 'till-card', 'till-printer', 'till-tray', 'till-pens', 'till-bell',
     'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-cashbox', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
+  // (the customers' stools, the length of the bars: the views' cameras each see a few of them, so left out of their areas and kept together)
+  'grp-stools': { zh: '吧台座椅', ja: 'カウンター席', members: Array.from({ length: 10 }, (_, n) => `stool${n}`), spans: true },
 }
 const unsettled = new Set<string>()
-/** the default groups the owner has broken up: not made again */
+/** the groups the owner has broken up (the shop's own, and the views' areas): not made again (kept here too, for when storage is blocked) */
 const KEY_GD = 'jgs-edit-groups-dropped'
-const dropped = (): string[] => { try { return JSON.parse(localStorage.getItem(KEY_GD) ?? '[]') } catch { return [] } }
+const droppedNow = new Set<string>()
+const dropped = (): string[] => { try { return [...new Set([...JSON.parse(localStorage.getItem(KEY_GD) ?? '[]'), ...droppedNow])] } catch { return [...droppedNow] } }
+const drop = (id: string) => { droppedNow.add(id); try { localStorage.setItem(KEY_GD, JSON.stringify(dropped())) } catch { /* storage blocked */ } }
+/** the views' areas: a group each, made by groupByViews */
+export const AREA = 'grp-view-'
+export const isArea = (id: string | null) => !!id && id.startsWith(AREA)
 const loadGroups = (): Record<string, Group> => {
   let g: Record<string, Group> = {}
   try { g = JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { /* storage blocked */ }
   for (const [id, d] of Object.entries(DEFAULT_GROUPS)) {
-    // (not when the owner has already put any of its pieces in a group of their own, or broken it up)
-    const taken = Object.values(g).some((x) => x.members.some((m) => d.members.includes(m)))
+    // (not when the owner has already put any of its pieces in a group of their own, or broken it up; a view's area holding them gives them up
+    // to it, and holds it in their place)
+    const taken = Object.entries(g).some(([k, x]) => !isArea(k) && x.members.some((m) => d.members.includes(m)))
     if (g[id] || taken || dropped().includes(id)) continue
+    let home: string | null = null
+    for (const [k, x] of Object.entries(g)) {
+      if (!isArea(k) || !x.members.some((m) => d.members.includes(m))) continue
+      g[k] = { ...x, members: x.members.filter((m) => !d.members.includes(m)) }
+      home ??= k
+    }
+    if (home) g[home] = { ...g[home], members: [...g[home].members, id] }
     g[id] = { name: d.zh, members: d.members, pivot: [0, 0, 0], t: [0, 0, 0], yaw: 0, s: 1 }
     unsettled.add(id)
   }
   return g
 }
+/** a point in the world, where it stands inside a group as that group's own pivot is kept (the groups it's in undone, outermost first) */
+const intoGroup = (gid: string | null, v: V3): V3 => {
+  if (!gid) return v
+  return [gid, ...chainOf(state.groups, gid)].reverse().reduce((p, k) => undoGroup(state.groups[k], p), v)
+}
+const middle = (pts: V3[]): V3 => [0, 1, 2].map((k) => pts.reduce((a, v) => a + v[k], 0) / pts.length) as V3
 /** a default group's pivot: the middle of its members, once they've all been measured */
 function settleGroups() {
   for (const id of [...unsettled]) {
     const g = state.groups[id]
     if (!g) { unsettled.delete(id); continue }
-    const pts = g.members.map((m) => registry.get(m)?.center?.() ?? null)
+    const pts = leavesOf(state.groups, id).map((m) => registry.get(m)?.center?.() ?? null)
     if (pts.some((v) => !v)) continue
-    const pivot = [0, 1, 2].map((k) => pts.reduce((a, v) => a + v![k], 0) / pts.length) as V3
-    state.groups = { ...state.groups, [id]: { ...g, pivot } }
+    state.groups = { ...state.groups, [id]: { ...g, pivot: intoGroup(parentOf(state.groups, id), middle(pts as V3[])) } }
     unsettled.delete(id)
   }
 }
@@ -115,7 +137,7 @@ const hotSubs = new Set<() => void>()
 export function setListHot(id: string | null) { if (listHot === id) return; listHot = id; hotSubs.forEach((f) => f()) }
 const hotSub = (f: () => void) => { hotSubs.add(f); return () => { hotSubs.delete(f) } }
 export const useListHot = (id: string) =>
-  useSyncExternalStore(hotSub, () => !!listHot && (listHot === id || (listHot in state.groups && state.groups[listHot].members.includes(id))))
+  useSyncExternalStore(hotSub, () => !!listHot && (listHot === id || (listHot in state.groups && within(state.groups, id, listHot))))
 /**
  * Where each piece stands to begin with: the places the owner has settled on by hand (as X, Y, Z in the piece's parent's own units). The
  * offset shown and typed in edit mode is from here, so every piece starts at 0, 0, 0, its own centre.
@@ -162,10 +184,16 @@ export const BASES: Record<string, V3> = {
   'viewcam-free': [0.0478, 0, 0.4475],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
-/** the group a piece belongs to, if any */
-export const groupOf = (piece: string): string | null => Object.keys(state.groups).find((g) => state.groups[g].members.includes(piece)) ?? null
-/** whether a piece is the selected one, or in the selected group */
-export const isPicked = (piece: string) => state.selected === piece || (isGroup(state.selected) && state.groups[state.selected!].members.includes(piece))
+/** the group a piece (or a group) is in, if any: the one holding it directly (that one may be in a view's area in its turn) */
+export const groupOf = (piece: string): string | null => parentOf(state.groups, piece)
+/** whether a piece is the selected one, or in the selected group (however deep) */
+export const isPicked = (piece: string) => state.selected === piece || (isGroup(state.selected) && within(state.groups, piece, state.selected!))
+/** a group that keeps things together in the list rather than making one thing of them (a view's area, the stools along the bars): a click in
+ * the room picks the piece in it, not it */
+const isGathering = (gid: string) => isArea(gid) || !!DEFAULT_GROUPS[gid]?.spans
+/** what a click on a piece in the scene picks: the group it's in, as one (the till and all on it), but not a view's whole area or the like (that's
+ * picked from the list, or its tag); or the piece alone */
+export const clickPick = (piece: string) => chainOf(state.groups, piece).find((g) => !isGathering(g)) ?? piece
 export const offsetOf = (id: string): V3 => state.groups[id] ? state.groups[id].t : state.offsets[id] ?? [0, 0, 0]
 /** where the piece is: its settled place, and what's been moved by hand from it */
 export const positionOf = (id: string): V3 => {
@@ -341,7 +369,7 @@ const registry: Map<string, Entry> = typeof window !== 'undefined'
 export function frameSelected() {
   const id = state.selected
   if (!id) return
-  const target = state.groups[id] ? state.groups[id].members[0] : id
+  const target = leavesOf(state.groups, id).find((m) => registry.has(m)) ?? id
   registry.get(target)?.focus()
 }
 export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null) {
@@ -352,9 +380,13 @@ export function registerMovable(id: string, label: string, focus: () => void, ce
 
 // ---- groups
 let groupSeq = 0
-/** the pieces picked in the list (Ctrl- or Shift-click adds one), the selected one too, that can be grouped and aren't in a group already */
-export const groupable = () => [...new Set([...state.picked, ...(state.selected && !isGroup(state.selected) ? [state.selected] : [])])]
-  .filter((id) => registry.get(id)?.center && !groupOf(id))
+/** the pieces picked in the list (Ctrl- or Shift-click adds one), the selected one too, that can be grouped: in no group, or all in the same one
+ * (a view's area: the new group is made inside it) */
+export const groupable = () => {
+  const ids = [...new Set([...state.picked, ...(state.selected && !isGroup(state.selected) ? [state.selected] : [])])].filter((id) => registry.get(id)?.center)
+  const home = ids.length ? groupOf(ids[0]) : null
+  return ids.filter((id) => groupOf(id) === home)
+}
 export function pickToggle(id: string) {
   state.picked = state.picked.includes(id) ? state.picked.filter((x) => x !== id) : [...state.picked, id]
   if (!state.selected || isGroup(state.selected)) state.selected = id
@@ -363,13 +395,20 @@ export function pickToggle(id: string) {
 export function makeGroup() {
   const ids = groupable()
   if (ids.length < 2) { toast(T().needTwo); return }
+  const home = groupOf(ids[0])
   const pts = ids.map((id) => registry.get(id)!.center!()).filter((v): v is V3 => !!v)
-  const pivot = (pts.length ? [0, 1, 2].map((k) => pts.reduce((a, v) => a + v[k], 0) / pts.length) : [0, 0, 0]) as V3
+  const pivot = pts.length ? intoGroup(home, middle(pts)) : [0, 0, 0] as V3
   beginChange()
   let n = ++groupSeq
   while (state.groups[`grp${n}`]) n = ++groupSeq
   const id = `grp${n}`
   state.groups = { ...state.groups, [id]: { name: T().groupName(n), members: ids, pivot, t: [0, 0, 0], yaw: 0, s: 1 } }
+  // (made inside the group its pieces were in: it holds the new one where they stood in its list)
+  if (home) {
+    const was = state.groups[home].members
+    const at = was.findIndex((m) => ids.includes(m))
+    state.groups = { ...state.groups, [home]: { ...state.groups[home], members: [...was.slice(0, at), id, ...was.slice(at).filter((m) => !ids.includes(m))] } }
+  }
   state.picked = []
   state.selected = id
   save(); emit()
@@ -378,9 +417,12 @@ export function makeGroup() {
 export function dissolveGroup(id: string | null = state.selected) {
   if (!id || !state.groups[id]) return
   beginChange()
-  const { [id]: _g, ...rest } = state.groups
+  const { [id]: g, ...rest } = state.groups
+  // (what was in it goes back into the group it was in, if any, where it stood)
+  const home = parentOf(rest, id)
+  if (home) rest[home] = { ...rest[home], members: rest[home].members.flatMap((m) => (m === id ? g.members : [m])) }
   state.groups = rest
-  if (DEFAULT_GROUPS[id]) try { localStorage.setItem(KEY_GD, JSON.stringify([...dropped(), id])) } catch { /* storage blocked */ }
+  if (DEFAULT_GROUPS[id] || isArea(id)) drop(id)
   state.selected = null
   save(); emit()
   toast(T().ungrouped, 'edit')
@@ -390,10 +432,75 @@ export function renameGroup(id: string, name: string) {
   state.groups = { ...state.groups, [id]: { ...state.groups[id], name } }
   save(); emit()
 }
-/** the transform of the group a piece is in, to lay over it: where it turns from, how far it's moved (in the room's frame), turned and sized */
-export const groupTransformOf = (piece: string) => {
-  const g = groupOf(piece)
-  return g ? state.groups[g] : null
+/** the transforms of the groups a piece is in, to lay over it (the one holding it first, then the one that's in, out to a view's area): where
+ * each turns from, how far it's moved (in the room's frame), turned and sized; none when none of them has been (they'd change nothing) */
+export const groupTransformOf = (piece: string): Group[] | null => {
+  const gs = chainOf(state.groups, piece).map((g) => state.groups[g])
+  return gs.some((g) => !isStill(g)) ? gs : null
+}
+/** the transforms of the groups a group is in (the one holding it first): what its own handles stand in */
+export const outerTransformOf = (gid: string): Group[] => chainOf(state.groups, gid).map((g) => state.groups[g])
+/** how far above the middle of what a group holds its tag in the room floats */
+const TAG_LIFT = 1.1
+/** the groups at the top (a view's area, one of the owner's) as their tags in the room show them: the name, where (above the middle of what it
+ * holds, moved as the group is), and the number of the view whose area it is (none for the others); not until its middle has been found, nor for
+ * one that runs across the room (the stools: their middle is over the kitchen, nowhere they are) */
+export function groupTags(): { id: string; name: string; at: V3; area: number | null }[] {
+  return Object.keys(state.groups).filter((gid) => !groupOf(gid) && !unsettled.has(gid) && !DEFAULT_GROUPS[gid]?.spans).map((gid) => {
+    const g = state.groups[gid]
+    const n = VIEW_SPOTS.findIndex((v) => AREA + v.id === gid)
+    return { id: gid, name: pieceName(g.name, lang), at: [g.pivot[0] + g.t[0], g.pivot[1] + g.t[1] + TAG_LIFT, g.pivot[2] + g.t[2]] as V3, area: n >= 0 ? n + 1 : null }
+  })
+}
+
+// ---- the views' areas: each view's camera stands somewhere and looks at a part of the shop; what it has in sight, and is nearest the point it
+// looks at, is its area, a group of its own (火烤灶台區, 玄關區…), made the first time edit mode opens. The groups the shop has (the till's, the
+// shrine's…) go into an area whole; only pieces new to the shop are put in an area later, so whatever the owner takes out of one stays out.
+/** where the views' cameras are and look (App knows: the views' own poses, or the cameras placed by hand); null while any is still loading */
+let viewCams: (() => ViewCam[] | null) | null = null
+export function setViewCams(fn: (() => ViewCam[] | null) | null) { viewCams = fn }
+/** the pieces an area has been made with, or offered to: not offered again */
+const KEY_AK = 'jgs-edit-area-known-1'
+const knownNow = new Set<string>()
+const known = (): Set<string> => { try { return new Set([...JSON.parse(localStorage.getItem(KEY_AK) ?? '[]'), ...knownNow]) } catch { return new Set(knownNow) } }
+/** what the views' own words (views.ts's about) say they're of, where their cameras alone don't settle it: the entrance is framed a little into
+ * the room, so its lanterns, its noren, the shoe rack (and the helmet on it) and the lucky cats' stand by the door are at the edge of its frame or
+ * out of it, and nearer what the till's or the shrine's camera looks at */
+const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', shoecab: 'genkan', kabuto: 'genkan', 'grp-doorcats': 'genkan' }
+/** an area's name: its view's, as an area (後台區 is one already) */
+const areaName = (view: string) => { const n = VIEW_SPOTS.find((v) => v.id === view)?.zh ?? view; return n.endsWith('區') ? n : `${n}區` }
+/** each view's area made a group, of the pieces (and the shop's groups, whole) loose at the top that are new to it */
+export function groupByViews() {
+  const cams = viewCams?.()
+  if (!cams?.length) return
+  const seen = known(), gone = dropped()
+  const things: { id: string; at: V3 }[] = []
+  const middleOf = (ids: string[]) => { const pts = ids.map((m) => registry.get(m)?.center?.() ?? null).filter((v): v is V3 => !!v); return pts.length ? middle(pts) : null }
+  for (const [id, r] of registry) {
+    if (id.startsWith('viewcam-') || id === 'boss' || (r.parent && registry.has(r.parent)) || groupOf(id) || seen.has(id)) continue
+    const at = middleOf([id])
+    if (at) things.push({ id, at })
+  }
+  for (const gid of Object.keys(state.groups)) {
+    const leaves = leavesOf(state.groups, gid)
+    if (isArea(gid) || groupOf(gid) || DEFAULT_GROUPS[gid]?.spans || leaves.some((m) => seen.has(m))) continue
+    const at = middleOf(leaves)
+    if (at) things.push({ id: gid, at })
+  }
+  let made = false
+  for (const [view, ids] of Object.entries(areasOf(things, cams, undefined, AREA_OF))) {
+    const gid = AREA + view, g = state.groups[gid]
+    if (gone.includes(gid)) continue
+    // (a piece new to the shop joins its area, unless the area's been moved, turned or sized: it'd be carried off with it)
+    if (g && !isStill(g)) continue
+    const all = [...(g?.members ?? []), ...ids]
+    const pivot = middleOf(all.flatMap((m) => leavesOf(state.groups, m))) ?? [0, 0, 0]
+    state.groups = { ...state.groups, [gid]: g ? { ...g, members: all, pivot } : { name: areaName(view), members: all, pivot, t: [0, 0, 0], yaw: 0, s: 1 } }
+    made = true
+  }
+  for (const id of registry.keys()) knownNow.add(id)
+  try { localStorage.setItem(KEY_AK, JSON.stringify([...known()])) } catch { /* storage blocked */ }
+  if (made) { save(); emit() }
 }
 
 /** the shop opening (locked) or shut: opening switches the mode off */
@@ -438,6 +545,7 @@ export function toggleEdit() {
   if (state.locked) { toast(T().locked); return }
   if (state.on) { cancelEdit(); return }
   settleGroups()
+  groupByViews()
   state.wire = false
   baseline = take()
   state.on = true
@@ -494,7 +602,7 @@ export const setStats = (id: string, st: { tris: number; verts: number; meshes: 
 export const statsOf = (id: string) => {
   const g = state.groups[id]
   if (!g) return stats.get(id) ?? null
-  const ms = g.members.map((m) => stats.get(m)).filter((x): x is { tris: number; verts: number; meshes: number } => !!x)
+  const ms = leavesOf(state.groups, id).map((m) => stats.get(m)).filter((x): x is { tris: number; verts: number; meshes: number } => !!x)
   return ms.length ? ms.reduce((a, b) => ({ tris: a.tris + b.tris, verts: a.verts + b.verts, meshes: a.meshes + b.meshes })) : null
 }
 let el: HTMLDivElement | null = null
@@ -507,6 +615,11 @@ let rows = new Map<string, HTMLDivElement>()
 /** the outliner's two tabs (the scene's pieces, the views' cameras): which one each row is in, the one shown, and the pick it last followed */
 type ListTab = 'scene' | 'camera'
 let rowTab = new Map<string, ListTab>()
+/** the groups each row is listed under (folded away while any of them is), and the groups opened to show what's in them (kept for next time) */
+let rowUnder = new Map<string, string[]>()
+const KEY_OPEN = 'jgs-edit-open-1'
+const open: Set<string> = (() => { try { return new Set<string>(JSON.parse(localStorage.getItem(KEY_OPEN) ?? '[]')) } catch { return new Set<string>() } })()
+const keepOpen = () => { try { localStorage.setItem(KEY_OPEN, JSON.stringify([...open])) } catch { /* (not kept) */ } }
 let listTab: ListTab = 'scene'
 let tabFollows: string | null = null
 let showRows: (() => void) | null = null
@@ -569,6 +682,11 @@ const PANEL_CSS = `
 .be-row:hover { background:#3a3a3a }
 .be-grow { font-weight:600; color:#ffd37a }
 .be-grow::before { border-radius:50%; }
+.be-fold { display:inline-block; width:14px; margin-left:-4px; color:#bbb; text-align:center; cursor:pointer }
+.be-fold:hover { color:#fff }
+.be-num { display:inline-grid; place-items:center; min-width:15px; height:15px; margin-right:5px; padding:0 3px; border-radius:8px; background:#e0a040; color:#1d1d1d; font:700 10px/1 sans-serif; vertical-align:1px }
+.be-area { color:#ffe3a8; border-top:1px solid #343434 }
+.be-area::before { display:none }
 .be-row.multi { background:#2f4a73; color:#fff }
 .be-row.on { background:#4772b3; color:#fff }
 .be-row.on::before { border-color:#fff; background:#ffd37a }
@@ -723,12 +841,30 @@ function panel() {
     const list = h('div', 'be-list')
     rows = new Map()
     rowTab = new Map()
+    rowUnder = new Map()
     let building: ListTab = 'scene'
-    // (the groups first, each with its members under it; then every piece not in one)
-    const addRow = (id: string, label: string, depth: number, group: boolean) => {
-      const row = h('div', `be-row${group ? ' be-grow' : ''}`, (depth > 0 && !group ? '└ ' : '') + label)
+    // (the views' areas first (each with its view's number, as the views' spots have it), the other groups, each with what's in it under it, folded
+    // away until opened; then every piece in no group)
+    const addRow = (id: string, label: string, depth: number, under: string[], kind: 'piece' | 'group' | 'area' = 'piece') => {
+      const group = kind !== 'piece'
+      const row = h('div', `be-row${group ? ' be-grow' : ''}${kind === 'area' ? ' be-area' : ''}`)
+      if (group) {
+        // (its arrow folds what's in it away, or opens it)
+        const fold = h('span', 'be-fold', open.has(id) ? '▾' : '▸')
+        fold.title = T().fold
+        fold.onclick = (e) => {
+          e.stopPropagation()
+          if (open.has(id)) open.delete(id); else open.add(id)
+          fold.textContent = open.has(id) ? '▾' : '▸'
+          keepOpen(); showRows?.()
+        }
+        row.appendChild(fold)
+      }
+      const num = kind === 'area' ? VIEW_SPOTS.findIndex((v) => AREA + v.id === id) : -1
+      if (num >= 0) row.appendChild(h('b', 'be-num', String(num + 1)))
+      row.appendChild(document.createTextNode((depth > 0 && !group ? '└ ' : '') + label))
       if (depth) row.style.paddingLeft = `${12 + depth * 16}px`
-      row.title = group ? T().rowGroup : T().rowPiece
+      row.title = kind === 'area' ? T().rowArea : group ? T().rowGroup : T().rowPiece
       row.onclick = (e) => {
         const ev = e as MouseEvent
         if (!group && (ev.ctrlKey || ev.metaKey || ev.shiftKey)) { pickToggle(id); return }
@@ -742,19 +878,29 @@ function panel() {
       list.appendChild(row)
       rows.set(id, row as HTMLDivElement)
       rowTab.set(id, building)
+      rowUnder.set(id, under)
     }
     // (each piece followed by the pieces inside it, a step further in, as an outliner's hierarchy)
     const childrenOf = (id: string) => [...registry].filter(([, r]) => r.parent === id).map(([k]) => k)
-    const addTree = (id: string, depth: number) => {
-      addRow(id, pieceName(registry.get(id)!.label, lang), depth, false)
-      for (const k of childrenOf(id)) if (!groupOf(k)) addTree(k, depth + 1)
+    const addTree = (id: string, depth: number, under: string[] = []) => {
+      addRow(id, pieceName(registry.get(id)!.label, lang), depth, under)
+      for (const k of childrenOf(id)) if (!groupOf(k)) addTree(k, depth + 1, under)
+    }
+    const addGroup = (gid: string, depth: number, under: string[] = []) => {
+      const g = state.groups[gid]
+      const n = leavesOf(state.groups, gid).filter((m) => registry.has(m)).length
+      addRow(gid, `${pieceName(g.name, lang)}（${n}）`, depth, under, isArea(gid) ? 'area' : 'group')
+      for (const m of g.members) {
+        if (state.groups[m]) addGroup(m, depth + 1, [...under, gid])
+        else if (registry.has(m)) addTree(m, depth + 1, [...under, gid])
+      }
     }
     // (in two tabs: the scene's pieces, and the views' cameras)
     const isCam = (id: string) => id.startsWith('viewcam-')
-    for (const [gid, g] of Object.entries(state.groups)) {
-      addRow(gid, `${g.name}（${g.members.length}）`, 0, true)
-      for (const m of g.members) if (registry.has(m)) addTree(m, 1)
-    }
+    const tops = Object.keys(state.groups).filter((gid) => !groupOf(gid))
+    const areaAt = (gid: string) => VIEW_SPOTS.findIndex((v) => AREA + v.id === gid)
+    for (const gid of tops.filter(isArea).sort((a, b) => areaAt(a) - areaAt(b))) addGroup(gid, 0)
+    for (const gid of tops.filter((g) => !isArea(g))) addGroup(gid, 0)
     for (const [id, r] of registry) if (!isCam(id) && !groupOf(id) && !(r.parent && registry.has(r.parent))) addTree(id, 0)
     building = 'camera'
     for (const [id, r] of registry) if (isCam(id) && !groupOf(id) && !(r.parent && registry.has(r.parent))) addTree(id, 0)
@@ -765,10 +911,15 @@ function panel() {
       tabs.appendChild(b)
       return [t, b] as const
     })
-    // (only the rows of the tab shown, and of those only what the search finds)
+    // (only the rows of the tab shown, and of those only what's not folded away in a group, or (searching) what the search finds, folded or not)
     showRows = () => {
       const q = find.value.trim().toLowerCase()
-      for (const [id, row] of rows) row.style.display = rowTab.get(id) === listTab && (!q || (row.textContent ?? id).toLowerCase().includes(q)) ? '' : 'none'
+      for (const [id, row] of rows) {
+        const shown = q ? (row.textContent ?? id).toLowerCase().includes(q) : (rowUnder.get(id) ?? []).every((g) => open.has(g))
+        row.style.display = rowTab.get(id) === listTab && shown ? '' : 'none'
+        const fold = row.querySelector('.be-fold')
+        if (fold) fold.textContent = open.has(id) ? '▾' : '▸'
+      }
       for (const [t, b] of tabButtons) b.classList.toggle('on', t === listTab)
     }
     find.oninput = () => showRows?.()
@@ -831,7 +982,7 @@ function panel() {
     rs.title = T().renderTip
     const rsNote = h('div', 'be-note', T().renderNone)
     rs.appendChild(rsNote)
-    const targets = () => { const id = state.selected; return !id ? [] : state.groups[id] ? state.groups[id].members : [id] }
+    const targets = () => { const id = state.selected; return !id ? [] : leavesOf(state.groups, id) }
     type Opt = { label: string; key: keyof RenderPref; choices: [string, RenderPref[keyof RenderPref]][] }
     const opts: Opt[] = [
       { label: T().shade, key: 'shade', choices: [[T().shadeSmooth, 'smooth'], [T().shadeFlat, 'flat']] },
@@ -902,6 +1053,11 @@ function panel() {
     tabFollows = state.selected
     const t = state.selected ? rowTab.get(state.selected) : undefined
     if (t) listTab = t
+    // (and the groups it's in opened, so its row is there to see, scrolled to)
+    const under = state.selected ? rowUnder.get(state.selected) ?? [] : []
+    if (under.some((g) => !open.has(g))) { for (const g of under) open.add(g); keepOpen() }
+    const row = state.selected ? rows.get(state.selected) : undefined
+    if (row) requestAnimationFrame(() => row.scrollIntoView({ block: 'nearest' }))
   }
   showRows?.()
   if (summary) {
@@ -915,7 +1071,7 @@ function panel() {
   if (info) {
     const id = state.selected
     const r = id ? registry.get(id) : null
-    info.innerHTML = id ? `${state.groups[id] ? '▣ ' + state.groups[id].name + T().groupMark : r ? pieceName(r.label, lang) : id}` : `<em>${T().nothing}</em>`
+    info.innerHTML = id ? `${state.groups[id] ? '▣ ' + pieceName(state.groups[id].name, lang) + T().groupMark : r ? pieceName(r.label, lang) : id}` : `<em>${T().nothing}</em>`
     const st = id ? statsOf(id) : null
     if (st) info.innerHTML += `<div class="be-stats">${T().stats(st.tris, st.verts, st.meshes)}</div>`
     const values = id ? [...readLoc(id), ...readRot(id), ...readScale(id)] : []
@@ -972,5 +1128,5 @@ if (typeof window !== 'undefined') {
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return
     toggleEdit()
   })
-  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, moveTo, select, toggle: toggleEdit, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id) }
+  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, moveTo, turnTo, select, toggle: toggleEdit, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
 }

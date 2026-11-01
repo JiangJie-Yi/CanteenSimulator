@@ -5,9 +5,10 @@
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { ALONG } from './bar'
-import { beginChange, commitOffsets, FIXED_SIZE, getEdit, GIZMO, groupOf, setStats, groupTransformOf, isPicked, moveTo, offsetOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, useListHot, type V3 } from './edit'
+import { beginChange, clickPick, commitOffsets, FIXED_SIZE, getEdit, GIZMO, groupTags, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setListHot, setPivot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -127,23 +128,72 @@ const AXES = [
  */
 /** a group's turn, about the room's axes (X along the bar, Y up, Z across it), as a matrix in the world */
 /** scratch for laying a group's transform over its pieces each frame (the group's turn about the world's own axes) */
-const GT = { world: new THREE.Matrix4(), local: new THREE.Matrix4(), m: new THREE.Matrix4(), e: new THREE.Euler() }
+const GT = { world: new THREE.Matrix4(), local: new THREE.Matrix4(), m: new THREE.Matrix4(), g: new THREE.Matrix4(), e: new THREE.Euler() }
+/** a group's move, turn and size about its pivot, as a matrix (into `out`: not GT.m, which it works in) */
+function groupMatrix(gt: Group, out: THREE.Matrix4) {
+  const r = gt.r ?? [0, gt.yaw, 0]
+  return out.makeTranslation(gt.pivot[0] + gt.t[0], gt.pivot[1] + gt.t[1], gt.pivot[2] + gt.t[2])
+    .multiply(GT.m.makeRotationFromEuler(GT.e.set(r[0] * DEG, r[1] * DEG, r[2] * DEG)))
+    .multiply(GT.m.makeScale(gt.s, gt.s, gt.s))
+    .multiply(GT.m.makeTranslation(-gt.pivot[0], -gt.pivot[1], -gt.pivot[2]))
+}
+/** the groups a piece is in, laid over one another (the one holding it first, then the one that's in…), as one matrix in the world */
+function chainMatrix(gs: Group[], out: THREE.Matrix4) {
+  out.identity()
+  for (const gt of gs) out.premultiply(groupMatrix(gt, GT.g))
+  return out
+}
 
 /** the selected group's handles: the arrows, rings or boxes at its pivot (where it's been moved to), along the room's axes; they move, turn and
- * size the group as one, as a piece's own handles do it */
+ * size the group as one, as a piece's own handles do it. A group inside another (the till's, in its view's area) has them inside that one's
+ * move, turn and size, as what it holds is */
 export function GroupGizmo() {
   const { on, selected, groups } = useEdit()
   const g = on && selected ? groups[selected] : null
   if (!g || !selected) return null
-  // (in the world's frame, as the group's move is kept)
-  const a = 0
-  const p = new THREE.Vector3(...g.pivot).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a)
+  const outer = chainMatrix(outerTransformOf(selected), new THREE.Matrix4())
+  const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3()
+  outer.decompose(p, q, s)
   return (
-    <group name="group-gizmo" rotation-y={a}>
+    <group name="group-gizmo" position={p} quaternion={q} scale={s}>
       <group>
-        <AxisGizmo id={selected} at={[p.x + g.t[0], p.y + g.t[1], p.z + g.t[2]]} theta={0} />
+        <AxisGizmo id={selected} at={[g.pivot[0] + g.t[0], g.pivot[1] + g.t[1], g.pivot[2] + g.t[2]]} theta={0} />
       </group>
     </group>
+  )
+}
+
+/** in edit mode, each view's area (and each other group at the top) named where it is in the room: a tag at its middle, a little above it; the
+ * pointer over it lights all it holds, a click picks it whole */
+export function GroupTags() {
+  const { on, selected } = useEdit()
+  if (!on) return null
+  return (
+    <>
+      {groupTags().map(({ id, name, at, area }) => (
+        <Html key={id} position={at} center zIndexRange={[30, 0]}>
+          <GroupTag id={id} name={name} area={area} on={selected === id} />
+        </Html>
+      ))}
+    </>
+  )
+}
+function GroupTag({ id, name, area, on }: { id: string; name: string; area: number | null; on: boolean }) {
+  const el = useRef<HTMLButtonElement>(null)
+  // (listened for on the tag itself and stopped there: edit mode swallows clicks on the 3D view, and a press left to go on would reach the
+  // scene behind it and pick the piece there)
+  useEffect(() => {
+    const b = el.current
+    if (!b) return
+    b.onpointerdown = (e) => { e.stopPropagation(); select(id) }
+    b.onpointerenter = () => setListHot(id)
+    b.onpointerleave = () => setListHot(null)
+    return () => { b.onpointerdown = null; b.onpointerenter = null; b.onpointerleave = null }
+  }, [id])
+  return (
+    <button ref={el} type="button" className={`group-tag${area !== null ? ' is-area' : ''}${on ? ' is-on' : ''}`}>
+      {area !== null ? <i>{area}</i> : <i>▣</i>}{name}
+    </button>
   )
 }
 
@@ -633,7 +683,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     return m && g.current ? (g.current.localToWorld(new THREE.Vector3(...m.c)).toArray() as V3) : null
   }, parentPiece), [id, label, camera, controls, parentPiece])
 
-  // (the group this piece is in, if any: its move, turn and size laid over the piece as one, about the group's own middle, in the world)
+  // (the groups this piece is in, if any has been moved, turned or sized: their moves, turns and sizes laid over the piece as one, each about its
+  // own middle, in the world; one in a view's area that's as it was made changes nothing, and costs nothing a frame)
   const gt = groupTransformOf(id)
   useFrame(() => {
     const w = gw.current
@@ -646,11 +697,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     if (!par) return
     par.updateWorldMatrix(true, false)
     // (worked out in the module's scratch matrices: this runs every frame for each piece in a group, and made new ones each time)
-    const r = gt.r ?? [0, gt.yaw, 0]
-    GT.world.makeTranslation(gt.pivot[0] + gt.t[0], gt.pivot[1] + gt.t[1], gt.pivot[2] + gt.t[2])
-      .multiply(GT.m.makeRotationFromEuler(GT.e.set(r[0] * DEG, r[1] * DEG, r[2] * DEG)))
-      .multiply(GT.m.makeScale(gt.s, gt.s, gt.s))
-      .multiply(GT.m.makeTranslation(-gt.pivot[0], -gt.pivot[1], -gt.pivot[2]))
+    chainMatrix(gt, GT.world)
     GT.local.copy(par.matrixWorld).invert().multiply(GT.world).multiply(par.matrixWorld)
     if (!laid.current || !w.matrix.equals(GT.local)) { w.matrix.copy(GT.local); w.matrixWorldNeedsUpdate = true; laid.current = true }
   })
@@ -708,9 +755,10 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     // (an axis arrow under the pointer takes it: the box is only for the free move)
     if (e.intersections?.some((i) => i.object.userData.gizmo)) return
     e.stopPropagation()
-    // (a piece in a group is picked as its group, and the group's own handles move, turn and size it all together; Alt picks the piece alone)
-    const grpId = groupOf(id)
-    if (grpId && !e.nativeEvent.altKey) { select(grpId); return }
+    // (a piece in a group is picked as its group, and the group's own handles move, turn and size it all together; Alt picks the piece alone.
+    // A view's whole area isn't picked so (that's from the list, or its tag): the piece in it is)
+    const grpId = clickPick(id)
+    if (grpId !== id && !e.nativeEvent.altKey) { select(grpId); return }
     if (tool === 'select') { moveTo(id, offsetOf(id)); return }
     const lift = e.nativeEvent.shiftKey
     const wp = grp.getWorldPosition(new THREE.Vector3())

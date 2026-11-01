@@ -23,6 +23,8 @@ export const EDIT_TEXT = {
     outliner: '場景與攝影機',
     find: '搜尋…',
     rowGroup: '選整個群組（一起移動、轉向、縮放）',
+    rowArea: '選這個視角看的整個區域（一起移動、轉向、縮放）；在場景裡點只會選到裡面的那件',
+    fold: '展開／收起',
     rowPiece: 'Ctrl 或 Shift 點選可多選，再按「成組」；單點是把鏡頭帶到它',
     transform: '變換',
     resize: '往上拖拉可拉高面板',
@@ -77,6 +79,8 @@ export const EDIT_TEXT = {
     outliner: 'シーンとカメラ',
     find: '検索…',
     rowGroup: 'グループごと選ぶ（まとめて移動・回転・拡大縮小）',
+    rowArea: 'この視点が映すエリアごと選ぶ（まとめて移動・回転・拡大縮小）。シーンでクリックすると中の一点だけ選ばれます',
+    fold: '開く／たたむ',
     rowPiece: 'Ctrl か Shift を押しながらクリックで複数選択、「グループ化」でまとめる。クリックだけならカメラがその物へ',
     transform: 'トランスフォーム',
     resize: '上へドラッグでパネルを高く',
@@ -131,6 +135,8 @@ export const EDIT_TEXT = {
     outliner: 'Scene and cameras',
     find: 'Search…',
     rowGroup: 'Select the whole group (move, turn and scale together)',
+    rowArea: 'Select the whole area this view looks at (move, turn and scale together); clicking in the scene picks just the piece in it',
+    fold: 'Open / fold',
     rowPiece: 'Ctrl or Shift click to pick several, then Group; a click frames it',
     transform: 'Transform',
     resize: 'Drag up to make the panel taller',
@@ -179,6 +185,8 @@ const PIECES_JA: Record<string, string> = {
   老闆: '店主', '紙箱（紙袋）': '段ボール箱（紙袋）', '紙箱（收銀紙捲）': '段ボール箱（レジロール）', '紙箱（紙巾）': '段ボール箱（紙ナプキン）', '紙箱（杯墊）': '段ボール箱（コースター）', '紙箱（割箸）': '段ボール箱（割り箸）', 收銀機操作說明書: 'レジスター取扱説明書', 錢箱: '手提げ金庫',
   '平板（iPad）': 'タブレット（iPad）', 音箱: 'スピーカー', 酒樽: '酒樽', 電燈開關: '照明スイッチ', 逃生出口燈: '非常口誘導灯', 收銀高腳凳: 'レジの高いスツール', 收銀矮凳: 'レジの低いスツール', 餐盤堆: '皿の山', 柳樹: '柳',
   竹盆栽: '竹の鉢植え', 酒箱: '酒の木箱', 武士頭盔: '兜', '攝影機 1（研製視角）': 'カメラ 1（試作の視点）',
+  門口招財貓組: '入口の招き猫', 小神龕組: '神棚', 收銀櫃組: 'レジ一式', 吧台座椅: 'カウンター席',
+  火烤灶台區: '炉端エリア', 櫃檯區: 'レジエリア', 玄關區: '玄関エリア', 小神龕區: '神棚エリア', 飲品櫃區: '飲み物エリア', 廁所區: 'お手洗いエリア', 後台區: '裏方エリア', 窗口區: '丸窓エリア',
 }
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
 const PIECES_EN: Record<string, string> = {
@@ -191,6 +199,8 @@ const PIECES_EN: Record<string, string> = {
   '紙箱（紙袋）': 'Box (paper bags)', '紙箱（收銀紙捲）': 'Box (till rolls)', '紙箱（紙巾）': 'Box (napkins)', '紙箱（杯墊）': 'Box (coasters)',
   '紙箱（割箸）': 'Box (chopsticks)', 收銀機操作說明書: 'Register manual', 錢箱: 'Cash box',
   老闆: 'Owner', 惠比壽石像: 'Ebisu statue', 武士頭盔: 'Samurai helmet', 門口招財貓組: 'Lucky cats (group)', 小神龕組: 'Shrine (group)',
+  收銀櫃組: 'Till (group)', 吧台座椅: 'Bar stools',
+  火烤灶台區: 'Grill area', 櫃檯區: 'Till area', 玄關區: 'Entrance area', 小神龕區: 'Shrine area', 飲品櫃區: 'Drinks area', 廁所區: 'Toilets area', 後台區: 'Back room area', 窗口區: 'Window area',
 }
 /** the words in the names made up as they're placed (畫（-5, -4.2）, 馬桶（男廁）, 座位 3…) */
 const WORDS_JA: [string, string][] = [

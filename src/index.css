@@ -6422,6 +6422,15 @@ body:has(.view-menu) > .be { opacity: 0.15; pointer-events: none; }
   font-size: 12px; white-space: nowrap; }
 .view-cam-tag i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #f2a33a; color: #141416;
   font-style: normal; font-weight: 700; font-size: 12px; }
+/* edit mode: each view's area (and each other group at the top) named where it is in the room, its view's number as that view's camera has it;
+   pointed at it lights what it holds, a press picks it whole */
+.group-tag { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; border: 1px dashed rgb(120 190 255 / 0.85); border-radius: 6px;
+  background: rgb(16 34 54 / 0.72); color: #d6ecff; font: 600 12px/1.2 "Noto Sans TC", sans-serif; white-space: nowrap; cursor: pointer; }
+.group-tag i { display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 4px; background: rgb(120 190 255 / 0.3);
+  color: #fff; font-style: normal; font-size: 11px; }
+.group-tag.is-area i { border-radius: 50%; background: #f2a33a; color: #141416; }
+.group-tag:hover { background: rgb(26 58 92 / 0.9); border-style: solid; color: #fff; }
+.group-tag.is-on { border: 1px solid #f2a33a; background: rgb(74 46 10 / 0.88); color: #ffe3a8; }
 
 /* researching at the grill: a shallow focus on the fire, what's round it out of focus and darker (over the 3D view, under the panels) */
 .grill-focus { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
