@@ -3665,7 +3665,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   useLayoutEffect(() => {
     if (lastSpace.current === space) return
     snaps.current.set(lastSpace.current, save())
-    load(snaps.current.get(space))
+    // (each opening a clean kitchen: the last day's leftovers (raw skewers set out, half-cooked ones, a plate nobody came for) aren't
+    // brought back onto the table (the owner saw skewers there that nobody had ordered); the shut shop's table comes back as it was left)
+    load(space === 'open' ? undefined : snaps.current.get(space))
     lastSpace.current = space
     // (shut: the customers are gone, and what they'd ordered with them)
     if (space === 'closed') {
