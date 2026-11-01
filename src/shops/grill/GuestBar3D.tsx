@@ -48,7 +48,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { PLACE, SICK, PASS_ALONG, SHRINE_FLOWERS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { KITCHEN_ROUTE, PLACE, SICK, PASS_ALONG, SHRINE_FLOWERS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -1386,7 +1386,7 @@ const IN_SINK = 0.78
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
 const WASH_EACH = 0.5
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
-const KITCHEN_BLOCKS = new Set(['ricetub', 'freezer', 'platerack', 'platerack2', 'sink', 'produce', 'coalsack'])
+const KITCHEN_BLOCKS = new Set(['ricetub', 'misopot', 'freezer', 'platerack', 'platerack2', 'sink', 'produce', 'coalsack'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
@@ -1643,6 +1643,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const way = kitchenPath(flat(from), flat(to), { x0: k.along[0], z0: k.lay[0], x1: k.along[1], z1: k.lay[1] }, kitchenBlocks())
     return way ? way.map(back) : [from.clone().setY(0), to.clone().setY(0)]
   }
+  // (the crew's way home goes round the same things: Roasting asks for it as they leave)
+  useEffect(() => {
+    KITCHEN_ROUTE.route = (from, to) => kitchenRoute(from, to)
+    return () => { KITCHEN_ROUTE.route = null }
+  })
 
   // the plates: those out at the seats (or on their way), and the two stacks
   const [, setTick] = useState(0)

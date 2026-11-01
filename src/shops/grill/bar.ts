@@ -634,6 +634,9 @@ export function staffWayOut(cs: Counter[]): THREE.Vector3[] {
   const c = cs[0], { mid } = gateOf(c, BAR_GATES[0])
   return [mid.clone().addScaledVector(c.lay, 0.45), mid.clone().addScaledVector(c.lay, -0.5), doorOf(cs)]
 }
+/** a way across the kitchen's floor (the first counter's frame, its points on the floor) round the cook's table and all that stands on it:
+ * GuestBar3D's kitchen route (game/kitchenPath), for the crew too (Roasting: the cooks' way home); null till the bar's drawn */
+export const KITCHEN_ROUTE: { route: ((from: THREE.Vector3, to: THREE.Vector3) => THREE.Vector3[]) | null } = { route: null }
 /** whether a place (the first counter's frame) is over the kitchen's raised floor */
 export function inKitchen(cs: Counter[], p: THREE.Vector3) {
   const k = kitchenOf(cs), d = p.clone().sub(cs[0].at), a = d.dot(cs[0].along), l = d.dot(cs[0].lay)

@@ -815,7 +815,8 @@ useGLTF.preload(KNIVES_URL)
  * big the pot's drawn, and how high the stand's top is (a little lower than the tub's) */
 const MISOPOT_URL = import.meta.env.BASE_URL + 'models/misopot.glb'
 useGLTF.preload(MISOPOT_URL)
-const MISO_AT = { along: 3.4, lay: 0.6 }
+// (beside the rice tub, on its far side from the cook table, in a row with it (the owner's: it stood behind the tub, where the crew stand))
+const MISO_AT = { along: 4.49, lay: -0.83 }
 const MISO_SCALE = 1.3
 const MISO_TOP = -0.45
 function MisoPot() {

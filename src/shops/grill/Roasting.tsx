@@ -51,7 +51,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -826,7 +826,7 @@ function crewWayOut(role: Role, at: THREE.Vector3) {
  * One of the staff at their place; once the shop's shut and empty (SHOP.leaving) they walk their way out (`way`, from wherever they are)
  * and are gone. `seat`: the name of an unseen mark in the scene they sit on instead, facing its -z (the cashier's chair: it can be moved).
  */
-function CrewWalk({ at, yaw, way, seat, children }: { at: THREE.Vector3; yaw: number; way: THREE.Vector3[]; seat?: string; children: React.ReactNode }) {
+function CrewWalk({ at, yaw, way, seat, round, children }: { at: THREE.Vector3; yaw: number; way: THREE.Vector3[]; seat?: string; round?: boolean; children: React.ReactNode }) {
   const g = useRef<THREE.Group>(null)
   const gone = useRef(0)
   const path = useRef<{ way: THREE.Vector3[]; len: number } | null>(null)
@@ -863,7 +863,10 @@ function CrewWalk({ at, yaw, way, seat, children }: { at: THREE.Vector3; yaw: nu
     // (on their way: from where they are, down off a seat onto the floor, then the way out)
     if (!path.current) {
       const from = o.position.clone().setY(way[0].y)
-      const w = [from, ...way.slice(1)]
+      // (a cook: across the kitchen to the gate round all that stands on its floor (GuestBar3D's route), then on out)
+      const out = staffWayOut(GRILL_COUNTERS)
+      const across = round && KITCHEN_ROUTE.route ? KITCHEN_ROUTE.route(toBar(from), out[0]) : null
+      const w = across ? [from, ...across.slice(1).map(fromBar), ...out.slice(1).map(fromBar)].map((v, i) => (i ? v.setY(floorAt(v)) : v)) : [from, ...way.slice(1)]
       path.current = { way: w, len: pathLength(w) }
     }
     const { way: w, len } = path.current
@@ -881,7 +884,8 @@ function crewPlaces(crew: CrewMember[]) {
   const spots: Record<Role, { at: THREE.Vector3; yaw: number }[]> = {
     chef: [{ at: CHEF_AT, yaw: CHEF_YAW }],
     sous: [{ at: kitchenAt(1.3), yaw: KITCHEN_YAW }],
-    stock: [{ at: kitchenAt(-0.6), yaw: KITCHEN_YAW }],
+    // (the stocker's GuestBar3D's: by the drinks' crates, carrying them to the fridges; drawn here too they stood in the rice tub)
+    stock: [],
     // (stood back far enough that the register's drawer, run all the way out, stops short of them)
     cashier: [{ at: onFloor(c0.at.clone().addScaledVector(c0.along, c0.length / 2 + TILL.along).addScaledVector(c0.lay, TILL.lay + TILL.D / 2 + 0.5)),
       yaw: Math.atan2(-c0.lay.x, -c0.lay.z) }],
@@ -5664,7 +5668,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <BossSpot open={space === 'open'} lang={lang} />
       )}
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw, way, seat }) => (
-        <CrewWalk key={m.id} at={at} yaw={yaw} way={way} seat={seat}>
+        <CrewWalk key={m.id} at={at} yaw={yaw} way={way} seat={seat} round={m.role === 'chef' || m.role === 'sous'}>
           {!seat && <BlobShadow r={0.17} />}<StaffFigure id={m.id} role={m.role} look={m.look} seated={!!seat} />
         </CrewWalk>
       ))}
