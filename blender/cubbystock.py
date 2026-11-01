@@ -1,9 +1,10 @@
-"""What's kept in the cook's table's two cupboards (cubbystock.glb): no plates or bowls (those are all on the dish racks), the grill's own
-stores. "StockRight" for the right-hand cupboard (1.64 across, a shelf over its right-hand part): two big 1.8-litre bottles (一升瓶) of soy
-sauce and mirin, a glazed pickle jar under a wooden lid, a stack of folded cloths, a cedar salt box, a carton under the shelf, and on the
-shelf three little jars of seasoning and a tin of sesame oil. "StockLeft" for the left-hand one (1.15 across, a shelf the whole way): a
-carton of binchotan and a charcoal starter on its floor, and on the shelf two bundles of iron skewers tied with twine, a box of foil and
-three lemons on a little tray.
+"""What's kept in the cook's table's two cupboards (cubbystock.glb), which are fridges (the owner's: under-counter fridges, a cold white
+lining inside, what's kept cold kept there): no plates or bowls (those are all on the dish racks), nor anything that keeps at room temperature.
+"StockRight" for the right-hand fridge (1.64 across, a shelf over its right-hand part): the sauces: two big 1.8-litre bottles (一升瓶) of soy
+sauce and mirin, a tub of miso under its lid, the glazed jar of tare for basting, two tins of condensed milk; on the shelf a box of wasabi, a
+jar of yuzu kosho and three lemons in a dish. "StockLeft" for the left-hand one (1.15 across, a shelf the whole way): what's grilled that keeps
+cold: on its floor a crate of corn and a box of mushrooms (shiitake, king oyster), bundles of asparagus and a basket of shishito; on the shelf
+trays of skewers ready for the fire (negima, pork belly, sausages) and onigiri on a plate.
 
 Each in its cupboard's own frame, in the room's units: y up from the cupboard's floor, x along the table, +z toward the doors, the middle
 of its floor at the origin.
@@ -100,6 +101,31 @@ M = {
     "spiceB": pbr("StockSpiceBonito", tuple(lin("#a8784a")), rough=0.8),
     "glass": pbr("StockJarGlass", tuple(lin("#dfe8ea")), rough=0.1),
     "oilTin": pbr("StockOilTin", tuple(lin("#d8b24a")), rough=0.35, metal=0.7),
+    "misoTub": pbr("StockMisoTub", tuple(lin("#c8a46a")), rough=0.6),
+    "misoHoop": pbr("StockMisoHoop", tuple(lin("#2c3e66")), rough=0.6),
+    "misoLid": pbr("StockMisoLid", tuple(lin("#a8784a")), rough=0.7),
+    "milkTin": pbr("StockMilkTin", (1, 1, 1), tex=label_tex("StockMilkLabelTex", "#f4f1e6", "#2a6ab0", "#f4f1e6"), rough=0.4),
+    "tinEnd": pbr("StockTinEnd", tuple(lin("#c8ccd2")), rough=0.3, metal=0.9),
+    "wasabiBox": pbr("StockWasabiBox", tuple(lin("#5f9a3a")), rough=0.6),
+    "wasabiBand": pbr("StockWasabiBand", tuple(lin("#f2efe6")), rough=0.6),
+    "yuzu": pbr("StockYuzuPaste", tuple(lin("#a8b83a")), rough=0.7),
+    "dish": pbr("StockDishWhite", tuple(lin("#f2f0ea")), rough=0.3),
+    "foam": pbr("StockFoamTray", tuple(lin("#f4f4f2")), rough=0.85),
+    "chicken": pbr("StockChicken", tuple(lin("#f0d6c4")), rough=0.6),
+    "negi": pbr("StockNegi", tuple(lin("#8ab84a")), rough=0.6),
+    "pork": pbr("StockPork", tuple(lin("#e8a0a0")), rough=0.6),
+    "fat": pbr("StockPorkFat", tuple(lin("#f6eee4")), rough=0.6),
+    "sausage": pbr("StockSausage", tuple(lin("#a8402a")), rough=0.45),
+    "rice": pbr("StockOnigiri", tuple(lin("#f6f4ee")), rough=0.8),
+    "nori": pbr("StockNori", tuple(lin("#1e2a1e")), rough=0.6),
+    "corn": pbr("StockCorn", tuple(lin("#f2c63a")), rough=0.6),
+    "husk": pbr("StockCornHusk", tuple(lin("#a8c06a")), rough=0.8),
+    "crate": pbr("StockCrateWood", tuple(lin("#c49a62")), rough=0.8),
+    "shiitake": pbr("StockShiitake", tuple(lin("#6a4428")), rough=0.7),
+    "stem": pbr("StockMushroomStem", tuple(lin("#efe4cc")), rough=0.7),
+    "aspara": pbr("StockAsparagus", tuple(lin("#6a9a3a")), rough=0.6),
+    "shishito": pbr("StockShishito", tuple(lin("#4a8a2a")), rough=0.45),
+    "basket": pbr("StockBasketBamboo", tuple(lin("#c8a86a")), rough=0.8),
 }
 groups = {"right": [], "left": []}
 cur = "right"
@@ -185,61 +211,101 @@ def rod(name, a, b, r, mat, sides=5):
     return add(o)
 
 
-# ===================== the right-hand cupboard =====================
+# ===================== the right-hand fridge: the sauces =====================
 cur = "right"
 # (two 一升瓶: a long body, round shoulders, a short neck, a gilt cap; the label round its middle)
 BOTTLE = [(0.0, 0.0), (0.046, 0.0), (0.05, 0.006), (0.05, 0.26), (0.044, 0.3), (0.022, 0.34), (0.016, 0.36), (0.016, 0.39), (0.018, 0.395), (0.018, 0.42), (0.0, 0.42)]
 for i, (x, z, glass, lab) in enumerate(((-0.68, -0.28, "soyGlass", "soyLabel"), (-0.55, -0.34, "mirinGlass", "mirinLabel"))):
     lathe(f"StockBottle{i}", BOTTLE, lambda b, g=glass: "cap" if b >= 7 else g, (x, 0.0, z), seg=16)
     lathe(f"StockBottleLabel{i}", [(0.0512, 0.11), (0.0512, 0.23)], lambda b, l=lab: l, (x, 0.0, z), seg=16)
-# (the pickle jar: a glazed belly, a pale unglazed lip, a wooden drop lid with a stone on it)
+# (the miso: a squat cedar tub bound with two indigo hoops, its lid on)
+lathe("StockMisoTub", [(0.0, 0.0), (0.12, 0.0), (0.13, 0.17), (0.0, 0.17)], lambda b: "misoTub", (-0.32, 0.0, -0.22), seg=20)
+for k, y in enumerate((0.03, 0.13)):
+    lathe(f"StockMisoHoop{k}", [(0.123 + 0.0006 * y * 10, y), (0.124 + 0.0006 * y * 10, y + 0.018)], lambda b: "misoHoop", (-0.32, 0.0, -0.22), seg=20)
+lathe("StockMisoLid", [(0.0, 0.17), (0.138, 0.17), (0.138, 0.19), (0.0, 0.19)], lambda b: "misoLid", (-0.32, 0.0, -0.22), seg=20)
+box("StockMisoKnob", -0.37, -0.27, 0.19, 0.21, -0.235, -0.205, "misoLid", bev=0.004)
+# (the tare for basting: the glazed jar under its wooden drop lid)
 JAR = [(0.0, 0.0), (0.08, 0.0), (0.12, 0.06), (0.135, 0.13), (0.12, 0.2), (0.09, 0.235), (0.09, 0.25), (0.075, 0.25), (0.075, 0.235)]
-lathe("StockPickleJar", JAR, lambda b: "jarLip" if b >= 5 else "jar", (-0.3, 0.0, -0.25), seg=18)
-lathe("StockPickleLid", [(0.0, 0.0), (0.082, 0.0), (0.082, 0.018), (0.0, 0.018)], lambda b: "lid", (-0.3, 0.25, -0.25), seg=18)
-blob("StockPickleStone", -0.3, 0.29, -0.25, 0.05, 0.03, 0.045, "stone")
-# (the folded cloths, white and indigo by turns)
-for k in range(4):
-    box(f"StockCloth{k}", -0.62, -0.42, k * 0.034, k * 0.034 + 0.032, 0.08, 0.24, "indigo" if k % 2 else "cloth", bev=0.008)
-# (the salt box: cedar, its lid a shade over, 塩 brushed on it as a dark mark)
-box("StockSaltBox", -0.1, 0.16, 0.0, 0.15, -0.3, -0.12, "cedar", bev=0.004)
-box("StockSaltLid", -0.11, 0.17, 0.15, 0.17, -0.31, -0.11, "cedar", bev=0.004)
-box("StockSaltMark", 0.005, 0.045, 0.055, 0.095, -0.115, -0.112, "saltMark")
-# (under the shelf, a carton)
-box("StockCarton", 0.38, 0.76, 0.0, 0.24, -0.4, -0.05, "kraft")
-# (on the shelf: three little jars of seasoning, a tin of sesame oil)
+lathe("StockPickleJar", JAR, lambda b: "jarLip" if b >= 5 else "jar", (0.02, 0.0, -0.26), seg=18)
+lathe("StockPickleLid", [(0.0, 0.0), (0.082, 0.0), (0.082, 0.018), (0.0, 0.018)], lambda b: "lid", (0.02, 0.25, -0.26), seg=18)
+# (two tins of condensed milk, one on the other)
+for k in range(2):
+    lathe(f"StockMilkTin{k}", [(0.0, 0.0), (0.038, 0.0), (0.04, 0.004), (0.04, 0.076), (0.038, 0.08), (0.0, 0.08)],
+          lambda b: "tinEnd" if b in (0, 4) else "milkTin", (-0.12, k * 0.08, -0.02), seg=14)
+# (on the shelf: a box of wasabi with its white band, a jar of yuzu kosho, three lemons in a dish)
 SH = 0.3
-for k, mat in enumerate(("spiceW", "spiceR", "spiceB")):
-    x = 0.42 + k * 0.1
-    lathe(f"StockSpiceJar{k}", [(0.0, 0.0), (0.036, 0.0), (0.036, 0.09), (0.0, 0.09)], lambda b: "glass", (x, SH, -0.28), seg=12)
-    lathe(f"StockSpice{k}", [(0.0, 0.004), (0.032, 0.004), (0.032, 0.06), (0.0, 0.06)], lambda b, m=mat: m, (x, SH, -0.28), seg=12)
-    lathe(f"StockSpiceCap{k}", [(0.0, 0.09), (0.038, 0.09), (0.038, 0.11), (0.0, 0.11)], lambda b: "lid", (x, SH, -0.28), seg=12)
-lathe("StockOilTin", [(0.0, 0.0), (0.05, 0.0), (0.05, 0.15), (0.02, 0.17), (0.014, 0.19), (0.0, 0.19)], lambda b: "oilTin", (0.72, SH, -0.2), seg=14)
+box("StockWasabiBox", 0.4, 0.56, SH, SH + 0.05, -0.32, -0.24, "wasabiBox", bev=0.003)
+box("StockWasabiBand", 0.45, 0.48, SH, SH + 0.051, -0.321, -0.239, "wasabiBand")
+lathe("StockYuzuJar", [(0.0, 0.0), (0.036, 0.0), (0.036, 0.09), (0.0, 0.09)], lambda b: "glass", (0.64, SH, -0.28), seg=12)
+lathe("StockYuzuPaste", [(0.0, 0.004), (0.032, 0.004), (0.032, 0.062), (0.0, 0.062)], lambda b: "yuzu", (0.64, SH, -0.28), seg=12)
+lathe("StockYuzuCap", [(0.0, 0.09), (0.038, 0.09), (0.038, 0.11), (0.0, 0.11)], lambda b: "lid", (0.64, SH, -0.28), seg=12)
+lathe("StockLemonDish", [(0.0, 0.0), (0.06, 0.0), (0.1, 0.03), (0.105, 0.034), (0.0, 0.012)], lambda b: "dish", (0.52, SH, -0.08), seg=18)
+for k, (x, z) in enumerate(((0.49, -0.1), (0.56, -0.1), (0.52, -0.04))):
+    blob(f"StockLemon{k}", x, SH + 0.05, z, 0.045, 0.034, 0.034, "lemon")
 
-# ===================== the left-hand cupboard =====================
+# ===================== the left-hand fridge: what's grilled that keeps cold =====================
 cur = "left"
-# (a carton of binchotan, its black band with 炭 left white in it; a charcoal starter: an iron pot with holes round its foot, a long handle)
-box("StockCoalCarton", -0.5, -0.06, 0.0, 0.24, -0.42, -0.08, "coalBox")
-lathe("StockStarter", [(0.0, 0.0), (0.07, 0.0), (0.075, 0.16), (0.0, 0.16)], lambda b: "iron", (0.12, 0.0, -0.22), seg=14)
-rod("StockStarterHandle", (0.19, 0.12, -0.22), (0.42, 0.13, -0.18), 0.008, "iron", sides=6)
+# (on its floor: a crate of corn, its husks pulled back)
+box("StockCornCrate", -0.5, -0.12, 0.0, 0.1, -0.4, -0.1, "crate", bev=0.004)
+for k in range(4):
+    x = -0.45 + k * 0.09
+    o = lathe(f"StockCorn{k}", [(0.0, 0.0), (0.03, 0.01), (0.034, 0.06), (0.03, 0.17), (0.0, 0.2)], lambda b: "corn", (0.0, 0.0, 0.0), seg=10)
+    o.location = P(x, 0.13, -0.32)
+    o.rotation_euler = (math.pi / 2, 0, 0.1 * k)
+    h = lathe(f"StockCornHusk{k}", [(0.0, 0.0), (0.036, 0.004), (0.03, 0.05), (0.0, 0.06)], lambda b: "husk", (0.0, 0.0, 0.0), seg=8)
+    h.location = P(x, 0.13, -0.13)
+    h.rotation_euler = (math.pi / 2, 0, 0.1 * k)
+# (a box of mushrooms: shiitake caps and king oyster stems)
+box("StockMushroomBox", 0.0, 0.3, 0.0, 0.08, -0.4, -0.16, "crate", bev=0.003)
+for k in range(5):
+    x, z = 0.05 + (k % 3) * 0.1, -0.34 + (k // 3) * 0.1
+    lathe(f"StockShiitakeStem{k}", [(0.0, 0.0), (0.012, 0.0), (0.012, 0.03), (0.0, 0.03)], lambda b: "stem", (x, 0.07, z), seg=8)
+    lathe(f"StockShiitake{k}", [(0.0, 0.03), (0.045, 0.03), (0.04, 0.045), (0.022, 0.058), (0.0, 0.06)], lambda b: "shiitake", (x, 0.07, z), seg=12)
+for k in range(2):
+    o = lathe(f"StockEringi{k}", [(0.0, 0.0), (0.02, 0.0), (0.024, 0.1), (0.032, 0.12), (0.0, 0.14)], lambda b: "stem" if b < 3 else "shiitake", (0.0, 0.0, 0.0), seg=10)
+    o.location = P(0.24 - k * 0.07, 0.11, -0.2)
+    o.rotation_euler = (math.pi / 2 - 0.1, 0, 0.3)
+# (asparagus in a bundle, tied; a basket of shishito)
+for k in range(9):
+    a = 2 * math.pi * k / 9
+    rod(f"StockAsparagus{k}", (0.38 + 0.02 * math.cos(a), 0.0, -0.3 + 0.02 * math.sin(a)), (0.38 + 0.024 * math.cos(a), 0.22, -0.3 + 0.024 * math.sin(a)), 0.006, "aspara", sides=5)
+lathe("StockAsparaTie", [(0.03, 0.06), (0.03, 0.075)], lambda b: "twine", (0.38, 0.0, -0.3), seg=10)
+lathe("StockShishitoBasket", [(0.0, 0.0), (0.07, 0.0), (0.1, 0.06), (0.0, 0.03)], lambda b: "basket", (0.36, 0.0, -0.07), seg=14)
+for k in range(7):
+    a = 2 * math.pi * k / 7
+    o = blob(f"StockShishito{k}", 0.36 + 0.045 * math.cos(a), 0.055, -0.07 + 0.045 * math.sin(a), 0.035, 0.012, 0.012, "shishito", seg=8, rings=5)
+    o.rotation_euler = (0, 0, a)
+# (on the shelf: trays of skewers ready for the fire, and onigiri on a plate)
 SH = 0.3
-# (on the shelf: two bundles of iron skewers, a box of foil, three lemons on a little tray)
-for b in range(2):
-    z0 = -0.36 + b * 0.12
-    for k in range(14):
-        a = 2 * math.pi * k / 14
-        rr = 0.012 if k % 2 else 0.022
-        rod(f"StockSkewer{b}{k}", (-0.48, SH + 0.03 + rr * math.sin(a), z0 + rr * math.cos(a)), (-0.08, SH + 0.03 + rr * math.sin(a), z0 + rr * math.cos(a)), 0.003, "steel", sides=4)
-    for xt in (-0.38, -0.18):
-        lathe(f"StockSkewerTie{b}{int(-xt * 100)}", [(0.03, 0.0), (0.03, 0.012)], lambda m: "twine", (0.0, 0.0, 0.0), seg=10).rotation_euler = (math.pi / 2, 0, 0)
-        groups[cur][-1].location = P(xt, SH + 0.03, z0)
-        groups[cur][-1].rotation_euler = (0, math.pi / 2, 0)
-box("StockFoilBox", 0.0, 0.34, SH, SH + 0.06, -0.38, -0.32, "foilBox", bev=0.003)
-lathe("StockFoilRoll", [(0.0, 0.0), (0.024, 0.0), (0.024, 0.006), (0.0, 0.006)], lambda b: "foilEnd", (0.0, 0.0, 0.0), seg=12)
-groups[cur][-1].location = P(0.344, SH + 0.03, -0.35)
-groups[cur][-1].rotation_euler = (0, math.pi / 2, 0)
-box("StockLemonTray", 0.1, 0.42, SH, SH + 0.02, -0.18, 0.0, "tray", bev=0.004)
-for k, (x, z) in enumerate(((0.18, -0.09), (0.28, -0.11), (0.34, -0.05))):
-    blob(f"StockLemon{k}", x, SH + 0.055, z, 0.048, 0.036, 0.036, "lemon")
+for t, (x0, kind) in enumerate(((-0.52, "negima"), (-0.24, "pork"), (0.04, "sausage"))):
+    box(f"StockSkewerTray{t}", x0, x0 + 0.24, SH, SH + 0.015, -0.4, -0.16, "foam", bev=0.004)
+    for k in range(4):
+        z = -0.37 + k * 0.06
+        rod(f"StockTraySkewer{t}{k}", (x0 + 0.02, SH + 0.03, z), (x0 + 0.23, SH + 0.03, z), 0.0025, "steel", sides=4)
+        for c in range(4):
+            x = x0 + 0.05 + c * 0.04
+            if kind == "negima":
+                mat = "negi" if c % 2 else "chicken"
+                box(f"StockMeat{t}{k}{c}", x - 0.014, x + 0.014, SH + 0.016, SH + 0.044, z - 0.014, z + 0.014, mat, bev=0.004)
+            elif kind == "pork":
+                box(f"StockMeat{t}{k}{c}", x - 0.016, x + 0.016, SH + 0.016, SH + 0.04, z - 0.016, z + 0.016, "pork", bev=0.003)
+                box(f"StockFat{t}{k}{c}", x - 0.004, x + 0.004, SH + 0.016, SH + 0.041, z - 0.0161, z + 0.0161, "fat")
+            elif c < 2:
+                o = lathe(f"StockSausage{t}{k}{c}", [(0.0, 0.0), (0.012, 0.006), (0.013, 0.07), (0.0, 0.078)], lambda b: "sausage", (0.0, 0.0, 0.0), seg=10)
+                o.location = P(x0 + 0.05 + c * 0.085, SH + 0.03, z)
+                o.rotation_euler = (0, math.pi / 2, 0)
+lathe("StockOnigiriPlate", [(0.0, 0.0), (0.08, 0.0), (0.12, 0.016), (0.125, 0.02), (0.0, 0.008)], lambda b: "dish", (0.36, SH, -0.24), seg=18)
+for k, (x, z, rot) in enumerate(((0.32, -0.26, 0.3), (0.41, -0.25, -0.4), (0.36, -0.19, 1.2))):
+    bpy.ops.mesh.primitive_cone_add(vertices=3, radius1=0.045, radius2=0.03, depth=0.03, location=P(x, SH + 0.025, z))
+    o = active()
+    o.rotation_euler = (0, 0, rot)
+    b = bevel(o, 0.012, 3)
+    b.limit_method = "NONE"
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.modifier_apply(modifier=b.name)
+    finish(o, f"StockOnigiri{k}", M["rice"])
+    add(o)
+    box(f"StockNori{k}", x - 0.016, x + 0.016, SH + 0.008, SH + 0.03, z - 0.032, z - 0.029, "nori")
 
 # ===================== two roots =====================
 roots = {}

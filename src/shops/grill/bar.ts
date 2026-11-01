@@ -197,6 +197,7 @@ export function fridgesOf(cs: Counter[]) {
 export const FRIDGE = { W: 0.86, H: 2.17, D: 0.75 }
 /** each fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
 export const FRIDGE_STATE = [{ passing: 0, open: false }, { passing: 0, open: false }]
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridgeDoors?: unknown }).__fridgeDoors = FRIDGE_STATE
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridge?: typeof FRIDGE_STATE }).__fridge = FRIDGE_STATE
 /** what's in it, and what each costs (NT$) */
 export const DRINKS = [
@@ -279,9 +280,9 @@ const drinkPanelSubs = new Set<() => void>()
 export function setDrinkPanel(open: boolean) { if (DRINK_PANEL.open === open) return; DRINK_PANEL.open = open; drinkPanelSubs.forEach((f) => f()) }
 export const onDrinkPanel = (f: () => void) => { drinkPanelSubs.add(f); return () => { drinkPanelSubs.delete(f) } }
 /** the ingredients' freezer clicked open (Decor): App takes the camera to the grill and opens the pantry's panel there, while the shop's shut */
-const pantryAsks = new Set<() => void>()
-export function askPantry() { pantryAsks.forEach((f) => f()) }
-export const onPantryAsk = (f: () => void) => { pantryAsks.add(f); return () => { pantryAsks.delete(f) } }
+const pantryAsks = new Set<(tab: string, from: 'freezer' | 'sack') => void>()
+export function askPantry(tab: string = 'frozen', from: 'freezer' | 'sack' = 'freezer') { pantryAsks.forEach((f) => f(tab, from)) }
+export const onPantryAsk = (f: (tab: string, from: 'freezer' | 'sack') => void) => { pantryAsks.add(f); return () => { pantryAsks.delete(f) } }
 /** a customer takes a drink: the last place holding one of that kind is emptied (any kind at all if it's run out) */
 export function takeDrink(id: DrinkId) {
   const home = fridgeUnitOf(id)
@@ -468,6 +469,14 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
 /** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
  * (none when the bed is full); the scene sets it while it's showing */
 export const COAL_BRIDGE: { place: (() => number) | null } = { place: null }
+/**
+ * The kitchen's supplies as App holds them (game/supplies): how many sticks of binchotan are left in the sack by the table, the crate on the
+ * table refilled from it (how many went in), and a dab of a seasoning taken from stock (false: there's none left, it doesn't go on). App sets
+ * them; until it does, there's no end to any of it.
+ */
+export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => number; dab: (k: string) => boolean } = {
+  coal: () => Infinity, refillCrate: (cap) => cap, dab: () => true,
+}
 export const billOf = (items: number, drink?: DrinkId) => Math.max(1, items) * 380 + (drink ? 320 : 0)
 /** the figures on the register's displays: a number with its thousands comma */
 export const yen = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')

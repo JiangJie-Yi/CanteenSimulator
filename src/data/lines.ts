@@ -3,6 +3,8 @@ import type { Lang } from './i18n'
 
 const ZH = {
   addCharcoal: '火小了，添點炭',
+  noCharcoal: '木炭用完了，麻袋空了，要叫貨',
+  outOf: (k: string) => `${({ salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉', miso: '味噌', wasabi: '山葵', shichimi: '七味粉', yuzu: '柚子胡椒', lemon: '檸檬' } as Record<string, string>)[k] ?? k}用完了，這份只好不加`,
   done: (n: string) => `${n}烤好了！`,
   seasoned: (n: string, k: string) => `${n}${({ salt: '撒點鹽', soy: '刷上醬油', milk: '淋上煉乳', peanut: '撒花生粉', miso: '抹上味噌', wasabi: '配上山葵', shichimi: '撒點七味', yuzu: '點上柚子胡椒', lemon: '擠點檸檬' } as Record<string, string>)[k] ?? ''}`,
   onFire: (n: string) => `${n}上火了`,
@@ -25,6 +27,8 @@ const ZH = {
 }
 const JA: typeof ZH = {
   addCharcoal: '火が弱いな、炭を足そう',
+  noCharcoal: '炭が切れた、袋も空だ。注文しないと',
+  outOf: (k: string) => `${({ salt: '塩', soy: '醤油', milk: '練乳', peanut: 'きな粉', miso: '味噌', wasabi: 'わさび', shichimi: '七味', yuzu: '柚子胡椒', lemon: 'レモン' } as Record<string, string>)[k] ?? k}が切れた、これはなしで`,
   done: (n) => `${n}、焼き上がり！`,
   seasoned: (n, k) => `${n}に${({ salt: '塩をひと振り', soy: '醤油を塗って', milk: '練乳をかけて', peanut: 'きな粉をまぶして', miso: '味噌を塗って', wasabi: 'わさびを添えて', shichimi: '七味を振って', yuzu: '柚子胡椒を添えて', lemon: 'レモンを搾って' } as Record<string, string>)[k] ?? ''}`,
   onFire: (n) => `${n}、火にかけます`,
@@ -47,6 +51,8 @@ const JA: typeof ZH = {
 }
 const EN: typeof ZH = {
   addCharcoal: 'The fire’s low, more charcoal',
+  noCharcoal: 'Out of charcoal, the sack’s empty: we need to order some',
+  outOf: (k: string) => `Out of ${({ salt: 'salt', soy: 'soy', milk: 'condensed milk', peanut: 'peanut powder', miso: 'miso', wasabi: 'wasabi', shichimi: 'shichimi', yuzu: 'yuzu kosho', lemon: 'lemon' } as Record<string, string>)[k] ?? k}: this one goes without`,
   done: (n) => `${n}, done!`,
   seasoned: (n, k) => `${n}: ${({ salt: 'a pinch of salt', soy: 'a brush of soy', milk: 'condensed milk over it', peanut: 'peanut powder on it', miso: 'miso spread on', wasabi: 'wasabi on the side', shichimi: 'shichimi shaken on', yuzu: 'a dab of yuzu kosho', lemon: 'a squeeze of lemon' } as Record<string, string>)[k] ?? ''}`,
   onFire: (n) => `${n}, on the fire`,

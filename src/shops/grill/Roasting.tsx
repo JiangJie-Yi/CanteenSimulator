@@ -46,11 +46,12 @@ import { setTip } from '@/scene/hoverTip'
 import { slide as drawerSound } from './TillDesk'
 import { tissuePull } from './paperSound'
 import { reflectStudio, useStudio } from '@/scene/studio'
+import { ColdMist } from '@/scene/ColdMist'
 import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -1071,8 +1072,25 @@ function CubbyFrame() {
  * pointed at, they lit up and swung open of themselves, and stayed open while the pointer was inside). `front`: the face they hang on (lay); `back`: how far in the cupboard goes (lay), its inside dark. `lit`: a strip of warm
  * light under its header inside, coming on as the doors open (and off as they shut, so none leaks out through them), lighting what's in it.
  */
-const STRIP_OFF = new THREE.Color('#5a4a38')
-const STRIP_ON = new THREE.Color('#fff0cc')
+// (the cupboards are fridges (the owner's): a cold white light in them, not a warm one)
+const STRIP_OFF = new THREE.Color('#4a5058')
+const STRIP_ON = new THREE.Color('#eef7ff')
+/** a fridge's white lining, its walls, ceiling, floor and shelf */
+const FRIDGE_LINING = '#e3e9ee'
+/** what a fridge's display says: its temperature */
+const FRIDGE_READOUT = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 128; c.height = 64
+  const g = c.getContext('2d')!
+  g.fillStyle = '#0d1418'; g.fillRect(0, 0, 128, 64)
+  g.fillStyle = '#7fe8ff'; g.shadowColor = '#4ad0ff'; g.shadowBlur = 10
+  g.font = 'bold 40px "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText('3.0℃', 64, 34)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
 /** how bright a cupboard's lamp is, its doors open */
 const CUBBY_LAMP = 3.2
 /** how far a leaf swings open (a little past square) */
@@ -1114,6 +1132,8 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
   // (where the cupboard's lamp shines: straight down, onto its floor)
   const lampAim = useMemo(() => new THREE.Object3D(), [])
   const strip = useRef<THREE.MeshBasicMaterial>(null)
+  // (how open it is, for the cold that spills out)
+  const cold = useRef(0)
   const side = a0 < COOK_NOTCH.along[0] ? 'left' : 'right'
   if (import.meta.env?.DEV && typeof window !== 'undefined') ((window as unknown as { __cubbies?: Record<string, typeof st> }).__cubbies ??= {})[side] = st
   const geo = useMemo(() => panelBox(W, H, 0.025, 0.45), [W, H])
@@ -1157,6 +1177,7 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
     doors.current.forEach((d, i) => { if (d) d.rotation.y = leaves[i] * e * LEAF_SWING })
     if (lamp.current) lamp.current.intensity = e * CUBBY_LAMP
     strip.current?.color.lerpColors(STRIP_OFF, STRIP_ON, Math.min(1, e * 1.5))
+    cold.current = e
   })
   const tip = () => setTip({ title: '櫃門', hint: st.current.blocked ? '前面有人，打不開' : st.current.kept ? '點一下關上' : '點一下打開' })
   const over = (e: Parameters<typeof handOver.onPointerOver>[0]) => {
@@ -1177,10 +1198,35 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
           {QUALITY.tier === 'high' && (
             <>
               <primitive object={lampAim} position={[0, bottom, (back - front) * 0.4]} />
-              <spotLight ref={lamp} position={[0, top - 0.03, (back - front) * 0.4]} target={lampAim} color="#ffd8a0" intensity={0}
+              <spotLight ref={lamp} position={[0, top - 0.03, (back - front) * 0.4]} target={lampAim} color="#e6f2ff" intensity={0}
                 angle={1.25} penumbra={0.55} distance={(top - bottom) * 1.8} decay={1.6} />
             </>
           )}
+          {/* (a fridge's white lining: its back, its two ends, its ceiling, its floor; the shelf lined white too) */}
+          <StaticBatch>
+            <mesh position={[0, (top + bottom) / 2, back - front + 0.006]}><boxGeometry args={[span - 0.01, H, 0.008]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
+            {[-1, 1].map((e) => (
+              <mesh key={e} position={[e * (span / 2 - 0.006), (top + bottom) / 2, (back - front) / 2]}><boxGeometry args={[0.008, H, front - back - 0.01]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
+            ))}
+            <mesh position={[0, top - 0.005, (back - front) / 2 - 0.01]}><boxGeometry args={[span - 0.01, 0.008, front - back - 0.03]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
+            <mesh position={[0, bottom + 0.003, (back - front) / 2]}><boxGeometry args={[span - 0.01, 0.006, front - back - 0.01]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
+            {/* (the shelf: the right-hand one over its right-hand part, the left-hand one the whole way) */}
+            {(() => {
+              const s0 = side === 'right' ? CUBBY.shelfAlong - (a0 + a1) / 2 : -span / 2, s1 = span / 2
+              return <mesh position={[(s0 + s1) / 2, CUBBY_SHELF_Y - CUBBY.shelfThick / 2, (back - front) / 2]}><boxGeometry args={[s1 - s0 - 0.01, CUBBY.shelfThick + 0.004, front - back - 0.02]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
+            })()}
+          </StaticBatch>
+          {/* (its display, on the header above its doors: what it's keeping at) */}
+          {FRIDGE_READOUT && (
+            <mesh position={[span / 2 - 0.16, -0.19, 0.0515]}>
+              <planeGeometry args={[0.1, 0.05]} />
+              <meshBasicMaterial map={FRIDGE_READOUT} toneMapped={false} />
+            </mesh>
+          )}
+          {/* (and the cold that spills out over its sill as its doors open, falling to the floor and rolling out across it) */}
+          <group position={[0, floor, 0.03]}>
+            <ColdMist width={span * 0.8} drop={bottom - floor + 0.16} reach={0.7} level={cold} opacity={0.28} />
+          </group>
         </>
       )}
       {leaves.map((sd, i) => (
@@ -2887,6 +2933,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return !!standStick(lying, Math.random, PIT_LIFT) || coals.current.some((c) => c && !c.gone && !c.dying && ashedOut(c))
   }
   /** charcoal onto the fire: a load (the chef, the button), or `count` sticks (one, dragged from the crate by hand) */
+  /** a handful of charcoal: six or seven sticks */
+  const coalPortion = () => COAL_PER_ADD.min + Math.floor(Math.random() * (COAL_PER_ADD.max - COAL_PER_ADD.min + 1))
   const dropCoals = (from?: { x: number; y: number; z: number }, count?: number, force = 0) => {
     // (only as many as the bed has room for: the most it holds, less those still burning; ones burnt to ash are cleared to make room)
     const aliveNow = coals.current.filter((c) => c && !c.gone && !c.dying)
@@ -2944,7 +2992,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // (the fire bar's button, in App: a portion out of the crate, as many as the bed takes; it pays for those)
   useEffect(() => {
     if (!active || !bar) return
-    COAL_BRIDGE.place = () => (fire && fire.current >= 1 - 1e-6 ? 0 : dropCoals())
+    COAL_BRIDGE.place = () => (fire && fire.current >= 1 - 1e-6 ? 0 : dropCoals(undefined, Math.min(SUPPLIES.coal(), coalPortion())))
     return () => { COAL_BRIDGE.place = null }
   })
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dropCoals: dropCoals, __fire: fire, __coals: coals, __pieces: pieces })
@@ -3596,7 +3644,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (fire && fire.current < 0.35) {
       // (a handful out of the crate, as many as the bed takes; paid for only those, and none at all when it's full)
       if (!roomForCoal()) return
-      const placed = dropCoals()
+      // (no more than the sack has: none left, the chef says so now and then)
+      const left = SUPPLIES.coal()
+      if (left < 1) { say(L().noCharcoal); return }
+      const placed = dropCoals(undefined, Math.min(left, coalPortion()))
       if (!placed || onAddCharcoal?.(placed) === false) return
       say(L().addCharcoal)
       return
@@ -3677,7 +3728,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return at === 'before' || at === 'early' ? r < 0.6 : at === 'late' ? r >= 0.85 : false
     }
     const dab = (p: Piece, k: Exclude<Seasoning, 'water'>) => {
-      season(p, k)
+      // (none left in stock: it goes without, and the cook says so)
+      if (!season(p, k)) { say(L().outOf(k)); return }
       emit(k, p.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
       say(L().seasoned(nameOfP(p), k))
     }
@@ -4054,6 +4106,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   /** a seasoning lands on a piece: its look changes (more of it with every dab) */
   const season = (p: Piece, kind: Seasoning) => {
+    // (a dose of it from stock, unless it's one the dish was ordered with, the first time: that went with the order. None left, it doesn't
+    // go on)
+    const paid = !!p.want?.dabs.includes(kind) && !p.dabs[kind]
+    if (kind !== 'water' && !paid && !SUPPLIES.dab(kind)) return false
     const before = tasteOf(p)
     p.dabs[kind]++
     if (kind === 'water') {
@@ -4068,6 +4124,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     const delta = tasteOf(p) - before
     pop(p.node.position.clone().add(new THREE.Vector3(0, 0.3, 0)), delta)
+    return true
   }
 
   // little floating words: how a seasoning changed a piece's 美味

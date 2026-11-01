@@ -9,6 +9,7 @@ import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
+import { ColdMist } from '@/scene/ColdMist'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { BOSS_DRINK } from './Boss'
@@ -17,7 +18,6 @@ import { fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STA
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
-import { Steam } from '@/scene/Steam'
 import { setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
@@ -2661,9 +2661,10 @@ function FridgeDoorImpl({ n = 0 }: { n?: number }) {
     <group>
       {/* the model's own door, hung on its pivot (the glass and its frame), swung with the rest of the model's scale */}
       <group onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...tipOver('飲料櫃', '點一下開關門')}><primitive object={doorRoot} /></group>
-      {/* the mist, low at the foot of the open door, rolling out over the floor */}
-      <group position={[0, 0.05, D / 2 + 0.1]}>
-        <Steam width={W * 0.9} height={0.5} opacity={0.5} layers={2} color="#eaf6ff" shade="#bcd8ec" speed={0.06} level={mist} />
+      {/* the cold, pouring out over the open door's foot and rolling out over the floor (it was drawn as rising steam: the owner saw it
+          was wrong) */}
+      <group position={[0, 0, D / 2 + 0.02]}>
+        <ColdMist width={W * 0.85} drop={0.4} reach={0.9} level={mist} />
       </group>
     </group>
   )

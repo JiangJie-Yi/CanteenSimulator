@@ -2,6 +2,7 @@
 // Pure functions over the data in src/data, so App (and the tests) all reckon the same way.
 import { DISHES, type Dish } from '@/data/menu'
 import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Seasoning } from '@/data/recipes'
+import { CHARCOAL, CHARCOAL_LOW, charcoalOrder, SEASON_GOODS, SEASON_PAR, seasonId, isSeasonId } from './supplies'
 
 export type Stock = Record<string, number>
 
@@ -66,11 +67,14 @@ export const entryCost = (e: Entry) => {
   return e.parts.reduce((n, p) => n + partCost(d, p), 0)
 }
 
-/** what a dish on the menu takes out of stock */
+/** what a dish on the menu takes out of stock: its food, and a dose of each seasoning that goes on it */
 export const needOf = (e: Entry): Stock => {
   const d = shopOf(e)
   const need: Stock = {}
-  for (const p of e.parts) for (const [k, q] of Object.entries(takesOf(d, p.id))) need[k] = (need[k] ?? 0) + q
+  for (const p of e.parts) {
+    for (const [k, q] of Object.entries(takesOf(d, p.id))) need[k] = (need[k] ?? 0) + q
+    for (const k of p.dabs ?? []) need[seasonId(k)] = (need[seasonId(k)] ?? 0) + 1
+  }
   return need
 }
 
@@ -115,29 +119,45 @@ export const supplierDiscount = (skill: number) => Math.max(0, Math.min(0.05, (s
 export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number, skill: number) {
   const per: Stock = {}
   for (const e of menu) for (const [k, q] of Object.entries(needOf(e))) per[k] = Math.max(per[k] ?? 0, q)
-  const goods = new Map(goodsOf(d).map((g) => [g.id, g]))
+  const goods = new Map([...goodsOf(d), ...SEASON_GOODS].map((g) => [g.id, g]))
   const off = 1 - supplierDiscount(skill)
   const buy: Stock = {}
   let cost = 0
   for (const [id, q] of Object.entries(per)) {
     const g = goods.get(id)
     const have = stock[id] ?? 0
-    if (!g || have > REORDER_AT * q) continue
-    const n = PAR * q - have
+    // (a seasoning, counted in doses, is kept at its own usual stock: ordered once it's down to a third of it)
+    const par = isSeasonId(id) ? SEASON_PAR : PAR * q
+    if (!g || have > (isSeasonId(id) ? SEASON_PAR / 3 : REORDER_AT * q)) continue
+    const n = par - have
     const c = Math.round(costOf(g) * n * off)
     if (cost + c > cash) continue
     buy[id] = n
     cost += c
   }
-  return { buy, cost }
+  // (and the charcoal, a sack at a time, once the sack's running low: paid as fuel)
+  let fuel = 0
+  if ((stock[CHARCOAL] ?? 0) < CHARCOAL_LOW) {
+    const sacks = charcoalOrder(2)
+    const c = Math.round(sacks.cost * off)
+    if (cost + c <= cash) { buy[CHARCOAL] = sacks.sticks; fuel = c }
+  }
+  return { buy, cost, fuel }
 }
 
-/** 一鍵補貨: everything the shop sells topped up to PAR portions (what's already over it is left as it is) */
+/** 一鍵補貨: everything the shop sells topped up to PAR portions, and every seasoning to its own usual stock (what's already over it is left as
+ * it is) */
 export function topUpOrder(d: Dish, stock: Stock, par = PAR) {
   const buy: Stock = {}
   let cost = 0
   for (const g of goodsOf(d)) {
     const n = par - (stock[g.id] ?? 0)
+    if (n <= 0) continue
+    buy[g.id] = n
+    cost += costOf(g) * n
+  }
+  for (const g of SEASON_GOODS) {
+    const n = SEASON_PAR - (stock[g.id] ?? 0)
     if (n <= 0) continue
     buy[g.id] = n
     cost += costOf(g) * n

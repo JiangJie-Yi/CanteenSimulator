@@ -12,13 +12,13 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ALONG, askPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver } from './bar'
+import { ALONG, askPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, SUPPLIES } from './bar'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { PlateRack } from './PlateRack'
 import { SinkModel } from './Sink'
-import { ProduceSacks } from './KitchenStores'
+import { CharcoalSack, ProduceSacks } from './KitchenStores'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
@@ -128,13 +128,14 @@ const BASKET_WEAVE = canvas(256, 128, (g) => {
   }
 })
 
-/** the crate's sticks: how many are in it (36 packed; each one dragged to the fire is one fewer; the last gone, a fresh crate comes) */
+/** the crate's sticks: how many are in it (36 packed; each one dragged to the fire is one fewer; the last gone, it's filled again from the
+ * sack of binchotan on the floor by the table, as much as the sack has: with none left in the sack, it stays empty till some's bought) */
 const CRATE_FULL = 36
 export const CRATE = { left: CRATE_FULL }
 /** a stick taken out of the crate (onto the fire) */
 export function takeFromCrate() {
   CRATE.left -= 1
-  if (CRATE.left <= 0) CRATE.left = CRATE_FULL
+  if (CRATE.left <= 0) CRATE.left = SUPPLIES.refillCrate(CRATE_FULL)
 }
 
 /** A square plaited basket of white binchotan stood on end, packed full, its tag on the front. Only the sticks are taken hold of (pointed at,
@@ -179,7 +180,15 @@ function Crate() {
   // (as many shown as are left in it: the last ones in the list (the front rows) go first; the basket and its sticks drawn as one batch
   // each, the sticks' made again only when one's taken)
   const [left, setLeft] = useState(CRATE.left)
-  useFrame(() => { if (CRATE.left !== left) setLeft(CRATE.left) })
+  const lastLook = useRef(0)
+  useFrame((st) => {
+    // (empty, it's filled again as soon as there's charcoal in the sack: looked at now and then)
+    if (CRATE.left <= 0 && st.clock.elapsedTime - lastLook.current > 1) {
+      lastLook.current = st.clock.elapsedTime
+      if (SUPPLIES.coal() > 0) CRATE.left = SUPPLIES.refillCrate(CRATE_FULL)
+    }
+    if (CRATE.left !== left) setLeft(CRATE.left)
+  })
   return (
     <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35}>
       <StaticBatch>
@@ -706,7 +715,16 @@ const SACKS_AT = { along: -2.36, lay: 3.42 }
 function SacksAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, SACKS_AT.along).addScaledVector(LAY, SACKS_AT.lay)
-  return <Movable id="produce" label="地瓜馬鈴薯" ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><ProduceSacks /></group></Movable>
+  // (1.4 times the size they were modelled (the owner's), sized about their foot)
+  return <Movable id="produce" label="地瓜馬鈴薯" baseScale={1.4} ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><ProduceSacks /></group></Movable>
+}
+/** where the sack of binchotan stands (the owner's: on the floor by the cook table's right-hand end, toward the cook's side, the rice tub
+ * beyond it): along and across, in the fire's frame */
+const COAL_SACK_AT = { along: 2.72, lay: 1.7 }
+function CharcoalSackAt() {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const p = new THREE.Vector3().addScaledVector(ALONG, COAL_SACK_AT.along).addScaledVector(LAY, COAL_SACK_AT.lay)
+  return <Movable id="coalsack" label="備長炭麻袋" baseScale={1.25} ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)}><CharcoalSack /></group></Movable>
 }
 const KNIVES_URL = import.meta.env.BASE_URL + 'models/knives.glb'
 /** the cook's knives on their folded cloth (blender/knives.py), laid along the table behind the hearth */
@@ -763,7 +781,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
-      <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /></group>
+      <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><CharcoalSackAt /></group>
     </>
   )
 }

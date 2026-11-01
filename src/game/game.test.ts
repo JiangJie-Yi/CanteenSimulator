@@ -6,6 +6,7 @@ import { ROLES } from '@/data/staff'
 import { KINDS, kindOf } from '@/data/guests'
 import { SAY_CHUNK, sayChunks } from '@/game/say'
 import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder } from '@/game/economy'
+import { SEASON_GOODS, SEASON_PAR } from './supplies'
 import { trialIdeas } from '@/game/research'
 import { makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
 import { bestDabs, expectedTaste, understand } from '@/game/chefChat'
@@ -185,7 +186,8 @@ describe('game/economy: the stock keeper', () => {
   const grill = shop('grilledfish')
   const menu = [entry('grilledfish', ['Saury']), entry('grilledfish', ['GrilledCorn'])]
   it('tops up only what the menu uses and is running low, back to PAR', () => {
-    const { buy, cost } = restockOrder(grill, menu, { Saury: 2, GrilledCorn: REORDER_AT + 1, Salmon: 0 }, 1e6, 60)
+    // (the charcoal's sack full enough: it isn't what's tested here)
+    const { buy, cost } = restockOrder(grill, menu, { Saury: 2, GrilledCorn: REORDER_AT + 1, Salmon: 0, charcoal: 100 }, 1e6, 60)
     expect(buy).toEqual({ Saury: PAR - 2 })
     expect(cost).toBe(costOf(grill.items.find((x) => x.id === 'Saury')!) * (PAR - 2))
   })
@@ -235,8 +237,10 @@ describe('game/economy: 一鍵補貨', () => {
     expect(buy.Saury).toBe(PAR - 4)
     expect(buy.Salmon).toBeUndefined()
     expect(buy.GrilledCorn).toBe(PAR)
-    expect(cost).toBe(Object.entries(buy).reduce((n, [id, q]) => n + costOf(goodsOf(grill).find((g) => g.id === id)!) * q, 0))
-    expect(topUpOrder(grill, Object.fromEntries(goodsOf(grill).map((g) => [g.id, PAR]))).cost).toBe(0)
+    // (the seasonings are topped up too, each to its own usual stock)
+    const all = [...goodsOf(grill), ...SEASON_GOODS]
+    expect(cost).toBe(Object.entries(buy).reduce((n, [id, q]) => n + costOf(all.find((g) => g.id === id)!) * q, 0))
+    expect(topUpOrder(grill, Object.fromEntries([...goodsOf(grill).map((g) => [g.id, PAR]), ...SEASON_GOODS.map((g) => [g.id, SEASON_PAR])])).cost).toBe(0)
   })
 })
 

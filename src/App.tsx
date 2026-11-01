@@ -19,6 +19,7 @@ import { moodOf } from '@/game/taste'
 import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
+import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
 import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, coalCharge, STICKS_PER_PORTION, afterCharcoal, canAddCharcoal, canServe, CAPITAL, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
@@ -29,7 +30,8 @@ import { OpeningSpot } from '@/scene/OpeningSpot'
 import { OccluderFade } from '@/scene/OccluderFade'
 import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
-import { DrinkStockPanel } from '@/shops/grill/DrinkStockPanel'
+import { StockPanel, type StockTab } from '@/shops/grill/StockPanel'
+import { FREEZER } from '@/shops/grill/Decor'
 import { useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
@@ -50,7 +52,7 @@ import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { FIRE_SHIFT, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE } from '@/shops/grill/bar'
+import { FIRE_SHIFT, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, SUPPLIES } from '@/shops/grill/bar'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
@@ -1071,17 +1073,22 @@ export default function App() {
   const showFire = research && DISHES[active].heat === 'fire'
   const showFull = view === 'boss'
   const hudRows = (showFire ? 1 : 0) + (showFull ? 1 : 0)
-  // (the ingredients' panel, opened and shut by the fridge button, while researching)
+  // (the stock panel (庫存), opened and shut by the little fridge top right at any time, on one of its tabs)
   const [fridgeOpen, setFridgeOpen] = useState(false)
-  // (the freezer clicked open in the room: while the shop's shut, to the grill with the pantry's panel open)
-  const openRef = useRef(false)
-  openRef.current = ai
-  useEffect(() => onPantryAsk(() => {
-    if (openRef.current) return
-    setView('grill')
-    setResetView((n) => n + 1)
+  const [stockTab, setStockTab] = useState<StockTab>('frozen')
+  // (the freezer clicked open in the room: the panel opens on the freezer's tab, the camera staying where it is (the owner's); the panel shut,
+  // the freezer's lid shuts with it)
+  const byFreezer = useRef(false)
+  useEffect(() => onPantryAsk((tab, from) => {
+    byFreezer.current = from === 'freezer'
+    setStockTab(tab as StockTab)
     setFridgeOpen(true)
   }), [])
+  useEffect(() => {
+    if (fridgeOpen || !byFreezer.current) return
+    byFreezer.current = false
+    FREEZER.open = false
+  }, [fridgeOpen])
   // (the panels docked at the right, the pantry, the office and the drinks' stock, open one at a time: opening one shuts the others)
   const drinksOpen = useSyncExternalStore(onDrinkPanel, () => DRINK_PANEL.open)
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
@@ -1197,15 +1204,16 @@ export default function App() {
     SHOP_PURSE.cash = () => cashNow.current
     SHOP_PURSE.spend = (n: number) => setLedger((l) => ({ ...l, bought: l.bought + n }))
   }, [])
-  // ingredients in stock, by portion; nothing until it's bought
-  const [stock, setStock] = useState<Record<string, number>>(() => SAVED?.stock ?? {})
+  // ingredients in stock, by portion; nothing until it's bought (but the seasonings and the charcoal: a new shop has some of those, game/supplies)
+  const [stock, setStock] = useState<Record<string, number>>(() => ({ ...startingSupplies(), ...SAVED?.stock }))
   // how fresh each food in stock is (game/freshness): what's bought comes in fresh and mixes with what's there; it goes off as time passes
   const [fresh, setFresh] = useState<Record<string, number>>(() => SAVED?.fresh ?? {})
   const stockWas = useRef(stock)
   useEffect(() => {
     const was = stockWas.current
     stockWas.current = stock
-    const grew = Object.keys(stock).filter((k) => (stock[k] ?? 0) > (was[k] ?? 0))
+    // (what isn't food doesn't go off: the seasonings, the charcoal)
+    const grew = Object.keys(stock).filter((k) => !isSupply(k) && (stock[k] ?? 0) > (was[k] ?? 0))
     if (grew.length) setFresh((f) => ({ ...f, ...Object.fromEntries(grew.map((k) => [k, blendFresh(was[k] ?? 0, f[k] ?? 100, (stock[k] ?? 0) - (was[k] ?? 0))])) }))
   }, [stock])
   useEffect(() => {
@@ -1249,7 +1257,12 @@ export default function App() {
   const [office, setOffice] = useState<null | OfficeTab>(null)
   useEffect(() => { if (office) { setFridgeOpen(false); setDrinkPanel(false) } }, [office])
   useEffect(() => { if (fridgeOpen) { setOffice(null); setDrinkPanel(false) } }, [fridgeOpen])
-  useEffect(() => { if (drinksOpen) { setOffice(null); setFridgeOpen(false) } }, [drinksOpen])
+  useEffect(() => {
+    if (!drinksOpen) return
+    setDrinkPanel(false)
+    setStockTab('drinks')
+    setFridgeOpen(true)
+  }, [drinksOpen])
   // (Esc shuts whatever's open, the one on top first: the office, the ledger, the boards, the tools, the pantry, the views. Not in the
   // editor, where Esc lets go of what's picked; nor when something of its own has taken it (the register's manual))
   useEffect(() => {
@@ -1520,7 +1533,7 @@ export default function App() {
   }
   /** buy in n of something (paid from the cash in hand) */
   const buyIn = (d: DishInfo, id: string, n: number) => {
-    const it = ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id)
+    const it = ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id)
     const cost = costOf(it ?? { price: 0 }) * n
     if (cost > cash) return
     book('bought', cost)
@@ -1528,6 +1541,22 @@ export default function App() {
   }
   /** the three ways to restock all at once: 補到平均 (whatever's under the average, up to it), 各補 5, 補滿 (everything up to PAR) */
   const restockOf = (d: DishInfo, how: Restock) => (how === 'avg' ? averageOrder(d, stock) : how === 'each' ? eachOrder(d, 5) : topUpOrder(d, stock))
+  /** everything out on the board to try put back: refunded (nothing was made) */
+  const putAllBack = () => {
+    for (const x of [...dish.bases, ...dish.items]) {
+      const n = orders[dish.id][x.id] ?? 0
+      if (!n) continue
+      if (ai) book('revenue', -x.price * n)
+      book('food', -costOf(x) * n)
+      const parts = (x as { includes?: Record<string, number> }).includes ?? { [x.id]: 1 }
+      setStock((st) => {
+        const next = { ...st }
+        for (const [k, q] of Object.entries(parts)) next[k] = (next[k] ?? 0) + q * n
+        return next
+      })
+    }
+    setOrders((all) => ({ ...all, [dish.id]: {} }))
+  }
   const restock = (d: DishInfo, how: Restock) => {
     const { buy, cost } = restockOf(d, how)
     if (!cost || cost > cash) return
@@ -1539,6 +1568,13 @@ export default function App() {
     })
   }
   const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
+  /** sacks of binchotan bought in (the stock's supplies), paid as fuel */
+  const buyCharcoal = (sacks: number) => {
+    const o = charcoalOrder(sacks)
+    if (o.cost > cash) return
+    book('fuel', o.cost)
+    shiftStock({ [CHARCOAL]: o.sticks })
+  }
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest' | 'stock' | 'order'; text: string }[]>([])
   /** what each customer's saying just now (over their head) */
   const [speech, setSpeech] = useState<Record<number, { key: number; text: string }>>({})
@@ -1660,8 +1696,14 @@ export default function App() {
   // grill, which has no bed), a portion)
   const addCharcoal = (sticks?: number, byHand = false) => {
     if (!canAddCharcoal(fire.current) || sticks === 0) { say(UI[lang].charcoalFull); return false }
-    const { cost, boost } = coalCharge(sticks ?? STICKS_PER_PORTION, byHand)
-    book('fuel', cost)
+    // (a stick by hand comes out of the crate on the table, already taken from the sack when the crate was filled; a handful comes out of the
+    // sack: none left there, none goes on. It was paid for as fuel when it was bought)
+    if (!byHand) {
+      const n = Math.ceil(sticks ?? STICKS_PER_PORTION)
+      if ((stockRef.current[CHARCOAL] ?? 0) < n) { say(tl(lang, '木炭用完了，到庫存的耗材訂木炭', '炭が切れた。在庫の消耗品から注文を', 'Out of charcoal: order some from the stock’s supplies')); return false }
+      shiftStock({ [CHARCOAL]: -n })
+    }
+    const { boost } = coalCharge(sticks ?? STICKS_PER_PORTION, byHand)
     fire.current = afterCharcoal(fire.current, boost)
     setFireLevel(Math.round(fire.current * 100))
     return true
@@ -1737,6 +1779,48 @@ export default function App() {
   aiRef.current = { ai, wage: chef.wagePerHour, shop: DISHES[active].id }
   const stockRef = useRef(stock)
   stockRef.current = stock
+  /** a change to the stock, at once (stockRef, for what reads it before the next draw) and in state */
+  const shiftStock = (delta: Record<string, number>) => {
+    stockRef.current = { ...stockRef.current }
+    for (const [k, q] of Object.entries(delta)) stockRef.current[k] = (stockRef.current[k] ?? 0) + q
+    setStock((st) => {
+      const next = { ...st }
+      for (const [k, q] of Object.entries(delta)) next[k] = (next[k] ?? 0) + q
+      return next
+    })
+  }
+  const shiftStockRef = useRef(shiftStock)
+  shiftStockRef.current = shiftStock
+  const supplyLang = useRef(lang)
+  supplyLang.current = lang
+  // (the kitchen asks for its supplies here: the sack's charcoal, the crate filled from it, a seasoning's dab; a word, now and then, when one's out)
+  const outSaid = useRef<Record<string, number>>({})
+  useEffect(() => {
+    const out = (id: string, text: string) => {
+      const now = performance.now()
+      if (now - (outSaid.current[id] ?? -1e9) < 8000) return
+      outSaid.current[id] = now
+      say(text)
+    }
+    SUPPLIES.coal = () => stockRef.current[CHARCOAL] ?? 0
+    SUPPLIES.refillCrate = (cap: number) => {
+      const r = crateRefill(stockRef.current[CHARCOAL] ?? 0, cap)
+      if (r.crate) shiftStockRef.current({ [CHARCOAL]: -r.crate })
+      else out(CHARCOAL, tl(supplyLang.current, '炭箱空了，麻袋裡也沒有木炭：到庫存的耗材訂木炭', '炭箱が空、袋にも炭がない。在庫の消耗品から注文を', 'The crate’s empty and so is the sack: order charcoal from the stock’s supplies'))
+      return r.crate
+    }
+    SUPPLIES.dab = (k: string) => {
+      if (!dabFrom(stockRef.current, k as Seasoning)) {
+        const name = supplyName(seasonId(k as Seasoning), supplyLang.current) ?? k
+        out(k, tl(supplyLang.current, `${name}用完了：到庫存補貨`, `${name}が切れた。在庫から補充を`, `Out of ${name}: restock it from the stock`))
+        return false
+      }
+      shiftStockRef.current({ [seasonId(k as Seasoning)]: -1 })
+      return true
+    }
+    return () => { SUPPLIES.coal = () => Infinity; SUPPLIES.refillCrate = (cap: number) => cap; SUPPLIES.dab = () => true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // the stock keeper (倉儲) at each shop goes round now and then and orders in whatever its menu is running low on:
   // a quicker one checks more often, a tired one less often, a skilled one gets a better price
   const restockRef = useRef({ cash, menuBy, hired, active, lang })
@@ -1753,10 +1837,12 @@ export default function App() {
         const now = Date.now()
         if (now - (lastRound.current[d.id] ?? 0) < (45 - keeper.speed * 0.3) * (1 + fatigue / 100) * 1000) continue
         lastRound.current[d.id] = now
-        const { buy, cost } = restockOrder(d, menuBy[d.id] ?? [], stockRef.current, money, effective(keeper, fatigue) * 100)
-        if (!cost) continue
-        money -= cost
+        const { buy, cost, fuel } = restockOrder(d, menuBy[d.id] ?? [], stockRef.current, money, effective(keeper, fatigue) * 100)
+        if (!cost && !fuel) continue
+        money -= cost + fuel
         book('bought', cost)
+        // (the charcoal's sacks are fuel)
+        if (fuel) book('fuel', fuel)
         stockRef.current = { ...stockRef.current }
         for (const [k, n] of Object.entries(buy)) stockRef.current[k] = (stockRef.current[k] ?? 0) + n
         setStock((st) => {
@@ -1767,7 +1853,7 @@ export default function App() {
         if (DISHES[active].id === d.id) {
           const names = Object.entries(buy).map(([k, n]) => {
             const it = ALL_ITEMS.get(k) ?? d.bases.find((b) => b.id === k)
-            return `${(it ? nameIn(lang, it) : null) ?? k} ${n}`
+            return `${(it ? nameIn(lang, it) : null) ?? supplyName(k, lang) ?? k} ${n}`
           })
           talk('stock', UI[lang].restocked(lang === 'ja' ? keeper.ja : keeper.zh, names.join('、')))
         }
@@ -1918,9 +2004,10 @@ export default function App() {
       // no stock keeper: order in what the menu's running low on, as one would
       const keeper = (CANDIDATES[d.id] ?? []).some((w) => w.role === 'stock' && mine[w.id])
       if (!keeper) {
-        const { buy, cost } = restockOrder(d, entriesOf(d.id), stock, cash, 60)
-        if (cost) {
+        const { buy, cost, fuel } = restockOrder(d, entriesOf(d.id), stock, cash, 60)
+        if (cost || fuel) {
           book('bought', cost)
+          if (fuel) book('fuel', fuel)
           setStock((st) => {
             const next = { ...st }
             for (const [k, q] of Object.entries(buy)) next[k] = (next[k] ?? 0) + q
@@ -2124,7 +2211,7 @@ export default function App() {
     return !!e && orderEntryRef.current(e, guest, reuse)
   }, [])
   return (
-    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}${hand && !!dish.roast && !editOn ? ' has-fridge' : ''} hud-rows-${hudRows}`} ref={appRef}>
+    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}${!!dish.roast && !editOn ? ' has-fridge' : ''} hud-rows-${hudRows}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -2247,7 +2334,6 @@ export default function App() {
           <span className="auto-long">{UI[lang].auto}</span>
         </button>
         {/* (the drinks' stock, opened from the back stock by the fridges) */}
-        <DrinkStockPanel lang={lang} />
         {office && (
           <Office dish={dish} lang={lang} cash={cash} owner={owner ?? ''} onClose={() => setOffice(null)}
             tab={office} onTab={setOffice}
@@ -2296,7 +2382,7 @@ export default function App() {
               } catch {
                 // storage blocked
               }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0 }, stock: {}, hired: {}, notes: {}, owner: null, opened: {} }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}
@@ -2435,8 +2521,8 @@ export default function App() {
           </div>
         </div>
       )}
-      {/* (the right-hand board only where it has a use: the foods' fridge when researching, the menu once open; in the free view there is none) */}
-      {((hand && fridgeOpen) || ai) && (<>
+      {/* (the right-hand board only once the shop's open: its menu; the stock is the stock panel's, below) */}
+      {ai && (<>
       <div className="menu-backing" aria-hidden="true" />
       <Menu key={dish.id + (hand ? '' : '-menu')} dish={hand ? researchDish(dish) : menuDish(dish)} research={hand} open={ai}
         layoutLike={!hand ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
@@ -2446,23 +2532,17 @@ export default function App() {
          lang={lang} quantities={hand ? orders[dish.id] : entryCount}
         feed={feed} locked={!hand} stock={hand ? stock : entryStock(dish)} fresh={fresh}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
-        onClear={() => {
-          // cancelling everything refunds it (nothing was made)
-          for (const x of [...dish.bases, ...dish.items]) {
-            const n = orders[dish.id][x.id] ?? 0
-            if (!n) continue
-            if (ai) book('revenue', -x.price * n)
-            book('food', -costOf(x) * n)
-            const parts = (x as { includes?: Record<string, number> }).includes ?? { [x.id]: 1 }
-            setStock((st) => {
-              const next = { ...st }
-              for (const [k, q] of Object.entries(parts)) next[k] = (next[k] ?? 0) + q * n
-              return next
-            })
-          }
-          setOrders((all) => ({ ...all, [dish.id]: {} }))
-        }} />
+        onClear={putAllBack} />
       </>)}
+      {/* (the stock: everything kept, at any time, from the little fridge top right; researching, its foods are taken out to try from it) */}
+      {fridgeOpen && !editOn && !!dish.roast && (
+        <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} cash={cash}
+          unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id) ?? { price: 0 })}
+          research={hand} quantities={orders[dish.id] ?? {}} onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)} onClear={putAllBack}
+          onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)}
+          restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
+          onBuyCharcoal={buyCharcoal} onClose={() => setFridgeOpen(false)} />
+      )}
       {/* (the fold tab only for the open shop's menu: researching, the fridge button opens and shuts the panel) */}
       {ai && (
         <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner !== null && !opened[dish.id])}
@@ -2507,10 +2587,10 @@ export default function App() {
           {blessed ? (tl(lang, '供酒中', 'お供え中', 'Offering')) : (tl(lang, '供酒', 'お神酒', 'Offer sake'))}
         </button>
       )}
-      {/* (at the grill with the shop shut, researching: a little fridge, top right, opens and shuts the ingredients' panel) */}
-      {hand && !!dish.roast && !editOn && (
+      {/* (a little fridge, top right, always there: opens and shuts the stock panel (the owner's)) */}
+      {!!dish.roast && !editOn && (
         <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => { setFridgeOpen((v) => !v); setMenuFolded(false) }} aria-pressed={fridgeOpen}
-          title={tl(lang, '打開／關上食材櫃', '食材庫を開く／閉じる', 'Open / close the pantry')}>
+          title={tl(lang, '打開／關上庫存', '在庫を開く／閉じる', 'Open / close the stock')}>
           {/* (a little two-door fridge: enamel white going cool blue down it, chrome handles, a snowflake on the freezer, a fish on the chiller,
               a gleam down its side and its shadow under it) */}
           <svg className="fridge-icon" viewBox="6 1 36 46" aria-hidden="true">

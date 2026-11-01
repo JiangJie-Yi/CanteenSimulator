@@ -1,8 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useState } from 'react'
 import { tl, type Lang } from '@/data/i18n'
 import { buyCase, caseCost, CASE_SIZE, drinkCounts, fillFromBack } from '@/game/drinkStock'
-import { DRINK_BACK, DRINK_PANEL, DRINKS, FRIDGE_STOCK, FRIDGE_UNITS, onDrinkPanel, setDrinkPanel, SHOP_PURSE, type DrinkId } from './bar'
+import { DRINK_BACK, DRINKS, FRIDGE_STOCK, FRIDGE_UNITS, SHOP_PURSE, type DrinkId } from './bar'
 
 type Drink = (typeof DRINKS)[number]
 const HOMES = FRIDGE_UNITS.map((u) => u.shelves.map((sh) => sh.ids))
@@ -11,7 +10,7 @@ const UNIT_DRINKS = FRIDGE_UNITS.map((u) => [...new Set(u.shelves.flatMap((sh) =
 const drinkOf = (id: DrinkId) => DRINKS.find((d) => d.id === id)!
 
 /** a little picture of a drink as it stands in the fridge: a can, a bottle, or the little bottle of cultured milk; in its own colours */
-function DrinkIcon({ d }: { d: Drink }) {
+export function DrinkIcon({ d }: { d: Drink }) {
   const [bg, fg] = d.label
   const ink = '#3b2a20'
   if (d.shape === 'can') {
@@ -48,23 +47,18 @@ function DrinkIcon({ d }: { d: Drink }) {
 }
 
 /**
- * The drinks' stock (opened by a click on the back stock by the fridges): for each fridge every drink it holds, how many stand in it of the
- * places meant for them and how many wait in the back, with a case to order in (paid from the shop's cash) and the fridge to fill from the
- * back at a click; at its foot, every fridge filled from the back, and a case ordered of each drink the back hasn't enough of to fill its
- * places. Esc or × shuts it. (Pure rules: game/drinkStock.)
+ * The drinks' stock, as the stock panel's 飲料 tab shows it (StockPanel; the back stock by the fridges opens it there): for each fridge every
+ * drink it holds, how many stand in it of the places meant for them and how many wait in the back, with a case to order in (paid from the
+ * shop's cash) and the fridge to fill from the back at a click; at its foot, every fridge filled from the back, and a case ordered of each
+ * drink the back hasn't enough of to fill its places. (Pure rules: game/drinkStock.)
  */
-export function DrinkStockPanel({ lang }: { lang: Lang }) {
-  const open = useSyncExternalStore(onDrinkPanel, () => DRINK_PANEL.open)
+export function DrinkStockBody({ lang }: { lang: Lang }) {
   // (the stock moves while it's open (customers, the stocker): looked at again a few times a second)
   const [, tick] = useState(0)
   useEffect(() => {
-    if (!open) return
     const t = window.setInterval(() => tick((n) => n + 1), 300)
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); setDrinkPanel(false) } }
-    window.addEventListener('keydown', key)
-    return () => { window.clearInterval(t); window.removeEventListener('keydown', key) }
-  }, [open])
-  if (!open) return null
+    return () => window.clearInterval(t)
+  }, [])
   const cash = SHOP_PURSE.cash()
   const changed = () => { FRIDGE_STOCK.ver++; DRINK_BACK.ver++; tick((n) => n + 1) }
   const buy = (id: DrinkId) => {
@@ -89,15 +83,8 @@ export function DrinkStockPanel({ lang }: { lang: Lang }) {
   const short = UNIT_DRINKS.flat().filter((id) => { const t = total(id); return (DRINK_BACK.back[id] ?? 0) < t.places - t.have })
   const shortCost = short.reduce((n, id) => n + caseCost(id), 0)
   const anyToFill = UNIT_DRINKS.flat().some((id) => { const t = total(id); return t.have < t.places && (DRINK_BACK.back[id] ?? 0) > 0 })
-  return createPortal(
+  return (
     <>
-    <h2 className="dock-title" aria-hidden="true">{tl(lang, '飲料', 'ドリンク', 'Drinks')}<small lang="en">DRINKS</small></h2>
-    <section className="drink-stock" role="dialog" aria-label={tl(lang, '飲料庫存', 'ドリンク在庫', 'Drinks stock')}>
-      <header className="drink-stock-head">
-        <b>{tl(lang, '飲料庫存', 'ドリンク在庫', 'Drinks stock')}</b>
-        <span className="drink-stock-cash">{tl(lang, '現金', '現金', 'Cash')} <b className="money">NT${Math.round(cash).toLocaleString()}</b></span>
-        <button type="button" className="panel-x" onClick={() => setDrinkPanel(false)} aria-label={tl(lang, '關閉', '閉じる', 'Close')}>×</button>
-      </header>
       <div className="chiller-scroll">
         {FRIDGE_UNITS.map((unit, u) => (
           <section key={u} className={`chiller-zone ${u ? 'is-drinks-alcohol' : 'is-chilled'}`}>
@@ -142,8 +129,6 @@ export function DrinkStockPanel({ lang }: { lang: Lang }) {
           {tl(lang, `缺的各訂一箱`, `足りない分を各1ケース`, `A case of each that's short`)}{short.length ? <> <b className="money">{shortCost.toLocaleString()}</b></> : null}
         </button>
       </footer>
-    </section>
-    </>,
-    document.body,
+    </>
   )
 }

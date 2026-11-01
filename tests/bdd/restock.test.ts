@@ -2,6 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { DISHES } from '@/data/menu'
 import { PAR, REORDER_AT, restockOrder, topUpOrder, goodsOf, costOf, type Stock } from '@/game/economy'
+import { CHARCOAL, SEASON_GOODS, SEASON_PAR } from '@/game/supplies'
 import type { Entry } from '@/data/recipes'
 
 const grill = DISHES.find((d) => d.id === 'grilledfish')!
@@ -19,7 +20,7 @@ feature('倉儲自動補貨', () => {
   })
 
   scenario('庫存還夠的品項不補', ({ given, when, then }) => {
-    given('庫存高於補貨門檻', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2 } as Stock })
+    given('庫存高於補貨門檻（木炭也還夠）', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100 } as Stock })
     when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
     then('什麼都不買', (w) => { expect(w.o.buy).toEqual({}); expect(w.o.cost).toBe(0) })
   })
@@ -32,14 +33,15 @@ feature('倉儲自動補貨', () => {
     then('下單的總額不超過 50 元', (w) => { expect(w.o.cost).toBeLessThanOrEqual(50) })
   })
 
-  scenario('一鍵補貨把所有商品補到 PAR，已經超過的不動', ({ given, when, then, and }) => {
+  scenario('一鍵補貨把所有商品補到 PAR、調味料補到常備量，已經超過的不動', ({ given, when, then, and }) => {
     given('一樣商品庫存已經超過 PAR，其他都是空的', (w) => { w.rich = goodsOf(grill)[0].id; w.stock = { [w.rich]: PAR + 5 } as Stock })
     when('一鍵補貨', (w) => { w.o = topUpOrder(grill, w.stock) })
     then('庫存超過的那樣不再買', (w) => { expect(w.o.buy[w.rich]).toBeUndefined() })
-    and('其他每樣都補到 PAR，總價是它們成本的總和', (w) => {
+    and('其他每樣都補到 PAR，調味料各補到常備量，總價是它們成本的總和', (w) => {
       const rest = goodsOf(grill).filter((g) => g.id !== w.rich)
       for (const g of rest) expect(w.o.buy[g.id]).toBe(PAR)
-      expect(w.o.cost).toBe(rest.reduce((t, g) => t + costOf(g) * PAR, 0))
+      for (const g of SEASON_GOODS) expect(w.o.buy[g.id]).toBe(SEASON_PAR)
+      expect(w.o.cost).toBe(rest.reduce((t, g) => t + costOf(g) * PAR, 0) + SEASON_GOODS.reduce((t, g) => t + costOf(g) * SEASON_PAR, 0))
     })
   })
 })

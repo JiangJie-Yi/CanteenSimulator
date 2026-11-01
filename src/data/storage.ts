@@ -6,7 +6,8 @@ export type Storage = 'frozen' | 'chilled' | 'ambient'
 
 const FROZEN = new Set(['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Salmon', 'Hokke', 'Buri', 'Gindara', 'Nodoguro',
   'ShrimpSkewer', 'Squid', 'Scallop'])
-const AMBIENT = new Set(['Sake', 'Potato', 'SweetPotato'])
+// (and the seasonings that keep dry: salt, the peanut powder, shichimi; the sauces, once opened, go in the fridge)
+const AMBIENT = new Set(['Sake', 'Potato', 'SweetPotato', 'season:salt', 'season:peanut', 'season:shichimi', 'charcoal'])
 
 /** where a food is kept (anything not named frozen or at room temperature is chilled) */
 export const storageOf = (id: string): Storage => (FROZEN.has(id) ? 'frozen' : AMBIENT.has(id) ? 'ambient' : 'chilled')
