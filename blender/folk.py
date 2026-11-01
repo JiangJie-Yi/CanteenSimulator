@@ -351,7 +351,8 @@ def perm_shell(name="perm"):
         curls.append((Vector((rr * math.sin(t), y, rr * math.cos(t))), rnd.uniform(0.85, 1.15)))
     cut_n = Vector((0, -1, 0.55)).normalized()
     bm = bmesh.new()
-    seg, rings = 64, 36
+    # (as fine as the curls need and no finer: each grandmother wears it)
+    seg, rings = 44, 24
     grid = []
     for i in range(rings + 1):
         th = math.pi * i / rings

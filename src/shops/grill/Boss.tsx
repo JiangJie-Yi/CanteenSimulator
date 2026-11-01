@@ -54,6 +54,49 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * fridge, taken off the table as he picks it up); he goes over, drinks it and says so; cleared when it's drunk */
 export const BOSS_DRINK = { at: null as THREE.Vector3 | null, id: null as DrinkId | null, item: null as unknown, arrived: false, since: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossDrink?: typeof BOSS_DRINK }).__bossDrink = BOSS_DRINK
+/** the owner as he's drawn (his materials, his ink, his parts merged), made once: his figure in the room is it, the character viewer a copy */
+function styledBoss(scene: THREE.Group) {
+  if (!made) {
+    const r = scene.clone(true)
+    const mats = new Map<THREE.Material, THREE.Material>()
+    // (every plain-coloured piece of him (no picture on it) one material, its colour carried by its vertices: merged below, they're one draw)
+    const plain = airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap }))
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      if (!src.map && !src.transparent && src.opacity === 1 && !/White|Dark/.test(src.name)) {
+        m.geometry = m.geometry.clone()
+        colourVertices(m.geometry, src.color)
+        m.material = plain
+        m.castShadow = !UNINKED.test(m.name)
+        m.receiveShadow = true
+        return
+      }
+      let t = mats.get(src)
+      if (!t) {
+        t = /White|Dark/.test(src.name)
+          ? new THREE.MeshBasicMaterial({ color: src.color.clone() })
+          : airbrush(new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, gradientMap }))
+        mats.set(src, t)
+      }
+      m.material = t
+      m.castShadow = !UNINKED.test(m.name)
+      m.receiveShadow = true
+    })
+    inkModel(r, (m) => UNINKED.test(m.name), { width: 0.006, weld: true })
+    // (his body's parts merged by material, a handful of draws; what moves on its own (his hands and what they hold, his eyes, his mouth) kept apart)
+    mergeByMaterial(r, (o) => /^Boss(Hand|Tongs|Fan|Eye|Mouth)/.test(o.name))
+    made = r
+  }
+  return made
+}
+/** the owner standing still, a copy of him (developer mode's character viewer) */
+export function BossModel() {
+  const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => styledBoss(gltf.scene).clone(true), [gltf])
+  return <primitive object={obj} />
+}
 /** `to`: the far end of his walk; `open`: the shop's open (his chef has the grill, he stays put); he mutters in `lang` */
 export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?: [number, number]; open?: boolean; lang?: Lang; children?: ReactNode }) {
   // ---- muttering to himself, always: a line every few seconds, by day or night, open or shut (data/bossLines), never the same twice running
@@ -81,42 +124,7 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
   sayRef.current = say
   const openRef = useRef(open)
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const root = useMemo(() => {
-    if (!made) {
-      const r = gltf.scene.clone(true)
-      const mats = new Map<THREE.Material, THREE.Material>()
-      // (every plain-coloured piece of him (no picture on it) one material, its colour carried by its vertices: merged below, they're one draw)
-      const plain = airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap }))
-      r.traverse((o) => {
-        const m = o as THREE.Mesh
-        if (!m.isMesh) return
-        const src = m.material as THREE.MeshStandardMaterial
-        if (!src.map && !src.transparent && src.opacity === 1 && !/White|Dark/.test(src.name)) {
-          m.geometry = m.geometry.clone()
-          colourVertices(m.geometry, src.color)
-          m.material = plain
-          m.castShadow = !UNINKED.test(m.name)
-          m.receiveShadow = true
-          return
-        }
-        let t = mats.get(src)
-        if (!t) {
-          t = /White|Dark/.test(src.name)
-            ? new THREE.MeshBasicMaterial({ color: src.color.clone() })
-            : airbrush(new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, gradientMap }))
-          mats.set(src, t)
-        }
-        m.material = t
-        m.castShadow = !UNINKED.test(m.name)
-        m.receiveShadow = true
-      })
-      inkModel(r, (m) => UNINKED.test(m.name), { width: 0.006, weld: true })
-      // (his body's parts merged by material, a handful of draws; what moves on its own (his hands and what they hold, his eyes, his mouth) kept apart)
-      mergeByMaterial(r, (o) => /^Boss(Hand|Tongs|Fan|Eye|Mouth)/.test(o.name))
-      made = r
-    }
-    return made
-  }, [gltf])
+  const root = useMemo(() => styledBoss(gltf.scene), [gltf])
   const mover = useRef<THREE.Group>(null)
   useEffect(() => {
     const m = mover.current

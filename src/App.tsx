@@ -31,6 +31,7 @@ import { OpeningSpot } from '@/scene/OpeningSpot'
 import { OccluderFade } from '@/scene/OccluderFade'
 import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
+import { CharacterViewer } from '@/shops/grill/CharacterViewer'
 import { StockPanel, type StockTab } from '@/shops/grill/StockPanel'
 import { useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
@@ -2557,6 +2558,8 @@ export default function App() {
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={putAllBack} />
       </>)}
+      {/* (developer mode's character viewer, on the right: every figure on a turntable (the owner's: it comes with G)) */}
+      {editOn && !phone && <CharacterViewer lang={lang} />}
       {/* (the stock: everything kept, at any time, from the little fridge top right; researching, its foods are taken out to try from it) */}
       {fridgeOpen && !editOn && !!dish.roast && (
         <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} cash={cash} focus={stockFocus}
