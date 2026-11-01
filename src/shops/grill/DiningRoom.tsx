@@ -9,7 +9,6 @@ import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
-import type { Lang } from '@/data/i18n'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture } from '@/scene/signFont'
 import { BOSS_DRINK } from './Boss'
@@ -3668,7 +3667,7 @@ function LightSwitch() {
 }
 useGLTF.preload(SWITCH_URL)
 
-function ShopPropsImpl({ counters, lang = 'zh' }: { counters: Counter[]; lang?: Lang }) {
+function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   const c0 = counters[0]
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, along).addScaledVector(c0.lay, lay)
   // (their fronts toward the room's open side, where the camera is)
@@ -3695,24 +3694,26 @@ function ShopPropsImpl({ counters, lang = 'zh' }: { counters: Counter[]; lang?: 
   }, [fr, c1])
   return (
     // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
+    // (not keyed by the language any more: that was for a mat with words on it, long gone, and each switch built all four again, their
+    // copies, pictures and ink lines left behind each time)
     <>
       <Movable id="speaker" label="音箱" baseTurn={[0, 45, 0]} baseScale={0.82}><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
       {/* (one stack, standing where the two used to) */}
-      <Movable id="sake" label="酒樽"><StaticBatch key={lang}>
+      <Movable id="sake" label="酒樽"><StaticBatch>
         <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
           <group rotation-y={Math.PI / 2}><SakeStack part={0} /></group>
         </group>
       </StaticBatch></Movable>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
-      <Movable id="willow" label="柳樹"><StaticBatch key={lang}>
+      <Movable id="willow" label="柳樹"><StaticBatch>
         <group position={at(3.55, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
       </StaticBatch></Movable>
-      <Movable id="bamboo" label="竹盆栽"><StaticBatch key={lang}>
+      <Movable id="bamboo" label="竹盆栽"><StaticBatch>
         <group position={cornerAt} rotation-y={0.4}><BambooModel /></group>
       </StaticBatch></Movable>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
-      {fr && <Movable id="crates" label="酒箱"><StaticBatch key={lang}>
+      {fr && <Movable id="crates" label="酒箱"><StaticBatch>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <BottleCrates />
           {/* (and beside them the cartons of canned drinks) */}

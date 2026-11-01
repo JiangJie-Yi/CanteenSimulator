@@ -2153,7 +2153,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               {/* (and past the bar's end, a strip more behind the till for the cashier to stand on; a shop laid out
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} drop={KITCHEN_DROP / scale} />}
-              {given && <Later stage={2}><ShopProps counters={counters} lang={lang} /></Later>}
+              {given && <Later stage={2}><ShopProps counters={counters} /></Later>}
               {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} altar={incense ?? true} corner />}
             </group>
           )
