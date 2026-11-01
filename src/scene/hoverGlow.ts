@@ -11,6 +11,10 @@ const LIT = new Set<THREE.Object3D>()
 
 function brighten(m: THREE.Material): THREE.Material {
   const c = m.clone()
+  // (a material whose shader's been changed (cut to a round window, the figures' airbrushing) keeps the change in its glowing copy: a copy
+  // doesn't carry it, and the round window's shoji, lit, showed where it had slid into the wall)
+  c.onBeforeCompile = m.onBeforeCompile
+  c.customProgramCacheKey = m.customProgramCacheKey
   const mm = c as THREE.MeshToonMaterial & THREE.MeshBasicMaterial
   if ('emissive' in c) {
     // (lit materials: a warm emissive, and the colour itself a little lighter)

@@ -929,9 +929,9 @@ function drawRoundPaper(g: CanvasRenderingContext2D, night: boolean) {
       g.fillStyle = l; g.fillRect(0, 0, 512, 512)
     }
   } else {
-    // (the sky's cool light through the paper: near white where the sun's behind it, sky blue toward the rim)
-    const gr = g.createRadialGradient(256, 210, 20, 256, 256, 300)
-    gr.addColorStop(0, '#f6fbff'); gr.addColorStop(0.55, '#d6eaff'); gr.addColorStop(1, '#9cc3f0')
+    // (the sky's cool light through the paper, a linear gradient (the owner's): pale at the top, a deeper blue toward the foot)
+    const gr = g.createLinearGradient(0, 0, 0, 512)
+    gr.addColorStop(0, '#eef7ff'); gr.addColorStop(0.45, '#cfe5fb'); gr.addColorStop(1, '#94bde9')
     g.fillStyle = gr; g.fillRect(0, 0, 512, 512)
   }
   // (the fibres of the washi)
@@ -1042,6 +1042,10 @@ function RoundWood() {
       }
       m.material = t
     })
+    // (the lattice the shoji's own now: its two halves slide apart, RoundShoji)
+    const lattice: THREE.Object3D[] = []
+    r.traverse((o) => { if (/^RoundLattice/.test(o.name)) lattice.push(o) })
+    for (const o of lattice) o.parent?.remove(o)
     inkModel(r, (m) => !/RoundFrame/.test(m.name), { width: 0.0025, weld: true })
     mergeByMaterial(r)
     return r
@@ -1049,6 +1053,170 @@ function RoundWood() {
   return <primitive object={obj} />
 }
 useGLTF.preload(ROUND_URL)
+/** the round window's radius (its paper's) */
+const ROUND_R = 0.4
+/** what's outside the round window, seen with its shoji slid open: by day bamboo against the sky (a linear gradient, pale above, the blue
+ * deepening toward the horizon), a low fence of split bamboo; by night the same under the moon, dark */
+function drawOutside(g: CanvasRenderingContext2D, night: boolean) {
+  const sky = g.createLinearGradient(0, 0, 0, 512)
+  if (night) { sky.addColorStop(0, '#0d1428'); sky.addColorStop(1, '#25335a') } else { sky.addColorStop(0, '#6fa8e6'); sky.addColorStop(1, '#d6ecff') }
+  g.fillStyle = sky; g.fillRect(0, 0, 512, 512)
+  if (night) {
+    const m = g.createRadialGradient(150, 120, 0, 150, 120, 90)
+    m.addColorStop(0, 'rgba(255,250,225,1)'); m.addColorStop(0.25, 'rgba(255,250,225,0.95)'); m.addColorStop(0.3, 'rgba(200,210,255,0.25)'); m.addColorStop(1, 'rgba(200,210,255,0)')
+    g.fillStyle = m; g.fillRect(0, 0, 512, 512)
+  }
+  // (bamboo: culms near and far, their nodes, a few leaves)
+  const rnd = seeded(9)
+  for (const [x, w, far] of [[70, 16, 1], [190, 11, 1], [330, 18, 0], [440, 13, 1], [260, 9, 1]] as [number, number, number][]) {
+    g.fillStyle = night ? (far ? '#1a2a24' : '#13201b') : far ? '#7fa65a' : '#5e8a3e'
+    g.fillRect(x - w / 2, 0, w, 512)
+    g.fillStyle = night ? '#0c1612' : '#3f6a2a'
+    for (let y = 30 + rnd() * 40; y < 512; y += 70 + rnd() * 30) g.fillRect(x - w / 2 - 1, y, w + 2, 3)
+    g.fillStyle = night ? 'rgba(20,40,30,0.9)' : 'rgba(80,140,60,0.9)'
+    for (let k = 0; k < 6; k++) {
+      const ly = rnd() * 400, side = rnd() < 0.5 ? -1 : 1
+      g.save(); g.translate(x + side * w * 0.5, ly); g.rotate(side * (0.6 + rnd() * 0.5))
+      g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(side * 10, 18, 0, 52); g.quadraticCurveTo(-side * 4, 18, 0, 0); g.fill()
+      g.restore()
+    }
+  }
+  // (a low fence of split bamboo across the foot)
+  g.fillStyle = night ? '#2a2618' : '#c9b277'
+  g.fillRect(0, 420, 512, 92)
+  g.strokeStyle = night ? '#16130c' : '#8a7442'; g.lineWidth = 3
+  for (let x = 0; x < 512; x += 14) { g.beginPath(); g.moveTo(x, 420); g.lineTo(x, 512); g.stroke() }
+  g.fillStyle = night ? '#100e08' : '#6a5630'
+  g.fillRect(0, 440, 512, 6); g.fillRect(0, 486, 512, 6)
+}
+const ROUND_OUTSIDE = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 512
+  const g = c.getContext('2d')!
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  const draw = () => { drawOutside(g, document.documentElement.dataset.theme === 'dark'); t.needsUpdate = true }
+  draw()
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  return t
+})()
+/** a passer-by's shadow on the paper by day: a figure, soft-edged, walking (a bag on one shoulder) */
+const PASSER = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 128; c.height = 256
+  const g = c.getContext('2d')!
+  g.filter = 'blur(5px)'
+  g.fillStyle = 'rgba(30,45,70,0.55)'
+  g.beginPath(); g.arc(64, 52, 22, 0, Math.PI * 2); g.fill()
+  g.beginPath(); g.moveTo(34, 86); g.quadraticCurveTo(64, 70, 94, 86); g.lineTo(100, 190); g.lineTo(28, 190); g.closePath(); g.fill()
+  g.fillRect(40, 186, 18, 70); g.fillRect(70, 186, 18, 70)
+  g.beginPath(); g.ellipse(100, 140, 16, 24, 0.2, 0, Math.PI * 2); g.fill()
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+/**
+ * The round window's shoji (the owner's: it opens left and right): two halves, each a half of the paper with its own lattice (bars over the
+ * washi), sliding apart into the wall when clicked and back together, cut to the window's round (whatever slides past its edge is in the wall,
+ * unseen); behind them the view outside (ROUND_OUTSIDE). By day, now and then, a passer-by's shadow crosses the paper outside (the owner's).
+ * Not batched: it moves, and it's clicked.
+ */
+function RoundShoji() {
+  const R = ROUND_R
+  const win = useRef<THREE.Group>(null)
+  const halves = useRef<(THREE.Group | null)[]>([])
+  const passer = useRef<THREE.Mesh>(null)
+  const st = useRef({ open: false, k: 0, next: 12 + Math.random() * 20, walk: -1, dir: 1 })
+  /** the window's frame, inverted, for cutting what's drawn to its round */
+  const inv = useMemo(() => ({ value: new THREE.Matrix4() }), [])
+  const round = useMemo(() => {
+    const cut = <T extends THREE.Material>(m: T) => {
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.uWinInv = inv
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform mat4 uWinInv;\nvarying vec3 vWin;')
+          .replace('#include <project_vertex>', '#include <project_vertex>\nvWin = (uWinInv * modelMatrix * vec4(transformed, 1.0)).xyz;')
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWin;')
+          .replace('void main() {', `void main() {\n  if (vWin.y * vWin.y + vWin.z * vWin.z > ${(R * R).toFixed(5)}) discard;`)
+      }
+      m.customProgramCacheKey = () => 'round-cut'
+      return m
+    }
+    return {
+      paper: cut(new THREE.MeshBasicMaterial({ map: ROUND_PAPER, toneMapped: false })),
+      wood: cut(new THREE.MeshToonMaterial({ color: '#b98656' })),
+      passer: cut(new THREE.MeshBasicMaterial({ map: PASSER, transparent: true, depthWrite: false, toneMapped: false })),
+    }
+  }, [inv, R])
+  useEffect(() => () => { round.paper.dispose(); round.wood.dispose(); round.passer.dispose() }, [round])
+  // (each half's lattice: its outer upright, the three bars across from the middle out to the round, an upright at its inner edge)
+  const bars = useMemo(() => [-1, 1].map((sd) => {
+    const out: { p: [number, number, number]; s: [number, number, number] }[] = []
+    out.push({ p: [-0.012, 0, sd * 0.2], s: [0.018, 2 * Math.sqrt(R * R - 0.04), 0.016] })
+    out.push({ p: [-0.012, 0, sd * 0.008], s: [0.018, 2 * R, 0.016] })
+    for (const y of [-0.2, 0, 0.2]) {
+      const half = Math.sqrt(R * R - y * y)
+      out.push({ p: [-0.012, y, sd * half / 2], s: [0.018, 0.016, half] })
+    }
+    return out
+  }), [R])
+  useFrame((_, dt) => {
+    const w = win.current
+    const s = st.current
+    if (!w) return
+    inv.value.copy(w.matrixWorld).invert()
+    const want = s.open ? 1 : 0
+    s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.6)
+    const e = s.k * s.k * (3 - 2 * s.k)
+    halves.current.forEach((h, i) => { if (h) h.position.z = (i ? 1 : -1) * e * (R + 0.02) })
+    // (a passer-by now and then, by day, while the paper's shut)
+    const night = document.documentElement.dataset.theme === 'dark'
+    const m = passer.current
+    if (m) {
+      if (s.walk < 0) {
+        s.next -= Math.min(dt, 0.1)
+        if (s.next <= 0 && !night && s.k < 0.05) { s.walk = 0; s.dir = Math.random() < 0.5 ? -1 : 1 }
+      } else {
+        s.walk += Math.min(dt, 0.1) / 5.5
+        if (s.walk >= 1 || s.k > 0.05) { s.walk = -1; s.next = 20 + Math.random() * 25 }
+      }
+      m.visible = s.walk >= 0
+      if (s.walk >= 0) {
+        m.position.z = s.dir * (-R - 0.2 + s.walk * (2 * R + 0.4))
+        m.position.y = -0.02 + Math.abs(Math.sin(s.walk * Math.PI * 9)) * 0.012
+      }
+    }
+  })
+  const says = () => (st.current.open ? '點一下關上' : '點一下打開（左右拉開）')
+  return (
+    <group ref={win}>
+      {/* (outside, behind it all) */}
+      <mesh position-x={-0.001} rotation-y={-Math.PI / 2}>
+        <circleGeometry args={[R, 64]} />
+        <meshBasicMaterial map={ROUND_OUTSIDE} toneMapped={false} />
+      </mesh>
+      <group onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; st.current.open = !st.current.open; setTip({ title: '圓窗', hint: says() }) }}
+        onPointerOver={(ev) => { if (getEdit().on) return; tipOver('圓窗', says()).onPointerOver(ev) }}
+        onPointerOut={(ev) => { tipOver('圓窗', '').onPointerOut(ev) }}>
+        {[0, 1].map((i) => (
+          <group key={i} ref={(o) => { halves.current[i] = o }}>
+            <mesh position-x={-0.004} rotation-y={-Math.PI / 2} material={round.paper}>
+              <circleGeometry args={[R, 48, i ? -Math.PI / 2 : Math.PI / 2, Math.PI]} />
+            </mesh>
+            {bars[i].map((b, k) => (
+              <mesh key={k} position={b.p} material={round.wood}><boxGeometry args={b.s} /></mesh>
+            ))}
+          </group>
+        ))}
+      </group>
+      {/* (a passer-by's shadow outside, on the paper) */}
+      <mesh ref={passer} name="round-passer" position-x={-0.0045} rotation-y={-Math.PI / 2} material={round.passer} visible={false} renderOrder={3}>
+        <planeGeometry args={[0.28, 0.56]} />
+      </mesh>
+    </group>
+  )
+}
 /** where along the back wall the second round window goes (the wall's own frame) */
 const ROUND_AT = -1.36
 /** the daylight that comes in through it (by day only, gone at night): a cool glow round it on the plaster, and a faint shaft of it slanting
@@ -1142,12 +1310,8 @@ function RoundWindow() {
       {/* (by day: the sky's light glowing round it on the plaster, and slanting in) */}
       <mesh position-x={-0.075} rotation-y={-Math.PI / 2} material={WINDOW_HALO} renderOrder={2}><planeGeometry args={[R * 4.2, R * 4.2]} /></mesh>
       <mesh geometry={SUNBEAM_GEO} material={SUNBEAM} renderOrder={2} />
-      {/* (the paper, set back in the reveal) */}
-      <mesh position-x={-0.004} rotation-y={-Math.PI / 2}>
-        <circleGeometry args={[R, 64]} />
-        <meshBasicMaterial map={ROUND_PAPER} toneMapped={false} />
-      </mesh>
-      {/* (the reveal, the lattice, the frame and its bead) */}
+      {/* (the paper is the shoji's: RoundShoji, outside the batch, as it slides open) */}
+      {/* (the reveal, the frame and its bead) */}
       <Suspense fallback={null}><RoundWood /></Suspense>
     </group>
   )
@@ -2431,7 +2595,7 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
             </group>
           </StaticBatch>
           {/* (the moon's dust in its shaft by night, outside the batch: it drifts, and a batch's pieces stand still) */}
-          {a.round && <group position={[0, 1.4, a.z]}><WindowDust /></group>}
+          {a.round && <group position={[0, 1.4, a.z]}><WindowDust /><RoundShoji /></group>}
           </Movable>
         ))}
         {/* (the supplies in the corner between the drinks fridges and the toilets' doorway) */}
