@@ -2544,7 +2544,7 @@ export default function App() {
       <Bgm />
       <HoverTip hidden={editOn} />
       <RegisterManual lang={lang} />
-      <LoadingScreen />
+      <LoadingScreen scene={!NO_WEBGL && !flatGrill} />
     </div>
   )
 }

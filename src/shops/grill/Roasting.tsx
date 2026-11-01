@@ -43,11 +43,12 @@ import { AxisGizmo, focusCamera, useEditBox } from './Movable'
 import { ashMaterial, charcoalMaterial, useBinchotan } from './binchotanModel'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, useEdit, type V3 } from './edit'
 import { setTip } from '@/scene/hoverTip'
+import { slide as drawerSound } from './TillDesk'
 import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { PASS_ALONG, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -102,8 +103,12 @@ const BAR_AT_SCENE = toGrillScene(BAR_AT)
 const BAR_TOP_SCENE = BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y
 /** how big food is on the bar, next to the fire's: a skewer about as long as a customer's plate is wide */
 const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
-/** the pass, where what's grilled is put out for a server to carry */
-const PASS_SCENE = toGrillScene(passOf(GRILL_COUNTERS)).setY(GRILL_BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y + 0.04)
+/** how tall the raised lip along the bars' cook's side stands over their tops */
+const LIP_H = 0.15
+/** the pass's shelf on the lip (a 付け台): along, across, thick */
+const PASS_SHELF = { len: 0.52, deep: 0.26, t: 0.025 }
+/** the pass, where what's grilled is put out for a server to carry: on its shelf over the lip */
+const PASS_SCENE = toGrillScene(passOf(GRILL_COUNTERS)).setY((GRILL_BAR_TOP + LIP_H + PASS_SHELF.t) * GRILL_SCALE + GRILL_OFFSET.y + 0.04)
 /** the pass's tray's places (the tray a lacquered 盆 on the bar where what's cooked is put out for the servers, 0.84 along and 0.44 across:
  * blender/passtray.py): six side by side along it, each laid across it (a skewer's stick resting over its rims), then six more on top */
 const PASS_ROW = 6
@@ -763,6 +768,7 @@ function BarImpl() {
         {GRILL_COUNTERS.length > 1 && <BarTop />}
       </StaticBatch>
       {GRILL_COUNTERS.map((c, i) => BAR_GATES[i] && <BarGate key={i} c={c} gate={BAR_GATES[i]} />)}
+      {GRILL_COUNTERS.map((c, i) => <BarDrawers key={`drawers-${i}`} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)} />)}
     </group>
   )
 }
@@ -1625,7 +1631,6 @@ function logBarkFor(len: number) {
 }
 const LOG_KNOT = new THREE.SphereGeometry(0.011, 7, 5)
 /** how high the raised lip along the bar's cook's side stands over its top */
-const LIP_H = 0.15
 /** how far the first counter's lip runs on towards the side counter's, so the two meet at the corner with no gap (the bar's own sizes) */
 const LIP_JOIN = 0.29
 /** a unit slab with rounded edges (scaled to each top), its grain still running the long way */
@@ -1738,10 +1743,19 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
           </group>
         )
       })()}
+      {/* the pass's shelf, on the lip between the first two places: a board of the lip's wood, the tray stood on it (PassTray) */}
+      {c === GRILL_COUNTERS[0] && (
+        <group position={[-L / 2 + PASS_ALONG, BAR_TOP + LIP_H + PASS_SHELF.t / 2, PASS_LAY]}>
+          <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len, PASS_SHELF.t, PASS_SHELF.deep]} castShadow><meshToonMaterial color="#ffffff" map={TRAY_WOOD} /></mesh>
+          <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len * 1.01, PASS_SHELF.t * 1.25, PASS_SHELF.deep * 1.03]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+        </group>
+      )}
       {Array.from({ length: c.seats }, (_, n) => {
-        const x = (n - (c.seats - 1) / 2) * (L / c.seats) + (c.shift ?? 0)
+        const x = seatAlong(c, n)
         return (
           <group key={n} position={[x, BAR_TOP, 0]}>
+            {/* (the case its drawer runs in, under the top's edge on the customer's side: BarDrawers draws the drawer) */}
+            <group position={[0, -0.06, DRAWER.z]}><BarPiece name="BarDrawerCase" /></group>
             {/* (each customer's plate is set down in the middle of their place and cleared away by GuestBar3D) in front of it, nearest them,
                 the pair of chopsticks laid across, their tips to the customer's left (+x) up on the rest; beyond the plate the little soy dish
                 (on the right instead at a seat where it'd be off the top, by the gate) */}
@@ -1758,10 +1772,58 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
           </group>
         )
       })}
-      {/* a box of tissues between each pair of seats, back by the lip clear of their plates (none where the pass's tray stands) */}
-      {Array.from({ length: Math.floor(c.seats / 2) }, (_, k) => (2 * k + 1 - c.seats / 2) * (L / c.seats) + (c.shift ?? 0))
-        .filter((tx) => c !== GRILL_COUNTERS[0] || Math.abs(tx - (-c.length / 2 + PASS_ALONG)) > 0.3)
-        .map((tx) => <group key={tx} position={[tx, BAR_TOP, 0.18]}><BarPiece name="BarTissue" /></group>)}
+    </group>
+  )
+}
+
+/** each place's drawer under the top: where its case's front edge stands (just behind the top's rounded edge, on the customers' side), how far
+ * the drawer slides out, and where its box of tissues sits in it */
+const DRAWER = { z: -0.296, out: 0.15, tissue: [0, -0.105, 0.122] as [number, number, number] }
+/**
+ * Each place's drawer, a box of tissues in it (the owner's: one to each place, in its own drawer; they were a box between every two places,
+ * on the top): pointed at, it lights up and says so; a click slides it out toward the customer, another back in, with the runners' rumble. Its
+ * case is the counter's own (batched with it); the drawer moves, so it isn't, and the tissues in it are drawn only while it's out. Nothing
+ * works in edit mode.
+ */
+const BarDrawers = memo(function BarDrawers({ c, first }: { c: Counter; first: number }) {
+  return (
+    <group position={c.at} rotation-y={Math.atan2(-c.along.z, c.along.x)}>
+      {Array.from({ length: c.seats }, (_, n) => <BarDrawer key={n} x={seatAlong(c, n)} seat={first + n} />)}
+    </group>
+  )
+})
+/** a place's drawer (its seat's number among all the bars': while someone sits there it's pushed home and stays shut, or it'd go into them) */
+function BarDrawer({ x, seat }: { x: number; seat: number }) {
+  const slider = useRef<THREE.Group>(null)
+  const inside = useRef<THREE.Group>(null)
+  const st = useRef({ open: false, at: 0 })
+  const says = () => (st.current.open ? '裡面一盒衛生紙・點一下推回去' : '一個座位一盒衛生紙・點一下拉開')
+  useFrame((_, dt) => {
+    const s = st.current
+    if (s.open && SEATS_TAKEN.has(seat)) { s.open = false; drawerSound(true) }
+    const want = s.open ? 1 : 0
+    if (Math.abs(want - s.at) < 1e-4) return
+    s.at = Math.abs(want - s.at) < 0.002 ? want : s.at + (want - s.at) * Math.min(1, dt * 7)
+    if (slider.current) slider.current.position.z = -DRAWER.out * s.at
+    if (inside.current) inside.current.visible = s.at > 0.02
+  })
+  return (
+    <group position={[x, BAR_TOP - 0.06, DRAWER.z]}>
+      {/* (handlers on a group round it: a primitive's own aren't attached) */}
+      <group ref={slider}
+        onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; tipOver('抽屜', says()).onPointerOver(e) }}
+        onPointerOut={(e) => { if (getEdit().on) return; tipOver('抽屜', says()).onPointerOut(e) }}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (getEdit().on) return
+          if (SEATS_TAKEN.has(seat)) { setTip({ title: '抽屜', hint: '客人坐著，等他走了再開' }); return }
+          st.current.open = !st.current.open
+          drawerSound(!st.current.open)
+          setTip({ title: '抽屜', hint: says() })
+        }}>
+        <BarPiece name="BarDrawer" />
+        <group ref={inside} position={DRAWER.tissue} visible={false}><BarPiece name="BarTissueLow" /></group>
+      </group>
     </group>
   )
 }

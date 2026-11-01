@@ -7,6 +7,11 @@
 - "BarHashioki": a chopstick rest (箸置き) of indigo-glazed porcelain, 4.5 cm, a little pillow drawn in at its waist.
 - "BarTissue": a box of tissues in a walnut case, 24 x 12 cm and 7.5 high, its edges rounded, a slot along its top and a tissue puffed up out
   of it.
+- "BarDrawerCase", "BarDrawer", "BarTissueLow": each place's drawer under the top on the customers' side (the owner's: a box of tissues to
+  each place, in its own drawer): a walnut case open at the front hanging under the top, 34 cm across, 12.5 deep (down) and 26 back; the
+  drawer that runs in it, its front a little proud, a brass bar pull; and the box of tissues that lives in it, its tissue only just pulled up
+  (a full puff would be squashed under the top). The case's and the drawer's origin is the middle of the case's front edge along its top
+  (the top's underside): the case runs back into +z and down, the drawer slides out toward -z.
 
 Each piece stands at its own origin (on y = 0, its middle over the origin; the chopstick and the rest lie along x). Low in triangles.
 
@@ -239,8 +244,8 @@ def tissue_case(name, W=0.24, H=0.075, D=0.12, r=0.008):
     return o
 
 
-def tissue_sheet(name):
-    """the tissue pulled up out of the slot: a soft sheet, its foot in the slot, its top fanned and folded over"""
+def tissue_sheet(name, h=0.045, fan=0.05):
+    """the tissue pulled up out of the slot: a soft sheet, its foot in the slot, its top fanned and folded over (`h` how far up it stands)"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     nu, nv = 5, 4
@@ -250,9 +255,9 @@ def tissue_sheet(name):
         row = []
         for i in range(nu + 1):
             s = i / nu - 0.5
-            w = 0.05 + 0.05 * t
+            w = 0.05 + fan * t
             x = s * w * 2
-            y = 0.075 + t * 0.045 - (s * 2) ** 2 * 0.012 * t
+            y = 0.075 + t * h - (s * 2) ** 2 * 0.012 * t * h / 0.045
             z = 0.012 * math.sin(math.pi * t) * (1 - abs(s)) - 0.008 * t * t + 0.004 * math.sin(s * 6 + t * 3)
             row.append(bm.verts.new(P(x, y, z)))
         vs.append(row)
@@ -262,6 +267,88 @@ def tissue_sheet(name):
             for lp, (ii, jj) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
                 lp[uvl].uv = (ii / nu, jj / nv)
     return mesh_obj(name, bm)
+
+
+def board(name, x0, x1, y0, y1, z0, z1, ease=0.0015):
+    """a piece of wood between those bounds, its edges eased a little, its picture laid on each face at one scale (grain along x)"""
+    bpy.ops.mesh.primitive_cube_add(size=1, location=P((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
+    o = bpy.context.view_layer.objects.active
+    o.name = name
+    o.scale = (x1 - x0, z1 - z0, y1 - y0)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
+    if ease:
+        mod = o.modifiers.new("ease", "BEVEL")
+        mod.width = ease
+        mod.segments = 1
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+    me = o.data
+    uvl = me.uv_layers.new(name="UVMap") if not me.uv_layers else me.uv_layers[0]
+    for poly in me.polygons:
+        nrm = poly.normal
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            if abs(nrm.z) > 0.6:
+                uvl.data[li].uv = (co.x / 0.3 + 0.5, co.y / 0.3 + 0.5)
+            elif abs(nrm.y) > 0.6:
+                uvl.data[li].uv = (co.x / 0.3 + 0.5, co.z / 0.3)
+            else:
+                uvl.data[li].uv = (co.y / 0.3 + 0.5, co.z / 0.3)
+    for f in me.polygons:
+        f.use_smooth = False
+    return o
+
+
+def joined(name, objs):
+    """several pieces made one mesh (one material: one draw)"""
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.join()
+    o = bpy.context.view_layer.objects.active
+    o.name = name
+    o.data.name = name
+    return o
+
+
+# (each place's drawer: its case's outside, the drawer's front and box, in the game's frame from the middle of the case's front edge along the
+# top's underside: x across, y up (all below 0), z back toward the cook)
+DW, DH, DD, DT = 0.34, 0.125, 0.26, 0.012
+
+
+def drawer_case(name):
+    """the case: a top just under the counter's, a bottom, two sides and a back, open at the front"""
+    x, y0 = DW / 2, -DH
+    return joined(name, [board(f"{name}Top", -x, x, -DT, 0, 0, DD), board(f"{name}Bottom", -x, x, y0, y0 + DT, 0, DD),
+                         board(f"{name}L", -x, -x + DT, y0 + DT, -DT, 0, DD), board(f"{name}R", x - DT, x, y0 + DT, -DT, 0, DD),
+                         board(f"{name}Back", -x + DT, x - DT, y0 + DT, -DT, DD - DT, DD)])
+
+
+def drawer_body(name):
+    """the drawer: its front (2 mm proud of the case), and the box behind it: a bottom, two sides, a back"""
+    fy0, fy1 = -DH + 0.014, -0.014
+    by0 = -DH + DT + 0.002
+    ix = 0.14
+    return joined(name, [board(f"{name}Front", -0.156, 0.156, fy0, fy1, -0.002, 0.014, ease=0.002),
+                         board(f"{name}Bottom", -ix - 0.006, ix + 0.006, by0, by0 + 0.006, 0.014, 0.236, ease=0),
+                         board(f"{name}L", -ix - 0.006, -ix, by0, -0.035, 0.014, 0.236, ease=0),
+                         board(f"{name}R", ix, ix + 0.006, by0, -0.035, 0.014, 0.236, ease=0),
+                         board(f"{name}Back", -ix, ix, by0, -0.035, 0.23, 0.236, ease=0)])
+
+
+def drawer_pull(name, segs=8):
+    """a little brass bar pull on two posts, across the front's middle"""
+    cy, z = -DH / 2, -0.002
+    bpy.ops.mesh.primitive_cylinder_add(vertices=segs, radius=0.0042, depth=0.07, location=P(0, cy, z - 0.013), rotation=(0, math.pi / 2, 0))
+    bar = bpy.context.view_layer.objects.active
+    posts = []
+    for sx in (-0.028, 0.028):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=segs, radius=0.003, depth=0.013, location=P(sx, cy, z - 0.0065), rotation=(math.pi / 2, 0, 0))
+        posts.append(bpy.context.view_layer.objects.active)
+    o = joined(name, [bar] + posts)
+    for f in o.data.polygons:
+        f.use_smooth = True
+    return o
 
 
 def slot(name, W=0.13, D=0.014, y=0.0752):
@@ -290,6 +377,7 @@ M = {
     "walnut": pbr("BarTissueWalnut", (1, 1, 1), tex=image("bartissuewood", walnut()), rough=0.45, coat=0.2),
     "paper": pbr("BarTissuePaper", (0.97, 0.96, 0.94), rough=0.9),
     "slot": pbr("BarTissueSlot", (0.05, 0.04, 0.03), rough=0.9),
+    "brass": pbr("BarDrawerBrass", (0.78, 0.6, 0.3), rough=0.35, metal=0.8),
 }
 roots, allparts = [], []
 for name, build, offset in (
@@ -297,7 +385,11 @@ for name, build, offset in (
         ("BarChopstick", lambda ps: [fin(chopstick("BarChopstickBody"), M["lacquer"], ps)], (0.15, 0, 0)),
         ("BarHashioki", lambda ps: [fin(hashioki("BarHashiokiBody"), M["rest"], ps)], (0.45, 0, 0)),
         ("BarTissue", lambda ps: [fin(tissue_case("BarTissueCase"), M["walnut"], ps), fin(slot("BarTissueSlot"), M["slot"], ps),
-                                  fin(tissue_sheet("BarTissueSheet"), M["paper"], ps)], (0.7, 0, 0))):
+                                  fin(tissue_sheet("BarTissueSheet"), M["paper"], ps)], (0.7, 0, 0)),
+        ("BarTissueLow", lambda ps: [fin(tissue_case("BarTissueLowCase"), M["walnut"], ps), fin(slot("BarTissueLowSlot"), M["slot"], ps),
+                                     fin(tissue_sheet("BarTissueLowSheet", h=0.012, fan=0.03), M["paper"], ps)], (0.7, 0, 0.3)),
+        ("BarDrawerCase", lambda ps: [fin(drawer_case("BarDrawerCaseBody"), M["walnut"], ps)], (0.1, 0.2, 0.3)),
+        ("BarDrawer", lambda ps: [fin(drawer_body("BarDrawerBody"), M["walnut"], ps), fin(drawer_pull("BarDrawerPull"), M["brass"], ps)], (0.5, 0.2, 0.3))):
     parts = []
     build(parts)
     root = bpy.data.objects.new(name, None)

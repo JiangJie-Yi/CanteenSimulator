@@ -2,7 +2,7 @@
 
 - "TillStoolHigh": the cashier's chair, 44 cm to its seat. A square seat with rounded corners: a frame of walnut round a seat of woven
   rush (い草), wrapped the old way, its strands running along each rail and meeting in an X at the corners' diagonals, a little domed;
-  four square legs tapering to small brass shoes, splayed a touch; a footrest across the front faced in brass, rails at the sides and the
+  four square legs tapering to little blue silicone caps (the owner's: so the floor isn't scratched), splayed a touch; a footrest across the front faced in brass, rails at the sides and the
   back; the back legs run on up as two posts, raked back, a crest rail bent round the sitter between them, and under it a small panel of
   kumiko (角麻の葉: a square grid, each square crossed) in pale hinoki in a walnut frame.
 - "TillStoolLow": a helper's stool of the same make, 34 cm, with no back.
@@ -242,13 +242,20 @@ def seat_panel(name, cx, cz, W, D, y, dome, n=8):
     return mesh_obj(name, bm, smooth_shade=True)
 
 
-def shoe(name, at, r, h, segs=8):
-    """a brass shoe on a leg's foot: a short square-ish cap (an 8-sided cylinder, turned 22.5 degrees)"""
-    bpy.ops.mesh.primitive_cylinder_add(vertices=segs, radius=r, depth=h, location=P(at[0], at[1] + h / 2, at[2]))
+def shoe(name, at, w, h, r=0.006):
+    """a silicone cap pulled over a leg's foot, so the floor isn't scratched (the owner's, as a chair's little boots; they were brass): a
+    square a little wider than the leg, up over its last few centimetres, every edge well rounded"""
+    bpy.ops.mesh.primitive_cube_add(size=1, location=P(at[0], at[1] + h / 2, at[2]))
     o = bpy.context.view_layer.objects.active
     o.name = name
-    o.rotation_euler = (0, 0, math.pi / segs)
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+    o.scale = (w, w, h)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    mod = o.modifiers.new("round", "BEVEL")
+    mod.width = r
+    mod.segments = 2
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    for f in o.data.polygons:
+        f.use_smooth = True
     return o
 
 
@@ -289,7 +296,7 @@ def seat_and_legs(name, M, parts, H, W, D, splay, rails):
         tops.append(t_)
         fin(beam(f"{name}Leg{k}", t_, f_, 0.034, 0.034, up=(0, 0, 1) if abs(sz) else (1, 0, 0), wb=0.026, db=0.026),
             M["walnut"], parts)
-        fin(shoe(f"{name}Shoe{k}", (f_[0], 0, f_[2]), 0.018, 0.024, segs=6), M["brass"], parts)
+        fin(shoe(f"{name}Shoe{k}", (f_[0], 0, f_[2]), 0.034, 0.034), M["cap"], parts)
     # (the rails between the legs, where the legs are at each height)
     def leg_at(k, y):
         tx, ty, tz = tops[k]
@@ -373,7 +380,9 @@ def materials():
             "rush": pbr("TillRush", (1, 1, 1), tex=image("tillrush", rush()), rough=0.85),
             "hinoki": pbr("TillHinoki", (1, 1, 1), tex=image("tillhinoki", hinoki()), rough=0.6),
             "kumiko": pbr("TillKumiko", (1, 1, 1), tex=image("tillkumiko", KUMIKO[0], alpha=KUMIKO[1]), rough=0.6, blend=True),
-            "brass": pbr("StoolBrass", (0.78, 0.6, 0.3), rough=0.3, metal=1.0)}
+            "brass": pbr("StoolBrass", (0.78, 0.6, 0.3), rough=0.3, metal=1.0),
+            # (the feet's caps: a soft blue silicone, matte)
+            "cap": pbr("TillStoolCap", (0.078, 0.212, 0.552), rough=0.7)}
 
 
 def preview_rig(at_y, dist):

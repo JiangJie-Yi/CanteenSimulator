@@ -14,6 +14,8 @@ import { emptyFridge, readDrinks, startBack, writeDrinks, type Back } from '@/ga
  * stools runs an aisle, and the customers walk in along the aisles, never through the stools.
  */
 export type Counter = { at: THREE.Vector3; along: THREE.Vector3; lay: THREE.Vector3; length: number; seats: number
+  /** how far apart its stools are (SEAT_PITCH for the grill's, the same along every counter); its length over its seats if not given */
+  pitch?: number
   /** its stools moved along it this far from evenly spaced about its middle (clear of a gate at one end) */
   shift?: number
   /** how far behind its middle line its wall stands (FLOOR_FAR unless it's further back, to make room by it) */
@@ -32,8 +34,9 @@ export type Seat = {
   counter: number
 }
 
-/** how far behind the counter's middle line the stools stand, and the aisle behind them */
-export const SIT_BACK = 0.5
+/** how far behind the counter's middle line the stools stand, and the aisle behind them (0.58: at 0.5 a sitter's big head, turned about,
+ * went into the top's edge) */
+export const SIT_BACK = 0.58
 export const AISLE = 1.15
 /** the customers' floor runs from this far toward the cook from a counter's middle line (under the bar, up to its
  * cook's edge's reach) back to the wall behind the aisle; the kitchen's floor starts where it stops */
@@ -467,8 +470,11 @@ export function payOf(cs: Counter[]) {
 
 /** the pass, in the bar's own frame: on the first counter's top, on the kitchen's half of it, between its first two places (`PASS_ALONG`
  * in from its start), so what's put out there doesn't stand at a customer's place as if it were theirs */
-export const PASS_ALONG = 0.75
-export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + PASS_ALONG)
+export const PASS_ALONG = 0.65
+/** and across it: up on a shelf over the raised lip on the cook's side (a 付け台), above the places, not down among their plates and soy dishes
+ * (between two places evenly spaced there was no room for the tray: it lay under the next place's soy dish, and its plate went into it) */
+export const PASS_LAY = 0.28
+export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + PASS_ALONG).addScaledVector(cs[0].lay, PASS_LAY)
   .addScaledVector(cs[0].lay, 0.14)
 
 /**
@@ -492,9 +498,15 @@ export function roomOf(cs: Counter[]) {
 export const LAY = new THREE.Vector3(0.59, 0, 0.81)
 export const ALONG = new THREE.Vector3(0.81, 0, -0.59)
 
+/** how far apart the grill's stools stand, along both its counters: the seats spaced evenly the shop over (the side counter's were 0.91 apart,
+ * the long one's 0.75) */
+export const SEAT_PITCH = 0.75
+/** where a counter's n-th place is along it, from its middle: what the stools, the places' settings and their drawers all go by */
+export const seatAlong = (c: Counter, n: number) => (n - (c.seats - 1) / 2) * (c.pitch ?? c.length / c.seats) + (c.shift ?? 0)
+
 export function seatsOf(cs: Counter[]): Seat[] {
   return cs.flatMap((c, ci) => Array.from({ length: c.seats }, (_, n) => {
-    const plate = c.at.clone().addScaledVector(c.along, (n - (c.seats - 1) / 2) * (c.length / c.seats) + (c.shift ?? 0))
+    const plate = c.at.clone().addScaledVector(c.along, seatAlong(c, n))
     return {
       plate,
       stool: plate.clone().addScaledVector(c.lay, -SIT_BACK),
@@ -569,9 +581,13 @@ export const BAR_TRIM = 0.4
 export const GRILL_COUNTERS: Counter[] = [
   // (its start drawn in to meet the side counter, which is drawn in from the wall by SIDE_PULL: the far end stays where it was)
   // (and its far end drawn in by BAR_TRIM: the strip of floor that was left between the kitchen and the till taken out, all past it closing up)
-  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2 - BAR_TRIM / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL - BAR_TRIM, seats: 6 },
+  // (its places drawn back a little from the gate's end: the last one's chopsticks reached the gap, its drawer the gate's post)
+  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2 - BAR_TRIM / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL - BAR_TRIM, seats: 6,
+    pitch: SEAT_PITCH, shift: -0.1 },
   // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)
-  { at: new THREE.Vector3().addScaledVector(LAY, -0.42 + 0.25).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14 + 0.5, seats: 4, shift: 0.25 - 0.1,
+  // (its four places as far apart as the long one's, in the middle of its run between the gate and the corner)
+  { at: new THREE.Vector3().addScaledVector(LAY, -0.42 + 0.25).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14 + 0.5, seats: 4,
+    pitch: SEAT_PITCH, shift: 0.25,
     // (its wall set further back, for the drinks fridges by the toilets: where it was, the counter having moved off it)
     far: FLOOR_FAR - 0.45 - SIDE_PULL },
 ]

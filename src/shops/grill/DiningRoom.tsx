@@ -3452,9 +3452,9 @@ function DrinkCartons() {
   return <primitive object={obj} />
 }
 useGLTF.preload(CARTONS_URL)
-/** an unseen box over the crates and cartons: they're the drinks' back stock; pointed at it says what's lowest, a click opens the drinks' stock
- * (DrinkStockPanel: order cases, fill the fridges) */
-function BackStockHit({ size = [0.42, 0.62, 0.34] }: { size?: [number, number, number] }) {
+/** an unseen box over the crates and cartons: they're the drinks' stock; pointed at it says what's lowest and lights them all (`lit`: the
+ * crates and cartons as drawn, the box itself being unseen), a click opens the drinks' stock (DrinkStockPanel: order cases, fill the fridges) */
+function BackStockHit({ size = [0.42, 0.62, 0.34], lit }: { size?: [number, number, number]; lit: () => THREE.Object3D | null }) {
   const hint = () => `後場最少：${lowestBack().slice(0, 3).map((id) => `${drinkLabel(id)} ${DRINK_BACK.back[id] ?? 0}`).join('、')}｜點一下打開飲料庫存`
   const open = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
@@ -3462,8 +3462,8 @@ function BackStockHit({ size = [0.42, 0.62, 0.34] }: { size?: [number, number, n
     setDrinkPanel(true)
   }
   return (
-    <mesh position={[0, size[1] / 2, 0]} onClick={open} onPointerOver={(e) => { handOver.onPointerOver(e); setTip({ title: '飲料後場庫存', hint: hint() }) }}
-      onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
+    <mesh position={[0, size[1] / 2, 0]} onClick={open} onPointerOver={(e) => { handOver.onPointerOver({ ...e, eventObject: lit() ?? e.eventObject }); setTip({ title: '飲料庫存區', hint: hint() }) }}
+      onPointerOut={(e) => { handOver.onPointerOut({ ...e, eventObject: lit() ?? e.eventObject }); setTip(null) }}>
       <boxGeometry args={size} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
@@ -3843,6 +3843,9 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   // (their fronts toward the room's open side, where the camera is)
   const face = Math.atan2(-c0.lay.x, -c0.lay.z)
   const fr = useMemo(() => fridgesOf(counters), [counters])
+  // (the drinks' stock as drawn, the crates and the cartons: what lights up when the unseen box over them is pointed at)
+  const stock = useRef<THREE.Group>(null)
+  const stockLit = () => stock.current
   const c1 = counters[1]
   // (the corner where the room's two walls meet: the plant stands in it, a little in from both)
   const cornerAt = useMemo(() => {
@@ -3883,17 +3886,17 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
         <group position={cornerAt} rotation-y={0.4}><BambooModel /></group>
       </StaticBatch></Movable>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
-      {fr && <Movable id="crates" label="酒箱"><StaticBatch>
+      {fr && <Movable id="crates" label="酒箱"><group ref={stock}><StaticBatch>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <BottleCrates />
           {/* (and beside them the cartons of canned drinks) */}
           <group position={CARTONS_AT} rotation-y={Math.PI / 2 + 0.04}><DrinkCartons /></group>
         </group>
-      </StaticBatch>
+      </StaticBatch></group>
         {/* (the back stock: pointed at, what's running low; a click opens the drinks' stock) */}
         <group name="look-crates" position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
-          <BackStockHit />
-          <group position={CARTONS_AT} rotation-y={Math.PI / 2}><BackStockHit size={[0.66, 0.46, 0.24]} /></group>
+          <BackStockHit lit={stockLit} />
+          <group position={CARTONS_AT} rotation-y={Math.PI / 2}><BackStockHit size={[0.66, 0.46, 0.24]} lit={stockLit} /></group>
         </group>
       </Movable>}
     </>

@@ -8,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { ALONG } from './bar'
+import { holdVeil } from '@/scene/Later'
 import { beginChange, clickPick, commitOffsets, FIXED_SIZE, getEdit, GIZMO, groupTags, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setListHot, setPivot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
@@ -587,6 +588,9 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   // (turned or sized about its middle, it can't be shown until that middle's known: drawn about the wrong point first, it would jump into place)
   const pivoted = baseScale !== 1 || baseTurn.some((v) => v) || rot.some((v) => v) || sc.some((v) => v !== 1)
   const [ready, setReady] = useState(false)
+  // (the loading veil waits till it's measured and shown: a piece held back till then came in after the veil had gone. Taken once it's
+  // mounted, not as it's drawn: a drawing put aside while a model loads would hold it for ever)
+  useLayoutEffect(() => (ready ? undefined : holdVeil(`piece ${id}`)), [ready, id])
 
   /** its size and middle as it stands untouched: taken of the inner group alone (the handle and arrows are not in it), in the frame of the group that carries the offset */
   /**

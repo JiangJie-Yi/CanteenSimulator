@@ -178,8 +178,8 @@ export function TillBellLive({ tip, onRing }: { tip: Record<string, unknown>; on
   )
 }
 
-/** a drawer's runners: a soft wooden rumble as it's pulled or pushed, and the knock as it comes home */
-function slide(closing: boolean) {
+/** a drawer's runners: a soft wooden rumble as it's pulled or pushed, and the knock as it comes home (the bar's drawers make it too) */
+export function slide(closing: boolean) {
   try {
     audio ??= new AudioContext()
     const t = audio.currentTime
