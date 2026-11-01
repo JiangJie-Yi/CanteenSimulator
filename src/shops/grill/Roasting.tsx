@@ -942,19 +942,6 @@ const KITCHEN_FLOOR = (() => {
   const lay1 = c1 ? toGrillScene(c1.at.clone().addScaledVector(c1.along, -c1.length / 2 - 0.35)).dot(LAY) : COOK_TABLE.lay[1] + 0.9
   return { lay: [lay0, lay1], along: [along0, along1] }
 })()
-/** the back of the notch under the hearth, where the cook stands: a face of the table's marble, the knives hung on it (no cupboard there) */
-function NotchFace() {
-  const floor = GRILL_OFFSET.y - KITCHEN_DROP
-  const top = -0.3, bottom = floor + CUBBY.plinth
-  const W = COOK_NOTCH.along[1] - COOK_NOTCH.along[0] - 0.006, H = top - bottom
-  const geo = useMemo(() => panelBox(W, H, 0.03, 0.45), [W, H])
-  const at = new THREE.Vector3().addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2).addScaledVector(LAY, COOK_NOTCH.lay[0] - 0.04)
-  return (
-    <mesh geometry={geo} position={[at.x, bottom + H / 2, at.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} receiveShadow>
-      <meshToonMaterial color="#ffffff" map={COOK_MARBLE} />
-    </mesh>
-  )
-}
 function CookTableImpl({ floor = true }: { floor?: boolean }) {
   // (and under it all the kitchen's floor, from the bar's cook's edges to the front, and on past the table's
   // right-hand end where the other cooks stand)
@@ -971,10 +958,9 @@ function CookTableImpl({ floor = true }: { floor?: boolean }) {
       <group name="cook-table-c0" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[0]).addScaledVector(LAY, COOK_TABLE.lay[0])} />
       <group name="cook-table-c1" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[1]).addScaledVector(LAY, COOK_TABLE.lay[1])} />
       {/* (the cubbies either side a pair of doors each, opening out to the left and the right; under the hearth, at the back of the notch,
-          no doors: a plain marble face, the cook's knives hung on it (Decor's KnifeSet) */}
+          no cupboard: the table's own face, the cook's knives hung upright on their rack on it (Decor's KnifeSet) */}
       <CubbyDoors along={CUBBY2.along as [number, number]} hinge="both" lit />
       <CubbyDoors along={CUBBY.along as [number, number]} hinge="both" lit />
-      <NotchFace />
       {/* (what's kept in them: the grill's own stores, no plates (blender/cubbystock.py)) */}
       {([['right', CUBBY.along], ['left', CUBBY2.along]] as const).map(([which, al]) => {
         const at = new THREE.Vector3().addScaledVector(ALONG, (al[0] + al[1]) / 2).addScaledVector(LAY, (CUBBY.lay[0] + COOK_TABLE.lay[1] - 0.06) / 2)

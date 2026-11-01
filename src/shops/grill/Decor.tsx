@@ -22,6 +22,7 @@ import { ProduceSacks } from './KitchenStores'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
+import { reflectStudio, useStudio } from '@/scene/studio'
 
 type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
@@ -711,8 +712,12 @@ const KNIVES_URL = import.meta.env.BASE_URL + 'models/knives.glb'
 /** the cook's knives on their folded cloth (blender/knives.py), laid along the table behind the hearth */
 /** the knife board (blender/knives.py) on the hearth frame's right-hand face: how far along that face is, where along the side its middle is,
  * how high it's hung, and its size (the model's real size, drawn up a little to the hearth's) */
-const KNIFE_BOARD = { y: -0.5, scale: 1.3 }
+/** the rack's middle, how high (its handles just under the top's edge over the notch), and how big it's drawn */
+const KNIFE_BOARD = { y: -0.51, scale: 1.3 }
+/** what's metal on it: the blades' steel, the gyuto's nickel spacer, the brass screws (real metal, the studio in them, so the steel gleams) */
+const KNIFE_METAL = /Steel|Silver|Screw/
 function KnifeSet() {
+  useStudio()
   const gltf = useGLTF(KNIVES_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
     const r = gltf.scene.clone(true)
@@ -723,24 +728,29 @@ function KnifeSet() {
       const src = m.material as THREE.MeshStandardMaterial
       let t = made.get(src)
       if (!t) {
-        t = /Steel/.test(src.name)
-          ? new THREE.MeshStandardMaterial({ color: '#ffffff', map: src.map, metalness: 0.55, roughness: 0.3 })
-          : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+        if (KNIFE_METAL.test(src.name)) {
+          const blade = /Steel/.test(src.name) && !/Neck/.test(src.name)
+          const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), map: src.map ?? null, metalness: blade ? 0.8 : 0.9,
+            roughness: blade ? 0.26 : 0.32, envMapIntensity: 0.95 })
+          reflectStudio(g)
+          t = g
+        } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
         made.set(src, t)
       }
       m.material = t
       m.castShadow = true
       m.receiveShadow = true
     })
-    inkModel(r, (m) => /Mark|Sign|Cloth|Neck|Screw/.test(m.name), { width: 0.0012, weld: true })
+    inkModel(r, (m) => /Mark|Neck|Screw|Spacer/.test(m.name), { width: 0.0012, weld: true })
     // (the set never moves: drawn a few parts at a time)
     mergeByMaterial(r)
     return r
   }, [gltf])
-  // (hung on the marble face at the back of the notch under the hearth, where its cupboard was, facing the cook who stands there: the board's
-  // back to the face, its middle the notch's; in the fire's frame, FIRE_SHIFT back along from the table's)
+  // (screwed to the table's face at the back of the notch under the hearth (where its cupboard was, set 0.06 back from the notch's line),
+  // facing the cook who stands there: the board's back to the face, its middle the notch's; in the fire's frame, FIRE_SHIFT back along
+  // from the table's)
   const p = new THREE.Vector3().addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
-    .addScaledVector(LAY, COOK_NOTCH.lay[0] - 0.04 + 0.016)
+    .addScaledVector(LAY, COOK_NOTCH.lay[0] - 0.06 + 0.001)
   return <group position={[p.x, KNIFE_BOARD.y, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} scale={KNIFE_BOARD.scale}><primitive object={obj} /></group>
 }
 useGLTF.preload(KNIVES_URL)
