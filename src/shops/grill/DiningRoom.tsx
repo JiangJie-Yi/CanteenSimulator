@@ -2323,47 +2323,65 @@ function seeded(seed: number) {
   let n = seed
   return () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646 }
 }
-/**
- * A band of seigaiha (青海波) round a lantern's paper, from y0 down to y1: rows of fans of concentric arcs, each row half a fan along and a
- * little lower than the one before, each fan over the ones behind it. Painted on a sheet of its own, each fan rubbing out what's behind it
- * before its arcs are drawn, so between the lines the paper itself shows (its glow, its fibres); in indigo, a fine line along each edge of the
- * band. On a lit lantern the ink is the light coming through it, a little warmer and fainter.
- */
-function waveBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number, lit: boolean) {
-  const R = 19, RINGS = [1, 0.76, 0.52, 0.28]
+/** an indigo band round a lantern's belly, after the owner's references (they found the waves there wouldn't do): a ground of indigo,
+ * its pattern in pale lines through it: 麻の葉 (hemp leaves: a lattice of triangles, each with lines from its corners to its middle) or 七宝
+ * (circles linked endlessly, each through its neighbours, a little four-petalled flower where four meet). Its width a whole number of
+ * repeats, so it runs on round the lantern with no seam; drawn on its own sheet and laid over the paper, the washi showing through */
+function indigoBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number, lit: boolean, kind: 'asanoha' | 'shippo') {
   const h = Math.ceil(y1 - y0)
   const sheet = document.createElement('canvas')
   sheet.width = W; sheet.height = h
   const s = sheet.getContext('2d')
   if (!s) return
-  const ink = lit ? 'rgba(52,58,88,0.5)' : 'rgba(34,58,96,0.72)'
-  s.lineWidth = 2.2
-  s.strokeStyle = ink
-  // (rows from the top down, each over the last; the fans just past either end too, so the band runs on round the lantern without a seam:
-  // its width is a whole number of fans)
-  const step = W / Math.round(W / (2 * R))
-  for (let row = 0, y = R * 0.55; y < h + R; row++, y += R * 0.55) {
-    for (let x = (row % 2 ? step / 2 : 0) - step; x < W + step; x += step) {
-      s.save()
-      s.globalCompositeOperation = 'destination-out'
-      s.beginPath(); s.arc(x, y, R, Math.PI, 0); s.closePath(); s.fill()
-      s.restore()
-      for (const k of RINGS) { s.beginPath(); s.arc(x, y, R * k - 1.1, Math.PI, 0); s.stroke() }
+  s.fillStyle = lit ? 'rgba(38,50,98,0.68)' : 'rgba(30,46,92,0.86)'
+  s.fillRect(0, 0, W, h)
+  s.strokeStyle = lit ? 'rgba(255,240,214,0.85)' : 'rgba(244,238,224,0.92)'
+  s.lineCap = 'round'
+  if (kind === 'asanoha') {
+    const a = W / 40, rh = (a * Math.sqrt(3)) / 2
+    s.lineWidth = 1.6
+    for (let row = -1; row * rh < h + rh; row++) {
+      const yA = row * rh, yB = yA + rh, off = (row % 2 ? a / 2 : 0)
+      for (let x = off - a; x < W + a; x += a) {
+        // (an upward triangle and the downward one beside it, each with its edges and the lines from its corners to its middle)
+        const tris = [[[x, yB], [x + a, yB], [x + a / 2, yA]], [[x + a / 2, yA], [x + 1.5 * a, yA], [x + a, yB]]]
+        for (const t of tris) {
+          const cx = (t[0][0] + t[1][0] + t[2][0]) / 3, cy = (t[0][1] + t[1][1] + t[2][1]) / 3
+          s.beginPath()
+          s.moveTo(t[0][0], t[0][1]); s.lineTo(t[1][0], t[1][1]); s.lineTo(t[2][0], t[2][1]); s.closePath()
+          for (const v of t) { s.moveTo(v[0], v[1]); s.lineTo(cx, cy) }
+          s.stroke()
+        }
+      }
+    }
+  } else {
+    const d = W / 32, r = d / Math.SQRT2
+    s.lineWidth = 1.8
+    for (let y = 0; y < h + d; y += d) for (let x = 0; x < W + d; x += d) {
+      s.beginPath(); s.arc(x, y, r, 0, Math.PI * 2); s.stroke()
+    }
+    // (a little flower where four circles meet, in each star between them)
+    s.fillStyle = s.strokeStyle
+    for (let y = d / 2; y < h + d; y += d) for (let x = d / 2; x < W + d; x += d) {
+      for (let k = 0; k < 4; k++) {
+        const a = (k * Math.PI) / 2 + Math.PI / 4
+        s.beginPath(); s.ellipse(x + Math.cos(a) * 2.6, y + Math.sin(a) * 2.6, 2.4, 1.3, a, 0, Math.PI * 2); s.fill()
+      }
     }
   }
   g.drawImage(sheet, 0, y0)
-  // (a fine line along either edge)
-  g.fillStyle = ink
-  g.fillRect(0, y0 - 4, W, 2)
-  g.fillRect(0, y1 + 2, W, 2)
+  // (a fine line of indigo along either edge)
+  g.fillStyle = lit ? 'rgba(46,56,98,0.6)' : 'rgba(30,46,92,0.85)'
+  g.fillRect(0, y0 - 5, W, 2)
+  g.fillRect(0, y1 + 3, W, 2)
 }
 /**
  * A lantern's paper (u round it, v up it: 1024 x 300, about as many pixels to the inch round its belly as up it, so what's painted on it
  * keeps its shape there). `lit`: glowing from within, warm, brightest in the middle of its belly; unlit, plain washi, a little cream (only
- * a little). Its bamboo ribs and the seams between its panels, the paper's fibres here and there, and a band of seigaiha waves round its
- * lower belly (the owner's: it had two sea bream painted on it, which looked odd).
+ * a little). Its bamboo ribs and the seams between its panels, the paper's fibres here and there, and an indigo band round its lower belly
+ * (`band`: 麻の葉 or 七宝, after the owner's references; it had two sea bream painted on it, then seigaiha waves, neither of which would do).
  */
-function lanternPaper(g: CanvasRenderingContext2D, lit: boolean, waves = true) {
+function lanternPaper(g: CanvasRenderingContext2D, lit: boolean, band: 'asanoha' | 'shippo' | null = 'asanoha') {
   const W = 1024, H = 300
   const grad = g.createLinearGradient(0, 0, 0, H)
   for (const [t, c] of (lit ? [[0, '#f2b878'], [0.22, '#ffe2b0'], [0.5, '#fff6e0'], [0.78, '#ffe2b0'], [1, '#f2b878']]
@@ -2398,13 +2416,13 @@ function lanternPaper(g: CanvasRenderingContext2D, lit: boolean, waves = true) {
   // (the seams between its panels)
   g.fillStyle = lit ? 'rgba(200,140,80,0.16)' : 'rgba(120,110,95,0.14)'
   for (let x = 0; x < W; x += 128) g.fillRect(x, 0, 1.6, H)
-  // (the waves, round its lower belly)
-  if (waves) waveBand(g, W, H * 0.6, H * 0.8, lit)
+  // (its band, round its lower belly)
+  if (band) indigoBand(g, W, H * 0.58, H * 0.8, lit, band)
 }
 /** the round lantern's paper (the owner's: a round one with 日式烤魚 on it): the same washi, a band of vermilion near each end, the words
  * twice round it (a side each), in the signs' brush lettering */
 function roundPaper(g: CanvasRenderingContext2D, lit: boolean) {
-  lanternPaper(g, lit, false)
+  lanternPaper(g, lit, null)
   const W = 1024, H = 300
   g.fillStyle = lit ? '#d0392a' : '#9a3a30'
   g.fillRect(0, H * 0.07, W, H * 0.07); g.fillRect(0, H * 0.86, W, H * 0.07)
@@ -2454,6 +2472,9 @@ const PENDANT_POOL = nightGlow(new THREE.MeshBasicMaterial({ map: GLOW, transpar
 /** and the same paper with no light in it: plain washi, a little cream, its fibres and its waves */
 const LANTERN_SKIN_OFF = signTexture(1024, 300, (g) => lanternPaper(g, false))
 const LANTERN_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: LANTERN_SKIN, toneMapped: false, side: THREE.DoubleSide }), { offMap: LANTERN_SKIN_OFF })
+/** the other oval lantern's: the same washi, its band 七宝 */
+const LANTERN_SHADE_SHIPPO = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: signTexture(1024, 300, (g) => lanternPaper(g, true, 'shippo')),
+  toneMapped: false, side: THREE.DoubleSide }), { offMap: signTexture(1024, 300, (g) => lanternPaper(g, false, 'shippo')) })
 /** the round lantern (日式烤魚 on it): rounder and a little bigger, drawn in to its rings */
 const ROUND_LANTERN_R = 0.15
 const ROUND_LANTERN_END = Math.sqrt(ROUND_LANTERN_R ** 2 - 0.06 ** 2)
@@ -2536,7 +2557,7 @@ const FISH_FIN_GEO = (() => {
 })()
 /** a pendant lamp; `style`: 0 the oval washi lantern with its waves, 1 the round one with 日式烤魚 on it, 2 the fish (the owner's: two or
  * three kinds of lantern, a fish among them) */
-function Pendant({ z, drop, pool, style = 0 }: { z: number; drop: number; pool: number; style?: number }) {
+function Pendant({ z, drop, pool, style = 0, band = 0 }: { z: number; drop: number; pool: number; style?: number; band?: number }) {
   return (
     <group position={[0, WALL_H, z]}>
       <mesh position-y={-drop / 2}>
@@ -2547,7 +2568,7 @@ function Pendant({ z, drop, pool, style = 0 }: { z: number; drop: number; pool: 
       {/* (a lamp casts no shadow: the moon threw the lit lanterns' onto the floor, well away under them) */}
       <group position-y={-drop - (style === 1 ? 0.18 : style === 2 ? FISH_HANG + 0.016 : 0.13)}>
         {style === 0 && (<>
-          <mesh geometry={LANTERN_GEO} material={LANTERN_SHADE} />
+          <mesh geometry={LANTERN_GEO} material={band ? LANTERN_SHADE_SHIPPO : LANTERN_SHADE} />
           <mesh geometry={LANTERN_GEO} scale={1.035}>
             <meshBasicMaterial color={INK} side={THREE.BackSide} />
           </mesh>
@@ -2813,7 +2834,7 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
       {Array.from({ length: lamps }, (_, i) => {
         const z = (i - (lamps - 1) / 2) * (c.length / lamps)
         // (three kinds in turn (the owner's): the oval washi one, the round one with 日式烤魚 on it, the fish)
-        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05} userData={{ fade: true }}><Pendant z={z} drop={0.25} pool={top} style={(i + (lamps === 2 ? 1 : 0)) % 3} /></group></Movable>
+        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05} userData={{ fade: true }}><Pendant z={z} drop={0.25} pool={top} style={(i + (lamps === 2 ? 1 : 0)) % 3} band={i > 0 ? 1 : 0} /></group></Movable>
       })}
     </group>
   )
