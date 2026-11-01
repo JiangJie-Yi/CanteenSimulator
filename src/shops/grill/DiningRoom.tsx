@@ -1,7 +1,7 @@
 import { blessingChime, shrineDoor } from './shrineSound'
 import { BambooModel, WashstandModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPaper, WcRemote } from './Restroom'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -777,16 +777,12 @@ function drawRoundPaper(g: CanvasRenderingContext2D, night: boolean) {
   // (the fibres of the washi)
   g.strokeStyle = night ? 'rgba(200,210,240,0.08)' : 'rgba(110,140,190,0.13)'; g.lineWidth = 1
   for (let k = 0; k < 160; k++) { const x = (k * 97) % 512, y = (k * 233) % 512; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 14, y + (k % 5) - 2); g.stroke() }
-  // (bamboo outside: culms and leaves, sharp grey-green shadows in the sun, dark shapes at night)
-  g.fillStyle = night ? 'rgba(8,10,20,0.6)' : 'rgba(55,80,120,0.34)'
-  for (const [x, w, lean] of [[120, 16, 0.04], [190, 12, -0.03], [360, 18, 0.02], [420, 11, -0.05]] as [number, number, number][]) {
-    g.save(); g.translate(x, 512); g.rotate(lean); g.fillRect(-w / 2, -520, w, 520)
-    for (let y = 60; y < 520; y += 95) g.fillRect(-w / 2 - 2, -y, w + 4, 3)
-    g.restore()
-  }
-  for (let k = 0; k < 26; k++) {
-    const x = 90 + (k * 53) % 360, y = 60 + (k * 71) % 230, a = (k % 7) * 0.5 - 1.4
-    g.save(); g.translate(x, y); g.rotate(a); g.beginPath(); g.ellipse(26, 0, 30, 6, 0, 0, Math.PI * 2); g.fill(); g.restore()
+  // (and its longer fibres and the odd thicker one, as handmade paper has; no bamboo's shadows on it: there's none outside)
+  g.strokeStyle = night ? 'rgba(220,228,250,0.06)' : 'rgba(255,255,255,0.5)'
+  for (let k = 0; k < 60; k++) {
+    const x = (k * 151) % 512, y = (k * 89) % 512, a = (k * 0.71) % Math.PI
+    g.lineWidth = k % 9 ? 0.8 : 1.6
+    g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a) * 18 + 6, y + Math.sin(a) * 18 - 4, x + Math.cos(a) * 34, y + Math.sin(a) * 34); g.stroke()
   }
 }
 const ROUND_PAPER = (() => {
@@ -802,9 +798,36 @@ const ROUND_PAPER = (() => {
   return t
 })()
 /**
- * A round window (丸窓) let into the plaster: a deep reveal of wood round it, a thick turned frame of warm keyaki, and inside, a light
- * lattice over washi lit from outside (day or night: ROUND_PAPER), bamboo's shadows on it; hung lower than before, its frame just clear of the rail over the wainscot
+ * A round window (丸窓) let into the plaster: a reveal of wood round it, a frame of keyaki turned to a moulded profile, four bent segments
+ * with the grain running round, and inside, a lattice of sugi over washi lit from outside (day or night: ROUND_PAPER; blender/roundwindow.py
+ * for the woodwork); hung low, its frame just clear of the rail over the wainscot
  */
+const ROUND_URL = import.meta.env.BASE_URL + 'models/roundwindow.glb'
+/** the window's woodwork, in the room's toon light, its frame inked round, drawn a few parts at a time (it never moves) */
+function RoundWood() {
+  const gltf = useGLTF(ROUND_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) {
+        t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+        t.name = src.name
+        made.set(src, t)
+      }
+      m.material = t
+    })
+    inkModel(r, (m) => !/RoundFrame/.test(m.name), { width: 0.0025, weld: true })
+    mergeByMaterial(r)
+    return r
+  }, [gltf])
+  return <primitive object={obj} />
+}
+useGLTF.preload(ROUND_URL)
 /** where along the back wall the second round window goes (the wall's own frame) */
 const ROUND_AT = -1.36
 /** the daylight that comes in through it (by day only, gone at night): a cool glow round it on the plaster, and a faint shaft of it slanting
@@ -891,7 +914,6 @@ const SUNBEAM_GEO = (() => {
 })()
 function RoundWindow() {
   const R = 0.4
-  const lat = [-0.2, 0, 0.2]
   return (
     <group name="RoundWindow">
       {/* (what the window view (data/views) looks at: its middle, its +z turned to face into the room) */}
@@ -899,35 +921,13 @@ function RoundWindow() {
       {/* (by day: the sky's light glowing round it on the plaster, and slanting in) */}
       <mesh position-x={-0.075} rotation-y={-Math.PI / 2} material={WINDOW_HALO} renderOrder={2}><planeGeometry args={[R * 4.2, R * 4.2]} /></mesh>
       <mesh geometry={SUNBEAM_GEO} material={SUNBEAM} renderOrder={2} />
-      {/* (the reveal, the wall's thickness lined in wood) */}
-      <mesh position-x={-0.03} rotation-z={Math.PI / 2}>
-        <cylinderGeometry args={[R + 0.004, R + 0.004, 0.06, 64, 1, true]} />
-        <meshToonMaterial color="#7a4e2c" side={THREE.BackSide} />
-      </mesh>
       {/* (the paper, set back in the reveal) */}
       <mesh position-x={-0.004} rotation-y={-Math.PI / 2}>
         <circleGeometry args={[R, 64]} />
         <meshBasicMaterial map={ROUND_PAPER} toneMapped={false} />
       </mesh>
-      {/* (the lattice: three bars each way, their ends let into the reveal) */}
-      {lat.map((k) => {
-        const L = 2 * Math.sqrt(R * R - k * k)
-        return (
-          <group key={k}>
-            <mesh position={[-0.012, 0, k]}><boxGeometry args={[0.016, L, 0.018]} /><meshToonMaterial color="#8a5a34" /></mesh>
-            <mesh position={[-0.012, k, 0]}><boxGeometry args={[0.016, 0.018, L]} /><meshToonMaterial color="#8a5a34" /></mesh>
-          </group>
-        )
-      })}
-      {/* (the frame: a thick ring of warm wood standing proud of the wall, a fine darker bead inside it) */}
-      <mesh position-x={-0.05} rotation-y={Math.PI / 2}>
-        <torusGeometry args={[R + 0.035, 0.04, 14, 72]} />
-        <meshToonMaterial color="#a8703e" />
-      </mesh>
-      <mesh position-x={-0.062} rotation-y={Math.PI / 2}>
-        <torusGeometry args={[R + 0.004, 0.012, 8, 72]} />
-        <meshToonMaterial color="#5a361c" />
-      </mesh>
+      {/* (the reveal, the lattice, the frame and its bead) */}
+      <Suspense fallback={null}><RoundWood /></Suspense>
     </group>
   )
 }
