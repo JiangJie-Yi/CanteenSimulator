@@ -215,7 +215,8 @@ export const DISHES: Dish[] = [
       // the table's top only while something's on it. This is where the first plate used to stand)
       plate: [2.333, -1.26, 0.224],
       // (on the table's top at its left end, clear of the hearth, behind the bin)
-      basket: { at: [-1.821, 0, 0.768], capacity: 20 },
+      // (moved 0.4 toward the cook, as the owner drew)
+      basket: { at: [-1.585, 0, 1.092], capacity: 20 },
       basketItems: ['Potato', 'SweetPotato'],
       // (in the front row, left of the miso soup bowls)
       dish: { at: [2.133, -0.74, 0.374], capacity: 3 },
