@@ -730,6 +730,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
   const change = useRef<THREE.Group>(null)
   const open = useRef(0)
   const vel = useRef(0)
+  const innerShown = useRef<boolean | null>(null)
   /** (whether the drawer was last sent out: it rings as it's let go) */
   const sentOut = useRef(false)
   const [pay, setPay] = useState<{ tender: Note[]; change: (Note | CoinKind)[] }>({ tender: [], change: [] })
@@ -781,6 +782,12 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     const knock = rt < 0.3 ? Math.abs(Math.sin(rt * Math.PI * 2 / 0.15)) * 0.0025 * (1 - rt / 0.3) : 0
     if (drawer.current) drawer.current.position.z = -open.current * 0.24 - knock
     if (cash.current) cash.current.visible = open.current > 0.15
+    // (its inside drawn only once it's out a little: shut, it's all in the dark of the till)
+    const inside = open.current > 0.02
+    if (inside !== innerShown.current) {
+      innerShown.current = inside
+      for (const o of useRegisterModel.cached()?.inner ?? []) o.visible = inside
+    }
     if (drawerSeen.current !== TILL_CASH.drawer) { drawerSeen.current = TILL_CASH.drawer; setInDrawer(TILL_CASH.drawer) }
     // (what's being paid, as notes and coins to draw: changes only with the customer)
     const key = `${TILL_STATE.tender}|${TILL_STATE.change}`

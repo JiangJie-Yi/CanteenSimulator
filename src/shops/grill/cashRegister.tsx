@@ -63,7 +63,9 @@ function realFinish(src: THREE.MeshStandardMaterial): THREE.Material {
   return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: Math.max(0.45, src.roughness), metalness: 0, sheen: 0.2 })
 }
 let regModel: { body: THREE.Object3D; drawer: THREE.Object3D; keys: THREE.Object3D; keysAll: THREE.Object3D; modeKey: THREE.Object3D; drawerKey: THREE.Object3D
-  solid: THREE.Mesh[] } | null = null
+  solid: THREE.Mesh[]; inner: THREE.Object3D[] } | null = null
+/** what's inside the drawer, behind its front: the tray, the insert, the coin rolls, the notes' rollers and weights */
+const DRAWER_INNER = /^Reg(Tray|Roll|Coin|Bill|Insert)/
 export function useRegisterModel() {
   const gltf = useGLTF(REGISTER_URL) as unknown as { scene: THREE.Group }
   if (regModel) return regModel
@@ -97,7 +99,10 @@ export function useRegisterModel() {
   const keysAll = get('RegKeys').clone(true)
   mergeByMaterial(keysAll)
   keysAll.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).raycast = () => {} })
-  regModel = { body: get('RegBody'), drawer: get('RegDrawer'), keys: get('RegKeys'), keysAll, modeKey: get('RegModeKey'), drawerKey: get('RegDrawerKey'), solid }
+  // (the drawer's inside, some forty parts with their ink: drawn only while it's out, shut in the till's dark it's nothing to see)
+  const inner: THREE.Object3D[] = []
+  for (const o of get('RegDrawer').children) if (DRAWER_INNER.test(o.name)) inner.push(o)
+  regModel = { body: get('RegBody'), drawer: get('RegDrawer'), keys: get('RegKeys'), keysAll, modeKey: get('RegModeKey'), drawerKey: get('RegDrawerKey'), solid, inner }
   return regModel
 }
 /** the model once it's loaded (for handlers, outside of rendering), or null before */
