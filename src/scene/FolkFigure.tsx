@@ -20,7 +20,7 @@ import type { Mood } from './people'
  *
  * Each combination of hair and things about them is put together once (the body, the head and each hand merged by material, inked) and
  * copied for each customer, with their own materials (their colours, their clothes, their face; and their own so they can fade alone).
- * Sat, the round body sits up on the stool's seat; walking, it waddles; eating, the bowl's held up and the chopsticks go to the mouth.
+ * Sat, the round body sits up on the stool's seat; walking, it waddles; eating, the chopsticks in the right hand go from the plate to the mouth.
  */
 const URL = import.meta.env.BASE_URL + 'models/folk.glb'
 const TEX = import.meta.env.BASE_URL + 'textures/folk/'
@@ -48,15 +48,16 @@ const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.3
 /**
  * The pair of chopsticks in a customer's hand while they eat: the bar's own lacquered ones, picked up off their rest (the owner's: they ate with
  * none to be seen, the pair on the rest untouched; the brown sticks in their fist pointed back into them): black over the top third, a fine
- * gold band, deep red to the tips, along +y from a little behind the grip to the tips, coming together toward them. One shape for every
- * customer, its colours in its vertices; a bite at the tips going up to the mouth.
+ * gold band, deep red to the tips, along +y from well behind the grip to the tips, coming together toward them: their black ends standing out
+ * of the round fist (held at a quarter of their length they were all inside it, a red stick under the hand being all there was to see). One
+ * shape for every customer, its colours in its vertices; a bite at the tips going up to the mouth.
  */
-const CHOP_LEN = 0.24
-const CHOP_GRIP = 0.075
+const CHOP_LEN = 0.3
+const CHOP_GRIP = 0.13
 const CHOP_GEO = (() => {
   const parts: THREE.BufferGeometry[] = []
   const y0 = -CHOP_GRIP, y1 = CHOP_LEN - CHOP_GRIP, third = y0 + CHOP_LEN / 3
-  const r = (y: number) => 0.0048 - (0.0026 * (y - y0)) / CHOP_LEN
+  const r = (y: number) => 0.0062 - (0.0032 * (y - y0)) / CHOP_LEN
   const seg = (a: number, b: number, c: string) => {
     const g = new THREE.CylinderGeometry(r(b), r(a), b - a, 6, 1)
     g.translate(0, (a + b) / 2, 0)
@@ -67,8 +68,8 @@ const CHOP_GEO = (() => {
   }
   for (const sd of [-1, 1]) {
     for (const g of [seg(y0, third, '#151112'), seg(third, third + 0.007, '#d9b04a'), seg(third + 0.007, y1, '#7c2a1e')]) {
-      g.rotateZ(sd * 0.024)
-      g.translate(sd * 0.0055, 0, 0)
+      g.rotateZ(sd * 0.034)
+      g.translate(sd * 0.0075, 0, 0)
       parts.push(g)
     }
   }
@@ -79,9 +80,9 @@ const CHOP_GEO = (() => {
 const CHOP_MAT = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap })
 const BITE_GEO = new THREE.SphereGeometry(0.014, 8, 6)
 const BITE_MAT = new THREE.MeshToonMaterial({ color: '#c8743a', gradientMap })
-/** where the chopsticks' tips go, in the figure's frame: down into the bowl in the left hand, or up to the mouth (the head's middle 0.8 up,
- * blender/folk.py's C) */
-const CHOP_BOWL = new THREE.Vector3(-0.08, 0.47, 0.33)
+/** where the chopsticks' tips go, in the figure's frame: down to their plate on the bar in front of them (measured: the bar's top 0.3 up from
+ * the seat, the plate 0.72 out), or up to the mouth (the head's middle 0.8 up, blender/folk.py's C) */
+const CHOP_PLATE = new THREE.Vector3(-0.03, 0.3, 0.72)
 const CHOP_MOUTH = new THREE.Vector3(0, 0.7, 0.26)
 const UP = new THREE.Vector3(0, 1, 0)
 const X_AXIS = new THREE.Vector3(1, 0, 0)
@@ -287,13 +288,14 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   }, [fig])
 
   const chop = useRef<THREE.Group>(null)
-  const bowl = useRef<THREE.Group>(null)
   const phone = useRef<THREE.Group>(null)
   const heldRef = useRef<THREE.Group>(null)
   const carried = useRef<THREE.Group>(null)
   // (the things in their hands ride with the hands)
   useEffect(() => {
-    const pairs: [React.RefObject<THREE.Group | null>, THREE.Object3D | null][] = [[chop, fig.handR], [heldRef, fig.handR], [carried, fig.handR], [phone, fig.handL], [bowl, fig.handL]]
+    // (handL is at the figure's -x, which facing +z is its right hand, handR its left (the owner saw the chopsticks in the left hand and the
+    // phone in the right): the chopsticks and a drink in the right, the phone and the briefcase in the left)
+    const pairs: [React.RefObject<THREE.Group | null>, THREE.Object3D | null][] = [[chop, fig.handL], [heldRef, fig.handL], [carried, fig.handR], [phone, fig.handR]]
     for (const [r, hand] of pairs) if (r.current && hand) hand.add(r.current)
     return () => { for (const [r] of pairs) r.current?.removeFromParent() }
   }, [fig])
@@ -370,7 +372,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     b.rotation.y += (turn - b.rotation.y) * Math.min(1, dt * 4)
     b.scale.y = 1 + (walking ? 0 : Math.sin(t * 1.7 + id) * 0.008) + squash
     b.scale.x = b.scale.z = 1 - squash * 0.5
-    // (the head: looking about by beats while they sit, down at the phone or the bowl, nodding as they talk)
+    // (the head: looking about by beats while they sit, down at the phone or the plate, nodding as they talk)
     if (fig.head) {
       let yaw = 0, pitch = 0
       if (!walking) {
@@ -387,8 +389,8 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       look.current.pitch += (pitch - look.current.pitch) * ease
       fig.head.rotation.set(-look.current.pitch, look.current.yaw, 0, 'YXZ')
     }
-    // (the hands: swinging as they walk; at the table, the bowl held up in the left and the chopsticks going to the mouth in the right; the phone
-    // up in the left; the chin on the right; reaching into the fridge; a drink held)
+    // (the hands: swinging as they walk; at the table, the left on the bar and the chopsticks from the plate to the mouth in the right; the phone
+    // up in the left; the chin on the left hand; reaching into the fridge; a drink held in the right)
     const L = fig.handL, Rh = fig.handR
     const chew = eating && ((t * 0.7 + id * 0.3) % 1) > 0.55
     if (L && Rh) {
@@ -397,21 +399,23 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       let lr = 0, rr = 0
       if (walking) { lp.z += swing; rp.z -= swing }
       if (eating) {
-        lp.set(-0.12, 0.42, 0.3)
-        lr = -0.6
+        // (the right hand, the chopsticks in it, out over their plate on the bar, then up beside the face with a bite (out in front of it:
+        // right at it the sticks went into the head); the left resting on the bar's edge (it held up a bowl, which nobody could make out))
         const k = chew ? 1 : 0
-        // (up beside the face, out in front of it, the tips toward the mouth: right at it, the sticks went into the head)
-        rp.set(0.12 + 0.05 * k, 0.4 + 0.26 * k, 0.32 + 0.08 * k)
-        rr = -0.9 - 0.4 * k
+        lp.set(-0.07 - 0.08 * k, 0.38 + 0.26 * k, 0.5 - 0.14 * k)
+        lr = -0.7 - 0.6 * k
+        rp.set(0.17, 0.31, 0.36)
+        rr = -0.3
       } else if (showPhone) {
-        lp.set(-0.06, 0.44, 0.32)
-        lr = -1.1
+        // (in the left hand, held up in front)
+        rp.set(0.06, 0.44, 0.32)
+        rr = -1.1
       } else if (!walking && idle === 'chin' && !talk && !pose) {
         rp.set(0.08, 0.5, 0.27)
         rr = -1.4
       }
       if (pose === 'Fetch') { rp.set(0.16, 0.52, 0.38); rr = -1.2 }
-      if (held && !eating) { rp.set(0.22, 0.34, 0.2); rr = -0.3 }
+      if (held && !eating) { lp.set(-0.22, 0.34, 0.2); lr = -0.3 }
       L.position.lerp(lp, Math.min(1, dt * 10))
       Rh.position.lerp(rp, Math.min(1, dt * 10))
       L.rotation.x += (lr - L.rotation.x) * Math.min(1, dt * 10)
@@ -419,16 +423,16 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     }
     if (chop.current) {
       chop.current.visible = eating
-      // (the tips at the bowl, or at the mouth: their way from the hand in the figure's frame, taken into the hand's (turned about x))
-      if (eating && Rh) {
-        const to = chew ? CHOP_MOUTH : CHOP_BOWL
-        chopDir.copy(to).sub(Rh.position).normalize().applyAxisAngle(X_AXIS, -Rh.rotation.x)
+      // (the tips at the plate, or at the mouth: their way from the hand in the figure's frame, taken into the hand's (turned about x))
+      if (eating && L) {
+        const to = chew ? CHOP_MOUTH : CHOP_PLATE
+        chopDir.copy(to).sub(L.position).normalize().applyAxisAngle(X_AXIS, -L.rotation.x)
         chopQ.setFromUnitVectors(UP, chopDir)
         chop.current.quaternion.slerp(chopQ, Math.min(1, dt * 12))
       }
-      if (bite.current) bite.current.visible = eating && !chew
+      // (a bite in the tips from the plate till they're at the mouth)
+      if (bite.current) bite.current.visible = eating && !!L && L.position.y < 0.55
     }
-    if (bowl.current) bowl.current.visible = eating
     if (phone.current) phone.current.visible = showPhone
     if (carried.current) carried.current.visible = spec.briefcase && walking
     // (the face: their mood; blinking now and then; delighted when the food's just come; chewing; talking)
@@ -447,20 +451,9 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       <group scale={k}>
         <primitive object={fig.root} />
         {/* the chopsticks in the right hand (the place's own, off their rest), a bite at their tips on its way up */}
-        <group ref={chop} visible={false}>
+        <group ref={chop} name="FolkChop" visible={false}>
           <mesh geometry={CHOP_GEO ?? undefined} material={CHOP_MAT} />
           <mesh ref={bite} geometry={BITE_GEO} material={BITE_MAT} position={[0, CHOP_LEN - CHOP_GRIP - 0.01, 0]} scale={[1, 0.7, 0.8]} />
-        </group>
-        {/* the rice bowl on the left hand */}
-        <group ref={bowl} visible={false} position={[0.02, 0.05, 0.02]}>
-          <mesh rotation-x={Math.PI}>
-            <sphereGeometry args={[0.075, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.42]} />
-            <meshToonMaterial color="#e9e1cf" side={THREE.DoubleSide} gradientMap={gradientMap} />
-          </mesh>
-          <mesh position-y={-0.018} rotation-x={-Math.PI / 2}>
-            <circleGeometry args={[0.068, 16]} />
-            <meshToonMaterial color="#fbf8f0" gradientMap={gradientMap} />
-          </mesh>
         </group>
         {/* a phone in the left hand, its screen lit toward them */}
         <group ref={phone} visible={false} position={[0, 0.05, 0.02]} rotation-x={-0.3}>
@@ -469,7 +462,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         </group>
         {/* a drink held in the right hand */}
         <group ref={heldRef} visible={!!held} position={[0, 0.02, 0.03]} scale={1.1}>{held}</group>
-        {/* the briefcase: in the right hand while they walk; by the stool while they sit */}
+        {/* the briefcase: in the left hand while they walk; by the stool while they sit */}
         {spec.briefcase && <group ref={carried} position={[0, 0.0, 0.02]} rotation-z={Math.PI} scale={1.4}><Briefcase /></group>}
       </group>
       {spec.briefcase && !walking && <group position={[-0.22, -seatLift, 0.12]} rotation-y={0.3} scale={1.4 * fit}><group position-y={0.105} rotation-z={Math.PI}><Briefcase /></group></group>}
