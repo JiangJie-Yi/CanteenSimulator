@@ -3,7 +3,8 @@ supplies.glb, node "CornerSupplies".
 
 One stack against the wall, nothing out in front of it (the owner's: the way to the toilets' doors kept clear): two corrugated cartons of
 tissue boxes (taped shut, the upper one turned a little), a carton of cleaning things on them (the owner's: the detergents boxed, not stood
-about loose; the mop, the broom and the bucket gone), and a twelve-roll pack of toilet paper on top.
+about loose; the mop, the broom and the bucket gone) to one side, two spray bottles of cleaner out of it beside it, in use (the owner's: two
+out), and a twelve-roll pack of toilet paper on top of the carton.
 The cartons' print is the game's ("SupplyCartonPrint", 1536 x 512): each carton laid out on it as a flat dieline at one scale, 750 px to the
 metre, so what's printed keeps its shape on every face (the owner saw the words run off the edges: a face was squeezed into a cell of
 another shape): its front (its back the same) and one end side by side along the top of its piece, its top under them; the pieces side by
@@ -157,18 +158,35 @@ def stick(name, mat, a, b, r, segs=8):
 
 
 # ---- stacked to fit the narrow gap between the drinks fridge and the toilets' door (about half a metre along the wall), all of it against
-# the wall: the two cartons of tissues, the carton of cleaning things on them, the pack of rolls on top
+# the wall: the two cartons of tissues, the carton of cleaning things on them to one side and two sprays out of it beside it, the pack of
+# rolls on top of the carton
 carton("SupplyCarton0", 0.0, 0.0, 0.17, 0.44, 0.31, 0.27, 0.0, 4.0)
 carton("SupplyCarton1", 0.01, 0.27, 0.17, 0.4, 0.29, 0.24, 0.08, 4.0 + (0.44 + 0.31) * PX + 10)
-carton("SupplyCarton2", 0.0, 0.51, 0.16, 0.26, 0.2, 0.22, -0.06, 4.0 + (0.44 + 0.31 + 0.4 + 0.29) * PX + 20)
+CLEAN_X = -0.06
+carton("SupplyCarton2", CLEAN_X, 0.51, 0.16, 0.26, 0.2, 0.22, -0.06, 4.0 + (0.44 + 0.31 + 0.4 + 0.29) * PX + 20)
+# (the two sprays out of the carton, on the tissue carton beside it: white with a blue trigger, pink with the same, their labels round them,
+# their nozzles out toward the room)
+for k, (z, mat) in enumerate(((0.1, "bottleW"), (0.22, "bottleP"))):
+    x = 0.14 - k * 0.012
+    cyl(f"SupplySpray{k}", mat, x, 0.51, z, 0.034, 0.029, 0.2, segs=14)
+    cyl(f"SupplySprayShoulder{k}", mat, x, 0.71, z, 0.029, 0.017, 0.025, segs=14)
+    cyl(f"SupplySprayNeck{k}", "trigger", x, 0.735, z, 0.017, 0.015, 0.03, segs=10)
+    for nm, (dy, dz), (sx, sy, sz) in (("Head", (0.785, 0.012), (0.022, 0.034, 0.056)), ("Lever", (0.748, 0.03), (0.012, 0.04, 0.012))):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=P(x, dy, z + dz))
+        t = bpy.context.view_layer.objects.active
+        t.name = f"SupplyTrigger{nm}{k}"
+        t.scale = (sx, sz, sy)
+        bpy.ops.object.transform_apply(scale=True)
+        fin(t, "trigger", smooth=False)
+    cyl(f"SupplySprayLabel{k}", "label", x, 0.56, z, 0.0345, 0.0335, 0.09, segs=14, cap=False)
 ROLLS_Y = 0.73
 for i in range(3):
     for j in range(2):
         for k in range(2):
-            x, z = -0.105 + i * 0.105, 0.115 + j * 0.105
+            x, z = CLEAN_X - 0.105 + i * 0.105, 0.115 + j * 0.105
             cyl(f"SupplyRoll{i}{j}{k}", "roll", x, ROLLS_Y + k * 0.1, z, 0.05, 0.05, 0.1, segs=14)
             cyl(f"SupplyRollCore{i}{j}{k}", "rollcore", x, ROLLS_Y + k * 0.1 + 0.0995, z, 0.018, 0.018, 0.0012, segs=10)
-bpy.ops.mesh.primitive_cube_add(size=1, location=P(0.0, ROLLS_Y + 0.1, 0.1675))
+bpy.ops.mesh.primitive_cube_add(size=1, location=P(CLEAN_X, ROLLS_Y + 0.1, 0.1675))
 band = bpy.context.view_layer.objects.active
 band.name = "SupplyWrapBand"
 band.scale = (0.316, 0.216, 0.05)
