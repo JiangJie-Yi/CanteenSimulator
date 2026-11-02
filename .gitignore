@@ -33,3 +33,6 @@ __pycache__/
 # Claude Code personal settings
 .claude/settings.local.json
 .playwright-mcp/
+
+# glTF-Transform output to compare before taking (scripts/optimize-glb.mjs)
+public/models-opt/

@@ -108,8 +108,30 @@ export function BossModel() {
   const obj = useMemo(() => styledBoss(gltf.scene).clone(true), [gltf])
   return <primitive object={obj} />
 }
-/** `to`: the far end of his walk; `open`: the shop's open (his chef has the grill, he stays put); he mutters in `lang` */
-export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?: [number, number]; open?: boolean; lang?: Lang; children?: ReactNode }) {
+/** the way he walks (his own frame, from his place): out to the aisle behind him at `mouth` (straight back out of the cook table's notch,
+ * where he stands at the fire), then along it, `dir`, as far as `range` either way: what he's sent to (a taste, a drink) he goes to the
+ * nearest of it on the aisle, and back again by the same way (the owner saw him walk into the table, round the notch's corner and into the
+ * cubby beside it) */
+export type BossAisle = { mouth: [number, number]; dir: [number, number]; range: [number, number] }
+/** the next place to make for on his way to `goal` (his frame): coming out of the notch, straight back to its mouth first; going back into
+ * it, along the aisle to the mouth first and then straight in; the goal itself otherwise. So he never cuts across the table's corner, and
+ * never turns back and forth on the way (a target that flipped between the mouth and the goal as he passed it made him shake) */
+export function bossStep(at: [number, number], goal: [number, number], aisle?: BossAisle): [number, number] {
+  if (!aisle) return goal
+  const [mx, mz] = aisle.mouth
+  const mo = Math.hypot(mx, mz)
+  if (mo < 0.01) return goal
+  const ox = mx / mo, oz = mz / mo
+  const inside = (x: number, z: number) => x * ox + z * oz < mo - 0.06
+  const a = inside(at[0], at[1])
+  if (a === inside(goal[0], goal[1])) return goal
+  if (a) return [mx, mz]
+  return Math.abs(at[0] * oz - at[1] * ox) > 0.04 ? [mx, mz] : goal
+}
+/** `to`: the far end of his walk; `aisle`: the way he walks (BossAisle); `open`: the shop's open (his chef has the grill, he stays put); he
+ * mutters in `lang` */
+export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }: { to?: [number, number]; aisle?: BossAisle; open?: boolean; lang?: Lang
+  children?: ReactNode }) {
   // ---- muttering to himself, always: a line every few seconds, by day or night, open or shut (data/bossLines), never the same twice running
   const [say, setSay] = useState<{ text: string; key: number } | null>(null)
   /** (he's said he's munching, this taste) */
@@ -260,16 +282,24 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     const want = BOSS_TASTE.at ?? BOSS_DRINK.at
     const ask = !edit && want && m.parent ? m.parent.worldToLocal(want.clone()) : null
     if (ask) {
-      const len = Math.hypot(to[0], to[1]) || 1
-      const ux = to[0] / len, uz = to[1] / len
-      const k = Math.max(-0.4, Math.min(len, ask.x * ux + ask.z * uz))
-      const gx = ux * k, gz = uz * k
-      const dx = gx - s.x, dz = gz - s.z
+      // (the nearest he can come to it: on the aisle, by way of the notch's mouth; with no aisle given, along his walk's line, not behind it)
+      let goal: [number, number]
+      if (aisle) {
+        const [mx, mz] = aisle.mouth, [ax, az] = aisle.dir
+        const k = Math.max(aisle.range[0], Math.min(aisle.range[1], (ask.x - mx) * ax + (ask.z - mz) * az))
+        goal = [mx + ax * k, mz + az * k]
+      } else {
+        const len = Math.hypot(to[0], to[1]) || 1
+        const k = Math.max(0, Math.min(len, (ask.x * to[0] + ask.z * to[1]) / len))
+        goal = [(to[0] / len) * k, (to[1] / len) * k]
+      }
+      const [wx, wz] = bossStep([s.x, s.z], goal, aisle)
+      const dx = wx - s.x, dz = wz - s.z
       const d = Math.hypot(dx, dz)
-      if (d > 0.03) {
+      if (Math.hypot(goal[0] - s.x, goal[1] - s.z) > 0.03) {
         speed = RUN_SPEED
         const stepL = Math.min(d, speed * dt)
-        s.x += (dx / d) * stepL; s.z += (dz / d) * stepL
+        if (d > 1e-6) { s.x += (dx / d) * stepL; s.z += (dz / d) * stepL }
         s.stride += stepL
         turnTo(s, Math.atan2(dx, dz), dt * 9)
         if (drinking) BOSS_DRINK.arrived = false
@@ -300,17 +330,19 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
       const runIx = ROUNDS.findIndex((x) => x.act === 'run')
       s.phase = runIx >= 0 ? runIx : 0
     } else if (act === 'walk' || act === 'run') {
+      // (out along the aisle and back home, by way of the notch's mouth)
       const [gx, gz] = act === 'walk' ? to : [0, 0]
-      const dx = gx - s.x, dz = gz - s.z
+      const [wx, wz] = bossStep([s.x, s.z], [gx, gz], aisle)
+      const dx = wx - s.x, dz = wz - s.z
       const d = Math.hypot(dx, dz)
       speed = act === 'walk' ? WALK_SPEED : RUN_SPEED
-      if (d < 0.02) {
+      if (Math.hypot(gx - s.x, gz - s.z) < 0.02) {
         s.x = gx; s.z = gz
         s.phase = (s.phase + 1) % ROUNDS.length; s.t = 0
         speed = 0
       } else {
         const step = Math.min(d, speed * dt)
-        s.x += (dx / d) * step; s.z += (dz / d) * step
+        if (d > 1e-6) { s.x += (dx / d) * step; s.z += (dz / d) * step }
         s.stride += step
         turnTo(s, Math.atan2(dx, dz), dt * 9)
       }
@@ -321,8 +353,10 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     }
     if (edit) act = 'idle'
     // ---- gravity: he stands on whatever's under him, and if he's left in the air (put up high in the editor) he drops onto it, with a
-    // little bounce
-    if (T - s.probeAt > 0.2) { s.probeAt = T; s.ground = groundBelow(m, s.x, s.z) }
+    // little bounce; walking, on the floor itself (his frame's), not on what the ray finds under him as he passes (a step's edge, a sack, a
+    // door swung open), which had him bob up and down (the owner's)
+    if (speed > 0) s.ground = 0
+    else if (T - s.probeAt > 0.2) { s.probeAt = T; s.ground = groundBelow(m, s.x, s.z) }
     const scale = m.parent?.getWorldScale(new THREE.Vector3()).y || 1
     if (s.y > s.ground + 1e-4 || s.vy > 0) {
       s.vy -= (9 / scale) * dt

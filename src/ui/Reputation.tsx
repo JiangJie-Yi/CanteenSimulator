@@ -7,6 +7,8 @@ import { memo, useEffect, useState } from 'react'
 import { CC_BY_URL, CREDITS, DEV_MODEL, DEVELOPER, DEVELOPER_URL, REPO_URL, SITE_URL, VERSION } from '@/data/credits'
 import { guestLabel } from '@/data/guests'
 import { tl, type Lang } from '@/data/i18n'
+import { STORY } from '@/data/story'
+import { CAPITAL, SHOP_COST } from '@/game/economy'
 import { remarkOf, satisfaction, starsOf, type Rating, type Remark, type Visit } from '@/game/reputation'
 import { FitLine } from './FitLine'
 import { ReviewerAvatar } from './ReviewerAvatar'
@@ -116,6 +118,22 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
       <div className="rep-body">
         {tab === 'about' ? (
           <>
+            {/* (the story first (the owner's): him come alone to Osaka, the money he came with set out as a page of his ledger (the game's
+                own amounts), what every day costs; a sheet of washi with the shop's seal, its last line in the shop's red) */}
+            <article className="rep-story" lang={lang === 'zh' ? 'zh-Hant' : lang}>
+              <header>
+                <div><h3>{STORY[lang].title}</h3><small>{STORY[lang].sub}</small></div>
+                <span className="rep-seal" aria-hidden="true">聞野</span>
+              </header>
+              <p>{STORY[lang].open}</p>
+              <dl className="rep-ledger">
+                <dt>{STORY[lang].ledger[0]}</dt><dd>NT${CAPITAL.toLocaleString('en-US')}</dd>
+                <dt>{STORY[lang].ledger[1]}</dt><dd>−NT${SHOP_COST.toLocaleString('en-US')}</dd>
+                <dt>{STORY[lang].ledger[2]}</dt><dd>NT${(CAPITAL - SHOP_COST).toLocaleString('en-US')}</dd>
+              </dl>
+              {STORY[lang].body.map((t) => <p key={t}>{t}</p>)}
+              <p className="rep-story-end">{STORY[lang].end}</p>
+            </article>
             {/* (the game, who makes it, and where its source is) */}
             <div className="rep-about">
               <strong>{pick('聞野・日式烤魚', '聞野・炭火焼の魚', 'Kikuno · Japanese Grill')}</strong>

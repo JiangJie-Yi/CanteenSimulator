@@ -2457,8 +2457,9 @@ export default function App() {
         {showFull && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
         {/* (on a wide screen 經營 and 自動營運 are round buttons in the row top right, and the cash stands on its own here, where 經營 was:
             a click on it opens the books) */}
-        <button type="button" className="money-chip" onClick={() => setOffice('ledger')}
-          title={tl(lang, '現金（點一下看帳簿）', '現金（クリックで帳簿）', 'Cash (click for the ledger)')}>
+        {/* (and a click again shuts it, whichever of its pages is open (the owner's)) */}
+        <button type="button" className="money-chip" onClick={() => setOffice((o) => (o ? null : 'ledger'))} aria-expanded={!!office}
+          title={tl(lang, '現金（點一下看帳簿，再點一下關上）', '現金（クリックで帳簿、もう一度で閉じる）', 'Cash (click for the ledger, again to close it)')}>
           <b className="money"><small className="money-cur">NT$</small>{Math.round(cash).toLocaleString()}</b>
         </button>
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}

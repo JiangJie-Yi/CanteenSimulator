@@ -120,6 +120,11 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
   const [spin, setSpin] = useState(true)
   const [stats, setStats] = useState({ tris: 0, draws: 0 })
   const e = ENTRIES.find((x) => x.key === pick.key) ?? ENTRIES[0]
+  // (the one before or after in the list, round from the last to the first: the arrows either side of the stage (the owner's))
+  const step = (d: number) => setPick((p) => {
+    const i = Math.max(0, ENTRIES.findIndex((x) => x.key === p.key))
+    return { key: ENTRIES[(i + d + ENTRIES.length) % ENTRIES.length].key, n: 0 }
+  })
   const ids = e.kind ? IDS.get(e.kind) ?? [1] : []
   const gid = ids.length ? ids[pick.n % ids.length] : 0
   const name = tl(lang, e.zh, e.ja, e.en)
@@ -146,6 +151,12 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
             </Suspense>
             <OrbitControls target={[0, 0.9, 0]} enablePan={false} minDistance={2} maxDistance={9} />
           </Canvas>
+          {([-1, 1] as const).map((d) => (
+            <button key={d} type="button" className={`char-view-arrow ${d < 0 ? 'is-prev' : 'is-next'}`} onClick={() => step(d)}
+              aria-label={d < 0 ? tl(lang, '上一個', '前へ', 'Previous') : tl(lang, '下一個', '次へ', 'Next')}>
+              <svg viewBox="0 0 16 28" aria-hidden="true"><path d={d < 0 ? 'M11 4 3 14l8 10' : 'M5 4l8 10-8 10'} /></svg>
+            </button>
+          ))}
         </div>
         <div className="char-view-info">
           {tl(lang, `三角面 ${stats.tris.toLocaleString()}・繪製 ${stats.draws} 次`, `三角形 ${stats.tris.toLocaleString()}・描画 ${stats.draws} 回`, `${stats.tris.toLocaleString()} triangles · ${stats.draws} draws`)}

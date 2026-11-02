@@ -2099,6 +2099,8 @@ function WcWall({ len, at, yaw, top, cut = false }: { len: number; at: [number, 
 /** how thick the rooms' walls are drawn behind their faces (the owner's: the partitions between the men's and the women's, and between each
  * washroom and its toilet, were bare planes, paper-thin seen from above): the men's and the women's rooms 0.12 apart, half each */
 const WC_T = 0.06
+/** how far behind the shop's wall face (the rooms' x = 0) their walls' bodies begin: never in its face */
+const WC_IN = 0.02
 /** a stretch of solid wall in the rooms' frame, from x0 to x1, y0 to y1, z0 to z1 (either way round): its top and its cut end seen from
  * outside, in a plaster a touch deeper than the walls' faces */
 function WcMass({ x, y, z }: { x: [number, number]; y: [number, number]; z: [number, number] }) {
@@ -2182,9 +2184,11 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <WcWall len={SW} at={[SX, 0, s * (w / 2 + E)]} yaw={s > 0 ? Math.PI : 0} top={top} />
       {/* the walls' bodies behind their faces, solid to the top (cut open at the back wall, seen from outside): the wall toward the other
           toilet's rooms (theirs the other half of it); by the door, the short wall and the depth of the shop's wall before the toilet's room,
-          one block; over the way through, the plaster's lintel; the toilet's room's end */}
-      <WcMass x={[0, D]} y={[0, top]} z={[-s * (w / 2 + 0.002), -s * (w / 2 + WC_T)]} />
-      <WcMass x={[0, X0 - 0.002]} y={[0, top]} z={[s * (w / 2 + 0.002), s * (w / 2 + E + WC_T)]} />
+          one block; over the way through, the plaster's lintel; the toilet's room's end. Each from a little behind the shop's wall (WC_IN):
+          from it, their fronts were in its face and fought it, flickering, the wainscot beside the doors showing plaster (the owner saw
+          both) */}
+      <WcMass x={[WC_IN, D]} y={[0, top]} z={[-s * (w / 2 + 0.002), -s * (w / 2 + WC_T)]} />
+      <WcMass x={[WC_IN, X0 - 0.002]} y={[0, top]} z={[s * (w / 2 + 0.002), s * (w / 2 + E + WC_T)]} />
       <WcMass x={[X0, D]} y={[h, top]} z={[s * w / 2, s * (w / 2 + WC_T)]} />
       <WcMass x={[X0, D]} y={[0, top]} z={[s * (w / 2 + E + 0.002), s * (w / 2 + E + WC_T)]} />
       {/* (the way through: a cedar post at the short wall's end, as deep as the wall; the noren's rod under the lintel, on two little brackets) */}

@@ -6644,15 +6644,16 @@ html[lang='en'] .heat-label { font-size: 13px; }
     height: 44px;
     align-items: center;
     padding: 0 16px 0 12px;
-    border: 1.5px solid var(--text-soft);
+    border: 0;
     border-radius: 22px;
     background: var(--page);
     box-shadow: 0 4px 12px -6px rgb(59 42 32 / 0.5);
     font: 700 16px/1 var(--brush);
     cursor: pointer;
-    transition: margin-top 0.3s ease, transform 0.15s;
+    transition: margin-top 0.3s ease, transform 0.15s, filter 0.12s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out;
   }
   .money-chip:hover { transform: translateY(-1px); }
+  .money-chip:active { transform: none; filter: brightness(0.88); transition-duration: 0s; }
   /* (left of the pantry's little fridge when that's there, at the grill) */
   .app.has-fridge .money-chip { right: 384px; }
   .app.is-hushed .money-chip { display: none; }
@@ -6776,9 +6777,8 @@ html[lang='en'] .heat-label { font-size: 13px; }
   .money-chip { right: 280px; }
   .fridge-toggle { right: 280px; }
   .app.has-fridge .money-chip { right: 332px; }
-  /* (smoked glass: readable over the bright room by day as over the dark by night) */
+  /* (smoked glass: readable over the bright room by day as over the dark by night; no rim round it (the owner's: not a white frame)) */
   .money-chip {
-    border: 1px solid rgb(255 255 255 / 0.34);
     background: linear-gradient(180deg, rgb(46 38 30 / 0.46), rgb(22 18 14 / 0.34));
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     backdrop-filter: blur(12px) saturate(1.4);
@@ -6788,7 +6788,12 @@ html[lang='en'] .heat-label { font-size: 13px; }
   /* (important: money's pale green everywhere else is, and it won over this, the owner saw the chip's sum the dull green still) */
   .money-chip .money { color: #4fff85 !important; text-shadow: 0 1px 2px rgb(0 0 0 / 0.55); }
   .money-chip .money-cur { font-size: 0.62em; margin-right: 0.12em; letter-spacing: 0.02em; opacity: 0.85; }
-  .money-chip:hover { background: linear-gradient(180deg, rgb(56 46 36 / 0.55), rgb(28 22 18 / 0.42)); }
+  /* (pointed at, the owner's: the glass a little lighter and the sum glowing, the chip lifted; pressed, a touch darker) */
+  .money-chip:hover {
+    background: linear-gradient(180deg, rgb(66 54 40 / 0.62), rgb(32 26 20 / 0.5));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.32), 0 8px 22px -8px rgb(0 0 0 / 0.6), 0 0 18px -2px rgb(79 255 133 / 0.3);
+    filter: brightness(1.1);
+  }
 }
 
 /* ---- the interface in English: all of it set in LXGW WenKai TC, as the owner chose (once Cormorant Garamond), its plain labels too (what
@@ -6956,7 +6961,28 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 .char-view-head b { font-weight: 600; color: #f0f0f0; }
 .char-view-head span { flex: 1; min-width: 0; color: #e8a33d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .char-view-fold { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 3px; background: #4a4a4a; color: #ddd; cursor: pointer; }
-.char-view-stage { height: 360px; flex: none; background: radial-gradient(ellipse at 50% 38%, #5a5550 0%, #2b2826 62%, #1c1a19 100%); cursor: grab; }
+.char-view-stage { position: relative; height: 360px; flex: none; background: radial-gradient(ellipse at 50% 38%, #5a5550 0%, #2b2826 62%, #1c1a19 100%); cursor: grab; }
+/* (either side of the stage, half way up: the one before and the one after in the list) */
+.char-view-arrow {
+  position: absolute;
+  top: 50%;
+  width: 32px;
+  height: 56px;
+  margin-top: -28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.22);
+  color: #e6e6e6;
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 0.12s, background 0.12s;
+}
+.char-view-arrow.is-prev { left: 8px; }
+.char-view-arrow.is-next { right: 8px; }
+.char-view-arrow:hover { opacity: 1; background: rgb(0 0 0 / 0.42); }
+.char-view-arrow:active { background: #e8a33d; color: #1d1d1d; }
+.char-view-arrow svg { width: 14px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .char-view-stage:active { cursor: grabbing; }
 .char-view-info { padding: 5px 10px; color: #b8b8b8; font-size: 12px; border-top: 1px solid #1c1c1c; font-variant-numeric: tabular-nums; }
 .char-view-tools { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 10px 8px; border-bottom: 1px solid #1c1c1c; }
@@ -7061,6 +7087,70 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 .rep-about dt { color: #7a6250; white-space: nowrap; }
 :root[data-theme='dark'] .rep-about dt { color: #c9bfae; }
 .rep-about dd { margin: 0; overflow-wrap: anywhere; }
+/* (the story: a sheet of washi, faintly laid, the shop's seal stamped askew by its title; the money he came with a page of his ledger, ruled,
+   its red line down the side; its last line in the shop's red under a dashed rule) */
+.rep-story {
+  --st-paper: linear-gradient(180deg, #fbf3e1, #f1e4c8);
+  --st-ink: #3b2a20;
+  --st-soft: #7a6250;
+  --st-red: #b23a28;
+  --st-rule: rgb(59 42 32 / 0.09);
+  --st-sheet: rgb(255 255 255 / 0.5);
+  margin: 0 0 12px;
+  padding: 14px 16px 12px;
+  border: 1px solid rgb(122 74 40 / 0.22);
+  border-radius: 12px;
+  background: radial-gradient(circle at 16% 10%, rgb(255 255 255 / 0.5), transparent 45%),
+    repeating-linear-gradient(97deg, rgb(140 110 70 / 0.04) 0 1px, transparent 1px 7px), var(--st-paper);
+  box-shadow: inset 0 0 0 4px rgb(255 255 255 / 0.3), 0 4px 12px -6px rgb(59 42 32 / 0.35);
+  color: var(--st-ink);
+}
+:root[data-theme='dark'] .rep-story {
+  --st-paper: linear-gradient(180deg, rgb(70 55 42 / 0.9), rgb(48 38 29 / 0.9));
+  --st-ink: #efe3cc;
+  --st-soft: #c9b79e;
+  --st-red: #ff9a80;
+  --st-rule: rgb(246 236 216 / 0.1);
+  --st-sheet: rgb(0 0 0 / 0.18);
+  border-color: rgb(246 236 216 / 0.14);
+}
+.rep-story > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+.rep-story h3 { margin: 0; font: 700 21px/1.2 var(--brush); letter-spacing: 0.12em; white-space: nowrap; }
+.rep-story > header small { display: block; margin-top: 4px; font-size: 12px; letter-spacing: 0.22em; color: var(--st-soft); white-space: nowrap; }
+.rep-seal {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: #c4442f;
+  color: #fbeee0;
+  font: 700 12px/1.05 var(--brush);
+  writing-mode: vertical-rl;
+  letter-spacing: 0.06em;
+  box-shadow: inset 0 0 0 2px rgb(251 238 224 / 0.55);
+  transform: rotate(-6deg);
+  opacity: 0.92;
+}
+.rep-story p { margin: 0 0 9px; font-size: 13.5px; line-height: 1.8; text-wrap: pretty; }
+.rep-story:lang(ja) p { word-break: auto-phrase; }
+.rep-story p.rep-story-end { margin: 12px 0 2px; padding-top: 10px; border-top: 1px dashed rgb(196 68 47 / 0.4); color: var(--st-red); font-weight: 700; }
+.rep-ledger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  margin: 2px 0 11px;
+  padding: 4px 12px;
+  border-left: 3px solid #c4442f;
+  border-radius: 4px;
+  background: repeating-linear-gradient(180deg, transparent 0 25px, var(--st-rule) 25px 26px), var(--st-sheet);
+  font-size: 13px;
+  line-height: 26px;
+}
+.rep-ledger dt { color: var(--st-soft); white-space: nowrap; }
+.rep-ledger dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rep-ledger :is(dt, dd):nth-last-child(-n + 2) { font-weight: 700; color: var(--st-red); }
 .rep-drawer a { color: #2f6f9f; text-decoration: underline; text-underline-offset: 2px; }
 :root[data-theme='dark'] .rep-drawer a { color: #9cc8ef; }
 .rep-credits { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

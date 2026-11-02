@@ -63,16 +63,26 @@ type SteamProps = ThreeElements['group'] & {
   level?: RefObject<number>
 }
 
+/** each size of steam's planes, made once and shared by every steam of that size (each dish's had its own, let go as it went: in development,
+ * where React makes each twice and keeps one, the other was never let go) */
+const PLANES = new Map<string, THREE.PlaneGeometry>()
+function planeOf(width: number, height: number) {
+  const key = `${width}|${height}`
+  let g = PLANES.get(key)
+  if (!g) {
+    g = new THREE.PlaneGeometry(width, height, 8, 28)
+    g.translate(0, height / 2, 0)
+    PLANES.set(key, g)
+  }
+  return g
+}
+
 /** Rising steam (or smoke) built from a few crossed, noise-animated planes. */
 // (drawn again only when its props change: a position handed down as a new [x, y, z] with the same numbers is the same place)
 export const Steam = memo(SteamImpl, sameProps)
 function SteamImpl({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, color = '#ffffff', shade = '#e6f0fc',
   speed = 0.07, level, ...props }: SteamProps) {
-  const geometry = useMemo(() => {
-    const g = new THREE.PlaneGeometry(width, height, 8, 28)
-    g.translate(0, height / 2, 0)
-    return g
-  }, [width, height])
+  const geometry = useMemo(() => planeOf(width, height), [width, height])
 
   const materials = useMemo(
     () =>
@@ -98,7 +108,6 @@ function SteamImpl({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, colo
     [layers],
   )
 
-  useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => { for (const m of materials) m.dispose() }, [materials])
   const time = useRef(0)
   const group = useRef<THREE.Group>(null)

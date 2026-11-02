@@ -11,7 +11,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
-import { Person } from '@/scene/Person3D'
+import { OLD_GUESTS, Person } from '@/scene/Person3D'
 import { FOLK_HEIGHT, FolkFigure, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
@@ -95,7 +95,7 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
 /** the customers (and their stools) at life size beside the bar, which is drawn to match them */
 const PEOPLE_SCALE = 1.3
 /** the customers drawn in the boss's style (scene/FolkFigure), his height; ?guests=old brings back the old figures (scene/Person3D) */
-const FOLK_GUESTS = typeof location === 'undefined' || new URLSearchParams(location.search).get('guests') !== 'old'
+const FOLK_GUESTS = !OLD_GUESTS
 /** the staff (the servers) drawn the boss's height, a head shorter than the customers: the boss (Roasting's BOSS_SCALE) is 0.95 tall at 1.68,
  * a figure here 0.97 tall at this and the shop's own scale of 2 */
 const STAFF_SCALE = (1.05 * 0.8 * 2 * 0.95) / (0.97 * 2)

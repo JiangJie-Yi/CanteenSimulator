@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -243,16 +243,24 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
   const pictures = usePictures()
   const spec = useMemo(() => folkSpec(id), [id])
+  // (their figure: the template's, put together for them (its shapes and ink shared); made while drawing, so nothing in it that must be let
+  // go: a copy made and thrown away (React's strict checks make two) leaves nothing behind)
   const fig = useMemo(() => {
-    const base = template(gltf.scene, spec.hair, spec.acc)
-    const root = base.root.clone(true)
-    // (their own materials: their skin, hair and clothes, their face; theirs alone, to fade)
+    const root = template(gltf.scene, spec.hair, spec.acc).root.clone(true)
+    const get = (n: string) => root.getObjectByName(n) ?? null
+    return { root, body: get('body')!, head: get('head'), handL: get('handL'), handR: get('handR'), face: null as THREE.MeshToonMaterial | null }
+  }, [gltf, spec])
+  // (their own materials: their skin, hair and clothes, their face; theirs alone, to fade: made as they're shown and let go as they go, the
+  // template's put back (in development every customer left a set behind: the copy that was made twice and dropped))
+  useLayoutEffect(() => {
     const own = new Map<THREE.Material, THREE.Material>()
-    let face: THREE.MeshToonMaterial | null = null
-    root.traverse((o) => {
+    const was = new Map<THREE.Mesh, THREE.Material>()
+    fig.root.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.Material
+      // (the ink lines are the hull's own, shared: not copied)
+      if ((src as THREE.MeshBasicMaterial).side === THREE.BackSide && src.type !== 'MeshToonMaterial') return
       let t = own.get(src)
       if (!t) {
         t = src.clone()
@@ -265,27 +273,26 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
           const ft = pictures.get(`face_${spec.face}`)!.clone()
           ft.needsUpdate = true
           tm.map = ft
-          face = tm
+          fig.face = tm
         }
         else if (src.name === 'FolkKnit') tm.map = cloth('knit', '#8a6a9a', [6, 2])
-        // (the ink lines are the hull's own, shared: not copied)
-        if ((src as THREE.MeshBasicMaterial).side === THREE.BackSide && src.type !== 'MeshToonMaterial') t = src
         own.set(src, t)
       }
+      was.set(m, src)
       m.material = t
     })
-    const get = (n: string) => root.getObjectByName(n) ?? null
-    // (what's theirs alone, to let go when they've gone: their copies, not the ink lines all of them share)
-    const mine = [...new Set([...own.entries()].filter(([src, t]) => t !== src).map(([, t]) => t))]
-    return { root, body: get('body')!, head: get('head'), handL: get('handL'), handR: get('handR'), face: face as THREE.MeshToonMaterial | null, mats: [...new Set(own.values())], mine }
-  }, [gltf, spec, pictures])
-  // (a customer gone: their own materials and their face's copy let go (the shapes are the template's, shared, kept))
-  useEffect(() => () => {
-    for (const m of fig.mine) {
-      if (m.name === 'FolkFace') (m as THREE.MeshToonMaterial).map?.dispose()
-      m.dispose()
+    // (their new materials opaque, with no expression yet: their fading and their face set afresh)
+    faded.current = 1
+    exprNow.current = null
+    return () => {
+      for (const [m, src] of was) m.material = src
+      for (const t of own.values()) {
+        if (t.name === 'FolkFace') (t as THREE.MeshToonMaterial).map?.dispose()
+        t.dispose()
+      }
+      fig.face = null
     }
-  }, [fig])
+  }, [fig, spec, pictures])
 
   const chop = useRef<THREE.Group>(null)
   const phone = useRef<THREE.Group>(null)
@@ -313,7 +320,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const pace = useRef(0)
   const lastPos = useRef<THREE.Vector3 | null>(null)
   const outer = useRef<THREE.Group>(null)
-  const exprNow = useRef<Expr>('neutral')
+  const exprNow = useRef<Expr | null>('neutral')
   const v3 = useMemo(() => new THREE.Vector3(), [])
   const chopDir = useMemo(() => new THREE.Vector3(), [])
   const chopQ = useMemo(() => new THREE.Quaternion(), [])

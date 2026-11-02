@@ -892,20 +892,37 @@ function crewPlaces(crew: CrewMember[]) {
   })
 }
 /** where the cook stands (on the floor, in the notch: in up to the hearth, as the owner drew; he stood out past the table's edge), and the
- * way he faces: in at the fire */
-const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.0).addScaledVector(ALONG, -0.4).setY(GRILL_OFFSET.y - KITCHEN_DROP)
-/** the aisle in front of the cook table, where he walks along it (out of the notch first) */
+ * way he faces: in at the fire. In the middle of the notch, along: it's only a little wider than he is (1.3 to his 1.0), and set to one side
+ * (it was 0.36 nearer its left-hand side) he stood into the table beside it, by the left-hand cubby (the owner saw it) */
+const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.0).addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
+  .setY(GRILL_OFFSET.y - KITCHEN_DROP)
+/** the aisle in front of the cook table, where he stands while the shop's open */
 const AISLE_LAY = 2.62
+/** and the line he walks along it, a little further out (clear of his cook's back, at the fire), and how far along it either way (the
+ * Roasting frame's along: in front of the table, short of its ends, clear of what stands by them) */
+const WALK_LAY = AISLE_LAY + 0.38
+const WALK_ALONG: [number, number] = [-1.24, 1.86]
 const CHEF_YAW = Math.atan2(-CHEF_AT.x, -CHEF_AT.z)
 /** the owner, smaller than the cooks (round and short, as Overcooked's), and how far down the cook's aisle his walk goes, in his own frame */
 const BOSS_SCALE = 1.05 * 0.8 * GRILL_SCALE
-/** where he stands while the shop's open: down the aisle from the grill, out of his chef's way */
-const BOSS_OPEN_AT = CHEF_AT.clone().addScaledVector(LAY, AISLE_LAY - 2.0).addScaledVector(ALONG, 1.6)
-// (out of the notch and along the aisle: far enough out that he clears the corner of the table beside it)
-const BOSS_WALK = ((): [number, number] => {
-  const v = ALONG.clone().multiplyScalar(1.7).addScaledVector(LAY, AISLE_LAY + 0.38 - 2.0).applyAxisAngle(new THREE.Vector3(0, 1, 0), -CHEF_YAW).divideScalar(BOSS_SCALE)
-  return [v.x, v.z]
-})()
+/** where he stands while the shop's open: down the aisle from the grill, out of his chef's way (where it was when his place at the fire was
+ * further to the left) */
+const BOSS_OPEN_AT = new THREE.Vector3().addScaledVector(LAY, AISLE_LAY).addScaledVector(ALONG, 1.2).setY(CHEF_AT.y)
+/** a step in the Roasting frame, in his own (turned with him, his size) */
+const bossFrame = (v: THREE.Vector3, unit = false): [number, number] => {
+  const w = v.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -CHEF_YAW)
+  if (unit) w.normalize(); else w.divideScalar(BOSS_SCALE)
+  return [w.x, w.z]
+}
+/** his way about, from a place of his (BossAisle): straight back to the walking line, then along it */
+const bossAisle = (home: THREE.Vector3) => {
+  const h = home.dot(ALONG)
+  return { mouth: bossFrame(LAY.clone().multiplyScalar(WALK_LAY - home.dot(LAY))), dir: bossFrame(ALONG, true),
+    range: [(WALK_ALONG[0] - h) / BOSS_SCALE, (WALK_ALONG[1] - h) / BOSS_SCALE] as [number, number] }
+}
+const BOSS_AISLE = bossAisle(CHEF_AT), BOSS_AISLE_OPEN = bossAisle(BOSS_OPEN_AT)
+// (his walk on his round: out of the notch (straight back) and along the aisle)
+const BOSS_WALK = bossFrame(ALONG.clone().multiplyScalar(1.7).addScaledVector(LAY, WALK_LAY - CHEF_AT.dot(LAY)))
 /** a wood texture of blender/woodtex.py's, tiled every `w` x `h` of the table's units */
 function woodTex(file: string, w: number, h: number) {
   if (typeof document === 'undefined') return null
@@ -2213,7 +2230,7 @@ function EditProxyImpl({ id, label, at, size, yaw }: { id: string; label: string
 const BossSpot = memo(function BossSpot({ open, lang }: { open: boolean; lang: Lang }) {
   return (
     <Movable id="boss" label="老闆"><group position={open ? BOSS_OPEN_AT : CHEF_AT} rotation-y={CHEF_YAW} scale={BOSS_SCALE}>
-      <Boss to={BOSS_WALK} open={open} lang={lang}><BlobShadow r={0.24} /></Boss>
+      <Boss to={BOSS_WALK} aisle={open ? BOSS_AISLE_OPEN : BOSS_AISLE} open={open} lang={lang}><BlobShadow r={0.24} /></Boss>
     </group></Movable>
   )
 })

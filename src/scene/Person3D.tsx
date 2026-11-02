@@ -24,6 +24,8 @@ import { cloth, type Pattern } from './patterns'
  */
 
 const URL = import.meta.env.BASE_URL + 'models/guests.glb'
+/** the old figures wanted (?guests=old): the customers are scene/FolkFigure's otherwise, and these never drawn */
+export const OLD_GUESTS = typeof location !== 'undefined' && new URLSearchParams(location.search).get('guests') === 'old'
 const INK = new THREE.Color('#3b2a20')
 const OUTLINE = 0.0035
 const SKIN = ['#f3d2b0', '#eac39c', '#d9a77e', '#f6dcc0', '#c99470']
@@ -626,4 +628,5 @@ export function Person({ id, eating, walking, still, t: tGiven, clock, talk = 0,
  * The cook, standing at the fire while the shop is open and busy at it: fanning the coals with an uchiwa in his left
  * hand, turning a skewer low over them with his right, then holding it up high to shake salt down. Faces +Z.
  */
-useGLTF.preload(URL)
+// (fetched ahead only if they're wanted: 9 MB, read and unpacked at every load for figures no one saw)
+if (OLD_GUESTS) useGLTF.preload(URL)
