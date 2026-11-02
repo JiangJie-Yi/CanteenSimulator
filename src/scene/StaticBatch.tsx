@@ -140,7 +140,8 @@ export function StaticBatch({ children, parts }: { children: ReactNode; parts?: 
   return (
     <>
       <group ref={holder}>{children}</group>
-      <group ref={merged} />
+      {/* (what it merged into: marked, so a piece looking for the way its contents face looks past it, into the originals) */}
+      <group ref={merged} userData={{ batchMade: true }} />
     </>
   )
 }

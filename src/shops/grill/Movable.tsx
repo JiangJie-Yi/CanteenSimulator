@@ -624,8 +624,9 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const inn = inner.current
     if (!inn) return 0
     let n: THREE.Object3D = inn
-    // (the editor's own wire box hung in it is not part of what's seen)
-    const kids = (o: THREE.Object3D) => o.children.filter((c) => !(c as THREE.LineSegments).isLineSegments)
+    // (the editor's own wire box hung in it is not part of what's seen; nor what a batch merged its parts into: its originals, under the
+    // batch's other group, are where the turn is (a piece turned inside its batch had the world's axes for its own, the willow, the till))
+    const kids = (o: THREE.Object3D) => o.children.filter((c) => !(c as THREE.LineSegments).isLineSegments && !c.userData.batchMade)
     while (kids(n).length === 1 && !(kids(n)[0] as THREE.Mesh).isMesh) n = kids(n)[0]
     inn.updateWorldMatrix(true, true)
     const yaw = (o: THREE.Object3D) => new THREE.Euler().setFromQuaternion(o.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
@@ -636,6 +637,77 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     setInQuat(Math.abs(e.x) > 0.02 || Math.abs(e.z) > 0.02 ? q : null)
     return Math.atan2(Math.sin(d), Math.cos(d))
   }
+  /**
+   * The way it faces, for its object axes (the move arrows, the place fields, the scale handles), as a turn in its inner frame. The turn its
+   * contents carry (contentYaw) if they carry one, else the room's direction (the bar's: the whole shop is laid out along it, a slant of
+   * 36° to the world's axes, which had been every unturned piece's own); and for anything squared off (its footprint a box, not a round), the
+   * box's own direction as it lies, which can be turned against both (a carton set down askew, a stool turned on its spot), unless it's
+   * within a few degrees of one of them (then that one, exactly: a model's footprint is seldom a perfect box). The owner's: the till's
+   * group's and many a piece's axes stood across them.
+   */
+  const faceYaw = () => {
+    const inn = inner.current
+    if (!inn) return 0
+    const chain = contentYaw()
+    inn.updateWorldMatrix(true, false)
+    const yawW = (o: THREE.Object3D) => new THREE.Euler().setFromQuaternion(o.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
+    // (the room's direction, turned with the piece's own turn: in the inner frame, the room's against the frame the piece stands in)
+    const own = (rotationOf(id)[1] + baseTurn[1]) * DEG
+    const roomIn = Math.atan2(-ALONG.z, ALONG.x) - (yawW(inn) - own)
+    const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
+    const quarter = (a: number) => { const x = wrap(a * 4) / 4; return x }
+    const ref = Math.abs(chain) > 0.002 ? chain : wrap(roomIn)
+    const box = footprint()
+    if (!box) return ref
+    const SNAP = 6 * DEG
+    if (Math.abs(quarter(box - ref)) <= SNAP) return ref
+    if (Math.abs(quarter(box - roomIn)) <= SNAP) return wrap(ref + quarter(roomIn - ref))
+    return wrap(ref + quarter(box - ref))
+  }
+  /** the direction its footprint's tightest box lies along, in the inner frame (a quarter turn either way the same), if it's squared off at all:
+   * null for a round (whose box fits about as well any way it's turned) */
+  const footprint = () => {
+    const inn = inner.current
+    if (!inn) return null
+    inn.updateWorldMatrix(true, true)
+    const toInner = new THREE.Matrix4().copy(inn.matrixWorld).invert()
+    const xs: number[] = [], zs: number[] = []
+    const v = new THREE.Vector3(), mat = new THREE.Matrix4()
+    const meshes: THREE.Mesh[] = []
+    inn.traverse((m) => {
+      if (!(m instanceof THREE.Mesh) || (m as THREE.InstancedMesh).isInstancedMesh) return
+      for (let o: THREE.Object3D | null = m; o && o !== inn; o = o.parent) if (!o.visible) return
+      const mats = Array.isArray(m.material) ? m.material : [m.material]
+      if (!m.userData.proxy && mats.every((x) => !x.visible || x.opacity <= 0.02 || !x.colorWrite || x.blending === THREE.AdditiveBlending || x.side === THREE.BackSide || (x.transparent && !x.depthWrite))) return
+      if (m.geometry.getAttribute('position')) meshes.push(m)
+    })
+    const total = meshes.reduce((n, m) => n + m.geometry.getAttribute('position').count, 0)
+    if (!total) return null
+    // (a few hundred of its points are enough to tell how it lies)
+    const stride = Math.max(1, Math.ceil(total / 600))
+    for (const m of meshes) {
+      const pos = m.geometry.getAttribute('position')
+      mat.multiplyMatrices(toInner, m.matrixWorld)
+      for (let i = 0; i < pos.count; i += stride) { v.fromBufferAttribute(pos, i).applyMatrix4(mat); xs.push(v.x); zs.push(v.z) }
+    }
+    const area = (a: number) => {
+      const c = Math.cos(a), s = Math.sin(a)
+      let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity
+      for (let i = 0; i < xs.length; i++) {
+        const u = xs[i] * c - zs[i] * s, w = xs[i] * s + zs[i] * c
+        if (u < u0) u0 = u; if (u > u1) u1 = u; if (w < w0) w0 = w; if (w > w1) w1 = w
+      }
+      return (u1 - u0) * (w1 - w0)
+    }
+    let best = 0, low = Infinity, high = 0
+    for (let d = 0; d < 90; d += 2) { const a = area(d * DEG); if (a < low) { low = a; best = d * DEG } high = Math.max(high, a) }
+    for (let d = -2; d <= 2; d += 0.25) { const a = area(best + d * DEG); if (a < low) { low = a; best = best + d * DEG } }
+    // (squared off: turned the worst way, its box a quarter bigger than the tightest; a round one's hardly changes)
+    return low > 1e-9 && (high - low) / low >= 0.25 ? best : null
+  }
+  /** the turn its object axes go by: the way it faces (faceYaw); one stretched unevenly keeps the turn its stretch was made along (the
+   * contents' own), so it isn't stretched another way */
+  const facing = () => { const s = scaleOf(id); return s[0] !== s[1] || s[1] !== s[2] ? contentYaw() : faceYaw() }
   const frame = () => {
     const par = gw.current
     if (!par) return
@@ -681,7 +753,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     let tries = 0
     const t = window.setInterval(() => {
       const m = measure()
-      if (m || ++tries > 80) { if (m) setMid(footOf(m)); setInYaw(contentYaw()); setReady(true); window.clearInterval(t) }
+      if (m || ++tries > 80) { if (m) setMid(footOf(m)); setInYaw(facing()); setReady(true); window.clearInterval(t) }
     }, 100)
     return () => window.clearInterval(t)
   }, [])
@@ -689,7 +761,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     if (!on) { setBox(null); return }
     // (the parent's turn measured again now: taken at mount, a parent still being laid out could give the wrong one, and the world's axes with it)
     frame()
-    setInYaw(contentYaw())
+    setInYaw(facing())
     // (a batch merges its meshes a moment after mounting: measured at once and again a little later, so the box is there whenever it's switched on)
     const first = measure('whole')
     if (first) setFrame(id, first.theta, ownYaw)
