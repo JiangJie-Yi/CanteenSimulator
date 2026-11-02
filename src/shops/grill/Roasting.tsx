@@ -3678,8 +3678,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (lastSpace.current === space) return
     snaps.current.set(lastSpace.current, save())
     // (each opening a clean kitchen: the last day's leftovers (raw skewers set out, half-cooked ones, a plate nobody came for) aren't
-    // brought back onto the table (the owner saw skewers there that nobody had ordered); the shut shop's table comes back as it was left)
+    // brought back onto the table (the owner saw skewers there that nobody had ordered); the shut shop's table comes back as it was left.
+    // What stands on the table stays where it stood, though: the seasoning ledge, the board, the bucket, the bin, the basket and the bowl
+    // keep their places (and what edit mode did to them), only the plates and dishes put out going; cleared with the rest, the ledge went
+    // back to the model's own place at every opening (placed once, by boxPlaced) and the edit's moves were lost (the owner saw it shift))
+    const stands = [...moved.current].filter(([k]) => !STACKABLE(k)).map(([k, v]) => [k, v.clone()] as const)
     load(space === 'open' ? undefined : snaps.current.get(space))
+    if (space === 'open') for (const [k, v] of stands) moved.current.set(k, v)
     lastSpace.current = space
     // (shut: the customers are gone, and what they'd ordered with them)
     if (space === 'closed') {
