@@ -3,12 +3,12 @@
 // waited for it, and what put them out (no tissues at their place, a dirty toilet, the lights off, an upset stomach, nothing on the menu
 // they could have); the shop's stars are the recent visits' average, the newer counting more; and what each said.
 
-export type Gripe = 'wait' | 'tissue' | 'toilet' | 'dark' | 'sick' | 'nothing'
+export type Gripe = 'wait' | 'tissue' | 'toilet' | 'dark' | 'sick' | 'nothing' | 'receipt'
 /** one customer's visit, as they leave: what they thought of what they ate (0..100, none if they ate nothing), how long they waited for
  * their first piece (seconds), whether they walked out, and what put them out */
 export type Visit = { id: number; taste: number | null; waited: number; walkedOut: boolean; gripes: Gripe[] }
 /** how much each kind of upset takes off a visit's satisfaction */
-export const GRIPE_COST: Record<Gripe, number> = { wait: 12, tissue: 8, toilet: 10, dark: 18, sick: 35, nothing: 25 }
+export const GRIPE_COST: Record<Gripe, number> = { wait: 12, tissue: 8, toilet: 10, dark: 18, sick: 35, nothing: 25, receipt: 6 }
 /** how long a wait for the first piece is taken in good part (seconds); after that, a point off every six seconds, up to twenty */
 export const WAIT_OK = 90
 
@@ -49,7 +49,7 @@ export function rateShop(visits: Visit[]): Rating {
     stars: avg(satisfaction),
     n: visits.length,
     food: avg((v) => v.taste),
-    service: avg((v) => clamp(100 - Math.min(60, Math.max(0, v.waited - 60) / 2) - (v.walkedOut ? 50 : 0) - (has(v, 'nothing') ? 30 : 0), 0, 100)),
+    service: avg((v) => clamp(100 - Math.min(60, Math.max(0, v.waited - 60) / 2) - (v.walkedOut ? 50 : 0) - (has(v, 'nothing') ? 30 : 0) - (has(v, 'receipt') ? 20 : 0), 0, 100)),
     place: avg((v) => clamp(100 - (has(v, 'tissue') ? 25 : 0) - (has(v, 'toilet') ? 30 : 0) - (has(v, 'dark') ? 35 : 0) - (has(v, 'sick') ? 40 : 0), 0, 100)),
   }
 }

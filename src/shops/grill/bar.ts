@@ -10,6 +10,7 @@ import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
 import { emptyFridge, readDrinks, startBack, writeDrinks, type Back } from '@/game/drinkStock'
 import { replaces } from '@/scene/hot'
+import { ROLL_SLIPS } from '@/game/receipts'
 
 /*
  * Where the customers sit: one or more counters, each a straight run of stools. A counter is given by its middle
@@ -113,6 +114,15 @@ export function setTissues(seat: number, sheets: number) {
 /** what's put each customer out while they're here (game/reputation's gripes), for their visit's score as they go (Roasting) */
 export const GRIPES = new Map<number, Set<Gripe>>()
 export const gripe = (id: number, g: Gripe) => { const s = GRIPES.get(id) ?? new Set<Gripe>(); s.add(g); GRIPES.set(id, s) }
+/** a gripe that comes after a customer's visit's been scored (at the till, paying: no receipt), added to it by App, and said */
+export const LATE_GRIPE: { add: (id: number, g: Gripe) => void } = { add: gripe }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __lateGripe?: typeof LATE_GRIPE }).__lateGripe = LATE_GRIPE
+/** the receipt printer's roll (game/receipts): slips left on it; `ver` counts its changes, for the stock's panel to follow */
+export const PRINTER = { slips: ROLL_SLIPS, ver: 0 }
+const printerSubs = new Set<() => void>()
+export const onPrinter = (f: () => void) => { printerSubs.add(f); return () => { printerSubs.delete(f) } }
+export function setPrinter(slips: number) { if (PRINTER.slips === slips) return; PRINTER.slips = slips; PRINTER.ver++; printerSubs.forEach((f) => f()) }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __printer?: typeof PRINTER }).__printer = PRINTER
 /** the owner out on the floor serving (no server hired: he carries the plates, clears them and takes the washed ones back himself, the
  * owner's: nothing flies): GuestBar3D walks a figure of him; Roasting's, at his place in the kitchen, is hidden meanwhile */
 export const OWNER_OUT = { on: false }
@@ -516,7 +526,9 @@ export const TILL_STATE = { text: '0', drawer: 0,
   /** the one paying pays by card (on the reader, no cash), how many groups are waiting to pay, and so whether the tablet's in use (game/till) */
   card: false, queue: 0, tablet: false,
   /** what the one paying owes, and their number */
-  bill: 0, payer: 0 }
+  bill: 0, payer: 0,
+  /** this payment's receipt printed (cashRegister: none with the printer out of paper and no spare roll) */
+  slip: true }
 /** what a customer's bill comes to: the dishes they ordered and the drink from the fridge, if they took one */
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __till?: typeof TILL_STATE }).__till = TILL_STATE
 /**

@@ -9,7 +9,8 @@ import { DEPTS, newRegister, pressKey, REG_MODES, REG_TAG_TEXT, regFigure, setMo
 import { keyHelp } from '@/data/registerKeys'
 import type { Lang } from '@/data/i18n'
 import { deposit } from '@/game/till'
-import { POINTER_HINT, TILL_CASH, TILL_STATE } from './bar'
+import { printSlip, RECEIPT } from '@/game/receipts'
+import { LATE_GRIPE, POINTER_HINT, PRINTER, setPrinter, SUPPLIES, TILL_CASH, TILL_STATE } from './bar'
 import { getEdit } from './edit'
 
 /**
@@ -330,6 +331,15 @@ export function drawReceipt(r: Receipt | null): number {
   return h / 200
 }
 
+/** a slip off the printer's roll (game/receipts): a spare roll put in from the stock when it's run out; false with none spare (no paper) */
+function slipOff() {
+  const spares = SUPPLIES.has(RECEIPT)
+  const r = printSlip(PRINTER.slips, spares < 0 ? Infinity : spares)
+  if (r.changed) SUPPLIES.take(RECEIPT, 1)
+  setPrinter(r.roll)
+  return r.printed
+}
+
 /** do what pressing a key does: the register's state, the beep, the drawer, the receipt */
 export function press(key: RegKey, now = new Date()) {
   REGISTER.pressed.set(key, performance.now())
@@ -339,8 +349,11 @@ export function press(key: RegKey, now = new Date()) {
   if (r.effect.drawer) TILL_STATE.manual = true
   if (r.effect.locked) rattle()
   if (r.effect.receipt) {
-    REGISTER.printLen = drawReceipt(r.effect.receipt)
-    REGISTER.printAt = performance.now()
+    // (on paper off the printer's roll: out of it, and no spare roll, nothing comes out but an error's beep)
+    if (slipOff()) {
+      REGISTER.printLen = drawReceipt(r.effect.receipt)
+      REGISTER.printAt = performance.now()
+    } else beep('error')
   } else if (r.effect.feed) {
     REGISTER.printLen = drawReceipt(null)
     REGISTER.printAt = performance.now()
@@ -370,7 +383,7 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
     // (the cashier ringing a customer up: a department key for each dish, the drink, the subtotal, the cash key)
     const k = TILL_STATE.k, pk = lastK.current
     if (k >= 0) {
-      if (pk < 0) rung.current = 0
+      if (pk < 0) { rung.current = 0; TILL_STATE.slip = true }
       const parts = TILL_STATE.parts
       const n = Math.min(parts.length, Math.floor((k / 0.32) * parts.length) + 1)
       if (k < 0.32 && n > rung.current) {
@@ -386,7 +399,12 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
         // (a card's sale settled as CHARGE: no cash tendered, the drawer left shut)
         const { state, receipt } = settle(base, lines, TILL_STATE.card ? 0 : TILL_STATE.tender, TILL_STATE.card ? 'CHARGE' : 'CASH', new Date())
         REGISTER.state = state
-        if (state.receiptOn) { REGISTER.printLen = drawReceipt(receipt); REGISTER.printAt = -1 }
+        // (the customer's receipt: always given while the shop's open (the owner's: a key pressed by mistake mustn't change how the shop
+        // runs; the RCPT key's for sales rung up by hand), on a slip off the printer's roll; with the roll out and no spare, none, and the
+        // customer's put out by it (their visit's scored already: added to it))
+        TILL_STATE.slip = slipOff()
+        if (TILL_STATE.slip) { REGISTER.printLen = drawReceipt(receipt); REGISTER.printAt = -1 }
+        else LATE_GRIPE.add(TILL_STATE.payer, 'receipt')
       }
       if (pk < 0.44 && k >= 0.44) {
         REGISTER.pressed.set(TILL_STATE.card ? 'CHARGE' : 'CASH', now)

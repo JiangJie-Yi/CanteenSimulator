@@ -1202,7 +1202,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     // (the receipt: printed out of its window while the customer pays, torn off and gone as they take their change)
     const sl = slip.current
     if (sl && k >= 0) {
-      sl.visible = k >= 0.3 && k < 0.95
+      sl.visible = TILL_STATE.slip && k >= 0.3 && k < 0.95
       if (sl.visible) { sl.scale.y = Math.max(0.01, smooth(0.3, 0.52, k) * REGISTER.printLen); sl.position.y = 0.2185 + smooth(0.88, 0.95, k) * 0.05 }
     } else if (sl) {
       // (a receipt printed by hand at the keys: fed out over a moment, left hanging till it's torn off, a click, or a while has passed)

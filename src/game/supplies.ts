@@ -2,6 +2,7 @@
 // dry powders at room temperature), and the binchotan for the fire, kept in a sack on the floor by the table and taken from it into the
 // crate on the table's top as the crate runs out. Each is bought in, held in stock and used up (the owner's: they aren't free).
 import { TISSUE, TISSUE_START } from './tissues'
+import { RECEIPT, RECEIPT_START } from './receipts'
 import { SEASONINGS, SEASON_COST, SEASON_NAME, type Seasoning } from '@/data/recipes'
 import type { Lang } from '@/data/i18n'
 import type { Stock } from './economy'
@@ -35,6 +36,8 @@ export const startingSupplies = (): Stock => ({
   [CHARCOAL]: CHARCOAL_START,
   // (spare boxes of tissues for the places' drawers: game/tissues)
   [TISSUE]: TISSUE_START,
+  // (and spare rolls of receipt paper for the register's printer: game/receipts)
+  [RECEIPT]: RECEIPT_START,
 })
 
 /** a dab of a seasoning taken from stock (null when there's none left: it can't go on) */
@@ -64,5 +67,6 @@ export function supplyName(id: string, lang: Lang): string | null {
   const k = seasonOf(id)
   if (k) return SEASON_NAME[lang][k]
   if (id === TISSUE) return lang === 'ja' ? 'ティッシュ（箱）' : lang === 'en' ? 'tissues (boxes)' : '衛生紙（盒）'
+  if (id === RECEIPT) return lang === 'ja' ? 'レシート用紙（巻）' : lang === 'en' ? 'receipt paper (rolls)' : '發票紙（捲）'
   return id === CHARCOAL ? (lang === 'ja' ? '備長炭' : lang === 'en' ? 'binchotan' : '備長炭') : null
 }

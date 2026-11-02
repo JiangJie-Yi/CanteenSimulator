@@ -54,11 +54,13 @@ import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { CUBBY_OPEN, FIRE_SHIFT, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, TISSUES_KEY, tissuesAt, TOILETS, UTILITY } from '@/shops/grill/bar'
+import { CUBBY_OPEN, FIRE_SHIFT, gripe, LATE_GRIPE, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, TISSUES_KEY, tissuesAt, TOILETS, UTILITY } from '@/shops/grill/bar'
 import { getBgmOff } from '@/ui/bgmStore'
 import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
 import { keepVisits, rateShop, type Visit } from '@/game/reputation'
 import { refillBoxes, TISSUE, tissueOrder } from '@/game/tissues'
+import { RECEIPT, receiptOrder } from '@/game/receipts'
+import { LINES } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
@@ -1269,6 +1271,23 @@ export default function App() {
     return next
   }), [])
   const shopRating = useMemo(() => rateShop(shopVisits), [shopVisits])
+  // (a gripe after the visit's been scored: no receipt as they paid, the printer out of paper and no spare roll (game/receipts); added to their
+  // visit, or kept for it if it isn't scored yet)
+  const visitsNow = useRef(shopVisits)
+  visitsNow.current = shopVisits
+  useEffect(() => {
+    LATE_GRIPE.add = (id, g) => {
+      if (!visitsNow.current.some((v) => v.id === id)) { gripe(id, g); return }
+      setShopVisits((vs) => {
+        const k = vs.map((v) => v.id).lastIndexOf(id)
+        if (k < 0 || vs[k].gripes.includes(g)) return vs
+        const next = vs.map((v, i) => (i === k ? { ...v, gripes: [...v.gripes, g] } : v))
+        try { localStorage.setItem(VISITS_KEY, JSON.stringify(next)) } catch { /* (not kept) */ }
+        return next
+      })
+    }
+    return () => { LATE_GRIPE.add = gripe }
+  }, [])
   const [showRating, setShowRating] = useState(false)
   const closeRating = useCallback(() => setShowRating(false), [])
   const meterTick = useRef(0)
@@ -1652,6 +1671,13 @@ export default function App() {
     book('bought', o.cost)
     shiftStock({ [TISSUE]: o.boxes })
   }
+  /** packs of receipt paper bought (game/receipts), paid as stock bought */
+  const buyReceipts = (packs: number) => {
+    const o = receiptOrder(packs)
+    if (o.cost > cash) return
+    book('bought', o.cost)
+    shiftStock({ [RECEIPT]: o.rolls })
+  }
   /** sacks of binchotan bought in (the stock's supplies), paid as fuel */
   const buyCharcoal = (sacks: number) => {
     const o = charcoalOrder(sacks)
@@ -1739,6 +1765,12 @@ export default function App() {
   const phone = usePhone()
   phoneRef.current = phone
   const [lang, setLang] = useState<Lang>(() => SAVED?.lang ?? 'zh')
+  // (what a customer says at the till with no receipt to be had)
+  useEffect(() => {
+    const add = LATE_GRIPE.add
+    LATE_GRIPE.add = (id, g) => { add(id, g); if (g === 'receipt') talk('guest', LINES[lang].noReceipt(id)) }
+    return () => { LATE_GRIPE.add = add }
+  }, [talk, lang])
   langRef.current = lang
   // (what's kept if the 3D view is lost: read from here the moment it happens)
   const resumeRef = useRef<() => Omit<Saved, 'v'>>(() => ({ ledger, stock, hired, notes, owner, opened, fresh }))
@@ -1909,6 +1941,8 @@ export default function App() {
   }
   const shiftStockRef = useRef(shiftStock)
   shiftStockRef.current = shiftStock
+  // (dev: the stock looked at and changed from the console, for checking what runs out)
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __stockNow: () => stockRef.current, __shiftStock: (d: Record<string, number>) => shiftStockRef.current(d) })
   const supplyLang = useRef(lang)
   supplyLang.current = lang
   // (the kitchen asks for its supplies here: the sack's charcoal, the crate filled from it, a seasoning's dab; a word, now and then, when one's out)
@@ -2710,7 +2744,7 @@ export default function App() {
           research={hand} quantities={orders[dish.id] ?? {}} onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)} onClear={putAllBack}
           onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)}
           restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
-          onBuyCharcoal={buyCharcoal} onBuyTissues={buyTissues} onClose={() => setFridgeOpen(false)} />
+          onBuyCharcoal={buyCharcoal} onBuyTissues={buyTissues} onBuyReceipts={buyReceipts} onClose={() => setFridgeOpen(false)} />
       )}
       {/* (the fold tab only for the open shop's menu: researching, the fridge button opens and shuts the panel) */}
       {ai && (

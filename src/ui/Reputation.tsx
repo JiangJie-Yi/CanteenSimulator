@@ -50,6 +50,11 @@ const REMARK: Record<Remark, [string, string, string][]> = {
     ['上菜好慢', '料理が出るのが遅い', 'The food was slow to come'],
     ['餓到不行才上菜', '腹ペコで待たされた', 'Starving by the time it came'],
   ],
+  receipt: [
+    ['結帳沒拿到發票', 'レシートをもらえなかった', 'No receipt when I paid'],
+    ['發票紙用完了也不補', 'レシートの紙が切れたまま', 'Out of receipt paper, and nobody refilled it'],
+    ['付了錢，連張發票都沒有', '払ったのにレシートもない', 'Paid, and not even a receipt'],
+  ],
   tissue: [
     ['抽屜裡沒有衛生紙', 'ティッシュがなかった', 'No tissues at my place'],
     ['想擦嘴卻沒有衛生紙', '口を拭くティッシュがない', 'Nothing to wipe my mouth with'],

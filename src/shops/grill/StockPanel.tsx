@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { BOX_LOW, BOX_SHEETS, TISSUE, TISSUE_PACK } from '@/game/tissues'
+import { RECEIPT, RECEIPT_PACK, ROLL_SLIPS } from '@/game/receipts'
 import { LOADS, USES, POWER_TIERS, WATER_TIERS, WATER_BASE, BILL_DAYS, type Meter, type Use } from '@/game/utilities'
 import { createPortal } from 'react-dom'
 import { nameIn, tl, type Lang } from '@/data/i18n'
@@ -13,7 +14,7 @@ import { FitLine } from '@/ui/FitLine'
 import { FoodArt } from '@/ui/FoodArt'
 import type { Restock } from '@/ui/Menu'
 import { CRATE, FREEZER_TEMP } from './Decor'
-import { GRILL_SEATS, tissuesAt } from './bar'
+import { GRILL_SEATS, onPrinter, PRINTER, tissuesAt } from './bar'
 import { DrinkStockBody } from './DrinkStockPanel'
 
 /** the stock panel's tabs: the freezer, the fridge (the cupboards' under the cook table), the larder at room temperature, the drinks, and what
@@ -95,6 +96,8 @@ type Props = {
   onBuyCharcoal: (sacks: number) => void
   /** packs of tissue boxes bought (game/tissues) */
   onBuyTissues: (packs: number) => void
+  /** packs of receipt paper bought (game/receipts) */
+  onBuyReceipts: (packs: number) => void
   onClose: () => void
 }
 
@@ -129,7 +132,7 @@ export function StockPanel(p: Props) {
   }, [p.focus, tab])
   /** how many in a tab are out (or spoiled): a red mark on the tab */
   const warn = (t: StockTab) => {
-    if (t === 'supplies') return (p.stock[CHARCOAL] ?? 0) + CRATE.left <= 0 ? 1 : 0
+    if (t === 'supplies') return ((p.stock[CHARCOAL] ?? 0) + CRATE.left <= 0 ? 1 : 0) + ((p.stock[RECEIPT] ?? 0) <= 0 && PRINTER.slips < ROLL_SLIPS / 5 ? 1 : 0)
     if (t === 'drinks') return 0
     const zone = foods.filter((x) => storageOf(x.id) === t).filter((x) => (p.stock[x.id] ?? 0) <= 0 || freshGrade(p.fresh[x.id] ?? 100) === 'spoiled').length
     const seas = SEASONINGS.filter((k) => storageOf(seasonId(k)) === t && (p.stock[seasonId(k)] ?? 0) <= 0).length
@@ -315,8 +318,43 @@ function Supplies(p: Props) {
           <p className="stock-note">{tl(lang, '桌上的炭箱用完，會從地上的麻袋補滿；麻袋空了就沒有炭可加。', '卓上の炭箱が空になると床の袋から補充。袋が空なら炭は足せない。', 'When the crate on the table runs out it’s filled from the sack on the floor; with the sack empty there’s no charcoal to add.')}</p>
         </section>
         <TissueZone {...p} />
+        <ReceiptZone {...p} />
       </div>
     </>
+  )
+}
+
+/** the receipt paper (game/receipts, the owner's: a consumable): the roll in the register's printer (slips left on it), the spare rolls in
+ * stock, and packs of ten to buy */
+function ReceiptZone(p: Props) {
+  const { lang, stock, cash } = p
+  const spares = stock[RECEIPT] ?? 0
+  const slips = useSyncExternalStore(onPrinter, () => PRINTER.slips, () => PRINTER.slips)
+  const out = spares <= 0 && slips <= 0
+  return (
+    <section className="chiller-zone is-supplies">
+      <h3 className="chiller-zone-head"><span>{tl(lang, '收銀', 'レジ', 'Till')}</span><i aria-hidden="true">{tl(lang, '耗材', '消耗品', 'consumable')}</i></h3>
+      <div className="chiller-bins">
+        <div className={`chiller-bin season-bin supply-bin is-still${out ? ' is-out' : ''}`}>
+          <span className="chiller-bin-head"><span className="tissue-icon" aria-hidden="true">🧾</span><FitLine className="chiller-bin-name">{supplyName(RECEIPT, lang)}</FitLine></span>
+          <FitLine className="drink-bin-sub" min={9}>{tl(lang, `57mm 感熱紙 × ${RECEIPT_PACK.rolls}捲・NT$${RECEIPT_PACK.cost}`, `57mm 感熱紙 × ${RECEIPT_PACK.rolls}巻・NT$${RECEIPT_PACK.cost}`, `57 mm thermal × ${RECEIPT_PACK.rolls}, NT$${RECEIPT_PACK.cost}`)}</FitLine>
+          <span className={`chiller-level${slips <= 0 ? ' is-zero' : slips < ROLL_SLIPS / 5 ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (slips / ROLL_SLIPS) * 100)}%` }} /></span>
+          <span className="chiller-bin-info" aria-hidden="true">
+            <b className={spares <= 0 ? 'is-zero' : ''}>{tl(lang, '備品', '予備', 'Spare')} <em>{spares}</em></b>
+            <small>{tl(lang, `印表機剩 ${slips} 張`, `プリンター残り ${slips} 枚`, `${slips} slips in the printer`)}</small>
+          </span>
+          <span className="chiller-buy season-buy">
+            <span role="button" tabIndex={0} className={`chiller-btn${cash >= RECEIPT_PACK.cost ? '' : ' is-off'}`} onClick={() => cash >= RECEIPT_PACK.cost && p.onBuyReceipts(1)}
+              title={tl(lang, `訂一組（${RECEIPT_PACK.rolls} 捲，NT$${RECEIPT_PACK.cost}）`, '1組注文', 'Order a pack')}>{tl(lang, '訂一組', '1組', '+1 pack')}</span>
+            <span role="button" tabIndex={0} className={`chiller-btn chiller-fill${cash >= 2 * RECEIPT_PACK.cost ? '' : ' is-off'}`} onClick={() => cash >= 2 * RECEIPT_PACK.cost && p.onBuyReceipts(2)}
+              title={tl(lang, `訂兩組（NT$${2 * RECEIPT_PACK.cost}）`, '2組注文', 'Order two packs')}>{tl(lang, '兩組', '2組', '+2')}</span>
+          </span>
+        </div>
+      </div>
+      <p className="stock-note">{tl(lang, `每位客人結帳印一張發票（一捲 ${ROLL_SLIPS} 張）；印表機的紙用完，收銀員會換上一捲備品；沒有備品就開不出發票，客人會不滿（影響店家評價）。`,
+        `お会計ごとにレシートを1枚（1巻 ${ROLL_SLIPS} 枚）。紙が切れるとレジ係が予備に交換。予備がないとレシートが出せず、お客さんの評価が下がる。`,
+        `A receipt for every customer who pays (${ROLL_SLIPS} to a roll); when the printer runs out the cashier puts in a spare, and with none spare there's no receipt, which costs the shop its rating.`)}</p>
+    </section>
   )
 }
 
