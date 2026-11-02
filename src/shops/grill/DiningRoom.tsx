@@ -4338,45 +4338,35 @@ export const DrinkBottle = memo(DrinkBottleImpl)
 function DrinkBottleImpl({ id, lit = false, wet = false }: { id: DrinkId; lit?: boolean; wet?: boolean }) {
   return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} lit={lit} wet={wet} /></group>
 }
-/** each drink's look with a gentle glow, for those standing in a fridge */
-const LIT_LOOK = new Map<DrinkId, { glass: THREE.Material; label: THREE.Material }>()
-function litLook(id: DrinkId) {
-  let l = LIT_LOOK.get(id)
-  if (!l) {
-    const base = BOTTLE_LOOK[id]
-    const glass = base.glass.clone() as THREE.MeshToonMaterial
-    glass.emissive = glass.color.clone()
-    glass.emissiveIntensity = 0.32
-    const label = base.label.clone() as THREE.MeshToonMaterial
-    label.emissive = new THREE.Color('#ffffff')
-    label.emissiveMap = label.map
-    label.emissiveIntensity = 0.3
-    l = { glass, label }
-    LIT_LOOK.set(id, l)
-  }
-  return l
-}
 function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: boolean; wet?: boolean }) {
   const d = DRINKS.find((x) => x.id === id)!
-  const look = lit ? litLook(id) : BOTTLE_LOOK[id]
+  const kind = KIND_OF[id]
+  const label = lit ? LABEL_LIT : LABEL_MAT
+  const glassMat = kind === 'can' ? (lit ? CAN_LIT : CAN) : (lit ? GLASS_LIT : GLASS)
+  // (the glass itself: the beer's brown, the ramune's pale aqua, the rest clear; the PET clear and thinner; its tint and clearness in its vertices)
+  const glass = (g: THREE.BufferGeometry) => kind === 'can' ? g
+    : tinted(g, id === 'beer' ? '#5a3010' : id === 'ramune' ? '#a8dcea' : kind === 'pet' ? '#f2f6f8' : '#eef4f2', id === 'beer' ? 0.88 : kind === 'pet' ? 0.22 : 0.28)
+  // (the drink in it: its own colour, a little see-through (the milk not at all))
+  const fill = (g: THREE.BufferGeometry) => tinted(g, id === 'ramune' ? '#dff4fa' : id === 'sake' ? '#f6f2de' : d.color,
+    id === 'milk' ? 1 : id === 'ramune' || id === 'sake' || id === 'sports' ? 0.45 : 0.85)
   // (turned so its label's name faces +z)
   if (d.shape === 'can' && id !== 'cola' && id !== 'greenTea') return (
     // a can: printed all over, its silver top and rim
     <group rotation-y={-Math.PI / 2}>
-      <mesh geometry={BOTTLE_GEO.can} material={look.glass} />
-      <mesh geometry={BOTTLE_GEO.canLabel} position-y={0.046} material={look.label} />
+      <mesh geometry={BOTTLE_GEO.can} material={glassMat} />
+      <mesh geometry={labelGeo(BOTTLE_GEO.canLabel, id)} position-y={0.046} material={label} />
       {wet && <mesh geometry={BOTTLE_GEO.canLabel} position-y={0.046} material={DEW} scale={[1.012, 1, 1.012]} />}
-      <mesh geometry={BOTTLE_GEO.canTop} position-y={0.0905} material={look.glass} />
-      <mesh geometry={BOTTLE_GEO.canRim} position-y={0.09}><meshToonMaterial color="#aeb3b9" /></mesh>
-      <mesh geometry={BOTTLE_GEO.canTab} position={[0, 0.0928, 0.002]}><meshToonMaterial color="#d8dce0" /></mesh>
+      <mesh geometry={BOTTLE_GEO.canTop} position-y={0.0905} material={glassMat} />
+      <mesh geometry={tinted(BOTTLE_GEO.canRim, '#aeb3b9')} position-y={0.09} material={PARTS} />
+      <mesh geometry={tinted(BOTTLE_GEO.canTab, '#d8dce0')} position={[0, 0.0928, 0.002]} material={PARTS} />
     </group>
   )
   if (d.shape === 'small') return (
     // the little cultured milk bottle: waisted, a red foil top
     <group rotation-y={-Math.PI / 2}>
-      <mesh geometry={BOTTLE_GEO.small} position-y={0.036} material={look.label} />
+      <mesh geometry={labelGeo(BOTTLE_GEO.small, id)} position-y={0.036} material={label} />
       {wet && <mesh geometry={BOTTLE_GEO.small} position-y={0.036} material={DEW} scale={[1.02, 1, 1.02]} />}
-      <mesh geometry={BOTTLE_GEO.smallTop} position-y={0.074}><meshToonMaterial color={d.cap} /></mesh>
+      <mesh geometry={tinted(BOTTLE_GEO.smallTop, d.cap)} position-y={0.074} material={PARTS} />
     </group>
   )
   // the bottles proper, each shaped as it is in a shop: the beer's long neck, the sake's slim shoulder, the big tea bottle
@@ -4386,24 +4376,24 @@ function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: b
   if (shaped) return (
     <group rotation-y={-Math.PI / 2}>
       {/* (the drink inside, seen through the glass or plastic: made before the bottle, so at the same depth it is drawn first and the bottle over it) */}
-      <mesh geometry={BOTTLE_DRINK[drinkKey]} material={DRINK_FILL[id]} />
-      <mesh geometry={shaped.body} material={look.glass} />
+      <mesh geometry={fill(BOTTLE_DRINK[drinkKey])} material={FILL} />
+      <mesh geometry={glass(shaped.body)} material={glassMat} />
       {wet && <mesh geometry={shaped.body} material={DEW} scale={[1.006, 1, 1.006]} />}
-      <mesh geometry={shaped.label} position-y={shaped.labelY} material={look.label} />
-      <mesh geometry={shaped.cap} position-y={shaped.capY}><meshToonMaterial color={d.cap} /></mesh>
+      <mesh geometry={labelGeo(shaped.label, id)} position-y={shaped.labelY} material={label} />
+      <mesh geometry={tinted(shaped.cap, d.cap)} position-y={shaped.capY} material={PARTS} />
       {/* (the foil round the beer's neck, the sake's paper collar) */}
-      {shaped.foil && <mesh geometry={shaped.foil} position-y={shaped.foilY}><meshToonMaterial color={id === 'beer' ? '#d4b04a' : '#f4efe2'} /></mesh>}
+      {shaped.foil && <mesh geometry={tinted(shaped.foil, id === 'beer' ? '#d4b04a' : '#f4efe2')} position-y={shaped.foilY} material={PARTS} />}
     </group>
   )
   // the ramune: its pale aqua glass, the fizzy drink in it, the glass marble held up in the neck's pinch, the blue plastic cap, a paper band
   return (
     <group rotation-y={-Math.PI / 2}>
-      <mesh geometry={BOTTLE_GEO.ramuneDrink} material={DRINK_FILL[id]} />
+      <mesh geometry={fill(BOTTLE_GEO.ramuneDrink)} material={FILL} />
       <mesh geometry={BOTTLE_GEO.marble} position-y={0.1402} material={MARBLE} />
-      <mesh geometry={BOTTLE_GEO.ramune} material={look.glass} />
+      <mesh geometry={glass(BOTTLE_GEO.ramune)} material={glassMat} />
       {wet && <mesh geometry={BOTTLE_GEO.ramune} material={DEW} scale={[1.006, 1, 1.006]} />}
-      <mesh geometry={BOTTLE_GEO.ramuneLabel} position-y={0.055} material={look.label} />
-      <mesh geometry={BOTTLE_GEO.ramuneCap} position-y={0.182}><meshToonMaterial color={d.cap} /></mesh>
+      <mesh geometry={labelGeo(BOTTLE_GEO.ramuneLabel, id)} position-y={0.055} material={label} />
+      <mesh geometry={tinted(BOTTLE_GEO.ramuneCap, d.cap)} position-y={0.182} material={PARTS} />
     </group>
   )
 }
@@ -4664,31 +4654,100 @@ function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly strin
 /** what each drink's made of: aluminium cans, glass bottles, PET bottles, the little cultured milk bottle */
 const KIND_OF: Record<DrinkId, 'can' | 'glass' | 'pet' | 'small'> = { beer: 'glass', sake: 'glass', oolong: 'pet', ramune: 'glass', beerCan: 'can', highball: 'can',
   coffee: 'can', greenTea: 'pet', cola: 'pet', yakult: 'small', sports: 'pet', milk: 'glass', chuhai: 'can' }
-const BOTTLE_LOOK = Object.fromEntries(DRINKS.map((d) => {
-  const tex = canvasTex(LABEL_W, LABEL_H, (g) => drawLabel(g, d.id, d.label))
-  if (tex) tex.anisotropy = 4
-  const kind = KIND_OF[d.id]
-  // (a can is printed on bare aluminium: its body and lid polished metal; glass and plastic glossy and see-through)
-  // (the glass itself: the beer's brown, the ramune's pale aqua, the rest clear; the PET clear and thinner; the drink is its own mesh inside)
-  const glassTint = d.id === 'beer' ? '#5a3010' : d.id === 'ramune' ? '#a8dcea' : '#eef4f2'
-  const glass = kind === 'can'
-    ? new THREE.MeshStandardMaterial({ color: '#d4d8dc', metalness: 0.9, roughness: 0.25 })
-    : kind === 'glass'
-      ? new THREE.MeshPhysicalMaterial({ color: glassTint, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.03, transparent: true,
-        opacity: d.id === 'beer' ? 0.88 : 0.28, specularIntensity: 1, depthWrite: false })
-      : kind === 'pet'
-        ? new THREE.MeshPhysicalMaterial({ color: '#f2f6f8', roughness: 0.08, clearcoat: 0.9, clearcoatRoughness: 0.06, transparent: true, opacity: 0.22, depthWrite: false })
-        : new THREE.MeshStandardMaterial({ color: d.color, roughness: 0.4 })
-  const label = kind === 'can'
-    ? new THREE.MeshStandardMaterial({ color: '#ffffff', map: tex, metalness: 0.55, roughness: 0.28 })
-    : new THREE.MeshPhysicalMaterial({ color: '#ffffff', map: tex, roughness: d.id === 'sake' ? 0.8 : 0.3, clearcoat: d.id === 'sake' ? 0 : 0.6 })
-  reflectStudio(glass as THREE.MeshStandardMaterial, label as THREE.MeshStandardMaterial)
-  return [d.id, { glass, label }]
-})) as unknown as Record<DrinkId, { glass: THREE.Material; label: THREE.Material }>
-/** the drink in each bottle: its own colour, a little see-through (the milk not at all), lit a touch from within so it glows in the fridge */
-const DRINK_FILL = Object.fromEntries(DRINKS.map((d) => [d.id, new THREE.MeshPhysicalMaterial({ color: d.id === 'ramune' ? '#dff4fa' : d.id === 'sake' ? '#f6f2de' : d.color,
-  roughness: 0.15, transparent: d.id !== 'milk', opacity: d.id === 'milk' ? 1 : d.id === 'ramune' || d.id === 'sake' || d.id === 'sports' ? 0.45 : 0.85,
-  emissive: d.color, emissiveIntensity: 0.12, depthWrite: d.id === 'milk' })])) as unknown as Record<DrinkId, THREE.Material>
+/**
+ * The drinks' looks, shared by them all, so a fridge's eighty bottles are a handful of draws (each drink's own glass, label, drink and cap
+ * had been a material each: some fifty draws for the two fridges). Every label in one picture (LABEL_ATLAS, a cell each, a margin of itself
+ * round it), and how each is finished (its clear coat, how rough, how metallic: a can's printed aluminium, the sake's washi) in a little
+ * picture laid the same way (LABEL_FINISH, a pixel a cell); the glass and the PET one see-through material, each drink's tint and how clear
+ * it is in its vertices; the drink inside likewise; the caps, foils and rims one toon material, their colours in their vertices; the cans'
+ * aluminium one. In a fridge's light, a glowing twin of each.
+ */
+const CELL_W = LABEL_W + 16, CELL_H = LABEL_H + 16, ATLAS_COLS = 4, ATLAS_ROWS = Math.ceil(DRINKS.length / 4)
+const cellOf = (id: DrinkId) => { const i = DRINKS.findIndex((d) => d.id === id); return { c: i % ATLAS_COLS, r: Math.floor(i / ATLAS_COLS) } }
+const LABEL_ATLAS = (() => {
+  const t = canvasTex(CELL_W * ATLAS_COLS, CELL_H * ATLAS_ROWS, (g) => {
+    for (const d of DRINKS) {
+      const { c, r } = cellOf(d.id), x0 = c * CELL_W, y0 = r * CELL_H
+      g.save()
+      g.beginPath(); g.rect(x0 + 8, y0 + 8, LABEL_W, LABEL_H); g.clip()
+      g.translate(x0 + 8, y0 + 8)
+      drawLabel(g, d.id, d.label)
+      g.restore()
+      // (its margin: across, the other edge (it wraps round the bottle); up and down, its own edge drawn out)
+      const cv = g.canvas
+      g.drawImage(cv, x0 + LABEL_W, y0 + 8, 8, LABEL_H, x0, y0 + 8, 8, LABEL_H)
+      g.drawImage(cv, x0 + 8, y0 + 8, 8, LABEL_H, x0 + 8 + LABEL_W, y0 + 8, 8, LABEL_H)
+      g.drawImage(cv, x0, y0 + 8, CELL_W, 1, x0, y0, CELL_W, 8)
+      g.drawImage(cv, x0, y0 + 7 + LABEL_H, CELL_W, 1, x0, y0 + 8 + LABEL_H, CELL_W, 8)
+    }
+  })
+  if (t) t.anisotropy = 4
+  return t
+})()
+const LABEL_FINISH = (() => {
+  const data = new Uint8Array(ATLAS_COLS * ATLAS_ROWS * 4)
+  for (const d of DRINKS) {
+    const { c, r } = cellOf(d.id), kind = KIND_OF[d.id]
+    // (red: its clear coat; green: how rough; blue: how metallic, as three's maps read them)
+    const [coat, rough, metal] = kind === 'can' ? [0, 0.28, 0.55] : d.id === 'sake' ? [0, 0.8, 0] : [0.6, 0.3, 0]
+    data.set([coat * 255, rough * 255, metal * 255, 255], ((ATLAS_ROWS - 1 - r) * ATLAS_COLS + c) * 4)
+  }
+  const t = new THREE.DataTexture(data, ATLAS_COLS, ATLAS_ROWS)
+  t.magFilter = t.minFilter = THREE.NearestFilter
+  t.needsUpdate = true
+  return t
+})()
+/** a drink's label shape, its UVs into its cell of the atlas (made once a shape a drink) */
+const LABEL_GEO = new Map<string, THREE.BufferGeometry>()
+function labelGeo(g: THREE.BufferGeometry, id: DrinkId) {
+  const key = `${g.uuid}|${id}`
+  let out = LABEL_GEO.get(key)
+  if (!out) {
+    out = g.clone()
+    const uv = out.attributes.uv as THREE.BufferAttribute, { c, r } = cellOf(id)
+    const AW = CELL_W * ATLAS_COLS, AH = CELL_H * ATLAS_ROWS
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (c * CELL_W + 8 + uv.getX(i) * LABEL_W) / AW, 1 - (r * CELL_H + 8 + (1 - uv.getY(i)) * LABEL_H) / AH)
+    LABEL_GEO.set(key, out)
+  }
+  return out
+}
+/** a shape with a colour (and, given, how clear it is) in its every vertex, for a material shared by many colours (made once a colour) */
+const TINTED = new Map<string, THREE.BufferGeometry>()
+function tinted(g: THREE.BufferGeometry, hex: string, alpha?: number) {
+  const key = `${g.uuid}|${hex}|${alpha ?? ''}`
+  let out = TINTED.get(key)
+  if (!out) {
+    out = g.clone()
+    const c = new THREE.Color(hex), n = out.attributes.position.count, k = alpha === undefined ? 3 : 4, a = new Float32Array(n * k)
+    for (let i = 0; i < n; i++) { a[i * k] = c.r; a[i * k + 1] = c.g; a[i * k + 2] = c.b; if (k === 4) a[i * k + 3] = alpha! }
+    out.setAttribute('color', new THREE.BufferAttribute(a, k))
+    TINTED.set(key, out)
+  }
+  return out
+}
+/** a glow the colour of what's glowing: its emissive times its vertices' colour */
+function glowByVertex<M extends THREE.Material>(m: M, key: string) {
+  m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('vec3 totalEmissiveRadiance = emissive;', 'vec3 totalEmissiveRadiance = emissive * vColor.rgb;') }
+  m.customProgramCacheKey = () => key
+  return m
+}
+const LABEL_MAT = new THREE.MeshPhysicalMaterial({ color: '#ffffff', map: LABEL_ATLAS, roughnessMap: LABEL_FINISH, metalnessMap: LABEL_FINISH, clearcoatMap: LABEL_FINISH,
+  roughness: 1, metalness: 1, clearcoat: 1 })
+const LABEL_LIT = LABEL_MAT.clone()
+LABEL_LIT.emissive = new THREE.Color('#ffffff'); LABEL_LIT.emissiveMap = LABEL_ATLAS; LABEL_LIT.emissiveIntensity = 0.3
+const GLASS = new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.06, clearcoat: 0.95, clearcoatRoughness: 0.04, transparent: true,
+  depthWrite: false, specularIntensity: 1 })
+const GLASS_LIT = glowByVertex(GLASS.clone(), 'bottle-glass-lit')
+GLASS_LIT.emissive = new THREE.Color('#ffffff'); GLASS_LIT.emissiveIntensity = 0.32
+const CAN = new THREE.MeshStandardMaterial({ color: '#d4d8dc', metalness: 0.9, roughness: 0.25 })
+const CAN_LIT = CAN.clone()
+CAN_LIT.emissive = new THREE.Color('#d4d8dc'); CAN_LIT.emissiveIntensity = 0.32
+reflectStudio(GLASS, GLASS_LIT, CAN, CAN_LIT, LABEL_MAT, LABEL_LIT)
+/** the drink in each bottle: its colour and how clear in its vertices, lit a touch from within so it glows in the fridge */
+const FILL = glowByVertex(new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.15, transparent: true, depthWrite: false,
+  emissive: '#ffffff', emissiveIntensity: 0.12 }), 'bottle-fill')
+/** the caps, foils, collars and rims: their colours in their vertices */
+const PARTS = new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true })
 /** the ramune's marble: clear glass catching the light */
 const MARBLE = new THREE.MeshPhysicalMaterial({ color: '#e8f6fa', roughness: 0.02, clearcoat: 1, transparent: true, opacity: 0.55, specularIntensity: 1 })
 /** dew on a cold bottle: little beads of water scattered over it, a few running down (a picture of them, laid over the glass) */
