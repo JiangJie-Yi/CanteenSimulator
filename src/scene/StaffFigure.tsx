@@ -4,9 +4,10 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Look as StaffLook, Role } from '@/data/staff'
+import { atlasModel } from './atlasMerge'
 import { inkTogether } from './inkHull'
 import { airbrush, gradientMap } from './Person3D'
-import { bakeable, colourVertices, keyOf } from './StaticBatch'
+import { bakeable, colourVertices } from './StaticBatch'
 
 /*
  * The staff, made as the boss is (blender/boss.py with CREW=<variant>): an Overcooked cook's big round head on a short plump body rounding
@@ -14,10 +15,11 @@ import { bakeable, colourVertices, keyOf } from './StaticBatch'
  * in an indigo samue under a white hachimaki, the women in a plum kimono and gold obi with their hair up, the stock keeper in khaki work
  * clothes. Skin and hair as their pictures in the office have them (ui/Avatar.tsx, the same hash of their id), glasses on the same ones.
  *
- * Each figure is drawn in a handful of meshes: the body's parts merged by material, the eyes, the glasses and each hand on their own (they
- * move or come and go); inked once per variant, then copied. Every plain-coloured piece (no picture on it: the cord, the collar, the brows,
- * the towel...) is one material with its colour carried by its vertices, so they're a single draw; the skin and hair (each person's own)
- * and the printed cloth keep theirs. Each part's ink is one line round all of it.
+ * Each figure is drawn in a handful of meshes (the owner's: the shop slows when it's full; they were 17 to 22 draws each): all of it but
+ * the eyes one material per variant (scene/atlasMerge: the pictures on the clothes packed into one atlas, every plain colour carried by
+ * the vertices), so each part (the body, the eyes, the glasses, each hand, the fan: they move or come and go) is one mesh, its ink one line
+ * round its inked pieces; built once per variant, then copied. The skin and the hair, each person's own, are colours in their vertices
+ * too: each figure has its own colours over the variant's shared shape (its positions, normals and UVs shared, its colours its own).
  */
 type Variant = 'chef' | 'chefF' | 'server' | 'serverF' | 'stock'
 const url = (v: Variant) => import.meta.env.BASE_URL + `models/crew_${v}.glb`
@@ -35,7 +37,9 @@ const AV_SKIN = ['#f3d2b0', '#eac39c', '#e2b48a', '#f6dcc0', '#d9a77e']
 const AV_HAIR = ['#2b1d14', '#3a2a20', '#1c1c22', '#5a3a2a', '#4a3020', '#6b4a32']
 const avHash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
 
-type Built = { root: THREE.Group; skin: THREE.MeshToonMaterial; hair: THREE.MeshToonMaterial }
+type Built = { root: THREE.Group }
+/** where in a part's mesh the skin or the hair is (its vertices from `start`, `count` of them), coloured for each person */
+type Tint = { start: number; count: number; tint: 'skin' | 'hair' }
 const made = new Map<Variant, Built>()
 
 /** which part of the figure a mesh belongs to, by its node's name (or an ancestor's) */
@@ -52,46 +56,36 @@ function partOf(o: THREE.Object3D): 'handL' | 'handR' | 'fan' | 'eyes' | 'glasse
   return 'body'
 }
 
-/** the variant's figure, built once: its materials the people's soft paint, its parts merged, inked */
+/** the variant's figure, built once: one material for all but the eyes, each part one mesh, inked round its inked pieces */
 function build(scene: THREE.Group): Built {
-  scene.updateWorldMatrix(true, true)
-  const inv = new THREE.Matrix4().copy(scene.matrixWorld).invert()
-  const mats = new Map<THREE.Material, THREE.Material>()
-  let skin: THREE.MeshToonMaterial | null = null, hair: THREE.MeshToonMaterial | null = null
-  // (the plain pieces' one material each way they're painted: soft toon, and flat for the eyes' whites and darks)
-  const plainToon = airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap }))
+  const s = scene.clone(true)
+  s.updateWorldMatrix(true, true)
+  const inv = new THREE.Matrix4().copy(s.matrixWorld).invert()
+  // (the eyes' whites and darks flat, unlit; the skin and hair marked, to be each person's own)
   const plainFlat = new THREE.MeshBasicMaterial({ color: '#ffffff', vertexColors: true })
-  const paint = (src: THREE.MeshStandardMaterial) => {
-    let t = mats.get(src)
-    if (!t) {
-      t = /White|Dark/.test(src.name)
-        ? new THREE.MeshBasicMaterial({ color: src.color.clone() })
-        : airbrush(new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, gradientMap }))
-      if (/CrewSkin/.test(src.name)) skin = t as THREE.MeshToonMaterial
-      if (/CrewHair/.test(src.name)) hair = t as THREE.MeshToonMaterial
-      mats.set(src, t)
-    }
-    return t
-  }
-  // (each part's meshes gathered by material, inked or not)
-  const parts = new Map<string, Map<string, { mat: THREE.Material; inked: boolean; geos: THREE.BufferGeometry[] }>>()
-  scene.traverse((o) => {
+  s.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh || Array.isArray(m.material)) return
+    const n = (m.material as THREE.Material).name
+    m.userData.flat = /White|Dark/.test(n)
+    m.userData.tint = /CrewSkin/.test(n) ? 'skin' : /CrewHair/.test(n) ? 'hair' : undefined
+  })
+  atlasModel(s, (m) => partOf(m) !== 'drop' && !m.userData.flat, (atlas) => airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap })))
+  // (each part's meshes gathered by material (the atlas's, or the eyes' flat one), each piece noted inked or not and skin or hair)
+  type Piece = { geo: THREE.BufferGeometry; inked: boolean; tint?: 'skin' | 'hair' }
+  const parts = new Map<string, Map<THREE.Material, Piece[]>>()
+  s.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh || Array.isArray(m.material)) return
     const part = partOf(m)
     if (part === 'drop') return
-    const src = m.material as THREE.MeshStandardMaterial
-    const mat = paint(src)
-    const inked = !UNINKED.test(m.name)
-    const plain = !src.map && !src.transparent && src.opacity === 1 && mat !== skin && mat !== hair
-    const use = plain ? (mat instanceof THREE.MeshBasicMaterial ? plainFlat : plainToon) : mat
-    const key = `${keyOf(use)}|${use.uuid}|${inked}`
-    const byMat = parts.get(part) ?? new Map()
-    const g = byMat.get(key) ?? { mat: use, inked, geos: [] }
     const geo = bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld))
-    if (plain) colourVertices(geo, (mat as THREE.MeshToonMaterial | THREE.MeshBasicMaterial).color)
-    g.geos.push(geo)
-    byMat.set(key, g)
+    if (m.userData.flat) colourVertices(geo, (m.material as THREE.MeshBasicMaterial).color)
+    const mat = m.userData.flat ? plainFlat : (m.material as THREE.Material)
+    const byMat = parts.get(part) ?? new Map<THREE.Material, Piece[]>()
+    const list = byMat.get(mat) ?? []
+    list.push({ geo, inked: !UNINKED.test(m.name), tint: m.userData.tint })
+    byMat.set(mat, list)
     parts.set(part, byMat)
   })
   const root = new THREE.Group()
@@ -102,27 +96,40 @@ function build(scene: THREE.Group): Built {
     let at: THREE.Vector3 | null = part === 'handL' ? REST.L : part === 'handR' ? REST.R : null
     if (part === 'eyes') {
       const bb = new THREE.Box3()
-      for (const { geos } of byMat.values()) for (const g of geos) { g.computeBoundingBox(); bb.union(g.boundingBox!) }
+      for (const list of byMat.values()) for (const { geo } of list) { geo.computeBoundingBox(); bb.union(geo.boundingBox!) }
       at = bb.getCenter(new THREE.Vector3())
     }
-    for (const { mat, inked, geos } of byMat.values()) {
-      const geo = mergeGeometries(geos)
-      for (const x of geos) x.dispose()
+    const inks: THREE.Mesh[] = []
+    let shadow = false
+    for (const [mat, list] of byMat) {
+      // (where the skin and hair fall in the merged mesh, by the order its pieces go in)
+      const tints: Tint[] = []
+      let start = 0
+      for (const x of list) {
+        const n = x.geo.attributes.position.count
+        if (x.tint) tints.push({ start, count: n, tint: x.tint })
+        start += n
+        if (x.inked) { inks.push(new THREE.Mesh(x.geo.clone())); shadow = true }
+      }
+      const geo = mergeGeometries(list.map((x) => x.geo))
+      for (const x of list) x.geo.dispose()
       if (!geo) continue
       if (at) geo.translate(-at.x, -at.y, -at.z)
       const mesh = new THREE.Mesh(geo, mat)
-      mesh.castShadow = inked
+      mesh.castShadow = shadow && mat !== plainFlat
       mesh.receiveShadow = true
-      mesh.userData.uninked = !inked
+      if (tints.length) mesh.userData.tints = tints
       holder.add(mesh)
     }
     if (at) holder.position.copy(at)
-    // (one ink line round the whole part, whatever it's painted with)
-    const hull = inkTogether(holder.children.filter((o) => !o.userData.uninked) as THREE.Mesh[], { width: 0.006, weld: true })
+    // (one ink line round the part's inked pieces)
+    if (at) for (const m of inks) m.geometry.translate(-at.x, -at.y, -at.z)
+    const hull = inkTogether(inks, { width: 0.006, weld: true })
+    for (const m of inks) m.geometry.dispose()
     if (hull) holder.add(hull)
     root.add(holder)
   }
-  return { root, skin: skin!, hair: hair! }
+  return { root }
 }
 
 /**
@@ -144,23 +151,44 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     if (!made.has(v)) made.set(v, build(gltf.scene))
     const base = made.get(v)!
     const root = base.root.clone(true)
-    // (their own skin and hair, the rest shared with the others in the same clothes)
+    // (their own skin and hair: colours over the variant's shape, in a colour attribute of their own (the shape's other attributes shared))
     const old = who.age === 'old'
-    const skin = base.skin.clone(), hair = base.hair.clone()
-    skin.color.set(AV_SKIN[h % AV_SKIN.length])
-    hair.color.set(old ? ((h >> 4) & 1 ? '#d6d1c8' : '#a9a49c') : AV_HAIR[(h >> 3) % AV_HAIR.length])
+    // (a hash past 2^31 makes `h >> 3` negative and its pick nothing: their hair then stays the model's own, as it always has)
+    const pickHair = old ? ((h >> 4) & 1 ? '#d6d1c8' : '#a9a49c') : AV_HAIR[(h >> 3) % AV_HAIR.length]
+    const skin = new THREE.Color(AV_SKIN[h % AV_SKIN.length])
+    const hair = pickHair ? new THREE.Color(pickHair) : null
+    const own: THREE.BufferGeometry[] = []
     root.traverse((o) => {
       const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      if (m.material === base.skin) m.material = skin
-      else if (m.material === base.hair) m.material = hair
+      const tints = m.userData.tints as Tint[] | undefined
+      if (!m.isMesh || !tints) return
+      const src = m.geometry
+      const g = new THREE.BufferGeometry()
+      for (const [k, a] of Object.entries(src.attributes)) if (k !== 'color') g.setAttribute(k, a)
+      const col = (src.attributes.color as THREE.BufferAttribute).clone()
+      for (const t of tints) {
+        const c = t.tint === 'skin' ? skin : hair
+        if (c) for (let i = t.start; i < t.start + t.count; i++) col.setXYZ(i, c.r, c.g, c.b)
+      }
+      g.setAttribute('color', col)
+      src.computeBoundingSphere()
+      g.boundingSphere = src.boundingSphere
+      m.geometry = g
+      own.push(g)
     })
     const glasses = (h >> 7) % 5 === 0 || (old && (h >> 7) % 2 === 0)
     const get = (n: string) => root.getObjectByName(n) ?? null
     const g = get('glasses')
     if (g) g.visible = glasses
-    return { root, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes') }
+    return { root, own, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes') }
   }, [gltf, v, h, who.age])
+  // (their own colours let go with them; the shape they share is kept for the others)
+  useEffect(() => () => {
+    for (const g of fig.own) {
+      for (const k of Object.keys(g.attributes)) if (k !== 'color') g.deleteAttribute(k)
+      g.dispose()
+    }
+  }, [fig])
   // (a cook fans the fire only now and then: a spell of it, the fan in hand, then put down; each to their own times)
   const [fanning, setFanning] = useState(false)
   const clock = useRef(0)
