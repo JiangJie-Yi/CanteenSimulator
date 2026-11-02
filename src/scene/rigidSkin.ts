@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 
 /*
  * A figure that moves in parts drawn as one mesh and one ink line (the owner's: a person in one or two draws): its pieces put together as a
@@ -139,4 +140,34 @@ export function rigidFigure(root: THREE.Object3D, pieces: SkinPiece[], material:
     m.boundingSphere!.radius *= 1.6
   }
   return { mesh, ink }
+}
+
+/**
+ * A figure's copy, bound to its own parts. SkeletonUtils' clone gives every skinned mesh in it a skeleton of its own, and the renderer makes
+ * each skeleton a picture of its bones' matrices (a texture on the GPU): the body and its ink line were two. Here the ink is put on the
+ * body's skeleton (the same bones, the same rest): one each. Let the copy go with `releaseFigure` (or its pictures stay on the GPU: every
+ * customer who came and went left two behind, the soak's textures climbing thirty a minute while the shop was open)
+ */
+export function cloneFigure(src: THREE.Object3D) {
+  const root = cloneSkinned(src)
+  const skinned: THREE.SkinnedMesh[] = []
+  root.traverse((o) => { if ((o as THREE.SkinnedMesh).isSkinnedMesh) skinned.push(o as THREE.SkinnedMesh) })
+  const first = skinned[0]
+  for (const m of skinned.slice(1)) {
+    const same = m.skeleton.bones.length === first.skeleton.bones.length && m.skeleton.bones.every((b, i) => b === first.skeleton.bones[i])
+    if (!same) continue
+    m.skeleton.dispose()
+    m.skeleton = first.skeleton
+  }
+  return root
+}
+/** a figure's copy gone: its skeletons' pictures let go from the GPU (its shapes and materials are the template's, shared, and stay) */
+export function releaseFigure(root: THREE.Object3D) {
+  const done = new Set<THREE.Skeleton>()
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh
+    if (!m.isSkinnedMesh || done.has(m.skeleton)) return
+    done.add(m.skeleton)
+    m.skeleton.dispose()
+  })
 }

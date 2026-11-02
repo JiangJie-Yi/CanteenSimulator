@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom'
 import { nameIn, tl, type Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { SEASONINGS, SEASON_COST, type Seasoning } from '@/data/recipes'
-import { STORAGES, storageName, storageOf, type Storage } from '@/data/storage'
+import { STORAGES, stockNameOf, storageName, storageOf, type Storage } from '@/data/storage'
 import { PAR } from '@/game/economy'
 import { freshGrade } from '@/game/freshness'
 import { CHARCOAL, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
@@ -176,7 +176,7 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
   const count = p.foods.reduce((n, x) => n + (p.quantities[x.id] ?? 0), 0)
   const bin = (x: Dish['items'][number]) => {
     const n = p.quantities[x.id] ?? 0
-    const name = nameIn(lang, x)
+    const name = stockNameOf(x.id, lang) ?? nameIn(lang, x)
     const cost = p.unitCost(x.id)
     const have = stock[x.id] ?? 0
     const out = have <= 0
@@ -198,7 +198,7 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
           <FitLine className="chiller-bin-name">{name}</FitLine>
           {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{tl(lang, '試', '試', 'Try')}×{n}</span>}
         </span>
-        {x.en && <span className="chiller-bin-en" lang="en">{x.en}</span>}
+        {x.en && <span className="chiller-bin-en" lang="en">{stockNameOf(x.id, 'en') ?? x.en}</span>}
         <span className={`chiller-level${out ? ' is-zero' : have < PAR ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / PAR) * 100)}%` }} /></span>
         <span className="chiller-bin-info" aria-hidden="true">
           <b className={out ? 'is-zero' : ''}>{tl(lang, '庫存', '在庫', 'Stock')} <em>{have}</em></b>

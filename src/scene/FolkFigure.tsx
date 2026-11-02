@@ -3,10 +3,9 @@ import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
 import { airbrush, gradientMap, hash, lookOf } from './Person3D'
-import { paintable, rigidFigure, type SkinPiece } from './rigidSkin'
+import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from './rigidSkin'
 import { bakeable, colourVertices } from './StaticBatch'
 import { cloth } from './patterns'
 import type { Mood } from './people'
@@ -331,12 +330,14 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const fig = useMemo(() => {
     const t = template(gltf.scene, spec.hair, spec.acc, spec.briefcase)
     // (a copy whose one mesh is bound to the copy's own parts)
-    const root = cloneSkinned(t.root) as THREE.Group
+    const root = cloneFigure(t.root) as THREE.Group
     const get = (n: string) => root.getObjectByName(n) ?? null
     return { root, tints: t.tints, body: get('body')!, head: get('head'), handL: get('handL'), handR: get('handR'), chop: get('chop'), bite: get('bite'),
       phone: get('phone'), carried: get('carried'), parked: get('parked'), mesh: root.getObjectByName('FolkMesh') as THREE.SkinnedMesh,
       face: null as { value: number } | null }
   }, [gltf, spec])
+  // (their skeleton's picture let go as they go)
+  useEffect(() => () => releaseFigure(fig.root), [fig])
   // (their own material (their clothes, their face, their knit; theirs alone, to fade) and their own colours (skin and hair over the shared
   // shape): made as they're shown and let go as they go, the template's put back (in development every customer left a set behind: the copy
   // that was made twice and dropped))

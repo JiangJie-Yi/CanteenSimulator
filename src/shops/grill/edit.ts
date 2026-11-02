@@ -113,7 +113,7 @@ type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string,
   wire: boolean }
 /** offsets made defaults (BASES) since they were set by hand: a browser still holding just that offset drops it, so it isn't counted twice
  * (the rest it holds are kept, as a new KEY would lose them) */
-const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.0502, 0, 0] }
+const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.0502, 0, 0], willow: [-0.465, 0, -0.367] }
 /** offsets made defaults by how far they went, whichever way the panel's axes ran when they were set (the way-in switches moved 0.54 along
  * their wall by the owner, then made so) */
 const SETTLED_BY: Record<string, number> = { 'lightswitch-room': 0.54, 'lightswitch-door': 0.54 }
@@ -182,7 +182,8 @@ export const BASES: Record<string, V3> = {
   // (no lift: sized about its foot it stands on the dais (Movable's ground); the 0.19 made up for its sinking when it was sized about its middle)
   freezer: [-0.9694, 0, 1.3355],
   // (moved on by X 0.215 in the room's frame, taken into this parent's units)
-  willow: [0.2534, 0, 0.0272],
+  // (moved by the owner X -0.465, Z -0.367 (its object frame was the world's then), made so)
+  willow: [0.2534 - 0.465, 0, 0.0272 - 0.367],
   // (the speaker set at X -0.285 Y 0.518 Z 0.169, the red lantern raised 0.25, in the room's frame)
   speaker: [0.3044, 0.518, 0.1309],
   chochin: [0, 0.25, 0],

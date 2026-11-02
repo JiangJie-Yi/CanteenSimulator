@@ -2,11 +2,10 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { Look as StaffLook, Role } from '@/data/staff'
 import { atlasModel } from './atlasMerge'
 import { airbrush, gradientMap } from './Person3D'
-import { paintable, rigidFigure, type SkinPiece } from './rigidSkin'
+import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from './rigidSkin'
 import { bakeable, colourVertices } from './StaticBatch'
 
 /*
@@ -162,7 +161,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     if (!made.has(v)) made.set(v, build(gltf.scene, v))
     const base = made.get(v)!
     // (a copy whose one mesh is bound to the copy's own parts)
-    const root = cloneSkinned(base.root) as THREE.Group
+    const root = cloneFigure(base.root) as THREE.Group
     const old = who.age === 'old'
     const glasses = (h >> 7) % 5 === 0 || (old && (h >> 7) % 2 === 0)
     const get = (n: string) => root.getObjectByName(n) ?? null
@@ -172,6 +171,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     get('clip')?.scale.setScalar(0)
     return { root, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes'), clip: get('clip') }
   }, [gltf, v, h, who.age, role])
+  // (their skeleton's picture let go as they go)
+  useEffect(() => () => releaseFigure(fig.root), [fig])
   // (their own skin and hair: colours over the variant's shape, in a colour attribute of their own, the shape's other attributes shared.
   // Made as they're shown and undone as they go: the shared shape put back on their meshes, only their own colours let go. They were made
   // with the figure and let go in an effect, and the effect's let-go ran once before they were ever drawn (React's strict checks unmount

@@ -2,11 +2,10 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { bakeable } from '@/scene/StaticBatch'
 import { atlasModel } from '@/scene/atlasMerge'
 import { airbrush, gradientMap } from '@/scene/Person3D'
-import { paintable, rigidFigure, type SkinPiece } from '@/scene/rigidSkin'
+import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from '@/scene/rigidSkin'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
 import { bossLineText, bossSituation, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
@@ -123,7 +122,8 @@ function styledBoss(scene: THREE.Group) {
 /** the owner standing still, a copy of him (developer mode's character viewer) */
 export function BossModel() {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => cloneSkinned(styledBoss(gltf.scene)), [gltf])
+  const obj = useMemo(() => cloneFigure(styledBoss(gltf.scene)), [gltf])
+  useEffect(() => () => releaseFigure(obj), [obj])
   return <primitive object={obj} />
 }
 /** the way he walks (his own frame, from his place): out to the aisle behind him at `mouth` (straight back out of the cook table's notch,

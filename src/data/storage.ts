@@ -7,7 +7,8 @@ export type Storage = 'frozen' | 'chilled' | 'ambient'
 const FROZEN = new Set(['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Salmon', 'Hokke', 'Buri', 'Gindara', 'Nodoguro',
   'ShrimpSkewer', 'Squid', 'Scallop'])
 // (and the seasonings that keep dry: salt, the peanut powder, shichimi; the sauces, once opened, go in the fridge)
-const AMBIENT = new Set(['Sake', 'Potato', 'SweetPotato', 'season:salt', 'season:peanut', 'season:shichimi', 'charcoal'])
+// (the rice balls' rice too: white rice keeps at room temperature, in its sacks by the sake (the owner's))
+const AMBIENT = new Set(['Sake', 'Potato', 'SweetPotato', 'Onigiri', 'season:salt', 'season:peanut', 'season:shichimi', 'charcoal'])
 
 /** where a food is kept (anything not named frozen or at room temperature is chilled) */
 export const storageOf = (id: string): Storage => (FROZEN.has(id) ? 'frozen' : AMBIENT.has(id) ? 'ambient' : 'chilled')
@@ -19,3 +20,13 @@ export const STORAGES: { id: Storage; zh: string; ja: string; en: string; temp: 
   { id: 'ambient', zh: '常溫', ja: '常温', en: 'Room temp', temp: '22℃' },
 ]
 export const storageName = (s: (typeof STORAGES)[number], lang: Lang) => (lang === 'ja' ? s.ja : lang === 'en' ? s.en : s.zh)
+
+/** what a food is called where it's kept, where that's other than the dish (the rice balls are kept as the white rice they're made of, the
+ * owner's: grilled with soy sauce) */
+const STOCK_NAMES: Record<string, { zh: string; ja: string; en: string }> = {
+  Onigiri: { zh: '白米（飯糰用）', ja: '白米（おにぎり用）', en: 'Rice (for onigiri)' },
+}
+export const stockNameOf = (id: string, lang: Lang): string | null => {
+  const n = STOCK_NAMES[id]
+  return n ? (lang === 'ja' ? n.ja : lang === 'en' ? n.en : n.zh) : null
+}

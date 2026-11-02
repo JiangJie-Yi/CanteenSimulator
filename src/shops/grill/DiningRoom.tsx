@@ -2913,11 +2913,16 @@ function ShrineDoors() {
   )
 }
 
+/** how high the shrine stands on its table, in the model's units: its base (the model's foot, at 0) right on the table's top, a hair into it
+ * so no line shows (it was 0.015 up: with the altar's own scale on top of the shrine's, 4.5 cm clear of the table in the room, the owner's
+ * "floating apart") */
+const SHRINE_LIFT = -0.0003
 function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase1' | 'cups' }) {
   return (
     <group>
       {/* the shrine itself, from blender/kamidana.py: a three-bay shrine in hinoki, its fittings gold */}
-      {(part === 'all' || part === 'shrine') && <group position={[-0.14, 0.015, 0]}><KamidanaModel /></group>}
+      {/* (its base down on the table's top: it stood 4.5 cm above it (the owner saw it floating, apart from its table)) */}
+      {(part === 'all' || part === 'shrine') && <group position={[-0.14, SHRINE_LIFT, 0]}><KamidanaModel /></group>}
       {/* the bouquets in their vases, leaning in a little, each its own piece */}
       {[-1, 1].filter((sd) => part === 'all' || part === `vase${sd}`).map((sd) => (
         <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><BouquetPick lean={sd * -0.08} slot={sd < 0 ? 0 : 1} /><ContactShadow r={0.05} y={-0.014} /></group>
@@ -3397,7 +3402,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
  * dish of oranges. Offering the sake (a click) fills the cup and makes the shrine itself glow for a minute.
  */
 /** where the Ebisu sits, in the altar's frame (the shrine at the wall, scaled up, its middle bay's floor) */
-const EBISU_AT: [number, number, number] = [0.29 + 1.25 * (-0.14 + 0.027), 1.25 * (0.015 + 0.045 + 0.04), 0]
+const EBISU_AT: [number, number, number] = [0.29 + 1.25 * (-0.14 + 0.027), 1.25 * (SHRINE_LIFT + 0.045 + 0.04), 0]
 /** a faint rainbow aura: a soft ring of the spectrum round a clear middle, fading out at its edge */
 const AURA = canvasTex(128, 128, (g) => {
   // (a pale, warm glow ring, only a hint of colour round it (a faint, desaturated rainbow), broken up by grainy noise; painted per pixel, so a
@@ -3713,7 +3718,7 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
           <group scale-z={SHRINE_WIDE} scale-x={SHRINE_DEEP}><StaticBatch><Kamidana part="shrine" /></StaticBatch></group>
         </group>
         {/* (its doors, which open; the Ebisu inside, a piece of its own: brought back with the shallower shrine, he himself not squashed) */}
-        <group scale-x={SHRINE_DEEP}><group position={[-0.14, 0.015, 0]}>
+        <group scale-x={SHRINE_DEEP}><group position={[-0.14, SHRINE_LIFT, 0]}>
           <ShrineDoors />
           <Movable id="ebisu" label="惠比壽石像"><group scale-x={1 / SHRINE_DEEP} {...nameOver('惠比壽石像', '七福神之一，保佑生意興隆、漁獲豐收')}><KamidanaModel part="ebisu" /></group></Movable>
         </group></group>
@@ -4597,30 +4602,6 @@ const FRIDGE_SIGNS = FRIDGE_UNITS.map((u, n) => canvasTex(192, 48, (g) => {
   brushText(g, `${u.sign[0]} · ${u.sign[1]}`, 96, 25, 26, { fill: '#fff6e0', edge: n ? '#0a1020' : '#7a0e0a', shadow: 'rgba(0,0,0,0.5)', shine: '#ffffff', spacing: 1 })
 }))
 
-const PROP_GEO = {
-  barrel: new THREE.CylinderGeometry(0.2, 0.2, 0.42, 24, 1, true),
-  barrelTop: new THREE.CircleGeometry(0.2, 24),
-  rope: new THREE.TorusGeometry(0.203, 0.012, 5, 28),
-  pot: new THREE.CylinderGeometry(0.15, 0.12, 0.26, 16),
-  stalk: new THREE.CylinderGeometry(0.014, 0.017, 1, 6),
-  leaf: new THREE.ConeGeometry(0.035, 0.2, 4),
-  crate: new THREE.BoxGeometry(0.3, 0.2, 0.24),
-  tallPot: new THREE.CylinderGeometry(0.13, 0.1, 0.34, 16),
-  bottle: new THREE.CylinderGeometry(0.03, 0.03, 0.14, 8),
-}
-function Inked({ geometry, color, map, grow = 1.04, side, ...rest }: { geometry: THREE.BufferGeometry; color: string; map?: THREE.Texture | null
-  grow?: number; side?: THREE.Side } & Record<string, unknown>) {
-  return (
-    <group {...rest}>
-      <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color={color} map={map ?? null} side={side ?? THREE.FrontSide} />
-      </mesh>
-      <mesh geometry={geometry} scale={grow}>
-        <meshBasicMaterial color={INK} side={THREE.BackSide} />
-      </mesh>
-    </group>
-  )
-}
 const BARRELS_URL = import.meta.env.BASE_URL + 'models/komodaru.glb'
 /** a stack of straw-wrapped sake barrels (菰樽, blender/komodaru.py: two on the floor, one on them), toon-shaded and inked, stood on the
  * floor, ~1.1 tall; `part` turns each stack its own way so two never look alike */
@@ -4652,39 +4633,38 @@ function SakeStack({ part }: { part: number }) {
   }, [gltf, part])
   return <primitive object={stack} />
 }
-/** the willow's weeping branches: each a thin tube arching out from the top of its trunk and falling away */
-const WILLOW = (() => {
-  const branches: THREE.BufferGeometry[] = []
-  const leaves: THREE.Vector3[] = []
-  for (let k = 0; k < 14; k++) {
-    const a = (k / 14) * Math.PI * 2 + (k % 3) * 0.3
-    const reach = 0.16 + (k % 4) * 0.04, fall = 0.55 + (k % 5) * 0.09
-    const dir = new THREE.Vector3(Math.cos(a), 0, Math.sin(a))
-    const top = new THREE.Vector3(0, 1.05 + (k % 3) * 0.04, 0)
-    const pts = [top, top.clone().addScaledVector(dir, reach * 0.5).add(new THREE.Vector3(0, 0.08, 0)), top.clone().addScaledVector(dir, reach),
-      top.clone().addScaledVector(dir, reach * 1.15).add(new THREE.Vector3(0, -fall * 0.5, 0)), top.clone().addScaledVector(dir, reach * 1.2).add(new THREE.Vector3(0, -fall, 0))]
-    const curve = new THREE.CatmullRomCurve3(pts)
-    branches.push(new THREE.TubeGeometry(curve, 10, 0.0035, 3, false))
-    for (let i = 3; i <= 12; i++) leaves.push(curve.getPoint(i / 12))
-  }
-  return { branches: mergeGeometries(branches)!, leaves }
-})()
-const WILLOW_LEAF = new THREE.ConeGeometry(0.012, 0.06, 4)
-/** a weeping willow (柳) in a tall glazed pot: a slender trunk, its long thin branches falling all round it in green */
-function PottedWillow() {
-  return (
-    <group>
-      <Inked geometry={PROP_GEO.tallPot} color="#3a4a3e" position-y={0.17} />
-      <mesh position-y={0.34} rotation-x={-Math.PI / 2}><circleGeometry args={[0.12, 16]} /><meshToonMaterial color="#4a3020" /></mesh>
-      <mesh position={[0.01, 0.7, 0]} rotation-z={0.05}><cylinderGeometry args={[0.012, 0.022, 0.75, 6]} /><meshToonMaterial color="#5a4a32" /></mesh>
-      <mesh geometry={WILLOW.branches}><meshToonMaterial color="#6a7a3a" /></mesh>
-      {WILLOW.leaves.map((p, i) => (
-        <mesh key={i} geometry={WILLOW_LEAF} position={p} rotation={[Math.PI + (i % 3 - 1) * 0.4, i * 1.3, (i % 2 - 0.5) * 0.6]}>
-          <meshToonMaterial color={i % 3 ? '#7a9a3e' : '#8aac4a'} />
-        </mesh>
-      ))}
-    </group>
-  )
+/**
+ * A weeping willow (柳) in a tall glazed pot (blender/willow.py; the owner's: its quality up, its faces not too many: it was a pot, a stick,
+ * fourteen tubes and 140 little cones, 2,128 triangles; now 1,540): a celadon pot run pale from the rim, a slender trunk, six branches arching
+ * over, and its long twigs hanging, each two crossed strips of a painted twig and its leaves, drawn double-sided and cut out by their alpha
+ * (no ink line round them: it would draw their strips' edges)
+ */
+const WILLOW_URL = import.meta.env.BASE_URL + 'models/willow.glb'
+useGLTF.preload(WILLOW_URL)
+function WillowModel() {
+  const gltf = useGLTF(WILLOW_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.getObjectByName('Willow')!.clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) {
+        const leaves = src.name === 'WillowLeaves'
+        t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, side: leaves ? THREE.DoubleSide : THREE.FrontSide, alphaTest: leaves ? 0.5 : 0 })
+        made.set(src, t)
+      }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, (m) => /Leaves|Soil/.test(m.name), { width: 0.004, weld: true })
+    return r
+  }, [gltf])
+  return <primitive object={obj} />
 }
 /** plastic crates of bottles (P箱), stacked by the fridges, where the stock's seen to (blender/bottlecrate.py: the owner's, their hand-holds
  * cut through and plastic to look at; they were boxes with a black slot painted on) */
@@ -5231,6 +5211,78 @@ function LightSwitch({ circuit = 'room', slim = false }: { circuit?: Circuit; sl
 useGLTF.preload(SWITCH_URL)
 useGLTF.preload(SWITCH_SLIM_URL)
 
+/**
+ * The sacks of white rice by the sake (blender/ricesacks.py; the owner's: the room-temperature stock wants rice, its sacks piled by the sake,
+ * for the rice balls, grilled with soy sauce): three unopened burlap sacks, two lying and one stood against them, each printed by the game:
+ * 白米 big in black over its weave, 新米 in red above, its weight under, a red seal. Pointed at, they say how much rice there is; clicked, the
+ * stock opens on its room-temperature tab, at the rice
+ */
+const RICE_URL = import.meta.env.BASE_URL + 'models/ricesacks.glb'
+useGLTF.preload(RICE_URL)
+const riceSackPrint = (weave: CanvasImageSource | null) => canvasTex(512, 512, (g) => {
+  g.save()
+  if (weave) g.drawImage(weave, 0, 0, 512, 512)
+  else { g.fillStyle = '#c9b48c'; g.fillRect(0, 0, 512, 512) }
+  // (printed onto the weave: multiplied, so the threads show through the ink)
+  g.globalCompositeOperation = 'multiply'
+  g.globalAlpha = 0.9
+  g.strokeStyle = '#b3261e'; g.lineWidth = 7
+  g.strokeRect(92, 112, 328, 288)
+  g.lineWidth = 2.5
+  g.strokeRect(104, 124, 304, 264)
+  g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillStyle = '#b3261e'
+  g.font = `900 46px ${SIGN_FONT}`
+  g.fillText('新米', 256, 162)
+  g.fillStyle = '#1a1612'
+  g.font = `900 150px ${SIGN_FONT}`
+  g.fillText('白米', 256, 262)
+  g.font = '700 30px "Noto Sans JP", "Yu Gothic", sans-serif'
+  g.fillText('精白米 30kg', 256, 356)
+  // (the seal, a red ring with 米 in it, at the box's corner)
+  g.strokeStyle = '#b3261e'; g.lineWidth = 6
+  g.beginPath(); g.arc(404, 392, 34, 0, Math.PI * 2); g.stroke()
+  g.fillStyle = '#b3261e'
+  g.font = `900 38px ${SIGN_FONT}`
+  g.fillText('米', 404, 394)
+  g.restore()
+})
+function RiceSacks() {
+  const gltf = useGLTF(RICE_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.getObjectByName('RiceSacks')!.clone(true)
+    r.position.set(0, 0, 0)
+    let mat: THREE.Material | null = null
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      if (!mat) {
+        const src = m.material as THREE.MeshStandardMaterial
+        // (the print's top toward the sack's far side, reading along its length from the room (flipped as a canvas is, unlike a glTF's own
+        // pictures: kept glTF's way it came out mirrored))
+        const t = riceSackPrint((src.map?.image as CanvasImageSource | undefined) ?? null)
+        mat = new THREE.MeshToonMaterial({ color: '#ffffff', map: t })
+      }
+      m.material = mat
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, () => false, { width: 0.004, weld: true })
+    return mergeByMaterial(r)
+  }, [gltf])
+  const says = () => {
+    const n = SUPPLIES.has('Onigiri')
+    return n < 0 ? '做飯糰用的白米（配醬油烤）・點一下看常溫區' : `白米 ${n} 份・做飯糰用（配醬油烤）・點一下看常溫區`
+  }
+  return (
+    // (handlers on a group round it: a primitive's own aren't attached)
+    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('白米袋', says()).onPointerOver(e) }}
+      onPointerOut={(e) => { if (getEdit().on) return; tipOver('白米袋', '').onPointerOut(e) }}
+      onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('ambient', 'sack', undefined, 'Onigiri') }}>
+      <primitive object={obj} />
+    </group>
+  )
+}
 function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   const c0 = counters[0]
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, along).addScaledVector(c0.lay, lay)
@@ -5278,9 +5330,15 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
       </Movable>
       {/* plants about the room: a willow by the sake barrels in the front corner; bamboo by the till's end, by the door
           (none against the side wall: the two drinks fridges stand there) */}
-      <Movable id="willow" label="柳樹"><StaticBatch>
-        <group position={at(3.55, 2.95)} rotation-y={1.4} scale={0.9}><PottedWillow /></group>
-      </StaticBatch></Movable>
+      {/* (its place and turn outside its batch: the object axes in edit mode follow the turn of what's inside a piece down to its first group
+          of more than one thing, and a batch is two (the owner saw its object and world places read the same)) */}
+      {/* (the sacks of rice beside the sake, between it and the willow (the owner's circle)) */}
+      <Movable id="ricesacks" label="白米袋">
+        <group position={at(3.5, 2.97)} rotation-y={face + 0.15}><RiceSacks /></group>
+      </Movable>
+      <Movable id="willow" label="柳樹">
+        <group position={at(3.55, 2.95)} rotation-y={1.4} scale={0.9}><StaticBatch><WillowModel /></StaticBatch></group>
+      </Movable>
       <Movable id="bamboo" label="竹盆栽"><StaticBatch>
         <group position={cornerAt} rotation-y={0.4}><BambooModel /></group>
       </StaticBatch></Movable>
