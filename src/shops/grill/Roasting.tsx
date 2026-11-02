@@ -121,8 +121,6 @@ const PASS_SCENE = toGrillScene(passOf(GRILL_COUNTERS)).setY((GRILL_BAR_TOP + LI
 const PASS_ROW = 6
 const passSpot = (n: number) => PASS_SCENE.clone().addScaledVector(ALONG, ((n % PASS_ROW) - (PASS_ROW - 1) / 2) * 0.065 * GRILL_SCALE)
   .add(new THREE.Vector3(0, Math.floor(n / PASS_ROW) * 0.025 * GRILL_SCALE, 0))
-/** how long (s) food cooked for a customer who's left waits for another who's owed one before it's binned */
-const ORPHAN_WAIT = 20
 const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 /**
@@ -3513,6 +3511,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     else flatQ(p, p.toQ, p.via === 'pass' ? LAY : STACK_DIR)
     p.local.copy(p.toP).sub(containerAt('bar'))
   }
+  /** the chef says something, now and then (not more often than every two and a half seconds) */
+  const chefSay = (text: string) => {
+    if (performance.now() - chefSaid.current > 2500) {
+      chefSaid.current = performance.now()
+      onSay?.('chef', text)
+    }
+  }
+  /** into the bin with it: a short arc down into the cook table's bin (the frame loop flies it), and gone */
+  const binIt = (p: Piece) => {
+    SERVICE.waiting.delete(p.key)
+    p.via = undefined
+    p.passAt = undefined
+    p.trashFrom.copy(p.node.position)
+    p.trash = 0
+    p.node.userData.onPlate = true
+  }
   const collect = (p: Piece) => {
     if (p.collected || !present(p)) return
     const bowl = inBowl(p)
@@ -3541,6 +3555,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const owner = space === 'open' ? ownerOf(p) : undefined
     if (space === 'open' && owner) {
       serveTo(p, owner)
+      return
+    }
+    // (the shop open and cooked for nobody, its customer gone before it was done: straight into the bin (the owner's: what nobody wants is
+    // thrown away), not onto a plate on the cook's table, where it looked as if someone were eating there, tasting it)
+    if (space === 'open' && roast.trash) {
+      binIt(p)
+      chefSay(L().orphanAway)
       return
     }
     if (bowl) {
@@ -3914,12 +3935,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * and clears burnt food and bare sticks into the bucket.
    */
   const runChef = () => {
-    const say = (text: string) => {
-      if (performance.now() - chefSaid.current > 2500) {
-        chefSaid.current = performance.now()
-        onSay?.('chef', text)
-      }
-    }
+    const say = chefSay
     // the owner is the head chef and works the grill by hand; a hired chef cooks alongside (takes things off when
     // done, seasons them), the sous chef does the rest (keeps the fire up, puts what's waiting on, clears away)
     // (with the shop open the kitchen cooks by itself: the owner's own cook does all of it, a hired chef or sous chef working alongside)
@@ -3968,13 +3984,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           return
         }
         stray.guest = was
-        if (stray.landed > ORPHAN_WAIT && roast.trash) {
-          SERVICE.waiting.delete(stray.key)
-          stray.via = undefined
-          stray.passAt = undefined
-          stray.trashFrom.copy(stray.node.position)
-          stray.trash = 0
-          stray.node.userData.onPlate = true
+        if (roast.trash) {
+          binIt(stray)
           say(L().orphanAway)
           return
         }
