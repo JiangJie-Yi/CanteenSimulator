@@ -112,7 +112,9 @@ export function BossModel() {
  * where he stands at the fire), then along it, `dir`, as far as `range` either way: what he's sent to (a taste, a drink) he goes to the
  * nearest of it on the aisle, and back again by the same way (the owner saw him walk into the table, round the notch's corner and into the
  * cubby beside it) */
-export type BossAisle = { mouth: [number, number]; dir: [number, number]; range: [number, number] }
+export type BossAisle = { mouth: [number, number]; dir: [number, number]; range: [number, number]
+  /** the notch's wooden step, under his place: he's up on it (`h` high) till he's come `to` that far out along his way out */
+  step?: { to: number; h: number } }
 /** the next place to make for on his way to `goal` (his frame): coming out of the notch, straight back to its mouth first; going back into
  * it, along the aisle to the mouth first and then straight in; the goal itself otherwise. So he never cuts across the table's corner, and
  * never turns back and forth on the way (a target that flipped between the mouth and the goal as he passed it made him shake) */
@@ -354,11 +356,16 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     if (edit) act = 'idle'
     // ---- gravity: he stands on whatever's under him, and if he's left in the air (put up high in the editor) he drops onto it, with a
     // little bounce; walking, on the floor itself (his frame's), not on what the ray finds under him as he passes (a step's edge, a sack, a
-    // door swung open), which had him bob up and down (the owner's)
-    if (speed > 0) s.ground = 0
+    // door swung open), which had him bob up and down (the owner's); in the notch, on its wooden step, and stepping up onto it and down off
+    // it smoothly as he walks
+    const deck = aisle?.step
+    const out = deck ? (s.x * aisle!.mouth[0] + s.z * aisle!.mouth[1]) / (Math.hypot(aisle!.mouth[0], aisle!.mouth[1]) || 1) : 0
+    if (deck && out < deck.to) s.ground = deck.h
+    else if (speed > 0) s.ground = 0
     else if (T - s.probeAt > 0.2) { s.probeAt = T; s.ground = groundBelow(m, s.x, s.z) }
     const scale = m.parent?.getWorldScale(new THREE.Vector3()).y || 1
-    if (s.y > s.ground + 1e-4 || s.vy > 0) {
+    if (speed > 0) { s.y += (s.ground - s.y) * Math.min(1, dt * 14); s.vy = 0 }
+    else if (s.y > s.ground + 1e-4 || s.vy > 0) {
       s.vy -= (9 / scale) * dt
       s.y += s.vy * dt
       if (s.y <= s.ground) { s.y = s.ground; s.vy = s.vy < -1.2 ? -s.vy * 0.28 : 0 }

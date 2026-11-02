@@ -1,5 +1,6 @@
 // A koban (小判), the old oval gold coin, standing in its little lacquered stand between the beckoning cats at the door (the owner's, after
-// a Sketchfab model they pointed to; blender/koban.py). Its faces are painted here: the hammer's fine lines across them (茣蓙目), the
+// a Sketchfab model they pointed to; blender/koban.py, a coin of 48 faces). Its faces are painted here: its raised rim, the hammer's fine
+// lines across them (茣蓙目), the
 // paulownia in its fan-shaped frame stamped at top and foot, 壹両 and 光次 with the mint's mark down the middle, the little stamps on the
 // back; and the same painted again in greys for how high each part stands, made into a normal map, so the stamps stand up and the lines
 // sink in the light. Real gold: it shines with the studio's reflections, as the shrine's metal does.
@@ -116,6 +117,21 @@ function face(g: CanvasRenderingContext2D, x0: number, back: boolean, mode: Mode
     g.fillStyle = grad
   } else g.fillStyle = '#808080'
   g.fillRect(x0, 0, w, h)
+  // (the raised rim round the edge (the model's face is flat: the owner's, as few faces as can be), a fine groove inside it)
+  const rim = w * 0.065
+  g.save()
+  if (mode === 'height') g.filter = 'blur(2px)'
+  g.lineWidth = rim
+  g.strokeStyle = mode === 'height' ? '#d0d0d0' : '#f3d27a'
+  g.beginPath()
+  g.ellipse(cx, cy, w / 2 - rim / 2, h / 2 - rim / 2, 0, 0, Math.PI * 2)
+  g.stroke()
+  g.lineWidth = w * 0.012
+  g.strokeStyle = mode === 'height' ? '#5c5c5c' : '#9a6a20'
+  g.beginPath()
+  g.ellipse(cx, cy, w / 2 - rim - w * 0.006, h / 2 - rim - w * 0.006, 0, 0, Math.PI * 2)
+  g.stroke()
+  g.restore()
   // (inside the rim: the hammer's fine lines straight across, close together, each a little uneven)
   g.save()
   g.beginPath()

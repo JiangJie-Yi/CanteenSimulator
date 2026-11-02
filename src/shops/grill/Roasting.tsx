@@ -871,7 +871,8 @@ function crewPlaces(crew: CrewMember[]) {
   const c0 = GRILL_COUNTERS[0]
   const onFloor = (v: THREE.Vector3) => toGrillScene(v).setY(GRILL_OFFSET.y)
   const spots: Record<Role, { at: THREE.Vector3; yaw: number }[]> = {
-    chef: [{ at: CHEF_AT, yaw: CHEF_YAW }],
+    // (up on the notch's step)
+    chef: [{ at: CHEF_AT.clone().setY(CHEF_AT.y + NOTCH_STEP.h), yaw: CHEF_YAW }],
     sous: [{ at: kitchenAt(1.3), yaw: KITCHEN_YAW }],
     // (the stocker's GuestBar3D's: by the drinks' crates, carrying them to the fridges; drawn here too they stood in the rice tub)
     stock: [],
@@ -920,7 +921,16 @@ const bossAisle = (home: THREE.Vector3) => {
   return { mouth: bossFrame(LAY.clone().multiplyScalar(WALK_LAY - home.dot(LAY))), dir: bossFrame(ALONG, true),
     range: [(WALK_ALONG[0] - h) / BOSS_SCALE, (WALK_ALONG[1] - h) / BOSS_SCALE] as [number, number] }
 }
-const BOSS_AISLE = bossAisle(CHEF_AT), BOSS_AISLE_OPEN = bossAisle(BOSS_OPEN_AT)
+/** the low wooden step on the notch's floor that he and his cook stand on at the fire (the owner's; blender/notchstep.py): its height, its
+ * depth, and where it stands (its back to the notch's back, its front, the step up, a little out past the table's edge), turned with the
+ * table */
+const NOTCH_STEP = { h: 0.14, d: 0.95 }
+const NOTCH_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, CHEF_AT.dot(ALONG)).addScaledVector(LAY, COOK_NOTCH.lay[0] + 0.01 + NOTCH_STEP.d / 2)
+  .setY(CHEF_AT.y)
+const NOTCH_STEP_YAW = Math.atan2(-ALONG.z, ALONG.x)
+const BOSS_AISLE = { ...bossAisle(CHEF_AT),
+  step: { to: (NOTCH_STEP_AT.dot(LAY) + NOTCH_STEP.d / 2 - CHEF_AT.dot(LAY)) / BOSS_SCALE, h: NOTCH_STEP.h / BOSS_SCALE } }
+const BOSS_AISLE_OPEN = bossAisle(BOSS_OPEN_AT)
 // (his walk on his round: out of the notch (straight back) and along the aisle)
 const BOSS_WALK = bossFrame(ALONG.clone().multiplyScalar(1.7).addScaledVector(LAY, WALK_LAY - CHEF_AT.dot(LAY)))
 /** a wood texture of blender/woodtex.py's, tiled every `w` x `h` of the table's units */
@@ -2224,6 +2234,36 @@ function EditProxyImpl({ id, label, at, size, yaw }: { id: string; label: string
     </Movable>
   )
 }
+
+const STEP_URL = import.meta.env.BASE_URL + 'models/notchstep.glb'
+useGLTF.preload(STEP_URL)
+/** the notch's wooden step (blender/notchstep.py): its boards in the table's keyaki, its skirt the bar's standing boards, its battens dark;
+ * inked, merged, standing still */
+const NotchStep = memo(function NotchStep() {
+  const gltf = useGLTF(STEP_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.getObjectByName('NotchStep')!.clone(true)
+    r.position.set(0, 0, 0)
+    const top = new THREE.MeshToonMaterial({ color: '#ffffff', map: COOK_TABLE_WOOD })
+    const skirt = new THREE.MeshToonMaterial({ color: '#e0c8a8', map: BAR_BASE_WOOD })
+    const batten = new THREE.MeshToonMaterial({ color: '#3a2618' })
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const n = (m.material as THREE.Material).name
+      m.material = n === 'StepTop' ? top : n === 'StepSkirt' ? skirt : batten
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, () => false, { width: 0.004, weld: true })
+    return r
+  }, [gltf])
+  return (
+    <Movable id="notchstep" label="缺口木台階"><StaticBatch>
+      <group position={NOTCH_STEP_AT} rotation-y={NOTCH_STEP_YAW}><primitive object={obj} /></group>
+    </StaticBatch></Movable>
+  )
+})
 
 /** the owner in his place (at the grill while the shop's shut, along the aisle while it's open): drawn again only when that or the language
  * changes, not with every redraw of the kitchen (he walks, turns and fades by his own frame loop) */
@@ -5979,9 +6019,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {/* (the crew keep their own places on the kitchen floor: carried back by the shift) */}
       <group position={[FIRE_SHIFT.x, 0, FIRE_SHIFT.z]}>
       {/* the owner: at his grill while the shop's shut; open, his chef has the grill and he stands along the aisle from it, keeping an eye  (he fades himself out of the way when he stands between the camera and what it looks at: Boss.tsx) */}
-      {bar && (
+      {bar && (<>
         <BossSpot open={space === 'open'} lang={lang} />
-      )}
+        {/* (and the notch's wooden step he and his cook stand on) */}
+        <NotchStep />
+      </>)}
       {space === 'open' && bar && crewPlaces(crew).map(({ m, at, yaw, way, seat }) => (
         <CrewWalk key={m.id} id={m.id} at={at} yaw={yaw} way={way} seat={seat} round={m.role === 'chef' || m.role === 'sous'}>
           {!seat && <BlobShadow r={0.17} />}<StaffFigure id={m.id} role={m.role} look={m.look} seated={!!seat} />

@@ -1,10 +1,12 @@
 """A koban (小判), the old oval gold coin, standing in a little lacquered stand between the beckoning cats at the door (the owner's, after a
 Sketchfab model they pointed to, only looked at): koban.glb, node "Koban".
 
-The coin: an oval, a good deal taller than wide, its edge rounded, a narrow raised rim round each face and the face inside it a hair lower;
-a clean low mesh (rings round the oval, a fan at the middle), all its detail painted by the game onto its two faces (the hammer's fine
-lines across it (茣蓙目), the paulownia in its fan-shaped frame stamped at top and foot, 壹両 and 光次 with the mint's mark down the middle,
-the little stamps on the back) and lit as raised and sunk by a normal map made from the same painting. Its two faces are unwrapped side by
+The coin: an oval, a good deal taller than wide, as low a mesh as it can be (the owner's: 24 points round, never a fan of triangles into
+the middle, its side one band, the coin under a hundred faces): each face a ladder of quads straight across (each pair of points at one
+height joined, a triangle at top and foot), its side a single band of quads round it; all its detail painted by the game onto its two
+faces (its raised rim, the hammer's fine lines across it (茣蓙目), the paulownia in its fan-shaped frame stamped at top and foot, 壹両 and
+光次 with the mint's mark down the middle, the little stamps on the back) and lit as raised and sunk by a normal map made from the same
+painting. Its two faces are unwrapped side by
 side onto one picture, the front on the left half, the back on the right, each as wide and tall as the coin is (so the painting isn't
 squashed); its edge on a plain gold strip at the picture's foot.
 The stand: a low block of black lacquer with rounded edges, the coin's foot sunk into a slot in it, the coin leaning back a little.
@@ -39,9 +41,7 @@ def P(x, y, z):
 
 
 W, H, T = 0.075, 0.14, 0.0055      # the coin: across, tall, thick
-RIM = 0.0042                        # the raised rim's width, in from the edge
-SINK = 0.0007                       # how far the face lies below the rim
-N = 48                              # points round the oval
+N = 24                              # points round the oval
 STAND = (0.10, 0.026, 0.044)        # the stand: along, tall, deep
 LEAN = math.radians(6)              # the coin leans back this much
 FOOT = 0.012                        # and its foot is this far down in the stand's slot
@@ -60,25 +60,14 @@ def oval(k, s):
 
 
 def coin():
-    """rings round the oval on each face (the edge's rounding, the rim, the face sunk inside it, a little doming toward the middle), the
-    two faces joined by the rounded edge; each face's UVs where the picture's cell for it has that point (front left, back right,
-    mirrored, so the back reads the right way round from behind); the edge's on the plain strip"""
+    """the two faces, each a ladder of quads straight across the oval (the points at one height joined, a triangle at top and at foot),
+    and the side, one band of quads round it; the faces and the side apart (their own vertices), so the edge between them stays sharp. Each
+    face's UVs where the picture's cell for it has that point (front left, back right, mirrored, so the back reads the right way round from
+    behind); the side's on the plain strip"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    # (each ring: its scale of the oval, its height off the middle plane (a share of half the thickness))
-    rim_in = 1 - 2 * RIM / W
-    rings = [(1.0, 0.55), (0.985, 0.92), (0.965, 1.0), (rim_in + 0.012, 1.0), (rim_in, 1 - SINK / (T / 2)), (0.62, 1 - SINK / (T / 2) + 0.05),
-             (0.3, 1 - SINK / (T / 2) + 0.08)]
-    faces_by_side = {}
-    for side in (1, -1):
-        rows = []
-        for s, h in rings:
-            rows.append([bm.verts.new(P(*oval(k, s), side * h * T / 2)) for k in range(N)])
-        centre = bm.verts.new(P(0, 0, side * (1 - SINK / (T / 2) + 0.09) * T / 2))
-        faces_by_side[side] = (rows, centre)
 
-    def uv_of(v, side):
-        x, y = v.co.x, v.co.z   # (Blender's x is the game's x, its z the game's y)
+    def uv_of(x, y, side):
         u = x / W + 0.5
         if side < 0:
             u = 1 - u
@@ -86,44 +75,46 @@ def coin():
         # strip under them)
         return (0.5 * u + (0.5 if side < 0 else 0.0), 0.08 + 0.92 * (y / H + 0.5))
 
+    def facing(f, want):
+        """turn the face round if it doesn't face `want` (Blender's frame)"""
+        f.normal_update()
+        if f.normal.dot(want) < 0:
+            f.normal_flip()
+
     for side in (1, -1):
-        rows, centre = faces_by_side[side]
-        for r in range(len(rows) - 1):
-            for k in range(N):
-                q = [rows[r][k], rows[r][(k + 1) % N], rows[r + 1][(k + 1) % N], rows[r + 1][k]]
-                if side < 0:
-                    q.reverse()
-                f = bm.faces.new(q)
-                f.material_index = 0
-                for lp in f.loops:
-                    lp[uvl].uv = uv_of(lp.vert, side)
-        for k in range(N):
-            q = [rows[-1][k], rows[-1][(k + 1) % N], centre]
-            if side < 0:
-                q.reverse()
-            f = bm.faces.new(q)
+        ring = [bm.verts.new(P(*oval(k, 1.0), side * T / 2)) for k in range(N)]
+        h = N // 2
+        loops = [[0, 1, N - 1]] + [[k, k + 1, N - k - 1, N - k] for k in range(1, h - 1)] + [[h - 1, h, h + 1]]
+        for idx in loops:
+            f = bm.faces.new([ring[i % N] for i in idx])
+            facing(f, P(0, 0, side))
             for lp in f.loops:
-                lp[uvl].uv = uv_of(lp.vert, side)
-    # (the edge: the two faces' outer rings joined, its UVs along the strip at the picture's foot)
-    front, back = faces_by_side[1][0][0], faces_by_side[-1][0][0]
+                x, y = lp.vert.co.x, lp.vert.co.z   # (Blender's x is the game's x, its z the game's y)
+                lp[uvl].uv = uv_of(x, y, side)
+    front = [bm.verts.new(P(*oval(k, 1.0), T / 2)) for k in range(N)]
+    back = [bm.verts.new(P(*oval(k, 1.0), -T / 2)) for k in range(N)]
     for k in range(N):
-        q = [front[(k + 1) % N], front[k], back[k], back[(k + 1) % N]]
-        f = bm.faces.new(q)
-        for lp, (u, v) in zip(f.loops, [((k + 1) / N, 0.06), (k / N, 0.06), (k / N, 0.01), ((k + 1) / N, 0.01)]):
-            lp[uvl].uv = (u, v)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        f = bm.faces.new([front[k], front[(k + 1) % N], back[(k + 1) % N], back[k]])
+        mid = (front[k].co + front[(k + 1) % N].co) / 2
+        facing(f, Vector((mid.x, 0, mid.z)))
+        for lp in f.loops:
+            kk = (front + back).index(lp.vert) % N
+            u = (kk if not (kk == 0 and k == N - 1) else N) / N
+            lp[uvl].uv = (u, 0.06 if lp.vert in front else 0.01)
     me = bpy.data.meshes.new("KobanCoin")
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new("KobanCoin", me)
     bpy.context.collection.objects.link(o)
     o.data.materials.append(M["gold"])
+    # (flat faces, the side smooth round)
     for pg in o.data.polygons:
-        pg.use_smooth = True
+        pg.use_smooth = abs(pg.normal.y) < 0.5
     # (stood in its stand: its foot down in the slot, leaning back)
     o.location = P(0, H / 2 + STAND[1] - FOOT, 0.002)
     o.rotation_euler = (-LEAN, 0, 0)
     parts.append(o)
+    print("KOBAN_COIN_FACES", len(o.data.polygons), "TRIS", sum(len(pg.vertices) - 2 for pg in o.data.polygons))
     return o
 
 
@@ -136,8 +127,8 @@ def stand():
     o.scale = (sx, sz, sy)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     bev = o.modifiers.new("Round", "BEVEL")
-    bev.width = 0.004
-    bev.segments = 3
+    bev.width = 0.003
+    bev.segments = 1
     bev.limit_method = "ANGLE"
     bpy.ops.object.modifier_apply(modifier=bev.name)
     o.data.materials.append(M["lacquer"])
