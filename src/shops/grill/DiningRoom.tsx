@@ -4135,21 +4135,54 @@ function PottedWillow() {
     </group>
   )
 }
-/** plastic crates of empty bottles (P箱), stacked by the kitchen's end, where the stock's seen to */
-/** a beer crate's side: its maker's name moulded in, a hand-hold slot, a ribbed band (white on the crate's red) */
-const CRATE_SIDE = canvasTex(256, 128, (g) => {
-  g.fillStyle = '#c0302a'; g.fillRect(0, 0, 256, 128)
-  g.fillStyle = 'rgba(0,0,0,0.18)'
-  for (let x = 0; x < 256; x += 16) g.fillRect(x, 0, 3, 128)
-  g.fillStyle = '#2a0a08'; g.beginPath(); g.roundRect(78, 14, 100, 22, 11); g.fill()
-  g.fillStyle = '#f4ece0'
-  g.font = '900 34px "Zen Antique", serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.fillText('ビール', 128, 76)
-  g.font = '700 14px "Arial Black", sans-serif'; g.fillText('20本入 · 中瓶', 128, 108)
+/** plastic crates of bottles (P箱), stacked by the fridges, where the stock's seen to (blender/bottlecrate.py: the owner's, their hand-holds
+ * cut through and plastic to look at; they were boxes with a black slot painted on) */
+const CRATE_URL = import.meta.env.BASE_URL + 'models/bottlecrate.glb'
+useGLTF.preload(CRATE_URL)
+/** the brewer's name moulded white on a crate's long sides: ビール big, 20本入 · 中瓶 under it, on clear (the planes over the smooth panels) */
+const CRATE_LETTERS = canvasTex(600, 128, (g) => {
+  g.save()
+  g.fillStyle = '#f6efe4'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.font = `900 62px ${SIGN_FONT}`
+  g.fillText('ビール', 300, 50)
+  g.font = '700 25px "Arial Black", sans-serif'
+  ;(g as unknown as { letterSpacing: string }).letterSpacing = '2px'
+  g.fillText('20本入 · 中瓶', 300, 103)
+  g.restore()
 })
+/** the crate's moulded red plastic, glossy (the studio's light in it), and its lettering: made once, shared */
+let crateMats: { plastic: THREE.MeshStandardMaterial; letters: THREE.MeshToonMaterial } | null = null
+const crateMatsOf = () => {
+  if (!crateMats) {
+    const plastic = new THREE.MeshStandardMaterial({ color: '#c3302a', roughness: 0.36, metalness: 0, envMapIntensity: 0.85 })
+    reflectStudio(plastic)
+    if (CRATE_LETTERS) CRATE_LETTERS.flipY = false
+    crateMats = { plastic, letters: new THREE.MeshToonMaterial({ color: '#ffffff', map: CRATE_LETTERS, alphaTest: 0.45 }) }
+  }
+  return crateMats
+}
+function CrateModel() {
+  useStudio()
+  const gltf = useGLTF(CRATE_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.getObjectByName('BottleCrate')!.clone(true)
+    r.position.set(0, 0, 0)
+    const m = crateMatsOf()
+    r.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh) return
+      mesh.material = /Letters/.test(mesh.name) ? m.letters : m.plastic
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+    })
+    inkModel(r, (q) => /Letters/.test(q.name), { width: 0.0012, weld: true })
+    return r
+  }, [gltf])
+  return <primitive object={obj} />
+}
 /**
- * The empty-bottle crates (P箱) by the fridges, the brewer's red plastic, two stacked: each a frame of ribbed sides with hand-holds,
- * a grid of cells inside, and its brown beer bottles standing in the cells, their necks and caps up out of it
+ * The bottle crates (P箱) by the fridges, the brewer's red plastic, two stacked (blender/bottlecrate.py: ribbed sides, a hand-hold cut
+ * through each, a grid of cells inside), its brown beer bottles standing in the cells, their necks and caps up out of it
  */
 /** the drinks' names, for the back stock's tag */
 const drinkLabel = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? id
@@ -4200,7 +4233,8 @@ function DrinkCartons() {
         // (a glTF model's pictures are read top row first: the print's canvas too)
         const print = k ? cartonPrint(CARTON_DRINKS[+k[1]]) : null
         if (print) { print.flipY = false; print.needsUpdate = true }
-        t = new THREE.MeshToonMaterial({ color: k ? '#ffffff' : src.color.clone(), map: print ?? src.map })
+        // (the tape clear, as packing tape is (the owner's: it was an opaque brown strip))
+        t = /Tape/.test(src.name) ? clearTape() : new THREE.MeshToonMaterial({ color: k ? '#ffffff' : src.color.clone(), map: print ?? src.map })
         mats.set(src, t)
       }
       m.material = t
@@ -4257,26 +4291,13 @@ const SAKE_HIT: [number, number, number] = [0.9, 1.1, 0.76]
 /** (the stack bigger now (nine cases, 0.83 by 0.42, 1.1 high): drawn 0.08 further from the crates, which it ran 6 cm into) */
 const CARTONS_AT: [number, number, number] = [-0.44, 0, 0.173]
 function BottleCrates() {
-  const W = 0.36, D = 0.29, H = 0.2
+  const W = 0.36, D = 0.29
   const cols = 5, rows = 4
   return (
     <group>
       {[0, 1].map((k) => (
         <group key={k} position={[k * 0.03 - 0.015, k * 0.272, 0]} rotation-y={k * 0.1}>
-          {/* (the four sides, printed, and the floor) */}
-          {[[0, D / 2, 0], [0, -D / 2, Math.PI], [W / 2, 0, Math.PI / 2], [-W / 2, 0, -Math.PI / 2]].map(([x, z, ry], i) => (
-            <mesh key={i} position={[x, H / 2, z]} rotation-y={ry}>
-              <boxGeometry args={[i < 2 ? W : D, H, 0.012]} /><meshToonMaterial color="#ffffff" map={CRATE_SIDE} />
-            </mesh>
-          ))}
-          <mesh position-y={0.006}><boxGeometry args={[W, 0.012, D]} /><meshToonMaterial color="#9a2620" /></mesh>
-          {/* (the cells' walls) */}
-          {Array.from({ length: cols - 1 }, (_, c) => (
-            <mesh key={`c${c}`} position={[-W / 2 + (W / cols) * (c + 1), H * 0.45, 0]}><boxGeometry args={[0.006, H * 0.9, D - 0.02]} /><meshToonMaterial color="#a82a22" /></mesh>
-          ))}
-          {Array.from({ length: rows - 1 }, (_, r) => (
-            <mesh key={`r${r}`} position={[0, H * 0.45, -D / 2 + (D / rows) * (r + 1)]}><boxGeometry args={[W - 0.02, H * 0.9, 0.006]} /><meshToonMaterial color="#a82a22" /></mesh>
-          ))}
+          <CrateModel />
           {/* (the bottles: the lower crate full, the top one with a few gone) */}
           {Array.from({ length: cols * rows }, (_, n) => {
             if (k === 1 && (n % 7 === 3 || n === 11)) return null
