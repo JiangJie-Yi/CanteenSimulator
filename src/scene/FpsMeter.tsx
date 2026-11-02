@@ -11,7 +11,7 @@ const SIZE = new Vector2()
 export function FpsMeter() {
   const gl = useThree((s) => s.gl)
   const el = useRef<HTMLDivElement | null>(null)
-  const acc = useRef({ frames: 0, time: 0, worst: 0 })
+  const acc = useRef({ frames: 0, time: 0, worst: 0, last: -1 })
   useEffect(() => {
     const d = document.createElement('div')
     d.style.cssText = 'position:fixed;right:0;top:0;z-index:80;pointer-events:none;height:18px;max-width:100vw;text-align:right;'
@@ -22,8 +22,13 @@ export function FpsMeter() {
     el.current = d
     return () => { d.remove(); el.current = null }
   }, [])
-  useFrame((_, dt) => {
+  useFrame(() => {
     const a = acc.current
+    // (by the wall clock, not the frame's step: at x2 the game's clock runs twice as fast and its steps are twice as long, and the meter read
+    // half the frame rate it was (the soak's 30 fps at x2 were 50))
+    const now = performance.now()
+    const dt = a.last < 0 ? 0 : Math.min(1, (now - a.last) / 1000)
+    a.last = now
     a.frames++
     a.time += dt
     a.worst = Math.max(a.worst, dt)

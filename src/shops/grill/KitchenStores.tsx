@@ -21,6 +21,8 @@ const OPEN = /^(ProduceSack|CharcoalSack)/
 /** what's baked (the tubers: blender/produce.py bakes a detailed twin onto each coarse one), its normal map kept, so the room's light shades
  * it as if it were round */
 const BAKED = /^ProduceTuber/
+/** how much brighter each sack's burlap is drawn than it's woven */
+const BURLAP_LIFT: Record<string, number> = { ProduceSackPotato: 1.28, ProduceSackSweet: 1.28, CharcoalSackCloth: 1.18 }
 /** too small or too fine for an ink line (the skewers, their ties, the labels and the marks on things) */
 const UNINKED = /Skewer|Label|Mark|Spice\d|SpiceCap|FoilRoll|Lemon\d/
 
@@ -44,7 +46,12 @@ function partOf(scene: THREE.Group, node: string, width: number, keep?: (o: THRE
           reflectStudio(g)
           t = g
         } else {
-          t = new THREE.MeshToonMaterial({ color: sm.color.clone(), map: sm.map ?? null, side: OPEN.test(sm.name) ? THREE.DoubleSide : THREE.FrontSide })
+          const toon = new THREE.MeshToonMaterial({ color: sm.color.clone(), map: sm.map ?? null, side: OPEN.test(sm.name) ? THREE.DoubleSide : THREE.FrontSide })
+          // (the sacks' burlap a little brighter than it's woven (the owner's): the potatoes' and sweet potatoes' paler, the charcoal's printed
+          // one less so)
+          const lift = BURLAP_LIFT[sm.name]
+          if (lift) toon.color.multiplyScalar(lift)
+          t = toon
           if (BAKED.test(sm.name) && sm.normalMap) Object.assign(t, { normalMap: sm.normalMap, normalScale: sm.normalScale.clone() })
         }
         t.name = sm.name

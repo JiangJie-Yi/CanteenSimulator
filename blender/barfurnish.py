@@ -56,8 +56,14 @@ def apply_all(o):
         bpy.ops.object.modifier_apply(modifier=m.name)
 
 
-def lathe(name, prof, segs=40):
-    """a turned piece: the profile [(radius, height)] swept round the vertical, its UVs round it and up it"""
+def lathe(name, prof, segs=24):
+    """a turned piece: the profile [(radius, height)] swept round the vertical, its UVs round it and up it. A profile that starts or ends on
+    the axis has that point left out and the ring beside it closed flat instead (laddered on export): never a fan of triangles into the
+    middle (the owner's low-poly rule; the pot's foot was 120 triangles round one point)"""
+    if prof[0][0] <= 1e-4:
+        prof = prof[1:]
+    if prof[-1][0] <= 1e-4:
+        prof = prof[:-1]
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     rings = []
@@ -124,10 +130,10 @@ def bamboo():
     parts = []
     # (the pot: a tapering bowl with a rolled lip; the unglazed clay foot)
     pot = lathe("BambooPot", [(0.0, 0.012), (0.1, 0.012), (0.115, 0.03), (0.15, 0.12), (0.168, 0.22), (0.17, 0.25), (0.178, 0.262), (0.17, 0.27),
-                              (0.158, 0.262), (0.152, 0.24)], 40)
+                              (0.158, 0.262), (0.152, 0.24)], 24)
     fin(pot, "BambooPot", M["glaze"], parts)
-    fin(lathe("BambooPotFoot", [(0.0, 0.0), (0.104, 0.0), (0.104, 0.014), (0.0, 0.014)], 40), "BambooPotFoot", M["clay"], parts)
-    fin(lathe("BambooSoil", [(0.0, 0.236), (0.152, 0.236), (0.152, 0.24), (0.0, 0.243)], 32), "BambooSoil", M["soil"], parts)
+    fin(lathe("BambooPotFoot", [(0.0, 0.0), (0.104, 0.0), (0.104, 0.014), (0.0, 0.014)], 24), "BambooPotFoot", M["clay"], parts)
+    fin(lathe("BambooSoil", [(0.0, 0.236), (0.152, 0.236), (0.152, 0.24), (0.0, 0.243)], 24), "BambooSoil", M["soil"], parts)
     # (moss in soft clumps, pale pebbles between)
     for i in range(14):
         a, r = rng.random() * 6.28, 0.03 + rng.random() * 0.11
