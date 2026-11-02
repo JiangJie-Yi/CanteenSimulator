@@ -2301,7 +2301,8 @@ function StaffDoor() {
     const sign = new THREE.Group()
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.24),
       new THREE.MeshToonMaterial({ color: '#ffffff', map: STAFF_SIGN, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }))
-    plate.position.set(-0.0372, 0.56, 0)
+    // (high on the board, just under the waist rail: the owner's; it sat in the board's middle)
+    plate.position.set(-0.0372, 0.84, 0)
     plate.rotation.y = -Math.PI / 2
     sign.add(plate)
     return { panel, sign }
@@ -2326,8 +2327,10 @@ function StaffDoor() {
   return (
     <group name="staff-door">
       <group scale={[1, 1, narrow]}><primitive object={frame} /></group>
-      <mesh position={[-0.004, WC_H / 2, 0]} rotation-y={-Math.PI / 2}>
-        <planeGeometry args={[STAFF_W - 0.05, WC_H - 0.02]} />
+      {/* (the dark of the passage: right across the opening and on behind the posts, the head and the sill, so no plaster shows round its
+          edges (the owner saw a pale strip down the side; it stopped 2.5 cm short of each post)) */}
+      <mesh position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2}>
+        <planeGeometry args={[STAFF_W + 0.06, WC_H + 0.03]} />
         <meshBasicMaterial color="#ffffff" map={STAFF_DARK} />
       </mesh>
       <group ref={g} onClick={(ev) => {
