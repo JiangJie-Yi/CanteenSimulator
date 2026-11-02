@@ -1,5 +1,6 @@
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { sheetsFor, takeSheets } from '@/game/tissues'
+import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
+import { drinksToOrder, stockerChore, type StockChore } from '@/game/stocker'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -50,9 +51,9 @@ import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
-import { looksOf, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, LIP_H, PASS, PASS_SHELF, PASS_SLOTS, PASS_STACK_ALONG, passSlotAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
-import { emptyFillable, restockRun } from '@/game/drinkStock'
+import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
+import { aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, LIP_H, PASS, PASS_SHELF, PASS_SLOTS, PASS_STACK_ALONG, passSlotAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
 
@@ -204,63 +205,162 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
 const STOCK_CARRY = 8
 // (he walks by his own frame loop: drawn again only if he or the room changes, not with every redraw of the bar)
 const Stocker = memo(StockerImpl, (a, b) => a.counters === b.counters && a.fridges === b.fridges && a.who.id === b.who.id && a.who.look === b.who.look)
+/**
+ * The stock keeper (倉儲; the owner's: they order in and restock, and walk to do it), by game/stocker's chores: a toilet's roll running out,
+ * changed for a new one (in through its door when nobody's using it, the guests leaving it till he's out); the drinks carried out of the back
+ * to a fridge short of them; a place's box of tissues running low, changed for a spare (its drawer pulled out while he does, nobody sat
+ * there); and, looking round, a case of a drink ordered in once the back's down to under half a case of it. From his place by the crates
+ * along the aisles, round the corner for the long counter.
+ */
 function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges: NonNullable<ReturnType<typeof fridgesOf>>; who: { id: string; look: StaffLook } }) {
   const g = useRef<THREE.Group>(null)
-  const box = useRef<THREE.Mesh>(null)
+  const held = useRef<{ crate: THREE.Object3D | null; roll: THREE.Object3D | null; box: THREE.Object3D | null }>({ crate: null, roll: null, box: null })
   const c1 = counters[1]
   const home = useMemo(() => {
     const last = fridges[fridges.length - 1]
     return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32 + 0.55)
   }, [c1, fridges])
-  const st = useRef({ phase: 'idle' as 'idle' | 'go' | 'fill' | 'back', t: 0, unit: 0, pos: home.clone(), yaw: 0, check: 0 })
+  const seats = useMemo(() => seatsOf(counters), [counters])
+  const wcs = useMemo(() => toiletsOf(counters), [counters])
+  /** his way out into the side counter's aisle, across from his place */
+  const homeAisle = useMemo(() => c1.at.clone().addScaledVector(c1.along, home.clone().sub(c1.at).dot(c1.along) / c1.along.lengthSq()).addScaledVector(c1.lay, -AISLE), [home, c1])
+  const st = useRef({ phase: 'idle' as 'idle' | 'go' | 'work' | 'back', t: 0, chore: null as StockChore, path: [] as THREE.Vector3[], len: 0, d: 0,
+    pos: home.clone(), yaw: 0, check: 0, done: false })
   const [moving, setMoving] = useState(false)
+  if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stocker?: typeof st }).__stocker = st
   useFrame((_, dt0) => {
     const dt = Math.min(dt0, 0.1)
     const s = st.current
-    const walk = (to: THREE.Vector3) => {
-      const d = to.clone().sub(s.pos).setY(0)
-      const len = d.length()
-      if (len < 0.03) return true
-      s.pos.addScaledVector(d.normalize(), Math.min(len, dt * 1.0))
-      s.yaw = Math.atan2(d.x, d.z)
-      return false
+    /** along his way, out or back (back: the same way, walked from its end) */
+    const walk = () => {
+      s.d = Math.min(s.len, s.d + dt * 1.0)
+      const { p, dir } = alongPath(s.path, s.phase === 'back' ? s.len - s.d : s.d)
+      s.pos.copy(p)
+      if (dir.x || dir.z) s.yaw = s.phase === 'back' ? Math.atan2(-dir.x, -dir.z) : Math.atan2(dir.x, dir.z)
+      return s.d >= s.len
     }
+    const set = (path: THREE.Vector3[]) => { s.path = path; s.len = pathLength(path); s.d = 0 }
+    const c = s.chore
     if (s.phase === 'idle') {
       s.check += dt
+      s.yaw += (Math.atan2(-c1.lay.x, -c1.lay.z) - s.yaw) * Math.min(1, dt * 4)
       if (s.check > 1) {
         s.check = 0
-        const n = fridges.findIndex((f) => emptyFillable(FRIDGE_STOCK.units[f.n], FRIDGE_UNITS[f.n].shelves.map((sh) => sh.ids), DRINK_BACK.back) >= 3)
-        if (n >= 0) { s.phase = 'go'; s.unit = fridges[n].n; setMoving(true) }
+        // (a case ordered in of whatever the back's running out of, one a look)
+        const ids = FRIDGE_UNITS.flatMap((u) => u.shelves.flatMap((sh) => sh.ids))
+        const want = drinksToOrder(DRINK_BACK.back, ids)[0]
+        if (want) {
+          const r = buyCase(DRINK_BACK.back, want, SHOP_PURSE.cash())
+          if (r.ok) { DRINK_BACK.back = r.back; SHOP_PURSE.spend(caseCost(want)); DRINK_BACK.ver++ }
+        }
+        const busy = (w: 'm' | 'f') => TOILETS[w].passing > 0 || TOILETS[w].inside > 0
+        const next = stockerChore({
+          rolls: { m: TOILETS.m.room.paper, f: TOILETS.f.room.paper }, wcBusy: { m: busy('m'), f: busy('f') },
+          fridgeShort: fridges.map((f) => emptyFillable(FRIDGE_STOCK.units[f.n], FRIDGE_UNITS[f.n].shelves.map((sh) => sh.ids), DRINK_BACK.back)),
+          boxes: seats.map((_, i) => tissuesAt(i)), seatTaken: (n) => SEATS_TAKEN.has(n), spares: Math.max(0, SUPPLIES.has(TISSUE)),
+        })
+        if (next && !(next.kind === 'roll' && !wcs)) {
+          s.chore = next
+          s.done = false
+          if (next.kind === 'drinks') set([home.clone(), fridges.find((f) => f.n === next.unit)!.front.clone()])
+          else if (next.kind === 'roll') {
+            const w = wcs![next.who]
+            STOCKER_WC.who = next.who
+            set([home.clone(), homeAisle.clone(), w.aisle.clone(), w.front.clone(), w.inside.clone()])
+          } else {
+            const seat = seats[next.seat]
+            // (beside the stool, on the drawer's side, facing the bar)
+            const beside = seat.aisle.clone().lerp(seat.stool, 0.55).addScaledVector(seat.along, -0.3)
+            set([home.clone(), homeAisle.clone(), ...(seat.counter === 1 ? [] : [aisleCornerOf(counters, c1)]), seat.aisle.clone(), beside])
+          }
+          s.phase = 'go'
+          setMoving(true)
+        }
       }
-      s.yaw += (Math.atan2(-c1.lay.x, -c1.lay.z) - s.yaw) * Math.min(1, dt * 4)
     } else if (s.phase === 'go') {
-      if (walk(fridges.find((f) => f.n === s.unit)!.front)) { s.phase = 'fill'; s.t = 0; FRIDGE_STATE[s.unit].passing++; setMoving(false) }
-    } else if (s.phase === 'fill') {
+      if (walk()) { s.phase = 'work'; s.t = 0; setMoving(false) }
+    } else if (s.phase === 'work' && c) {
       s.t += dt
-      const f = fridges.find((x) => x.n === s.unit)!
-      s.yaw = Math.atan2(f.at.x - s.pos.x, f.at.z - s.pos.z)
-      if (s.t > 1.6) {
-        const run = restockRun(FRIDGE_STOCK.units[s.unit], FRIDGE_UNITS[s.unit].shelves.map((sh) => sh.ids), DRINK_BACK.back, STOCK_CARRY)
-        run.rows.forEach((r, i) => { FRIDGE_STOCK.units[s.unit][i] = r })
-        DRINK_BACK.back = run.back
-        DRINK_BACK.ver++
-        FRIDGE_STOCK.ver++
-        FRIDGE_STATE[s.unit].passing = Math.max(0, FRIDGE_STATE[s.unit].passing - 1)
-        s.phase = 'back'
-        setMoving(true)
+      if (c.kind === 'drinks') {
+        const f = fridges.find((x) => x.n === c.unit)!
+        s.yaw = Math.atan2(f.at.x - s.pos.x, f.at.z - s.pos.z)
+        if (s.t < dt * 1.5) FRIDGE_STATE[c.unit].passing++
+        if (s.t > 1.6) {
+          const run = restockRun(FRIDGE_STOCK.units[c.unit], FRIDGE_UNITS[c.unit].shelves.map((sh) => sh.ids), DRINK_BACK.back, STOCK_CARRY)
+          run.rows.forEach((r, i) => { FRIDGE_STOCK.units[c.unit][i] = r })
+          DRINK_BACK.back = run.back
+          DRINK_BACK.ver++
+          FRIDGE_STOCK.ver++
+          FRIDGE_STATE[c.unit].passing = Math.max(0, FRIDGE_STATE[c.unit].passing - 1)
+          s.phase = 'back'
+        }
+      } else if (c.kind === 'roll') {
+        // (in, the door shut behind him: the old roll off the holder, a new one on)
+        if (s.t > 2.4 && !s.done) {
+          s.done = true
+          const t = TOILETS[c.who]
+          t.room = newRoll(t.room)
+          t.rollAt = performance.now()
+        }
+        if (s.t > 2.8) s.phase = 'back'
+      } else {
+        // (the drawer out, the box in it changed for a spare, the drawer back in)
+        const seat = seats[c.seat]
+        const at = seat.mid
+        s.yaw = Math.atan2(at.x - s.pos.x, at.z - s.pos.z)
+        if (!SEATS_TAKEN.has(c.seat)) DRAWER_HELD.add(c.seat)
+        if (s.t > 1.3 && !s.done) {
+          s.done = true
+          if (SUPPLIES.take(TISSUE, 1)) setTissues(c.seat, BOX_SHEETS)
+        }
+        if (s.t > 2.0) { DRAWER_HELD.delete(c.seat); s.phase = 'back' }
       }
-    } else if (walk(home)) { s.phase = 'idle'; setMoving(false) }
-    if (g.current) { g.current.position.copy(s.pos); g.current.rotation.y = s.yaw }
-    // (the case in his arms, carried out full; back empty-handed)
-    if (box.current) box.current.visible = s.phase === 'go' || s.phase === 'fill'
+      if (s.phase === 'back') { s.d = 0; setMoving(true) }
+    } else if (s.phase === 'back') {
+      if (walk()) {
+        s.phase = 'idle'
+        s.pos.copy(home)
+        if (c?.kind === 'roll') STOCKER_WC.who = null
+        s.chore = null
+        setMoving(false)
+      }
+    }
+    // (at a toilet's door: near enough to have it open; in, past it)
+    if (c?.kind === 'roll' && wcs) {
+      const w = wcs[c.who]
+      STOCKER_WC.near = s.pos.distanceTo(w.front) < 1.3 && !(s.phase === 'work')
+      STOCKER_WC.inside = s.phase === 'work'
+    } else { STOCKER_WC.near = false; STOCKER_WC.inside = false }
+    if (g.current) {
+      g.current.position.copy(s.pos)
+      g.current.rotation.y = s.yaw
+      // (unseen while he's in the toilet, the door shut)
+      g.current.visible = !(c?.kind === 'roll' && s.phase === 'work')
+    }
+    // (in his arms: a case of drinks carried out; a new roll; a new box of tissues; back empty-handed)
+    const out = s.phase === 'go' || s.phase === 'work'
+    const h = held.current
+    if (h.crate) h.crate.visible = out && c?.kind === 'drinks'
+    if (h.roll) h.roll.visible = out && c?.kind === 'roll' && !s.done
+    if (h.box) h.box.visible = out && c?.kind === 'tissue' && !s.done
   })
+  // (shut, nothing of his left about: no drawer held out, no toilet waiting on him)
+  useEffect(() => () => { STOCKER_WC.who = null; STOCKER_WC.near = false; STOCKER_WC.inside = false; DRAWER_HELD.clear() }, [])
   return (
     <group ref={g} position={home} scale={STAFF_SCALE}>
       <BlobShadow r={0.17} />
       <StaffFigure id={who.id} role="stock" look={who.look} moving={moving} />
-      <mesh ref={box} position={[0, HELD_AT[1] + 0.06, HELD_AT[2]]} visible={false}>
+      <mesh ref={(o) => { held.current.crate = o }} position={[0, HELD_AT[1] + 0.06, HELD_AT[2]]} visible={false}>
         <boxGeometry args={[0.22, 0.13, 0.16]} />
         <meshToonMaterial color="#b98a52" />
+      </mesh>
+      <mesh ref={(o) => { held.current.roll = o }} position={[0, HELD_AT[1] + 0.05, HELD_AT[2]]} rotation-z={Math.PI / 2} visible={false}>
+        <cylinderGeometry args={[0.05, 0.05, 0.1, 14]} />
+        <meshToonMaterial color="#f4f2ec" />
+      </mesh>
+      <mesh ref={(o) => { held.current.box = o }} position={[0, HELD_AT[1] + 0.04, HELD_AT[2]]} visible={false}>
+        <boxGeometry args={[0.2, 0.06, 0.11]} />
+        <meshToonMaterial color="#e9e3d4" />
       </mesh>
     </group>
   )
@@ -1810,11 +1910,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // where a server stands to take what's set out there: in the aisle across the bar from it
   const passSpot = useMemo(() => pass.out.clone().setY(0), [pass])
   /** where the first counter's aisle meets another's */
-  const aisleCorner = (c: Counter) => {
-    const c0 = counters[0]
-    const p0 = c0.at.clone().addScaledVector(c0.lay, -AISLE)
-    return p0.clone().addScaledVector(c0.along, c.at.clone().addScaledVector(c.lay, -AISLE).sub(p0).dot(c0.along))
-  }
+  const aisleCorner = (c: Counter) => aisleCornerOf(counters, c)
   // the servers wait in the kitchen, each just inside a gate in the bar (the first counter's, by the till, and the side
   // counter's), so they go out through it on every trip and come back in by it, the door swinging for them; a shop
   // without gates has them waiting by the pass
@@ -2174,7 +2270,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.t = 0
         } else if (wcs && (SICK.has(s.id) || guest?.state === 'waiting' && Math.random() < wcRate() * Math.min(dt, 0.1))
           // (one at a time: a toilet someone's on their way to, in, or coming out of is left till they're done)
-          && !shown.some((x) => x !== s && x.wc?.who === (HER.has(kindOf(s.id).kind) ? 'f' : 'm') && x.phase.startsWith('wc'))) {
+          && !shown.some((x) => x !== s && x.wc?.who === (HER.has(kindOf(s.id).kind) ? 'f' : 'm') && x.phase.startsWith('wc'))
+          // (nor one the stock keeper's gone to change the roll in)
+          && STOCKER_WC.who !== (HER.has(kindOf(s.id).kind) ? 'f' : 'm')) {
           const who = HER.has(kindOf(s.id).kind) ? 'f' : 'm'
           const w = wcs[who]
           const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
@@ -2335,8 +2433,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (wcs) for (const who of ['m', 'f'] as const) {
       // (and shut behind them while they're in: locked, its window showing 使用中)
       TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack')
-        && (groups.current.get(x.id)?.position.distanceTo(wcs[who].front) ?? 9) < 1.3).length
-      TOILETS[who].inside = shown.filter((x) => x.wc?.who === who && x.phase === 'wcIn').length
+        && (groups.current.get(x.id)?.position.distanceTo(wcs[who].front) ?? 9) < 1.3).length + (STOCKER_WC.who === who && STOCKER_WC.near ? 1 : 0)
+      TOILETS[who].inside = shown.filter((x) => x.wc?.who === who && x.phase === 'wcIn').length + (STOCKER_WC.who === who && STOCKER_WC.inside ? 1 : 0)
     }
     // (the ids held as they are now: the update may run later, once `done` below is a new empty list, and then it took nobody out; those out of
     // the door stayed listed, holding their stool's number, asking every frame to be taken out and drawing the bar again each time)

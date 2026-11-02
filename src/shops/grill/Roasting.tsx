@@ -35,7 +35,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt } from './bar'
+import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -1983,7 +1983,9 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
         g.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m) m.opacity = fade })
       }
     }
-    const want = s.open ? 1 : 0
+    // (out while the stock keeper changes its box of tissues, too)
+    const want = s.open || DRAWER_HELD.has(seat) ? 1 : 0
+    if (inside.current && want) inside.current.visible = true
     if (Math.abs(want - s.at) < 1e-4) return
     s.at = Math.abs(want - s.at) < 0.002 ? want : s.at + (want - s.at) * Math.min(1, dt * 7)
     if (slider.current) slider.current.position.z = -DRAWER.out * s.at

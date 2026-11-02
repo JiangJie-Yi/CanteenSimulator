@@ -1875,6 +1875,11 @@ export default function App() {
     }
     SUPPLIES.coal = () => stockRef.current[CHARCOAL] ?? 0
     SUPPLIES.has = (id: string) => stockRef.current[id] ?? 0
+    SUPPLIES.take = (id: string, n: number) => {
+      if ((stockRef.current[id] ?? 0) < n) return false
+      shiftStockRef.current({ [id]: -n })
+      return true
+    }
     SUPPLIES.refillCrate = (cap: number) => {
       const r = crateRefill(stockRef.current[CHARCOAL] ?? 0, cap)
       if (r.crate) shiftStockRef.current({ [CHARCOAL]: -r.crate })
@@ -1890,7 +1895,7 @@ export default function App() {
       shiftStockRef.current({ [seasonId(k as Seasoning)]: -1 })
       return true
     }
-    return () => { SUPPLIES.coal = () => Infinity; SUPPLIES.refillCrate = (cap: number) => cap; SUPPLIES.dab = () => true; SUPPLIES.has = () => -1 }
+    return () => { SUPPLIES.coal = () => Infinity; SUPPLIES.refillCrate = (cap: number) => cap; SUPPLIES.dab = () => true; SUPPLIES.has = () => -1; SUPPLIES.take = () => true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // the stock keeper (倉儲) at each shop goes round now and then and orders in whatever its menu is running low on:

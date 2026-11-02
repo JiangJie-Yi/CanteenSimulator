@@ -513,11 +513,19 @@ export const COAL_BRIDGE: { place: (() => number) | null } = { place: null }
  * table refilled from it (how many went in), and a dab of a seasoning taken from stock (false: there's none left, it doesn't go on). App sets
  * them; until it does, there's no end to any of it.
  */
-export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => number; dab: (k: string) => boolean; has: (id: string) => number } = {
+export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => number; dab: (k: string) => boolean; has: (id: string) => number
+  take: (id: string, n: number) => boolean } = {
   coal: () => Infinity, refillCrate: (cap) => cap, dab: () => true,
   // (how many of a food there are in stock, for what's said of it in the room; -1, not known: no shop's running)
   has: () => -1,
+  // (n of something taken out of stock, if there are as many: a spare box of tissues, the stock keeper's)
+  take: () => true,
 }
+/** the stock keeper at a toilet just now, to change its roll: which, whether near enough its door to have it open, whether in (the guests
+ * leave that toilet till he's done; the door opens and shuts for him as for them) */
+export const STOCKER_WC: { who: 'm' | 'f' | null; near: boolean; inside: boolean } = { who: null, near: false, inside: false }
+/** the places whose drawer the stock keeper has out just now, changing the box of tissues in it */
+export const DRAWER_HELD = new Set<number>()
 export const billOf = (items: number, drink?: DrinkId) => Math.max(1, items) * 380 + (drink ? 320 : 0)
 /** the figures on the register's displays: a number with its thousands comma */
 export const yen = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
@@ -640,6 +648,12 @@ export function inGenkan(cs: Counter[], p: THREE.Vector3) {
   const c0 = cs[0], d = p.clone().sub(c0.at)
   const a = d.dot(c0.along) - c0.length / 2, l = d.dot(c0.lay)
   return a > GENKAN.along[0] && a < GENKAN.along[1] + 0.01 && l > GENKAN.lay[0] - 0.01 && l < GENKAN.lay[1]
+}
+/** where the first counter's aisle meets another counter's (the aisle behind its stools) */
+export function aisleCornerOf(cs: Counter[], c: Counter) {
+  const c0 = cs[0]
+  const p0 = c0.at.clone().addScaledVector(c0.lay, -AISLE)
+  return p0.clone().addScaledVector(c0.along, c.at.clone().addScaledVector(c.lay, -AISLE).sub(p0).dot(c0.along))
 }
 /** the way in: on the first counter's aisle, just past its far end */
 export const doorOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, cs[0].length / 2 + 1.0)
