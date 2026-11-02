@@ -1235,51 +1235,271 @@ function RoundWood() {
 useGLTF.preload(ROUND_URL)
 /** the round window's radius (its paper's) */
 const ROUND_R = 0.4
-/** what's outside the round window, seen with its shoji slid open: by day bamboo against the sky (a linear gradient, pale above, the blue
- * deepening toward the horizon), a low fence of split bamboo; by night the same under the moon, dark */
-function drawOutside(g: CanvasRenderingContext2D, night: boolean) {
-  const sky = g.createLinearGradient(0, 0, 0, 512)
-  if (night) { sky.addColorStop(0, '#0d1428'); sky.addColorStop(1, '#25335a') } else { sky.addColorStop(0, '#6fa8e6'); sky.addColorStop(1, '#d6ecff') }
-  g.fillStyle = sky; g.fillRect(0, 0, 512, 512)
+/**
+ * What's outside the round window, seen with its shoji slid open (the owner's: the shop's in a city, and the view wants depth; it was bamboo
+ * against the sky, flat): a city backstreet in four layers, each drawn at its own depth behind the window and looked through it in
+ * perspective (ROUND_VIEW's shader), so as the camera moves the near things slide across the far ones. Near (0.2 behind it): a low fence of
+ * split bamboo, a wire sagging across. Across the alley (1.2): old two- and three-storey fronts, their windows, a vertical sign or two, the
+ * air conditioners' outdoor units, a utility pole with its transformer and the wires strung from it. Far off (5): the city's towers, hazy blue
+ * with the distance by day, by night their windows lit and red lights on their tops, and a lattice radio tower among them. And the sky (20): by
+ * day blue, paler toward the horizon, a few clouds; by night deep blue, the city's glow along its foot, a few stars and the moon. Each layer's
+ * picture spans a half-size `H` either way of the window's middle (in its own units), so it fills the view at an angle too.
+ */
+const VIEW_LAYERS = { near: { d: 0.2, H: 0.52 }, mid: { d: 1.2, H: 1.12 }, far: { d: 5, H: 3.4 }, sky: { d: 20, H: 12.4 } }
+type ViewLayer = keyof typeof VIEW_LAYERS
+/** a layer's picture's own places: x, y (the window's units, its middle 0, up +) to the canvas's pixels */
+const viewPx = (k: ViewLayer, size: number) => {
+  const H = VIEW_LAYERS[k].H
+  return { X: (x: number) => (x / H * 0.5 + 0.5) * size, Y: (y: number) => (0.5 - y / H * 0.5) * size, S: (l: number) => (l / H * 0.5) * size }
+}
+function drawViewSky(g: CanvasRenderingContext2D, size: number, night: boolean) {
+  const { X, Y, S } = viewPx('sky', size)
+  const grd = g.createLinearGradient(0, 0, 0, size)
+  if (night) { grd.addColorStop(0, '#070d22'); grd.addColorStop(0.42, '#14214a'); grd.addColorStop(0.5, '#3a3550'); grd.addColorStop(0.53, '#6a4a48'); grd.addColorStop(1, '#1a1a26') }
+  else { grd.addColorStop(0, '#3f86d8'); grd.addColorStop(0.4, '#8dbcef'); grd.addColorStop(0.5, '#d4e8fb'); grd.addColorStop(1, '#c8dcef') }
+  g.fillStyle = grd
+  g.fillRect(0, 0, size, size)
+  const rnd = seeded(91)
   if (night) {
-    const m = g.createRadialGradient(150, 120, 0, 150, 120, 90)
-    m.addColorStop(0, 'rgba(255,250,225,1)'); m.addColorStop(0.25, 'rgba(255,250,225,0.95)'); m.addColorStop(0.3, 'rgba(200,210,255,0.25)'); m.addColorStop(1, 'rgba(200,210,255,0)')
-    g.fillStyle = m; g.fillRect(0, 0, 512, 512)
+    // (a few stars, the city's glow drowning those low down; the moon, high, its halo)
+    for (let k = 0; k < 90; k++) {
+      const x = rnd() * size, y = rnd() * size * 0.45
+      g.fillStyle = `rgba(255,255,240,${0.25 + rnd() * 0.6})`
+      g.fillRect(x, y, 1 + (rnd() < 0.15 ? 1 : 0), 1 + (rnd() < 0.15 ? 1 : 0))
+    }
+    const mx = X(-2.2), my = Y(4.2), mr = S(0.55)
+    const halo = g.createRadialGradient(mx, my, 0, mx, my, mr * 6)
+    halo.addColorStop(0, 'rgba(255,250,225,0.5)'); halo.addColorStop(0.3, 'rgba(190,200,255,0.15)'); halo.addColorStop(1, 'rgba(190,200,255,0)')
+    g.fillStyle = halo
+    g.fillRect(mx - mr * 6, my - mr * 6, mr * 12, mr * 12)
+    g.fillStyle = '#fff6da'
+    g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.fill()
+    g.fillStyle = 'rgba(200,190,160,0.35)'
+    for (const [dx, dy, r] of [[-0.25, -0.1, 0.22], [0.2, 0.25, 0.15], [0.05, -0.35, 0.12]]) { g.beginPath(); g.arc(mx + dx * mr, my + dy * mr, r * mr, 0, Math.PI * 2); g.fill() }
+  } else {
+    // (a few clouds: soft heaps of white, flat below, drifting high)
+    g.filter = 'blur(6px)'
+    for (const [cx, cy, w] of [[-3.5, 3.2, 2.4], [2.6, 4.6, 3.0], [0.4, 2.2, 1.6], [5.5, 2.6, 2.0], [-6, 5.2, 2.6]]) {
+      g.fillStyle = 'rgba(255,255,255,0.85)'
+      for (let k = 0; k < 7; k++) {
+        const r = S(w * (0.18 + rnd() * 0.16))
+        g.beginPath(); g.arc(X(cx + (rnd() - 0.5) * w), Y(cy + rnd() * w * 0.22), r, 0, Math.PI * 2); g.fill()
+      }
+      g.fillStyle = 'rgba(205,220,240,0.6)'
+      g.fillRect(X(cx - w * 0.55), Y(cy - 0.05), S(w * 1.1), S(0.18))
+    }
+    g.filter = 'none'
   }
-  // (bamboo: culms near and far, their nodes, a few leaves)
-  const rnd = seeded(9)
-  for (const [x, w, far] of [[70, 16, 1], [190, 11, 1], [330, 18, 0], [440, 13, 1], [260, 9, 1]] as [number, number, number][]) {
-    g.fillStyle = night ? (far ? '#1a2a24' : '#13201b') : far ? '#7fa65a' : '#5e8a3e'
-    g.fillRect(x - w / 2, 0, w, 512)
-    g.fillStyle = night ? '#0c1612' : '#3f6a2a'
-    for (let y = 30 + rnd() * 40; y < 512; y += 70 + rnd() * 30) g.fillRect(x - w / 2 - 1, y, w + 2, 3)
-    g.fillStyle = night ? 'rgba(20,40,30,0.9)' : 'rgba(80,140,60,0.9)'
-    for (let k = 0; k < 6; k++) {
-      const ly = rnd() * 400, side = rnd() < 0.5 ? -1 : 1
-      g.save(); g.translate(x + side * w * 0.5, ly); g.rotate(side * (0.6 + rnd() * 0.5))
-      g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(side * 10, 18, 0, 52); g.quadraticCurveTo(-side * 4, 18, 0, 0); g.fill()
-      g.restore()
+}
+function drawViewFar(g: CanvasRenderingContext2D, size: number, night: boolean) {
+  const { X, Y, S } = viewPx('far', size)
+  g.clearRect(0, 0, size, size)
+  const rnd = seeded(37)
+  // (far off, the haze of the distance: their colour gone toward the sky's)
+  const body = night ? '#121a30' : '#8aa3c2', edge = night ? '#0c1222' : '#7d97b8'
+  g.filter = 'blur(0.8px)'
+  // (the radio tower: a lattice tapering up, two decks, its top a mast; red and white by day, lit warm by night)
+  const tx = -0.9
+  const tower = (x: number, y: number) => [X(tx + x), Y(y)] as const
+  g.strokeStyle = night ? '#ffb45a' : '#d9663f'
+  g.lineWidth = Math.max(1, S(0.012))
+  for (const sd of [-1, 1]) {
+    g.beginPath()
+    g.moveTo(...tower(sd * 0.45, -0.6)); g.quadraticCurveTo(...tower(sd * 0.12, 0.6), ...tower(sd * 0.04, 1.9))
+    g.stroke()
+  }
+  for (let k = 0; k < 14; k++) {
+    const y0 = -0.6 + k * 0.18, w0 = 0.45 * Math.pow(1 - (y0 + 0.6) / 2.6, 1.6) + 0.04
+    const y1 = y0 + 0.18, w1 = 0.45 * Math.pow(1 - (y1 + 0.6) / 2.6, 1.6) + 0.04
+    g.beginPath(); g.moveTo(...tower(-w0, y0)); g.lineTo(...tower(w1, y1)); g.moveTo(...tower(w0, y0)); g.lineTo(...tower(-w1, y1)); g.stroke()
+  }
+  g.fillStyle = night ? '#ffc070' : '#f2f0ea'
+  g.fillRect(X(tx - 0.16), Y(0.85), S(0.32), S(0.08))
+  g.fillRect(X(tx - 0.08), Y(1.5), S(0.16), S(0.06))
+  g.fillRect(X(tx - 0.012), Y(2.6), S(0.024), S(0.7))
+  // (the towers: a row of blocks of every height and width along the horizon, some stepped, each with its windows)
+  let x = -3.4
+  while (x < 3.4) {
+    const w = 0.22 + rnd() * 0.45, h = 0.2 + rnd() * rnd() * 1.6 + (Math.abs(x - 0.6) < 0.8 ? 0.4 : 0)
+    const y0 = -0.75
+    g.fillStyle = rnd() < 0.5 ? body : edge
+    g.fillRect(X(x), Y(y0 + h), S(w), S(h))
+    if (rnd() < 0.3) g.fillRect(X(x + w * 0.2), Y(y0 + h + 0.12), S(w * 0.6), S(0.12))
+    // (windows: by night lit, warm and cool, many dark; by day faint lines)
+    const rows = Math.floor(h / 0.045), cols = Math.max(2, Math.floor(w / 0.05))
+    for (let r = 1; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (night) {
+        if (rnd() < 0.42) {
+          g.fillStyle = rnd() < 0.7 ? 'rgba(255,214,140,0.85)' : 'rgba(190,220,255,0.75)'
+          g.fillRect(X(x + (c + 0.3) * (w / cols)), Y(y0 + r * 0.045), Math.max(1, S(w / cols * 0.45)), Math.max(1, S(0.018)))
+        }
+      } else if (r % 2 === 0) {
+        g.fillStyle = 'rgba(220,232,245,0.35)'
+        g.fillRect(X(x + (c + 0.2) * (w / cols)), Y(y0 + r * 0.045), Math.max(1, S(w / cols * 0.6)), Math.max(1, S(0.012)))
+      }
+    }
+    if (night && h > 0.9) { g.fillStyle = '#ff3a2a'; g.beginPath(); g.arc(X(x + w / 2), Y(y0 + h + 0.02), Math.max(1.5, S(0.016)), 0, Math.PI * 2); g.fill() }
+    x += w + (rnd() < 0.25 ? 0.05 + rnd() * 0.15 : 0)
+  }
+  g.filter = 'none'
+  // (the haze at their feet, the street's lights by night)
+  const haze = g.createLinearGradient(0, Y(-0.2), 0, Y(-0.8))
+  haze.addColorStop(0, night ? 'rgba(90,60,70,0)' : 'rgba(210,225,240,0)')
+  haze.addColorStop(1, night ? 'rgba(120,80,70,0.7)' : 'rgba(210,225,240,0.75)')
+  g.fillStyle = haze
+  g.fillRect(0, Y(-0.2), size, Y(-0.8) - Y(-0.2))
+}
+function drawViewMid(g: CanvasRenderingContext2D, size: number, night: boolean) {
+  const { X, Y, S } = viewPx('mid', size)
+  g.clearRect(0, 0, size, size)
+  const rnd = seeded(58)
+  // (the fronts across the alley: each its own height, colour and windows, the street below out of sight)
+  // (low enough that the city's towers and the sky show over them through the window's upper half: the depth's in what's seen beyond)
+  const fronts = [
+    { x: -1.12, w: 0.62, top: 0.02, col: '#b7a58a', win: 3 },
+    { x: -0.5, w: 0.5, top: 0.2, col: '#8c8f93', win: 2 },
+    { x: 0.0, w: 0.04, top: -1, col: '#000', win: 0 },
+    { x: 0.04, w: 0.56, top: -0.06, col: '#c9b9a0', win: 3 },
+    { x: 0.6, w: 0.56, top: 0.26, col: '#9d8470', win: 3 },
+  ]
+  const dim = night ? 0.26 : 1
+  const shade = (hex: string, k: number) => { const c = new THREE.Color(hex).multiplyScalar(k); return `#${c.getHexString()}` }
+  for (const f of fronts) {
+    if (f.top < -0.5) continue
+    g.fillStyle = shade(f.col, dim)
+    g.fillRect(X(f.x), Y(f.top), S(f.w), Y(-1.1) - Y(f.top))
+    // (its parapet and the shadow under it)
+    g.fillStyle = shade(f.col, dim * 0.78)
+    g.fillRect(X(f.x - 0.01), Y(f.top + 0.03), S(f.w + 0.02), S(0.05))
+    g.fillStyle = 'rgba(0,0,0,0.18)'
+    g.fillRect(X(f.x), Y(f.top - 0.02), S(f.w), S(0.03))
+    // (its windows, floor by floor: frames, the panes dark or lit, a curtain here and there)
+    for (let fl = 0; fl < 3; fl++) {
+      const wy = f.top - 0.16 - fl * 0.34
+      if (wy < -0.95) break
+      for (let k = 0; k < f.win; k++) {
+        const wx = f.x + 0.06 + k * (f.w - 0.08) / f.win
+        const ww = (f.w - 0.08) / f.win - 0.06, wh = 0.16
+        g.fillStyle = shade('#5a5148', dim)
+        g.fillRect(X(wx - 0.008), Y(wy + 0.008), S(ww + 0.016), S(wh + 0.016))
+        const lit = night && rnd() < 0.55
+        g.fillStyle = lit ? (rnd() < 0.7 ? '#ffd389' : '#bfe0ff') : night ? '#1b2030' : '#6f8ea8'
+        g.fillRect(X(wx), Y(wy), S(ww), S(wh))
+        if (!night) { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(X(wx + ww * 0.1), Y(wy - 0.01), S(ww * 0.25), S(wh * 0.8)) }
+        if (rnd() < 0.4) { g.fillStyle = lit ? 'rgba(240,170,110,0.75)' : 'rgba(220,210,190,0.7)'; g.fillRect(X(wx), Y(wy), S(ww * 0.35), S(wh)) }
+      }
+      // (an air conditioner's outdoor unit on a bracket under a window, now and then)
+      if (rnd() < 0.6) {
+        const ax = f.x + 0.08 + rnd() * (f.w - 0.3)
+        g.fillStyle = night ? '#4a4c50' : '#e6e4dc'
+        g.fillRect(X(ax), Y(wy - 0.2), S(0.16), S(0.11))
+        g.strokeStyle = night ? '#2a2c30' : '#9a9890'
+        g.lineWidth = Math.max(1, S(0.006))
+        g.beginPath(); g.arc(X(ax + 0.1), Y(wy - 0.255), S(0.035), 0, Math.PI * 2); g.stroke()
+      }
     }
   }
-  // (a low fence of split bamboo across the foot)
-  g.fillStyle = night ? '#2a2618' : '#c9b277'
-  g.fillRect(0, 420, 512, 92)
-  g.strokeStyle = night ? '#16130c' : '#8a7442'; g.lineWidth = 3
-  for (let x = 0; x < 512; x += 14) { g.beginPath(); g.moveTo(x, 420); g.lineTo(x, 512); g.stroke() }
-  g.fillStyle = night ? '#100e08' : '#6a5630'
-  g.fillRect(0, 440, 512, 6); g.fillRect(0, 486, 512, 6)
+  // (the signs: tall boards on the fronts, lit by night)
+  const sign = (x: number, top: number, h: number, bg: string, fg: string, text: string) => {
+    const glow = night
+    if (glow) { g.fillStyle = bg; g.globalAlpha = 0.35; g.filter = 'blur(8px)'; g.fillRect(X(x - 0.04), Y(top + 0.04), S(0.16), S(h + 0.08)); g.filter = 'none'; g.globalAlpha = 1 }
+    g.fillStyle = glow ? bg : shade(bg, 0.85)
+    g.fillRect(X(x), Y(top), S(0.08), S(h))
+    g.strokeStyle = shade(bg, 0.5)
+    g.lineWidth = Math.max(1, S(0.005))
+    g.strokeRect(X(x), Y(top), S(0.08), S(h))
+    g.fillStyle = fg
+    g.font = `bold ${Math.round(S(0.055))}px "Yu Mincho", "MS Mincho", serif`
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    const chars = [...text]
+    chars.forEach((ch, i) => g.fillText(ch, X(x + 0.04), Y(top - (i + 0.5) * (h / chars.length))))
+  }
+  sign(-0.42, 0.12, 0.42, night ? '#ff4d6d' : '#c8344c', '#fff6ee', 'スナック')
+  sign(0.12, -0.14, 0.34, night ? '#ffd24a' : '#e2b23a', '#3a2410', 'ラーメン')
+  sign(0.98, 0.16, 0.36, night ? '#5ad1ff' : '#2f8fc4', '#ffffff', '居酒屋')
+  // (a lantern hung by a door below, by night its glow)
+  if (night) { const lg = g.createRadialGradient(X(-0.8), Y(-0.55), 0, X(-0.8), Y(-0.55), S(0.25)); lg.addColorStop(0, 'rgba(255,170,90,0.7)'); lg.addColorStop(1, 'rgba(255,170,90,0)'); g.fillStyle = lg; g.fillRect(X(-1.05), Y(-0.3), S(0.5), S(0.5)) }
+  // (the utility pole: its concrete shaft, a crossarm, a transformer, insulators; and its wires, sagging off both ways)
+  const px = 0.36
+  g.fillStyle = night ? '#2e3036' : '#a8a8a2'
+  g.beginPath(); g.moveTo(X(px - 0.03), Y(-1.1)); g.lineTo(X(px - 0.018), Y(1.0)); g.lineTo(X(px + 0.018), Y(1.0)); g.lineTo(X(px + 0.03), Y(-1.1)); g.fill()
+  g.fillStyle = night ? '#24262c' : '#7c7c76'
+  g.fillRect(X(px - 0.2), Y(0.86), S(0.4), S(0.025))
+  g.fillRect(X(px - 0.15), Y(0.6), S(0.3), S(0.02))
+  g.fillStyle = night ? '#3a3e44' : '#8f9497'
+  g.fillRect(X(px + 0.03), Y(0.55), S(0.09), S(0.15))
+  g.fillRect(X(px - 0.12), Y(0.55), S(0.09), S(0.15))
+  g.strokeStyle = night ? 'rgba(10,10,14,0.9)' : 'rgba(40,40,40,0.85)'
+  g.lineWidth = Math.max(1, S(0.005))
+  for (const [y, sag] of [[0.86, 0.12], [0.84, 0.16], [0.6, 0.1], [0.58, 0.14], [0.45, 0.2]] as [number, number][]) {
+    for (const sd of [-1, 1]) {
+      g.beginPath()
+      g.moveTo(X(px + sd * 0.18), Y(y))
+      g.quadraticCurveTo(X(px + sd * 0.7), Y(y - sag * 1.6), X(px + sd * 1.15), Y(y - sag * 0.4))
+      g.stroke()
+    }
+  }
 }
-const ROUND_OUTSIDE = (() => {
+function drawViewNear(g: CanvasRenderingContext2D, size: number, night: boolean) {
+  const { X, Y, S } = viewPx('near', size)
+  g.clearRect(0, 0, size, size)
+  // (a low fence of split bamboo just outside, across the foot of the view, out of focus a little)
+  g.filter = 'blur(1.2px)'
+  const top = -0.26
+  g.fillStyle = night ? '#2a2618' : '#c9b277'
+  g.fillRect(0, Y(top), size, size - Y(top))
+  g.strokeStyle = night ? '#16130c' : '#8a7442'
+  g.lineWidth = Math.max(2, S(0.008))
+  for (let x = -0.52; x < 0.52; x += 0.028) { g.beginPath(); g.moveTo(X(x), Y(top)); g.lineTo(X(x), size); g.stroke() }
+  g.fillStyle = night ? '#100e08' : '#6a5630'
+  g.fillRect(0, Y(top - 0.05), size, S(0.022))
+  g.fillRect(0, Y(top - 0.17), size, S(0.022))
+  // (a wire sagging across, near)
+  g.strokeStyle = night ? 'rgba(0,0,0,0.85)' : 'rgba(30,30,30,0.8)'
+  g.lineWidth = Math.max(1.5, S(0.006))
+  g.beginPath(); g.moveTo(X(-0.52), Y(0.44)); g.quadraticCurveTo(X(0.0), Y(0.22), X(0.52), Y(0.4)); g.stroke()
+  g.filter = 'none'
+}
+/** the four layers' pictures, made again day and night as the theme turns */
+const ROUND_VIEW = (() => {
   if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = c.height = 512
-  const g = c.getContext('2d')!
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  const draw = () => { drawOutside(g, document.documentElement.dataset.theme === 'dark'); t.needsUpdate = true }
-  draw()
-  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-  return t
+  const make = (size: number, draw: (g: CanvasRenderingContext2D, size: number, night: boolean) => void) => {
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    const g = c.getContext('2d')!
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.anisotropy = 4
+    return { t, paint: (night: boolean) => { draw(g, size, night); t.needsUpdate = true } }
+  }
+  const layers = { sky: make(512, drawViewSky), far: make(1024, drawViewFar), mid: make(1024, drawViewMid), near: make(512, drawViewNear) }
+  const paint = () => { const night = document.documentElement.dataset.theme === 'dark'; for (const l of Object.values(layers)) l.paint(night) }
+  paint()
+  new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  const L = VIEW_LAYERS
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uSky: { value: layers.sky.t }, uFar: { value: layers.far.t }, uMid: { value: layers.mid.t }, uNear: { value: layers.near.t },
+      uCam: { value: new THREE.Vector3(0, 0, 3) } },
+    vertexShader: `varying vec3 vLocal;
+void main() { vLocal = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform sampler2D uSky, uFar, uMid, uNear;
+uniform vec3 uCam;
+varying vec3 vLocal;
+vec4 layer(sampler2D t, vec2 xy, float H) { return texture2D(t, clamp(xy / (2.0 * H) + 0.5, 0.0, 1.0)); }
+void main() {
+  // (the way the eye looks through this point of the window, on into the street: where it meets each layer)
+  vec3 dir = normalize(vLocal - uCam);
+  vec2 slope = dir.xy / max(-dir.z, 0.15);
+  vec3 c = layer(uSky, vLocal.xy + slope * ${L.sky.d.toFixed(1)}, ${L.sky.H.toFixed(2)}).rgb;
+  vec4 f = layer(uFar, vLocal.xy + slope * ${L.far.d.toFixed(1)}, ${L.far.H.toFixed(2)}); c = mix(c, f.rgb, f.a);
+  vec4 m = layer(uMid, vLocal.xy + slope * ${L.mid.d.toFixed(1)}, ${L.mid.H.toFixed(2)}); c = mix(c, m.rgb, m.a);
+  vec4 n = layer(uNear, vLocal.xy + slope * ${L.near.d.toFixed(1)}, ${L.near.H.toFixed(2)}); c = mix(c, n.rgb, n.a);
+  gl_FragColor = vec4(c, 1.0);
+  #include <colorspace_fragment>
+}`,
+  })
+  return mat
 })()
 /** a passer-by's shadow on the paper by day: a figure, soft-edged, walking (a bag on one shoulder) */
 const PASSER = (() => {
@@ -1300,7 +1520,7 @@ const PASSER = (() => {
 /**
  * The round window's shoji (the owner's: it opens left and right): two halves, each a half of the paper with its own lattice (bars over the
  * washi), sliding apart into the wall when clicked and back together at another, with the runners' sound, cut to the window's round
- * (whatever slides past its edge is in the wall, unseen); behind them the view outside (ROUND_OUTSIDE). They swung open into the room for a
+ * (whatever slides past its edge is in the wall, unseen); behind them the view outside (ROUND_VIEW: a city backstreet, in depth). They swung open into the room for a
  * while, hinged at the round's left and right like the fridges' doors; the owner found the half-moons standing out in the air odd, and chose
  * this, as a round window's shoji does. By day, now and then, a passer-by's shadow crosses the paper outside (the owner's). Not batched: it
  * moves, and it's clicked.
@@ -1309,6 +1529,7 @@ function RoundShoji() {
   const R = ROUND_R
   const win = useRef<THREE.Group>(null)
   const halves = useRef<(THREE.Group | null)[]>([])
+  const view = useRef<THREE.Mesh>(null)
   const passer = useRef<THREE.Mesh>(null)
   const st = useRef({ open: false, k: 0, next: 12 + Math.random() * 20, walk: -1, dir: 1 })
   /** the window's frame, inverted, for cutting what's drawn to its round */
@@ -1347,11 +1568,14 @@ function RoundShoji() {
     return g
   }), [R])
   useEffect(() => () => { bars.forEach((g) => g.dispose()) }, [bars])
-  useFrame((_, dt) => {
+  const eye = useMemo(() => new THREE.Vector3(), [])
+  useFrame(({ camera }, dt) => {
     const w = win.current
     const s = st.current
     if (!w) return
     inv.value.copy(w.matrixWorld).invert()
+    // (where the eye is, in the window's own frame: the street's layers are looked through from there)
+    if (view.current && ROUND_VIEW) ROUND_VIEW.uniforms.uCam.value.copy(view.current.worldToLocal(eye.copy(camera.position)))
     const want = s.open ? 1 : 0
     s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.6)
     const e = s.k * s.k * (3 - 2 * s.k)
@@ -1376,10 +1600,9 @@ function RoundShoji() {
   const says = () => (st.current.open ? '點一下關上' : '點一下打開（左右拉開）')
   return (
     <group ref={win}>
-      {/* (outside, behind it all) */}
-      <mesh position-x={-0.001} rotation-y={-Math.PI / 2}>
+      {/* (outside, behind it all: the street, seen in depth through the window (ROUND_VIEW)) */}
+      <mesh ref={view} position-x={-0.001} rotation-y={-Math.PI / 2} material={ROUND_VIEW ?? undefined}>
         <circleGeometry args={[R, 64]} />
-        <meshBasicMaterial map={ROUND_OUTSIDE} toneMapped={false} />
       </mesh>
       <group onClick={(ev) => {
         ev.stopPropagation()
@@ -1390,6 +1613,11 @@ function RoundShoji() {
       }}
         onPointerOver={(ev) => { if (getEdit().on) return; tipOver('圓窗', says()).onPointerOver(ev) }}
         onPointerOut={(ev) => { tipOver('圓窗', '').onPointerOut(ev) }}>
+        {/* (the whole window to point at, its frame too, open or shut: an unseen disc out over the frame (the owner's); the pointer's rays
+            don't mind it's unseen) */}
+        <mesh position-x={-0.092} rotation-y={-Math.PI / 2} visible={false}>
+          <circleGeometry args={[R + 0.08, 32]} />
+        </mesh>
         {[0, 1].map((i) => (
           <group key={i} ref={(o) => { halves.current[i] = o }}>
             <mesh position-x={-0.004} rotation-y={-Math.PI / 2} material={round.paper}>
