@@ -1297,11 +1297,14 @@ const PASSER = (() => {
   t.colorSpace = THREE.SRGBColorSpace
   return t
 })()
+/** how far the round window's two leaves swing open: a little past square, as the cook table's fridge doors do */
+const ROUND_SWING = 1.75
 /**
- * The round window's shoji (the owner's: it opens left and right): two halves, each a half of the paper with its own lattice (bars over the
- * washi), sliding apart into the wall when clicked and back together, cut to the window's round (whatever slides past its edge is in the wall,
- * unseen); behind them the view outside (ROUND_OUTSIDE). By day, now and then, a passer-by's shadow crosses the paper outside (the owner's).
- * Not batched: it moves, and it's clicked.
+ * The round window's shoji (the owner's: it opens left and right, the way the fridges under the cook table do): two halves, each a half of the
+ * paper with its own lattice (bars over the washi), hinged at the window's left and right and swinging open into the room when clicked, shut
+ * again at another (they slid apart into the wall, cut to the window's round); behind them the view outside (ROUND_OUTSIDE). By day, now and
+ * then, a passer-by's shadow crosses the paper outside (the owner's), cut to the round as it comes and goes. Not batched: it moves, and it's
+ * clicked.
  */
 function RoundShoji() {
   const R = ROUND_R
@@ -1324,8 +1327,9 @@ function RoundShoji() {
       return m
     }
     return {
-      paper: cut(new THREE.MeshBasicMaterial({ map: ROUND_PAPER, toneMapped: false })),
-      wood: cut(new THREE.MeshToonMaterial({ color: '#b98656' })),
+      // (the leaves' own: each is its half of the round and stays it, swung or not; both faces, as an open leaf shows its back)
+      paper: new THREE.MeshBasicMaterial({ map: ROUND_PAPER, toneMapped: false, side: THREE.DoubleSide }),
+      wood: new THREE.MeshToonMaterial({ color: '#b98656' }),
       passer: cut(new THREE.MeshBasicMaterial({ map: PASSER, transparent: true, depthWrite: false, toneMapped: false })),
     }
   }, [inv, R])
@@ -1353,7 +1357,8 @@ function RoundShoji() {
     const want = s.open ? 1 : 0
     s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.6)
     const e = s.k * s.k * (3 - 2 * s.k)
-    halves.current.forEach((h, i) => { if (h) h.position.z = (i ? 1 : -1) * e * (R + 0.02) })
+    // (each leaf about its hinge at its own side of the round, out into the room (-x))
+    halves.current.forEach((h, i) => { if (h) h.rotation.y = (i ? 1 : -1) * e * ROUND_SWING })
     // (a passer-by now and then, by day, while the paper's shut)
     const night = document.documentElement.dataset.theme === 'dark'
     const m = passer.current
@@ -1371,7 +1376,7 @@ function RoundShoji() {
       } else m.position.z = 2 * R
     }
   })
-  const says = () => (st.current.open ? '點一下關上' : '點一下打開（左右拉開）')
+  const says = () => (st.current.open ? '點一下關上' : '點一下打開（左右對開）')
   return (
     <group ref={win}>
       {/* (outside, behind it all) */}
@@ -1383,11 +1388,14 @@ function RoundShoji() {
         onPointerOver={(ev) => { if (getEdit().on) return; tipOver('圓窗', says()).onPointerOver(ev) }}
         onPointerOut={(ev) => { tipOver('圓窗', '').onPointerOut(ev) }}>
         {[0, 1].map((i) => (
-          <group key={i} ref={(o) => { halves.current[i] = o }}>
-            <mesh position-x={-0.004} rotation-y={-Math.PI / 2} material={round.paper}>
-              <circleGeometry args={[R, 48, i ? -Math.PI / 2 : Math.PI / 2, Math.PI]} />
-            </mesh>
-            <mesh geometry={bars[i]} material={round.wood} />
+          // (hinged at the round's own edge on its side: the leaf drawn back from it)
+          <group key={i} ref={(o) => { halves.current[i] = o }} position-z={(i ? 1 : -1) * R}>
+            <group position-z={(i ? -1 : 1) * R}>
+              <mesh position-x={-0.004} rotation-y={-Math.PI / 2} material={round.paper}>
+                <circleGeometry args={[R, 48, i ? -Math.PI / 2 : Math.PI / 2, Math.PI]} />
+              </mesh>
+              <mesh geometry={bars[i]} material={round.wood} />
+            </group>
           </group>
         ))}
       </group>
