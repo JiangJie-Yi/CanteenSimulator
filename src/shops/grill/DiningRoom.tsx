@@ -2748,12 +2748,12 @@ function seeded(seed: number) {
 }
 /** a band round a lantern's top or its foot, after the owner's two pattern sheets (their references 5a72cc81, 鱗, and 16be7e14, 立涌; before
  * them seigaiha and shippo from another sheet, thin seigaiha lines and 麻の葉, none of which would do), in one family of colour, indigo
- * (the owner's), laid on as a dyer's band glowing in the paper: the band's ground first multiplied in (the paper's fibres and ribs through
- * it), then the pattern over it in colour dodge (加亮顏色, the owner's), each shape lightening the ground by how light its own blue is, so the
- * shapes glow from the deep blue of the band, their fine lines and a few flecks the brightest. 鱗 (uroko): rows of scales, each a
- * round-topped dome, every row lying over the one behind it half a scale along; 立涌 (tatewaku): upright stripes of every width waving up
- * the band together. Its width a whole number of repeats, so it runs on round the lantern with no seam */
-const BAND_COLOURS = ['#0b1630', '#14254a', '#1d3566', '#284684', '#3a5ba0']
+ * (the owner's), multiplied into the paper at half strength (色彩增值、半透明 50%, the owner's: it was colour dodge for a while, the shapes
+ * glowing out of a deep blue band), so the washi's fibres, ribs and glow come through every shape: on a pale blue ground, the shapes from deep
+ * indigo to a light blue, fine dark lines round them. 鱗 (uroko): rows of scales, each a round-topped dome, every row lying over the one behind
+ * it half a scale along; 立涌 (tatewaku): upright stripes of every width waving up the band together. Its width a whole number of repeats, so
+ * it runs on round the lantern with no seam */
+const BAND_COLOURS = ['#1d3468', '#2c4c8c', '#4568a8', '#6a8cc6', '#9ab2dc']
 function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number, lit: boolean, kind: 'uroko' | 'tatewaku', flip = false) {
   const h = Math.ceil(y1 - y0)
   const sheet = document.createElement('canvas')
@@ -2761,8 +2761,8 @@ function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: num
   const s = sheet.getContext('2d')
   if (!s) return
   const rnd = seeded(kind === 'uroko' ? 47 : 53)
-  // (the lines and flecks: the lightest blue, the brightest once dodged)
-  const LINE = '#5f86c8'
+  // (the lines and flecks: the deepest indigo, the dye at its strongest)
+  const LINE = '#13254d'
   /** a colour of the sheet, not the one just used (two the same side by side read as one) */
   let last = -1
   // (the navy a little more often than the rest, as the sheets have it: `deep`)
@@ -2785,7 +2785,7 @@ function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: num
     }
     s.restore()
   }
-  s.fillStyle = '#050a18'
+  s.fillStyle = '#dce5f3'
   s.fillRect(0, 0, W, h)
   s.lineWidth = 1.5
   if (kind === 'uroko') {
@@ -2831,22 +2831,19 @@ function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: num
       x += w
     }
   }
-  // (a few flecks, lighter still)
+  // (a few flecks of the dye)
   s.fillStyle = LINE
   for (let k = 0; k < 70; k++) { s.beginPath(); s.arc(rnd() * W, rnd() * h, 0.6 + rnd() * 1.2, 0, Math.PI * 2); s.fill() }
   g.save()
-  // (the band's indigo ground multiplied into the paper, as dye is: its fibres, ribs and seams through it)
+  // (multiplied into the paper at half strength, as dye is, see-through: the upper band turned upside down, so the two face each other
+  // across the lantern's middle)
   g.globalCompositeOperation = 'multiply'
-  g.fillStyle = lit ? '#6f8fc4' : '#5a78ad'
-  g.fillRect(0, y0, W, h)
-  // (the pattern dodged over it, each shape lightening the ground by its own blue: the upper band turned upside down, so the two face
-  // each other across the lantern's middle)
-  g.globalCompositeOperation = 'color-dodge'
+  g.globalAlpha = 0.5
   if (flip) { g.translate(0, y0 + h); g.scale(1, -1); g.drawImage(sheet, 0, 0) } else g.drawImage(sheet, 0, y0)
   // (a fine line of indigo along either edge)
   g.setTransform(1, 0, 0, 1, 0, 0)
-  g.globalCompositeOperation = 'multiply'
-  g.fillStyle = 'rgba(37,56,95,0.85)'
+  g.globalAlpha = 1
+  g.fillStyle = 'rgba(37,56,95,0.6)'
   g.fillRect(0, y0 - 5, W, 2.5)
   g.fillRect(0, y0 + h + 3, W, 2.5)
   g.restore()
