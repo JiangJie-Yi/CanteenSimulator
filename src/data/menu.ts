@@ -230,7 +230,7 @@ export const DISHES: Dish[] = [
       toolPots: { SaltPot: 'SaltPinch', SoyPot: 'SoyBrush', MilkJar: 'MilkBrush', PeanutBowl: 'PeanutSpoon',
         MisoPot: 'MisoSpoon', WasabiDish: 'WasabiSpoon', ShichimiBowl: 'ShichimiSpoon', YuzuJar: 'YuzuSpoon', LemonDish: 'LemonWedge', LemonWedges: 'LemonWedge' },
       // the seasoning ledge on the hearth's front (moved as a whole) and everything standing on it, and the fan's hook at its end
-      toolBox: ['SeasoningBox', 'FanHook', 'SaltPot', 'SoyPot', 'MilkJar', 'PeanutBowl', 'SaltPinch', 'SoyBrush', 'MilkBrush',
+      toolBox: ['SeasoningBox', 'FanHolder', 'SaltPot', 'SoyPot', 'MilkJar', 'PeanutBowl', 'SaltPinch', 'SoyBrush', 'MilkBrush',
         'PeanutSpoon', 'SeasoningBox2', 'MisoPot', 'WasabiDish', 'ShichimiBowl', 'YuzuJar', 'LemonDish', 'LemonWedges',
         'MisoSpoon', 'WasabiSpoon', 'ShichimiSpoon', 'YuzuSpoon', 'LemonWedge'],
       // a bucket of water for splashing, the trash bin beside it (both on the left); the tray where ordered food

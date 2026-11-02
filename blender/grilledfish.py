@@ -2898,14 +2898,19 @@ for _p in box.data.polygons:
 box.data.materials.clear()
 box.data.materials.append(M["box_wood"])
 centre_origin(box, (box_c.x, box_c.y, LEDGE_TOP - LEDGE_T / 2))
-# (the fan's hook: a bamboo post up from the ledge's left end, an arm out past it, a peg the fan's loop hangs on (FAN_PEG in Roasting))
-_hp = box_c + tang * (-LEDGE_L / 2 + 0.03)
-_hook = [stick_between((_hp.x, _hp.y, LEDGE_TOP), (_hp.x, _hp.y, 0.99), 0.011, M["hook_bamboo"], "FanHookPost")]
-_he = box_c + tang * (-LEDGE_L / 2 - 0.2)
-_hook.append(stick_between((_hp.x, _hp.y, 0.985), (_he.x, _he.y, 0.985), 0.008, M["hook_bamboo"], "FanHookArm"))
-_hook.append(stick_between((_he.x, _he.y, 0.975), (_he.x, _he.y, 1.02), 0.007, M["hook_bamboo"], "FanHookPeg"))
-hook = join(_hook, "FanHook")
-centre_origin(hook, (box_c.x, box_c.y, LEDGE_TOP - LEDGE_T / 2))
+# (the fan's holder (団扇立て; the owner's: it hung from a hook on a tall bamboo post before, which looked odd): a short tube of bamboo
+# standing on the ledge's left end, a node round it, open at its mouth, its wall turned in over the lip and down inside; the fan stands
+# in it, handle down (Decor; FAN_HOLDER in Roasting). Ten round, 120 faces)
+_hp = box_c + tang * (-LEDGE_L / 2 + 0.045)
+HOLD_R, HOLD_H = 0.03, 0.16
+_sec = [(HOLD_R, LEDGE_TOP), (HOLD_R, LEDGE_TOP + 0.098), (HOLD_R + 0.004, LEDGE_TOP + 0.104), (HOLD_R, LEDGE_TOP + 0.11),
+        (HOLD_R, LEDGE_TOP + HOLD_H), (HOLD_R - 0.006, LEDGE_TOP + HOLD_H), (HOLD_R - 0.006, LEDGE_TOP + 0.04)]
+holder, _ = lathe("FanHolder", _sec, seg=10)
+for _v in holder.data.vertices:
+    _v.co.x += _hp.x
+    _v.co.y += _hp.y
+holder.data.materials.append(M["hook_bamboo"])
+centre_origin(holder, (box_c.x, box_c.y, LEDGE_TOP - LEDGE_T / 2))
 
 
 def in_box(offset):

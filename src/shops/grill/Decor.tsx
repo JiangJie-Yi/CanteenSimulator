@@ -251,16 +251,19 @@ function Crate() {
 }
 
 /** A round paper fan (団扇) lying by the seasoning boxes; picked up, it's held upright and swings as it's waved. */
-/** the fan hung on its hook: handle up, its paper toward the cook (turned up off the table, then round to face along the table's lay) */
-const FAN_HUNG = new THREE.Euler(-Math.PI / 2, Math.atan2(-LAY.x, -LAY.z), 0, 'YXZ')
-/** how far below the end of its hook's peg the hung fan's middle hangs (the world's units) */
-const FAN_BELOW_PEG = 0.477
+/** the fan stood in its holder (団扇立て, on the seasonings' ledge's left end; the owner's: hung from a hook on a post, it looked odd): handle
+ * down, its paper toward the cook (turned up off the table the other way, and round half a turn to face along the table's lay again) */
+const FAN_HUNG = new THREE.Euler(Math.PI / 2, Math.atan2(-LAY.x, -LAY.z) + Math.PI, 0, 'YXZ')
+/** how far above its holder's mouth the stood fan's middle is (the world's units): its handle (0.47 below its middle) 7 cm down in it */
+const FAN_ABOVE_MOUTH = 0.4
+/** scratch for the holder's mouth */
+const MOUTH = new THREE.Vector3()
 function Fan({ held, at }: { held: RefObject<Held>; at: [number, number, number] }) {
   const g = useRef<THREE.Group>(null)
-  // (its hook, on the seasonings' ledge: it hangs from the hook wherever the hook is, so it's never left in the air when the ledge, or the
-  // fan, has been moved by hand in edit mode; the peg's end the hook's furthest point to the left along the table)
+  // (its holder, on the seasonings' ledge: it stands in the holder wherever the holder is, so it's never left in the air when the ledge, or
+  // the fan, has been moved by hand in edit mode; the holder's mouth the middle of its top ring)
   const scene = useThree((st) => st.scene)
-  const hook = useRef<{ mesh: THREE.Mesh; i: number } | null>(null)
+  const hook = useRef<{ mesh: THREE.Mesh; ring: number[] } | null>(null)
   const peg = useMemo(() => new THREE.Vector3(), [])
   const swing = useRef(0)
   const last = useRef(0)
@@ -281,23 +284,29 @@ function Fan({ held, at }: { held: RefObject<Held>; at: [number, number, number]
       // face to the camera's side, handle down, rocking side to side as it fans
       o.rotation.set(1.45 + Math.sin(phase.current) * 0.35 * beat.current, -0.6, swing.current, 'XYZ')
     } else {
-      // (back on its hook)
+      // (back in its holder)
       let k = hook.current
       if (!k || !k.mesh.parent) {
-        const mesh = scene.getObjectByName('FanHook') as THREE.Mesh | undefined
+        const mesh = scene.getObjectByName('FanHolder') as THREE.Mesh | undefined
         k = null
         if (mesh?.isMesh) {
+          // (its mouth's ring: the vertices highest up it, in the world; their middle is the mouth)
           const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute
           mesh.updateWorldMatrix(true, false)
-          let best = 0, bd = Infinity
-          for (let i = 0; i < pos.count; i++) { const d = peg.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).dot(ALONG); if (d < bd) { bd = d; best = i } }
-          k = { mesh, i: best }
+          const ys = Array.from({ length: pos.count }, (_, i) => MOUTH.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).y)
+          const top = Math.max(...ys)
+          k = { mesh, ring: ys.flatMap((y, i) => (y > top - 1e-3 ? [i] : [])) }
         }
         hook.current = k
       }
       if (k && o.parent) {
-        peg.fromBufferAttribute(k.mesh.geometry.getAttribute('position') as THREE.BufferAttribute, k.i).applyMatrix4(k.mesh.matrixWorld)
-        peg.y -= FAN_BELOW_PEG
+        // (the ring's middle in the world: the mouth, wherever the ledge has been moved)
+        const pos = k.mesh.geometry.getAttribute('position') as THREE.BufferAttribute
+        k.mesh.updateWorldMatrix(true, false)
+        peg.set(0, 0, 0)
+        for (const i of k.ring) peg.add(MOUTH.fromBufferAttribute(pos, i).applyMatrix4(k.mesh.matrixWorld))
+        peg.divideScalar(Math.max(1, k.ring.length))
+        peg.y += FAN_ABOVE_MOUTH
         o.position.copy(o.parent.worldToLocal(peg))
       } else o.position.set(at[0], at[1], at[2])
       o.rotation.copy(FAN_HUNG)

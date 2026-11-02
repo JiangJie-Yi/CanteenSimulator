@@ -463,9 +463,9 @@ const BOX_SPOT = { along: -0.04, lay: 1.222 + 0.1 }
 /** the ledge's length, and the fan's peg at the end of the hook past its left end: how far along from the ledge's middle and how high above it
  * (blender/grilledfish.py: LEDGE_L, the hook's arm 0.2 past the end at 0.985 high, the ledge's middle at 0.19) */
 const LEDGE_L = 1.62
-const FAN_PEG = { along: -LEDGE_L / 2 - 0.2, up: 0.985 - 0.19 }
+const FAN_PEG = { along: -LEDGE_L / 2 + 0.045, up: 0.365 - 0.19 }
 /** the fan hung on its peg: its paper's middle this far below the peg (its handle's length, 1.6 times its own, and the loop) */
-const FAN_DROP = 0.487
+const FAN_DROP = -0.4
 /** the containers that stay where they're set, whatever's beside them: the ledge, fixed to the hearth */
 const FIXED = new Set(['box'])
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
