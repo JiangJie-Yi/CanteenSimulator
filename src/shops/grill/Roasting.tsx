@@ -42,7 +42,8 @@ import { fireSound } from '@/game/fireSound'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { Boss, BOSS_TASTE } from './Boss'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
-import { ashMaterial, charcoalMaterial, useBinchotan, type BinchotanKit } from './binchotanModel'
+import { ashMaterial, MODEL_LEN, MODEL_R, useBinchotan } from './binchotanModel'
+import { coalLayer, coalLook, type CoalLook } from './coalLayer'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, settleOffset, useEdit, type V3 } from './edit'
 import { setTip } from '@/scene/hoverTip'
 import { slide as drawerSound } from './TillDesk'
@@ -2651,24 +2652,6 @@ function warmCharring(root: THREE.Object3D, isFood: (id: string) => boolean) {
   return true
 }
 
-/**
- * The fire's charcoal and its ash made with the page (scene/Prewarm): a stick on its own material and a piece burnt to ash, each as it's
- * drawn whole and as it fades (transparent), compiled while the page loads, kept, never drawn. The first stick to burn through (a minute
- * or so into service) stopped the picture while its ash's program was linked, and again when that ash faded.
- */
-let coalWarmed = false
-function warmCoal(bin: BinchotanKit) {
-  if (coalWarmed) return
-  coalWarmed = true
-  const group = new THREE.Group()
-  for (const transparent of [false, true]) {
-    const coal = charcoalMaterial(bin), ash = ashMaterial(bin)
-    coal.transparent = ash.transparent = transparent
-    group.add(new THREE.Mesh(bin.stick(0.3, 0.032, 0), coal), new THREE.Mesh(bin.chunk(0), ash))
-  }
-  warmLater(group)
-}
-
 /** A small repeatable random generator, so a piece always gets the same crumple. */
 function seeded(key: string) {
   let h = 2166136261
@@ -3254,27 +3237,29 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // charcoal added is thrown in: a few sticks leave the hand (or the crate), fly in an arc, land on the heap, bounce, tip and lie
   // where they land, a burst of sparks and ash where each strikes. Each stick starts black and kindles on its own, over some
   // seconds, to red-hot (its glow reddening, its face going ashy grey), as binchotan does
-  type Coal = { g: THREE.Object3D | null; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
+  type Coal = { g: THREE.Object3D; mat: CoalLook; x: number; y: number; z: number; vx: number; vz: number; vy: number; rx: number; rz: number; ry: number
     sx: number; sz: number; settled: boolean; top: number; delay: number; heat: number; bounced: boolean
     /** how hard it was thrown (0 dropped gently .. 1 flung): how high it bounces; and a hop it's been jolted into by another landing hard by it */
     force?: number; hopY?: number; hopV?: number
     /** seconds since it landed, whether it's burnt out, and how long it's been going out when it's pushed out by the new */
     age: number; gone: boolean; dying: boolean; dyT: number
     /** where it lies in plan (its landing), the way it points, how steeply it tips, and the pose it settles to */
-    tx: number; tz: number; yaw: number; slope: number; lx: number; lz: number; ly: number; qEnd: THREE.Quaternion; geo: THREE.BufferGeometry }
+    tx: number; tz: number; yaw: number; slope: number; lx: number; lz: number; ly: number; qEnd: THREE.Quaternion
+    /** which of the six sticks it is, and its size against the model's (its pose is `g`: the fire's drawn instanced, coalLayer) */
+    shape: number; wide: number; long: number }
   const coals = useRef<Coal[]>([])
   /** whether the bed has been laid with its first sticks */
   const bedSeeded = useRef(false)
-  const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same sticks as the crate's, from Blender (blender/binchotan.py): each thrown one its own of the six, its own length and thickness)
   const bin = useBinchotan()
-  // (its charcoal's and ash's programs made with the page)
-  useEffect(() => warmCoal(bin), [bin])
-  const randomStick = () => bin.stick(0.28 + Math.random() * 0.12, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 6))
+  /** a stick from the crate: one of the six, its own length and thickness */
+  const stickSize = () => ({ shape: Math.floor(Math.random() * 6), wide: (0.03 + Math.random() * 0.006) / MODEL_R, long: (0.28 + Math.random() * 0.12) / MODEL_LEN })
+  // (the sticks on the fire and the crumbs they break into, all drawn by a few instanced meshes: their poses and looks written in each frame)
+  const coalDraw = useMemo(() => coalLayer(bin), [bin])
+  useEffect(() => () => coalDraw.dispose(), [coalDraw])
   /** the pieces of sticks that burnt through and broke: falling onto what's under them, lying there as grey ash a while, then gone */
-  type Crumb = { id: number; geo: THREE.BufferGeometry; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; ty: number; vy: number; q: THREE.Quaternion; age: number; m: THREE.Mesh | null }
+  type Crumb = { id: number; shape: number; sy: number; mat: CoalLook; x: number; y: number; z: number; ty: number; vy: number; q: THREE.Quaternion; age: number; m: THREE.Object3D }
   const crumbs = useRef<Crumb[]>([])
-  const [crumbIds, setCrumbIds] = useState<number[]>([])
   const crumbSeq = useRef(0)
   /** a stick burnt through gives way: it's gone from the heap (what lay on it comes down) and its pieces fall */
   const breakStick = (c: Coal) => {
@@ -3285,16 +3270,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const parts = crumble({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope }, below, Math.random, PIT_LIFT)
     const made = parts.map((p) => {
       // (burnt through: grey ash, granular, the pieces' shapes but the ash's own face)
-      const mat = ashMaterial(bin)
+      const mat = coalLook()
       // (lying on its side the way it fell, a little askew)
       const q = new THREE.Quaternion().setFromUnitVectors(UP_AXIS, new THREE.Vector3(Math.cos(p.yaw), (Math.random() - 0.5) * 0.4, Math.sin(p.yaw)).normalize())
         .multiply(new THREE.Quaternion().setFromAxisAngle(UP_AXIS, Math.random() * 6))
-      return { id: crumbSeq.current++, geo: bin.chunk(Math.floor(Math.random() * 6), p.len), mat, x: p.x, y: c.y + 0.004, z: p.z, ty: p.y, vy: 0, q, age: 0, m: null } as Crumb
+      const shape = Math.floor(Math.random() * 6), m = new THREE.Object3D()
+      m.position.set(p.x, c.y + 0.004, p.z)
+      m.quaternion.copy(q)
+      return { id: crumbSeq.current++, shape, sy: Math.max(0.02, p.len) / bin.chunkShape(shape).len, mat, x: p.x, y: c.y + 0.004, z: p.z, ty: p.y, vy: 0, q, age: 0, m } as Crumb
     })
-    const all = [...crumbs.current, ...made]
-    for (const k of all.slice(0, Math.max(0, all.length - 40))) k.mat.dispose()
-    crumbs.current = all.slice(-40)
-    setCrumbIds(crumbs.current.map((k) => k.id))
+    crumbs.current = [...crumbs.current, ...made].slice(-40)
     burst(c.x, c.top, c.z)
     restack()
   }
@@ -3340,7 +3325,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const aliveNow = coals.current.filter((c) => c && !c.gone && !c.dying)
     const n = Math.min(count ?? COAL_PER_ADD.min + Math.floor(Math.random() * (COAL_PER_ADD.max - COAL_PER_ADD.min + 1)), COAL_MAX - aliveNow.length + aliveNow.filter(ashedOut).length)
     if (n <= 0) return 0
-    const base = coalIds.length ? coalIds[coalIds.length - 1] + 1 : 0
+    const base = coals.current.length
     // (a bed only holds so many sticks: when the new ones would take it past the most, the oldest burn out at once, shrinking away)
     const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
     for (const c of alive.filter(ashedOut).slice(0, Math.max(0, alive.length + n - COAL_MAX))) c.dying = true
@@ -3369,11 +3354,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const ly = rest.y
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
       // (the charcoal as it came from the crate; the cracks light up only as it heats (the emissive map))
-      const mat = charcoalMaterial(bin)
-      coals.current[base + k] = { g: null, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
+      const mat = coalLook(), g = new THREE.Object3D()
+      g.visible = false
+      coals.current[base + k] = { g, mat, x: start.x + (Math.random() - 0.5) * 0.06, y: start.y, z: start.z + (Math.random() - 0.5) * 0.06, vx: 0, vz: 0, vy: 0,
         rx: Math.random() * 3, rz: Math.random() * 3, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 14 * (1 + 1.5 * force), sz: (Math.random() - 0.5) * 14 * (1 + 1.5 * force), force,
         settled: false, top: rest.y, delay: k * 0.11 + Math.random() * 0.05, heat: 0, bounced: false, age: 0, gone: false, dying: false, dyT: 0,
-        tx, tz, yaw, slope: rest.slope, lx: spot.from.x, lz: spot.from.z, ly, qEnd: new THREE.Quaternion(), geo: randomStick() }
+        tx, tz, yaw, slope: rest.slope, lx: spot.from.x, lz: spot.from.z, ly, qEnd: new THREE.Quaternion(), ...stickSize() }
       placed++
     }
     if (!placed) return 0
@@ -3386,7 +3372,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       c.vz = (c.lz - c.z) / T
       c.vy = (c.ly - c.y + 0.5 * 9.8 * T * T) / T
     }
-    setCoalIds((ids) => [...ids, ...Array.from({ length: placed }, (_, k) => base + k)].slice(-28))
     return placed
   }
   // (the fire bar's button, in App: a portion out of the crate, as many as the bed takes; it pays for those)
@@ -5232,14 +5217,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const burnt = c.dying ? (c.dyT += delta) / 1.5 : Math.min(1, c.age / COAL_LAST_S)
         if (c.dying) {
           if (c.dyT <= delta) {
-            c.mat.transparent = true; c.mat.needsUpdate = true
+            c.mat.transparent = true
             burst(c.x, c.y, c.z)
-            const rim = c.g.children[1] as THREE.Mesh | undefined
-            if (rim) { const m = rim.material as THREE.Material; m.transparent = true; m.needsUpdate = true }
           }
+          // (its ink fading with it: the same instance's alpha, coalLayer)
           c.mat.opacity = Math.max(0, 1 - burnt)
-          const rim = c.g.children[1] as THREE.Mesh | undefined
-          if (rim) (rim.material as THREE.Material).opacity = Math.max(0, 1 - burnt)
         } else {
           const slim = 1 - 0.1 * burnt * burnt
           c.g.scale.set(slim, 1, slim)
@@ -5322,15 +5304,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       k.mat.emissive.setRGB(0.9, 0.22, 0.05)
       k.mat.emissiveIntensity = 0.35 * glowLeft * (0.85 + 0.15 * Math.sin(clock * 3 + k.id))
       if (k.age > 40) {
-        if (!k.mat.transparent) { k.mat.transparent = true; k.mat.needsUpdate = true }
+        k.mat.transparent = true
         k.mat.opacity = Math.max(0, 1 - (k.age - 40) / 3)
       }
     }
-    if (crumbs.current.some((k) => k.age > 43)) {
-      for (const k of crumbs.current) if (k.age > 43) k.mat.dispose()
-      crumbs.current = crumbs.current.filter((k) => k.age <= 43)
-      setCrumbIds(crumbs.current.map((k) => k.id))
-    }
+    if (crumbs.current.some((k) => k.age > 43)) crumbs.current = crumbs.current.filter((k) => k.age <= 43)
+    // (the sticks and the crumbs drawn as they now are)
+    coalDraw.draw(coals.current, crumbs.current)
     // (sparks and ash from the landings: thrown up, falling back, fading out)
     {
       const sp = sparkPts.current
@@ -6040,17 +6020,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       ))}
       <TasteBowl container="bowl-0" position={bowlAt().toArray() as [number, number, number]} />
       <EmberBed fuel={fuel} />
-      {coalIds.map((id) => coals.current[id] && (
-        <group key={id} visible={false} ref={(m) => { if (coals.current[id]) coals.current[id].g = m }}>
-          <mesh geometry={coals.current[id].geo} material={coals.current[id].mat} castShadow />
-          {/* (the outline: round the sides only, not past the ends, so the hollow ends stay open) */}
-          <mesh geometry={coals.current[id].geo} scale={[1.07, 1, 1.07]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
-        </group>
-      ))}
-      {crumbIds.map((id) => {
-        const k = crumbs.current.find((q) => q.id === id)
-        return k && <mesh key={id} ref={(m) => { k.m = m; if (m) { m.position.set(k.x, k.y, k.z); m.quaternion.copy(k.q) } }} geometry={k.geo} material={k.mat} castShadow />
-      })}
+      {/* (the sticks on the fire, their ink, and the crumbs they break into: a few instanced meshes, written each frame) */}
+      <primitive object={coalDraw.group} />
       <points geometry={sparkGeo} frustumCulled={false}><pointsMaterial size={0.024} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></points>
       <points geometry={ashGeo} frustumCulled={false}><pointsMaterial size={0.05} vertexColors transparent opacity={0.6} depthWrite={false} toneMapped={false} /></points>
       {shards.map((sh) => (

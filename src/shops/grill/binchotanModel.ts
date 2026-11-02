@@ -10,7 +10,7 @@ const URL = import.meta.env.BASE_URL + 'models/binchotan.glb'
 useGLTF.preload(URL)
 
 /** a stick as modelled: its length and radius (each one used is scaled from these) */
-const MODEL_LEN = 0.3, MODEL_R = 0.032
+export const MODEL_LEN = 0.3, MODEL_R = 0.032
 
 export type BinchotanKit = {
   /** a stick `len` long and about `r` round, the `k`th of the six (geometry shared between calls with the same sizes) */
@@ -19,6 +19,10 @@ export type BinchotanKit = {
   chunk: (k: number, len?: number) => THREE.BufferGeometry
   /** the `k`th clump of ash (flat underneath, at y = 0) */
   ash: (k: number) => THREE.BufferGeometry
+  /** the `k`th stick and broken piece as modelled (a stick MODEL_LEN long and MODEL_R round, a piece `len` long): the fire's are drawn from
+   * these, instanced, each one's size in its instance (coalLayer) */
+  stickShape: (k: number) => THREE.BufferGeometry
+  chunkShape: (k: number) => { g: THREE.BufferGeometry; len: number }
   ashMap: THREE.Texture | null
   /** the charcoal's face, its relief, and the cracks' glow */
   face: THREE.Texture | null
@@ -61,6 +65,8 @@ function kitOf(scene: THREE.Group): BinchotanKit {
       return scaled(`c${k % 6}|${L}`, c.g, 1, L / c.len)
     },
     ash: (k) => ashes[((k % 6) + 6) % 6],
+    stickShape: (k) => sticks[((k % 6) + 6) % 6],
+    chunkShape: (k) => chunks[((k % 6) + 6) % 6],
     ashMap: (ashSrc as THREE.MeshStandardMaterial | null)?.map ?? null,
     face: s?.map ?? null,
     normal: s?.normalMap ?? null,
