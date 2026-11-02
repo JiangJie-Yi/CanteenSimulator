@@ -2,7 +2,9 @@
 // clicked opens it): its stars and how many have rated it, the food, the service and the place each on its own, and what the latest
 // customers said as they went (game/reputation). A drawer out from the left edge under the sign, back again at its ×, at a click on
 // nothing in the room or at Esc (the owner's), in the office's finish: its wood title bar, its glass, a section under a rule, a card each.
-import { memo, useEffect } from 'react'
+// Its second tab, 關於 (the owner's): the game, who makes it, its source on GitHub, and the work used in it under licence with its authors.
+import { memo, useEffect, useState } from 'react'
+import { CC_BY_URL, CREDITS, DEVELOPER, DEVELOPER_URL, REPO_URL, SITE_URL } from '@/data/credits'
 import { guestLabel } from '@/data/guests'
 import { tl, type Lang } from '@/data/i18n'
 import { remarkOf, satisfaction, starsOf, type Rating, type Remark, type Visit } from '@/game/reputation'
@@ -93,6 +95,8 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
     return () => window.removeEventListener('keydown', key)
   }, [open, onClose])
   const title = tl(lang, '店家評價', 'お店の評価', 'The shop’s rating')
+  const [tab, setTab] = useState<'rating' | 'about'>('rating')
+  const pick = (zh: string, ja: string, en: string) => tl(lang, zh, ja, en)
   const parts: [string, number | null][] = [
     [tl(lang, '料理', '料理', 'Food'), rating.food],
     [tl(lang, '服務', 'サービス', 'Service'), rating.service],
@@ -102,11 +106,45 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
   return (
     <section className={`rep-drawer${open ? ' is-open' : ''}`} role="dialog" aria-label={title} aria-hidden={!open} inert={!open}>
       <header>
-        <b>{title}</b>
+        <nav className="rep-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === 'rating'} onClick={() => setTab('rating')}>{title}</button>
+          <button type="button" role="tab" aria-selected={tab === 'about'} onClick={() => setTab('about')}>{pick('關於', 'このゲームについて', 'About')}</button>
+        </nav>
         <button type="button" className="panel-x" onClick={onClose} aria-label={tl(lang, '關閉', '閉じる', 'Close')}>×</button>
       </header>
       <div className="rep-body">
-        {rating.stars === null ? (
+        {tab === 'about' ? (
+          <>
+            {/* (the game, who makes it, and where its source is) */}
+            <div className="rep-about">
+              <strong>{pick('聞野・日式烤魚', '聞野・炭火焼の魚', 'Kikuno · Japanese Grill')}</strong>
+              <p>{pick('在瀏覽器裡玩的日式烤魚店經營遊戲：試做、開店、雇人，看客人吃得開不開心。',
+                'ブラウザで遊ぶ炭火焼の店の経営ゲーム。試作し、店を開き、人を雇い、お客さんの顔を見る。',
+                'A Japanese charcoal grill to run in the browser: try dishes out, open up, hire staff, and watch how the customers like it.')}</p>
+              <dl>
+                <dt>{pick('開發者', '開発', 'Developer')}</dt><dd><a href={DEVELOPER_URL} target="_blank" rel="noopener noreferrer">{DEVELOPER}</a></dd>
+                <dt>GitHub</dt><dd><a href={REPO_URL} target="_blank" rel="noopener noreferrer">{REPO_URL.replace('https://', '')}</a></dd>
+                <dt>{pick('線上遊玩', 'プレイ', 'Play')}</dt><dd><a href={SITE_URL} target="_blank" rel="noopener noreferrer">{SITE_URL.replace('https://', '')}</a></dd>
+                <dt>{pick('製作', '制作', 'Made with')}</dt><dd>React・three.js・Vite・Blender</dd>
+              </dl>
+            </div>
+            {/* (the work used under a licence that asks for its author to be named: each its own card, what was changed in it said) */}
+            <h4>{pick('使用的模型', '使用したモデル', 'Models used')}<small>{CREDITS.length}</small></h4>
+            <ul className="rep-credits">
+              {CREDITS.map((c) => (
+                <li key={c.title}>
+                  <span className="rep-credit-what">{pick(c.what.zh, c.what.ja, c.what.en)}</span>
+                  <b>「{c.title}」</b>
+                  <span>by {c.author}</span>
+                  <small><a href={CC_BY_URL} target="_blank" rel="noopener noreferrer">{c.licence}</a>・{c.from}・{pick(c.changed.zh, c.changed.ja, c.changed.en)}</small>
+                </li>
+              ))}
+            </ul>
+            <p className="rep-note">{pick('其餘的模型、貼圖與介面都是為這個遊戲做的（模型用 Blender 的程式產生）。',
+              'それ以外のモデル・テクスチャ・画面はこのゲームのために作ったもの（モデルは Blender のスクリプトで生成）。',
+              'Every other model, picture and screen was made for this game (the models by scripts in Blender).')}</p>
+          </>
+        ) : rating.stars === null ? (
           <p className="rep-empty">{tl(lang, '還沒有客人評價：開店迎客吧。', 'まだ評価がない。お店を開けよう。', 'No one’s rated it yet: open up and let them in.')}</p>
         ) : (
           <>

@@ -1,5 +1,4 @@
 import { canDismiss } from '@/game/hiring'
-import { CREDITS } from '@/data/credits'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { useDrag } from './useDrag'
@@ -156,10 +155,6 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
           })}
           {/* (starting the whole business over, out of the way at the foot) */}
           <p className="ofc-foot"><button type="button" className="ofc-restart" onClick={onReset}>{t('重新開始遊戲', '最初からやり直す')}</button></p>
-          {/* (the work used under a licence that asks for its author to be named) */}
-          <p className="ofc-credits">
-            {CREDITS.map((c) => `${t(c.what.zh, c.what.ja)}：「${c.title}」 by ${c.author}（${c.licence}、${c.from}）`).join(' ／ ')}
-          </p>
         </div>
       )}
     </section>
