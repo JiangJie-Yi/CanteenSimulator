@@ -697,7 +697,8 @@ export const GRILL_OFFSET = GRILL_PIVOT.clone().multiplyScalar(1 - GRILL_SCALE).
  */
 /** the second cubby, at the table's left: the trash bin on its floor, the basket on its shelf */
 export const CUBBY2 = { along: [-1.5, -0.35], lay: [0.95, 2.1] }
-export const CUBBY = { along: [1.36, 3.0], lay: [0.95, 2.1], plinth: 0.1, shelfAlong: 2.5, shelfThick: 0.04 }
+// (the right-hand one as wide as the left-hand one (the owner's: the two alike; it ran on to 3.0), the table's own face past it)
+export const CUBBY = { along: [1.36, 2.51], lay: [0.95, 2.1], plinth: 0.1, shelfThick: 0.04 }
 /** the notch cut into the cook's table's front under the hearth (along from–to, lay from–to): somewhere to stand right up at the fire */
 export const COOK_NOTCH = { along: [-0.04, 1.26], lay: [1.26, 2.1] }
 /** the cubby's floor and shelf surfaces, in the scene: the table's top is y = 0 */

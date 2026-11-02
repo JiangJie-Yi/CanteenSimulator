@@ -1267,10 +1267,10 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
             <mesh position={[0, top - 0.005, (back - front) / 2 - 0.01]}><boxGeometry args={[span - 0.01, 0.008, front - back - 0.03]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
             <mesh position={[0, bottom + 0.003, (back - front) / 2]}><boxGeometry args={[span - 0.01, 0.006, front - back - 0.01]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
           </StaticBatch>
-          {/* (the shelf a white wire rack, as the drinks fridges' are (the owner's): the right-hand one over its right-hand part, the left-hand
-              one the whole way) */}
+          {/* (the shelf a white wire rack, as the drinks fridges' are, over each one's outer half only (the owner's): its inner half, by the cook's
+              notch, the whole height for the bottles and the seasonings (blender/cubbystock.py)) */}
           {(() => {
-            const s0 = side === 'right' ? CUBBY.shelfAlong - (a0 + a1) / 2 : -span / 2, s1 = span / 2
+            const s0 = side === 'right' ? 0 : -span / 2, s1 = side === 'right' ? span / 2 : 0
             return <mesh position={[(s0 + s1) / 2, CUBBY_SHELF_Y - 0.006, (back - front) / 2]} geometry={wireRack(s1 - s0 - 0.02, front - back - 0.04)}>
               <meshToonMaterial color="#eef2f5" />
             </mesh>
