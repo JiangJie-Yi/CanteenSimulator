@@ -63,8 +63,10 @@ export function useEditBox(root: { current: THREE.Object3D | null }, on: boolean
         for (let i = 0; i < pos.count; i += step) pts.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(mat))
       })
       if (!pts.length) return
-      // (turned about the vertical to whichever angle fits it tightest: a piece set at a slant gets a box at the same slant)
+      // (turned about the vertical to whichever angle fits it tightest: a piece set at a slant gets a box at the same slant; but square to the
+      // piece unless a slant fits it markedly tighter (a round lantern fits as well at any angle, and its box came out crooked: the owner's))
       let best = { a: 0, x0: 0, x1: 0, z0: 0, z1: 0, area: Infinity }
+      let square = Infinity
       for (let k = 0; k < 45; k++) {
         const a = (k / 45) * (Math.PI / 2), co = Math.cos(a), si = Math.sin(a)
         let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity
@@ -76,7 +78,8 @@ export function useEditBox(root: { current: THREE.Object3D | null }, on: boolean
           if (z > z1) z1 = z
         }
         const area = (x1 - x0) * (z1 - z0)
-        if (area < best.area) best = { a, x0, x1, z0, z1, area }
+        if (k === 0) square = area
+        if (area < best.area && (k === 0 || area < square * 0.9)) best = { a, x0, x1, z0, z1, area }
       }
       let y0 = Infinity, y1 = -Infinity
       for (const q of pts) { if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y }

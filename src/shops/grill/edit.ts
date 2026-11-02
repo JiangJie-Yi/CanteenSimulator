@@ -123,12 +123,19 @@ const loadOffsets = () => {
 }
 /** and turns made defaults (a Movable's baseTurn) since they were set by hand: the fish lantern's quarter turn (the owner's) */
 const SETTLED_R: Record<string, V3> = { fishlantern: [0, -90, 0] }
+/** and sizes made defaults (a Movable's baseScale) since they were set by hand: the fish lantern 1.3 times as big (the owner's) */
+const SETTLED_S: Record<string, V3> = { fishlantern: [1.3, 1.3, 1.3] }
+const loadScales = () => {
+  const o = load(KEY_S)
+  for (const [id, v] of Object.entries(SETTLED_S)) if (o[id]?.every((x, i) => Math.abs(x - v[i]) < 0.01)) delete o[id]
+  return o
+}
 const loadRotations = () => {
   const o = load(KEY_R)
   for (const [id, v] of Object.entries(SETTLED_R)) if (o[id]?.every((x, i) => Math.abs(x - v[i]) < 0.5)) delete o[id]
   return o
 }
-let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: loadRotations(), scales: load(KEY_S), selected: null, groups: loadGroups(), picked: [],
+let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: loadRotations(), scales: loadScales(), selected: null, groups: loadGroups(), picked: [],
   pivots: load(KEY_P), pivotMode: false, space: 'local', wire: false }
 const subs = new Set<() => void>()
 /** what was selected last time round: a newly picked piece starts in its own (object) axes */

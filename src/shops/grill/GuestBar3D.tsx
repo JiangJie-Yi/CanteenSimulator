@@ -466,13 +466,13 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (the red lantern, its own piece: hung by its own cord) */}
       {/* (the lanterns at the door don't fade when they're in the way, as the room's hangings do: they're outside, and it left them a ghost
           from inside (the owner's)) */}
-      <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
+      <Movable id="chochin" label="紅燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
       {/* (and the grill's own, cream, 炭火 on it, hung right beside the red one, on its far side from the doorway (the owner's: it hung on the
           doorway's other side)) */}
-      <Movable id="chochin2" label="燒烤燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_PAIR, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
+      <Movable id="chochin2" label="燒烤燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_PAIR, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
       {/* (and beyond it the fish lantern, a round one with a fish hung under it (the owner's, after their photograph of one)) */}
-      {/* (turned a quarter round, its fish's side to the street (the owner's)) */}
-      <Movable id="fishlantern" label="魚燈" baseTurn={[0, -90, 0]}><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
+      {/* (turned a quarter round, its fish's side to the street, and 1.3 times as big (the owner's)) */}
+      <Movable id="fishlantern" label="魚燈" baseTurn={[0, -90, 0]} baseScale={1.3}><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
@@ -598,7 +598,7 @@ const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTex
   }
   // (the words, down the front and again round the back)
   const chars = [...(cream ? '炭火' : mark)]
-  const size = chars.length === 1 ? 230 : chars.length === 2 ? 168 : 124
+  const size = (chars.length === 1 ? 230 : chars.length === 2 ? 168 : 124) * (cream ? 0.82 : 1)
   const gap = chars.length === 1 ? 0 : size * 1.02
   for (const u of [128, 384]) chars.forEach((ch, i) =>
     brushText(g, ch, u, 256 + (i - (chars.length - 1) / 2) * gap, size, cream
@@ -814,9 +814,10 @@ const FISH_LANTERN_TEX = (() => {
   finTex.colorSpace = THREE.SRGBColorSpace
   return { bodyTex, finTex }
 })()
-/** the round lantern's paper: washi lit from within, ribbed, 烤魚 in black brush round its front and again round its back (u reads left to right
- * from the front, 0.75 its middle; v from its top down). Its lettering drawn wider than tall: the paper's u is a longer way round its belly
- * than its v is up it */
+/** the round lantern's paper: washi lit from within, ribbed, 焼魚 in black brush round it twice, a quarter round from the fish's front and
+ * back (u reads left to right; its words at u 0 and 0.5, so with the fish's side to the street (the lantern turned a quarter) they face the
+ * street too, the owner's; v from its top down). Its lettering drawn wider than tall: the paper's u is a longer way round its belly than its
+ * v is up it */
 const FISH_TOP_TEX = signTexture(1024, 256, (g) => {
   const W = 1024, H = 256
   const grad = g.createLinearGradient(0, 0, 0, H)
@@ -826,11 +827,12 @@ const FISH_TOP_TEX = signTexture(1024, 256, (g) => {
   for (let y = 4; y < H; y += 10.5) { g.fillStyle = 'rgba(120,90,50,0.22)'; g.fillRect(0, y, W, 1.6) }
   g.fillStyle = 'rgba(120,90,50,0.12)'
   for (let x = 0; x < W; x += 128) g.fillRect(x, 0, 1.5, H)
-  for (const cx of [W * 0.75, W * 0.25]) {
+  // (the one at u 0 drawn at both edges, half of it each side of the seam)
+  for (const cx of [W * 0.5, 0, W]) {
     g.save()
     g.translate(cx, H * 0.53)
     g.scale(1.36, 1)
-    brushText(g, '烤', -54, 0, 104, { fill: '#140a06', shadow: 'rgba(255,200,120,0.3)' })
+    brushText(g, '焼', -54, 0, 104, { fill: '#140a06', shadow: 'rgba(255,200,120,0.3)' })
     brushText(g, '魚', 54, 0, 104, { fill: '#140a06', shadow: 'rgba(255,200,120,0.3)' })
     g.restore()
   }
