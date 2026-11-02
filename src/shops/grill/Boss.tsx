@@ -25,7 +25,7 @@ import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_OUT, type DrinkId } from './bar'
  */
 const URL = import.meta.env.BASE_URL + 'models/boss.glb'
 /** the small parts: no ink line round them */
-const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan)/
+const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan|Sideburn|Pencil|Pin|Towel)/
 let made: THREE.Object3D | null = null
 
 /** where his hands hang at rest (as modelled, the node's own frame) */
