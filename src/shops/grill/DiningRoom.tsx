@@ -684,7 +684,7 @@ function drawRoundPaper(g: CanvasRenderingContext2D, sky: Sky) {
   g.clearRect(0, 0, 512, 512)
   if (sky === 'dusk' || sky === 'dawn') {
     const gr = g.createLinearGradient(0, 0, 0, 512)
-    if (sky === 'dusk') { gr.addColorStop(0, '#ffe6c4'); gr.addColorStop(0.45, '#ffc189'); gr.addColorStop(1, '#ee8a5c') }
+    if (sky === 'dusk') { gr.addColorStop(0, '#ffebcf'); gr.addColorStop(0.45, '#ffd29e'); gr.addColorStop(1, '#f3a874') }
     else { gr.addColorStop(0, '#eceeff'); gr.addColorStop(0.5, '#f4dde8'); gr.addColorStop(1, '#ebc4c8') }
     g.fillStyle = gr; g.fillRect(0, 0, 512, 512)
     // (the sun's own brightness through the paper: the evening's low on one side, the morning's a faint glow over it all)
@@ -720,7 +720,7 @@ function drawRoundPaper(g: CanvasRenderingContext2D, sky: Sky) {
     g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a) * 18 + 6, y + Math.sin(a) * 18 - 4, x + Math.cos(a) * 34, y + Math.sin(a) * 34); g.stroke()
   }
   if (night) bambooGrove(g, 'shadow')
-  else if (sky === 'dusk') bambooGrove(g, 'shadow', '96,40,14')
+  else if (sky === 'dusk') bambooGrove(g, 'shadow', '90,58,26')
   else if (sky === 'dawn') { g.globalAlpha = 0.45; bambooGrove(g, 'shadow', '70,58,104'); g.globalAlpha = 1 }
 }
 /**
@@ -897,7 +897,7 @@ function drawViewSky(g: CanvasRenderingContext2D, size: number, sky: Sky) {
     // (dusk: deep violet overhead to the orange glow along the horizon, the sun low in it; dawn: blue going pale, a rose and peach band low
     // down, the last stars fading)
     const stops: [number, string][] = sky === 'dusk'
-      ? [[0, '#37386e'], [0.3, '#7c5488'], [0.43, '#e0805e'], [0.5, '#ffc277'], [0.54, '#f7a868'], [1, '#6e4650']]
+      ? [[0, '#3a4076'], [0.3, '#76668f'], [0.43, '#e5a070'], [0.5, '#ffd28a'], [0.54, '#f5bb7e'], [1, '#6a5258']]
       : [[0, '#5f80c8'], [0.36, '#a9b7e6'], [0.46, '#f1c6cc'], [0.5, '#ffdcbc'], [0.54, '#f3d2c6'], [1, '#cdbfd0']]
     for (const [k, c] of stops) grd.addColorStop(k, c)
     g.fillStyle = grd
@@ -906,7 +906,7 @@ function drawViewSky(g: CanvasRenderingContext2D, size: number, sky: Sky) {
     if (sky === 'dusk') {
       const sx = X(1.9), sy = Y(1.7), sr = S(0.62)
       const glow = g.createRadialGradient(sx, sy, 0, sx, sy, sr * 7)
-      glow.addColorStop(0, 'rgba(255,236,190,0.9)'); glow.addColorStop(0.25, 'rgba(255,170,90,0.45)'); glow.addColorStop(1, 'rgba(255,140,80,0)')
+      glow.addColorStop(0, 'rgba(255,240,200,0.9)'); glow.addColorStop(0.25, 'rgba(255,196,112,0.45)'); glow.addColorStop(1, 'rgba(255,170,100,0)')
       g.fillStyle = glow
       g.fillRect(sx - sr * 7, sy - sr * 7, sr * 14, sr * 14)
       g.fillStyle = '#fff1d0'
@@ -920,12 +920,12 @@ function drawViewSky(g: CanvasRenderingContext2D, size: number, sky: Sky) {
     // (long thin clouds lit from below: gold and rose at dusk, pink at dawn)
     g.filter = 'blur(5px)'
     for (const [cx, cy, w] of [[-3.5, 3.0, 3.2], [2.8, 4.4, 3.6], [0.2, 2.4, 2.2], [5.2, 2.9, 2.6], [-6, 4.8, 3.0]]) {
-      g.fillStyle = sky === 'dusk' ? 'rgba(255,170,120,0.7)' : 'rgba(255,212,222,0.75)'
+      g.fillStyle = sky === 'dusk' ? 'rgba(255,200,145,0.7)' : 'rgba(255,212,222,0.75)'
       for (let k = 0; k < 6; k++) {
         const r = S(w * (0.1 + rnd() * 0.08))
         g.beginPath(); g.ellipse(X(cx + (rnd() - 0.5) * w), Y(cy + rnd() * w * 0.12), r * 2.6, r, 0, 0, Math.PI * 2); g.fill()
       }
-      g.fillStyle = sky === 'dusk' ? 'rgba(150,80,110,0.45)' : 'rgba(190,170,210,0.4)'
+      g.fillStyle = sky === 'dusk' ? 'rgba(138,104,122,0.42)' : 'rgba(190,170,210,0.4)'
       g.fillRect(X(cx - w * 0.5), Y(cy + 0.02), S(w), S(0.1))
     }
     g.filter = 'none'
@@ -1121,7 +1121,7 @@ function drawViewMid(g: CanvasRenderingContext2D, size: number, sky: Sky) {
     }
   }
   // (the fronts across the alley in the shade at dusk, the sun going down behind them, warm on their edges; cool and grey at dawn)
-  toneTo(g, size, sky, 'rgba(104,58,52,0.4)', 'rgba(118,118,168,0.26)')
+  toneTo(g, size, sky, 'rgba(94,72,62,0.38)', 'rgba(118,118,168,0.26)')
 }
 function drawViewNear(g: CanvasRenderingContext2D, size: number, sky: Sky) {
   const { X, S } = viewPx('near', size)
@@ -1134,7 +1134,7 @@ function drawViewNear(g: CanvasRenderingContext2D, size: number, sky: Sky) {
   bambooGrove(g, sky === 'night' ? 'night' : 'day')
   g.restore()
   // (against the evening sun the bamboo's dark, its edges warm; in the dawn a cool grey-green)
-  toneTo(g, size, sky, 'rgba(46,22,12,0.62)', 'rgba(70,72,110,0.3)')
+  toneTo(g, size, sky, 'rgba(40,30,20,0.6)', 'rgba(70,72,110,0.3)')
 }
 /** the four layers' pictures, made again as the part of the day turns */
 const ROUND_VIEW = (() => {
@@ -1315,9 +1315,9 @@ if (typeof document !== 'undefined') onSky(() => { const s = skyNow(); for (cons
 // (by night the moon's faint blue glow round the window and its shaft slanting in, dust drifting in it (WindowDust); at dusk the evening
 // sun's, orange and stronger; at dawn only a faint rose glow round it (the morning sun's on the room's other side); by day none)
 const WINDOW_HALO = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.halo, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false }), { day: ['#8fc4ff', 0], dawn: ['#ffc6d4', 0.12], dusk: ['#ffac64', 0.3], night: ['#8fc4ff', 0.22] })
+  toneMapped: false }), { day: ['#8fc4ff', 0], dawn: ['#ffc6d4', 0.12], dusk: ['#ffc07c', 0.3], night: ['#8fc4ff', 0.22] })
 const SUNBEAM = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false, side: THREE.DoubleSide }), { day: ['#78b2ff', 0], dawn: ['#ffd6de', 0], dusk: ['#ffa059', 0.22], night: ['#78b2ff', 0.15] })
+  toneMapped: false, side: THREE.DoubleSide }), { day: ['#78b2ff', 0], dawn: ['#ffd6de', 0], dusk: ['#ffb872', 0.22], night: ['#78b2ff', 0.15] })
 /** the dust in the moon's shaft by night, in the evening sun's at dusk: specks drifting slowly down it and about, catching its light (in the
  * window's frame, as the shaft) */
 const DUST_N = 46

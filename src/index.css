@@ -645,7 +645,7 @@ button {
   transition: background-color 120ms ease, transform 120ms ease;
 }
 .game-clock-sky.is-dawn { --sky-ink: #ffc0a6; }
-.game-clock-sky.is-dusk { --sky-ink: #ff9a4c; }
+.game-clock-sky.is-dusk { --sky-ink: #ffac5c; }
 .game-clock-sky.is-night { --sky-ink: #e9eefc; }
 .game-clock-sky svg {
   width: 15px;

@@ -193,8 +193,9 @@ const LIGHTING: Record<Sky, { sun: string; sunIntensity: number; sky: string; gr
   // (the owner's: dawn and dusk between day and night)
   dawn: { sun: '#ffbfa6', sunIntensity: 1.15, sky: '#a9b4e6', ground: '#54464c', hemi: 0.85, spot: 22, fire: 2.5,
     shadow: '#000000', shadowOpacity: 0.32, env: 0.72 },
-  // the evening sun, deep orange, low in through the round window; a dusky violet sky over warm ground
-  dusk: { sun: '#ff9d52', sunIntensity: 1.6, sky: '#b9a8d2', ground: '#7a5442', hemi: 0.95, spot: 24, fire: 3,
+  // the evening sun, a warm amber-gold, low in through the round window; a dusky violet sky over warm ground (the owner: deep orange was
+  // too red)
+  dusk: { sun: '#ffb46e', sunIntensity: 1.5, sky: '#b6b2d6', ground: '#6e5848', hemi: 0.95, spot: 24, fire: 3,
     shadow: '#000000', shadowOpacity: 0.36, env: 0.88 },
   // moonlight; the warm spot, fire and burners carry the scene
   night: { sun: '#b8c4ff', sunIntensity: 0.9, sky: '#6a6274', ground: '#3a2c20', hemi: 1.35, spot: 30, fire: 4,
