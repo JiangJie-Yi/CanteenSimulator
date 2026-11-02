@@ -176,8 +176,8 @@ def mesh_obj(name, bm, smooth_shade=True):
 def soy_dish(name, segs=24):
     """turned on the wheel: the profile (radius, height) from the middle of its underside out round the foot, up the outside, over the rim and
     back in across the well; its picture laid flat from above (u, v from x, z over its 9 cm)"""
-    prof = [(0.0, 0.004), (0.023, 0.004), (0.025, 0.0), (0.0295, 0.0), (0.031, 0.004), (0.039, 0.0105), (0.0442, 0.0165), (0.0452, 0.0188),
-            (0.0438, 0.0194), (0.0405, 0.0158), (0.031, 0.0092), (0.016, 0.0066), (0.0, 0.0062)]
+    prof = [(0.023, 0.004), (0.025, 0.0), (0.0295, 0.0), (0.031, 0.004), (0.039, 0.0105), (0.0442, 0.0165), (0.0452, 0.0188),
+            (0.0438, 0.0194), (0.0405, 0.0158), (0.031, 0.0092), (0.016, 0.0066)]
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     rings = []
@@ -209,6 +209,14 @@ def soy_dish(name, segs=24):
             f = bm.faces.new(uniq)
             for lp in f.loops:
                 lp[uvl].uv = uv_of(lp.vert.co)
+    # (its underside's middle and its well's floor closed flat across the rings next to the axis, laddered on export: they were fans of
+    # triangles into a point at the middle, 24 of them (the owner's low-poly rule))
+    for ring in (rings[0], rings[-1]):
+        if ring[0] is None:
+            continue
+        f = bm.faces.new(ring)
+        for lp in f.loops:
+            lp[uvl].uv = uv_of(lp.vert.co)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return mesh_obj(name, bm)
 
@@ -480,6 +488,10 @@ def tissue_pull(name):
 def lathe(name, prof, segs=24, v_of=None):
     """turned: the profile (radius, height) round the y axis, from the middle of its underside out and up; its picture wrapped round it (u
     the way round, v from v_of(height), else its height over the profile's)"""
+    # (a profile starting or ending on the axis: that point left out and the ring beside it closed flat instead, laddered on export; never a
+    # fan of triangles into the middle)
+    shut = [prof[0][0] <= 1e-6, prof[-1][0] <= 1e-6]
+    prof = prof[1 if shut[0] else 0: len(prof) - (1 if shut[1] else 0)]
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     top = max(y for _, y in prof) or 1.0
@@ -506,6 +518,13 @@ def lathe(name, prof, segs=24, v_of=None):
                 co = lp.vert.co
                 ang = (math.atan2(-co.y, co.x) / (2 * math.pi)) % 1.0
                 lp[uvl].uv = (ang, v_of(co.z) if v_of else co.z / top)
+    for ring, on in ((rings[0], shut[0]), (rings[-1], shut[1])):
+        if not on:
+            continue
+        f = bm.faces.new(ring)
+        for lp in f.loops:
+            co = lp.vert.co
+            lp[uvl].uv = ((math.atan2(-co.y, co.x) / (2 * math.pi)) % 1.0, v_of(co.z) if v_of else co.z / top)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return mesh_obj(name, bm)
 
