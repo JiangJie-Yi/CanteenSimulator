@@ -467,10 +467,12 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (the lanterns at the door don't fade when they're in the way, as the room's hangings do: they're outside, and it left them a ghost
           from inside (the owner's)) */}
       <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
-      {/* (and the grill's own, cream, 炭火焼 on it, hung on the doorway's other side) */}
-      <Movable id="chochin2" label="燒烤燈籠" baseTurn={[0, 45, 0]}><group position={[(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
+      {/* (and the grill's own, cream, 炭火 on it, hung right beside the red one, on its far side from the doorway (the owner's: it hung on the
+          doorway's other side)) */}
+      <Movable id="chochin2" label="燒烤燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_PAIR, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
       {/* (and beyond it the fish lantern, a round one with a fish hung under it (the owner's, after their photograph of one)) */}
-      <Movable id="fishlantern" label="魚燈"><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
+      {/* (turned a quarter round, its fish's side to the street (the owner's)) */}
+      <Movable id="fishlantern" label="魚燈" baseTurn={[0, -90, 0]}><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
@@ -560,8 +562,9 @@ const DOORMAT = (() => signTexture(512, 280, (g) => {
 /**
  * A long lantern's skin (長提灯), its picture once round it: the washi lit from inside, the bamboo ribs it's wound on painted in (each a fine
  * dark line, the paper between them bellying a little, lit at its crown), its ends darker under the caps; and down its front and again round
- * its back the words in big brushed characters. `red`: the red one, the shop's mark in black edged with gold; `cream`: the grill's, cream
- * paper, 炭火焼 in black with a red band top and bottom.
+ * its back the words in big brushed characters. `red`: the red one, the shop's mark in black edged with gold, a white band round it near
+ * each end (the owner's); `cream`: the grill's, cream paper, 炭火 in black (the owner had its 焼 taken off: the red one beside it says it)
+ * with a red band top and bottom.
  */
 const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTexture(512, 512, (g) => {
   const cream = style === 'cream'
@@ -589,12 +592,10 @@ const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTex
   ends.addColorStop(0, 'rgba(20,6,2,0.45)'); ends.addColorStop(0.1, 'rgba(20,6,2,0)'); ends.addColorStop(0.9, 'rgba(20,6,2,0)'); ends.addColorStop(1, 'rgba(20,6,2,0.45)')
   g.fillStyle = ends
   g.fillRect(0, 0, 512, 512)
-  if (cream) {
-    // (the grill's: a red band round it near each end)
-    for (const y of [56, 440]) { g.fillStyle = '#b8261c'; g.fillRect(0, y, 512, 16) }
-  }
+  // (a band round it near each end: red on the grill's cream one, white on the red one)
+  for (const y of [56, 440]) { g.fillStyle = cream ? '#b8261c' : '#f6eedd'; g.fillRect(0, y, 512, 16) }
   // (the words, down the front and again round the back)
-  const chars = [...(cream ? '炭火焼' : mark)]
+  const chars = [...(cream ? '炭火' : mark)]
   const size = chars.length === 1 ? 230 : chars.length === 2 ? 168 : 124
   const gap = chars.length === 1 ? 0 : size * 1.02
   for (const u of [128, 384]) chars.forEach((ch, i) =>
@@ -604,6 +605,8 @@ const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTex
 })
 /** a door lantern's paper with its flame out (its own switch by the way in): as the daylight finds it by day, dim by night */
 const unlitPaper = () => (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark' ? 0.3 : 0.78)
+/** how far apart the two lanterns by the doorway hang, the red and the grill's beside it (middle to middle) */
+const CHOCHIN_PAIR = 0.3
 const CHOCHIN_GLOW = (() => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')
@@ -809,7 +812,7 @@ const FISH_LANTERN_TEX = (() => {
   finTex.colorSpace = THREE.SRGBColorSpace
   return { bodyTex, finTex }
 })()
-/** the round lantern's paper: washi lit from within, ribbed, 焼魚 in black brush round its front and again round its back (u reads left to right
+/** the round lantern's paper: washi lit from within, ribbed, 烤魚 in black brush round its front and again round its back (u reads left to right
  * from the front, 0.75 its middle; v from its top down). Its lettering drawn wider than tall: the paper's u is a longer way round its belly
  * than its v is up it */
 const FISH_TOP_TEX = signTexture(1024, 256, (g) => {
@@ -825,7 +828,7 @@ const FISH_TOP_TEX = signTexture(1024, 256, (g) => {
     g.save()
     g.translate(cx, H * 0.53)
     g.scale(1.36, 1)
-    brushText(g, '焼', -54, 0, 104, { fill: '#140a06', shadow: 'rgba(255,200,120,0.3)' })
+    brushText(g, '烤', -54, 0, 104, { fill: '#140a06', shadow: 'rgba(255,200,120,0.3)' })
     brushText(g, '魚', 54, 0, 104, { fill: '#140a06', shadow: 'rgba(255,200,120,0.3)' })
     g.restore()
   }
