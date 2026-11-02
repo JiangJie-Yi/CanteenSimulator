@@ -97,8 +97,8 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
 const MAX_SEATED = GRILL_SEATS.length
 /** who can come in as a couple: him, and her */
-const COUPLE_HIM = new Set<GuestKind>(['salaryman', 'student', 'highSchoolBoy', 'yankee', 'tourist'])
-const COUPLE_HER = new Set<GuestKind>(['officeLady', 'highSchoolGirl', 'yukata', 'maid', 'student'])
+const COUPLE_HIM = new Set<GuestKind>(['salaryman', 'collegeStudent', 'schoolboy', 'delinquent', 'foreignTourist'])
+const COUPLE_HER = new Set<GuestKind>(['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'collegeStudent'])
 const PATIENCE = 150
 /** the bar the customers sit at, behind the fire (away from the camera): its middle, length, top, and seats */
 const BAR_AT = GRILL_COUNTERS[0].at.clone()

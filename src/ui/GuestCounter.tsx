@@ -39,19 +39,19 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
   const old = kind === 'grandma' || kind === 'grandpa'
   const hair = old ? '#cfcfcf' : gyaru ? pick(['#f0d090', '#e8b860', '#c8884a'], id) : pick(HAIR, id * 3)
   // (a third of the students in their big headphones, the same ones as in 3D)
-  const phones = kind === 'student' && hash01(id, 23) < 0.34
+  const phones = kind === 'collegeStudent' && hash01(id, 23) < 0.34
   const scale = kind === 'kid' ? 0.78 : kind === 'grandma' ? 0.92 : 1
-  const wide = kind === 'uncle' ? 1.22 : kind === 'grandpa' ? 1.05 : kind === 'highSchoolGirl' || kind === 'officeLady' || gyaru ? 0.92 : 1
-  const glasses = old || kind === 'officeLady' && id % 2 === 0 || kind === 'student' && id % 3 === 0
+  const wide = kind === 'uncle' ? 1.22 : kind === 'grandpa' ? 1.05 : kind === 'schoolgirl' || kind === 'officeLady' || gyaru ? 0.92 : 1
+  const glasses = old || kind === 'officeLady' && id % 2 === 0 || kind === 'collegeStudent' && id % 3 === 0
   const top: Record<string, string> = {
-    salaryman: '#2b3444', officeLady: '#6a6f78', highSchoolGirl: '#f4f1ea', highSchoolBoy: '#1c1e26', grandma: '#c9b48a',
+    salaryman: '#2b3444', officeLady: '#6a6f78', schoolgirl: '#f4f1ea', schoolboy: '#1c1e26', grandma: '#c9b48a',
     grandpa: '#7a5a3a', kid: pick(['#e85a4a', '#4a8ad8', '#f0c040'], id), uncle: pick(['#4a7a5a', '#a8432f', '#3d6a9a'], id),
-    student: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukata: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
-    yankee: '#15161c', bosozoku: pick(['#f2efe8', '#4a2a5e', '#1a1a20'], id),
-    tourist: pick(['#e8d24a', '#4aa8d8', '#e86a4a'], id), civilServant: '#4a4e56', maid: '#1c1c24',
+    collegeStudent: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukataLady: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
+    delinquent: '#15161c', bosozoku: pick(['#f2efe8', '#4a2a5e', '#1a1a20'], id),
+    foreignTourist: pick(['#e8d24a', '#4aa8d8', '#e86a4a'], id), civilServant: '#4a4e56', maidCoser: '#1c1c24',
     gyaru: pick(['#f06aa0', '#f2f0ea', '#1c1c22', '#f2c62a'], id),
   }
-  const legs = kind === 'highSchoolGirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a' : '#2f2f36'
+  const legs = kind === 'schoolgirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a' : '#2f2f36'
   return (
     <svg viewBox="0 0 40 60" className={`gc-person${walking ? ' is-walking' : ''}${eating ? ' is-eating' : ''}`}
       aria-hidden="true">
@@ -65,7 +65,7 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
         {walking && (
           <g className="gc-legs">
             <path d="M16 44l-2 12M24 44l2 12" stroke={legs} strokeWidth="3.4" strokeLinecap="round" />
-            <path d="M12 56h4M24 56h4" stroke={kind === 'highSchoolGirl' || kind === 'kid' ? '#3a2a1e' : '#1c1c1c'} strokeWidth="2.4"
+            <path d="M12 56h4M24 56h4" stroke={kind === 'schoolgirl' || kind === 'kid' ? '#3a2a1e' : '#1c1c1c'} strokeWidth="2.4"
               strokeLinecap="round" />
           </g>
         )}
@@ -75,7 +75,7 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
         <path d="M9 47c0-11 4-19 11-19s11 8 11 19z" fill={top[kind]} stroke={INK} strokeWidth="1.1" />
         {kind === 'salaryman' && <><path d="M16 29l4 9 4-9" fill="#f4f1ea" /><path d="M20 30l-1.2 2 1.2 8 1.2-8z" fill="#a8322a" /></>}
         {kind === 'officeLady' && <><path d="M16 29l4 7 4-7" fill="#f4f1ea" /><circle cx="20" cy="33" r="0.9" fill="#c9b48a" /></>}
-        {kind === 'highSchoolGirl' && (
+        {kind === 'schoolgirl' && (
           <>
             {/* the sailor collar with its white stripes, and the red scarf */}
             <path d="M11 33l9 6 9-6-2-4h-14z" fill="#23324a" />
@@ -83,15 +83,15 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
             <path d="M18 37l2 4 2-4z" fill="#c4302a" />
           </>
         )}
-        {kind === 'highSchoolBoy' && <><path d="M20 29v18" stroke="#3a3a46" strokeWidth="0.8" />{[32, 36, 40, 44].map((y) => <circle key={y} cx="20" cy={y} r="0.8" fill="#e0c060" />)}</>}
+        {kind === 'schoolboy' && <><path d="M20 29v18" stroke="#3a3a46" strokeWidth="0.8" />{[32, 36, 40, 44].map((y) => <circle key={y} cx="20" cy={y} r="0.8" fill="#e0c060" />)}</>}
         {gyaru && <><path d="M15 29q5 5 10 0" fill="none" stroke="#e8c45a" strokeWidth="0.8" /><circle cx="20" cy="31.6" r="0.9" fill="#e8c45a" /></>}
         {kind === 'grandma' && <><path d="M15 29l5 6 5-6" fill="#efe8d6" /><path d="M14 38h12" stroke="rgb(0 0 0 / 0.15)" strokeWidth="1" /></>}
         {kind === 'grandpa' && <><path d="M16 29l4 6 4-6" fill="#e8e0d0" /><path d="M14 31v16M26 31v16" stroke="#5a3a20" strokeWidth="1" /></>}
         {kind === 'uncle' && <><path d="M17 29l3 4 3-4" fill="#f4f1ea" /><circle cx="20" cy="35" r="0.7" fill={INK} /></>}
-        {kind === 'student' && <><path d="M14 30q6 5 12 0" fill="none" stroke="rgb(0 0 0 / 0.25)" strokeWidth="1.4" /><path d="M18 36v5M22 36v5" stroke="#f1ead8" strokeWidth="0.9" /></>}
-        {kind === 'yukata' && <><path d="M15 29l5 9 5-9" fill="none" stroke="#f4f0e6" strokeWidth="1.6" /><path d="M10 40h20" stroke="#e8c45a" strokeWidth="3" /><circle cx="14" cy="44" r="1.2" fill="#f4f0e6" opacity="0.6" /><circle cx="25" cy="34" r="1.2" fill="#f4f0e6" opacity="0.6" /></>}
+        {kind === 'collegeStudent' && <><path d="M14 30q6 5 12 0" fill="none" stroke="rgb(0 0 0 / 0.25)" strokeWidth="1.4" /><path d="M18 36v5M22 36v5" stroke="#f1ead8" strokeWidth="0.9" /></>}
+        {kind === 'yukataLady' && <><path d="M15 29l5 9 5-9" fill="none" stroke="#f4f0e6" strokeWidth="1.6" /><path d="M10 40h20" stroke="#e8c45a" strokeWidth="3" /><circle cx="14" cy="44" r="1.2" fill="#f4f0e6" opacity="0.6" /><circle cx="25" cy="34" r="1.2" fill="#f4f0e6" opacity="0.6" /></>}
         <g className="gc-head">
-          {(kind === 'highSchoolGirl' || kind === 'officeLady' || gyaru) && (
+          {(kind === 'schoolgirl' || kind === 'officeLady' || gyaru) && (
             <path d={kind === 'officeLady' ? 'M11.5 20c0 6 1.5 8 8.5 8s8.5-2 8.5-8z' : gyaru ? 'M10.5 20c0 12 2.5 16 9.5 16s9.5-4 9.5-16z' : 'M11 20c0 10 2 13 9 13s9-3 9-13z'} fill={hair} />
           )}
           <circle cx="20" cy="20" r="8.5" fill={skin} stroke={INK} strokeWidth="1.1" />
@@ -102,14 +102,14 @@ function Person({ id, walking, eating }: { id: number; walking: boolean; eating:
             <path d="M11.6 19c0-6 4-9.5 8.4-9.5s8.4 3.5 8.4 9.5c-2-3-5-4.5-8.4-4.5s-6.4 1.5-8.4 4.5z" fill={hair} />
           )}
           {kind === 'grandma' && <circle cx="20" cy="10" r="3.4" fill={hair} stroke="#a8a8a8" strokeWidth="0.5" />}
-          {kind === 'yukata' && <><circle cx="27" cy="13" r="2.6" fill={hair} /><path d="M26 11l4-3" stroke="#c4302a" strokeWidth="1" /><circle cx="30" cy="8" r="1" fill="#e85a7a" /></>}
-          {kind === 'highSchoolGirl' && <path d="M14 12l3 2" stroke="#c4302a" strokeWidth="1.4" strokeLinecap="round" />}
+          {kind === 'yukataLady' && <><circle cx="27" cy="13" r="2.6" fill={hair} /><path d="M26 11l4-3" stroke="#c4302a" strokeWidth="1" /><circle cx="30" cy="8" r="1" fill="#e85a7a" /></>}
+          {kind === 'schoolgirl' && <path d="M14 12l3 2" stroke="#c4302a" strokeWidth="1.4" strokeLinecap="round" />}
           {/* the gyaru's heavy lashes and liner, and her glossy lips */}
           {gyaru && <path d="M15 19.6l3.6-.4M21.4 19.2l3.6.4M25 19.6l1.2-1M15 19.6l-1.2-1" stroke="#1a120e" strokeWidth="0.9" strokeLinecap="round" />}
           {/* the student's headphones: a band over the top, red cups on the ears */}
           {phones && <><path d="M11 21c0-11 18-11 18 0" fill="none" stroke="#2a2220" strokeWidth="1.6" /><rect x="9.4" y="18.5" width="3.2" height="5" rx="1.4" fill="#d0342c" stroke={INK} strokeWidth="0.6" /><rect x="27.4" y="18.5" width="3.2" height="5" rx="1.4" fill="#d0342c" stroke={INK} strokeWidth="0.6" /></>}
           {kind === 'kid' && <path d="M10.5 17c1-8 18-8 19 0zM29 17h3" fill="#f2c62a" stroke="#c49a1a" strokeWidth="0.8" />}
-          {kind === 'student' && id % 2 === 0 && <path d="M11 15c1-7 17-7 18 0zM27 15h6" fill="#2f4a6a" stroke="#2f4a6a" strokeWidth="1.6" />}
+          {kind === 'collegeStudent' && id % 2 === 0 && <path d="M11 15c1-7 17-7 18 0zM27 15h6" fill="#2f4a6a" stroke="#2f4a6a" strokeWidth="1.6" />}
           {glasses ? (
             <g fill="none" stroke="#2a1d16" strokeWidth="0.8">
               <circle cx="16.8" cy="21" r="2" /><circle cx="23.2" cy="21" r="2" /><path d="M18.8 21h2.4" />

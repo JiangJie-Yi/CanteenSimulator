@@ -1747,7 +1747,7 @@ const AT_SEAT = {
   shoe: new THREE.SphereGeometry(1, 8, 6),
 }
 /** the women's kinds, who use the women's toilet */
-const HER = new Set(['officeLady', 'highSchoolGirl', 'yukata', 'grandma', 'maid', 'gyaru'])
+const HER = new Set(['officeLady', 'schoolgirl', 'yukataLady', 'grandma', 'maidCoser', 'gyaru'])
 /** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
 const WC_RATE = 1 / 240
 const WC_STAY = 6

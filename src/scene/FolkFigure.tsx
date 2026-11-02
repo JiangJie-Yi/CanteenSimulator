@@ -30,16 +30,16 @@ type Expr = keyof typeof EXPR
 
 /** how each kind wears its hair (one picked by id) and what it has about it */
 const HAIR: Record<GuestKind, string[]> = {
-  salaryman: ['part', 'crop'], officeLady: ['bob', 'bunLow'], highSchoolGirl: ['twin', 'long', 'pony'], highSchoolBoy: ['crop', 'spiky'],
-  grandma: ['perm'], grandpa: ['bald'], kid: ['kid'], uncle: ['crop', 'bald'], student: ['crop', 'spiky'], yukata: ['bunHigh'],
-  yankee: ['pomp'], bosozoku: ['pomp', 'spiky'], tourist: ['crop', 'pony'], civilServant: ['part'], maid: ['twin', 'long'], gyaru: ['gyaru'],
+  salaryman: ['part', 'crop'], officeLady: ['bob', 'bunLow'], schoolgirl: ['twin', 'long', 'pony'], schoolboy: ['crop', 'spiky'],
+  grandma: ['perm'], grandpa: ['bald'], kid: ['kid'], uncle: ['crop', 'bald'], collegeStudent: ['crop', 'spiky'], yukataLady: ['bunHigh'],
+  delinquent: ['pomp'], bosozoku: ['pomp', 'spiky'], foreignTourist: ['crop', 'pony'], civilServant: ['part'], maidCoser: ['twin', 'long'], gyaru: ['gyaru'],
 }
 const ACC: Partial<Record<GuestKind, string[]>> = {
-  kid: ['schoolhat', 'randoseru'], uncle: ['moustache', 'towel'], grandpa: ['moustache'], grandma: ['shawl'], student: ['backpack'],
-  yukata: ['obibow', 'kanzashi'], yankee: ['collar'], highSchoolBoy: ['collar'], bosozoku: ['hachimaki'], tourist: ['sunhat', 'camera'],
-  maid: ['maidcap'], gyaru: ['hoops'],
+  kid: ['schoolhat', 'randoseru'], uncle: ['moustache', 'towel'], grandpa: ['moustache'], grandma: ['shawl'], collegeStudent: ['backpack'],
+  yukataLady: ['obibow', 'kanzashi'], delinquent: ['collar'], schoolboy: ['collar'], bosozoku: ['hachimaki'], foreignTourist: ['sunhat', 'camera'],
+  maidCoser: ['maidcap'], gyaru: ['hoops'],
 }
-const FEMALE = new Set<GuestKind>(['officeLady', 'highSchoolGirl', 'yukata', 'maid', 'gyaru'])
+const FEMALE = new Set<GuestKind>(['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'gyaru'])
 /** what's worn on the head (turns with it) */
 const ON_HEAD = new Set(['glasses', 'moustache', 'phones', 'sunhat', 'schoolhat', 'maidcap', 'hachimaki', 'hoops', 'kanzashi'])
 /** where the head turns from (the neck), in the model's frame */
@@ -108,17 +108,17 @@ export function folkSpec(id: number): FolkSpec {
   const hair = FORCE_HAIR ?? hairs[Math.floor(hash(id, 31) * hairs.length) % hairs.length]
   const acc = [...(ACC[kind] ?? [])]
   // (glasses and headphones as the old figures had them)
-  if (kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0) || (kind === 'civilServant' && id % 2 === 1)) acc.push('glasses')
-  if (kind === 'student' && hash(id, 23) < 0.34) acc.push('phones')
+  if (kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'collegeStudent' && id % 2 === 0) || (kind === 'civilServant' && id % 2 === 1)) acc.push('glasses')
+  if (kind === 'collegeStudent' && hash(id, 23) < 0.34) acc.push('phones')
   const face: FaceType = kind === 'kid' ? 'kid' : kind === 'grandma' || kind === 'grandpa' ? 'elder'
-    : FEMALE.has(kind) || (kind === 'tourist' && hair === 'pony') ? 'female' : 'male'
+    : FEMALE.has(kind) || (kind === 'foreignTourist' && hair === 'pony') ? 'female' : 'male'
   return { kind, hair, acc, face, outfit: `outfit_${kind}_${id % 2}`, size: l.size, skin: l.skin, hairColor: l.hair, top: l.top,
     briefcase: (kind === 'salaryman' && id % 2 === 0) || kind === 'civilServant' }
 }
 
 /** the pictures: every kind's clothes (two colours each) and the four faces, loaded together before any customer's drawn */
-const KINDS: GuestKind[] = ['salaryman', 'officeLady', 'highSchoolGirl', 'highSchoolBoy', 'grandma', 'grandpa', 'kid', 'uncle', 'student', 'yukata',
-  'yankee', 'bosozoku', 'tourist', 'civilServant', 'maid', 'gyaru']
+const KINDS: GuestKind[] = ['salaryman', 'officeLady', 'schoolgirl', 'schoolboy', 'grandma', 'grandpa', 'kid', 'uncle', 'collegeStudent', 'yukataLady',
+  'delinquent', 'bosozoku', 'foreignTourist', 'civilServant', 'maidCoser', 'gyaru']
 const PICTURES = [...KINDS.flatMap((k) => [`outfit_${k}_0`, `outfit_${k}_1`]), 'face_male', 'face_female', 'face_elder', 'face_kid']
 const PICTURE_URLS = PICTURES.map((n) => TEX + n + '.png')
 const prepared = new WeakSet<THREE.Texture>()

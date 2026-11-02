@@ -746,7 +746,7 @@ def outfit(kind, n):
         put(img, vee(0.22, 0.07), "#f6f4f0")
         lapels(img, "#40444c")
         buttons(img, "#d8c070", (0.55,), 0.0, 0.008)
-    elif kind == "highSchoolGirl":
+    elif kind == "schoolgirl":
         img = fill("#f4f1ea")
         put(img, V < WAIST, "#23324a")
         put(img, (V < WAIST) & (np.abs(((U / 0.035) % 1.0) - 0.5) < 0.05), "#16223a")
@@ -754,7 +754,7 @@ def outfit(kind, n):
         put(img, vee(0.2, 0.06) & (V > 0.66), "#f4f1ea")
         put(img, (np.abs(V - 0.79) < 0.008) & ~vee(0.2, 0.1), "#f4f1ea")
         put(img, (np.abs(DU) < 0.03 + (0.72 - V) * 0.25) & (V > 0.6) & (V < 0.72), ["#c8302a", "#2a4a9a"][n])
-    elif kind == "highSchoolBoy":
+    elif kind == "schoolboy":
         img = fill(["#1c1e26", "#22263a"][n])
         buttons(img, "#e0b040", (0.48, 0.58, 0.68, 0.78), 0.0, 0.011)
         put(img, V > 0.84, "#101218")
@@ -780,13 +780,13 @@ def outfit(kind, n):
         dots(img, "#2a3a2a", 0.09, 0.2, 0.005)
         buttons(img, "#f4f0e6", (0.5, 0.6, 0.7, 0.8), 0.0, 0.007)
         put(img, V < WAIST - 0.03, "#c8b48a")
-    elif kind == "student":
+    elif kind == "collegeStudent":
         img = fill(["#6d7f8c", "#8a4a3a"][n])
         check(img, "#1a1a1a", "#f0e8d0")
         put(img, vee(0.3, 0.09), "#f2f0ea")
         put(img, V < WAIST, "#3a4a6a")
         put(img, (V < WAIST) & (np.abs(((U / 0.25) % 1.0) - 0.5) < 0.004), "#c8a050")
-    elif kind == "yukata":
+    elif kind == "yukataLady":
         base = ["#3a5a8c", "#a84a6a"][n]
         img = fill(base)
         dots(img, "#f4efe6", 0.08, 0.18, 0.02, petals=5)
@@ -795,7 +795,7 @@ def outfit(kind, n):
         put(img, cross, "#f4efe6")
         put(img, (V > 0.42) & (V < 0.58), ["#e8b84a", "#e8d8a8"][n])
         put(img, np.abs(V - 0.5) < 0.008, "#c8302a")
-    elif kind == "yankee":
+    elif kind == "delinquent":
         img = fill("#15161c")
         put(img, np.abs(DU) < 0.05 + 0.02 * (V > 0.6), "#a8242a")
         put(img, (np.abs(np.abs(DU) - 0.05) < 0.006), "#e0b040")
@@ -810,7 +810,7 @@ def outfit(kind, n):
             put(img, (np.abs(DU - 0.14) < 0.006) & (np.abs(V - (0.76 - k * 0.07)) < 0.03), ink)
         put(img, (np.abs(DU) < 0.004), "#000000", 0.3)
         put(img, V > 0.84, coat)
-    elif kind == "tourist":
+    elif kind == "foreignTourist":
         img = fill(["#e8d24a", "#4aa8d8"][n])
         if n == 1:
             dots(img, "#f4f0e0", 0.09, 0.2, 0.02, petals=5)
@@ -825,7 +825,7 @@ def outfit(kind, n):
         lapels(img, "#30343a")
         put(img, (np.abs(DU + 0.12) < 0.025) & (np.abs(V - 0.7) < 0.03), "#f6f4ee")
         put(img, (np.abs(DU + 0.12) < 0.02) & (np.abs(V - 0.715) < 0.006), "#3a5a9a")
-    elif kind == "maid":
+    elif kind == "maidCoser":
         img = fill("#1c1c24")
         apron = ((np.abs(DU) < 0.16) & (V < WAIST + 0.02)) | ((np.abs(DU) < 0.075) & (V >= WAIST) & (V < 0.72))
         put(img, apron, "#f8f6f2")
@@ -845,8 +845,8 @@ def outfit(kind, n):
     return img
 
 
-KINDS = ["salaryman", "officeLady", "highSchoolGirl", "highSchoolBoy", "grandma", "grandpa", "kid", "uncle", "student", "yukata", "yankee",
-         "bosozoku", "tourist", "civilServant", "maid", "gyaru"]
+KINDS = ["salaryman", "officeLady", "schoolgirl", "schoolboy", "grandma", "grandpa", "kid", "uncle", "collegeStudent", "yukataLady", "delinquent",
+         "bosozoku", "foreignTourist", "civilServant", "maidCoser", "gyaru"]
 for kind in KINDS:
     for n in (0, 1):
         write_png(os.path.join(TEX_DIR, f"outfit_{kind}_{n}.png"), outfit(kind, n))

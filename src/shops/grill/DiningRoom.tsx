@@ -1934,66 +1934,79 @@ function crest(g: CanvasRenderingContext2D, kind: 'ume' | 'sakura', x: number, y
   }
   g.restore()
 }
+/** the noren over each toilet's door (the owner's: longer, and close fitting: as wide as the doorway, the posts' inner faces just covered,
+ * its top up over the head where it hangs from its rod, no gap showing the shoji above it): across both its panels, and down */
+const WC_NOREN_W = 0.85, WC_NOREN_L = 0.6
 /**
- * The short noren over each toilet's door (the owner's: some pattern on them, cut in half down the middle): navy for the men's with a white
+ * The noren over each toilet's door (the owner's: some pattern on them, cut in half down the middle): navy for the men's with a white
  * 梅鉢 across its middle, deep red for the women's with a white 桜, the slit between its two panels cutting the crest in half; a darker band
  * along its top where it's sewn over its rod, the crest small and tone on tone scattered over the rest, a white line along its hem, the
- * cotton's weave. One picture over both panels (each panel shows its half: ToiletDoor's noren).
+ * cotton's weave. One picture over both panels (each panel shows its half: ToiletDoor's noren), at the noren's own shape (a pixel as tall as
+ * it's wide, the crest round).
  */
-const wcNoren = (who: 'm' | 'f') => canvasTex(1024, 484, (g) => {
-  const cloth = who === 'm' ? '#22335f' : '#8e2329'
-  const kind = who === 'm' ? 'ume' : 'sakura'
-  g.save()
-  g.fillStyle = cloth; g.fillRect(0, 0, 1024, 484)
-  // (the weave: fine threads either way)
-  g.globalAlpha = 0.06
-  g.fillStyle = '#ffffff'
-  for (let x = 0; x < 1024; x += 3) g.fillRect(x, 0, 1, 484)
-  g.fillStyle = '#000000'
-  for (let y = 0; y < 484; y += 3) g.fillRect(0, y, 1024, 1)
-  g.globalAlpha = 1
-  // (the small crests, tone on tone, clear of the big one)
-  for (let r = 0, y = 92; y < 470; r++, y += 78) for (let x = (r % 2) * 56 + 40; x < 1024; x += 112) {
-    if (Math.hypot(x - 512, y - 252) < 210) continue
-    crest(g, kind, x, y, 22, 'rgba(255,255,255,0.1)', 'rgba(0,0,0,0)')
-  }
-  // (the band along its top, sewn over the rod)
-  g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(0, 0, 1024, 44)
-  g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(0, 44, 1024, 3)
-  // (the big crest across the middle, white, in a fine white ring)
-  crest(g, kind, 512, 252, 148, '#f4efe4', cloth)
-  g.strokeStyle = '#f4efe4'; g.lineWidth = 6
-  g.beginPath(); g.arc(512, 252, 178, 0, Math.PI * 2); g.stroke()
-  // (a white line along the hem)
-  g.fillStyle = '#f4efe4'; g.fillRect(0, 456, 1024, 5)
-  g.restore()
-})
+const wcNoren = (who: 'm' | 'f') => {
+  const PX = 1024 / WC_NOREN_W, H = Math.round(WC_NOREN_L * PX)
+  return canvasTex(1024, H, (g) => {
+    const cloth = who === 'm' ? '#22335f' : '#8e2329'
+    const kind = who === 'm' ? 'ume' : 'sakura'
+    const band = Math.round(0.034 * PX), cy = Math.round(band + (H - band) * 0.47)
+    g.save()
+    g.fillStyle = cloth; g.fillRect(0, 0, 1024, H)
+    // (the weave: fine threads either way)
+    g.globalAlpha = 0.06
+    g.fillStyle = '#ffffff'
+    for (let x = 0; x < 1024; x += 3) g.fillRect(x, 0, 1, H)
+    g.fillStyle = '#000000'
+    for (let y = 0; y < H; y += 3) g.fillRect(0, y, 1024, 1)
+    g.globalAlpha = 1
+    // (the small crests, tone on tone, clear of the big one)
+    for (let r = 0, y = band + 50; y < H - 20; r++, y += 78) for (let x = (r % 2) * 56 + 40; x < 1024; x += 112) {
+      if (Math.hypot(x - 512, y - cy) < 250) continue
+      crest(g, kind, x, y, 22, 'rgba(255,255,255,0.1)', 'rgba(0,0,0,0)')
+    }
+    // (the band along its top, sewn over the rod)
+    g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(0, 0, 1024, band)
+    g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(0, band, 1024, 3)
+    // (the big crest across the middle, white, in a fine white ring)
+    crest(g, kind, 512, cy, 178, '#f4efe4', cloth)
+    g.strokeStyle = '#f4efe4'; g.lineWidth = 7
+    g.beginPath(); g.arc(512, cy, 214, 0, Math.PI * 2); g.stroke()
+    // (a white line along the hem)
+    g.fillStyle = '#f4efe4'; g.fillRect(0, H - Math.round(0.022 * PX), 1024, 5)
+    g.restore()
+  })
+}
 const WC_NOREN = { m: wcNoren('m'), f: wcNoren('f') }
 /**
  * The long noren hung across the way round to the toilet (the owner's: in through the door the washstand first, the toilet round the
  * corner), down to below the waist: linen dyed from pale at its top down into the room's colour (ぼかし), a dark band along its top over the
  * rod, the room's crest small and white near its foot, cut in half by the slit between its two panels; the linen's weave.
  */
-const wcStallNoren = (who: 'm' | 'f') => canvasTex(512, 1024, (g) => {
-  const deep = who === 'm' ? '#22335f' : '#8e2329'
-  const pale = who === 'm' ? '#e8ebf0' : '#f6e8e6'
-  g.save()
-  const gr = g.createLinearGradient(0, 0, 0, 1024)
-  gr.addColorStop(0, pale); gr.addColorStop(0.4, pale); gr.addColorStop(0.8, deep); gr.addColorStop(1, deep)
-  g.fillStyle = gr; g.fillRect(0, 0, 512, 1024)
-  g.globalAlpha = 0.07
-  g.fillStyle = '#ffffff'
-  for (let x = 0; x < 512; x += 3) g.fillRect(x, 0, 1, 1024)
-  g.fillStyle = '#000000'
-  for (let y = 0; y < 1024; y += 3) g.fillRect(0, y, 512, 1)
-  g.globalAlpha = 1
-  g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, 512, 40)
-  crest(g, who === 'm' ? 'ume' : 'sakura', 256, 862, 64, '#f4efe4', deep)
-  g.strokeStyle = '#f4efe4'; g.lineWidth = 4
-  g.beginPath(); g.arc(256, 862, 80, 0, Math.PI * 2); g.stroke()
-  g.fillStyle = '#f4efe4'; g.fillRect(0, 1004, 512, 4)
-  g.restore()
-})
+/** the long noren inside: down to the waist (the owner's: shorter; it hung to the knee), and the opening it hangs across */
+const WC_STALL_L = 0.9, WC_STALL_W = WC_ROOM.D - WC_ROOM.X0 - 0.06
+const wcStallNoren = (who: 'm' | 'f') => {
+  const H = Math.round(512 * WC_STALL_L / WC_STALL_W)
+  return canvasTex(512, H, (g) => {
+    const deep = who === 'm' ? '#22335f' : '#8e2329'
+    const pale = who === 'm' ? '#e8ebf0' : '#f6e8e6'
+    g.save()
+    const gr = g.createLinearGradient(0, 0, 0, H)
+    gr.addColorStop(0, pale); gr.addColorStop(0.3, pale); gr.addColorStop(0.78, deep); gr.addColorStop(1, deep)
+    g.fillStyle = gr; g.fillRect(0, 0, 512, H)
+    g.globalAlpha = 0.07
+    g.fillStyle = '#ffffff'
+    for (let x = 0; x < 512; x += 3) g.fillRect(x, 0, 1, H)
+    g.fillStyle = '#000000'
+    for (let y = 0; y < H; y += 3) g.fillRect(0, y, 512, 1)
+    g.globalAlpha = 1
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, 512, 40)
+    crest(g, who === 'm' ? 'ume' : 'sakura', 256, H - 152, 64, '#f4efe4', deep)
+    g.strokeStyle = '#f4efe4'; g.lineWidth = 4
+    g.beginPath(); g.arc(256, H - 152, 80, 0, Math.PI * 2); g.stroke()
+    g.fillStyle = '#f4efe4'; g.fillRect(0, H - 20, 512, 4)
+    g.restore()
+  })
+}
 const WC_STALL_NOREN = { m: wcStallNoren('m'), f: wcStallNoren('f') }
 
 /**
@@ -2159,7 +2172,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
   // (the toilet's room: from X0 back to the back wall, from the washroom's side E on along the wall)
   const SW = D - X0, SX = (X0 + D) / 2, SZ = s * (w / 2 + E / 2)
   // (the long noren across the way into it: two panels, each its half of the one picture, a slit between)
-  const OP = SW - 0.06, NL = h - 0.55
+  const OP = WC_STALL_W, NL = WC_STALL_L
   const noren = useMemo(() => [-1, 1].map((sd) => {
     const pw = (OP - 0.02) / 2
     const g = new THREE.PlaneGeometry(pw, NL)
@@ -2731,6 +2744,9 @@ function ToiletHit({ who }: { who: 'm' | 'f' }) {
       </mesh>
   )
 }
+/** the door noren's place: its cloth's plane (in front of the panel slid out onto its track, its face at -0.109), its top (up over the
+ * head, WC_H to WC_H + 0.07), its rod's height (in front of the head's middle) and the slit between its panels */
+const NOREN_X = -0.118, NOREN_TOP = WC_H + 0.08, NOREN_ROD_Y = WC_H + 0.05, NOREN_SLIT = 0.008
 function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   const W = WC_W, H = WC_H
   const door = useWcDoor()
@@ -2738,13 +2754,13 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   const lang = useDocLang()
   // (the noren's two panels, each showing its half of the one picture: the slit between them cuts the crest in half)
   const noren = useMemo(() => [-1, 1].map((sd) => {
-    const w = W / 2.2, span = 2 * (W / 4.2) + w
-    const geo = new THREE.PlaneGeometry(w, 0.36)
-    const u0 = (sd * W / 4.2 - w / 2 + span / 2) / span, u1 = u0 + w / span
+    const w = (WC_NOREN_W - NOREN_SLIT) / 2
+    const geo = new THREE.PlaneGeometry(w, WC_NOREN_L)
+    const u0 = sd < 0 ? 0 : 1 - w / WC_NOREN_W, u1 = u0 + w / WC_NOREN_W
     const uv = geo.attributes.uv as THREE.BufferAttribute
     for (let k = 0; k < uv.count; k++) uv.setX(k, u0 + uv.getX(k) * (u1 - u0))
-    return { sd, geo }
-  }), [W])
+    return { sd, geo, z: sd * (NOREN_SLIT + w) / 2 }
+  }), [])
   useEffect(() => () => noren.forEach((n) => n.geo.dispose()), [noren])
   return (
     <group>
@@ -2752,13 +2768,26 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
       <primitive object={frame} />
       {/* (the sliding panel: ToiletPanel, not merged) and the little room behind it */}
       <WcRoom w={W} h={H} who={who} />
-      {/* the short noren, and the plaque over it */}
-      {noren.map(({ sd, geo }) => (
-        <mesh key={sd} geometry={geo} position={[-0.125, H - 0.2, sd * W / 4.2]} rotation-y={-Math.PI / 2}>
+      {/* the noren, hung from its rod in front of the head: the rod on two little brackets off the head's face, just above the panel's
+          way out onto its track (the panel slides out under it, and behind the cloth); the cloth just in front of the rod, its top band over
+          it, up over the head (from the room seen from above, nothing of the shoji shows over it: the owner's) */}
+      <mesh position={[NOREN_X + 0.008, NOREN_ROD_Y, 0]} rotation-x={Math.PI / 2}>
+        <cylinderGeometry args={[0.006, 0.006, WC_NOREN_W + 0.05, 8]} />
+        <meshToonMaterial color="#3a2416" />
+      </mesh>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[(NOREN_X + 0.008 - 0.07) / 2, NOREN_ROD_Y, sd * (WC_NOREN_W / 2 - 0.02)]}>
+          <boxGeometry args={[-(NOREN_X + 0.008) - 0.07 + 0.002, 0.022, 0.014]} />
+          <meshToonMaterial color="#3a2416" />
+        </mesh>
+      ))}
+      {noren.map(({ sd, geo, z }) => (
+        <mesh key={sd} geometry={geo} position={[NOREN_X, NOREN_TOP - WC_NOREN_L / 2, z]} rotation-y={-Math.PI / 2}>
           <meshToonMaterial color="#ffffff" map={WC_NOREN[who]} side={THREE.DoubleSide} />
         </mesh>
       ))}
-      <mesh position={[-0.075, H + 0.16, 0]} rotation-y={-Math.PI / 2}>
+      {/* the plaque over it, up on the wall clear of the noren's top */}
+      <mesh position={[-0.075, NOREN_TOP + 0.13, 0]} rotation-y={-Math.PI / 2}>
         <planeGeometry args={[0.4, 0.24]} />
         <meshToonMaterial color="#ffffff" map={wcSign(who, lang)} />
       </mesh>

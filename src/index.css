@@ -6992,6 +6992,7 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 .char-view-tools { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 10px 8px; border-bottom: 1px solid #1c1c1c; }
 .char-view-tools button, .char-view-group button {
   padding: 3px 9px; border: 1px solid #1f1f1f; border-radius: 4px; background: #474747; color: #e2e2e2; font: inherit; font-size: 12px; cursor: pointer;
+  white-space: nowrap;
 }
 .char-view-tools button:hover, .char-view-group button:hover { background: #555; }
 .char-view-tools button.is-on, .char-view-group button.is-on { background: #e8a33d; border-color: #b97c24; color: #1d1d1d; }

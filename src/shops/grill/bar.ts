@@ -445,7 +445,7 @@ export const drinkFor = (kind: string, id: number): DrinkId => {
   const of = (l: DrinkId[]) => l[id % l.length]
   if (kind === 'kid') return of(['ramune', 'yakult', 'cola'])
   if (kind === 'grandma' || kind === 'grandpa') return of(['oolong', 'greenTea', 'yakult', 'sake'])
-  if (kind === 'highSchoolGirl' || kind === 'highSchoolBoy') return of(['cola', 'ramune', 'greenTea', 'coffee', 'yakult'])
+  if (kind === 'schoolgirl' || kind === 'schoolboy') return of(['cola', 'ramune', 'greenTea', 'coffee', 'yakult'])
   if (kind === 'salaryman' || kind === 'civilServant') return of(['beerCan', 'coffee', 'highball', 'beer'])
   if (kind === 'uncle') return of(['beer', 'sake', 'highball', 'beerCan'])
   return of(['beer', 'highball', 'sake', 'beerCan', 'oolong', 'coffee', 'cola'])

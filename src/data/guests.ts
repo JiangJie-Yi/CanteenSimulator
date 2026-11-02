@@ -2,27 +2,37 @@
 // "the old lady"), not by a number. Each guest's id picks one of these, and the drawing follows it.
 import type { Lang } from './i18n'
 
-export type GuestKind = 'salaryman' | 'officeLady' | 'highSchoolGirl' | 'highSchoolBoy' | 'grandma' | 'grandpa' | 'kid'
-  | 'uncle' | 'student' | 'yukata' | 'yankee' | 'bosozoku' | 'tourist' | 'civilServant' | 'maid' | 'gyaru'
+// (their keys nouns of a kind, as the owner set them out: the high schoolers schoolgirl and schoolboy, the university student collegeStudent,
+// the lady in yukata yukataLady, the delinquent (once yankee), the foreign tourist, the maid cosplayer)
+export type GuestKind =
+  | 'salaryman' | 'schoolgirl' | 'grandma' | 'uncle' | 'kid'
+  | 'officeLady' | 'collegeStudent' | 'grandpa' | 'yukataLady' | 'schoolboy'
+  | 'delinquent' | 'bosozoku' | 'foreignTourist' | 'civilServant' | 'maidCoser' | 'gyaru'
 
-/** who they are, and how often they come in (the weights against each other: the rough lot only now and then) */
+/** who they are, and how often they come in (the weights against each other: the rough lot only now and then), grouped as the owner set
+ * them out */
 export const KINDS: { kind: GuestKind; zh: string; ja: string; en: string; weight: number }[] = [
+  // (the working public)
   { kind: 'salaryman', zh: '上班族', ja: 'サラリーマン', en: 'Salaryman', weight: 10 },
-  { kind: 'highSchoolGirl', zh: '女高中生', ja: '女子高生', en: 'Schoolgirl', weight: 10 },
-  { kind: 'grandma', zh: '老奶奶', ja: 'おばあちゃん', en: 'Grandma', weight: 10 },
-  { kind: 'uncle', zh: '中年大叔', ja: 'おじさん', en: 'Uncle', weight: 10 },
-  { kind: 'kid', zh: '小學生', ja: '小学生', en: 'Kid', weight: 10 },
-  { kind: 'officeLady', zh: 'OL 小姐', ja: 'OLさん', en: 'Office lady', weight: 10 },
-  { kind: 'student', zh: '大學生', ja: '大学生', en: 'Student', weight: 10 },
-  { kind: 'grandpa', zh: '老爺爺', ja: 'おじいちゃん', en: 'Grandpa', weight: 10 },
-  { kind: 'yukata', zh: '浴衣姐姐', ja: '浴衣のお姉さん', en: 'Lady in yukata', weight: 10 },
-  { kind: 'highSchoolBoy', zh: '男高中生', ja: '男子高生', en: 'Schoolboy', weight: 10 },
-  { kind: 'yankee', zh: '不良少年', ja: 'ヤンキー', en: 'Delinquent', weight: 5 },
-  { kind: 'bosozoku', zh: '暴走族', ja: '暴走族', en: 'Biker', weight: 3 },
-  { kind: 'tourist', zh: '外國觀光客', ja: '外国人観光客', en: 'Tourist', weight: 6 },
-  { kind: 'civilServant', zh: '公務員', ja: '公務員', en: 'Civil servant', weight: 7 },
-  { kind: 'maid', zh: '女僕 Coser', ja: 'メイドさん', en: 'Maid cosplayer', weight: 3 },
-  { kind: 'gyaru', zh: '辣妹', ja: 'ギャル', en: 'Gyaru', weight: 7 },
+  { kind: 'officeLady', zh: 'OL 小姐', ja: 'OLさん', en: 'Office Lady', weight: 10 },
+  { kind: 'civilServant', zh: '公務員', ja: '公務員', en: 'Civil Servant', weight: 7 },
+  // (students)
+  { kind: 'schoolboy', zh: '男高中生', ja: '男子高生', en: 'High School Boy', weight: 10 },
+  { kind: 'schoolgirl', zh: '女高中生', ja: '女子高生', en: 'High School Girl', weight: 10 },
+  { kind: 'collegeStudent', zh: '大學生', ja: '大学生', en: 'University Student', weight: 10 },
+  { kind: 'kid', zh: '小學生', ja: '小学生', en: 'Elementary Student', weight: 10 },
+  // (the neighbourhood, the elderly)
+  { kind: 'uncle', zh: '中年大叔', ja: 'おじさん', en: 'Middle-aged Regular', weight: 10 },
+  { kind: 'grandpa', zh: '老爺爺', ja: 'おじいちゃん', en: 'Elderly Gentleman', weight: 10 },
+  { kind: 'grandma', zh: '老奶奶', ja: 'おばあちゃん', en: 'Elderly Lady', weight: 10 },
+  // (a style of their own)
+  { kind: 'yukataLady', zh: '大和撫子', ja: 'やまとなでしこ', en: 'Lady in Yukata', weight: 10 },
+  { kind: 'foreignTourist', zh: '外國觀光客', ja: '外国人観光客', en: 'Foreign Tourist', weight: 6 },
+  { kind: 'gyaru', zh: '澀谷辣妹', ja: 'ギャル', en: 'Gyaru', weight: 7 },
+  { kind: 'maidCoser', zh: '次元少女', ja: 'メイドさん', en: 'Maid Cosplayer', weight: 3 },
+  // (the night's regulars, the rough lot)
+  { kind: 'delinquent', zh: '不良少年', ja: 'ヤンキー', en: 'Delinquent', weight: 5 },
+  { kind: 'bosozoku', zh: '暴走族', ja: '暴走族', en: 'Biker Gang', weight: 3 },
 ]
 
 const TOTAL = KINDS.reduce((n, k) => n + k.weight, 0)

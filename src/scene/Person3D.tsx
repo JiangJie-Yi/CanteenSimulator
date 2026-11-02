@@ -24,6 +24,9 @@ import { cloth, type Pattern } from './patterns'
  */
 
 const URL = import.meta.env.BASE_URL + 'models/guests.glb'
+/** the kinds renamed since guests.glb was made (the owner's names now), and what its parts are still named for */
+const MODEL_KIND: Partial<Record<string, string>> = { schoolgirl: 'highSchoolGirl', schoolboy: 'highSchoolBoy', collegeStudent: 'student',
+  yukataLady: 'yukata', delinquent: 'yankee', foreignTourist: 'tourist', maidCoser: 'maid' }
 /** the old figures wanted (?guests=old): the customers are scene/FolkFigure's otherwise, and these never drawn */
 export const OLD_GUESTS = typeof location !== 'undefined' && new URLSearchParams(location.search).get('guests') === 'old'
 const INK = new THREE.Color('#3b2a20')
@@ -42,28 +45,28 @@ export function lookOf(id: number, kind: Kind): Look {
   if (kind === 'chef' || kind === 'staffM' || kind === 'staffF') return CHEF_LOOK
   const old = kind === 'grandma' || kind === 'grandpa'
   const top: Record<GuestKind, string> = {
-    salaryman: '#2b3444', officeLady: '#6a6f78', highSchoolGirl: '#f4f1ea', highSchoolBoy: '#1c1e26', grandma: '#c9b48a',
+    salaryman: '#2b3444', officeLady: '#6a6f78', schoolgirl: '#f4f1ea', schoolboy: '#1c1e26', grandma: '#c9b48a',
     grandpa: '#7a5a3a', kid: pick(['#e85a4a', '#4a8ad8', '#f0c040'], id), uncle: pick(['#4a7a5a', '#a8432f', '#3d6a9a'], id),
-    student: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukata: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
-    yankee: pick(['#15161c', '#1c2440'], id), bosozoku: pick(['#f2efe8', '#4a2a5e', '#1a1a20'], id),
-    tourist: pick(['#e8d24a', '#4aa8d8', '#e86a4a', '#f2f0ea'], id), civilServant: pick(['#4a4e56', '#3a4250'], id), maid: '#1c1c24',
+    collegeStudent: pick(['#6d7f8c', '#8a4a3a', '#4a6a4a'], id), yukataLady: pick(['#3a5a8c', '#a84a6a', '#5a7a5a'], id),
+    delinquent: pick(['#15161c', '#1c2440'], id), bosozoku: pick(['#f2efe8', '#4a2a5e', '#1a1a20'], id),
+    foreignTourist: pick(['#e8d24a', '#4aa8d8', '#e86a4a', '#f2f0ea'], id), civilServant: pick(['#4a4e56', '#3a4250'], id), maidCoser: '#1c1c24',
     gyaru: pick(['#f06aa0', '#f2f0ea', '#1c1c22', '#f2c62a'], id),
   }
   return {
     top: top[kind],
-    legs: kind === 'highSchoolGirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a'
-      : kind === 'student' ? '#3a4a6a' : kind === 'grandma' ? '#5a4a3e' : kind === 'yukata' || kind === 'bosozoku' ? top[kind]
-        : kind === 'yankee' ? '#15161c' : kind === 'tourist' ? '#a8946a' : kind === 'civilServant' ? top[kind] : kind === 'maid' ? '#1c1c24' : kind === 'gyaru' ? pick(['#2a2a32', '#3a5a8a', '#c43a6a'], id + 1) : '#2f2f36',
+    legs: kind === 'schoolgirl' ? '#23324a' : kind === 'officeLady' ? '#4a4f58' : kind === 'kid' ? '#2a4a7a'
+      : kind === 'collegeStudent' ? '#3a4a6a' : kind === 'grandma' ? '#5a4a3e' : kind === 'yukataLady' || kind === 'bosozoku' ? top[kind]
+        : kind === 'delinquent' ? '#15161c' : kind === 'foreignTourist' ? '#a8946a' : kind === 'civilServant' ? top[kind] : kind === 'maidCoser' ? '#1c1c24' : kind === 'gyaru' ? pick(['#2a2a32', '#3a5a8a', '#c43a6a'], id + 1) : '#2f2f36',
     // (the rough lot bleach it, or dye it red-brown, as often as not)
-    hair: kind === 'gyaru' ? pick(['#f0d090', '#e8b860', '#c8884a', '#f2e2b8'], id) : kind === 'tourist' ? pick(['#e8cc80', '#b07a40', '#c0602a', '#2b1d14'], id) : kind === 'maid' ? pick(['#e88ab0', '#1c1c22', '#8a5a3a', '#e8cc80', '#a8c8e8'], id)
-      : old ? '#d4d4d4' : kind === 'yankee' || kind === 'bosozoku' ? pick(['#e2b85a', '#1c1c22', '#a8542a'], id) : pick(HAIR, id * 3),
+    hair: kind === 'gyaru' ? pick(['#f0d090', '#e8b860', '#c8884a', '#f2e2b8'], id) : kind === 'foreignTourist' ? pick(['#e8cc80', '#b07a40', '#c0602a', '#2b1d14'], id) : kind === 'maidCoser' ? pick(['#e88ab0', '#1c1c22', '#8a5a3a', '#e8cc80', '#a8c8e8'], id)
+      : old ? '#d4d4d4' : kind === 'delinquent' || kind === 'bosozoku' ? pick(['#e2b85a', '#1c1c22', '#a8542a'], id) : pick(HAIR, id * 3),
     // (a visitor from abroad as like as not fairer, or darker, than anyone local)
-    skin: kind === 'gyaru' ? pick(['#c99470', '#b8805a', '#d8a880'], id) : kind === 'tourist' ? pick(['#f8e2d0', '#f6d8c4', '#8a5a3a', '#c99470'], id) : pick(SKIN, id * 7 + 1),
-    shoes: kind === 'maid' ? '#1a1a1a' : kind === 'gyaru' ? '#f2f0ea' : kind === 'student' || kind === 'kid' || kind === 'tourist' ? '#f2f0ea' : kind === 'yukata' ? '#b08a5a' : '#2a2220',
+    skin: kind === 'gyaru' ? pick(['#c99470', '#b8805a', '#d8a880'], id) : kind === 'foreignTourist' ? pick(['#f8e2d0', '#f6d8c4', '#8a5a3a', '#c99470'], id) : pick(SKIN, id * 7 + 1),
+    shoes: kind === 'maidCoser' ? '#1a1a1a' : kind === 'gyaru' ? '#f2f0ea' : kind === 'collegeStudent' || kind === 'kid' || kind === 'foreignTourist' ? '#f2f0ea' : kind === 'yukataLady' ? '#b08a5a' : '#2a2220',
     size: kind === 'kid' ? 0.78 : kind === 'grandma' ? 0.93 : 1,
     topCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', grandma: 'floret', grandpa: 'knit', kid: 'border', uncle: 'hibiscus',
-      student: 'plaid', yukata: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
-    legCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', yukata: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
+      collegeStudent: 'plaid', yukataLady: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
+    legCloth: ({ salaryman: 'pinstripe', officeLady: 'glen', yukataLady: 'asanoha' } as Partial<Record<GuestKind, Pattern>>)[kind],
   }
 }
 
@@ -213,9 +216,11 @@ function useRigged(id: number, kind: Kind, glasses: boolean, phones: boolean,
     // (clone only this kind's figure: the others' parts are lifted off the source for the moment of the copy, and
     // put back. A copy of all eighteen kinds would be thrown mostly away at once, at every customer that came in)
     const others: [THREE.Object3D, THREE.Object3D][] = []
+    // (its parts by the name it had when blender/guests.py made it: the kinds renamed since are found under their old names)
+    const prefix = MODEL_KIND[kind] ?? kind
     gltf.scene.traverse((o) => {
       const p = o.parent
-      if (p && (p.name === 'Rig' || p.name === 'Guests') && !(o instanceof THREE.Bone) && o.name !== 'Rig' && !o.name.startsWith(kind)
+      if (p && (p.name === 'Rig' || p.name === 'Guests') && !(o instanceof THREE.Bone) && o.name !== 'Rig' && !o.name.startsWith(prefix)
         && (o instanceof THREE.Mesh || o.children.some((c) => c instanceof THREE.Mesh))) others.push([o, p])
     })
     for (const [o] of others) o.removeFromParent()
@@ -224,7 +229,7 @@ function useRigged(id: number, kind: Kind, glasses: boolean, phones: boolean,
     // (three drops the dots from glTF names: "salaryman.body" is "salarymanbody")
     const partOf = (o: THREE.Object3D): string | null => {
       for (let p: THREE.Object3D | null = o; p; p = p.parent) {
-        if (p.name.startsWith(kind)) return p.name.slice(kind.length)
+        if (p.name.startsWith(prefix)) return p.name.slice(prefix.length)
         if (p.name === 'Rig' || p.name === 'Guests') return null
       }
       return null
@@ -412,10 +417,10 @@ export function Person({ id, eating, walking, still, t: tGiven, clock, talk = 0,
   held?: React.ReactNode }) {
   const kind = kindOf(id).kind
   const l = lookOf(id, kind)
-  const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'student' && id % 2 === 0)
+  const glasses = kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'collegeStudent' && id % 2 === 0)
     || (kind === 'civilServant' && id % 2 === 1)
   // (a third of the students come in with their big headphones on)
-  const phones = kind === 'student' && hash(id, 23) < 0.34
+  const phones = kind === 'collegeStudent' && hash(id, 23) < 0.34
   const r = useRigged(id, kind, glasses, phones)
   const playing = useRef<string | null>(null)
   const last = useRef<number | null>(null)

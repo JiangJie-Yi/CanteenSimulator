@@ -25,8 +25,8 @@ const NET_SPOTS = 3
 const SIPS = 3
 const SOUP_TASTE = 78
 const DABS = ['salt', 'soy', 'milk', 'peanut', 'miso', 'wasabi', 'shichimi', 'yuzu', 'lemon'] as const
-const COUPLE_HIM = new Set<GuestKind>(['salaryman', 'student', 'highSchoolBoy', 'yankee', 'tourist'])
-const COUPLE_HER = new Set<GuestKind>(['officeLady', 'highSchoolGirl', 'yukata', 'maid', 'student', 'gyaru'])
+const COUPLE_HIM = new Set<GuestKind>(['salaryman', 'collegeStudent', 'schoolboy', 'delinquent', 'foreignTourist'])
+const COUPLE_HER = new Set<GuestKind>(['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'collegeStudent', 'gyaru'])
 const roastRate = (fire: number) => 0.25 + 1.75 * fire
 const stageOf = (r: number) => ROAST_STAGES.find((s) => r < s.until)!
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x))
