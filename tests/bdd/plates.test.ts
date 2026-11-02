@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { CARRY, DRYER_CAP, DRY_S, PASS_CAP, PASS_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
   putBack, unload, washNow, washOne, type Dryer } from '@/game/plates'
-import { kitchenPath, type Rect } from '@/game/kitchenPath'
+import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 
 const idle: Dryer = { n: 0, left: null }
 
@@ -125,6 +125,15 @@ feature('服務生在廚房裡走去碗盤櫃，繞開擺設', () => {
     then('找得到路，起點不變', (w) => { expect(w.p).not.toBeNull(); expect(w.p[0]).toEqual([2.05, 2]) })
     and('第一步往最近的邊走出去（往左）', (w) => { expect(w.p[1][0]).toBeLessThan(2) })
     and('走出來之後，每一段都不穿過灶台', (w) => { expect(crosses(w.p.slice(1), w.table)).toBe(false) })
+  })
+
+  scenario('待命的位置落在擺設上（例如飯桶旁的味噌湯鍋），就站到旁邊最近的空處', ({ given, when, then, and }) => {
+    given('一個湯鍋（含旁邊留的走道寬度）', (w) => { w.pot = { x0: 3, z0: 1, x1: 3.6, z1: 1.6 } })
+    when('外場的待命點在湯鍋靠右的地方', (w) => { w.at = standClear([3.5, 1.3], [w.pot]) })
+    then('移到湯鍋外面', (w) => { expect(w.at[0] >= w.pot.x1 || w.at[0] <= w.pot.x0 || w.at[1] >= w.pot.z1 || w.at[1] <= w.pot.z0).toBe(true) })
+    and('往最近的那一邊（右邊）移，只移一點點', (w) => { expect(w.at[0]).toBeGreaterThan(3.6); expect(w.at[0]).toBeLessThan(3.7); expect(w.at[1]).toBe(1.3) })
+    when('待命點本來就在空處', (w) => { w.at = standClear([1, 1], [w.pot]) })
+    then('不動', (w) => { expect(w.at).toEqual([1, 1]) })
   })
 
   scenario('完全被擋住時沒有路', ({ when, then }) => {

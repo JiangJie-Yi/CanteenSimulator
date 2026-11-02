@@ -30,6 +30,11 @@ function stepOut(p: P, blocks: Rect[], cell: number): P {
   return q
 }
 
+/** a place to stand (a server's, waiting by their gate) clear of what's on the floor: where it is, or (standing in a block, the room round it
+ * included) just past the block's nearest edge. A server's place inside their gate was on the miso pot by the rice tub, once it was put
+ * back there (the owner saw her standing in it) */
+export const standClear = (p: P, blocks: Rect[], cell = 0.1): P => stepOut(p, blocks, cell)
+
 /**
  * The way from `from` to `to` inside `room`, round the `blocks` (each already grown by how much room a person walking by needs): the
  * corners along it, from and to included; the straight line if nothing's in the way; null if there's no way at all. (`from` and `to`

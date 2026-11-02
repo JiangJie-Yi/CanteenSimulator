@@ -46,7 +46,7 @@ import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { takeOut, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, PASS_CAP, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring, putBack, RACK_FULL, unload, washOne } from '@/game/plates'
-import { kitchenPath, type Rect } from '@/game/kitchenPath'
+import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
@@ -2049,9 +2049,26 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const ownerServes = !!given && servers.length === 0 && homes.length > 0
   const ownerHome = useRef<(typeof homes)[number] | null>(null)
   const ownerAt = () => OWNER_SPOT.clone().add(FIRE_SHIFT).sub(offset ?? new THREE.Vector3()).divideScalar(scale).setY(0)
+  // (a server's place stood clear of what's on the kitchen's floor, as it is today (the miso pot by the rice tub was on one, the owner saw her
+  // standing in it); worked out once the floor's been looked at, and again the next day)
+  const clearHomes = useRef(new Map<number, (typeof homes)[number]>())
+  const clearHome = (wi: number) => {
+    const h = homes[wi]
+    if (!h) return h
+    const kept = clearHomes.current.get(wi)
+    if (kept) return kept
+    const blocks = kitchenBlocks()
+    if (!blocks.length) return h
+    const [a, l] = standClear(flat(h.at), blocks)
+    const c0 = counters[0]
+    const at = c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(h.at.y)
+    const made = { ...h, at, way: [at, ...h.way.slice(1)] }
+    clearHomes.current.set(wi, made)
+    return made
+  }
   // (his way out found only once he first goes, the kitchen's floor and what's on it in the scene by then)
   const homeOf = (wi: number) => {
-    if (!ownerServes) return homes[wi]
+    if (!ownerServes) return clearHome(wi)
     if (!ownerHome.current) {
       const at = ownerAt()
       const g = homes[0]
@@ -2263,18 +2280,26 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __dirty: dirty, __barFrame: frame, __passAt: pass.at, __passOut: pass.out, __platerRun: platerRun, __runs: runs })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __dirty: dirty, __barFrame: frame, __passAt: pass.at, __passOut: pass.out, __platerRun: platerRun, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v) })
 
   shownRef.current = shown
   // closing the shop empties the room at once: nobody at the stools, no plates out or being carried, the stacks as at the start
+  // (and looked at as the shop opens: measured while it was shut, the room may still have been coming in (the miso pot by the rice tub wasn't
+  // there yet, and the whole day the servers' places and ways went through it))
+  useEffect(() => {
+    if (!open) return
+    blocksMade.current = null
+    clearHomes.current.clear()
+  }, [open])
   useEffect(() => {
     if (open) return
     setShown([])
     runs.current = []
     runObjs.current.clear()
     waiting.current = []
-    // (the kitchen's floor looked at again tomorrow: things may be moved about in the meantime)
+    // (the kitchen's floor looked at again tomorrow: things may be moved about in the meantime; the servers' places with it)
     blocksMade.current = null
+    clearHomes.current.clear()
     // (every plate washed and back on the racks for the next day)
     PLATE_RACK.n = RACK_FULL
     dirty.current = 0
@@ -2815,6 +2840,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (looked about every quarter of a second, not every frame)
         if (w.t >= 0.25) {
           w.t = 0
+          // (not at their place: the day's first moment, stood where it was before the kitchen's floor was looked at (in the miso pot): over to it)
+          if (open && !SHOP.leaving && Math.hypot(w.pos.x - home.at.x, w.pos.z - home.at.z) > 0.05) { go([home.at.clone(), w.pos.clone()], 'back'); return }
           const slot = readySlot()
           const spoken = new Set(waiters.current.flatMap((x) => x.carry ?? []))
           const dirtyNow = runs.current.filter((r) => r.phase === 'dirty' && !spoken.has(r.key))
@@ -3008,7 +3035,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (the shop's shut and empty: out through their gate, along the aisle (round the corner from the side counter's) and through the
         // front door, as the customers go, and gone)
         if (!w.out) {
-          const h = homes[wi]
+          const h = homeOf(wi)
           const way = [w.pos.clone(), ...h.way.slice(1).map((v) => v.clone()), ...(h.counter ? [aisleCorner(counters[h.counter])] : []), doorOf(counters)]
           w.out = { way, len: pathLength(way), d: 0 }
         }
@@ -3188,7 +3215,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       ))}
       {/* the pass's stack of clean plates (the kitchen brings them from the racks; one's laid for a seat as its first food comes off the fire) */}
       {given && (
-        <group ref={passStack} position={passPlace(PASS_STACK_ALONG)}>
+        <group ref={passStack} name="pass-stack" position={passPlace(PASS_STACK_ALONG)}>
           {Array.from({ length: PASS_STACK_SHOWN }, (_, i) => (
             <group key={i} position={[0, i * STACK_GAP * ON_PASS, 0]} rotation-y={i * 1.1} scale={ON_PASS} visible={false}><Plate design={i + 5} /></group>
           ))}
@@ -3239,7 +3266,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </group>
       ))}
       {runs.current.map((r) => (
-        <group key={r.key} ref={(o) => {
+        <group key={r.key} name={`plate-run-${r.key}`} ref={(o) => {
           if (!o) return void runObjs.current.delete(r.key)
           runObjs.current.set(r.key, o)
           if (!o.userData.placed) {

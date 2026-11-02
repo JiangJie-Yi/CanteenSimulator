@@ -105,8 +105,9 @@ const BAR_AT = GRILL_COUNTERS[0].at.clone()
 // (high enough for the customers sat at it: about a third of their height above the seat, as a real counter)
 const BAR_TOP = GRILL_BAR_TOP
 const BAR_SEATS = GRILL_SEATS.length
-/** the same, in the scene as drawn (GRILL_SCALE bigger) */
-const BAR_AT_SCENE = toGrillScene(BAR_AT)
+/** the same, as this one's drawn (GRILL_SCALE bigger; and this one's frame is the fire's, FIRE_SHIFT along from the bar's: without it the food
+ * set at a customer's place lay 0.65 along the counter from their plate, and that carried on a server's tray beside the tray) */
+const BAR_AT_SCENE = toGrillScene(BAR_AT).sub(FIRE_SHIFT)
 const BAR_TOP_SCENE = BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y
 /** how big food is on the bar, next to the fire's: a skewer about as long as a customer's plate is wide */
 const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
@@ -116,11 +117,12 @@ const PASS_FRAME = passOf(GRILL_COUNTERS)
 const PASS_TOP_SCENE = (GRILL_BAR_TOP + LIP_H + PASS_SHELF.t) * GRILL_SCALE + GRILL_OFFSET.y
 const PASS_ACROSS = PASS_FRAME.across.clone()
 /** where a piece goes on the pass: side by side along its slot (on the plate laid there, or the bare shelf, loose), three to a row, a full row
- * with another on top */
-const passFoodAt = (slot: number, row: number, plate: boolean) => toGrillScene(PASS_FRAME.at.clone().addScaledVector(PASS_FRAME.dir, passSlotAlong(slot)))
+ * with another on top. In this one's frame, the fire FIRE_SHIFT along from the bar's (fromBar, below): without it the food landed, and the
+ * shelf stood, 0.65 along the long counter from the plates the bar draws on the pass (the owner saw the board off by itself on the counter) */
+const passFoodAt = (slot: number, row: number, plate: boolean) => toGrillScene(PASS_FRAME.at.clone().addScaledVector(PASS_FRAME.dir, passSlotAlong(slot))).sub(FIRE_SHIFT)
   .addScaledVector(PASS_FRAME.dir, ((row % 3) - 1) * 0.07 * GRILL_SCALE)
   .setY(PASS_TOP_SCENE + 0.04 + (plate ? 0.01 * GRILL_SCALE : 0) + Math.floor(row / 3) * 0.06)
-const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).setY(0)
+const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).sub(FIRE_SHIFT).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 /**
  * A stick of charcoal dropped on the heap: a dull, dry clatter, not a ring. A woody knock (noise through a mid band, gone in a few hundredths of
@@ -431,14 +433,14 @@ function TrashBinImpl({ position, container, contents = 0 }: { position: [number
 
 /** the pass's shelf on the side counter's lip, in the scene: where the bar's frame has it (on its counter's unit directions, as the bar's
  * drawn), its turn the counter's */
-const PASS_SHELF_AT = toGrillScene(PASS_FRAME.at).setY((BAR_TOP + LIP_H + PASS_SHELF.t / 2) * GRILL_SCALE + GRILL_OFFSET.y)
+const PASS_SHELF_AT = toGrillScene(PASS_FRAME.at).sub(FIRE_SHIFT).setY((BAR_TOP + LIP_H + PASS_SHELF.t / 2) * GRILL_SCALE + GRILL_OFFSET.y)
 const PASS_SHELF_YAW = PASS_FRAME.yaw
 /** the pass's shelf (a 付け台, a board of the lip's wood): only while the shop's open (the owner, seeing the bare board on the lip with the
  * shop shut, asked what it was). What's on it is the scene's own: the plates GuestBar3D's, the food this one's (the red lacquered tray it held
  * is gone: the food's plated there now, the owner's) */
 const PassShelf = memo(function PassShelf() {
   return (
-    <group position={PASS_SHELF_AT} rotation-y={PASS_SHELF_YAW} scale={GRILL_SCALE}>
+    <group name="pass-shelf" position={PASS_SHELF_AT} rotation-y={PASS_SHELF_YAW} scale={GRILL_SCALE}>
       <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len, PASS_SHELF.t, PASS_SHELF.deep]} castShadow receiveShadow><meshToonMaterial color="#ffffff" map={TRAY_WOOD} /></mesh>
       <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len * 1.01, PASS_SHELF.t * 1.25, PASS_SHELF.deep * 1.03]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
     </group>
@@ -5678,8 +5680,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             p.via = undefined
             p.flight = 0.6
           } else if (SERVICE.carried.has(p.key)) {
-            // (on the server's tray, where they hold it: its spot moved with it, as above)
-            p.fromP.copy(SERVICE.carried.get(p.key)!)
+            // (on the server's tray, where they hold it: its spot moved with it, as above; the bar hands it in its own frame)
+            p.fromP.copy(SERVICE.carried.get(p.key)!).sub(FIRE_SHIFT)
             p.toP.copy(p.fromP)
             p.local.copy(p.toP).sub(containerAt('bar'))
             p.flight = 1
