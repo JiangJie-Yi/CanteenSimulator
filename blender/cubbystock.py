@@ -295,8 +295,9 @@ for t, (x0, kind) in enumerate(((-0.52, "negima"), (-0.24, "pork"), (0.04, "saus
                 o = lathe(f"StockSausage{t}{k}{c}", [(0.0, 0.0), (0.012, 0.006), (0.013, 0.07), (0.0, 0.078)], lambda b: "sausage", (0.0, 0.0, 0.0), seg=10)
                 o.location = P(x0 + 0.05 + c * 0.085, SH + 0.03, z)
                 o.rotation_euler = (0, math.pi / 2, 0)
-lathe("StockOnigiriPlate", [(0.0, 0.0), (0.08, 0.0), (0.12, 0.016), (0.125, 0.02), (0.0, 0.008)], lambda b: "dish", (0.36, SH, -0.24), seg=18)
-for k, (x, z, rot) in enumerate(((0.32, -0.26, 0.3), (0.41, -0.25, -0.4), (0.36, -0.19, 1.2))):
+# (clear of the sausages' tray beside it: it lay 4.5 cm over the tray's end)
+lathe("StockOnigiriPlate", [(0.0, 0.0), (0.08, 0.0), (0.12, 0.016), (0.125, 0.02), (0.0, 0.008)], lambda b: "dish", (0.425, SH, -0.24), seg=18)
+for k, (x, z, rot) in enumerate(((0.385, -0.26, 0.3), (0.475, -0.25, -0.4), (0.425, -0.19, 1.2))):
     bpy.ops.mesh.primitive_cone_add(vertices=3, radius1=0.045, radius2=0.03, depth=0.03, location=P(x, SH + 0.025, z))
     o = active()
     o.rotation_euler = (0, 0, rot)
