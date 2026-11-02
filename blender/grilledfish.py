@@ -860,12 +860,13 @@ for k in range(4):
 # (the brass: a cap over each corner and a shoe round its foot, and a fine inlaid line round the inner edge's top)
 # (each corner's cap symmetric about the corner, its inner edge a diagonal (the owner's: 対称, 斜辺): on the top a triangle, its legs along
 # both outer edges, its long side cut on the slant (a bevel) passing just outside the inner corner; down both outer faces it comes as far
-# as the cap does, its end cut on the same diagonal, 45° down toward the corner; round the foot a shoe of the same, its ends on that same
-# line, so on each face the brass is one triangle with the wood's band showing across its middle. A hair proud of the wood; the parts of
+# as the cap does, its end cut on the same diagonal, 45° down toward the corner; round the foot a shoe the cap's mirror image (the owner's:
+# top and bottom alike, the same thickness, on all four sides): as tall as the cap comes down, widest at the floor, its ends cut 45° up
+# toward the corner, so each face reads the same upside down, the wood's band across its middle. A hair proud of the wood; the parts of
 # each made as one solid swallowing the wood's corner (all of it but what shows is inside the wood). The pattern pressed into all of it:
 # on the top turned to the corner's diagonal, a coin on the corner; down the faces upright, a coin halved round the corner's edge)
 CAP_BT = 0.006
-CAP_DOWN, FOOT_UP = 0.38, 0.2     # (how far down the cap comes, and how far up the shoe, as shares of the frame's height)
+CAP_DOWN = FOOT_UP = 0.3     # (how far down the cap comes, and how far up the shoe, as shares of the frame's height: the same, the owner's)
 CAP_LEG = 2 * IRORI_W + 2 * CAP_BT - 0.012
 Z_TOP, Z_RIDGE, Z_CAP0, Z_FOOT = IRORI_H + CAP_BT, IRORI_H, IRORI_H * (1 - CAP_DOWN), IRORI_H * FOOT_UP
 
@@ -894,13 +895,17 @@ for k in range(4):
         return (sx * (X0 - s_), sy * (Y0 - t_), z_)
 
     def end(z_):
-        # (how far along each face the brass reaches at this height: the one diagonal, 45° down toward the corner)
+        # (how far along each face the cap reaches at this height: the diagonal, 45° down toward the corner)
         return CAP_LEG - (Z_RIDGE - z_)
+
+    def end_up(z_):
+        # (and the shoe, the cap's mirror: widest at the floor, 45° up toward the corner)
+        return CAP_LEG - z_
     cap = hull_object(f"RobuchiCap{k}", [at(0, 0, Z_TOP), at(CAP_LEG - 2 * CAP_BT, 0, Z_TOP), at(0, CAP_LEG - 2 * CAP_BT, Z_TOP),
                                           at(CAP_LEG, 0, Z_RIDGE), at(0, CAP_LEG, Z_RIDGE),
                                           at(0, 0, Z_CAP0), at(end(Z_CAP0), 0, Z_CAP0), at(0, end(Z_CAP0), Z_CAP0)])
-    shoe = hull_object(f"RobuchiShoe{k}", [at(0, 0, -0.001), at(end(-0.001), 0, -0.001), at(0, end(-0.001), -0.001),
-                                           at(0, 0, Z_FOOT), at(end(Z_FOOT), 0, Z_FOOT), at(0, end(Z_FOOT), Z_FOOT)])
+    shoe = hull_object(f"RobuchiShoe{k}", [at(0, 0, -0.001), at(end_up(-0.001), 0, -0.001), at(0, end_up(-0.001), -0.001),
+                                           at(0, 0, Z_FOOT), at(end_up(Z_FOOT), 0, Z_FOOT), at(0, end_up(Z_FOOT), Z_FOOT)])
     bpy.ops.object.select_all(action="DESELECT")
     cap.select_set(True); shoe.select_set(True)
     bpy.context.view_layer.objects.active = cap
