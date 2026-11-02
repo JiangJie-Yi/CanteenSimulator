@@ -32,7 +32,7 @@ import numpy as np
 from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import pbr, export_dish  # noqa: E402
+from common import pbr, export_dish, ladder_fill  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -63,12 +63,14 @@ def active():
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 # ---- the figure's measure, as the boss's (blender/boss.py)
-PROFILE = [(0.0, 0.0), (0.008, 0.08), (0.03, 0.155), (0.07, 0.21), (0.12, 0.243), (0.18, 0.26), (0.24, 0.262),
-           (0.3, 0.255), (0.36, 0.238), (0.41, 0.21), (0.45, 0.17), (0.48, 0.11), (0.495, 0.05), (0.5, 0.0)]
+# (as few rings as hold its round (the owner's rule for every figure: 2,000 to 3,500 triangles a person, outline and all); its foot shut by a
+# ladder, its top left open up inside the head; the clothes' pictures still painted to the full height it had, to 0.5 up)
+PROFILE = [(0.0, 0.0), (0.008, 0.08), (0.03, 0.155), (0.07, 0.21), (0.13, 0.246), (0.17, 0.2546), (0.24, 0.262), (0.32, 0.25),
+           (0.39, 0.225), (0.44, 0.19), (0.47, 0.14)]
 BH = 1.24
 DY = 0.5 * (BH - 1)
 PROFILE = [(y * BH, r) for (y, r) in PROFILE]
-BODY_TOP = PROFILE[-1][0]
+BODY_TOP = 0.5 * BH
 C = Vector((0.0, 0.68 + DY, 0.0))
 R = 0.27
 HAND_AT = {-1: Vector((-0.31, 0.26, 0.05)), 1: Vector((0.31, 0.26, 0.05))}
@@ -143,8 +145,35 @@ def from_bm(name, bm, mat, smooth=True):
     return fin(o, name, mat, smooth)
 
 
+def ring_ball(radius=1.0, segs=12, rings=6, location=(0, 0, 0)):
+    """a ball made of rings round its axis (Blender's z, three's y), as a UV sphere is, but its two ends shut with ladders of quads, not
+    fans into a pole (the owner's rule); `segs` round it (no more than 24), `rings` bands from its foot to its top. Made the active object
+    at `location`, as the primitive is"""
+    segs = min(24, segs)
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    lat = [-math.pi / 2 + math.pi * k / rings for k in range(1, rings)]
+    rows = [[bm.verts.new((radius * math.cos(t) * math.cos(2 * math.pi * i / segs), radius * math.cos(t) * math.sin(2 * math.pi * i / segs),
+                           radius * math.sin(t))) for i in range(segs)] for t in lat]
+    for k in range(len(rows) - 1):
+        for i in range(segs):
+            f = bm.faces.new((rows[k][i], rows[k][(i + 1) % segs], rows[k + 1][(i + 1) % segs], rows[k + 1][i]))
+            for lp, (ii, kk) in zip(f.loops, ((i, k), (i + 1, k), (i + 1, k + 1), (i, k + 1))):
+                lp[uvl].uv = (ii / segs, (lat[kk] + math.pi / 2) / math.pi)
+    for k in (0, len(rows) - 1):
+        for f in ladder_fill(bm, rows[k]):
+            for lp in f.loops:
+                lp[uvl].uv = (rows[k].index(lp.vert) / segs, (lat[k] + math.pi / 2) / math.pi)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new("Ball"); bm.to_mesh(me); bm.free()
+    o = bpy.data.objects.new("Ball", me); bpy.context.collection.objects.link(o)
+    o.location = location
+    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+    return o
+
+
 def sphere(name, at, r, mat, seg=12, rings=8, scale=(1, 1, 1)):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=seg, ring_count=rings, location=P(*at))
+    ring_ball(radius=r, segs=seg, rings=rings, location=P(*at))
     o = active()
     o.scale = (scale[0], scale[2], scale[1])
     # (the scale alone: transform_apply's other two default to on, and would move its origin to the world's)
@@ -152,7 +181,14 @@ def sphere(name, at, r, mat, seg=12, rings=8, scale=(1, 1, 1)):
     return fin(o, name, mat)
 
 
-def tube(name, pts, r, mat, cyclic=False, res=1):
+def tube(name, pts, r, mat, cyclic=False, res=0, most=None):
+    """a round tube through points (three's frame): four-sided (smooth shading rounds it), a long run taken at no more than `most` of its
+    points (a closed loop 12, an open run 5, unless told)"""
+    most = most or (12 if cyclic else 5)
+    if len(pts) > most:
+        k = len(pts) if cyclic else len(pts) - 1
+        m = most if cyclic else most - 1
+        pts = [pts[min(len(pts) - 1, round(i * k / m)) % len(pts)] for i in range(most)]
     cd = bpy.data.curves.new(name, "CURVE")
     cd.dimensions = "3D"
     cd.bevel_depth = r
@@ -172,8 +208,9 @@ def tube(name, pts, r, mat, cyclic=False, res=1):
     return fin(active(), name, mat)
 
 
-def lathe(name, profile, mat, seg=24, a0=0.0, a1=2 * math.pi, uv=False, vtop=1.0, solid=0.0):
-    """turned on the y axis; `uv`: u round it (the front, +z, at 0.5), v up it (y / vtop); `solid`: a sheet given that thickness"""
+def lathe(name, profile, mat, seg=12, a0=0.0, a1=2 * math.pi, uv=False, vtop=1.0, solid=0.0, shut=(False, False)):
+    """turned on the y axis; `uv`: u round it (the front, +z, at 0.5), v up it (y / vtop); `solid`: a sheet given that thickness; `shut`:
+    its first ring and its last closed by a ladder (none of them drawn in to a point: no fan into a pole)"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     full = abs(a1 - a0 - 2 * math.pi) < 1e-6
@@ -194,6 +231,12 @@ def lathe(name, profile, mat, seg=24, a0=0.0, a1=2 * math.pi, uv=False, vtop=1.0
                 v0, v1 = profile[j][0] / vtop, profile[j + 1][0] / vtop
                 for lp, q in zip(f.loops, ((u0, v0), (u1, v0), (u1, v1), (u0, v1))):
                     lp[uvl].uv = q
+    if full:
+        for k, on in ((0, shut[0]), (len(rings) - 1, shut[1])):
+            if on:
+                for f in ladder_fill(bm, rings[k][::-1] if k == 0 else rings[k]):
+                    for lp in f.loops:
+                        lp[uvl].uv = ((rings[k].index(lp.vert) / seg + 0.5) % 1.0, profile[k][0] / vtop)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
     o = from_bm(name, bm, mat)
     if solid:
@@ -204,9 +247,9 @@ def lathe(name, profile, mat, seg=24, a0=0.0, a1=2 * math.pi, uv=False, vtop=1.0
     return o
 
 
-def cut_sphere(name, r, mat, planes, seg=20, rings=12, at=None):
+def cut_sphere(name, r, mat, planes, seg=14, rings=9, at=None):
     """a ball round the head's middle (or `at`) with what's on the outer side of each plane (point, normal; three's frame) cut away"""
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=seg, ring_count=rings, location=P(*(at or C)))
+    ring_ball(radius=r, segs=seg, rings=rings, location=P(*(at or C)))
     o = active()
     bm = bmesh.new()
     bm.from_mesh(o.data)
@@ -218,10 +261,10 @@ def cut_sphere(name, r, mat, planes, seg=20, rings=12, at=None):
     return fin(o, name, mat)
 
 
-def tuft(name, at, d, r, ln, mat, flat=1.0, seg=8, rings=6):
+def tuft(name, at, d, r, ln, mat, flat=1.0, seg=6, rings=4):
     """a lock (or a curl, a quiff): a soft cone from `at` out along `d`, `r` across at its root, `ln` long, flattened across by `flat`"""
     d = d.normalized()
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=seg, ring_count=rings, location=(0, 0, 0))
+    ring_ball(radius=1, segs=seg, rings=rings, location=(0, 0, 0))
     o = active()
     for v in o.data.vertices:
         x, y, z = v.co.x, v.co.y, v.co.z
@@ -251,26 +294,26 @@ def join(objs, name):
 
 
 # ===================================================================== the figure
-body = lathe("FolkBody", PROFILE, M["body"], seg=24, uv=True, vtop=BODY_TOP)
+body = lathe("FolkBody", PROFILE[1:], M["body"], seg=12, uv=True, vtop=BODY_TOP, shut=(True, False))
 
 # (the head: a ball, a button nose, ears; one mesh in their skin)
-h = sphere("hd", C, R, M["skin"], seg=24, rings=14)
-nose = sphere("nose", on_head(0.0, -0.035, 0.002)[0], 0.022, M["skin"], seg=8, rings=6)
-ears = [sphere(f"ear{sd}", Vector((sd * (R + 0.006), C.y - 0.005, -0.015)), 0.048, M["skin"], seg=10, rings=6, scale=(0.45, 0.85, 0.95)) for sd in (-1, 1)]
+h = sphere("hd", C, R, M["skin"], seg=20, rings=11)
+nose = sphere("nose", on_head(0.0, -0.035, 0.002)[0], 0.022, M["skin"], seg=10, rings=5)
+ears = [sphere(f"ear{sd}", Vector((sd * (R + 0.006), C.y - 0.005, -0.015)), 0.048, M["skin"], seg=8, rings=4, scale=(0.45, 0.85, 0.95)) for sd in (-1, 1)]
 join([h, nose] + ears, "FolkHead")
 
 # (the face: a shell just off the front of the head, its picture a strip of eight; this one's UVs over the first)
 FACE_AZ, FACE_EL = (-62.0, 62.0), (-52.0, 42.0)
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
-NA, NE = 14, 10
+NA, NE = 9, 7
 grid = []
 for j in range(NE + 1):
     row = []
     for i in range(NA + 1):
         az = math.radians(FACE_AZ[0] + (FACE_AZ[1] - FACE_AZ[0]) * i / NA)
         el = math.radians(FACE_EL[0] + (FACE_EL[1] - FACE_EL[0]) * j / NE)
-        row.append(bm.verts.new(P(*head_at(az, el, 0.0035))))
+        row.append(bm.verts.new(P(*head_at(az, el, 0.0042))))
     grid.append(row)
 for j in range(NE):
     for i in range(NA):
@@ -281,7 +324,7 @@ from_bm("FolkFace", bm, M["face"])
 
 # (hands: floating mittens, a plump paddle and a thumb, each its own mesh about where it hangs)
 for sd, at in HAND_AT.items():
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=8, location=(0, 0, 0))
+    ring_ball(radius=1, segs=9, rings=5, location=(0, 0, 0))
     hm = active()
     for v in hm.data.vertices:
         x, y, z = v.co.x, v.co.z, -v.co.y
@@ -291,7 +334,7 @@ for sd, at in HAND_AT.items():
     hm.location = P(*at)
     hm.rotation_euler = (0, -sd * 0.25, 0)
     fin(hm, "mitt", M["skin"])
-    th = sphere("thumb", at + Vector((-sd * 0.036, 0.014, 0.024)), 1.0, M["skin"], seg=8, rings=6, scale=(0.019, 0.019, 0.03))
+    th = sphere("thumb", at + Vector((-sd * 0.036, 0.014, 0.024)), 1.0, M["skin"], seg=6, rings=3, scale=(0.019, 0.019, 0.03))
     th.rotation_euler = (0.5, 0, -sd * 0.6)
     join([hm, th], f"FolkHand{'L' if sd < 0 else 'R'}")
 
@@ -301,13 +344,13 @@ HT = 0.012
 
 def back_shell(name="back", nape=-0.15):
     """the hair round the back and sides, from just behind the ears, down to the nape"""
-    return cut_sphere(name, R + HT, M["hair"], [((0, 0, 0.055), (0, 0, 1)), ((0, nape, -R), Vector((0, -1, 0.4)))], seg=20, rings=12)
+    return cut_sphere(name, R + HT, M["hair"], [((0, 0, 0.055), (0, 0, 1)), ((0, nape, -R), Vector((0, -1, 0.4)))], seg=14, rings=10)
 
 
 def crown(name="crown", fringe=False):
     """the hair over the crown: a man's front edge just over the brows; a woman's brought down straight over them (a fringe)"""
     co, no = ((0, -0.03, 0), (0, -1, 0.47)) if fringe else ((0, 0.01, 0), (0, -1, 0.4))
-    return cut_sphere(name, R + HT * 1.4, M["hair"], [(co, no)], seg=22, rings=12)
+    return cut_sphere(name, R + HT * 1.4, M["hair"], [(co, no)], seg=14, rings=9)
 
 
 def side_locks(length=0.13, at_e=0.3):
@@ -321,21 +364,21 @@ def style(name, objs):
 style("crop", [back_shell(), crown()])
 style("part", [back_shell(), crown(), tuft("partlock", head_at(0.55, 0.62, -0.004), head_at(-0.2, 0.46, 0.014) - head_at(0.55, 0.62, -0.004), 0.05, 0.2, M["hair"], 0.35)])
 # (long: down the back past the shoulders, a lock before each ear down to the chest)
-long_back = lathe("longback", [(C.y + 0.05, R + 0.016), (C.y - 0.08, R + 0.018), (C.y - 0.2, 0.25), (C.y - 0.32, 0.24), (C.y - 0.4, 0.22)],
-                  M["hair"], seg=14, a0=math.pi * 0.58, a1=math.pi * 1.42, solid=0.018)
+long_back = lathe("longback", [(C.y + 0.05, R + 0.016), (C.y - 0.08, R + 0.018), (C.y - 0.2, 0.25), (C.y - 0.4, 0.22)],
+                  M["hair"], seg=7, a0=math.pi * 0.58, a1=math.pi * 1.42, solid=0.018)
 style("long", [back_shell(nape=-0.25), crown(fringe=True), long_back] + side_locks(0.3, 0.2))
 # (bob: cut level with the chin all round but the face)
 bob = lathe("bobshell", [(C.y + 0.12, R + 0.02), (C.y, R + 0.026), (C.y - 0.12, R + 0.02), (C.y - 0.16, R - 0.01)],
-            M["hair"], seg=16, a0=math.pi * 0.32, a1=math.pi * 1.68, solid=0.016)
+            M["hair"], seg=10, a0=math.pi * 0.32, a1=math.pi * 1.68, solid=0.016)
 style("bob", [back_shell(), crown(fringe=True), bob])
-style("bunLow", [back_shell(nape=-0.2), crown(fringe=True), sphere("bunlo", head_at(math.pi, -0.05, 0.03), 0.075, M["hair"], seg=12, rings=8)] + side_locks())
-style("bunHigh", [back_shell(nape=-0.2), crown(fringe=True), sphere("bunhi", head_at(math.pi, 0.62, 0.05), 0.085, M["hair"], seg=12, rings=8, scale=(1.1, 0.9, 0.85))] + side_locks())
+style("bunLow", [back_shell(nape=-0.2), crown(fringe=True), sphere("bunlo", head_at(math.pi, -0.05, 0.03), 0.075, M["hair"], seg=10, rings=5)] + side_locks())
+style("bunHigh", [back_shell(nape=-0.2), crown(fringe=True), sphere("bunhi", head_at(math.pi, 0.62, 0.05), 0.085, M["hair"], seg=10, rings=5, scale=(1.1, 0.9, 0.85))] + side_locks())
 # (twin tails, tied high either side)
 twin = [tuft(f"tail{sd}", head_at(sd * 1.35, 0.42, 0.0), Vector((sd * 0.45, -1, -0.2)), 0.05, 0.3, M["hair"], 0.75) for sd in (-1, 1)]
-ties = [sphere(f"tie{sd}", head_at(sd * 1.35, 0.42, 0.012), 0.022, M["red"], seg=8, rings=6) for sd in (-1, 1)]
+ties = [sphere(f"tie{sd}", head_at(sd * 1.35, 0.42, 0.012), 0.022, M["red"], seg=6, rings=3) for sd in (-1, 1)]
 style("twin", [back_shell(), crown(fringe=True)] + twin + ties)
 pony = tuft("pony", head_at(math.pi, 0.45, 0.02), Vector((0, -1, -0.35)), 0.06, 0.32, M["hair"], 0.75)
-style("pony", [back_shell(), crown(fringe=True), pony, sphere("ponytie", head_at(math.pi, 0.45, 0.03), 0.024, M["red"], seg=8, rings=6)])
+style("pony", [back_shell(), crown(fringe=True), pony, sphere("ponytie", head_at(math.pi, 0.45, 0.03), 0.024, M["red"], seg=6, rings=3)])
 def perm_shell(name="perm"):
     """a grandmother's perm (the owner: seventeen balls stuck on, each inked round, looked odd): one soft, full shell over the crown, the
     sides and the back, as a set perm sits, cut by one tilted plane, so its edge is a smooth line from over the brows in front, past the
@@ -343,7 +386,7 @@ def perm_shell(name="perm"):
     round the whole of it, not round each curl"""
     rnd = __import__("random").Random(11)
     curls = []
-    n = 62
+    n = 30
     for k in range(n):
         y = 1 - 2 * (k + 0.5) / n
         rr = math.sqrt(max(0.0, 1 - y * y))
@@ -352,7 +395,7 @@ def perm_shell(name="perm"):
     cut_n = Vector((0, -1, 0.55)).normalized()
     bm = bmesh.new()
     # (as fine as the curls need and no finer: each grandmother wears it)
-    seg, rings = 44, 24
+    seg, rings = 24, 14
     grid = []
     for i in range(rings + 1):
         th = math.pi * i / rings
@@ -365,28 +408,24 @@ def perm_shell(name="perm"):
                 cs = d.dot(c)
                 # (each curl a round cap, as a ball pressed into the mass: deep enough between them that each one shows)
                 a = math.acos(max(-1.0, min(1.0, cs)))
-                W = 0.29 * k
+                W = 0.42 * k
                 if a < W:
-                    bump = max(bump, 0.052 * k * math.sqrt(1 - (a / W) ** 2))
+                    bump = max(bump, 0.075 * k * math.sqrt(1 - (a / W) ** 2))
             # (fuller over the crown and the sides than at the nape: a set perm's round shape; and drawn in to the scalp at its edge, so it
             # sits on the head there and doesn't stand off it like a cap)
             full = 0.016 + 0.012 * max(0.0, d.y + 0.2)
             edge = max(0.0, -(d * R - Vector((0, -0.06, 0))).dot(cut_n))
             hug = min(1.0, edge / 0.09) ** 0.7
             row.append(bm.verts.new(P(*(C + d * (R + 0.004 + (full + bump) * hug)))))
-            if i in (0, rings):
-                break
         grid.append(row)
-    for i in range(rings):
+    # (rows 1 to rings-1 only: the crown's ring and the bottom's each shut by a ladder, no pole)
+    grid = grid[1:-1]
+    for i in range(len(grid) - 1):
         for j in range(seg):
             j2 = (j + 1) % seg
-            a_, b_ = grid[i], grid[i + 1]
-            if i == 0:
-                bm.faces.new((a_[0], b_[j], b_[j2]))
-            elif i == rings - 1:
-                bm.faces.new((a_[j], b_[0], a_[j2]))
-            else:
-                bm.faces.new((a_[j], b_[j], b_[j2], a_[j2]))
+            bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j2], grid[i][j2]))
+    ladder_fill(bm, grid[0][::-1])
+    ladder_fill(bm, grid[-1])
     # (one tilted plane: over the brows in front (0.09 up), the ears' tops at the sides (-0.06), the nape behind (-0.21))
     geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
     bmesh.ops.bisect_plane(bm, geom=geom, plane_co=Vector(P(*(C + Vector((0, -0.06, 0))))), plane_no=Vector(P(0, -1, 0.55)).normalized(), clear_outer=True)
@@ -402,13 +441,13 @@ def perm_shell(name="perm"):
 style("perm", [perm_shell()])
 # (bald on top: a ring of hair round the back and the sides only)
 ring = lathe("baldring", [(C.y + 0.07, R + 0.008), (C.y + 0.03, R + 0.016), (C.y - 0.06, R + 0.014), (C.y - 0.11, R - 0.01)],
-             M["hair"], seg=16, a0=math.pi * 0.4, a1=math.pi * 1.6, solid=0.012)
+             M["hair"], seg=10, a0=math.pi * 0.4, a1=math.pi * 1.6, solid=0.012)
 style("bald", [ring])
 # (a pompadour: the quiff rolled up and forward over the brow)
-quiff = [tuft("quiff0", head_at(0.0, 0.95, -0.01), Vector((0, 0.35, 1.0)), 0.1, 0.17, M["hair"], 0.8, seg=10, rings=8),
+quiff = [tuft("quiff0", head_at(0.0, 0.95, -0.01), Vector((0, 0.35, 1.0)), 0.1, 0.17, M["hair"], 0.8, seg=8, rings=5),
          tuft("quiff1", head_at(0.0, 1.25, -0.01), Vector((0, 0.6, 1.0)), 0.08, 0.13, M["hair"], 0.8)]
 style("pomp", [back_shell(), crown()] + quiff)
-def clump(name, frm, to, r, flat=0.5, n=5, m=5):
+def clump(name, frm, to, r, flat=0.5, n=4, m=4):
     """a clump of hair combed along the head: from `frm` (bearing, elevation), its root a little under the hair's face, round the head to
     `to` (bearing, elevation, how far off the head its point stands), lifting off it and narrowing to that point; `r` its half-width at the
     root, `flat` its thickness against its width"""
@@ -451,7 +490,7 @@ SPIKY = (
 spikes = [clump(f"spike{k}", frm, to, r) for k, (frm, to, r) in enumerate(SPIKY)]
 style("spiky", [back_shell(), crown()] + spikes)
 style("kid", [back_shell(), crown(fringe=True), tuft("ahoge", head_at(0.0, 1.3, -0.006), Vector((0.1, 1, 0.75)), 0.032, 0.1, M["hair"], 0.45)])
-def hair_cap(name, hairline, seg=24, rings=9, full=0.02):
+def hair_cap(name, hairline, seg=14, rings=6, full=0.02):
     """a cap of hair in clean quads: every column from the crown down to the hairline (`hairline(bearing)` its elevation there, bearing 0 the
     front), a little off the head and fuller over the top, drawn in to the scalp along its edge so it sits on the head there; a ring of
     thin triangles only round the very top of the crown. (The other styles' shells are balls cut by planes, which leaves slivers and odd
@@ -471,13 +510,15 @@ def hair_cap(name, hairline, seg=24, rings=9, full=0.02):
         cols.append(col)
     for j in range(seg):
         j2 = (j + 1) % seg
-        bm.faces.new((top, cols[j2][0], cols[j][0]))
         for i in range(rings - 1):
             bm.faces.new((cols[j][i], cols[j2][i], cols[j2][i + 1], cols[j][i + 1]))
+    # (the crown shut by a ladder across its first ring, raised a little to the point it had)
+    bm.verts.remove(top)
+    ladder_fill(bm, [cols[j][0] for j in range(seg)][::-1])
     return from_bm(name, bm, M["hair"])
 
 
-def drill(name, top, down, length, r0, turns=2.2, sides=10, rings=16):
+def drill(name, top, down, length, r0, turns=2.2, sides=6, rings=9):
     """a ringlet (縦ロール) hanging from `top` along `down`: a lock twisted round on itself, two spiral ridges running round it to its tip,
     swelling a little below its root and narrowing to a point; clean quads, a fan only at its tip and a cap at its root (in the hair)"""
     d = down.normalized()
@@ -511,8 +552,8 @@ def drill(name, top, down, length, r0, turns=2.2, sides=10, rings=16):
 
 # (gyaru: long, big and full, a fringe over the brows, the back down past the shoulders, and a ringlet down each side from behind the ear (it
 # was three balls stacked up each side, and the cap two cut balls))
-long_back2 = lathe("longback2", [(C.y + 0.05, R + 0.016), (C.y - 0.08, R + 0.018), (C.y - 0.2, 0.25), (C.y - 0.32, 0.24), (C.y - 0.4, 0.22)],
-                   M["hair"], seg=14, a0=math.pi * 0.58, a1=math.pi * 1.42, solid=0.018)
+long_back2 = lathe("longback2", [(C.y + 0.05, R + 0.016), (C.y - 0.08, R + 0.018), (C.y - 0.2, 0.25), (C.y - 0.4, 0.22)],
+                   M["hair"], seg=7, a0=math.pi * 0.58, a1=math.pi * 1.42, solid=0.018)
 gyaru_cap = hair_cap("gyarucap", lambda a: 0.35 - 0.95 * (lambda x: x * x * (3 - 2 * x))(min(1.0, abs(a) / math.pi)), full=0.03)
 ringlets = [drill(f"ringlet{sd}", head_at(sd * 1.32, -0.1, 0.03), Vector((sd * 0.14, -1, 0.06)), 0.3, 0.056) for sd in (-1, 1)]
 style("gyaru", [gyaru_cap, long_back2] + ringlets)
@@ -530,8 +571,8 @@ gl = []
 for sd in (-1, 1):
     ex = sd * 0.09
     ring = []
-    for i in range(16):
-        t = 2 * math.pi * i / 16
+    for i in range(9):
+        t = 2 * math.pi * i / 9 + math.pi / 18
         c_, s_ = math.cos(t), math.sin(t)
         ring.append(on_head(ex + 0.05 * math.copysign(abs(c_) ** 0.7, c_), EY + 0.04 * math.copysign(abs(s_) ** 0.7, s_), 0.022)[0])
     gl.append(tube(f"gl{sd}", ring, 0.0055, M["frame"], cyclic=True))
@@ -546,15 +587,15 @@ acc("moustache", [tube(f"mo{sd}", [on_head(sd * (0.012 + 0.036 * u), -0.07 + 0.0
 band = tube("hpb", [head_at(math.radians(90) * (2 * u - 1), math.radians(90) * (1 - abs(2 * u - 1)) ** 0.6, 0.03) for u in [k / 10 for k in range(11)]], 0.012, M["phones"])
 cups = []
 for sd in (-1, 1):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.06, depth=0.04, location=P(sd * (R + 0.03), C.y - 0.01, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.06, depth=0.04, location=P(sd * (R + 0.03), C.y - 0.01, 0))
     cy = active()
     cy.rotation_euler = (0, math.pi / 2, 0)
     cups.append(fin(cy, f"cup{sd}", M["cup"]))
 acc("phones", [band] + cups)
 # (a straw sun hat: a wide brim, its crown and a ribbon round it)
-brim = lathe("brim", [(C.y + 0.17, 0.2), (C.y + 0.15, 0.33), (C.y + 0.13, 0.38)], M["straw"], seg=20, solid=0.012)
-hcrown = lathe("hcrown", [(C.y + 0.16, 0.25), (C.y + 0.26, 0.24), (C.y + 0.32, 0.18), (C.y + 0.335, 0.0)], M["straw"], seg=20)
-ribbon_ = lathe("hrib", [(C.y + 0.165, 0.252), (C.y + 0.205, 0.248)], M["red"], seg=20, solid=0.004)
+brim = lathe("brim", [(C.y + 0.17, 0.2), (C.y + 0.15, 0.33), (C.y + 0.13, 0.38)], M["straw"], seg=12, solid=0.012)
+hcrown = lathe("hcrown", [(C.y + 0.16, 0.25), (C.y + 0.26, 0.24), (C.y + 0.32, 0.18), (C.y + 0.333, 0.08)], M["straw"], seg=12, shut=(False, True))
+ribbon_ = lathe("hrib", [(C.y + 0.165, 0.252), (C.y + 0.205, 0.248)], M["red"], seg=12, solid=0.004)
 acc("sunhat", [brim, hcrown, ribbon_])
 # (a camera on a strap round the neck, on the chest)
 cam_at = on_body(0.0, 0.47, 0.03)
@@ -562,13 +603,8 @@ bpy.ops.mesh.primitive_cube_add(size=1, location=P(*cam_at))
 cb = active()
 cb.scale = (0.13, 0.045, 0.08)
 bpy.ops.object.transform_apply(scale=True)
-bv = cb.modifiers.new("b", "BEVEL")
-bv.width = 0.01
-bv.segments = 2
-bpy.context.view_layer.objects.active = cb
-bpy.ops.object.modifier_apply(modifier="b")
-fin(cb, "camb", M["dark"])
-bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.03, depth=0.05, location=P(*(cam_at + Vector((0.015, 0, 0.04)))))
+fin(cb, "camb", M["dark"], smooth=False)
+bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.03, depth=0.05, location=P(*(cam_at + Vector((0.015, 0, 0.04)))))
 ln = active()
 ln.rotation_euler = (math.pi / 2, 0, 0)
 fin(ln, "camlens", M["frame"])
@@ -576,8 +612,8 @@ strap = tube("camstrap", [on_body(-0.05, 0.5, 0.01), on_body(-0.12, 0.58, 0.004)
                           Vector((0.14, 0.62, 0.0)), on_body(0.12, 0.58, 0.004), on_body(0.05, 0.5, 0.01)], 0.006, M["dark"])
 acc("camera", [cb, ln, strap])
 # (a schoolchild's yellow cap, round, with a short brim all round)
-acc("schoolhat", [lathe("sch", [(C.y + 0.06, R + 0.05), (C.y + 0.08, R + 0.02), (C.y + 0.2, R - 0.02), (C.y + 0.27, 0.16), (C.y + 0.3, 0.0)], M["yellow"], seg=20),
-                  lathe("schb", [(C.y + 0.06, R + 0.01), (C.y + 0.055, R + 0.06)], M["yellow"], seg=20, solid=0.008)])
+acc("schoolhat", [lathe("sch", [(C.y + 0.06, R + 0.05), (C.y + 0.08, R + 0.02), (C.y + 0.2, R - 0.02), (C.y + 0.27, 0.16), (C.y + 0.296, 0.06)], M["yellow"], seg=14, shut=(False, True)),
+                  lathe("schb", [(C.y + 0.06, R + 0.01), (C.y + 0.055, R + 0.06)], M["yellow"], seg=14, solid=0.008)])
 
 
 def backpack(name, mat, w, hgt, d, y0, round_top=0.05):
@@ -588,7 +624,7 @@ def backpack(name, mat, w, hgt, d, y0, round_top=0.05):
     bpy.ops.object.transform_apply(scale=True)
     bvl = b.modifiers.new("b", "BEVEL")
     bvl.width = round_top
-    bvl.segments = 3
+    bvl.segments = 1
     bpy.context.view_layer.objects.active = b
     bpy.ops.object.modifier_apply(modifier="b")
     fin(b, name + "box", mat)
@@ -600,38 +636,90 @@ def backpack(name, mat, w, hgt, d, y0, round_top=0.05):
 acc("randoseru", backpack("rs", M["bag"], 0.3, 0.3, 0.16, 0.24))
 acc("backpack", backpack("bp", M["pack"], 0.32, 0.3, 0.14, 0.2, 0.08))
 # (the maid's cap: a frilled white band over the crown)
-frill = tube("mfb", [head_at(math.radians(85) * (2 * u - 1), math.radians(60) + math.radians(30) * (1 - abs(2 * u - 1)), 0.03) for u in [k / 10 for k in range(11)]], 0.018, M["white"])
-frills = [sphere(f"mf{k}", head_at(math.radians(85) * (2 * (k / 8) - 1), math.radians(60) + math.radians(30) * (1 - abs(2 * (k / 8) - 1)), 0.045), 0.022, M["white"], seg=8, rings=5) for k in range(9)]
+frill = tube("mfb", [head_at(math.radians(85) * (2 * u - 1), math.radians(60) + math.radians(30) * (1 - abs(2 * u - 1)), 0.03) for u in [k / 10 for k in range(11)]], 0.018, M["white"], most=5)
+frills = [sphere(f"mf{k}", head_at(math.radians(85) * (2 * (k / 4) - 1), math.radians(60) + math.radians(30) * (1 - abs(2 * (k / 4) - 1)), 0.045), 0.032, M["white"], seg=6, rings=4) for k in range(5)]
 acc("maidcap", [frill] + frills)
 # (the bōsōzoku's hachimaki: a white band round the brow, the rising sun on its front)
-hb = tube("hcb", [head_at(2 * math.pi * k / 20, math.asin(0.11 / R) - 0.1 * max(0.0, -math.cos(2 * math.pi * k / 20)), 0.02) for k in range(20)], 0.02, M["white"], cyclic=True)
-sun = sphere("hsun", head_at(0.0, math.asin(0.11 / R), 0.038), 0.026, M["red"], seg=10, rings=6, scale=(1, 1, 0.3))
+hb = tube("hcb", [head_at(2 * math.pi * k / 11, math.asin(0.11 / R) - 0.1 * max(0.0, -math.cos(2 * math.pi * k / 11)), 0.022) for k in range(11)], 0.02, M["white"], cyclic=True, most=11)
+sun = sphere("hsun", head_at(0.0, math.asin(0.11 / R), 0.04), 0.026, M["red"], seg=8, rings=4, scale=(1, 1, 0.3))
 acc("hachimaki", [hb, sun])
 # (hoop earrings, gold)
 hoops = []
 for sd in (-1, 1):
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.035, minor_radius=0.005, major_segments=16, minor_segments=6, location=P(sd * (R + 0.02), C.y - 0.07, 0.0))
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.035, minor_radius=0.005, major_segments=10, minor_segments=4, location=P(sd * (R + 0.02), C.y - 0.07, 0.0))
     t = active()
     t.rotation_euler = (math.pi / 2, 0, math.pi / 2)
     hoops.append(fin(t, f"hoop{sd}", M["gold"]))
 acc("hoops", hoops)
 # (the yukata's obi bow on the back, and a flower hairpin)
 BELT = 0.235 * BH
-bow = [sphere(f"bw{sd}", Vector((sd * 0.09, BELT + 0.05, -(rb(BELT + 0.05) + 0.04))), 0.07, M["obi"], seg=10, rings=6, scale=(1, 0.65, 0.4)) for sd in (-1, 1)]
-bow.append(sphere("bwk", Vector((0, BELT + 0.05, -(rb(BELT + 0.05) + 0.05))), 0.035, M["obi"], seg=8, rings=6))
+bow = [sphere(f"bw{sd}", Vector((sd * 0.09, BELT + 0.05, -(rb(BELT + 0.05) + 0.04))), 0.07, M["obi"], seg=8, rings=4, scale=(1, 0.65, 0.4)) for sd in (-1, 1)]
+bow.append(sphere("bwk", Vector((0, BELT + 0.05, -(rb(BELT + 0.05) + 0.05))), 0.035, M["obi"], seg=6, rings=4))
 acc("obibow", bow)
-pin = [sphere(f"kp{k}", head_at(1.0 + 0.12 * math.cos(2 * math.pi * k / 5), 0.75 + 0.12 * math.sin(2 * math.pi * k / 5), 0.03), 0.022, M["red"], seg=8, rings=5) for k in range(5)]
-pin.append(sphere("kpc", head_at(1.0, 0.75, 0.04), 0.016, M["yellow"], seg=8, rings=5))
+pin = [sphere(f"kp{k}", head_at(1.0 + 0.12 * math.cos(2 * math.pi * k / 5), 0.75 + 0.12 * math.sin(2 * math.pi * k / 5), 0.03), 0.022, M["red"], seg=6, rings=3) for k in range(5)]
+pin.append(sphere("kpc", head_at(1.0, 0.75, 0.04), 0.016, M["yellow"], seg=6, rings=3))
 acc("kanzashi", pin)
 # (a knitted shawl round the shoulders, and a towel round the neck)
-acc("shawl", [lathe("shawl", [(0.6, 0.15), (0.56, 0.22), (0.5, 0.25), (0.46, 0.262)], M["knit"], seg=20, solid=0.02)])
+acc("shawl", [lathe("shawl", [(0.6, 0.15), (0.56, 0.22), (0.5, 0.25), (0.46, 0.262)], M["knit"], seg=12, solid=0.02)])
 NY = 0.575
-tw = [tube("nt", [Vector((math.sin(2 * math.pi * i / 16) * 0.172, NY + 0.015 * math.cos(2 * math.pi * i / 16), math.cos(2 * math.pi * i / 16) * 0.172)) for i in range(16)], 0.022, M["white"], cyclic=True)]
+tw = [tube("nt", [Vector((math.sin(2 * math.pi * i / 11) * 0.174, NY + 0.015 * math.cos(2 * math.pi * i / 11), math.cos(2 * math.pi * i / 11) * 0.174)) for i in range(11)], 0.022, M["white"], cyclic=True, most=11)]
 tw += [tube(f"nte{sd}", [on_body(sd * (0.075 + 0.01 * u), NY - 0.01 - 0.15 * u, 0.012) for u in (0, 0.5, 1)], 0.02, M["white"]) for sd in (-1, 1)]
 acc("towel", tw)
 # (a gakuran's stand collar, black, round the neck)
-acc("collar", [lathe("collar", [(0.53, 0.2), (0.57, 0.185), (0.61, 0.16)], M["dark"], seg=20, solid=0.015)])
+acc("collar", [lathe("collar", [(0.53, 0.2), (0.57, 0.185), (0.61, 0.16)], M["dark"], seg=12, solid=0.015)])
 
+from mathutils.bvhtree import BVHTree  # noqa: E402
+
+
+def cull_hidden(o, covers, reach=0.07):
+    """delete the faces of `o` that can't be seen: from a face's middle and from near each of its corners, rays out along its normal and
+    tilted 35 degrees four ways round it all meet one of `covers` within `reach`"""
+    covers = [c for c in covers if c is not None and c is not o]
+    deps = bpy.context.evaluated_depsgraph_get()
+    vs, fs = [], []
+    for c in covers:
+        me_ = c.evaluated_get(deps).to_mesh()
+        base = len(vs)
+        vs += [c.matrix_world @ v.co for v in me_.vertices]
+        fs += [[base + i for i in pl.vertices] for pl in me_.polygons]
+        c.evaluated_get(deps).to_mesh_clear()
+    tree = BVHTree.FromPolygons(vs, fs)
+    mw = o.matrix_world
+    nm = mw.to_3x3().inverted().transposed()
+    bm_ = bmesh.new(); bm_.from_mesh(o.data)
+    gone = []
+    for f in bm_.faces:
+        n = (nm @ f.normal).normalized()
+        a = n.cross(Vector((0, 0, 1)) if abs(n.z) < 0.9 else Vector((1, 0, 0))).normalized()
+        b = n.cross(a)
+        dirs = [n] + [(n + d * math.tan(math.radians(35))).normalized() for d in (a, -a, b, -b)]
+        c0 = f.calc_center_median()
+        pts = [c0] + [c0 + (v.co - c0) * 0.8 for v in f.verts]
+        if all(tree.ray_cast(mw @ q + n * 0.001, d, reach)[0] is not None for q in pts for d in dirs):
+            gone.append(f)
+    bmesh.ops.delete(bm_, geom=gone, context="FACES")
+    bm_.to_mesh(o.data); bm_.free()
+    return len(gone)
+
+
+bpy.context.view_layer.update()
+_by = {o.name: o for o in parts}
+# (only what's inside the body: the head's foot, down in it (every corner of the face in the body, a little in from its side); the face's
+# sheet is a picture with nothing round its eyes and mouth, the head's skin showing through it, so nothing's culled behind it)
+_hb = bmesh.new(); _hb.from_mesh(_by["FolkHead"].data)
+_mw = _by["FolkHead"].matrix_world
+
+
+def _inside(v):
+    q = _mw @ v.co
+    y, rr = q.z, math.hypot(q.x, q.y)
+    return y < PROFILE[-1][0] - 0.005 and rr < rb(y) - 0.012
+
+
+_gone = [f for f in _hb.faces if all(_inside(v) for v in f.verts)]
+bmesh.ops.delete(_hb, geom=_gone, context="FACES")
+_hb.to_mesh(_by["FolkHead"].data); _hb.free()
+print("CULLED", {"FolkHead": len(_gone)})
 root = bpy.data.objects.new("Folk", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
