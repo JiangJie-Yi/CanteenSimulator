@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { GAME_SPEED } from './speed'
 
@@ -17,6 +17,19 @@ const CAP_FPS = 30
 const MAX_STEP = 0.1
 /** ?pace=0: never steps down (for measuring how heavy a view is) */
 const OFF = typeof location !== 'undefined' && new URLSearchParams(location.search).get('pace') === '0'
+
+/** the resolution the pacer has stepped the 3D view down to (null: as the page asks for it), for the Canvas's own `dpr` to follow
+ * (usePacedDpr). Given anything else, R3F set the canvas back to it each time the page redrew, several times a second while the shop's
+ * open, and the pacer down again each frame after: the canvas flicking between the two resolutions, reallocated each time (the owner saw
+ * the screen flickering, only with the shop open, on a machine slow enough for the pacer to have stepped in) */
+let paced: number | null = null
+const pacedSubs = new Set<() => void>()
+const pace = (dpr: number) => {
+  if (paced === dpr) return
+  paced = dpr
+  pacedSubs.forEach((f) => f())
+}
+export const usePacedDpr = () => useSyncExternalStore((f) => { pacedSubs.add(f); return () => { pacedSubs.delete(f) } }, () => paced, () => null)
 
 /**
  * Drives the 3D view's clock, and keeps it smooth on a machine that can't keep up.
@@ -40,8 +53,8 @@ export function FramePacer() {
   const capped = useRef(false)
 
   useFrame((_, dt) => {
-    // (stepped down to one pixel per screen pixel, it stays there: the canvas's own size, set again as the page redraws, would undo it)
-    if (level.current >= 1 && gl.getPixelRatio() !== 1) setDpr(1)
+    // (stepped down to one pixel per screen pixel, it stays there: the Canvas's dpr follows it, usePacedDpr)
+    if (level.current >= 1 && gl.getPixelRatio() !== 1) { pace(1); setDpr(1) }
     if (OFF || level.current >= 2 || document.hidden) return
     // (a long gap is the tab coming back, or loading: not the drawing being slow; and at ×2 the clock runs faster
     // than the frames come, so it's real frames per real second that are counted)
@@ -58,7 +71,7 @@ export function FramePacer() {
     since.current = 0
     if (fps >= LAG_FPS) return
     level.current++
-    if (level.current === 1) setDpr(1)
+    if (level.current === 1) { pace(1); setDpr(1) }
     else capped.current = true
     if (import.meta.env.DEV) console.info(`[pacer] ${fps.toFixed(0)} fps: step ${level.current}`)
   })

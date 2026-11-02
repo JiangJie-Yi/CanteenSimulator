@@ -37,7 +37,7 @@ import { StockPanel, type StockTab } from '@/shops/grill/StockPanel'
 import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
-import { FramePacer } from '@/scene/FramePacer'
+import { FramePacer, usePacedDpr } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED } from '@/scene/speed'
 import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
@@ -1712,6 +1712,8 @@ export default function App() {
 
   // where the stage sits inside the full-window canvas
   const appRef = useRef<HTMLDivElement>(null)
+  // (the 3D view's resolution once the frame pacer has stepped it down: the Canvas is given it, or it'd set its own back at every redraw)
+  const pacedDpr = usePacedDpr()
   const stageRef = useRef<HTMLDivElement>(null)
   const [frame, setFrame] = useState<Frame>({ cx: 0, cy: 0, w: 0, h: 0 })
   useEffect(() => {
@@ -2336,7 +2338,7 @@ export default function App() {
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
           // (a screen at its plain resolution (devicePixelRatio 1, as most desktops) is drawn a little finer than it shows, then scaled down:
           // with the antialiasing that keeps edges from stepping; the frame pacer drops it to 1 if the frames can't keep up)
-          dpr={typeof window === 'undefined' ? 1 : Math.min(QUALITY.dpr, Math.max(window.devicePixelRatio || 1, phone ? 1 : 1.5))}
+          dpr={pacedDpr ?? (typeof window === 'undefined' ? 1 : Math.min(QUALITY.dpr, Math.max(window.devicePixelRatio || 1, phone ? 1 : 1.5)))}
           onPointerMissed={() => window.dispatchEvent(new Event('scene-blank-click'))}
           onCreated={({ gl, camera, scene, get }) => {
             // (in development, the renderer's counts are to hand for checking how heavy a view is; and the canvas's state (its frame
