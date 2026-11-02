@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react'
 import type { Lang } from '@/data/i18n'
 import { tl } from '@/data/i18n'
+import { setTip } from '@/scene/hoverTip'
 
 // the shop's name: 聞野 日式烤魚 ("smelt from out in the fields"), on a vermilion lacquered board cut like a fish
 const NAMES: Record<string, Record<Lang, { main: string; sub: string }>> = {
@@ -33,11 +35,18 @@ const FISH_RULE = 'M3 25Q6 11 18 7Q40 3 64 7Q76 10 83 22L94 9Q91 25 94 41L83 28Q
 export function Brand({ night, lang, shop = 'grilledfish', dark = false, ignite = 0, onClick }:
   { night: boolean; lang: Lang; shop?: string; dark?: boolean; ignite?: number; onClick?: () => void }) {
   const { main, sub } = (NAMES[shop] ?? NAMES.grilledfish)[lang]
+  // (its tag taken down if the sign goes (lit afresh, as when the shop's founded) with the pointer still on it)
+  const tipped = useRef(false)
+  useEffect(() => () => { if (tipped.current) { tipped.current = false; setTip(null) } }, [shop, ignite])
   return (
     // dark: the business hasn't been founded yet (the sign is unlit); ignite: it's just been founded (it comes to life)
     <h1 key={`${shop}-${ignite}`} className={`brand brand-${shop}${night ? ' brand-night' : ''} brand-${lang}${dark ? ' brand-dark' : ''}${ignite ? ' brand-ignite' : ''}`}
       lang={tl(lang, 'zh-Hant', 'ja', 'en')} aria-label={`${main}${sub}${night ? ' 深夜' : ''}`}
       onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
+      // (pointed at, the same paper tag as anything in the room that can be used: what it is and what a click does)
+      onPointerEnter={onClick ? () => { tipped.current = true; setTip({ title: tl(lang, '店家評價', 'お店の評価', 'The shop’s rating'), hint: tl(lang, '點一下查看', 'クリックで見る', 'Click to see') }) } : undefined}
+      onPointerLeave={onClick ? () => { tipped.current = false; setTip(null) } : undefined}
       style={onClick ? { pointerEvents: 'auto', cursor: 'pointer' } : undefined}>
       <span className="brand-plate" aria-hidden="true">
         <span className="brand-cord brand-cord-left" />

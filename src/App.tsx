@@ -1230,6 +1230,7 @@ export default function App() {
   }), [])
   const shopRating = useMemo(() => rateShop(shopVisits), [shopVisits])
   const [showRating, setShowRating] = useState(false)
+  const closeRating = useCallback(() => setShowRating(false), [])
   const meterTick = useRef(0)
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
   const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.utility ?? 0) - (ledger.setup ?? 0) - (ledger.offering ?? 0) + (ledger.till ?? 0)
@@ -1317,15 +1318,15 @@ export default function App() {
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [office, boardsOpen, toolsOpen, fridgeOpen, viewMenu, editOn])
-  // (the panels docked at the right (the office, the pantry, the drinks' stock) fold away at a click on the 3D view that lands on nothing that
-  // can be clicked (a wall, the floor): not at a drag that turns the view, nor at a click on something that does something there (the
-  // grill's food and tools while cooking, the freezer, the speaker), which goes on as it did)
+  // (the panels docked at the right (the office, the pantry, the drinks' stock), and the shop's rating out at the left, fold away at a click
+  // on the 3D view that lands on nothing that can be clicked (a wall, the floor): not at a drag that turns the view, nor at a click on
+  // something that does something there (the grill's food and tools while cooking, the freezer, the speaker), which goes on as it did)
   useEffect(() => {
-    if (!office && !fridgeOpen && !drinksOpen) return
-    const blank = () => { setOffice(null); setFridgeOpen(false); setDrinkPanel(false) }
+    if (!office && !fridgeOpen && !drinksOpen && !showRating) return
+    const blank = () => { setOffice(null); setFridgeOpen(false); setDrinkPanel(false); setShowRating(false) }
     window.addEventListener('scene-blank-click', blank)
     return () => window.removeEventListener('scene-blank-click', blank)
-  }, [office, fridgeOpen, drinksOpen])
+  }, [office, fridgeOpen, drinksOpen, showRating])
   // (the number keys choose a view, as the eye's list numbers them: 1 the overview ... 9 the window, 0 the owner's own eyes; not in edit mode,
   // which has keys of its own (4, 5), nor while something's being typed)
   useEffect(() => {
@@ -2300,7 +2301,7 @@ export default function App() {
     return !!e && orderEntryRef.current(e, guest, reuse)
   }, [])
   return (
-    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}${!!dish.roast && !editOn ? ' has-fridge' : ''} hud-rows-${hudRows}`} ref={appRef}>
+    <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}${!!dish.roast && !editOn ? ' has-fridge' : ''}${office || fridgeOpen ? ' is-docked' : ''} hud-rows-${hudRows}`} ref={appRef}>
       {/* the 3D view fills the whole window behind the stage and the menu, so nothing is cut off at the menu's
           edge; the camera is offset so the dish still sits in the middle of the stage */}
       {glLost && (
@@ -2390,8 +2391,9 @@ export default function App() {
         )}
         <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
           onClick={editOn ? undefined : () => setShowRating((v) => !v)} />
-        {/* (the shop's rating, from its sign (the owner's): every customer's satisfaction made into its stars) */}
-        {showRating && !editOn && <Reputation lang={lang} rating={shopRating} visits={shopVisits} onClose={() => setShowRating(false)} />}
+        {/* (the shop's rating, from its sign (the owner's): every customer's satisfaction made into its stars; a drawer out from the left, kept
+            drawn so it slides back in as it slid out) */}
+        {!editOn && <Reputation open={showRating} lang={lang} rating={shopRating} visits={shopVisits} onClose={closeRating} />}
         {/* (the fire is the grill's own (research, at the grill's view); how full is the owner's own, on his view: the rest of the time they're
             out of the way, and the buttons under them move up into the room left) */}
         {showFire && <FireControl level={fireLevel} onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
@@ -2685,7 +2687,7 @@ export default function App() {
       )}
       {/* (a little fridge, top right, always there: opens and shuts the stock panel (the owner's)) */}
       {!!dish.roast && !editOn && (
-        <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => { setFridgeOpen((v) => !v); setMenuFolded(false) }} aria-pressed={fridgeOpen}
+        <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => setFridgeOpen((v) => !v)} aria-pressed={fridgeOpen}
           title={tl(lang, '打開／關上庫存', '在庫を開く／閉じる', 'Open / close the stock')}>
           {/* (a little two-door fridge: enamel white going cool blue down it, chrome handles, a snowflake on the freezer, a fish on the chiller,
               a gleam down its side and its shadow under it) */}

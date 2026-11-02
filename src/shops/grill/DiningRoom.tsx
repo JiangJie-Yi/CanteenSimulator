@@ -1885,19 +1885,36 @@ const STAFF_STAIRS = canvasTex(512, 1440, (g) => {
   sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.45)')
   g.fillStyle = sh; g.fillRect(0, 0, W, H)
 })
-/** the plaque over the staff's door: 員工專用 in cream on dark wood, STAFF ONLY under it */
-const STAFF_SIGN = canvasTex(336, 128, (g) => {
-  g.fillStyle = '#3a2416'; g.fillRect(0, 0, 336, 128)
-  g.strokeStyle = '#7a5434'; g.lineWidth = 6; g.strokeRect(6, 6, 324, 116)
-  brushText(g, '員工專用', 168, 54, 52, { fill: '#f2e4c4', shadow: 'rgba(0,0,0,0.5)', spacing: 6 })
-  g.fillStyle = '#d8c49a'; g.font = '600 18px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
-  ;(g as unknown as { letterSpacing: string }).letterSpacing = '4px'
-  g.fillText('STAFF ONLY', 168, 102)
+/** 員工專用 painted on the staff's door, across its board below the waist (the owner's: on the door itself; it was a plaque over it, half
+ * behind the banner hung there), STAFF ONLY small under it: cream signwriter's paint on the cedar, worn a little so the grain shows through */
+const STAFF_SIGN = canvasTex(512, 256, (g) => {
+  brushText(g, '員工專用', 256, 104, 104, { fill: '#f3e7cc', shadow: 'rgba(30,16,8,0.45)', spacing: 10 })
+  g.save()
+  g.fillStyle = '#efe0c0'; g.font = '700 30px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  ;(g as unknown as { letterSpacing: string }).letterSpacing = '9px'
+  g.fillText('STAFF ONLY', 260, 196)
+  g.restore()
+  // (the paint worn: specks and short scuffs along the grain taken out of it; the canvas's state put back after, as it's painted again on
+  // the same canvas once the sign font is in, and would rub everything out)
+  let seed = 7
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+  g.save()
+  g.globalCompositeOperation = 'destination-out'
+  for (let k = 0; k < 900; k++) {
+    g.globalAlpha = 0.25 + rnd() * 0.55
+    g.fillRect(rnd() * 512, rnd() * 256, 1 + rnd() * 2.5, 1 + rnd() * 1.2)
+  }
+  for (let k = 0; k < 70; k++) {
+    g.globalAlpha = 0.18 + rnd() * 0.3
+    g.fillRect(rnd() * 512, rnd() * 256, 8 + rnd() * 26, 0.8 + rnd() * 0.8)
+  }
+  g.restore()
 })
 /**
  * The staff's door (the owner's: in the side wall by the corner, where the koi print hung; a sliding door like the toilets'): the toilets'
- * door narrowed, its dark cedar frame on the plaster, the stair painted on the wall inside it, a plaque over it; clicked it slides aside
- * toward the corner (behind the bamboo's pot) and back again.
+ * door narrowed, its dark cedar frame on the plaster, the stair painted on the wall inside it, 員工專用 painted on its board; clicked it
+ * slides aside away from the corner and back again (the owner's: it slid toward the corner, behind the bamboo's pot), the panel turned
+ * about so its pull is at the edge it's pulled by.
  */
 function StaffDoor() {
   const door = useWcDoor()
@@ -1913,12 +1930,13 @@ function StaffDoor() {
     const ss = (a: number, b: number) => { const t = Math.min(1, Math.max(0, (s.k - a) / (b - a))); return t * t * (3 - 2 * t) }
     if (g.current) {
       g.current.position.x = -0.065 * ss(0, 0.25)
-      g.current.position.z = -ss(0.2, 1) * (STAFF_W - 0.06)
+      // (its far edge stopping short of the scroll hung beside it)
+      g.current.position.z = ss(0.2, 1) * (STAFF_W - 0.1)
     }
   })
   const says = () => (st.current.open ? '點一下關上（樓上是員工休息室）' : '點一下打開（樓上是員工休息室）')
   return (
-    <group>
+    <group name="staff-door">
       <group scale={[1, 1, narrow]}><primitive object={frame} /></group>
       <mesh position={[-0.004, WC_H / 2, 0]} rotation-y={-Math.PI / 2}>
         <planeGeometry args={[STAFF_W - 0.05, WC_H - 0.02]} />
@@ -1927,12 +1945,13 @@ function StaffDoor() {
       <group ref={g} onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; st.current.open = !st.current.open; setTip({ title: '員工專用門', hint: says() }) }}
         onPointerOver={(ev) => { if (getEdit().on) return; tipOver('員工專用門', says()).onPointerOver(ev) }}
         onPointerOut={(ev) => { tipOver('員工專用門', '').onPointerOut(ev) }}>
-        <group position={[-0.03, 0, 0]} scale={[1, 1, narrow]}><primitive object={panel} /></group>
+        <group position={[-0.03, 0, 0]} scale={[1, 1, -narrow]}><primitive object={panel} /></group>
+        {/* (on the board's face, a little above its middle, just clear of it) */}
+        <mesh position={[-0.0372, 0.6, 0]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[0.46, 0.23]} />
+          <meshToonMaterial color="#ffffff" map={STAFF_SIGN} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} />
+        </mesh>
       </group>
-      <mesh position={[-0.075, WC_H + 0.15, 0]} rotation-y={-Math.PI / 2}>
-        <planeGeometry args={[0.42, 0.16]} />
-        <meshToonMaterial color="#ffffff" map={STAFF_SIGN} />
-      </mesh>
     </group>
   )
 }

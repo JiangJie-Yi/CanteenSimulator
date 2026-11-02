@@ -1798,7 +1798,9 @@ button {
   }
 
   .app.menu-folded .menu,
-  .app.menu-folded .menu-backing {
+  .app.menu-folded .menu-backing,
+  .app.is-docked .menu,
+  .app.is-docked .menu-backing {
     opacity: 0;
     transform: translateX(30%);
     pointer-events: none;
@@ -1806,6 +1808,13 @@ button {
 
   .menu-backing {
     transition: opacity 260ms ease;
+  }
+
+  /* (one thing at the right at a time (the owner's): while a panel docked there is open (the office, the stock), the menu steps out of its
+     way, tab and all, and comes back as it was when it shuts; they lay over each other, their upright titles one on the other) */
+  .app.is-docked .menu-fold {
+    opacity: 0;
+    pointer-events: none;
   }
 
   /* the tab on the menu's edge that folds it away and brings it back: a small plate of black lacquer with a fine gold rule round it and a gold
@@ -1836,7 +1845,7 @@ button {
     place-items: center;
     cursor: pointer;
     opacity: 1;
-    transition: right 360ms ease, filter 160ms ease, transform 160ms ease;
+    transition: right 360ms ease, filter 160ms ease, transform 160ms ease, opacity 260ms ease;
   }
 
   .menu-fold span {
@@ -3884,12 +3893,18 @@ button {
   cursor: pointer;
 }
 
+/* (the sign opens the shop's rating: pointed at, it glows warm round its own fish-cut edge and says so (ui/Brand's tag). It used to beckon
+   with a gold ring pulsing round its box forever, left over from when an unopened shop was opened from its sign: the owner saw its
+   rectangle flickering round the logo) */
 .brand[role='button'] .brand-plate {
-  animation: brand-beckon 1.6s ease-in-out infinite;
+  transition: background-color 300ms ease, color 300ms ease, filter 180ms ease;
 }
-
-@keyframes brand-beckon {
-  50% { box-shadow: 0 0 0 3px rgb(255 214 140 / 0.7), 0 0 18px 4px rgb(255 214 140 / 0.6); }
+.brand[role='button']:hover .brand-plate,
+.brand[role='button']:focus-visible .brand-plate {
+  filter: drop-shadow(0 0.12em 0.14em rgb(40 20 10 / 0.55)) drop-shadow(0 0 0.2em rgb(255 214 140 / 0.9)) brightness(1.06);
+}
+.brand[role='button']:focus-visible {
+  outline: none;
 }
 
 .welcome-warn {
@@ -6974,28 +6989,90 @@ html.theme-fading::view-transition-new(root) {
 .stock-meter-note { margin: 10px 0 0; font-size: 11px; color: #a89f90; }
 
 /* ---- the shop's rating (ui/Reputation.tsx, the owner's: from the shop's sign): its stars, its three sides, what the latest said ---- */
-.rep-card {
-  position: fixed; left: 18px; top: 112px; z-index: 60; width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 140px); overflow-y: auto;
-  border-radius: 12px; background: rgba(250, 245, 236, 0.97); color: #2a2018; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
-  font: 14px/1.5 var(--sans, sans-serif);
+/* ---- the shop's rating (ui/Reputation): a drawer out from the left edge under the sign (the owner's: left to right, back at its ×, a click
+   on nothing in the room or Esc), in the office's finish: the wood title bar and frame, its glass (pale by day, dark by night), the section
+   under a rule with its count, a card each ---- */
+.rep-drawer {
+  position: fixed;
+  z-index: 40;
+  left: 14px;
+  top: 110px;
+  width: min(380px, calc(100vw - 28px));
+  max-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 3px solid #5a3d28;
+  border-radius: 10px;
+  background: rgb(251 246 234 / 0.66);
+  -webkit-backdrop-filter: blur(5px) saturate(1.1);
+  backdrop-filter: blur(5px) saturate(1.1);
+  color: #3b2a20;
+  box-shadow: 0 16px 40px -14px rgb(0 0 0 / 0.6);
+  font: 14px/1.45 var(--brush);
+  /* (shut: slid out past the left edge, and gone once it's there) */
+  transform: translateX(calc(-100% - 28px));
+  visibility: hidden;
+  transition: transform 340ms cubic-bezier(0.2, 0.8, 0.3, 1), visibility 0s linear 340ms;
 }
-.rep-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--grain-dark, #3a2a1e); color: #f4ead8; border-radius: 12px 12px 0 0; }
-.rep-head b { font-family: var(--brush, inherit); font-size: 17px; letter-spacing: 0.08em; }
-.rep-empty { margin: 0; padding: 18px 16px; color: #6a5a48; }
-.rep-score { display: flex; align-items: baseline; gap: 10px; padding: 14px 16px 6px; }
-.rep-score strong { font-size: 40px; line-height: 1; color: #c8521e; font-variant-numeric: tabular-nums; }
-.rep-score small { color: #7a6a58; }
+.rep-drawer.is-open {
+  transform: none;
+  visibility: visible;
+  transition: transform 340ms cubic-bezier(0.2, 0.8, 0.3, 1), visibility 0s;
+}
+:root[data-theme='dark'] .rep-drawer { background: rgb(30 26 22 / 0.85); color: var(--text); }
+.rep-drawer > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--wood-bar);
+  color: #f6e8cc;
+  border-bottom: 2px solid #8a6a44;
+}
+.rep-drawer > header b { font-size: 17px; letter-spacing: 0.14em; }
+.rep-drawer > header .panel-x { margin-left: auto; }
+.rep-body { min-height: 0; overflow-y: auto; padding: 12px 14px 4px; scrollbar-width: thin; }
+.rep-empty, .rep-sum, .rep-recent li {
+  background: rgb(255 255 255 / 0.3);
+  border: 1px solid rgb(59 42 32 / 0.12);
+  border-radius: 12px;
+}
+:root[data-theme='dark'] :is(.rep-empty, .rep-sum, .rep-recent li) { background: rgb(255 255 255 / 0.05); border-color: rgb(246 236 216 / 0.12); }
+.rep-empty { margin: 0 0 10px; padding: 16px 14px; }
+/* (the shop's stars, big, and beside them the food, the service and the place) */
+.rep-sum { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; padding: 12px 14px; }
+.rep-score { display: grid; justify-items: start; gap: 3px; }
+.rep-score strong { font-size: 40px; line-height: 1; color: #c4442f; font-variant-numeric: tabular-nums; }
+:root[data-theme='dark'] .rep-score strong { color: #ff9a80; }
+.rep-score small, .rep-note { color: #7a6250; }
+:root[data-theme='dark'] :is(.rep-score small, .rep-note) { color: #c9bfae; }
 .rep-stars { position: relative; display: inline-block; font-size: 13px; letter-spacing: 1px; line-height: 1; }
-.rep-stars.is-big { font-size: 22px; }
-.rep-stars-base { color: #d9cfbf; }
+.rep-stars.is-big { font-size: 19px; }
+.rep-stars-base { color: rgb(59 42 32 / 0.18); }
+:root[data-theme='dark'] .rep-stars-base { color: rgb(246 236 216 / 0.2); }
 .rep-stars-fill { position: absolute; left: 0; top: 0; overflow: hidden; white-space: nowrap; color: #f0a020; }
-.rep-parts { list-style: none; margin: 0; padding: 4px 16px 10px; }
-.rep-parts li { display: grid; grid-template-columns: 4.5em auto 1fr; align-items: center; gap: 8px; padding: 2px 0; }
+.rep-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rep-parts li { display: grid; grid-template-columns: 3.6em auto 1fr; align-items: center; gap: 8px; }
 .rep-parts li b { justify-self: end; font-variant-numeric: tabular-nums; }
-.rep-recent-head { margin: 0; padding: 6px 16px 4px; font-size: 13px; color: #6a5a48; border-top: 1px solid rgba(60, 40, 20, 0.12); }
-.rep-recent { list-style: none; margin: 0; padding: 0 16px 6px; }
-.rep-recent li { display: flex; flex-direction: column; padding: 5px 0; border-bottom: 1px dotted rgba(60, 40, 20, 0.15); }
-.rep-who { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
-.rep-said { color: #4a3a2a; }
-.rep-note { margin: 0; padding: 8px 16px 14px; font-size: 11px; color: #8a7a68; }
+/* (the latest customers: under a rule as the office's jobs are, their count beside it) */
+.rep-drawer h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 8px;
+  padding: 4px 0 6px 10px;
+  border-left: 4px solid #e8b04a;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+.rep-drawer h4 small { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: rgb(59 42 32 / 0.08); font-variant-numeric: tabular-nums; }
+:root[data-theme='dark'] .rep-drawer h4 { color: #f6ecd8; border-color: rgb(246 236 216 / 0.25); }
+:root[data-theme='dark'] .rep-drawer h4 small { background: rgb(246 236 216 / 0.1); }
+.rep-recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rep-recent li { display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; padding: 9px 12px; }
+.rep-recent .mood-face { grid-row: 1 / 3; width: 34px; height: 34px; align-self: center; filter: drop-shadow(0 2px 3px rgb(59 42 32 / 0.18)); }
+.rep-who { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }
+.rep-said { font-size: 13.5px; }
+.rep-note { margin: 0; padding: 10px 2px 12px; font-size: 11.5px; }
 .tissue-icon { font-size: 18px; line-height: 1; }
