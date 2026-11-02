@@ -2754,7 +2754,7 @@ function seeded(seed: number) {
  * it half a scale along; 立涌 (tatewaku): upright stripes of every width waving up the band together. Its width a whole number of repeats, so
  * it runs on round the lantern with no seam */
 const BAND_COLOURS = ['#1d3468', '#2c4c8c', '#4568a8', '#6a8cc6', '#9ab2dc']
-function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number, lit: boolean, kind: 'uroko' | 'tatewaku', flip = false) {
+function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number, kind: 'uroko' | 'tatewaku', flip = false) {
   const h = Math.ceil(y1 - y0)
   const sheet = document.createElement('canvas')
   sheet.width = W; sheet.height = h
@@ -2892,8 +2892,8 @@ function lanternPaper(g: CanvasRenderingContext2D, lit: boolean, band: 'uroko' |
   for (let x = 0; x < W; x += 128) g.fillRect(x, 0, 1.6, H)
   // (its bands, one round its shoulder and one round its foot, mirrored (the owner's: top and bottom, the one the other way up), each out
   // toward its end so the white of the paper between them is wide (the owner's: wider))
-  patternBand(g, W, H * 0.07, H * 0.27, lit, band, true)
-  patternBand(g, W, H * 0.73, H * 0.93, lit, band)
+  patternBand(g, W, H * 0.07, H * 0.27, band, true)
+  patternBand(g, W, H * 0.73, H * 0.93, band)
 }
 const LANTERN_SKIN = signTexture(1024, 300, (g) => lanternPaper(g, true))
 const PENDANT_GLOW = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffcf90' }), 0.35, 0.75)
