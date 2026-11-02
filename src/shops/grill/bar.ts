@@ -534,8 +534,8 @@ export function payOf(cs: Counter[]) {
 }
 
 /** the pass, in the bar's own frame: on the first counter's top, on the kitchen's half of it, between its first two places (`PASS_ALONG`
- * in from its start), so what's put out there doesn't stand at a customer's place as if it were theirs */
-export const PASS_ALONG = 0.65
+ * in from its start, worked out from them below GRILL_COUNTERS), so what's put out there doesn't stand at a customer's place as if it were
+ * theirs */
 /** and across it: up on a shelf over the raised lip on the cook's side (a 付け台), above the places, not down among their plates and soy dishes
  * (between two places evenly spaced there was no room for the tray: it lay under the next place's soy dish, and its plate went into it) */
 export const PASS_LAY = 0.28
@@ -566,8 +566,8 @@ export const ALONG = new THREE.Vector3(0.81, 0, -0.59)
 export const OWNER_SPOT = new THREE.Vector3().addScaledVector(LAY, 2.62).addScaledVector(ALONG, 1.2)
 export const OWNER_YAW = (() => { const v = new THREE.Vector3().addScaledVector(LAY, 2.0).addScaledVector(ALONG, -0.4); return Math.atan2(-v.x, -v.z) })()
 
-/** how far apart the grill's stools stand, along both its counters: the seats spaced evenly the shop over (the side counter's were 0.91 apart,
- * the long one's 0.75) */
+/** how far apart the grill's stools stand along the side counter (the long one's five are spread wider, over the run its six had: the owner
+ * found six too crowded) */
 export const SEAT_PITCH = 0.75
 /** where a counter's n-th place is along it, from its middle: what the stools, the places' settings and their drawers all go by */
 export const seatAlong = (c: Counter, n: number) => (n - (c.seats - 1) / 2) * (c.pitch ?? c.length / c.seats) + (c.shift ?? 0)
@@ -651,8 +651,10 @@ export const GRILL_COUNTERS: Counter[] = [
   // (its start drawn in to meet the side counter, which is drawn in from the wall by SIDE_PULL: the far end stays where it was)
   // (and its far end drawn in by BAR_TRIM: the strip of floor that was left between the kitchen and the till taken out, all past it closing up)
   // (its places drawn back a little from the gate's end: the last one's chopsticks reached the gap, its drawer the gate's post)
-  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2 - BAR_TRIM / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL - BAR_TRIM, seats: 6,
-    pitch: SEAT_PITCH, shift: -0.1 },
+  // (five places, not six, spread over the run the six had: first and last where they were, the rest evenly between (the owner's: one fewer,
+  // evenly spread, not so crowded); 0.94 apart)
+  { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2 - BAR_TRIM / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL - BAR_TRIM, seats: 5,
+    pitch: (SEAT_PITCH * 5) / 4, shift: -0.1 },
   // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)
   // (its four places as far apart as the long one's, in the middle of its run between the gate and the corner)
   { at: new THREE.Vector3().addScaledVector(LAY, -0.42 + 0.25).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14 + 0.5, seats: 4,
@@ -661,6 +663,8 @@ export const GRILL_COUNTERS: Counter[] = [
     far: FLOOR_FAR - 0.45 - SIDE_PULL },
 ]
 export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)
+/** the pass's way in from the first counter's start: halfway between its first two places */
+export const PASS_ALONG = GRILL_COUNTERS[0].length / 2 + (seatAlong(GRILL_COUNTERS[0], 0) + seatAlong(GRILL_COUNTERS[0], 1)) / 2
 /**
  * The staff's way home once the shop's shut and empty (the first counter's frame): from just inside its gate by the till, through it and
  * along the aisle out of the front door, as the customers go. Each comes to it their own way first.

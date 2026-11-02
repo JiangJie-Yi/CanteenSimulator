@@ -49,7 +49,7 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   'grp-till': { zh: '收銀櫃組', ja: 'レジ一式', members: ['till-counter', 'till-register', 'till-card', 'till-printer', 'till-tray', 'till-pens', 'till-bell',
     'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-cashbox', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
   // (the customers' stools, the length of the bars: the views' cameras each see a few of them, so left out of their areas and kept together)
-  'grp-stools': { zh: '吧台座椅', ja: 'カウンター席', members: Array.from({ length: 10 }, (_, n) => `stool${n}`), spans: true },
+  'grp-stools': { zh: '吧台座椅', ja: 'カウンター席', members: Array.from({ length: 9 }, (_, n) => `stool${n}`), spans: true },
 }
 const unsettled = new Set<string>()
 /** the groups the owner has broken up (the shop's own, and the views' areas): not made again (kept here too, for when storage is blocked) */
