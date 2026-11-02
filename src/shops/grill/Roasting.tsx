@@ -42,7 +42,7 @@ import { fireSound } from '@/game/fireSound'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { Boss, BOSS_TASTE } from './Boss'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
-import { ashMaterial, charcoalMaterial, useBinchotan } from './binchotanModel'
+import { ashMaterial, charcoalMaterial, useBinchotan, type BinchotanKit } from './binchotanModel'
 import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, settleOffset, useEdit, type V3 } from './edit'
 import { setTip } from '@/scene/hoverTip'
 import { slide as drawerSound } from './TillDesk'
@@ -55,6 +55,7 @@ import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
 import { seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PASS, PASS_SHELF, PASS_SLOTS, passSlotAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
+import { warmLater } from '@/scene/Prewarm'
 
 export { BAR_AT, BAR_TOP }
 
@@ -2612,6 +2613,62 @@ function biteOutline(outline: THREE.Mesh, bites: Bites) {
   mat.uniforms.uBiteCount = bites.uBiteCount
 }
 
+/**
+ * The charring programs made with the page (scene/Prewarm), not when the first piece of a kind is ordered: every food mesh once on its own
+ * charring copy of its material (its browning, seasonings and bites) and its ink on its bitten copy, compiled while the page loads, kept,
+ * never drawn. The first of each kind, ordered, stopped the picture a quarter to half a second while its program was linked. False till
+ * Dish has made the food over into its toon materials (bindMaterials waits for the same).
+ */
+function warmCharring(root: THREE.Object3D, isFood: (id: string) => boolean) {
+  const meshes: THREE.Mesh[] = []
+  for (const obj of root.children) {
+    if (!isFood((obj.userData.itemId as string | undefined) ?? baseName(obj.name))) continue
+    obj.traverse((o) => { if (o instanceof THREE.Mesh && !o.name.endsWith('_outline')) meshes.push(o) })
+  }
+  if (!meshes.length || !meshes.every((m) => m.material instanceof THREE.MeshToonMaterial)) return false
+  const group = new THREE.Group()
+  for (const m of meshes) {
+    const src = m.material as THREE.MeshToonMaterial
+    if (src.name.startsWith('Foil') || src.name.startsWith('Wrapper')) continue
+    // (both of its sides: a piece cooks front side only, and shows its inside, both, once it's bitten)
+    for (const side of [THREE.FrontSide, THREE.DoubleSide]) {
+      const mat = src.clone()
+      mat.side = side
+      addCharring(mat, EYE_LOOKS, newBites())
+      const w = m.clone(false) as THREE.Mesh
+      w.material = mat
+      group.add(w)
+    }
+    for (const c of m.children) {
+      if (!(c instanceof THREE.Mesh) || !c.name.endsWith('_outline')) continue
+      const o = c.clone(false) as THREE.Mesh
+      o.material = (c.material as THREE.ShaderMaterial).clone()
+      biteOutline(o, newBites())
+      group.add(o)
+    }
+  }
+  warmLater(group)
+  return true
+}
+
+/**
+ * The fire's charcoal and its ash made with the page (scene/Prewarm): a stick on its own material and a piece burnt to ash, each as it's
+ * drawn whole and as it fades (transparent), compiled while the page loads, kept, never drawn. The first stick to burn through (a minute
+ * or so into service) stopped the picture while its ash's program was linked, and again when that ash faded.
+ */
+let coalWarmed = false
+function warmCoal(bin: BinchotanKit) {
+  if (coalWarmed) return
+  coalWarmed = true
+  const group = new THREE.Group()
+  for (const transparent of [false, true]) {
+    const coal = charcoalMaterial(bin), ash = ashMaterial(bin)
+    coal.transparent = ash.transparent = transparent
+    group.add(new THREE.Mesh(bin.stick(0.3, 0.032, 0), coal), new THREE.Mesh(bin.chunk(0), ash))
+  }
+  warmLater(group)
+}
+
 /** A small repeatable random generator, so a piece always gets the same crumple. */
 function seeded(key: string) {
   let h = 2166136261
@@ -2949,6 +3006,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** (on a phone) who's had their drink from the fridge */
   const drank = useRef(new Set<number>())
   const scannedCount = useRef(-1)
+  // (the charring programs, made while the page loads: warmCharring)
+  const charWarm = useRef(false)
+  useFrame(() => { if (!charWarm.current) charWarm.current = warmCharring(root, (id) => id in roast.times) })
   const scan = () => {
     const known = new Set(pieces.current.map((p) => p.node))
     for (const obj of root.children) {
@@ -3208,6 +3268,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [coalIds, setCoalIds] = useState<number[]>([])
   // (the same sticks as the crate's, from Blender (blender/binchotan.py): each thrown one its own of the six, its own length and thickness)
   const bin = useBinchotan()
+  // (its charcoal's and ash's programs made with the page)
+  useEffect(() => warmCoal(bin), [bin])
   const randomStick = () => bin.stick(0.28 + Math.random() * 0.12, 0.03 + Math.random() * 0.006, Math.floor(Math.random() * 6))
   /** the pieces of sticks that burnt through and broke: falling onto what's under them, lying there as grey ash a while, then gone */
   type Crumb = { id: number; geo: THREE.BufferGeometry; mat: THREE.MeshToonMaterial; x: number; y: number; z: number; ty: number; vy: number; q: THREE.Quaternion; age: number; m: THREE.Mesh | null }

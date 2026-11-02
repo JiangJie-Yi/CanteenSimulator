@@ -9,6 +9,7 @@ import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } fr
 import { bakeable, colourVertices } from './StaticBatch'
 import { cloth } from './patterns'
 import type { Mood } from './people'
+import { warmLater } from './Prewarm'
 
 /*
  * A customer in the boss's style (blender/folk.py: public/models/folk.glb): an Overcooked cook's big round head on a short plump body, no
@@ -182,7 +183,11 @@ const templates = new Map<string, Template>()
  */
 function folkMaterial(outfit: THREE.Texture | null, face: THREE.Texture | null, knit: THREE.Texture | null) {
   const u = { faceMap: { value: face }, faceOffset: { value: 0 }, knitMap: { value: knit }, knitRepeat: { value: knit?.repeat ?? new THREE.Vector2(1, 1) } }
-  const m = paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: outfit, vertexColors: true, gradientMap })))
+  // (hashed from the start, so a fade (theirs as they come in and go) only moves its opacity: switched on and off for each, the last fade
+  // over let the hashed program go and the next one linked it again, a hitch at every customer's coming and going; at full opacity nothing's
+  // cut)
+  const m = paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: outfit, vertexColors: true, gradientMap, alphaHash: true })))
+  m.userData.hashed = true
   const before = m.onBeforeCompile
   m.onBeforeCompile = (sh, r) => {
     before.call(m, sh, r)
@@ -312,6 +317,28 @@ function template(scene: THREE.Group, hair: string, acc: string[], briefcase: bo
 }
 
 /**
+ * One customer made with the page and never shown: their program (the customers' material on their skinned figure) linked while the page
+ * loads (scene/Prewarm), not when the first one comes in (a hitch of a tenth of a second or more), and kept (this one's material is never
+ * let go), so it isn't let go and linked again when the shop has emptied and the next one comes.
+ */
+const folkWarmed = new WeakSet<object>()
+export function FolkWarm() {
+  const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
+  const pictures = usePictures()
+  useEffect(() => {
+    // (once for the page: the bar mounted again (or twice, in development) makes no more of it)
+    if (folkWarmed.has(gltf.scene)) return
+    folkWarmed.add(gltf.scene)
+    const spec = folkSpec(0)
+    const root = cloneFigure(template(gltf.scene, spec.hair, spec.acc, spec.briefcase).root) as THREE.Group
+    const mesh = root.getObjectByName('FolkMesh') as THREE.SkinnedMesh
+    mesh.material = folkMaterial(pictures.get(spec.outfit) ?? null, pictures.get(`face_${spec.face}`) ?? null, null).material
+    warmLater(root)
+  }, [gltf, pictures])
+  return null
+}
+
+/**
  * A customer, as Person3D's Person has them (the same props): sat on their stool or walking, eating, talking to the one they came with,
  * passing the time (looking about, at their phone, chin in hand), their mood on their face, a hop of delight when their food comes,
  * fading as they go; `fit`: their size in the frame they're drawn in (the boss's height there).
@@ -409,7 +436,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       if ((mat as THREE.MeshBasicMaterial).side === THREE.BackSide && mat.type !== 'MeshToonMaterial') { m.visible = f >= 1; return }
       if (mat.userData.base === undefined) mat.userData.base = { opacity: mat.opacity, transparent: mat.transparent }
       const base = mat.userData.base as { opacity: number; transparent: boolean }
-      if (was !== f < 1) { if (!base.transparent) mat.alphaHash = f < 1; mat.needsUpdate = true }
+      if (was !== f < 1 && !base.transparent && !mat.userData.hashed) { mat.alphaHash = f < 1; mat.needsUpdate = true }
       mat.opacity = base.opacity * f
     })
   }

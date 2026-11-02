@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, type RefObject } from 'react'
+import { memo, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
 import { snoise as noise } from '@/scene/shaders/noise'
@@ -77,6 +77,30 @@ function planeOf(width: number, height: number) {
   return g
 }
 
+/** steam's materials put by when a steam goes, for the next: disposed, the last of them let their program go and the next steam (a dish
+ * served every few seconds) linked it again, a hitch each time; as many as were ever up at once, no more */
+const SPARE: THREE.ShaderMaterial[] = []
+function steamMaterial(seed: number) {
+  const m = SPARE.pop() ?? new THREE.ShaderMaterial({
+    vertexShader,
+    fragmentShader,
+    uniforms: {
+      uTime: { value: 0 },
+      uSeed: { value: 0 },
+      uOpacity: { value: 0 },
+      uColor: { value: new THREE.Color() },
+      uShade: { value: new THREE.Color() },
+      uSpeed: { value: 0 },
+    },
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  })
+  m.uniforms.uSeed.value = seed
+  m.uniforms.uOpacity.value = 0
+  return m
+}
+
 /** Rising steam (or smoke) built from a few crossed, noise-animated planes. */
 // (drawn again only when its props change: a position handed down as a new [x, y, z] with the same numbers is the same place)
 export const Steam = memo(SteamImpl, sameProps)
@@ -84,31 +108,13 @@ function SteamImpl({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, colo
   speed = 0.07, level, ...props }: SteamProps) {
   const geometry = useMemo(() => planeOf(width, height), [width, height])
 
-  const materials = useMemo(
-    () =>
-      Array.from(
-        { length: layers },
-        (_, i) =>
-          new THREE.ShaderMaterial({
-            vertexShader,
-            fragmentShader,
-            uniforms: {
-              uTime: { value: 0 },
-              uSeed: { value: i * 7.31 },
-              uOpacity: { value: 0 },
-              uColor: { value: new THREE.Color() },
-              uShade: { value: new THREE.Color() },
-              uSpeed: { value: 0 },
-            },
-            transparent: true,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-          }),
-      ),
-    [layers],
-  )
-
-  useEffect(() => () => { for (const m of materials) m.dispose() }, [materials])
+  // (taken as it's shown and put by as it goes: made while drawing, a copy React makes and drops (in development) would never come back)
+  const [materials, setMaterials] = useState<THREE.ShaderMaterial[]>([])
+  useLayoutEffect(() => {
+    const ms = Array.from({ length: layers }, (_, i) => steamMaterial(i * 7.31))
+    setMaterials(ms)
+    return () => { SPARE.push(...ms) }
+  }, [layers])
   const time = useRef(0)
   const group = useRef<THREE.Group>(null)
   useFrame((_, delta) => {

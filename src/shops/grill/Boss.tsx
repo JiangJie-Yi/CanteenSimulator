@@ -235,6 +235,10 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       if (/outline/i.test(o.name) || (!Array.isArray(m) && m.side === THREE.BackSide)) { ink.push(o); return }
       for (const x of Array.isArray(m) ? m : [m]) set.add(x)
     })
+    // (hashed from the start: a fade only moves their opacity (at full, nothing's cut); switched on and off with each, the program each way
+    // was let go and linked again, a hitch every time he stepped in front of the camera or out of its way. One that's blended already
+    // fades by its blending: hashed, its soft edges would be cut to a dither for good)
+    for (const x of set) if (!x.transparent) { x.alphaHash = true; x.needsUpdate = true }
     return { mats: [...set], inks: ink }
   }, [root])
   const controls = useThree((s) => s.controls) as unknown as { target?: THREE.Vector3 } | null
@@ -270,13 +274,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     ghost.current += (want - ghost.current) * Math.min(1, Math.min(dt, 0.1) * 6)
     const k = ghost.current
     for (const o of inks) o.visible = k > 0.95
-    const faded = k < 0.99
     // (faded by hashing, not blending: each pixel of him drawn or not by a fine dither as faint as he is, his nearest surface still hiding his
     // far side, so he's one see-through figure whatever's drawn first; blended, he went to a jumble or to black)
-    for (const x of mats) {
-      if (x.alphaHash !== faded) { x.alphaHash = faded; x.needsUpdate = true }
-      x.opacity = k
-    }
+    for (const x of mats) x.opacity = k
   })
   useFrame(({ clock }) => {
     const s = st.current

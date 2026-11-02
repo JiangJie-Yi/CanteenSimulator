@@ -12,7 +12,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
-import { FOLK_HEIGHT, FolkFigure, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
+import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { Omamori } from './Omamori'
@@ -3120,6 +3120,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
 
   return (
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
+      {/* (one customer made with the page, never shown: their program linked while it loads) */}
+      {people && <Suspense fallback={null}><FolkWarm /></Suspense>}
       {drawCounter && <group position={at}><Counter length={length} /></group>}
       {counters.map((c, i) => {
         // the first counter's floor runs on past its end to the door, and back to meet the others' aisles; each other

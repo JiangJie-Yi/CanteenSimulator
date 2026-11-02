@@ -78,6 +78,7 @@ import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
 import { usePanelSound } from '@/ui/uiSound'
 import { noteDrawn } from '@/scene/Later'
+import { Prewarm } from '@/scene/Prewarm'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
@@ -2470,6 +2471,7 @@ export default function App() {
         >
           <FramePacer />
           <DrawnProbe />
+          <Prewarm />
           <FpsMeter />
           <Scene active={active} orders={orders} theme={theme} sky={sky} reducedMotion={reducedMotion}
             fire={fire} frame={frame} onOffFire={sceneOffFire}
