@@ -178,6 +178,12 @@ export const handOver = {
     if (el?.style && !POINTER_HINT.hand) el.style.cursor = ''
   },
 }
+/** a thing that's only named when pointed at, with nothing to do with it (an omamori, a helmet, an offering): its tag by the pointer, but
+ * no glow and the cursor left as it is (the owner's: a glow and a pointing hand say it can be clicked, and these can't) */
+export const nameOver = (title: string, hint: string) => ({
+  onPointerOver: (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (HOVER.paused) return; setTip({ title, hint }) },
+  onPointerOut: () => { if (HOVER.paused) return; setTip(null) },
+})
 /** `handOver` that also names the thing and says what to do with it, in a tag by the pointer */
 export const tipOver = (title: string, hint: string) => ({
   onPointerOver: (e: Parameters<typeof handOver.onPointerOver>[0]) => { handOver.onPointerOver(e); setTip({ title, hint }) },

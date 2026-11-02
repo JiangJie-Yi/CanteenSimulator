@@ -7,8 +7,7 @@ import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 import { mergeByMaterial } from '@/scene/StaticBatch'
 import { brushText, SIGN_FONT, signTexture } from '@/scene/signFont'
-import { tipOver } from './bar'
-import { getEdit } from './edit'
+import { nameOver } from './bar'
 
 const URL = import.meta.env.BASE_URL + 'models/omamori.glb'
 useGLTF.preload(URL)
@@ -145,8 +144,7 @@ export function Omamori() {
     return r
   }, [gltf])
   return (
-    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('御守', '開運招福：保佑生意興隆').onPointerOver(e) }}
-      onPointerOut={(e) => { if (getEdit().on) return; tipOver('御守', '').onPointerOut(e) }}>
+    <group {...nameOver('御守', '開運招福：保佑生意興隆')}>
       <primitive object={obj} />
     </group>
   )

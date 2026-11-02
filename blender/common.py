@@ -244,8 +244,59 @@ def leaf(x, y, z, rot, length, width, mat, name, cup=0.05, thickness=0.006):
     return finish(o, name, mat)
 
 
-def export_dish(root, parts, glb_path, blend_path, preview=None):
-    """Optionally render a preview, export the dish (root + parts) to GLB and save the .blend."""
+def ladder_fill(bm, ring):
+    """close a ring of verts (in order round it, convex) with a ladder of quads straight across it (each vert joined to the one opposite),
+    a triangle at either end: never a fan of triangles into one point (the owner's: those shade in dark blotches, and a cap's N-gon is cut
+    into one on export)"""
+    n = len(ring)
+    faces = [bm.faces.new((ring[0], ring[1], ring[n - 1]))]
+    lo, hi = 1, n - 1
+    while hi - lo > 2:
+        faces.append(bm.faces.new((ring[lo], ring[lo + 1], ring[hi - 1], ring[hi])))
+        lo += 1
+        hi -= 1
+    if hi - lo == 2:
+        faces.append(bm.faces.new((ring[lo], ring[lo + 1], ring[hi])))
+    return faces
+
+
+def ladder_ngons(obj):
+    """every convex face of more than four sides (a cylinder's cap, a lathe's end) cut into a ladder (ladder_fill), its material, shading
+    and UVs kept; a face that isn't convex (a letter's outline) is left as it is"""
+    if obj.type != "MESH":
+        return 0
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    uv = bm.loops.layers.uv.active
+    done = 0
+    for f in [f for f in bm.faces if len(f.verts) > 4]:
+        vs = [v.co for v in f.verts]
+        k = len(vs)
+        if any((vs[(i + 1) % k] - vs[i]).cross(vs[(i + 2) % k] - vs[(i + 1) % k]).dot(f.normal) < -1e-12 for i in range(k)):
+            continue
+        ring = [lp.vert for lp in f.loops]
+        uvs = {lp.vert: lp[uv].uv.copy() for lp in f.loops} if uv else None
+        mat, smooth = f.material_index, f.smooth
+        bm.faces.remove(f)
+        for nf in ladder_fill(bm, ring):
+            nf.material_index = mat
+            nf.smooth = smooth
+            if uv:
+                for lp in nf.loops:
+                    lp[uv].uv = uvs[lp.vert]
+        done += 1
+    bm.to_mesh(obj.data)
+    bm.free()
+    return done
+
+
+def export_dish(root, parts, glb_path, blend_path, preview=None, ladder=True):
+    """Optionally render a preview, export the dish (root + parts) to GLB and save the .blend. Every part's convex N-gons (caps) are cut
+    into ladders first (`ladder`: ladder_ngons), so none comes out a fan."""
+    if ladder:
+        n = sum(ladder_ngons(o) for o in parts if getattr(o, "type", None) == "MESH")
+        if n:
+            print("LADDERED_NGONS", n)
     scene = bpy.context.scene
     if preview:
         for engine in ("BLENDER_EEVEE", "BLENDER_EEVEE_NEXT"):

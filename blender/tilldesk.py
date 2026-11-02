@@ -485,27 +485,37 @@ nodes.append(node("TillCardReader", cr))
 # The service bell: a polished brass dome on a dark wooden base with a felt foot, the plunger (its own node, TillBellPlunger) on top
 # =====================================================================
 bl = []
-bl.append(cyl("BellBase", 0.044, 0.015, P(0, 0.0075, 0), M["bellWood"], verts=48))
-bl.append(cyl("BellBaseBevel", 0.045, 0.003, P(0, 0.0135, 0), M["bellWood"], verts=48, r2=0.042))
-bl.append(cyl("BellBaseRim", 0.0445, 0.002, P(0, 0.001, 0), M["felt"], verts=48))
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.037, location=P(0, 0.015, 0), segments=64, ring_count=32)
-dome = active()
-# (its lower half taken away, the cut edge left exactly on the equator: a clean hemisphere, smooth all over, for an unbroken gleam)
+bl.append(cyl("BellBase", 0.044, 0.015, P(0, 0.0075, 0), M["bellWood"], verts=20))
+bl.append(cyl("BellBaseBevel", 0.045, 0.003, P(0, 0.0135, 0), M["bellWood"], verts=20, r2=0.042))
+bl.append(cyl("BellBaseRim", 0.0445, 0.002, P(0, 0.001, 0), M["felt"], verts=20))
+# (the dome: twenty round, five bands of quads from its foot up to a little ring under the collar, which hides it; no sphere's pole at its
+# top (the owner's: a fan gathered into a point shades in a blotch, and it was 1,984 triangles), smooth all over for an unbroken gleam)
 bm_ = bmesh.new()
-bm_.from_mesh(dome.data)
-bmesh.ops.delete(bm_, geom=[v for v in bm_.verts if v.co.z < -1e-6], context="VERTS")
-bm_.to_mesh(dome.data)
+DR, DN = 0.037, 20
+d_rings = []
+for ph in (0.0, 0.38, 0.73, 1.04, 1.29, 1.42):
+    rr, hh = DR * math.cos(ph), DR * 0.8 * math.sin(ph)
+    d_rings.append([bm_.verts.new(P(rr * math.cos(2 * math.pi * k / DN), 0.015 + hh, rr * math.sin(2 * math.pi * k / DN))) for k in range(DN)])
+for a_, b_ in zip(d_rings, d_rings[1:]):
+    for k in range(DN):
+        bm_.faces.new((a_[k], a_[(k + 1) % DN], b_[(k + 1) % DN], b_[k]))
+bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+for f_ in bm_.faces:
+    if f_.normal.dot(f_.calc_center_median() - Vector(P(0, 0.015, 0))) < 0:
+        f_.normal_flip()
+dme = bpy.data.meshes.new("BellDome")
+bm_.to_mesh(dme)
 bm_.free()
+dome = bpy.data.objects.new("BellDome", dme)
+bpy.context.collection.objects.link(dome)
 finish(dome, "BellDome", M["nickel"])
-dome.scale = (1, 1, 0.8)
-apply_scale(dome)
 for poly in dome.data.polygons:
     poly.use_smooth = True
 bl.append(dome)
 # (a fine rolled lip round the dome's foot, and a thin gold ring where it meets the base)
-bpy.ops.mesh.primitive_torus_add(major_radius=0.0368, minor_radius=0.0012, major_segments=64, minor_segments=10, location=P(0, 0.0157, 0))
+bpy.ops.mesh.primitive_torus_add(major_radius=0.0368, minor_radius=0.0012, major_segments=20, minor_segments=4, location=P(0, 0.0157, 0))
 bl.append(finish(active(), "BellLip", M["nickel"]))
-bl.append(cyl("BellCollar", 0.006, 0.004, P(0, 0.015 + 0.0296 + 0.0015, 0), M["nickel"], verts=24))
+bl.append(cyl("BellCollar", 0.006, 0.004, P(0, 0.015 + 0.0296 + 0.0015, 0), M["nickel"], verts=16))
 plunger = bpy.data.objects.new("TillBellPlunger", None)
 bpy.context.collection.objects.link(plunger)
 plunger.location = P(0, 0.015 + 0.0296 + 0.0035, 0)
@@ -824,14 +834,17 @@ IA, IB = 0.034, 0.0205                    # (the oval's half length and half wid
 
 
 def isect(s_, h_):
-    """the cross-section, as (how far out, 0..1 of the rim's oval; height), for a rim of height h_"""
-    return [(0.0, 0.0), (0.3, 0.0), (0.62, 0.0006), (0.84, 0.0028), (0.95, 0.0075), (1.01, 0.42 * h_), (1.035, 0.68 * h_), (1.02, 0.86 * h_),
-            (0.97, 0.97 * h_), (0.9, 1.0 * h_), (0.82, 0.95 * h_), (0.75, 0.8 * h_), (0.68, 0.58 * h_ + 0.004), (0.6, 0.0118), (0.53, 0.0122),
-            (0.47, 0.0142), (0.43, 0.0178), (0.37, 0.0212), (0.29, 0.0238), (0.19, 0.0256), (0.09, 0.0265), (0.0, 0.0267)]
+    """the cross-section, as (how far out, 0..1 of the rim's oval; height), for a rim of height h_: from the foot's edge out and up the
+    outer wall, over the rim, down the inner wall into the valley, up over the dome to the little ring at its crown (the owner's: a clean
+    low mesh; it was twenty-two points, smoothed over, 7,216 triangles with a fan of 88 at its foot and crown). Thirteen, most of them round
+    the rim's roll, which is what it's known by (eight left it a paper boat's sharp edge: the owner's way, looked at close before and
+    after)"""
+    return [(0.55, 0.0), (0.84, 0.0028), (0.97, 0.008), (1.025, 0.5 * h_), (1.02, 0.84 * h_), (0.95, 0.99 * h_), (0.86, 0.98 * h_),
+            (0.77, 0.83 * h_), (0.68, 0.58 * h_ + 0.004), (0.56, 0.012), (0.44, 0.016), (0.3, 0.0232), (0.14, 0.0262)]
 
 
-# (forty-four round it: smoothed once over, still round at its rim's ends however close it's looked at)
-NT = 44
+# (twenty-four round it: its foot and crown each closed by a ladder of quads, no fan into a point)
+NT = 24
 bm_ = bmesh.new()
 rings = []
 for i in range(NT):
@@ -840,30 +853,26 @@ for i in range(NT):
     h_ = 0.0155 + 0.0135 * c2 ** 1.3          # (the rim low along the sides, high and full at the ends)
     row = []
     prof = isect(0, h_)
-    for (sv, yv) in prof[1:-1]:
+    for (sv, yv) in prof:
         # (toward the middle the oval rounds off, so the dome is round, not long)
         k = min(1.0, max(0.0, (sv - 0.38) / 0.3))
         k = k * k * (3 - 2 * k)
         ax = IB * 1.08 + (IA * (1 + 0.07 * c2) - IB * 1.08) * k
         row.append(bm_.verts.new(P(math.cos(th) * ax * sv, GY + yv, math.sin(th) * IB * sv)))
     rings.append(row)
-foot = bm_.verts.new(P(0, GY, 0))
-crown = bm_.verts.new(P(0, GY + 0.0267, 0))
 nP = len(rings[0])
 for i in range(NT):
     r0, r1 = rings[i], rings[(i + 1) % NT]
-    bm_.faces.new((foot, r1[0], r0[0]))
     for j in range(nP - 1):
         bm_.faces.new((r0[j], r1[j], r1[j + 1], r0[j + 1]))
-    bm_.faces.new((r0[-1], r1[-1], crown))
+ladder_fill(bm_, [rings[i][0] for i in range(NT)])
+ladder_fill(bm_, [rings[i][-1] for i in range(NT)])
 bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
 me_ = bpy.data.meshes.new("IngotBody")
 bm_.to_mesh(me_)
 bm_.free()
 fig = bpy.data.objects.new("IngotBody", me_)
 bpy.context.collection.objects.link(fig)
-ss_ = fig.modifiers.new("s", "SUBSURF"); ss_.levels = 1
-apply_mods(fig)
 # (a size bigger: the ingot fills its cushion)
 for vt in fig.data.vertices:
     vt.co.x *= 1.2

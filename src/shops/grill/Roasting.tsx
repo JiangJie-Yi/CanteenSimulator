@@ -895,7 +895,9 @@ function crewPlaces(crew: CrewMember[]) {
 /** where the cook stands (on the floor, in the notch: in up to the hearth, as the owner drew; he stood out past the table's edge), and the
  * way he faces: in at the fire. In the middle of the notch, along: it's only a little wider than he is (1.3 to his 1.0), and set to one side
  * (it was 0.36 nearer its left-hand side) he stood into the table beside it, by the left-hand cubby (the owner saw it) */
-const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.0).addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
+// (and 2.2 out, not 2.0: up on the notch's step his chest and sleeves were level with the seasonings' ledge, its pots in them (clips.mjs
+// found it; at 2.12 his sleeves still brushed the peanut bowl and the miso))
+const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.2).addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
   .setY(GRILL_OFFSET.y - KITCHEN_DROP)
 /** the aisle in front of the cook table, where he stands while the shop's open */
 const AISLE_LAY = 2.62
@@ -925,7 +927,8 @@ const bossAisle = (home: THREE.Vector3) => {
  * depth, and where it stands (its back to the notch's back, its front, the step up, a little out past the table's edge), turned with the
  * table */
 const NOTCH_STEP = { h: 0.14, d: 0.95 }
-const NOTCH_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, CHEF_AT.dot(ALONG)).addScaledVector(LAY, COOK_NOTCH.lay[0] + 0.01 + NOTCH_STEP.d / 2)
+// (its back 0.09 out from the notch's back, so its front's as far past the table's edge as he's stood back)
+const NOTCH_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, CHEF_AT.dot(ALONG)).addScaledVector(LAY, COOK_NOTCH.lay[0] + 0.09 + NOTCH_STEP.d / 2)
   .setY(CHEF_AT.y)
 const NOTCH_STEP_YAW = Math.atan2(-ALONG.z, ALONG.x)
 const BOSS_AISLE = { ...bossAisle(CHEF_AT),

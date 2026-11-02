@@ -6915,8 +6915,12 @@ html[lang='en'] .menu-title-en { display: none; }
 .chiller-bin.is-still { cursor: default; }
 .chiller-bin.is-still:hover { transform: none; }
 .chiller-bin-head svg.season-icon { width: 34px; height: 34px; flex: none; }
-.season-bin .chiller-bin-head { display: flex; align-items: center; gap: 6px; }
-.season-buy { grid-template-columns: 1fr 1fr; }
+/* (a seasoning's card has one row fewer than a food's (no English name): its own rows, the meter's narrow one second, and room between them
+   (the owner's: they were crowded, what's left squeezed into the meter's 14px row against the buttons)) */
+.season-bin { grid-template-rows: auto 12px auto auto; row-gap: 6px; padding: 9px 10px 10px; }
+.season-bin .chiller-bin-head { display: flex; align-items: center; gap: 8px; }
+.season-bin .chiller-level { align-self: center; }
+.season-buy { grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 2px; }
 .chiller-zone.is-seasonings .chiller-zone-head { background: linear-gradient(180deg, #6a5a8e, #574a78); }
 .chiller-zone.is-seasonings .chiller-zone-head i { color: #e3d6ff; text-shadow: none; font-size: 11px; }
 .chiller-zone.is-supplies { background: linear-gradient(180deg, #f1e9da, #e6dac3); }

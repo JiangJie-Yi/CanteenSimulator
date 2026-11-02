@@ -12,8 +12,7 @@ import { normalFromHeight } from '@/scene/normalFromHeight'
 import { mergeByMaterial } from '@/scene/StaticBatch'
 import { brushText, signTexture } from '@/scene/signFont'
 import { reflectStudio } from '@/scene/studio'
-import { tipOver } from './bar'
-import { getEdit } from './edit'
+import { nameOver } from './bar'
 
 const URL = import.meta.env.BASE_URL + 'models/koban.glb'
 useGLTF.preload(URL)
@@ -210,8 +209,7 @@ export function Koban() {
     return r
   }, [gltf])
   return (
-    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('小判金幣', '招財納福的金幣').onPointerOver(e) }}
-      onPointerOut={(e) => { if (getEdit().on) return; tipOver('小判金幣', '').onPointerOut(e) }}>
+    <group {...nameOver('小判金幣', '招財納福的金幣')}>
       <primitive object={obj} />
     </group>
   )

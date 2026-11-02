@@ -85,6 +85,26 @@ export function useRegisterModel() {
   })
   inkModel(root, (m) => REG_UNINKED.test(m.name), { width: 0.0022, weld: true })
   const get = (n: string) => root.getObjectByName(n)!
+  // (the keys clear of their panel, their lettering clear of their caps (the owner saw them flicker and shadows cross them, black, where they
+  // meet): their letters drawn a little toward the eye (their own copy of the ink, offset in depth: a tenth of a millimetre over the caps,
+  // far off they fought the caps' tops for the same depth), and the keys casting no shadow (folded together they made one big caster,
+  // shadowing the panel and their own caps in the shadow map's coarse steps))
+  const lettering = new Map<THREE.Material, THREE.Material>()
+  get('RegKeys').traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh) return
+    m.castShadow = false
+    if (!/^KeyFace_/.test(m.name)) return
+    let t = lettering.get(m.material as THREE.Material)
+    if (!t) {
+      t = (m.material as THREE.Material).clone()
+      t.polygonOffset = true
+      t.polygonOffsetFactor = -2
+      t.polygonOffsetUnits = -4
+      lettering.set(m.material as THREE.Material, t)
+    }
+    m.material = t
+  })
   // (the body never moves: its parts drawn a few at a time; the keys, the drawer and the locks, which do, as they are)
   mergeByMaterial(get('RegBody'))
   // (the body's own surfaces, not their ink lines: what stands in front of the drawer, the keys and the keys' locks when seen from the side or behind)

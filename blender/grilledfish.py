@@ -25,7 +25,7 @@ import numpy as np
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import (active, apply_scale, bevel, cyl_uv, export_dish, fbm, finish, grid01, image, join,  # noqa: E402
+from common import (active, apply_scale, bevel, cyl_uv, export_dish, fbm, finish, grid01, image, join, ladder_fill,  # noqa: E402
                     leaf, mix, pbr, seed, smooth, to_normal, vnoise)
 from tubers import potato, potato_skin, sweet_potato, sweet_potato_skin  # noqa: E402
 
@@ -2359,10 +2359,11 @@ M.update({
 
 # ---- the seasoning pots: each turned on the wheel and glazed (the foot ring left bare, the lip rolled, the glaze thin and breaking over
 # it, pooled deep inside, run in drips down the outside), its own glaze in its own picture; and what's in each, seen from above
-def lathe(name, pts, seg=28, planar=0.0, split=None):
-    """Spin a section (r, z) round the z axis into a mesh (a point on the axis becomes the pole of a fan). Each loop gets u round it and v
-    along the section by length; or, with `planar` the radius, u and v laid on from above (for a surface seen from overhead). Faces from the
-    section's point `split` on get the second material."""
+def lathe(name, pts, seg=20, planar=0.0, split=None):
+    """Spin a section (r, z) round the z axis into a mesh. A point on the axis isn't a pole all its ring gathers into (the owner's: a fan of
+    triangles into a middle shades in a dark blotch): the ring next to it is closed across by a ladder of quads instead. Each loop gets u
+    round it and v along the section by length; or, with `planar` the radius, u and v laid on from above (for a surface seen from overhead).
+    Faces from the section's point `split` on get the second material."""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new("UVMap")
     L = [0.0]
@@ -2371,25 +2372,28 @@ def lathe(name, pts, seg=28, planar=0.0, split=None):
     vs = [l_ / L[-1] for l_ in L]
     rings = []
     for (r, z) in pts:
-        if r < 1e-6:
-            rings.append([bm.verts.new((0.0, 0.0, z))])
-        else:
-            rings.append([bm.verts.new((r * math.cos(2 * math.pi * k / seg), r * math.sin(2 * math.pi * k / seg), z)) for k in range(seg)])
+        rings.append(None if r < 1e-6 else [bm.verts.new((r * math.cos(2 * math.pi * k / seg), r * math.sin(2 * math.pi * k / seg), z)) for k in range(seg)])
+
+    def lay(f, uvs, i):
+        f.material_index = 1 if split is not None and i >= split else 0
+        for loop, t in zip(f.loops, uvs):
+            loop[uvl].uv = (0.5 + loop.vert.co.x / (2 * planar), 0.5 + loop.vert.co.y / (2 * planar)) if planar else t
     for i in range(len(pts) - 1):
         A, B = rings[i], rings[i + 1]
+        if A is None or B is None:
+            # (the axis: the ring beside it closed by a ladder straight across)
+            ring, at = (B, i + 1) if A is None else (A, i)
+            if ring is None:
+                continue
+            order = list(reversed(ring)) if A is None else ring
+            for f in ladder_fill(bm, order):
+                lay(f, [(ring.index(lp.vert) / seg, vs[at]) for lp in f.loops], i)
+            continue
         for k in range(seg):
             k2 = (k + 1) % seg
             u0, u1 = k / seg, (k + 1) / seg
-            if len(A) == 1:
-                vv, uv = (A[0], B[k], B[k2]), (((u0 + u1) / 2, vs[i]), (u0, vs[i + 1]), (u1, vs[i + 1]))
-            elif len(B) == 1:
-                vv, uv = (A[k], A[k2], B[0]), ((u0, vs[i]), (u1, vs[i]), ((u0 + u1) / 2, vs[i + 1]))
-            else:
-                vv, uv = (A[k], A[k2], B[k2], B[k]), ((u0, vs[i]), (u1, vs[i]), (u1, vs[i + 1]), (u0, vs[i + 1]))
-            f = bm.faces.new(vv)
-            f.material_index = 1 if split is not None and i >= split else 0
-            for loop, t in zip(f.loops, uv):
-                loop[uvl].uv = (0.5 + loop.vert.co.x / (2 * planar), 0.5 + loop.vert.co.y / (2 * planar)) if planar else t
+            f = bm.faces.new((A[k], A[k2], B[k2], B[k]))
+            lay(f, ((u0, vs[i]), (u1, vs[i]), (u1, vs[i + 1]), (u0, vs[i + 1])), i)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
@@ -2400,42 +2404,43 @@ def lathe(name, pts, seg=28, planar=0.0, split=None):
 
 
 def pot_section(radius, depth, belly):
-    """A pot's section from the middle of its underside, out round its foot ring, up its side, over its rolled lip and down inside to the
-    middle of its floor; and the indices along it of the foot ring's top, the lip's start, the inside's start and the floor's edge."""
+    """A pot's section, as low as the owner's rule has it (a small thing 50 to 100 faces, round no more than 24 times, no fan into a middle):
+    its foot's edge (the underside closed across it by a ladder), up its side where its belly starts, the top of its wall, its rolled lip,
+    in over the lip and down to its floor's edge (the floor closed across by a ladder); and the indices along it of the foot ring's top, the
+    lip's start, the inside's start and the floor's edge. Sixteen round: 98 faces."""
     W, LIP, HF = 0.0075, 0.0022, 0.009
     rf = radius * 0.6
 
     def body(t):
         return radius * (0.82 + belly * math.sin(t * math.pi * 0.85))
-    pts = [(0.0, 0.003), (rf - 0.006, 0.003), (rf - 0.0045, 0.0), (rf, 0.0), (rf + 0.001, HF * 0.7)]
+    # (the underside closed across a ring a little in from the foot's edge, a small rounding up to it, so the foot's normals turn smoothly:
+    # straight from the underside to the wall, its ink line opened at the foot in two hooks)
+    # (and a foot ring standing straight up a little from its edge before the wall goes out: without it the ink line round the narrow foot
+    # folded over in two dark hooks)
+    pts = [(0.0, 0.002), (rf - 0.003, 0.002), (rf, 0.0), (rf + 0.001, HF * 0.7)]
     i_foot = len(pts) - 1
-    K = 10
-    outer = []
-    for k in range(K + 1):
-        t = k / K
-        e = 1 - (1 - min(1.0, t / 0.32)) ** 2.4
-        outer.append((rf + 0.002 + (body(t) - rf - 0.002) * e, HF + t * (depth - HF)))
-    pts += outer[:-1]
-    rr = outer[-1][0]
+    e = 1 - (1 - min(1.0, 0.3 / 0.32)) ** 2.4
+    pts.append((rf + 0.002 + (body(0.3) - rf - 0.002) * e, HF + 0.3 * (depth - HF)))
+    rr = body(1.0)
+    pts.append((rr, depth - 0.003))
+    # (over the lip's top and straight down inside to the floor's edge: what's in the pot hides the inside wall)
     i_lip = len(pts)
-    pts += [(rr + LIP, depth - 0.003), (rr + LIP * 0.4, depth + 0.0012), (rr - W * 0.5, depth + 0.0016), (rr - W, depth - 0.002)]
-    i_in = len(pts) - 1
-    for k in range(K - 1, 1, -1):
-        r, z = outer[k]
-        pts.append((r - W, z))
+    pts.append((rr - W * 0.35, depth + 0.0016))
+    i_in = i_lip
+    r2 = pts[4][0] - W
+    pts.append((r2 * 0.75, HF + W + 0.001))
     i_floor = len(pts) - 1
-    r2 = outer[2][0] - W
-    pts += [(r2 * 0.7, HF + W + 0.0015), (r2 * 0.35, HF + W + 0.0003), (0.0, HF + W)]
+    pts.append((0.0, HF + W))
     return pts, i_foot, i_lip, i_in, i_floor
 
 
 def pot_inner_r(radius, depth, belly, z):
-    """how far out a pot's inside wall is at height z (so what's in it meets the wall)"""
-    W, HF = 0.0075, 0.009
-    rf = radius * 0.6
-    t = min(1.0, max(0.0, (z - HF) / (depth - HF)))
-    e = 1 - (1 - min(1.0, t / 0.32)) ** 2.4
-    return rf + 0.002 + (radius * (0.82 + belly * math.sin(t * math.pi * 0.85)) - rf - 0.002) * e - W
+    """how far out a pot's inside wall is at height z (so what's in it meets the wall): along the section's inside, from its rim down to its
+    floor's edge, as pot_section has it"""
+    pts, _, _, i_in, i_floor = pot_section(radius, depth, belly)
+    (r1, z1), (r0, z0) = pts[i_in], pts[i_floor]
+    t = min(1.0, max(0.0, (z - z0) / (z1 - z0)))
+    return r0 + (r1 - r0) * t
 
 
 def srgb(c):
@@ -2559,7 +2564,8 @@ def open_pot(x, y, radius, depth, mat, belly=0.3, name="Pot"):
     pts, i_foot, i_lip, i_in, i_floor = pot_section(radius, depth, belly)
     # (the outside ends at the top of the lip: past it the faces turn in toward the middle, and the game's ink line round them would show as
     # an arc across what's in the pot)
-    pot, vs = lathe(name, pts, split=i_lip + 1)
+    # (the inside's material from the lip's top on: what turns in over it gets no ink line, or the line shows as an arc inside the pot)
+    pot, vs = lathe(name, pts, seg=16, split=i_lip)
     look = {"SaltPotGlaze": "ruri", "SoyPotGlaze": "tenmoku", "MilkJarGlaze": "shino", "SmallWhiteDish": "sometsuke"}.get(mat.name, "wood")
     tex = glaze_picture(name, look, vs, i_foot, i_lip, i_in, i_floor, sum(map(ord, name)))
     m = pbr(name + "Glaze", tex=tex, rough=0.35 if look != "wood" else 0.6, coat=0.4 if look != "wood" else 0.0)
@@ -2575,15 +2581,15 @@ def open_pot(x, y, radius, depth, mat, belly=0.3, name="Pot"):
 def filling(x, y, z, radius, height, mat, rough=0.06, kind=None):
     """What's in a pot: a soft mound (a powder, a paste) or a level surface creeping up the wall (a sauce), its picture laid on from above"""
     liquid = kind in ("soy", "milk")
-    K = 8
+    K = 3
     pts = []
     for k in range(K + 1):
         rr = radius * k / K
-        zz = height * 0.25 + height * 0.75 * (rr / radius) ** 6 if liquid else height * (1 - (rr / radius) ** 2) ** 0.8
+        zz = height * 0.25 + height * 0.75 * (rr / radius) ** 6 if liquid else height * max(0.0, 1 - (rr / radius) ** 2) ** 0.8
         pts.append((rr, zz))
     pts.append((radius * 0.98, -0.006))
     pts.append((0.0, -0.006))
-    o, _ = lathe("Filling", pts, seg=24, planar=radius)
+    o, _ = lathe("Filling", pts, seg=16, planar=radius)
     if kind:
         tex, nrm = fill_picture(kind, sum(map(ord, kind)) * 7)
         mat = pbr("Fill" + kind.capitalize(), tex=tex, nrm=nrm, rough=0.15 if liquid else 0.8)

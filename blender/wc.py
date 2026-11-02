@@ -55,9 +55,15 @@ def fin(o, name, mat, parts, smooth=True):
     return o
 
 
-def lathe_oval(name, prof, sx=1.0, sz=1.0, segs=40, cx=0.0, cz=0.0, cap=True):
+def lathe_oval(name, prof, sx=1.0, sz=1.0, segs=24, cx=0.0, cz=0.0, cap=True):
     """a turned piece, its rings stretched to an oval (sx along x, sz along z), centred at (cx, cz) (three frame); a profile that closes
-    on itself (a ring, like the seat) takes cap=False, or its ends would be filled across its hole"""
+    on itself (a ring, like the seat) takes cap=False, or its ends would be filled across its hole. A profile's end on the axis (r 0) isn't a
+    point all its ring gathers into: the ring next to it is closed across by a ladder of quads instead (the owner's: a fan of triangles into a
+    middle shades in a dark blotch), as an end off the axis is"""
+    while len(prof) > 2 and prof[0][0] <= 1e-4:
+        prof = prof[1:]
+    while len(prof) > 2 and prof[-1][0] <= 1e-4:
+        prof = prof[:-1]
     bm = bmesh.new()
     rings = []
     for (r, y) in prof:
@@ -66,10 +72,9 @@ def lathe_oval(name, prof, sx=1.0, sz=1.0, segs=40, cx=0.0, cz=0.0, cap=True):
         for j in range(segs):
             j2 = (j + 1) % segs
             bm.faces.new((rings[i][j], rings[i][j2], rings[i + 1][j2], rings[i + 1][j]))
-    if cap and prof[0][0] > 1e-4:
-        bm.faces.new(list(reversed(rings[0])))
-    if cap and prof[-1][0] > 1e-4:
-        bm.faces.new(rings[-1])
+    if cap:
+        ladder_fill(bm, list(reversed(rings[0])))
+        ladder_fill(bm, rings[-1])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
@@ -131,7 +136,8 @@ def toilet():
     # (its back running on into the cistern's foot, all one glaze: a rounded block under the seat's hinge)
     fin(rbox("WcNeck", (0.24, 0.34, 0.27), (0.215, 0.17, 0), 0.06, 3), "WcNeck", M["china"], parts)
     # (the water in the well: its own node, to swirl when it's flushed)
-    w = lathe_oval("WcWater", [(0.0, 0.0), (0.068, 0.0), (0.0, 0.0001)], 1.22, 1.0, 32, 0, 0)
+    # (a thin disc, its two faces ladders across it: no point in its middle for the swirl to gather into)
+    w = lathe_oval("WcWater", [(0.068, 0.0), (0.068, 0.0001)], 1.22, 1.0, 20, 0, 0)
     w.location = P(BX - 0.005, 0.297, 0)
     fin(w, "WcWater", M["water"], parts)
     # (the washlet: its body behind the seat, rounded, a seam line round it, the blue power lamp on its side, the wand's grey shutter under its lip)
@@ -280,7 +286,7 @@ def bits():
     add("WcFold", fo, "Fold", M["paper"], False)
     # ---- the toilet brush in its pot, on the floor (the brush its own node, to scrub with)
     node("WcBrushPot")
-    pot = lathe_oval("BrushPot", [(0.0, 0.0), (0.05, 0.0), (0.056, 0.01), (0.05, 0.16), (0.054, 0.17), (0.046, 0.17), (0.04, 0.03), (0.0, 0.03)], 1, 1, 32, 0, 0)
+    pot = lathe_oval("BrushPot", [(0.0, 0.0), (0.05, 0.0), (0.056, 0.01), (0.05, 0.16), (0.054, 0.17), (0.046, 0.17), (0.04, 0.03), (0.0, 0.03)], 1, 1, 20, 0, 0)
     add("WcBrushPot", pot, "BrushPot", M["pot"])
     node("WcBrush")
     add("WcBrush", tube("BrushHandle", [(0.0, 0.05, 0.0), (0.0, 0.2, 0.0), (0.004, 0.33, 0.0)], 0.007), "BrushHandle", M["pot"])
@@ -291,8 +297,8 @@ def bits():
     add("WcBrush", o, "BrushHead", M["bristle"])
     # ---- the sanitary bin (the women's): a slim pedal bin with a round lid
     node("WcBin")
-    add("WcBin", lathe_oval("BinBody", [(0.0, 0.0), (0.075, 0.0), (0.08, 0.01), (0.078, 0.23), (0.0, 0.23)], 1.0, 0.7, 32, 0, 0), "BinBody", M["bin"])
-    add("WcBin", lathe_oval("BinLid", [(0.0, 0.23), (0.082, 0.23), (0.084, 0.24), (0.06, 0.255), (0.0, 0.258)], 1.0, 0.7, 32, 0, 0), "BinLid", M["ivory"])
+    add("WcBin", lathe_oval("BinBody", [(0.0, 0.0), (0.075, 0.0), (0.08, 0.01), (0.078, 0.23), (0.0, 0.23)], 1.0, 0.7, 20, 0, 0), "BinBody", M["bin"])
+    add("WcBin", lathe_oval("BinLid", [(0.0, 0.23), (0.082, 0.23), (0.084, 0.24), (0.06, 0.255), (0.0, 0.258)], 1.0, 0.7, 20, 0, 0), "BinLid", M["ivory"])
     add("WcBin", rbox("BinPedal", (0.05, 0.012, 0.03), (0.0, 0.012, 0.065), 0.004, 2), "BinPedal", M["chrome"])
     # ---- the women's: sanitary pads, free to take (the owner's: 女廁有提供衛生棉): a little hinoki shelf on the wall (its origin where the
     # shelf's top meets the wall) on two brackets, a woven rattan basket on it, the pads in it stood on end like cards, each in its own pastel
@@ -302,7 +308,7 @@ def bits():
     for sd in (-1, 1):
         add("WcPads", rbox(f"PadBracket{sd}", (0.012, 0.06, 0.07), (sd * 0.085, -0.044, 0.035), 0.002, 1), f"PadBracket{sd}", M["hinoki"])
     add("WcPads", lathe_oval("PadBasket", [(0.0, 0.0), (0.05, 0.0), (0.054, 0.004), (0.057, 0.048), (0.053, 0.05), (0.05, 0.01), (0.0, 0.01)],
-                             1.45, 0.8, 32, 0, 0.05), "PadBasket", M["rattan"])
+                             1.45, 0.8, 20, 0, 0.05), "PadBasket", M["rattan"])
     for k, (c, lean) in enumerate((("padPink", -0.12), ("padWhite", -0.05), ("padLilac", 0.02), ("padPink", 0.06), ("padWhite", 0.1), ("padLilac", 0.16))):
         o = rbox(f"Pad{k}", (0.013, 0.064, 0.05), (-0.052 + k * 0.021, 0.042, 0.05), 0.005, 2)
         o.rotation_euler = (0, lean, 0)
@@ -343,42 +349,40 @@ def box_uv(o, k, up=False):
     return o
 
 
-def lathe_uv(name, prof, segs=48, cx=0.0, cz=0.0):
+def lathe_uv(name, prof, segs=24, cx=0.0, cz=0.0):
     """a turned piece with its picture on it: u round it, v along its profile by length (0 at its first point, 1 at its last); a profile that
-    starts or ends on the axis (r 0) closes there on one vertex"""
+    starts or ends on the axis (r 0) isn't gathered into a point there: the ring next to the axis is closed by a ladder of quads across it
+    (the owner's: a fan into a middle shades in a dark blotch). Returns the piece and its profile's points' places along it (0..1), as
+    before, the axis ends among them"""
     L = [0.0]
     for (r0, y0), (r1, y1) in zip(prof, prof[1:]):
         L.append(L[-1] + math.hypot(r1 - r0, y1 - y0))
+    total = L[-1]
+    shut = [prof[0][0] < 1e-6, prof[-1][0] < 1e-6]
+    lo, hi = (1 if shut[0] else 0), len(prof) - (1 if shut[1] else 0)
+    pg, lg = prof[lo:hi], L[lo:hi]
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    rings = []
-    for (r, y) in prof:
-        if r < 1e-6:
-            pole = bm.verts.new(P(cx, y, cz))
-            rings.append([pole] * segs)
-        else:
-            rings.append([bm.verts.new(P(cx + r * math.cos(2 * math.pi * j / segs), y, cz + r * math.sin(2 * math.pi * j / segs))) for j in range(segs)])
-    for i in range(len(prof) - 1):
+    rings = [[bm.verts.new(P(cx + r * math.cos(2 * math.pi * j / segs), y, cz + r * math.sin(2 * math.pi * j / segs))) for j in range(segs)] for (r, y) in pg]
+    for i in range(len(pg) - 1):
         for j in range(segs):
             j2 = (j + 1) % segs
-            quad = [(rings[i][j], j, i), (rings[i][j2], j + 1, i), (rings[i + 1][j2], j + 1, i + 1), (rings[i + 1][j], j, i + 1)]
-            seen, vs = set(), []
-            for q in quad:
-                if q[0] not in seen:
-                    seen.add(q[0])
-                    vs.append(q)
-            if len(vs) < 3:
-                continue
-            f = bm.faces.new([q[0] for q in vs])
-            for l, q in zip(f.loops, vs):
-                l[uvl].uv = (q[1] / segs, L[q[2]] / L[-1])
+            f = bm.faces.new((rings[i][j], rings[i][j2], rings[i + 1][j2], rings[i + 1][j]))
+            for l, (uu, vi) in zip(f.loops, ((j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1))):
+                l[uvl].uv = (uu / segs, lg[vi] / total)
+    for k, ring in ((0, list(reversed(rings[0]))), (-1, rings[-1])):
+        if not shut[0 if k == 0 else 1]:
+            continue
+        for f in ladder_fill(bm, ring):
+            for l in f.loops:
+                l[uvl].uv = (rings[k].index(l.vert) / segs, lg[k] / total)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
-    return o, [x / L[-1] for x in L]
+    return o, [x / total for x in L]
 
 
 def washstand():
@@ -405,7 +409,7 @@ def washstand():
     prof = [(0.0, T), (0.06, T), (0.066, T + 0.005), (0.068, T + 0.014), (0.064, T + 0.018), (0.088, T + 0.026),
             (0.124, T + 0.05), (0.151, T + 0.083), (0.165, T + 0.112), (0.17, T + 0.129), (0.168, T + 0.136), (0.162, T + 0.138),
             (0.157, T + 0.133), (0.151, T + 0.115), (0.135, T + 0.084), (0.11, T + 0.058), (0.076, T + 0.042), (0.036, T + 0.035), (0.0, T + 0.033)]
-    bowl, vs = lathe_uv("WashBowl", prof, 56, -0.21, 0)
+    bowl, vs = lathe_uv("WashBowl", prof, 32, -0.21, 0)
     vf, vr = vs[5], vs[10]
     NB = 512
     bu, bv = grid01(NB)
@@ -519,7 +523,7 @@ def washstand():
     # ---- the soap bottle, celadon, a brass pump on it
     sx, sz = -0.1, 0.215
     fin(lathe_oval("WashSoapBottle", [(0.0, T), (0.026, T), (0.03, T + 0.008), (0.031, T + 0.058), (0.027, T + 0.078), (0.013, T + 0.09),
-                                      (0.012, T + 0.098), (0.0, T + 0.098)], 1, 1, 24, sx, sz), "WashSoapBottle", M["celadon"], parts)
+                                      (0.012, T + 0.098), (0.0, T + 0.098)], 1, 1, 16, sx, sz), "WashSoapBottle", M["celadon"], parts)
     bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.007, depth=0.02, location=P(sx, T + 0.106, sz))
     fin(active(), "WashPumpNeck", M["brass"], parts)
     fin(rbox("WashPumpHead", (0.024, 0.01, 0.016), (sx - 0.006, T + 0.12, sz), 0.003, 2), "WashPumpHead", M["brass"], parts)

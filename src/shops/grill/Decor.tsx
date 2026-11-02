@@ -12,7 +12,7 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, SUPPLIES, tipOver } from './bar'
+import { ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, SUPPLIES } from './bar'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
@@ -859,56 +859,6 @@ function KnifeSet() {
   return <group position={[p.x, KNIFE_BOARD.y, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} scale={KNIFE_BOARD.scale}><primitive object={obj} /></group>
 }
 useGLTF.preload(KNIVES_URL)
-/** the miso soup's pot (blender/misopot.py), on a little stand of the rice tub's beside it (the owner's: where the tub stood), steaming; how
- * big the pot's drawn, and how high the stand's top is (a little lower than the tub's) */
-const MISOPOT_URL = import.meta.env.BASE_URL + 'models/misopot.glb'
-useGLTF.preload(MISOPOT_URL)
-// (beside the rice tub, on its far side from the cook table, in a row with it (the owner's: it stood behind the tub, where the crew stand))
-const MISO_AT = { along: 4.49, lay: -0.83 }
-const MISO_SCALE = 1.3
-const MISO_TOP = -0.45
-function MisoPot() {
-  useStudio()
-  const gltf = useGLTF(MISOPOT_URL) as unknown as { scene: THREE.Group }
-  const stand = useStand()
-  const pot = useMemo(() => {
-    const r = gltf.scene.getObjectByName('MisoPot')!.clone(true)
-    r.position.set(0, 0, 0)
-    const made = new Map<THREE.Material, THREE.Material>()
-    r.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      let t = made.get(src)
-      if (!t) {
-        // (the hammered aluminium real metal, the studio in it; the rest in the room's toon light)
-        if (/Alu|Inside/.test(src.name)) {
-          const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), map: src.map ?? null, normalMap: src.normalMap ?? null, metalness: 0.8, roughness: 0.34, envMapIntensity: 0.9 })
-          reflectStudio(g)
-          t = g
-        } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
-        made.set(src, t)
-      }
-      m.material = t
-      m.castShadow = true
-      m.receiveShadow = true
-    })
-    inkModel(r, (m) => /Soup|Inside/.test(m.name), { width: 0.0016, weld: true })
-    return r
-  }, [gltf])
-  const floor = GRILL_OFFSET.y - KITCHEN_DROP
-  const p = new THREE.Vector3().addScaledVector(ALONG, MISO_AT.along).addScaledVector(LAY, MISO_AT.lay)
-  const s = stand.clone()
-  return (
-    <group position={[p.x, 0, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
-      <primitive object={s} position-y={floor} scale={[0.6, (MISO_TOP - floor) / 1.08, 0.6]} />
-      <group position-y={MISO_TOP} scale={MISO_SCALE} {...tipOver('味噌湯鍋', '一直保溫著的味噌湯（豆腐、海帶芽、蔥）')}>
-        <primitive object={pot} />
-        <Steam position={[0, 0.4, 0]} width={0.36} height={0.5} opacity={0.3} layers={2} />
-      </group>
-    </group>
-  )
-}
 function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternAt: [number, number, number]; fanAt: [number, number, number] }) {
   return (
     <>
@@ -917,7 +867,6 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <HeldStick held={held} />
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
-      <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
       <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><CharcoalSackAt /></group>
     </>
