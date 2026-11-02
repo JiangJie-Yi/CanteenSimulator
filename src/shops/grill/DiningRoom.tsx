@@ -1602,36 +1602,153 @@ function WallPiece({ z0, z1, y0, y1, plaster = false }: { z0: number; z1: number
     </mesh>
   )
 }
-/** the plaque over each toilet's door: 男 in indigo with a man's figure, 女 in red with a woman's, and the word under */
-const wcSign = (who: 'm' | 'f') => canvasTex(160, 96, (g) => {
-  const ink = who === 'm' ? '#24407a' : '#b8262a'
-  g.fillStyle = '#3a2416'
-  g.fillRect(0, 0, 160, 96)
-  g.fillStyle = '#efe2c4'
-  g.fillRect(4, 4, 152, 88)
-  // the figure: a head, and a body (a woman's in a skirt)
+/** words fitted to a width: as big as `size` but never wider than `w` (measured in their own face), centred at x, y */
+function fitText(g: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, size: number, ink: string, face = 'sans-serif', weight = 'bold', spacing = 0) {
+  g.save()
+  g.font = `${weight} ${size}px ${face}`
+  const width = g.measureText(text).width + spacing * Math.max(0, [...text].length - 1)
+  const k = Math.min(1, w / Math.max(1, width))
+  g.font = `${weight} ${size * k}px ${face}`
+  ;(g as unknown as { letterSpacing: string }).letterSpacing = `${spacing * k}px`
+  g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText(text, x + (spacing * k) / 2, y)
+  g.restore()
+}
+/**
+ * The plaque over each toilet's door (the owner's: some design to it, and its words in the language on screen): a board of pale keyaki, its
+ * grain running along it, a dark rim and a fine gold line inside that; a round badge in the room's colour (indigo the men's, vermilion the
+ * women's) with a white figure in it; the big character brushed in that colour (男, 女; in English MEN, WOMEN); and a band along its foot
+ * in the colour with what it is in white (男廁 · MEN, 男性 · お手洗い, RESTROOM). Made once for each room and language.
+ */
+const WC_SIGN_MADE = new Map<string, THREE.Texture | null>()
+function wcSign(who: 'm' | 'f', lang: string) {
+  const key = `${who}|${lang}`
+  if (!WC_SIGN_MADE.has(key)) WC_SIGN_MADE.set(key, canvasTex(320, 192, (g) => {
+    const ink = who === 'm' ? '#24407a' : '#b8262a'
+    const ja = lang.startsWith('ja'), en = lang.startsWith('en')
+    g.save()
+    const rim = new Path2D(); rim.roundRect(4, 4, 312, 184, 22)
+    g.fillStyle = '#4a2c18'; g.fill(rim)
+    const face = new Path2D(); face.roundRect(11, 11, 298, 170, 16)
+    const wood = g.createLinearGradient(0, 11, 0, 181)
+    wood.addColorStop(0, '#d9ad74'); wood.addColorStop(0.5, '#e8c590'); wood.addColorStop(1, '#cc9c62')
+    g.fillStyle = wood; g.fill(face)
+    g.save(); g.clip(face)
+    g.strokeStyle = 'rgba(120,72,30,0.22)'; g.lineWidth = 1.2
+    for (let k = 0; k < 17; k++) {
+      const y0 = 12 + k * 10.5
+      g.beginPath()
+      for (let x = 0; x <= 320; x += 8) { const y = y0 + Math.sin(x / 55 + k * 0.9) * 4 + Math.sin(x / 17 + k) * 1.2; if (x === 0) g.moveTo(x, y); else g.lineTo(x, y) }
+      g.stroke()
+    }
+    const vg = g.createRadialGradient(160, 96, 60, 160, 96, 190)
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(70,36,10,0.3)')
+    g.fillStyle = vg; g.fillRect(0, 0, 320, 192)
+    g.restore()
+    g.strokeStyle = '#c9a24e'; g.lineWidth = 2
+    g.beginPath(); g.roundRect(19, 19, 282, 154, 11); g.stroke()
+    // (the band along its foot)
+    g.fillStyle = ink; g.beginPath(); g.roundRect(28, 136, 264, 28, 6); g.fill()
+    const band = en ? 'RESTROOM' : ja ? (who === 'm' ? '男性 · お手洗い' : '女性 · お手洗い') : (who === 'm' ? '男廁 · MEN' : '女廁 · WOMEN')
+    fitText(g, band, 160, 151, 244, 18, '#fbf4e6', 'sans-serif', 'bold', en ? 4 : 2)
+    // (the badge and its figure)
+    const cx = 80, cy = 76, R = 44
+    g.fillStyle = ink; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = '#f6ecd6'; g.lineWidth = 2.5; g.beginPath(); g.arc(cx, cy, R - 6, 0, Math.PI * 2); g.stroke()
+    g.fillStyle = '#fbf4e6'
+    g.beginPath(); g.arc(cx, cy - 21, 7.5, 0, Math.PI * 2); g.fill()
+    if (who === 'm') {
+      g.beginPath(); g.roundRect(cx - 12, cy - 10, 24, 25, 5); g.fill()
+      g.fillRect(cx - 10, cy + 12, 8, 20); g.fillRect(cx + 2, cy + 12, 8, 20)
+    } else {
+      g.beginPath(); g.moveTo(cx, cy - 11); g.lineTo(cx + 18, cy + 17); g.lineTo(cx - 18, cy + 17); g.closePath(); g.fill()
+      g.fillRect(cx - 9, cy + 15, 6, 17); g.fillRect(cx + 3, cy + 15, 6, 17)
+    }
+    // (the big character, or the word)
+    if (en) fitText(g, who === 'm' ? 'MEN' : 'WOMEN', 208, 78, 150, 60, ink, SIGN_FONT, 'bold', 2)
+    else brushText(g, who === 'm' ? '男' : '女', 206, 76, 100, { fill: ink, edge: '#f6ecd6', shadow: 'rgba(60,30,10,0.35)', shine: '#ffffff' })
+    g.restore()
+  }))
+  return WC_SIGN_MADE.get(key) ?? null
+}
+
+/** a family crest (紋) in one colour, centred at x, y, `R` its radius: 梅鉢 (plum blossom: five round petals, a dot in its heart and a ring of
+ * small ones round it) or 桜 (cherry blossom: five petals each notched at its tip, stamens in its heart), after the owner's two references */
+function crest(g: CanvasRenderingContext2D, kind: 'ume' | 'sakura', x: number, y: number, R: number, ink: string, ground: string) {
+  g.save()
+  g.translate(x, y)
   g.fillStyle = ink
-  g.beginPath()
-  g.arc(36, 24, 9, 0, Math.PI * 2)
-  g.fill()
-  g.beginPath()
-  if (who === 'm') {
-    g.rect(26, 36, 20, 26)
-    g.rect(28, 62, 6, 22)
-    g.rect(38, 62, 6, 22)
+  if (kind === 'ume') {
+    for (let k = 0; k < 5; k++) {
+      const a = -Math.PI / 2 + (k * 2 * Math.PI) / 5
+      g.beginPath(); g.arc(Math.cos(a) * R * 0.62, Math.sin(a) * R * 0.62, R * 0.345, 0, Math.PI * 2); g.fill()
+    }
+    g.fillStyle = ground; g.beginPath(); g.arc(0, 0, R * 0.3, 0, Math.PI * 2); g.fill()
+    g.fillStyle = ink; g.beginPath(); g.arc(0, 0, R * 0.1, 0, Math.PI * 2); g.fill()
+    for (let k = 0; k < 5; k++) {
+      const a = -Math.PI / 2 + Math.PI / 5 + (k * 2 * Math.PI) / 5
+      g.beginPath(); g.arc(Math.cos(a) * R * 0.2, Math.sin(a) * R * 0.2, R * 0.05, 0, Math.PI * 2); g.fill()
+    }
   } else {
-    g.moveTo(36, 34)
-    g.lineTo(52, 66)
-    g.lineTo(20, 66)
-    g.closePath()
-    g.rect(29, 66, 5, 18)
-    g.rect(38, 66, 5, 18)
+    for (let k = 0; k < 5; k++) {
+      g.save()
+      g.rotate((k * 2 * Math.PI) / 5)
+      g.beginPath()
+      g.moveTo(0, -R * 0.16)
+      g.bezierCurveTo(-R * 0.22, -R * 0.3, -R * 0.46, -R * 0.62, -R * 0.32, -R * 0.9)
+      g.quadraticCurveTo(-R * 0.2, -R * 1.03, -R * 0.08, -R * 0.99)
+      g.lineTo(0, -R * 0.85)
+      g.lineTo(R * 0.08, -R * 0.99)
+      g.quadraticCurveTo(R * 0.2, -R * 1.03, R * 0.32, -R * 0.9)
+      g.bezierCurveTo(R * 0.46, -R * 0.62, R * 0.22, -R * 0.3, 0, -R * 0.16)
+      g.closePath(); g.fill()
+      g.restore()
+    }
+    g.beginPath(); g.arc(0, 0, R * 0.08, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = ink; g.lineWidth = Math.max(1, R * 0.03)
+    for (let k = 0; k < 5; k++) {
+      const a = -Math.PI / 2 + Math.PI / 5 + (k * 2 * Math.PI) / 5
+      g.beginPath(); g.moveTo(Math.cos(a) * R * 0.08, Math.sin(a) * R * 0.08); g.lineTo(Math.cos(a) * R * 0.2, Math.sin(a) * R * 0.2); g.stroke()
+      g.beginPath(); g.arc(Math.cos(a) * R * 0.22, Math.sin(a) * R * 0.22, R * 0.035, 0, Math.PI * 2); g.fill()
+    }
   }
-  g.fill()
-  brushText(g, who === 'm' ? '男' : '女', 104, 42, 58, { fill: ink, edge: '#f4eadb', shadow: 'rgba(60,30,10,0.35)', shine: '#ffffff' })
-  brushText(g, who === 'm' ? '男廁 · MEN' : '女廁 · WOMEN', 104, 80, 14, { fill: '#1d140c', weight: 'normal' })
+  g.restore()
+}
+/**
+ * The short noren over each toilet's door (the owner's: some pattern on them, cut in half down the middle): navy for the men's with a white
+ * 梅鉢 across its middle, deep red for the women's with a white 桜, the slit between its two panels cutting the crest in half; a darker band
+ * along its top where it's sewn over its rod, the crest small and tone on tone scattered over the rest, a white line along its hem, the
+ * cotton's weave. One picture over both panels (each panel shows its half: ToiletDoor's noren).
+ */
+const wcNoren = (who: 'm' | 'f') => canvasTex(1024, 484, (g) => {
+  const cloth = who === 'm' ? '#22335f' : '#8e2329'
+  const kind = who === 'm' ? 'ume' : 'sakura'
+  g.save()
+  g.fillStyle = cloth; g.fillRect(0, 0, 1024, 484)
+  // (the weave: fine threads either way)
+  g.globalAlpha = 0.06
+  g.fillStyle = '#ffffff'
+  for (let x = 0; x < 1024; x += 3) g.fillRect(x, 0, 1, 484)
+  g.fillStyle = '#000000'
+  for (let y = 0; y < 484; y += 3) g.fillRect(0, y, 1024, 1)
+  g.globalAlpha = 1
+  // (the small crests, tone on tone, clear of the big one)
+  for (let r = 0, y = 92; y < 470; r++, y += 78) for (let x = (r % 2) * 56 + 40; x < 1024; x += 112) {
+    if (Math.hypot(x - 512, y - 252) < 210) continue
+    crest(g, kind, x, y, 22, 'rgba(255,255,255,0.1)', 'rgba(0,0,0,0)')
+  }
+  // (the band along its top, sewn over the rod)
+  g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(0, 0, 1024, 44)
+  g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(0, 44, 1024, 3)
+  // (the big crest across the middle, white, in a fine white ring)
+  crest(g, kind, 512, 252, 148, '#f4efe4', cloth)
+  g.strokeStyle = '#f4efe4'; g.lineWidth = 6
+  g.beginPath(); g.arc(512, 252, 178, 0, Math.PI * 2); g.stroke()
+  // (a white line along the hem)
+  g.fillStyle = '#f4efe4'; g.fillRect(0, 456, 1024, 5)
+  g.restore()
 })
-const WC_SIGNS = { m: wcSign('m'), f: wcSign('f') }
+const WC_NOREN = { m: wcNoren('m'), f: wcNoren('f') }
 
 /**
  * The way through to the toilet: one sliding door (引き戸) in a dark wooden frame, shut, wood below and shoji paper on
@@ -2304,6 +2421,17 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   const W = WC_W, H = WC_H
   const door = useWcDoor()
   const frame = useMemo(() => door.frame(), [door])
+  const lang = useDocLang()
+  // (the noren's two panels, each showing its half of the one picture: the slit between them cuts the crest in half)
+  const noren = useMemo(() => [-1, 1].map((sd) => {
+    const w = W / 2.2, span = 2 * (W / 4.2) + w
+    const geo = new THREE.PlaneGeometry(w, 0.36)
+    const u0 = (sd * W / 4.2 - w / 2 + span / 2) / span, u1 = u0 + w / span
+    const uv = geo.attributes.uv as THREE.BufferAttribute
+    for (let k = 0; k < uv.count; k++) uv.setX(k, u0 + uv.getX(k) * (u1 - u0))
+    return { sd, geo }
+  }), [W])
+  useEffect(() => () => noren.forEach((n) => n.geo.dispose()), [noren])
   return (
     <group>
       {/* the frame round the opening: dark cedar posts, the head over them and the sill (blender/wcdoor.py) */}
@@ -2311,15 +2439,14 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
       {/* (the sliding panel: ToiletPanel, not merged) and the little room behind it */}
       <WcRoom w={W} h={H} who={who} />
       {/* the short noren, and the plaque over it */}
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[-0.125, H - 0.2, sd * W / 4.2]} rotation-y={-Math.PI / 2}>
-          <planeGeometry args={[W / 2.2, 0.36]} />
-          <meshToonMaterial color={who === 'm' ? '#2c3e66' : '#9a2a2a'} side={THREE.DoubleSide} />
+      {noren.map(({ sd, geo }) => (
+        <mesh key={sd} geometry={geo} position={[-0.125, H - 0.2, sd * W / 4.2]} rotation-y={-Math.PI / 2}>
+          <meshToonMaterial color="#ffffff" map={WC_NOREN[who]} side={THREE.DoubleSide} />
         </mesh>
       ))}
       <mesh position={[-0.075, H + 0.16, 0]} rotation-y={-Math.PI / 2}>
         <planeGeometry args={[0.4, 0.24]} />
-        <meshToonMaterial color="#ffffff" map={WC_SIGNS[who]} />
+        <meshToonMaterial color="#ffffff" map={wcSign(who, lang)} />
       </mesh>
     </group>
   )
