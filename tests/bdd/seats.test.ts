@@ -2,15 +2,22 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { GRILL_COUNTERS, GRILL_SEATS, lampsAlong, passOf, seatAlong, seatLabel } from '@/shops/grill/bar'
 
-feature('吧台的座位：全店 8 個，平均分開，每個座位有號碼，每兩位客人之間一盞吊燈', () => {
-  scenario('全店只有 8 個座位，兩座吧台的座位間距都一樣（店主要的：8 張、平均放）', ({ given, then, and }) => {
+feature('吧台的座位：全店 8 個，兩座吧台各 4 個，每個座位有號碼，每兩位客人之間一盞吊燈', () => {
+  scenario('全店 8 個座位，兩座吧台各 4 個（店主要的：長吧台靠轉角的那個移到側吧台，兩邊才均衡）', ({ given, then, and }) => {
     given('烤魚店的兩座吧台', (w) => { w.cs = GRILL_COUNTERS })
     then('全店 8 個座位', () => { expect(GRILL_SEATS.length).toBe(8) })
-    and('長吧台 5 個、側吧台 3 個', (w) => { expect(w.cs.map((c: { seats: number }) => c.seats)).toEqual([5, 3]) })
-    and('每座吧台相鄰兩個座位的間距都一樣，兩座也一樣', (w) => {
-      const gaps = (w.cs as typeof GRILL_COUNTERS).flatMap((c) => Array.from({ length: c.seats - 1 }, (_, n) => seatAlong(c, n + 1) - seatAlong(c, n)))
-      for (const g of gaps) expect(g).toBeCloseTo(gaps[0], 6)
+    and('長吧台 4 個、側吧台 4 個', (w) => { expect(w.cs.map((c: { seats: number }) => c.seats)).toEqual([4, 4]) })
+    and('每座吧台相鄰兩個座位的間距都一樣', (w) => {
+      for (const c of w.cs as typeof GRILL_COUNTERS) {
+        const gaps = Array.from({ length: c.seats - 1 }, (_, n) => seatAlong(c, n + 1) - seatAlong(c, n))
+        for (const g of gaps) expect(g).toBeCloseTo(gaps[0], 6)
+      }
     })
+  })
+
+  scenario('長吧台留下的 4 個座位在原來的地方：拿掉的是最靠轉角的那個', ({ given, then }) => {
+    given('長吧台', (w) => { w.c = GRILL_COUNTERS[0] })
+    then('離轉角最遠的座位（1 號）跟以前一樣，在吧台中間往門口 1.775', (w) => { expect(seatAlong(w.c, w.c.seats - 1)).toBeCloseTo(1.775, 6) })
   })
 
   scenario('吊燈掛在每兩位客人中間（店主要的）', ({ given, then, and }) => {
