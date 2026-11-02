@@ -1523,37 +1523,20 @@ void main() {
   })
   return mat
 })()
-/** a passer-by's shadow on the paper by day: a figure, soft-edged, walking (a bag on one shoulder) */
-const PASSER = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 128; c.height = 256
-  const g = c.getContext('2d')!
-  g.filter = 'blur(5px)'
-  g.fillStyle = 'rgba(30,45,70,0.55)'
-  g.beginPath(); g.arc(64, 52, 22, 0, Math.PI * 2); g.fill()
-  g.beginPath(); g.moveTo(34, 86); g.quadraticCurveTo(64, 70, 94, 86); g.lineTo(100, 190); g.lineTo(28, 190); g.closePath(); g.fill()
-  g.fillRect(40, 186, 18, 70); g.fillRect(70, 186, 18, 70)
-  g.beginPath(); g.ellipse(100, 140, 16, 24, 0.2, 0, Math.PI * 2); g.fill()
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-})()
 /**
  * The round window's shoji (the owner's: it opens left and right): two halves, each a half of the paper with its own lattice (bars over the
  * washi), sliding apart into the wall when clicked and back together at another, with the runners' sound, cut to the window's round
  * (whatever slides past its edge is in the wall, unseen); behind them the view outside (ROUND_VIEW: a city backstreet, in depth). They swung open into the room for a
  * while, hinged at the round's left and right like the fridges' doors; the owner found the half-moons standing out in the air odd, and chose
- * this, as a round window's shoji does. By day, now and then, a passer-by's shadow crosses the paper outside (the owner's). Not batched: it
- * moves, and it's clicked.
+ * this, as a round window's shoji does. (A passer-by's shadow crossed the paper by day now and then: the owner found it odd and had it
+ * taken away.) Not batched: it moves, and it's clicked.
  */
 function RoundShoji() {
   const R = ROUND_R
   const win = useRef<THREE.Group>(null)
   const halves = useRef<(THREE.Group | null)[]>([])
   const view = useRef<THREE.Mesh>(null)
-  const passer = useRef<THREE.Mesh>(null)
-  const st = useRef({ open: false, k: 0, next: 12 + Math.random() * 20, walk: -1, dir: 1 })
+  const st = useRef({ open: false, k: 0 })
   /** the window's frame, inverted, for cutting what's drawn to its round */
   const inv = useMemo(() => ({ value: new THREE.Matrix4() }), [])
   const round = useMemo(() => {
@@ -1571,10 +1554,9 @@ function RoundShoji() {
     return {
       paper: cut(new THREE.MeshBasicMaterial({ map: ROUND_PAPER, toneMapped: false })),
       wood: cut(new THREE.MeshToonMaterial({ color: '#b98656' })),
-      passer: cut(new THREE.MeshBasicMaterial({ map: PASSER, transparent: true, depthWrite: false, toneMapped: false })),
     }
   }, [inv, R])
-  useEffect(() => () => { round.paper.dispose(); round.wood.dispose(); round.passer.dispose() }, [round])
+  useEffect(() => () => { round.paper.dispose(); round.wood.dispose() }, [round])
   // (each half's lattice, one mesh: its outer upright, the three bars across from the middle out to the round, an upright at its inner edge)
   const bars = useMemo(() => [-1, 1].map((sd) => {
     const out: THREE.BufferGeometry[] = []
@@ -1602,26 +1584,10 @@ function RoundShoji() {
     s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.6)
     const e = s.k * s.k * (3 - 2 * s.k)
     halves.current.forEach((h, i) => { if (h) h.position.z = (i ? 1 : -1) * e * (R + 0.02) })
-    // (a passer-by now and then, by day, while the paper's shut)
-    const night = document.documentElement.dataset.theme === 'dark'
-    const m = passer.current
-    if (m) {
-      if (s.walk < 0) {
-        s.next -= Math.min(dt, 0.1)
-        if (s.next <= 0 && !night && s.k < 0.05) { s.walk = 0; s.dir = Math.random() < 0.5 ? -1 : 1 }
-      } else {
-        s.walk += Math.min(dt, 0.1) / 5.5
-        if (s.walk >= 1 || s.k > 0.05) { s.walk = -1; s.next = 20 + Math.random() * 25 }
-      }
-      if (s.walk >= 0) {
-        m.position.z = s.dir * (-R - 0.2 + s.walk * (2 * R + 0.4))
-        m.position.y = -0.02 + Math.abs(Math.sin(s.walk * Math.PI * 9)) * 0.012
-      } else m.position.z = 2 * R
-    }
   })
   const says = () => (st.current.open ? '點一下關上' : '點一下打開（左右拉開）')
   return (
-    <group ref={win}>
+    <group ref={win} name="round-shoji">
       {/* (outside, behind it all: the street, seen in depth through the window (ROUND_VIEW)) */}
       <mesh ref={view} position-x={-0.001} rotation-y={-Math.PI / 2} material={ROUND_VIEW ?? undefined}>
         <circleGeometry args={[R, 64]} />
@@ -1649,10 +1615,6 @@ function RoundShoji() {
           </group>
         ))}
       </group>
-      {/* (a passer-by's shadow outside, on the paper) */}
-      <mesh ref={passer} name="round-passer" position={[-0.0045, 0, 2 * R]} rotation-y={-Math.PI / 2} material={round.passer} renderOrder={3}>
-        <planeGeometry args={[0.28, 0.56]} />
-      </mesh>
     </group>
   )
 }

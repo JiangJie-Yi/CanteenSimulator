@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -151,14 +151,25 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     if (!made.has(v)) made.set(v, build(gltf.scene))
     const base = made.get(v)!
     const root = base.root.clone(true)
-    // (their own skin and hair: colours over the variant's shape, in a colour attribute of their own (the shape's other attributes shared))
+    const old = who.age === 'old'
+    const glasses = (h >> 7) % 5 === 0 || (old && (h >> 7) % 2 === 0)
+    const get = (n: string) => root.getObjectByName(n) ?? null
+    const g = get('glasses')
+    if (g) g.visible = glasses
+    return { root, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes') }
+  }, [gltf, v, h, who.age])
+  // (their own skin and hair: colours over the variant's shape, in a colour attribute of their own, the shape's other attributes shared.
+  // Made as they're shown and undone as they go: the shared shape put back on their meshes, only their own colours let go. They were made
+  // with the figure and let go in an effect, and the effect's let-go ran once before they were ever drawn (React's strict checks unmount
+  // and mount again): it took the shared shape off the meshes still drawn, and they drew nothing but their ink, black (the owner saw it))
+  useLayoutEffect(() => {
     const old = who.age === 'old'
     // (a hash past 2^31 makes `h >> 3` negative and its pick nothing: their hair then stays the model's own, as it always has)
     const pickHair = old ? ((h >> 4) & 1 ? '#d6d1c8' : '#a9a49c') : AV_HAIR[(h >> 3) % AV_HAIR.length]
     const skin = new THREE.Color(AV_SKIN[h % AV_SKIN.length])
     const hair = pickHair ? new THREE.Color(pickHair) : null
-    const own: THREE.BufferGeometry[] = []
-    root.traverse((o) => {
+    const swapped: [THREE.Mesh, THREE.BufferGeometry, THREE.BufferGeometry][] = []
+    fig.root.traverse((o) => {
       const m = o as THREE.Mesh
       const tints = m.userData.tints as Tint[] | undefined
       if (!m.isMesh || !tints) return
@@ -174,21 +185,16 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
       src.computeBoundingSphere()
       g.boundingSphere = src.boundingSphere
       m.geometry = g
-      own.push(g)
+      swapped.push([m, src, g])
     })
-    const glasses = (h >> 7) % 5 === 0 || (old && (h >> 7) % 2 === 0)
-    const get = (n: string) => root.getObjectByName(n) ?? null
-    const g = get('glasses')
-    if (g) g.visible = glasses
-    return { root, own, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes') }
-  }, [gltf, v, h, who.age])
-  // (their own colours let go with them; the shape they share is kept for the others)
-  useEffect(() => () => {
-    for (const g of fig.own) {
-      for (const k of Object.keys(g.attributes)) if (k !== 'color') g.deleteAttribute(k)
-      g.dispose()
+    return () => {
+      for (const [m, src, g] of swapped) {
+        m.geometry = src
+        for (const k of Object.keys(g.attributes)) if (k !== 'color') g.deleteAttribute(k)
+        g.dispose()
+      }
     }
-  }, [fig])
+  }, [fig, h, who.age])
   // (a cook fans the fire only now and then: a spell of it, the fan in hand, then put down; each to their own times)
   const [fanning, setFanning] = useState(false)
   const clock = useRef(0)
