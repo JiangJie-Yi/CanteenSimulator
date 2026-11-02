@@ -93,13 +93,23 @@ def mesh_obj(name, bm, mat, smooth_shade=True):
     return finish(o, name, mat, smooth_shade)
 
 
-def lathe(name, profile, mat, segs=48):
-    """A solid of revolution about Z from a list of (r, z), facing +Z."""
+def lathe(name, profile, mat, segs=24):
+    """A solid of revolution about Z from a list of (r, z), facing +Z, 24 round. A profile ending on the axis has that point left out and the
+    ring before it closed flat instead (laddered on export): never a fan of triangles into the middle (the owner's low-poly rule; the dust
+    cap was 48 into one point)"""
+    shut = profile[-1][0] <= 1e-6
+    if shut:
+        profile = profile[:-1]
     bm = bmesh.new()
     verts = [bm.verts.new((r, 0, z)) for r, z in profile]
     edges = [bm.edges.new((a, b)) for a, b in zip(verts, verts[1:])]
     bmesh.ops.spin(bm, geom=verts + edges, cent=(0, 0, 0), axis=(0, 0, 1), angle=math.tau, steps=segs, use_duplicate=False)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
+    if shut:
+        r_end, z_end = profile[-1]
+        ring = [v for v in bm.verts if abs(math.hypot(v.co.x, v.co.y) - r_end) < 1e-6 and abs(v.co.z - z_end) < 1e-6]
+        ring.sort(key=lambda v: math.atan2(v.co.y, v.co.x))
+        bm.faces.new(ring)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return mesh_obj(name, bm, mat)
 
@@ -316,17 +326,18 @@ for sx in (-1, 1):
     parts.append(cyl(f"SpeakerYokeEnd{sx}", 0.021, 0.006, (sx * YX, PIVOT.y - 0.03, PIVOT.z), M["steel"], rot=(0, math.pi / 2, 0), verts=32))
     # the clamping knob: fluted, a washer under it
     parts.append(cyl(f"SpeakerWasher{sx}", 0.016, 0.002, (sx * (YX + 0.004), PIVOT.y, PIVOT.z), M["screw"], rot=(0, math.pi / 2, 0)))
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.021, depth=0.016, location=(sx * (YX + 0.013), PIVOT.y, PIVOT.z), rotation=(0, math.pi / 2, 0))
+    # (16 round, every other point drawn in for its flutes, one bevel: it was 32 round with two, 892 triangles a knob)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.021, depth=0.016, location=(sx * (YX + 0.013), PIVOT.y, PIVOT.z), rotation=(0, math.pi / 2, 0))
     k = active()
     for v in k.data.vertices:
         r_ = math.hypot(v.co.x, v.co.y)
         if r_ > 0.01:
             a = math.atan2(v.co.y, v.co.x)
-            f = 1.0 if (round(a / (math.tau / 32)) % 2) else 0.86
+            f = 1.0 if (round(a / (math.tau / 16)) % 2) else 0.86
             v.co.x *= f
             v.co.y *= f
     finish(k, f"SpeakerKnob{sx}", M["rubber"])
-    bevel(k, 0.002, 2)
+    bevel(k, 0.002, 1)
     parts.append(k)
 # the arm back to the corner, a ball joint where it meets the yoke, and the corner bracket: an angle of steel whose two flanges lie flat on the
 # two walls, the arm screwed into its spine. The game stretches the arm (its own node, SpeakerArmReach, along +Y from the joint) and sets the
@@ -338,7 +349,8 @@ reach.location = (0, YB, PIVOT.z)
 arm = cyl("SpeakerArm", 0.014, WALL - YB, (0, (WALL - YB) / 2, 0), M["steel"], rot=(math.pi / 2, 0, 0))
 arm.parent = reach
 parts += [reach, arm]
-bpy.ops.mesh.primitive_uv_sphere_add(radius=0.022, location=(0, YB + 0.012, PIVOT.z), segments=24, ring_count=12)
+# (an icosphere: round without poles, 80 faces (it was a 24 x 12 globe, 24 triangles into each pole))
+bpy.ops.mesh.primitive_ico_sphere_add(radius=0.022, location=(0, YB + 0.012, PIVOT.z), subdivisions=1)
 parts.append(finish(active(), "SpeakerJoint", M["steel"]))
 parts.append(cyl("SpeakerJointNut", 0.017, 0.012, (0, YB + 0.03, PIVOT.z), M["steel"], rot=(math.pi / 2, 0, 0), verts=6))
 mount = bpy.data.objects.new("SpeakerMount", None)

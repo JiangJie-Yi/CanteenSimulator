@@ -1,3 +1,4 @@
+import { setTip } from '@/scene/hoverTip'
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
@@ -1172,6 +1173,8 @@ export default function App() {
   // (and the frame pacer doesn't judge for a while after any of these, or the view flown elsewhere: a moment of slow frames, figures built
   // and shaders compiled, no measure of the machine; it took the shop opening for a slow machine and drew the rest of the session coarse)
   useEffect(() => { holdPacer() }, [speed, editOn, ai, view])
+  // (a view changed by a key with the pointer resting on something: its name tag let go, or it stayed over the new view till the pointer moved)
+  useEffect(() => { setTip(null) }, [view])
   // the omiki (御神酒) offered at the shrine by the door: for a while more come in and they order more
   const [omikiAt, setOmikiAt] = useState<number | null>(null)
   const [blessed, setBlessed] = useState(false)
