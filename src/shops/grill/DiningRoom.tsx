@@ -1660,30 +1660,173 @@ const wcNoren = (who: 'm' | 'f') => {
 const WC_NOREN = { m: wcNoren('m'), f: wcNoren('f') }
 /**
  * The long noren hung across the way round to the toilet (the owner's: in through the door the washstand first, the toilet round the
- * corner), down to below the waist: linen dyed from pale at its top down into the room's colour (ぼかし), a dark band along its top over the
- * rod, the room's crest small and white near its foot, cut in half by the slit between its two panels; the linen's weave.
+ * corner), down to below the waist: linen, a dark band along its top over the rod, printed (the owner's, after his two pictures of wagara):
+ * the men's green bamboo, a few stalks with their nodes and sprays of slender leaves, two paler ones behind for depth; the women's peonies,
+ * three great layered blossoms, pink, red and cream round golden hearts, among their leaves; the linen's weave over it all. Nothing across
+ * the slit between its two panels.
  */
 /** the long noren inside: down to the waist (the owner's: shorter; it hung to the knee), and the opening it hangs across */
 const WC_STALL_L = 0.9, WC_STALL_W = WC_ROOM.D - WC_ROOM.X0 - 0.06
 const wcStallNoren = (who: 'm' | 'f') => {
   const H = Math.round(512 * WC_STALL_L / WC_STALL_W)
   return canvasTex(512, H, (g) => {
-    const deep = who === 'm' ? '#22335f' : '#8e2329'
-    const pale = who === 'm' ? '#e8ebf0' : '#f6e8e6'
+    // (a little random of its own, the same every time it's drawn)
+    let seed = who === 'm' ? 7 : 11
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646 }
     g.save()
     const gr = g.createLinearGradient(0, 0, 0, H)
-    gr.addColorStop(0, pale); gr.addColorStop(0.3, pale); gr.addColorStop(0.78, deep); gr.addColorStop(1, deep)
+    if (who === 'm') { gr.addColorStop(0, '#f1efe2'); gr.addColorStop(1, '#dfe5cd') } else { gr.addColorStop(0, '#f9eee8'); gr.addColorStop(1, '#f0d8d0') }
     g.fillStyle = gr; g.fillRect(0, 0, 512, H)
+    const leaf = (x: number, y: number, a: number, len: number, wid: number, col: string) => {
+      g.save(); g.translate(x, y); g.rotate(a)
+      g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * 0.42, -wid, len, 0); g.quadraticCurveTo(len * 0.42, wid, 0, 0)
+      g.fillStyle = col; g.fill()
+      g.strokeStyle = 'rgba(255,255,255,0.28)'; g.lineWidth = 1.2
+      g.beginPath(); g.moveTo(len * 0.06, 0); g.lineTo(len * 0.86, 0); g.stroke()
+      g.restore()
+    }
+    if (who === 'm') {
+      // bamboo: a stalk from the top band to the hem, leaning a little; its nodes a dark ring with a pale lip above; sprays from some
+      const stalk = (x0: number, x1: number, w: number, body: string, lit: string, ring: string, sprays: boolean) => {
+        const at = (y: number) => x0 + (x1 - x0) * (y / H)
+        g.lineCap = 'butt'
+        g.strokeStyle = body; g.lineWidth = w
+        g.beginPath(); g.moveTo(at(40), 40); g.lineTo(at(H), H); g.stroke()
+        g.strokeStyle = lit; g.lineWidth = w * 0.22
+        g.beginPath(); g.moveTo(at(40) - w * 0.22, 40); g.lineTo(at(H) - w * 0.22, H); g.stroke()
+        for (let y = 70 + rnd() * 60; y < H - 30; y += 110 + rnd() * 50) {
+          const x = at(y)
+          g.fillStyle = ring; g.fillRect(x - w / 2 - 1.5, y, w + 3, 3.5)
+          g.fillStyle = lit; g.fillRect(x - w / 2, y - 3, w, 2)
+          if (!sprays || rnd() < 0.35) continue
+          // (a spray off the node: a twig out to one side, a fan of slender leaves at its end)
+          const side = x < 256 ? -1 : 1, s2 = rnd() < 0.3 ? -side : side
+          const tx = x + s2 * (24 + rnd() * 18), ty = y + 14 + rnd() * 10
+          g.strokeStyle = ring; g.lineWidth = 2
+          g.beginPath(); g.moveTo(x, y + 2); g.quadraticCurveTo((x + tx) / 2, y + 2, tx, ty); g.stroke()
+          const n = 3 + Math.floor(rnd() * 3)
+          for (let k = 0; k < n; k++) {
+            const a = (s2 > 0 ? 0.35 : Math.PI - 0.35) + s2 * (k - (n - 1) / 2) * 0.42 + (rnd() - 0.5) * 0.25
+            leaf(tx, ty, a, 62 + rnd() * 30, 8 + rnd() * 3, ['#3f8a49', '#2f6e3c', '#58a05c'][k % 3])
+          }
+        }
+      }
+      // (two pale ones behind, then the near ones; none across the slit at the middle)
+      stalk(150, 140, 14, 'rgba(150,190,140,0.55)', 'rgba(220,235,205,0.5)', 'rgba(110,150,100,0.5)', false)
+      stalk(398, 412, 13, 'rgba(150,190,140,0.55)', 'rgba(220,235,205,0.5)', 'rgba(110,150,100,0.5)', false)
+      stalk(84, 104, 26, '#4f9a55', '#a9d69c', '#2a5c33', true)
+      stalk(206, 190, 21, '#3f8a49', '#9bcf8e', '#285a31', true)
+      stalk(326, 344, 27, '#56a35a', '#b2dca3', '#2d6236', true)
+      stalk(450, 436, 19, '#468f4f', '#a2d496', '#2a5c33', true)
+    } else {
+      // peonies (牡丹, as in the owner's reference): their three-lobed leaves first, then each blossom from the back, seen a little from
+      // above: a ring of broad ruffled petals, deep at the heart and pale at the edge; a smaller ring; the golden heart of stamens; and the
+      // cupped petals in front of it. Each kept to its own panel (the slit at the middle cuts through nothing)
+      type Hue = { deep: string; mid: string; pale: string; line: string }
+      const petal = (L: number, W: number, from: string, to: string, line: string, bumps: number) => {
+        // (in the petal's own frame: its narrow base at the origin, its ruffled end out along +x; a few shallow scallops round the end,
+        // a little notch where each two meet; faint veins from the base)
+        const edge = (t: number) => { const a = t * 1.25; return [L * 0.6 + Math.cos(a) * L * 0.4, Math.sin(a) * W] }
+        const gr = g.createLinearGradient(0, 0, L, 0)
+        gr.addColorStop(0, from); gr.addColorStop(0.6, to); gr.addColorStop(1, to)
+        g.beginPath()
+        g.moveTo(0, -W * 0.22)
+        const [sx, sy] = edge(-1)
+        g.bezierCurveTo(L * 0.25, -W * 0.55, L * 0.5, -W * 1.05, sx, sy)
+        for (let k = 0; k < bumps; k++) {
+          const t0 = -1 + (k / bumps) * 2, t1 = -1 + ((k + 1) / bumps) * 2
+          const [mx, my] = edge((t0 + t1) / 2), [ex, ey] = edge(t1)
+          const out = 1 + 0.1 + rnd() * 0.06
+          g.quadraticCurveTo(L * 0.6 + (mx - L * 0.6) * out, my * out, ex - (ex - L * 0.6) * 0.04, ey * 0.96)
+        }
+        g.bezierCurveTo(L * 0.5, W * 1.05, L * 0.25, W * 0.55, 0, W * 0.22)
+        g.closePath()
+        g.fillStyle = gr; g.fill()
+        g.strokeStyle = line; g.lineWidth = 1.3; g.stroke()
+        g.globalAlpha = 0.3
+        g.strokeStyle = line; g.lineWidth = 0.9
+        for (const t of [-0.55, -0.18, 0.18, 0.55]) {
+          const [vx, vy] = edge(t)
+          g.beginPath(); g.moveTo(L * 0.08, 0); g.quadraticCurveTo(vx * 0.45, vy * 0.3, vx * 0.78, vy * 0.78); g.stroke()
+        }
+        g.globalAlpha = 1
+      }
+      const peonyLeaf = (x: number, y: number, a: number, len: number, body: string, lit: string) => {
+        // (a stalk, three pointed lobes at its end, the middle the longest; two-toned, a pale vein down each)
+        g.save(); g.translate(x, y); g.rotate(a)
+        g.strokeStyle = body; g.lineWidth = 2.2
+        g.beginPath(); g.moveTo(0, 0); g.lineTo(len * 0.3, 0); g.stroke()
+        for (const [da, k] of [[-0.62, 0.68], [0.62, 0.68], [0, 1]]) {
+          g.save(); g.translate(len * 0.3, 0); g.rotate(da)
+          const l = len * 0.7 * k, w = l * 0.27
+          g.beginPath(); g.moveTo(0, 0)
+          g.bezierCurveTo(l * 0.3, -w * 1.1, l * 0.72, -w * 0.85, l, 0)
+          g.bezierCurveTo(l * 0.72, w * 0.85, l * 0.3, w * 1.1, 0, 0)
+          g.fillStyle = body; g.fill()
+          g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(l * 0.3, -w * 1.1, l * 0.72, -w * 0.85, l, 0); g.closePath()
+          g.fillStyle = lit; g.fill()
+          g.strokeStyle = 'rgba(232,240,214,0.5)'; g.lineWidth = 1.1
+          g.beginPath(); g.moveTo(l * 0.04, 0); g.lineTo(l * 0.86, 0); g.stroke()
+          g.restore()
+        }
+        g.restore()
+      }
+      const blossom = (cx: number, cy: number, r: number, hue: Hue) => {
+        g.save()
+        const left = cx < 256
+        g.beginPath(); g.rect(left ? 0 : 263, 40, 249, H - 40); g.clip()
+        for (const a of [-0.35, 0.55, 1.45, 2.35, 3.35]) {
+          const t = a + (rnd() - 0.5) * 0.3
+          peonyLeaf(cx + Math.cos(t) * r * 0.45, cy + Math.sin(t) * r * 0.4, t, r * (0.95 + rnd() * 0.15), ['#2f5a3a', '#355f3d', '#2a5234'][Math.floor(rnd() * 3)], '#4f8a58')
+        }
+        // (the flower a little flattened, seen from above it)
+        g.translate(cx, cy); g.scale(1, 0.84)
+        const off = rnd() * 0.9
+        for (let k = 0; k < 7; k++) {
+          const a = off + (k / 7) * Math.PI * 2
+          g.save(); g.rotate(a); g.translate(r * 0.08, 0)
+          petal(r * (0.92 + rnd() * 0.12), r * 0.44, hue.deep, hue.pale, hue.line, 4)
+          g.restore()
+        }
+        for (let k = 0; k < 6; k++) {
+          const a = off + ((k + 0.5) / 6) * Math.PI * 2
+          g.save(); g.rotate(a); g.translate(r * 0.05, 0)
+          petal(r * 0.7, r * 0.36, hue.deep, hue.mid, hue.line, 3)
+          g.restore()
+        }
+        // (the heart: golden stamens, a little above the middle)
+        g.save(); g.translate(0, -r * 0.1)
+        g.fillStyle = '#c9932e'
+        g.beginPath(); g.ellipse(0, 0, r * 0.27, r * 0.19, 0, 0, Math.PI * 2); g.fill()
+        g.fillStyle = '#e9c252'
+        g.beginPath(); g.ellipse(0, -r * 0.02, r * 0.23, r * 0.15, 0, 0, Math.PI * 2); g.fill()
+        for (let k = 0; k < 22; k++) {
+          const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd())
+          const x = Math.cos(a) * d * r * 0.22, y = Math.sin(a) * d * r * 0.14 - r * 0.02
+          g.fillStyle = '#f6dc7a'; g.beginPath(); g.arc(x, y, 2.6, 0, Math.PI * 2); g.fill()
+          g.strokeStyle = '#a8701e'; g.lineWidth = 0.8; g.stroke()
+        }
+        g.restore()
+        // (the cupped petals in front of it, up from below, their ruffled tops over the heart's lower half)
+        for (let k = 0; k < 3; k++) {
+          g.save(); g.translate((k - 1) * r * 0.3, r * 0.52); g.rotate(-Math.PI / 2 + (k - 1) * 0.38)
+          petal(r * (0.6 + (k === 1 ? 0.06 : 0)), r * 0.3, hue.mid, hue.pale, hue.line, 3)
+          g.restore()
+        }
+        g.restore()
+      }
+      blossom(140, H * 0.4, 92, { deep: '#d55a74', mid: '#ec8fa1', pale: '#fbd5dc', line: 'rgba(140,40,60,0.5)' })
+      blossom(380, H * 0.6, 104, { deep: '#8f1a27', mid: '#c93744', pale: '#f0807f', line: 'rgba(80,10,20,0.55)' })
+      blossom(158, H * 0.8, 76, { deep: '#e3a88c', mid: '#f4d7c4', pale: '#fffaf1', line: 'rgba(150,105,80,0.45)' })
+    }
+    // (the linen's weave over it all)
     g.globalAlpha = 0.07
     g.fillStyle = '#ffffff'
     for (let x = 0; x < 512; x += 3) g.fillRect(x, 0, 1, H)
     g.fillStyle = '#000000'
     for (let y = 0; y < H; y += 3) g.fillRect(0, y, 512, 1)
     g.globalAlpha = 1
-    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, 512, 40)
-    crest(g, who === 'm' ? 'ume' : 'sakura', 256, H - 152, 64, '#f4efe4', deep)
-    g.strokeStyle = '#f4efe4'; g.lineWidth = 4
-    g.beginPath(); g.arc(256, H - 152, 80, 0, Math.PI * 2); g.stroke()
+    g.fillStyle = who === 'm' ? '#2c4632' : '#6a1d26'; g.fillRect(0, 0, 512, 40)
     g.fillStyle = '#f4efe4'; g.fillRect(0, H - 20, 512, 4)
     g.restore()
   })
@@ -1885,6 +2028,8 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
   }), [OP, NL, SX])
   useEffect(() => () => noren.forEach((n) => n.g.dispose()), [noren])
   const W2 = SW / 2
+  // (the noren's rod: just under the lintel, in the middle of the wall's depth)
+  const ROD_Y = h - 0.035, ROD_Z = w / 2 + WC_T / 2
   return (
     <group>
       {/* (dark in it while its switch by the door is off) */}
@@ -1908,16 +2053,18 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <WcMass x={[WC_IN, X0 - 0.002]} y={[0, top]} z={[s * (w / 2 + 0.002), s * (w / 2 + E + WC_T)]} />
       <WcMass x={[X0, D]} y={[h, top]} z={[s * w / 2, s * (w / 2 + WC_T)]} />
       <WcMass x={[X0, D]} y={[0, top]} z={[s * (w / 2 + E + 0.002), s * (w / 2 + E + WC_T)]} />
-      {/* (the way through: a cedar post at the short wall's end, as deep as the wall; the noren's rod under the lintel, on two little brackets) */}
+      {/* (the way through: a cedar post at the short wall's end, as deep as the wall; the noren's rod across it just under the lintel, in the
+          wall's depth, from the post's face to the back wall's, each end in a little wooden socket (竿受け) fixed there: it hung on two
+          brackets under the lintel that were fixed to nothing, the owner's) */}
       <mesh position={[X0 + 0.02, h / 2, s * (w / 2 + WC_T / 2 - 0.005)]}><boxGeometry args={[0.04, h, WC_T + 0.01]} /><meshToonMaterial color="#5a3a22" /></mesh>
-      <mesh position={[SX, h - 0.07, s * (w / 2 - 0.035)]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.008, 0.008, OP + 0.04, 8]} /><meshToonMaterial color="#3a2416" /></mesh>
-      {[X0 + 0.07, D - 0.05].map((x) => <mesh key={x} position={[x, h - 0.04, s * (w / 2 - 0.018)]}><boxGeometry args={[0.012, 0.07, 0.036]} /><meshToonMaterial color="#3a2416" /></mesh>)}
+      <mesh position={[(X0 + 0.04 + D) / 2, ROD_Y, s * ROD_Z]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.008, 0.008, D - X0 - 0.04, 8]} /><meshToonMaterial color="#3a2416" /></mesh>
+      {[X0 + 0.04 + 0.011, D - 0.011].map((x) => <mesh key={x} position={[x, ROD_Y, s * ROD_Z]}><boxGeometry args={[0.022, 0.034, 0.034]} /><meshToonMaterial color="#5a3a22" /></mesh>)}
       </StaticBatch>
       {/* the long noren across the way to the toilet, its two panels hanging from the rod (the noren and the rod stand still: batched apart,
           their picture each its own) */}
       <Movable id={`wc2-${who}-noren`} label={`隔間暖簾（${name}）`}><StaticBatch>
         {noren.map(({ sd, g, x }) => (
-          <mesh key={sd} geometry={g} position={[x, h - 0.07 - NL / 2, s * (w / 2 - 0.035)]}>
+          <mesh key={sd} geometry={g} position={[x, ROD_Y - NL / 2, s * ROD_Z]}>
             <meshToonMaterial color="#ffffff" map={WC_STALL_NOREN[who]} side={THREE.DoubleSide} />
           </mesh>
         ))}
@@ -1987,8 +2134,9 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         {/* (marks on the floor before it as it gets dirty) */}
         <WcMarks who={who} at={[0.03, 0.006, 0]} size={[0.3, 0.5]} />
         <StaticBatch>
-        {/* (the shoji window over the toilet: washi in a dark lattice, lit from outside) */}
-        <group position={[E - 0.006, 1.38, 0]} rotation-y={-Math.PI / 2}>
+        {/* (the shoji window by the toilet: washi in a dark lattice, lit from outside; on the back wall, the shop's outside, for both toilets
+            alike (the owner's: on each one's end wall, they faced opposite ways)) */}
+        <group position={[E - 0.42, 1.38, -s * (W2 - 0.006)]} rotation-y={s > 0 ? 0 : Math.PI}>
           <mesh position-z={0.0015}><planeGeometry args={[0.46, 0.34]} /><meshBasicMaterial color="#fcebc6" toneMapped={false} /></mesh>
           {[-1, 0, 1].map((k) => <mesh key={`v${k}`} position={[k * 0.115, 0, 0.003]}><planeGeometry args={[0.012, 0.34]} /><meshToonMaterial color="#3a2416" /></mesh>)}
           {[-0.5, 0.5].map((k) => <mesh key={`h${k}`} position={[0, k * 0.11, 0.003]}><planeGeometry args={[0.46, 0.012]} /><meshToonMaterial color="#3a2416" /></mesh>)}
