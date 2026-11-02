@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 import { mergeByMaterial } from '@/scene/StaticBatch'
 import { setTip } from '@/scene/hoverTip'
+import { reflectStudio, useStudio } from '@/scene/studio'
 import { getEdit } from './edit'
 
 const URL = import.meta.env.BASE_URL + 'models/kabuto.glb'
@@ -14,6 +15,7 @@ const URL = import.meta.env.BASE_URL + 'models/kabuto.glb'
  */
 export function Kabuto() {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
+  useStudio()
   const root = useMemo(() => {
     const r = gltf.scene.clone(true)
     // (one finish for each of the model's materials, shared by all its parts, so they can be merged)
@@ -24,18 +26,20 @@ export function Kabuto() {
       const src = m.material as THREE.MeshStandardMaterial
       let t = made.get(src)
       if (!t) {
-        t = src.name === 'KabutoGold'
-          ? new THREE.MeshStandardMaterial({ color: '#e0b247', metalness: 1, roughness: 0.28 })
+        // (the gold its engraving and the wings' studs painted on it, real metal catching the studio's light)
+        t = src.name === 'KabutoGold' || src.name === 'KabutoWing'
+          ? new THREE.MeshStandardMaterial({ color: '#ffffff', map: src.map, metalness: 1, roughness: 0.3 })
           : src.name === 'KabutoLacquer'
-            ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 })
+            ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 })
             : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
+        if ((t as THREE.MeshStandardMaterial).metalness === 1) reflectStudio(t as THREE.MeshStandardMaterial)
         made.set(src, t)
       }
       m.material = t
       m.castShadow = true
       m.receiveShadow = true
     })
-    inkModel(r, (m) => /Rivet|Tehen|Hem|Sun/.test(m.name), { width: 0.0012, weld: true })
+    inkModel(r, (m) => /Tehen|Crest|Cord|Knot|Inside/.test(m.name), { width: 0.0012, weld: true })
     // (nothing on it moves: its parts drawn a few at a time)
     mergeByMaterial(r)
     return r
