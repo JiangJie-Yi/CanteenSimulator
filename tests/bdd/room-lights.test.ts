@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { comesIn, LIGHTS_DEFAULT, lampGlow, patienceIn, readLights, roomDim, roomMood, keyLightFrom, shadowDepth, shadowSoft, studioLight, switchLights, unlitShade, writeLights } from '@/game/roomLights'
+import { comesIn, exitSignLit, LIGHTS_DEFAULT, lampGlow, lightOn, patienceIn, readLights, roomDim, roomMood, keyLightFrom, shadowDepth, shadowSoft, studioLight, switchLights, unlitShade, writeLights } from '@/game/roomLights'
 
 feature('牆上的電燈開關', () => {
   scenario('一開店燈是開著的', ({ given, then }) => {
@@ -9,10 +9,52 @@ feature('牆上的電燈開關', () => {
   })
 
   scenario('按一下開關燈就關，再按一下又開', ({ given, when, then, and }) => {
-    given('燈開著', (w) => { w.s = { on: true } })
+    given('燈開著', (w) => { w.s = { ...LIGHTS_DEFAULT, on: true } })
     when('按一下開關', (w) => { w.s = switchLights(w.s) })
     then('燈關了', (w) => { expect(w.s.on).toBe(false) })
     and('再按一下又開', (w) => { expect(switchLights(w.s).on).toBe(true) })
+  })
+
+  scenario('玄關的電燈開關只關店裡的燈：逃生出口燈是緊急照明，一直亮', ({ given, when, then, and }) => {
+    given('所有的燈都開著', (w) => { w.s = readLights(null) })
+    when('按玄關的店內電燈開關', (w) => { w.s = switchLights(w.s, 'room') })
+    then('店裡的燈關了', (w) => { expect(lightOn(w.s, 'room')).toBe(false) })
+    and('門口的燈籠、男廁、女廁的燈都還開著', (w) => { for (const c of ['door', 'wcM', 'wcF'] as const) expect(lightOn(w.s, c)).toBe(true) })
+    and('逃生出口燈還亮著', (w) => { expect(exitSignLit(w.s)).toBe(true) })
+  })
+
+  scenario('玄關的另一個開關只熄門口的燈籠', ({ given, when, then, and }) => {
+    given('所有的燈都開著', (w) => { w.s = readLights(null) })
+    when('按門口燈籠的開關', (w) => { w.s = switchLights(w.s, 'door') })
+    then('燈籠熄了', (w) => { expect(lightOn(w.s, 'door')).toBe(false) })
+    and('店裡的燈還開著', (w) => { expect(lightOn(w.s, 'room')).toBe(true) })
+    and('再按一下燈籠又亮', (w) => { expect(lightOn(switchLights(w.s, 'door'), 'door')).toBe(true) })
+  })
+
+  scenario('男廁、女廁門旁各一個開關，各開各的燈', ({ given, when, then, and }) => {
+    given('所有的燈都開著', (w) => { w.s = readLights(null) })
+    when('按男廁門旁的開關', (w) => { w.s = switchLights(w.s, 'wcM') })
+    then('男廁的燈關了，女廁的還開著', (w) => { expect(lightOn(w.s, 'wcM')).toBe(false); expect(lightOn(w.s, 'wcF')).toBe(true) })
+    when('再按女廁門旁的開關', (w) => { w.s = switchLights(w.s, 'wcF') })
+    then('兩間都關了', (w) => { expect(lightOn(w.s, 'wcM')).toBe(false); expect(lightOn(w.s, 'wcF')).toBe(false) })
+    and('店裡的燈不受影響', (w) => { expect(lightOn(w.s, 'room')).toBe(true) })
+  })
+
+  scenario('四個開關全關，逃生出口燈還是亮的', ({ given, when, then }) => {
+    given('所有的燈都開著', (w) => { w.s = readLights(null) })
+    when('四個開關都按一下', (w) => { for (const c of ['room', 'door', 'wcM', 'wcF'] as const) w.s = switchLights(w.s, c) })
+    then('逃生出口燈亮著', (w) => { expect(exitSignLit(w.s)).toBe(true) })
+  })
+
+  scenario('只記得店內電燈的舊存檔：其他的燈當作開著', ({ given, then, and }) => {
+    given('瀏覽器裡存的是以前的格式（店內關燈）', (w) => { w.s = readLights('{"on":false}') })
+    then('店內的燈是關的', (w) => { expect(lightOn(w.s, 'room')).toBe(false) })
+    and('門口的燈籠與兩間廁所的燈是開的', (w) => { for (const c of ['door', 'wcM', 'wcF'] as const) expect(lightOn(w.s, c)).toBe(true) })
+  })
+
+  scenario('四個開關存起來再讀回來都一樣', ({ given, then }) => {
+    given('燈籠與女廁的燈關著', (w) => { w.s = switchLights(switchLights(readLights(null), 'door'), 'wcF') })
+    then('讀回來一樣', (w) => { expect(readLights(writeLights(w.s))).toEqual(w.s) })
   })
 
   scenario('關燈時吊燈不發光，開燈就亮', ({ given, then, and }) => {

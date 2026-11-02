@@ -1,15 +1,29 @@
 import type { Sky } from './clock'
 
 /*
- * The shop's lights, on the wall switch by the door: on or off. Off, the lamps (the paper pendants, the string of bulbs, the warm spot over
- * the fire) give no light, and the room falls dark: by day the sky through the windows still lights it a little, by night hardly at all.
+ * The shop's lights, on its wall switches (the owner's): the room's, by the way in (the paper pendants, the bar's cove light, the warm spot
+ * over the fire: off, the room falls dark, by day the sky through the windows still lighting it a little, by night hardly at all); beside it
+ * the lanterns at the door's; and one by each toilet's door, its lights. The exit sign is the emergency light: no switch puts it out.
  */
-export type RoomLights = { on: boolean }
+export type RoomLights = { on: boolean; door: boolean; wc: { m: boolean; f: boolean } }
+/** the switches: the room's, the door's lanterns', the men's toilet's, the women's */
+export type Circuit = 'room' | 'door' | 'wcM' | 'wcF'
 
-export const LIGHTS_DEFAULT: RoomLights = { on: true }
+export const LIGHTS_DEFAULT: RoomLights = { on: true, door: true, wc: { m: true, f: true } }
 
-/** the switch pressed: on goes off, off goes on */
-export const switchLights = (s: RoomLights): RoomLights => ({ on: !s.on })
+/** whether this switch's lights are on */
+export const lightOn = (s: RoomLights, c: Circuit) => (c === 'room' ? s.on : c === 'door' ? s.door : s.wc[c === 'wcM' ? 'm' : 'f'])
+
+/** a switch pressed: its lights on go off, off go on; the others as they were */
+export function switchLights(s: RoomLights, c: Circuit = 'room'): RoomLights {
+  if (c === 'room') return { ...s, on: !s.on }
+  if (c === 'door') return { ...s, door: !s.door }
+  const k = c === 'wcM' ? 'm' : 'f'
+  return { ...s, wc: { ...s.wc, [k]: !s.wc[k] } }
+}
+
+/** the exit sign: the emergency light, lit whatever the switches are */
+export const exitSignLit = (_s: RoomLights) => true
 
 /** how much of their glow the lamps give (their haloes and pools of light; how strong that is by day and by night is each lamp's own): all
  * of it with the switch on, none off */
@@ -64,12 +78,15 @@ export const unlitShade = (night: boolean) => (night ? '#58585b' : '#d4d2cd')
 
 export const writeLights = (s: RoomLights) => JSON.stringify(s)
 
-/** the switch as it was left (on, if nothing's kept or it can't be read) */
+/** the switches as they were left (each on, if nothing's kept for it or it can't be read; an old browser kept only the room's) */
 export function readLights(text: string | null): RoomLights {
+  const fresh = (): RoomLights => ({ ...LIGHTS_DEFAULT, wc: { ...LIGHTS_DEFAULT.wc } })
   try {
-    const raw = JSON.parse(text ?? 'null') as { on?: unknown } | null
-    return raw && typeof raw.on === 'boolean' ? { on: raw.on } : { ...LIGHTS_DEFAULT }
+    const raw = JSON.parse(text ?? 'null') as { on?: unknown; door?: unknown; wc?: { m?: unknown; f?: unknown } } | null
+    if (!raw || typeof raw.on !== 'boolean') return fresh()
+    const b = (v: unknown) => (typeof v === 'boolean' ? v : true)
+    return { on: raw.on, door: b(raw.door), wc: { m: b(raw.wc?.m), f: b(raw.wc?.f) } }
   } catch {
-    return { ...LIGHTS_DEFAULT }
+    return fresh()
   }
 }

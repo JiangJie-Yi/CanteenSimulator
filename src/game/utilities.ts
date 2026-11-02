@@ -7,8 +7,8 @@
 // 台灣自來水: four tiers a month (7.35, 9.45, 11.55, 12.075 a 度, 1 度 = 1 m³), and a 20 mm meter's basic charge, 35.7 a month.
 
 /** when something draws power: all day and night (the fridges), while the shop's open, while the room's lights are on, while the fire's
- * lit (the extractor over it), while the music's playing */
-export type When = 'always' | 'open' | 'lights' | 'fire' | 'music'
+ * lit (the extractor over it), while the music's playing, while the door's lanterns or a toilet's lights are on (their own switches) */
+export type When = 'always' | 'open' | 'lights' | 'fire' | 'music' | 'door' | 'wcM' | 'wcF'
 export type Load = { id: string; zh: string; ja: string; en: string; watts: number; when: When }
 /** what draws power, its average draw (a compressor's cycling averaged in) */
 export const LOADS: Load[] = [
@@ -18,18 +18,23 @@ export const LOADS: Load[] = [
   { id: 'washlet', zh: '免治馬桶 ×2（座溫）', ja: '温水便座 ×2（保温）', en: 'Washlets ×2 (seat warmers)', watts: 50, when: 'always' },
   { id: 'exit', zh: '逃生出口燈', ja: '非常口灯', en: 'Exit sign', watts: 4, when: 'always' },
   { id: 'lights', zh: '吊燈・槽燈', ja: '照明', en: 'Room lights', watts: 210, when: 'lights' },
+  { id: 'lanterns', zh: '門口燈籠 ×2・魚燈', ja: '入口の提灯 ×2・魚灯', en: 'Door lanterns ×2, fish lantern', watts: 30, when: 'door' },
+  { id: 'wcM', zh: '男廁電燈', ja: '男性トイレの照明', en: "Men's toilet lights", watts: 14, when: 'wcM' },
+  { id: 'wcF', zh: '女廁電燈', ja: '女性トイレの照明', en: "Women's toilet lights", watts: 14, when: 'wcF' },
   { id: 'hood', zh: '排煙機', ja: '排煙機', en: 'Smoke extractor', watts: 420, when: 'fire' },
   { id: 'warmer', zh: '味噌湯與飯的保溫', ja: '味噌汁・ご飯の保温', en: 'Soup and rice warmers', watts: 260, when: 'open' },
   { id: 'pos', zh: '收銀機・平板・刷卡機・印表機', ja: 'レジ・タブレット・端末・プリンター', en: 'Till, tablet, card reader, printer', watts: 55, when: 'open' },
   { id: 'music', zh: '音箱', ja: 'スピーカー', en: 'Speaker', watts: 20, when: 'music' },
 ]
 /** what's going on that changes the draw: the shop open, the lights, the fire, the music; the freezer's setting and its lid; the cook
- * table's fridges' doors */
-export type Conditions = { open: boolean; lights: boolean; fire: boolean; music: boolean; freezerSet: number; freezerOpen: boolean; fridgeOpen: boolean }
+ * table's fridges' doors; the door's lanterns and each toilet's lights, on their own switches (off, if not said) */
+export type Conditions = { open: boolean; lights: boolean; fire: boolean; music: boolean; freezerSet: number; freezerOpen: boolean; fridgeOpen: boolean
+  door?: boolean; wcM?: boolean; wcF?: boolean }
 /** a load's draw right now (W): nothing when it's not its time; the freezer harder the colder it's set (4% a degree under -20℃) and twice as
  * hard with its lid up; the fridges half as hard again with their doors open */
 export function drawOf(l: Load, c: Conditions) {
   const on = l.when === 'always' || (l.when === 'open' && c.open) || (l.when === 'lights' && c.lights) || (l.when === 'fire' && c.fire) || (l.when === 'music' && c.music)
+    || (l.when === 'door' && !!c.door) || (l.when === 'wcM' && !!c.wcM) || (l.when === 'wcF' && !!c.wcF)
   if (!on) return 0
   if (l.id === 'freezer') return l.watts * Math.max(0.5, 1 + 0.04 * (-20 - c.freezerSet)) * (c.freezerOpen ? 2 : 1)
   if (l.id === 'fridges') return l.watts * (c.fridgeOpen ? 1.5 : 1)

@@ -62,8 +62,8 @@ const drop = (id: string) => { droppedNow.add(id); try { localStorage.setItem(KE
 export const AREA = 'grp-view-'
 export const isArea = (id: string | null) => !!id && id.startsWith(AREA)
 /** pieces taken out of the shop (the owner's): the till's plain cash box, the string of bulbs, the strings of banners and the banners on the
- * walls; any group kept in the browser lets them go */
-const RETIRED = (id: string) => id === 'till-cashbox' || /^(festoon|banners|nobori)/.test(id)
+ * walls; and the light switch by the round window (it's by the way in now, with others: new pieces); any group kept in the browser lets them go */
+const RETIRED = (id: string) => id === 'till-cashbox' || id === 'lightswitch' || /^(festoon|banners|nobori)/.test(id)
 const loadGroups = (): Record<string, Group> => {
   let g: Record<string, Group> = {}
   try { g = JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { /* storage blocked */ }

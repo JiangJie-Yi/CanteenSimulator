@@ -1,13 +1,14 @@
 import { useSyncExternalStore } from 'react'
-import { LIGHTS_DEFAULT, readLights, switchLights, writeLights, type RoomLights } from '@/game/roomLights'
+import { LIGHTS_DEFAULT, readLights, switchLights, writeLights, type Circuit, type RoomLights } from '@/game/roomLights'
 
-/** the shop's lights (the wall switch by the door), kept in the browser: whoever draws a lamp or the room's light follows it */
+/** the shop's lights (its wall switches: the room's and the door lanterns' by the way in, each toilet's by its door), kept in the browser:
+ * whoever draws a lamp or the room's light follows them */
 const KEY = 'jgs-lights-1'
-let state: RoomLights = (() => { try { return readLights(localStorage.getItem(KEY)) } catch { return { ...LIGHTS_DEFAULT } } })()
+let state: RoomLights = (() => { try { return readLights(localStorage.getItem(KEY)) } catch { return { ...LIGHTS_DEFAULT, wc: { ...LIGHTS_DEFAULT.wc } } } })()
 const subs = new Set<() => void>()
 export const getLights = () => state
-export function pressLightSwitch() {
-  state = switchLights(state)
+export function pressLightSwitch(c: Circuit = 'room') {
+  state = switchLights(state, c)
   try { localStorage.setItem(KEY, writeLights(state)) } catch { /* (not kept) */ }
   subs.forEach((f) => f())
 }

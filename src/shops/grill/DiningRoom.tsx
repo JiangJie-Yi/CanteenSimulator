@@ -23,7 +23,7 @@ import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
 import { setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
-import { lampGlow } from '@/game/roomLights'
+import { lampGlow, lightOn, type Circuit } from '@/game/roomLights'
 import type { Sky } from '@/game/clock'
 import { lampLit } from './lampShades'
 
@@ -1750,12 +1750,33 @@ const WC_GEO = {
   lamp: new THREE.SphereGeometry(0.06, 12, 8),
 }
 /** the room's paper lamp, on its sensor */
+/**
+ * A toilet in the dark (its switch by the door off: the owner's): its rooms' insides dimmed, as the lamp's paper is, by a see-through black
+ * box filling each (its faces toward the eye only, so whatever's in it is darkened once, seen from above or through the door); fading in
+ * and out as the switch goes, not drawn at all while the light's on. `rooms`: each one's size across x, up and across z, and its middle.
+ */
+const WC_DARK = new THREE.BoxGeometry(1, 1, 1)
+function WcDark({ who, rooms }: { who: 'm' | 'f'; rooms: [number, number, number, number, number][] }) {
+  const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0, depthWrite: false }), [])
+  useEffect(() => () => mat.dispose(), [mat])
+  const group = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const want = getLights().wc[who] ? 0 : 0.62
+    mat.opacity += (want - mat.opacity) * 0.08
+    if (group.current) group.current.visible = mat.opacity > 0.01
+  })
+  return (
+    <group ref={group} visible={false}>
+      {rooms.map(([sx, sy, sz, x, z], i) => <mesh key={i} geometry={WC_DARK} material={mat} position={[x, sy / 2, z]} scale={[sx, sy, sz]} renderOrder={4} />)}
+    </group>
+  )
+}
 function WcLamp({ who, at }: { who: 'm' | 'f'; at: [number, number, number] }) {
   const m = useRef<THREE.MeshBasicMaterial>(null)
   const k = useRef(0.4)
   useFrame(() => {
-    const t = TOILETS[who]
-    k.current += ((t.inside > 0 || t.passing > 0 || t.open ? 1 : 0.4) - k.current) * 0.08
+    // (on its own switch by the door (the owner's): lit while it's on, dark paper while it's off; it used to light only with someone there)
+    k.current += ((getLights().wc[who] ? 1 : 0.12) - k.current) * 0.08
     m.current?.color.set('#fff1cc').multiplyScalar(k.current)
   })
   return <mesh geometry={WC_GEO.lamp} position={at}><meshBasicMaterial ref={m} color="#fff1cc" toneMapped={false} /></mesh>
@@ -1831,7 +1852,7 @@ function WcFloor({ wx, wz, at }: { wx: number; wz: number; at: [number, number, 
  * the paper on its holder and the washlet's remote on one wall, the brush in the corner; in the women's the Otohime, the sanitary bin and a
  * basket of sanitary pads (the men's has no Otohime: the owner's). Floorboards of pale hinoki, charred-cedar planks to the waist and cream
  * plaster above, the walls between the rooms solid (WC_T behind each face), open above (no ceiling or beams: seen from above, cut open, the
- * owner had the dark beams taken away), a paper lamp on a wall of each room, lit on its sensor. Its frame: x from the door's wall back
+ * owner had the dark beams taken away), a paper lamp on a wall of each room, lit on the switch by the door. Its frame: x from the door's wall back
  * (WC_ROOM.D deep), z across the door from its middle; the toilet's room is on the side `s`.
  */
 function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
@@ -1855,6 +1876,8 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
   const W2 = SW / 2
   return (
     <group>
+      {/* (dark in it while its switch by the door is off) */}
+      <WcDark who={who} rooms={[[D, top - 0.03, w, D / 2, 0], [SW, top - 0.03, E, SX, SZ]]} />
       <StaticBatch>
       <WcFloor wx={D} wz={w} at={[D / 2, 0.004, 0]} />
       <WcFloor wx={SW} wz={E} at={[SX, 0.004, SZ]} />
@@ -3062,7 +3085,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         // (on the back wall, the plum scroll's place is a round window let into the plaster instead)
         round: (shelf && k % 2 === 1 && SCROLLS[(start + k) % SCROLLS.length] === 'plum') || z === extra,
         // (bare where a banner hung (every third place, but by the drinks fridges) and a big signboard (every fifth, between): they were taken
-        // down (the owner's), their places still counted so the rest keep theirs, and the light switch its own)
+        // down (the owner's), their places still counted so the rest keep theirs)
         bare: z !== extra && ((k % 3 === 2 && isClear(z, 0.9)) || (k % 5 === 3 && k % 3 !== 2)) }))
       // (nothing where the staff's door is: taken out after the rest are given theirs, so they keep what they were)
       .filter((a) => staffDoor === undefined || Math.abs(a.z - staffDoor) > STAFF_W / 2 + 0.3)
@@ -3083,11 +3106,6 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
     const w = span[1] - span[0] - 0.08
     return { z: (span[0] + span[1]) / 2, k: Math.min(1, w / 0.56) }
   }, [door, clear])
-  // (the light switch: halfway between the round window short of the shelf and the next picture toward it; by the door if there's none)
-  const switchZ = useMemo(() => {
-    const i = art.reduce((k, a, j) => (a.round && a.z < shelfZ ? j : k), -1)
-    return i >= 0 && i + 1 < art.length && art[i + 1].z < shelfZ ? (art[i].z + art[i + 1].z) / 2 : to - 0.16
-  }, [art, shelfZ, to])
   const frieze = useMemo(() => {
     if (!SEIGAIHA) return null
     const t = SEIGAIHA.clone()
@@ -3173,8 +3191,16 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {staffDoor !== undefined && <Movable id="staffdoor" label="員工專用門"><group position={[0, 0, staffDoor]}><StaffDoor /></group></Movable>}
         {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
         {altar && <Movable id="exitsign" label="逃生出口燈"><group name="look-exit" position={[-0.045, 2.08, to - 0.62]} rotation-y={-Math.PI / 2}><ExitSign /></group></Movable>}
-        {/* (the light switch at hand height on the plaster between the round window and the picture after it, the owner's place for it) */}
-        {altar && <Movable id="lightswitch" label="電燈開關"><group position={[-0.002, 1.12, switchZ]}><LightSwitch /></group></Movable>}
+        {/* (by the way in, at hand height, between the shoe cupboard and the corner: the room's light switch, and beside it the door's lanterns'
+            (the owner's: moved from by the round window; neither puts out the exit sign, the emergency light)) */}
+        {altar && <Movable id="lightswitch-room" label="店內電燈開關"><group position={[-0.002, 1.12, to - GENKAN_SWITCH]}><LightSwitch circuit="room" /></group></Movable>}
+        {altar && <Movable id="lightswitch-door" label="門口燈籠開關"><group position={[-0.002, 1.12, to - GENKAN_SWITCH + SWITCH_STEP]}><LightSwitch circuit="door" /></group></Movable>}
+        {/* (and beside each toilet's door, on its outer side, that toilet's lights' switch (the owner's)) */}
+        {door !== undefined && (['m', 'f'] as const).map((who, k) => (
+          <Movable key={who} id={`lightswitch-wc-${who}`} label={who === 'm' ? '男廁電燈開關' : '女廁電燈開關'}>
+            <group position={[-0.002, 1.12, door + (k ? 1 : -1) * (WC_W + 0.12 + WC_SWITCH_OUT)]}><LightSwitch circuit={who === 'm' ? 'wcM' : 'wcF'} /></group>
+          </Movable>
+        ))}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
           {/* hung on the wall on two cloud brackets (雲形の棚受け, blender/kamidana.py's KamiBracket, the owner's after their photo): an arm under
               the shelf ending in a cloud's head, the cloud stepping back down to the plate on the wall, which runs on below to a rounded end */}
@@ -4954,11 +4980,23 @@ const SWITCH_URL = import.meta.env.BASE_URL + 'models/lightswitch.glb'
  * or on again (scene/lightsStore; the lamps and the room's light follow it): the rocker rocks over, and while the lights are out its
  * little guide light (ホタル) glows green, to find it by in the dark. Facing -x (the wall's own frame: the room).
  */
-function LightSwitch() {
-  const { on } = useLights()
+/** how far from the wall's end by the way in the room's switch is (the door lanterns' a plate's width nearer the way in), and how far out
+ * past a toilet's doorway its switch is */
+const GENKAN_SWITCH = 0.32
+const SWITCH_STEP = 0.11
+const WC_SWITCH_OUT = 0.1
+/** each switch's name, and what pressing it does */
+const SWITCH_SAYS: Record<Circuit, { title: string; on: string; off: string }> = {
+  room: { title: '店內電燈', on: '點一下關燈', off: '點一下開燈' },
+  door: { title: '門口燈籠', on: '點一下熄掉燈籠', off: '點一下點亮燈籠' },
+  wcM: { title: '男廁電燈', on: '點一下關燈', off: '點一下開燈' },
+  wcF: { title: '女廁電燈', on: '點一下關燈', off: '點一下開燈' },
+}
+function LightSwitch({ circuit = 'room' }: { circuit?: Circuit }) {
+  const on = lightOn(useLights(), circuit)
   const [lit, setLit] = useState(false)
-  const tag = () => setTip({ title: '電燈開關', hint: getLights().on ? '點一下關燈' : '點一下開燈' })
-  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; pressLightSwitch(); lightSwitchSound(getLights().on); tag() }
+  const tag = () => { const say = SWITCH_SAYS[circuit]; setTip({ title: say.title, hint: lightOn(getLights(), circuit) ? say.on : say.off }) }
+  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; pressLightSwitch(circuit); lightSwitchSound(lightOn(getLights(), circuit)); tag() }
   const gltf = useGLTF(SWITCH_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const root = gltf.scene.clone(true)

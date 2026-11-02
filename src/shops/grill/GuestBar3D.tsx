@@ -23,6 +23,7 @@ import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel } from '@/scene/inkHull'
 import { setTip } from '@/scene/hoverTip'
+import { getLights } from '@/scene/lightsStore'
 import { Later } from '@/scene/Later'
 import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
@@ -463,11 +464,13 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <group position-x={DX}>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
-      <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
+      {/* (the lanterns at the door don't fade when they're in the way, as the room's hangings do: they're outside, and it left them a ghost
+          from inside (the owner's)) */}
+      <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
       {/* (and the grill's own, cream, 炭火焼 on it, hung on the doorway's other side) */}
-      <Movable id="chochin2" label="燒烤燈籠" baseTurn={[0, 45, 0]}><group position={[(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} style="cream" /></group></Movable>
+      <Movable id="chochin2" label="燒烤燈籠" baseTurn={[0, 45, 0]}><group position={[(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
       {/* (and beyond it the fish lantern, a round one with a fish hung under it (the owner's, after their photograph of one)) */}
-      <Movable id="fishlantern" label="魚燈"><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85} userData={{ fade: true }}><FishLantern /></group></Movable>
+      <Movable id="fishlantern" label="魚燈"><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
@@ -599,6 +602,8 @@ const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTex
       ? { fill: '#160a06', shadow: 'rgba(255,200,120,0.3)' }
       : { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' }))
 })
+/** a door lantern's paper with its flame out (its own switch by the way in): as the daylight finds it by day, dim by night */
+const unlitPaper = () => (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark' ? 0.3 : 0.78)
 const CHOCHIN_GLOW = (() => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')
@@ -646,10 +651,12 @@ function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream
   const halo = useRef<THREE.Sprite>(null)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const f = 0.9 + 0.06 * Math.sin(t * 2.1) + 0.04 * Math.sin(t * 7.3 + 1.1)
+    // (lit, its glow breathing like the flame; out (the door lanterns' switch by the way in), the paper as daylight or the dark finds it)
+    const on = getLights().door
+    const f = on ? 0.9 + 0.06 * Math.sin(t * 2.1) + 0.04 * Math.sin(t * 7.3 + 1.1) : unlitPaper()
     if (hang.current) hang.current.rotation.z = Math.sin(t * 0.9) * 0.04
     if (skin.current) skin.current.color.setScalar(f)
-    if (halo.current) halo.current.material.opacity = 0.5 + (f - 0.9) * 2
+    if (halo.current) halo.current.material.opacity = on ? 0.5 + (f - 0.9) * 2 : 0
   })
   return (
     <group>
@@ -844,6 +851,7 @@ const FISH_GLOW = (() => {
 function FishLantern() {
   const gltf = useGLTF(FISH_LANTERN_URL) as unknown as { scene: THREE.Group }
   const hang = useRef<THREE.Group>(null)
+  const fishGlow = useRef<THREE.Sprite>(null)
   const { model, fish, papers } = useMemo(() => {
     const r = gltf.scene.clone(true)
     const papers: THREE.MeshBasicMaterial[] = []
@@ -881,8 +889,10 @@ function FishLantern() {
   useEffect(() => () => { for (const m of papers) m.dispose() }, [papers])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const flame = 0.92 + 0.05 * Math.sin(t * 2.3) + 0.03 * Math.sin(t * 6.1 + 0.7)
+    const on = getLights().door
+    const flame = on ? 0.92 + 0.05 * Math.sin(t * 2.3) + 0.03 * Math.sin(t * 6.1 + 0.7) : unlitPaper()
     for (const m of papers) m.color.setScalar(flame)
+    if (fishGlow.current) fishGlow.current.material.opacity = on ? 0.55 : 0
     if (hang.current) { hang.current.rotation.z = Math.sin(t * 0.8) * 0.025; hang.current.rotation.x = Math.sin(t * 0.55 + 1) * 0.015 }
     fish.rotation.z = Math.sin(t * 0.8 - 0.7) * 0.045
   })
@@ -900,7 +910,7 @@ function FishLantern() {
       </mesh>
       <group ref={hang} position-y={-FISH_LANTERN_CORD}>
         <primitive object={model} />
-        <sprite position-y={-0.16} scale={[0.62, 0.55, 1]}>
+        <sprite ref={fishGlow} position-y={-0.16} scale={[0.62, 0.55, 1]}>
           <spriteMaterial map={FISH_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
         </sprite>
         <sprite position-y={-0.68} scale={[0.5, 0.95, 1]}>

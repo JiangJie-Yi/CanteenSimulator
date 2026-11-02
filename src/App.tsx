@@ -2014,7 +2014,7 @@ export default function App() {
       if (SINK.tap) uses.tap = (uses.tap ?? 0) + k / 60
       // (and the toilets' washstand taps, turned on by hand and left running)
       for (const w of [TOILETS.m, TOILETS.f]) if (w.tap) uses.wcTap = (uses.wcTap ?? 0) + k / 60
-      const m = meterAdd(meterRef.current, energyOver(k, { open: aiRef.current.ai, lights: getLights().on, fire: fire.current > 0, music: !getBgmOff(),
+      const m = meterAdd(meterRef.current, energyOver(k, { open: aiRef.current.ai, lights: getLights().on, door: getLights().door, wcM: getLights().wc.m, wcF: getLights().wc.f, fire: fire.current > 0, music: !getBgmOff(),
         freezerSet: FREEZER_TEMP.set, freezerOpen: FREEZER.open, fridgeOpen: CUBBY_OPEN.left || CUBBY_OPEN.right }), uses)
       meterRef.current = m.meter
       if (m.cost > 0) book('utility', m.cost)

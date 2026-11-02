@@ -3,7 +3,7 @@ import { drawOf, energyOver, freshMeter, LOADS, meterAdd, nextDay, POWER_TIERS, 
 import { feature, scenario } from './bdd'
 
 const shut: Conditions = { open: false, lights: false, fire: false, music: false, freezerSet: -20, freezerOpen: false, fridgeOpen: false }
-const busy: Conditions = { open: true, lights: true, fire: true, music: true, freezerSet: -20, freezerOpen: false, fridgeOpen: false }
+const busy: Conditions = { open: true, lights: true, fire: true, music: true, freezerSet: -20, freezerOpen: false, fridgeOpen: false, door: true, wcM: true, wcF: true }
 const load = (id: string) => LOADS.find((l) => l.id === id)!
 
 feature('水電：營業的消耗開支（沒有瓦斯，全靠炭火）', () => {
@@ -13,11 +13,23 @@ feature('水電：營業的消耗開支（沒有瓦斯，全靠炭火）', () =>
     then('只有全天候的那幾樣', (w) => { expect(w.on).toEqual(['drinks', 'exit', 'freezer', 'fridges', 'washlet']) })
     and('沒有瓦斯這一項', () => { expect(LOADS.some((l) => /gas/.test(l.id))).toBe(false) })
   })
-  scenario('營業、開燈、生火、放音樂時，排煙機、保溫、收銀、燈、音箱都算進去', ({ given, when, then }) => {
-    given('店開著、燈亮、火在燒、音樂在播', (w) => { w.c = busy })
+  scenario('營業、開燈、生火、放音樂時，排煙機、保溫、收銀、燈、音箱、門口燈籠、廁所燈都算進去', ({ given, when, then }) => {
+    given('店開著、所有的燈都亮、火在燒、音樂在播', (w) => { w.c = busy })
     when('算一小時的用電', (w) => { w.kwh = Object.values(energyOver(3600, w.c as Conditions)).reduce((a: number, b: number) => a + b, 0) })
     then('每一樣的瓦數加起來（約 1.64 度）', (w) => { expect(w.kwh).toBeCloseTo(LOADS.reduce((n, l) => n + l.watts, 0) / 1000, 3) })
   })
+  scenario('門口燈籠與廁所的燈只在它們自己的開關開著時耗電', ({ given, then, and }) => {
+    given('閉店時', () => {})
+    then('門口燈籠開著才算', () => {
+      expect(drawOf(load('lanterns'), { ...shut, door: true })).toBe(load('lanterns').watts)
+      expect(drawOf(load('lanterns'), { ...shut, door: false })).toBe(0)
+    })
+    and('男廁、女廁的燈各算各的', () => {
+      expect(drawOf(load('wcM'), { ...shut, wcM: true })).toBe(load('wcM').watts)
+      expect(drawOf(load('wcF'), { ...shut, wcM: true })).toBe(0)
+    })
+  })
+
   scenario('冷凍櫃設得越冷越耗電，蓋子開著加倍', ({ given, then, and }) => {
     given('冷凍櫃設 -20℃', (w) => { w.base = drawOf(load('freezer'), shut) })
     then('設 -25℃ 時多兩成', (w) => { expect(drawOf(load('freezer'), { ...shut, freezerSet: -25 })).toBeCloseTo((w.base as number) * 1.2, 5) })
