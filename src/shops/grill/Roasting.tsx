@@ -954,6 +954,8 @@ function woodTex(file: string, w: number, h: number) {
 const COOK_TABLE_WOOD = woodTex('keyaki_top.jpg', 1.6, 1.6)
 /** its body: cedar boards standing in framed panels, a panel every 0.6 across, one the body's height */
 const COOK_PANEL_WOOD = woodTex('cedar_panel.jpg', 1, 1)
+/** the bar's base: boards standing side by side, straight grain and flat-sawn in turn, their grain clear (the owner: it didn't show) */
+const BAR_BASE_WOOD = woodTex('bar_base.jpg', 1, 1)
 /** below its top: honed white marble with soft grey veining (blender/marbletex.py), a tile 1.2 across (the owner had it dark a while, and
  * wanted it white again: marble_panel_dark.jpg is still made) */
 const COOK_MARBLE = woodTex('marble_panel.jpg', 1, 1)
@@ -1765,6 +1767,9 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
   // (the base, short of the gate)
   const baseL = L + 0.2 - G
   const baseX = -end * G / 2
+  // (a counter butting into another runs its base on into the other's, so no slot opens between them at the corner (the owner saw the
+  // floor through one: the side counter's base stopped 8 cm short of the long one's back))
+  const run = butt ? 0.12 : 0
   // (where the top starts, on the near end: short of a gate there)
   return (
     <group position={c.at} rotation-y={yaw}>
@@ -1834,8 +1839,8 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
       {/* the base stands back on the cook's side, so the customers' knees go under the top: dark cedar boards standing in a frame, their
           grain at one scale along it (the table's own panelling, darker), the cove light washing down them */}
       {/* (it stands in the top's shadow, lit by nothing but the cove light: its boards glow a little with it, grain and all, or they'd be black) */}
-      <mesh position={[baseX, (BAR_TOP - 0.06) / 2, 0.08]} castShadow geometry={panelBox(baseL, BAR_TOP - 0.06, 0.4, 0.55)}>
-        <meshToonMaterial color="#6a4a32" map={COOK_PANEL_WOOD} emissive="#7a5232" emissiveMap={COOK_PANEL_WOOD} emissiveIntensity={0.5} />
+      <mesh position={[baseX + run / 2, (BAR_TOP - 0.06) / 2, 0.08]} castShadow geometry={panelBox(baseL + run, BAR_TOP - 0.06, 0.4, 0.55)}>
+        <meshToonMaterial color="#d4c2b0" map={BAR_BASE_WOOD} emissive="#ffffff" emissiveMap={BAR_BASE_WOOD} emissiveIntensity={0.26} />
       </mesh>
       {/* the raised lip on the cook's side, the step the food is handed over */}
       {/* (stopping short of where the other counter butts on, and of the gate's flap) */}
