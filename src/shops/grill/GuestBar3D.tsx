@@ -4,6 +4,7 @@ import { drinksToOrder, stockerChore, type StockChore } from '@/game/stocker'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { FloorPiece } from '@/scene/FloorPiece'
 import { QUALITY } from '@/scene/quality'
@@ -1422,7 +1423,7 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
     const W = ly[1] - ly[0], L = al[1] - al[0]
     // (its rim board, its dark body in boards laid the long way, its toe board: each in timber, the grain running along it)
     return [[top, 0.06], [top - 0.06, 0.22], [top - 0.28, 0.05]].map(([y0, h], i) => (
-      <mesh key={`${key}${i}`} position={[cx, (y0 as number) - (h as number) / 2, cz]} geometry={timberBox(W, h as number, L)}
+      <mesh key={`${key}${i}`} position={[cx, (y0 as number) - (h as number) / 2, cz]} geometry={timberBox(W, h as number, L, BASE_TILE.along, BASE_TILE.across)}
         material={BASE_TIMBER[i]} />
     ))
   }
@@ -1439,34 +1440,123 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
     </>
   )
 }
-/** the base's timber, dark: its rim board a shade lighter, its body boards with their seams, its toe board darkest; long grain, a few streaks */
+/** the floor's edging strip: how wide (in from the edge) and how high over the boards */
+const EDGE_W = 0.04, EDGE_H = 0.02
+/**
+ * A strip laid along a run of points (x, z) on the floor, `w` wide inward (to the left of the way it runs) and `h` high, its corners
+ * mitred (each piece's inner edge cut back where it turns, so the two meet on the diagonal) and its two ends square: each piece a
+ * four-sided slab, the lot one geometry.
+ */
+function mitredRun(pts: [number, number][], w: number, h: number) {
+  const n = pts.length - 1
+  const nrm = (a: [number, number], b: [number, number]): [number, number] => {
+    const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz)
+    return [-dz / l, dx / l]
+  }
+  // (each point's inner point: in square at the two ends, where the two pieces' inner lines cross at a corner)
+  const ins = pts.map(([x, z], i): [number, number] => {
+    if (i === 0 || i === n) { const m = i === 0 ? nrm(pts[0], pts[1]) : nrm(pts[n - 1], pts[n]); return [x + m[0] * w, z + m[1] * w] }
+    const m0 = nrm(pts[i - 1], pts[i]), m1 = nrm(pts[i], pts[i + 1])
+    const bx = m0[0] + m1[0], bz = m0[1] + m1[1], dot = m0[0] * bx + m0[1] * bz
+    return [x + (bx / dot) * w, z + (bz / dot) * w]
+  })
+  const pieces = pts.slice(0, n).map((a, i) => {
+    // (the slab's plan, in the shape's own plane (x, -z), stood up h: an extrusion winds its own faces outward)
+    const shape = new THREE.Shape([a, pts[i + 1], ins[i + 1], ins[i]].map(([x, z]) => new THREE.Vector2(x, -z)))
+    const g = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false })
+    g.rotateX(-Math.PI / 2)
+    return g
+  })
+  const g = mergeGeometries(pieces)!
+  pieces.forEach((q) => q.dispose())
+  return g
+}
+const EDGING = new THREE.MeshToonMaterial({ color: '#3a2416' })
+/** how much of the base's timber one repeat of its picture covers (BASE_TIMBER): four along, half across, a pixel as long as it's wide */
+const BASE_TILE = { along: 4, across: 0.5 }
+/**
+ * The base's timber, dark: its rim board a shade lighter, its body boards laid the long way in courses, its toe board darkest. Real boards
+ * (the owner's: it looked stretched, the same long streaks the whole way along): each course of boards of their own lengths (a metre or so
+ * to nearly two), their butt joints staggered course to course, each board its own shade; the grain in each wavers and comes and goes
+ * (lines start and stop along it, closer and wider), now and then a knot with its rings, a fine shine along some lines. Four along by half
+ * across a repeat (BASE_TILE), 256 pixels a unit both ways; its ends meet (the boards and their grain wrap round), so it runs on unseamed.
+ */
 const BASE_TIMBER = (() => {
-  const make = (base: string, seams: boolean) => {
+  const W = 1024, H = 128, PX = W / BASE_TILE.along
+  const make = (base: string, courses: number, seed0: number) => {
     if (typeof document === 'undefined') return new THREE.MeshToonMaterial({ color: base })
     const c = document.createElement('canvas')
-    c.width = 256
-    c.height = 64
+    c.width = W
+    c.height = H
     const g = c.getContext('2d')!
-    g.fillStyle = base
-    g.fillRect(0, 0, 256, 64)
-    let seed = base.charCodeAt(2) * 31 + 7
+    let seed = seed0
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    for (let i = 0; i < 46; i++) {
-      const y = rnd() * 64
-      g.strokeStyle = rnd() < 0.7 ? `rgba(15,8,3,${0.18 + rnd() * 0.2})` : `rgba(200,150,100,${0.08 + rnd() * 0.08})`
-      g.lineWidth = 0.5 + rnd() * 1.1
-      g.beginPath()
-      g.moveTo(0, y)
-      g.bezierCurveTo(85, y + (rnd() - 0.5) * 3, 170, y + (rnd() - 0.5) * 3, 256, y + (rnd() - 0.5) * 2)
-      g.stroke()
+    const ch = H / courses
+    g.fillStyle = base
+    g.fillRect(0, 0, W, H)
+    for (let k = 0; k < courses; k++) {
+      const y0 = k * ch
+      // (the course's boards: lengths from 0.9 to 1.9 units, the first joint somewhere along, wrapping round the picture's ends)
+      const joints: number[] = []
+      let x = rnd() * PX
+      while (joints.length === 0 || x < joints[0] + W - 0.9 * PX) { joints.push(x); x += (0.9 + rnd()) * PX }
+      for (let b = 0; b < joints.length; b++) {
+        const xa = joints[b], xb = b + 1 < joints.length ? joints[b + 1] : joints[0] + W
+        // (the board's own: its shade, its grain's lines (each wavering, starting and stopping, some dark, a few with a shine), maybe a knot;
+        // chosen once, drawn twice a picture's width apart, so a board over the right end comes back in at the left the same)
+        const sh = (rnd() - 0.5) * 0.22
+        const nl = Math.round(ch / 2.6)
+        const lines = Array.from({ length: nl }, (_, i) => ({
+          y: y0 + ((i + 0.3 + rnd() * 0.4) / nl) * ch, x0: xa - 20 + rnd() * (xb - xa) * 0.5, len: (0.35 + rnd() * 0.9) * (xb - xa),
+          amp: 0.4 + rnd() * 1.8, f: (2 + rnd() * 5) / PX, ph: rnd() * 6.28, dark: rnd() < 0.78, a: rnd(), lw: 0.6 + rnd() * 1.2 }))
+        const knot = rnd() < 0.35 ? { x: xa + (0.2 + rnd() * 0.6) * (xb - xa), y: y0 + (0.3 + rnd() * 0.4) * ch, r: Math.min(ch * 0.32, 4 + rnd() * 7),
+          rings: Array.from({ length: 6 }, () => rnd()) } : null
+        for (const off of [0, -W]) {
+          g.save()
+          g.beginPath(); g.rect(xa + off, y0, xb - xa, ch); g.clip()
+          g.fillStyle = sh > 0 ? `rgba(255,220,180,${sh * 0.45})` : `rgba(0,0,0,${-sh * 0.8})`
+          g.fillRect(xa + off, y0, xb - xa, ch)
+          for (const ln of lines) {
+            g.strokeStyle = ln.dark ? `rgba(12,6,2,${0.16 + ln.a * 0.24})` : `rgba(235,190,140,${0.07 + ln.a * 0.09})`
+            g.lineWidth = ln.lw
+            g.beginPath()
+            for (let xx = ln.x0; xx <= ln.x0 + ln.len; xx += 6) {
+              const yy = ln.y + ln.amp * Math.sin(xx * ln.f * 6.28 + ln.ph) + 0.6 * Math.sin(xx * ln.f * 17 + ln.ph * 2)
+              if (xx === ln.x0) g.moveTo(xx + off, yy); else g.lineTo(xx + off, yy)
+            }
+            g.stroke()
+          }
+          // (a knot: a dark eye in a few rings)
+          if (knot) {
+            let n = 0
+            for (let r = knot.r * 2.2; r > knot.r; r -= 2.2) {
+              g.strokeStyle = `rgba(12,6,2,${0.12 + knot.rings[n++ % 6] * 0.1})`; g.lineWidth = 0.8
+              g.beginPath(); g.ellipse(knot.x + off, knot.y, r * 1.9, r, 0, 0, 6.29); g.stroke()
+            }
+            g.fillStyle = 'rgba(10,5,2,0.55)'
+            g.beginPath(); g.ellipse(knot.x + off, knot.y, knot.r * 1.5, knot.r * 0.75, 0, 0, 6.29); g.fill()
+          }
+          g.restore()
+        }
+        // (the butt joint: a dark line, a hair of light on one side of it)
+        const jx = xa % W
+        g.fillStyle = 'rgba(8,4,1,0.75)'; g.fillRect(jx - 1, y0, 2, ch)
+        g.fillStyle = 'rgba(255,220,180,0.12)'; g.fillRect(jx + 1, y0, 1, ch)
+      }
+      // (the course's seam with the next: dark, a light edge under it)
+      if (courses > 1) {
+        g.fillStyle = 'rgba(8,4,1,0.7)'; g.fillRect(0, y0, W, 1.6)
+        g.fillStyle = 'rgba(255,220,180,0.1)'; g.fillRect(0, y0 + 1.6, W, 1)
+      }
     }
-    if (seams) { g.fillStyle = 'rgba(10,5,2,0.6)'; for (const y of [0, 21, 42]) g.fillRect(0, y, 256, 1.6) }
     const t = new THREE.CanvasTexture(c)
     t.colorSpace = THREE.SRGBColorSpace
     t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.anisotropy = 4
     return new THREE.MeshToonMaterial({ color: '#ffffff', map: t })
   }
-  return [make('#5c3a22', false), make('#3d2414', true), make('#2a180c', false)]
+  // (the rim board a single board deep; the body six courses to the half unit; the toe a single board)
+  return [make('#5c3a22', 1, 9157), make('#3d2414', 6, 4271), make('#2a180c', 1, 7331)]
 })()
 /** raw timber for the steps: warm unplaned wood, its long grain wavering, a knot or two, and the dark rough of the cut */
 const STEP_LOG = (() => {
@@ -1500,8 +1590,8 @@ const STEP_LOG = (() => {
  */
 const TIMBER_GEO = new Map<string, THREE.BufferGeometry>()
 const TIMBER = new THREE.MeshToonMaterial({ color: '#ffffff', map: STEP_LOG })
-function timberBox(w: number, h: number, d: number) {
-  const key = [w, h, d].map((v) => v.toFixed(3)).join()
+function timberBox(w: number, h: number, d: number, along = 1, across = 0.25) {
+  const key = [w, h, d, along, across].map((v) => v.toFixed(3)).join()
   const have = TIMBER_GEO.get(key)
   if (have) return have
   const g = new THREE.BoxGeometry(w, h, d)
@@ -1514,9 +1604,9 @@ function timberBox(w: number, h: number, d: number) {
     for (let k = 0; k < 4; k++) {
       const i = f * 4 + k
       const u = uv.getX(i), v = uv.getY(i)
-      // (the longer side takes the grain, the texture's u)
-      if (du >= dv) uv.setXY(i, u * du, v * dv * 4)
-      else uv.setXY(i, v * dv, u * du * 4)
+      // (the longer side takes the grain, the texture's u; one repeat of the picture `along` long and `across` wide)
+      if (du >= dv) uv.setXY(i, (u * du) / along, (v * dv) / across)
+      else uv.setXY(i, (v * dv) / along, (u * du) / across)
     }
   }
   return g
@@ -1534,7 +1624,7 @@ function KitchenDais({ counters, rise }: { counters: Counter[]; rise: number }) 
   // (in the floor's frame: x is minus lay, z is along)
   return (
     <>
-      <mesh position={[-(ky0 + ky1) / 2, rise / 2, (kx0 + kx1) / 2]} geometry={timberBox(ky1 - ky0, rise, kx1 - kx0)} material={BASE_TIMBER[1]} receiveShadow />
+      <mesh position={[-(ky0 + ky1) / 2, rise / 2, (kx0 + kx1) / 2]} geometry={timberBox(ky1 - ky0, rise, kx1 - kx0, BASE_TILE.along, BASE_TILE.across)} material={BASE_TIMBER[1]} receiveShadow />
       <FloorPiece w={ky1 - ky0} l={kx1 - kx0} tint="#d2c4b2" position={[-(ky0 + ky1) / 2, rise + 0.004, (kx0 + kx1) / 2]} />
       {/* (the steps: half its height, outside its edge at the first counter's gate, at the side counter's, and along its open end) */}
       <mesh position={[-(ky0 - S / 2), rise / 4, (gates.first[0] + gates.first[1]) / 2]} geometry={timberBox(S, rise / 2, gates.first[1] - gates.first[0] + 0.2)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />
@@ -1620,6 +1710,9 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
   const g0 = c.length / 2 + GENKAN.along[0], gl = GENKAN.lay[1], D = GENKAN.depth
   // (how far down the base's top lies: below the sunk kitchen's floor, or the genkan's stone, whichever's lower)
   const baseDrop = Math.max(drop, D + 0.02)
+  // (the edging's run, in the floor's frame (x = -lay, z = along): from the kamachi's end at the door round to the genkan's other side)
+  const edging = useMemo(() => mitredRun([[-gl, a1], [-l1, a1], [-l1, a0], [-l0, a0], [-l0, g0]], EDGE_W, EDGE_H), [gl, a1, l1, a0, l0, g0])
+  useEffect(() => () => edging.dispose(), [edging])
   // (the kitchen's cut out of the boards: it lies lower, KitchenPit)
   const piece = (al: [number, number], ly: [number, number], k: string) => minus(al, ly, kitchen).map(([a, l], i) => (
     <FloorPiece key={`${k}${i}`} w={l[1] - l[0]} l={a[1] - a[0]} position={[-(l[0] + l[1]) / 2, 0.004, (a[0] + a[1]) / 2]} />
@@ -1629,6 +1722,10 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
       {piece([a0, g0], [l0, l1], 'a')}
       {piece([g0, a1], [gl, l1], 'b')}
       <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={baseDrop} />
+      {/* (the floor's edge, dark, all the way round but where the genkan's kamachi is: from the kamachi's end by the door, round the
+          room's open end, along its open side, up the side wall and along the back wall to the genkan, each corner mitred (the owner's: the
+          strip along the side wall stopped short of the corner, and the open edges had none)) */}
+      <mesh geometry={edging} material={EDGING} />
       {/* (the whole shop's soft shadow on the ground it stands on, under its base and spreading out past it a little) */}
       <mesh position={[-(l0 + l1) / 2 - 0.12, -baseDrop - 0.34, (a0 + a1) / 2 + 0.1]} rotation-x={-Math.PI / 2} renderOrder={-1}>
         <planeGeometry args={[(l1 - l0) + 2.4, (a1 - a0) + 2.4]} />
@@ -1640,7 +1737,7 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
         : [[al, ly] as [[number, number], [number, number]]]).map(([a, l], i) => (
         // (its sides, showing as the step down into the kitchen, in the base's dark timber boards)
         <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, 0.001 - (baseDrop + 0.004) / 2, (a[0] + a[1]) / 2]}
-          geometry={timberBox(l[1] - l[0], baseDrop + 0.004, a[1] - a[0])} material={BASE_TIMBER[1]} />
+          geometry={timberBox(l[1] - l[0], baseDrop + 0.004, a[1] - a[0], BASE_TILE.along, BASE_TILE.across)} material={BASE_TIMBER[1]} />
       )))}
       {drop > 0 ? <KitchenPit counters={counters} drop={drop} /> : <KitchenDais counters={counters} rise={-drop} />}
       {/* the genkan: its stone, the step's riser round its two inner sides, and the polished kamachi on the edge */}
@@ -2995,7 +3092,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             o.at.clone().addScaledVector(unit(o.lay), farOf(o)).sub(c.at).dot(unit(c.along))))
           return (
             <group key={i}>
-              <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} bare={!!given} />
+              <DiningFloor c={c} from={back} to={c.length / 2 + 1.45} bare={!!given} wall={!given} />
               {/* (and past the bar's end, a strip more behind the till for the cashier to stand on; a shop laid out
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} drop={KITCHEN_DROP / scale} />}
@@ -3010,7 +3107,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const corner = (FLOOR_FAR - c.at.clone().sub(c0.at).dot(unit(c0.lay))) / unit(c.along).dot(unit(c0.lay))
         return (
           <group key={i}>
-            <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} />
+            <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} wall={!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
             {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lampId="sidelamp" lampName="側吧台" top={top} door={wcs?.door ?? (meet + corner) / 2}
               clear={fridgeClear} hang={koiHang(fridgeClear ?? [], -c.length / 2 - 0.35)} />}

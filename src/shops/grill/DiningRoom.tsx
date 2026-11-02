@@ -3469,9 +3469,10 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         ))}
         {/* the rail over the wainscot and the beam along the top */}
         {/* (the rail broken where the toilets' doorways are) */}
-        {/* (stopping short of the doorways' frames, and not across the little strip between the two doors) */}
+        {/* (run right up to the doorways' frames (the owner's: these two sides weren't filled, the rail stopped short of the frames and the
+            plaster showed between), and not across the little strip between the two doors) */}
         {spans.filter(([a, b, y0]) => y0 < WAINSCOT && b - a > 0.3).flatMap(([z0, z1]) => {
-          const a = door !== undefined && z0 !== from ? z0 + 0.09 : z0, b = door !== undefined && z1 !== to ? z1 - 0.09 : z1
+          const a = door !== undefined && z0 !== from ? z0 + 0.001 : z0, b = door !== undefined && z1 !== to ? z1 - 0.001 : z1
           // (and broken at the staff's door, short of its frame either side)
           const cut = staffDoor === undefined ? null : [staffDoor - STAFF_W / 2 - 0.07, staffDoor + STAFF_W / 2 + 0.07]
           const runs = cut && cut[0] < b && cut[1] > a ? [[a, cut[0]], [cut[1], b]].filter(([p, q]) => q - p > 0.02) : [[a, b]]
