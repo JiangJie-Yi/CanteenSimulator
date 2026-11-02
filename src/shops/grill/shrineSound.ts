@@ -1,6 +1,6 @@
 // The shrine's sounds, made on the spot with WebAudio (no recordings): the blessing coming down as the offering's taken (a temple bowl's long
-// ring under a fall of small bright bells and a breath of air), and the shrine's little doors (their pins creaking by stick-slip friction
-// through a hinoki panel's resonances, the latch, a knock as they stop or meet).
+// ring under a fall of small bright bells and a breath of air), and the shrine's little doors (the latch, their wooden pins turning with a
+// soft dry brush and a few faint ticks through a hinoki panel's resonances, a knock as they stop or meet).
 
 let audio: AudioContext | null = null
 const ctx = () => (audio ??= new AudioContext())
@@ -155,34 +155,49 @@ function latch(a: AudioContext, out: AudioNode, t: number, gain: number) {
   ring(a, out, t, 6900, gain * 0.03, 0.06)
 }
 
+/** the doors' wooden pins turning in their sockets: a soft dry brush of noise, darker as the swing slows (`pitch` a little higher, closing) */
+function rub(a: AudioContext, out: AudioNode, t: number, len: number, gain: number, pitch: number) {
+  const n = noise(a, len, (x) => Math.sin(Math.PI * Math.min(1, x * 1.3)) ** 1.5 * (0.75 + 0.25 * Math.random()))
+  const bp = a.createBiquadFilter(), lp = a.createBiquadFilter(), g = a.createGain()
+  bp.type = 'bandpass'
+  bp.Q.value = 1.1
+  bp.frequency.setValueAtTime(1300 * pitch, t)
+  bp.frequency.linearRampToValueAtTime(850 * pitch, t + len)
+  lp.type = 'lowpass'
+  lp.frequency.value = 3200
+  g.gain.value = gain
+  n.connect(bp).connect(lp).connect(g).connect(out)
+  n.start(t)
+}
+
 /**
- * The shrine's little double doors (観音開き) swinging on their wooden pins. Opening: the latch lets go, the pins creak as the doors swing
- * out, slowing, and they knock softly against their stops. Closing: a quicker, higher creak as they're swung to, and the two leaves
- * meeting, one a moment after the other, the latch catching.
+ * The shrine's little double doors (観音開き) on their wooden pins, as small light doors sound (the owner found the old creak odd: a long
+ * buzzing squeak, a hundred and fifty slips a second through the panel). Opening: the latch lets go, the pins turn with a soft dry brush and
+ * a few faint ticks of the wood, and the leaves come gently to their stops, one a moment after the other. Closing: the brush, a little
+ * higher and quicker, the two leaves meeting with a soft knock, and the latch catching.
  */
 export function shrineDoor(open: boolean) {
   try {
     const a = ctx()
     const t = a.currentTime + 0.01
     const out = a.createGain()
-    out.gain.value = 0.7
+    out.gain.value = 0.6
     out.connect(a.destination)
-    const panel = woodPanel(a, out, 2.4, 3.2)
+    const panel = woodPanel(a, out, 2.4, 1.4)
     if (open) {
-      latch(a, out, t, 0.5)
-      // (the swing: the push builds, wavers, and eases off as the doors slow)
-      const cr = stickSlip(a, 0.7, (x) => (x < 0.15 ? x / 0.15 : 1) * (1 - x) ** 0.6 * (0.5 + 0.06 * Math.sin(x * 23)))
-      cr.connect(panel)
-      cr.start(t + 0.04)
-      knock(a, out, t + 0.76, 0.85, 0.35)
-      knock(a, out, t + 0.8, 0.9, 0.12)
+      latch(a, out, t, 0.32)
+      rub(a, out, t + 0.03, 0.26, 0.11, 1)
+      // (a few faint ticks of the pins as they give: friction's slips, slow and soft, not a creak)
+      const ticks = stickSlip(a, 0.24, (x) => 0.16 * Math.sin(Math.PI * x))
+      ticks.connect(panel)
+      ticks.start(t + 0.05)
+      knock(a, out, t + 0.31, 0.82, 0.16)
+      knock(a, out, t + 0.355, 0.88, 0.1)
     } else {
-      const cr = stickSlip(a, 0.42, (x) => Math.sin(Math.PI * Math.min(1, x * 1.2)) * (0.62 + 0.05 * Math.sin(x * 31)))
-      cr.connect(panel)
-      cr.start(t)
-      knock(a, out, t + 0.44, 1.1, 0.7)
-      knock(a, out, t + 0.475, 1.18, 0.5)
-      latch(a, out, t + 0.5, 0.7)
+      rub(a, out, t, 0.2, 0.1, 1.15)
+      knock(a, out, t + 0.21, 1.05, 0.3)
+      knock(a, out, t + 0.24, 1.12, 0.2)
+      latch(a, out, t + 0.28, 0.42)
     }
   } catch {
     // (no audio: silent)
