@@ -45,6 +45,46 @@ const ON_HEAD = new Set(['glasses', 'moustache', 'phones', 'sunhat', 'schoolhat'
 /** where the head turns from (the neck), in the model's frame */
 const NECK = new THREE.Vector3(0, 0.56, 0)
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
+/**
+ * The pair of chopsticks in a customer's hand while they eat: the bar's own lacquered ones, picked up off their rest (the owner's: they ate with
+ * none to be seen, the pair on the rest untouched; the brown sticks in their fist pointed back into them): black over the top third, a fine
+ * gold band, deep red to the tips, along +y from a little behind the grip to the tips, coming together toward them. One shape for every
+ * customer, its colours in its vertices; a bite at the tips going up to the mouth.
+ */
+const CHOP_LEN = 0.24
+const CHOP_GRIP = 0.075
+const CHOP_GEO = (() => {
+  const parts: THREE.BufferGeometry[] = []
+  const y0 = -CHOP_GRIP, y1 = CHOP_LEN - CHOP_GRIP, third = y0 + CHOP_LEN / 3
+  const r = (y: number) => 0.0048 - (0.0026 * (y - y0)) / CHOP_LEN
+  const seg = (a: number, b: number, c: string) => {
+    const g = new THREE.CylinderGeometry(r(b), r(a), b - a, 6, 1)
+    g.translate(0, (a + b) / 2, 0)
+    const cc = new THREE.Color(c), n = g.attributes.position.count, col = new Float32Array(n * 3)
+    for (let i = 0; i < n; i++) col.set([cc.r, cc.g, cc.b], i * 3)
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3))
+    return g
+  }
+  for (const sd of [-1, 1]) {
+    for (const g of [seg(y0, third, '#151112'), seg(third, third + 0.007, '#d9b04a'), seg(third + 0.007, y1, '#7c2a1e')]) {
+      g.rotateZ(sd * 0.024)
+      g.translate(sd * 0.0055, 0, 0)
+      parts.push(g)
+    }
+  }
+  const all = mergeGeometries(parts)
+  parts.forEach((g) => g.dispose())
+  return all
+})()
+const CHOP_MAT = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap })
+const BITE_GEO = new THREE.SphereGeometry(0.014, 8, 6)
+const BITE_MAT = new THREE.MeshToonMaterial({ color: '#c8743a', gradientMap })
+/** where the chopsticks' tips go, in the figure's frame: down into the bowl in the left hand, or up to the mouth (the head's middle 0.8 up,
+ * blender/folk.py's C) */
+const CHOP_BOWL = new THREE.Vector3(-0.08, 0.47, 0.33)
+const CHOP_MOUTH = new THREE.Vector3(0, 0.7, 0.26)
+const UP = new THREE.Vector3(0, 1, 0)
+const X_AXIS = new THREE.Vector3(1, 0, 0)
 /** where they sit on the stool, in the customers' frame (blender/stools.py: its oak seat's top, 0.29, and on the cushion, pressed down) */
 export const SEAT = 0.31
 /** how tall the figure stands, to the top of its head (blender/folk.py: the head's top), in its own frame */
@@ -273,6 +313,9 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const outer = useRef<THREE.Group>(null)
   const exprNow = useRef<Expr>('neutral')
   const v3 = useMemo(() => new THREE.Vector3(), [])
+  const chopDir = useMemo(() => new THREE.Vector3(), [])
+  const chopQ = useMemo(() => new THREE.Quaternion(), [])
+  const bite = useRef<THREE.Mesh>(null)
 
   const applyFade = (f: number) => {
     if (Math.abs(f - faded.current) < 0.01 && (f < 1) === (faded.current < 1)) return
@@ -357,7 +400,8 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         lp.set(-0.12, 0.42, 0.3)
         lr = -0.6
         const k = chew ? 1 : 0
-        rp.set(0.12 - 0.06 * k, 0.4 + 0.22 * k, 0.32 - 0.04 * k)
+        // (up beside the face, out in front of it, the tips toward the mouth: right at it, the sticks went into the head)
+        rp.set(0.12 + 0.05 * k, 0.4 + 0.26 * k, 0.32 + 0.08 * k)
         rr = -0.9 - 0.4 * k
       } else if (showPhone) {
         lp.set(-0.06, 0.44, 0.32)
@@ -373,7 +417,17 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       L.rotation.x += (lr - L.rotation.x) * Math.min(1, dt * 10)
       Rh.rotation.x += (rr - Rh.rotation.x) * Math.min(1, dt * 10)
     }
-    if (chop.current) chop.current.visible = eating
+    if (chop.current) {
+      chop.current.visible = eating
+      // (the tips at the bowl, or at the mouth: their way from the hand in the figure's frame, taken into the hand's (turned about x))
+      if (eating && Rh) {
+        const to = chew ? CHOP_MOUTH : CHOP_BOWL
+        chopDir.copy(to).sub(Rh.position).normalize().applyAxisAngle(X_AXIS, -Rh.rotation.x)
+        chopQ.setFromUnitVectors(UP, chopDir)
+        chop.current.quaternion.slerp(chopQ, Math.min(1, dt * 12))
+      }
+      if (bite.current) bite.current.visible = eating && !chew
+    }
     if (bowl.current) bowl.current.visible = eating
     if (phone.current) phone.current.visible = showPhone
     if (carried.current) carried.current.visible = spec.briefcase && walking
@@ -392,18 +446,10 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     <group ref={outer} position-y={seatLift}>
       <group scale={k}>
         <primitive object={fig.root} />
-        {/* the chopsticks, along the right hand, a bite at their tips */}
-        <group ref={chop} visible={false} rotation-x={-0.4}>
-          {[-0.006, 0.006].map((x) => (
-            <mesh key={x} position={[x, 0.08, 0.02]} rotation-z={x * 4}>
-              <cylinderGeometry args={[0.0028, 0.004, 0.2, 5]} />
-              <meshToonMaterial color="#6a4226" gradientMap={gradientMap} />
-            </mesh>
-          ))}
-          <mesh position={[0, 0.18, 0.02]} scale={[1, 0.7, 0.8]}>
-            <sphereGeometry args={[0.014, 8, 6]} />
-            <meshToonMaterial color="#c8743a" gradientMap={gradientMap} />
-          </mesh>
+        {/* the chopsticks in the right hand (the place's own, off their rest), a bite at their tips on its way up */}
+        <group ref={chop} visible={false}>
+          <mesh geometry={CHOP_GEO ?? undefined} material={CHOP_MAT} />
+          <mesh ref={bite} geometry={BITE_GEO} material={BITE_MAT} position={[0, CHOP_LEN - CHOP_GRIP - 0.01, 0]} scale={[1, 0.7, 0.8]} />
         </group>
         {/* the rice bowl on the left hand */}
         <group ref={bowl} visible={false} position={[0.02, 0.05, 0.02]}>

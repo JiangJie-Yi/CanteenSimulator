@@ -70,6 +70,9 @@ export const PLATES_SET = new Set<number>()
  * still getting up and going. Nobody new is given one of these, though the shop's done with whoever had it.
  */
 export const SEATS_TAKEN = new Set<number>()
+/** the places whose chopsticks are up: their customer's eating (GuestBar3D fills it each frame; Roasting's BarChopsticks takes those pairs
+ * off their rests, FolkFigure has them in the hand) */
+export const CHOPS_UP = new Set<number>()
 /** the customers whose stomachs something spoiled has upset (game/freshness sickChance): off to the toilet as soon as they can be */
 export const SICK = new Set<number>()
 /**

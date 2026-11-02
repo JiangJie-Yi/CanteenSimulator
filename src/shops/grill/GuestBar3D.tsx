@@ -51,7 +51,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, PASS_ALONG, SHRINE_FLOWERS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, PASS_ALONG, SHRINE_FLOWERS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, passOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -1884,6 +1884,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       SERVICE.servers = 0
       OWNER_OUT.on = false
       SEATS_TAKEN.clear()
+      CHOPS_UP.clear()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [servers.length, homes, ownerServes])
@@ -2245,6 +2246,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     TILL_STATE.tablet = tabletActive(queue, TILL_STATE.k >= 0 && TILL_STATE.card)
     SEATS_TAKEN.clear()
     for (const x of shown) SEATS_TAKEN.add(x.seat)
+    // (and whose chopsticks are up off their rest, in their hand: those sat eating)
+    CHOPS_UP.clear()
+    for (const x of shown) if (x.phase === 'sit' && guestsRef.current.find((g) => g.id === x.id)?.state === 'eating') CHOPS_UP.add(x.seat)
     // nobody walks through anybody: those walking (in, out, to the toilet or the fridge) keep a body's width apart,
     // stepping aside for each other and for the servers (who keep to their way, their trays held level)
     {

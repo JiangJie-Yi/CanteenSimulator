@@ -4,7 +4,7 @@ import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { colourVertices, StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
@@ -53,7 +53,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -794,6 +794,7 @@ function BarImpl() {
       </StaticBatch>
       {GRILL_COUNTERS.map((c, i) => BAR_GATES[i] && <BarGate key={i} c={c} gate={BAR_GATES[i]} />)}
       {GRILL_COUNTERS.map((c, i) => <BarDrawers key={`drawers-${i}`} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)} />)}
+      <BarChopsticks />
     </group>
   )
 }
@@ -1866,11 +1867,7 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
                 nearest them, the pair of chopsticks laid across, their tips to the customer's left (+x) up on the rest, which lies across
                 them; behind on the left the little soy dish (on the right instead at a seat where it'd be off the top, by the gate) */}
             <group position={[SETTING.restX, 0, PLACE.chop]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group>
-            {[-1, 1].map((sd) => (
-              <group key={sd} position={[-SETTING.chopL / 2, 0.0015, PLACE.chop + sd * 0.0075]} rotation-y={sd * 0.012} rotation-z={SETTING.chopTilt}>
-                <BarPiece name="BarChopstick" />
-              </group>
-            ))}
+            {/* (the chopsticks on it: BarChopsticks, out of the batch, so a pair can be picked up) */}
             <group position={[sauceSide(c, gate, x), 0.001, PLACE.sauce[1]]}>
               <BarPiece name="BarSoyDish" design={n} />
               {/* (empty till someone sits down there: GuestBar3D pours them their soy) */}
@@ -1993,6 +1990,84 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
   )
 }
 
+/** the chopsticks' ink, drawn for each of their instances: BarPiece's hull (their back faces pushed out along their welded normals) */
+const CHOP_INK = new THREE.ShaderMaterial({
+  uniforms: { uWidth: { value: 0.0008 }, uColor: { value: new THREE.Color('#3b2a20') } },
+  vertexShader: /* glsl */ `
+    uniform float uWidth;
+    void main() {
+      vec4 p = vec4(position + normalize(normal) * uWidth, 1.0);
+      #ifdef USE_INSTANCING
+      p = instanceMatrix * p;
+      #endif
+      gl_Position = projectionMatrix * modelViewMatrix * p;
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform vec3 uColor;
+    void main() { gl_FragColor = vec4(uColor, 1.0); }`,
+  side: THREE.BackSide,
+})
+const CHOP_GONE = new THREE.Matrix4().makeScale(0, 0, 0)
+/**
+ * Every place's chopsticks at once, one draw and one for their ink (instanced): lying across the place on their rest until its customer starts
+ * eating, when they're picked up (FolkFigure has the same lacquered pair in the hand) and gone from the rest till they've done (the owner's:
+ * the customers ate with the pair on the rest untouched). Out of the bar's batch, so a pair can go.
+ */
+const BarChopsticks = memo(function BarChopsticks() {
+  const gltf = useGLTF(SETTING_URL) as unknown as { scene: THREE.Group }
+  const made = useMemo(() => {
+    const src = gltf.scene.getObjectByName('BarChopstick')
+    let mesh: THREE.Mesh | null = null
+    src?.traverse((o) => { if (!mesh && (o as THREE.Mesh).isMesh) mesh = o as THREE.Mesh })
+    if (!src || !mesh) return null
+    const m0 = mesh as THREE.Mesh
+    // (its shape in the piece's own frame, its root at the origin, as BarPiece lays it)
+    src.updateMatrixWorld(true)
+    const geo = m0.geometry.clone().applyMatrix4(new THREE.Matrix4().copy(src.matrixWorld).invert().multiply(m0.matrixWorld))
+    const was = m0.material as THREE.MeshStandardMaterial
+    const mat = new THREE.MeshToonMaterial({ color: was.color.clone(), map: was.map })
+    const shape = new THREE.BufferGeometry()
+    shape.setAttribute('position', geo.attributes.position)
+    if (geo.index) shape.setIndex(geo.index)
+    const hull = mergeVertices(shape, 1e-5)
+    hull.computeVertexNormals()
+    // (each place's two sticks where they lie, in the bars' frame: its counter, its place along it, and each stick on the rest)
+    const places: THREE.Matrix4[][] = []
+    const e = new THREE.Euler(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1)
+    for (const c of GRILL_COUNTERS) {
+      const bar = new THREE.Matrix4().compose(c.at, q.setFromEuler(e.set(0, Math.atan2(-c.along.z, c.along.x), 0)), one)
+      for (let n = 0; n < c.seats; n++) {
+        const at = bar.clone().multiply(new THREE.Matrix4().makeTranslation(seatAlong(c, n), BAR_TOP, 0))
+        places.push([-1, 1].map((sd) => at.clone().multiply(new THREE.Matrix4().compose(new THREE.Vector3(-SETTING.chopL / 2, 0.0015, PLACE.chop + sd * 0.0075),
+          q.setFromEuler(e.set(0, sd * 0.012, SETTING.chopTilt)), one))))
+      }
+    }
+    const sticks = new THREE.InstancedMesh(geo, mat, places.length * 2)
+    const ink = new THREE.InstancedMesh(hull, CHOP_INK, places.length * 2)
+    ink.instanceMatrix = sticks.instanceMatrix
+    sticks.receiveShadow = true
+    sticks.frustumCulled = ink.frustumCulled = false
+    return { sticks, ink, places, geo, hull, mat }
+  }, [gltf])
+  useEffect(() => () => { if (made) { made.geo.dispose(); made.hull.dispose(); made.mat.dispose(); made.sticks.dispose(); made.ink.dispose() } }, [made])
+  // (which places' pairs are up, last laid out: laid out again only when that changes)
+  const shown = useRef('-')
+  useFrame(() => {
+    if (!made) return
+    const key = [...CHOPS_UP].sort((a, b) => a - b).join()
+    if (key === shown.current) return
+    shown.current = key
+    made.places.forEach((pair, i) => pair.forEach((m, k) => made.sticks.setMatrixAt(i * 2 + k, CHOPS_UP.has(i) ? CHOP_GONE : m)))
+    made.sticks.instanceMatrix.needsUpdate = true
+  })
+  if (!made) return null
+  return (
+    <>
+      <primitive object={made.sticks} />
+      <primitive object={made.ink} />
+    </>
+  )
+})
 /** where a place's chopsticks lie (across it, nearest the customer), how long they are, how far along their rest stands under their tips, and the
  * slope they lie at from the table up onto it */
 // (the rest lies across the chopsticks now (the owner's): they cross its drawn-in waist, lower than its ends, so they slope less)
