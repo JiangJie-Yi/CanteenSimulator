@@ -2864,6 +2864,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
   // pieces by node, found by scanning the model root; rescanned whenever Dish adds a cloned portion
   const pieces = useRef<Piece[]>([])
+  if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __pieces?: typeof pieces }).__pieces = pieces
   /** (on a phone) who's had their drink from the fridge */
   const drank = useRef(new Set<number>())
   const scannedCount = useRef(-1)
@@ -5630,11 +5631,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             p.fromQ.copy(p.node.quaternion)
             p.toP.copy(barSeat(p.seat)).addScaledVector(GRILL_SEATS[p.seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE)
               .add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
+            // (its spot is kept as where it is from the bar (the frame below puts it there each frame): moved to the plate, or it went back to
+            // the pass every frame, and lay there, on the pass's board, while its customer's plate went out empty (the owner saw two skewers
+            // left on the board))
+            p.local.copy(p.toP).sub(containerAt('bar'))
             p.via = undefined
             p.flight = 0.6
           } else if (SERVICE.carried.has(p.key)) {
+            // (on the server's tray, where they hold it: its spot moved with it, as above)
             p.fromP.copy(SERVICE.carried.get(p.key)!)
             p.toP.copy(p.fromP)
+            p.local.copy(p.toP).sub(containerAt('bar'))
             p.flight = 1
           } else if (p.passAt === undefined) {
             // (held by the fire: a slot on the pass, and a plate in it, asked for again)

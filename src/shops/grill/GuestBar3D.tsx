@@ -2480,6 +2480,27 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (r.phase !== 'set') continue
         if (!shownRef.current.some((x) => x.seat === r.seat && x.phase !== 'leave')) leftDirty(r)
       }
+      // (a plate on a tray no server's holding any more (their round cut short: the staff changed, the shop shut) isn't left hanging in the
+      // air where it was (the owner saw plates floating): one being carried to a customer goes back on the pass's stack (or the racks, with
+      // that full); one cleared off the bar goes on into the sink as a dirty plate)
+      const holding = new Set<number>()
+      for (const x of waiters.current) {
+        if (x.run !== null && x.run !== undefined) holding.add(x.run)
+        for (const k of x.carry ?? []) holding.add(k)
+      }
+      for (const r of [...runs.current]) {
+        if (r.phase === 'carry' && !holding.has(r.key)) {
+          runs.current = runs.current.filter((x) => x !== r)
+          if (PASS.stock < PASS_CAP) PASS.stock += 1
+          else PLATE_RACK.n = putBack(PLATE_RACK.n, 1)
+          redraw()
+        } else if (r.phase === 'taken' && !holding.has(r.key)) {
+          SINK_BIN.sticks += r.sticks ?? 0
+          r.phase = 'clear'
+          r.to = undefined
+          r.t = 0
+        }
+      }
     }
     let finished = 0, homed = 0
     for (const r of runs.current) {
