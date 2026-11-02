@@ -2,11 +2,11 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { Look as StaffLook, Role } from '@/data/staff'
 import { atlasModel } from './atlasMerge'
-import { inkTogether } from './inkHull'
 import { airbrush, gradientMap } from './Person3D'
+import { paintable, rigidFigure, type SkinPiece } from './rigidSkin'
 import { bakeable, colourVertices } from './StaticBatch'
 
 /*
@@ -15,11 +15,12 @@ import { bakeable, colourVertices } from './StaticBatch'
  * in an indigo samue under a white hachimaki, the women in a plum kimono and gold obi with their hair up, the stock keeper in khaki work
  * clothes. Skin and hair as their pictures in the office have them (ui/Avatar.tsx, the same hash of their id), glasses on the same ones.
  *
- * Each figure is drawn in a handful of meshes (the owner's: the shop slows when it's full; they were 17 to 22 draws each): all of it but
- * the eyes one material per variant (scene/atlasMerge: the pictures on the clothes packed into one atlas, every plain colour carried by
- * the vertices), so each part (the body, the eyes, the glasses, each hand, the fan: they move or come and go) is one mesh, its ink one line
- * round its inked pieces; built once per variant, then copied. The skin and the hair, each person's own, are colours in their vertices
- * too: each figure has its own colours over the variant's shared shape (its positions, normals and UVs shared, its colours its own).
+ * Each figure is drawn in two draws (the owner's: a person in one or two; they were 17 to 22, then 9 to 11): all of it one material per
+ * variant (scene/atlasMerge: the pictures on the clothes packed into one atlas, every plain colour carried by the vertices; the eyes flat,
+ * unlit, by their vertices' paint), all of it one mesh, each part (the body, the eyes, the glasses, each hand, the fan, a server's tray, the
+ * stock keeper's clipboard) moved by its own group as a bone (scene/rigidSkin), what comes and goes scaled to nothing; its ink one line
+ * round its inked pieces, bending with it. Built once per variant, then copied. The skin and the hair, each person's own, are colours in
+ * their vertices too: each figure has its own colours over the variant's shared shape (its positions, normals and UVs shared, its colours its own).
  */
 type Variant = 'chef' | 'chefF' | 'server' | 'serverF' | 'stock'
 const url = (v: Variant) => import.meta.env.BASE_URL + `models/crew_${v}.glb`
@@ -38,12 +39,15 @@ const AV_HAIR = ['#2b1d14', '#3a2a20', '#1c1c22', '#5a3a2a', '#4a3020', '#6b4a32
 const avHash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
 
 type Built = { root: THREE.Group }
+/** the parts that move (the figure's bones), in the order the mesh's vertices name them */
+const BONES = ['body', 'eyes', 'glasses', 'handL', 'handR', 'fan', 'tray', 'clip'] as const
+type Part = (typeof BONES)[number]
 /** where in a part's mesh the skin or the hair is (its vertices from `start`, `count` of them), coloured for each person */
 type Tint = { start: number; count: number; tint: 'skin' | 'hair' }
 const made = new Map<Variant, Built>()
 
 /** which part of the figure a mesh belongs to, by its node's name (or an ancestor's) */
-function partOf(o: THREE.Object3D): 'handL' | 'handR' | 'fan' | 'eyes' | 'glasses' | 'drop' | 'body' {
+function partOf(o: THREE.Object3D): Part | 'drop' {
   for (let p: THREE.Object3D | null = o; p; p = p.parent) {
     const n = p.name
     if (/^BossHandL/.test(n)) return 'handL'
@@ -56,13 +60,33 @@ function partOf(o: THREE.Object3D): 'handL' | 'handR' | 'fan' | 'eyes' | 'glasse
   return 'body'
 }
 
-/** the variant's figure, built once: one material for all but the eyes, each part one mesh, inked round its inked pieces */
-function build(scene: THREE.Group): Built {
+/** a server's round lacquered tray with a cup of tea on it, and the stock keeper's clipboard with its list, in the figure's frame at rest
+ * where they're held (they were meshes of their own, two draws each), their colours in their vertices */
+function heldPieces(): { geo: THREE.BufferGeometry; part: Part }[] {
+  const piece = (g: THREE.BufferGeometry, colour: string, m: THREE.Matrix4) => {
+    const out = bakeable(g, m)
+    colourVertices(out, new THREE.Color(colour))
+    g.dispose()
+    return out
+  }
+  const at = new THREE.Matrix4().makeTranslation(TRAY_AT[0], TRAY_AT[1], TRAY_AT[2])
+  const clip = new THREE.Matrix4().makeTranslation(TRAY_AT[0], TRAY_AT[1] + 0.04, TRAY_AT[2] - 0.02).multiply(new THREE.Matrix4().makeRotationX(-0.6))
+  return [
+    { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.1, 0.095, 0.014, 16), '#3a1a14', at) },
+    { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.024, 0.02, 0.05, 10), '#e8dcc0', at.clone().multiply(new THREE.Matrix4().makeTranslation(0.03, 0.03, 0))) },
+    { part: 'clip', geo: piece(new THREE.BoxGeometry(0.12, 0.008, 0.16), '#c9a66b', clip) },
+    { part: 'clip', geo: piece(new THREE.PlaneGeometry(0.1, 0.12), '#f7f3ea', clip.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.005, 0.01)).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2))) },
+  ]
+}
+
+/** the variant's figure, built once: one material, one mesh moved in parts by its groups, one ink line round its inked pieces; only what
+ * the variant ever holds in it (a cook's fan, a server's tray, the stock keeper's clipboard: hidden, they'd still be drawn, as nothing) */
+function build(scene: THREE.Group, v: Variant): Built {
+  const holds: Part[] = v === 'chef' || v === 'chefF' ? ['fan'] : v === 'stock' ? ['clip'] : ['tray']
   const s = scene.clone(true)
   s.updateWorldMatrix(true, true)
   const inv = new THREE.Matrix4().copy(s.matrixWorld).invert()
   // (the eyes' whites and darks flat, unlit; the skin and hair marked, to be each person's own)
-  const plainFlat = new THREE.MeshBasicMaterial({ color: '#ffffff', vertexColors: true })
   s.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh || Array.isArray(m.material)) return
@@ -70,65 +94,52 @@ function build(scene: THREE.Group): Built {
     m.userData.flat = /White|Dark/.test(n)
     m.userData.tint = /CrewSkin/.test(n) ? 'skin' : /CrewHair/.test(n) ? 'hair' : undefined
   })
-  atlasModel(s, (m) => partOf(m) !== 'drop' && !m.userData.flat, (atlas) => airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap })))
-  // (each part's meshes gathered by material (the atlas's, or the eyes' flat one), each piece noted inked or not and skin or hair)
-  type Piece = { geo: THREE.BufferGeometry; inked: boolean; tint?: 'skin' | 'hair' }
-  const parts = new Map<string, Map<THREE.Material, Piece[]>>()
+  const mat = atlasModel(s, (m) => partOf(m) !== 'drop', (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap }))))!
+  // (every piece of it in the figure's frame, its part, inked or not, flat or not, skin or hair)
+  const pieces: (SkinPiece & { tint?: 'skin' | 'hair' })[] = []
   s.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh || Array.isArray(m.material)) return
     const part = partOf(m)
-    if (part === 'drop') return
-    const geo = bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld))
-    if (m.userData.flat) colourVertices(geo, (m.material as THREE.MeshBasicMaterial).color)
-    const mat = m.userData.flat ? plainFlat : (m.material as THREE.Material)
-    const byMat = parts.get(part) ?? new Map<THREE.Material, Piece[]>()
-    const list = byMat.get(mat) ?? []
-    list.push({ geo, inked: !UNINKED.test(m.name), tint: m.userData.tint })
-    byMat.set(mat, list)
-    parts.set(part, byMat)
+    if (part === 'drop' || (part === 'fan' && !holds.includes('fan'))) return
+    pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: BONES.indexOf(part),
+      inked: !UNINKED.test(m.name), flat: !!m.userData.flat, tint: m.userData.tint })
   })
-  const root = new THREE.Group()
-  for (const [part, byMat] of parts) {
-    const holder = new THREE.Group()
-    holder.name = part
-    // (a hand is moved about its own middle: its meshes set round the place it hangs at rest; the eyes about theirs, to close)
-    let at: THREE.Vector3 | null = part === 'handL' ? REST.L : part === 'handR' ? REST.R : null
-    if (part === 'eyes') {
-      const bb = new THREE.Box3()
-      for (const list of byMat.values()) for (const { geo } of list) { geo.computeBoundingBox(); bb.union(geo.boundingBox!) }
-      at = bb.getCenter(new THREE.Vector3())
-    }
-    const inks: THREE.Mesh[] = []
-    let shadow = false
-    for (const [mat, list] of byMat) {
-      // (where the skin and hair fall in the merged mesh, by the order its pieces go in)
-      const tints: Tint[] = []
-      let start = 0
-      for (const x of list) {
-        const n = x.geo.attributes.position.count
-        if (x.tint) tints.push({ start, count: n, tint: x.tint })
-        start += n
-        if (x.inked) { inks.push(new THREE.Mesh(x.geo.clone())); shadow = true }
-      }
-      const geo = mergeGeometries(list.map((x) => x.geo))
-      for (const x of list) x.geo.dispose()
-      if (!geo) continue
-      if (at) geo.translate(-at.x, -at.y, -at.z)
-      const mesh = new THREE.Mesh(geo, mat)
-      mesh.castShadow = shadow && mat !== plainFlat
-      mesh.receiveShadow = true
-      if (tints.length) mesh.userData.tints = tints
-      holder.add(mesh)
-    }
-    if (at) holder.position.copy(at)
-    // (one ink line round the part's inked pieces)
-    if (at) for (const m of inks) m.geometry.translate(-at.x, -at.y, -at.z)
-    const hull = inkTogether(inks, { width: 0.006, weld: true })
-    for (const m of inks) m.geometry.dispose()
-    if (hull) holder.add(hull)
-    root.add(holder)
+  for (const h of heldPieces()) {
+    if (holds.includes(h.part)) pieces.push({ geo: h.geo, bone: BONES.indexOf(h.part) })
+    else h.geo.dispose()
   }
+  // (the parts' groups, each at the place it's moved about: a hand at where it hangs, the eyes at their middle (to close), the rest at the
+  // figure's)
+  const root = new THREE.Group()
+  root.name = 'body'
+  const bones: THREE.Object3D[] = [root]
+  for (const name of BONES.slice(1)) {
+    const g = new THREE.Group()
+    g.name = name
+    if (name === 'handL') g.position.copy(REST.L)
+    else if (name === 'handR') g.position.copy(REST.R)
+    else if (name === 'eyes') {
+      const bb = new THREE.Box3()
+      for (const p of pieces) if (p.bone === BONES.indexOf('eyes')) { p.geo.computeBoundingBox(); bb.union(p.geo.boundingBox!) }
+      if (!bb.isEmpty()) bb.getCenter(g.position)
+    }
+    root.add(g)
+    bones.push(g)
+  }
+  // (where the skin and hair fall in the one mesh, by the order its pieces go in)
+  const tints: Tint[] = []
+  let start = 0
+  for (const p of pieces) {
+    const n = p.geo.attributes.position.count
+    if (p.tint) tints.push({ start, count: n, tint: p.tint })
+    start += n
+  }
+  const { mesh } = rigidFigure(root, pieces, mat, bones, 0.006)
+  for (const p of pieces) p.geo.dispose()
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  if (tints.length) mesh.userData.tints = tints
   return { root }
 }
 
@@ -148,16 +159,19 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
   const v = variantOf(role, who.female)
   const gltf = useGLTF(url(v)) as unknown as { scene: THREE.Group }
   const fig = useMemo(() => {
-    if (!made.has(v)) made.set(v, build(gltf.scene))
+    if (!made.has(v)) made.set(v, build(gltf.scene, v))
     const base = made.get(v)!
-    const root = base.root.clone(true)
+    // (a copy whose one mesh is bound to the copy's own parts)
+    const root = cloneSkinned(base.root) as THREE.Group
     const old = who.age === 'old'
     const glasses = (h >> 7) % 5 === 0 || (old && (h >> 7) % 2 === 0)
     const get = (n: string) => root.getObjectByName(n) ?? null
-    const g = get('glasses')
-    if (g) g.visible = glasses
-    return { root, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes') }
-  }, [gltf, v, h, who.age])
+    // (what they don't have scaled to nothing: their part of the one mesh drawn as nothing)
+    get('glasses')?.scale.setScalar(glasses ? 1 : 0)
+    get('tray')?.scale.setScalar(role === 'server' ? 1 : 0)
+    get('clip')?.scale.setScalar(0)
+    return { root, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes'), clip: get('clip') }
+  }, [gltf, v, h, who.age, role])
   // (their own skin and hair: colours over the variant's shape, in a colour attribute of their own, the shape's other attributes shared.
   // Made as they're shown and undone as they go: the shared shape put back on their meshes, only their own colours let go. They were made
   // with the figure and let go in an effect, and the effect's let-go ran once before they were ever drawn (React's strict checks unmount
@@ -201,7 +215,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
   const outer = useRef<THREE.Group>(null)
   const last = useRef<THREE.Vector3 | null>(null)
   const pace = useRef(0)
-  useEffect(() => { if (fig.fan) fig.fan.visible = false }, [fig])
+  useEffect(() => { fig.fan?.scale.setScalar(0) }, [fig])
   useFrame((_, delta) => {
     const dt = Math.min(0.1, delta)
     const t = (clock.current += dt)
@@ -244,41 +258,19 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
       } else hand.rotation.z = 0
     }
     if (fig.fan && fig.handR) {
-      fig.fan.visible = cook && fanning
-      if (fig.fan.visible) { fig.fan.position.copy(fig.handR.position).add(new THREE.Vector3(0, 0.03, 0.02)); fig.fan.rotation.z = fig.handR.rotation.z }
+      const shown = cook && fanning
+      fig.fan.scale.setScalar(shown ? 1 : 0)
+      if (shown) { fig.fan.position.copy(fig.handR.position).add(new THREE.Vector3(0, 0.03, 0.02)); fig.fan.rotation.z = fig.handR.rotation.z }
     }
+    // (the stock keeper's clipboard, held up while they stand)
+    fig.clip?.scale.setScalar(role === 'stock' && !moving ? 1 : 0)
     // (a blink every few seconds)
     if (fig.eyes) fig.eyes.scale.y = (t + seed * 0.9) % 3.6 < 0.12 ? 0.1 : 1
   })
   return (
     <group ref={outer} userData={{ staffRole: role }}>
+      {/* (a server's tray with a cup of tea on it, the stock keeper's clipboard: parts of the one mesh, shown as they're held) */}
       <primitive object={fig.root} />
-      {/* a server's round lacquered tray, a cup of tea on it, held level on the hands */}
-      {role === 'server' && (
-        <group position={TRAY_AT}>
-          <mesh castShadow>
-            <cylinderGeometry args={[0.1, 0.095, 0.014, 24]} />
-            <meshToonMaterial color="#3a1a14" gradientMap={gradientMap} />
-          </mesh>
-          <mesh position={[0.03, 0.03, 0]}>
-            <cylinderGeometry args={[0.024, 0.02, 0.05, 14]} />
-            <meshToonMaterial color="#e8dcc0" gradientMap={gradientMap} />
-          </mesh>
-        </group>
-      )}
-      {/* the stock keeper's clipboard, held up in front, the stock list on it */}
-      {role === 'stock' && !moving && (
-        <group position={[TRAY_AT[0], TRAY_AT[1] + 0.04, TRAY_AT[2] - 0.02]} rotation-x={-0.6}>
-          <mesh>
-            <boxGeometry args={[0.12, 0.008, 0.16]} />
-            <meshToonMaterial color="#c9a66b" gradientMap={gradientMap} />
-          </mesh>
-          <mesh position={[0, 0.005, 0.01]} rotation-x={-Math.PI / 2}>
-            <planeGeometry args={[0.1, 0.12]} />
-            <meshToonMaterial color="#f7f3ea" gradientMap={gradientMap} />
-          </mesh>
-        </group>
-      )}
     </group>
   )
 }

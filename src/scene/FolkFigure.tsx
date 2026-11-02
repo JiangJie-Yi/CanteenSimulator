@@ -3,9 +3,10 @@ import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
-import { inkTogether } from './inkHull'
-import { Briefcase, airbrush, gradientMap, hash, lookOf } from './Person3D'
+import { airbrush, gradientMap, hash, lookOf } from './Person3D'
+import { paintable, rigidFigure, type SkinPiece } from './rigidSkin'
 import { bakeable, colourVertices } from './StaticBatch'
 import { cloth } from './patterns'
 import type { Mood } from './people'
@@ -18,8 +19,12 @@ import type { Mood } from './people'
  * show; their hair one of a dozen styles, and what some of them have about them (glasses, a hat, headphones, a randoseru...) shown as
  * their kind has it. Skin and hair in their own colours (lookOf, as the old figures had them).
  *
- * Each combination of hair and things about them is put together once (the body, the head and each hand merged by material, inked) and
- * copied for each customer, with their own materials (their colours, their clothes, their face; and their own so they can fade alone).
+ * Each combination of hair and things about them is put together once and copied for each customer: all of it one mesh in one material
+ * (scene/rigidSkin: two draws a customer, the owner's; they were 13 to 24), each vertex painted from its colour alone, the clothes' picture,
+ * the face's strip (over the skin's colour, slid along to the expression) or the knit's, moved in parts by the groups that move them (the
+ * body, the head, each hand, the chopsticks and their bite, the phone, the briefcase in hand and by the stool, each scaled to nothing while
+ * it's not shown), its ink one line round its inked pieces; each customer their own colours over the shared shape, and their own material
+ * (their clothes, their face, so they can fade alone).
  * Sat, the round body sits up on the stool's seat; walking, it waddles; eating, the chopsticks in the right hand go from the plate to the mouth.
  */
 const URL = import.meta.env.BASE_URL + 'models/folk.glb'
@@ -58,16 +63,40 @@ const CHOP_GEO = (() => {
   const parts: THREE.BufferGeometry[] = []
   const y0 = -CHOP_GRIP, y1 = CHOP_LEN - CHOP_GRIP, third = y0 + CHOP_LEN / 3
   const r = (y: number) => 0.0062 - (0.0032 * (y - y0)) / CHOP_LEN
-  const seg = (a: number, b: number, c: string) => {
-    const g = new THREE.CylinderGeometry(r(b), r(a), b - a, 6, 1)
-    g.translate(0, (a + b) / 2, 0)
-    const cc = new THREE.Color(c), n = g.attributes.position.count, col = new Float32Array(n * 3)
+  const SIDES = 6
+  // (a band of a stick: an open six-sided tube from a to b, its colour in its vertices; the back end shut by a cap fanned from its rim (no
+  // point in its middle), the tips left open (3 mm across): 40 triangles a stick, they were 72)
+  const band = (a: number, b: number, c: string, shut: boolean) => {
+    const pos: number[] = [], nrm: number[] = [], idx: number[] = []
+    for (const y of [a, b]) for (let k = 0; k < SIDES; k++) {
+      const t = (k / SIDES) * Math.PI * 2
+      pos.push(Math.cos(t) * r(y), y, Math.sin(t) * r(y))
+      nrm.push(Math.cos(t), 0, Math.sin(t))
+    }
+    for (let k = 0; k < SIDES; k++) {
+      const k1 = (k + 1) % SIDES
+      idx.push(k, k1 + SIDES, k1, k, k + SIDES, k1 + SIDES)
+    }
+    if (shut) {
+      const o = pos.length / 3
+      for (let k = 0; k < SIDES; k++) {
+        const t = (k / SIDES) * Math.PI * 2
+        pos.push(Math.cos(t) * r(a), a, Math.sin(t) * r(a))
+        nrm.push(0, -1, 0)
+      }
+      for (let k = 1; k < SIDES - 1; k++) idx.push(o, o + k, o + k + 1)
+    }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3))
+    g.setIndex(idx)
+    const cc = new THREE.Color(c), n = pos.length / 3, col = new Float32Array(n * 3)
     for (let i = 0; i < n; i++) col.set([cc.r, cc.g, cc.b], i * 3)
     g.setAttribute('color', new THREE.BufferAttribute(col, 3))
     return g
   }
   for (const sd of [-1, 1]) {
-    for (const g of [seg(y0, third, '#151112'), seg(third, third + 0.007, '#d9b04a'), seg(third + 0.007, y1, '#7c2a1e')]) {
+    for (const g of [band(y0, third, '#151112', true), band(third, third + 0.007, '#d9b04a', false), band(third + 0.007, y1, '#7c2a1e', false)]) {
       g.rotateZ(sd * 0.034)
       g.translate(sd * 0.0075, 0, 0)
       parts.push(g)
@@ -77,9 +106,7 @@ const CHOP_GEO = (() => {
   parts.forEach((g) => g.dispose())
   return all
 })()
-const CHOP_MAT = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap })
-const BITE_GEO = new THREE.SphereGeometry(0.014, 8, 6)
-const BITE_MAT = new THREE.MeshToonMaterial({ color: '#c8743a', gradientMap })
+const BITE_GEO = new THREE.OctahedronGeometry(0.014, 0)
 /** where the chopsticks' tips go, in the figure's frame: down to their plate on the bar in front of them (measured: the bar's top 0.3 up from
  * the seat, the plate 0.72 out), or up to the mouth (the head's middle 0.8 up, blender/folk.py's C) */
 const CHOP_PLATE = new THREE.Vector3(-0.03, 0.3, 0.72)
@@ -92,8 +119,10 @@ export const SEAT = 0.31
 export const FOLK_HEIGHT = 1.07
 /** parts with no ink line round them (by their material: the face's picture, the glasses' frames, gold, the little red ties and flowers) */
 const UNINKED = /FolkFace|FolkFrame|FolkGold|FolkRed/
-/** the materials kept as themselves: each customer's own skin and hair, the outfit's and the face's pictures, the knit's pattern, the gold */
-const PAINTED = new Set(['FolkSkin', 'FolkHair', 'FolkBody', 'FolkFace', 'FolkKnit', 'FolkGold'])
+/** which picture a vertex is painted from (its `paint`'s z): its colour alone, the clothes', the face's strip over the skin's colour, the knit's */
+const PIC = { none: 0, outfit: 1, face: 2, knit: 3 } as const
+/** the parts that move, in the order the vertices name them: the body, the head and the hands, what's in the hands, the briefcase by the stool */
+const FOLK_BONES = ['body', 'head', 'handL', 'handR', 'chop', 'bite', 'phone', 'carried', 'parked'] as const
 
 /** in development, ?hair=<style> puts every customer in that hairstyle, to look at it */
 const FORCE_HAIR = import.meta.env.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search).get('hair') : null
@@ -142,12 +171,65 @@ function usePictures() {
   }, [list])
 }
 
-type Template = { root: THREE.Group; mats: Map<string, THREE.Material> }
+/** where in the one mesh the skin or the hair is (its vertices from `start`, `count` of them), coloured for each customer */
+type Tint = { start: number; count: number; tint: 'skin' | 'hair' }
+type Template = { root: THREE.Group; tints: Tint[] }
 const templates = new Map<string, Template>()
 
-/** one combination of hair and things, put together and inked once */
-function template(scene: THREE.Group, hair: string, acc: string[]): Template {
-  const key = `${hair}|${[...acc].sort().join(',')}`
+/**
+ * A customer's own material: toon light with the people's airbrush, its vertices' paint (scene/rigidSkin), and three pictures picked by it:
+ * the clothes' (`map`), the face's strip (slid along by `faceOffset`, laid over the skin's colour by its own alpha: no see-through sheet,
+ * so its soft edges stay soft), the knit's (tiled as it says). Made fresh for each, its uniforms its own.
+ */
+function folkMaterial(outfit: THREE.Texture | null, face: THREE.Texture | null, knit: THREE.Texture | null) {
+  const u = { faceMap: { value: face }, faceOffset: { value: 0 }, knitMap: { value: knit }, knitRepeat: { value: knit?.repeat ?? new THREE.Vector2(1, 1) } }
+  const m = paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: outfit, vertexColors: true, gradientMap })))
+  const before = m.onBeforeCompile
+  m.onBeforeCompile = (sh, r) => {
+    before.call(m, sh, r)
+    Object.assign(sh.uniforms, u)
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D faceMap;\nuniform float faceOffset;\nuniform sampler2D knitMap;\nuniform vec2 knitRepeat;')
+      .replace('#include <map_fragment>', `#ifdef USE_MAP
+  if (vPaint.z > 0.5 && vPaint.z < 1.5) diffuseColor *= texture2D(map, vMapUv);
+  else if (vPaint.z > 2.5) diffuseColor *= texture2D(knitMap, vMapUv * knitRepeat);
+#endif`)
+      // (the face over the skin once the skin's colour and the airbrush are in (the face's own colours not shaded by them, as its own sheet
+      // had them), its faintest edges cut as they were (that sheet's alpha test))
+      .replace('#include <alphamap_fragment>', `#ifdef USE_MAP
+  if (vPaint.z > 1.5 && vPaint.z < 2.5) { vec4 fc = texture2D(faceMap, vMapUv + vec2(faceOffset, 0.0)); diffuseColor.rgb = mix(diffuseColor.rgb, fc.rgb, fc.a < 0.35 ? 0.0 : fc.a); }
+#endif
+#include <alphamap_fragment>`)
+  }
+  const key = m.customProgramCacheKey.bind(m)
+  m.customProgramCacheKey = () => `${key()}|folk`
+  return { material: m, face: u.faceOffset }
+}
+
+/** what's held in the hands, at rest in its part's own frame: the chopsticks, their bite, the phone (its screen lit), the briefcase */
+function heldShapes(briefcase: boolean): { part: (typeof FOLK_BONES)[number]; geo: THREE.BufferGeometry; colour?: string; flat?: boolean; inked?: boolean }[] {
+  const at = (g: THREE.BufferGeometry, m: THREE.Matrix4) => { g.applyMatrix4(m); return g }
+  const out: { part: (typeof FOLK_BONES)[number]; geo: THREE.BufferGeometry; colour?: string; flat?: boolean; inked?: boolean }[] = [
+    { part: 'chop', geo: CHOP_GEO!.clone() },
+    { part: 'bite', geo: BITE_GEO.clone(), colour: '#c8743a' },
+    { part: 'phone', geo: new THREE.BoxGeometry(0.06, 0.11, 0.009), colour: '#22252a' },
+    { part: 'phone', geo: at(new THREE.PlaneGeometry(0.052, 0.096), new THREE.Matrix4().makeTranslation(0, 0, -0.005).multiply(new THREE.Matrix4().makeRotationY(Math.PI))), colour: '#b8e2ff', flat: true },
+  ]
+  if (briefcase) {
+    // (as Person3D's Briefcase: its handle, its body (inked), two latches; in hand as it hangs, by the stool stood on its end)
+    const bag = (): { geo: THREE.BufferGeometry; colour: string; inked?: boolean }[] => [
+      { geo: at(new THREE.TorusGeometry(0.012, 0.003, 3, 6, Math.PI), new THREE.Matrix4().makeTranslation(0, 0.012, 0).multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2))), colour: '#1a1410' },
+      { geo: at(new THREE.BoxGeometry(0.028, 0.1, 0.14), new THREE.Matrix4().makeTranslation(0, 0.065, 0)), colour: '#2a1e16', inked: true },
+      ...[-0.035, 0.035].map((z) => ({ geo: at(new THREE.BoxGeometry(0.031, 0.012, 0.014), new THREE.Matrix4().makeTranslation(0, 0.024, z)), colour: '#c8b070' })),
+    ]
+    for (const b of bag()) out.push({ part: 'carried', ...b })
+    for (const b of bag()) out.push({ part: 'parked', ...b, geo: at(b.geo, new THREE.Matrix4().makeTranslation(0, 0.105, 0).multiply(new THREE.Matrix4().makeRotationZ(Math.PI))) })
+  }
+  return out
+}
+
+/** one combination of hair, things and a briefcase or not, put together and inked once */
+function template(scene: THREE.Group, hair: string, acc: string[], briefcase: boolean): Template {
+  const key = `${hair}|${[...acc].sort().join(',')}|${briefcase}`
   const hit = templates.get(key)
   if (hit) return hit
   scene.updateWorldMatrix(true, true)
@@ -156,24 +238,34 @@ function template(scene: THREE.Group, hair: string, acc: string[]): Template {
     || n === `Folk_hair_${hair}` || acc.some((a) => n === `Folk_acc_${a}`)
   const partOf = (n: string) => n === 'FolkHandL' ? 'handL' : n === 'FolkHandR' ? 'handR'
     : n === 'FolkHead' || n === 'FolkFace' || n.startsWith('Folk_hair_') || (n.startsWith('Folk_acc_') && ON_HEAD.has(n.slice(9))) ? 'head' : 'body'
-  // (one material for each of the model's, by name: the game's toon paint; every plain-coloured one (no picture, not each customer's own
-  // colour, not metal) the one material FolkPlain, its colour carried by the vertices, so all of them are one draw)
-  const mats = new Map<string, THREE.Material>()
-  const matOf = (src: THREE.MeshStandardMaterial) => {
-    const name = PAINTED.has(src.name) ? src.name : 'FolkPlain'
-    let m = mats.get(name)
-    if (!m) {
-      if (src.name === 'FolkFace') m = new THREE.MeshToonMaterial({ gradientMap, transparent: true, alphaTest: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })
-      else if (src.name === 'FolkGold') m = new THREE.MeshStandardMaterial({ color: '#e0b040', metalness: 1, roughness: 0.3 })
-      else if (name === 'FolkPlain') m = airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap }))
-      else m = airbrush(new THREE.MeshToonMaterial({ color: src.color.clone(), gradientMap }))
-      m.name = name
-      mats.set(name, m)
-    }
-    return m
+  // ---- the parts' groups, at the places they're moved about
+  const root = new THREE.Group()
+  const groups = new Map<string, THREE.Group>()
+  const group = (name: (typeof FOLK_BONES)[number], parent: THREE.Object3D, at?: THREE.Vector3) => {
+    const g = new THREE.Group()
+    g.name = name
+    if (at) g.position.copy(at)
+    parent.add(g)
+    groups.set(name, g)
+    return g
   }
-  // (by part, by material, inked or not: the frame of the glasses and the red of a cap go uninked, merged apart from the rest)
-  const groups = new Map<string, Map<string, { mat: THREE.Material; inked: boolean; geos: THREE.BufferGeometry[] }>>()
+  const body = group('body', root)
+  group('head', body, NECK)
+  const handL = group('handL', body, REST.L)
+  const handR = group('handR', body, REST.R)
+  const chop = group('chop', handL)
+  const bite = group('bite', chop, new THREE.Vector3(0, CHOP_LEN - CHOP_GRIP - 0.01, 0))
+  bite.scale.set(1, 0.7, 0.8)
+  const phone = group('phone', handR, new THREE.Vector3(0, 0.05, 0.02))
+  phone.rotation.x = -0.3
+  const carried = group('carried', handR, new THREE.Vector3(0, 0, 0.02))
+  carried.rotation.z = Math.PI
+  carried.scale.setScalar(1.4)
+  group('parked', root)
+  root.updateMatrixWorld(true)
+  const bones = FOLK_BONES.map((n) => groups.get(n)!)
+  // ---- every piece of the figure in its frame, with its part, its picture or its colour, inked or not, shadowed or not
+  const pieces: (SkinPiece & { tint?: 'skin' | 'hair' })[] = []
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh) return
@@ -183,48 +275,39 @@ function template(scene: THREE.Group, hair: string, acc: string[]): Template {
     if (!keep(n)) return
     const part = partOf(n)
     const src = mesh.material as THREE.MeshStandardMaterial
-    const mat = matOf(src)
-    const inked = !UNINKED.test(src.name) && !UNINKED.test(named)
-    const byMat = groups.get(part) ?? new Map<string, { mat: THREE.Material; inked: boolean; geos: THREE.BufferGeometry[] }>()
-    const key = `${mat.uuid}|${inked}`
-    const g = byMat.get(key) ?? { mat, inked, geos: [] }
     const geo = bakeable(mesh.geometry, new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld))
-    if (mat.name === 'FolkPlain') colourVertices(geo, src.color)
-    g.geos.push(geo)
-    byMat.set(key, g)
-    groups.set(part, byMat)
+    const tint = src.name === 'FolkSkin' || src.name === 'FolkFace' ? 'skin' : src.name === 'FolkHair' ? 'hair' : undefined
+    const pic = src.name === 'FolkBody' ? PIC.outfit : src.name === 'FolkFace' ? PIC.face : src.name === 'FolkKnit' ? PIC.knit : PIC.none
+    // (the clothes' picture white under it; the knit over its own colour, as its material had it; the plain ones' colours, the gold's too, in
+    // their vertices)
+    colourVertices(geo, pic === PIC.outfit ? new THREE.Color('#ffffff') : src.name === 'FolkGold' ? new THREE.Color('#e0b040') : src.color)
+    // (the head takes no shadows: the shop's one shadow map is too coarse for a face, and the hair's and the hat's fell on it in blotches and
+    // streaks; its toon light shades it)
+    pieces.push({ geo, bone: FOLK_BONES.indexOf(part), inked: !UNINKED.test(src.name) && !UNINKED.test(named), pic, tint, shadowless: part === 'head' })
   })
-  const root = new THREE.Group()
-  const body = new THREE.Group()
-  body.name = 'body'
-  root.add(body)
-  for (const [part, byMat] of groups) {
-    const g = new THREE.Group()
-    g.name = part
-    const at = part === 'handL' ? REST.L : part === 'handR' ? REST.R : part === 'head' ? NECK : null
-    const inkedHere: THREE.Mesh[] = []
-    for (const { mat, inked, geos } of byMat.values()) {
-      const geo = mergeGeometries(geos)
-      for (const x of geos) x.dispose()
-      if (!geo) continue
-      if (at) geo.translate(-at.x, -at.y, -at.z)
-      const mesh = new THREE.Mesh(geo, mat)
-      mesh.name = mat.name
-      mesh.castShadow = mat.name !== 'FolkFace'
-      // (the head takes no shadows: the shop's one shadow map is too coarse for a face, and the hair's and the hat's fell on it in blotches
-      // and streaks; its toon light shades it)
-      mesh.receiveShadow = part !== 'head'
-      g.add(mesh)
-      if (inked) inkedHere.push(mesh)
-    }
-    // (one ink line round the whole part, whatever it's painted with)
-    const hull = inkTogether(inkedHere, { width: 0.006, weld: true })
-    if (hull) g.add(hull)
-    if (at) g.position.copy(at)
-    // (the head and the hands ride on the body: they bob and rock with it)
-    if (part === 'body') { for (const c of [...g.children]) body.add(c) } else body.add(g)
+  for (const h of heldShapes(briefcase)) {
+    const b = groups.get(h.part)!
+    const geo = bakeable(h.geo, b.matrixWorld)
+    h.geo.dispose()
+    if (h.colour) colourVertices(geo, new THREE.Color(h.colour))
+    pieces.push({ geo, bone: FOLK_BONES.indexOf(h.part), inked: !!h.inked, flat: h.flat })
   }
-  const t = { root, mats }
+  // (where the skin and hair fall in the one mesh, by the order its pieces go in)
+  const tints: Tint[] = []
+  let start = 0
+  for (const p of pieces) {
+    const k = p.geo.attributes.position.count
+    if (p.tint) tints.push({ start, count: k, tint: p.tint })
+    start += k
+  }
+  const { mesh } = rigidFigure(root, pieces, folkMaterial(null, null, null).material, bones, 0.006)
+  for (const p of pieces) p.geo.dispose()
+  mesh.name = 'FolkMesh'
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  // (what's held starts put away)
+  for (const n of ['chop', 'bite', 'phone', 'carried', 'parked']) groups.get(n)!.scale.setScalar(0)
+  const t = { root, tints }
   templates.set(key, t)
   return t
 }
@@ -246,65 +329,54 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   // (their figure: the template's, put together for them (its shapes and ink shared); made while drawing, so nothing in it that must be let
   // go: a copy made and thrown away (React's strict checks make two) leaves nothing behind)
   const fig = useMemo(() => {
-    const root = template(gltf.scene, spec.hair, spec.acc).root.clone(true)
+    const t = template(gltf.scene, spec.hair, spec.acc, spec.briefcase)
+    // (a copy whose one mesh is bound to the copy's own parts)
+    const root = cloneSkinned(t.root) as THREE.Group
     const get = (n: string) => root.getObjectByName(n) ?? null
-    return { root, body: get('body')!, head: get('head'), handL: get('handL'), handR: get('handR'), face: null as THREE.MeshToonMaterial | null }
+    return { root, tints: t.tints, body: get('body')!, head: get('head'), handL: get('handL'), handR: get('handR'), chop: get('chop'), bite: get('bite'),
+      phone: get('phone'), carried: get('carried'), parked: get('parked'), mesh: root.getObjectByName('FolkMesh') as THREE.SkinnedMesh,
+      face: null as { value: number } | null }
   }, [gltf, spec])
-  // (their own materials: their skin, hair and clothes, their face; theirs alone, to fade: made as they're shown and let go as they go, the
-  // template's put back (in development every customer left a set behind: the copy that was made twice and dropped))
+  // (their own material (their clothes, their face, their knit; theirs alone, to fade) and their own colours (skin and hair over the shared
+  // shape): made as they're shown and let go as they go, the template's put back (in development every customer left a set behind: the copy
+  // that was made twice and dropped))
   useLayoutEffect(() => {
-    const own = new Map<THREE.Material, THREE.Material>()
-    const was = new Map<THREE.Mesh, THREE.Material>()
-    fig.root.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const src = m.material as THREE.Material
-      // (the ink lines are the hull's own, shared: not copied)
-      if ((src as THREE.MeshBasicMaterial).side === THREE.BackSide && src.type !== 'MeshToonMaterial') return
-      let t = own.get(src)
-      if (!t) {
-        t = src.clone()
-        const tm = t as THREE.MeshToonMaterial
-        if (src.name === 'FolkSkin') tm.color.set(spec.skin)
-        else if (src.name === 'FolkHair') tm.color.set(spec.hairColor)
-        else if (src.name === 'FolkBody') { tm.color.set('#ffffff'); tm.map = pictures.get(spec.outfit) ?? null }
-        else if (src.name === 'FolkFace') {
-          // (their own copy of the strip, the same picture, slid along to the expression they show)
-          const ft = pictures.get(`face_${spec.face}`)!.clone()
-          ft.needsUpdate = true
-          tm.map = ft
-          fig.face = tm
-        }
-        else if (src.name === 'FolkKnit') tm.map = cloth('knit', '#8a6a9a', [6, 2])
-        own.set(src, t)
-      }
-      was.set(m, src)
-      m.material = t
-    })
-    // (their new materials opaque, with no expression yet: their fading and their face set afresh)
+    const m = fig.mesh
+    const was = m.material
+    const { material, face } = folkMaterial(pictures.get(spec.outfit) ?? null, pictures.get(`face_${spec.face}`) ?? null,
+      spec.acc.includes('shawl') ? cloth('knit', '#8a6a9a', [6, 2]) : null)
+    m.material = material
+    fig.face = face
+    const src = m.geometry
+    const g = new THREE.BufferGeometry()
+    for (const [k, a] of Object.entries(src.attributes)) if (k !== 'color') g.setAttribute(k, a)
+    const col = (src.attributes.color as THREE.BufferAttribute).clone()
+    const skin = new THREE.Color(spec.skin), hairC = new THREE.Color(spec.hairColor)
+    for (const t of fig.tints) {
+      const c = t.tint === 'skin' ? skin : hairC
+      for (let i = t.start; i < t.start + t.count; i++) col.setXYZ(i, c.r, c.g, c.b)
+    }
+    g.setAttribute('color', col)
+    m.geometry = g
+    // (their new material opaque, with no expression yet: their fading and their face set afresh)
     faded.current = 1
     exprNow.current = null
     return () => {
-      for (const [m, src] of was) m.material = src
-      for (const t of own.values()) {
-        if (t.name === 'FolkFace') (t as THREE.MeshToonMaterial).map?.dispose()
-        t.dispose()
-      }
+      m.material = was
+      m.geometry = src
+      for (const k of Object.keys(g.attributes)) if (k !== 'color') g.deleteAttribute(k)
+      g.dispose()
+      material.dispose()
       fig.face = null
     }
   }, [fig, spec, pictures])
 
-  const chop = useRef<THREE.Group>(null)
-  const phone = useRef<THREE.Group>(null)
   const heldRef = useRef<THREE.Group>(null)
-  const carried = useRef<THREE.Group>(null)
-  // (the things in their hands ride with the hands)
+  // (a drink in their hand rides with it: handL is at the figure's -x, which facing +z is its right hand (the chopsticks and a drink in the
+  // right, the phone and the briefcase in the left: parts of the one mesh))
   useEffect(() => {
-    // (handL is at the figure's -x, which facing +z is its right hand, handR its left (the owner saw the chopsticks in the left hand and the
-    // phone in the right): the chopsticks and a drink in the right, the phone and the briefcase in the left)
-    const pairs: [React.RefObject<THREE.Group | null>, THREE.Object3D | null][] = [[chop, fig.handL], [heldRef, fig.handL], [carried, fig.handR], [phone, fig.handR]]
-    for (const [r, hand] of pairs) if (r.current && hand) hand.add(r.current)
-    return () => { for (const [r] of pairs) r.current?.removeFromParent() }
+    if (heldRef.current && fig.handL) fig.handL.add(heldRef.current)
+    return () => { heldRef.current?.removeFromParent() }
   }, [fig])
 
   const timeNow = () => clock?.current ?? 0
@@ -324,7 +396,6 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const v3 = useMemo(() => new THREE.Vector3(), [])
   const chopDir = useMemo(() => new THREE.Vector3(), [])
   const chopQ = useMemo(() => new THREE.Quaternion(), [])
-  const bite = useRef<THREE.Mesh>(null)
 
   const applyFade = (f: number) => {
     if (Math.abs(f - faded.current) < 0.01 && (f < 1) === (faded.current < 1)) return
@@ -342,9 +413,9 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     })
   }
   const setExpr = (e: Expr) => {
-    if (exprNow.current === e || !fig.face?.map) return
+    if (exprNow.current === e || !fig.face) return
     exprNow.current = e
-    fig.face.map.offset.x = EXPR[e] / 8
+    fig.face.value = EXPR[e] / 8
   }
 
   useFrame(() => {
@@ -434,20 +505,31 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       L.rotation.x += (lr - L.rotation.x) * Math.min(1, dt * 10)
       Rh.rotation.x += (rr - Rh.rotation.x) * Math.min(1, dt * 10)
     }
-    if (chop.current) {
-      chop.current.visible = eating
+    // (what's in their hands, shown by its part of the one mesh being its size, hidden by its being nothing)
+    if (fig.chop) {
+      fig.chop.scale.setScalar(eating ? 1 : 0)
       // (the tips at the plate, or at the mouth: their way from the hand in the figure's frame, taken into the hand's (turned about x))
       if (eating && L) {
         const to = chew ? CHOP_MOUTH : CHOP_PLATE
         chopDir.copy(to).sub(L.position).normalize().applyAxisAngle(X_AXIS, -L.rotation.x)
         chopQ.setFromUnitVectors(UP, chopDir)
-        chop.current.quaternion.slerp(chopQ, Math.min(1, dt * 12))
+        fig.chop.quaternion.slerp(chopQ, Math.min(1, dt * 12))
       }
       // (a bite in the tips from the plate till they're at the mouth)
-      if (bite.current) bite.current.visible = eating && !!L && L.position.y < 0.55
+      if (eating && !!L && L.position.y < 0.55) fig.bite?.scale.set(1, 0.7, 0.8)
+      else fig.bite?.scale.setScalar(0)
     }
-    if (phone.current) phone.current.visible = showPhone
-    if (carried.current) carried.current.visible = spec.briefcase && walking
+    fig.phone?.scale.setScalar(showPhone ? 1 : 0)
+    fig.carried?.scale.setScalar(spec.briefcase && walking ? 1.4 : 0)
+    // (by the stool while they sit: in the figure's frame, which is scaled to their size and lifted to the seat)
+    if (fig.parked) {
+      const kk = fit * spec.size, lift = walking || ground ? 0 : SEAT
+      if (spec.briefcase && !walking) {
+        fig.parked.position.set(-0.22 / kk, -lift / kk, 0.12 / kk)
+        fig.parked.rotation.y = 0.3
+        fig.parked.scale.setScalar(1.4 / spec.size)
+      } else fig.parked.scale.setScalar(0)
+    }
     // (the face: their mood; blinking now and then; delighted when the food's just come; chewing; talking)
     const delighted = since >= 0 && since < 1.2
     const joy = mood === 'joy' || delighted
@@ -462,23 +544,11 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     // (sat, the round body sits on the stool's seat; standing or walking, on the floor)
     <group ref={outer} position-y={seatLift}>
       <group scale={k}>
+        {/* (the chopsticks and their bite, the phone, the briefcase in hand and by the stool: parts of the one mesh) */}
         <primitive object={fig.root} />
-        {/* the chopsticks in the right hand (the place's own, off their rest), a bite at their tips on its way up */}
-        <group ref={chop} name="FolkChop" visible={false}>
-          <mesh geometry={CHOP_GEO ?? undefined} material={CHOP_MAT} />
-          <mesh ref={bite} geometry={BITE_GEO} material={BITE_MAT} position={[0, CHOP_LEN - CHOP_GRIP - 0.01, 0]} scale={[1, 0.7, 0.8]} />
-        </group>
-        {/* a phone in the left hand, its screen lit toward them */}
-        <group ref={phone} visible={false} position={[0, 0.05, 0.02]} rotation-x={-0.3}>
-          <mesh><boxGeometry args={[0.06, 0.11, 0.009]} /><meshToonMaterial color="#22252a" gradientMap={gradientMap} /></mesh>
-          <mesh position-z={-0.005} rotation-y={Math.PI}><planeGeometry args={[0.052, 0.096]} /><meshBasicMaterial color="#b8e2ff" toneMapped={false} /></mesh>
-        </group>
         {/* a drink held in the right hand */}
         <group ref={heldRef} visible={!!held} position={[0, 0.02, 0.03]} scale={1.1}>{held}</group>
-        {/* the briefcase: in the left hand while they walk; by the stool while they sit */}
-        {spec.briefcase && <group ref={carried} position={[0, 0.0, 0.02]} rotation-z={Math.PI} scale={1.4}><Briefcase /></group>}
       </group>
-      {spec.briefcase && !walking && <group position={[-0.22, -seatLift, 0.12]} rotation-y={0.3} scale={1.4 * fit}><group position-y={0.105} rotation-z={Math.PI}><Briefcase /></group></group>}
     </group>
   )
 }

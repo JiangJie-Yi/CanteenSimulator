@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { inkModel } from '@/scene/inkHull'
-import { colourVertices, mergeByMaterial } from '@/scene/StaticBatch'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { bakeable } from '@/scene/StaticBatch'
 import { atlasModel } from '@/scene/atlasMerge'
 import { airbrush, gradientMap } from '@/scene/Person3D'
+import { paintable, rigidFigure, type SkinPiece } from '@/scene/rigidSkin'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
 import { bossLineText, bossSituation, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
@@ -55,49 +56,66 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * fridge, taken off the table as he picks it up); he goes over, drinks it and says so; cleared when it's drunk */
 export const BOSS_DRINK = { at: null as THREE.Vector3 | null, id: null as DrinkId | null, item: null as unknown, arrived: false, since: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossDrink?: typeof BOSS_DRINK }).__bossDrink = BOSS_DRINK
+/** the parts of him that move on their own (his bones, after his body): his hands, what they hold, his eyes (to blink), his smile and his
+ * open mouth (in turn as he talks) */
+const BOSS_BONES = ['BossHandL', 'BossHandR', 'BossTongs', 'BossFan', 'BossEyes', 'BossSmile', 'BossTalk']
 /**
- * The owner as he's drawn (his materials, his ink, his parts merged), made once: his figure in the room is it, the character viewer a copy.
- * Drawn in as few draws as can be (the owner's: he was 27 in the room, 39 in the viewer, and the shop slows when it's full): all of him but
- * his eyes one material (scene/atlasMerge: the pictures on his coat, apron, trousers, hair and towel packed into one atlas, the plain
- * parts' colours carried by their vertices), so his body is one mesh and its ink another; his eyes, their dark and their shines, one mesh,
- * unlit, in a group at their middle that closes as he blinks; each hand one, and the tongs and the fan each one; the mouth as it was.
+ * The owner as he's drawn, made once: his figure in the room is it, the character viewer a copy. Drawn in two draws (the owner's: a person
+ * in one or two; he was 27, then 9): all of him one material (scene/atlasMerge: the pictures on his coat, apron, trousers, hair and towel
+ * packed into one atlas, the plain parts' colours carried by their vertices, his eyes flat (unlit) by their vertices' paint), all of him one
+ * mesh moved in parts by the groups that move them (scene/rigidSkin: his hands, the tongs and the fan, his eyes in a group at their middle
+ * that closes as he blinks, his smile and his open mouth, each scaled to nothing while it's not shown), and one ink line round his inked
+ * pieces, bending with him.
  */
 function styledBoss(scene: THREE.Group) {
   if (!made) {
     const r = scene.clone(true)
     r.updateMatrixWorld(true)
-    // ---- his eyes
-    const eyeParts: THREE.Mesh[] = []
-    r.traverse((o) => { if ((o as THREE.Mesh).isMesh && /^BossEye/.test(o.name)) eyeParts.push(o as THREE.Mesh) })
-    if (eyeParts.length) {
-      const eyes = new THREE.Group()
-      eyes.name = 'BossEyes'
+    // ---- the groups that move his eyes and his mouth, at their middles (the rest are his own nodes)
+    const holder = (name: string, test: RegExp) => {
+      const meshes: THREE.Mesh[] = []
+      r.traverse((o) => { if ((o as THREE.Mesh).isMesh && test.test(o.name)) meshes.push(o as THREE.Mesh) })
+      if (!meshes.length) return
+      const g = new THREE.Group()
+      g.name = name
       const box = new THREE.Box3()
-      for (const e of eyeParts) box.expandByObject(e)
-      const holder = eyeParts[0].parent!
-      holder.add(eyes)
-      eyes.position.copy(holder.worldToLocal(box.getCenter(new THREE.Vector3())))
-      eyes.updateMatrixWorld(true)
-      const eyeMat = new THREE.MeshBasicMaterial({ color: '#ffffff', vertexColors: true })
-      for (const e of eyeParts) {
-        e.geometry = e.geometry.clone()
-        colourVertices(e.geometry, (e.material as THREE.MeshStandardMaterial).color)
-        e.material = eyeMat
-        eyes.attach(e)
-      }
+      for (const e of meshes) box.expandByObject(e)
+      const at = meshes[0].parent!
+      at.add(g)
+      g.position.copy(at.worldToLocal(box.getCenter(new THREE.Vector3())))
+      g.updateMatrixWorld(true)
+      for (const e of meshes) g.attach(e)
     }
-    // ---- the rest of him one material
-    atlasModel(r, (m) => !/^BossEye/.test(m.name), (atlas) => airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap })))
-    r.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      m.castShadow = !UNINKED.test(m.name)
-      m.receiveShadow = true
-    })
-    inkModel(r, (m) => UNINKED.test(m.name), { width: 0.006, weld: true })
-    // (his body merged; what moves on its own (his hands and what they hold, his eyes, his mouth) kept apart, each of those merged in itself)
-    mergeByMaterial(r, (o) => /^Boss(Hand|Tongs|Fan|Eyes|Mouth)/.test(o.name))
-    for (const n of ['BossHandL', 'BossHandR', 'BossTongs', 'BossFan', 'BossEyes']) { const o = r.getObjectByName(n); if (o) mergeByMaterial(o) }
+    holder('BossEyes', /^BossEye/)
+    holder('BossSmile', /^BossMouth$/)
+    holder('BossTalk', /^BossMouth(Open|Tongue)/)
+    // ---- all of him one material: his eyes' whites and darks in it too, by their vertices, flat
+    atlasModel(r, () => true, (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap }))))
+    // ---- each piece of him in his frame, with its part, inked or not, flat or not
+    r.updateMatrixWorld(true)
+    const inv = r.matrixWorld.clone().invert()
+    const bones: THREE.Object3D[] = [r, ...BOSS_BONES.map((n) => r.getObjectByName(n) ?? (() => { const g = new THREE.Group(); g.name = n; r.add(g); return g })())]
+    const boneOf = (o: THREE.Object3D) => {
+      for (let q: THREE.Object3D | null = o; q && q !== r; q = q.parent) { const k = bones.indexOf(q); if (k > 0) return k }
+      return 0
+    }
+    const pieces: SkinPiece[] = []
+    const meshes: THREE.Mesh[] = []
+    r.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh) })
+    let mat: THREE.Material | null = null
+    for (const m of meshes) {
+      mat = m.material as THREE.Material
+      pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: boneOf(m),
+        inked: !UNINKED.test(m.name), flat: /^BossEye/.test(m.name) && !/Glass/.test(m.name) })
+      m.removeFromParent()
+      m.geometry.dispose()
+    }
+    const { mesh } = rigidFigure(r, pieces, mat!, bones, 0.006)
+    for (const p of pieces) p.geo.dispose()
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+    // (what's held starts put away)
+    for (const n of ['BossTongs', 'BossFan', 'BossTalk']) r.getObjectByName(n)?.scale.setScalar(0)
     made = r
   }
   return made
@@ -105,7 +123,7 @@ function styledBoss(scene: THREE.Group) {
 /** the owner standing still, a copy of him (developer mode's character viewer) */
 export function BossModel() {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => styledBoss(gltf.scene).clone(true), [gltf])
+  const obj = useMemo(() => cloneSkinned(styledBoss(gltf.scene)), [gltf])
   return <primitive object={obj} />
 }
 /** the way he walks (his own frame, from his place): out to the aisle behind him at `mouth` (straight back out of the cook table's notch,
@@ -173,8 +191,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     handL: root.getObjectByName('BossHandL'),
     tongs: root.getObjectByName('BossTongs'),
     fan: root.getObjectByName('BossFan'),
-    smile: root.getObjectByName('BossMouth'),
-    talk: ['BossMouthOpen', 'BossMouthTongue'].map((n) => root.getObjectByName(n)).filter(Boolean) as THREE.Object3D[],
+    smile: root.getObjectByName('BossSmile'),
+    talk: root.getObjectByName('BossTalk'),
     eyes: root.getObjectByName('BossEyes'),
   }), [root])
   const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0, y: 0, vy: 0, ground: 0, probeAt: -1, probeX: 0, probeZ: 0, probeEdit: false })
@@ -448,12 +466,12 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       }
     }
     if (parts.tongs) {
-      parts.tongs.visible = act === 'tongs'
+      parts.tongs.scale.setScalar(act === 'tongs' ? 1 : 0)
       parts.tongs.position.copy(hand).add(new THREE.Vector3(-0.02, 0.0, 0.02))
       parts.tongs.rotation.set(0.5 - Math.max(0, Math.sin(s.t * 2.2)) ** 6 * 0.5, -0.25, 0)
     }
     if (parts.fan) {
-      parts.fan.visible = act === 'fan'
+      parts.fan.scale.setScalar(act === 'fan' ? 1 : 0)
       parts.fan.position.copy(hand).add(new THREE.Vector3(0, 0.0, 0.02))
       // (fanned to and fro at the fire, quick)
       parts.fan.rotation.set(-0.5 + Math.sin(T * 13) * 0.55, 0, -0.15)
@@ -463,11 +481,11 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     const talking = !!sayRef.current
     const munching = act === 'taste'
     const gape = (talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2) || (munching && Math.sin((T - BOSS_TASTE.since) * 7) > 0.3)
-    if (parts.smile) parts.smile.visible = !gape
-    for (const o of parts.talk) {
-      o.visible = gape
-      const sy = (o.userData.sy ??= o.scale.y) as number
-      o.scale.y = sy * (0.7 + 0.3 * Math.abs(Math.sin(T * 17)))
+    // (each shown by its part of the one mesh being its size, hidden by its being nothing)
+    parts.smile?.scale.setScalar(gape ? 0 : 1)
+    if (parts.talk) {
+      if (gape) parts.talk.scale.set(1, 0.7 + 0.3 * Math.abs(Math.sin(T * 17)), 1)
+      else parts.talk.scale.setScalar(0)
     }
     // ---- a blink every few seconds, now and then twice
     let lid = 1
