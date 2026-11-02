@@ -3,7 +3,7 @@
 // glowing behind the stones, which can be moved about like the dishes. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
 // them like anything else (DECOR is their footprint, for its settle()).
 import { getLights } from '@/scene/lightsStore'
-import { memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -105,6 +105,30 @@ const FAN_PAPER = canvas(256, 256, (g) => {
     g.lineTo(128 - Math.cos(a) * 200, 256 - Math.sin(a) * 260)
     g.stroke()
   }
+})
+
+/** the fan's other side (the owner's: a fan has two sides; from behind it was a dark disc, its outline's back): the same paper, its bamboo ribs
+ * plainer through it, the shop's mark (聞 in a red round seal) and a band of indigo waves along its foot */
+const FAN_BACK = canvas(256, 256, (g) => {
+  g.fillStyle = '#f1e7d2'
+  g.fillRect(0, 0, 256, 256)
+  g.strokeStyle = 'rgba(120,90,50,0.38)'
+  g.lineWidth = 2.4
+  for (let k = 0; k < 24; k++) {
+    const a = (k / 23) * Math.PI
+    g.beginPath()
+    g.moveTo(128, 256)
+    g.lineTo(128 - Math.cos(a) * 200, 256 - Math.sin(a) * 260)
+    g.stroke()
+  }
+  g.strokeStyle = '#2f5d8a'
+  g.lineWidth = 5
+  for (let x = -20; x < 290; x += 40) { g.beginPath(); g.arc(x, 212, 20, Math.PI, 0); g.stroke() }
+  g.fillStyle = '#c8402e'
+  g.beginPath(); g.arc(128, 104, 44, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = '#f1e7d2'; g.lineWidth = 3
+  g.beginPath(); g.arc(128, 104, 37, 0, Math.PI * 2); g.stroke()
+  brushText(g, '聞', 128, 106, 50, { fill: '#f6efe2' })
 })
 
 /** water-hyacinth plaiting: pale straw bands, each a row of slanted strands that flips direction from cell to cell */
@@ -282,19 +306,29 @@ function Fan({ held, at }: { held: RefObject<Held>; at: [number, number, number]
     const face = new THREE.CircleGeometry(0.15, 40)
     face.rotateX(-Math.PI / 2)
     face.scale(1, 1, 0.92)
+    // (its back: the same shape turned half round about the handle's line, so it faces the other way with its picture the right way round
+    // from that side, the handle's end of it still at the handle (mirrored, its triangles turned inside out and it was never drawn))
+    const back = face.clone().rotateZ(Math.PI)
     return {
       face,
+      back,
       handle: new THREE.CylinderGeometry(0.011, 0.013, 0.17, 8).rotateX(Math.PI / 2),
       rim: new THREE.TorusGeometry(0.15, 0.006, 6, 48).rotateX(Math.PI / 2).scale(1, 1, 0.92),
+      // (its outline: a fine dark ring round the rim, seen from either side; a disc's back faces pushed out, as other things are inked,
+      // was a dark disc over its whole back)
+      ink: new THREE.TorusGeometry(0.1535, 0.0042, 5, 48).rotateX(Math.PI / 2).scale(1, 1, 0.92),
     }
   }, [])
+  useEffect(() => () => { for (const x of Object.values(geo)) x.dispose() }, [geo])
   return (
     // (a proper size for fanning a charcoal fire: about a hand and a half across)
     <group ref={g} userData={{ decor: 'fan' }} scale={1.6}>
-      <Inked geometry={geo.face} map={FAN_PAPER} grow={1.05} position={[0, 0.004, 0]} />
-      <mesh geometry={geo.rim} position={[0, 0.006, 0]}>
+      <mesh geometry={geo.face} position={[0, 0.0048, 0]} castShadow receiveShadow><meshToonMaterial color="#ffffff" map={FAN_PAPER} /></mesh>
+      <mesh geometry={geo.back} position={[0, 0.0032, 0]} receiveShadow><meshToonMaterial color="#ffffff" map={FAN_BACK} /></mesh>
+      <mesh geometry={geo.rim} position={[0, 0.004, 0]}>
         <meshToonMaterial color="#9a7444" />
       </mesh>
+      <mesh geometry={geo.ink} position={[0, 0.004, 0]}><meshBasicMaterial color={INK} /></mesh>
       <Inked geometry={geo.handle} color="#b08a55" grow={1.12} position={[0, 0.012, 0.21]} />
     </group>
   )
