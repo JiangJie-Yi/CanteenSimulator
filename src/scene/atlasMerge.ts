@@ -42,6 +42,10 @@ export function atlasModel(root: THREE.Object3D, pick: (m: THREE.Mesh) => boolea
   canvas.width = W
   canvas.height = H
   const g = canvas.getContext('2d')!
+  // (opaque all over, white where nothing's drawn: a patch's edge or the white patch the plain parts point at, in the small mips of a far
+  // view, never takes in a see-through black corner (the figure's fade is hashed on its alpha, and the plain parts greyed with it))
+  g.fillStyle = '#ffffff'
+  g.fillRect(0, 0, W, H)
   for (const p of list) {
     // (the picture, and round it a margin of itself as it wraps: drawn three by three, kept to its own patch)
     g.save()
