@@ -216,15 +216,15 @@ def text(name, body, size, mat_, at, rot, font=None, fit=None):
     return finish(t, name, mat_, smooth_shade=False)
 
 
-def tube(name, pts, r, mat_):
+def tube(name, pts, r, mat_, ring=None, steps=None):
     """a cable through the points (three frame). Its roundness and the steps along it go by how thick it is and how many points it's drawn
     through: a stem a millimetre thick is six-sided, a trunk eight, anything thicker ten; a path of many points (the cushion's cord, forty)
     needs few steps between them"""
     cd = bpy.data.curves.new(name, "CURVE")
     cd.dimensions = "3D"
     cd.bevel_depth = r
-    cd.bevel_resolution = 1 if r < 0.003 else 2 if r < 0.007 else 3
-    cd.resolution_u = max(2, min(10 if r >= 0.003 else 6, round(60 / len(pts))))
+    cd.bevel_resolution = ring if ring is not None else 1 if r < 0.003 else 2 if r < 0.007 else 3
+    cd.resolution_u = steps if steps is not None else max(2, min(10 if r >= 0.003 else 6, round(60 / len(pts))))
     sp = cd.splines.new("BEZIER")
     sp.bezier_points.add(len(pts) - 1)
     for bp, p in zip(sp.bezier_points, pts):
@@ -729,13 +729,15 @@ for k in range(3):
         pts.append((rr * math.cos(a_), y, rr * math.sin(a_)))
     ox, oz = math.cos(k * 2.094 + 0.5), math.sin(k * 2.094 + 0.5)
     pts += [(ox * 0.02, TT_ + 0.03, oz * 0.02), (ox * 0.045, TT_ + 0.06, oz * 0.045)]
-    tr_ = tube(f"TreeTrunk{k}", pts, 0.0055 - k * 0.0004, M["bark"])
+    # (six round, two steps between its points: it was eight round and four, 1,024 triangles a trunk)
+    tr_ = tube(f"TreeTrunk{k}", pts, 0.0055 - k * 0.0004, M["bark"], ring=1, steps=2)
     # (the trunk's bark wrapped round it: UVs up its length)
     bpy.ops.object.select_all(action="DESELECT"); tr_.select_set(True); bpy.context.view_layer.objects.active = tr_
     bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cylinder_project(scale_to_bounds=True); bpy.ops.object.mode_set(mode="OBJECT")
     mtree.append(tr_)
     # (the swelling at the trunk's foot, where the three meet the soil)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.009, segments=14, ring_count=8, location=P(math.cos(k * 2.094) * 0.007, TB + 0.004, math.sin(k * 2.094) * 0.007))
+    # (an icosphere: round without poles)
+    bpy.ops.mesh.primitive_ico_sphere_add(radius=0.009, subdivisions=1, location=P(math.cos(k * 2.094) * 0.007, TB + 0.004, math.sin(k * 2.094) * 0.007))
     sw_ = active(); sw_.scale = (1, 1, 0.75); apply_scale(sw_)
     mtree.append(finish(sw_, f"TreeTrunkFoot{k}", M["bark"]))
     # (the stems off each branch, four to a branch, rising and arching out, each ending in a hand of five to seven leaflets)
@@ -791,7 +793,7 @@ bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, ZT + 0.007, 0))
 zb = active()
 zb.scale = S(0.106, 0.018, 0.082)
 apply_scale(zb)
-sd_ = zb.modifiers.new("s", "SUBSURF"); sd_.levels = 3
+sd_ = zb.modifiers.new("s", "SUBSURF"); sd_.levels = 2   # (twice is round enough at ten centimetres: three times was 768 triangles)
 apply_mods(zb)
 for vt in zb.data.vertices:
     # (puffed: fullest in the middle, the edges pinched in, the very middle drawn down where it's tufted)
@@ -805,8 +807,8 @@ ig.append(zb)
 # (a gold cord piping round the cushion's edge, and four little tufts sewn into its top)
 _cw, _cd = 0.047, 0.036
 _pts = []
-for i in range(41):
-    t_ = i / 40 * 2 * math.pi
+for i in range(21):
+    t_ = i / 20 * 2 * math.pi
     cx_, sy_ = math.cos(t_), math.sin(t_)
     # (a rounded square: a superellipse)
     _pts.append((math.copysign(abs(cx_) ** 0.5, cx_) * _cw, ZT + 0.0085, math.copysign(abs(sy_) ** 0.5, sy_) * _cd))
