@@ -2457,7 +2457,7 @@ function seeded(seed: number) {
  * upright stripes of every width waving up the band together. Its width a whole number of repeats, so it runs on round the lantern with no
  * seam; drawn on its own sheet and laid over the paper a little see-through, the lit washi glowing through it */
 const BAND_COLOURS = ['#25385f', '#9fac8e', '#a79bc6', '#8ea2ba', '#ece4d0', '#b7c3cd']
-function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number, lit: boolean, kind: 'uroko' | 'tatewaku') {
+function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number, lit: boolean, kind: 'uroko' | 'tatewaku', flip = false) {
   const h = Math.ceil(y1 - y0)
   const sheet = document.createElement('canvas')
   sheet.width = W; sheet.height = h
@@ -2540,15 +2540,18 @@ function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: num
   }
   s.fillStyle = GOLD
   for (let k = 0; k < 60; k++) { s.beginPath(); s.arc(rnd() * W, rnd() * h, 0.6 + rnd() * 1.2, 0, Math.PI * 2); s.fill() }
-  // (laid on a little see-through: the paper's glow through it when it's lit)
+  // (multiplied into the paper, as dye is (the owner's: 色彩增值, see-through): its fibres, ribs and seams and its glow all through it; the
+  // upper band turned upside down, so the two face each other across the lantern's middle)
   g.save()
-  g.globalAlpha = lit ? 0.84 : 0.94
-  g.drawImage(sheet, 0, y0)
-  g.restore()
+  g.globalCompositeOperation = 'multiply'
+  g.globalAlpha = lit ? 0.88 : 0.95
+  if (flip) { g.translate(0, y0 + h); g.scale(1, -1); g.drawImage(sheet, 0, 0) } else g.drawImage(sheet, 0, y0)
   // (a fine line of navy along either edge)
-  g.fillStyle = lit ? 'rgba(37,56,95,0.75)' : 'rgba(37,56,95,0.9)'
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.fillStyle = 'rgba(37,56,95,0.85)'
   g.fillRect(0, y0 - 5, W, 2.5)
-  g.fillRect(0, y1 + 3, W, 2.5)
+  g.fillRect(0, y0 + h + 3, W, 2.5)
+  g.restore()
 }
 /**
  * A lantern's paper (u round it, v up it: 1024 x 300, about as many pixels to the inch round its belly as up it, so what's painted on it
@@ -2592,8 +2595,9 @@ function lanternPaper(g: CanvasRenderingContext2D, lit: boolean, band: 'uroko' |
   // (the seams between its panels)
   g.fillStyle = lit ? 'rgba(200,140,80,0.16)' : 'rgba(120,110,95,0.14)'
   for (let x = 0; x < W; x += 128) g.fillRect(x, 0, 1.6, H)
-  // (its band, round its lower belly)
-  patternBand(g, W, H * 0.54, H * 0.82, lit, band)
+  // (its bands, one round its shoulder and one round its lower belly, mirrored (the owner's: top and bottom, the one the other way up))
+  patternBand(g, W, H * 0.12, H * 0.36, lit, band, true)
+  patternBand(g, W, H * 0.64, H * 0.88, lit, band)
 }
 const LANTERN_SKIN = signTexture(1024, 300, (g) => lanternPaper(g, true))
 const PENDANT_GLOW = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffcf90' }), 0.35, 0.75)
