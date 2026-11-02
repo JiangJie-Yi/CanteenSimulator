@@ -181,6 +181,40 @@ if CREW == "server":
     _ct[st] = _ct[st] * 0.55 + np.array([0.75, 0.78, 0.86], np.float32) * 0.45
 # (a faint shade down the folds)
 _ct = _ct * (1 - 0.05 * (0.5 + 0.5 * np.sin(_u * 2 * np.pi * 9)))[..., None]
+
+
+def _creases(c, specs):
+    """the cloth's creases (the owner's: the kappōgi wants its folds): each (u0, v0, u1, v1, width, depth) a fold from one point to the other on
+    the body's picture (u round it from the front, wrapping; v up it, the body from 0.11 to 0.355), a shadow down one side of its line and a
+    little light along the other, both fading toward its ends"""
+    shade = np.zeros_like(_u)
+    for (u0, v0, u1, v1, w, d) in specs:
+        du = ((_u - u0 + 0.5) % 1.0) - 0.5
+        dv = _v - v0
+        ex, ey = ((u1 - u0 + 0.5) % 1.0) - 0.5, v1 - v0
+        L = math.hypot(ex, ey)
+        tx, ty = ex / L, ey / L
+        along = du * tx + dv * ty
+        across = -du * ty + dv * tx
+        t = np.clip(along / L, 0, 1)
+        taper = np.where((along > 0) & (along < L), np.sin(np.pi * t) ** 0.7, 0)
+        dark = np.where(across < 0, smooth(w, 0, -across), 0) * d
+        light = np.where(across > 0, smooth(w * 0.5, 0, across), 0) * d * 0.35
+        shade += (light - dark) * taper
+    return (c * (1 + np.clip(shade, -0.4, 0.2))[..., None]).clip(0, 1).astype(np.float32)
+
+
+_W = 0.30 / 1.64     # (the apron's ties round the waist, where the cloth gathers)
+_ct = _creases(_ct, [
+    # (behind: radiating from the ties, up toward the shoulders and down to the hem)
+    (0.5, _W, 0.4, 0.33, 0.024, 0.22), (0.5, _W, 0.46, 0.345, 0.02, 0.18), (0.5, _W, 0.54, 0.345, 0.02, 0.18), (0.5, _W, 0.6, 0.33, 0.024, 0.22),
+    (0.5, _W, 0.42, 0.12, 0.022, 0.2), (0.5, _W, 0.48, 0.113, 0.018, 0.16), (0.5, _W, 0.52, 0.113, 0.018, 0.16), (0.5, _W, 0.58, 0.12, 0.022, 0.2),
+    # (down the sides from under the arms)
+    (0.22, 0.345, 0.27, 0.2, 0.022, 0.2), (0.27, 0.33, 0.31, 0.22, 0.018, 0.15), (0.78, 0.345, 0.73, 0.2, 0.022, 0.2), (0.73, 0.33, 0.69, 0.22, 0.018, 0.15),
+    # (across the chest along the crossed front, and a few short gathers at the hem)
+    (0.1, 0.345, 0.03, 0.27, 0.018, 0.16), (0.9, 0.345, 0.97, 0.27, 0.018, 0.16),
+    (0.15, 0.118, 0.16, 0.155, 0.014, 0.14), (0.32, 0.118, 0.33, 0.15, 0.014, 0.14), (0.68, 0.118, 0.67, 0.15, 0.014, 0.14), (0.85, 0.118, 0.84, 0.155, 0.014, 0.14),
+])
 M["coat"] = pbr("BossCoat", (1, 1, 1), tex=image(f"{CREW or 'boss'}_cotton", _ct.astype(np.float32)), rough=0.75)
 if CREW:
     # (the cap's tenugui white, a band's white; the collar a shade of the coat, the kimono's white)
