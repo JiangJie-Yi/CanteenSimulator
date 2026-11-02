@@ -87,6 +87,8 @@ function piecesOf(scene: THREE.Group) {
           ? new THREE.MeshPhysicalMaterial({ color: '#cfd4d9', metalness: 1, roughness: 0.26, clearcoat: 0.4, clearcoatRoughness: 0.25, envMapIntensity: 0.95 })
           : new THREE.MeshPhysicalMaterial({ color: src.color.clone(), metalness: 0.9, roughness: src.name === 'DeskChrome' ? 0.12 : 0.3, envMapIntensity: 0.8 })
         : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
+      // (the tray's thanks: a little picture (TrayThanksPrint) on a quad a hair proud of it, its letters the picture's alpha)
+      if (src.transparent) Object.assign(t, { transparent: true, depthWrite: false, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })
       mats.set(src, t)
     }
     if (METAL.has(src.name)) reflectStudio(t as THREE.MeshPhysicalMaterial)

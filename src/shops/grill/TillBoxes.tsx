@@ -33,6 +33,8 @@ function piecesOf(gltf: { scene: THREE.Group }) {
       let t = toon.get(src)
       if (!t) {
         t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
+        // (the printing: one picture of all of it (TillBoxPrint), on quads a hair proud of the boards, its letters the picture's alpha)
+        if (src.transparent) Object.assign(t, { transparent: true, depthWrite: false, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })
         toon.set(src, t)
       }
       m.material = t

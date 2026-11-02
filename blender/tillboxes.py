@@ -117,6 +117,9 @@ M = {
     "white": pbr("ManualInk", (0.95, 0.94, 0.9), rough=0.6),
     "staple": pbr("ManualStaple", (0.7, 0.72, 0.74), rough=0.3, metal=1.0),
 }
+# (all the printing (the boxes' names, their small print, the arrows and stamps, the manual's title): drawn into one picture, a quad each, not
+# hundreds of triangles of letters a word (the owner's low-poly rule))
+PRINT = DecalAtlas("TillBoxPrint", ppm=3000, size=1024)
 
 
 def apply_mods(o):
@@ -157,7 +160,7 @@ def text(name, body, size, mat, at, rot, font=None, align="CENTER", fit=None):
     t.data.align_x = align
     t.data.align_y = "CENTER"
     t.data.extrude = 0.0
-    t.data.resolution_u = 3    # (flat lettering, coarse curves: its sides never showed, and the curves were most of the triangles)
+    t.data.resolution_u = 8    # (fine curves: the letters are only drawn into the print's picture (PRINT), never kept as triangles)
     if font:
         t.data.font = font
     bpy.ops.object.convert(target="MESH")
@@ -165,7 +168,7 @@ def text(name, body, size, mat, at, rot, font=None, align="CENTER", fit=None):
     if fit and t.dimensions.x > fit:
         t.scale.x = fit / t.dimensions.x
         apply_scale(t)
-    return finish(t, name, mat, smooth_shade=False)
+    return PRINT.add(finish(t, name, mat, smooth_shade=False))
 
 
 parts = []
@@ -236,7 +239,7 @@ def cardboard(name, at, w, h, d, label_zh, label_ja, sub, mat="kraft", tape="tap
         sx_, sy_ = -w * 0.33, cy - h * 0.22
         bpy.ops.mesh.primitive_torus_add(major_radius=h * 0.09, minor_radius=0.0011, major_segments=28, minor_segments=3,
                                          location=P(sx_, sy_, fz + 0.0003), rotation=(math.pi / 2, 0, 0))
-        mine.append(finish(active(), f"{name}StampRing", M[col], smooth_shade=False))
+        mine.append(PRINT.add(finish(active(), f"{name}StampRing", M[col], smooth_shade=False)))
         mine.append(text(f"{name}Stamp", txt, h * 0.1, M[col], P(sx_, sy_, fz + 0.0003), (math.pi / 2, 0.25, 0), ZH))
     place = Matrix.Translation(P(x0, 0, z0)) @ Matrix.Rotation(yaw, 4, "Z")
     for o in mine:
@@ -321,6 +324,7 @@ if PREVIEW:
     world.node_tree.nodes["Background"].inputs[1].default_value = 0.5
     bpy.context.scene.world = world
 
+PRINT.finish()
 os.makedirs(os.path.join(PROJECT, "public", "models"), exist_ok=True)
 export_dish(root, parts, os.path.join(PROJECT, "public", "models", "tillboxes.glb"), os.path.join(PROJECT, "blender", "tillboxes.blend"), PREVIEW)
 print("TILLBOXES_DONE", len(parts), "parts")

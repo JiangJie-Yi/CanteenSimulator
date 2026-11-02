@@ -5025,6 +5025,8 @@ function WallSpeaker() {
         const shell = src.name === 'SpeakerABS' || src.name === 'SpeakerBaffle'
         t = new THREE.MeshToonMaterial({ color: shell ? new THREE.Color(src.name === 'SpeakerABS' ? '#45484e' : '#2c2e32') : src.color.clone().multiplyScalar(lift),
           map: shell ? null : src.map, alphaTest: grille ? 0.5 : 0, side: grille ? THREE.DoubleSide : THREE.FrontSide })
+        // (the badge's word: a little picture (SpeakerBadgePrint) on a quad a hair proud of it, its letters the picture's alpha)
+        if (src.transparent) Object.assign(t, { transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })
         t.name = src.name
         toon.set(src, t)
       }

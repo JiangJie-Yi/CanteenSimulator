@@ -197,7 +197,7 @@ def cyl(name, r, depth, at, mat_, rot=(0, 0, 0), verts=24, r2=None):
     return o
 
 
-def text(name, body, size, mat_, at, rot, font=None, fit=None):
+def text(name, body, size, mat_, at, rot, font=None, fit=None, res=3):
     bpy.ops.object.text_add(location=at, rotation=rot)
     t = active()
     t.data.body = body
@@ -205,7 +205,9 @@ def text(name, body, size, mat_, at, rot, font=None, fit=None):
     t.data.align_x = "CENTER"
     t.data.align_y = "CENTER"
     t.data.extrude = 0.0
-    t.data.resolution_u = 3    # (flat lettering, coarse curves: its sides never showed, and the curves were most of the triangles)
+    # (flat lettering, coarse curves: its sides never showed, and the curves were most of the triangles; finer (`res`) for what's only drawn
+    # into a picture)
+    t.data.resolution_u = res
     if font:
         t.data.font = font
     bpy.ops.object.convert(target="MESH")
@@ -620,7 +622,10 @@ m_ = lattice.modifiers.new("clip", "BOOLEAN"); m_.operation = "INTERSECT"; m_.ob
 apply_mods(lattice)
 bpy.data.objects.remove(clip)
 tr.append(lattice)
-tr.append(text("TillTrayThanks", "ありがとうございました", 0.0068, M["gilt"], P(0, 0.0027, FD / 2 + 0.0075), (0, 0, 0), JA, fit=TW2 - 0.075))
+# (its thanks drawn into a little picture on a quad a hair proud of the tray (THANKS_PRINT), not kept as a mesh of letters: 1,400 triangles)
+THANKS_PRINT = DecalAtlas("TrayThanksPrint", ppm=5000, size=(1024, 64))
+tr.append(THANKS_PRINT.add(text("TillTrayThanks", "ありがとうございました", 0.0068, M["gilt"], P(0, 0.0027, FD / 2 + 0.0075), (0, 0, 0), JA, fit=TW2 - 0.075, res=8)))
+THANKS_PRINT.finish()
 for sx in (-1, 1):
     for sz in (-1, 1):
         tr.append(cyl(f"TillTrayFoot{sx}{sz}", 0.006, 0.0016, P(sx * (TW2 / 2 - 0.02), -0.0008, sz * (TD2 / 2 - 0.02)), M["rubber"], verts=16))

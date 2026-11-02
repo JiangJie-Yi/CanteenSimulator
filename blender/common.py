@@ -290,6 +290,114 @@ def ladder_ngons(obj):
     return done
 
 
+def _to_srgb(c):
+    """a linear colour (a material's) as the picture's sRGB value"""
+    return tuple(1.055 * max(0.0, x) ** (1 / 2.4) - 0.055 if x > 0.0031308 else 12.92 * max(0.0, x) for x in c)
+
+
+class DecalAtlas:
+    """Printing that was letters of mesh (hundreds of triangles a word: the low-poly rule's worst) drawn into one picture instead. Each text
+    (or flat mark) object's triangles are filled into its own corner of the atlas in its material's colour, the object let go, and a quad of
+    two triangles laid in its place, a hair proud of its plane, showing it. add() each (it hands back the quad, named as the object was, to be
+    moved and parented as it would have been); finish() once, after them all, packs the corners into the picture, paints them and gives every
+    quad the atlas's material (`name`, its alpha the letters'). `size` is the picture's side, or its (width, height)."""
+
+    def __init__(self, name, ppm=3000, size=1024, rough=0.8):
+        self.name, self.ppm, self.size, self.rough = name, ppm, size, rough
+        self.items = []
+
+    def add(self, obj, pad=0.0015, lift=0.0002):
+        bpy.context.view_layer.update()
+        mats = obj.data.materials
+        rgb = _to_srgb(mats[0].diffuse_color[:3]) if len(mats) and mats[0] else (0.0, 0.0, 0.0)
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        # (in the object's own frame: its letters lie in its x-y plane)
+        tris = [[(lp.vert.co.x, lp.vert.co.y) for lp in f.loops] for f in bm.faces]
+        bm.free()
+        ss = [p[0] for t in tris for p in t]
+        ts = [p[1] for t in tris for p in t]
+        s0, s1, t0, t1 = min(ss) - pad, max(ss) + pad, min(ts) - pad, max(ts) + pad
+        name, mw = obj.name, obj.matrix_world.copy()
+        me_old = obj.data
+        bpy.data.objects.remove(obj)
+        if me_old.users == 0:
+            bpy.data.meshes.remove(me_old)
+        me = bpy.data.meshes.new(name)
+        me.from_pydata([(s0, t0, lift), (s1, t0, lift), (s1, t1, lift), (s0, t1, lift)], [], [(0, 1, 2, 3)])
+        me.update()
+        quad = bpy.data.objects.new(name, me)
+        bpy.context.collection.objects.link(quad)
+        quad.matrix_world = mw
+        self.items.append({"quad": quad, "rgb": rgb, "tris": tris, "box": (s0, t0, s1, t1)})
+        return quad
+
+    @staticmethod
+    def _pack(rects, nw, nh, gap):
+        order = sorted(range(len(rects)), key=lambda i: -rects[i][1])
+        pos, x, y, row = [None] * len(rects), 0, 0, 0
+        for i in order:
+            w, h = rects[i]
+            if w + 2 * gap > nw:
+                return None
+            if x + w + 2 * gap > nw:
+                x, y, row = 0, y + row, 0
+            if y + h + 2 * gap > nh:
+                return None
+            pos[i] = (x + gap, y + gap)
+            x += w + 2 * gap
+            row = max(row, h + 2 * gap)
+        return pos
+
+    def finish(self):
+        NW, NH = self.size if isinstance(self.size, tuple) else (self.size, self.size)
+        G, SS = 3, 4
+        ppm = self.ppm
+        while True:
+            rects = [(max(2, math.ceil((it["box"][2] - it["box"][0]) * ppm)), max(2, math.ceil((it["box"][3] - it["box"][1]) * ppm)))
+                     for it in self.items]
+            pos = self._pack(rects, NW, NH, G)
+            if pos:
+                break
+            ppm *= 0.92
+        print("DECAL_ATLAS", self.name, len(self.items), "items at", round(ppm), "px a metre")
+        A = np.zeros((NH, NW), np.float32)
+        C = np.zeros((NH, NW, 3), np.float32)
+        for it, (x, y), (w, h) in zip(self.items, pos, rects):
+            s0, t0 = it["box"][0], it["box"][1]
+            m = np.zeros((h * SS, w * SS), np.float32)
+            yy, xx = np.mgrid[0:h * SS, 0:w * SS].astype(np.float32) + 0.5
+            k = ppm * SS
+            for tri in it["tris"]:
+                q = [((s - s0) * k, (t - t0) * k) for s, t in tri]
+                x0, x1 = int(max(0, min(p[0] for p in q) - 1)), int(min(w * SS, max(p[0] for p in q) + 2))
+                y0, y1 = int(max(0, min(p[1] for p in q) - 1)), int(min(h * SS, max(p[1] for p in q) + 2))
+                if x1 <= x0 or y1 <= y0:
+                    continue
+                X, Y = xx[y0:y1, x0:x1], yy[y0:y1, x0:x1]
+                (ax, ay), (bx, by), (cx, cy) = q
+                d1 = (bx - ax) * (Y - ay) - (by - ay) * (X - ax)
+                d2 = (cx - bx) * (Y - by) - (cy - by) * (X - bx)
+                d3 = (ax - cx) * (Y - cy) - (ay - cy) * (X - cx)
+                inside = ((d1 >= 0) & (d2 >= 0) & (d3 >= 0)) | ((d1 <= 0) & (d2 <= 0) & (d3 <= 0))
+                m[y0:y1, x0:x1] = np.maximum(m[y0:y1, x0:x1], inside.astype(np.float32))
+            A[y:y + h, x:x + w] = m.reshape(h, SS, w, SS).mean(axis=(1, 3))
+            # (its colour over its whole corner and the gutter round it, so filtering at the letters' rims never pulls in another's)
+            C[max(0, y - G):y + h + G, max(0, x - G):x + w + G] = it["rgb"]
+        mat = pbr(self.name, (1, 1, 1), tex=image(self.name, C, alpha=A), rough=self.rough, blend=True)
+        for it, (x, y), (w, h) in zip(self.items, pos, rects):
+            s0, t0, s1, t1 = it["box"]
+            u0, v0 = x / NW, y / NH
+            u1, v1 = (x + (s1 - s0) * ppm) / NW, (y + (t1 - t0) * ppm) / NH
+            me = it["quad"].data
+            uvl = me.uv_layers.new()
+            for li, uv in zip(me.polygons[0].loop_indices, ((u0, v0), (u1, v0), (u1, v1), (u0, v1))):
+                uvl.data[li].uv = uv
+            me.materials.append(mat)
+        return mat
+
+
 def export_dish(root, parts, glb_path, blend_path, preview=None, ladder=True):
     """Optionally render a preview, export the dish (root + parts) to GLB and save the .blend. Every part's convex N-gons (caps) are cut
     into ladders first (`ladder`: ladder_ngons), so none comes out a fan."""

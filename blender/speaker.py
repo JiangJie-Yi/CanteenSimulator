@@ -253,20 +253,24 @@ GRILLE_FACE = FRONT - 0.001 - 0.0012
 # ---- the badge on the grille's foot (brushed aluminium, the word inked in) and the power light
 badge = box("SpeakerBadge", (0.072, 0.0015, 0.018), (-0.06, GRILLE_FACE - 0.001, -H / 2 + 0.036), M["badge"], bev=0.002)
 cab_parts.append(badge)
+# (the word drawn into a little picture on a quad a hair proud of the badge (BADGE_PRINT), not kept as a mesh of letters: five of them
+# were 1,400 triangles)
 bpy.ops.object.text_add(location=(0, 0, 0))
 t = active()
 t.data.body = "SOUND"
 t.data.size = 0.012
 t.data.align_x = "CENTER"
 t.data.align_y = "CENTER"
-t.data.extrude = 0.0003
+t.data.resolution_u = 8
 t.data.space_character = 1.15
 bpy.ops.object.convert(target="MESH")
 t = active()
 finish(t, "SpeakerBadgeText", M["ink"], smooth_shade=False)
 t.rotation_euler = (math.pi / 2, 0, 0)
-t.location = (-0.06, GRILLE_FACE - 0.0028, -H / 2 + 0.036)
-cab_parts.append(t)
+t.location = (-0.06, GRILLE_FACE - 0.00175, -H / 2 + 0.036)
+BADGE_PRINT = DecalAtlas("SpeakerBadgePrint", ppm=4000, size=(256, 64))
+cab_parts.append(BADGE_PRINT.add(t))
+BADGE_PRINT.finish()
 led = cyl("SpeakerLED", 0.0045, 0.004, (0, 0, 0), M["led"], verts=16)
 to_front(led, GRILLE_FACE - 0.0015, -H / 2 + 0.036, 0.105)
 cab_parts.append(led)
