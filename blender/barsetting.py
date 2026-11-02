@@ -89,10 +89,11 @@ WALNUTS = (
     # (its two browns (the board's streaks wander between them); how far the pith was below the face (0: quartered, straight stripes), how
     # much the log tapered (how tall the arches), how many rings across, how much darker the late wood, a pale streak of sapwood, a dark
     # mineral streak)
-    dict(base=(0.37, 0.24, 0.155), alt=(0.31, 0.205, 0.15), d=0.14, taper=0.24, rings=36, late=0.2, sap=0.0, streak=0.0),
-    dict(base=(0.285, 0.185, 0.125), alt=(0.25, 0.165, 0.13), d=0.0, taper=0.0, rings=48, late=0.2, sap=0.0, streak=0.0),
-    dict(base=(0.41, 0.27, 0.165), alt=(0.37, 0.245, 0.16), d=0.09, taper=0.3, rings=30, late=0.18, sap=1.0, streak=0.0),
-    dict(base=(0.34, 0.23, 0.175), alt=(0.29, 0.205, 0.175), d=0.2, taper=0.17, rings=40, late=0.17, sap=0.0, streak=1.0),
+    # (a lighter walnut than it was, oiled, warm (the owner's: a little brighter): its browns a quarter or so up on what they were)
+    dict(base=(0.5, 0.335, 0.215), alt=(0.43, 0.29, 0.2), d=0.14, taper=0.24, rings=34, late=0.3, sap=0.0, streak=0.0),
+    dict(base=(0.42, 0.28, 0.185), alt=(0.37, 0.25, 0.18), d=0.0, taper=0.0, rings=44, late=0.28, sap=0.0, streak=0.0),
+    dict(base=(0.53, 0.36, 0.225), alt=(0.47, 0.32, 0.21), d=0.09, taper=0.3, rings=28, late=0.28, sap=1.0, streak=0.0),
+    dict(base=(0.47, 0.32, 0.215), alt=(0.41, 0.28, 0.205), d=0.2, taper=0.17, rings=38, late=0.27, sap=0.0, streak=1.0),
 )
 
 
@@ -106,16 +107,23 @@ def walnut(variant=0, N=512):
     seed(31 + variant * 7)
     u, v = grid01(N)
     wob = fbm(N, 2, 3, 4) - 0.5
+    # (the grain wandering as a tree's does: long slow bends along the board, and finer ripples on them)
+    bend = (fbm(N, 1, 3, 4) - 0.5) * 0.09 + (fbm(N, 3, 9, 3) - 0.5) * 0.018
+    vv = v + bend
     # (the rings: the distance from the pith, the pith wandering a little under the board, less the taper along it)
     vc = 0.5 + 0.16 * np.sin(2 * math.pi * (u * 0.45 + 0.21 * variant)) + wob * 0.07
     if w["d"] > 0:
-        ring = (np.sqrt((v - vc) ** 2 + w["d"] ** 2) - w["taper"] * u) * w["rings"]
+        ring = (np.sqrt((vv - vc) ** 2 + w["d"] ** 2) - w["taper"] * u) * w["rings"]
     else:
-        ring = (v + wob * 0.05 + 0.012 * np.sin(2 * math.pi * u)) * w["rings"]
-    # (rings unevenly wide: good years and lean ones)
-    ring = ring + (fbm(N, 2, 7, 3) - 0.5) * 1.6
+        ring = (vv + wob * 0.05 + 0.012 * np.sin(2 * math.pi * u)) * w["rings"]
+    # (rings unevenly wide: good years and lean ones, a run of narrow ones here and there)
+    ring = ring + (fbm(N, 2, 7, 3) - 0.5) * 1.6 + np.sin(ring * 0.37 + wob * 3) * 0.35
     ph = ring - np.floor(ring)
-    late = smooth(0.5, 0.78, ph) * (1 - smooth(0.86, 1.0, ph))
+    # (each ring: the early wood pale and open, darkening through the year to a sharp edge where the next year starts)
+    late = smooth(0.35, 0.9, ph) ** 1.6 * (1 - smooth(0.93, 1.0, ph))
+    # (each ring's late wood its own depth: a hard year's darker)
+    seed(41 + variant)
+    late = late * (0.65 + 0.55 * vnoise(N, 2, 16))
     # (the colour drifting along the grain: long streaks across, between the board's two browns)
     seed(53 + variant)
     drift = smooth(0.25, 0.75, vnoise(N, 2, 9) * 0.65 + vnoise(N, 3, 23) * 0.35)
@@ -126,9 +134,11 @@ def walnut(variant=0, N=512):
     pore = vnoise(N, 12, 190) * vnoise(N, 40, 270)
     flecks = smooth(0.36, 0.56, pore) * (0.6 + 0.4 * late)
     col = col * (1 - flecks * 0.3)[..., None]
-    # (and a silky sheen of fibre along it)
+    # (and a silky sheen of fibre along it, with walnut's cool grey-violet in the darkest streaks)
     fibre = vnoise(N, 5, 310)
     col = col * (0.96 + 0.08 * fibre)[..., None]
+    cool = np.array((0.3, 0.24, 0.24), np.float32)
+    col = mix(col, cool, (late * (1 - drift) * 0.18).astype(np.float32))
     if w["sap"]:
         # (the sapwood: a creamy streak along one edge, its border soft and wandering)
         edge = 0.14 + 0.035 * np.sin(2 * math.pi * u * 1.3) + wob * 0.05
@@ -269,16 +279,47 @@ def hashioki(name, L=0.045, r0=0.0062, rw=0.0044, segs=12, n=8):
 
 
 def tissue_case(name, W=0.24, H=0.075, D=0.12, r=0.008):
-    """the case: a box with its edges rounded (one bevel round, two steps), its grain along it"""
-    bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, H / 2, 0))
-    o = bpy.context.view_layer.objects.active
-    o.name = name
-    o.scale = (W, D, H)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    mod = o.modifiers.new("round", "BEVEL")
+    """the case, made as a joiner would (the owner's: it was a plain rounded block): a body with its corners rounded, and a lid board laid on
+    it, a fine shadow line of a seam between them, the lid's edges chamfered; through the lid a long slot with rounded ends, its sides
+    going down into the box. Its grain along it"""
+    LT = min(0.009, H * 0.15)          # the lid's thickness
+    SW, SD = W * 0.56, 0.016           # the slot: long, narrow
+    bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, (H - LT) / 2, 0))
+    body = bpy.context.view_layer.objects.active
+    body.scale = (W, D, H - LT - 0.0012)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
+    mod = body.modifiers.new("round", "BEVEL")
     mod.width = r
     mod.segments = 2
     bpy.ops.object.modifier_apply(modifier=mod.name)
+    # (the seam's shadow: the body's top a hair under the lid, and the lid a hair in from its edges)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, H - LT / 2, 0))
+    lid = bpy.context.view_layer.objects.active
+    lid.scale = (W - 0.002, D - 0.002, LT)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
+    mod = lid.modifiers.new("chamfer", "BEVEL")
+    mod.width = 0.0022
+    mod.segments = 1
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    # (the slot: a stadium cut down through the lid and on into the box)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=SD / 2, depth=0.05, location=P(0, H, 0))
+    cut = bpy.context.view_layer.objects.active
+    cut.scale = ((SW + SD) / SD, 1.0, 1.0)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
+    # (squared off into a stadium: its middle part's sides flattened)
+    for vtx in cut.data.vertices:
+        if abs(vtx.co.x) < SW / 2:
+            vtx.co.y = math.copysign(SD / 2, vtx.co.y) if abs(vtx.co.y) > 1e-6 else vtx.co.y
+    for target in (lid, body):
+        b = target.modifiers.new("slot", "BOOLEAN")
+        b.operation = "DIFFERENCE"
+        b.solver = "EXACT"
+        b.object = cut
+        bpy.context.view_layer.objects.active = target
+        bpy.ops.object.modifier_apply(modifier=b.name)
+    bpy.data.objects.remove(cut, do_unlink=True)
+    o = joined(name, [body, lid])
+    o.name = name
     # (its picture laid along it: u along x, v round it, at one scale)
     me = o.data
     uvl = me.uv_layers.new(name="UVMap") if not me.uv_layers else me.uv_layers[0]
@@ -372,18 +413,21 @@ DW, DH, DD, DT = 0.17, 0.125, 0.26, 0.012
 def drawer_case(name):
     """the case: a top just under the counter's, a bottom, two sides and a back, open at the front"""
     x, y0 = DW / 2, -DH
-    return joined(name, [board(f"{name}Top", -x, x, -DT, 0, 0, DD), board(f"{name}Bottom", -x, x, y0, y0 + DT, 0, DD),
-                         board(f"{name}L", -x, -x + DT, y0 + DT, -DT, 0, DD), board(f"{name}R", x - DT, x, y0 + DT, -DT, 0, DD),
+    return joined(name, [board(f"{name}Top", -x, x, -DT, 0, 0, DD, ease=0.0028), board(f"{name}Bottom", -x, x, y0, y0 + DT, 0, DD, ease=0.0028),
+                         board(f"{name}L", -x, -x + DT, y0 + DT, -DT, 0, DD, ease=0.0028), board(f"{name}R", x - DT, x, y0 + DT, -DT, 0, DD, ease=0.0028),
                          board(f"{name}Back", -x + DT, x - DT, y0 + DT, -DT, DD - DT, DD)])
 
 
 def drawer_body(name):
-    """the drawer: its front (2 mm proud of the case), and the box behind it: a bottom, two sides, a back"""
+    """the drawer: its front (2 mm proud of the case: a frame, its edges chamfered, and a raised field in it a little prouder still, its
+    edges chamfered too, so a fine shadow runs round it; the owner: better made), and the box behind it: a bottom, two sides, a back"""
     fy0, fy1 = -DH + 0.014, -0.014
     by0 = -DH + DT + 0.002
     fx = DW / 2 - DT - 0.002
     ix = fx - 0.008
-    return joined(name, [board(f"{name}Front", -fx, fx, fy0, fy1, -0.002, 0.014, ease=0.002),
+    m = 0.011
+    return joined(name, [board(f"{name}Front", -fx, fx, fy0, fy1, -0.002, 0.014, ease=0.0028),
+                         board(f"{name}Field", -fx + m, fx - m, fy0 + m, fy1 - m, -0.0045, 0.0, ease=0.0022),
                          board(f"{name}Bottom", -ix - 0.006, ix + 0.006, by0, by0 + 0.006, 0.014, 0.236, ease=0),
                          board(f"{name}L", -ix - 0.006, -ix, by0, -0.035, 0.014, 0.236, ease=0),
                          board(f"{name}R", ix, ix + 0.006, by0, -0.035, 0.014, 0.236, ease=0),
@@ -590,7 +634,9 @@ def swatch(name):
 
 
 def slot(name, W=0.13, D=0.014, y=0.0752):
+    """the dark inside seen down the slot: a floor a little way under the lid (the tissues' top, in shadow)"""
     bm = bmesh.new()
+    y = y - 0.012
     vs = [bm.verts.new(P(x, y, z)) for (x, z) in ((-W / 2, -D / 2), (W / 2, -D / 2), (W / 2, D / 2), (-W / 2, D / 2))]
     bm.faces.new(list(reversed(vs)))
     return mesh_obj(name, bm, smooth_shade=False)

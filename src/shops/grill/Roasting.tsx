@@ -2156,9 +2156,12 @@ function BarPiece({ name, design, grain, fade }: { name: string; design?: number
         const m = o as THREE.Mesh
         if (!m.isMesh) return
         const was = m.material as THREE.MeshStandardMaterial
+        const map = design !== undefined && /Dish/.test(was.name) ? wareDesign(design) : swatch && /Walnut/.test(was.name) ? swatch : was.map
+        // (the walnut glowing a little with its own grain: under the bar's top it's in shadow, and it went a dark brown block there)
+        const wood = /Walnut/.test(was.name)
         m.material = /Brass/.test(was.name) ? barBrassOf()
-          : new THREE.MeshToonMaterial({ color: was.color.clone(),
-            map: design !== undefined && /Dish/.test(was.name) ? wareDesign(design) : swatch && /Walnut/.test(was.name) ? swatch : was.map,
+          : new THREE.MeshToonMaterial({ color: was.color.clone(), map,
+            ...(wood ? { emissive: new THREE.Color('#ffffff'), emissiveMap: map, emissiveIntensity: 0.2 } : {}),
             side: /Paper/.test(was.name) ? THREE.DoubleSide : THREE.FrontSide })
         m.castShadow = /Tissue/.test(name)
         m.receiveShadow = true
