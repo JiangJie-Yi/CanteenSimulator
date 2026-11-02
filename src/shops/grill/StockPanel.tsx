@@ -372,7 +372,7 @@ function TissueZone(p: Props) {
   const sheets = boxes.reduce((a, b) => a + b, 0)
   return (
     <section className="chiller-zone is-supplies">
-      <h3 className="chiller-zone-head"><span>{tl(lang, '衛生紙', 'ティッシュ', 'Tissues')}</span><i aria-hidden="true">{tl(lang, '耗材', '消耗品', 'consumable')}</i></h3>
+      <h3 className="chiller-zone-head"><span>{tl(lang, '民生', '日用品', 'Household')}</span><i aria-hidden="true">{tl(lang, '耗材', '消耗品', 'consumable')}</i></h3>
       <div className="chiller-bins">
         <div className={`chiller-bin season-bin supply-bin is-still${empty ? ' is-out' : ''}`}>
           <span className="chiller-bin-head"><span className="tissue-icon" aria-hidden="true">🧻</span><span className="chiller-bin-name">{supplyName(TISSUE, lang)}</span></span>

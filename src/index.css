@@ -7076,3 +7076,112 @@ html.theme-fading::view-transition-new(root) {
 .rep-said { font-size: 13.5px; }
 .rep-note { margin: 0; padding: 10px 2px 12px; font-size: 11.5px; }
 .tissue-icon { font-size: 18px; line-height: 1; }
+
+/* ---- the stock panel in the office's finish (the owner's: frosted glass as the office's staff tab has it, not the fridge's blues): the wood
+   frame and title bar, its tabs the office's pills, pale frosted glass by day and dark by night, each zone under a rule in its own colour
+   (the freezer's and the fridge's temperatures still lit), each thing one of the office's cards; the drinks' tab and the supplies' too ---- */
+.drink-stock.stock-panel {
+  --ink: #3b2a20;
+  --ink-soft: #7a6250;
+  --card: rgb(255 255 255 / 0.3);
+  --card-line: rgb(59 42 32 / 0.12);
+  --zone-glass: rgb(248 242 228 / 0.95);
+  --pill: rgb(59 42 32 / 0.08);
+  border: 3px solid #5a3d28;
+  border-radius: 10px;
+  background: rgb(251 246 234 / 0.66);
+  -webkit-backdrop-filter: blur(5px) saturate(1.1);
+  backdrop-filter: blur(5px) saturate(1.1);
+  box-shadow: 0 16px 40px -14px rgb(0 0 0 / 0.6);
+  color: var(--ink);
+}
+:root[data-theme='dark'] .drink-stock.stock-panel {
+  --ink: #f6ecd8;
+  --ink-soft: #c9bfae;
+  --card: rgb(255 255 255 / 0.05);
+  --card-line: rgb(246 236 216 / 0.12);
+  --zone-glass: rgb(36 31 26 / 0.96);
+  --pill: rgb(246 236 216 / 0.1);
+  background: rgb(30 26 22 / 0.85);
+}
+/* (the title bar and the tabs one run of the office's wood, the tabs its pills) */
+.stock-panel .drink-stock-head { background: linear-gradient(180deg, #6b4a30, #5c3f29); color: #f6e8cc; }
+.stock-panel .stock-tabs { gap: 6px; padding: 2px 12px 10px; background: linear-gradient(180deg, #5c3f29, #4a3020); border-bottom: 2px solid #8a6a44; }
+.stock-panel .stock-tab {
+  padding: 6px 4px 7px;
+  border: 1px solid rgb(246 232 204 / 0.45);
+  border-radius: 999px;
+  background: transparent;
+  color: #f6e8cc;
+  box-shadow: none !important;
+}
+.stock-panel .stock-tab:hover { background: rgb(246 232 204 / 0.14); color: #fff; }
+.stock-panel .stock-tab.is-on { background: #f6ecd8; border-color: #f6ecd8; color: #3b2a20; }
+.stock-panel .stock-tab i { top: -7px; right: -3px; box-shadow: 0 0 0 2px #5c3f29; }
+/* (the zones: on the glass, each under the office's rule, in its own colour; the heading kept over what scrolls under it) */
+.stock-panel .chiller-zone,
+.stock-panel .chiller-zone.is-ambient,
+.stock-panel .chiller-zone.is-supplies { background: none; }
+.stock-panel .chiller-zone + .chiller-zone { border-top: 0; }
+.stock-panel .chiller-zone.is-frozen { --zone: #4aa8d8; }
+.stock-panel .chiller-zone.is-chilled { --zone: #3fb488; }
+.stock-panel .chiller-zone.is-ambient { --zone: #e8a04a; }
+.stock-panel .chiller-zone.is-seasonings { --zone: #8a72c8; }
+.stock-panel .chiller-zone.is-supplies { --zone: #b08a5c; }
+.stock-panel .chiller-zone.is-drinks-alcohol { --zone: #c4442f; }
+.stock-panel .chiller-zone .chiller-zone-head {
+  padding: 10px 14px 6px;
+  background: var(--zone-glass) !important;
+  color: var(--ink);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+.stock-panel .chiller-zone-head > span { padding: 3px 0 4px 10px; border-left: 4px solid var(--zone, #a08a5c); }
+.stock-panel .chiller-zone .chiller-zone-head i {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--pill);
+  color: var(--ink);
+  font: 600 12px/1.3 var(--brush);
+  text-shadow: none;
+}
+/* (the freezer's and the fridge's own temperatures still on their little lit displays) */
+.stock-panel .chiller-zone.is-frozen .chiller-zone-head i,
+.stock-panel .chiller-zone.is-chilled:not(.is-seasonings) .chiller-zone-head i {
+  border-radius: 5px;
+  background: #0d1a24;
+  font: 600 12px/1.3 ui-monospace, monospace;
+}
+.stock-panel .chiller-zone.is-frozen .chiller-zone-head i { color: #7fe0ff; text-shadow: 0 0 6px #4ac8ee; }
+.stock-panel .chiller-zone.is-chilled:not(.is-seasonings) .chiller-zone-head i { color: #9ff0c8; text-shadow: 0 0 6px #4aeea0; }
+/* (each thing a card of the office's) */
+.stock-panel .chiller-bin,
+.stock-panel .chiller-bin.is-out {
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgb(59 42 32 / 0.06);
+}
+.stock-panel .chiller-bin:not(.is-still):hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--zone, #a08a5c) 60%, transparent); box-shadow: 0 6px 14px rgb(59 42 32 / 0.14); }
+.stock-panel .chiller-bin.is-taken { border-color: #c4442f; background: color-mix(in srgb, #c4442f 10%, var(--card)); }
+.stock-panel :is(.chiller-bin-en, .drink-bin-sub, .chiller-bin-info small, .stock-note) { color: var(--ink-soft); }
+.stock-panel .chiller-bin-info b { color: #2f8a4c; }
+:root[data-theme='dark'] .stock-panel .chiller-bin-info b { color: #7fd69a; }
+.stock-panel .chiller-bin-info b.is-zero { color: #c4442f; }
+:root[data-theme='dark'] .stock-panel .chiller-bin-info b.is-zero { color: #ff8f78; }
+:root[data-theme='dark'] .stock-panel .chiller-bin-head .food-art-band { background: radial-gradient(ellipse at 50% 60%, rgb(255 255 255 / 0.2), rgb(255 255 255 / 0.04) 72%); }
+:root[data-theme='dark'] .stock-panel .chiller-bin-head :is(.icon, svg:not(.food-art)) { background: rgb(246 236 216 / 0.14); color: #f6ecd8; }
+/* (its buttons the office's: dark wood, the one that fills it the office's red) */
+.stock-panel .chiller-btn { background: rgb(59 42 32 / 0.74); color: #f6ecd8; }
+.stock-panel .chiller-btn:hover { background: #5a3d28; }
+.stock-panel .chiller-btn.chiller-fill { background: #c4442f; }
+.stock-panel .chiller-btn.chiller-fill:hover { background: #a8352a; }
+:root[data-theme='dark'] .stock-panel .chiller-btn:not(.chiller-fill) { background: rgb(246 236 216 / 0.16); }
+:root[data-theme='dark'] .stock-panel .chiller-btn:not(.chiller-fill):hover { background: rgb(246 236 216 / 0.26); }
+.stock-panel .chiller-scroll { scrollbar-color: rgb(59 42 32 / 0.35) transparent; }
+:root[data-theme='dark'] .stock-panel .chiller-scroll { scrollbar-color: rgb(246 236 216 / 0.3) transparent; }
+/* (its foot on the glass, under a fine rule) */
+.stock-panel :is(.stock-foot, .drink-stock-foot) { background: rgb(59 42 32 / 0.06); border-top: 1px solid var(--card-line); }
+:root[data-theme='dark'] .stock-panel :is(.stock-foot, .drink-stock-foot) { background: rgb(0 0 0 / 0.18); }
+.stock-panel .stock-foot .tally-trying { color: var(--ink); }
