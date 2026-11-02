@@ -204,7 +204,7 @@ button {
   position: fixed;
   z-index: 10;
   top: 20px;
-  right: 124px;
+  right: 72px;
   width: 44px;
   height: 44px;
   border: 1.5px solid var(--text-soft);
@@ -602,28 +602,52 @@ button {
   }
 }
 
-/* pinned to the top-right corner of the whole page */
-.theme-toggle {
+/* the game's day and time (ui/GameClock), under the round buttons top right (the owner's: the day's count moved there; a second of ours
+   a minute of the game's, and day and night come round with it, no button for them): smoked glass like the cash, a sun or a moon, the day,
+   the time; only to read, nothing to press */
+.game-clock {
   position: fixed;
   z-index: 10;
-  top: 20px;
+  top: 72px;
   right: 20px;
-  width: 44px;
-  height: 44px;
-  border: 1.5px solid var(--text-soft);
-  border-radius: 50%;
-  background: var(--page);
-  color: var(--text);
-  font-size: 20px;
-  font-weight: 700;
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px 0 9px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgb(46 38 30 / 0.46), rgb(22 18 14 / 0.34));
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 6px 18px -8px rgb(0 0 0 / 0.5);
+  color: #f6ecda;
+  font: 700 14px/1 var(--brush);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+  pointer-events: none;
+  user-select: none;
+}
+.game-clock-sky {
+  width: 15px;
+  height: 15px;
+  fill: #ffd36a;
+  stroke: #ffd36a;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.game-clock.is-night .game-clock-sky {
+  fill: #e9eefc;
+  stroke: none;
+}
+.game-clock-time {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+/* (out of the way of a panel docked at the right: its title runs down where the clock is) */
+.app.is-docked .game-clock {
+  display: none;
 }
 
-.theme-toggle:hover {
-  border-color: var(--text);
-}
-
-.theme-toggle:focus-visible,
 .switcher button:focus-visible {
   outline: 3px solid var(--moss);
   outline-offset: 3px;
@@ -1414,12 +1438,9 @@ button {
     padding-top: 8px;
   }
 
-  .theme-toggle {
-    top: 14px;
+  .game-clock {
+    top: 62px;
     right: 14px;
-    width: 40px;
-    height: 40px;
-    font-size: 18px;
   }
 
   .brand {
@@ -1612,12 +1633,9 @@ button {
     grid-template-columns: auto 120px;
   }
 
-  .theme-toggle {
-    top: 10px;
+  .game-clock {
+    top: 54px;
     right: 10px;
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
   }
 
   .switcher {
@@ -1928,7 +1946,7 @@ button {
   position: fixed;
   z-index: 10;
   top: 20px;
-  right: 176px;
+  right: 124px;
   width: 44px;
   height: 44px;
   border: 1.5px solid var(--text-soft);
@@ -1990,12 +2008,13 @@ button {
   cursor: default;
 }
 
-/* language toggle, beside the day/night button */
+/* language toggle, at the right end of the row of round buttons (the day/night button was beyond it: the game's clock turns day and night
+   now) */
 .lang-toggle {
   position: fixed;
   z-index: 10;
   top: 20px;
-  right: 72px;
+  right: 20px;
   width: 44px;
   height: 44px;
   border: 1.5px solid var(--text-soft);
@@ -2775,7 +2794,7 @@ button {
   align-items: center;
   gap: 6px;
   font: 700 14px/1 var(--brush);
-  right: 124px;
+  right: 72px;
 }
 
 .shop-lamp {
@@ -2925,22 +2944,14 @@ button {
   background: #e8742a;
   color: #fff;
 }
-/* narrow phones: the four round switches shrink and close up so they clear the shop sign */
+/* narrow phones: the round switches shrink and close up so they clear the shop sign */
 @media (max-width: 400px) {
-  .theme-toggle,
   .lang-toggle {
     top: 10px;
     width: 34px;
     height: 34px;
     font-size: 14px;
-  }
-
-  .theme-toggle {
     right: 10px;
-  }
-
-  .lang-toggle {
-    right: 48px;
   }
 
   .ai-toggle {
@@ -2948,7 +2959,7 @@ button {
     height: 34px;
     min-width: 0;
     padding: 0 8px;
-    right: 86px;
+    right: 48px;
     font-size: 12px;
     gap: 4px;
   }
@@ -3048,13 +3059,15 @@ button {
     font: 700 18px/1 system-ui, sans-serif;
   }
 
-  .app .theme-toggle,
   .app .lang-toggle,
   .app .ai-toggle {
     display: none;
   }
 
-  .app.tools-open .theme-toggle,
+  .app.tools-open .game-clock {
+    display: none;
+  }
+
   .app.tools-open .lang-toggle,
   .app.tools-open .ai-toggle {
     display: grid;
@@ -3069,7 +3082,6 @@ button {
 
   .app.tools-open .ai-toggle { top: 62px; }
   .app.tools-open .lang-toggle { top: 108px; }
-  .app.tools-open .theme-toggle { top: 154px; }
 
   /* the chip with the guests and the books sits left of the ☰ */
   .side-boards {
@@ -3962,7 +3974,7 @@ button {
    one after another ---- */
 .app.is-hushed .ai-toggle,
 .app.is-hushed .lang-toggle,
-.app.is-hushed .theme-toggle,
+.app.is-hushed .game-clock,
 .app.is-hushed .tools-toggle,
 .app.is-hushed .heat,
 .app.is-hushed .fullness,
@@ -3981,7 +3993,7 @@ button {
 
 .app:not(.is-hushed) .ai-toggle,
 .app:not(.is-hushed) .lang-toggle,
-.app:not(.is-hushed) .theme-toggle,
+.app:not(.is-hushed) .game-clock,
 .app:not(.is-hushed) .tools-toggle {
   animation: ui-pop-top 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
 }
@@ -3992,7 +4004,7 @@ button {
 .app:not(.is-hushed) .office-toggle { animation-delay: 380ms; }
 .app:not(.is-hushed) .ai-toggle { animation-delay: 240ms; }
 .app:not(.is-hushed) .lang-toggle { animation-delay: 320ms; }
-.app:not(.is-hushed) .theme-toggle { animation-delay: 400ms; }
+.app:not(.is-hushed) .game-clock { animation-delay: 400ms; }
 
 @keyframes ui-pop-left {
   from { opacity: 0; translate: -40px 0; scale: 0.8; }
@@ -6626,8 +6638,8 @@ html[lang='en'] .heat-label { font-size: 13px; }
     border-radius: 50%;
     animation-name: ui-pop-top;
   }
-  .app .office-toggle { right: 280px; }
-  .app .auto-toggle { right: 228px; }
+  .app .office-toggle { right: 228px; }
+  .app .auto-toggle { right: 176px; }
   .app .office-toggle em,
   .app .office-toggle .money,
   .app .auto-toggle .auto-long { display: none; }
@@ -6638,7 +6650,6 @@ html[lang='en'] .heat-label { font-size: 13px; }
     display: flex;
     position: fixed;
     top: 20px;
-    right: 332px;
     left: auto;
     z-index: 10;
     height: 44px;
@@ -6654,8 +6665,6 @@ html[lang='en'] .heat-label { font-size: 13px; }
   }
   .money-chip:hover { transform: translateY(-1px); }
   .money-chip:active { transform: none; filter: brightness(0.88); transition-duration: 0s; }
-  /* (left of the pantry's little fridge when that's there, at the grill) */
-  .app.has-fridge .money-chip { right: 384px; }
   .app.is-hushed .money-chip { display: none; }
   .app:not(.is-hushed) .money-chip { animation: ui-pop-top 520ms cubic-bezier(0.2, 1.5, 0.4, 1) 300ms both; }
 }
@@ -6774,9 +6783,10 @@ html[lang='en'] .heat-label { font-size: 13px; }
    (phones keep their 經營 button: the cash isn't shown on its own there) ---- */
 @media (min-width: 901px) {
   .app .office-toggle { display: none; }
-  .money-chip { right: 280px; }
-  .fridge-toggle { right: 280px; }
-  .app.has-fridge .money-chip { right: 332px; }
+  .money-chip { right: 228px; }
+  .fridge-toggle { right: 228px; }
+  /* (left of the pantry's little fridge when that's there, at the grill) */
+  .app.has-fridge .money-chip { right: 280px; }
   /* (smoked glass: readable over the bright room by day as over the dark by night; no rim round it (the owner's: not a white frame)) */
   .money-chip {
     background: linear-gradient(180deg, rgb(46 38 30 / 0.46), rgb(22 18 14 / 0.34));

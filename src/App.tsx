@@ -77,6 +77,9 @@ import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
 import { tl } from '@/data/i18n'
+import { themeAt, type Clock } from '@/game/clock'
+import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
+import { GameClock } from '@/ui/GameClock'
 import { ageFresh, blendFresh } from '@/game/freshness'
 import { FREEZER, FREEZER_TEMP } from '@/shops/grill/Decor'
 
@@ -90,12 +93,14 @@ const RESUME_KEY = 'jgs-resume-1'
 type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; utility?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
   fresh?: Record<string, number>
-  /** (kept across a lost 3D view only) the menus put out, the time of day, the language, and the people who'd applied for the jobs (made at
-   * random each visit: the staff taken on are some of them) */
-  menuBy?: Record<string, Entry[]>; theme?: Theme; lang?: Lang; candidates?: typeof CANDIDATES }
+  /** (kept across a lost 3D view only) the menus put out, the game's clock (the day and the time of day), the language, and the people who'd
+   * applied for the jobs (made at random each visit: the staff taken on are some of them) */
+  menuBy?: Record<string, Entry[]>; clock?: Clock; lang?: Lang; candidates?: typeof CANDIDATES }
 // Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff). The one exception is a page
 // brought back because its 3D view was lost (game/resume): it goes on from where it was, once.
 // (Any save left by an older version is cleared.)
+// (dev: the game's clock in hand, to see a dusk or a dawn without waiting: __clock.set(17 * 60 + 59))
+if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __clock: { get: getClock, set: (minute: number, day?: number) => setClock({ day: day ?? getClock().day, minute }) } })
 const SAVED: Saved | null = (() => {
   let back: Saved | null = null
   try {
@@ -112,6 +117,8 @@ const SAVED: Saved | null = (() => {
   }
   // (the same applicants as before, so the staff taken on are still among them)
   if (back?.candidates) for (const [shop, ws] of Object.entries(back.candidates)) CANDIDATES[shop] = ws
+  // (and the clock as it was: the same day, the same time of day)
+  if (back?.clock && typeof back.clock.day === 'number' && typeof back.clock.minute === 'number') setClock(back.clock)
   return back
 })()
 
@@ -285,11 +292,9 @@ const METER_KEY = 'jgs-utilities-1'
 /** the customers' visits (game/reputation), kept in the browser; cleared with a fresh start */
 const VISITS_KEY = 'jgs-reputation-1'
 function useTheme(): [Theme, () => void] {
-  const [theme, setTheme] = useState<Theme>(() => {
-    // (not remembered: every visit starts from the system preference; a page brought back after its 3D view was lost, as it was)
-    if (SAVED?.theme) return SAVED.theme
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  })
+  // (the time of day on the game's clock (the owner's: day and night come round with the time, not at a button): a new game's ten in the
+  // morning, a page brought back after its 3D view was lost the time it was)
+  const [theme, setTheme] = useState<Theme>(() => themeAt(getClock()))
   useEffect(() => {
     document.documentElement.dataset.theme = theme
   }, [theme])
@@ -1194,10 +1199,11 @@ export default function App() {
   lightRef.current = lightIncense
   const incenseProp = useMemo(() => ({ litAt: incenseAt, onLight: () => lightRef.current() }), [incenseAt])
   const space: 'closed' | 'open' = ai ? 'open' : 'closed'
-  // (opening is the start of a new day)
+  // (a new day on the clock (midnight) starts today's count of guests over)
+  const clockDay = useClock((c) => c.day)
   useEffect(() => {
-    if (ai) setDays((d) => ({ ...d, day: d.day + 1, today: 0 }))
-  }, [ai])
+    setDays((d) => (d.today ? { ...d, today: 0 } : d))
+  }, [clockDay])
   const orders = ordersBy[space]
   const setOrders = (fn: (all: Record<string, Record<string, number>>) => Record<string, Record<string, number>>) =>
     setOrdersBy((b) => ({ ...b, [space]: fn(b[space]) }))
@@ -1222,8 +1228,9 @@ export default function App() {
   const guests = guestsBy[DISHES[active].id] ?? []
   // how many have come in all (customers are numbered as they come; the list itself only keeps the latest)
   const visits = guests.reduce((n, g) => Math.max(n, g.id), 0)
-  // the shop's days: each time it opens is a new one; and how many customers came in, today and all told
-  const [days, setDays] = useState({ day: 0, today: 0, total: 0 })
+  // how many customers came in, today (since midnight on the game's clock) and all told (the day itself is the clock's, shown under the round
+  // buttons)
+  const [days, setDays] = useState({ today: 0, total: 0 })
   const seen = useRef(new Set<string>())
   const setShopGuests = useCallback((dishId: string, g: GuestView[]) => {
     setGuestsBy((b) => ({ ...b, [dishId]: g }))
@@ -1698,6 +1705,12 @@ export default function App() {
     t.ready.catch(() => {})
     t.finished.then(done, done)
   }
+  // (day and night come round with the game's clock (the owner's): at dusk and at dawn the room dissolves into the other)
+  const clockTheme = useClock((c) => themeAt(c))
+  useEffect(() => {
+    if (clockTheme !== theme) switchTheme()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clockTheme])
   // the menu can be folded away to give the food the whole screen
   const [menuFolded, setMenuFolded] = useState(false)
   // (every panel heard as it opens and as it shuts (the owner's): the rating's drawer, the office, the stock, the drinks, the views' menu,
@@ -1733,7 +1746,7 @@ export default function App() {
   langRef.current = lang
   // (what's kept if the 3D view is lost: read from here the moment it happens)
   const resumeRef = useRef<() => Omit<Saved, 'v'>>(() => ({ ledger, stock, hired, notes, owner, opened, fresh }))
-  resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, menuBy, theme, lang, candidates: CANDIDATES })
+  resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, menuBy, clock: getClock(), lang, candidates: CANDIDATES })
   const lostTimer = useRef(0)
   // (brought back after it was lost: said so, once)
   useEffect(() => {
@@ -1997,6 +2010,9 @@ export default function App() {
         }
         return changed ? next : h
       })
+      // (the game's clock: a minute of the game's for each second (the owner's), sped up with the game; only its face redraws, and the page
+      // at dusk, at dawn and at midnight)
+      advanceClock(GAME_SPEED.value)
       // (and the chef's wage, by the second while the shop's open: in the same tick, so the two are one redraw of the page, not two)
       if (aiRef.current.ai) book('wage', aiRef.current.wage / 3600 * GAME_SPEED.value)
       // (and the water and power (the owner's: what keeping it going costs), metered by the second against the month)
@@ -2736,6 +2752,8 @@ export default function App() {
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
         {UI[lang].lang}
       </button>
+      {/* (the game's day and time, under the round buttons (the owner's): day and night come round with it) */}
+      <GameClock lang={lang} />
       {/* (on a phone there's no 3D room and no shrine to click: the sake is offered from here) */}
       {phone && ai && !!dish.roast && (
         <button type="button" className={`incense-toggle${blessed ? ' is-on' : ''}`} onClick={lightIncense} disabled={blessed}
@@ -2789,10 +2807,6 @@ export default function App() {
       <button type="button" className={`speed-toggle${speed > 1 ? ' is-on' : ''}`} onClick={() => setSpeed((v) => (v > 1 ? 1 : 2))}
         aria-pressed={speed > 1} title={tl(lang, '快速 ×2', '早送り ×2', 'Fast ×2')}>
         {speed > 1 ? '×2' : '▶▶'}
-      </button>
-      <button type="button" className="theme-toggle" onClick={switchTheme}
-        aria-label={theme === 'light' ? '切換成深色模式' : '切換成淺色模式'}>
-        {theme === 'light' ? '夜' : '晝'}
       </button>
       <Bgm />
       <HoverTip hidden={editOn} />

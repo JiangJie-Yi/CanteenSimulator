@@ -39,7 +39,7 @@ type MenuProps = {
   onRestock?: (how: Restock) => void
   restockCost?: Record<Restock, number>
   /** the shop's diary: which day of business, and how many customers today and all told */
-  days?: { day: number; today: number; total: number }
+  days?: { today: number; total: number }
   /** (the menu, open) size its tags as the board of the shop's foods is sized: this many tags, this many sets */
   layoutLike?: { tags: number; bases: number }
   cash?: number
@@ -473,12 +473,12 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
         </footer>
       ) : (
       <footer className="tally">
-        {/* the shop's diary: which day it is, and how many have come in */}
-        {days && days.day > 0 && (
+        {/* the shop's diary: how many have come in, today and all told (the day itself is under the round buttons, on the game's clock) */}
+        {days && days.total > 0 && (
           <p className="tally-day">
-            {lang === 'ja' ? <>営業 <strong>{days.day}</strong> 日目・本日の来客 <strong>{days.today}</strong> 名・累計 <strong>{days.total}</strong> 名</>
-              : lang === 'en' ? <>Day <strong>{days.day}</strong> · today <strong>{days.today}</strong> guests · <strong>{days.total}</strong> in all</>
-              : <>第 <strong>{days.day}</strong> 天・今日來客 <strong>{days.today}</strong> 位・累計 <strong>{days.total}</strong> 位</>}
+            {lang === 'ja' ? <>本日の来客 <strong>{days.today}</strong> 名・累計 <strong>{days.total}</strong> 名</>
+              : lang === 'en' ? <>Today <strong>{days.today}</strong> guests · <strong>{days.total}</strong> in all</>
+              : <>今日來客 <strong>{days.today}</strong> 位・累計 <strong>{days.total}</strong> 位</>}
           </p>
         )}
         <p>

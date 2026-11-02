@@ -338,14 +338,14 @@ function MeterChip({ lang, meter: m }: { lang: Lang; meter: Meter }) {
     <span className="stock-meter-wrap">
       <button type="button" className={`stock-meter${open ? ' is-open' : ''}`} onClick={() => setOpen((v) => !v)} aria-expanded={open}
         title={tl(lang, '水電（這個月）', '水道光熱費（今月）', 'Water and power (this month)')}>
-        <i>{tl(lang, `第 ${Math.max(1, m.day)} 天`, `${Math.max(1, m.day)} 日目`, `Day ${Math.max(1, m.day)}`)}</i>
+        <i>{tl(lang, `第 ${Math.max(1, m.day)} 營業日`, `${Math.max(1, m.day)} 営業日目`, `Opening day ${Math.max(1, m.day)}`)}</i>
         <span>⚡{m.kwh.toFixed(1)}</span>
         <span>💧{(m.m3 * 1000).toFixed(0)}L</span>
         <b>NT${m.cost.toFixed(0)}</b>
       </button>
       {open && (
         <div className="stock-meter-detail" role="dialog">
-          <h4>{tl(lang, `這個月的水電（${BILL_DAYS} 個營業日一期，第 ${Math.max(1, m.day)} 天）`, `今月の水道光熱費（${BILL_DAYS} 営業日で一期、${Math.max(1, m.day)} 日目）`, `This month's water and power (${BILL_DAYS} opening days a bill; day ${Math.max(1, m.day)})`)}</h4>
+          <h4>{tl(lang, `這個月的水電（${BILL_DAYS} 個營業日一期，第 ${Math.max(1, m.day)} 個營業日）`, `今月の水道光熱費（${BILL_DAYS} 営業日で一期、${Math.max(1, m.day)} 営業日目）`, `This month's water and power (${BILL_DAYS} opening days a bill; opening day ${Math.max(1, m.day)})`)}</h4>
           <p className="stock-meter-sum">{tl(lang, `用電 ${m.kwh.toFixed(2)} 度・用水 ${m.m3.toFixed(3)} 度（${(m.m3 * 1000).toFixed(0)} 公升）・共 NT$${m.cost.toFixed(1)}`,
             `電気 ${m.kwh.toFixed(2)} kWh・水 ${m.m3.toFixed(3)} m³（${(m.m3 * 1000).toFixed(0)} L）・計 NT$${m.cost.toFixed(1)}`,
             `${m.kwh.toFixed(2)} kWh・${m.m3.toFixed(3)} m³ (${(m.m3 * 1000).toFixed(0)} L)・NT$${m.cost.toFixed(1)} in all`)}</p>
