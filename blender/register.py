@@ -437,11 +437,54 @@ for i in range(6):
     cut(ins, cutter)
 uv_box(ins)
 drawer_parts.append(ins)
-# the notes' weights: a steel arm hinged at the back wall, lying forward onto the notes, a grey roller at its end
+# (in the 2000 compartment, as most shops do: rolls of coins (棒金), fifty coins each in clear film, the bank's paper band round the middle.
+# The owner asked what the lumps were: they'd been a pale cylinder, a band, two printed rules, a coin at each end and a crimped torus round
+# it, nine parts that all ran together at that size. Each now one plain 16-sided cylinder, its ends closed in ladders (never a fan into the
+# middle); its side and its ends two materials, their pictures painted by the game (cashRegister.tsx: the coins' edges under the film and
+# the printed band along the side, the coin's face at each end), 60 triangles. The 2000s' weight lies on top of them)
+ROLLS = ((100, 0.0108, 0.085), (10, 0.0105, 0.075), (1, 0.0085, 0.075))   # (the coin, its radius (Cash.tsx's), fifty of them long)
+ROLL_GAP, ROLL_WRAP, ROLL_SEG = 0.003, 0.0004, 16
+ROLL_FLOOR = INS_Y + 0.004
+ROLL_TOP = ROLL_FLOOR + 2 * (max(r for _, r, _ in ROLLS) + ROLL_WRAP)
+_rx = INS_W / 2 - 2.5 * INS_W / 4 - (sum(2 * (r + ROLL_WRAP) for _, r, _ in ROLLS) + ROLL_GAP * (len(ROLLS) - 1)) / 2
+for kind, r, length in ROLLS:
+    r += ROLL_WRAP
+    cx = _rx + r
+    _rx += 2 * r + ROLL_GAP
+    cy_, cz_ = ROLL_FLOOR + r, 0.07
+    bm = bmesh.new()
+    n = ROLL_SEG
+    ends = [[bm.verts.new(P(cx + r * math.cos(2 * math.pi * i / n), cy_ + r * math.sin(2 * math.pi * i / n), cz_ + e * length / 2)) for i in range(n)] for e in (-1, 1)]
+    side = [bm.faces.new((ends[0][i], ends[0][(i + 1) % n], ends[1][(i + 1) % n], ends[1][i])) for i in range(n)]
+    caps = [(f, 1) for f in ladder_fill(bm, ends[1])] + [(f, -1) for f in ladder_fill(bm, list(reversed(ends[0])))]
+    uv = bm.loops.layers.uv.new("UVMap")
+    # (the side: round it across, along it from the front end to the back; the game's picture is drawn that way)
+    for i, f in enumerate(side):
+        f.material_index = 0
+        for lp, (k, t) in zip(f.loops, ((i, 0), (i + 1, 0), (i + 1, 1), (i, 1))):
+            lp[uv].uv = (k / n, t)
+    # (each end: the coin's face across it, its top up, read from outside that end)
+    for f, e in caps:
+        f.material_index = 1
+        for lp in f.loops:
+            x3, y3 = lp.vert.co.x - cx, lp.vert.co.z - cy_
+            lp[uv].uv = (0.5 + e * x3 / (2 * r), 0.5 - y3 / (2 * r))
+    me = bpy.data.meshes.new(f"RegCoinRoll{kind}")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(f"RegCoinRoll{kind}", me)
+    bpy.context.collection.objects.link(o)
+    me.materials.append(pbr(f"RegRollWrap{kind}", (0.9, 0.9, 0.9), rough=0.4))
+    me.materials.append(pbr(f"RegRollEnd{kind}", (0.85, 0.85, 0.85), rough=0.3, metal=0.9))
+    smooth_angle(o, 40)
+    drawer_parts.append(o)
+# the notes' weights: a steel arm hinged at the back wall, lying forward onto the notes, a grey roller at its end (the 2000s' lying level on
+# its coin rolls, hinged at the back wall's top)
 for i in range(4):
     cx = INS_W / 2 - (i + 0.5) * INS_W / 4
-    hinge = Vector(P(cx, INS_Y + 0.024, INS_Z1 - 0.008))
-    roller = Vector(P(cx, INS_Y + 0.018, BILL_Z0 + 0.04))
+    lift = ROLL_TOP + 0.0047 if i == 2 else None
+    hinge = Vector(P(cx, lift or INS_Y + 0.024, INS_Z1 - 0.008))
+    roller = Vector(P(cx, lift or INS_Y + 0.018, BILL_Z0 + 0.04))
     mid = (hinge + roller) / 2
     d = roller - hinge
     arm = cyl(f"RegBillArm{i}", 0.0016, d.length, tuple(mid), M["steel"], verts=8)
@@ -449,30 +492,6 @@ for i in range(4):
     drawer_parts.append(arm)
     drawer_parts.append(cyl(f"RegBillHinge{i}", 0.0028, 0.03, tuple(hinge), M["steel"], rot=(0, math.pi / 2, 0), verts=12))
     drawer_parts.append(cyl(f"RegBillRoller{i}", 0.0042, 0.044, tuple(roller), M["rubber"] if "rubber" in M else M["dark"], rot=(0, math.pi / 2, 0), verts=16))
-# (in the 2000 compartment, as most shops do: rolls of coins in their bank paper)
-# (棒金: fifty coins wrapped tight in the bank's paper, its ends crimped over so the coin shows in the middle; the paper printed in the
-# coin's colour with a pale band, its value and count along it)
-for k, (col, metal, label) in enumerate((((0.93, 0.62, 0.62), (0.82, 0.83, 0.84), "百円 50枚"), ((0.95, 0.82, 0.58), (0.72, 0.42, 0.24), "拾円 50枚"))):
-    cx = INS_W / 2 - 2.5 * INS_W / 4 + (k - 0.5) * 0.026
-    R_, L_ = 0.0088, 0.088
-    cy_, cz_ = INS_Y + 0.004 + R_, 0.07
-    roll = cyl(f"RegCoinRoll{k}", R_, L_, P(cx, cy_, cz_), pbr(f"RegRollPaper{k}", col, rough=0.75), rot=(math.pi / 2, 0, 0), verts=20)
-    drawer_parts.append(roll)
-    # (the pale band round its middle, and two fine printed rules)
-    drawer_parts.append(cyl(f"RegRollBand{k}", R_ + 0.0002, L_ * 0.42, P(cx, cy_, cz_), pbr(f"RegRollBand{k}", (0.97, 0.95, 0.9), rough=0.8), rot=(math.pi / 2, 0, 0), verts=20))
-    for dz in (-L_ * 0.22, L_ * 0.22):
-        drawer_parts.append(cyl(f"RegRollRule{k}{int(dz * 1000)}", R_ + 0.0003, 0.0012, P(cx, cy_, cz_ + dz), M["ink"], rot=(math.pi / 2, 0, 0), verts=20))
-    # (each end: the paper crimped over the rim, the coin's face showing inside it)
-    for sd in (-1, 1):
-        ez = cz_ + sd * (L_ / 2 + 0.0004)
-        drawer_parts.append(cyl(f"RegRollCoin{k}{sd}", R_ * 0.62, 0.001, P(cx, cy_, ez), pbr(f"RegRollMetal{k}", metal, rough=0.3, metal=0.9), rot=(math.pi / 2, 0, 0), verts=20))
-        bpy.ops.mesh.primitive_torus_add(major_radius=R_ * 0.8, minor_radius=R_ * 0.22, major_segments=24, minor_segments=6, location=P(cx, cy_, ez - sd * 0.0012), rotation=(math.pi / 2, 0, 0))
-        cr = bpy.context.view_layer.objects.active
-        cr.name = f"RegRollCrimp{k}{sd}"
-        cr.data.materials.append(bpy.data.materials[f"RegRollPaper{k}"])
-        drawer_parts.append(cr)
-    # (its value and count printed along it, on the band, facing up)
-    drawer_parts.append(text(f"RegRollLabel{k}", label, 0.0055, M["ink"], P(cx, cy_ + R_ + 0.0003, cz_), (0, 0, math.pi / 2), fit=L_ * 0.4))
 
 # =====================================================================
 # Assemble: RegBody (fixed) and RegDrawer under the root

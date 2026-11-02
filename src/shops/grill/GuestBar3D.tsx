@@ -1086,17 +1086,20 @@ const REG_CABLES = {
 /** the register's size in the till, its body and its working parts (drawer, keys, displays) alike: as it's modelled, at one with the tablet,
  * printer and card reader beside it (it had been 1.4 times larger, out of scale with them) */
 const REG_SC = 1
-/** where each kind of note lies in the drawer's insert, along its width (in the till's own units, from the insert's middle) */
 /**
- * The insert's layout (blender/register.py's RegInsert), in the till's own units from the insert's middle: the notes' compartments along the
- * back (the 2000 one holds coin rolls), the six coin cups along the front, and how many coins lie in each
+ * The insert's layout (blender/register.py's RegInsert), in the register's own units, in the drawer's frame: the middles of the notes'
+ * compartments along the back (the 2000 one holds coin rolls) and of the six coin cups along the front, their floors' heights, the cups'
+ * floors' slope, and how many coins lie in each. The money in them is drawn at the till's own scale (1 / REG_SC). When the register was
+ * brought down from 1.4 times its model's size these stayed in the old, 1.4 times larger units: the outer cups' coins lay outside the drawer
+ * on either side and the 10000s stuck out over it (the owner: "the till's burst")
  */
-const NOTE_X: Record<Note, number> = { 10000: 0.1754, 5000: 0.0585, 1000: -0.1754 }
-const NOTE_Z = 0.108, NOTE_Y = 0.0049
-const COIN_CUPS: [CoinKind, number, number][] = [[500, 0.1949, 14], [100, 0.1169, 24], [50, 0.039, 15], [10, -0.039, 26], [5, -0.1169, 11], [1, -0.1949, 18]]
-const COIN_Z = -0.0966, COIN_Y = 0.0035
-/** a point in the insert, in the till's frame, with the drawer out as far as `open` */
-const insertToTill = (ix: number, iy: number, iz: number, top: number, open: number) => new THREE.Vector3(0.05 - ix, top + 0.0245 + iy, 0.074 - iz + 0.336 * open)
+const NOTE_X: Record<Note, number> = { 10000: 0.1253, 5000: 0.0418, 1000: -0.1253 }
+const NOTE_Z = 0.067, NOTE_Y = 0.021
+const COIN_CUPS: [CoinKind, number, number][] = [[500, 0.1392, 14], [100, 0.0835, 24], [50, 0.0278, 15], [10, -0.0278, 26], [5, -0.0835, 11], [1, -0.1392, 18]]
+const COIN_Z = -0.079, COIN_Y = 0.02, COIN_TILT = -0.12
+/** a point in the insert (the drawer's frame), in the till's frame, with the drawer out as far as `open` */
+const insertToTill = (ix: number, iy: number, iz: number, top: number, open: number) =>
+  new THREE.Vector3(0.05 - ix * REG_SC, top + iy * REG_SC, 0.06 - (iz - 0.24 * open) * REG_SC)
 /** where the coin tray's middle is, and how far down the till's top its dish is, in the till's frame */
 const TRAY_AT = { x: 0.0, z: -0.4, y: 0.0215 }
 const smooth = (e0: number, e1: number, x: number) => THREE.MathUtils.smoothstep(x, e0, e1)
@@ -1219,7 +1222,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
         const t = smooth(0.54, 0.64, k)
         const kind = pay.tender[0] ?? 1000
         // (its slot in the drawer, in the till's frame: the drawer's own place, less how far out it's drawn)
-        const slot = insertToTill(NOTE_X[kind], NOTE_Y + 0.016, NOTE_Z, top, open.current)
+        const slot = insertToTill(NOTE_X[kind], NOTE_Y + 0.011, NOTE_Z, top, open.current)
         const tray = new THREE.Vector3(TRAY_AT.x, top + TRAY_AT.y + (1 - smooth(0.38, 0.44, k)) * 0.1, TRAY_AT.z)
         tg.position.lerpVectors(tray, slot, t)
         tg.position.y += Math.sin(Math.PI * t) * 0.07
@@ -1232,7 +1235,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
       cg.visible = k >= 0.64 && k < 0.95
       if (cg.visible) {
         const t = smooth(0.64, 0.74, k)
-        const from = insertToTill(COIN_CUPS[1][1], COIN_Y + 0.01, COIN_Z, top, open.current)
+        const from = insertToTill(COIN_CUPS[1][1], COIN_Y + 0.007, COIN_Z, top, open.current)
         const to = new THREE.Vector3(TRAY_AT.x, top + TRAY_AT.y, TRAY_AT.z)
         cg.position.lerpVectors(from, to, t)
         cg.position.y += Math.sin(Math.PI * t) * 0.06 + smooth(0.9, 0.95, k) * 0.12
@@ -1294,26 +1297,28 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
         }} onPointerOut={(e) => { setDrawerHover(false, e.nativeEvent); setDrawerKeyHover(false, e.nativeEvent) }}>
           {/* (its front and its tray, from the model) */}
           <RegisterDrawer />
-          {/* (the insert, laid out in the till's own units: the group is scaled back by the register's size) */}
-          <group ref={cash} visible={false} position={[0, 0.0175, -0.01]} scale={1 / REG_SC}>
+          {/* (the insert: each compartment and cup where the model has it, the money in it at the till's own scale) */}
+          <group ref={cash} visible={false}>
             {/* the money in the insert (the insert itself is the model's): the notes face up in their compartments under the weights, a stray one
-                askew on top; the coins heaped loose in their cups */}
+                askew on top; the coins heaped loose in their cups, on their floors' slope */}
             {/* (as many as there are, a stack's worth at most; clicked, the owner takes them) */}
             {(Object.keys(NOTE_X).map(Number) as Note[]).map((kind, i) => {
               const n = Math.min(inDrawer[kind], 12)
               return (
                 <group key={kind} position={[NOTE_X[kind], NOTE_Y, NOTE_Z]} onClick={(e) => takeCash(e, kind)} {...cashTip(kind)}>
-                  {n > 1 && <NoteStack kind={kind} n={n - 1} rotation-y={Math.PI / 2 + (i - 1) * 0.012} />}
-                  {n > 0 && <NoteStack kind={kind} n={1} position={[0.002 * (i - 1), 0.0012 * (n - 1) + 0.001, -0.004]} rotation-y={Math.PI / 2 + 0.05 - i * 0.03} />}
+                  <group scale={1 / REG_SC}>
+                    {n > 1 && <NoteStack kind={kind} n={n - 1} rotation-y={Math.PI / 2 + (i - 1) * 0.012} />}
+                    {n > 0 && <NoteStack kind={kind} n={1} position={[0.002 * (i - 1), 0.0012 * (n - 1) + 0.001, -0.004]} rotation-y={Math.PI / 2 + 0.05 - i * 0.03} />}
+                  </group>
                   {/* (a touch area over the compartment, so even an empty one can be pointed at) */}
-                  <mesh visible={false} position-y={0.01}><boxGeometry args={[0.1, 0.03, 0.16]} /></mesh>
+                  <mesh visible={false} position-y={0.007}><boxGeometry args={[0.072, 0.021, 0.114]} /></mesh>
                 </group>
               )
             })}
             {COIN_CUPS.map(([kind, x]) => (
-              <group key={kind} position={[x, COIN_Y, COIN_Z]} onClick={(e) => takeCash(e, kind)} {...cashTip(kind)}>
-                {inDrawer[kind] > 0 && <CoinPile kind={kind} n={Math.min(inDrawer[kind], 40)} w={0.056} d={0.15} seed={kind} />}
-                <mesh visible={false} position-y={0.008}><boxGeometry args={[0.06, 0.02, 0.15]} /></mesh>
+              <group key={kind} position={[x, COIN_Y, COIN_Z]} rotation-x={COIN_TILT} onClick={(e) => takeCash(e, kind)} {...cashTip(kind)}>
+                {inDrawer[kind] > 0 && <CoinPile kind={kind} n={Math.min(inDrawer[kind], 40)} w={0.04 * REG_SC} d={0.11 * REG_SC} seed={kind} scale={1 / REG_SC} />}
+                <mesh visible={false} position-y={0.006}><boxGeometry args={[0.044, 0.014, 0.12]} /></mesh>
               </group>
             ))}
           </group>

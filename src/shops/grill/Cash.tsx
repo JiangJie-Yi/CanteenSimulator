@@ -397,6 +397,54 @@ const coinMats = (kind: CoinKind) => {
   coinMatsMade.set(kind, out)
   return out
 }
+/** each bank's colour for a roll of each coin, its paper printed in it */
+const ROLL_INK: Record<CoinKind, string> = { 1: '#2f5ea6', 5: '#8a6a1e', 10: '#2e7d47', 50: '#c4661c', 100: '#c4342e', 500: '#6b3f8f' }
+const rollMatsMade = new Map<CoinKind, { wrap: THREE.Material; end: THREE.Material }>()
+/**
+ * A roll of fifty coins (棒金), as the bank hands them out (the drawer's coin rolls: blender/register.py's RegCoinRoll, its side and its ends
+ * each a material named for the coin). Along its side, under the clear film at either end, the coins' edges, each a lit band between dark
+ * seams (the 100s and 500s milled, fine ticks across), the film's gloss along its top; round its middle the bank's white paper band, a
+ * stripe of the coin's colour at either edge, its value and count printed along it, twice round. Its ends the coin's face. A second picture
+ * says what's metal and how smooth: the coins smooth metal, the paper rough and not
+ */
+export const coinRollMats = (kind: CoinKind) => {
+  const had = rollMatsMade.get(kind)
+  if (had) return had
+  const c = COINS[kind], ink = ROLL_INK[kind]
+  const W = 256, H = 320, RIB = H / 50, B0 = Math.round(H * 0.17), B1 = Math.round(H * 0.83)
+  const font = '"Noto Sans JP", "Yu Gothic", "Microsoft JhengHei", sans-serif'
+  const map = tex(W, H, (g) => {
+    for (let j = 0; j < 50; j++) {
+      const y = j * RIB
+      g.fillStyle = c.edge; g.fillRect(0, y, W, RIB)
+      g.fillStyle = c.base; g.fillRect(0, y + 1, W, RIB - 2)
+      g.fillStyle = 'rgba(255,255,255,0.4)'; g.fillRect(0, y + 1.4, W, 1)
+      if (kind === 100 || kind === 500) { g.fillStyle = 'rgba(0,0,0,0.22)'; for (let x = 0; x < W; x += 3) g.fillRect(x, y + 1, 1, RIB - 2) }
+    }
+    const gloss = g.createLinearGradient(0, 0, W, 0)
+    gloss.addColorStop(0.12, 'rgba(255,255,255,0)'); gloss.addColorStop(0.22, 'rgba(255,255,255,0.32)'); gloss.addColorStop(0.32, 'rgba(255,255,255,0)')
+    g.fillStyle = gloss; g.fillRect(0, 0, W, H)
+    g.fillStyle = '#f6f1e5'; g.fillRect(0, B0, W, B1 - B0)
+    g.fillStyle = ink
+    g.fillRect(0, B0, W, 9); g.fillRect(0, B1 - 9, W, 9)
+    g.fillRect(0, B0 + 13, W, 2); g.fillRect(0, B1 - 15, W, 2)
+    g.textAlign = 'center'; g.textBaseline = 'middle'
+    for (const u of [0.25, 0.75]) {
+      g.save(); g.translate(u * W, (B0 + B1) / 2); g.rotate(-Math.PI / 2)
+      g.font = `bold 40px ${font}`; g.fillText(`${kind}円`, -30, 0)
+      g.font = `bold 26px ${font}`; g.fillText('50枚', 58, 2)
+      g.restore()
+    }
+  })
+  const mr = tex(W, H, (g) => {
+    g.fillStyle = 'rgb(0,90,230)'; g.fillRect(0, 0, W, H)
+    g.fillStyle = 'rgb(0,200,0)'; g.fillRect(0, B0, W, B1 - B0)
+  })
+  mr.colorSpace = THREE.NoColorSpace
+  const out = { wrap: new THREE.MeshStandardMaterial({ map, roughnessMap: mr, metalnessMap: mr, roughness: 1, metalness: 1, envMapIntensity: 1.1 }), end: coinMats(kind)[1] }
+  rollMatsMade.set(kind, out)
+  return out
+}
 const NOTE_GEO = new THREE.BoxGeometry(NOTE_W, 1, NOTE_D)
 const COIN_GEO: Partial<Record<CoinKind, THREE.CylinderGeometry>> = {}
 const coinGeo = (kind: CoinKind) => (COIN_GEO[kind] ??= new THREE.CylinderGeometry(COINS[kind].r, COINS[kind].r, 1, 28))
