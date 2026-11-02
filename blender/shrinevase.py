@@ -82,9 +82,11 @@ def fin(o, name, mat, smooth=True):
 
 
 # ---- the vase: turned from a profile (radius, height), its foot, belly, shoulder, slender neck and flared lip; hollow at the mouth
-prof = [(0.0, 0.0), (0.024, 0.0), (0.026, 0.004), (0.03, 0.018), (0.034, 0.04), (0.033, 0.058), (0.026, 0.07), (0.016, 0.08),
-        (0.012, 0.092), (0.012, 0.104), (0.015, 0.112), (0.018, 0.116), (0.0165, 0.117), (0.011, 0.112), (0.0, 0.11)]
-seg = 40
+# (no points on the axis: its foot and the floor down its mouth are closed flat across their rings below, laddered on export; they were fans
+# of forty triangles into a point (the owner's low-poly rule). 24 round)
+prof = [(0.024, 0.0), (0.026, 0.004), (0.03, 0.018), (0.034, 0.04), (0.033, 0.058), (0.026, 0.07), (0.016, 0.08),
+        (0.012, 0.092), (0.012, 0.104), (0.015, 0.112), (0.018, 0.116), (0.0165, 0.117), (0.011, 0.112)]
+seg = 24
 import bmesh  # noqa: E402
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
@@ -96,6 +98,11 @@ for i in range(len(rings) - 1):
         f = bm.faces.new((rings[i][j], rings[i][j2], rings[i + 1][j2], rings[i + 1][j]))
         for lp, (uu, vv) in zip(f.loops, ((j / seg, prof[i][1]), ((j + 1) / seg, prof[i][1]), ((j + 1) / seg, prof[i + 1][1]), (j / seg, prof[i + 1][1]))):
             lp[uvl].uv = (uu, vv / H)
+for ring in (rings[0], rings[-1]):
+    f = bm.faces.new(ring)
+    for lp in f.loops:
+        co = lp.vert.co
+        lp[uvl].uv = (0.5 + co.x / 0.07, 0.5 - co.y / 0.07)
 bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 me = bpy.data.meshes.new("Vase")
@@ -114,8 +121,9 @@ def leaf_mesh(bend=0.0, twist=0.0, L=0.034, W=0.013):
     its length by `bend` and turned a little about it by `twist`, as a leaf hangs off its stalk"""
     b = bmesh.new()
     cols = []
-    for i in range(8):
-        t = i / 7
+    # (five rows along it: eight made a leaf of 4 cm 84 triangles, and there are some sixty to a vase)
+    for i in range(5):
+        t = i / 4
         w = W / 2 * math.sin(math.pi * t) ** 0.8
         row = []
         for s_ in (-1, 0, 1):
@@ -125,7 +133,7 @@ def leaf_mesh(bend=0.0, twist=0.0, L=0.034, W=0.013):
             x, z = x * math.cos(a) - z * math.sin(a), x * math.sin(a) + z * math.cos(a)
             row.append(b.verts.new((x, t * L * (1 - 0.25 * bend * t), z - bend * L * t * t)))
         cols.append(row)
-    for i in range(7):
+    for i in range(4):
         for k in range(2):
             b.faces.new((cols[i][k], cols[i][k + 1], cols[i + 1][k + 1], cols[i + 1][k]))
     me_ = bpy.data.meshes.new("leaf")
@@ -292,8 +300,8 @@ def bloom(name, at, face, rings, mat, heart=None, extra=None, with_stalk=True):
         ph = random.uniform(0, 1)
         for i in range(n):
             petal(b, 2 * math.pi * (i + ph) / n, r0, L * random.uniform(0.88, 1.12), W * random.uniform(0.9, 1.1),
-                  elev + random.uniform(-0.12, 0.12), curl * random.uniform(0.8, 1.2), cup, shape, nt=5 if shape == "narrow" else 7,
-                  ns=3 if shape == "narrow" else 5)
+                  elev + random.uniform(-0.12, 0.12), curl * random.uniform(0.8, 1.2), cup, shape, nt=4 if shape == "narrow" else 5,
+                  ns=3)
     me_ = bpy.data.meshes.new(name); b.to_mesh(me_); b.free()
     o = bpy.data.objects.new(name, me_); bpy.context.collection.objects.link(o)
     q = Vector(face).normalized().to_track_quat("Z", "Y")
@@ -302,7 +310,7 @@ def bloom(name, at, face, rings, mat, heart=None, extra=None, with_stalk=True):
     fin(o, name, mat)
     if heart:
         hm, hr, hz = heart
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=hr, segments=12, ring_count=7, location=at + q @ Vector((0, 0, hz)))
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=hr, subdivisions=1, location=at + q @ Vector((0, 0, hz)))
         hb = active(); hb.scale = (1, 1, 0.65); hb.rotation_mode = "QUATERNION"; hb.rotation_quaternion = q
         fin(hb, name + "Heart", hm)
     if extra:
@@ -443,7 +451,7 @@ for i in range(NBUD):
     a_ = random.uniform(0, 2 * math.pi)
     rr = random.uniform(0.04, 0.065)
     at = Vector(P(math.cos(a_) * rr, random.uniform(0.15, 0.18), math.sin(a_) * rr))
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0042 if VARIANT else 0.0035, segments=10, ring_count=6, location=at)
+    bpy.ops.mesh.primitive_ico_sphere_add(radius=0.0042 if VARIANT else 0.0035, subdivisions=1, location=at)
     bd = active(); bd.scale = (1, 1, 1.4)
     fin(bd, f"VaseBud{i}", M[BUDMAT[i % len(BUDMAT)]])
     stalk(f"VaseBud{i}", at)
