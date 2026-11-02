@@ -187,9 +187,16 @@ export const tipOver = (title: string, hint: string) => ({
 export const WC_W = 0.82
 export const WC_SLIDE = WC_W - 0.1
 /**
+ * Each toilet's rooms behind its door (the owner's: the door slid open shows the washstand and its mirror first; the toilet's round the
+ * corner): the washroom straight in, D deep from the wall to its back wall, where the washstand stands; and off its side, away from the other
+ * toilet, the toilet's own little room, running E on along the wall, from X0 back (clear of the wall's thickness) to that same back wall.
+ * In the room's own frame: x from the door's wall back, z across the door from its middle.
+ */
+export const WC_ROOM = { D: 0.9, E: 0.84, X0: 0.24 }
+/**
  * The two toilets, the men's and the women's, side by side in the side counter's wall where it runs into the corner:
- * each one's door along that counter (from its middle), the spot on the floor before it, and one inside. With only the
- * one counter there are none.
+ * each one's door along that counter (from its middle), the spot on the floor before it, and inside: just in at the door, at the
+ * washstand, the turn round the corner and before the toilet. With only the one counter there are none.
  */
 export function toiletsOf(cs: Counter[]) {
   if (cs.length < 2) return null
@@ -201,8 +208,14 @@ export function toiletsOf(cs: Counter[]) {
   const one = (k: number) => {
     const z = door + k * (WC_W / 2 + 0.06)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
-    // (inside: just past the door, on the duckboard, clear of the toilet: once in, the door shuts on them)
-    return { z, front: at(farOf(c) + 0.45), aisle: at(-AISLE), inside: at(farOf(c) + 0.02) }
+    // (a spot in the rooms, in their own frame: x back from the wall, across from the door's middle; the toilet's room is on the side `k`)
+    const room = (x: number, across: number) => c.at.clone().addScaledVector(c.along, z + k * across).addScaledVector(c.lay, farOf(c) - x)
+    const { D, X0, E } = WC_ROOM
+    return { z, front: at(farOf(c) + 0.45), aisle: at(-AISLE),
+      // (just in at the door; before the washstand, facing it; the turn toward the toilet's room; before the toilet, round the corner)
+      inside: room(0.12, 0), basin: room(D - 0.6, 0), turn: room(0.34, WC_W / 2 - 0.11), stall: room((X0 + D) / 2 - 0.02, WC_W / 2 + E * 0.13),
+      // (the way they face at the washstand: into the room, away from the door)
+      basinYaw: Math.atan2(-c.lay.x, -c.lay.z) }
   }
   return { door, m: one(-1), f: one(1) }
 }
@@ -234,22 +247,22 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 /** what's in it, and what each costs (NT$) */
 export const DRINKS = [
   // bottles
-  { id: 'beer', zh: '瓶裝啤酒', ja: '瓶ビール', price: 120, color: '#7a4a1a', cap: '#d4b04a', glass: false, shape: 'bottle', label: ['#c8a040', '#7a1a12', '生ビール'] },
-  { id: 'sake', zh: '清酒', ja: '日本酒', price: 150, color: '#e8eef0', cap: '#c4302a', glass: true, shape: 'bottle', label: ['#f4efe2', '#b8261c', '清酒'] },
-  { id: 'oolong', zh: '烏龍茶', ja: 'ウーロン茶', price: 50, color: '#9a5a1a', cap: '#2a6a3a', glass: false, shape: 'bottle', label: ['#3a6a3a', '#f2e6c8', '烏龍茶'] },
-  { id: 'ramune', zh: '彈珠汽水', ja: 'ラムネ', price: 60, color: '#8ad0e8', cap: '#2a6ab0', glass: true, shape: 'bottle', label: ['#2a6ab0', '#ffffff', 'ラムネ'] },
+  { id: 'beer', zh: '瓶裝啤酒', ja: '瓶ビール', en: 'Bottled beer', price: 120, color: '#7a4a1a', cap: '#d4b04a', glass: false, shape: 'bottle', label: ['#c8a040', '#7a1a12', '生ビール'] },
+  { id: 'sake', zh: '清酒', ja: '日本酒', en: 'Sake', price: 150, color: '#e8eef0', cap: '#c4302a', glass: true, shape: 'bottle', label: ['#f4efe2', '#b8261c', '清酒'] },
+  { id: 'oolong', zh: '烏龍茶', ja: 'ウーロン茶', en: 'Oolong tea', price: 50, color: '#9a5a1a', cap: '#2a6a3a', glass: false, shape: 'bottle', label: ['#3a6a3a', '#f2e6c8', '烏龍茶'] },
+  { id: 'ramune', zh: '彈珠汽水', ja: 'ラムネ', en: 'Ramune', price: 60, color: '#8ad0e8', cap: '#2a6ab0', glass: true, shape: 'bottle', label: ['#2a6ab0', '#ffffff', 'ラムネ'] },
   // cans
-  { id: 'beerCan', zh: '罐裝啤酒', ja: '缶ビール', price: 100, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#e8d070', '#b8261c', 'ビール'] },
-  { id: 'highball', zh: '調酒', ja: 'ハイボール', price: 110, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#1c2a4a', '#e8c45a', 'ハイボール'] },
-  { id: 'coffee', zh: '罐裝咖啡', ja: '缶コーヒー', price: 45, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#4a2a18', '#f2e2c0', '珈琲'] },
-  { id: 'greenTea', zh: '綠茶', ja: '緑茶', price: 40, color: '#9bb85a', cap: '#2f7a3a', glass: false, shape: 'can', label: ['#4a8a3a', '#ffffff', 'お茶'] },
-  { id: 'cola', zh: '可樂', ja: 'コーラ', price: 40, color: '#4a2414', cap: '#c4302a', glass: false, shape: 'can', label: ['#b8201c', '#ffffff', 'コーラ'] },
+  { id: 'beerCan', zh: '罐裝啤酒', ja: '缶ビール', en: 'Canned beer', price: 100, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#e8d070', '#b8261c', 'ビール'] },
+  { id: 'highball', zh: '調酒', ja: 'ハイボール', en: 'Highball', price: 110, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#1c2a4a', '#e8c45a', 'ハイボール'] },
+  { id: 'coffee', zh: '罐裝咖啡', ja: '缶コーヒー', en: 'Canned coffee', price: 45, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#4a2a18', '#f2e2c0', '珈琲'] },
+  { id: 'greenTea', zh: '綠茶', ja: '緑茶', en: 'Green tea', price: 40, color: '#9bb85a', cap: '#2f7a3a', glass: false, shape: 'can', label: ['#4a8a3a', '#ffffff', 'お茶'] },
+  { id: 'cola', zh: '可樂', ja: 'コーラ', en: 'Cola', price: 40, color: '#4a2414', cap: '#c4302a', glass: false, shape: 'can', label: ['#b8201c', '#ffffff', 'コーラ'] },
   // the little bottles of cultured milk drink
-  { id: 'yakult', zh: '養樂多', ja: '乳酸菌飲料', price: 20, color: '#f2ece0', cap: '#c4302a', glass: false, shape: 'small', label: ['#f2ece0', '#c4302a', '乳酸菌'] },
+  { id: 'yakult', zh: '養樂多', ja: '乳酸菌飲料', en: 'Cultured milk', price: 20, color: '#f2ece0', cap: '#c4302a', glass: false, shape: 'small', label: ['#f2ece0', '#c4302a', '乳酸菌'] },
   // a sports drink in its plastic bottle, the glass milk bottle with its paper cap, a chuhai in a can
-  { id: 'sports', zh: '運動飲料', ja: 'スポーツドリンク', price: 50, color: '#a8d8ee', cap: '#1f6fb8', glass: true, shape: 'bottle', label: ['#f4f9fc', '#1f6fb8', 'スポーツ'] },
-  { id: 'milk', zh: '牛奶', ja: '牛乳', price: 45, color: '#f6f2e6', cap: '#f4efe2', glass: true, shape: 'bottle', label: ['#f4f0e4', '#3a6ab0', '牛乳'] },
-  { id: 'chuhai', zh: '酎沙瓦', ja: 'チューハイ', price: 90, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#f6b8c4', '#ffffff', 'チューハイ'] },
+  { id: 'sports', zh: '運動飲料', ja: 'スポーツドリンク', en: 'Sports drink', price: 50, color: '#a8d8ee', cap: '#1f6fb8', glass: true, shape: 'bottle', label: ['#f4f9fc', '#1f6fb8', 'スポーツ'] },
+  { id: 'milk', zh: '牛奶', ja: '牛乳', en: 'Milk', price: 45, color: '#f6f2e6', cap: '#f4efe2', glass: true, shape: 'bottle', label: ['#f4f0e4', '#3a6ab0', '牛乳'] },
+  { id: 'chuhai', zh: '酎沙瓦', ja: 'チューハイ', en: 'Chu-hi', price: 90, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#f6b8c4', '#ffffff', 'チューハイ'] },
 ] as const
 export type DrinkId = (typeof DRINKS)[number]['id']
 /**
@@ -433,9 +446,11 @@ export const drinkFor = (kind: string, id: number): DrinkId => {
 }
 
 /** each toilet: how many are going through its door just now and whether someone's inside, locked (GuestBar3D); whether the player's
- * opened it; its upkeep (game/restroom: how clean, how much paper); and when it last flushed, was scrubbed, played its Otohime, or was
- * knocked at (performance.now() ms, for the room's animations and sounds) */
-const wcOf = () => ({ passing: 0, inside: 0, open: false, room: freshRoom(), flushAt: -1e9, scrubAt: -1e9, otoAt: -1e9, knockAt: -1e9, rollAt: -1e9, washAt: -1e9 })
+ * opened it; its upkeep (game/restroom: how clean, how much paper); whether its washstand's tap's been turned on by hand (metered by the
+ * minute, App); and when it last flushed, was scrubbed, played its Otohime, was knocked at, or a guest last washed their hands at its
+ * washstand (performance.now() ms, for the room's animations and sounds) */
+const wcOf = () => ({ passing: 0, inside: 0, open: false, room: freshRoom(), tap: false, flushAt: -1e9, scrubAt: -1e9, otoAt: -1e9, knockAt: -1e9,
+  rollAt: -1e9, washAt: -1e9, handAt: -1e9 })
 export const TOILETS = { m: wcOf(), f: wcOf() }
 /** points off the taste of what each guest eats, for what they found in the toilet (Roasting reads it) */
 export const WC_GRUMBLE = new Map<number, number>()

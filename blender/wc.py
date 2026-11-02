@@ -7,9 +7,11 @@
 - wcbits.glb, node "WcBits": the room's small fittings, each its own node, made with its back to a wall at z=0 facing +z: the wall
   remote "WcRemote" (screen, stop, wash and bidet keys), the flush keys "WcFlushKey", the Otohime "WcOtohime" (sakura on its face) and
   its lit ring "WcOtoLed", the walnut paper holder "WcHolder" with the roll "WcRoll" (unit radius, scaled by what's left), its core
-  "WcCore" and the folded point "WcFold"; on the floor the brush pot "WcBrushPot" and brush "WcBrush", and the sanitary bin "WcBin".
-- washstand.glb, node "WcWashstand": a hand-wash counter against the wall (its back +x three): a plank of cedar on two brackets, a round
-  stone vessel sink sat on it, a brass tap from the wall arching over it, a round mirror framed in wood above, a brass towel ring.
+  "WcCore" and the folded point "WcFold"; on the floor the brush pot "WcBrushPot" and brush "WcBrush", and the sanitary bin "WcBin"; the
+  women's sanitary pads "WcPads" (a hinoki wall shelf, a rattan basket of them in pastel wrappers).
+- washstand.glb, node "WcWashstand": the washroom's vanity against its back wall (its back +x three): a hinoki counter on a dark cedar
+  cabinet with sliding lattice doors, a Shigaraki vessel bowl with a brass drain, a soap bottle, a brass wall tap whose cross handle is
+  its own node ("WashTapHandle"), the marks "WashSpoutTip" and "WashBowlFloor" for the game's water, and a round mirror over it.
 
 Run:
     blender -b --factory-startup --python blender/wc.py -- <project path>
@@ -204,7 +206,12 @@ def bits():
          "led": pbr("BitLed", lin("#5ab4ff"), rough=0.3, emit=lin("#5ab4ff"), emit_strength=1.5),
          "pot": pbr("BitPot", lin("#e9e2d2"), rough=0.2, coat=0.6),
          "bristle": pbr("BitBristle", lin("#f4f4f0"), rough=0.7),
-         "bin": pbr("BitBin", lin("#e8d6d2"), rough=0.3, coat=0.4)}
+         "bin": pbr("BitBin", lin("#e8d6d2"), rough=0.3, coat=0.4),
+         "hinoki": pbr("BitHinoki", lin("#dcc096"), rough=0.5),
+         "rattan": pbr("BitRattan", lin("#b98a52"), rough=0.6),
+         "padPink": pbr("BitPadPink", lin("#f4b8ca"), rough=0.45, coat=0.3),
+         "padWhite": pbr("BitPadWhite", lin("#f8f4f1"), rough=0.45, coat=0.3),
+         "padLilac": pbr("BitPadLilac", lin("#cbb8e6"), rough=0.45, coat=0.3)}
     groups = {}
 
     def node(name):
@@ -287,6 +294,19 @@ def bits():
     add("WcBin", lathe_oval("BinBody", [(0.0, 0.0), (0.075, 0.0), (0.08, 0.01), (0.078, 0.23), (0.0, 0.23)], 1.0, 0.7, 32, 0, 0), "BinBody", M["bin"])
     add("WcBin", lathe_oval("BinLid", [(0.0, 0.23), (0.082, 0.23), (0.084, 0.24), (0.06, 0.255), (0.0, 0.258)], 1.0, 0.7, 32, 0, 0), "BinLid", M["ivory"])
     add("WcBin", rbox("BinPedal", (0.05, 0.012, 0.03), (0.0, 0.012, 0.065), 0.004, 2), "BinPedal", M["chrome"])
+    # ---- the women's: sanitary pads, free to take (the owner's: 女廁有提供衛生棉): a little hinoki shelf on the wall (its origin where the
+    # shelf's top meets the wall) on two brackets, a woven rattan basket on it, the pads in it stood on end like cards, each in its own pastel
+    # wrapper, leaning a little this way and that
+    node("WcPads")
+    add("WcPads", rbox("PadShelf", (0.22, 0.014, 0.1), (0, -0.007, 0.05), 0.003, 2), "PadShelf", M["hinoki"])
+    for sd in (-1, 1):
+        add("WcPads", rbox(f"PadBracket{sd}", (0.012, 0.06, 0.07), (sd * 0.085, -0.044, 0.035), 0.002, 1), f"PadBracket{sd}", M["hinoki"])
+    add("WcPads", lathe_oval("PadBasket", [(0.0, 0.0), (0.05, 0.0), (0.054, 0.004), (0.057, 0.048), (0.053, 0.05), (0.05, 0.01), (0.0, 0.01)],
+                             1.45, 0.8, 32, 0, 0.05), "PadBasket", M["rattan"])
+    for k, (c, lean) in enumerate((("padPink", -0.12), ("padWhite", -0.05), ("padLilac", 0.02), ("padPink", 0.06), ("padWhite", 0.1), ("padLilac", 0.16))):
+        o = rbox(f"Pad{k}", (0.013, 0.064, 0.05), (-0.052 + k * 0.021, 0.042, 0.05), 0.005, 2)
+        o.rotation_euler = (0, lean, 0)
+        add("WcPads", o, f"Pad{k}", M[c])
     allp = []
     for g, ps in groups.items():
         allp += ps + [bpy.data.objects[g]]
@@ -298,52 +318,234 @@ def bits():
     print("BITS_DONE", sum(len(o.data.polygons) for o in allp if o.type == "MESH"))
 
 
+def box_uv(o, k, up=False):
+    """box-projected UVs, `k` repeats a metre, the picture's u (its grain) along the piece's length: across the stand (three z) unless `up`
+    (along three y: for what stands upright, the slats and the doors' stiles)"""
+    me = o.data
+    if not me.uv_layers:
+        me.uv_layers.new()
+    uv = me.uv_layers.active.data
+    for f in me.polygons:
+        n = f.normal
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        for li in f.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            tx, ty, tz = co.x, co.z, -co.y
+            if ax == 2:
+                a, b = tz, tx
+            elif ax == 0:
+                a, b = tz, ty
+            else:
+                a, b = tx, ty
+            if up and ax != 2:
+                a, b = b, a
+            uv[li].uv = (a * k, b * k)
+    return o
+
+
+def lathe_uv(name, prof, segs=48, cx=0.0, cz=0.0):
+    """a turned piece with its picture on it: u round it, v along its profile by length (0 at its first point, 1 at its last); a profile that
+    starts or ends on the axis (r 0) closes there on one vertex"""
+    L = [0.0]
+    for (r0, y0), (r1, y1) in zip(prof, prof[1:]):
+        L.append(L[-1] + math.hypot(r1 - r0, y1 - y0))
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    rings = []
+    for (r, y) in prof:
+        if r < 1e-6:
+            pole = bm.verts.new(P(cx, y, cz))
+            rings.append([pole] * segs)
+        else:
+            rings.append([bm.verts.new(P(cx + r * math.cos(2 * math.pi * j / segs), y, cz + r * math.sin(2 * math.pi * j / segs))) for j in range(segs)])
+    for i in range(len(prof) - 1):
+        for j in range(segs):
+            j2 = (j + 1) % segs
+            quad = [(rings[i][j], j, i), (rings[i][j2], j + 1, i), (rings[i + 1][j2], j + 1, i + 1), (rings[i + 1][j], j, i + 1)]
+            seen, vs = set(), []
+            for q in quad:
+                if q[0] not in seen:
+                    seen.add(q[0])
+                    vs.append(q)
+            if len(vs) < 3:
+                continue
+            f = bm.faces.new([q[0] for q in vs])
+            for l, q in zip(f.loops, vs):
+                l[uvl].uv = (q[1] / segs, L[q[2]] / L[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    return o, [x / L[-1] for x in L]
+
+
 def washstand():
+    """the washroom's vanity, the first thing seen as the door's slid open (the owner's): its back to the wall at x=0 (three), facing -x.
+    A thick counter of pale hinoki on a low cabinet of dark cedar, two sliding doors of upright hinoki slats (引き違いの竪格子) on it over a
+    shadowed plinth; on the counter a Shigaraki vessel bowl (warm speckled clay, a glassy green ash glaze run down from its scorched rim and
+    pooled deep in its well, a brass drain), a little celadon soap bottle with a brass pump; a brass wall tap over the bowl (横水栓: its
+    body out of the wall, the cross handle on its bonnet a node of its own, WashTapHandle, its origin on the spindle, for the game to turn;
+    the spout running on and turning down to its mouth over the drain, marked WashSpoutTip; the drain marked WashBowlFloor); over it all a
+    round mirror in a slim black-lacquered frame with a fine brass ring"""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     seed(3)
     N = 256
     u, v = grid01(N)
-    cedar = mix((0.62, 0.4, 0.24), (0.74, 0.5, 0.32), smooth(0.3, 0.9, fbm(N, 3, 40, 4)))
-    cedar = mix(cedar, (0.42, 0.24, 0.12), smooth(0.85, 1.0, np.sin((u * 26 + fbm(N, 3, 3, 3) * 3) * math.pi * 2) * 0.5 + 0.5) * 0.4)
-    stone = mix((0.32, 0.33, 0.34), (0.46, 0.47, 0.48), fbm(N, 30, 30, 4))
-    stone = stone * (1 - 0.15 * (fbm(N, 80, 80, 2) > 0.62))[..., None]
-    M = {"cedar": pbr("WashCedar", (1, 1, 1), tex=image("washcedar", cedar), rough=0.45, coat=0.4),
-         "bracket": pbr("WashBracket", lin("#4a2e1a"), rough=0.5),
-         "stone": pbr("WashStone", (1, 1, 1), tex=image("washstone", stone), rough=0.55),
-         "water": pbr("WashWater", lin("#8ab8c8"), rough=0.05),
-         "brass": pbr("WashBrass", lin("#c9a04a"), rough=0.25, metal=1.0),
-         "mirror": pbr("WashMirror", lin("#c8d8e0"), rough=0.03, metal=1.0),
-         "frame": pbr("WashFrame", lin("#6a4428"), rough=0.5)}
+    # (hinoki: pale and warm, a fine straight grain along u, a few darker growth lines, a faint sheen of figure)
+    hin = mix((0.84, 0.69, 0.48), (0.91, 0.78, 0.58), fbm(N, 3, 24, 4))
+    lines = np.sin((v * 34 + fbm(N, 2, 6, 3) * 2.4) * math.pi * 2) * 0.5 + 0.5
+    hin = mix(hin, (0.66, 0.48, 0.3), smooth(0.86, 1.0, lines) * 0.45)
+    # (the cabinet's cedar, darkened (sumi): the same grain, deep brown)
+    sugi = mix((0.17, 0.11, 0.07), (0.25, 0.165, 0.105), fbm(N, 3, 24, 4))
+    sugi = mix(sugi, (0.09, 0.055, 0.035), smooth(0.84, 1.0, lines) * 0.6)
+    # (the bowl: u round it, v along its profile; where the foot, the rim and the well's floor fall on it is known once it's turned)
+    T = 0.76
+    prof = [(0.0, T), (0.06, T), (0.066, T + 0.005), (0.068, T + 0.014), (0.064, T + 0.018), (0.088, T + 0.026),
+            (0.124, T + 0.05), (0.151, T + 0.083), (0.165, T + 0.112), (0.17, T + 0.129), (0.168, T + 0.136), (0.162, T + 0.138),
+            (0.157, T + 0.133), (0.151, T + 0.115), (0.135, T + 0.084), (0.11, T + 0.058), (0.076, T + 0.042), (0.036, T + 0.035), (0.0, T + 0.033)]
+    bowl, vs = lathe_uv("WashBowl", prof, 56, -0.21, 0)
+    vf, vr = vs[5], vs[10]
+    NB = 512
+    bu, bv = grid01(NB)
+    clay = mix((0.7, 0.42, 0.24), (0.84, 0.57, 0.34), fbm(NB, 10, 6, 4))
+    sp = rng.random((NB, NB))
+    clay = np.where((sp > 0.994)[..., None], np.array((0.95, 0.91, 0.82), np.float32), clay)
+    clay = np.where((sp < 0.004)[..., None], np.array((0.32, 0.19, 0.1), np.float32), clay)
+    # (the glaze's lower edge on the outside: wavering round it, with a few long drips running down nearly to the foot)
+    wav = fbm(NB, 14, 2, 3)[NB // 2]
+    drip = np.zeros(NB, np.float32)
+    for c0, w0, d0 in ((0.07, 0.012, 0.9), (0.21, 0.02, 0.6), (0.37, 0.01, 1.0), (0.52, 0.016, 0.7), (0.66, 0.012, 0.95), (0.83, 0.022, 0.55), (0.93, 0.01, 0.8)):
+        dd = np.minimum(np.abs(bu[0] - c0), 1 - np.abs(bu[0] - c0))
+        drip = np.maximum(drip, d0 * np.exp(-(dd / w0) ** 2))
+    edge = vr - (vr - vf) * (0.42 + 0.22 * wav + 0.5 * drip)
+    out = bv < vr
+    glz = smooth(0.0, 0.012, bv - edge[None, :])
+    # (thick where it ran: a darker, greener bead along the drips' ends and the edge)
+    bead = np.exp(-((bv - edge[None, :]) / 0.012) ** 2)
+    ash = mix((0.5, 0.5, 0.24), (0.34, 0.44, 0.22), fbm(NB, 8, 8, 3))
+    outer = mix(clay, ash, glz * 0.82)
+    outer = mix(outer, (0.16, 0.3, 0.17), bead * 0.7)
+    # (the rim scorched in the kiln (焦げ): dark, patchy)
+    scorch = smooth(vr - 0.06, vr, bv) * (1 - smooth(vr, vr + 0.05, bv)) * (0.5 + 0.5 * fbm(NB, 9, 3, 3))
+    # (inside: the glaze glassy green, deepening down the well to a clear pool on its floor, fine crackle through it)
+    t = np.clip((bv - vr) / (1 - vr), 0, 1)
+    inner = mix((0.48, 0.5, 0.27), (0.2, 0.4, 0.27), smooth(0.05, 0.6, t))
+    inner = mix(inner, (0.07, 0.29, 0.26), smooth(0.55, 0.95, t))
+    crack = np.abs(fbm(NB, 18, 18, 3) - 0.5) < 0.008
+    inner = mix(inner, (0.1, 0.16, 0.1), crack.astype(np.float32) * 0.35)
+    col = np.where(out[..., None], outer, inner)
+    col = mix(col, (0.2, 0.13, 0.08), scorch * 0.75)
+    M = {"hinoki": pbr("WashHinoki", (1, 1, 1), tex=image("washhinoki", hin), rough=0.5, coat=0.3),
+         "sugi": pbr("WashSugi", (1, 1, 1), tex=image("washsugi", sugi), rough=0.55),
+         "shadow": pbr("WashShadow", lin("#140d08"), rough=0.8),
+         "bowl": pbr("WashBowl", (1, 1, 1), tex=image("washbowl", col), rough=0.15, coat=0.8),
+         "brass": pbr("WashBrass", lin("#c9a04a"), rough=0.22, metal=1.0),
+         "mirror": pbr("WashMirror", lin("#d8e2e6"), rough=0.02, metal=1.0),
+         "frame": pbr("WashFrame", lin("#1c1410"), rough=0.3, coat=0.6),
+         "celadon": pbr("WashSoap", lin("#a9c7b4"), rough=0.2, coat=0.7),
+         "outlet": pbr("WashOutlet", lin("#2a2620"), rough=0.6)}
     parts = []
-    TOP = 0.74
-    fin(rbox("WashTop", (0.24, 0.04, 0.36), (-0.12, TOP, 0), 0.006, 2), "WashTop", M["cedar"], parts)
-    bpy.ops.object.select_all(action="DESELECT")
-    for sd in (-1, 1):
-        fin(rbox(f"WashBracket{sd}", (0.18, 0.12, 0.03), (-0.09, TOP - 0.08, sd * 0.13), 0.008, 2), f"WashBracket{sd}", M["bracket"], parts)
-    # (the stone bowl: thick walled, round, its inside a deep well, a little water standing in it)
-    bowl = lathe_oval("WashBowl", [(0.0, TOP + 0.02), (0.08, TOP + 0.02), (0.11, TOP + 0.05), (0.12, TOP + 0.1), (0.118, TOP + 0.11), (0.1, TOP + 0.11),
-                                   (0.095, TOP + 0.06), (0.06, TOP + 0.035), (0.0, TOP + 0.03)], 1.0, 1.0, 40, -0.13, 0)
-    fin(bowl, "WashBowl", M["stone"], parts)
-    fin(lathe_oval("WashWater", [(0.0, TOP + 0.05), (0.085, TOP + 0.05), (0.0, TOP + 0.0501)], 1, 1, 24, -0.13, 0), "WashWater", M["water"], parts)
-    # (the tap: out of the wall, arching over the bowl, a cross handle on top)
-    fin(tube("WashTap", [(0.0, TOP + 0.2, 0.0), (-0.06, TOP + 0.22, 0.0), (-0.11, TOP + 0.21, 0.0), (-0.13, TOP + 0.17, 0.0)], 0.009), "WashTap", M["brass"], parts)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.022, depth=0.012, location=P(-0.006, TOP + 0.2, 0), rotation=(0, math.pi / 2, 0))
+    W, DP, TH, PL = 0.56, 0.42, 0.05, 0.09
+    CD = DP - 0.03
+    CW = W - 0.04
+    # ---- the counter, its edges eased, its grain along it
+    fin(box_uv(rbox("WashTop", (DP, TH, W), (-DP / 2, T - TH / 2, 0), 0.006, 2), 2.2), "WashTop", M["hinoki"], parts)
+    # ---- the cabinet under it, the plinth set back in shadow
+    fin(box_uv(rbox("WashCabinet", (CD, T - TH - PL, CW), (-CD / 2, PL + (T - TH - PL) / 2, 0), 0.004, 1), 2.2, up=True), "WashCabinet", M["sugi"], parts)
+    fin(rbox("WashPlinth", (CD - 0.05, PL, CW - 0.06), (-(CD - 0.05) / 2, PL / 2, 0), 0.0, 1), "WashPlinth", M["shadow"], parts)
+    # ---- its two sliding doors, one on each of two tracks, the front one over the back's edge: a frame of hinoki and upright slats, a dark
+    # panel behind them, a little notch of a pull in each outer stile
+    y0, y1 = PL + 0.022, T - TH - 0.022
+    for k, (za, zb, x0) in enumerate(((-CW / 2 + 0.02, 0.006, -CD - 0.001), (-0.006, CW / 2 - 0.02, -CD - 0.017))):
+        zc, dw = (za + zb) / 2, zb - za
+        fin(rbox(f"WashDoorBack{k}", (0.004, y1 - y0, dw), (x0 - 0.004, (y0 + y1) / 2, zc), 0.0, 1), f"WashDoorBack{k}", M["shadow"], parts)
+        st, rl = 0.02, 0.028
+        for sd in (-1, 1):
+            fin(box_uv(rbox(f"WashStile{k}{sd}", (0.012, y1 - y0, st), (x0 - 0.008, (y0 + y1) / 2, zc + sd * (dw - st) / 2), 0.002, 1), 2.2, up=True), f"WashStile{k}{sd}", M["hinoki"], parts)
+            fin(box_uv(rbox(f"WashRail{k}{sd}", (0.012, rl, dw - 2 * st), (x0 - 0.008, (y0 + y1) / 2 + sd * ((y1 - y0) - rl) / 2, zc), 0.002, 1), 2.2), f"WashRail{k}{sd}", M["hinoki"], parts)
+        n = 7
+        inner = dw - 2 * st
+        for j in range(n):
+            z = zc - inner / 2 + inner * (j + 1) / (n + 1)
+            fin(box_uv(rbox(f"WashSlat{k}{j}", (0.008, y1 - y0 - 2 * rl, 0.011), (x0 - 0.006, (y0 + y1) / 2, z), 0.0, 1), 2.2, up=True), f"WashSlat{k}{j}", M["hinoki"], parts)
+        pz = zc + (-1 if k == 0 else 1) * (dw / 2 - st / 2)
+        fin(rbox(f"WashPull{k}", (0.006, 0.055, 0.009), (x0 - 0.013, (y0 + y1) / 2, pz), 0.002, 1), f"WashPull{k}", M["shadow"], parts)
+    # ---- the bowl, on the counter, and its brass drain
+    fin(bowl, "WashBowl", M["bowl"], parts)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.027, depth=0.004, location=P(-0.21, T + 0.035, 0))
+    fin(active(), "WashDrain", M["brass"], parts)
+    for k in range(6):
+        a = k * math.pi / 3
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.0035, depth=0.002, location=P(-0.21 + 0.014 * math.cos(a), T + 0.0372, 0.014 * math.sin(a)))
+        fin(active(), f"WashDrainHole{k}", M["outlet"], parts)
+    # ---- the tap: its rose on the wall, its body out of it, the bonnet on top, the spout running on and turning down over the drain
+    HY = T + 0.33
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.026, depth=0.01, location=P(-0.005, HY, 0), rotation=(0, math.pi / 2, 0))
     fin(active(), "WashTapRose", M["brass"], parts)
-    for a in (0, math.pi / 2):
-        fin(rbox(f"WashHandle{int(a * 10)}", (0.05 if a == 0 else 0.008, 0.008, 0.008 if a == 0 else 0.05), (-0.05, TOP + 0.245, 0), 0.003, 2), f"WashHandle{int(a * 10)}", M["brass"], parts)
-    # (the mirror over it, round in a wooden frame; a brass towel ring at its side)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.15, depth=0.02, location=P(-0.012, TOP + 0.55, 0), rotation=(0, math.pi / 2, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.015, depth=0.08, location=P(-0.045, HY, 0), rotation=(0, math.pi / 2, 0))
+    fin(active(), "WashTapBody", M["brass"], parts)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.017, depth=0.03, location=P(-0.045, HY + 0.022, 0))
+    fin(active(), "WashTapBonnet", M["brass"], parts)
+    fin(tube("WashTapSpout", [(-0.08, HY, 0.0), (-0.13, HY + 0.002, 0.0), (-0.18, HY - 0.012, 0.0), (-0.204, HY - 0.045, 0.0), (-0.21, HY - 0.07, 0.0)],
+             0.0115, caps=True, res=2, ru=6), "WashTapSpout", M["brass"], parts)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.0135, depth=0.016, location=P(-0.21, HY - 0.076, 0))
+    fin(active(), "WashTapMouth", M["brass"], parts)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.009, depth=0.002, location=P(-0.21, HY - 0.0845, 0))
+    fin(active(), "WashTapOutlet", M["outlet"], parts)
+    # (the cross handle: four arms with a ball on each end, a cap in the middle, on a short spindle: its own node, turned about the spindle)
+    handle = bpy.data.objects.new("WashTapHandle", None)
+    bpy.context.collection.objects.link(handle)
+    handle.location = P(-0.045, HY + 0.037, 0)
+    bpy.context.view_layer.update()
+    hparts = []
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.006, depth=0.022, location=P(-0.045, HY + 0.046, 0))
+    fin(active(), "WashHandleSpindle", M["brass"], hparts)
+    for a in (0.0, math.pi / 2):
+        fin(rbox(f"WashHandleArm{int(a * 10)}", (0.07 if a == 0 else 0.009, 0.008, 0.009 if a == 0 else 0.07), (-0.045, HY + 0.058, 0), 0.003, 2),
+            f"WashHandleArm{int(a * 10)}", M["brass"], hparts)
+    for k in range(4):
+        a = k * math.pi / 2
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.008, location=P(-0.045 + 0.035 * math.cos(a), HY + 0.058, 0.035 * math.sin(a)))
+        fin(active(), f"WashHandleBall{k}", M["brass"], hparts)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.011, depth=0.01, location=P(-0.045, HY + 0.064, 0))
+    fin(active(), "WashHandleCap", M["brass"], hparts)
+    bpy.context.view_layer.update()
+    for o in hparts:
+        mw = o.matrix_world.copy()
+        o.parent = handle
+        o.matrix_world = mw
+    # ---- the soap bottle, celadon, a brass pump on it
+    sx, sz = -0.1, 0.215
+    fin(lathe_oval("WashSoapBottle", [(0.0, T), (0.026, T), (0.03, T + 0.008), (0.031, T + 0.058), (0.027, T + 0.078), (0.013, T + 0.09),
+                                      (0.012, T + 0.098), (0.0, T + 0.098)], 1, 1, 24, sx, sz), "WashSoapBottle", M["celadon"], parts)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.007, depth=0.02, location=P(sx, T + 0.106, sz))
+    fin(active(), "WashPumpNeck", M["brass"], parts)
+    fin(rbox("WashPumpHead", (0.024, 0.01, 0.016), (sx - 0.006, T + 0.12, sz), 0.003, 2), "WashPumpHead", M["brass"], parts)
+    fin(tube("WashPumpNozzle", [(sx - 0.014, T + 0.121, sz), (sx - 0.034, T + 0.118, sz)], 0.003, caps=True, res=1, ru=2), "WashPumpNozzle", M["brass"], parts)
+    # ---- the mirror over it all: round, a slim black-lacquered frame, a fine brass ring at the glass's edge
+    MY = T + 0.66
+    bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=0.205, depth=0.022, location=P(-0.011, MY, 0), rotation=(0, math.pi / 2, 0))
     fin(active(), "WashMirrorFrame", M["frame"], parts)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.128, depth=0.004, location=P(-0.024, TOP + 0.55, 0), rotation=(0, math.pi / 2, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=0.188, depth=0.004, location=P(-0.0235, MY, 0), rotation=(0, math.pi / 2, 0))
     fin(active(), "WashMirror", M["mirror"], parts)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.07, minor_radius=0.006, major_segments=32, minor_segments=8, location=P(-0.03, TOP + 0.18, 0.26), rotation=(math.pi / 2, 0, 0))
-    fin(active(), "WashTowelRing", M["brass"], parts)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.19, minor_radius=0.0032, major_segments=64, minor_segments=6, location=P(-0.024, MY, 0), rotation=(0, math.pi / 2, 0))
+    fin(active(), "WashMirrorRing", M["brass"], parts)
+    # (the marks the game reads: the spout's mouth, the drain)
+    marks = []
+    for name, at in (("WashSpoutTip", (-0.21, HY - 0.086, 0)), ("WashBowlFloor", (-0.21, T + 0.037, 0))):
+        e = bpy.data.objects.new(name, None)
+        bpy.context.collection.objects.link(e)
+        e.location = P(*at)
+        marks.append(e)
     root = bpy.data.objects.new("WcWashstand", None)
     bpy.context.collection.objects.link(root)
-    for o in parts:
+    for o in parts + marks + [handle]:
         o.parent = root
-    export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "washstand.glb"), os.path.join(PROJECT, "blender", "washstand.blend"), None)
-    print("WASH_DONE", sum(len(o.data.polygons) for o in parts))
+    export_dish(root, parts + hparts + marks + [handle, root], os.path.join(PROJECT, "public", "models", "washstand.glb"),
+                os.path.join(PROJECT, "blender", "washstand.blend"), None)
+    print("WASH_DONE", sum(len(o.data.polygons) for o in parts + hparts))
 
 
 ONLY = os.environ.get("WC_ONLY", "toilet,bits,washstand")

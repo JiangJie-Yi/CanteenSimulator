@@ -5,7 +5,7 @@ import type { Lang } from './i18n'
 export const EDIT_TEXT = {
   zh: {
     title: '開發者模式',
-    keys: 'G／Esc 離開　Ctrl+Z / Y',
+    keys: 'G／Esc 離開',
     minimize: '縮小面板', close: '關閉（離開開發者模式）', sceneHead: '場景', cameraHead: '攝影機', backdrop: '背景色', backdropReset: '還原',
     render: '渲染', renderNone: '（選一件擺設來調它的渲染方式）', shade: '光影', shadeSmooth: '平滑', shadeFlat: '平面', look: '材質', lookKeep: '原本', lookToon: '卡通',
     lookReal: '寫實', lookUnlit: '無光', ink: '描線', cast: '投影', receive: '受影', on: '開', off: '關', renderReset: '還原這件的渲染',
@@ -13,7 +13,7 @@ export const EDIT_TEXT = {
     tools: { select: '選取 (Q)', move: '位移 (W，再按一次切換物件／世界座標)', rotate: '旋轉 (E)', scale: '縮放 (R)' },
     spaceLocalShort: '物', spaceWorldShort: '世',
     spaceLocal: '物件座標：軸跟著擺設自己的方向（點一下或再按一次 W／E／R 改世界座標）', spaceWorld: '世界座標：軸是整個場景的 X、Y、Z（點一下或再按一次 W／E／R 改物件座標）',
-    hotkeys: 'Q 選取　W 位移　E 旋轉　R 縮放（再按一次切換座標）\nF 對準選取　A 看全部　Esc 取消選取（再按離開）　D 中心點\n+ / − 操作軸大小　4 線框　5 著色　Alt＋左鍵 旋轉視角　Alt＋中鍵 平移　Alt＋右鍵 推拉',
+    hotkeys: 'Q 選取　W 位移　E 旋轉　R 縮放（再按一次切換座標）\nF 對準選取　A 看全部　Esc 取消選取（再按離開）　D 中心點　Ctrl+Z／Y 復原／重做\n+ / − 操作軸大小　4 線框　5 著色　Alt＋左鍵 旋轉視角　Alt＋中鍵 平移　Alt＋右鍵 推拉',
     spaceBadgeWorld: '🌐 世界座標（場景的 X／Y／Z）', spaceBadgeLocal: '📦 物件座標（跟著物件方向）',
     spaceBadgeTip: '點一下切換（或再按一次 W／E／R）', spaceNowWorld: '已切換：世界座標（場景的 X／Y／Z）', spaceNowLocal: '已切換：物件座標（跟著物件的方向）',
     wireOn: '線框模式（4）：看模型的拓撲，按 5 回到著色', wireOff: '著色模式（5）',
@@ -61,7 +61,7 @@ export const EDIT_TEXT = {
   },
   ja: {
     title: '開発者モード',
-    keys: 'G／Esc で終了　Ctrl+Z / Y',
+    keys: 'G／Esc で終了',
     minimize: 'パネルを畳む', close: '閉じる（開発者モード終了）', sceneHead: 'シーン', cameraHead: 'カメラ', backdrop: '背景色', backdropReset: '元に戻す',
     render: 'レンダリング', renderNone: '（オブジェクトを選ぶと描き方を変えられます）', shade: 'シェーディング', shadeSmooth: 'スムーズ', shadeFlat: 'フラット', look: 'マテリアル',
     lookKeep: '元のまま', lookToon: 'トゥーン', lookReal: 'リアル', lookUnlit: 'ライトなし', ink: '輪郭線', cast: '影を落とす', receive: '影を受ける', on: 'オン', off: 'オフ',
@@ -69,7 +69,7 @@ export const EDIT_TEXT = {
     tools: { select: '選択 (Q)', move: '移動 (W、もう一度でローカル／ワールド切替)', rotate: '回転 (E)', scale: '拡大縮小 (R)' },
     spaceLocalShort: 'ロ', spaceWorldShort: 'ワ',
     spaceLocal: 'ローカル座標：軸は物の向き（クリックか W／E／R をもう一度でワールド座標）', spaceWorld: 'ワールド座標：軸はシーン全体の X・Y・Z（クリックか W／E／R をもう一度でローカル座標）',
-    hotkeys: 'Q 選択　W 移動　E 回転　R 拡縮（もう一度で座標切替）\nF 選択に寄る　A 全体　Esc 選択解除（もう一度で終了）　D ピボット\n+ / − ハンドル大小　4 ワイヤー　5 シェード　Alt＋左 回転　Alt＋中 パン　Alt＋右 ドリー',
+    hotkeys: 'Q 選択　W 移動　E 回転　R 拡縮（もう一度で座標切替）\nF 選択に寄る　A 全体　Esc 選択解除（もう一度で終了）　D ピボット　Ctrl+Z／Y 元に戻す／やり直し\n+ / − ハンドル大小　4 ワイヤー　5 シェード　Alt＋左 回転　Alt＋中 パン　Alt＋右 ドリー',
     spaceBadgeWorld: '🌐 ワールド座標（シーンの X／Y／Z）', spaceBadgeLocal: '📦 ローカル座標（物の向き）',
     spaceBadgeTip: 'クリックで切替（W／E／R をもう一度でも）', spaceNowWorld: '切替：ワールド座標（シーンの X／Y／Z）', spaceNowLocal: '切替：ローカル座標（物の向き）',
     wireOn: 'ワイヤーフレーム（4）：モデルのトポロジーを表示、5 でシェーディングに戻る', wireOff: 'シェーディング（5）',
@@ -117,7 +117,7 @@ export const EDIT_TEXT = {
   },
   en: {
     title: 'Developer mode',
-    keys: 'G / Esc to leave   Ctrl+Z / Y',
+    keys: 'G / Esc to leave',
     minimize: 'Fold the panel', close: 'Close (leave developer mode)', sceneHead: 'Scene', cameraHead: 'Cameras', backdrop: 'Backdrop', backdropReset: 'Reset',
     render: 'Render', renderNone: '(pick a piece to set how it is drawn)', shade: 'Shading', shadeSmooth: 'Smooth', shadeFlat: 'Flat', look: 'Material',
     lookKeep: 'As made', lookToon: 'Toon', lookReal: 'Real', lookUnlit: 'Unlit', ink: 'Outline', cast: 'Casts shadow', receive: 'Takes shadow', on: 'On', off: 'Off',
@@ -125,7 +125,7 @@ export const EDIT_TEXT = {
     tools: { select: 'Select (Q)', move: 'Move (W, again to switch object / world)', rotate: 'Rotate (E)', scale: 'Scale (R)' },
     spaceLocalShort: 'Obj', spaceWorldShort: 'Wld',
     spaceLocal: 'Object space: the axes follow the piece (click, or W / E / R again, for world)', spaceWorld: 'World space: the scene’s own X, Y, Z (click, or W / E / R again, for object)',
-    hotkeys: 'Q select   W move   E rotate   R scale (again: switch space)\nF frame selection   A frame all   Esc deselect (again: leave)   D pivot\n+ / − handle size   4 wireframe   5 shaded   Alt+left orbit   Alt+middle pan   Alt+right dolly',
+    hotkeys: 'Q select   W move   E rotate   R scale (again: switch space)\nF frame selection   A frame all   Esc deselect (again: leave)   D pivot   Ctrl+Z / Y undo / redo\n+ / − handle size   4 wireframe   5 shaded   Alt+left orbit   Alt+middle pan   Alt+right dolly',
     spaceBadgeWorld: '🌐 World space (the scene’s X / Y / Z)', spaceBadgeLocal: '📦 Object space (follows the piece)',
     spaceBadgeTip: 'Click to switch (or W / E / R again)', spaceNowWorld: 'Now: world space (the scene’s X / Y / Z)', spaceNowLocal: 'Now: object space (follows the piece)',
     wireOn: 'Wireframe (4): see the topology, 5 for shaded', wireOff: 'Shaded (5)',

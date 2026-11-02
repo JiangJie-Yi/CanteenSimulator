@@ -8,21 +8,24 @@ import { mergeByMaterial } from '@/scene/StaticBatch'
 import { toonOf } from './BarFurnish'
 import { handOver, TOILETS, meterWater } from './bar'
 import { getEdit } from './edit'
-import { flushSound, knockSound, otohimeNear, otohimeSound, rollSound, scrubSound } from './restroomSound'
+import { flushSound, knockSound, otohimeNear, otohimeSound, rollSound, scrubSound, tapRunning } from './restroomSound'
 
 /**
  * The toilet rooms' live parts (blender/wc.py): the washlet that lifts its lid as someone comes in and flushes as they go (the water
  * swirling down, the cistern's tap running into the basin on its lid as it refills); clicked, it's scrubbed with the brush from the pot
  * in the corner if it's not spotless, flushed if it is. On the walls, the washlet's remote (its wand gives a little fountain) and the
- * flush keys; the Otohime (音姫), which plays a stream and birdsong, by itself while a woman's in; the paper on its holder, thinning visit
- * by visit till it's bare, a new roll with its end folded to a point at a click; in the women's, the sanitary bin. As it gets dirty,
- * marks on the duckboard and a ring in the bowl, and at the worst flies; scrubbed, it sparkles. Everything in the room's own frame
- * (WcRoom: x from the door to the back wall at D, z across it, w wide).
+ * flush keys; the Otohime (音姫), which plays a stream and birdsong, by itself while a woman's in (the women's only); the paper on its
+ * holder, thinning visit by visit till it's bare, a new roll with its end folded to a point at a click; in the women's, the sanitary bin and
+ * a basket of sanitary pads on a shelf, free to take. As it gets dirty, marks on the floor before it and a ring in the bowl, and at the worst
+ * flies; scrubbed, it sparkles. In the washroom through the door, the washstand: its tap turned on and off at a click, and running by
+ * itself while a guest washes their hands. Each in the frame it's set in by WcRoom.
  */
 const TOILET_URL = import.meta.env.BASE_URL + 'models/toilet.glb'
 const BITS_URL = import.meta.env.BASE_URL + 'models/wcbits.glb'
+const WASH_URL = import.meta.env.BASE_URL + 'models/washstand.glb'
 useGLTF.preload(TOILET_URL)
 useGLTF.preload(BITS_URL)
+useGLTF.preload(WASH_URL)
 
 type Who = 'm' | 'f'
 const now = () => performance.now()
@@ -223,9 +226,8 @@ export function ToiletLive({ who, at }: { who: Who; at: [number, number, number]
     if (t.flushAt > s.lastIn) {
       s.lastIn = t.flushAt
       if (T - t.flushAt < 200) flushSound(nearOf(parts.root, camera))
-      // (metered: the cistern refilled, through the tap on its lid where hands are washed)
+      // (metered: the cistern refilled (through the tap on its lid); the hands are washed at the washstand, and metered there)
       meterWater('flush')
-      meterWater('handwash')
     }
     if (t.washAt > s.lastWash) { s.lastWash = t.washAt; meterWater('washlet') }
   })
@@ -319,14 +321,14 @@ function useBits() {
     }
     const r = {
       remote: of('WcRemote'), flush: of('WcFlushKey'), oto: of('WcOtohime'), led: of('WcOtoLed'), holder: of('WcHolder'), roll: of('WcRoll'),
-      core: of('WcCore'), fold: of('WcFold'), pot: of('WcBrushPot'), brush: of('WcBrush'), bin: of('WcBin'),
+      core: of('WcCore'), fold: of('WcFold'), pot: of('WcBrushPot'), brush: of('WcBrush'), bin: of('WcBin'), pads: of('WcPads'),
     }
     const lcd = r.remote.getObjectByName('RemLcd') as THREE.Mesh | undefined
     lit(lcd, '#a8e0c8')
     const ledMat = lit(r.led.getObjectByName('OtoLed') as THREE.Mesh, '#5ab4ff')
     // (the parts that never move on their own, their buttons and ink lines, folded into a mesh or two per material: the remote and the
     // Otohime were near thirty draws apiece, in each of the two toilets; the lit screen keeps its own)
-    for (const o of [r.remote, r.oto, r.holder, r.pot, r.bin]) mergeByMaterial(o)
+    for (const o of [r.remote, r.oto, r.holder, r.pot, r.bin, r.pads]) mergeByMaterial(o)
     return { ...r, ledMat }
   }, [gltf])
 }
@@ -469,4 +471,82 @@ export function WcBrush({ who, at, bowl }: { who: Who; at: [number, number, numb
 export function WcBin() {
   const b = useBits()
   return <primitive object={b.bin} />
+}
+
+/** the sanitary pads (the women's; the owner's: 女廁有提供衛生棉): a basket of them on a little shelf on the wall (z=0, facing +z), free to take;
+ * pointed at, only named (nothing to click: no glow, the cursor as it is) */
+export function WcPads() {
+  const b = useBits()
+  return (
+    <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '衛生棉', hint: '免費提供・歡迎取用' }) }}
+      onPointerOut={() => setTip(null)}>
+      <primitive object={b.pads} />
+    </group>
+  )
+}
+
+/** how long a guest's hand wash runs the tap (ms) */
+export const HAND_MS = 2600
+const WASH_STREAM = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent: true, opacity: 0.62, depthWrite: false, toneMapped: false })
+/**
+ * The washroom's washstand (blender/wc.py: its back to +x, against the back wall facing the door, so it's the first thing seen as the door
+ * slides open; the owner's): its tap's cross handle turned a quarter round at a click to run the water, and back to stop it (left running,
+ * it's metered by the minute: App), and turned and running by itself while a guest washes their hands (metered as a hand wash); a stream
+ * from the spout's mouth down into the bowl, wavering, a ring spreading where it lands; heard running, as loud as it's near.
+ */
+export function WashstandLive({ who }: { who: Who }) {
+  const gltf = useGLTF(WASH_URL) as unknown as { scene: THREE.Group }
+  const parts = useMemo(() => {
+    const root = toonOf(WASH_URL, gltf.scene)
+    // (the handle a piece of its own, turned as the water's turned on and off; the rest never moves: a mesh or two per material)
+    const handle = root.getObjectByName('WashTapHandle')!
+    handle.removeFromParent()
+    root.updateMatrixWorld(true)
+    const at = (n: string) => root.worldToLocal(root.getObjectByName(n)!.getWorldPosition(new THREE.Vector3()))
+    const tip = at('WashSpoutTip'), floor = at('WashBowlFloor')
+    mergeByMaterial(root)
+    mergeByMaterial(handle)
+    return { root, handle, tip, floor }
+  }, [gltf])
+  const st = useRef({ turn: 0, lastHand: -1e9 })
+  const stream = useRef<THREE.Mesh>(null)
+  const ring = useRef<THREE.Mesh>(null)
+  const len = parts.tip.y - parts.floor.y
+  useFrame(({ clock, camera }, dt) => {
+    const t = TOILETS[who]
+    const s = st.current
+    const on = t.tap || now() - t.handAt < HAND_MS
+    s.turn += ((on ? 1 : 0) - s.turn) * Math.min(1, Math.min(dt, 0.1) * 8)
+    parts.handle.rotation.y = s.turn * (Math.PI / 2)
+    // (a guest's hand wash, metered once)
+    if (t.handAt > s.lastHand) { s.lastHand = t.handAt; meterWater('handwash') }
+    const k = clock.elapsedTime
+    if (stream.current) {
+      stream.current.visible = on
+      if (on) stream.current.scale.set(1 + Math.sin(k * 31) * 0.12, 1, 1 + Math.cos(k * 27) * 0.12)
+    }
+    if (ring.current) {
+      ring.current.visible = on
+      if (on) { const r = 1 + ((k * 2.4) % 1) * 1.6; ring.current.scale.set(r, r, r); (ring.current.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - ((k * 2.4) % 1)) }
+    }
+    tapRunning(`wc-${who}`, on ? nearOf(parts.root, camera) : 0)
+  })
+  const says = () => (TOILETS[who].tap ? '點一下關水' : '點一下開水（開著會一直計水費）')
+  return (
+    <group>
+      <primitive object={parts.root} />
+      {/* (the tap's handle: pointed at it lights and says so; clicked, the water's turned on, or off) */}
+      <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; TOILETS[who].tap = !TOILETS[who].tap; setTip({ title: '洗手台水龍頭', hint: says() }) }}
+        {...hover('洗手台水龍頭', says)}>
+        <primitive object={parts.handle} />
+      </group>
+      <mesh position={[parts.tip.x, parts.floor.y + len / 2, parts.tip.z]} ref={stream} material={WASH_STREAM} visible={false} raycast={() => {}}>
+        <cylinderGeometry args={[0.0045, 0.006, len, 8, 1, true]} />
+      </mesh>
+      <mesh ref={ring} position={[parts.floor.x, parts.floor.y + 0.003, parts.floor.z]} rotation-x={-Math.PI / 2} visible={false} raycast={() => {}}>
+        <ringGeometry args={[0.01, 0.018, 20]} />
+        <meshBasicMaterial color="#e8f6fc" transparent opacity={0.5} depthWrite={false} toneMapped={false} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  )
 }

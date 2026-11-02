@@ -13,9 +13,9 @@ const TILLSTOOL_URL = import.meta.env.BASE_URL + 'models/tillstool.glb'
 const BAMBOO_URL = import.meta.env.BASE_URL + 'models/bamboopot.glb'
 const TOILET_URL = import.meta.env.BASE_URL + 'models/toilet.glb'
 const WASH_URL = import.meta.env.BASE_URL + 'models/washstand.glb'
-const GLOSSY = new Set(['StoolBrass', 'PotGlaze', 'WcChina', 'WcIvory', 'WcChrome', 'WcWater', 'WashBrass', 'WashMirror', 'WashWater'])
+const GLOSSY = new Set(['StoolBrass', 'PotGlaze', 'WcChina', 'WcIvory', 'WcChrome', 'WcWater', 'WashBrass', 'WashMirror', 'WashBowl', 'WashSoap', 'WashFrame'])
 /** parts too thin or small for an ink line */
-const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel)/
+const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel|Slat|Drain|Pump|Pull|Pad\d)/
 
 const made = new Map<string, THREE.Object3D>()
 function toonOf(url: string, scene: THREE.Group) {
@@ -30,7 +30,8 @@ function toonOf(url: string, scene: THREE.Group) {
     let t = mats.get(src)
     if (!t) {
       t = GLOSSY.has(src.name)
-        ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, metalness: src.metalness, roughness: Math.max(0.2, src.roughness), clearcoat: 0.5 })
+        // (the washroom's mirror kept a mirror: nearly smooth (the rest a little softened))
+        ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, metalness: src.metalness, roughness: src.name === 'WashMirror' ? 0.04 : Math.max(0.2, src.roughness), clearcoat: 0.5 })
         // (the chair back's kumiko: one picture, its gaps cut out by its alpha (tested, not blended), seen from either side)
         : src.name === 'TillKumiko'
           ? new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, alphaTest: 0.5, side: THREE.DoubleSide })
@@ -38,7 +39,8 @@ function toonOf(url: string, scene: THREE.Group) {
       mats.set(src, t)
     }
     // (chrome real metal, the studio in it: with nothing to reflect it drew black (the cistern's spout, the owner saw))
-    if (/Chrome/.test(src.name) && (t as THREE.MeshStandardMaterial).metalness > 0.5) reflectStudio(t as THREE.MeshStandardMaterial)
+    // (and the washroom's brass and mirror the same)
+    if (/Chrome|^Wash(Brass|Mirror)$/.test(src.name) && (t as THREE.MeshStandardMaterial).metalness > 0.5) reflectStudio(t as THREE.MeshStandardMaterial)
     m.material = t
     m.castShadow = !UNINKED.test(m.name)
     m.receiveShadow = true

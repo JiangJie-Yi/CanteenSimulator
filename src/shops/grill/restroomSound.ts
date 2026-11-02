@@ -151,6 +151,42 @@ export function rollSound(near: number) {
   o.stop(t + 0.5)
 }
 
+/** taps left running or washing (the sink's, the toilets' washstands'): one splashing loop for them all, as loud as the nearest running one;
+ * each tap says how near it's running each frame (0: shut) */
+const taps = new Map<string, number>()
+let run: { gain: GainNode } | null = null
+export function tapRunning(id: string, level: number) {
+  const prev = taps.get(id) ?? 0
+  if (Math.abs(prev - level) < 0.02 && !(level === 0 && prev !== 0)) return
+  taps.set(id, level)
+  const a = ctx()
+  if (!a) return
+  const l = Math.max(0, ...taps.values())
+  if (!run) {
+    if (l <= 0) return
+    // (water splashing into a basin: rough noise, a slow wobble in its band, looped)
+    const n = Math.floor(a.sampleRate * 2)
+    const b = a.createBuffer(1, n, a.sampleRate)
+    const d = b.getChannelData(0)
+    let last = 0
+    for (let i = 0; i < n; i++) { last = last * 0.25 + (Math.random() * 2 - 1) * 0.75; d[i] = last * (0.8 + 0.2 * Math.sin((i / n) * Math.PI * 2 * 23)) }
+    const src = a.createBufferSource()
+    src.buffer = b
+    src.loop = true
+    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = 0.6
+    const lfo = a.createOscillator(); lfo.frequency.value = 3.3
+    const depth = a.createGain(); depth.gain.value = 300
+    lfo.connect(depth).connect(f.frequency)
+    const gain = a.createGain()
+    gain.gain.value = 0
+    src.connect(f).connect(gain).connect(a.destination)
+    src.start()
+    lfo.start()
+    run = { gain }
+  }
+  run.gain.gain.setTargetAtTime(0.16 * l, a.currentTime, 0.12)
+}
+
 /** the Otohime: a stream babbling over stones and a bird or two, for `seconds` (its volume follows the view each frame: see otohimeNear) */
 let oto: { gain: GainNode; until: number } | null = null
 export function otohimeSound(seconds: number) {

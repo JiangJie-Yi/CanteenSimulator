@@ -46,7 +46,7 @@ export function energyOver(seconds: number, c: Conditions): Record<string, numbe
 }
 
 /** what uses water (litres each time) and, heated, power (kWh each time) */
-export type Use = 'dish' | 'flush' | 'washlet' | 'handwash' | 'cooking' | 'mop' | 'dipper' | 'tap'
+export type Use = 'dish' | 'flush' | 'washlet' | 'handwash' | 'cooking' | 'mop' | 'dipper' | 'tap' | 'wcTap'
 export const USES: Record<Use, { zh: string; ja: string; en: string; litres: number; kwh: number }> = {
   // (a plate washed in hot water: a litre or so warmed 20℃ by the instant heater, two more cold to rinse)
   dish: { zh: '洗碗（熱水）', ja: '皿洗い（湯）', en: 'Washing up (hot)', litres: 3, kwh: 0.025 },
@@ -60,6 +60,8 @@ export const USES: Record<Use, { zh: string; ja: string; en: string; litres: num
   dipper: { zh: '水瓢澆水', ja: '柄杓の水', en: 'The dipper', litres: 0.3, kwh: 0 },
   // (the sink's tap left running: a minute's worth)
   tap: { zh: '流理台水龍頭（每分鐘）', ja: '流しの蛇口（毎分）', en: "The sink's tap (a minute)", litres: 6, kwh: 0 },
+  // (a toilet's washstand tap left running, turned on by hand: a basin tap's aerated flow, a minute's worth)
+  wcTap: { zh: '廁所洗手台水龍頭（每分鐘）', ja: 'トイレの洗面台の蛇口（毎分）', en: "A toilet's washstand tap (a minute)", litres: 5, kwh: 0 },
 }
 
 /** a tier of a tariff: the rate for what's used up to `upTo` this month */

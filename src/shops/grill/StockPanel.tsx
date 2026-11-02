@@ -9,6 +9,7 @@ import { STORAGES, storageName, storageOf, type Storage } from '@/data/storage'
 import { PAR } from '@/game/economy'
 import { freshGrade } from '@/game/freshness'
 import { CHARCOAL, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
+import { FitLine } from '@/ui/FitLine'
 import { FoodArt } from '@/ui/FoodArt'
 import type { Restock } from '@/ui/Menu'
 import { CRATE, FREEZER_TEMP } from './Decor'
@@ -191,7 +192,7 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
         onKeyDown={(e) => { if (research && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); p.onAdd(x.id) } }}>
         <span className="chiller-bin-head">
           <FoodArt id={x.id} store={storageOf(x.id)} band />
-          <span className="chiller-bin-name">{name}</span>
+          <FitLine className="chiller-bin-name">{name}</FitLine>
           {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{tl(lang, '試', '試', 'Try')}×{n}</span>}
         </span>
         {x.en && <span className="chiller-bin-en" lang="en">{x.en}</span>}
@@ -229,7 +230,7 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
     const buy = (n: number) => (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (can(n)) p.onBuy(id, n) }
     return (
       <div key={id} className={`chiller-bin season-bin is-still${out ? ' is-out' : ''}`} aria-label={`${supplyName(id, lang)}，${tl(lang, '庫存', '在庫', 'Stock')} ${have}`}>
-        <span className="chiller-bin-head"><SeasonIcon k={k} /><span className="chiller-bin-name">{supplyName(id, lang)}</span></span>
+        <span className="chiller-bin-head"><SeasonIcon k={k} /><FitLine className="chiller-bin-name">{supplyName(id, lang)}</FitLine></span>
         <span className={`chiller-level${out ? ' is-zero' : have < SEASON_PAR / 3 ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / SEASON_PAR) * 100)}%` }} /></span>
         <span className="chiller-bin-info" aria-hidden="true">
           <b className={out ? 'is-zero' : ''}>{tl(lang, '剩', '残り', 'Left')} <em>{have}</em>{tl(lang, ' 份', '回', '')}</b>
@@ -296,8 +297,8 @@ function Supplies(p: Props) {
           <h3 className="chiller-zone-head"><span>{tl(lang, '燃料', '燃料', 'Fuel')}</span><i aria-hidden="true">{tl(lang, '非食材', '食材以外', 'not food')}</i></h3>
           <div className="chiller-bins">
             <div className={`chiller-bin season-bin supply-bin is-still${out ? ' is-out' : ''}`}>
-              <span className="chiller-bin-head"><CharcoalIcon /><span className="chiller-bin-name">{supplyName(CHARCOAL, lang)}</span></span>
-              <span className="drink-bin-sub">{tl(lang, `一袋 ${SACK_STICKS} 根・NT$${SACK_COST}`, `1袋 ${SACK_STICKS}本・NT$${SACK_COST}`, `${SACK_STICKS} a sack, NT$${SACK_COST}`)}</span>
+              <span className="chiller-bin-head"><CharcoalIcon /><FitLine className="chiller-bin-name">{supplyName(CHARCOAL, lang)}</FitLine></span>
+              <FitLine className="drink-bin-sub" min={9}>{tl(lang, `一袋 ${SACK_STICKS} 根・NT$${SACK_COST}`, `1袋 ${SACK_STICKS}本・NT$${SACK_COST}`, `${SACK_STICKS} a sack, NT$${SACK_COST}`)}</FitLine>
               <span className={`chiller-level${out ? ' is-zero' : sack < SACK_STICKS ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (sack / (2 * SACK_STICKS)) * 100)}%` }} /></span>
               <span className="chiller-bin-info" aria-hidden="true">
                 <b className={sack <= 0 ? 'is-zero' : ''}>{tl(lang, '麻袋', '袋', 'Sack')} <em>{sack}</em></b>
@@ -375,8 +376,8 @@ function TissueZone(p: Props) {
       <h3 className="chiller-zone-head"><span>{tl(lang, '民生', '日用品', 'Household')}</span><i aria-hidden="true">{tl(lang, '耗材', '消耗品', 'consumable')}</i></h3>
       <div className="chiller-bins">
         <div className={`chiller-bin season-bin supply-bin is-still${empty ? ' is-out' : ''}`}>
-          <span className="chiller-bin-head"><span className="tissue-icon" aria-hidden="true">🧻</span><span className="chiller-bin-name">{supplyName(TISSUE, lang)}</span></span>
-          <span className="drink-bin-sub">{tl(lang, `一盒 ${BOX_SHEETS} 抽・一組 ${TISSUE_PACK.boxes} 盒 NT$${TISSUE_PACK.cost}`, `1箱 ${BOX_SHEETS}枚・${TISSUE_PACK.boxes}箱 NT$${TISSUE_PACK.cost}`, `${BOX_SHEETS} a box, ${TISSUE_PACK.boxes} boxes NT$${TISSUE_PACK.cost}`)}</span>
+          <span className="chiller-bin-head"><span className="tissue-icon" aria-hidden="true">🧻</span><FitLine className="chiller-bin-name">{supplyName(TISSUE, lang)}</FitLine></span>
+          <FitLine className="drink-bin-sub" min={9}>{tl(lang, `${BOX_SHEETS}抽 × ${TISSUE_PACK.boxes}盒・NT$${TISSUE_PACK.cost}`, `${BOX_SHEETS}枚 × ${TISSUE_PACK.boxes}箱・NT$${TISSUE_PACK.cost}`, `${BOX_SHEETS} × ${TISSUE_PACK.boxes} boxes, NT$${TISSUE_PACK.cost}`)}</FitLine>
           <span className={`chiller-level${empty ? ' is-zero' : low ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (sheets / (boxes.length * BOX_SHEETS || 1)) * 100)}%` }} /></span>
           <span className="chiller-bin-info" aria-hidden="true">
             <b className={spares <= 0 ? 'is-zero' : ''}>{tl(lang, '備品', '予備', 'Spare')} <em>{spares}</em></b>

@@ -635,7 +635,8 @@ const PANEL_CSS = `
 .be { position:fixed; left:12px; bottom:92px; z-index:9999; width:292px; max-height:calc(100vh - 110px); display:flex; background:#303030; color:#d6d6d6;
   font:11.5px/1.35 "Inter","Segoe UI","Noto Sans TC",sans-serif; border:1px solid #1a1a1a; border-radius:6px; box-shadow:0 6px 22px rgba(0,0,0,.55); overflow:hidden; user-select:none }
 .be * { box-sizing:border-box }
-.be-keys { margin:6px 0 2px; padding:5px 7px; border-radius:4px; background:#262626; color:#9a9a9a; font:10.5px/1.6 monospace; white-space:pre-line }
+.be-keys { display:flex; flex-wrap:wrap; gap:0 12px; margin:6px 0 2px; padding:5px 7px; border-radius:4px; background:#262626; color:#9a9a9a; font:10.5px/1.6 monospace }
+.be-key { white-space:nowrap }
 .be-space { display:block; width:100%; margin:0 0 6px; padding:5px 8px; border:0; border-radius:4px; text-align:left; cursor:pointer;
   font:600 12px/1.3 inherit; color:#fff; background:#2f6fb0 }
 .be-space.local { background:#c27a1e }
@@ -651,8 +652,8 @@ const PANEL_CSS = `
 .be-tool-text { font:700 13px/1 system-ui, sans-serif }
 .be-tool-gap { height:8px; border-bottom:1px solid #4a4a4a; margin-bottom:4px }
 .be-main { flex:1; min-width:0; display:flex; flex-direction:column }
-.be-head { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#1f1f1f; font-weight:600; letter-spacing:.02em; color:#e6e6e6 }
-.be-head small { margin-left:auto; font-weight:400; color:#8a8a8a }
+.be-head { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#1f1f1f; font-weight:600; letter-spacing:.02em; color:#e6e6e6; white-space:nowrap }
+.be-head small { margin-left:auto; font-weight:400; color:#8a8a8a; white-space:nowrap }
 .be-tabs { display:flex; gap:2px; border-bottom:2px solid #e0a040 }
 .be-tab { flex:1; padding:4px 8px 3px; background:#1d1d1d; color:#8c8c8c; border:1px solid #333; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font:inherit; font-weight:700; letter-spacing:.08em }
 .be-tab:hover { color:#d6d6d6; background:#2c2c2c }
@@ -994,7 +995,10 @@ function panel() {
     group(T().rotation, '5', readRot, (id, v) => { const z = zeroOf(id).r; turnTo(id, [v[0] + z[0], v[1] + z[1], v[2] + z[2]]) }, [0, 0, 0])
     group(T().scale, '0.05', readScale, (id, v) => { const z = zeroOf(id).s; scaleTo(id, [v[0] * z[0], v[1] * z[1], v[2] * z[2]]) }, [1, 1, 1], true)
     // (the keys, as in Maya, at a glance)
-    tr.appendChild(h('div', 'be-keys', T().hotkeys))
+    // (each key and what it does a chip of its own, never broken across a line (the owner's: nothing on two lines); the chips flow on)
+    const keys = h('div', 'be-keys')
+    for (const item of T().hotkeys.split(/\n|　|\s{3,}/).map((x) => x.trim()).filter(Boolean)) keys.appendChild(h('span', 'be-key', item))
+    tr.appendChild(keys)
     // Render: how the chosen piece is drawn (its shading, its material, its outline, its shadows), for it alone (a group: each of its members)
     const rs = section(T().render)
     rs.title = T().renderTip

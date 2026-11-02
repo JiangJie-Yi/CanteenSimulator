@@ -54,7 +54,7 @@ import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { CUBBY_OPEN, FIRE_SHIFT, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, TISSUES_KEY, tissuesAt, UTILITY } from '@/shops/grill/bar'
+import { CUBBY_OPEN, FIRE_SHIFT, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, TISSUES_KEY, tissuesAt, TOILETS, UTILITY } from '@/shops/grill/bar'
 import { getBgmOff } from '@/ui/bgmStore'
 import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
 import { keepVisits, rateShop, type Visit } from '@/game/reputation'
@@ -71,6 +71,7 @@ import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
 import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
+import { usePanelSound } from '@/ui/uiSound'
 import { noteDrawn } from '@/scene/Later'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
@@ -1677,6 +1678,15 @@ export default function App() {
   }
   // the menu can be folded away to give the food the whole screen
   const [menuFolded, setMenuFolded] = useState(false)
+  // (every panel heard as it opens and as it shuts (the owner's): the rating's drawer, the office, the stock, the drinks, the views' menu,
+  // the menu folded away and back, the developer's panel)
+  usePanelSound(showRating)
+  usePanelSound(office !== null)
+  usePanelSound(fridgeOpen)
+  usePanelSound(drinksOpen)
+  usePanelSound(viewMenu)
+  usePanelSound(!menuFolded)
+  usePanelSound(editOn)
   // (in edit mode the menu is folded away first, to leave the room in view; it comes back as it was when editing ends)
   const foldedBeforeEdit = useRef<boolean | null>(null)
   useEffect(() => {
@@ -1973,6 +1983,8 @@ export default function App() {
       UTILITY.uses = {}
       // (the sink's tap left running: a minute's worth a minute)
       if (SINK.tap) uses.tap = (uses.tap ?? 0) + k / 60
+      // (and the toilets' washstand taps, turned on by hand and left running)
+      for (const w of [TOILETS.m, TOILETS.f]) if (w.tap) uses.wcTap = (uses.wcTap ?? 0) + k / 60
       const m = meterAdd(meterRef.current, energyOver(k, { open: aiRef.current.ai, lights: getLights().on, fire: fire.current > 0, music: !getBgmOff(),
         freezerSet: FREEZER_TEMP.set, freezerOpen: FREEZER.open, fridgeOpen: CUBBY_OPEN.left || CUBBY_OPEN.right }), uses)
       meterRef.current = m.meter

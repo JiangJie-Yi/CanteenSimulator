@@ -2,7 +2,7 @@
 fixed to the wall, its front sloping back to a lip; and hanging from a slot along its underside a thin pane of acrylic, lit from the edge,
 its face printed (the game paints the face: EXIT, the running figure leaving by a doorway, the words in the language on screen).
 
-- "ExitBox": the housing, 44 cm along, 6 tall, 7 deep; its end caps a little darker.
+- "ExitBox": the housing, 40 cm along, 6 tall, 7 deep; its end caps a little darker.
 - "ExitFace": the pane's front, its UVs the whole face (0..1), facing +z; "ExitBack": its back, the same picture (u turned, so it reads
   right from behind too); "ExitPane": the pane's clear edges.
 
@@ -25,9 +25,10 @@ from common import *  # noqa: E402,F403
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREVIEW = argv[1] if len(argv) > 1 else None
-# (the pane: its width and height, its thickness; the housing over it)
-PW, PH, PT = 0.42, 0.155, 0.006
-HW, HH, HD = 0.44, 0.06, 0.07
+# (the pane: its width and height, its thickness; the housing over it (a little shorter than it was, the owner's: 0.42 and 0.44); the game's
+# DiningRoom EXIT_PANE follows the pane's size)
+PW, PH, PT = 0.38, 0.155, 0.006
+HW, HH, HD = 0.40, 0.06, 0.07
 
 
 def P(x, y, z):

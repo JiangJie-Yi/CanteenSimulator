@@ -8,6 +8,7 @@ import { CC_BY_URL, CREDITS, DEV_MODEL, DEVELOPER, DEVELOPER_URL, REPO_URL, SITE
 import { guestLabel } from '@/data/guests'
 import { tl, type Lang } from '@/data/i18n'
 import { remarkOf, satisfaction, starsOf, type Rating, type Remark, type Visit } from '@/game/reputation'
+import { FitLine } from './FitLine'
 import { MoodFace } from './MoodFace'
 
 /** what a customer says as they go, a few ways each (the owner's: every one said the same line), picked by who they were and how it went */
@@ -123,11 +124,14 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
                 'A Japanese charcoal grill to run in the browser: try dishes out, open up, hire staff, and watch how the customers like it.')}</p>
               <dl>
                 <dt>{pick('開發者', '開発', 'Developer')}</dt><dd><a href={DEVELOPER_URL} target="_blank" rel="noopener noreferrer">{DEVELOPER}</a></dd>
-                <dt>GitHub</dt><dd><a href={REPO_URL} target="_blank" rel="noopener noreferrer">{REPO_URL.replace('https://', '')}</a></dd>
-                <dt>{pick('線上遊玩', 'プレイ', 'Play')}</dt><dd><a href={SITE_URL} target="_blank" rel="noopener noreferrer">{SITE_URL.replace('https://', '')}</a></dd>
+                {/* (each on one line, set smaller if it must be (the owner's: nothing on two lines): the addresses without their https://
+                    and the end slash, the model and the tool each a line of its own) */}
+                <dt>GitHub</dt><dd><FitLine><a href={REPO_URL} target="_blank" rel="noopener noreferrer">{REPO_URL.replace(/^https:\/\/|\/$/g, '')}</a></FitLine></dd>
+                <dt>{pick('線上遊玩', 'プレイ', 'Play')}</dt><dd><FitLine><a href={SITE_URL} target="_blank" rel="noopener noreferrer">{SITE_URL.replace(/^https:\/\/|\/$/g, '')}</a></FitLine></dd>
                 <dt>{pick('版本', 'バージョン', 'Version')}</dt><dd>v{VERSION}</dd>
-                <dt>{pick('開發模型', '開発モデル', 'Developed with')}</dt><dd>{DEV_MODEL}（Anthropic）・Claude Code</dd>
-                <dt>{pick('製作', '制作', 'Made with')}</dt><dd>React・three.js・Vite・Blender</dd>
+                <dt>{pick('開發模型', '開発モデル', 'Model')}</dt><dd><FitLine>{DEV_MODEL}（Anthropic）</FitLine></dd>
+                <dt>{pick('開發工具', '開発ツール', 'Tool')}</dt><dd>Claude Code</dd>
+                <dt>{pick('製作', '制作', 'Made with')}</dt><dd><FitLine>React・three.js・Vite・Blender</FitLine></dd>
               </dl>
             </div>
             {/* (the work used under a licence that asks for its author to be named: each its own card, what was changed in it said) */}

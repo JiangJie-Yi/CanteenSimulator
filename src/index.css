@@ -3902,13 +3902,20 @@ button {
 /* (the sign opens the shop's rating: pointed at, it glows warm round its own fish-cut edge and says so (ui/Brand's tag). It used to beckon
    with a gold ring pulsing round its box forever, left over from when an unopened shop was opened from its sign: the owner saw its
    rectangle flickering round the logo) */
+/* (quick to answer the pointer, the owner's: it came up over 180 ms) */
 .brand[role='button'] .brand-plate {
-  transition: background-color 300ms ease, color 300ms ease, filter 180ms ease;
+  transition: background-color 300ms ease, color 300ms ease, filter 70ms ease-out;
 }
-/* (a soft, see-through glow: the owner found the first one too solid, a pale rim round the board) */
+/* (a soft, see-through glow: the owner found the first one too solid, a pale rim round the board; and the board itself a quarter brighter,
+   the owner's) */
 .brand[role='button']:hover .brand-plate,
 .brand[role='button']:focus-visible .brand-plate {
-  filter: drop-shadow(0 0.12em 0.14em rgb(40 20 10 / 0.55)) drop-shadow(0 0 0.32em rgb(255 214 140 / 0.38)) brightness(1.04);
+  filter: drop-shadow(0 0.12em 0.14em rgb(40 20 10 / 0.55)) drop-shadow(0 0 0.32em rgb(255 214 140 / 0.38)) brightness(1.25);
+}
+/* (pressed: the whole of it a shade darker, at once (the owner's)) */
+.brand[role='button']:active .brand-plate {
+  filter: drop-shadow(0 0.12em 0.14em rgb(40 20 10 / 0.55)) brightness(0.84);
+  transition-duration: 0s;
 }
 .brand[role='button']:focus-visible {
   outline: none;
@@ -5929,7 +5936,13 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
   font-weight: 700;
   font-size: 15px;
   line-height: 1.15;
-  overflow-wrap: anywhere;
+}
+
+/* (a name or a line that keeps to one line, set smaller where it doesn't fit (ui/FitLine): the owner's, nothing on two lines) */
+.fit-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .chiller-taken {
@@ -6932,6 +6945,12 @@ html.theme-fading::view-transition-new(root) {
   animation-duration: 0.65s;
   animation-timing-function: ease-in-out;
 }
+/* (the sign kept out of the dissolve: it changes at once, so the 深夜 stamp's bounce down onto it and its letters' flicker as they light are
+   seen as they play (the owner's: keep them); they played under the dissolve, faded over by the picture of the page as it was) */
+html.theme-fading .brand { view-transition-name: brand; }
+html.theme-fading::view-transition-old(brand) { animation: none; opacity: 0; }
+html.theme-fading::view-transition-group(brand),
+html.theme-fading::view-transition-new(brand) { animation: none; }
 
 /* (asked for from the room (the sake barrels: the sake), a card in the stock is brought into view and lit a moment) */
 .stock-panel .is-focus { animation: stock-focus 1.8s ease-in-out; }
@@ -7052,7 +7071,7 @@ html.theme-fading::view-transition-new(root) {
 :root[data-theme='dark'] .rep-about strong { color: #ff9a80; }
 .rep-about p { margin: 6px 0 10px; font-size: 13.5px; }
 .rep-about dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 13.5px; }
-.rep-about dt { color: #7a6250; }
+.rep-about dt { color: #7a6250; white-space: nowrap; }
 :root[data-theme='dark'] .rep-about dt { color: #c9bfae; }
 .rep-about dd { margin: 0; overflow-wrap: anywhere; }
 .rep-drawer a { color: #2f6f9f; text-decoration: underline; text-underline-offset: 2px; }
@@ -7067,8 +7086,10 @@ html.theme-fading::view-transition-new(root) {
 .rep-stars-base { color: rgb(59 42 32 / 0.18); }
 :root[data-theme='dark'] .rep-stars-base { color: rgb(246 236 216 / 0.2); }
 .rep-stars-fill { position: absolute; left: 0; top: 0; overflow: hidden; white-space: nowrap; color: #f0a020; }
-.rep-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.rep-parts li { display: grid; grid-template-columns: 3.6em auto 1fr; align-items: center; gap: 8px; }
+.rep-parts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: max-content auto 1fr; gap: 4px 8px; }
+/* (each row on the list's own columns, the names' as wide as the longest of them, nothing broken onto a second line (the owner's: サービ/ス,
+   The/place, in a column 3.6em wide)) */
+.rep-parts li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; white-space: nowrap; }
 .rep-parts li b { justify-self: end; font-variant-numeric: tabular-nums; }
 /* (the latest customers: under a rule as the office's jobs are, their count beside it) */
 .rep-drawer h4 {
@@ -7087,7 +7108,7 @@ html.theme-fading::view-transition-new(root) {
 .rep-recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .rep-recent li { display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; padding: 9px 12px; }
 .rep-recent .mood-face { grid-row: 1 / 3; width: 34px; height: 34px; align-self: center; filter: drop-shadow(0 2px 3px rgb(59 42 32 / 0.18)); }
-.rep-who { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }
+.rep-who { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; white-space: nowrap; }
 .rep-said { font-size: 13.5px; }
 .rep-note { margin: 0; padding: 10px 2px 12px; font-size: 11.5px; }
 .tissue-icon { font-size: 18px; line-height: 1; }

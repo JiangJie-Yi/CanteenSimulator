@@ -38,6 +38,13 @@ feature('水電：營業的消耗開支（沒有瓦斯，全靠炭火）', () =>
     then('用了 54 公升水', (w) => { expect((w.r as ReturnType<typeof meterAdd>).meter.m3).toBeCloseTo(0.054, 6) })
     and('熱水器用了 0.25 度電', (w) => { expect((w.r as ReturnType<typeof meterAdd>).meter.power['heat:dish']).toBeCloseTo(0.25, 6) })
   })
+  scenario('廁所洗手台的水龍頭開著不關，每分鐘 5 公升；客人洗一次手 1.5 公升', ({ given, when, then, and }) => {
+    given('這個月剛開始', (w) => { w.m = freshMeter() })
+    when('男廁的水龍頭開了 3 分鐘，又有 4 位客人洗手', (w) => { w.r = meterAdd(w.m as ReturnType<typeof freshMeter>, {}, { wcTap: 3, handwash: 4 }) })
+    then('用了 21 公升水', (w) => { expect((w.r as ReturnType<typeof meterAdd>).meter.m3).toBeCloseTo(0.021, 6) })
+    and('分開記在兩項', (w) => { const r = w.r as ReturnType<typeof meterAdd>; expect(r.meter.water.wcTap).toBeCloseTo(15, 6); expect(r.meter.water.handwash).toBeCloseTo(6, 6) })
+    and('要付水費', (w) => { expect((w.r as ReturnType<typeof meterAdd>).cost).toBeGreaterThan(0) })
+  })
   scenario('一個月是 30 個營業日：第 31 天重新起算，再收一次水表基本費', ({ given, when, then, and }) => {
     given(`第 ${BILL_DAYS} 天，已經用了 500 度電`, (w) => { w.m = { ...freshMeter(), day: BILL_DAYS, kwh: 500 } })
     when('隔天開店', (w) => { w.n = nextDay(w.m as ReturnType<typeof freshMeter>) })

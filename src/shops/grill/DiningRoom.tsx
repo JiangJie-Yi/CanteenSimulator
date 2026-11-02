@@ -1,7 +1,7 @@
 import { blessingChime, shrineDoor } from './shrineSound'
 import { TISSUE } from '@/game/tissues'
-import { BambooModel, WashstandModel } from './BarFurnish'
-import { doorClick, LOCK_TEX, ToiletLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPaper, WcRemote } from './Restroom'
+import { BambooModel } from './BarFurnish'
+import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote } from './Restroom'
 import { slideDoorSound } from './restroomSound'
 import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -16,7 +16,7 @@ import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
 import { BOSS_DRINK } from './Boss'
 import { CASE_SIZE } from '@/game/drinkStock'
-import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
+import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -1125,17 +1125,30 @@ function drawRoundPaper(g: CanvasRenderingContext2D, night: boolean) {
     g.lineWidth = k % 9 ? 0.8 : 1.6
     g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a) * 18 + 6, y + Math.sin(a) * 18 - 4, x + Math.cos(a) * 34, y + Math.sin(a) * 34); g.stroke()
   }
-  if (night) bambooShadows(g)
+  if (night) bambooGrove(g, 'shadow')
 }
 /**
- * The moon's shadows of bamboo outside on the round window's paper (512 x 512): two culms far off, thin and soft, two nearer, fuller and
- * sharper, each tapering, its nodes ridged, and from some nodes a slender branch with a spray of narrow pointed leaves drooping from its end;
- * and a few sprays hanging in from above
+ * The bamboo just outside the round window, in the paper's frame (512 x 512 over the window's round): two culms further off, thin, two
+ * nearer and fuller, each tapering, its nodes ridged, and from some nodes a slender branch with a spray of narrow pointed leaves drooping
+ * from its end; and a few sprays hanging in from above. Drawn the one way, by one seed, as the moon's shadows on the paper by night
+ * (`shadow`), and as the bamboo itself seen with the shoji open (`day`: green culms lit down one side, their nodes pale rings, the leaves in
+ * three greens; `night`: moonlit silhouettes, a cool light down one edge), so each culm, branch and leaf outside is where its shadow falls
+ * (the owner's: the view open matching the shadows shut)
  */
-function bambooShadows(g: CanvasRenderingContext2D) {
+function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'night') {
   const rnd = seeded(5)
+  const shadow = look === 'shadow'
+  const LEAF = look === 'day' ? ['#4f7a2c', '#6c9a3a', '#3f6424'] : ['#18261e', '#203226', '#121c16']
+  let tone = 0
   const leaf = (len: number, wid: number) => {
+    if (!shadow) g.fillStyle = LEAF[tone++ % 3]
     g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(wid, len * 0.34, 0, len); g.quadraticCurveTo(-wid * 0.8, len * 0.34, 0, 0); g.fill()
+    // (the midrib: a fine paler line down the leaf)
+    if (!shadow && len > 26) {
+      g.strokeStyle = look === 'day' ? 'rgba(220,235,170,0.35)' : 'rgba(150,170,190,0.18)'
+      g.lineWidth = 0.7
+      g.beginPath(); g.moveTo(0, 2); g.quadraticCurveTo(wid * 0.15, len * 0.4, 0, len * 0.9); g.stroke()
+    }
   }
   const spray = (n: number, side: number, size: number) => {
     for (let k = 0; k < n; k++) {
@@ -1145,17 +1158,34 @@ function bambooShadows(g: CanvasRenderingContext2D) {
       g.restore()
     }
   }
-  const culm = (x: number, w: number, lean: number, blur: number, alpha: number) => {
+  const culm = (x: number, w: number, lean: number, blur: number, alpha: number, far: boolean) => {
     g.save()
-    g.filter = `blur(${blur}px)`
-    g.fillStyle = `rgba(6,10,24,${alpha})`
-    g.strokeStyle = `rgba(6,10,24,${alpha})`
+    // (the shadows soft as the moon throws them; the bamboo itself crisp, the two further off a touch out of focus)
+    g.filter = shadow ? `blur(${blur}px)` : far ? 'blur(0.8px)' : 'none'
+    const ink = shadow ? `rgba(6,10,24,${alpha})` : look === 'day' ? '#4a5e22' : '#141e18'
+    g.fillStyle = ink
+    g.strokeStyle = ink
     g.translate(x, 540)
     g.rotate(lean)
-    g.beginPath(); g.moveTo(-w / 2, 0); g.lineTo(-w * 0.4, -620); g.lineTo(w * 0.4, -620); g.lineTo(w / 2, 0); g.fill()
+    // (the culm: its shadow from below the paper up past its top; the bamboo itself on down to the ground, out of sight under the window)
+    const foot = shadow ? 0 : 260
+    if (!shadow) {
+      const body = g.createLinearGradient(-w / 2, 0, w / 2, 0)
+      if (look === 'day') { body.addColorStop(0, '#5f7a2a'); body.addColorStop(0.3, '#a6be58'); body.addColorStop(0.55, '#8eaa44'); body.addColorStop(1, '#4e6622') }
+      else { body.addColorStop(0, '#2c3c46'); body.addColorStop(0.25, '#1a2620'); body.addColorStop(1, '#0f1712') }
+      g.fillStyle = body
+    }
+    g.beginPath(); g.moveTo(-w / 2, foot); g.lineTo(-w * 0.4, -620); g.lineTo(w * 0.4, -620); g.lineTo(w / 2, foot); g.fill()
+    g.fillStyle = ink
     for (let y = 30 + rnd() * 40; y < 600; y += 74 + rnd() * 26) {
-      // (a node: the culm's ridge across it, a little proud each side)
-      g.fillRect(-w * 0.62, -y - 1.6, w * 1.24, 3.4)
+      // (a node: the culm's ridge across it, a little proud each side; on the bamboo itself a pale ring over a dark line)
+      if (shadow) g.fillRect(-w * 0.62, -y - 1.6, w * 1.24, 3.4)
+      else {
+        g.fillStyle = look === 'day' ? '#d8dc9a' : '#3a4a52'
+        g.fillRect(-w * 0.58, -y - 1.6, w * 1.16, 1.8)
+        g.fillStyle = ink
+        g.fillRect(-w * 0.55, -y + 0.2, w * 1.1, 1.4)
+      }
       if (rnd() < 0.6) {
         const side = rnd() < 0.5 ? -1 : 1, bl = 30 + rnd() * 46
         g.save()
@@ -1172,13 +1202,13 @@ function bambooShadows(g: CanvasRenderingContext2D) {
     }
     g.restore()
   }
-  culm(146, 11, 0.05, 2.4, 0.26)
-  culm(214, 8, -0.035, 2.6, 0.22)
-  culm(366, 17, 0.03, 0.9, 0.46)
-  culm(434, 12, -0.06, 1.1, 0.4)
+  culm(146, 11, 0.05, 2.4, 0.26, true)
+  culm(214, 8, -0.035, 2.6, 0.22, true)
+  culm(366, 17, 0.03, 0.9, 0.46, false)
+  culm(434, 12, -0.06, 1.1, 0.4, false)
   // (sprays hanging in from above, out of the frame)
   g.save()
-  g.filter = 'blur(1.4px)'
+  g.filter = shadow ? 'blur(1.4px)' : 'none'
   g.fillStyle = 'rgba(6,10,24,0.34)'
   for (const [x, y, side] of [[290, -8, 1], [120, 4, -1], [470, 20, -1]] as [number, number, number][]) {
     g.save(); g.translate(x, y); g.rotate(Math.PI * 0.08 * side); spray(5, side, 46); g.restore()
@@ -1238,8 +1268,9 @@ const ROUND_R = 0.4
 /**
  * What's outside the round window, seen with its shoji slid open (the owner's: the shop's in a city, and the view wants depth; it was bamboo
  * against the sky, flat): a city backstreet in four layers, each drawn at its own depth behind the window and looked through it in
- * perspective (ROUND_VIEW's shader), so as the camera moves the near things slide across the far ones. Near (0.2 behind it): a low fence of
- * split bamboo, a wire sagging across. Across the alley (1.2): old two- and three-storey fronts, their windows, a vertical sign or two, the
+ * perspective (ROUND_VIEW's shader), so as the camera moves the near things slide across the far ones. Near (0.2 behind it): a few bamboo,
+ * the ones whose shadows fall on the paper by night (bambooGrove; there was a low fence of split bamboo and a wire: the owner took them away).
+ * Across the alley (1.2): old two- and three-storey fronts, their windows, a vertical sign or two, the
  * air conditioners' outdoor units, a utility pole with its transformer and the wires strung from it. Far off (5): the city's towers, hazy blue
  * with the distance by day, by night their windows lit and red lights on their tops, and a lattice radio tower among them. And the sky (20): by
  * day blue, paler toward the horizon, a few clouds; by night deep blue, the city's glow along its foot, a few stars and the moon. Each layer's
@@ -1442,24 +1473,15 @@ function drawViewMid(g: CanvasRenderingContext2D, size: number, night: boolean) 
   }
 }
 function drawViewNear(g: CanvasRenderingContext2D, size: number, night: boolean) {
-  const { X, Y, S } = viewPx('near', size)
+  const { X, S } = viewPx('near', size)
   g.clearRect(0, 0, size, size)
-  // (a low fence of split bamboo just outside, across the foot of the view, out of focus a little)
-  g.filter = 'blur(1.2px)'
-  const top = -0.26
-  g.fillStyle = night ? '#2a2618' : '#c9b277'
-  g.fillRect(0, Y(top), size, size - Y(top))
-  g.strokeStyle = night ? '#16130c' : '#8a7442'
-  g.lineWidth = Math.max(2, S(0.008))
-  for (let x = -0.52; x < 0.52; x += 0.028) { g.beginPath(); g.moveTo(X(x), Y(top)); g.lineTo(X(x), size); g.stroke() }
-  g.fillStyle = night ? '#100e08' : '#6a5630'
-  g.fillRect(0, Y(top - 0.05), size, S(0.022))
-  g.fillRect(0, Y(top - 0.17), size, S(0.022))
-  // (a wire sagging across, near)
-  g.strokeStyle = night ? 'rgba(0,0,0,0.85)' : 'rgba(30,30,30,0.8)'
-  g.lineWidth = Math.max(1.5, S(0.006))
-  g.beginPath(); g.moveTo(X(-0.52), Y(0.44)); g.quadraticCurveTo(X(0.0), Y(0.22), X(0.52), Y(0.4)); g.stroke()
-  g.filter = 'none'
+  // (a few bamboo just outside (the owner's: the fence taken away), the very ones whose shadows the moon throws on the paper: the paper's
+  // 512 px over the window's round, laid on this layer's own span)
+  g.save()
+  g.translate(X(-ROUND_R), X(-ROUND_R))
+  g.scale(S(2 * ROUND_R) / 512, S(2 * ROUND_R) / 512)
+  bambooGrove(g, night ? 'night' : 'day')
+  g.restore()
 }
 /** the four layers' pictures, made again day and night as the theme turns */
 const ROUND_VIEW = (() => {
@@ -1985,6 +2007,32 @@ const wcNoren = (who: 'm' | 'f') => canvasTex(1024, 484, (g) => {
   g.restore()
 })
 const WC_NOREN = { m: wcNoren('m'), f: wcNoren('f') }
+/**
+ * The long noren hung across the way round to the toilet (the owner's: in through the door the washstand first, the toilet round the
+ * corner), down to below the waist: linen dyed from pale at its top down into the room's colour (ぼかし), a dark band along its top over the
+ * rod, the room's crest small and white near its foot, cut in half by the slit between its two panels; the linen's weave.
+ */
+const wcStallNoren = (who: 'm' | 'f') => canvasTex(512, 1024, (g) => {
+  const deep = who === 'm' ? '#22335f' : '#8e2329'
+  const pale = who === 'm' ? '#e8ebf0' : '#f6e8e6'
+  g.save()
+  const gr = g.createLinearGradient(0, 0, 0, 1024)
+  gr.addColorStop(0, pale); gr.addColorStop(0.4, pale); gr.addColorStop(0.8, deep); gr.addColorStop(1, deep)
+  g.fillStyle = gr; g.fillRect(0, 0, 512, 1024)
+  g.globalAlpha = 0.07
+  g.fillStyle = '#ffffff'
+  for (let x = 0; x < 512; x += 3) g.fillRect(x, 0, 1, 1024)
+  g.fillStyle = '#000000'
+  for (let y = 0; y < 1024; y += 3) g.fillRect(0, y, 512, 1)
+  g.globalAlpha = 1
+  g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, 512, 40)
+  crest(g, who === 'm' ? 'ume' : 'sakura', 256, 862, 64, '#f4efe4', deep)
+  g.strokeStyle = '#f4efe4'; g.lineWidth = 4
+  g.beginPath(); g.arc(256, 862, 80, 0, Math.PI * 2); g.stroke()
+  g.fillStyle = '#f4efe4'; g.fillRect(0, 1004, 512, 4)
+  g.restore()
+})
+const WC_STALL_NOREN = { m: wcStallNoren('m'), f: wcStallNoren('f') }
 
 /**
  * The way through to the toilet: one sliding door (引き戸) in a dark wooden frame, shut, wood below and shoji paper on
@@ -2056,14 +2104,6 @@ const WC_GEO = {
   leaf: new THREE.ConeGeometry(0.02, 0.12, 4),
   lamp: new THREE.SphereGeometry(0.06, 12, 8),
 }
-/**
- * The little room behind a toilet's door, in the Japanese way: floorboards of pale hinoki, charred-cedar planks to the
- * waist and cream plaster above, dark beams over a ceiling of boards; a white toilet against the back wall with its
- * cistern (a small basin on its top to wash the hands in), a shoji window over it, a slatted duckboard (簀の子) before
- * it and slippers by the door; a stone basin on a wooden shelf by the other wall with a bamboo dipper, a round mirror
- * in a wooden frame and an indigo hand towel on a rod; the paper in a wooden holder; a bamboo vase of camellia on the
- * cistern, the お手洗い plaque, and a paper lamp lit overhead.
- */
 /** the room's paper lamp, on its sensor */
 function WcLamp({ who, at }: { who: 'm' | 'f'; at: [number, number, number] }) {
   const m = useRef<THREE.MeshBasicMaterial>(null)
@@ -2075,46 +2115,165 @@ function WcLamp({ who, at }: { who: 'm' | 'f'; at: [number, number, number] }) {
   })
   return <mesh geometry={WC_GEO.lamp} position={at}><meshBasicMaterial ref={m} color="#fff1cc" toneMapped={false} /></mesh>
 }
+/** a wall of the toilet's rooms, facing into them: charred cedar to the waist with a rail along it, cream plaster over; `len` along it, its
+ * middle at `at`, turned `yaw` (unturned, it faces +z); the cedar's boards their own width whatever its length */
+function WcWall({ len, at, yaw, top }: { len: number; at: [number, number, number]; yaw: number; top: number }) {
+  const geo = useMemo(() => {
+    const lower = new THREE.PlaneGeometry(len, 0.9)
+    const uv = lower.attributes.uv as THREE.BufferAttribute
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (len / 0.3), uv.getY(i) * (0.9 / 0.5))
+    return { lower, upper: new THREE.PlaneGeometry(len, top - 0.9), rail: new THREE.BoxGeometry(len, 0.035, 0.03) }
+  }, [len, top])
+  useEffect(() => () => { geo.lower.dispose(); geo.upper.dispose(); geo.rail.dispose() }, [geo])
+  return (
+    <group position={at} rotation-y={yaw}>
+      <mesh geometry={geo.lower} position-y={0.45}><meshToonMaterial color="#ffffff" map={WC_CEDAR} /></mesh>
+      <mesh geometry={geo.upper} position-y={0.9 + (top - 0.9) / 2}><meshToonMaterial color="#ece0c6" /></mesh>
+      <mesh geometry={geo.rail} position={[0, 0.9, 0.012]}><meshToonMaterial color="#6a4428" /></mesh>
+    </group>
+  )
+}
+/** a floor of hinoki boards, `wx` by `wz`, its middle at `at` (the boards their own width whatever its size) */
+function WcFloor({ wx, wz, at }: { wx: number; wz: number; at: [number, number, number] }) {
+  const geo = useMemo(() => {
+    const g = new THREE.PlaneGeometry(wx, wz)
+    const uv = g.attributes.uv as THREE.BufferAttribute
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (wx / 0.4), uv.getY(i) * (wz / 0.4))
+    return g
+  }, [wx, wz])
+  useEffect(() => () => geo.dispose(), [geo])
+  return <mesh geometry={geo} position={at} rotation-x={-Math.PI / 2}><meshToonMaterial color="#ffffff" map={WC_FLOOR} /></mesh>
+}
+/**
+ * The rooms behind a toilet's door, in the Japanese way (the owner's: the door slid open shows the washstand and its mirror; the toilet's
+ * round the corner). Straight in, the washroom: the washstand against its back wall facing the door (blender/wc.py: a hinoki counter on a
+ * dark cedar cabinet with lattice doors, a Shigaraki bowl, a brass tap whose water runs at a click, a round mirror over it), a bamboo vase
+ * of camellia on its counter, an indigo hand towel on a bamboo rod on the wall beside it, the お手洗い plaque, a slatted duckboard (簀の子)
+ * before the washstand and the slippers by the door. Off its side, away from the other toilet, through an opening hung with a long noren,
+ * the toilet's own little room: the toilet at its far end with its cistern to the wall (a small basin on its top), a shoji window over it,
+ * the paper on its holder and the washlet's remote on one wall, the brush in the corner; in the women's the Otohime, the sanitary bin and a
+ * basket of sanitary pads (the men's has no Otohime: the owner's). Floorboards of pale hinoki, charred-cedar planks to the waist and cream
+ * plaster above, dark beams over a ceiling of boards, a paper lamp lit over each room on its sensor. Its frame: x from the door's wall back
+ * (WC_ROOM.D deep), z across the door from its middle; the toilet's room is on the side `s`.
+ */
 function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
-  const D = 0.9
-  const floor = useMemo(() => {
-    if (!WC_FLOOR) return null
-    const t = WC_FLOOR.clone()
-    t.repeat.set(D / 0.4, w / 0.4)
-    t.needsUpdate = true
-    return t
-  }, [w])
-  const cedar = useMemo(() => {
-    if (!WC_CEDAR) return null
-    const t = WC_CEDAR.clone()
-    t.repeat.set(w / 0.3, 0.9 / 0.5)
-    t.needsUpdate = true
-    return t
-  }, [w])
-  const cedarSide = useMemo(() => {
-    if (!WC_CEDAR) return null
-    const t = WC_CEDAR.clone()
-    t.repeat.set(D / 0.3, 0.9 / 0.5)
-    t.needsUpdate = true
-    return t
-  }, [])
-  const accent = who === 'm' ? '#2c3e66' : '#9a2a2a'
+  const { D, E, X0 } = WC_ROOM
+  const s = who === 'm' ? -1 : 1
   const top = h + 0.3
-  const PLASTER = '#ece0c6'
+  const name = who === 'm' ? '男廁' : '女廁'
+  // (the toilet's room: from X0 back to the back wall, from the washroom's side E on along the wall)
+  const SW = D - X0, SX = (X0 + D) / 2, SZ = s * (w / 2 + E / 2)
+  // (the long noren across the way into it: two panels, each its half of the one picture, a slit between)
+  const OP = SW - 0.06, NL = h - 0.55
+  const noren = useMemo(() => [-1, 1].map((sd) => {
+    const pw = (OP - 0.02) / 2
+    const g = new THREE.PlaneGeometry(pw, NL)
+    const uv = g.attributes.uv as THREE.BufferAttribute
+    const u0 = sd < 0 ? 0 : (pw + 0.02) / OP, u1 = u0 + pw / OP
+    for (let k = 0; k < uv.count; k++) uv.setX(k, u0 + uv.getX(k) * (u1 - u0))
+    return { sd, g, x: SX + sd * (pw + 0.02) / 2 }
+  }), [OP, NL, SX])
+  useEffect(() => () => noren.forEach((n) => n.g.dispose()), [noren])
+  const W2 = SW / 2
   return (
     <group>
       <StaticBatch>
-      <mesh position={[D / 2, 0.004, 0]} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[D, w]} />
-        <meshToonMaterial color="#ffffff" map={floor} />
-      </mesh>
-      {/* back wall and the two side walls: charred cedar to the waist with a rail along it, cream plaster over */}
-      <group position={[D, 0, 0]}>
-        <mesh position-y={0.45} rotation-y={-Math.PI / 2}><planeGeometry args={[w, 0.9]} /><meshToonMaterial color="#ffffff" map={cedar} /></mesh>
-        <mesh position-y={0.9 + (top - 0.9) / 2} rotation-y={-Math.PI / 2}><planeGeometry args={[w, top - 0.9]} /><meshToonMaterial color={PLASTER} /></mesh>
-        <mesh position={[-0.012, 0.9, 0]}><boxGeometry args={[0.03, 0.035, w]} /><meshToonMaterial color="#6a4428" /></mesh>
+      <WcFloor wx={D} wz={w} at={[D / 2, 0.004, 0]} />
+      <WcFloor wx={SW} wz={E} at={[SX, 0.004, SZ]} />
+      {/* the back wall, behind the washstand and on along the toilet's room; the washroom's other side; the short stretch by the door on the
+          toilet's side, and the plaster over the way through; the toilet's room's near wall and its end */}
+      <WcWall len={w + E} at={[D, 0, s * E / 2]} yaw={-Math.PI / 2} top={top} />
+      <WcWall len={D} at={[D / 2, 0, -s * w / 2]} yaw={s > 0 ? 0 : Math.PI} top={top} />
+      <WcWall len={X0} at={[X0 / 2, 0, s * w / 2]} yaw={s > 0 ? Math.PI : 0} top={top} />
+      {[-1, 1].map((f) => (
+        <mesh key={f} position={[SX, h + (top - h) / 2, s * w / 2]} rotation-y={(s * f) > 0 ? 0 : Math.PI}>
+          <planeGeometry args={[SW, top - h]} /><meshToonMaterial color="#ece0c6" />
+        </mesh>
+      ))}
+      <WcWall len={E} at={[X0, 0, SZ]} yaw={Math.PI / 2} top={top} />
+      <WcWall len={SW} at={[SX, 0, s * (w / 2 + E)]} yaw={s > 0 ? Math.PI : 0} top={top} />
+      {/* (the way through: a dark post at the short wall's end, a head beam over it, the noren's rod under that) */}
+      <mesh position={[X0 + 0.02, h / 2, s * w / 2]}><boxGeometry args={[0.04, h, 0.05]} /><meshToonMaterial color="#2e1d12" /></mesh>
+      <mesh position={[SX, h - 0.02, s * w / 2]}><boxGeometry args={[SW, 0.05, 0.05]} /><meshToonMaterial color="#2e1d12" /></mesh>
+      <mesh position={[SX, h - 0.07, s * (w / 2 - 0.035)]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.008, 0.008, OP + 0.04, 8]} /><meshToonMaterial color="#3a2416" /></mesh>
+      {/* the ceilings of dark boards, beams across them */}
+      <mesh position={[D / 2, top, 0]} rotation-x={Math.PI / 2}><planeGeometry args={[D, w]} /><meshToonMaterial color="#3a2416" /></mesh>
+      <mesh position={[SX, top, SZ]} rotation-x={Math.PI / 2}><planeGeometry args={[SW, E]} /><meshToonMaterial color="#3a2416" /></mesh>
+      {[0.25, 0.7].map((x) => <mesh key={x} position={[x, top - 0.03, 0]}><boxGeometry args={[0.06, 0.06, w]} /><meshToonMaterial color="#241408" /></mesh>)}
+      <mesh position={[SX, top - 0.03, SZ]}><boxGeometry args={[SW, 0.06, 0.06]} /><meshToonMaterial color="#241408" /></mesh>
+      </StaticBatch>
+      {/* the long noren across the way to the toilet, its two panels hanging from the rod (the noren and the rod stand still: batched apart,
+          their picture each its own) */}
+      <Movable id={`wc2-${who}-noren`} label={`隔間暖簾（${name}）`}><StaticBatch>
+        {noren.map(({ sd, g, x }) => (
+          <mesh key={sd} geometry={g} position={[x, h - 0.07 - NL / 2, s * (w / 2 - 0.035)]}>
+            <meshToonMaterial color="#ffffff" map={WC_STALL_NOREN[who]} side={THREE.DoubleSide} />
+          </mesh>
+        ))}
+      </StaticBatch></Movable>
+      {/* ---- the washroom: the washstand facing the door, its tap live (Restroom) */}
+      <Movable id={`wc2-${who}-basin`} label={`洗手台與鏡子（${name}）`}>
+        <group position={[D, 0, 0]}><WashstandLive who={who} /></group>
+      </Movable>
+      <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}><StaticBatch>
+      {/* (a bamboo vase of camellia on the washstand's counter, beside the bowl) */}
+      <group position={[D - 0.1, 0.76, -0.215]}>
+        <mesh geometry={WC_GEO.pot} position-y={0.05}><meshToonMaterial color="#b8a060" /></mesh>
+        {[0.02, 0.05, 0.08].map((y) => <mesh key={y} position-y={y}><torusGeometry args={[0.03, 0.002, 4, 10]} /><meshToonMaterial color="#8a7a3a" /></mesh>)}
+        <mesh position={[0.01, 0.17, 0.005]} rotation-z={0.15}><cylinderGeometry args={[0.0022, 0.0022, 0.14, 5]} /><meshToonMaterial color="#3a2a1a" /></mesh>
+        <mesh position={[0.02, 0.24, 0.005]}><sphereGeometry args={[0.024, 8, 6]} /><meshToonMaterial color="#d8445a" /></mesh>
+        {[0, 1.6, 3.2, 4.7].map((a) => (
+          <mesh key={a} geometry={WC_GEO.leaf} position={[Math.cos(a) * 0.02, 0.15, Math.sin(a) * 0.02]} rotation={[Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5]}>
+            <meshToonMaterial color="#3f7a3a" />
+          </mesh>
+        ))}
+      </group>
+      </StaticBatch></Movable>
+      <Movable id={`wc2-${who}-towel`} label={`手巾架（${name}）`}><StaticBatch>
+      {/* (the indigo hand towel on a bamboo rod on the wall beside the washstand) */}
+      <group position={[D - 0.24, 0.98, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
+        <mesh position-z={0.022} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.007, 0.007, 0.18, 8]} /><meshToonMaterial color="#b89a52" /></mesh>
+        {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.08, 0, 0.011]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.005, 0.005, 0.022, 6]} /><meshToonMaterial color="#5a3d22" /></mesh>)}
+        <mesh position={[0, -0.11, 0.03]}><planeGeometry args={[0.12, 0.22]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI} side={THREE.DoubleSide} /></mesh>
+      </group>
+      </StaticBatch></Movable>
+      <Movable id={`wc2-${who}-plaque`} label={`廁所牌（${name}）`}><StaticBatch>
+      <mesh position={[0.36, 1.52, -s * (w / 2 - 0.006)]} rotation-y={s > 0 ? 0 : Math.PI}><planeGeometry args={[0.3, 0.12]} /><meshToonMaterial color="#ffffff" map={WC_PLAQUE} /></mesh>
+      </StaticBatch></Movable>
+      <Movable id={`wc2-${who}-duck`} label={`簀之子踏板（${name}）`}><StaticBatch>
+      {/* the slatted duckboard (簀の子) before the washstand, where hands are washed */}
+      <group position={[D - 0.56, 0, 0]}>
+        {Array.from({ length: 9 }, (_, k) => (
+          <mesh key={k} position={[0, 0.02, (k - 4) * 0.052]}><boxGeometry args={[0.2, 0.02, 0.04]} /><meshToonMaterial color="#d8c08a" /></mesh>
+        ))}
+        {[-1, 1].map((sd) => <mesh key={sd} position={[0, 0.008, sd * 0.2]}><boxGeometry args={[0.2, 0.016, 0.03]} /><meshToonMaterial color="#6a4a28" /></mesh>)}
+      </group>
+      </StaticBatch></Movable>
+      <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${name}）`}><StaticBatch>
+      {/* (a pair of toilet slippers by the door: rounded soles, a cloth band over the toes, the toilet's own colour, set side by side toes out) */}
+      {[-1, 1].map((sd) => (
+        <group key={sd} position={[0.15, 0.03, sd * 0.055]} rotation-y={sd * 0.06}>
+          <mesh position-y={0.008} scale={[0.13, 0.016, 0.046]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color="#e8dcc4" /></mesh>
+          <mesh position-y={0.017} scale={[0.125, 0.004, 0.042]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color={who === 'm' ? '#2c3e66' : '#9a2a2a'} /></mesh>
+          <mesh position={[-0.055, 0.024, 0]} rotation-x={Math.PI / 2} scale={[1, 1, 0.8]}><torusGeometry args={[0.04, 0.016, 6, 16, Math.PI]} /><meshToonMaterial color={who === 'm' ? '#2c3e66' : '#9a2a2a'} /></mesh>
+        </group>
+      ))}
+      </StaticBatch></Movable>
+      <Movable id={`wc2-${who}-lamp`} label={`紙燈（${name}）`}><WcLamp who={who} at={[D / 2, h + 0.1, 0]} /><StaticBatch>
+      {/* a paper lamp over each room, in a wooden cage: on a motion sensor, bright while someone's in or the door's open, dim otherwise */}
+      <mesh position={[D / 2, h + 0.1, 0]}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
+      </StaticBatch></Movable>
+      {/* ---- the toilet's room, in its own frame: x from the way in (0) to its far end (E), z across it */}
+      <group position={[SX, 0, s * w / 2]} rotation-y={-s * Math.PI / 2}>
+        <Movable id={`wc2-${who}-toilet`} label={`馬桶（${name}）`}>
+        {/* the toilet with its washlet, facing the way in, its cistern to the far wall (blender/wc.py; Restroom: its lid, flush, scrubbing) */}
+        <ToiletLive who={who} at={[E - 0.4, 0, 0]} />
+        </Movable>
+        {/* (marks on the floor before it as it gets dirty) */}
+        <WcMarks who={who} at={[0.03, 0.006, 0]} size={[0.3, 0.5]} />
+        <StaticBatch>
         {/* (the shoji window over the toilet: washi in a dark lattice, lit from outside) */}
-        <group position={[-0.006, 1.38, 0]} rotation-y={-Math.PI / 2}>
+        <group position={[E - 0.006, 1.38, 0]} rotation-y={-Math.PI / 2}>
           <mesh position-z={0.0015}><planeGeometry args={[0.46, 0.34]} /><meshBasicMaterial color="#fcebc6" toneMapped={false} /></mesh>
           {[-1, 0, 1].map((k) => <mesh key={`v${k}`} position={[k * 0.115, 0, 0.003]}><planeGeometry args={[0.012, 0.34]} /><meshToonMaterial color="#3a2416" /></mesh>)}
           {[-0.5, 0.5].map((k) => <mesh key={`h${k}`} position={[0, k * 0.11, 0.003]}><planeGeometry args={[0.46, 0.012]} /><meshToonMaterial color="#3a2416" /></mesh>)}
@@ -2122,92 +2281,38 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
             <mesh key={`${x}${y}`} position={[x, y, 0.004]}><planeGeometry args={[sw, sh]} /><meshToonMaterial color="#2e1d12" /></mesh>
           ))}
         </group>
-      </group>
-      {[-1, 1].map((sd) => (
-        <group key={sd} position={[D / 2, 0, sd * w / 2]} rotation-y={sd > 0 ? Math.PI : 0}>
-          <mesh position-y={0.45}><planeGeometry args={[D, 0.9]} /><meshToonMaterial color="#ffffff" map={cedarSide} /></mesh>
-          <mesh position-y={0.9 + (top - 0.9) / 2}><planeGeometry args={[D, top - 0.9]} /><meshToonMaterial color={PLASTER} /></mesh>
-          <mesh position={[0, 0.9, 0.012]}><boxGeometry args={[D, 0.035, 0.03]} /><meshToonMaterial color="#6a4428" /></mesh>
-        </group>
-      ))}
-      {/* the ceiling of dark boards, with two beams across it */}
-      <mesh position={[D / 2, top, 0]} rotation-x={Math.PI / 2}><planeGeometry args={[D, w]} /><meshToonMaterial color="#3a2416" /></mesh>
-      {[0.25, 0.7].map((x) => <mesh key={x} position={[x, top - 0.03, 0]}><boxGeometry args={[0.06, 0.06, w]} /><meshToonMaterial color="#241408" /></mesh>)}
-      </StaticBatch>
-      <Movable id={`wc-${who}-toilet`} label={`馬桶（${who === 'm' ? '男廁' : '女廁'}）`}>
-      {/* the toilet with its washlet, facing the door, its cistern to the back wall (blender/wc.py; Restroom: its lid, flush, scrubbing) */}
-      <ToiletLive who={who} at={[D - 0.4, 0, 0]} />
-      </Movable>
-      {/* (marks on the duckboard as it gets dirty) */}
-      <WcMarks who={who} at={[0.105, 0.032, 0]} size={[0.21, 0.46]} />
-      <Movable id={`wc-${who}-remote`} label={`免治馬桶遙控器（${who === 'm' ? '男廁' : '女廁'}）`}>
-        <group position={[D - 0.36, 0.86, w / 2]} rotation-y={Math.PI}><WcRemote who={who} /></group>
-      </Movable>
-      <Movable id={`wc-${who}-oto`} label={`音姬（${who === 'm' ? '男廁' : '女廁'}）`}>
-        <group position={[D, 1.0, w / 2 - 0.12]} rotation-y={-Math.PI / 2}><WcOtohime who={who} /></group>
-      </Movable>
-      <Movable id={`wc-${who}-brush`} label={`馬桶刷（${who === 'm' ? '男廁' : '女廁'}）`}>
-        <WcBrush who={who} at={[D - 0.08, 0, -w / 2 + 0.08]} bowl={[D - 0.43, 0.31, 0]} />
-      </Movable>
-      {who === 'f' && (
-        <Movable id="wc-f-bin" label="生理用品垃圾桶（女廁）">
-          <group position={[D - 0.1, 0, w / 2 - 0.1]} rotation-y={Math.PI}><WcBin /></group>
+        </StaticBatch>
+        <Movable id={`wc2-${who}-remote`} label={`免治馬桶遙控器（${name}）`}>
+          <group position={[E - 0.36, 0.86, W2]} rotation-y={Math.PI}><WcRemote who={who} /></group>
         </Movable>
-      )}
-      <Movable id={`wc-${who}-vase`} label={`竹花瓶（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      {/* (on the hand-wash counter, beside the bowl) */}
-      <group position={[D * 0.45 - 0.26, 0.06, -w / 2 + 0.01]}>
-        {/* (a bamboo vase of camellia beside it) */}
-        <group position={[0.13, 0.7, 0.09]}>
-          <mesh geometry={WC_GEO.pot} position-y={0.05}><meshToonMaterial color="#b8a060" /></mesh>
-          {[0.02, 0.05, 0.08].map((y) => <mesh key={y} position-y={y}><torusGeometry args={[0.03, 0.002, 4, 10]} /><meshToonMaterial color="#8a7a3a" /></mesh>)}
-          <mesh position={[0.01, 0.17, 0.005]} rotation-z={0.15}><cylinderGeometry args={[0.0022, 0.0022, 0.14, 5]} /><meshToonMaterial color="#3a2a1a" /></mesh>
-          <mesh position={[0.02, 0.24, 0.005]}><sphereGeometry args={[0.024, 8, 6]} /><meshToonMaterial color="#d8445a" /></mesh>
-          {[0, 1.6, 3.2, 4.7].map((a) => (
-            <mesh key={a} geometry={WC_GEO.leaf} position={[Math.cos(a) * 0.02, 0.15, Math.sin(a) * 0.02]} rotation={[Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5]}>
-              <meshToonMaterial color="#3f7a3a" />
-            </mesh>
-          ))}
-        </group>
+        {/* (the Otohime in the women's only: the owner's) */}
+        {who === 'f' && (
+          <Movable id="wc2-f-oto" label="音姬（女廁）">
+            <group position={[E, 1.0, W2 - 0.12]} rotation-y={-Math.PI / 2}><WcOtohime who={who} /></group>
+          </Movable>
+        )}
+        <Movable id={`wc2-${who}-brush`} label={`馬桶刷（${name}）`}>
+          <WcBrush who={who} at={[E - 0.08, 0, -W2 + 0.08]} bowl={[E - 0.43, 0.31, 0]} />
+        </Movable>
+        <Movable id={`wc2-${who}-paper`} label={`衛生紙架（${name}）`}>
+          {/* the paper, on its walnut holder on the wall by the toilet (Restroom: thinning with use, a new roll at a click) */}
+          <group position={[E - 0.36, 0.6, W2]} rotation-y={Math.PI}><WcPaper who={who} /></group>
+        </Movable>
+        {who === 'f' && (
+          <Movable id="wc2-f-bin" label="生理用品垃圾桶（女廁）">
+            <group position={[E - 0.1, 0, W2 - 0.1]} rotation-y={Math.PI}><WcBin /></group>
+          </Movable>
+        )}
+        {who === 'f' && (
+          <Movable id="wc2-f-pads" label="衛生棉（女廁）">
+            {/* (the sanitary pads, free to take, on their shelf on the wall across from the paper) */}
+            <group position={[E - 0.42, 0.98, -W2]}><WcPads /></group>
+          </Movable>
+        )}
+        <Movable id={`wc2-${who}-lamp2`} label={`隔間紙燈（${name}）`}><WcLamp who={who} at={[E / 2, h + 0.1, 0]} /><StaticBatch>
+          <mesh position={[E / 2, h + 0.1, 0]}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
+        </StaticBatch></Movable>
       </group>
-      </StaticBatch></Movable>
-      <Movable id={`wc-${who}-duck`} label={`簀之子踏板（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      {/* the slatted duckboard (簀の子) before the toilet, and the slippers by the door */}
-      {/* (from the door to the toilet's front, stopping short of it: the toilet stands on the floor) */}
-      <group position={[0.105, 0, 0]}>
-        {Array.from({ length: 9 }, (_, k) => (
-          <mesh key={k} position={[0, 0.02, (k - 4) * 0.052]}><boxGeometry args={[0.2, 0.02, 0.04]} /><meshToonMaterial color="#d8c08a" /></mesh>
-        ))}
-        {[-1, 1].map((sd) => <mesh key={sd} position={[0, 0.008, sd * 0.2]}><boxGeometry args={[0.2, 0.016, 0.03]} /><meshToonMaterial color="#6a4a28" /></mesh>)}
-      </group>
-      </StaticBatch></Movable>
-      <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      {/* (a pair of toilet slippers: rounded soles, a cloth band over the toes, the toilet's own colour, set side by side toes out) */}
-      {[-1, 1].map((sd) => (
-        <group key={sd} position={[0.15, 0.03, sd * 0.055]} rotation-y={sd * 0.06}>
-          <mesh position-y={0.008} scale={[0.13, 0.016, 0.046]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color="#e8dcc4" /></mesh>
-          <mesh position-y={0.017} scale={[0.125, 0.004, 0.042]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color={accent} /></mesh>
-          <mesh position={[-0.055, 0.024, 0]} rotation-x={Math.PI / 2} scale={[1, 1, 0.8]}><torusGeometry args={[0.04, 0.016, 6, 16, Math.PI]} /><meshToonMaterial color={accent} /></mesh>
-        </group>
-      ))}
-      </StaticBatch></Movable>
-      <Movable id={`wc-${who}-basin`} label={`石洗手台與鏡子（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      {/* the hand-wash counter against the side wall: a cedar plank on brackets, a stone bowl, a brass tap arching over it, a round
-          mirror and a towel ring (blender/wc.py); the indigo hand towel hung beside */}
-      <group position={[D * 0.45, 0, -w / 2]} rotation-y={Math.PI / 2}><WashstandModel /></group>
-      <mesh position={[D * 0.45 + 0.26, 0.86, -w / 2 + 0.035]}><planeGeometry args={[0.1, 0.2]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI} side={THREE.DoubleSide} /></mesh>
-      </StaticBatch></Movable>
-      <Movable id={`wc-${who}-paper`} label={`衛生紙架（${who === 'm' ? '男廁' : '女廁'}）`}>
-      {/* the paper, on its walnut holder on the other wall (Restroom: thinning with use, a new roll at a click) */}
-      <group position={[D - 0.36, 0.6, w / 2]} rotation-y={Math.PI}><WcPaper who={who} /></group>
-      </Movable>
-      <Movable id={`wc-${who}-plaque`} label={`廁所牌（${who === 'm' ? '男廁' : '女廁'}）`}><StaticBatch>
-      <mesh position={[D * 0.45, 1.5, w / 2 - 0.006]} rotation-y={Math.PI}><planeGeometry args={[0.3, 0.12]} /><meshToonMaterial color="#ffffff" map={WC_PLAQUE} /></mesh>
-      </StaticBatch></Movable>
-      <Movable id={`wc-${who}-lamp`} label={`紙燈（${who === 'm' ? '男廁' : '女廁'}）`}><WcLamp who={who} at={[D / 2, h + 0.1, 0]} /><StaticBatch>
-      {/* a paper lamp overhead, in a wooden cage: on a motion sensor, bright while someone's in or the door's open, dim otherwise */}
-      <mesh position={[D / 2, h + 0.1, 0]}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
-      </StaticBatch></Movable>
     </group>
   )
 }
@@ -2853,6 +2958,9 @@ function nameOnly(title: string, hint: string) {
 const SHRINE_WIDE = 1.1
 /** and a little shallower front to back, its back still to the wall (the offerings' shelf in front of it as it was) */
 const SHRINE_DEEP = 0.8
+/** how far the doors swing open (radians): each leaf turned a little at a time against the railing's posts, caps, rails and balusters
+ * (blender/kamidana.py's sizes, widened as the shrine is), the middle ones clear to 61°, the side bays' to 74°, each set a few degrees short */
+const DOOR_SWING = { middle: 1.0, side: 1.22 }
 function ShrineDoors() {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
   const doors = useMemo(() => {
@@ -2893,13 +3001,15 @@ function ShrineDoors() {
     if (want !== wasOpen.current) { wasOpen.current = want; shrineDoor(want) }
     k.current += ((want ? 1 : 0) - k.current) * Math.min(1, dt * 4)
     for (const leaf of doors.children) {
-      // (each leaf swings out to the front, the left one one way and the right the other)
+      // (each leaf swings out to the front, the left one one way and the right the other, as far as it can without meeting the railing round
+      // the deck (the owner saw them go through its posts and rails, swung 100°): the middle doors' hinges stand right behind the posts at the
+      // foot of the steps, the side bays' leaves a short way behind the front rails)
       const sd = leaf.name.endsWith('-1') ? -1 : 1
-      leaf.rotation.y = sd * k.current * 1.75
+      leaf.rotation.y = sd * k.current * (/^KamiM/.test(leaf.name) ? DOOR_SWING.middle : DOOR_SWING.side)
     }
   })
   return (
-    <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v); setTip({ title: '神棚の扉', hint: open ? '點一下打開' : '點一下關上' }) }}
+    <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v); setTip({ title: '神棚門', hint: open ? '點一下打開' : '點一下關上' }) }}
       {...tipOver('神棚門', open ? '點一下關上' : '點一下打開')}>
       <primitive object={doors} />
     </group>
@@ -5024,14 +5134,17 @@ function useDocLang() {
   }, [])
   return lang
 }
-/** the exit sign's face, as Taiwan's edge-lit ones: green, lit; EXIT spaced out on the left, in the middle a white doorway with the running
- * figure leaving by it, on the right the words in the language on screen. The three laid out evenly: each measured, the same margin at either
- * end and the same gap between them, each centred on the pane's middle by its own letters' height (the words were set low, and crowded
- * against the doorway's step while EXIT stood far off); words too long for their room set smaller */
+/** the exit sign's pane (blender/exitsign.py's PW, PH): a little shorter than it was (the owner's: 0.42) */
+const EXIT_PANE = { w: 0.38, h: 0.155 }
+/** the exit sign's face, as Taiwan's edge-lit ones: green, lit; in the very middle a white doorway with the running figure leaving by it, its
+ * step a line under it as wide either side (the owner's: the sign balanced about the doorway; its step ran out to the right only, and the
+ * doorway sat wherever EXIT and the words left it); EXIT spaced out in the middle of the half to its left, the words in the language on
+ * screen in the middle of the half to its right, set smaller if they don't fit; each centred on the pane's middle by its own letters' height */
 const exitFace = (lang: string) => {
   const words = lang === 'ja' ? '非常口' : lang === 'en' ? 'WAY OUT' : '緊急出口'
-  return canvasTex(1024, 378, (g) => {
-    const W = 1024, H = 378, MID = H / 2
+  const H = 378, W = Math.round((H * EXIT_PANE.w) / EXIT_PANE.h)
+  return canvasTex(W, H, (g) => {
+    const MID = H / 2
     // (the ground: a bright green, a little brighter toward the top edge where the light comes in)
     const grad = g.createLinearGradient(0, 0, 0, H)
     grad.addColorStop(0, '#36dc7c'); grad.addColorStop(1, '#1cb75f')
@@ -5041,29 +5154,31 @@ const exitFace = (lang: string) => {
     g.fillStyle = edge; g.fillRect(0, 0, W, 70)
     g.fillStyle = '#ffffff'; g.strokeStyle = '#ffffff'; g.lineCap = 'round'; g.lineJoin = 'round'
     g.textBaseline = 'alphabetic'; g.textAlign = 'left'
-    // (the parts measured: EXIT's letters with a space between each, the doorway with its step, the words)
-    const EXIT_FONT = '600 92px "Arial", "Helvetica", sans-serif', TRACK = 22
+    // (the doorway in the middle, its step overhanging it as much either side; each half beside it what's left, less a margin and a gap)
+    const DOOR = 150, LIP = 20, wIcon = DOOR + 2 * LIP
+    const MARGIN = 40, GAP = 36
+    const half = (W - wIcon) / 2 - MARGIN - GAP
+    // (EXIT's letters with a space between each, closer if they don't fit their half)
+    const EXIT_FONT = '600 92px "Arial", "Helvetica", sans-serif'
     g.font = EXIT_FONT
     const letters = 'EXIT'.split('').map((ch) => ({ ch, w: g.measureText(ch).width }))
-    const wExit = letters.reduce((a, l) => a + l.w, 0) + TRACK * (letters.length - 1)
+    const inked = letters.reduce((a, l) => a + l.w, 0)
+    const TRACK = Math.max(6, Math.min(22, (half - inked) / (letters.length - 1)))
+    const wExit = inked + TRACK * (letters.length - 1)
     const exitM = g.measureText('EXIT')
-    const DOOR = 150, STEP = 60, wDoor = DOOR + STEP
-    const MARGIN = 64, MIN_GAP = 56
     let size = lang === 'en' ? 76 : 96
     const wordFont = (px: number) => (lang === 'en' ? `700 ${px}px "Arial", "Helvetica", sans-serif` : `700 ${px}px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif`)
     g.font = wordFont(size)
     let wWords = g.measureText(words).width
-    const room = W - 2 * MARGIN - wExit - wDoor - 2 * MIN_GAP
-    if (wWords > room) { size = Math.floor((size * room) / wWords); g.font = wordFont(size); wWords = g.measureText(words).width }
-    const gap = (W - 2 * MARGIN - wExit - wDoor - wWords) / 2
+    if (wWords > half) { size = Math.floor((size * half) / wWords); g.font = wordFont(size); wWords = g.measureText(words).width }
     // (each line of letters set so the middle of its own glyphs is the pane's middle)
     const centred = (m: TextMetrics) => MID + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2
     g.font = EXIT_FONT
-    let x = MARGIN
+    let x = MARGIN + (half - wExit) / 2
     const yExit = centred(exitM)
     for (const l of letters) { g.fillText(l.ch, x, yExit); x += l.w + TRACK }
-    // (the doorway: a white frame, open, the green showing through it, the figure running out through it to the right, the step beyond)
-    const x0 = MARGIN + wExit + gap, top = MID - 118, foot = MID + 118
+    // (the doorway: a white frame, open, the green showing through it, the figure running out through it to the right, its step under it)
+    const x0 = W / 2 - DOOR / 2, top = MID - 118, foot = MID + 118
     g.fillRect(x0, top, DOOR, foot - top)
     g.fillStyle = grad; g.fillRect(x0 + 18, top + 18, DOOR - 36, foot - top - 18)
     g.fillStyle = '#ffffff'
@@ -5076,10 +5191,10 @@ const exitFace = (lang: string) => {
     g.beginPath(); g.moveTo(fx(78), fy(82)); g.lineTo(fx(48), fy(90)); g.lineTo(fx(30), fy(120)); g.stroke()
     g.beginPath(); g.moveTo(fx(60), fy(136)); g.lineTo(fx(94), fy(168)); g.lineTo(fx(88), fy(212)); g.stroke()
     g.beginPath(); g.moveTo(fx(60), fy(136)); g.lineTo(fx(32), fy(168)); g.lineTo(fx(-2), fy(174)); g.stroke()
-    g.fillRect(x0, foot - 10, wDoor, 12)
-    // (the words)
+    g.fillRect(x0 - LIP, foot - 10, wIcon, 12)
+    // (the words, in the middle of the half to the right)
     g.font = wordFont(size)
-    g.fillText(words, x0 + wDoor + gap, centred(g.measureText(words)))
+    g.fillText(words, W / 2 + wIcon / 2 + GAP + (half - wWords) / 2, centred(g.measureText(words)))
   })
 }
 /** a soft glow the shape of a lit panel: a rectangle (iw x ih) on a w x h sheet, blurred `blur` px all round (the blur of a shadow cast from
@@ -5096,8 +5211,9 @@ function softRect(w: number, h: number, iw: number, ih: number, blur: number) {
   t.colorSpace = THREE.SRGBColorSpace
   return t
 }
-/** the exit sign's light round its pane (0.42 x 0.156 in its frame, on a sheet 0.62 x 0.35), and the wider light it throws on the wall behind */
-const EXIT_HALO = softRect(320, 180, 216, 80, 26)
+/** the exit sign's light round its pane (EXIT_PANE in its frame, on a sheet 0.2 wider and 0.35 high: 516 px a unit), and the wider light it
+ * throws on the wall behind */
+const EXIT_HALO = softRect(Math.round((EXIT_PANE.w + 0.2) * 516), 180, Math.round(EXIT_PANE.w * 516), 80, 26)
 const EXIT_SPILL = softRect(256, 160, 110, 50, 40)
 /**
  * The emergency exit sign on the wall by the way out (blender/exitsign.py): an aluminium housing along the top, an acrylic pane hanging from
@@ -5135,7 +5251,7 @@ function ExitSign() {
       {/* (its light: a green edge all round the pane, from a glow its own shape just behind it, and the light it throws on the wave frieze
           behind (its face 0.038 in front of it), wider and fainter; it was a round glow, orange-tinted, its bright middle hidden by the pane) */}
       <mesh position={[0, 0, -0.012]}>
-        <planeGeometry args={[0.62, 0.35]} />
+        <planeGeometry args={[EXIT_PANE.w + 0.2, 0.35]} />
         <meshBasicMaterial map={EXIT_HALO} color="#6dffad" transparent opacity={0.9} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
       <mesh position={[0, -0.02, -0.036]}>

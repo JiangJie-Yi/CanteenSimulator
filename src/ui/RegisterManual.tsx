@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { Lang } from '@/data/i18n'
 import { REGISTER_MANUAL } from '@/data/registerManual'
 import { tl } from '@/data/i18n'
+import { usePanelSound } from './uiSound'
 
 /** whether the register's manual is open (opened by clicking the booklet under the till) */
 let open = false
@@ -49,6 +50,7 @@ const turn = (set: (n: number) => void, by: number) => {
 /** the manual, opened: a booklet's pages, one at a time, turned with the arrows, shut with × or Esc or a click outside */
 export function RegisterManual({ lang }: { lang: Lang }) {
   const isOpen = useOpen()
+  usePanelSound(isOpen)
   const [page, setPage] = useState(0)
   useEffect(() => { shown = page }, [page])
   // (Esc shuts it; the arrow keys turn the pages)

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { tl, type Lang } from '@/data/i18n'
 import { buyCase, caseCost, CASE_SIZE, drinkCounts, fillFromBack } from '@/game/drinkStock'
+import { FitLine } from '@/ui/FitLine'
 import { DRINK_BACK, DRINKS, FRIDGE_STOCK, FRIDGE_UNITS, SHOP_PURSE, type DrinkId } from './bar'
 
 type Drink = (typeof DRINKS)[number]
@@ -92,13 +93,13 @@ export function DrinkStockBody({ lang }: { lang: Lang }) {
             <div className="chiller-bins">
               {UNIT_DRINKS[u].map((id) => {
                 const d = drinkOf(id), c = counts[u][id] ?? { have: 0, places: 0 }, back = DRINK_BACK.back[id] ?? 0
-                const name = tl(lang, d.zh, d.ja, d.ja)
+                const name = tl(lang, d.zh, d.ja, d.en)
                 const out = c.have <= 0
                 const cost = caseCost(id)
                 return (
                   <div key={id} className={`chiller-bin drink-bin${out ? ' is-out' : ''}`}
                     aria-label={`${name}：${tl(lang, '櫃中', '庫内', 'in the fridge')} ${c.have}/${c.places}，${tl(lang, '後場', 'バック', 'in the back')} ${back}`}>
-                    <span className="chiller-bin-head"><DrinkIcon d={d} /><span className="chiller-bin-name">{name}</span></span>
+                    <span className="chiller-bin-head"><DrinkIcon d={d} /><FitLine className="chiller-bin-name">{name}</FitLine></span>
                     <span className="drink-bin-sub">{tl(lang, `一箱 ${CASE_SIZE[id]} 瓶`, `1ケース ${CASE_SIZE[id]}本`, `${CASE_SIZE[id]} a case`)}</span>
                     <span className={`chiller-level${out ? ' is-zero' : c.have < c.places ? ' is-low' : ''}`} aria-hidden="true">
                       <i style={{ width: `${c.places ? Math.min(100, (c.have / c.places) * 100) : 0}%` }} />

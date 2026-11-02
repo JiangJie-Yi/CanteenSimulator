@@ -12,6 +12,7 @@ import { mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { DRYER, SINK, tipOver } from './bar'
 import { getEdit } from './edit'
+import { tapRunning } from './restroomSound'
 
 const URL = import.meta.env.BASE_URL + 'models/sink.glb'
 /** the brass, the copper and the dryer's stainless: real metal, reflecting the studio (it only reads as metal by what it reflects) */
@@ -68,6 +69,7 @@ function dressSink(r: THREE.Object3D) {
   inkModel(r, (m) => FINE.test(m.name), { width: 0.004, weld: true })
 }
 
+const SINK_AT_V = new THREE.Vector3()
 const WATER = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent: true, opacity: 0.6, depthWrite: false, toneMapped: false })
 const SPLASH = new THREE.MeshBasicMaterial({ color: '#e8f6fc', transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
 
@@ -107,8 +109,10 @@ export function SinkModel() {
   const stream = useRef<THREE.Mesh>(null)
   const ring = useRef<THREE.Mesh>(null)
   const len = tip.y - floor.y
-  useFrame(({ clock }, dt) => {
+  useFrame(({ clock, camera }, dt) => {
     const on = SINK.washing || SINK.tap
+    // (heard running, as loud as it's near)
+    tapRunning('sink', on ? Math.max(0, Math.min(1, 1 - (root.getWorldPosition(SINK_AT_V).distanceTo(camera.position) - 1.5) / 7)) : 0)
     turn.current += ((SINK.tap ? 1 : 0) - turn.current) * Math.min(1, Math.min(dt, 0.1) * 8)
     handle.rotation.y = turn.current * (Math.PI / 2)
     opened.current += (DRYER.open - opened.current) * Math.min(1, Math.min(dt, 0.1) * 5)

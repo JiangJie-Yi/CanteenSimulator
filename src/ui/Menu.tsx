@@ -7,6 +7,7 @@ import { STORAGES, storageName, storageOf } from '@/data/storage'
 import { Icon, iconFor } from './Icon'
 import { tl } from '@/data/i18n'
 import { freshGrade } from '@/game/freshness'
+import { FitLine } from './FitLine'
 import { FoodArt, hasFoodArt } from './FoodArt'
 
 export type Restock = 'avg' | 'each' | 'full'
@@ -276,7 +277,7 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!locked) onAdd(x.id) } else onKey(x.id)(e) }}>
         <span className="chiller-bin-head">
           <FoodArt id={x.id} store={storageOf(x.id)} band />
-          <span className="chiller-bin-name">{name}</span>
+          <FitLine className="chiller-bin-name">{name}</FitLine>
           {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{tl(lang, '試', '試', 'Try')}×{n}</span>}
         </span>
         {x.en && <span className="chiller-bin-en" lang="en">{x.en}</span>}

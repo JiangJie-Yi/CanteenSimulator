@@ -415,6 +415,12 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         rr = -1.4
       }
       if (pose === 'Fetch') { rp.set(0.16, 0.52, 0.38); rr = -1.2 }
+      // (washing their hands at a basin: both out in front, rubbing round each other under the tap)
+      if (pose === 'Wash') {
+        const r = Math.sin(t * 11 + id) * 0.025, q = Math.cos(t * 11 + id) * 0.015
+        lp.set(-0.045 + r, 0.5 + q, 0.4); rp.set(0.045 - r, 0.5 - q, 0.4)
+        lr = rr = -1.25
+      }
       if (held && !eating) { lp.set(-0.22, 0.34, 0.2); lr = -0.3 }
       L.position.lerp(lp, Math.min(1, dt * 10))
       Rh.position.lerp(rp, Math.min(1, dt * 10))

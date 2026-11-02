@@ -26,6 +26,7 @@ import { setTip } from '@/scene/hoverTip'
 import { Later } from '@/scene/Later'
 import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
+import { HAND_MS } from './Restroom'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
@@ -266,7 +267,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
           else if (next.kind === 'roll') {
             const w = wcs![next.who]
             STOCKER_WC.who = next.who
-            set([home.clone(), homeAisle.clone(), w.aisle.clone(), w.front.clone(), w.inside.clone()])
+            // (in at the door, past the washstand, round the corner to the toilet's paper)
+            set([home.clone(), homeAisle.clone(), w.aisle.clone(), w.front.clone(), w.inside.clone(), w.turn.clone(), w.stall.clone()])
           } else {
             const seat = seats[next.seat]
             // (beside the stool, on the drawer's side, facing the bar)
@@ -1714,7 +1716,7 @@ function Counter({ length }: { length: number }) {
   )
 }
 
-type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcBack'; t: number
+type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcWash' | 'wcBack'; t: number
   /** how far along their way they'd come last frame, and whether they've stood still since (a pause: shoes, paying, getting up) */
   lastD?: number; still?: boolean
   /** (off to the toilet, or to the fridge for a drink) where, and the way there from their stool; told to go home
@@ -1746,6 +1748,8 @@ const HER = new Set(['officeLady', 'highSchoolGirl', 'yukata', 'grandma', 'maid'
 /** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
 const WC_RATE = 1 / 240
 const WC_STAY = 6
+/** and how long they wash their hands at the washstand after, the tap running (Restroom's HAND_MS) */
+const HAND_S = HAND_MS / 1000
 /** and to go and get themselves a drink from the fridge (once), and how long they stand choosing */
 const DRINK_RATE = 1 / 70
 /** (in development, `__drinkRate` in the console makes them thirstier, for watching it) */
@@ -2276,7 +2280,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const who = HER.has(kindOf(s.id).kind) ? 'f' : 'm'
           const w = wcs[who]
           const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
-          const path = [st.stool.clone(), st.aisle.clone(), ...turn, w.aisle.clone(), w.front.clone(), w.inside.clone()]
+          // (in at the door, past the washstand, round the corner to the toilet)
+          const path = [st.stool.clone(), st.aisle.clone(), ...turn, w.aisle.clone(), w.front.clone(), w.inside.clone(), w.turn.clone(), w.stall.clone()]
           s.wc = { who, path, len: pathLength(path) }
           s.phase = 'wcGo'
           s.t = 0
@@ -2318,9 +2323,25 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             onDrink?.(s.id, s.drink)
             redraw()
           }
-          s.phase = 'wcBack'
+          if (s.wc && s.wc.who !== 'drink' && wcs) {
+            // (out round the corner to the washstand, to wash their hands, the tap running; then out the way they came in, from there)
+            const who = s.wc.who
+            const w = wcs[who]
+            const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
+            const back = [st.stool.clone(), st.aisle.clone(), ...turn, w.aisle.clone(), w.front.clone(), w.inside.clone(), w.basin.clone()]
+            s.wc = { ...s.wc, path: back, len: pathLength(back) }
+            TOILETS[who].handAt = performance.now()
+            s.phase = 'wcWash'
+          } else s.phase = 'wcBack'
           s.t = 0
         }
+      } else if (s.phase === 'wcWash') {
+        // (at the washstand, facing it, washing their hands)
+        const w = wcs![s.wc!.who as 'm' | 'f']
+        g?.position.copy(w.basin)
+        if (g) g.rotation.y = w.basinYaw
+        s.still = true
+        if (s.t > HAND_S) { s.phase = 'wcBack'; s.t = 0; s.still = false }
       } else {
         // a moment to get up, then off the way they came, by the till: they stop there to pay, and again at the genkan's step
         const lp = leavePaths[s.seat]
@@ -2434,7 +2455,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (and shut behind them while they're in: locked, its window showing 使用中)
       TOILETS[who].passing = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcGo' || x.phase === 'wcBack')
         && (groups.current.get(x.id)?.position.distanceTo(wcs[who].front) ?? 9) < 1.3).length + (STOCKER_WC.who === who && STOCKER_WC.near ? 1 : 0)
-      TOILETS[who].inside = shown.filter((x) => x.wc?.who === who && x.phase === 'wcIn').length + (STOCKER_WC.who === who && STOCKER_WC.inside ? 1 : 0)
+      TOILETS[who].inside = shown.filter((x) => x.wc?.who === who && (x.phase === 'wcIn' || x.phase === 'wcWash')).length + (STOCKER_WC.who === who && STOCKER_WC.inside ? 1 : 0)
     }
     // (the ids held as they are now: the update may run later, once `done` below is a new empty list, and then it took nobody out; those out of
     // the door stayed listed, holding their stool's number, asking every frame to be taken out and drawing the bar again each time)
@@ -3219,7 +3240,7 @@ function PersonClockImpl({ s, eating, clock, talk, mood }: { s: Shown; phase: st
   // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them; the old figures, made to sit on
   // the old, taller stool, sat down by the difference)
   return <Suspense fallback={null}><group position-y={!FOLK_GUESTS && s.phase === 'sit' ? -OLD_STOOL_DROP : 0}><Figure id={s.id} eating={eating} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
-    fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : undefined} fit={FOLK_FIT}
+    fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : s.phase === 'wcWash' ? 'Wash' : undefined} fit={FOLK_FIT}
     held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></group></Suspense>
 }
 
