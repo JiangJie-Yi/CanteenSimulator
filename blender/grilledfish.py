@@ -466,6 +466,11 @@ SALT_H = 0.07          # (a thick bed: the salt piled well up inside the stones,
 IRORI_IN = 0.8
 IRORI_W = 0.13
 IRORI_H = 0.15
+# (an oblong hearth, longer along the table (x) than across it: the game's HEARTH_LONG. The frame is made that shape here, its bars all as
+# wide as each other, rather than stretched in the game: stretched, its bars along the table came out wider than the others and the corner
+# caps lopsided (the owner's: symmetric). Its outside as long as the stretched one was; its bed still stretched in the game)
+IRORI_LONG = 1.15
+IRORI_IX = (IRORI_IN + IRORI_W) * IRORI_LONG - IRORI_W
 
 
 def salt_height(x, y):
@@ -728,7 +733,71 @@ _kcol = mix(_kcol, (0.17, 0.08, 0.035), smooth(0.55, 0.95, _kline) * 0.45)
 _kcol = mix(_kcol, (0.52, 0.31, 0.16), smooth(0.6, 0.9, fbm(1024, 14, 3, 3)) * 0.18)
 _kcol = mix(_kcol, (0.2, 0.1, 0.05), smooth(0.55, 0.85, fbm(1024, 3, 1, 3)) * 0.25)
 M["robuchi"] = pbr("Robuchi", tex=image("T_Robuchi", _kcol), rough=0.28, coat=0.7)
-M["brass"] = pbr("RobuchiBrass", (0.78, 0.58, 0.26), rough=0.3, metal=1.0)
+
+
+def brass_pattern(n=512):
+    """The pattern pressed into the brass (the owner's, after their reference: 七宝 coins, each a disc of four petals round a concave
+    square; between each two along a row a Chinese knot (盤長結), a square of cord turned on its point, crossed three ways each way, an ear
+    at each of its four points; between them down a column a little four-petalled flower; fine rings of 七宝 linking them all; a dotted
+    line down from knot to knot), as how deep it's pressed at each point (1 where the pattern is): one repeat, tiling."""
+    u, v = grid01(n)
+    px = 1.0 / n
+
+    def soft(d):
+        return np.clip(d / (1.2 * px) + 0.5, 0, 1).astype(np.float32)
+
+    def wrap(a):
+        return a - np.round(a)
+    m = np.zeros((n, n), np.float32)
+    # (the coins, at the repeat's corners: a disc, and in it four circles' overlap with it leaving the concave square)
+    dx, dy = wrap(u), wrap(v)
+    rc, hw = 0.28, 0.35
+    b = (1 - hw * hw) / (math.sqrt(2) - 2 * hw)
+    rho = b - hw
+    petals = np.zeros_like(m)
+    for cx, cy in ((b, 0), (-b, 0), (0, b), (0, -b)):
+        petals = np.maximum(petals, soft(rho * rc - np.hypot(dx - cx * rc, dy - cy * rc)))
+    m = np.maximum(m, np.minimum(soft(rc - np.hypot(dx, dy)), petals))
+    # (the knots, halfway along the row)
+    kx, ky = wrap(u - 0.5), wrap(v)
+    pp, qq = (kx + ky) / math.sqrt(2), (kx - ky) / math.sqrt(2)
+    a_, e_, w_ = 0.058, 0.026, 0.012
+    cords = np.minimum.reduce([np.abs(np.abs(pp) - a_), np.abs(np.abs(pp) - a_ / 3), np.abs(np.abs(qq) - a_), np.abs(np.abs(qq) - a_ / 3)])
+    knot = np.minimum(soft(a_ + w_ / 2 - np.maximum(np.abs(pp), np.abs(qq))), soft(w_ / 2 - cords))
+    for sp in (-1, 1):
+        for sq in (-1, 1):
+            knot = np.maximum(knot, soft(w_ / 2 - np.abs(np.hypot(pp - sp * (a_ + e_ * 0.7), qq - sq * (a_ + e_ * 0.7)) - e_)))
+    m = np.maximum(m, knot)
+    # (the little flowers, halfway down the column: four petals on the diagonals)
+    fx, fy = wrap(u), wrap(v - 0.5)
+    for ang in (45, 135, 225, 315):
+        ca, sa = math.cos(math.radians(ang)), math.sin(math.radians(ang))
+        al, ac = fx * ca + fy * sa - 0.04, -fx * sa + fy * ca
+        m = np.maximum(m, soft((1 - np.sqrt((al / 0.034) ** 2 + (ac / 0.017) ** 2)) * 0.017))
+    # (the fine rings: round each coin and round each point between four, half the repeat across, through the knots and the flowers)
+    for ox, oy in ((0.0, 0.0), (0.5, 0.5)):
+        fu, fv = np.floor(u - ox), np.floor(v - oy)
+        best = np.full((n, n), 9.0, np.float32)
+        for i in (0, 1):
+            for j in (0, 1):
+                best = np.minimum(best, np.abs(np.hypot(u - ox - fu - i, v - oy - fv - j) - 0.5))
+        m = np.maximum(m, soft(0.0055 - best))
+    # (the dotted lines, down from knot to knot)
+    du = wrap(u - 0.5)
+    for vv in np.arange(0.2, 0.801, 0.04):
+        m = np.maximum(m, soft(0.0065 - np.hypot(du, wrap(v - vv))))
+    # (its walls eased a little, as a stamp's are)
+    for _ in range(2):
+        m = (m + np.roll(m, 1, 0) + np.roll(m, -1, 0) + np.roll(m, 1, 1) + np.roll(m, -1, 1)) / 5
+    return m
+
+
+# (the brass: polished, the pattern pressed into it, darker where it's pressed (the patina in its hollows; the game gives it its brass))
+_bp = brass_pattern()
+M["brass"] = pbr("RobuchiBrass", (0.78, 0.58, 0.26), tex=image("T_RobuchiBrass", np.repeat((1 - 0.28 * _bp)[..., None], 3, -1)),
+                 nrm=image("N_RobuchiBrass", to_normal(1 - _bp, 3.2), data=True), rough=0.3, metal=1.0)
+# (one repeat of it, in the model's units: four along each leg of a corner's cap)
+BRASS_P = 0.065
 # (the frame's inner faces, toward the fire: the same keyaki gone dark with the years' heat, blotched with soot and a few scorched patches
 # near black, a little ash caught in the grain)
 _soot = smooth(0.35, 0.8, fbm(1024, 5, 3, 4))
@@ -739,12 +808,20 @@ _bcol = mix(_bcol, (0.03, 0.02, 0.015), _char * 0.85)
 _bcol = mix(_bcol, (0.45, 0.42, 0.38), (vnoise(1024, 200, 60) > 0.9).astype(np.float32) * _soot * 0.35)
 M["robuchi_burnt"] = pbr("RobuchiBurnt", tex=image("T_RobuchiBurnt", _bcol), rough=0.55, coat=0.3)
 bars = []
-OUT = IRORI_IN + IRORI_W
+IX_, IY_ = IRORI_IX, IRORI_IN
+OX_, OY_ = IX_ + IRORI_W, IY_ + IRORI_W
+# (each bar's plan, round the oblong from the near side: its outer edge, then its inner, its ends cut at 45° to meet the next's (the bars
+# all as wide, so the mitres run corner to corner))
+BAR_PLANS = [
+    [(-OX_, -OY_), (OX_, -OY_), (IX_, -IY_), (-IX_, -IY_)],
+    [(OX_, -OY_), (OX_, OY_), (IX_, IY_), (IX_, -IY_)],
+    [(OX_, OY_), (-OX_, OY_), (-IX_, IY_), (IX_, IY_)],
+    [(-OX_, OY_), (-OX_, -OY_), (-IX_, -IY_), (-IX_, IY_)],
+]
 for k in range(4):
-    # (each bar a box along x at y = -(IN + W/2), then turned to its side; its ends cut at 45° to meet the next)
     bm_ = bmesh.new()
     zs = (0.0, IRORI_H)
-    ring = [(-OUT, -OUT), (OUT, -OUT), (IRORI_IN, -IRORI_IN), (-IRORI_IN, -IRORI_IN)]
+    ring = BAR_PLANS[k]
     lo = [bm_.verts.new((x, y, zs[0])) for x, y in ring]
     hi = [bm_.verts.new((x, y, zs[1])) for x, y in ring]
     bm_.faces.new(hi)
@@ -756,10 +833,8 @@ for k in range(4):
     bm_.to_mesh(me_); bm_.free()
     o = bpy.data.objects.new(f"Robuchi{k}", me_)
     bpy.context.collection.objects.link(o)
-    o.rotation_euler = (0, 0, k * math.pi / 2)
     bpy.context.view_layer.objects.active = o
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True)
-    bpy.ops.object.transform_apply(rotation=True)
     bevel(o, 0.012, 3, angle=False)
     bpy.ops.object.modifier_apply(modifier="Bevel")
     # (the grain along each bar: u along its length; v across its top, or down its sides, at one scale everywhere so nothing stretches)
@@ -782,39 +857,83 @@ for k in range(4):
         if abs(f.normal.z) < 0.5 and f.normal.dot(toward) > 0.6:
             f.material_index = 1
     bars.append(o)
-# (the brass: an L-shaped plate over each corner, and a fine inlaid line round the inner edge's top)
-# (each corner capped, as an irori's 隅金具 is: a cast cap of brass, L-shaped in plan, over the corner's top and a little way down both its
-# outer faces, and a band of the same round its foot; between them the frame's own wood shows (the owner's: the sleeve went all the way
-# down, a block of brass). A hair proud of the wood all round, their edges eased; their inner edges sunk just inside the wood)
-CL, BT = 0.22, 0.006
-CAP_DOWN, FOOT_UP = 0.38, 0.2     # (how far down the cap comes, and how far up the foot's band, as shares of the frame's height)
+# (the brass: a cap over each corner and a shoe round its foot, and a fine inlaid line round the inner edge's top)
+# (each corner's cap symmetric about the corner, its inner edge a diagonal (the owner's: 対称, 斜辺): on the top a triangle, its legs along
+# both outer edges, its long side cut on the slant (a bevel) passing just outside the inner corner; down both outer faces it comes as far
+# as the cap does, its end cut on the same diagonal, 45° down toward the corner; round the foot a shoe of the same, its ends on that same
+# line, so on each face the brass is one triangle with the wood's band showing across its middle. A hair proud of the wood; the parts of
+# each made as one solid swallowing the wood's corner (all of it but what shows is inside the wood). The pattern pressed into all of it:
+# on the top turned to the corner's diagonal, a coin on the corner; down the faces upright, a coin halved round the corner's edge)
+CAP_BT = 0.006
+CAP_DOWN, FOOT_UP = 0.38, 0.2     # (how far down the cap comes, and how far up the shoe, as shares of the frame's height)
+CAP_LEG = 2 * IRORI_W + 2 * CAP_BT - 0.012
+Z_TOP, Z_RIDGE, Z_CAP0, Z_FOOT = IRORI_H + CAP_BT, IRORI_H, IRORI_H * (1 - CAP_DOWN), IRORI_H * FOOT_UP
+
+
+def hull_object(name, pts):
+    """A convex solid round these points: its faces each one flat piece (the hull's triangles on a plane dissolved together)"""
+    bm_ = bmesh.new()
+    vs_ = [bm_.verts.new(q) for q in pts]
+    res = bmesh.ops.convex_hull(bm_, input=vs_, use_existing_faces=False)
+    bmesh.ops.delete(bm_, geom=[g for g in res["geom_interior"] + res["geom_unused"] if isinstance(g, bmesh.types.BMVert)], context="VERTS")
+    bmesh.ops.dissolve_limit(bm_, angle_limit=math.radians(1), verts=bm_.verts[:], edges=bm_.edges[:])
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me_ = bpy.data.meshes.new(name)
+    bm_.to_mesh(me_); bm_.free()
+    o = bpy.data.objects.new(name, me_)
+    bpy.context.collection.objects.link(o)
+    return o
+
+
 for k in range(4):
     sx, sy = (1 if k in (1, 2) else -1), (1 if k >= 2 else -1)
-    i_ = IRORI_IN + 0.004
-    plan = [(OUT - CL, OUT + BT), (OUT + BT, OUT + BT), (OUT + BT, OUT - CL), (i_, OUT - CL), (i_, i_), (OUT - CL, i_)]
-    bm_ = bmesh.new()
-    for (z0, z1) in ((IRORI_H * (1 - CAP_DOWN), IRORI_H + BT), (-0.001, IRORI_H * FOOT_UP)):
-        lo = [bm_.verts.new((sx * x, sy * y, z0)) for x, y in plan]
-        hi = [bm_.verts.new((sx * x, sy * y, z1)) for x, y in plan]
-        bm_.faces.new(hi)
-        bm_.faces.new(lo[::-1])
-        for i in range(len(plan)):
-            bm_.faces.new((lo[i], lo[(i + 1) % len(plan)], hi[(i + 1) % len(plan)], hi[i]))
-    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
-    me_ = bpy.data.meshes.new(f"RobuchiBrassCorner{k}")
-    bm_.to_mesh(me_); bm_.free()
-    o = bpy.data.objects.new(f"RobuchiBrassCorner{k}", me_)
-    bpy.context.collection.objects.link(o)
-    bpy.context.view_layer.objects.active = o
-    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True)
-    bevel(o, 0.004, 2, angle=False)
+    X0, Y0 = OX_ + CAP_BT, OY_ + CAP_BT
+
+    def at(s_, t_, z_):
+        # (s along the face across x from the corner's edge in, t along the other; both from the brass's outer faces)
+        return (sx * (X0 - s_), sy * (Y0 - t_), z_)
+
+    def end(z_):
+        # (how far along each face the brass reaches at this height: the one diagonal, 45° down toward the corner)
+        return CAP_LEG - (Z_RIDGE - z_)
+    cap = hull_object(f"RobuchiCap{k}", [at(0, 0, Z_TOP), at(CAP_LEG - 2 * CAP_BT, 0, Z_TOP), at(0, CAP_LEG - 2 * CAP_BT, Z_TOP),
+                                          at(CAP_LEG, 0, Z_RIDGE), at(0, CAP_LEG, Z_RIDGE),
+                                          at(0, 0, Z_CAP0), at(end(Z_CAP0), 0, Z_CAP0), at(0, end(Z_CAP0), Z_CAP0)])
+    shoe = hull_object(f"RobuchiShoe{k}", [at(0, 0, -0.001), at(end(-0.001), 0, -0.001), at(0, end(-0.001), -0.001),
+                                           at(0, 0, Z_FOOT), at(end(Z_FOOT), 0, Z_FOOT), at(0, end(Z_FOOT), Z_FOOT)])
+    bpy.ops.object.select_all(action="DESELECT")
+    cap.select_set(True); shoe.select_set(True)
+    bpy.context.view_layer.objects.active = cap
+    bpy.ops.object.join()
+    o = cap
+    bevel(o, 0.0025, 1, angle=False)
     bpy.ops.object.modifier_apply(modifier="Bevel")
+    # (the pattern's place on it: see above)
+    bm_ = bmesh.new(); bm_.from_mesh(o.data)
+    uvl_ = bm_.loops.layers.uv.verify()
+    for f in bm_.faces:
+        n_ = f.normal
+        zc = (Z_CAP0 + Z_TOP) / 2 if f.calc_center_median().z > IRORI_H / 2 else Z_FOOT / 2
+        for l in f.loops:
+            c = l.vert.co
+            s_, t_ = X0 - sx * c.x, Y0 - sy * c.y
+            if n_.z > 0.7:
+                l[uvl_].uv = ((s_ - t_) / (math.sqrt(2) * BRASS_P), (s_ + t_) / (math.sqrt(2) * BRASS_P))
+            elif abs(n_.x) >= abs(n_.y):
+                l[uvl_].uv = (t_ / BRASS_P, (c.z - zc) / BRASS_P)
+            else:
+                l[uvl_].uv = (s_ / BRASS_P, (c.z - zc) / BRASS_P)
+    bm_.to_mesh(o.data); bm_.free()
     bars.append(finish(o, f"RobuchiBrassCorner{k}", M["brass"], smooth_shade=False))
 for k in range(4):
-    a_ = k * math.pi / 2
-    ca, sa = math.cos(a_), math.sin(a_)
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(-sa * (IRORI_IN + 0.012), ca * -(IRORI_IN + 0.012), IRORI_H + 0.001))
-    o = active(); o.scale = ((2 * IRORI_IN) if k % 2 == 0 else 0.006, 0.006 if k % 2 == 0 else (2 * IRORI_IN), 0.003)
+    # (the inlaid line along each bar's inner edge, plain: all of it on a flat of the pattern's repeat)
+    along_x = k % 2 == 0
+    sgn = -1 if k < 2 else 1
+    loc = (0.0, sgn * (IY_ + 0.012), IRORI_H + 0.001) if along_x else (sgn * (IX_ + 0.012), 0.0, IRORI_H + 0.001)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+    o = active(); o.scale = (2 * IX_, 0.006, 0.003) if along_x else (0.006, 2 * IY_, 0.003)
+    for l in o.data.uv_layers.active.data:
+        l.uv = (0.25, 0.25)
     bars.append(finish(o, f"RobuchiBrassLine{k}", M["brass"], smooth_shade=False))
 join(bars, "Robuchi")
 

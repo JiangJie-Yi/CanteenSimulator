@@ -2900,8 +2900,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (the stones, set round the square, carried round with it about the fire's middle)
         const turn = Math.atan2(-ALONG.z, ALONG.x)
         if (/^Stone/.test(o.name)) o.position.applyAxisAngle(UP_AXIS, turn)
-        // (the frame and its bed drawn longer along the table: its own x is the table's length once turned)
-        if (/^(FirePit|Robuchi)/.test(o.name)) o.scale.x *= HEARTH_LONG
+        // (the bed drawn longer along the table: its own x is the table's length once turned. The frame's made that long already
+        // (blender/grilledfish.py's IRORI_LONG): stretched here, its bars along the table were wider than the others and its brass corner
+        // caps lopsided)
+        if (/^FirePit/.test(o.name)) o.scale.x *= HEARTH_LONG
         o.rotateOnWorldAxis(UP_AXIS, turn)
       }
       // (the salt heaped higher, filling the ring)
