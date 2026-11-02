@@ -242,7 +242,7 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
         {incl && <span className="stamp stamp-incl" aria-hidden="true">{t.included}</span>}
         {/* (on the test board the stock line already shows it, in red) */}
         {out && <span className="out-tag" aria-hidden="true">{tl(lang, '缺', '切', 'Out')}</span>}
-        {filling.map((f) => <span key={f.key} className="fill-guest" aria-hidden="true">#{f.guest}</span>)}
+        {filling.length > 0 && <span className="fill-guests" aria-hidden="true">{filling.map((f) => <span key={f.key} className="fill-guest">#{f.guest}</span>)}</span>}
         {n > 0 && (
           <span key={n} className="stamp" aria-hidden="true">
             點{n > 1 && <span className="stamp-count">×{n}</span>}

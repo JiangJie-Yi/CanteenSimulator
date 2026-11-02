@@ -179,10 +179,10 @@ export const EDIT_TEXT = {
 /** each piece's name in Japanese, by its Chinese name */
 const PIECES_JA: Record<string, string> = {
   小判金幣: '小判',
-  缺口木台階: '足場の踏み台',
+  木台階: '踏み台',
   刀具組: '包丁セット', 切魚砧板: '魚をさばくまな板',
   備長炭籃: '備長炭のかご', 團扇: 'うちわ', 行燈: '行灯', 飯桶: '飯びつ', 味噌湯鍋: '味噌汁の鍋', 冷藏櫃: '冷蔵庫', 碗盤櫃架: '食器棚', '碗盤架 1': '食器ラック 1', '碗盤架 2': '食器ラック 2', 大砧板: '大まな板', 流理台: '流し台', 地瓜馬鈴薯: 'さつまいもとじゃがいも',
-  調味盒: '調味料入れ', 水桶: '水桶', 櫃檯尾閘門門板: 'カウンター端の扉', 水槽旁閘門門板: '流し横の扉', 供桌: '供え台', 神龕: '神棚',
+  調味架: '調味料の棚', 水桶: '水桶', 竹簍: '竹ざる', 試吃碗: '味見の椀', 廚餘桶: '生ごみ入れ', 飯糰小碟: 'おにぎりの小皿', 櫃檯尾閘門門板: 'カウンター端の扉', 水槽旁閘門門板: '流し横の扉', 供桌: '供え台', 神龕: '神棚',
   '神前燈籠（左）': '神前灯籠（左）', '神前燈籠（右）': '神前灯籠（右）',
   神龕旁花瓶與杯: '神棚の花瓶と杯', 御神酒壺: '御神酒徳利', 橘子盤: 'みかんの皿', 經書: '大祓詞の経本', 供桌上的供品: '供え物',
   門口招財貓台: '入口の招き猫台', 玄關地墊: '玄関マット', 鞋櫃: '下駄箱', 紅燈籠: '赤提灯', 燒烤燈籠: '炭火焼の提灯', 魚燈: '魚の提灯', 門簾: '暖簾', 收銀櫃檯: 'レジカウンター',
@@ -197,7 +197,7 @@ const PIECES_JA: Record<string, string> = {
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
 const PIECES_EN: Record<string, string> = {
   備長炭籃: 'Charcoal crate', 團扇: 'Fan', 行燈: 'Paper lantern', 飯桶: 'Rice tub', 味噌湯鍋: 'Miso soup pot', 冷藏櫃: 'Fridge', 碗盤櫃架: 'Dish rack', '碗盤架 1': 'Dish rack 1', '碗盤架 2': 'Dish rack 2', 大砧板: 'Cutting board', 流理台: 'Sink', 地瓜馬鈴薯: 'Potato sacks',
-  調味盒: 'Seasoning box', 水桶: 'Water bucket', 供桌: 'Offering shelf', 神龕: 'Shrine', 御神酒壺: 'Sake flask', 橘子盤: 'Ponkan dish', 經書: 'Sutra',
+  調味架: 'Seasoning ledge', 水桶: 'Water bucket', 竹簍: 'Bamboo basket', 試吃碗: 'Tasting bowl', 廚餘桶: 'Scraps bin', 飯糰小碟: 'Rice-ball dish', 木台階: 'Wooden step', 供桌: 'Offering shelf', 神龕: 'Shrine', 御神酒壺: 'Sake flask', 橘子盤: 'Ponkan dish', 經書: 'Sutra',
   '神前燈籠（左）': 'Shrine lantern (left)', '神前燈籠（右）': 'Shrine lantern (right)',
   門口招財貓台: 'Lucky cat stand', 玄關地墊: 'Doormat', 鞋櫃: 'Shoe rack', 紅燈籠: 'Red lantern', 燒烤燈籠: 'Grill lantern', 魚燈: 'Fish lantern', 門簾: 'Noren', 收銀櫃檯: 'Till counter',
   '收銀機（含抽屜）': 'Cash register', 刷卡機: 'Card reader', 明細印表機: 'Receipt printer', 找零盤: 'Change tray', 筆筒: 'Pen pot', 御守: 'Omamori',

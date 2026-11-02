@@ -219,8 +219,9 @@ function WhenHeld({ holds, children }: { holds: () => boolean; children: React.R
 const BOWL_PUSH = 0.3
 /** the bowl's rim above its foot: what's laid across it rests at this height */
 const BOWL_RIM = 0.15
-/** the table's pieces that edit mode moves by their nudge (the cutting board, the seasoning box, the water bucket): the edit id of each */
-const EDIT_PIECES: Record<string, string> = { tray: 'cutboard', box: 'seasoning', bin: 'bucket' }
+/** the table's pieces that edit mode moves by their nudge (the cutting board, the seasoning ledge, the water bucket, the basket, the tasting
+ * bowl, the scraps bin, the rice balls' dish: the owner's, every one a piece of its own): the edit id of each */
+const EDIT_PIECES: Record<string, string> = { tray: 'cutboard', box: 'seasoning', bin: 'bucket', 'basket-0': 'basket', 'bowl-0': 'tastebowl', trash: 'trash', rawdish: 'ricedish' }
 /** whether the table's pieces (the plates, the seasoning box, the cutting board, the bowl...) can be dragged about by hand: not any more, they
  * stay where they're set (the owner moves them in developer mode); only the food, the tools and the charcoal are picked up */
 const DRAG_PIECES = false
@@ -894,7 +895,7 @@ function crewPlaces(crew: CrewMember[]) {
  * (it was 0.36 nearer its left-hand side) he stood into the table beside it, by the left-hand cubby (the owner saw it) */
 // (and 2.2 out, not 2.0: up on the notch's step his chest and sleeves were level with the seasonings' ledge, its pots in them (clips.mjs
 // found it; at 2.12 his sleeves still brushed the peanut bowl and the miso))
-const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.2).addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
+const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
   .setY(GRILL_OFFSET.y - KITCHEN_DROP)
 /** the aisle in front of the cook table, where he stands while the shop's open */
 const AISLE_LAY = 2.62
@@ -923,7 +924,7 @@ const bossAisle = (home: THREE.Vector3) => {
 /** the low wooden step on the notch's floor that he and his cook stand on at the fire (the owner's; blender/notchstep.py): its height, its
  * depth, and where it stands (its back to the notch's back, its front, the step up, a little out past the table's edge), turned with the
  * table */
-const NOTCH_STEP = { h: 0.14, d: 0.95 }
+const NOTCH_STEP = { h: 0.2, d: 1.05 }
 // (its back 0.09 out from the notch's back, so its front's as far past the table's edge as he's stood back)
 const NOTCH_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, CHEF_AT.dot(ALONG)).addScaledVector(LAY, COOK_NOTCH.lay[0] + 0.09 + NOTCH_STEP.d / 2)
   .setY(CHEF_AT.y)
@@ -1749,64 +1750,80 @@ const ROUNDED_SLAB = new RoundedBoxGeometry(1, 1, 1, 3, 0.08)
  * and that end of the top too: the staff's way between the kitchen and the floor, shut by a little swing door (BarGate).
  */
 /**
- * Each place's number (the owner's: the bar's places numbered): a little tag of black lacquer standing at the back of the place, just in front
- * of the raised lip (the long counter's first place, at the corner, has none behind it), its number in gold in a fine gold frame on both
- * faces, the customer's and the kitchen's, on a foot of plain wood. One picture for all the places, a cell each; batched with the bar.
+ * Each place's number (the owner's: the bar's places numbered; round, and fixed on the wooden screen behind the place): a disc of black
+ * lacquer on the screen's face toward the customer, half way up it, its number in gold inside a gold ring. A place with no screen behind it
+ * has it standing on a little foot instead, its number on both faces. One picture for all the places, a cell each (the disc's round edge
+ * its cut-out: a square of two triangles, no fan of them round a middle), its rim a short tube; batched with the bar.
  */
-const SEAT_TAG = { w: 0.05, h: 0.062, d: 0.008, z: 0.215, foot: 0.012 }
+const SEAT_TAG = { r: 0.032, d: 0.008, foot: 0.012 }
+/** the screen's (the raised lip's) face toward the customer, across the counter, and how far in from its ends a disc keeps */
+const LIP_FACE = 0.28 - 0.03
 const SEAT_TAG_TEX = (() => {
   if (typeof document === 'undefined') return null
-  const n = GRILL_SEATS.length, cw = 128, ch = 160
+  const n = GRILL_SEATS.length, c = 128
   const cv = document.createElement('canvas')
-  cv.width = cw * n; cv.height = ch
+  cv.width = c * n; cv.height = c
   const g = cv.getContext('2d')
   if (!g) return null
   for (let k = 0; k < n; k++) {
-    const x0 = k * cw
-    const gr = g.createLinearGradient(x0, 0, x0 + cw, ch)
+    const cx = k * c + c / 2, cy = c / 2, R = c / 2 - 1
+    const gr = g.createLinearGradient(cx - R, cy - R, cx + R, cy + R)
     gr.addColorStop(0, '#2c2523'); gr.addColorStop(0.5, '#161213'); gr.addColorStop(1, '#0d0b0b')
     g.fillStyle = gr
-    g.fillRect(x0, 0, cw, ch)
+    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill()
     g.strokeStyle = '#c9a24e'
     g.lineWidth = 3
-    g.strokeRect(x0 + 10, 10, cw - 20, ch - 20)
+    g.beginPath(); g.arc(cx, cy, R - 9, 0, Math.PI * 2); g.stroke()
     g.lineWidth = 1
-    g.strokeRect(x0 + 16, 16, cw - 32, ch - 32)
-    g.font = 'bold 92px Georgia, "Times New Roman", serif'
+    g.beginPath(); g.arc(cx, cy, R - 15, 0, Math.PI * 2); g.stroke()
+    g.font = 'bold 66px Georgia, "Times New Roman", serif'
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.fillStyle = 'rgba(0,0,0,0.6)'
-    g.fillText(String(seatLabel(k)), x0 + cw / 2 + 2, ch / 2 + 9)
+    g.fillText(String(seatLabel(k)), cx + 2, cy + 6)
     g.fillStyle = '#e6c26e'
-    g.fillText(String(seatLabel(k)), x0 + cw / 2, ch / 2 + 7)
+    g.fillText(String(seatLabel(k)), cx, cy + 4)
   }
   const t = new THREE.CanvasTexture(cv)
   t.colorSpace = THREE.SRGBColorSpace
   t.anisotropy = 4
   return t
 })()
-/** a tag's face, its picture the k-th cell */
+/** a disc's face, its picture the k-th cell (cut round by the picture's clear corners) */
 const seatTagFace = (k: number) => {
-  const g = new THREE.PlaneGeometry(SEAT_TAG.w, SEAT_TAG.h)
+  const g = new THREE.PlaneGeometry(2 * SEAT_TAG.r, 2 * SEAT_TAG.r)
   const uv = g.attributes.uv as THREE.BufferAttribute
   const n = GRILL_SEATS.length
   for (let i = 0; i < uv.count; i++) uv.setX(i, (k + uv.getX(i)) / n)
   return g
 }
 const SEAT_TAG_FACES = GRILL_SEATS.map((_, k) => seatTagFace(k))
-function SeatTag({ k }: { k: number }) {
-  const y = SEAT_TAG.foot + SEAT_TAG.h / 2
+/** the disc's rim: a short open tube, its axis across the counter */
+const SEAT_TAG_RIM = new THREE.CylinderGeometry(SEAT_TAG.r * 0.985, SEAT_TAG.r * 0.985, SEAT_TAG.d, 20, 1, true).rotateX(Math.PI / 2)
+const SEAT_TAG_FACE_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ map: SEAT_TAG_TEX, alphaTest: 0.5, emissive: '#ffffff', emissiveMap: SEAT_TAG_TEX, emissiveIntensity: 0.18 })
+const SEAT_TAG_RIM_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#151112' })
+/** the place's number: on the screen's face behind it (`onLip`), or standing on a foot there's no screen */
+function SeatTag({ k, onLip }: { k: number; onLip: boolean }) {
+  if (onLip) {
+    const y = LIP_H / 2
+    return (
+      <group position={[0, y, LIP_FACE - SEAT_TAG.d / 2 - 0.001]}>
+        <mesh geometry={SEAT_TAG_RIM} material={SEAT_TAG_RIM_MAT!} />
+        {/* (its face toward the customer, -z) */}
+        <mesh geometry={SEAT_TAG_FACES[k]} material={SEAT_TAG_FACE_MAT!} position-z={-SEAT_TAG.d / 2 - 0.0006} rotation-y={Math.PI} />
+      </group>
+    )
+  }
+  const y = SEAT_TAG.foot + SEAT_TAG.r
   return (
-    <group position={[0, 0, SEAT_TAG.z]}>
-      <mesh position={[0, SEAT_TAG.foot / 2, 0]}><boxGeometry args={[SEAT_TAG.w + 0.012, SEAT_TAG.foot, 0.026]} /><meshToonMaterial color="#d6b88c" /></mesh>
-      <mesh position={[0, y, 0]}><boxGeometry args={[SEAT_TAG.w, SEAT_TAG.h, SEAT_TAG.d]} /><meshToonMaterial color="#151112" /></mesh>
-      {/* (the customer's face toward -z, the kitchen's toward +z, each reading the right way round from its side) */}
-      <mesh geometry={SEAT_TAG_FACES[k]} position={[0, y, -SEAT_TAG.d / 2 - 0.0006]} rotation-y={Math.PI}>
-        <meshToonMaterial map={SEAT_TAG_TEX} emissive="#ffffff" emissiveMap={SEAT_TAG_TEX} emissiveIntensity={0.18} />
-      </mesh>
-      <mesh geometry={SEAT_TAG_FACES[k]} position={[0, y, SEAT_TAG.d / 2 + 0.0006]}>
-        <meshToonMaterial map={SEAT_TAG_TEX} emissive="#ffffff" emissiveMap={SEAT_TAG_TEX} emissiveIntensity={0.18} />
-      </mesh>
+    <group position={[0, 0, LIP_FACE - 0.035]}>
+      <mesh position={[0, SEAT_TAG.foot / 2, 0]}><boxGeometry args={[2 * SEAT_TAG.r * 0.8, SEAT_TAG.foot, 0.026]} /><meshToonMaterial color="#d6b88c" /></mesh>
+      <group position-y={y}>
+        <mesh geometry={SEAT_TAG_RIM} material={SEAT_TAG_RIM_MAT!} />
+        {/* (the customer's face toward -z, the kitchen's toward +z, each reading the right way round from its side) */}
+        <mesh geometry={SEAT_TAG_FACES[k]} material={SEAT_TAG_FACE_MAT!} position-z={-SEAT_TAG.d / 2 - 0.0006} rotation-y={Math.PI} />
+        <mesh geometry={SEAT_TAG_FACES[k]} material={SEAT_TAG_FACE_MAT!} position-z={SEAT_TAG.d / 2 + 0.0006} />
+      </group>
     </group>
   )
 }
@@ -1825,6 +1842,16 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
   // (a counter butting into another runs its base on into the other's, so no slot opens between them at the corner (the owner saw the
   // floor through one: the side counter's base stopped 8 cm short of the long one's back))
   const run = butt ? 0.12 : 0
+  // (the raised lip's run along the counter: stopping short of where the other counter butts on, and of the gate's flap; the first counter's
+  // starts where the side counter's now stands, drawn in from the wall by SIDE_PULL, the two running a little into each other at the corner)
+  const lipSpan = (() => {
+    let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.02 : 0) + (trim ? SIDE_PULL - LIP_JOIN : 0), x1 = (L + 0.3) / 2 + (butt ? 0.05 : 0)
+    if (gate) {
+      if (end > 0) x1 -= G
+      else x0 += G
+    }
+    return [x0, x1]
+  })()
   // (where the top starts, on the near end: short of a gate there)
   return (
     <group position={c.at} rotation-y={yaw}>
@@ -1903,11 +1930,7 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
         // (where the two counters' lips meet at the corner, each runs a little into the other: no notch between their
         // rounded ends)
         // (the first counter's lip starts where the side counter's now stands, drawn in from the wall by SIDE_PULL)
-        let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.02 : 0) + (trim ? SIDE_PULL - LIP_JOIN : 0), x1 = (L + 0.3) / 2 + (butt ? 0.05 : 0)
-        if (gate) {
-          if (end > 0) x1 -= G
-          else x0 += G
-        }
+        const [x0, x1] = lipSpan
         return (
           // (a tall one, a screen of wood between the customers and the kitchen, its top rounded)
           <group position={[(x0 + x1) / 2, BAR_TOP + LIP_H / 2, 0.28]}>
@@ -1928,8 +1951,8 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
                 them; behind on the left the little soy dish (on the right instead at a seat where it'd be off the top, by the gate) */}
             <group position={[SETTING.restX, 0, PLACE.chop]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group>
             {/* (the chopsticks on it: BarChopsticks, out of the batch, so a pair can be picked up) */}
-            {/* (the place's number, standing at its back) */}
-            <SeatTag k={first + n} />
+            {/* (the place's number, on the screen behind it; standing, where there's none) */}
+            <SeatTag k={first + n} onLip={x - SEAT_TAG.r - 0.03 > lipSpan[0] && x + SEAT_TAG.r + 0.03 < lipSpan[1]} />
             <group position={[sauceSide(c, gate, x), 0.001, PLACE.sauce[1]]}>
               <BarPiece name="BarSoyDish" design={n} />
               {/* (empty till someone sits down there: GuestBar3D pours them their soy) */}
@@ -2237,8 +2260,8 @@ function EditProxyImpl({ id, label, at, size, yaw }: { id: string; label: string
 
 const STEP_URL = import.meta.env.BASE_URL + 'models/notchstep.glb'
 useGLTF.preload(STEP_URL)
-/** the notch's wooden step (blender/notchstep.py): its boards in the table's keyaki, its skirt the bar's standing boards, its battens dark;
- * inked, merged, standing still */
+/** the notch's wooden step (blender/notchstep.py, the owner's 木台階: one block): its top in the table's keyaki, its sides the bar's standing
+ * boards; inked, merged, standing still */
 const NotchStep = memo(function NotchStep() {
   const gltf = useGLTF(STEP_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
@@ -2246,12 +2269,11 @@ const NotchStep = memo(function NotchStep() {
     r.position.set(0, 0, 0)
     const top = new THREE.MeshToonMaterial({ color: '#ffffff', map: COOK_TABLE_WOOD })
     const skirt = new THREE.MeshToonMaterial({ color: '#e0c8a8', map: BAR_BASE_WOOD })
-    const batten = new THREE.MeshToonMaterial({ color: '#3a2618' })
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const n = (m.material as THREE.Material).name
-      m.material = n === 'StepTop' ? top : n === 'StepSkirt' ? skirt : batten
+      m.material = n === 'StepTop' ? top : skirt
       m.castShadow = true
       m.receiveShadow = true
     })
@@ -2259,7 +2281,7 @@ const NotchStep = memo(function NotchStep() {
     return r
   }, [gltf])
   return (
-    <Movable id="notchstep" label="缺口木台階"><StaticBatch>
+    <Movable id="notchstep" label="木台階"><StaticBatch>
       <group position={NOTCH_STEP_AT} rotation-y={NOTCH_STEP_YAW}><primitive object={obj} /></group>
     </StaticBatch></Movable>
   )
@@ -5984,8 +6006,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       {/* (edit mode's boxes for what the nudge moves: an unseen block the size of each, in a group the edit moves; the pieces themselves follow by the nudge) */}
       {roast.tray && <EditProxy id="cutboard" label="大砧板" at={containerAt('tray')} size={[TRAY_W, 0.12, TRAY_D]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
-      {carriers.box && <EditProxy id="seasoning" label="調味盒" at={containerAt('box').add(new THREE.Vector3(0, -0.12, 0))} size={[LEDGE_L, 0.42, 0.22]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
+      {carriers.box && <EditProxy id="seasoning" label="調味架" at={containerAt('box').add(new THREE.Vector3(0, -0.12, 0))} size={[LEDGE_L, 0.42, 0.22]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
       {carriers.bin && <EditProxy id="bucket" label="水桶" at={containerAt('bin')} size={[BIN_R * 2, 0.45, BIN_R * 2]} yaw={0} />}
+      {roast.basket && <EditProxy id="basket" label="竹簍" at={containerAt('basket-0')} size={[BASKET_R * 2, 0.14, BASKET_R * 2]} yaw={0} />}
+      <EditProxy id="tastebowl" label="試吃碗" at={containerAt('bowl-0')} size={[BOWL_R * 2, BOWL_RIM, BOWL_R * 2]} yaw={0} />
+      {roast.trash && <EditProxy id="trash" label="廚餘桶" at={containerAt('trash')} size={[TRASH_R * 2, 0.4, TRASH_R * 2]} yaw={0} />}
+      {roast.rawDish && <EditProxy id="ricedish" label="飯糰小碟" at={containerAt('rawdish')} size={[DISH_R * 2, 0.06, DISH_R * 2]} yaw={0} />}
       {/* (the table, the crew and the bar stay where they were drawn: the fire and all round it stand FIRE_SHIFT along from them, to the table's middle) */}
       <group position={[-FIRE_SHIFT.x, 0, -FIRE_SHIFT.z]}>
       <CookTable floor={!bar} />
