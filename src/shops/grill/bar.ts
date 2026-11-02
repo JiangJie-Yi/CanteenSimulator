@@ -663,6 +663,13 @@ export const GRILL_COUNTERS: Counter[] = [
     far: FLOOR_FAR - 0.45 - SIDE_PULL },
 ]
 export const GRILL_SEATS = seatsOf(GRILL_COUNTERS)
+/** the number a place shows on its tag (the owner's: the bar's places numbered): from the door in, along the long counter to the corner, then
+ * on along the side counter away from it, so they run 1, 2, 3… left to right for whoever sits at either counter (the places' own order runs
+ * the other way: the long counter's from the corner, the side one's toward it) */
+export const seatLabel = (k: number) => {
+  const [c0, c1] = GRILL_COUNTERS
+  return k < c0.seats ? c0.seats - k : c0.seats + (c1 ? c1.seats - (k - c0.seats) : 0)
+}
 /** the pass's way in from the first counter's start: halfway between its first two places */
 export const PASS_ALONG = GRILL_COUNTERS[0].length / 2 + (seatAlong(GRILL_COUNTERS[0], 0) + seatAlong(GRILL_COUNTERS[0], 1)) / 2
 /**

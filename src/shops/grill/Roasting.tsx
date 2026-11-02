@@ -53,7 +53,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, PASS_ALONG, PASS_LAY, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 
 export { BAR_AT, BAR_TOP }
@@ -788,7 +788,8 @@ function BarImpl() {
   return (
     <group position={GRILL_OFFSET} scale={GRILL_SCALE}>
       <StaticBatch>
-        {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} butt={i > 0}
+        {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)}
+          trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} butt={i > 0}
           gate={BAR_GATES[i]} noTop={GRILL_COUNTERS.length > 1} />)}
         {GRILL_COUNTERS.length > 1 && <BarTop />}
       </StaticBatch>
@@ -1755,7 +1756,69 @@ const ROUNDED_SLAB = new RoundedBoxGeometry(1, 1, 1, 3, 0.08)
  * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
  * and that end of the top too: the staff's way between the kitchen and the floor, shut by a little swing door (BarGate).
  */
-function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c: Counter; trim?: number; gate?: Gate
+/**
+ * Each place's number (the owner's: the bar's places numbered): a little tag of black lacquer standing at the back of the place, just in front
+ * of the raised lip (the long counter's first place, at the corner, has none behind it), its number in gold in a fine gold frame on both
+ * faces, the customer's and the kitchen's, on a foot of plain wood. One picture for all the places, a cell each; batched with the bar.
+ */
+const SEAT_TAG = { w: 0.05, h: 0.062, d: 0.008, z: 0.215, foot: 0.012 }
+const SEAT_TAG_TEX = (() => {
+  if (typeof document === 'undefined') return null
+  const n = GRILL_SEATS.length, cw = 128, ch = 160
+  const cv = document.createElement('canvas')
+  cv.width = cw * n; cv.height = ch
+  const g = cv.getContext('2d')
+  if (!g) return null
+  for (let k = 0; k < n; k++) {
+    const x0 = k * cw
+    const gr = g.createLinearGradient(x0, 0, x0 + cw, ch)
+    gr.addColorStop(0, '#2c2523'); gr.addColorStop(0.5, '#161213'); gr.addColorStop(1, '#0d0b0b')
+    g.fillStyle = gr
+    g.fillRect(x0, 0, cw, ch)
+    g.strokeStyle = '#c9a24e'
+    g.lineWidth = 3
+    g.strokeRect(x0 + 10, 10, cw - 20, ch - 20)
+    g.lineWidth = 1
+    g.strokeRect(x0 + 16, 16, cw - 32, ch - 32)
+    g.font = 'bold 92px Georgia, "Times New Roman", serif'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillStyle = 'rgba(0,0,0,0.6)'
+    g.fillText(String(seatLabel(k)), x0 + cw / 2 + 2, ch / 2 + 9)
+    g.fillStyle = '#e6c26e'
+    g.fillText(String(seatLabel(k)), x0 + cw / 2, ch / 2 + 7)
+  }
+  const t = new THREE.CanvasTexture(cv)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = 4
+  return t
+})()
+/** a tag's face, its picture the k-th cell */
+const seatTagFace = (k: number) => {
+  const g = new THREE.PlaneGeometry(SEAT_TAG.w, SEAT_TAG.h)
+  const uv = g.attributes.uv as THREE.BufferAttribute
+  const n = GRILL_SEATS.length
+  for (let i = 0; i < uv.count; i++) uv.setX(i, (k + uv.getX(i)) / n)
+  return g
+}
+const SEAT_TAG_FACES = GRILL_SEATS.map((_, k) => seatTagFace(k))
+function SeatTag({ k }: { k: number }) {
+  const y = SEAT_TAG.foot + SEAT_TAG.h / 2
+  return (
+    <group position={[0, 0, SEAT_TAG.z]}>
+      <mesh position={[0, SEAT_TAG.foot / 2, 0]}><boxGeometry args={[SEAT_TAG.w + 0.012, SEAT_TAG.foot, 0.026]} /><meshToonMaterial color="#d6b88c" /></mesh>
+      <mesh position={[0, y, 0]}><boxGeometry args={[SEAT_TAG.w, SEAT_TAG.h, SEAT_TAG.d]} /><meshToonMaterial color="#151112" /></mesh>
+      {/* (the customer's face toward -z, the kitchen's toward +z, each reading the right way round from its side) */}
+      <mesh geometry={SEAT_TAG_FACES[k]} position={[0, y, -SEAT_TAG.d / 2 - 0.0006]} rotation-y={Math.PI}>
+        <meshToonMaterial map={SEAT_TAG_TEX} emissive="#ffffff" emissiveMap={SEAT_TAG_TEX} emissiveIntensity={0.18} />
+      </mesh>
+      <mesh geometry={SEAT_TAG_FACES[k]} position={[0, y, SEAT_TAG.d / 2 + 0.0006]}>
+        <meshToonMaterial map={SEAT_TAG_TEX} emissive="#ffffff" emissiveMap={SEAT_TAG_TEX} emissiveIntensity={0.18} />
+      </mesh>
+    </group>
+  )
+}
+function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = false }: { c: Counter; first?: number; trim?: number; gate?: Gate
   /** its far end runs into the first counter's side (its lip runs on into the first one's, so they meet with no gap) */
   butt?: boolean
   /** its top drawn with the others' as one piece (BarTop), not its own */
@@ -1873,6 +1936,8 @@ function BarCounterImpl({ c, trim = 0, gate, noTop = false, butt = false }: { c:
                 them; behind on the left the little soy dish (on the right instead at a seat where it'd be off the top, by the gate) */}
             <group position={[SETTING.restX, 0, PLACE.chop]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group>
             {/* (the chopsticks on it: BarChopsticks, out of the batch, so a pair can be picked up) */}
+            {/* (the place's number, standing at its back) */}
+            <SeatTag k={first + n} />
             <group position={[sauceSide(c, gate, x), 0.001, PLACE.sauce[1]]}>
               <BarPiece name="BarSoyDish" design={n} />
               {/* (empty till someone sits down there: GuestBar3D pours them their soy) */}
