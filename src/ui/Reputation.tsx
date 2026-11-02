@@ -8,18 +8,69 @@ import { tl, type Lang } from '@/data/i18n'
 import { remarkOf, satisfaction, starsOf, type Rating, type Remark, type Visit } from '@/game/reputation'
 import { MoodFace } from './MoodFace'
 
-const REMARK: Record<Remark, [string, string, string]> = {
-  great: ['烤得剛剛好，太好吃了！', '焼き加減が最高、うまい！', 'Grilled just right. Delicious!'],
-  good: ['好吃，會再來', 'おいしかった、また来たい', 'Good. I’ll be back'],
-  fine: ['還可以', 'まあまあ', 'It was all right'],
-  poor: ['不太好吃…', 'いまいち…', 'Not great…'],
-  walkedOut: ['等不到餐點，走了', '料理が来なくて帰った', 'Gave up waiting and left'],
-  wait: ['等太久了', '待たされた', 'Waited too long'],
-  tissue: ['抽屜裡沒有衛生紙', 'ティッシュがなかった', 'No tissues at my place'],
-  toilet: ['廁所不乾淨', 'トイレが汚かった', 'The toilet wasn’t clean'],
-  dark: ['店裡太暗了', '店が暗すぎた', 'It was too dark to eat'],
-  sick: ['吃完肚子痛', '食べたらお腹が痛くなった', 'Got a stomach ache after'],
-  nothing: ['沒有想吃的', '食べたいものがなかった', 'Nothing I wanted'],
+/** what a customer says as they go, a few ways each (the owner's: every one said the same line), picked by who they were and how it went */
+const REMARK: Record<Remark, [string, string, string][]> = {
+  great: [
+    ['烤得剛剛好，太好吃了！', '焼き加減が最高、うまい！', 'Grilled just right. Delicious!'],
+    ['外皮酥脆、肉汁滿滿，會再來！', '皮はパリッと身はジューシー、また来ます！', 'Crisp outside, juicy inside. I’ll be back!'],
+    ['炭火香太讚了', '炭火の香りがたまらない', 'That charcoal aroma, wow'],
+    ['吃得好滿足，下次帶朋友來', '大満足、今度は友達を連れてくる', 'So satisfying. Bringing friends next time'],
+    ['鹹淡剛好，配酒一流', '塩加減が絶妙で酒がすすむ', 'Seasoned just right, perfect with a drink'],
+    ['這才是真正的炭烤', 'これぞ本物の炭火焼', 'Now that’s real charcoal grilling'],
+  ],
+  good: [
+    ['好吃，會再來', 'おいしかった、また来たい', 'Good. I’ll be back'],
+    ['不錯吃，價格也實在', 'なかなか、値段も手頃', 'Pretty good, fair price too'],
+    ['火候掌握得不錯', '焼き具合がいい', 'Nicely cooked'],
+    ['很有居酒屋的氣氛', '居酒屋らしくていい', 'Feels like a proper izakaya'],
+    ['吃得很開心', '楽しく食べられた', 'Enjoyed that'],
+  ],
+  fine: [
+    ['還可以', 'まあまあ', 'It was all right'],
+    ['普普通通', '普通かな', 'Nothing special'],
+    ['味道有點淡', '少し味が薄い', 'A bit bland'],
+    ['再烤一下會更好', 'もう少し焼いてほしかった', 'Could’ve done with a bit longer on the fire'],
+  ],
+  poor: [
+    ['不太好吃…', 'いまいち…', 'Not great…'],
+    ['有點烤過頭了', 'ちょっと焦げてた', 'A little burnt'],
+    ['跟想像的不一樣', '思ってたのと違う', 'Not what I hoped for'],
+  ],
+  walkedOut: [
+    ['等不到餐點，走了', '料理が来なくて帰った', 'Gave up waiting and left'],
+    ['等太久了，下次再說', '待ちきれない、また今度', 'Took too long. Another time'],
+  ],
+  wait: [
+    ['等太久了', '待たされた', 'Waited too long'],
+    ['上菜好慢', '料理が出るのが遅い', 'The food was slow to come'],
+    ['餓到不行才上菜', '腹ペコで待たされた', 'Starving by the time it came'],
+  ],
+  tissue: [
+    ['抽屜裡沒有衛生紙', 'ティッシュがなかった', 'No tissues at my place'],
+    ['想擦嘴卻沒有衛生紙', '口を拭くティッシュがない', 'Nothing to wipe my mouth with'],
+  ],
+  toilet: [
+    ['廁所不乾淨', 'トイレが汚かった', 'The toilet wasn’t clean'],
+    ['廁所該打掃了', 'トイレの掃除をしてほしい', 'The toilet needs a clean'],
+  ],
+  dark: [
+    ['店裡太暗了', '店が暗すぎた', 'It was too dark to eat'],
+    ['暗到看不清楚菜', '暗くて料理が見えない', 'Too dark to see the food'],
+  ],
+  sick: [
+    ['吃完肚子痛', '食べたらお腹が痛くなった', 'Got a stomach ache after'],
+    ['食材好像不太新鮮', '食材が新しくなかったかも', 'Something didn’t seem fresh'],
+  ],
+  nothing: [
+    ['沒有想吃的', '食べたいものがなかった', 'Nothing I wanted'],
+    ['菜單上沒有我要的', 'メニューに欲しいのがない', 'Nothing on the menu for me'],
+  ],
+}
+/** which of a remark's ways a visit says it: by who they were and how long they waited and how it tasted, so the same kind of visit isn't
+ * always the same words */
+const remarkLine = (v: Visit) => {
+  const lines = REMARK[remarkOf(v)]
+  return lines[Math.abs(v.id * 31 + Math.round(v.waited) * 7 + Math.round(v.taste ?? 0)) % lines.length]
 }
 
 /** five stars, filled as far as `v` (1..5) goes */
@@ -76,7 +127,7 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
             <ul className="rep-recent">
               {latest.map((v, i) => {
                 const sat = satisfaction(v)
-                const [zh, ja, en] = REMARK[remarkOf(v)]
+                const [zh, ja, en] = remarkLine(v)
                 return (
                   <li key={`${v.id}-${i}`}>
                     <MoodFace guest={{ rating: sat, state: v.walkedOut ? 'angry' : 'done' }} />
