@@ -193,7 +193,8 @@ lock = beam("WcLockPlate", (-0.0095, -0.006), (0.915, 0.975), (LZ - 0.048, LZ + 
 bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.03, depth=0.004, location=P(-0.0075, 0.8, LZ))
 rim = bpy.context.view_layer.objects.active
 rim.rotation_euler = (0, math.pi / 2, 0)
-rim.scale = (1, 0.65, 1)
+# (round, the owner's: it was an oval half again as tall as wide)
+rim.scale = (1, 1, 1)
 bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
 rim.name = "WcPullRim"
 rim.data.materials.append(M["brass"])
@@ -201,7 +202,7 @@ pp.append(rim)
 bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.024, depth=0.0045, location=P(-0.0079, 0.8, LZ))
 well = bpy.context.view_layer.objects.active
 well.rotation_euler = (0, math.pi / 2, 0)
-well.scale = (1, 0.62, 1)
+well.scale = (1, 1, 1)
 bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
 well.name = "WcPullWell"
 well.data.materials.append(M["lacquer"])

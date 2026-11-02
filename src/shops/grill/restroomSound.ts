@@ -99,6 +99,39 @@ export function knockSound(near: number) {
   }
 }
 
+/**
+ * A wooden sliding door (引き戸) run along its track (the owner's: every sliding door heard as it's opened and shut): the low rumble of its
+ * runners, rising as it gets going and falling as it slows, a faint woody chatter over it, and at the end a soft knock as it meets its
+ * post (a duller one shutting, a lighter tap opening). `seconds` how long it runs, `near` how loud (0..1) for how near the view is.
+ */
+export function slideDoorSound(opening: boolean, near = 1, seconds = 0.55) {
+  const a = ctx()
+  if (!a || near < 0.02) return
+  const t = a.currentTime
+  // (the runners: low noise through a low band, swelling and fading with the door's pace)
+  const run = noise(a, seconds, (x) => Math.sin(Math.PI * Math.min(1, x * 1.15)) ** 0.8, 0.86)
+  const lo = a.createBiquadFilter(); lo.type = 'bandpass'; lo.frequency.value = 230; lo.Q.value = 0.9
+  run.connect(lo).connect(out(a, 0.55 * near))
+  run.start(t)
+  // (the wood on wood over it, a little higher and rough)
+  const chat = noise(a, seconds, (x) => 0.5 * Math.sin(Math.PI * x) * (0.6 + 0.4 * Math.sin(x * 60)), 0.5)
+  const hi = a.createBiquadFilter(); hi.type = 'bandpass'; hi.frequency.value = 1300; hi.Q.value = 1.2
+  chat.connect(hi).connect(out(a, 0.12 * near))
+  chat.start(t)
+  // (and the knock as it comes to its post)
+  const at = t + seconds * 0.95
+  const o = a.createOscillator()
+  const g = a.createGain()
+  o.type = 'triangle'
+  o.frequency.setValueAtTime(opening ? 210 : 150, at)
+  o.frequency.exponentialRampToValueAtTime(opening ? 140 : 90, at + 0.09)
+  g.gain.setValueAtTime((opening ? 0.22 : 0.4) * near, at)
+  g.gain.exponentialRampToValueAtTime(0.0005, at + 0.14)
+  o.connect(g).connect(a.destination)
+  o.start(at)
+  o.stop(at + 0.16)
+}
+
 /** a new roll on the holder: a papery rustle and the bar's click */
 export function rollSound(near: number) {
   const a = ctx()

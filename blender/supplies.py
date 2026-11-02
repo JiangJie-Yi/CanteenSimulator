@@ -1,8 +1,9 @@
 """The supplies in the corner by the drinks fridge (the owner's: tissue cartons and cleaning things, for the toilets and about the shop):
 supplies.glb, node "CornerSupplies".
 
-Two corrugated cartons of tissue boxes stacked (taped shut, the upper one turned a little), a twelve-roll pack of toilet paper on top, a
-blue bucket in front, and a carton of cleaning things (the owner's: the detergents boxed, not stood about loose; the mop and the broom gone).
+One stack against the wall, nothing out in front of it (the owner's: the way to the toilets' doors kept clear): two corrugated cartons of
+tissue boxes (taped shut, the upper one turned a little), a carton of cleaning things on them (the owner's: the detergents boxed, not stood
+about loose; the mop, the broom and the bucket gone), and a twelve-roll pack of toilet paper on top.
 The cartons' print is the game's ("SupplyCartonPrint", 1536 x 512): each carton laid out on it as a flat dieline at one scale, 750 px to the
 metre, so what's printed keeps its shape on every face (the owner saw the words run off the edges: a face was squeezed into a cell of
 another shape): its front (its back the same) and one end side by side along the top of its piece, its top under them; the pieces side by
@@ -155,28 +156,24 @@ def stick(name, mat, a, b, r, segs=8):
     return fin(o, mat)
 
 
-# ---- stacked to fit the narrow gap between the drinks fridge and the toilets' door (about half a metre along the wall): the cartons
-# against the wall, the pack of rolls on top of them, the bucket and the carton of cleaning things in front of them
+# ---- stacked to fit the narrow gap between the drinks fridge and the toilets' door (about half a metre along the wall), all of it against
+# the wall: the two cartons of tissues, the carton of cleaning things on them, the pack of rolls on top
 carton("SupplyCarton0", 0.0, 0.0, 0.17, 0.44, 0.31, 0.27, 0.0, 4.0)
 carton("SupplyCarton1", 0.01, 0.27, 0.17, 0.4, 0.29, 0.24, 0.08, 4.0 + (0.44 + 0.31) * PX + 10)
-carton("SupplyCarton2", 0.15, 0.0, 0.47, 0.26, 0.2, 0.22, -0.1, 4.0 + (0.44 + 0.31 + 0.4 + 0.29) * PX + 20)
+carton("SupplyCarton2", 0.0, 0.51, 0.16, 0.26, 0.2, 0.22, -0.06, 4.0 + (0.44 + 0.31 + 0.4 + 0.29) * PX + 20)
+ROLLS_Y = 0.73
 for i in range(3):
     for j in range(2):
         for k in range(2):
             x, z = -0.105 + i * 0.105, 0.115 + j * 0.105
-            cyl(f"SupplyRoll{i}{j}{k}", "roll", x, 0.51 + k * 0.1, z, 0.05, 0.05, 0.1, segs=14)
-            cyl(f"SupplyRollCore{i}{j}{k}", "rollcore", x, 0.51 + k * 0.1 + 0.0995, z, 0.018, 0.018, 0.0012, segs=10)
-bpy.ops.mesh.primitive_cube_add(size=1, location=P(0.0, 0.61, 0.1675))
+            cyl(f"SupplyRoll{i}{j}{k}", "roll", x, ROLLS_Y + k * 0.1, z, 0.05, 0.05, 0.1, segs=14)
+            cyl(f"SupplyRollCore{i}{j}{k}", "rollcore", x, ROLLS_Y + k * 0.1 + 0.0995, z, 0.018, 0.018, 0.0012, segs=10)
+bpy.ops.mesh.primitive_cube_add(size=1, location=P(0.0, ROLLS_Y + 0.1, 0.1675))
 band = bpy.context.view_layer.objects.active
 band.name = "SupplyWrapBand"
 band.scale = (0.316, 0.216, 0.05)
 bpy.ops.object.transform_apply(scale=True)
 fin(band, "wrap", smooth=False)
-bx, bz = -0.15, 0.52
-cyl("SupplyBucket", "bucket", bx, 0.0, bz, 0.12, 0.15, 0.27, segs=20, cap=False)
-cyl("SupplyBucketFloor", "bucketin", bx, 0.003, bz, 0.118, 0.118, 0.003, segs=20)
-stick("SupplyBucketBail", "handle", (bx - 0.15, 0.27, bz), (bx + 0.15, 0.27, bz), 0.004, 6)
-
 root = bpy.data.objects.new("CornerSupplies", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
