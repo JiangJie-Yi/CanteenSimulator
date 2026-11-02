@@ -147,6 +147,9 @@ def cut(target, cutter):
     bpy.data.objects.remove(cutter)
 
 
+PRINT = DecalAtlas("RegPrint", ppm=6000, size=1024)
+
+
 def text(name, body, size, mat, at, rot, align="CENTER", fit=None):
     """flat printed lettering (a hair proud of the surface), lines split on '/'; squeezed sideways to `fit` wide if it's wider"""
     bpy.ops.object.text_add(location=at, rotation=rot)
@@ -156,7 +159,9 @@ def text(name, body, size, mat, at, rot, align="CENTER", fit=None):
     t.data.align_x = align
     t.data.align_y = "CENTER"
     t.data.extrude = 0.0
-    t.data.resolution_u = 3    # (flat lettering, coarse curves: its sides never showed, and the curves were most of the triangles)
+    # (fine curves: the letters are only drawn into the print's picture (PRINT), a quad each, never kept as triangles: the keys' lettering
+    # alone was three and a half thousand)
+    t.data.resolution_u = 8
     t.data.font = JP if any(ord(ch) > 127 for ch in body) else BOLD
     t.data.space_line = 0.9
     bpy.ops.object.convert(target="MESH")
@@ -164,7 +169,7 @@ def text(name, body, size, mat, at, rot, align="CENTER", fit=None):
     if fit and t.dimensions.x > fit:
         t.scale.x = fit / t.dimensions.x
         apply_scale(t)
-    return finish(t, name, mat, smooth_shade=False)
+    return PRINT.add(finish(t, name, mat, smooth_shade=False))
 
 
 # (the lettering bold, as printed on real keys: Arial Bold, Blender's own font if it isn't there)
@@ -536,6 +541,7 @@ if PREVIEW:
     bpy.context.scene.world = world
 
 os.makedirs(os.path.join(PROJECT, "public", "models"), exist_ok=True)
+PRINT.finish()
 export_dish(root, parts, os.path.join(PROJECT, "public", "models", "register.glb"),
             os.path.join(PROJECT, "blender", "register.blend"), PREVIEW)
 print("REGISTER_DONE", len(parts), "parts")

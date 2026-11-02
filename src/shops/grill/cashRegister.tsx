@@ -61,6 +61,9 @@ function realFinish(src: THREE.MeshStandardMaterial): THREE.Material {
   // (the coin rolls in the drawer: their sides and ends painted as the money is)
   const roll = /^RegRoll(Wrap|End)(\d+)$/.exec(n)
   if (roll) { const m = coinRollMats(Number(roll[2]) as CoinKind); return roll[1] === 'Wrap' ? m.wrap : m.end }
+  // (all its lettering: one picture on a quad each (blender/register.py's PRINT), a hair toward the eye so it never fights what it's on)
+  if (n === 'RegPrint') return new THREE.MeshPhysicalMaterial({ color: '#ffffff', map: src.map, roughness: 0.6, transparent: true, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })
   if (n === 'RegChrome') return new THREE.MeshPhysicalMaterial({ color: '#dfe3e8', metalness: 1, roughness: 0.12 })
   if (n === 'RegSteel') return new THREE.MeshPhysicalMaterial({ color: '#a7adb5', metalness: 0.9, roughness: 0.3 })
   if (n === 'RegScreen') return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), roughness: 0.05, clearcoat: 1 })
