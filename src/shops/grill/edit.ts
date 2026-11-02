@@ -43,7 +43,7 @@ export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: nu
 /** groups the shop comes with (the owner's own are added to them): the door's cat stand with its four cats; their pivot is found the first time
  * edit mode opens, once the pieces have been measured. `spans`: it runs across the room, in no one view's area (see groupByViews) */
 const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]; spans?: boolean }> = {
-  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3'] },
+  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban'] },
   // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
   'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
@@ -465,7 +465,8 @@ const known = (): Set<string> => { try { return new Set([...JSON.parse(localStor
 /** what the views' own words (views.ts's about) say they're of, where their cameras alone don't settle it: the entrance is framed a little into
  * the room, so its lanterns, its noren, the shoe rack (and the helmet on it) and the lucky cats' stand by the door are at the edge of its frame or
  * out of it, and nearer what the till's or the shrine's camera looks at */
-const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan', kabuto: 'genkan', 'grp-doorcats': 'genkan' }
+const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan', kabuto: 'genkan', 'grp-doorcats': 'genkan',
+  koban: 'genkan' }
 /** an area's name: its view's, as an area (後台區 is one already) */
 const areaName = (view: string) => { const n = VIEW_SPOTS.find((v) => v.id === view)?.zh ?? view; return n.endsWith('區') ? n : `${n}區` }
 /** each view's area made a group, of the pieces (and the shop's groups, whole) loose at the top that are new to it */

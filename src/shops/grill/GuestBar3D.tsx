@@ -28,6 +28,7 @@ import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
 import { HAND_MS } from './Restroom'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
+import { Koban } from './Koban'
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
@@ -415,6 +416,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
             <group position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
           </StaticBatch></Movable>
         ))}
+        {/* (a koban, the old oval gold coin, on its little stand between the two big cats on top (the owner's)) */}
+        <Movable id="koban" label="小判金幣"><group position={[-0.07, 0.6, 0]} rotation-y={-Math.PI / 2}><Koban /></group></Movable>
       </group>
       {/* a samurai helmet (兜) on its stand, set out on top of the shoe cupboard as a decoration, facing into the room */}
       <Movable id="kabuto" label="武士頭盔"><group position={[0.34, -GENKAN.depth + 0.87, SHOE_CAB_Z - 0.09]} rotation-y={Math.PI / 2} scale={0.82}><Kabuto /></group></Movable>
