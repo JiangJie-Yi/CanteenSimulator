@@ -186,7 +186,8 @@ def mesh_obj(name, verts, faces, mat_, smooth_shade=False):
 def giboshi(name, at, r):
     """an onion-domed post cap (擬宝珠): a collar, the bulb, its pointed tip"""
     parts = [cyl(f"{name}Collar", r * 1.05, r * 0.6, Vector(at) + Vector((0, 0, r * 0.3)), M["gold"], verts=16)]
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=16, ring_count=10, location=Vector(at) + Vector((0, 0, r * 1.4)))
+    # (an icosphere drawn up into the onion's point: round without poles (it was a 16 x 10 globe, sixteen triangles into each pole))
+    bpy.ops.mesh.primitive_ico_sphere_add(radius=r, subdivisions=2, location=Vector(at) + Vector((0, 0, r * 1.4)))
     b = active()
     for vv in b.data.vertices:
         if vv.co.z > 0:
