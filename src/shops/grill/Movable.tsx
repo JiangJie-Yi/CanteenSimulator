@@ -8,7 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
 import { holdVeil } from '@/scene/Later'
-import { beginChange, clickPick, commitOffsets, FIXED_SIZE, getEdit, GIZMO, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
+import { beginChange, clickPick, groupFrame, commitOffsets, FIXED_SIZE, getEdit, GIZMO, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -151,7 +151,7 @@ function chainMatrix(gs: Group[], out: THREE.Matrix4) {
  * size the group as one, as a piece's own handles do it. A group inside another (the till's, in its view's area) has them inside that one's
  * move, turn and size, as what it holds is */
 export function GroupGizmo() {
-  const { on, selected, groups } = useEdit()
+  const { on, selected, groups, space } = useEdit()
   const g = on && selected ? groups[selected] : null
   if (!g || !selected) return null
   const outer = chainMatrix(outerTransformOf(selected), new THREE.Matrix4())
@@ -160,7 +160,8 @@ export function GroupGizmo() {
   return (
     <group name="group-gizmo" position={p} quaternion={q} scale={s}>
       <group>
-        <AxisGizmo id={selected} at={[g.pivot[0] + g.t[0], g.pivot[1] + g.t[1], g.pivot[2] + g.t[2]]} theta={0} />
+        {/* (on the room's axes; or, in object space, the group's own: its first piece's turned by the group's) */}
+        <AxisGizmo id={selected} at={[g.pivot[0] + g.t[0], g.pivot[1] + g.t[1], g.pivot[2] + g.t[2]]} theta={space === 'local' ? groupFrame(selected) : 0} />
       </group>
     </group>
   )

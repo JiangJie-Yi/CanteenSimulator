@@ -611,8 +611,19 @@ const frames = new Map<string, number>()
 const framesObj = new Map<string, number>()
 export const setFrame = (id: string, theta: number, own?: number) => { frames.set(id, theta); if (own !== undefined) framesObj.set(id, own) }
 const turnY = (v: V3, a: number): V3 => [v[0] * Math.cos(a) + v[2] * Math.sin(a), v[1], -v[0] * Math.sin(a) + v[2] * Math.cos(a)]
-/** the turn (about the vertical) the panel's place goes by: the world's (world space) or the piece's own (object space), into its parent's frame */
-const frameFor = (id: string) => (state.space === 'local' ? framesObj.get(id) ?? 0 : frames.get(id) ?? 0)
+/** a group's own frame, for its object axes: its first piece's own (as that stands), turned by the group's own turn about the vertical (a
+ * group's handles stood along the room's axes whichever the space: the shrine's, along its wall, didn't turn with object axes, the owner's) */
+export function groupFrame(gid: string): number {
+  const g = state.groups[gid]
+  if (!g) return 0
+  // (its piece's own turn is from that piece's parent's frame, which `frames` has turned from the room's: both, for the turn from the room's)
+  const first = leavesOf(state.groups, gid).find((m) => framesObj.has(m))
+  return (first ? framesObj.get(first)! - (frames.get(first) ?? 0) : 0) + ((g.r?.[1] ?? g.yaw) * Math.PI) / 180
+}
+/** the turn (about the vertical) the panel's place goes by: the world's (world space) or the piece's own (object space), into its parent's frame
+ * (a group's parent's frame is the room's: its own in object space) */
+const frameFor = (id: string) => (state.groups[id] ? (state.space === 'local' ? groupFrame(id) : 0)
+  : state.space === 'local' ? framesObj.get(id) ?? 0 : frames.get(id) ?? 0)
 export const toRoom = (id: string, v: V3): V3 => turnY(v, -frameFor(id))
 /** what the panel shows: the place, turn and size counted from the piece's zero */
 const readLoc = (id: string): V3 => { const o = offsetOf(id), z = zeroOf(id).o; return toRoom(id, [o[0] - z[0], o[1] - z[1], o[2] - z[2]]) }
@@ -1181,5 +1192,5 @@ if (typeof window !== 'undefined') {
   // (a hot update swaps this module for a new copy: the old one's key let go of (or G was heard by every copy left behind, each with its own
   // developer mode, one more with every edit), its panel and notice taken away)
   replaces(import.meta.hot, () => { window.removeEventListener('keydown', onKey); offRenderPrefs(); el?.remove(); toastEl?.remove() })
-  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, moveTo, turnTo, select, toggle: toggleEdit, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
+  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { groupFrame, framesOf: (id: string) => [frames.get(id), framesObj.get(id)], get: getEdit, moveTo, turnTo, select, toggle: toggleEdit, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
 }
