@@ -3,11 +3,12 @@ import { BASE_MATERIAL } from './baseMaterial'
 import { useGLTF } from '@react-three/drei'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { CopyLayout } from '@/data/menu'
 import { reflectStudio, useStudio } from './studio'
 
 const INK = new THREE.Color('#3b2a20')
-const OUTLINE_WIDTH = 0.007
+export const OUTLINE_WIDTH = 0.007
 // too small, thin or flat to look good with an ink line
 const NO_OUTLINE = new Set(['FirePit', 'Charcoal', 'GrillNet', 'AshLump', 'CoalChunk', 'CoalStick'])
 /** parts too fine for an ink line (a shrimp's legs and feelers would come out as heavy black wire) */
@@ -175,6 +176,58 @@ function makeOutline(mesh: THREE.Mesh): THREE.Mesh {
   return outline
 }
 
+/** a node's several ink lines drawn as one (inkTogether), and the parts it's the lines of */
+type OneInk = { ink: THREE.Mesh; parts: THREE.Mesh[]; hulls: THREE.Mesh[] }
+const sharedScale = new THREE.Vector3()
+/**
+ * The ink of what stands on the dish (the pots, the bucket, the dipper, the hearth's frame: not the menu's food, which Roasting does its own
+ * way) drawn one line a node, not one for each of its materials: the parts lying in one frame under one parent have their hulls merged into
+ * one mesh beside them, the hulls kept but hidden. Shown while its parts all are; while some are hidden and some not, their own lines instead.
+ */
+function inkTogether(scene: THREE.Object3D, food: (o: THREE.Object3D) => boolean) {
+  const out: OneInk[] = []
+  const groups = new Map<THREE.Object3D, THREE.Mesh[]>()
+  const hullOf = (m: THREE.Object3D) => m.children.find((c) => (c as THREE.Mesh).isMesh && c.name.endsWith('_outline')) as THREE.Mesh | undefined
+  scene.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh || m.name.endsWith('_outline') || !m.parent || m.morphTargetInfluences?.length || !hullOf(m) || food(m)) return
+    const list = groups.get(m.parent) ?? []
+    list.push(m)
+    groups.set(m.parent, list)
+  })
+  for (const [parent, ms] of groups) {
+    if (ms.length < 2 || parent.userData.inkTogether || !ms.every((m) => m.matrix.equals(ms[0].matrix))) continue
+    const hulls = ms.map(hullOf) as THREE.Mesh[]
+    const geos = hulls.map((h) => {
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', h.geometry.attributes.position)
+      g.setAttribute('normal', h.geometry.attributes.normal)
+      if (h.geometry.index) g.setIndex(h.geometry.index)
+      return g
+    })
+    if (!geos.every((g) => !!g.index === !!geos[0].index)) continue
+    const geo = mergeGeometries(geos)
+    if (!geo) continue
+    const mat = (hulls[0].material as THREE.ShaderMaterial).clone()
+    const ink = new THREE.Mesh(geo, mat)
+    ink.name = 'ink_together'
+    ink.matrix.copy(ms[0].matrix)
+    ink.matrixAutoUpdate = false
+    ink.raycast = () => {}
+    let most = 0
+    ink.onBeforeRender = () => {
+      parent.getWorldScale(sharedScale)
+      const avg = (sharedScale.x + sharedScale.y + sharedScale.z) / 3
+      if (avg > most) { most = avg; mat.uniforms.uWidth.value = OUTLINE_WIDTH / avg }
+    }
+    parent.add(ink)
+    parent.userData.inkTogether = true
+    for (const h of hulls) h.visible = false
+    out.push({ ink, parts: ms, hulls })
+  }
+  return out
+}
+
 type DishProps = ThreeElements['group'] & {
   url: string
   /** every menu item id this model has */
@@ -324,7 +377,8 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
     const toonCache = new Map<string, THREE.Material>()
     const meshes: THREE.Mesh[] = []
     scene.traverse((obj) => {
-      if (obj instanceof THREE.Mesh && !obj.name.endsWith('_outline')) meshes.push(obj)
+      // (not the ink lines merged a node at a time, here or by Roasting: they're ink already)
+      if (obj instanceof THREE.Mesh && !obj.name.endsWith('_outline') && obj.name !== 'ink_together' && !obj.userData.oneInk) meshes.push(obj)
     })
     for (const mesh of meshes) {
       mesh.castShadow = !NO_CAST.has(baseName(mesh.name))
@@ -345,6 +399,9 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
         mesh.add(makeOutline(mesh))
       }
     }
+    // (what stands on it inked a line a node; the menu's food is Roasting's)
+    const made = inkTogether(scene, (o) => { for (let q: THREE.Object3D | null = o; q && q !== scene; q = q.parent) if (ids.has(baseName(q.name)) || q.userData.itemId) return true; return false })
+    scene.userData.inkTogether = [...((scene.userData.inkTogether as OneInk[] | undefined) ?? []), ...made]
   }, [scene])
 
   // objects hidden by the chosen base
@@ -360,6 +417,12 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
   // items drop in from above, bounce on landing and spring up to size; taking one out shrinks it away
   const first = useRef(true)
   useFrame((_, delta) => {
+    // (the merged ink lines shown while all their parts are; a part hidden alone, their own lines instead)
+    for (const one of (scene.userData.inkTogether as OneInk[] | undefined) ?? []) {
+      const all = one.parts.every((m) => m.visible), none = !one.parts.some((m) => m.visible)
+      one.ink.visible = all
+      for (const h of one.hulls) h.visible = !all && !none
+    }
     const snap = instant || first.current
     first.current = false
     const dt = Math.min(delta, 1 / 30)

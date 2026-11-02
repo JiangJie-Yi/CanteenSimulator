@@ -5,6 +5,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { OUTLINE_WIDTH } from '@/scene/Dish'
 import { colourVertices, StaticBatch } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
@@ -2652,6 +2653,60 @@ function warmCharring(root: THREE.Object3D, isFood: (id: string) => boolean) {
   return true
 }
 
+const inkScale = new THREE.Vector3()
+/**
+ * A piece's food drawn with one ink line round all its parts, not one for each (a fish's body, fins and eyes, a rice ball's rice and its
+ * seaweed: the grill's food was some eighty draws of ink alone). The parts lying in one frame (a model's several materials, one node) have
+ * their hulls merged into one mesh beside them, on a copy of their bitten ink (its bites the piece's own); their own hulls are kept but
+ * hidden (a portion's copy is made from the first's node, and builds its own from them). Not the stick (its bites stay empty), nor foil,
+ * nor what swells (its hull follows its shape keys).
+ */
+function inkOneLine(p: Piece) {
+  const groups = new Map<THREE.Object3D, THREE.Mesh[]>()
+  const hullOf = (m: THREE.Mesh) => m.children.find((c) => c instanceof THREE.Mesh && c.name.endsWith('_outline')) as THREE.Mesh | undefined
+  for (const { mesh: m, foil } of p.mats) {
+    if (foil || p.sticks.includes(m) || m.morphTargetInfluences?.length || !m.parent || !hullOf(m)) continue
+    const list = groups.get(m.parent) ?? []
+    list.push(m)
+    groups.set(m.parent, list)
+  }
+  for (const [parent, ms] of groups) {
+    // (one copied from another portion's node: its line rebuilt from these parts, on this piece's bites)
+    for (const c of [...parent.children]) if (c.userData.oneInk) c.removeFromParent()
+    if (ms.length < 2 || !ms.every((m) => m.matrix.equals(ms[0].matrix))) continue
+    const hulls = ms.map(hullOf) as THREE.Mesh[]
+    const geos = hulls.map((h) => {
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', h.geometry.attributes.position)
+      g.setAttribute('normal', h.geometry.attributes.normal)
+      if (h.geometry.index) g.setIndex(h.geometry.index)
+      return g
+    })
+    if (!geos.every((g) => !!g.index === !!geos[0].index)) continue
+    const geo = mergeGeometries(geos)
+    if (!geo) continue
+    const mat = (hulls[0].material as THREE.ShaderMaterial).clone()
+    mat.uniforms.uBites = p.bites.uBites
+    mat.uniforms.uBiteCount = p.bites.uBiteCount
+    const ink = new THREE.Mesh(geo, mat)
+    ink.matrix.copy(ms[0].matrix)
+    ink.matrixAutoUpdate = false
+    ink.userData.oneInk = true
+    ink.raycast = () => {}
+    let most = 0
+    // (its width kept the same on screen however big the piece has been (as Dish's lines do))
+    ink.onBeforeRender = () => {
+      parent.getWorldScale(inkScale)
+      const avg = (inkScale.x + inkScale.y + inkScale.z) / 3
+      if (avg > most) { most = avg; mat.uniforms.uWidth.value = OUTLINE_WIDTH / avg }
+    }
+    parent.add(ink)
+    for (const h of hulls) h.visible = false
+    p.ink = ink
+    p.inkOf = ms
+  }
+}
+
 /** A small repeatable random generator, so a piece always gets the same crumple. */
 function seeded(key: string) {
   let h = 2166136261
@@ -2723,6 +2778,9 @@ type Piece = {
   puffs: THREE.Mesh[]
   /** eaten down to the bare stick, which stays on the plate until clicked away */
   stickOnly: boolean
+  /** its food's ink lines as one (inkOneLine), and the parts it's the lines of: shown while they are */
+  ink?: THREE.Mesh
+  inkOf?: THREE.Mesh[]
   /** grill-net items: which spot on the net it has (null: waiting its turn, hidden and not cooking) */
   netSpot: number | null
   /** when the owner asked to taste it (performance.now()), the boss on his way to eat it; 0 if not */
@@ -3081,6 +3139,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       else p.food.push(m)
       if (m.morphTargetInfluences?.length) p.puffs.push(m)
     }
+    inkOneLine(p)
   }
 
   const present = (p: Piece) => !menuIds.has(p.id) || p.copy < (quantities[p.id] ?? 0)
@@ -5581,6 +5640,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
     pieces.current.forEach((p, n) => {
       bindMaterials(p)
+      // (its one ink line shown while its food is)
+      if (p.ink && p.inkOf) p.ink.visible = p.inkOf[0].visible
       if (present(p) && !p.wasPresent) {
         // just ordered: it's brought out raw on the tray (the base fish, not on the menu, starts on the fire)
         p.wasPresent = true
