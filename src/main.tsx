@@ -1,5 +1,7 @@
 // (first of all, in development: every texture and shape noted as it's made, to let go of what a hot update leaves behind)
 import './scene/gpuSweep'
+// (and a phone fetches none of the 3D shop: it draws it flat)
+import './scene/flatGate'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

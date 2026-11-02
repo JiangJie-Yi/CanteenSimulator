@@ -11,7 +11,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
 
 const SMALL = +(process.env.SMALL ?? 0.25), TRIS = +(process.env.TRIS ?? 100), POLE = +(process.env.POLE ?? 12)
 let files = process.argv.slice(2)
-if (!files.length) files = (await readdir('public/models')).filter((f) => f.endsWith('.glb') && !f.endsWith('-lite.glb')).map((f) => join('public/models', f))
+if (!files.length) files = (await readdir('public/models')).filter((f) => f.endsWith('.glb')).map((f) => join('public/models', f))
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS)
 const rows = []
 for (const file of files) {

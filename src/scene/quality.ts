@@ -1,11 +1,10 @@
 // How much the device can take, decided once at start-up, and what each level turns on.
 //
-// The real limit on phones is GPU memory, mostly textures (a 1024 px texture takes 4 MB on the GPU however well
-// it is compressed in the file), so the levels differ above all in which model is loaded and how big the painted
-// textures are:
-//   high   — a desktop or a strong tablet: the light model shows first, then the full one is swapped in
-//   medium — most phones: the light model only, softer shadows, a lighter canvas
-//   low    — old or weak devices: the light model, no shadows, no antialiasing, the lightest canvas
+// Every level loads the full models (the owner's: the web is 3D in full, a phone is drawn flat in 2D (game/device); the light models are
+// gone); they differ in how sharp the canvas is, the shadows, and how big the painted textures are:
+//   high   — a desktop or a strong tablet: sharp, full shadows
+//   medium — most tablets: a lighter canvas, softer shadows
+//   low    — old or weak devices: no shadows, no antialiasing, the lightest canvas
 // Every level loads only the dish on screen (the next is loaded when switched to), except high, which keeps all
 // three ready. `?q=low|medium|high` forces a level; a dropped WebGL context remembers to start one level lower.
 
@@ -18,10 +17,6 @@ export type Quality = {
   shadows: boolean
   shadowSize: number
   antialias: boolean
-  /** load the light model (…-lite.glb) */
-  lite: boolean
-  /** after the light model, swap in the full one once it's loaded (and the dish is idle) */
-  upgrade: boolean
   /** the largest painted (canvas) texture */
   canvasMax: number
   /** keep every dish loaded, not just the one on screen */
@@ -81,14 +76,11 @@ function choose(): Tier {
 const TIER = choose()
 
 export const QUALITY: Quality = {
-  // (the full model at once: the light one first and the full one swapped in after built the whole shop twice over at the start, and the
-  // loading veil could lift in the gap between, on an empty room (the owner saw it); the veil covers the loading anyway)
-  high: { tier: 'high', dpr: 2, shadows: true, shadowSize: 2048, antialias: true, lite: false, upgrade: false, canvasMax: 1024,
-    allDishes: true },
-  medium: { tier: 'medium', dpr: 1.5, shadows: true, shadowSize: 1024, antialias: true, lite: true, upgrade: false,
-    canvasMax: 512, allDishes: false },
-  low: { tier: 'low', dpr: 1, shadows: false, shadowSize: 512, antialias: false, lite: true, upgrade: false, canvasMax: 512,
-    allDishes: false },
+  // (the full model at once, on every level: a light one first and the full one swapped in after built the whole shop twice over at the
+  // start, and the loading veil could lift in the gap between, on an empty room (the owner saw it); the light ones are gone now)
+  high: { tier: 'high', dpr: 2, shadows: true, shadowSize: 2048, antialias: true, canvasMax: 1024, allDishes: true },
+  medium: { tier: 'medium', dpr: 1.5, shadows: true, shadowSize: 1024, antialias: true, canvasMax: 512, allDishes: false },
+  low: { tier: 'low', dpr: 1, shadows: false, shadowSize: 512, antialias: false, canvasMax: 512, allDishes: false },
 }[TIER] as Quality
 
 /** the GPU gave up: start a level lower next time */
@@ -101,7 +93,6 @@ export function stepDown() {
   }
 }
 
-export const liteUrl = (url: string) => url.replace(/\.glb$/, '-lite.glb')
 
 /** what this browser offers, for the "can't open 3D" notice: so a screenshot of it says what's wrong */
 export function webglReport() {

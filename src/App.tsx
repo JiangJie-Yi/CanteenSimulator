@@ -67,7 +67,9 @@ import { CANDIDATES, pickHires } from '@/game/hiring'
 import { keptForResume, resumeFrom } from '@/game/resume'
 import { Office, type OfficeTab } from '@/ui/Office'
 import { Welcome } from '@/ui/Welcome'
-import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
+import { QUALITY, stepDown, webglReport } from '@/scene/quality'
+import { showsFlat } from '@/game/device'
+import { MOBILE } from '@/scene/flatGate'
 import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
@@ -228,32 +230,19 @@ function DrawnProbe() {
   useFrame(({ gl }) => noteDrawn(gl.info.render.calls))
   return null
 }
-/** a phone (a touch screen, or a narrow one): the customers are shown in the 2D bar on the guest board instead of in 3D */
-const PHONE_QUERY = '(hover: none) and (pointer: coarse), (max-width: 760px)'
-/**
- * a phone by its screen's size (not a tablet, though that's a touch screen too): the short side under 600 css px.
- * Only a phone gets the grill drawn flat, without any 3D.
- */
-const SMALL_SCREEN_QUERY = '(max-width: 599px), (max-height: 499px)'
 /** whether the phone's flat grill (Grill2D) is open: not yet (the owner's); at a phone's size a card says so instead (PhoneClosed) */
 const PHONE_2D_OPEN = false
-function useMedia(query: string) {
-  const [on, setOn] = useState(() => window.matchMedia(query).matches)
-  useEffect(() => {
-    const mq = window.matchMedia(query)
-    const onChange = () => setOn(mq.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [query])
-  return on
-}
+/**
+ * A phone, by its size or by its word (game/device's showsFlat; the owner's): everything drawn flat, in 2D, the grill (Grill2D) and the
+ * customers on the guest board, no 3D at all; anything else, a computer or a tablet, is the web page in full 3D, its full models only.
+ */
 function usePhone() {
-  const [phone, setPhone] = useState(() => window.matchMedia(PHONE_QUERY).matches)
+  const read = () => showsFlat({ width: window.innerWidth, height: window.innerHeight, mobile: MOBILE })
+  const [phone, setPhone] = useState(read)
   useEffect(() => {
-    const mq = window.matchMedia(PHONE_QUERY)
-    const onChange = () => setPhone(mq.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
+    const onResize = () => setPhone(read())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
   return phone
 }
@@ -642,17 +631,6 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
   if (import.meta.env.DEV) Object.assign(window, { __smoke: grillSmoke })
   const dishLight = DISHES[active].light ?? {}
 
-  // staged loading: once the light model of the dish on screen has been up a moment, and nothing's been ordered
-  // from it yet, the full model is loaded behind it and takes over
-  const [upgraded, setUpgraded] = useState<Set<string>>(() => new Set())
-  const activeId = DISHES[active].id
-  // (on neither table: swapping the model starts the dish over)
-  const idle = !inUse.includes(activeId)
-  useEffect(() => {
-    if (!QUALITY.upgrade || !idle || upgraded.has(activeId)) return
-    const t = window.setTimeout(() => setUpgraded((u) => new Set(u).add(activeId)), 1500)
-    return () => window.clearTimeout(t)
-  }, [activeId, idle, upgraded])
 
   // warm spot: per-dish position, strength and shadow softness, eased so switching dishes doesn't pop
   const spot = useRef<THREE.SpotLight>(null)
@@ -1025,11 +1003,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
             {/* (only the dish on screen is loaded, unless the device can hold all three; a shop with food out stays
                 loaded though, or switching away and back would throw away everything on it and start it over) */}
             {(QUALITY.allDishes || i === active || inUse.includes(dish.id)) && <Suspense fallback={null}>
-              {/* loaded in two steps where the device can take it: the light model shows at once, the full one
-                  replaces it when it has loaded (only while nothing's ordered, so nothing being cooked is lost) */}
-              {QUALITY.lite && !(QUALITY.upgrade && upgraded.has(dish.id)) ? models(liteUrl(dish.model))
-                : QUALITY.lite ? <Suspense fallback={models(liteUrl(dish.model))}>{models(dish.model)}</Suspense>
-                  : models(dish.model)}
+              {/* (its full model, on every device that draws in 3D (the owner's: there's no light one now)) */}
+              {models(dish.model)}
               {/* toon ramps blow out easily, so the firelight stays modest */}
               {/* (the flames from the salt bed's surface up through the charcoal stood round them, licking out over its top) */}
               {dish.heat === 'fire' && <group position={dish.roast ? [FIRE_SHIFT.x, PIT_LIFT + 0.19, FIRE_SHIFT.z] : undefined}><Fire width={0.5} height={0.75} baseIntensity={look.fire} level={fire} /></group>}
@@ -1756,7 +1731,6 @@ export default function App() {
   const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
   const phone = usePhone()
-  const smallScreen = useMedia(SMALL_SCREEN_QUERY)
   phoneRef.current = phone
   const [lang, setLang] = useState<Lang>(() => SAVED?.lang ?? 'zh')
   langRef.current = lang
@@ -1849,7 +1823,7 @@ export default function App() {
   const dish = DISHES[active]
   // a phone at the grill has no 3D view: the fire pit and the customers' bar are drawn flat (Grill2D)
   // (by the screen's size: a tablet, touch screen or not, keeps the 3D grill)
-  const flatGrill = smallScreen && !!dish.roast
+  const flatGrill = phone && !!dish.roast
   const sceneOffFire = (n: number, loose: number) => { setOffFire(n); setLoose(loose) }
   const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
   const sceneOrder = (id: string, guest?: number, reuse = false) => {
@@ -2834,5 +2808,5 @@ export default function App() {
 
 // (a phone loads each dish when it's switched to, to keep memory down)
 for (const d of QUALITY.allDishes ? DISHES : []) {
-  useGLTF.preload(QUALITY.lite ? liteUrl(d.model) : d.model)
+  useGLTF.preload(d.model)
 }
