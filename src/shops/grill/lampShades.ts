@@ -4,6 +4,7 @@
 import * as THREE from 'three'
 import { unlitShade } from '@/game/roomLights'
 import { getLights, onLights } from '@/scene/lightsStore'
+import { replaces } from '@/scene/hot'
 
 type Shade = { m: THREE.MeshBasicMaterial; lit: THREE.Color; litMap: THREE.Texture | null; offMap: THREE.Texture | null; dim: number }
 const SHADES: Shade[] = []
@@ -33,6 +34,9 @@ function lampsNow() {
   for (const s of SHADES) show(s, on, night)
 }
 if (typeof document !== 'undefined') {
-  new MutationObserver(lampsNow).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-  onLights(lampsNow)
+  const o = new MutationObserver(lampsNow)
+  o.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  const off = onLights(lampsNow)
+  // (undone when a hot update swaps this module for a new copy, or each copy left behind kept repainting its old shades)
+  replaces(import.meta.hot, () => { o.disconnect(); off() })
 }

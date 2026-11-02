@@ -1,16 +1,8 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { PACE, holdPace, newPace, paceFrame } from '@/game/framePace'
 import { GAME_SPEED } from './speed'
 
-/** below this many frames a second (the typical frame over a couple of seconds) the view is lagging */
-const LAG_FPS = 40
-/** how long it's watched before each step down (s) */
-const WINDOW_S = 2.5
-/** how long after it starts before it judges at all (s): while the shop's still loading (its models coming in, its shaders compiled the
- * first time each is seen) the frames come slow and uneven, and that's no measure of the machine */
-const WARMUP_S = 10
-/** a frame this long (s) is a hitch (something loading, a shader compiling), not the drawing being slow: the window starts over */
-const HITCH_S = 0.25
 /** the frame rate it's held to once it's still lagging on a lighter canvas */
 const CAP_FPS = 30
 /** the longest step the game takes in one frame (s): a stall (a hidden tab, a hitch) isn't a leap forward */
@@ -24,20 +16,27 @@ const OFF = typeof location !== 'undefined' && new URLSearchParams(location.sear
  * the screen flickering, only with the shop open, on a machine slow enough for the pacer to have stepped in) */
 let paced: number | null = null
 const pacedSubs = new Set<() => void>()
-const pace = (dpr: number) => {
+const setPaced = (dpr: number | null) => {
   if (paced === dpr) return
   paced = dpr
   pacedSubs.forEach((f) => f())
 }
+
+/** something big has just happened (the shop opening or shutting, the speed changed, the developer mode on or off, the view flown
+ * elsewhere): a moment of slow frames, its figures built and shaders compiled, and no measure of the machine; the pacer doesn't judge for
+ * a while (`s` seconds) */
+let heldFor = 0
+export function holdPacer(s: number = PACE.HOLD_S) { heldFor = Math.max(heldFor, s) }
+// (and after a hot update while the game's being worked on: parts of the scene built again, shaders compiled again)
+if (import.meta.hot) import.meta.hot.on('vite:afterUpdate', () => holdPacer(10))
 export const usePacedDpr = () => useSyncExternalStore((f) => { pacedSubs.add(f); return () => { pacedSubs.delete(f) } }, () => paced, () => null)
 
 /**
  * Drives the 3D view's clock, and keeps it smooth on a machine that can't keep up.
  *
  * - Lagging: when the frame rate stays low it first draws the canvas at one pixel per screen pixel, and if that isn't
- *   enough holds it to a steady 30 frames a second (an even 30 looks smoother than a stuttering 40). It only steps
- *   down, once each, for the session; it judges by the typical frame (the median, so a hitch now and then doesn't count), and not
- *   until the shop's had time to load.
+ *   enough holds it to a steady 30 frames a second (an even 30 looks smoother than a stuttering 40); fast again a good while, it
+ *   goes back (game/framePace: when, and why not sooner).
  * - Game speed (GAME_SPEED, the ×2 button): the loop is run by hand, the game's clock moving on at that many times
  *   the real one, so everything in the scene (cooking, customers, servers) goes that much faster together.
  *
@@ -46,34 +45,27 @@ export const usePacedDpr = () => useSyncExternalStore((f) => { pacedSubs.add(f);
  */
 export function FramePacer() {
   const { setDpr, setFrameloop, advance, clock, gl } = useThree()
-  const level = useRef(0)
-  const times = useRef<number[]>([])
-  const since = useRef(0)
-  const age = useRef(0)
+  const pace = useRef(newPace())
   const capped = useRef(false)
+  // (the tab coming back: its first frames come slow)
+  useEffect(() => {
+    const back = () => { if (!document.hidden) holdPacer(3) }
+    document.addEventListener('visibilitychange', back)
+    return () => document.removeEventListener('visibilitychange', back)
+  }, [])
 
   useFrame((_, dt) => {
-    // (stepped down to one pixel per screen pixel, it stays there: the Canvas's dpr follows it, usePacedDpr)
-    if (level.current >= 1 && gl.getPixelRatio() !== 1) { pace(1); setDpr(1) }
-    if (OFF || level.current >= 2 || document.hidden || GAME_SPEED.value === 0) return
-    // (a long gap is the tab coming back, or loading: not the drawing being slow; and at ×2 the clock runs faster
-    // than the frames come, so it's real frames per real second that are counted)
-    const real = dt / GAME_SPEED.value
-    age.current += Math.min(real, 0.5)
-    if (age.current < WARMUP_S) return
-    if (real > HITCH_S) { times.current = []; since.current = 0; return }
-    times.current.push(real)
-    since.current += real
-    if (since.current < WINDOW_S) return
-    const sorted = times.current.sort((a, b) => a - b)
-    const fps = 1 / sorted[sorted.length >> 1]
-    times.current = []
-    since.current = 0
-    if (fps >= LAG_FPS) return
-    level.current++
-    if (level.current === 1) { pace(1); setDpr(1) }
-    else capped.current = true
-    if (import.meta.env.DEV) console.info(`[pacer] ${fps.toFixed(0)} fps: step ${level.current}`)
+    const p = pace.current
+    // (drawn lightly, it stays at one pixel per screen pixel: the Canvas's dpr follows it, usePacedDpr)
+    if (p.level >= 1 && gl.getPixelRatio() !== 1) { setPaced(1); setDpr(1) }
+    if (heldFor) { holdPace(p, heldFor); heldFor = 0 }
+    if (OFF || document.hidden || GAME_SPEED.value === 0) return
+    // (at ×2 the clock runs faster than the frames come: it's real frames per real second that are counted)
+    const act = paceFrame(p, dt / GAME_SPEED.value)
+    if (!act) return
+    capped.current = p.level === 2
+    if (p.level >= 1) { setPaced(1); setDpr(1) } else setPaced(null)
+    if (import.meta.env.DEV) console.info(`[pacer] ${p.fps.toFixed(0)} fps: ${act === 'down' ? 'down' : 'back up'} to ${['the full resolution', 'one pixel per screen pixel', 'one pixel per screen pixel, held to 30 a second'][p.level]}`)
   })
 
   // the loop run by hand (held to 30, or the game sped up): a frame drawn only once a frame's time has gone by, the

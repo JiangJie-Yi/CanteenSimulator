@@ -7,7 +7,7 @@ import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
+import { StaticBatch, mergeByMaterial, type BatchParts } from '@/scene/StaticBatch'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
@@ -26,6 +26,7 @@ import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lights
 import { lampGlow, lightOn, type Circuit } from '@/game/roomLights'
 import type { Sky } from '@/game/clock'
 import { lampLit } from './lampShades'
+import { replaces } from '@/scene/hot'
 
 /**
  * The lamps' painted light (their halos and the pools they throw) by the time of day: faint by day, when the room's lit anyway; full and
@@ -39,8 +40,16 @@ function skyNow(): Sky {
   const s = typeof document === 'undefined' ? undefined : document.documentElement.dataset.sky
   return s === 'dawn' || s === 'day' || s === 'dusk' || s === 'night' ? s : isNight() ? 'night' : 'day'
 }
+/** what this module sets going by itself (observers, subscriptions), undone when it's swapped for a new copy of itself (a hot update while
+ * it's being worked on): left behind, each kept redrawing the old copy's pictures at every turn of the day, a few more with every edit */
+const UNDO: (() => void)[] = []
+replaces(import.meta.hot, () => { for (const f of UNDO.splice(0)) f() })
 /** watch the page for the part of the day turning (either of its two marks) */
-const onSky = (f: () => void) => new MutationObserver(f).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-sky'] })
+const onSky = (f: () => void) => {
+  const o = new MutationObserver(f)
+  o.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-sky'] })
+  UNDO.push(() => o.disconnect())
+}
 function nightGlow<M extends THREE.Material>(m: M, day: number, night: number, lamp = true): M {
   NIGHT_GLOWS.push({ m, day, night, lamp })
   m.opacity = (isNight() ? night : day) * (lamp ? lampGlow(getLights().on) : 1)
@@ -51,8 +60,9 @@ function lightsNow() {
   for (const g of NIGHT_GLOWS) g.m.opacity = (n ? g.night : g.day) * (g.lamp ? lampGlow(on) : 1)
 }
 if (typeof document !== 'undefined') {
-  new MutationObserver(lightsNow).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-  onLights(lightsNow)
+  const o = new MutationObserver(lightsNow)
+  o.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  UNDO.push(() => o.disconnect(), onLights(lightsNow))
 }
 
 /**
@@ -3809,10 +3819,28 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
   const shelves = FRIDGE_UNITS[n].shelves
   const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.16)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
+  // (what the shelves' batch was made with: each place's drink, an empty one as the drink that's its own (its home), so a place emptied and
+  // filled again (a customer's drink taken, the stocker's carried out) is only hidden and shown in the batch; only a place holding another
+  // drink than it was made with (one dragged across, two swapped) makes it again. Made again at every change before, both fridges' hundred
+  // and sixty bottles, it was a stall each time a customer took a drink)
+  const [baked, setBaked] = useState(() => bakedShelves(n))
+  const batch = useRef<BatchParts | null>(null)
+  const shown = useRef<{ now: string; api: BatchParts | null }>({ now: '', api: null })
   useFrame((_, dt) => {
     if (seen.current !== FRIDGE_STOCK.ver) {
       seen.current = FRIDGE_STOCK.ver
       setVer((v) => v + 1)
+      if (FRIDGE_STOCK.units[n].some((row, r) => row.some((id, k) => id !== null && id !== baked[r]?.[k]))) setBaked(bakedShelves(n))
+    }
+    // (each place's bottles shown or hidden in the batch as the stock is now; the one being carried, its front bottle hidden)
+    const api = batch.current
+    const now = `${FRIDGE_STOCK.ver}|${lifted}`
+    if (api && (shown.current.now !== now || shown.current.api !== api)) {
+      shown.current = { now, api }
+      FRIDGE_STOCK.units[n].forEach((row, r) => row.forEach((id, k) => {
+        api.show(`f${r}-${k}`, id !== null && lifted !== `${r}-${k}`)
+        api.show(`b${r}-${k}`, id !== null)
+      }))
     }
     // (what's out: on the floor before the fridge, or set down on a table, upright, where it was put)
     const host = root.current
@@ -3960,6 +3988,23 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     window.addEventListener('pointerup', up)
   }
   const reg = (key: string) => (g: THREE.Group | null) => { if (g) objs.current.set(key, g); else objs.current.delete(key) }
+  const bakedKey = baked.map((row) => row.join(',')).join('|')
+  // (made once for what it was baked with, so the stock changing doesn't redraw the hundred and sixty bottles under the batch)
+  const ranks = useMemo(() => baked.map((row, r) => row.map((id, k) => {
+    const sh = FRIDGE_UNITS[n].shelves
+    const sp = new THREE.Vector3((k - (sh[r].ids.length - 1) / 2) * sh[r].pitch, sh[r].y, 0.16), step = sh[r].pitch * 1.02
+    const deep = Math.max(1, Math.floor(RANK_DEPTH / step))
+    return [
+      <group key={`f${r}-${k}`} position={sp.toArray()} userData={{ batchPart: `f${r}-${k}` }}><DrinkBottle id={id} lit /></group>,
+      <group key={`b${r}-${k}`} userData={{ batchPart: `b${r}-${k}` }}>
+        {Array.from({ length: deep }, (_, j) => (
+          <group key={j} position={[sp.x + (((k * 7 + j * 3) % 5) - 2) * 0.003, sp.y, sp.z - step * (j + 1)]} rotation-y={((k + j) % 3 - 1) * 0.25}>
+            <DrinkBottle id={id} lit />
+          </group>
+        ))}
+      </group>,
+    ]
+  })), [baked, n])
   return (
     <group ref={root}>
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
@@ -3975,19 +4020,9 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
         </group>
       )))}
       {/* (the front bottles and the ranks behind each, packed shoulder to shoulder back to the fridge's back wall, as a shop's shelves are:
-          one batch, redrawn as the stock changes (and without the one being carried); a hair of play in each so the rows aren't ruled) */}
-      <StaticBatch key={`ranks${FRIDGE_STOCK.ver}-${lifted}`}>
-        {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => {
-          if (!id) return null
-          const sp = slotAt(r, k), step = shelves[r].pitch * 1.02
-          const ranks = Math.max(1, Math.floor(RANK_DEPTH / step))
-          return [...(lifted === `${r}-${k}` ? [] : [<group key={`f${r}-${k}`} position={sp.toArray()}><DrinkBottle id={id} lit /></group>]), ...Array.from({ length: ranks }, (_, j) => (
-            <group key={`b${r}-${k}-${j}`} position={[sp.x + (((k * 7 + j * 3) % 5) - 2) * 0.003, sp.y, sp.z - step * (j + 1)]} rotation-y={((k + j) % 3 - 1) * 0.25}>
-              <DrinkBottle id={id} lit />
-            </group>
-          ))]
-        }))}
-      </StaticBatch>
+          one batch, each place's front bottle and ranks a part of it, hidden while the place is empty (and the front one while it's carried);
+          a hair of play in each so the rows aren't ruled) */}
+      <StaticBatch key={`ranks${n}|${bakedKey}`} parts={batch}>{ranks}</StaticBatch>
       {/* (what's been taken out, stood on the floor before the fridge) */}
       {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
         <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
@@ -4001,6 +4036,8 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
 /** how far back behind the front rank the shelves are filled: one rank more behind each, enough for the shelf to read full through the
  * glass (all the way back it was six hundred bottles a fridge) */
 const RANK_DEPTH = 0.12
+/** a fridge's places as its shelves' batch is made with them: each its drink, or (empty) the drink that's its own */
+const bakedShelves = (n: number) => FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => (id ?? FRIDGE_UNITS[n].shelves[r].ids[k]) as DrinkId))
 /** the soft light round a bottle the pointer's on */
 const BOTTLE_HALO = new THREE.MeshBasicMaterial({ color: '#fff0c0', transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
 /** a drink's name, for its tag */

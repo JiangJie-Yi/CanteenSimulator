@@ -177,7 +177,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     talk: ['BossMouthOpen', 'BossMouthTongue'].map((n) => root.getObjectByName(n)).filter(Boolean) as THREE.Object3D[],
     eyes: root.getObjectByName('BossEyes'),
   }), [root])
-  const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0, y: 0, vy: 0, ground: 0, probeAt: -1 })
+  const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0, y: 0, vy: 0, ground: 0, probeAt: -1, probeX: 0, probeZ: 0, probeEdit: false })
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const ray = useMemo(() => new THREE.Raycaster(), [])
@@ -190,12 +190,19 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     ray.set(from, new THREE.Vector3(0, -1, 0))
     // (the camera too: the scene's sprites (labels, glints) need it to be tested at all)
     ray.camera = camera
-    for (const h of ray.intersectObjects(scene.children, true)) {
-      const o = h.object as THREE.Mesh
-      if (!o.isMesh || !solid(o, m)) continue
-      return frame.worldToLocal(h.point.clone()).y
+    // (only what could be under his feet, each tested on its own: what's shown (not the originals a batch has hidden, thousands of them),
+    // solid, not him, and no one else (a character's skinned body is costly to test, each vertex posed by its bones, and never the ground).
+    // Through the whole room as it was, tested and then thrown out, it was a fifth of a frame a time)
+    const hits: THREE.Intersection[] = []
+    const look = (o: THREE.Object3D) => {
+      if (!o.visible || o === m || o.userData.editHandle || o.name === 'edit-gizmo') return
+      const mesh = o as THREE.Mesh
+      if (mesh.isMesh && !(mesh as THREE.SkinnedMesh).isSkinnedMesh && solidStuff(mesh)) ray.intersectObject(mesh, false, hits)
+      for (const c of o.children) look(c)
     }
-    return 0
+    look(scene)
+    hits.sort((a, b) => a.distance - b.distance)
+    return hits.length ? frame.worldToLocal(hits[0].point.clone()).y : 0
   }
   // ---- out of the way of the camera: standing between it and what it's on (the grill, from camera 1 right behind him), he fades to a ghost
   // of himself, as a game's characters do; his own materials, so nothing else fades with him
@@ -362,7 +369,12 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     const out = deck ? (s.x * aisle!.mouth[0] + s.z * aisle!.mouth[1]) / (Math.hypot(aisle!.mouth[0], aisle!.mouth[1]) || 1) : 0
     if (deck && out < deck.to) s.ground = deck.h
     else if (speed > 0) s.ground = 0
-    else if (T - s.probeAt > 0.2) { s.probeAt = T; s.ground = groundBelow(m, s.x, s.z) }
+    // (looked for again only when it may have changed: he's stopped somewhere new, or the editor's on (anything under him may be moved) or
+    // has just gone off; standing at his place all through business, it was five rays a second through the room for the same answer)
+    else if (s.probeAt < 0 || Math.hypot(s.x - s.probeX, s.z - s.probeZ) > 0.005 || edit !== s.probeEdit || (edit && T - s.probeAt > 0.2)) {
+      s.probeAt = T; s.probeX = s.x; s.probeZ = s.z; s.probeEdit = edit
+      s.ground = groundBelow(m, s.x, s.z)
+    }
     const scale = m.parent?.getWorldScale(new THREE.Vector3()).y || 1
     if (speed > 0) { s.y += (s.ground - s.y) * Math.min(1, dt * 14); s.vy = 0 }
     else if (s.y > s.ground + 1e-4 || s.vy > 0) {
@@ -484,14 +496,12 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
 }
 
 /** whether a mesh is something to stand on: shown (it and all above it), not see-through or a shadow, not part of him, not the editor's handles */
-function solid(o: THREE.Object3D, self: THREE.Object3D) {
-  const mat = (o as THREE.Mesh).material as THREE.Material | THREE.Material[]
-  // (nor a shadow: the floor's shadow-catching sheet, blob shadows and other see-through decals laid over things)
+/** whether a mesh's material is something to stand on: not a shadow (the floor's shadow-catching sheet, blob shadows and other see-through
+ * decals laid over things), not unseen */
+function solidStuff(o: THREE.Mesh) {
+  const mat = o.material as THREE.Material | THREE.Material[]
   for (const mm of Array.isArray(mat) ? mat : [mat]) {
     if (!mm.visible || !mm.colorWrite || (mm as THREE.ShadowMaterial).isShadowMaterial || (mm.transparent && (mm.opacity < 0.2 || !mm.depthWrite))) return false
-  }
-  for (let p: THREE.Object3D | null = o; p; p = p.parent) {
-    if (p === self || !p.visible || p.userData.editHandle || p.name === 'edit-gizmo') return false
   }
   return true
 }

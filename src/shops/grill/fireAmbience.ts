@@ -3,6 +3,8 @@
 // (a bed of bright, busy noise, little spits flaring out of it). It starts with the first sound the player allows (a click), and quietens
 // while the view is somewhere else in the shop (`near` 0..1).
 
+import { replaces } from '@/scene/hot'
+
 let ac: AudioContext | null = null
 let out: GainNode | null = null
 let hiss: GainNode | null = null
@@ -52,6 +54,9 @@ if (typeof window !== 'undefined') {
   const go = () => { start(); if (ac?.state === 'suspended') void ac.resume() }
   window.addEventListener('pointerdown', go)
   window.addEventListener('keydown', go)
+  // (let go of when a hot update swaps this module for a new copy, and its sound with it: the old copy's fire went on hissing at its last
+  // loudness under the new one's)
+  replaces(import.meta.hot, () => { window.removeEventListener('pointerdown', go); window.removeEventListener('keydown', go); void ac?.close() })
 }
 
 /** a sharp little sound: a charcoal pop (low, woody) or a spit of fat (high, quick) */

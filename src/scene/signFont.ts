@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { replaces } from './hot'
 
 /**
  * The shop's lettering: Zen Antique, a retro Mincho with the pen's swell in every stroke (index.html asks for it in a
@@ -38,7 +39,9 @@ if (typeof document !== 'undefined' && document.fonts) {
   // (the font's page may not have been asked for yet when this runs: once the page has, and the font's in)
   void ask()
   void document.fonts.ready.then(() => { if (!fontsOk) void ask() })
-  document.fonts.addEventListener('loadingdone', () => { if (!fontsOk) void ask() })
+  const done = () => { if (!fontsOk) void ask() }
+  document.fonts.addEventListener('loadingdone', done)
+  replaces(import.meta.hot, () => document.fonts.removeEventListener('loadingdone', done))
 }
 
 /** a canvas texture painted by `draw`, painted again by it once the sign font has loaded */

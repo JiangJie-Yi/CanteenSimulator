@@ -3,6 +3,8 @@
 // the brush scrubbing, a knock at a locked door, the paper holder's new roll, the Otohime (音姫): a babbling stream with birdsong, played for
 // a while to cover what's done; a tap's handle turned, the light switch's tick, the cold cabinets' doors.
 
+import { replaces } from '@/scene/hot'
+
 let ac: AudioContext | null = null
 function ctx() {
   if (ac) return ac.state === 'running' ? ac : null
@@ -13,6 +15,8 @@ function ctx() {
 if (typeof window !== 'undefined') {
   const go = () => { const a = ac ?? ctx(); if (a?.state === 'suspended') void a.resume() }
   window.addEventListener('pointerdown', go)
+  // (let go of, with its sound, when a hot update swaps this module for a new copy)
+  replaces(import.meta.hot, () => { window.removeEventListener('pointerdown', go); void ac?.close() })
 }
 
 function noise(a: AudioContext, seconds: number, shape: (t: number) => number, smooth = 0.4) {

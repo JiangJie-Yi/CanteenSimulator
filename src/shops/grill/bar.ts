@@ -9,6 +9,7 @@ import { RACK_FULL, type Dryer } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
 import { emptyFridge, readDrinks, startBack, writeDrinks, type Back } from '@/game/drinkStock'
+import { replaces } from '@/scene/hot'
 
 /*
  * Where the customers sit: one or more counters, each a straight run of stools. A counter is given by its middle
@@ -318,12 +319,14 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 // (kept again whenever the fridges or the back change: looked at every second and a half)
 if (typeof window !== 'undefined') {
   let seen = ''
-  window.setInterval(() => {
+  const id = window.setInterval(() => {
     const v = `${FRIDGE_STOCK.ver}|${DRINK_BACK.ver}`
     if (v === seen) return
     seen = v
     try { localStorage.setItem(DRINKS_KEY, writeDrinks({ units: FRIDGE_STOCK.units, back: DRINK_BACK.back })) } catch { /* (not kept) */ }
   }, 1500)
+  // (stopped when a hot update swaps this module for a new copy: one more of them with every edit, before)
+  replaces(import.meta.hot, () => window.clearInterval(id))
 }
 /** the drinks' stock panel (shops/grill/DrinkStockPanel), opened from the back stock by the fridges: open or not, and who's watching */
 export const DRINK_PANEL = { open: false }

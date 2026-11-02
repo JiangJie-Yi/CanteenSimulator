@@ -12,6 +12,7 @@ import { areasOf, chainOf, isStill, leavesOf, parentOf, undoGroup, within, type 
 import { glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 import { GRILL_SEATS } from './bar'
+import { replaces } from '@/scene/hot'
 
 export type V3 = [number, number, number]
 /** the panel's language (the game's: App sets it) */
@@ -1131,11 +1132,11 @@ function panel() {
 }
 
 // (the Render section follows its settings as they change)
-onRenderPrefs(() => { if (state.on) panel() })
+const offRenderPrefs = onRenderPrefs(() => { if (state.on) panel() })
 
 // ---- the key (once, whichever pieces are mounted)
 if (typeof window !== 'undefined') {
-  window.addEventListener('keydown', (e) => {
+  const onKey = (e: KeyboardEvent) => {
     const t0 = e.target
     const typing = t0 instanceof HTMLInputElement || t0 instanceof HTMLTextAreaElement || (t0 instanceof HTMLElement && t0.isContentEditable)
     // (Ctrl+Z / Ctrl+Y in edit mode, unless it's text being typed into a field, which has its own)
@@ -1174,6 +1175,10 @@ if (typeof window !== 'undefined') {
     const t = e.target
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return
     toggleEdit()
-  })
+  }
+  window.addEventListener('keydown', onKey)
+  // (a hot update swaps this module for a new copy: the old one's key let go of (or G was heard by every copy left behind, each with its own
+  // developer mode, one more with every edit), its panel and notice taken away)
+  replaces(import.meta.hot, () => { window.removeEventListener('keydown', onKey); offRenderPrefs(); el?.remove(); toastEl?.remove() })
   if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { get: getEdit, moveTo, turnTo, select, toggle: toggleEdit, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
 }

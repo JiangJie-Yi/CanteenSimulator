@@ -37,7 +37,7 @@ import { StockPanel, type StockTab } from '@/shops/grill/StockPanel'
 import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
-import { FramePacer, usePacedDpr } from '@/scene/FramePacer'
+import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED, paused } from '@/scene/speed'
 import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
@@ -1167,6 +1167,9 @@ export default function App() {
   // (the game stands still while developer mode's on during business (the owner's): the customers, the clock, the wages, the fire, the
   // cooks; on again, at its speed, as the mode ends)
   useEffect(() => { GAME_SPEED.value = editOn && ai ? 0 : speed }, [speed, editOn, ai])
+  // (and the frame pacer doesn't judge for a while after any of these, or the view flown elsewhere: a moment of slow frames, figures built
+  // and shaders compiled, no measure of the machine; it took the shop opening for a slow machine and drew the rest of the session coarse)
+  useEffect(() => { holdPacer() }, [speed, editOn, ai, view])
   // the omiki (御神酒) offered at the shrine by the door: for a while more come in and they order more
   const [omikiAt, setOmikiAt] = useState<number | null>(null)
   const [blessed, setBlessed] = useState(false)

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, type MutableRefObject, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
@@ -9,8 +9,13 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
  * merged into one, and the originals are hidden. A beckoning cat of forty parts, inked, is two draws, not eighty.
  *
  * Only for what's static: the children are read once, when it mounts (a change to them later isn't picked up), and
- * nothing in it can move on its own or be pointed at.
+ * nothing in it can move on its own or be pointed at. What's in it can be put away and brought back, though, without
+ * merging it all again: a group marked `userData.batchPart` is a part of it that `parts` shows or hides (a fridge's
+ * shelf place emptied as a customer takes its drink, filled again by the stocker).
  */
+
+/** the parts of a batch, shown or hidden (`userData.batchPart` on a group in it): given once it's merged */
+export type BatchParts = { show: (part: string, shown: boolean) => void }
 
 const ATTRS = ['position', 'normal', 'uv'] as const
 
@@ -53,7 +58,7 @@ export function bakeable(g: THREE.BufferGeometry, m: THREE.Matrix4) {
   return out
 }
 
-export function StaticBatch({ children }: { children: ReactNode }) {
+export function StaticBatch({ children, parts }: { children: ReactNode; parts?: MutableRefObject<BatchParts | null> }) {
   const holder = useRef<THREE.Group>(null)
   const merged = useRef<THREE.Group>(null)
   useLayoutEffect(() => {
@@ -61,18 +66,25 @@ export function StaticBatch({ children }: { children: ReactNode }) {
     if (!h || !o) return
     h.updateWorldMatrix(true, true)
     const inv = new THREE.Matrix4().copy(h.matrixWorld).invert()
-    const groups = new Map<string, { mat: THREE.Material; geos: THREE.BufferGeometry[]; shadow: boolean; order: number }>()
+    // (and where each marked part's vertices went: [its piece among `pieces` (which merged mesh), from which vertex, how many])
+    const groups = new Map<string, { mat: THREE.Material; geos: THREE.BufferGeometry[]; shadow: boolean; order: number; count: number; parts: [string, number, number][] }>()
+    const partOf = (m: THREE.Object3D) => { for (let q: THREE.Object3D | null = m; q && q !== h; q = q.parent) if (typeof q.userData.batchPart === 'string') return q.userData.batchPart as string; return null }
     h.traverse((m) => {
       if (!(m instanceof THREE.Mesh) || m instanceof THREE.SkinnedMesh || m instanceof THREE.InstancedMesh || Array.isArray(m.material)) return
       if (!m.visible) return
       const key = `${keyOf(m.material)}|${m.renderOrder}`
-      const g = groups.get(key) ?? { mat: m.material as THREE.Material, geos: [] as THREE.BufferGeometry[], shadow: false, order: m.renderOrder }
-      g.geos.push(bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)))
+      const g = groups.get(key) ?? { mat: m.material as THREE.Material, geos: [] as THREE.BufferGeometry[], shadow: false, order: m.renderOrder, count: 0, parts: [] }
+      const geo = bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld))
+      const part = parts ? partOf(m) : null
+      if (part) g.parts.push([part, g.count, geo.attributes.position.count])
+      g.count += geo.attributes.position.count
+      g.geos.push(geo)
       g.shadow ||= m.castShadow
       groups.set(key, g)
     })
     const made: THREE.Mesh[] = []
-    for (const { mat, geos, shadow, order } of groups.values()) {
+    const ranges = new Map<string, [THREE.Mesh, number, number][]>()
+    for (const { mat, geos, shadow, order, parts: marked } of groups.values()) {
       const geo = mergeGeometries(geos)
       for (const x of geos) x.dispose()
       if (!geo) continue
@@ -83,12 +95,40 @@ export function StaticBatch({ children }: { children: ReactNode }) {
       mesh.renderOrder = order
       made.push(mesh)
       o.add(mesh)
+      for (const [part, from, n] of marked) {
+        const list = ranges.get(part) ?? []
+        list.push([mesh, from, n])
+        ranges.set(part, list)
+      }
     }
     h.visible = false
     // (the originals, hidden, aren't drawn; nor need their places be worked out again every frame: thousands of them, in all the batches)
     const own = h.updateMatrixWorld
     h.updateMatrixWorld = () => {}
+    // (a part hidden: its vertices all drawn in to one point, so its triangles cover nothing (and cast nothing); shown, put back from
+    // how they were made; only its own stretch of the buffer sent again, not the whole batch merged over)
+    const kept = new Map<THREE.Mesh, Float32Array>()
+    const hidden = new Set<string>()
+    const api: BatchParts = {
+      show: (part, shown) => {
+        if (shown !== hidden.has(part)) return
+        if (shown) hidden.delete(part)
+        else hidden.add(part)
+        for (const [mesh, from, n] of ranges.get(part) ?? []) {
+          const pos = mesh.geometry.attributes.position as THREE.BufferAttribute
+          const arr = pos.array as Float32Array
+          let orig = kept.get(mesh)
+          if (!orig) { orig = arr.slice(); kept.set(mesh, orig) }
+          if (shown) arr.set(orig.subarray(from * 3, (from + n) * 3), from * 3)
+          else for (let i = from * 3; i < (from + n) * 3; i += 3) { arr[i] = orig[from * 3]; arr[i + 1] = orig[from * 3 + 1]; arr[i + 2] = orig[from * 3 + 2] }
+          pos.addUpdateRange(from * 3, n * 3)
+          pos.needsUpdate = true
+        }
+      },
+    }
+    if (parts) parts.current = api
     return () => {
+      if (parts?.current === api) parts.current = null
       for (const m of made) {
         m.removeFromParent()
         m.geometry.dispose()
@@ -96,7 +136,7 @@ export function StaticBatch({ children }: { children: ReactNode }) {
       h.visible = true
       h.updateMatrixWorld = own
     }
-  }, [])
+  }, [parts])
   return (
     <>
       <group ref={holder}>{children}</group>

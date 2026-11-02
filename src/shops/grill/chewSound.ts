@@ -1,6 +1,8 @@
 // The owner tasting: the crunch of each bite and the soft munching between, made on the spot with WebAudio (no recordings), each a little
 // different from the last so a run of them doesn't drone.
 
+import { replaces } from '@/scene/hot'
+
 let ac: AudioContext | null = null
 function ctx() {
   if (ac) return ac.state === 'running' ? ac : null
@@ -9,7 +11,10 @@ function ctx() {
   return ac?.state === 'running' ? ac : null
 }
 if (typeof window !== 'undefined') {
-  window.addEventListener('pointerdown', () => { const a = ac ?? ctx(); if (a?.state === 'suspended') void a.resume() })
+  const go = () => { const a = ac ?? ctx(); if (a?.state === 'suspended') void a.resume() }
+  window.addEventListener('pointerdown', go)
+  // (let go of, with its sound, when a hot update swaps this module for a new copy)
+  replaces(import.meta.hot, () => { window.removeEventListener('pointerdown', go); void ac?.close() })
 }
 
 function noise(a: AudioContext, seconds: number, shape: (t: number) => number, smooth: number) {

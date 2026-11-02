@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { replaces } from '@/scene/hot'
 
 // The interface's own sounds, made on the spot with WebAudio (no recordings; the owner's: every panel heard as it opens and as it shuts): a
 // soft papery swish, a band of noise sweeping up as the panel comes out and down as it goes back, and a light wooden tick as it settles.
@@ -10,7 +11,12 @@ function ctx() {
   if (ac?.state === 'suspended') void ac.resume()
   return ac && ac.state !== 'closed' ? ac : null
 }
-if (typeof window !== 'undefined') window.addEventListener('pointerdown', () => { const a = ac ?? ctx(); if (a?.state === 'suspended') void a.resume() })
+if (typeof window !== 'undefined') {
+  const go = () => { const a = ac ?? ctx(); if (a?.state === 'suspended') void a.resume() }
+  window.addEventListener('pointerdown', go)
+  // (let go of, with its sound, when a hot update swaps this module for a new copy)
+  replaces(import.meta.hot, () => { window.removeEventListener('pointerdown', go); void ac?.close() })
+}
 
 /** when one was last heard: a panel opened shuts another (the office opened, the stock put away), and one swish is heard for the two */
 let lastAt = -1

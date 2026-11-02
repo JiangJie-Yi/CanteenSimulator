@@ -2,6 +2,8 @@
 // peanut, shichimi), a wet dab for the pastes and sauces, a squeeze for the lemon; each pitched a little differently from the last, so a run
 // of them doesn't drone; and while a powder's sprinkled, a faint patter of grains between the dabs.
 
+import { replaces } from '@/scene/hot'
+
 let ac: AudioContext | null = null
 function ctx() {
   if (ac) return ac.state === 'running' ? ac : null
@@ -12,6 +14,8 @@ function ctx() {
 if (typeof window !== 'undefined') {
   const go = () => { const a = ac ?? ctx(); if (a?.state === 'suspended') void a.resume() }
   window.addEventListener('pointerdown', go)
+  // (let go of, with its sound, when a hot update swaps this module for a new copy)
+  replaces(import.meta.hot, () => { window.removeEventListener('pointerdown', go); void ac?.close() })
 }
 
 function noise(a: AudioContext, seconds: number, shape: (t: number) => number, smooth = 0.3) {
