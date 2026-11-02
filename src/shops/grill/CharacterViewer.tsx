@@ -141,7 +141,7 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
               <Fitted key={`${e.key}-${gid}`} onStats={setStats} spin={spin}>
                 {e.group === 'boss' && <BossModel />}
                 {e.group === 'staff' && <StaffFigure id={`viewer-${e.key}`} role={e.role!} look={{ female: !!e.female, age: 'young' }} moving={walk} />}
-                {e.group === 'guest' && <FolkFigure id={gid} eating={false} walking={walk} mood={mood} />}
+                {e.group === 'guest' && <FolkFigure id={gid} eating={false} walking={walk} mood={mood} ground />}
               </Fitted>
             </Suspense>
             <OrbitControls target={[0, 0.9, 0]} enablePan={false} minDistance={2} maxDistance={9} />

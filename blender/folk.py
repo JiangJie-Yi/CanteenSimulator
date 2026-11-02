@@ -451,11 +451,71 @@ SPIKY = (
 spikes = [clump(f"spike{k}", frm, to, r) for k, (frm, to, r) in enumerate(SPIKY)]
 style("spiky", [back_shell(), crown()] + spikes)
 style("kid", [back_shell(), crown(fringe=True), tuft("ahoge", head_at(0.0, 1.3, -0.006), Vector((0.1, 1, 0.75)), 0.032, 0.1, M["hair"], 0.45)])
-# (gyaru: long, a curl or two at each side)
-gcurl = [sphere(f"gc{sd}{k}", head_at(sd * 1.25, -0.2 - 0.14 * k, 0.04 + 0.02 * k), 0.045 - 0.006 * k, M["hair"], seg=8, rings=6) for sd in (-1, 1) for k in range(3)]
+def hair_cap(name, hairline, seg=24, rings=9, full=0.02):
+    """a cap of hair in clean quads: every column from the crown down to the hairline (`hairline(bearing)` its elevation there, bearing 0 the
+    front), a little off the head and fuller over the top, drawn in to the scalp along its edge so it sits on the head there; a ring of
+    thin triangles only round the very top of the crown. (The other styles' shells are balls cut by planes, which leaves slivers and odd
+    faces along each cut and a pole at the top: the owner saw the gyaru's in the wireframe)"""
+    bm = bmesh.new()
+    top = bm.verts.new(P(*(C + Vector((0, 1, 0)) * (R + HT * 1.4 + full + 0.008))))
+    cols = []
+    for j in range(seg):
+        a = 2 * math.pi * j / seg - math.pi
+        e_h = hairline(a)
+        col = []
+        for i in range(1, rings + 1):
+            t = i / rings
+            e = math.pi / 2 - (math.pi / 2 - e_h) * t
+            hug = 1 - 0.8 * t ** 4
+            col.append(bm.verts.new(P(*head_at(a, e, (HT * 1.4 + full * max(0.0, math.sin(e)) + 0.008) * hug + 0.002))))
+        cols.append(col)
+    for j in range(seg):
+        j2 = (j + 1) % seg
+        bm.faces.new((top, cols[j2][0], cols[j][0]))
+        for i in range(rings - 1):
+            bm.faces.new((cols[j][i], cols[j2][i], cols[j2][i + 1], cols[j][i + 1]))
+    return from_bm(name, bm, M["hair"])
+
+
+def drill(name, top, down, length, r0, turns=2.2, sides=10, rings=16):
+    """a ringlet (縦ロール) hanging from `top` along `down`: a lock twisted round on itself, two spiral ridges running round it to its tip,
+    swelling a little below its root and narrowing to a point; clean quads, a fan only at its tip and a cap at its root (in the hair)"""
+    d = down.normalized()
+    u = d.cross(Vector((0, 0, 1)))
+    if u.length < 1e-3:
+        u = d.cross(Vector((1, 0, 0)))
+    u.normalize()
+    w = d.cross(u).normalized()
+    bm = bmesh.new()
+    rings_v = []
+    for i in range(rings + 1):
+        t = i / rings
+        c = top + d * length * t
+        rr = r0 * (1 - 0.72 * t ** 1.2) * (0.78 + 0.22 * math.sin(math.pi * min(1.0, t * 2.5)))
+        ring = []
+        for k in range(sides):
+            th = 2 * math.pi * k / sides
+            ridge = 1 + 0.26 * math.sin(2 * th - 2 * math.pi * turns * t)
+            ring.append(bm.verts.new(P(*(c + (u * math.cos(th) + w * math.sin(th)) * rr * ridge))))
+        rings_v.append(ring)
+    tip = bm.verts.new(P(*(top + d * (length + r0 * 0.35))))
+    for i in range(rings):
+        for k in range(sides):
+            k2 = (k + 1) % sides
+            bm.faces.new((rings_v[i][k], rings_v[i][k2], rings_v[i + 1][k2], rings_v[i + 1][k]))
+    for k in range(sides):
+        bm.faces.new((rings_v[-1][k], rings_v[-1][(k + 1) % sides], tip))
+    bm.faces.new(rings_v[0][::-1])
+    return from_bm(name, bm, M["hair"])
+
+
+# (gyaru: long, big and full, a fringe over the brows, the back down past the shoulders, and a ringlet down each side from behind the ear (it
+# was three balls stacked up each side, and the cap two cut balls))
 long_back2 = lathe("longback2", [(C.y + 0.05, R + 0.016), (C.y - 0.08, R + 0.018), (C.y - 0.2, 0.25), (C.y - 0.32, 0.24), (C.y - 0.4, 0.22)],
                    M["hair"], seg=14, a0=math.pi * 0.58, a1=math.pi * 1.42, solid=0.018)
-style("gyaru", [back_shell(nape=-0.25), crown(fringe=True), long_back2] + gcurl)
+gyaru_cap = hair_cap("gyarucap", lambda a: 0.35 - 0.95 * (lambda x: x * x * (3 - 2 * x))(min(1.0, abs(a) / math.pi)), full=0.03)
+ringlets = [drill(f"ringlet{sd}", head_at(sd * 1.32, -0.1, 0.03), Vector((sd * 0.14, -1, 0.06)), 0.3, 0.056) for sd in (-1, 1)]
+style("gyaru", [gyaru_cap, long_back2] + ringlets)
 
 # ===================================================================== what some of them have about them
 EY = 0.015

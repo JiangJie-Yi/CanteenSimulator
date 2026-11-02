@@ -193,9 +193,12 @@ function template(scene: THREE.Group, hair: string, acc: string[]): Template {
  * passing the time (looking about, at their phone, chin in hand), their mood on their face, a hop of delight when their food comes,
  * fading as they go; `fit`: their size in the frame they're drawn in (the boss's height there).
  */
-export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1 }: {
+export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false }: {
   id: number; eating: boolean; walking: boolean; still?: () => boolean; clock?: { current: number }; talk?: number; mood?: Mood | null
-  fade?: () => number; slippers?: () => boolean; pose?: string; held?: ReactNode; fit?: number }) {
+  fade?: () => number; slippers?: () => boolean; pose?: string; held?: ReactNode; fit?: number
+  /** stood on the floor, not sat on a stool's seat, when not walking (the character viewer's turntable: there's no stool there, and sat
+   * at the seat's height over it they floated, the briefcase set down by them on the floor) */
+  ground?: boolean }) {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
   const pictures = usePictures()
   const spec = useMemo(() => folkSpec(id), [id])
@@ -383,9 +386,10 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   })
 
   const k = fit * spec.size
+  const seatLift = walking || ground ? 0 : SEAT
   return (
     // (sat, the round body sits on the stool's seat; standing or walking, on the floor)
-    <group ref={outer} position-y={walking ? 0 : SEAT}>
+    <group ref={outer} position-y={seatLift}>
       <group scale={k}>
         <primitive object={fig.root} />
         {/* the chopsticks, along the right hand, a bite at their tips */}
@@ -422,7 +426,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         {/* the briefcase: in the right hand while they walk; by the stool while they sit */}
         {spec.briefcase && <group ref={carried} position={[0, 0.0, 0.02]} rotation-z={Math.PI} scale={1.4}><Briefcase /></group>}
       </group>
-      {spec.briefcase && !walking && <group position={[-0.22, -SEAT, 0.12]} rotation-y={0.3} scale={1.4 * fit}><group position-y={0.105} rotation-z={Math.PI}><Briefcase /></group></group>}
+      {spec.briefcase && !walking && <group position={[-0.22, -seatLift, 0.12]} rotation-y={0.3} scale={1.4 * fit}><group position-y={0.105} rotation-z={Math.PI}><Briefcase /></group></group>}
     </group>
   )
 }
