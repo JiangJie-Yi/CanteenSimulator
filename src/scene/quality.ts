@@ -81,7 +81,9 @@ function choose(): Tier {
 const TIER = choose()
 
 export const QUALITY: Quality = {
-  high: { tier: 'high', dpr: 2, shadows: true, shadowSize: 2048, antialias: true, lite: true, upgrade: true, canvasMax: 1024,
+  // (the full model at once: the light one first and the full one swapped in after built the whole shop twice over at the start, and the
+  // loading veil could lift in the gap between, on an empty room (the owner saw it); the veil covers the loading anyway)
+  high: { tier: 'high', dpr: 2, shadows: true, shadowSize: 2048, antialias: true, lite: false, upgrade: false, canvasMax: 1024,
     allDishes: true },
   medium: { tier: 'medium', dpr: 1.5, shadows: true, shadowSize: 1024, antialias: true, lite: true, upgrade: false,
     canvasMax: 512, allDishes: false },

@@ -71,6 +71,7 @@ import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
 import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
+import { noteDrawn } from '@/scene/Later'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
@@ -205,6 +206,11 @@ function usePrefersReducedMotion() {
   return reduced
 }
 
+/** tells the loading veil how many draws each frame took (scene/Later's noteDrawn): it waits for the shop to be drawn, not only loaded */
+function DrawnProbe() {
+  useFrame(({ gl }) => noteDrawn(gl.info.render.calls))
+  return null
+}
 /** a phone (a touch screen, or a narrow one): the customers are shown in the 2D bar on the guest board instead of in 3D */
 const PHONE_QUERY = '(hover: none) and (pointer: coarse), (max-width: 760px)'
 /**
@@ -2379,6 +2385,7 @@ export default function App() {
           gl={makeRenderer}
         >
           <FramePacer />
+          <DrawnProbe />
           <FpsMeter />
           <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
             fire={fire} frame={frame} onOffFire={sceneOffFire}

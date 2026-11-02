@@ -10,21 +10,23 @@ const DELAY = [0, 600, 1500, 2600]
 /** the stages mounted but not yet in (still waiting their turn, or their models still loading), and anything else the veil should wait
  * for (holdVeil: a piece not yet measured and shown) */
 const pending = new Set<symbol>()
-const subs = new Set<() => void>()
-const tell = () => subs.forEach((f) => f())
 /** whether the scene's staged parts have begun at all (before they mount there's nothing pending, and that isn't "all in") */
 let seen = false
 /** how many stages (and held things) are still to come in */
 export const laterPending = () => pending.size
 export const laterSeen = () => seen
-export function onLater(f: () => void) { subs.add(f); return () => { subs.delete(f) } }
+/** how many draws the last frame took (the scene's DrawnProbe tells it): a shop that's in takes hundreds; one that's still suspended, a
+ * handful. The veil waits for the shop to be drawn as well as loaded (the owner saw it lift on an empty room) */
+let lastDrawn = 0
+export const noteDrawn = (calls: number) => { lastDrawn = calls }
+export const sceneDrawn = () => lastDrawn > 100
 // (in development, what the veil is waiting for: __veilWait())
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __veilWait?: () => string[] }).__veilWait = () => [...pending].map((s) => s.description ?? '?')
 /** something the loading veil should wait for, till the release it returns is called (or it goes) */
 export function holdVeil(what = 'held') {
   const me = Symbol(what)
-  pending.add(me); tell()
-  return () => { if (pending.delete(me)) tell() }
+  pending.add(me)
+  return () => { pending.delete(me) }
 }
 
 export function Later({ stage, children }: { stage: 1 | 2 | 3; children: ReactNode }) {
@@ -33,8 +35,8 @@ export function Later({ stage, children }: { stage: 1 | 2 | 3; children: ReactNo
   useLayoutEffect(() => {
     const me = id.current
     seen = true
-    pending.add(me); tell()
-    return () => { pending.delete(me); tell() }
+    pending.add(me)
+    return () => { pending.delete(me) }
   }, [])
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -48,6 +50,6 @@ export function Later({ stage, children }: { stage: 1 | 2 | 3; children: ReactNo
   return on ? <Suspense fallback={null}>{children}<StageIn id={id.current} /></Suspense> : null
 }
 function StageIn({ id }: { id: symbol }) {
-  useEffect(() => { pending.delete(id); tell() }, [id])
+  useEffect(() => { pending.delete(id) }, [id])
   return null
 }

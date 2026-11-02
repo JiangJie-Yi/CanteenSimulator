@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProgress } from '@react-three/drei'
 import { GrillingFish } from './GrillingFish'
-import { laterPending, laterSeen, onLater } from '@/scene/Later'
+import { laterPending, laterSeen, sceneDrawn } from '@/scene/Later'
 
 /** how long the loading may sit without any file coming in before it's called stuck (ms) */
 const STALL_MS = 20000
@@ -29,20 +29,22 @@ export function LoadingScreen({ scene = true }: { scene?: boolean }) {
   // (the shop has come in when nothing's loading and every staged part (scene/Later: the decor, the fixtures, the customers) is in, and has
   // stayed so a moment: it lifted once the first files were in, and the stools, the fridges and the crates came in seconds after it)
   const [done, setDone] = useState(false)
-  const [stages, setStages] = useState(laterPending)
-  useEffect(() => onLater(() => setStages(laterPending())), [])
   // (`scene`: a 3D shop is coming, whose staged parts are waited for once they've begun; without one (a phone's 2D grill) only the files)
-  const allIn = () => !useProgress.getState().active && laterPending() === 0 && (!scene || laterSeen())
+  // (and, with a 3D shop, drawn: not lifted on an empty room while the shop's tree is still suspended (files in, a model still parsing))
+  const allIn = () => !useProgress.getState().active && laterPending() === 0 && (!scene || (laterSeen() && sceneDrawn()))
+  // (looked at a few times a second: it's all in once that's held a moment (0.6 s); a page with no 3D shop and nothing to load, after a while)
   useEffect(() => {
     if (done) return
-    if (total > 0 && allIn()) {
-      const t = window.setTimeout(() => { if (allIn()) setDone(true) }, 600)
-      return () => window.clearTimeout(t)
-    }
-    const t = window.setTimeout(() => { if (useProgress.getState().total === 0 && laterPending() === 0 && !scene) setDone(true) }, 3000)
-    return () => window.clearTimeout(t)
+    let held = 0, idle = 0
+    const t = window.setInterval(() => {
+      const total = useProgress.getState().total
+      held = total > 0 && allIn() ? held + 250 : 0
+      idle = total === 0 && laterPending() === 0 && !scene ? idle + 250 : 0
+      if (held >= 600 || idle >= 3000) setDone(true)
+    }, 250)
+    return () => window.clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, total, done, stages, scene])
+  }, [done, scene])
   const last = useRef({ loaded: -1, at: performance.now() })
   useEffect(() => {
     if (loaded !== last.current.loaded) { last.current = { loaded, at: performance.now() }; setStuck(false) }
