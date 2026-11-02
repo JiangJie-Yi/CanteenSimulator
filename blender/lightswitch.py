@@ -7,10 +7,13 @@
 - "SwitchLamp": a slim window low on the rocker for the little guide light (ホタル), lit by the game while the lights are off, so the switch
   is found in the dark.
 
-The game's frame: y up, the wall at z = 0, the face toward +z; 9 cm wide and 14 cm tall.
+The game's frame: y up, the wall at z = 0, the face toward +z; 9 cm wide and 14 cm tall. With SWITCH=slim, the slim one (スリムスイッチ)
+instead: lightswitch-slim.glb, 3.4 cm wide and 12 cm tall, its rocker narrow, for a door frame's post (the toilets' switches, between their
+doors where the sliding doors don't cover them: the owner's).
 
 Run:
     blender -b --factory-startup --python blender/lightswitch.py -- <project path>
+    SWITCH=slim blender -b --factory-startup --python blender/lightswitch.py -- <project path>
 """
 import math
 import os
@@ -41,13 +44,17 @@ M = {"plate": pbr("SwitchPlate", lin("#efe8d8"), rough=0.45),
      "frame": pbr("SwitchFrame", lin("#e2d8c4"), rough=0.5),
      "rocker": pbr("SwitchRocker", lin("#f6f1e6"), rough=0.35),
      "lamp": pbr("SwitchLamp", lin("#6f8a62"), rough=0.4)}
-W, H, T = 0.09, 0.14, 0.008
+SLIM = os.environ.get("SWITCH") == "slim"
+W, H, T = (0.034, 0.12, 0.008) if SLIM else (0.09, 0.14, 0.008)
 
 
-def slab(name, w, h, d, z0, r, mat, bow=0.0):
-    """a soft-cornered slab, w by h, d thick, its back at z0 (the game's frame), its corners rounded r; its face bowed out by `bow`"""
+def slab(name, w, h, d, z0, r, mat, bow=0.0, bevel=True):
+    """a soft-cornered slab, w by h, d thick, its back at z0 (the game's frame), its corners rounded r; its face bowed out by `bow`; its edges
+    bevelled (not the guide light's window, a sliver too thin for one)"""
     bm = bmesh.new()
-    seg = 4
+    # (each corner's quarter round in two steps, and the edges' bevel a single step: a small thing, held to the low-poly rule (it was 944
+    # triangles with four and two); the ink line and the light round the edge read the same)
+    seg = 2
     outline = []
     for cx, cy, a0 in ((w / 2 - r, h / 2 - r, 0), (-w / 2 + r, h / 2 - r, 90), (-w / 2 + r, -h / 2 + r, 180), (w / 2 - r, -h / 2 + r, 270)):
         for k in range(seg + 1):
@@ -67,10 +74,11 @@ def slab(name, w, h, d, z0, r, mat, bow=0.0):
     o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
     o.data.materials.append(mat)
-    m = o.modifiers.new("b", "BEVEL"); m.width = 0.0015; m.segments = 2
-    bpy.context.view_layer.objects.active = o
-    o.select_set(True)
-    bpy.ops.object.modifier_apply(modifier="b")
+    if bevel:
+        m = o.modifiers.new("b", "BEVEL"); m.width = 0.0015; m.segments = 1
+        bpy.context.view_layer.objects.active = o
+        o.select_set(True)
+        bpy.ops.object.modifier_apply(modifier="b")
     for f in o.data.polygons:
         f.use_smooth = True
     return o
@@ -78,8 +86,8 @@ def slab(name, w, h, d, z0, r, mat, bow=0.0):
 
 parts = []
 # (the plate: its frame round the edge, the face set in a touch inside it)
-frame = slab("SwitchPlate", W, H, T, 0.0, 0.01, M["frame"])
-face = slab("SwitchPlateFace", W - 0.012, H - 0.012, T + 0.0008, 0.0, 0.006, M["plate"])
+frame = slab("SwitchPlate", W, H, T, 0.0, 0.008 if SLIM else 0.01, M["frame"])
+face = slab("SwitchPlateFace", W - (0.008 if SLIM else 0.012), H - (0.008 if SLIM else 0.012), T + 0.0008, 0.0, 0.004 if SLIM else 0.006, M["plate"])
 bpy.ops.object.select_all(action="DESELECT")
 frame.select_set(True); face.select_set(True)
 bpy.context.view_layer.objects.active = frame
@@ -88,17 +96,18 @@ plate = bpy.context.view_layer.objects.active
 plate.name = "SwitchPlate"
 parts.append(plate)
 # (the rocker: a wide paddle over most of the face, bowed out a little; its origin at its middle, where it rocks)
-rocker = slab("SwitchRocker", W - 0.024, H - 0.04, 0.006, 0.0, 0.004, M["rocker"], bow=0.0012)
+rocker = slab("SwitchRocker", W - (0.014 if SLIM else 0.024), H - (0.03 if SLIM else 0.04), 0.006, 0.0, 0.003 if SLIM else 0.004, M["rocker"], bow=0.0012)
 rocker.location = P(0, 0, T + 0.0008)
 parts.append(rocker)
 # (the guide light's slim window, low on the rocker)
-lamp = slab("SwitchLamp", 0.016, 0.004, 0.0004, 0.0, 0.0015, M["lamp"])
-lamp.location = P(0, -(H - 0.04) / 2 + 0.012, 0.006 + 0.0012 * 0.3)
+lamp = slab("SwitchLamp", 0.008 if SLIM else 0.016, 0.004, 0.0004, 0.0, 0.0015, M["lamp"], bevel=False)
+lamp.location = P(0, -(H - (0.03 if SLIM else 0.04)) / 2 + 0.012, 0.006 + 0.0012 * 0.3)
 lamp.parent = rocker
 parts.append(lamp)
 root = bpy.data.objects.new("LightSwitch", None)
 bpy.context.collection.objects.link(root)
 plate.parent = root
 rocker.parent = root
-export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "lightswitch.glb"), os.path.join(PROJECT, "blender", "lightswitch.blend"), None)
+NAME = "lightswitch-slim" if SLIM else "lightswitch"
+export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", NAME + ".glb"), os.path.join(PROJECT, "blender", NAME + ".blend"), None)
 print("SWITCH_DONE", sum(len(p.vertices) - 2 for o in parts for p in o.data.polygons))

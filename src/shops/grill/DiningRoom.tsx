@@ -3206,10 +3206,11 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
             (the owner's: moved from by the round window; neither puts out the exit sign, the emergency light)) */}
         {altar && <Movable id="lightswitch-room" label="店內電燈開關"><group position={[-0.002, 1.12, to - GENKAN_SWITCH]}><LightSwitch circuit="room" /></group></Movable>}
         {altar && <Movable id="lightswitch-door" label="門口燈籠開關"><group position={[-0.002, 1.12, to - GENKAN_SWITCH + SWITCH_STEP]}><LightSwitch circuit="door" /></group></Movable>}
-        {/* (and beside each toilet's door, on its outer side, that toilet's lights' switch (the owner's)) */}
+        {/* (and each toilet's lights' switch, slim, on the post between the two doors, each on its own door's side of it (the owner's): beside
+            each door's outer side the door slid open over it) */}
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
-          <Movable key={who} id={`lightswitch-wc-${who}`} label={who === 'm' ? '男廁電燈開關' : '女廁電燈開關'}>
-            <group position={[-0.002, 1.12, door + (k ? 1 : -1) * (WC_W + 0.12 + WC_SWITCH_OUT)]}><LightSwitch circuit={who === 'm' ? 'wcM' : 'wcF'} /></group>
+          <Movable key={who} id={`wcswitch-${who}`} label={who === 'm' ? '男廁電燈開關' : '女廁電燈開關'}>
+            <group position={[-WC_POST_FACE - 0.002, 1.12, door + (k ? 1 : -1) * WC_SWITCH_Z]}><LightSwitch circuit={who === 'm' ? 'wcM' : 'wcF'} slim /></group>
           </Movable>
         ))}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
@@ -5013,16 +5014,22 @@ function ExitSign() {
 useGLTF.preload(EXIT_URL)
 
 const SWITCH_URL = import.meta.env.BASE_URL + 'models/lightswitch.glb'
+/** the slim one (スリムスイッチ, 3.4 cm by 12): the toilets', on the post between their two doors */
+const SWITCH_SLIM_URL = import.meta.env.BASE_URL + 'models/lightswitch-slim.glb'
 /**
  * The light switch on the wall by the door (blender/lightswitch.py): an ivory wide rocker at hand height. A click puts the shop's lights out
  * or on again (scene/lightsStore; the lamps and the room's light follow it): the rocker rocks over, and while the lights are out its
  * little guide light (ホタル) glows green, to find it by in the dark. Facing -x (the wall's own frame: the room).
  */
 /** how far from the wall's end by the way in the room's switch is (the door lanterns' a plate's width nearer the way in; the owner moved
- * the pair 0.54 further in along the wall), and how far out past a toilet's doorway its switch is */
+ * the pair 0.54 further in along the wall) */
 const GENKAN_SWITCH = 0.86
 const SWITCH_STEP = 0.11
-const WC_SWITCH_OUT = 0.1
+/** the toilets' two switches, slim, side by side on the post between their doors (the owner's: beside each door, on its outer side, the
+ * door slid open covered it): each on its own door's half of the post (the two doors' frames meet there, a post 6 cm wide each, 6 deep),
+ * how far from the middle, and how far out from the wall the post's face is */
+const WC_SWITCH_Z = 0.03
+const WC_POST_FACE = 0.06
 /** each switch's name, and what pressing it does */
 const SWITCH_SAYS: Record<Circuit, { title: string; on: string; off: string }> = {
   room: { title: '店內電燈', on: '點一下關燈', off: '點一下開燈' },
@@ -5030,12 +5037,12 @@ const SWITCH_SAYS: Record<Circuit, { title: string; on: string; off: string }> =
   wcM: { title: '男廁電燈', on: '點一下關燈', off: '點一下開燈' },
   wcF: { title: '女廁電燈', on: '點一下關燈', off: '點一下開燈' },
 }
-function LightSwitch({ circuit = 'room' }: { circuit?: Circuit }) {
+function LightSwitch({ circuit = 'room', slim = false }: { circuit?: Circuit; slim?: boolean }) {
   const on = lightOn(useLights(), circuit)
   const [lit, setLit] = useState(false)
   const tag = () => { const say = SWITCH_SAYS[circuit]; setTip({ title: say.title, hint: lightOn(getLights(), circuit) ? say.on : say.off }) }
   const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; pressLightSwitch(circuit); lightSwitchSound(lightOn(getLights(), circuit)); tag() }
-  const gltf = useGLTF(SWITCH_URL) as unknown as { scene: THREE.Group }
+  const gltf = useGLTF(slim ? SWITCH_SLIM_URL : SWITCH_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const root = gltf.scene.clone(true)
     const toon = new Map<THREE.Material, THREE.MeshToonMaterial>()
@@ -5067,6 +5074,7 @@ function LightSwitch({ circuit = 'room' }: { circuit?: Circuit }) {
   )
 }
 useGLTF.preload(SWITCH_URL)
+useGLTF.preload(SWITCH_SLIM_URL)
 
 function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   const c0 = counters[0]
