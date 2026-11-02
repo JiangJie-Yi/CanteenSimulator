@@ -2248,7 +2248,15 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
   const door = useWcDoor()
   // (the men's slides off one way, the women's the other, away from each other)
   const away = who === 'm' ? -1 : 1
-  const panel = useMemo(() => door.panel(), [door])
+  // (its own board of planks, like the staff's door (the owner's): the model's one great flat-sawn figure over the whole of it, before)
+  const panel = useMemo(() => {
+    const p = door.panel()
+    p.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (m.isMesh && (m.material as THREE.Material).name === 'WcDoorBoard') m.material = new THREE.MeshToonMaterial({ name: 'WcDoorBoard', color: '#ffffff', map: WC_BOARD[who] })
+    })
+    return p
+  }, [door, who])
   const k = useRef(0)
   const was = useRef(0)
   useFrame(({ camera }, dt) => {
@@ -2496,43 +2504,76 @@ const STAFF_DARK = canvasTex(128, 256, (g) => {
   g.fillStyle = sheen
   g.fillRect(20, 214, 88, 42)
 })
-/** the staff door's lower board, its own (the owner's: a natural grain; the toilets' doors have one great flat-sawn figure over the whole
- * board): four cedar planks standing side by side, each its own tone, a fine straight grain up them, now and then a soft arch of a figure,
- * a dark groove between each two; laid as the board's UVs run (glTF's way up) */
-const STAFF_BOARD = (() => {
+/** a sliding door's lower board of cedar planks (the owner's: a natural grain, the staff door's first, then the toilets' after it, each its
+ * own): four or five planks standing side by side, each its own width and tone, a fine straight grain up them that thickens and thins, a
+ * darker streak down some, a soft arch of a flat-sawn figure on one or two, now and then a small knot with the grain parting round it, a dark
+ * groove between each two; laid as the board's UVs run (glTF's way up). Every door's from its own seed, so no two are alike */
+function plankBoard(seed: number, tones: string[]) {
   const t = canvasTex(256, 320, (g) => {
-    let seed = 13
-    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
-    const tones = ['#a2704a', '#8f6040', '#a87a52', '#966846']
-    for (let k = 0; k < 4; k++) {
-      const x0 = k * 64
-      g.fillStyle = tones[k]; g.fillRect(x0, 0, 64, 320)
-      // (the straight grain: fine lines up the plank, wandering a little, darker and lighter)
-      for (let q = 0; q < 26; q++) {
-        const x = x0 + 3 + rnd() * 58, dark = rnd() < 0.6
-        g.strokeStyle = dark ? `rgba(60,34,18,${0.12 + rnd() * 0.16})` : `rgba(240,210,170,${0.08 + rnd() * 0.1})`
-        g.lineWidth = 0.6 + rnd() * 1.2
-        g.beginPath(); g.moveTo(x, 0)
-        for (let y = 0; y <= 320; y += 20) g.lineTo(x + Math.sin(y / 60 + q) * 1.4 + (rnd() - 0.5) * 0.6, y)
+    let sd = seed
+    const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647 }
+    // (the planks' widths: unequal, filling the board)
+    const n = tones.length, ws = tones.map(() => 0.7 + rnd() * 0.6), sum = ws.reduce((a, b) => a + b, 0)
+    let x0 = 0
+    for (let k = 0; k < n; k++) {
+      const w = (ws[k] / sum) * 256, x1 = k === n - 1 ? 256 : x0 + w
+      const pw = x1 - x0
+      g.fillStyle = tones[k]; g.fillRect(x0, 0, pw + 1, 320)
+      // (the tone drifting down the plank: a little lighter or darker in long soft bands)
+      const drift = g.createLinearGradient(0, 0, 0, 320)
+      for (let y = 0; y <= 4; y++) drift.addColorStop(y / 4, rnd() < 0.5 ? `rgba(255,236,200,${rnd() * 0.08})` : `rgba(40,20,8,${rnd() * 0.09})`)
+      g.fillStyle = drift; g.fillRect(x0, 0, pw, 320)
+      // (a darker streak down it, mineral or heartwood, on some)
+      if (rnd() < 0.5) {
+        const sx = x0 + 6 + rnd() * (pw - 16), sw = 3 + rnd() * 8
+        const gr = g.createLinearGradient(sx, 0, sx + sw, 0)
+        gr.addColorStop(0, 'rgba(50,26,12,0)'); gr.addColorStop(0.5, `rgba(50,26,12,${0.1 + rnd() * 0.12})`); gr.addColorStop(1, 'rgba(50,26,12,0)')
+        g.fillStyle = gr; g.fillRect(sx, 0, sw, 320)
+      }
+      // (a knot or two, the grain to go round them)
+      const knots: [number, number, number][] = []
+      if (rnd() < 0.55) knots.push([x0 + 8 + rnd() * (pw - 16), 30 + rnd() * 260, 2.5 + rnd() * 3.5])
+      // (the straight grain: fine lines up the plank, closer here and wider there, bending round a knot)
+      const lines = Math.round(pw * (0.32 + rnd() * 0.2))
+      for (let q = 0; q < lines; q++) {
+        const x = x0 + 2 + rnd() * (pw - 4), dark = rnd() < 0.62
+        g.strokeStyle = dark ? `rgba(60,34,18,${0.08 + rnd() * 0.2})` : `rgba(240,210,170,${0.06 + rnd() * 0.1})`
+        g.lineWidth = 0.5 + rnd() * (dark ? 1.6 : 1)
+        const ph = rnd() * 6, amp = 0.6 + rnd() * 1.6
+        g.beginPath()
+        for (let y = 0; y <= 320; y += 10) {
+          let xx = x + Math.sin(y / (40 + amp * 20) + ph) * amp
+          for (const [kx, ky, kr] of knots) { const dy = y - ky, d = Math.hypot(xx - kx, dy); if (d < kr * 5) xx += Math.sign(xx - kx || 1) * (kr * 5 - d) * 0.45 * Math.exp(-(dy * dy) / (kr * kr * 30)) }
+          if (y === 0) g.moveTo(xx, y); else g.lineTo(xx, y)
+        }
         g.stroke()
       }
-      // (on two of them a soft arch of a flat-sawn figure, low in contrast)
-      if (k === 1 || k === 3) {
-        const cx = x0 + 32, top = 60 + rnd() * 80
-        for (let r = 0; r < 5; r++) {
-          g.strokeStyle = `rgba(70,40,20,${0.16 - r * 0.02})`; g.lineWidth = 1.4
-          g.beginPath(); g.moveTo(cx - 10 - r * 5, 320); g.bezierCurveTo(cx - 10 - r * 5, top + r * 18 + 60, cx - 2 - r * 2, top + r * 14, cx, top + r * 14)
-          g.bezierCurveTo(cx + 2 + r * 2, top + r * 14, cx + 10 + r * 5, top + r * 18 + 60, cx + 10 + r * 5, 320); g.stroke()
+      for (const [kx, ky, kr] of knots) {
+        const gr = g.createRadialGradient(kx, ky, 0, kx, ky, kr * 1.8)
+        gr.addColorStop(0, 'rgba(40,20,8,0.75)'); gr.addColorStop(0.5, 'rgba(70,38,18,0.45)'); gr.addColorStop(1, 'rgba(70,38,18,0)')
+        g.fillStyle = gr; g.beginPath(); g.ellipse(kx, ky, kr * 1.4, kr * 1.9, 0, 0, Math.PI * 2); g.fill()
+      }
+      // (on some a soft arch of a flat-sawn figure, low in contrast, its own height)
+      if (rnd() < 0.45) {
+        const cx = x0 + pw * (0.35 + rnd() * 0.3), top = 40 + rnd() * 140, rings = 3 + Math.floor(rnd() * 4)
+        for (let r = 0; r < rings; r++) {
+          g.strokeStyle = `rgba(70,40,20,${0.15 - r * 0.02})`; g.lineWidth = 1 + rnd() * 0.8
+          const sp = pw * 0.12 + r * pw * 0.07
+          g.beginPath(); g.moveTo(cx - sp, 320); g.bezierCurveTo(cx - sp, top + r * 18 + 60, cx - 2 - r * 2, top + r * 14, cx, top + r * 14)
+          g.bezierCurveTo(cx + 2 + r * 2, top + r * 14, cx + sp, top + r * 18 + 60, cx + sp, 320); g.stroke()
         }
       }
       // (the groove at its edge, a hair of light beside it)
-      g.fillStyle = 'rgba(30,16,8,0.75)'; g.fillRect(x0, 0, 2, 320)
-      g.fillStyle = 'rgba(255,230,190,0.12)'; g.fillRect(x0 + 2, 0, 1, 320)
+      if (k) { g.fillStyle = 'rgba(30,16,8,0.75)'; g.fillRect(x0, 0, 2, 320); g.fillStyle = 'rgba(255,230,190,0.12)'; g.fillRect(x0 + 2, 0, 1, 320) }
+      x0 = x1
     }
   })
   if (t) t.flipY = false
   return t
-})()
+}
+const STAFF_BOARD = plankBoard(13, ['#a2704a', '#8f6040', '#a87a52', '#966846'])
+/** the toilets' doors' boards: the same planks, each door its own (the men's a shade cooler, the women's warmer) */
+const WC_BOARD = { m: plankBoard(29, ['#9a6a46', '#8a5c3c', '#a27450', '#93663f', '#9c6c48']), f: plankBoard(47, ['#a87450', '#94643f', '#ad7c54', '#9b6a44']) }
 /** 員工專用 on the staff's door, across its board below the waist (the owner's: on the door itself, on black; it was a plaque over it, half
  * behind the banner hung there), STAFF ONLY small under it: cream on a black plate with a fine cream rule round it, worn a little */
 const STAFF_SIGN = canvasTex(512, 256, (g) => {
