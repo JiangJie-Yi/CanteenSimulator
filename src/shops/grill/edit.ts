@@ -112,9 +112,13 @@ type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string,
 /** offsets made defaults (BASES) since they were set by hand: a browser still holding just that offset drops it, so it isn't counted twice
  * (the rest it holds are kept, as a new KEY would lose them) */
 const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.0502, 0, 0] }
+/** offsets made defaults by how far they went, whichever way the panel's axes ran when they were set (the way-in switches moved 0.54 along
+ * their wall by the owner, then made so) */
+const SETTLED_BY: Record<string, number> = { 'lightswitch-room': 0.54, 'lightswitch-door': 0.54 }
 const loadOffsets = () => {
   const o = load(KEY)
   for (const [id, v] of Object.entries(SETTLED)) if (o[id]?.every((x, i) => Math.abs(x - v[i]) < 0.002)) delete o[id]
+  for (const [id, d] of Object.entries(SETTLED_BY)) if (o[id] && Math.abs(Math.hypot(...o[id]) - d) < 0.01 && Math.abs(o[id][1]) < 0.002) delete o[id]
   return o
 }
 /** and turns made defaults (a Movable's baseTurn) since they were set by hand: the fish lantern's quarter turn (the owner's) */

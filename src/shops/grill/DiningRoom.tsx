@@ -4980,9 +4980,9 @@ const SWITCH_URL = import.meta.env.BASE_URL + 'models/lightswitch.glb'
  * or on again (scene/lightsStore; the lamps and the room's light follow it): the rocker rocks over, and while the lights are out its
  * little guide light (ホタル) glows green, to find it by in the dark. Facing -x (the wall's own frame: the room).
  */
-/** how far from the wall's end by the way in the room's switch is (the door lanterns' a plate's width nearer the way in), and how far out
- * past a toilet's doorway its switch is */
-const GENKAN_SWITCH = 0.32
+/** how far from the wall's end by the way in the room's switch is (the door lanterns' a plate's width nearer the way in; the owner moved
+ * the pair 0.54 further in along the wall), and how far out past a toilet's doorway its switch is */
+const GENKAN_SWITCH = 0.86
 const SWITCH_STEP = 0.11
 const WC_SWITCH_OUT = 0.1
 /** each switch's name, and what pressing it does */

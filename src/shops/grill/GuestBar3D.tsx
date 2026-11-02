@@ -562,9 +562,9 @@ const DOORMAT = (() => signTexture(512, 280, (g) => {
 /**
  * A long lantern's skin (長提灯), its picture once round it: the washi lit from inside, the bamboo ribs it's wound on painted in (each a fine
  * dark line, the paper between them bellying a little, lit at its crown), its ends darker under the caps; and down its front and again round
- * its back the words in big brushed characters. `red`: the red one, the shop's mark in black edged with gold, a white band round it near
- * each end (the owner's); `cream`: the grill's, cream paper, 炭火 in black (the owner had its 焼 taken off: the red one beside it says it)
- * with a red band top and bottom.
+ * its back the words in big brushed characters. `red`: the red one, the shop's mark in black edged with gold (a white band near each end
+ * was tried: the owner had it taken off); `cream`: the grill's, cream paper, 炭火 in black (the owner had its 焼 taken off: the red one
+ * beside it says it) with a red band top and bottom.
  */
 const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTexture(512, 512, (g) => {
   const cream = style === 'cream'
@@ -592,8 +592,10 @@ const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTex
   ends.addColorStop(0, 'rgba(20,6,2,0.45)'); ends.addColorStop(0.1, 'rgba(20,6,2,0)'); ends.addColorStop(0.9, 'rgba(20,6,2,0)'); ends.addColorStop(1, 'rgba(20,6,2,0.45)')
   g.fillStyle = ends
   g.fillRect(0, 0, 512, 512)
-  // (a band round it near each end: red on the grill's cream one, white on the red one)
-  for (const y of [56, 440]) { g.fillStyle = cream ? '#b8261c' : '#f6eedd'; g.fillRect(0, y, 512, 16) }
+  if (cream) {
+    // (the grill's: a red band round it near each end)
+    for (const y of [56, 440]) { g.fillStyle = '#b8261c'; g.fillRect(0, y, 512, 16) }
+  }
   // (the words, down the front and again round the back)
   const chars = [...(cream ? '炭火' : mark)]
   const size = chars.length === 1 ? 230 : chars.length === 2 ? 168 : 124
