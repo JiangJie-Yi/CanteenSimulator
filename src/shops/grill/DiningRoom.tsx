@@ -2743,13 +2743,14 @@ function seeded(seed: number) {
   let n = seed
   return () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646 }
 }
-/** a band round a lantern's belly, after the owner's two pattern sheets (their references 5a72cc81, 鱗, and 16be7e14, 立涌; before them
- * seigaiha and shippo from another sheet, thin seigaiha lines and 麻の葉, none of which would do), in their colours: deep navy, sage green,
- * lavender, a blue-grey and cream, each a little mottled as watercolour is, a fine gold line round every shape and a fleck of gold leaf here
- * and there. 鱗 (uroko): rows of scales, each a round-topped dome, every row lying over the one behind it half a scale along; 立涌 (tatewaku):
- * upright stripes of every width waving up the band together. Its width a whole number of repeats, so it runs on round the lantern with no
- * seam; drawn on its own sheet and laid over the paper a little see-through, the lit washi glowing through it */
-const BAND_COLOURS = ['#25385f', '#9fac8e', '#a79bc6', '#8ea2ba', '#ece4d0', '#b7c3cd']
+/** a band round a lantern's top or its foot, after the owner's two pattern sheets (their references 5a72cc81, 鱗, and 16be7e14, 立涌; before
+ * them seigaiha and shippo from another sheet, thin seigaiha lines and 麻の葉, none of which would do), in one family of colour, indigo
+ * (the owner's), laid on as a dyer's band glowing in the paper: the band's ground first multiplied in (the paper's fibres and ribs through
+ * it), then the pattern over it in colour dodge (加亮顏色, the owner's), each shape lightening the ground by how light its own blue is, so the
+ * shapes glow from the deep blue of the band, their fine lines and a few flecks the brightest. 鱗 (uroko): rows of scales, each a
+ * round-topped dome, every row lying over the one behind it half a scale along; 立涌 (tatewaku): upright stripes of every width waving up
+ * the band together. Its width a whole number of repeats, so it runs on round the lantern with no seam */
+const BAND_COLOURS = ['#0b1630', '#14254a', '#1d3566', '#284684', '#3a5ba0']
 function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: number, lit: boolean, kind: 'uroko' | 'tatewaku', flip = false) {
   const h = Math.ceil(y1 - y0)
   const sheet = document.createElement('canvas')
@@ -2757,7 +2758,8 @@ function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: num
   const s = sheet.getContext('2d')
   if (!s) return
   const rnd = seeded(kind === 'uroko' ? 47 : 53)
-  const GOLD = '#c9a24e'
+  // (the lines and flecks: the lightest blue, the brightest once dodged)
+  const LINE = '#5f86c8'
   /** a colour of the sheet, not the one just used (two the same side by side read as one) */
   let last = -1
   // (the navy a little more often than the rest, as the sheets have it: `deep`)
@@ -2780,7 +2782,7 @@ function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: num
     }
     s.restore()
   }
-  s.fillStyle = '#ece4d0'
+  s.fillStyle = '#050a18'
   s.fillRect(0, 0, W, h)
   s.lineWidth = 1.5
   if (kind === 'uroko') {
@@ -2794,7 +2796,7 @@ function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: num
         s.fillStyle = pick()
         s.fill(path)
         mottle(path, x, y - R * 0.3, R)
-        s.strokeStyle = GOLD
+        s.strokeStyle = LINE
         s.stroke(path)
       }
     }
@@ -2820,27 +2822,27 @@ function patternBand(g: CanvasRenderingContext2D, W: number, y0: number, y1: num
         s.fillStyle = shift === 0 ? (colours[k] = pick(true)) : colours[k]
         s.fill(path)
         mottle(path, (x0 + x1) / 2, h / 2, Math.max(w, h * 0.5))
-        s.strokeStyle = GOLD
+        s.strokeStyle = LINE
         s.stroke(path)
       }
       x += w
     }
   }
-  // (the paper's own pale specks through it, and a few flecks of gold leaf)
-  for (let k = 0; k < 140; k++) {
-    s.fillStyle = 'rgba(255,255,255,0.18)'
-    s.beginPath(); s.arc(rnd() * W, rnd() * h, 0.5 + rnd() * 1.3, 0, Math.PI * 2); s.fill()
-  }
-  s.fillStyle = GOLD
-  for (let k = 0; k < 60; k++) { s.beginPath(); s.arc(rnd() * W, rnd() * h, 0.6 + rnd() * 1.2, 0, Math.PI * 2); s.fill() }
-  // (multiplied into the paper, as dye is (the owner's: 色彩增值, see-through): its fibres, ribs and seams and its glow all through it; the
-  // upper band turned upside down, so the two face each other across the lantern's middle)
+  // (a few flecks, lighter still)
+  s.fillStyle = LINE
+  for (let k = 0; k < 70; k++) { s.beginPath(); s.arc(rnd() * W, rnd() * h, 0.6 + rnd() * 1.2, 0, Math.PI * 2); s.fill() }
   g.save()
+  // (the band's indigo ground multiplied into the paper, as dye is: its fibres, ribs and seams through it)
   g.globalCompositeOperation = 'multiply'
-  g.globalAlpha = lit ? 0.88 : 0.95
+  g.fillStyle = lit ? '#6f8fc4' : '#5a78ad'
+  g.fillRect(0, y0, W, h)
+  // (the pattern dodged over it, each shape lightening the ground by its own blue: the upper band turned upside down, so the two face
+  // each other across the lantern's middle)
+  g.globalCompositeOperation = 'color-dodge'
   if (flip) { g.translate(0, y0 + h); g.scale(1, -1); g.drawImage(sheet, 0, 0) } else g.drawImage(sheet, 0, y0)
-  // (a fine line of navy along either edge)
+  // (a fine line of indigo along either edge)
   g.setTransform(1, 0, 0, 1, 0, 0)
+  g.globalCompositeOperation = 'multiply'
   g.fillStyle = 'rgba(37,56,95,0.85)'
   g.fillRect(0, y0 - 5, W, 2.5)
   g.fillRect(0, y0 + h + 3, W, 2.5)
@@ -2888,9 +2890,10 @@ function lanternPaper(g: CanvasRenderingContext2D, lit: boolean, band: 'uroko' |
   // (the seams between its panels)
   g.fillStyle = lit ? 'rgba(200,140,80,0.16)' : 'rgba(120,110,95,0.14)'
   for (let x = 0; x < W; x += 128) g.fillRect(x, 0, 1.6, H)
-  // (its bands, one round its shoulder and one round its lower belly, mirrored (the owner's: top and bottom, the one the other way up))
-  patternBand(g, W, H * 0.12, H * 0.36, lit, band, true)
-  patternBand(g, W, H * 0.64, H * 0.88, lit, band)
+  // (its bands, one round its shoulder and one round its foot, mirrored (the owner's: top and bottom, the one the other way up), each out
+  // toward its end so the white of the paper between them is wide (the owner's: wider))
+  patternBand(g, W, H * 0.07, H * 0.27, lit, band, true)
+  patternBand(g, W, H * 0.73, H * 0.93, lit, band)
 }
 const LANTERN_SKIN = signTexture(1024, 300, (g) => lanternPaper(g, true))
 const PENDANT_GLOW = nightGlow(new THREE.SpriteMaterial({ map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, color: '#ffcf90' }), 0.35, 0.75)
