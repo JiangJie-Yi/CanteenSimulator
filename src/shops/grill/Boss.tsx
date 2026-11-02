@@ -4,6 +4,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 import { colourVertices, mergeByMaterial } from '@/scene/StaticBatch'
+import { atlasModel } from '@/scene/atlasMerge'
 import { airbrush, gradientMap } from '@/scene/Person3D'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
@@ -54,39 +55,49 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * fridge, taken off the table as he picks it up); he goes over, drinks it and says so; cleared when it's drunk */
 export const BOSS_DRINK = { at: null as THREE.Vector3 | null, id: null as DrinkId | null, item: null as unknown, arrived: false, since: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossDrink?: typeof BOSS_DRINK }).__bossDrink = BOSS_DRINK
-/** the owner as he's drawn (his materials, his ink, his parts merged), made once: his figure in the room is it, the character viewer a copy */
+/**
+ * The owner as he's drawn (his materials, his ink, his parts merged), made once: his figure in the room is it, the character viewer a copy.
+ * Drawn in as few draws as can be (the owner's: he was 27 in the room, 39 in the viewer, and the shop slows when it's full): all of him but
+ * his eyes one material (scene/atlasMerge: the pictures on his coat, apron, trousers, hair and towel packed into one atlas, the plain
+ * parts' colours carried by their vertices), so his body is one mesh and its ink another; his eyes, their dark and their shines, one mesh,
+ * unlit, in a group at their middle that closes as he blinks; each hand one, and the tongs and the fan each one; the mouth as it was.
+ */
 function styledBoss(scene: THREE.Group) {
   if (!made) {
     const r = scene.clone(true)
-    const mats = new Map<THREE.Material, THREE.Material>()
-    // (every plain-coloured piece of him (no picture on it) one material, its colour carried by its vertices: merged below, they're one draw)
-    const plain = airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap }))
+    r.updateMatrixWorld(true)
+    // ---- his eyes
+    const eyeParts: THREE.Mesh[] = []
+    r.traverse((o) => { if ((o as THREE.Mesh).isMesh && /^BossEye/.test(o.name)) eyeParts.push(o as THREE.Mesh) })
+    if (eyeParts.length) {
+      const eyes = new THREE.Group()
+      eyes.name = 'BossEyes'
+      const box = new THREE.Box3()
+      for (const e of eyeParts) box.expandByObject(e)
+      const holder = eyeParts[0].parent!
+      holder.add(eyes)
+      eyes.position.copy(holder.worldToLocal(box.getCenter(new THREE.Vector3())))
+      eyes.updateMatrixWorld(true)
+      const eyeMat = new THREE.MeshBasicMaterial({ color: '#ffffff', vertexColors: true })
+      for (const e of eyeParts) {
+        e.geometry = e.geometry.clone()
+        colourVertices(e.geometry, (e.material as THREE.MeshStandardMaterial).color)
+        e.material = eyeMat
+        eyes.attach(e)
+      }
+    }
+    // ---- the rest of him one material
+    atlasModel(r, (m) => !/^BossEye/.test(m.name), (atlas) => airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap })))
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      if (!src.map && !src.transparent && src.opacity === 1 && !/White|Dark/.test(src.name)) {
-        m.geometry = m.geometry.clone()
-        colourVertices(m.geometry, src.color)
-        m.material = plain
-        m.castShadow = !UNINKED.test(m.name)
-        m.receiveShadow = true
-        return
-      }
-      let t = mats.get(src)
-      if (!t) {
-        t = /White|Dark/.test(src.name)
-          ? new THREE.MeshBasicMaterial({ color: src.color.clone() })
-          : airbrush(new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, gradientMap }))
-        mats.set(src, t)
-      }
-      m.material = t
       m.castShadow = !UNINKED.test(m.name)
       m.receiveShadow = true
     })
     inkModel(r, (m) => UNINKED.test(m.name), { width: 0.006, weld: true })
-    // (his body's parts merged by material, a handful of draws; what moves on its own (his hands and what they hold, his eyes, his mouth) kept apart)
-    mergeByMaterial(r, (o) => /^Boss(Hand|Tongs|Fan|Eye|Mouth)/.test(o.name))
+    // (his body merged; what moves on its own (his hands and what they hold, his eyes, his mouth) kept apart, each of those merged in itself)
+    mergeByMaterial(r, (o) => /^Boss(Hand|Tongs|Fan|Eyes|Mouth)/.test(o.name))
+    for (const n of ['BossHandL', 'BossHandR', 'BossTongs', 'BossFan', 'BossEyes']) { const o = r.getObjectByName(n); if (o) mergeByMaterial(o) }
     made = r
   }
   return made
@@ -140,8 +151,7 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
     fan: root.getObjectByName('BossFan'),
     smile: root.getObjectByName('BossMouth'),
     talk: ['BossMouthOpen', 'BossMouthTongue'].map((n) => root.getObjectByName(n)).filter(Boolean) as THREE.Object3D[],
-    eyes: ['BossEye-1', 'BossEye1', 'BossEyeShine-1', 'BossEyeShine1', 'BossEyeShineB-1', 'BossEyeShineB1']
-      .map((n) => root.getObjectByName(n)).filter(Boolean) as THREE.Object3D[],
+    eyes: root.getObjectByName('BossEyes'),
   }), [root])
   const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0, y: 0, vy: 0, ground: 0, probeAt: -1 })
   const scene = useThree((s) => s.scene)
@@ -414,10 +424,7 @@ export function Boss({ to = [0, 0], open = false, lang = 'zh', children }: { to?
       s.blinkAt = T + (s.blinks % 4 === 3 ? 0.12 : 2.2 + Math.random() * 3)
       s.blinks++
     }
-    for (const e of parts.eyes) {
-      const sy = (e.userData.sy ??= e.scale.y) as number
-      e.scale.y = sy * (/Shine/.test(e.name) ? (lid < 0.5 ? 0 : 1) : lid)
-    }
+    if (parts.eyes) parts.eyes.scale.y = lid
   })
   return (
     <group ref={mover} name="BossFollow">

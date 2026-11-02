@@ -124,6 +124,7 @@ export function mergeByMaterial(root: THREE.Object3D, keep: (o: THREE.Object3D) 
     g.meshes.push(m)
     groups.set(m.material, g)
   })
+  const merged = new Set<THREE.Object3D>([...groups.values()].flatMap((g) => (g.meshes.length < 2 ? [] : g.meshes)))
   for (const [mat, { geos, meshes }] of groups) {
     if (meshes.length < 2) { for (const x of geos) x.dispose(); continue }
     const geo = mergeGeometries(geos)
@@ -136,6 +137,8 @@ export function mergeByMaterial(root: THREE.Object3D, keep: (o: THREE.Object3D) 
     // (an ink hull stays one: not pointed at, not inked again)
     if (meshes.every((x) => x.raycast === meshes[0].raycast)) mesh.raycast = meshes[0].raycast
     if (meshes.some((x) => x.userData.inked)) mesh.userData.inked = true
+    // (what hangs under a mesh merged away and isn't merged itself (a lone hand's ink line, the only one of its kind) is kept, where it was)
+    for (const x of meshes) for (const c of [...x.children]) if (!merged.has(c)) x.parent?.attach(c)
     for (const x of meshes) x.removeFromParent()
     root.add(mesh)
   }
