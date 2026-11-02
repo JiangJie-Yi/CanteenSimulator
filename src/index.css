@@ -2013,7 +2013,7 @@ button {
 }
 
 /* (a phone's) light the incense: under the round buttons, top right */
-.incense-toggle {
+.omiki-toggle {
   position: fixed;
   z-index: 10;
   top: 62px;
@@ -2026,7 +2026,7 @@ button {
   font: 700 13px/1 var(--brush);
   cursor: pointer;
 }
-.incense-toggle.is-on {
+.omiki-toggle.is-on {
   background: #c4302a;
   color: #fff6e0;
   cursor: default;
@@ -5755,7 +5755,7 @@ button {
   transform: scale(0.8);
   transform-origin: top left;
 }
-.is-flatgrill .incense-toggle {
+.is-flatgrill .omiki-toggle {
   top: 62px;
 }
 .is-flatgrill .grill2d {
@@ -5795,7 +5795,7 @@ button {
   box-sizing: border-box;
   padding-left: 60px;
 }
-.is-flatgrill .incense-toggle {
+.is-flatgrill .omiki-toggle {
   position: fixed;
   top: 146px;
   left: 8px;
@@ -5817,7 +5817,7 @@ button {
   transform: scale(0.82);
   transform-origin: top left;
 }
-.is-flatgrill .incense-toggle {
+.is-flatgrill .omiki-toggle {
   top: 108px;
   left: auto;
   right: 10px;

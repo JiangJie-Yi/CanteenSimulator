@@ -18,7 +18,7 @@
 // into one palette texture: both rename and remove what the game looks things up by (node names like RegDrawer or FreezerLid, material
 // names like BambooSkewer), and the game already merges what doesn't move by material as it loads (StaticBatch, mergeByMaterial), so
 // they're off unless asked for, and a model they're used on must be checked in the game.
-// A model with a skin (the old guests.glb) is never joined or paletted: it's deduplicated, pruned and welded only, its skeleton untouched.
+// A model with a skin is never joined or paletted: it's deduplicated, pruned and welded only, its skeleton untouched.
 // Each model's size, meshes, primitives (draws), materials, textures, vertices and triangles are printed before and after.
 import { readdir, mkdir, stat } from 'node:fs/promises'
 import { basename, join as joinPath, resolve } from 'node:path'

@@ -15,7 +15,7 @@ feature('牆上的電燈開關', () => {
     and('再按一下又開', (w) => { expect(switchLights(w.s).on).toBe(true) })
   })
 
-  scenario('關燈時吊燈與燈串不發光，開燈就亮', ({ given, then, and }) => {
+  scenario('關燈時吊燈不發光，開燈就亮', ({ given, then, and }) => {
     given('開燈與關燈', () => {})
     then('關燈時不發光', () => { expect(lampGlow(false)).toBe(0) })
     and('開燈時照它本來的亮度', () => { expect(lampGlow(true)).toBe(1) })

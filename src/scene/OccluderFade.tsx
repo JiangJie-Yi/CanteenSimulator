@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
 /**
- * Hangings that get in the way fade: a group marked `userData.fade` (the noren, the red lantern, the banners and flags, the lamps) that stands
+ * Hangings that get in the way fade: a group marked `userData.fade` (the noren, the lanterns at the door, the lamps) that stands
  * between the camera and what it's looking at (the orbit's target, and a little round it) turns see-through, and comes back once it's out of the
  * way. Rays are cast at the group's own meshes (a batch's hidden originals included, since its merged copy can't be hit); what's drawn
  * (the merged copy, the ink lines) is what fades, each mesh on its own copy of its material so nothing else that shares it fades too. The

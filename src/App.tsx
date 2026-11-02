@@ -342,15 +342,15 @@ const orderedBase = (dish: DishInfo, order: Record<string, number>) => dish.base
 type Frame = { cx: number; cy: number; w: number; h: number }
 
 /** the sake offered at the shrine stands (and brings its extra custom) this long (ms) */
-const INCENSE_MS = 180000
+const OMIKI_MS = 180000
 /** what offering the sake costs (NT$) */
 const OFFERING_COST = 1000
 type SceneProps = {
   /** a customer took a drink from the grill's fridge */
   onDrink?: (guest: number, drink: DrinkId) => void
-  /** the incense on the grill's altar: when it was lit (performance.now), and lighting a new one */
-  incense: { litAt: number | null; onLight: () => void }
-  /** the incense is burning: customers order more */
+  /** the omiki (御神酒) at the shrine by the door: when it was offered (performance.now), and offering it again */
+  omiki: { pouredAt: number | null; onPour: () => void }
+  /** the omiki's been offered: customers order more */
   blessed?: boolean
   active: number
   orders: Record<string, Record<string, number>>
@@ -541,7 +541,7 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
 /** the view switched to the free one with the camera left where it is (entering edit mode: the owner's), not glided to the free view's own
  * place: set just before the switch, taken by the camera's homing */
 const HOLD_POSE = { next: false }
-function Scene({ incense, active, orders, theme, sky, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
+function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -1015,7 +1015,7 @@ function Scene({ incense, active, orders, theme, sky, reducedMotion, fire, frame
                   mark={dish.roast ? '聞野' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}
                   at={dish.roast ? BAR_AT : new THREE.Vector3(-0.59, 0, -0.81).multiplyScalar(1.95)}
-                  incense={dish.roast ? incense : undefined} onDrink={onDrink} onSay={onSay} /></group>
+                  omiki={dish.roast ? omiki : undefined} onDrink={onDrink} onSay={onSay} /></group>
               )}
           </group>
         )
@@ -1189,30 +1189,30 @@ export default function App() {
     setView((v) => { if (v !== 'free') HOLD_POSE.next = true; return 'free' })
   }, [editOn])
   useEffect(() => { GAME_SPEED.value = speed }, [speed])
-  // the sake offered at the shrine by the door: for a minute more come in and they order more
-  const [incenseAt, setIncenseAt] = useState<number | null>(null)
+  // the omiki (御神酒) offered at the shrine by the door: for a while more come in and they order more
+  const [omikiAt, setOmikiAt] = useState<number | null>(null)
   const [blessed, setBlessed] = useState(false)
   // closing: shut by the owner, the last customers finishing; leaving: they've gone and the staff are walking out
   const [closing, setClosing] = useState(false)
   const [leaving, setLeaving] = useState(false)
   useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
-  const lightIncense = () => {
-    if (incenseAt !== null && performance.now() - incenseAt < INCENSE_MS) return
+  const offerOmiki = () => {
+    if (omikiAt !== null && performance.now() - omikiAt < OMIKI_MS) return
     if (cash < OFFERING_COST) {
       say(tl(lang, '現金不足：供清酒需要 NT$1,000', 'お金が足りません：お神酒をお供えするには NT$1,000 かかります', 'Not enough cash: offering sake costs NT$1,000'))
       return
     }
     book('offering', OFFERING_COST)
-    setIncenseAt(performance.now())
+    setOmikiAt(performance.now())
     setBlessed(true)
-    window.setTimeout(() => setBlessed(false), INCENSE_MS)
+    window.setTimeout(() => setBlessed(false), OMIKI_MS)
     say(tl(lang, '供了一杯清酒（花費 NT$1,000）：這三分鐘客人會變多，也點得比較多', 'お神酒をお供えしました（NT$1,000）：三分間、お客さんが増えて、よく注文してくれます', 'Sake offered (NT$1,000): for three minutes more customers come, and order more'))
   }
-  // (the altar's offering as the room is given it: the same object until it's lit again, its handler always the latest (it reads the cash),
-  // so the wall it hangs on isn't drawn again with every redraw of the app)
-  const lightRef = useRef(lightIncense)
-  lightRef.current = lightIncense
-  const incenseProp = useMemo(() => ({ litAt: incenseAt, onLight: () => lightRef.current() }), [incenseAt])
+  // (the shrine's offering as the room is given it: the same object until it's offered again, its handler always the latest (it reads the
+  // cash), so the wall it hangs on isn't drawn again with every redraw of the app)
+  const offerRef = useRef(offerOmiki)
+  offerRef.current = offerOmiki
+  const omikiProp = useMemo(() => ({ pouredAt: omikiAt, onPour: () => offerRef.current() }), [omikiAt])
   const space: 'closed' | 'open' = ai ? 'open' : 'closed'
   // (a new day on the clock (midnight) starts today's count of guests over)
   const clockDay = useClock((c) => c.day)
@@ -2458,7 +2458,7 @@ export default function App() {
             onEat={onEat} onNotice={sceneNotice}
             resetView={resetView} pins={viewMenu} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1); setViewMenu(false) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
-            incense={incenseProp} onDrink={onDrink} onWalkOut={refund} onVisit={addVisit} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
+            omiki={omikiProp} onDrink={onDrink} onWalkOut={refund} onVisit={addVisit} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests}
             phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />
@@ -2772,7 +2772,7 @@ export default function App() {
       <GameClock lang={lang} />
       {/* (on a phone there's no 3D room and no shrine to click: the sake is offered from here) */}
       {phone && ai && !!dish.roast && (
-        <button type="button" className={`incense-toggle${blessed ? ' is-on' : ''}`} onClick={lightIncense} disabled={blessed}
+        <button type="button" className={`omiki-toggle${blessed ? ' is-on' : ''}`} onClick={offerOmiki} disabled={blessed}
           title={tl(lang, '供清酒（花 NT$1,000，三分鐘內客人變多、點得也多）', 'お神酒を供える（NT$1,000、三分間、客足とご注文が増える）', 'Offer sake (NT$1,000: three minutes of more customers ordering more)')}>
           {blessed ? (tl(lang, '供酒中', 'お供え中', 'Offering')) : (tl(lang, '供酒', 'お神酒', 'Offer sake'))}
         </button>

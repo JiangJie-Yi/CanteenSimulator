@@ -156,7 +156,7 @@ export function sauceSide(c: Counter, gate: { end: 1 | -1; w: number; shift?: nu
   const topX1 = (c.length + 0.3) / 2 - (gate && gate.end > 0 ? gateCut(gate) : 0)
   return x + PLACE.sauce[0] + 0.06 > topX1 ? -PLACE.sauce[0] : PLACE.sauce[0]
 }
-/** things in the room that can be clicked (the toilets' doors, the altar's incense): how many are under the pointer */
+/** things in the room that can be clicked (the toilets' doors, the shrine's omiki): how many are under the pointer */
 export const POINTER_HINT = { hand: 0 }
 /** handlers for one of those: a hand over it */
 export const handOver = {

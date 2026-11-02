@@ -48,7 +48,7 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
   'grp-till': { zh: '收銀櫃組', ja: 'レジ一式', members: ['till-counter', 'till-register', 'till-card', 'till-printer', 'till-tray', 'till-pens', 'till-bell',
-    'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-cashbox', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
+    'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
   // (the customers' stools, the length of the bars: the views' cameras each see a few of them, so left out of their areas and kept together)
   'grp-stools': { zh: '吧台座椅', ja: 'カウンター席', members: Array.from({ length: GRILL_SEATS.length }, (_, n) => `stool${n}`), spans: true },
 }
@@ -61,9 +61,13 @@ const drop = (id: string) => { droppedNow.add(id); try { localStorage.setItem(KE
 /** the views' areas: a group each, made by groupByViews */
 export const AREA = 'grp-view-'
 export const isArea = (id: string | null) => !!id && id.startsWith(AREA)
+/** pieces taken out of the shop (the owner's): the till's plain cash box, the string of bulbs, the strings of banners and the banners on the
+ * walls; any group kept in the browser lets them go */
+const RETIRED = (id: string) => id === 'till-cashbox' || /^(festoon|banners|nobori)/.test(id)
 const loadGroups = (): Record<string, Group> => {
   let g: Record<string, Group> = {}
   try { g = JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { /* storage blocked */ }
+  for (const [k, x] of Object.entries(g)) if (x.members.some(RETIRED)) g[k] = { ...x, members: x.members.filter((m) => !RETIRED(m)) }
   for (const [id, d] of Object.entries(DEFAULT_GROUPS)) {
     // (not when the owner has already put any of its pieces in a group of their own, or broken it up; a view's area holding them gives them up
     // to it, and holds it in their place)

@@ -224,11 +224,6 @@ const EDIT_PIECES: Record<string, string> = { tray: 'cutboard', box: 'seasoning'
 const DRAG_PIECES = false
 /** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
 const PLATE_TOP: [number, number, number] = [1.45, 0.02, -1.24]
-/**
- * Spare plates and dishes stacked where the first of each stands: none any more. The plates and bowls are all kept in the dish cabinet
- * (PlateRack), but for the tasting bowl on the table; a plate or a side dish is on the table only while something's on it.
- */
-const SPARES: Record<string, { n: number; step: number }> = {}
 /** seconds to eat one piece: a few bites, each taking a chunk out and chewed before the next */
 const EAT_SECONDS = 3
 const BITES_PER_PIECE = 4
@@ -953,7 +948,7 @@ const COOK_PANEL_WOOD = woodTex('cedar_panel.jpg', 1, 1)
 /** the bar's base: boards standing side by side, straight grain and flat-sawn in turn, their grain clear (the owner: it didn't show) */
 const BAR_BASE_WOOD = woodTex('bar_base.jpg', 1, 1)
 /** below its top: honed white marble with soft grey veining (blender/marbletex.py), a tile 1.2 across (the owner had it dark a while, and
- * wanted it white again: marble_panel_dark.jpg is still made) */
+ * wanted it white again) */
 const COOK_MARBLE = woodTex('marble_panel.jpg', 1, 1)
 /** a box whose sides carry the panel texture at its true size: each side's u stretched to how wide it is (a panel every `tile` across), v
  * the whole height */
@@ -2810,7 +2805,7 @@ type RoastingProps = {
   onOrderEntry?: (key: string, guest: number, reuse?: Record<string, number>) => boolean
   /** how slowly customers come in (no cashier: fewer) */
   crowd?: number
-  /** the incense is burning: each customer orders a little more */
+  /** the omiki's been offered at the shrine: each customer orders a little more */
   blessed?: boolean
   /** (on a phone, with no 3D room) a waiting customer's had a drink from the fridge */
   onDrink?: (guest: number, drink: DrinkId) => void
@@ -3120,7 +3115,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** whether anything is lying on (or in) this container */
   const holds = (k: string) => pieces.current.some((q) => q.container === k && present(q) && !q.eaten)
 
-  const plateAt = (n: number) => onSpares(`plate-${n}`, clearSpot('plate', n, PLATE_R, (m) => {
+  const plateAt = (n: number) => atHome(`plate-${n}`, clearSpot('plate', n, PLATE_R, (m) => {
     // (as many as are needed go round the fire on the table's top, the first where the others start)
     const [x, y, z] = PLATE_TOP
     const r0 = Math.hypot(x, z)
@@ -3326,23 +3321,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const inNotch = a > COOK_NOTCH.along[0] + 0.05 && a < COOK_NOTCH.along[1] - 0.05 && l > COOK_NOTCH.lay[0] + 0.05
     return inNotch || a < COOK_TABLE.along[0] - 0.05 || a > COOK_TABLE.along[1] + 0.05 || l < COOK_TABLE.lay[0] - 0.05 || l > COOK_TABLE.lay[1] + 0.05 - 0 * r
   }
-  /** a container at home, moved by its nudge — lifted onto its stack of spares while it's still standing over it */
-  function onSpares(key: string, home: THREE.Vector3) {
-    const at = home.clone().add(nudge(key))
-    const sp = SPARES[key]
-    if (sp && !stackOn.current.has(key) && Math.hypot(at.x - home.x, at.z - home.z) < 0.12) at.y += sp.n * sp.step
-    return at
-  }
-  /** where each stack of spares stands (the container's home), for drawing them and for bumping into */
-  const spareHome = (key: string) => {
-    if (key === 'plate-0') return onSparesHome(plateAt, 0, 'plate-0')
-    if (key === 'dish-0') return roast.dish ? onSparesHome(dishAt, 0, 'dish-0') : null
-    return roast.rawDish ? new THREE.Vector3(...roast.rawDish.at) : null
-  }
-  const onSparesHome = (at: (n: number) => THREE.Vector3, n: number, key: string) => {
-    const p = at(n).sub(nudge(key))
-    p.y = 0
-    return p
+  /** a container at home, moved by its nudge (no spare plates or dishes stacked on the table any more: they're all in the dish cabinet, but
+   * for the tasting bowl; a plate or a side dish is on the table only while something's on it) */
+  function atHome(key: string, home: THREE.Vector3) {
+    return home.clone().add(nudge(key))
   }
   const bowlAt = () => { const v = new THREE.Vector3(...BOWL_TOP).add(nudge('bowl-0')); clearOfHearth(v, BOWL_R); return v }
   const basketAt = (n: number) => {
@@ -3358,7 +3340,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (kind === 'bar') return BAR_AT_SCENE.clone()
     if (kind === 'lantern') return new THREE.Vector3(DECOR.lantern.at[0], 0, DECOR.lantern.at[1]).add(nudge('lantern'))
     if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
-    if (kind === 'rawdish') return onSpares('rawdish', new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])))
+    if (kind === 'rawdish') return atHome('rawdish', new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])))
     if (kind === 'bowl') return bowlAt()
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
@@ -3395,10 +3377,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (what it's stacked with doesn't push it away; nor, while an empty one is carried, other empty ones it could go on)
     const others = containerKeys().filter((k) => k !== key && !FIXED.has(k) && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
       .flatMap((k) => circlesOf(k, containerAt(k)))
-    for (const k of Object.keys(SPARES)) {
-      const h = k !== key && spareHome(k)
-      if (h) others.push({ p: h, r: footprint(k) })
-    }
     // the crate (the fan hangs on its hook, up off the table)
     for (const d of [DECOR.crate, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
     // the bar behind the fire (shop open) is in the way too
@@ -3467,7 +3445,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const dishAt = (n: number) => {
     // (as many as are needed in a row on the table's top, clear of what stands there)
     const [x, y, z] = DISH_TOP
-    return onSpares(`dish-${n}`, clearSpot('dish', n, DISH_R, (m) => new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -Math.max(0, m - 1) * DISH_STEP)))
+    return atHome(`dish-${n}`, clearSpot('dish', n, DISH_R, (m) => new THREE.Vector3(x, y, z).addScaledVector(STACK_DIR, -Math.max(0, m - 1) * DISH_STEP)))
   }
   const [dishCount, setDishCount] = useState(1)
   // nothing on the table overlaps: every plate, dish, basket, box, bucket, bin and tray is pushed clear of the
@@ -5974,18 +5952,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
         <WhenHeld key={n} holds={() => holds(`dish-${n}`)}><SideDish container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} /></WhenHeld>
       ))}
-      {Object.entries(SPARES).map(([k, sp]) => {
-        const h = spareHome(k)
-        if (!h) return null
-        const base = k === 'plate-0' ? roast.plate[1] ?? 0 : k === 'dish-0' ? roast.dish!.at[1] : roast.rawDish!.at[1]
-        return Array.from({ length: sp.n }, (_, i) => {
-          // (stacked by hand: each a little off true)
-          const j = Math.sin(i * 7.3 + k.length) * 0.012
-          const at: [number, number, number] = [h.x + j, base + i * sp.step, h.z - j * 0.7]
-          return k === 'plate-0' ? <Plate key={`${k}-${i}`} container="" position={at} />
-            : <SideDish key={`${k}-${i}`} container="" position={at} />
-        })
-      })}
       <TasteBowl container="bowl-0" position={bowlAt().toArray() as [number, number, number]} />
       <EmberBed fuel={fuel} />
       {coalIds.map((id) => coals.current[id] && (

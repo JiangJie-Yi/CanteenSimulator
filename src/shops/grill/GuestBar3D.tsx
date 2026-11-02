@@ -12,7 +12,6 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
-import { OLD_GUESTS, Person } from '@/scene/Person3D'
 import { FOLK_HEIGHT, FolkFigure, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
@@ -96,8 +95,6 @@ function Part({ geo, color, outline = 1.06, ...rest }: { geo: THREE.BufferGeomet
 
 /** the customers (and their stools) at life size beside the bar, which is drawn to match them */
 const PEOPLE_SCALE = 1.3
-/** the customers drawn in the boss's style (scene/FolkFigure), his height; ?guests=old brings back the old figures (scene/Person3D) */
-const FOLK_GUESTS = !OLD_GUESTS
 /** the staff (the servers) drawn the boss's height, a head shorter than the customers: the boss (Roasting's BOSS_SCALE) is 0.95 tall at 1.68,
  * a figure here 0.97 tall at this and the shop's own scale of 2 */
 const STAFF_SCALE = (1.05 * 0.8 * 2 * 0.95) / (0.97 * 2)
@@ -1047,11 +1044,6 @@ function RegisterImpl({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
       <Movable id="till-manual" label="收銀機操作說明書">
         <group position={at} rotation-y={yaw}><TillBoxes part="manual" lang={lang} /></group>
       </Movable>
-      <Movable id="till-cashbox" label="錢箱"><StaticBatch>
-        <group position={at} rotation-y={yaw}>
-          <Part geo={REG_GEO.body} color="#2a3442" outline={1.02} position={[0.3, top - 0.155, 0.08]} scale={[0.2, 0.065, 0.16]} />
-        </group>
-      </StaticBatch></Movable>
       <Movable id="till-ipad" label="平板（iPad）">
       <group position={at} rotation-y={yaw}>
         {/* the order tablet, an iPad on a folding stand, at the cashier's right hand, its screen toward the cashier, leaning back a little */}
@@ -1891,7 +1883,7 @@ const IN_SINK = 0.78
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
 const WASH_EACH = 0.5
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
-const KITCHEN_BLOCKS = new Set(['ricetub', 'freezer', 'platerack', 'platerack2', 'sink', 'sink-bin', 'produce', 'coalsack'])
+const KITCHEN_BLOCKS = new Set(['ricetub', 'misopot', 'freezer', 'platerack', 'platerack2', 'sink', 'sink-bin', 'produce', 'coalsack'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
@@ -1932,7 +1924,7 @@ function PlateImpl({ dirty = false, design = 0, sticks = 1 }: { dirty?: boolean;
 }
 
 export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
-  speech = {}, servers = [], plater = null, stocker = null, incense, onDrink, onSay, open = true }:
+  speech = {}, servers = [], plater = null, stocker = null, omiki, onDrink, onSay, open = true }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
@@ -1950,8 +1942,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     onDrink?: (guest: number, drink: DrinkId) => void
     /** the shop's open: shut, nobody's in the room and the plates are back where they started */
     open?: boolean
-    /** the incense on the altar by the door (lit when, and lighting another) */
-    incense?: { litAt: number | null; onLight: () => void }
+    /** the omiki (御神酒) offered at the shrine by the door (poured when, and offering it again) */
+    omiki?: { pouredAt: number | null; onPour: () => void }
     /** the servers on the floor: they carry what's plated at the pass to the customers, clear the plates done with, and wash them */
     servers?: { id: string; look: StaffLook }[]
     /** who plates in the kitchen, fetching plates from the racks for the pass (the third cook, or the second): none, the owner does */
@@ -3097,7 +3089,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} drop={KITCHEN_DROP / scale} />}
               {given && <Later stage={2}><ShopProps counters={counters} /></Later>}
-              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lampId="barlamp" lampName="長吧台" top={top} altar={incense ?? true} corner={wallBack}
+              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lampId="barlamp" lampName="長吧台" top={top} altar={omiki ?? true} corner={wallBack}
                 staffDoor={STAFF_DOOR_AT} />}
             </group>
           )
@@ -3276,8 +3268,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               <PersonClock s={s} phase={s.phase} drink={s.drink} eating={s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'}
                 clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} />
             </group>
-            {/* (their label just over their head: a figure in the boss's style is shorter than the old ones, and sits up on the seat) */}
-            <GuestLabel id={s.id} y={FOLK_GUESTS ? ((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.15 : 1.05 * PEOPLE_SCALE}
+            {/* (their label just over their head, sat up on the seat or standing) */}
+            <GuestLabel id={s.id} y={((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.15}
               say={speech[s.id]} dots={!!g && !walking && g.state === 'waiting' && g.rating === null} rating={g?.rating ?? null} angry={g?.state === 'angry'}
               partner={g?.partner !== undefined} name={guestLabel(s.id, lang)} onEl={labelEl} />
           </group>
@@ -3348,8 +3340,6 @@ const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, p
   )
 })
 
-/** how much lower the stool's seat is than the one the old figures (guests.glb) were made to sit on */
-const OLD_STOOL_DROP = 0.343 - FOLK_SEAT
 /** one customer's figure, moved by the bar's clock each frame (read from the ref: nothing re-renders for it) */
 // (drawn again only when what's shown of them changes (their phase, eating or not, the drink in hand, who they turn to, how they're
 // getting on), not each time the bar above them redraws, several times a second; `phase` and `drink` are passed only so it notices them)
@@ -3357,12 +3347,10 @@ const PersonClock = memo(PersonClockImpl)
 function PersonClockImpl({ s, eating, clock, talk, mood }: { s: Shown; phase: string; drink?: string; eating: boolean; clock: { current: number }
   talk: number; mood: ReturnType<typeof moodOf> }) {
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
-  const Figure = FOLK_GUESTS ? FolkFigure : Person
-  // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them; the old figures, made to sit on
-  // the old, taller stool, sat down by the difference)
-  return <Suspense fallback={null}><group position-y={!FOLK_GUESTS && s.phase === 'sit' ? -OLD_STOOL_DROP : 0}><Figure id={s.id} eating={eating} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
+  // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them)
+  return <Suspense fallback={null}><FolkFigure id={s.id} eating={eating} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : s.phase === 'wcWash' ? 'Wash' : undefined} fit={FOLK_FIT}
-    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></group></Suspense>
+    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></Suspense>
 }
 
 // (drawn again only when their own props change, not each time the page above them redraws: while the shop's open that's many times a second)

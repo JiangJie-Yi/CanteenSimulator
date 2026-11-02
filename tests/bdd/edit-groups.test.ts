@@ -75,13 +75,13 @@ feature('開發者模式依視角攝影機自動分組', () => {
   })
 
   scenario('進開發者模式時，每台攝影機看的區域各成一組，原本的群組整組放進去', ({ given, when, then, and }) => {
-    given('灶台旁有團扇與行燈，櫃檯上有收銀櫃組的收銀機與錢箱，兩台視角攝影機', (w) => {
+    given('灶台旁有團扇與行燈，櫃檯上有收銀櫃組的收銀機與筆筒，兩台視角攝影機', (w) => {
       const at = (v: [number, number, number]) => () => v
       w.off = [
         registerMovable('fan', '團扇', () => {}, at([1, 0.5, 0])),
         registerMovable('lantern', '行燈', () => {}, at([-1, 0.5, 0.5])),
         registerMovable('till-register', '收銀機', () => {}, at([6, 0.5, 0])),
-        registerMovable('till-cashbox', '錢箱', () => {}, at([6.3, 0.5, 0.2])),
+        registerMovable('till-pens', '筆筒', () => {}, at([6.3, 0.5, 0.2])),
       ]
       setViewCams(() => [GRILL, TILL])
     })

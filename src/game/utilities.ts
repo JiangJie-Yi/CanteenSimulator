@@ -17,7 +17,7 @@ export const LOADS: Load[] = [
   { id: 'drinks', zh: '飲料櫃 ×2', ja: 'ドリンク冷蔵庫 ×2', en: 'Drinks fridges ×2', watts: 280, when: 'always' },
   { id: 'washlet', zh: '免治馬桶 ×2（座溫）', ja: '温水便座 ×2（保温）', en: 'Washlets ×2 (seat warmers)', watts: 50, when: 'always' },
   { id: 'exit', zh: '逃生出口燈', ja: '非常口灯', en: 'Exit sign', watts: 4, when: 'always' },
-  { id: 'lights', zh: '吊燈・燈串・槽燈', ja: '照明', en: 'Room lights', watts: 210, when: 'lights' },
+  { id: 'lights', zh: '吊燈・槽燈', ja: '照明', en: 'Room lights', watts: 210, when: 'lights' },
   { id: 'hood', zh: '排煙機', ja: '排煙機', en: 'Smoke extractor', watts: 420, when: 'fire' },
   { id: 'warmer', zh: '味噌湯與飯的保溫', ja: '味噌汁・ご飯の保温', en: 'Soup and rice warmers', watts: 260, when: 'open' },
   { id: 'pos', zh: '收銀機・平板・刷卡機・印表機', ja: 'レジ・タブレット・端末・プリンター', en: 'Till, tablet, card reader, printer', watts: 55, when: 'open' },

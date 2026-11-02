@@ -632,432 +632,6 @@ const SCROLL_BROCADE = canvasTex(256, 512, (g) => {
 const PRINTS: ArtKey[] = ['akaFuji', 'fuji', 'rainBridge', 'wave', 'koi']
 const SCROLLS: ArtKey[] = ['calligraphy', 'kabuki', 'plum', 'bijin']
 
-/**
- * Nobori (幟), the tall narrow banners a yakitori or grill shop hangs: a cloth of red, indigo or white with the shop's
- * word down it in big letters (a stripe along its edge, stitching), laced by loops to a bamboo rod, the foot weighted;
- * it stirs a little in the air.
- */
-type NoboriLook = { text: string; cloth: string; ink: string; edge: string; shape: 'rect' | 'swallow' | 'point' | 'wave'
-  pat?: 'seigaiha' | 'fish' | 'sun' | 'flame' | 'stripe' }
-/** the cloths: red, indigo, white, black, orange, yellow, green; cut square, swallow-tailed, to a point or scalloped; some printed
- * with waves, a fish, the sun, flames or a stripe */
-const NOBORI_LOOKS: NoboriLook[] = [
-  { text: '炭火燒烤', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2', shape: 'rect' },
-  { text: '日式烤魚', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0', shape: 'swallow', pat: 'seigaiha' },
-  { text: '生ビール', cloth: '#f4efe2', ink: '#b8261c', edge: '#b8261c', shape: 'rect' },
-  { text: '銘酒', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2', shape: 'point' },
-  { text: '深夜食堂', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0', shape: 'rect', pat: 'stripe' },
-  { text: '飲料', cloth: '#f4efe2', ink: '#1f3a68', edge: '#1f3a68', shape: 'wave' },
-  { text: '大漁', cloth: '#14120f', ink: '#e8c45a', edge: '#e8c45a', shape: 'swallow', pat: 'flame' },
-  { text: '旬', cloth: '#e8742a', ink: '#fffaf0', edge: '#fffaf0', shape: 'rect', pat: 'sun' },
-  { text: '名物', cloth: '#f2c62a', ink: '#1a0d06', edge: '#1a0d06', shape: 'point' },
-  { text: '本日推薦', cloth: '#f4efe2', ink: '#14120f', edge: '#b8261c', shape: 'rect', pat: 'stripe' },
-  { text: '秋刀魚', cloth: '#1f3a68', ink: '#fffaf0', edge: '#fffaf0', shape: 'swallow', pat: 'fish' },
-  { text: '営業中', cloth: '#b8261c', ink: '#fffaf0', edge: '#fffaf0', shape: 'wave' },
-  { text: '焼', cloth: '#14120f', ink: '#d8341c', edge: '#d8341c', shape: 'rect', pat: 'flame' },
-  { text: '歓迎', cloth: '#2f7a4a', ink: '#fffaf0', edge: '#fffaf0', shape: 'point' },
-  { text: '鮭', cloth: '#e8742a', ink: '#fffaf0', edge: '#fffaf0', shape: 'swallow', pat: 'seigaiha' },
-  { text: '炭火', cloth: '#f4efe2', ink: '#14120f', edge: '#14120f', shape: 'wave', pat: 'sun' },
-  { text: '焼鳥', cloth: '#e8588a', ink: '#fffaf0', edge: '#fffaf0', shape: 'swallow', pat: 'stripe' },
-  { text: '刺身', cloth: '#7a4aa8', ink: '#fffaf0', edge: '#f2d9ff', shape: 'rect', pat: 'seigaiha' },
-  { text: '定食', cloth: '#f2c62a', ink: '#b8261c', edge: '#b8261c', shape: 'point' },
-  { text: 'おでん', cloth: '#3aa7b8', ink: '#fffaf0', edge: '#fffaf0', shape: 'wave', pat: 'stripe' },
-  { text: '祭', cloth: '#d8341c', ink: '#f2c62a', edge: '#f2c62a', shape: 'swallow', pat: 'sun' },
-  { text: '呑', cloth: '#9ad0e8', ink: '#1f3a68', edge: '#1f3a68', shape: 'rect', pat: 'seigaiha' },
-  { text: '本日限定', cloth: '#f4efe2', ink: '#7a4aa8', edge: '#e8588a', shape: 'swallow', pat: 'stripe' },
-  { text: '生ビール', cloth: '#2f7a4a', ink: '#fffaf0', edge: '#e8c45a', shape: 'point' },
-]
-const NOBORI_W = 0.3
-const NOBORI_H = 0.92
-const noboriCache = new Map<number, THREE.Texture | null>()
-const noboriTex = (i: number) => {
-  if (!noboriCache.has(i)) {
-    const look = NOBORI_LOOKS[i]
-    noboriCache.set(i, signTexture(96 * 3, 296 * 3, (g) => {
-      // (drawn at three times its laid-out size: the letters and the stitching stay crisp seen close)
-      g.setTransform(3, 0, 0, 3, 0, 0)
-      // (the cloth's cut: square, a swallow's tail, a point, or scallops along its foot)
-      g.save()
-      g.beginPath()
-      if (look.shape === 'swallow') {
-        g.moveTo(0, 0); g.lineTo(96, 0); g.lineTo(96, 296); g.lineTo(48, 244); g.lineTo(0, 296)
-      } else if (look.shape === 'point') {
-        g.moveTo(0, 0); g.lineTo(96, 0); g.lineTo(96, 236); g.lineTo(48, 296); g.lineTo(0, 236)
-      } else if (look.shape === 'wave') {
-        g.moveTo(0, 0); g.lineTo(96, 0); g.lineTo(96, 270)
-        for (let k = 2; k >= 0; k--) g.arc(16 + k * 32, 270, 16, 0, Math.PI, false)
-      } else {
-        g.rect(0, 0, 96, 296)
-      }
-      g.closePath()
-      g.clip()
-      g.fillStyle = look.cloth
-      g.fillRect(0, 0, 96, 296)
-      // (the weave, and a border stitched down each side)
-      g.strokeStyle = 'rgba(0,0,0,0.07)'
-      for (let y = 0; y < 296; y += 3) {
-        g.beginPath()
-        g.moveTo(0, y)
-        g.lineTo(96, y)
-        g.stroke()
-      }
-      // (what's printed on it)
-      g.fillStyle = look.edge
-      g.strokeStyle = look.edge
-      if (look.pat === 'seigaiha') {
-        g.globalAlpha = 0.45
-        g.lineWidth = 1.6
-        for (let row = 0; row < 3; row++) for (let col = -1; col < 4; col++) for (const r of [14, 9, 4]) {
-          g.beginPath()
-          g.arc(col * 26 + (row % 2) * 13, 262 + row * 13, r, Math.PI, 0)
-          g.stroke()
-        }
-        g.globalAlpha = 1
-      } else if (look.pat === 'fish') {
-        g.globalAlpha = 0.5
-        g.beginPath()
-        g.ellipse(46, 252, 22, 10, 0, 0, Math.PI * 2)
-        g.moveTo(66, 252); g.lineTo(84, 240); g.lineTo(84, 264)
-        g.fill()
-        g.globalAlpha = 1
-      } else if (look.pat === 'sun') {
-        g.fillStyle = '#c8301e'
-        g.beginPath()
-        g.arc(48, 44, 24, 0, Math.PI * 2)
-        g.fill()
-      } else if (look.pat === 'flame') {
-        g.fillStyle = '#d8341c'
-        g.globalAlpha = 0.85
-        for (let k = 0; k < 4; k++) {
-          g.beginPath()
-          g.moveTo(k * 24 - 4, 296)
-          g.quadraticCurveTo(k * 24 + 10, 262 - (k % 2) * 14, k * 24 + 12, 232 - (k % 2) * 22)
-          g.quadraticCurveTo(k * 24 + 22, 262, k * 24 + 30, 296)
-          g.fill()
-        }
-        g.globalAlpha = 1
-      } else if (look.pat === 'stripe') {
-        g.globalAlpha = 0.28
-        g.save()
-        g.translate(48, 148)
-        g.rotate(-0.25)
-        g.fillRect(-70, -120, 22, 240)
-        g.fillRect(48, -120, 22, 240)
-        g.restore()
-        g.globalAlpha = 1
-      }
-      // (the cotton's slub: flecks a little lighter and darker all over)
-      for (let k = 0; k < 900; k++) { g.fillStyle = k % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'; g.fillRect((k * 37) % 96, (k * 89) % 296, 1.4, 0.6) }
-      // (the cloth's own life: a soft shade down it, two vertical folds, the dye heavier at the top where it's hung)
-      const shade = g.createLinearGradient(0, 0, 96, 0)
-      shade.addColorStop(0, 'rgba(0,0,0,0.16)')
-      shade.addColorStop(0.2, 'rgba(0,0,0,0)')
-      shade.addColorStop(0.78, 'rgba(255,255,255,0.06)')
-      shade.addColorStop(1, 'rgba(0,0,0,0.2)')
-      g.fillStyle = shade
-      g.fillRect(0, 0, 96, 296)
-      const dye = g.createLinearGradient(0, 0, 0, 60)
-      dye.addColorStop(0, 'rgba(0,0,0,0.28)')
-      dye.addColorStop(1, 'rgba(0,0,0,0)')
-      g.fillStyle = dye
-      g.fillRect(0, 0, 96, 60)
-      g.strokeStyle = 'rgba(0,0,0,0.12)'
-      g.lineWidth = 2
-      for (const fx of [32, 66]) {
-        g.beginPath()
-        g.moveTo(fx, 0)
-        g.lineTo(fx + 3, 296)
-        g.stroke()
-      }
-      // (the sleeve at the top the rod passes through, stitched along its lower edge)
-      g.fillStyle = 'rgba(0,0,0,0.22)'
-      g.fillRect(0, 0, 96, 12)
-      g.fillStyle = look.edge
-      g.globalAlpha = 0.8
-      for (let x = 4; x < 96; x += 8) g.fillRect(x, 12, 4, 1.6)
-      g.globalAlpha = 1
-      g.fillStyle = look.edge
-      g.fillRect(5, 0, 3, 296)
-      g.fillRect(88, 0, 3, 296)
-      g.setLineDash([6, 5])
-      g.strokeStyle = look.edge
-      g.lineWidth = 1.4
-      g.strokeRect(12, 4, 72, look.shape === 'rect' ? 288 : 226)
-      g.setLineDash([])
-      // (the word, a letter to a line, big and bold, in the sign font)
-      const chars = [...look.text]
-      const size = chars.length > 3 ? 46 : chars.length === 1 ? 78 : 56
-      const gap = Math.min(size * 1.08, 190 / chars.length)
-      const top = look.pat === 'sun' ? 104 : 30
-      chars.forEach((ch, k) => brushText(g, ch, 48, top + size * 0.55 + k * gap, size, { fill: look.ink, edge: look.cloth, shadow: 'rgba(0,0,0,0.26)', shine: look.ink }))
-      g.restore()
-    }))
-  }
-  return noboriCache.get(i) ?? null
-}
-/** a wide banner (横断幕) hung from two cords across a stretch of the rope: a word set along it */
-const HBANNER_LOOKS = [
-  { text: 'いらっしゃいませ', cloth: '#b8261c', ink: '#fbf3e2', edge: '#fbf3e2' },
-  { text: '炭火燒烤 銘酒', cloth: '#1f3a68', ink: '#fbf3e2', edge: '#e8d9b0' },
-  { text: '本日の推薦', cloth: '#f4efe2', ink: '#b8261c', edge: '#b8261c' },
-  { text: '大漁', cloth: '#14120f', ink: '#e8c45a', edge: '#e8c45a' },
-]
-const hbannerCache = new Map<number, THREE.Texture | null>()
-const hbannerTex = (i: number) => {
-  if (!hbannerCache.has(i)) {
-    const look = HBANNER_LOOKS[i]
-    hbannerCache.set(i, signTexture(320 * 3, 96 * 3, (g) => {
-      g.setTransform(3, 0, 0, 3, 0, 0)
-      g.fillStyle = look.cloth
-      g.fillRect(0, 0, 320, 96)
-      g.strokeStyle = 'rgba(0,0,0,0.07)'
-      for (let x = 0; x < 320; x += 3) {
-        g.beginPath()
-        g.moveTo(x, 0)
-        g.lineTo(x, 96)
-        g.stroke()
-      }
-      g.fillStyle = look.edge
-      g.fillRect(0, 5, 320, 3)
-      g.fillRect(0, 88, 320, 3)
-      const chars = [...look.text]
-      const size = chars.length > 5 ? 40 : 54
-      brushText(g, look.text, 160, 49, Math.min(size, 290 / chars.length), { fill: look.ink, shadow: 'rgba(0,0,0,0.25)' })
-      // (a shade along it as it sags between its cords, stitched hems, brass grommets at its top corners)
-      const sag = g.createLinearGradient(0, 0, 0, 96)
-      sag.addColorStop(0, 'rgba(0,0,0,0.18)'); sag.addColorStop(0.3, 'rgba(0,0,0,0)'); sag.addColorStop(1, 'rgba(0,0,0,0.12)')
-      g.fillStyle = sag; g.fillRect(0, 0, 320, 96)
-      g.setLineDash([5, 4]); g.strokeStyle = look.edge; g.lineWidth = 1; g.globalAlpha = 0.7
-      g.beginPath(); g.moveTo(0, 12); g.lineTo(320, 12); g.moveTo(0, 84); g.lineTo(320, 84); g.stroke()
-      g.setLineDash([]); g.globalAlpha = 1
-      for (const x of [10, 310]) { g.fillStyle = '#c8a050'; g.beginPath(); g.arc(x, 10, 5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#2a1a10'; g.beginPath(); g.arc(x, 10, 2.4, 0, Math.PI * 2); g.fill() }
-    }))
-  }
-  return hbannerCache.get(i) ?? null
-}
-/** a banner's cloth, a unit plane with a slow ripple down it (so it hangs as cloth, not a board) */
-const CLOTH_GEO = (() => {
-  const g = new THREE.PlaneGeometry(1, 1, 4, 10)
-  const p = g.attributes.position
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i)
-    p.setZ(i, Math.sin(y * 7 + x * 3) * 0.018 * (0.4 + (0.5 - y)) + Math.sin(x * 9) * 0.01)
-  }
-  g.computeVertexNormals()
-  return g
-})()
-const NOBORI_GEO = {
-  rod: new THREE.CylinderGeometry(0.007, 0.007, NOBORI_W + 0.08, 8),
-  cap: new THREE.SphereGeometry(0.011, 8, 6),
-  loop: new THREE.BoxGeometry(0.004, 0.05, 0.02),
-  weight: new THREE.CylinderGeometry(0.006, 0.006, NOBORI_W + 0.03, 6),
-}
-function Nobori({ i }: { i: number }) {
-  const cloth = useRef<THREE.Group>(null)
-  const seed = useMemo(() => i * 1.7 + 0.5, [i])
-  useFrame(({ clock }) => {
-    // (a slow sway from the rod, and a ripple's worth of lean)
-    const t = clock.elapsedTime
-    if (cloth.current) {
-      cloth.current.rotation.z = Math.sin(t * 0.8 + seed) * 0.035
-      cloth.current.rotation.y = Math.sin(t * 0.6 + seed * 2) * 0.03
-    }
-  })
-  return (
-    <group position-y={NOBORI_H / 2 - 0.05}>
-      {/* the rod and its knobs, over the cloth's top */}
-      <mesh geometry={NOBORI_GEO.rod} position={[-0.01, NOBORI_H / 2 + 0.03, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#6a4a2a" /></mesh>
-      {[-1, 1].map((s) => <mesh key={s} geometry={NOBORI_GEO.cap} position={[-0.01, NOBORI_H / 2 + 0.03, s * (NOBORI_W + 0.08) / 2]}><meshToonMaterial color="#3a2a1a" /></mesh>)}
-      <group ref={cloth} position={[-0.012, NOBORI_H / 2 + 0.03, 0]}>
-        {/* (the loops it hangs by, the cloth below them) */}
-        {[-0.11, 0, 0.11].map((z) => <mesh key={z} geometry={NOBORI_GEO.loop} position={[0, -0.02, z]}><meshToonMaterial color="#e8dcc0" /></mesh>)}
-        <mesh position={[-0.004, -NOBORI_H / 2 - 0.04, 0]} rotation-y={-Math.PI / 2} geometry={CLOTH_GEO} scale={[NOBORI_W, NOBORI_H, 1]}>
-          <meshToonMaterial color="#ffffff" map={noboriTex(i)} side={THREE.DoubleSide} transparent alphaTest={0.4} />
-        </mesh>
-        <mesh geometry={NOBORI_GEO.weight} position={[-0.006, -NOBORI_H - 0.04, 0]} rotation-x={Math.PI / 2}><meshToonMaterial color="#2a1a10" /></mesh>
-      </group>
-    </group>
-  )
-}
-
-/**
- * The banners strung overhead as an izakaya hangs them: a rope along the wall's aisle, a close row of narrow banners of every
- * colour hung from it, each swinging a little on its own.
- */
-/** `start`, `step`: which cloths it takes in turn */
-function BannerRow({ zs, start = 0, step = 1 }: { zs: number[]; start?: number; step?: number }) {
-  const refs = useRef<(THREE.Group | null)[]>([])
-  // (the same every time: a mix of cloths and lengths, a wide banner every so often taking three places)
-  const items = useMemo(() => {
-    const out: { z: number; look: number; len: number; w: number; wide: boolean }[] = []
-    for (let k = 0; k < zs.length; k++) {
-      if (k % 7 === 3 && k + 2 < zs.length) {
-        out.push({ z: zs[k + 1], look: (k * 3) % HBANNER_LOOKS.length, len: 0.2, w: 0.62, wide: true })
-        k += 2
-      } else {
-        const look = (start + k * step) % NOBORI_LOOKS.length
-        out.push({ z: zs[k], look, len: 0.34 + 0.05 * Math.abs(((k % 4) - 1.5)), w: NOBORI_LOOKS[look].shape === 'rect' ? 0.15 : 0.17, wide: false })
-      }
-    }
-    return out
-  }, [zs, start, step])
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
-    refs.current.forEach((g, i) => {
-      if (!g) return
-      g.rotation.x = Math.sin(t * 0.9 + i * 1.3) * 0.05
-      g.rotation.z = Math.sin(t * 0.7 + i) * 0.04
-    })
-  })
-  const z0 = zs[0] - 0.12, z1 = zs[zs.length - 1] + 0.12
-  // (the rope swags between pegs about a metre apart, dipping a little in each span; the cloths hang from it where it is)
-  const spans = Math.max(1, Math.round((z1 - z0) / 1.1)), span = (z1 - z0) / spans, SAG = 0.06
-  const sagAt = (z: number) => { const t = ((z - z0) / span) % 1; return -SAG * 4 * t * (1 - t) }
-  const rope = useMemo(() => {
-    const pts: THREE.Vector3[] = []
-    for (let k = 0; k <= spans * 16; k++) { const z = z0 + (k / 16) * span; pts.push(new THREE.Vector3(0, k % 16 === 0 ? 0 : sagAt(z), z)) }
-    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), spans * 16, 0.005, 5)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [z0, z1])
-  return (
-    <group>
-      <mesh geometry={rope}><meshToonMaterial color="#3a2414" /></mesh>
-      {/* (a brass peg at each end of each span) */}
-      {Array.from({ length: spans + 1 }, (_, k) => (
-        <mesh key={`p${k}`} position={[0, 0, z0 + k * span]}><sphereGeometry args={[0.012, 8, 6]} /><meshToonMaterial color="#c8a050" /></mesh>
-      ))}
-      {items.map((it, i) => (
-        <group key={i} position={[0, sagAt(it.z), it.z]} ref={(g) => { refs.current[i] = g }}>
-          {it.wide ? (
-            <>
-              <mesh position={[0, -0.02 - it.len / 2, 0]} rotation-y={-Math.PI / 2}>
-                <planeGeometry args={[it.w, it.len]} /><meshToonMaterial color="#ffffff" map={hbannerTex(it.look)} side={THREE.DoubleSide} />
-              </mesh>
-              <mesh position={[0, -0.02 - it.len, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.004, 0.004, it.w, 5]} /><meshToonMaterial color="#3a2414" /></mesh>
-            </>
-          ) : (
-            <>
-              {/* (the cloth's sleeve over the rope) */}
-              <mesh position={[0, -0.008, 0]}><boxGeometry args={[0.014, 0.022, it.w + 0.01]} /><meshToonMaterial color="#e8dcc0" /></mesh>
-              <mesh position={[0, -it.len / 2 - 0.015, 0]} rotation-y={-Math.PI / 2} geometry={CLOTH_GEO} scale={[it.w, it.len, 1]}>
-                <meshToonMaterial color="#ffffff" map={noboriTex(it.look)} side={THREE.DoubleSide} transparent alphaTest={0.4} />
-              </mesh>
-            </>
-          )}
-        </group>
-      ))}
-    </group>
-  )
-}
-
-/**
- * A string of little warm bulbs swagged along a wall's top under the frieze: a thin wire looped between brass pegs, a bulb every hand's width
- * along each loop, and a small glowing paper globe at each peg. Light is painted (emissive bulbs, a soft halo), none cast.
- */
-// (switched off, grey: a bulb's clear glass darker than a globe's frosted)
-const FESTOON_BULB = lampLit(new THREE.MeshBasicMaterial({ toneMapped: false }), { dim: 0.5 })
-const FESTOON_GLOBE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffd9a0', toneMapped: false }), { dim: 0.92 })
-const FESTOON_HALO = nightGlow(new THREE.MeshBasicMaterial({ color: '#ffc060', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }), 0.1, 0.32)
-function Festoon({ l, mid }: { l: number; mid: number }) {
-  const built = useMemo(() => {
-    const spans = Math.max(1, Math.round(l / 0.8)), span = l / spans, sag = 0.075, per = 6
-    const wire: number[] = [], bulbs: [number, number][] = [], pegs: number[] = []
-    for (let i = 0; i < spans; i++) {
-      const z0 = -l / 2 + i * span
-      pegs.push(z0)
-      let prev: [number, number] | null = null
-      for (let k = 0; k <= 12; k++) {
-        const t = k / 12, pt: [number, number] = [z0 + t * span, -sag * 4 * t * (1 - t)]
-        if (prev) wire.push(0, prev[1], prev[0], 0, pt[1], pt[0])
-        prev = pt
-      }
-      for (let k = 1; k < per; k++) {
-        const t = k / per
-        bulbs.push([z0 + t * span, -sag * 4 * t * (1 - t) - 0.016])
-      }
-    }
-    pegs.push(l / 2)
-    const wireGeo = new THREE.BufferGeometry()
-    wireGeo.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3))
-    return { wireGeo, bulbs, pegs }
-  }, [l])
-  const bulb = useRef<THREE.InstancedMesh>(null), halo = useRef<THREE.InstancedMesh>(null), globe = useRef<THREE.InstancedMesh>(null)
-  useEffect(() => {
-    const m = new THREE.Matrix4(), c = new THREE.Color()
-    built.bulbs.forEach(([z, y], i) => {
-      m.makeTranslation(0, y, z)
-      bulb.current?.setMatrixAt(i, m)
-      halo.current?.setMatrixAt(i, m)
-      // (the bulbs go amber, white and gold in turn, so the string reads as a run of colours, not a bead chain)
-      bulb.current?.setColorAt(i, c.set(i % 3 === 0 ? '#ffd27a' : i % 3 === 1 ? '#fff0c4' : '#ffb85c'))
-    })
-    built.pegs.forEach((z, i) => globe.current?.setMatrixAt(i, m.makeTranslation(0, -0.04, z)))
-    for (const r of [bulb, halo, globe]) if (r.current) { r.current.instanceMatrix.needsUpdate = true; if (r.current.instanceColor) r.current.instanceColor.needsUpdate = true }
-  }, [built])
-  return (
-    <group position={[-0.034, WALL_H - 0.32, mid]}>
-      <group>
-        <lineSegments geometry={built.wireGeo}><lineBasicMaterial color="#2a1a10" /></lineSegments>
-        <instancedMesh ref={bulb} args={[undefined, undefined, built.bulbs.length]}>
-          <sphereGeometry args={[0.013, 8, 6]} /><primitive object={FESTOON_BULB} attach="material" />
-        </instancedMesh>
-        <instancedMesh ref={halo} args={[undefined, undefined, built.bulbs.length]} renderOrder={2}>
-          <sphereGeometry args={[0.034, 8, 6]} /><primitive object={FESTOON_HALO} attach="material" />
-        </instancedMesh>
-        <instancedMesh ref={globe} args={[undefined, undefined, built.pegs.length]}>
-          <sphereGeometry args={[0.03, 10, 8]} /><primitive object={FESTOON_GLOBE} attach="material" />
-        </instancedMesh>
-      </group>
-    </group>
-  )
-}
-
-/** a big signboard (看板) on the wall: a cream board with the word brushed down it in great black strokes, a red seal at its foot */
-const KANBAN_LOOKS = [
-  { text: '炭火燒烤', seal: '聞野', bg: '#ecd9a6', ink: '#1a0d06', frame: '#3a2416' },
-  { text: '日式烤魚', seal: '聞野', bg: '#1c1a18', ink: '#e8c45a', frame: '#6a4a2a' },
-  { text: '大漁', seal: '漁', bg: '#b8261c', ink: '#fbf3e2', frame: '#3a2416' },
-  { text: '銘酒', seal: '酒', bg: '#f4efe2', ink: '#1f3a68', frame: '#3a2416' },
-  { text: '深夜食堂', seal: '聞野', bg: '#1f3a68', ink: '#fbf3e2', frame: '#2a1a10' },
-]
-const kanbanCache = new Map<number, THREE.Texture | null>()
-const kanbanTex = (i: number) => {
-  if (!kanbanCache.has(i)) {
-    const look = KANBAN_LOOKS[i]
-    kanbanCache.set(i, signTexture(128, 320, (g) => {
-      g.fillStyle = look.bg
-      g.fillRect(0, 0, 128, 320)
-      g.strokeStyle = 'rgba(120,80,30,0.16)'
-      for (let y = 0; y < 320; y += 4) {
-        g.beginPath()
-        g.moveTo(0, y + Math.sin(y * 0.3) * 1.5)
-        g.lineTo(128, y)
-        g.stroke()
-      }
-      g.strokeStyle = look.frame
-      g.lineWidth = 5
-      g.strokeRect(5, 5, 118, 310)
-      const chars = [...look.text]
-      const size = chars.length > 2 ? 62 : 78
-      const gap = Math.min(size * 1.05, 230 / chars.length)
-      chars.forEach((ch, k) => brushText(g, ch, 64, 28 + size * 0.5 + k * gap, size, { fill: look.ink, shadow: 'rgba(0,0,0,0.25)' }))
-      g.fillStyle = look.bg === '#b8261c' ? '#fbf3e2' : '#b8261c'
-      g.fillRect(40, 262, 48, 40)
-      brushText(g, look.seal, 64, 283, look.seal.length > 1 ? 18 : 26, { fill: look.bg === '#b8261c' ? '#b8261c' : '#fbf3e2' })
-    }))
-  }
-  return kanbanCache.get(i) ?? null
-}
-function Kanban({ i }: { i: number }) {
-  const W = 0.34, H = 0.82
-  return (
-    <group>
-      <mesh position-x={-0.012}><boxGeometry args={[0.024, H + 0.05, W + 0.05]} /><meshToonMaterial color="#2e1d12" /></mesh>
-      <mesh position-x={-0.026} rotation-y={-Math.PI / 2}><planeGeometry args={[W, H]} /><meshToonMaterial color="#ffffff" map={kanbanTex(i)} /></mesh>
-    </group>
-  )
-}
-
 /** a print behind glass in a thin dark frame */
 function Framed({ art }: { art: ArtKey }) {
   const W = 0.5, H = 0.36, M = 0.045, F = 0.032
@@ -3440,8 +3014,8 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
   corner?: boolean | number
   /** stretches of it (along it) where something stands against it: nothing hung there, no post */
   clear?: [number, number][]
-  /** its shelf an altar instead (by the door): a command flag in the censer, and incense (lit when, and lighting more) */
-  altar?: boolean | { litAt: number | null; onLight: () => void }
+  /** its shelf an altar instead (by the door), and the omiki (御神酒) offered at it: when it was poured, and offering it again */
+  altar?: boolean | { pouredAt: number | null; onPour: () => void }
   /** its pendant lamps' edit ids (this, then their number) and their name in the list (each counter's its own) */
   lampId: string
   lampName: string
@@ -3481,20 +3055,18 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
     }
     const kept = spots.filter((z) => (!shelf || Math.abs(z - shelfZ) > 0.85 * ALTAR_SCALE) && isClear(z, 0.3) && (door === undefined || Math.abs(z - door) > 0.95)
       && (door === undefined || Math.abs(z - door) > WC_W * 2 + 0.3))
-    // (and on the back wall a second round window, in the bay among the bunting left of the specials' boards: the place nearest it)
+    // (and on the back wall a second round window: the place nearest its spot)
     const extra = shelf && kept.length ? kept.reduce((m, z) => (Math.abs(z - ROUND_AT) < Math.abs(m - ROUND_AT) ? z : m), kept[0]) : null
     return kept
       .map((z, k) => ({ z, scroll: k % 2 ? SCROLLS[(start + k) % SCROLLS.length] : undefined, print: PRINTS[(start + k) % PRINTS.length],
         // (on the back wall, the plum scroll's place is a round window let into the plaster instead)
         round: (shelf && k % 2 === 1 && SCROLLS[(start + k) % SCROLLS.length] === 'plum') || z === extra,
-        // (a banner every third place along the wall, in turn)
-        // (none by the drinks fridges: the wall there is left plain)
-        nobori: z !== extra && k % 3 === 2 && isClear(z, 0.9) ? Math.floor(k / 3 + start) % NOBORI_LOOKS.length : undefined,
-        // (and a big signboard every fifth, between)
-        kanban: z !== extra && k % 5 === 3 && k % 3 !== 2 ? Math.floor(k / 5 + start) % KANBAN_LOOKS.length : undefined }))
+        // (bare where a banner hung (every third place, but by the drinks fridges) and a big signboard (every fifth, between): they were taken
+        // down (the owner's), their places still counted so the rest keep theirs, and the light switch its own)
+        bare: z !== extra && ((k % 3 === 2 && isClear(z, 0.9)) || (k % 5 === 3 && k % 3 !== 2)) }))
       // (nothing where the staff's door is: taken out after the rest are given theirs, so they keep what they were)
       .filter((a) => staffDoor === undefined || Math.abs(a.z - staffDoor) > STAFF_W / 2 + 0.3)
-      .concat(hang.map((h) => ({ z: h.z, scroll: undefined, print: h.print, round: false, nobori: undefined, kanban: undefined })))
+      .concat(hang.map((h) => ({ z: h.z, scroll: undefined, print: h.print, round: false, bare: false })))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear, staffDoor, hang.map((h) => `${h.z}${h.print}`).join()])
   // (the pictures just past the staff's door hung a little further along, clear of its frame (the owner's: the scroll there was right up
@@ -3575,7 +3147,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
           return runs.map(([p, q]) => <Box key={`${z0}|${p}`} size={[0.05, 0.05, q - p]} color="#3a2416" position={[-0.02, WAINSCOT, (p + q) / 2]} />)
         })}
         <Box size={[0.08, 0.1, l]} color="#3a2416" position={[-0.03, WALL_H - 0.05, mid]} />
-        {/* (no upright posts: nothing stands in the way of the banners strung along it) */}
+        {/* (no upright posts along it) */}
         {/* a frieze of seigaiha waves under the beam, and the pictures hung along the plaster */}
         <mesh position={[-0.004, WALL_H - 0.2, mid]} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[l, 0.2]} />
@@ -3584,10 +3156,10 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         <Box size={[0.03, 0.025, l]} color="#3a2416" position={[-0.01, WALL_H - 0.31, mid]} />
         </StaticBatch>
         {/* (everything below is its own piece in a batch of its own, so each can be moved by hand when the shop's shut: key G) */}
-        {art.filter((a) => a.nobori === undefined).map((a) => (
-          <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`${a.kanban !== undefined ? '木牌' : a.round ? '圓窗' : a.scroll ? '掛軸' : '畫'}（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><StaticBatch>
+        {art.filter((a) => !a.bare).map((a) => (
+          <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`${a.round ? '圓窗' : a.scroll ? '掛軸' : '畫'}（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><StaticBatch>
             <group position={[0, a.round ? 1.4 : a.scroll ? 1.42 : 1.5, a.z + nudgeArt(a.z)]}>
-              {a.kanban !== undefined ? <Kanban i={a.kanban} /> : a.round ? <RoundWindow /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
+              {a.round ? <RoundWindow /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
             </group>
           </StaticBatch>
           {/* (the moon's dust in its shaft by night, outside the batch: it drifts, and a batch's pieces stand still) */}
@@ -3607,30 +3179,8 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
           {/* hung on the wall on two cloud brackets (雲形の棚受け, blender/kamidana.py's KamiBracket, the owner's after their photo): an arm under
               the shelf ending in a cloud's head, the cloud stepping back down to the plate on the wall, which runs on below to a rounded end */}
           {[-0.35, 0.35].map((z) => <group key={z} position={[ALTAR_D / 2, -0.034, z]}><KamiCopy part="bracket" /></group>)}</group></StaticBatch></Movable>}
-        {/* (the string of bulbs under the frieze: instanced, so out of the batch) */}
-        <Movable id={`festoon${from.toFixed(1)}`} label={`燈串（${from.toFixed(0)}）`}><group userData={{ fade: true }}><Festoon l={l} mid={mid} /></group></Movable>
-        {/* (the strings of banners overhead, clear of the altar, the fridges and the toilets' doors) */}
-        {(() => {
-          const zs: number[] = []
-          // (not out to the way in at the end: nothing hung over the doorway)
-          // (and none in the corner where the speaker hangs: kept clear of it by its own reach and size)
-          for (let z = from + (corner ? 1.15 : 0.25); z < to - 1.05; z += 0.145) {
-            if (altar && Math.abs(z - shelfZ) < 0.62 * ALTAR_SCALE) continue
-            if (!isClear(z, 0.6)) continue
-            if (door !== undefined && Math.abs(z - door) < WC_W + 0.3) continue
-            zs.push(z)
-          }
-          return zs.length > 1 ? (
-            <>
-              {/* (one string along the wall, swagged between its pegs, a cloth every other place) */}
-              <Movable id={`banners${from.toFixed(1)}a`} label={`旗幟串 1（${from.toFixed(0)}）`}><group position={[-0.3, 2.22, 0]} userData={{ fade: true }}><BannerRow zs={zs.filter((_, k) => k % 2 === 0)} /></group></Movable>
-            </>
-          ) : null
-        })()}
-        {/* (the banners sway: not merged) */}
-        {art.filter((a) => a.nobori !== undefined).map((a) => <Movable key={`n${a.z}`} id={`nobori${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`幟旗（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><group position={[0, 1.08, a.z]} userData={{ fade: true }}><Nobori i={a.nobori!} /></group></Movable>)}
-        {/* (the altar's flag stirs, its incense smokes: not merged) */}
-        {altar && <Movable id="altarfittings" label="供桌上的供品與線香"><group name="look-altar" position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><Altar incense={altar === true ? undefined : altar} /></group></Movable>}
+        {/* (the omiki poured, the motes rising over the shrine: not merged) */}
+        {altar && <Movable id="altarfittings" label="供桌上的供品"><group name="look-altar" position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><Altar omiki={altar === true ? undefined : altar} /></group></Movable>}
       </group>
       {/* the toilets: not part of the wall that's hidden from behind, so they're still there when the camera swings round to the back */}
       <group position-x={-far}>
@@ -3708,8 +3258,8 @@ const SHRINE_LAMP_X = 0.07, SHRINE_LAMP_Z = 0.288
 const FLASK_X = -0.04
 /** and its height: up over the beckoning cats' stand below it, by the door */
 const ALTAR_Y = 1.42
-/** how long the sake offered stands there, and the extra custom it brings (ms) */
-const INCENSE_MS = 180000
+/** how long the omiki offered stands there, and the extra custom it brings (ms) */
+const OMIKI_MS = 180000
 /** the small shrine's offering table (blender/kamidana.py's KamiTable): three keyaki boards, a dark lip with a gold line inside it, gold front
  * corners, the arched apron below; in the altar's own frame (its top's surface at y = 0, its front at x = -D/2) */
 function AltarTable() {
@@ -3720,7 +3270,7 @@ function Sutra() {
     <group position={[-0.105, 0.001, -0.34]} rotation-y={-Math.PI / 2}><KamidanaModel part="sutra" /></group>
   )
 }
-function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => void } }) {
+function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => void } }) {
   // (the offering: one flask pours clear sake into the three cups in turn, the stream and the cups filling; then it's set back)
   const flaskRef = useRef<THREE.Group>(null)
   const flaskShadow = useRef<THREE.Group>(null)
@@ -3816,8 +3366,8 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       ;(moteGeo.attributes.alpha as THREE.BufferAttribute).needsUpdate = true
     }
     // (offered, the sake stands in its cup for a minute and the shrine glows, then goes quiet; then another can be offered)
-    const at = incense?.litAt ?? null
-    const left = at === null ? 0 : Math.max(0, 1 - (performance.now() - at) / INCENSE_MS)
+    const at = omiki?.pouredAt ?? null
+    const left = at === null ? 0 : Math.max(0, 1 - (performance.now() - at) / OMIKI_MS)
     const on = left > 0
     burning.current = on
     // (the blessing's strength: up as the pour ends, a pulse while it stands, down at its end; the doors open for it)
@@ -3953,7 +3503,7 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       m.scale.setScalar(Math.max(0.0001, KAMI_SC * cupInnerR(h) * 0.96))
     }
   })
-  const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; incense?.onLight() }
+  const offer = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; omiki?.onPour() }
   // (the shrine's front, in the altar's frame: its doors' plane, and the roof's)
   const SC = KAMI_SC
   // (the flask (blender/kamidana.py): clicked, it's lifted and pours the offering; a box round it to point at)
