@@ -16,7 +16,7 @@ import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
 import { BOSS_DRINK } from './Boss'
 import { CASE_SIZE } from '@/game/drinkStock'
-import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_W, type Counter, type DrinkId } from './bar'
+import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -2016,50 +2016,14 @@ function LockWindow({ who }: { who: 'm' | 'f' }) {
     </mesh>
   )
 }
-/**
- * A sliding door run into the wall (引き込み戸; the owner's: the doors open all the way, and nothing of them comes out into the room to walk
- * into or to run through what stands by the wall, as the toilets' did through the cartons in the corner): what of its panel has gone past
- * the doorway's post on the side it opens to isn't drawn, being in the wall's pocket there; cut in its materials' shaders against the
- * doorway's own frame (`away` the side it slides to along the frame's z, `edge` that post's inner face). The materials are its own copies;
- * the uniforms returned are pointed at the frame every frame (`uFrameInv`, its world matrix inverted).
- */
-function pocketDoor(objs: THREE.Object3D[], away: number, edge: number) {
-  const uniforms = { uFrameInv: { value: new THREE.Matrix4() }, uAway: { value: away }, uEdge: { value: edge } }
-  const copies = new Map<THREE.Material, THREE.Material>()
-  for (const root of objs) root.traverse((o) => {
-    const m = o as THREE.Mesh
-    if (!m.isMesh) return
-    const src = m.material as THREE.Material
-    let c = copies.get(src)
-    if (!c) {
-      c = src.clone()
-      c.onBeforeCompile = (sh) => {
-        Object.assign(sh.uniforms, uniforms)
-        sh.vertexShader = 'uniform mat4 uFrameInv;\nvarying float vPocketZ;\n' + sh.vertexShader.replace('#include <project_vertex>',
-          '#include <project_vertex>\n  vPocketZ = (uFrameInv * modelMatrix * vec4(transformed, 1.0)).z;')
-        sh.fragmentShader = 'uniform float uAway;\nuniform float uEdge;\nvarying float vPocketZ;\n' + sh.fragmentShader.replace('void main() {',
-          'void main() {\n  if (uAway * vPocketZ > uEdge) discard;')
-      }
-      c.customProgramCacheKey = () => 'pocket-door'
-      copies.set(src, c)
-    }
-    m.material = c
-  })
-  return uniforms
-}
-/** how far a toilet's door runs into the wall open: all of it but its edge with the pull (the panel's 0.8) */
-const WC_POCKET = 0.78
 const doorAt = new THREE.Vector3()
 function ToiletPanel({ who }: { who: 'm' | 'f' }) {
   const H = WC_H
   const g = useRef<THREE.Group>(null)
   const door = useWcDoor()
-  // (the men's slides off one way, the women's the other, away from each other, each into the wall)
+  // (the men's slides off one way, the women's the other, away from each other)
   const away = who === 'm' ? -1 : 1
-  const { panel, pocket } = useMemo(() => {
-    const panel = door.panel()
-    return { panel, pocket: pocketDoor([panel], away, 0.405) }
-  }, [door, away])
+  const panel = useMemo(() => door.panel(), [door])
   const k = useRef(0)
   const was = useRef(0)
   useFrame(({ camera }, dt) => {
@@ -2071,13 +2035,12 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
       if (g.current) slideDoorSound(want === 1, Math.max(0, 1 - camera.position.distanceTo(g.current.getWorldPosition(doorAt)) / 12))
     }
     k.current += Math.sign(want - k.current) * Math.min(Math.abs(want - k.current), Math.min(dt, 0.1) * 1.8)
-    // (straight along its track and into the wall, all the way open; it stepped out in front of the wall and ran along it once)
-    const t = Math.min(1, Math.max(0, k.current)), e = t * t * (3 - 2 * t)
+    // (first out of the doorway onto its track in front of the wall, clear of the frame's posts and the plaster, then along it, open (seen
+    // open: run into the wall it was gone, and the owner wanted it there); shutting, the other way about)
+    const ss = (a: number, b: number) => { const t = Math.min(1, Math.max(0, (k.current - a) / (b - a))); return t * t * (3 - 2 * t) }
     if (g.current) {
-      g.current.position.x = 0
-      g.current.position.z = away * e * WC_POCKET
-      const f = g.current.parent
-      if (f) pocket.uFrameInv.value.copy(f.matrixWorld).invert()
+      g.current.position.x = -0.065 * ss(0, 0.25)
+      g.current.position.z = away * ss(0.2, 1) * WC_SLIDE
     }
   })
   return (
@@ -2325,23 +2288,23 @@ const STAFF_SIGN = canvasTex(512, 256, (g) => {
 /**
  * The staff's door (the owner's: in the side wall by the corner, where the koi print hung; a sliding door like the toilets'): the toilets'
  * door, its dark cedar frame on the plaster, the dark of the passage inside it, 員工專用 on black on its board; clicked it slides away from
- * the corner all the way into the wall (a pocket: what's in the wall isn't drawn) and back again, with the runners' sound (the owner's: it
- * slid toward the corner, behind the bamboo's pot, then along the wall in front of the scroll, part open), the panel turned about so its
- * pull is at the edge it's pulled by.
+ * the corner along the wall all the way open and back again, with the runners' sound (the owner's: it slid toward the corner, behind the
+ * bamboo's pot, then only part way; run into the wall it was gone, and they wanted it seen), the panel turned about so its pull is at the
+ * edge it's pulled by.
  */
 function StaffDoor() {
   const door = useWcDoor()
   const frame = useMemo(() => door.frame(), [door])
-  const { panel, sign, pocket } = useMemo(() => {
+  const { panel, sign } = useMemo(() => {
     const panel = door.panel()
-    // (the sign rides on the panel, and into the wall with it)
+    // (the sign rides on the panel)
     const sign = new THREE.Group()
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.24),
       new THREE.MeshToonMaterial({ color: '#ffffff', map: STAFF_SIGN, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }))
     plate.position.set(-0.0372, 0.56, 0)
     plate.rotation.y = -Math.PI / 2
     sign.add(plate)
-    return { panel, sign, pocket: pocketDoor([panel, sign], 1, STAFF_W / 2 + 0.005) }
+    return { panel, sign }
   }, [door])
   useEffect(() => () => { for (const o of sign.children) (o as THREE.Mesh).geometry.dispose() }, [sign])
   const g = useRef<THREE.Group>(null)
@@ -2351,13 +2314,12 @@ function StaffDoor() {
     const s = st.current
     const want = s.open ? 1 : 0
     s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.8)
-    const t = Math.min(1, Math.max(0, s.k)), e = t * t * (3 - 2 * t)
+    const ss = (a: number, b: number) => { const t = Math.min(1, Math.max(0, (s.k - a) / (b - a))); return t * t * (3 - 2 * t) }
     if (g.current) {
-      // (straight along its track into the wall, all the way open: only its edge with the pull left at the post)
-      g.current.position.x = 0
-      g.current.position.z = e * (STAFF_W - 0.03)
-      const f = g.current.parent
-      if (f) pocket.uFrameInv.value.copy(f.matrixWorld).invert()
+      // (out onto its track in front of the wall, then along it all the way open: clear of the doorway, the scroll beside it hung further
+      // along for it (nudgeArt))
+      g.current.position.x = -0.065 * ss(0, 0.25)
+      g.current.position.z = ss(0.2, 1) * (STAFF_W - 0.02)
     }
   })
   const says = () => (st.current.open ? '點一下關上（員工休息室）' : '點一下打開（員工休息室）')
@@ -3049,7 +3011,7 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
   }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear, staffDoor, hang.map((h) => `${h.z}${h.print}`).join()])
   // (the pictures just past the staff's door hung a little further along, clear of its frame (the owner's: the scroll there was right up
   // against it); each one's piece keeps its name, so where it's been moved by hand still holds)
-  const nudgeArt = (z: number) => (staffDoor !== undefined && z > staffDoor && z - staffDoor < 1.6 ? 0.25 : 0)
+  const nudgeArt = (z: number) => (staffDoor !== undefined && z > staffDoor && z - staffDoor < 1.6 ? 0.42 : 0)
   // (the supplies' place: the gap between the drinks fridges and the toilets' doorway on this wall; shrunk only if it's narrower than
   // the stack, about 0.55 across)
   const supplies = useMemo(() => {
@@ -3144,7 +3106,8 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
           </Movable>
         ))}
         {/* (the supplies in the corner between the drinks fridges and the toilets' doorway) */}
-        {supplies && <Movable id="supplies" label="衛生紙與清潔用品"><group position={[-0.02, 0, supplies.z]} rotation-y={-Math.PI / 2} scale={supplies.k}><CornerSupplies /></group></Movable>}
+        {/* (stood a slot off the wall: the men's door, open, slides along behind them, not through them) */}
+        {supplies && <Movable id="supplies" label="衛生紙與清潔用品"><group position={[-0.13, 0, supplies.z]} rotation-y={-Math.PI / 2} scale={supplies.k}><CornerSupplies /></group></Movable>}
         {/* (the staff's door, where asked: up the stairs behind it, 員工專用) */}
         {staffDoor !== undefined && <Movable id="staffdoor" label="員工專用門"><group position={[0, 0, staffDoor]}><StaffDoor /></group></Movable>}
         {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
