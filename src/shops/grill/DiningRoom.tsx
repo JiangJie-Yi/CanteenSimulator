@@ -438,7 +438,7 @@ const ART = {
     sleeve.bezierCurveTo(58, 370, 72, 362, 76, 342)
     sleeve.lineTo(80, 240)
     sleeve.closePath()
-    // (her right sleeve hanging from the arm bent up to the fan)
+    // (her right sleeve hanging from her arm, bent to the shamisen's plectrum)
     const rsleeve = new Path2D()
     rsleeve.moveTo(146, 204)
     rsleeve.bezierCurveTo(166, 226, 176, 270, 176, 318)
@@ -583,32 +583,51 @@ const ART = {
       g.beginPath(); g.moveTo(x, y); g.lineTo(x + 1, y + 14 + q * 3); g.stroke()
       g.fillStyle = '#e8c45a'; g.beginPath(); g.ellipse(x + 1, y + 16 + q * 3, 1.4, 2.2, 0, 0, Math.PI * 2); g.fill()
     }
-    // ---- the round fan in her hand: its paper with a goldfish and a ripple, its ribs, its bamboo rim and handle
-    const fan = new Path2D()
-    fan.arc(146, 222, 25, 0, Math.PI * 2)
-    g.fillStyle = '#f7f0e2'; g.fill(fan)
-    g.save(); g.clip(fan)
-    line(0.4, 'rgba(120,96,60,0.3)')
-    for (let q = -6; q <= 6; q++) { const a = -Math.PI / 2 + q * 0.24; g.beginPath(); g.moveTo(146, 247); g.lineTo(146 + Math.cos(a) * 40, 247 + Math.sin(a) * 40); g.stroke() }
-    line(1, 'rgba(70,120,190,0.7)')
-    for (const y of [228, 236]) { g.beginPath(); g.moveTo(126, y); g.quadraticCurveTo(136, y - 4, 146, y); g.quadraticCurveTo(156, y + 4, 166, y); g.stroke() }
-    g.fillStyle = '#d8382a'
-    g.beginPath(); g.ellipse(146, 212, 8, 4.6, -0.3, 0, Math.PI * 2); g.fill()
-    g.beginPath(); g.moveTo(138, 215); g.quadraticCurveTo(130, 210, 128, 220); g.quadraticCurveTo(132, 216, 137, 219); g.closePath(); g.fill()
-    g.fillStyle = INK; g.beginPath(); g.arc(151.5, 210, 0.9, 0, Math.PI * 2); g.fill()
+    // ---- the shamisen across her (the owner's: it was a round fan with a goldfish on it): its body (胴) at her waist, turned to the neck's
+    // slope, a dark wooden rim round its white skin with the dark guard (撥皮) where the plectrum strikes; its slender lacquered neck (棹)
+    // up to her right, past her sleeve, to the pegbox (天神) bent back with its three ivory pegs; three strings from the bridge up the neck;
+    // the plectrum (撥), ivory, fanning out from her hand over the skin
+    const ang = Math.atan2(160 - 300, 186 - 124)
+    g.save(); g.translate(124, 300); g.rotate(ang + Math.PI / 2)
+    const dou = new Path2D(); dou.roundRect(-21, -22, 42, 44, 7)
+    g.fillStyle = '#5a3018'; g.fill(dou)
+    g.fillStyle = '#f4eee2'; g.beginPath(); g.roundRect(-17.5, -18.5, 35, 37, 5); g.fill()
+    g.fillStyle = '#2c2420'; g.beginPath(); g.ellipse(0, -8, 11, 6, 0, Math.PI, Math.PI * 2); g.fill()
+    line(0.9); g.stroke(dou)
+    // (the bridge (駒) low on the skin)
+    g.fillStyle = '#e9dcae'; g.fillRect(-7, 11, 14, 2.2)
     g.restore()
-    line(1.6, '#3a2a1a'); g.stroke(fan)
-    line(2.6, '#8a6a3a'); g.beginPath(); g.moveTo(146, 247); g.lineTo(140, 286); g.stroke()
-    // (her hand round the handle, out of her sleeve)
+    const ux = Math.cos(ang), uy = Math.sin(ang)
+    const neckA = [124 + ux * 22, 300 + uy * 22], neckB = [124 + ux * 162, 300 + uy * 162]
+    line(5.5, '#24160e'); g.beginPath(); g.moveTo(neckA[0], neckA[1]); g.lineTo(neckB[0], neckB[1]); g.stroke()
+    line(1, 'rgba(200,150,100,0.45)'); g.beginPath(); g.moveTo(neckA[0] - 1.6, neckA[1]); g.lineTo(neckB[0] - 1.6, neckB[1]); g.stroke()
+    // (the pegbox bent back from the neck's top, and its three pegs out to either side)
+    const tx = neckB[0] + ux * 4, ty = neckB[1] + uy * 4
+    line(6.5, '#1c120c'); g.beginPath(); g.moveTo(neckB[0], neckB[1]); g.quadraticCurveTo(tx + ux * 8, ty + uy * 8, tx + ux * 10 + 5, ty + uy * 10 + 2); g.stroke()
+    line(2.2, '#efe3c4')
+    for (const [k, sd] of [[2, 1], [6, -1], [10, 1]] as [number, number][]) {
+      const px = neckB[0] + ux * k, py = neckB[1] + uy * k
+      g.beginPath(); g.moveTo(px - uy * sd * 2, py + ux * sd * 2); g.lineTo(px - uy * sd * 9, py + ux * sd * 9); g.stroke()
+    }
+    // (the three strings, from the bridge up to the pegs)
+    line(0.45, 'rgba(250,244,228,0.95)')
+    for (const o of [-1.4, 0, 1.4]) {
+      const bx = 124 - ux * 12 - uy * o, by = 300 - uy * 12 + ux * o
+      g.beginPath(); g.moveTo(bx, by); g.lineTo(neckB[0] - uy * o * 0.4, neckB[1] + ux * o * 0.4); g.stroke()
+    }
+    // (her hand out of her sleeve with the plectrum, over the skin)
+    const bachi = new Path2D()
+    bachi.moveTo(146, 282); bachi.lineTo(128, 266); bachi.lineTo(140, 254); bachi.lineTo(152, 276); bachi.closePath()
+    g.fillStyle = '#ecdcae'; g.fill(bachi); line(0.8, '#6a5030'); g.stroke(bachi)
     const hand = new Path2D()
-    hand.moveTo(130, 270); hand.bezierCurveTo(136, 262, 146, 264, 146, 272); hand.bezierCurveTo(146, 280, 138, 284, 132, 282); hand.closePath()
+    hand.moveTo(142, 290); hand.bezierCurveTo(146, 280, 158, 280, 160, 288); hand.bezierCurveTo(160, 296, 152, 300, 146, 298); hand.closePath()
     g.fillStyle = '#faf5ec'; g.fill(hand); line(0.8); g.stroke(hand)
-    line(0.6); g.beginPath(); g.moveTo(138, 268); g.lineTo(141, 276); g.moveTo(142, 267); g.lineTo(144, 274); g.stroke()
+    line(0.6); g.beginPath(); g.moveTo(150, 285); g.lineTo(152, 293); g.moveTo(154, 284); g.lineTo(156, 291); g.stroke()
     // ---- the title in its cartouche, top right, and a seal at the foot
     g.fillStyle = '#efe2c2'; g.fillRect(162, 12, 28, 96)
     line(1); g.strokeRect(162, 12, 28, 96); g.strokeRect(164.5, 14.5, 23, 91)
     g.fillStyle = INK; g.font = '700 17px "Zen Antique", serif'; g.textAlign = 'center'; g.textBaseline = 'alphabetic'
-    ;['美', '人', '團', '扇'].forEach((c, q) => g.fillText(c, 176, 34 + q * 21))
+    ;['三', '味', '線'].forEach((c, q) => g.fillText(c, 176, 38 + q * 26))
     seal(g, 14, 420, 24)
   }),
 }
@@ -2194,7 +2213,7 @@ function useWcDoor() {
         const src = m.material as THREE.MeshStandardMaterial
         let t = toon.get(src)
         // (the paper seen from both sides: from in the toilet too)
-        if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: src.name === 'WcDoorPaper' ? THREE.DoubleSide : THREE.FrontSide }); toon.set(src, t) }
+        if (!t) { t = new THREE.MeshToonMaterial({ name: src.name, color: src.color.clone(), map: src.map, side: src.name === 'WcDoorPaper' ? THREE.DoubleSide : THREE.FrontSide }); toon.set(src, t) }
         m.material = t
       })
       return root
@@ -2454,12 +2473,66 @@ const STAFF_W = 0.82
  * Behind the staff's door, inside its frame: the dark of the passage beyond, black at the top going to a grey at the floor (the owner's: a
  * painted stair stood there once, its perspective only right from straight in front)
  */
-const STAFF_DARK = canvasTex(64, 256, (g) => {
+const STAFF_DARK = canvasTex(128, 256, (g) => {
+  // (layered, as a passage going back into the dark looks (the owner's: more depth in it than one gradient): black overhead to a dim grey
+  // floor; a faint warm light far in, low in the middle, from a room further along; the jambs' own shadow down either side; a sheen on the
+  // floor's boards near the sill)
   const gr = g.createLinearGradient(0, 0, 0, 256)
-  gr.addColorStop(0, '#060606'); gr.addColorStop(0.55, '#1c1c1e'); gr.addColorStop(1, '#5a5a5c')
+  gr.addColorStop(0, '#050505'); gr.addColorStop(0.45, '#151416'); gr.addColorStop(0.78, '#2a2826'); gr.addColorStop(1, '#4e4a46')
   g.fillStyle = gr
-  g.fillRect(0, 0, 64, 256)
+  g.fillRect(0, 0, 128, 256)
+  const far = g.createRadialGradient(64, 150, 2, 64, 150, 70)
+  far.addColorStop(0, 'rgba(150,110,70,0.32)'); far.addColorStop(0.5, 'rgba(90,64,40,0.14)'); far.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = far
+  g.fillRect(0, 0, 128, 256)
+  for (const [x0, x1] of [[0, 30], [128, 98]]) {
+    const side = g.createLinearGradient(x0, 0, x1, 0)
+    side.addColorStop(0, 'rgba(0,0,0,0.7)'); side.addColorStop(1, 'rgba(0,0,0,0)')
+    g.fillStyle = side
+    g.fillRect(Math.min(x0, x1), 0, 30, 256)
+  }
+  const sheen = g.createLinearGradient(0, 214, 0, 256)
+  sheen.addColorStop(0, 'rgba(255,240,220,0)'); sheen.addColorStop(1, 'rgba(255,240,220,0.12)')
+  g.fillStyle = sheen
+  g.fillRect(20, 214, 88, 42)
 })
+/** the staff door's lower board, its own (the owner's: a natural grain; the toilets' doors have one great flat-sawn figure over the whole
+ * board): four cedar planks standing side by side, each its own tone, a fine straight grain up them, now and then a soft arch of a figure,
+ * a dark groove between each two; laid as the board's UVs run (glTF's way up) */
+const STAFF_BOARD = (() => {
+  const t = canvasTex(256, 320, (g) => {
+    let seed = 13
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+    const tones = ['#a2704a', '#8f6040', '#a87a52', '#966846']
+    for (let k = 0; k < 4; k++) {
+      const x0 = k * 64
+      g.fillStyle = tones[k]; g.fillRect(x0, 0, 64, 320)
+      // (the straight grain: fine lines up the plank, wandering a little, darker and lighter)
+      for (let q = 0; q < 26; q++) {
+        const x = x0 + 3 + rnd() * 58, dark = rnd() < 0.6
+        g.strokeStyle = dark ? `rgba(60,34,18,${0.12 + rnd() * 0.16})` : `rgba(240,210,170,${0.08 + rnd() * 0.1})`
+        g.lineWidth = 0.6 + rnd() * 1.2
+        g.beginPath(); g.moveTo(x, 0)
+        for (let y = 0; y <= 320; y += 20) g.lineTo(x + Math.sin(y / 60 + q) * 1.4 + (rnd() - 0.5) * 0.6, y)
+        g.stroke()
+      }
+      // (on two of them a soft arch of a flat-sawn figure, low in contrast)
+      if (k === 1 || k === 3) {
+        const cx = x0 + 32, top = 60 + rnd() * 80
+        for (let r = 0; r < 5; r++) {
+          g.strokeStyle = `rgba(70,40,20,${0.16 - r * 0.02})`; g.lineWidth = 1.4
+          g.beginPath(); g.moveTo(cx - 10 - r * 5, 320); g.bezierCurveTo(cx - 10 - r * 5, top + r * 18 + 60, cx - 2 - r * 2, top + r * 14, cx, top + r * 14)
+          g.bezierCurveTo(cx + 2 + r * 2, top + r * 14, cx + 10 + r * 5, top + r * 18 + 60, cx + 10 + r * 5, 320); g.stroke()
+        }
+      }
+      // (the groove at its edge, a hair of light beside it)
+      g.fillStyle = 'rgba(30,16,8,0.75)'; g.fillRect(x0, 0, 2, 320)
+      g.fillStyle = 'rgba(255,230,190,0.12)'; g.fillRect(x0 + 2, 0, 1, 320)
+    }
+  })
+  if (t) t.flipY = false
+  return t
+})()
 /** 員工專用 on the staff's door, across its board below the waist (the owner's: on the door itself, on black; it was a plaque over it, half
  * behind the banner hung there), STAFF ONLY small under it: cream on a black plate with a fine cream rule round it, worn a little */
 const STAFF_SIGN = canvasTex(512, 256, (g) => {
@@ -2503,6 +2576,14 @@ function StaffDoor() {
   const frame = useMemo(() => door.frame(), [door])
   const { panel, sign } = useMemo(() => {
     const panel = door.panel()
+    // (its own lower board, a natural grain of planks, and its pull a dark brown lacquer (the owner's), not the toilets' doors' black)
+    panel.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const name = (m.material as THREE.Material).name
+      if (name === 'WcDoorBoard') m.material = new THREE.MeshToonMaterial({ name, color: '#ffffff', map: STAFF_BOARD })
+      else if (name === 'WcDoorLacquer') m.material = new THREE.MeshToonMaterial({ name, color: '#3a2215' })
+    })
     // (the sign rides on the panel)
     const sign = new THREE.Group()
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.24),
