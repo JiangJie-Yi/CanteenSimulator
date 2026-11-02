@@ -2623,9 +2623,114 @@ POT_K = 0.82
 _lu, _lv = grid01(256)
 _lg = np.sin((_lv * 30 + fbm(256, 2, 6, 4) * 1.4) * math.pi * 2) * 0.5 + 0.5
 _ledge = mix(mix((0.56, 0.36, 0.2), (0.47, 0.29, 0.15), fbm(256, 3, 9, 4)), (0.33, 0.19, 0.09), smooth(0.65, 0.95, _lg) * 0.5)
-M["box_wood"] = pbr("SeasoningBoxWood", tex=image("T_LedgeCedar", _ledge), rough=0.55, coat=0.15)
+
+
+def ledge_wood(W=1024, H=256):
+    """the ledge's wood (the owner's: its grain was too plain, a few even stripes): a flat-sawn board, its rings in long arches nested along it
+    (cathedral figure), their crowns wandering across it, rings now close now wide, a fine straight grain over them, a knot with the rings
+    bent round it, the colour drifting along the board. u along the grain, the picture once over the ledge's length (W x H its 4 : 1).
+    Its own random numbers: the rest of the model's pictures are drawn from the script's in turn, and stay as they were"""
+    r = np.random.default_rng(2610)
+
+    def noise(cx, cy):
+        g = r.random((cy + 1, cx + 1)).astype(np.float32)
+        ux = np.linspace(0, cx, W, endpoint=False)
+        uy = np.linspace(0, cy, H, endpoint=False)
+        ix, iy = ux.astype(int), uy.astype(int)
+        fx = ux - ix
+        fy = uy - iy
+        fx = (fx * fx * (3 - 2 * fx))[None, :]
+        fy = (fy * fy * (3 - 2 * fy))[:, None]
+        a, b = g[np.ix_(iy, ix)], g[np.ix_(iy, ix + 1)]
+        c, d = g[np.ix_(iy + 1, ix)], g[np.ix_(iy + 1, ix + 1)]
+        return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+
+    def fb(cx, cy, oct=4):
+        out = np.zeros((H, W), np.float32)
+        amp = tot = 0.0
+        amp = 1.0
+        for o in range(oct):
+            out += amp * noise(cx * 2 ** o, cy * 2 ** o)
+            tot += amp
+            amp *= 0.5
+        return out / tot
+
+    u = np.linspace(0, 1, W, endpoint=False)[None, :] + np.zeros((H, 1), np.float32)
+    v = np.linspace(0, 1, H, endpoint=False)[:, None] + np.zeros((1, W), np.float32)
+    wob = fb(6, 2) - 0.5
+    # (the arches' crowns wandering across the board as it runs)
+    crown = 0.5 + 0.18 * np.sin(2 * math.pi * u * 0.9 + 0.8) + 0.12 * (fb(3, 1) - 0.5)
+    ring = ((v - crown) * 2.4) ** 2 * 6.0 - u * 9.0 + wob * 0.9
+    # (a knot: the rings bent round it, its heart dark)
+    kx, ky = 0.68, 0.3
+    dk = np.sqrt(((u - kx) * 4.0) ** 2 + (v - ky) ** 2)
+    ring = ring + 0.9 * np.exp(-(dk / 0.07) ** 2)
+    # (rings now close, now wide: their pace drifting)
+    pace = 1.0 + 0.35 * (fb(4, 1) - 0.5)
+    late = smooth(0.55, 0.96, np.sin(2 * math.pi * ring * pace))
+    base = np.array((0.62, 0.42, 0.25), np.float32)
+    dark = np.array((0.36, 0.21, 0.1), np.float32)
+    col = base[None, None, :] + (dark - base)[None, None, :] * (late * 0.55)[..., None]
+    fine = np.sin(2 * math.pi * (v * 110 + wob * 7))
+    col = col + (dark - base)[None, None, :] * (smooth(0.75, 1.0, fine) * 0.16)[..., None]
+    col = col * (0.88 + 0.22 * fb(5, 2))[..., None]
+    col = col * (1 - 0.55 * np.exp(-(dk / 0.025) ** 2))[..., None]
+    return np.clip(col, 0, 1)
+
+
+M["box_wood"] = pbr("SeasoningBoxWood", tex=image("T_LedgeCedar", ledge_wood()), rough=0.55, coat=0.15)
 M["hook_bamboo"] = pbr("FanHookBamboo", (0.74, 0.62, 0.36), rough=0.45)
 _turn = math.atan2(tang.y, tang.x)
+
+
+def grain_uv(o, g_axis, a_axis):
+    """UVs from the wood's own directions (world): u along its grain `g_axis`, the ledge's picture once over the ledge's length; v across it
+    at the picture's own scale; each face from the two axes it lies along (its ends from across and through). Measured from the ledge's
+    middle, so the picture lies once along it, unrepeated (the boxes' faces had been wrapped round the ledge as a cylinder's)"""
+    g_axis, a_axis = Vector(g_axis).normalized(), Vector(a_axis).normalized()
+    b_axis = g_axis.cross(a_axis).normalized()
+    L, Lq = LEDGE_L, LEDGE_L / 4
+    me = o.data
+    if not me.uv_layers:
+        me.uv_layers.new()
+    uvl = me.uv_layers.active
+    mw = o.matrix_world
+    nm = mw.to_3x3()
+    origin = Vector((box_c.x, box_c.y, LEDGE_TOP))
+    for poly in me.polygons:
+        n = (nm @ poly.normal).normalized()
+        dg, da, db = abs(n.dot(g_axis)), abs(n.dot(a_axis)), abs(n.dot(b_axis))
+        for li in poly.loop_indices:
+            co = mw @ me.vertices[me.loops[li].vertex_index].co - origin
+            cg, ca, cb = co.dot(g_axis), co.dot(a_axis), co.dot(b_axis)
+            if dg >= da and dg >= db:
+                uv = (0.5 + ca / L, 0.5 + cb / Lq)
+            elif da >= db:
+                uv = (0.5 + cg / L, 0.5 + cb / Lq)
+            else:
+                uv = (0.5 + cg / L, 0.5 + ca / Lq)
+            uvl.data[li].uv = uv
+
+
+def beam_between(A, B, w, t, name):
+    """a member of the ledge's wood from A to B (world points), `w` wide along the ledge and `t` thick, square to its length"""
+    d = (B - A).normalized()
+    side = tang.normalized()
+    up = d.cross(side).normalized()
+    bm = bmesh.new()
+    vs = []
+    for end in (A, B):
+        for (sx, sy) in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            vs.append(bm.verts.new(end + side * (sx * w / 2) + up * (sy * t / 2)))
+    for f in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
+        bm.faces.new([vs[i] for i in f])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    return o
 
 
 def ledge_block(along0, along1, out0, out1, z0, z1, name):
@@ -2638,33 +2743,30 @@ def ledge_block(along0, along1, out0, out1, z0, z1, name):
     return o
 
 
-_parts = [
-    # (the shelf, and the lip along its front)
-    ledge_block(-LEDGE_L / 2, LEDGE_L / 2, -LEDGE_D / 2, LEDGE_D / 2, LEDGE_TOP - LEDGE_T, LEDGE_TOP, "LedgeBoard"),
-    ledge_block(-LEDGE_L / 2, LEDGE_L / 2, LEDGE_D / 2 - 0.012, LEDGE_D / 2, LEDGE_TOP, LEDGE_TOP + 0.016, "LedgeLip"),
-]
+_Z = Vector((0, 0, 1))
+_board = ledge_block(-LEDGE_L / 2, LEDGE_L / 2, -LEDGE_D / 2, LEDGE_D / 2, LEDGE_TOP - LEDGE_T, LEDGE_TOP, "LedgeBoard")
+_lip = ledge_block(-LEDGE_L / 2, LEDGE_L / 2, LEDGE_D / 2 - 0.012, LEDGE_D / 2, LEDGE_TOP, LEDGE_TOP + 0.016, "LedgeLip")
+grain_uv(_board, tang, out)
+grain_uv(_lip, tang, out)
+_parts = [_board, _lip]
 for side in (-1, 1):
-    # (each bracket: a cleat screwed to the frame's face, and a brace from its foot out under the shelf)
+    # (each bracket: a cleat screwed to the frame's face, and a brace from its foot up to the shelf's underside near its front, its ends
+    # sunk into the cleat and the shelf (it was a block tilted the wrong way and too long: it ran down from under the shelf's front out past
+    # it, the owner saw it poking out into the frame)
     x = side * (LEDGE_L / 2 - 0.18)
-    _parts.append(ledge_block(x - 0.022, x + 0.022, -LEDGE_D / 2, -LEDGE_D / 2 + 0.03, 0.06, LEDGE_TOP - LEDGE_T, "LedgeCleat"))
-    br = ledge_block(x - 0.018, x + 0.018, -0.13, 0.13, -0.012, 0.012, "LedgeBrace")
-    # (tilted up from the cleat's foot to the shelf's underside near its front)
-    br.rotation_euler = (0, 0, 0)
-    bpy.ops.object.select_all(action="DESELECT")
-    br.select_set(True)
-    bpy.context.view_layer.objects.active = br
-    mid = box_c + tang * x + out * (-LEDGE_D / 2 + 0.095)
-    br.location = (mid.x, mid.y, (0.075 + LEDGE_TOP - LEDGE_T) / 2)
-    _axis = tang
-    import mathutils
-    br.matrix_world = mathutils.Matrix.Translation(br.location) @ mathutils.Matrix.Rotation(-math.atan2(LEDGE_TOP - LEDGE_T - 0.075, 0.17), 4, Vector(_axis)) @ mathutils.Matrix.Translation(-br.location) @ br.matrix_world
+    cl = ledge_block(x - 0.022, x + 0.022, -LEDGE_D / 2, -LEDGE_D / 2 + 0.03, 0.06, LEDGE_TOP - LEDGE_T, "LedgeCleat")
+    grain_uv(cl, _Z, tang)
+    _parts.append(cl)
+    _a = box_c + tang * x + out * (-LEDGE_D / 2 + 0.024)
+    _b = box_c + tang * x + out * (LEDGE_D / 2 - 0.04)
+    br = beam_between(Vector((_a.x, _a.y, 0.078)), Vector((_b.x, _b.y, LEDGE_TOP - LEDGE_T + 0.004)), 0.034, 0.022, "LedgeBrace")
+    grain_uv(br, Vector((_b.x - _a.x, _b.y - _a.y, LEDGE_TOP - LEDGE_T + 0.004 - 0.078)), tang)
     _parts.append(br)
 box = join(_parts, "SeasoningBox")
 for _p in box.data.polygons:
     _p.use_smooth = False
 box.data.materials.clear()
 box.data.materials.append(M["box_wood"])
-cyl_uv(box)
 centre_origin(box, (box_c.x, box_c.y, LEDGE_TOP - LEDGE_T / 2))
 # (the fan's hook: a bamboo post up from the ledge's left end, an arm out past it, a peg the fan's loop hangs on (FAN_PEG in Roasting))
 _hp = box_c + tang * (-LEDGE_L / 2 + 0.03)
