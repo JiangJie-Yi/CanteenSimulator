@@ -35,7 +35,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, SHRINE_FLOWERS, WC_GRUMBLE, tissuesAt } from './bar'
+import { COAL_BRIDGE, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -1943,7 +1943,10 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
   const sheet = useRef<THREE.Group>(null)
   const box = useRef<THREE.Group>(null)
   const st = useRef({ open: false, at: 0, pulled: -1, used: false, sheets: null as null | { flat: THREE.Object3D; up: THREE.Object3D } })
-  const says = () => (st.current.open ? '裡面一盒衛生紙・點衛生紙抽一張・點抽屜推回去' : '一個座位一盒衛生紙・點一下拉開')
+  // (how many are left in its box, out of a new box's (the owner's: shown as 200/200))
+  const left = () => `${tissuesAt(seat)}/${BOX_SHEETS}`
+  const says = () => (st.current.open ? `衛生紙 ${left()}・點衛生紙抽一張・點抽屜推回去` : `一個座位一盒衛生紙（${left()}）・點一下拉開`)
+  const tissueSays = () => (tissuesAt(seat) > 0 ? `剩 ${left()}・點一下抽一張` : `${left()}・空了，開店前會換新的一盒`)
   useFrame((_, dt) => {
     const s = st.current
     if (s.open && SEATS_TAKEN.has(seat)) { s.open = false; drawerSound(true) }
@@ -2008,13 +2011,20 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
         <group ref={inside} position={DRAWER.tissue} visible={false}>
           {/* (the box itself: a click on it pulls a tissue. Shut away it isn't drawn, but it's still in the pointer's way (the pointer's
               rays don't mind what's hidden): there it's the drawer, which a click opens) */}
-          <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; if (st.current.open) tipOver('衛生紙', '點一下抽一張').onPointerOver(e); else tipOver('抽屜', says()).onPointerOver(e) }}
+          <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; if (st.current.open) tipOver('衛生紙', tissueSays()).onPointerOver(e); else tipOver('抽屜', says()).onPointerOver(e) }}
             onPointerOut={(e) => { if (getEdit().on) return; tipOver('衛生紙', '').onPointerOut(e) }}
             onClick={(e) => {
               e.stopPropagation()
               if (getEdit().on) return
               if (!st.current.open) { toggle(); return }
-              if (st.current.pulled < 0) { st.current.pulled = 0; st.current.used = true; tissuePull() }
+              // (one out of the box: it's counted, as the customers' are)
+              if (st.current.pulled < 0 && tissuesAt(seat) > 0) {
+                st.current.pulled = 0
+                st.current.used = true
+                setTissues(seat, tissuesAt(seat) - 1)
+                tissuePull()
+                setTip({ title: '衛生紙', hint: tissueSays() })
+              }
             }}>
             <group ref={box}><BarPiece name="BarTissueLow" /></group>
           </group>

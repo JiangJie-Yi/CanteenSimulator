@@ -7200,3 +7200,40 @@ html.theme-fading::view-transition-new(root) {
 .stock-panel :is(.stock-foot, .drink-stock-foot) { background: rgb(59 42 32 / 0.06); border-top: 1px solid var(--card-line); }
 :root[data-theme='dark'] .stock-panel :is(.stock-foot, .drink-stock-foot) { background: rgb(0 0 0 / 0.18); }
 .stock-panel .stock-foot .tally-trying { color: var(--ink); }
+
+/* At a phone's size: the flat (2D) grill isn't open yet, a card over everything says so (ui/PhoneClosed), in the office's finish */
+.phone-closed {
+  position: fixed;
+  inset: 0;
+  /* (over everything: the corner's buttons too) */
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: radial-gradient(ellipse at 50% 40%, #3a3a42, var(--scene-bg, #26262c) 70%);
+}
+.phone-closed-card {
+  width: min(360px, 100%);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.45);
+  border: 1px solid rgb(255 255 255 / 0.12);
+}
+.phone-closed-card > header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 18px;
+  color: #f6ecd8;
+  background: var(--grain-dark, #3b2a20);
+}
+.phone-closed-card > header b { font-family: 'Zen Antique', serif; font-size: 26px; letter-spacing: 0.08em; }
+.phone-closed-card > header small { font-size: 13px; opacity: 0.8; letter-spacing: 0.1em; }
+.phone-closed-body {
+  padding: 18px 20px 20px;
+  color: #3b2a20;
+  background: rgb(250 246 238 / 0.9);
+  backdrop-filter: blur(10px);
+}
+.phone-closed-body h2 { margin: 0 0 8px; font-size: 19px; letter-spacing: 0.06em; }
+.phone-closed-body p { margin: 0; font-size: 14px; line-height: 1.6; }

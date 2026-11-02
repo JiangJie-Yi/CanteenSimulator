@@ -70,6 +70,7 @@ import { Welcome } from '@/ui/Welcome'
 import { liteUrl, QUALITY, stepDown, webglReport } from '@/scene/quality'
 import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { Grill2D } from '@/shops/grill/Grill2D'
+import { PhoneClosed } from '@/ui/PhoneClosed'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
@@ -211,6 +212,8 @@ const PHONE_QUERY = '(hover: none) and (pointer: coarse), (max-width: 760px)'
  * Only a phone gets the grill drawn flat, without any 3D.
  */
 const SMALL_SCREEN_QUERY = '(max-width: 599px), (max-height: 499px)'
+/** whether the phone's flat grill (Grill2D) is open: not yet (the owner's); at a phone's size a card says so instead (PhoneClosed) */
+const PHONE_2D_OPEN = false
 function useMedia(query: string) {
   const [on, setOn] = useState(() => window.matchMedia(query).matches)
   useEffect(() => {
@@ -2385,7 +2388,8 @@ export default function App() {
         </Crash>
       </div>
       <div className="stage" ref={stageRef}>
-        {flatGrill && dish.roast && (
+        {flatGrill && !PHONE_2D_OPEN && <PhoneClosed lang={lang} />}
+        {flatGrill && PHONE_2D_OPEN && dish.roast && (
           <Grill2D roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])} active fire={fire}
             onOffFire={sceneOffFire} onEat={onEat} onNotice={sceneNotice} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal}
             onSay={talk} chef={chefOf(dish.id)} onGuests={(g) => setShopGuests(dish.id, g)}

@@ -20,3 +20,6 @@ export const DEVELOPER = 'JiangJie-Yi'
 export const DEVELOPER_URL = 'https://github.com/JiangJie-Yi'
 export const REPO_URL = 'https://github.com/JiangJie-Yi/CanteenSimulator'
 export const SITE_URL = 'https://jiangjie-yi.github.io/CanteenSimulator/'
+/** the game's version (the owner's: 0.01 for now), and the AI model it's developed with (in Claude Code) */
+export const VERSION = '0.01'
+export const DEV_MODEL = 'Claude Opus 5.5'

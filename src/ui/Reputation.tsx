@@ -4,7 +4,7 @@
 // nothing in the room or at Esc (the owner's), in the office's finish: its wood title bar, its glass, a section under a rule, a card each.
 // Its second tab, 關於 (the owner's): the game, who makes it, its source on GitHub, and the work used in it under licence with its authors.
 import { memo, useEffect, useState } from 'react'
-import { CC_BY_URL, CREDITS, DEVELOPER, DEVELOPER_URL, REPO_URL, SITE_URL } from '@/data/credits'
+import { CC_BY_URL, CREDITS, DEV_MODEL, DEVELOPER, DEVELOPER_URL, REPO_URL, SITE_URL, VERSION } from '@/data/credits'
 import { guestLabel } from '@/data/guests'
 import { tl, type Lang } from '@/data/i18n'
 import { remarkOf, satisfaction, starsOf, type Rating, type Remark, type Visit } from '@/game/reputation'
@@ -125,6 +125,8 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
                 <dt>{pick('開發者', '開発', 'Developer')}</dt><dd><a href={DEVELOPER_URL} target="_blank" rel="noopener noreferrer">{DEVELOPER}</a></dd>
                 <dt>GitHub</dt><dd><a href={REPO_URL} target="_blank" rel="noopener noreferrer">{REPO_URL.replace('https://', '')}</a></dd>
                 <dt>{pick('線上遊玩', 'プレイ', 'Play')}</dt><dd><a href={SITE_URL} target="_blank" rel="noopener noreferrer">{SITE_URL.replace('https://', '')}</a></dd>
+                <dt>{pick('版本', 'バージョン', 'Version')}</dt><dd>v{VERSION}</dd>
+                <dt>{pick('開發模型', '開発モデル', 'Developed with')}</dt><dd>{DEV_MODEL}（Anthropic）・Claude Code</dd>
                 <dt>{pick('製作', '制作', 'Made with')}</dt><dd>React・three.js・Vite・Blender</dd>
               </dl>
             </div>
