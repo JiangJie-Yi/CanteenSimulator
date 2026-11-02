@@ -904,31 +904,88 @@ for o in eb:
     o.matrix_world = mw
 ebisu.location = P(BX + 0.012, DY + 0.005 + 0.016, 0)
 parts += eb + [ebisu]
-# (the talismans in the side bays)
+# (the talismans in the side bays, against their back walls; before each a masakaki (真榊), the pair of them flanking the god (the owner's: the
+# bays had held two little vases of sakaki and a stand of rice cakes with an orange). Each a black-lacquered stand, a wooden pole with a
+# gilt cap and a sprig of sakaki at its top, the five colours of silk (五色絹: green, yellow, red, white, purple) hanging from a gilt
+# crossbar under it, and before the silk, as is the rule, the mirror and the jewel (鏡, 勾玉) on the right one as one faces the shrine, the
+# sword (剣) on the left. Some 300 triangles each; the small parts unlined (their names carry NO_INK's words))
 M["fuda"] = pbr("KamiFuda", lin("#f3eedd"), rough=0.8)
 M["fudaSeal"] = pbr("KamiFudaSeal", lin("#b8261c"), rough=0.6)
 M["sideLeaf"] = pbr("KamiSideLeaf", lin("#2f6a24"), rough=0.3)
-M["daidai"] = pbr("KamiDaidai", lin("#e8801a"), rough=0.45)
+M["jade"] = pbr("KamiJade", lin("#3d9a6a"), rough=0.3)
+M["blade"] = pbr("KamiBlade", lin("#d6dbe0"), rough=0.25)
+_ku, _kv = grid01(128)
+_band = np.clip((_ku * 5).astype(int), 0, 4)
+_five = np.array([[0.18, 0.49, 0.29], [0.91, 0.73, 0.2], [0.78, 0.2, 0.17], [0.96, 0.95, 0.91], [0.43, 0.23, 0.55]], np.float32)
+# (each band hangs in a soft fold: lighter down its middle, a fine darker seam between them, a little darker toward the hem)
+goshiki = _five[_band] * (0.84 + 0.16 * np.sin((_ku * 5 % 1) * math.pi))[..., None] * (0.9 + 0.1 * _kv)[..., None]
+goshiki = goshiki * (1 - 0.35 * (np.abs((_ku * 5 % 1) - 0.5) > 0.47))[..., None]
+M["goshiki"] = pbr("KamiGoshiki", (1, 1, 1), tex=image("goshiki", goshiki), rough=0.6)
+
+
+def leaf6(name, base, dirv, sidev, length, width, thick, mat_):
+    """a small leaf: a long, flat octahedron from `base` along `dirv`, widest four tenths along, `sidev` across its face (eight faces)"""
+    base, dirv, sidev = Vector(base), Vector(dirv).normalized(), Vector(sidev).normalized()
+    nrm = dirv.cross(sidev).normalized()
+    mid = base + dirv * length * 0.4
+    pts = [base, base + dirv * length, mid + sidev * width / 2, mid - sidev * width / 2, mid + nrm * thick / 2, mid - nrm * thick / 2]
+    faces = [(0, 3, 4), (3, 1, 4), (1, 2, 4), (2, 0, 4), (3, 0, 5), (1, 3, 5), (2, 1, 5), (0, 2, 5)]
+    return mesh_obj(name, [P(*q) for q in pts], faces, mat_)
+
+
+def masakaki(tag, x, zc, right):
+    """a masakaki on a side bay's floor at (x, zc), facing the doors (-x); `right`: the right one as one faces the shrine (+z), the mirror
+    and the jewel on it, else the sword"""
+    out = []
+    y = DY + 0.005
+    out.append(box(f"Kami{tag}Stand", S(0.016, 0.004, 0.016), P(x, y + 0.002, zc), M["woodDark"], bev=0.0006, uv=0))
+    out.append(cyl(f"Kami{tag}SocketCap", 0.0028, 0.006, P(x, y + 0.007, zc), M["woodDark"], verts=8))
+    top = y + 0.072   # (low enough that its sakaki shows under the doorway's lintel)
+    out.append(cyl(f"Kami{tag}Rod", 0.001, top - y - 0.008, P(x, (y + 0.008 + top) / 2, zc), M["wood"][0], verts=6))
+    out.append(cyl(f"Kami{tag}Cap", 0.0017, 0.003, P(x, top + 0.0015, zc), M["gold"], verts=8))
+    # (the sprig of sakaki over the cap: five glossy leaves fanned up and out, the middle one tallest, tipped a little toward the front)
+    for k in range(5):
+        a = (k - 2) * 0.5
+        d = Vector((-0.25, math.cos(a), math.sin(a)))
+        out.append(leaf6(f"Kami{tag}LeafStem{k}", (x, top + 0.002, zc), d, Vector((0, -math.sin(a), math.cos(a))), 0.012 - abs(k - 2) * 0.0012, 0.0045, 0.0008, M["sideLeaf"]))
+    # (the gilt crossbar the silk hangs from, a little under the top, across the bay)
+    bar = top - 0.006
+    out.append(box(f"Kami{tag}Beam", S(0.0014, 0.0014, 0.03), P(x, bar, zc), M["gold"], uv=0))
+    # (the silk: the five colours across, hanging from the bar to below the middle; a face to the front and one to the back)
+    W_, L_, xs = 0.026, 0.044, x - 0.0012
+    q = [P(xs, bar - 0.0007, zc - W_ / 2), P(xs, bar - 0.0007, zc + W_ / 2), P(xs, bar - L_, zc + W_ / 2), P(xs, bar - L_, zc - W_ / 2)]
+    silk = mesh_obj(f"Kami{tag}SilkFringe", q + [tuple(v) for v in q], [(0, 3, 2, 1), (4, 5, 6, 7)], M["goshiki"])
+    uvl = silk.data.uv_layers.new().data
+    for poly in silk.data.polygons:
+        for li in poly.loop_indices:
+            vi = silk.data.loops[li].vertex_index % 4
+            uvl[li].uv = ((0, 1, 1, 0)[vi], (1, 1, 0, 0)[vi])
+    out.append(silk)
+    hx = x - 0.0035
+    if right:
+        # (the mirror, a gilt disc on its cord from the bar's middle; the jewel, a green bead, hung under it)
+        out.append(box(f"Kami{tag}Cord", S(0.0005, 0.005, 0.0005), P(hx, bar - 0.0025, zc), M["shide"], uv=0))
+        out.append(cyl(f"Kami{tag}MirrorPlate", 0.0075, 0.0012, P(hx, bar - 0.0125, zc), M["gold"], rot=(0, math.pi / 2, 0), verts=16))
+        out.append(box(f"Kami{tag}JewelCord", S(0.0005, 0.006, 0.0005), P(hx, bar - 0.023, zc), M["shide"], uv=0))
+        out.append(leaf6(f"Kami{tag}JewelBal", (hx, bar - 0.0255, zc), Vector((0, -1, 0)), Vector((0, 0, 1)), 0.0062, 0.0042, 0.0028, M["jade"]))
+    else:
+        # (the sword, hilt up: a gilt pommel and guard, the grip, the straight two-edged blade to its point)
+        out.append(cyl(f"Kami{tag}SwordCap", 0.0013, 0.002, P(hx, bar - 0.002, zc), M["gold"], verts=8))
+        out.append(cyl(f"Kami{tag}SwordCore", 0.0009, 0.007, P(hx, bar - 0.0065, zc), M["woodDark"], verts=6))
+        out.append(box(f"Kami{tag}SwordGold", S(0.0012, 0.0012, 0.0066), P(hx, bar - 0.0106, zc), M["gold"], uv=0))
+        out.append(box(f"Kami{tag}SwordEdge", S(0.0006, 0.026, 0.0036), P(hx, bar - 0.0242, zc), M["blade"], uv=0))
+        bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.0018, radius2=0, depth=0.004, location=P(hx, bar - 0.0392, zc))
+        t_ = active(); t_.rotation_euler = (math.pi, 0, 0); t_.scale = (0.167, 1.0, 1.0); apply_scale(t_)
+        out.append(finish(t_, f"Kami{tag}SwordTipEdge", M["blade"], smooth_shade=False))
+    return out
+
+
 for sz in (-1, 1):
     zc_ = sz * 0.112
     parts.append(box(f"KamiFuda{sz}", S(0.004, 0.075, 0.026), P(BX + 0.05, DY + 0.005 + 0.0375, zc_), M["fuda"], bev=0.0006, uv=0))
     parts.append(box(f"KamiFudaFold{sz}", S(0.0045, 0.012, 0.0265), P(BX + 0.05, DY + 0.005 + 0.068, zc_), M["fuda"], uv=0))
     parts.append(box(f"KamiFudaSeal{sz}", S(0.0008, 0.008, 0.008), P(BX + 0.0476, DY + 0.005 + 0.03, zc_), M["fudaSeal"], uv=0))
-    # (before the talisman: a pair of little white vases of sakaki either side, and a small hinoki stand (三方) with a pair of round rice cakes on
-    # it, an orange on top)
-    for s2 in (-1, 1):
-        parts.append(cyl(f"KamiSideVase{sz}{s2}", 0.006, 0.026, P(BX + 0.03, DY + 0.005 + 0.013, zc_ + s2 * 0.021), M["shide"], verts=14))
-        for k_ in range(4):
-            a_ = k_ * 1.6 + s2
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=8, ring_count=5,
-                                                 location=P(BX + 0.03 + 0.005 * math.cos(a_), DY + 0.005 + 0.032 + k_ * 0.006, zc_ + s2 * 0.021 + 0.006 * math.sin(a_)))
-            lf_ = active(); lf_.scale = (0.0045, 0.009, 0.0022); lf_.rotation_euler = (0.4 * math.sin(a_), 0.4 * math.cos(a_), a_)
-            parts.append(finish(lf_, f"KamiSideSakaki{sz}{s2}{k_}", M["sideLeaf"]))
-    parts.append(box(f"KamiSideSanbo{sz}", S(0.024, 0.011, 0.024), P(BX + 0.008, DY + 0.005 + 0.0055, zc_), wood(), bev=0.0008, uv=0))
-    for k_, r_ in enumerate((0.0095, 0.008)):
-        parts.append(cyl(f"KamiSideMochi{sz}{k_}", r_, 0.0055, P(BX + 0.008, DY + 0.005 + 0.0137 + k_ * 0.0055, zc_), M["shide"], verts=16))
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0048, segments=10, ring_count=6, location=P(BX + 0.008, DY + 0.005 + 0.027, zc_))
-    parts.append(finish(active(), f"KamiSideDaidai{sz}", M["daidai"]))
+    parts += masakaki(f"Masakaki{sz}", BX + 0.007, zc_, sz > 0)
 
 # =====================================================================
 # The sacred rope (注連縄) across the shrine's front, over the doors: twisted green-gold straw, fat in the middle and tapering to its tied
