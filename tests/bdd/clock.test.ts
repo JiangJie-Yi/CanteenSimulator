@@ -1,6 +1,13 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { DAWN, DUSK, START, hhmm, isNight, themeAt, tick } from '@/game/clock'
+import { SKIES, START, hhmm, isNight, nextSky, skyAt, themeAt, tick, type Sky } from '@/game/clock'
+
+/** how long a part of the day lasts, in game minutes */
+const lengthOf = (s: Sky) => {
+  const k = SKIES.findIndex((p) => p.sky === s)
+  const next = SKIES[(k + 1) % SKIES.length].from
+  return (next - SKIES[k].from + 24 * 60) % (24 * 60)
+}
 
 feature('遊戲時鐘：現實一秒是遊戲一分鐘，晝夜跟著時間走', () => {
   scenario('新的一局從第一天早上十點開始，是白天', ({ given, then, and }) => {
@@ -36,12 +43,46 @@ feature('遊戲時鐘：現實一秒是遊戲一分鐘，晝夜跟著時間走',
     and('11:00', (w) => { expect(hhmm(w.c.minute)).toBe('11:00') })
   })
 
-  scenario('晚上六點到早上六點是夜晚，其餘是白天', ({ given, then, and }) => {
+  scenario('一天分成清晨、白天、黃昏、黑夜，清晨與黃昏比較短', ({ given, then, and }) => {
     given('一天裡的幾個時候', () => {})
-    then('傍晚六點天黑', () => { expect(isNight(DUSK)).toBe(true); expect(isNight(DUSK - 1)).toBe(false) })
-    and('早上六點天亮', () => { expect(isNight(DAWN)).toBe(false); expect(isNight(DAWN - 1)).toBe(true) })
-    and('半夜是夜晚', () => { expect(themeAt({ day: 2, minute: 0 })).toBe('dark') })
-    and('中午是白天', () => { expect(themeAt({ day: 2, minute: 12 * 60 })).toBe('light') })
+    then('早上五點天開始亮，是清晨', () => { expect(skyAt(5 * 60)).toBe('dawn'); expect(skyAt(5 * 60 - 1)).toBe('night') })
+    and('六點半是白天', () => { expect(skyAt(6 * 60 + 30)).toBe('day'); expect(skyAt(6 * 60 + 29)).toBe('dawn') })
+    and('傍晚五點是黃昏', () => { expect(skyAt(17 * 60)).toBe('dusk'); expect(skyAt(17 * 60 - 1)).toBe('day') })
+    and('六點半天黑', () => { expect(skyAt(18 * 60 + 30)).toBe('night'); expect(skyAt(18 * 60 + 29)).toBe('dusk') })
+    and('半夜是黑夜', () => { expect(skyAt(0)).toBe('night'); expect(isNight(0)).toBe(true) })
+    and('清晨與黃昏各一個半小時，白天、黑夜都長得多', () => {
+      expect(lengthOf('dawn')).toBe(90)
+      expect(lengthOf('dusk')).toBe(90)
+      expect(lengthOf('day')).toBeGreaterThan(lengthOf('dawn') * 4)
+      expect(lengthOf('night')).toBeGreaterThan(lengthOf('dusk') * 4)
+    })
+    and('四段加起來是一整天', () => { expect(SKIES.reduce((n, p) => n + lengthOf(p.sky), 0)).toBe(24 * 60) })
+  })
+
+  scenario('畫面只有黑夜是暗的，清晨與黃昏的面板還是亮的', ({ given, then, and }) => {
+    given('一天裡的幾個時候', () => {})
+    then('半夜是暗的', () => { expect(themeAt({ day: 2, minute: 0 })).toBe('dark') })
+    and('清晨、中午、黃昏是亮的', () => {
+      for (const m of [5 * 60 + 30, 12 * 60, 17 * 60 + 30]) expect(themeAt({ day: 2, minute: m })).toBe('light')
+    })
+  })
+
+  scenario('按一下時鐘上的太陽，時間跳到下一段的開頭（測光源用）', ({ given, when, then, and }) => {
+    given('第 2 天中午 12:00', (w) => { w.c = { day: 2, minute: 12 * 60 } })
+    when('按一下', (w) => { w.c = nextSky(w.c) })
+    then('是第 2 天 17:00，黃昏', (w) => { expect(w.c).toEqual({ day: 2, minute: 17 * 60 }); expect(skyAt(w.c.minute)).toBe('dusk') })
+    when('再按一下', (w) => { w.c = nextSky(w.c) })
+    then('18:30，黑夜', (w) => { expect(hhmm(w.c.minute)).toBe('18:30'); expect(skyAt(w.c.minute)).toBe('night') })
+    when('再按一下', (w) => { w.c = nextSky(w.c) })
+    then('隔天早上五點，清晨', (w) => { expect(w.c).toEqual({ day: 3, minute: 5 * 60 }); expect(skyAt(w.c.minute)).toBe('dawn') })
+    when('再按一下', (w) => { w.c = nextSky(w.c) })
+    then('06:30，白天', (w) => { expect(hhmm(w.c.minute)).toBe('06:30'); expect(skyAt(w.c.minute)).toBe('day') })
+  })
+
+  scenario('半夜按一下，是同一天的清晨', ({ given, when, then }) => {
+    given('第 4 天 02:00', (w) => { w.c = { day: 4, minute: 2 * 60 } })
+    when('按一下', (w) => { w.c = nextSky(w.c) })
+    then('第 4 天 05:00', (w) => { expect(w.c).toEqual({ day: 4, minute: 5 * 60 }) })
   })
 
   scenario('時鐘不會倒著走', ({ given, when, then }) => {

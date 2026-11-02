@@ -72,12 +72,44 @@ feature('牆上的電燈開關', () => {
 
   scenario('白天是日正當中：光從正上方照下來，影子落在東西正下方', ({ given, then, and }) => {
     given('圓窗朝外的方向', (w) => { w.window = [0.6, -0.8] as [number, number] })
-    then('白天的光從正上方來（90 度），不管窗在哪', (w) => { expect(keyLightFrom(false, w.window)).toEqual([0, 1, 0]); expect(keyLightFrom(false, null)).toEqual([0, 1, 0]) })
+    then('白天的光從正上方來（90 度），不管窗在哪', (w) => { expect(keyLightFrom('day', w.window)).toEqual([0, 1, 0]); expect(keyLightFrom('day', null)).toEqual([0, 1, 0]) })
     and('晚上的月光從圓窗外的高處斜斜照進來', (w) => {
-      const [x, y, z] = keyLightFrom(true, w.window)
+      const [x, y, z] = keyLightFrom('night', w.window)
       expect(Math.hypot(x, y, z)).toBeCloseTo(1, 5)
       expect(y).toBeGreaterThan(0.8)
       expect(x * w.window[0] + z * w.window[1]).toBeGreaterThan(0.1)
+    })
+  })
+
+  scenario('黃昏的夕陽從圓窗外低低地斜照進來，比月光低', ({ given, then, and }) => {
+    given('圓窗朝外的方向', (w) => { w.window = [0.6, -0.8] as [number, number] })
+    then('從窗的那一側照進來', (w) => {
+      const [x, y, z] = keyLightFrom('dusk', w.window)
+      expect(Math.hypot(x, y, z)).toBeCloseTo(1, 5)
+      expect(x * w.window[0] + z * w.window[1]).toBeGreaterThan(0.6)
+    })
+    and('比月光低，但不是貼地的（店裡還照得到）', (w) => {
+      const y = keyLightFrom('dusk', w.window)[1]
+      expect(y).toBeLessThan(keyLightFrom('night', w.window)[1] - 0.2)
+      expect(y).toBeGreaterThan(0.35)
+    })
+  })
+
+  scenario('清晨的光從圓窗的另一邊斜斜照進來', ({ given, then, and }) => {
+    given('圓窗朝外的方向', (w) => { w.window = [0.6, -0.8] as [number, number] })
+    then('從窗的對面來', (w) => {
+      const [x, y, z] = keyLightFrom('dawn', w.window)
+      expect(Math.hypot(x, y, z)).toBeCloseTo(1, 5)
+      expect(x * w.window[0] + z * w.window[1]).toBeLessThan(-0.4)
+    })
+    and('比正午低、比夕陽高一點', (w) => {
+      const y = keyLightFrom('dawn', w.window)[1]
+      expect(y).toBeLessThan(0.9)
+      expect(y).toBeGreaterThan(keyLightFrom('dusk', w.window)[1])
+    })
+    and('找不到窗時，清晨與黃昏也是從正上方', () => {
+      expect(keyLightFrom('dawn', null)).toEqual([0, 1, 0])
+      expect(keyLightFrom('dusk', null)).toEqual([0, 1, 0])
     })
   })
 

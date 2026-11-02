@@ -24,6 +24,7 @@ import { setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
 import { lampGlow } from '@/game/roomLights'
+import type { Sky } from '@/game/clock'
 import { lampLit } from './lampShades'
 
 /**
@@ -33,6 +34,13 @@ import { lampLit } from './lampShades'
 /** (a lamp's: out with the wall switch; the daylight through the windows isn't) */
 const NIGHT_GLOWS: { m: THREE.Material; day: number; night: number; lamp: boolean }[] = []
 const isNight = () => typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark'
+/** the part of the day outside (the page's data-sky: dawn, day, dusk, night; the round window's paper, view and light follow it) */
+function skyNow(): Sky {
+  const s = typeof document === 'undefined' ? undefined : document.documentElement.dataset.sky
+  return s === 'dawn' || s === 'day' || s === 'dusk' || s === 'night' ? s : isNight() ? 'night' : 'day'
+}
+/** watch the page for the part of the day turning (either of its two marks) */
+const onSky = (f: () => void) => new MutationObserver(f).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-sky'] })
 function nightGlow<M extends THREE.Material>(m: M, day: number, night: number, lamp = true): M {
   NIGHT_GLOWS.push({ m, day, night, lamp })
   m.opacity = (isNight() ? night : day) * (lamp ? lampGlow(getLights().on) : 1)
@@ -1092,13 +1100,25 @@ function Framed({ art }: { art: ArtKey }) {
 }
 
 /**
- * The round window's paper, as the light outside falls on it: by day the sky's cool blue through it, the bamboo's shadows sharp on it; by
- * night dark blue, a street lantern's warm glow off to one side and the moon's paler one high up, the bamboo only darker against it.
- * Drawn again (the one canvas) whenever the room turns from day to night (data-theme on the page).
+ * The round window's paper, as the light outside falls on it: by day the sky's cool blue through it; by night dark blue, a street lantern's
+ * warm glow off to one side and the moon's paler one high up, the bamboo's shadows on it; at dusk the evening sun's orange, brightest where
+ * it's low behind the paper, the bamboo's shadows thrown long and warm-dark; at dawn a pale rose under lavender, the bamboo's shadows faint.
+ * Drawn again (the one canvas) whenever the part of the day turns (data-sky on the page).
  */
-function drawRoundPaper(g: CanvasRenderingContext2D, night: boolean) {
+function drawRoundPaper(g: CanvasRenderingContext2D, sky: Sky) {
+  const night = sky === 'night'
   g.clearRect(0, 0, 512, 512)
-  if (night) {
+  if (sky === 'dusk' || sky === 'dawn') {
+    const gr = g.createLinearGradient(0, 0, 0, 512)
+    if (sky === 'dusk') { gr.addColorStop(0, '#ffe6c4'); gr.addColorStop(0.45, '#ffc189'); gr.addColorStop(1, '#ee8a5c') }
+    else { gr.addColorStop(0, '#eceeff'); gr.addColorStop(0.5, '#f4dde8'); gr.addColorStop(1, '#ebc4c8') }
+    g.fillStyle = gr; g.fillRect(0, 0, 512, 512)
+    // (the sun's own brightness through the paper: the evening's low on one side, the morning's a faint glow over it all)
+    const [x, y, r, c] = sky === 'dusk' ? [330, 300, 260, 'rgba(255,244,214,0.75)'] : [256, 160, 330, 'rgba(255,250,246,0.5)']
+    const l = g.createRadialGradient(x as number, y as number, 0, x as number, y as number, r as number)
+    l.addColorStop(0, c as string); l.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = l; g.fillRect(0, 0, 512, 512)
+  } else if (night) {
     const gr = g.createRadialGradient(256, 256, 30, 256, 256, 300)
     gr.addColorStop(0, '#3a4766'); gr.addColorStop(0.7, '#262f4a'); gr.addColorStop(1, '#151a2c')
     g.fillStyle = gr; g.fillRect(0, 0, 512, 512)
@@ -1126,6 +1146,8 @@ function drawRoundPaper(g: CanvasRenderingContext2D, night: boolean) {
     g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a) * 18 + 6, y + Math.sin(a) * 18 - 4, x + Math.cos(a) * 34, y + Math.sin(a) * 34); g.stroke()
   }
   if (night) bambooGrove(g, 'shadow')
+  else if (sky === 'dusk') bambooGrove(g, 'shadow', '96,40,14')
+  else if (sky === 'dawn') { g.globalAlpha = 0.45; bambooGrove(g, 'shadow', '70,58,104'); g.globalAlpha = 1 }
 }
 /**
  * The bamboo just outside the round window, in the paper's frame (512 x 512 over the window's round): two culms further off, thin, two
@@ -1135,7 +1157,7 @@ function drawRoundPaper(g: CanvasRenderingContext2D, night: boolean) {
  * three greens; `night`: moonlit silhouettes, a cool light down one edge), so each culm, branch and leaf outside is where its shadow falls
  * (the owner's: the view open matching the shadows shut)
  */
-function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'night') {
+function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'night', shade = '6,10,24') {
   const rnd = seeded(5)
   const shadow = look === 'shadow'
   const LEAF = look === 'day' ? ['#4f7a2c', '#6c9a3a', '#3f6424'] : ['#18261e', '#203226', '#121c16']
@@ -1162,7 +1184,7 @@ function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'nigh
     g.save()
     // (the shadows soft as the moon throws them; the bamboo itself crisp, the two further off a touch out of focus)
     g.filter = shadow ? `blur(${blur}px)` : far ? 'blur(0.8px)' : 'none'
-    const ink = shadow ? `rgba(6,10,24,${alpha})` : look === 'day' ? '#4a5e22' : '#141e18'
+    const ink = shadow ? `rgba(${shade},${alpha})` : look === 'day' ? '#4a5e22' : '#141e18'
     g.fillStyle = ink
     g.strokeStyle = ink
     g.translate(x, 540)
@@ -1209,7 +1231,7 @@ function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'nigh
   // (sprays hanging in from above, out of the frame)
   g.save()
   g.filter = shadow ? 'blur(1.4px)' : 'none'
-  g.fillStyle = 'rgba(6,10,24,0.34)'
+  g.fillStyle = `rgba(${shade},0.34)`
   for (const [x, y, side] of [[290, -8, 1], [120, 4, -1], [470, 20, -1]] as [number, number, number][]) {
     g.save(); g.translate(x, y); g.rotate(Math.PI * 0.08 * side); spray(5, side, 46); g.restore()
   }
@@ -1223,9 +1245,9 @@ const ROUND_PAPER = (() => {
   const g = c.getContext('2d')!
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
-  const draw = () => { drawRoundPaper(g, document.documentElement.dataset.theme === 'dark'); t.needsUpdate = true }
+  const draw = () => { drawRoundPaper(g, skyNow()); t.needsUpdate = true }
   draw()
-  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  onSky(draw)
   return t
 })()
 /**
@@ -1283,9 +1305,58 @@ const viewPx = (k: ViewLayer, size: number) => {
   const H = VIEW_LAYERS[k].H
   return { X: (x: number) => (x / H * 0.5 + 0.5) * size, Y: (y: number) => (0.5 - y / H * 0.5) * size, S: (l: number) => (l / H * 0.5) * size }
 }
-function drawViewSky(g: CanvasRenderingContext2D, size: number, night: boolean) {
+/** the street's day-lit pictures toned to the light of dawn or dusk: everything drawn on the layer (and only that) washed over with it */
+function toneTo(g: CanvasRenderingContext2D, size: number, sky: Sky, dusk: string, dawn: string) {
+  if (sky !== 'dusk' && sky !== 'dawn') return
+  g.save()
+  g.filter = 'none'
+  g.globalCompositeOperation = 'source-atop'
+  g.fillStyle = sky === 'dusk' ? dusk : dawn
+  g.fillRect(0, 0, size, size)
+  g.restore()
+}
+function drawViewSky(g: CanvasRenderingContext2D, size: number, sky: Sky) {
+  const night = sky === 'night'
   const { X, Y, S } = viewPx('sky', size)
   const grd = g.createLinearGradient(0, 0, 0, size)
+  if (sky === 'dusk' || sky === 'dawn') {
+    // (dusk: deep violet overhead to the orange glow along the horizon, the sun low in it; dawn: blue going pale, a rose and peach band low
+    // down, the last stars fading)
+    const stops: [number, string][] = sky === 'dusk'
+      ? [[0, '#37386e'], [0.3, '#7c5488'], [0.43, '#e0805e'], [0.5, '#ffc277'], [0.54, '#f7a868'], [1, '#6e4650']]
+      : [[0, '#5f80c8'], [0.36, '#a9b7e6'], [0.46, '#f1c6cc'], [0.5, '#ffdcbc'], [0.54, '#f3d2c6'], [1, '#cdbfd0']]
+    for (const [k, c] of stops) grd.addColorStop(k, c)
+    g.fillStyle = grd
+    g.fillRect(0, 0, size, size)
+    const rnd = seeded(91)
+    if (sky === 'dusk') {
+      const sx = X(1.9), sy = Y(1.7), sr = S(0.62)
+      const glow = g.createRadialGradient(sx, sy, 0, sx, sy, sr * 7)
+      glow.addColorStop(0, 'rgba(255,236,190,0.9)'); glow.addColorStop(0.25, 'rgba(255,170,90,0.45)'); glow.addColorStop(1, 'rgba(255,140,80,0)')
+      g.fillStyle = glow
+      g.fillRect(sx - sr * 7, sy - sr * 7, sr * 14, sr * 14)
+      g.fillStyle = '#fff1d0'
+      g.beginPath(); g.arc(sx, sy, sr, 0, Math.PI * 2); g.fill()
+    } else {
+      for (let k = 0; k < 24; k++) {
+        g.fillStyle = `rgba(255,255,250,${0.15 + rnd() * 0.35})`
+        g.fillRect(rnd() * size, rnd() * size * 0.22, 1, 1)
+      }
+    }
+    // (long thin clouds lit from below: gold and rose at dusk, pink at dawn)
+    g.filter = 'blur(5px)'
+    for (const [cx, cy, w] of [[-3.5, 3.0, 3.2], [2.8, 4.4, 3.6], [0.2, 2.4, 2.2], [5.2, 2.9, 2.6], [-6, 4.8, 3.0]]) {
+      g.fillStyle = sky === 'dusk' ? 'rgba(255,170,120,0.7)' : 'rgba(255,212,222,0.75)'
+      for (let k = 0; k < 6; k++) {
+        const r = S(w * (0.1 + rnd() * 0.08))
+        g.beginPath(); g.ellipse(X(cx + (rnd() - 0.5) * w), Y(cy + rnd() * w * 0.12), r * 2.6, r, 0, 0, Math.PI * 2); g.fill()
+      }
+      g.fillStyle = sky === 'dusk' ? 'rgba(150,80,110,0.45)' : 'rgba(190,170,210,0.4)'
+      g.fillRect(X(cx - w * 0.5), Y(cy + 0.02), S(w), S(0.1))
+    }
+    g.filter = 'none'
+    return
+  }
   if (night) { grd.addColorStop(0, '#070d22'); grd.addColorStop(0.42, '#14214a'); grd.addColorStop(0.5, '#3a3550'); grd.addColorStop(0.53, '#6a4a48'); grd.addColorStop(1, '#1a1a26') }
   else { grd.addColorStop(0, '#3f86d8'); grd.addColorStop(0.4, '#8dbcef'); grd.addColorStop(0.5, '#d4e8fb'); grd.addColorStop(1, '#c8dcef') }
   g.fillStyle = grd
@@ -1322,7 +1393,8 @@ function drawViewSky(g: CanvasRenderingContext2D, size: number, night: boolean) 
     g.filter = 'none'
   }
 }
-function drawViewFar(g: CanvasRenderingContext2D, size: number, night: boolean) {
+function drawViewFar(g: CanvasRenderingContext2D, size: number, sky: Sky) {
+  const night = sky === 'night'
   const { X, Y, S } = viewPx('far', size)
   g.clearRect(0, 0, size, size)
   const rnd = seeded(37)
@@ -1379,8 +1451,11 @@ function drawViewFar(g: CanvasRenderingContext2D, size: number, night: boolean) 
   haze.addColorStop(1, night ? 'rgba(120,80,70,0.7)' : 'rgba(210,225,240,0.75)')
   g.fillStyle = haze
   g.fillRect(0, Y(-0.2), size, Y(-0.8) - Y(-0.2))
+  // (at dusk the towers dark violet against the glow behind them, at dawn a lavender haze)
+  toneTo(g, size, sky, 'rgba(66,44,92,0.58)', 'rgba(150,140,196,0.38)')
 }
-function drawViewMid(g: CanvasRenderingContext2D, size: number, night: boolean) {
+function drawViewMid(g: CanvasRenderingContext2D, size: number, sky: Sky) {
+  const night = sky === 'night'
   const { X, Y, S } = viewPx('mid', size)
   g.clearRect(0, 0, size, size)
   const rnd = seeded(58)
@@ -1471,8 +1546,10 @@ function drawViewMid(g: CanvasRenderingContext2D, size: number, night: boolean) 
       g.stroke()
     }
   }
+  // (the fronts across the alley in the shade at dusk, the sun going down behind them, warm on their edges; cool and grey at dawn)
+  toneTo(g, size, sky, 'rgba(104,58,52,0.4)', 'rgba(118,118,168,0.26)')
 }
-function drawViewNear(g: CanvasRenderingContext2D, size: number, night: boolean) {
+function drawViewNear(g: CanvasRenderingContext2D, size: number, sky: Sky) {
   const { X, S } = viewPx('near', size)
   g.clearRect(0, 0, size, size)
   // (a few bamboo just outside (the owner's: the fence taken away), the very ones whose shadows the moon throws on the paper: the paper's
@@ -1480,25 +1557,29 @@ function drawViewNear(g: CanvasRenderingContext2D, size: number, night: boolean)
   g.save()
   g.translate(X(-ROUND_R), X(-ROUND_R))
   g.scale(S(2 * ROUND_R) / 512, S(2 * ROUND_R) / 512)
-  bambooGrove(g, night ? 'night' : 'day')
+  bambooGrove(g, sky === 'night' ? 'night' : 'day')
   g.restore()
+  // (against the evening sun the bamboo's dark, its edges warm; in the dawn a cool grey-green)
+  toneTo(g, size, sky, 'rgba(46,22,12,0.62)', 'rgba(70,72,110,0.3)')
 }
-/** the four layers' pictures, made again day and night as the theme turns */
+/** the four layers' pictures, made again as the part of the day turns */
 const ROUND_VIEW = (() => {
   if (typeof document === 'undefined') return null
-  const make = (size: number, draw: (g: CanvasRenderingContext2D, size: number, night: boolean) => void) => {
+  const make = (size: number, draw: (g: CanvasRenderingContext2D, size: number, sky: Sky) => void) => {
     const c = document.createElement('canvas')
     c.width = c.height = size
     const g = c.getContext('2d')!
     const t = new THREE.CanvasTexture(c)
     t.colorSpace = THREE.SRGBColorSpace
     t.anisotropy = 4
-    return { t, paint: (night: boolean) => { draw(g, size, night); t.needsUpdate = true } }
+    return { t, paint: (sky: Sky) => { draw(g, size, sky); t.needsUpdate = true } }
   }
   const layers = { sky: make(512, drawViewSky), far: make(1024, drawViewFar), mid: make(1024, drawViewMid), near: make(512, drawViewNear) }
-  const paint = () => { const night = document.documentElement.dataset.theme === 'dark'; for (const l of Object.values(layers)) l.paint(night) }
+  // (only when it's turned: the two marks change together, and each would paint all four again)
+  let painted: Sky | null = null
+  const paint = () => { const sky = skyNow(); if (sky === painted) return; painted = sky; for (const l of Object.values(layers)) l.paint(sky) }
   paint()
-  new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  onSky(paint)
   const L = VIEW_LAYERS
   const mat = new THREE.ShaderMaterial({
     uniforms: { uSky: { value: layers.sky.t }, uFar: { value: layers.far.t }, uMid: { value: layers.mid.t }, uNear: { value: layers.near.t },
@@ -1646,12 +1727,25 @@ const DAYLIGHT = (() => {
   }
   return { halo: tex(halo), beam: tex(beam) }
 })()
-// (only by night: the moon's faint blue glow round the window and its shaft slanting in, dust drifting in it (WindowDust); by day none)
-const WINDOW_HALO = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.halo, color: '#8fc4ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false }), 0, 0.22, false)
-const SUNBEAM = nightGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, color: '#78b2ff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false, side: THREE.DoubleSide }), 0, 0.15, false)
-/** the dust in the moon's shaft by night: specks drifting slowly down it and about, catching its light (in the window's frame, as the shaft) */
+/** the light from outside about the round window, by the part of the day: its colour, and how strong (none by day, the sky's light all
+ * over then) */
+const SKY_GLOWS: { m: THREE.MeshBasicMaterial; looks: Record<Sky, [string, number]> }[] = []
+function skyGlow(m: THREE.MeshBasicMaterial, looks: Record<Sky, [string, number]>) {
+  SKY_GLOWS.push({ m, looks })
+  const [c, o] = looks[skyNow()]
+  m.color.set(c)
+  m.opacity = o
+  return m
+}
+if (typeof document !== 'undefined') onSky(() => { const s = skyNow(); for (const { m, looks } of SKY_GLOWS) { m.color.set(looks[s][0]); m.opacity = looks[s][1] } })
+// (by night the moon's faint blue glow round the window and its shaft slanting in, dust drifting in it (WindowDust); at dusk the evening
+// sun's, orange and stronger; at dawn only a faint rose glow round it (the morning sun's on the room's other side); by day none)
+const WINDOW_HALO = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.halo, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  toneMapped: false }), { day: ['#8fc4ff', 0], dawn: ['#ffc6d4', 0.12], dusk: ['#ffac64', 0.3], night: ['#8fc4ff', 0.22] })
+const SUNBEAM = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  toneMapped: false, side: THREE.DoubleSide }), { day: ['#78b2ff', 0], dawn: ['#ffd6de', 0], dusk: ['#ffa059', 0.22], night: ['#78b2ff', 0.15] })
+/** the dust in the moon's shaft by night, in the evening sun's at dusk: specks drifting slowly down it and about, catching its light (in the
+ * window's frame, as the shaft) */
 const DUST_N = 46
 function WindowDust() {
   const pts = useRef<THREE.Points>(null)
@@ -1665,8 +1759,10 @@ function WindowDust() {
   useFrame(({ clock }) => {
     const o = pts.current
     if (!o) return
-    o.visible = isNight()
+    const sky = skyNow()
+    o.visible = sky === 'night' || sky === 'dusk'
     if (!o.visible) return
+    mat.color.set(sky === 'dusk' ? '#ffd8a8' : '#cfe4ff')
     const t = clock.elapsedTime, a = geo.attributes.position as THREE.BufferAttribute
     const tilt = 0.62, R = 0.4
     for (let i = 0; i < DUST_N; i++) {

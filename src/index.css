@@ -627,18 +627,42 @@ button {
   pointer-events: none;
   user-select: none;
 }
+/* (the part of the day: a button (the owner's, to look at the lights in each); its own colour each: rosy dawn, gold day, orange dusk,
+   the pale moon) */
 .game-clock-sky {
+  --sky-ink: #ffd36a;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0 -2px 0 -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+.game-clock-sky.is-dawn { --sky-ink: #ffc0a6; }
+.game-clock-sky.is-dusk { --sky-ink: #ff9a4c; }
+.game-clock-sky.is-night { --sky-ink: #e9eefc; }
+.game-clock-sky svg {
   width: 15px;
   height: 15px;
-  fill: #ffd36a;
-  stroke: #ffd36a;
+  fill: var(--sky-ink);
+  stroke: var(--sky-ink);
   stroke-width: 1.4;
   stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: filter 120ms ease;
 }
-.game-clock.is-night .game-clock-sky {
-  fill: #e9eefc;
-  stroke: none;
-}
+.game-clock-sky.is-night svg { stroke: none; }
+.game-clock-sky .game-clock-arrow { fill: none; }
+.game-clock-sky:hover { background-color: rgb(255 255 255 / 0.16); }
+.game-clock-sky:hover svg { filter: drop-shadow(0 0 3px var(--sky-ink)); }
+.game-clock-sky:active { transform: scale(0.9); transition-duration: 0s; }
+.game-clock-sky:focus-visible { outline: 2px solid var(--sky-ink); outline-offset: 1px; }
 .game-clock-time {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;

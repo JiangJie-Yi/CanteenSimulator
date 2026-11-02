@@ -77,7 +77,7 @@ import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
 import { tl } from '@/data/i18n'
-import { themeAt, type Clock } from '@/game/clock'
+import { skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
 import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
 import { GameClock } from '@/ui/GameClock'
 import { ageFresh, blendFresh } from '@/game/freshness'
@@ -180,14 +180,23 @@ const DIGEST_KCAL_PER_SEC = 1.2
 
 type Theme = 'light' | 'dark'
 
-const LIGHTING: Record<Theme, { sun: string; sunIntensity: number; sky: string; ground: string; hemi: number;
-  spot: number; fire: number; shadow: string; shadowOpacity: number }> = {
+const LIGHTING: Record<Sky, { sun: string; sunIntensity: number; sky: string; ground: string; hemi: number;
+  spot: number; fire: number; shadow: string; shadowOpacity: number
+  /** how much of the sky's light the room's environment gives (the soft fill from all round) */
+  env: number }> = {
   // golden-hour sun and a cool sky fill
-  light: { sun: '#ffe7c2', sunIntensity: 1.8, sky: '#cfe0ff', ground: '#7a6450', hemi: 1.0, spot: 18, fire: 2,
-    shadow: '#000000', shadowOpacity: 0.28 },
+  day: { sun: '#ffe7c2', sunIntensity: 1.8, sky: '#cfe0ff', ground: '#7a6450', hemi: 1.0, spot: 18, fire: 2,
+    shadow: '#000000', shadowOpacity: 0.28, env: 1 },
+  // the early sun, rosy and not yet strong, low from the room's far side; the rest of the room still in the cool of the night going
+  // (the owner's: dawn and dusk between day and night)
+  dawn: { sun: '#ffbfa6', sunIntensity: 1.15, sky: '#a9b4e6', ground: '#54464c', hemi: 0.85, spot: 22, fire: 2.5,
+    shadow: '#000000', shadowOpacity: 0.32, env: 0.72 },
+  // the evening sun, deep orange, low in through the round window; a dusky violet sky over warm ground
+  dusk: { sun: '#ff9d52', sunIntensity: 1.6, sky: '#b9a8d2', ground: '#7a5442', hemi: 0.95, spot: 24, fire: 3,
+    shadow: '#000000', shadowOpacity: 0.36, env: 0.88 },
   // moonlight; the warm spot, fire and burners carry the scene
-  dark: { sun: '#b8c4ff', sunIntensity: 0.9, sky: '#6a6274', ground: '#3a2c20', hemi: 1.35, spot: 30, fire: 4,
-    shadow: '#000000', shadowOpacity: 0.45 },
+  night: { sun: '#b8c4ff', sunIntensity: 0.9, sky: '#6a6274', ground: '#3a2c20', hemi: 1.35, spot: 30, fire: 4,
+    shadow: '#000000', shadowOpacity: 0.45, env: 1 },
 }
 
 // a warm lamp hanging above and in front of the dish, like over a stall counter
@@ -291,14 +300,17 @@ function ShadowPacer() {
 const METER_KEY = 'jgs-utilities-1'
 /** the customers' visits (game/reputation), kept in the browser; cleared with a fresh start */
 const VISITS_KEY = 'jgs-reputation-1'
-function useTheme(): [Theme, () => void] {
-  // (the time of day on the game's clock (the owner's: day and night come round with the time, not at a button): a new game's ten in the
-  // morning, a page brought back after its 3D view was lost the time it was)
-  const [theme, setTheme] = useState<Theme>(() => themeAt(getClock()))
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-  }, [theme])
-  return [theme, () => setTheme((t) => (t === 'light' ? 'dark' : 'light'))]
+function useSky(): [Sky, (s: Sky) => void] {
+  // (the part of the day on the game's clock (the owner's: day and night come round with the time, dawn and dusk between them): a new game's
+  // ten in the morning, a page brought back after its 3D view was lost the time it was); on the page as its look (data-theme: dark by night
+  // only) and as the light outside (data-sky: the round window's view and paper, its shaft of light, follow it)
+  const [sky, setSky] = useState<Sky>(() => skyAt(getClock().minute))
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    root.dataset.theme = themeOf(sky)
+    root.dataset.sky = sky
+  }, [sky])
+  return [sky, setSky]
 }
 
 /** Signed carousel slot of dish i relative to the active one, wrapping so neighbours are -1 / +1. */
@@ -343,6 +355,8 @@ type SceneProps = {
   active: number
   orders: Record<string, Record<string, number>>
   theme: Theme
+  /** the part of the day (the room's light: its key light, its sky's colours) */
+  sky: Sky
   reducedMotion: boolean
   /** 0..1 charcoal fire strength for the grill */
   fire: RefObject<number>
@@ -527,7 +541,7 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
 /** the view switched to the free one with the camera left where it is (entering edit mode: the owner's), not glided to the free view's own
  * place: set just before the switch, taken by the camera's homing */
 const HOLD_POSE = { next: false }
-function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
+function Scene({ incense, active, orders, theme, sky, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -572,7 +586,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     camera.setViewOffset(size.width, size.height, offX, offY, size.width, size.height)
     camera.updateProjectionMatrix()
   }, [camera, size, frame, editing])
-  const look = LIGHTING[theme]
+  const look = LIGHTING[sky]
   // (the wall switch by the door: with the lights out, the warm lamp over the fire is out and the room's own light falls to the daylight by day,
   // to little by night (the night's key light, standing for the moon, with it: the fire then carries the room); the day's sun is as it was)
   const lights = useLights()
@@ -585,25 +599,26 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   const scene3 = useThree((s) => s.scene)
   const glKey = useThree((s) => s.gl)
   const moonAt = useRef(0)
-  const keyNow = useRef({ on: lights.on, night: theme === 'dark' })
-  keyNow.current = { on: lights.on, night: theme === 'dark' }
+  const keyNow = useRef({ on: lights.on, night: theme === 'dark', sky })
+  keyNow.current = { on: lights.on, night: theme === 'dark', sky }
   /** the key light set as the lights and the time of day are now: its shadows' depth and softness, where it shines from */
   const placeKey = () => {
     const k = keyLight.current
     if (!k) return
     // (how dark its shadows fall and how soft: light and soft by day, faint by night with the lamps on, plain under the moon with them off)
-    const { on, night } = keyNow.current
+    const { on, night, sky: now } = keyNow.current
     k.shadow.intensity = shadowDepth(on, night)
     k.shadow.radius = shadowSoft(night)
-    // (by day the noon sun, straight overhead; by night the moon, high out past the round window: the window's room is toward its -x)
-    const w = night ? scene3.getObjectByName('RoundWindow') : null
+    // (by day the noon sun, straight overhead; by night the moon, high out past the round window (the window's room is toward its -x); at
+    // dusk the evening sun low in through it, at dawn the early sun from the room's other side)
+    const w = now !== 'day' ? scene3.getObjectByName('RoundWindow') : null
     let out: [number, number] | null = null
     if (w) {
       w.updateWorldMatrix(true, false)
       const o = new THREE.Vector3(1, 0, 0).transformDirection(w.matrixWorld)
       out = [o.x, o.z]
     }
-    const [x, y, z] = keyLightFrom(night, out)
+    const [x, y, z] = keyLightFrom(now, out)
     k.position.set(x * 19, y * 19, z * 19)
   }
   // (the lights switched, or day turned to night: the shadows changed with the room's light on the very next frame, the shadow map drawn
@@ -613,7 +628,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     placeKey()
     if (keyLight.current) keyLight.current.shadow.needsUpdate = true
     glKey.shadowMap.needsUpdate = true
-  }, [lights.on, theme, glKey])
+  }, [lights.on, theme, sky, glKey])
   // (and every half second, the round window's moon following the window, should it be moved)
   useFrame((st) => {
     if (st.clock.elapsedTime - moonAt.current < 0.5) return
@@ -931,7 +946,7 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
         shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
       <ShadowPacer />
       <hemisphereLight args={[look.sky, look.ground, look.hemi * dim]} />
-      <IndoorHDRI night={theme === 'dark'} intensity={(theme === 'dark' ? 0.3 + look.hemi * 0.4 : 0.5 + look.hemi * 0.5) * dim} />
+      <IndoorHDRI night={theme === 'dark'} intensity={(theme === 'dark' ? 0.3 + look.hemi * 0.4 : 0.5 + look.hemi * 0.5) * look.env * dim} />
       <spotLight
         ref={spot}
         position={SPOT_POSITION}
@@ -1687,30 +1702,31 @@ export default function App() {
     setChat((all) => [...all.slice(-4), { id, who, text }])
     window.setTimeout(() => setChat((all) => all.filter((m) => m.id !== id)), 6000)
   }, [])
-  const [theme, toggleTheme] = useTheme()
+  const [sky, setSky] = useSky()
+  const theme = themeOf(sky)
   /**
-   * The day turned to night (or back) as a dissolve, not a cut (the owner's: ease-in-out, 0.65 s): the browser holds a picture of the page as
-   * it is (the room and the panels alike), the change is made under it, and the one fades into the other (a view transition; index.css's
-   * `theme-fading`). A browser without them, or one set to reduce motion, just changes.
+   * One part of the day turned to the next (day to dusk, dusk to night...) as a dissolve, not a cut (the owner's: ease-in-out, 0.65 s): the
+   * browser holds a picture of the page as it is (the room and the panels alike), the change is made under it, and the one fades into the
+   * other (a view transition; index.css's `theme-fading`). A browser without them, or one set to reduce motion, just changes.
    */
-  const switchTheme = () => {
+  const switchSky = (next: Sky) => {
     const root = document.documentElement
     if (!('startViewTransition' in document) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      toggleTheme()
+      setSky(next)
       return
     }
     root.classList.add('theme-fading')
     const done = () => root.classList.remove('theme-fading')
-    const t = document.startViewTransition(() => flushSync(toggleTheme))
+    const t = document.startViewTransition(() => flushSync(() => setSky(next)))
     t.ready.catch(() => {})
     t.finished.then(done, done)
   }
-  // (day and night come round with the game's clock (the owner's): at dusk and at dawn the room dissolves into the other)
-  const clockTheme = useClock((c) => themeAt(c))
+  // (the parts of the day come round with the game's clock (the owner's), or at the sun on it pressed: the room dissolves into the next)
+  const clockSky = useClock((c) => skyAt(c.minute))
   useEffect(() => {
-    if (clockTheme !== theme) switchTheme()
+    if (clockSky !== sky) switchSky(clockSky)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clockTheme])
+  }, [clockSky])
   // the menu can be folded away to give the food the whole screen
   const [menuFolded, setMenuFolded] = useState(false)
   // (every panel heard as it opens and as it shuts (the owner's): the rating's drawer, the office, the stock, the drinks, the views' menu,
@@ -2437,7 +2453,7 @@ export default function App() {
           <FramePacer />
           <DrawnProbe />
           <FpsMeter />
-          <Scene active={active} orders={orders} theme={theme} reducedMotion={reducedMotion}
+          <Scene active={active} orders={orders} theme={theme} sky={sky} reducedMotion={reducedMotion}
             fire={fire} frame={frame} onOffFire={sceneOffFire}
             onEat={onEat} onNotice={sceneNotice}
             resetView={resetView} pins={viewMenu} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1); setViewMenu(false) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}

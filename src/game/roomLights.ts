@@ -1,3 +1,5 @@
+import type { Sky } from './clock'
+
 /*
  * The shop's lights, on the wall switch by the door: on or off. Off, the lamps (the paper pendants, the string of bulbs, the warm spot over
  * the fire) give no light, and the room falls dark: by day the sky through the windows still lights it a little, by night hardly at all.
@@ -41,12 +43,16 @@ export const shadowSoft = (night: boolean) => (night ? 5 : 8)
 /**
  * Where the key light shines from (a unit vector toward it). By day the sun at noon, straight overhead (90 degrees): every shadow falls
  * right under what casts it, none thrown across the room. By night the moon, high up out past the round window (`window`: which way the
- * window faces out, level; none found, straight down too), its shadows short and falling away from the window.
+ * window faces out, level; none found, straight down too), its shadows short and falling away from the window. At dusk the evening sun,
+ * lower, in through the round window too, its shadows long; at dawn the early sun from the room's other side, a little higher than dusk's
+ * (low enough to throw the shadows across the floor, high enough that the room's still lit, not all in its walls' shade).
  */
-export function keyLightFrom(night: boolean, window: [number, number] | null): [number, number, number] {
-  if (!night || !window) return [0, 1, 0]
+const KEY_RISE: Record<Sky, [out: number, up: number]> = { day: [0, 1], night: [6, 18], dusk: [14, 11], dawn: [-11, 12] }
+export function keyLightFrom(sky: Sky, window: [number, number] | null): [number, number, number] {
+  if (sky === 'day' || !window) return [0, 1, 0]
+  const [out, up] = KEY_RISE[sky]
   const l = Math.hypot(window[0], window[1]) || 1
-  const v = [(window[0] / l) * 6, 18, (window[1] / l) * 6]
+  const v = [(window[0] / l) * out, up, (window[1] / l) * out]
   const n = Math.hypot(v[0], v[1], v[2])
   return [v[0] / n, v[1] / n, v[2] / n]
 }
