@@ -55,7 +55,7 @@ export function FramePacer() {
   useFrame((_, dt) => {
     // (stepped down to one pixel per screen pixel, it stays there: the Canvas's dpr follows it, usePacedDpr)
     if (level.current >= 1 && gl.getPixelRatio() !== 1) { pace(1); setDpr(1) }
-    if (OFF || level.current >= 2 || document.hidden) return
+    if (OFF || level.current >= 2 || document.hidden || GAME_SPEED.value === 0) return
     // (a long gap is the tab coming back, or loading: not the drawing being slow; and at ×2 the clock runs faster
     // than the frames come, so it's real frames per real second that are counted)
     const real = dt / GAME_SPEED.value

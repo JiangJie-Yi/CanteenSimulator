@@ -57,6 +57,7 @@ export const EDIT_TEXT = {
     cancelled: '已取消，擺設回到編輯前的位置、大小與方向',
     left: '離開開發者模式',
     locked: '營業中不能編輯，請先閉店',
+    paused: '營業中：遊戲先暫停，離開開發者模式就繼續',
     entered: '進入開發者模式：拖曳擺設，完成後按「確認」；按 G 或「取消」會放棄變更',
   },
   ja: {
@@ -113,6 +114,7 @@ export const EDIT_TEXT = {
     cancelled: 'キャンセルしました。編集前の位置・大きさ・向きに戻しました',
     left: '開発者モードを終了',
     locked: '営業中は編集できません。先に閉店してください',
+    paused: '営業中：ゲームを一時停止。開発者モードを出ると再開します',
     entered: '開発者モード：物をドラッグして動かし、終わったら「確定」。G か「キャンセル」で変更を破棄',
   },
   en: {
@@ -169,6 +171,7 @@ export const EDIT_TEXT = {
     cancelled: 'Cancelled: everything back as it was before editing',
     left: 'Left developer mode',
     locked: 'Can’t edit while open: close the shop first',
+    paused: 'Open: the game is paused until you leave developer mode',
     entered: 'Developer mode: drag pieces about, Confirm when done; G or Cancel discards the changes',
   },
 } satisfies Record<Lang, unknown>

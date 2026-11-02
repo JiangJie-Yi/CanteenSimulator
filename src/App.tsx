@@ -39,7 +39,7 @@ import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight }
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, usePacedDpr } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
-import { GAME_SPEED } from '@/scene/speed'
+import { GAME_SPEED, paused } from '@/scene/speed'
 import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
 import { offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
@@ -1080,7 +1080,7 @@ export default function App() {
   // how full you are: every bite eaten adds its calories, and they slowly digest away
   const [kcal, setKcal] = useState(0)
   useEffect(() => {
-    const id = window.setInterval(() => setKcal((k) => Math.max(0, k - DIGEST_KCAL_PER_SEC)), 1000)
+    const id = window.setInterval(() => { if (!paused()) setKcal((k) => Math.max(0, k - DIGEST_KCAL_PER_SEC)) }, 1000)
     return () => window.clearInterval(id)
   }, [])
   // 評價: the average 美味 of everything eaten
@@ -1164,7 +1164,9 @@ export default function App() {
     if (!editOn) return
     setView((v) => { if (v !== 'free') HOLD_POSE.next = true; return 'free' })
   }, [editOn])
-  useEffect(() => { GAME_SPEED.value = speed }, [speed])
+  // (the game stands still while developer mode's on during business (the owner's): the customers, the clock, the wages, the fire, the
+  // cooks; on again, at its speed, as the mode ends)
+  useEffect(() => { GAME_SPEED.value = editOn && ai ? 0 : speed }, [speed, editOn, ai])
   // the omiki (御神酒) offered at the shrine by the door: for a while more come in and they order more
   const [omikiAt, setOmikiAt] = useState<number | null>(null)
   const [blessed, setBlessed] = useState(false)
@@ -1947,6 +1949,7 @@ export default function App() {
   const lastRound = useRef<Record<string, number>>({})
   useEffect(() => {
     const id = window.setInterval(() => {
+      if (paused()) return
       const { cash, menuBy, hired, active, lang } = restockRef.current
       let money = cash
       for (const d of DISHES) {
@@ -2195,7 +2198,7 @@ export default function App() {
   useEffect(() => {
     if (!auto) return
     autoStep.current()
-    const id = window.setInterval(() => autoStep.current(), 2500)
+    const id = window.setInterval(() => { if (!paused()) autoStep.current() }, 2500)
     return () => window.clearInterval(id)
   }, [auto])
 

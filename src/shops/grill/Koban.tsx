@@ -193,7 +193,10 @@ export function Koban() {
       bump.flipY = false
       bump.anisotropy = 4
     }
-    const gold = new THREE.MeshStandardMaterial({ color: '#ffffff', map: pic, normalMap: bump, metalness: 1, roughness: 0.3 })
+    // (brighter (the owner's): the studio's reflection 1.6 times as strong, a smoother polish, and its own picture glowing a little warm, so
+    // it's gold even where the room's dim)
+    const gold = new THREE.MeshStandardMaterial({ color: '#ffffff', map: pic, normalMap: bump, metalness: 1, roughness: 0.24, envMapIntensity: 1.6,
+      emissive: '#6a4a14', emissiveMap: pic, emissiveIntensity: 0.45 })
     const line = new THREE.MeshStandardMaterial({ color: '#d9a944', metalness: 1, roughness: 0.35 })
     const lacquer = new THREE.MeshToonMaterial({ color: '#1c130f' })
     reflectStudio(gold, line)

@@ -564,8 +564,9 @@ export function cancelEdit() {
   leave(changed ? T().cancelled : T().left)
 }
 export function toggleEdit() {
-  if (state.locked) { toast(T().locked); return }
   if (state.on) { cancelEdit(); return }
+  // (during business too: the game stands still while it's on (the owner's), and says so)
+  if (state.locked) toast(T().paused)
   settleGroups()
   groupByViews()
   state.wire = false

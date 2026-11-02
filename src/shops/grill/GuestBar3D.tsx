@@ -471,8 +471,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
           doorway's other side)) */}
       <Movable id="chochin2" label="燒烤燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_PAIR, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
       {/* (and beyond it the fish lantern, a round one with a fish hung under it (the owner's, after their photograph of one)) */}
-      {/* (turned a quarter round, its fish's side to the street, and 1.3 times as big (the owner's)) */}
-      <Movable id="fishlantern" label="魚燈" baseTurn={[0, -90, 0]} baseScale={1.3}><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
+      {/* (turned a quarter round, its fish's side to the street, and a little bigger: 1.15 times (the owner's: 1.3, then a little smaller)) */}
+      <Movable id="fishlantern" label="魚燈" baseTurn={[0, -90, 0]} baseScale={1.15}><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}

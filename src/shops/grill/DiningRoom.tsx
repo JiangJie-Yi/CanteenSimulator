@@ -1320,7 +1320,8 @@ const SUNBEAM = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, transp
   toneMapped: false, side: THREE.DoubleSide }), { day: ['#78b2ff', 0], dawn: ['#ffd6de', 0], dusk: ['#ffb872', 0.22], night: ['#78b2ff', 0.15] })
 /** the dust in the moon's shaft by night, in the evening sun's at dusk: specks drifting slowly down it and about, catching its light (in the
  * window's frame, as the shaft) */
-const DUST_N = 46
+// (24 of them, the owner's: fewer specks; they were 46)
+const DUST_N = 24
 function WindowDust() {
   const pts = useRef<THREE.Points>(null)
   const { geo, seeds } = useMemo(() => {
