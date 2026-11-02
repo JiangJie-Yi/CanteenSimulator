@@ -363,6 +363,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <Movable id="chochin" label="紅燈籠" baseTurn={[0, 45, 0]}><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} /></group></Movable>
       {/* (and the grill's own, cream, 炭火焼 on it, hung on the doorway's other side) */}
       <Movable id="chochin2" label="燒烤燈籠" baseTurn={[0, 45, 0]}><group position={[(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]} userData={{ fade: true }}><Chochin mark={lantern} style="cream" /></group></Movable>
+      {/* (and beyond it the fish lantern, a round one with a fish hung under it (the owner's, after their photograph of one)) */}
+      <Movable id="fishlantern" label="魚燈"><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85} userData={{ fade: true }}><FishLantern /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
@@ -561,6 +563,246 @@ function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream
             <spriteMaterial map={CHOCHIN_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.5} />
           </sprite>
         </group>
+      </group>
+    </group>
+  )
+}
+
+/** how far beyond the grill's lantern the fish lantern hangs, along the doorway's face; the cord from the beam to its ring */
+const FISH_LANTERN_OUT = 0.44
+const FISH_LANTERN_CORD = 0.1
+/** the arm it hangs from, out of the wall's end (its own frame's units, before its scale) */
+const FISH_ARM = 0.42
+const FISH_LANTERN_URL = import.meta.env.BASE_URL + 'models/fishlantern.glb'
+useGLTF.preload(FISH_LANTERN_URL)
+/** the fish's radius down its length (t 0 its head's top, 1 the root of its tail), as blender/fishlantern.py turns it: to paint its flowers
+ * round wherever they are on it (the paper's u is the same width round its narrow tail as round its shoulders) */
+const FISH_RT: [number, number][] = [[0, 0], [0.02, 0.026], [0.06, 0.047], [0.12, 0.063], [0.2, 0.076], [0.3, 0.085], [0.4, 0.086], [0.5, 0.081],
+  [0.6, 0.072], [0.7, 0.059], [0.8, 0.044], [0.9, 0.031], [0.96, 0.026], [1, 0.024]]
+const fishR = (t: number) => {
+  for (let i = 1; i < FISH_RT.length; i++) if (t <= FISH_RT[i][0]) {
+    const [t0, r0] = FISH_RT[i - 1], [t1, r1] = FISH_RT[i]
+    return r0 + ((r1 - r0) * (t - t0)) / (t1 - t0)
+  }
+  return FISH_RT[FISH_RT.length - 1][1]
+}
+/** the fish lantern's pictures, painted once: the fish's indigo washi, lit from within (brightest down the middle of its front and back, darker
+ * to its sides and ends, mottled as dyed paper is), printed with white blossoms of four and five petals, its eyes gold-ringed; its fins and
+ * tail ribbed, indigo at the root going pale to a scalloped edge (cut out: alphaTest); the round lantern's washi with 焼魚 on it front and
+ * back. u round the fish reads left to right from its front, 0.75 the middle of its front; v from its head down */
+const FISH_LANTERN_TEX = (() => {
+  if (typeof document === 'undefined') return null
+  const W = 1024, H = 1024, L = 0.56
+  // (a little seeded stream of numbers, the same fish every time)
+  let n = 97
+  const rnd = () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646 }
+  const body = document.createElement('canvas')
+  body.width = W; body.height = H
+  const g = body.getContext('2d')!
+  const im = g.createImageData(W, H)
+  const dark = [24, 38, 84], light = [96, 128, 196]
+  for (let y = 0; y < H; y++) {
+    const t = y / H, along = 0.5 + 0.5 * Math.sin(Math.PI * Math.min(1, t * 1.15))
+    for (let x = 0; x < W; x++) {
+      const u = x / W
+      const face = Math.pow(Math.abs(Math.sin(2 * Math.PI * u)), 0.8)
+      const mottle = 0.06 * Math.sin(u * 37 + t * 11) * Math.sin(u * 13 - t * 29) + 0.04 * Math.sin(u * 91 + t * 53)
+      const k = Math.min(1, Math.max(0, 0.18 + 0.7 * face * along + mottle))
+      const i = (y * W + x) * 4
+      im.data[i] = dark[0] + (light[0] - dark[0]) * k
+      im.data[i + 1] = dark[1] + (light[1] - dark[1]) * k
+      im.data[i + 2] = dark[2] + (light[2] - dark[2]) * k
+      im.data[i + 3] = 255
+    }
+  }
+  g.putImageData(im, 0, 0)
+  // (pixels to a metre round it at t, and down it)
+  const across = (t: number) => W / (2 * Math.PI * Math.max(0.012, fishR(t)) * 0.914)
+  const down = H / L
+  const EYES: [number, number][] = [[1 - 35 / 360, 0.1], [1 - 145 / 360, 0.1]]
+  /** a blossom (world radius `r` metres) at u, t: `petals` round petals, white, its heart a dot; drawn again across the seam if it runs over */
+  const blossom = (u: number, t: number, r: number, petals: number, turn: number) => {
+    for (const shift of [-W, 0, W]) {
+      const x = u * W + shift, y = t * H
+      const hs = across(t) * r, vs = down * r
+      if (x + hs < 0 || x - hs > W) continue
+      g.save()
+      g.translate(x, y)
+      g.scale(hs, vs)
+      g.rotate(turn)
+      g.fillStyle = '#f4f1e6'
+      for (let k = 0; k < petals; k++) {
+        const a = (k / petals) * Math.PI * 2
+        g.beginPath(); g.ellipse(Math.cos(a) * 0.52, Math.sin(a) * 0.52, 0.48, 0.4, a, 0, Math.PI * 2); g.fill()
+      }
+      g.fillStyle = petals === 5 ? '#e8c46a' : '#26386f'
+      g.beginPath(); g.arc(0, 0, 0.17, 0, Math.PI * 2); g.fill()
+      g.restore()
+    }
+  }
+  for (let k = 0, made = 0; k < 400 && made < 110; k++) {
+    const u = rnd(), t = 0.03 + rnd() * 0.94, r = 0.009 + rnd() * 0.014
+    // (none over its eyes)
+    if (EYES.some(([eu, et]) => Math.hypot(Math.min(Math.abs(u - eu), 1 - Math.abs(u - eu)) * W / across(et), (t - et) * L) < 0.03 + r)) continue
+    blossom(u, t, r, rnd() < 0.6 ? 5 : 4, rnd() * Math.PI)
+    made++
+  }
+  // (its eyes: a gold ring round a black eye, a glint in it)
+  for (const [u, t] of EYES) {
+    const x = u * W, y = t * H, hs = across(t), vs = down
+    g.save(); g.translate(x, y); g.scale(hs, vs)
+    g.fillStyle = '#1a1410'; g.beginPath(); g.arc(0, 0, 0.0185, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#e8b530'; g.beginPath(); g.arc(0, 0, 0.016, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#120c08'; g.beginPath(); g.arc(0, 0, 0.0095, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(0.003, -0.003, 0.0028, 0, Math.PI * 2); g.fill()
+    g.restore()
+  }
+  const bodyTex = new THREE.CanvasTexture(body)
+  bodyTex.colorSpace = THREE.SRGBColorSpace
+  bodyTex.wrapS = THREE.RepeatWrapping
+  bodyTex.anisotropy = 4
+  // (a fin: x from its root to its edge, y across it; seven ribs, the edge scalloped between them)
+  const fin = document.createElement('canvas')
+  fin.width = fin.height = 256
+  const f = fin.getContext('2d')!
+  const RIBS = 7, F = 256
+  const edge = new Path2D()
+  edge.moveTo(0, 0)
+  edge.lineTo(F * 0.9, 0)
+  for (let k = 0; k < RIBS; k++) {
+    const y0 = (k / RIBS) * F, y1 = ((k + 1) / RIBS) * F, ym = (y0 + y1) / 2
+    edge.quadraticCurveTo(F * 1.04, ym, F * 0.88, y1)
+  }
+  edge.lineTo(0, F)
+  edge.closePath()
+  const fill = f.createLinearGradient(0, 0, F, 0)
+  fill.addColorStop(0, '#22336a'); fill.addColorStop(0.55, '#4d68ab'); fill.addColorStop(0.85, '#9fb2dc'); fill.addColorStop(1, '#e4e8f2')
+  f.fillStyle = fill
+  f.fill(edge)
+  f.save()
+  f.clip(edge)
+  // (the ribs, pale, each with the dye pooled darker along its side)
+  for (let k = 0; k < RIBS; k++) {
+    const y = ((k + 0.5) / RIBS) * F
+    f.strokeStyle = 'rgba(14,22,52,0.35)'; f.lineWidth = 5
+    f.beginPath(); f.moveTo(0, y + 2); f.lineTo(F, y + 2); f.stroke()
+    f.strokeStyle = '#eee9dc'; f.lineWidth = 2.4
+    f.beginPath(); f.moveTo(0, y); f.lineTo(F, y); f.stroke()
+  }
+  // (a pale rim along its scalloped edge, and a few white spots)
+  f.strokeStyle = 'rgba(240,238,230,0.9)'; f.lineWidth = 5
+  f.stroke(edge)
+  f.fillStyle = 'rgba(244,241,230,0.85)'
+  for (let k = 0; k < 10; k++) { f.beginPath(); f.arc(F * (0.25 + rnd() * 0.5), F * rnd(), 3 + rnd() * 4, 0, Math.PI * 2); f.fill() }
+  f.restore()
+  const finTex = new THREE.CanvasTexture(fin)
+  finTex.colorSpace = THREE.SRGBColorSpace
+  return { bodyTex, finTex }
+})()
+/** the round lantern's paper: washi lit from within, ribbed, 焼魚 in black brush round its front and again round its back (u reads left to right
+ * from the front, 0.75 its middle; v from its top down). Its lettering drawn wider than tall: the paper's u is a longer way round its belly
+ * than its v is up it */
+const FISH_TOP_TEX = signTexture(1024, 256, (g) => {
+  const W = 1024, H = 256
+  const grad = g.createLinearGradient(0, 0, 0, H)
+  grad.addColorStop(0, '#c9b58e'); grad.addColorStop(0.3, '#f6ecd4'); grad.addColorStop(0.5, '#fff8e8'); grad.addColorStop(0.7, '#f6ecd4'); grad.addColorStop(1, '#c9b58e')
+  g.fillStyle = grad
+  g.fillRect(0, 0, W, H)
+  for (let y = 4; y < H; y += 10.5) { g.fillStyle = 'rgba(120,90,50,0.22)'; g.fillRect(0, y, W, 1.6) }
+  g.fillStyle = 'rgba(120,90,50,0.12)'
+  for (let x = 0; x < W; x += 128) g.fillRect(x, 0, 1.5, H)
+  for (const cx of [W * 0.75, W * 0.25]) {
+    g.save()
+    g.translate(cx, H * 0.53)
+    g.scale(1.36, 1)
+    brushText(g, '焼', -54, 0, 104, { fill: '#140a06', shadow: 'rgba(255,200,120,0.3)' })
+    brushText(g, '魚', 54, 0, 104, { fill: '#140a06', shadow: 'rgba(255,200,120,0.3)' })
+    g.restore()
+  }
+})
+/** a soft round glow, warm white, for round the lit papers */
+const FISH_GLOW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+  grad.addColorStop(0, 'rgba(255,236,200,0.7)'); grad.addColorStop(0.4, 'rgba(255,220,170,0.22)'); grad.addColorStop(1, 'rgba(255,210,160,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 128, 128)
+  return new THREE.CanvasTexture(c)
+})()
+/**
+ * The fish lantern by the door (the owner's, after their photograph of one: blender/fishlantern.py): a round paper lantern with 焼魚 on it,
+ * and under it on a short chain a fish lantern hung head up, its indigo washi printed with white blossoms, gold-ringed eyes, ribbed fins
+ * spread out on either side and its tail fanned at the foot, lit from within. It hangs on a cord from the beam and sways a touch, the fish
+ * on its chain a moment behind the lantern; its glow breathes like the flame in it.
+ */
+function FishLantern() {
+  const gltf = useGLTF(FISH_LANTERN_URL) as unknown as { scene: THREE.Group }
+  const hang = useRef<THREE.Group>(null)
+  const { model, fish, papers } = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    const papers: THREE.MeshBasicMaterial[] = []
+    const lit = (map: THREE.Texture | null, fin = false) => {
+      const m = new THREE.MeshBasicMaterial({ map, toneMapped: false, side: fin ? THREE.DoubleSide : THREE.FrontSide, alphaTest: fin ? 0.5 : 0 })
+      papers.push(m)
+      return m
+    }
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const name = (m.material as THREE.Material).name
+      m.material = name === 'FishLanternTopPaper' ? lit(FISH_TOP_TEX)
+        : name === 'FishLanternPaper' ? lit(FISH_LANTERN_TEX?.bodyTex ?? null)
+          : name === 'FishLanternFinPaper' ? lit(FISH_LANTERN_TEX?.finTex ?? null, true)
+            : name === 'FishLanternIron' ? new THREE.MeshToonMaterial({ color: '#2a2622' })
+              : new THREE.MeshToonMaterial({ color: '#16110e' })
+      m.castShadow = false
+    })
+    inkModel(r, (m) => /Fins|Chain/.test(m.name), { width: 0.0015, weld: true })
+    // (the fish and its fins on a pivot at its head, where the chain holds it, to swing a little after the lantern)
+    const body = r.getObjectByName('FishLanternBody') as THREE.Mesh | undefined
+    const fins = r.getObjectByName('FishLanternFins')
+    const fish = new THREE.Group()
+    if (body && fins) {
+      body.geometry.computeBoundingBox()
+      const head = body.geometry.boundingBox!.max.y
+      fish.position.y = head
+      const holder = body.parent ?? r
+      holder.add(fish)
+      for (const o of [body, fins]) { fish.add(o); o.position.y -= head }
+    }
+    return { model: r, fish, papers }
+  }, [gltf])
+  useEffect(() => () => { for (const m of papers) m.dispose() }, [papers])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    const flame = 0.92 + 0.05 * Math.sin(t * 2.3) + 0.03 * Math.sin(t * 6.1 + 0.7)
+    for (const m of papers) m.color.setScalar(flame)
+    if (hang.current) { hang.current.rotation.z = Math.sin(t * 0.8) * 0.025; hang.current.rotation.x = Math.sin(t * 0.55 + 1) * 0.015 }
+    fish.rotation.z = Math.sin(t * 0.8 - 0.7) * 0.045
+  })
+  return (
+    <group>
+      {/* (hung from the end of a wooden arm out of the wall's end beside the doorway, square to the street: there's no eave out there) */}
+      <mesh position={[-FISH_ARM / 2 + 0.03, 0.03, 0]}>
+        <boxGeometry args={[FISH_ARM, 0.045, 0.05]} />
+        <meshToonMaterial color="#3a2416" />
+      </mesh>
+      <mesh position={[0, 0.006, 0]} rotation-y={Math.PI / 2}><torusGeometry args={[0.012, 0.0028, 5, 10]} /><meshToonMaterial color="#2a2622" /></mesh>
+      <mesh position-y={-FISH_LANTERN_CORD / 2}>
+        <cylinderGeometry args={[0.003, 0.003, FISH_LANTERN_CORD, 4]} />
+        <meshBasicMaterial color="#1a0d08" />
+      </mesh>
+      <group ref={hang} position-y={-FISH_LANTERN_CORD}>
+        <primitive object={model} />
+        <sprite position-y={-0.16} scale={[0.62, 0.55, 1]}>
+          <spriteMaterial map={FISH_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
+        </sprite>
+        <sprite position-y={-0.68} scale={[0.5, 0.95, 1]}>
+          <spriteMaterial map={FISH_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.35} color="#bcd0ff" />
+        </sprite>
       </group>
     </group>
   )

@@ -464,7 +464,7 @@ const known = (): Set<string> => { try { return new Set([...JSON.parse(localStor
 /** what the views' own words (views.ts's about) say they're of, where their cameras alone don't settle it: the entrance is framed a little into
  * the room, so its lanterns, its noren, the shoe rack (and the helmet on it) and the lucky cats' stand by the door are at the edge of its frame or
  * out of it, and nearer what the till's or the shrine's camera looks at */
-const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', shoecab: 'genkan', kabuto: 'genkan', 'grp-doorcats': 'genkan' }
+const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan', kabuto: 'genkan', 'grp-doorcats': 'genkan' }
 /** an area's name: its view's, as an area (後台區 is one already) */
 const areaName = (view: string) => { const n = VIEW_SPOTS.find((v) => v.id === view)?.zh ?? view; return n.endsWith('區') ? n : `${n}區` }
 /** each view's area made a group, of the pieces (and the shop's groups, whole) loose at the top that are new to it */
