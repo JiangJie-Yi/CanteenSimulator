@@ -2854,7 +2854,7 @@ function BouquetPick({ lean = 0, slot }: { lean?: number; slot: number }) {
 const KAMIDANA_URL = import.meta.env.BASE_URL + 'models/kamidana.glb'
 /** the shrine's model (and the oranges and the sutra, nodes of their own in it): its wood toon like the room, its gold real metal reflecting the
  * studio, an ink line round the bigger parts; made once, each piece taken out of it to be shown where it stands */
-type KamiPart = 'shrine' | 'oranges' | 'sutra' | 'table' | 'flask' | 'cupstand' | 'doors' | 'ebisu'
+type KamiPart = 'shrine' | 'oranges' | 'sutra' | 'table' | 'flask' | 'cupstand' | 'doors' | 'ebisu' | 'bracket' | 'lantern'
 let kamidanaParts: Record<KamiPart, THREE.Object3D> | null = null
 function kamidanaOf(scene: THREE.Group) {
   if (kamidanaParts) return kamidanaParts
@@ -2881,6 +2881,9 @@ function kamidanaOf(scene: THREE.Group) {
         // (the Ebisu: a light carving wearing the fine one's relief (a normal map baked from it) and its hollows' shadow in the colour; lit, not
         // toon-flat, so the carving shows)
         t = new THREE.MeshStandardMaterial({ map: src.map, normalMap: src.normalMap, roughness: 0.85 })
+      } else if (src.name === 'KamiLanternPaper') {
+        // (the little lanterns' paper, lit from inside: drawn as it glows, its lattice dark across it, by day and by night)
+        t = new THREE.MeshBasicMaterial({ color: '#ffe3b8', map: src.map })
       } else if (src.name === 'KamiPeel') {
         // (the ponkan's peel: a little gloss on its oily skin, not a polish)
         t = new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: 0.48, clearcoat: 0.22, clearcoatRoughness: 0.35, specularIntensity: 0.55 })
@@ -2902,10 +2905,18 @@ function kamidanaOf(scene: THREE.Group) {
   doors.position.copy(shrineNode.position); doors.quaternion.copy(shrineNode.quaternion); doors.scale.copy(shrineNode.scale)
   for (const leaf of [...shrineNode.children].filter((o) => /DoorLeaf/.test(o.name))) { leaf.removeFromParent(); doors.add(leaf) }
   kamidanaParts = { oranges: take('KamiOranges'), sutra: take('KamiSutra'), table: take('KamiTable'), flask: take('KamiFlask'), cupstand: take('KamiCupStand'),
+    bracket: take('KamiBracket'), lantern: take('KamiLantern'),
     ebisu: (() => { const o = r.getObjectByName('KamiEbisu')!; o.removeFromParent(); return o })(), doors, shrine: r }
   // (what's left, the shrine itself, never moves: its hundred parts folded into a mesh per material)
   mergeByMaterial(r)
   return kamidanaParts
+}
+/** another of one of the shrine model's pieces (the shelf's two brackets, the two lanterns): a copy sharing its shapes and materials */
+function KamiCopy({ part }: { part: KamiPart }) {
+  const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
+  useStudio()
+  const obj = useMemo(() => kamidanaOf(gltf.scene)[part].clone(true), [gltf, part])
+  return <primitive object={obj} />
 }
 function KamidanaModel({ part = 'shrine' }: { part?: KamiPart }) {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
@@ -2988,9 +2999,9 @@ const easeOut = (q: number) => 1 - (1 - q) ** 3
 const SHRINE_WIDE = 1.1
 /** and a little shallower front to back, its back still to the wall (the offerings' shelf in front of it as it was) */
 const SHRINE_DEEP = 0.8
-/** how far the doors swing open (radians): each leaf turned a little at a time against the railing's posts, caps, rails and balusters
- * (blender/kamidana.py's sizes, widened as the shrine is), the middle ones clear to 61°, the side bays' to 74°, each set a few degrees short */
-const DOOR_SWING = { middle: 1.0, side: 1.22 }
+/** how far the doors swing open (radians): wide, square to the front and a little past (the owner's: the railing round the outside, nothing
+ * across the front; it ran before the side bays' doors and beside the steps, and stopped them at 57° and 70°) */
+const DOOR_SWING = { middle: 1.62, side: 1.7 }
 function ShrineDoors() {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
   const doors = useMemo(() => {
@@ -3496,13 +3507,9 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {/* (the light switch at hand height on the plaster between the round window and the picture after it, the owner's place for it) */}
         {altar && <Movable id="lightswitch" label="電燈開關"><group position={[-0.002, 1.12, switchZ]}><LightSwitch /></group></Movable>}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
-          {/* held off the wall on two carved brackets (持ち送り): a curved knee from the wall up under the shelf */}
-          {[-0.35, 0.35].map((z) => (
-            <group key={z} position={[ALTAR_D / 2, -0.03, z - 0.015]}>
-              <mesh geometry={SHELF_BRACKET}><meshToonMaterial color="#1c130d" /></mesh>
-              <mesh geometry={SHELF_BRACKET} scale={[1.035, 1.035, 1.4]} position-z={-0.004}><meshBasicMaterial color="#c9a040" side={THREE.BackSide} /></mesh>
-            </group>
-          ))}</group></StaticBatch></Movable>}
+          {/* hung on the wall on two cloud brackets (雲形の棚受け, blender/kamidana.py's KamiBracket, the owner's after their photo): an arm under
+              the shelf ending in a cloud's head, the cloud stepping back down to the plate on the wall, which runs on below to a rounded end */}
+          {[-0.35, 0.35].map((z) => <group key={z} position={[ALTAR_D / 2, -0.034, z]}><KamiCopy part="bracket" /></group>)}</group></StaticBatch></Movable>}
         {/* (the string of bulbs under the frieze: instanced, so out of the batch) */}
         <Movable id={`festoon${from.toFixed(1)}`} label={`燈串（${from.toFixed(0)}）`}><group userData={{ fade: true }}><Festoon l={l} mid={mid} /></group></Movable>
         {/* (the strings of banners overhead, clear of the altar, the fridges and the toilets' doors) */}
@@ -3552,22 +3559,6 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
  * The altar on the shelf by the door: the household shrine (神棚), a pair of sake flasks (御神酒徳利) and a cup set out before it, a
  * dish of oranges. Offering the sake (a click) fills the cup and makes the shrine itself glow for a minute.
  */
-/**
- * A carved shelf bracket (持ち送り), in the wall's frame (x out from the wall, which is at x = 0, so it reaches to -x):
- * a post against the wall, an arm under the shelf, and between them a deep curve, its end rounded off.
- */
-const SHELF_BRACKET = (() => {
-  const sh = new THREE.Shape()
-  const D = 0.34, H = 0.24, w = 0.035
-  sh.moveTo(0, 0)
-  sh.lineTo(-D, 0)
-  sh.quadraticCurveTo(-D - 0.01, -0.03, -D + 0.02, -0.045)
-  sh.quadraticCurveTo(-w - 0.02, -0.06, -w, -H + 0.02)
-  sh.quadraticCurveTo(-w * 0.4, -H - 0.02, 0, -H)
-  sh.lineTo(0, 0)
-  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 10 })
-  return g
-})()
 /** where the Ebisu sits, in the altar's frame (the shrine at the wall, scaled up, its middle bay's floor) */
 const EBISU_AT: [number, number, number] = [0.29 + 1.25 * (-0.14 + 0.027), 1.25 * (0.015 + 0.045 + 0.04), 0]
 /** a faint rainbow aura: a soft ring of the spectrum round a clear middle, fading out at its edge */
@@ -3613,6 +3604,9 @@ const ALTAR_D = 0.58
 /** the offering table drawn shallower than it was modelled (ALTAR_D), its back still to the wall: the owner's, a little less deep (0.53);
  * what's on it brought back to fit, the cups, the flask, the oranges (a little smaller) and the sutra */
 const TABLE_DEEP = 0.53 / ALTAR_D
+/** where the two little lanterns stand on the shelf, in its frame: beside the shrine's base's front corners (its plinth out to 0.2475 across,
+ * its front at 0.065), between it and the vases (from 0.325 across), behind the flask and the book */
+const SHRINE_LAMP_X = 0.07, SHRINE_LAMP_Z = 0.288
 /** where the flask stands, by the cups' stand (back 0.02 with them) */
 const FLASK_X = -0.04
 /** and its height: up over the beckoning cats' stand below it, by the door */
@@ -3889,6 +3883,13 @@ function Altar({ incense }: { incense?: { litAt: number | null; onLight: () => v
       </group></Movable>
       {/* (the vases and the cups beside it, each its own piece: not part of what's pointed at, they don't light with it; the vases not batched,
           a batch takes no clicks, and clicked they change their flowers) */}
+      {/* the two little lanterns before the shrine (神前灯籠, the owner's after their photo): beside its base's front corners, between it and
+          the vases, lit; clear of the side doors as they open, of the flask and of the book */}
+      {[-1, 1].map((sd) => (
+        <Movable key={sd} id={`shrinelamp${sd}`} label={sd < 0 ? '神前燈籠（左）' : '神前燈籠（右）'}>
+          <group position={[SHRINE_LAMP_X, 0, sd * SHRINE_LAMP_Z]} scale={SC} {...nameOver('神前燈籠', '供在神前的小木燈籠，點著燈')}><StaticBatch><KamiCopy part="lantern" /></StaticBatch><ContactShadow r={0.032} /></group>
+        </Movable>
+      ))}
       <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase-1" /></group></Movable>
       <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase1" /></group></Movable>
       <Movable id="shrinecups" label="清酒杯與琉璃台"><group ref={cupsRef} position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC} {...nameOver('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>

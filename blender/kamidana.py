@@ -219,7 +219,7 @@ for k in range(3):
 # its top edge sloping as the steps do, so the steps don't stand out as bare blocks)
 FB = DF - 3 * SD
 for sz in (-1, 1):
-    pts = [(BX - RX_ + 0.004, 0.058), (BX - RX_ + 0.004, 0.0), (FB - 0.004, 0.0), (FB - 0.004, 0.012)]
+    pts = [(BX - RX_ + 0.004, 0.046), (BX - RX_ + 0.004, 0.0), (FB - 0.004, 0.0), (FB - 0.004, 0.012)]
     g_ = mesh_obj(f"KamiStepSide{sz}", [P(x, y, sz * (SW / 2 + 0.003)) for x, y in pts], [(0, 1, 2, 3)], M["woodDark"])
     sol = g_.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.006; sol.offset = 0
     bev_ = g_.modifiers.new("b", "BEVEL"); bev_.width = 0.0008; bev_.segments = 1
@@ -228,11 +228,13 @@ for sz in (-1, 1):
     parts.append(g_)
 
 # =====================================================================
-# The railing round the deck: posts with gold caps, two rails and a row of balusters between, open at the front for the steps
+# The railing round the deck's outside: a post with a gold cap at each corner, two rails and a row of balusters between, along the back
+# and down the two sides; open across the front (the owner's: round the outside, so it's not in the doors' way: it ran before the side
+# bays' doors, with a post each side of the steps, and the doors swung into it)
 # =====================================================================
 DY = 0.04
 RX = 0.083
-posts = [(BX + sx * RX, sz * 0.153) for sx in (-1, 1) for sz in (-1, 1)] + [(BX - RX, sz * 0.05) for sz in (-1, 1)]
+posts = [(BX + sx * RX, sz * 0.153) for sx in (-1, 1) for sz in (-1, 1)]
 for i, (x, z) in enumerate(posts):
     parts.append(box(f"KamiPost{i}", S(0.012, 0.055, 0.012), P(x, DY + 0.0275, z), M["woodDark"], bev=0.0012))
     parts += giboshi(f"KamiCap{i}", P(x, DY + 0.055, z), 0.0058)
@@ -240,14 +242,11 @@ for y in (DY + 0.018, DY + 0.045):
     parts.append(box(f"KamiRailBack{int(y * 1000)}", S(0.007, 0.006, 0.306), P(BX + RX, y, 0), M["woodDark"]))
     for sz in (-1, 1):
         parts.append(box(f"KamiRailSide{sz}{int(y * 1000)}", S(2 * RX, 0.006, 0.007), P(BX, y, sz * 0.153), M["woodDark"]))
-        parts.append(box(f"KamiRailFront{sz}{int(y * 1000)}", S(0.007, 0.006, 0.103), P(BX - RX, y, sz * 0.1015), M["woodDark"]))
 for z in np.linspace(-0.14, 0.14, 9):
     parts.append(box(f"KamiBalB{z:.3f}", S(0.004, 0.026, 0.004), P(BX + RX, DY + 0.0315, z), wood(), uv=0.1))
 for x in np.linspace(-RX + 0.018, RX - 0.018, 6):
     for sz in (-1, 1):
         parts.append(box(f"KamiBalS{x:.3f}{sz}", S(0.004, 0.026, 0.004), P(BX + x, DY + 0.0315, sz * 0.153), wood(), uv=0.1))
-for z in (-0.135, -0.11, -0.085, 0.085, 0.11, 0.135):
-    parts.append(box(f"KamiBalF{z:.3f}", S(0.004, 0.026, 0.004), P(BX - RX, DY + 0.0315, z), wood(), uv=0.1))
 
 RT = 0.016  # (the roof's thickness: bark laid deep)
 
@@ -1295,7 +1294,7 @@ for o in sx_:
 # =====================================================================
 # The offering table (in the altar's own frame and size): its top three boards of keyaki side by side, their grain along the table and their
 # rings showing, each board its own; a dark lip along the front and sides with a gold line inlaid inside it, gold caps on the two front corners,
-# and under the front edge an apron cut with five arched openings
+# (no apron under it: it's a shelf hung on the wall now, on two cloud brackets, the owner's)
 # =====================================================================
 tx_ = []
 TD, TL, TT = 0.58, 0.9, 0.034
@@ -1321,28 +1320,93 @@ for sd in (-1, 1):
     tx_.append(box(f"KamiTableCapSide{sd}", S(CAP, LIP_H + TT, 0.0024), P(-TD / 2 + CAP / 2, (LIP_H - TT) / 2, sd * (TL / 2 + 0.0012)), M["gold"], uv=0))
     bpy.ops.mesh.primitive_uv_sphere_add(radius=0.004, segments=10, ring_count=6, location=P(-TD / 2 + CAP / 2 - 0.004, LIP_H + 0.0034, zc_ - sd * 0.004))
     tx_.append(finish(active(), f"KamiTableCapNail{sd}", M["gold"]))
-# (the apron: a board under the front edge, five arched openings cut through it)
-AW, AH, AT = 0.86, 0.07, 0.016
-apron = box("KamiTableApron", S(AT, AH, AW), P(-TD / 2 + LIP + AT / 2, -TT - AH / 2 + 0.001, 0), M["keyakiDark"], bev=0.0015)
-for k in range(5):
-    zc_ = (k - 2) * 0.15
-    cut = box(f"KamiApronCut{k}", S(AT * 3, AH - 0.032, 0.05), P(-TD / 2 + LIP + AT / 2, -TT - AH + 0.016 + (AH - 0.032) / 2, zc_), M["seam"], uv=0)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.025, depth=AT * 3, location=P(-TD / 2 + LIP + AT / 2, -TT - 0.016 - 0.025 + 0.004, zc_), rotation=(0, math.pi / 2, 0))
-    arch_ = active()
-    for c_ in (cut, arch_):
-        mod = apron.modifiers.new("d", "BOOLEAN")
-        mod.operation = "DIFFERENCE"
-        mod.object = c_
-        mod.solver = "EXACT"
-        apply_mods(apron)
-        bpy.data.objects.remove(c_)
-uv_grain(apron, 0.3)
-tx_.append(apron)
 table = bpy.data.objects.new("KamiTable", None)
 bpy.context.collection.objects.link(table)
 for o in tx_:
     if o.parent is None:
         o.parent = table
+
+# =====================================================================
+# The shelf's bracket (雲形の棚受け, the owner's, after their photo): one board of dark keyaki on edge, standing out from the wall under the
+# shelf: along its top an arm under the shelf, its end a rounded cloud head; from it, back toward the wall and down, the cloud: a C curled up
+# into it and two lobes more, each lower and further in, into the plate against the wall, which runs on down below them to a rounded end.
+# Low (its outline 23 points, one board thick: 25 faces). In its own frame: the wall at x = 0, out to -x, its top (under the shelf) at y = 0
+# =====================================================================
+BR_D, BR_T = 0.26, 0.03
+_bk = BR_D / 0.3
+BR_PROFILE = [(0.0, 0.0), (BR_D, 0.0),
+              (BR_D + 0.008, -0.014), (BR_D + 0.006, -0.042), (BR_D - 0.016, -0.066), (BR_D - 0.046, -0.07),
+              (BR_D - 0.066 * _bk, -0.058),
+              (BR_D - 0.084 * _bk, -0.07), (BR_D - 0.088 * _bk, -0.098),
+              (BR_D - 0.104 * _bk, -0.128), (BR_D - 0.134 * _bk, -0.142), (BR_D - 0.162 * _bk, -0.136),
+              (BR_D - 0.178 * _bk, -0.15), (BR_D - 0.184 * _bk, -0.176),
+              (BR_D - 0.2 * _bk, -0.204), (BR_D - 0.228 * _bk, -0.214),
+              (0.05, -0.236), (0.036, -0.262),
+              (0.036, -0.33), (0.03, -0.35), (0.018, -0.36), (0.006, -0.356), (0.0, -0.35)]
+_nb = len(BR_PROFILE)
+_bv = [P(-u, v, -BR_T / 2) for u, v in BR_PROFILE] + [P(-u, v, BR_T / 2) for u, v in BR_PROFILE]
+_bf = [tuple(range(_nb))[::-1], tuple(range(_nb, 2 * _nb))] + [(i, (i + 1) % _nb, _nb + (i + 1) % _nb, _nb + i) for i in range(_nb)]
+bracket_ = mesh_obj("KamiBracketBoard", _bv, _bf, M["keyakiDark"])
+_bm = bmesh.new(); _bm.from_mesh(bracket_.data)
+bmesh.ops.recalc_face_normals(_bm, faces=_bm.faces)
+_bm.to_mesh(bracket_.data); _bm.free()
+uv_grain(bracket_, 0.3)
+bracket = bpy.data.objects.new("KamiBracket", None)
+bpy.context.collection.objects.link(bracket)
+bracket_.parent = bracket
+
+# =====================================================================
+# A little lantern for before the shrine (神前灯籠, the owner's: two, after their photo): hinoki, its foot, a square post, a little table
+# on it, the firebox (火袋) of paper on a lattice lit from inside, a post at each of its corners, a hipped roof over it and a gold jewel on
+# its top. Low: 71 faces. Its foot's middle at the origin
+# =====================================================================
+_lp = np.ones((64, 64, 3), np.float32) * np.array([0.98, 0.92, 0.78], np.float32)
+_g = np.arange(64)
+_line = (np.abs(_g - 31.5) < 1.6) | (_g < 3) | (_g > 60)
+_lp[_line, :] = (0.42, 0.28, 0.16)
+_lp[:, _line] = (0.42, 0.28, 0.16)
+M["lanternPaper"] = pbr("KamiLanternPaper", (1, 1, 1), tex=image("T_KamiLanternPaper", _lp), emit=(1.0, 0.75, 0.42), emit_strength=2.0, rough=0.9)
+lx_ = []
+lx_.append(box("KamiLanternFoot", S(0.045, 0.012, 0.045), P(0, 0.006, 0), wood(), uv=0.1))
+lx_.append(box("KamiLanternPost", S(0.014, 0.046, 0.014), P(0, 0.035, 0), wood(), uv=0.1))
+lx_.append(box("KamiLanternTable", S(0.036, 0.008, 0.036), P(0, 0.062, 0), wood(), uv=0.1))
+_paper = box("KamiLanternBox", S(0.028, 0.034, 0.028), P(0, 0.083, 0), M["lanternPaper"], uv=0)
+# (each of its sides the whole picture, its lattice)
+for poly in _paper.data.polygons:
+    n_ = poly.normal
+    for li in poly.loop_indices:
+        co = _paper.data.vertices[_paper.data.loops[li].vertex_index].co
+        a_ = co.y if abs(n_.x) > 0.5 else co.x
+        _paper.data.uv_layers.active.data[li].uv = (a_ / 0.028 + 0.5, co.z / 0.034 + 0.5)
+lx_.append(_paper)
+for lsx in (-1, 1):
+    for lsz in (-1, 1):
+        lx_.append(box(f"KamiLanternCorner{lsx}{lsz}", S(0.005, 0.036, 0.005), P(lsx * 0.0145, 0.083, lsz * 0.0145), M["woodDark"], uv=0.1))
+lx_.append(box("KamiLanternLid", S(0.034, 0.004, 0.034), P(0, 0.102, 0), wood(), uv=0.1))
+# (the roof: its eaves a square band, hipped up to a point)
+_a, _y0, _y1, _ya = 0.033, 0.104, 0.109, 0.132
+_rv = [P(lsx * _a, _y0, lsz * _a) for lsx, lsz in ((-1, -1), (1, -1), (1, 1), (-1, 1))] + \
+      [P(lsx * _a, _y1, lsz * _a) for lsx, lsz in ((-1, -1), (1, -1), (1, 1), (-1, 1))] + [P(0, _ya, 0)]
+_rf = [(3, 2, 1, 0)] + [(i, (i + 1) % 4, 4 + (i + 1) % 4, 4 + i) for i in range(4)] + [(4 + i, 4 + (i + 1) % 4, 8) for i in range(4)]
+_roof = mesh_obj("KamiLanternRoof", _rv, _rf, M["woodDark"])
+_bm = bmesh.new(); _bm.from_mesh(_roof.data)
+bmesh.ops.recalc_face_normals(_bm, faces=_bm.faces)
+_bm.to_mesh(_roof.data); _bm.free()
+uv_grain(_roof, 0.1)
+lx_.append(_roof)
+# (the jewel on its top: an octahedron of gold)
+_jr, _jy = 0.0055, 0.1365
+_jv = [P(0, _jy + _jr, 0), P(0, _jy - _jr, 0), P(_jr, _jy, 0), P(0, _jy, _jr), P(-_jr, _jy, 0), P(0, _jy, -_jr)]
+_jf = [(0, 2 + i, 2 + (i + 1) % 4) for i in range(4)] + [(1, 2 + (i + 1) % 4, 2 + i) for i in range(4)]
+_jw = mesh_obj("KamiLanternCapJewel", _jv, _jf, M["gold"])
+_bm = bmesh.new(); _bm.from_mesh(_jw.data)
+bmesh.ops.recalc_face_normals(_bm, faces=_bm.faces)
+_bm.to_mesh(_jw.data); _bm.free()
+lx_.append(_jw)
+lantern = bpy.data.objects.new("KamiLantern", None)
+bpy.context.collection.objects.link(lantern)
+for o in lx_:
+    o.parent = lantern
 
 # =====================================================================
 # The sake flask (御神酒徳利): white porcelain, a round belly narrowing to a long neck and a flared lip; a red cord tied round the neck with
