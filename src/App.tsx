@@ -954,6 +954,11 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
                 // the grill's room is there before it opens too, empty
                 <group position={dish.roast ? FIRE_SHIFT.clone().negate() : undefined}><GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
                   servers={dish.roast && ai ? (() => { const hired = crewOf(dish.id).filter((w) => w.role === 'server'); return hired.length ? hired : [HOUSE_SERVER] })() : []}
+                  plater={dish.roast && ai ? (() => {
+                    // (who plates at the pass, fetching its plates from the racks: the third cook, else the second; neither, the owner does)
+                    const c = crewOf(dish.id), m = c.find((w) => w.role === 'sous') ?? c.find((w) => w.role === 'chef')
+                    return m ? { id: m.id, role: m.role as 'chef' | 'sous', look: m.look } : null
+                  })() : null}
                   stocker={dish.roast && ai ? crewOf(dish.id).find((w) => w.role === 'stock') ?? null : null}
                   mark={dish.roast ? '聞野' : '食堂'}
                   top={dish.roast ? BAR_TOP : 0.465} counters={dish.roast ? GRILL_COUNTERS : undefined} scale={dish.roast ? GRILL_SCALE : 1} offset={dish.roast ? GRILL_OFFSET : undefined}

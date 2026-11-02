@@ -5,7 +5,7 @@ import type { Use } from '@/game/utilities'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 import { openingFloat, type DrawerCash } from '@/game/till'
-import { RACK_FULL } from '@/game/plates'
+import { RACK_FULL, type Dryer } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
 import { emptyFridge, readDrinks, startBack, writeDrinks, type Back } from '@/game/drinkStock'
@@ -502,8 +502,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void) | null } = { drawer: openingFloat(), onTake: null }
 /** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
 export const PLATE_RACK = { n: RACK_FULL }
-/** the kitchen's sink (Sink.tsx): whether the dirty plates are being washed in it just now (the tap runs) */
-/** the sink: its plates being washed (the tap runs); and its tap turned on by hand (the owner's: its handle's to be turned) */
+/** the sink (Sink.tsx): its plates being washed (the tap runs); and its tap turned on by hand (the owner's: its handle's to be turned) */
 export const SINK = { washing: false, tap: false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plates: PLATE_RACK, __sink: SINK })
 /** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
@@ -533,14 +532,55 @@ export function payOf(cs: Counter[]) {
   return { spot: at(TILL.along, TILL.lay - TILL.D / 2 - 0.46), lane: at(0.4, TILL.lay - TILL.D / 2 - 0.46), aisle: at(0.4, -AISLE) }
 }
 
-/** the pass, in the bar's own frame: on the first counter's top, on the kitchen's half of it, between its first two places (`PASS_ALONG`
- * in from its start, worked out from them below GRILL_COUNTERS), so what's put out there doesn't stand at a customer's place as if it were
- * theirs */
-/** and across it: up on a shelf over the raised lip on the cook's side (a 付け台), above the places, not down among their plates and soy dishes
- * (between two places evenly spaced there was no room for the tray: it lay under the next place's soy dish, and its plate went into it) */
+/** how tall the raised lip along the counters' cook's side stands over their tops */
+export const LIP_H = 0.15
+/** where the pass is across its counter: up on a shelf over the raised lip on the cook's side (a 付け台), above the places, not down among their
+ * plates and soy dishes */
 export const PASS_LAY = 0.28
-/** (the tray centred on its shelf: it stood 0.14 further in, over the cook table's edge, and the lantern there stood in it) */
-export const passOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, -cs[0].length / 2 + PASS_ALONG).addScaledVector(cs[0].lay, PASS_LAY)
+/** the pass's shelf: along, across, thick */
+export const PASS_SHELF = { len: 0.72, deep: 0.26, t: 0.025 }
+/** the pass's places for what's set out on it (a plate laid for a seat with its food on it; or a seat's later food out loose, its plate at the
+ * seat already), and where along the shelf (from its middle) each stands; its stack of clean plates at the end nearer the racks */
+export const PASS_SLOTS = 2
+export const passSlotAlong = (k: number) => 0.24 * k
+export const PASS_STACK_ALONG = -0.24
+/**
+ * The pass (出餐口), in the bar's own frame: a shelf over the raised lip of the side counter, between its two places furthest from the corner,
+ * where the kitchen and the floor both reach it (the owner's: the kitchen plates the food and the floor only carries it; at the long counter's
+ * corner, where it was, the cook's table stood right up against the bar and nobody in the kitchen could stand at it). Its middle up on the lip
+ * (`at`), its counter's way along (`dir`) and across toward the kitchen (`across`), unit; where a server stands for it in the aisle across the
+ * bar (`out`), and where the kitchen stands at it (`in`), the dish racks a few steps behind. With one counter, between its first two places.
+ */
+export function passOf(cs: Counter[]) {
+  const counter = cs[1] ? 1 : 0, c = cs[counter]
+  const along = (seatAlong(c, 0) + seatAlong(c, 1)) / 2
+  const dir = c.along.clone().normalize(), across = c.lay.clone().normalize()
+  const mid = c.at.clone().addScaledVector(dir, along)
+  return { counter, dir, across, at: mid.clone().addScaledVector(across, PASS_LAY), out: mid.clone().addScaledVector(across, -0.75),
+    in: mid.clone().addScaledVector(across, 0.66), yaw: Math.atan2(-c.along.z, c.along.x) }
+}
+/** what's at the pass just now: one of its slots, the seat it's for, whether a plate's laid there (the seat's plate isn't out yet), and how
+ * many of its pieces are flying to it and are down on it (Roasting counts them every frame) */
+export type PassSlot = { seat: number; plate: boolean; flying: number; landed: number }
+/**
+ * The pass: the clean plates stacked at its end for plating on (the kitchen brings them from the racks: `coming`, on their way), and its slots
+ * (Roasting lays a plate in one for a seat whose first food is done, and puts that seat's food on it; GuestBar3D draws the plate and has it
+ * carried, the slot freed as it's taken up)
+ */
+export const PASS = { stock: 0, coming: 0, slots: Array.from({ length: PASS_SLOTS }, () => null as PassSlot | null) }
+/** the seats whose plate is out (set down at them, or on its way there): their later food goes out on the pass loose, for adding to it */
+export const PLATES_OUT = new Set<number>()
+/** the kitchen's plater (the third cook, or the second) off their place, fetching plates for the pass: GuestBar3D walks a figure of them,
+ * Roasting's at their place is hidden meanwhile (the owner, plating with no cook to, is OWNER_OUT) */
+export const PLATER_OUT: { id: string | null } = { id: null }
+/** the dish dryer in the sink's cabinet (game/plates' Dryer: what's in it, its time left); `open`, its door down (0..1) to load or unload it
+ * (Sink.tsx draws it, GuestBar3D runs it) */
+export const DRYER: Dryer & { open: number } = { n: 0, left: null, open: 0 }
+/** the bin by the sink: how many used sticks are in it (cleared off the customers' plates with them; the owner's: thrown away there) */
+export const SINK_BIN = { sticks: 0 }
+/** the sticks each seat's plate has on it, of what's been eaten off it (Roasting counts what's set down; GuestBar3D clears them with the plate) */
+export const SEAT_STICKS = new Map<number, number>()
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pass: PASS, __dryer: DRYER, __sinkBin: SINK_BIN })
 
 /**
  * The whole shop's floor as one rectangle, in the first counter's frame (along it and across it, lay, from its middle):
@@ -670,8 +710,6 @@ export const seatLabel = (k: number) => {
   const [c0, c1] = GRILL_COUNTERS
   return k < c0.seats ? c0.seats - k : c0.seats + (c1 ? c1.seats - (k - c0.seats) : 0)
 }
-/** the pass's way in from the first counter's start: halfway between its first two places */
-export const PASS_ALONG = GRILL_COUNTERS[0].length / 2 + (seatAlong(GRILL_COUNTERS[0], 0) + seatAlong(GRILL_COUNTERS[0], 1)) / 2
 /**
  * The staff's way home once the shop's shut and empty (the first counter's frame): from just inside its gate by the till, through it and
  * along the aisle out of the front door, as the customers go. Each comes to it their own way first.

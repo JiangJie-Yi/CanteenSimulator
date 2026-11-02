@@ -1,58 +1,96 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { CARRY_CLEAN, RACK_FULL, WASH_AT, carryClean, nextChore, putBack, takePlate, washNow, washOne } from '@/game/plates'
+import { CARRY, DRYER_CAP, DRY_S, PASS_CAP, PASS_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
+  putBack, unload, washNow, washOne, type Dryer } from '@/game/plates'
 import { kitchenPath, type Rect } from '@/game/kitchenPath'
 
-feature('碗盤統一放在碗盤櫃：上菜從碗盤櫃拿，吃完在流理台洗好放回去', () => {
-  scenario('上菜前從碗盤櫃拿一個盤子', ({ given, when, then, and }) => {
-    given('碗盤櫃是滿的', (w) => { w.rack = RACK_FULL })
-    when('拿一個盤子', (w) => { w.r = takePlate(w.rack) })
-    then('拿到了', (w) => { expect(w.r.got).toBe(true) })
-    and('碗盤櫃少一個', (w) => { expect(w.r.rack).toBe(RACK_FULL - 1) })
-  })
+const idle: Dryer = { n: 0, left: null }
 
-  scenario('碗盤櫃空了就拿不到，客人要等盤子洗好', ({ when, then }) => {
-    when('碗盤櫃是空的時候拿盤子', (w) => { w.r = takePlate(0) })
-    then('拿不到，碗盤櫃還是 0 個', (w) => { expect(w.r.got).toBe(false); expect(w.r.rack).toBe(0) })
+feature('廚房擺盤：三廚從碗盤櫃把盤子拿到出餐口，菜在出餐口裝盤', () => {
+  scenario(`出餐口的乾淨盤子少於 ${PASS_LOW} 個就去碗盤櫃拿`, ({ then, and, but }) => {
+    then('出餐口剩 1 個、碗盤櫃有：去拿', () => { expect(platerGoes(1, 0, 30)).toBe(true) })
+    and(`還有 ${PASS_LOW} 個就不去`, () => { expect(platerGoes(PASS_LOW, 0, 30)).toBe(false) })
+    and('已經有人在拿的路上：不重複去', () => { expect(platerGoes(0, 3, 30)).toBe(false) })
+    but('碗盤櫃空了就不去（等洗好烘乾的搬回來）', () => { expect(platerGoes(0, 0, 0)).toBe(false) })
   })
-
-  scenario('髒盤子在流理台累積到一批才洗', ({ then, but }) => {
-    then(`流理台有 ${WASH_AT} 個髒盤子就開始洗`, () => { expect(washNow(WASH_AT, 30, false)).toBe(true) })
-    but('只有 2 個、碗盤櫃還有盤子時先不洗', () => { expect(washNow(2, 30, false)).toBe(false) })
+  scenario(`一趟補到 ${PASS_CAP} 個為止，最多拿 ${CARRY} 個、不超過碗盤櫃剩的`, ({ then, and }) => {
+    then(`出餐口剩 1 個：拿 ${PASS_CAP - 1} 個`, () => { expect(platesToBring(1, 30)).toBe(PASS_CAP - 1) })
+    and('碗盤櫃只剩 2 個：拿 2 個', () => { expect(platesToBring(0, 2)).toBe(2) })
+    and('出餐口是滿的：不拿', () => { expect(platesToBring(PASS_CAP, 30)).toBe(0) })
   })
-
-  scenario('碗盤櫃空了，流理台有髒盤子就馬上洗', ({ then, and }) => {
-    then('碗盤櫃 0 個、流理台 1 個髒盤子：開始洗', () => { expect(washNow(1, 0, false)).toBe(true) })
-    and('正在洗的時候不重複開始', () => { expect(washNow(WASH_AT + 3, 0, true)).toBe(false) })
-  })
-
-  scenario('洗好的盤子放回碗盤櫃，最多放到滿', ({ then, and }) => {
-    then('碗盤櫃 40 個，洗好 6 個：變 46 個', () => { expect(putBack(40, 6)).toBe(46) })
-    and(`碗盤櫃 48 個，洗好 6 個：最多 ${RACK_FULL} 個`, () => { expect(putBack(48, 6)).toBe(RACK_FULL) })
+  scenario('搬回碗盤櫃的盤子最多放到滿', ({ then, and }) => {
+    then('碗盤櫃 40 個，搬回 5 個：變 45 個', () => { expect(putBack(40, 5)).toBe(45) })
+    and(`碗盤櫃 48 個，搬回 5 個：最多 ${RACK_FULL} 個`, () => { expect(putBack(48, 5)).toBe(RACK_FULL) })
   })
 })
 
-feature('盤子都是人拿的，不會自己飛：送菜、收盤、洗好的拿回碗盤櫃', () => {
-  scenario('菜做好了、客人在等：先送菜', ({ then, and }) => {
-    then('客人已經有盤子：去送', () => { expect(nextChore({ serve: 'ready', dirty: 3, clean: 8, rack: 20 })).toBe('serve') })
-    and('客人還沒有盤子、碗盤櫃有：順路拿一個去送', () => { expect(nextChore({ serve: 'plate', dirty: 0, clean: 0, rack: 5 })).toBe('serve') })
+feature('外場分工：一個端菜收盤，另一個洗碗、烘碗、搬回碗盤架', () => {
+  const base = { serve: false, dirty: 0, sink: 0, rack: 30, dryer: idle }
+  scenario('兩個外場：第一個管外場，第二個管洗碗；只有一個人時全部自己做', ({ then, and }) => {
+    then('一個人：什麼都做', () => { expect(dutyOf(0, 1)).toBe('all') })
+    and('兩個人：第一個外場、第二個洗碗', () => { expect(dutyOf(0, 2)).toBe('floor'); expect(dutyOf(1, 2)).toBe('dish') })
   })
-  scenario('要盤子但碗盤櫃空了：先把流理台旁洗好的拿回碗盤櫃', ({ then }) => {
-    then('碗盤櫃 0 個、洗好的有 4 個', () => { expect(nextChore({ serve: 'plate', dirty: 2, clean: 4, rack: 0 })).toBe('restock') })
+  scenario('出餐口有裝好的菜：誰有空誰先端', ({ then, and }) => {
+    then('管外場的去端', () => { expect(nextChore({ ...base, duty: 'floor', serve: true, dirty: 3 })).toBe('serve') })
+    and('管洗碗的有空也幫忙端', () => { expect(nextChore({ ...base, duty: 'dish', serve: true, sink: WASH_AT })).toBe('serve') })
   })
-  scenario('沒有菜要送：把客人留下的髒盤子收到流理台', ({ then }) => {
-    then('座位上有 2 個髒盤子', () => { expect(nextChore({ serve: null, dirty: 2, clean: 3, rack: 30 })).toBe('clear') })
+  scenario('座位上的髒盤子由管外場的收', ({ then, but }) => {
+    then('管外場的去收', () => { expect(nextChore({ ...base, duty: 'floor', dirty: 2 })).toBe('clear') })
+    but('管洗碗的不收', () => { expect(nextChore({ ...base, duty: 'dish', dirty: 2 })).toBeNull() })
   })
-  scenario(`都沒事時把洗好的盤子拿回碗盤櫃，一次最多 ${CARRY_CLEAN} 個`, ({ then, and }) => {
-    then('洗好的有 7 個：去拿', () => { expect(nextChore({ serve: null, dirty: 0, clean: 7, rack: 30 })).toBe('restock') })
-    and(`一趟拿 ${CARRY_CLEAN} 個，剩下的下一趟`, () => { expect(carryClean(7)).toBe(CARRY_CLEAN); expect(carryClean(2)).toBe(2) })
+  scenario('流理台的髒盤子由管洗碗的洗', ({ then, but }) => {
+    then(`流理台有 ${WASH_AT} 個：管洗碗的去洗`, () => { expect(nextChore({ ...base, duty: 'dish', sink: WASH_AT })).toBe('wash') })
+    but('管外場的不洗', () => { expect(nextChore({ ...base, duty: 'floor', sink: WASH_AT })).toBeNull() })
   })
-  scenario('什麼事都沒有就休息', ({ then }) => {
-    then('沒菜、沒髒盤、沒洗好的', () => { expect(nextChore({ serve: null, dirty: 0, clean: 0, rack: 50 })).toBeNull() })
+  scenario('烘好的盤子由管洗碗的搬回碗盤架；碗盤架空了最優先', ({ then, and }) => {
+    then('烘好了：去搬', () => { expect(nextChore({ ...base, duty: 'dish', dryer: { n: 6, left: 0 } })).toBe('unload') })
+    and('碗盤架空了、流理台也有要洗的：先搬烘好的', () => {
+      expect(nextChore({ ...base, duty: 'dish', rack: 0, sink: 3, dryer: { n: 6, left: 0 } })).toBe('unload')
+    })
   })
-  scenario('洗好的盤子先疊在流理台旁，等人拿回去', ({ then, and }) => {
-    then('洗一個：髒的少一個、洗好的多一個', () => { expect(washOne(3, 1)).toEqual({ dirty: 2, clean: 2 }) })
-    and('沒有髒的就不變', () => { expect(washOne(0, 4)).toEqual({ dirty: 0, clean: 4 }) })
+  scenario('一個人時：端菜、洗碗、收盤、搬盤都做', ({ then, and }) => {
+    then('有髒盤子：收', () => { expect(nextChore({ ...base, duty: 'all', dirty: 1 })).toBe('clear') })
+    and('流理台夠一批：洗', () => { expect(nextChore({ ...base, duty: 'all', sink: WASH_AT })).toBe('wash') })
+    and('烘好了：搬', () => { expect(nextChore({ ...base, duty: 'all', dryer: { n: 3, left: 0 } })).toBe('unload') })
+    and('都沒事就休息', () => { expect(nextChore({ ...base, duty: 'all' })).toBeNull() })
+  })
+})
+
+feature('洗碗、烘碗：洗好的放進烘碗機，烘好才搬回碗盤架', () => {
+  scenario('髒盤子在流理台累積到一批才洗；碗盤架空了就馬上洗', ({ then, and, but }) => {
+    then(`流理台 ${WASH_AT} 個：洗`, () => { expect(washNow(WASH_AT, 30, idle)).toBe(true) })
+    but('只有 2 個、碗盤架還有：先不洗', () => { expect(washNow(2, 30, idle)).toBe(false) })
+    and('碗盤架 0 個、流理台 1 個：馬上洗', () => { expect(washNow(1, 0, idle)).toBe(true) })
+  })
+  scenario('烘碗機在烘、或裡面還有烘好的、或滿了：不能再洗進去', ({ then, and }) => {
+    then('正在烘', () => { expect(washNow(WASH_AT, 30, { n: 4, left: 12 })).toBe(false) })
+    and('烘好了還沒拿出來', () => { expect(washNow(WASH_AT, 30, { n: 4, left: 0 })).toBe(false) })
+    and('滿了', () => { expect(washNow(WASH_AT, 30, { n: DRYER_CAP, left: null })).toBe(false) })
+  })
+  scenario('洗好一個：流理台少一個、烘碗機多一個', ({ then, and }) => {
+    then('流理台 3 個、烘碗機空的', () => { expect(washOne(3, idle)).toEqual({ dirty: 2, dryer: { n: 1, left: null } }) })
+    and('烘碗機滿了就不洗', () => { expect(washOne(3, { n: DRYER_CAP, left: null })).toEqual({ dirty: 3, dryer: { n: DRYER_CAP, left: null } }) })
+  })
+  scenario('流理台洗空了、或烘碗機放滿了，就關門開始烘', ({ then, and, but }) => {
+    then('洗空了', () => { expect(dryerStarts(0, { n: 4, left: null })).toBe(true) })
+    and('放滿了', () => { expect(dryerStarts(3, { n: DRYER_CAP, left: null })).toBe(true) })
+    but('還在洗、還沒滿：先不烘', () => { expect(dryerStarts(3, { n: 4, left: null })).toBe(false) })
+    and('空的不烘', () => { expect(dryerStarts(0, idle)).toBe(false) })
+  })
+  scenario(`烘 ${DRY_S} 秒後烘好`, ({ given, when, then, and }) => {
+    given('剛開始烘', (w) => { w.d = { n: 6, left: DRY_S } })
+    when(`過了 ${DRY_S / 2} 秒`, (w) => { w.d = dryerTick(w.d, DRY_S / 2) })
+    then('還在烘', (w) => { expect(w.d.left).toBeCloseTo(DRY_S / 2) })
+    when(`再過 ${DRY_S} 秒`, (w) => { w.d = dryerTick(w.d, DRY_S) })
+    and('烘好了（不會變成負的）', (w) => { expect(w.d.left).toBe(0) })
+  })
+  scenario(`烘好的一趟搬 ${CARRY} 個，搬空了烘碗機才能再用`, ({ given, when, then, and }) => {
+    given('烘好 7 個', (w) => { w.d = { n: 7, left: 0 } })
+    when('搬一趟', (w) => { w.r = unload(w.d) })
+    then(`拿 ${CARRY} 個，剩 ${7 - CARRY} 個還是烘好的`, (w) => { expect(w.r.take).toBe(CARRY); expect(w.r.dryer).toEqual({ n: 7 - CARRY, left: 0 }) })
+    when('再搬一趟', (w) => { w.r = unload(w.r.dryer) })
+    and('拿完了，烘碗機空出來', (w) => { expect(w.r.take).toBe(7 - CARRY); expect(w.r.dryer).toEqual(idle) })
+    and('還在烘的拿不出來', () => { expect(unload({ n: 5, left: 9 }).take).toBe(0) })
   })
 })
 

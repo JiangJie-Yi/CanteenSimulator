@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { GRILL_COUNTERS, GRILL_SEATS, PASS_ALONG, seatAlong, seatLabel } from '@/shops/grill/bar'
+import { GRILL_COUNTERS, GRILL_SEATS, passOf, seatAlong, seatLabel } from '@/shops/grill/bar'
 
 feature('吧台的座位：長吧台五個平均分開，每個座位有號碼', () => {
   scenario('長吧台少一個座位、平均分（店主覺得六個太擠）', ({ given, then, and }) => {
@@ -14,9 +14,14 @@ feature('吧台的座位：長吧台五個平均分開，每個座位有號碼',
       const side = GRILL_COUNTERS[1]
       expect(seatAlong(w.c, 1) - seatAlong(w.c, 0)).toBeGreaterThan(seatAlong(side, 1) - seatAlong(side, 0))
     })
-    and('出餐口在第一、二個座位正中間', (w) => {
+  })
+
+  scenario('出餐口在側吧台離轉角最遠的兩個座位正中間（廚房那側站得到人）', ({ given, then }) => {
+    given('出餐口', (w) => { w.p = passOf(GRILL_COUNTERS); w.c = GRILL_COUNTERS[1] })
+    then('在側吧台、兩個座位中間', (w) => {
+      expect(w.p.counter).toBe(1)
       const mid = (seatAlong(w.c, 0) + seatAlong(w.c, 1)) / 2
-      expect(-w.c.length / 2 + PASS_ALONG).toBeCloseTo(mid, 6)
+      expect(w.p.at.clone().sub(w.c.at).dot(w.p.dir)).toBeCloseTo(mid, 6)
     })
   })
 
