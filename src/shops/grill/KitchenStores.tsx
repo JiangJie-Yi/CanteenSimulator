@@ -6,7 +6,7 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { mergeByMaterial } from '@/scene/StaticBatch'
+import { countedBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { SACK_STICKS } from '@/game/supplies'
 import { askPantry, SUPPLIES, tipOver } from './bar'
@@ -105,10 +105,12 @@ export function CharcoalSack() {
   const { obj, sticks } = useMemo(() => {
     const r = partOf(gltf.scene, 'CharcoalSack', 0.004, (o) => /^CharcoalStick/.test(o.name))
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
-    const sticks: THREE.Object3D[] = []
-    r.traverse((o) => { if (/^CharcoalStick\d+$/.test(o.name)) sticks.push(o) })
-    sticks.sort((a, b) => +a.name.slice(13) - +b.name.slice(13))
-    return { obj: r, sticks }
+    const list: THREE.Mesh[] = []
+    r.traverse((o) => { if (/^CharcoalStick\d+$/.test(o.name) && (o as THREE.Mesh).isMesh) list.push(o as THREE.Mesh) })
+    // (the outer ring goes first, the middle ones stand longest: the sticks in the order they're shown, the middle's first; all of them one
+    // mesh and one ink line, cut to as many as are left (they were a mesh and a line each: 28 draws))
+    list.sort((a, b) => +b.name.slice(13) - +a.name.slice(13))
+    return { obj: r, sticks: countedBatch(r, list) }
   }, [gltf])
   const shown = useRef(-1)
   useFrame(() => {
@@ -116,8 +118,7 @@ export function CharcoalSack() {
     const n = left === Infinity ? STICKS_SHOWN : Math.min(STICKS_SHOWN, Math.ceil((left / (2 * SACK_STICKS)) * STICKS_SHOWN))
     if (n === shown.current) return
     shown.current = n
-    // (the outer ring goes first: the middle ones stand longest)
-    sticks.forEach((o, i) => { o.visible = STICKS_SHOWN - 1 - i < n })
+    sticks.show(n)
   })
   const says = () => {
     const left = SUPPLIES.coal()

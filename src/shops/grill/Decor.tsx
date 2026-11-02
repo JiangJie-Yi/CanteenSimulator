@@ -904,7 +904,8 @@ function MisoPot() {
       m.receiveShadow = true
     })
     inkModel(r, (m) => /Soup|Inside/.test(m.name), { width: 0.0016, weld: true })
-    return r
+    // (it never moves: its parts and their ink lines folded together by material (they were some twenty draws))
+    return mergeByMaterial(r)
   }, [gltf])
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, MISO_AT.along).addScaledVector(LAY, MISO_AT.lay)

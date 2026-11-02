@@ -1733,6 +1733,8 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
   ))
   return (
     <group name="room-floor" position={c.at} rotation-y={Math.atan2(c.along.x, c.along.z)}>
+      {/* (none of it ever moves: folded together by material, it was some thirty-five draws; made again only if the room's shape changes) */}
+      <StaticBatch key={`${a0}|${a1}|${l0}|${l1}|${drop}`}>
       {piece([a0, g0], [l0, l1], 'a')}
       {piece([g0, a1], [gl, l1], 'b')}
       <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={baseDrop} />
@@ -1766,6 +1768,7 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
       {/* (the wall's foot, and the room's open end, down to the stone) */}
       <mesh position={[-l0, -D / 2, (g0 + a1) / 2]}><boxGeometry args={[0.02, D, a1 - g0]} /><meshToonMaterial color="#2a1a10" /></mesh>
       <mesh position={[-(l0 + gl) / 2, -D / 2, a1]}><boxGeometry args={[gl - l0, D, 0.012]} /><meshToonMaterial color="#2a1a10" /></mesh>
+      </StaticBatch>
     </group>
   )
 }

@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { mergeByMaterial } from '@/scene/StaticBatch'
+import { colourVertices, mergeByMaterial } from '@/scene/StaticBatch'
 import { setTip } from '@/scene/hoverTip'
 import { DEPTS, newRegister, pressKey, REG_MODES, REG_TAG_TEXT, regFigure, setMode, settle, turnDrawerKey, type Receipt, type RegKey } from '@/game/register'
 import { keyHelp } from '@/data/registerKeys'
@@ -88,6 +88,27 @@ export function useRegisterModel() {
     m.material = t
     m.castShadow = !REG_UNINKED.test(m.name)
   })
+  // (the plain-coloured parts that share a finish (the plastics, the keys' caps of every colour, the chrome, the steel) drawn with one material
+  // each, their colours carried by their vertices: folded together below, the body, the keys and the drawer are a few draws each, not one for
+  // every colour (the register was some fifty))
+  const shared = new Map<string, THREE.Material>()
+  root.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh || Array.isArray(m.material)) return
+    const mat = m.material as THREE.MeshPhysicalMaterial
+    if (mat.map || mat.transparent || /^KeyFace_/.test(m.name)) return
+    const key = [mat.type, mat.metalness, mat.roughness, mat.clearcoat, mat.clearcoatRoughness, mat.sheen, mat.side].join('|')
+    let one = shared.get(key)
+    if (!one) {
+      one = mat.clone()
+      ;(one as THREE.MeshPhysicalMaterial).color.set('#ffffff')
+      one.vertexColors = true
+      shared.set(key, one)
+    }
+    m.geometry = m.geometry.clone()
+    colourVertices(m.geometry, mat.color)
+    m.material = one
+  })
   inkModel(root, (m) => REG_UNINKED.test(m.name), { width: 0.0022, weld: true })
   const get = (n: string) => root.getObjectByName(n)!
   // (the keys clear of their panel, their lettering clear of their caps (the owner saw them flicker and shadows cross them, black, where they
@@ -124,10 +145,21 @@ export function useRegisterModel() {
   const keysAll = get('RegKeys').clone(true)
   mergeByMaterial(keysAll)
   keysAll.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).raycast = () => {} })
-  // (the drawer's inside, some forty parts with their ink: drawn only while it's out, shut in the till's dark it's nothing to see)
-  const inner: THREE.Object3D[] = []
-  for (const o of get('RegDrawer').children) if (DRAWER_INNER.test(o.name)) inner.push(o)
-  regModel = { body: get('RegBody'), drawer: get('RegDrawer'), keys: get('RegKeys'), keysAll, modeKey: get('RegModeKey'), drawerKey: get('RegDrawerKey'), solid, inner }
+  // (the drawer's inside, some forty parts with their ink: drawn only while it's out, shut in the till's dark it's nothing to see; put in a
+  // group of their own and folded together by material, as the drawer's front and lock are, and each key's parts: each moves as one (the
+  // shut drawer and the two keys were some twenty draws, the inside forty more))
+  const drawer = get('RegDrawer')
+  const inside = new THREE.Group()
+  inside.name = 'RegDrawerInside'
+  drawer.add(inside)
+  drawer.updateMatrixWorld(true)
+  for (const o of [...drawer.children]) if (DRAWER_INNER.test(o.name)) inside.attach(o)
+  mergeByMaterial(inside)
+  mergeByMaterial(drawer, (o) => o === inside || o.name === 'RegDrawerKey')
+  mergeByMaterial(get('RegDrawerKey'))
+  mergeByMaterial(get('RegModeKey'))
+  const inner: THREE.Object3D[] = [inside]
+  regModel = { body: get('RegBody'), drawer, keys: get('RegKeys'), keysAll, modeKey: get('RegModeKey'), drawerKey: get('RegDrawerKey'), solid, inner }
   return regModel
 }
 /** the model once it's loaded (for handlers, outside of rendering), or null before */

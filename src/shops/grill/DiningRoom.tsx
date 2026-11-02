@@ -2199,7 +2199,8 @@ function useWcDoor() {
       })
       return root
     }
-    return { panel: () => conv(gltf.scene.getObjectByName('WcDoorPanel')!.clone(true)), frame: () => conv(gltf.scene.getObjectByName('WcDoorFrame')!.clone(true)) }
+    // (each its parts folded together by material: a panel slides as one, a frame never moves; a panel was fourteen draws, the frame four)
+    return { panel: () => mergeByMaterial(conv(gltf.scene.getObjectByName('WcDoorPanel')!.clone(true))), frame: () => mergeByMaterial(conv(gltf.scene.getObjectByName('WcDoorFrame')!.clone(true))) }
   }, [gltf])
 }
 useGLTF.preload(WCDOOR_URL)
@@ -2880,6 +2881,9 @@ function ShrineDoors() {
         }
         leaf.position.z *= SHRINE_WIDE
         leaf.scale.z *= SHRINE_WIDE
+        // (each leaf swings as one: its board, its gold crest and plates and its ink folded together by material (six leaves, some
+        // twenty-five draws))
+        mergeByMaterial(leaf)
       }
       d.userData.wide = true
     }
@@ -3838,6 +3842,9 @@ function useFreezer(n: number) {
       pivot.updateMatrixWorld(true)
       pivot.attach(door)
     } else body.add(root)
+    // (the cabinet never moves and the door swings as one: each's parts and ink folded together by material (some ten draws a fridge))
+    mergeByMaterial(root)
+    mergeByMaterial(pivot)
     // (stood in the shop: scaled, its middle at the origin, its base on the floor)
     const place = new THREE.Group()
     place.scale.setScalar(FREEZER.scale)
