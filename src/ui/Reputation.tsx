@@ -9,7 +9,7 @@ import { guestLabel } from '@/data/guests'
 import { tl, type Lang } from '@/data/i18n'
 import { remarkOf, satisfaction, starsOf, type Rating, type Remark, type Visit } from '@/game/reputation'
 import { FitLine } from './FitLine'
-import { MoodFace } from './MoodFace'
+import { ReviewerAvatar } from './ReviewerAvatar'
 
 /** what a customer says as they go, a few ways each (the owner's: every one said the same line), picked by who they were and how it went */
 const REMARK: Record<Remark, [string, string, string][]> = {
@@ -174,7 +174,8 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
                 const [zh, ja, en] = remarkLine(v)
                 return (
                   <li key={`${v.id}-${i}`}>
-                    <MoodFace guest={{ rating: sat, state: v.walkedOut ? 'angry' : 'done' }} />
+                    {/* (their profile picture, as a map app's reviews have them (the owner's: not an emoji): game/avatars) */}
+                    <ReviewerAvatar id={v.id} name={guestLabel(v.id, lang)} />
                     <span className="rep-who">{guestLabel(v.id, lang)}<Stars v={starsOf(sat)} /></span>
                     <span className="rep-said">「{tl(lang, zh, ja, en)}」</span>
                   </li>
