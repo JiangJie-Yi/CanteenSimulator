@@ -1,6 +1,7 @@
-// The toilets' sounds, made on the spot with WebAudio (no recordings), each as loud as the room is near the view (`near` 0..1): the
-// flush (a rush of water that swells and drains away with a gurgle, then the cistern refilling), the brush scrubbing, a knock at a locked
-// door, the paper holder's new roll, and the Otohime (音姫): a babbling stream with birdsong, played for a while to cover what's done.
+// The toilets' sounds, and the room's fittings' (the taps, the light switch), made on the spot with WebAudio (no recordings), each as loud as
+// the room is near the view (`near` 0..1): the flush (a rush of water that swells and drains away with a gurgle, then the cistern refilling),
+// the brush scrubbing, a knock at a locked door, the paper holder's new roll, the Otohime (音姫): a babbling stream with birdsong, played for
+// a while to cover what's done; a tap's handle turned, the light switch's tick, the cold cabinets' doors.
 
 let ac: AudioContext | null = null
 function ctx() {
@@ -185,6 +186,91 @@ export function tapRunning(id: string, level: number) {
     run = { gain }
   }
   run.gain.gain.setTargetAtTime(0.16 * l, a.currentTime, 0.12)
+}
+
+/** a tap's cross handle given its quarter turn (the owner's: turning it should be heard; light, not heavy or watery): the stem turning in its
+ * packing, a short faint stick-slip squeak rising as it opens (falling as it shuts), a little ring of brass on brass at the end of the turn,
+ * and, shutting, the washer seating with a small dull knock */
+export function tapTurnSound(open: boolean, near = 1) {
+  const a = ctx()
+  if (!a || near < 0.02) return
+  const t = a.currentTime
+  const dur = 0.2
+  const o = a.createOscillator()
+  o.type = 'sawtooth'
+  o.frequency.setValueAtTime(open ? 520 : 680, t)
+  o.frequency.linearRampToValueAtTime(open ? 780 : 440, t + dur)
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 1.3
+  // (the squeak in grains, the stem sticking and slipping some thirty times a second, loudest midway)
+  const g = a.createGain()
+  g.gain.setValueAtTime(0.0001, t)
+  for (let k = t; k < t + dur; ) {
+    const step = 1 / 32 + Math.random() * 0.01
+    const peak = 0.04 * near * Math.sin((Math.PI * (k - t)) / dur) + 0.0001
+    g.gain.linearRampToValueAtTime(peak, k + step * 0.3)
+    g.gain.linearRampToValueAtTime(0.0001, k + step)
+    k += step
+  }
+  o.connect(bp).connect(g).connect(a.destination)
+  o.start(t)
+  o.stop(t + dur + 0.03)
+  // (brass on brass as the cross comes to its stop: two thin partials, dying away)
+  const end = t + dur
+  for (const [f, v] of [[2650, 0.028], [4180, 0.016]] as const) {
+    const r = a.createOscillator(), rg = a.createGain()
+    r.frequency.value = f
+    rg.gain.setValueAtTime(v * near, end)
+    rg.gain.exponentialRampToValueAtTime(0.0001, end + 0.22)
+    r.connect(rg).connect(a.destination)
+    r.start(end)
+    r.stop(end + 0.24)
+  }
+  if (!open) {
+    const th = noise(a, 0.035, (x) => (1 - x) ** 3, 0.55)
+    const lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.4
+    th.connect(lp).connect(out(a, 0.12 * near))
+    th.start(end)
+  }
+}
+
+/** the light switch (a wide rocker) pressed: two dry little ticks a hair apart, the rocker giving and then landing, bright and short with
+ * nothing ringing after (the owner's: light; the first try was heavy and watery, a falling tone under a ringing band), a touch higher
+ * switching on */
+export function lightSwitchSound(on: boolean) {
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  const tick = (at: number, gain: number, cut: number, ms: number) => {
+    const s = noise(a, ms / 1000, (x) => (1 - x) ** 3, 0)
+    const f = a.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = cut; f.Q.value = 0.5
+    s.connect(f).connect(out(a, gain))
+    s.start(at)
+  }
+  tick(t, 0.07, 4500, 3)
+  tick(t + 0.012, on ? 0.2 : 0.17, on ? 2800 : 2400, 5)
+}
+
+/** a cold cabinet's door (the drinks fridges' glass doors, the ingredients freezer's lid: `chest`), as light as the switch: opening, its seal
+ * let go, a short soft breath of air; shut, it meets the cabinet, a muffled knock with the seal's little tick on it */
+export function coolerDoorSound(opening: boolean, near = 1, chest = false) {
+  const a = ctx()
+  if (!a || near < 0.02) return
+  const t = a.currentTime
+  if (opening) {
+    const s = noise(a, 0.09, (x) => Math.min(1, x * 8) * (1 - x) ** 2, 0.3)
+    const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = chest ? 900 : 1300; bp.Q.value = 0.5
+    s.connect(bp).connect(out(a, 0.15 * near))
+    s.start(t)
+    return
+  }
+  const s = noise(a, 0.05, (x) => (1 - x) ** 3, 0.6)
+  const lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = chest ? 420 : 600; lp.Q.value = 0.4
+  s.connect(lp).connect(out(a, 0.28 * near))
+  s.start(t)
+  const k = noise(a, 0.004, (x) => 1 - x, 0)
+  const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000
+  k.connect(hp).connect(out(a, 0.07 * near))
+  k.start(t + 0.008)
 }
 
 /** the Otohime: a stream babbling over stones and a bird or two, for `seconds` (its volume follows the view each frame: see otohimeNear) */

@@ -27,6 +27,24 @@ feature('員工與徵人', () => {
     then('體力低的累得比較快，而休息一分鐘恢復的比任何人累積的都多', (w) => { expect(w.tb).toBeGreaterThan(w.ta); expect(restPerMin).toBeGreaterThan(w.tb) })
   })
 
+  scenario('應徵的人夠多可以挑：每個職位至少是名額的 4 倍，掌爐的師傅（二廚）至少 8 位', ({ given, then, and }) => {
+    given('新開一局，日式烤魚店來應徵的人', (w) => { w.people = makeCandidates('grilledfish', seeded(11)); w.roles = ROLES.grilledfish })
+    then('每個職位的應徵者至少是名額的 4 倍', (w) => {
+      for (const r of w.roles as { role: string; max: number }[]) expect((w.people as Worker[]).filter((p) => p.role === r.role).length, r.role).toBeGreaterThanOrEqual(r.max * 4)
+    })
+    and('二廚（掌爐的師傅）至少 8 位，老中青都有', (w) => {
+      const chefs = (w.people as Worker[]).filter((p) => p.role === 'chef')
+      expect(chefs.length).toBeGreaterThanOrEqual(8)
+      expect(new Set(chefs.map((c) => c.look.age)).size).toBe(3)
+    })
+    and('名字都不一樣，大部分人的經歷也不一樣', (w) => {
+      const people = w.people as Worker[]
+      expect(new Set(people.map((p) => p.zh)).size).toBe(people.length)
+      const lines = people.map((p) => p.note.split('，')[0])
+      expect(new Set(lines).size).toBeGreaterThanOrEqual(people.length * 0.6)
+    })
+  })
+
   scenario('合理薪資不低於基本工資，技能越高越貴', ({ when, then }) => {
     when('求各職位技能 0 與 100 的合理時薪', (w) => {
       w.rows = (['chef', 'sous', 'server', 'stock', 'cashier'] as const).map((r) => [fair(r, 0), fair(r, 100)])

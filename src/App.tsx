@@ -519,6 +519,9 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
   )
 }
 
+/** the view switched to the free one with the camera left where it is (entering edit mode: the owner's), not glided to the free view's own
+ * place: set just before the switch, taken by the camera's homing */
+const HOLD_POSE = { next: false }
 function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
@@ -575,14 +578,17 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
   // window, its shadows falling away from it: game/roomLights' keyLightFrom)
   const keyLight = useRef<THREE.DirectionalLight>(null)
   const scene3 = useThree((s) => s.scene)
+  const glKey = useThree((s) => s.gl)
   const moonAt = useRef(0)
-  useFrame((st) => {
+  const keyNow = useRef({ on: lights.on, night: theme === 'dark' })
+  keyNow.current = { on: lights.on, night: theme === 'dark' }
+  /** the key light set as the lights and the time of day are now: its shadows' depth and softness, where it shines from */
+  const placeKey = () => {
     const k = keyLight.current
-    if (!k || st.clock.elapsedTime - moonAt.current < 0.5) return
-    moonAt.current = st.clock.elapsedTime
+    if (!k) return
     // (how dark its shadows fall and how soft: light and soft by day, faint by night with the lamps on, plain under the moon with them off)
-    const night = theme === 'dark'
-    k.shadow.intensity = shadowDepth(lights.on, night)
+    const { on, night } = keyNow.current
+    k.shadow.intensity = shadowDepth(on, night)
     k.shadow.radius = shadowSoft(night)
     // (by day the noon sun, straight overhead; by night the moon, high out past the round window: the window's room is toward its -x)
     const w = night ? scene3.getObjectByName('RoundWindow') : null
@@ -594,6 +600,20 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     }
     const [x, y, z] = keyLightFrom(night, out)
     k.position.set(x * 19, y * 19, z * 19)
+  }
+  // (the lights switched, or day turned to night: the shadows changed with the room's light on the very next frame, the shadow map drawn
+  // again for it (it's otherwise drawn every third frame: ShadowPacer); they waited for the half-second look before, and lagged behind the
+  // light (the owner saw it))
+  useLayoutEffect(() => {
+    placeKey()
+    if (keyLight.current) keyLight.current.shadow.needsUpdate = true
+    glKey.shadowMap.needsUpdate = true
+  }, [lights.on, theme, glKey])
+  // (and every half second, the round window's moon following the window, should it be moved)
+  useFrame((st) => {
+    if (st.clock.elapsedTime - moonAt.current < 0.5) return
+    moonAt.current = st.clock.elapsedTime
+    placeKey()
   })
 
   // smoke off the grill: only once food on it is cooking through (Roasting sets it)
@@ -707,6 +727,8 @@ function Scene({ incense, active, orders, theme, reducedMotion, fire, frame, onO
     homedFor.current = { active, resetView, view, w: size.width, h: size.height, camTry }
     if (was && was.active === active && was.resetView === resetView && was.view === view && was.w === size.width && was.h === size.height && was.camTry === camTry
       && frame.w > 0 && frame.h > 0) return
+    // (gone over to the free view where the camera stands (entering edit mode): not homed)
+    if (HOLD_POSE.next && view === 'free') { HOLD_POSE.next = false; return }
     const focus = new THREE.Vector3(0, DISHES[active].focusY, 0)
     // (a phone's stage sits above the menu inside a full-height canvas: what fits it is the stage's width against
     // the canvas height, and it mustn't back off just because the menu was folded away)
@@ -1140,11 +1162,11 @@ export default function App() {
       layer?.removeEventListener('contextmenu', stop, true)
     }
   }, [editOn])
-  // (entering the developer mode (G) the view goes over to the free one, the whole shop in sight to edit)
+  // (entering the developer mode (G) the view goes over to the free one, to be turned about at will, but the camera stays where it is (the
+  // owner's: it went back to the free view's first place, the whole shop, every time))
   useEffect(() => {
     if (!editOn) return
-    setView('free')
-    setResetView((n) => n + 1)
+    setView((v) => { if (v !== 'free') HOLD_POSE.next = true; return 'free' })
   }, [editOn])
   useEffect(() => { GAME_SPEED.value = speed }, [speed])
   // the sake offered at the shrine by the door: for a minute more come in and they order more

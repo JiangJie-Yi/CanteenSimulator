@@ -19,6 +19,7 @@ import { Movable } from './Movable'
 import { PlateRack } from './PlateRack'
 import { SINK_SETS, SinkModel, SinkPart } from './Sink'
 import { CharcoalSack, ProduceSacks } from './KitchenStores'
+import { coolerDoorSound } from './restroomSound'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
@@ -567,6 +568,7 @@ export const FRIDGE_KICK = { at: -1e9 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridgeKick?: typeof FRIDGE_KICK }).__fridgeKick = FRIDGE_KICK
 /** the freezer's lid, opened by hand (a click): it stays up till it's clicked shut */
 export const FREEZER = { open: false }
+const LID_AT = new THREE.Vector3()
 const FREEZER_URL = import.meta.env.BASE_URL + 'models/freezer.glb'
 /** a soft round glow, for a lit lamp */
 const GLOW_TEX = (() => {
@@ -656,8 +658,18 @@ function IngredientFridge() {
     FREEZER_TEMP.shownAt = performance.now()
     try { localStorage.setItem(TEMP_KEY, String(FREEZER_TEMP.set)) } catch { /* (not kept) */ }
   }
-  useFrame((_, dt) => {
+  // (the lid heard: its seal let go as it's lifted, a muffled knock as it comes down shut (the owner's), as loud as it's near)
+  const lidHeard = useRef({ open: 0, down: true })
+  useFrame(({ camera }, dt) => {
     const open = FREEZER.open || performance.now() - FRIDGE_KICK.at < 1800 ? 1 : 0
+    const heard = lidHeard.current
+    const near = () => (lid.current ? Math.max(0, 1 - lid.current.getWorldPosition(LID_AT).distanceTo(camera.position) / 12) : 1)
+    if (open && !heard.open) coolerDoorSound(true, near(), true)
+    heard.open = open
+    if (lid.current) {
+      if (lid.current.rotation.x < -0.3) heard.down = false
+      else if (!heard.down && !open && lid.current.rotation.x > -0.04) { heard.down = true; coolerDoorSound(false, near(), true) }
+    }
     FREEZER_TEMP.now = driftTemp(FREEZER_TEMP.now, FREEZER_TEMP.set, open > 0, Math.min(dt, 0.1))
     const setting = performance.now() - FREEZER_TEMP.shownAt < 2000
     const shows = setting ? FREEZER_TEMP.set : Math.round(FREEZER_TEMP.now)

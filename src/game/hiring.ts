@@ -8,8 +8,9 @@ import { fair, type Look, type Role, type Worker } from '@/data/staff'
 
 export type Rand = () => number
 
-/** how many come for each job at each shop */
-const COUNTS: Record<Role, number> = { chef: 4, sous: 3, cashier: 3, server: 3, stock: 3 }
+/** how many come for each job at each shop: a good few to choose from for each place (the owner's: there were too few, four cooks for
+ * the grill and three of the rest), the most for the grill (the cook in charge of it, the shop's own 師傅) and the floor (two places) */
+export const APPLICANTS: Record<Role, number> = { chef: 8, sous: 6, cashier: 5, server: 8, stock: 5 }
 /** how likely each job's applicants are women */
 const WOMEN: Record<Role, number> = { chef: 0.3, sous: 0.4, cashier: 0.7, server: 0.55, stock: 0.35 }
 const AGES: Look['age'][] = ['young', 'middle', 'old']
@@ -72,9 +73,9 @@ function noteOf(rand: Rand, shop: string, role: Role, age: Look['age'], w: { ski
 /** everyone who comes to be hired at a shop */
 export function makeCandidates(shop: string, rand: Rand = Math.random, taken = new Set<string>()): Worker[] {
   const out: Worker[] = []
-  for (const role of Object.keys(COUNTS) as Role[]) {
+  for (const role of Object.keys(APPLICANTS) as Role[]) {
     const off = Math.floor(rand() * 3)
-    for (let k = 0; k < COUNTS[role]; k++) {
+    for (let k = 0; k < APPLICANTS[role]; k++) {
       // (a shop's applicants for a job cover the ages: one of each first, then any)
       const age = k < 3 ? AGES[(k + off) % 3] : pick(rand, AGES)
       const female = rand() < WOMEN[role]

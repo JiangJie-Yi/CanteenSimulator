@@ -2997,7 +2997,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} drop={KITCHEN_DROP / scale} />}
               {given && <Later stage={2}><ShopProps counters={counters} /></Later>}
-              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lamps={4} top={top} altar={incense ?? true} corner={wallBack}
+              {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lampId="barlamp" lampName="長吧台" top={top} altar={incense ?? true} corner={wallBack}
                 staffDoor={STAFF_DOOR_AT} />}
             </group>
           )
@@ -3009,7 +3009,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <group key={i}>
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
-            {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lamps={2} top={top} door={wcs?.door ?? (meet + corner) / 2}
+            {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lampId="sidelamp" lampName="側吧台" top={top} door={wcs?.door ?? (meet + corner) / 2}
               clear={fridgeClear} hang={koiHang(fridgeClear ?? [], -c.length / 2 - 0.35)} />}
           </group>
         )

@@ -12,7 +12,7 @@ import { mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { DRYER, SINK, tipOver } from './bar'
 import { getEdit } from './edit'
-import { tapRunning } from './restroomSound'
+import { tapRunning, tapTurnSound } from './restroomSound'
 
 const URL = import.meta.env.BASE_URL + 'models/sink.glb'
 /** the brass, the copper and the dryer's stainless: real metal, reflecting the studio (it only reads as metal by what it reflects) */
@@ -103,8 +103,9 @@ export function SinkModel() {
   }, [gltf])
   // (the dryer's door eased down and up; it drops forward, about its foot)
   const opened = useRef(0)
-  // (the handle a quarter turn round while the water's on, turned there and back)
+  // (the handle a quarter turn round while the water's on, turned there and back, heard as it's turned)
   const turn = useRef(0)
+  const wasOn = useRef(SINK.tap)
   // the tap running while the plates are being washed: a stream from its mouth to the basin's floor, wavering, a splash ring where it lands
   const stream = useRef<THREE.Mesh>(null)
   const ring = useRef<THREE.Mesh>(null)
@@ -112,7 +113,9 @@ export function SinkModel() {
   useFrame(({ clock, camera }, dt) => {
     const on = SINK.washing || SINK.tap
     // (heard running, as loud as it's near)
-    tapRunning('sink', on ? Math.max(0, Math.min(1, 1 - (root.getWorldPosition(SINK_AT_V).distanceTo(camera.position) - 1.5) / 7)) : 0)
+    const near = Math.max(0, Math.min(1, 1 - (root.getWorldPosition(SINK_AT_V).distanceTo(camera.position) - 1.5) / 7))
+    tapRunning('sink', on ? near : 0)
+    if (SINK.tap !== wasOn.current) { wasOn.current = SINK.tap; tapTurnSound(SINK.tap, Math.max(0.35, near)) }
     turn.current += ((SINK.tap ? 1 : 0) - turn.current) * Math.min(1, Math.min(dt, 0.1) * 8)
     handle.rotation.y = turn.current * (Math.PI / 2)
     opened.current += (DRYER.open - opened.current) * Math.min(1, Math.min(dt, 0.1) * 5)

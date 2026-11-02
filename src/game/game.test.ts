@@ -9,7 +9,7 @@ import { SAY_CHUNK, sayChunks } from '@/game/say'
 import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder } from '@/game/economy'
 import { SEASON_GOODS, SEASON_PAR } from './supplies'
 import { trialIdeas } from '@/game/research'
-import { makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
+import { APPLICANTS, makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
 import { bestDabs, expectedTaste, understand } from '@/game/chefChat'
 import { moodOf, PAIRING, PAIRING_DEFAULT, starText } from '@/game/taste'
 
@@ -143,7 +143,7 @@ describe('hiring: a new lot of people each game', () => {
         for (const k of [w.skill, w.speed, w.stamina]) expect(k).toBeGreaterThan(0)
       }
     }
-    expect(taken.size).toBe(DISHES.length * 16)
+    expect(taken.size).toBe(DISHES.length * Object.values(APPLICANTS).reduce((n, k) => n + k, 0))
   })
   it('is different from one game to the next', () => {
     const a = makeCandidates('grilledfish', seeded(1)).map((w) => w.zh).join()

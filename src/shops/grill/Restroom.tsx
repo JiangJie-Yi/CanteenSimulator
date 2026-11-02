@@ -8,7 +8,7 @@ import { mergeByMaterial } from '@/scene/StaticBatch'
 import { toonOf } from './BarFurnish'
 import { handOver, TOILETS, meterWater } from './bar'
 import { getEdit } from './edit'
-import { flushSound, knockSound, otohimeNear, otohimeSound, rollSound, scrubSound, tapRunning } from './restroomSound'
+import { flushSound, knockSound, otohimeNear, otohimeSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
 
 /**
  * The toilet rooms' live parts (blender/wc.py): the washlet that lifts its lid as someone comes in and flushes as they go (the water
@@ -508,7 +508,7 @@ export function WashstandLive({ who }: { who: Who }) {
     mergeByMaterial(handle)
     return { root, handle, tip, floor }
   }, [gltf])
-  const st = useRef({ turn: 0, lastHand: -1e9 })
+  const st = useRef({ turn: 0, lastHand: -1e9, was: false })
   const stream = useRef<THREE.Mesh>(null)
   const ring = useRef<THREE.Mesh>(null)
   const len = parts.tip.y - parts.floor.y
@@ -516,6 +516,8 @@ export function WashstandLive({ who }: { who: Who }) {
     const t = TOILETS[who]
     const s = st.current
     const on = t.tap || now() - t.handAt < HAND_MS
+    // (the handle heard as it's turned, by a click or a guest washing their hands, as loud as the room's near)
+    if (on !== s.was) { s.was = on; tapTurnSound(on, nearOf(parts.root, camera)) }
     s.turn += ((on ? 1 : 0) - s.turn) * Math.min(1, Math.min(dt, 0.1) * 8)
     parts.handle.rotation.y = s.turn * (Math.PI / 2)
     // (a guest's hand wash, metered once)

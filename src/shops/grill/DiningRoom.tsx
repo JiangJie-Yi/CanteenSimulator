@@ -2,7 +2,7 @@ import { blessingChime, shrineDoor } from './shrineSound'
 import { TISSUE } from '@/game/tissues'
 import { BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote } from './Restroom'
-import { slideDoorSound } from './restroomSound'
+import { coolerDoorSound, lightSwitchSound, slideDoorSound } from './restroomSound'
 import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -16,7 +16,7 @@ import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
 import { BOSS_DRINK } from './Boss'
 import { CASE_SIZE } from '@/game/drinkStock'
-import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, type Counter, type DrinkId } from './bar'
+import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -2078,20 +2078,50 @@ function WcLamp({ who, at }: { who: 'm' | 'f'; at: [number, number, number] }) {
   return <mesh geometry={WC_GEO.lamp} position={at}><meshBasicMaterial ref={m} color="#fff1cc" toneMapped={false} /></mesh>
 }
 /** a wall of the toilet's rooms, facing into them: charred cedar to the waist with a rail along it, cream plaster over; `len` along it, its
- * middle at `at`, turned `yaw` (unturned, it faces +z); the cedar's boards their own width whatever its length */
-function WcWall({ len, at, yaw, top }: { len: number; at: [number, number, number]; yaw: number; top: number }) {
+ * middle at `at`, turned `yaw` (unturned, it faces +z); the cedar's boards their own width whatever its length. `cut`: the wall that's cut
+ * away for the view from outside (seen from behind, its faces aren't drawn), its rail a strip on its face, not a bar left floating */
+function WcWall({ len, at, yaw, top, cut = false }: { len: number; at: [number, number, number]; yaw: number; top: number; cut?: boolean }) {
   const geo = useMemo(() => {
     const lower = new THREE.PlaneGeometry(len, 0.9)
     const uv = lower.attributes.uv as THREE.BufferAttribute
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (len / 0.3), uv.getY(i) * (0.9 / 0.5))
-    return { lower, upper: new THREE.PlaneGeometry(len, top - 0.9), rail: new THREE.BoxGeometry(len, 0.035, 0.03) }
-  }, [len, top])
+    return { lower, upper: new THREE.PlaneGeometry(len, top - 0.9), rail: cut ? new THREE.PlaneGeometry(len, 0.035) : new THREE.BoxGeometry(len, 0.035, 0.03) }
+  }, [len, top, cut])
   useEffect(() => () => { geo.lower.dispose(); geo.upper.dispose(); geo.rail.dispose() }, [geo])
   return (
     <group position={at} rotation-y={yaw}>
       <mesh geometry={geo.lower} position-y={0.45}><meshToonMaterial color="#ffffff" map={WC_CEDAR} /></mesh>
       <mesh geometry={geo.upper} position-y={0.9 + (top - 0.9) / 2}><meshToonMaterial color="#ece0c6" /></mesh>
-      <mesh geometry={geo.rail} position={[0, 0.9, 0.012]}><meshToonMaterial color="#6a4428" /></mesh>
+      <mesh geometry={geo.rail} position={[0, 0.9, cut ? 0.003 : 0.012]}><meshToonMaterial color="#6a4428" /></mesh>
+    </group>
+  )
+}
+/** how thick the rooms' walls are drawn behind their faces (the owner's: the partitions between the men's and the women's, and between each
+ * washroom and its toilet, were bare planes, paper-thin seen from above): the men's and the women's rooms 0.12 apart, half each */
+const WC_T = 0.06
+/** a stretch of solid wall in the rooms' frame, from x0 to x1, y0 to y1, z0 to z1 (either way round): its top and its cut end seen from
+ * outside, in a plaster a touch deeper than the walls' faces */
+function WcMass({ x, y, z }: { x: [number, number]; y: [number, number]; z: [number, number] }) {
+  const [x0, x1] = [Math.min(...x), Math.max(...x)], [z0, z1] = [Math.min(...z), Math.max(...z)]
+  return (
+    <mesh position={[(x0 + x1) / 2, (y[0] + y[1]) / 2, (z0 + z1) / 2]}>
+      <boxGeometry args={[x1 - x0, y[1] - y[0], z1 - z0]} /><meshToonMaterial color="#e2d4b6" />
+    </mesh>
+  )
+}
+/** a paper lamp on a wall, on a little wooden arm (the rooms have no ceiling: they're seen from above, cut open): its globe in its ring `out`
+ * from the wall, at `at` on it, the wall facing `yaw` (unturned, +z) */
+function WcSconce({ who, at, yaw }: { who: 'm' | 'f'; at: [number, number, number]; yaw: number }) {
+  const out = 0.1
+  return (
+    <group position={at} rotation-y={yaw}>
+      <WcLamp who={who} at={[0, 0, out]} />
+      <StaticBatch>
+        <mesh position={[0, 0, out]} rotation-x={Math.PI / 2}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
+        <mesh position={[0, 0.07, out / 2]}><boxGeometry args={[0.014, 0.014, out]} /><meshToonMaterial color="#5a3a22" /></mesh>
+        <mesh position={[0, 0.035, out]}><cylinderGeometry args={[0.003, 0.003, 0.07, 5]} /><meshToonMaterial color="#3a2416" /></mesh>
+        <mesh position={[0, 0.07, 0.006]}><boxGeometry args={[0.05, 0.05, 0.012]} /><meshToonMaterial color="#5a3a22" /></mesh>
+      </StaticBatch>
     </group>
   )
 }
@@ -2115,7 +2145,8 @@ function WcFloor({ wx, wz, at }: { wx: number; wz: number; at: [number, number, 
  * the toilet's own little room: the toilet at its far end with its cistern to the wall (a small basin on its top), a shoji window over it,
  * the paper on its holder and the washlet's remote on one wall, the brush in the corner; in the women's the Otohime, the sanitary bin and a
  * basket of sanitary pads (the men's has no Otohime: the owner's). Floorboards of pale hinoki, charred-cedar planks to the waist and cream
- * plaster above, dark beams over a ceiling of boards, a paper lamp lit over each room on its sensor. Its frame: x from the door's wall back
+ * plaster above, the walls between the rooms solid (WC_T behind each face), open above (no ceiling or beams: seen from above, cut open, the
+ * owner had the dark beams taken away), a paper lamp on a wall of each room, lit on its sensor. Its frame: x from the door's wall back
  * (WC_ROOM.D deep), z across the door from its middle; the toilet's room is on the side `s`.
  */
 function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
@@ -2144,25 +2175,22 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <WcFloor wx={SW} wz={E} at={[SX, 0.004, SZ]} />
       {/* the back wall, behind the washstand and on along the toilet's room; the washroom's other side; the short stretch by the door on the
           toilet's side, and the plaster over the way through; the toilet's room's near wall and its end */}
-      <WcWall len={w + E} at={[D, 0, s * E / 2]} yaw={-Math.PI / 2} top={top} />
+      <WcWall len={w + E} at={[D, 0, s * E / 2]} yaw={-Math.PI / 2} top={top} cut />
       <WcWall len={D} at={[D / 2, 0, -s * w / 2]} yaw={s > 0 ? 0 : Math.PI} top={top} />
       <WcWall len={X0} at={[X0 / 2, 0, s * w / 2]} yaw={s > 0 ? Math.PI : 0} top={top} />
-      {[-1, 1].map((f) => (
-        <mesh key={f} position={[SX, h + (top - h) / 2, s * w / 2]} rotation-y={(s * f) > 0 ? 0 : Math.PI}>
-          <planeGeometry args={[SW, top - h]} /><meshToonMaterial color="#ece0c6" />
-        </mesh>
-      ))}
       <WcWall len={E} at={[X0, 0, SZ]} yaw={Math.PI / 2} top={top} />
       <WcWall len={SW} at={[SX, 0, s * (w / 2 + E)]} yaw={s > 0 ? Math.PI : 0} top={top} />
-      {/* (the way through: a dark post at the short wall's end, a head beam over it, the noren's rod under that) */}
-      <mesh position={[X0 + 0.02, h / 2, s * w / 2]}><boxGeometry args={[0.04, h, 0.05]} /><meshToonMaterial color="#2e1d12" /></mesh>
-      <mesh position={[SX, h - 0.02, s * w / 2]}><boxGeometry args={[SW, 0.05, 0.05]} /><meshToonMaterial color="#2e1d12" /></mesh>
+      {/* the walls' bodies behind their faces, solid to the top (cut open at the back wall, seen from outside): the wall toward the other
+          toilet's rooms (theirs the other half of it); by the door, the short wall and the depth of the shop's wall before the toilet's room,
+          one block; over the way through, the plaster's lintel; the toilet's room's end */}
+      <WcMass x={[0, D]} y={[0, top]} z={[-s * (w / 2 + 0.002), -s * (w / 2 + WC_T)]} />
+      <WcMass x={[0, X0 - 0.002]} y={[0, top]} z={[s * (w / 2 + 0.002), s * (w / 2 + E + WC_T)]} />
+      <WcMass x={[X0, D]} y={[h, top]} z={[s * w / 2, s * (w / 2 + WC_T)]} />
+      <WcMass x={[X0, D]} y={[0, top]} z={[s * (w / 2 + E + 0.002), s * (w / 2 + E + WC_T)]} />
+      {/* (the way through: a cedar post at the short wall's end, as deep as the wall; the noren's rod under the lintel, on two little brackets) */}
+      <mesh position={[X0 + 0.02, h / 2, s * (w / 2 + WC_T / 2 - 0.005)]}><boxGeometry args={[0.04, h, WC_T + 0.01]} /><meshToonMaterial color="#5a3a22" /></mesh>
       <mesh position={[SX, h - 0.07, s * (w / 2 - 0.035)]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.008, 0.008, OP + 0.04, 8]} /><meshToonMaterial color="#3a2416" /></mesh>
-      {/* the ceilings of dark boards, beams across them */}
-      <mesh position={[D / 2, top, 0]} rotation-x={Math.PI / 2}><planeGeometry args={[D, w]} /><meshToonMaterial color="#3a2416" /></mesh>
-      <mesh position={[SX, top, SZ]} rotation-x={Math.PI / 2}><planeGeometry args={[SW, E]} /><meshToonMaterial color="#3a2416" /></mesh>
-      {[0.25, 0.7].map((x) => <mesh key={x} position={[x, top - 0.03, 0]}><boxGeometry args={[0.06, 0.06, w]} /><meshToonMaterial color="#241408" /></mesh>)}
-      <mesh position={[SX, top - 0.03, SZ]}><boxGeometry args={[SW, 0.06, 0.06]} /><meshToonMaterial color="#241408" /></mesh>
+      {[X0 + 0.07, D - 0.05].map((x) => <mesh key={x} position={[x, h - 0.04, s * (w / 2 - 0.018)]}><boxGeometry args={[0.012, 0.07, 0.036]} /><meshToonMaterial color="#3a2416" /></mesh>)}
       </StaticBatch>
       {/* the long noren across the way to the toilet, its two panels hanging from the rod (the noren and the rod stand still: batched apart,
           their picture each its own) */}
@@ -2221,10 +2249,11 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         </group>
       ))}
       </StaticBatch></Movable>
-      <Movable id={`wc2-${who}-lamp`} label={`紙燈（${name}）`}><WcLamp who={who} at={[D / 2, h + 0.1, 0]} /><StaticBatch>
-      {/* a paper lamp over each room, in a wooden cage: on a motion sensor, bright while someone's in or the door's open, dim otherwise */}
-      <mesh position={[D / 2, h + 0.1, 0]}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
-      </StaticBatch></Movable>
+      <Movable id={`wc2-${who}-lamp`} label={`紙燈（${name}）`}>
+      {/* a paper lamp on the wall toward the other toilet, on its arm: on a motion sensor, bright while someone's in or the door's open, dim
+          otherwise */}
+      <WcSconce who={who} at={[D * 0.62, h - 0.02, -s * w / 2]} yaw={s > 0 ? 0 : Math.PI} />
+      </Movable>
       {/* ---- the toilet's room, in its own frame: x from the way in (0) to its far end (E), z across it */}
       <group position={[SX, 0, s * w / 2]} rotation-y={-s * Math.PI / 2}>
         <Movable id={`wc2-${who}-toilet`} label={`馬桶（${name}）`}>
@@ -2271,9 +2300,10 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
             <group position={[E - 0.42, 0.98, -W2]}><WcPads /></group>
           </Movable>
         )}
-        <Movable id={`wc2-${who}-lamp2`} label={`隔間紙燈（${name}）`}><WcLamp who={who} at={[E / 2, h + 0.1, 0]} /><StaticBatch>
-          <mesh position={[E / 2, h + 0.1, 0]}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
-        </StaticBatch></Movable>
+        <Movable id={`wc2-${who}-lamp2`} label={`隔間紙燈（${name}）`}>
+          {/* (the toilet's own lamp on its end wall, over the window) */}
+          <WcSconce who={who} at={[E, h - 0.02, 0]} yaw={-Math.PI / 2} />
+        </Movable>
       </group>
     </group>
   )
@@ -2656,10 +2686,19 @@ function StaffDoor() {
  * The whole doorway, noren and plaque too, as one easy thing to point at: an unseen plane just in front of it (clicking it works the door, pointing
  * lights up the sliding panel and names it). Not merged, so it can be pointed at.
  */
+/** a raycast that never finds anything: what's set on something not to be pointed at for now */
+const NO_RAYCAST = () => {}
 function ToiletHit({ who }: { who: 'm' | 'f' }) {
   const W = WC_W, H = WC_H
+  // (not there for the pointer while the door's open: what's inside is clicked through the doorway (the tap, the toilet), not the door (the
+  // owner clicked the tap and got the door); the door's shut again by clicking its panel, slid aside)
+  const hit = useRef<THREE.Mesh>(null)
+  useFrame(() => {
+    const m = hit.current, d = TOILETS[who]
+    if (m) m.raycast = d.open || d.passing > 0 ? NO_RAYCAST : THREE.Mesh.prototype.raycast
+  })
   return (
-      <mesh position={[-0.16, (H + 0.3) / 2, 0]} rotation-y={-Math.PI / 2}
+      <mesh ref={hit} position={[-0.16, (H + 0.3) / 2, 0]} rotation-y={-Math.PI / 2}
         onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; doorClick(who, Math.max(0, 1 - ev.distance / 8)) }}
         onPointerOver={(ev) => {
           ev.stopPropagation()
@@ -3255,7 +3294,7 @@ function Pendant({ z, drop, pool, band = 0 }: { z: number; drop: number; pool: n
  * One counter's stretch of the room: the wall behind its aisle (from/to along it, in the counter's own frame), and
  * pendant lamps over it.
  */
-function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, clear = [], corner = false, hang = [], staffDoor }: { c: Counter; from: number; to: number; far: number
+function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar = false, clear = [], corner = false, hang = [], staffDoor }: { c: Counter; from: number; to: number; far: number
   /** prints hung here as well, where asked (along it) */
   hang?: { z: number; print: ArtKey }[]
   /** a staff-only door here (its middle, along it): nothing hung over it */
@@ -3267,7 +3306,9 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
   clear?: [number, number][]
   /** its shelf an altar instead (by the door): a command flag in the censer, and incense (lit when, and lighting more) */
   altar?: boolean | { litAt: number | null; onLight: () => void }
-  lamps: number
+  /** its pendant lamps' edit ids (this, then their number) and their name in the list (each counter's its own) */
+  lampId: string
+  lampName: string
   /** the bar top's height, where the lamps' light falls */
   top: number
   /** where along it the sliding door to the toilet is, if it has one */
@@ -3469,12 +3510,11 @@ function DiningWallImpl({ c, from, to, far, lamps, top, door, altar = false, cle
           <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /><ToiletHit who={who} /></group>
         ))}
       </group>
-      {/* pendant lamps over the bar's customer side, low */}
-      {Array.from({ length: lamps }, (_, i) => {
-        const z = (i - (lamps - 1) / 2) * (c.length / lamps)
-        // (three kinds in turn (the owner's): the oval washi one, the round one with 日式烤魚 on it, the fish)
-        return <Movable key={i} id={`pendant${i}`} label={`吊燈 ${i + 1}`}><group position-x={0.05} userData={{ fade: true }}><Pendant z={z} drop={0.25} pool={top} band={i % 2} /></group></Movable>
-      })}
+      {/* pendant lamps over the bar's customer side, low: one between each two places, midway (the owner's: a lamp between one customer and
+          the next; bar's lampsAlong), their bands 鱗 and 立涌 in turn */}
+      {lampsAlong(c).map((z, i) => (
+        <Movable key={i} id={`${lampId}${i}`} label={`吊燈（${lampName} ${i + 1}）`}><group position-x={0.05} userData={{ fade: true }}><Pendant z={z} drop={0.25} pool={top} band={i % 2} /></group></Movable>
+      ))}
     </group>
   )
 }
@@ -4011,6 +4051,7 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
  * pours out of it in a low white mist.
  */
 export const FridgeDoor = memo(FridgeDoorImpl)
+const FRIDGE_DOOR_AT = new THREE.Vector3()
 function FridgeDoorImpl({ n = 0 }: { n?: number }) {
   const { W, D } = FRIDGE
   const { door, doorRoot } = useFreezer(n)
@@ -4018,8 +4059,13 @@ function FridgeDoorImpl({ n = 0 }: { n?: number }) {
   const mist = useRef(0)
   // (the door's state lives outside React: leave it shut when the shop's let go, so it doesn't come back open)
   useEffect(() => () => { FRIDGE_STATE[n].open = false; FRIDGE_STATE[n].passing = 0 }, [n])
-  useFrame((_, dt) => {
+  // (heard: its seal let go as it starts to swing open, a muffled knock as it swings shut (the owner's), as loud as it's near)
+  const heard = useRef(0)
+  useFrame(({ camera }, dt) => {
     const want = FRIDGE_STATE[n].passing > 0 || FRIDGE_STATE[n].open ? 1 : 0
+    const near = () => Math.max(0, 1 - door.getWorldPosition(FRIDGE_DOOR_AT).distanceTo(camera.position) / 12)
+    if (want && !heard.current) { heard.current = 1; coolerDoorSound(true, near()) }
+    else if (!want && heard.current && open.current < 0.04) { heard.current = 0; coolerDoorSound(false, near()) }
     open.current += Math.sign(want - open.current) * Math.min(Math.abs(want - open.current), Math.min(dt, 0.1) * 2.2)
     const e = open.current * open.current * (3 - 2 * open.current)
     door.rotation.y = -e * (Math.PI / 2)
@@ -5235,7 +5281,7 @@ function LightSwitch() {
   const { on } = useLights()
   const [lit, setLit] = useState(false)
   const tag = () => setTip({ title: '電燈開關', hint: getLights().on ? '點一下關燈' : '點一下開燈' })
-  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; pressLightSwitch(); tag() }
+  const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; pressLightSwitch(); lightSwitchSound(getLights().on); tag() }
   const gltf = useGLTF(SWITCH_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const root = gltf.scene.clone(true)

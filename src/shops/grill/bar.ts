@@ -629,11 +629,16 @@ export const ALONG = new THREE.Vector3(0.81, 0, -0.59)
 export const OWNER_SPOT = new THREE.Vector3().addScaledVector(LAY, 2.62).addScaledVector(ALONG, 1.2)
 export const OWNER_YAW = (() => { const v = new THREE.Vector3().addScaledVector(LAY, 2.0).addScaledVector(ALONG, -0.4); return Math.atan2(-v.x, -v.z) })()
 
-/** how far apart the grill's stools stand along the side counter (the long one's five are spread wider, over the run its six had: the owner
- * found six too crowded) */
+/** how far apart the grill's stools stood along the side counter, four of them (the long one's five spread wider, over the run its six had:
+ * the owner found six too crowded); every place now as far apart as the long counter's (BAR_PITCH) */
 export const SEAT_PITCH = 0.75
+/** how far apart the grill's places are, at both counters alike (the owner's: eight places in all, evenly spaced) */
+export const BAR_PITCH = (SEAT_PITCH * 5) / 4
 /** where a counter's n-th place is along it, from its middle: what the stools, the places' settings and their drawers all go by */
 export const seatAlong = (c: Counter, n: number) => (n - (c.seats - 1) / 2) * (c.pitch ?? c.length / c.seats) + (c.shift ?? 0)
+/** where a counter's pendant lamps hang along it, from its middle: one between each two places next to each other, midway (the owner's: a
+ * lamp between one customer and the next) */
+export const lampsAlong = (c: Counter) => Array.from({ length: Math.max(0, c.seats - 1) }, (_, n) => (seatAlong(c, n) + seatAlong(c, n + 1)) / 2)
 
 export function seatsOf(cs: Counter[]): Seat[] {
   return cs.flatMap((c, ci) => Array.from({ length: c.seats }, (_, n) => {
@@ -723,11 +728,12 @@ export const GRILL_COUNTERS: Counter[] = [
   // (five places, not six, spread over the run the six had: first and last where they were, the rest evenly between (the owner's: one fewer,
   // evenly spread, not so crowded); 0.94 apart)
   { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2 - BAR_TRIM / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL - BAR_TRIM, seats: 5,
-    pitch: (SEAT_PITCH * 5) / 4, shift: -0.1 },
+    pitch: BAR_PITCH, shift: -0.1 },
   // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)
-  // (its four places as far apart as the long one's, in the middle of its run between the gate and the corner)
-  { at: new THREE.Vector3().addScaledVector(LAY, -0.42 + 0.25).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14 + 0.5, seats: 4,
-    pitch: SEAT_PITCH, shift: 0.25,
+  // (its three places as far apart as the long one's (the owner's: eight in all, evenly spaced; it had four, closer), about the middle of its
+  // run between the gate and the corner, where its four were)
+  { at: new THREE.Vector3().addScaledVector(LAY, -0.42 + 0.25).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14 + 0.5, seats: 3,
+    pitch: BAR_PITCH, shift: 0.25,
     // (its wall set further back, for the drinks fridges by the toilets: where it was, the counter having moved off it)
     far: FLOOR_FAR - 0.45 - SIDE_PULL },
 ]
