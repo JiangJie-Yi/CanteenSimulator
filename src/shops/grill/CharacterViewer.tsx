@@ -14,6 +14,7 @@ import { FolkFigure } from '@/scene/FolkFigure'
 import type { Mood } from '@/scene/people'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
+import { WireView } from './Movable'
 
 type Entry = { key: string; zh: string; ja: string; en: string; group: 'boss' | 'staff' | 'guest'; role?: Role; female?: boolean; kind?: GuestKind }
 const ENTRIES: Entry[] = [
@@ -150,6 +151,8 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
               </Fitted>
             </Suspense>
             <OrbitControls target={[0, 0.9, 0]} enablePan={false} minDistance={2} maxDistance={9} />
+            {/* (the wireframe (4) here too, its hidden lines hidden) */}
+            <WireView />
           </Canvas>
           {([-1, 1] as const).map((d) => (
             <button key={d} type="button" className={`char-view-arrow ${d < 0 ? 'is-prev' : 'is-next'}`} onClick={() => step(d)}

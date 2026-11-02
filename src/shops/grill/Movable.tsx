@@ -167,29 +167,60 @@ export function GroupGizmo() {
   )
 }
 
-/** developer mode's wireframe (Maya's 4): every material drawn as its edges, so each model's topology shows; 5 (or leaving) puts it back */
+/** the materials' own wireframe settings while it's shown, kept for every view of it (the scene's and the character viewer's share materials) */
+const WIRE_WAS = new Map<THREE.Material, boolean>()
+let wireUsers = 0
+/** what a surface writes to the depth only, drawn before the lines: the lines behind a surface are hidden by it */
+const WIRE_DEPTH = new THREE.MeshBasicMaterial({ colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })
+/**
+ * Developer mode's wireframe (Maya's 4): every material drawn as its edges, so each model's topology shows; 5 (or leaving) puts it back. Only
+ * the edges that can be seen (a depth-only copy of each mesh drawn first, its lines over it): drawn all through, a figure's back and every
+ * layer under its front showed through it, and its wiring read as parts all overlapping (the owner's). In each canvas it's put in.
+ */
 export function WireView() {
   const { wire, on } = useEdit()
   const scene = useThree((st) => st.scene)
   useEffect(() => {
     if (!wire || !on) return
-    const was = new Map<THREE.Material, boolean>()
+    wireUsers++
+    const shadows: THREE.Mesh[] = []
+    const seen = new Set<THREE.Object3D>()
     const apply = () => scene.traverse((o) => {
       const m = o as THREE.Mesh
-      if (!m.isMesh || m.userData.editHandle) return
+      if (!m.isMesh || m.userData.editHandle || m.userData.wireDepth || seen.has(m)) return
+      seen.add(m)
+      let any = false
       for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
         const w = mat as THREE.Material & { wireframe?: boolean }
-        if (w.wireframe === undefined || was.has(mat)) continue
-        was.set(mat, w.wireframe)
+        if (w.wireframe === undefined || !w.visible || (mat.transparent && !mat.depthWrite)) continue
+        any = true
+        if (!WIRE_WAS.has(mat)) WIRE_WAS.set(mat, !!w.wireframe)
         w.wireframe = true
       }
+      if (!any) return
+      // (its depth-only copy: the same shape, bent the same way if it's skinned, set out the same way if instanced)
+      const sk = m as THREE.SkinnedMesh, im = m as THREE.InstancedMesh
+      let d: THREE.Mesh
+      if (sk.isSkinnedMesh) { const s = new THREE.SkinnedMesh(m.geometry, WIRE_DEPTH); s.bind(sk.skeleton, sk.bindMatrix); d = s }
+      else if (im.isInstancedMesh) { const i = new THREE.InstancedMesh(m.geometry, WIRE_DEPTH, im.count); i.instanceMatrix = im.instanceMatrix; d = i }
+      else d = new THREE.Mesh(m.geometry, WIRE_DEPTH)
+      d.userData.wireDepth = true
+      d.renderOrder = -1
+      d.frustumCulled = false
+      d.raycast = () => {}
+      m.add(d)
+      shadows.push(d)
     })
     apply()
     // (models still loading, or batches merging, are caught a moment later)
     const t = window.setInterval(apply, 1000)
     return () => {
       window.clearInterval(t)
-      for (const [mat, w] of was) (mat as THREE.Material & { wireframe: boolean }).wireframe = w
+      for (const d of shadows) d.removeFromParent()
+      if (--wireUsers === 0) {
+        for (const [mat, w] of WIRE_WAS) (mat as THREE.Material & { wireframe: boolean }).wireframe = w
+        WIRE_WAS.clear()
+      }
     }
   }, [wire, on, scene])
   return null
