@@ -1,10 +1,12 @@
 """The supplies in the corner by the drinks fridge (the owner's: tissue cartons and cleaning things, for the toilets and about the shop):
 supplies.glb, node "CornerSupplies".
 
-Two corrugated cartons of tissue boxes stacked (taped shut, the upper one turned a little; their print, 衛生紙 and what's in them, is the
-game's: their faces UV'd onto one picture, "SupplyCartonPrint"), a twelve-roll pack of toilet paper on the floor beside them, and the cleaning
-things against the wall: a blue bucket with a string mop stood in it, a broom (a straw head on a bamboo handle), two trigger spray bottles and
-a jug of detergent.
+Two corrugated cartons of tissue boxes stacked (taped shut, the upper one turned a little), a twelve-roll pack of toilet paper on top, a
+blue bucket in front, and a carton of cleaning things (the owner's: the detergents boxed, not stood about loose; the mop and the broom gone).
+The cartons' print is the game's ("SupplyCartonPrint", 1536 x 512): each carton laid out on it as a flat dieline at one scale, 750 px to the
+metre, so what's printed keeps its shape on every face (the owner saw the words run off the edges: a face was squeezed into a cell of
+another shape): its front (its back the same) and one end side by side along the top of its piece, its top under them; the pieces side by
+side, the two tissue cartons and then the cleaning one (CARTON_PIECES below, which the game's painter follows).
 
 The game's frame (y up), its back to the wall at z = 0 (facing +z), along the wall x, the floor at y = 0; about 0.9 along, 0.4 out, real
 size (metres), about half a metre along it.
@@ -71,9 +73,14 @@ def fin(o, mat, smooth=True):
     return o
 
 
-def carton(name, cx, y0, cz, w, d, h, yaw, cell):
-    """a corrugated carton, taped shut: its four sides and top UV'd onto the print picture's cell `cell` (of four across, two up: the long
-    sides in the cell's top half, the ends and the top below), its edges a touch rounded; a strip of tape over its top and down its ends"""
+PX, TW, TH = 750.0, 1536.0, 512.0
+CARTON_PIECES = []
+
+
+def carton(name, cx, y0, cz, w, d, h, yaw, px0):
+    """a corrugated carton, taped shut: its faces laid out on the print as a dieline from `px0` along it (front and back on one piece W x H,
+    the ends on one D x H beside it, the top W x D under them; the bottom on a corner of the top), one scale for all; a strip of tape over
+    its top and down its ends"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     hw, hd = w / 2, d / 2
@@ -82,21 +89,28 @@ def carton(name, cx, y0, cz, w, d, h, yaw, cell):
     def at(x, y, z):
         c, s = math.cos(yaw), math.sin(yaw)
         return P(cx + x * c + z * s, y0 + y, cz - x * s + z * c)
-    cu, cv = (cell % 4) / 4, (cell // 4) / 2
-    # (each face: the cell's left half the front/back, right half the ends; the top along the cell's foot)
+    # (the pieces, in the print's pixels from its top left: front x0..x0+W, end beside it, top under the front)
+    W, D, H = w * PX, d * PX, h * PX
+    front = (px0, 0.0, px0 + W, H)
+    end = (px0 + W, 0.0, px0 + W + D, H)
+    top = (px0, H, px0 + W, H + D)
+    CARTON_PIECES.append((name, px0, W, D, H))
+    # (each face's corners in its own order: bottom left, bottom right, top right, top left as seen from outside it; the top's "bottom" its
+    # front edge)
     faces = [
-        ([(-hw, 0, hd), (hw, 0, hd), (hw, h, hd), (-hw, h, hd)], (0.0, 0.3, 0.5, 1.0)),       # front (+z)
-        ([(hw, 0, -hd), (-hw, 0, -hd), (-hw, h, -hd), (hw, h, -hd)], (0.0, 0.3, 0.5, 1.0)),   # back
-        ([(hw, 0, hd), (hw, 0, -hd), (hw, h, -hd), (hw, h, hd)], (0.5, 0.3, 1.0, 1.0)),       # end (+x)
-        ([(-hw, 0, -hd), (-hw, 0, hd), (-hw, h, hd), (-hw, h, -hd)], (0.5, 0.3, 1.0, 1.0)),   # end (-x)
-        ([(-hw, h, hd), (hw, h, hd), (hw, h, -hd), (-hw, h, -hd)], (0.0, 0.0, 1.0, 0.3)),     # top
-        ([(-hw, 0, -hd), (hw, 0, -hd), (hw, 0, hd), (-hw, 0, hd)], (0.0, 0.0, 0.1, 0.1)),     # bottom
+        ([(-hw, 0, hd), (hw, 0, hd), (hw, h, hd), (-hw, h, hd)], front),       # front (+z)
+        ([(hw, 0, -hd), (-hw, 0, -hd), (-hw, h, -hd), (hw, h, -hd)], front),   # back
+        ([(hw, 0, hd), (hw, 0, -hd), (hw, h, -hd), (hw, h, hd)], end),         # end (+x)
+        ([(-hw, 0, -hd), (-hw, 0, hd), (-hw, h, hd), (-hw, h, -hd)], end),     # end (-x)
+        ([(-hw, h, hd), (hw, h, hd), (hw, h, -hd), (-hw, h, -hd)], top),       # top
+        ([(-hw, 0, -hd), (hw, 0, -hd), (hw, 0, hd), (-hw, 0, hd)], (px0, H + D - 8, px0 + 8, H + D)),  # bottom
     ]
-    for pts, (u0, v0, u1, v1) in faces:
+    for pts, (x0, ya, x1, yb) in faces:
         vs = [bm.verts.new(at(*p)) for p in pts]
         f = bm.faces.new(vs)
-        for lp, (uu, vv) in zip(f.loops, ((u0, v0), (u1, v0), (u1, v1), (u0, v1))):
-            lp[uvl].uv = (cu + uu / 4, cv + vv / 2)
+        # (the picture's v runs up from its foot: a face's foot is the piece's lower edge (yb), its top the upper (ya))
+        for lp, (uu, vv) in zip(f.loops, ((x0, yb), (x1, yb), (x1, ya), (x0, ya))):
+            lp[uvl].uv = (uu / TW, 1 - vv / TH)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
@@ -142,9 +156,10 @@ def stick(name, mat, a, b, r, segs=8):
 
 
 # ---- stacked to fit the narrow gap between the drinks fridge and the toilets' door (about half a metre along the wall): the cartons
-# against the wall, the pack of rolls on top of them, the bucket and mop in front of them, the broom leant beside, the bottles at the side
-carton("SupplyCarton0", 0.0, 0.0, 0.17, 0.44, 0.31, 0.27, 0.0, 0)
-carton("SupplyCarton1", 0.01, 0.27, 0.17, 0.4, 0.29, 0.24, 0.08, 1)
+# against the wall, the pack of rolls on top of them, the bucket and the carton of cleaning things in front of them
+carton("SupplyCarton0", 0.0, 0.0, 0.17, 0.44, 0.31, 0.27, 0.0, 4.0)
+carton("SupplyCarton1", 0.01, 0.27, 0.17, 0.4, 0.29, 0.24, 0.08, 4.0 + (0.44 + 0.31) * PX + 10)
+carton("SupplyCarton2", 0.15, 0.0, 0.47, 0.26, 0.2, 0.22, -0.1, 4.0 + (0.44 + 0.31 + 0.4 + 0.29) * PX + 20)
 for i in range(3):
     for j in range(2):
         for k in range(2):
@@ -157,41 +172,17 @@ band.name = "SupplyWrapBand"
 band.scale = (0.316, 0.216, 0.05)
 bpy.ops.object.transform_apply(scale=True)
 fin(band, "wrap", smooth=False)
-bx, bz = -0.1, 0.5
+bx, bz = -0.15, 0.52
 cyl("SupplyBucket", "bucket", bx, 0.0, bz, 0.12, 0.15, 0.27, segs=20, cap=False)
 cyl("SupplyBucketFloor", "bucketin", bx, 0.003, bz, 0.118, 0.118, 0.003, segs=20)
 stick("SupplyBucketBail", "handle", (bx - 0.15, 0.27, bz), (bx + 0.15, 0.27, bz), 0.004, 6)
-stick("SupplyMopHandle", "handle", (bx + 0.02, 0.06, bz), (bx - 0.06, 1.25, 0.035), 0.012, 8)
-for k in range(14):
-    a = 2 * math.pi * k / 14
-    stick(f"SupplyMopStrand{k}", "mop", (bx + 0.02 + 0.02 * math.cos(a), 0.22, bz + 0.02 * math.sin(a)),
-          (bx + 0.02 + 0.08 * math.cos(a), 0.06, bz + 0.08 * math.sin(a)), 0.012, 5)
-stick("SupplyBroomHandle", "bamboo", (0.2, 0.2, 0.46), (0.23, 1.3, 0.035), 0.012, 8)
-bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.11, radius2=0.035, depth=0.22, location=P(0.195, 0.11, 0.48))
-head = bpy.context.view_layer.objects.active
-head.name = "SupplyBroomHead"
-head.scale = (1.0, 0.35, 1.0)
-bpy.ops.object.transform_apply(scale=True)
-fin(head, "broom")
-for k, (x, mat) in enumerate(((0.07, "bottleW"), (0.14, "bottleP"))):
-    cyl(f"SupplySpray{k}", mat, x, 0.0, 0.4, 0.035, 0.03, 0.2, segs=14)
-    cyl(f"SupplySprayNeck{k}", "trigger", x, 0.2, 0.4, 0.016, 0.014, 0.03, segs=10)
-    bpy.ops.mesh.primitive_cube_add(size=1, location=P(x, 0.245, 0.415))
-    t = bpy.context.view_layer.objects.active
-    t.name = f"SupplyTrigger{k}"
-    t.scale = (0.02, 0.035, 0.05)
-    bpy.ops.object.transform_apply(scale=True)
-    fin(t, "trigger", smooth=False)
-    cyl(f"SupplySprayLabel{k}", "label", x, 0.06, 0.4, 0.0355, 0.034, 0.08, segs=14, cap=False)
-cyl("SupplyJug", "jug", 0.07, 0.0, 0.5, 0.055, 0.05, 0.22, segs=16)
-cyl("SupplyJugCap", "cap", 0.07, 0.22, 0.5, 0.02, 0.018, 0.03, segs=10)
-cyl("SupplyJugLabel", "label", 0.07, 0.07, 0.5, 0.0555, 0.054, 0.09, segs=16, cap=False)
 
 root = bpy.data.objects.new("CornerSupplies", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
     o.parent = root
 print("SUPPLIES_TRIS", sum(len(p.vertices) - 2 for o in parts for p in o.data.polygons))
+print("CARTON_PIECES", [(n, round(x), round(w), round(d), round(h)) for n, x, w, d, h in CARTON_PIECES])
 if PREVIEW:
     cam = bpy.data.objects.new("PreviewCam", bpy.data.cameras.new("PreviewCam"))
     bpy.context.collection.objects.link(cam)
