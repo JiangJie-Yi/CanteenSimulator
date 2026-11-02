@@ -44,7 +44,7 @@ export const usePacedDpr = () => useSyncExternalStore((f) => { pacedSubs.add(f);
  * jumps.
  */
 export function FramePacer() {
-  const { setDpr, setFrameloop, advance, clock, gl } = useThree()
+  const { setDpr, setFrameloop, advance, clock, gl, get } = useThree()
   const pace = useRef(newPace())
   const capped = useRef(false)
   // (the tab coming back: its first frames come slow)
@@ -64,7 +64,8 @@ export function FramePacer() {
     const act = paceFrame(p, dt / GAME_SPEED.value)
     if (!act) return
     capped.current = p.level === 2
-    if (p.level >= 1) { setPaced(1); setDpr(1) } else setPaced(null)
+    // (the resolution set only when it changes: a needless setDpr asks R3F for a frame of its own, see below)
+    if (p.level >= 1) { setPaced(1); if (gl.getPixelRatio() !== 1) setDpr(1) } else setPaced(null)
     if (import.meta.env.DEV) console.info(`[pacer] ${p.fps.toFixed(0)} fps: ${act === 'down' ? 'down' : 'back up'} to ${['the full resolution', 'one pixel per screen pixel', 'one pixel per screen pixel, held to 30 a second'][p.level]}`)
   })
 
@@ -75,6 +76,8 @@ export function FramePacer() {
     let last = 0
     let game = 0
     let manual = false
+    // (the game's time last handed to the scene, run by hand: what its clock should read)
+    let shown = 0
     const tick = (t: number) => {
       raf = requestAnimationFrame(tick)
       const want = capped.current || GAME_SPEED.value !== 1
@@ -84,7 +87,13 @@ export function FramePacer() {
         // (carrying on from the scene's own clock; and handing it back with its last tick set to now, so its next
         // step isn't the whole time since it started)
         game = clock.elapsedTime
+        shown = game
         if (!want) clock.oldTime = performance.now()
+        // (going over to the loop run by hand: any frame R3F has still been asked for (a setDpr, a change to its store) is dropped. Left, R3F's
+        // own loop drew it at its next tick with its own timestamp, in milliseconds, taken for the game's clock in seconds: every frame
+        // callback was handed some fifty thousand seconds, then as many back, and every timer in the shop stood still for hours (the
+        // e2e's customers never came, under software GL, where the pacer steps down))
+        if (want) get().internal.frames = 0
         setFrameloop(want ? 'never' : 'always')
       }
       if (!manual) return
@@ -92,7 +101,10 @@ export function FramePacer() {
       const step = Math.min(MAX_STEP, Math.max(0, (t - last) / 1000))
       last = t
       game += step * GAME_SPEED.value
+      // (and the clock as this left it, should anything else have moved it meanwhile: the scene's step is only ever this one)
+      if (clock.elapsedTime !== shown) clock.elapsedTime = shown
       advance(game)
+      shown = game
     }
     raf = requestAnimationFrame(tick)
     return () => {
@@ -102,6 +114,6 @@ export function FramePacer() {
         setFrameloop('always')
       }
     }
-  }, [setFrameloop, advance, clock])
+  }, [setFrameloop, advance, clock, get])
   return null
 }
