@@ -10,7 +10,9 @@
 - "BarDrawerCase", "BarDrawer", "BarTissueLow": each place's drawer under the top on the customers' side (the owner's: a box of tissues to
   each place, in its own drawer): a walnut case open at the front hanging under the top, 17 cm across (the owner's: half what it was), 12.5
   deep (down) and 26 back; the drawer that runs in it, its front a little proud, a brass bar pull; and the box of tissues that lives in it,
-  a compact one lying lengthways in the drawer, its tissue only just pulled up (a full puff would be squashed under the top). The case's and
+  a compact one lying lengthways in the drawer, its tissue only just pulled up (a full puff would be squashed under the top), and the next
+  tissue as it's left once one's been pulled, standing up out of the slot ("BarTissueLowPop": the game shows it once the box has been
+  used, the flat one before; the owner's: a box that's been pulled from shows it). The case's and
   the drawer's origin is the middle of the case's front edge along its top (the top's underside): the case runs back into +z and down, the
   drawer slides out toward -z.
 - "BarTissuePull": a tissue as it's pulled out of the box: a soft sheet hanging from where it's held (its top edge at the origin).
@@ -629,7 +631,8 @@ for name, build, offset in (
                                   fin(tissue_sheet("BarTissueSheet"), M["paper"], ps)], (0.7, 0, 0)),
         ("BarTissueLow", lambda ps: [fin(tissue_case("BarTissueLowCase", W=0.2, H=0.06, D=0.11), M["walnut"], ps),
                                      fin(slot("BarTissueLowSlot", W=0.1, y=0.0602), M["slot"], ps),
-                                     fin(tissue_sheet("BarTissueLowSheet", h=0.01, fan=0.02, y0=0.06), M["paper"], ps)], (0.7, 0, 0.3)),
+                                     fin(tissue_sheet("BarTissueLowSheet", h=0.01, fan=0.02, y0=0.06), M["paper"], ps),
+                                     fin(tissue_sheet("BarTissueLowPop", h=0.04, fan=0.04, y0=0.06), M["paper"], ps)], (0.7, 0, 0.3)),
         ("BarTissuePull", lambda ps: [fin(tissue_pull("BarTissuePullSheet"), M["paper"], ps)], (0.95, 0.2, 0.3)),
         ("BarDrawerCase", lambda ps: [fin(drawer_case("BarDrawerCaseBody"), M["walnut"], ps)], (0.1, 0.2, 0.3)),
         ("BarDrawer", lambda ps: [fin(drawer_body("BarDrawerBody"), M["walnut"], ps), fin(drawer_pull("BarDrawerPull"), M["brass"], ps)], (0.5, 0.2, 0.3)),

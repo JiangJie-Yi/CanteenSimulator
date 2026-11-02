@@ -35,7 +35,8 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, SHRINE_FLOWERS, WC_GRUMBLE } from './bar'
+import { COAL_BRIDGE, SHRINE_FLOWERS, WC_GRUMBLE, tissuesAt } from './bar'
+import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
 import { flowerBuffs } from '@/game/shrineFlowers'
@@ -1908,25 +1909,42 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
   const slider = useRef<THREE.Group>(null)
   const inside = useRef<THREE.Group>(null)
   const sheet = useRef<THREE.Group>(null)
-  const st = useRef({ open: false, at: 0, pulled: -1 })
+  const box = useRef<THREE.Group>(null)
+  const st = useRef({ open: false, at: 0, pulled: -1, used: false, sheets: null as null | { flat: THREE.Object3D; up: THREE.Object3D } })
   const says = () => (st.current.open ? '裡面一盒衛生紙・點衛生紙抽一張・點抽屜推回去' : '一個座位一盒衛生紙・點一下拉開')
   useFrame((_, dt) => {
     const s = st.current
     if (s.open && SEATS_TAKEN.has(seat)) { s.open = false; drawerSound(true) }
-    // (a tissue pulled: drawn out of the slot toward whoever pulled it, low, and only once it's clear of the counter's edge over the drawer
-    // up and away, fading (it rose straight up through the counter's top))
+    // (a box that's been pulled from shows it: the next tissue left standing up out of the slot, the flat one only in a new box)
+    if (s.at > 0.02 && box.current) {
+      if (!s.sheets) {
+        const flat = box.current.getObjectByName('BarTissueLowSheet'), up = box.current.getObjectByName('BarTissueLowPop')
+        if (flat && up) s.sheets = { flat, up }
+      }
+      if (s.sheets) {
+        const used = s.used || tissuesAt(seat) < BOX_SHEETS
+        s.sheets.up.visible = used
+        s.sheets.flat.visible = !used
+      }
+    }
+    // (a tissue pulled, the owner's way: drawn up out of the slot, its foot in the slot till it's all out, leaning out toward whoever's
+    // pulling it, then lifted on up and away, fading. The sheet hangs from its top edge, so it's stretched out of the slot from nothing
+    // as its top rises (it hung its whole length below the box from the start, under the drawer, and looked to be falling))
     const g = sheet.current
     if (g && s.pulled >= 0) {
       s.pulled += dt
       const k = s.pulled / TISSUE_FLY
       if (k >= 1) { s.pulled = -1; g.visible = false } else {
         g.visible = true
-        const out = 0.16 * THREE.MathUtils.smoothstep(k, 0, 0.35) + 0.08 * k
-        const up = THREE.MathUtils.smootherstep(k, 0.3, 0.75)
-        g.position.set(Math.sin(k * 5) * 0.012, 0.02 + up * 0.22 + k * 0.03, -out)
-        g.rotation.set(-0.25 * k, Math.sin(k * 3) * 0.3, Math.sin(k * 6) * 0.12)
-        g.scale.setScalar(0.35 + 0.65 * THREE.MathUtils.smoothstep(k, 0, 0.3))
-        const fade = 1 - THREE.MathUtils.smoothstep(k, 0.6, 1)
+        const rise = THREE.MathUtils.smoothstep(k, 0, 0.42)
+        const free = THREE.MathUtils.smootherstep(k, 0.42, 1)
+        const len = TISSUE_LEN * rise
+        // (its top edge: up out of the slot and leaning out toward the customer as it comes, then on up and away)
+        g.position.set(Math.sin(k * 7) * 0.006 * free, TISSUE_SLOT + len * 0.93 + free * 0.1, -(0.4 * len + free * 0.17))
+        // (leaning back to the slot as it's drawn, its width along the slot's length; a little sway once it's free)
+        g.rotation.set(-0.4 * rise + 0.15 * free, Math.PI / 2 + Math.sin(k * 4) * 0.25 * free, Math.sin(k * 6) * 0.1 * free)
+        g.scale.set(0.72 + 0.28 * free, Math.max(0.02, rise), 1)
+        const fade = 1 - THREE.MathUtils.smoothstep(k, 0.62, 1)
         g.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m) m.opacity = fade })
       }
     }
@@ -1936,6 +1954,13 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
     if (slider.current) slider.current.position.z = -DRAWER.out * s.at
     if (inside.current) inside.current.visible = s.at > 0.02
   })
+  /** the drawer clicked: out, or back in */
+  const toggle = () => {
+    if (SEATS_TAKEN.has(seat)) { setTip({ title: '抽屜', hint: '客人坐著，等他走了再開' }); return }
+    st.current.open = !st.current.open
+    drawerSound(!st.current.open)
+    setTip({ title: '抽屜', hint: says() })
+  }
   return (
     <group position={[x, BAR_TOP - 0.06, DRAWER.z]}>
       {/* (handlers on a group round it: a primitive's own aren't attached) */}
@@ -1945,22 +1970,21 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
         onClick={(e) => {
           e.stopPropagation()
           if (getEdit().on) return
-          if (SEATS_TAKEN.has(seat)) { setTip({ title: '抽屜', hint: '客人坐著，等他走了再開' }); return }
-          st.current.open = !st.current.open
-          drawerSound(!st.current.open)
-          setTip({ title: '抽屜', hint: says() })
+          toggle()
         }}>
         <BarPiece name="BarDrawer" grain={grain} />
         <group ref={inside} position={DRAWER.tissue} visible={false}>
-          {/* (the box itself: a click on it pulls a tissue) */}
-          <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; tipOver('衛生紙', '點一下抽一張').onPointerOver(e) }}
+          {/* (the box itself: a click on it pulls a tissue. Shut away it isn't drawn, but it's still in the pointer's way (the pointer's
+              rays don't mind what's hidden): there it's the drawer, which a click opens) */}
+          <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; if (st.current.open) tipOver('衛生紙', '點一下抽一張').onPointerOver(e); else tipOver('抽屜', says()).onPointerOver(e) }}
             onPointerOut={(e) => { if (getEdit().on) return; tipOver('衛生紙', '').onPointerOut(e) }}
             onClick={(e) => {
               e.stopPropagation()
-              if (getEdit().on || !st.current.open) return
-              if (st.current.pulled < 0) { st.current.pulled = 0; tissuePull() }
+              if (getEdit().on) return
+              if (!st.current.open) { toggle(); return }
+              if (st.current.pulled < 0) { st.current.pulled = 0; st.current.used = true; tissuePull() }
             }}>
-            <BarPiece name="BarTissueLow" />
+            <group ref={box}><BarPiece name="BarTissueLow" /></group>
           </group>
           <group ref={sheet} visible={false}><BarPiece name="BarTissuePull" fade /></group>
         </group>
@@ -1973,8 +1997,11 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
  * slope they lie at from the table up onto it */
 // (the rest lies across the chopsticks now (the owner's): they cross its drawn-in waist, lower than its ends, so they slope less)
 const SETTING = { chopL: 0.22, restX: 0.088, chopTilt: Math.atan2(0.0075, 0.198) }
-/** how long a pulled tissue takes to drift off and fade */
-const TISSUE_FLY = 1.6
+/** how long a pulled tissue takes to come out and drift off, fading; how long it is (BarTissuePull hangs this far from its top edge); and how
+ * high the box's slot stands over the box's foot */
+const TISSUE_FLY = 1.8
+const TISSUE_LEN = 0.17
+const TISSUE_SLOT = 0.06
 const SETTING_URL = import.meta.env.BASE_URL + 'models/barsetting.glb'
 const settingPieces = new Map<string, THREE.Object3D>()
 /** the polished brass of the drawers' pulls (real metal, the studio in it), made once */
