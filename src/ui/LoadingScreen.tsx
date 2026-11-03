@@ -63,7 +63,7 @@ export function LoadingScreen({ scene = true }: { scene?: boolean }) {
       <div className="loading-board">
         <h1>聞野</h1>
         <small>日式烤魚</small>
-        <div className="loading-bar"><i style={{ width: `${pct ?? 0}%` }} /></div>
+        <div className="loading-bar"><i style={{ width: `${pct ?? 0}%`, '--done': (pct ?? 0) / 100 } as React.CSSProperties} /></div>
         <p>{pct === null ? '開店準備中…' : `開店準備中 ${pct.toFixed(0)}%`}</p>
       </div>
       {stuck && (
