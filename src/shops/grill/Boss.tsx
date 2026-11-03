@@ -40,7 +40,7 @@ const ROUND: Phase[] = [
 const ROUND_OPEN: Phase[] = [{ act: 'idle', len: 6 }, { act: 'wave', len: 3 }]
 const WALK_SPEED = 0.9
 /** how near the camera he may come, anywhere in the picture, before he fades (while it's looking past him at something else) */
-const BOSS_CLOSE = 2.6
+const BOSS_CLOSE = 3.4
 const RUN_SPEED = 2.4
 
 /** `to`: the far end of his walk, in the frame he stands in (x, z), from his place at its origin, facing +z */

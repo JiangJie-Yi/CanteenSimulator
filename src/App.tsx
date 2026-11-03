@@ -177,6 +177,10 @@ const OVERVIEW_POSITION = new THREE.Vector3(21.7, 15.5, 2.2)
 const CAMERA_FOV = 40
 /** the lens of the view through the owner's eyes: wide, as a first-person view is */
 const WIDE_FOV = 85
+/** how long the camera takes flying from one view to another (s), eased in and out */
+const FLY_S = 0.9
+/** which way along his own z the owner faces (+1 or -1): his portrait's taken from there */
+const PORTRAIT_FACE = 1
 
 const ITEM_IDS = Object.fromEntries(DISHES.map((d) => [d.id, d.items.map((it) => it.id)]))
 /** every menu item by id (for its calories when it's eaten) */
@@ -553,13 +557,11 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
   const spotRef = useRef(spotLock)
   spotRef.current = spotLock
   const wasLocked = useRef(false)
-  // (the view through the owner's eyes is a wide one; every other view the usual lens)
-  const wide = !editing && !!VIEW_SPOTS.find((v) => v.id === view)?.follow
-  useEffect(() => {
-    const cam = camera as THREE.PerspectiveCamera
-    cam.fov = wide ? WIDE_FOV : CAMERA_FOV
-    cam.updateProjectionMatrix()
-  }, [wide, camera])
+  // (each view its own lens (the owner's: a cinematographer's choice for each, VIEW_SPOTS' fov), eased to as the camera flies there; through
+  // the owner's eyes a wide one; edit mode the usual)
+  const spotNow = VIEW_SPOTS.find((v) => v.id === view)
+  const fovGoal = useRef(CAMERA_FOV)
+  fovGoal.current = editing ? CAMERA_FOV : spotNow?.follow && !spotNow.portrait ? WIDE_FOV : spotNow?.fov ?? CAMERA_FOV
   const scene = useThree((s) => s.scene)
   const size = useThree((s) => s.size)
   // frame the dish on the stage rather than the whole canvas: shift the projection so the stage's centre is
@@ -654,6 +656,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
   // on every dish change (and when the viewport reshapes), glide the camera back to the home pose
   // so framing never drifts
   const homing = useRef(true)
+  /** the flight under way to a view: from where, and how far through it (0..1) */
+  const fly = useRef<{ pos: THREE.Vector3; target: THREE.Vector3; t: number } | null>(null)
   const home = useRef(new THREE.Vector3())
   const homeTarget = useMemo(() => new THREE.Vector3(), [])
   // (what the camera was last homed for: a change in the canvas's own shape alone (the menu folding or opening, edit mode folding it) isn't a reason to
@@ -682,6 +686,18 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
       const frame = anchor.parent ?? anchor
       frame.updateWorldMatrix(true, false)
       const p = anchor.position
+      // (a portrait of him (the owner's): from in front of him and a little to one side, a three-quarter view, at his eyes' height, looking
+      // at his face; carried along as he goes)
+      if (spot.portrait) {
+        // (the way he faces, his own (he turns as he goes), level; his eyes' and face's heights, and how big a unit of his frame is)
+        anchor.updateWorldMatrix(true, false)
+        const fwd = new THREE.Vector3(0, 0, PORTRAIT_FACE).transformDirection(anchor.matrixWorld).setY(0).normalize()
+        const side = new THREE.Vector3(0, 1, 0).cross(fwd)
+        const unit = frame.getWorldScale(new THREE.Vector3()).x
+        const base = anchor.getWorldPosition(new THREE.Vector3())
+        const eyeY = frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.98, p.z)).y, faceY = frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.86, p.z)).y
+        return { pos: base.clone().setY(eyeY + 0.08 * unit).addScaledVector(fwd, 2.1 * unit).addScaledVector(side, 1.0 * unit), target: base.clone().setY(faceY - 0.04 * unit) }
+      }
       // (looking at the fire, wherever he's standing: what he's minding; from where he was looking straight ahead the view was the
       // underside of the table by him)
       const eye = frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.98, p.z + 0.42))
@@ -759,8 +775,18 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
       const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()))
       aimTarget.copy(aimPos.current).addScaledVector(dir, def.pos.distanceTo(def.target))
     }
+    // (a longer or shorter lens than the usual, the camera dollied back or in to keep the same framing, as a cameraman would: a narrower lens
+    // from where the wider one stood cropped the overview's walls)
+    const lens = VIEW_SPOTS.find((v) => v.id === view)?.fov
+    // (from as far as it was ever seen from: the overview's stood further than the controls let it, and was held at their limit, 20)
+    if (def && lens && !editing) {
+      const arm = aimPos.current.clone().sub(aimTarget)
+      arm.setLength(Math.min(arm.length(), 20) * Math.tan((CAMERA_FOV * Math.PI) / 360) / Math.tan((lens * Math.PI) / 360))
+      aimPos.current.copy(aimTarget).add(arm)
+    }
     homing.current = true
     homeGap.current = Infinity
+    fly.current = null
     zoomGoal.current = null
   }, [active, aspect, resetView, view, frame.w, frame.h, size.width, size.height, camTry])
 
@@ -841,6 +867,9 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
 
   useFrame((_, delta) => {
     const k = reducedMotion ? 1 : Math.min(1, delta * 6)
+    // (the lens eased to the view's own)
+    const pc = camera as THREE.PerspectiveCamera
+    if (Math.abs(pc.fov - fovGoal.current) > 0.01) { pc.fov += (fovGoal.current - pc.fov) * (reducedMotion ? 1 : Math.min(1, delta * 4)); pc.updateProjectionMatrix() }
     // slide dishes along X; a dish that wraps from one side to the other jumps instead of crossing the stage
     groups.current.forEach((g, i) => {
       if (!g) return
@@ -866,7 +895,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
     const c = controls.current
     // (a view that follows what it looks at (the owner, about his grill): its aim moved on with him every frame, the camera gliding after)
     const follow = VIEW_SPOTS.find((v) => v.id === view)?.follow && spotLock ? poseOf(view) : null
-    if (c && follow) {
+    // (his portrait flown to like any view, then held on him; first person held to his eyes at once)
+    if (c && follow && !(homing.current && spotNow?.portrait)) {
       // (first person: held to his eyes every frame, no gliding after)
       camera.position.copy(follow.pos)
       c.target.copy(follow.target)
@@ -900,10 +930,15 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
       wasLocked.current = false
     } else if (c && homing.current) {
       c.enabled = !spotLock
-      camera.position.lerp(aimPos.current, k)
-      // (any panning is undone too: the target slides back to the middle of the dish)
-      c.target.lerp(aimTarget, k)
+      // (flown there over FLY_S, eased in and out (the owner's: 0.8 to 1 s, smooth), not slowing on and on as it nears; any panning undone too)
+      if (!fly.current) fly.current = { pos: camera.position.clone(), target: c.target.clone(), t: 0 }
+      const f = fly.current
+      f.t = reducedMotion ? 1 : Math.min(1, f.t + delta / FLY_S)
+      const e = f.t < 0.5 ? 4 * f.t ** 3 : 1 - (-2 * f.t + 2) ** 3 / 2
+      camera.position.lerpVectors(f.pos, aimPos.current, e)
+      c.target.lerpVectors(f.target, aimTarget, e)
       c.update()
+      if (f.t >= 1) { homing.current = false; fly.current = null }
       // (there, or as near as it can come: the controls' limits (distance, how low it looks) can keep it off the aim, and then it would be held
       // there for good, every frame, the view never let go)
       const gap = camera.position.distanceTo(aimPos.current) + c.target.distanceTo(aimTarget)
@@ -1061,7 +1096,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
         // which also pinch to zoom
         touches={IS_TOUCH ? { ONE: -1 as unknown as THREE.TOUCH, TWO: THREE.TOUCH.DOLLY_ROTATE } : undefined}
         minDistance={1.8}
-        maxDistance={20}
+        maxDistance={24}
         maxPolarAngle={Math.PI * 0.45}
         // the wheel is handled below for a smooth glide; rotation eases to a stop, quickly (the owner's: at 0.08 the view went on drifting
         // a good while after it was let go, and seemed to move by itself); never turning on its own
