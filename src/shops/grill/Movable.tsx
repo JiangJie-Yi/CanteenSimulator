@@ -188,6 +188,8 @@ export function WireView() {
     wireUsers++
     const shadows: THREE.Mesh[] = []
     const seen = new Set<THREE.Object3D>()
+    // (every shape drawn as lines: three builds each one a line index for it, kept as long as the shape is; let go once it's shaded again)
+    const wired = new Set<THREE.BufferGeometry>()
     const apply = () => scene.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh || m.userData.editHandle || m.userData.wireDepth || seen.has(m)) return
@@ -201,6 +203,7 @@ export function WireView() {
         w.wireframe = true
       }
       if (!any) return
+      wired.add(m.geometry)
       // (its depth-only copy: the same shape, bent the same way if it's skinned, set out the same way if instanced)
       const sk = m as THREE.SkinnedMesh, im = m as THREE.InstancedMesh
       let d: THREE.Mesh
@@ -209,7 +212,8 @@ export function WireView() {
       else d = new THREE.Mesh(m.geometry, WIRE_DEPTH)
       d.userData.wireDepth = true
       d.renderOrder = -1
-      d.frustumCulled = false
+      // (culled as its mesh is: drawn for everything off screen too, it doubled the draws (the owner saw 3,000))
+      d.frustumCulled = m.frustumCulled
       d.raycast = () => {}
       m.add(d)
       shadows.push(d)
@@ -223,6 +227,9 @@ export function WireView() {
       if (--wireUsers === 0) {
         for (const [mat, w] of WIRE_WAS) (mat as THREE.Material & { wireframe: boolean }).wireframe = w
         WIRE_WAS.clear()
+        // (each shape's line index let go (three drops it with the shape's buffers; they're sent again as it's next drawn): kept, the heap
+        // stayed 200 MB up after the wireframe was left (the owner saw 606 MB))
+        for (const g of wired) g.dispose()
       }
     }
   }, [wire, on, scene])

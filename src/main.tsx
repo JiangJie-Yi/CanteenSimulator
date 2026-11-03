@@ -2,6 +2,7 @@
 import './scene/gpuSweep'
 // (and a phone fetches none of the 3D shop: it draws it flat)
 import './scene/flatGate'
+import './scene/triProfiler'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
