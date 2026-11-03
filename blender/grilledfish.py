@@ -1016,7 +1016,10 @@ def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
     length = d.length + extra
     point_len = 0.06
     total = length + point_len
-    rings, seg = 40, 8
+    # (sixteen rings up the shaft (its drift is five spans), three more down the point, whose last is closed across in a ladder: forty, the
+    # last eight points all at its tip, a fan of degenerate triangles there)
+    zs = [length * i / 16 for i in range(17)] + [length + point_len * q for q in (0.4, 0.72, 0.92)]
+    rings, seg = len(zs) - 1, 8
     r0 = random.uniform(0.0065, 0.0085)
     bow = random.uniform(-0.008, 0.008)
     flat = random.uniform(0.8, 1.0)                      # split bamboo is never quite round
@@ -1024,9 +1027,8 @@ def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     grid = []
-    for i in range(rings + 1):
-        t = i / rings
-        z = t * total
+    for i, z in enumerate(zs):
+        t = z / total
         # thickness drifts along the stick, then tapers to the point over the last few centimetres
         k = wob[int(t * 5)] * (1 - (t * 5 % 1)) + wob[int(t * 5) + 1] * (t * 5 % 1)
         if z > length:
@@ -1041,6 +1043,7 @@ def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
             for l, (uu, vv) in zip(f.loops, ((j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1))):
                 l[uvl].uv = (uu / seg, vv / rings)
     bm.faces.new(grid[0][::-1])
+    ladder_fill(bm, grid[-1])
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
