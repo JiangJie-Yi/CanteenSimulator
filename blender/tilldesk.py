@@ -714,8 +714,9 @@ def leaflet(name, at, ang, L, W, droop, mat_):
     """one pachira leaflet: a long pointed oval, fanned out at `ang` from where it joins, arching down along its length, its UVs along it"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    # (four steps across, not two: the midrib's fold and an edge each side are all that show of it; eight along its arch)
-    NU, NV = 8, 2
+    # (the midrib's fold and an edge each side across it; six along its arch, its base and tip one point each (eight rows, those two rows
+    # three points all in one place: a pole of degenerate triangles at either end))
+    NU, NV = 6, 2
     vs = []
     for i in range(NU + 1):
         t = i / NU
@@ -726,13 +727,21 @@ def leaflet(name, at, ang, L, W, droop, mat_):
             x, z = t * L, q * half
             # (arched down along it, and cupped a little across it, folded up along the midrib)
             y = -droop * t * t + abs(q) * half * 0.25
+            if i in (0, NU) and j > 0:
+                row.append((row[0][0], (t, j / NV)))
+                continue
             row.append((bm.verts.new((x * math.cos(ang) - z * math.sin(ang) + at[0], -(x * math.sin(ang) + z * math.cos(ang)) - at[2], y + at[1])), (t, j / NV)))
         vs.append(row)
     for i in range(NU):
         for j in range(NV):
-            quad = (vs[i][j], vs[i + 1][j], vs[i + 1][j + 1], vs[i][j + 1])
-            f = bm.faces.new([q[0] for q in quad])
-            for lp, q in zip(f.loops, quad):
+            quad = [vs[i][j], vs[i + 1][j], vs[i + 1][j + 1], vs[i][j + 1]]
+            # (at the base and the tip, a triangle)
+            seen = []
+            for q in quad:
+                if all(q[0] is not s_[0] for s_ in seen):
+                    seen.append(q)
+            f = bm.faces.new([q[0] for q in seen])
+            for lp, q in zip(f.loops, seen):
                 lp[uvl].uv = q[1]
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
