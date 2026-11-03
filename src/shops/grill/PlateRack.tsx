@@ -44,21 +44,17 @@ const SHELVES = [0.1, 0.5]
 const WOOD = '#a9774a'
 const WOOD_DARK = '#7d5430'
 
-/** a plate's section, out from the middle (x) and up (y), in its radius: a foot ring under it, a flat well, the rim curving up to a rounded
- * lip, and back down the inside a little thinner; all the way round (wareGeometry turns it) */
+/** a plate's section, out from the middle (x) and up (y), in its radius: a foot ring under it, a flat well, the rim sweeping up to a rounded
+ * lip, and back down the inside a little thinner; all the way round (wareGeometry turns it). Ten points (it was eighteen: the rim's sweep in
+ * three steps each side, which the outline and the toon light never showed from across the kitchen) */
 function plateProfile(R: number): [number, number][] {
-  const pts: [number, number][] = [[0, 0.018], [0.3, 0.018], [0.33, 0.004], [0.36, 0], [0.42, 0], [0.45, 0.012], [0.5, 0.02]]
-  // (the underside of the rim, sweeping up and out)
-  for (let k = 1; k <= 3; k++) { const t = k / 3; pts.push([0.5 + 0.48 * t, 0.02 + 0.13 * t ** 1.8]) }
-  // (the lip, rounded over, and the top of the rim back in)
-  pts.push([0.995, 0.162], [0.99, 0.172], [0.975, 0.172])
-  for (let k = 3; k >= 1; k--) { const t = k / 3; pts.push([0.5 + 0.46 * t, 0.045 + 0.12 * t ** 1.8]) }
-  pts.push([0.45, 0.042], [0, 0.04])
+  const pts: [number, number][] = [[0, 0.018], [0.33, 0.004], [0.42, 0], [0.5, 0.02], [0.76, 0.065], [0.995, 0.165], [0.975, 0.172],
+    [0.74, 0.088], [0.45, 0.042], [0, 0.04]]
   return pts.map(([x, y]) => [x * R, y * R])
 }
-// (twenty round and three steps up each side of the rim: fifty of them stand in the racks, each inked, and they're seen from across the
-// kitchen, stood on edge or stacked; a quarter fewer faces than the plates on the bar, which are looked down on close to)
-const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R, 20)
+// (sixteen round: fifty of them stand in the racks, each inked, seen from across the kitchen, stood on edge or stacked; 288 faces each,
+// 680 before (the owner's: the racks drew 68,000 between them))
+const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R, 16)
 type Spot = { m: THREE.Matrix4; design: number }
 
 /** how far each plate in a pile stands above the one under it: they nest, foot in the one below's well (the plate's well sits 0.04 R up,
