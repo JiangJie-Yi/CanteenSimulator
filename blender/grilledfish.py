@@ -1281,6 +1281,21 @@ def fan(length, spread, n, ragged=0.2):
     return pts
 
 
+def ladder_poles(bm, uvl):
+    """a unit uv sphere's two poles (on its z axis) taken out and the ring beside each closed across in a ladder, not a fan into the pole
+    (the owner's: those shade in dark blotches); the ladder's UVs at that ring's own height"""
+    for pole in [v for v in bm.verts if abs(v.co.z) > 0.9999]:
+        ring = [e.other_vert(pole) for e in pole.link_edges]
+        ring.sort(key=lambda v: math.atan2(v.co.y, v.co.x))
+        vs = [lp[uvl].uv.y for v in ring for lp in v.link_loops]
+        vv = sum(vs) / len(vs)
+        bm.verts.remove(pole)
+        for f in ladder_fill(bm, ring):
+            for lp in f.loops:
+                lp[uvl].uv = (0.5 + 0.5 * math.atan2(lp.vert.co.y, lp.vert.co.x) / math.pi, vv)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+
+
 def fish(species="ayu"):
     """A whole salt-grilled fish (塩焼き) as it hangs round the fire at a robatayaki: built along local X with its head at -X (down the
     skewer, its open mouth toward the coals, the tail up at the top), the body nearly straight with just a little swim left in it.
@@ -1298,16 +1313,7 @@ def fish(species="ayu"):
     # (24 round, 24 along: 56 by 40 made each fish some 4,500 triangles, with a fan of 56 into each end; its scales are the normal map's)
     bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=24, radius=1, calc_uvs=True)
     # (each end, the snout's tip and the tail's root, closed across the ring beside it in a ladder, not a fan into the pole)
-    for pole in [v for v in bm.verts if abs(v.co.z) > 0.9999]:
-        ring = [e.other_vert(pole) for e in pole.link_edges]
-        ring.sort(key=lambda v: math.atan2(v.co.y, v.co.x))
-        vs = [lp[uvl].uv.y for v in ring for lp in v.link_loops]
-        vv = sum(vs) / len(vs)
-        bm.verts.remove(pole)
-        for f in ladder_fill(bm, ring):
-            for lp in f.loops:
-                lp[uvl].uv = (0.5 + 0.5 * math.atan2(lp.vert.co.y, lp.vert.co.x) / math.pi, vv)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ladder_poles(bm, uvl)
     for vtx in bm.verts:
         # turn the sphere so its poles are the tail (-X) and the head (+X): its UVs then run along the fish
         ox, oy, oz = vtx.co
@@ -2097,8 +2103,10 @@ def squid():
     with sauce, a broad diamond of fins at its tip, the head with its eyes below, and eight short arms plus two
     long tentacles curling down and out."""
     bm = bmesh.new()
-    bm.loops.layers.uv.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=24, radius=1, calc_uvs=True)
+    uvl = bm.loops.layers.uv.new()
+    # (20 round, 16 along, its ends laddered: 32 by 24 with a fan of 32 into each)
+    bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=16, radius=1, calc_uvs=True)
+    ladder_poles(bm, uvl)
     for vtx in bm.verts:
         ox, oy, oz = vtx.co
         vtx.co = Vector((oz, oy, -ox))                    # poles along the stick, like the fish
@@ -2117,12 +2125,12 @@ def squid():
     parts.append(flat_fin("SquidFin", [(0.04, 0.0), (-0.035, 0.085), (-0.1, 0.0), (-0.035, -0.085)], 0.007,
                           M["squid"], at=(0.2, 0, 0)))
     # the head, a little narrower than the mantle's open end, with an eye on each side
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=10, location=(-0.115, 0, 0))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=7, location=(-0.115, 0, 0))
     head = active()
     head.scale = (0.03, 0.026, 0.032)
     parts.append(finish(head, "SquidHead", M["squid"]))
     for side in (-1, 1):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=10, ring_count=6, location=(-0.11, side * 0.024, 0.008))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=8, ring_count=5, location=(-0.11, side * 0.024, 0.008))
         parts.append(finish(active(), "SquidEye", M["pupil"]))
     # arms fanning down from the head, curling at the ends; the two long feeding tentacles reach further
     for i in range(10):
@@ -2136,7 +2144,7 @@ def squid():
             pts.append((-0.13 - s * length,
                         spread * 0.02 + random.uniform(-0.002, 0.002),
                         spread * (0.02 + s * length * 0.45) + math.sin(s * math.pi * curl) * 0.02 * s))
-        parts.append(tube(pts, 0.0075 if not long_ else 0.006, 0.0015, M["squid"], "SquidArm"))
+        parts.append(tube(pts, 0.0075 if not long_ else 0.006, 0.0015, M["squid"], "SquidArm", seg=6))
     # a good-sized squid, half as big again as it's drawn above
     for o in parts:
         o.location *= 1.5
