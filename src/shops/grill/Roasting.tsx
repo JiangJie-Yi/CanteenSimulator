@@ -337,12 +337,12 @@ function TrashBinImpl({ position, container, contents = 0 }: { position: [number
   // and foot bound in dark rattan, a strip of washi on the front with ごみ brushed on it; open-topped, so the
   // woven inside shows
   const body = useMemo(() => {
-    const g = new THREE.CylinderGeometry(R * 1.04, R * 0.86, TRASH_H, 64, 1, true)
+    const g = new THREE.CylinderGeometry(R * 1.04, R * 0.86, TRASH_H, 24, 1, true)
     g.translate(0, TRASH_H / 2, 0)
     return g
   }, [R])
   const inner = useMemo(() => {
-    const g = new THREE.CylinderGeometry(R * 0.99, R * 0.82, TRASH_H - 0.02, 48, 1, true)
+    const g = new THREE.CylinderGeometry(R * 0.99, R * 0.82, TRASH_H - 0.02, 24, 1, true)
     g.translate(0, TRASH_H / 2 + 0.01, 0)
     return g
   }, [R])
@@ -412,15 +412,15 @@ function TrashBinImpl({ position, container, contents = 0 }: { position: [number
       </mesh>
       {/* the rattan-bound rim, a second band below it, and the foot */}
       <mesh position-y={TRASH_H} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 1.04, 0.016, 8, 64]} />
+        <torusGeometry args={[R * 1.04, 0.016, 6, 24]} />
         <meshToonMaterial color="#4a2e18" map={RATTAN} />
       </mesh>
       <mesh position-y={TRASH_H * 0.82} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 1.01, 0.007, 6, 64]} />
+        <torusGeometry args={[R * 1.01, 0.007, 5, 24]} />
         <meshToonMaterial color="#5a3820" />
       </mesh>
       <mesh position-y={0.014} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 0.87, 0.014, 8, 64]} />
+        <torusGeometry args={[R * 0.87, 0.014, 6, 24]} />
         <meshToonMaterial color="#4a2e18" map={RATTAN} />
       </mesh>
       {/* the washi strip with ごみ */}
