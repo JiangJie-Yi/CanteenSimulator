@@ -212,7 +212,6 @@ bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
 NR, NA = 9, 32
 rings = []
-centre = bm.verts.new(P(0, RTOP + 0.022, 0))
 for i in range(1, NR + 1):
     t = i / NR
     row = []
@@ -223,7 +222,8 @@ for i in range(1, NR + 1):
         h = 0.022 * (1 - t * t) + 0.006 * math.sin(a_ * 3 + t * 5) * t * (1 - t) * 4 + 0.003 * math.sin(a_ * 11 + t * 17)
         row.append(bm.verts.new(P(r * math.cos(a_), RTOP + h, r * math.sin(a_))))
     rings.append(row)
-faces = [bm.faces.new((centre, rings[0][(j + 1) % NA], rings[0][j])) for j in range(NA)]
+# (its crown closed across the first ring in a ladder, not a fan of 32 into a point)
+faces = list(ladder_fill(bm, rings[0]))
 for i in range(NR - 1):
     for j in range(NA):
         jn = (j + 1) % NA
