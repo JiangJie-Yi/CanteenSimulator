@@ -14,7 +14,7 @@ const FADED = 0.18
 /** the rays: a grid round where what's looked at is on the screen (in the screen's -1..1, about a third of it across) */
 const AIM: [number, number][] = [-0.3, -0.15, 0, 0.15, 0.3].flatMap((x) => [-0.3, -0.15, 0, 0.15, 0.3].map((y) => [x, y] as [number, number]))
 
-type Fader = { root: THREE.Object3D; hit: THREE.Mesh[]; drawn: THREE.Mesh[]; k: number; want: number; own: Map<THREE.Material, THREE.Material> }
+type Fader = { root: THREE.Object3D; hit: THREE.Mesh[]; drawn: THREE.Mesh[]; ink: THREE.Mesh[]; low: number; k: number; want: number; own: Map<THREE.Material, THREE.Material> }
 
 export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefined }) {
   const { scene, camera } = useThree()
@@ -28,21 +28,28 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
     const list: Fader[] = []
     scene.traverse((o) => {
       if (!o.userData.fade) return
-      const hit: THREE.Mesh[] = [], drawn: THREE.Mesh[] = []
+      const hit: THREE.Mesh[] = [], drawn: THREE.Mesh[] = [], ink: THREE.Mesh[] = []
       o.traverse((m) => {
         const mesh = m as THREE.Mesh
         if (!mesh.isMesh || mesh.userData.glow) return
+        // (its ink line, drawn on its own back faces: not faded but put away while it's faded (the owner's: a faded lamp went a dark ball,
+        // its black hull showing through its see-through shade))
+        const mats = ([] as THREE.Material[]).concat(mesh.material)
+        if (mesh.name.endsWith('_outline') || mats.every((x) => x.side === THREE.BackSide)) { ink.push(mesh); return }
         drawn.push(mesh)
-        if (!mesh.name.endsWith('_outline')) hit.push(mesh)
+        hit.push(mesh)
       })
       const was = faders.current.find((f) => f.root === o)
-      list.push({ root: o, hit, drawn, k: was?.k ?? 1, want: 1, own: was?.own ?? new Map() })
+      // (how far it fades: a number on the mark, or FADED; a lit lamp keeps more of itself, or it goes dark against the wall behind)
+      const low = typeof o.userData.fade === 'number' ? o.userData.fade : FADED
+      list.push({ root: o, hit, drawn, ink, low, k: was?.k ?? 1, want: 1, own: was?.own ?? new Map() })
     })
     faders.current = list
   }
 
   const setOpacity = (f: Fader, k: number) => {
     const faded = k < 0.999
+    for (const m of f.ink) m.visible = !faded
     for (const m of f.drawn) {
       const orig = m.userData.fadeOrig as THREE.Material | THREE.Material[] | undefined
       // (whole again: back on its own material, which everything that changes it (the wall switch) changes for it as well)
@@ -96,7 +103,7 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
           if (ray.current.intersectObjects(f.hit, false).length) hits.add(f)
         }
       }
-      for (const f of faders.current) f.want = hits.has(f) ? FADED : 1
+      for (const f of faders.current) f.want = hits.has(f) ? f.low : 1
     }
     for (const f of faders.current) {
       if (Math.abs(f.k - f.want) >= 0.002) {
