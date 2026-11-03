@@ -164,7 +164,7 @@ def barrel(at, turn, k):
     # (the body: the straw mat round it, its rows running round; a little uneven, as a mat is)
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    NA, NZ = 32, 10
+    NA, NZ = 24, 8   # (24 round and 8 up, smooth shaded under its straw texture: 32 x 10 before)
     rings = []
     for j in range(NZ + 1):
         z = HT * j / NZ
@@ -200,7 +200,7 @@ def barrel(at, turn, k):
     # flaring out and drooping over the edge as straw does, their lengths and lean uneven; both faces, seen from in and out)
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    NB = 96
+    NB = 96   # (64, a little wider, left gaps that read as dark teeth round the lid: kept at 96)
     for i in range(NB):
         a = 2 * math.pi * i / NB + random.uniform(-0.02, 0.02)
         out_ = Vector((math.cos(a), math.sin(a), 0))
