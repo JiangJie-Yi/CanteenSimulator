@@ -376,8 +376,9 @@ outline = [(FZ, 0.003)] + SIDE + [(BZ, 0.003)]
 for zz, yy in outline:
     left.append(bm_.verts.new(P(-RW / 2, yy, zz)))
     right.append(bm_.verts.new(P(RW / 2, yy, zz)))
-bm_.faces.new(left)
-bm_.faces.new(list(reversed(right)))
+# (its sides closed in ladders of quads across them, not one face each cut into a fan)
+ladder_fill(bm_, left)
+ladder_fill(bm_, list(reversed(right)))
 n_ = len(outline)
 for i in range(n_):
     j = (i + 1) % n_
@@ -389,7 +390,7 @@ bm_.free()
 shell = bpy.data.objects.new("ReaderBody", me_)
 bpy.context.collection.objects.link(shell)
 finish(shell, "ReaderBody", M["reader"], smooth_shade=False)
-bevel(shell, 0.007, 4, angle=True)
+bevel(shell, 0.007, 2, angle=True)
 apply_mods(shell)
 smooth_angle(shell, 40)
 cr.append(shell)
@@ -665,7 +666,7 @@ apply_mods(pot)
 bpy.data.objects.remove(potin)
 mtree.append(pot)
 # (its rim: a rolled lip round the top, open in the middle so the soil and pebbles show)
-bpy.ops.mesh.primitive_torus_add(major_radius=PR - 0.003, minor_radius=0.0045, major_segments=48, minor_segments=8, location=P(0, PH2, 0))
+bpy.ops.mesh.primitive_torus_add(major_radius=PR - 0.003, minor_radius=0.0045, major_segments=24, minor_segments=6, location=P(0, PH2, 0))
 mtree.append(finish(active(), "TreePotRim", M["potGlaze"]))
 mtree.append(cyl("TreePotFoot", PR * 0.74, 0.006, P(0, 0.003, 0), M["potFoot"], verts=40))
 mtree.append(cyl("TreeSoil", PR - 0.008, 0.004, P(0, PH2 - 0.012, 0), M["soil"], verts=32))
@@ -817,7 +818,7 @@ for i in range(21):
     cx_, sy_ = math.cos(t_), math.sin(t_)
     # (a rounded square: a superellipse)
     _pts.append((math.copysign(abs(cx_) ** 0.5, cx_) * _cw, ZT + 0.0085, math.copysign(abs(sy_) ** 0.5, sy_) * _cd))
-ig.append(tube("IngotCushionCord", _pts, 0.0016, M["coinGold"]))
+ig.append(tube("IngotCushionCord", _pts, 0.0016, M["coinGold"], steps=1))
 for sx in (-1, 1):
     for sz in (-1, 1):
         bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0018, segments=10, ring_count=6, location=P(sx * 0.016, ZT + 0.0135, sz * 0.012))
