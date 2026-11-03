@@ -181,9 +181,10 @@ def box(name, size, at, mat_, bev=0.0, rot=(0, 0, 0)):
     apply_scale(o)
     finish(o, name, mat_, smooth_shade=False)
     if bev:
-        bevel(o, bev, 3, angle=False)
+        # (a round edge in two steps, smoothed across (45 degrees a step): three made each little box 188 triangles, and a pole at each corner)
+        bevel(o, bev, 2, angle=False)
         apply_mods(o)
-        smooth_angle(o)
+        smooth_angle(o, 50)
     return o
 
 
@@ -266,17 +267,33 @@ nodes = []
 # =====================================================================
 pc = []
 CR, CH = 0.034, 0.09
-cup = cyl("PenCup", CR, CH, P(0, CH / 2, 0), M["cupGlaze"], verts=48, r2=CR * 0.96)
-inner = cyl("pcin", CR - 0.0032, CH, P(0, CH / 2 + 0.004, 0), M["cupGlaze"], verts=48, r2=CR * 0.96 - 0.0032)
-m_ = cup.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = inner; m_.solver = "EXACT"
-apply_mods(cup)
-bpy.data.objects.remove(inner)
+# (turned as one wall: out round the foot, up, over the lip and down to the floor inside; 24 round, its foot and floor closed in ladders (a
+# boolean of two 48-sided cones left both cut into fans))
+cb = bmesh.new()
+NCUP = 24
+CUP_PROFILE = [(CR, 0.0), (CR * 0.96, CH), (CR * 0.96 - 0.0032, CH), (CR - 0.0032, 0.004)]
+cup_rings = [[cb.verts.new(P(r * math.cos(2 * math.pi * k / NCUP), z, r * math.sin(2 * math.pi * k / NCUP))) for k in range(NCUP)]
+             for r, z in CUP_PROFILE]
+for i in range(len(cup_rings) - 1):
+    for k in range(NCUP):
+        k2 = (k + 1) % NCUP
+        cb.faces.new((cup_rings[i][k], cup_rings[i][k2], cup_rings[i + 1][k2], cup_rings[i + 1][k]))
+ladder_fill(cb, cup_rings[0])
+ladder_fill(cb, cup_rings[-1][::-1])
+bmesh.ops.recalc_face_normals(cb, faces=cb.faces)
+cup_me = bpy.data.meshes.new("PenCup")
+cb.to_mesh(cup_me)
+cb.free()
+cup = bpy.data.objects.new("PenCup", cup_me)
+bpy.context.collection.objects.link(cup)
+cup = finish(cup, "PenCup", M["cupGlaze"])
+smooth_angle(cup, 40)
 bpy.ops.object.select_all(action="DESELECT"); cup.select_set(True); bpy.context.view_layer.objects.active = cup
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cylinder_project(); bpy.ops.object.mode_set(mode="OBJECT")
 pc.append(cup)
-pc.append(cyl("PenCupRim", CR * 0.96 + 0.0002, 0.003, P(0, CH - 0.0015, 0), M["cupRim"], verts=48))
-pc.append(cyl("PenCupBand", CR * 0.985 + 0.0004, 0.010, P(0, CH * 0.6, 0), M["cupBand"], verts=48))
-pc.append(cyl("PenCupFloor", CR - 0.0035, 0.002, P(0, 0.012, 0), M["cupIn"], verts=32))
+pc.append(cyl("PenCupRim", CR * 0.96 + 0.0002, 0.003, P(0, CH - 0.0015, 0), M["cupRim"], verts=24))
+pc.append(cyl("PenCupBand", CR * 0.985 + 0.0004, 0.010, P(0, CH * 0.6, 0), M["cupBand"], verts=24))
+pc.append(cyl("PenCupFloor", CR - 0.0035, 0.002, P(0, 0.012, 0), M["cupIn"], verts=24))
 FLOOR = 0.013
 RING = ["#1f3f9c", "#1f9cc8", "#2f8a4a", "#f0e14a", "#ef8a2a", "#c22a24", "#e05a9c", "#7a4ab0", "#16171a", "#d0d4da"]
 LEAN = 0.13
@@ -622,6 +639,12 @@ clip = box("clip", S(FW, 0.02, FD), P(0, 0.0029, 0), M["resinRib"], bev=0.01)
 m_ = lattice.modifiers.new("clip", "BOOLEAN"); m_.operation = "INTERSECT"; m_.object = clip; m_.solver = "EXACT"
 apply_mods(lattice)
 bpy.data.objects.remove(clip)
+# (the ribs' undersides, lying on the floor, never seen)
+lb = bmesh.new()
+lb.from_mesh(lattice.data)
+bmesh.ops.delete(lb, geom=[f for f in lb.faces if f.normal.z < -0.9], context="FACES")
+lb.to_mesh(lattice.data)
+lb.free()
 tr.append(lattice)
 # (its thanks drawn into a little picture on a quad a hair proud of the tray (THANKS_PRINT), not kept as a mesh of letters: 1,400 triangles)
 THANKS_PRINT = DecalAtlas("TrayThanksPrint", ppm=5000, size=(1024, 64))
