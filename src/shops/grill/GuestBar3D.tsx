@@ -21,7 +21,7 @@ import { BlobShadow } from '@/scene/BlobShadow'
 import { brushText, followSign, signTexture } from '@/scene/signFont'
 import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
-import { inkModel } from '@/scene/inkHull'
+import { inkModel, inkTogether } from '@/scene/inkHull'
 import { setTip } from '@/scene/hoverTip'
 import { shrineDoor } from './shrineSound'
 import { getLights } from '@/scene/lightsStore'
@@ -1347,23 +1347,51 @@ useGLTF.preload(SHOE_URL)
  * The genkan's shoe cupboard (blender/shoecab.py; the owner's): a low walnut cabinet, nine shoji-latticed doors over empty cubbies (the guests' own shoes go in them).
  * Pointed at, it says what it is; a click swings all nine open 75 degrees or shut, a wooden knock as they go.
  */
+/** the shoe cupboard's one material: its parts' colours on their points */
+const SHOE_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
 function ShoeCupboard() {
   const gltf = useGLTF(SHOE_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const root = gltf.scene.clone(true)
-    const mats = new Map<THREE.Material, THREE.Material>()
-    root.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      let t = mats.get(src)
-      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone() }); mats.set(src, t) }
-      m.material = t
-    })
-    inkModel(root, (m) => /Pull|Strap|Kumiko|Washi/.test(m.name), { width: 0.0015, weld: true })
-    // (nine doors, three by three: each hinged on its left or right edge, as its name says)
+    // (each door, and the carcass, drawn once: its parts' colours written on their points, one material for all of it, its pieces put
+    // together; an ink line round only its wood, not round the lattice's thin bars (they'd go black). Nine doors of four materials each,
+    // each inked, were 47 draws; now two a door)
+    const parts = (node: THREE.Object3D) => {
+      const out: THREE.Mesh[] = []
+      node.traverse((o) => { if ((o as THREE.Mesh).isMesh && o !== node) out.push(o as THREE.Mesh) })
+      if ((node as THREE.Mesh).isMesh) out.push(node as THREE.Mesh)
+      return out
+    }
+    const together = (node: THREE.Object3D) => {
+      const ms = parts(node)
+      if (!ms.length) return
+      node.updateWorldMatrix(true, true)
+      const inv = node.matrixWorld.clone().invert()
+      const geos = ms.map((m) => {
+        const g = new THREE.BufferGeometry()
+        g.setAttribute('position', m.geometry.attributes.position.clone())
+        g.setAttribute('normal', m.geometry.attributes.normal.clone())
+        if (m.geometry.index) g.setIndex(m.geometry.index.clone())
+        const c = (m.material as THREE.MeshStandardMaterial).color
+        const n = g.attributes.position.count, col = new Float32Array(n * 3)
+        for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3)
+        g.setAttribute('color', new THREE.BufferAttribute(col, 3))
+        g.applyMatrix4(inv.clone().multiply(m.matrixWorld))
+        return g
+      })
+      const wood = ms.filter((m) => /^Shoe(Wood|Top)$/.test((m.material as THREE.Material).name))
+      const hull = inkTogether(wood.map((m) => { const k = new THREE.Mesh(m.geometry.clone().applyMatrix4(inv.clone().multiply(m.matrixWorld))); return k }), { width: 0.0015, weld: true })
+      for (const m of ms) if (m !== node) m.removeFromParent()
+      const one = new THREE.Mesh(mergeGeometries(geos)!, SHOE_MAT)
+      one.name = node.name + 'Drawn'
+      node.add(one)
+      if (hull) node.add(hull)
+    }
     const doors: { o: THREE.Object3D; s: number }[] = []
     root.traverse((o) => { const m = /^ShoeDoor([LR])\d+$/.exec(o.name); if (m) doors.push({ o, s: m[1] === 'L' ? -1 : 1 }) })
+    for (const d of doors) together(d.o)
+    const cab = root.getObjectByName('ShoeCab')
+    if (cab) together(cab)
     return { root, doors }
   }, [gltf])
   const st = useRef({ open: false, k: 0 })
