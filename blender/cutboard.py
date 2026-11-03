@@ -76,10 +76,10 @@ cd.fill_mode = "BOTH"
 cd.resolution_u = 24
 cd.extrude = (TOP - BOT) / 2 - 0.012
 cd.bevel_depth = 0.012
-cd.bevel_resolution = 3
+cd.bevel_resolution = 2  # (three steps before: 2,720 triangles)
 
 
-def outline(n=96):
+def outline(n=64):
     pts = []
     for k in range(n):
         a = 2 * math.pi * k / n
@@ -105,7 +105,7 @@ def spline(pts):
 spline(outline())
 # (the hang hole: an oval near the fuller end, toward the far side, big enough for fingers)
 HX, HY, HA, HB = L / 2 - 0.2, D / 2 - 0.2, 0.11, 0.06
-spline([(HX + HA * math.cos(2 * math.pi * k / 40), HY + HB * math.sin(2 * math.pi * k / 40)) for k in range(40)][::-1])
+spline([(HX + HA * math.cos(2 * math.pi * k / 28), HY + HB * math.sin(2 * math.pi * k / 28)) for k in range(28)][::-1])
 o = bpy.data.objects.new("CutBoard", cd)
 bpy.context.collection.objects.link(o)
 o.location = (0, 0, (TOP + BOT) / 2)
