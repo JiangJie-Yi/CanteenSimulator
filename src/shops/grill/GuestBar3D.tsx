@@ -56,7 +56,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { nameOver, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -1140,6 +1140,9 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     TILL_CASH.onTake?.(r.amount)
     beep('ok')
   }
+  const rolls = useRegisterModel().rolls
+  const rollSays = (k: number) => nameOver(tl(lang, `棒金・${k} 円`, `棒金・${k}円`, `Coin roll, ¥${k}`),
+    tl(lang, `${k} 円硬幣 50 枚一捲，銀行包好的找零備用`, `${k}円玉50枚入り、銀行で巻いた釣り銭の予備`, `Fifty ¥${k} coins rolled by the bank, change kept in hand`))
   const cashTip = (k: Denom) => tipOver(
     tl(lang, `${k.toLocaleString()} 円${k >= 1000 ? '鈔' : '硬幣'}`, `${k.toLocaleString()} 円${k >= 1000 ? '札' : '玉'}`, `¥${k.toLocaleString()} ${k >= 1000 ? 'notes' : 'coins'}`),
     tl(lang, `點一下取出 ¥${(k * inDrawer[k]).toLocaleString()}，加進現金`, `クリックで ¥${(k * inDrawer[k]).toLocaleString()} を取り出す`, `Click to take ¥${(k * inDrawer[k]).toLocaleString()} into cash`))
@@ -1284,6 +1287,13 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
         }} onPointerOut={(e) => { setDrawerHover(false, e.nativeEvent); setDrawerKeyHover(false, e.nativeEvent) }}>
           {/* (its front and its tray, from the model) */}
           <RegisterDrawer />
+          {/* (the coin rolls (棒金) in the 2000s' place: each named when pointed at (the owner asked what the three were), nothing to do with
+              them; only while the drawer's out) */}
+          {rolls.map((r) => (
+            <mesh key={r.kind} name={`coinroll-${r.kind}`} position={r.at} visible={false} {...rollSays(r.kind)}>
+              <boxGeometry args={[r.size.x + 0.002, r.size.y + 0.002, r.size.z]} />
+            </mesh>
+          ))}
           {/* (the insert: each compartment and cup where the model has it, the money in it at the till's own scale) */}
           <group ref={cash} visible={false}>
             {/* the money in the insert (the insert itself is the model's): the notes face up in their compartments under the weights, a stray one
