@@ -97,6 +97,10 @@ WALNUTS = (
 )
 
 
+# (how strongly the rings' late wood shows, over each board's own: half, the owner finding the grain too heavy)
+GRAIN = 0.5
+
+
 def walnut(variant=0, N=512):
     """a board of walnut, its grain along u, drawn as the wood is: the growth rings where the face cuts them, long narrow arches up the
     board where it's flat-sawn (the log's taper: each arch's peak toward +u), straight stripes where it's quartered; each ring's late wood
@@ -120,25 +124,27 @@ def walnut(variant=0, N=512):
     ring = ring + (fbm(N, 2, 7, 3) - 0.5) * 1.6 + np.sin(ring * 0.37 + wob * 3) * 0.35
     ph = ring - np.floor(ring)
     # (each ring: the early wood pale and open, darkening through the year to a sharp edge where the next year starts)
-    late = smooth(0.35, 0.9, ph) ** 1.6 * (1 - smooth(0.93, 1.0, ph))
+    # (its edge eased, not a hard line: the owner found the grain heavy, each ring a sharp dark stroke)
+    late = smooth(0.35, 0.9, ph) ** 1.6 * (1 - smooth(0.82, 1.0, ph))
     # (each ring's late wood its own depth: a hard year's darker)
     seed(41 + variant)
-    late = late * (0.65 + 0.55 * vnoise(N, 2, 16))
+    late = late * (0.78 + 0.35 * vnoise(N, 2, 16))
     # (the colour drifting along the grain: long streaks across, between the board's two browns)
     seed(53 + variant)
     drift = smooth(0.25, 0.75, vnoise(N, 2, 9) * 0.65 + vnoise(N, 3, 23) * 0.35)
     col = mix(np.array(w["base"], np.float32), np.array(w["alt"], np.float32), drift)
-    col = col * (1 - late * w["late"])[..., None]
+    # (the late wood only a shade darker: the grain soft, as oiled walnut's is (the owner's: lighter, more natural))
+    col = col * (1 - late * w["late"] * GRAIN)[..., None]
     # (the pores: fine dark flecks, long along the grain, a few more in the late wood)
     seed(77 + variant)
     pore = vnoise(N, 12, 190) * vnoise(N, 40, 270)
     flecks = smooth(0.36, 0.56, pore) * (0.6 + 0.4 * late)
-    col = col * (1 - flecks * 0.3)[..., None]
+    col = col * (1 - flecks * 0.15)[..., None]
     # (and a silky sheen of fibre along it, with walnut's cool grey-violet in the darkest streaks)
     fibre = vnoise(N, 5, 310)
     col = col * (0.96 + 0.08 * fibre)[..., None]
     cool = np.array((0.3, 0.24, 0.24), np.float32)
-    col = mix(col, cool, (late * (1 - drift) * 0.18).astype(np.float32))
+    col = mix(col, cool, (late * (1 - drift) * 0.08).astype(np.float32))
     if w["sap"]:
         # (the sapwood: a creamy streak along one edge, its border soft and wandering)
         edge = 0.14 + 0.035 * np.sin(2 * math.pi * u * 1.3) + wob * 0.05
@@ -148,7 +154,7 @@ def walnut(variant=0, N=512):
     if w["streak"]:
         # (a dark mineral streak along the grain, fading in and out)
         line = smooth(0.03, 0.0, np.abs(v - (0.68 + 0.02 * np.sin(2 * math.pi * u)) - wob * 0.03)) * smooth(0.1, 0.4, u) * smooth(0.95, 0.7, u)
-        col = col * (1 - line * 0.35)[..., None]
+        col = col * (1 - line * 0.2)[..., None]
     return np.clip(col, 0, 1)
 
 
