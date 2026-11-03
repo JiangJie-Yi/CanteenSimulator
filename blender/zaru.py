@@ -116,21 +116,22 @@ def lathe(name, prof, segs):
     uvl = bm.loops.layers.uv.new()
     rings = [[bm.verts.new(P(r * math.cos(2 * math.pi * j / segs), y, r * math.sin(2 * math.pi * j / segs))) if r > 1e-6 else None
               for j in range(segs)] for (r, y) in prof]
-    centres = {i: bm.verts.new(P(0, y, 0)) for i, (r, y) in enumerate(prof) if r <= 1e-6}
+    # (a point of the profile on the axis isn't made: the ring beside it is closed across in a ladder, not a fan into the middle)
+    rings = [None if r[0] is None else r for r in rings]
+
+    def uv(f):
+        for lp in f.loops:
+            co = lp.vert.co
+            lp[uvl].uv = (co.x / (2 * R * 1.04) + 0.5, -co.y / (2 * R * 1.04) + 0.5)
     for i in range(len(prof) - 1):
+        a, b = rings[i], rings[i + 1]
+        if a is None or b is None:
+            for f in ladder_fill(bm, a or b):
+                uv(f)
+            continue
         for j in range(segs):
             j2 = (j + 1) % segs
-            vs = [rings[i][j] or centres[i], rings[i][j2] or centres[i], rings[i + 1][j2] or centres[i + 1], rings[i + 1][j] or centres[i + 1]]
-            uniq = []
-            for vv in vs:
-                if vv not in uniq:
-                    uniq.append(vv)
-            if len(uniq) < 3:
-                continue
-            f = bm.faces.new(uniq)
-            for lp in f.loops:
-                co = lp.vert.co
-                lp[uvl].uv = (co.x / (2 * R * 1.04) + 0.5, -co.y / (2 * R * 1.04) + 0.5)
+            uv(bm.faces.new((a[j], a[j2], b[j2], b[j])))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
@@ -142,7 +143,7 @@ def lathe(name, prof, segs):
     return o
 
 
-def hoop(name, radius, tube, y, segs=48, sides=10):
+def hoop(name, radius, tube, y, segs=48, sides=6):
     """the rolled rim: a torus round the basket's lip, its UVs u round the rim and v round the tube"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
@@ -178,7 +179,7 @@ M = {
 # (the bowl: its outside and its inside one surface with a thin wall between, the wall's top hidden under the hoop)
 prof_out = [(0.0, 0.006), (R * 0.55, 0.008), (R * 0.82, 0.036), (R * 0.97, 0.096), (R * 1.0, 0.126)]
 prof_in = [(R * 0.975, 0.126), (R * 0.95, 0.1), (R * 0.8, 0.044), (R * 0.53, 0.018), (0.0, 0.016)]
-bowl = lathe("ZaruBowl", prof_out + prof_in, 48)
+bowl = lathe("ZaruBowl", prof_out + prof_in, 32)
 bowl.data.materials.append(M["weave"])
 rim = hoop("ZaruRim", R * 0.99, 0.017, 0.132)
 rim.data.materials.append(M["rim"])
