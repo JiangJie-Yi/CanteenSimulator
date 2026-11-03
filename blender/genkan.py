@@ -116,7 +116,7 @@ def noren():
     parts = []
     W, H, ROD_Y = 1.05, 0.68, 0.0
     PW = W / 3 - 0.012
-    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.012, depth=W + 0.06, location=P(0, ROD_Y, 0), rotation=(0, math.pi / 2, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.012, depth=W + 0.06, location=P(0, ROD_Y, 0), rotation=(0, math.pi / 2, 0))
     fin(active(), "NorenRod", M["rod"], parts)
     for sd in (-1, 1):
         bpy.ops.mesh.primitive_ico_sphere_add(radius=0.017, subdivisions=2, location=P(sd * (W / 2 + 0.035), ROD_Y, 0))
@@ -131,15 +131,16 @@ def noren():
             fold = (0.004 + 0.012 * v) * math.sin(u * math.pi * 5 + k * 1.3) + 0.004 * math.sin(u * math.pi * 11 + k)
             curl = 0.01 * max(0.0, v - 0.94) / 0.06
             return P(x, y, fold - curl), (u, v)
-        # (24 across for its folds, 12 down: they only deepen toward the hem; 20 down made each panel 2,700 triangles)
-        pnl = grid_mesh(f"NorenPanel{k}", 24, 12, panel)
+        # (12 across for its folds, 5 down: they only deepen toward the hem, and the cloth's picture is its texture's; 24 x 12 made each
+        # panel 1,872 triangles with its thickness, 20 down 2,700)
+        pnl = grid_mesh(f"NorenPanel{k}", 12, 5, panel)
         sol = pnl.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.003
         bpy.context.view_layer.objects.active = pnl
         bpy.ops.object.modifier_apply(modifier="t")
         # (its tabs: three loops of the same cloth over the rod)
         tabs = []
         for t in (-0.38, 0, 0.38):
-            bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.004, major_segments=16, minor_segments=6,
+            bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.004, major_segments=10, minor_segments=4,
                                              location=P(t * PW, ROD_Y - 0.008, 0), rotation=(0, math.pi / 2, 0))
             tb = active(); tb.scale = (1.0, 0.7, 1.4)
             bpy.ops.object.transform_apply(scale=True)
