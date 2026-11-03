@@ -257,13 +257,14 @@ def stool(name, M, seat_top=0.29, R=0.128, rings_at=(0.1,), splay=0.05):
     th = 0.05
     s0 = seat_top - th
     # (the seat: a bun of oak, its top a touch domed, its edge rolled round, its underside chamfered in)
-    prof = [(0.0, seat_top + 0.004), (R * 0.55, seat_top + 0.003), (R - 0.022, seat_top), (R - 0.007, seat_top - 0.006), (R, seat_top - 0.018),
-            (R - 0.002, s0 + 0.016), (R - 0.012, s0 + 0.003), (R - 0.03, s0), (0.0, s0)]
+    # (its ends a small ring closed in a ladder, not drawn into one point: the owner's low-poly rule)
+    prof = [(R * 0.12, seat_top + 0.004), (R * 0.55, seat_top + 0.003), (R - 0.022, seat_top), (R - 0.007, seat_top - 0.006), (R, seat_top - 0.018),
+            (R - 0.002, s0 + 0.016), (R - 0.012, s0 + 0.003), (R - 0.03, s0), (R * 0.12, s0)]
     fin(lathe(f"{name}Seat", list(reversed(prof)), 24, "flat"), M["oak"], parts)
     # (the cushion: plump, domed, its middle drawn down by the button; piped round its rim)
     top = seat_top + 0.002
     cr = R - 0.02
-    cp = [(0.0, top + 0.03)]
+    cp = [(cr * 0.08, top + 0.03)]
     for i in range(1, 9):
         t = i / 8
         h = 0.046 * math.sqrt(max(0.0, 1 - t ** 3)) - 0.011 * math.exp(-(t / 0.16) ** 2)
@@ -274,7 +275,7 @@ def stool(name, M, seat_top=0.29, R=0.128, rings_at=(0.1,), splay=0.05):
     for tag, mat in (("", "cloth"), ("Red", "clothRed")):
         cush = lathe(f"{name}Cushion{tag}", list(reversed(cp)), 24, "flat")
         fin(cush, M[mat], parts)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=10, ring_count=6, location=P(0, top + 0.033, 0))
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.008, subdivisions=1, location=P(0, top + 0.033, 0))
         b = bpy.context.view_layer.objects.active
         b.name = f"{name}Button{tag}"
         b.scale = (1, 1, 0.5)
