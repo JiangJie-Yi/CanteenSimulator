@@ -6,6 +6,7 @@
 import { memo, useEffect, useState } from 'react'
 import { CC_BY_URL, CREDITS, DEV_MODEL, DEVELOPER, DEVELOPER_URL, REPO_URL, SITE_URL, VERSION } from '@/data/credits'
 import { guestLabel } from '@/data/guests'
+import { reviewerNames } from '@/data/reviewers'
 import { tl, type Lang } from '@/data/i18n'
 import { STORY } from '@/data/story'
 import { CAPITAL, SHOP_COST } from '@/game/economy'
@@ -192,18 +193,19 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
             </div>
             <h4>{tl(lang, '最近的客人說', '最近のお客さんの声', 'What the latest said')}<small>{latest.length}</small></h4>
             <ul className="rep-recent">
-              {latest.map((v, i) => {
+              {(() => { const names = reviewerNames(latest.map((v) => v.id), lang); return latest.map((v, i) => {
                 const sat = satisfaction(v)
                 const [zh, ja, en] = remarkLine(v)
                 return (
                   <li key={`${v.id}-${i}`}>
                     {/* (their profile picture, as a map app's reviews have them (the owner's: not an emoji): game/avatars) */}
-                    <ReviewerAvatar id={v.id} name={guestLabel(v.id, lang)} />
-                    <span className="rep-who">{guestLabel(v.id, lang)}<Stars v={starsOf(sat)} /></span>
+                    {/* (the name they review under, as on a map app (data/reviewers); what kind of customer they were a small tag beside it) */}
+                    <ReviewerAvatar id={v.id} name={names[i]} />
+                    <span className="rep-who">{names[i]}<small className="rep-kind">{guestLabel(v.id, lang)}</small><Stars v={starsOf(sat)} /></span>
                     <span className="rep-said">「{tl(lang, zh, ja, en)}」</span>
                   </li>
                 )
-              })}
+              }) })()}
             </ul>
             <p className="rep-note">{tl(lang, '最近 60 位客人的滿意度（越近的越重）：美味、等候時間、衛生紙、廁所、燈光、身體狀況都算。',
               '最近 60 人の満足度（新しいほど重い）：味・待ち時間・ティッシュ・トイレ・照明・体調。',
