@@ -131,7 +131,8 @@ def noren():
             fold = (0.004 + 0.012 * v) * math.sin(u * math.pi * 5 + k * 1.3) + 0.004 * math.sin(u * math.pi * 11 + k)
             curl = 0.01 * max(0.0, v - 0.94) / 0.06
             return P(x, y, fold - curl), (u, v)
-        pnl = grid_mesh(f"NorenPanel{k}", 24, 20, panel)
+        # (24 across for its folds, 12 down: they only deepen toward the hem; 20 down made each panel 2,700 triangles)
+        pnl = grid_mesh(f"NorenPanel{k}", 24, 12, panel)
         sol = pnl.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.003
         bpy.context.view_layer.objects.active = pnl
         bpy.ops.object.modifier_apply(modifier="t")
