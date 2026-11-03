@@ -19,7 +19,7 @@ import { ROLL_SLIPS } from '@/game/receipts'
  * stools runs an aisle, and the customers walk in along the aisles, never through the stools.
  */
 export type Counter = { at: THREE.Vector3; along: THREE.Vector3; lay: THREE.Vector3; length: number; seats: number
-  /** how far apart its stools are (SEAT_PITCH for the grill's, the same along every counter); its length over its seats if not given */
+  /** how far apart its stools are; its length over its seats if not given */
   pitch?: number
   /** its stools moved along it this far from evenly spaced about its middle (clear of a gate at one end) */
   shift?: number
@@ -650,11 +650,8 @@ export const ALONG = new THREE.Vector3(0.81, 0, -0.59)
 export const OWNER_SPOT = new THREE.Vector3().addScaledVector(LAY, 2.62).addScaledVector(ALONG, 1.2)
 export const OWNER_YAW = (() => { const v = new THREE.Vector3().addScaledVector(LAY, 2.0).addScaledVector(ALONG, -0.4); return Math.atan2(-v.x, -v.z) })()
 
-/** how far apart the side counter's four places are (all its run between the gate and the corner takes) */
-export const SEAT_PITCH = 0.75
-/** how far apart the long counter's places are (its five spread over the run its six had: the owner found six too crowded; four now, the
- * one by the corner gone round to the side counter) */
-export const BAR_PITCH = (SEAT_PITCH * 5) / 4
+/** a counter's places spread evenly from one end place to the other (along it, from its middle): its pitch and shift */
+const spread = (seats: number, from: number, to: number) => ({ pitch: (to - from) / (seats - 1), shift: (from + to) / 2 })
 /** where a counter's n-th place is along it, from its middle: what the stools, the places' settings and their drawers all go by */
 export const seatAlong = (c: Counter, n: number) => (n - (c.seats - 1) / 2) * (c.pitch ?? c.length / c.seats) + (c.shift ?? 0)
 /** where a counter's pendant lamps hang along it, from its middle: one between each two places next to each other, midway (the owner's: a
@@ -746,15 +743,16 @@ export const GRILL_COUNTERS: Counter[] = [
   // (its start drawn in to meet the side counter, which is drawn in from the wall by SIDE_PULL: the far end stays where it was)
   // (and its far end drawn in by BAR_TRIM: the strip of floor that was left between the kitchen and the till taken out, all past it closing up)
   // (its places drawn back a little from the gate's end: the last one's chopsticks reached the gap, its drawer the gate's post)
-  // (four places, 0.94 apart: the five it had (the owner's: not six, evenly spread, not so crowded), less the one by the corner, which went
-  // round to the side counter (the owner's: four and four, balanced); the other four where they were)
+  // (four places spread evenly over all the run there is (the owner's: the places moved along into the empty end and spread evenly): from one
+  // by the gate, drawn back from it (the owner's: place 1 was too near the genkan's door), to one by the corner end, where the run was left
+  // bare when that end's place went round to the side counter)
   { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2 - BAR_TRIM / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL - BAR_TRIM, seats: 4,
-    pitch: BAR_PITCH, shift: BAR_PITCH / 2 - 0.1 },
+    ...spread(4, -1.5, 1.45) },
   // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)
-  // (four places again, as it had before (the owner's: the long counter's place by the corner brought round, four and four), 0.75 apart, all
-  // its run between the gate and the corner takes; for a while it had three, as far apart as the long one's)
+  // (four places (the long counter's by the corner brought round, four and four) spread evenly over its whole run (the owner's: the corner
+  // end was left bare): from the one by the gate, where it was, to one by the corner, its stool clear of the long counter's back)
   { at: new THREE.Vector3().addScaledVector(LAY, -0.42 + 0.25).addScaledVector(ALONG, -2.75 + SIDE_PULL), along: LAY.clone().negate(), lay: ALONG, length: 3.14 + 0.5, seats: 4,
-    pitch: SEAT_PITCH, shift: 0.25,
+    ...spread(4, -0.875, 1.62),
     // (its wall set further back, for the drinks fridges by the toilets: where it was, the counter having moved off it)
     far: FLOOR_FAR - 0.45 - SIDE_PULL },
 ]

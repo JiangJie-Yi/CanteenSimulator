@@ -271,8 +271,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
             set([home.clone(), homeAisle.clone(), w.aisle.clone(), w.front.clone(), w.inside.clone(), w.turn.clone(), w.stall.clone()])
           } else {
             const seat = seats[next.seat]
-            // (beside the stool, on the drawer's side, facing the bar)
-            const beside = seat.aisle.clone().lerp(seat.stool, 0.55).addScaledVector(seat.along, -0.3)
+            // (beside the stool, on the drawer's side (the customer's left, + along), facing the bar)
+            const beside = seat.aisle.clone().lerp(seat.stool, 0.55).addScaledVector(seat.along, 0.3)
             set([home.clone(), homeAisle.clone(), ...(seat.counter === 1 ? [] : [aisleCornerOf(counters, c1)]), seat.aisle.clone(), beside])
           }
           s.phase = 'go'

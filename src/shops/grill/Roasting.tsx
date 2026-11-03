@@ -1741,7 +1741,6 @@ function logBarkFor(len: number) {
   if (!t && LOG_BARK) { t = LOG_BARK.clone(); t.repeat.set(1, Math.max(1, k * 2.2)); t.needsUpdate = true; BARK_BY_LEN.set(k, t) }
   return t ?? null
 }
-const LOG_KNOT = new THREE.SphereGeometry(0.011, 7, 5)
 /** how high the raised lip along the bar's cook's side stands over its top */
 /** how far the first counter's lip runs on towards the side counter's, so the two meet at the corner with no gap (the bar's own sizes) */
 const LIP_JOIN = 0.29
@@ -1898,14 +1897,10 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
             <mesh geometry={LOG_GEO} position={[0, FOOT_RAIL.y, FOOT_RAIL.z]} rotation-z={Math.PI / 2} scale={[1.16, len + 0.012, 1.16]}>
               <meshBasicMaterial color="#2a1a10" side={THREE.BackSide} />
             </mesh>
-            {/* (the bark's rings and a few knots along it, and the cut ends showing the pale wood) */}
+            {/* (the bark's rings along it, and the cut ends showing the pale wood; its knots taken off: the owner saw odd little dots under the legs) */}
             {Array.from({ length: Math.max(1, Math.round(len / 0.55)) }, (_, k) => (
               <mesh key={`r${k}`} geometry={LOG_RING} position={[-len / 2 + (len * (k + 0.5)) / Math.max(1, Math.round(len / 0.55)), FOOT_RAIL.y, FOOT_RAIL.z]}
                 rotation-z={Math.PI / 2} rotation-y={k}><meshToonMaterial color="#4a3220" /></mesh>
-            ))}
-            {Array.from({ length: Math.max(1, Math.round(len / 0.9)) }, (_, k) => (
-              <mesh key={`k${k}`} geometry={LOG_KNOT} position={[-len / 2 + (len * (k + 0.3 + (k % 2) * 0.35)) / Math.max(1, Math.round(len / 0.9)),
-                FOOT_RAIL.y + 0.012 + (k % 2) * 0.006, FOOT_RAIL.z - 0.026 - (k % 3) * 0.003]}><meshToonMaterial color="#9a6c44" /></mesh>
             ))}
             {[-1, 1].map((sd) => (
               <mesh key={`e${sd}`} geometry={LOG_END} position={[sd * (len / 2 + 0.002), FOOT_RAIL.y, FOOT_RAIL.z]} rotation-y={sd * Math.PI / 2}>
@@ -1971,10 +1966,11 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
   )
 }
 
-/** each place's drawer under the top: where it is along the place (to the customer's right: the owner's, half as wide as it was and moved over),
+/** each place's drawer under the top: where it is along the place (to the customer's left: the owner's; half as wide as it was, and for a
+ * while on their right),
  * where its case's front edge stands (just behind the top's rounded edge, on the customers' side), how far the drawer slides out, and where its
  * box of tissues sits in it (lengthways) */
-const DRAWER = { x: -0.17, z: -0.296, out: 0.15, tissue: [0, -0.105, 0.122] as [number, number, number] }
+const DRAWER = { x: 0.17, z: -0.296, out: 0.15, tissue: [0, -0.105, 0.122] as [number, number, number] }
 /**
  * Each place's drawer, a box of tissues in it (the owner's: one to each place, in its own drawer; they were a box between every two places,
  * on the top): pointed at, it lights up and says so; a click slides it out toward the customer, another back in, with the runners' rumble. Its
