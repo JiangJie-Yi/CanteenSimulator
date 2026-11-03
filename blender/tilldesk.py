@@ -700,9 +700,9 @@ for i in range(30):
     a_ = i * 2.399
     rr = 0.014 + math.sqrt(i / 30) * (PR - 0.026)
     sz = 0.0042 + _pr.random() * 0.0028
-    # (eight round and five up: squashed and half buried, smoothed, they're as round as ever)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=sz, segments=8, ring_count=5, location=P(rr * math.cos(a_), PH2 - 0.0095, rr * math.sin(a_)),
-                                         rotation=(0, 0, _pr.random() * 6.28))
+    # (an icosahedron, squashed and half buried, smoothed: as round as ever, no poles (a UV sphere's were fans of eight), 20 faces not 64)
+    bpy.ops.mesh.primitive_ico_sphere_add(radius=sz, subdivisions=0, location=P(rr * math.cos(a_), PH2 - 0.0095, rr * math.sin(a_)),
+                                          rotation=(0, 0, _pr.random() * 6.28))
     pb = active(); pb.scale = (1 + _pr.random() * 0.5, 1, 0.55); apply_scale(pb)
     mtree.append(finish(pb, f"TreePebble{i}", M[("pebble", "pebble2", "pebble3")[i % 3]]))
 # (a gold band round the pot's shoulder, and 發 in gold on its front)
@@ -716,7 +716,7 @@ def leaflet(name, at, ang, L, W, droop, mat_):
     uvl = bm.loops.layers.uv.new()
     # (the midrib's fold and an edge each side across it; six along its arch, its base and tip one point each (eight rows, those two rows
     # three points all in one place: a pole of degenerate triangles at either end))
-    NU, NV = 6, 2
+    NU, NV = 4, 2   # (four along its arch (six before), smooth shaded: a leaflet five centimetres long)
     vs = []
     for i in range(NU + 1):
         t = i / NU
@@ -786,7 +786,7 @@ for k in range(3):
         reach = 0.05 + (h % 2) * 0.012
         ex, ez = sx + math.cos(b) * reach, sz + math.sin(b) * reach
         ey = TT_ + 0.08 + ((h + k) % 3) * 0.014
-        mtree.append(tube(f"TreeStem{k}{h}", [(sx, TT_ + 0.06, sz), (sx + math.cos(b) * reach * 0.4, ey + 0.012, sz + math.sin(b) * reach * 0.4), (ex, ey, ez)], 0.0011, M["stem"]))
+        mtree.append(tube(f"TreeStem{k}{h}", [(sx, TT_ + 0.06, sz), (sx + math.cos(b) * reach * 0.4, ey + 0.012, sz + math.sin(b) * reach * 0.4), (ex, ey, ez)], 0.0011, M["stem"], ring=0, steps=3))  # (a millimetre thick: four-sided, three steps a span)
         nleaf = 5 + (h + k) % 3
         for f in range(nleaf):
             mid = (nleaf - 1) / 2
@@ -795,11 +795,11 @@ for k in range(3):
             mtree.append(leaflet(f"TreeLeaf{k}{h}{f}", (ex, ey + 0.002, ez), fa, L, L * 0.34, 0.012 + 0.004 * abs(f - mid),
                                  M["leaf"] if (k + h + f) % 3 else M["leaf2"]))
 # (a red ribbon tied round the braid in a bow, its two tails hanging, and a gold coin hung from it)
-bpy.ops.mesh.primitive_torus_add(major_radius=0.011, minor_radius=0.0028, major_segments=24, minor_segments=6, location=P(0, TB + 0.06, 0))
+bpy.ops.mesh.primitive_torus_add(major_radius=0.011, minor_radius=0.0028, major_segments=16, minor_segments=5, location=P(0, TB + 0.06, 0))
 rb = active(); rb.scale = (1, 1, 1.6); apply_scale(rb)
 mtree.append(finish(rb, "TreeRibbon", M["ribbonRed"]))
 for sd in (-1, 1):
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.0065, minor_radius=0.0018, major_segments=18, minor_segments=6,
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.0065, minor_radius=0.0018, major_segments=12, minor_segments=4,
                                      location=P(0.006 * sd, TB + 0.062, 0.0125), rotation=(math.pi / 2, 0.5 * sd, 0))
     lp_ = active(); lp_.scale = (1.4, 1, 0.7); apply_scale(lp_)
     mtree.append(finish(lp_, f"TreeRibbonLoop{sd}", M["ribbonRed"]))
