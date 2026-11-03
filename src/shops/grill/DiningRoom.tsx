@@ -5225,10 +5225,24 @@ function WallSpeaker() {
       m.castShadow = SPEAKER_INKED.test(m.name)
     })
     inkModel(root, (m) => !SPEAKER_INKED.test(m.name), { width: 0.004, weld: true })
-    // (drawn a few parts at a time; the arm and its bracket, which reach back to the corner wherever it's put, on their own)
-    mergeByMaterial(root, (o) => /^Speaker(Arm|Mount)/.test(o.name))
-    return { root, led: led as THREE.MeshBasicMaterial | null, toon: [...toon.values()] }
+    // (drawn a few parts at a time; the arm and its bracket, which reach back to the corner wherever it's put, on their own; the woofer's cone,
+    // dust cap and surround on their own too, to thump with the music)
+    mergeByMaterial(root, (o) => /^Speaker(Arm|Mount)/.test(o.name) || /^Speaker(Cone|DustCap|Surround)$/.test(o.name))
+    const thump = ['SpeakerCone', 'SpeakerDustCap', 'SpeakerSurround'].map((n) => root.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o)
+      .map((o) => ({ o, z: o.position.z, s: o.scale.clone() }))
+    let grille: THREE.Object3D | null = null
+    root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && (m.material as THREE.Material).name === 'SpeakerGrille') grille = m })
+    const g = grille as THREE.Object3D | null
+    return { root, led: led as THREE.MeshBasicMaterial | null, toon: [...toon.values()], thump, grille: g ? { o: g, z: g.position.z } : null }
   }, [gltf])
+  // (the bass while the music plays (the owner's): every half beat at 120 a minute the woofer's cone pushes out along the speaker's face and
+  // swells a little, then springs back; the grille in front of it, which hides most of it, nudged out with it)
+  const beat = useRef(0)
+  useFrame((_, dt) => {
+    const k = off ? 0 : Math.exp(-((beat.current = (beat.current + Math.min(dt, 0.1)) % 0.5) / 0.5) * 9)
+    for (const t of model.thump) { t.o.position.z = t.z + 0.005 * k; t.o.scale.copy(t.s).multiplyScalar(1 + 0.04 * k) }
+    if (model.grille) model.grille.o.position.z = model.grille.z + 0.002 * k
+  })
   useEffect(() => { model.led?.color.set(off ? '#d02a2a' : '#3ddc6a') }, [model, off])
   // (the arm reaches back to the room's corner and the bracket sits in it: found by a ray from the arm's joint straight back, so it still fits
   // wherever the speaker's been moved to. Looked for every half second only until two looks agree, and again once it's moved: asked all the
