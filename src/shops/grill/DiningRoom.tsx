@@ -2543,11 +2543,14 @@ float stairY(float s) { return s < S0 ? YF : YF + min(float(N), floor((s - S0) /
 // (the stair's line along the walls, straight up its slope, not stepped (the owner's: the wainscot's top went up in a saw, plaster in its
 // notches): from the floor a step before the first riser, up through the steps' nosings, level again over the landing)
 float lineY(float s) { return YF + clamp(s - S0 + RUN, 0.0, float(N) * RUN) * K; }
-// (wood: a grain along u, its rings wandering, two browns)
-vec3 wood(float u, float v, vec3 a, vec3 b) {
-  float g = 0.5 + 0.5 * sin(u * 70.0 + sin(v * 9.0 + u * 3.0) * 2.5);
-  float plank = step(0.5, fract(v * 4.0 + 0.37)) * 0.06;
-  return mix(a, b, g * 0.6) * (0.94 + plank);
+// (a board's straight grain running along it, its lines across it (the owner's: the treads' grain had gone into waves): fine lines
+// that waver only a little, a slower drift of colour along it)
+vec3 grain(float along, float across, vec3 a, vec3 b) {
+  float ph = across * 45.0 + sin(along * 1.7) * 0.4;
+  // (soft, and faded as it's seen from further off, finer than the pixels: else the far treads' lines beat into a zigzag)
+  float g = 0.5 + 0.3 * sin(ph) * (1.0 - smoothstep(0.25, 0.8, fwidth(ph)));
+  float drift = 0.5 + 0.5 * sin(along * 1.3 + across * 3.7);
+  return mix(a, b, g * 0.45 + drift * 0.25);
 }
 void main() {
   vec3 dir = normalize(vLocal - uCam);
@@ -2587,29 +2590,34 @@ void main() {
   float glow = 0.0;
   if (kind == 1 || kind == 2) {
     float lift = p.y - lineY(p.z);
-    c = lift < 0.95 ? wood(p.y * 0.3, p.z * 1.7 + float(kind), vec3(0.12, 0.065, 0.032), vec3(0.18, 0.1, 0.05)) * (0.92 + 0.08 * step(0.5, fract(p.z * 6.0)))
+    c = lift < 0.95 ? grain(p.y + floor(p.z * 6.0) * 1.9, p.z + float(kind) * 0.37, vec3(0.12, 0.065, 0.032), vec3(0.18, 0.1, 0.05)) * (0.92 + 0.08 * step(0.5, fract(p.z * 6.0)))
       : vec3(0.42, 0.37, 0.29) * (0.96 + 0.04 * sin(p.z * 40.0 + p.y * 23.0));
     // (the skirting along the stair: a dark board its whole length, its top edge catching a little light)
     if (lift < 0.11) c = vec3(0.07, 0.04, 0.02) * (lift > 0.095 ? 1.8 : 1.0);
-    // (the handrail on the right: a dark round rail parallel to the stair, lit along its top, a shadow under it on the wall)
+    // (the handrail on the left wall (the owner's), up the whole stair from its foot to the landing: a dark round rail parallel to it, lit
+    // along its top, a shadow under it on the wall, held off the wall by three iron brackets (its foot, its middle, its top))
     float rail = p.y - (lineY(p.z) + 0.8);
-    if (kind == 2 && p.z > S0 - RUN) {
-      if (abs(rail) < 0.022) c = mix(vec3(0.12, 0.065, 0.03), vec3(0.42, 0.25, 0.12), smoothstep(-0.022, 0.022, rail));
-      else if (rail < -0.022 && rail > -0.07) c *= mix(0.45, 1.0, smoothstep(-0.022, -0.07, rail));
+    if (kind == 1 && p.z > S0 - 0.15 && p.z < S0 + float(N) * RUN + 0.2) {
+      float bz = min(min(abs(p.z - (S0 + 0.05)), abs(p.z - (S0 + float(N) * RUN * 0.5))), abs(p.z - (S0 + float(N) * RUN - 0.05)));
+      if (abs(rail) < 0.024) c = mix(vec3(0.1, 0.055, 0.025), vec3(0.42, 0.25, 0.12), smoothstep(-0.024, 0.024, rail));
+      else if (rail < -0.024 && rail > -0.075 && bz < 0.014) c = vec3(0.16, 0.16, 0.17) * (rail > -0.03 ? 1.6 : 1.0);
+      else if (rail < -0.024 && rail > -0.08) c *= mix(0.4, 1.0, smoothstep(-0.024, -0.08, rail));
     }
     // (round the corner at the top, the way on: lit)
     if (kind == 1 && p.z > D - 0.85 && p.z < D - 0.1 && p.y > TOP && p.y < TOP + 1.85) { c = vec3(1.0, 0.7, 0.38); glow = 0.75; }
   } else if (kind == 3) {
-    // (the entry's floor: boards running in, a dark seam between each two)
-    c = wood(p.z * 0.6, p.x * 9.0, vec3(0.13, 0.072, 0.035), vec3(0.2, 0.11, 0.052)) * (1.0 - 0.55 * step(0.95, fract((p.x + HW) / 0.115)));
+    // (the entry's floor: boards laid across, parallel to the sill (the owner's: as the room's run), a dark seam between each two)
+    float bd = floor(p.z / 0.115);
+    c = grain(p.x + bd * 1.7, p.z, vec3(0.13, 0.072, 0.035), vec3(0.2, 0.11, 0.052)) * (0.93 + 0.07 * fract(sin(bd * 12.9) * 43.7));
+    c *= 1.0 - 0.55 * step(0.95, fract(p.z / 0.115));
   } else if (kind == 7) {
     // (each tread two boards across, a seam between them, its front edge (the nosing) a little lighter, worn)
     float f = fract((p.z - S0) / RUN);
-    c = wood(p.x * 1.3, p.z * 4.0 + floor(f * 2.0), vec3(0.14, 0.078, 0.038), vec3(0.22, 0.125, 0.06));
+    c = grain(p.x + floor((p.z - S0) / RUN * 2.0) * 1.3, p.z, vec3(0.14, 0.078, 0.038), vec3(0.22, 0.125, 0.06));
     c *= 1.0 - 0.5 * smoothstep(0.035, 0.0, abs(f - 0.5)) * step(p.z, S0 + float(N) * RUN);
     c *= 1.0 + 0.35 * smoothstep(0.08, 0.0, f) * step(p.z, S0 + float(N) * RUN);
   }
-  else if (kind == 6) { c = wood(p.x, p.y * 5.0, vec3(0.09, 0.05, 0.025), vec3(0.14, 0.078, 0.038)); }
+  else if (kind == 6) { c = grain(p.x + floor((p.z - S0) / RUN + 0.5) * 2.1, p.y, vec3(0.09, 0.05, 0.025), vec3(0.14, 0.078, 0.038)); }
   else if (kind == 5) { c = vec3(0.12, 0.08, 0.05) * (0.9 + 0.1 * step(0.5, fract(p.z * 3.0))); }
   else {
     c = vec3(0.5, 0.44, 0.35);
