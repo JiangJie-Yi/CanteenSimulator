@@ -1348,8 +1348,9 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
  * (both moved along away from the door, the owner's wish, the doorway and the till's end left open)
  */
 const CAT_STAND_Z = -1.92, SHOE_CAB_Z = -0.62
-/** the shoe cupboard's middle off the wall: its back where the first one's was (0.51), now it's 1.27 times as deep */
-const SHOE_CAB_X = 0.51 - (0.34 * 1.27) / 2
+/** the shoe cupboard's middle off the wall: its back 5 cm in from where the first one's was (0.51), now it's 1.27 times as deep (at 0.51 the
+ * floor's edge strip along the wall ran 4 cm into its back) */
+const SHOE_CAB_X = 0.46 - (0.34 * 1.27) / 2
 /** the shoe cupboard's top (blender/shoecab.py's H): what stands on it stands there */
 const SHOE_TOP = 0.66 * 1.27
 const SHOE_URL = import.meta.env.BASE_URL + 'models/shoecab.glb'
