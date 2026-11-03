@@ -2502,6 +2502,9 @@ const float HW = ${f(hw)}, YF = ${f(yf)}, RISE = ${f(rise)}, RUN = ${f(run)}, S0
 const float YC = ${f(yc)}, SC = ${f(sc)}, K = ${f(k)}, YCAP = ${f(ycap)};
 const int N = ${N};
 float stairY(float s) { return s < S0 ? YF : YF + min(float(N), floor((s - S0) / RUN) + 1.0) * RISE; }
+// (the stair's line along the walls, straight up its slope, not stepped (the owner's: the wainscot's top went up in a saw, plaster in its
+// notches): from the floor a step before the first riser, up through the steps' nosings, level again over the landing)
+float lineY(float s) { return YF + clamp(s - S0 + RUN, 0.0, float(N) * RUN) * K; }
 // (wood: a grain along u, its rings wandering, two browns)
 vec3 wood(float u, float v, vec3 a, vec3 b) {
   float g = 0.5 + 0.5 * sin(u * 70.0 + sin(v * 9.0 + u * 3.0) * 2.5);
@@ -2545,14 +2548,30 @@ void main() {
   vec3 c;
   float glow = 0.0;
   if (kind == 1 || kind == 2) {
-    float lift = p.y - stairY(p.z);
-    c = lift < 0.85 ? wood(p.y * 0.3, p.z * 1.7 + float(kind), vec3(0.16, 0.09, 0.045), vec3(0.24, 0.14, 0.07)) * (0.92 + 0.08 * step(0.5, fract(p.z * 6.0)))
-      : vec3(0.52, 0.46, 0.36) * (0.96 + 0.04 * sin(p.z * 40.0 + p.y * 23.0));
+    float lift = p.y - lineY(p.z);
+    c = lift < 0.95 ? wood(p.y * 0.3, p.z * 1.7 + float(kind), vec3(0.12, 0.065, 0.032), vec3(0.18, 0.1, 0.05)) * (0.92 + 0.08 * step(0.5, fract(p.z * 6.0)))
+      : vec3(0.42, 0.37, 0.29) * (0.96 + 0.04 * sin(p.z * 40.0 + p.y * 23.0));
+    // (the skirting along the stair: a dark board its whole length, its top edge catching a little light)
+    if (lift < 0.11) c = vec3(0.07, 0.04, 0.02) * (lift > 0.095 ? 1.8 : 1.0);
+    // (the handrail on the right: a dark round rail parallel to the stair, lit along its top, a shadow under it on the wall)
+    float rail = p.y - (lineY(p.z) + 0.8);
+    if (kind == 2 && p.z > S0 - RUN) {
+      if (abs(rail) < 0.022) c = mix(vec3(0.12, 0.065, 0.03), vec3(0.42, 0.25, 0.12), smoothstep(-0.022, 0.022, rail));
+      else if (rail < -0.022 && rail > -0.07) c *= mix(0.45, 1.0, smoothstep(-0.022, -0.07, rail));
+    }
     // (round the corner at the top, the way on: lit)
     if (kind == 1 && p.z > D - 0.85 && p.z < D - 0.1 && p.y > TOP && p.y < TOP + 1.85) { c = vec3(1.0, 0.7, 0.38); glow = 0.75; }
-  } else if (kind == 3) { c = wood(p.z * 0.2, p.x * 2.0, vec3(0.2, 0.12, 0.06), vec3(0.3, 0.18, 0.09)); }
-  else if (kind == 7) { c = wood(p.x, p.z * 3.0, vec3(0.3, 0.17, 0.08), vec3(0.42, 0.25, 0.12)); }
-  else if (kind == 6) { c = wood(p.x, p.y * 5.0, vec3(0.17, 0.1, 0.05), vec3(0.24, 0.14, 0.07)); }
+  } else if (kind == 3) {
+    // (the entry's floor: boards running in, a dark seam between each two)
+    c = wood(p.z * 0.6, p.x * 9.0, vec3(0.13, 0.072, 0.035), vec3(0.2, 0.11, 0.052)) * (1.0 - 0.55 * step(0.95, fract((p.x + HW) / 0.115)));
+  } else if (kind == 7) {
+    // (each tread two boards across, a seam between them, its front edge (the nosing) a little lighter, worn)
+    float f = fract((p.z - S0) / RUN);
+    c = wood(p.x * 1.3, p.z * 4.0 + floor(f * 2.0), vec3(0.14, 0.078, 0.038), vec3(0.22, 0.125, 0.06));
+    c *= 1.0 - 0.5 * smoothstep(0.035, 0.0, abs(f - 0.5)) * step(p.z, S0 + float(N) * RUN);
+    c *= 1.0 + 0.35 * smoothstep(0.08, 0.0, f) * step(p.z, S0 + float(N) * RUN);
+  }
+  else if (kind == 6) { c = wood(p.x, p.y * 5.0, vec3(0.09, 0.05, 0.025), vec3(0.14, 0.078, 0.038)); }
   else if (kind == 5) { c = vec3(0.12, 0.08, 0.05) * (0.9 + 0.1 * step(0.5, fract(p.z * 3.0))); }
   else {
     c = vec3(0.5, 0.44, 0.35);
@@ -2569,11 +2588,12 @@ void main() {
   vec3 toL = L - p;
   float dl = length(toL);
   float lamp = 5.0 / (1.0 + dl * dl * 1.3) * (0.35 + 0.65 * max(dot(n, toL / dl), 0.0));
-  float door = 0.45 * exp(-p.z * 3.0);
+  float door = 0.3 * exp(-p.z * 2.6);
   // (and its light spilling down the stair: the steps further up and in the warmer, the treads most, what's seen of it through the door
   // lit from above)
-  float spill = smoothstep(S0 + 1.5 * RUN, S0 + 8.0 * RUN, p.z) * (kind == 7 ? 1.25 : 0.8);
-  vec3 light = vec3(0.05, 0.045, 0.04) + vec3(1.0, 0.6, 0.27) * (lamp + spill) + vec3(0.85, 0.8, 0.72) * door;
+  // (dim and quiet below, the owner's: only up toward the landing does the lamp's warmth come down)
+  float spill = smoothstep(S0 + 4.0 * RUN, S0 + 10.0 * RUN, p.z) * (kind == 7 ? 1.2 : 0.7);
+  vec3 light = vec3(0.045, 0.038, 0.03) + vec3(1.0, 0.58, 0.25) * (lamp * smoothstep(S0 + 2.0 * RUN, D, p.z) + spill) + vec3(0.85, 0.8, 0.72) * door;
   // the creases darker: the steps' inner corners, along the walls' feet, the walls' corners
   float ao = 1.0;
   if (kind == 7 || kind == 3) {
@@ -2585,6 +2605,11 @@ void main() {
   if (kind == 1 || kind == 2) ao *= mix(0.45, 1.0, smoothstep(0.0, 0.12, p.y - stairY(p.z)));
   if (kind == 4) ao *= mix(0.5, 1.0, smoothstep(0.0, 0.1, HW - abs(p.x)));
   vec3 col = mix(c * light * ao, c, glow);
+  // (the treads' and the floor's varnish: a soft sheen where they turn the lamp's light toward the eye)
+  if (kind == 7 || kind == 3) {
+    float sh = pow(max(dot(reflect(-toL / dl, n), -normalize(d)), 0.0), 18.0);
+    col += vec3(1.0, 0.7, 0.4) * sh * (lamp + spill) * 0.12 * ao;
+  }
   // the frame's edge: darker where the opening meets the posts, the sill and the head
   float edge = min(min(HW - abs(vLocal.x), vLocal.y - YF), ${f(H / 2)} - vLocal.y);
   col *= mix(0.25, 1.0, smoothstep(0.0, 0.07, edge));
