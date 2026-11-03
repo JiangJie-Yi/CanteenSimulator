@@ -4642,7 +4642,7 @@ button {
 .stock-panel .stock-tab:hover { background: rgb(232 211 166 / 0.16); color: #fff3d8; }
 :is(.office, .rep-drawer) > header :is(.ofc-tabs, .rep-tabs) button[aria-selected='true'],
 .stock-panel .stock-tab.is-on {
-  background: linear-gradient(180deg, #fbf3e2, #e9d8b6);
+  background: linear-gradient(180deg in oklab, #fbf3e2, #e9d8b6);
   color: #3b2a20;
   border-color: #f6ecd8;
   box-shadow: 0 2px 4px rgb(0 0 0 / 0.3), inset 0 1px 0 rgb(255 255 255 / 0.8) !important;
@@ -6206,7 +6206,7 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
 :root {
   /* (the panels' title bars (the owner's: thicker than a flat brown): a lacquered dark wood, a faint upright grain over it) */
   --wood-bar: repeating-linear-gradient(90deg, rgb(255 255 255 / 0.025) 0 2px, transparent 2px 7px, rgb(0 0 0 / 0.04) 7px 9px, transparent 9px 13px),
-    linear-gradient(180deg, #4a2e1b, #382112);
+    linear-gradient(180deg in oklab, #4a2e1b, #382112);
   /* (and its top edge catching the light) */
   --wood-bar-lip: inset 0 1px 0 rgb(255 255 255 / 0.15), inset 0 -1px 0 rgb(0 0 0 / 0.25);
 }
@@ -7323,7 +7323,7 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 }
 /* (the title bar and the tabs one run of the office's wood, the tabs its pills) */
 .stock-panel .drink-stock-head { position: relative; background: var(--wood-bar); box-shadow: var(--wood-bar-lip); color: #f6e8cc; transition: background 0.4s ease; }
-.stock-panel .stock-tabs { position: relative; gap: 6px; padding: 2px 12px 10px; background: linear-gradient(180deg, #382112, #2e1b0f); border-bottom: 2px solid #8a6a44; transition: background 0.4s ease; }
+.stock-panel .stock-tabs { position: relative; gap: 6px; padding: 2px 12px 10px; background: linear-gradient(180deg in oklab, #382112, #2e1b0f); border-bottom: 2px solid #8a6a44; transition: background 0.4s ease; }
 .stock-panel .stock-tab {
   padding: 6px 4px 7px;
   border-radius: 999px;
@@ -7331,17 +7331,17 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 }
 /* (the cold (the owner's): on the freezer's tab the head and its tabs go a deep frozen blue, the chosen tab ice, a frosty glow along the
    panel's inside top and a cold mist breathing over the head; on the fridge's and the drinks', a cooler, lighter touch of it) */
-.stock-panel.is-frozen .drink-stock-head { background: repeating-linear-gradient(90deg, rgb(255 255 255 / 0.03) 0 2px, transparent 2px 9px), linear-gradient(180deg, #2a4466, #1b2a47); }
-.stock-panel.is-frozen .stock-tabs { background: linear-gradient(180deg, #1b2a47, #15213a); border-bottom-color: #7fb4dc; }
-.stock-panel.is-frozen .stock-tab.is-on { background: linear-gradient(180deg, #f4fbff, #cfe9f7); color: #1d3a5c; border-color: #e6f6ff; text-shadow: 0 1px 0 rgb(255 255 255 / 0.7); }
-.stock-panel.is-cool .drink-stock-head { background: repeating-linear-gradient(90deg, rgb(255 255 255 / 0.03) 0 2px, transparent 2px 9px), linear-gradient(180deg, #3e4a52, #2c363e); }
-.stock-panel.is-cool .stock-tabs { background: linear-gradient(180deg, #2c363e, #232b31); border-bottom-color: #9cc4d8; }
-.stock-panel.is-cool .stock-tab.is-on { background: linear-gradient(180deg, #f6fbfc, #dcecf2); color: #24414f; border-color: #eef8fb; }
+.stock-panel.is-frozen .drink-stock-head { background: repeating-linear-gradient(90deg, rgb(255 255 255 / 0.03) 0 2px, transparent 2px 9px), linear-gradient(180deg in oklab, oklch(0.38 0.07 250), oklch(0.27 0.06 260)); }
+.stock-panel.is-frozen .stock-tabs { background: linear-gradient(180deg in oklab, oklch(0.27 0.06 260), oklch(0.23 0.05 262)); border-bottom-color: #7fb4dc; }
+.stock-panel.is-frozen .stock-tab.is-on { background: linear-gradient(180deg in oklab, oklch(0.98 0.01 230), oklch(0.91 0.04 230)); color: #1d3a5c; border-color: #e6f6ff; text-shadow: 0 1px 0 rgb(255 255 255 / 0.7); }
+.stock-panel.is-cool .drink-stock-head { background: repeating-linear-gradient(90deg, rgb(255 255 255 / 0.03) 0 2px, transparent 2px 9px), linear-gradient(180deg in oklab, #3e4a52, #2c363e); }
+.stock-panel.is-cool .stock-tabs { background: linear-gradient(180deg in oklab, #2c363e, #232b31); border-bottom-color: #9cc4d8; }
+.stock-panel.is-cool .stock-tab.is-on { background: linear-gradient(180deg in oklab, #f6fbfc, #dcecf2); color: #24414f; border-color: #eef8fb; }
 .stock-panel.is-frozen { box-shadow: 0 16px 40px -14px rgb(0 0 0 / 0.6), inset 0 2px 12px rgb(120 210 255 / 0.35); }
 .stock-panel.is-cool { box-shadow: 0 16px 40px -14px rgb(0 0 0 / 0.6), inset 0 2px 10px rgb(150 215 240 / 0.2); }
 .stock-panel .drink-stock-head::after {
   content: ''; position: absolute; inset: 0 0 -46px; pointer-events: none; opacity: 0; transition: opacity 0.5s ease;
-  background: radial-gradient(60% 70% at 30% 0%, rgb(225 245 255 / 0.32), transparent 70%), radial-gradient(50% 60% at 75% 10%, rgb(225 245 255 / 0.24), transparent 70%);
+  background: radial-gradient(60% 70% at 30% 0% in oklab, rgb(225 245 255 / 0.32), transparent 70%), radial-gradient(50% 60% at 75% 10% in oklab, rgb(225 245 255 / 0.24), transparent 70%);
   animation: stock-mist 5s ease-in-out infinite;
 }
 .stock-panel.is-frozen .drink-stock-head::after { opacity: 1; }

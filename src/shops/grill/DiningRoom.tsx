@@ -1958,6 +1958,21 @@ const WC_GEO = {
  * and out as the switch goes, not drawn at all while the light's on. `rooms`: each one's size across x, up and across z, and its middle.
  */
 const WC_DARK = new THREE.BoxGeometry(1, 1, 1)
+/** the daylight from the stall's window on its floor: a soft fan, barred by the window's lattice */
+const WC_WINDOW_FALL = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas'); c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const gr = g.createRadialGradient(64, 0, 4, 64, 0, 110)
+  gr.addColorStop(0, 'rgba(255,248,230,0.9)'); gr.addColorStop(1, 'rgba(255,248,230,0)')
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128)
+  g.globalCompositeOperation = 'destination-out'
+  g.fillStyle = 'rgba(0,0,0,0.7)'
+  for (const x of [34, 64, 94]) g.fillRect(x - 3, 0, 6, 128)
+  for (const y of [42, 84]) g.fillRect(0, y - 3, 128, 6)
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
 function WcDark({ who, rooms }: { who: 'm' | 'f'; rooms: [number, number, number, number, number][] }) {
   const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0, depthWrite: false }), [])
   useEffect(() => () => mat.dispose(), [mat])
@@ -1996,7 +2011,8 @@ function WcWall({ len, at, yaw, top, cut = false }: { len: number; at: [number, 
   useEffect(() => () => { geo.lower.dispose(); geo.upper.dispose(); geo.rail.dispose() }, [geo])
   return (
     <group position={at} rotation-y={yaw}>
-      <mesh geometry={geo.lower} position-y={0.45}><meshToonMaterial color="#ffffff" map={WC_CEDAR} /></mesh>
+      {/* (lifted a touch by its own grain: from above, in the corners behind the toilet, the charred cedar went a dead black) */}
+      <mesh geometry={geo.lower} position-y={0.45}><meshToonMaterial color="#ffffff" map={WC_CEDAR} emissive="#ffffff" emissiveMap={WC_CEDAR} emissiveIntensity={0.22} /></mesh>
       <mesh geometry={geo.upper} position-y={0.9 + (top - 0.9) / 2}><meshToonMaterial color="#ece0c6" /></mesh>
       <mesh geometry={geo.rail} position={[0, 0.9, cut ? 0.003 : 0.012]}><meshToonMaterial color="#6a4428" /></mesh>
     </group>
@@ -2268,7 +2284,9 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         {/* (the shoji window by the toilet: washi in a dark lattice, lit from outside; on the back wall, the shop's outside, for both toilets
             alike (the owner's: on each one's end wall, they faced opposite ways)) */}
         <group position={[E - 0.42, 1.38, -s * (W2 - 0.006)]} rotation-y={s > 0 ? 0 : Math.PI}>
-          <mesh position-z={0.0015}><planeGeometry args={[0.46, 0.34]} /><meshBasicMaterial color="#fcebc6" toneMapped={false} /></mesh>
+          {/* (daylight through the washi, soft and white (the owner's: it read grey, a model shut in the dark): drawn after the room's dark
+              so its switch doesn't dim the sky outside) */}
+          <mesh position-z={0.0015} renderOrder={5}><planeGeometry args={[0.46, 0.34]} /><meshBasicMaterial color="#fff8ea" toneMapped={false} transparent depthWrite={false} /></mesh>
           {[-1, 0, 1].map((k) => <mesh key={`v${k}`} position={[k * 0.115, 0, 0.003]}><planeGeometry args={[0.012, 0.34]} /><meshToonMaterial color="#3a2416" /></mesh>)}
           {[-0.5, 0.5].map((k) => <mesh key={`h${k}`} position={[0, k * 0.11, 0.003]}><planeGeometry args={[0.46, 0.012]} /><meshToonMaterial color="#3a2416" /></mesh>)}
           {[[0, 0.18, 0.5, 0.03], [0, -0.18, 0.5, 0.03], [-0.24, 0, 0.03, 0.4], [0.24, 0, 0.03, 0.4]].map(([x, y, sw, sh]) => (
@@ -2276,6 +2294,11 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
           ))}
         </group>
         </StaticBatch>
+        {/* (its light falling in: a faint fan of it on the floor below the window, barred by its lattice) */}
+        <mesh position={[E - 0.42, 0.012, -s * (W2 - 0.3)]} rotation-x={-Math.PI / 2} renderOrder={5} raycast={() => {}}>
+          <planeGeometry args={[0.5, 0.5]} />
+          <meshBasicMaterial map={WC_WINDOW_FALL ?? undefined} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.5} />
+        </mesh>
         <Movable id={`wc2-${who}-remote`} label={`免治馬桶遙控器（${name}）`}>
           <group position={[E - 0.34, 0.9, -W2]}><WcRemote who={who} /></group>
         </Movable>
@@ -3032,7 +3055,7 @@ function ToiletHit({ who }: { who: 'm' | 'f' }) {
 }
 /** the door noren's place: its cloth's plane (in front of the panel slid out onto its track, its face at -0.109), its top (up over the
  * head, WC_H to WC_H + 0.07), its rod's height (in front of the head's middle) and the slit between its panels */
-const NOREN_X = -0.118, NOREN_TOP = WC_H + 0.08, NOREN_ROD_Y = WC_H + 0.05, NOREN_SLIT = 0.008
+const NOREN_X = -0.118, NOREN_TOP = WC_H + 0.08, NOREN_SLIT = 0.008
 function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   const W = WC_W, H = WC_H
   const door = useWcDoor()
@@ -3057,15 +3080,17 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
       {/* the noren, hung from its rod in front of the head: the rod on two little brackets off the head's face, just above the panel's
           way out onto its track (the panel slides out under it, and behind the cloth); the cloth just in front of the rod, its top band over
           it, up over the head (from the room seen from above, nothing of the shoji shows over it: the owner's) */}
-      <mesh position={[NOREN_X + 0.008, NOREN_ROD_Y, 0]} rotation-x={Math.PI / 2}>
-        <cylinderGeometry args={[0.006, 0.006, WC_NOREN_W + 0.05, 8]} />
-        <meshToonMaterial color="#3a2416" />
+      {/* (its pole (暖簾棒, the owner's: it seemed to hang from nothing): a round of pale wood through the cloth's top sleeve, showing in front
+          of it and past its two ends, held off the head on three small dark L brackets, at its ends and in its middle) */}
+      <mesh position={[NOREN_X - 0.006, NOREN_TOP - 0.022, 0]} rotation-x={Math.PI / 2}>
+        <cylinderGeometry args={[0.011, 0.011, WC_NOREN_W + 0.1, 10]} />
+        <meshToonMaterial color="#d9b884" />
       </mesh>
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[(NOREN_X + 0.008 - 0.07) / 2, NOREN_ROD_Y, sd * (WC_NOREN_W / 2 - 0.02)]}>
-          <boxGeometry args={[-(NOREN_X + 0.008) - 0.07 + 0.002, 0.022, 0.014]} />
-          <meshToonMaterial color="#3a2416" />
-        </mesh>
+      {[-1, 0, 1].map((k) => (
+        <group key={k} position={[0, NOREN_TOP - 0.022, k * (WC_NOREN_W / 2 + 0.03)]}>
+          <mesh position={[(NOREN_X - 0.006 - 0.07) / 2, -0.016, 0]}><boxGeometry args={[-(NOREN_X - 0.006) - 0.07 + 0.012, 0.01, 0.016]} /><meshToonMaterial color="#3a2416" /></mesh>
+          <mesh position={[NOREN_X - 0.024, -0.004, 0]}><boxGeometry args={[0.008, 0.032, 0.016]} /><meshToonMaterial color="#3a2416" /></mesh>
+        </group>
       ))}
       {noren.map(({ sd, geo, z }) => (
         <mesh key={sd} geometry={geo} position={[NOREN_X, NOREN_TOP - WC_NOREN_L / 2, z]} rotation-y={-Math.PI / 2}>
