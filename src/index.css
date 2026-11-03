@@ -6299,6 +6299,12 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
 }
 
 /* (over a small thing the tag stands just above its top (HoverTip places the whole of it), not off to the pointer's side) */
+/* (and fades out as the pointer leaves) */
+.hover-tip.is-leaving .tool-tag {
+  opacity: 0;
+  transition: opacity 110ms ease-in;
+}
+
 .hover-tip.is-anchored .tool-tag {
   left: 0;
   top: 0;

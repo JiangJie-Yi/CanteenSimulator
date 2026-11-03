@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { TIP_AIM, useTip } from '@/scene/hoverTip'
 
@@ -6,6 +6,8 @@ import { TIP_AIM, useTip } from '@/scene/hoverTip'
 const ANCHOR_MAX = 220
 /** the gap between a thing's top and its tag, and the room kept from the window's edges (px) */
 const GAP = 12, EDGE = 8
+/** how long a tag takes fading out once the pointer's left its thing (ms) */
+const FADE_MS = 110
 
 /**
  * The tag over whatever the pointer is on (see scene/hoverTip): the same paper tag as the charcoal's. Over a small thing (a bottle, a
@@ -13,7 +15,16 @@ const GAP = 12, EDGE = 8
  * over the next ones); over a big one (a wall, the counter) it follows the pointer as before. It fades in.
  */
 export function HoverTip({ hidden = false }: { hidden?: boolean }) {
-  const tip = useTip()
+  const live = useTip()
+  // (the last tag kept a moment once the pointer's left it, fading out, not snapped away)
+  const [tip, setShown] = useState(live)
+  const [leaving, setLeaving] = useState(false)
+  useEffect(() => {
+    if (live) { setShown(live); setLeaving(false); return }
+    setLeaving(true)
+    const t = window.setTimeout(() => { setShown(null); setLeaving(false) }, FADE_MS)
+    return () => window.clearTimeout(t)
+  }, [live])
   const el = useRef<HTMLDivElement>(null)
   const pointer = useRef({ x: 0, y: 0 })
   // (where its thing's top is, in the world, once per tag; null: by the pointer)
@@ -71,7 +82,7 @@ export function HoverTip({ hidden = false }: { hidden?: boolean }) {
   }, [tip])
   if (!tip || hidden) return null
   return (
-    <div ref={el} className="hover-tip" aria-hidden="true">
+    <div ref={el} className={`hover-tip${leaving ? ' is-leaving' : ''}`} aria-hidden="true">
       <span className={`tool-tag${tip.warn ? ' is-warn' : ''}`}>{tip.title}<small>{tip.hint}</small></span>
     </div>
   )
