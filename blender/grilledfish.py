@@ -1310,8 +1310,9 @@ def fish(species="ayu"):
     slope = lambda x: math.atan(0.95 * D * sway * math.pi / L * math.cos(x * math.pi / L))   # noqa: E731
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    # (24 round, 24 along: 56 by 40 made each fish some 4,500 triangles, with a fan of 56 into each end; its scales are the normal map's)
-    bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=24, radius=1, calc_uvs=True)
+    # (16 round, 18 along, smooth shaded: a fish's body is flat-sided and its scales are the normal map's (24 by 24 before, 56 by 40 before
+    # that, some 4,500 triangles a fish); the shishamo's three to a stick were 6,000 triangles a skewer)
+    bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=18, radius=1, calc_uvs=True)
     # (each end, the snout's tip and the tail's root, closed across the ring beside it in a ladder, not a fan into the pole)
     ladder_poles(bm, uvl)
     for vtx in bm.verts:
