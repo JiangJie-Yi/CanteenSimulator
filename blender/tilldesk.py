@@ -659,7 +659,8 @@ nodes.append(node("TillTray", tr))
 # The cat's stand: a river stone, its top worn level, the cat (on its own red zabuton) sat up on it
 # =====================================================================
 cs = []
-bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=1.0)
+# (three subdivisions, smooth: four made it 1,280 triangles under a cat that hides most of it)
+bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=1.0)
 st = active()
 SX, SZ, SY = 0.1, 0.135, 0.17
 for vtx in st.data.vertices:
@@ -844,16 +845,17 @@ for i in range(21):
 ig.append(tube("IngotCushionCord", _pts, 0.0016, M["coinGold"], steps=1))
 for sx in (-1, 1):
     for sz in (-1, 1):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0018, segments=10, ring_count=6, location=P(sx * 0.016, ZT + 0.0135, sz * 0.012))
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.0018, subdivisions=1, location=P(sx * 0.016, ZT + 0.0135, sz * 0.012))
         ig.append(finish(active(), f"IngotTuft{sx}{sz}", M["coinGold"]))
 for sx in (-1, 1):
     for sz in (-1, 1):
         cx_, cz_ = sx * 0.051, sz * 0.039
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0021, segments=12, ring_count=8, location=P(cx_, ZT + 0.0045, cz_))
+        # (a few millimetres across: an icosphere, no pole)
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.0021, subdivisions=1, location=P(cx_, ZT + 0.0045, cz_))
         ig.append(finish(active(), f"IngotTasselKnot{sx}{sz}", M["coinGold"]))
         # (the tassel lying out from the corner across the stand, flaring at its end)
         d_ = Vector((sx, -sz, 0)).normalized()
-        bpy.ops.mesh.primitive_cone_add(vertices=14, radius1=0.0026, radius2=0.0011, depth=0.009, location=Vector(P(cx_, ZT + 0.0016, cz_)) + d_ * 0.0055)
+        bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.0026, radius2=0.0011, depth=0.009, location=Vector(P(cx_, ZT + 0.0016, cz_)) + d_ * 0.0055)
         tc_ = active()
         tc_.rotation_euler = (-d_).to_track_quat("Z", "Y").to_euler()
         ig.append(finish(tc_, f"IngotTassel{sx}{sz}", M["coinGold"]))
