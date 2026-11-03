@@ -155,7 +155,7 @@ fin(active(), "RiceFloor", M["inside"], body)
 # (the copper hoops: flat bands following the wall's taper, each with a lap and two rivets)
 for (y, w) in ((0.07, 0.045), (0.2, 0.03), (0.3, 0.03)):
     r = R0 + (R1 - R0) * (y / H) + 0.004
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=r, depth=w, location=P(0, y, 0), end_fill_type="NOTHING")
+    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=r, depth=w, location=P(0, y, 0), end_fill_type="NOTHING")  # (as many sides as the tub: fewer, its corners fell between the staves' and kinked)
     hp = active()
     sol = hp.modifiers.new("s", "SOLIDIFY"); sol.thickness = 0.003; sol.offset = 1
     bpy.context.view_layer.objects.active = hp
@@ -163,7 +163,8 @@ for (y, w) in ((0.07, 0.045), (0.2, 0.03), (0.3, 0.03)):
     fin(hp, f"RiceHoop{int(y * 100)}", M["copper"], body)
     a = 0.5
     for dy in (-w * 0.25, w * 0.25):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.004, segments=6, ring_count=4, location=P((r + 0.004) * math.cos(a), y + dy, (r + 0.004) * math.sin(a)))
+        # (a rivet's head: an icosahedron, no poles)
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.004, subdivisions=0, location=P((r + 0.004) * math.cos(a), y + dy, (r + 0.004) * math.sin(a)))
         fin(active(), f"RiceRivet{int(y * 100)}{dy > 0}", M["rivet"], body)
 # (the ears: a block of the wood either side, a hole through it, a loop of cord)
 for sd in (-1, 1):
@@ -177,11 +178,11 @@ for sd in (-1, 1):
     bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.0045, major_segments=10, minor_segments=4, location=P(sd * (R1 + 0.04), 0.36, 0), rotation=(math.pi / 2, 0, 0))
     fin(active(), f"RiceCord{sd}", M["cord"], body)
 # (the rim's lip, eased)
-bpy.ops.mesh.primitive_torus_add(major_radius=R1 - 0.005, minor_radius=0.008, major_segments=32, minor_segments=6, location=P(0, H - 0.002, 0))
+bpy.ops.mesh.primitive_torus_add(major_radius=R1 - 0.005, minor_radius=0.008, major_segments=24, minor_segments=4, location=P(0, H - 0.002, 0))
 fin(active(), "RiceRim", M["saw"][1], body)
 
 # ---- the lid: its origin at its underside
-bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.285, depth=0.032, location=P(0, 0.016, 0))
+bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.285, depth=0.032, location=P(0, 0.016, 0))
 lid = active()
 m_ = lid.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 2
 bpy.context.view_layer.objects.active = lid
@@ -210,7 +211,7 @@ RTOP = H - 0.045
 RIN = R0 + (R1 - R0) * (RTOP / H) - 0.006
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
-NR, NA = 9, 32
+NR, NA = 6, 24
 rings = []
 for i in range(1, NR + 1):
     t = i / NR

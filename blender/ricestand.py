@@ -100,7 +100,7 @@ def block(name, size, at, mat, bev=0.006):
     o.scale = (size[0], size[2], size[1])
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     if bev:
-        m = o.modifiers.new("b", "BEVEL"); m.width = bev; m.segments = 2
+        m = o.modifiers.new("b", "BEVEL"); m.width = bev; m.segments = 1
         bpy.ops.object.modifier_apply(modifier="b")
     box_uv(o)
     o.name = name
@@ -132,7 +132,7 @@ for k in range(4):
     bpy.context.view_layer.objects.active = o
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True)
     bpy.ops.object.transform_apply(rotation=True)
-    m = o.modifiers.new("b", "BEVEL"); m.width = 0.006; m.segments = 2
+    m = o.modifiers.new("b", "BEVEL"); m.width = 0.006; m.segments = 1
     bpy.ops.object.modifier_apply(modifier="b")
     box_uv(o)
     o.data.materials.append(M["walnut"])
@@ -159,7 +159,7 @@ for sx in (-1, 1):
         o = bpy.data.objects.new("StandLeg", me)
         bpy.context.collection.objects.link(o)
         bpy.context.view_layer.objects.active = o
-        m = o.modifiers.new("b", "BEVEL"); m.width = 0.006; m.segments = 2
+        m = o.modifiers.new("b", "BEVEL"); m.width = 0.006; m.segments = 1
         bpy.ops.object.modifier_apply(modifier="b")
         box_uv(o)
         o.data.materials.append(M["hinoki"])
