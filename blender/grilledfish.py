@@ -2972,7 +2972,8 @@ def utensil(name, head, handle_end, head_obj, radius=0.006, handle=None):
 
 
 def spoon_bowl(at, r):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=at)
+    # (an icosphere squashed flat: a uv sphere's poles were a fan of 14 on its face)
+    bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=2, location=at)
     o = active()
     o.scale = (r, r * 0.8, r * 0.35)
     return finish(o, "SpoonBowl", M["spoon_wood"])
@@ -2987,7 +2988,8 @@ M["spoon_china"] = pbr("SpoonChina", (0.95, 0.94, 0.9), rough=0.2, coat=0.6)
 
 def spoon_head(kind, at):
     """The head of a seasoning's own spoon, and what its handle is made of and how thick."""
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=10, location=at)
+    # (an icosphere squashed flat: a uv sphere's poles were a fan of 16 on its face)
+    bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=2, location=at)
     o = active()
     if kind == "miso":
         # a flat paddle (へら), broad and thin, squared off a little at the end
