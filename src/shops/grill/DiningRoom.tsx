@@ -7,7 +7,7 @@ import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { StaticBatch, mergeByMaterial, type BatchParts } from '@/scene/StaticBatch'
+import { plainColours, StaticBatch, mergeByMaterial, type BatchParts } from '@/scene/StaticBatch'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
@@ -883,6 +883,7 @@ function RoundWood() {
     r.traverse((o) => { if (/^RoundLattice/.test(o.name)) lattice.push(o) })
     for (const o of lattice) o.parent?.remove(o)
     inkModel(r, (m) => !/RoundFrame/.test(m.name), { width: 0.0025, weld: true })
+    plainColours(r)
     mergeByMaterial(r)
     return r
   }, [gltf])
@@ -2602,6 +2603,7 @@ function CornerSupplies() {
     })
     inkModel(r, (m) => /Strand|Core|Bail|Label|Tape/.test(m.name), { width: 0.002, weld: true })
     // (folded together by material: seventy small parts and their ink lines were each a draw of their own)
+    plainColours(r)
     mergeByMaterial(r)
     return r
   }, [gltf])
@@ -3116,6 +3118,7 @@ function Bouquet({ lean = 0, variant = 0 }: { lean?: number; variant?: number })
       m.castShadow = true
     })
     inkModel(r, (m) => /Leaves|Mum|Stems|Stalk|Bud|Breath|Flower/.test(m.name), { width: 0.0008, weld: true })
+    plainColours(r)
     mergeByMaterial(r)
     return r
   }, [gltf])
@@ -3203,6 +3206,7 @@ function kamidanaOf(scene: THREE.Group) {
     bracket: take('KamiBracket'), lantern: take('KamiLantern'),
     ebisu: (() => { const o = r.getObjectByName('KamiEbisu')!; o.removeFromParent(); return o })(), doors, shrine: r }
   // (what's left, the shrine itself, never moves: its hundred parts folded into a mesh per material)
+  plainColours(r)
   mergeByMaterial(r)
   return kamidanaParts
 }
@@ -3325,6 +3329,7 @@ function ShrineDoors() {
         leaf.scale.z *= SHRINE_WIDE
         // (each leaf swings as one: its board, its gold crest and plates and its ink folded together by material (six leaves, some
         // twenty-five draws))
+        plainColours(leaf)
         mergeByMaterial(leaf)
       }
       d.userData.wide = true
@@ -4300,6 +4305,7 @@ function useFreezer(n: number) {
       pivot.attach(door)
     } else body.add(root)
     // (the cabinet never moves and the door swings as one: each's parts and ink folded together by material (some ten draws a fridge))
+    plainColours(root)
     mergeByMaterial(root)
     mergeByMaterial(pivot)
     // (stood in the shop: scaled, its middle at the origin, its base on the floor)
@@ -5322,6 +5328,7 @@ function DrinkCartons() {
     })
     inkModel(root, (m) => /Tape/.test((m.material as THREE.Material).name ?? ''), { width: 0.0012, weld: true })
     // (nine cases now, each its board, its print and three strips of tape: folded together by material, a handful of draws for the stack)
+    plainColours(root)
     mergeByMaterial(root)
     return root
   }, [gltf])
@@ -5899,6 +5906,7 @@ function RiceSacks() {
       m.receiveShadow = true
     })
     inkModel(r, () => false, { width: 0.004, weld: true })
+    plainColours(r)
     return mergeByMaterial(r)
   }, [gltf])
   const says = () => {

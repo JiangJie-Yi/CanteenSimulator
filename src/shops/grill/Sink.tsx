@@ -8,7 +8,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { mergeByMaterial } from '@/scene/StaticBatch'
+import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { DRYER, SINK, tipOver } from './bar'
 import { getEdit } from './edit'
@@ -95,6 +95,7 @@ export function SinkModel() {
     const at = (n: string) => r.worldToLocal(r.getObjectByName(n)!.getWorldPosition(new THREE.Vector3()))
     const tip = at('SinkSpoutTip'), floor = at('SinkBasinFloor')
     // (never moving: a mesh or two for each material, its ink one line; the marks the game reads (the tap's mouth, the basin's floor) kept)
+    plainColours(r)
     mergeByMaterial(r)
     mergeByMaterial(handle)
     mergeByMaterial(door)
@@ -160,6 +161,7 @@ export function SinkPart({ node }: { node: string }) {
     if (!src) return new THREE.Group()
     const r = src.clone(true)
     dressSink(r)
+    plainColours(r)
     mergeByMaterial(r)
     return r
   }, [gltf, node])

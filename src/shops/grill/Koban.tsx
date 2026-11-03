@@ -9,7 +9,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 import { normalFromHeight } from '@/scene/normalFromHeight'
-import { mergeByMaterial } from '@/scene/StaticBatch'
+import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { brushText, signTexture } from '@/scene/signFont'
 import { reflectStudio } from '@/scene/studio'
 import { nameOver } from './bar'
@@ -208,6 +208,7 @@ export function Koban() {
       m.receiveShadow = true
     })
     inkModel(r, (m) => m.name === 'KobanStandLine', { width: 0.0008, weld: true })
+    plainColours(r)
     mergeByMaterial(r)
     return r
   }, [gltf])

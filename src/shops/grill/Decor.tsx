@@ -7,7 +7,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type React
 import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
+import { plainColours, StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
@@ -521,7 +521,7 @@ function useRiceTub() {
     const get = (n: string) => { const o = root.getObjectByName(n)!; o.removeFromParent(); return o }
     riceParts = { body: get('RiceTubBody'), lid: get('RiceTubLid'), rice: get('RiceTubRice') }
     // (each of the three, which move only as a whole (the lid lifted off), drawn a few parts at a time)
-    for (const part of Object.values(riceParts)) mergeByMaterial(part)
+    for (const part of Object.values(riceParts)) { plainColours(part); mergeByMaterial(part) }
     return riceParts
   }, [gltf])
 }
@@ -546,6 +546,7 @@ function useStand() {
       m.receiveShadow = true
     })
     inkModel(r, () => false, { width: 0.0016, weld: true })
+    plainColours(r)
     mergeByMaterial(r)
     return r
   }, [standGltf])
@@ -665,6 +666,7 @@ function IngredientFridge() {
     // (no ink lines round it: plain and clean, as an appliance looks; the body and what's in it drawn a few parts at a time, the lid (which
     // swings up) on its own)
     // (what's in it kept apart too: drawn only while the lid's up, some thirty draws saved the rest of the time)
+    plainColours(root)
     mergeByMaterial(root, (o) => /^FreezerLid|^FreezerGoods/.test(o.name))
     return root
   }, [fz])
@@ -876,6 +878,7 @@ function KnifeSet() {
     })
     inkModel(r, (m) => /Mark|Neck|Screw|Spacer/.test(m.name), { width: 0.0012, weld: true })
     // (the set never moves: drawn a few parts at a time)
+    plainColours(r)
     mergeByMaterial(r)
     return r
   }, [gltf])
@@ -924,6 +927,7 @@ function MisoPot() {
     })
     inkModel(r, (m) => /Soup|Inside/.test(m.name), { width: 0.0016, weld: true })
     // (it never moves: its parts and their ink lines folded together by material (they were some twenty draws))
+    plainColours(r)
     return mergeByMaterial(r)
   }, [gltf])
   const floor = GRILL_OFFSET.y - KITCHEN_DROP

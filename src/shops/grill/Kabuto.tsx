@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { mergeByMaterial } from '@/scene/StaticBatch'
+import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { setTip } from '@/scene/hoverTip'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { getEdit } from './edit'
@@ -41,6 +41,7 @@ export function Kabuto() {
     })
     inkModel(r, (m) => /Tehen|Crest|Cord|Knot|Inside/.test(m.name), { width: 0.0012, weld: true })
     // (nothing on it moves: its parts drawn a few at a time)
+    plainColours(r)
     mergeByMaterial(r)
     return r
   }, [gltf])
