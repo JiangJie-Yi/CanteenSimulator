@@ -5653,6 +5653,8 @@ const EXIT_SPILL = softRect(256, 160, 110, 50, 40)
  * The emergency exit sign on the wall by the way out (blender/exitsign.py): an aluminium housing along the top, an acrylic pane hanging from
  * it lit from its edge, its face (both sides) lit whatever the room's lights, the words in the language on screen
  */
+/** where the exit sign's little spot is aimed: down from it and out from the wall: its pool on the floor in front, not a streak down the wall */
+const EXIT_SPOT_AIM = (() => { const o = new THREE.Object3D(); o.position.set(0, -1.5, 0.75); return o })()
 function ExitSign() {
   const lang = useDocLang()
   const gltf = useGLTF(EXIT_URL) as unknown as { scene: THREE.Group }
@@ -5692,9 +5694,13 @@ function ExitSign() {
         <planeGeometry args={[1.2, 0.75]} />
         <meshBasicMaterial map={EXIT_SPILL} color="#3ee58a" transparent opacity={0.45} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
-      {/* (a faint green light of its own, on its own battery (the owner's): the same whatever the room's switches, so in the dark the wall and
-          the floor below it still show its green; there from the start (a light added later recompiles every material)) */}
-      <pointLight position={[0, -0.12, 0.12]} color="#40ff90" intensity={0.3} distance={3} decay={2} />
+      {/* (a faint green light of its own, on its own battery (the owner's): the same whatever the room's switches, never raised. A narrow,
+          soft-edged spot pointed down from just in front of the pane, so only a small pool under the sign takes its green: as a point light
+          it lit a big round patch on the wall, hard-edged where its reach ended, that stood out once the room went dark. There from the start
+          (a light added later recompiles every material)) */}
+      <spotLight position={[0, -0.1, 0.14]} color="#40ff90" intensity={0.7} distance={1.8} decay={2} angle={0.35} penumbra={0.8}
+        target={EXIT_SPOT_AIM} />
+      <primitive object={EXIT_SPOT_AIM} />
     </group>
   )
 }
