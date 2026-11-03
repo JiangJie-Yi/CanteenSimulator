@@ -716,8 +716,8 @@ function IngredientFridge() {
     <group>
       {/* (clicked open, the pantry's panel comes up with it, at the grill (App: askPantry)) */}
       <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; FREEZER.open = !FREEZER.open; if (FREEZER.open) askPantry('frozen', 'freezer', () => { FREEZER.open = false }); else shutPantry(); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開' }) }}
-        onPointerOver={(e) => { e.stopPropagation(); glowOnly(e.eventObject); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開食材櫃' }) }}
-        onPointerOut={(e) => { glowLeave(e.eventObject); setTip(null) }}>
+        onPointerOver={(e) => { handOver.onPointerOver(e); setTip({ title: '食材冷凍櫃', hint: FREEZER.open ? '點一下關上' : '點一下打開食材櫃' }) }}
+        onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
         <primitive object={model} />
       </group>
       <pointLight ref={light} position={[-HOUSE / 2, H - 0.12, 0.15]} color="#cfe9ff" intensity={0} distance={2.4} decay={1.6} />

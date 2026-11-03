@@ -1145,7 +1145,8 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     tl(lang, `${k} 円硬幣 50 枚一捲，銀行包好的找零備用`, `${k}円玉50枚入り、銀行で巻いた釣り銭の予備`, `Fifty ¥${k} coins rolled by the bank, change kept in hand`))
   const cashTip = (k: Denom) => tipOver(
     tl(lang, `${k.toLocaleString()} 円${k >= 1000 ? '鈔' : '硬幣'}`, `${k.toLocaleString()} 円${k >= 1000 ? '札' : '玉'}`, `¥${k.toLocaleString()} ${k >= 1000 ? 'notes' : 'coins'}`),
-    tl(lang, `點一下取出 ¥${(k * inDrawer[k]).toLocaleString()}，加進現金`, `クリックで ¥${(k * inDrawer[k]).toLocaleString()} を取り出す`, `Click to take ¥${(k * inDrawer[k]).toLocaleString()} into cash`))
+    inDrawer[k] ? tl(lang, `點一下取出 ¥${(k * inDrawer[k]).toLocaleString()}，加進現金`, `クリックで ¥${(k * inDrawer[k]).toLocaleString()} を取り出す`, `Click to take ¥${(k * inDrawer[k]).toLocaleString()} into cash`)
+      : tl(lang, '這格是空的', 'この仕切りは空', 'This one is empty'))
   const paySeen = useRef('')
   const led = useMemo(() => {
     const c = document.createElement('canvas')
