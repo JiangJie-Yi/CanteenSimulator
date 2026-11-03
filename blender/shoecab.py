@@ -1,13 +1,13 @@
 """The genkan's shoe cupboard (下駄箱), as a ryotei's or an izakaya's is (the owner's: low, broad and solid, not a tall narrow cupboard of
 paper panes with brass knobs): shoecab.glb.
 
-A low cabinet of dark walnut on a recessed plinth, its top board overhanging a little (the kabuto and a vase stand on it); inside, two
-columns of two compartments; each compartment's door a frame with horizontal louvres over a dark backing (the airing a shoe cupboard
-wants), a sunk pull (引手) cut into its free edge; in each compartment a pair of geta or of slippers. Every piece a plain box (no
-subdivisions), the faces against the floor, the wall and each other left off: some 500 triangles.
+A low cabinet of dark walnut on a recessed plinth, its top board overhanging a little (a vase stands on it); inside, three columns of three
+empty cubbies (the guests' own shoes go in them); each one's door a frame with a kumiko lattice over washi (the owner's: the shoji face of
+the first one kept), a sunk pull (引手) cut into its free edge. Every piece a plain box (no subdivisions), the faces against the floor, the
+wall and each other left off: some 750 triangles.
 
-Nodes the game finds: "ShoeCab" (the carcass and what's inside, still), "ShoeDoor0".."ShoeDoor3" (each door, its origin on its hinge, the
-outer edge: the game swings it open 75 degrees), "ShoeDoorRow" in their names' order: 0 bottom left, 1 bottom right, 2 top left, 3 top right.
+Nodes the game finds: "ShoeCab" (the carcass and what's inside, still), "ShoeDoorL<k>" / "ShoeDoorR<k>" (each door, hinged on its left or
+right edge, its origin on its hinge: the game swings it open 75 degrees), numbered row by row from the bottom left.
 
 The game's frame (y up), the foot's middle at the origin, the front toward +z, x across it.
 
@@ -42,20 +42,20 @@ def P(x, y, z):
     return Vector((x, -z, y))
 
 
-W, D, H = 0.56, 0.34, 0.66        # across, deep, tall (top board included)
-T = 0.02                          # the carcass's boards
-PLINTH = 0.05                     # the recessed plinth's height
-TOP = 0.03                        # the top board, overhanging
+SC = 1.27                         # (the owner's: the whole of it 1.25 to 1.3 times the first one)
+W, D, H = 0.56 * SC, 0.34 * SC, 0.66 * SC   # across, deep, tall (top board included)
+T = 0.022                          # the carcass's boards
+PLINTH = 0.06                     # the recessed plinth's height
+TOP = 0.035                        # the top board, overhanging
 M = {
-    "wood": pbr("ShoeWood", lin("#5a3a22"), rough=0.5),
-    "top": pbr("ShoeTop", lin("#4a2e1c"), rough=0.45),
-    "slat": pbr("ShoeSlat", lin("#6e4a2c"), rough=0.55),
+    # (a deep walnut, matt (the owner's: roughness 0.85); the lattice a shade lighter, the washi behind it pale)
+    "wood": pbr("ShoeWood", lin("#3e2616"), rough=0.85),
+    "top": pbr("ShoeTop", lin("#33200f"), rough=0.85),
+    "slat": pbr("ShoeSlat", lin("#4a2e1a"), rough=0.85),
+    "paper": pbr("ShoePaper", lin("#efe6d0"), rough=0.9),
     "back": pbr("ShoeBack", lin("#1c120c"), rough=0.8),
     "inside": pbr("ShoeInside", lin("#2e2016"), rough=0.8),
     "pull": pbr("ShoePull", lin("#141010"), rough=0.4),
-    "geta": pbr("ShoeGeta", lin("#c9a878"), rough=0.6),
-    "strap": pbr("ShoeStrap", lin("#a8302a"), rough=0.7),
-    "slipper": pbr("ShoeSlipper", lin("#2c3e66"), rough=0.8),
 }
 
 
@@ -91,56 +91,59 @@ carcass = []
 x0, x1 = -W / 2, W / 2
 z0, z1 = -D / 2, D / 2
 y_in0, y_in1 = PLINTH + T, H - TOP          # the compartments' floor and ceiling
-xm, ym = 0.0, (y_in0 + y_in1) / 2           # the divider's and the middle shelf's places
-# (the plinth, set back; the sides; the floor; the top, overhanging; the back; the divider; the middle shelf)
+# (three columns and three rows of empty cubbies, for the guests' own shoes (the owner's: nothing in them, and more of them))
+COLS = ROWS = 3
+xs = [x0 + T + (W - 2 * T + T) * c / COLS - (T / 2 if c else 0) for c in range(COLS + 1)]
+xs[-1] = x1 - T
+ys = [y_in0 + (y_in1 - y_in0 + T) * r / ROWS - (T / 2 if r else 0) for r in range(ROWS + 1)]
+ys[-1] = y_in1
+# (each cubby's span: from past one divider (or the side) to the next divider (or the other side))
+cells_x = [(xs[c] + (T / 2 if c else 0), xs[c + 1] - (T / 2 if c + 1 < COLS else 0)) for c in range(COLS)]
+cells_y = [(ys[r] + (T / 2 if r else 0), ys[r + 1] - (T / 2 if r + 1 < ROWS else 0)) for r in range(ROWS)]
+# (the plinth, set back; the sides; the floor; the top, overhanging; the back; the dividers; the shelves)
 carcass.append(box("Plinth", x0 + 0.02, x1 - 0.02, 0, PLINTH, z0 + 0.01, z1 - 0.03, "back", drop=('-y', '-z')))
 carcass.append(box("SideL", x0, x0 + T, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y', '-z')))
 carcass.append(box("SideR", x1 - T, x1, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y', '-z')))
 carcass.append(box("Floor", x0 + T, x1 - T, PLINTH, y_in0, z0, z1, "wood", drop=('-y', '-x', '+x', '-z')))
 carcass.append(box("Top", x0 - 0.012, x1 + 0.012, H - TOP, H, z0, z1 + 0.015, "top", drop=('-z',)))
 carcass.append(box("Back", x0 + T, x1 - T, y_in0, y_in1, z0, z0 + 0.008, "inside", drop=('-z', '-x', '+x', '-y', '+y')))
-carcass.append(box("Divider", xm - T / 2, xm + T / 2, y_in0, y_in1, z0 + 0.008, z1, "wood", drop=('-y', '+y', '-z')))
-for sx0, sx1 in ((x0 + T, xm - T / 2), (xm + T / 2, x1 - T)):
-    carcass.append(box("Shelf", sx0, sx1, ym - T / 2, ym + T / 2, z0 + 0.008, z1, "wood", drop=('-x', '+x', '-z')))
-# (in each compartment its footwear: geta (a pale board and a red thong) above, slippers (a navy sole and its band) below)
-FX = [(x0 + T + xm - T / 2) / 2, (xm + T / 2 + x1 - T) / 2]
-for row, y in ((0, y_in0), (1, ym + T / 2)):
-    for cx in FX:
-        for sd in (-1, 1):
-            px = cx + sd * 0.055
-            if row:
-                carcass.append(box("Geta", px - 0.04, px + 0.04, y, y + 0.02, -0.11, 0.11, "geta", drop=('-y',)))
-                carcass.append(box("GetaStrap", px - 0.006, px + 0.006, y + 0.02, y + 0.03, -0.02, 0.07, "strap", drop=('-y',)))
-            else:
-                carcass.append(box("Slipper", px - 0.042, px + 0.042, y, y + 0.012, -0.12, 0.12, "slipper", drop=('-y',)))
-                carcass.append(box("SlipperBand", px - 0.044, px + 0.044, y + 0.012, y + 0.035, 0.0, 0.07, "slipper", drop=('-y', '-z')))
+for c in range(1, COLS):
+    carcass.append(box("Divider", xs[c] - T / 2, xs[c] + T / 2, y_in0, y_in1, z0 + 0.008, z1, "wood", drop=('-y', '+y', '-z')))
+for r in range(1, ROWS):
+    for sx0, sx1 in cells_x:
+        carcass.append(box("Shelf", sx0, sx1, ys[r] - T / 2, ys[r] + T / 2, z0 + 0.008, z1, "wood", drop=('-x', '+x', '-z')))
 cab = join(carcass, "ShoeCab")
 
 # (the doors: each a frame of stiles and rails, louvres across it over a dark backing, a sunk pull at its free edge; its origin on its hinge)
 doors = []
 ZD = z1                           # the doors' back face, on the carcass's front
-DT = 0.016                        # a door's thickness
-for k, (cx0, cx1, cy0, cy1) in enumerate([(x0 + T, xm - T / 2, y_in0, ym - T / 2), (xm + T / 2, x1 - T, y_in0, ym - T / 2),
-                                          (x0 + T, xm - T / 2, ym + T / 2, y_in1), (xm + T / 2, x1 - T, ym + T / 2, y_in1)]):
+DT = 0.02                        # a door's thickness
+CELLS = [(c, r) for r in range(ROWS) for c in range(COLS)]
+for k, (col, row) in enumerate(CELLS):
+    (cx0, cx1), (cy0, cy1) = cells_x[col], cells_y[row]
     g = 0.002                      # (the gap round each door)
     a0, a1, b0, b1 = cx0 + g, cx1 - g, cy0 + g, cy1 - g
-    hinge_left = k % 2 == 0        # (the left doors hinge on the left, the right on the right: they open outward from the middle)
+    hinge_left = col < COLS - 1    # (the right column hinges on the right, the others on the left: none swings into the next one open)
     parts = []
-    S = 0.022                      # the frame's width
-    parts.append(box("Backing", a0 + S / 2, a1 - S / 2, b0 + S / 2, b1 - S / 2, ZD, ZD + 0.004, "back", drop=('-z', '-x', '+x', '-y', '+y')))
+    S = 0.02                       # the frame's width
+    # (the washi, set in the frame; over it the kumiko: two uprights and three rails, proud of the paper (the owner's: the shoji face kept))
+    parts.append(box("Washi", a0 + S, a1 - S, b0 + S, b1 - S, ZD + 0.004, ZD + 0.006, "paper", drop=('-z', '-x', '+x', '-y', '+y')))
     parts.append(box("StileL", a0, a0 + S, b0, b1, ZD, ZD + DT, "wood", drop=('-z',)))
     parts.append(box("StileR", a1 - S, a1, b0, b1, ZD, ZD + DT, "wood", drop=('-z',)))
     parts.append(box("RailB", a0 + S, a1 - S, b0, b0 + S, ZD, ZD + DT, "wood", drop=('-z', '-x', '+x')))
     parts.append(box("RailT", a0 + S, a1 - S, b1 - S, b1, ZD, ZD + DT, "wood", drop=('-z', '-x', '+x')))
-    n = 5
-    for i in range(n):
-        y = b0 + S + (b1 - b0 - 2 * S) * (i + 0.5) / n
-        parts.append(box("Louvre", a0 + S, a1 - S, y - 0.009, y + 0.009, ZD + 0.004, ZD + DT - 0.003, "slat", drop=('-z', '-x', '+x')))
+    K = 0.006                      # a kumiko bar's width
+    xmid = (a0 + a1) / 2           # (one upright and two rails: the doors are small now)
+    parts.append(box("Kumiko", xmid - K / 2, xmid + K / 2, b0 + S, b1 - S, ZD + 0.006, ZD + DT - 0.004, "slat", drop=('-z', '-y', '+y')))
+    for i in (1, 2):
+        y = b0 + S + (b1 - b0 - 2 * S) * i / 3
+        for xa, xb in ((a0 + S, xmid - K / 2), (xmid + K / 2, a1 - S)):
+            parts.append(box("Kumiko", xa, xb, y - K / 2, y + K / 2, ZD + 0.006, ZD + DT - 0.004, "slat", drop=('-z', '-x', '+x')))
     # (the pull: a dark recess cut into the free stile, as a hikite is)
     px = (a1 - S / 2) if hinge_left else (a0 + S / 2)
     py = (b0 + b1) / 2
-    parts.append(box("Pull", px - 0.006, px + 0.006, py - 0.03, py + 0.03, ZD + DT - 0.004, ZD + DT + 0.0005, "pull", drop=('-z',)))
-    d = join(parts, f"ShoeDoor{k}")
+    parts.append(box("Pull", px - 0.006, px + 0.006, py - 0.022, py + 0.022, ZD + DT - 0.004, ZD + DT + 0.0005, "pull", drop=('-z',)))
+    d = join(parts, f"ShoeDoor{'L' if hinge_left else 'R'}{k}")
     # (its origin on its hinge: the outer edge's back corner)
     hx = a0 if hinge_left else a1
     pivot = P(hx, 0, ZD)

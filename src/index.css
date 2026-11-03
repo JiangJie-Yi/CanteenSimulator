@@ -6291,6 +6291,9 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
   position: relative;
   left: 16px;
   top: -52px;
+  /* (small and light, the owner's: the line under the name kept short, never a long banner over the room) */
+  max-width: 240px;
+  padding: 6px 12px;
 }
 
 /* the stock bar on each chiller tag: how much there is against the par level */

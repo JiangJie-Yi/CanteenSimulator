@@ -44,7 +44,7 @@ export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: nu
 /** groups the shop comes with (the owner's own are added to them): the door's cat stand with its four cats; their pivot is found the first time
  * edit mode opens, once the pieces have been measured. `spans`: it runs across the room, in no one view's area (see groupByViews) */
 const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]; spans?: boolean }> = {
-  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban'] },
+  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban', 'kabuto'] },
   // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
   'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
@@ -184,8 +184,7 @@ export const BASES: Record<string, V3> = {
   // (moved on by X 0.215 in the room's frame, taken into this parent's units)
   // (moved by the owner X -0.465, Z -0.367 (its object frame was the world's then), made so)
   willow: [0.2534 - 0.465, 0, 0.0272 - 0.367],
-  // (the speaker set at X -0.285 Y 0.518 Z 0.169, the red lantern raised 0.25, in the room's frame)
-  speaker: [0.3044, 0.518, 0.1309],
+  // (the red lantern raised 0.25, in the room's frame; the speaker's corner offset gone: it hangs over the staff door now)
   chochin: [0, 0.25, 0],
   chochin2: [0, 0.25, 0],
   sake: [0.084, 0, 0.118],

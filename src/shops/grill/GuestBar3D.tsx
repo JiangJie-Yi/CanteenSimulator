@@ -419,8 +419,9 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
         {/* (a koban, the old oval gold coin, on its little stand between the two big cats on top (the owner's)) */}
         <Movable id="koban" label="小判金幣"><group position={[-0.07, 0.6, 0]} rotation-y={-Math.PI / 2}><Koban /></group></Movable>
       </group>
-      {/* a samurai helmet (兜) on its stand, set out on top of the shoe cupboard as a decoration, facing into the room */}
-      <Movable id="kabuto" label="武士頭盔"><group position={[0.34, -GENKAN.depth + SHOE_TOP, SHOE_CAB_Z - 0.09]} rotation-y={Math.PI / 2} scale={0.82}><Kabuto /></group></Movable>
+      {/* a samurai helmet (兜) on its stand, set out on the cats' stand's lower tier between its two small cats, facing into the room (the
+          owner's: off the shoe cupboard's top); small enough to sit on the tier's front strip, clear of the upper tier behind it */}
+      <Movable id="kabuto" label="武士頭盔"><group position={[0.4 - 0.26, 0.33, CAT_STAND_Z]} rotation-y={Math.PI / 2} scale={0.48}><Kabuto /></group></Movable>
       <Movable id="genkan" label="玄關地墊"><StaticBatch>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       {/* the coir mat lying on the genkan's stone, just inside */}
@@ -431,18 +432,18 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       </StaticBatch></Movable>
       <Movable id="shoecab" label="鞋櫃">
       {/* the shoe cupboard (下駄箱) against the wall in the genkan (blender/shoecab.py; the owner's: low, broad, walnut, louvred doors that
-          open, sunk pulls): its doors swing open at a click to the geta and slippers inside; a vase of a sprig on its top */}
-      <group position={[0.34, -GENKAN.depth, SHOE_CAB_Z]}>
+          open, sunk pulls): its doors swing open at a click to its empty cubbies; a vase of a sprig on its top */}
+      <group position={[SHOE_CAB_X, -GENKAN.depth, SHOE_CAB_Z]}>
         <group rotation-y={-Math.PI / 2}><ShoeCupboard /></group>
         <StaticBatch>
-        <mesh position={[0, SHOE_TOP + 0.06, 0.2]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
+        <mesh position={[0, SHOE_TOP + 0.06, 0]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
         {[0, 1, 2].map((k) => (
-          <mesh key={k} position={[Math.cos(k * 2) * 0.02, SHOE_TOP + 0.17 + k * 0.02, 0.2 + Math.sin(k * 2) * 0.02]} rotation={[Math.sin(k * 2) * 0.4, 0, Math.cos(k * 2) * 0.4]}>
+          <mesh key={k} position={[Math.cos(k * 2) * 0.02, SHOE_TOP + 0.17 + k * 0.02, 0 + Math.sin(k * 2) * 0.02]} rotation={[Math.sin(k * 2) * 0.4, 0, Math.cos(k * 2) * 0.4]}>
             <cylinderGeometry args={[0.003, 0.004, 0.16, 4]} /><meshToonMaterial color="#5a3a1e" />
           </mesh>
         ))}
         {[0, 1, 2, 3].map((k) => (
-          <mesh key={`b${k}`} position={[Math.cos(k * 1.7) * 0.05, SHOE_TOP + 0.23 + (k % 2) * 0.03, 0.2 + Math.sin(k * 1.7) * 0.05]}><icosahedronGeometry args={[0.014, 0]} /><meshToonMaterial color="#f2b0c0" /></mesh>
+          <mesh key={`b${k}`} position={[Math.cos(k * 1.7) * 0.05, SHOE_TOP + 0.23 + (k % 2) * 0.03, 0 + Math.sin(k * 1.7) * 0.05]}><icosahedronGeometry args={[0.014, 0]} /><meshToonMaterial color="#f2b0c0" /></mesh>
         ))}
         </StaticBatch>
       </group>
@@ -1336,13 +1337,15 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
  * (both moved along away from the door, the owner's wish, the doorway and the till's end left open)
  */
 const CAT_STAND_Z = -1.92, SHOE_CAB_Z = -0.62
+/** the shoe cupboard's middle off the wall: its back where the first one's was (0.51), now it's 1.27 times as deep */
+const SHOE_CAB_X = 0.51 - (0.34 * 1.27) / 2
 /** the shoe cupboard's top (blender/shoecab.py's H): what stands on it stands there */
-const SHOE_TOP = 0.66
+const SHOE_TOP = 0.66 * 1.27
 const SHOE_URL = import.meta.env.BASE_URL + 'models/shoecab.glb'
 useGLTF.preload(SHOE_URL)
 /**
- * The genkan's shoe cupboard (blender/shoecab.py; the owner's): a low walnut cabinet, four louvred doors on their hinges at its outer edges.
- * Pointed at, it says what it is; a click swings all four open 75 degrees (to the geta and slippers inside) or shut, a wooden knock as they go.
+ * The genkan's shoe cupboard (blender/shoecab.py; the owner's): a low walnut cabinet, nine shoji-latticed doors over empty cubbies (the guests' own shoes go in them).
+ * Pointed at, it says what it is; a click swings all nine open 75 degrees or shut, a wooden knock as they go.
  */
 function ShoeCupboard() {
   const gltf = useGLTF(SHOE_URL) as unknown as { scene: THREE.Group }
@@ -1357,8 +1360,10 @@ function ShoeCupboard() {
       if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone() }); mats.set(src, t) }
       m.material = t
     })
-    inkModel(root, (m) => /Pull|Strap|Louvre/.test(m.name), { width: 0.0015, weld: true })
-    const doors = [0, 1, 2, 3].map((k) => root.getObjectByName(`ShoeDoor${k}`)!)
+    inkModel(root, (m) => /Pull|Strap|Kumiko|Washi/.test(m.name), { width: 0.0015, weld: true })
+    // (nine doors, three by three: each hinged on its left or right edge, as its name says)
+    const doors: { o: THREE.Object3D; s: number }[] = []
+    root.traverse((o) => { const m = /^ShoeDoor([LR])\d+$/.exec(o.name); if (m) doors.push({ o, s: m[1] === 'L' ? -1 : 1 }) })
     return { root, doors }
   }, [gltf])
   const st = useRef({ open: false, k: 0 })
@@ -1366,7 +1371,7 @@ function ShoeCupboard() {
     const s = st.current
     s.k += Math.sign((s.open ? 1 : 0) - s.k) * Math.min(Math.abs((s.open ? 1 : 0) - s.k), Math.min(dt, 0.1) * 2.4)
     const e = s.k * s.k * (3 - 2 * s.k)
-    model.doors.forEach((d, k) => { d.rotation.y = (k % 2 === 0 ? -1 : 1) * e * (75 * Math.PI / 180) })
+    model.doors.forEach((d) => { d.o.rotation.y = d.s * e * (75 * Math.PI / 180) })
   })
   const says = () => (st.current.open ? '點擊關閉' : '點擊開啟')
   return (
@@ -1386,8 +1391,8 @@ const DOOR_CATS = [
   // (each with room round it: none touching the next, nor the shoe cupboard and the helmet beside the stand)
   { x: -0.05, y: 0.6, z: -0.17, yaw: 0.2, kind: 1 as const, h: 0.5 },
   { x: -0.05, y: 0.6, z: 0.17, yaw: -0.2, kind: 3 as const, h: 0.44 },
-  { x: -0.27, y: 0.32, z: -0.29, yaw: 0.25, kind: 2 as const, h: 0.38 },
-  { x: -0.27, y: 0.32, z: 0.29, yaw: -0.25, kind: 1 as const, h: 0.42 },
+  { x: -0.27, y: 0.32, z: -0.3, yaw: 0.25, kind: 2 as const, h: 0.38 },
+  { x: -0.27, y: 0.32, z: 0.3, yaw: -0.25, kind: 1 as const, h: 0.42 },
 ]
 /** the register's figure tabs: the amount (¥ 1 2 8 0 as it might be), and its maker's plate */
 /** the customers' display: green figures on black, the amount to pay */

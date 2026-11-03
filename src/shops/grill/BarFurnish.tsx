@@ -71,6 +71,13 @@ export function StoolModel({ red = false }: { red?: boolean }) {
   }, [gltf, red])
   return <primitive object={obj} />
 }
+/** an unseen box over the bamboo pot, the size of its model (a batch's merged meshes take no pointer): what's said when it's pointed at */
+export function BambooHit(props: { onPointerOver: (e: { stopPropagation: () => void }) => void; onPointerOut: () => void }) {
+  const gltf = useGLTF(BAMBOO_URL) as unknown as { scene: THREE.Group }
+  const box = useMemo(() => new THREE.Box3().setFromObject(gltf.scene), [gltf])
+  const size = box.getSize(new THREE.Vector3()), mid = box.getCenter(new THREE.Vector3())
+  return <mesh visible={false} position={mid} {...props}><boxGeometry args={[size.x * 0.8, size.y, size.z * 0.8]} /></mesh>
+}
 /** one of the till's two seats (blender/tillstools.py): the cashier's walnut chair with its kumiko back (`High`), a helper's stool of the same
  * make (`Low`), each stood at its own origin, facing -z */
 export function TillStoolModel({ which }: { which: 'High' | 'Low' }) {

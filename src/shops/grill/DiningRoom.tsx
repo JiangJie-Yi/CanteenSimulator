@@ -1,6 +1,6 @@
 import { blessingChime, shrineDoor } from './shrineSound'
 import { TISSUE } from '@/game/tissues'
-import { BambooModel } from './BarFurnish'
+import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote } from './Restroom'
 import { coolerDoorSound, lightSwitchSound, slideDoorSound } from './restroomSound'
 import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
@@ -1463,6 +1463,9 @@ function RoundWindow() {
 }
 
 /** a hanging scroll: the painting on paper mounted in brocade, its cord over a nail, a weighted rod at the foot */
+/** what the pieces only to look at say when they're pointed at (the owner's): a tag, no glow, the cursor left an arrow, no click */
+const BIJIN_SAYS = nameOver('【掛軸】三味線美人圖', '江戶浮世繪藝伎，洋溢典雅古韻')
+const BAMBOO_SAYS = nameOver('【觀賞盆栽】青竹', '象徵節節高升，增添店內沉靜綠意')
 function Scroll({ art }: { art: ArtKey }) {
   const W = 0.26, H = 0.62
   return (
@@ -3789,6 +3792,10 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
           </StaticBatch>
           {/* (the moon's dust in its shaft by night, outside the batch: it drifts, and a batch's pieces stand still) */}
           {a.round && <group position={[0, 1.4, a.z + nudgeArt(a.z)]}><WindowDust /><RoundShoji /></group>}
+          {/* (the beauty with her shamisen: only to look at (the owner's), named when pointed at, the cursor left an arrow) */}
+          {a.scroll === 'bijin' && (
+            <mesh visible={false} position={[-0.01, 1.42, a.z + nudgeArt(a.z)]} {...BIJIN_SAYS}><boxGeometry args={[0.02, 0.92, 0.34]} /></mesh>
+          )}
           </Movable>
         ))}
         {/* (the supplies in the corner between the drinks fridges and the toilets' doorway) */}
@@ -3796,6 +3803,9 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {supplies && <Movable id="supplies" label="衛生紙與清潔用品"><group position={[-0.13, 0, supplies.z]} rotation-y={-Math.PI / 2} scale={supplies.k}><CornerSupplies /></group></Movable>}
         {/* (the staff's door, where asked: up the stairs behind it, 員工專用) */}
         {staffDoor !== undefined && <Movable id="staffdoor" label="員工專用門"><group position={[0, 0, staffDoor]}><StaffDoor /></group></Movable>}
+        {/* (the speaker, flat to the wall over the staff door, centred on it, its bracket on the beam under the frieze and facing straight out
+            into the room (the owner's: in the corner, 1.25 times the size, it sat on the door's head turned askew)) */}
+        {staffDoor !== undefined && <Movable id="speaker" label="音箱" baseScale={0.82 * 1.25}><group position={[-0.2, WALL_H - 0.17, staffDoor]} rotation-y={-Math.PI / 2}><WallSpeaker /></group></Movable>}
         {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
         {altar && <Movable id="exitsign" label="逃生出口燈"><group name="look-exit" position={[-0.045, 2.08, to - 0.62]} rotation-y={-Math.PI / 2}><ExitSign /></group></Movable>}
         {/* (by the way in, at hand height, between the shoe cupboard and the corner: the room's light switch, and beside it the door's lanterns'
@@ -5475,6 +5485,9 @@ function WallSpeaker() {
     inkModel(root, (m) => !SPEAKER_INKED.test(m.name), { width: 0.004, weld: true })
     // (drawn a few parts at a time; the arm and its bracket, which reach back to the corner wherever it's put, on their own; the woofer's cone,
     // dust cap and surround on their own too, to thump with the music)
+    // (tipped down only a little, 8 degrees, level and square to the wall (the owner's: the model's own was 12.6))
+    const tilt = root.getObjectByName('SpeakerTilt')
+    if (tilt) tilt.rotation.x = 0.14
     mergeByMaterial(root, (o) => /^Speaker(Arm|Mount)/.test(o.name) || /^Speaker(Cone|DustCap|Surround)$/.test(o.name))
     const thump = ['SpeakerCone', 'SpeakerDustCap', 'SpeakerSurround'].map((n) => root.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o)
       .map((o) => ({ o, z: o.position.z, s: o.scale.clone() }))
@@ -5679,6 +5692,9 @@ function ExitSign() {
         <planeGeometry args={[1.2, 0.75]} />
         <meshBasicMaterial map={EXIT_SPILL} color="#3ee58a" transparent opacity={0.45} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
+      {/* (a faint green light of its own, on its own battery (the owner's): the same whatever the room's switches, so in the dark the wall and
+          the floor below it still show its green; there from the start (a light added later recompiles every material)) */}
+      <pointLight position={[0, -0.12, 0.12]} color="#40ff90" intensity={0.3} distance={3} decay={2} />
     </group>
   )
 }
@@ -5882,14 +5898,6 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
     const along = Math.min(-c0.length / 2 - 0.35, ...counters.slice(1).map((o) => o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c0.at).dot(c0.along)))
     return c0.at.clone().addScaledVector(c0.along, along + 0.42).addScaledVector(c0.lay, farOf(c0) + 0.42)
   }, [c0, counters])
-  // (the same corner, up under the ceiling, the speaker hung there and turned to face down the room's diagonal)
-  const speaker = useMemo(() => {
-    const along = Math.min(-c0.length / 2 - 0.35, ...counters.slice(1).map((o) => o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c0.at).dot(c0.along)))
-    // (flat to the far wall and tucked right into the corner, so none of the banner strings (which hang no nearer than 0.3 from a wall) runs through it)
-    const p = c0.at.clone().addScaledVector(c0.along, along + 0.145).addScaledVector(c0.lay, farOf(c0) + 0.115)
-    p.y += 1.55
-    return { p, yaw: Math.atan2(c0.lay.x, c0.lay.z) }
-  }, [c0, counters])
   const crateAt = useMemo(() => {
     if (!fr || !c1) return new THREE.Vector3()
     const last = fr[fr.length - 1]
@@ -5900,7 +5908,6 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
     // (not keyed by the language any more: that was for a mat with words on it, long gone, and each switch built all four again, their
     // copies, pictures and ink lines left behind each time)
     <>
-      <Movable id="speaker" label="音箱" baseTurn={[0, 45, 0]} baseScale={0.82}><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
       {/* (one stack, standing where the two used to) */}
       <Movable id="sake" label="酒樽"><group ref={sake}><StaticBatch>
         <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
@@ -5922,7 +5929,10 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
       </Movable>
       <Movable id="bamboo" label="竹盆栽"><StaticBatch>
         <group position={cornerAt} rotation-y={0.4}><BambooModel /></group>
-      </StaticBatch></Movable>
+      </StaticBatch>
+        {/* (only to look at (the owner's): named when pointed at, the cursor left an arrow, a click does nothing) */}
+        <group position={cornerAt} rotation-y={0.4}><BambooHit {...BAMBOO_SAYS} /></group>
+      </Movable>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
       {fr && <Movable id="crates" label="酒箱"><group ref={stock}><StaticBatch>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
