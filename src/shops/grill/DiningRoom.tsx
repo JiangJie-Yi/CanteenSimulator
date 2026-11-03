@@ -871,7 +871,8 @@ function RoundWood() {
       const src = m.material as THREE.MeshStandardMaterial
       let t = made.get(src)
       if (!t) {
-        t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+        // (its wood a deep walnut, darkened over its own grain (the owner's: a dark, solid frame; it was a bright orange keyaki))
+        t = new THREE.MeshToonMaterial({ color: src.color.clone().multiply(ROUND_WOOD_TINT), map: src.map ?? null })
         t.name = src.name
         made.set(src, t)
       }
@@ -888,6 +889,8 @@ function RoundWood() {
   return <primitive object={obj} />
 }
 useGLTF.preload(ROUND_URL)
+/** the round window's frame's tint over its keyaki: a deep walnut */
+const ROUND_WOOD_TINT = new THREE.Color('#7a5136')
 /** the round window's radius (its paper's) */
 const ROUND_R = 0.4
 /**
@@ -1186,11 +1189,12 @@ const ROUND_VIEW = (() => {
   const L = VIEW_LAYERS
   const mat = new THREE.ShaderMaterial({
     uniforms: { uSky: { value: layers.sky.t }, uFar: { value: layers.far.t }, uMid: { value: layers.mid.t }, uNear: { value: layers.near.t },
-      uCam: { value: new THREE.Vector3(0, 0, 3) } },
+      uCam: { value: new THREE.Vector3(0, 0, 3) }, uTime: { value: 0 } },
     vertexShader: `varying vec3 vLocal;
 void main() { vLocal = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `uniform sampler2D uSky, uFar, uMid, uNear;
 uniform vec3 uCam;
+uniform float uTime;
 varying vec3 vLocal;
 vec4 layer(sampler2D t, vec2 xy, float H) { return texture2D(t, clamp(xy / (2.0 * H) + 0.5, 0.0, 1.0)); }
 void main() {
@@ -1198,9 +1202,13 @@ void main() {
   vec3 dir = normalize(vLocal - uCam);
   vec2 slope = dir.xy / max(-dir.z, 0.15);
   vec3 c = layer(uSky, vLocal.xy + slope * ${L.sky.d.toFixed(1)}, ${L.sky.H.toFixed(2)}).rgb;
-  vec4 f = layer(uFar, vLocal.xy + slope * ${L.far.d.toFixed(1)}, ${L.far.H.toFixed(2)}); c = mix(c, f.rgb, f.a);
-  vec4 m = layer(uMid, vLocal.xy + slope * ${L.mid.d.toFixed(1)}, ${L.mid.H.toFixed(2)}); c = mix(c, m.rgb, m.a);
-  vec4 n = layer(uNear, vLocal.xy + slope * ${L.near.d.toFixed(1)}, ${L.near.H.toFixed(2)}); c = mix(c, n.rgb, n.a);
+  // (the far city and the street across hazed into the sky by the air between (the owner's: softer, less contrast, the eye kept on the
+  // window and the bamboo); the near bamboo stirring a little in the wind, more toward their tops)
+  vec3 air = c;
+  vec4 f = layer(uFar, vLocal.xy + slope * ${L.far.d.toFixed(1)}, ${L.far.H.toFixed(2)}); c = mix(c, mix(f.rgb, air, 0.38), f.a);
+  vec4 m = layer(uMid, vLocal.xy + slope * ${L.mid.d.toFixed(1)}, ${L.mid.H.toFixed(2)}); c = mix(c, mix(m.rgb, air, 0.14), m.a);
+  vec2 sway = vec2(sin(uTime * 0.9 + vLocal.y * 2.5) * 0.008 + sin(uTime * 2.3) * 0.002, 0.0) * (0.4 + vLocal.y / 0.8 + 0.5);
+  vec4 n = layer(uNear, vLocal.xy + slope * ${L.near.d.toFixed(1)} + sway, ${L.near.H.toFixed(2)}); c = mix(c, n.rgb, n.a);
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`,
@@ -1215,29 +1223,50 @@ void main() {
  * this, as a round window's shoji does. (A passer-by's shadow crossed the paper by day now and then: the owner found it odd and had it
  * taken away.) Not batched: it moves, and it's clicked.
  */
+/** the glow under the round window's sill: a soft fan of light fading down the wall, its colour the part of the day's */
+const SILL_TEX = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 128; c.height = 64
+  const g = c.getContext('2d')!
+  const gr = g.createRadialGradient(64, 0, 4, 64, 0, 64)
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 64)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+const SILL_LIGHT: Record<Sky, { c: THREE.Color; a: number }> = {
+  day: { c: new THREE.Color('#dce8ff'), a: 0.16 },
+  dusk: { c: new THREE.Color('#ffb46e'), a: 0.3 },
+  dawn: { c: new THREE.Color('#ffc8c0'), a: 0.16 },
+  night: { c: new THREE.Color('#9fb8e0'), a: 0 },
+}
 function RoundShoji() {
   const R = ROUND_R
   const win = useRef<THREE.Group>(null)
   const halves = useRef<(THREE.Group | null)[]>([])
   const view = useRef<THREE.Mesh>(null)
+  const sill = useRef<THREE.Mesh>(null)
   const st = useRef({ open: false, k: 0 })
   /** the window's frame, inverted, for cutting what's drawn to its round */
   const inv = useMemo(() => ({ value: new THREE.Matrix4() }), [])
   const round = useMemo(() => {
-    const cut = <T extends THREE.Material>(m: T) => {
+    const cut = <T extends THREE.Material>(m: T, lowerOnly = false) => {
       m.onBeforeCompile = (sh) => {
         sh.uniforms.uWinInv = inv
         sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform mat4 uWinInv;\nvarying vec3 vWin;')
           .replace('#include <project_vertex>', '#include <project_vertex>\nvWin = (uWinInv * modelMatrix * vec4(transformed, 1.0)).xyz;')
         sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWin;')
-          .replace('void main() {', `void main() {\n  if (vWin.y * vWin.y + vWin.z * vWin.z > ${(R * R).toFixed(5)}) discard;`)
+          .replace('void main() {', `void main() {\n  if (vWin.y * vWin.y + vWin.z * vWin.z > ${(R * R).toFixed(5)}${lowerOnly ? ' || vWin.y > 0.0' : ''}) discard;`)
       }
-      m.customProgramCacheKey = () => 'round-cut'
+      m.customProgramCacheKey = () => (lowerOnly ? 'round-cut-low' : 'round-cut')
       return m
     }
     return {
-      paper: cut(new THREE.MeshBasicMaterial({ map: ROUND_PAPER, toneMapped: false })),
-      wood: cut(new THREE.MeshToonMaterial({ color: '#b98656' })),
+      // (the washi on its lower half only (the owner's: the lower half screened, the upper open on the view, as a koshi-shoji is))
+      paper: cut(new THREE.MeshBasicMaterial({ map: ROUND_PAPER, toneMapped: false }), true),
+      wood: cut(new THREE.MeshToonMaterial({ color: '#6a4428' })),
     }
   }, [inv, R])
   useEffect(() => () => { round.paper.dispose(); round.wood.dispose() }, [round])
@@ -1264,6 +1293,15 @@ function RoundShoji() {
     inv.value.copy(w.matrixWorld).invert()
     // (where the eye is, in the window's own frame: the street's layers are looked through from there)
     if (view.current && ROUND_VIEW) ROUND_VIEW.uniforms.uCam.value.copy(view.current.worldToLocal(eye.copy(camera.position)))
+    if (ROUND_VIEW) ROUND_VIEW.uniforms.uTime.value += Math.min(dt, 0.1)
+    // (the light under the sill: its part of the day's colour, eased)
+    if (sill.current) {
+      const want = SILL_LIGHT[skyNow()]
+      const m = sill.current.material as THREE.MeshBasicMaterial
+      m.color.lerp(want.c, Math.min(1, dt * 2))
+      m.opacity += (want.a - m.opacity) * Math.min(1, dt * 2)
+      sill.current.visible = m.opacity > 0.01
+    }
     const want = s.open ? 1 : 0
     s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.6)
     const e = s.k * s.k * (3 - 2 * s.k)
@@ -1272,6 +1310,12 @@ function RoundShoji() {
   const says = () => (st.current.open ? '點一下關上' : '點一下打開（左右拉開）')
   return (
     <group ref={win} name="round-shoji">
+      {/* (the light in through it falling on the wall under its sill (the owner's): a soft glow fading down the plaster, cool white by day,
+          warm at dusk, rose at dawn, none at night (the moon's beam is its own)) */}
+      <mesh ref={sill} position={[-0.012, -R - 0.32, 0]} rotation-y={-Math.PI / 2} raycast={() => {}}>
+        <planeGeometry args={[R * 2.4, 0.6]} />
+        <meshBasicMaterial map={SILL_TEX ?? undefined} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
       {/* (outside, behind it all: the street, seen in depth through the window (ROUND_VIEW)) */}
       <mesh ref={view} position-x={-0.001} rotation-y={-Math.PI / 2} material={ROUND_VIEW ?? undefined}>
         <circleGeometry args={[R, 64]} />
