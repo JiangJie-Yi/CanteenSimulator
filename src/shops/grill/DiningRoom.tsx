@@ -1694,49 +1694,41 @@ const wcStallNoren = (who: 'm' | 'f') => {
     const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646 }
     g.save()
     const gr = g.createLinearGradient(0, 0, 0, H)
-    if (who === 'm') { gr.addColorStop(0, '#f1efe2'); gr.addColorStop(1, '#dfe5cd') } else { gr.addColorStop(0, '#f9eee8'); gr.addColorStop(1, '#f0d8d0') }
+    if (who === 'm') { gr.addColorStop(0, '#22385e'); gr.addColorStop(1, '#162540') } else { gr.addColorStop(0, '#f9eee8'); gr.addColorStop(1, '#f0d8d0') }
     g.fillStyle = gr; g.fillRect(0, 0, 512, H)
-    const leaf = (x: number, y: number, a: number, len: number, wid: number, col: string) => {
-      g.save(); g.translate(x, y); g.rotate(a)
-      g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * 0.42, -wid, len, 0); g.quadraticCurveTo(len * 0.42, wid, 0, 0)
-      g.fillStyle = col; g.fill()
-      g.strokeStyle = 'rgba(255,255,255,0.28)'; g.lineWidth = 1.2
-      g.beginPath(); g.moveTo(len * 0.06, 0); g.lineTo(len * 0.86, 0); g.stroke()
-      g.restore()
-    }
     if (who === 'm') {
-      // bamboo: a stalk from the top band to the hem, leaning a little; its nodes a dark ring with a pale lip above; sprays from some
-      const stalk = (x0: number, x1: number, w: number, body: string, lit: string, ring: string, sprays: boolean) => {
-        const at = (y: number) => x0 + (x1 - x0) * (y / H)
-        g.lineCap = 'butt'
-        g.strokeStyle = body; g.lineWidth = w
-        g.beginPath(); g.moveTo(at(40), 40); g.lineTo(at(H), H); g.stroke()
-        g.strokeStyle = lit; g.lineWidth = w * 0.22
-        g.beginPath(); g.moveTo(at(40) - w * 0.22, 40); g.lineTo(at(H) - w * 0.22, H); g.stroke()
-        for (let y = 70 + rnd() * 60; y < H - 30; y += 110 + rnd() * 50) {
-          const x = at(y)
-          g.fillStyle = ring; g.fillRect(x - w / 2 - 1.5, y, w + 3, 3.5)
-          g.fillStyle = lit; g.fillRect(x - w / 2, y - 3, w, 2)
-          if (!sprays || rnd() < 0.35) continue
-          // (a spray off the node: a twig out to one side, a fan of slender leaves at its end)
-          const side = x < 256 ? -1 : 1, s2 = rnd() < 0.3 ? -side : side
-          const tx = x + s2 * (24 + rnd() * 18), ty = y + 14 + rnd() * 10
-          g.strokeStyle = ring; g.lineWidth = 2
-          g.beginPath(); g.moveTo(x, y + 2); g.quadraticCurveTo((x + tx) / 2, y + 2, tx, ty); g.stroke()
-          const n = 3 + Math.floor(rnd() * 3)
-          for (let k = 0; k < n; k++) {
-            const a = (s2 > 0 ? 0.35 : Math.PI - 0.35) + s2 * (k - (n - 1) / 2) * 0.42 + (rnd() - 0.5) * 0.25
-            leaf(tx, ty, a, 62 + rnd() * 30, 8 + rnd() * 3, ['#3f8a49', '#2f6e3c', '#58a05c'][k % 3])
+      // (indigo (the owner's: the men's a deep navy with a traditional pattern; it was green bamboo on linen): waves of seigaiha rising over
+      // its lower half in pale lines, fading upward; on each panel a white crest, the plum blossom (梅鉢) in its ring)
+      const R = 30
+      for (let row = 0; row * R * 0.5 < H * 0.55; row++) {
+        const y = H - row * R * 0.5
+        const fade = Math.max(0, 1 - row * R * 0.5 / (H * 0.55))
+        for (let x = (row % 2) * R; x < 512 + R; x += R * 2) {
+          for (let k = 3; k >= 1; k--) {
+            g.beginPath(); g.arc(x, y, (R * k) / 3, Math.PI, 0)
+            g.fillStyle = k === 3 ? '#1b2d4d' : 'rgba(0,0,0,0)'; if (k === 3) g.fill()
+            g.strokeStyle = `rgba(200,215,235,${0.5 * fade})`; g.lineWidth = 2
+            g.stroke()
           }
         }
       }
-      // (two pale ones behind, then the near ones; none across the slit at the middle)
-      stalk(150, 140, 14, 'rgba(150,190,140,0.55)', 'rgba(220,235,205,0.5)', 'rgba(110,150,100,0.5)', false)
-      stalk(398, 412, 13, 'rgba(150,190,140,0.55)', 'rgba(220,235,205,0.5)', 'rgba(110,150,100,0.5)', false)
-      stalk(84, 104, 26, '#4f9a55', '#a9d69c', '#2a5c33', true)
-      stalk(206, 190, 21, '#3f8a49', '#9bcf8e', '#285a31', true)
-      stalk(326, 344, 27, '#56a35a', '#b2dca3', '#2d6236', true)
-      stalk(450, 436, 19, '#468f4f', '#a2d496', '#2a5c33', true)
+      const crest = (cx: number, cy: number, r: number) => {
+        g.strokeStyle = '#f2efe6'; g.lineWidth = 4
+        g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke()
+        g.fillStyle = '#f2efe6'
+        for (let k = 0; k < 5; k++) {
+          const a = -Math.PI / 2 + (k * 2 * Math.PI) / 5
+          g.beginPath(); g.arc(cx + Math.cos(a) * r * 0.42, cy + Math.sin(a) * r * 0.42, r * 0.3, 0, Math.PI * 2); g.fill()
+        }
+        g.fillStyle = '#22385e'; g.beginPath(); g.arc(cx, cy, r * 0.17, 0, Math.PI * 2); g.fill()
+        g.fillStyle = '#f2efe6'
+        for (let k = 0; k < 5; k++) {
+          const a = -Math.PI / 2 + Math.PI / 5 + (k * 2 * Math.PI) / 5
+          g.beginPath(); g.arc(cx + Math.cos(a) * r * 0.12, cy + Math.sin(a) * r * 0.12, r * 0.03, 0, Math.PI * 2); g.fill()
+        }
+      }
+      crest(128, H * 0.36, 52)
+      crest(384, H * 0.36, 52)
     } else {
       // peonies (牡丹, as in the owner's reference): their three-lobed leaves first, then each blossom from the back, seen a little from
       // above: a ring of broad ruffled petals, deep at the heart and pale at the edge; a smaller ring; the golden heart of stamens; and the
@@ -1845,7 +1837,7 @@ const wcStallNoren = (who: 'm' | 'f') => {
     g.fillStyle = '#000000'
     for (let y = 0; y < H; y += 3) g.fillRect(0, y, 512, 1)
     g.globalAlpha = 1
-    g.fillStyle = who === 'm' ? '#2c4632' : '#6a1d26'; g.fillRect(0, 0, 512, 40)
+    g.fillStyle = who === 'm' ? '#0f1a2e' : '#6a1d26'; g.fillRect(0, 0, 512, 40)
     g.fillStyle = '#f4efe4'; g.fillRect(0, H - 20, 512, 4)
     g.restore()
   })
@@ -1888,15 +1880,6 @@ const WC_CEDAR = canvasTex(64, 128, (g) => {
     }
   }
 }, true)
-/** the plaque by the door: お手洗い in black on a pale board */
-const WC_PLAQUE = canvasTex(160, 64, (g) => {
-  g.fillStyle = '#e6d2a4'
-  g.fillRect(0, 0, 160, 64)
-  g.strokeStyle = '#3a2416'
-  g.lineWidth = 4
-  g.strokeRect(3, 3, 154, 58)
-  brushText(g, 'お手洗い', 80, 33, 34, { fill: '#1a0d06', spacing: 3 })
-})
 /** a hand towel (手拭い) of indigo cotton with a wave pattern, white at both ends */
 const WC_TENUGUI = canvasTex(48, 96, (g) => {
   g.fillStyle = '#1f3a68'
@@ -1978,6 +1961,16 @@ function WcWall({ len, at, yaw, top, cut = false }: { len: number; at: [number, 
 /** how thick the rooms' walls are drawn behind their faces (the owner's: the partitions between the men's and the women's, and between each
  * washroom and its toilet, were bare planes, paper-thin seen from above): the men's and the women's rooms 0.12 apart, half each */
 const WC_T = 0.06
+/** an unseen sheet over a wall's face that takes the pointer and stops it there: what's behind the wall isn't pointed at through it */
+const stopHere = (e: { stopPropagation: () => void }) => e.stopPropagation()
+const WC_BLOCK_MAT = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+function WcBlock({ len, at, yaw, top }: { len: number; at: [number, number, number]; yaw: number; top: number }) {
+  return (
+    <mesh position={[at[0], top / 2, at[2]]} rotation-y={yaw} material={WC_BLOCK_MAT} onPointerOver={stopHere} onPointerMove={stopHere} onClick={stopHere}>
+      <planeGeometry args={[len, top]} />
+    </mesh>
+  )
+}
 /** how far behind the shop's wall face (the rooms' x = 0) their walls' bodies begin: never in its face */
 const WC_IN = 0.02
 /** a stretch of solid wall in the rooms' frame, from x0 to x1, y0 to y1, z0 to z1 (either way round): its top and its cut end seen from
@@ -2076,7 +2069,16 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
   const OP = WC_STALL_W, NL = WC_STALL_L
   const noren = useMemo(() => [-1, 1].map((sd) => {
     const pw = (OP - 0.02) / 2
-    const g = new THREE.PlaneGeometry(pw, NL)
+    // (hung in soft folds (the owner's: it read as a flat board): the cloth waved across, three folds a panel, the waves easing out to
+    // nothing at the rod where it's gathered, deepest at the hem; its normals from the waves, so its light runs down the folds)
+    const g = new THREE.PlaneGeometry(pw, NL, 18, 6)
+    const pos = g.attributes.position as THREE.BufferAttribute
+    for (let k = 0; k < pos.count; k++) {
+      const x = pos.getX(k), y = pos.getY(k)
+      const down = (NL / 2 - y) / NL
+      pos.setZ(k, Math.sin((x / pw + 0.5) * Math.PI * 6 + sd) * 0.012 * (0.35 + 0.65 * down))
+    }
+    g.computeVertexNormals()
     const uv = g.attributes.uv as THREE.BufferAttribute
     const u0 = sd < 0 ? 0 : (pw + 0.02) / OP, u1 = u0 + pw / OP
     for (let k = 0; k < uv.count; k++) uv.setX(k, u0 + uv.getX(k) * (u1 - u0))
@@ -2124,6 +2126,12 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <mesh position={[(X0 + 0.04 + D) / 2, ROD_Y, s * ROD_Z]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.008, 0.008, D - X0 - 0.04, 8]} /><meshToonMaterial color="#3a2416" /></mesh>
       {[X0 + 0.04 + 0.011, D - 0.011].map((x) => <mesh key={x} position={[x, ROD_Y, s * ROD_Z]}><boxGeometry args={[0.022, 0.034, 0.034]} /><meshToonMaterial color="#5a3a22" /></mesh>)}
       </StaticBatch>
+      {/* (the walls stop the pointer (the owner's: over the washroom's wall, it found the drinks fridge behind and offered to open it): an
+          unseen sheet over each wall's face but the cut one, taking the pointer and passing it on to nothing) */}
+      <WcBlock len={D} at={[D / 2, 0, -s * w / 2]} yaw={s > 0 ? 0 : Math.PI} top={top} />
+      <WcBlock len={X0} at={[X0 / 2, 0, s * w / 2]} yaw={s > 0 ? Math.PI : 0} top={top} />
+      <WcBlock len={E} at={[X0, 0, SZ]} yaw={Math.PI / 2} top={top} />
+      <WcBlock len={SW} at={[SX, 0, s * (w / 2 + E)]} yaw={s > 0 ? Math.PI : 0} top={top} />
       {/* the long noren across the way to the toilet, its two panels hanging from the rod (the noren and the rod stand still: batched apart,
           their picture each its own) */}
       <Movable id={`wc2-${who}-noren`} label={`隔間暖簾（${name}）`}><StaticBatch>
@@ -2137,7 +2145,23 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <Movable id={`wc2-${who}-basin`} label={`洗手台與鏡子（${name}）`}>
         <group position={[D, 0, 0]}><WashstandLive who={who} /></group>
       </Movable>
-      <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}><StaticBatch>
+      {/* (the men's: a moss ball (苔玉) on a dark, near-black stoneware dish and a stub of bamboo by it (the owner's: the men's and women's
+          set apart); the women's its bamboo vase of camellia) */}
+      {who === 'm' && (
+        <Movable id="wc2-m-moss" label="苔玉（男廁）"><StaticBatch>
+          <group position={[D - 0.14, 0.764, -0.19]}>
+            <mesh position-y={0.008}><cylinderGeometry args={[0.05, 0.04, 0.016, 12]} /><meshToonMaterial color="#2c2a28" /></mesh>
+            <mesh position-y={0.048} scale={[1, 0.9, 1]}><icosahedronGeometry args={[0.04, 1]} /><meshToonMaterial color="#4c6e34" /></mesh>
+            {[0, 2.1, 4.2].map((a) => (
+              <mesh key={a} geometry={WC_GEO.leaf} position={[Math.cos(a) * 0.012, 0.1, Math.sin(a) * 0.012]} rotation={[Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35]}>
+                <meshToonMaterial color="#5f8f45" />
+              </mesh>
+            ))}
+            <mesh position={[0.06, 0.05, 0.03]}><cylinderGeometry args={[0.009, 0.01, 0.1, 6]} /><meshToonMaterial color="#7a9a4a" /></mesh>
+          </group>
+        </StaticBatch></Movable>
+      )}
+      {who === 'f' && <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}><StaticBatch>
       {/* (a bamboo vase of camellia on the washstand's counter, beside the bowl) */}
       {/* (clear of the counter's back rail: it stood 2 mm into it (clips.mjs)) */}
       <group position={[D - 0.14, 0.764, -0.19]}>
@@ -2153,7 +2177,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
           </mesh>
         ))}
       </group>
-      </StaticBatch></Movable>
+      </StaticBatch></Movable>}
       <Movable id={`wc2-${who}-towel`} label={`手巾架（${name}）`}><StaticBatch>
       {/* (the indigo hand towel on a bamboo rod on the wall beside the washstand) */}
       <group position={[D - 0.24, 0.98, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
@@ -2162,9 +2186,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         <mesh position={[0, -0.11, 0.03]}><planeGeometry args={[0.12, 0.22]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI} side={THREE.DoubleSide} /></mesh>
       </group>
       </StaticBatch></Movable>
-      <Movable id={`wc2-${who}-plaque`} label={`廁所牌（${name}）`}><StaticBatch>
-      <mesh position={[0.36, 1.52, -s * (w / 2 - 0.006)]} rotation-y={s > 0 ? 0 : Math.PI}><planeGeometry args={[0.3, 0.12]} /><meshToonMaterial color="#ffffff" map={WC_PLAQUE} /></mesh>
-      </StaticBatch></Movable>
+      {/* (no お手洗い plaque on the wall: the owner's, the wall kept clean) */}
       <Movable id={`wc2-${who}-duck`} label={`簀之子踏板（${name}）`}><StaticBatch>
       {/* the slatted duckboard (簀の子) before the washstand, where hands are washed */}
       <group position={[D - 0.56, 0, 0]}>
@@ -5302,7 +5324,7 @@ const NOTE_TEX = (() => {
 })()
 /**
  * Notes coming out of the speaker's cones while music plays: ♪ ♫ ♩ ♬ sprites, big ones from the woofer and small ones from the tweeter, each
- * rising and swaying on its own beat, growing as it goes and fading out; with the music off they thin out and are gone.
+ * rising and swaying on its own beat, growing as it goes and fading out; with the music off no more set out, and those up finish their flight.
  */
 function MusicNotes({ playing }: { playing: boolean }) {
   const N = 10
@@ -5314,19 +5336,29 @@ function MusicNotes({ playing }: { playing: boolean }) {
     return { x0: (((i * 37) % 7) - 3) * 0.008, y0: woofer ? -0.07 : 0.15, size: (woofer ? 0.17 : 0.09) * (0.8 + ((i * 53) % 5) * 0.1), speed: 0.22 + ((i * 29) % 6) * 0.025,
       drift: (((i * 17) % 9) - 4) * 0.045, phase: i / N }
   }), [])
-  useFrame(({ clock }, dt) => {
-    k.current += ((playing ? 1 : 0) - k.current) * Math.min(1, dt * 3)
+  // (each note's own flight: when it set out (none: not flying). With the music on, a note that's done sets out again; with it off, no new
+  // one sets out, and those already up go on rising and fading out each in its own time (the owner's: they all shrank away at once))
+  const born = useRef<(number | null)[]>(notes.map(() => null))
+  useFrame(({ clock }) => {
     const t = clock.elapsedTime
     notes.forEach((n, i) => {
       const sp = refs.current[i]
       if (!sp) return
-      const life = (t * n.speed + n.phase) % 1
+      let b0 = born.current[i]
+      if (b0 !== null && (t - b0) * n.speed >= 1) b0 = null
+      // (set out again, or for the first time as the music starts: staggered by each note's own phase)
+      if (b0 === null && playing) b0 = t + (k.current ? 0 : n.phase / n.speed)
+      born.current[i] = b0
+      const life = b0 === null ? -1 : (t - b0) * n.speed
+      sp.visible = life >= 0 && life < 1
+      if (!sp.visible) return
       // (out of the cone, on and up in front of the speaker, swaying as it goes)
       sp.position.set(n.x0 + n.drift * life + Math.sin(t * 2.1 + i * 1.7) * 0.04 * life, n.y0 + life * 0.55, 0.14 + life * 0.5)
-      sp.scale.setScalar(n.size * Math.min(1, life * 6) * (0.75 + 0.5 * life) * k.current)
-      ;(sp.material as THREE.SpriteMaterial).opacity = Math.min(1, life * 8) * (1 - life) ** 0.6 * k.current
-      sp.visible = k.current > 0.02
+      sp.scale.setScalar(n.size * Math.min(1, life * 6) * (0.75 + 0.5 * life))
+      ;(sp.material as THREE.SpriteMaterial).opacity = Math.min(1, life * 8) * (1 - life) ** 0.6
     })
+    // (whether the music's been on since the notes last stood still: a fresh start staggers them)
+    k.current = playing || born.current.some((x) => x !== null) ? 1 : 0
   })
   return (
     <>
