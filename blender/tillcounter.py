@@ -322,9 +322,10 @@ def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell, shade):
     bm_ = bmesh.new()
     seg = 12
     uvl = bm_.loops.layers.uv.new("UVMap")
-    ys = {round(y0 + h * i / 12, 5) for i in range(13)}
+    # (eight lengths up it, and three rings at each node: its scar, its ridge, its pinch; twelve and five were some 800 triangles a culm)
+    ys = {round(y0 + h * i / 8, 5) for i in range(9)}
     for n in nodes_at:
-        for d in (-0.006, -0.0025, 0.0, 0.0025, 0.009):
+        for d in (-0.006, 0.0, 0.009):
             if y0 < n + d < y0 + h:
                 ys.add(round(n + d, 5))
     ys = sorted(ys)
