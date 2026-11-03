@@ -3,7 +3,7 @@ import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
-import { setTip } from '@/scene/hoverTip'
+import { aimTip, setTip } from '@/scene/hoverTip'
 import { openingFloat, type DrawerCash } from '@/game/till'
 import { RACK_FULL, type Dryer } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
@@ -171,12 +171,13 @@ export function sauceSide(c: Counter, gate: { end: 1 | -1; w: number; shift?: nu
 export const POINTER_HINT = { hand: 0 }
 /** handlers for one of those: a hand over it */
 export const handOver = {
-  onPointerOver: (e: { stopPropagation: () => void; nativeEvent: Event; eventObject?: THREE.Object3D }) => {
+  onPointerOver: (e: { stopPropagation: () => void; nativeEvent: Event; eventObject?: THREE.Object3D; camera?: THREE.Camera }) => {
     e.stopPropagation()
     // (in edit mode nothing answers the pointer: only the pieces themselves)
     if (HOVER.paused) return
-    // (and the thing itself lights up, so it's plain which one is under the pointer)
+    // (and the thing itself lights up, so it's plain which one is under the pointer; its tag stands over it)
     glowOnly(e.eventObject)
+    aimTip(e)
     POINTER_HINT.hand++
     const el = e.nativeEvent.target as HTMLElement | null
     if (el?.style) el.style.cursor = 'pointer'
@@ -192,7 +193,7 @@ export const handOver = {
 /** a thing that's only named when pointed at, with nothing to do with it (an omamori, a helmet, an offering): its tag by the pointer, but
  * no glow and the cursor left as it is (the owner's: a glow and a pointing hand say it can be clicked, and these can't) */
 export const nameOver = (title: string, hint: string) => ({
-  onPointerOver: (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (HOVER.paused) return; setTip({ title, hint }) },
+  onPointerOver: (e: { stopPropagation: () => void; eventObject?: THREE.Object3D; camera?: THREE.Camera; nativeEvent?: Event }) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title, hint }) },
   onPointerOut: () => { if (HOVER.paused) return; setTip(null) },
 })
 /** `handOver` that also names the thing and says what to do with it, in a tag by the pointer */
@@ -279,7 +280,7 @@ export const DRINKS = [
   // a sports drink in its plastic bottle, the glass milk bottle with its paper cap, a chuhai in a can
   { id: 'sports', zh: '運動飲料', ja: 'スポーツドリンク', en: 'Sports drink', price: 50, color: '#a8d8ee', cap: '#1f6fb8', glass: true, shape: 'bottle', label: ['#f4f9fc', '#1f6fb8', 'スポーツ'] },
   { id: 'milk', zh: '牛奶', ja: '牛乳', en: 'Milk', price: 45, color: '#f6f2e6', cap: '#f4efe2', glass: true, shape: 'bottle', label: ['#f4f0e4', '#3a6ab0', '牛乳'] },
-  { id: 'chuhai', zh: '酎沙瓦', ja: 'チューハイ', en: 'Chu-hi', price: 90, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#f6b8c4', '#ffffff', 'チューハイ'] },
+  { id: 'chuhai', zh: '檸檬沙瓦', ja: 'チューハイ', en: 'Chu-hi', price: 90, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#f6b8c4', '#ffffff', 'チューハイ'] },
 ] as const
 export type DrinkId = (typeof DRINKS)[number]['id']
 /**

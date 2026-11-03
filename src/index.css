@@ -6294,6 +6294,19 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
   /* (small and light, the owner's: the line under the name kept short, never a long banner over the room) */
   max-width: 240px;
   padding: 6px 12px;
+  /* (it fades in, a little up into place) */
+  animation: tip-in 120ms ease-out;
+}
+
+/* (over a small thing the tag stands just above its top (HoverTip places the whole of it), not off to the pointer's side) */
+.hover-tip.is-anchored .tool-tag {
+  left: 0;
+  top: 0;
+}
+
+@keyframes tip-in {
+  from { opacity: 0; translate: 0 4px; }
+  to { opacity: 1; translate: 0 0; }
 }
 
 /* the stock bar on each chiller tag: how much there is against the par level */

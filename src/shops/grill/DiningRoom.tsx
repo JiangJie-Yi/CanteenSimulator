@@ -20,7 +20,7 @@ import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINK
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
-import { setTip } from '@/scene/hoverTip'
+import { aimTip, setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
 import { lampGlow, lightOn, type Circuit } from '@/game/roomLights'
@@ -4497,6 +4497,30 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     // (what's been taken is put back by the stocker, carried out from the back (GuestBar3D's stocker), not by itself)
   })
   type From = { kind: 'slot'; r: number; k: number } | { kind: 'out'; i: number }
+  /**
+   * The real top of whatever's under a point set down on a table (tableHit has each table at one height; where a top stands a little higher
+   * or lower than that, a drink set down there hung in the air (the owner's)): a short ray straight down there, against only what's near it
+   * (not the whole scene, nor the figures, nor the drinks themselves, nor anything unseen): its y, or the table's own if nothing's found
+   */
+  const surfaceAt = (p: THREE.Vector3, skip: THREE.Object3D | null) => {
+    const from = p.clone().setY(p.y + 0.3), near: THREE.Object3D[] = []
+    const c = new THREE.Vector3(), s = new THREE.Sphere()
+    const under = (o: THREE.Object3D) => { for (let a: THREE.Object3D | null = o; a; a = a.parent) if (a === skip) return true; return false }
+    scene.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh || !m.visible || (m as THREE.SkinnedMesh).isSkinnedMesh || !m.geometry) return
+      const mat = m.material as THREE.Material
+      if (!mat || (mat.transparent && !mat.depthWrite) || (mat as THREE.MeshBasicMaterial).colorWrite === false) return
+      if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere()
+      s.copy(m.geometry.boundingSphere!).applyMatrix4(m.matrixWorld)
+      c.copy(s.center).setY(from.y)
+      if (c.distanceTo(from) > s.radius + 0.05 || s.center.y - s.radius > from.y || under(m)) return
+      near.push(m)
+    })
+    const rc = new THREE.Raycaster(from, new THREE.Vector3(0, -1, 0), 0, 0.6)
+    const hit = rc.intersectObjects(near, false).find((h) => h.face && h.face.normal.clone().transformDirection(h.object.matrixWorld).y > 0.7)
+    return hit && Math.abs(hit.point.y - p.y) < 0.25 ? hit.point.y : p.y
+  }
   const begin = (from: From, ev: { stopPropagation: () => void }) => {
     // (edit mode is for the scene alone)
     if (getEdit().on) return
@@ -4525,6 +4549,8 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       // (over a table, nearer than the fridge's own front, it goes down on the table, standing upright, wherever the pointer is)
       const th = tableHit(raycaster.ray)
       onTable = th && (!hit || th.distanceTo(raycaster.ray.origin) < hit.distanceTo(raycaster.ray.origin)) ? th : null
+      // (down on the top that's really there, not the table's height as reckoned)
+      if (onTable) onTable.y = surfaceAt(onTable, root.current)
       // (carried within the boss's reach, set down where he'd come for it or held right over him: he glows, to say it's for him)
       const boss = scene.getObjectByName('BossFollow')
       if (boss && !BOSS_DRINK.at) {
@@ -4633,7 +4659,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
         <group key={`${r}-${k}`} ref={reg(`${r}-${k}`)}
           position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin({ kind: 'slot', r, k }, ev)}
-          onPointerOver={(ev) => { ev.stopPropagation(); if (doorOpen()) { document.body.style.cursor = 'grab'; setHover(`${r}-${k}`) } setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
+          onPointerOver={(ev) => { ev.stopPropagation(); if (doorOpen()) { document.body.style.cursor = 'grab'; setHover(`${r}-${k}`) } aimTip(ev); setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
           onPointerOut={() => { document.body.style.cursor = ''; setHover((h) => (h === `${r}-${k}` ? null : h)); setTip(null) }}>
           {/* (what the pointer finds: the bottle's size, unseen) */}
           <mesh position-y={0.11} visible={false}><boxGeometry args={[shelves[r].pitch * 0.9, 0.22, 0.06]} /></mesh>
@@ -4649,7 +4675,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       {/* (what's been taken out, stood on the floor before the fridge) */}
       {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
         <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
-          onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject); setTip({ title: drinkName(o.id), hint: '拖曳移動，放回櫃子或遞給客人' }) }} onPointerOut={(ev) => { document.body.style.cursor = ''; glowLeave(ev.eventObject); setTip(null) }}>
+          onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject); aimTip(ev); setTip({ title: drinkName(o.id), hint: '拖曳移動，放回櫃子或遞給客人' }) }} onPointerOut={(ev) => { document.body.style.cursor = ''; glowLeave(ev.eventObject); setTip(null) }}>
           <DrinkBottle id={o.id} wet />
         </group>
       ))}
