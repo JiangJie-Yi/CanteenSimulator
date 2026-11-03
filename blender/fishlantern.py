@@ -51,7 +51,7 @@ def mesh_obj(name, bm, smooth=True):
 def lathe(name, prof, segs, mat, flat=1.0, u0=0.0):
     """turned round the vertical: `prof` the (radius, height, v) points from one end to the other; `flat` squeezes it front to back; u round
     it the way that reads left to right from the front (+z): 0 at its right side (+x), 0.25 at its back, 0.5 its left, 0.75 the middle of
-    its front; the ends closed to a point where their radius is 0"""
+    its front; where an end's radius is 0, the ring beside it closed across in a ladder instead (not a fan into one point)"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     rings = []
@@ -59,9 +59,16 @@ def lathe(name, prof, segs, mat, flat=1.0, u0=0.0):
         ring = []
         for k in range(segs + 1):
             a = 2 * math.pi * k / segs
-            ring.append(bm.verts.new(P(r * math.cos(a), y, flat * r * math.sin(a))) if r > 1e-6 or k == 0 else ring[0])
-        rings.append(ring)
+            ring.append(bm.verts.new(P(r * math.cos(a), y, flat * r * math.sin(a))) if (r > 1e-6 and k < segs) else (ring[0] if k == segs else None))
+        rings.append(ring if r > 1e-6 else None)
     for j in range(len(prof) - 1):
+        if rings[j] is None or rings[j + 1] is None:
+            jj = j + 1 if rings[j] is None else j
+            for f in ladder_fill(bm, rings[jj][:segs]):
+                for lp in f.loops:
+                    k = rings[jj].index(lp.vert)
+                    lp[uvl].uv = (u0 + 1 - k / segs, prof[jj][2])
+            continue
         for k in range(segs):
             a, b, c, d = rings[j][k], rings[j][k + 1], rings[j + 1][k + 1], rings[j + 1][k]
             vs = [a, b, c, d]
