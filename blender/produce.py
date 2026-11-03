@@ -168,10 +168,8 @@ def sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 2, sa
             f = bm.faces.new((r0[jn], r1[jn], r1[j2], r0[j2]))
             for loop, (jj, tt) in zip(f.loops, ((jn, t0), (jn, t1), (jn + 1, t1), (jn + 1, t0))):
                 loop[uv].uv = (jj / seg * 2, tt * 1.4)
-    # (its foot: a fan facing down)
-    c = bm.verts.new(P(cx, 0.0, cz))
-    for jn in range(seg):
-        bm.faces.new((rows[0][0][jn], rows[0][0][(jn + 1) % seg], c))
+    # (its foot: closed across in a ladder facing down, not a fan into its middle)
+    ladder_fill(bm, rows[0][0])
     o = mesh_object(name, bm, mat)
     # ---- the dark floor just inside the mouth, under what's heaped there (none where a heap fills it) ----
     bm = bmesh.new()
