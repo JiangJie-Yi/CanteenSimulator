@@ -142,6 +142,8 @@ let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffset
 const subs = new Set<() => void>()
 /** what was selected last time round: a newly picked piece starts in its own (object) axes */
 let lastSelected: string | null = null
+/** the mode the dock was last shown for */
+let dockOn = false
 const emit = () => {
   if (state.selected !== lastSelected) {
     lastSelected = state.selected
@@ -149,6 +151,9 @@ const emit = () => {
   }
   // (in edit mode the room's own pointing (lit things, name tags, the hand) is paused: what's lit now is put out)
   if (HOVER.paused !== state.on) { HOVER.paused = state.on; if (state.on) { glowOnly(null); setTip(null); POINTER_RESET() } }
+  // (the dock follows the mode in and out: the character viewer kept minimised from before came back with no pill to bring it out (it
+  // was only shown on pressing − or a pill), and the viewer seemed gone)
+  if (dockOn !== state.on) { dockOn = state.on; showDock() }
   state = { ...state }; subs.forEach((f) => f()); panel()
 }
 /** (the cursor back to the arrow, wherever a hover had set it) */
