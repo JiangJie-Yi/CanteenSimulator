@@ -92,7 +92,7 @@ glow_tex = image("binGlow", np.clip(glow, 0, 1))
 MAT = pbr("Binchotan", (1, 1, 1), tex=face_tex, nrm=nrm_tex, nrm_strength=1.0, rough=0.42, metal=0.35, emit=(1, 1, 1), emit_strength=1.0, emit_tex=glow_tex)
 
 
-def piece(name, L, R, jag, rng, bend=0.03, NA=16, NL=24):
+def piece(name, L, R, jag, rng, bend=0.03, NA=16, NL=12):
     """a stick (or a piece of one) along z: its section never quite round (ridges, a couple of splits sunk in, a slight flat), bent a little,
     thicker at one end; its ends broken unevenly (`jag`), each end closed by a rough fan"""
     ph = rng.uniform(0, 6.28, 4)
@@ -131,23 +131,41 @@ def piece(name, L, R, jag, rng, bend=0.03, NA=16, NL=24):
         for i in range(NA):
             a = j * row + i
             fs.append((a, a + 1, a + 1 + row, a + row))
-    # (the ends: a fan to a middle a little in, the broken face rough)
+    # (the ends: a ring halfway in, a little sunk or proud by turns (the broken face rough), and that ring closed across in a ladder, not
+    # a fan into one middle point)
     for end, j, sgn in ((0, 0, -1), (1, NL, 1)):
         cx = sum(vs[j * row + i][0] for i in range(NA)) / NA
         cy = sum(vs[j * row + i][1] for i in range(NA)) / NA
         cz = sum(vs[j * row + i][2] for i in range(NA)) / NA + sgn * float(rng.uniform(-0.3, 0.6)) * jag
-        c = len(vs)
-        vs.append((cx, cy, cz))
-        uvs.append((0.5, 0.5))
         first = len(vs)
         for i in range(NA):
             x, y, z = vs[j * row + i]
             vs.append((x, y, z))
             a = i / NA * 2 * math.pi
             uvs.append((0.5 + math.cos(a) * 0.15, 0.5 + math.sin(a) * 0.15))
+        inner = len(vs)
+        for i in range(NA):
+            x, y, z = vs[j * row + i]
+            vs.append((cx + (x - cx) * 0.5, cy + (y - cy) * 0.5, (z + cz) / 2 + float(rng.normal(0, jag * 0.25))))
+            a = i / NA * 2 * math.pi
+            uvs.append((0.5 + math.cos(a) * 0.075, 0.5 + math.sin(a) * 0.075))
         for i in range(NA):
             p, q = first + i, first + (i + 1) % NA
-            fs.append((c, q, p) if sgn < 0 else (c, p, q))
+            pi_, qi = inner + i, inner + (i + 1) % NA
+            fs.append((p, pi_, qi, q) if sgn < 0 else (p, q, qi, pi_))
+        # (round it the way that faces out of the end: anticlockwise seen from beyond it)
+        ring = [inner + i for i in range(NA)]
+        if sgn < 0:
+            ring = ring[::-1]
+        # (the ladder: each point joined across to the one opposite, a triangle at either end)
+        lo, hi = 1, NA - 1
+        fs.append((ring[0], ring[1], ring[NA - 1]))
+        while hi - lo > 2:
+            fs.append((ring[lo], ring[lo + 1], ring[hi - 1], ring[hi]))
+            lo += 1
+            hi -= 1
+        if hi - lo == 2:
+            fs.append((ring[lo], ring[lo + 1], ring[hi]))
     me_ = bpy.data.meshes.new(name)
     me_.from_pydata(vs, [], fs)
     me_.update()
