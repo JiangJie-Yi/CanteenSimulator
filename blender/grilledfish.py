@@ -2390,11 +2390,30 @@ def roast_in_ash(name, mat, top_mat, flesh_mat, angle_deg, r, size, bend=0.0):
     bmesh.ops.delete(bm, geom=[f for f in bm.faces if f not in filled], context="FACES_ONLY")
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
     cx = sum((v.co for v in bm.verts), Vector()) / max(1, len(bm.verts))
-    bmesh.ops.poke(bm, faces=bm.faces[:])
-    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=2, use_grid_fill=True)
+    # (as many draws from the shared random numbers as the poked and cut mound this was made of used, so what's made after it is unchanged)
+    old = bm.copy()
+    bmesh.ops.poke(old, faces=old.faces[:])
+    bmesh.ops.subdivide_edges(old, edges=old.edges[:], cuts=2, use_grid_fill=True)
+    draws = len(old.verts)
+    old.free()
+    rng = random.Random(draws)
+    for _ in range(draws):
+        random.uniform(-0.03, 0.04)
+    # (the mound in rings drawn in toward its middle, the last closed across in a ladder: poked, it was a fan of fifty into the middle)
+    for f in list(bm.faces):
+        ring = list(f.verts)
+        bm.faces.remove(f)
+        for k in (1, 2, 3):
+            inner = [bm.verts.new(cx + (v.co - cx) * (1 - k / 4)) for v in ring]
+            for j in range(len(ring)):
+                j2 = (j + 1) % len(ring)
+                bm.faces.new((ring[j], ring[j2], inner[j2], inner[j]))
+            ring = inner
+        ladder_fill(bm, ring)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     for vtx in bm.verts:
         d = (vtx.co.xy - cx.xy).length
-        vtx.co.z = CUT + 0.02 + 0.22 * max(0.0, 1 - d / 0.9) ** 1.5 + random.uniform(-0.03, 0.04)
+        vtx.co.z = CUT + 0.02 + 0.22 * max(0.0, 1 - d / 0.9) ** 1.5 + rng.uniform(-0.03, 0.04)
     uvl = bm.loops.layers.uv.verify()
     for f in bm.faces:
         for l in f.loops:
