@@ -23,6 +23,7 @@ import type { Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel } from '@/scene/inkHull'
 import { setTip } from '@/scene/hoverTip'
+import { shrineDoor } from './shrineSound'
 import { getLights } from '@/scene/lightsStore'
 import { Later } from '@/scene/Later'
 import { wareGeometry } from './ware'
@@ -419,7 +420,7 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
         <Movable id="koban" label="小判金幣"><group position={[-0.07, 0.6, 0]} rotation-y={-Math.PI / 2}><Koban /></group></Movable>
       </group>
       {/* a samurai helmet (兜) on its stand, set out on top of the shoe cupboard as a decoration, facing into the room */}
-      <Movable id="kabuto" label="武士頭盔"><group position={[0.34, -GENKAN.depth + 0.87, SHOE_CAB_Z - 0.09]} rotation-y={Math.PI / 2} scale={0.82}><Kabuto /></group></Movable>
+      <Movable id="kabuto" label="武士頭盔"><group position={[0.34, -GENKAN.depth + SHOE_TOP, SHOE_CAB_Z - 0.09]} rotation-y={Math.PI / 2} scale={0.82}><Kabuto /></group></Movable>
       <Movable id="genkan" label="玄關地墊"><StaticBatch>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       {/* the coir mat lying on the genkan's stone, just inside */}
@@ -428,39 +429,24 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
         <meshToonMaterial color="#ffffff" map={DOORMAT} />
       </mesh>
       </StaticBatch></Movable>
-      <Movable id="shoecab" label="鞋櫃"><StaticBatch>
-      {/* the shoe cupboard (下駄箱) against the wall in the genkan: dark wood, its doors in a grid of small panels, a
-          vase of a sprig on top */}
+      <Movable id="shoecab" label="鞋櫃">
+      {/* the shoe cupboard (下駄箱) against the wall in the genkan (blender/shoecab.py; the owner's: low, broad, walnut, louvred doors that
+          open, sunk pulls): its doors swing open at a click to the geta and slippers inside; a vase of a sprig on its top */}
       <group position={[0.34, -GENKAN.depth, SHOE_CAB_Z]}>
-        <Part geo={REG_GEO.round} color="#4a2e1c" outline={1.02} position={[0, 0.42, 0]} scale={[0.3, 0.84, 0.42]} />
-        {/* (its plinth, set back a little, dark) */}
-        <mesh position={[0.01, 0.025, 0]}><boxGeometry args={[0.29, 0.05, 0.41]} /><meshToonMaterial color="#24160c" /></mesh>
-        {[0, 1, 2].map((r) => [-1, 1].map((sd) => (
-          <group key={`${r}${sd}`} position={[-0.152, 0.17 + r * 0.24, sd * 0.1]}>
-            {/* (each door a frame round a kumiko lattice over pale paper, a brass pull) */}
-            <mesh rotation-y={-Math.PI / 2}><planeGeometry args={[0.17, 0.21]} /><meshToonMaterial color="#5a3820" /></mesh>
-            <mesh position-x={-0.002} rotation-y={-Math.PI / 2}><planeGeometry args={[0.13, 0.17]} /><meshToonMaterial color="#e8dcc0" /></mesh>
-            {[-0.04, 0, 0.04].map((k) => (
-              <mesh key={`v${k}`} position={[-0.004, 0, k]}><boxGeometry args={[0.004, 0.17, 0.006]} /><meshToonMaterial color="#6a4428" /></mesh>
-            ))}
-            {[-0.055, -0.0185, 0.0185, 0.055].map((k) => (
-              <mesh key={`h${k}`} position={[-0.004, k, 0]}><boxGeometry args={[0.004, 0.006, 0.13]} /><meshToonMaterial color="#6a4428" /></mesh>
-            ))}
-            <mesh position={[-0.008, 0, -sd * 0.07]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.009, 0.009, 0.01, 10]} /><meshToonMaterial color="#c8a050" /></mesh>
-          </group>
-        )))}
-        <Part geo={REG_GEO.round} color="#3a2416" outline={1.02} position={[0, 0.855, 0]} scale={[0.32, 0.03, 0.44]} />
-        <mesh position={[0, 0.93, 0.15]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
+        <group rotation-y={-Math.PI / 2}><ShoeCupboard /></group>
+        <StaticBatch>
+        <mesh position={[0, SHOE_TOP + 0.06, 0.2]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
         {[0, 1, 2].map((k) => (
-          <mesh key={k} position={[Math.cos(k * 2) * 0.02, 1.04 + k * 0.02, 0.15 + Math.sin(k * 2) * 0.02]} rotation={[Math.sin(k * 2) * 0.4, 0, Math.cos(k * 2) * 0.4]}>
+          <mesh key={k} position={[Math.cos(k * 2) * 0.02, SHOE_TOP + 0.17 + k * 0.02, 0.2 + Math.sin(k * 2) * 0.02]} rotation={[Math.sin(k * 2) * 0.4, 0, Math.cos(k * 2) * 0.4]}>
             <cylinderGeometry args={[0.003, 0.004, 0.16, 4]} /><meshToonMaterial color="#5a3a1e" />
           </mesh>
         ))}
         {[0, 1, 2, 3].map((k) => (
-          <mesh key={`b${k}`} position={[Math.cos(k * 1.7) * 0.05, 1.1 + (k % 2) * 0.03, 0.15 + Math.sin(k * 1.7) * 0.05]}><sphereGeometry args={[0.014, 6, 5]} /><meshToonMaterial color="#f2b0c0" /></mesh>
+          <mesh key={`b${k}`} position={[Math.cos(k * 1.7) * 0.05, SHOE_TOP + 0.23 + (k % 2) * 0.03, 0.2 + Math.sin(k * 1.7) * 0.05]}><icosahedronGeometry args={[0.014, 0]} /><meshToonMaterial color="#f2b0c0" /></mesh>
         ))}
+        </StaticBatch>
       </group>
-      </StaticBatch></Movable>
+      </Movable>
       <group position-x={DX}>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
@@ -1350,6 +1336,46 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
  * (both moved along away from the door, the owner's wish, the doorway and the till's end left open)
  */
 const CAT_STAND_Z = -1.92, SHOE_CAB_Z = -0.62
+/** the shoe cupboard's top (blender/shoecab.py's H): what stands on it stands there */
+const SHOE_TOP = 0.66
+const SHOE_URL = import.meta.env.BASE_URL + 'models/shoecab.glb'
+useGLTF.preload(SHOE_URL)
+/**
+ * The genkan's shoe cupboard (blender/shoecab.py; the owner's): a low walnut cabinet, four louvred doors on their hinges at its outer edges.
+ * Pointed at, it says what it is; a click swings all four open 75 degrees (to the geta and slippers inside) or shut, a wooden knock as they go.
+ */
+function ShoeCupboard() {
+  const gltf = useGLTF(SHOE_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    const mats = new Map<THREE.Material, THREE.Material>()
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = mats.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone() }); mats.set(src, t) }
+      m.material = t
+    })
+    inkModel(root, (m) => /Pull|Strap|Louvre/.test(m.name), { width: 0.0015, weld: true })
+    const doors = [0, 1, 2, 3].map((k) => root.getObjectByName(`ShoeDoor${k}`)!)
+    return { root, doors }
+  }, [gltf])
+  const st = useRef({ open: false, k: 0 })
+  useFrame((_, dt) => {
+    const s = st.current
+    s.k += Math.sign((s.open ? 1 : 0) - s.k) * Math.min(Math.abs((s.open ? 1 : 0) - s.k), Math.min(dt, 0.1) * 2.4)
+    const e = s.k * s.k * (3 - 2 * s.k)
+    model.doors.forEach((d, k) => { d.rotation.y = (k % 2 === 0 ? -1 : 1) * e * (75 * Math.PI / 180) })
+  })
+  const says = () => (st.current.open ? '點擊關閉' : '點擊開啟')
+  return (
+    <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.open = !st.current.open; shrineDoor(st.current.open); setTip({ title: '【下駄箱】', hint: says() }) }}
+      {...tipOver('【下駄箱】', '點擊開啟 / 關閉')}>
+      <primitive object={model.root} />
+    </group>
+  )
+}
 /**
  * The cats at the door, on their stand just inside it against the wall (the entrance's +x side; the till is on the
  * other), facing across the way in at those coming through
