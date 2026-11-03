@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -8,6 +8,7 @@ import { mergeByMaterial } from '@/scene/StaticBatch'
 import { toonOf } from './BarFurnish'
 import { handOver, TOILETS, meterWater } from './bar'
 import { getEdit } from './edit'
+import { roundMirror } from './mirror'
 import { flushSound, knockSound, otohimeNear, otohimeSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
 
 /**
@@ -504,15 +505,30 @@ export function WashstandLive({ who }: { who: Who }) {
     root.updateMatrixWorld(true)
     const at = (n: string) => root.worldToLocal(root.getObjectByName(n)!.getWorldPosition(new THREE.Vector3()))
     const tip = at('WashSpoutTip'), floor = at('WashBowlFloor')
+    // (the mirror's glass: where its face is (the stand's back is to +x, the glass faces -x), for the mirror that shows the room)
+    const pane = root.getObjectByName('WashMirror') as THREE.Mesh
+    const box = new THREE.Box3().setFromObject(pane), mid = box.getCenter(new THREE.Vector3())
+    const toRoot = root.matrixWorld.clone().invert()
+    const face = new THREE.Vector3(box.min.x, mid.y, mid.z).applyMatrix4(toRoot)
     mergeByMaterial(root)
     mergeByMaterial(handle)
-    return { root, handle, tip, floor }
+    let plain: THREE.Object3D | null = null
+    root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && (m.material as THREE.Material).name === 'WashMirror') plain = m })
+    const mirror = roundMirror((box.max.y - box.min.y) / 2)
+    mirror.glass.position.copy(face).add(new THREE.Vector3(-0.0006, 0, 0))
+    mirror.glass.rotation.y = -Math.PI / 2
+    return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null }
   }, [gltf])
+  useEffect(() => () => { parts.mirror.glass.getRenderTarget().dispose(); (parts.mirror.glass.material as THREE.Material).dispose() }, [parts])
+  const frame = useRef(0)
   const st = useRef({ turn: 0, lastHand: -1e9, was: false })
   const stream = useRef<THREE.Mesh>(null)
   const ring = useRef<THREE.Mesh>(null)
   const len = parts.tip.y - parts.floor.y
-  useFrame(({ clock, camera }, dt) => {
+  useFrame(({ clock, camera, scene }, dt) => {
+    // (the mirror showing the room while the eye's near it; the plain glass (the studio's blur in it) when not)
+    const showing = parts.mirror.tick(scene, camera, frame.current++)
+    if (parts.plain) parts.plain.visible = !showing
     const t = TOILETS[who]
     const s = st.current
     const on = t.tap || now() - t.handAt < HAND_MS
@@ -537,6 +553,7 @@ export function WashstandLive({ who }: { who: Who }) {
   return (
     <group>
       <primitive object={parts.root} />
+      <primitive object={parts.mirror.glass} />
       {/* (the tap's handle: pointed at it lights and says so; clicked, the water's turned on, or off) */}
       <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; TOILETS[who].tap = !TOILETS[who].tap; setTip({ title: '洗手台水龍頭', hint: says() }) }}
         {...hover('洗手台水龍頭', says)}>
