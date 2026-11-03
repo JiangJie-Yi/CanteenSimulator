@@ -326,6 +326,14 @@ def tissue_case(name, W=0.24, H=0.075, D=0.12, r=0.008):
         bpy.context.view_layer.objects.active = target
         bpy.ops.object.modifier_apply(modifier=b.name)
     bpy.data.objects.remove(cut, do_unlink=True)
+    # (the faces the slot was cut through, left as one face round a hole each: cut into triangles evenly here, not fanned from one corner on
+    # export)
+    for target in (lid, body):
+        tb = bmesh.new()
+        tb.from_mesh(target.data)
+        bmesh.ops.triangulate(tb, faces=[f for f in tb.faces if len(f.verts) > 4], quad_method="BEAUTY", ngon_method="BEAUTY")
+        tb.to_mesh(target.data)
+        tb.free()
     o = joined(name, [body, lid])
     o.name = name
     # (its picture laid along it: u along x, v round it, at one scale)
@@ -341,8 +349,12 @@ def tissue_case(name, W=0.24, H=0.075, D=0.12, r=0.008):
                 uvl.data[li].uv = (co.x / 0.3 + 0.5, co.z / 0.3)
             else:
                 uvl.data[li].uv = (co.y / 0.3 + 0.5, co.z / 0.3)
-    for f in me.polygons:
-        f.use_smooth = True
+    # (smooth round its rounded corners and edges, flat across its faces: smoothed all over, the long triangles of the lid's top round the
+    # slot shaded in broad streaks)
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(40))
     return o
 
 
