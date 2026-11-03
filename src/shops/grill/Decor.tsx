@@ -363,6 +363,9 @@ const GLOW = canvas(128, 128, (g) => {
  */
 const LANTERN_SCALE = 1.8
 const ANDON_URL = import.meta.env.BASE_URL + 'models/andon.glb'
+/** the kumiko's tint lit (its own pale wood, warm against the glowing paper) and out (the frame's dark brown) */
+const KUMIKO_LIT = new THREE.Color('#ffffff')
+const KUMIKO_OUT = new THREE.Color('#5a3a26')
 useGLTF.preload(ANDON_URL)
 function Lantern({ at }: { at: [number, number, number] }) {
   const paper = useRef<THREE.MeshBasicMaterial>(null)
@@ -379,8 +382,15 @@ function Lantern({ at }: { at: [number, number, number] }) {
     // a flame's flicker: a slow breath and a quicker shiver, never quite repeating
     const f0 = 0.88 + 0.07 * Math.sin(t * 2.3) + 0.05 * Math.sin(t * 7.9 + 1.3) + 0.03 * Math.sin(t * 17.1)
     const f = f0 * k
-    // (out, the paper is only paper: dim, as the room's light leaves it)
-    if (paper.current) paper.current.color.setScalar(Math.max(f, 0.32))
+    // (out, the paper is only paper (the owner's: it went a dead cold grey, its kumiko bright orange): a warm ivory washi lit by the room
+    // alone, no glow of its own, and the kumiko the frame's dark brown; lit, the paper glows and the kumiko shows warm against it)
+    if (paper.current) paper.current.color.setScalar(Math.max(f, 0.55))
+    const out = k < 0.45
+    if (model.out !== out) {
+      model.out = out
+      for (const m of model.papers) m.material = out ? model.paperOff : model.paperMat
+    }
+    for (const w of model.kumiko) w.color.copy(KUMIKO_LIT).lerp(KUMIKO_OUT, 1 - k)
     if (halo.current) halo.current.visible = k > 0.02
     if (flame.current) flame.current.visible = k > 0.02
     if (halo.current) {
@@ -403,19 +413,28 @@ function Lantern({ at }: { at: [number, number, number] }) {
   const model = useMemo(() => {
     const r = gltf.scene.clone(true)
     const paperMat = new THREE.MeshBasicMaterial({ toneMapped: false, side: THREE.DoubleSide })
+    // (out: plain washi in the room's light, no glow; its fibres the same picture)
+    const paperOff = new THREE.MeshToonMaterial({ color: '#efeadf', side: THREE.DoubleSide })
     const woodMats = new Map<THREE.Material, THREE.Material>()
+    const kumiko: THREE.MeshToonMaterial[] = []
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
-      if (src.name === 'AndonPaper') { paperMat.map = src.map; m.material = paperMat; return }
-      if (!woodMats.has(src)) woodMats.set(src, new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map }))
+      if (src.name === 'AndonPaper') { paperMat.map = src.map; paperOff.map = src.map; m.material = paperMat; return }
+      if (!woodMats.has(src)) {
+        const t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
+        woodMats.set(src, t)
+        if (src.name === 'AndonWood') kumiko.push(t)
+      }
       m.material = woodMats.get(src)!
       m.castShadow = true
     })
     // (its two hundred little parts, a mesh each, folded into one per material: a few draws, not two hundred)
     mergeByMaterial(r)
-    return { r, paperMat }
+    const papers: THREE.Mesh[] = []
+    r.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && m.material === paperMat) papers.push(m) })
+    return { r, paperMat, paperOff, papers, kumiko, out: false }
   }, [gltf])
   useLayoutEffect(() => { (paper as { current: THREE.MeshBasicMaterial | null }).current = model.paperMat }, [model])
   // (the shade's middle, as modelled: on its legs, 0.16 up to its foot, 0.36 tall)
