@@ -127,7 +127,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **介面風格**：木紋深色外框與標題列、半透明淺色面板（`index.css` 末尾的 `--grain-dark`、`--grain-light`）；只是按的東西（食材卡、補貨鈕）用半透明玻璃，不用木色。
 - **介面的字不斷行**（店主要的：「介面都要避免斷行」；看到評價面板的「サービ／ス」「The／place」）：短的字（標題、頁籤、名稱、欄位）一律一行：`white-space: nowrap`；欄寬照最長的那個（評價的料理／服務／環境用 `max-content` 欄、每列 `subgrid`）；框可能太窄的用 `ui/FitLine`（放不下就把字級縮小到放得下，最小 10 px，框大小一變重算；庫存與菜單的卡片名稱、耗材的說明、關於頁的網址）；長串的按鍵說明拆成一個個不斷行的小塊（開發者模式的熱鍵 `be-key`；標題列只留「G／Esc 離開」，Ctrl+Z／Y 移到熱鍵裡）。飲料有英文名稱了（`DRINKS` 的 `en`，以前英文介面顯示日文）。檢查：`node tests/e2e/_wraps.mjs`（在 git 外：中、日、英各打開每個面板與頁籤，列出被擠成兩行的短字，要是 found 0）。
 - **介面打開、收起都有聲音**（店主要的）：`ui/uiSound.ts` 的 `panelSound`（WebAudio：一陣柔和的紙聲，打開時往上掃、收起時往下掃，停下時一聲輕的木頭聲；0.15 秒內只響一次，換面板時不會疊兩聲），`usePanelSound(open)` 掛在 App（店家評價的抽屜、經營、庫存、飲料庫存、視角選單、菜單收合、開發者模式）與收銀機說明書；新加的面板也要掛。
-- **HDRI**：`scene/IndoorHDRI.tsx` 在 `public/hdris/` 找真的 HDRI（夜晚 `grill_night_1k.exr`、`night.exr`、`night.hdr`；白天 `grill_day_1k.exr`、`day.exr`、`day.hdr`，.exr 或 .hdr 都可以），沒有就用內建的假 HDRI。**BGM**：`ui/Bgm.tsx` 播 `public/music/IzakayaNight.mp3`。
+- **HDRI**：`scene/IndoorHDRI.tsx` 在 `public/hdris/` 找真的 HDRI（夜晚 `grill_night_1k.exr`、`night.exr`、`night.hdr`；白天 `grill_day_1k.exr`、`day.exr`、`day.hdr`，.exr 或 .hdr 都可以），沒有就用內建的假 HDRI。**BGM**：`ui/Bgm.tsx` 播 `public/music/LateNightTavern.mp3`（店主換的；以前是 `IzakayaNight.mp3`）。
 
 ## 常見改動要碰哪裡
 
