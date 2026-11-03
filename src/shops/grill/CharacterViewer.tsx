@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
+import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
 import { KINDS, kindOf, type GuestKind } from '@/data/guests'
 import { tl, type Lang } from '@/data/i18n'
 import type { Role } from '@/data/staff'
@@ -66,7 +67,7 @@ function Stand() {
 }
 
 /** the figure scaled to stand STAND_H tall on the stand, its feet's middle at its middle; its triangles and draws counted */
-function Fitted({ children, onStats, spin }: { children: React.ReactNode; onStats: (s: { tris: number; draws: number }) => void; spin: boolean }) {
+function Fitted({ children, onStats, spin, look, normals }: { children: React.ReactNode; onStats: (s: { tris: number; draws: number }) => void; spin: boolean; look: Look; normals: boolean }) {
   const inner = useRef<THREE.Group>(null)
   const outer = useRef<THREE.Group>(null)
   const tries = useRef(0)
@@ -99,7 +100,49 @@ function Fitted({ children, onStats, spin }: { children: React.ReactNode; onStat
     g.position.set(-c.x * k, -box.min.y * k, -c.z * k)
     if (tries.current % 10 === 0) onStats({ tris: Math.round(tris), draws })
   })
-  return <group ref={outer}><group ref={inner}>{children}</group></group>
+  return <group ref={outer}><group ref={inner}>{children}</group><LookOver root={inner} look={look} normals={normals} /></group>
+}
+
+/** how the figure's drawn, for looking it over (the owner's): as it is, a plain clay, or each point coloured by the way it faces */
+type Look = 'as' | 'clay' | 'normal'
+const CLAY = new THREE.MeshStandardMaterial({ color: '#d8d2c8', roughness: 0.85 })
+const NORMAL_LOOK = new THREE.MeshNormalMaterial()
+/**
+ * The figure's look-over tools: its materials swapped for a clay or a normals' colouring (each mesh's own kept and put back), and its
+ * vertex normals drawn as short lines (a dark patch in its shading is often a normal turned wrong). Only on the viewer's own copy.
+ */
+function LookOver({ root, look, normals }: { root: React.RefObject<THREE.Group | null>; look: Look; normals: boolean }) {
+  const helpers = useRef<VertexNormalsHelper[]>([])
+  useEffect(() => {
+    const g = root.current
+    if (!g) return
+    const was = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>()
+    if (look !== 'as') g.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh || ([] as THREE.Material[]).concat(m.material).every((x) => x.side === THREE.BackSide)) return
+      was.set(m, m.material)
+      m.material = look === 'clay' ? CLAY : NORMAL_LOOK
+    })
+    return () => { for (const [m, mat] of was) m.material = mat }
+  }, [root, look])
+  useEffect(() => {
+    const g = root.current
+    if (!g || !normals) return
+    const made: VertexNormalsHelper[] = []
+    g.updateMatrixWorld(true)
+    g.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh || !m.geometry?.attributes?.normal || ([] as THREE.Material[]).concat(m.material).every((x) => x.side === THREE.BackSide)) return
+      // (about two centimetres a line, whatever the figure's been scaled by)
+      const h = new VertexNormalsHelper(m, 0.02 / Math.max(1e-3, g.getWorldScale(new THREE.Vector3()).x), 0x33ccff)
+      g.parent?.add(h)
+      made.push(h)
+    })
+    helpers.current = made
+    return () => { for (const h of made) { h.removeFromParent(); h.geometry.dispose(); (h.material as THREE.Material).dispose() } helpers.current = [] }
+  }, [root, normals])
+  useFrame(() => { for (const h of helpers.current) h.update() })
+  return null
 }
 
 function Lights() {
@@ -140,6 +183,8 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
   const [mood, setMood] = useState<Mood | null>(null)
   const [walk, setWalk] = useState(false)
   const [spin, setSpin] = useState(true)
+  const [look, setLook] = useState<Look>('as')
+  const [normals, setNormals] = useState(false)
   const [stats, setStats] = useState({ tris: 0, draws: 0 })
   const e = ENTRIES.find((x) => x.key === pick.key) ?? ENTRIES[0]
   // (the one before or after in the list, round from the last to the first: the arrows either side of the stage (the owner's))
@@ -170,7 +215,7 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
             <Lights />
             <Stand />
             <Suspense fallback={null}>
-              <Fitted key={`${e.key}-${gid}`} onStats={setStats} spin={spin}>
+              <Fitted key={`${e.key}-${gid}`} onStats={setStats} spin={spin} look={look} normals={normals}>
                 {e.group === 'boss' && <BossModel />}
                 {e.group === 'staff' && <StaffFigure id={`viewer-${e.key}`} role={e.role!} look={{ female: !!e.female, age: 'young' }} moving={walk} />}
                 {e.group === 'guest' && <FolkFigure id={gid} eating={false} walking={walk} mood={mood} ground />}
@@ -194,6 +239,11 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
           <button type="button" className={spin ? 'is-on' : ''} onClick={() => setSpin((v) => !v)}>{tl(lang, '旋轉', '回転', 'Spin')}</button>
           {e.group !== 'boss' && <button type="button" className={walk ? 'is-on' : ''} onClick={() => setWalk((v) => !v)}>{tl(lang, '走路', '歩く', 'Walk')}</button>}
           {e.group === 'guest' && <button type="button" onClick={() => setPick((p) => ({ ...p, n: p.n + 1 }))}>{tl(lang, '換一位', '別の人', 'Another')}</button>}
+          {/* (looking it over: clay, normals' colours, the normals drawn) */}
+          {([['as', tl(lang, '原材質', '元の材質', 'As made')], ['clay', tl(lang, '白模', '白モデル', 'Clay')], ['normal', tl(lang, '法線色', '法線色', 'Normals')]] as [Look, string][]).map(([k, label]) => (
+            <button key={k} type="button" className={look === k ? 'is-on' : ''} onClick={() => setLook(k)}>{label}</button>
+          ))}
+          <button type="button" className={normals ? 'is-on' : ''} onClick={() => setNormals((v) => !v)}>{tl(lang, '法線方向', '法線の向き', 'Normal lines')}</button>
           {e.group === 'guest' && moods.map(([m, label]) => (
             <button key={label} type="button" className={mood === m ? 'is-on' : ''} onClick={() => setMood(m)}>{label}</button>
           ))}
