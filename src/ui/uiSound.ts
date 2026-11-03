@@ -73,3 +73,25 @@ export function usePanelSound(open: boolean) {
     panelSound(open)
   }, [open])
 }
+
+/** the freezer's tab chosen (the owner's): a short soft hiss of its seal, and a light tick of ice over it */
+export function frostSound() {
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  const n = Math.max(1, Math.floor(a.sampleRate * 0.22))
+  const buf = a.createBuffer(1, n, a.sampleRate)
+  const d = buf.getChannelData(0)
+  for (let i = 0; i < n; i++) { const x = i / n; d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * x) ** 2 * (1 - x) }
+  const src = a.createBufferSource(); src.buffer = buf
+  const f = a.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500
+  const g = a.createGain(); g.gain.value = 0.05
+  src.connect(f).connect(g).connect(a.destination)
+  src.start(t)
+  for (const [dt, hz] of [[0.04, 3100], [0.11, 4200]] as const) {
+    const o = a.createOscillator(); o.type = 'sine'; o.frequency.value = hz
+    const k = a.createGain()
+    k.gain.setValueAtTime(0, t + dt); k.gain.linearRampToValueAtTime(0.035, t + dt + 0.003); k.gain.exponentialRampToValueAtTime(0.0001, t + dt + 0.09)
+    o.connect(k).connect(a.destination); o.start(t + dt); o.stop(t + dt + 0.1)
+  }
+}

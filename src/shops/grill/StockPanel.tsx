@@ -16,7 +16,7 @@ import type { Restock } from '@/ui/Menu'
 import { CRATE, FREEZER_TEMP } from './Decor'
 import { GRILL_SEATS, onPrinter, PRINTER, tissuesAt } from './bar'
 import { DrinkStockBody } from './DrinkStockPanel'
-import { usePanelSound } from '@/ui/uiSound'
+import { frostSound, usePanelSound } from '@/ui/uiSound'
 
 /** the stock panel's tabs: the freezer, the fridge (the cupboards' under the cook table), the larder at room temperature, the drinks, and what
  * isn't food (the charcoal) */
@@ -144,6 +144,9 @@ export function StockPanel(p: Props) {
   const [tucked, setTucked] = useState(false)
   useEffect(() => { setTucked(false) }, [tab, p.focus])
   usePanelSound(!tucked)
+  // (to the freezer's tab: the soft breath of its seal and a tick of ice)
+  const tabWas = useRef(tab)
+  useEffect(() => { if (tab === 'frozen' && tabWas.current !== 'frozen') frostSound(); tabWas.current = tab }, [tab])
   const panel = useRef<HTMLElement>(null)
   const handle = useRef<HTMLButtonElement>(null)
   // (the handle at the middle of the panel's height, however tall its tab makes it)
@@ -161,7 +164,7 @@ export function StockPanel(p: Props) {
         aria-expanded={!tucked} aria-label={tuckLabel} title={tuckLabel}>
         <svg viewBox="0 0 10 18" aria-hidden="true"><path d={tucked ? 'M7 3 L3 9 L7 15' : 'M3 3 L7 9 L3 15'} /></svg>
       </button>
-      <section ref={panel} className={`drink-stock stock-panel${tucked ? ' is-tucked' : ''}`} role="dialog" aria-label={tl(lang, '庫存', '在庫', 'Stock')} inert={tucked}>
+      <section ref={panel} className={`drink-stock stock-panel${tucked ? ' is-tucked' : ''}${tab === 'frozen' ? ' is-frozen' : tab === 'chilled' || tab === 'drinks' ? ' is-cool' : ''}`} role="dialog" aria-label={tl(lang, '庫存', '在庫', 'Stock')} inert={tucked}>
         <header className="drink-stock-head">
           <b>{tl(lang, '庫存', '在庫', 'Stock')}</b>
           {p.meter && <MeterChip lang={lang} meter={p.meter} />}
