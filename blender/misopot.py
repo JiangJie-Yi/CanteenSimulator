@@ -125,37 +125,36 @@ def mesh(name, bm, mat, smooth_=True):
     return o
 
 
-def lathe(name, prof, mat, segs=32, top_uv=False):
-    """turned round y: the profile (radius, height) pairs; UVs round it, or laid flat from above (top_uv: a surface seen from above)"""
+def lathe(name, prof, mat, segs=24, top_uv=False):
+    """turned round y: the profile (radius, height) pairs; UVs round it, or laid flat from above (top_uv: a surface seen from above). A point
+    of it on the axis isn't made: the ring beside it is closed across in a ladder instead (a fan of triangles into the middle shades in
+    a dark blotch: the owner's)"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    rings = []
-    for (r, y) in prof:
-        rings.append([bm.verts.new(P(r * math.cos(2 * math.pi * j / segs), y, r * math.sin(2 * math.pi * j / segs))) for j in range(segs)]
-                     if r > 1e-6 else [bm.verts.new(P(0, y, 0))])
-    total = sum(math.hypot(prof[i + 1][0] - prof[i][0], prof[i + 1][1] - prof[i][1]) for i in range(len(prof) - 1)) or 1
-    acc = [0.0]
-    for i in range(len(prof) - 1):
-        acc.append(acc[-1] + math.hypot(prof[i + 1][0] - prof[i][0], prof[i + 1][1] - prof[i][1]))
+    rings = [[bm.verts.new(P(r * math.cos(2 * math.pi * j / segs), y, r * math.sin(2 * math.pi * j / segs))) for j in range(segs)]
+             if r > 1e-6 else None for (r, y) in prof]
+
+    def uv(f):
+        for lp in f.loops:
+            co = lp.vert.co
+            if top_uv:
+                lp[uvl].uv = (co.x / (2 * R) + 0.5, -co.y / (2 * R) + 0.5)
+            else:
+                ang = (math.atan2(-co.y, co.x) / (2 * math.pi)) % 1.0
+                lp[uvl].uv = (ang * 3, co.z / H)
     for i in range(len(rings) - 1):
         a, b = rings[i], rings[i + 1]
+        if a is None or b is None:
+            for f in ladder_fill(bm, a or b):
+                uv(f)
+            continue
         for j in range(segs):
             j2 = (j + 1) % segs
-            if len(a) == 1:
-                vs = (a[0], b[j2], b[j]) if False else (a[0], b[j], b[j2])
-            elif len(b) == 1:
-                vs = (a[j], b[0], a[j2])
-            else:
-                vs = (a[j], b[j], b[j2], a[j2])
-            f = bm.faces.new(vs)
-            for lp in f.loops:
-                co = lp.vert.co
-                if top_uv:
-                    lp[uvl].uv = (co.x / (2 * R) + 0.5, -co.y / (2 * R) + 0.5)
-                else:
-                    ang = (math.atan2(-co.y, co.x) / (2 * math.pi)) % 1.0
-                    lp[uvl].uv = (ang * 3, co.z / H)
+            uv(bm.faces.new((a[j], b[j], b[j2], a[j2])))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    # (a surface seen from above faces up)
+    if top_uv:
+        bmesh.ops.reverse_faces(bm, faces=[f for f in bm.faces if f.normal.z < 0])
     return bm
 
 
