@@ -14,7 +14,7 @@ import { reflectStudio, useStudio } from '@/scene/studio'
 import { ColdMist } from '@/scene/ColdMist'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
-import { BOSS_DRINK } from './Boss'
+import { BOSS_DRINK, BOSS_FX } from './Boss'
 import { CASE_SIZE } from '@/game/drinkStock'
 import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
@@ -4311,6 +4311,13 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       // (over a table, nearer than the fridge's own front, it goes down on the table, standing upright, wherever the pointer is)
       const th = tableHit(raycaster.ray)
       onTable = th && (!hit || th.distanceTo(raycaster.ray.origin) < hit.distanceTo(raycaster.ray.origin)) ? th : null
+      // (carried within the boss's reach, set down where he'd come for it or held right over him: he glows, to say it's for him)
+      const boss = scene.getObjectByName('BossFollow')
+      if (boss && !BOSS_DRINK.at) {
+        const bp = boss.getWorldPosition(new THREE.Vector3())
+        const mid = bp.clone().add(new THREE.Vector3(0, 0.6, 0))
+        BOSS_FX.hover = (!!onTable && bp.setY(onTable.y).distanceTo(onTable) < 3) || raycaster.ray.distanceToPoint(mid) < 0.6
+      } else BOSS_FX.hover = false
       if (onTable) {
         grp.position.copy(host.worldToLocal(onTable.clone()))
         grp.quaternion.copy(host.getWorldQuaternion(new THREE.Quaternion()).invert())
@@ -4328,6 +4335,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       if (controls) controls.enabled = true
       dragKey.current = null
       setLifted(null)
+      BOSS_FX.hover = false
       grp.quaternion.identity()
       if (onTable) {
         const w: [number, number, number] = [onTable.x, onTable.y, onTable.z]
@@ -4339,6 +4347,8 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
         const item = from.kind === 'slot' ? FRIDGE_STOCK.out[FRIDGE_STOCK.out.length - 1] : FRIDGE_STOCK.out[from.i]
         if (boss && item && !BOSS_DRINK.at && boss.getWorldPosition(new THREE.Vector3()).setY(onTable.y).distanceTo(onTable) < 3) {
           BOSS_DRINK.at = onTable.clone(); BOSS_DRINK.id = item.id; BOSS_DRINK.item = item; BOSS_DRINK.arrived = false
+          // (handed him: a flash of the glow)
+          BOSS_FX.glowAt = performance.now()
         }
         return
       }

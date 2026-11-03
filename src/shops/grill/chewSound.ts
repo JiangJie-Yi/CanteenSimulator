@@ -61,3 +61,23 @@ export function chewSound() {
   n.connect(f).connect(g).connect(a.destination)
   n.start(t)
 }
+
+/** a gulp, the boss drinking (the owner's: 咕嚕): a low glug falling in pitch, and a little burst of the drink's bubble over it */
+export function gulpSound() {
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  const o = a.createOscillator()
+  o.type = 'sine'
+  o.frequency.setValueAtTime(240 + Math.random() * 40, t)
+  o.frequency.exponentialRampToValueAtTime(95, t + 0.13)
+  const k = a.createGain()
+  k.gain.setValueAtTime(0, t); k.gain.linearRampToValueAtTime(0.13, t + 0.012); k.gain.exponentialRampToValueAtTime(0.0001, t + 0.16)
+  o.connect(k).connect(a.destination)
+  o.start(t); o.stop(t + 0.18)
+  const n = noise(a, 0.06, (x) => Math.sin(Math.PI * x), 0.55)
+  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 650 + Math.random() * 200; f.Q.value = 2.2
+  const g = a.createGain(); g.gain.value = 0.06
+  n.connect(f).connect(g).connect(a.destination)
+  n.start(t + 0.05)
+}

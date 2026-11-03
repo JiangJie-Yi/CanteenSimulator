@@ -8,8 +8,9 @@ import { airbrush, gradientMap } from '@/scene/Person3D'
 import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from '@/scene/rigidSkin'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
-import { bossLineText, bossSituation, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
+import { bossLineText, bossSituation, cashLineText, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
 import { DrinkBottle } from './DiningRoom'
+import { gulpSound } from './chewSound'
 import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_OUT, type DrinkId } from './bar'
 
 /**
@@ -53,8 +54,17 @@ export const BOSS_TASTE = { at: null as THREE.Vector3 | null, arrived: false, si
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossTaste?: typeof BOSS_TASTE }).__bossTaste = BOSS_TASTE
 /** a drink set down on a table near him (DiningRoom's FridgeStock, as it's let go there): where it stands (world) and which it is (the drink out of the
  * fridge, taken off the table as he picks it up); he goes over, drinks it and says so; cleared when it's drunk */
+/**
+ * How the boss answers what's done to him (the owner's): `hover`, a drink carried within his reach (he glows warm while it's held there);
+ * `glowAt`, a drink set down for him (a flash of the same glow, fading over a second); `joyAt`, the till's money taken (a line of delight
+ * over his head, a hop, coins and hearts rising). Times by performance.now().
+ */
+export const BOSS_FX = { hover: false, glowAt: -1e9, joyAt: -1e9 }
+const GLOW = new THREE.Color('#ffb648')
+const GLOW_LINE = new THREE.Color('#ffd24a')
 export const BOSS_DRINK = { at: null as THREE.Vector3 | null, id: null as DrinkId | null, item: null as unknown, arrived: false, since: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossDrink?: typeof BOSS_DRINK }).__bossDrink = BOSS_DRINK
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossFx?: typeof BOSS_FX }).__bossFx = BOSS_FX
 /** the parts of him that move on their own (his bones, after his body): his hands, what they hold, his eyes (to blink), his smile and his
  * open mouth (in turn as he talks) */
 const BOSS_BONES = ['BossHandL', 'BossHandR', 'BossTongs', 'BossFan', 'BossEyes', 'BossSmile', 'BossTalk']
@@ -232,7 +242,13 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       const m = (o as THREE.Mesh).material
       if (!m) return
       // (the ink line round him is drawn on its own back faces: it goes while he's faded, or it would hang there as a dark ring)
-      if (/outline/i.test(o.name) || (!Array.isArray(m) && m.side === THREE.BackSide)) { ink.push(o); return }
+      if (/outline/i.test(o.name) || (!Array.isArray(m) && m.side === THREE.BackSide)) {
+        ink.push(o)
+        // (his own copy of the line's material (it's shared by width with everyone's), so it can turn gold round him alone as he glows)
+        const sm = m as THREE.ShaderMaterial
+        if (!Array.isArray(m) && sm.isShaderMaterial && sm.uniforms?.uColor) (o as THREE.Mesh).material = sm.clone()
+        return
+      }
       for (const x of Array.isArray(m) ? m : [m]) set.add(x)
     })
     // (hashed from the start: a fade only moves their opacity (at full, nothing's cut); switched on and off with each, the program each way
@@ -243,6 +259,13 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
   }, [root])
   const controls = useThree((s) => s.controls) as unknown as { target?: THREE.Vector3 } | null
   const fadeClock = useRef(0)
+  const glowWas = useRef(0)
+  const glowBase = useMemo(() => new Map<THREE.Material, { c: THREE.Color; i: number }>(), [])
+  // (what floats up over his head: his gulps while he drinks, his coins and hearts at the till's money)
+  const [gulu, setGulu] = useState(0)
+  const [joy, setJoy] = useState(0)
+  const gulps = useRef({ next: 0, n: 0 })
+  const joySeen = useRef(BOSS_FX.joyAt)
   useFrame(({ camera: cam, clock }) => {
     const m = mover.current
     if (!m) return
@@ -277,6 +300,29 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     // (faded by hashing, not blending: each pixel of him drawn or not by a fine dither as faint as he is, his nearest surface still hiding his
     // far side, so he's one see-through figure whatever's drawn first; blended, he went to a jumble or to black)
     for (const x of mats) x.opacity = k
+    // (the glow: steady and breathing while a drink's held over him, a flash fading over a second when one's set down for him)
+    const since = (performance.now() - BOSS_FX.glowAt) / 1000
+    const flash = since < 0 ? 0 : since < 0.15 ? since / 0.15 * 0.8 : Math.max(0, 0.8 * (1 - (since - 0.15) / 0.85))
+    const g = Math.max(BOSS_FX.hover && !getEdit().on ? 0.75 + 0.25 * Math.sin(clock.elapsedTime * 6) : 0, flash / 0.8)
+    if (g !== glowWas.current) {
+      glowWas.current = g
+      // (his body only a little lifted with the warm light; the glow's in his line, gone a bright gold and thicker, round him)
+      for (const x of mats) {
+        const t = x as THREE.MeshToonMaterial
+        if (!t.emissive) continue
+        if (!glowBase.has(t)) glowBase.set(t, { c: t.emissive.clone(), i: t.emissiveIntensity })
+        const base = glowBase.get(t)!
+        if (g > 0) { t.emissive.copy(GLOW); t.emissiveIntensity = 0.14 * g } else { t.emissive.copy(base.c); t.emissiveIntensity = base.i }
+      }
+      for (const o of inks) {
+        const sm = (o as THREE.Mesh).material as THREE.ShaderMaterial
+        if (!sm.uniforms?.uColor) continue
+        if (!glowBase.has(sm)) glowBase.set(sm, { c: sm.uniforms.uColor.value.clone(), i: sm.uniforms.uWidth.value })
+        const base = glowBase.get(sm)!
+        sm.uniforms.uColor.value.copy(base.c).lerp(GLOW_LINE, g)
+        sm.uniforms.uWidth.value = base.i * (1 + 1.4 * g)
+      }
+    }
   })
   useFrame(({ clock }) => {
     const s = st.current
@@ -456,6 +502,22 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     // ---- what's in his hand: the tongs at the fire, the fan down the aisle; held at the right hand, swinging with it
     const hand = REST.R.clone().add(parts.handR?.position ?? new THREE.Vector3())
     // (the drink in his hand, tipped up to his mouth as he drinks)
+    // (gulping while the bottle's tipped up: a glug every half second or so, and 咕嚕咕嚕～♪ floating up, once a drink)
+    if (act === 'drink') {
+      const u = T - BOSS_DRINK.since
+      const gp = gulps.current
+      if (u < 0.1) { gp.next = 0.45; gp.n = 0 }
+      if (u > gp.next && u < 3.4) { gp.next = u + 0.42 + Math.random() * 0.12; gulpSound(); if (gp.n++ === 0) setGulu((v) => v + 1) }
+    }
+    // (the till's money taken: a line of delight, a hop, coins and hearts)
+    if (BOSS_FX.joyAt !== joySeen.current) {
+      joySeen.current = BOSS_FX.joyAt
+      setSay({ text: cashLineText(Math.random(), lang), key: Date.now() })
+      setJoy((v) => v + 1)
+      if (s.vy === 0 && speed === 0) s.vy = 1.9 / scale
+    }
+    const joyU = (performance.now() - BOSS_FX.joyAt) / 1000
+    if (joyU < 1.2) b.position.y += Math.abs(Math.sin(joyU * Math.PI * 3)) * 0.04 * (1 - joyU / 1.2)
     if (drinkRef.current) {
       drinkRef.current.visible = act === 'drink'
       if (act === 'drink') {
@@ -504,6 +566,18 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       {say && !getEdit().on && (
         <Html position={[0, 1.42, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
           <span key={say.key} className="g3-bubble g3-say boss-say">{say.text}</span>
+        </Html>
+      )}
+      {gulu > 0 && !getEdit().on && (
+        <Html position={[0.18, 1.2, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+          <span key={gulu} className="boss-float boss-gulu">{lang === 'ja' ? 'ゴクゴク〜♪' : lang === 'en' ? 'Glug glug~ ♪' : '咕嚕咕嚕～♪'}</span>
+        </Html>
+      )}
+      {joy > 0 && !getEdit().on && (
+        <Html position={[0, 1.3, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+          <span key={joy} className="boss-joy" aria-hidden="true">
+            {['🪙', '❤️', '🪙', '💖', '🪙', '❤️'].map((c, i) => <i key={i} style={{ '--i': i } as React.CSSProperties}>{c}</i>)}
+          </span>
         </Html>
       )}
       <group ref={body}><primitive object={root} />

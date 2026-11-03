@@ -34,6 +34,7 @@ import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
 import { Reputation } from '@/ui/Reputation'
 import { CharacterViewer } from '@/shops/grill/CharacterViewer'
+import { BOSS_FX } from '@/shops/grill/Boss'
 import { StockPanel, type StockTab } from '@/shops/grill/StockPanel'
 import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
@@ -2265,6 +2266,8 @@ export default function App() {
   useEffect(() => {
     TILL_CASH.onTake = (amount) => {
       book('till', amount)
+      // (and the boss, wherever he is, delighted (the owner's): a line, a hop, coins and hearts)
+      BOSS_FX.joyAt = performance.now()
       sayRef.current(tl(langRef.current, `從收銀機取出 NT$${amount.toLocaleString()}`, `レジから NT$${amount.toLocaleString()} を取り出しました`, `Took NT$${amount.toLocaleString()} from the till`))
     }
     return () => { TILL_CASH.onTake = null }

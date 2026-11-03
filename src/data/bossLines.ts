@@ -134,3 +134,13 @@ export const drinkLineText = (r: number, lang: Lang) => {
   const l = DRINK_LINES[Math.floor(r * DRINK_LINES.length) % DRINK_LINES.length]
   return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
 }
+/** what the owner says, delighted, as the money's taken out of the till's drawer (the owner's) */
+export const CASH_LINES: Line[] = [
+  { zh: '喔喔！今天收成真好！💸', ja: 'おおっ！今日は大漁だ！💸', en: 'Ooh! A good haul today! 💸' },
+  { zh: '太棒了！有錢賺囉！❤️', ja: 'やった！儲かったぞ！❤️', en: "Brilliant! We're making money! ❤️" },
+  { zh: '嘿嘿，今天也是大豐收～', ja: 'へへっ、今日も大漁だね〜', en: 'Heh heh, another bumper day~' },
+]
+export const cashLineText = (r: number, lang: Lang) => {
+  const l = CASH_LINES[Math.floor(r * CASH_LINES.length) % CASH_LINES.length]
+  return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
+}
