@@ -1498,7 +1498,9 @@ KERNELS_AROUND, KERNELS_ALONG = 16, 12   # must match the T_GrilledCorn texture 
 def corn_cob():
     """Cob with real kernel bumps (lined up with the texture), a narrower tip, and husk leaves peeled back
     around a stalk stub at the base. Built along local Z with the tip at +Z, then laid along X (tip up the stick)."""
-    rings, seg = 72, 64
+    # (two points round a kernel, three along it: the kernels' rows still stand in ridges, their roundness the normal map's; 72 by 64 was
+    # some ten thousand triangles for one cob)
+    rings, seg = 36, 32
     bm = bmesh.new()
     grid = []
     for i in range(rings + 1):
@@ -1519,11 +1521,9 @@ def corn_cob():
         for j in range(seg):
             jn = (j + 1) % seg
             bm.faces.new((grid[i][j], grid[i][jn], grid[i + 1][jn], grid[i + 1][j]))
-    for row, z, flip in ((grid[0], -CORN_L / 2, True), (grid[-1], CORN_L / 2, False)):
-        c = bm.verts.new((0, 0, z))
-        for j in range(seg):
-            jn = (j + 1) % seg
-            bm.faces.new((c, row[jn], row[j]) if flip else (c, row[j], row[jn]))
+    # (its two ends closed across in ladders, not fans of 64 into a point)
+    for row in (grid[0], grid[-1]):
+        ladder_fill(bm, row)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new("Cob")
     bm.to_mesh(me)
@@ -1628,7 +1628,8 @@ def okra():
         twist = random.uniform(0.2, 0.5)
         bm = bmesh.new()
         uvl = bm.loops.layers.uv.new()
-        rings, seg = 22, 30
+        # (four points a ridge round it: 30 by 22 made the four pods 5,300 triangles)
+        rings, seg = 14, 20
         grid = []
         for k in range(rings + 1):
             t = k / rings
