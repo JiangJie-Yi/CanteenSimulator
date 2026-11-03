@@ -175,7 +175,7 @@ export function PlateRack({ part = 0 }: { part?: number }) {
       {/* (where a server stands for a plate, and where it's lifted off) */}
       <group name={`rack-front-${part}`} position={[0, 0, D / 2 + 0.5]} />
       <group name={`rack-top-${part}`} position={[0, CAB + SHELVES[1] + 0.12, 0.04]} />
-      <StaticBatch>
+      <StaticBatch plain>
       <CabinetBase />
       {/* (the rack itself, up on the cupboard's top) */}
       <group position-y={CAB}>

@@ -218,7 +218,7 @@ function Crate() {
   })
   return (
     <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35}>
-      <StaticBatch>
+      <StaticBatch plain>
       <Inked geometry={geo.side} map={weave} position={[0, H / 2, D / 2 - T / 2]}>
         {/* the tag faces out of the front */}
         <mesh geometry={geo.label} position={[0.09, 0, T / 2 + 0.002]}>
@@ -741,7 +741,7 @@ function IngredientFridge() {
           </mesh>
           <group ref={knobCap}>
             {/* (its cap, sixteen ridges and mark drawn as three: they turn together, as one) */}
-            <StaticBatch>
+            <StaticBatch plain>
             <mesh rotation-x={Math.PI / 2} position-z={0.016}>
               <cylinderGeometry args={[0.018, 0.02, 0.018, 24]} />
               <meshStandardMaterial color="#22272c" metalness={0.1} roughness={0.45} />

@@ -735,7 +735,7 @@ function BarImpl() {
   // (and one top over both, in one piece round the corner, its edges rounded and flush where they meet)
   return (
     <group position={GRILL_OFFSET} scale={GRILL_SCALE}>
-      <StaticBatch>
+      <StaticBatch plain>
         {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)}
           trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} butt={i > 0}
           gate={BAR_GATES[i]} noTop={GRILL_COUNTERS.length > 1} />)}
@@ -1243,7 +1243,7 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
             </>
           )}
           {/* (a fridge's white lining: its back, its two ends, its ceiling, its floor; the shelf lined white too) */}
-          <StaticBatch>
+          <StaticBatch plain>
             <mesh position={[0, (top + bottom) / 2, back - front + 0.006]}><boxGeometry args={[span - 0.01, H, 0.008]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
             {[-1, 1].map((e) => (
               <mesh key={e} position={[e * (span / 2 - 0.006), (top + bottom) / 2, (back - front) / 2]}><boxGeometry args={[0.008, H, front - back - 0.01]} /><meshToonMaterial color={FRIDGE_LINING} /></mesh>
@@ -1298,7 +1298,7 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
               </mesh>
             )}
             {/* (the frame's four pieces drawn as one: they swing as one) */}
-            <StaticBatch>
+            <StaticBatch plain>
             {[-1, 1].map((e) => (
               <group key={e}>
                 <mesh position={[e * (W / 2 - 0.03), 0, 0.006]}><boxGeometry args={[0.06, H, 0.02]} /><meshToonMaterial color="#7a5638" map={COOK_PANEL_WOOD} /></mesh>
@@ -1451,7 +1451,7 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
         {editing && <group ref={gizmoFrame}><AxisGizmo id={`gate${idx}`} at={[end * G / 2, H / 2, 0]} theta={space === 'world' ? gateWorld : 0} /></group>}
         <group ref={leaf} name="gate-leaf">
           {/* (its frame, panels, joints and hinge leaves, some forty parts, drawn as a handful: they swing together, as one) */}
-          <StaticBatch>
+          <StaticBatch plain>
           <group position-x={end * (G / 2 - 0.005)}>
             {/* a framed door of planed wood: two stiles and three rails with rounded edges, the grain running up the
                 stiles and across the rails, and a recessed board panel of upright planks between them */}
@@ -1472,7 +1472,7 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
         {/* the hinges, top and bottom (they go with the door when it's moved by hand, so they're in its group): a brass knuckle on the hinge's line, a leaf screwed to the base's end and one to
             the door's stile (that one turns with it: GateHingeLeaf) */}
         {/* (some thirty parts, drawn as four: they never move apart) */}
-        <StaticBatch>
+        <StaticBatch plain>
         {[0.16, BAR_TOP - 0.16].map((y) => (
           <group key={y} position-y={y}>
             <mesh geometry={HINGE_GEO.knuckle}><meshToonMaterial color="#c8a050" /></mesh>
@@ -2263,7 +2263,7 @@ const NotchStep = memo(function NotchStep() {
     return r
   }, [gltf])
   return (
-    <Movable id="notchstep" label="木台階"><StaticBatch>
+    <Movable id="notchstep" label="木台階"><StaticBatch plain>
       <group position={NOTCH_STEP_AT} rotation-y={NOTCH_STEP_YAW}><primitive object={obj} /></group>
     </StaticBatch></Movable>
   )

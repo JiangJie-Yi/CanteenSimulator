@@ -395,7 +395,7 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
   return (
     <group name="look-door" position={at} rotation-y={yaw}>
       {/* (in edit mode the cats' stand, the shoe cupboard and the like can each be moved: each its own batch inside its own Movable) */}
-      <Movable id="doorcats" label="門口招財貓台"><StaticBatch>
+      <Movable id="doorcats" label="門口招財貓台"><StaticBatch plain>
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
       <group position={[0.4, 0, CAT_STAND_Z]}>
         {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower) */}
@@ -412,7 +412,7 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (each cat its own piece in edit mode, on the stand's frame) */}
       <group position={[0.4, 0, CAT_STAND_Z]}>
         {DOOR_CATS.map((k, i) => (
-          <Movable key={i} id={`doorcat${i}`} label={`招財貓 ${i + 1}`}><StaticBatch>
+          <Movable key={i} id={`doorcat${i}`} label={`招財貓 ${i + 1}`}><StaticBatch plain>
             <group position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
           </StaticBatch></Movable>
         ))}
@@ -422,7 +422,7 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* a samurai helmet (兜) on its stand, set out on the cats' stand's lower tier between its two small cats, facing into the room (the
           owner's: off the shoe cupboard's top); small enough to sit on the tier's front strip, clear of the upper tier behind it */}
       <Movable id="kabuto" label="武士頭盔"><group position={[0.4 - 0.26, 0.33, CAT_STAND_Z]} rotation-y={Math.PI / 2} scale={0.48}><Kabuto /></group></Movable>
-      <Movable id="genkan" label="玄關地墊"><StaticBatch>
+      <Movable id="genkan" label="玄關地墊"><StaticBatch plain>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       {/* the coir mat lying on the genkan's stone, just inside */}
       <mesh position={[0, -GENKAN.depth + 0.009, -0.18]} rotation-x={-Math.PI / 2} scale={[-1, 1, 1]}>
@@ -435,7 +435,7 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
           open, sunk pulls): its doors swing open at a click to its empty cubbies; a vase of a sprig on its top */}
       <group position={[SHOE_CAB_X, -GENKAN.depth, SHOE_CAB_Z]}>
         <group rotation-y={-Math.PI / 2}><ShoeCupboard /></group>
-        <StaticBatch>
+        <StaticBatch plain>
         <mesh position={[0, SHOE_TOP + 0.06, 0]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
         {[0, 1, 2].map((k) => (
           <mesh key={k} position={[Math.cos(k * 2) * 0.02, SHOE_TOP + 0.17 + k * 0.02, 0 + Math.sin(k * 2) * 0.02]} rotation={[Math.sin(k * 2) * 0.4, 0, Math.cos(k * 2) * 0.4]}>
@@ -933,15 +933,15 @@ function RegisterImpl({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
           register, where the cashier sits (the unseen mark on its seat, which Roasting sits them on, the chair's way round), and a helper's
           stool of the same make along from it) */}
       <Movable id="till-stool-hi" label="收銀高腳凳">
-        <StaticBatch>
+        <StaticBatch plain>
           <group position={at} rotation-y={yaw}><group position={TILL_CHAIR} scale={PEOPLE_SCALE}><TillStoolModel which="High" /></group></group>
         </StaticBatch>
         <group position={at} rotation-y={yaw}><group name="cashier-seat" position={[TILL_CHAIR[0], TILL_SEAT * PEOPLE_SCALE, TILL_CHAIR[2]]} /></group>
       </Movable>
-      <Movable id="till-stool-lo" label="收銀矮凳"><StaticBatch>
+      <Movable id="till-stool-lo" label="收銀矮凳"><StaticBatch plain>
         <group position={at} rotation-y={yaw}><group position={[-0.44, 0, 0.68]} rotation-y={-0.28} scale={PEOPLE_SCALE}><TillStoolModel which="Low" /></group></group>
       </StaticBatch></Movable>
-      <Movable id="till-counter" label="收銀櫃檯"><StaticBatch>
+      <Movable id="till-counter" label="收銀櫃檯"><StaticBatch plain>
       <group position={at} rotation-y={yaw}>
       {/* (local x along the bar, +z toward the cashier, behind it) */}
       {/* the counter itself, from blender/tillcounter.py: its dark body with the lit bamboo and the lantern window, the marble top, the walnut partition */}
@@ -949,7 +949,7 @@ function RegisterImpl({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
       </group>
       </StaticBatch></Movable>
       <Movable id="till-register" label="收銀機（含抽屜）">
-        <StaticBatch>
+        <StaticBatch plain>
       <group position={at} rotation-y={yaw}>
       {/* the register, an electronic one of the kind every shop has: a cream cash drawer (a lock and a label on its front)
           under a body whose sloped panel carries the keys (the coloured function keys to the left, the grey number pad, the
@@ -971,25 +971,25 @@ function RegisterImpl({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
         </StaticBatch>
         <RegisterLive at={at} yaw={yaw} top={top} lang={lang} />
       </Movable>
-      <Movable id="till-card" label="刷卡機"><StaticBatch>
+      <Movable id="till-card" label="刷卡機"><StaticBatch plain>
       <group position={at} rotation-y={yaw}>
       {/* the card reader on its cradle, its face to the customers (blender/tilldesk.py), on the desk mat */}
       <group position={[-0.38, top, -0.1]}><TillDeskPiece name="TillCardReader" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-printer" label="明細印表機" baseTurn={[0, 180, 0]}><StaticBatch>
+      <Movable id="till-printer" label="明細印表機" baseTurn={[0, 180, 0]}><StaticBatch plain>
       <group position={at} rotation-y={yaw}>
       {/* the receipt printer, its slip curling out (blender/tilldesk.py), on the desk mat */}
       <group position={[-0.38, top, 0.12]}><TillDeskPiece name="TillPrinter" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-tray" label="找零盤" baseTurn={[0, 90, 0]}><StaticBatch>
+      <Movable id="till-tray" label="找零盤" baseTurn={[0, 90, 0]}><StaticBatch plain>
       <group position={at} rotation-y={yaw}>
       {/* the change tray (カルトン, blender/tilldesk.py): black resin, its floor ribbed, ありがとうございました in gold along its edge */}
       <group position={[0.0, top, -0.4]}><TillDeskPiece name="TillTray" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-pens" label="筆筒"><StaticBatch>
+      <Movable id="till-pens" label="筆筒"><StaticBatch plain>
       <group position={at} rotation-y={yaw}>
       {/* the pen cup, full (blender/tilldesk.py), on the desk mat */}
       <group position={[-0.52, top, 0.12]}><TillDeskPiece name="TillPens" /></group>
@@ -1018,13 +1018,13 @@ function RegisterImpl({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
       </group>
       </group>
       </Movable>
-      <Movable id="till-ingot" label="元寶"><StaticBatch>
+      <Movable id="till-ingot" label="元寶"><StaticBatch plain>
       <group position={at} rotation-y={yaw}>
       {/* a gold ingot (元寶) on its red stand, for wealth, between the bell and the cat (blender/tilldesk.py) */}
       <group position={[-0.3, top, -0.34]} rotation-y={0.3} scale={1.5}><TillDeskPiece name="TillIngot" /></group>
       </group>
       </StaticBatch></Movable>
-      <Movable id="till-tree" label="招財樹"><StaticBatch>
+      <Movable id="till-tree" label="招財樹"><StaticBatch plain>
       <group position={at} rotation-y={yaw}>
       {/* a money tree (pachira) in its red pot, by the cat (blender/tilldesk.py) */}
       <group position={[0.12, top, -0.34]}><TillDeskPiece name="TillMoneyTree" /></group>
@@ -3409,7 +3409,7 @@ const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsO
           sits and the way to it stay as they are, so no one is put out of a seat) */}
       {seats.map((st, n) => (
         <Movable key={`${seats.length}-${n}`} id={`stool${n}`} label={`座位 ${n + 1}`}>
-          <StaticBatch>
+          <StaticBatch plain>
             <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><StoolModel red={n % 2 === 1} /></group>
           </StaticBatch>
         </Movable>
