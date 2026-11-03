@@ -5,9 +5,9 @@ import { WOOD_LOOK, woodMaterial } from './woodLooks'
 
 /** the shop's floorboards (woodLooks' floor: a deep walnut, five boards to the texture) */
 export const SHOP_BOARDS = plankTexture(WOOD_LOOK.floor.boards!, 5)
-/** how they're laid: the way they run (along the first counter), a board's width and a texture's length (world units): a board 15 cm
- * wide, as a Japanese floor's are (the owner's: they read as wide sheets, 26 cm) */
-export const BOARD_LAY = { along: new THREE.Vector3(0.81, 0, -0.59), board: 0.15, boards: 5, run: 3.2 }
+/** how they're laid: the way they run (along the first counter), a board's width and a texture's length (world units): wide boards as
+ * before (the owner's: at 15 cm they read as a bamboo mat) */
+export const BOARD_LAY = { along: new THREE.Vector3(0.81, 0, -0.59), board: 0.26, boards: 5, run: 4.2 }
 /** the floor's material, one for every piece (matte; a tint, the kitchen's darker, its own copy) */
 const FLOOR_MATS = new Map<string, THREE.Material>()
 const floorMat = (tint: string) => {

@@ -66,8 +66,9 @@ export function plankTexture(colours: string[], boardsAcross = 4, size: [number,
     sheen.addColorStop(0, 'rgba(0,0,0,0.18)'); sheen.addColorStop(0.15, 'rgba(0,0,0,0)'); sheen.addColorStop(0.5, 'rgba(255,240,210,0.05)'); sheen.addColorStop(0.85, 'rgba(0,0,0,0)'); sheen.addColorStop(1, 'rgba(0,0,0,0.2)')
     g.fillStyle = sheen; g.fillRect(x0, 0, w, H)
     g.restore()
-    g.fillStyle = 'rgba(25,14,8,0.65)'
-    g.fillRect(x0, 0, 1.2, H)
+    // (the seam between boards soft, not a sharp black line (the owner's))
+    g.fillStyle = 'rgba(25,14,8,0.32)'
+    g.fillRect(x0, 0, 1, H)
     // (each board's butt joint, staggered from the next, with its two nail heads)
     const jy = (b * 197) % H
     g.fillRect(x0, jy, w, 1.2)
