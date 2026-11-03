@@ -119,7 +119,7 @@ def noren():
     bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.012, depth=W + 0.06, location=P(0, ROD_Y, 0), rotation=(0, math.pi / 2, 0))
     fin(active(), "NorenRod", M["rod"], parts)
     for sd in (-1, 1):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.017, segments=14, ring_count=8, location=P(sd * (W / 2 + 0.035), ROD_Y, 0))
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.017, subdivisions=2, location=P(sd * (W / 2 + 0.035), ROD_Y, 0))
         fin(active(), f"NorenCap{sd}", M["brass"], parts)
     for k in range(3):
         cx = (k - 1) * (W / 3)

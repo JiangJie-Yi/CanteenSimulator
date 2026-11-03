@@ -205,9 +205,15 @@ def bamboo():
                     t_ = s_ / 4
                     w_ = W * math.sin(math.pi * min(1, t_ * 1.15)) * (1 - 0.3 * t_)
                     c_ = tip + d0 * (L * t_) + Vector((0, 0, -0.06 * t_ * t_ - 0.01 * t_))
+                    # (its base one point: two there in one place, with every leaf of the fan's, made a pole of degenerate triangles)
+                    if s_ == 0:
+                        v0 = leaf_bm.verts.new(c_)
+                        vs.append((v0, v0))
+                        continue
                     vs.append((leaf_bm.verts.new(c_ - side * w_), leaf_bm.verts.new(c_ + side * w_)))
                 for s_ in range(4):
-                    f = leaf_bm.faces.new((vs[s_][0], vs[s_][1], vs[s_ + 1][1], vs[s_ + 1][0]))
+                    q = (vs[s_][0], vs[s_][1], vs[s_ + 1][1], vs[s_ + 1][0]) if s_ else (vs[0][0], vs[1][1], vs[1][0])
+                    f = leaf_bm.faces.new(q)
                     f.material_index = (j + i) % 2
     me = bpy.data.meshes.new("BambooLeaves")
     leaf_bm.to_mesh(me)
