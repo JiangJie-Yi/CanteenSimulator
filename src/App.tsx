@@ -43,7 +43,7 @@ import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
 import { SHOP } from '@/game/shopState'
 import { GAME_SPEED, paused } from '@/scene/speed'
 import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
-import { offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
+import { getEdit, offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import type { ViewCam } from '@/game/editGroups'
 import { cameraOneOf } from '@/scene/camera1'
@@ -1132,6 +1132,8 @@ export default function App() {
   // (and asked for one thing in particular (the sake barrels clicked: the sake), it's brought into view in the panel and lit a moment)
   const [stockFocus, setStockFocus] = useState<{ id: string; n: number } | null>(null)
   useEffect(() => onPantryAsk((tab, _from, close, focus) => {
+    // (nothing of the game's opened from the room while in developer mode)
+    if (getEdit().on) return
     opener.current = close ?? null
     setStockTab(tab as StockTab)
     setFridgeOpen(true)
@@ -1168,6 +1170,10 @@ export default function App() {
   useEffect(() => {
     if (!editOn) return
     setView((v) => { if (v !== 'free') HOLD_POSE.next = true; return 'free' })
+    // (the game's panels shut as it's entered (the owner's: the stock, the office, the rating, the drinks, the boards and tools; it's for the
+    // scene alone), not merely hidden to come back as it's left)
+    setFridgeOpen(false); setOffice(null); setShowRating(false); setDrinkPanel(false); setBoardsOpen(false); setToolsOpen(false); setViewMenu(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editOn])
   // (the game stands still while developer mode's on during business (the owner's): the customers, the clock, the wages, the fire, the
   // cooks; on again, at its speed, as the mode ends)

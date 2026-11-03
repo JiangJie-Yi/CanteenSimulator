@@ -36,7 +36,9 @@ const lineMat = (color: string, opacity: number, through: boolean) => new THREE.
 // (at rest only where it isn't hidden, so the room isn't a tangle of lines; pointed at or chosen, seen through whatever's in front)
 const EDGE: Record<Look, THREE.LineBasicMaterial> = { idle: lineMat('#5fb4ff', 0.4, false), hover: lineMat('#9ad6ff', 0.9, true), chosen: lineMat('#ffb43c', 1, true) }
 
-export function useEditBox(root: { current: THREE.Object3D | null }, on: boolean, look: Look, ready = true) {
+/** `yaw`: the turn inside it its object axes go by (Movable's inYaw); the box is squared to it, so it sits on the piece as its handles do
+ * (the owner's: a turned piece's box stood square to the room, swollen round it) */
+export function useEditBox(root: { current: THREE.Object3D | null }, on: boolean, look: Look, ready = true, yaw: number | null = null) {
   const edge = useRef<THREE.LineSegments | null>(null)
   useEffect(() => {
     if (!on) return
@@ -67,8 +69,9 @@ export function useEditBox(root: { current: THREE.Object3D | null }, on: boolean
       // piece unless a slant fits it markedly tighter (a round lantern fits as well at any angle, and its box came out crooked: the owner's))
       let best = { a: 0, x0: 0, x1: 0, z0: 0, z1: 0, area: Infinity }
       let square = Infinity
-      for (let k = 0; k < 45; k++) {
-        const a = (k / 45) * (Math.PI / 2), co = Math.cos(a), si = Math.sin(a)
+      const angles = yaw !== null ? [yaw] : Array.from({ length: 45 }, (_, k) => (k / 45) * (Math.PI / 2))
+      for (let k = 0; k < angles.length; k++) {
+        const a = angles[k], co = Math.cos(a), si = Math.sin(a)
         let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity
         for (const q of pts) {
           const x = q.x * co - q.z * si, z = q.x * si + q.z * co
@@ -97,7 +100,7 @@ export function useEditBox(root: { current: THREE.Object3D | null }, on: boolean
     const t = window.setTimeout(fit, 450)
     return () => { window.clearTimeout(t); edge.current?.removeFromParent(); edge.current?.geometry.dispose(); edge.current = null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, ready])
+  }, [on, ready, yaw])
   useEffect(() => { if (edge.current) edge.current.material = EDGE[look] }, [look, on])
 }
 /** an axis's letter on a round disc in its colour, drawn once */
@@ -873,7 +876,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
 
   const [hover, setHover] = useState(false)
   const listed = useListHot(id)
-  useEditBox(inner, on, selected === id || isPicked(id) ? 'chosen' : hover || listed ? 'hover' : 'idle', ready)
+  useEditBox(inner, on, selected === id || isPicked(id) ? 'chosen' : hover || listed ? 'hover' : 'idle', ready, inYaw)
   useEffect(() => { if (!on) setHover(false) }, [on])
 
   return (
