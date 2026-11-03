@@ -3255,19 +3255,20 @@ wires = []
 for k in range(-8, 9):
     t = k * NET_R / 8.6
     half = math.sqrt(max(0.0, NET_R * NET_R - t * t))
-    # (six round, their ends open: they run into the hoop)
-    wires.append(stick_between((-half, t, NET_Z), (half, t, NET_Z), 0.0026, M["net"], "Wire", sides=6, caps=False))
-    wires.append(stick_between((t, -half, NET_Z - 0.004), (t, half, NET_Z - 0.004), 0.0026, M["net"], "Wire", sides=6, caps=False))
+    # (four round (six before: a wire 5 mm across reads as a line), their ends open: they run into the hoop)
+    wires.append(stick_between((-half, t, NET_Z), (half, t, NET_Z), 0.0026, M["net"], "Wire", sides=4, caps=False))
+    wires.append(stick_between((t, -half, NET_Z - 0.004), (t, half, NET_Z - 0.004), 0.0026, M["net"], "Wire", sides=4, caps=False))
 
 
 def ring(r, z, thick, n, name):
-    # (one closed tube round, six round: a rod a segment, each capped, made the net some six thousand triangles)
-    bpy.ops.mesh.primitive_torus_add(major_radius=r, minor_radius=thick, major_segments=n, minor_segments=6, location=(0, 0, z))
+    # (one closed tube round, four round (a rod a segment, each capped, made the net some six thousand triangles; six round, 3,100 with
+    # the rest; the owner's count had it among the heaviest))
+    bpy.ops.mesh.primitive_torus_add(major_radius=r, minor_radius=thick, major_segments=n, minor_segments=4, location=(0, 0, z))
     wires.append(finish(active(), name, M["net"]))
 
 
-ring(NET_R, NET_Z, 0.0075, 56, "Hoop")
-ring(NET_R * 0.93, NET_Z + 0.002, 0.0035, 48, "Hoop")
+ring(NET_R, NET_Z, 0.0075, 32, "Hoop")
+ring(NET_R * 0.93, NET_Z + 0.002, 0.0035, 32, "Hoop")
 for sd in (-1, 1):
     # (a loop handle: a half-hoop standing out past the rim)
     pts = [(sd * (NET_R + 0.05 * math.sin(math.pi * u)), 0.06 * math.cos(math.pi * u), NET_Z + 0.012 * math.sin(math.pi * u)) for u in [k / 8 for k in range(9)]]
@@ -3276,7 +3277,7 @@ for sd in (-1, 1):
 # (the trivet under it: an iron ring a little below the net, three claws up from it holding the net, three legs bowing out from it to the
 # salt, each with a little round foot)
 TRZ = NET_Z - 0.07
-ring(NET_R * 0.86, TRZ, 0.009, 40, "Trivet")
+ring(NET_R * 0.86, TRZ, 0.009, 24, "Trivet")
 for k in range(3):
     a = math.radians(90 + 120 * k)
     ca, sa = math.cos(a), math.sin(a)
