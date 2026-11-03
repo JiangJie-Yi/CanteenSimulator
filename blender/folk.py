@@ -247,7 +247,7 @@ def lathe(name, profile, mat, seg=12, a0=0.0, a1=2 * math.pi, uv=False, vtop=1.0
     return o
 
 
-def cut_sphere(name, r, mat, planes, seg=14, rings=9, at=None):
+def cut_sphere(name, r, mat, planes, seg=12, rings=8, at=None):
     """a ball round the head's middle (or `at`) with what's on the outer side of each plane (point, normal; three's frame) cut away"""
     ring_ball(radius=r, segs=seg, rings=rings, location=P(*(at or C)))
     o = active()
@@ -297,8 +297,9 @@ def join(objs, name):
 body = lathe("FolkBody", PROFILE[1:], M["body"], seg=12, uv=True, vtop=BODY_TOP, shut=(True, False))
 
 # (the head: a ball, a button nose, ears; one mesh in their skin)
-h = sphere("hd", C, R, M["skin"], seg=20, rings=11)
-nose = sphere("nose", on_head(0.0, -0.035, 0.002)[0], 0.022, M["skin"], seg=10, rings=5)
+# (16 round by 9: 20 by 11 before; the face sheet stays clear of its flats, 4.2 mm off the round)
+h = sphere("hd", C, R, M["skin"], seg=16, rings=9)
+nose = sphere("nose", on_head(0.0, -0.035, 0.002)[0], 0.022, M["skin"], seg=8, rings=4)
 ears = [sphere(f"ear{sd}", Vector((sd * (R + 0.006), C.y - 0.005, -0.015)), 0.048, M["skin"], seg=8, rings=4, scale=(0.45, 0.85, 0.95)) for sd in (-1, 1)]
 join([h, nose] + ears, "FolkHead")
 
@@ -324,7 +325,7 @@ from_bm("FolkFace", bm, M["face"])
 
 # (hands: floating mittens, a plump paddle and a thumb, each its own mesh about where it hangs)
 for sd, at in HAND_AT.items():
-    ring_ball(radius=1, segs=9, rings=5, location=(0, 0, 0))
+    ring_ball(radius=1, segs=8, rings=4, location=(0, 0, 0))
     hm = active()
     for v in hm.data.vertices:
         x, y, z = v.co.x, v.co.z, -v.co.y
@@ -344,13 +345,13 @@ HT = 0.012
 
 def back_shell(name="back", nape=-0.15):
     """the hair round the back and sides, from just behind the ears, down to the nape"""
-    return cut_sphere(name, R + HT, M["hair"], [((0, 0, 0.055), (0, 0, 1)), ((0, nape, -R), Vector((0, -1, 0.4)))], seg=14, rings=10)
+    return cut_sphere(name, R + HT, M["hair"], [((0, 0, 0.055), (0, 0, 1)), ((0, nape, -R), Vector((0, -1, 0.4)))], seg=12, rings=8)
 
 
 def crown(name="crown", fringe=False):
     """the hair over the crown: a man's front edge just over the brows; a woman's brought down straight over them (a fringe)"""
     co, no = ((0, -0.03, 0), (0, -1, 0.47)) if fringe else ((0, 0.01, 0), (0, -1, 0.4))
-    return cut_sphere(name, R + HT * 1.4, M["hair"], [(co, no)], seg=14, rings=9)
+    return cut_sphere(name, R + HT * 1.4, M["hair"], [(co, no)], seg=12, rings=8)
 
 
 def side_locks(length=0.13, at_e=0.3):
@@ -447,7 +448,7 @@ style("bald", [ring])
 quiff = [tuft("quiff0", head_at(0.0, 0.95, -0.01), Vector((0, 0.35, 1.0)), 0.1, 0.17, M["hair"], 0.8, seg=8, rings=5),
          tuft("quiff1", head_at(0.0, 1.25, -0.01), Vector((0, 0.6, 1.0)), 0.08, 0.13, M["hair"], 0.8)]
 style("pomp", [back_shell(), crown()] + quiff)
-def clump(name, frm, to, r, flat=0.5, n=4, m=4):
+def clump(name, frm, to, r, flat=0.5, n=3, m=4):
     """a clump of hair combed along the head: from `frm` (bearing, elevation), its root a little under the hair's face, round the head to
     `to` (bearing, elevation, how far off the head its point stands), lifting off it and narrowing to that point; `r` its half-width at the
     root, `flat` its thickness against its width"""
@@ -490,7 +491,7 @@ SPIKY = (
 spikes = [clump(f"spike{k}", frm, to, r) for k, (frm, to, r) in enumerate(SPIKY)]
 style("spiky", [back_shell(), crown()] + spikes)
 style("kid", [back_shell(), crown(fringe=True), tuft("ahoge", head_at(0.0, 1.3, -0.006), Vector((0.1, 1, 0.75)), 0.032, 0.1, M["hair"], 0.45)])
-def hair_cap(name, hairline, seg=14, rings=6, full=0.02):
+def hair_cap(name, hairline, seg=12, rings=5, full=0.02):
     """a cap of hair in clean quads: every column from the crown down to the hairline (`hairline(bearing)` its elevation there, bearing 0 the
     front), a little off the head and fuller over the top, drawn in to the scalp along its edge so it sits on the head there; a ring of
     thin triangles only round the very top of the crown. (The other styles' shells are balls cut by planes, which leaves slivers and odd
