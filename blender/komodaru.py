@@ -177,17 +177,21 @@ def barrel(at, turn, k):
             for l, (uu, vv) in zip(f.loops, ((i / NA, j / NZ), ((i + 1) / NA, j / NZ), ((i + 1) / NA, (j + 1) / NZ), (i / NA, (j + 1) / NZ))):
                 l[uvl].uv = (uu * 2, vv)
     # (the lid: a straw disc a little domed, gathered in at its rim)
-    c = bm.verts.new((0, 0, HT + 0.03))
-    for i in range(NA):
-        i2 = (i + 1) % NA
-        f = bm.faces.new((rings[-1][i], rings[-1][i2], c))
+    # (its dome two rings in toward the middle, the last closed across in a ladder, and its foot laddered too: fans of 32 into a point)
+    lid = [rings[-1]]
+    for kk, (fr, up) in enumerate(((0.62, 0.021), (0.3, 0.028))):
+        lid.append([bm.verts.new((v.co.x * fr, v.co.y * fr, HT + up)) for v in rings[-1]])
+    lid_faces = []
+    for a_, b_ in zip(lid, lid[1:]):
+        for i in range(NA):
+            i2 = (i + 1) % NA
+            lid_faces.append(bm.faces.new((a_[i], a_[i2], b_[i2], b_[i])))
+    lid_faces += ladder_fill(bm, lid[-1])
+    for f in lid_faces:
         for l in f.loops:
             co = l.vert.co
             l[uvl].uv = (0.5 + co.x * 1.6, 0.5 + co.y * 1.6)
-    cb = bm.verts.new((0, 0, 0.0))
-    for i in range(NA):
-        i2 = (i + 1) % NA
-        bm.faces.new((rings[0][i2], rings[0][i], cb))
+    ladder_fill(bm, rings[0][::-1])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(f"KomoBody{k}"); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(f"KomoBody{k}", me); bpy.context.collection.objects.link(o)
