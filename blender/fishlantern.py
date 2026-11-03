@@ -153,18 +153,19 @@ A, B = 0.135, 0.125                     # (its belly's radius, its half height w
 PHI = math.acos(0.062 / A)              # (where the caps take it)
 YC = -0.05 - B * math.sin(PHI)          # (its middle: its paper's top just inside the top cap)
 prof = []
-N = 12
+N = 8
 for i in range(N + 1):
     f = -PHI + 2 * PHI * i / N
     prof.append((A * math.cos(f), YC + B * math.sin(f), 1 - i / N))
-parts.append(lathe("FishLanternTopPaper", prof, 20, M["top"]))
+# (eight bands and fourteen round, smooth shaded: its letters are the game's picture; 12 x 20 before)
+parts.append(lathe("FishLanternTopPaper", prof, 14, M["top"]))
 TOP_Y = YC + B * math.sin(PHI)
 BOT_Y = YC - B * math.sin(PHI)
-parts.append(cap("FishLanternCapTop", TOP_Y - 0.008, TOP_Y + 0.018, 0.066, M["lacquer"]))
-parts.append(cap("FishLanternCapFoot", BOT_Y - 0.018, BOT_Y + 0.008, 0.066, M["lacquer"]))
-parts.append(torus("FishLanternRing", (0, -0.016, 0), 0.013, 0.003, M["iron"]))
+parts.append(cap("FishLanternCapTop", TOP_Y - 0.008, TOP_Y + 0.018, 0.066, M["lacquer"], segs=12))
+parts.append(cap("FishLanternCapFoot", BOT_Y - 0.018, BOT_Y + 0.008, 0.066, M["lacquer"], segs=12))
+parts.append(torus("FishLanternRing", (0, -0.016, 0), 0.013, 0.003, M["iron"], segs=8, sides=4))
 LOOP_Y = BOT_Y - 0.018 - 0.012
-parts.append(torus("FishLanternLoop", (0, LOOP_Y, 0), 0.009, 0.0025, M["iron"]))
+parts.append(torus("FishLanternLoop", (0, LOOP_Y, 0), 0.009, 0.0025, M["iron"], segs=8, sides=4))
 
 # =====================================================================
 # The chain
@@ -172,7 +173,7 @@ parts.append(torus("FishLanternLoop", (0, LOOP_Y, 0), 0.009, 0.0025, M["iron"]))
 LINK = 0.022
 y = LOOP_Y - 0.009 - LINK / 2 + 0.004
 for k in range(4):
-    parts.append(torus(f"FishLanternLink{k}", (0, y, 0), 0.0075, 0.0022, M["iron"], turn=(math.pi / 2) * ((k + 1) % 2), stretch=1.5, segs=10, sides=5))
+    parts.append(torus(f"FishLanternLink{k}", (0, y, 0), 0.0075, 0.0022, M["iron"], turn=(math.pi / 2) * ((k + 1) % 2), stretch=1.5, segs=8, sides=4))
     y -= LINK - 0.004
 HEAD_Y = y + LINK / 2 - 0.002
 

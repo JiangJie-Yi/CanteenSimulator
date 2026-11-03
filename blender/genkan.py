@@ -87,18 +87,18 @@ def lantern():
         a = 2 * math.pi * u
         # (the picture turned to read upright from outside: glTF's textures run top-down)
         return P(r * math.cos(a), y, r * math.sin(a)), (1 - u, 1 - v)
-    # (24 round and 10 down: smooth shading carries the curve; it was 32 by 16, half again its faces for nothing the eye can tell)
-    fin(grid_mesh("ChochinSkin", 24, 10, skin), "ChochinSkin", M["paper"], parts)
+    # (16 round and 8 down: smooth shading carries the curve; 24 by 10 before, 32 by 16 before that)
+    fin(grid_mesh("ChochinSkin", 16, 8, skin), "ChochinSkin", M["paper"], parts)
     for sd, y in ((1, H / 2 + 0.006), (-1, -H / 2 - 0.006)):
-        bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=R * 0.86, depth=0.045, location=P(0, y, 0))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=R * 0.86, depth=0.045, location=P(0, y, 0))
         c = active()
         bv = c.modifiers.new("b", "BEVEL"); bv.width = 0.005; bv.segments = 1
         bpy.ops.object.modifier_apply(modifier="b")
         fin(c, f"ChochinCap{'Top' if sd > 0 else 'Bottom'}", M["lacquer"], parts)
-        bpy.ops.mesh.primitive_torus_add(major_radius=R * 0.87, minor_radius=0.003, major_segments=24, minor_segments=4, location=P(0, y - sd * 0.014, 0))
+        bpy.ops.mesh.primitive_torus_add(major_radius=R * 0.87, minor_radius=0.003, major_segments=16, minor_segments=3, location=P(0, y - sd * 0.014, 0))
         fin(active(), f"ChochinBand{'Top' if sd > 0 else 'Bottom'}", M["gold"], parts)
     # (the cord loop over the top cap)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.026, minor_radius=0.0025, major_segments=14, minor_segments=4, location=P(0, H / 2 + 0.05, 0),
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.026, minor_radius=0.0025, major_segments=8, minor_segments=4, location=P(0, H / 2 + 0.05, 0),
                                      rotation=(math.pi / 2, 0, 0))
     fin(active(), "ChochinBail", M["gold"], parts)
     root = bpy.data.objects.new("Chochin", None)
