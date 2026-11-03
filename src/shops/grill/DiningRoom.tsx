@@ -3719,7 +3719,8 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
     const below = clear.filter((r) => r[1] <= g0), above = clear.filter((r) => r[0] >= g1)
     const span = below.length ? [Math.max(...below.map((r) => r[1])), g0] : above.length ? [g1, Math.min(...above.map((r) => r[0]))] : null
     if (!span || span[1] - span[0] < 0.35) return null
-    const w = span[1] - span[0] - 0.08
+    // (four centimetres' room either side, six: at four the toilet rolls on top touched the fridge's side (clips.mjs))
+    const w = span[1] - span[0] - 0.12
     return { z: (span[0] + span[1]) / 2, k: Math.min(1, w / 0.56) }
   }, [door, clear])
   const frieze = useMemo(() => {

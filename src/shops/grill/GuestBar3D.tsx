@@ -595,7 +595,7 @@ const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTex
 /** a door lantern's paper with its flame out (its own switch by the way in): as the daylight finds it by day, dim by night */
 const unlitPaper = () => (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark' ? 0.3 : 0.78)
 /** how far apart the two lanterns by the doorway hang, the red and the grill's beside it (middle to middle) */
-const CHOCHIN_PAIR = 0.3
+const CHOCHIN_PAIR = 0.32  // (0.3: their paper just touched, clips.mjs)
 const CHOCHIN_GLOW = (() => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')
