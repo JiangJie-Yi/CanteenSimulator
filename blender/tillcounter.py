@@ -281,7 +281,7 @@ for sx in (-1, 1):
 WX = W / 2 - 0.05
 WY = H / 2 + 0.03
 # (the ring round the opening, standing a little proud of the end; a sleeve of the same pale wood lining the hole back to the paper)
-bpy.ops.mesh.primitive_torus_add(major_radius=0.213, minor_radius=0.017, major_segments=64, minor_segments=12, location=P(W / 2 - 0.016, WY, 0.02), rotation=(0, math.pi / 2, 0))
+bpy.ops.mesh.primitive_torus_add(major_radius=0.213, minor_radius=0.017, major_segments=48, minor_segments=8, location=P(W / 2 - 0.016, WY, 0.02), rotation=(0, math.pi / 2, 0))
 ring = active()
 finish(ring, "TillWindowRing", M["ring"])
 bd.append(ring)
