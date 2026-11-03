@@ -170,7 +170,7 @@ for sd in (-1, 1):
     bpy.ops.mesh.primitive_cube_add(size=1, location=P(sd * (R1 + 0.02), 0.355, 0))
     e = active(); e.scale = (0.045, 0.05, 0.05)
     bpy.ops.object.transform_apply(scale=True)
-    m_ = e.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 3
+    m_ = e.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 2
     bpy.context.view_layer.objects.active = e
     bpy.ops.object.modifier_apply(modifier="b")
     fin(e, f"RiceEar{sd}", M["saw"][0], body)
@@ -183,7 +183,7 @@ fin(active(), "RiceRim", M["saw"][1], body)
 # ---- the lid: its origin at its underside
 bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.285, depth=0.032, location=P(0, 0.016, 0))
 lid = active()
-m_ = lid.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 3
+m_ = lid.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 2
 bpy.context.view_layer.objects.active = lid
 bpy.ops.object.modifier_apply(modifier="b")
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
@@ -199,7 +199,7 @@ fin(lid, "RiceTubLidTop", M["lid"], lidp)
 bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, 0.05, 0))
 bar = active(); bar.scale = (0.24, 0.05, 0.035)
 bpy.ops.object.transform_apply(scale=True)
-m_ = bar.modifiers.new("b", "BEVEL"); m_.width = 0.01; m_.segments = 3
+m_ = bar.modifiers.new("b", "BEVEL"); m_.width = 0.01; m_.segments = 2
 bpy.context.view_layer.objects.active = bar
 bpy.ops.object.modifier_apply(modifier="b")
 fin(bar, "RiceTubLidBar", M["bar"], lidp)
