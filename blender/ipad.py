@@ -113,9 +113,10 @@ def box(name, size, at, mat, bev=0.0, rot=(0, 0, 0)):
     apply_scale(o)
     finish(o, name, mat, smooth_shade=False)
     if bev:
-        bevel(o, bev, 3, angle=False)
+        # (a round edge in two steps, smoothed across (45 degrees a step): three made each little box 188 triangles)
+        bevel(o, bev, 2, angle=False)
         apply_mods(o)
-        smooth_angle(o)
+        smooth_angle(o, 50)
     return o
 
 
