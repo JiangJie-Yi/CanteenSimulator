@@ -200,12 +200,13 @@ def bamboo():
                 # (a narrow lanceolate leaf, drooping along its length)
                 prev = None
                 vs = []
-                for s_ in range(7):
-                    t_ = s_ / 6
+                # (five rows down it: seven made the pot's leaves some six thousand triangles)
+                for s_ in range(5):
+                    t_ = s_ / 4
                     w_ = W * math.sin(math.pi * min(1, t_ * 1.15)) * (1 - 0.3 * t_)
                     c_ = tip + d0 * (L * t_) + Vector((0, 0, -0.06 * t_ * t_ - 0.01 * t_))
                     vs.append((leaf_bm.verts.new(c_ - side * w_), leaf_bm.verts.new(c_ + side * w_)))
-                for s_ in range(6):
+                for s_ in range(4):
                     f = leaf_bm.faces.new((vs[s_][0], vs[s_][1], vs[s_ + 1][1], vs[s_ + 1][0]))
                     f.material_index = (j + i) % 2
     me = bpy.data.meshes.new("BambooLeaves")
