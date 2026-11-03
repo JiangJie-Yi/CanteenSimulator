@@ -137,12 +137,14 @@ def bamboo():
     # (moss in soft clumps, pale pebbles between)
     for i in range(14):
         a, r = rng.random() * 6.28, 0.03 + rng.random() * 0.11
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.022 + rng.random() * 0.012, segments=10, ring_count=6, location=P(math.cos(a) * r, 0.24, math.sin(a) * r))
+        # (an icosphere: round without poles (a UV sphere's top was a fan of ten); 80 faces)
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.022 + rng.random() * 0.012, subdivisions=1, location=P(math.cos(a) * r, 0.24, math.sin(a) * r))
         m = active(); m.scale = (1, 1, 0.35); bpy.ops.object.transform_apply(scale=True)
         fin(m, f"BambooMoss{i}", M["moss"], parts)
     for i in range(18):
         a, r = rng.random() * 6.28, 0.03 + rng.random() * 0.115
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008 + rng.random() * 0.006, segments=8, ring_count=5, location=P(math.cos(a) * r, 0.244, math.sin(a) * r))
+        # (a pebble a centimetre across: twenty faces of an icosahedron, shaded smooth, is round enough (a UV sphere was 64, poled))
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.008 + rng.random() * 0.006, subdivisions=0, location=P(math.cos(a) * r, 0.244, math.sin(a) * r))
         m = active(); m.scale = (1.3, 1, 0.55); bpy.ops.object.transform_apply(scale=True)
         fin(m, f"BambooPebble{i}", M["pebble"], parts)
     # (the culms: each its height and lean, nodes every so often, narrowing as they rise)
@@ -167,11 +169,11 @@ def bamboo():
             if d.length < 0.01:
                 continue
             ra, rb = r0 * (1 - 0.45 * ta), r0 * (1 - 0.45 * tb)
-            bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=ra, radius2=rb * 0.97, depth=d.length, location=(a_ + b_) / 2)
+            bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=ra, radius2=rb * 0.97, depth=d.length, location=(a_ + b_) / 2)
             # (both its ends kept (the step from one length to the next, wider, shows at each node as part of its pale ring; without them the
-            # nodes looked thin), laddered, not 12-point fans)
+            # nodes looked thin), laddered, not 8-point fans; eight round (twelve before): a culm 2 cm across, smooth shaded)
             bmc = bmesh.new(); bmc.from_mesh(active().data)
-            for cap in [f for f in bmc.faces if len(f.verts) == 12]:
+            for cap in [f for f in bmc.faces if len(f.verts) == 8]:
                 ring = list(cap.verts)
                 bmesh.ops.delete(bmc, geom=[cap], context="FACES_ONLY")
                 ladder_fill(bmc, ring)
@@ -181,7 +183,7 @@ def bamboo():
             bpy.ops.object.transform_apply(rotation=True)
             fin(c, f"BambooCulm{k}_{i}", M["culm"], parts)
             if i:
-                bpy.ops.mesh.primitive_torus_add(major_radius=ra * 1.02, minor_radius=ra * 0.13, major_segments=12, minor_segments=4, location=a_)
+                bpy.ops.mesh.primitive_torus_add(major_radius=ra * 1.02, minor_radius=ra * 0.13, major_segments=8, minor_segments=4, location=a_)
                 nd = active()
                 nd.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
                 fin(nd, f"BambooNode{k}_{i}", M["node"], parts)
