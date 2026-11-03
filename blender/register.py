@@ -429,15 +429,16 @@ drawer_parts.append(box("RegTrayBack", S(0.35, 0.04, 0.007), P(0, 0.03, 0.1385),
 INS_Y = 0.017                      # the tray's floor
 INS_W, INS_Z0, INS_Z1 = 0.334, -0.152, 0.134
 BILL_Z0, COIN_Z1 = 0.004, -0.006   # where the note compartments begin, the coin cups end
-ins = box("RegInsert", S(INS_W, 0.022, INS_Z1 - INS_Z0), P(0, INS_Y + 0.011, (INS_Z0 + INS_Z1) / 2), M["tray"], bev=0.003)
+# (its edges and its wells' corners rounded in two steps, not three and five: the insert was 2,736 triangles, seen only with the drawer out)
+ins = box("RegInsert", S(INS_W, 0.022, INS_Z1 - INS_Z0), P(0, INS_Y + 0.011, (INS_Z0 + INS_Z1) / 2), M["tray"], bev=0.003, segs=2)
 # (the note compartments: wide shallow wells, a low divider between each)
 for i in range(4):
     cx = INS_W / 2 - (i + 0.5) * INS_W / 4
-    cut(ins, box("bc", S(INS_W / 4 - 0.006, 0.03, INS_Z1 - BILL_Z0 - 0.008), P(cx, INS_Y + 0.004 + 0.015, (BILL_Z0 + INS_Z1) / 2 - 0.002), M["tray"], bev=0.004))
+    cut(ins, box("bc", S(INS_W / 4 - 0.006, 0.03, INS_Z1 - BILL_Z0 - 0.008), P(cx, INS_Y + 0.004 + 0.015, (BILL_Z0 + INS_Z1) / 2 - 0.002), M["tray"], bev=0.004, segs=2))
 # (the coin cups: deep, round-cornered, their floors sweeping up to the front)
 for i in range(6):
     cx = INS_W / 2 - (i + 0.5) * INS_W / 6
-    cutter = box("cc", S(INS_W / 6 - 0.008, 0.03, COIN_Z1 - INS_Z0 - 0.01), P(cx, INS_Y + 0.003 + 0.015, (INS_Z0 + COIN_Z1) / 2), M["tray"], bev=0.009, segs=5)
+    cutter = box("cc", S(INS_W / 6 - 0.008, 0.03, COIN_Z1 - INS_Z0 - 0.01), P(cx, INS_Y + 0.003 + 0.015, (INS_Z0 + COIN_Z1) / 2), M["tray"], bev=0.009, segs=3)
     cutter.rotation_euler = (-0.12, 0, 0)
     cut(ins, cutter)
 uv_box(ins)
