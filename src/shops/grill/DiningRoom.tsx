@@ -3430,7 +3430,8 @@ function ballLathe(R: number, end: number, bands: number, round: number) {
   }
   return new THREE.LatheGeometry(pts, round)
 }
-const LANTERN_GEO = ballLathe(LANTERN_R, LANTERN_END, 12, 24)
+// (eight bands and sixteen round, smooth shaded: 256 faces (12 x 24, 576, before; the owner's count had each lamp at 1,418 with its outline))
+const LANTERN_GEO = ballLathe(LANTERN_R, LANTERN_END, 8, 16)
 /** a little seeded stream of numbers, the same pictures every time */
 function seeded(seed: number) {
   let n = seed
@@ -3615,11 +3616,11 @@ function Pendant({ z, drop, pool, band = 0 }: { z: number; drop: number; pool: n
         </mesh>
         {[LANTERN_END + 0.004, -LANTERN_END - 0.004].map((y) => (
           <mesh key={y} position-y={y}>
-            <cylinderGeometry args={[0.056, 0.056, 0.024, 16]} />
+            <cylinderGeometry args={[0.056, 0.056, 0.024, 12]} />
             <meshToonMaterial color="#cdb083" />
           </mesh>
         ))}
-        <mesh position-y={LANTERN_END + 0.028} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 5, 12]} /><meshToonMaterial color="#8a6a3a" /></mesh>
+        <mesh position-y={LANTERN_END + 0.028} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 4, 8]} /><meshToonMaterial color="#8a6a3a" /></mesh>
         <sprite scale={0.85} material={PENDANT_GLOW} />
         {/* (and by night a wide soft bloom round it) */}
         <sprite scale={2.2} material={PENDANT_BLOOM} />
