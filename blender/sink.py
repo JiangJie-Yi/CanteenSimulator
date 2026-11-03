@@ -6,8 +6,8 @@
 - The cabinet under it of dark-stained sugi, its frame and panels: under the basin an opening hung with a noren of indigo cotton, a band of
   white waves across its foot, on a bamboo rod; to the right a pair of sliding doors of vertical slats over a board, each with its sunk
   pull; a wooden bar across the front with a cloth hung on it; a dark kick at its foot.
-- A brass tap standing up behind the basin, its spout curving over it, a cross handle on top, a little bag of white cloth tied over its
-  mouth (a filter, as kitchens tie on).
+- A commercial stainless tap behind the basin, its gooseneck spout arching over it to an aerator, a single lever on top (it was a brass
+  cross tap with a little bag of white cloth tied over its mouth).
 - On the counter: a draining basket of woven bamboo with three plates standing in it and a bowl upside down; a palm-fibre scrubber
   (棕櫚たわし) and a bar of soap each on its little dish; a hinoki hand pail with copper hoops at the far end.
 
@@ -136,6 +136,8 @@ M = {
     "hinoki": pbr("SinkHinoki", (1, 1, 1), tex=image("sink_hinoki", np.clip(hin, 0, 1).astype(np.float32)), rough=0.55),
     "cloth": pbr("SinkCloth", (1, 1, 1), tex=image("sink_cloth", np.clip(cloth, 0, 1).astype(np.float32)), rough=0.9),
     "steel": pbr("SinkSteel", lin("#c9ccd0"), rough=0.3, metal=1.0),
+    # (the tap's brushed stainless (the owner's: a commercial kitchen's, #e0e0e0, rough 0.2, metal 0.9))
+    "faucet": pbr("SinkSteelTap", lin("#e0e0e0"), rough=0.2, metal=0.9),
     "panel": pbr("SinkPanel", lin("#1c1d20"), rough=0.25),
     "button": pbr("SinkButton", lin("#d8d8d2"), rough=0.4),
     "lamp": pbr("SinkLamp", lin("#3a3a36"), rough=0.3),
@@ -396,40 +398,34 @@ for p in o.data.polygons:
 parts.append(o)
 
 # ---------------------------------------------------------------------------------------------------- the tap
+# (a commercial kitchen's: brushed stainless, a short round body on a foot, a high arched gooseneck swivel spout over the basin with an
+# aerator at its mouth, a single flat lever on top (the owner's: the brass cross tap was the washroom's, out of place in a kitchen))
 tx = (x0 + x1) / 2
 tz = -D / 2 + 0.07
-cyl("SinkTapFoot", tx, H, H + 0.015, tz, 0.028, "brass", seg=20)
-cyl("SinkTapRiser", tx, H + 0.015, H + 0.26, tz, 0.013, "brass", seg=16)
-# (the spout: up over and down toward the basin's middle)
+cyl("SinkTapFoot", tx, H, H + 0.012, tz, 0.032, "faucet", seg=16, r1=0.028)
+cyl("SinkTapBody", tx, H + 0.012, H + 0.13, tz, 0.022, "faucet", seg=16)
+# (the spout: from the body's side, straight up, over in an arch and down toward the basin's middle)
 mz = (BASIN[2] + BASIN[3]) / 2 - 0.02
-spout = [(tx, H + 0.24, tz), (tx, H + 0.3, tz + (mz - tz) * 0.3), (tx, H + 0.27, tz + (mz - tz) * 0.8), (tx, H + 0.2, mz)]
-tube("SinkTapSpout", spout, 0.011, "brass", res=8, sides=12)
+spout = [(tx, H + 0.1, tz + 0.016), (tx, H + 0.3, tz + 0.02), (tx, H + 0.37, tz + (mz - tz) * 0.35), (tx, H + 0.33, tz + (mz - tz) * 0.8),
+         (tx, H + 0.25, mz)]
+tube("SinkTapSpout", spout, 0.011, "faucet", res=4, sides=12)
 mouth = spout[-1]
-cyl("SinkTapMouth", tx, mouth[1] - 0.02, mouth[1], mouth[2], 0.0125, "brass", seg=16)
-empty("SinkSpoutTip", tx, mouth[1] - 0.06, mouth[2])
-# (the cross handle on top, its four arms and a cap)
-cyl("SinkTapStem", tx, H + 0.26, H + 0.29, tz, 0.009, "brass", seg=12)
-for a_ in range(4):
-    ang = math.pi / 4 + a_ * math.pi / 2
-    tube(f"SinkTapArm{a_}", [(tx, H + 0.285, tz), (tx + 0.045 * math.cos(ang), H + 0.29, tz + 0.045 * math.sin(ang))], 0.005, "brass", res=1, sides=8)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=10, ring_count=6, location=P(tx + 0.045 * math.cos(ang), H + 0.29, tz + 0.045 * math.sin(ang)))
-    finish(active(), f"SinkTapKnob{a_}", M["brass"])
-    parts.append(active())
-cyl("SinkTapCap", tx, H + 0.29, H + 0.3, tz, 0.012, "brass", seg=12, r1=0.006)
-# (a little bag of white cloth tied over its mouth, a string round its neck)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=8, location=P(tx, mouth[1] - 0.045, mouth[2]))
-bag = active()
-bag.scale = (0.022, 0.022, 0.035)
-apply_scale(bag)
-bm = bmesh.new()
-bm.from_mesh(bag.data)
-for vtx in bm.verts:
-    vtx.co.x += 0.002 * math.sin(vtx.co.z * 300)
-bm.to_mesh(bag.data)
-bm.free()
-finish(bag, "SinkTapBag", M["bag"])
-parts.append(bag)
-cyl("SinkTapString", tx, mouth[1] - 0.022, mouth[1] - 0.016, mouth[2], 0.0135, "rod", seg=12)
+# (the aerator: a short wider cylinder at its mouth, its screen darker)
+cyl("SinkTapMouth", tx, mouth[1] - 0.026, mouth[1] + 0.004, mouth[2], 0.0135, "faucet", seg=12)
+cyl("SinkTapScreen", tx, mouth[1] - 0.027, mouth[1] - 0.025, mouth[2], 0.011, "drain", seg=12)
+empty("SinkSpoutTip", tx, mouth[1] - 0.05, mouth[2])
+# (the lever on top: a short stem, a flat bar out to the side ending in a rounded paddle, a cap; turned about the body's upright)
+cyl("SinkTapStem", tx, H + 0.13, H + 0.155, tz, 0.014, "faucet", seg=12)
+bpy.ops.mesh.primitive_cube_add(size=1, location=P(tx + 0.045, H + 0.158, tz))
+lever = active()
+lever.scale = (0.085, 0.008, 0.016)
+apply_scale(lever)
+bv = lever.modifiers.new("b", "BEVEL"); bv.width = 0.003; bv.segments = 1
+bpy.context.view_layer.objects.active = lever
+bpy.ops.object.modifier_apply(modifier="b")
+finish(lever, "SinkTapArm0", M["faucet"])
+parts.append(lever)
+cyl("SinkTapCap", tx, H + 0.155, H + 0.166, tz, 0.014, "faucet", seg=12, r1=0.009)
 
 # ---------------------------------------------------------------------------------------------------- on the counter
 # (the draining basket: woven bamboo, a rim of split cane, standing on the draining part)
@@ -569,7 +565,7 @@ for set_name, prefixes in SETS:
     e.parent = root
     holder[set_name] = (e, prefixes)
 # (the handle turns about the tap's own upright; the dryer's door about its hinge along its foot)
-holder["SinkTapHandle"][0].location = P(tx, H + 0.285, tz)
+holder["SinkTapHandle"][0].location = P(tx, H + 0.158, tz)
 holder["SinkDryerDoor"][0].location = P(*DOOR_HINGE)
 # (the holders' own places taken in before what's in them is hung on them, so nothing moves)
 bpy.context.view_layer.update()
