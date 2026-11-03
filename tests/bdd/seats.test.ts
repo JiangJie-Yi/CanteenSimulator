@@ -1,6 +1,7 @@
+import * as THREE from 'three'
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { BAR_GATES, GRILL_COUNTERS, GRILL_SEATS, gateOf, lampsAlong, passOf, seatAlong, seatLabel, type Counter } from '@/shops/grill/bar'
+import { ALONG, BAR_GATES, COOK_NOTCH, GRILL_COUNTERS, GRILL_SEATS, LAY, gateOf, lampsAlong, platingOf, seatAlong, seatLabel, toGrillScene, type Counter } from '@/shops/grill/bar'
 
 feature('吧台的座位：全店 8 個，兩座吧台各 4 個，每個座位有號碼，每兩位客人之間一盞吊燈', () => {
   scenario('全店 8 個座位，兩座吧台各 4 個（店主要的：長吧台靠轉角的那個移到側吧台，兩邊才均衡）', ({ given, then, and }) => {
@@ -45,12 +46,28 @@ feature('吧台的座位：全店 8 個，兩座吧台各 4 個，每個座位�
     })
   })
 
-  scenario('出餐口在側吧台離轉角最遠的兩個座位正中間（廚房那側站得到人）', ({ given, then }) => {
-    given('出餐口', (w) => { w.p = passOf(GRILL_COUNTERS); w.c = GRILL_COUNTERS[1] })
-    then('在側吧台、兩個座位中間', (w) => {
-      expect(w.p.counter).toBe(1)
-      const mid = (seatAlong(w.c, 0) + seatAlong(w.c, 1)) / 2
-      expect(w.p.at.clone().sub(w.c.at).dot(w.p.dir)).toBeCloseTo(mid, 6)
+  scenario('沒有吧台上的出餐口：主廚在灶台桌上、自己身旁裝盤，外場走進廚房到他旁邊端', ({ given, then, and }) => {
+    given('主廚的裝盤處', (w) => { w.p = platingOf(); w.scene = (v: THREE.Vector3) => toGrillScene(v) })
+    then('裝好的盤子放在灶台桌面上（桌面高度），在主廚的缺口旁邊、桌子的範圍內', (w) => {
+      const at = w.scene(w.p.at)
+      expect(at.y).toBeCloseTo(0, 6)
+      const along = at.dot(ALONG), lay = at.dot(LAY)
+      expect(along).toBeGreaterThan(COOK_NOTCH.along[1])
+      expect(along - COOK_NOTCH.along[1]).toBeLessThan(2)
+      expect(lay).toBeLessThan(2.1)
+      expect(lay).toBeGreaterThan(COOK_NOTCH.lay[0])
+    })
+    and('外場取餐站的地方在廚房地上、桌子前緣外面，就在盤子前面', (w) => {
+      const out = w.scene(w.p.out), at = w.scene(w.p.at)
+      expect(out.dot(LAY)).toBeGreaterThan(2.1)
+      expect(Math.hypot(out.x - at.x, out.z - at.z)).toBeLessThan(1)
+    })
+    and('不在任何一座吧台上', (w) => {
+      for (const c of GRILL_COUNTERS) {
+        const d = w.p.at.clone().sub(c.at)
+        const inside = Math.abs(d.dot(c.along.clone().normalize())) < c.length / 2 && Math.abs(d.dot(c.lay.clone().normalize())) < 0.4
+        expect(inside).toBe(false)
+      }
     })
   })
 

@@ -55,7 +55,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PASS, PASS_SHELF, PASS_SLOTS, passSlotAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, passOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -114,17 +114,17 @@ const BAR_AT_SCENE = toGrillScene(BAR_AT).sub(FIRE_SHIFT)
 const BAR_TOP_SCENE = BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y
 /** how big food is on the bar, next to the fire's: a skewer about as long as a customer's plate is wide */
 const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
-/** the pass (bar.ts's passOf), where what's grilled is plated for a server to carry: on its shelf over the side counter's lip; its shelf's top in
- * the scene, and the way across it (toward the kitchen) */
-const PASS_FRAME = passOf(GRILL_COUNTERS)
-const PASS_TOP_SCENE = (GRILL_BAR_TOP + LIP_H + PASS_SHELF.t) * GRILL_SCALE + GRILL_OFFSET.y
-const PASS_ACROSS = PASS_FRAME.across.clone()
-/** where a piece goes on the pass: side by side along its slot (on the plate laid there, or the bare shelf, loose), three to a row, a full row
- * with another on top. In this one's frame, the fire FIRE_SHIFT along from the bar's (fromBar, below): without it the food landed, and the
- * shelf stood, 0.65 along the long counter from the plates the bar draws on the pass (the owner saw the board off by itself on the counter) */
-const passFoodAt = (slot: number, row: number, plate: boolean) => toGrillScene(PASS_FRAME.at.clone().addScaledVector(PASS_FRAME.dir, passSlotAlong(slot))).sub(FIRE_SHIFT)
-  .addScaledVector(PASS_FRAME.dir, ((row % 3) - 1) * 0.07 * GRILL_SCALE)
-  .setY(PASS_TOP_SCENE + 0.04 + (plate ? 0.01 * GRILL_SCALE : 0) + Math.floor(row / 3) * 0.06)
+/** the chef's plating place (bar.ts's platingOf), on the cook table right beside him: what's grilled is plated there, ready (ORDER_READY), and
+ * a server comes into the kitchen to him for it (the owner's: no pass on the bar between them any more); the table's top in the scene, and
+ * the way across the table */
+const PLATING_FRAME = platingOf()
+const PLATING_TOP = PLATING_FRAME.top * GRILL_SCALE + GRILL_OFFSET.y
+const PLATING_ACROSS = PLATING_FRAME.across.clone()
+/** where a piece goes at the plating place: side by side in its slot (on the plate laid there, or loose on the table, for a plate already out),
+ * three to a row, a full row with another on top; in this one's frame, the fire FIRE_SHIFT along from the bar's (fromBar, below) */
+const readyFoodAt = (slot: number, row: number, plate: boolean) => toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, readyAlong(slot))).sub(FIRE_SHIFT)
+  .addScaledVector(PLATING_FRAME.across, ((row % 3) - 1) * 0.06 * GRILL_SCALE)
+  .setY(PLATING_TOP + 0.04 + (plate ? 0.01 * GRILL_SCALE : 0) + Math.floor(row / 3) * 0.06)
 const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).sub(FIRE_SHIFT).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 /**
@@ -434,22 +434,6 @@ function TrashBinImpl({ position, container, contents = 0 }: { position: [number
     </group>
   )
 }
-
-/** the pass's shelf on the side counter's lip, in the scene: where the bar's frame has it (on its counter's unit directions, as the bar's
- * drawn), its turn the counter's */
-const PASS_SHELF_AT = toGrillScene(PASS_FRAME.at).sub(FIRE_SHIFT).setY((BAR_TOP + LIP_H + PASS_SHELF.t / 2) * GRILL_SCALE + GRILL_OFFSET.y)
-const PASS_SHELF_YAW = PASS_FRAME.yaw
-/** the pass's shelf (a 付け台, a board of the lip's wood): only while the shop's open (the owner, seeing the bare board on the lip with the
- * shop shut, asked what it was). What's on it is the scene's own: the plates GuestBar3D's, the food this one's (the red lacquered tray it held
- * is gone: the food's plated there now, the owner's) */
-const PassShelf = memo(function PassShelf() {
-  return (
-    <group name="pass-shelf" position={PASS_SHELF_AT} rotation-y={PASS_SHELF_YAW} scale={GRILL_SCALE}>
-      <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len, PASS_SHELF.t, PASS_SHELF.deep]} castShadow receiveShadow><meshToonMaterial color="#ffffff" map={TRAY_WOOD} /></mesh>
-      <mesh geometry={ROUNDED_SLAB} scale={[PASS_SHELF.len * 1.01, PASS_SHELF.t * 1.25, PASS_SHELF.deep * 1.03]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
-    </group>
-  )
-})
 
 /** the tray for raw food waiting to go on the fire: a row of sticks across it, a few more laid in the gaps on top; loose food in a row along
  * its back. It holds no more than that: the rest wait in the fridge until there's room, brought out as the tray's cleared */
@@ -833,7 +817,7 @@ function CrewWalk({ id, at, yaw, way, seat, round, children }: { id: string; at:
     if (!SHOP.leaving) {
       gone.current = 0
       path.current = null
-      // (off fetching plates for the pass: GuestBar3D walks them meanwhile)
+      // (off fetching plates for the plating place: GuestBar3D walks them meanwhile)
       o.visible = PLATER_OUT.id !== id
       if (seat && o.parent) {
         if (!mark.current?.parent) mark.current = scene.getObjectByName(seat) ?? null
@@ -1937,7 +1921,6 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
           </group>
         )
       })()}
-      {/* (the pass's shelf is drawn with its tray, while the shop's open: PassTray) */}
       {Array.from({ length: c.seats }, (_, n) => {
         const x = seatAlong(c, n)
         return (
@@ -2747,13 +2730,13 @@ type Piece = {
   collected: boolean
   /** 0..1 along the flight to the plate */
   flight: number
-  /** (served by a server) out at the pass, or on its way: it goes on to the customer's plate when it's set down */
-  via?: 'pass'
+  /** (served by a server) set out ready at the chef's plating place, or on its way: it goes on to the customer's plate when it's set down */
+  via?: 'plated'
   /** (the owner tasting it: time since his last munch) */
   chewAt?: number
-  /** which of the pass tray's places it's put out on */
-  passAt?: number
-  /** drawn at the bar's size: it's been out on it (at the pass), so it doesn't grow back on the last hop */
+  /** which of the plating place's slots it's put out in */
+  readyAt?: number
+  /** drawn at the bar's size: it's been out at the plating place, so it doesn't grow back on the last hop */
   small?: boolean
   fromP: THREE.Vector3
   fromQ: THREE.Quaternion
@@ -3635,30 +3618,30 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     setMoveTick((t) => t + 1)
   }
   /**
-   * A piece for the pass put to a slot there: the seat's own, if one's set out for it; else a free one, a plate laid in it off the pass's stack
+   * A piece for the plating place put to a slot there: the seat's own, if one's set out for it; else a free one, a plate laid in it off the plating place's stack
    * if the seat's plate isn't out yet (else the piece goes loose, to be added to the plate at the seat). None to be had (no slot free, or no
    * plate stacked there yet: the kitchen's gone for some), false: it stays held where it is, and is asked for again
    */
-  const placeOnPass = (p: Piece) => {
-    let k = PASS.slots.findIndex((sl) => sl?.seat === p.seat)
+  const plateReady = (p: Piece) => {
+    let k = PLATING.slots.findIndex((sl) => sl?.seat === p.seat)
     if (k < 0) {
       const plated = PLATES_OUT.has(p.seat)
-      const free = PASS.slots.findIndex((sl) => sl === null)
-      if (free < 0 || (!plated && PASS.stock <= 0)) return false
+      const free = PLATING.slots.findIndex((sl) => sl === null)
+      if (free < 0 || (!plated && PLATING.stock <= 0)) return false
       k = free
-      PASS.slots[k] = { seat: p.seat, plate: !plated, flying: 1, landed: 0 }
-      if (!plated) PASS.stock -= 1
+      PLATING.slots[k] = { seat: p.seat, plate: !plated, flying: 1, landed: 0 }
+      if (!plated) PLATING.stock -= 1
     }
-    const row = pieces.current.filter((q) => q !== p && q.via === 'pass' && q.passAt === k && !q.eaten && q.trash < 0 &&
+    const row = pieces.current.filter((q) => q !== p && q.via === 'plated' && q.readyAt === k && !q.eaten && q.trash < 0 &&
       !SERVICE.claimed.has(q.key) && !SERVICE.carried.has(q.key)).length
-    p.passAt = k
-    p.toP.copy(passFoodAt(k, row, PASS.slots[k]!.plate))
+    p.readyAt = k
+    p.toP.copy(readyFoodAt(k, row, PLATING.slots[k]!.plate))
     p.local.copy(p.toP).sub(containerAt('bar'))
     return true
   }
   /**
    * The open shop: a cooked piece goes to the customer who's owed one of these, onto their plate at the bar (pieces already on it push the
-   * new one along), or, with a server on the floor, out to the pass, plated there for them to carry over (the owner's: the kitchen plates,
+   * new one along), or, with a server on the floor, out to the plating place, plated there for them to carry over (the owner's: the kitchen plates,
    * the floor only carries)
    */
   const serveTo = (p: Piece, owner: Guest) => {
@@ -3670,13 +3653,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.container = 'bar'
     p.body = null
     if (p.loose) flatQ(p, p.toQ, LAY_DIR)
-    // (across the pass, side by side; on a customer's plate along it)
-    else flatQ(p, p.toQ, SERVICE.servers && bar ? PASS_ACROSS : STACK_DIR)
+    // (across the plating place, side by side; on a customer's plate along it)
+    else flatQ(p, p.toQ, SERVICE.servers && bar ? PLATING_ACROSS : STACK_DIR)
     p.local.copy(p.toP).sub(containerAt('bar'))
     if (SERVICE.servers && bar) {
-      p.via = 'pass'
-      p.passAt = undefined
-      placeOnPass(p)
+      p.via = 'plated'
+      p.readyAt = undefined
+      plateReady(p)
     }
   }
   /** the chef says something, now and then (not more often than every two and a half seconds) */
@@ -3690,7 +3673,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const binIt = (p: Piece) => {
     SERVICE.waiting.delete(p.key)
     p.via = undefined
-    p.passAt = undefined
+    p.readyAt = undefined
     p.trashFrom.copy(p.node.position)
     p.trash = 0
     p.node.userData.onPlate = true
@@ -3982,7 +3965,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const revive = (p: Piece) => {
     fresh(p)
     p.via = undefined
-    p.passAt = undefined
+    p.readyAt = undefined
     p.small = false
     SERVICE.delivered.delete(p.key)
     for (const { mat, foil } of p.mats) {
@@ -4129,12 +4112,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       say(scrapIt.stickOnly ? L().stickAway : L().burntAway)
       return
     }
-    // (cooked for someone who's since gone: left on the cook's table with no one to go to, or out on the pass for a customer who's left;
+    // (cooked for someone who's since gone: left on the cook's table with no one to go to, or out on the plating place for a customer who's left;
     // the next customer owed one of these has it at once, and if nobody is, after a while it's cold and it's binned)
     if (space === 'open') {
       const here = (id: number) => guests.current.some((g) => g.id === id && (g.state === 'waiting' || g.state === 'eating'))
-      const stray = live.find((p) => p.collected && (p.flight >= 1 || (p.via === 'pass' && p.passAt === undefined)) && !p.stickOnly &&
-        !SERVICE.claimed.has(p.key) && !SERVICE.carried.has(p.key) && (p.container !== 'bar' || (p.via === 'pass' && !here(p.guest))))
+      const stray = live.find((p) => p.collected && (p.flight >= 1 || (p.via === 'plated' && p.readyAt === undefined)) && !p.stickOnly &&
+        !SERVICE.claimed.has(p.key) && !SERVICE.carried.has(p.key) && (p.container !== 'bar' || (p.via === 'plated' && !here(p.guest))))
       if (stray) {
         const was = stray.guest
         stray.guest = -1
@@ -4142,7 +4125,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (owner) {
           SERVICE.waiting.delete(stray.key)
           stray.via = undefined
-          stray.passAt = undefined
+          stray.readyAt = undefined
           stray.slot = null
           stray.flight = 0
           stray.fromP.copy(stray.node.position)
@@ -5783,8 +5766,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         // (served at the bar, it waits in the cook's hand by the fire till the customer's plate is set down for it)
         const plateless = p.container === 'bar' && bar && !SERVICE.servers && !p.via && p.flight === 0 && !PLATES_SET.has(p.seat)
-        // (served through the pass: out there till a server takes it, then on the tray with them, then onto the plate)
-        if (p.via === 'pass') {
+        // (served through the plating place: out there till a server takes it, then on the tray with them, then onto the plate)
+        if (p.via === 'plated') {
           if (SERVICE.delivered.has(p.key)) {
             SERVICE.delivered.delete(p.key)
             // (its stick left on the plate once it's eaten: cleared with it, into the bin by the sink)
@@ -5795,7 +5778,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             p.toP.copy(barSeat(p.seat)).addScaledVector(GRILL_SEATS[p.seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE)
               .add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
             // (its spot is kept as where it is from the bar (the frame below puts it there each frame): moved to the plate, or it went back to
-            // the pass every frame, and lay there, on the pass's board, while its customer's plate went out empty (the owner saw two skewers
+            // the plating place every frame, and lay there, on the plating place, while its customer's plate went out empty (the owner saw two skewers
             // left on the board))
             p.local.copy(p.toP).sub(containerAt('bar'))
             p.via = undefined
@@ -5806,23 +5789,23 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             p.toP.copy(p.fromP)
             p.local.copy(p.toP).sub(containerAt('bar'))
             p.flight = 1
-          } else if (p.passAt === undefined) {
-            // (held by the fire: a slot on the pass, and a plate in it, asked for again)
-            placeOnPass(p)
-          } else if (!SERVICE.claimed.has(p.key) && PASS.slots[p.passAt]?.seat !== p.seat) {
+          } else if (p.readyAt === undefined) {
+            // (held by the fire: a slot on the plating place, and a plate in it, asked for again)
+            plateReady(p)
+          } else if (!SERVICE.claimed.has(p.key) && PLATING.slots[p.readyAt]?.seat !== p.seat) {
             // (its slot taken up, or freed, without it: it goes to a slot of its own again, from where it is)
-            p.passAt = undefined
+            p.readyAt = undefined
             SERVICE.waiting.delete(p.key)
             p.fromP.copy(p.node.position)
             p.fromQ.copy(p.node.quaternion)
             p.flight = 0
-            placeOnPass(p)
+            plateReady(p)
           } else if (p.flight >= 1) {
             p.small = true
             if (!SERVICE.waiting.has(p.key) && !SERVICE.claimed.has(p.key)) SERVICE.waiting.set(p.key, p.seat)
           }
         }
-        const held = p.via === 'pass' && p.passAt === undefined
+        const held = p.via === 'plated' && p.readyAt === undefined
         if (!plateless && !held) p.flight = Math.min(1, p.flight + dt / FLIGHT_SECONDS)
         if (!p.body?.live) {
           const e = p.flight < 0.5 ? 2 * p.flight * p.flight : 1 - (-2 * p.flight + 2) ** 2 / 2
@@ -5962,22 +5945,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (roast.basket) settleBasket(dt)
 
     // AI simulation: the chef works the grill, customers order and eat
-    // the pass's slots: how many of each one's pieces are flying to it and are down on it (GuestBar3D sends a server once it's all there); one
+    // the plating place's slots: how many of each one's pieces are flying to it and are down on it (GuestBar3D sends a server once it's all there); one
     // left with nothing (its customer gone, what was on it binned) freed, its plate back on the stack
-    if (space === 'open') for (let k = 0; k < PASS_SLOTS; k++) {
-      const sl = PASS.slots[k]
+    if (space === 'open') for (let k = 0; k < READY_SLOTS; k++) {
+      const sl = PLATING.slots[k]
       if (!sl) continue
       let flying = 0, landed = 0
       for (const q of pieces.current) {
-        if (q.via !== 'pass' || q.passAt !== k || q.eaten || q.trash >= 0 || SERVICE.claimed.has(q.key) || SERVICE.carried.has(q.key)) continue
+        if (q.via !== 'plated' || q.readyAt !== k || q.eaten || q.trash >= 0 || SERVICE.claimed.has(q.key) || SERVICE.carried.has(q.key)) continue
         if (q.flight >= 1) landed++
         else flying++
       }
       sl.flying = flying
       sl.landed = landed
       if (!flying && !landed) {
-        if (sl.plate) PASS.stock += 1
-        PASS.slots[k] = null
+        if (sl.plate) PLATING.stock += 1
+        PLATING.slots[k] = null
       }
     }
 
@@ -6143,8 +6126,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </group>
       )}
       <points geometry={grains.geometry} material={grainMaterial} frustumCulled={false} renderOrder={3} />
-      {/* (the pass's shelf, while the shop's open: what's cooked is plated on it for the servers) */}
-      {space === 'open' && bar && <PassShelf />}
       {active && trayMore > 0 && roast.tray && (
         <Html position={trayAt().addScaledVector(STACK_DIR, TRAY_W / 2 - 0.1).addScaledVector(LAY_DIR, TRAY_D / 2 - 0.05).add(new THREE.Vector3(0, 0.12, 0))}
           center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>

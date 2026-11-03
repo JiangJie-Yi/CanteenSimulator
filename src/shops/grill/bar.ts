@@ -578,43 +578,47 @@ export function payOf(cs: Counter[]) {
 
 /** how tall the raised lip along the counters' cook's side stands over their tops */
 export const LIP_H = 0.15
-/** where the pass is across its counter: up on a shelf over the raised lip on the cook's side (a 付け台), above the places, not down among their
- * plates and soy dishes */
-export const PASS_LAY = 0.28
-/** the pass's shelf: along, across, thick */
-export const PASS_SHELF = { len: 0.72, deep: 0.26, t: 0.025 }
-/** the pass's places for what's set out on it (a plate laid for a seat with its food on it; or a seat's later food out loose, its plate at the
- * seat already), and where along the shelf (from its middle) each stands; its stack of clean plates at the end nearer the racks */
-export const PASS_SLOTS = 2
-export const passSlotAlong = (k: number) => 0.24 * k
-export const PASS_STACK_ALONG = -0.24
 /**
- * The pass (出餐口), in the bar's own frame: a shelf over the raised lip of the side counter, between its two places furthest from the corner,
- * where the kitchen and the floor both reach it (the owner's: the kitchen plates the food and the floor only carries it; at the long counter's
- * corner, where it was, the cook's table stood right up against the bar and nobody in the kitchen could stand at it). Its middle up on the lip
- * (`at`), its counter's way along (`dir`) and across toward the kitchen (`across`), unit; where a server stands for it in the aisle across the
- * bar (`out`), and where the kitchen stands at it (`in`), the dish racks a few steps behind. With one counter, between its first two places.
+ * The chef's plating place (盛り付け), on the cook table right beside him (the owner's: no pass on the bar any more; the chef plates what's
+ * grilled where he stands, sets it down ready (ORDER_READY) on the table's front edge, and a server comes into the kitchen to him for it).
+ * In the scene's frame (ALONG and LAY, the table's top at y 0): where a ready plate is set down (`along`, `lay`), its clean plates' stack just
+ * behind it (`stackLay`), where a server stands in front of it to take it up (`serverLay`) and where the plater sets down what they bring
+ * (`platerAlong`): to the right of the tasting bowl, clear of it and of the bin behind (measured from above, 2026-11-04)
  */
-export function passOf(cs: Counter[]) {
-  const counter = cs[1] ? 1 : 0, c = cs[counter]
-  const along = (seatAlong(c, 0) + seatAlong(c, 1)) / 2
-  const dir = c.along.clone().normalize(), across = c.lay.clone().normalize()
-  const mid = c.at.clone().addScaledVector(dir, along)
-  return { counter, dir, across, at: mid.clone().addScaledVector(across, PASS_LAY), out: mid.clone().addScaledVector(across, -0.75),
-    in: mid.clone().addScaledVector(across, 0.66), yaw: Math.atan2(-c.along.z, c.along.x) }
+export const PLATING_SPOT = { along: 2.86, lay: 1.8, stackLay: 1.3, serverLay: 2.6, platerAlong: 3.15 }
+/** a place in the scene's frame (ALONG, LAY, height) into the bar's (what toGrillScene undoes) */
+const sceneToBar = (along: number, lay: number, y = 0) => new THREE.Vector3().addScaledVector(ALONG, along).addScaledVector(LAY, lay).setY(y)
+  .sub(GRILL_OFFSET).divideScalar(GRILL_SCALE)
+/** how many plates can stand ready at the plating place at once (one seat's each); and where along it (from the ready place, toward the
+ * chef's side: LAY) each stands, its stack of clean plates behind them */
+export const READY_SLOTS = 1
+export const readyAlong = (k: number) => -0.24 * k
+export const PLATE_STACK_ALONG = (PLATING_SPOT.stackLay - PLATING_SPOT.lay) / 2 // (the bar's sizes: GRILL_SCALE, 2, is set further down)
+/**
+ * The plating place, in the bar's frame (the frame GuestBar3D walks its servers in): the ready plate's place on the table (`at`, its `top`
+ * the table's top), the way its places run (`dir`, unit: back across the table from the front edge) and across it (`across`); where a
+ * server stands on the kitchen's floor in front of it to take a plate up (`out`) and where the plater stands to set the clean ones down
+ * (`in`), both beside the chef at his notch.
+ */
+export function platingOf() {
+  const top = sceneToBar(0, 0, 0).y
+  const at = sceneToBar(PLATING_SPOT.along, PLATING_SPOT.lay).setY(top)
+  const dir = LAY.clone().normalize(), across = ALONG.clone().normalize()
+  return { at, top, dir, across, out: sceneToBar(PLATING_SPOT.along, PLATING_SPOT.serverLay).setY(0),
+    in: sceneToBar(PLATING_SPOT.platerAlong, PLATING_SPOT.serverLay).setY(0) }
 }
-/** what's at the pass just now: one of its slots, the seat it's for, whether a plate's laid there (the seat's plate isn't out yet), and how
- * many of its pieces are flying to it and are down on it (Roasting counts them every frame) */
-export type PassSlot = { seat: number; plate: boolean; flying: number; landed: number }
+/** what's ready at the plating place just now: one of its slots, the seat it's for, whether a plate's laid there (the seat's plate isn't out
+ * yet), and how many of its pieces are flying to it and are down on it (Roasting counts them every frame) */
+export type ReadyPlate = { seat: number; plate: boolean; flying: number; landed: number }
 /**
- * The pass: the clean plates stacked at its end for plating on (the kitchen brings them from the racks: `coming`, on their way), and its slots
- * (Roasting lays a plate in one for a seat whose first food is done, and puts that seat's food on it; GuestBar3D draws the plate and has it
- * carried, the slot freed as it's taken up)
+ * The plating place: the clean plates stacked there for plating on (the kitchen's plater brings them from the racks: `coming`, on their
+ * way), and its slots, each a plate ready for a server (Roasting lays a plate in one for a seat whose first food is done and puts that
+ * seat's food on it; GuestBar3D draws the plate and has a server come for it, the slot freed as it's taken up)
  */
-export const PASS = { stock: 0, coming: 0, slots: Array.from({ length: PASS_SLOTS }, () => null as PassSlot | null) }
-/** the seats whose plate is out (set down at them, or on its way there): their later food goes out on the pass loose, for adding to it */
+export const PLATING = { stock: 0, coming: 0, slots: Array.from({ length: READY_SLOTS }, () => null as ReadyPlate | null) }
+/** the seats whose plate is out (set down at them, or on its way there): their later food is set out at the plating place loose, for adding to it */
 export const PLATES_OUT = new Set<number>()
-/** the kitchen's plater (the third cook, or the second) off their place, fetching plates for the pass: GuestBar3D walks a figure of them,
+/** the kitchen's plater (the third cook, or the second) off their place, fetching plates for the plating place: GuestBar3D walks a figure of them,
  * Roasting's at their place is hidden meanwhile (the owner, plating with no cook to, is OWNER_OUT) */
 export const PLATER_OUT: { id: string | null } = { id: null }
 /** the dish dryer in the sink's cabinet (game/plates' Dryer: what's in it, its time left); `open`, its door down (0..1) to load or unload it
@@ -624,7 +628,7 @@ export const DRYER: Dryer & { open: number } = { n: 0, left: null, open: 0 }
 export const SINK_BIN = { sticks: 0 }
 /** the sticks each seat's plate has on it, of what's been eaten off it (Roasting counts what's set down; GuestBar3D clears them with the plate) */
 export const SEAT_STICKS = new Map<number, number>()
-if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pass: PASS, __dryer: DRYER, __sinkBin: SINK_BIN })
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plating: PLATING, __dryer: DRYER, __sinkBin: SINK_BIN })
 
 /**
  * The whole shop's floor as one rectangle, in the first counter's frame (along it and across it, lay, from its middle):

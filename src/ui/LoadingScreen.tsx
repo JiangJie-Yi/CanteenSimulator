@@ -69,7 +69,7 @@ export function LoadingScreen({ scene = true }: { scene?: boolean }) {
       {stuck && (
         <div className="loading-stuck">
           <p>{failed ? `有 ${errors.length} 個檔案沒有載入成功` : '載入好像卡住了'}（可能是模型正在更新，或開發伺服器在重啟）</p>
-          <button type="button" onClick={() => window.location.reload()}>重新載入</button>
+          <button type="button" onClick={() => window.location.replace(window.location.pathname + '?v=' + Date.now())}>重新載入</button>
         </div>
       )}
     </div>

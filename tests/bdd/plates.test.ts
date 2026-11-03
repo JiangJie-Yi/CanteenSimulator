@@ -1,22 +1,22 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { CARRY, DRYER_CAP, DRY_S, PASS_CAP, PASS_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
+import { CARRY, DRYER_CAP, DRY_S, STACK_CAP, STACK_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
   putBack, unload, washNow, washOne, type Dryer } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 
 const idle: Dryer = { n: 0, left: null }
 
-feature('廚房擺盤：三廚從碗盤櫃把盤子拿到出餐口，菜在出餐口裝盤', () => {
-  scenario(`出餐口的乾淨盤子少於 ${PASS_LOW} 個就去碗盤櫃拿`, ({ then, and, but }) => {
-    then('出餐口剩 1 個、碗盤櫃有：去拿', () => { expect(platerGoes(1, 0, 30)).toBe(true) })
-    and(`還有 ${PASS_LOW} 個就不去`, () => { expect(platerGoes(PASS_LOW, 0, 30)).toBe(false) })
+feature('廚房擺盤：三廚從碗盤櫃把盤子拿到主廚身旁的裝盤處，主廚就地裝盤，外場進廚房端走', () => {
+  scenario(`裝盤處的乾淨盤子少於 ${STACK_LOW} 個就去碗盤櫃拿`, ({ then, and, but }) => {
+    then('裝盤處剩 1 個、碗盤櫃有：去拿', () => { expect(platerGoes(1, 0, 30)).toBe(true) })
+    and(`還有 ${STACK_LOW} 個就不去`, () => { expect(platerGoes(STACK_LOW, 0, 30)).toBe(false) })
     and('已經有人在拿的路上：不重複去', () => { expect(platerGoes(0, 3, 30)).toBe(false) })
     but('碗盤櫃空了就不去（等洗好烘乾的搬回來）', () => { expect(platerGoes(0, 0, 0)).toBe(false) })
   })
-  scenario(`一趟補到 ${PASS_CAP} 個為止，最多拿 ${CARRY} 個、不超過碗盤櫃剩的`, ({ then, and }) => {
-    then(`出餐口剩 1 個：拿 ${PASS_CAP - 1} 個`, () => { expect(platesToBring(1, 30)).toBe(PASS_CAP - 1) })
+  scenario(`一趟補到 ${STACK_CAP} 個為止，最多拿 ${CARRY} 個、不超過碗盤櫃剩的`, ({ then, and }) => {
+    then(`裝盤處剩 1 個：拿 ${STACK_CAP - 1} 個`, () => { expect(platesToBring(1, 30)).toBe(STACK_CAP - 1) })
     and('碗盤櫃只剩 2 個：拿 2 個', () => { expect(platesToBring(0, 2)).toBe(2) })
-    and('出餐口是滿的：不拿', () => { expect(platesToBring(PASS_CAP, 30)).toBe(0) })
+    and('裝盤處是滿的：不拿', () => { expect(platesToBring(STACK_CAP, 30)).toBe(0) })
   })
   scenario('搬回碗盤櫃的盤子最多放到滿', ({ then, and }) => {
     then('碗盤櫃 40 個，搬回 5 個：變 45 個', () => { expect(putBack(40, 5)).toBe(45) })
@@ -30,7 +30,7 @@ feature('外場分工：一個端菜收盤，另一個洗碗、烘碗、搬回�
     then('一個人：什麼都做', () => { expect(dutyOf(0, 1)).toBe('all') })
     and('兩個人：第一個外場、第二個洗碗', () => { expect(dutyOf(0, 2)).toBe('floor'); expect(dutyOf(1, 2)).toBe('dish') })
   })
-  scenario('出餐口有裝好的菜：誰有空誰先端', ({ then, and }) => {
+  scenario('裝盤處有裝好的菜：誰有空誰先端', ({ then, and }) => {
     then('管外場的去端', () => { expect(nextChore({ ...base, duty: 'floor', serve: true, dirty: 3 })).toBe('serve') })
     and('管洗碗的有空也幫忙端', () => { expect(nextChore({ ...base, duty: 'dish', serve: true, sink: WASH_AT })).toBe('serve') })
   })
