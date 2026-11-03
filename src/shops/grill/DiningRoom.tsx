@@ -1980,12 +1980,41 @@ const WC_T = 0.06
 const WC_IN = 0.02
 /** a stretch of solid wall in the rooms' frame, from x0 to x1, y0 to y1, z0 to z1 (either way round): its top and its cut end seen from
  * outside, in a plaster a touch deeper than the walls' faces */
-function WcMass({ x, y, z }: { x: [number, number]; y: [number, number]; z: [number, number] }) {
+function WcMass({ x, y, z, cap = true }: { x: [number, number]; y: [number, number]; z: [number, number]; cap?: boolean }) {
   const [x0, x1] = [Math.min(...x), Math.max(...x)], [z0, z1] = [Math.min(...z), Math.max(...z)]
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, lx = x1 - x0, lz = z1 - z0
+  // (outside, as the shop's own walls are (the owner's: a wing of the house, not a white box stuck on): dark cedar boards to the waist, plaster
+  // over; along its top a dark wooden cap a little wider than the wall, so it's no paper-thin edge seen from above)
+  const split = Math.min(Math.max(WC_WAIST, y[0]), y[1])
   return (
-    <mesh position={[(x0 + x1) / 2, (y[0] + y[1]) / 2, (z0 + z1) / 2]}>
-      <boxGeometry args={[x1 - x0, y[1] - y[0], z1 - z0]} /><meshToonMaterial color="#e2d4b6" />
-    </mesh>
+    <>
+      {split > y[0] && <mesh position={[cx, (y[0] + split) / 2, cz]}><boxGeometry args={[lx, split - y[0], lz]} /><meshToonMaterial color="#3e2716" /></mesh>}
+      {y[1] > split && <mesh position={[cx, (split + y[1]) / 2, cz]}><boxGeometry args={[lx, y[1] - split, lz]} /><meshToonMaterial color="#e2d4b6" /></mesh>}
+      {cap && <mesh position={[cx, y[1] + WC_CAP / 2, cz]}><boxGeometry args={[lx + 0.02, WC_CAP, lz + 0.024]} /><meshToonMaterial color="#2e1c10" /></mesh>}
+    </>
+  )
+}
+/** the height of the rooms' dark cedar outside (their wainscot's), and of the dark wooden cap along their walls' tops */
+const WC_WAIST = 0.9
+const WC_CAP = 0.03
+/** the slatted ceiling over a room (the owner's: from above, the toilet not looked straight down into, the lamps' light showing between
+ * the slats): cedar slats across it from the shop's wall to the back, laid on the walls' caps, a gap between each two; `z` across it */
+function WcSlats({ x, z, y }: { x: [number, number]; z: [number, number]; y: number }) {
+  const [z0, z1] = [Math.min(...z), Math.max(...z)]
+  const n = Math.max(2, Math.round((z1 - z0) / 0.1))
+  const lx = x[1] - x[0]
+  return (
+    <>
+      {Array.from({ length: n }, (_, k) => (
+        <mesh key={k} position={[(x[0] + x[1]) / 2, y, z0 + ((k + 0.5) * (z1 - z0)) / n]}>
+          <boxGeometry args={[lx, 0.022, 0.04]} /><meshToonMaterial color="#4a2e1a" />
+        </mesh>
+      ))}
+      {/* (two bearers under them along each end, as they're laid on) */}
+      {[x[0] + 0.03, x[1] - 0.03].map((bx) => (
+        <mesh key={bx} position={[bx, y - 0.022, (z0 + z1) / 2]}><boxGeometry args={[0.04, 0.022, z1 - z0]} /><meshToonMaterial color="#2e1c10" /></mesh>
+      ))}
+    </>
   )
 }
 /** a paper lamp on a wall, on a little wooden arm (the rooms have no ceiling: they're seen from above, cut open): its globe in its ring `out`
@@ -2013,7 +2042,8 @@ function WcFloor({ wx, wz, at }: { wx: number; wz: number; at: [number, number, 
     return g
   }, [wx, wz])
   useEffect(() => () => geo.dispose(), [geo])
-  return <mesh geometry={geo} position={at} rotation-x={-Math.PI / 2}><meshToonMaterial color="#ffffff" map={WC_FLOOR} /></mesh>
+  // (a shade dimmer than its hinoki (the owner's: the rooms dim and private, the light on the washstand and the noren by the lamps))
+  return <mesh geometry={geo} position={at} rotation-x={-Math.PI / 2}><meshToonMaterial color="#9c9286" map={WC_FLOOR} /></mesh>
 }
 /**
  * The rooms behind a toilet's door, in the Japanese way (the owner's: the door slid open shows the washstand and its mirror; the toilet's
@@ -2072,6 +2102,14 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <WcMass x={[WC_IN, X0 - 0.002]} y={[0, top]} z={[s * (w / 2 + 0.002), s * (w / 2 + E + WC_T)]} />
       <WcMass x={[X0, D]} y={[h, top]} z={[s * w / 2, s * (w / 2 + WC_T)]} />
       <WcMass x={[X0, D]} y={[0, top]} z={[s * (w / 2 + E + 0.002), s * (w / 2 + E + WC_T)]} />
+      {/* (the back wall's top capped too, along the washroom and the toilet's room) */}
+      <mesh position={[D + 0.012, top + WC_CAP / 2, s * (E + WC_T) / 2]}><boxGeometry args={[0.05, WC_CAP, w + E + 2 * WC_T + 0.024]} /><meshToonMaterial color="#2e1c10" /></mesh>
+      {/* (the slatted ceilings, over the washroom and the toilet's room, on the caps) */}
+      <WcSlats x={[WC_IN, D]} z={[-s * (w / 2 + 0.01), s * (w / 2 + 0.01)]} y={top + WC_CAP + 0.011} />
+      <WcSlats x={[X0, D]} z={[s * (w / 2 + WC_T - 0.01), s * (w / 2 + E + 0.01)]} y={top + WC_CAP + 0.011} />
+      {/* (dark posts at the outer corners: the toilet's room's far corner, and, once for both, the corner between the two toilets) */}
+      <mesh position={[D + 0.012, (top + WC_CAP) / 2, s * (w / 2 + E + WC_T)]}><boxGeometry args={[0.07, top + WC_CAP, 0.07]} /><meshToonMaterial color="#2e1c10" /></mesh>
+      {s < 0 && <mesh position={[D + 0.012, (top + WC_CAP) / 2, -s * (w / 2 + WC_T)]}><boxGeometry args={[0.07, top + WC_CAP, 0.07]} /><meshToonMaterial color="#2e1c10" /></mesh>}
       {/* (the way through: a cedar post at the short wall's end, as deep as the wall; the noren's rod across it just under the lintel, in the
           wall's depth, from the post's face to the back wall's, each end in a little wooden socket (竿受け) fixed there: it hung on two
           brackets under the lintel that were fixed to nothing, the owner's) */}

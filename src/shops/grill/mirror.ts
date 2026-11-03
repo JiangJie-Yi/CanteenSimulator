@@ -65,12 +65,17 @@ export function roundMirror(r: number): Mirror {
   const draw = glass.onBeforeRender
   let odd = false
   glass.onBeforeRender = function (...args) { odd = !odd; if (odd || glass.forceUpdate) draw.apply(this, args) }
-  const at = new THREE.Vector3(), eye = new THREE.Vector3(), sphere = new THREE.Sphere()
+  const at = new THREE.Vector3(), eye = new THREE.Vector3(), face = new THREE.Vector3(), sphere = new THREE.Sphere()
   let swept = -1e9
   const tick = (scene: THREE.Scene, camera: THREE.Camera, frame: number) => {
     glass.getWorldPosition(at)
     camera.getWorldPosition(eye)
-    const on = eye.distanceTo(at) < NEAR
+    // (and looked at from in front, within some 60 degrees of straight on: from above or the side the room's open top is what it'd show,
+    // the empty dark round the shop, and the glass went black)
+    face.set(0, 0, 1).transformDirection(glass.matrixWorld)
+    const to = eye.clone().sub(at)
+    const d = to.length()
+    const on = d < NEAR && to.dot(face) > 0.5 * d
     glass.visible = on
     // (now and then while it shows: what's come near it (a guest walked in), the people and the lights, put on its layer)
     if (on && frame - swept > 60) {
