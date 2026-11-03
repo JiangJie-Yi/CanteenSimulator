@@ -2737,11 +2737,13 @@ def filling(x, y, z, radius, height, mat, rough=0.06, kind=None):
     return finish(o, "Filling", mat)
 
 
-def stick_between(p0, p1, radius, mat, name):
-    """A thin round rod from p0 to p1 (brush and spoon handles, grill wires)."""
+def stick_between(p0, p1, radius, mat, name, sides=8, caps=True):
+    """A thin round rod from p0 to p1 (brush and spoon handles, grill wires); `caps` False leaves its ends open (where they run into
+    something)."""
     p0, p1 = Vector(p0), Vector(p1)
     d = p1 - p0
-    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=radius, depth=d.length, location=(p0 + p1) / 2)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=sides, radius=radius, depth=d.length, location=(p0 + p1) / 2,
+                                        end_fill_type="NGON" if caps else "NOTHING")
     o = active()
     o.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
     return finish(o, name, mat)
@@ -3216,14 +3218,15 @@ wires = []
 for k in range(-8, 9):
     t = k * NET_R / 8.6
     half = math.sqrt(max(0.0, NET_R * NET_R - t * t))
-    wires.append(stick_between((-half, t, NET_Z), (half, t, NET_Z), 0.0026, M["net"], "Wire"))
-    wires.append(stick_between((t, -half, NET_Z - 0.004), (t, half, NET_Z - 0.004), 0.0026, M["net"], "Wire"))
+    # (six round, their ends open: they run into the hoop)
+    wires.append(stick_between((-half, t, NET_Z), (half, t, NET_Z), 0.0026, M["net"], "Wire", sides=6, caps=False))
+    wires.append(stick_between((t, -half, NET_Z - 0.004), (t, half, NET_Z - 0.004), 0.0026, M["net"], "Wire", sides=6, caps=False))
 
 
 def ring(r, z, thick, n, name):
-    for k in range(n):
-        a0, a1 = 2 * math.pi * k / n, 2 * math.pi * (k + 1) / n
-        wires.append(stick_between((r * math.cos(a0), r * math.sin(a0), z), (r * math.cos(a1), r * math.sin(a1), z), thick, M["net"], name))
+    # (one closed tube round, six round: a rod a segment, each capped, made the net some six thousand triangles)
+    bpy.ops.mesh.primitive_torus_add(major_radius=r, minor_radius=thick, major_segments=n, minor_segments=6, location=(0, 0, z))
+    wires.append(finish(active(), name, M["net"]))
 
 
 ring(NET_R, NET_Z, 0.0075, 56, "Hoop")
