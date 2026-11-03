@@ -8,7 +8,8 @@ import * as THREE from 'three'
  */
 
 /** a plank texture, its boards down the image (across u), the grain along v */
-export function plankTexture(colours: string[], boardsAcross = 4, size: [number, number] = [128, 512]) {
+/** `calm`: fewer, softer grain lines (the shop's floor, the owner's: dense fine lines read as a bamboo mat) */
+export function plankTexture(colours: string[], boardsAcross = 4, size: [number, number] = [128, 512], calm = false) {
   if (typeof document === 'undefined') return null
   // (painted at four times the laid-out size, so the grain holds up close)
   const K = 4
@@ -32,9 +33,9 @@ export function plankTexture(colours: string[], boardsAcross = 4, size: [number,
     g.beginPath(); g.rect(x0, 0, w, H); g.clip()
     // (flat-sawn grain: long nested arches up the board, its heart off to one side)
     const hx = x0 + w * (0.3 + rnd() * 0.4)
-    for (let k = 0; k < 24; k++) {
+    for (let k = 0; k < (calm ? 10 : 24); k++) {
       const top = rnd() * H, len = H * (0.25 + rnd() * 0.45), sp = 1.5 + k * 1.1
-      g.strokeStyle = `rgba(40,22,10,${0.16 + rnd() * 0.16})`
+      g.strokeStyle = `rgba(40,22,10,${(0.16 + rnd() * 0.16) * (calm ? 0.6 : 1)})`
       g.lineWidth = 0.45 + rnd() * 0.6
       g.beginPath()
       g.moveTo(hx - sp, top + len); g.bezierCurveTo(hx - sp, top + len * 0.2, hx + sp, top + len * 0.2, hx + sp, top + len)
@@ -48,12 +49,12 @@ export function plankTexture(colours: string[], boardsAcross = 4, size: [number,
       g.lineWidth = 2 + rnd() * 4
       g.beginPath(); g.moveTo(gx, 0); g.bezierCurveTo(gx - 3, H / 3, gx + 3, (H * 2) / 3, gx, H); g.stroke()
     }
-    for (let k = 0; k < 16; k++) {
+    for (let k = 0; k < (calm ? 6 : 16); k++) {
       const gx = x0 + 1 + rnd() * (w - 2)
       g.strokeStyle = `rgba(30,18,10,${0.12 + rnd() * 0.14})`; g.lineWidth = 0.4 + rnd() * 0.3
       g.beginPath(); g.moveTo(gx, 0); g.bezierCurveTo(gx - 1, H / 3, gx + 1.5, (H * 2) / 3, gx, H); g.stroke()
     }
-    for (let k = 0; k < 220; k++) { g.fillStyle = 'rgba(25,14,6,0.25)'; g.fillRect(x0 + rnd() * w, rnd() * H, 0.35, 1.6) }
+    for (let k = 0; k < (calm ? 90 : 220); k++) { g.fillStyle = 'rgba(25,14,6,0.25)'; g.fillRect(x0 + rnd() * w, rnd() * H, 0.35, 1.6) }
     // (a knot now and then)
     if (rnd() < 0.6) {
       const kx = x0 + w * (0.2 + rnd() * 0.6), ky = rnd() * H

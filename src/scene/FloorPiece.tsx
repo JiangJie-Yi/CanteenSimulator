@@ -4,10 +4,10 @@ import { boardUVs, plankTexture } from './floorBoards'
 import { WOOD_LOOK, woodMaterial } from './woodLooks'
 
 /** the shop's floorboards (woodLooks' floor: a deep walnut, five boards to the texture) */
-export const SHOP_BOARDS = plankTexture(WOOD_LOOK.floor.boards!, 5)
+export const SHOP_BOARDS = plankTexture(WOOD_LOOK.floor.boards!.slice(0, 4), 4, [128, 512], true)
 /** how they're laid: the way they run (along the first counter), a board's width and a texture's length (world units): wide boards as
  * before (the owner's: at 15 cm they read as a bamboo mat) */
-export const BOARD_LAY = { along: new THREE.Vector3(0.81, 0, -0.59), board: 0.26, boards: 5, run: 4.2 }
+export const BOARD_LAY = { along: new THREE.Vector3(0.81, 0, -0.59), board: 0.26, boards: 4, run: 4.2 }
 /** the floor's material, one for every piece (matte; a tint, the kitchen's darker, its own copy) */
 const FLOOR_MATS = new Map<string, THREE.Material>()
 const floorMat = (tint: string) => {

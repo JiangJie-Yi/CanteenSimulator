@@ -2893,6 +2893,20 @@ const STAFF_SIGN = canvasTex(512, 256, (g) => {
  * bamboo's pot, then only part way; run into the wall it was gone, and they wanted it seen), the panel turned about so its pull is at the
  * edge it's pulled by.
  */
+/** the staff door's washi, its own (the toilets' doors keep theirs): a faint warm glow by night (the owner's: the stair's lamp behind it) */
+const STAFF_PAPER = new THREE.MeshToonMaterial({ name: 'StaffDoorPaper', color: '#ffffff', emissive: '#b08654', emissiveIntensity: 0, side: THREE.DoubleSide })
+/** and that light spilling round the door on the wall and its frame: a soft warm patch, laid on additively, by night only */
+const STAFF_SPILL = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas'); c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const gr = g.createRadialGradient(64, 54, 6, 64, 64, 64)
+  gr.addColorStop(0, 'rgba(255,200,130,0.55)'); gr.addColorStop(0.55, 'rgba(255,190,120,0.18)'); gr.addColorStop(1, 'rgba(255,190,120,0)')
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128)
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+const STAFF_SPILL_MAT = new THREE.MeshBasicMaterial({ map: STAFF_SPILL ?? undefined, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })
 function StaffDoor() {
   const door = useWcDoor()
   const frame = useMemo(() => door.frame(), [door])
@@ -2905,6 +2919,8 @@ function StaffDoor() {
       const name = (m.material as THREE.Material).name
       if (name === 'WcDoorBoard') m.material = new THREE.MeshToonMaterial({ name, color: '#ffffff', map: STAFF_BOARD })
       else if (name === 'WcDoorLacquer') m.material = new THREE.MeshToonMaterial({ name, color: '#3a2215' })
+      // (its own washi: by night it glows faintly warm, the stair's lamp behind it (StaffDoor's frame eases it in))
+      else if (name === 'WcDoorPaper') { const src = m.material as THREE.MeshStandardMaterial; m.material = STAFF_PAPER; STAFF_PAPER.map = src.map ?? null; STAFF_PAPER.emissiveMap = src.map ?? null }
     })
     // (the sign rides on the panel)
     const sign = new THREE.Group()
@@ -2923,6 +2939,10 @@ function StaffDoor() {
   const st = useRef({ open: false, k: 0 })
   const narrow = STAFF_W / WC_W
   useFrame(({ camera }, dt) => {
+    // (by night (dusk a little), the washi glows faintly with the stair's lamp, and its light spills round the door)
+    const sky = skyNow(), nightK = sky === 'night' ? 1 : sky === 'dusk' ? 0.4 : 0
+    STAFF_PAPER.emissiveIntensity += (0.55 * nightK - STAFF_PAPER.emissiveIntensity) * Math.min(1, dt * 2)
+    STAFF_SPILL_MAT.opacity += (0.5 * nightK - STAFF_SPILL_MAT.opacity) * Math.min(1, dt * 2)
     // (pointed at: the landing's lamp eased a little brighter)
     const hv = STAFF_STAIRS.uniforms.uHover
     hv.value += ((stairsHot.current ? 1 : 0) - hv.value) * Math.min(1, dt * 8)
@@ -2946,6 +2966,9 @@ function StaffDoor() {
       {/* (the dark of the passage: right across the opening and on behind the posts, the head and the sill, so no plaster shows round its
           edges (the owner saw a pale strip down the side; it stopped 2.5 cm short of each post)) */}
       {/* (pointed at, through the open door (the shut door's in front and takes the pointer first): what's up there, and its light a little up) */}
+      <mesh position={[-0.012, WC_H * 0.62, 0]} rotation-y={-Math.PI / 2} material={STAFF_SPILL_MAT} renderOrder={3} raycast={() => {}}>
+        <planeGeometry args={[STAFF_W * 2.4, WC_H * 1.4]} />
+      </mesh>
       <mesh ref={stairs} position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2} material={STAFF_STAIRS}
         onPointerOver={(ev) => { ev.stopPropagation(); if (getEdit().on) return; stairsHot.current = true; document.body.style.cursor = 'not-allowed'; setTip({ title: '2F 員工休息室／倉庫', hint: '🚫 閒人勿進・禁止進入', warn: true }) }}
         onPointerOut={() => { stairsHot.current = false; document.body.style.cursor = ''; setTip(null) }} onClick={(ev) => ev.stopPropagation()}>
