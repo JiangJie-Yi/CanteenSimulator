@@ -390,8 +390,9 @@ pts = [term, term + Vector((0, 0.03, -0.05)), Vector((0.02, 0.17, -0.2)), Vector
 cd = bpy.data.curves.new("SpeakerCable", "CURVE")
 cd.dimensions = "3D"
 cd.bevel_depth = 0.0042
-cd.bevel_resolution = 3
-cd.resolution_u = 10
+# (eight round, five steps a span: a cord 8 mm thick, it was 800 triangles at twelve and ten)
+cd.bevel_resolution = 1
+cd.resolution_u = 5
 sp = cd.splines.new("BEZIER")
 sp.bezier_points.add(len(pts) - 1)
 for bp, p in zip(sp.bezier_points, pts):
