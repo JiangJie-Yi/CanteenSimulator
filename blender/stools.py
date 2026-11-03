@@ -186,7 +186,8 @@ def lathe(name, prof, segs, uv="flat", y0=0.0):
     return mesh_obj(name, bm)
 
 
-def leg(name, top, foot, r0, r1, segs=14, rings=5):
+def leg(name, top, foot, r0, r1, segs=10, rings=2):
+    # (ten round and two lengths down a straight taper (14 x 5 before: a straight leg needs no rings along it), the foot's dome kept)
     """a round leg from `top` to `foot` (the game's frame), r0 thick at the top and r1 at the foot, its foot rounded off; the grain
     (the picture's v) running down it"""
     a, b = P(*top), P(*foot)
@@ -221,7 +222,7 @@ def leg(name, top, foot, r0, r1, segs=14, rings=5):
     return mesh_obj(name, bm)
 
 
-def ring(name, y, R, r, segs=28, tube=8):
+def ring(name, y, R, r, segs=26, tube=6):  # (26 round: at 20 its corners showed close to; 28 x 8 before)
     """a bent ring of round wood, level at height y, R round and r thick; its grain running round it"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
@@ -265,8 +266,9 @@ def stool(name, M, seat_top=0.29, R=0.128, rings_at=(0.1,), splay=0.05):
     top = seat_top + 0.002
     cr = R - 0.02
     cp = [(cr * 0.08, top + 0.03)]
-    for i in range(1, 9):
-        t = i / 8
+    # (six steps out to its rim (eight before), smooth shaded)
+    for i in range(1, 7):
+        t = i / 6
         h = 0.046 * math.sqrt(max(0.0, 1 - t ** 3)) - 0.011 * math.exp(-(t / 0.16) ** 2)
         cp.append((cr * t, top + max(0.004, h)))
     cp.append((cr + 0.004, top + 0.006))
