@@ -77,7 +77,7 @@ def smooth_angle(o, deg=35):
     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(deg))
 
 
-def rounded_slab(name, w, h, d, r, mat, edge=0.0, n=10):
+def rounded_slab(name, w, h, d, r, mat, edge=0.0, n=10, segs=3):
     """a flat slab, w wide and h tall (in its own x, z), d thick along y, its corners rounded by r, its edges eased by `edge`"""
     bm = bmesh.new()
     pts = []
@@ -100,7 +100,7 @@ def rounded_slab(name, w, h, d, r, mat, edge=0.0, n=10):
     bpy.context.collection.objects.link(o)
     finish(o, name, mat, smooth_shade=False)
     if edge:
-        bevel(o, edge, 3, angle=True)
+        bevel(o, edge, segs, angle=True)
         apply_mods(o)
     smooth_angle(o)
     return o
@@ -161,7 +161,7 @@ tab.append(box("IpadPort", S(0.0085, 0.001, 0.0024), P(0, -TH / 2 - 0.0002, 0), 
 BACK = -TD / 2
 BS, BR, BH = 0.03, 0.0085, 0.0012
 BX, BY = TW / 2 - 0.009 - BS / 2, TH / 2 - 0.009 - BS / 2
-bump = rounded_slab("IpadCamBump", BS, BS, BH, BR, M["alu"], edge=0.0005)
+bump = rounded_slab("IpadCamBump", BS, BS, BH, BR, M["alu"], edge=0.0005, n=4, segs=1)
 bump.location = P(BX, BY, BACK - BH / 2)
 tab.append(bump)
 TOPB = BACK - BH
@@ -175,7 +175,7 @@ tab.append(cyl("IpadLidar", 0.0034, 0.0004, P(LX, BY - q, TOPB - 0.0006), M["len
 tab.append(cyl("IpadFlash", 0.0028, 0.0003, P(BX - q, BY - q, TOPB - 0.0002), M["flash"], rot=(math.pi / 2, 0, 0), verts=24))
 tab.append(cyl("IpadMicHole", 0.0007, 0.0003, P(BX - q, LY, TOPB - 0.0002), M["dark"], rot=(math.pi / 2, 0, 0), verts=10))
 # the logo, in the middle of the back where the maker's would be: an avocado cut in half, polished, its stone a round hollow
-def avocado(w, h, n=48):
+def avocado(w, h, n=20):
     """the outline of a halved avocado: round at the foot, narrowing to the stalk end (x, y around its middle)"""
     pts = []
     for k in range(n):
@@ -187,7 +187,8 @@ def avocado(w, h, n=48):
 import bmesh as _bm
 lb = _bm.new()
 outer = [lb.verts.new((x, 0, y)) for x, y in avocado(0.026, 0.034)]
-lb.faces.new(outer)
+# (closed in a ladder of quads across it, not one face cut into a fan)
+ladder_fill(lb, outer)
 lmesh = bpy.data.meshes.new("IpadLogo")
 lb.to_mesh(lmesh)
 lb.free()
@@ -198,7 +199,7 @@ sol = logo.modifiers.new("Solidify", "SOLIDIFY")
 sol.thickness = 0.0002
 apply_mods(logo)
 # (its stone: a round hollow, a little below the middle)
-bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.0062, depth=0.01, location=(0, 0, -0.006), rotation=(math.pi / 2, 0, 0))
+bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.0062, depth=0.01, location=(0, 0, -0.006), rotation=(math.pi / 2, 0, 0))
 stone = active()
 m = logo.modifiers.new("cut", "BOOLEAN")
 m.operation = "DIFFERENCE"
@@ -209,7 +210,7 @@ bpy.data.objects.remove(stone)
 # (upright when held upright, as the maker's is: on the back, facing out of it)
 logo.location = P(0, 0.0, BACK - 0.00012)
 tab.append(logo)
-tab.append(cyl("IpadLogoStone", 0.0055, 0.00015, P(0, -0.006 + 0.0, BACK - 0.0001), M["logoStone"], rot=(math.pi / 2, 0, 0), verts=32))
+tab.append(cyl("IpadLogoStone", 0.0055, 0.00015, P(0, -0.006 + 0.0, BACK - 0.0001), M["logoStone"], rot=(math.pi / 2, 0, 0), verts=16))
 # the connector's three dots, on the back by the long edge that's the bottom held landscape (where a keyboard case clips on)
 for k in range(3):
     tab.append(cyl(f"IpadConnector{k}", 0.0011, 0.0003, P(-TW / 2 + 0.006, (k - 1) * 0.005, BACK - 0.0001), M["dark"], rot=(math.pi / 2, 0, 0), verts=12))
@@ -244,7 +245,7 @@ tab.append(scr)
 # The stand: a weighted base plate, the back arm hinged on it, the ledge in front with its rubber pads
 # =====================================================================
 stand = []
-base = rounded_slab("IpadStandBase", 0.15, 0.12, 0.009, 0.02, M["stand"], edge=0.002)
+base = rounded_slab("IpadStandBase", 0.15, 0.12, 0.009, 0.02, M["stand"], edge=0.002, n=4, segs=1)
 base.rotation_euler = (math.pi / 2, 0, 0)
 base.location = P(0, 0.0045, -0.005)
 stand.append(base)
@@ -254,7 +255,7 @@ stand.append(box("IpadStandFoot", S(0.14, 0.0015, 0.11), P(0, 0.0004, -0.005), M
 hinge = Vector(P(0, 0.012, -0.05))
 top = Vector(P(0, 0.12, -0.008))
 arm_len = (top - hinge).length
-arm = rounded_slab("IpadStandArm", 0.07, arm_len, 0.006, 0.012, M["stand"], edge=0.0015)
+arm = rounded_slab("IpadStandArm", 0.07, arm_len, 0.006, 0.012, M["stand"], edge=0.0015, n=4, segs=1)
 d = top - hinge
 # (its long side, Blender z, turned onto the line from the hinge to the top)
 arm.rotation_euler = (math.atan2(-d.y, d.z), 0, 0)
