@@ -1063,10 +1063,12 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
         minDistance={1.8}
         maxDistance={20}
         maxPolarAngle={Math.PI * 0.45}
-        // the wheel is handled below for a smooth glide; rotation drifts to a stop instead of halting
+        // the wheel is handled below for a smooth glide; rotation eases to a stop, quickly (the owner's: at 0.08 the view went on drifting
+        // a good while after it was let go, and seemed to move by itself); never turning on its own
         enableZoom={IS_TOUCH}
         enableDamping
-        dampingFactor={0.08}
+        dampingFactor={0.25}
+        autoRotate={false}
         onStart={() => { homing.current = false }}
       />
     </>

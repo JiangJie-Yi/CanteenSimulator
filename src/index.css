@@ -7473,3 +7473,6 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   100% { opacity: 0; transform: translate(calc(-50% + var(--dx) * (18px + var(--i) * 4px)), -64px) scale(0.9) rotate(calc(var(--dx) * 18deg)); }
 }
 @media (prefers-reduced-motion: reduce) { .boss-float, .boss-joy i { animation-duration: 0.01s; } }
+
+/* (a tag that says no: its hint in red (the staff stair's 閒人勿進)) */
+.hover-tip .tool-tag.is-warn small { color: #c4302a; font-weight: 700; }

@@ -2653,28 +2653,6 @@ vec3 grain(float along, float across, vec3 a, vec3 b) {
   float drift = 0.5 + 0.5 * sin(along * 1.3 + across * 3.7);
   return mix(a, b, g * 0.45 + drift * 0.25);
 }
-// (where a ray first meets a capsule round segment a-b, r thick: its distance, or -1)
-float capsule(vec3 ro, vec3 rd, vec3 a, vec3 b, float r) {
-  vec3 ba = b - a, oa = ro - a;
-  float baba = dot(ba, ba), bard = dot(ba, rd), baoa = dot(ba, oa), rdoa = dot(rd, oa), oaoa = dot(oa, oa);
-  float qa = baba - bard * bard, qb = baba * rdoa - baoa * bard, qc = baba * oaoa - baoa * baoa - r * r * baba;
-  float h = qb * qb - qa * qc;
-  if (h >= 0.0) {
-    float t = (-qb - sqrt(h)) / qa;
-    float y = baoa + t * bard;
-    if (y > 0.0 && y < baba) return t;
-    vec3 oc = y <= 0.0 ? oa : ro - b;
-    qb = dot(rd, oc); qc = dot(oc, oc) - r * r;
-    h = qb * qb - qc;
-    if (h > 0.0) return -qb - sqrt(h);
-  }
-  return -1.0;
-}
-vec3 capsuleNormal(vec3 p, vec3 a, vec3 b, float r) {
-  vec3 ba = b - a, pa = p - a;
-  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-  return (pa - h * ba) / r;
-}
 void main() {
   vec3 dir = normalize(vLocal - uCam);
   // (x along the opening, y up, z here is depth back into the wall)
@@ -2712,19 +2690,8 @@ void main() {
       if (t > 0.0 && t < best && p.z >= si - OV && p.z <= si) { best = t; kind = 9; }
     }
   }
-  // the handrail (10): a round bar, 4.4 cm across, its axis 7.5 cm off the left wall (held off it on brackets: closer, it and the wall's
-  // shading fought), 0.8 over the stair's line: level from just inside the door to the stair's foot, then up the slope to the landing, one
-  // bar with a rounded bend (the owner's: it stopped short in the air at the foot), its ends rounded off
-  vec3 rn = vec3(0.0);
-  {
-    float RR = 0.022, XR = -HW + 0.075;
-    vec3 r0 = vec3(XR, YF + 0.8, 0.12), r1 = vec3(XR, YF + 0.8, S0 - RUN), r2 = vec3(XR, YF + 0.8 + float(N) * RUN * K, S0 - RUN + float(N) * RUN - 0.04);
-    float ta = capsule(o, d, r0, r1, RR), tb = capsule(o, d, r1, r2, RR);
-    if (ta > 0.0 && ta < best) { best = ta; kind = 10; rn = capsuleNormal(o + d * ta, r0, r1, RR); }
-    if (tb > 0.0 && tb < best) { best = tb; kind = 10; rn = capsuleNormal(o + d * tb, r1, r2, RR); }
-  }
   p = o + d * best;
-  vec3 n = kind == 10 ? rn : kind == 1 ? vec3(1, 0, 0) : kind == 2 ? vec3(-1, 0, 0) : (kind == 3 || kind == 7) ? vec3(0, 1, 0) : (kind == 5 || kind == 9) ? vec3(0, -1, 0) : vec3(0, 0, -1);
+  vec3 n = kind == 1 ? vec3(1, 0, 0) : kind == 2 ? vec3(-1, 0, 0) : (kind == 3 || kind == 7) ? vec3(0, 1, 0) : (kind == 5 || kind == 9) ? vec3(0, -1, 0) : vec3(0, 0, -1);
   // its own colour (linear)
   vec3 c;
   float glow = 0.0;
@@ -2737,17 +2704,7 @@ void main() {
       : vec3(0.42, 0.37, 0.29) * (0.96 + 0.04 * sin(p.z * 40.0 + p.y * 23.0));
     // (the skirting along the stair: a dark board its whole length, its top edge catching a little light)
     if (lift < 0.11) c = vec3(0.07, 0.04, 0.02) * (lift > 0.095 ? 1.8 : 1.0);
-    // (the handrail on the left wall (the owner's), up the whole stair from its foot to the landing: a dark round rail parallel to it, lit
-    // along its top, a shadow under it on the wall, held off the wall by three iron brackets (its foot, its middle, its top))
-    float rail = p.y - (lineY(p.z) + 0.8);
-    if (kind == 1 && p.z > 0.1 && p.z < S0 + float(N) * RUN + 0.2) {
-      float bz = min(min(abs(p.z - 0.2), abs(p.z - (S0 + float(N) * RUN * 0.5))), abs(p.z - (S0 + float(N) * RUN - 0.1)));
-      // (round, 4 cm across, standing off the wall (the owner's: it read as a thin line): shaded across as a bar is, a bright line along its
-      // upper side, dark under; its shadow a broad soft band on the wall below; each bracket a short iron arm, lit on its top)
-      if (rail < 0.0 && rail > -0.07 && bz < 0.016) c = mix(vec3(0.08, 0.08, 0.085), vec3(0.34, 0.34, 0.36), smoothstep(-0.05, -0.026, rail)) * mix(0.7, 1.0, smoothstep(0.016, 0.004, bz));
-      else if (rail < 0.01 && rail > -0.12) c *= mix(0.35, 1.0, smoothstep(0.0, -0.12, rail));
-      else if (bz < 0.03 && rail < -0.08 && rail > -0.13) c *= mix(0.55, 1.0, smoothstep(-0.08, -0.13, rail));
-    }
+    // (no handrail: the left wall plain (the owner's))
     // (round the corner at the top, the way on (the owner's: the stair turns at the landing into the floor above, not a dead end): an
     // opening on the left, a corridor going off into the dim, warm light from deep in it, and a shoji slid half open across its near half)
     if (kind == 1 && p.z > D - 0.85 && p.z < D - 0.1 && p.y > TOP && p.y < TOP + 1.85) {
@@ -2782,7 +2739,6 @@ void main() {
     c = grain(p.x + floor((p.z - S0) / RUN + 0.5) * 1.3, p.y, vec3(0.33, 0.19, 0.09), vec3(0.46, 0.29, 0.14)) * (0.8 + 0.45 * smoothstep(0.4, 1.0, e));
   }
   else if (kind == 9) { c = vec3(0.04, 0.025, 0.012); }
-  else if (kind == 10) { c = grain(p.z * 3.0, n.y * 0.3, vec3(0.16, 0.09, 0.045), vec3(0.24, 0.14, 0.07)); }
   else if (kind == 6) { c = grain(p.x + floor((p.z - S0) / RUN + 0.5) * 2.1, p.y, vec3(0.035, 0.03, 0.026), vec3(0.06, 0.052, 0.045)); }
   else if (kind == 5) { c = vec3(0.12, 0.08, 0.05) * (0.9 + 0.1 * step(0.5, fract(p.z * 3.0))); }
   else {
@@ -2817,7 +2773,7 @@ void main() {
   if (kind == 4) ao *= mix(0.5, 1.0, smoothstep(0.0, 0.1, HW - abs(p.x)));
   vec3 col = mix(c * light * ao, c, glow);
   // (the treads' and the floor's varnish: a soft sheen where they turn the lamp's light toward the eye)
-  if (kind == 7 || kind == 3 || kind == 10) {
+  if (kind == 7 || kind == 3) {
     float sh = pow(max(dot(reflect(-toL / dl, n), -normalize(d)), 0.0), 18.0);
     col += vec3(1.0, 0.7, 0.4) * sh * (lamp + spill) * 0.12 * ao;
   }
@@ -2991,8 +2947,8 @@ function StaffDoor() {
           edges (the owner saw a pale strip down the side; it stopped 2.5 cm short of each post)) */}
       {/* (pointed at, through the open door (the shut door's in front and takes the pointer first): what's up there, and its light a little up) */}
       <mesh ref={stairs} position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2} material={STAFF_STAIRS}
-        onPointerOver={(ev) => { if (getEdit().on) return; stairsHot.current = true; tipOver('2F 員工休息室／倉庫', '閒人勿進').onPointerOver(ev) }}
-        onPointerOut={(ev) => { stairsHot.current = false; tipOver('', '').onPointerOut(ev) }} onClick={(ev) => ev.stopPropagation()}>
+        onPointerOver={(ev) => { ev.stopPropagation(); if (getEdit().on) return; stairsHot.current = true; document.body.style.cursor = 'not-allowed'; setTip({ title: '2F 員工休息室／倉庫', hint: '🚫 閒人勿進・禁止進入', warn: true }) }}
+        onPointerOut={() => { stairsHot.current = false; document.body.style.cursor = ''; setTip(null) }} onClick={(ev) => ev.stopPropagation()}>
         <planeGeometry args={[STAFF_W + 0.06, WC_H + 0.03]} />
       </mesh>
       <group ref={g} onClick={(ev) => {

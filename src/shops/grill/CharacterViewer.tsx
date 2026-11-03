@@ -16,7 +16,7 @@ import { StaffFigure } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { WireView } from './Movable'
 import { usePanelSound } from '@/ui/uiSound'
-import { getCharHidden, onCharHidden, setCharHidden } from './edit'
+import { getCharHidden, onCharHidden, setCharHidden, toggleEdit } from './edit'
 
 type Entry = { key: string; zh: string; ja: string; en: string; group: 'boss' | 'staff' | 'guest'; role?: Role; female?: boolean; kind?: GuestKind }
 const ENTRIES: Entry[] = [
@@ -153,7 +153,7 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
   const group = (g: Entry['group']) => tl(lang, g === 'boss' ? '老闆' : g === 'staff' ? '店員' : '客人', g === 'boss' ? '店主' : g === 'staff' ? 'スタッフ' : 'お客さん', g === 'boss' ? 'Owner' : g === 'staff' ? 'Staff' : 'Customers')
   const moods: [Mood | null, string][] = [[null, tl(lang, '平常', 'ふつう', 'Calm')], ['joy', tl(lang, '開心', 'うれしい', 'Happy')], ['mad', tl(lang, '生氣', '怒り', 'Cross')], ['sad', tl(lang, '難過', 'かなしい', 'Sad')]]
   const minLabel = tl(lang, '縮到左下角', '左下にしまう', 'Minimise to the bottom left')
-  const closeLabel = tl(lang, '關閉角色預覽', 'キャラクターを閉じる', 'Close the character viewer')
+  const closeLabel = tl(lang, '關閉（離開開發者模式）', '閉じる（開発者モード終了）', 'Close (leave developer mode)')
   return createPortal(
     <div className={`char-dock${tucked ? ' is-tucked' : ''}`} style={height ? { height } : undefined}>
     <section className={`char-view${open ? '' : ' is-folded'}`} aria-label={tl(lang, '角色模型', 'キャラクター', 'Characters')} inert={tucked}>
@@ -161,7 +161,8 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
         <b>{tl(lang, '角色模型', 'キャラクター', 'Characters')}</b>
         <span>{name}{e.kind ? ` #${gid}` : ''}</span>
         <button type="button" className="char-view-fold" onClick={() => setCharHidden(true)} title={minLabel} aria-label={minLabel}>−</button>
-        <button type="button" className="char-view-fold char-view-x" onClick={() => setCharHidden(true)} title={closeLabel} aria-label={closeLabel}>×</button>
+        {/* (× leaves developer mode, as the dev panel's does (the owner's): both panels, the handles and the boxes gone) */}
+        <button type="button" className="char-view-fold char-view-x" onClick={() => toggleEdit()} title={closeLabel} aria-label={closeLabel}>×</button>
       </header>
       {open && (<>
         <div className="char-view-stage">

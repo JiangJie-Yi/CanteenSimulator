@@ -3,7 +3,8 @@
 import { useSyncExternalStore } from 'react'
 import { HOVER } from './hoverGlow'
 
-export type Tip = { title: string; hint: string } | null
+/** `warn`: a no (no entry, can't be used): its hint in red */
+export type Tip = { title: string; hint: string; warn?: boolean } | null
 let tip: Tip = null
 const subs = new Set<() => void>()
 export const setTip = (t: Tip) => { if (t && HOVER.paused) t = null; if (t?.title === tip?.title && t?.hint === tip?.hint) return; tip = t; subs.forEach((f) => f()) }

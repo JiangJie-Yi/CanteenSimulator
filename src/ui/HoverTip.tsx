@@ -16,7 +16,7 @@ export function HoverTip({ hidden = false }: { hidden?: boolean }) {
   if (!tip || hidden) return null
   return (
     <div ref={el} className="hover-tip" aria-hidden="true">
-      <span className="tool-tag">{tip.title}<small>{tip.hint}</small></span>
+      <span className={`tool-tag${tip.warn ? ' is-warn' : ''}`}>{tip.title}<small>{tip.hint}</small></span>
     </div>
   )
 }
