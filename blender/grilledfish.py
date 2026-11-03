@@ -1399,8 +1399,9 @@ def fish(species="ayu"):
         for k in range(13):
             sx = -L * 0.82 + k * L * 0.055
             for side in (-1, 1):
-                bpy.ops.mesh.primitive_uv_sphere_add(radius=0.006, segments=8, ring_count=6,
-                                                     location=(sx, bend(sx) + side * width_at(sx) * 0.97, wave(sx) + depth_at(sx) * 0.05))
+                # (an icosphere, 20 triangles: uv spheres 8 by 6 were 80 each, 2,080 for the row)
+                bpy.ops.mesh.primitive_ico_sphere_add(radius=0.006, subdivisions=1,
+                                                      location=(sx, bend(sx) + side * width_at(sx) * 0.97, wave(sx) + depth_at(sx) * 0.05))
                 sc = active()
                 sc.scale = (1.4, 0.18, 0.6)
                 parts.append(finish(sc, "Scute", M["scute"]))
@@ -1672,7 +1673,7 @@ def okra():
         # the calyx: a pale ridged collar where the pod meets its stalk, and the stalk cut off short
         s = 1 if down else -1                      # the stalk end (built at -z) is on top once flipped down
         cap_z = s * length / 2
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.028, minor_radius=0.008, major_segments=15, minor_segments=6,
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.028, minor_radius=0.008, major_segments=12, minor_segments=5,
                                          location=(x, 0, cap_z))
         parts.append(finish(active(), "OkraCalyx", M["okra_calyx"]))
         bpy.ops.mesh.primitive_cone_add(vertices=10, radius1=0.014, radius2=0.008, depth=0.03,
@@ -1739,7 +1740,7 @@ def asparagus():
                                             location=(x + math.cos(a) * r * 0.35, tip_y + lift, math.sin(a) * r * 0.35),
                                             rotation=(math.radians(-90) + math.sin(a) * 0.3, 0, math.cos(a) * 0.3))
             parts.append(finish(active(), "AsparagusScale", M["asparagus_tip"]))
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=10, ring_count=8, location=(x, tip_y + r * 0.9, 0))
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=2, location=(x, tip_y + r * 0.9, 0))
         bud = active()
         bud.scale = (r * 0.7, r * 2.0, r * 0.7)
         parts.append(finish(bud, "AsparagusTip", M["asparagus_tip"]))
