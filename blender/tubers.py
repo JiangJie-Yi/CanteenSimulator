@@ -17,7 +17,7 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
-from common import fbm, grid01, mix, smooth, to_normal, vnoise
+from common import fbm, grid01, ladder_fill, mix, smooth, to_normal, vnoise
 
 # ---------------------------------------------------------------------------------------------------- skins
 
@@ -139,15 +139,19 @@ def sweet_potato(name, mat, length=0.2, girth=0.065, bend=0.12, seed=0, rings=16
             f = bm.faces.new((grid[i][j], grid[i][j2], grid[i + 1][j2], grid[i + 1][j]))
             for loop, (ii, jj) in zip(f.loops, ((i, j), (i, j + 1), (i + 1, j + 1), (i + 1, j))):
                 loop[uvl].uv = (ii / rings, jj / around)
-    # (the ends: the stem end a little dome, the root end's tail closed to a point)
+    # (the ends: the stem end a little dome, the root end's tail drawn out: a ring half as wide most of the way to where its tip was, and
+    # that closed across in a ladder, not a fan into a point)
     for i, d in ((0, -1), (rings, 1)):
         ring = grid[i]
         c = sum((v_.co for v_ in ring), Vector()) / len(ring)
-        tip = bm.verts.new(c + Vector((d * length * (0.012 if d < 0 else 0.03), 0, 0)))
+        tip = c + Vector((d * length * (0.012 if d < 0 else 0.03), 0, 0))
+        inner = [bm.verts.new(c + (v_.co - c) * 0.45 + (tip - c) * 0.75) for v_ in ring]
+        made = []
         for j in range(around):
             j2 = (j + 1) % around
-            q = (ring[j], ring[j2], tip) if d > 0 else (ring[j2], ring[j], tip)
-            f = bm.faces.new(q)
+            made.append(bm.faces.new((ring[j], ring[j2], inner[j2], inner[j])))
+        made += ladder_fill(bm, inner)
+        for f in made:
             for loop in f.loops:
                 loop[uvl].uv = (i / rings, 0.5)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
@@ -168,22 +172,21 @@ def potato(name, mat, size=0.09, seed=0, seg=16, rings=11):
         dent = max([0.075 * (1 - (d.angle(e) / 0.32) ** 2) for e in EYES if d.angle(e) < 0.32] or [0.0])
         r = size / 2 * (knob - dent)
         return Vector((d.x * r, d.y * r * ky, d.z * r * kz))
-    top, bot = bm.verts.new(at(0.0, 0.0)), bm.verts.new(at(math.pi, 0.0))
-    grid = [[top] * seg] + [[bm.verts.new(at(math.pi * i / rings, 2 * math.pi * j / seg)) for j in range(seg)] for i in range(1, rings)] + [[bot] * seg]
-    for i in range(rings):
+    # (no points at its two poles: the rings beside them closed across in ladders instead, not fans into a point)
+    grid = [None] + [[bm.verts.new(at(math.pi * i / rings, 2 * math.pi * j / seg)) for j in range(seg)] for i in range(1, rings)] + [None]
+    for i in range(1, rings - 1):
         for j in range(seg):
             j2 = (j + 1) % seg
             corners = ((i, j, j), (i, j2, j + 1), (i + 1, j2, j + 1), (i + 1, j, j))
-            vs, uvs = [], []
-            for ii, jj, ju in corners:
-                vtx = grid[ii][jj]
-                if vtx in vs:
-                    continue
-                vs.append(vtx)
+            f = bm.faces.new([grid[ii][jj] for ii, jj, _ in corners])
+            for loop, (ii, _, ju) in zip(f.loops, corners):
                 # (u round it, v from the top pole down: as the skin's eyes are painted (eye_uv))
-                uvs.append((((j + 0.5) if ii in (0, rings) else ju) / seg, ii / rings))
-            f = bm.faces.new(vs)
-            for loop, uv in zip(f.loops, uvs):
-                loop[uvl].uv = uv
+                loop[uvl].uv = (ju / seg, ii / rings)
+    for i in (1, rings - 1):
+        for f in ladder_fill(bm, grid[i]):
+            for loop in f.loops:
+                j = grid[i].index(loop.vert)
+                # (the ring's own row of its picture: nothing is baked or painted between it and the pole now)
+                loop[uvl].uv = (j / seg, i / rings)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return _object(name, bm, mat)
