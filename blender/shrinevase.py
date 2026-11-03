@@ -127,15 +127,23 @@ def leaf_mesh(bend=0.0, twist=0.0, L=0.034, W=0.013):
         w = W / 2 * math.sin(math.pi * t) ** 0.8
         row = []
         for s_ in (-1, 0, 1):
+            # (its base and its tip one point each: three there in one place made degenerate fans at both ends)
+            if i in (0, 4) and s_ != 0:
+                row.append(None)
+                continue
             x, z = s_ * w, abs(s_) * w * 0.35 - 0.002 * math.sin(math.pi * t)
             # (the twist grows toward the tip; the arch drops it)
             a = twist * t
             x, z = x * math.cos(a) - z * math.sin(a), x * math.sin(a) + z * math.cos(a)
             row.append(b.verts.new((x, t * L * (1 - 0.25 * bend * t), z - bend * L * t * t)))
-        cols.append(row)
+        cols.append([row[1]] * 3 if row[0] is None else row)
     for i in range(4):
         for k in range(2):
-            b.faces.new((cols[i][k], cols[i][k + 1], cols[i + 1][k + 1], cols[i + 1][k]))
+            q = []
+            for v in (cols[i][k], cols[i][k + 1], cols[i + 1][k + 1], cols[i + 1][k]):
+                if v not in q:
+                    q.append(v)
+            b.faces.new(q)
     me_ = bpy.data.meshes.new("leaf")
     b.to_mesh(me_)
     b.free()
@@ -363,13 +371,14 @@ elif VARIANT == 0:
     # 金運: white and gold chrysanthemums in three kinds: big incurved ball blooms (輪菊) heaped at the top, gold spider mums (糸菊) with long
     # thread petals curling at their ends, and a scatter of small single spray mums (小菊) round them, white and yellow with green hearts
     def BALL(r):
+        # (each ring's petals start a little off the middle: started on it, every petal of the inner rings met in one point)
         return [(22, 0.002, r, r * 0.3, 0.15, 0.5, 0.6, "narrow"), (20, 0.002, r * 0.92, r * 0.32, 0.55, 0.7, 0.7, "narrow"),
-                (17, 0.001, r * 0.85, r * 0.34, 0.95, 0.8, 0.8, "narrow"), (13, 0.0, r * 0.72, r * 0.36, 1.3, 0.9, 0.8, "narrow"),
-                (9, 0.0, r * 0.55, r * 0.38, 1.5, 1.0, 0.8, "narrow")]
+                (17, 0.001, r * 0.85, r * 0.34, 0.95, 0.8, 0.8, "narrow"), (13, 0.0012, r * 0.72, r * 0.36, 1.3, 0.9, 0.8, "narrow"),
+                (9, 0.0008, r * 0.55, r * 0.38, 1.5, 1.0, 0.8, "narrow")]
 
     def SPIDER(r):
         return [(26, 0.003, r, r * 0.07, 0.25, 1.7, 0.3, "narrow"), (20, 0.002, r * 0.8, r * 0.08, 0.7, 1.6, 0.3, "narrow"),
-                (14, 0.0, r * 0.45, r * 0.12, 1.2, 0.9, 0.5, "narrow")]
+                (14, 0.001, r * 0.45, r * 0.12, 1.2, 0.9, 0.5, "narrow")]
 
     def SINGLE(r):
         return [(16, r * 0.25, r * 0.8, r * 0.26, 0.12, -0.15, 0.25, "narrow")]
@@ -391,10 +400,10 @@ else:
     # breath (霞草) through them
     def PEONY(r):
         return [(9, 0.003, r, r * 0.75, 0.3, 0.5, 0.6, "round"), (8, 0.002, r * 0.85, r * 0.7, 0.7, 0.6, 0.65, "round"),
-                (7, 0.001, r * 0.65, r * 0.65, 1.05, 0.6, 0.65, "round"), (6, 0.0, r * 0.45, r * 0.6, 1.35, 0.5, 0.6, "round")]
+                (7, 0.001, r * 0.65, r * 0.65, 1.05, 0.6, 0.65, "round"), (6, 0.001, r * 0.45, r * 0.6, 1.35, 0.5, 0.6, "round")]
 
     def PEONY_IN(r):
-        return [(5, 0.0, r * 0.32, r * 0.55, 1.45, 0.4, 0.5, "round")]
+        return [(5, 0.0008, r * 0.32, r * 0.55, 1.45, 0.4, 0.5, "round")]
 
     def CAMELLIA(r):
         return [(6, 0.003, r, r * 0.9, 0.25, 0.35, 0.5, "round"), (5, 0.002, r * 0.8, r * 0.85, 0.75, 0.35, 0.6, "round")]
