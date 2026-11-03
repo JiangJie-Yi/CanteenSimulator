@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
@@ -44,6 +45,8 @@ const REPO = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'JapaneseGrillSimul
 export default defineConfig(({ command, isPreview }) => ({
   base: command === 'build' || isPreview ? `/${REPO}/` : '/',
   plugins: [react(), blenderBridge()],
+  // (the game's version, from package.json's gameVersion: npm run bump adds 0.01; the about tab shows it)
+  define: { __GAME_VERSION__: JSON.stringify(JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).gameVersion) },
   // (the same alias as tsconfig.app.json's paths)
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
