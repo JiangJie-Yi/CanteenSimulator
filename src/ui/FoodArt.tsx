@@ -219,33 +219,37 @@ function FishArt({ f, u }: { f: Fish; u: string }) {
 /** a fillet (切り身): a thick slab seen from above and a little in front, its cut face lit, its flesh's grain (a salmon's white fat in
  * chevrons, a cod's flakes), its skin a band along the back, its thickness below */
 function FilletArt({ f, u }: { f: NonNullable<Fish['fillet']>; u: string }) {
-  const top = 'M18 60 C18 44 34 34 62 33 C90 32 110 42 110 56 C110 70 94 80 64 81 C34 82 18 74 18 60 Z'
-  const side = 'M18 60 C18 74 34 90 64 90 C96 90 110 79 110 64 L110 56 C110 70 94 80 64 81 C34 82 18 74 18 60 Z'
+  // (a steak cut across the fish (the owner's: rounder and thicker, the fat in white arcs): its outline full and soft, the belly's edge
+  // a soft curve at the front; seen from a little in front, its thickness a band below)
+  const top = 'M16 58 C14 40 36 28 64 28 C94 28 114 42 112 60 C111 72 100 80 84 81 C76 82 70 82 64 82 C58 82 52 82 44 81 C28 80 17 72 16 58 Z'
+  const side = 'M16 58 C16 74 28 90 44 90 C54 90 59 91 64 91 C69 91 76 90 84 90 C102 90 112 79 112 66 L112 60 C111 72 100 80 84 81 C76 82 70 82 64 82 C58 82 52 82 44 81 C28 80 17 72 16 58 Z'
+  // (the backbone's place, a little above the middle: the flesh's arcs round it, wider out to the skin)
+  const bx = 64, by = 50
   const grain = f.kind === 'salmon'
-    ? [26, 37, 48, 59, 70, 81, 92].map((x) => <path key={x} d={`M${x} 31 C${x + 7} 40 ${x - 4} 46 ${x + 4} 54 C${x + 11} 62 ${x - 2} 70 ${x + 6} 82`} fill="none" stroke={f.line} strokeWidth="2.8" strokeLinecap="round" />)
-    : [30, 42, 54, 66, 78, 90].map((x) => <path key={x} d={`M${x - 4} 34 C${x + 6} 44 ${x - 6} 56 ${x + 2} 66 C${x + 6} 72 ${x} 78 ${x + 4} 84`} fill="none" stroke={f.line} strokeWidth="1.6" strokeLinecap="round" />)
+    ? [12, 20, 28, 36, 44, 52].map((r, k) => <path key={r} d={`M${bx - r * 1.25} ${by + r * 0.55} C${bx - r * 1.3} ${by - r * 0.9} ${bx + r * 1.3} ${by - r * 0.9} ${bx + r * 1.25} ${by + r * 0.55}`} fill="none" stroke={f.line} strokeWidth={k < 2 ? 2 : 2.6} strokeLinecap="round" />)
+    : [12, 22, 32, 42, 52].map((r) => <path key={r} d={`M${bx - r * 1.2} ${by + r * 0.5} C${bx - r * 1.2} ${by - r * 0.8} ${bx + r * 1.2} ${by - r * 0.8} ${bx + r * 1.2} ${by + r * 0.5}`} fill="none" stroke={f.line} strokeWidth="1.4" strokeLinecap="round" strokeDasharray="6 3" />)
   return (
     <g>
       <defs>
         <clipPath id={`${u}k`}><path d={top} /></clipPath>
-        <radialGradient id={`${u}f`} cx="45%" cy="40%" r="70%"><stop offset="0" stopColor={shade(f.flesh, 0.18)} /><stop offset="1" stopColor={shade(f.flesh, -0.06)} /></radialGradient>
-        <linearGradient id={`${u}d`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={shade(f.flesh, -0.12)} /><stop offset="1" stopColor={shade(f.flesh, -0.3)} /></linearGradient>
+        <radialGradient id={`${u}f`} cx="48%" cy="36%" r="72%"><stop offset="0" stopColor={shade(f.flesh, 0.22)} /><stop offset="0.6" stopColor={f.flesh} /><stop offset="1" stopColor={shade(f.flesh, -0.1)} /></radialGradient>
+        <linearGradient id={`${u}d`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={shade(f.flesh, -0.14)} /><stop offset="1" stopColor={shade(f.flesh, -0.34)} /></linearGradient>
       </defs>
-      {/* (its thickness, the side below the face, the grain showing on it too) */}
+      {/* (its thickness, the side below the face, the flesh's layers showing on it) */}
       <path d={side} fill={`url(#${u}d)`} stroke={INK} strokeWidth={OUT} strokeLinejoin="round" />
-      {[34, 50, 66, 82, 98].map((x) => <path key={x} d={`M${x} ${80 - Math.abs(x - 64) * 0.12} l1.5 7`} stroke={shade(f.line, -0.1)} strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />)}
+      {[28, 40, 52, 76, 88, 100].map((x) => <path key={x} d={`M${x} ${81 - Math.abs(x - 64) * 0.04} l1 7`} stroke={shade(f.line, -0.08)} strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />)}
       <path d={top} fill={`url(#${u}f)`} />
       <g clipPath={`url(#${u}k)`}>
         {grain}
-        {/* (a fillet's dark meat just under the skin, then the skin: a cod's black, a salmon's silver with its scales) */}
-        <path d="M12 46 C40 33 92 30 116 44 L116 50 C92 38 40 41 12 54 Z" fill={f.kind === 'salmon' ? '#d8625a' : '#e8d8c0'} opacity="0.6" />
-        <path d="M12 43 C40 30 92 27 116 40 L116 22 L12 22 Z" fill={f.skin} />
-        {f.kind === 'salmon' && <path d="M12 43 C40 30 92 27 116 40 L116 22 L12 22 Z" fill="none" />}
-        <path d="M14 44 C42 31 90 28 114 41" fill="none" stroke={shade(f.skin, 0.45)} strokeWidth="1.2" />
+        {/* (the dark meat along the skin, the skin round the back (a cod's black, a salmon's silver), the backbone's little round) */}
+        <path d="M8 62 C14 44 40 37 64 37 C90 37 116 45 120 62 L114 62 C108 50 90 42 64 42 C38 42 20 50 14 62 Z" fill={f.kind === 'salmon' ? '#d8625a' : '#e8d8c0'} opacity="0.55" />
+        <path d="M8 58 C14 40 40 34 64 34 C90 34 116 42 120 58 L120 8 L8 8 Z" fill={f.skin} />
+        <path d="M14 56 C20 42 40 36.6 64 36.6 C88 36.6 110 42 115 54" fill="none" stroke={shade(f.skin, 0.45)} strokeWidth="1.2" />
+        <circle cx={bx} cy={by} r="3.4" fill={shade(f.flesh, 0.35)} stroke={shade(f.line, -0.2)} strokeWidth="1" />
         {/* (the face's shade toward the front, its gleam across the top) */}
-        <path d="M12 70 C40 84 88 84 116 64 L116 92 L12 92 Z" fill="#000" opacity="0.07" />
-        <path d="M34 54 C48 47 70 45 88 48" fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" opacity="0.5" />
-        <path d="M40 62 C46 59 54 58 60 58" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
+        <path d="M10 66 C40 86 88 86 118 62 L118 96 L10 96 Z" fill="#000" opacity="0.08" />
+        <path d="M32 46 C44 38 64 36 84 39" fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" opacity="0.55" />
+        <path d="M38 55 C44 52 50 51 56 51" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
       </g>
       <path d={top} fill="none" stroke={INK} strokeWidth={OUT} strokeLinejoin="round" />
     </g>
@@ -309,15 +313,21 @@ function OtherArt({ id }: { id: string }) {
         {hi('M50 30 C46 38 42 46 40 54')}
       </g>
     case 'ShrimpSkewer':
+      // (a prawn grilled on its skewer (the owner's: its curve, its segments, a little charred): curled, its back's shell in banded
+      // segments over the curve, deeper at their edges and toasted, its fanned tail, its legs under it, its long feelers)
       return <g>{skewer}
-        <path d="M32 88 C18 68 30 40 58 34 C82 30 100 44 94 64 C90 76 76 78 72 68 C70 60 78 56 82 60" fill="#f58a5a" {...o} />
-        <path d="M32 88 C26 74 30 60 40 52 C44 66 52 76 62 80 C52 84 42 88 32 88 Z" fill="#d85a34" />
-        {[[44, 42, 50, 66], [56, 37, 60, 61], [68, 35, 70, 58], [80, 38, 80, 56]].map(([a, b, c, d]) => <path key={a} d={`M${a} ${b} Q${(a + c) / 2 + 4} ${(b + d) / 2} ${c} ${d}`} {...line('#b8401e')} />)}
-        <path d="M32 88 L18 104 L28 104 L38 94 Z" fill="#ec6a40" {...o} />
-        {[0, 1, 2, 3, 4].map((k) => <path key={k} d={`M${46 + k * 7} ${70 + k} l-4 11`} {...line('#c8502a', 1.2)} />)}
-        <path d="M90 52 C104 40 112 24 116 12 M88 48 C100 32 104 20 102 8" {...line('#c8502a', 1.1)} />
-        <circle cx="86" cy="48" r="3" fill="#1c1612" /><circle cx="85" cy="47" r="0.9" fill="#fff" />
-        {hi('M42 46 C50 40 62 36 72 36')}
+        <defs><linearGradient id="shg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffa274" /><stop offset="1" stopColor="#e2603a" /></linearGradient></defs>
+        <path d="M30 90 C16 70 26 40 56 32 C82 26 102 42 98 62 C95 76 80 80 74 70 C71 63 77 58 82 61" fill="url(#shg)" {...o} />
+        <path d="M30 90 C24 76 28 60 38 52 C44 66 52 76 64 80 C52 84 42 88 30 90 Z" fill="#c84e2a" />
+        {[[40, 44, 52, 70], [52, 37, 62, 64], [64, 33, 72, 60], [76, 33, 82, 58], [87, 39, 88, 56]].map(([a, b, c, d]) => (
+          <g key={a}><path d={`M${a} ${b} Q${(a + c) / 2 + 5} ${(b + d) / 2} ${c} ${d}`} {...line('#9a3416', 2.2)} /><path d={`M${a + 1.6} ${b + 0.6} Q${(a + c) / 2 + 6.6} ${(b + d) / 2} ${c + 1.6} ${d}`} {...line('#ffc49a', 1)} /></g>
+        ))}
+        <path d="M30 90 C24 96 14 100 10 108 C18 108 26 106 32 100 C34 104 36 108 40 110 C40 102 38 96 34 92 Z" fill="#ec6a40" {...o} />
+        <path d="M18 104 L30 96 M32 98 L36 106" {...line('#a8401e', 1.2)} />
+        {[0, 1, 2, 3, 4].map((k) => <path key={k} d={`M${46 + k * 7} ${72 + k} q-2 6 -5 10`} {...line('#c8502a', 1.4)} />)}
+        <path d="M92 52 C106 40 114 24 118 10 M88 48 C100 32 106 18 104 6" {...line('#c8502a', 1.1)} />
+        <circle cx="86" cy="48" r="3.2" fill="#1c1612" /><circle cx="84.8" cy="46.8" r="1" fill="#fff" />
+        {hi('M40 46 C50 38 62 34 74 34')}
       </g>
     case 'Sausage':
       return <g>{skewer}<g transform="rotate(-38 66 62)">
@@ -360,18 +370,32 @@ function OtherArt({ id }: { id: string }) {
             <path d={`M${cx - 8} ${cy + 6} l6 -12 M${cx + 2} ${cy + 8} l6 -12`} {...line('#7a3612', 2.4)} />{hi(`M${cx - 8} ${cy - 8} l8 -3`, 2.6)}</g>}</g>
       })}</g>
     case 'Squid':
+      // (grilled ika (the owner's: curved, its tentacles flowing): a soft torpedo of a mantle, its two fins rounded at the top, browned to a
+      // caramel at its edges, its diamond scoring; big shining eyes; its tentacles curling out under it, two long ones, little suckers)
       return <g>
-        <path d="M64 10 L90 40 C92 66 82 80 74 84 H54 C46 80 36 66 38 40 Z" fill="#fbf1e8" {...o} />
-        <path d="M64 10 L90 40 L80 44 L64 24 L48 44 L38 40 Z" fill="#f2d8cc" {...o} />
-        <path d="M76 46 C82 60 80 76 74 84 C84 80 92 66 90 40 Z" fill="#ecd2c2" />
-        {[0, 12, 24].map((d) => <path key={d} d={`M44 ${46 + d} L84 ${60 + d - 12}`} {...line('#dcb4a0', 1)} />)}
-        {[0, 12, 24].map((d) => <path key={`b${d}`} d={`M44 ${58 + d - 12} L84 ${44 + d}`} {...line('#dcb4a0', 1)} />)}
-        {[[50, 58], [72, 52], [62, 72]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="1.6" fill="#b4687a" opacity="0.8" />)}
-        {[46, 54, 62, 70, 78, 84].map((x, k) => <path key={x} d={`M${x} 84 C${x + (k % 2 ? 6 : -6)} 98 ${x} 106 ${x + (k - 2.5) * 2.6} 118`} fill="none" stroke={INK} strokeWidth="6.6" strokeLinecap="round" />)}
-        {[46, 54, 62, 70, 78, 84].map((x, k) => <path key={`f${x}`} d={`M${x} 84 C${x + (k % 2 ? 6 : -6)} 98 ${x} 106 ${x + (k - 2.5) * 2.6} 118`} fill="none" stroke="#f0d4c4" strokeWidth="3.6" strokeLinecap="round" />)}
-        <circle cx="54" cy="76" r="3.4" fill="#1c1612" /><circle cx="74" cy="76" r="3.4" fill="#1c1612" />
-        <circle cx="53" cy="75" r="1" fill="#fff" /><circle cx="73" cy="75" r="1" fill="#fff" />
-        {hi('M50 36 C48 48 48 58 50 66')}
+        <defs>
+          <radialGradient id="sqg" cx="42%" cy="42%" r="70%"><stop offset="0" stopColor="#fdf3e6" /><stop offset="0.7" stopColor="#f2d2b0" /><stop offset="1" stopColor="#d9a070" /></radialGradient>
+          <clipPath id="sqc"><path d="M64 14 C78 22 86 40 86 58 C86 72 78 82 64 84 C50 82 42 72 42 58 C42 40 50 22 64 14 Z" /></clipPath>
+        </defs>
+        {[-1, 1].map((sd) => <path key={sd} d={`M${64 + sd * 6} 20 C${64 + sd * 26} 18 ${64 + sd * 34} 30 ${64 + sd * 30} 44 C${64 + sd * 26} 40 ${64 + sd * 18} 38 ${64 + sd * 14} 40 Z`} fill="#eec29a" {...o} />)}
+        {[[46, -10], [52, -6], [58, -2], [70, 2], [76, 6], [82, 10]].map(([x, b], k) => (
+          <g key={x}>
+            <path d={`M${x} 80 C${x + b * 0.4} 94 ${x + b} 102 ${x + b * 1.6} ${110 + (k % 2) * 4} C${x + b * 1.9} ${114 + (k % 2) * 4} ${x + b * 1.4} 118 ${x + b * 1.1} 116`} fill="none" stroke={INK} strokeWidth="7" strokeLinecap="round" />
+            <path d={`M${x} 80 C${x + b * 0.4} 94 ${x + b} 102 ${x + b * 1.6} ${110 + (k % 2) * 4} C${x + b * 1.9} ${114 + (k % 2) * 4} ${x + b * 1.4} 118 ${x + b * 1.1} 116`} fill="none" stroke="#f0caa6" strokeWidth="4" strokeLinecap="round" />
+            {[0.35, 0.6, 0.82].map((t) => <circle key={t} cx={x + b * t * 1.4} cy={80 + t * 32} r="0.9" fill="#c98a5e" />)}
+          </g>
+        ))}
+        <path d="M60 82 C52 98 36 104 24 108 M68 82 C76 98 92 104 104 108" fill="none" stroke={INK} strokeWidth="5" strokeLinecap="round" />
+        <path d="M60 82 C52 98 36 104 24 108 M68 82 C76 98 92 104 104 108" fill="none" stroke="#e8b88e" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M64 14 C78 22 86 40 86 58 C86 72 78 82 64 84 C50 82 42 72 42 58 C42 40 50 22 64 14 Z" fill="url(#sqg)" {...o} />
+        <g clipPath="url(#sqc)">
+          {[-24, -12, 0, 12, 24, 36].map((d) => <path key={d} d={`M30 ${44 + d} L98 ${76 + d - 36}`} {...line('#c98a5e', 1.1)} />)}
+          {[-24, -12, 0, 12, 24, 36].map((d) => <path key={`b${d}`} d={`M30 ${40 + d - 36 + 36} L98 ${8 + d + 36}`} {...line('#c98a5e', 1.1)} />)}
+          <path d="M76 24 C88 44 88 70 76 84 L96 84 L96 20 Z" fill="#b8703e" opacity="0.35" />
+        </g>
+        <circle cx="54" cy="70" r="4.4" fill="#1c1612" /><circle cx="74" cy="70" r="4.4" fill="#1c1612" />
+        <circle cx="52.6" cy="68.4" r="1.5" fill="#fff" /><circle cx="72.6" cy="68.4" r="1.5" fill="#fff" />
+        {hi('M54 26 C49 36 47 46 47 56')}
       </g>
     case 'Asparagus':
       return <g>{[0, 1, 2].map((k) => <g key={k} transform={`rotate(${-18 + k * 13} 64 108)`}>
