@@ -115,16 +115,17 @@ def uv_box(o):
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
-def box(name, size, at, mat, bev=0.0, segs=3, rot=(0, 0, 0)):
+def box(name, size, at, mat, bev=0.0, segs=2, rot=(0, 0, 0)):
     bpy.ops.mesh.primitive_cube_add(size=1, location=at, rotation=rot)
     o = active()
     o.scale = size
     apply_scale(o)
     finish(o, name, mat, smooth_shade=False)
     if bev:
+        # (a round edge in two steps, smoothed across (45 degrees a step): three made each little box 188 triangles)
         bevel(o, bev, segs, angle=False)
         apply_mods(o)
-        smooth_angle(o)
+        smooth_angle(o, 50 if segs == 2 else 35)
     return o
 
 
