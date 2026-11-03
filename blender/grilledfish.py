@@ -1798,7 +1798,8 @@ def shrimp_body(cx, R, size, name, flip=1, straight=0.0):
     Returns its parts: the segmented shell, tail fan, rostrum, eyes, antennae, walking legs and swimmerets."""
     parts = []
     th0, th1 = math.pi, 2 * math.pi + 0.18                     # head end .. tail end, round the bottom of the U
-    rings, seg = 64, 16
+    # (44 along, about four to each of its six tail segments' rims, and 12 round: 64 and 16 were 2,000 triangles a shell)
+    rings, seg = 44, 12
     centre = Vector((cx, 0, 0))
 
     def frame(s):
