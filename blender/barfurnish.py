@@ -168,12 +168,20 @@ def bamboo():
                 continue
             ra, rb = r0 * (1 - 0.45 * ta), r0 * (1 - 0.45 * tb)
             bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=ra, radius2=rb * 0.97, depth=d.length, location=(a_ + b_) / 2)
+            # (both its ends kept (the step from one length to the next, wider, shows at each node as part of its pale ring; without them the
+            # nodes looked thin), laddered, not 12-point fans)
+            bmc = bmesh.new(); bmc.from_mesh(active().data)
+            for cap in [f for f in bmc.faces if len(f.verts) == 12]:
+                ring = list(cap.verts)
+                bmesh.ops.delete(bmc, geom=[cap], context="FACES_ONLY")
+                ladder_fill(bmc, ring)
+            bmc.to_mesh(active().data); bmc.free()
             c = active()
             c.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
             bpy.ops.object.transform_apply(rotation=True)
             fin(c, f"BambooCulm{k}_{i}", M["culm"], parts)
             if i:
-                bpy.ops.mesh.primitive_torus_add(major_radius=ra * 1.02, minor_radius=ra * 0.13, major_segments=14, minor_segments=5, location=a_)
+                bpy.ops.mesh.primitive_torus_add(major_radius=ra * 1.02, minor_radius=ra * 0.13, major_segments=12, minor_segments=4, location=a_)
                 nd = active()
                 nd.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
                 fin(nd, f"BambooNode{k}_{i}", M["node"], parts)
