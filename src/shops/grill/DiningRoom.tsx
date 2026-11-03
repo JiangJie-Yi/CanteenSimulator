@@ -2940,8 +2940,10 @@ function StaffDoor() {
   const narrow = STAFF_W / WC_W
   useFrame(({ camera }, dt) => {
     // (by night (dusk a little), the washi glows faintly with the stair's lamp, and its light spills round the door)
+    // (only while it's shut over the stair: slid open it's off the lamp, just paper in the room's light (the owner's))
     const sky = skyNow(), nightK = sky === 'night' ? 1 : sky === 'dusk' ? 0.4 : 0
-    STAFF_PAPER.emissiveIntensity += (0.55 * nightK - STAFF_PAPER.emissiveIntensity) * Math.min(1, dt * 2)
+    const shut = Math.max(0, 1 - st.current.k * 4)
+    STAFF_PAPER.emissiveIntensity += (0.35 * nightK * shut - STAFF_PAPER.emissiveIntensity) * Math.min(1, dt * 6)
     STAFF_SPILL_MAT.opacity += (0.5 * nightK - STAFF_SPILL_MAT.opacity) * Math.min(1, dt * 2)
     // (pointed at: the landing's lamp eased a little brighter)
     const hv = STAFF_STAIRS.uniforms.uHover
