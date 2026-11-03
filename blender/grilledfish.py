@@ -1746,18 +1746,22 @@ def asparagus():
     return parts
 
 
+OG = 30
+
+
 def onigiri():
     """Rounded triangle of rice, flat faces toward the camera, with a nori band at the bottom."""
     bm = bmesh.new()
     pts = []
-    for i in range(48):
-        a = 2 * math.pi * i / 48
+    # (30 round its soft triangle, 48 before; its rounded edge two steps, three before)
+    for i in range(OG):
+        a = 2 * math.pi * i / OG
         r = 0.1 * (1 + 0.16 * math.cos(3 * a))      # soft triangle
         pts.append((r * math.cos(a), r * math.sin(a)))
     ring_f = [bm.verts.new((x, -0.035, z)) for x, z in pts]
     ring_b = [bm.verts.new((x, 0.035, z)) for x, z in pts]
-    for i in range(48):
-        j = (i + 1) % 48
+    for i in range(OG):
+        j = (i + 1) % OG
         bm.faces.new((ring_f[i], ring_f[j], ring_b[j], ring_b[i]))
     bm.faces.new(ring_f[::-1])
     bm.faces.new(ring_b)
@@ -1778,7 +1782,7 @@ def onigiri():
     bm.free()
     rice = bpy.data.objects.new("Rice", me)
     bpy.context.collection.objects.link(rice)
-    bevel(rice, 0.02, 3, angle=False)
+    bevel(rice, 0.02, 2, angle=False)
     finish(rice, "Rice", M["onigiri"])
     # the triangle is drawn with its point at +X, which is already up the stick; the flat side sits at
     # x ≈ -0.084, so the nori band wraps across that bottom edge, square to it and centred on the rice
