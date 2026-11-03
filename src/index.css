@@ -7024,28 +7024,28 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 }
 
 /* ---- developer mode's character viewer (CharacterViewer.tsx, the owner's: it comes with G, on the right), in the editor's dark grey ---- */
-/* (its dock: the panel and, on its left edge, the handle that slides it off to the right but for the handle (the owner's); tucked, it lets
-   the scene behind have the pointer, only the handle taking it) */
+/* (its frame: the panel, 360 wide as the dev panel is, its height dragged at its foot (kept); minimised (−), it shrinks away into the dock at
+   the bottom left (edit.ts: its pill there brings it back), letting the scene have the pointer meanwhile) */
 .char-dock {
-  position: fixed; right: 14px; top: 72px; z-index: 9998; width: 340px; max-height: calc(100vh - 150px); display: flex;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: fixed; right: 14px; top: 72px; z-index: 9998; width: 360px; max-height: calc(100vh - 100px); display: flex; flex-direction: column;
+  transform-origin: 0 100%; transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
 }
-.char-dock.is-tucked { transform: translateX(calc(100% + 14px)); pointer-events: none; }
-.char-dock.is-tucked .dock-handle { pointer-events: auto; }
-.char-dock .dock-handle { position: absolute; left: 0; top: 50%; transform: translate(-100%, -50%); background: #3a3a3a; color: #ddd; }
-.char-dock .dock-handle:hover { background: #4a4a4a; color: #e8a33d; }
-/* (tucked, the viewer's handle a little taller, half see-through, its name upright under the arrow: 👤 角色) */
-.char-dock.is-tucked .dock-handle { height: auto; padding: 10px 0; gap: 6px; width: 26px; background: rgb(58 58 58 / 0.82); }
-.dock-handle-word { writing-mode: vertical-rl; font: 600 12px/1 system-ui, sans-serif; letter-spacing: 0.12em; white-space: nowrap; }
+.char-dock.is-tucked { pointer-events: none; opacity: 0; transform: scale(0.15); }
+.char-view-grip { flex: none; height: 9px; margin-top: -4px; cursor: ns-resize; position: relative; z-index: 1; }
+.char-view-grip::after { content: ''; position: absolute; left: 50%; top: 3px; width: 40px; height: 3px; margin-left: -20px; border-radius: 2px; background: #5a5a5a; }
+.char-view-grip:hover::after { background: #e8a33d; }
+.char-view-x:hover { background: #b8433a !important; color: #fff !important; }
 .char-view {
-  flex: 1; min-width: 0; max-height: 100%;
+  flex: 1; min-width: 0; min-height: 0;
   display: flex; flex-direction: column; background: #303030; color: #d6d6d6; border: 1px solid #1c1c1c; border-radius: 6px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font: 13px/1.4 system-ui, sans-serif; overflow: hidden;
 }
-.char-view-head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #3a3a3a; border-bottom: 1px solid #1c1c1c; }
+/* (its title bar the dev panel's own: 36 high, the same grey, the same type and buttons (the owner's: the two panels alike)) */
+.char-view-head { display: flex; align-items: center; gap: 8px; height: 36px; flex: none; padding: 0 10px; background: #262626; border-bottom: 1px solid #1a1a1a; font: 600 13px/1 "Inter", "Segoe UI", "Noto Sans TC", sans-serif; }
 .char-view-head b { font-weight: 600; color: #f0f0f0; }
 .char-view-head span { flex: 1; min-width: 0; color: #e8a33d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.char-view-fold { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 3px; background: #4a4a4a; color: #ddd; cursor: pointer; }
+.char-view-fold { width: 22px; height: 22px; flex: none; padding: 0; border: 0; border-radius: 4px; background: #3a3a3a; color: #ddd; font: 600 14px/22px sans-serif; cursor: pointer; }
+.char-view-fold:hover { background: #4a4a4a; }
 .char-view-stage { position: relative; height: 360px; flex: none; background: radial-gradient(ellipse at 50% 38%, #5a5550 0%, #2b2826 62%, #1c1a19 100%); cursor: grab; }
 /* (either side of the stage, half way up: the one before and the one after in the list) */
 .char-view-arrow {

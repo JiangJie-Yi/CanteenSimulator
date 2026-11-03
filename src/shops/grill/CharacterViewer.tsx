@@ -2,7 +2,7 @@
 // staff in each of their outfits, every kind of customer (another of the same kind at a click), turned with the mouse and zoomed with the
 // wheel; a customer's moods and anyone's walk to try; how many triangles and draws each one is. Its own little canvas (its own GL context),
 // mounted only while developer mode is on.
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
@@ -16,6 +16,7 @@ import { StaffFigure } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { WireView } from './Movable'
 import { usePanelSound } from '@/ui/uiSound'
+import { getCharHidden, onCharHidden, setCharHidden } from './edit'
 
 type Entry = { key: string; zh: string; ja: string; en: string; group: 'boss' | 'staff' | 'guest'; role?: Role; female?: boolean; kind?: GuestKind }
 const ENTRIES: Entry[] = [
@@ -41,7 +42,8 @@ const IDS = (() => {
 const STAND_H = 1.8
 const KEY_PICK = 'jgs-char-view-1'
 /** whether the viewer's slid away to the screen's edge (its handle left showing): kept in the browser */
-const KEY_TUCK = 'jgs-char-view-tucked-1'
+/** the viewer's height, as last dragged (its foot's grip) */
+const KEY_H = 'jgs-char-view-h-1'
 
 /** a wooden turntable: a round top with a brass ring, on a dark plinth */
 function Stand() {
@@ -120,9 +122,21 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
   useEffect(() => { try { localStorage.setItem(KEY_PICK, JSON.stringify(pick)) } catch { /* (not kept) */ } }, [pick])
   const open = true
   // (slid off to the right, all but its handle (the owner's: a drawer's handle on its left edge), and its little canvas resting meanwhile)
-  const [tucked, setTucked] = useState(() => { try { return localStorage.getItem(KEY_TUCK) === '1' } catch { return false } })
-  useEffect(() => { try { localStorage.setItem(KEY_TUCK, tucked ? '1' : '0') } catch { /* (not kept) */ } }, [tucked])
+  // (minimised into the dock at the bottom left, its pill there to bring it back (edit.ts holds it; the owner's: − and × on its title bar
+  // as the dev panel's, no side handle); its little canvas resting meanwhile)
+  const tucked = useSyncExternalStore(onCharHidden, getCharHidden)
   usePanelSound(!tucked)
+  // (its height dragged at its foot, kept; the list inside scrolls)
+  const [height, setHeight] = useState(() => { try { return Number(localStorage.getItem(KEY_H)) || 0 } catch { return 0 } })
+  const dragH = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const el = (e.currentTarget as HTMLElement).parentElement!
+    const y0 = e.clientY, h0 = el.offsetHeight
+    const fit = (h: number) => Math.max(320, Math.min(window.innerHeight - 100, h))
+    const move = (m: PointerEvent) => setHeight(fit(h0 + m.clientY - y0))
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); setHeight((h) => { try { localStorage.setItem(KEY_H, String(h)) } catch { /* */ } return h }) }
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
+  }
   const [mood, setMood] = useState<Mood | null>(null)
   const [walk, setWalk] = useState(false)
   const [spin, setSpin] = useState(true)
@@ -138,18 +152,16 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
   const name = tl(lang, e.zh, e.ja, e.en)
   const group = (g: Entry['group']) => tl(lang, g === 'boss' ? '老闆' : g === 'staff' ? '店員' : '客人', g === 'boss' ? '店主' : g === 'staff' ? 'スタッフ' : 'お客さん', g === 'boss' ? 'Owner' : g === 'staff' ? 'Staff' : 'Customers')
   const moods: [Mood | null, string][] = [[null, tl(lang, '平常', 'ふつう', 'Calm')], ['joy', tl(lang, '開心', 'うれしい', 'Happy')], ['mad', tl(lang, '生氣', '怒り', 'Cross')], ['sad', tl(lang, '難過', 'かなしい', 'Sad')]]
-  const tuckLabel = tucked ? tl(lang, '展開角色模型', 'キャラクターを開く', 'Show characters') : tl(lang, '收起角色模型', 'キャラクターをしまう', 'Hide characters')
+  const minLabel = tl(lang, '縮到左下角', '左下にしまう', 'Minimise to the bottom left')
+  const closeLabel = tl(lang, '關閉角色預覽', 'キャラクターを閉じる', 'Close the character viewer')
   return createPortal(
-    <div className={`char-dock${tucked ? ' is-tucked' : ''}`}>
-    <button type="button" className="dock-handle" onClick={() => setTucked((v) => !v)} aria-expanded={!tucked} aria-label={tuckLabel} title={tuckLabel}>
-      <svg viewBox="0 0 10 18" aria-hidden="true"><path d={tucked ? 'M7 3 L3 9 L7 15' : 'M3 3 L7 9 L3 15'} /></svg>
-      {tucked && <span className="dock-handle-word">👤 {tl(lang, '角色', 'キャラ', 'Cast')}</span>}
-    </button>
+    <div className={`char-dock${tucked ? ' is-tucked' : ''}`} style={height ? { height } : undefined}>
     <section className={`char-view${open ? '' : ' is-folded'}`} aria-label={tl(lang, '角色模型', 'キャラクター', 'Characters')} inert={tucked}>
       <header className="char-view-head">
         <b>{tl(lang, '角色模型', 'キャラクター', 'Characters')}</b>
         <span>{name}{e.kind ? ` #${gid}` : ''}</span>
-        <button type="button" className="char-view-fold" onClick={() => setTucked(true)} title={tuckLabel} aria-label={tuckLabel}>−</button>
+        <button type="button" className="char-view-fold" onClick={() => setCharHidden(true)} title={minLabel} aria-label={minLabel}>−</button>
+        <button type="button" className="char-view-fold char-view-x" onClick={() => setCharHidden(true)} title={closeLabel} aria-label={closeLabel}>×</button>
       </header>
       {open && (<>
         <div className="char-view-stage">
@@ -197,6 +209,7 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
         </div>
       </>)}
     </section>
+    <div className="char-view-grip" onPointerDown={dragH} title={tl(lang, '拖曳調整高度', 'ドラッグで高さを変える', 'Drag to resize')} />
     </div>,
     document.body,
   )

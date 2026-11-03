@@ -643,27 +643,55 @@ export const statsOf = (id: string) => {
   return ms.length ? ms.reduce((a, b) => ({ tris: a.tris + b.tris, verts: a.verts + b.verts, meshes: a.meshes + b.meshes })) : null
 }
 let el: HTMLDivElement | null = null
-/** the panel tucked away to the left (the owner's: − hides the panel only, the gizmo and what's picked staying; × or G leave the mode),
- * a little DEV tab left at the screen's edge to bring it back */
+/**
+ * Developer mode's two panels minimised into a dock at the bottom left, beside the axes (the owner's: − shrinks a panel down into it, a pill
+ * there brings it back where it was; the side handles gone): the dev panel (its pick, gizmo and wireframe staying meanwhile) and the
+ * character viewer, whose state is here for CharacterViewer to follow. × leaves the mode (the dev panel's) or puts the viewer away
+ * (the viewer's), its pill left in the dock.
+ */
 let tucked = false
-let devTab: HTMLButtonElement | null = null
+let dock: HTMLDivElement | null = null
+let devPill: HTMLButtonElement | null = null, charPill: HTMLButtonElement | null = null
+let charHidden = (() => { try { return localStorage.getItem('jgs-char-view-hidden-1') === '1' } catch { return false } })()
+const charSubs = new Set<() => void>()
+export const getCharHidden = () => charHidden
+export const onCharHidden = (f: () => void) => { charSubs.add(f); return () => { charSubs.delete(f) } }
+export function setCharHidden(v: boolean) {
+  if (charHidden === v) return
+  charHidden = v
+  try { localStorage.setItem('jgs-char-view-hidden-1', v ? '1' : '0') } catch { /* (not kept) */ }
+  for (const f of charSubs) f()
+  showDock()
+}
+function showDock() {
+  if (typeof document === 'undefined') return
+  if (!dock) {
+    dock = document.createElement('div')
+    dock.className = 'be-dock'
+    const pill = (text: string, go: () => void) => {
+      const b = document.createElement('button')
+      b.type = 'button'; b.className = 'be-pill'; b.textContent = text
+      b.onclick = (e) => { e.stopPropagation(); go() }
+      dock!.appendChild(b)
+      return b
+    }
+    devPill = pill('🛠️ ' + T().devPill, () => setTucked(false))
+    charPill = pill('👤 ' + T().charPill, () => setCharHidden(false))
+    document.body.appendChild(dock)
+  }
+  const on = state.on
+  devPill!.classList.toggle('on', on && tucked)
+  charPill!.classList.toggle('on', on && charHidden)
+  devPill!.title = T().unfold
+  dock.classList.toggle('on', on && (tucked || charHidden))
+}
 function setTucked(v: boolean) {
   tucked = v
   if (el) {
-    const r = el.getBoundingClientRect()
     el.classList.toggle('be-tucked', v)
-    el.style.transform = v ? `translateX(${-Math.ceil(r.right + 16)}px)` : ''
     el.inert = v
   }
-  if (!devTab && typeof document !== 'undefined') {
-    devTab = document.createElement('button')
-    devTab.type = 'button'
-    devTab.className = 'be-devtab'
-    devTab.textContent = '🛠️ DEV'
-    devTab.onclick = (e) => { e.stopPropagation(); setTucked(false) }
-    document.body.appendChild(devTab)
-  }
-  if (devTab) { devTab.classList.toggle('on', v && !!el); devTab.title = T().unfold }
+  showDock()
 }
 let spaceBadge: HTMLButtonElement | null = null
 let info: HTMLDivElement | null = null
@@ -693,7 +721,7 @@ let built = ''
 
 /** the panel's look: after Blender's dark interface (grey panels, a darker header bar, blue for what's active, red/green/blue axis stripes) */
 const PANEL_CSS = `
-.be { position:fixed; left:12px; bottom:92px; z-index:9999; width:292px; max-height:calc(100vh - 110px); display:flex; background:#303030; color:#d6d6d6;
+.be { position:fixed; left:12px; bottom:92px; z-index:9999; width:360px; box-sizing:border-box; max-height:calc(100vh - 110px); display:flex; background:#303030; color:#d6d6d6;
   font:11.5px/1.35 "Inter","Segoe UI","Noto Sans TC",sans-serif; border:1px solid #1a1a1a; border-radius:6px; box-shadow:0 6px 22px rgba(0,0,0,.55); overflow:hidden; user-select:none }
 .be * { box-sizing:border-box }
 .be-keys { display:flex; flex-wrap:wrap; gap:0 12px; margin:6px 0 2px; padding:5px 7px; border-radius:4px; background:#262626; color:#9a9a9a; font:10.5px/1.6 monospace }
@@ -713,20 +741,22 @@ const PANEL_CSS = `
 .be-tool-text { font:700 13px/1 system-ui, sans-serif }
 .be-tool-gap { height:8px; border-bottom:1px solid #4a4a4a; margin-bottom:4px }
 .be-main { flex:1; min-width:0; display:flex; flex-direction:column }
-.be-head { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#1f1f1f; font-weight:600; letter-spacing:.02em; color:#e6e6e6; white-space:nowrap }
+.be-head { display:flex; align-items:center; gap:8px; height:36px; padding:0 10px; background:#262626; border-bottom:1px solid #1a1a1a; font:600 13px/1 "Inter","Segoe UI","Noto Sans TC",sans-serif; letter-spacing:.02em; color:#f0f0f0; white-space:nowrap }
 .be-head small { margin-left:auto; font-weight:400; color:#8a8a8a; white-space:nowrap }
 .be-tabs { display:flex; gap:2px; border-bottom:2px solid #e0a040 }
 .be-tab { flex:1; padding:4px 8px 3px; background:#1d1d1d; color:#8c8c8c; border:1px solid #333; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font:inherit; font-weight:700; letter-spacing:.08em }
 .be-tab:hover { color:#d6d6d6; background:#2c2c2c }
 .be-tab.on { background:#e0a040; border-color:#e0a040; color:#1d1d1d }
 .be-tabs + .be-list { border-top-left-radius:0; border-top-right-radius:0 }
-.be-win { width:20px; height:20px; padding:0; border:0; border-radius:3px; background:#3a3a3a; color:#ddd; font:600 13px/20px sans-serif; cursor:pointer; flex:none }
+.be-win { width:22px; height:22px; padding:0; border:0; border-radius:4px; background:#3a3a3a; color:#ddd; font:600 14px/22px sans-serif; cursor:pointer; flex:none }
 .be-win:hover { background:#4a4a4a } .be-close:hover { background:#b8433a; color:#fff }
-.be { transition: transform .3s cubic-bezier(.4,0,.2,1) } .be.be-tucked { pointer-events:none }
-.be-devtab { position:fixed; left:0; bottom:120px; z-index:9999; padding:8px 12px 8px 10px; border:1px solid #1a1a1a; border-left:0;
-  border-radius:0 10px 10px 0; background:rgba(40,40,40,.88); color:#e6e6e6; font:600 13px/1 system-ui, sans-serif; cursor:pointer;
-  box-shadow:3px 4px 12px rgba(0,0,0,.35); transform:translateX(-110%); transition:transform .3s cubic-bezier(.4,0,.2,1) }
-.be-devtab.on { transform:none } .be-devtab:hover { background:#4772b3; color:#fff }
+.be { transform-origin:0 100%; transition:transform .28s cubic-bezier(.4,0,.2,1), opacity .22s ease }
+.be.be-tucked { pointer-events:none; opacity:0; transform:translate(140px, 92px) scale(.15) }
+.be-dock { position:fixed; left:164px; bottom:30px; z-index:9999; display:none; gap:8px }
+.be-dock.on { display:flex }
+.be-pill { display:none; padding:7px 14px; border:1px solid #1a1a1a; border-radius:999px; background:rgba(40,40,40,.9); color:#e6e6e6;
+  font:600 12.5px/1 "Inter","Segoe UI","Noto Sans TC",sans-serif; white-space:nowrap; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,.35) }
+.be-pill.on { display:block } .be-pill:hover { background:#4772b3; color:#fff }
 .be-body { overflow:auto; flex:1; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a }
 .be-grip { position:absolute; left:0; right:0; top:-5px; height:10px; cursor:ns-resize; z-index:3 }
 .be-grip::after { content:''; position:absolute; left:50%; top:3px; width:44px; height:4px; margin-left:-22px; border-radius:2px; background:#5a5a5a }
@@ -796,7 +826,7 @@ const TOOL_ICONS: Record<Tool, string> = {
 }
 function panel() {
   if (typeof document === 'undefined') return
-  if (!state.on) { if (tucked) { tucked = false; devTab?.classList.remove('on') } el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; setListHot(null); return }
+  if (!state.on) { tucked = false; showDock(); el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; setListHot(null); return }
   if (!document.getElementById('be-style')) {
     const st = document.createElement('style')
     st.id = 'be-style'
