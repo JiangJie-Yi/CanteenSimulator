@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { mergeByMaterial } from '@/scene/StaticBatch'
+import { mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { TILL_STATE, yen } from './bar'
@@ -98,7 +98,12 @@ function piecesOf(scene: THREE.Group) {
   })
   inkModel(root, (m) => UNINKED.test(m.name), { width: 0.0012, weld: true })
   const get = (n: DeskPiece) => { const o = root.getObjectByName(n)!; o.removeFromParent(); return o }
+  // (their plain colours one material, the colour on the points; then each piece drawn in as few meshes as its materials allow, all but
+  // what moves on its own (the bell's plunger; the stand's drawers, merged round in TillMat): the pens were fifteen draws, the card reader
+  // and the printer nine and more)
+  plainColours(root)
   pieces = { TillPens: get('TillPens'), TillPrinter: get('TillPrinter'), TillCardReader: get('TillCardReader'), TillBell: get('TillBell'), TillMat: get('TillMat'), TillCatStand: get('TillCatStand'), TillTray: get('TillTray'), TillMoneyTree: get('TillMoneyTree'), TillIngot: get('TillIngot') }
+  for (const [n, o] of Object.entries(pieces)) if (n !== 'TillMat') mergeByMaterial(o, (q) => /^TillBellPlunger/.test(q.name))
   return pieces
 }
 
