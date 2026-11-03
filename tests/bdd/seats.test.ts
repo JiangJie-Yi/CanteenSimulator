@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { GRILL_COUNTERS, GRILL_SEATS, lampsAlong, passOf, seatAlong, seatLabel } from '@/shops/grill/bar'
+import { BAR_GATES, GRILL_COUNTERS, GRILL_SEATS, gateOf, lampsAlong, passOf, seatAlong, seatLabel, type Counter } from '@/shops/grill/bar'
 
 feature('吧台的座位：全店 8 個，兩座吧台各 4 個，每個座位有號碼，每兩位客人之間一盞吊燈', () => {
   scenario('全店 8 個座位，兩座吧台各 4 個（店主要的：長吧台靠轉角的那個移到側吧台，兩邊才均衡）', ({ given, then, and }) => {
@@ -15,9 +15,24 @@ feature('吧台的座位：全店 8 個，兩座吧台各 4 個，每個座位�
     })
   })
 
-  scenario('長吧台留下的 4 個座位在原來的地方：拿掉的是最靠轉角的那個', ({ given, then }) => {
-    given('長吧台', (w) => { w.c = GRILL_COUNTERS[0] })
-    then('離轉角最遠的座位（1 號）跟以前一樣，在吧台中間往門口 1.775', (w) => { expect(seatAlong(w.c, w.c.seats - 1)).toBeCloseTo(1.775, 6) })
+  scenario('每座吧台的座位平均排滿整座吧台（店主要的：轉角那頭不留空、1 號不要太靠玄關）', ({ given, then, and }) => {
+    given('兩座吧台與它們的閘門', (w) => { w.cs = GRILL_COUNTERS })
+    then('同一座吧台相鄰座位的間距都一樣', (w) => {
+      for (const c of w.cs as Counter[]) {
+        const at = Array.from({ length: c.seats }, (_, n) => seatAlong(c, n))
+        for (let n = 2; n < at.length; n++) expect(at[n] - at[n - 1]).toBeCloseTo(at[1] - at[0], 6)
+      }
+    })
+    and('每個座位都在桌面上', (w) => {
+      for (const c of w.cs as Counter[]) for (let n = 0; n < c.seats; n++) expect(Math.abs(seatAlong(c, n))).toBeLessThan((c.length + 0.3) / 2 - 0.3)
+    })
+    and('閘門旁的座位離閘門至少 0.4（長吧台的 1 號不擠在玄關旁）', (w) => {
+      ;(w.cs as Counter[]).forEach((c, i) => {
+        const g = gateOf(c, BAR_GATES[i])
+        const near = BAR_GATES[i].end > 0 ? seatAlong(c, c.seats - 1) : seatAlong(c, 0)
+        expect(Math.abs(g.hinge - near)).toBeGreaterThanOrEqual(0.4)
+      })
+    })
   })
 
   scenario('吊燈掛在每兩位客人中間（店主要的）', ({ given, then, and }) => {
