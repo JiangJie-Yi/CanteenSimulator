@@ -2631,6 +2631,8 @@ export default function App() {
                 localStorage.removeItem(METER_KEY)
                 localStorage.removeItem(VISITS_KEY)
                 localStorage.removeItem(TISSUES_KEY)
+                // (and this tab's kept progress, from a lost 3D view: never brought back over the fresh start)
+                sessionStorage.removeItem(RESUME_KEY)
               } catch {
                 // storage blocked
               }
