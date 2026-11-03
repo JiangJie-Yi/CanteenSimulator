@@ -165,20 +165,23 @@ def lathe(name, prof, mat_of, at, seg=16, uv_v=False):
         mn = mat_of(i)
         if mn not in mats:
             mats.append(mn)
+        # (a point on the axis: the ring beside it closed across in a ladder instead, not a fan into the middle)
+        if len(a) == 1 or len(b) == 1:
+            ring, ii = (b, i + 1) if len(a) == 1 else (a, i)
+            bm.verts.remove((a if len(a) == 1 else b)[0])
+            for f in ladder_fill(bm, ring if len(a) == 1 else ring[::-1]):
+                f.material_index = mats.index(mn)
+                for loop in f.loops:
+                    co = loop.vert.co
+                    loop[uvl].uv = (0.5 + co.x * 4, (prof[ii][1] - h0) / (h1 - h0 + 1e-6))
+            continue
         for k in range(seg):
             k2 = (k + 1) % seg
-            if len(a) == 1:
-                f = bm.faces.new((a[0], b[k], b[k2]))
-                ks = [(None, i), (k, i + 1), (k + 1, i + 1)]
-            elif len(b) == 1:
-                f = bm.faces.new((a[k], b[0], a[k2]))
-                ks = [(k, i), (None, i + 1), (k + 1, i)]
-            else:
-                f = bm.faces.new((a[k], b[k], b[k2], a[k2]))
-                ks = [(k, i), (k, i + 1), (k + 1, i + 1), (k + 1, i)]
+            f = bm.faces.new((a[k], b[k], b[k2], a[k2]))
+            ks = [(k, i), (k, i + 1), (k + 1, i + 1), (k + 1, i)]
             f.material_index = mats.index(mn)
             for loop, (kk, ii) in zip(f.loops, ks):
-                loop[uvl].uv = ((kk if kk is not None else k + 0.5) / seg, (prof[ii][1] - h0) / (h1 - h0 + 1e-6))
+                loop[uvl].uv = (kk / seg, (prof[ii][1] - h0) / (h1 - h0 + 1e-6))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
