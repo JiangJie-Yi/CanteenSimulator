@@ -114,7 +114,7 @@ def lathe(name, profile, mat, segs=24):
     return mesh_obj(name, bm, mat)
 
 
-def box(name, size, at, mat, bev=0.0, segs=3):
+def box(name, size, at, mat, bev=0.0, segs=2):  # (three steps: 188 triangles a small box)
     bpy.ops.mesh.primitive_cube_add(size=1, location=at)
     o = active()
     o.scale = size
