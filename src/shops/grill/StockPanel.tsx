@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { BOX_LOW, BOX_SHEETS, TISSUE, TISSUE_PACK } from '@/game/tissues'
 import { RECEIPT, RECEIPT_PACK, ROLL_SLIPS } from '@/game/receipts'
 import { LOADS, USES, POWER_TIERS, WATER_TIERS, WATER_BASE, BILL_DAYS, type Meter, type Use } from '@/game/utilities'
@@ -16,6 +16,7 @@ import type { Restock } from '@/ui/Menu'
 import { CRATE, FREEZER_TEMP } from './Decor'
 import { GRILL_SEATS, onPrinter, PRINTER, tissuesAt } from './bar'
 import { DrinkStockBody } from './DrinkStockPanel'
+import { usePanelSound } from '@/ui/uiSound'
 
 /** the stock panel's tabs: the freezer, the fridge (the cupboards' under the cook table), the larder at room temperature, the drinks, and what
  * isn't food (the charcoal) */
@@ -138,10 +139,29 @@ export function StockPanel(p: Props) {
     const seas = SEASONINGS.filter((k) => storageOf(seasonId(k)) === t && (p.stock[seasonId(k)] ?? 0) <= 0).length
     return zone + seas
   }
+  // (slid off to the right by the handle on its left edge, all but the handle and its upright name, which bring it back (the owner's); opened
+  // again, or sent to a tab or a thing by a click in the room, it's out)
+  const [tucked, setTucked] = useState(false)
+  useEffect(() => { setTucked(false) }, [tab, p.focus])
+  usePanelSound(!tucked)
+  const panel = useRef<HTMLElement>(null)
+  const handle = useRef<HTMLButtonElement>(null)
+  // (the handle at the middle of the panel's height, however tall its tab makes it)
+  useLayoutEffect(() => {
+    const el = panel.current, h = handle.current
+    if (el && h) h.style.top = `${el.offsetTop + el.offsetHeight / 2}px`
+  })
+  const tuckLabel = tucked ? tl(lang, '展開庫存', '在庫を開く', 'Show stock') : tl(lang, '收起庫存', '在庫をしまう', 'Hide stock')
   return createPortal(
     <>
-      <h2 className="dock-title" aria-hidden="true">{tl(lang, '庫存', '在庫', 'Stock')}<small lang="en">STOCK</small></h2>
-      <section className="drink-stock stock-panel" role="dialog" aria-label={tl(lang, '庫存', '在庫', 'Stock')}>
+      <h2 className={`dock-title${tucked ? ' is-tucked' : ''}`} aria-hidden="true" onClick={tucked ? () => setTucked(false) : undefined}>
+        {tl(lang, '庫存', '在庫', 'Stock')}<small lang="en">STOCK</small>
+      </h2>
+      <button ref={handle} type="button" className={`dock-handle stock-handle${tucked ? ' is-tucked' : ''}`} onClick={() => setTucked((v) => !v)}
+        aria-expanded={!tucked} aria-label={tuckLabel} title={tuckLabel}>
+        <svg viewBox="0 0 10 18" aria-hidden="true"><path d={tucked ? 'M7 3 L3 9 L7 15' : 'M3 3 L7 9 L3 15'} /></svg>
+      </button>
+      <section ref={panel} className={`drink-stock stock-panel${tucked ? ' is-tucked' : ''}`} role="dialog" aria-label={tl(lang, '庫存', '在庫', 'Stock')} inert={tucked}>
         <header className="drink-stock-head">
           <b>{tl(lang, '庫存', '在庫', 'Stock')}</b>
           {p.meter && <MeterChip lang={lang} meter={p.meter} />}

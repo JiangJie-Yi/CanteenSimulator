@@ -15,6 +15,7 @@ import type { Mood } from '@/scene/people'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { WireView } from './Movable'
+import { usePanelSound } from '@/ui/uiSound'
 
 type Entry = { key: string; zh: string; ja: string; en: string; group: 'boss' | 'staff' | 'guest'; role?: Role; female?: boolean; kind?: GuestKind }
 const ENTRIES: Entry[] = [
@@ -39,6 +40,8 @@ const IDS = (() => {
 /** how tall every figure stands on the stand (each scaled to it), and the stand's top */
 const STAND_H = 1.8
 const KEY_PICK = 'jgs-char-view-1'
+/** whether the viewer's slid away to the screen's edge (its handle left showing): kept in the browser */
+const KEY_TUCK = 'jgs-char-view-tucked-1'
 
 /** a wooden turntable: a round top with a brass ring, on a dark plinth */
 function Stand() {
@@ -116,6 +119,10 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
   })
   useEffect(() => { try { localStorage.setItem(KEY_PICK, JSON.stringify(pick)) } catch { /* (not kept) */ } }, [pick])
   const [open, setOpen] = useState(true)
+  // (slid off to the right, all but its handle (the owner's: a drawer's handle on its left edge), and its little canvas resting meanwhile)
+  const [tucked, setTucked] = useState(() => { try { return localStorage.getItem(KEY_TUCK) === '1' } catch { return false } })
+  useEffect(() => { try { localStorage.setItem(KEY_TUCK, tucked ? '1' : '0') } catch { /* (not kept) */ } }, [tucked])
+  usePanelSound(!tucked)
   const [mood, setMood] = useState<Mood | null>(null)
   const [walk, setWalk] = useState(false)
   const [spin, setSpin] = useState(true)
@@ -131,8 +138,13 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
   const name = tl(lang, e.zh, e.ja, e.en)
   const group = (g: Entry['group']) => tl(lang, g === 'boss' ? '老闆' : g === 'staff' ? '店員' : '客人', g === 'boss' ? '店主' : g === 'staff' ? 'スタッフ' : 'お客さん', g === 'boss' ? 'Owner' : g === 'staff' ? 'Staff' : 'Customers')
   const moods: [Mood | null, string][] = [[null, tl(lang, '平常', 'ふつう', 'Calm')], ['joy', tl(lang, '開心', 'うれしい', 'Happy')], ['mad', tl(lang, '生氣', '怒り', 'Cross')], ['sad', tl(lang, '難過', 'かなしい', 'Sad')]]
+  const tuckLabel = tucked ? tl(lang, '展開角色模型', 'キャラクターを開く', 'Show characters') : tl(lang, '收起角色模型', 'キャラクターをしまう', 'Hide characters')
   return createPortal(
-    <section className={`char-view${open ? '' : ' is-folded'}`} aria-label={tl(lang, '角色模型', 'キャラクター', 'Characters')}>
+    <div className={`char-dock${tucked ? ' is-tucked' : ''}`}>
+    <button type="button" className="dock-handle" onClick={() => setTucked((v) => !v)} aria-expanded={!tucked} aria-label={tuckLabel} title={tuckLabel}>
+      <svg viewBox="0 0 10 18" aria-hidden="true"><path d={tucked ? 'M7 3 L3 9 L7 15' : 'M3 3 L7 9 L3 15'} /></svg>
+    </button>
+    <section className={`char-view${open ? '' : ' is-folded'}`} aria-label={tl(lang, '角色模型', 'キャラクター', 'Characters')} inert={tucked}>
       <header className="char-view-head">
         <b>{tl(lang, '角色模型', 'キャラクター', 'Characters')}</b>
         <span>{name}{e.kind ? ` #${gid}` : ''}</span>
@@ -140,7 +152,7 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
       </header>
       {open && (<>
         <div className="char-view-stage">
-          <Canvas dpr={[1, 1.5]} camera={{ fov: 28, position: [0, 1.25, 5.2] }} gl={{ antialias: true, alpha: true }}>
+          <Canvas dpr={[1, 1.5]} camera={{ fov: 28, position: [0, 1.25, 5.2] }} gl={{ antialias: true, alpha: true }} frameloop={tucked ? 'never' : 'always'}>
             <Lights />
             <Stand />
             <Suspense fallback={null}>
@@ -183,7 +195,8 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
           ))}
         </div>
       </>)}
-    </section>,
+    </section>
+    </div>,
     document.body,
   )
 }

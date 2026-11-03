@@ -6767,6 +6767,16 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .drink-stock-foot button:disabled { opacity: 0.45; cursor: default; }
 .drink-stock-foot .money { color: #d8ffe0 !important; }
 
+/* (a docked panel's handle: a slim tab with rounded outer corners on the panel's left edge, an arrow pointing the way a click sends it) */
+.dock-handle {
+  width: 18px; height: 64px; padding: 0; display: grid; place-items: center; cursor: pointer;
+  border: 1px solid #1c1c1c; border-right: 0; border-radius: 9px 0 0 9px; box-shadow: -4px 4px 12px rgb(0 0 0 / 0.3);
+}
+.dock-handle svg { width: 8px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.dock-handle:focus-visible { outline: 2px solid #e8a33d; outline-offset: 2px; }
+/* (the stock's handle only beside the docked panel: on a narrow screen the panel's a window in the middle) */
+.stock-handle { display: none; }
+
 /* ---- the panels that open over the room, docked at the right as the pantry is (one at a time: App shuts the others), each with its name
    standing upright beside it as the pantry's 食材 does ---- */
 .dock-title { display: none; }
@@ -6780,6 +6790,17 @@ html[lang='en'] .heat-label { font-size: 13px; }
     max-height: calc(100vh - 200px);
   }
   .drink-stock { width: 460px; }
+  .drink-stock.stock-panel.is-tucked { transform: translateX(calc(100% + 89px)); pointer-events: none; }
+  /* (its handle on its left edge (89 + its 526 with its border, from the right), its middle at the panel's (StockPanel sets top); tucked, at the screen's edge
+     beside the upright 庫存, which then takes a click too) */
+  .stock-handle {
+    display: grid; position: fixed; z-index: 31; right: 615px; transform: translateY(-50%);
+    background: #5a3d28; color: #f6ecd8; border-color: #3b2a20;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .stock-handle:hover { background: #6e4b31; }
+  .stock-handle.is-tucked { right: 64px; }
+  .dock-title.is-tucked { pointer-events: auto; cursor: pointer; }
   .dock-title {
     display: flex;
     flex-direction: column;
@@ -7003,8 +7024,18 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 }
 
 /* ---- developer mode's character viewer (CharacterViewer.tsx, the owner's: it comes with G, on the right), in the editor's dark grey ---- */
+/* (its dock: the panel and, on its left edge, the handle that slides it off to the right but for the handle (the owner's); tucked, it lets
+   the scene behind have the pointer, only the handle taking it) */
+.char-dock {
+  position: fixed; right: 14px; top: 72px; z-index: 9998; width: 340px; max-height: calc(100vh - 150px); display: flex;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.char-dock.is-tucked { transform: translateX(calc(100% + 14px)); pointer-events: none; }
+.char-dock.is-tucked .dock-handle { pointer-events: auto; }
+.char-dock .dock-handle { position: absolute; left: 0; top: 50%; transform: translate(-100%, -50%); background: #3a3a3a; color: #ddd; }
+.char-dock .dock-handle:hover { background: #4a4a4a; color: #e8a33d; }
 .char-view {
-  position: fixed; right: 14px; top: 72px; z-index: 9998; width: 340px; max-height: calc(100vh - 150px);
+  flex: 1; min-width: 0; max-height: 100%;
   display: flex; flex-direction: column; background: #303030; color: #d6d6d6; border: 1px solid #1c1c1c; border-radius: 6px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font: 13px/1.4 system-ui, sans-serif; overflow: hidden;
 }
@@ -7259,6 +7290,7 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   backdrop-filter: blur(5px) saturate(1.1);
   box-shadow: 0 16px 40px -14px rgb(0 0 0 / 0.6);
   color: var(--ink);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 :root[data-theme='dark'] .drink-stock.stock-panel {
   --ink: #f6ecd8;
