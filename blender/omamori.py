@@ -53,7 +53,7 @@ def half_width(y):
     return hw
 
 
-def pouch(nx=12, ny=20):
+def pouch(nx=8, ny=14):
     """the pouch: a grid on each face, every row as wide as the outline is there (so its edge is the outline exactly), puffed like a
     cushion, fullest in the middle and rounding down to its edge, where the two faces share their vertices (the seam). Front UVs on the
     picture's left half, back on its right"""
@@ -99,13 +99,14 @@ def pouch(nx=12, ny=20):
     return o
 
 
-def cord(name, pts, r=0.0016, cyclic=False):
+def cord(name, pts, r=0.0016, cyclic=False, steps=3):
     """a length of the white cord through `pts` (the game's frame), round, its ends closed"""
     cd = bpy.data.curves.new(name, "CURVE")
     cd.dimensions = "3D"
     cd.bevel_depth = r
     cd.bevel_resolution = 1
-    cd.resolution_u = 5
+    # (eight round, a few steps a span: a cord a few millimetres long was 600 triangles at five)
+    cd.resolution_u = steps
     cd.use_fill_caps = True
     sp = cd.splines.new("BEZIER")
     sp.use_cyclic_u = cyclic
@@ -127,14 +128,14 @@ def cord(name, pts, r=0.0016, cyclic=False):
     return o
 
 
-def loop(name, cx, cy, rx, ry, tilt, n=10):
+def loop(name, cx, cy, rx, ry, tilt, n=8):
     """a closed loop of the cord: an ellipse round (cx, cy), stood a little off the pouch's face"""
     pts = []
     for k in range(n):
         a = 2 * math.pi * k / n
         x, y = cx + rx * math.cos(a), cy + ry * math.sin(a)
         pts.append((x, y, 0.0015 * math.sin(a + tilt)))
-    return cord(name, pts, cyclic=True)
+    return cord(name, pts, cyclic=True, steps=2)
 
 
 pouch()
