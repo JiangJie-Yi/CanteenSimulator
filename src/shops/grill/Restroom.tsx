@@ -4,7 +4,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { setTip } from '@/scene/hoverTip'
 import { cleanRoom, FLIES_AT, DIRTY_AT, newRoll, ROLL_USES } from '@/game/restroom'
-import { mergeByMaterial } from '@/scene/StaticBatch'
+import { mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { toonOf } from './BarFurnish'
 import { handOver, TOILETS, meterWater } from './bar'
 import { getEdit } from './edit'
@@ -143,6 +143,8 @@ export function ToiletLive({ who, at }: { who: Who; at: [number, number, number]
     lit(root.getObjectByName('WcArmScreen') as THREE.Mesh, '#9fe0ff')
     // (what never moves on its own folded together by material, its ink lines into one: some thirty draws to under twenty; the lid, the water
     // and the washlet's wand, which do, kept as they are)
+    // (its plain colours one material, so those merge too)
+    plainColours(root)
     mergeByMaterial(root, (o) => /^Wc(Lid|Water|Wand)$/.test(o.name))
     const wand = root.getObjectByName('WcWand')
     return { root, lid: root.getObjectByName('WcLid')!, water, wand, wandX: wand?.position.x ?? 0.16 }
@@ -329,7 +331,7 @@ function useBits() {
     const ledMat = lit(r.led.getObjectByName('OtoLed') as THREE.Mesh, '#5ab4ff')
     // (the parts that never move on their own, their buttons and ink lines, folded into a mesh or two per material: the remote and the
     // Otohime were near thirty draws apiece, in each of the two toilets; the lit screen keeps its own)
-    for (const o of [r.remote, r.oto, r.holder, r.pot, r.bin, r.pads]) mergeByMaterial(o)
+    for (const o of [r.remote, r.oto, r.holder, r.pot, r.bin, r.pads]) { plainColours(o); mergeByMaterial(o) }
     return { ...r, ledMat }
   }, [gltf])
 }
@@ -510,6 +512,7 @@ export function WashstandLive({ who }: { who: Who }) {
     const box = new THREE.Box3().setFromObject(pane), mid = box.getCenter(new THREE.Vector3())
     const toRoot = root.matrixWorld.clone().invert()
     const face = new THREE.Vector3(box.min.x, mid.y, mid.z).applyMatrix4(toRoot)
+    plainColours(root)
     mergeByMaterial(root)
     mergeByMaterial(handle)
     let plain: THREE.Object3D | null = null
