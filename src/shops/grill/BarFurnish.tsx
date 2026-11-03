@@ -13,7 +13,14 @@ const TILLSTOOL_URL = import.meta.env.BASE_URL + 'models/tillstool.glb'
 const BAMBOO_URL = import.meta.env.BASE_URL + 'models/bamboopot.glb'
 const TOILET_URL = import.meta.env.BASE_URL + 'models/toilet.glb'
 const WASH_URL = import.meta.env.BASE_URL + 'models/washstand.glb'
-const GLOSSY = new Set(['StoolBrass', 'PotGlaze', 'WcChina', 'WcIvory', 'WcChrome', 'WcWater', 'WashBrass', 'WashMirror', 'WashBowl', 'WashSoap', 'WashFrame'])
+const GLOSSY = new Set(['StoolBrass', 'PotGlaze', 'WcChina', 'WcIvory', 'WcChrome', 'WcWater', 'WashBrass', 'WashMirror', 'WashBowl', 'WashSoap', 'WashFrame', 'BitWalnut'])
+/** a few made as asked (the owner's): the toilet's china a warm ivory, glazed (clear coat, a little rough); its chrome bright metal; the
+ * paper holder's walnut with a soft sheen */
+const FINISH: Record<string, { color?: string; roughness: number; metalness: number; clearcoat: number }> = {
+  WcChina: { color: '#f4f4f0', roughness: 0.15, metalness: 0.05, clearcoat: 0.8 },
+  WcChrome: { roughness: 0.2, metalness: 0.9, clearcoat: 0.3 },
+  BitWalnut: { roughness: 0.45, metalness: 0, clearcoat: 0.35 },
+}
 /** parts too thin or small for an ink line */
 const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel|Slat|Drain|Pump|Pull|Pad\d)/
 
@@ -31,7 +38,8 @@ function toonOf(url: string, scene: THREE.Group) {
     if (!t) {
       t = GLOSSY.has(src.name)
         // (the washroom's mirror kept a mirror: nearly smooth (the rest a little softened))
-        ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, metalness: src.metalness, roughness: src.name === 'WashMirror' ? 0.04 : Math.max(0.2, src.roughness), clearcoat: 0.5 })
+        ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, metalness: src.metalness, roughness: src.name === 'WashMirror' ? 0.04 : Math.max(0.2, src.roughness), clearcoat: 0.5,
+          ...(FINISH[src.name] ? { ...FINISH[src.name], color: FINISH[src.name].color ? new THREE.Color(FINISH[src.name].color) : src.color.clone() } : {}) })
         // (the chair back's kumiko: one picture, its gaps cut out by its alpha (tested, not blended), seen from either side)
         : src.name === 'TillKumiko'
           ? new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, alphaTest: 0.5, side: THREE.DoubleSide })

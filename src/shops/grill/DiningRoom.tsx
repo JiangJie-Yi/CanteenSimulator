@@ -1921,6 +1921,8 @@ const WC_GEO = {
   pot: new THREE.CylinderGeometry(0.03, 0.026, 0.1, 10),
   leaf: new THREE.ConeGeometry(0.02, 0.12, 4),
   lamp: new THREE.SphereGeometry(0.06, 12, 8),
+  /** the wall lantern's paper: a box a little inside its frame */
+  lantern: new THREE.BoxGeometry(0.11, 0.17, 0.05),
 }
 /** the room's paper lamp, on its sensor */
 /**
@@ -1944,7 +1946,7 @@ function WcDark({ who, rooms }: { who: 'm' | 'f'; rooms: [number, number, number
     </group>
   )
 }
-function WcLamp({ who, at }: { who: 'm' | 'f'; at: [number, number, number] }) {
+function WcLamp({ who, at, geo = WC_GEO.lamp }: { who: 'm' | 'f'; at: [number, number, number]; geo?: THREE.BufferGeometry }) {
   const m = useRef<THREE.MeshBasicMaterial>(null)
   const k = useRef(0.4)
   useFrame(() => {
@@ -1952,7 +1954,7 @@ function WcLamp({ who, at }: { who: 'm' | 'f'; at: [number, number, number] }) {
     k.current += ((getLights().wc[who] ? 1 : 0.12) - k.current) * 0.08
     m.current?.color.set('#fff1cc').multiplyScalar(k.current)
   })
-  return <mesh geometry={WC_GEO.lamp} position={at}><meshBasicMaterial ref={m} color="#fff1cc" toneMapped={false} /></mesh>
+  return <mesh geometry={geo} position={at}><meshBasicMaterial ref={m} color="#fff1cc" toneMapped={false} /></mesh>
 }
 /** a wall of the toilet's rooms, facing into them: charred cedar to the waist with a rail along it, cream plaster over; `len` along it, its
  * middle at `at`, turned `yaw` (unturned, it faces +z); the cedar's boards their own width whatever its length. `cut`: the wall that's cut
@@ -2020,15 +2022,20 @@ function WcSlats({ x, z, y }: { x: [number, number]; z: [number, number]; y: num
 /** a paper lamp on a wall, on a little wooden arm (the rooms have no ceiling: they're seen from above, cut open): its globe in its ring `out`
  * from the wall, at `at` on it, the wall facing `yaw` (unturned, +z) */
 function WcSconce({ who, at, yaw }: { who: 'm' | 'f'; at: [number, number, number]; yaw: number }) {
-  const out = 0.1
+  // (a small Japanese wall lantern (the owner's: not a globe on a bent black arm): a dark wooden frame on a backboard against the wall, its
+  // washi lit from inside, a kumiko of thin bars over its front; low on triangles, its glow its own, no light of its own)
+  const out = 0.045
+  const D = '#3a2416'
   return (
-    <group position={at} rotation-y={yaw}>
-      <WcLamp who={who} at={[0, 0, out]} />
+    <group position={[at[0], at[1] - 0.06, at[2]]} rotation-y={yaw}>
+      <WcLamp who={who} at={[0, 0, out]} geo={WC_GEO.lantern} />
       <StaticBatch>
-        <mesh position={[0, 0, out]} rotation-x={Math.PI / 2}><torusGeometry args={[0.062, 0.004, 5, 18]} /><meshToonMaterial color="#3a2416" /></mesh>
-        <mesh position={[0, 0.07, out / 2]}><boxGeometry args={[0.014, 0.014, out]} /><meshToonMaterial color="#5a3a22" /></mesh>
-        <mesh position={[0, 0.035, out]}><cylinderGeometry args={[0.003, 0.003, 0.07, 5]} /><meshToonMaterial color="#3a2416" /></mesh>
-        <mesh position={[0, 0.07, 0.006]}><boxGeometry args={[0.05, 0.05, 0.012]} /><meshToonMaterial color="#5a3a22" /></mesh>
+        <mesh position={[0, 0, 0.006]}><boxGeometry args={[0.15, 0.26, 0.012]} /><meshToonMaterial color="#5a3a22" /></mesh>
+        {[-1, 1].map((sd) => <mesh key={`p${sd}`} position={[sd * 0.06, 0, out]}><boxGeometry args={[0.012, 0.2, 0.064]} /><meshToonMaterial color={D} /></mesh>)}
+        {[-1, 1].map((sd) => <mesh key={`c${sd}`} position={[0, sd * 0.098, out]}><boxGeometry args={[0.14, 0.014, 0.07]} /><meshToonMaterial color={D} /></mesh>)}
+        {/* (its kumiko: one bar up the middle, three across) */}
+        <mesh position={[0, 0, out + 0.0262]}><boxGeometry args={[0.005, 0.18, 0.004]} /><meshToonMaterial color={D} /></mesh>
+        {[-0.045, 0, 0.045].map((y) => <mesh key={`h${y}`} position={[0, y, out + 0.0262]}><boxGeometry args={[0.11, 0.005, 0.004]} /><meshToonMaterial color={D} /></mesh>)}
       </StaticBatch>
     </group>
   )
@@ -2186,7 +2193,8 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <group position={[SX, 0, s * w / 2]} rotation-y={-s * Math.PI / 2}>
         <Movable id={`wc2-${who}-toilet`} label={`馬桶（${name}）`}>
         {/* the toilet with its washlet, facing the way in, its cistern to the far wall (blender/wc.py; Restroom: its lid, flush, scrubbing) */}
-        <ToiletLive who={who} at={[E - 0.4, 0, 0]} />
+        {/* (mirrored across its middle (the owner's): its washlet's panel on its left, the side the remote and the paper are on) */}
+        <group scale={[1, 1, -1]}><ToiletLive who={who} at={[E - 0.4, 0, 0]} /></group>
         </Movable>
         {/* (marks on the floor before it as it gets dirty) */}
         <WcMarks who={who} at={[0.03, 0.006, 0]} size={[0.3, 0.5]} />
@@ -2203,7 +2211,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         </group>
         </StaticBatch>
         <Movable id={`wc2-${who}-remote`} label={`免治馬桶遙控器（${name}）`}>
-          <group position={[E - 0.36, 0.86, W2]} rotation-y={Math.PI}><WcRemote who={who} /></group>
+          <group position={[E - 0.34, 0.9, -W2]}><WcRemote who={who} /></group>
         </Movable>
         {/* (the Otohime in the women's only: the owner's) */}
         {who === 'f' && (
@@ -2216,7 +2224,8 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         </Movable>
         <Movable id={`wc2-${who}-paper`} label={`衛生紙架（${name}）`}>
           {/* the paper, on its walnut holder on the wall by the toilet (Restroom: thinning with use, a new roll at a click) */}
-          <group position={[E - 0.36, 0.6, W2]} rotation-y={Math.PI}><WcPaper who={who} /></group>
+          {/* (on the same wall as the remote, its own place forward of it, clear of the washlet's arm (the owner's: they crowded each other)) */}
+          <group position={[E - 0.66, 0.62, -W2]}><WcPaper who={who} /></group>
         </Movable>
         {who === 'f' && (
           <Movable id="wc2-f-bin" label="生理用品垃圾桶（女廁）">
@@ -2226,7 +2235,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         {who === 'f' && (
           <Movable id="wc2-f-pads" label="衛生棉（女廁）">
             {/* (the sanitary pads, free to take, on their shelf on the wall across from the paper) */}
-            <group position={[E - 0.42, 0.98, -W2]}><WcPads /></group>
+            <group position={[E - 0.42, 0.98, W2]} rotation-y={Math.PI}><WcPads /></group>
           </Movable>
         )}
         <Movable id={`wc2-${who}-lamp2`} label={`隔間紙燈（${name}）`}>
@@ -2531,10 +2540,11 @@ const STAFF_STAIRS = (() => {
   const top = yf + N * rise, yc = yf + 2.15, sc = s0 + 0.55, k = rise / run, ycap = top + 2.1
   const f = (v: number) => v.toFixed(4)
   return new THREE.ShaderMaterial({
-    uniforms: { uCam: { value: new THREE.Vector3(0, 0, 3) } },
+    uniforms: { uCam: { value: new THREE.Vector3(0, 0, 3) }, uHover: { value: 0 } },
     vertexShader: `varying vec3 vLocal;
 void main() { vLocal = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `uniform vec3 uCam;
+uniform float uHover;
 varying vec3 vLocal;
 const float HW = ${f(hw)}, YF = ${f(yf)}, RISE = ${f(rise)}, RUN = ${f(run)}, S0 = ${f(s0)}, D = ${f(D)}, TOP = ${f(top)};
 const float YC = ${f(yc)}, SC = ${f(sc)}, K = ${f(k)}, YCAP = ${f(ycap)};
@@ -2553,6 +2563,28 @@ vec3 grain(float along, float across, vec3 a, vec3 b) {
   float g = 0.5 + 0.3 * sin(ph) * (1.0 - smoothstep(0.25, 0.8, fwidth(ph)));
   float drift = 0.5 + 0.5 * sin(along * 1.3 + across * 3.7);
   return mix(a, b, g * 0.45 + drift * 0.25);
+}
+// (where a ray first meets a capsule round segment a-b, r thick: its distance, or -1)
+float capsule(vec3 ro, vec3 rd, vec3 a, vec3 b, float r) {
+  vec3 ba = b - a, oa = ro - a;
+  float baba = dot(ba, ba), bard = dot(ba, rd), baoa = dot(ba, oa), rdoa = dot(rd, oa), oaoa = dot(oa, oa);
+  float qa = baba - bard * bard, qb = baba * rdoa - baoa * bard, qc = baba * oaoa - baoa * baoa - r * r * baba;
+  float h = qb * qb - qa * qc;
+  if (h >= 0.0) {
+    float t = (-qb - sqrt(h)) / qa;
+    float y = baoa + t * bard;
+    if (y > 0.0 && y < baba) return t;
+    vec3 oc = y <= 0.0 ? oa : ro - b;
+    qb = dot(rd, oc); qc = dot(oc, oc) - r * r;
+    h = qb * qb - qc;
+    if (h > 0.0) return -qb - sqrt(h);
+  }
+  return -1.0;
+}
+vec3 capsuleNormal(vec3 p, vec3 a, vec3 b, float r) {
+  vec3 ba = b - a, pa = p - a;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return (pa - h * ba) / r;
 }
 void main() {
   vec3 dir = normalize(vLocal - uCam);
@@ -2591,26 +2623,16 @@ void main() {
       if (t > 0.0 && t < best && p.z >= si - OV && p.z <= si) { best = t; kind = 9; }
     }
   }
-  // the handrail (10): a round bar, 4.4 cm across, its axis 6 cm off the left wall, 0.8 over the stair's line, along the slope from its foot
-  // to the landing (the owner's: painted on the wall it read as a thin line from in front; this is round from anywhere)
-  vec3 RA = vec3(-HW + 0.06, YF + 0.8, S0 - RUN);
-  vec3 RU = normalize(vec3(0.0, K, 1.0));
-  float RR = 0.022;
+  // the handrail (10): a round bar, 4.4 cm across, its axis 7.5 cm off the left wall (held off it on brackets: closer, it and the wall's
+  // shading fought), 0.8 over the stair's line: level from just inside the door to the stair's foot, then up the slope to the landing, one
+  // bar with a rounded bend (the owner's: it stopped short in the air at the foot), its ends rounded off
   vec3 rn = vec3(0.0);
   {
-    vec3 w = o - RA;
-    float du = dot(d, RU), wu = dot(w, RU);
-    float qa = dot(d, d) - du * du, qb = 2.0 * (dot(d, w) - du * wu), qc = dot(w, w) - wu * wu - RR * RR;
-    float disc = qb * qb - 4.0 * qa * qc;
-    if (disc > 0.0) {
-      float th = (-qb - sqrt(disc)) / (2.0 * qa);
-      vec3 h = o + d * th;
-      float along = dot(h - RA, RU) * RU.z;
-      if (th > 0.0 && th < best && along > 0.08 && along < float(N) * RUN - 0.02) {
-        best = th; kind = 10;
-        rn = normalize(h - RA - RU * dot(h - RA, RU));
-      }
-    }
+    float RR = 0.022, XR = -HW + 0.075;
+    vec3 r0 = vec3(XR, YF + 0.8, 0.12), r1 = vec3(XR, YF + 0.8, S0 - RUN), r2 = vec3(XR, YF + 0.8 + float(N) * RUN * K, S0 - RUN + float(N) * RUN - 0.04);
+    float ta = capsule(o, d, r0, r1, RR), tb = capsule(o, d, r1, r2, RR);
+    if (ta > 0.0 && ta < best) { best = ta; kind = 10; rn = capsuleNormal(o + d * ta, r0, r1, RR); }
+    if (tb > 0.0 && tb < best) { best = tb; kind = 10; rn = capsuleNormal(o + d * tb, r1, r2, RR); }
   }
   p = o + d * best;
   vec3 n = kind == 10 ? rn : kind == 1 ? vec3(1, 0, 0) : kind == 2 ? vec3(-1, 0, 0) : (kind == 3 || kind == 7) ? vec3(0, 1, 0) : (kind == 5 || kind == 9) ? vec3(0, -1, 0) : vec3(0, 0, -1);
@@ -2619,15 +2641,18 @@ void main() {
   float glow = 0.0;
   if (kind == 1 || kind == 2) {
     float lift = p.y - lineY(p.z);
-    c = lift < 0.95 ? grain(p.y + floor(p.z * 6.0) * 1.9, p.z + float(kind) * 0.37, vec3(0.12, 0.065, 0.032), vec3(0.18, 0.1, 0.05)) * (0.92 + 0.08 * step(0.5, fract(p.z * 6.0)))
+    // (the wainscot's top straight along the slope, carried on down past the stair's foot (the owner's: it bent up there, plaster in the bend))
+    float slope = YF + (p.z - S0 + RUN) * K;
+    float wt = min(slope, lineY(p.z)) + 0.95;
+    c = p.y < wt ? grain(p.y + floor(p.z * 6.0) * 1.9, p.z + float(kind) * 0.37, vec3(0.12, 0.065, 0.032), vec3(0.18, 0.1, 0.05)) * (0.92 + 0.08 * step(0.5, fract(p.z * 6.0)))
       : vec3(0.42, 0.37, 0.29) * (0.96 + 0.04 * sin(p.z * 40.0 + p.y * 23.0));
     // (the skirting along the stair: a dark board its whole length, its top edge catching a little light)
     if (lift < 0.11) c = vec3(0.07, 0.04, 0.02) * (lift > 0.095 ? 1.8 : 1.0);
     // (the handrail on the left wall (the owner's), up the whole stair from its foot to the landing: a dark round rail parallel to it, lit
     // along its top, a shadow under it on the wall, held off the wall by three iron brackets (its foot, its middle, its top))
     float rail = p.y - (lineY(p.z) + 0.8);
-    if (kind == 1 && p.z > S0 - 0.15 && p.z < S0 + float(N) * RUN + 0.2) {
-      float bz = min(min(abs(p.z - (S0 + 0.05)), abs(p.z - (S0 + float(N) * RUN * 0.5))), abs(p.z - (S0 + float(N) * RUN - 0.05)));
+    if (kind == 1 && p.z > 0.1 && p.z < S0 + float(N) * RUN + 0.2) {
+      float bz = min(min(abs(p.z - 0.2), abs(p.z - (S0 + float(N) * RUN * 0.5))), abs(p.z - (S0 + float(N) * RUN - 0.1)));
       // (round, 4 cm across, standing off the wall (the owner's: it read as a thin line): shaded across as a bar is, a bright line along its
       // upper side, dark under; its shadow a broad soft band on the wall below; each bracket a short iron arm, lit on its top)
       if (rail < 0.0 && rail > -0.07 && bz < 0.016) c = mix(vec3(0.08, 0.08, 0.085), vec3(0.34, 0.34, 0.36), smoothstep(-0.05, -0.026, rail)) * mix(0.7, 1.0, smoothstep(0.016, 0.004, bz));
@@ -2679,7 +2704,7 @@ void main() {
   vec3 L = vec3(-HW - 0.25, TOP + 1.0, D - 0.4);
   vec3 toL = L - p;
   float dl = length(toL);
-  float lamp = 5.0 / (1.0 + dl * dl * 1.3) * (0.35 + 0.65 * max(dot(n, toL / dl), 0.0));
+  float lamp = (5.0 + 2.5 * uHover) / (1.0 + dl * dl * 1.3) * (0.35 + 0.65 * max(dot(n, toL / dl), 0.0));
   float door = 0.5 * exp(-p.z * 2.2);
   // (and its light spilling down the stair: the steps further up and in the warmer, the treads most, what's seen of it through the door
   // lit from above)
@@ -2699,7 +2724,7 @@ void main() {
     // (the nosing's shadow along the riser's top)
     ao *= mix(0.3, 1.0, smoothstep(0.0, 0.05, YF + (ri + 1.0) * RISE - NT - p.y));
   }
-  if (kind == 1 || kind == 2) ao *= mix(0.45, 1.0, smoothstep(0.0, 0.12, p.y - stairY(p.z)));
+  if (kind == 1 || kind == 2) ao *= mix(0.55, 1.0, smoothstep(0.0, 0.12, p.y - lineY(p.z)));
   if (kind == 4) ao *= mix(0.5, 1.0, smoothstep(0.0, 0.1, HW - abs(p.x)));
   vec3 col = mix(c * light * ao, c, glow);
   // (the treads' and the floor's varnish: a soft sheen where they turn the lamp's light toward the eye)
@@ -2849,9 +2874,13 @@ function StaffDoor() {
   useEffect(() => () => { for (const o of sign.children) (o as THREE.Mesh).geometry.dispose() }, [sign])
   const g = useRef<THREE.Group>(null)
   const stairs = useRef<THREE.Mesh>(null)
+  const stairsHot = useRef(false)
   const st = useRef({ open: false, k: 0 })
   const narrow = STAFF_W / WC_W
   useFrame(({ camera }, dt) => {
+    // (pointed at: the landing's lamp eased a little brighter)
+    const hv = STAFF_STAIRS.uniforms.uHover
+    hv.value += ((stairsHot.current ? 1 : 0) - hv.value) * Math.min(1, dt * 8)
     // (the eye, in the stair's pane's own frame: where its lines through the pane run on into the stairwell)
     if (stairs.current) STAFF_STAIRS.uniforms.uCam.value.copy(stairs.current.worldToLocal(STAFF_EYE.copy(camera.position)))
     const s = st.current
@@ -2871,7 +2900,10 @@ function StaffDoor() {
       <group scale={[1, 1, narrow]}><primitive object={frame} /></group>
       {/* (the dark of the passage: right across the opening and on behind the posts, the head and the sill, so no plaster shows round its
           edges (the owner saw a pale strip down the side; it stopped 2.5 cm short of each post)) */}
-      <mesh ref={stairs} position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2} material={STAFF_STAIRS} raycast={() => {}}>
+      {/* (pointed at, through the open door (the shut door's in front and takes the pointer first): what's up there, and its light a little up) */}
+      <mesh ref={stairs} position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2} material={STAFF_STAIRS}
+        onPointerOver={(ev) => { if (getEdit().on) return; stairsHot.current = true; tipOver('2F 員工休息室／倉庫', '閒人勿進').onPointerOver(ev) }}
+        onPointerOut={(ev) => { stairsHot.current = false; tipOver('', '').onPointerOut(ev) }} onClick={(ev) => ev.stopPropagation()}>
         <planeGeometry args={[STAFF_W + 0.06, WC_H + 0.03]} />
       </mesh>
       <group ref={g} onClick={(ev) => {
