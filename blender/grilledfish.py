@@ -1943,10 +1943,12 @@ def shrimp_pair():
 
 def sausage():
     """A plump link with rounded ends, curved like a real sausage. Built along local Z, then laid along X."""
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=24, rotation=(0, math.radians(90), 0))
+    # (20 round, 14 along, its two ends closed in ladders, not fans into their poles)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=20, ring_count=14, rotation=(0, math.radians(90), 0))
     o = active()
     bm = bmesh.new()
     bm.from_mesh(o.data)
+    ladder_poles(bm, bm.loops.layers.uv.verify())
     for vtx in bm.verts:
         z = vtx.co.z
         # long capsule: fuller through the middle, rounded at the ends
