@@ -1291,8 +1291,20 @@ def fish(species="ayu"):
     wave = lambda x: 0.95 * D * sway * math.sin(x * math.pi / L)      # noqa: E731  the gentle curve, seen from the side
     slope = lambda x: math.atan(0.95 * D * sway * math.pi / L * math.cos(x * math.pi / L))   # noqa: E731
     bm = bmesh.new()
-    bm.loops.layers.uv.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=56, v_segments=40, radius=1, calc_uvs=True)
+    uvl = bm.loops.layers.uv.new()
+    # (24 round, 24 along: 56 by 40 made each fish some 4,500 triangles, with a fan of 56 into each end; its scales are the normal map's)
+    bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=24, radius=1, calc_uvs=True)
+    # (each end, the snout's tip and the tail's root, closed across the ring beside it in a ladder, not a fan into the pole)
+    for pole in [v for v in bm.verts if abs(v.co.z) > 0.9999]:
+        ring = [e.other_vert(pole) for e in pole.link_edges]
+        ring.sort(key=lambda v: math.atan2(v.co.y, v.co.x))
+        vs = [lp[uvl].uv.y for v in ring for lp in v.link_loops]
+        vv = sum(vs) / len(vs)
+        bm.verts.remove(pole)
+        for f in ladder_fill(bm, ring):
+            for lp in f.loops:
+                lp[uvl].uv = (0.5 + 0.5 * math.atan2(lp.vert.co.y, lp.vert.co.x) / math.pi, vv)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     for vtx in bm.verts:
         # turn the sphere so its poles are the tail (-X) and the head (+X): its UVs then run along the fish
         ox, oy, oz = vtx.co
@@ -1355,10 +1367,10 @@ def fish(species="ayu"):
     ez = wave(ex) + depth_at(ex) * 0.22
     for side in (-1, 1):
         ey = bend(ex) + side * (width_at(ex) * 0.86)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=20, ring_count=12, location=(ex, ey, ez))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=12, ring_count=7, location=(ex, ey, ez))
         active().scale = (1, 0.38, 1)
         parts.append(finish(active(), "Eye", M["eye"]))
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.42, segments=14, ring_count=8, location=(ex, ey + side * er * 0.3, ez))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.42, segments=10, ring_count=5, location=(ex, ey + side * er * 0.3, ez))
         active().scale = (1, 0.3, 1)
         parts.append(finish(active(), "Pupil", M["pupil"]))
         # (the gill cover's edge: a dark arc from the nape down behind the eye to the throat)
@@ -1369,7 +1381,7 @@ def fish(species="ayu"):
         parts.append(tube(arc, 0.0022 + D * 0.012, (0.0022 + D * 0.012) * 0.6, M["pupil"], "Gill", 6))
     # the mouth, open toward the coals: a dark gape at the snout's tip, its lower jaw jutting a little
     mx = L * 0.97
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=D * 0.16, segments=16, ring_count=10, location=(mx, bend(mx), wave(mx) - depth_at(L * 0.9) * 0.15))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=D * 0.16, segments=12, ring_count=6, location=(mx, bend(mx), wave(mx) - depth_at(L * 0.9) * 0.15))
     active().scale = (0.7, max(0.4, W / D * 1.1), 1)
     parts.append(finish(active(), "Mouth", M["pupil"]))
 
