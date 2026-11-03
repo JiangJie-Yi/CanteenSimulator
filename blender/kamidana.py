@@ -578,7 +578,7 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
     LL = 0.05
     for k in range(n):
         z = zc + (k - (n - 1) / 2) * gap
-        lg = cyl(f"Kami{tag}Katsuogi{k}", 0.0068, LL, P(cx0, ridge_h + 0.025, z), M["woodDark"], rot=(0, math.pi / 2, 0), verts=20)
+        lg = cyl(f"Kami{tag}Katsuogi{k}", 0.0068, LL, P(cx0, ridge_h + 0.025, z), M["woodDark"], rot=(0, math.pi / 2, 0), verts=12)
         bpy.ops.object.select_all(action="DESELECT"); lg.select_set(True); bpy.context.view_layer.objects.active = lg
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
         bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="DESELECT")
@@ -587,7 +587,8 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
         for e in lg.data.edges:
             v0, v1 = lg.data.vertices[e.vertices[0]].co, lg.data.vertices[e.vertices[1]].co
             e.select = abs(v0.x - v1.x) > LL * 0.5
-        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.subdivide(number_cuts=8); bpy.ops.object.mode_set(mode="OBJECT")
+        # (four cuts along it for its swell: eight with twenty round made each log 396 triangles)
+        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.subdivide(number_cuts=4); bpy.ops.object.mode_set(mode="OBJECT")
         for vt in lg.data.vertices:
             u_ = vt.co.x / (LL / 2)
             k_ = 1 - 0.2 * u_ * u_
@@ -599,7 +600,7 @@ def bay(tag, zc, width, body_h, ridge_h, depth=0.13):
         uv_grain(lg, 0.06)
         out.append(lg)
         for sx in (-1, 1):
-            out.append(cyl(f"Kami{tag}KatsuogiCap{k}{sx}", 0.0058, 0.0045, P(cx0 + sx * (LL / 2 - 0.0005), ridge_h + 0.025, z), M["gold"], rot=(0, math.pi / 2, 0), verts=20))
+            out.append(cyl(f"Kami{tag}KatsuogiCap{k}{sx}", 0.0058, 0.0045, P(cx0 + sx * (LL / 2 - 0.0005), ridge_h + 0.025, z), M["gold"], rot=(0, math.pi / 2, 0), verts=12))
     return out
 
 
@@ -668,8 +669,9 @@ def ebtube(name, pts, r, mat_, ring=8):
     sp.use_endpoint_u = True
     sp.order_u = min(3, len(pts))
     cu.bevel_depth = r
-    cu.bevel_resolution = 2
-    cu.resolution_u = 6
+    # (eight round and two steps a span: a crescent a few millimetres long was 764 triangles at twelve and six)
+    cu.bevel_resolution = 1
+    cu.resolution_u = 2
     cu.use_fill_caps = True
     o = bpy.data.objects.new(name, cu)
     bpy.context.collection.objects.link(o)
@@ -1040,7 +1042,8 @@ def rope_at(t):
 
 # (two strands twisted round the middle line, as loosely as a straw rope this long is (about 2.7 turns over its span), smooth, thick where
 # the rope's thick)
-NSEG = 120
+# (72 along its span, some 27 to a turn: 120 made each strand 1,920 triangles)
+NSEG = 72
 for strand in range(2):
     pts, rad = [], []
     for i in range(NSEG + 1):
@@ -1183,7 +1186,8 @@ for x, y, z, r in rest:
 rest.append((tx, ty, tz, tr))
 TOP_Y = ty
 for k, (x, y, z, r) in enumerate(rest):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=32, ring_count=20, location=P(x, y, z))
+    # (20 round, 12 up: 32 by 20 was 1,200 triangles an orange a few centimetres across)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=20, ring_count=12, location=P(x, y, z))
     o = active()
     rng_ = np.random.default_rng(k + 3)
     ph_ = rng_.uniform(0, 6.28, 3)
@@ -1566,9 +1570,14 @@ def wrap(o, cuts=0):
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     if cuts:
-        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.subdivide(number_cuts=cuts)
-        bpy.ops.object.mode_set(mode="OBJECT")
+        # (cut across its face both ways, as it bends round the flask and with its swell, but not through its paper's thickness: cut
+        # every way, a label a few centimetres square was 1,452 triangles)
+        bm_ = bmesh.new()
+        bm_.from_mesh(o.data)
+        round_ = [e for e in bm_.edges if e.calc_length() > 0.004]
+        bmesh.ops.subdivide_edges(bm_, edges=round_, cuts=cuts, use_grid_fill=True)
+        bm_.to_mesh(o.data)
+        bm_.free()
     for vt in o.data.vertices:
         gx, gy, gz = vt.co.x, vt.co.z, -vt.co.y          # (the game's frame)
         r = body_r(gy)
