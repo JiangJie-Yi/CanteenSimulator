@@ -158,6 +158,54 @@ def walnut(variant=0, N=512):
     return np.clip(col, 0, 1)
 
 
+DRAWER_WALNUTS = (
+    # (the drawers' and their cases' walnut as it was before it was brightened (the owner's: the drawer as the old one, a little lighter and
+    # more natural; the tissue box in it the new): its browns a shade lighter than they were, the same four boards)
+    dict(base=(0.4, 0.26, 0.17), alt=(0.335, 0.22, 0.162), d=0.14, taper=0.24, rings=36, late=0.2, sap=0.0, streak=0.0),
+    dict(base=(0.31, 0.2, 0.135), alt=(0.27, 0.178, 0.14), d=0.0, taper=0.0, rings=48, late=0.2, sap=0.0, streak=0.0),
+    dict(base=(0.44, 0.29, 0.178), alt=(0.4, 0.265, 0.172), d=0.09, taper=0.3, rings=30, late=0.18, sap=1.0, streak=0.0),
+    dict(base=(0.37, 0.25, 0.19), alt=(0.315, 0.222, 0.19), d=0.2, taper=0.17, rings=40, late=0.17, sap=0.0, streak=1.0),
+)
+
+
+def drawer_walnut(variant=0, N=512):
+    """the drawers' walnut, drawn as it was (walnut() before it was brightened): the rings' late wood soft, the colour drifting along the
+    grain; made a little more natural: the grain bending slowly along the board as a tree's does, its late wood and pores a little fainter"""
+    w = DRAWER_WALNUTS[variant]
+    seed(31 + variant * 7)
+    u, v = grid01(N)
+    wob = fbm(N, 2, 3, 4) - 0.5
+    bend = (fbm(N, 1, 3, 4) - 0.5) * 0.07 + (fbm(N, 3, 9, 3) - 0.5) * 0.012
+    vv = v + bend
+    vc = 0.5 + 0.16 * np.sin(2 * math.pi * (u * 0.45 + 0.21 * variant)) + wob * 0.07
+    if w["d"] > 0:
+        ring = (np.sqrt((vv - vc) ** 2 + w["d"] ** 2) - w["taper"] * u) * w["rings"]
+    else:
+        ring = (vv + wob * 0.05 + 0.012 * np.sin(2 * math.pi * u)) * w["rings"]
+    ring = ring + (fbm(N, 2, 7, 3) - 0.5) * 1.6
+    ph = ring - np.floor(ring)
+    late = smooth(0.5, 0.78, ph) * (1 - smooth(0.86, 1.0, ph))
+    seed(53 + variant)
+    drift = smooth(0.25, 0.75, vnoise(N, 2, 9) * 0.65 + vnoise(N, 3, 23) * 0.35)
+    col = mix(np.array(w["base"], np.float32), np.array(w["alt"], np.float32), drift)
+    col = col * (1 - late * w["late"] * 0.75)[..., None]
+    seed(77 + variant)
+    pore = vnoise(N, 12, 190) * vnoise(N, 40, 270)
+    flecks = smooth(0.36, 0.56, pore) * (0.6 + 0.4 * late)
+    col = col * (1 - flecks * 0.2)[..., None]
+    fibre = vnoise(N, 5, 310)
+    col = col * (0.96 + 0.08 * fibre)[..., None]
+    if w["sap"]:
+        edge = 0.14 + 0.035 * np.sin(2 * math.pi * u * 1.3) + wob * 0.05
+        sap = smooth(edge + 0.012, edge - 0.025, v)
+        cream = np.array((0.64, 0.5, 0.36), np.float32) * (0.94 + 0.1 * fibre)[..., None]
+        col = mix(col, cream * (1 - late * 0.12)[..., None], sap * 0.9)
+    if w["streak"]:
+        line = smooth(0.03, 0.0, np.abs(v - (0.68 + 0.02 * np.sin(2 * math.pi * u)) - wob * 0.03)) * smooth(0.1, 0.4, u) * smooth(0.95, 0.7, u)
+        col = col * (1 - line * 0.25)[..., None]
+    return np.clip(col, 0, 1)
+
+
 def glaze(N=64):
     """the rest's indigo glaze, a little paler where it pools thin"""
     seed(4)
@@ -439,21 +487,20 @@ DW, DH, DD, DT = 0.17, 0.125, 0.26, 0.012
 def drawer_case(name):
     """the case: a top just under the counter's, a bottom, two sides and a back, open at the front"""
     x, y0 = DW / 2, -DH
-    return joined(name, [board(f"{name}Top", -x, x, -DT, 0, 0, DD, ease=0.0028), board(f"{name}Bottom", -x, x, y0, y0 + DT, 0, DD, ease=0.0028),
-                         board(f"{name}L", -x, -x + DT, y0 + DT, -DT, 0, DD, ease=0.0028), board(f"{name}R", x - DT, x, y0 + DT, -DT, 0, DD, ease=0.0028),
+    # (as it was first made (the owner's: the drawer the old one): its boards' edges not eased)
+    return joined(name, [board(f"{name}Top", -x, x, -DT, 0, 0, DD), board(f"{name}Bottom", -x, x, y0, y0 + DT, 0, DD),
+                         board(f"{name}L", -x, -x + DT, y0 + DT, -DT, 0, DD), board(f"{name}R", x - DT, x, y0 + DT, -DT, 0, DD),
                          board(f"{name}Back", -x + DT, x - DT, y0 + DT, -DT, DD - DT, DD)])
 
 
 def drawer_body(name):
-    """the drawer: its front (2 mm proud of the case: a frame, its edges chamfered, and a raised field in it a little prouder still, its
-    edges chamfered too, so a fine shadow runs round it; the owner: better made), and the box behind it: a bottom, two sides, a back"""
+    """the drawer: its front (2 mm proud of the case), and the box behind it: a bottom, two sides, a back (the owner's: the drawer as it was
+    first made, one plain board for its front; for a while a frame with a raised field in it)"""
     fy0, fy1 = -DH + 0.014, -0.014
     by0 = -DH + DT + 0.002
     fx = DW / 2 - DT - 0.002
     ix = fx - 0.008
-    m = 0.011
-    return joined(name, [board(f"{name}Front", -fx, fx, fy0, fy1, -0.002, 0.014, ease=0.0028),
-                         board(f"{name}Field", -fx + m, fx - m, fy0 + m, fy1 - m, -0.0045, 0.0, ease=0.0022),
+    return joined(name, [board(f"{name}Front", -fx, fx, fy0, fy1, -0.002, 0.014, ease=0.002),
                          board(f"{name}Bottom", -ix - 0.006, ix + 0.006, by0, by0 + 0.006, 0.014, 0.236, ease=0),
                          board(f"{name}L", -ix - 0.006, -ix, by0, -0.035, 0.014, 0.236, ease=0),
                          board(f"{name}R", ix, ix + 0.006, by0, -0.035, 0.014, 0.236, ease=0),
@@ -696,7 +743,8 @@ M = {
     "lacquer": pbr("BarChopLacquer", (1, 1, 1), tex=image("barchop", lacquer()), rough=0.3, coat=0.5),
     "rest": pbr("BarRestGlaze", (1, 1, 1), tex=image("barrest", glaze()), rough=0.2, coat=0.5),
     "walnut": pbr("BarTissueWalnut", (1, 1, 1), tex=image("bartissuewood", walnut(0)), rough=0.45, coat=0.2),
-    **{f"walnut{k}": pbr(f"BarWalnut{k}", (1, 1, 1), tex=image(f"barwalnut{k}", walnut(k)), rough=0.45, coat=0.2) for k in range(4)},
+    # (the four boards the game gives the drawers and their cases, seat by seat: the old walnut (drawer_walnut); the tissue box the new one)
+    **{f"walnut{k}": pbr(f"BarWalnut{k}", (1, 1, 1), tex=image(f"barwalnut{k}", drawer_walnut(k)), rough=0.45, coat=0.2) for k in range(4)},
     "tray": pbr("BarCondTray", (0.06, 0.045, 0.04), rough=0.25, coat=0.6),
     "shoyu": pbr("BarShoyuGlaze", (1, 1, 1), tex=image("barshoyu", shoyu_glaze()), rough=0.2, coat=0.5),
     "celadon": pbr("BarWasabiGlaze", (1, 1, 1), tex=image("barwasabi", celadon()), rough=0.2, coat=0.5),
