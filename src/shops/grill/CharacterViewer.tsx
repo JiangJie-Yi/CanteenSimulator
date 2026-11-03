@@ -118,7 +118,7 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
     return { key: 'boss', n: 0 }
   })
   useEffect(() => { try { localStorage.setItem(KEY_PICK, JSON.stringify(pick)) } catch { /* (not kept) */ } }, [pick])
-  const [open, setOpen] = useState(true)
+  const open = true
   // (slid off to the right, all but its handle (the owner's: a drawer's handle on its left edge), and its little canvas resting meanwhile)
   const [tucked, setTucked] = useState(() => { try { return localStorage.getItem(KEY_TUCK) === '1' } catch { return false } })
   useEffect(() => { try { localStorage.setItem(KEY_TUCK, tucked ? '1' : '0') } catch { /* (not kept) */ } }, [tucked])
@@ -143,12 +143,13 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
     <div className={`char-dock${tucked ? ' is-tucked' : ''}`}>
     <button type="button" className="dock-handle" onClick={() => setTucked((v) => !v)} aria-expanded={!tucked} aria-label={tuckLabel} title={tuckLabel}>
       <svg viewBox="0 0 10 18" aria-hidden="true"><path d={tucked ? 'M7 3 L3 9 L7 15' : 'M3 3 L7 9 L3 15'} /></svg>
+      {tucked && <span className="dock-handle-word">👤 {tl(lang, '角色', 'キャラ', 'Cast')}</span>}
     </button>
     <section className={`char-view${open ? '' : ' is-folded'}`} aria-label={tl(lang, '角色模型', 'キャラクター', 'Characters')} inert={tucked}>
       <header className="char-view-head">
         <b>{tl(lang, '角色模型', 'キャラクター', 'Characters')}</b>
         <span>{name}{e.kind ? ` #${gid}` : ''}</span>
-        <button type="button" className="char-view-fold" onClick={() => setOpen((v) => !v)} aria-expanded={open}>{open ? '▾' : '▸'}</button>
+        <button type="button" className="char-view-fold" onClick={() => setTucked(true)} title={tuckLabel} aria-label={tuckLabel}>−</button>
       </header>
       {open && (<>
         <div className="char-view-stage">

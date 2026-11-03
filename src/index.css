@@ -7034,6 +7034,9 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 .char-dock.is-tucked .dock-handle { pointer-events: auto; }
 .char-dock .dock-handle { position: absolute; left: 0; top: 50%; transform: translate(-100%, -50%); background: #3a3a3a; color: #ddd; }
 .char-dock .dock-handle:hover { background: #4a4a4a; color: #e8a33d; }
+/* (tucked, the viewer's handle a little taller, half see-through, its name upright under the arrow: 👤 角色) */
+.char-dock.is-tucked .dock-handle { height: auto; padding: 10px 0; gap: 6px; width: 26px; background: rgb(58 58 58 / 0.82); }
+.dock-handle-word { writing-mode: vertical-rl; font: 600 12px/1 system-ui, sans-serif; letter-spacing: 0.12em; white-space: nowrap; }
 .char-view {
   flex: 1; min-width: 0; max-height: 100%;
   display: flex; flex-direction: column; background: #303030; color: #d6d6d6; border: 1px solid #1c1c1c; border-radius: 6px;

@@ -6,7 +6,7 @@ export const EDIT_TEXT = {
   zh: {
     title: '開發者模式',
     keys: 'G／Esc 離開',
-    minimize: '縮小面板', close: '關閉（離開開發者模式）', sceneHead: '場景', cameraHead: '攝影機', backdrop: '背景色', backdropReset: '還原',
+    minimize: '收起面板（物件與操作軸保留）', unfold: '展開開發者面板', close: '關閉（離開開發者模式）', sceneHead: '場景', cameraHead: '攝影機', backdrop: '背景色', backdropReset: '還原',
     render: '渲染', renderNone: '（選一件擺設來調它的渲染方式）', shade: '光影', shadeSmooth: '平滑', shadeFlat: '平面', look: '材質', lookKeep: '原本', lookToon: '卡通',
     lookReal: '寫實', lookUnlit: '無光', ink: '描線', cast: '投影', receive: '受影', on: '開', off: '關', renderReset: '還原這件的渲染',
     renderTip: '只改這件擺設的畫法（存在瀏覽器裡；全部還原會一起清掉）',
@@ -63,7 +63,7 @@ export const EDIT_TEXT = {
   ja: {
     title: '開発者モード',
     keys: 'G／Esc で終了',
-    minimize: 'パネルを畳む', close: '閉じる（開発者モード終了）', sceneHead: 'シーン', cameraHead: 'カメラ', backdrop: '背景色', backdropReset: '元に戻す',
+    minimize: 'パネルをしまう（選択と軸はそのまま）', unfold: '開発者パネルを開く', close: '閉じる（開発者モード終了）', sceneHead: 'シーン', cameraHead: 'カメラ', backdrop: '背景色', backdropReset: '元に戻す',
     render: 'レンダリング', renderNone: '（オブジェクトを選ぶと描き方を変えられます）', shade: 'シェーディング', shadeSmooth: 'スムーズ', shadeFlat: 'フラット', look: 'マテリアル',
     lookKeep: '元のまま', lookToon: 'トゥーン', lookReal: 'リアル', lookUnlit: 'ライトなし', ink: '輪郭線', cast: '影を落とす', receive: '影を受ける', on: 'オン', off: 'オフ',
     renderReset: 'このオブジェクトの描き方を戻す', renderTip: 'このオブジェクトだけ描き方を変えます（ブラウザに保存、全部元に戻すで消えます）',
@@ -120,7 +120,7 @@ export const EDIT_TEXT = {
   en: {
     title: 'Developer mode',
     keys: 'G / Esc to leave',
-    minimize: 'Fold the panel', close: 'Close (leave developer mode)', sceneHead: 'Scene', cameraHead: 'Cameras', backdrop: 'Backdrop', backdropReset: 'Reset',
+    minimize: 'Tuck the panel away (the pick and its handles stay)', unfold: 'Show the developer panel', close: 'Close (leave developer mode)', sceneHead: 'Scene', cameraHead: 'Cameras', backdrop: 'Backdrop', backdropReset: 'Reset',
     render: 'Render', renderNone: '(pick a piece to set how it is drawn)', shade: 'Shading', shadeSmooth: 'Smooth', shadeFlat: 'Flat', look: 'Material',
     lookKeep: 'As made', lookToon: 'Toon', lookReal: 'Real', lookUnlit: 'Unlit', ink: 'Outline', cast: 'Casts shadow', receive: 'Takes shadow', on: 'On', off: 'Off',
     renderReset: 'Reset this piece', renderTip: 'Changes how this piece alone is drawn (kept in the browser; Reset all clears it)',

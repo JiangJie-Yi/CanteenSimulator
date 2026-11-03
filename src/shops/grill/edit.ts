@@ -643,6 +643,28 @@ export const statsOf = (id: string) => {
   return ms.length ? ms.reduce((a, b) => ({ tris: a.tris + b.tris, verts: a.verts + b.verts, meshes: a.meshes + b.meshes })) : null
 }
 let el: HTMLDivElement | null = null
+/** the panel tucked away to the left (the owner's: − hides the panel only, the gizmo and what's picked staying; × or G leave the mode),
+ * a little DEV tab left at the screen's edge to bring it back */
+let tucked = false
+let devTab: HTMLButtonElement | null = null
+function setTucked(v: boolean) {
+  tucked = v
+  if (el) {
+    const r = el.getBoundingClientRect()
+    el.classList.toggle('be-tucked', v)
+    el.style.transform = v ? `translateX(${-Math.ceil(r.right + 16)}px)` : ''
+    el.inert = v
+  }
+  if (!devTab && typeof document !== 'undefined') {
+    devTab = document.createElement('button')
+    devTab.type = 'button'
+    devTab.className = 'be-devtab'
+    devTab.textContent = '🛠️ DEV'
+    devTab.onclick = (e) => { e.stopPropagation(); setTucked(false) }
+    document.body.appendChild(devTab)
+  }
+  if (devTab) { devTab.classList.toggle('on', v && !!el); devTab.title = T().unfold }
+}
 let spaceBadge: HTMLButtonElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
@@ -700,7 +722,11 @@ const PANEL_CSS = `
 .be-tabs + .be-list { border-top-left-radius:0; border-top-right-radius:0 }
 .be-win { width:20px; height:20px; padding:0; border:0; border-radius:3px; background:#3a3a3a; color:#ddd; font:600 13px/20px sans-serif; cursor:pointer; flex:none }
 .be-win:hover { background:#4a4a4a } .be-close:hover { background:#b8433a; color:#fff }
-.be.be-min { max-height:none } .be.be-min .be-body, .be.be-min .be-tools { display:none }
+.be { transition: transform .3s cubic-bezier(.4,0,.2,1) } .be.be-tucked { pointer-events:none }
+.be-devtab { position:fixed; left:0; bottom:120px; z-index:9999; padding:8px 12px 8px 10px; border:1px solid #1a1a1a; border-left:0;
+  border-radius:0 10px 10px 0; background:rgba(40,40,40,.88); color:#e6e6e6; font:600 13px/1 system-ui, sans-serif; cursor:pointer;
+  box-shadow:3px 4px 12px rgba(0,0,0,.35); transform:translateX(-110%); transition:transform .3s cubic-bezier(.4,0,.2,1) }
+.be-devtab.on { transform:none } .be-devtab:hover { background:#4772b3; color:#fff }
 .be-body { overflow:auto; flex:1; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a }
 .be-grip { position:absolute; left:0; right:0; top:-5px; height:10px; cursor:ns-resize; z-index:3 }
 .be-grip::after { content:''; position:absolute; left:50%; top:3px; width:44px; height:4px; margin-left:-22px; border-radius:2px; background:#5a5a5a }
@@ -770,7 +796,7 @@ const TOOL_ICONS: Record<Tool, string> = {
 }
 function panel() {
   if (typeof document === 'undefined') return
-  if (!state.on) { el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; setListHot(null); return }
+  if (!state.on) { if (tucked) { tucked = false; devTab?.classList.remove('on') } el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; setListHot(null); return }
   if (!document.getElementById('be-style')) {
     const st = document.createElement('style')
     st.id = 'be-style'
@@ -783,6 +809,7 @@ function panel() {
     el?.remove()
     el = document.createElement('div')
     el.className = 'be'
+    if (tucked) requestAnimationFrame(() => setTucked(true))
     const h = (tag: string, cls?: string, text?: string) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n }
     // (its top edge a grip: dragged up, the panel grows taller (it stands on the bottom); the height kept for next time)
     const grip = h('div', 'be-grip')
@@ -825,7 +852,7 @@ function panel() {
     // (the panel folded down to its title bar, and shut (leaving the mode, as G or Esc))
     const minB = h('button', 'be-win', '−') as HTMLButtonElement
     minB.title = T().minimize
-    minB.onclick = (e) => { e.stopPropagation(); const r = minB.closest('.be'); r?.classList.toggle('be-min'); minB.textContent = r?.classList.contains('be-min') ? '▢' : '−' }
+    minB.onclick = (e) => { e.stopPropagation(); setTucked(true) }
     const closeB = h('button', 'be-win be-close', '×') as HTMLButtonElement
     closeB.title = T().close
     closeB.onclick = (e) => { e.stopPropagation(); toggleEdit() }
