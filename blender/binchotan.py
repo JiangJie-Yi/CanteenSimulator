@@ -92,7 +92,9 @@ glow_tex = image("binGlow", np.clip(glow, 0, 1))
 MAT = pbr("Binchotan", (1, 1, 1), tex=face_tex, nrm=nrm_tex, nrm_strength=1.0, rough=0.42, metal=0.35, emit=(1, 1, 1), emit_strength=1.0, emit_tex=glow_tex)
 
 
-def piece(name, L, R, jag, rng, bend=0.03, NA=16, NL=12):
+def piece(name, L, R, jag, rng, bend=0.03, NA=10, NL=4):
+    # (ten round and four along, ~108 faces (it was 16 x 12, 476): its ridges and splits are the normal map's; the crate holds seventy of
+    # them, the owner's count of the scene's faces had it at 34,000)
     """a stick (or a piece of one) along z: its section never quite round (ridges, a couple of splits sunk in, a slight flat), bent a little,
     thicker at one end; its ends broken unevenly (`jag`), each end closed by a rough fan"""
     ph = rng.uniform(0, 6.28, 4)
@@ -188,7 +190,7 @@ for k in range(6):
     parts.append(piece(f"BinStick{k}", 0.3, 0.032, 0.006, rng, bend=0.03 + 0.01 * (k % 3)))
 for k in range(6):
     rng = np.random.default_rng(200 + k)
-    parts.append(piece(f"BinChunk{k}", float(rng.uniform(0.05, 0.1)), 0.024, 0.012, rng, bend=0.01, NL=6))
+    parts.append(piece(f"BinChunk{k}", float(rng.uniform(0.05, 0.1)), 0.024, 0.012, rng, bend=0.01, NL=2))
 
 # (the ash a stick burns down to: grey clumps, granular, lumpy on top and flat underneath (they lie on the bed, none balanced on a point),
 # a pale ash grey flecked with darker grains and a few white ones; their own material)

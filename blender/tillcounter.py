@@ -282,7 +282,7 @@ for sx in (-1, 1):
 WX = W / 2 - 0.05
 WY = H / 2 + 0.03
 # (the ring round the opening, standing a little proud of the end; a sleeve of the same pale wood lining the hole back to the paper)
-bpy.ops.mesh.primitive_torus_add(major_radius=0.213, minor_radius=0.017, major_segments=48, minor_segments=8, location=P(W / 2 - 0.016, WY, 0.02), rotation=(0, math.pi / 2, 0))
+bpy.ops.mesh.primitive_torus_add(major_radius=0.213, minor_radius=0.017, major_segments=32, minor_segments=6, location=P(W / 2 - 0.016, WY, 0.02), rotation=(0, math.pi / 2, 0))
 ring = active()
 finish(ring, "TillWindowRing", M["ring"])
 bd.append(ring)
@@ -321,12 +321,13 @@ def culm(name, x, r, y0, h, z, lean, bow, phase, nodes_at, swell, shade):
     bowed, thicker and thinner along its length (`swell`: amount, wavelength, phase), and at each node a sharp ridge with the sheath's scar
     just under it and a little pinch above"""
     bm_ = bmesh.new()
-    seg = 12
+    seg = 8
     uvl = bm_.loops.layers.uv.new("UVMap")
-    # (eight lengths up it, and three rings at each node: its scar, its ridge, its pinch; twelve and five were some 800 triangles a culm)
-    ys = {round(y0 + h * i / 8, 5) for i in range(9)}
+    # (eight round, six lengths up it, and two rings at each node: its ridge and the pinch just above; ~200 triangles a culm (twelve round,
+    # eight lengths and three rings a node were ~500; twelve and five before that some 800): the node's line and lip are in its texture)
+    ys = {round(y0 + h * i / 6, 5) for i in range(7)}
     for n in nodes_at:
-        for d in (-0.006, 0.0, 0.009):
+        for d in (0.0, 0.009):
             if y0 < n + d < y0 + h:
                 ys.add(round(n + d, 5))
     ys = sorted(ys)
@@ -437,7 +438,7 @@ for yy in (0.17, TOP - 0.17):
         if i % 3 or any(abs(cx - n) < 0.03 for n in nodes_r):
             continue
         for sgn in (-1, 1):
-            bpy.ops.mesh.primitive_torus_add(major_radius=0.019, minor_radius=0.0017, major_segments=16, minor_segments=5,
+            bpy.ops.mesh.primitive_torus_add(major_radius=0.019, minor_radius=0.0017, major_segments=8, minor_segments=4,
                                              location=P(cx, yy, (RZ + z) / 2), rotation=(0, sgn * math.pi / 4, 0))
             tl_ = active(); tl_.scale = (1, 0.75, 1); apply_scale(tl_)
             bd.append(finish(tl_, f"TillRope{int(yy * 100)}_{i}_{sgn}", M["rope"]))
