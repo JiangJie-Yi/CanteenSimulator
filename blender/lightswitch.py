@@ -45,7 +45,9 @@ M = {"plate": pbr("SwitchPlate", lin("#efe8d8"), rough=0.45),
      "rocker": pbr("SwitchRocker", lin("#f6f1e6"), rough=0.35),
      "lamp": pbr("SwitchLamp", lin("#6f8a62"), rough=0.4)}
 SLIM = os.environ.get("SWITCH") == "slim"
-W, H, T = (0.034, 0.12, 0.008) if SLIM else (0.09, 0.14, 0.008)
+# (SWITCH=double: one plate, two rockers side by side (the owner's: the toilets' two switches in one frame on the post between their doors))
+DOUBLE = os.environ.get("SWITCH") == "double"
+W, H, T = (0.034, 0.12, 0.008) if SLIM else (0.08, 0.12, 0.008) if DOUBLE else (0.09, 0.14, 0.008)
 
 
 def slab(name, w, h, d, z0, r, mat, bow=0.0, bevel=True):
@@ -86,8 +88,8 @@ def slab(name, w, h, d, z0, r, mat, bow=0.0, bevel=True):
 
 parts = []
 # (the plate: its frame round the edge, the face set in a touch inside it)
-frame = slab("SwitchPlate", W, H, T, 0.0, 0.008 if SLIM else 0.01, M["frame"])
-face = slab("SwitchPlateFace", W - (0.008 if SLIM else 0.012), H - (0.008 if SLIM else 0.012), T + 0.0008, 0.0, 0.004 if SLIM else 0.006, M["plate"])
+frame = slab("SwitchPlate", W, H, T, 0.0, 0.008 if SLIM or DOUBLE else 0.01, M["frame"])
+face = slab("SwitchPlateFace", W - (0.008 if SLIM or DOUBLE else 0.012), H - (0.008 if SLIM or DOUBLE else 0.012), T + 0.0008, 0.0, 0.004 if SLIM or DOUBLE else 0.006, M["plate"])
 bpy.ops.object.select_all(action="DESELECT")
 frame.select_set(True); face.select_set(True)
 bpy.context.view_layer.objects.active = frame
@@ -95,19 +97,27 @@ bpy.ops.object.join()
 plate = bpy.context.view_layer.objects.active
 plate.name = "SwitchPlate"
 parts.append(plate)
-# (the rocker: a wide paddle over most of the face, bowed out a little; its origin at its middle, where it rocks)
-rocker = slab("SwitchRocker", W - (0.014 if SLIM else 0.024), H - (0.03 if SLIM else 0.04), 0.006, 0.0, 0.003 if SLIM else 0.004, M["rocker"], bow=0.0012)
-rocker.location = P(0, 0, T + 0.0008)
-parts.append(rocker)
-# (the guide light's slim window, low on the rocker)
-lamp = slab("SwitchLamp", 0.008 if SLIM else 0.016, 0.004, 0.0004, 0.0, 0.0015, M["lamp"], bevel=False)
-lamp.location = P(0, -(H - (0.03 if SLIM else 0.04)) / 2 + 0.012, 0.006 + 0.0012 * 0.3)
-lamp.parent = rocker
-parts.append(lamp)
+# (the rocker: a wide paddle over most of the face, bowed out a little; its origin at its middle, where it rocks; the double's two side by side,
+# SwitchRocker0 (left, -x) and SwitchRocker1, each with its own guide light)
+rockers = []
+for k, x in ([(0, -0.0185), (1, 0.0185)] if DOUBLE else [(None, 0.0)]):
+    rw = 0.031 if DOUBLE else W - (0.014 if SLIM else 0.024)
+    rh = H - (0.03 if SLIM or DOUBLE else 0.04)
+    nm = "SwitchRocker" if k is None else f"SwitchRocker{k}"
+    rocker = slab(nm, rw, rh, 0.006, 0.0, 0.003 if SLIM or DOUBLE else 0.004, M["rocker"], bow=0.0012)
+    rocker.location = P(x, 0, T + 0.0008)
+    parts.append(rocker)
+    rockers.append(rocker)
+    # (the guide light's slim window, low on the rocker)
+    lamp = slab("SwitchLamp" if k is None else f"SwitchLamp{k}", 0.008 if SLIM or DOUBLE else 0.016, 0.004, 0.0004, 0.0, 0.0015, M["lamp"], bevel=False)
+    lamp.location = P(0, -rh / 2 + 0.012, 0.006 + 0.0012 * 0.3)
+    lamp.parent = rocker
+    parts.append(lamp)
 root = bpy.data.objects.new("LightSwitch", None)
 bpy.context.collection.objects.link(root)
 plate.parent = root
-rocker.parent = root
-NAME = "lightswitch-slim" if SLIM else "lightswitch"
+for r_ in rockers:
+    r_.parent = root
+NAME = "lightswitch-slim" if SLIM else "lightswitch-double" if DOUBLE else "lightswitch"
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", NAME + ".glb"), os.path.join(PROJECT, "blender", NAME + ".blend"), None)
 print("SWITCH_DONE", sum(len(p.vertices) - 2 for o in parts for p in o.data.polygons))

@@ -3754,11 +3754,13 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {altar && <Movable id="lightswitch-door" label="門口燈籠開關"><group position={[-0.002, 1.12, to - GENKAN_SWITCH + SWITCH_STEP]}><LightSwitch circuit="door" /></group></Movable>}
         {/* (and each toilet's lights' switch, slim, on the post between the two doors, each on its own door's side of it (the owner's): beside
             each door's outer side the door slid open over it) */}
-        {door !== undefined && (['m', 'f'] as const).map((who, k) => (
-          <Movable key={who} id={`wcswitch-${who}`} label={who === 'm' ? '男廁電燈開關' : '女廁電燈開關'}>
-            <group position={[-WC_POST_FACE - 0.002, 1.12, door + (k ? 1 : -1) * WC_SWITCH_Z]}><LightSwitch circuit={who === 'm' ? 'wcM' : 'wcF'} slim /></group>
+        {/* (one plate with two rockers, the men's and the women's, in the middle of the post (the owner's: two slim plates side by side
+            showed a seam between them, their edges near the post's)) */}
+        {door !== undefined && (
+          <Movable id="wcswitch" label="廁所電燈開關">
+            <group position={[-WC_POST_FACE - 0.002, 1.12, door]}><DoubleSwitch circuits={['wcM', 'wcF']} /></group>
           </Movable>
-        ))}
+        )}
         {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
           {/* hung on the wall on two cloud brackets (雲形の棚受け, blender/kamidana.py's KamiBracket, the owner's after their photo): an arm under
               the shelf ending in a cloud's head, the cloud stepping back down to the plate on the wall, which runs on below to a rounded end */}
@@ -5644,10 +5646,7 @@ const SWITCH_SLIM_URL = import.meta.env.BASE_URL + 'models/lightswitch-slim.glb'
  * the pair 0.54 further in along the wall) */
 const GENKAN_SWITCH = 0.86
 const SWITCH_STEP = 0.11
-/** the toilets' two switches, slim, side by side on the post between their doors (the owner's: beside each door, on its outer side, the
- * door slid open covered it): each on its own door's half of the post (the two doors' frames meet there, a post 6 cm wide each, 6 deep),
- * how far from the middle, and how far out from the wall the post's face is */
-const WC_SWITCH_Z = 0.03
+/** how far out from the wall the post between the toilets' doors stands (its face): the toilets' switch plate on it */
 const WC_POST_FACE = 0.06
 /** each switch's name, and what pressing it does */
 const SWITCH_SAYS: Record<Circuit, { title: string; on: string; off: string }> = {
@@ -5694,6 +5693,54 @@ function LightSwitch({ circuit = 'room', slim = false }: { circuit?: Circuit; sl
 }
 useGLTF.preload(SWITCH_URL)
 useGLTF.preload(SWITCH_SLIM_URL)
+const SWITCH_DOUBLE_URL = import.meta.env.BASE_URL + 'models/lightswitch-double.glb'
+/** one plate, two rockers (blender/lightswitch.py, SWITCH=double): each its own circuit, its own guide light; which one's pointed at or
+ * pressed by which side of the plate the pointer's on (the first, -x, on the left) */
+function DoubleSwitch({ circuits }: { circuits: [Circuit, Circuit] }) {
+  const lights = useLights()
+  const [lit, setLit] = useState<0 | 1 | null>(null)
+  const gltf = useGLTF(SWITCH_DOUBLE_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    const toon = new Map<THREE.Material, THREE.MeshToonMaterial>()
+    const lamps = [new THREE.MeshBasicMaterial({ toneMapped: false }), new THREE.MeshBasicMaterial({ toneMapped: false })]
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      if (src.name === 'SwitchLamp') { m.material = lamps[/1$/.test(m.name) ? 1 : 0]; return }
+      let t = toon.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone() }); toon.set(src, t) }
+      m.material = t
+    })
+    inkModel(root, (m) => /Lamp/.test(m.name), { width: 0.0012, weld: true })
+    return { root, rockers: [root.getObjectByName('SwitchRocker0'), root.getObjectByName('SwitchRocker1')], lamps, toon: [...toon.values()] }
+  }, [gltf])
+  useEffect(() => {
+    circuits.forEach((c, k) => {
+      const on = lightOn(lights, c)
+      const r = model.rockers[k]
+      if (r) r.rotation.x = on ? -0.14 : 0.14
+      model.lamps[k].color.set(on ? '#7c8a72' : '#8dffb0')
+    })
+  }, [model, lights, circuits])
+  useEffect(() => { for (const t of model.toon) t.emissive.set(lit !== null ? '#2a2a30' : '#000000') }, [model, lit])
+  const which = (e: { point: THREE.Vector3 }) => (model.root.worldToLocal(e.point.clone()).x < 0 ? 0 : 1) as 0 | 1
+  const tag = (k: 0 | 1) => { const c = circuits[k], say = SWITCH_SAYS[c]; setTip({ title: say.title, hint: lightOn(getLights(), c) ? say.on : say.off }) }
+  return (
+    <group rotation-y={-Math.PI / 2}
+      onClick={(e: { stopPropagation: () => void; point: THREE.Vector3 }) => {
+        e.stopPropagation(); if (getEdit().on) return
+        const k = which(e); pressLightSwitch(circuits[k]); lightSwitchSound(lightOn(getLights(), circuits[k])); tag(k)
+      }}
+      onPointerMove={(e: { stopPropagation: () => void; point: THREE.Vector3 }) => { if (getEdit().on) return; const k = which(e); if (k !== lit) { setLit(k); tag(k) } }}
+      onPointerOver={(e: { stopPropagation: () => void; point: THREE.Vector3 }) => { e.stopPropagation(); if (getEdit().on) return; const k = which(e); setLit(k); handOver.onPointerOver(e as never); tag(k) }}
+      onPointerOut={(e: { stopPropagation: () => void }) => { setLit(null); handOver.onPointerOut(e as never); setTip(null) }}>
+      <primitive object={model.root} />
+    </group>
+  )
+}
+useGLTF.preload(SWITCH_DOUBLE_URL)
 
 /**
  * The sacks of white rice by the sake (blender/ricesacks.py; the owner's: the room-temperature stock wants rice, its sacks piled by the sake,
