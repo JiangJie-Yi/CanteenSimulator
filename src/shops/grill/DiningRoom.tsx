@@ -2478,32 +2478,121 @@ function CornerSupplies() {
 /** the staff's door, its width along the wall (the toilets' own: the owner found it too narrow at 0.66) */
 const STAFF_W = 0.82
 /**
- * Behind the staff's door, inside its frame: the dark of the passage beyond, black at the top going to a grey at the floor (the owner's: a
- * painted stair stood there once, its perspective only right from straight in front)
+ * Behind the staff's door, inside its frame: the stair up to the floor above (the owner's: as the round window's view is, a picture in depth
+ * on one flat pane, costing nothing; a stair painted flat on it once was only right from straight in front). The pane's two triangles find,
+ * for each point, where the eye's line through it meets the stairwell behind: its side walls (cedar wainscot under plaster), the entry's
+ * floor, the steps (treads and risers) climbing away to a landing, the ceiling sloping up over them, the far wall; and shade it there: warm
+ * light from a paper lamp up on the landing (a shoji glowing on the far wall, and the way on round the corner to the left lit), the room's
+ * own light coming in a little way at the door, the corners and the stair's creases darker, and the edges where the frame meets it darkest.
+ * Units are the pane's (its middle at 0, the opening STAFF_W across and WC_H + 0.03 high; depth back into the wall).
  */
-const STAFF_DARK = canvasTex(128, 256, (g) => {
-  // (layered, as a passage going back into the dark looks (the owner's: more depth in it than one gradient): black overhead to a dim grey
-  // floor; a faint warm light far in, low in the middle, from a room further along; the jambs' own shadow down either side; a sheen on the
-  // floor's boards near the sill)
-  const gr = g.createLinearGradient(0, 0, 0, 256)
-  gr.addColorStop(0, '#050505'); gr.addColorStop(0.45, '#151416'); gr.addColorStop(0.78, '#2a2826'); gr.addColorStop(1, '#4e4a46')
-  g.fillStyle = gr
-  g.fillRect(0, 0, 128, 256)
-  const far = g.createRadialGradient(64, 150, 2, 64, 150, 70)
-  far.addColorStop(0, 'rgba(150,110,70,0.32)'); far.addColorStop(0.5, 'rgba(90,64,40,0.14)'); far.addColorStop(1, 'rgba(0,0,0,0)')
-  g.fillStyle = far
-  g.fillRect(0, 0, 128, 256)
-  for (const [x0, x1] of [[0, 30], [128, 98]]) {
-    const side = g.createLinearGradient(x0, 0, x1, 0)
-    side.addColorStop(0, 'rgba(0,0,0,0.7)'); side.addColorStop(1, 'rgba(0,0,0,0)')
-    g.fillStyle = side
-    g.fillRect(Math.min(x0, x1), 0, 30, 256)
+const STAFF_EYE = new THREE.Vector3()
+const STAFF_STAIRS = (() => {
+  const H = WC_H + 0.03, hw = STAFF_W / 2, yf = -H / 2
+  const N = 11, rise = 0.19, run = 0.25, s0 = 0.55, D = s0 + N * run + 0.95
+  const top = yf + N * rise, yc = yf + 2.15, sc = s0 + 0.55, k = rise / run, ycap = top + 2.1
+  const f = (v: number) => v.toFixed(4)
+  return new THREE.ShaderMaterial({
+    uniforms: { uCam: { value: new THREE.Vector3(0, 0, 3) } },
+    vertexShader: `varying vec3 vLocal;
+void main() { vLocal = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 uCam;
+varying vec3 vLocal;
+const float HW = ${f(hw)}, YF = ${f(yf)}, RISE = ${f(rise)}, RUN = ${f(run)}, S0 = ${f(s0)}, D = ${f(D)}, TOP = ${f(top)};
+const float YC = ${f(yc)}, SC = ${f(sc)}, K = ${f(k)}, YCAP = ${f(ycap)};
+const int N = ${N};
+float stairY(float s) { return s < S0 ? YF : YF + min(float(N), floor((s - S0) / RUN) + 1.0) * RISE; }
+// (wood: a grain along u, its rings wandering, two browns)
+vec3 wood(float u, float v, vec3 a, vec3 b) {
+  float g = 0.5 + 0.5 * sin(u * 70.0 + sin(v * 9.0 + u * 3.0) * 2.5);
+  float plank = step(0.5, fract(v * 4.0 + 0.37)) * 0.06;
+  return mix(a, b, g * 0.6) * (0.94 + plank);
+}
+void main() {
+  vec3 dir = normalize(vLocal - uCam);
+  // (x along the opening, y up, z here is depth back into the wall)
+  vec3 o = vec3(vLocal.x, vLocal.y, 0.0);
+  vec3 d = vec3(dir.x, dir.y, max(-dir.z, 0.001));
+  float best = 1e9; int kind = 0; float t;
+  vec3 p;
+  // side walls (kind 1 left, 2 right)
+  if (d.x > 0.0) { t = (HW - o.x) / d.x; if (t < best) { best = t; kind = 2; } }
+  if (d.x < 0.0) { t = (-HW - o.x) / d.x; if (t < best) { best = t; kind = 1; } }
+  // the entry's floor (3), the far wall (4)
+  if (d.y < 0.0) { t = (YF - o.y) / d.y; if (t > 0.0 && t < best) { best = t; kind = 3; } }
+  t = (D - o.z) / d.z; if (t < best) { best = t; kind = 4; }
+  // the ceiling: flat over the entry, sloping up over the stair, flat again over the landing (5)
+  if (d.y > 0.0) {
+    t = (YC - o.y) / d.y; p = o + d * t; if (t < best && p.z < SC) { best = t; kind = 5; }
+    t = (YCAP - o.y) / d.y; p = o + d * t; if (t < best && YC + (p.z - SC) * K >= YCAP) { best = t; kind = 5; }
   }
-  const sheen = g.createLinearGradient(0, 214, 0, 256)
-  sheen.addColorStop(0, 'rgba(255,240,220,0)'); sheen.addColorStop(1, 'rgba(255,240,220,0.12)')
-  g.fillStyle = sheen
-  g.fillRect(20, 214, 88, 42)
-})
+  float den = d.y - d.z * K;
+  if (abs(den) > 1e-5) { t = (YC + (o.z - SC) * K - o.y) / den; p = o + d * t; if (t > 0.0 && t < best && p.z >= SC && p.y <= YCAP) { best = t; kind = 5; } }
+  // the steps: each one's riser (6) and tread (7)
+  for (int i = 0; i < N; i++) {
+    float si = S0 + float(i) * RUN, y0 = YF + float(i) * RISE, y1 = y0 + RISE;
+    t = (si - o.z) / d.z; p = o + d * t;
+    if (t > 0.0 && t < best && p.y >= y0 && p.y <= y1) { best = t; kind = 6; }
+    if (d.y < 0.0) {
+      t = (y1 - o.y) / d.y; p = o + d * t;
+      float s1 = i == N - 1 ? D : si + RUN;
+      if (t > 0.0 && t < best && p.z >= si && p.z <= s1) { best = t; kind = 7; }
+    }
+  }
+  p = o + d * best;
+  vec3 n = kind == 1 ? vec3(1, 0, 0) : kind == 2 ? vec3(-1, 0, 0) : (kind == 3 || kind == 7) ? vec3(0, 1, 0) : kind == 5 ? vec3(0, -1, 0) : vec3(0, 0, -1);
+  // its own colour (linear)
+  vec3 c;
+  float glow = 0.0;
+  if (kind == 1 || kind == 2) {
+    float lift = p.y - stairY(p.z);
+    c = lift < 0.85 ? wood(p.y * 0.3, p.z * 1.7 + float(kind), vec3(0.16, 0.09, 0.045), vec3(0.24, 0.14, 0.07)) * (0.92 + 0.08 * step(0.5, fract(p.z * 6.0)))
+      : vec3(0.52, 0.46, 0.36) * (0.96 + 0.04 * sin(p.z * 40.0 + p.y * 23.0));
+    // (round the corner at the top, the way on: lit)
+    if (kind == 1 && p.z > D - 0.85 && p.z < D - 0.1 && p.y > TOP && p.y < TOP + 1.85) { c = vec3(1.0, 0.7, 0.38); glow = 0.75; }
+  } else if (kind == 3) { c = wood(p.z * 0.2, p.x * 2.0, vec3(0.2, 0.12, 0.06), vec3(0.3, 0.18, 0.09)); }
+  else if (kind == 7) { c = wood(p.x, p.z * 3.0, vec3(0.3, 0.17, 0.08), vec3(0.42, 0.25, 0.12)); }
+  else if (kind == 6) { c = wood(p.x, p.y * 5.0, vec3(0.17, 0.1, 0.05), vec3(0.24, 0.14, 0.07)); }
+  else if (kind == 5) { c = vec3(0.12, 0.08, 0.05) * (0.9 + 0.1 * step(0.5, fract(p.z * 3.0))); }
+  else {
+    c = vec3(0.5, 0.44, 0.35);
+    // (the far wall's shoji, lit from behind)
+    if (p.y > TOP + 0.15 && p.y < TOP + 1.6 && abs(p.x + 0.04) < 0.26) {
+      vec2 q = vec2((p.x + 0.04) / 0.52 + 0.5, (p.y - TOP - 0.15) / 1.45);
+      float bar = step(0.92, fract(q.x * 3.0)) + step(0.94, fract(q.y * 5.0));
+      c = mix(vec3(1.0, 0.78, 0.46), vec3(0.2, 0.12, 0.06), min(bar, 1.0));
+      glow = 1.0 - min(bar, 1.0) * 0.8;
+    }
+  }
+  // the lamp up on the landing: warm, falling off with distance; a little of the room's light at the door; a dim warmth over all
+  vec3 L = vec3(-0.08, TOP + 0.95, D - 0.45);
+  vec3 toL = L - p;
+  float dl = length(toL);
+  float lamp = 5.0 / (1.0 + dl * dl * 1.3) * (0.35 + 0.65 * max(dot(n, toL / dl), 0.0));
+  float door = 0.45 * exp(-p.z * 3.0);
+  // (and its light spilling down the stair: the steps further up and in the warmer, the treads most, what's seen of it through the door
+  // lit from above)
+  float spill = smoothstep(S0 + 1.5 * RUN, S0 + 8.0 * RUN, p.z) * (kind == 7 ? 1.25 : 0.8);
+  vec3 light = vec3(0.05, 0.045, 0.04) + vec3(1.0, 0.6, 0.27) * (lamp + spill) + vec3(0.85, 0.8, 0.72) * door;
+  // the creases darker: the steps' inner corners, along the walls' feet, the walls' corners
+  float ao = 1.0;
+  if (kind == 7 || kind == 3) {
+    float back = kind == 7 ? (S0 + (floor((p.z - S0) / RUN) + 1.0) * RUN - p.z) : (S0 - p.z);
+    ao *= mix(0.45, 1.0, smoothstep(0.0, 0.07, back));
+    ao *= mix(0.5, 1.0, smoothstep(0.0, 0.09, HW - abs(p.x)));
+  }
+  if (kind == 6) ao *= mix(0.55, 1.0, smoothstep(0.0, 0.06, p.y - (YF + floor((p.z - S0) / RUN + 0.5) * RISE)));
+  if (kind == 1 || kind == 2) ao *= mix(0.45, 1.0, smoothstep(0.0, 0.12, p.y - stairY(p.z)));
+  if (kind == 4) ao *= mix(0.5, 1.0, smoothstep(0.0, 0.1, HW - abs(p.x)));
+  vec3 col = mix(c * light * ao, c, glow);
+  // the frame's edge: darker where the opening meets the posts, the sill and the head
+  float edge = min(min(HW - abs(vLocal.x), vLocal.y - YF), ${f(H / 2)} - vLocal.y);
+  col *= mix(0.25, 1.0, smoothstep(0.0, 0.07, edge));
+  gl_FragColor = vec4(col, 1.0);
+  #include <colorspace_fragment>
+}`,
+  })
+})()
 /** a sliding door's lower board of cedar planks (the owner's: a natural grain, the staff door's first, then the toilets' after it, each its
  * own): four or five planks standing side by side, each its own width and tone, a fine straight grain up them that thickens and thins, a
  * darker streak down some, a soft arch of a flat-sawn figure on one or two, now and then a small knot with the grain parting round it, a dark
@@ -2637,9 +2726,12 @@ function StaffDoor() {
   }, [door])
   useEffect(() => () => { for (const o of sign.children) (o as THREE.Mesh).geometry.dispose() }, [sign])
   const g = useRef<THREE.Group>(null)
+  const stairs = useRef<THREE.Mesh>(null)
   const st = useRef({ open: false, k: 0 })
   const narrow = STAFF_W / WC_W
-  useFrame((_, dt) => {
+  useFrame(({ camera }, dt) => {
+    // (the eye, in the stair's pane's own frame: where its lines through the pane run on into the stairwell)
+    if (stairs.current) STAFF_STAIRS.uniforms.uCam.value.copy(stairs.current.worldToLocal(STAFF_EYE.copy(camera.position)))
     const s = st.current
     const want = s.open ? 1 : 0
     s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.8)
@@ -2657,9 +2749,8 @@ function StaffDoor() {
       <group scale={[1, 1, narrow]}><primitive object={frame} /></group>
       {/* (the dark of the passage: right across the opening and on behind the posts, the head and the sill, so no plaster shows round its
           edges (the owner saw a pale strip down the side; it stopped 2.5 cm short of each post)) */}
-      <mesh position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2}>
+      <mesh ref={stairs} position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2} material={STAFF_STAIRS} raycast={() => {}}>
         <planeGeometry args={[STAFF_W + 0.06, WC_H + 0.03]} />
-        <meshBasicMaterial color="#ffffff" map={STAFF_DARK} />
       </mesh>
       <group ref={g} onClick={(ev) => {
         ev.stopPropagation()
