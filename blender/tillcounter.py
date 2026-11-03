@@ -552,10 +552,26 @@ sh.append(sweep("TillCap", profile((FT + 0.018) / 2, YT, YT + CAP, 0.007), path(
 for tag, (ex, ez) in (("Start", (XL, ZF)), ("End", (XE, ZB))):
     pr = (FT + 0.018) / 2 + 0.002
     sh.append(cyl(f"TillPost{tag}", pr, YT + CAP - TOP, P(ex, (TOP + YT + CAP) / 2, ez), M["walnut"], verts=20))
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=pr, segments=20, ring_count=8, location=P(ex, YT + CAP, ez))
-    dome = active()
-    dome.scale = (1, 1, 0.35)
-    apply_scale(dome)
+    # (the dome: only its upper half (the lower was inside the post), four rings up, its crown closed in a ladder, not twenty triangles
+    # into the pole)
+    db = bmesh.new()
+    rings = [[db.verts.new((ex + pr * math.cos(ph) * math.cos(2 * math.pi * k / 20), -ez + pr * math.cos(ph) * math.sin(2 * math.pi * k / 20),
+                            YT + CAP + 0.35 * pr * math.sin(ph))) for k in range(20)] for ph in (0.0, 0.5, 0.9, 1.22)]
+    for i in range(len(rings) - 1):
+        for k in range(20):
+            db.faces.new((rings[i][k], rings[i][(k + 1) % 20], rings[i + 1][(k + 1) % 20], rings[i + 1][k]))
+    ladder_fill(db, rings[-1])
+    bmesh.ops.recalc_face_normals(db, faces=db.faces)
+    # (its wood laid across it from above)
+    uvl = db.loops.layers.uv.new()
+    for f in db.faces:
+        for lp in f.loops:
+            lp[uvl].uv = (0.5 + (lp.vert.co.x - ex) / (2 * pr), 0.5 + (lp.vert.co.y + ez) / (2 * pr))
+    dm = bpy.data.meshes.new(f"TillPost{tag}Top")
+    db.to_mesh(dm)
+    db.free()
+    dome = bpy.data.objects.new(f"TillPost{tag}Top", dm)
+    bpy.context.collection.objects.link(dome)
     sh.append(finish(dome, f"TillPost{tag}Top", M["walnut"]))
 mid = path()[8]
 sh.append(cyl("TillPostCorner", FT / 2 + 0.006, YT - Y0, P(mid[0], (Y0 + YT) / 2, mid[1]), M["walnut"], verts=16))
