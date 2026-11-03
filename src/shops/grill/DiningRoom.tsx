@@ -2085,7 +2085,7 @@ function WcSconce({ who, at, yaw }: { who: 'm' | 'f'; at: [number, number, numbe
   return (
     <group position={[at[0], at[1] - 0.06, at[2]]} rotation-y={yaw}>
       <WcLamp who={who} at={[0, 0, out]} geo={WC_GEO.lantern} />
-      <StaticBatch>
+      <StaticBatch plain>
         <mesh position={[0, 0, 0.006]}><boxGeometry args={[0.15, 0.26, 0.012]} /><meshToonMaterial color="#5a3a22" /></mesh>
         {[-1, 1].map((sd) => <mesh key={`p${sd}`} position={[sd * 0.06, 0, out]}><boxGeometry args={[0.012, 0.2, 0.064]} /><meshToonMaterial color={D} /></mesh>)}
         {[-1, 1].map((sd) => <mesh key={`c${sd}`} position={[0, sd * 0.098, out]}><boxGeometry args={[0.14, 0.014, 0.07]} /><meshToonMaterial color={D} /></mesh>)}
@@ -2155,7 +2155,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
     <group>
       {/* (dark in it while its switch by the door is off) */}
       <WcDark who={who} rooms={[[D, top - 0.03, w, D / 2, 0], [SW, top - 0.03, E, SX, SZ]]} />
-      <StaticBatch>
+      <StaticBatch plain>
       <WcFloor wx={D} wz={w} at={[D / 2, 0.004, 0]} />
       <WcFloor wx={SW} wz={E} at={[SX, 0.004, SZ]} />
       {/* the back wall, behind the washstand and on along the toilet's room; the washroom's other side; the short stretch by the door on the
@@ -2197,7 +2197,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <WcBlock len={SW} at={[SX, 0, s * (w / 2 + E)]} yaw={s > 0 ? Math.PI : 0} top={top} />
       {/* the long noren across the way to the toilet, its two panels hanging from the rod (the noren and the rod stand still: batched apart,
           their picture each its own) */}
-      <Movable id={`wc2-${who}-noren`} label={`隔間暖簾（${name}）`}><StaticBatch>
+      <Movable id={`wc2-${who}-noren`} label={`隔間暖簾（${name}）`}><StaticBatch plain>
         {noren.map(({ sd, g, x }) => (
           <mesh key={sd} geometry={g} position={[x, ROD_Y - NL / 2, s * ROD_Z]}>
             <meshToonMaterial color="#ffffff" map={WC_STALL_NOREN[who]} side={THREE.DoubleSide} />
@@ -2211,7 +2211,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       {/* (the men's: a moss ball (苔玉) on a dark, near-black stoneware dish and a stub of bamboo by it (the owner's: the men's and women's
           set apart); the women's its bamboo vase of camellia) */}
       {who === 'm' && (
-        <Movable id="wc2-m-moss" label="苔玉（男廁）"><StaticBatch>
+        <Movable id="wc2-m-moss" label="苔玉（男廁）"><StaticBatch plain>
           <group position={[D - 0.14, 0.764, -0.19]}>
             <mesh position-y={0.008}><cylinderGeometry args={[0.05, 0.04, 0.016, 12]} /><meshToonMaterial color="#2c2a28" /></mesh>
             <mesh position-y={0.048} scale={[1, 0.9, 1]}><icosahedronGeometry args={[0.04, 1]} /><meshToonMaterial color="#4c6e34" /></mesh>
@@ -2224,7 +2224,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
           </group>
         </StaticBatch></Movable>
       )}
-      {who === 'f' && <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}><StaticBatch>
+      {who === 'f' && <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}><StaticBatch plain>
       {/* (a bamboo vase of camellia on the washstand's counter, beside the bowl) */}
       {/* (clear of the counter's back rail: it stood 2 mm into it (clips.mjs)) */}
       <group position={[D - 0.14, 0.764, -0.19]}>
@@ -2241,7 +2241,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         ))}
       </group>
       </StaticBatch></Movable>}
-      <Movable id={`wc2-${who}-towel`} label={`手巾架（${name}）`}><StaticBatch>
+      <Movable id={`wc2-${who}-towel`} label={`手巾架（${name}）`}><StaticBatch plain>
       {/* (the indigo hand towel on a bamboo rod on the wall beside the washstand) */}
       <group position={[D - 0.24, 0.98, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
         <mesh position-z={0.022} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.007, 0.007, 0.18, 8]} /><meshToonMaterial color="#b89a52" /></mesh>
@@ -2250,7 +2250,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       </group>
       </StaticBatch></Movable>
       {/* (no お手洗い plaque on the wall: the owner's, the wall kept clean) */}
-      <Movable id={`wc2-${who}-duck`} label={`簀之子踏板（${name}）`}><StaticBatch>
+      <Movable id={`wc2-${who}-duck`} label={`簀之子踏板（${name}）`}><StaticBatch plain>
       {/* the slatted duckboard (簀の子) before the washstand, where hands are washed */}
       <group position={[D - 0.56, 0, 0]}>
         {Array.from({ length: 9 }, (_, k) => (
@@ -2259,7 +2259,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         {[-1, 1].map((sd) => <mesh key={sd} position={[0, 0.008, sd * 0.2]}><boxGeometry args={[0.2, 0.016, 0.03]} /><meshToonMaterial color="#6a4a28" /></mesh>)}
       </group>
       </StaticBatch></Movable>
-      <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${name}）`}><StaticBatch>
+      <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${name}）`}><StaticBatch plain>
       {/* (a pair of toilet slippers by the door: rounded soles, a cloth band over the toes, the toilet's own colour, set side by side toes out) */}
       {[-1, 1].map((sd) => (
         <group key={sd} position={[0.15, 0.03, sd * 0.055]} rotation-y={sd * 0.06}>
@@ -2283,7 +2283,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         </Movable>
         {/* (marks on the floor before it as it gets dirty) */}
         <WcMarks who={who} at={[0.03, 0.006, 0]} size={[0.3, 0.5]} />
-        <StaticBatch>
+        <StaticBatch plain>
         {/* (the shoji window by the toilet: washi in a dark lattice, lit from outside; on the back wall, the shop's outside, for both toilets
             alike (the owner's: on each one's end wall, they faced opposite ways)) */}
         <group position={[E - 0.42, 1.38, -s * (W2 - 0.006)]} rotation-y={s > 0 ? 0 : Math.PI}>
@@ -3738,7 +3738,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
       {/* (local x is away from the cook: the wall stands at the floor's far edge, facing back toward the bar) */}
       <group ref={wall} position-x={-far} name="room-wall" userData={{ from, to, shelf }}>
         {/* (all of it standing still: drawn merged, a few meshes for the whole wall) */}
-        <StaticBatch key={`${from}|${to}|${door}|${!!altar}`}>
+        <StaticBatch plain key={`${from}|${to}|${door}|${!!altar}`}>
         {/* the plaster over the wainscot, open where the toilets' doors are (a strip between them, and over them) */}
         {/* (the wall's thickness: a slab behind it, the base's dark wood, full height, over the toilets' doorways only above them) */}
         {/* (down through the base's own thickness too, which stops at the room's outline, short of the wall's) */}
@@ -3786,7 +3786,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         </StaticBatch>
         {/* (everything below is its own piece in a batch of its own, so each can be moved by hand when the shop's shut: key G) */}
         {art.filter((a) => !a.bare).map((a) => (
-          <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`${a.round ? '圓窗' : a.scroll ? '掛軸' : '畫'}（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><StaticBatch>
+          <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`${a.round ? '圓窗' : a.scroll ? '掛軸' : '畫'}（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><StaticBatch plain>
             <group position={[0, a.round ? 1.4 : a.scroll ? 1.42 : 1.5, a.z + nudgeArt(a.z)]}>
               {a.round ? <RoundWindow /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
             </group>
@@ -3822,7 +3822,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
             <group position={[-WC_POST_FACE - 0.002, 1.12, door]}><DoubleSwitch circuits={['wcM', 'wcF']} /></group>
           </Movable>
         )}
-        {altar && <Movable id="altar" label="供桌"><StaticBatch><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
+        {altar && <Movable id="altar" label="供桌"><StaticBatch plain><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
           {/* hung on the wall on two cloud brackets (雲形の棚受け, blender/kamidana.py's KamiBracket, the owner's after their photo): an arm under
               the shelf ending in a cloud's head, the cloud stepping back down to the plate on the wall, which runs on below to a rounded end */}
           {[-0.35, 0.35].map((z) => <group key={z} position={[ALTAR_D / 2, -0.034, z]}><KamiCopy part="bracket" /></group>)}</group></StaticBatch></Movable>}
@@ -4167,7 +4167,7 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
         {/* (pointed at, the shrine is only named (it isn't clicked: no glow, the cursor as it is); its doors and the flask are what's worked) */}
         <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '神棚', hint: '供奉惠比壽；點御神酒供酒，點門開關' }) }}
           onPointerOut={() => setTip(null)}>
-          <group scale-z={SHRINE_WIDE} scale-x={SHRINE_DEEP}><StaticBatch><Kamidana part="shrine" /></StaticBatch></group>
+          <group scale-z={SHRINE_WIDE} scale-x={SHRINE_DEEP}><StaticBatch plain><Kamidana part="shrine" /></StaticBatch></group>
         </group>
         {/* (its doors, which open; the Ebisu inside, a piece of its own: brought back with the shallower shrine, he himself not squashed) */}
         <group scale-x={SHRINE_DEEP}><group position={[-0.14, SHRINE_LIFT, 0]}>
@@ -4181,12 +4181,12 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
           the vases, lit; clear of the side doors as they open, of the flask and of the book */}
       {[-1, 1].map((sd) => (
         <Movable key={sd} id={`shrinelamp${sd}`} label={sd < 0 ? '神前燈籠（左）' : '神前燈籠（右）'}>
-          <group position={[SHRINE_LAMP_X, 0, sd * SHRINE_LAMP_Z]} scale={SC} {...nameOver('神前燈籠', '供在神前的小木燈籠，點著燈')}><StaticBatch><KamiCopy part="lantern" /></StaticBatch><ContactShadow r={0.032} /></group>
+          <group position={[SHRINE_LAMP_X, 0, sd * SHRINE_LAMP_Z]} scale={SC} {...nameOver('神前燈籠', '供在神前的小木燈籠，點著燈')}><StaticBatch plain><KamiCopy part="lantern" /></StaticBatch><ContactShadow r={0.032} /></group>
         </Movable>
       ))}
       <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase-1" /></group></Movable>
       <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase1" /></group></Movable>
-      <Movable id="shrinecups" label="清酒杯與琉璃台"><group ref={cupsRef} position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC} {...nameOver('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch><Kamidana part="cups" /></StaticBatch></group></Movable>
+      <Movable id="shrinecups" label="清酒杯與琉璃台"><group ref={cupsRef} position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC} {...nameOver('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch plain><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={STAR} vertexColors size={1} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} onBeforeCompile={pointsEach} />
       </points>
@@ -4343,7 +4343,7 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
       <primitive object={body} />
       {/* the cove lights (槽燈): a narrow slot let into each inner side, a thin line of white light deep in it, and
           the light washing softly along the wall, shelf and drinks beside it (up each side only) */}
-      <StaticBatch>
+      <StaticBatch plain>
       {[-1, 1].map((sd) => (
         <group key={sd} position={[sd * (W / 2 - 0.075), H / 2 - 0.02, D / 2 - 0.1]}>
           <mesh><boxGeometry args={[0.03, H - 0.46, 0.03]} /><meshBasicMaterial color="#202226" /></mesh>
@@ -4356,7 +4356,7 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
       {/* the lit sign standing on top of the cabinet: a slim dark box with the board on its front, slanted a little back */}
       <group position={[0, H + 0.03, D / 2 - 0.1]} rotation-x={-0.12}>
         {/* (its box and its twenty-one bulbs drawn as a few: they never move) */}
-        <StaticBatch>
+        <StaticBatch plain>
         <mesh position={[0, 0.1, -0.02]}><boxGeometry args={[W * 0.92, 0.2, 0.06]} /><meshToonMaterial color="#1c1d20" /></mesh>
         <mesh position={[0, 0.1, 0.0115]}><planeGeometry args={[W * 0.86, 0.17]} /><meshBasicMaterial color="#ffffff" map={FRIDGE_SIGNS[n]} toneMapped={false} /></mesh>
         {/* (a strip of light round the sign's edge: little bulbs in a row, warm white, and a glowing bar along its foot) */}
@@ -5917,7 +5917,7 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
     // copies, pictures and ink lines left behind each time)
     <>
       {/* (one stack, standing where the two used to) */}
-      <Movable id="sake" label="酒樽"><group ref={sake}><StaticBatch>
+      <Movable id="sake" label="酒樽"><group ref={sake}><StaticBatch plain>
         <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>
           <group rotation-y={Math.PI / 2}><SakeStack part={0} /></group>
         </group>
@@ -5933,16 +5933,16 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
         <group position={at(3.5, 2.97)} rotation-y={face + 0.15}><RiceSacks /></group>
       </Movable>
       <Movable id="willow" label="柳樹">
-        <group position={at(3.55, 2.95)} rotation-y={1.4} scale={0.9}><StaticBatch><WillowModel /></StaticBatch></group>
+        <group position={at(3.55, 2.95)} rotation-y={1.4} scale={0.9}><StaticBatch plain><WillowModel /></StaticBatch></group>
       </Movable>
-      <Movable id="bamboo" label="竹盆栽"><StaticBatch>
+      <Movable id="bamboo" label="竹盆栽"><StaticBatch plain>
         <group position={cornerAt} rotation-y={0.4}><BambooModel /></group>
       </StaticBatch>
         {/* (only to look at (the owner's): named when pointed at, the cursor left an arrow, a click does nothing) */}
         <group position={cornerAt} rotation-y={0.4}><BambooHit {...BAMBOO_SAYS} /></group>
       </Movable>
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
-      {fr && <Movable id="crates" label="酒箱"><group ref={stock}><StaticBatch>
+      {fr && <Movable id="crates" label="酒箱"><group ref={stock}><StaticBatch plain>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <BottleCrates />
           {/* (and beside them the cartons of canned drinks) */}

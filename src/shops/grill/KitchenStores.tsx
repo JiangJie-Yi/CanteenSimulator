@@ -6,7 +6,7 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { countedBatch, mergeByMaterial } from '@/scene/StaticBatch'
+import { countedBatch, mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { SACK_STICKS } from '@/game/supplies'
 import { askPantry, SUPPLIES, tipOver } from './bar'
@@ -64,6 +64,8 @@ function partOf(scene: THREE.Group, node: string, width: number, keep?: (o: THRE
     m.receiveShadow = true
   })
   inkModel(r, (m) => UNINKED.test(m.name), { width, weld: true })
+  // (its plain-coloured pieces one material, their colours on their points: merged, one draw where each colour was its own)
+  plainColours(r)
   mergeByMaterial(r, keep)
   return r
 }

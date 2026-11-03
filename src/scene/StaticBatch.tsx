@@ -21,8 +21,43 @@ const ATTRS = ['position', 'normal', 'uv'] as const
 
 /** what decides whether two meshes can be drawn as one */
 export function keyOf(m: THREE.Material) {
-  const x = m as THREE.Material & { color?: THREE.Color; map?: THREE.Texture | null; toneMapped?: boolean }
-  return [m.type, x.color?.getHexString(), x.map?.uuid, m.side, m.transparent, m.opacity, m.blending, m.depthWrite, x.toneMapped].join('|')
+  const x = m as THREE.Material & { color?: THREE.Color; map?: THREE.Texture | null; toneMapped?: boolean; vertexColors?: boolean }
+  return [m.type, x.color?.getHexString(), x.map?.uuid, m.side, m.transparent, m.opacity, m.blending, m.depthWrite, x.toneMapped, x.vertexColors].join('|')
+}
+
+/** the materials plain pieces share, their colours on their points: one for each way of drawing that isn't the colour */
+const PLAIN = new Map<string, THREE.MeshToonMaterial>()
+/** a toon material that's only a colour: no picture, opaque, not glowing, not reworked in its shader */
+const plainOf = (m: THREE.Material) => {
+  const t = m as THREE.MeshToonMaterial
+  if (!t.isMeshToonMaterial || t.map || t.alphaMap || t.emissiveMap || t.normalMap || t.bumpMap || t.lightMap || t.aoMap || t.transparent || t.opacity < 1
+    || t.alphaTest > 0 || t.vertexColors || t.wireframe || t.emissive.getHex() !== 0 || t.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile) return null
+  return [t.gradientMap?.uuid, t.side, t.depthWrite, t.depthTest, t.toneMapped, t.fog, t.polygonOffset, t.polygonOffsetFactor, t.polygonOffsetUnits].join('|')
+}
+/**
+ * The plain-coloured pieces under root given one material between them, each one's colour written on its points (its geometry copied first:
+ * others may share it in another colour), so merged they're one draw where each colour was its own (half the scene's draws were plain
+ * toon colours). Only for what's left alone once it's made: a colour changed on one of their materials later doesn't show any more.
+ */
+export function plainColours(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh || Array.isArray(m.material) || (m as THREE.SkinnedMesh).isSkinnedMesh || (m as THREE.InstancedMesh).isInstancedMesh) return
+    const key = plainOf(m.material)
+    if (key === null) return
+    let shared = PLAIN.get(key)
+    if (!shared) {
+      shared = (m.material as THREE.MeshToonMaterial).clone()
+      shared.color.set('#ffffff')
+      shared.vertexColors = true
+      shared.name = 'PlainColours'
+      PLAIN.set(key, shared)
+    }
+    const g = m.geometry.clone()
+    colourVertices(g, (m.material as THREE.MeshToonMaterial).color)
+    m.geometry = g
+    m.material = shared
+  })
 }
 
 /** the geometry, its own copy, with just what every merged mesh has (and unindexed, so any can go with any) */
@@ -58,12 +93,14 @@ export function bakeable(g: THREE.BufferGeometry, m: THREE.Matrix4) {
   return out
 }
 
-export function StaticBatch({ children, parts }: { children: ReactNode; parts?: MutableRefObject<BatchParts | null> }) {
+/** `plain`: its plain-coloured pieces drawn as one (plainColours): for a batch whose colours are never changed once it's made */
+export function StaticBatch({ children, parts, plain = false }: { children: ReactNode; parts?: MutableRefObject<BatchParts | null>; plain?: boolean }) {
   const holder = useRef<THREE.Group>(null)
   const merged = useRef<THREE.Group>(null)
   useLayoutEffect(() => {
     const h = holder.current, o = merged.current
     if (!h || !o) return
+    if (plain) plainColours(h)
     h.updateWorldMatrix(true, true)
     const inv = new THREE.Matrix4().copy(h.matrixWorld).invert()
     // (and where each marked part's vertices went: [its piece among `pieces` (which merged mesh), from which vertex, how many])
@@ -136,7 +173,7 @@ export function StaticBatch({ children, parts }: { children: ReactNode; parts?: 
       h.visible = true
       h.updateMatrixWorld = own
     }
-  }, [parts])
+  }, [parts, plain])
   return (
     <>
       <group ref={holder}>{children}</group>
