@@ -3957,9 +3957,6 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {supplies && <Movable id="supplies" label="衛生紙與清潔用品"><group position={[-0.13, 0, supplies.z]} rotation-y={-Math.PI / 2} scale={supplies.k}><CornerSupplies /></group></Movable>}
         {/* (the staff's door, where asked: up the stairs behind it, 員工專用) */}
         {staffDoor !== undefined && <Movable id="staffdoor" label="員工專用門"><group position={[0, 0, staffDoor]}><StaffDoor /></group></Movable>}
-        {/* (the speaker, flat to the wall over the staff door, centred on it, its bracket on the beam under the frieze and facing straight out
-            into the room (the owner's: in the corner, 1.25 times the size, it sat on the door's head turned askew)) */}
-        {staffDoor !== undefined && <Movable id="speaker" label="音箱" baseScale={0.82 * 1.25}><group position={[-0.2, WALL_H - 0.17, staffDoor]} rotation-y={-Math.PI / 2}><WallSpeaker /></group></Movable>}
         {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
         {altar && <Movable id="exitsign" label="逃生出口燈"><group name="look-exit" position={[-0.045, 2.08, to - 0.62]} rotation-y={-Math.PI / 2}><ExitSign /></group></Movable>}
         {/* (by the way in, at hand height, between the shoe cupboard and the corner: the room's light switch, and beside it the door's lanterns'
@@ -5707,9 +5704,9 @@ function WallSpeaker() {
     inkModel(root, (m) => !SPEAKER_INKED.test(m.name), { width: 0.004, weld: true })
     // (drawn a few parts at a time; the arm and its bracket, which reach back to the corner wherever it's put, on their own; the woofer's cone,
     // dust cap and surround on their own too, to thump with the music)
-    // (tipped down only a little, 8 degrees, level and square to the wall (the owner's: the model's own was 12.6))
+    // (tipped down 12 degrees on its bracket, as a shop's wall speaker hangs (the owner's: 10 to 15))
     const tilt = root.getObjectByName('SpeakerTilt')
-    if (tilt) tilt.rotation.x = 0.14
+    if (tilt) tilt.rotation.x = 0.21
     mergeByMaterial(root, (o) => /^Speaker(Arm|Mount)/.test(o.name) || /^Speaker(Cone|DustCap|Surround)$/.test(o.name))
     const thump = ['SpeakerCone', 'SpeakerDustCap', 'SpeakerSurround'].map((n) => root.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o)
       .map((o) => ({ o, z: o.position.z, s: o.scale.clone() }))
@@ -6128,6 +6125,15 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
     const along = Math.min(-c0.length / 2 - 0.35, ...counters.slice(1).map((o) => o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c0.at).dot(c0.along)))
     return c0.at.clone().addScaledVector(c0.along, along + 0.42).addScaledVector(c0.lay, farOf(c0) + 0.42)
   }, [c0, counters])
+  // (the speaker in the corner where the room's two walls meet (by the staff door), up under the frieze, turned to face down the room's
+  // diagonal into the shop (the owner's: over the staff door, flat to the wall, it filled the space over the door); its arm reaching back
+  // into the corner, wherever it's put)
+  const speaker = useMemo(() => {
+    const along = Math.min(-c0.length / 2 - 0.35, ...counters.slice(1).map((o) => o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c0.at).dot(c0.along)))
+    const p = c0.at.clone().addScaledVector(c0.along, along + 0.145).addScaledVector(c0.lay, farOf(c0) + 0.115)
+    p.y += 1.55
+    return { p, yaw: Math.atan2(c0.lay.x, c0.lay.z) }
+  }, [c0, counters])
   const crateAt = useMemo(() => {
     if (!fr || !c1) return new THREE.Vector3()
     const last = fr[fr.length - 1]
@@ -6138,6 +6144,7 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
     // (not keyed by the language any more: that was for a mat with words on it, long gone, and each switch built all four again, their
     // copies, pictures and ink lines left behind each time)
     <>
+      <Movable id="speaker" label="音箱" baseTurn={[0, 45, 0]} baseScale={0.82}><group position={speaker.p} rotation-y={speaker.yaw}><WallSpeaker /></group></Movable>
       {/* (one stack, standing where the two used to) */}
       <Movable id="sake" label="酒樽"><group ref={sake}><StaticBatch plain>
         <group position={at(3.55, 3.6)} rotation-y={face + 0.3}>

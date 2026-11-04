@@ -189,7 +189,8 @@ export const BASES: Record<string, V3> = {
   // (moved on by X 0.215 in the room's frame, taken into this parent's units)
   // (moved by the owner X -0.465, Z -0.367 (its object frame was the world's then), made so)
   willow: [0.2534 - 0.465, 0, 0.0272 - 0.367],
-  // (the red lantern raised 0.25, in the room's frame; the speaker's corner offset gone: it hangs over the staff door now)
+  // (the speaker set at X -0.285 Y 0.518 Z 0.169, in the room's frame: back in its corner (the owner's); the red lantern raised 0.25)
+  speaker: [0.3044, 0.518, 0.1309],
   chochin: [0, 0.25, 0],
   chochin2: [0, 0.25, 0],
   sake: [0.084, 0, 0.118],
