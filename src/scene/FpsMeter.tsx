@@ -5,9 +5,10 @@ import { Vector2 } from 'three'
 /**
  * A thin green bar along the very top of the window: the frame rate, the frame's time, the draw calls and triangles of the
  * last frame, what's held in the GPU (geometries, textures, shader programs), the resolution it's drawn at, and the memory the
- * page uses where the browser says. It writes straight to its own element, twice a second, so it costs the frame nothing.
+ * page uses where the browser says. It writes straight to its own element, twice a second, so it costs the frame nothing. F hides it.
  */
 const SIZE = new Vector2()
+const SHOW_KEY = 'canteen_show_fps'
 export function FpsMeter() {
   const gl = useThree((s) => s.gl)
   const el = useRef<HTMLDivElement | null>(null)
@@ -20,7 +21,20 @@ export function FpsMeter() {
     d.textContent = 'FPS …'
     document.body.appendChild(d)
     el.current = d
-    return () => { d.remove(); el.current = null }
+    // (F hides it and shows it again (the owner's), kept; not while typing, nor in developer mode, where F frames what's picked)
+    const shown = (on: boolean) => { d.style.display = on ? '' : 'none' }
+    try { shown(localStorage.getItem(SHOW_KEY) !== '0') } catch { /* (not kept) */ }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyF' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+      if (document.querySelector('.app.is-editing')) return
+      const on = d.style.display === 'none'
+      shown(on)
+      try { localStorage.setItem(SHOW_KEY, on ? '1' : '0') } catch { /* (not kept) */ }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('keydown', onKey); d.remove(); el.current = null }
   }, [])
   useFrame(() => {
     const a = acc.current
@@ -32,6 +46,8 @@ export function FpsMeter() {
     a.frames++
     a.time += dt
     a.worst = Math.max(a.worst, dt)
+    // (hidden: nothing written to it, and nothing counted toward when it's shown again)
+    if (el.current?.style.display === 'none') { a.frames = 0; a.time = 0; a.worst = 0; return }
     if (a.time < 0.5 || !el.current) return
     const fps = a.frames / a.time
     const ms = (a.time / a.frames) * 1000
