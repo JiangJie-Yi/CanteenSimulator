@@ -3566,6 +3566,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const h = carriers.bin[0].home
       moved.current.set('bin', new THREE.Vector3(1.35 - h.x, 0, -1.45 - h.z))
     }
+    // (and back on its hearth if it was ever let fall off the table, as it could be before it was fixed in place)
+    const ledge = moved.current.get('box')
+    if (ledge && (Math.abs(ledge.y) > 1e-4 || outsideTable(containerAt('box'), footprint('box')))) { moved.current.delete('box'); boxPlaced.current = false }
     if (carriers.box && !boxPlaced.current && !moved.current.has('box')) {
       boxPlaced.current = true
       const want = new THREE.Vector3().addScaledVector(ALONG, BOX_SPOT.along).addScaledVector(LAY, BOX_SPOT.lay)
@@ -4768,7 +4771,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // otherwise grab a plate, side dish, the basket, the seasoning box or the bin (not the food on them)
         const picked = food ? null : pickContainer()
         // (charcoal goes on only by dragging a stick from the crate: a click on the fire does nothing)
-        if (!picked) return
+        // (nor the seasoning ledge, hung on the hearth's frame: dragged past the table's edge it fell to the kitchen floor, its pots and
+        // the fan in its holder with it (the owner found it lying by the sink); its pots and utensils are still taken up one by one)
+        if (!picked || FIXED.has(picked)) return
         // (from a stack, the one on top comes off)
         const key = STACKABLE(picked) ? stackTop(picked) : picked
         if (stackOn.current.has(key)) {

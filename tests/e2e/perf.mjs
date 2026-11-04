@@ -47,6 +47,25 @@ if (process.env.OPEN) {
   await p.locator('.office .panel-x').click()
   await p.locator('.ai-toggle').click()
   await p.waitForTimeout(+process.env.OPEN)
+  // (SHOTS=<prefix>: views 3 and 4 (the till and the doorway) and the overview shot while open, to see the customers' things)
+  // (BITS=<prefix>: the customers' shoes and soy dishes (SeatBits' instanced meshes): how many, and a close shot over the shoes and over a soy dish)
+  if (process.env.BITS) {
+    const info = await p.evaluate(() => {
+      const out = []
+      window.__scene.traverse((o) => { if (o.isInstancedMesh && o.count > 0 && o.count <= 24 && !o.userData?.batchPart) { const v = new o.position.constructor(), M = new o.matrix.constructor(); o.getMatrixAt(0, M); v.setFromMatrixPosition(M).applyMatrix4(o.matrixWorld); out.push({ geo: o.geometry.type, r: o.geometry.parameters?.radius, count: o.count, first: v.toArray().map((x) => +x.toFixed(2)) }) } })
+      return out
+    })
+    console.log(JSON.stringify(info))
+    console.log('SOY', JSON.stringify(await p.evaluate(() => { let o = null; window.__scene.traverse((x) => { if (x.isInstancedMesh && x.geometry.type === 'CircleGeometry' && x.geometry.parameters.radius === 0.03) o = x }); if (!o) return null; let v = true; for (let a = o; a; a = a.parent) if (!a.visible) v = false; const M = new o.matrix.constructor(); o.getMatrixAt(0, M); return { vis: v, count: o.count, mat: o.material.type, col: o.material.color.getHexString(), side: o.material.side, m: M.elements.map((x) => +x.toFixed(3)), parent: o.parent?.name, layers: o.layers.mask } })))
+    for (const [i, q] of info.filter((x) => x.geo === 'SphereGeometry' || x.geo === 'CircleGeometry').entries()) {
+      await p.evaluate((f) => { window.__freeCam = true; window.__ctl.target.set(...f); window.__cam.position.set(f[0] + 0.01, f[1] + 0.9, f[2]); window.__ctl.update() }, q.first)
+      await p.waitForTimeout(1200)
+      await p.screenshot({ path: `${process.env.BITS}-${i}.png`, clip: { x: 300, y: 300, width: 640, height: 480 } })
+    }
+  }
+  if (process.env.SHOTS) {
+    for (const k of ['4', '3', '1']) { await p.keyboard.press(k); await p.waitForTimeout(2500); await p.screenshot({ path: `${process.env.SHOTS}-${k}.png` }) }
+  }
   await p.locator('.view-reset').click()
   await p.locator('.view-menu button', { hasText: '自由' }).first().click()
   await p.waitForTimeout(3000)

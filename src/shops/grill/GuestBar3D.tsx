@@ -1,4 +1,4 @@
-import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
 import { drinksToOrder, stockerChore, type StockChore } from '@/game/stocker'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -45,7 +45,7 @@ import { beep, behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey,
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
-import { takeOut, type Denom } from '@/game/till'
+import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, STACK_CAP, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring, putBack, RACK_FULL, unload, washOne } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
@@ -56,7 +56,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { nameOver, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -1140,9 +1140,25 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     TILL_CASH.onTake?.(r.amount)
     beep('ok')
   }
-  const rolls = useRegisterModel().rolls
-  const rollSays = (k: number) => nameOver(tl(lang, `棒金・${k} 円`, `棒金・${k}円`, `Coin roll, ¥${k}`),
-    tl(lang, `${k} 円硬幣 50 枚一捲，銀行包好的找零備用`, `${k}円玉50枚入り、銀行で巻いた釣り銭の予備`, `Fifty ¥${k} coins rolled by the bank, change kept in hand`))
+  const { rolls, rollNodes } = useRegisterModel()
+  // (the rolls taken are gone from the drawer, as drawn: kept in TILL_CASH, so a register built again shows them so)
+  const [rollsIn, setRollsIn] = useState(TILL_CASH.rolls)
+  useEffect(() => { for (const [k, o] of rollNodes) o.visible = !!rollsIn[k] }, [rollNodes, rollsIn])
+  /** the owner takes a coin roll (棒金), as a compartment's money: only with the drawer out, its fifty coins to the shop's cash */
+  const takeCoinRoll = (e: { stopPropagation: () => void }, k: number) => {
+    e.stopPropagation()
+    if (getEdit().on || open.current < 0.5) return
+    const r = takeRoll(TILL_CASH.rolls, k)
+    if (!r.amount) return
+    TILL_CASH.rolls = r.rolls
+    setRollsIn(r.rolls)
+    setTip(null)
+    TILL_CASH.onTake?.(r.amount)
+    beep('ok')
+  }
+  const rollTip = (k: number) => tipOver(tl(lang, `棒金・${k} 円`, `棒金・${k}円`, `Coin roll, ¥${k}`),
+    tl(lang, `${k} 円硬幣 50 枚一捲・點一下取出 ¥${(k * ROLL_COINS).toLocaleString()}，加進現金`, `${k}円玉50枚の棒金・クリックで ¥${(k * ROLL_COINS).toLocaleString()} を取り出す`,
+      `Fifty ¥${k} coins rolled by the bank: click to take ¥${(k * ROLL_COINS).toLocaleString()} into cash`))
   const cashTip = (k: Denom) => tipOver(
     tl(lang, `${k.toLocaleString()} 円${k >= 1000 ? '鈔' : '硬幣'}`, `${k.toLocaleString()} 円${k >= 1000 ? '札' : '玉'}`, `¥${k.toLocaleString()} ${k >= 1000 ? 'notes' : 'coins'}`),
     inDrawer[k] ? tl(lang, `點一下取出 ¥${(k * inDrawer[k]).toLocaleString()}，加進現金`, `クリックで ¥${(k * inDrawer[k]).toLocaleString()} を取り出す`, `Click to take ¥${(k * inDrawer[k]).toLocaleString()} into cash`)
@@ -1288,10 +1304,10 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
         }} onPointerOut={(e) => { setDrawerHover(false, e.nativeEvent); setDrawerKeyHover(false, e.nativeEvent) }}>
           {/* (its front and its tray, from the model) */}
           <RegisterDrawer />
-          {/* (the coin rolls (棒金) in the 2000s' place: each named when pointed at (the owner asked what the three were), nothing to do with
-              them; only while the drawer's out) */}
-          {rolls.map((r) => (
-            <mesh key={r.kind} name={`coinroll-${r.kind}`} position={r.at} visible={false} {...rollSays(r.kind)}>
+          {/* (the coin rolls (棒金) in the 2000s' place: each named when pointed at (the owner asked what the three were), and taken like a
+              compartment's money (the owner's: it's money too), each worth its fifty coins; only while the drawer's out) */}
+          {rolls.filter((r) => rollsIn[r.kind]).map((r) => (
+            <mesh key={r.kind} name={`coinroll-${r.kind}`} position={r.at} visible={false} {...rollTip(r.kind)} onClick={(e) => takeCoinRoll(e, r.kind)}>
               <boxGeometry args={[r.size.x + 0.002, r.size.y + 0.002, r.size.z]} />
             </mesh>
           ))}
@@ -1931,6 +1947,63 @@ const AT_SEAT = {
   daikon: new THREE.SphereGeometry(0.011, 8, 6),
   shoe: new THREE.SphereGeometry(1, 8, 6),
 }
+/** the colours of the shoes left at the door, by the customer's id */
+const SHOE_COLOURS = ['#2a2220', '#5a3a22', '#f2f0ea', '#1c1c22', '#7a2a22']
+/** how many of each SeatBits holds at most */
+const BITS_MAX = 24
+const BIT_MATS = {
+  shoe: new THREE.MeshToonMaterial({ color: '#ffffff' }),
+  soy: new THREE.MeshToonMaterial({ color: '#3a1c0c' }),
+  daikon: new THREE.MeshToonMaterial({ color: '#f2efe4' }),
+}
+const BIT_M = new THREE.Matrix4(), BIT_N = new THREE.Matrix4(), BIT_Q = new THREE.Quaternion(), BIT_C = new THREE.Color()
+const BIT_ID = new THREE.Quaternion()
+const BIT_UP = new THREE.Vector3(0, 1, 0), BIT_X = new THREE.Vector3(1, 0, 0), BIT_P = new THREE.Vector3(), BIT_S = new THREE.Vector3()
+/**
+ * The customers' little things, each kind one draw for all of them (they were two meshes a customer, a draw each: some thirty a frame with
+ * the bar full): the pairs of shoes left on the genkan's stone, and the soy in the dish at each seated customer's place with its dab of
+ * daikon. Laid out as they were, each the shape and colour it had.
+ */
+const SeatBits = memo(function SeatBits({ shoes, soys }: { shoes: { at: THREE.Vector3; turn: number; colour: string }[]; soys: THREE.Vector3[] }) {
+  const shoe = useRef<THREE.InstancedMesh>(null), soy = useRef<THREE.InstancedMesh>(null), daikon = useRef<THREE.InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const m = shoe.current
+    if (!m) return
+    let n = 0
+    for (const sh of shoes) {
+      BIT_M.compose(sh.at, BIT_Q.setFromAxisAngle(BIT_UP, sh.turn), BIT_S.set(1, 1, 1))
+      for (const sd of [-1, 1]) {
+        if (n >= BITS_MAX) break
+        BIT_N.compose(BIT_P.set(sd * 0.028, 0.018, 0), BIT_ID, BIT_S.set(0.025, 0.018, 0.06)).premultiply(BIT_M)
+        m.setMatrixAt(n, BIT_N)
+        m.setColorAt(n, BIT_C.set(sh.colour))
+        n++
+      }
+    }
+    m.count = n
+    m.instanceMatrix.needsUpdate = true
+    if (m.instanceColor) m.instanceColor.needsUpdate = true
+  }, [shoes])
+  useLayoutEffect(() => {
+    const a = soy.current, b = daikon.current
+    if (!a || !b) return
+    const n = Math.min(BITS_MAX, soys.length)
+    for (let i = 0; i < n; i++) {
+      a.setMatrixAt(i, BIT_M.compose(soys[i], BIT_Q.setFromAxisAngle(BIT_X, -Math.PI / 2), BIT_S.set(1, 1, 1)))
+      b.setMatrixAt(i, BIT_M.compose(BIT_P.copy(soys[i]).add(BIT_S.set(0.008, 0.004, 0.004)), BIT_ID, BIT_S.set(1, 0.5, 1)))
+    }
+    a.count = n; b.count = n
+    a.instanceMatrix.needsUpdate = true; b.instanceMatrix.needsUpdate = true
+  }, [soys])
+  // (never culled as a whole: their bounds would be the first few's)
+  return (
+    <>
+      <instancedMesh ref={shoe} args={[AT_SEAT.shoe, BIT_MATS.shoe, BITS_MAX]} count={0} frustumCulled={false} />
+      <instancedMesh ref={soy} args={[AT_SEAT.soy, BIT_MATS.soy, BITS_MAX]} count={0} frustumCulled={false} />
+      <instancedMesh ref={daikon} args={[AT_SEAT.daikon, BIT_MATS.daikon, BITS_MAX]} count={0} frustumCulled={false} />
+    </>
+  )
+})
 /** the women's kinds, who use the women's toilet */
 const HER = new Set(['officeLady', 'schoolgirl', 'yukataLady', 'grandma', 'maidCoser', 'gyaru'])
 /** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
@@ -3186,6 +3259,25 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
   })
 
+  // (the customers' shoes at the door and the soy at their places, for SeatBits: worked out again only when who's in, and where, changes)
+  const seatShoes = useMemo(() => {
+    const c0 = counters[0]
+    return shown.filter((s) => s.slippers).slice(0, 9).map((s, k) => ({
+      // (three pairs abreast, on the till's side of the way in, out of everyone's feet and clear of the doorpost)
+      at: c0.at.clone().addScaledVector(c0.along, c0.length / 2 + GENKAN.along[0] + 0.08 + Math.floor(k / 3) * 0.12)
+        .addScaledVector(c0.lay, -0.7 - (k % 3) * 0.12).setY(-GENKAN.depth),
+      turn: Math.atan2(c0.along.x, c0.along.z) + Math.PI + (s.id % 3 - 1) * 0.15,
+      colour: SHOE_COLOURS[s.id % 5],
+    }))
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [shown.map((s) => (s.slippers ? s.id : -1)).join(), counters])
+  const seatSoys = useMemo(() => shown.filter((s) => s.phase !== 'enter' && s.phase !== 'leave').map((s) => {
+      const st = seats[s.seat], c = counters[st.counter]
+      const x = st.mid.clone().sub(c.at).dot(c.along)
+      return st.mid.clone().addScaledVector(c.along, sauceSide(c, BAR_GATES[st.counter], x)).addScaledVector(c.lay, PLACE.sauce[1]).setY(top + 0.013)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [shown.map((s) => (s.phase !== 'enter' && s.phase !== 'leave' ? s.seat : -1)).join(), seats, counters, top])
+
   return (
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
       {/* (one customer made with the page, never shown: their program linked while it loads) */}
@@ -3238,24 +3330,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* (each stool its own Movable, so each can be moved, turned and made larger or smaller by hand when the shop's shut: only the stool's look; where its guest
           sits and the way to it stay as they are, so no one is put out of a seat) */}
       <Stools seats={seats} />
-      {/* their shoes, left in pairs on the genkan's stone by the step, a pair for each of them inside */}
-      {given && (() => {
-        const c0 = counters[0]
-        const inside = shown.filter((s) => s.slippers)
-        return inside.slice(0, 9).map((s, k) => {
-          // (three pairs abreast, on the till's side of the way in, out of everyone's feet and clear of the doorpost)
-          const at = c0.at.clone().addScaledVector(c0.along, c0.length / 2 + GENKAN.along[0] + 0.08 + Math.floor(k / 3) * 0.12)
-            .addScaledVector(c0.lay, -0.7 - (k % 3) * 0.12).setY(-GENKAN.depth)
-          const col = ['#2a2220', '#5a3a22', '#f2f0ea', '#1c1c22', '#7a2a22'][s.id % 5]
-          return (
-            <group key={`shoe${s.id}`} position={at} rotation-y={Math.atan2(c0.along.x, c0.along.z) + Math.PI + (s.id % 3 - 1) * 0.15}>
-              {[-1, 1].map((sd) => (
-                <mesh key={sd} geometry={AT_SEAT.shoe} position={[sd * 0.028, 0.018, 0]} scale={[0.025, 0.018, 0.06]}><meshToonMaterial color={col} /></mesh>
-              ))}
-            </group>
-          )
-        })
-      })()}
+      {/* their shoes, left in pairs on the genkan's stone by the step, a pair for each of them inside (all of them one draw: SeatBits) */}
+      {given && <SeatBits shoes={seatShoes} soys={seatSoys} />}
       {/* (the fridges' own light inside, always on: it lights the drinks whatever the room's light, and shows the more with the lamps out; one
           for the pair, between them, and here from the first, not with the fridges as they come in later: a light added to the scene has every
           material in it made again, a stall) */}
@@ -3274,19 +3350,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           </group>
         )
       })}
-      {/* each seated customer's soy, poured into the little dish at their place (empty till they sit), a dab of
-          grated daikon in it */}
-      {given && shown.filter((s) => s.phase !== 'enter' && s.phase !== 'leave').map((s) => {
-        const st = seats[s.seat], c = counters[st.counter]
-        const x = st.mid.clone().sub(c.at).dot(c.along)
-        const at = st.mid.clone().addScaledVector(c.along, sauceSide(c, BAR_GATES[st.counter], x)).addScaledVector(c.lay, PLACE.sauce[1]).setY(top + 0.013)
-        return (
-          <group key={`soy${s.id}`} position={at}>
-            <mesh geometry={AT_SEAT.soy} rotation-x={-Math.PI / 2}><meshToonMaterial color="#3a1c0c" /></mesh>
-            <mesh geometry={AT_SEAT.daikon} position={[0.008, 0.004, 0.004]} scale={[1, 0.5, 1]}><meshToonMaterial color="#f2efe4" /></mesh>
-          </group>
-        )
-      })}
+      {/* (each seated customer's soy in the little dish at their place, a dab of grated daikon in it: drawn with the shoes, SeatBits) */}
       {/* the dirty plates waiting in the sink, and the plates out: on their way to a seat, at it, cleared away, washed and going back */}
       {Array.from({ length: dirty.current }, (_, i) => (
         <group key={`d${i}`} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}><Plate dirty design={i} /></group>

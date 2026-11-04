@@ -40,3 +40,14 @@ export const deposit = (d: DrawerCash, bill: number): DrawerCash => {
 
 /** the owner takes everything in one note's compartment or coin's cup: the drawer without it, and how much was taken */
 export const takeOut = (d: DrawerCash, k: Denom): { drawer: DrawerCash; amount: number } => ({ drawer: { ...d, [k]: 0 }, amount: k * d[k] })
+
+/** the coin rolls (棒金) in the drawer: fifty coins a roll, one of each of these, wrapped by the bank */
+export const ROLL_COINS = 50
+export const ROLL_KINDS = [100, 10, 1] as const
+/** which of the rolls are still in the drawer */
+export type Rolls = Record<number, boolean>
+/** the rolls the game starts with, as it starts with its float: one of each, never brought again */
+export const startingRolls = (): Rolls => Object.fromEntries(ROLL_KINDS.map((k) => [k, true]))
+/** the owner takes one roll: the rolls without it, and what it was worth (nothing if it's gone) */
+export const takeRoll = (r: Rolls, k: number): { rolls: Rolls; amount: number } =>
+  r[k] ? { rolls: { ...r, [k]: false }, amount: k * ROLL_COINS } : { rolls: r, amount: 0 }

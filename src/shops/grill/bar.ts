@@ -4,7 +4,7 @@ import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
-import { openingFloat, type DrawerCash } from '@/game/till'
+import { openingFloat, startingRolls, type DrawerCash, type Rolls } from '@/game/till'
 import { RACK_FULL, type Dryer } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
@@ -536,7 +536,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * the money in the register's drawer (game/till): the day's float, and each cash customer's bill put in as they pay; the owner takes a
  * compartment's worth out by clicking it, and `onTake` (set by App) puts it to the shop's cash
  */
-export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void) | null } = { drawer: openingFloat(), onTake: null }
+export const TILL_CASH: { drawer: DrawerCash; rolls: Rolls; onTake: ((amount: number) => void) | null } = { drawer: openingFloat(), rolls: startingRolls(), onTake: null }
 /** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
 export const PLATE_RACK = { n: RACK_FULL }
 /** the sink (Sink.tsx): its plates being washed (the tap runs); and its tap turned on by hand (the owner's: its handle's to be turned) */
