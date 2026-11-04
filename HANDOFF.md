@@ -1,35 +1,79 @@
-# 交接（新 chat 用）
+# 交接（HANDOFF）
 
-先讀 `CLAUDE.md`（開發守則、同步流程、BDD、編輯模式），再讀本檔。雲端 chat 只推 `cloud-work`，**不要推 `main`**（推 `main` 會部署網站）；改完檢查順序：`npx tsc -b` → `npm test`（93 項）→ commit → `git fetch origin && git merge origin/main` → `git push origin cloud-work`。使用者的本機用 `npm run dev:sync` 拉 `cloud-work`，在 http://localhost:5173/JapaneseGrillSimulator/ 看。
+最後更新：2026-11-04。新的 chat 先讀 `CLAUDE.md`（開發守則、檔案分層、BDD、開發者模式、效能守則），再讀本檔。
 
-## 使用者的習慣與要求
-- 要真的測過才說完成（Playwright：`/opt/pw-browsers/chromium --use-gl=swiftshader`；開發用 `__scene`、`__cam`、`__ctl`、`__edit`、`__till`、`__fire`、`__coals`、`__dropCoals`）。軟體 GL 約 10 FPS，等待要放長。
-- 方向用鏡頭位置判斷，不要猜；盡量用數值驗證，截圖只截目標區域（可用 `addStyleTag` 把 `.menu` 藏起來）。
-- 新行為先寫成 BDD 情境（`tests/bdd/`）再實作。
-- 回報只講結果、已驗證與未驗證的部分。
-- 雲端碰不到使用者的電腦：BGM 的 mp3、休眠電腦都要請使用者自己做。
+## 協作方式（2026-11-04 起，店主定的）
 
-## 這個 chat 做完的（摘要）
-- 編輯模式：Blender 風格面板、房間軸、貼合模型的選取框、+/− 縮放、群組、預設值寫進 `BASES`／`baseScale`／`baseTurn`、進入時收選單且不重設鏡頭。物件拆得很細（收銀台 9 件、牆上每幅畫、廁所裡的小東西、酒樽與餐盤堆、門簾／紅燈籠／玄關地墊…）。廁所整間、爐子、吧台、行燈、扇子沒拆（牽涉動線或玩法）。
-- 炭火：真實尺寸的堆疊（不浮空、最多三層、疊在別根上的才會滑、滑不遠）、炭堆滿且還在燒就不能再加、火力 100% 不能再加（`game/economy.ts` 的 `canAddCharcoal`）、燒完變灰白的炭而不是縮短、黑炭裂縫發光加餘燼床。
-- 收銀機：顯示器擺正、抽屜好點、灰塵污漬磨損、背面纜線、側面接口；冷藏櫃去掉「食材」字牌與地板飾條。
-- 場景：日夜不同的 HDRI、牆頂燈串、和紙吊燈、神龕兩格階梯加帶小門的圍欄、門簾家紋魚圖。
-- BGM：`src/ui/Bgm.tsx` 先找 `src/` 底下的音檔（使用者本機是 `src/IzakayaNight.mp3`，用 `import.meta.glob`，沒有檔也不會壞建置），再依序試 `public/audio/izakaya-night.mp3`、`居酒屋の夜.mp3`、m4a／ogg／wav；找不到時按鈕提示要放的路徑。檔案要提交進 repo 才會跟著部署。
-- HDRI：`src/scene/IndoorHDRI.tsx` 若有 `public/hdri/day.hdr`、`night.hdr`（polyhaven.com/hdris 的 1k .hdr，CC0）就用真的，沒有就用內建的假 HDRI。雲端連不上 polyhaven，所以沒放檔。
-- 瘦身：移除沒人用的匯出（`starsFor`、`COIN_R`、`KITCHEN_TOP`、`resetOne`、`equilibriumTemp`、`MiniStomach`）、翻頁箭頭與迷你胃的 CSS、Blender 備份檔、`__pycache__`、`blender/archive`、`public/icons.svg`。
+1. **先定位、再改**：畫面或渲染的問題，先用射線、場景走訪或把網格染成洋紅色截圖，找出畫出那個東西的網格與「檔案：行號」，回報店主確認後才改。不要猜是哪個檔案。
+2. **自帶驗證**：每次修正或優化都要自己驗證並回報數字（`npm run bench`、改動前後的數值、同一鏡頭的近拍對照）。
+3. **里程碑同步文件**：每完成一個階段，更新本檔與 `README.md`；提交訊息用結構化前綴（`feat:`、`fix(scene):`、`perf:`、`docs:`、`refactor:`）。
+4. **推送只由店主做**：本機 commit，推 `main` 就會部署網站，請店主自己 `git push origin main`。
 
-## 後來加的
-- 廚房三模式（`game/mode.ts`）：自由（閉店預設，自由視角）／研製（按右上「研」鈕，鎖攝影機 1，冷藏櫃在右側，食材直接出現在大砧板，烤好的進試吃碗）／營業（廚房自己烤）。編輯模式擋掉所有場景互動；行燈、團扇、大砧板、調味盒、水桶也有編輯框（後三者只有位移）；火堆內的炭與炭籃同款長條、灰渣圈已移除。
-- 炭火改成有稜角的炭塊、裂縫對齊溝槽發光；櫃台線路收成一束、加 iPad；收銀抽屜內部依日圓重做；飯桶更多細節；水桶箍圈改成片狀；吊燈圓形；傘移除；編輯模式面板顯示家具總數。
+改完的檢查順序：`npx tsc -b` → `npm test` → 有動到遊戲流程時 `npm run e2e` → 效能相關時 `npm run bench` → commit。
 
-## 待辦
-1. 【你】`src/IzakayaNight.mp3` 要提交進 repo（雲端看不到；網站才會有 BGM）；另外下載日夜兩張 HDRI 放進 `public/hdri/`。
-2. 吧台本體、爐子與石頭、行燈、扇子還沒做成編輯物件（等使用者決定）。
-2b. HDRI：雲端連不上 polyhaven，還沒放真檔；使用者放進 `public/hdri/` 後確認有套用（白天／夜晚不同）。
-3. 【你】GitHub repo 改名 JapaneseGrillSimulator（push 時 GitHub 提示已搬到 JiangJie-Yi/CanteenSimulator）。
-4. 【你】看一遍畫面是否到位；編輯模式的舊設定若看起來歪，按「全部還原」。
+## 場景架構（要改東西時先找這裡）
+
+| 東西 | 檔案 | 說明 |
+|---|---|---|
+| 整間店的 3D | `src/App.tsx`（Canvas、燈光、視角、時鐘、帳本） | 場景分三批載入（`scene/Later.tsx`），載入畫面等全部畫出來、著色程式編好（`scene/Prewarm.tsx`）才收起 |
+| 灶台、吧台本體、烤物流程 | `src/shops/grill/Roasting.tsx` | 灶台上的擺設由桌面位移 `moved` 定位；調味架固定（`FIXED`，第 457 行） |
+| 客人、外場、收銀台、地板、玄關 | `src/shops/grill/GuestBar3D.tsx` | 地板是 `RoomFloorImpl`（`room-floor` 群組）；客人的鞋子、醬油碟是 `SeatBits`（第 1967 行） |
+| 牆、牆上的東西、廁所、飲料櫃、圓窗 | `src/shops/grill/DiningRoom.tsx` | 圓窗：`RoundWindow`（第 1450 行）、拉門與窗外景色 `RoundShoji`（第 1246 行）、景色著色器 `ROUND_VIEW`（第 1173 行）、四層景深 `VIEW_LAYERS`（第 908 行） |
+| 灶台上的擺設（炭箱、行燈、冷凍櫃、飯桶） | `src/shops/grill/Decor.tsx` | 行燈、冷凍櫃的燈是 `scene/AnchoredLight.tsx`（燈掛在場景最上層，跟著擺設走） |
+| 地板材質 | `src/scene/FloorPiece.tsx`、`src/scene/floorBoards.ts` | 2026-11-04 退回優化前：卡通材質、暖棕色木板（`woodLooks.ts` 目前沒用） |
+| 開發者模式 | `src/shops/grill/edit.ts`、`Movable.tsx`、`CharacterViewer.tsx` | G 鍵進出；左下角 Dock 的「👤 角色預覽」跟著模式出現（`edit.ts` 第 156 行） |
+| 純邏輯（可測） | `src/game/*.ts` | 每條規則都有 BDD 情境（`tests/bdd/`） |
+| 3D 模型 | `blender/*.py` → `public/models/*.glb` | Low-Poly 鐵律見 `CLAUDE.md` |
+
+## 量測工具
+
+| 指令 | 用途 |
+|---|---|
+| `npm run bench` | 總覽的繪製次數、三角面、幾何、貼圖、著色程式、heap；視角 1～0 巡航、開關燈、開發者模式的平均 FPS、1% Low、最差一格、heap 差 |
+| `__triTop(n, 'piece' \| 'mesh')`（dev console） | 三角面排行 |
+| `node tests/e2e/soak.mjs`（`BASE=http://localhost:4173` 量正式版） | 長時間營業，每分鐘一行：heap、FPS、繪製、幾何、貼圖、程式 |
+| `node tests/e2e/perf.mjs free`（`OPEN=60000 BY=1`） | 營業時每件擺設畫幾次 |
+| `node tests/e2e/clips.mjs` | 穿模檢查 |
+
+## 目前的數字（2026-11-04）
+
+| 指標 | 數值 | 怎麼量的 |
+|---|---:|---|
+| 閉店總覽繪製次數 | 約 1,190（含陰影那一格約 1,450） | `npm run bench`，1920×1080 |
+| 閉店總覽三角面 | 約 60.9 萬 | 同上 |
+| 著色程式 | 128（以前 190～258） | 同上 |
+| 正式版營業 20 分鐘 | 58～61 FPS，最差一格 18～29 ms，heap 82 → 86 MB 持平 | `soak.mjs`，`BASE=http://localhost:4173` |
+| 營業時繪製次數 | 約 1,450（吧台本體 78 → 37） | `perf.mjs OPEN=60000 BY=1` |
+
+## 2026-11-03～04 完成的
+
+- **老闆頭部減面，保留描線**：頭部零件 1,353 → 1,071 面，整個人連描線 3,433 → 3,005；頭巾、捲邊、頭髮保留原段數（減了印花碎掉、出現稜角與接縫）。`blender/boss.py`。
+- **角色預覽面板消失**：收起的狀態存在瀏覽器裡，叫回它的按鈕卻沒出現；現在 Dock 跟著開發者模式。`edit.ts`。
+- **白米袋**：標籤「【常溫食材】白米存量」、剩幾份、見底提示，點一下開庫存常溫區補貨；從高處指米袋不再被菰樽搶走。`DiningRoom.tsx` 的 `RiceSacks`、`SakeHit`。
+- **棒金可以拿**：抽屜裡 100、10、1 圓棒金各一捲，點一下取出（50 枚 × 面額）加進現金，一局一份。`game/till.ts`、`cashRegister.tsx`、`GuestBar3D.tsx`。
+- **調味架與團扇掉到走道地上**：原因是調味架能被手拖過桌緣，照盤子的規則掉到地上；現在不能拖，已經掉下去的自動回到爐框前。`Roasting.tsx` 第 3570、4776 行。實測拖曳不動；**待店主在自己的存檔確認**。
+- **視角**：每個視角自己的焦段、0.9 秒緩入緩出；櫃檯退遠拍整座收銀台、玄關抬高。`data/views.ts`。
+- **著色程式 190 → 128**：吊掛物變淡用的半透明材質載入時就編好（`OccluderFade.tsx`）；行燈、冷凍櫃的燈不再跟著擺設藏起來（`AnchoredLight.tsx`）。
+- **地板退回優化前**。`FloorPiece.tsx`、`floorBoards.ts`。
+- **README 重寫**成目前的遊戲（以前寫的是三間店）。
+- 先前一晚：EXIT 燈、Hover 標籤、飲料落在真的檯面上、收銀抽屜三層音效、全場減面約 78.5 萬 → 62 萬面、素色零件共用材質合併（見 `CLAUDE.md`）。
+
+## 待辦（依優先）
+
+| 優先 | 項目 | 目前狀態 | 下一步 |
+|---|---|---|---|
+| 🔴 | **Heap 2.2～2.3 GB**（店主看到的，第 55 天、開發版分頁） | 還沒重現。正式版 20 分鐘 heap 持平（86 MB），開發版剛載入約 315 MB | 照「先定位」：用開發版長時間、×2 營業重現，每段時間做 heap 快照，比對哪類物件一直增加（`_leakfind.mjs`）；確認來源後回報再改 |
+| 🔴 | **圓窗外的景色沒有生效** | 還沒定位 | 照「先定位」：請店主說明在哪個視角、哪個時段看到什麼；用洋紅色染色確認窗洞裡畫的是 `RoundShoji` 的景色平面（`DiningRoom.tsx` 第 1246 行），還是被窗紙、格子或別的網格擋住 |
+| 🟡 | **調味架回到爐框** | 已修（見上），待店主確認 | 店主在原本的存檔重新整理或熱更新後看灶台 |
+| 🟡 | **醬油碟裡看不到醬油** | 位置與以前相同，沒用舊版對照，不確定是原本就被碟底蓋住，還是這次改出來的 | 定位碟子內底的高度與醬油的高度，比對後回報 |
+| 🔵 | **繪製次數、著色程式** | 1,190 次、128 個 | 目標 200 次、40 個需要跨擺設合併（開發者模式就不能逐件移動）或拿掉材質效果，要店主決定方向 |
+| 🔵 | **老闆頭部 300～500 面** | 1,071 面 | 要拿掉眼鏡、鬍子等辨識特徵才做得到，待店主決定 |
+| ⚪ | **洗手槽走道地板反白** | 重現不出來；地板已退回優化前 | 若還有，請店主截圖（時段、開關燈、視角） |
+| ⚪ | **推送** | 本機領先 GitHub 多個提交 | 店主執行 `git push origin main` |
 
 ## 注意
-- stop hook 常誤報「有未推送提交」：實際比對 `git ls-remote origin cloud-work` 與 `git rev-parse HEAD`。
-- 開發伺服器在雲端常中斷：`setsid nohup npx vite --port 5173`；不要用 `pkill`。重啟後第一次載入很慢。
-- e2e 在雲端：`CHROME_PATH=/opt/pw-browsers/chromium OPEN_FOR=240000 node tests/e2e/flow.mjs http://localhost:5173/JapaneseGrillSimulator/ grilledfish`（約 7 分鐘，跑的時候別改檔，熱更新會重載頁面）。
+
+- 開發伺服器的熱更新會在開著的分頁裡累積資源（`scene/gpuSweep.ts` 會清，但不會歸零）；量效能用新開的頁面或正式版（`npm run build && npx vite preview`）。
+- 不要用 `visible` 開關燈：可見的燈數一變，所有材質都要重編。
+- 不要用縮小代替隱藏：載入時合併的東西照世界座標烘進去，精度會壞。
+- `tests/e2e/_*.mjs` 是一次性的檢查腳本，不進 git；`r1.jpg`～`r8.jpg`、`public/textures/ReferenceTexture/` 也不進 git。
