@@ -8,7 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { plainColours, StaticBatch, mergeByMaterial, type BatchParts } from '@/scene/StaticBatch'
-import { glowLeave, glowOnly } from '@/scene/hoverGlow'
+import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { ColdMist } from '@/scene/ColdMist'
@@ -4602,6 +4602,9 @@ function FridgeDoorImpl({ n = 0 }: { n?: number }) {
  * before the fridge, and back in again later.
  */
 export const FridgeStock = memo(FridgeStockImpl)
+/** where a drink's held, up from its foot (its middle: the pointer stays on it) */
+const GRAB = 0.11
+const HELD_MID = new THREE.Vector3(0, -GRAB, 0)
 function FridgeStockImpl({ n = 0 }: { n?: number }) {
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster, scene } = useThree()
@@ -4615,6 +4618,13 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
   const [lifted, setLifted] = useState<string | null>(null)
   const [hover, setHover] = useState<string | null>(null)
   const [raised, setRaised] = useState<string | null>(null)
+  // (the bottle carried out of its place, drawn on its own in it, lit while it's carried)
+  useEffect(() => {
+    if (!lifted) return
+    const g = objs.current.get(lifted)
+    glowOn(g)
+    return () => glowOff(g)
+  }, [lifted])
   const shelves = FRIDGE_UNITS[n].shelves
   const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.16)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
@@ -4721,20 +4731,34 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     if (controls) controls.enabled = false
     document.body.classList.add('is-carrying')
     const plane = new THREE.Plane()
-    const at = new THREE.Vector3()
     let onTable: THREE.Vector3 | null = null
     dragKey.current = key
     if (from.kind === 'slot') setLifted(key)
+    // (carried on a level through where it was picked up (the owner's: on the fridge's upright front alone it lagged and swung off from the
+    // pointer, seen from above, and stopped dead at the fridge's sides): wherever the pointer's ray meets that level, it's right there, a
+    // little up; in front of the fridge's own outline it's on the fridge's front, to go into a place on another shelf)
+    // (held by its middle, GRAB up from its foot: the pointer stays on the bottle's middle, not its foot)
+    host.updateWorldMatrix(true, false)
+    // (the level a little above where it was, so what it's carried over isn't run into; it stays on the pointer)
+    const level = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(grp.localToWorld(new THREE.Vector3(0, GRAB, 0)).y + 0.05))
+    // (lit while it's carried, as everything picked up is: one off the floor now; one out of a place once the bottle carried is drawn in it
+    // (the effect on `lifted`))
+    if (from.kind === 'out') glowOn(grp)
     const move = (e: PointerEvent) => {
       const rect = gl.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1), camera)
       host.updateWorldMatrix(true, false)
       const nrm = new THREE.Vector3(0, 0, 1).transformDirection(host.matrixWorld)
       plane.setFromNormalAndCoplanarPoint(nrm, host.localToWorld(new THREE.Vector3(0, 0.7, 0.2)))
-      const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
-      // (over a table, nearer than the fridge's own front, it goes down on the table, standing upright, wherever the pointer is)
+      const front = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
+      const onFront = front ? host.worldToLocal(front.clone()) : null
+      const inFridge = !!onFront && Math.abs(onFront.x) < 0.45 && onFront.y > 0.02 && onFront.y < 1.62
+      const flat = inFridge ? null : raycaster.ray.intersectPlane(level, new THREE.Vector3())
+      const hit = inFridge ? front : flat
+      // (out of the fridge, over a table: it goes down on the table, standing upright, wherever the pointer is (the level it's carried on is
+      // the shelf's, often over the tables' tops: the ray met it first and it was never over one); on the fridge's front, a table nearer)
       const th = tableHit(raycaster.ray)
-      onTable = th && (!hit || th.distanceTo(raycaster.ray.origin) < hit.distanceTo(raycaster.ray.origin)) ? th : null
+      onTable = th && (!inFridge || !hit || th.distanceTo(raycaster.ray.origin) < hit.distanceTo(raycaster.ray.origin)) ? th : null
       // (down on the top that's really there, not the table's height as reckoned)
       if (onTable) onTable.y = surfaceAt(onTable, root.current)
       // (carried within the boss's reach, set down where he'd come for it or held right over him: he glows, to say it's for him)
@@ -4750,9 +4774,9 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
         return
       }
       grp.quaternion.identity()
-      if (!hit) return
-      at.copy(host.worldToLocal(hit))
-      grp.position.set(THREE.MathUtils.clamp(at.x, -1.1, 1.1), THREE.MathUtils.clamp(at.y, 0.02, 1.62), 0.2)
+      if (inFridge && onFront) { grp.position.set(onFront.x, onFront.y - GRAB, 0.2); return }
+      if (!flat) return
+      grp.position.copy(host.worldToLocal(flat)).add(HELD_MID)
     }
     const up = () => {
       window.removeEventListener('pointermove', move)
@@ -4762,6 +4786,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       dragKey.current = null
       setLifted(null)
       BOSS_FX.hover = false
+      glowOff(grp)
       grp.quaternion.identity()
       if (onTable) {
         const w: [number, number, number] = [onTable.x, onTable.y, onTable.z]
@@ -4778,8 +4803,9 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
         }
         return
       }
-      const px = grp.position.x, py = grp.position.y
-      const inside = Math.abs(px) < 0.4 && py > 0.1 && py < 1.62
+      const px = grp.position.x, py = grp.position.y, pz = grp.position.z
+      // (let go on the fridge's front, within it: into a place; out in front of it on the level, it's out)
+      const inside = Math.abs(px) < 0.4 && py > 0.1 && py < 1.62 && Math.abs(pz - 0.2) < 0.12
       // (dropped on the nearest place within reach: moved or swapped; out past the fridge's sides or down to the floor, stood
       // on the floor; anywhere else, back where it was)
       let best: [number, number] | null = null
@@ -4800,8 +4826,9 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
         if (from.kind === 'slot' && (best[0] !== from.r || best[1] !== from.k)) moveDrink(n, [from.r, from.k], best)
         else if (from.kind === 'out') putBack(from.i, n, best)
       } else if (!inside) {
-        const x = THREE.MathUtils.clamp(px, -1.0, 1.0)
-        const z = 0.5 + 0.13 * (FRIDGE_STOCK.out.filter((o) => o.unit === n).length % 3)
+        const x = THREE.MathUtils.clamp(px, -1.2, 1.2)
+        // (where it was let go, out before the fridge; let go against its front, a little out from it, the others' places taken in turn)
+        const z = pz > 0.35 ? Math.min(pz, 1.6) : 0.5 + 0.13 * (FRIDGE_STOCK.out.filter((o) => o.unit === n).length % 3)
         let idx = from.kind === 'out' ? from.i : -1
         if (from.kind === 'slot') {
           pullOut(n, [from.r, from.k], x, z)
@@ -4843,7 +4870,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
   return (
     <group ref={root}>
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
-        <group key={`${r}-${k}`} ref={reg(`${r}-${k}`)}
+        <group key={`${r}-${k}`} ref={reg(`${r}-${k}`)} name={`drink-${n}-${r}-${k}`}
           position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin({ kind: 'slot', r, k }, ev)}
           onPointerOver={(ev) => { ev.stopPropagation(); if (doorOpen()) { document.body.style.cursor = 'pointer'; setHover(`${r}-${k}`); setRaised(`${r}-${k}`) } aimTip(ev); setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
           onPointerOut={() => { document.body.style.cursor = ''; setHover((h) => (h === `${r}-${k}` ? null : h)); setTip(null) }}>
@@ -4860,7 +4887,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       <StaticBatch key={`ranks${n}|${bakedKey}`} parts={batch}>{ranks}</StaticBatch>
       {/* (what's been taken out, stood on the floor before the fridge) */}
       {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
-        <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
+        <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} name={`drink-out-${n}-${i}`} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
           onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject); aimTip(ev); setTip({ title: drinkName(o.id), hint: '拖曳移動，放回櫃子或遞給客人' }) }} onPointerOut={(ev) => { document.body.style.cursor = ''; glowLeave(ev.eventObject); setTip(null) }}>
           <DrinkBottle id={o.id} wet />
         </group>
