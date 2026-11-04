@@ -34,9 +34,9 @@ export type ViewSpot = {
 export const VIEW_SPOTS: ViewSpot[] = [
   { id: 'free', zh: '自由視角', ja: '全体', en: 'Overview', fov: 35, about: { zh: '從高處斜看整間店', ja: '店全体を高いところから', en: 'The whole shop from up high' } },
   { id: 'grill', zh: '火烤灶台', ja: '炉端', en: 'Grill', fov: 40, about: { zh: '圍爐燒烤的灶台：炭火、烤魚、調味', ja: '囲炉裏の炉端：炭火、焼き魚、味付け', en: 'The hearth grill: charcoal, fish, seasoning' } },
-  { id: 'till', zh: '櫃檯', ja: 'レジ', en: 'Till', anchor: 'TillMarble', back: 3.0, up: 1.6, fov: 42,
+  { id: 'till', zh: '櫃檯', ja: 'レジ', en: 'Till', anchor: 'TillMarble', back: 5.0, up: 2.6, fov: 42,
     about: { zh: '收銀櫃檯：收銀機、平板、刷卡機、服務鈴', ja: 'レジカウンター：レジ、タブレット、カード端末、呼び鈴', en: 'The till counter: register, tablet, card reader, bell' } },
-  { id: 'genkan', zh: '玄關', ja: '玄関', en: 'Entrance', anchor: 'look-door', back: 3.9, up: 2.6, shift: [-1.5, 0], from: [0.59, 0.81], fov: 45,
+  { id: 'genkan', zh: '玄關', ja: '玄関', en: 'Entrance', anchor: 'look-door', back: 3.9, up: 3.6, shift: [-1.5, 0], from: [0.59, 0.81], fov: 45,
     about: { zh: '入口：門簾、紅燈籠、鞋櫃、招財貓台', ja: '入口：暖簾、赤提灯、下駄箱、招き猫の台', en: 'The entrance: noren, red lantern, shoe rack, lucky cats' } },
   { id: 'altar', zh: '小神龕', ja: '神棚', en: 'Shrine', anchor: 'look-altar', back: 2.6, up: -0.3, fov: 35,
     about: { zh: '神棚與供桌：點御神酒供酒，可招來更多客人', ja: '神棚と供え台：御神酒を供えると客が増える', en: 'The household shrine: offer sake to bring more customers' } },
