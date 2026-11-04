@@ -228,8 +228,11 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     last.current = at
     pace.current += (Math.min(1, step / 0.6) - pace.current) * Math.min(1, dt * 8)
     const walk = pace.current
+    // (what the chef's walk (Roasting's CrewWalk) says he's doing just now: carrying food back in both hands, preparing it on the board,
+    // fanning the coals for something on the fire)
+    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean } | undefined
     if (cook) {
-      const f = (t + seed * 3.7) % 17 < 6 && !moving
+      const f = job?.fetcher ? !!job.fanNow : (t + seed * 3.7) % 17 < 6 && !moving
       if (f !== fanning) setFanning(f)
     }
     // (a waddle as they walk, as Overcooked's cooks do: bobbing at each step, rocking side to side; standing, breathing)
@@ -238,7 +241,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07
     fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0)
     fig.body.scale.y = 1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008
-    const hold = role === 'server' || role === 'stock' ? 1 : role === 'cashier' ? 0.6 : 0
+    const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
       if (!hand) continue
       if (seated) {
@@ -253,6 +256,11 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
       const out = new THREE.Vector3(sd * (hold === 1 ? 0.13 : 0.12), hold === 1 ? TRAY_AT[1] - 0.04 : 0.22, hold === 1 ? TRAY_AT[2] - 0.02 : 0.26)
       hand.position.lerpVectors(rest, out, hold).add(new THREE.Vector3(0, 0, hold === 1 ? 0 : swing))
       hand.rotation.x = hold === 1 ? -1.1 : 0
+      if (job?.prep) {
+        // (working at the board: both hands down in front, the knife hand cutting, the other holding it)
+        hand.position.set(sd * 0.12, 0.3 + (sd > 0 ? Math.abs(Math.sin(t * 11)) * 0.05 : 0), 0.3)
+        hand.rotation.x = -0.6
+      }
       if (cook && fanning && sd > 0) {
         hand.position.set(0.3, 0.42 + Math.sin(t * 7) * 0.03, 0.18)
         hand.rotation.z = Math.sin(t * 7) * 0.4
