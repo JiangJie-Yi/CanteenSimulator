@@ -24,12 +24,24 @@ const heap = async () => {
   return page.evaluate(() => Math.round((performance.memory?.usedJSHeapSize ?? 0) / 1048576))
 }
 // (the renderer's counts over one whole frame: three resets them each frame, so they're read in the next one's callback)
+// (over six frames: the shadow map is redrawn only every third (ShadowPacer), so a frame's counts are with or without it; the least is the
+// picture alone, the most with the shadows)
 const still = async () => {
-  const s = await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => {
+  const s = await page.evaluate(() => new Promise((done) => {
     const gl = window.__gl
     if (!gl) return done(null)
-    done({ draws: gl.info.render.calls, tris: gl.info.render.triangles, geo: gl.info.memory.geometries, tex: gl.info.memory.textures, prog: gl.info.programs?.length ?? 0 })
-  }))))
+    const seen = []
+    const read = () => {
+      seen.push({ draws: gl.info.render.calls, tris: gl.info.render.triangles })
+      if (seen.length < 7) requestAnimationFrame(read)
+      else {
+        const f = seen.slice(1)
+        done({ draws: Math.min(...f.map((x) => x.draws)), drawsShadow: Math.max(...f.map((x) => x.draws)), tris: Math.min(...f.map((x) => x.tris)),
+          trisShadow: Math.max(...f.map((x) => x.tris)), geo: gl.info.memory.geometries, tex: gl.info.memory.textures, prog: gl.info.programs?.length ?? 0 })
+      }
+    }
+    requestAnimationFrame(read)
+  }))
   return { ...(s ?? {}), heap: await heap() }
 }
 
@@ -95,8 +107,10 @@ fs.writeFileSync(OUT.replace(/\.md$/, '') + '.json', JSON.stringify(run, null, 1
 // ---- the table
 const before = process.env.BEFORE ? JSON.parse(fs.readFileSync(process.env.BEFORE, 'utf8')) : null
 const rows = [
-  ['Draw calls（總覽）', (r) => r.still.draws],
-  ['Triangles（總覽）', (r) => r.still.tris],
+  ['Draw calls（總覽，畫面）', (r) => r.still.draws],
+  ['Draw calls（含陰影那一格）', (r) => r.still.drawsShadow],
+  ['Triangles（總覽，畫面）', (r) => r.still.tris],
+  ['Triangles（含陰影那一格）', (r) => r.still.trisShadow],
   ['Geometries', (r) => r.still.geo],
   ['Textures', (r) => r.still.tex],
   ['Shader programs', (r) => r.still.prog],
