@@ -2279,8 +2279,9 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <group position={[SX, 0, s * w / 2]} rotation-y={-s * Math.PI / 2}>
         <Movable id={`wc2-${who}-toilet`} label={`馬桶（${name}）`}>
         {/* the toilet with its washlet, facing the way in, its cistern to the far wall (blender/wc.py; Restroom: its lid, flush, scrubbing) */}
-        {/* (mirrored across its middle (the owner's): its washlet's panel on its left, the side the remote and the paper are on) */}
-        <group scale={[1, 1, -1]}><ToiletLive who={who} at={[E - 0.4, 0, 0]} /></group>
+        {/* (as modelled: its washlet's panel on the sitter's left (+z), the wall remote's side; the paper on the right, to the right hand
+            (the owner's: the panel and the paper were both on the right, crowding the one hand)) */}
+        <ToiletLive who={who} at={[E - 0.4, 0, 0]} />
         </Movable>
         {/* (marks on the floor before it as it gets dirty) */}
         <WcMarks who={who} at={[0.03, 0.006, 0]} size={[0.3, 0.5]} />
@@ -2303,8 +2304,10 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
           <planeGeometry args={[0.5, 0.5]} />
           <meshBasicMaterial map={WC_WINDOW_FALL ?? undefined} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.5} />
         </mesh>
-        <Movable id={`wc2-${who}-remote`} label={`免治馬桶遙控器（${name}）`}>
-          <group position={[E - 0.34, 0.9, -W2]}><WcRemote who={who} /></group>
+        {/* (the remote on the left-hand wall (+z), turned to face the room, a little forward of the seat: clear of the pads' shelf over the
+            cistern in the women's) */}
+        <Movable id={`wc2-${who}-remote2`} label={`免治馬桶遙控器（${name}）`}>
+          <group position={[E - 0.74, 0.9, W2]} rotation-y={Math.PI}><WcRemote who={who} /></group>
         </Movable>
         {/* (the Otohime in the women's only: the owner's) */}
         {who === 'f' && (
@@ -2317,8 +2320,8 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         </Movable>
         <Movable id={`wc2-${who}-paper`} label={`衛生紙架（${name}）`}>
           {/* the paper, on its walnut holder on the wall by the toilet (Restroom: thinning with use, a new roll at a click) */}
-          {/* (on the same wall as the remote, its own place forward of it, clear of the washlet's arm (the owner's: they crowded each other)) */}
-          <group position={[E - 0.66, 0.62, -W2]}><WcPaper who={who} /></group>
+          {/* (on the right-hand wall (-z), to the right hand, just forward of the seat, clear of the lid as it lifts) */}
+          <group position={[E - 0.62, 0.62, -W2]}><WcPaper who={who} /></group>
         </Movable>
         {who === 'f' && (
           <Movable id="wc2-f-bin" label="生理用品垃圾桶（女廁）">
