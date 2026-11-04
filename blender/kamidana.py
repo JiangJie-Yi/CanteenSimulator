@@ -1456,15 +1456,31 @@ bmesh.ops.recalc_face_normals(_bm, faces=_bm.faces)
 _bm.to_mesh(_roof.data); _bm.free()
 uv_grain(_roof, 0.1)
 lx_.append(_roof)
-# (the jewel on its top: an octahedron of gold)
-_jr, _jy = 0.0055, 0.1365
-_jv = [P(0, _jy + _jr, 0), P(0, _jy - _jr, 0), P(_jr, _jy, 0), P(0, _jy, _jr), P(-_jr, _jy, 0), P(0, _jy, -_jr)]
-_jf = [(0, 2 + i, 2 + (i + 1) % 4) for i in range(4)] + [(1, 2 + (i + 1) % 4, 2 + i) for i in range(4)]
-_jw = mesh_obj("KamiLanternCapJewel", _jv, _jf, M["gold"])
-_bm = bmesh.new(); _bm.from_mesh(_jw.data)
-bmesh.ops.recalc_face_normals(_bm, faces=_bm.faces)
-_bm.to_mesh(_jw.data); _bm.free()
-lx_.append(_jw)
+# (the jewel on its top (宝珠, the owner's: the octahedron there was a sharp lump): a plump onion of gold, its point drawn up, on a low
+# eight-sided seat; each ring closed with a ladder of quads, never a fan into one point)
+def _ringed(name, prof, segs, mat_, y0):
+    """a turned piece of rings (r, y), y over y0: smooth, its first and last rings each closed with a ladder of quads"""
+    bm_ = bmesh.new()
+    rings = []
+    for r_, y_ in prof:
+        rings.append([bm_.verts.new(P(r_ * math.cos(2 * math.pi * j / segs), y0 + y_, r_ * math.sin(2 * math.pi * j / segs))) for j in range(segs)])
+    for a_, b_ in zip(rings, rings[1:]):
+        for j in range(segs):
+            bm_.faces.new((a_[j], a_[(j + 1) % segs], b_[(j + 1) % segs], b_[j]))
+    ladder_fill(bm_, rings[0][::-1])
+    ladder_fill(bm_, rings[-1])
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me_ = bpy.data.meshes.new(name)
+    bm_.to_mesh(me_); bm_.free()
+    o_ = bpy.data.objects.new(name, me_)
+    bpy.context.collection.objects.link(o_)
+    return finish(o_, name, mat_, smooth_shade=True)
+
+
+_hy = _ya - 0.0008
+lx_.append(_ringed("KamiLanternCapSeat", [(0.0042, 0.0), (0.0046, 0.0012), (0.0034, 0.0021)], 8, M["gold"], _hy))
+lx_.append(_ringed("KamiLanternCapJewel", [(0.0021, 0.0017), (0.0043, 0.0027), (0.0055, 0.0043), (0.0052, 0.006), (0.0037, 0.0077),
+                                           (0.0018, 0.0092), (0.0006, 0.0103)], 10, M["gold"], _hy))
 lantern = bpy.data.objects.new("KamiLantern", None)
 bpy.context.collection.objects.link(lantern)
 for o in lx_:

@@ -203,3 +203,60 @@ export function shrineDoor(open: boolean) {
     // (no audio: silent)
   }
 }
+
+/**
+ * Sake poured from the flask into one of the little cups (the owner's): a thin stream's trickle, its note rising as the cup fills (a small
+ * cup's ring going up as the space in it shrinks), a few soft glugs from the flask's neck; `len` how long this cup's pour lasts (s), `level`
+ * how loud for how near the camera is (0..1), `pan` where it is across the picture (-1 left .. 1 right)
+ */
+export function pourSake(len: number, level: number, pan: number) {
+  try {
+    const a = ctx()
+    const t = a.currentTime + 0.01
+    const out = a.createGain()
+    out.gain.value = 0.32 * Math.max(0, Math.min(1, level))
+    const p = a.createStereoPanner()
+    p.pan.value = Math.max(-0.8, Math.min(0.8, pan))
+    out.connect(p).connect(a.destination)
+    // (the stream: noise through a narrow band whose middle climbs as the cup fills, its loudness easing in and away)
+    const stream = noise(a, len + 0.1, (x) => Math.min(1, x * 12) * Math.min(1, (1 - x) * 6) * (0.75 + 0.25 * Math.sin(x * 70)))
+    const band = a.createBiquadFilter(), band2 = a.createBiquadFilter(), sg = a.createGain()
+    band.type = 'bandpass'; band.Q.value = 6
+    band.frequency.setValueAtTime(900, t)
+    band.frequency.exponentialRampToValueAtTime(2300, t + len)
+    band2.type = 'highpass'; band2.frequency.value = 500
+    sg.gain.value = 0.9
+    stream.connect(band).connect(band2).connect(sg).connect(out)
+    stream.start(t)
+    // (the cup's own ring under it, rising with it)
+    const o = a.createOscillator(), og = a.createGain()
+    o.type = 'sine'
+    o.frequency.setValueAtTime(620, t)
+    o.frequency.exponentialRampToValueAtTime(1250, t + len)
+    og.gain.setValueAtTime(0, t)
+    og.gain.linearRampToValueAtTime(0.035, t + 0.08)
+    og.gain.setValueAtTime(0.035, t + len - 0.1)
+    og.gain.linearRampToValueAtTime(0, t + len)
+    o.connect(og).connect(out)
+    o.start(t)
+    o.stop(t + len + 0.05)
+    // (a few glugs from the flask's neck: short falling blips, each a little higher than the last)
+    const glugs = 2 + Math.floor(Math.random() * 2)
+    for (let k = 0; k < glugs; k++) {
+      const tk = t + 0.12 + (k + Math.random() * 0.4) * (len - 0.2) / glugs
+      const g = a.createOscillator(), gg = a.createGain()
+      const f0 = 260 + k * 60 + Math.random() * 30
+      g.type = 'sine'
+      g.frequency.setValueAtTime(f0 * 1.6, tk)
+      g.frequency.exponentialRampToValueAtTime(f0, tk + 0.05)
+      gg.gain.setValueAtTime(0, tk)
+      gg.gain.linearRampToValueAtTime(0.09, tk + 0.008)
+      gg.gain.exponentialRampToValueAtTime(0.0001, tk + 0.09)
+      g.connect(gg).connect(out)
+      g.start(tk)
+      g.stop(tk + 0.12)
+    }
+  } catch {
+    // (no audio: silent)
+  }
+}

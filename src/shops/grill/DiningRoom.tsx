@@ -1,4 +1,4 @@
-import { blessingChime, shrineDoor } from './shrineSound'
+import { blessingChime, pourSake, shrineDoor } from './shrineSound'
 import { TISSUE } from '@/game/tissues'
 import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote } from './Restroom'
@@ -3130,8 +3130,10 @@ VASE_URLS.forEach((u) => useGLTF.preload(u))
  * look stamped out alike. `slot`: 0 the left vase, 1 the right */
 function BouquetPick({ lean = 0, slot }: { lean?: number; slot: number }) {
   const [v, setV] = useState<Flower>(SHRINE_FLOWERS[slot] ?? 0)
-  const turn = useMemo(() => (Math.random() - 0.5) * 1.2, [v])
-  const tilt = useMemo(() => (Math.random() - 0.5) * 0.06, [v])
+  // (its turn and lean worked out from which side and which flowers, not drawn at random: drawn again each time the vase was mounted (a view
+  // switched, a model loading nearby), it turned on the spot (the owner saw both vases jumping about); still different either side)
+  const turn = (((slot * 7 + v * 13 + 3) % 11) / 10 - 0.5) * 1.2
+  const tilt = (((slot * 5 + v * 3 + 2) % 7) / 6 - 0.5) * 0.06
   return (
     // (smaller than they were: the vases stood nearly as tall as the shrine; a sakaki vase comes to about two thirds of it)
     <group rotation-y={turn} scale={0.78} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const n = nextFlower(v); setShrineFlower(slot, n); setV(n) }}
@@ -3928,6 +3930,8 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
   const flaskRef = useRef<THREE.Group>(null)
   const flaskShadow = useRef<THREE.Group>(null)
   const streamRef = useRef<THREE.Mesh>(null)
+  /** whether a cup was being poured into last frame: its sound starts as the stream does */
+  const wasPouring = useRef(false)
   const liquid = useRef<(THREE.Mesh | null)[]>([null, null, null])
   // (the cups as they stand, moved by hand or not: the pour, the stream, the sake in them and the sparks all go where they are)
   const cupsRef = useRef<THREE.Group>(null)
@@ -3989,7 +3993,7 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
     return g
   }, [])
   const sizes = moteGeo.attributes.size as THREE.BufferAttribute
-  useFrame(({ clock }, dt) => {
+  useFrame(({ clock, camera }, dt) => {
     const t = clock.elapsedTime
     // (the motes: each rises from the shrine's base and fades as it goes, over about three seconds, swaying a little)
     if (moteMat.current) moteMat.current.opacity += ((BLESSING.on ? 0.9 : 0) - moteMat.current.opacity) * Math.min(1, dt * 1.5)
@@ -4134,6 +4138,14 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       sh.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined; if (m) m.opacity = 1 - lift })
     }
     const pouring = pourK > 0.01
+    // (each cup's pour heard as its stream starts (the owner's): as loud as the camera's near, from the side of the picture it's on)
+    if (pouring && !wasPouring.current && f) {
+      const at = f.getWorldPosition(new THREE.Vector3())
+      const d = camera.position.distanceTo(at)
+      const ndc = at.clone().project(camera)
+      pourSake(EACH - 0.2, Math.min(1, 1.8 / (d + 0.6)), ndc.x)
+    }
+    wasPouring.current = pouring
     if (streamRef.current) {
       streamRef.current.visible = pouring
       if (pouring) {
@@ -4186,8 +4198,8 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       {/* the two little lanterns before the shrine (神前灯籠, the owner's after their photo): beside its base's front corners, between it and
           the vases, lit; clear of the side doors as they open, of the flask and of the book */}
       {[-1, 1].map((sd) => (
-        <Movable key={sd} id={`shrinelamp${sd}`} label={sd < 0 ? '神前燈籠（左）' : '神前燈籠（右）'}>
-          <group position={[SHRINE_LAMP_X, 0, sd * SHRINE_LAMP_Z]} scale={SC} {...nameOver('神前燈籠', '供在神前的小木燈籠，點著燈')}><StaticBatch plain><KamiCopy part="lantern" /></StaticBatch><ContactShadow r={0.032} /></group>
+        <Movable key={sd} id={`shrinelamp${sd}`} label={sd < 0 ? '神前廊燈（左）' : '神前廊燈（右）'}>
+          <group position={[SHRINE_LAMP_X, 0, sd * SHRINE_LAMP_Z]} scale={SC} {...nameOver('【廊燈】神前廊燈', '供在神前的木造廊燈，柔和照亮神龕門戶。')}><StaticBatch plain><KamiCopy part="lantern" /></StaticBatch><ContactShadow r={0.032} /></group>
         </Movable>
       ))}
       <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase-1" /></group></Movable>
