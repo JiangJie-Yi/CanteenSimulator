@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { warmLater } from './Prewarm'
 
 /**
  * Hangings that get in the way fade: a group marked `userData.fade` (the noren, the lanterns at the door, the lamps) that stands
@@ -15,6 +16,19 @@ const FADED = 0.18
 const AIM: [number, number][] = [-0.3, -0.15, 0, 0.15, 0.3].flatMap((x) => [-0.3, -0.15, 0, 0.15, 0.3].map((y) => [x, y] as [number, number]))
 
 type Fader = { root: THREE.Object3D; hit: THREE.Mesh[]; drawn: THREE.Mesh[]; ink: THREE.Mesh[]; low: number; k: number; want: number; own: Map<THREE.Material, THREE.Material> }
+
+/** a hanging's own see-through copy of one of its materials, made once: remembering how it was, so the original stays as it is for everything else */
+function ownCopy(own: Map<THREE.Material, THREE.Material>, mat: THREE.Material) {
+  let c = own.get(mat)
+  if (!c) {
+    c = mat.clone()
+    c.userData.base = { opacity: mat.opacity }
+    c.transparent = true
+    c.depthWrite = false
+    own.set(mat, c)
+  }
+  return c
+}
 
 export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefined }) {
   const { scene, camera } = useThree()
@@ -42,7 +56,16 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
       const was = faders.current.find((f) => f.root === o)
       // (how far it fades: a number on the mark, or FADED; a lit lamp keeps more of itself, or it goes dark against the wall behind)
       const low = typeof o.userData.fade === 'number' ? o.userData.fade : FADED
-      list.push({ root: o, hit, drawn, ink, low, k: was?.k ?? 1, want: 1, own: was?.own ?? new Map() })
+      const own = was?.own ?? new Map<THREE.Material, THREE.Material>()
+      // (its see-through copies made now, and compiled with the rest at load (Prewarm): made the first time it faded, their programs were
+      // compiled then, a hitch of 80 to 150 ms on turning to the grill, where a lamp hangs between the camera and the fire)
+      for (const mesh of drawn) {
+        for (const mat of ([] as THREE.Material[]).concat(mesh.material)) {
+          if (own.has(mat) || mesh.userData.fadeOrig) continue
+          warmLater(new THREE.Mesh(mesh.geometry, ownCopy(own, mat)))
+        }
+      }
+      list.push({ root: o, hit, drawn, ink, low, k: was?.k ?? 1, want: 1, own })
     })
     faders.current = list
   }
@@ -63,13 +86,7 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
       if (!orig) m.userData.fadeOrig = m.material
       const src = m.userData.fadeOrig as THREE.Material | THREE.Material[]
       const next = (Array.isArray(src) ? src : [src]).map((mat) => {
-        let c = f.own.get(mat)
-        if (!c) {
-          // (its own copy, remembering how it was, so the original stays as it is for everything else)
-          c = mat.clone()
-          c.userData.base = { opacity: mat.opacity }
-          f.own.set(mat, c)
-        }
+        const c = ownCopy(f.own, mat)
         // (as its original is now: a lamp's shade lit or dark, its picture)
         const from = mat as THREE.MeshBasicMaterial & { emissive?: THREE.Color }, to = c as THREE.MeshBasicMaterial & { emissive?: THREE.Color }
         if (from.color && to.color) to.color.copy(from.color)

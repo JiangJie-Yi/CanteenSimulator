@@ -13,7 +13,8 @@
     "e2e": "node tests/e2e/flow.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
-    "bump": "node scripts/bump-version.js"
+    "bump": "node scripts/bump-version.js",
+    "bench": "node tests/e2e/bench.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
