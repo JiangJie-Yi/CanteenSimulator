@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -38,6 +39,18 @@ function blenderBridge(): Plugin {
   }
 }
 
+/** the version the game shows: <gameVersion's whole part>.<commit count> (<short hash>), or package.json's gameVersion where there's no
+ * git to ask (the build on GitHub fetches the whole history for it: deploy.yml's fetch-depth 0) */
+function gameVersion() {
+  const base = String(JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).gameVersion ?? '0')
+  try {
+    const git = (a: string) => execSync(`git ${a}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    return `${base.split('.')[0]}.${git('rev-list --count HEAD')} (${git('rev-parse --short HEAD')})`
+  } catch {
+    return base
+  }
+}
+
 // https://vite.dev/config/
 // GitHub Pages serves the site from https://<user>.github.io/<repo>/: built on GitHub, the repo's own name (so the site
 // works whatever the repo's called); built here, and in `vite preview`, JapaneseGrillSimulator
@@ -45,8 +58,9 @@ const REPO = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'JapaneseGrillSimul
 export default defineConfig(({ command, isPreview }) => ({
   base: command === 'build' || isPreview ? `/${REPO}/` : '/',
   plugins: [react(), blenderBridge()],
-  // (the game's version, from package.json's gameVersion: npm run bump adds 0.01; the about tab shows it)
-  define: { __GAME_VERSION__: JSON.stringify(JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).gameVersion) },
+  // (the game's version, shown on the about tab: it moves on with every commit by itself (the owner's: v0.01 stood still whatever was
+  // pushed): package.json's gameVersion's whole part, then how many commits there are, and the commit it was built from)
+  define: { __GAME_VERSION__: JSON.stringify(gameVersion()) },
   // (the same alias as tsconfig.app.json's paths)
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
