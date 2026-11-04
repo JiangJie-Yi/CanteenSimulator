@@ -1,20 +1,11 @@
 import { useLayoutEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { boardUVs, plankTexture } from './floorBoards'
-import { WOOD_LOOK, woodMaterial } from './woodLooks'
 
-/** the shop's floorboards (woodLooks' floor: a deep walnut, five boards to the texture) */
-export const SHOP_BOARDS = plankTexture(WOOD_LOOK.floor.boards!.slice(0, 4), 4, [128, 512], true)
-/** how they're laid: the way they run (along the first counter), a board's width and a texture's length (world units): wide boards as
- * before (the owner's: at 15 cm they read as a bamboo mat) */
+/** the shop's floorboards: warm brown, four boards to the texture */
+export const SHOP_BOARDS = plankTexture(['#8a6440', '#7d5a3a', '#94704a', '#836040'])
+/** how they're laid: the way they run (along the first counter), a board's width and a texture's length (world units) */
 export const BOARD_LAY = { along: new THREE.Vector3(0.81, 0, -0.59), board: 0.26, boards: 4, run: 4.2 }
-/** the floor's material, one for every piece (matte; a tint, the kitchen's darker, its own copy) */
-const FLOOR_MATS = new Map<string, THREE.Material>()
-const floorMat = (tint: string) => {
-  let m = FLOOR_MATS.get(tint)
-  if (!m) { m = woodMaterial('floor', SHOP_BOARDS, tint); FLOOR_MATS.set(tint, m) }
-  return m
-}
 
 /**
  * One piece of a floor laid in the shop's boards: a w × l rectangle (in its own frame, flat), its boards placed from
@@ -29,8 +20,9 @@ export function FloorPiece({ w, l, tint = '#ffffff', ...rest }: { w: number; l: 
     boardUVs(m.geometry, m.matrixWorld, BOARD_LAY.along, BOARD_LAY)
   })
   return (
-    <mesh ref={mesh} rotation-x={-Math.PI / 2} receiveShadow material={floorMat(tint)} {...rest}>
+    <mesh ref={mesh} rotation-x={-Math.PI / 2} receiveShadow {...rest}>
       <planeGeometry args={[w, l]} />
+      <meshToonMaterial color={tint} map={SHOP_BOARDS} />
     </mesh>
   )
 }
