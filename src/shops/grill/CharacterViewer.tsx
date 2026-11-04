@@ -7,7 +7,6 @@ import { createPortal } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
-import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
 import { KINDS, kindOf, type GuestKind } from '@/data/guests'
 import { tl, type Lang } from '@/data/i18n'
 import type { Role } from '@/data/staff'
@@ -70,15 +69,20 @@ function Stand() {
 function Fitted({ children, onStats, spin, look, normals }: { children: React.ReactNode; onStats: (s: { tris: number; draws: number }) => void; spin: boolean; look: Look; normals: boolean }) {
   const inner = useRef<THREE.Group>(null)
   const outer = useRef<THREE.Group>(null)
-  const tries = useRef(0)
+  // (measured until it's held the same size for a while: a model loads, and grows, some frames after it's mounted, and on a long session
+  // or with the panel tucked away that's well past the first forty frames (only those were measured, and a figure that came later stood
+  // at its model's own size, a speck on the stand); frames with nothing in them yet don't count)
+  const still = useRef(0)
+  const [ready, setReady] = useState(false)
+  const was = useRef(new THREE.Vector3())
   const box = useMemo(() => new THREE.Box3(), [])
+  const camera = useThree((t) => t.camera) as THREE.PerspectiveCamera
+  const controls = useThree((t) => t.controls) as unknown as { target: THREE.Vector3; update: () => void; minDistance: number; maxDistance: number } | null
   useFrame((_, dt) => {
     const o = outer.current, g = inner.current
     if (!o || !g) return
     if (spin) o.rotation.y += Math.min(dt, 0.1) * 0.45
-    // (measured for the first frames: a model loads, and grows, a frame or two after it's mounted)
-    if (tries.current > 40) return
-    tries.current++
+    if (still.current > 8) return
     g.scale.setScalar(1)
     g.position.set(0, 0, 0)
     g.updateMatrixWorld(true)
@@ -94,13 +98,32 @@ function Fitted({ children, onStats, spin, look, normals }: { children: React.Re
     })
     if (box.isEmpty()) return
     const size = box.getSize(new THREE.Vector3())
+    still.current = size.distanceTo(was.current) < 1e-4 ? still.current + 1 : 0
+    was.current.copy(size)
     const k = STAND_H / Math.max(0.01, size.y)
     g.scale.setScalar(k)
     const c = box.getCenter(new THREE.Vector3())
     g.position.set(-c.x * k, -box.min.y * k, -c.z * k)
-    if (tries.current % 10 === 0) onStats({ tris: Math.round(tris), draws })
+    onStats({ tris: Math.round(tris), draws })
+    // (once it's settled, the camera fitted to it (the owner's): the controls aimed at its middle, the camera back far enough that its
+    // bounding sphere fills the view with a fifth to spare, a little above its middle; the near and far planes by that distance)
+    if (still.current > 8) {
+      setReady(true)
+      g.updateMatrixWorld(true)
+      const b = new THREE.Box3().setFromObject(g)
+      const centre = b.getCenter(new THREE.Vector3()), tall = b.getSize(new THREE.Vector3())
+      const radius = b.getBoundingSphere(new THREE.Sphere()).radius
+      const fov = camera.fov * (Math.PI / 180)
+      const d = Math.abs(radius / Math.sin(fov / 2)) * 1.25
+      camera.position.set(centre.x, centre.y + tall.y * 0.1, centre.z + d)
+      camera.near = d / 100
+      camera.far = d * 100
+      camera.updateProjectionMatrix()
+      if (controls) { controls.target.copy(centre); controls.minDistance = d * 0.35; controls.maxDistance = d * 2; controls.update() }
+      else camera.lookAt(centre)
+    }
   })
-  return <group ref={outer}><group ref={inner}>{children}</group><LookOver root={inner} look={look} normals={normals} /></group>
+  return <group ref={outer}><group ref={inner}>{children}</group><LookOver root={inner} look={look} normals={normals && ready} /></group>
 }
 
 /** how the figure's drawn, for looking it over (the owner's): as it is, a plain clay, or each point coloured by the way it faces */
@@ -112,7 +135,7 @@ const NORMAL_LOOK = new THREE.MeshNormalMaterial()
  * vertex normals drawn as short lines (a dark patch in its shading is often a normal turned wrong). Only on the viewer's own copy.
  */
 function LookOver({ root, look, normals }: { root: React.RefObject<THREE.Group | null>; look: Look; normals: boolean }) {
-  const helpers = useRef<VertexNormalsHelper[]>([])
+  const helpers = useRef<NormalLines | null>(null)
   useEffect(() => {
     const g = root.current
     if (!g) return
@@ -125,24 +148,89 @@ function LookOver({ root, look, normals }: { root: React.RefObject<THREE.Group |
     })
     return () => { for (const [m, mat] of was) m.material = mat }
   }, [root, look])
+  const scene = useThree((t) => t.scene)
   useEffect(() => {
     const g = root.current
     if (!g || !normals) return
-    const made: VertexNormalsHelper[] = []
+    // (the lines' length by the figure's height (the owner's: 5%, never under 0.08; at two centimetres they were specks round it))
     g.updateMatrixWorld(true)
-    g.traverse((o) => {
+    const tall = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3()).y
+    const lines = new NormalLines(g, Math.max(tall * 0.05, 0.08))
+    // (in the scene's own frame: hung under the turntable it was carried round twice, and its points were the model's at rest)
+    scene.add(lines)
+    helpers.current = lines
+    return () => { lines.removeFromParent(); lines.geometry.dispose(); (lines.material as THREE.Material).dispose(); helpers.current = null }
+  }, [root, normals, scene])
+  useFrame(() => helpers.current?.update())
+  return null
+}
+
+/**
+ * Every vertex's normal drawn as a line out from it, in bright cyan, where the figure is drawn: through its skinning (the figures are one
+ * rigidly skinned mesh each, their points at rest somewhere else entirely: three's VertexNormalsHelper reads the points at rest, and
+ * scattered them round the body as specks), then the mesh's place in the world. Parts shrunk to nothing (a fan put away) left out.
+ */
+class NormalLines extends THREE.LineSegments {
+  private meshes: THREE.Mesh[]
+  private len: number
+  constructor(root: THREE.Object3D, len: number) {
+    const meshes: THREE.Mesh[] = []
+    root.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh || !m.geometry?.attributes?.normal || ([] as THREE.Material[]).concat(m.material).every((x) => x.side === THREE.BackSide)) return
-      // (about two centimetres a line, whatever the figure's been scaled by)
-      const h = new VertexNormalsHelper(m, 0.02 / Math.max(1e-3, g.getWorldScale(new THREE.Vector3()).x), 0x33ccff)
-      g.parent?.add(h)
-      made.push(h)
+      meshes.push(m)
     })
-    helpers.current = made
-    return () => { for (const h of made) { h.removeFromParent(); h.geometry.dispose(); (h.material as THREE.Material).dispose() } helpers.current = [] }
-  }, [root, normals])
-  useFrame(() => { for (const h of helpers.current) h.update() })
-  return null
+    const n = meshes.reduce((k, m) => k + m.geometry.attributes.position.count, 0)
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 6), 3))
+    super(geo, new THREE.LineBasicMaterial({ color: 0x00ffff }))
+    this.meshes = meshes
+    this.len = len
+    this.frustumCulled = false
+    this.matrixAutoUpdate = false
+    this.update()
+  }
+  update() {
+    const out = this.geometry.attributes.position as THREE.BufferAttribute
+    const P = new THREE.Vector3(), N = new THREE.Vector3(), M = new THREE.Matrix4(), S = new THREE.Matrix4(), B = new THREE.Matrix4()
+    const nm = new THREE.Matrix3()
+    let k = 0
+    for (const m of this.meshes) {
+      m.updateWorldMatrix(true, false)
+      const pos = m.geometry.attributes.position, nor = m.geometry.attributes.normal
+      const sk = (m as THREE.SkinnedMesh).isSkinnedMesh ? (m as THREE.SkinnedMesh) : null
+      const si = sk?.geometry.attributes.skinIndex, sw = sk?.geometry.attributes.skinWeight
+      for (let i = 0; i < pos.count; i++, k += 2) {
+        P.fromBufferAttribute(pos, i)
+        N.fromBufferAttribute(nor, i)
+        if (sk && si && sw) {
+          // (the skinning: each bone's pose times its inverse at rest, by its weight, after the mesh's bind matrix; the bones' matrices are
+          // the world's already, so the mesh's own place is in them)
+          M.set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+          for (let j = 0; j < 4; j++) {
+            const w = sw.getComponent(i, j)
+            const bi = si.getComponent(i, j)
+            const bone = sk.skeleton.bones[bi]
+            if (!w || !bone) continue
+            S.multiplyMatrices(bone.matrixWorld, sk.skeleton.boneInverses[bi])
+            for (let e = 0; e < 16; e++) M.elements[e] += S.elements[e] * w
+          }
+          B.multiplyMatrices(M, sk.bindMatrix)
+          P.applyMatrix4(B)
+          N.applyMatrix3(nm.getNormalMatrix(B))
+        } else {
+          P.applyMatrix4(m.matrixWorld)
+          N.applyMatrix3(nm.getNormalMatrix(m.matrixWorld))
+        }
+        // (a part shrunk to nothing: no line)
+        if (!(N.lengthSq() > 1e-12) || !Number.isFinite(P.x) || !Number.isFinite(N.x)) { out.setXYZ(k, 0, -100, 0); out.setXYZ(k + 1, 0, -100, 0); continue }
+        N.normalize()
+        out.setXYZ(k, P.x, P.y, P.z)
+        out.setXYZ(k + 1, P.x + N.x * this.len, P.y + N.y * this.len, P.z + N.z * this.len)
+      }
+    }
+    out.needsUpdate = true
+  }
 }
 
 function Lights() {
@@ -221,7 +309,7 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
                 {e.group === 'guest' && <FolkFigure id={gid} eating={false} walking={walk} mood={mood} ground />}
               </Fitted>
             </Suspense>
-            <OrbitControls target={[0, 0.9, 0]} enablePan={false} minDistance={2} maxDistance={9} />
+            <OrbitControls makeDefault target={[0, 0.9, 0]} enablePan={false} minDistance={2} maxDistance={9} />
             {/* (the wireframe (4) here too, its hidden lines hidden) */}
             <WireView />
           </Canvas>
