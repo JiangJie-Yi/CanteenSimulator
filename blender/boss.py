@@ -365,7 +365,8 @@ lathe("BossBody", [(y, r + (0.006 if y < HEM + 0.04 else 0.0)) for (y, r) in PRO
 C = Vector((0.0, 0.68 + DY, 0.0))
 R = 0.27
 # (the owner's head 22 round, the staff's 20: what of it the tenugui, the hair and the body hide is culled at the end)
-ring_ball(radius=R, segs=22 if not CREW else 20, rings=12, location=P(*C))
+# (the owner's lean head (the owner's: his head 300 to 500 triangles): 16 round, 9 rings; the staff's as before)
+ring_ball(radius=R, segs=16 if not CREW else 20, rings=9 if not CREW else 12, location=P(*C))
 head = fin(active(), "BossHead", M["skin"])
 
 
@@ -445,7 +446,7 @@ if FEMALE:
 # (sideburns down in front of the ears)
 for sd in (-1, 1):
     q = head_at(sd * math.radians(76), -0.05, 0.004)
-    ring_ball(radius=1, segs=6, rings=4, location=P(*q))
+    ring_ball(radius=1, segs=6, rings=3 if not CREW else 4, location=P(*q))
     o = active(); o.scale = (0.016, 0.02, 0.045)
     fin(o, f"BossSideburn{sd}", M["hair"])
 
@@ -455,7 +456,7 @@ for sd in (-1, 1):
     ex = sd * 0.09
     # (eyes: big dark ovals with two glints)
     p, n = on_head(ex, EY, 0.0)
-    ring_ball(radius=1, segs=8, rings=4, location=P(*p))
+    ring_ball(radius=1, segs=6 if not CREW else 8, rings=4, location=P(*p))
     o = active(); o.scale = (0.016, 0.01, 0.021) if not CREW else (0.018, 0.01, 0.025)
     o.rotation_mode = "QUATERNION"; o.rotation_quaternion = Vector(P(*n)).to_track_quat("Y", "Z")
     fin(o, f"BossEye{sd}", M["dark"])
@@ -469,8 +470,8 @@ for sd in (-1, 1):
     disc(f"BossEyeShineB{sd}", p, n, 0.0026, M["white"], segs=5)
     # (the glasses: a round-cornered frame round each eye, standing a little off the face)
     ring = []
-    for i in range(9 if not CREW else 8):
-        t = 2 * math.pi * i / (9 if not CREW else 8) + math.pi / 8
+    for i in range(8):
+        t = 2 * math.pi * i / 8 + math.pi / 8
         c_, s_ = math.cos(t), math.sin(t)
         fx = ex + 0.05 * math.copysign(abs(c_) ** 0.7, c_)
         fy = EY + 0.04 * math.copysign(abs(s_) ** 0.7, s_)
@@ -479,8 +480,9 @@ for sd in (-1, 1):
     # (its arm back to the ear)
     arm = [on_head(sd * 0.143, EY + 0.012, 0.022)[0]]
     a_out = math.asin(0.143 / R)
-    for k in range(1, 4):
-        arm.append(head_at(sd * (a_out + (math.radians(84) - a_out) * k / 3), math.asin((EY + 0.012) / R), 0.012 + 0.01 * (1 - k / 3)))
+    for k in range(1, 3 if not CREW else 4):
+        f_ = k / (2 if not CREW else 3)
+        arm.append(head_at(sd * (a_out + (math.radians(84) - a_out) * f_), math.asin((EY + 0.012) / R), 0.012 + 0.01 * (1 - f_)))
     tube(f"BossGlassArm{sd}", arm, 0.0045, M["frame"])
     # (brows: arched and kind, over the frames)
     if not CREW:
@@ -490,10 +492,10 @@ for sd in (-1, 1):
         tube(f"BossBrow{sd}", [on_head(ex + 0.02 * (2 * u - 1), EY + 0.068 + 0.008 * (1 - (2 * u - 1) ** 2) - sd * 0.0 * u, 0.004)[0]
                                for u in [k / 6 for k in range(7)]], 0.0065, M["brow"])
 # (the bridge between the frames)
-tube("BossGlassBridge", [on_head(x, EY + 0.012 + 0.006 * (1 - (x / 0.033) ** 2), 0.024)[0] for x in (-0.033, -0.017, 0, 0.017, 0.033)], 0.005, M["frame"])
+tube("BossGlassBridge", [on_head(x, EY + 0.012 + 0.006 * (1 - (x / 0.033) ** 2), 0.024)[0] for x in ((-0.033, 0, 0.033) if not CREW else (-0.033, -0.017, 0, 0.017, 0.033))], 0.005, M["frame"])
 # (a round nose)
 p, n = on_head(0.0, -0.04, 0.012) if not CREW else on_head(0.0, -0.035, 0.002)
-ring_ball(radius=0.042 if not CREW else 0.022, segs=8, rings=5, location=P(*p))
+ring_ball(radius=0.042 if not CREW else 0.022, segs=6 if not CREW else 8, rings=4 if not CREW else 5, location=P(*p))
 fin(active(), "BossNose", M["skin"])
 # (a moustache: two soft brown wings either side under the nose)
 for sd in ((-1, 1) if not CREW else ()):
@@ -526,7 +528,7 @@ if CREW:
         fin(o, f"BossCheek{sd}", M["cheek"])
 # (ears)
 for sd in (-1, 1):
-    ring_ball(radius=0.048, segs=8, rings=4, location=P(sd * (R + 0.006), C.y - 0.005, -0.015))
+    ring_ball(radius=0.048, segs=6 if not CREW else 8, rings=4, location=P(sd * (R + 0.006), C.y - 0.005, -0.015))
     e = active(); e.scale = (0.45, 0.85, 0.95)
     fin(e, f"BossEar{sd}", M["skin"])
 
@@ -600,7 +602,7 @@ if WEAR != "bun":
     tube("BossTenuguiRoll", roll, 0.013 if CAPPED else 0.017, M["tenugui"], cyclic=True, most=10)
 # (the knot at the back, and its two corners: flat flaps of the cloth, hanging and flaring out)
 kp = head_at(math.pi, 0.14 if CAPPED else HB - 0.12, 0.035 if CAPPED else 0.05)
-ring_ball(radius=0.034, segs=8, rings=4, location=P(*kp))
+ring_ball(radius=0.034, segs=6 if not CREW else 8, rings=4, location=P(*kp))
 k_ = active(); k_.scale = (1.35, 0.95, 0.85)
 fin(k_, "BossKnot", M["tenugui"])
 for k, sd in enumerate((-1, 1)):
