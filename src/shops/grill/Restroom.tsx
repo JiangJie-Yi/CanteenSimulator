@@ -497,7 +497,8 @@ const WASH_STREAM = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent:
  * it's metered by the minute: App), and turned and running by itself while a guest washes their hands (metered as a hand wash); a stream
  * from the spout's mouth down into the bowl, wavering, a ring spreading where it lands; heard running, as loud as it's near.
  */
-export function WashstandLive({ who }: { who: Who }) {
+/** `mirrored`: laid out the other way about, as the washroom it stands in is (the soap bottle on the other side of the bowl) */
+export function WashstandLive({ who, mirrored = false }: { who: Who; mirrored?: boolean }) {
   const gltf = useGLTF(WASH_URL) as unknown as { scene: THREE.Group }
   const parts = useMemo(() => {
     const root = toonOf(WASH_URL, gltf.scene)
@@ -505,6 +506,20 @@ export function WashstandLive({ who }: { who: Who }) {
     const handle = root.getObjectByName('WashTapHandle')!
     handle.removeFromParent()
     root.updateMatrixWorld(true)
+    // (in the mirrored washroom the soap bottle stands on the bowl's other side (the owner's: the two washrooms alike, mirrored; it stood
+    // behind the vase there): turned on the lathe and its pump pointing straight out, it's mirrored by moving it across)
+    if (mirrored) {
+      const soap = ['WashSoapBottle', 'WashPumpNeck', 'WashPumpHead', 'WashPumpNozzle'].map((n) => root.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o)
+      const box = new THREE.Box3()
+      for (const o of soap) box.expandByObject(o)
+      const cz = root.worldToLocal(box.getCenter(new THREE.Vector3())).z
+      for (const o of soap) {
+        const p = o.parent!
+        const a = p.worldToLocal(root.localToWorld(new THREE.Vector3())), b = p.worldToLocal(root.localToWorld(new THREE.Vector3(0, 0, -2 * cz)))
+        o.position.add(b.sub(a))
+      }
+      root.updateMatrixWorld(true)
+    }
     const at = (n: string) => root.worldToLocal(root.getObjectByName(n)!.getWorldPosition(new THREE.Vector3()))
     const tip = at('WashSpoutTip'), floor = at('WashBowlFloor')
     // (the mirror's glass: where its face is (the stand's back is to +x, the glass faces -x), for the mirror that shows the room)
@@ -521,7 +536,7 @@ export function WashstandLive({ who }: { who: Who }) {
     mirror.glass.position.copy(face).add(new THREE.Vector3(-0.0006, 0, 0))
     mirror.glass.rotation.y = -Math.PI / 2
     return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null }
-  }, [gltf])
+  }, [gltf, mirrored])
   useEffect(() => () => { parts.mirror.glass.getRenderTarget().dispose(); (parts.mirror.glass.material as THREE.Material).dispose() }, [parts])
   const frame = useRef(0)
   const st = useRef({ turn: 0, lastHand: -1e9, was: false })

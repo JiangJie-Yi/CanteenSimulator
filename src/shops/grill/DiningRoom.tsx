@@ -1742,7 +1742,7 @@ const wcStallNoren = (who: 'm' | 'f') => {
     const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646 }
     g.save()
     const gr = g.createLinearGradient(0, 0, 0, H)
-    if (who === 'm') { gr.addColorStop(0, '#22385e'); gr.addColorStop(1, '#162540') } else { gr.addColorStop(0, '#f9eee8'); gr.addColorStop(1, '#f0d8d0') }
+    if (who === 'm') { gr.addColorStop(0, '#22385e'); gr.addColorStop(1, '#162540') } else { gr.addColorStop(0, '#4b3c68'); gr.addColorStop(1, '#2f2546') }
     g.fillStyle = gr; g.fillRect(0, 0, 512, H)
     if (who === 'm') {
       // (indigo (the owner's: the men's a deep navy with a traditional pattern; it was green bamboo on linen): waves of seigaiha rising over
@@ -1885,7 +1885,9 @@ const wcStallNoren = (who: 'm' | 'f') => {
     g.fillStyle = '#000000'
     for (let y = 0; y < H; y += 3) g.fillRect(0, y, 512, 1)
     g.globalAlpha = 1
-    g.fillStyle = who === 'm' ? '#0f1a2e' : '#6a1d26'; g.fillRect(0, 0, 512, 40)
+    // (the women's a deep wisteria (藤色), answering the men's indigo (the owner's: its pale pink linen stood out from the wood), its
+    // band along the top a deep madder)
+    g.fillStyle = who === 'm' ? '#0f1a2e' : '#5a1a2c'; g.fillRect(0, 0, 512, 40)
     g.fillStyle = '#f4efe4'; g.fillRect(0, H - 20, 512, 4)
     g.restore()
   })
@@ -1928,9 +1930,10 @@ const WC_CEDAR = canvasTex(64, 128, (g) => {
     }
   }
 }, true)
-/** a hand towel (手拭い) of indigo cotton with a wave pattern, white at both ends */
-const WC_TENUGUI = canvasTex(48, 96, (g) => {
-  g.fillStyle = '#1f3a68'
+/** a hand towel (手拭い) of dyed cotton with a wave pattern, white at both ends: indigo in the men's, a deep madder (茜色) in the women's
+ * (the owner's: a colour of its own there, as calm as the men's) */
+const tenugui = (base: string) => canvasTex(48, 96, (g) => {
+  g.fillStyle = base
   g.fillRect(0, 0, 48, 96)
   g.strokeStyle = 'rgba(244,239,226,0.7)'
   g.lineWidth = 1.2
@@ -1943,6 +1946,7 @@ const WC_TENUGUI = canvasTex(48, 96, (g) => {
   g.fillRect(0, 0, 48, 6)
   g.fillRect(0, 90, 48, 6)
 }, false)
+const WC_TENUGUI = { m: tenugui('#1f3a68'), f: tenugui('#7e2634') }
 const WC_GEO = {
   bowl: new THREE.SphereGeometry(0.12, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2),
   foot: new THREE.CylinderGeometry(0.07, 0.09, 0.28, 16),
@@ -2207,13 +2211,13 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       </StaticBatch></Movable>
       {/* ---- the washroom: the washstand facing the door, its tap live (Restroom) */}
       <Movable id={`wc2-${who}-basin`} label={`洗手台與鏡子（${name}）`}>
-        <group position={[D, 0, 0]}><WashstandLive who={who} /></group>
+        <group position={[D, 0, 0]}><WashstandLive who={who} mirrored={s > 0} /></group>
       </Movable>
       {/* (the men's: a moss ball (苔玉) on a dark, near-black stoneware dish and a stub of bamboo by it (the owner's: the men's and women's
           set apart); the women's its bamboo vase of camellia) */}
       {who === 'm' && (
         <Movable id="wc2-m-moss" label="苔玉（男廁）"><StaticBatch plain>
-          <group position={[D - 0.14, 0.764, -0.19]}>
+          <group position={[D - 0.14, 0.764, s * 0.19]}>
             <mesh position-y={0.008}><cylinderGeometry args={[0.05, 0.04, 0.016, 12]} /><meshToonMaterial color="#2c2a28" /></mesh>
             <mesh position-y={0.048} scale={[1, 0.9, 1]}><icosahedronGeometry args={[0.04, 1]} /><meshToonMaterial color="#4c6e34" /></mesh>
             {[0, 2.1, 4.2].map((a) => (
@@ -2227,8 +2231,9 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       )}
       {who === 'f' && <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}><StaticBatch plain>
       {/* (a bamboo vase of camellia on the washstand's counter, beside the bowl) */}
-      {/* (clear of the counter's back rail: it stood 2 mm into it (clips.mjs)) */}
-      <group position={[D - 0.14, 0.764, -0.19]}>
+      {/* (clear of the counter's back rail: it stood 2 mm into it (clips.mjs)); on the same side as the men's moss ball, the stall's
+          (the owner's: the two washrooms laid out alike, mirrored; it stood on the towel's side) */}
+      <group position={[D - 0.14, 0.764, s * 0.19]}>
         <mesh geometry={WC_GEO.pot} position-y={0.05}><meshToonMaterial color="#b8a060" /></mesh>
         {/* (its nodes: each ring lying round the tube (they stood upright, cutting through it in a jagged dark seam down its side), a little
             its inside just clear of it where it is (it tapers, 0.026 at its foot to 0.03 at its top)) */}
@@ -2247,7 +2252,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <group position={[D - 0.24, 0.98, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
         <mesh position-z={0.022} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.007, 0.007, 0.18, 8]} /><meshToonMaterial color="#b89a52" /></mesh>
         {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.08, 0, 0.011]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.005, 0.005, 0.022, 6]} /><meshToonMaterial color="#5a3d22" /></mesh>)}
-        <mesh position={[0, -0.11, 0.03]}><planeGeometry args={[0.12, 0.22]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI} side={THREE.DoubleSide} /></mesh>
+        <mesh position={[0, -0.11, 0.03]}><planeGeometry args={[0.12, 0.22]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI[who]} side={THREE.DoubleSide} /></mesh>
       </group>
       </StaticBatch></Movable>
       {/* (no お手洗い plaque on the wall: the owner's, the wall kept clean) */}
