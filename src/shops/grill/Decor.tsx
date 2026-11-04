@@ -24,6 +24,7 @@ import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
+import { AnchoredLight } from '@/scene/AnchoredLight'
 
 type Spot = { at: [number, number]; r: number }
 /** where each one stands (x, z) and how much room it takes */
@@ -454,7 +455,7 @@ function Lantern({ at }: { at: [number, number, number] }) {
       <sprite ref={halo} position={[0, MID * K, 0]} scale={0.95}>
         <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
       </sprite>
-      {QUALITY.tier === 'high' && <pointLight ref={lamp} position={[0, MID * K, 0]} color="#ffb060" intensity={0.7} distance={1.8} decay={2} />}
+      {QUALITY.tier === 'high' && <AnchoredLight light={lamp} position={[0, MID * K, 0]} color="#ffb060" intensity={0.7} distance={1.8} decay={2} />}
     </group>
   )
 }
@@ -722,7 +723,7 @@ function IngredientFridge() {
         onPointerOut={(e) => { handOver.onPointerOut(e); setTip(null) }}>
         <primitive object={model} />
       </group>
-      <pointLight ref={light} position={[-HOUSE / 2, H - 0.12, 0.15]} color="#cfe9ff" intensity={0} distance={2.4} decay={1.6} />
+      <AnchoredLight light={light} position={[-HOUSE / 2, H - 0.12, 0.15]} color="#cfe9ff" intensity={0} distance={2.4} decay={1.6} />
       {/* the temperature on the housing's display, and the thermostat's two buttons under it (up a degree, down a degree) */}
       <mesh position={[W / 2 - HOUSE / 2 - 0.03, 0.62, 0.74 / 2 + 0.009]}>
         <planeGeometry args={[0.1, 0.038]} />
