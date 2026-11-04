@@ -455,6 +455,9 @@ const FAN_PEG = { along: -LEDGE_L / 2 + 0.045, up: 0.365 - 0.19 }
 const FAN_DROP = -0.4
 /** the containers that stay where they're set, whatever's beside them: the ledge, fixed to the hearth */
 const FIXED = new Set(['box'])
+/** how many of the floating 美味 words can be up at once, and where an unused place waits */
+const POP_SLOTS = 8
+const POP_AWAY: [number, number, number] = [0, -50, 0]
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
 const PIT_SCALE = 1.3
 /**
@@ -4591,14 +4594,23 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
 
   // little floating words: how a seasoning changed a piece's 美味
-  const [pops, setPops] = useState<{ id: number; at: [number, number, number]; text: string; good: boolean }[]>([])
+  // (shown in a few places kept mounted, each word taking the next free one: one mounted for each word, a React root and its page element
+  // made and thrown away two or three times a second while the chef seasoned, kept in development (the heap rose with them))
+  const [pops, setPops] = useState<({ id: number; at: [number, number, number]; text: string; good: boolean } | null)[]>(() => Array(POP_SLOTS).fill(null))
   const popId = useRef(0)
   const pop = (at: THREE.Vector3, delta: number) => {
     if (!delta) return
     const id = ++popId.current
     const text = delta > 0 ? `美味 +${delta}` : `美味 ${delta}`
-    setPops((all) => [...all, { id, at: at.toArray() as [number, number, number], text, good: delta > 0 }])
-    window.setTimeout(() => setPops((all) => all.filter((x) => x.id !== id)), 1500)
+    setPops((all) => {
+      // (the first free place, or the oldest's)
+      let k = all.findIndex((x) => !x)
+      if (k < 0) k = all.reduce((o, x, i) => (x!.id < all[o]!.id ? i : o), 0)
+      const next = all.slice()
+      next[k] = { id, at: at.toArray() as [number, number, number], text, good: delta > 0 }
+      return next
+    })
+    window.setTimeout(() => setPops((all) => (all.some((x) => x?.id === id) ? all.map((x) => (x?.id === id ? null : x)) : all)), 1500)
   }
   // the 美味 of whatever's pointed at
   const [tasteTip, setTasteTip] = useState<{ at: [number, number, number]; taste: number } | null>(null)
@@ -6148,9 +6160,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           <span className="taste-tip">美味 <b>{tasteTip.taste}</b></span>
         </Html>
       )}
-      {pops.map((x) => (
-        <Html key={x.id} position={x.at} center zIndexRange={[36, 26]} style={{ pointerEvents: 'none' }}>
-          <span className={`taste-pop${x.good ? '' : ' is-bad'}`}>{x.text}</span>
+      {pops.map((x, k) => (
+        <Html key={k} position={x?.at ?? POP_AWAY} center zIndexRange={[36, 26]} style={{ pointerEvents: 'none' }}>
+          {/* (the word's own key: a new one starts its rise again) */}
+          {x && <span key={x.id} className={`taste-pop${x.good ? '' : ' is-bad'}`}>{x.text}</span>}
         </Html>
       ))}
       {active && toolLabel && (

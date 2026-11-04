@@ -95,6 +95,12 @@ function Stars({ v, big = false }: { v: number; big?: boolean }) {
 }
 
 // (drawn again only when it opens or shuts, or a new visit is rated: the shop's own re-renders, several a second while it's open, pass it by)
+/** each visit's own key for the list, given the first time it's shown and kept: keyed by its place, every row was made again as a new
+ * review came in at the top (ninety list items a minute while the shop's busy, the drawer shut or not) */
+const VISIT_KEYS = new WeakMap<object, number>()
+let visitSerial = 0
+const visitKey = (v: object) => { let k = VISIT_KEYS.get(v); if (k === undefined) { k = ++visitSerial; VISIT_KEYS.set(v, k) } return k }
+
 export const Reputation = memo(function Reputation({ open, lang, rating, visits, onClose }:
   { open: boolean; lang: Lang; rating: Rating; visits: Visit[]; onClose: () => void }) {
   useEffect(() => {
@@ -197,7 +203,7 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
                 const sat = satisfaction(v)
                 const [zh, ja, en] = remarkLine(v)
                 return (
-                  <li key={`${v.id}-${i}`}>
+                  <li key={visitKey(v)}>
                     {/* (their profile picture, as a map app's reviews have them (the owner's: not an emoji): game/avatars) */}
                     {/* (the name they review under, as on a map app (data/reviewers); what kind of customer they were a small tag beside it) */}
                     <ReviewerAvatar id={v.id} name={names[i]} />
