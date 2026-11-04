@@ -760,7 +760,8 @@ function drawRoundPaper(g: CanvasRenderingContext2D, sky: Sky) {
  * three greens; `night`: moonlit silhouettes, a cool light down one edge), so each culm, branch and leaf outside is where its shadow falls
  * (the owner's: the view open matching the shadows shut)
  */
-function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'night', shade = '6,10,24') {
+/** `part`: only the two further culms ('back'), only the two near ones and the sprays ('front'), or all of it; drawn the same whichever */
+function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'night', shade = '6,10,24', part: 'all' | 'back' | 'front' = 'all') {
   const rnd = seeded(5)
   const shadow = look === 'shadow'
   const LEAF = look === 'day' ? ['#4f7a2c', '#6c9a3a', '#3f6424'] : ['#18261e', '#203226', '#121c16']
@@ -785,6 +786,8 @@ function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'nigh
   }
   const culm = (x: number, w: number, lean: number, blur: number, alpha: number, far: boolean) => {
     g.save()
+    // (the part not drawn still drawn, unseen: the same random runs through, so each part is as it is in the whole)
+    if ((far && part === 'front') || (!far && part === 'back')) g.globalAlpha = 0
     // (the shadows soft as the moon throws them; the bamboo itself crisp, the two further off a touch out of focus)
     g.filter = shadow ? `blur(${blur}px)` : far ? 'blur(0.8px)' : 'none'
     const ink = shadow ? `rgba(${shade},${alpha})` : look === 'day' ? '#4a5e22' : '#141e18'
@@ -834,6 +837,7 @@ function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'nigh
   // (sprays hanging in from above, out of the frame)
   g.save()
   g.filter = shadow ? 'blur(1.4px)' : 'none'
+  if (part === 'back') g.globalAlpha = 0
   g.fillStyle = `rgba(${shade},0.34)`
   for (const [x, y, side] of [[290, -8, 1], [120, 4, -1], [470, 20, -1]] as [number, number, number][]) {
     g.save(); g.translate(x, y); g.rotate(Math.PI * 0.08 * side); spray(5, side, 46); g.restore()
@@ -905,7 +909,7 @@ const ROUND_R = 0.4
  * day blue, paler toward the horizon, a few clouds; by night deep blue, the city's glow along its foot, a few stars and the moon. Each layer's
  * picture spans a half-size `H` either way of the window's middle (in its own units), so it fills the view at an angle too.
  */
-const VIEW_LAYERS = { near: { d: 0.2, H: 0.52 }, mid: { d: 1.2, H: 1.12 }, far: { d: 5, H: 3.4 }, sky: { d: 20, H: 12.4 } }
+const VIEW_LAYERS = { near: { d: 0.2, H: 0.52 }, back: { d: 0.42, H: 0.52 }, mid: { d: 1.2, H: 1.12 }, far: { d: 5, H: 3.4 }, sky: { d: 20, H: 12.4 } }
 type ViewLayer = keyof typeof VIEW_LAYERS
 /** a layer's picture's own places: x, y (the window's units, its middle 0, up +) to the canvas's pixels */
 const viewPx = (k: ViewLayer, size: number) => {
@@ -1064,99 +1068,217 @@ function drawViewFar(g: CanvasRenderingContext2D, size: number, sky: Sky) {
 function drawViewMid(g: CanvasRenderingContext2D, size: number, sky: Sky) {
   const night = sky === 'night'
   const { X, Y, S } = viewPx('mid', size)
+  const H = VIEW_LAYERS.mid.H, W = 2 * H
   g.clearRect(0, 0, size, size)
-  const rnd = seeded(58)
-  // (the fronts across the alley: each its own height, colour and windows, the street below out of sight)
-  // (low enough that the city's towers and the sky show over them through the window's upper half: the depth's in what's seen beyond)
-  const fronts = [
-    { x: -1.12, w: 0.62, top: 0.02, col: '#b7a58a', win: 3 },
-    { x: -0.5, w: 0.5, top: 0.2, col: '#8c8f93', win: 2 },
-    { x: 0.0, w: 0.04, top: -1, col: '#000', win: 0 },
-    { x: 0.04, w: 0.56, top: -0.06, col: '#c9b9a0', win: 3 },
-    { x: 0.6, w: 0.56, top: 0.26, col: '#9d8470', win: 3 },
-  ]
-  const dim = night ? 0.26 : 1
+  const dim = night ? 0.3 : 1
   const shade = (hex: string, k: number) => { const c = new THREE.Color(hex).multiplyScalar(k); return `#${c.getHexString()}` }
-  for (const f of fronts) {
-    if (f.top < -0.5) continue
-    g.fillStyle = shade(f.col, dim)
-    g.fillRect(X(f.x), Y(f.top), S(f.w), Y(-1.1) - Y(f.top))
-    // (its parapet and the shadow under it)
-    g.fillStyle = shade(f.col, dim * 0.78)
-    g.fillRect(X(f.x - 0.01), Y(f.top + 0.03), S(f.w + 0.02), S(0.05))
-    g.fillStyle = 'rgba(0,0,0,0.18)'
-    g.fillRect(X(f.x), Y(f.top - 0.02), S(f.w), S(0.03))
-    // (its windows, floor by floor: frames, the panes dark or lit, a curtain here and there)
-    for (let fl = 0; fl < 3; fl++) {
-      const wy = f.top - 0.16 - fl * 0.34
-      if (wy < -0.95) break
-      for (let k = 0; k < f.win; k++) {
-        const wx = f.x + 0.06 + k * (f.w - 0.08) / f.win
-        const ww = (f.w - 0.08) / f.win - 0.06, wh = 0.16
-        g.fillStyle = shade('#5a5148', dim)
-        g.fillRect(X(wx - 0.008), Y(wy + 0.008), S(ww + 0.016), S(wh + 0.016))
-        const lit = night && rnd() < 0.55
-        g.fillStyle = lit ? (rnd() < 0.7 ? '#ffd389' : '#bfe0ff') : night ? '#1b2030' : '#6f8ea8'
-        g.fillRect(X(wx), Y(wy), S(ww), S(wh))
-        if (!night) { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(X(wx + ww * 0.1), Y(wy - 0.01), S(ww * 0.25), S(wh * 0.8)) }
-        if (rnd() < 0.4) { g.fillStyle = lit ? 'rgba(240,170,110,0.75)' : 'rgba(220,210,190,0.7)'; g.fillRect(X(wx), Y(wy), S(ww * 0.35), S(wh)) }
+  const rect = (x: number, y: number, w: number, h: number, c: string) => { g.fillStyle = c; g.fillRect(X(x), Y(y), S(w), S(h)) }
+  /**
+   * The street across the alley, one stretch of it that repeats along (the shader takes it round: seen at an angle the street runs on,
+   * no wall or sky run out at its edge (the owner's)): two machiya (町家) between a beige block of flats and a grey one, all down to the
+   * ground: upper floors of windows, a band between each floor, an eave of tiles over the ground floor, the shops under it (lattices,
+   * noren, red lanterns, a shutter), the kerb and the street. Drawn three times over, a stretch apart, so what crosses an edge carries on.
+   */
+  const stretch = () => {
+    const rnd = seeded(58)
+    // (where each storey sits: the ground floor's eave, the floors above it)
+    const EAVE = -0.4, STREET = -1.0
+    type Front = { x: number; w: number; top: number; kind: 'machiya' | 'flats' | 'concrete'; col: string }
+    const fronts: Front[] = [
+      { x: -H, w: 0.6, top: 0.04, kind: 'machiya', col: '#5a3a26' },
+      { x: -H + 0.6, w: 0.62, top: 0.34, kind: 'flats', col: '#cdbb9c' },
+      { x: -H + 1.22, w: 0.5, top: 0.0, kind: 'machiya', col: '#4a3022' },
+      { x: -H + 1.72, w: W - 1.72, top: 0.24, kind: 'concrete', col: '#9a9c9e' },
+    ]
+    for (const f of fronts) {
+      const R = f.x + f.w
+      // ---- above the eave: the wall, by its kind
+      if (f.kind === 'machiya') {
+        // (an old townhouse: a plaster upper floor with its mushiko slits (虫籠窓), a little roof of tiles over it, dark timber)
+        rect(f.x, f.top, f.w, f.top - EAVE, shade('#e4dccb', dim))
+        rect(f.x, f.top, f.w, 0.02, shade('#3a2a1e', dim))
+        rect(f.x, f.top, 0.025, f.top - EAVE, shade(f.col, dim))
+        rect(R - 0.025, f.top, 0.025, f.top - EAVE, shade(f.col, dim))
+        // (its roof at the top: kawara in a band, their round ends along the edge lit on top)
+        rect(f.x - 0.02, f.top + 0.09, f.w + 0.04, 0.09, shade('#3e434a', dim))
+        for (let x = f.x - 0.01; x < R + 0.02; x += 0.035) {
+          g.fillStyle = shade('#6a717a', dim)
+          g.beginPath(); g.arc(X(x), Y(f.top + 0.005), S(0.013), 0, Math.PI * 2); g.fill()
+        }
+        // (the mushiko slits: a long low opening of thick white bars, dark between; warm behind them by night)
+        const sy = f.top - 0.13, sw = f.w * 0.62, sx = f.x + (f.w - sw) / 2
+        rect(sx, sy, sw, 0.12, night ? (rnd() < 0.7 ? '#e9a957' : '#2a2018') : shade('#2a211a', 1))
+        for (let x = sx + 0.012; x < sx + sw; x += 0.03) rect(x, sy, 0.016, 0.12, shade('#ece4d4', dim))
+        rect(sx - 0.01, sy + 0.01, sw + 0.02, 0.012, shade('#d6ccb8', dim))
+      } else {
+        // (a block: its wall, the band along each floor (腰線), the parapet and its shadow)
+        rect(f.x, f.top, f.w, f.top - EAVE, shade(f.col, dim))
+        rect(f.x - 0.01, f.top + 0.03, f.w + 0.02, 0.05, shade(f.col, dim * 0.8))
+        rect(f.x, f.top - 0.02, f.w, 0.025, 'rgba(0,0,0,0.16)')
+        if (f.kind === 'concrete') for (let y = f.top - 0.06; y > EAVE; y -= 0.05) rect(f.x, y, f.w, 0.002, 'rgba(0,0,0,0.07)')
+        const n = Math.max(2, Math.round((f.w - 0.06) / 0.2))
+        for (let fl = 0; ; fl++) {
+          const wy = f.top - 0.1 - fl * 0.32
+          if (wy - 0.16 < EAVE + 0.04) break
+          // (the floor's band under its windows)
+          rect(f.x, wy - 0.2, f.w, 0.018, shade(f.col, dim * 0.82))
+          rect(f.x, wy - 0.218, f.w, 0.006, 'rgba(255,255,255,0.12)')
+          for (let k = 0; k < n; k++) {
+            const ww = (f.w - 0.06) / n - 0.05, wh = 0.15, wx = f.x + 0.055 + k * (f.w - 0.06) / n
+            // (its frame, set in a little: a dark reveal along its top and side)
+            rect(wx - 0.01, wy + 0.01, ww + 0.02, wh + 0.02, shade('#57514a', dim))
+            const lit = night && rnd() < 0.45
+            if (lit) rect(wx, wy, ww, wh, rnd() < 0.8 ? '#ffd78f' : '#ffe9c2')
+            else {
+              // (by day the glass a pale blue-grey with the sky in it, brighter at the top, a streak across it)
+              const gl = g.createLinearGradient(0, Y(wy), 0, Y(wy - wh))
+              gl.addColorStop(0, night ? '#1d2436' : '#a9bccb'); gl.addColorStop(1, night ? '#121828' : '#6f8598')
+              g.fillStyle = gl; g.fillRect(X(wx), Y(wy), S(ww), S(wh))
+              if (!night) {
+                g.fillStyle = 'rgba(255,255,255,0.28)'
+                g.beginPath(); g.moveTo(X(wx + ww * 0.15), Y(wy)); g.lineTo(X(wx + ww * 0.4), Y(wy)); g.lineTo(X(wx + ww * 0.15), Y(wy - wh)); g.lineTo(X(wx - ww * 0.1 > wx ? wx : wx), Y(wy - wh)); g.fill()
+              }
+            }
+            rect(wx + ww / 2 - 0.004, wy, 0.008, wh, shade('#57514a', dim))
+            // (a curtain drawn part across, now and then)
+            if (rnd() < 0.35) rect(wx, wy, ww * 0.32, wh, lit ? 'rgba(232,160,100,0.7)' : `rgba(226,214,192,${night ? 0.25 : 0.7})`)
+            // (a little awning (雨よけ) over some)
+            if (rnd() < 0.4) {
+              rect(wx - 0.02, wy + 0.035, ww + 0.04, 0.02, shade('#6c6a66', dim))
+              rect(wx - 0.02, wy + 0.015, ww + 0.04, 0.006, 'rgba(0,0,0,0.2)')
+            }
+          }
+          // (an air conditioner's outdoor unit on its bracket under a window, now and then)
+          if (rnd() < 0.7) {
+            const ax = f.x + 0.06 + rnd() * (f.w - 0.26)
+            rect(ax, wy - 0.17, 0.15, 0.1, night ? '#4a4c52' : '#e8e6de')
+            rect(ax, wy - 0.27, 0.15, 0.006, shade('#6a6a66', dim))
+            g.strokeStyle = night ? '#2a2c30' : '#9a9890'; g.lineWidth = Math.max(1, S(0.005))
+            g.beginPath(); g.arc(X(ax + 0.095), Y(wy - 0.22), S(0.032), 0, Math.PI * 2); g.stroke()
+            for (let k = 0; k < 4; k++) rect(ax + 0.01, wy - 0.185 - k * 0.02, 0.04, 0.004, night ? '#2a2c30' : '#b8b6ae')
+          }
+        }
       }
-      // (an air conditioner's outdoor unit on a bracket under a window, now and then)
-      if (rnd() < 0.6) {
-        const ax = f.x + 0.08 + rnd() * (f.w - 0.3)
-        g.fillStyle = night ? '#4a4c50' : '#e6e4dc'
-        g.fillRect(X(ax), Y(wy - 0.2), S(0.16), S(0.11))
-        g.strokeStyle = night ? '#2a2c30' : '#9a9890'
-        g.lineWidth = Math.max(1, S(0.006))
-        g.beginPath(); g.arc(X(ax + 0.1), Y(wy - 0.255), S(0.035), 0, Math.PI * 2); g.stroke()
+      // ---- the eave over the ground floor: a strip of tiles, their ends lit along the edge, its shadow under it
+      rect(f.x - 0.01, EAVE + 0.05, f.w + 0.02, 0.06, shade(f.kind === 'machiya' ? '#3e434a' : '#5a5c60', dim))
+      rect(f.x - 0.01, EAVE - 0.005, f.w + 0.02, 0.012, shade('#8a9098', dim))
+      rect(f.x, EAVE - 0.015, f.w, 0.05, 'rgba(0,0,0,0.3)')
+      // ---- the ground floor
+      const gy = EAVE - 0.06, gh = gy - STREET
+      if (f.kind === 'machiya') {
+        // (its timber face: a lattice (格子) of fine slats over the front room, a noren in its doorway; warm light behind by night)
+        rect(f.x, gy, f.w, gh, shade(f.col, dim))
+        const lx = f.x + 0.03, lw = f.w * 0.52
+        rect(lx, gy - 0.04, lw, gh - 0.1, night ? '#c9873e' : '#2b1f17')
+        for (let x = lx + 0.005; x < lx + lw; x += 0.022) rect(x, gy - 0.04, 0.012, gh - 0.1, shade('#6b4a30', night ? 0.55 : 1))
+        rect(lx, gy - 0.04, lw, 0.012, shade('#3a281c', dim))
+        // (the doorway, its noren: indigo, a white crest, split in three)
+        const dx = lx + lw + 0.04, dw = f.w - lw - 0.1
+        rect(dx, gy - 0.02, dw, gh - 0.02, night ? '#3a2614' : '#1a120c')
+        const nc = rnd() < 0.5 ? '#2c3f6a' : '#7a2a2a'
+        for (let k = 0; k < 3; k++) rect(dx + 0.004 + k * dw / 3, gy - 0.03, dw / 3 - 0.008, 0.2, shade(nc, night ? 0.75 : 1))
+        g.fillStyle = shade('#f2ece0', night ? 0.8 : 1)
+        g.beginPath(); g.arc(X(dx + dw / 2), Y(gy - 0.12), S(0.025), 0, Math.PI * 2); g.fill()
+      } else if (f.kind === 'flats') {
+        // (an izakaya on the ground floor of the flats: its sliding doors of glass in timber, a noren, a pair of red lanterns)
+        rect(f.x, gy, f.w, gh, shade('#3a2a20', dim))
+        const dx = f.x + 0.06, dw = f.w - 0.12
+        rect(dx, gy - 0.05, dw, gh - 0.05, night ? '#e2a25a' : '#4c5862')
+        for (let k = 1; k < 4; k++) rect(dx + k * dw / 4 - 0.005, gy - 0.05, 0.01, gh - 0.05, shade('#3a2a20', 1))
+        rect(dx, gy - 0.2, dw, 0.008, shade('#3a2a20', 1))
+        for (let k = 0; k < 4; k++) rect(dx + 0.004 + k * dw / 4, gy - 0.04, dw / 4 - 0.008, 0.17, shade('#1f2d4e', night ? 0.8 : 1))
+      } else {
+        // (a shop shut for the day: its shutter half down, the glass under it)
+        rect(f.x, gy, f.w, gh, shade('#7d8082', dim))
+        const sx = f.x + 0.05, sw = f.w - 0.1
+        rect(sx, gy - 0.03, sw, gh - 0.05, night ? '#d9c08a' : '#566470')
+        for (let y = gy - 0.03; y > gy - 0.25; y -= 0.018) rect(sx, y, sw, 0.012, shade('#a2a6a8', night ? 0.5 : 1))
+        rect(sx, gy - 0.25, sw, 0.012, shade('#5a5e60', dim))
+      }
+      rect(f.x, STREET + 0.012, f.w, 0.012, 'rgba(0,0,0,0.3)')
+    }
+    // ---- red lanterns (赤ちょうちん) hung from the eave: one by the machiya's door, a pair by the izakaya's
+    const chochin = (x: number, y: number, r: number) => {
+      if (night) {
+        const lg = g.createRadialGradient(X(x), Y(y), 0, X(x), Y(y), S(r * 4))
+        lg.addColorStop(0, 'rgba(255,120,70,0.55)'); lg.addColorStop(1, 'rgba(255,120,70,0)')
+        g.fillStyle = lg; g.fillRect(X(x - r * 4), Y(y + r * 4), S(r * 8), S(r * 8))
+      }
+      rect(x - 0.002, EAVE - 0.01, 0.004, EAVE - 0.01 - (y + r * 1.5), shade('#2a2420', dim))
+      const body = g.createRadialGradient(X(x - r * 0.3), Y(y + r * 0.2), 0, X(x), Y(y), S(r * 1.3))
+      if (night) { body.addColorStop(0, '#ffd2a0'); body.addColorStop(0.5, '#ff5a3a'); body.addColorStop(1, '#a8231c') }
+      else { body.addColorStop(0, '#e2483c'); body.addColorStop(0.6, '#b8261e'); body.addColorStop(1, '#6a1410') }
+      g.fillStyle = body
+      g.beginPath(); g.ellipse(X(x), Y(y), S(r), S(r * 1.45), 0, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = night ? 'rgba(150,40,20,0.5)' : 'rgba(60,10,8,0.45)'; g.lineWidth = Math.max(1, S(0.002))
+      for (let k = -2; k <= 2; k++) { g.beginPath(); g.ellipse(X(x), Y(y + k * r * 0.45), S(r * Math.sqrt(1 - (k * 0.3) ** 2)), S(r * 0.08), 0, 0, Math.PI * 2); g.stroke() }
+      rect(x - r * 0.62, y + r * 1.5, r * 1.24, r * 0.22, '#1a1412')
+      rect(x - r * 0.62, y - r * 1.28, r * 1.24, r * 0.22, '#1a1412')
+      g.fillStyle = night ? '#2a0e08' : '#1a0806'
+      g.font = `bold ${Math.round(S(r * 0.9))}px "Yu Mincho", "MS Mincho", serif`; g.textAlign = 'center'; g.textBaseline = 'middle'
+      g.fillText('酒', X(x), Y(y))
+    }
+    chochin(-H + 0.6 + 0.12, -0.56, 0.036)
+    chochin(-H + 0.6 + 0.5, -0.56, 0.036)
+    // (the machiya's before its lattice: by its door it hung over the noren's crest)
+    chochin(-H + 1.22 + 0.16, -0.55, 0.032)
+    // ---- the signs: boards stood off the wall on brackets, a side to them, lit from behind by night
+    const sign = (x: number, top: number, h: number, w: number, bg: string, fg: string, text: string) => {
+      const d = 0.014
+      if (night) { g.save(); g.fillStyle = bg; g.globalAlpha = 0.45; g.filter = 'blur(10px)'; g.fillRect(X(x - 0.05), Y(top + 0.05), S(w + 0.1), S(h + 0.1)); g.restore() }
+      // (its brackets to the wall, top and foot)
+      for (const y of [top - 0.03, top - h + 0.03]) rect(x + w, y + 0.006, 0.05, 0.012, shade('#3a3a3a', dim))
+      // (its side, toward the wall)
+      g.fillStyle = shade(bg, night ? 0.55 : 0.5)
+      g.beginPath(); g.moveTo(X(x + w), Y(top)); g.lineTo(X(x + w + d), Y(top - d)); g.lineTo(X(x + w + d), Y(top - h - d)); g.lineTo(X(x + w), Y(top - h)); g.fill()
+      g.fillStyle = shade(bg, night ? 0.4 : 0.42)
+      g.beginPath(); g.moveTo(X(x), Y(top - h)); g.lineTo(X(x + w), Y(top - h)); g.lineTo(X(x + w + d), Y(top - h - d)); g.lineTo(X(x + d), Y(top - h - d)); g.fill()
+      // (its face: lit through by night, a frame round it)
+      const face = g.createLinearGradient(X(x), 0, X(x + w), 0)
+      face.addColorStop(0, night ? shade(bg, 1.25) : bg); face.addColorStop(1, night ? bg : shade(bg, 0.86))
+      g.fillStyle = face; g.fillRect(X(x), Y(top), S(w), S(h))
+      g.strokeStyle = shade(bg, 0.45); g.lineWidth = Math.max(1, S(0.006)); g.strokeRect(X(x), Y(top), S(w), S(h))
+      g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = Math.max(1, S(0.002)); g.strokeRect(X(x + 0.008), Y(top - 0.008), S(w - 0.016), S(h - 0.016))
+      g.fillStyle = fg
+      g.font = `bold ${Math.round(S(w * 0.66))}px "Yu Mincho", "MS Mincho", serif`
+      g.textAlign = 'center'; g.textBaseline = 'middle'
+      const chars = [...text]
+      chars.forEach((ch, i) => g.fillText(ch, X(x + w / 2), Y(top - (i + 0.5) * (h / chars.length))))
+    }
+    sign(-H + 0.6 + 0.03, 0.22, 0.42, 0.085, night ? '#3aa8ff' : '#1f6fb8', '#ffffff', '居酒屋')
+    sign(-H + 1.72 + 0.05, 0.14, 0.4, 0.08, night ? '#fff6e4' : '#f2ede2', '#2a1c14', '酒処')
+    sign(W - H - 0.16, 0.1, 0.32, 0.07, night ? '#ff5a72' : '#c8344c', '#fff6ee', 'スナック')
+    // ---- the kerb and the street below it all (run on down: seen from high the street's all that shows there)
+    rect(-H, STREET, W, 0.025, shade('#9a968e', dim))
+    const st = g.createLinearGradient(0, Y(STREET - 0.025), 0, Y(-H))
+    st.addColorStop(0, shade('#4a4a4c', dim)); st.addColorStop(1, shade('#3a3a3c', dim))
+    g.fillStyle = st; g.fillRect(X(-H), Y(STREET - 0.025), S(W), Y(-H) - Y(STREET - 0.025) + 2)
+    if (night) for (const x of [-H + 0.42, -H + 0.95, -H + 1.6]) {
+      const pool = g.createRadialGradient(X(x), Y(STREET - 0.06), 0, X(x), Y(STREET - 0.06), S(0.22))
+      pool.addColorStop(0, 'rgba(255,170,100,0.35)'); pool.addColorStop(1, 'rgba(255,170,100,0)')
+      g.fillStyle = pool; g.fillRect(X(x - 0.22), Y(STREET), S(0.44), Y(-H) - Y(STREET))
+    }
+    // ---- the utility pole and its wires, thin and far off
+    const px = 0.36
+    g.fillStyle = night ? '#2e3036' : '#a8a8a2'
+    g.beginPath(); g.moveTo(X(px - 0.022), Y(STREET)); g.lineTo(X(px - 0.014), Y(1.0)); g.lineTo(X(px + 0.014), Y(1.0)); g.lineTo(X(px + 0.022), Y(STREET)); g.fill()
+    g.fillStyle = night ? '#24262c' : '#7c7c76'
+    g.fillRect(X(px - 0.16), Y(0.86), S(0.32), S(0.018))
+    g.fillStyle = night ? '#3a3e44' : '#8f9497'
+    g.fillRect(X(px + 0.025), Y(0.62), S(0.07), S(0.12))
+    g.strokeStyle = night ? 'rgba(10,10,14,0.8)' : 'rgba(40,40,40,0.7)'
+    g.lineWidth = Math.max(1, S(0.003))
+    for (const [y, sag] of [[0.86, 0.12], [0.84, 0.16], [0.62, 0.12]] as [number, number][]) {
+      for (const sd of [-1, 1]) {
+        g.beginPath(); g.moveTo(X(px + sd * 0.15), Y(y)); g.quadraticCurveTo(X(px + sd * 0.6), Y(y - sag * 1.6), X(px + sd * H), Y(y - sag * 0.6)); g.stroke()
       }
     }
   }
-  // (the signs: tall boards on the fronts, lit by night)
-  const sign = (x: number, top: number, h: number, bg: string, fg: string, text: string) => {
-    const glow = night
-    if (glow) { g.fillStyle = bg; g.globalAlpha = 0.35; g.filter = 'blur(8px)'; g.fillRect(X(x - 0.04), Y(top + 0.04), S(0.16), S(h + 0.08)); g.filter = 'none'; g.globalAlpha = 1 }
-    g.fillStyle = glow ? bg : shade(bg, 0.85)
-    g.fillRect(X(x), Y(top), S(0.08), S(h))
-    g.strokeStyle = shade(bg, 0.5)
-    g.lineWidth = Math.max(1, S(0.005))
-    g.strokeRect(X(x), Y(top), S(0.08), S(h))
-    g.fillStyle = fg
-    g.font = `bold ${Math.round(S(0.055))}px "Yu Mincho", "MS Mincho", serif`
-    g.textAlign = 'center'
-    g.textBaseline = 'middle'
-    const chars = [...text]
-    chars.forEach((ch, i) => g.fillText(ch, X(x + 0.04), Y(top - (i + 0.5) * (h / chars.length))))
-  }
-  sign(-0.42, 0.12, 0.42, night ? '#ff4d6d' : '#c8344c', '#fff6ee', 'スナック')
-  sign(0.12, -0.14, 0.34, night ? '#ffd24a' : '#e2b23a', '#3a2410', 'ラーメン')
-  sign(0.98, 0.16, 0.36, night ? '#5ad1ff' : '#2f8fc4', '#ffffff', '居酒屋')
-  // (a lantern hung by a door below, by night its glow)
-  if (night) { const lg = g.createRadialGradient(X(-0.8), Y(-0.55), 0, X(-0.8), Y(-0.55), S(0.25)); lg.addColorStop(0, 'rgba(255,170,90,0.7)'); lg.addColorStop(1, 'rgba(255,170,90,0)'); g.fillStyle = lg; g.fillRect(X(-1.05), Y(-0.3), S(0.5), S(0.5)) }
-  // (the utility pole: its concrete shaft, a crossarm, a transformer, insulators; and its wires, sagging off both ways)
-  const px = 0.36
-  g.fillStyle = night ? '#2e3036' : '#a8a8a2'
-  g.beginPath(); g.moveTo(X(px - 0.03), Y(-1.1)); g.lineTo(X(px - 0.018), Y(1.0)); g.lineTo(X(px + 0.018), Y(1.0)); g.lineTo(X(px + 0.03), Y(-1.1)); g.fill()
-  g.fillStyle = night ? '#24262c' : '#7c7c76'
-  g.fillRect(X(px - 0.2), Y(0.86), S(0.4), S(0.025))
-  g.fillRect(X(px - 0.15), Y(0.6), S(0.3), S(0.02))
-  g.fillStyle = night ? '#3a3e44' : '#8f9497'
-  g.fillRect(X(px + 0.03), Y(0.55), S(0.09), S(0.15))
-  g.fillRect(X(px - 0.12), Y(0.55), S(0.09), S(0.15))
-  g.strokeStyle = night ? 'rgba(10,10,14,0.9)' : 'rgba(40,40,40,0.85)'
-  g.lineWidth = Math.max(1, S(0.005))
-  for (const [y, sag] of [[0.86, 0.12], [0.84, 0.16], [0.6, 0.1], [0.58, 0.14], [0.45, 0.2]] as [number, number][]) {
-    for (const sd of [-1, 1]) {
-      g.beginPath()
-      g.moveTo(X(px + sd * 0.18), Y(y))
-      g.quadraticCurveTo(X(px + sd * 0.7), Y(y - sag * 1.6), X(px + sd * 1.15), Y(y - sag * 0.4))
-      g.stroke()
-    }
-  }
+  for (const k of [-1, 0, 1]) { g.save(); g.translate(S(k * W), 0); stretch(); g.restore() }
   // (the fronts across the alley in the shade at dusk, the sun going down behind them, warm on their edges; cool and grey at dawn)
   toneTo(g, size, sky, 'rgba(94,72,62,0.38)', 'rgba(118,118,168,0.26)')
 }
-function drawViewNear(g: CanvasRenderingContext2D, size: number, sky: Sky) {
+function drawViewNear(g: CanvasRenderingContext2D, size: number, sky: Sky, part: 'back' | 'front' = 'front') {
   const { X, S } = viewPx('near', size)
   g.clearRect(0, 0, size, size)
   // (a few bamboo just outside (the owner's: the fence taken away), the very ones whose shadows the moon throws on the paper: the paper's
@@ -1164,7 +1286,7 @@ function drawViewNear(g: CanvasRenderingContext2D, size: number, sky: Sky) {
   g.save()
   g.translate(X(-ROUND_R), X(-ROUND_R))
   g.scale(S(2 * ROUND_R) / 512, S(2 * ROUND_R) / 512)
-  bambooGrove(g, sky === 'night' ? 'night' : 'day')
+  bambooGrove(g, sky === 'night' ? 'night' : 'day', undefined, part)
   g.restore()
   // (against the evening sun the bamboo's dark, its edges warm; in the dawn a cool grey-green)
   toneTo(g, size, sky, 'rgba(40,30,20,0.6)', 'rgba(70,72,110,0.3)')
@@ -1172,16 +1294,21 @@ function drawViewNear(g: CanvasRenderingContext2D, size: number, sky: Sky) {
 /** the four layers' pictures, made again as the part of the day turns */
 const ROUND_VIEW = (() => {
   if (typeof document === 'undefined') return null
-  const make = (size: number, draw: (g: CanvasRenderingContext2D, size: number, sky: Sky) => void) => {
+  const make = (size: number, draw: (g: CanvasRenderingContext2D, size: number, sky: Sky) => void, wrapS: THREE.Wrapping = THREE.ClampToEdgeWrapping) => {
     const c = document.createElement('canvas')
     c.width = c.height = size
     const g = c.getContext('2d')!
     const t = new THREE.CanvasTexture(c)
+    t.wrapS = wrapS
     t.colorSpace = THREE.SRGBColorSpace
     t.anisotropy = 4
     return { t, paint: (sky: Sky) => { draw(g, size, sky); t.needsUpdate = true } }
   }
-  const layers = { sky: make(512, drawViewSky), far: make(1024, drawViewFar), mid: make(1024, drawViewMid), near: make(512, drawViewNear) }
+  // (the far city and the sky mirrored on round, the street across repeating, at an angle: their pictures' edges were drawn out into
+  // bands, the street across ran out to bare wall and the sky showed under it (the owner's); the bamboo in two depths, the two further
+  // culms a little behind the near ones, each stirring on its own)
+  const layers = { sky: make(512, drawViewSky, THREE.MirroredRepeatWrapping), far: make(1024, drawViewFar, THREE.MirroredRepeatWrapping),
+    mid: make(1024, drawViewMid, THREE.RepeatWrapping), back: make(512, (g, n, sk) => drawViewNear(g, n, sk, 'back')), near: make(512, drawViewNear) }
   // (only when it's turned: the two marks change together, and each would paint all four again)
   let painted: Sky | null = null
   const paint = () => { const sky = skyNow(); if (sky === painted) return; painted = sky; for (const l of Object.values(layers)) l.paint(sky) }
@@ -1189,26 +1316,30 @@ const ROUND_VIEW = (() => {
   onSky(paint)
   const L = VIEW_LAYERS
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uSky: { value: layers.sky.t }, uFar: { value: layers.far.t }, uMid: { value: layers.mid.t }, uNear: { value: layers.near.t },
+    uniforms: { uSky: { value: layers.sky.t }, uFar: { value: layers.far.t }, uMid: { value: layers.mid.t }, uBack: { value: layers.back.t }, uNear: { value: layers.near.t },
       uCam: { value: new THREE.Vector3(0, 0, 3) }, uTime: { value: 0 } },
     vertexShader: `varying vec3 vLocal;
 void main() { vLocal = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform sampler2D uSky, uFar, uMid, uNear;
+    fragmentShader: `uniform sampler2D uSky, uFar, uMid, uBack, uNear;
 uniform vec3 uCam;
 uniform float uTime;
 varying vec3 vLocal;
 vec4 layer(sampler2D t, vec2 xy, float H) { return texture2D(t, clamp(xy / (2.0 * H) + 0.5, 0.0, 1.0)); }
+// (along, as its picture wraps (repeating, or mirrored round); up and down held at its edges)
+vec4 layerOn(sampler2D t, vec2 xy, float H) { vec2 uv = xy / (2.0 * H) + 0.5; return texture2D(t, vec2(uv.x, clamp(uv.y, 0.002, 0.998))); }
 void main() {
   // (the way the eye looks through this point of the window, on into the street: where it meets each layer)
   vec3 dir = normalize(vLocal - uCam);
   vec2 slope = dir.xy / max(-dir.z, 0.15);
-  vec3 c = layer(uSky, vLocal.xy + slope * ${L.sky.d.toFixed(1)}, ${L.sky.H.toFixed(2)}).rgb;
+  vec3 c = layerOn(uSky, vLocal.xy + slope * ${L.sky.d.toFixed(1)}, ${L.sky.H.toFixed(2)}).rgb;
   // (the far city and the street across hazed into the sky by the air between (the owner's: softer, less contrast, the eye kept on the
   // window and the bamboo); the near bamboo stirring a little in the wind, more toward their tops)
   vec3 air = c;
-  vec4 f = layer(uFar, vLocal.xy + slope * ${L.far.d.toFixed(1)}, ${L.far.H.toFixed(2)}); c = mix(c, mix(f.rgb, air, 0.38), f.a);
-  vec4 m = layer(uMid, vLocal.xy + slope * ${L.mid.d.toFixed(1)}, ${L.mid.H.toFixed(2)}); c = mix(c, mix(m.rgb, air, 0.14), m.a);
+  vec4 f = layerOn(uFar, vLocal.xy + slope * ${L.far.d.toFixed(1)}, ${L.far.H.toFixed(2)}); c = mix(c, mix(f.rgb, air, 0.38), f.a);
+  vec4 m = layerOn(uMid, vLocal.xy + slope * ${L.mid.d.toFixed(1)}, ${L.mid.H.toFixed(2)}); c = mix(c, mix(m.rgb, air, 0.14), m.a);
   vec2 sway = vec2(sin(uTime * 0.9 + vLocal.y * 2.5) * 0.008 + sin(uTime * 2.3) * 0.002, 0.0) * (0.4 + vLocal.y / 0.8 + 0.5);
+  vec2 swayB = vec2(sin(uTime * 0.7 + vLocal.y * 2.1 + 1.7) * 0.006 + sin(uTime * 1.9 + 0.6) * 0.0015, 0.0) * (0.4 + vLocal.y / 0.8 + 0.5);
+  vec4 bb = layer(uBack, vLocal.xy + slope * ${L.back.d.toFixed(2)} + swayB, ${L.back.H.toFixed(2)}); c = mix(c, mix(bb.rgb, air, 0.06), bb.a);
   vec4 n = layer(uNear, vLocal.xy + slope * ${L.near.d.toFixed(1)} + sway, ${L.near.H.toFixed(2)}); c = mix(c, n.rgb, n.a);
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
