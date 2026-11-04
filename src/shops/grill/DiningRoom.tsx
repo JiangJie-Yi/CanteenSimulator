@@ -4471,6 +4471,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
   // round when the pointer's on it, and the bottle that's picked up drawn on its own while it's carried)
   const [lifted, setLifted] = useState<string | null>(null)
   const [hover, setHover] = useState<string | null>(null)
+  const [raised, setRaised] = useState<string | null>(null)
   const shelves = FRIDGE_UNITS[n].shelves
   const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.16)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
@@ -4489,11 +4490,11 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     }
     // (each place's bottles shown or hidden in the batch as the stock is now; the one being carried, its front bottle hidden)
     const api = batch.current
-    const now = `${FRIDGE_STOCK.ver}|${lifted}`
+    const now = `${FRIDGE_STOCK.ver}|${lifted}|${raised}`
     if (api && (shown.current.now !== now || shown.current.api !== api)) {
       shown.current = { now, api }
       FRIDGE_STOCK.units[n].forEach((row, r) => row.forEach((id, k) => {
-        api.show(`f${r}-${k}`, id !== null && lifted !== `${r}-${k}`)
+        api.show(`f${r}-${k}`, id !== null && lifted !== `${r}-${k}` && raised !== `${r}-${k}`)
         api.show(`b${r}-${k}`, id !== null)
       }))
     }
@@ -4701,12 +4702,12 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
         <group key={`${r}-${k}`} ref={reg(`${r}-${k}`)}
           position={slotAt(r, k).toArray()} onPointerDown={(ev) => begin({ kind: 'slot', r, k }, ev)}
-          onPointerOver={(ev) => { ev.stopPropagation(); if (doorOpen()) { document.body.style.cursor = 'grab'; setHover(`${r}-${k}`) } aimTip(ev); setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
+          onPointerOver={(ev) => { ev.stopPropagation(); if (doorOpen()) { document.body.style.cursor = 'pointer'; setHover(`${r}-${k}`); setRaised(`${r}-${k}`) } aimTip(ev); setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
           onPointerOut={() => { document.body.style.cursor = ''; setHover((h) => (h === `${r}-${k}` ? null : h)); setTip(null) }}>
           {/* (what the pointer finds: the bottle's size, unseen) */}
           <mesh position-y={0.11} visible={false}><boxGeometry args={[shelves[r].pitch * 0.9, 0.22, 0.06]} /></mesh>
-          {lifted === `${r}-${k}` ? <DrinkBottle id={id} lit /> : hover === `${r}-${k}` && (
-            <mesh position-y={0.11}><cylinderGeometry args={[0.036, 0.036, 0.25, 16, 1, true]} /><primitive object={BOTTLE_HALO} attach="material" /></mesh>
+          {lifted === `${r}-${k}` ? <DrinkBottle id={id} lit /> : raised === `${r}-${k}` && (
+            <HoverLift active={hover === `${r}-${k}`} onDone={() => setRaised((x) => (x === `${r}-${k}` ? null : x))}><DrinkBottle id={id} lit /></HoverLift>
           )}
         </group>
       )))}
@@ -4729,8 +4730,24 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
 const RANK_DEPTH = 0.12
 /** a fridge's places as its shelves' batch is made with them: each its drink, or (empty) the drink that's its own */
 const bakedShelves = (n: number) => FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => (id ?? FRIDGE_UNITS[n].shelves[r].ids[k]) as DrinkId))
-/** the soft light round a bottle the pointer's on */
-const BOTTLE_HALO = new THREE.MeshBasicMaterial({ color: '#fff0c0', transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
+/**
+ * A bottle the pointer's on, as everything else pointed at answers (the owner's): lifted 2 cm and made 3% larger, evenly, eased in; eased
+ * back to its place when the pointer leaves, and only then handed back to the shelf's batch (`onDone`). It was a glowing tube drawn round
+ * it, 25 cm tall whatever the drink: a can looked drawn out to twice its height, and washed white.
+ */
+function HoverLift({ active, onDone, children }: { active: boolean; onDone: () => void; children: React.ReactNode }) {
+  const g = useRef<THREE.Group>(null)
+  const k = useRef(0)
+  const done = useRef(onDone)
+  done.current = onDone
+  useFrame((_, dt) => {
+    k.current += ((active ? 1 : 0) - k.current) * Math.min(1, dt * 14)
+    const o = g.current
+    if (o) { o.position.y = 0.02 * k.current; o.scale.setScalar(1 + 0.03 * k.current) }
+    if (!active && k.current < 0.01) done.current()
+  })
+  return <group ref={g}>{children}</group>
+}
 /** a drink's name, for its tag */
 const drinkName = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? '飲料'
 /** a bottle of one of the drinks, standing (its foot at the origin): its glass or can, its label printed round it,
