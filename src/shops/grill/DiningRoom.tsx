@@ -2382,6 +2382,8 @@ function LockWindow({ who }: { who: 'm' | 'f' }) {
   )
 }
 const doorAt = new THREE.Vector3()
+/** the warm of a toilet's light through its door's washi, and on the floor before it */
+const WC_PAPER_GLOW = new THREE.Color('#ffe4a0')
 function ToiletPanel({ who }: { who: 'm' | 'f' }) {
   const H = WC_H
   const g = useRef<THREE.Group>(null)
@@ -2389,18 +2391,32 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
   // (the men's slides off one way, the women's the other, away from each other)
   const away = who === 'm' ? -1 : 1
   // (its own board of planks, like the staff's door (the owner's): the model's one great flat-sawn figure over the whole of it, before)
+  // (its washi its own (the owner's): lit from inside while that toilet's light is on, a warm glow through the paper, the kumiko staying dark
+  // against it; by night much more than by day; off, barely anything)
+  const paper = useMemo(() => new THREE.MeshToonMaterial({ name: 'WcDoorPaper', color: '#ffffff', emissive: WC_PAPER_GLOW, emissiveIntensity: 0, side: THREE.DoubleSide }), [])
+  useEffect(() => () => paper.dispose(), [paper])
   const panel = useMemo(() => {
     const p = door.panel()
     p.traverse((o) => {
       const m = o as THREE.Mesh
-      if (m.isMesh && (m.material as THREE.Material).name === 'WcDoorBoard') m.material = new THREE.MeshToonMaterial({ name: 'WcDoorBoard', color: '#ffffff', map: WC_BOARD[who] })
+      if (!m.isMesh) return
+      const name = (m.material as THREE.Material).name
+      if (name === 'WcDoorBoard') m.material = new THREE.MeshToonMaterial({ name: 'WcDoorBoard', color: '#ffffff', map: WC_BOARD[who] })
+      else if (name === 'WcDoorPaper') { const src = m.material as THREE.MeshToonMaterial; paper.map = src.map; paper.emissiveMap = src.map; m.material = paper }
     })
     return p
-  }, [door, who])
+  }, [door, who, paper])
   const k = useRef(0)
   const was = useRef(0)
+  const spill = useRef<THREE.MeshBasicMaterial>(null)
   useFrame(({ camera }, dt) => {
     const d = TOILETS[who]
+    // (how dark it is outside, and whether this toilet's light is on: the paper's glow and the faint warm spill on the floor before it)
+    const sky = skyNow(), dark = sky === 'night' ? 1 : sky === 'dusk' ? 0.6 : sky === 'dawn' ? 0.5 : 0.3
+    const on = getLights().wc[who]
+    const ease = Math.min(1, dt * 6)
+    paper.emissiveIntensity += ((on ? 0.6 * dark : 0.05 * dark) - paper.emissiveIntensity) * ease
+    if (spill.current) spill.current.opacity += ((on ? 0.32 * dark * (1 - k.current * 0.5) : 0) - spill.current.opacity) * ease
     const want = d.passing > 0 || d.open ? 1 : 0
     // (heard as it starts to move, opening or shutting, as loud as it's near (the owner's))
     if (want !== was.current) {
@@ -2417,14 +2433,21 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     }
   })
   return (
-    <group ref={g} onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; doorClick(who, Math.max(0, 1 - ev.distance / 8)) }}
-      {...tipOver('廁所門', '點一下開關（有人時會敲門）')}>
-      <group position={[-0.03, H / 2, 0]}>
-        <primitive object={panel} position-y={-H / 2} />
-        {/* the lock's little window on its brass plate, over the pull: 使用中 in red while someone's in, 空き in blue */}
-        <LockWindow who={who} />
+    <>
+      <group ref={g} onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; doorClick(who, Math.max(0, 1 - ev.distance / 8)) }}
+        {...tipOver('廁所門', '點一下開關（有人時會敲門）')}>
+        <group position={[-0.03, H / 2, 0]}>
+          <primitive object={panel} position-y={-H / 2} />
+          {/* the lock's little window on its brass plate, over the pull: 使用中 in red while someone's in, 空き in blue */}
+          <LockWindow who={who} />
+        </group>
       </group>
-    </group>
+      {/* (the light through the paper, a faint warm fan on the floor before the door: laid on, no light or shadow of its own) */}
+      <mesh position={[-0.42, 0.01, 0]} rotation={[-Math.PI / 2, 0, -Math.PI / 2]} renderOrder={2} raycast={() => {}}>
+        <planeGeometry args={[WC_W * 1.3, 0.8]} />
+        <meshBasicMaterial ref={spill} map={SILL_TEX} color={WC_PAPER_GLOW} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
+    </>
   )
 }
 const SUPPLIES_URL = import.meta.env.BASE_URL + 'models/supplies.glb'
