@@ -2537,8 +2537,11 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     const sky = skyNow(), dark = sky === 'night' ? 1 : sky === 'dusk' ? 0.6 : sky === 'dawn' ? 0.5 : 0.3
     const on = getLights().wc[who]
     const ease = Math.min(1, dt * 6)
-    paper.emissiveIntensity += ((on ? 0.6 * dark : 0.05 * dark) - paper.emissiveIntensity) * ease
-    if (spill.current) spill.current.opacity += ((on ? 0.32 * dark * (1 - k.current * 0.5) : 0) - spill.current.opacity) * ease
+    // (the paper glows only shut over the lit room: slid open, it stands before the solid wall with nothing behind it, plain paper in the
+    // room's light (the owner's); the light then pours out of the open doorway instead, the floor before it brighter the wider it's open)
+    const shut = 1 - k.current
+    paper.emissiveIntensity += ((on ? 0.5 * dark * shut : 0.05 * dark * shut) - paper.emissiveIntensity) * ease
+    if (spill.current) spill.current.opacity += ((on ? 0.32 * dark * (1 + 0.8 * k.current) : 0) - spill.current.opacity) * ease
     const want = d.passing > 0 || d.open ? 1 : 0
     // (heard as it starts to move, opening or shutting, as loud as it's near (the owner's))
     if (want !== was.current) {
