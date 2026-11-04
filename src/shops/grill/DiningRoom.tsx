@@ -1061,101 +1061,6 @@ function drawViewFar(g: CanvasRenderingContext2D, size: number, sky: Sky) {
   // (at dusk the towers dark violet against the glow behind them, at dawn a lavender haze)
   toneTo(g, size, sky, 'rgba(66,44,92,0.58)', 'rgba(150,140,196,0.38)')
 }
-function drawViewMid(g: CanvasRenderingContext2D, size: number, sky: Sky) {
-  const night = sky === 'night'
-  const { X, Y, S } = viewPx('mid', size)
-  g.clearRect(0, 0, size, size)
-  const rnd = seeded(58)
-  // (the fronts across the alley: each its own height, colour and windows, the street below out of sight)
-  // (low enough that the city's towers and the sky show over them through the window's upper half: the depth's in what's seen beyond)
-  const fronts = [
-    { x: -1.12, w: 0.62, top: 0.02, col: '#b7a58a', win: 3 },
-    { x: -0.5, w: 0.5, top: 0.2, col: '#8c8f93', win: 2 },
-    { x: 0.0, w: 0.04, top: -1, col: '#000', win: 0 },
-    { x: 0.04, w: 0.56, top: -0.06, col: '#c9b9a0', win: 3 },
-    { x: 0.6, w: 0.56, top: 0.26, col: '#9d8470', win: 3 },
-  ]
-  const dim = night ? 0.26 : 1
-  const shade = (hex: string, k: number) => { const c = new THREE.Color(hex).multiplyScalar(k); return `#${c.getHexString()}` }
-  for (const f of fronts) {
-    if (f.top < -0.5) continue
-    g.fillStyle = shade(f.col, dim)
-    g.fillRect(X(f.x), Y(f.top), S(f.w), Y(-1.1) - Y(f.top))
-    // (its parapet and the shadow under it)
-    g.fillStyle = shade(f.col, dim * 0.78)
-    g.fillRect(X(f.x - 0.01), Y(f.top + 0.03), S(f.w + 0.02), S(0.05))
-    g.fillStyle = 'rgba(0,0,0,0.18)'
-    g.fillRect(X(f.x), Y(f.top - 0.02), S(f.w), S(0.03))
-    // (its windows, floor by floor: frames, the panes dark or lit, a curtain here and there)
-    for (let fl = 0; fl < 3; fl++) {
-      const wy = f.top - 0.16 - fl * 0.34
-      if (wy < -0.95) break
-      for (let k = 0; k < f.win; k++) {
-        const wx = f.x + 0.06 + k * (f.w - 0.08) / f.win
-        const ww = (f.w - 0.08) / f.win - 0.06, wh = 0.16
-        g.fillStyle = shade('#5a5148', dim)
-        g.fillRect(X(wx - 0.008), Y(wy + 0.008), S(ww + 0.016), S(wh + 0.016))
-        const lit = night && rnd() < 0.55
-        g.fillStyle = lit ? (rnd() < 0.7 ? '#ffd389' : '#bfe0ff') : night ? '#1b2030' : '#6f8ea8'
-        g.fillRect(X(wx), Y(wy), S(ww), S(wh))
-        if (!night) { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(X(wx + ww * 0.1), Y(wy - 0.01), S(ww * 0.25), S(wh * 0.8)) }
-        if (rnd() < 0.4) { g.fillStyle = lit ? 'rgba(240,170,110,0.75)' : 'rgba(220,210,190,0.7)'; g.fillRect(X(wx), Y(wy), S(ww * 0.35), S(wh)) }
-      }
-      // (an air conditioner's outdoor unit on a bracket under a window, now and then)
-      if (rnd() < 0.6) {
-        const ax = f.x + 0.08 + rnd() * (f.w - 0.3)
-        g.fillStyle = night ? '#4a4c50' : '#e6e4dc'
-        g.fillRect(X(ax), Y(wy - 0.2), S(0.16), S(0.11))
-        g.strokeStyle = night ? '#2a2c30' : '#9a9890'
-        g.lineWidth = Math.max(1, S(0.006))
-        g.beginPath(); g.arc(X(ax + 0.1), Y(wy - 0.255), S(0.035), 0, Math.PI * 2); g.stroke()
-      }
-    }
-  }
-  // (the signs: tall boards on the fronts, lit by night)
-  const sign = (x: number, top: number, h: number, bg: string, fg: string, text: string) => {
-    const glow = night
-    if (glow) { g.fillStyle = bg; g.globalAlpha = 0.35; g.filter = 'blur(8px)'; g.fillRect(X(x - 0.04), Y(top + 0.04), S(0.16), S(h + 0.08)); g.filter = 'none'; g.globalAlpha = 1 }
-    g.fillStyle = glow ? bg : shade(bg, 0.85)
-    g.fillRect(X(x), Y(top), S(0.08), S(h))
-    g.strokeStyle = shade(bg, 0.5)
-    g.lineWidth = Math.max(1, S(0.005))
-    g.strokeRect(X(x), Y(top), S(0.08), S(h))
-    g.fillStyle = fg
-    g.font = `bold ${Math.round(S(0.055))}px "Yu Mincho", "MS Mincho", serif`
-    g.textAlign = 'center'
-    g.textBaseline = 'middle'
-    const chars = [...text]
-    chars.forEach((ch, i) => g.fillText(ch, X(x + 0.04), Y(top - (i + 0.5) * (h / chars.length))))
-  }
-  sign(-0.42, 0.12, 0.42, night ? '#ff4d6d' : '#c8344c', '#fff6ee', 'スナック')
-  sign(0.12, -0.14, 0.34, night ? '#ffd24a' : '#e2b23a', '#3a2410', 'ラーメン')
-  sign(0.98, 0.16, 0.36, night ? '#5ad1ff' : '#2f8fc4', '#ffffff', '居酒屋')
-  // (a lantern hung by a door below, by night its glow)
-  if (night) { const lg = g.createRadialGradient(X(-0.8), Y(-0.55), 0, X(-0.8), Y(-0.55), S(0.25)); lg.addColorStop(0, 'rgba(255,170,90,0.7)'); lg.addColorStop(1, 'rgba(255,170,90,0)'); g.fillStyle = lg; g.fillRect(X(-1.05), Y(-0.3), S(0.5), S(0.5)) }
-  // (the utility pole: its concrete shaft, a crossarm, a transformer, insulators; and its wires, sagging off both ways)
-  const px = 0.36
-  g.fillStyle = night ? '#2e3036' : '#a8a8a2'
-  g.beginPath(); g.moveTo(X(px - 0.03), Y(-1.1)); g.lineTo(X(px - 0.018), Y(1.0)); g.lineTo(X(px + 0.018), Y(1.0)); g.lineTo(X(px + 0.03), Y(-1.1)); g.fill()
-  g.fillStyle = night ? '#24262c' : '#7c7c76'
-  g.fillRect(X(px - 0.2), Y(0.86), S(0.4), S(0.025))
-  g.fillRect(X(px - 0.15), Y(0.6), S(0.3), S(0.02))
-  g.fillStyle = night ? '#3a3e44' : '#8f9497'
-  g.fillRect(X(px + 0.03), Y(0.55), S(0.09), S(0.15))
-  g.fillRect(X(px - 0.12), Y(0.55), S(0.09), S(0.15))
-  g.strokeStyle = night ? 'rgba(10,10,14,0.9)' : 'rgba(40,40,40,0.85)'
-  g.lineWidth = Math.max(1, S(0.005))
-  for (const [y, sag] of [[0.86, 0.12], [0.84, 0.16], [0.6, 0.1], [0.58, 0.14], [0.45, 0.2]] as [number, number][]) {
-    for (const sd of [-1, 1]) {
-      g.beginPath()
-      g.moveTo(X(px + sd * 0.18), Y(y))
-      g.quadraticCurveTo(X(px + sd * 0.7), Y(y - sag * 1.6), X(px + sd * 1.15), Y(y - sag * 0.4))
-      g.stroke()
-    }
-  }
-  // (the fronts across the alley in the shade at dusk, the sun going down behind them, warm on their edges; cool and grey at dawn)
-  toneTo(g, size, sky, 'rgba(94,72,62,0.38)', 'rgba(118,118,168,0.26)')
-}
 function drawViewNear(g: CanvasRenderingContext2D, size: number, sky: Sky) {
   const { X, S } = viewPx('near', size)
   g.clearRect(0, 0, size, size)
@@ -1181,39 +1086,256 @@ const ROUND_VIEW = (() => {
     t.anisotropy = 4
     return { t, paint: (sky: Sky) => { draw(g, size, sky); t.needsUpdate = true } }
   }
-  const layers = { sky: make(512, drawViewSky), far: make(1024, drawViewFar), mid: make(1024, drawViewMid), near: make(512, drawViewNear) }
-  // (only when it's turned: the two marks change together, and each would paint all four again)
-  let painted: Sky | null = null
-  const paint = () => { const sky = skyNow(); if (sky === painted) return; painted = sky; for (const l of Object.values(layers)) l.paint(sky) }
-  paint()
-  onSky(paint)
+  // (the sky, the far city and the near bamboo still painted; the street across, its floor and its pole made in the shader, in depth, as
+  // the staff stair is (the owner's: the painted fronts were flat cards, and their edges, held, were drawn out into bands seen at an angle))
+  const layers = { sky: make(512, drawViewSky), far: make(1024, drawViewFar), near: make(512, drawViewNear) }
   const L = VIEW_LAYERS
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uSky: { value: layers.sky.t }, uFar: { value: layers.far.t }, uMid: { value: layers.mid.t }, uNear: { value: layers.near.t },
-      uCam: { value: new THREE.Vector3(0, 0, 3) }, uTime: { value: 0 } },
+    uniforms: { uSky: { value: layers.sky.t }, uFar: { value: layers.far.t }, uNear: { value: layers.near.t },
+      uCam: { value: new THREE.Vector3(0, 0, 3) }, uTime: { value: 0 },
+      uWallLit: { value: new THREE.Color() }, uHaze: { value: new THREE.Color() }, uGround: { value: new THREE.Color() },
+      uGlass: { value: new THREE.Color() }, uNight: { value: 0 }, uLit: { value: 0 } },
     vertexShader: `varying vec3 vLocal;
 void main() { vLocal = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform sampler2D uSky, uFar, uMid, uNear;
-uniform vec3 uCam;
-uniform float uTime;
+    fragmentShader: `uniform sampler2D uSky, uFar, uNear;
+uniform vec3 uCam, uWallLit, uHaze, uGround, uGlass;
+uniform float uTime, uNight, uLit;
 varying vec3 vLocal;
-vec4 layer(sampler2D t, vec2 xy, float H) { return texture2D(t, clamp(xy / (2.0 * H) + 0.5, 0.0, 1.0)); }
+// (the street in the window's own frame: x across, y up from its middle, z out into the street; about a metre a unit)
+// (the window looks out over a back street from above: the houses across it two storeys, their tiled roofs just under the eye, the far
+// city and the sky over them; their fronts, their shops' shutters and the alley's floor seen looking down)
+const float GROUND = -6.2;
+const float FRONT = -4.6;
+const float ROOF_SLOPE = 0.42, ROOF_DEEP = 3.0;
+const float POLE_X = 0.95, POLE_Z = -3.6, POLE_R = 0.11, POLE_TOP = 7.4;
+const float BW = 4.2, BX = -1.3;
+float h1(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+float h2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + 1.0), f.x), f.y); }
+// (a rectangle's inside, softened at its edge by how big a pixel is there, so nothing far off shimmers)
+float box(vec2 p, vec2 lo, vec2 hi, float aa) { vec2 a = smoothstep(lo - aa, lo + aa, p) * (1.0 - smoothstep(hi - aa, hi + aa, p)); return a.x * a.y; }
+// (a painted layer at some depth, nothing where it isn't painted: no edge drawn out across the view, as it was when held at its edge)
+vec4 layer(sampler2D t, vec2 xy, float H) {
+  vec2 uv = xy / (2.0 * H) + 0.5;
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return vec4(0.0);
+  return texture2D(t, uv);
+}
+// (the sky by the way the eye looks: across, mirrored so it never runs out; up and down, held at its painted top and foot)
+vec3 skyAt(vec3 dir) {
+  vec2 xy = vLocal.xy + dir.xy / max(-dir.z, 0.05) * ${L.sky.d.toFixed(1)};
+  vec2 uv = xy / (2.0 * ${L.sky.H.toFixed(2)}) + 0.5;
+  uv.x = 1.0 - abs(1.0 - mod(uv.x, 2.0));
+  uv.y = clamp(uv.y, 0.002, 0.998);
+  return texture2D(uSky, uv).rgb;
+}
+// (a house's top, its front's height over the alley: two storeys, a little different each)
+float topOf(float id) { return 4.9 + h1(id + 3.0) * 0.5; }
+// (a house front at x, y: its walls, its windows, an air conditioner here and there, a lit sign down one edge, its roof's coping)
+vec4 house(float x, float y, float aa) {
+  float id = floor((x - BX) / BW);
+  float u = x - (BX + id * BW), v = y - GROUND;
+  float top = topOf(id);
+  if (v > top) return vec4(0.0);
+  float tone = h1(id + 11.0);
+  // (cream plaster, grey concrete, brown tile, a pale blue-grey)
+  vec3 wall = tone < 0.3 ? vec3(0.70, 0.62, 0.50) : tone < 0.55 ? vec3(0.50, 0.50, 0.48) : tone < 0.8 ? vec3(0.42, 0.31, 0.25) : vec3(0.52, 0.56, 0.58);
+  // (the tiled one: its courses of small tiles)
+  if (tone >= 0.55 && tone < 0.8) wall *= 0.9 + 0.1 * step(0.12, fract(v * 9.0)) * step(0.06, fract(u * 4.5 + floor(v * 9.0) * 0.5));
+  // (plaster: a mottle, rain streaks down from the sills, darker toward the alley's floor)
+  wall *= 0.9 + 0.12 * vn(vec2(u, v) * 3.0) - 0.06 * vn(vec2(u * 9.0, v * 0.6));
+  wall *= mix(0.62, 1.0, smoothstep(0.0, 2.2, v));
+  vec3 c = wall * uWallLit;
+  // (the seam between two houses, a band between the floors, the eaves' shadow under the roof)
+  c *= 1.0 - 0.6 * (1.0 - smoothstep(0.0, 0.05 + aa, u));
+  c *= 1.0 - 0.3 * box(vec2(u, v), vec2(0.0, 2.45), vec2(BW, 2.62), aa);
+  c *= mix(0.55, 1.0, smoothstep(0.0, 0.6, top - v));
+  // (the ground floor: a shop's shutter, its slats; by night a warm light behind the gaps)
+  float shop = box(vec2(u, v), vec2(0.35, 0.0), vec2(BW - 0.35, 2.4), aa);
+  vec3 shutter = vec3(0.40, 0.41, 0.43) * uWallLit * (0.78 + 0.22 * step(0.5, fract(v * 9.0)));
+  shutter += vec3(1.0, 0.7, 0.4) * uNight * 0.35 * step(0.5, h1(id + 5.0)) * step(0.92, fract(v * 9.0));
+  c = mix(c, shutter, shop);
+  // (the floors above: a row of windows each, set in their frames)
+  float floorN = floor((v - 2.6) / 2.8);
+  if (floorN >= 0.0) {
+    float fv = v - 2.6 - floorN * 2.8;
+    float n = max(1.0, floor((BW - 0.6) / 1.4));
+    float col = clamp(floor((u - 0.3) / ((BW - 0.6) / n)), 0.0, n - 1.0);
+    float cu = 0.3 + (col + 0.5) * (BW - 0.6) / n;
+    vec2 wp = vec2(u - cu, fv - 1.45);
+    float win = box(wp, vec2(-0.42, -0.55), vec2(0.42, 0.55), aa);
+    float frame = box(wp, vec2(-0.5, -0.62), vec2(0.5, 0.62), aa) - win;
+    float lit = step(1.0 - uLit, h2(vec2(id * 7.0 + col, floorN)));
+    vec3 glass = mix(uGlass * (0.75 + 0.35 * smoothstep(-0.55, 0.55, wp.y)), vec3(1.0, 0.78, 0.48) * (0.85 + 0.15 * h2(vec2(id, col + floorN))), lit);
+    // (a curtain half drawn in some)
+    glass *= 1.0 - 0.25 * step(0.6, h2(vec2(col, id + floorN))) * step(0.1, wp.x);
+    c = mix(c, vec3(0.2, 0.19, 0.18) * uWallLit, frame * 0.9);
+    c = mix(c, glass, win);
+    // (the sill's shadow under it)
+    c *= 1.0 - 0.25 * box(wp, vec2(-0.5, -0.8), vec2(0.5, -0.62), aa);
+    // (an air conditioner's outdoor unit beside some windows: a pale box, its fan's dark round)
+    if (h2(vec2(id + col * 3.0, floorN + 9.0)) > 0.55) {
+      vec2 ap = vec2(u - (cu + 0.78), fv - 0.55);
+      float ac = box(ap, vec2(-0.3, -0.22), vec2(0.3, 0.22), aa);
+      float fan = 1.0 - smoothstep(0.13 - aa, 0.13 + aa, length(ap - vec2(-0.06, 0.0)));
+      c = mix(c, vec3(0.82, 0.82, 0.8) * uWallLit * (1.0 - 0.45 * fan), ac);
+    }
+  }
+  // (a vertical sign down one edge of some: a lit panel, its letters lighter blocks; bright by night)
+  if (h1(id + 7.0) > 0.45) {
+    vec2 sp = vec2(u - (BW - 0.55), v - 3.0);
+    float sign = box(sp, vec2(-0.24, 0.0), vec2(0.24, 2.6), aa);
+    float hue = h1(id + 13.0);
+    vec3 panel = hue < 0.33 ? vec3(0.82, 0.18, 0.14) : hue < 0.66 ? vec3(0.95, 0.92, 0.84) : vec3(0.16, 0.3, 0.62);
+    vec3 ink = hue > 0.33 && hue < 0.66 ? vec3(0.15, 0.1, 0.1) : vec3(1.0, 0.97, 0.9);
+    float glyph = box(vec2(sp.x, fract(sp.y / 0.62) * 0.62), vec2(-0.15, 0.1), vec2(0.15, 0.48), aa) * step(0.3, h2(vec2(floor(sp.y / 0.62), id)));
+    vec3 sc = mix(panel, ink, glyph * 0.85) * mix(uWallLit, vec3(1.25), uNight * 0.85);
+    c = mix(c, sc, sign);
+  }
+  return vec4(c, 1.0);
+}
+// (its roof, rising away from the top of its front to the ridge: kawara in rows along it, each course's lip catching the light, the
+// ridge darker; where the eye meets it, if it does)
+vec4 roof(vec3 o, vec3 dir) {
+  // (which house, by where the eye crosses the fronts' line, then the slope over that one)
+  float tf = (FRONT - o.z) / dir.z;
+  float id = floor((o.x + dir.x * tf - BX) / BW);
+  for (int k = 0; k < 2; k++) {
+    float top = GROUND + topOf(id);
+    float den = dir.y + ROOF_SLOPE * dir.z;
+    if (abs(den) < 1e-4) return vec4(0.0);
+    float t = (top + ROOF_SLOPE * (FRONT - o.z) - o.y) / den;
+    vec3 p = o + dir * t;
+    float back = FRONT - p.z;
+    float hid = floor((p.x - BX) / BW);
+    if (hid != id) { id = hid; continue; }
+    if (t < 0.0 || back < 0.0 || back > ROOF_DEEP) return vec4(0.0);
+    float aa = 0.02 + t * 0.003;
+    float course = fract(back / 0.28);
+    float tile = fract((p.x - BX) / 0.3 + step(0.5, fract(back / 0.56)) * 0.5);
+    vec3 kawara = mix(vec3(0.24, 0.27, 0.32), vec3(0.32, 0.35, 0.4), h1(id + 21.0));
+    float shade = 0.72 + 0.28 * smoothstep(0.0, 0.25, course) - 0.18 * smoothstep(0.85, 1.0, course);
+    shade *= 0.9 + 0.1 * smoothstep(0.0, 0.5, abs(tile - 0.5) * 2.0);
+    vec3 c = kawara * shade * uWallLit;
+    c = mix(c, vec3(0.14, 0.15, 0.17) * uWallLit, smoothstep(ROOF_DEEP - 0.25 - aa, ROOF_DEEP - 0.2, back));
+    return vec4(c, t);
+  }
+  return vec4(0.0);
+}
 void main() {
-  // (the way the eye looks through this point of the window, on into the street: where it meets each layer)
-  vec3 dir = normalize(vLocal - uCam);
-  vec2 slope = dir.xy / max(-dir.z, 0.15);
-  vec3 c = layer(uSky, vLocal.xy + slope * ${L.sky.d.toFixed(1)}, ${L.sky.H.toFixed(2)}).rgb;
-  // (the far city and the street across hazed into the sky by the air between (the owner's: softer, less contrast, the eye kept on the
-  // window and the bamboo); the near bamboo stirring a little in the wind, more toward their tops)
-  vec3 air = c;
-  vec4 f = layer(uFar, vLocal.xy + slope * ${L.far.d.toFixed(1)}, ${L.far.H.toFixed(2)}); c = mix(c, mix(f.rgb, air, 0.38), f.a);
-  vec4 m = layer(uMid, vLocal.xy + slope * ${L.mid.d.toFixed(1)}, ${L.mid.H.toFixed(2)}); c = mix(c, mix(m.rgb, air, 0.14), m.a);
+  vec3 o = vLocal, dir = normalize(vLocal - uCam);
+  float far = 1e9;
+  vec3 c = skyAt(dir);
+  vec3 air = uHaze;
+  // (the far city, painted, behind the street: what the eye meets over the roofs across)
+  // (behind the street, far enough that it's always beyond it; across, mirrored so it never runs out)
+  vec2 fxy = vLocal.xy + dir.xy / max(-dir.z, 0.05) * 9.0;
+  vec2 fuv = fxy / (2.0 * ${L.far.H.toFixed(2)}) + 0.5;
+  fuv.x = 1.0 - abs(1.0 - mod(fuv.x, 2.0));
+  vec4 fc = fuv.y < 0.0 || fuv.y > 1.0 ? vec4(0.0) : texture2D(uFar, fuv);
+  c = mix(c, mix(fc.rgb, air, 0.38), fc.a);
+  // (the house fronts across the alley)
+  if (dir.z < -0.01) {
+    float t = (FRONT - o.z) / dir.z;
+    vec3 p = o + dir * t;
+    if (p.y > GROUND) {
+      float aa = 0.02 + t * 0.0025 / max(0.15, -dir.z);
+      vec4 h = house(p.x, p.y, aa);
+      if (h.a > 0.0) { c = mix(h.rgb, air, 0.08); far = t; }
+    }
+    // (or over a front, its roof)
+    if (far > 1e8) {
+      vec4 r = roof(o, dir);
+      if (r.a > 0.0) { c = mix(r.rgb, air, 0.1); far = r.a; }
+    }
+  }
+  // (the alley's floor, as near as it is: asphalt, the gutter along the house fronts, darker under them; by night the lamp's pool)
+  if (dir.y < -0.001) {
+    float t = (GROUND - o.y) / dir.y;
+    if (t < far) {
+      vec3 p = o + dir * t;
+      float aa = 0.02 + t * 0.003;
+      vec3 g = uGround * (0.86 + 0.18 * vn(p.xz * 4.0) + 0.06 * vn(p.xz * 23.0));
+      float gutter = box(vec2(p.z, 0.0), vec2(FRONT + 0.12, -1.0), vec2(FRONT + 0.36, 1.0), aa);
+      g = mix(g, uGround * 1.35, gutter);
+      g *= 1.0 - 0.55 * box(vec2(p.z, 0.0), vec2(FRONT + 0.25, -1.0), vec2(FRONT + 0.29, 1.0), aa);
+      g *= mix(0.6, 1.0, smoothstep(FRONT, FRONT + 0.9, p.z));
+      g += vec3(1.0, 0.82, 0.55) * uNight * 0.45 * exp(-dot(p.xz - vec2(POLE_X + 0.4, POLE_Z), p.xz - vec2(POLE_X + 0.4, POLE_Z)) * 0.7);
+      c = mix(g, air, 0.08);
+      far = t;
+    }
+  }
+  // (the utility pole: a concrete round, lit on one side)
+  {
+    vec2 oc = o.xz - vec2(POLE_X, POLE_Z), dd = dir.xz;
+    float A = dot(dd, dd), B = dot(oc, dd), C = dot(oc, oc) - POLE_R * POLE_R, D = B * B - A * C;
+    if (D > 0.0) {
+      float t = (-B - sqrt(D)) / A;
+      vec3 p = o + dir * t;
+      float hy = p.y - GROUND;
+      if (t > 0.0 && t < far && hy > 0.0 && hy < POLE_TOP) {
+        vec2 n = normalize(p.xz - vec2(POLE_X, POLE_Z));
+        float lit = 0.55 + 0.45 * max(0.0, dot(n, normalize(vec2(-0.6, 0.8))));
+        c = vec3(0.5, 0.49, 0.47) * (0.35 + 0.65 * lit) * (0.92 + 0.08 * step(0.5, fract(hy * 1.5))) * uWallLit;
+        far = t;
+      }
+    }
+    // (in the pole's own plane: the transformer drum, the cross arm, the lamp, and the wires sagging along the alley from it)
+    if (dir.z < -0.01) {
+      float t = (POLE_Z - o.z) / dir.z;
+      if (t > 0.0 && t < far) {
+        vec3 p = o + dir * t;
+        float hy = p.y - GROUND, aa = 0.01 + t * 0.002;
+        float drum = box(vec2(p.x - POLE_X - 0.24, hy), vec2(-0.17, 5.2), vec2(0.17, 5.95), aa);
+        float arm = box(vec2(p.x - POLE_X, hy), vec2(-0.75, 6.9), vec2(0.75, 7.0), aa);
+        float lamp = box(vec2(p.x - POLE_X - 0.42, hy), vec2(-0.16, 4.3), vec2(0.16, 4.4), aa);
+        vec3 metal = vec3(0.42, 0.44, 0.45) * uWallLit;
+        c = mix(c, metal * 1.15, drum);
+        c = mix(c, metal * 0.7, arm);
+        c = mix(c, mix(metal, vec3(1.6, 1.4, 1.0), uNight), lamp);
+        float wires = 0.0;
+        for (int k = 0; k < 3; k++) {
+          float fk = float(k);
+          float q = (mod(p.x - POLE_X, 9.0) / 9.0) * 2.0 - 1.0;
+          float wy = 6.85 + fk * 0.12 - 0.55 * (1.0 - q * q) * (1.0 - fk * 0.15);
+          wires = max(wires, 1.0 - smoothstep(0.012, 0.012 + aa, abs(hy - wy)));
+        }
+        c = mix(c, vec3(0.08, 0.08, 0.09), wires * 0.9);
+      }
+    }
+  }
+  // (the near bamboo, stirring a little in the wind, more toward their tops)
   vec2 sway = vec2(sin(uTime * 0.9 + vLocal.y * 2.5) * 0.008 + sin(uTime * 2.3) * 0.002, 0.0) * (0.4 + vLocal.y / 0.8 + 0.5);
-  vec4 n = layer(uNear, vLocal.xy + slope * ${L.near.d.toFixed(1)} + sway, ${L.near.H.toFixed(2)}); c = mix(c, n.rgb, n.a);
+  vec4 nb = layer(uNear, vLocal.xy + dir.xy / max(-dir.z, 0.05) * ${L.near.d.toFixed(1)} + sway, ${L.near.H.toFixed(2)});
+  c = mix(c, nb.rgb, nb.a);
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`,
   })
+  // (each part of the day's light on the street: the walls, the air between, the alley's floor, the windows' glass, how dark, how many lit)
+  const LOOK: Record<Sky, { wall: string; haze: string; ground: string; glass: string; night: number; lit: number }> = {
+    day: { wall: '#e6dfd2', haze: '#c8dcef', ground: '#4f4d4b', glass: '#6f8fb3', night: 0, lit: 0 },
+    dusk: { wall: '#f0bf8e', haze: '#e5a070', ground: '#5c4c4a', glass: '#c99a78', night: 0.25, lit: 0.22 },
+    dawn: { wall: '#d9c6d2', haze: '#f1c6cc', ground: '#64606e', glass: '#a8a6c8', night: 0.12, lit: 0.1 },
+    night: { wall: '#3c4664', haze: '#2c2c44', ground: '#24242c', glass: '#1c2438', night: 1, lit: 0.45 },
+  }
+  // (only when it's turned: the two marks change together, and each would paint all three again)
+  let painted: Sky | null = null
+  const paint = () => {
+    const sky = skyNow()
+    if (sky === painted) return
+    painted = sky
+    for (const l of Object.values(layers)) l.paint(sky)
+    const k = LOOK[sky], u = mat.uniforms
+    ;(u.uWallLit.value as THREE.Color).set(k.wall)
+    ;(u.uHaze.value as THREE.Color).set(k.haze)
+    ;(u.uGround.value as THREE.Color).set(k.ground)
+    ;(u.uGlass.value as THREE.Color).set(k.glass)
+    u.uNight.value = k.night
+    u.uLit.value = k.lit
+  }
+  paint()
+  onSky(paint)
   return mat
 })()
 /**
