@@ -5360,8 +5360,20 @@ function SakeHit({ lit }: { lit: () => THREE.Object3D | null }) {
     const n = SUPPLIES.has('Sake')
     return n < 0 ? '點一下看常溫區的清酒' : `清酒 ${n}・點一下看常溫區的庫存`
   }
+  // (pointed at only where the barrels themselves are, tried against them as drawn: the box round the round, tall stack caught the pointer
+  // in the air beside them, over the rice sacks at their foot, seen from up high)
+  const raycast = useMemo(() => {
+    const found: THREE.Intersection[] = []
+    return function (this: THREE.Mesh, ray: THREE.Raycaster, hits: THREE.Intersection[]) {
+      const drawn = lit()
+      if (!drawn) { THREE.Mesh.prototype.raycast.call(this, ray, hits); return }
+      found.length = 0
+      ray.intersectObject(drawn, true, found)
+      if (found.length) hits.push({ ...found[0], object: this })
+    }
+  }, [lit])
   return (
-    <mesh position={[0, SAKE_HIT[1] / 2, 0]}
+    <mesh position={[0, SAKE_HIT[1] / 2, 0]} raycast={raycast}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('ambient', 'sack', undefined, 'Sake') }}
       onPointerOver={(e) => { if (getEdit().on) return; handOver.onPointerOver({ ...e, eventObject: lit() ?? e.eventObject }); setTip({ title: '菰樽（清酒）', hint: hint() }) }}
       onPointerOut={(e) => { handOver.onPointerOut({ ...e, eventObject: lit() ?? e.eventObject }); setTip(null) }}>
@@ -5911,13 +5923,14 @@ function RiceSacks() {
     return mergeByMaterial(r)
   }, [gltf])
   const says = () => {
+    // (the owner's: its stock, and a word when it's run out; clicked, the stock's room-temperature tab, where it's ordered)
     const n = SUPPLIES.has('Onigiri')
-    return n < 0 ? '做飯糰用的白米（配醬油烤）・點一下看常溫區' : `白米 ${n} 份・做飯糰用（配醬油烤）・點一下看常溫區`
+    return n < 0 ? '做飯糰的主食・點一下開常溫區補貨' : n === 0 ? '白米已耗盡・點一下開常溫區進貨' : `剩 ${n} 份・做飯糰的主食・點一下開常溫區補貨`
   }
   return (
     // (handlers on a group round it: a primitive's own aren't attached)
-    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('白米袋', says()).onPointerOver(e) }}
-      onPointerOut={(e) => { if (getEdit().on) return; tipOver('白米袋', '').onPointerOut(e) }}
+    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('【常溫食材】白米存量', says()).onPointerOver(e) }}
+      onPointerOut={(e) => { if (getEdit().on) return; tipOver('【常溫食材】白米存量', '').onPointerOut(e) }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('ambient', 'sack', undefined, 'Onigiri') }}>
       <primitive object={obj} />
     </group>
