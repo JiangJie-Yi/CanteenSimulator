@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Gripe, Visit } from '@/game/reputation'
 import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
@@ -22,7 +22,7 @@ import { LINES } from '@/data/lines'
 import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
 import { sameProps } from '@/scene/sameProps'
-import { StaffFigure, TRAY_AT } from '@/scene/StaffFigure'
+import { StaffFigure, StaffWarm, TRAY_AT } from '@/scene/StaffFigure'
 import { commuteOf, delayOf, paceOf } from '@/game/commute'
 import { COMMUTERS, makeTrip, through, tripStep, type Trip } from './commuteWalk'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
@@ -6326,6 +6326,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <BossSpot open={space === 'open'} lang={lang} />
         {/* (and the notch's wooden step he and his cook stand on) */}
         <NotchStep />
+        {/* (the staff's outfits drawn a moment under the notch's floor as the shop loads: their programs made then, not as they first walk in) */}
+        <Suspense fallback={null}><group position={CHEF_AT}><StaffWarm /></group></Suspense>
       </>)}
       {space === 'open' && bar && crewPlaces(crew.some((m) => m.role === 'chef') ? crew : [HOUSE_CHEF, ...crew]).map(({ m, at, yaw, way, seat }, i, all) => (
         <CrewWalk key={m.id} id={m.id} role={m.role} at={at} yaw={yaw} way={way} seat={seat} round={m.role === 'chef' || m.role === 'sous'}

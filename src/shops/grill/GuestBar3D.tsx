@@ -1172,6 +1172,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
   const open = useRef(0)
   const vel = useRef(0)
   const innerShown = useRef<boolean | null>(null)
+  const warmFrames = useRef(0)
   /** (whether the drawer was last sent out: it rings as it's let go) */
   const sentOut = useRef(false)
   const [pay, setPay] = useState<{ tender: Note[]; change: (Note | CoinKind)[] }>({ tender: [], change: [] })
@@ -1242,9 +1243,10 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     const rt = (performance.now() - REGISTER.rattleAt) / 1000
     const knock = rt < 0.3 ? Math.abs(Math.sin(rt * Math.PI * 2 / 0.15)) * 0.0025 * (1 - rt / 0.3) : 0
     if (drawer.current) drawer.current.position.z = -open.current * 0.24 - knock
-    if (cash.current) cash.current.visible = open.current > 0.15
-    // (its inside drawn only once it's out a little: shut, it's all in the dark of the till)
-    const inside = open.current > 0.02
+    if (cash.current) cash.current.visible = open.current > 0.15 || warmFrames.current < 40
+    // (its inside drawn only once it's out a little: shut, it's all in the dark of the till; and its first few dozen frames, unseen inside
+    // the shut till, so the programs it's drawn with (its shadow's too) are made as the shop loads, not at the first pull a minute in)
+    const inside = open.current > 0.02 || ++warmFrames.current < 40
     if (inside !== innerShown.current) {
       innerShown.current = inside
       for (const o of useRegisterModel.cached()?.inner ?? []) o.visible = inside
@@ -2017,6 +2019,9 @@ const SeatBits = memo(function SeatBits({ shoes, soys }: { shoes: { at: THREE.Ve
   useLayoutEffect(() => {
     const m = shoe.current
     if (!m) return
+    // (its colours there from the first, the empty shop: made with the first pair, the program it was warmed with as the shop loaded wasn't
+    // the one it then wanted, a hitch as the first customer came in)
+    if (!m.instanceColor) m.setColorAt(0, BIT_C.set('#000000'))
     let n = 0
     for (const sh of shoes) {
       BIT_M.compose(sh.at, BIT_Q.setFromAxisAngle(BIT_UP, sh.turn), BIT_S.set(1, 1, 1))

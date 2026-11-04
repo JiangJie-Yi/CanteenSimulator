@@ -8,6 +8,7 @@ import { airbrush, gradientMap } from './Person3D'
 import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from './rigidSkin'
 import { bakeable, colourVertices } from './StaticBatch'
 import { warmLater } from './Prewarm'
+import { holdVeil } from './Later'
 
 /*
  * The staff, made as the boss is (blender/boss.py with CREW=<variant>): an Overcooked cook's big round head on a short plump body rounding
@@ -45,12 +46,12 @@ type Part = (typeof BONES)[number]
 /** where in a part's mesh the skin or the hair is (its vertices from `start`, `count` of them), coloured for each person */
 type Tint = { start: number; count: number; tint: 'skin' | 'hair' }
 const made = new Map<Variant, Built>()
-/** a material's see-through twin, for fading someone out of (or into) a doorway: the same shader, its opacity theirs */
+/** a material's twin of their own, for fading someone out of (or into) a doorway: hashed from the start (as the customers' and the
+ * owner's are: alphaHash at full opacity drops nothing), so only its opacity moves and no other program is ever wanted for it */
 function fadeOf(m: THREE.Material) {
   const c = m.clone()
   c.onBeforeCompile = m.onBeforeCompile
   c.customProgramCacheKey = m.customProgramCacheKey
-  c.transparent = true
   return c
 }
 
@@ -102,7 +103,7 @@ function build(scene: THREE.Group, v: Variant): Built {
     m.userData.flat = /White|Dark/.test(n)
     m.userData.tint = /CrewSkin/.test(n) ? 'skin' : /CrewHair/.test(n) ? 'hair' : undefined
   })
-  const mat = atlasModel(s, (m) => partOf(m) !== 'drop', (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap }))))!
+  const mat = atlasModel(s, (m) => partOf(m) !== 'drop', (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap, alphaHash: true }))))!
   // (every piece of it in the figure's frame, its part, inked or not, flat or not, skin or hair)
   const pieces: (SkinPiece & { tint?: 'skin' | 'hair' })[] = []
   s.traverse((o) => {
@@ -167,14 +168,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
   const v = variantOf(role, who.female)
   const gltf = useGLTF(url(v)) as unknown as { scene: THREE.Group }
   const fig = useMemo(() => {
-    if (!made.has(v)) {
-      made.set(v, build(gltf.scene, v))
-      // (its see-through look, compiled with the rest as the shop loads: fading out of a door it's put on (fadeOf), and a new program then
-      // would stop the frame)
-      const w = cloneFigure(made.get(v)!.root)
-      w.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.material = Array.isArray(m.material) ? m.material.map(fadeOf) : fadeOf(m.material) })
-      warmLater(w)
-    }
+    if (!made.has(v)) made.set(v, build(gltf.scene, v))
     const base = made.get(v)!
     // (a copy whose one mesh is bound to the copy's own parts)
     const root = cloneFigure(base.root) as THREE.Group
@@ -233,6 +227,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
   const last = useRef<THREE.Vector3 | null>(null)
   const pace = useRef(0)
   const faded = useRef<{ was: Map<THREE.Mesh, THREE.Material | THREE.Material[]>; mats: THREE.Material[] } | null>(null)
+  const inks = useRef<THREE.Mesh[]>([])
   useEffect(() => () => { if (faded.current) { for (const [m, mat] of faded.current.was) m.material = mat; for (const c of faded.current.mats) c.dispose(); faded.current = null } }, [fig])
   useEffect(() => { fig.fan?.scale.setScalar(0) }, [fig])
   useFrame((_, delta) => {
@@ -250,13 +245,15 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
     const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number } | undefined
-    // (how much of them shows: their own see-through copies of the materials while they're fading, the shared ones back after)
+    // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line, a
+    // solid colour, put away meanwhile (as the customers' is))
     const fade = job?.fade ?? 1
     if (fade < 0.999 && !faded.current) {
       const was = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>(), mats: THREE.Material[] = []
       fig.root.traverse((q) => {
         const m = q as THREE.Mesh
         if (!m.isMesh) return
+        if ((m.material as THREE.Material).type === 'ShaderMaterial') { m.visible = false; inks.current.push(m); return }
         was.set(m, m.material)
         const one = (x: THREE.Material) => { const c = fadeOf(x); mats.push(c); return c }
         m.material = Array.isArray(m.material) ? m.material.map(one) : one(m.material)
@@ -266,6 +263,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     if (faded.current) {
       if (fade >= 0.999) {
         for (const [m, mat] of faded.current.was) m.material = mat
+        for (const m of inks.current) m.visible = true
+        inks.current = []
         for (const c of faded.current.mats) c.dispose()
         faded.current = null
       } else for (const c of faded.current.mats) c.opacity = fade
@@ -330,3 +329,25 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
 }
 
 for (const v of VARIANTS) useGLTF.preload(url(v))
+
+/**
+ * Every outfit built and drawn as the shop loads, out of sight under the kitchen's floor, a few frames, then gone (the loading veil held
+ * meanwhile): the staff only come in once it opens, and the programs they're drawn with, their shadows' among them (only drawing a thing
+ * into the shadow's picture makes its program), were made as they first walked in, a frame stopped each.
+ */
+export function StaffWarm() {
+  const gltfs = VARIANTS.map((v) => useGLTF(url(v)) as unknown as { scene: THREE.Group })
+  const roots = useMemo(() => VARIANTS.map((v, i) => {
+    if (!made.has(v)) made.set(v, build(gltfs[i].scene, v))
+    const r = cloneFigure(made.get(v)!.root) as THREE.Group
+    warmLater(r)
+    return r
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [])
+  const [on, setOn] = useState(true)
+  const frames = useRef(0)
+  useEffect(() => (on ? holdVeil('staff-warm') : undefined), [on])
+  useEffect(() => () => { for (const r of roots) releaseFigure(r) }, [roots])
+  useFrame(() => { if (on && ++frames.current > 40) setOn(false) })
+  return on ? <group position={[0, -0.6, 0]}>{roots.map((r, i) => <primitive key={i} object={r} position={[i * 0.3, 0, 0]} />)}</group> : null
+}
