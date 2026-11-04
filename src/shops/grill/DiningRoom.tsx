@@ -16,7 +16,7 @@ import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
 import { BOSS_DRINK, BOSS_FX } from './Boss'
 import { CASE_SIZE } from '@/game/drinkStock'
-import { askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, type Counter, type DrinkId } from './bar'
+import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -2792,7 +2792,7 @@ const STAFF_W = 0.82
  * own light coming in a little way at the door, the corners and the stair's creases darker, and the edges where the frame meets it darkest.
  * Units are the pane's (its middle at 0, the opening STAFF_W across and WC_H + 0.03 high; depth back into the wall).
  */
-const STAFF_EYE = new THREE.Vector3()
+const STAFF_EYE = new THREE.Vector3(), STAFF_EYE2 = new THREE.Vector3()
 const STAFF_STAIRS = (() => {
   const H = WC_H + 0.03, hw = STAFF_W / 2, yf = -H / 2
   const N = 11, rise = 0.19, run = 0.25, s0 = 0.55, D = s0 + N * run + 0.95
@@ -3107,6 +3107,7 @@ function StaffDoor() {
   const stairs = useRef<THREE.Mesh>(null)
   const stairsHot = useRef(false)
   const st = useRef({ open: false, k: 0 })
+  const heldWas = useRef(false)
   const narrow = STAFF_W / WC_W
   useFrame(({ camera }, dt) => {
     // (by night (dusk a little), the washi glows faintly with the stair's lamp, and its light spills round the door)
@@ -3121,7 +3122,10 @@ function StaffDoor() {
     // (the eye, in the stair's pane's own frame: where its lines through the pane run on into the stairwell)
     if (stairs.current) STAFF_STAIRS.uniforms.uCam.value.copy(stairs.current.worldToLocal(STAFF_EYE.copy(camera.position)))
     const s = st.current
-    const want = s.open ? 1 : 0
+    // (open as one of the staff goes up or comes down the stair, shut again after, its runners heard either way)
+    const held = performance.now() < STAFF_DOOR_HOLD.until
+    if (held !== heldWas.current) { heldWas.current = held; if (!s.open) slideDoorSound(held, Math.max(0, 1 - (g.current ? g.current.getWorldPosition(STAFF_EYE2).distanceTo(camera.position) : 8) / 8)) }
+    const want = s.open || held ? 1 : 0
     s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.8)
     const ss = (a: number, b: number) => { const t = Math.min(1, Math.max(0, (s.k - a) / (b - a))); return t * t * (3 - 2 * t) }
     if (g.current) {

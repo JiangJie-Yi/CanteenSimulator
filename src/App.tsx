@@ -40,7 +40,9 @@ import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { SHOP } from '@/game/shopState'
+import { SHOP, STAFF_TALK } from '@/game/shopState'
+import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
+import { CLOSE_DORM, CLOSE_HOME, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
 import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
 import { getEdit, offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
@@ -1227,6 +1229,36 @@ export default function App() {
   const [closing, setClosing] = useState(false)
   const [leaving, setLeaving] = useState(false)
   useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
+  /** who goes home through the front door at the day's end and comes in by it in the morning (game/commute): the hired staff but the
+   * cooks who live upstairs, and the shop's own server when none's hired */
+  const commuters = () => {
+    const d = DISHES[active].id
+    const crew = staffOf(d).filter((w) => commuteOf(w.role) === 'home')
+    return staffOf(d, 'server').length ? crew : [...crew, { id: 'house-server', zh: '', ja: '', role: 'server' as Role }]
+  }
+  /** a word from one of the staff (or the owner): over their head, and in the log with their name */
+  const sayStaff = useRef<(id: string, pool: Record<Lang, readonly string[]>, day: number, k?: number) => void>(() => {})
+  sayStaff.current = (id, pool, day, k = 0) => {
+    const text = lineOf(pool[lang], k, day)
+    STAFF_TALK.push({ key: ++chatId.current, id, text, until: performance.now() + 4800 })
+    const w = id === 'owner' ? null : staffOf(DISHES[active].id).find((x) => x.id === id)
+    const name = w ? (lang === 'ja' ? w.ja : w.zh) : ''
+    talk(id === 'owner' ? 'owner' : 'staff', name ? `${name}${lang === 'ja' ? '「' : '：'}${text}${lang === 'ja' ? '」' : ''}` : text)
+  }
+  // (opened: the staff walk in from now, each at their own moment (Roasting, GuestBar3D); the owner says good morning, then one or two of
+  // those coming in at the door as they reach their places)
+  useEffect(() => {
+    if (!ai) return
+    SHOP.openedAt = performance.now()
+    SHOP.day++
+    const day = SHOP.day
+    const timers = [window.setTimeout(() => sayStaff.current('owner', OPEN_DORM, day), 1200)]
+    talkersOf(commuters().map((w) => w.id), day).forEach((id, k) => {
+      timers.push(window.setTimeout(() => sayStaff.current(id, OPEN_HOME, day, k), (delayOf(id, day + 0.5) * 0.8 + 5.5 + k * 1.6) * 1000))
+    })
+    return () => { for (const t of timers) window.clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ai])
   const offerOmiki = () => {
     if (omikiAt !== null && performance.now() - omikiAt < OMIKI_MS) return
     if (cash < OFFERING_COST) {
@@ -1733,11 +1765,11 @@ export default function App() {
     book('fuel', o.cost)
     shiftStock({ [CHARCOAL]: o.sticks })
   }
-  const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest' | 'stock' | 'order'; text: string }[]>([])
+  const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner'; text: string }[]>([])
   /** what each customer's saying just now (over their head) */
   const [speech, setSpeech] = useState<Record<number, { key: number; text: string }>>({})
   const chatId = useRef(0)
-  const talk = useCallback((who: 'chef' | 'guest' | 'stock' | 'order', raw: string) => {
+  const talk = useCallback((who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner', raw: string) => {
     // what a customer says is shown in a bubble over their head, where there's a 3D bar to show it on
     const said = /^#(\d+) (.*)$/.exec(raw)
     if (who === 'guest' && said && !phoneRef.current) {
@@ -2216,12 +2248,28 @@ export default function App() {
     }
     if ((guestsBy[DISHES[active].id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')) return
     setLeaving(true)
-    // (a timer of its own, not the effect's: the effect runs again the moment `leaving` changes)
-    window.setTimeout(() => {
-      setAi(false)
-      setClosing(false)
-      setLeaving(false)
-    }, 5000)
+    // (one or two of those going home say goodbye on their way to the door, the owner answering (game/commute))
+    const day = SHOP.day, goers = commuters()
+    let first = Infinity
+    talkersOf(goers.map((w) => w.id), day).forEach((id, k) => {
+      const at = (delayOf(id, day) + 0.6 + k * 1.8) * 1000
+      first = Math.min(first, at)
+      window.setTimeout(() => sayStaff.current(id, CLOSE_HOME, day, k), at)
+    })
+    window.setTimeout(() => sayStaff.current('owner', CLOSE_DORM, day), (Number.isFinite(first) ? first : 600) + 1800)
+    // (shut once everyone's out of the door or up the stair (each walks off at their own moment: game/commute), at the latest after 40 s;
+    // a timer of its own, not the effect's: the effect runs again the moment `leaving` changes)
+    const t0 = performance.now()
+    const poll = window.setInterval(() => {
+      const gone = performance.now() - t0
+      if ((gone > 1500 && SHOP.walking.size === 0) || gone > 40000) {
+        window.clearInterval(poll)
+        SHOP.walking.clear()
+        setAi(false)
+        setClosing(false)
+        setLeaving(false)
+      }
+    }, 300)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closing, leaving, ai, guestsBy, active])
   const autoStep = useRef<() => void>(() => {})
@@ -2705,7 +2753,7 @@ export default function App() {
             {chat.map((m) => (
               <li key={m.id} className={`ai-line ai-${m.who}`}>
                 <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : m.who === 'stock' ? UI[lang].stock : m.who === 'order' ? (tl(lang, '點單', '注文', 'Orders'))
-                  : UI[lang].guest}</span>{m.text}
+                  : m.who === 'staff' ? tl(lang, '員工', 'スタッフ', 'Staff') : m.who === 'owner' ? tl(lang, '老闆', '店主', 'Owner') : UI[lang].guest}</span>{m.text}
               </li>
             ))}
           </ul>

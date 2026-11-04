@@ -276,6 +276,15 @@ button {
   background: #7a6a3e;
 }
 
+/* the staff's goodbyes and good mornings, and the owner's answers (game/commute) */
+.ai-staff .ai-who {
+  background: #4f6b52;
+}
+
+.ai-owner .ai-who {
+  background: #8a4a2a;
+}
+
 /* the foods a pointed-at set includes: their tags go a darker, oiled wood */
 .strip.is-included {
   --wood: #c9a46c;

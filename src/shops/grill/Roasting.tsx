@@ -23,6 +23,8 @@ import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
 import { sameProps } from '@/scene/sameProps'
 import { StaffFigure, TRAY_AT } from '@/scene/StaffFigure'
+import { commuteOf, delayOf, paceOf } from '@/game/commute'
+import { COMMUTERS, makeTrip, through, tripStep, type Trip } from './commuteWalk'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { CubbyStock } from './KitchenStores'
 import { QUALITY } from '@/scene/quality'
@@ -56,7 +58,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -855,7 +857,7 @@ function chefWay(home: THREE.Vector3, to: THREE.Vector3) {
   const mid = across ? across.slice(1, -1).map(fromBar).map((v) => v.setY(floorAt(v))) : []
   return [home.clone(), out, ...mid, to.clone()]
 }
-function CrewWalk({ id, at, yaw, way, seat, round, fetcher, children }: { id: string; at: THREE.Vector3; yaw: number; way: THREE.Vector3[]; seat?: string; round?: boolean
+function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { id: string; role: Role; at: THREE.Vector3; yaw: number; way: THREE.Vector3[]; seat?: string; round?: boolean
   fetcher?: boolean; children: React.ReactNode }) {
   const g = useRef<THREE.Group>(null)
   const trip = useRef<{ way: THREE.Vector3[]; len: number; gone: number } | null>(null)
@@ -916,12 +918,52 @@ function CrewWalk({ id, at, yaw, way, seat, round, fetcher, children }: { id: st
   const path = useRef<{ way: THREE.Vector3[]; len: number } | null>(null)
   const scene = useThree((s) => s.scene)
   const mark = useRef<THREE.Object3D | null>(null)
+  // (their walk home as the shop shuts, or in as it opens (game/commute, commuteWalk); whether they've come in yet today)
+  const commute = useRef<Trip | null>(null)
+  const arrived = useRef(false)
   useEffect(() => {
     const o = g.current
     if (!o) return
     KITCHEN_FOLK.add(o)
-    return () => { KITCHEN_FOLK.delete(o) }
-  }, [])
+    return () => { KITCHEN_FOLK.delete(o); SHOP.walking.delete(id); COMMUTERS.delete(id) }
+  }, [id])
+  /**
+   * Their way out from a place (this frame, on the floor), through the door and a step past it: a cook across the kitchen round all that
+   * stands on its floor (GuestBar3D's route) to the gate, the cashier along behind the till; home through the front door; a cook who lives
+   * upstairs (game/commute) from the gate across the aisle to the staff door and up the stair behind it.
+   */
+  const wayOf = (from: THREE.Vector3, o: THREE.Group) => {
+    const out = staffWayOut(GRILL_COUNTERS)
+    const across = round && KITCHEN_ROUTE.route ? KITCHEN_ROUTE.route(toBar(from), out[0]) : null
+    const toGate = across ? [from, ...across.slice(1).map(fromBar)] : null
+    const floor = (v: THREE.Vector3) => v.setY(floorAt(v))
+    const sd = commuteOf(role) === 'dorm' && o.parent ? scene.getObjectByName('staff-door') : undefined
+    if (sd && o.parent) {
+      sd.updateWorldMatrix(true, false)
+      const dW = sd.getWorldPosition(new THREE.Vector3()), room = sd.localToWorld(new THREE.Vector3(-1, 0, 0)).sub(dW).setY(0).normalize()
+      const here = (v: THREE.Vector3) => floor(o.parent!.worldToLocal(v))
+      const head = toGate ?? [from, ...way.slice(1, -2)]
+      return [...head.map((v, i) => (i ? floor(v) : v)), floor(fromBar(out[1])), here(dW.clone().addScaledVector(room, 0.75)), here(dW.clone()),
+        here(dW.clone().addScaledVector(room, -0.6))]
+    }
+    const w = (toGate ? [...toGate, ...out.slice(1).map(fromBar)] : [from, ...way.slice(1)]).map((v, i) => (i ? floor(v) : v))
+    return [...w, floor(through(w[w.length - 2], w[w.length - 1], 0.55))]
+  }
+  /** a step along their walk: where they stand and face, how much of them shows, their stretch and nod; the stair's door slid open
+   * for them as they near it; whether it's done */
+  const stepCommute = (o: THREE.Group, dt: number) => {
+    const tr = commute.current!
+    const pose = tripStep(tr, Math.min(dt, 0.1), 1.6, (v) => (o.parent ? o.parent.localToWorld(v.clone()) : v.clone()))
+    o.position.copy(pose.p)
+    if (pose.yaw !== null) o.rotation.y = pose.yaw
+    o.visible = pose.shown
+    o.userData.fade = pose.vis
+    o.userData.nod = pose.nod
+    o.userData.stretch = pose.stretch
+    if (commuteOf(role) === 'dorm' && tr.len - tr.d < 1.6 && tr.t > tr.wait) STAFF_DOOR_HOLD.until = performance.now() + 1500
+    if (tr.done) { o.userData.fade = 1; o.userData.nod = 0; o.userData.stretch = false }
+    return tr.done
+  }
   useFrame((_, dt) => {
     const o = g.current
     if (!o) return
@@ -930,6 +972,20 @@ function CrewWalk({ id, at, yaw, way, seat, round, fetcher, children }: { id: st
       path.current = null
       // (off fetching plates for the plating place: GuestBar3D walks them meanwhile)
       o.visible = PLATER_OUT.id !== id
+      // (coming in as the shop opens: in at the front door, or down the stair through the staff door, each at their own moment; unseen
+      // before it)
+      if (!arrived.current) {
+        if (!commute.current || commute.current.dir !== 'in') {
+          const w = performance.now() - SHOP.openedAt < 4000 ? wayOf(at.clone(), o) : null
+          if (w && w.length > 2) commute.current = makeTrip(id, 'in', w.reverse(), delayOf(id, SHOP.day + 0.5) * 0.8, paceOf(id))
+          else arrived.current = true
+        }
+        if (!arrived.current) {
+          if (!stepCommute(o, dt)) return
+          commute.current = null
+          arrived.current = true
+        }
+      }
       if (fetcher && o.visible && walkTrip(o, Math.min(dt, 0.1))) return
       if (seat && o.parent) {
         if (!mark.current?.parent) mark.current = scene.getObjectByName(seat) ?? null
@@ -946,24 +1002,15 @@ function CrewWalk({ id, at, yaw, way, seat, round, fetcher, children }: { id: st
       o.rotation.y = yaw
       return
     }
-    // (on their way: from where they are, down off a seat onto the floor, then the way out)
+    // (on their way: from where they are, down off a seat onto the floor, finishing up first, then home or upstairs)
     if (fetcher) { CHEF_TRIP.phase = 'idle'; CHEF_TRIP.keys = []; trip.current = null; o.userData.carry = o.userData.prep = false }
-    if (!path.current) {
-      const from = o.position.clone().setY(way[0].y)
-      // (a cook: across the kitchen to the gate round all that stands on its floor (GuestBar3D's route), then on out)
-      const out = staffWayOut(GRILL_COUNTERS)
-      const across = round && KITCHEN_ROUTE.route ? KITCHEN_ROUTE.route(toBar(from), out[0]) : null
-      const w = across ? [from, ...across.slice(1).map(fromBar), ...out.slice(1).map(fromBar)].map((v, i) => (i ? v.setY(floorAt(v)) : v)) : [from, ...way.slice(1)]
-      path.current = { way: w, len: pathLength(w) }
+    if (!commute.current || commute.current.dir !== 'out') {
+      commute.current = makeTrip(id, 'out', wayOf(o.position.clone().setY(way[0].y), o), delayOf(id, SHOP.day), paceOf(id))
+      SHOP.walking.add(id)
     }
-    const { way: w, len } = path.current
-    gone.current = Math.min(len, gone.current + Math.min(dt, 0.1) * 1.6)
-    const { p, dir } = alongPath(w, gone.current)
-    o.position.copy(p)
-    if (dir.x || dir.z) o.rotation.y = Math.atan2(dir.x, dir.z)
-    o.visible = gone.current < len - 0.2
+    if (stepCommute(o, dt)) SHOP.walking.delete(id)
   })
-  return <group ref={g} name={`crew-${id}`} position={at} rotation-y={yaw} scale={CHEF_SCALE}>{children}</group>
+  return <group ref={g} name={`crew-${id}`} userData={{ staffId: id }} position={at} rotation-y={yaw} scale={CHEF_SCALE}>{children}</group>
 }
 function crewPlaces(crew: CrewMember[]) {
   const c0 = GRILL_COUNTERS[0]
@@ -6281,7 +6328,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <NotchStep />
       </>)}
       {space === 'open' && bar && crewPlaces(crew.some((m) => m.role === 'chef') ? crew : [HOUSE_CHEF, ...crew]).map(({ m, at, yaw, way, seat }, i, all) => (
-        <CrewWalk key={m.id} id={m.id} at={at} yaw={yaw} way={way} seat={seat} round={m.role === 'chef' || m.role === 'sous'}
+        <CrewWalk key={m.id} id={m.id} role={m.role} at={at} yaw={yaw} way={way} seat={seat} round={m.role === 'chef' || m.role === 'sous'}
           fetcher={m.role === 'chef' && all.findIndex((x) => x.m.role === 'chef') === i}>
           {!seat && <BlobShadow r={0.17} />}<StaffFigure id={m.id} role={m.role} look={m.look} seated={!!seat} />
         </CrewWalk>

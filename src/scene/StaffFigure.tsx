@@ -7,6 +7,7 @@ import { atlasModel } from './atlasMerge'
 import { airbrush, gradientMap } from './Person3D'
 import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from './rigidSkin'
 import { bakeable, colourVertices } from './StaticBatch'
+import { warmLater } from './Prewarm'
 
 /*
  * The staff, made as the boss is (blender/boss.py with CREW=<variant>): an Overcooked cook's big round head on a short plump body rounding
@@ -44,6 +45,14 @@ type Part = (typeof BONES)[number]
 /** where in a part's mesh the skin or the hair is (its vertices from `start`, `count` of them), coloured for each person */
 type Tint = { start: number; count: number; tint: 'skin' | 'hair' }
 const made = new Map<Variant, Built>()
+/** a material's see-through twin, for fading someone out of (or into) a doorway: the same shader, its opacity theirs */
+function fadeOf(m: THREE.Material) {
+  const c = m.clone()
+  c.onBeforeCompile = m.onBeforeCompile
+  c.customProgramCacheKey = m.customProgramCacheKey
+  c.transparent = true
+  return c
+}
 
 /** which part of the figure a mesh belongs to, by its node's name (or an ancestor's) */
 function partOf(o: THREE.Object3D): Part | 'drop' {
@@ -158,7 +167,14 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
   const v = variantOf(role, who.female)
   const gltf = useGLTF(url(v)) as unknown as { scene: THREE.Group }
   const fig = useMemo(() => {
-    if (!made.has(v)) made.set(v, build(gltf.scene, v))
+    if (!made.has(v)) {
+      made.set(v, build(gltf.scene, v))
+      // (its see-through look, compiled with the rest as the shop loads: fading out of a door it's put on (fadeOf), and a new program then
+      // would stop the frame)
+      const w = cloneFigure(made.get(v)!.root)
+      w.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.material = Array.isArray(m.material) ? m.material.map(fadeOf) : fadeOf(m.material) })
+      warmLater(w)
+    }
     const base = made.get(v)!
     // (a copy whose one mesh is bound to the copy's own parts)
     const root = cloneFigure(base.root) as THREE.Group
@@ -216,6 +232,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
   const outer = useRef<THREE.Group>(null)
   const last = useRef<THREE.Vector3 | null>(null)
   const pace = useRef(0)
+  const faded = useRef<{ was: Map<THREE.Mesh, THREE.Material | THREE.Material[]>; mats: THREE.Material[] } | null>(null)
+  useEffect(() => () => { if (faded.current) { for (const [m, mat] of faded.current.was) m.material = mat; for (const c of faded.current.mats) c.dispose(); faded.current = null } }, [fig])
   useEffect(() => { fig.fan?.scale.setScalar(0) }, [fig])
   useFrame((_, delta) => {
     const dt = Math.min(0.1, delta)
@@ -228,9 +246,30 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     last.current = at
     pace.current += (Math.min(1, step / 0.6) - pace.current) * Math.min(1, dt * 8)
     const walk = pace.current
-    // (what the chef's walk (Roasting's CrewWalk) says he's doing just now: carrying food back in both hands, preparing it on the board,
-    // fanning the coals for something on the fire)
-    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean } | undefined
+    // (what their walk says they're doing just now: the chef carrying food back in both hands, preparing it on the board, fanning the coals
+    // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
+    // through it (commuteWalk))
+    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number } | undefined
+    // (how much of them shows: their own see-through copies of the materials while they're fading, the shared ones back after)
+    const fade = job?.fade ?? 1
+    if (fade < 0.999 && !faded.current) {
+      const was = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>(), mats: THREE.Material[] = []
+      fig.root.traverse((q) => {
+        const m = q as THREE.Mesh
+        if (!m.isMesh) return
+        was.set(m, m.material)
+        const one = (x: THREE.Material) => { const c = fadeOf(x); mats.push(c); return c }
+        m.material = Array.isArray(m.material) ? m.material.map(one) : one(m.material)
+      })
+      faded.current = { was, mats }
+    }
+    if (faded.current) {
+      if (fade >= 0.999) {
+        for (const [m, mat] of faded.current.was) m.material = mat
+        for (const c of faded.current.mats) c.dispose()
+        faded.current = null
+      } else for (const c of faded.current.mats) c.opacity = fade
+    }
     if (cook) {
       const f = job?.fetcher ? !!job.fanNow : (t + seed * 3.7) % 17 < 6 && !moving
       if (f !== fanning) setFanning(f)
@@ -239,7 +278,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     const ph = t * 9
     fig.body.position.y = walk * Math.abs(Math.sin(ph)) * 0.035
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07
-    fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0)
+    // (a bow of the head and shoulders at the door)
+    fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28
     fig.body.scale.y = 1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008
     const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
@@ -256,6 +296,11 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
       const out = new THREE.Vector3(sd * (hold === 1 ? 0.13 : 0.12), hold === 1 ? TRAY_AT[1] - 0.04 : 0.22, hold === 1 ? TRAY_AT[2] - 0.02 : 0.26)
       hand.position.lerpVectors(rest, out, hold).add(new THREE.Vector3(0, 0, hold === 1 ? 0 : swing))
       hand.rotation.x = hold === 1 ? -1.1 : 0
+      if (job?.stretch) {
+        // (finishing up: both arms up over the head in a long stretch, swaying a little)
+        hand.position.set(sd * 0.16, 0.95 + Math.sin(t * 1.6) * 0.03, 0.02)
+        hand.rotation.x = 0
+      }
       if (job?.prep) {
         // (working at the board: both hands down in front, the knife hand cutting, the other holding it)
         hand.position.set(sd * 0.12, 0.3 + (sd > 0 ? Math.abs(Math.sin(t * 11)) * 0.05 : 0), 0.3)

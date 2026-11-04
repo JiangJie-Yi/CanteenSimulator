@@ -13,6 +13,9 @@ import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
+import { delayOf, paceOf } from '@/game/commute'
+import { makeTrip, through, tripStep, type Trip } from './commuteWalk'
+import { StaffWords } from './StaffWords'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { Omamori } from './Omamori'
@@ -230,9 +233,54 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     pos: home.clone(), yaw: 0, check: 0, done: false })
   const [moving, setMoving] = useState(false)
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stocker?: typeof st }).__stocker = st
+  // (his walk in as the shop opens and home as it shuts (commuteWalk): out along the side counter's aisle, round the corner, to the front door)
+  const cm = useRef<{ trip: Trip | null; arrived: boolean }>({ trip: null, arrived: false })
+  useEffect(() => () => { SHOP.walking.delete(who.id) }, [who.id])
   useFrame((_, dt0) => {
     const dt = Math.min(dt0, 0.1)
     const s = st.current
+    const o = g.current
+    if (o) {
+      const c = cm.current
+      const wayFrom = (from: THREE.Vector3) => {
+        const w = [from.clone(), homeAisle.clone(), aisleCornerOf(counters, c1), doorOf(counters)]
+        return [...w, through(w[w.length - 2], w[w.length - 1], 0.5)]
+      }
+      const apply = (tr: Trip) => {
+        const pose = tripStep(tr, dt, 1.0, (v) => (o.parent ? o.parent.localToWorld(v.clone()) : v.clone()))
+        s.pos.copy(pose.p)
+        if (pose.yaw !== null) s.yaw = pose.yaw
+        o.position.copy(s.pos)
+        o.rotation.y = s.yaw
+        o.visible = pose.shown
+        o.userData.fade = tr.done ? 1 : pose.vis
+        o.userData.nod = pose.nod
+        o.userData.stretch = pose.stretch
+      }
+      if (!c.arrived) {
+        if (!c.trip) {
+          if (performance.now() - SHOP.openedAt < 4000) c.trip = makeTrip(who.id, 'in', wayFrom(home).reverse(), delayOf(who.id, SHOP.day + 0.5) * 0.8 + 1.2, paceOf(who.id))
+          else c.arrived = true
+        }
+        if (c.trip) {
+          apply(c.trip)
+          if (!c.trip.done) return
+          c.trip = null
+          c.arrived = true
+          s.pos.copy(home)
+        }
+      }
+      // (shut: once back from what he was about, finishing up, then home)
+      if (SHOP.leaving) {
+        SHOP.walking.add(who.id)
+        if (s.phase === 'idle' || c.trip) {
+          if (!c.trip) c.trip = makeTrip(who.id, 'out', wayFrom(s.pos), delayOf(who.id, SHOP.day), paceOf(who.id))
+          apply(c.trip)
+          if (c.trip.done) SHOP.walking.delete(who.id)
+          return
+        }
+      }
+    }
     /** along his way, out or back (back: the same way, walked from its end) */
     const walk = () => {
       s.d = Math.min(s.len, s.d + dt * 1.0)
@@ -350,7 +398,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   // (shut, nothing of his left about: no drawer held out, no toilet waiting on him)
   useEffect(() => () => { STOCKER_WC.who = null; STOCKER_WC.near = false; STOCKER_WC.inside = false; DRAWER_HELD.clear() }, [])
   return (
-    <group ref={g} position={home} scale={STAFF_SCALE}>
+    <group ref={g} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id }}>
       <BlobShadow r={0.17} />
       <StaffFigure id={who.id} role="stock" look={who.look} moving={moving} />
       <mesh ref={(o) => { held.current.crate = o }} position={[0, HELD_AT[1] + 0.06, HELD_AT[2]]} visible={false}>
@@ -2264,8 +2312,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** (clearing) the dirty plates they've come for, on their tray once taken; (from the dryer) how many dried plates are on their tray */
     carry?: number[]; stack?: number
     path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number
-    /** their way home once the shop's shut, and how far along it they are */
-    out?: { way: THREE.Vector3[]; len: number; d: number } }[]>([])
+    /** their walk home once the shop's shut, and in as it opens (commuteWalk); whether they're in yet */
+    out?: Trip; in?: Trip; arrived?: boolean }[]>([])
   const waiterObjs = useRef<(THREE.Group | null)[]>([])
   /** the kitchen's plater on their way to the racks for plates, and back with them to the plating place ('idle': at their place in the kitchen,
    * drawn there by Roasting) */
@@ -2939,8 +2987,44 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // its customer; the plates done with, cleared to the sink, their sticks into the bin beside it; washed there into the dish dryer; dried,
     // back to the racks
     const nServers = waiters.current.length
+    /** a server's walk in or out a step on: their place and facing, how much of them shows, their stretch and nod */
+    const walkCommute = (o: THREE.Group, tr: Trip, w: { pos: THREE.Vector3; yaw: number }) => {
+      const pose = tripStep(tr, Math.min(dt, 0.1), 1.1, (v) => (o.parent ? o.parent.localToWorld(v.clone()) : v.clone()))
+      w.pos.copy(pose.p)
+      if (pose.yaw !== null) w.yaw = pose.yaw
+      o.position.copy(w.pos)
+      o.rotation.y = w.yaw
+      o.visible = pose.shown
+      o.userData.fade = tr.done ? 1 : pose.vis
+      o.userData.nod = pose.nod
+      o.userData.stretch = pose.stretch
+      if (KITCHEN_DROP < 0) {
+        const d = w.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
+        if (a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]) o.position.y += -KITCHEN_DROP / scale
+      }
+    }
     waiters.current.forEach((w, wi) => {
       const home = homeOf(wi)
+      // (coming in as the shop opens: in at the front door, along the aisle and through their gate to their place, each at their own
+      // moment, unseen before it; no work till they're there)
+      if (!ownerServes && !w.arrived) {
+        const o = waiterObjs.current[wi], id = servers[wi]?.id ?? `server${wi}`
+        if (!w.in) {
+          if (o && performance.now() - SHOP.openedAt < 4000) {
+            const way = [home.at.clone(), ...home.way.slice(1).map((v) => v.clone()), ...(home.counter ? [aisleCorner(counters[home.counter])] : []), doorOf(counters)]
+            way.push(through(way[way.length - 2], way[way.length - 1], 0.5))
+            w.in = makeTrip(id, 'in', way.reverse(), delayOf(id, SHOP.day + 0.5) * 0.8 + 0.8, paceOf(id))
+          } else w.arrived = true
+        }
+        if (w.in && o) {
+          walkCommute(o, w.in, w)
+          if (!w.in.done) return
+          w.in = undefined
+          w.arrived = true
+          w.pos.copy(home.at)
+          w.yaw = home.yaw
+        }
+      }
       const duty = ownerServes ? 'all' : dutyOf(wi, nServers)
       const trayAt = () => w.pos.clone().add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE)
         .applyAxisAngle(UP_Y, w.yaw))
@@ -3181,21 +3265,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const o = waiterObjs.current[wi]
       if (ownerServes) OWNER_OUT.on = w.phase !== 'idle'
       if (o && SHOP.leaving && !ownerServes) {
-        // (the shop's shut and empty: out through their gate, along the aisle (round the corner from the side counter's) and through the
-        // front door, as the customers go, and gone)
+        // (the shop's shut and empty: finishing up a moment where they are, then out through their gate, along the aisle (round the corner
+        // from the side counter's) to the front door, a nod back in, and through it fading, as the customers go (commuteWalk))
+        const id = servers[wi]?.id ?? `server${wi}`
         if (!w.out) {
           const h = homeOf(wi)
           const way = [w.pos.clone(), ...h.way.slice(1).map((v) => v.clone()), ...(h.counter ? [aisleCorner(counters[h.counter])] : []), doorOf(counters)]
-          w.out = { way, len: pathLength(way), d: 0 }
+          way.push(through(way[way.length - 2], way[way.length - 1], 0.5))
+          w.out = makeTrip(id, 'out', way, delayOf(id, SHOP.day), paceOf(id))
+          SHOP.walking.add(id)
         }
-        const out = w.out
-        out.d = Math.min(out.len, out.d + Math.min(dt, 0.1) * 1.1)
-        const { p, dir } = alongPath(out.way, out.d)
-        w.pos.copy(p)
-        if (dir.x || dir.z) w.yaw = Math.atan2(dir.x, dir.z)
-        o.position.copy(w.pos)
-        o.rotation.y = w.yaw
-        o.visible = out.d < out.len - 0.12
+        walkCommute(o, w.out, w)
+        if (w.out.done) SHOP.walking.delete(id)
       } else if (o) {
         w.out = undefined
         // (the owner's figure here only while he's out: at his place, Roasting draws him)
@@ -3421,6 +3502,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       ))}
       <Later stage={3}>
       {given && fridges && stocker && <Stocker counters={counters} fridges={fridges} who={stocker} />}
+      {/* (what the staff and the owner say as the day ends and begins, over their heads) */}
+      {given && <StaffWords />}
       {ownerServes && (
         <group ref={(o) => {
           const was = waiterObjs.current[0]
@@ -3438,7 +3521,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (was && was !== o) KITCHEN_FOLK.delete(was)
           waiterObjs.current[i] = o
           if (o) KITCHEN_FOLK.add(o)
-        }} position={homes[i].at} rotation-y={homes[i].yaw} scale={STAFF_SCALE}>
+        }} position={homes[i].at} rotation-y={homes[i].yaw} scale={STAFF_SCALE} userData={{ staffId: w.id }}>
           <BlobShadow r={0.17} />
           <StaffFigure id={w.id} role="server" look={w.look} moving={!!moving[i]} />
         </group>

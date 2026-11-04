@@ -99,6 +99,8 @@ export const meterWater = (u: Use, n = 1) => { UTILITY.uses[u] = (UTILITY.uses[u
 export const CUBBY_OPEN = { left: false, right: false }
 /** when the chef last reached into each fridge under the cook table (performance.now()): its doors open part way for him a moment */
 export const CUBBY_KICK = { left: -1e9, right: -1e9 }
+/** the staff door held open till then (performance.now()): one of the staff going up or coming down the stair behind it */
+export const STAFF_DOOR_HOLD = { until: -1e9 }
 export const TISSUES_KEY = 'jgs-tissues-1'
 /** each place's box of tissues (sheets left; game/tissues): a customer takes a few as they finish, the owner one at a time from the
  * drawer; swapped for a full box from the spares before each opening (App); kept in the browser */
