@@ -62,6 +62,9 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 export const BOSS_FX = { hover: false, glowAt: -1e9, joyAt: -1e9 }
 const GLOW = new THREE.Color('#ffb648')
 const GLOW_LINE = new THREE.Color('#ffd24a')
+/** the drink in his hand: its foot a little under his fist, a touch forward of it (the body's frame); and a scratch vector for the hand */
+const DRINK_IN_PALM = new THREE.Vector3(0, -0.05, 0.015)
+const HAND_AT = new THREE.Vector3()
 export const BOSS_DRINK = { at: null as THREE.Vector3 | null, id: null as DrinkId | null, item: null as unknown, arrived: false, since: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossDrink?: typeof BOSS_DRINK }).__bossDrink = BOSS_DRINK
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossFx?: typeof BOSS_FX }).__bossFx = BOSS_FX
@@ -205,6 +208,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     talk: root.getObjectByName('BossTalk'),
     eyes: root.getObjectByName('BossEyes'),
   }), [root])
+  /** where his right hand is really drawn, in the hand bone's own frame (worked out once): the bone's origin isn't at the hand (he's one
+   * skinned mesh, his parts' vertices hung from their bones some way off), so what he holds hangs from this */
+  const palm = useRef<THREE.Vector3 | null>(null)
   const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0, y: 0, vy: 0, ground: 0, probeAt: -1, probeX: 0, probeZ: 0, probeEdit: false })
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
@@ -523,8 +529,15 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       if (act === 'drink') {
         const u = T - BOSS_DRINK.since
         const up = Math.min(1, u / 0.4) * (1 - Math.max(0, Math.min(1, (u - 3.4) / 0.6)))
-        drinkRef.current.position.copy(hand).add(new THREE.Vector3(0, -0.04, 0.02))
-        drinkRef.current.rotation.x = -up * 1.9
+        // (in his right hand, where the hand really is (the hand's place in the model's own units was a body's width off it, up in his
+        // head: he drank from an empty hand, the owner saw); stood in his palm, tipped back toward his mouth some 55 degrees as he drinks)
+        const dr = drinkRef.current
+        if (parts.handR && dr.parent) {
+          parts.handR.updateWorldMatrix(true, false)
+          palm.current ??= drawnCentre(root, parts.handR)
+          dr.position.copy(dr.parent.worldToLocal(parts.handR.localToWorld(HAND_AT.copy(palm.current)))).add(DRINK_IN_PALM)
+        } else dr.position.copy(hand).add(DRINK_IN_PALM)
+        dr.rotation.x = -up * 0.95
       }
     }
     if (parts.tongs) {
@@ -581,12 +594,33 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
         </Html>
       )}
       <group ref={body}><primitive object={root} />
-        <group ref={drinkRef} visible={false}>{drinkId && <DrinkBottle id={drinkId} wet />}</group>
+        <group ref={drinkRef} name="boss-drink-held" visible={false}>{drinkId && <DrinkBottle id={drinkId} wet />}</group>
       </group>
     </group>
   )
 }
 
+/** the middle of the vertices a bone carries as they're drawn, in the bone's own frame (a rigidly skinned figure: each vertex one bone's) */
+function drawnCentre(root: THREE.Object3D, bone: THREE.Object3D) {
+  let sm: THREE.SkinnedMesh | null = null
+  root.traverse((o) => { const m = o as THREE.SkinnedMesh; if (!sm && m.isSkinnedMesh && m.skeleton.bones.includes(bone as THREE.Bone)) sm = m })
+  const out = new THREE.Vector3()
+  if (!sm) return out
+  const m = sm as THREE.SkinnedMesh
+  m.updateWorldMatrix(true, false)
+  m.skeleton.update()
+  const bi = m.skeleton.bones.indexOf(bone as THREE.Bone), si = m.geometry.attributes.skinIndex, pos = m.geometry.attributes.position
+  const v = new THREE.Vector3()
+  let n = 0
+  for (let i = 0; i < pos.count; i++) {
+    if (si.getX(i) !== bi) continue
+    v.fromBufferAttribute(pos, i)
+    m.applyBoneTransform(i, v)
+    out.add(v.applyMatrix4(m.matrixWorld))
+    n++
+  }
+  return n ? bone.worldToLocal(out.divideScalar(n)) : out
+}
 /** whether a mesh is something to stand on: shown (it and all above it), not see-through or a shadow, not part of him, not the editor's handles */
 /** whether a mesh's material is something to stand on: not a shadow (the floor's shadow-catching sheet, blob shadows and other see-through
  * decals laid over things), not unseen */
