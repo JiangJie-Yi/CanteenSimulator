@@ -223,7 +223,7 @@ button {
   box-shadow: 0 0 12px rgb(232 116 42 / 0.6);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .ai-toggle {
     top: 14px;
     right: 108px;
@@ -907,7 +907,7 @@ button {
   background: color-mix(in srgb, var(--washi) 75%, transparent);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .view-reset {
     left: 14px;
     bottom: 14px;
@@ -965,7 +965,7 @@ button {
   flex: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .fullness {
     top: 146px;
     left: 14px;
@@ -977,7 +977,7 @@ button {
   }
 }
 
-@media (max-height: 520px) and (orientation: landscape) {
+@media (max-height: 499px) and (orientation: landscape) {
   .fullness {
     top: 116px;
   }
@@ -1394,7 +1394,7 @@ button {
 /* side-by-side layouts: if the window is too short for the whole menu it scrolls, and its top and bottom
    fade out rather than slicing tags off at the window edge (the fade sits in the menu's padding, so nothing
    is dimmed when everything fits) */
-@media (min-width: 901px) {
+@media (min-width: 600px) {
   .menu {
     max-height: 100vh;
     box-sizing: border-box;
@@ -1446,7 +1446,7 @@ button {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .app {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
@@ -1597,7 +1597,7 @@ button {
   }
 }
 
-@media (max-height: 520px) and (orientation: landscape) {
+@media (max-height: 499px) and (orientation: landscape) {
   .app {
     grid-template-columns: minmax(0, 1fr) minmax(0, 46vw);
     grid-template-rows: minmax(0, 1fr);
@@ -1794,7 +1794,7 @@ button {
 
 /* side by side (desktop and tablets): the stage always keeps at least half the width; the menu shrinks its tags
    to fit the other half (10 tag columns of 2.7em, plus gaps, the title and padding) */
-@media (min-width: 901px) and (min-height: 521px) {
+@media (min-width: 600px) and (min-height: 500px) {
   /* side by side: the food gets 60% of the width, the menu 40% (tags shrink to fit it). Folded away by its tab, the menu only slides off and
      the stage keeps its 60%, so the picture stays just where it was (the owner's: the view is framed on the stage, and the stage widening
      slid the whole room 20% across); edit mode and a shop not yet opened give the stage the whole width */
@@ -1956,7 +1956,7 @@ button {
   }
 }
 
-@media (max-width: 900px), (max-height: 520px) {
+@media (max-width: 599px), (max-height: 499px) {
   .menu-fold {
     display: none;
   }
@@ -1968,7 +1968,7 @@ button {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .menu {
     --tag-font: 15px;
   }
@@ -1985,7 +1985,7 @@ button {
   }
 }
 
-@media (max-height: 520px) and (orientation: landscape) {
+@media (max-height: 499px) and (orientation: landscape) {
   .menu {
     --tag-font: 11.5px;
   }
@@ -2025,7 +2025,7 @@ button {
   outline: 3px solid var(--moss);
   outline-offset: 3px;
 }
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .speed-toggle {
     top: 14px;
     right: 156px;
@@ -2090,7 +2090,7 @@ button {
   outline-offset: 3px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .lang-toggle {
     top: 14px;
     right: 62px;
@@ -2100,7 +2100,7 @@ button {
   }
 }
 
-@media (max-height: 520px) and (orientation: landscape) {
+@media (max-height: 499px) and (orientation: landscape) {
   .lang-toggle {
     top: 10px;
     right: 54px;
@@ -2134,7 +2134,7 @@ button {
   mask-image: radial-gradient(farthest-side at 58% 50%, #000 42%, rgb(0 0 0 / 0.55) 68%, transparent 100%);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .menu, .menu-backing { grid-area: 2 / 1; }
 
   .menu-backing::before {
@@ -2144,7 +2144,7 @@ button {
   }
 }
 
-@media (max-height: 520px) and (orientation: landscape) {
+@media (max-height: 499px) and (orientation: landscape) {
   .menu, .menu-backing { grid-area: 1 / 2; }
 
   .menu-backing::before {
@@ -2286,7 +2286,7 @@ button {
   color: var(--text-soft);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .side-boards {
     top: 64px;
     right: 10px;
@@ -2605,7 +2605,7 @@ button {
 }
 /* phones held upright: the menu tags wrap into rows and the menu scrolls down (a finger swipe), instead of a
    single row paged sideways; a peek of the next row and a fade at the bottom show there's more */
-@media (max-width: 900px) and (orientation: portrait) {
+@media (max-width: 599px) and (orientation: portrait) {
   .menu .strips {
     grid-auto-flow: row;
     grid-template-columns: repeat(auto-fill, 44px);
@@ -2640,7 +2640,7 @@ button {
   display: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   /* the guest board and the books fold into one chip at the top; tapped, they open over the scene */
   .boards-chip {
     display: flex;
@@ -2734,7 +2734,7 @@ button {
 }
 
 /* upright phones: shorter tags, one row in view and the rest a swipe down, so the 3D view gets the space */
-@media (max-width: 900px) and (orientation: portrait) {
+@media (max-width: 599px) and (orientation: portrait) {
   .menu .strips {
     grid-auto-rows: 176px;
     max-height: 206px;
@@ -2766,7 +2766,7 @@ button {
 }
 /* ---- upright phones: the menu below takes at most 40% of the screen, and folds away with the tab on its top
    edge (the 3D view then gets the whole screen) ---- */
-@media (max-width: 900px) and (orientation: portrait) {
+@media (max-width: 599px) and (orientation: portrait) {
   .menu {
     height: 40vh;
     height: 40dvh;
@@ -2833,7 +2833,7 @@ button {
   }
 }
 
-@media (max-width: 900px) and (orientation: portrait) {
+@media (max-width: 599px) and (orientation: portrait) {
   .menu-fold span {
     display: inline-block;
     transform: rotate(90deg);
@@ -2870,7 +2870,7 @@ button {
   50% { box-shadow: 0 0 10px 4px rgb(255 230 140 / 0.7); }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .ai-toggle {
     min-width: 58px;
     padding: 0 10px;
@@ -3070,7 +3070,7 @@ button {
   font-size: 18px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .ai-toggle {
     width: 40px;
     font-size: 16px;
@@ -3106,7 +3106,7 @@ button {
 }
 
 /* phones: the round switches fold into one ☰ button that opens them in a column */
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .tools-toggle {
     display: grid;
     place-items: center;
@@ -3167,7 +3167,7 @@ button {
 }
 
 /* touch screens swipe between dishes: no arrows needed */
-@media (max-width: 900px) and (hover: none) {
+@media (max-width: 599px) and (hover: none) {
   .switcher-arrow {
     display: none;
   }
@@ -3298,7 +3298,7 @@ button {
   color: #7a6656;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .notebook-toggle {
     top: 196px;
     left: 16px;
@@ -3570,7 +3570,7 @@ button {
   color: #2f7a2d;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .office-toggle {
     top: 196px;
     left: 20px;
@@ -3741,7 +3741,7 @@ button {
   z-index: 40;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .office {
     top: 64px;
     max-height: 56vh;
@@ -4396,7 +4396,7 @@ button {
   flex: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .ofc-list li {
     grid-template-columns: 20px 1fr 64px 44px 44px;
   }
@@ -5394,7 +5394,7 @@ button {
   50% { opacity: 0.4; }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .auto-toggle {
     top: 238px;
     left: 20px;
@@ -5554,7 +5554,7 @@ button {
   --hang: 10px;
   top: 6px;
 }
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .brand.brand-grilledfish {
     --hang: 9px;
     top: 4px;
@@ -6145,7 +6145,7 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
 .fridge-toggle:hover svg { transform: translateY(-1px) scale(1.06); }
 .fridge-toggle.is-on svg { fill: #bfe6ff; stroke: #1d5e8a; }
 .fridge-toggle:focus-visible { outline: 3px solid var(--moss); outline-offset: 3px; border-radius: 8px; }
-@media (max-width: 900px) {
+@media (max-width: 599px) {
   .fridge-toggle { top: 14px; right: 260px; width: 40px; height: 40px; }
 }
 @media (max-width: 400px) {
@@ -6689,7 +6689,7 @@ html[lang='en'] .heat-label { font-size: 13px; }
 
 /* ---- the top left: the fire (the grill's view) and the owner's hunger (his view) take the rows over the office and auto buttons; with one
    of them shown the buttons move up a row, with none up to the top (on a wide screen; narrow ones lay these out their own way) ---- */
-@media (min-width: 901px) {
+@media (min-width: 600px) {
   .office-toggle, .auto-toggle { transition: margin-top 0.3s ease; }
   .hud-rows-1 .office-toggle, .hud-rows-1 .auto-toggle { margin-top: -62px; }
   .hud-rows-0 .office-toggle, .hud-rows-0 .auto-toggle { margin-top: -152px; }
@@ -6730,7 +6730,7 @@ html[lang='en'] .heat-label { font-size: 13px; }
    the two as they were, the cash in 經營 ---- */
 .money-chip { display: none; }
 .auto-toggle .auto-short { display: none; }
-@media (min-width: 901px) {
+@media (min-width: 600px) {
   .app .office-toggle,
   .app .auto-toggle {
     position: fixed;
@@ -6850,7 +6850,7 @@ html[lang='en'] .heat-label { font-size: 13px; }
 /* ---- the panels that open over the room, docked at the right as the pantry is (one at a time: App shuts the others), each with its name
    standing upright beside it as the pantry's 食材 does ---- */
 .dock-title { display: none; }
-@media (min-width: 901px) {
+@media (min-width: 600px) {
   .office,
   .drink-stock {
     left: auto;
@@ -6909,7 +6909,7 @@ html[lang='en'] .heat-label { font-size: 13px; }
 
 /* ---- on a wide screen the cash is the way into the office (the books first): no 經營 button beside it; the cash a pane of frosted glass
    (phones keep their 經營 button: the cash isn't shown on its own there) ---- */
-@media (min-width: 901px) {
+@media (min-width: 600px) {
   .app .office-toggle { display: none; }
   .money-chip { right: 228px; }
   .fridge-toggle { right: 228px; }
@@ -7016,7 +7016,7 @@ html[lang='en'] .menu-title-en { display: none; }
 
 /* ---- the stock panel (shops/grill/StockPanel): everything kept, from the little fridge top right at any time; five tabs under its header
    (the freezer, the fridge, the larder, the drinks, the supplies), a red count on a tab with something out ---- */
-@media (min-width: 901px) { .drink-stock.stock-panel { width: 520px; } }
+@media (min-width: 600px) { .drink-stock.stock-panel { width: 520px; } }
 .stock-tabs { display: flex; gap: 2px; padding: 6px 8px 0; background: linear-gradient(180deg, #3a4858, #33404e); }
 .stock-tab {
   position: relative;
