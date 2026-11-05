@@ -2348,7 +2348,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
           set apart); the women's its bamboo vase of camellia) */}
       {who === 'm' && (
         <Movable id="wc2-m-moss" label="苔玉（男廁）"><StaticBatch plain>
-          <group position={[D - 0.14, 0.764, -0.19]}>
+          <group position={[D - 0.14, 0.764, 0.19]}>
             <mesh position-y={0.008}><cylinderGeometry args={[0.05, 0.04, 0.016, 12]} /><meshToonMaterial color="#2c2a28" /></mesh>
             <mesh position-y={0.048} scale={[1, 0.9, 1]}><icosahedronGeometry args={[0.04, 1]} /><meshToonMaterial color="#4c6e34" /></mesh>
             {[0, 2.1, 4.2].map((a) => (
@@ -2362,9 +2362,9 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       )}
       {who === 'f' && <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}><StaticBatch plain>
       {/* (a bamboo vase of camellia on the washstand's counter, beside the bowl) */}
-      {/* (clear of the counter's back rail: it stood 2 mm into it (clips.mjs)); on the bowl's left as the men's moss ball is, the soap on
-          its right, the two washstands the same way round (the owner's; mirrored for a while, they read as turned about) */}
-      <group position={[D - 0.14, 0.764, -0.19]}>
+      {/* (clear of the counter's back rail: it stood 2 mm into it (clips.mjs)); on the bowl's right as the men's moss ball is, the soap on
+          its left (the owner's: swapped), the two washstands the same way round (mirrored for a while, they read as turned about) */}
+      <group position={[D - 0.14, 0.764, 0.19]}>
         <mesh geometry={WC_GEO.pot} position-y={0.05}><meshToonMaterial color="#b8a060" /></mesh>
         {/* (its nodes: each ring lying round the tube (they stood upright, cutting through it in a jagged dark seam down its side), a little
             its inside just clear of it where it is (it tapers, 0.026 at its foot to 0.03 at its top)) */}

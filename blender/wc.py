@@ -543,7 +543,8 @@ def washstand():
         o.parent = handle
         o.matrix_world = mw
     # ---- the soap bottle, celadon, a brass pump on it
-    sx, sz = -0.1, 0.215
+    # (on the bowl's left, the plant on its right (the owner's: swapped))
+    sx, sz = -0.1, -0.215
     fin(lathe_oval("WashSoapBottle", [(0.0, T), (0.026, T), (0.03, T + 0.008), (0.031, T + 0.058), (0.027, T + 0.078), (0.013, T + 0.09),
                                       (0.012, T + 0.098), (0.0, T + 0.098)], 1, 1, 16, sx, sz), "WashSoapBottle", M["celadon"], parts)
     bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.007, depth=0.02, location=P(sx, T + 0.106, sz))
