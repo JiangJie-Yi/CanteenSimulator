@@ -28,6 +28,9 @@ import { crewFaceSheet, faceRange, glassesSheet, markFace, ownShape, setFace, sq
  */
 const URL = import.meta.env.BASE_URL + 'models/boss.glb'
 /** the small parts: no ink line round them */
+/** the head and what's on it, which take no shadow (as the customers' don't): the face's and the glasses' patches are see-through
+ * rectangles off the face, and the shadow pass (no alphaTest: they're hashed) cast them whole, black blocks over the eyes (the owner saw) */
+const HEAD = /^Boss(Head|Face|Glass|Nose|Moustache|Ear|Hair|Tenugui|Knot|Sideburn|Comb|Cap|Pencil)/
 const UNINKED = /(Face|Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan|Sideburn|Pencil|Pin|Towel)/
 let made: THREE.Object3D | null = null
 
@@ -136,7 +139,7 @@ function styledBoss(scene: THREE.Group) {
     for (const m of meshes) {
       mat = m.material as THREE.Material
       if (m.name === 'BossFace') face = pieces.length
-      pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: boneOf(m), inked: !UNINKED.test(m.name) })
+      pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: boneOf(m), inked: !UNINKED.test(m.name), shadowless: HEAD.test(m.name) })
       m.removeFromParent()
       m.geometry.dispose()
     }

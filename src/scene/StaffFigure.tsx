@@ -32,6 +32,9 @@ const variantOf = (role: Role, female: boolean): Variant =>
   role === 'chef' || role === 'sous' ? (female ? 'chefF' : 'chef') : role === 'stock' ? 'stock' : female ? 'serverF' : 'server'
 
 /** the small parts: no ink line round them */
+/** the head and what's on it, which take no shadow (as the customers' don't): the face's and the glasses' patches are see-through
+ * rectangles off the face, and the shadow pass (no alphaTest: they're hashed) cast them whole, black blocks over the eyes (the owner saw) */
+const HEAD = /^Boss(Head|Face|Glass|Nose|Moustache|Ear|Hair|Tenugui|Knot|Sideburn|Comb|Cap|Pencil)/
 const UNINKED = /(Face|Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|Thumb|Glass|Hem|Fan|Comb|Towel|Sideburn)/
 /** where a server's tray is held, and the stock keeper's clipboard: on the hands, out in front of the belly (the figure's frame) */
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
@@ -119,7 +122,7 @@ function build(scene: THREE.Group, v: Variant): Built {
     if (part === 'drop' || (part === 'fan' && !holds.includes('fan'))) return
     if (m.name === 'BossFace') face = pieces.length
     pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: BONES.indexOf(part),
-      inked: !UNINKED.test(m.name), flat: !!m.userData.flat, tint: m.userData.tint })
+      inked: !UNINKED.test(m.name), flat: !!m.userData.flat, shadowless: HEAD.test(m.name), tint: m.userData.tint })
   })
   for (const h of heldPieces()) {
     if (holds.includes(h.part)) pieces.push({ geo: h.geo, bone: BONES.indexOf(h.part) })
