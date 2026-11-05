@@ -20,7 +20,9 @@ export const StaffWords = memo(function StaffWords() {
       const now = performance.now()
       for (let i = STAFF_TALK.length - 1; i >= 0; i--) if (STAFF_TALK[i].until < now) STAFF_TALK.splice(i, 1)
       // (one bubble a speaker: a newer word takes an older one's place, never two stacked over one head)
-      for (let i = STAFF_TALK.length - 1; i >= 0; i--) if (STAFF_TALK.findIndex((w, k) => k > i && w.id === STAFF_TALK[i].id) >= 0) STAFF_TALK.splice(i, 1)
+      // (the same person by who they are, not by the id the word was given: the till's words are the owner's when no cashier's hired)
+      const who = (id: string) => SPEAKERS.get(id) ?? id
+      for (let i = STAFF_TALK.length - 1; i >= 0; i--) if (STAFF_TALK.findIndex((w, k) => k > i && who(w.id) === who(STAFF_TALK[i].id)) >= 0) STAFF_TALK.splice(i, 1)
       setWords((was) => (was.length === STAFF_TALK.length && was.every((w, i) => w.key === STAFF_TALK[i].key) ? was : [...STAFF_TALK]))
     }, 250)
     return () => window.clearInterval(t)

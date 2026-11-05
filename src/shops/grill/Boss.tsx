@@ -12,7 +12,7 @@ import { bossLineText, bossSituation, cashLineText, drinkLineText, munchLineText
 import { DrinkBottle } from './DiningRoom'
 import { gulpSound } from './chewSound'
 import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_OUT, type DrinkId } from './bar'
-import { RUSH, SPEAKERS } from '@/game/shopState'
+import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
 import { crewFaceSheet, faceRange, glassesSheet, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
 
 /**
@@ -212,6 +212,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     let n = 0
     let h = 0
     const next = () => {
+      // (one bubble over him at a time (the owner's): while he's saying something to the shop (a greeting, a welcome: STAFF_TALK), his
+      // muttering waits)
+      if (STAFF_TALK.some((w) => (w.id === 'owner' || SPEAKERS.get(w.id) === SPEAKERS.get('owner')) && w.until > performance.now())) { h = window.setTimeout(next, 800); return }
       const s = bossSituation(document.documentElement.dataset.theme === 'dark', open)
       const i = nextBossLine(s, last?.s === s ? last.i : null, Math.random())
       last = { s, i }
@@ -597,6 +600,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     // satisfied "ha" between gulps, munching as he tastes, alarm as a customer complains of the wait (RUSH), proud at the till's money), a
     // moment's face asked for over it (BOSS_FACE); while a line's up over his head his mouth flaps open and shut in syllables; a blink every
     // few seconds, now and then twice
+    // (a word to the shop over his head now (a greeting, a welcome): his muttering's bubble gives way, one bubble at a time)
+    if (sayRef.current && STAFF_TALK.some((w) => (w.id === 'owner' || SPEAKERS.get(w.id) === SPEAKERS.get('owner')) && w.until > performance.now())) { sayRef.current = null; setSay(null) }
     const talking = !!sayRef.current
     const now = performance.now()
     const gape = talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2

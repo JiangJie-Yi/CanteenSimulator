@@ -27,3 +27,4 @@ export const setTip = (t: Tip) => {
   subs.forEach((f) => f())
 }
 export const useTip = () => useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f) } }, () => tip)
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __tip?: typeof setTip }).__tip = setTip

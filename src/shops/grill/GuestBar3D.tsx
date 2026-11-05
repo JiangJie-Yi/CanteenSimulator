@@ -3968,9 +3968,11 @@ const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, p
   return (
     <Html position={at} center zIndexRange={LABEL_Z} style={LABEL_STYLE}>
       <div className="g3-label" ref={(el) => onEl(id, el)}>
-        {say ? <Say key={say.key} text={say.text} who={`#${id} ${name}`} /> : dots && <span className="g3-bubble">…</span>}
+        {/* (a bubble only while there's something to say (the owner's): a line, or the dots of waiting to order; their kind over it in
+            yellow, no number; nothing at all over someone just sitting there, not even their name) */}
+        {say ? <Say key={say.key} text={say.text} who={`${partner ? '♥ ' : ''}${name}`} />
+          : dots && <span className="g3-bubble"><b className="say-who">{partner ? '♥ ' : ''}{name}</b>…</span>}
         {rating !== null && <MoodFace guest={{ rating, state: angry ? 'angry' : 'done' }} />}
-        {!say && <span className="g3-name">{partner && <i className="g3-heart">♥</i>}{name}</span>}
       </div>
     </Html>
   )
