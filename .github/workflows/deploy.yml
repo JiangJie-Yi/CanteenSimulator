@@ -20,9 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        # (the whole history: the game's version counts the commits, vite.config.ts)
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -30,7 +27,10 @@ jobs:
       - run: npm ci
       # (a failing test stops the deploy)
       - run: npm test
+      # (the game's version: up 0.01 with every push, from this workflow's run number, vite.config.ts)
       - run: npm run build
+        env:
+          GAME_RUN: ${{ github.run_number }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

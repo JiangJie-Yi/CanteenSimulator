@@ -1,5 +1,4 @@
 import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
@@ -39,15 +38,20 @@ function blenderBridge(): Plugin {
   }
 }
 
-/** the version the game shows: <gameVersion's whole part>.<commit count> (<short hash>), or package.json's gameVersion where there's no
- * git to ask (the build on GitHub fetches the whole history for it: deploy.yml's fetch-depth 0) */
+/** the version the game shows (the owner's: v0.01 to start, up 0.01 with every push to main): on GitHub, the deploy's run number (it goes
+ * up one with each push, deploy.yml's GAME_RUN) counted from the push that was v0.01 (run 256); here, where nothing's been pushed yet,
+ * "dev" and the commit it's built from */
+const FIRST_RUN = 255
 function gameVersion() {
-  const base = String(JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).gameVersion ?? '0')
+  const run = Number(process.env.GAME_RUN)
+  if (run > FIRST_RUN) {
+    const n = run - FIRST_RUN
+    return `${Math.floor(n / 100)}.${String(n % 100).padStart(2, '0')}`
+  }
   try {
-    const git = (a: string) => execSync(`git ${a}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
-    return `${base.split('.')[0]}.${git('rev-list --count HEAD')} (${git('rev-parse --short HEAD')})`
+    return `dev (${execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()})`
   } catch {
-    return base
+    return 'dev'
   }
 }
 
@@ -58,8 +62,7 @@ const REPO = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'JapaneseGrillSimul
 export default defineConfig(({ command, isPreview }) => ({
   base: command === 'build' || isPreview ? `/${REPO}/` : '/',
   plugins: [react(), blenderBridge()],
-  // (the game's version, shown on the about tab: it moves on with every commit by itself (the owner's: v0.01 stood still whatever was
-  // pushed): package.json's gameVersion's whole part, then how many commits there are, and the commit it was built from)
+  // (the game's version, shown on the about tab: up 0.01 with every push to main, gameVersion above)
   define: { __GAME_VERSION__: JSON.stringify(gameVersion()) },
   // (the same alias as tsconfig.app.json's paths)
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
