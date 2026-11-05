@@ -6126,22 +6126,27 @@ function RiceSacks() {
   const obj = useMemo(() => {
     const r = gltf.scene.getObjectByName('RiceSacks')!.clone(true)
     r.position.set(0, 0, 0)
-    let mat: THREE.Material | null = null
+    // (the sacks' printed cloth one material; the open sack's inside, its rice and the wooden measure in it their own)
+    const made = new Map<string, THREE.Material>()
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let mat = made.get(src.name)
       if (!mat) {
-        const src = m.material as THREE.MeshStandardMaterial
         // (the print's top toward the sack's far side, reading along its length from the room (flipped as a canvas is, unlike a glTF's own
         // pictures: kept glTF's way it came out mirrored))
-        const t = riceSackPrint((src.map?.image as CanvasImageSource | undefined) ?? null)
-        mat = new THREE.MeshToonMaterial({ color: '#ffffff', map: t })
+        mat = src.name === 'RiceSack'
+          ? new THREE.MeshToonMaterial({ color: '#ffffff', map: riceSackPrint((src.map?.image as CanvasImageSource | undefined) ?? null) })
+          : new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, side: src.name === 'RiceSackInside' || src.name === 'RiceMasu' ? THREE.DoubleSide : THREE.FrontSide })
+        made.set(src.name, mat)
       }
       m.material = mat
       m.castShadow = true
       m.receiveShadow = true
     })
-    inkModel(r, () => false, { width: 0.004, weld: true })
+    // (the rice and the cloth's inside aren't outlined: the rice is seen down into the sack, its rim tucked under the cuff)
+    inkModel(r, (m) => /RiceSackRice|RiceSackIn$|RiceMasuRice/.test(m.name), { width: 0.004, weld: true })
     plainColours(r)
     return mergeByMaterial(r)
   }, [gltf])

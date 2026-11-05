@@ -2202,7 +2202,7 @@ const IN_SINK = 0.78
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
 const WASH_EACH = 0.5
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
-const KITCHEN_BLOCKS = new Set(['ricetub', 'misopot', 'hagama', 'freezer', 'platerack', 'platerack2', 'sink', 'sink-bin', 'produce', 'coalsack'])
+const KITCHEN_BLOCKS = new Set(['ricetub', 'misopot', 'hagama', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'sink', 'sink-bin', 'produce', 'coalsack'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
@@ -2484,9 +2484,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const waiterObjs = useRef<(THREE.Group | null)[]>([])
   /** the kitchen's plater on their way to the racks for plates, and back with them to the plating place ('idle': at their place in the kitchen,
    * drawn there by Roasting) */
-  // (and the kitchen's rice (game/rice): to the sink to wash a pot's worth, to the stove to set it on ('toSink', 'wash', 'toKama', 'load'); cooked,
+  // (and the kitchen's rice (game/rice): to the open sack of rice to scoop a pot's worth ('toSack', 'scoopRaw'), to the sink to wash it, to the
+  // electric cooker to set it on ('toSink', 'wash', 'toKama', 'load'); cooked,
   // to the stove to scoop it out and to the tub with it ('toCooked', 'scoop', 'toTub', 'fill'))
-  const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home' | 'toSink' | 'wash' | 'toKama' | 'load' | 'toCooked' | 'scoop' | 'toTub' | 'fill'
+  const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home' | 'toSack' | 'scoopRaw' | 'toSink' | 'wash' | 'toKama' | 'load' | 'toCooked' | 'scoop' | 'toTub' | 'fill'
     t: number; path: THREE.Vector3[]; len: number
     pos: THREE.Vector3; yaw: number; n: number }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
   const platerObj = useRef<THREE.Group | null>(null)
@@ -3145,8 +3146,19 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (r.cooked) onSay?.('chef', LINES[lang].riceDone)
       }
       /** where they stand at the rice pot's stove, and at the rice tub (the same side of it); its top, where the rice goes in and comes out */
-      const kamaSpot = () => { marks.current.delete('kama-front'); return inBar('kama-front', home()).setY(0) }
-      const kamaTop = () => { marks.current.delete('kama-top'); return inBar('kama-top', home()) }
+      const kamaSpot = () => { marks.current.delete('cooker-front'); return inBar('cooker-front', home()).setY(0) }
+      const kamaTop = () => { marks.current.delete('cooker-top'); return inBar('cooker-top', home()) }
+      /** the open sack of rice (by the sake, just past the kitchen's edge): its middle, the kitchen's edge nearest it (the route there), and
+       * where they stand at it, stepped down off the kitchen's floor to it */
+      const sackSpots = () => {
+        marks.current.delete('RiceSackOpenSet')
+        const at = inBar('RiceSackOpenSet', home()).setY(0)
+        const c0 = counters[0], d = at.clone().sub(c0.at)
+        const a = THREE.MathUtils.clamp(d.dot(c0.along), kitchen.along[0] + 0.2, kitchen.along[1] - 0.2)
+        const l = THREE.MathUtils.clamp(d.dot(c0.lay), kitchen.lay[0] + 0.2, kitchen.lay[1] - 0.2)
+        const edge = c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(0)
+        return { at, edge, front: at.clone().add(edge.clone().sub(at).setY(0).setLength(0.34)) }
+      }
       const tubSpot = () => { marks.current.delete('ricetub-mid'); return inBar('ricetub-mid', home()).add(kamaSpot().sub(kamaTop()).setY(0)).setY(0) }
       const faceTo = (v: THREE.Vector3) => { pl.yaw = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z) }
       const setOff = (to: THREE.Vector3, phase: typeof pl.phase) => {
@@ -3170,9 +3182,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             setOff(kamaSpot(), 'toCooked')
             away(true)
           } else if (open && !SHOP.leaving && riceGoes(RICE.tub, RICE.kama) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
-            // (the tub's running low: to the sink to wash the next pot's rice)
+            // (the tub's running low: to the open sack for the next pot's rice, over the kitchen's edge to it, then to the sink to wash it)
             pl.pos.copy(home())
-            setOff(sinkFront(), 'toSink')
+            const sk = sackSpots()
+            pl.path = [...kitchenRoute(pl.pos, sk.edge), sk.front]
+            pl.len = pathLength(pl.path)
+            pl.phase = 'toSack'
+            pl.t = 0
             away(true)
           } else if (open && !SHOP.leaving && platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
             pl.pos.copy(home())
@@ -3213,7 +3229,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.phase = 'idle'
         away(false)
       })
-      else if (pl.phase === 'toSink') walk(() => { pl.phase = 'wash'; RICE.washing = true; faceTo(inBar('SinkBasinFloor', endOf(1))) })
+      else if (pl.phase === 'toSack') walk(() => { pl.phase = 'scoopRaw'; faceTo(sackSpots().at) })
+      else if (pl.phase === 'scoopRaw' && pl.t > SCOOP_S) {
+        // (a pot's worth scooped into the bowl; back up onto the kitchen's floor and to the sink with it)
+        const sk = sackSpots()
+        pl.path = [pl.pos.clone(), sk.edge, ...kitchenRoute(sk.edge, sinkFront()).slice(1)]
+        pl.len = pathLength(pl.path)
+        pl.phase = 'toSink'
+        pl.t = 0
+      } else if (pl.phase === 'toSink') walk(() => { pl.phase = 'wash'; RICE.washing = true; faceTo(inBar('SinkBasinFloor', endOf(1))) })
       else if (pl.phase === 'wash' && pl.t > WASH_S) {
         // (washed, the water run off it, to the stove with it)
         RICE.washing = false
@@ -3234,7 +3258,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         RICE.kama = r.kama
         setOff(home(), 'home')
       }
-      const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'home' || pl.phase === 'toSink' || pl.phase === 'toKama' || pl.phase === 'toCooked' || pl.phase === 'toTub'
+      const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'home' || pl.phase === 'toSack' || pl.phase === 'toSink' || pl.phase === 'toKama' || pl.phase === 'toCooked' || pl.phase === 'toTub'
       if (mv !== platerMoving) setPlaterMoving(mv)
       const o = platerObj.current
       if (o) {
@@ -3242,12 +3266,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.position.copy(pl.pos)
         o.rotation.y = pl.yaw
         // (up on the kitchen's dais)
-        if (KITCHEN_DROP < 0) o.position.y += -KITCHEN_DROP / scale
+        // (up on the kitchen's dais while they're over it: stepped down off it at the rice sack)
+        if (KITCHEN_DROP < 0) {
+          const d = pl.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
+          if (a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]) o.position.y += -KITCHEN_DROP / scale
+        }
       }
       // (the rice in its bowl in their hands: washing it, to the pot with it (going in at 'load'); scooped out of the pot, to the tub with it)
       const pb = platerBowl.current
       if (pb && o) {
-        const holding = ['wash', 'toKama', 'load', 'scoop', 'toTub', 'fill'].includes(pl.phase)
+        const holding = ['scoopRaw', 'toSink', 'wash', 'toKama', 'load', 'scoop', 'toTub', 'fill'].includes(pl.phase)
         pb.visible = holding
         // (both hands out in front, holding it (or the plates))
         o.userData.carry = holding || (pl.n > 0 && pl.phase !== 'idle')
@@ -3255,12 +3283,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const hands = o.position.clone().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
           // (swirled in the water as it's washed)
           if (pl.phase === 'wash') hands.add(new THREE.Vector3(Math.sin(pl.t * 9) * 0.02, -0.03, Math.cos(pl.t * 9) * 0.02))
-          const k = pl.phase === 'load' || pl.phase === 'fill' ? Math.min(1, pl.t / 0.6) : pl.phase === 'scoop' ? Math.min(1, pl.t / SCOOP_S) : 0
-          const over = pl.phase === 'fill' ? inBar('ricetub-mid', hands) : kamaTop()
+          const k = pl.phase === 'load' || pl.phase === 'fill' ? Math.min(1, pl.t / 0.6) : pl.phase === 'scoop' || pl.phase === 'scoopRaw' ? Math.min(1, pl.t / SCOOP_S) : 0
+          const over = pl.phase === 'fill' ? inBar('ricetub-mid', hands) : pl.phase === 'scoopRaw' ? inBar('RiceSackOpenSet', hands).setY(hands.y - 0.1) : kamaTop()
           pb.position.lerpVectors(hands, over, Math.sin(Math.PI * k) * 0.6)
           pb.rotation.z = pl.phase === 'load' || pl.phase === 'fill' ? Math.sin(Math.PI * k) * 1.1 : 0
           const rice = pb.getObjectByName('bowl-rice')
-          if (rice) rice.scale.setScalar(pl.phase === 'load' || pl.phase === 'fill' ? Math.max(0.01, 1 - k) : pl.phase === 'scoop' ? Math.max(0.01, k) : 1)
+          if (rice) rice.scale.setScalar(pl.phase === 'load' || pl.phase === 'fill' ? Math.max(0.01, 1 - k) : pl.phase === 'scoop' || pl.phase === 'scoopRaw' ? Math.max(0.01, k) : 1)
         }
       }
       // (the plates in their hands, out in front of them)

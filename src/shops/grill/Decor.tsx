@@ -16,10 +16,11 @@ import { RICE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSE
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
+import { COOK_S } from '@/game/rice'
 import { PlateRack } from './PlateRack'
 import { SINK_SETS, SinkModel, SinkPart } from './Sink'
 import { CharcoalSack, ProduceSacks } from './KitchenStores'
-import { coolerDoorSound } from './restroomSound'
+import { coolerDoorSound, lightSwitchSound } from './restroomSound'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
@@ -957,59 +958,114 @@ const HAGAMA_URL = import.meta.env.BASE_URL + 'models/hagama.glb'
 useGLTF.preload(HAGAMA_URL)
 const HAGAMA_AT = { along: 4.3, lay: 0.35 }
 const HAGAMA_SCALE = 1.3
-const GLOW_ON = new THREE.Color('#ff8a3a'), GLOW_OFF = new THREE.Color('#2a1a12')
+const GLOW_OFF = new THREE.Color('#2a1a12')
 function Hagama() {
   const gltf = useGLTF(HAGAMA_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const r = gltf.scene.getObjectByName('Hagama')!.clone(true)
     r.position.set(0, 0, 0)
     const made = new Map<THREE.Material, THREE.Material>()
-    const glow = new THREE.MeshBasicMaterial({ color: GLOW_OFF.clone() })
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      // (its fire out: the coals' glow in the mouth dark (the rice is cooked in the electric cooker now, the owner's))
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.name === 'KamaGlow' ? GLOW_OFF.clone() : src.color.clone(), map: src.map ?? null }); made.set(src, t) }
+      m.material = t
+      m.castShadow = src.name !== 'KamaGlow'
+      m.receiveShadow = true
+    })
+    inkModel(r, (m) => m.name === 'KamaGlow', { width: 0.0016, weld: true })
+    plainColours(r)
+    mergeByMaterial(r)
+    return { root: r }
+  }, [gltf])
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const p = new THREE.Vector3().addScaledVector(ALONG, HAGAMA_AT.along).addScaledVector(LAY, HAGAMA_AT.lay)
+  return (
+    <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} scale={HAGAMA_SCALE} {...nameOver('羽釜與爐灶', '老式的炊飯爐灶（現在用電鍋煮飯）')}>
+      <primitive object={model.root} />
+    </group>
+  )
+}
+/**
+ * The electric rice cooker (blender/denkinabe.py: a classic Taiwanese 電鍋, pastel green, stainless lid, its switch lever and lamp at the
+ * front), on a small stand beside the iron pot (the owner's: the rice for the rice balls is cooked in it, scooped from the open sack and
+ * washed at the sink first, game/rice). While it cooks (bar.ts's RICE.kama) its lever is down and its lamp red, it steams from under its
+ * lid and the lid lifts a little as it boils; done, the lever clicks up and the lamp goes amber (keeping warm) till the rice is scooped out
+ * into the tub. Pointed at, it says how it's getting on.
+ */
+const DENKI_URL = import.meta.env.BASE_URL + 'models/denkinabe.glb'
+useGLTF.preload(DENKI_URL)
+const DENKI_AT = { along: 5.05, lay: 0.3 }
+const DENKI_SCALE = 1.3
+const DENKI_TOP = -0.45
+const LAMP_OFF = new THREE.Color('#3a1a14'), LAMP_COOK = new THREE.Color('#ff3a20'), LAMP_WARM = new THREE.Color('#ffb030')
+function DenkiNabe() {
+  const gltf = useGLTF(DENKI_URL) as unknown as { scene: THREE.Group }
+  const stand = useStand()
+  const model = useMemo(() => {
+    const r = gltf.scene.getObjectByName('DenkiNabe')!.clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    const lamp = new THREE.MeshBasicMaterial({ color: LAMP_OFF.clone() })
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
       let t = made.get(src)
       if (!t) {
-        t = src.name === 'KamaGlow' ? glow : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+        // (the stainless rim and lid real metal, the studio in it; the lamp lit by the game; the rest in the room's toon light)
+        if (src.name === 'DenkiLamp') t = lamp
+        else if (src.name === 'DenkiSteel') { const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.85, roughness: 0.28, envMapIntensity: 0.9 }); reflectStudio(g); t = g }
+        else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
         made.set(src, t)
       }
       m.material = t
-      m.castShadow = src.name !== 'KamaGlow'
+      m.castShadow = src.name !== 'DenkiLamp'
       m.receiveShadow = true
     })
-    inkModel(r, (m) => m.name === 'KamaGlow', { width: 0.0016, weld: true })
-    const lid = r.getObjectByName('KamaLid')!
+    inkModel(r, (m) => m.name.startsWith('DenkiLamp'), { width: 0.0016, weld: true })
+    const lid = r.getObjectByName('DenkiLid')!, lever = r.getObjectByName('DenkiLever')!
     plainColours(r)
-    mergeByMaterial(r, (o) => o === lid || o.parent === lid)
-    return { root: r, lid, lidY: lid.position.y, glow }
+    mergeByMaterial(r, (o) => o === lid || o.parent === lid || o === lever || o.parent === lever)
+    return { root: r, lid, lidY: lid.position.y, lever, leverY: lever.position.y, lamp }
   }, [gltf])
   const steam = useRef<THREE.Group>(null)
+  const was = useRef(RICE.kama.state)
   useFrame(({ clock }) => {
     const k = RICE.kama, t = clock.elapsedTime
     const cooking = k.state === 'cooking'
-    // (the coals glowing in the mouth, flickering, while it cooks)
-    model.glow.color.lerpColors(GLOW_OFF, GLOW_ON, cooking ? 0.8 + 0.2 * Math.sin(t * 9) * Math.sin(t * 3.1) : 0)
-    // (boiling hard in the middle of its time: the lid lifting and dropping on the steam)
-    const boil = cooking ? Math.max(0, Math.sin(Math.PI * (1 - k.left / 15))) : 0
-    model.lid.position.y = model.lidY + boil * Math.max(0, Math.sin(t * 23)) * 0.006
-    model.lid.rotation.z = boil * Math.sin(t * 17) * 0.02
+    model.lamp.color.copy(cooking ? LAMP_COOK : k.state === 'done' ? LAMP_WARM : LAMP_OFF)
+    // (the lever down while it cooks; done, it clicks up)
+    model.lever.position.y = model.leverY - (cooking ? 0.014 : 0)
+    if (was.current === 'cooking' && k.state === 'done') lightSwitchSound(true)
+    was.current = k.state
+    // (boiling hard in the middle of its time: the lid lifting a little on the steam)
+    const boil = cooking ? Math.max(0, Math.sin(Math.PI * (1 - k.left / COOK_S))) : 0
+    model.lid.position.y = model.lidY + boil * Math.max(0, Math.sin(t * 19)) * 0.004
     if (steam.current) steam.current.visible = k.state !== 'empty'
   })
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
-  const p = new THREE.Vector3().addScaledVector(ALONG, HAGAMA_AT.along).addScaledVector(LAY, HAGAMA_AT.lay)
-  const say = () => (RICE.kama.state === 'cooking' ? `炊飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒` : RICE.kama.state === 'done' ? '飯炊好了，等著盛進飯桶' : `空著（飯桶裡還有 ${RICE.tub} 份飯）`)
+  const p = new THREE.Vector3().addScaledVector(ALONG, DENKI_AT.along).addScaledVector(LAY, DENKI_AT.lay)
+  const s = stand.clone()
+  const say = () => (RICE.kama.state === 'cooking' ? `煮飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒` : RICE.kama.state === 'done' ? '飯煮好了（保溫中），等著盛進飯桶' : `空著（飯桶裡還有 ${RICE.tub} 份飯）`)
   return (
-    <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} scale={HAGAMA_SCALE}
-      onPointerOver={(e) => { e.stopPropagation(); setTip({ title: '羽釜', hint: say() }) }}
-      onPointerOut={() => setTip(null)}>
-      <primitive object={model.root} />
-      {/* (where the rice goes in and comes out; where whoever's cooking it stands, at its fire mouth) */}
-      <group name="kama-top" position={[0, 0.8, 0]} />
-      <group name="kama-front" position={[0, 0, 0.62]} />
-      <group ref={steam} visible={false}>
-        <Steam position={[0, 0.85, 0]} width={0.34} height={0.5} opacity={0.34} layers={2} />
+    <group position={[p.x, 0, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)}>
+      <primitive object={s} position-y={floor} scale={[0.55, (DENKI_TOP - floor) / 1.08, 0.55]} />
+      <group position-y={DENKI_TOP} scale={DENKI_SCALE}
+        onPointerOver={(e) => { e.stopPropagation(); setTip({ title: '電鍋', hint: say() }) }}
+        onPointerOut={() => setTip(null)}>
+        <primitive object={model.root} />
+        <group ref={steam} visible={false}>
+          <Steam position={[0, 0.42, 0]} width={0.22} height={0.4} opacity={0.32} layers={2} />
+        </group>
+        {/* (where the rice goes in and comes out) */}
+        <group name="cooker-top" position={[0, 0.3, 0]} />
       </group>
+      {/* (where whoever's cooking it stands, before it) */}
+      <group name="cooker-front" position={[0, floor, 0.62]} />
     </group>
   )
 }
@@ -1023,6 +1079,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
       <Movable id="hagama" label="羽釜與爐灶"><Hagama /></Movable>
+      <Movable id="denkinabe" label="電鍋"><DenkiNabe /></Movable>
       <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><CharcoalSackAt /></group>
     </>

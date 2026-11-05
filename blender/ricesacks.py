@@ -1,7 +1,7 @@
 """The sacks of white rice (白米) by the sake barrels, for the rice balls (the owner's: the room-temperature stock wants rice, its sacks
 piled by the sake; after two scanned burlap bags on Sketchfab, looked at only): ricesacks.glb, node "RiceSacks".
 
-Three sacks, unopened, sewn shut at both ends: two lying one on the other, the third stood on its end leaning against them. Each a pillow
+Three sacks: two unopened, sewn shut at both ends, lying one on the other; the third open, stood beside them (below). Each a pillow
 of a shape: full and round in its middle, thin and flat toward its sewn edges, its corners pulled out into little ears where the seams
 end. The cloth a coarse burlap, paler than the potatoes' (RiceSack: its weave here; the game prints 白米 and the rest on it, the print's
 place the middle of each face's UVs). Some 600 triangles.
@@ -111,16 +111,166 @@ def pillow(name, at, L, W, T, rot):
 
 
 L, W, T = 0.62, 0.4, 0.17
-# (two lying, the upper one a little askew; the third stood on its end against them, leaning back)
+# (two lying, the upper one a little askew)
 pillow("RiceSack0", (0.0, T * 0.42, 0.0), L, W, T, (0.0, 0.08, 0.0))
 pillow("RiceSack1", (0.03, T * 1.2, -0.01), L * 0.97, W * 0.98, T * 0.95, (0.03, -0.12, 0.02))
-pillow("RiceSack2", (L / 2 + 0.12, L / 2 + 0.02, 0.0), L * 0.96, W, T, (0.0, 0.25, math.pi / 2 - 0.22))
+
+# ---- the third, open (the owner's: one sack in use): stood on its bottom beside them, its mouth rolled down into a cuff, the white rice
+# heaped in it, a wooden measure (升) pushed into the rice. Its cloth the same printed burlap (RiceSack; u up its height, v across its front,
+# as a lying sack's u runs along its length: the print reads the same), the inside of the cloth and the cuff's underside plain (RiceSackInside),
+# the rice (RiceGrain) and the measure (RiceMasu) their own.
+
+# (the inside's burlap: the weave, darker, no print; the rice: grains on grains, a few broken, a soft shade; the measure: pale hinoki)
+M["inside"] = pbr("RiceSackInside", (1, 1, 1), tex=image("rice_burlap_in", np.clip(col * 0.72, 0, 1)), rough=0.95)
+S2 = 256
+u2, v2 = grid01(S2)
+gr = np.zeros((S2, S2), np.float32)
+grng = np.random.default_rng(5)
+for _ in range(1400):
+    cx, cy, a = grng.random(), grng.random(), grng.uniform(0, math.pi)
+    dx = (u2 - cx + 0.5) % 1.0 - 0.5
+    dy = (v2 - cy + 0.5) % 1.0 - 0.5
+    rx, ry = dx * math.cos(a) + dy * math.sin(a), -dx * math.sin(a) + dy * math.cos(a)
+    gr = np.maximum(gr, np.clip(1 - (rx / 0.011) ** 2 - (ry / 0.006) ** 2, 0, 1) * grng.uniform(0.7, 1.0))
+rice_col = mix((0.78, 0.76, 0.7), (0.99, 0.98, 0.95), gr)
+M["rice"] = pbr("RiceGrain", (1, 1, 1), tex=image("rice_grains", np.clip(rice_col, 0, 1)), rough=0.7)
+grain = 0.5 + 0.5 * np.sin((u2 * 40 + (fbm(S2, 2, 8) - 0.5) * 3) * math.pi)
+M["masu"] = pbr("RiceMasu", (1, 1, 1), tex=image("rice_masu", mix((0.86, 0.74, 0.54), (0.78, 0.64, 0.44), smooth(0.6, 1.0, grain) * 0.5)), rough=0.6)
+
+import bmesh  # noqa: E402
+
+OA, OB, OH = 0.19, 0.13, 0.4     # (the open sack's half-width, half-depth, height to its rolled rim)
+SEG = 24
+
+
+def ring(sx, y, inset=0.0):
+    """a rounded-square ring round y (a superellipse: a full sack's corners), `sx` its size against the sack's own"""
+    pts = []
+    for k in range(SEG):
+        t = 2 * math.pi * k / SEG
+        c, s = math.cos(t), math.sin(t)
+        e = 2 / 3.0
+        x = math.copysign(abs(c) ** e, c) * (OA * sx - inset)
+        z = math.copysign(abs(s) ** e, s) * (OB * sx - inset)
+        pts.append((x, y, z))
+    return pts
+
+
+def tube(name, rings, mat, uvmap):
+    """rings joined into a sleeve of quads; `uvmap(k, i)` gives each point's UV (k round it, i up the rings)"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    vs = [[bm.verts.new(P(*p)) for p in r] for r in rings]
+    for i in range(len(vs) - 1):
+        for k in range(SEG):
+            k2 = (k + 1) % SEG
+            f = bm.faces.new((vs[i][k], vs[i][k2], vs[i + 1][k2], vs[i + 1][k]))
+            for lp, (kk, ii) in zip(f.loops, ((k, i), (k + 1, i), (k + 1, i + 1), (k, i + 1))):
+                lp[uvl].uv = uvmap(kk, ii)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(M[mat])
+    parts.append(o)
+    return o
+
+
+# (its body: the foot spread a little where it sits, full in the middle, drawing in a touch to the rim; up its height u, round its front v:
+# the front half's v 0..1 one way, the back half's back again, so the print stands on its front and its back)
+body = [(0.94, 0.0), (1.02, 0.025), (1.06, 0.1), (1.07, 0.2), (1.04, 0.3), (1.0, OH)]
+across = lambda k: 1 - abs(((k / SEG) % 1.0) * 2 - 1)  # noqa: E731
+tube("RiceSackOpen", [ring(s, y) for s, y in body], "sack", lambda k, i: (across(k), 1 - body[i][1] / OH))
+# (the mouth rolled down outward: over the rim and down in a cuff; under it and the inside of the cloth plain burlap, down to the rice)
+cuff = [(1.0, OH), (1.05, OH + 0.022), (1.11, OH + 0.012), (1.13, OH - 0.03), (1.1, OH - 0.05), (1.06, OH - 0.04)]
+tube("RiceSackCuff", [ring(s, y) for s, y in cuff], "inside", lambda k, i: (k / SEG * 3, i / 5))
+RICE_Y = OH - 0.05
+inner = [(1.0, OH), (0.97, OH - 0.02), (0.96, RICE_Y - 0.02)]
+tube("RiceSackIn", [ring(s, y) for s, y in inner], "inside", lambda k, i: (k / SEG * 3, i / 2))
+# (the rice: heaped a little to the middle, its rim tucked under the cloth; closed across in a ladder, no fan to its middle)
+rice_rings = [ring(0.965, RICE_Y - 0.01), ring(0.75, RICE_Y + 0.012), ring(0.45, RICE_Y + 0.024)]
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+vs = [[bm.verts.new(P(*p)) for p in r] for r in rice_rings]
+for i in range(len(vs) - 1):
+    for k in range(SEG):
+        k2 = (k + 1) % SEG
+        bm.faces.new((vs[i][k], vs[i][k2], vs[i + 1][k2], vs[i + 1][k]))
+ladder_fill(bm, vs[-1])
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+for f in bm.faces:
+    if f.normal.z < 0:
+        f.normal_flip()
+    for lp in f.loops:
+        lp[uvl].uv = (lp.vert.co.x * 4 + 0.5, lp.vert.co.y * 4 + 0.5)
+me = bpy.data.meshes.new("RiceSackRice")
+bm.to_mesh(me)
+bm.free()
+for p in me.polygons:
+    p.use_smooth = True
+rice = bpy.data.objects.new("RiceSackRice", me)
+bpy.context.collection.objects.link(rice)
+rice.data.materials.append(M["rice"])
+parts.append(rice)
+# (the measure: an open hinoki box, 8 cm, pushed into the rice at a tilt, full of rice)
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+mw, mh, wall = 0.045, 0.07, 0.006
+outer = [(-mw, -mw), (mw, -mw), (mw, mw), (-mw, mw)]
+inner_ = [(-mw + wall, -mw + wall), (mw - wall, -mw + wall), (mw - wall, mw - wall), (-mw + wall, mw - wall)]
+ob = [bm.verts.new((x, z, 0)) for x, z in outer]
+ot = [bm.verts.new((x, z, mh)) for x, z in outer]
+it = [bm.verts.new((x, z, mh)) for x, z in inner_]
+ib = [bm.verts.new((x, z, mh - 0.02)) for x, z in inner_]
+for k in range(4):
+    k2 = (k + 1) % 4
+    for q in ((ob[k], ob[k2], ot[k2], ot[k]), (ot[k], ot[k2], it[k2], it[k]), (it[k], it[k2], ib[k2], ib[k])):
+        f = bm.faces.new(q)
+        for lp in f.loops:
+            lp[uvl].uv = (lp.vert.co.x * 8 + lp.vert.co.y * 8 + 0.5, lp.vert.co.z * 8)
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+me = bpy.data.meshes.new("RiceMasu")
+bm.to_mesh(me)
+bm.free()
+masu = bpy.data.objects.new("RiceMasu", me)
+bpy.context.collection.objects.link(masu)
+masu.data.materials.append(M["masu"])
+parts.append(masu)
+# (the rice heaped in it: a quad at its rim's height)
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+f = bm.faces.new([bm.verts.new((x, z, mh - 0.008)) for x, z in inner_])
+for lp in f.loops:
+    lp[uvl].uv = (lp.vert.co.x * 4 + 0.5, lp.vert.co.y * 4 + 0.5)
+me = bpy.data.meshes.new("RiceMasuRice")
+bm.to_mesh(me)
+bm.free()
+masu_rice = bpy.data.objects.new("RiceMasuRice", me)
+bpy.context.collection.objects.link(masu_rice)
+masu_rice.data.materials.append(M["rice"])
+masu_rice.parent = masu
+parts.append(masu_rice)
+masu.location = P(0.05, RICE_Y - 0.008, 0.02)
+masu.rotation_euler = (math.radians(14), math.radians(-10), math.radians(25))
+# (the open sack's pieces as one group, stood beside the lying pair)
+opened = bpy.data.objects.new("RiceSackOpenSet", None)
+bpy.context.collection.objects.link(opened)
+for o in (bpy.data.objects["RiceSackOpen"], bpy.data.objects["RiceSackCuff"], bpy.data.objects["RiceSackIn"], rice, masu):
+    o.parent = opened
+opened.location = P(L / 2 + 0.25, 0.0, 0.03)
+opened.rotation_euler = (0, 0, math.radians(-8))
+parts.append(opened)
 
 root = bpy.data.objects.new("RiceSacks", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
-    o.parent = root
-print("RICE_TRIS", sum(len(p.vertices) - 2 for o in parts for p in o.data.polygons))
+    if o.parent is None:
+        o.parent = root
+print("RICE_TRIS", sum(len(p.vertices) - 2 for o in parts if o.type == "MESH" for p in o.data.polygons))
 if PREVIEW:
     cam = bpy.data.objects.new("PreviewCam", bpy.data.cameras.new("PreviewCam"))
     bpy.context.collection.objects.link(cam)
