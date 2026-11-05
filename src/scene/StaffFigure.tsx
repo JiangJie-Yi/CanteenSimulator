@@ -9,6 +9,8 @@ import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } fr
 import { bakeable, colourVertices } from './StaticBatch'
 import { warmLater } from './Prewarm'
 import { holdVeil } from './Later'
+import { crewFaceSheet, faceRange, glassesSheet, markFace, ownShape, setFace, squash as jelly, type CrewFace } from './faceSheet'
+import { RUSH, STAFF_TALK } from '@/game/shopState'
 
 /*
  * The staff, made as the boss is (blender/boss.py with CREW=<variant>): an Overcooked cook's big round head on a short plump body rounding
@@ -30,7 +32,7 @@ const variantOf = (role: Role, female: boolean): Variant =>
   role === 'chef' || role === 'sous' ? (female ? 'chefF' : 'chef') : role === 'stock' ? 'stock' : female ? 'serverF' : 'server'
 
 /** the small parts: no ink line round them */
-const UNINKED = /(Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|Thumb|Glass|Hem|Fan|Comb|Towel|Sideburn)/
+const UNINKED = /(Face|Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|Thumb|Glass|Hem|Fan|Comb|Towel|Sideburn)/
 /** where a server's tray is held, and the stock keeper's clipboard: on the hands, out in front of the belly (the figure's frame) */
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
@@ -44,7 +46,7 @@ type Built = { root: THREE.Group }
 const BONES = ['body', 'eyes', 'glasses', 'handL', 'handR', 'fan', 'tray', 'clip'] as const
 type Part = (typeof BONES)[number]
 /** where in a part's mesh the skin or the hair is (its vertices from `start`, `count` of them), coloured for each person */
-type Tint = { start: number; count: number; tint: 'skin' | 'hair' }
+type Tint = { start: number; count: number; tint: 'skin' | 'hair' | 'nose' }
 const made = new Map<Variant, Built>()
 /** a material's twin of their own, for fading someone out of (or into) a doorway: hashed from the start (as the customers' and the
  * owner's are: alphaHash at full opacity drops nothing), so only its opacity moves and no other program is ever wanted for it */
@@ -81,8 +83,8 @@ function heldPieces(): { geo: THREE.BufferGeometry; part: Part }[] {
   const at = new THREE.Matrix4().makeTranslation(TRAY_AT[0], TRAY_AT[1], TRAY_AT[2])
   const clip = new THREE.Matrix4().makeTranslation(TRAY_AT[0], TRAY_AT[1] + 0.04, TRAY_AT[2] - 0.02).multiply(new THREE.Matrix4().makeRotationX(-0.6))
   return [
-    { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.1, 0.095, 0.014, 16), '#3a1a14', at) },
-    { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.024, 0.02, 0.05, 10), '#e8dcc0', at.clone().multiply(new THREE.Matrix4().makeTranslation(0.03, 0.03, 0))) },
+    { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.1, 0.095, 0.014, 12), '#3a1a14', at) },
+    { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.024, 0.02, 0.05, 8), '#e8dcc0', at.clone().multiply(new THREE.Matrix4().makeTranslation(0.03, 0.03, 0))) },
     { part: 'clip', geo: piece(new THREE.BoxGeometry(0.12, 0.008, 0.16), '#c9a66b', clip) },
     { part: 'clip', geo: piece(new THREE.PlaneGeometry(0.1, 0.12), '#f7f3ea', clip.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.005, 0.01)).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2))) },
   ]
@@ -101,16 +103,21 @@ function build(scene: THREE.Group, v: Variant): Built {
     if (!m.isMesh || Array.isArray(m.material)) return
     const n = (m.material as THREE.Material).name
     m.userData.flat = /White|Dark/.test(n)
-    m.userData.tint = /CrewSkin/.test(n) ? 'skin' : /CrewHair/.test(n) ? 'hair' : undefined
+    m.userData.tint = /CrewSkin/.test(n) ? 'skin' : /CrewHair/.test(n) ? 'hair' : /CrewNose/.test(n) ? 'nose' : undefined
+    // (the face's sheet of expressions and the glasses' frames painted, for the atlas to take in)
+    if (n === 'BossFace') (m.material as THREE.MeshStandardMaterial).map = crewFaceSheet(v === 'chefF' || v === 'serverF' ? 'female' : 'male')
+    else if (n === 'BossGlassPic') (m.material as THREE.MeshStandardMaterial).map = glassesSheet()
   })
   const mat = atlasModel(s, (m) => partOf(m) !== 'drop', (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap, alphaHash: true }))))!
   // (every piece of it in the figure's frame, its part, inked or not, flat or not, skin or hair)
-  const pieces: (SkinPiece & { tint?: 'skin' | 'hair' })[] = []
+  const pieces: (SkinPiece & { tint?: Tint['tint'] })[] = []
+  let face = -1
   s.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh || Array.isArray(m.material)) return
     const part = partOf(m)
     if (part === 'drop' || (part === 'fan' && !holds.includes('fan'))) return
+    if (m.name === 'BossFace') face = pieces.length
     pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: BONES.indexOf(part),
       inked: !UNINKED.test(m.name), flat: !!m.userData.flat, tint: m.userData.tint })
   })
@@ -145,6 +152,7 @@ function build(scene: THREE.Group, v: Variant): Built {
     start += n
   }
   const { mesh } = rigidFigure(root, pieces, mat, bones, 0.006)
+  markFace(mesh, faceRange(pieces, face))
   for (const p of pieces) p.geo.dispose()
   mesh.castShadow = true
   mesh.receiveShadow = true
@@ -159,7 +167,9 @@ function build(scene: THREE.Group, v: Variant): Built {
  */
 // (drawn again only when its own props change: the staff stand in parents that redraw several times a second, and they move by their own frames)
 export const StaffFigure = memo(StaffFigureImpl)
-function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }: { id: string; role: Role; look: StaffLook; moving?: boolean
+function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, face: faceAsked }: { id: string; role: Role; look: StaffLook; moving?: boolean
+  /** a face to make, whatever they're doing (the character viewer's buttons) */
+  face?: CrewFace
   /** sat (the cashier on the till's chair): leaning in a little, the hands up on the counter in front, now and then tapping at the keys */
   seated?: boolean }) {
   const h = avHash(id)
@@ -193,33 +203,21 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     const pickHair = old ? ((h >> 4) & 1 ? '#d6d1c8' : '#a9a49c') : AV_HAIR[(h >> 3) % AV_HAIR.length]
     const skin = new THREE.Color(AV_SKIN[h % AV_SKIN.length])
     const hair = pickHair ? new THREE.Color(pickHair) : null
-    const swapped: [THREE.Mesh, THREE.BufferGeometry, THREE.BufferGeometry][] = []
-    fig.root.traverse((o) => {
-      const m = o as THREE.Mesh
+    // (the nose their skin, a little rosy)
+    const nose = skin.clone().multiply(new THREE.Color('#ffd2c4'))
+    // (their face their own too: its UVs, slid from one expression to the next (scene/faceSheet))
+    return ownShape(fig.root, (m, col) => {
       const tints = m.userData.tints as Tint[] | undefined
-      if (!m.isMesh || !tints) return
-      const src = m.geometry
-      const g = new THREE.BufferGeometry()
-      for (const [k, a] of Object.entries(src.attributes)) if (k !== 'color') g.setAttribute(k, a)
-      const col = (src.attributes.color as THREE.BufferAttribute).clone()
+      if (!tints) return false
       for (const t of tints) {
-        const c = t.tint === 'skin' ? skin : hair
+        const c = t.tint === 'skin' ? skin : t.tint === 'nose' ? nose : hair
         if (c) for (let i = t.start; i < t.start + t.count; i++) col.setXYZ(i, c.r, c.g, c.b)
       }
-      g.setAttribute('color', col)
-      src.computeBoundingSphere()
-      g.boundingSphere = src.boundingSphere
-      m.geometry = g
-      swapped.push([m, src, g])
+      return true
     })
-    return () => {
-      for (const [m, src, g] of swapped) {
-        m.geometry = src
-        for (const k of Object.keys(g.attributes)) if (k !== 'color') g.deleteAttribute(k)
-        g.dispose()
-      }
-    }
   }, [fig, h, who.age])
+  // (their face (setExpression): what they're doing says it; a squash and stretch as it changes, or as they start to say something)
+  const faceWas = useRef<{ face: CrewFace; at: number; said: number; carry: boolean }>({ face: 'idle', at: -1e9, said: 0, carry: false })
   // (a cook fans the fire only now and then: a spell of it, the fan in hand, then put down; each to their own times)
   const [fanning, setFanning] = useState(false)
   const clock = useRef(0)
@@ -279,7 +277,24 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07
     // (a bow of the head and shoulders at the door)
     fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + (job?.lean ?? 0)
-    fig.body.scale.y = 1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008
+    // ---- their face: focused at the board, the fan or the till's keys; glad carrying a dish out; alarmed as a customer complains of the
+    // wait (RUSH); talking while a word of theirs is up (STAFF_TALK); a blink every few seconds; the viewer's face over all of it
+    const now = performance.now()
+    const word = STAFF_TALK.find((w) => w.id === id)
+    const tapping = seated && (t + seed) % 7 < 2.2
+    let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning) || tapping || job?.wipe !== undefined ? 'focused'
+      : job?.carry || job?.stretch || (job?.nod ?? 0) > 0.2 ? 'happy' : 'idle')
+    if (!faceAsked && word && Math.sin(t * 17) + Math.sin(t * 7.3) * 0.6 > 0.2) face = 'talk'
+    if ((t + seed * 0.9) % 3.4 < 0.15 && (face === 'idle' || face === 'focused' || face === 'talk')) face = 'blink'
+    const fw = faceWas.current
+    const settled = (f: CrewFace) => (f === 'blink' || f === 'talk' ? 'idle' : f)
+    if (settled(face) !== settled(fw.face) || (word && word.key !== fw.said) || (!!job?.carry && !fw.carry)) fw.at = t
+    fw.face = face
+    fw.said = word?.key ?? fw.said
+    fw.carry = !!job?.carry
+    setFace(fig.root, face)
+    const [jw, jh] = jelly(t - fw.at)
+    fig.body.scale.set(jw, (1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008) * jh, jw)
     const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
       if (!hand) continue
@@ -322,8 +337,6 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     }
     // (the stock keeper's clipboard, held up while they stand)
     fig.clip?.scale.setScalar(role === 'stock' && !moving ? 1 : 0)
-    // (a blink every few seconds)
-    if (fig.eyes) fig.eyes.scale.y = (t + seed * 0.9) % 3.6 < 0.12 ? 0.1 : 1
   })
   return (
     <group ref={outer} userData={{ staffRole: role }}>

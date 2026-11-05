@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { guestFaceStrip, type FaceKind } from './faceSheet'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -163,6 +164,9 @@ function usePictures() {
         t.flipY = false
         t.anisotropy = 4
         if (PICTURES[i].startsWith('outfit')) t.wrapS = THREE.RepeatWrapping
+        // (the faces painted afresh, as the owner's and the staff's are (scene/faceSheet: Overcooked's bold eyes, brows and mouths), in the
+        // file's strip of eight and its order)
+        if (PICTURES[i].startsWith('face_')) (t as THREE.Texture<unknown>).image = guestFaceStrip(PICTURES[i].slice(5) as FaceKind)
         t.needsUpdate = true
       }
       out.set(PICTURES[i], t)

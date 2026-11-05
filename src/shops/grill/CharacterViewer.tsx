@@ -15,6 +15,8 @@ import type { Mood } from '@/scene/people'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { WireView } from './Movable'
+import { isInk } from '@/scene/inkHull'
+import type { CrewFace } from '@/scene/faceSheet'
 import { usePanelSound } from '@/ui/uiSound'
 import { getCharHidden, onCharHidden, setCharHidden, toggleEdit } from './edit'
 
@@ -66,7 +68,7 @@ function Stand() {
 }
 
 /** the figure scaled to stand STAND_H tall on the stand, its feet's middle at its middle; its triangles and draws counted */
-function Fitted({ children, onStats, spin, look, normals }: { children: React.ReactNode; onStats: (s: { tris: number; draws: number }) => void; spin: boolean; look: Look; normals: boolean }) {
+function Fitted({ children, onStats, spin, look, normals }: { children: React.ReactNode; onStats: (s: Stats) => void; spin: boolean; look: Look; normals: boolean }) {
   const inner = useRef<THREE.Group>(null)
   const outer = useRef<THREE.Group>(null)
   // (measured until it's held the same size for a while: a model loads, and grows, some frames after it's mounted, and on a long session
@@ -87,14 +89,18 @@ function Fitted({ children, onStats, spin, look, normals }: { children: React.Re
     g.position.set(0, 0, 0)
     g.updateMatrixWorld(true)
     box.makeEmpty()
-    let tris = 0, draws = 0
+    // (the model's own triangles apart from its outline's (the owner's: the count is the figure's body; the ink hull, the stand, the
+    // normals' lines and a wireframe's copies aren't it): the hull's a back-faced copy, counted on its own)
+    let tris = 0, ink = 0, draws = 0
     g.traverse((q) => {
       const m = q as THREE.Mesh
-      if (!m.isMesh || !m.visible) return
+      if (!m.isMesh || !m.visible || q.userData.wireDepth) return
       draws++
       const geo = m.geometry
-      tris += (geo.index ? geo.index.count : geo.attributes.position.count) / 3
-      box.expandByObject(m)
+      const n = (geo.index ? geo.index.count : geo.attributes.position.count) / 3
+      const mats = Array.isArray(m.material) ? m.material : [m.material]
+      if (mats.every(isInk)) ink += n
+      else { tris += n; box.expandByObject(m) }
     })
     if (box.isEmpty()) return
     const size = box.getSize(new THREE.Vector3())
@@ -104,7 +110,7 @@ function Fitted({ children, onStats, spin, look, normals }: { children: React.Re
     g.scale.setScalar(k)
     const c = box.getCenter(new THREE.Vector3())
     g.position.set(-c.x * k, -box.min.y * k, -c.z * k)
-    onStats({ tris: Math.round(tris), draws })
+    onStats({ tris: Math.round(tris), ink: Math.round(ink), draws })
     // (once it's settled, the camera fitted to it (the owner's): the controls aimed at its middle, the camera back far enough that its
     // bounding sphere fills the view with a fifth to spare, a little above its middle; the near and far planes by that distance)
     if (still.current > 8) {
@@ -125,6 +131,8 @@ function Fitted({ children, onStats, spin, look, normals }: { children: React.Re
   })
   return <group ref={outer}><group ref={inner}>{children}</group><LookOver root={inner} look={look} normals={normals && ready} /></group>
 }
+
+type Stats = { tris: number; ink: number; draws: number }
 
 /** how the figure's drawn, for looking it over (the owner's): as it is, a plain clay, or each point coloured by the way it faces */
 type Look = 'as' | 'clay' | 'normal'
@@ -269,11 +277,13 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
   }
   const [mood, setMood] = useState<Mood | null>(null)
+  // (the owner's and the staff's expression to try (the owner's: Overcooked's faces), each with its squash and stretch)
+  const [face, setFace] = useState<CrewFace>('idle')
   const [walk, setWalk] = useState(false)
   const [spin, setSpin] = useState(true)
   const [look, setLook] = useState<Look>('as')
   const [normals, setNormals] = useState(false)
-  const [stats, setStats] = useState({ tris: 0, draws: 0 })
+  const [stats, setStats] = useState<Stats>({ tris: 0, ink: 0, draws: 0 })
   const e = ENTRIES.find((x) => x.key === pick.key) ?? ENTRIES[0]
   // (the one before or after in the list, round from the last to the first: the arrows either side of the stage (the owner's))
   const step = (d: number) => setPick((p) => {
@@ -285,6 +295,9 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
   const name = tl(lang, e.zh, e.ja, e.en)
   const group = (g: Entry['group']) => tl(lang, g === 'boss' ? '老闆' : g === 'staff' ? '店員' : '客人', g === 'boss' ? '店主' : g === 'staff' ? 'スタッフ' : 'お客さん', g === 'boss' ? 'Owner' : g === 'staff' ? 'Staff' : 'Customers')
   const moods: [Mood | null, string][] = [[null, tl(lang, '平常', 'ふつう', 'Calm')], ['joy', tl(lang, '開心', 'うれしい', 'Happy')], ['mad', tl(lang, '生氣', '怒り', 'Cross')], ['sad', tl(lang, '難過', 'かなしい', 'Sad')]]
+  const faces: [CrewFace, string][] = [['idle', tl(lang, '表情：平常', '表情：ふつう', 'Face: calm')], ['happy', tl(lang, '開心', 'うれしい', 'Happy')],
+    ['focused', tl(lang, '認真', '真剣', 'Focused')], ['panic', tl(lang, '慌張', 'あわてる', 'Panic')], ['proud', tl(lang, '得意', '得意げ', 'Proud')],
+    ['drink', tl(lang, '暢飲', 'ごくごく', 'Gulp')], ['talk', tl(lang, '說話', '話す', 'Talk')]]
   const minLabel = tl(lang, '縮到左下角', '左下にしまう', 'Minimise to the bottom left')
   const closeLabel = tl(lang, '關閉（離開開發者模式）', '閉じる（開発者モード終了）', 'Close (leave developer mode)')
   return createPortal(
@@ -304,8 +317,8 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
             <Stand />
             <Suspense fallback={null}>
               <Fitted key={`${e.key}-${gid}`} onStats={setStats} spin={spin} look={look} normals={normals}>
-                {e.group === 'boss' && <BossModel />}
-                {e.group === 'staff' && <StaffFigure id={`viewer-${e.key}`} role={e.role!} look={{ female: !!e.female, age: 'young' }} moving={walk} />}
+                {e.group === 'boss' && <BossModel face={face} />}
+                {e.group === 'staff' && <StaffFigure id={`viewer-${e.key}`} role={e.role!} look={{ female: !!e.female, age: 'young' }} moving={walk} face={face} />}
                 {e.group === 'guest' && <FolkFigure id={gid} eating={false} walking={walk} mood={mood} ground />}
               </Fitted>
             </Suspense>
@@ -321,7 +334,7 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
           ))}
         </div>
         <div className="char-view-info">
-          {tl(lang, `三角面 ${stats.tris.toLocaleString()}・繪製 ${stats.draws} 次`, `三角形 ${stats.tris.toLocaleString()}・描画 ${stats.draws} 回`, `${stats.tris.toLocaleString()} triangles · ${stats.draws} draws`)}
+          {tl(lang, `三角面 ${stats.tris.toLocaleString()}（描線 ${stats.ink.toLocaleString()}）・繪製 ${stats.draws} 次`, `三角形 ${stats.tris.toLocaleString()}（線 ${stats.ink.toLocaleString()}）・描画 ${stats.draws} 回`, `${stats.tris.toLocaleString()} tris (ink ${stats.ink.toLocaleString()}) · ${stats.draws} draws`)}
         </div>
         <div className="char-view-tools">
           <button type="button" className={spin ? 'is-on' : ''} onClick={() => setSpin((v) => !v)}>{tl(lang, '旋轉', '回転', 'Spin')}</button>
@@ -332,6 +345,9 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
             <button key={k} type="button" className={look === k ? 'is-on' : ''} onClick={() => setLook(k)}>{label}</button>
           ))}
           <button type="button" className={normals ? 'is-on' : ''} onClick={() => setNormals((v) => !v)}>{tl(lang, '法線方向', '法線の向き', 'Normal lines')}</button>
+          {e.group !== 'guest' && faces.map(([f, label]) => (
+            <button key={f} type="button" className={face === f ? 'is-on' : ''} onClick={() => setFace(f)}>{label}</button>
+          ))}
           {e.group === 'guest' && moods.map(([m, label]) => (
             <button key={label} type="button" className={mood === m ? 'is-on' : ''} onClick={() => setMood(m)}>{label}</button>
           ))}

@@ -52,6 +52,8 @@ export function atlasModel(root: THREE.Object3D, pick: (m: THREE.Mesh) => boolea
     g.beginPath()
     g.rect(p.x - pad, p.y - pad, p.w + 2 * pad, p.h + 2 * pad)
     g.clip()
+    // (a see-through picture (a face's features, the glasses' frames: scene/faceSheet) kept see-through: the white under it cleared)
+    if ((p.img as { seeThrough?: boolean }).seeThrough) g.clearRect(p.x - pad, p.y - pad, p.w + 2 * pad, p.h + 2 * pad)
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) g.drawImage(p.img, p.x + dx * p.w, p.y + dy * p.h)
     g.restore()
   }

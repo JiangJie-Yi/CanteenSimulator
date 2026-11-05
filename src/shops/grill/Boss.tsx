@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -12,7 +12,8 @@ import { bossLineText, bossSituation, cashLineText, drinkLineText, munchLineText
 import { DrinkBottle } from './DiningRoom'
 import { gulpSound } from './chewSound'
 import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_OUT, type DrinkId } from './bar'
-import { SPEAKERS } from '@/game/shopState'
+import { RUSH, SPEAKERS } from '@/game/shopState'
+import { crewFaceSheet, faceRange, glassesSheet, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -27,7 +28,7 @@ import { SPEAKERS } from '@/game/shopState'
  */
 const URL = import.meta.env.BASE_URL + 'models/boss.glb'
 /** the small parts: no ink line round them */
-const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan|Sideburn|Pencil|Pin|Towel)/
+const UNINKED = /(Face|Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan|Sideburn|Pencil|Pin|Towel)/
 let made: THREE.Object3D | null = null
 
 /** where his hands hang at rest (as modelled, the node's own frame) */
@@ -69,9 +70,20 @@ const HAND_AT = new THREE.Vector3()
 export const BOSS_DRINK = { at: null as THREE.Vector3 | null, id: null as DrinkId | null, item: null as unknown, arrived: false, since: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossDrink?: typeof BOSS_DRINK }).__bossDrink = BOSS_DRINK
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossFx?: typeof BOSS_FX }).__bossFx = BOSS_FX
-/** the parts of him that move on their own (his bones, after his body): his hands, what they hold, his eyes (to blink), his smile and his
- * open mouth (in turn as he talks) */
-const BOSS_BONES = ['BossHandL', 'BossHandR', 'BossTongs', 'BossFan', 'BossEyes', 'BossSmile', 'BossTalk']
+/** the parts of him that move on their own (his bones, after his body): his hands, what they hold, his moustache (bobbing as he talks
+ * and breathes); his face is a painted patch, its expression a frame of its sheet (scene/faceSheet) */
+const BOSS_BONES = ['BossHandL', 'BossHandR', 'BossTongs', 'BossFan', 'BossMoustache']
+/**
+ * setExpression for the owner: a face he's to make for a while (`face` till `until`, performance.now()), over what he'd show anyway (the
+ * character viewer's buttons, a moment's joy or alarm); and `at`, when it was set, for the squash and stretch it sets off.
+ */
+export const BOSS_FACE = { face: null as CrewFace | null, until: 0, at: -1e9 }
+export function setBossExpression(face: CrewFace, seconds = 2) {
+  BOSS_FACE.face = face
+  BOSS_FACE.until = performance.now() + seconds * 1000
+  BOSS_FACE.at = performance.now()
+}
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossFace?: typeof BOSS_FACE }).__bossFace = BOSS_FACE
 /**
  * The owner as he's drawn, made once: his figure in the room is it, the character viewer a copy. Drawn in two draws (the owner's: a person
  * in one or two; he was 27, then 9): all of him one material (scene/atlasMerge: the pictures on his coat, apron, trousers, hair and towel
@@ -99,10 +111,14 @@ function styledBoss(scene: THREE.Group) {
       g.updateMatrixWorld(true)
       for (const e of meshes) g.attach(e)
     }
-    holder('BossEyes', /^BossEye/)
-    holder('BossSmile', /^BossMouth$/)
-    holder('BossTalk', /^BossMouth(Open|Tongue)/)
-    // ---- all of him one material: his eyes' whites and darks in it too, by their vertices, flat
+    holder('BossMoustache', /^BossMoustache/)
+    // ---- his face's sheet of expressions and his glasses' frames painted, for the atlas to take in
+    r.traverse((o) => {
+      const mm = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
+      if (mm?.name === 'BossFace') mm.map = crewFaceSheet('boss')
+      else if (mm?.name === 'BossGlassPic') mm.map = glassesSheet()
+    })
+    // ---- all of him one material, his face's sheet in it too
     atlasModel(r, () => true, (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap }))))
     // ---- each piece of him in his frame, with its part, inked or not, flat or not
     r.updateMatrixWorld(true)
@@ -116,28 +132,43 @@ function styledBoss(scene: THREE.Group) {
     const meshes: THREE.Mesh[] = []
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh) })
     let mat: THREE.Material | null = null
+    let face = -1
     for (const m of meshes) {
       mat = m.material as THREE.Material
-      pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: boneOf(m),
-        inked: !UNINKED.test(m.name), flat: /^BossEye/.test(m.name) && !/Glass/.test(m.name) })
+      if (m.name === 'BossFace') face = pieces.length
+      pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: boneOf(m), inked: !UNINKED.test(m.name) })
       m.removeFromParent()
       m.geometry.dispose()
     }
     const { mesh } = rigidFigure(r, pieces, mat!, bones, 0.006)
+    markFace(mesh, faceRange(pieces, face))
     for (const p of pieces) p.geo.dispose()
     mesh.castShadow = true
     mesh.receiveShadow = true
     // (what's held starts put away)
-    for (const n of ['BossTongs', 'BossFan', 'BossTalk']) r.getObjectByName(n)?.scale.setScalar(0)
+    for (const n of ['BossTongs', 'BossFan']) r.getObjectByName(n)?.scale.setScalar(0)
     made = r
   }
   return made
 }
 /** the owner standing still, a copy of him (developer mode's character viewer) */
-export function BossModel() {
+export function BossModel({ face = 'idle' }: { face?: CrewFace }) {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => cloneFigure(styledBoss(gltf.scene)), [gltf])
   useEffect(() => () => releaseFigure(obj), [obj])
+  // (his face his own here (its UVs), so what he shows doesn't change him in the room)
+  useLayoutEffect(() => ownShape(obj), [obj])
+  // (the face asked for, a blink every few seconds over it, and a squash and stretch as it changes (the viewer's buttons))
+  const t0 = useRef({ face, at: -1e9 })
+  useFrame(({ clock }) => {
+    const T = clock.elapsedTime
+    if (t0.current.face !== face) t0.current = { face, at: T }
+    setFace(obj, face === 'idle' && T % 3.4 < 0.15 ? 'blink' : face)
+    const moustache = obj.getObjectByName('BossMoustache')
+    if (moustache) moustache.position.y = Math.sin(T * 1.6) * 0.003
+    const [w, h] = jelly(T - t0.current.at)
+    obj.scale.set(w, h, w)
+  })
   return <primitive object={obj} />
 }
 /** the way he walks (his own frame, from his place): out to the aisle behind him at `mouth` (straight back out of the cook table's notch,
@@ -205,10 +236,14 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     handL: root.getObjectByName('BossHandL'),
     tongs: root.getObjectByName('BossTongs'),
     fan: root.getObjectByName('BossFan'),
-    smile: root.getObjectByName('BossSmile'),
-    talk: root.getObjectByName('BossTalk'),
-    eyes: root.getObjectByName('BossEyes'),
+    moustache: root.getObjectByName('BossMoustache'),
   }), [root])
+  // (his moustache at rest, to bob from)
+  const tache = useMemo(() => parts.moustache?.position.clone() ?? new THREE.Vector3(), [parts])
+  /** the face he made last frame (a change sets off a squash and stretch) */
+  const faceWas = useRef<CrewFace>('idle')
+  /** the last line he started to say */
+  const saidKey = useRef(0)
   /** where his right hand is really drawn, in the hand bone's own frame (worked out once): the bone's origin isn't at the hand (he's one
    * skinned mesh, his parts' vertices hung from their bones some way off), so what he holds hangs from this */
   const palm = useRef<THREE.Vector3 | null>(null)
@@ -463,7 +498,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     const bob = moving ? Math.abs(Math.sin(step * Math.PI)) * (run ? 0.055 : 0.035) : 0
     const squash = moving ? 1 - Math.abs(Math.cos(step * Math.PI)) * 0.04 : 1 + Math.sin(T * 1.6) * 0.012
     b.position.y = bob
-    b.scale.set(2 - squash, squash, 2 - squash)
+    // (and Overcooked's squash and stretch, as he starts to say something or his face changes (BOSS_FACE.at))
+    const [jw, jh] = jelly((performance.now() - BOSS_FACE.at) / 1000)
+    b.scale.set((2 - squash) * jw, squash * jh, (2 - squash) * jw)
     const lean = moving ? (run ? 0.26 : 0.09) : act === 'fan' ? 0.06 : 0
     b.rotation.x += (lean - b.rotation.x) * Math.min(1, dt * 8)
     b.rotation.z = moving ? Math.sin(step * Math.PI) * (run ? 0.13 : 0.09) : Math.sin(T * 0.7) * 0.025
@@ -553,25 +590,32 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       parts.fan.rotation.set(-0.5 + Math.sin(T * 13) * 0.55, 0, -0.15)
     }
 
-    // ---- his mouth: while a line's up over his head, it flaps open and shut as he says it, in syllables; the rest of the time his smile
+    // ---- his face (setExpression): what he's doing says it (focused at the fan and the tongs, a squeezed-shut gulp as he drinks and a
+    // satisfied "ha" between gulps, munching as he tastes, alarm as a customer complains of the wait (RUSH), proud at the till's money), a
+    // moment's face asked for over it (BOSS_FACE); while a line's up over his head his mouth flaps open and shut in syllables; a blink every
+    // few seconds, now and then twice
     const talking = !!sayRef.current
-    const munching = act === 'taste'
-    const gape = (talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2) || (munching && Math.sin((T - BOSS_TASTE.since) * 7) > 0.3)
-    // (each shown by its part of the one mesh being its size, hidden by its being nothing)
-    parts.smile?.scale.setScalar(gape ? 0 : 1)
-    if (parts.talk) {
-      if (gape) parts.talk.scale.set(1, 0.7 + 0.3 * Math.abs(Math.sin(T * 17)), 1)
-      else parts.talk.scale.setScalar(0)
-    }
-    // ---- a blink every few seconds, now and then twice
-    let lid = 1
+    const now = performance.now()
+    const gape = talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2
+    let face: CrewFace = act === 'fan' || act === 'tongs' ? 'focused' : act === 'taste' ? (Math.sin((T - BOSS_TASTE.since) * 7) > 0.3 ? 'drink' : 'happy')
+      : act === 'drink' ? ((T - BOSS_DRINK.since) % 1.4 < 1 ? 'drink' : 'talk') : now - RUSH.at < 2500 ? 'panic' : now - BOSS_FX.joyAt < 2000 ? 'proud'
+      : act === 'wave' ? 'happy' : 'idle'
+    if (BOSS_FACE.face && now < BOSS_FACE.until) face = BOSS_FACE.face
+    if (gape && (face === 'idle' || face === 'happy' || face === 'focused')) face = 'talk'
     const since = T - s.blinkAt
-    if (since > 0 && since < 0.14) lid = 0.08 + 0.92 * Math.abs(since / 0.07 - 1)
-    else if (since >= 0.14) {
-      s.blinkAt = T + (s.blinks % 4 === 3 ? 0.12 : 2.2 + Math.random() * 3)
+    if (since >= 0.15) {
+      s.blinkAt = T + (s.blinks % 4 === 3 ? 0.12 : 2.5 + Math.random() * 1.5)
       s.blinks++
     }
-    if (parts.eyes) parts.eyes.scale.y = lid
+    if (since > 0 && since < 0.15 && (face === 'idle' || face === 'focused' || face === 'talk')) face = 'blink'
+    // (a new face (not a blink, not the flap of a word) sets off a squash and stretch; so does starting to talk)
+    const settled = (f: CrewFace) => (f === 'blink' || f === 'talk' ? 'idle' : f)
+    if (settled(face) !== settled(faceWas.current)) BOSS_FACE.at = now
+    if (sayRef.current && sayRef.current.key !== saidKey.current) { saidKey.current = sayRef.current.key; BOSS_FACE.at = now }
+    faceWas.current = face
+    setFace(root, face)
+    // (his moustache bobbing: with each breath, and up and down as he talks)
+    if (parts.moustache) parts.moustache.position.set(tache.x, tache.y + Math.sin(T * 1.6) * 0.003 + (face === 'talk' ? 0.006 : 0), tache.z)
   })
   return (
     <group ref={mover} name="BossFollow">

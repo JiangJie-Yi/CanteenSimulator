@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { RUSH } from '@/game/shopState'
 import { TUB_FULL, emptyKama, type Kama } from '@/game/rice'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
@@ -125,7 +126,10 @@ export function setTissues(seat: number, sheets: number) {
 }
 /** what's put each customer out while they're here (game/reputation's gripes), for their visit's score as they go (Roasting) */
 export const GRIPES = new Map<number, Set<Gripe>>()
-export const gripe = (id: number, g: Gripe) => { const s = GRIPES.get(id) ?? new Set<Gripe>(); s.add(g); GRIPES.set(id, s) }
+export const gripe = (id: number, g: Gripe) => {
+  const s = GRIPES.get(id) ?? new Set<Gripe>(); s.add(g); GRIPES.set(id, s)
+  if (g === 'wait') RUSH.at = performance.now()
+}
 /** a gripe that comes after a customer's visit's been scored (at the till, paying: no receipt), added to it by App, and said */
 export const LATE_GRIPE: { add: (id: number, g: Gripe) => void } = { add: gripe }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __lateGripe?: typeof LATE_GRIPE }).__lateGripe = LATE_GRIPE

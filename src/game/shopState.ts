@@ -14,3 +14,6 @@ export const STAFF_TALK: StaffWord[] = []
 /** each speaker's tag over their words (the owner's: every bubble says who): a staff member's id, 'owner', 'role:cashier' (whoever's at the
  * till) to their role and name (老闆 江老闆, 外場 小美…); App keeps it up to date with who's hired and the owner's name */
 export const SPEAKERS = new Map<string, string>()
+/** when a customer last complained of the wait (performance.now(), shops/grill/bar's gripe): the owner and the staff look alarmed a moment
+ * (the owner's: Overcooked's panic as the orders pile up) */
+export const RUSH = { at: -1e9 }

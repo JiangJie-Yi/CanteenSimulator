@@ -1,6 +1,6 @@
 # 交接（HANDOFF）
 
-最後更新：2026-11-05。新的 chat 先讀 `CLAUDE.md`（開發守則、檔案分層、BDD、開發者模式、效能守則），再讀本檔。
+最後更新：2026-11-06。新的 chat 先讀 `CLAUDE.md`（開發守則、檔案分層、BDD、開發者模式、效能守則），再讀本檔。
 
 ## 協作方式（2026-11-04 起，店主定的）
 
@@ -22,6 +22,7 @@
 | 灶台上的擺設（炭箱、行燈、冷凍櫃、飯桶） | `src/shops/grill/Decor.tsx` | 行燈、冷凍櫃的燈是 `scene/AnchoredLight.tsx`（燈掛在場景最上層，跟著擺設走） |
 | 地板材質 | `src/scene/FloorPiece.tsx`、`src/scene/floorBoards.ts` | 2026-11-04 退回優化前：卡通材質、暖棕色木板（`woodLooks.ts` 目前沒用） |
 | 開發者模式 | `src/shops/grill/edit.ts`、`Movable.tsx`、`CharacterViewer.tsx` | G 鍵進出；左下角 Dock 的「👤 角色預覽」跟著模式出現（`edit.ts` 第 156 行） |
+| 人物的臉與表情 | `src/scene/faceSheet.ts`、`blender/boss.py`（`head_patch`） | 老闆、店員、客人共用一支畫筆 `paintFace`；老闆店員換表情是移臉貼片的 UV（`setFace`，每人自己一份 `ownShape`），客人是原本的八格條；`setBossExpression`、`RUSH`（客人抱怨等太久時慌張）；人物面數 1,000 以下（CLAUDE.md「人物 1,000 面以下」） |
 | 純邏輯（可測） | `src/game/*.ts` | 每條規則都有 BDD 情境（`tests/bdd/`） |
 | 3D 模型 | `blender/*.py` → `public/models/*.glb` | Low-Poly 鐵律見 `CLAUDE.md` |
 

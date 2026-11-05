@@ -102,6 +102,9 @@ export function skinHull(width: number) {
  * A toon material taught the figure's `paint`: a flat vertex (the eyes' whites and darks) shows its colour as it is, unlit; a shadowless one
  * (the head) takes no shadow from the shop's lights. Kept with whatever the material already does to its shaders (the people's airbrush).
  */
+/** the least a figure's lit by, of its own colour (all of them: the owner, the staff, the guests) */
+export const FIGURE_FLOOR = 0.32
+
 export function paintable<M extends THREE.Material>(m: M): M {
   const before = m.onBeforeCompile
   m.onBeforeCompile = (sh, r) => {
@@ -110,7 +113,9 @@ export function paintable<M extends THREE.Material>(m: M): M {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPaint = paint;')
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vPaint;')
       .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin.replaceAll('&& receiveShadow )', '&& receiveShadow && vPaint.y > 0.5 )'))
-      .replace('#include <opaque_fragment>', 'outgoingLight = mix(outgoingLight, diffuseColor.rgb, vPaint.x);\n#include <opaque_fragment>')
+      // (never under a third of its own colour (the owner's: at night with the lights off the owner was a lump of charcoal): a figure
+      // still reads in the dark, its colours its own; in light it's above that and nothing changes)
+      .replace('#include <opaque_fragment>', `outgoingLight = mix(outgoingLight, diffuseColor.rgb, vPaint.x);\noutgoingLight = max(outgoingLight, diffuseColor.rgb * ${FIGURE_FLOOR.toFixed(2)});\n#include <opaque_fragment>`)
   }
   const key = m.customProgramCacheKey.bind(m)
   m.customProgramCacheKey = () => `${key()}|paint`
