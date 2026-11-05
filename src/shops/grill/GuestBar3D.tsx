@@ -60,7 +60,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -1428,6 +1428,8 @@ useGLTF.preload(SHOE_URL)
  */
 /** the shoe cupboard's one material: its parts' colours on their points */
 const SHOE_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
+/** one of a pair of shoes put away in a cubby */
+const SHOE_PAIR_GEO = new RoundedBoxGeometry(0.07, 0.052, 0.17, 2, 0.02)
 function ShoeCupboard() {
   const gltf = useGLTF(SHOE_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
@@ -1466,25 +1468,60 @@ function ShoeCupboard() {
       node.add(one)
       if (hull) node.add(hull)
     }
-    const doors: { o: THREE.Object3D; s: number }[] = []
-    root.traverse((o) => { const m = /^ShoeDoor([LR])\d+$/.exec(o.name); if (m) doors.push({ o, s: m[1] === 'L' ? -1 : 1 }) })
-    for (const d of doors) together(d.o)
+    const doors: { o: THREE.Object3D; s: number; cell: number; k: number }[] = []
+    root.traverse((o) => { const m = /^ShoeDoor([LR])(\d+)$/.exec(o.name); if (m) doors.push({ o, s: m[1] === 'L' ? -1 : 1, cell: +m[2], k: 0 }) })
+    // (each cubby's floor, from its door and the carcass's depth (the model as it stands, unturned): where its shoes go)
+    root.updateWorldMatrix(true, true)
     const cab = root.getObjectByName('ShoeCab')
+    const cabBox = cab ? new THREE.Box3().setFromObject(cab) : new THREE.Box3()
+    const cells: THREE.Vector3[] = []
+    for (const d of doors) {
+      const b = new THREE.Box3().setFromObject(d.o), c = b.getCenter(new THREE.Vector3())
+      cells[d.cell] = new THREE.Vector3(c.x, b.min.y + 0.004, (cabBox.min.z + cabBox.max.z) / 2 + 0.03)
+    }
+    for (const d of doors) together(d.o)
     if (cab) together(cab)
-    return { root, doors }
+    return { root, doors, cells }
   }, [gltf])
   const st = useRef({ open: false, k: 0 })
+  const g = useRef<THREE.Group>(null)
+  const pairs = useRef<(THREE.Group | null)[]>([])
+  const mats = useMemo(() => model.cells.map(() => new THREE.MeshToonMaterial({ color: '#444444' })), [model])
+  useEffect(() => () => { for (const m of mats) m.dispose() }, [mats])
   useFrame((_, dt) => {
     const s = st.current
     s.k += Math.sign((s.open ? 1 : 0) - s.k) * Math.min(Math.abs((s.open ? 1 : 0) - s.k), Math.min(dt, 0.1) * 2.4)
-    const e = s.k * s.k * (3 - 2 * s.k)
-    model.doors.forEach((d) => { d.o.rotation.y = d.s * e * (75 * Math.PI / 180) })
+    const now = performance.now()
+    // (all of them by a click; one at a time as a customer puts their shoes in or takes them out, open a moment)
+    model.doors.forEach((d) => {
+      const want = now - (SHOE_CELLS.kick.get(d.cell) ?? -1e9) < 1400 ? 1 : 0
+      d.k += Math.sign(want - d.k) * Math.min(Math.abs(want - d.k), Math.min(dt, 0.1) * 3.2)
+      const k = Math.max(s.k, d.k), e = k * k * (3 - 2 * k)
+      d.o.rotation.y = d.s * e * (75 * Math.PI / 180)
+    })
+    pairs.current.forEach((p, i) => {
+      const c = SHOE_CELLS.shoes.get(i)
+      if (!p) return
+      p.visible = !!c
+      if (c) mats[i].color.set(c)
+    })
+    if (g.current) { g.current.getWorldPosition(SHOE_CELLS.at); SHOE_CELLS.ready = true }
   })
   const says = () => (st.current.open ? '點擊關閉' : '點擊開啟')
   return (
     <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.open = !st.current.open; shrineDoor(st.current.open); setTip({ title: '【下駄箱】', hint: says() }) }}
       {...tipOver('【下駄箱】', '點擊開啟 / 關閉')}>
       <primitive object={model.root} />
+      <group ref={g}>
+        {/* (the shoes in each cubby: a pair, the customer's colour, toes out) */}
+        {model.cells.map((c, i) => (
+          <group key={i} name={`shoe-pair-${i}`} ref={(o) => { pairs.current[i] = o }} position={c} visible={false}>
+            {[-1, 1].map((sd) => (
+              <mesh key={sd} geometry={SHOE_PAIR_GEO} material={mats[i]} position={[sd * 0.045, 0.026, 0]} raycast={() => {}} />
+            ))}
+          </group>
+        ))}
+      </group>
     </group>
   )
 }
@@ -1972,6 +2009,8 @@ function Counter({ length }: { length: number }) {
 }
 
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcWash' | 'wcBack'; t: number
+  /** their shoes in a cubby of the cupboard; welcomed in */
+  shoesIn?: boolean; welcomed?: boolean
   /** (leaving) how long they've stood in the queue for the till; what's been said on the way out (getting up, paying, thanks) */
   hold?: number; said?: number
   /** how far along their way they'd come last frame, and whether they've stood still since (a pause: shoes, paying, getting up) */
@@ -1990,6 +2029,8 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   slippers?: boolean }
 /** how long they stand at the genkan's step changing their shoes */
 const SHOES_S = 1.2
+/** (their shoes go into the cupboard now: none left out on the genkan's stones) */
+const NO_SHOES: { at: THREE.Vector3; turn: number; colour: string }[] = []
 /** the money a customer's just paid, over their head: rising a hand's width and fading in 1.6 s, following them */
 function PayFloat({ text, follow, done }: { text: string; follow: () => THREE.Object3D | undefined; done: () => void }) {
   const g = useRef<THREE.Group>(null)
@@ -2014,6 +2055,24 @@ const PAY_S = 5.6
 const QUEUE_GAP = 0.6
 /** a walk that stops a while at a point along it: how far along, at a time when it would have been `d` */
 const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at + hold ? at : d - hold)
+/**
+ * A customer's moment at the genkan's step (`f` 0..1 through it; outside it, nothing): turned to the shoe cupboard, a little bow; their
+ * cubby (by their seat) opened a moment, their shoes put in it coming in (`entering`), taken out of it going
+ */
+function shoeStep(s: Shown, g: THREE.Object3D | undefined, f: number, entering: boolean) {
+  if (!g) return
+  if (f < 0 || f > 1) { g.rotation.x = 0; return }
+  const cell = s.seat % 9
+  if (SHOE_CELLS.ready && g.parent) {
+    const at = g.parent.worldToLocal(SHOE_CELLS.at.clone())
+    g.rotation.y = Math.atan2(at.x - g.position.x, at.z - g.position.z)
+  }
+  g.rotation.x = 0.16 * Math.sin(Math.PI * f)
+  // (its door open while they're at it, shut a moment after)
+  if (f > 0.12 && f < 0.85) SHOE_CELLS.kick.set(cell, performance.now())
+  if (f > 0.55 && entering && !s.shoesIn) { s.shoesIn = true; SHOE_CELLS.shoes.set(cell, SHOE_COLOURS[s.id % 5]) }
+  if (f > 0.55 && !entering && s.shoesIn !== false) { s.shoesIn = false; SHOE_CELLS.shoes.delete(cell) }
+}
 /** what's set at a customer's place (their soy, their drink) and their shoes left in the genkan: shared shapes */
 const AT_SEAT = {
   soy: new THREE.CircleGeometry(0.03, 16),
@@ -2608,12 +2667,22 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // in through the noren, along the aisle behind the stools (round the corner, for the other counter), and
         // in to their own stool
         // (stopping at the genkan's step a moment, to step out of their shoes and up into slippers)
-        const d = Math.min(len, withPause(s.t * SPEED * walkSpeedOf(kindOf(s.id).kind), stepAt(path), SHOES_S * SPEED * walkSpeedOf(kindOf(s.id).kind)))
+        const v = SPEED * walkSpeedOf(kindOf(s.id).kind), raw = s.t * v
+        const d = Math.min(len, withPause(raw, stepAt(path), SHOES_S * v))
         const { p, dir } = alongPath(path, d)
         s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < len
         s.lastD = d
         g?.position.copy(p)
         if (g) g.rotation.y = d < len ? Math.atan2(dir.x, dir.z) : st.yaw
+        // (welcomed in as they come through the noren: the servers and the owner)
+        if (!s.welcomed && s.t > 0.5) {
+          s.welcomed = true
+          const now = performance.now()
+          STAFF_TALK.push({ key: now + s.id, id: 'owner', text: LINES[lang].welcome, until: now + 2600 })
+          if (servers[0]) STAFF_TALK.push({ key: now + s.id + 0.5, id: servers[0].id, text: LINES[lang].welcome, until: now + 2600 })
+        }
+        // (at the step: their shoes off and into a cubby of the cupboard, turned to it, a little bow)
+        shoeStep(s, g, (raw - stepAt(path)) / (SHOES_S * v), true)
         s.slippers = d > stepAt(path)
         if (d >= len) {
           s.phase = 'sit'
@@ -2726,10 +2795,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const d = Math.max(0, Math.min(lp.len, withPause(withPause(raw, payAt, lp.payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v)))
         const { p, dir } = alongPath(lp.path, lp.len - d)
         s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < lp.len
+        // (at the step on the way out: their shoes out of their cubby and on)
+        const shoeFrom = lp.len - stepAt(lp.path)
+        const paid = withPause(raw, payAt, lp.payD ? PAY_S * v : 0)
         s.lastD = d
         s.slippers = lp.len - d > stepAt(lp.path)
         g?.position.copy(p)
         if (g) g.rotation.y = s.t < 0.8 ? st.yaw : Math.atan2(-dir.x, -dir.z)
+        shoeStep(s, g, (paid - shoeFrom) / (SHOES_S * v), false)
         // (at the till, facing it: the register's reading follows what they owe)
         // (waiting to pay: on the way out and not yet past the till)
         if (lp.payD && raw < payAt + PAY_S * v) queue++
@@ -3400,17 +3473,6 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   })
 
   // (the customers' shoes at the door and the soy at their places, for SeatBits: worked out again only when who's in, and where, changes)
-  const seatShoes = useMemo(() => {
-    const c0 = counters[0]
-    return shown.filter((s) => s.slippers).slice(0, 9).map((s, k) => ({
-      // (three pairs abreast, on the till's side of the way in, out of everyone's feet and clear of the doorpost)
-      at: c0.at.clone().addScaledVector(c0.along, c0.length / 2 + GENKAN.along[0] + 0.08 + Math.floor(k / 3) * 0.12)
-        .addScaledVector(c0.lay, -0.7 - (k % 3) * 0.12).setY(-GENKAN.depth),
-      turn: Math.atan2(c0.along.x, c0.along.z) + Math.PI + (s.id % 3 - 1) * 0.15,
-      colour: SHOE_COLOURS[s.id % 5],
-    }))
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [shown.map((s) => (s.slippers ? s.id : -1)).join(), counters])
   const seatSoys = useMemo(() => shown.filter((s) => s.phase !== 'enter' && s.phase !== 'leave').map((s) => {
       const st = seats[s.seat], c = counters[st.counter]
       const x = st.mid.clone().sub(c.at).dot(c.along)
@@ -3471,7 +3533,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           sits and the way to it stay as they are, so no one is put out of a seat) */}
       <Stools seats={seats} />
       {/* their shoes, left in pairs on the genkan's stone by the step, a pair for each of them inside (all of them one draw: SeatBits) */}
-      {given && <SeatBits shoes={seatShoes} soys={seatSoys} />}
+      {given && <SeatBits shoes={NO_SHOES} soys={seatSoys} />}
       {/* (the fridges' own light inside, always on: it lights the drinks whatever the room's light, and shows the more with the lamps out; one
           for the pair, between them, and here from the first, not with the fridges as they come in later: a light added to the scene has every
           material in it made again, a stall) */}

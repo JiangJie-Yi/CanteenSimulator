@@ -101,6 +101,13 @@ export const CUBBY_OPEN = { left: false, right: false }
 export const CUBBY_KICK = { left: -1e9, right: -1e9 }
 /** the staff door held open till then (performance.now()): one of the staff going up or coming down the stair behind it */
 export const STAFF_DOOR_HOLD = { until: -1e9 }
+/**
+ * The shoe cupboard's cubbies (the owner's: a customer's shoes go into one as they come in and out of it as they go): the colour of the
+ * shoes in each (by cell, 0..8), when each one's door was last opened for them (performance.now(): open a moment), and where the cupboard
+ * stands (the world: the customers turn to it)
+ */
+export const SHOE_CELLS = { shoes: new Map<number, string>(), kick: new Map<number, number>(), at: new THREE.Vector3(), ready: false }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shoes?: typeof SHOE_CELLS }).__shoes = SHOE_CELLS
 export const TISSUES_KEY = 'jgs-tissues-1'
 /** each place's box of tissues (sheets left; game/tissues): a customer takes a few as they finish, the owner one at a time from the
  * drawer; swapped for a full box from the spares before each opening (App); kept in the browser */

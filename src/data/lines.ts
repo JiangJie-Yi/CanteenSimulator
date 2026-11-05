@@ -22,6 +22,7 @@ const ZH = {
   // (the men's has no Otohime: said there it was wrong)
   wcNice: (id: number) => `#${id} 這家店連洗手間都很乾淨呢。`,
   wcGo: (id: number, k: number) => `#${id} ${['借個洗手間～', '稍微離席一下。', '喝太飽了，去下洗手間…'][k % 3]}`,
+  welcome: 'いらっしゃいませ！（歡迎光臨！）',
   payGo: (id: number, k: number) => `#${id} ${['吃得好飽，來去結帳吧。', '老闆，買單！'][k % 2]}`,
   payThanks: (id: number, k: number) => `#${id} ${['謝謝招待，很好吃喔！', '烤魚真是極品，下次再來！'][k % 2]}`,
   cashierThanks: (bill: string) => `謝謝光臨！一共是 ${bill}，慢走喔～`,
@@ -54,6 +55,7 @@ const JA: typeof ZH = {
   noReceipt: (id) => `#${id} レシートの紙切れ？じゃあいいや……`,
   wcNice: (id) => `#${id} このお店、トイレまできれいだね。`,
   wcGo: (id, k) => `#${id} ${['ちょっとお手洗いに～', '少し失礼しますね。', '飲みすぎた、トイレ行こ…'][k % 3]}`,
+  welcome: 'いらっしゃいませ！',
   payGo: (id, k) => `#${id} ${['お腹いっぱい、お会計しよう。', '大将、お勘定！'][k % 2]}`,
   payThanks: (id, k) => `#${id} ${['ごちそうさま、美味しかったよ！', '焼き魚、絶品だった。また来るね！'][k % 2]}`,
   cashierThanks: (bill) => `ありがとうございました！${bill}になります、お気をつけて～`,
@@ -86,6 +88,7 @@ const EN: typeof ZH = {
   noReceipt: (id) => `#${id} Out of receipt paper? Never mind, then…`,
   wcNice: (id) => `#${id} Even the restroom here is spotless.`,
   wcGo: (id, k) => `#${id} ${['Just popping to the restroom~', 'Excuse me a moment.', 'Drank a bit much, off to the loo...'][k % 3]}`,
+  welcome: 'Irasshaimase! Welcome in!',
   payGo: (id, k) => `#${id} ${["So full. Let's pay up.", 'The bill, please!'][k % 2]}`,
   payThanks: (id, k) => `#${id} ${['Thank you, that was delicious!', 'That grilled fish was superb. See you again!'][k % 2]}`,
   cashierThanks: (bill) => `Thank you! That's ${bill}. Take care~`,
