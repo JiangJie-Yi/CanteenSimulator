@@ -838,6 +838,20 @@ export const CHEF_CARRY = {
 const CARRY_S = { reach: 0.3, carry: 0.5, place: 0.35, back: 0.3, idle: 0 }
 /** how far he steps from his place toward what he's at (he's in the notch: the fire's right before him), and how far he leans setting it */
 const CARRY_STEP = 0.08, CARRY_LEAN = 0.26
+/**
+ * The chef's long metal chopsticks (金箸): what's further than his arm reaches (the far side of the hearth) he takes up and sets down with
+ * them, the pair reaching from his hand to it, so it doesn't slide to his hand by itself. Two thin rods from the origin along +z, 1 long
+ * (stretched to the distance), a little apart.
+ */
+const TONGS_GEO = (() => {
+  const a = new THREE.CylinderGeometry(0.0035, 0.0022, 1, 5).rotateX(Math.PI / 2).translate(-0.006, 0, 0.5)
+  const b = a.clone().translate(0.012, 0, 0)
+  return mergeGeometries([a, b])!
+})()
+const TONGS_MAT = new THREE.MeshToonMaterial({ color: '#8d9299' })
+/** further than this (the world's units) from his hand, he uses them */
+const ARM_REACH = 0.6
+const TONGS_Z = new THREE.Vector3(0, 0, 1)
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __chefCarry?: typeof CHEF_CARRY }).__chefCarry = CHEF_CARRY
 /** the Movable each store is, to find where it's been put (the cubby has none: it's the cook table's) */
 const STORE_PIECE: Record<Exclude<Store, 'cubby'>, string> = { freezer: 'freezer', ricetub: 'ricetub', sacks: 'produce' }
@@ -3226,6 +3240,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
   // pieces by node, found by scanning the model root; rescanned whenever Dish adds a cloned portion
   const pieces = useRef<Piece[]>([])
+  /** the chef's long chopsticks (CHEF_CARRY: out while he reaches further than his arm) */
+  const tongs = useRef<THREE.Mesh>(null)
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __pieces?: typeof pieces }).__pieces = pieces
   /** (on a phone) who's had their drink from the fridge */
   const drank = useRef(new Set<number>())
@@ -6252,6 +6268,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (what the chef's carrying: where it is through each step, and where he stands; it holds still in its own flight meanwhile)
     {
       const C = CHEF_CARRY
+      if (tongs.current) tongs.current.visible = false
       const p = C.key ? pieces.current.find((q) => q.key === C.key) : undefined
       if (C.key && (!p || !present(p) || p.eaten || p.trash >= 0 || performance.now() - CHEF_TRIP.seenAt > 1000)) {
         // (gone meanwhile, or nobody to carry it: let go, it goes on by itself)
@@ -6310,6 +6327,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           } else { C.phase = 'idle'; C.key = null; C.lean = 0; C.hold = false }
         }
         if (C.phase === 'back' || C.phase === 'idle') { if (C.kind === 'toFire') p.homeFlight = 1 }
+        // (the long chopsticks from his hand to it, while it's further than his arm reaches: out to it as he reaches, holding it as it comes in)
+        const tg = tongs.current
+        if (tg?.parent) {
+          const tip = p.node.getWorldPosition(new THREE.Vector3())
+          const from = CHEF_TRIP.hand.clone()
+          const far = tip.distanceTo(from)
+          const on = (C.phase === 'reach' || C.phase === 'carry' || C.phase === 'place') && far > ARM_REACH
+          tg.visible = on
+          if (on) {
+            if (C.phase === 'reach') tip.lerpVectors(from, tip, e)
+            const a = tg.parent.worldToLocal(from.clone()), b = tg.parent.worldToLocal(tip)
+            tg.position.copy(a)
+            tg.quaternion.setFromUnitVectors(TONGS_Z, b.clone().sub(a).normalize())
+            tg.scale.set(1, 1, a.distanceTo(b))
+          }
+        }
       }
     }
     if (ai && active) {
@@ -6443,6 +6476,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <BossSpot open={space === 'open'} lang={lang} />
         {/* (and the notch's wooden step he and his cook stand on) */}
         <NotchStep />
+        {/* (the chef's long chopsticks, out while he reaches across the hearth) */}
+        <mesh ref={tongs} name="chef-tongs" geometry={TONGS_GEO} material={TONGS_MAT} visible={false} raycast={() => {}} />
         {/* (the staff's outfits drawn a moment under the notch's floor as the shop loads: their programs made then, not as they first walk in) */}
         <Suspense fallback={null}><group position={CHEF_AT}><StaffWarm /></group></Suspense>
       </>)}
