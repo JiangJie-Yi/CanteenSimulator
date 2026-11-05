@@ -6,6 +6,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { StaticBatch } from '@/scene/StaticBatch'
+import { warmLater } from '@/scene/Prewarm'
 import { FloorPiece } from '@/scene/FloorPiece'
 import { QUALITY } from '@/scene/quality'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
@@ -53,6 +54,7 @@ import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, STACK_CAP, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring, putBack, RACK_FULL, unload, washOne } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
+import { SCOOP_S, WASH_S, kamaTick, riceGoes, scoopIn, setOn } from '@/game/rice'
 import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
@@ -60,7 +62,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -2167,7 +2169,9 @@ type PlateRun = { key: number; seat: number; guest: number; phase: 'ready' | 'se
   /** (on the plating place) its slot there */
   slot?: number
   /** (done with) the sticks left on it, of what was eaten off it: into the bin by the sink with them */
-  sticks?: number }
+  sticks?: number
+  /** (done with) the whole fish eaten off it, their bones left on it; and the customer's emptied glass beside it, cleared with it */
+  bones?: number; glass?: [number, number, number] }
 const STACK_GAP = 0.026
 const UP_Y = new THREE.Vector3(0, 1, 0)
 /** how many used sticks the bin by the sink shows at most (a bundle standing up out of it) */
@@ -2183,13 +2187,22 @@ const READY_S = 1.2
 /** a plate's size on the cook table at the plating place (a little smaller: the room there's between the tasting bowl and the bin), and how many of its stack are drawn at most (a few over what the kitchen
  * keeps there: those put back from a slot whose customer left) */
 const ON_TABLE = 0.85
+/** the plater's rice bowl (a wooden rice-washing bowl, open), and the rice in it */
+const RICE_BOWL_GEO = new THREE.CylinderGeometry(0.1, 0.07, 0.07, 16, 1, true).translate(0, 0.035, 0)
+const RICE_IN_GEO = new THREE.CylinderGeometry(0.092, 0.08, 0.025, 16)
+/** how long a server wipes the bar down where a plate was cleared: two strokes along and back */
+const WIPE_S = 1.1
+/** where they stand to wipe it: along the bar from the seat's middle (between its stool and the next), and back from the bar's middle line */
+const WIPE_STAND = [0.34, 0.48] as const
+/** the cloth they wipe it with: a folded white towel */
+const RAG_GEO = new RoundedBoxGeometry(0.085, 0.007, 0.05, 1, 0.003)
 const PASS_STACK_SHOWN = STACK_CAP + 3
 /** a plate's size in the sink, against its own */
 const IN_SINK = 0.78
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
 const WASH_EACH = 0.5
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
-const KITCHEN_BLOCKS = new Set(['ricetub', 'misopot', 'freezer', 'platerack', 'platerack2', 'sink', 'sink-bin', 'produce', 'coalsack'])
+const KITCHEN_BLOCKS = new Set(['ricetub', 'misopot', 'hagama', 'freezer', 'platerack', 'platerack2', 'sink', 'sink-bin', 'produce', 'coalsack'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
@@ -2200,11 +2213,60 @@ const SMEAR_GEO = new THREE.CircleGeometry(0.058, 18)
 const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.18, 5)
 /** where on a done-with plate its used sticks lie, criss-cross (as many as were eaten off it, up to four drawn) */
 const STICKS_ON = [[-0.02, 0.6], [0.015, -0.4], [-0.035, 1.3], [0.03, 0.15]] as const
+/**
+ * A grilled fish's bones as they're left on the plate (the owner's): the spine, a comb of ribs either side of it, the tail fin; and the
+ * head, browned. One geometry each (shared by every plate), lying along x, about 15 cm.
+ */
+const BONES_GEO = (() => {
+  const parts: THREE.BufferGeometry[] = []
+  const spine = new THREE.CylinderGeometry(0.0028, 0.0022, 0.12, 5)
+  spine.rotateZ(Math.PI / 2)
+  parts.push(spine)
+  for (let i = 0; i < 7; i++) for (const sd of [-1, 1]) {
+    const len = 0.03 - Math.abs(i - 2.5) * 0.003
+    const rib = new THREE.CylinderGeometry(0.0011, 0.0007, len, 4)
+    rib.translate(0, len / 2, 0)
+    rib.rotateZ(sd * 0.5)
+    rib.rotateX(sd * Math.PI / 2)
+    rib.translate(-0.045 + i * 0.014, 0, 0)
+    parts.push(rib)
+  }
+  const tail = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.028, 0.016), new THREE.Vector2(0.022, 0), new THREE.Vector2(0.028, -0.016)]))
+  tail.rotateX(-Math.PI / 2)
+  tail.translate(0.058, 0.001, 0)
+  parts.push(tail)
+  const g = mergeGeometries(parts.map((p) => p.index ? p.toNonIndexed() : p).map((p) => { p.deleteAttribute('uv'); return p }))
+  for (const p of parts) p.dispose()
+  return g
+})()
+const HEAD_GEO = (() => {
+  const g = new THREE.IcosahedronGeometry(0.016, 1)
+  g.scale(1.3, 0.55, 0.8)
+  g.translate(-0.074, 0.004, 0)
+  return g
+})()
+/** where the bones lie on a done-with plate (as many fish as were eaten off it, up to two drawn) */
+const BONES_ON = [[0.0, -0.025, 0.25], [0.01, 0.03, -0.35]] as const
+/** a customer's emptied glass, beside the plate, cleared with it (open, a little beer foam left round its foot) */
+const GLASS_GEO = new THREE.CylinderGeometry(0.03, 0.025, 0.1, 14, 1, true)
+const GLASS_FOOT = new THREE.CylinderGeometry(0.0255, 0.0255, 0.006, 14)
+/** where it rides once the plate's up on the tray: on the plate, at its middle */
+const GLASS_ON: [number, number, number] = [0.02, 0, 0.02]
+// (a done-with plate's bones and glass, and the plater's rice bowl, first shown mid-shift: their shaders made with the rest at load (scene/Prewarm))
+{
+  const g = new THREE.Group()
+  g.add(new THREE.Mesh(GLASS_GEO, new THREE.MeshBasicMaterial({ color: '#d8eef4', transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide })))
+  g.add(new THREE.Mesh(BONES_GEO, new THREE.MeshToonMaterial({ color: '#efe6cf' })))
+  g.add(new THREE.Mesh(GLASS_FOOT, new THREE.MeshToonMaterial({ color: '#b98b56', side: THREE.DoubleSide })))
+  warmLater(g)
+}
 
 /** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and the sticks left on it, of what was eaten off it,
  * thrown away with it at the sink (the owner's)); drawn again only when it gets dirty */
 const Plate = memo(PlateImpl)
-function PlateImpl({ dirty = false, design = 0, sticks = 1 }: { dirty?: boolean; design?: number; sticks?: number }) {
+function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass }: { dirty?: boolean; design?: number; sticks?: number; bones?: number
+  /** the emptied glass, where it stands from the plate's middle (on the bar where it was drunk, or on the plate being cleared) */
+  glass?: readonly [number, number, number] }) {
   return (
     <group>
       <mesh geometry={PLATE_GEO} castShadow receiveShadow>
@@ -2223,6 +2285,22 @@ function PlateImpl({ dirty = false, design = 0, sticks = 1 }: { dirty?: boolean;
               <meshToonMaterial color="#c9a46a" />
             </mesh>
           ))}
+          {/* (the bones of each fish eaten off it, picked clean, the head browned) */}
+          {BONES_ON.slice(0, Math.min(2, bones)).map(([x, z, yaw], i) => (
+            <group key={`b${i}`} name="plate-bones" position={[x, 0.016 + i * 0.004, z]} rotation-y={yaw}>
+              <mesh geometry={BONES_GEO}><meshToonMaterial color="#efe6cf" /></mesh>
+              <mesh geometry={HEAD_GEO}><meshToonMaterial color="#8a5a30" /></mesh>
+            </group>
+          ))}
+          {/* (their glass, drunk up) */}
+          {glass && (
+            <group name="plate-glass" position={[glass[0], glass[1] + 0.05, glass[2]]}>
+              <mesh geometry={GLASS_GEO}>
+                <meshBasicMaterial color="#d8eef4" transparent opacity={0.35} depthWrite={false} side={THREE.DoubleSide} />
+              </mesh>
+              <mesh geometry={GLASS_FOOT} position={[0, -0.047, 0]}><meshToonMaterial color="#f3ead2" /></mesh>
+            </group>
+          )}
         </>
       )}
     </group>
@@ -2406,11 +2484,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const waiterObjs = useRef<(THREE.Group | null)[]>([])
   /** the kitchen's plater on their way to the racks for plates, and back with them to the plating place ('idle': at their place in the kitchen,
    * drawn there by Roasting) */
-  const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home'; t: number; path: THREE.Vector3[]; len: number
+  // (and the kitchen's rice (game/rice): to the sink to wash a pot's worth, to the stove to set it on ('toSink', 'wash', 'toKama', 'load'); cooked,
+  // to the stove to scoop it out and to the tub with it ('toCooked', 'scoop', 'toTub', 'fill'))
+  const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home' | 'toSink' | 'wash' | 'toKama' | 'load' | 'toCooked' | 'scoop' | 'toTub' | 'fill'
+    t: number; path: THREE.Vector3[]; len: number
     pos: THREE.Vector3; yaw: number; n: number }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
   const platerObj = useRef<THREE.Group | null>(null)
   const [platerMoving, setPlaterMoving] = useState(false)
   const platerStack = useRef<THREE.Group>(null)
+  /** the bowl of rice in the plater's hands (washing it, carrying it to the pot, and the cooked rice to the tub) */
+  const platerBowl = useRef<THREE.Group>(null)
   /** the plates stacked at the plating place, and those standing in the dryer (drawn as many as there are) */
   const plateStack = useRef<THREE.Group>(null)
   const dryerPlates = useRef<THREE.Group>(null)
@@ -2552,6 +2635,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const leftDirty = (r: PlateRun) => {
     r.sticks = SEAT_STICKS.get(r.seat) ?? 0
     SEAT_STICKS.delete(r.seat)
+    r.bones = SEAT_BONES.get(r.seat) ?? 0
+    SEAT_BONES.delete(r.seat)
+    // (where their drink stood, from the plate: the glass is left there till the plate's taken, then rides on it)
+    if (shownRef.current.find((x) => x.id === r.guest)?.drink) {
+      const st = seats[r.seat], c = counters[st.counter]
+      r.glass = st.mid.clone().addScaledVector(c.along, PLACE.drink[0]).addScaledVector(c.lay, PLACE.drink[1]).setY(top).sub(plateAt(r.seat)).toArray() as [number, number, number]
+    } else r.glass = undefined
     if (waiters.current.length) { r.phase = 'dirty'; r.t = 0 } else { r.phase = 'clear'; r.t = -CLEAR_DELAY }
   }
   /** (every second) the plates out at seats looked over for any left where nobody sits */
@@ -2561,6 +2651,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const dryerAt = (k: number) => inBar('SinkDryerRack0', endOf(1)).lerp(inBar('SinkDryerRack1', endOf(1)), DRYER_CAP > 1 ? k / (DRYER_CAP - 1) : 0)
   /** each server's stack of dried plates, drawn on their tray while they carry it to the racks */
   const stackObjs = useRef<(THREE.Group | null)[]>([])
+  const ragObjs = useRef<(THREE.Mesh | null)[]>([])
   const shownRef = useRef<Shown[]>([])
   // (the shop open: its furnishings can't be moved about by hand; shut, they can: edit mode, key G)
   useEffect(() => { setLocked(open) }, [open])
@@ -2599,6 +2690,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     PLATING.slots.fill(null)
     PLATES_OUT.clear()
     SEAT_STICKS.clear()
+    SEAT_BONES.clear()
     Object.assign(DRYER, { n: 0, left: null, open: 0 })
     SINK_BIN.sticks = 0
     platerRun.current = { phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 }
@@ -3046,13 +3138,43 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       const away = (on: boolean) => { if (plater) PLATER_OUT.id = on ? plater.id : null; else OWNER_OUT.on = on }
       pl.t += step
+      // (the rice pot cooking on its stove, by the game's clock; cooked, said in the kitchen's log (the owner's))
+      {
+        const r = kamaTick(RICE.kama, step)
+        RICE.kama = r.kama
+        if (r.cooked) onSay?.('chef', LINES[lang].riceDone)
+      }
+      /** where they stand at the rice pot's stove, and at the rice tub (the same side of it); its top, where the rice goes in and comes out */
+      const kamaSpot = () => { marks.current.delete('kama-front'); return inBar('kama-front', home()).setY(0) }
+      const kamaTop = () => { marks.current.delete('kama-top'); return inBar('kama-top', home()) }
+      const tubSpot = () => { marks.current.delete('ricetub-mid'); return inBar('ricetub-mid', home()).add(kamaSpot().sub(kamaTop()).setY(0)).setY(0) }
+      const faceTo = (v: THREE.Vector3) => { pl.yaw = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z) }
+      const setOff = (to: THREE.Vector3, phase: typeof pl.phase) => {
+        pl.path = kitchenRoute(pl.pos, to)
+        pl.len = pathLength(pl.path)
+        pl.phase = phase
+        pl.t = 0
+      }
       if (!given || ownerServes) {
-        // (nobody to plate: a bar on its own, or the owner out serving it all himself; the plating place's stack kept up as it's used)
+        // (nobody to plate: a bar on its own, or the owner out serving it all himself; the plating place's stack kept up as it's used, and
+        // the rice cooked and into the tub by itself)
         if (open && PLATING.stock < STACK_CAP && PLATE_RACK.n > 0) { PLATING.stock += 1; PLATE_RACK.n -= 1 }
+        if (open && riceGoes(RICE.tub, RICE.kama)) RICE.kama = setOn()
+        if (RICE.kama.state === 'done') { const r = scoopIn(RICE.tub); RICE.tub = r.tub; RICE.kama = r.kama }
       } else if (pl.phase === 'idle') {
         if (pl.t > 0.5) {
           pl.t = 0
-          if (open && !SHOP.leaving && platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
+          if (open && !SHOP.leaving && RICE.kama.state === 'done') {
+            // (the pot's cooked: to it, to scoop the rice out into the tub)
+            pl.pos.copy(home())
+            setOff(kamaSpot(), 'toCooked')
+            away(true)
+          } else if (open && !SHOP.leaving && riceGoes(RICE.tub, RICE.kama) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
+            // (the tub's running low: to the sink to wash the next pot's rice)
+            pl.pos.copy(home())
+            setOff(sinkFront(), 'toSink')
+            away(true)
+          } else if (open && !SHOP.leaving && platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
             pl.pos.copy(home())
             pl.path = kitchenRoute(pl.pos, rackFront(rackNow()))
             pl.len = pathLength(pl.path)
@@ -3091,7 +3213,28 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.phase = 'idle'
         away(false)
       })
-      const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'home'
+      else if (pl.phase === 'toSink') walk(() => { pl.phase = 'wash'; RICE.washing = true; faceTo(inBar('SinkBasinFloor', endOf(1))) })
+      else if (pl.phase === 'wash' && pl.t > WASH_S) {
+        // (washed, the water run off it, to the stove with it)
+        RICE.washing = false
+        meterWater('cooking', 20)
+        setOff(kamaSpot(), 'toKama')
+      } else if (pl.phase === 'toKama') walk(() => { pl.phase = 'load'; faceTo(kamaTop()) })
+      else if (pl.phase === 'load' && pl.t > 0.8) {
+        // (into the pot, its lid on, the fire under it: cooking)
+        RICE.kama = setOn()
+        setOff(home(), 'home')
+      } else if (pl.phase === 'toCooked') walk(() => { pl.phase = 'scoop'; faceTo(kamaTop()) })
+      else if (pl.phase === 'scoop' && pl.t > SCOOP_S) setOff(tubSpot(), 'toTub')
+      else if (pl.phase === 'toTub') walk(() => { pl.phase = 'fill'; faceTo(inBar('ricetub-mid', pl.pos)) })
+      else if (pl.phase === 'fill' && pl.t > 0.8) {
+        // (into the tub: a pot's worth of rice for the rice balls)
+        const r = scoopIn(RICE.tub)
+        RICE.tub = r.tub
+        RICE.kama = r.kama
+        setOff(home(), 'home')
+      }
+      const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'home' || pl.phase === 'toSink' || pl.phase === 'toKama' || pl.phase === 'toCooked' || pl.phase === 'toTub'
       if (mv !== platerMoving) setPlaterMoving(mv)
       const o = platerObj.current
       if (o) {
@@ -3100,6 +3243,25 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.rotation.y = pl.yaw
         // (up on the kitchen's dais)
         if (KITCHEN_DROP < 0) o.position.y += -KITCHEN_DROP / scale
+      }
+      // (the rice in its bowl in their hands: washing it, to the pot with it (going in at 'load'); scooped out of the pot, to the tub with it)
+      const pb = platerBowl.current
+      if (pb && o) {
+        const holding = ['wash', 'toKama', 'load', 'scoop', 'toTub', 'fill'].includes(pl.phase)
+        pb.visible = holding
+        // (both hands out in front, holding it (or the plates))
+        o.userData.carry = holding || (pl.n > 0 && pl.phase !== 'idle')
+        if (holding) {
+          const hands = o.position.clone().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
+          // (swirled in the water as it's washed)
+          if (pl.phase === 'wash') hands.add(new THREE.Vector3(Math.sin(pl.t * 9) * 0.02, -0.03, Math.cos(pl.t * 9) * 0.02))
+          const k = pl.phase === 'load' || pl.phase === 'fill' ? Math.min(1, pl.t / 0.6) : pl.phase === 'scoop' ? Math.min(1, pl.t / SCOOP_S) : 0
+          const over = pl.phase === 'fill' ? inBar('ricetub-mid', hands) : kamaTop()
+          pb.position.lerpVectors(hands, over, Math.sin(Math.PI * k) * 0.6)
+          pb.rotation.z = pl.phase === 'load' || pl.phase === 'fill' ? Math.sin(Math.PI * k) * 1.1 : 0
+          const rice = pb.getObjectByName('bowl-rice')
+          if (rice) rice.scale.setScalar(pl.phase === 'load' || pl.phase === 'fill' ? Math.max(0.01, 1 - k) : pl.phase === 'scoop' ? Math.max(0.01, k) : 1)
+        }
       }
       // (the plates in their hands, out in front of them)
       const ps = platerStack.current
@@ -3293,7 +3455,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           w.phase = 'drop'
         }
       })
-      else if (w.phase === 'clearTake' && w.t > 0.4) {
+      else if (w.phase === 'clearTake' && w.t > 0.45 + WIPE_S) {
         // (another dirty plate at this counter still to take: on along the aisle to it; or back in through their gate, across to the sink)
         const next = runs.current.find((x) => (w.carry ?? []).includes(x.key) && x.phase === 'dirty')
         const st = seats[w.seat]
@@ -3396,6 +3558,26 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       const o = waiterObjs.current[wi]
       if (ownerServes) OWNER_OUT.on = w.phase !== 'idle'
+      // (the plate up on the tray, the bar where it was wiped down with a cloth, twice along and back (the owner's))
+      const wiping = w.phase === 'clearTake' && w.t > 0.45 && w.t < 0.45 + WIPE_S && w.seat >= 0
+      if (o) o.userData.wipe = wiping ? (w.t - 0.45) / WIPE_S : undefined
+      // (they step in to the bar's edge between the stools for it, facing it, and back out: the cloth's under their hand (StaffFigure's
+      // wipe: the right hand out on the top, along and back), on the near edge of the top where the plate was)
+      let wipeAt: { p: THREE.Vector3; yaw: number; k: number } | null = null
+      const rag = ragObjs.current[wi]
+      if (rag) rag.visible = wiping
+      if (wiping) {
+        const st = seats[w.seat], c = counters[st.counter], p = (w.t - 0.45) / WIPE_S
+        const stand = st.mid.clone().addScaledVector(c.lay, -WIPE_STAND[1]).addScaledVector(c.along, WIPE_STAND[0]).setY(w.pos.y)
+        const yaw = Math.atan2(c.lay.x, c.lay.z)
+        const k = Math.min(1, p / 0.15, (1 - p) / 0.15)
+        wipeAt = { p: stand, yaw, k: k * k * (3 - 2 * k) }
+        if (rag) {
+          const hand = new THREE.Vector3(0.06 + Math.sin(p * Math.PI * 4) * 0.12, 0, 0.4).multiplyScalar(STAFF_SCALE).applyAxisAngle(UP_Y, yaw)
+          rag.position.copy(stand).add(hand).setY(top + 0.006)
+          rag.rotation.y = yaw + Math.PI / 2 + Math.sin(p * Math.PI * 4) * 0.25
+        }
+      }
       if (o && SHOP.leaving && !ownerServes) {
         // (the shop's shut and empty: finishing up a moment where they are, then out through their gate, along the aisle (round the corner
         // from the side counter's) to the front door, a nod back in, and through it fading, as the customers go (commuteWalk))
@@ -3415,6 +3597,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.visible = !ownerServes || OWNER_OUT.on
         o.position.copy(w.pos)
         o.rotation.y = w.yaw
+        if (wipeAt) {
+          o.position.lerp(wipeAt.p, wipeAt.k)
+          o.rotation.y = w.yaw + Math.atan2(Math.sin(wipeAt.yaw - w.yaw), Math.cos(wipeAt.yaw - w.yaw)) * wipeAt.k
+        }
       }
       // (up on the kitchen's dais while they're over it)
       if (o && KITCHEN_DROP < 0) {
@@ -3454,7 +3640,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // the dryer drying (game/plates), its door down while someone's at it
     if (DRYER.left !== null && DRYER.left > 0) DRYER.left = dryerTick(DRYER, step).left
     DRYER.open = waiters.current.some((x) => x.phase === 'wash' || x.phase === 'unloadTake') ? 1 : 0
-    SINK.washing = waiters.current.some((x) => x.phase === 'wash') || wash.current !== null
+    SINK.washing = waiters.current.some((x) => x.phase === 'wash') || wash.current !== null || RICE.washing
     // (the plating place's stack of clean plates, the plates in the dryer, and the sticks in the bin: as many drawn as there are)
     plateStack.current?.children.forEach((c, i) => { c.visible = i < PLATING.stock })
     if (DRYER.n > 0 && dryerPlates.current) {
@@ -3599,6 +3785,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </group>
       )}
       {given && (
+        <group ref={platerBowl} visible={false}>
+          {/* (a wooden rice-washing bowl, the rice in it) */}
+          <mesh geometry={RICE_BOWL_GEO}><meshToonMaterial color="#b98b56" side={THREE.DoubleSide} /></mesh>
+          <mesh name="bowl-rice" geometry={RICE_IN_GEO} position={[0, 0.045, 0]}><meshToonMaterial color="#f6f2e8" /></mesh>
+        </group>
+      )}
+      {given && (
         <group ref={platerStack} visible={false}>
           {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * STACK_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK}><Plate design={i + 7} /></group>)}
         </group>
@@ -3609,6 +3802,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * STACK_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK} name={`stack-plate-${i}`}><Plate design={i + 3} /></group>)}
         </group>
       ))}
+      {/* (each server's cloth, out on the bar as they wipe it down) */}
+      {waiters.current.map((_, wi) => (
+        <mesh key={`rag${wi}`} name={`bar-rag-${wi}`} ref={(o) => { ragObjs.current[wi] = o }} geometry={RAG_GEO} visible={false} raycast={() => {}}>
+          <meshToonMaterial color="#f2efe6" />
+        </mesh>
+      ))}
       {runs.current.map((r) => (
         <group key={r.key} name={`plate-run-${r.key}`} ref={(o) => {
           if (!o) return void runObjs.current.delete(r.key)
@@ -3618,7 +3817,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             o.position.copy(r.from)
           }
         }}>
-          <Plate dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} design={designOf(r.key)} sticks={r.sticks ?? 1} />
+          <Plate dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)} />
         </group>
       ))}
       <Later stage={3}>

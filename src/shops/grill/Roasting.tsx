@@ -26,6 +26,7 @@ import { StaffFigure, StaffWarm, TRAY_AT } from '@/scene/StaffFigure'
 import { commuteOf, delayOf, paceOf } from '@/game/commute'
 import { COMMUTERS, makeTrip, through, tripStep, type Trip } from './commuteWalk'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
+import { SHAPE_S, takeRice } from '@/game/rice'
 import { CubbyStock } from './KitchenStores'
 import { QUALITY } from '@/scene/quality'
 import { seasonSound, sprinkleTick } from './seasonSound'
@@ -58,7 +59,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -820,6 +821,8 @@ export const CHEF_TRIP = {
   hand: new THREE.Vector3(),
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __chefTrip?: typeof CHEF_TRIP }).__chefTrip = CHEF_TRIP
+/** how long what he's brought is prepared on the board: a rice ball shaped in his hands (game/rice's SHAPE_S), else salted, scored, skewered */
+const prepOf = (store: Store) => (store === 'ricetub' ? SHAPE_S : PREP_S)
 /**
  * What the head chef has in his hands (the owner's: nothing flies across the kitchen by itself): a piece taken off the board to the fire,
  * or off the fire to the plating place. Its steps: reaching for it where it is, carrying it in his hands as he turns and steps to where
@@ -934,13 +937,17 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       o.position.copy(T.spot)
       o.rotation.y = Math.atan2(T.face.x - T.spot.x, T.face.z - T.spot.z)
       T.t += dt
-      if (T.t >= TAKE_S) { T.phase = afterPhase(T.phase); T.t = 0 }
+      if (T.t >= TAKE_S) {
+        // (a rice ball's rice out of the tub, for each one he's bringing (game/rice))
+        if (T.store === 'ricetub') for (let i = 0; i < T.keys.length; i++) RICE.tub = takeRice(RICE.tub)
+        T.phase = afterPhase(T.phase); T.t = 0
+      }
       hand()
       return true
     }
     if (T.phase === 'prepping') {
       T.t += dt
-      if (T.t >= PREP_S) { T.phase = afterPhase(T.phase); T.t = 0 }
+      if (T.t >= prepOf(T.store)) { T.phase = afterPhase(T.phase); T.t = 0 }
     }
     return false
   }
@@ -5864,7 +5871,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.fetching = false
         p.fresh = false
         p.node.userData.shrink = undefined
-        p.prepUntil = performance.now() + Math.max(0, PREP_S - T.t) * 1000
+        p.prepUntil = performance.now() + Math.max(0, prepOf(T.store) - T.t) * 1000
       }
       T.keys = []
     }
@@ -6049,6 +6056,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             SERVICE.delivered.delete(p.key)
             // (its stick left on the plate once it's eaten: cleared with it, into the bin by the sink)
             if (!p.loose) SEAT_STICKS.set(p.seat, (SEAT_STICKS.get(p.seat) ?? 0) + 1)
+            if (WHOLE_FISH.has(p.id)) SEAT_BONES.set(p.seat, (SEAT_BONES.get(p.seat) ?? 0) + 1)
             const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === p.seat && !q.via && present(q) && !q.eaten).length
             p.fromP.copy(p.node.position)
             p.fromQ.copy(p.node.quaternion)

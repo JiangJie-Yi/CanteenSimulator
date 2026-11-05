@@ -12,7 +12,7 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES } from './bar'
+import { RICE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES } from './bar'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
@@ -574,6 +574,8 @@ function RiceTub() {
       {/* the stand (blender/ricestand.py): a hinoki top in a raised walnut border, tapered legs splayed a little, walnut aprons with a
           cloud-shaped arch cut from them, a shelf of bamboo slats low down; drawn its own height from the floor up to the top */}
       <primitive object={stand} position-y={floor} scale={[1, (SIDE_TOP - floor) / 1.08, 1]} />
+      {/* (the tub's middle at its rim: the cooked rice goes in here) */}
+      <group name="ricetub-mid" position-y={SIDE_TOP + 0.5} />
       <group position-y={SIDE_TOP} scale={RICE_SCALE}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v) }}
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; glowOnly(e.eventObject); setTip({ title: '飯桶', hint: open ? '點一下蓋上蓋子' : '點一下掀開蓋子' }) }}
@@ -945,6 +947,72 @@ function MisoPot() {
     </group>
   )
 }
+/**
+ * The rice pot on its little stove (blender/hagama.py: a plastered clay stove, its fire mouth at the front, an iron 羽釜 under a wooden lid),
+ * beside the miso soup, on the side away from the rice tub (the owner's: the rice cooked in the shop for the rice balls, game/rice). While it
+ * cooks (bar.ts's RICE.kama) the coals glow in the mouth, it steams and its lid rattles as it boils; cooked, a last wisp till it's scooped
+ * into the tub. Pointed at, it says how it's getting on.
+ */
+const HAGAMA_URL = import.meta.env.BASE_URL + 'models/hagama.glb'
+useGLTF.preload(HAGAMA_URL)
+const HAGAMA_AT = { along: 4.3, lay: 0.35 }
+const HAGAMA_SCALE = 1.3
+const GLOW_ON = new THREE.Color('#ff8a3a'), GLOW_OFF = new THREE.Color('#2a1a12')
+function Hagama() {
+  const gltf = useGLTF(HAGAMA_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const r = gltf.scene.getObjectByName('Hagama')!.clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    const glow = new THREE.MeshBasicMaterial({ color: GLOW_OFF.clone() })
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) {
+        t = src.name === 'KamaGlow' ? glow : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+        made.set(src, t)
+      }
+      m.material = t
+      m.castShadow = src.name !== 'KamaGlow'
+      m.receiveShadow = true
+    })
+    inkModel(r, (m) => m.name === 'KamaGlow', { width: 0.0016, weld: true })
+    const lid = r.getObjectByName('KamaLid')!
+    plainColours(r)
+    mergeByMaterial(r, (o) => o === lid || o.parent === lid)
+    return { root: r, lid, lidY: lid.position.y, glow }
+  }, [gltf])
+  const steam = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => {
+    const k = RICE.kama, t = clock.elapsedTime
+    const cooking = k.state === 'cooking'
+    // (the coals glowing in the mouth, flickering, while it cooks)
+    model.glow.color.lerpColors(GLOW_OFF, GLOW_ON, cooking ? 0.8 + 0.2 * Math.sin(t * 9) * Math.sin(t * 3.1) : 0)
+    // (boiling hard in the middle of its time: the lid lifting and dropping on the steam)
+    const boil = cooking ? Math.max(0, Math.sin(Math.PI * (1 - k.left / 15))) : 0
+    model.lid.position.y = model.lidY + boil * Math.max(0, Math.sin(t * 23)) * 0.006
+    model.lid.rotation.z = boil * Math.sin(t * 17) * 0.02
+    if (steam.current) steam.current.visible = k.state !== 'empty'
+  })
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const p = new THREE.Vector3().addScaledVector(ALONG, HAGAMA_AT.along).addScaledVector(LAY, HAGAMA_AT.lay)
+  const say = () => (RICE.kama.state === 'cooking' ? `炊飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒` : RICE.kama.state === 'done' ? '飯炊好了，等著盛進飯桶' : `空著（飯桶裡還有 ${RICE.tub} 份飯）`)
+  return (
+    <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} scale={HAGAMA_SCALE}
+      onPointerOver={(e) => { e.stopPropagation(); setTip({ title: '羽釜', hint: say() }) }}
+      onPointerOut={() => setTip(null)}>
+      <primitive object={model.root} />
+      {/* (where the rice goes in and comes out; where whoever's cooking it stands, at its fire mouth) */}
+      <group name="kama-top" position={[0, 0.8, 0]} />
+      <group name="kama-front" position={[0, 0, 0.62]} />
+      <group ref={steam} visible={false}>
+        <Steam position={[0, 0.85, 0]} width={0.34} height={0.5} opacity={0.34} layers={2} />
+      </group>
+    </group>
+  )
+}
 function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternAt: [number, number, number]; fanAt: [number, number, number] }) {
   return (
     <>
@@ -954,6 +1022,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
+      <Movable id="hagama" label="羽釜與爐灶"><Hagama /></Movable>
       <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><CharcoalSackAt /></group>
     </>

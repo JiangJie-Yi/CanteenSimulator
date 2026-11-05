@@ -244,7 +244,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     // (what their walk says they're doing just now: the chef carrying food back in both hands, preparing it on the board, fanning the coals
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
-    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number } | undefined
+    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number } | undefined
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line, a
     // solid colour, put away meanwhile (as the customers' is))
     const fade = job?.fade ?? 1
@@ -304,6 +304,11 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
         // (working at the board: both hands down in front, the knife hand cutting, the other holding it)
         hand.position.set(sd * 0.12, 0.3 + (sd > 0 ? Math.abs(Math.sin(t * 11)) * 0.05 : 0), 0.3)
         hand.rotation.x = -0.6
+      }
+      if (job?.wipe !== undefined && sd > 0) {
+        // (wiping the bar down: the hand out in front on the cloth on the bar's top (0.79: the bar at a server's height), along and back twice)
+        hand.position.set(0.06 + Math.sin(job.wipe * Math.PI * 4) * 0.12, 0.79, 0.4)
+        hand.rotation.x = -1.3
       }
       if (cook && fanning && sd > 0) {
         hand.position.set(0.3, 0.42 + Math.sin(t * 7) * 0.03, 0.18)

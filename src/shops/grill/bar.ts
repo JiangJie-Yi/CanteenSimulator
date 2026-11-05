@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { TUB_FULL, emptyKama, type Kama } from '@/game/rice'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
@@ -640,6 +641,16 @@ export const DRYER: Dryer & { open: number } = { n: 0, left: null, open: 0 }
 export const SINK_BIN = { sticks: 0 }
 /** the sticks each seat's plate has on it, of what's been eaten off it (Roasting counts what's set down; GuestBar3D clears them with the plate) */
 export const SEAT_STICKS = new Map<number, number>()
+/** the whole fish each seat's eaten (their bones left on the plate, the owner's), and which of the foods are a whole fish to leave them */
+export const SEAT_BONES = new Map<number, number>()
+/**
+ * The kitchen's rice (game/rice): how many rice balls' rice the tub holds now, the iron pot on its stove (cooking, cooked, empty), and
+ * whether someone's washing the next pot's rice at the sink just now (GuestBar3D's plater does it all; Decor draws the pot; Roasting
+ * takes a portion for each rice ball)
+ */
+export const RICE: { tub: number; kama: Kama; washing: boolean } = { tub: TUB_FULL, kama: emptyKama(), washing: false }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __rice: RICE })
+export const WHOLE_FISH = new Set(['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Hokke', 'Nodoguro'])
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plating: PLATING, __dryer: DRYER, __sinkBin: SINK_BIN })
 
 /**
