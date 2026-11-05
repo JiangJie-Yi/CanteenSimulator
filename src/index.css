@@ -6329,11 +6329,10 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
   top: -52px;
   /* (small and light, the owner's: the line under the name kept short, never a long banner over the room; a longer one wraps inside the
      tag, never out past its edges (it ran out both sides of the drinks' storage's)) */
-  /* (neat and round, not a wide slab (the owner's): a little at least, as narrow as its words, its lines close and centred) */
+  /* (neat and small (the owner's): as wide as its words and no wider, 240 px at most, close padding, its lines close and centred) */
   width: max-content;
-  min-width: 140px;
-  max-width: 320px;
-  padding: 8px 14px;
+  max-width: 240px;
+  padding: 6px 12px;
   box-sizing: border-box;
   white-space: normal;
   text-align: center;
@@ -6346,12 +6345,10 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
 /* (and fades out as the pointer leaves) */
 .hover-tip .tool-tag .tip-title {
   font-weight: inherit;
-  font-size: 15px;
   white-space: nowrap;
 }
 
 .hover-tip .tool-tag small {
-  font-size: 12px;
   max-width: 100%;
   overflow-wrap: break-word;
   word-break: break-word;
@@ -6359,7 +6356,7 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
 }
 
 .hover-tip .tool-tag small.tip-act {
-  font-size: 11px;
+  font-size: 9px;
   opacity: 0.72;
 }
 
